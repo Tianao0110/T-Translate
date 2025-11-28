@@ -1,0 +1,340 @@
+// vite.config.js
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import path from 'path';
+import fs from 'fs';
+
+// 读取 package.json
+const packageJson = JSON.parse(fs.readFileSync('./package.json', 'utf-8'));
+
+// https://vitejs.dev/config/
+export default defineConfig(({ command, mode }) => {
+  const isDev = mode === 'development';
+  const isProd = mode === 'production';
+  
+  console.log(`🔧 Building in ${mode} mode...`);
+
+  return {
+    // 插件配置
+    plugins: [
+      react({
+        // React Fast Refresh
+        fastRefresh: true,
+        // Babel 配置
+        babel: {
+          plugins: [
+            // 生产环境移除 console
+            isProd && ['transform-remove-console', { exclude: ['error', 'warn'] }]
+          ].filter(Boolean)
+        }
+      })
+    ],
+
+    // 基础路径
+    base: isProd ? './' : '/',
+
+    // 路径别名
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, './src'),
+        '@components': path.resolve(__dirname, './src/components'),
+        '@services': path.resolve(__dirname, './src/services'),
+        '@utils': path.resolve(__dirname, './src/utils'),
+        '@stores': path.resolve(__dirname, './src/stores'),
+        '@styles': path.resolve(__dirname, './src/styles'),
+        '@config': path.resolve(__dirname, './src/config'),
+        '@assets': path.resolve(__dirname, './src/assets')
+      }
+    },
+
+    // 开发服务器配置
+    server: {
+      port: 5173,
+      strictPort: false, // 端口被占用时尝试下一个
+      host: '127.0.0.1',
+      open: false, // Electron 会自动打开，不需要浏览器
+      cors: true,
+      
+      // 代理配置（用于开发环境）
+      proxy: {
+        // LM Studio API 代理
+        '/v1': {
+          target: 'http://localhost:1234',
+          changeOrigin: true,
+          secure: false,
+          ws: true, // 支持 WebSocket
+          configure: (proxy, options) => {
+            proxy.on('error', (err, req, res) => {
+              console.log('Proxy error:', err);
+            });
+            proxy.on('proxyReq', (proxyReq, req, res) => {
+              console.log('Sending Request:', req.method, req.url);
+            });
+          }
+        }
+      },
+
+      // HMR 配置
+      hmr: {
+        overlay: true,
+        port: 5174
+      },
+
+      // 文件监听配置
+      watch: {
+        usePolling: false,
+        interval: 100,
+        // 忽略文件
+        ignored: ['**/node_modules/**', '**/dist/**', '**/.git/**']
+      }
+    },
+
+    // 构建配置
+    build: {
+      // 输出目录
+      outDir: 'build',
+      
+      // 资源目录
+      assetsDir: 'static',
+      
+      // 清空输出目录
+      emptyOutDir: true,
+      
+      // 源码映射
+      sourcemap: isDev ? 'inline' : false,
+      
+      // 压缩配置
+      minify: isProd ? 'terser' : false,
+      
+      // Terser 配置
+      terserOptions: isProd ? {
+        compress: {
+          drop_console: true,
+          drop_debugger: true,
+          pure_funcs: ['console.log', 'console.info']
+        },
+        format: {
+          comments: false
+        }
+      } : undefined,
+      
+      // 代码分割
+      rollupOptions: {
+        input: {
+          main: path.resolve(__dirname, 'index.html')
+        },
+        output: {
+          // 入口文件名
+          entryFileNames: `static/js/[name].[hash].js`,
+          
+          // 代码块文件名
+          chunkFileNames: `static/js/[name].[hash].js`,
+          
+          // 资源文件名
+          assetFileNames: (assetInfo) => {
+            const info = assetInfo.name.split('.');
+            const ext = info[info.length - 1];
+            
+            if (/png|jpe?g|svg|gif|tiff|bmp|ico/i.test(ext)) {
+              return `static/img/[name].[hash][extname]`;
+            } else if (/woff|woff2|eot|ttf|otf/i.test(ext)) {
+              return `static/fonts/[name].[hash][extname]`;
+            } else if (/css/i.test(ext)) {
+              return `static/css/[name].[hash][extname]`;
+            }
+            return `static/[name].[hash][extname]`;
+          },
+          
+          // 手动代码分割
+          manualChunks: {
+            // React 相关
+            'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+            
+            // UI 库
+            'ui-vendor': ['lucide-react', 'framer-motion'],
+            
+            // 工具库
+            'utils-vendor': ['axios', 'dayjs', 'uuid'],
+            
+            // 大型库单独打包
+            'monaco': ['@monaco-editor/react', 'monaco-editor'],
+            'tesseract': ['tesseract.js']
+          }
+        },
+        
+        // 外部依赖（Electron 环境）
+        external: isDev ? [] : [
+          'electron',
+          'electron-store',
+          'fs',
+          'path',
+          'os',
+          'child_process',
+          'crypto'
+        ]
+      },
+      
+      // 块大小警告
+      chunkSizeWarningLimit: isProd ? 1000 : 2000,
+      
+      // 资源内联限制
+      assetsInlineLimit: 4096, // 4kb
+      
+      // CSS 代码分割
+      cssCodeSplit: true,
+      
+      // 目标浏览器
+      target: 'chrome89', // Electron 13+ 使用 Chrome 89
+      
+      // 预构建
+      commonjsOptions: {
+        transformMixedEsModules: true,
+        include: [/node_modules/]
+      }
+    },
+
+    // CSS 配置
+    css: {
+      // CSS 预处理器配置
+      preprocessorOptions: {
+        css: {
+          charset: false // 避免 charset 警告
+        }
+      },
+      
+      // PostCSS 配置
+      postcss: {
+        plugins: [
+          // autoprefixer 等可以在这里添加
+        ]
+      },
+      
+      // CSS Modules
+      modules: {
+        localsConvention: 'camelCase',
+        generateScopedName: isDev 
+          ? '[name]__[local]__[hash:base64:5]'
+          : '[hash:base64:8]'
+      },
+      
+      // 开发模式下的配置
+      devSourcemap: isDev
+    },
+
+    // 依赖优化
+    optimizeDeps: {
+      // 包含的依赖
+      include: [
+        'react',
+        'react-dom',
+        'axios',
+        'zustand',
+        'dayjs',
+        'lucide-react',
+        'tesseract.js'
+      ],
+      
+      // 排除的依赖
+      exclude: [
+        'electron',
+        'electron-store'
+      ],
+      
+      // 强制预构建
+      force: isDev
+    },
+
+    // 性能优化
+    esbuild: {
+      // 生产环境移除 console 和 debugger
+      drop: isProd ? ['console', 'debugger'] : [],
+      
+      // 压缩标识符
+      minifyIdentifiers: isProd,
+      
+      // 压缩语法
+      minifySyntax: isProd,
+      
+      // 压缩空白
+      minifyWhitespace: isProd,
+      
+      // 合法注释
+      legalComments: 'none',
+      
+      // 目标
+      target: 'chrome89',
+      
+      // JSX 配置
+      jsxFactory: 'React.createElement',
+      jsxFragment: 'React.Fragment'
+      //jsxInject: `import React from 'react'`
+    },
+
+    // 定义全局常量
+    define: {
+      __APP_VERSION__: JSON.stringify(packageJson.version),
+      __APP_NAME__: JSON.stringify(packageJson.name),
+      __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+      __DEV__: isDev,
+      __PROD__: isProd,
+      
+      // Electron 相关
+      'process.env.IS_ELECTRON': JSON.stringify(true),
+      'process.env.NODE_ENV': JSON.stringify(mode),
+      
+      // 防止某些库的警告
+      'global': 'globalThis'
+    },
+
+    // Worker 配置
+    worker: {
+      format: 'es',
+      plugins: [react()]
+    },
+
+    // 日志级别
+    logLevel: isDev ? 'info' : 'warn',
+
+    // 清屏
+    clearScreen: false,
+
+    // JSON 配置
+    json: {
+      namedExports: true,
+      stringify: false
+    },
+
+    // 预览配置（用于预览构建结果）
+    preview: {
+      port: 4173,
+      strictPort: false,
+      host: '127.0.0.1',
+      open: false
+    },
+
+    // 环境变量目录
+    envDir: '.',
+    
+    // 环境变量前缀
+    envPrefix: 'VITE_',
+
+    // 应用类型
+    appType: 'spa'
+  };
+});
+
+// 自定义构建完成钩子
+process.on('exit', () => {
+  console.log('✨ Build process completed');
+});
+
+// 捕获未处理的错误
+process.on('uncaughtException', (error) => {
+  console.error('❌ Build error:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});

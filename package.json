@@ -1,0 +1,69 @@
+{
+  "name": "t-translate-core",
+  "version": "0.1.0",
+  "description": "Professional offline translation tool with AI support",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "concurrently \"npm run react:start\" \"wait-on http://localhost:5173 && npm run electron:start\"",
+    "react:start": "vite",
+    "electron:start": "electron .",
+    "build": "vite build && electron-builder",
+    "dist": "vite build && electron-builder --publish=never",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "translation",
+    "ai",
+    "offline",
+    "electron",
+    "react"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.1",
+    "concurrently": "^8.2.2",
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1",
+    "vite": "^5.0.10",
+    "wait-on": "^7.2.0"
+  },
+  "dependencies": {
+    "@monaco-editor/react": "^4.6.0",
+    "axios": "^1.6.2",
+    "dayjs": "^1.11.19",
+    "electron-store": "^8.1.0",
+    "framer-motion": "^10.16.16",
+    "idb": "^8.0.0",
+    "lucide-react": "^0.303.0",
+    "monaco-editor": "^0.45.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-hotkeys-hook": "^4.4.1",
+    "react-markdown": "^9.0.1",
+    "react-router-dom": "^6.21.1",
+    "tesseract.js": "^5.0.4",
+    "uuid": "^13.0.0",
+    "zustand": "^4.4.7"
+  },
+  "build": {
+    "appId": "com.ttranslate.core",
+    "productName": "T-Translate Core",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/**/*",
+      "dist/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}
