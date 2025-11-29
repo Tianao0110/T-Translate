@@ -1,13 +1,13 @@
-# T-Translate Core 🚀
+# T-Translate 🚀
 
 <div align="center">
-  <img src="public/icon.png" alt="T-Translate Core Logo" width="128" height="128">
+  <img src="public/icon.png" alt="T-Translate Logo" width="128" height="128">
   
   # 专业的离线翻译工具
   
-  [![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/yourusername/t-translate-core)
+  [![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/Tianao0110/T-Translate/)
   [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-  [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/yourusername/t-translate-core)
+  [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/Tianao0110/T-Translate/)
   
   **完全离线** | **隐私优先** | **本地 LLM** | **OCR 支持**
 </div>
@@ -17,30 +17,35 @@
 ## ✨ 特性
 
 ### 🔒 **完全离线 & 隐私保护**
+
 - 100% 本地运行，无需联网
 - 所有数据存储在本地，不上传任何信息
 - 支持安全模式，敏感内容不保存历史
 - 可选的历史记录加密存储
 
 ### 🤖 **本地 LLM 翻译**
+
 - 基于 LM Studio 的本地大语言模型
 - 支持多种开源模型（Llama, Mistral, Qwen 等）
 - 自定义翻译提示词模板
 - 批量翻译支持
 
 ### 👁️ **OCR 文字识别**
+
 - 内置 Tesseract.js 离线 OCR
 - 支持 LLM Vision 视觉识别
 - 截图翻译功能
 - 支持多语言识别
 
 ### 🎨 **现代化界面**
+
 - 优雅的用户界面设计
 - 深色/浅色主题切换
 - 响应式布局
 - 丰富的动画效果
 
 ### 📚 **强大的管理功能**
+
 - 翻译历史记录
 - 收藏夹管理
 - 分类和标签系统
@@ -53,6 +58,7 @@
 ### 前置要求
 
 1. **Node.js** (v16 或更高版本)
+
    - 下载地址: https://nodejs.org/
 
 2. **LM Studio** (用于本地 LLM)
@@ -60,10 +66,11 @@
    - 安装后下载并加载一个模型（推荐 Qwen, Llama 或 Mistral）
 
 ### 安装步骤
+
 ```bash
 # 1. 克隆项目
-git clone https://github.com/yourusername/t-translate-core.git
-cd t-translate-core
+git clone https://github.com/Tianao0110/T-Translate.git
+cd T-Translate
 
 # 2. 安装依赖
 npm install
@@ -81,11 +88,13 @@ npm run dist
 ### 快速开始
 
 1. **启动 LM Studio**
+
    - 打开 LM Studio
    - 加载一个模型
    - 启动本地服务器（默认端口 1234）
 
 2. **运行 T-Translate Core**
+
    - 运行 `npm start` 或打开构建好的应用
    - 应用会自动连接到 LM Studio
 
@@ -114,24 +123,26 @@ npm run dist
 
 ### 快捷键
 
-| 功能 | 快捷键 |
-|------|--------|
-| 翻译 | `Ctrl + Enter` |
-| 切换语言 | `Ctrl + L` |
+| 功能     | 快捷键             |
+| -------- | ------------------ |
+| 翻译     | `Ctrl + Enter`     |
+| 切换语言 | `Ctrl + L`         |
 | 清空内容 | `Ctrl + Shift + C` |
 | 截图翻译 | `Ctrl + Shift + T` |
-| 快速翻译 | `Ctrl + Q` |
-| 打开设置 | `Ctrl + ,` |
-| 切换标签 | `Ctrl + 1-4` |
+| 快速翻译 | `Ctrl + Q`         |
+| 打开设置 | `Ctrl + ,`         |
+| 切换标签 | `Ctrl + 1-4`       |
 
 ### 高级功能
 
 #### 🔐 隐私模式
+
 - **标准模式**: 正常保存历史记录
 - **安全模式**: 不保存敏感内容
 - **离线模式**: 使用缓存，完全断网
 
 #### 📝 翻译模板
+
 - **通用**: 标准翻译
 - **技术文档**: 保留术语准确性
 - **学术论文**: 严谨的学术用语
@@ -139,6 +150,7 @@ npm run dist
 - **口语化**: 自然流畅的表达
 
 #### 🗂️ 历史管理
+
 - 按日期、语言分组
 - 搜索和筛选功能
 - 批量操作
@@ -151,6 +163,7 @@ npm run dist
 ### LM Studio 设置
 
 默认配置：
+
 ```javascript
 {
   endpoint: "http://localhost:1234/v1",
@@ -163,6 +176,7 @@ npm run dist
 ### 支持的模型
 
 推荐使用以下模型获得最佳翻译效果：
+
 - Qwen 系列（推荐）
 - Llama 3
 - Mistral
@@ -171,14 +185,16 @@ npm run dist
 ### OCR 语言包
 
 默认支持：
+
 - 中文简体 + 英文
 - 可在设置中切换其他语言
 
 ---
 
 ## 🏗️ 项目结构
+
 ```
-t-translate-core/
+T-Translate/
 ├── electron/          # Electron 主进程
 ├── src/
 │   ├── components/    # React 组件
@@ -204,6 +220,7 @@ t-translate-core/
 - **本地 LLM**: LM Studio API
 
 ### 开发命令
+
 ```bash
 # 开发模式
 npm start
@@ -230,7 +247,7 @@ npm run dist:linux
 ## 📊 性能优化
 
 - **轻量级**: 基础内存占用 < 150MB
-- **快速启动**: 冷启动 < 3秒
+- **快速启动**: 冷启动 < 3 秒
 - **流畅动画**: 60fps 渲染
 - **智能缓存**: 减少重复翻译
 
@@ -240,9 +257,9 @@ npm run dist:linux
 
 ### 数据存储位置
 
-- **Windows**: `%APPDATA%/t-translate-core/`
-- **macOS**: `~/Library/Application Support/t-translate-core/`
-- **Linux**: `~/.config/t-translate-core/`
+- **Windows**: `%APPDATA%/T-Translate/`
+- **macOS**: `~/Library/Application Support/T-Translate/`
+- **Linux**: `~/.config/T-Translate/`
 
 ### 网络请求
 
@@ -270,6 +287,7 @@ npm run dist:linux
 ## 📝 更新日志
 
 ### v1.0.0 (2024-01-01)
+
 - 🎉 首次发布
 - ✨ 基础翻译功能
 - 👁️ OCR 文字识别
@@ -284,7 +302,7 @@ npm run dist:linux
 
 - 首次启动可能需要下载 Tesseract 语言包
 - 某些复杂布局的 PDF 可能识别不完整
-- 超长文本（>10000字）翻译可能较慢
+- 超长文本（>10000 字）翻译可能较慢
 
 ---
 
@@ -306,9 +324,8 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 
 ## 📮 联系方式
 
-- **GitHub Issues**: [报告问题](https://github.com/yourusername/t-translate-core/issues)
-- **Email**: your.email@example.com
-- **Discord**: [加入社区](https://discord.gg/yourdiscord)
+- **GitHub Issues**: [报告问题](https://github.com/Tianao0110/T-Translate/issues)
+- **Email**: Edanzeng0110@outlook.com
 
 ---
 
