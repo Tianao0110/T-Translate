@@ -25,11 +25,11 @@ const store = new Store({
   },
 });
 
-ipcMain.handle('store-get', async (event, key) => {
+ipcMain.handle("store-get", async (event, key) => {
   return store.get(key);
 });
 
-ipcMain.handle('store-set', async (event, key, val) => {
+ipcMain.handle("store-set", async (event, key, val) => {
   store.set(key, val);
 });
 
@@ -60,7 +60,7 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-	  sandbox: false,
+      sandbox: false,
       preload: path.join(__dirname, "preload.js"),
     },
     icon: path.join(__dirname, "../public/icon.png"),
@@ -309,7 +309,7 @@ function createMenu() {
           label: "使用指南",
           click: () => {
             shell.openExternal(
-              "https://github.com/yourusername/t-translate-core/wiki"
+              "https://github.com/yourusername/t-translate/wiki"
             );
           },
         },
@@ -331,8 +331,8 @@ function createMenu() {
           click: () => {
             dialog.showMessageBox(mainWindow, {
               type: "info",
-              title: "关于 T-Translate Core",
-              message: "T-Translate Core",
+              title: "关于 T-Translate",
+              message: "T-Translate",
               detail: `版本: 1.0.0\n离线翻译工具\n\n基于 LM Studio 和本地 OCR\n© 2024 Your Name`,
               buttons: ["确定"],
             });
@@ -422,7 +422,7 @@ function createTray() {
     },
   ]);
 
-  tray.setToolTip("T-Translate Core");
+  tray.setToolTip("T-Translate");
   tray.setContextMenu(contextMenu);
 
   // 双击托盘图标显示窗口

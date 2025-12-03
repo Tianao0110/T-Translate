@@ -3,7 +3,7 @@ const config = {
   // LM Studio 配置
   llm: {
     // LM Studio 默认端点
-    endpoint: 'http://localhost:1234/v1/',
+    endpoint: 'http://localhost:1234/v1',
     
     // API 超时设置（毫秒）
     timeout: 60000,

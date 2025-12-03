@@ -1,5 +1,5 @@
 {
-  "name": "t-translate-core",
+  "name": "t-translate",
   "version": "0.1.0",
   "description": "Professional offline translation tool with AI support",
   "main": "electron/main.js",
@@ -48,7 +48,7 @@
   },
   "build": {
     "appId": "com.ttranslate.core",
-    "productName": "T-Translate Core",
+    "productName": "T-Translate",
     "directories": {
       "output": "dist"
     },
