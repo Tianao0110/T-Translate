@@ -11,6 +11,7 @@
   
   **完全离线** | **隐私优先** | **本地 LLM** | **OCR 支持**
 </div>
+<img width="2560" height="1464" alt="image" src="https://github.com/user-attachments/assets/45928535-c6be-424f-aacf-b7938fb03304" />
 
 ---
 
