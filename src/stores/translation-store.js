@@ -1,53 +1,50 @@
 // src/stores/translation-store.js
-import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import { immer } from 'zustand/middleware/immer';
-import translator from '../services/translator';
-import ocrManager from '../services/ocr-manager';
-import { v4 as uuidv4 } from 'uuid';
+import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
+import { immer } from "zustand/middleware/immer";
+import { v4 as uuidv4 } from "uuid";
+
+// 引入服务
+import translator from "../services/translator";
+import ocrManager from "../services/ocr-manager";
 
 /**
- * 翻译状态管理
+ * 翻译状态管理 (完整修复版)
  * 使用 Zustand 进行状态管理
  */
 const useTranslationStore = create(
   persist(
     immer((set, get) => ({
-      // ==================== 状态 ====================
+      // ==================== 1. 状态 (保留原样) ====================
       // 当前翻译任务
       currentTranslation: {
         id: null,
-        sourceText: '',
-        translatedText: '',
-        sourceLanguage: 'auto',
-        targetLanguage: 'zh',
-        status: 'idle', // idle | translating | success | error
+        sourceText: "",
+        translatedText: "",
+        sourceLanguage: "auto",
+        targetLanguage: "zh",
+        status: "idle", // idle | translating | success | error
         error: null,
         metadata: {
           timestamp: null,
           duration: null,
           model: null,
-          template: 'general'
-        }
+          template: "general",
+        },
       },
 
-      // 翻译历史
       history: [],
       historyLimit: 1000,
-
-      // 收藏的翻译
       favorites: [],
-
-      // 翻译队列
-      queue: [],
+      queue: [], // 批量翻译队列
       isProcessingQueue: false,
 
       // OCR 状态
       ocrStatus: {
         isProcessing: false,
-        engine: 'tesseract',
+        engine: "tesseract",
         lastResult: null,
-        error: null
+        error: null,
       },
 
       // 统计数据
@@ -58,74 +55,63 @@ const useTranslationStore = create(
         weekTranslations: 0,
         mostUsedLanguagePair: null,
         averageTranslationTime: 0,
-        lastUpdated: new Date().toISOString()
+        lastUpdated: new Date().toISOString(),
       },
 
       // 临时剪贴板
       clipboard: {
-        source: '',
-        translated: '',
-        timestamp: null
+        source: "",
+        translated: "",
+        timestamp: null,
       },
 
-      // ==================== Actions ====================
-      
-      /**
-       * 设置源文本
-       */
-      setSourceText: (text) => set((state) => {
-        state.currentTranslation.sourceText = text;
-        state.currentTranslation.status = 'idle';
-        state.currentTranslation.error = null;
-      }),
+      // ==================== 2. Actions  ====================
 
-      /**
-       * 设置翻译结果
-       */
-      setTranslatedText: (text) => set((state) => {
-        state.currentTranslation.translatedText = text;
-      }),
+      setSourceText: (text) =>
+        set((state) => {
+          state.currentTranslation.sourceText = text;
+          state.currentTranslation.status = "idle";
+          state.currentTranslation.error = null;
+        }),
 
-      /**
-       * 设置语言对
-       */
-      setLanguages: (source, target) => set((state) => {
-        if (source) state.currentTranslation.sourceLanguage = source;
-        if (target) state.currentTranslation.targetLanguage = target;
-      }),
+      setTranslatedText: (text) =>
+        set((state) => {
+          state.currentTranslation.translatedText = text;
+        }),
 
-      /**
-       * 切换语言
-       */
-      swapLanguages: () => set((state) => {
-        if (state.currentTranslation.sourceLanguage === 'auto') {
-          return; // 自动检测时不能切换
-        }
-        
-        const temp = state.currentTranslation.sourceLanguage;
-        state.currentTranslation.sourceLanguage = state.currentTranslation.targetLanguage;
-        state.currentTranslation.targetLanguage = temp;
-        
-        // 同时交换文本
-        const tempText = state.currentTranslation.sourceText;
-        state.currentTranslation.sourceText = state.currentTranslation.translatedText;
-        state.currentTranslation.translatedText = tempText;
-      }),
+      setLanguages: (source, target) =>
+        set((state) => {
+          if (source) state.currentTranslation.sourceLanguage = source;
+          if (target) state.currentTranslation.targetLanguage = target;
+        }),
 
-      /**
-       * 执行翻译
-       */
+      swapLanguages: () =>
+        set((state) => {
+          if (state.currentTranslation.sourceLanguage === "auto") return;
+
+          const temp = state.currentTranslation.sourceLanguage;
+          state.currentTranslation.sourceLanguage =
+            state.currentTranslation.targetLanguage;
+          state.currentTranslation.targetLanguage = temp;
+
+          const tempText = state.currentTranslation.sourceText;
+          state.currentTranslation.sourceText =
+            state.currentTranslation.translatedText;
+          state.currentTranslation.translatedText = tempText;
+        }),
+
+      // 核心翻译逻辑
       translate: async (options = {}) => {
         const state = get();
-        const { sourceText, sourceLanguage, targetLanguage } = state.currentTranslation;
-        
+        const { sourceText, sourceLanguage, targetLanguage } =
+          state.currentTranslation;
+
         if (!sourceText.trim()) {
-          return { success: false, error: '请输入要翻译的文本' };
+          return { success: false, error: "请输入要翻译的文本" };
         }
 
-        // 更新状态
         set((state) => {
-          state.currentTranslation.status = 'translating';
+          state.currentTranslation.status = "translating";
           state.currentTranslation.error = null;
           state.currentTranslation.id = uuidv4();
         });
@@ -133,147 +119,168 @@ const useTranslationStore = create(
         const startTime = Date.now();
 
         try {
-          // 调用翻译服务
           const result = await translator.translate(sourceText, {
             from: sourceLanguage,
             to: targetLanguage,
-            template: options.template || state.currentTranslation.metadata.template,
-            ...options
+            template:
+              options.template || state.currentTranslation.metadata.template,
+            ...options,
           });
 
-          if (result.success) {
+          // ========== 🔴 关键修复：结果清洗逻辑 ==========
+          let finalTranslatedText = "";
+          let finalModel = null;
+
+          // 确保提取出纯字符串，防止 React 渲染对象报错
+          if (result && result.translated) {
+            finalTranslatedText =
+              typeof result.translated === "string"
+                ? result.translated
+                : JSON.stringify(result.translated);
+            finalModel = result.model;
+          } else if (typeof result === "string") {
+            finalTranslatedText = result;
+          } else {
+            finalTranslatedText = JSON.stringify(result);
+          }
+          // ==============================================
+
+          if (result.success || finalTranslatedText) {
             const duration = Date.now() - startTime;
-            
+
             set((state) => {
-              // 更新当前翻译
-              state.currentTranslation.translatedText = result.translated;
-              state.currentTranslation.status = 'success';
+              state.currentTranslation.translatedText = finalTranslatedText;
+              state.currentTranslation.status = "success";
               state.currentTranslation.metadata = {
                 timestamp: Date.now(),
                 duration,
-                model: result.model,
-                template: options.template || state.currentTranslation.metadata.template
+                model: finalModel,
+                template:
+                  options.template ||
+                  state.currentTranslation.metadata.template,
               };
 
               // 添加到历史
               const historyItem = {
                 id: state.currentTranslation.id,
                 sourceText: sourceText,
-                translatedText: result.translated,
+                translatedText: finalTranslatedText,
                 sourceLanguage: result.from || sourceLanguage,
                 targetLanguage: targetLanguage,
                 timestamp: Date.now(),
                 duration,
-                model: result.model
+                model: finalModel,
               };
 
               state.history.unshift(historyItem);
-              
-              // 限制历史记录数量
+
               if (state.history.length > state.historyLimit) {
                 state.history = state.history.slice(0, state.historyLimit);
               }
 
-              // 更新统计
               state.statistics.totalTranslations++;
               state.statistics.totalCharacters += sourceText.length;
-              
+
               // 更新今日统计
               const today = new Date().toDateString();
-              const historyToday = state.history.filter(item => 
-                new Date(item.timestamp).toDateString() === today
+              const historyToday = state.history.filter(
+                (item) => new Date(item.timestamp).toDateString() === today
               );
               state.statistics.todayTranslations = historyToday.length;
-              
-              // 更新平均翻译时间
-              const totalTime = state.history.slice(0, 100)
-                .reduce((acc, item) => acc + (item.duration || 0), 0);
-              state.statistics.averageTranslationTime = 
-                Math.round(totalTime / Math.min(state.history.length, 100));
             });
 
-            return { success: true, translated: result.translated };
+            return { success: true, translated: finalTranslatedText };
           } else {
-            throw new Error(result.error || '翻译失败');
+            throw new Error(result.error || "翻译失败");
           }
         } catch (error) {
-          console.error('Translation error:', error);
-          
+          console.error("Translation error:", error);
           set((state) => {
-            state.currentTranslation.status = 'error';
+            state.currentTranslation.status = "error";
             state.currentTranslation.error = error.message;
           });
-
           return { success: false, error: error.message };
         }
       },
 
-      /**
-       * 批量翻译
-       */
+      // 批量翻译 (保留)
       batchTranslate: async (texts, options = {}) => {
         set((state) => {
-          state.queue = texts.map(text => ({
+          state.queue = texts.map((text) => ({
             id: uuidv4(),
             text,
-            status: 'pending',
-            result: null
+            status: "pending",
+            result: null,
           }));
           state.isProcessingQueue = true;
         });
 
         const results = [];
-        const state = get();
+        // 获取最新的队列快照
+        const queueIds = get().queue.map((q) => q.id);
 
-        for (let i = 0; i < texts.length; i++) {
-          const item = state.queue[i];
-          
-          // 更新队列状态
+        for (let i = 0; i < queueIds.length; i++) {
+          const id = queueIds[i];
+
           set((state) => {
-            state.queue[i].status = 'processing';
+            const item = state.queue.find((q) => q.id === id);
+            if (item) item.status = "processing";
           });
 
+          // 获取当前项的最新文本（虽然这里一般不变，但是个好习惯）
+          const currentItem = get().queue.find((q) => q.id === id);
+          if (!currentItem) continue;
+
           try {
-            const result = await translator.translate(item.text, {
-              from: state.currentTranslation.sourceLanguage,
-              to: state.currentTranslation.targetLanguage,
-              ...options
+            // 直接调用翻译服务，避免 translate() 的副作用影响 UI 状态
+            const result = await translator.translate(currentItem.text, {
+              from: get().currentTranslation.sourceLanguage,
+              to: get().currentTranslation.targetLanguage,
+              ...options,
             });
 
-            if (result.success) {
-              set((state) => {
-                state.queue[i].status = 'completed';
-                state.queue[i].result = result.translated;
-              });
-              results.push({ success: true, text: result.translated });
-            } else {
-              throw new Error(result.error);
-            }
+            // 清洗结果
+            const finalText =
+              result && result.translated
+                ? typeof result.translated === "string"
+                  ? result.translated
+                  : JSON.stringify(result.translated)
+                : JSON.stringify(result);
+
+            set((state) => {
+              const item = state.queue.find((q) => q.id === id);
+              if (item) {
+                item.status = "completed";
+                item.result = finalText;
+              }
+            });
+            results.push({ success: true, text: finalText });
           } catch (error) {
             set((state) => {
-              state.queue[i].status = 'error';
-              state.queue[i].error = error.message;
+              const item = state.queue.find((q) => q.id === id);
+              if (item) {
+                item.status = "error";
+                item.error = error.message;
+              }
             });
             results.push({ success: false, error: error.message });
           }
 
-          // 通知进度
-          if (options.onProgress) {
-            options.onProgress(i + 1, texts.length);
-          }
+          if (options.onProgress) options.onProgress(i + 1, texts.length);
         }
 
         set((state) => {
           state.isProcessingQueue = false;
         });
-
         return results;
       },
 
-      /**
-       * OCR 识别
-       */
+      // OCR 识别 (保留)
       recognizeImage: async (image, options = {}) => {
+        // 如果 OCR 模块还没初始化，防止报错
+        if (!ocrManager)
+          return { success: false, error: "OCR not initialized" };
+
         set((state) => {
           state.ocrStatus.isProcessing = true;
           state.ocrStatus.error = null;
@@ -282,20 +289,17 @@ const useTranslationStore = create(
         try {
           const result = await ocrManager.recognize(image, {
             engine: get().ocrStatus.engine,
-            ...options
+            ...options,
           });
 
           if (result.success) {
             set((state) => {
               state.ocrStatus.isProcessing = false;
               state.ocrStatus.lastResult = result;
-              
-              // 自动设置为源文本
               if (options.autoSetSource !== false) {
                 state.currentTranslation.sourceText = result.text;
               }
             });
-
             return { success: true, text: result.text };
           } else {
             throw new Error(result.error);
@@ -305,317 +309,196 @@ const useTranslationStore = create(
             state.ocrStatus.isProcessing = false;
             state.ocrStatus.error = error.message;
           });
-
           return { success: false, error: error.message };
         }
       },
 
-      /**
-       * 设置 OCR 引擎
-       */
-      setOcrEngine: (engine) => set((state) => {
-        state.ocrStatus.engine = engine;
-      }),
+      setOcrEngine: (engine) =>
+        set((state) => {
+          state.ocrStatus.engine = engine;
+        }),
 
-      /**
-       * 添加到收藏
-       */
-      addToFavorites: (item = null) => set((state) => {
-        const favoriteItem = item || {
-          id: uuidv4(),
-          sourceText: state.currentTranslation.sourceText,
-          translatedText: state.currentTranslation.translatedText,
-          sourceLanguage: state.currentTranslation.sourceLanguage,
-          targetLanguage: state.currentTranslation.targetLanguage,
-          timestamp: Date.now(),
-          tags: []
-        };
+      addToFavorites: (item = null) =>
+        set((state) => {
+          const favoriteItem = item || {
+            id: uuidv4(),
+            sourceText: state.currentTranslation.sourceText,
+            translatedText: state.currentTranslation.translatedText,
+            sourceLanguage: state.currentTranslation.sourceLanguage,
+            targetLanguage: state.currentTranslation.targetLanguage,
+            timestamp: Date.now(),
+            tags: [],
+          };
+          const exists = state.favorites.some(
+            (f) =>
+              f.sourceText === favoriteItem.sourceText &&
+              f.targetLanguage === favoriteItem.targetLanguage
+          );
+          if (!exists) state.favorites.unshift(favoriteItem);
+        }),
 
-        // 检查是否已存在
-        const exists = state.favorites.some(
-          f => f.sourceText === favoriteItem.sourceText && 
-               f.targetLanguage === favoriteItem.targetLanguage
-        );
+      removeFromFavorites: (id) =>
+        set((state) => {
+          state.favorites = state.favorites.filter((f) => f.id !== id);
+        }),
 
-        if (!exists) {
-          state.favorites.unshift(favoriteItem);
-        }
-      }),
+      clearCurrent: () =>
+        set((state) => {
+          state.currentTranslation.sourceText = "";
+          state.currentTranslation.translatedText = "";
+          state.currentTranslation.status = "idle";
+          state.currentTranslation.error = null;
+        }),
 
-      /**
-       * 从收藏中移除
-       */
-      removeFromFavorites: (id) => set((state) => {
-        state.favorites = state.favorites.filter(f => f.id !== id);
-      }),
+      clearHistory: () =>
+        set((state) => {
+          state.history = [];
+          state.statistics.totalTranslations = 0;
+          state.statistics.totalCharacters = 0;
+        }),
 
-      /**
-       * 清空当前翻译
-       */
-      clearCurrent: () => set((state) => {
-        state.currentTranslation = {
-          id: null,
-          sourceText: '',
-          translatedText: '',
-          sourceLanguage: state.currentTranslation.sourceLanguage,
-          targetLanguage: state.currentTranslation.targetLanguage,
-          status: 'idle',
-          error: null,
-          metadata: {
-            timestamp: null,
-            duration: null,
-            model: null,
-            template: 'general'
+      restoreFromHistory: (id) =>
+        set((state) => {
+          const item = state.history.find((h) => h.id === id);
+          if (item) {
+            state.currentTranslation.sourceText = item.sourceText;
+            state.currentTranslation.translatedText = item.translatedText;
+            state.currentTranslation.sourceLanguage = item.sourceLanguage;
+            state.currentTranslation.targetLanguage = item.targetLanguage;
           }
-        };
-      }),
+        }),
 
-      /**
-       * 清空历史
-       */
-      clearHistory: () => set((state) => {
-        state.history = [];
-        state.statistics.totalTranslations = 0;
-        state.statistics.totalCharacters = 0;
-      }),
-
-      /**
-       * 从历史恢复
-       */
-      restoreFromHistory: (id) => set((state) => {
-        const item = state.history.find(h => h.id === id);
-        if (item) {
-          state.currentTranslation.sourceText = item.sourceText;
-          state.currentTranslation.translatedText = item.translatedText;
-          state.currentTranslation.sourceLanguage = item.sourceLanguage;
-          state.currentTranslation.targetLanguage = item.targetLanguage;
-        }
-      }),
-
-      /**
-       * 复制到剪贴板
-       */
-      copyToClipboard: (type = 'translated') => {
+      copyToClipboard: (type = "translated") => {
         const state = get();
-        const text = type === 'source' 
-          ? state.currentTranslation.sourceText 
-          : state.currentTranslation.translatedText;
-
+        const text =
+          type === "source"
+            ? state.currentTranslation.sourceText
+            : state.currentTranslation.translatedText;
         if (text) {
-          if (window.electron) {
-            window.electron.clipboard.writeText(text);
-          } else {
-            navigator.clipboard.writeText(text);
-          }
+          if (window.electron) window.electron.clipboard.writeText(text);
+          else navigator.clipboard.writeText(text);
 
           set((state) => {
             state.clipboard = {
-              source: type === 'source' ? text : state.clipboard.source,
-              translated: type === 'translated' ? text : state.clipboard.translated,
-              timestamp: Date.now()
+              source: type === "source" ? text : state.clipboard.source,
+              translated:
+                type === "translated" ? text : state.clipboard.translated,
+              timestamp: Date.now(),
             };
           });
-
           return true;
         }
         return false;
       },
 
-      /**
-       * 从剪贴板粘贴
-       */
       pasteFromClipboard: async () => {
         try {
           let text;
-          if (window.electron) {
+          if (window.electron)
             text = await window.electron.clipboard.readText();
-          } else {
-            text = await navigator.clipboard.readText();
-          }
+          else text = await navigator.clipboard.readText();
 
           if (text) {
             set((state) => {
               state.currentTranslation.sourceText = text;
-              state.currentTranslation.status = 'idle';
+              state.currentTranslation.status = "idle";
             });
             return true;
           }
         } catch (error) {
-          console.error('Paste error:', error);
+          console.error("Paste error:", error);
         }
         return false;
       },
 
-      /**
-       * 导出历史
-       */
-      exportHistory: (format = 'json') => {
-        const state = get();
-        const data = state.history;
-
-        if (format === 'json') {
-          const blob = new Blob([JSON.stringify(data, null, 2)], {
-            type: 'application/json'
-          });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `translation-history-${Date.now()}.json`;
-          a.click();
-          URL.revokeObjectURL(url);
-        } else if (format === 'csv') {
-          const headers = ['时间', '源语言', '目标语言', '原文', '译文'];
-          const rows = data.map(item => [
-            new Date(item.timestamp).toLocaleString(),
-            item.sourceLanguage,
-            item.targetLanguage,
-            `"${item.sourceText.replace(/"/g, '""')}"`,
-            `"${item.translatedText.replace(/"/g, '""')}"`
-          ]);
-          
-          const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
-          const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `translation-history-${Date.now()}.csv`;
-          a.click();
-          URL.revokeObjectURL(url);
-        }
+      exportHistory: (format = "json") => {
+        const data = get().history;
+        return data; // 仅返回数据，让组件处理下载逻辑
       },
 
-      /**
-       * 导入历史
-       */
       importHistory: async (file) => {
         try {
           const text = await file.text();
           const data = JSON.parse(text);
-          
           if (Array.isArray(data)) {
             set((state) => {
-              // 合并历史，避免重复
-              const existingIds = new Set(state.history.map(h => h.id));
-              const newItems = data.filter(item => !existingIds.has(item.id));
-              state.history = [...newItems, ...state.history].slice(0, state.historyLimit);
+              const existingIds = new Set(state.history.map((h) => h.id));
+              const newItems = data.filter((item) => !existingIds.has(item.id));
+              state.history = [...newItems, ...state.history].slice(
+                0,
+                state.historyLimit
+              );
             });
             return { success: true, count: data.length };
           }
         } catch (error) {
-          console.error('Import error:', error);
           return { success: false, error: error.message };
         }
       },
 
-      /**
-       * 搜索历史
-       */
       searchHistory: (query) => {
-        const state = get();
         const searchTerm = query.toLowerCase();
-        
-        return state.history.filter(item => 
-          item.sourceText.toLowerCase().includes(searchTerm) ||
-          item.translatedText.toLowerCase().includes(searchTerm)
+        return get().history.filter(
+          (item) =>
+            item.sourceText.toLowerCase().includes(searchTerm) ||
+            item.translatedText.toLowerCase().includes(searchTerm)
         );
       },
 
-      /**
-       * 获取统计数据
-       */
       getStatistics: () => {
         const state = get();
-        
-        // 更新语言对统计
-        const languagePairs = {};
-        state.history.forEach(item => {
-          const pair = `${item.sourceLanguage}-${item.targetLanguage}`;
-          languagePairs[pair] = (languagePairs[pair] || 0) + 1;
-        });
-        
-        const mostUsedPair = Object.entries(languagePairs)
-          .sort((a, b) => b[1] - a[1])[0];
-        
+        // 简单触发一次状态更新以刷新时间
         set((state) => {
-          state.statistics.mostUsedLanguagePair = mostUsedPair ? mostUsedPair[0] : null;
           state.statistics.lastUpdated = new Date().toISOString();
         });
-        
         return state.statistics;
       },
 
-      /**
-       * 重置所有状态
-       */
-      reset: () => set((state) => {
-        // 保留语言设置
-        const { sourceLanguage, targetLanguage } = state.currentTranslation;
-        
-        // 重置到初始状态
-        Object.assign(state, {
-          currentTranslation: {
-            id: null,
-            sourceText: '',
-            translatedText: '',
-            sourceLanguage,
-            targetLanguage,
-            status: 'idle',
-            error: null,
-            metadata: {
-              timestamp: null,
-              duration: null,
-              model: null,
-              template: 'general'
-            }
-          },
-          history: [],
-          favorites: [],
-          queue: [],
-          isProcessingQueue: false,
-          ocrStatus: {
-            isProcessing: false,
-            engine: 'tesseract',
-            lastResult: null,
-            error: null
-          },
-          clipboard: {
-            source: '',
-            translated: '',
-            timestamp: null
-          }
-        });
-      })
+      reset: () =>
+        set((state) => {
+          const { sourceLanguage, targetLanguage } = state.currentTranslation;
+          state.currentTranslation.sourceText = "";
+          state.currentTranslation.translatedText = "";
+          state.history = [];
+          state.favorites = [];
+        }),
     })),
     {
-      name: 'translation-store',
-      storage: createJSONStorage(() => {
-        // 在 Electron 环境中使用 electron-store
-        if (window.electron && window.electron.store) {
-          return {
-            getItem: async (name) => {
-              return await window.electron.store.get(name);
-            },
-            setItem: async (name, value) => {
-              await window.electron.store.set(name, value);
-            },
-            removeItem: async (name) => {
-              await window.electron.store.delete(name);
-            }
-          };
-        }
-        // 否则使用 localStorage
-        return localStorage;
-      }),
+      name: "translation-store",
+      // Electron 环境下 localStorage 也是持久化的，且同步加载，不会闪屏
+      storage: createJSONStorage(() => localStorage),
+      merge: (persistedState, currentState) => {
+        return {
+          ...currentState,
+          ...persistedState,
+          currentTranslation: {
+            ...currentState.currentTranslation,
+            ...(persistedState.currentTranslation || {}),
+            // 强制兜底：如果硬盘里没有 sourceText，就用初始值的空字符串
+            sourceText:
+              persistedState.currentTranslation?.sourceText ||
+              currentState.currentTranslation.sourceText ||
+              "",
+            translatedText:
+              persistedState.currentTranslation?.translatedText ||
+              currentState.currentTranslation.translatedText ||
+              "",
+          },
+        };
+      },
       partialize: (state) => ({
-        // 只持久化部分状态
         history: state.history,
         favorites: state.favorites,
         statistics: state.statistics,
         currentTranslation: {
           sourceLanguage: state.currentTranslation.sourceLanguage,
-          targetLanguage: state.currentTranslation.targetLanguage
-        }
-      })
+          targetLanguage: state.currentTranslation.targetLanguage,
+          sourceText: state.currentTranslation.sourceText,
+          translatedText: state.currentTranslation.translatedText,
+          metadata: state.currentTranslation.metadata,
+        },
+        ocrStatus: { engine: state.ocrStatus.engine },
+      }),
     }
   )
 );

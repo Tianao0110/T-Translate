@@ -62,11 +62,12 @@ function createWindow() {
       contextIsolation: true,
       sandbox: false,
       preload: path.join(__dirname, "preload.js"),
+      webSecurity: false, // 开发环境如果遇到跨域图片问题可临时设为 false，生产环境建议 true
     },
-    autoHideMenuBar: true,  // 自动隐藏菜单栏
+    autoHideMenuBar: true, // 自动隐藏菜单栏
     menuBarVisible: false, // 不显示菜单栏
     icon: path.join(__dirname, "../public/icon.png"),
-    frame: true,
+    frame: false,
     titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
     show: false, // 启动时先隐藏
     backgroundColor: "#ffffff",
@@ -527,6 +528,31 @@ function setupIPC() {
     if (!image.isEmpty()) {
       return image.toDataURL();
     }
+    return null;
+  });
+  // 补充 Store 相关方法 (Preload 需要)
+  ipcMain.handle("store-delete", async (event, key) => {
+    store.delete(key);
+  });
+
+  ipcMain.handle("store-clear", async (event) => {
+    store.clear();
+  });
+
+  ipcMain.handle("store-has", async (event, key) => {
+    return store.has(key);
+  });
+
+  // 补充 App 路径获取 (Preload 需要)
+  ipcMain.handle("get-app-path", async (event, name) => {
+    // name 可以是 'home', 'appData', 'userData', 'temp' 等
+    // 如果没有传 name，默认返回 userData
+    return app.getPath(name || "userData");
+  });
+
+  // 补充截图功能占位
+  ipcMain.handle("capture-screen", async () => {
+    // 暂时返回 null，后续开发截图功能时在这里实现
     return null;
   });
 }

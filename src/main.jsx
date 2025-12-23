@@ -121,35 +121,52 @@ if (process.env.NODE_ENV === 'development') {
 
 // 检查 Electron API 是否可用
 const checkElectronAPI = () => {
-  if (window.electron) {
-    console.log('✅ Electron API available');
+  if (!window.electron) {
+    console.warn('⚠️ Electron API not available - Running in browser mode');
+    return;
+  }
+
+  console.log('✅ Electron API available');
     
     // 获取应用信息
-    window.electron.app.getVersion().then(version => {
-      console.log('App Version:', version);
-    });
+    if (window.electron.app && window.electron.app.getVersion) {
+      window.electron.app.getVersion().then(version => {
+        console.log('App Version:', version);
+      }).catch(e => console.error(e));
+    }
     
     // 获取平台信息
-    const systemInfo = window.electron.system.getInfo();
-    console.log('System Info:', systemInfo);
+    // const systemInfo = window.electron.system.getInfo();
+    // console.log('System Info:', systemInfo);
     
     // 监听菜单事件
-    window.electron.menu.onAction((action) => {
-      console.log('Menu action received:', action);
-      // 这里可以发送自定义事件给 React 组件
-      window.dispatchEvent(new CustomEvent('menu-action', { detail: action }));
-    });
+    if (window.electron.menu && window.electron.menu.onAction) {
+      window.electron.menu.onAction((action) => {
+        console.log('Menu action received:', action);
+        window.dispatchEvent(new CustomEvent('menu-action', { detail: action }));
+      });
+    } else if (window.electron.ipc) {
+      // 备用方案：如果 menu 对象不存在，尝试直接用通用 IPC
+      window.electron.ipc.on('menu-action', (action) => {
+        console.log('Menu action received (IPC):', action);
+        window.dispatchEvent(new CustomEvent('menu-action', { detail: action }));
+      });
+    }
     
     // 监听文件导入事件
-    window.electron.translation.onImportFile((filePath) => {
-      console.log('Import file:', filePath);
-      window.dispatchEvent(new CustomEvent('import-file', { detail: filePath }));
-    });
-    
-  } else {
-    console.warn('⚠️ Electron API not available - Running in browser mode');
-  }
-};
+    if (window.electron.translation && window.electron.translation.onImportFile) {
+      window.electron.translation.onImportFile((filePath) => {
+        console.log('Import file:', filePath);
+        window.dispatchEvent(new CustomEvent('import-file', { detail: filePath }));
+      });
+    } else if (window.electron.ipc) {
+      // 备用方案
+      window.electron.ipc.on('import-file', (filePath) => {
+        console.log('Import file (IPC):', filePath);
+        window.dispatchEvent(new CustomEvent('import-file', { detail: filePath }));
+      });
+    }
+  };
 
 // 主题初始化
 const initTheme = () => {

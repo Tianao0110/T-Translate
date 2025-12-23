@@ -93,7 +93,8 @@ body {
 
 .app-content {
   display: flex;
-  height: 100vh;
+  flex: 1;
+  height: 0;
   overflow: hidden;
 }
 
@@ -856,4 +857,70 @@ body {
     order: 3;
     padding: 20px;
   }
+}
+
+/* ==================== Electron 窗口化专用样式 ==================== */
+
+/* 自定义标题栏容器 */
+.titlebar {
+  height: 32px; /* 标准标题栏高度 */
+  background-color: var(--bg-secondary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-primary);
+  /* 🔴 核心：允许拖动窗口 */
+  -webkit-app-region: drag; 
+  user-select: none;
+  flex-shrink: 0; /* 防止被压缩 */
+}
+
+/* 标题栏文字拖动区 */
+.title-drag-region {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding-left: 16px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* 窗口控制按钮区域 (最小化/关闭) */
+.window-controls {
+  display: flex;
+  height: 100%;
+  /* 🔴 核心：按钮区域必须设为不可拖动，否则无法点击 */
+  -webkit-app-region: no-drag; 
+}
+
+.window-control-btn {
+  width: 46px;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 16px;
+}
+
+.window-control-btn:hover {
+  background-color: var(--bg-hover);
+}
+
+/* 关闭按钮特殊样式 (红色背景) */
+.window-control-btn.close:hover {
+  background-color: #e81123;
+  color: white;
+}
+
+/* 图标微调 */
+.window-control-btn svg {
+  width: 14px;
+  height: 14px;
 }

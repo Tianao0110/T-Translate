@@ -1,6 +1,7 @@
 {
   "name": "t-translate",
-  "version": "0.1.0",
+  "private": true,
+  "version": "0.1.2",
   "description": "Professional offline translation tool with AI support",
   "main": "electron/main.js",
   "scripts": {
@@ -35,6 +36,7 @@
     "electron-store": "^8.1.0",
     "framer-motion": "^10.16.16",
     "idb": "^8.0.0",
+    "immer": "^11.1.0",
     "lucide-react": "^0.303.0",
     "monaco-editor": "^0.45.0",
     "react": "^18.2.0",

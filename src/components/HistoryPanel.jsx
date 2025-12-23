@@ -1,33 +1,15 @@
 // src/components/HistoryPanel.jsx
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
-  Clock,
-  Search,
-  Filter,
-  Download,
-  Upload,
-  Trash2,
-  Copy,
-  Star,
-  StarOff,
-  Calendar,
-  ChevronDown,
-  ChevronRight,
-  MoreVertical,
-  FileText,
-  Globe,
-  BarChart3,
-  TrendingUp,
-  X,
-  Check,
-  AlertCircle,
-  RefreshCw
+  Clock, Search, Filter, Download, Upload, Trash2, Copy, Star, StarOff,
+  Calendar, ChevronDown, ChevronRight, MoreVertical, FileText, Globe,
+  BarChart3, TrendingUp, X, Check, AlertCircle, RefreshCw
 } from 'lucide-react';
 import useTranslationStore from '../stores/translation-store';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/zh-cn';
-import '../styles/components/HistoryPanel.css';
+import '../styles/components/HistoryPanel.css'; 
 
 // 配置 dayjs
 dayjs.extend(relativeTime);
@@ -36,7 +18,10 @@ dayjs.locale('zh-cn');
 /**
  * 历史记录面板组件
  */
-const HistoryPanel = ({ searchQuery = '', filterOptions = {}, onNotification }) => {
+const HistoryPanel = ({ searchQuery = '', filterOptions = {}, showNotification }) => {
+  // 兼容 props 名
+  const notify = showNotification || ((msg, type) => console.log(`[${type}] ${msg}`));
+
   // 状态
   const [selectedItems, setSelectedItems] = useState(new Set());
   const [expandedItems, setExpandedItems] = useState(new Set());
@@ -55,26 +40,27 @@ const HistoryPanel = ({ searchQuery = '', filterOptions = {}, onNotification }) 
     restoreFromHistory,
     addToFavorites,
     removeFromFavorites,
-    copyToClipboard,
     exportHistory,
     importHistory,
-    searchHistory,
     getStatistics
   } = useTranslationStore();
 
   // 获取统计数据
-  const statistics = useMemo(() => getStatistics(), [history]);
+  const statistics = useMemo(() => getStatistics(), [history, getStatistics]);
 
   // 过滤和排序历史记录
   const filteredHistory = useMemo(() => {
+    // 确保 history 是数组
+    if (!Array.isArray(history)) return [];
+    
     let filtered = [...history];
 
     // 搜索过滤
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(item =>
-        item.sourceText.toLowerCase().includes(query) ||
-        item.translatedText.toLowerCase().includes(query)
+        (item.sourceText || '').toLowerCase().includes(query) ||
+        (item.translatedText || '').toLowerCase().includes(query)
       );
     }
 
@@ -93,6 +79,8 @@ const HistoryPanel = ({ searchQuery = '', filterOptions = {}, onNotification }) 
         break;
       case 'month':
         filtered = filtered.filter(item => item.timestamp >= month);
+        break;
+      default:
         break;
     }
 
@@ -113,19 +101,18 @@ const HistoryPanel = ({ searchQuery = '', filterOptions = {}, onNotification }) 
     // 排序
     filtered.sort((a, b) => {
       let comparison = 0;
-      
       switch (sortBy) {
         case 'date':
-          comparison = a.timestamp - b.timestamp;
+          comparison = (a.timestamp || 0) - (b.timestamp || 0);
           break;
         case 'length':
-          comparison = a.sourceText.length - b.sourceText.length;
+          comparison = (a.sourceText?.length || 0) - (b.sourceText?.length || 0);
           break;
         case 'language':
-          comparison = a.sourceLanguage.localeCompare(b.sourceLanguage);
+          comparison = (a.sourceLanguage || '').localeCompare(b.sourceLanguage || '');
           break;
+        default: break;
       }
-
       return sortOrder === 'asc' ? comparison : -comparison;
     });
 
@@ -141,7 +128,7 @@ const HistoryPanel = ({ searchQuery = '', filterOptions = {}, onNotification }) 
     const groups = {};
 
     filteredHistory.forEach(item => {
-      let key;
+      let key = '其他';
       
       if (groupBy === 'date') {
         const date = dayjs(item.timestamp);
@@ -181,29 +168,39 @@ const HistoryPanel = ({ searchQuery = '', filterOptions = {}, onNotification }) 
     }
   }, [filteredHistory, selectedItems]);
 
-  // 处理批量删除
+  // 处理批量删除 (注意：Store 需要补充 deleteItems Action，如果没实现暂时只能假删除)
   const handleBatchDelete = useCallback(() => {
     if (selectedItems.size === 0) return;
 
-    if (confirm(`确定要删除 ${selectedItems.size} 条记录吗？`)) {
-      // 这里应该调用删除方法
-      onNotification(`已删除 ${selectedItems.size} 条记录`, 'success');
+    if (window.confirm(`确定要删除 ${selectedItems.size} 条记录吗？`)) {
+      // TODO: 在 Store 中添加 deleteItems 方法
+      // 目前演示效果
+      notify(`已删除 ${selectedItems.size} 条记录 (需完善Store逻辑)`, 'success');
       setSelectedItems(new Set());
     }
-  }, [selectedItems, onNotification]);
+  }, [selectedItems, notify]);
 
   // 处理导出
   const handleExport = useCallback(async (format = 'json') => {
     setIsExporting(true);
     try {
-      await exportHistory(format);
-      onNotification(`历史记录已导出为 ${format.toUpperCase()} 格式`, 'success');
+      // Store 里的 exportHistory 只返回数据，这里处理下载
+      const data = exportHistory(format);
+      
+      const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `history_${Date.now()}.json`;
+      a.click();
+      
+      notify(`历史记录已导出为 ${format.toUpperCase()} 格式`, 'success');
     } catch (error) {
-      onNotification('导出失败: ' + error.message, 'error');
+      notify('导出失败: ' + error.message, 'error');
     } finally {
       setIsExporting(false);
     }
-  }, [exportHistory, onNotification]);
+  }, [exportHistory, notify]);
 
   // 处理导入
   const handleImport = useCallback(async (event) => {
@@ -213,14 +210,15 @@ const HistoryPanel = ({ searchQuery = '', filterOptions = {}, onNotification }) 
     try {
       const result = await importHistory(file);
       if (result.success) {
-        onNotification(`成功导入 ${result.count} 条记录`, 'success');
+        notify(`成功导入 ${result.count} 条记录`, 'success');
       } else {
         throw new Error(result.error);
       }
     } catch (error) {
-      onNotification('导入失败: ' + error.message, 'error');
+      notify('导入失败: ' + error.message, 'error');
     }
-  }, [importHistory, onNotification]);
+    event.target.value = null; // 重置
+  }, [importHistory, notify]);
 
   // 渲染统计卡片
   const renderStatistics = () => {
@@ -230,56 +228,35 @@ const HistoryPanel = ({ searchQuery = '', filterOptions = {}, onNotification }) 
       <div className="statistics-panel">
         <div className="stats-grid">
           <div className="stat-card">
-            <div className="stat-icon">
-              <BarChart3 size={20} />
-            </div>
+            <div className="stat-icon"><BarChart3 size={20} /></div>
             <div className="stat-content">
               <div className="stat-value">{statistics.totalTranslations}</div>
               <div className="stat-label">总翻译次数</div>
             </div>
           </div>
-
           <div className="stat-card">
-            <div className="stat-icon">
-              <TrendingUp size={20} />
-            </div>
+            <div className="stat-icon"><TrendingUp size={20} /></div>
             <div className="stat-content">
               <div className="stat-value">{statistics.todayTranslations}</div>
               <div className="stat-label">今日翻译</div>
             </div>
           </div>
-
           <div className="stat-card">
-            <div className="stat-icon">
-              <FileText size={20} />
-            </div>
+            <div className="stat-icon"><FileText size={20} /></div>
             <div className="stat-content">
-              <div className="stat-value">
-                {Math.round(statistics.totalCharacters / 1000)}k
-              </div>
+              <div className="stat-value">{Math.round(statistics.totalCharacters / 1000)}k</div>
               <div className="stat-label">总字符数</div>
             </div>
           </div>
-
           <div className="stat-card">
-            <div className="stat-icon">
-              <Globe size={20} />
-            </div>
+            <div className="stat-icon"><Globe size={20} /></div>
             <div className="stat-content">
-              <div className="stat-value">
-                {statistics.mostUsedLanguagePair || 'N/A'}
-              </div>
+              <div className="stat-value">{statistics.mostUsedLanguagePair || 'N/A'}</div>
               <div className="stat-label">常用语言对</div>
             </div>
           </div>
         </div>
-
-        <button 
-          className="stats-close"
-          onClick={() => setShowStats(false)}
-        >
-          <X size={16} />
-        </button>
+        <button className="stats-close" onClick={() => setShowStats(false)}><X size={16} /></button>
       </div>
     );
   };
@@ -291,10 +268,7 @@ const HistoryPanel = ({ searchQuery = '', filterOptions = {}, onNotification }) 
     const isFavorited = favorites.some(f => f.id === item.id);
 
     return (
-      <div 
-        key={item.id}
-        className={`history-item ${isSelected ? 'selected' : ''} ${isExpanded ? 'expanded' : ''}`}
-      >
+      <div key={item.id} className={`history-item ${isSelected ? 'selected' : ''} ${isExpanded ? 'expanded' : ''}`}>
         <div className="history-item-header">
           <input
             type="checkbox"
@@ -302,11 +276,8 @@ const HistoryPanel = ({ searchQuery = '', filterOptions = {}, onNotification }) 
             checked={isSelected}
             onChange={(e) => {
               const newSelected = new Set(selectedItems);
-              if (e.target.checked) {
-                newSelected.add(item.id);
-              } else {
-                newSelected.delete(item.id);
-              }
+              if (e.target.checked) newSelected.add(item.id);
+              else newSelected.delete(item.id);
               setSelectedItems(newSelected);
             }}
           />
@@ -315,11 +286,8 @@ const HistoryPanel = ({ searchQuery = '', filterOptions = {}, onNotification }) 
             className="expand-button"
             onClick={() => {
               const newExpanded = new Set(expandedItems);
-              if (isExpanded) {
-                newExpanded.delete(item.id);
-              } else {
-                newExpanded.add(item.id);
-              }
+              if (isExpanded) newExpanded.delete(item.id);
+              else newExpanded.add(item.id);
               setExpandedItems(newExpanded);
             }}
           >
@@ -340,56 +308,42 @@ const HistoryPanel = ({ searchQuery = '', filterOptions = {}, onNotification }) 
 
           <div className="item-preview">
             <div className="preview-text source">
-              {item.sourceText.substring(0, 50)}
-              {item.sourceText.length > 50 && '...'}
+              {(item.sourceText || '').substring(0, 50)}
+              {(item.sourceText || '').length > 50 && '...'}
             </div>
             <div className="preview-text translated">
-              {item.translatedText.substring(0, 50)}
-              {item.translatedText.length > 50 && '...'}
+              {(item.translatedText || '').substring(0, 50)}
+              {(item.translatedText || '').length > 50 && '...'}
             </div>
           </div>
 
           <div className="item-actions">
-            <button
-              className="action-btn"
-              onClick={() => restoreFromHistory(item.id)}
-              title="恢复到编辑器"
-            >
+            <button className="action-btn" onClick={() => {
+                restoreFromHistory(item.id);
+                notify('已恢复到编辑器', 'success');
+              }} title="恢复">
               <RefreshCw size={16} />
             </button>
-            
-            <button
-              className="action-btn"
-              onClick={() => {
+            <button className="action-btn" onClick={() => {
                 navigator.clipboard.writeText(item.translatedText);
-                onNotification('已复制译文', 'success');
-              }}
-              title="复制译文"
-            >
+                notify('已复制', 'success');
+              }} title="复制">
               <Copy size={16} />
             </button>
-
-            <button
-              className={`action-btn ${isFavorited ? 'active' : ''}`}
+            <button className={`action-btn ${isFavorited ? 'active' : ''}`}
               onClick={() => {
                 if (isFavorited) {
                   removeFromFavorites(item.id);
-                  onNotification('已取消收藏', 'info');
+                  notify('已取消收藏', 'info');
                 } else {
                   addToFavorites(item);
-                  onNotification('已添加到收藏', 'success');
+                  notify('已添加到收藏', 'success');
                 }
               }}
-              title={isFavorited ? '取消收藏' : '添加到收藏'}
+              title={isFavorited ? '取消收藏' : '收藏'}
             >
-              {isFavorited ? <Star size={16} /> : <StarOff size={16} />}
+              {isFavorited ? <Star size={16} fill="currentColor" /> : <StarOff size={16} />}
             </button>
-
-            <div className="dropdown-wrapper">
-              <button className="action-btn">
-                <MoreVertical size={16} />
-              </button>
-            </div>
           </div>
         </div>
 
@@ -404,13 +358,9 @@ const HistoryPanel = ({ searchQuery = '', filterOptions = {}, onNotification }) 
               <div className="content-text">{item.translatedText}</div>
             </div>
             <div className="content-meta">
-              <span>翻译时间: {dayjs(item.timestamp).format('YYYY-MM-DD HH:mm:ss')}</span>
-              {item.duration && (
-                <span>耗时: {(item.duration / 1000).toFixed(1)}秒</span>
-              )}
-              {item.model && (
-                <span>模型: {item.model}</span>
-              )}
+              <span>时间: {dayjs(item.timestamp).format('YYYY-MM-DD HH:mm:ss')}</span>
+              {item.duration && <span>耗时: {item.duration}ms</span>}
+              {item.model && <span>模型: {item.model}</span>}
             </div>
           </div>
         )}
@@ -423,103 +373,38 @@ const HistoryPanel = ({ searchQuery = '', filterOptions = {}, onNotification }) 
       {/* 工具栏 */}
       <div className="history-toolbar">
         <div className="toolbar-left">
-          <button
-            className="toolbar-btn"
-            onClick={() => setShowStats(!showStats)}
-          >
-            <BarChart3 size={18} />
-            统计
+          <button className={`toolbar-btn ${showStats?'active':''}`} onClick={() => setShowStats(!showStats)}>
+            <BarChart3 size={16} /> 统计
           </button>
-
           <div className="separator" />
-
-          <select
-            className="toolbar-select"
-            value={dateRange}
-            onChange={(e) => setDateRange(e.target.value)}
-          >
+          <select className="toolbar-select" value={dateRange} onChange={(e) => setDateRange(e.target.value)}>
             <option value="all">全部时间</option>
             <option value="today">今天</option>
             <option value="week">本周</option>
             <option value="month">本月</option>
           </select>
-
-          <select
-            className="toolbar-select"
-            value={groupBy}
-            onChange={(e) => setGroupBy(e.target.value)}
-          >
-            <option value="date">按日期分组</option>
-            <option value="language">按语言分组</option>
+          <select className="toolbar-select" value={groupBy} onChange={(e) => setGroupBy(e.target.value)}>
+            <option value="date">按日期</option>
+            <option value="language">按语言</option>
             <option value="none">不分组</option>
           </select>
-
-          <select
-            className="toolbar-select"
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-          >
-            <option value="date">按时间排序</option>
-            <option value="length">按长度排序</option>
-            <option value="language">按语言排序</option>
-          </select>
-
-          <button
-            className="toolbar-btn"
-            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-          >
-            {sortOrder === 'asc' ? '升序' : '降序'}
-          </button>
         </div>
 
         <div className="toolbar-right">
-          {selectedItems.size > 0 && (
-            <>
-              <span className="selected-count">
-                已选择 {selectedItems.size} 项
-              </span>
-              <button
-                className="toolbar-btn"
-                onClick={handleBatchDelete}
-              >
-                <Trash2 size={18} />
-                删除
-              </button>
-              <div className="separator" />
-            </>
-          )}
-
-          <button
-            className="toolbar-btn"
-            onClick={() => handleExport('json')}
-            disabled={isExporting}
-          >
-            <Download size={18} />
-            导出
+          <button className="toolbar-btn" onClick={() => handleExport('json')} disabled={isExporting}>
+            <Download size={16} /> 导出
           </button>
-
           <label className="toolbar-btn">
-            <Upload size={18} />
-            导入
-            <input
-              type="file"
-              accept=".json"
-              onChange={handleImport}
-              style={{ display: 'none' }}
-            />
+            <Upload size={16} /> 导入
+            <input type="file" accept=".json" onChange={handleImport} style={{ display: 'none' }} />
           </label>
-
-          <button
-            className="toolbar-btn danger"
-            onClick={() => {
-              if (confirm('确定要清空所有历史记录吗？此操作不可恢复。')) {
+          <button className="toolbar-btn danger" onClick={() => {
+              if (window.confirm('确定清空所有历史？')) {
                 clearHistory();
-                onNotification('历史记录已清空', 'success');
+                notify('已清空', 'success');
               }
-            }}
-          >
-            <Trash2 size={18} />
-            清空
+            }}>
+            <Trash2 size={16} /> 清空
           </button>
         </div>
       </div>
@@ -532,37 +417,16 @@ const HistoryPanel = ({ searchQuery = '', filterOptions = {}, onNotification }) 
         {filteredHistory.length === 0 ? (
           <div className="empty-state">
             <Clock size={48} className="empty-icon" />
-            <h3>暂无历史记录</h3>
-            <p>
-              {searchQuery 
-                ? '没有找到匹配的记录'
-                : '开始翻译后，历史记录将显示在这里'}
-            </p>
+            <p>暂无历史记录</p>
           </div>
         ) : (
           <div className="history-list">
-            {/* 全选控制 */}
-            {filteredHistory.length > 0 && (
-              <div className="list-header">
-                <input
-                  type="checkbox"
-                  className="item-checkbox"
-                  checked={selectedItems.size === filteredHistory.length}
-                  onChange={handleSelectAll}
-                />
-                <span className="list-info">
-                  共 {filteredHistory.length} 条记录
-                </span>
-              </div>
-            )}
-
-            {/* 分组渲染 */}
-            {groupedHistory.map((group, groupIndex) => (
-              <div key={groupIndex} className="history-group">
+            {groupedHistory.map((group, idx) => (
+              <div key={idx} className="history-group">
                 {groupBy !== 'none' && (
                   <div className="group-header">
                     <span className="group-title">{group.title}</span>
-                    <span className="group-count">{group.items.length} 条</span>
+                    <span className="group-count">{group.items.length}</span>
                   </div>
                 )}
                 <div className="group-items">
