@@ -350,6 +350,14 @@ const useTranslationStore = create(
         set((state) => {
           state.favorites = state.favorites.filter((f) => f.id !== id);
         }),
+        
+      updateFavoriteItem: (id, updates) =>
+        set((state) => {
+          const item = state.favorites.find((f) => f.id === id);
+          if (item) {
+            Object.assign(item, updates);
+          }
+        }),
 
       clearCurrent: () =>
         set((state) => {
@@ -366,10 +374,11 @@ const useTranslationStore = create(
           state.statistics.totalCharacters = 0;
         }),
 
-      removeFromHistory: (id) => set((state) => {
-        state.history = state.history.filter(item => item.id !== id);
-      }),
-      
+      removeFromHistory: (id) =>
+        set((state) => {
+          state.history = state.history.filter((item) => item.id !== id);
+        }),
+
       restoreFromHistory: (id) =>
         set((state) => {
           const item = state.history.find((h) => h.id === id);
