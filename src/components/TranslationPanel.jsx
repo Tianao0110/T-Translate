@@ -311,9 +311,6 @@ const TranslationPanel = ({ showNotification }) => {
         </div>
       </div>
 
-      {/* 隐私与模式面板 */}
-      {renderPrivacyPanel()}
-
       {/* 翻译主区域 (左右分栏) */}
       <div className="translation-areas">
         {/* 左侧：原文 */}

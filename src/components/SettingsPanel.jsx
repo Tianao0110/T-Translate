@@ -294,6 +294,87 @@ const SettingsPanel = ({ showNotification }) => {
           </div>
         );
 
+        case 'privacy':
+          return (
+            <div className="setting-content">
+              <h3>翻译与隐私模式</h3>
+              
+              {/* 模式选择卡片 */}
+              <div className="mode-selection-grid">
+                <div 
+                  className={`mode-card ${useTranslationStore.getState().translationMode === 'standard' ? 'selected' : ''}`}
+                  onClick={() => {
+                     updateSetting('privacy', 'mode', 'standard'); 
+                     useTranslationStore.getState().setTranslationMode('standard');
+                     // 强制刷新组件以更新 UI (简单做法)
+                     setActiveSection('privacy'); 
+                  }}
+                >
+                  <div className="mode-icon"><Zap size={24} /></div>
+                  <div className="mode-info">
+                    <h4>标准模式</h4>
+                    <p>功能全开，自动保存历史记录。</p>
+                  </div>
+                  {useTranslationStore.getState().translationMode === 'standard' && <div className="mode-check"><CheckCircle size={18} /></div>}
+                </div>
+  
+                <div 
+                  className={`mode-card ${useTranslationStore.getState().translationMode === 'secure' ? 'selected' : ''}`}
+                  onClick={() => {
+                     updateSetting('privacy', 'mode', 'secure');
+                     useTranslationStore.getState().setTranslationMode('secure');
+                     setActiveSection('privacy');
+                  }}
+                >
+                  <div className="mode-icon"><Shield size={24} /></div>
+                  <div className="mode-info">
+                    <h4>无痕模式</h4>
+                    <p>不保存任何历史记录，重启即焚。</p>
+                  </div>
+                  {useTranslationStore.getState().translationMode === 'secure' && <div className="mode-check"><CheckCircle size={18} /></div>}
+                </div>
+  
+                <div 
+                  className={`mode-card ${useTranslationStore.getState().translationMode === 'offline' ? 'selected' : ''}`}
+                  onClick={() => {
+                     updateSetting('privacy', 'mode', 'offline');
+                     useTranslationStore.getState().setTranslationMode('offline');
+                     setActiveSection('privacy');
+                  }}
+                >
+                  <div className="mode-icon"><Lock size={24} /></div>
+                  <div className="mode-info">
+                    <h4>离线模式</h4>
+                    <p>仅使用本地 OCR 和缓存，断开联网。</p>
+                  </div>
+                  {useTranslationStore.getState().translationMode === 'offline' && <div className="mode-check"><CheckCircle size={18} /></div>}
+                </div>
+              </div>
+  
+              <div className="setting-group" style={{marginTop: '24px'}}>
+                <label className="setting-label">自动删除历史 (天)</label>
+                <input
+                  type="number"
+                  className="setting-input"
+                  value={settings.privacy?.autoDeleteDays || 0}
+                  onChange={(e) => updateSetting('privacy', 'autoDeleteDays', parseInt(e.target.value))}
+                  min="0"
+                />
+              </div>
+  
+              <div className="setting-group">
+                <button className="danger-button" onClick={() => {
+                  if (window.confirm('确定要清除所有本地数据吗？')) {
+                    localStorage.clear();
+                    window.location.reload();
+                  }
+                }}>
+                  <Trash2 size={16} /> 清除所有数据
+                </button>
+              </div>
+            </div>
+          );
+          
       case 'ocr':
         return (
           <div className="setting-content">
@@ -363,6 +444,7 @@ const SettingsPanel = ({ showNotification }) => {
         <div className="settings-nav">
           <button className={`nav-item ${activeSection==='connection'?'active':''}`} onClick={()=>setActiveSection('connection')}><Wifi size={18}/><span>连接</span></button>
           <button className={`nav-item ${activeSection==='translation'?'active':''}`} onClick={()=>setActiveSection('translation')}><Globe size={18}/><span>翻译</span></button>
+          <button className={`nav-item ${activeSection==='privacy'?'active':''}`} onClick={()=>setActiveSection('privacy')}><Shield size={18}/><span>隐私</span></button>
           <button className={`nav-item ${activeSection==='ocr'?'active':''}`} onClick={()=>setActiveSection('ocr')}><Eye size={18}/><span>OCR</span></button>
           <button className={`nav-item ${activeSection==='interface'?'active':''}`} onClick={()=>setActiveSection('interface')}><Palette size={18}/><span>界面</span></button>
           <button className={`nav-item ${activeSection==='about'?'active':''}`} onClick={()=>setActiveSection('about')}><Info size={18}/><span>关于</span></button>

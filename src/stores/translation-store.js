@@ -17,6 +17,7 @@ const useTranslationStore = create(
     immer((set, get) => ({
       // ==================== 1. 状态 (保留原样) ====================
       // 当前翻译任务
+      translationMode: "standard", // 'standard' | 'secure' | 'offline'
       currentTranslation: {
         id: null,
         sourceText: "",
@@ -66,7 +67,10 @@ const useTranslationStore = create(
       },
 
       // ==================== 2. Actions  ====================
-
+      setTranslationMode: (mode) =>
+        set((state) => {
+          state.translationMode = mode;
+        }),
       setSourceText: (text) =>
         set((state) => {
           state.currentTranslation.sourceText = text;
@@ -103,6 +107,7 @@ const useTranslationStore = create(
       // 核心翻译逻辑
       translate: async (options = {}) => {
         const state = get();
+        const mode = state.translationMode;
         const { sourceText, sourceLanguage, targetLanguage } =
           state.currentTranslation;
 
@@ -161,27 +166,31 @@ const useTranslationStore = create(
               };
 
               // 添加到历史
-              const historyItem = {
-                id: state.currentTranslation.id,
-                sourceText: sourceText,
-                translatedText: finalTranslatedText,
-                sourceLanguage: result.from || sourceLanguage,
-                targetLanguage: targetLanguage,
-                timestamp: Date.now(),
-                duration,
-                model: finalModel,
-              };
+              if (mode !== "secure") {
+                // 添加到历史
+                const historyItem = {
+                  id: state.currentTranslation.id,
+                  sourceText: sourceText,
+                  translatedText: finalTranslatedText,
+                  sourceLanguage: result.from || sourceLanguage,
+                  targetLanguage: targetLanguage,
+                  timestamp: Date.now(),
+                  duration,
+                  model: finalModel,
+                };
 
-              state.history.unshift(historyItem);
+                state.history.unshift(historyItem);
 
-              if (state.history.length > state.historyLimit) {
-                state.history = state.history.slice(0, state.historyLimit);
+                if (state.history.length > state.historyLimit) {
+                  state.history = state.history.slice(0, state.historyLimit);
+                }
+
+                state.statistics.totalTranslations++;
+                state.statistics.totalCharacters += sourceText.length;
               }
+              // 🔴 结束修改
 
-              state.statistics.totalTranslations++;
-              state.statistics.totalCharacters += sourceText.length;
-
-              // 更新今日统计
+              // 更新今日统计 (如果无痕模式不计入统计，这部分也要放进 if 里，或者单独处理)
               const today = new Date().toDateString();
               const historyToday = state.history.filter(
                 (item) => new Date(item.timestamp).toDateString() === today
