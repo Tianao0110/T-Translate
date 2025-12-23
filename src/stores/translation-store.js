@@ -366,6 +366,10 @@ const useTranslationStore = create(
           state.statistics.totalCharacters = 0;
         }),
 
+      removeFromHistory: (id) => set((state) => {
+        state.history = state.history.filter(item => item.id !== id);
+      }),
+      
       restoreFromHistory: (id) =>
         set((state) => {
           const item = state.history.find((h) => h.id === id);

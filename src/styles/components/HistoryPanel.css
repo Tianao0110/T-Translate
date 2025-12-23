@@ -648,3 +648,56 @@
     #1e3a8a 0%, 
     #1e40af 100%);
 }
+
+/* 网格视图容器 - 瀑布流效果 */
+.favorites-grid { /* 复用之前的类名，或者改为 history-grid */
+  display: grid;
+  /* 自动填充，最小宽度 200px */
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  align-items: start; /* 防止卡片被拉伸 */
+}
+
+/* 卡片样式 */
+.history-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.2s;
+  /* 让高度随内容自适应 */
+  height: auto; 
+  break-inside: avoid; /* 防止在列之间断开 */
+}
+
+.history-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--accent-primary);
+}
+
+.card-text {
+  font-size: 13px;
+  line-height: 1.5;
+  /* 限制最大显示行数，超过显示省略号 */
+  display: -webkit-box;
+  -webkit-line-clamp: 4; 
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.card-divider {
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  margin: 4px 0;
+}
+
+/* 红色删除按钮 */
+.action-btn.danger:hover, .card-action-btn.danger:hover {
+  color: var(--error);
+  background: rgba(239, 68, 68, 0.1);
+}

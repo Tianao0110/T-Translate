@@ -153,7 +153,7 @@ const MainWindow = () => {
 
   const tabs = [
     { id: 'translate', label: '翻译', icon: Languages, shortcut: '1' },
-    { id: 'history', label: '历史', icon: History, shortcut: '2', badge: statistics.todayTranslations },
+    { id: 'history', label: '历史', icon: History, shortcut: '2' },
     { id: 'favorites', label: '收藏', icon: Star, shortcut: '3' },
     { id: 'settings', label: '设置', icon: Settings, shortcut: '4' }
   ];

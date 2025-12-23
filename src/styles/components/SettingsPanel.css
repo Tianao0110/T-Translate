@@ -1,28 +1,271 @@
-/* src/components/SettingsPanel.css */
+/* src/styles/components/SettingsPanel.css */
 
+/* 容器布局：左侧导航 + 右侧内容 */
 .settings-panel {
-    display: flex;
-    height: 100%;
-    background: var(--bg-primary);
-  }
-  
-  .settings-sidebar {
-    width: 200px;
-    background: var(--bg-secondary);
-    border-right: 1px solid var(--border-primary);
-    padding: 20px;
-  }
-  
-  .settings-content {
-    flex: 1;
-    padding: 20px;
-    overflow-y: auto;
-  }
+  display: flex;
+  height: 100%;
+  background: var(--bg-primary);
+  overflow: hidden;
+}
 
-  /* 模式选择网格 */
+/* ==================== 左侧侧边栏 ==================== */
+.settings-sidebar {
+  width: 240px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-primary);
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  flex-shrink: 0;
+}
+
+.settings-nav {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.nav-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.nav-item.active {
+  background: var(--bg-primary);
+  color: var(--accent-primary);
+  box-shadow: var(--shadow-sm);
+  font-weight: 600;
+}
+
+.settings-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-primary);
+}
+
+.action-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-primary);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.action-button:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.action-button.danger:hover {
+  border-color: var(--error);
+  color: var(--error);
+}
+
+/* ==================== 右侧内容区 ==================== */
+.settings-content-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.setting-content {
+  flex: 1;
+  padding: 40px 60px;
+  overflow-y: auto;
+  max-width: 900px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.setting-content h3 {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 32px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-primary);
+}
+
+/* 设置组 */
+.setting-group {
+  margin-bottom: 24px;
+  animation: fadeIn 0.3s ease;
+}
+
+.setting-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.label-hint {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-left: 8px;
+  font-weight: normal;
+}
+
+/* 输入框与按钮组合 */
+.input-group {
+  display: flex;
+  gap: 8px;
+}
+
+.setting-input, .setting-select {
+  flex: 1;
+  padding: 10px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.setting-input:focus, .setting-select:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  background: var(--bg-primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* 测试连接按钮 */
+.test-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-primary);
+}
+
+.test-button.connected {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--success);
+  border-color: var(--success);
+}
+
+.test-button.disconnected {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--error);
+  border-color: var(--error);
+}
+
+/* 开关 (Switch) */
+.setting-switch {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.setting-switch input {
+  display: none;
+}
+
+.switch-slider {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  background-color: var(--bg-tertiary);
+  border-radius: 24px;
+  transition: 0.3s;
+}
+
+.switch-slider:before {
+  content: "";
+  position: absolute;
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  border-radius: 50%;
+  transition: 0.3s;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+input:checked + .switch-slider {
+  background-color: var(--accent-primary);
+}
+
+input:checked + .switch-slider:before {
+  transform: translateX(20px);
+}
+
+.switch-label {
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+/* 主题选择器 */
+.theme-selector {
+  display: flex;
+  gap: 12px;
+}
+
+.theme-option {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  background: var(--bg-secondary);
+  border: 2px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all 0.2s;
+}
+
+.theme-option.active {
+  border-color: var(--accent-primary);
+  background: rgba(59, 130, 246, 0.05);
+  color: var(--accent-primary);
+}
+
+/* 隐私模式卡片 (复用之前的样式) */
 .mode-selection-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
   margin-bottom: 24px;
 }
@@ -33,21 +276,22 @@
   flex-direction: column;
   gap: 12px;
   padding: 16px;
-  background: var(--bg-primary);
-  border: 2px solid var(--border-primary);
+  background: var(--bg-secondary);
+  border: 2px solid transparent;
   border-radius: 12px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s;
 }
 
 .mode-card:hover {
+  background: var(--bg-hover);
   transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
 }
 
 .mode-card.selected {
+  background: var(--bg-primary);
   border-color: var(--accent-primary);
-  background: rgba(59, 130, 246, 0.05);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
 }
 
 .mode-icon {
@@ -58,10 +302,17 @@
   color: var(--accent-primary);
 }
 
+.mode-check {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  color: var(--accent-primary);
+}
+
 .mode-info h4 {
   font-size: 15px;
   font-weight: 600;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   color: var(--text-primary);
 }
 
@@ -71,17 +322,86 @@
   line-height: 1.4;
 }
 
-.mode-check {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  color: var(--accent-primary);
-  opacity: 0;
-  transform: scale(0.8);
-  transition: all 0.2s ease;
+/* 关于页面 */
+.about-section {
+  text-align: center;
 }
 
-.mode-card.selected .mode-check {
-  opacity: 1;
-  transform: scale(1);
+.app-icon {
+  color: var(--accent-primary);
+  margin-bottom: 16px;
+}
+
+.info-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin: 32px 0;
+  text-align: left;
+}
+
+.info-card {
+  background: var(--bg-secondary);
+  padding: 20px;
+  border-radius: 12px;
+}
+
+.info-card h4 {
+  font-size: 14px;
+  margin-bottom: 12px;
+  border-bottom: none;
+}
+
+.info-card p, .info-card li {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+/* 底部保存条 (可选，如果有的话) */
+.settings-footer {
+  padding: 16px 40px;
+  border-top: 1px solid var(--border-primary);
+  background: var(--bg-primary);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.save-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  background: var(--accent-primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.save-button:hover:not(:disabled) {
+  background: var(--accent-hover);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+/* 动画 */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 深色模式适配 */
+[data-theme="dark"] .setting-input, 
+[data-theme="dark"] .setting-select {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .mode-card {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .mode-card.selected {
+  background: rgba(59, 130, 246, 0.1);
 }
