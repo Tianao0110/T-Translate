@@ -1,33 +1,19 @@
-// src/App.jsx
+// src/App.jsx - 完整修复版
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
-  FileText, 
-  Settings, 
-  History, 
-  Globe,
-  Zap,
-  Moon,
-  Sun,
-  Maximize2,
-  Minimize2,
-  X,
-  Menu,
-  Copy,
-  Download,
-  Upload,
-  RefreshCw,
-  AlertCircle
+  FileText, Settings, History, Moon, Sun, Copy, Download, Upload,
+  RefreshCw, AlertCircle, CheckCircle, ChevronLeft, ChevronRight,
+  X, Trash2, Info, HelpCircle
 } from 'lucide-react';
-import translator from './services/translator';
+
+// 确保你项目里有这些文件，如果没有，需要把相关的 import 和调用注释掉
+import translator from './services/translator'; 
 import ocrManager from './services/ocr-manager';
 import llmClient from './utils/llm-client';
 import './styles/App.css';
 
-/**
- * 主应用组件
- */
 function App() {
-  // 状态管理
+  // ========== 1. 状态管理 ==========
   const [activeTab, setActiveTab] = useState('translate');
   const [sourceText, setSourceText] = useState('');
   const [translatedText, setTranslatedText] = useState('');
@@ -39,7 +25,6 @@ function App() {
   const [connectionStatus, setConnectionStatus] = useState('checking');
   const [ocrEngine, setOcrEngine] = useState('tesseract');
   const [translationHistory, setTranslationHistory] = useState([]);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [notification, setNotification] = useState(null);
 
@@ -61,214 +46,159 @@ function App() {
     { code: 'pt', name: '葡萄牙语' }
   ];
 
-  // 初始化
+  // ========== 2. 初始化与副作用 ==========
   useEffect(() => {
+    // 启动初始化
     initializeApp();
-    setupEventListeners();
+    
+    // 加载设置和历史
     loadSettings();
-	const timer = setTimeout(() => {
-      console.log("🚀 发送启动信号...");
-      window.__APP_LOADED__ = true; // 设置标记
-      window.dispatchEvent(new Event('app-ready')); // 发送事件
+    loadTranslationHistory();
+
+    // 绑定全局快捷键
+    const handleGlobalKeyDown = (e) => {
+      // Ctrl + Enter: 触发翻译
+      if (e.ctrlKey && e.key === 'Enter') {
+        if (activeTab === 'translate') {
+          // 这里使用 Ref 或者 document.querySelector 来触发按钮点击
+          // 避免闭包导致无法获取最新的 sourceText
+          const translateBtn = document.querySelector('.translate-button');
+          if (translateBtn && !translateBtn.disabled) translateBtn.click();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+
+    const timer = setTimeout(() => {
+      console.log("T-Translate 启动完成");
+      if (window) {
+        window.__APP_LOADED__ = true;
+        window.dispatchEvent(new Event('app-ready'));
+      }
     }, 100);
     
     return () => {
-      cleanupEventListeners();
+      clearTimeout(timer);
+      window.removeEventListener('keydown', handleGlobalKeyDown);
     };
-  }, []);
+  }, []); // 空依赖数组，只执行一次
 
-  // 初始化应用
   const initializeApp = async () => {
-    console.log('Initializing T-Translate Core...');
+    console.log('Initializing T-Translate...');
+    testLLMConnectionOnce();
     
-    // 测试 LM Studio 连接
-    testLLMConnection();
-    
-    // 初始化 OCR
     try {
-      await ocrManager.init();
-      console.log('OCR Manager initialized');
+      if (ocrManager && ocrManager.init) {
+        await ocrManager.init();
+        console.log('OCR Manager initialized');
+      }
     } catch (error) {
       console.error('OCR initialization failed:', error);
-      showNotification('OCR 初始化失败', 'error');
-    }
-    
-    // 加载翻译历史
-    loadTranslationHistory();
-  };
-
-  // 测试 LLM 连接
-  const testLLMConnection = async () => {
-    setConnectionStatus('checking');
-    try {
-      const result = await llmClient.testConnection();
-      setIsConnected(result.success);
-      setConnectionStatus(result.success ? 'connected' : 'disconnected');
-      
-      if (!result.success) {
-        showNotification('LM Studio 未连接，请启动 LM Studio 并加载模型', 'warning');
-      } else {
-        showNotification('LM Studio 连接成功', 'success');
-      }
-    } catch (error) {
-      setIsConnected(false);
-      setConnectionStatus('error');
-      showNotification('连接测试失败', 'error');
     }
   };
 
-  // 设置事件监听
-  const setupEventListeners = () => {
-    // 监听菜单事件
-    window.addEventListener('menu-action', handleMenuAction);
-    window.addEventListener('import-file', handleImportFile);
-    
-    // 监听快捷键
-    document.addEventListener('keydown', handleKeyDown);
-  };
-
-  // 清理事件监听
-  const cleanupEventListeners = () => {
-    window.removeEventListener('menu-action', handleMenuAction);
-    window.removeEventListener('import-file', handleImportFile);
-    document.removeEventListener('keydown', handleKeyDown);
-  };
-
-  // 处理菜单动作
-  const handleMenuAction = (event) => {
-    const action = event.detail;
-    console.log('Menu action:', action);
-    
-    switch (action) {
-      case 'new-translation':
-        clearContent();
-        break;
-      case 'export-translation':
-        exportTranslation();
-        break;
-      case 'capture-translate':
-        captureAndTranslate();
-        break;
-      case 'quick-translate':
-        quickTranslate();
-        break;
-      case 'switch-language':
-        switchLanguages();
-        break;
-      case 'clear-content':
-        clearContent();
-        break;
-      case 'open-settings':
-        setIsSettingsOpen(true);
-        break;
-      case 'show-shortcuts':
-        showShortcuts();
-        break;
-      default:
-        console.log('Unknown menu action:', action);
-    }
-  };
-
-  // 处理文件导入
-  const handleImportFile = async (event) => {
-    const filePath = event.detail;
-    console.log('Importing file:', filePath);
-    
-    if (window.electron) {
-      const result = await window.electron.fs.readFile(filePath);
-      if (result.success) {
-        setSourceText(result.data);
-        showNotification('文件导入成功', 'success');
-      } else {
-        showNotification('文件导入失败: ' + result.error, 'error');
-      }
-    }
-  };
-
-  // 处理快捷键
-  const handleKeyDown = (event) => {
-    // Ctrl+Enter 翻译
-    if (event.ctrlKey && event.key === 'Enter') {
-      handleTranslate();
-    }
-    // Ctrl+L 切换语言
-    else if (event.ctrlKey && event.key === 'l') {
-      event.preventDefault();
-      switchLanguages();
-    }
-  };
+  // ========== 3. 功能逻辑函数 (之前缺失的部分都在这里) ==========
 
   // 加载设置
-  const loadSettings = async () => {
-    if (window.electron && window.electron.store) {
-      const savedTheme = await window.electron.store.get('theme', 'light');
+  const loadSettings = () => {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
       setTheme(savedTheme);
       document.documentElement.setAttribute('data-theme', savedTheme);
-      
-      const savedOcrEngine = await window.electron.store.get('ocrEngine', 'tesseract');
-      setOcrEngine(savedOcrEngine);
-      
-      const savedSourceLang = await window.electron.store.get('sourceLanguage', 'auto');
-      setSourceLanguage(savedSourceLang);
-      
-      const savedTargetLang = await window.electron.store.get('targetLanguage', 'zh');
-      setTargetLanguage(savedTargetLang);
     }
   };
 
-  // 加载翻译历史
+  // 加载历史
   const loadTranslationHistory = () => {
-    const history = translator.getHistory({ limit: 20 });
-    setTranslationHistory(history.items);
+    try {
+      const history = localStorage.getItem('translationHistory');
+      if (history) {
+        setTranslationHistory(JSON.parse(history));
+      }
+    } catch (e) {
+      console.error("Failed to load history", e);
+    }
   };
 
-  // 主翻译函数
+  // 保存历史到本地存储
+  const saveHistoryToLocal = (newHistory) => {
+    localStorage.setItem('translationHistory', JSON.stringify(newHistory));
+  };
+
+  // 核心功能：翻译
   const handleTranslate = async () => {
-    if (!sourceText.trim()) {
-      showNotification('请输入要翻译的内容', 'warning');
-      return;
-    }
-    
-    if (!isConnected) {
-      showNotification('请先连接 LM Studio', 'error');
-      return;
-    }
+    if (!sourceText.trim()) return;
     
     setIsTranslating(true);
-    setTranslatedText('');
-    
     try {
+      // 1. 调用翻译服务
       const result = await translator.translate(sourceText, {
         from: sourceLanguage,
-        to: targetLanguage,
-        template: 'general'
+        to: targetLanguage
       });
-      
-      if (result.success) {
-        setTranslatedText(result.translated);
-        loadTranslationHistory(); // 刷新历史
-        showNotification('翻译完成', 'success');
+      if (result && result.translated) {
+        setTranslatedText(result.translated); 
       } else {
-        showNotification('翻译失败: ' + result.error, 'error');
+        // 如果结果里没有 translated 字段，可能是 llmClient 返回了原始对象
+        // 尝试兜底显示（调试用）
+        console.warn("翻译结果结构异常:", result);
+        setTranslatedText(typeof result === 'string' ? result : JSON.stringify(result, null, 2));
       }
+      
+      // 添加到历史记录
+      const newHistoryItem = {
+        ...result, 
+        id: Date.now(),
+        timestamp: new Date()
+      };
+      
+      const newHistory = [newHistoryItem, ...translationHistory].slice(0, 50);
+      setTranslationHistory(newHistory);
+      if (saveHistoryToLocal) saveHistoryToLocal(newHistory);
+      
     } catch (error) {
-      console.error('Translation error:', error);
-      showNotification('翻译出错: ' + error.message, 'error');
+      console.error('Translation failed:', error);
+      showNotification('翻译失败: ' + (error.message || '未知错误'), 'error');
     } finally {
       setIsTranslating(false);
     }
   };
 
-  // 切换语言
+  // 修复报错的核心：切换语言
   const switchLanguages = () => {
-    if (sourceLanguage !== 'auto') {
-      setSourceLanguage(targetLanguage);
-      setTargetLanguage(sourceLanguage);
-      
-      // 交换文本
-      const temp = sourceText;
-      setSourceText(translatedText);
-      setTranslatedText(temp);
+    // 逻辑：如果当前是自动检测，切换后目标变成英文(或者保持默认)
+    // 否则直接交换
+    const newSource = targetLanguage;
+    const newTarget = sourceLanguage === 'auto' ? 'en' : sourceLanguage;
+
+    setSourceLanguage(newSource);
+    setTargetLanguage(newTarget);
+
+    // 同时也交换文本框的内容
+    setSourceText(translatedText);
+    setTranslatedText(sourceText);
+  };
+
+  // 导出功能
+  const exportTranslation = () => {
+    if (!translatedText) return;
+    const element = document.createElement("a");
+    const file = new Blob([`原文:\n${sourceText}\n\n译文:\n${translatedText}`], {type: 'text/plain'});
+    element.href = URL.createObjectURL(file);
+    element.download = `translation_${new Date().toISOString().slice(0,10)}.txt`;
+    document.body.appendChild(element); 
+    element.click();
+    document.body.removeChild(element);
+  };
+
+  // 复制功能
+  const copyTranslation = async () => {
+    if (!translatedText) return;
+    try {
+      await navigator.clipboard.writeText(translatedText);
+      showNotification('译文已复制到剪贴板', 'success');
+    } catch (err) {
+      showNotification('复制失败', 'error');
     }
   };
 
@@ -276,201 +206,149 @@ function App() {
   const clearContent = () => {
     setSourceText('');
     setTranslatedText('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    // 聚焦回输入框
+    if (sourceTextRef.current) sourceTextRef.current.focus();
   };
 
-  // 复制翻译结果
-  const copyTranslation = () => {
-    if (translatedText) {
-      if (window.electron) {
-        window.electron.clipboard.writeText(translatedText);
-      } else {
-        navigator.clipboard.writeText(translatedText);
-      }
-      showNotification('已复制到剪贴板', 'success');
+  // 清空历史
+  const clearHistory = () => {
+    if (window.confirm('确定要清空所有翻译历史吗？')) {
+      setTranslationHistory([]);
+      localStorage.removeItem('translationHistory');
+      showNotification('历史记录已清空', 'success');
     }
   };
 
-  // 导出翻译
-  const exportTranslation = async () => {
-    if (!translatedText) {
-      showNotification('没有可导出的内容', 'warning');
+  // 文件上传处理
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // 简单文件大小限制 (例如 1MB)
+    if (file.size > 1024 * 1024) {
+      showNotification('文件过大，请上传 1MB 以内的文本文件', 'warning');
       return;
     }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target.result;
+      setSourceText(content);
+      showNotification(`已导入: ${file.name}`, 'success');
+    };
+    reader.onerror = () => showNotification('读取文件失败', 'error');
     
-    const content = `原文:\n${sourceText}\n\n译文:\n${translatedText}`;
-    
-    if (window.electron) {
-      const result = await window.electron.dialog.showSaveDialog({
-        defaultPath: `translation-${Date.now()}.txt`,
-        filters: [
-          { name: '文本文件', extensions: ['txt'] },
-          { name: '所有文件', extensions: ['*'] }
-        ]
-      });
-      
-      if (!result.canceled) {
-        await window.electron.fs.writeFile(result.filePath, content);
-        showNotification('导出成功', 'success');
+    reader.readAsText(file); // 默认按 UTF-8 读取
+    event.target.value = null; // 重置 input
+  };
+
+  // ========== 4. 辅助函数 ==========
+
+  const testLLMConnectionOnce = async () => {
+    try {
+      const result = await llmClient.testConnection();
+      setIsConnected(result.success);
+      setConnectionStatus(result.success ? 'connected' : 'disconnected');
+      if (!result.success) {
+        showNotification('LM Studio 未连接', 'warning');
+      } else {
+        showNotification('LM Studio 连接成功', 'success');
       }
+    } catch (error) {
+      setIsConnected(false);
+      setConnectionStatus('error');
     }
   };
 
-  // 快速翻译（从剪贴板）
-  const quickTranslate = async () => {
-    if (window.electron) {
-      const text = await window.electron.clipboard.readText();
-      if (text) {
-        setSourceText(text);
-        handleTranslate();
-      }
+  const testLLMConnection = async () => {
+    setConnectionStatus('checking');
+    try {
+      const result = await llmClient.testConnection();
+      setIsConnected(result.success);
+      setConnectionStatus(result.success ? 'connected' : 'disconnected');
+      showNotification(result.success ? '连接成功' : '连接失败', result.success ? 'success' : 'error');
+    } catch (error) {
+      setIsConnected(false);
+      setConnectionStatus('error');
+      showNotification('连接出错', 'error');
     }
   };
 
-  // 截图翻译
-  const captureAndTranslate = async () => {
-    showNotification('截图功能开发中...', 'info');
-    // TODO: 实现截图功能
+  const toggleTheme = () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
   };
 
-  // 显示快捷键
-  const showShortcuts = () => {
-    const shortcuts = `
-快捷键列表：
-- Ctrl+Enter - 翻译
-- Ctrl+L - 切换语言
-- Ctrl+N - 新建翻译
-- Ctrl+S - 导出翻译
-- Ctrl+Shift+T - 截图翻译
-- Ctrl+Q - 快速翻译
-- Ctrl+, - 打开设置
-    `;
-    alert(shortcuts);
-  };
-
-  // 显示通知
   const showNotification = (message, type = 'info') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 3000);
   };
 
-  // 处理文件上传
-  const handleFileUpload = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-    
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      setSourceText(e.target.result);
-      showNotification('文件加载成功', 'success');
-    };
-    reader.onerror = () => {
-      showNotification('文件读取失败', 'error');
-    };
-    reader.readAsText(file);
-  };
-
-  // 切换主题
-  const toggleTheme = () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light';
-    setTheme(newTheme);
-    document.documentElement.setAttribute('data-theme', newTheme);
-    
-    if (window.electron && window.electron.store) {
-      window.electron.store.set('theme', newTheme);
-    }
-  };
-
+  // ========== 5. 界面渲染 (JSX) ==========
   return (
-    <div className="app">
-      {/* 标题栏 */}
-      <div className="titlebar">
-        <div className="titlebar-drag-region">
-          <span className="app-title">T-Translate Core</span>
-        </div>
-        <div className="titlebar-controls">
-          <button onClick={toggleTheme} className="titlebar-button">
-            {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
-          </button>
-          {window.electron && (
-            <>
-              <button 
-                onClick={() => window.electron.window.minimize()} 
-                className="titlebar-button"
-              >
-                <Minimize2 size={16} />
-              </button>
-              <button 
-                onClick={() => window.electron.window.maximize()} 
-                className="titlebar-button"
-              >
-                <Maximize2 size={16} />
-              </button>
-              <button 
-                onClick={() => window.electron.window.close()} 
-                className="titlebar-button close"
-              >
-                <X size={16} />
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* 主内容区 */}
+    <div className={`app ${theme} no-titlebar`}>
       <div className="app-content">
         {/* 侧边栏 */}
         <div className={`sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}>
           <button 
             className="sidebar-toggle"
             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            title={isSidebarCollapsed ? '展开' : '收起'}
           >
-            <Menu size={20} />
+            {isSidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
           </button>
-          
+
           <nav className="sidebar-nav">
             <button
               className={`sidebar-item ${activeTab === 'translate' ? 'active' : ''}`}
               onClick={() => setActiveTab('translate')}
+              title="翻译"
             >
               <FileText size={20} />
               {!isSidebarCollapsed && <span>翻译</span>}
             </button>
+            
             <button
               className={`sidebar-item ${activeTab === 'history' ? 'active' : ''}`}
               onClick={() => setActiveTab('history')}
+              title="历史"
             >
               <History size={20} />
               {!isSidebarCollapsed && <span>历史</span>}
             </button>
+            
             <button
               className={`sidebar-item ${activeTab === 'settings' ? 'active' : ''}`}
               onClick={() => setActiveTab('settings')}
+              title="设置"
             >
               <Settings size={20} />
               {!isSidebarCollapsed && <span>设置</span>}
             </button>
           </nav>
 
-          {/* 连接状态 */}
-          <div className="connection-status">
-            <div className={`status-indicator ${connectionStatus}`}>
-              <Zap size={16} />
-            </div>
-            {!isSidebarCollapsed && (
-              <span className="status-text">
-                {connectionStatus === 'connected' ? 'LM Studio 已连接' :
-                 connectionStatus === 'checking' ? '检查连接...' : 
-                 'LM Studio 未连接'}
-              </span>
-            )}
+          <div className="sidebar-footer">
+            <button
+              className="sidebar-theme-toggle"
+              onClick={toggleTheme}
+              title="切换主题"
+            >
+              {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
+              {!isSidebarCollapsed && (
+                <span>{theme === 'light' ? '深色' : '浅色'}</span>
+              )}
+            </button>
           </div>
         </div>
 
         {/* 主面板 */}
         <div className="main-panel">
+          {/* A. 翻译页面 */}
           {activeTab === 'translate' && (
             <div className="translate-panel">
-              {/* 工具栏 */}
               <div className="toolbar">
                 <div className="language-selector">
                   <select
@@ -485,10 +363,12 @@ function App() {
                     ))}
                   </select>
                   
+                  {/* 这里就是之前报错的地方，现在 switchLanguages 已经定义了 */}
                   <button 
                     className="switch-button"
                     onClick={switchLanguages}
                     disabled={sourceLanguage === 'auto'}
+                    title="切换语言"
                   >
                     <RefreshCw size={18} />
                   </button>
@@ -510,29 +390,31 @@ function App() {
                   <button 
                     className="toolbar-button"
                     onClick={() => fileInputRef.current?.click()}
+                    title="导入文件"
                   >
                     <Upload size={18} />
-                    导入
+                    <span>导入</span>
                   </button>
                   <button 
                     className="toolbar-button"
                     onClick={exportTranslation}
                     disabled={!translatedText}
+                    title="导出翻译"
                   >
                     <Download size={18} />
-                    导出
+                    <span>导出</span>
                   </button>
                   <button 
                     className="toolbar-button"
                     onClick={clearContent}
+                    title="清空内容"
                   >
                     <X size={18} />
-                    清空
+                    <span>清空</span>
                   </button>
                 </div>
               </div>
 
-              {/* 翻译区域 */}
               <div className="translate-content">
                 <div className="translate-box">
                   <div className="box-header">
@@ -567,48 +449,80 @@ function App() {
                 <div className="translate-box">
                   <div className="box-header">
                     <span>译文</span>
-                    <div className="box-actions">
-                      <button
-                        className="icon-button"
-                        onClick={copyTranslation}
-                        disabled={!translatedText}
-                      >
-                        <Copy size={16} />
-                      </button>
-                    </div>
+                    <button
+                      className="icon-button"
+                      onClick={copyTranslation}
+                      disabled={!translatedText}
+                      title="复制译文"
+                    >
+                      <Copy size={16} />
+                    </button>
                   </div>
                   <textarea
                     className="translate-textarea"
                     value={translatedText}
                     onChange={(e) => setTranslatedText(e.target.value)}
                     placeholder="翻译结果将显示在这里..."
+                    readOnly
                   />
                 </div>
               </div>
             </div>
           )}
 
+          {/* B. 历史页面 */}
           {activeTab === 'history' && (
             <div className="history-panel">
-              <h2>翻译历史</h2>
+              <div className="panel-header">
+                <h2>翻译历史</h2>
+                {translationHistory.length > 0 && (
+                  <button 
+                    className="clear-button"
+                    onClick={clearHistory}
+                  >
+                    <Trash2 size={16} />
+                    清空历史
+                  </button>
+                )}
+              </div>
+              
               <div className="history-list">
                 {translationHistory.length > 0 ? (
-                  translationHistory.map((item, index) => (
-                    <div key={item.id || index} className="history-item">
-                      <div className="history-header">
-                        <span className="history-lang">
-                          {item.from} → {item.to}
-                        </span>
-                        <span className="history-time">
-                          {new Date(item.timestamp).toLocaleString()}
-                        </span>
+                  translationHistory.map((item, index) => {
+                    // 安全处理：确保 from 和 to 是字符串
+                    const fromLang = typeof item.from === 'object' ? 'auto' : item.from;
+                    const toLang = typeof item.to === 'object' ? 'zh' : item.to;
+                    
+                    return (
+                      <div key={item.id || index} className="history-item">
+                        <div className="history-header">
+                          <span className="history-lang">
+                            {languages.find(l=>l.code===fromLang)?.name || fromLang} 
+                            {' -> '} 
+                            {languages.find(l=>l.code===toLang)?.name || toLang}
+                          </span>
+                          <span className="history-time">
+                            {/* 安全处理时间戳 */}
+                            {new Date(item.timestamp || Date.now()).toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="history-content">
+                          <div className="history-original">
+                            {/* 关键修复：检查类型，如果是对象则不渲染或转换 */}
+                            {typeof item.original === 'string' 
+                              ? item.original 
+                              : (item.original?.original || JSON.stringify(item.original))}
+                          </div>
+                          <div className="history-translated">
+                            {/* 关键修复：检查类型，如果是对象则提取 translated 字段 */}
+                            {typeof item.translated === 'string' 
+                              ? item.translated 
+                              : (item.translated?.translated || "数据格式错误")}
+                          </div>
+                        </div>
                       </div>
-                      <div className="history-content">
-                        <div className="history-original">{item.original}</div>
-                        <div className="history-translated">{item.translated}</div>
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 ) : (
                   <div className="empty-state">
                     <History size={48} />
@@ -619,60 +533,81 @@ function App() {
             </div>
           )}
 
+          {/* C. 设置页面 */}
           {activeTab === 'settings' && (
             <div className="settings-panel">
               <h2>设置</h2>
-              <div className="settings-content">
-                <div className="setting-group">
-                  <h3>连接设置</h3>
-                  <div className="setting-item">
-                    <label>LM Studio 端点</label>
-                    <input 
-                      type="text" 
-                      defaultValue="http://localhost:1234/v1"
-                      className="setting-input"
-                    />
+              
+              <div className="setting-group">
+                <h3>快捷键</h3>
+                <div className="shortcut-list">
+                  <div className="shortcut-item">
+                    <kbd>Ctrl</kbd> + <kbd>Enter</kbd>
+                    <span>翻译</span>
                   </div>
-                  <button 
-                    className="setting-button"
-                    onClick={testLLMConnection}
+                  {/* 注意：Ctrl+L 一般是浏览器定位栏，网页版可能需要 e.preventDefault() */}
+                  <div className="shortcut-item">
+                    <kbd>Ctrl</kbd> + <kbd>L</kbd>
+                    <span>切换语言 (暂未绑定)</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="setting-group">
+                <h3>外观设置</h3>
+                <div className="setting-item">
+                  <label>主题模式</label>
+                  <span className="setting-value">
+                    {theme === 'light' ? '浅色模式' : '深色模式'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="setting-group">
+                <h3>LM Studio 连接</h3>
+                <div className="setting-item">
+                  <label>端点地址</label>
+                  <input 
+                    type="text" 
+                    defaultValue="http://localhost:1234/v1"
+                    className="setting-input"
+                  />
+                </div>
+                <div className="setting-item">
+                  <label>连接状态</label>
+                  <span className={`connection-badge ${connectionStatus}`}>
+                    {connectionStatus === 'connected' ? '已连接' :
+                     connectionStatus === 'checking' ? '检查中...' : '未连接'}
+                  </span>
+                </div>
+                <button 
+                  className="setting-button"
+                  onClick={testLLMConnection}
+                >
+                  测试连接
+                </button>
+              </div>
+
+              <div className="setting-group">
+                <h3>OCR 设置</h3>
+                <div className="setting-item">
+                  <label>OCR 引擎</label>
+                  <select 
+                    value={ocrEngine}
+                    onChange={(e) => setOcrEngine(e.target.value)}
+                    className="setting-select"
                   >
-                    测试连接
-                  </button>
+                    <option value="tesseract">Tesseract.js</option>
+                    <option value="llm-vision">LLM Vision</option>
+                  </select>
                 </div>
+              </div>
 
-                <div className="setting-group">
-                  <h3>OCR 设置</h3>
-                  <div className="setting-item">
-                    <label>OCR 引擎</label>
-                    <select 
-                      value={ocrEngine}
-                      onChange={(e) => setOcrEngine(e.target.value)}
-                      className="setting-select"
-                    >
-                      <option value="tesseract">Tesseract.js</option>
-                      <option value="llm-vision">LLM Vision</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="setting-group">
-                  <h3>界面设置</h3>
-                  <div className="setting-item">
-                    <label>主题</label>
-                    <select 
-                      value={theme}
-                      onChange={(e) => {
-                        const newTheme = e.target.value;
-                        setTheme(newTheme);
-                        document.documentElement.setAttribute('data-theme', newTheme);
-                      }}
-                      className="setting-select"
-                    >
-                      <option value="light">浅色</option>
-                      <option value="dark">深色</option>
-                    </select>
-                  </div>
+              <div className="setting-group">
+                <h3>关于</h3>
+                <div className="about-content">
+                  <p><strong>T-Translate</strong></p>
+                  <p>版本: 1.0.0</p>
                 </div>
               </div>
             </div>
@@ -680,19 +615,22 @@ function App() {
         </div>
       </div>
 
-      {/* 通知 */}
+      {/* 通知组件 */}
       {notification && (
         <div className={`notification notification-${notification.type}`}>
-          <AlertCircle size={16} />
+          {notification.type === 'success' && <CheckCircle size={16} />}
+          {notification.type === 'error' && <AlertCircle size={16} />}
+          {notification.type === 'warning' && <AlertCircle size={16} />}
+          {notification.type === 'info' && <Info size={16} />}
           <span>{notification.message}</span>
         </div>
       )}
 
-      {/* 隐藏的文件输入 */}
+      {/* 隐藏的文件输入框 */}
       <input
         ref={fileInputRef}
         type="file"
-        accept=".txt,.md,.doc,.docx"
+        accept=".txt,.md,.json"
         onChange={handleFileUpload}
         style={{ display: 'none' }}
       />

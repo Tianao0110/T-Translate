@@ -63,6 +63,8 @@ function createWindow() {
       sandbox: false,
       preload: path.join(__dirname, "preload.js"),
     },
+    autoHideMenuBar: true,  // 自动隐藏菜单栏
+    menuBarVisible: false, // 不显示菜单栏
     icon: path.join(__dirname, "../public/icon.png"),
     frame: true,
     titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
@@ -70,6 +72,7 @@ function createWindow() {
     backgroundColor: "#ffffff",
     alwaysOnTop: store.get("alwaysOnTop", false),
   });
+  mainWindow.removeMenu();
 
   // 加载应用
   if (isDev) {
