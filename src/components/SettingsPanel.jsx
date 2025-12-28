@@ -38,7 +38,15 @@ const SettingsPanel = ({ showNotification }) => {
   const notify = showNotification || ((msg, type) => console.log(`[${type}] ${msg}`));
 
   // Store actions
-  const { setOcrEngine } = useTranslationStore();
+  const { 
+    setOcrEngine, 
+    useStreamOutput, 
+    setUseStreamOutput,
+    autoTranslate,
+    setAutoTranslate,
+    autoTranslateDelay,
+    setAutoTranslateDelay
+  } = useTranslationStore();
 
   // 设置状态
   const [settings, setSettings] = useState({
@@ -286,10 +294,40 @@ const SettingsPanel = ({ showNotification }) => {
             </div>
             <div className="setting-group">
                 <label className="setting-switch">
-                    <input type="checkbox" checked={settings.translation.autoTranslate} onChange={(e)=>updateSetting('translation','autoTranslate',e.target.checked)} />
+                    <input 
+                      type="checkbox" 
+                      checked={autoTranslate} 
+                      onChange={(e) => setAutoTranslate(e.target.checked)} 
+                    />
                     <span className="switch-slider"></span>
                     <span className="switch-label">自动翻译</span>
                 </label>
+                <p className="setting-hint">输入停止后自动开始翻译</p>
+            </div>
+            <div className="setting-group">
+                <label className="setting-label">自动翻译延迟: {autoTranslateDelay}ms</label>
+                <input 
+                  type="range" 
+                  className="setting-range" 
+                  min="300" 
+                  max="2000" 
+                  step="100"
+                  value={autoTranslateDelay} 
+                  onChange={(e) => setAutoTranslateDelay(parseInt(e.target.value))} 
+                />
+                <p className="setting-hint">停止输入后等待多久开始翻译</p>
+            </div>
+            <div className="setting-group">
+                <label className="setting-switch">
+                    <input 
+                      type="checkbox" 
+                      checked={useStreamOutput} 
+                      onChange={(e) => setUseStreamOutput(e.target.checked)} 
+                    />
+                    <span className="switch-slider"></span>
+                    <span className="switch-label">流式输出（打字机效果）</span>
+                </label>
+                <p className="setting-hint">开启后翻译结果将逐字显示，关闭则一次性显示</p>
             </div>
           </div>
         );

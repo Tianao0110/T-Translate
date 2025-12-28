@@ -18,6 +18,9 @@ const useTranslationStore = create(
       // ==================== 1. 状态 (保留原样) ====================
       // 当前翻译任务
       translationMode: "standard", // 'standard' | 'secure' | 'offline'
+      useStreamOutput: true, // 是否使用流式输出（打字机效果）
+      autoTranslate: false, // 是否自动翻译
+      autoTranslateDelay: 500, // 自动翻译延迟（毫秒）
       currentTranslation: {
         id: null,
         sourceText: "",
@@ -71,6 +74,22 @@ const useTranslationStore = create(
         set((state) => {
           state.translationMode = mode;
         }),
+
+      setUseStreamOutput: (value) =>
+        set((state) => {
+          state.useStreamOutput = value;
+        }),
+
+      setAutoTranslate: (value) =>
+        set((state) => {
+          state.autoTranslate = value;
+        }),
+
+      setAutoTranslateDelay: (value) =>
+        set((state) => {
+          state.autoTranslateDelay = value;
+        }),
+
       setSourceText: (text) =>
         set((state) => {
           state.currentTranslation.sourceText = text;
@@ -104,7 +123,111 @@ const useTranslationStore = create(
           state.currentTranslation.translatedText = tempText;
         }),
 
-      // 核心翻译逻辑
+      // ==================== 流式翻译 (打字机效果) ====================
+      streamTranslate: async (options = {}) => {
+        const state = get();
+        const mode = state.translationMode;
+        const { sourceText, sourceLanguage, targetLanguage } =
+          state.currentTranslation;
+
+        if (!sourceText.trim()) {
+          return { success: false, error: "请输入要翻译的文本" };
+        }
+
+        const startTime = Date.now();
+
+        set((state) => {
+          state.currentTranslation.status = "translating";
+          state.currentTranslation.error = null;
+          state.currentTranslation.translatedText = ""; // 清空之前的译文
+          state.currentTranslation.id = uuidv4();
+        });
+
+        try {
+          // 调用 translator 的流式翻译
+          const stream = translator.streamTranslate(sourceText, {
+            from: sourceLanguage,
+            to: targetLanguage,
+            template: options.template || state.currentTranslation.metadata.template,
+            saveHistory: mode !== "secure",
+          });
+
+          let fullText = "";
+
+          // 逐步接收 chunk 并更新 UI
+          for await (const chunk of stream) {
+            if (chunk.error) {
+              throw new Error(chunk.error);
+            }
+
+            if (chunk.chunk) {
+              fullText = chunk.fullText;
+              // 实时更新译文
+              set((state) => {
+                state.currentTranslation.translatedText = fullText;
+              });
+            }
+
+            if (chunk.done) {
+              break;
+            }
+          }
+
+          const duration = Date.now() - startTime;
+
+          // 完成后更新状态和历史
+          set((state) => {
+            state.currentTranslation.status = "success";
+            state.currentTranslation.metadata = {
+              timestamp: Date.now(),
+              duration,
+              model: null,
+              template: options.template || state.currentTranslation.metadata.template,
+            };
+
+            // 添加到历史（非无痕模式）
+            if (mode !== "secure" && fullText) {
+              const historyItem = {
+                id: state.currentTranslation.id,
+                sourceText: sourceText,
+                translatedText: fullText,
+                sourceLanguage: sourceLanguage,
+                targetLanguage: targetLanguage,
+                timestamp: Date.now(),
+                duration,
+                model: null,
+              };
+
+              state.history.unshift(historyItem);
+
+              if (state.history.length > state.historyLimit) {
+                state.history = state.history.slice(0, state.historyLimit);
+              }
+
+              state.statistics.totalTranslations++;
+              state.statistics.totalCharacters += sourceText.length;
+
+              // 更新今日统计
+              const today = new Date().toDateString();
+              const historyToday = state.history.filter(
+                (item) => new Date(item.timestamp).toDateString() === today
+              );
+              state.statistics.todayTranslations = historyToday.length;
+            }
+          });
+
+          return { success: true, translated: fullText };
+        } catch (error) {
+          console.error("Stream translation error:", error);
+          set((state) => {
+            state.currentTranslation.status = "error";
+            state.currentTranslation.error = error.message;
+          });
+          return { success: false, error: error.message };
+        }
+      },
+
+      // 核心翻译逻辑（非流式，保留兼容）
       translate: async (options = {}) => {
         const state = get();
         const mode = state.translationMode;

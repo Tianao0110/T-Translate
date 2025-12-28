@@ -230,50 +230,96 @@ class LLMClient {
   }
 
   /**
-   * 流式聊天（用于实时显示）
+   * 流式聊天（用于实时显示）- 使用 Fetch API
+   * 在浏览器/Electron 渲染进程中正确支持 SSE 流
    */
   async *streamChat(messages, options = {}) {
-    try {
-      const requestData = {
-        model: options.model || this.config.models.chat,
-        messages: messages,
-        temperature: options.temperature || this.config.defaultParams.temperature,
-        max_tokens: options.max_tokens || this.config.defaultParams.max_tokens,
-        stream: true
-      };
+    const requestData = {
+      model: options.model || this.config.models?.chat || 'local-model',
+      messages: messages,
+      temperature: options.temperature || this.config.defaultParams?.temperature || 0.7,
+      max_tokens: options.max_tokens || this.config.defaultParams?.max_tokens || 2000,
+      stream: true
+    };
 
-      const response = await this.client.post('/chat/completions', requestData, {
-        responseType: 'stream'
+    try {
+      const response = await fetch(`${this.config.endpoint}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData),
       });
 
-      const stream = response.data;
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
       let buffer = '';
 
-      for await (const chunk of stream) {
-        buffer += chunk.toString();
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) {
+          break;
+        }
+
+        // 解码并添加到缓冲区
+        buffer += decoder.decode(value, { stream: true });
+        
+        // 按行分割处理
         const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
+        buffer = lines.pop() || ''; // 保留最后不完整的行
 
         for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6);
+          const trimmedLine = line.trim();
+          
+          if (!trimmedLine || trimmedLine === '') {
+            continue;
+          }
+          
+          if (trimmedLine.startsWith('data: ')) {
+            const data = trimmedLine.slice(6);
+            
             if (data === '[DONE]') {
               return;
             }
+            
             try {
               const json = JSON.parse(data);
-              if (json.choices?.[0]?.delta?.content) {
-                yield json.choices[0].delta.content;
+              const content = json.choices?.[0]?.delta?.content;
+              if (content) {
+                yield content;
               }
             } catch (e) {
-              console.error('Parse stream error:', e);
+              // 忽略解析错误（可能是不完整的 JSON）
+              console.debug('Parse chunk error (may be incomplete):', e.message);
             }
           }
         }
       }
+
+      // 处理缓冲区中剩余的数据
+      if (buffer.trim()) {
+        const trimmedLine = buffer.trim();
+        if (trimmedLine.startsWith('data: ') && trimmedLine !== 'data: [DONE]') {
+          try {
+            const json = JSON.parse(trimmedLine.slice(6));
+            const content = json.choices?.[0]?.delta?.content;
+            if (content) {
+              yield content;
+            }
+          } catch (e) {
+            // 忽略
+          }
+        }
+      }
+
     } catch (error) {
       console.error('Stream chat error:', error);
-      yield `[错误: ${error.message}]`;
+      throw error;
     }
   }
 

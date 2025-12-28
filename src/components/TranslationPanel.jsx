@@ -26,18 +26,20 @@ const TranslationPanel = ({ showNotification }) => {
   // ========== Zustand Store ==========
   const {
     currentTranslation,
+    useStreamOutput, // 流式输出开关
+    autoTranslate,   // 自动翻译开关
+    autoTranslateDelay, // 自动翻译延迟
     setSourceText,
     setTranslatedText,
     setLanguages,
-    translate,
+    translate,        // 非流式翻译
+    streamTranslate,  // 流式翻译
     recognizeImage,
     clearCurrent,
     swapLanguages,
     addToFavorites,
     copyToClipboard,
     pasteFromClipboard,
-    // 如果 Store 里没有专门设置模板的 action，我们可以直接修改 metadata (如果是 immer) 
-    // 或者在 translate 时传入
   } = useTranslationStore();
 
   // Refs
@@ -58,17 +60,15 @@ const TranslationPanel = ({ showNotification }) => {
     { code: 'ar', name: 'العربية', flag: '🇸🇦' }
   ];
 
-  // 翻译模板
+  // 翻译模板（精简版：3个）
   const templates = [
-    { id: 'general', name: '通用', icon: FileText },
-    { id: 'technical', name: '技术', icon: Zap },
-    { id: 'academic', name: '学术', icon: Sparkles },
-    { id: 'business', name: '商务', icon: FileText },
-    { id: 'casual', name: '口语', icon: Mic }
+    { id: 'natural', name: '自然', icon: FileText, desc: '日常/口语' },
+    { id: 'precise', name: '精确', icon: Zap, desc: '技术/学术' },
+    { id: 'formal', name: '正式', icon: Sparkles, desc: '商务/官方' },
   ];
 
-  // [UI 状态] 当前选中的模板 (UI state, 传给 translate 函数)
-  const [selectedTemplate, setSelectedTemplate] = useState('general');
+  // [UI 状态] 当前选中的模板
+  const [selectedTemplate, setSelectedTemplate] = useState('natural');
 
   // 初始化连接检查
   useEffect(() => {
@@ -86,7 +86,33 @@ const TranslationPanel = ({ showNotification }) => {
     }
   };
 
-  // 处理翻译
+  // 自动翻译：防抖逻辑
+  useEffect(() => {
+    // 如果未开启自动翻译，直接返回
+    if (!autoTranslate) return;
+    
+    // 如果没有输入内容，直接返回
+    if (!currentTranslation.sourceText.trim()) return;
+    
+    // 如果正在翻译中，不触发新的翻译
+    if (currentTranslation.status === 'translating') return;
+
+    // 设置防抖定时器
+    const timer = setTimeout(() => {
+      // 再次检查状态（防止在延迟期间状态已改变）
+      const state = useTranslationStore.getState();
+      if (state.autoTranslate && 
+          state.currentTranslation.sourceText.trim() && 
+          state.currentTranslation.status !== 'translating') {
+        handleTranslate();
+      }
+    }, autoTranslateDelay);
+
+    // 清理定时器
+    return () => clearTimeout(timer);
+  }, [currentTranslation.sourceText, autoTranslate, autoTranslateDelay]);
+
+  // 处理翻译（根据设置选择流式或非流式）
   const handleTranslate = async () => {
     if (!currentTranslation.sourceText.trim()) {
       notify('请输入要翻译的内容', 'warning');
@@ -95,19 +121,19 @@ const TranslationPanel = ({ showNotification }) => {
 
     if (!isConnected && translationMode !== 'offline') {
       notify('LM Studio 未连接，请检查连接或使用离线模式', 'error');
-      // 注意：这里我们不强制 return，允许用户尝试（也许连接刚恢复）
     }
 
-    // 调用 Store 的 translate Action
-    const result = await translate({
+    const options = {
       template: selectedTemplate,
-      // 如果是安全模式，可以传递给 service 层不记录历史 (需要 service 支持，目前 store 已有部分逻辑)
       saveHistory: translationMode !== 'secure' 
-    });
+    };
+
+    // 根据设置选择流式或非流式翻译
+    const result = useStreamOutput 
+      ? await streamTranslate(options)
+      : await translate(options);
 
     if (result.success) {
-      // 成功不打扰，或者显示个轻提示
-      // notify('翻译完成', 'success');
       if (translationMode === 'secure') {
         console.log('[SECURE] Translation done, history skipped.');
       }

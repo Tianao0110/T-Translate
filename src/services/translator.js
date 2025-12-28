@@ -18,65 +18,52 @@ class TranslationService {
     
     // 支持的语言列表
     this.supportedLanguages = {
-      'auto': '自动检测',
-      'zh': '中文',
-      'en': '英语',
-      'ja': '日语',
-      'ko': '韩语',
-      'es': '西班牙语',
-      'fr': '法语',
-      'de': '德语',
-      'ru': '俄语',
-      'pt': '葡萄牙语',
-      'it': '意大利语',
-      'ar': '阿拉伯语',
-      'hi': '印地语',
-      'th': '泰语',
-      'vi': '越南语'
-    };
-
-    // 翻译模板
-    this.templates = {
-      general: config.translation.systemPrompt,
-      technical: `你是一个专业的技术文档翻译助手。请将以下技术内容翻译成{targetLanguage}。
-要求：
-1. 保留所有技术术语的准确性
-2. 代码、命令、变量名保持原样
-3. 保持文档的格式和结构
-4. 技术缩写首次出现时提供全称`,
-      
-      academic: `你是一个学术翻译专家。请将以下学术内容翻译成{targetLanguage}。
-要求：
-1. 保持学术用语的严谨性
-2. 引用格式保持不变
-3. 专业术语使用标准译法
-4. 保留原文的逻辑结构`,
-      
-      casual: `你是一个翻译助手。请将以下内容翻译成{targetLanguage}。
-要求：
-1. 使用口语化的表达
-2. 保持原文的语气和情感
-3. 适当使用当地俚语或习语
-4. 让译文自然流畅`,
-      
-      business: `你是一个商务翻译专家。请将以下商务内容翻译成{targetLanguage}。
-要求：
-1. 使用正式的商务用语
-2. 保持专业术语的准确性
-3. 符合商务礼仪规范
-4. 确保信息传达准确无误`
+      'auto': 'Auto Detect',
+      'zh': 'Chinese',
+      'en': 'English',
+      'ja': 'Japanese',
+      'ko': 'Korean',
+      'es': 'Spanish',
+      'fr': 'French',
+      'de': 'German',
+      'ru': 'Russian',
+      'pt': 'Portuguese',
+      'it': 'Italian',
+      'ar': 'Arabic',
+      'hi': 'Hindi',
+      'th': 'Thai',
+      'vi': 'Vietnamese'
     };
   }
 
   /**
-   * 主翻译方法
+   * 获取翻译模板
+   * @param {string} templateName - 模板名称 (precise/natural/formal)
+   * @param {string} targetLanguage - 目标语言代码
+   * @returns {string} 完整的系统提示词
+   */
+  getTemplate(templateName, targetLanguage) {
+    const templates = config.translation.templates;
+    const template = templates[templateName] || templates.natural;
+    const langName = this.getLanguageName(targetLanguage);
+    return template.replace(/{targetLanguage}/g, langName);
+  }
+
+  /**
+   * 获取语言名称（英文）
+   */
+  getLanguageName(code) {
+    return this.supportedLanguages[code] || code;
+  }
+
+  /**
+   * 主翻译方法 - 使用模板直接调用 chatCompletion
    */
   async translate(text, options = {}) {
-    // 参数处理
     const {
       from = 'auto',
       to = 'zh',
-      template = 'general',
+      template = config.translation.defaultTemplate || 'natural',
       useCache = true,
       saveHistory = true,
       model = null
@@ -85,7 +72,7 @@ class TranslationService {
     // 检查缓存
     const cacheKey = this.getCacheKey(text, from, to, template);
     if (useCache && this.translationCache.has(cacheKey)) {
-      console.log('[Translator] 使用缓存的翻译结果');
+      console.log('[Translator] Using cached translation');
       return this.translationCache.get(cacheKey);
     }
 
@@ -129,18 +116,21 @@ class TranslationService {
         return result;
       }
 
-      // 获取翻译模板
+      // 🔴 核心修改：使用模板构建 messages，直接调用 chatCompletion
       const systemPrompt = this.getTemplate(template, to);
+      
+      const messages = [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: text }  // 直接发送原文，不需要额外包装
+      ];
 
-      // 调用 LLM 进行翻译
-      const response = await llmClient.translate(text, 
-        this.getLanguageName(to), 
-        this.getLanguageName(detectedLang),
-        { model }
-      );
+      console.log(`[Translator] Using template: ${template}, target: ${this.getLanguageName(to)}`);
+
+      // 调用 LLM
+      const response = await llmClient.chatCompletion(messages, { model });
 
       if (!response.success) {
-        throw new Error(response.error || '翻译失败');
+        throw new Error(response.error || 'Translation failed');
       }
 
       // 构建结果
@@ -162,7 +152,7 @@ class TranslationService {
       return result;
 
     } catch (error) {
-      console.error('[Translator] 翻译错误:', error);
+      console.error('[Translator] Translation error:', error);
       
       const result = {
         id: job.id,
@@ -239,7 +229,7 @@ class TranslationService {
     const {
       from = 'auto',
       to = 'zh',
-      template = 'general',
+      template = config.translation.defaultTemplate || 'natural',
       model = null
     } = options;
 
@@ -248,7 +238,7 @@ class TranslationService {
     
     const messages = [
       { role: 'system', content: systemPrompt },
-      { role: 'user', content: `请翻译以下内容:\n\n${text}` }
+      { role: 'user', content: text }
     ];
 
     try {
@@ -295,8 +285,6 @@ class TranslationService {
    */
   async detectLanguage(text) {
     // 简单的语言检测逻辑
-    // 实际项目中可以使用更复杂的检测方法或调用 LLM
-    
     const patterns = {
       zh: /[\u4e00-\u9fa5]/,
       ja: /[\u3040-\u309f\u30a0-\u30ff]/,
@@ -309,7 +297,7 @@ class TranslationService {
     // 统计各语言字符数
     const counts = {};
     for (const [lang, pattern] of Object.entries(patterns)) {
-      const matches = text.match(pattern);
+      const matches = text.match(new RegExp(pattern, 'g'));
       counts[lang] = matches ? matches.length : 0;
     }
 
@@ -329,36 +317,8 @@ class TranslationService {
       detectedLang = 'en';
     }
 
-    console.log(`[Translator] 检测到语言: ${detectedLang}`);
+    console.log(`[Translator] Detected language: ${detectedLang}`);
     return detectedLang;
-  }
-
-  /**
-   * 获取翻译模板
-   */
-  getTemplate(templateName, targetLanguage) {
-    const template = this.templates[templateName] || this.templates.general;
-    const langName = this.getLanguageName(targetLanguage);
-    return template.replace('{targetLanguage}', langName);
-  }
-
-  /**
-   * 获取语言名称
-   */
-  getLanguageName(code) {
-    if (this.supportedLanguages[code]) {
-      return this.supportedLanguages[code];
-    }
-    // 尝试映射常见的语言代码
-    const langMap = {
-      'zh': '中文',
-      'zh-CN': '中文简体',
-      'zh-TW': '中文繁体',
-      'en': '英语',
-      'en-US': '美式英语',
-      'en-GB': '英式英语'
-    };
-    return langMap[code] || code;
   }
 
   /**
@@ -414,7 +374,6 @@ class TranslationService {
 
     let filtered = this.translationHistory;
 
-    // 过滤条件
     if (from) {
       filtered = filtered.filter(item => item.from === from);
     }
@@ -429,7 +388,6 @@ class TranslationService {
       );
     }
 
-    // 分页
     return {
       items: filtered.slice(offset, offset + limit),
       total: filtered.length,
@@ -442,7 +400,7 @@ class TranslationService {
    */
   clearHistory() {
     this.translationHistory = [];
-    console.log('[Translator] 历史记录已清空');
+    console.log('[Translator] History cleared');
   }
 
   /**
@@ -450,7 +408,7 @@ class TranslationService {
    */
   clearCache() {
     this.translationCache.clear();
-    console.log('[Translator] 翻译缓存已清空');
+    console.log('[Translator] Cache cleared');
   }
 
   /**
@@ -480,13 +438,14 @@ class TranslationService {
     if (format === 'json') {
       return JSON.stringify(data, null, 2);
     } else if (format === 'csv') {
-      const headers = ['时间', '源语言', '目标语言', '原文', '译文'];
+      const headers = ['Time', 'From', 'To', 'Template', 'Original', 'Translated'];
       const rows = data.map(item => [
         dayjs(item.timestamp).format('YYYY-MM-DD HH:mm:ss'),
         item.from,
         item.to,
-        `"${item.original.replace(/"/g, '""')}"`,
-        `"${item.translated.replace(/"/g, '""')}"`
+        item.template || 'natural',
+        `"${(item.original || '').replace(/"/g, '""')}"`,
+        `"${(item.translated || '').replace(/"/g, '""')}"`
       ]);
       
       return [headers, ...rows].map(row => row.join(',')).join('\n');
