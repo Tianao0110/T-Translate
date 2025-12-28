@@ -7,6 +7,7 @@ import {
   ExternalLink, ChevronRight, Terminal, Code2, Palette
 } from 'lucide-react';
 import llmClient from '../utils/llm-client';
+import translator from '../services/translator';
 import useTranslationStore from '../stores/translation-store';
 import '../styles/components/SettingsPanel.css'; 
 
@@ -328,6 +329,30 @@ const SettingsPanel = ({ showNotification }) => {
                     <span className="switch-label">流式输出（打字机效果）</span>
                 </label>
                 <p className="setting-hint">开启后翻译结果将逐字显示，关闭则一次性显示</p>
+            </div>
+            
+            {/* 缓存管理 */}
+            <div className="setting-group" style={{marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border-primary)'}}>
+                <h4 style={{marginBottom: '12px', color: 'var(--text-secondary)'}}>翻译缓存</h4>
+                <p className="setting-hint" style={{marginBottom: '12px'}}>
+                  缓存已翻译的内容，相同文本再次翻译时直接返回结果，节省时间和资源。
+                  <br />
+                  当前缓存: {translator.getCacheStats().valid} 条 / 最大 {translator.getCacheStats().maxSize} 条
+                  <br />
+                  自动过期: {translator.getCacheStats().ttlDays} 天
+                </p>
+                <button 
+                  className="danger-button"
+                  onClick={() => {
+                    if (window.confirm('确定要清除所有翻译缓存吗？')) {
+                      translator.clearCache();
+                      notify('翻译缓存已清除', 'success');
+                      setActiveSection('translation'); // 刷新显示
+                    }
+                  }}
+                >
+                  <Trash2 size={16} /> 清除翻译缓存
+                </button>
             </div>
           </div>
         );

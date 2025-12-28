@@ -5,12 +5,180 @@ import { v4 as uuidv4 } from 'uuid';
 import dayjs from 'dayjs';
 
 /**
+ * 翻译缓存管理器
+ * 持久化到 localStorage，支持 TTL 和容量限制
+ */
+class TranslationCache {
+  constructor(options = {}) {
+    this.storageKey = 'translation-cache';
+    this.maxSize = options.maxSize || 200;  // 最大缓存条数
+    this.ttl = options.ttl || 7 * 24 * 60 * 60 * 1000;  // 7天过期
+    this.cache = new Map();
+    
+    // 启动时加载缓存
+    this.load();
+    // 清理过期缓存
+    this.cleanup();
+  }
+
+  /**
+   * 从 localStorage 加载缓存
+   */
+  load() {
+    try {
+      const data = localStorage.getItem(this.storageKey);
+      if (data) {
+        const parsed = JSON.parse(data);
+        // 转换为 Map
+        Object.entries(parsed).forEach(([key, value]) => {
+          this.cache.set(key, value);
+        });
+        console.log(`[Cache] Loaded ${this.cache.size} cached translations`);
+      }
+    } catch (error) {
+      console.error('[Cache] Failed to load cache:', error);
+      this.cache = new Map();
+    }
+  }
+
+  /**
+   * 保存缓存到 localStorage
+   */
+  save() {
+    try {
+      const obj = {};
+      this.cache.forEach((value, key) => {
+        obj[key] = value;
+      });
+      localStorage.setItem(this.storageKey, JSON.stringify(obj));
+    } catch (error) {
+      console.error('[Cache] Failed to save cache:', error);
+      // 如果存储失败（可能超出配额），清理一半的缓存
+      if (error.name === 'QuotaExceededError') {
+        this.evict(Math.floor(this.cache.size / 2));
+        this.save();
+      }
+    }
+  }
+
+  /**
+   * 获取缓存
+   */
+  get(key) {
+    const item = this.cache.get(key);
+    if (!item) return null;
+
+    // 检查是否过期
+    if (Date.now() - item.timestamp > this.ttl) {
+      this.cache.delete(key);
+      this.save();
+      return null;
+    }
+
+    return item.result;
+  }
+
+  /**
+   * 设置缓存
+   */
+  set(key, result) {
+    // 如果达到容量限制，先删除最旧的
+    if (this.cache.size >= this.maxSize) {
+      this.evict(Math.floor(this.maxSize * 0.2));  // 删除20%
+    }
+
+    this.cache.set(key, {
+      result,
+      timestamp: Date.now()
+    });
+
+    this.save();
+  }
+
+  /**
+   * 检查缓存是否存在
+   */
+  has(key) {
+    return this.get(key) !== null;
+  }
+
+  /**
+   * 删除指定数量的最旧缓存
+   */
+  evict(count) {
+    // Map 保持插入顺序，所以最早的在前面
+    const keysToDelete = Array.from(this.cache.keys()).slice(0, count);
+    keysToDelete.forEach(key => this.cache.delete(key));
+    console.log(`[Cache] Evicted ${keysToDelete.length} old entries`);
+  }
+
+  /**
+   * 清理过期缓存
+   */
+  cleanup() {
+    const now = Date.now();
+    let cleaned = 0;
+
+    this.cache.forEach((value, key) => {
+      if (now - value.timestamp > this.ttl) {
+        this.cache.delete(key);
+        cleaned++;
+      }
+    });
+
+    if (cleaned > 0) {
+      this.save();
+      console.log(`[Cache] Cleaned ${cleaned} expired entries`);
+    }
+  }
+
+  /**
+   * 清空所有缓存
+   */
+  clear() {
+    this.cache.clear();
+    localStorage.removeItem(this.storageKey);
+    console.log('[Cache] All cache cleared');
+  }
+
+  /**
+   * 获取缓存统计信息
+   */
+  getStats() {
+    let validCount = 0;
+    let expiredCount = 0;
+    const now = Date.now();
+
+    this.cache.forEach((value) => {
+      if (now - value.timestamp > this.ttl) {
+        expiredCount++;
+      } else {
+        validCount++;
+      }
+    });
+
+    return {
+      total: this.cache.size,
+      valid: validCount,
+      expired: expiredCount,
+      maxSize: this.maxSize,
+      ttlDays: this.ttl / (24 * 60 * 60 * 1000)
+    };
+  }
+}
+
+/**
  * 翻译服务
  * 处理所有翻译相关的业务逻辑
  */
 class TranslationService {
   constructor() {
-    this.translationCache = new Map();
+    // 使用持久化缓存
+    this.translationCache = new TranslationCache({
+      maxSize: 200,
+      ttl: 7 * 24 * 60 * 60 * 1000  // 7天
+    });
+    
     this.translationHistory = [];
     this.maxHistorySize = 1000;
     this.isTranslating = false;
@@ -38,9 +206,6 @@ class TranslationService {
 
   /**
    * 获取翻译模板
-   * @param {string} templateName - 模板名称 (precise/natural/formal)
-   * @param {string} targetLanguage - 目标语言代码
-   * @returns {string} 完整的系统提示词
    */
   getTemplate(templateName, targetLanguage) {
     const templates = config.translation.templates;
@@ -57,7 +222,7 @@ class TranslationService {
   }
 
   /**
-   * 主翻译方法 - 使用模板直接调用 chatCompletion
+   * 主翻译方法
    */
   async translate(text, options = {}) {
     const {
@@ -71,9 +236,12 @@ class TranslationService {
 
     // 检查缓存
     const cacheKey = this.getCacheKey(text, from, to, template);
-    if (useCache && this.translationCache.has(cacheKey)) {
-      console.log('[Translator] Using cached translation');
-      return this.translationCache.get(cacheKey);
+    if (useCache) {
+      const cachedResult = this.translationCache.get(cacheKey);
+      if (cachedResult) {
+        console.log('[Translator] Using cached translation');
+        return cachedResult;
+      }
     }
 
     // 创建翻译任务
@@ -92,7 +260,7 @@ class TranslationService {
     this.isTranslating = true;
 
     try {
-      // 检测源语言（如果需要）
+      // 检测源语言
       let detectedLang = from;
       if (from === 'auto') {
         detectedLang = await this.detectLanguage(text);
@@ -116,12 +284,12 @@ class TranslationService {
         return result;
       }
 
-      // 🔴 核心修改：使用模板构建 messages，直接调用 chatCompletion
+      // 使用模板构建 messages
       const systemPrompt = this.getTemplate(template, to);
       
       const messages = [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: text }  // 直接发送原文，不需要额外包装
+        { role: 'user', content: text }
       ];
 
       console.log(`[Translator] Using template: ${template}, target: ${this.getLanguageName(to)}`);
@@ -189,7 +357,6 @@ class TranslationService {
     } = options;
 
     if (concurrent) {
-      // 并发翻译
       const chunks = this.chunkArray(texts, maxConcurrent);
       let completed = 0;
 
@@ -208,7 +375,6 @@ class TranslationService {
         results.push(...chunkResults);
       }
     } else {
-      // 串行翻译
       for (let i = 0; i < texts.length; i++) {
         const result = await this.translate(texts[i], options);
         results.push(result);
@@ -230,8 +396,26 @@ class TranslationService {
       from = 'auto',
       to = 'zh',
       template = config.translation.defaultTemplate || 'natural',
+      useCache = true,
       model = null
     } = options;
+
+    // 检查缓存
+    const cacheKey = this.getCacheKey(text, from, to, template);
+    if (useCache) {
+      const cachedResult = this.translationCache.get(cacheKey);
+      if (cachedResult) {
+        console.log('[Translator] Using cached translation (stream mode)');
+        // 模拟流式输出缓存结果
+        yield {
+          chunk: cachedResult.translated,
+          fullText: cachedResult.translated,
+          done: true,
+          fromCache: true
+        };
+        return;
+      }
+    }
 
     // 获取翻译模板
     const systemPrompt = this.getTemplate(template, to);
@@ -254,6 +438,21 @@ class TranslationService {
         };
       }
       
+      // 保存到缓存
+      if (useCache && fullText) {
+        const result = {
+          id: uuidv4(),
+          success: true,
+          original: text,
+          translated: fullText,
+          from,
+          to,
+          template,
+          timestamp: Date.now()
+        };
+        this.translationCache.set(cacheKey, result);
+      }
+
       // 保存到历史
       if (options.saveHistory !== false) {
         this.addToHistory({
@@ -284,7 +483,6 @@ class TranslationService {
    * 语言检测
    */
   async detectLanguage(text) {
-    // 简单的语言检测逻辑
     const patterns = {
       zh: /[\u4e00-\u9fa5]/,
       ja: /[\u3040-\u309f\u30a0-\u30ff]/,
@@ -294,16 +492,14 @@ class TranslationService {
       th: /[\u0e00-\u0e7f]/
     };
 
-    // 统计各语言字符数
     const counts = {};
     for (const [lang, pattern] of Object.entries(patterns)) {
       const matches = text.match(new RegExp(pattern, 'g'));
       counts[lang] = matches ? matches.length : 0;
     }
 
-    // 找出最多的语言
     let maxCount = 0;
-    let detectedLang = 'en'; // 默认英语
+    let detectedLang = 'en';
 
     for (const [lang, count] of Object.entries(counts)) {
       if (count > maxCount) {
@@ -312,7 +508,6 @@ class TranslationService {
       }
     }
 
-    // 如果没有检测到特殊字符，检查是否是英语
     if (maxCount === 0 && /[a-zA-Z]/.test(text)) {
       detectedLang = 'en';
     }
@@ -328,12 +523,6 @@ class TranslationService {
     // 更新缓存
     if (useCache && result.success) {
       this.translationCache.set(cacheKey, result);
-      
-      // 限制缓存大小
-      if (this.translationCache.size > 500) {
-        const firstKey = this.translationCache.keys().next().value;
-        this.translationCache.delete(firstKey);
-      }
     }
 
     // 保存到历史
@@ -354,7 +543,6 @@ class TranslationService {
       timestamp: record.timestamp || Date.now()
     });
 
-    // 限制历史记录大小
     if (this.translationHistory.length > this.maxHistorySize) {
       this.translationHistory = this.translationHistory.slice(0, this.maxHistorySize);
     }
@@ -408,18 +596,26 @@ class TranslationService {
    */
   clearCache() {
     this.translationCache.clear();
-    console.log('[Translator] Cache cleared');
+  }
+
+  /**
+   * 获取缓存统计
+   */
+  getCacheStats() {
+    return this.translationCache.getStats();
   }
 
   /**
    * 获取缓存键
    */
   getCacheKey(text, from, to, template) {
-    return `${from}-${to}-${template}-${text.substring(0, 100)}`;
+    // 使用文本的前100个字符 + hash 作为 key，避免 key 过长
+    const textKey = text.length > 100 ? text.substring(0, 100) + '_' + text.length : text;
+    return `${from}-${to}-${template}-${textKey}`;
   }
 
   /**
-   * 工具函数：数组分块
+   * 数组分块
    */
   chunkArray(array, size) {
     const chunks = [];
@@ -458,9 +654,13 @@ class TranslationService {
    * 获取统计信息
    */
   getStatistics() {
+    const cacheStats = this.translationCache.getStats();
+    
     const stats = {
       totalTranslations: this.translationHistory.length,
-      cacheSize: this.translationCache.size,
+      cacheSize: cacheStats.valid,
+      cacheMaxSize: cacheStats.maxSize,
+      cacheTTLDays: cacheStats.ttlDays,
       languagePairs: {},
       templates: {},
       todayCount: 0,
@@ -472,16 +672,13 @@ class TranslationService {
     const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
 
     for (const item of this.translationHistory) {
-      // 语言对统计
       const pair = `${item.from}-${item.to}`;
       stats.languagePairs[pair] = (stats.languagePairs[pair] || 0) + 1;
       
-      // 模板统计
       if (item.template) {
         stats.templates[item.template] = (stats.templates[item.template] || 0) + 1;
       }
       
-      // 时间统计
       if (item.timestamp >= today) {
         stats.todayCount++;
       }
