@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>截图选区</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      cursor: crosshair;
+      user-select: none;
+    }
+    
+    body {
+      background: rgba(0, 0, 0, 0.05);
+    }
+    
+    #overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+    
+    /* 选区框样式 - 可自定义 */
+    #selection {
+      position: fixed;
+      border: 2px solid rgba(255, 255, 255, 0.9);
+      background: transparent;
+      display: none;
+      pointer-events: none;
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.3);
+    }
+    
+    #size-indicator {
+      position: fixed;
+      background: rgba(0, 0, 0, 0.6);
+      color: #fff;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-family: monospace;
+      display: none;
+      pointer-events: none;
+      z-index: 1000;
+    }
+    
+    #tips {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.6);
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      z-index: 1000;
+    }
+    
+    #tips kbd {
+      background: rgba(255, 255, 255, 0.2);
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin: 0 2px;
+    }
+    
+    /*=============================================
+      确认按钮样式 - 可自定义区域
+      位置：截图框内右下角
+      风格：柔和、不刺眼、玻璃质感
+    =============================================*/
+    #action-buttons {
+      position: fixed;
+      display: none;
+      gap: 8px;
+      z-index: 1001;
+      pointer-events: auto;
+      padding: 6px;
+      border-radius: 20px;
+      /* 玻璃背景效果 */
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .action-btn {
+      width: 36px;
+      height: 36px;
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+    }
+    
+    .action-btn:hover {
+      transform: scale(1.1);
+    }
+    
+    .action-btn:active {
+      transform: scale(0.95);
+    }
+    
+    /* 确认按钮 - 柔和绿色 */
+    .action-btn.confirm {
+      background: rgba(134, 239, 172, 0.5);  /* 浅绿色背景 */
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      box-shadow: 0 2px 8px rgba(34, 197, 94, 0.2);
+    }
+    
+    .action-btn.confirm:hover {
+      background: rgba(134, 239, 172, 0.7);
+      box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+    }
+    
+    .action-btn.confirm svg {
+      color: #15803d;  /* 深绿色图标 */
+    }
+    
+    /* 取消按钮 - 柔和红色 */
+    .action-btn.cancel {
+      background: rgba(254, 202, 202, 0.5);  /* 浅红色背景 */
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      box-shadow: 0 2px 8px rgba(239, 68, 68, 0.2);
+    }
+    
+    .action-btn.cancel:hover {
+      background: rgba(254, 202, 202, 0.7);
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+    }
+    
+    .action-btn.cancel svg {
+      color: #b91c1c;  /* 深红色图标 */
+    }
+    
+    .action-btn svg {
+      width: 20px;
+      height: 20px;
+    }
+    /*=============================================
+      确认按钮样式结束
+    =============================================*/
+  </style>
+</head>
+<body>
+  <div id="overlay"></div>
+  <div id="selection"></div>
+  <div id="size-indicator"></div>
+  <div id="tips">拖动鼠标选择截图区域 | <kbd>ESC</kbd> 或 右键取消</div>
+  
+  <!-- 确认/取消按钮 -->
+  <div id="action-buttons">
+    <button class="action-btn confirm" id="btn-confirm" title="确认截图 (Enter)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+    </button>
+    <button class="action-btn cancel" id="btn-cancel" title="取消 (ESC)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
+    </button>
+  </div>
+  
+  <script>
+    const { ipcRenderer } = require('electron');
+    
+    const overlay = document.getElementById('overlay');
+    const selection = document.getElementById('selection');
+    const sizeIndicator = document.getElementById('size-indicator');
+    const tips = document.getElementById('tips');
+    const actionButtons = document.getElementById('action-buttons');
+    const btnConfirm = document.getElementById('btn-confirm');
+    const btnCancel = document.getElementById('btn-cancel');
+    
+    let isSelecting = false;
+    let isDragging = false;  // 拖动选区
+    let hasSelection = false;
+    let startX = 0;
+    let startY = 0;
+    let dragOffsetX = 0;
+    let dragOffsetY = 0;
+    let selectionBounds = null;
+    let showConfirmButtons = true; // 可通过 IPC 配置
+    
+    // 接收配置
+    ipcRenderer.on('screenshot-config', (event, config) => {
+      if (config.showConfirmButtons !== undefined) {
+        showConfirmButtons = config.showConfirmButtons;
+      }
+    });
+    
+    // 确保窗口获得焦点以接收键盘事件
+    window.addEventListener('load', () => {
+      window.focus();
+      document.body.focus();
+    });
+    
+    // 更新按钮位置 - 放在选区内右下角
+    function updateButtonPosition() {
+      if (!selectionBounds || !showConfirmButtons) return;
+      
+      const padding = 10;
+      const btnWidth = actionButtons.offsetWidth || 100;
+      const btnHeight = actionButtons.offsetHeight || 48;
+      
+      // 计算按钮位置（选区内右下角）
+      let btnX = selectionBounds.x + selectionBounds.width - btnWidth - padding;
+      let btnY = selectionBounds.y + selectionBounds.height - btnHeight - padding;
+      
+      // 确保按钮在选区内
+      btnX = Math.max(selectionBounds.x + padding, btnX);
+      btnY = Math.max(selectionBounds.y + padding, btnY);
+      
+      // 如果选区太小，放在选区中心
+      if (selectionBounds.width < btnWidth + padding * 2 || 
+          selectionBounds.height < btnHeight + padding * 2) {
+        btnX = selectionBounds.x + (selectionBounds.width - btnWidth) / 2;
+        btnY = selectionBounds.y + (selectionBounds.height - btnHeight) / 2;
+      }
+      
+      actionButtons.style.left = btnX + 'px';
+      actionButtons.style.top = btnY + 'px';
+    }
+    
+    // 更新选区显示
+    function updateSelectionDisplay() {
+      if (!selectionBounds) return;
+      
+      selection.style.left = selectionBounds.x + 'px';
+      selection.style.top = selectionBounds.y + 'px';
+      selection.style.width = selectionBounds.width + 'px';
+      selection.style.height = selectionBounds.height + 'px';
+      
+      updateButtonPosition();
+    }
+    
+    // 鼠标按下
+    overlay.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return; // 只处理左键
+      
+      // 如果已有选区且启用确认按钮，检查是否点击在选区内（拖动）
+      if (hasSelection && showConfirmButtons && selectionBounds) {
+        const inSelection = e.clientX >= selectionBounds.x && 
+                           e.clientX <= selectionBounds.x + selectionBounds.width &&
+                           e.clientY >= selectionBounds.y && 
+                           e.clientY <= selectionBounds.y + selectionBounds.height;
+        
+        if (inSelection) {
+          // 开始拖动
+          isDragging = true;
+          dragOffsetX = e.clientX - selectionBounds.x;
+          dragOffsetY = e.clientY - selectionBounds.y;
+          selection.style.cursor = 'move';
+          return;
+        }
+      }
+      
+      // 重新选择
+      if (hasSelection) {
+        hasSelection = false;
+        actionButtons.style.display = 'none';
+      }
+      
+      isSelecting = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      
+      selection.style.left = startX + 'px';
+      selection.style.top = startY + 'px';
+      selection.style.width = '0px';
+      selection.style.height = '0px';
+      selection.style.display = 'block';
+      selection.style.cursor = 'crosshair';
+      
+      tips.style.display = 'none';
+    });
+    
+    // 鼠标移动
+    document.addEventListener('mousemove', (e) => {
+      // 拖动选区
+      if (isDragging && selectionBounds) {
+        selectionBounds.x = e.clientX - dragOffsetX;
+        selectionBounds.y = e.clientY - dragOffsetY;
+        
+        // 边界限制
+        selectionBounds.x = Math.max(0, Math.min(selectionBounds.x, window.innerWidth - selectionBounds.width));
+        selectionBounds.y = Math.max(0, Math.min(selectionBounds.y, window.innerHeight - selectionBounds.height));
+        
+        updateSelectionDisplay();
+        return;
+      }
+      
+      // 绘制选区
+      if (!isSelecting) return;
+      
+      const currentX = e.clientX;
+      const currentY = e.clientY;
+      
+      const left = Math.min(startX, currentX);
+      const top = Math.min(startY, currentY);
+      const width = Math.abs(currentX - startX);
+      const height = Math.abs(currentY - startY);
+      
+      selection.style.left = left + 'px';
+      selection.style.top = top + 'px';
+      selection.style.width = width + 'px';
+      selection.style.height = height + 'px';
+      
+      // 显示尺寸指示器
+      sizeIndicator.style.display = 'block';
+      sizeIndicator.style.left = (left + width + 10) + 'px';
+      sizeIndicator.style.top = (top + height + 10) + 'px';
+      sizeIndicator.textContent = `${width} × ${height}`;
+    });
+    
+    // 鼠标释放
+    document.addEventListener('mouseup', (e) => {
+      if (e.button !== 0) return;
+      
+      // 结束拖动
+      if (isDragging) {
+        isDragging = false;
+        selection.style.cursor = 'move';
+        return;
+      }
+      
+      if (!isSelecting) return;
+      isSelecting = false;
+      
+      const currentX = e.clientX;
+      const currentY = e.clientY;
+      
+      const left = Math.min(startX, currentX);
+      const top = Math.min(startY, currentY);
+      const width = Math.abs(currentX - startX);
+      const height = Math.abs(currentY - startY);
+      
+      // 如果选区太小，忽略
+      if (width < 10 || height < 10) {
+        selection.style.display = 'none';
+        sizeIndicator.style.display = 'none';
+        tips.style.display = 'block';
+        return;
+      }
+      
+      // 保存选区信息
+      selectionBounds = {
+        x: Math.round(left),
+        y: Math.round(top),
+        width: Math.round(width),
+        height: Math.round(height)
+      };
+      
+      hasSelection = true;
+      sizeIndicator.style.display = 'none';
+      
+      console.log('[Screenshot] Selection complete:', selectionBounds);
+      
+      // 如果启用确认按钮，显示按钮；否则直接发送
+      if (showConfirmButtons) {
+        actionButtons.style.display = 'flex';
+        updateButtonPosition();
+        selection.style.cursor = 'move';  // 允许拖动
+      } else {
+        sendSelection();
+      }
+    });
+    
+    // 发送选区
+    function sendSelection() {
+      if (selectionBounds) {
+        ipcRenderer.send('screenshot-selection', selectionBounds);
+      }
+    }
+    
+    // 确认按钮点击
+    btnConfirm.addEventListener('click', (e) => {
+      e.stopPropagation();
+      sendSelection();
+    });
+    
+    // 取消按钮点击
+    btnCancel.addEventListener('click', (e) => {
+      e.stopPropagation();
+      ipcRenderer.send('screenshot-cancel');
+    });
+    
+    // 键盘事件
+    document.addEventListener('keydown', (e) => {
+      console.log('[Screenshot] Key pressed:', e.key);
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        ipcRenderer.send('screenshot-cancel');
+      } else if (e.key === 'Enter' && hasSelection) {
+        e.preventDefault();
+        sendSelection();
+      }
+    });
+    
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        ipcRenderer.send('screenshot-cancel');
+      } else if (e.key === 'Enter' && hasSelection) {
+        e.preventDefault();
+        sendSelection();
+      }
+    });
+    
+    // 右键取消
+    document.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      ipcRenderer.send('screenshot-cancel');
+    });
+    
+    document.addEventListener('mousedown', (e) => {
+      if (e.button === 2) {
+        e.preventDefault();
+        ipcRenderer.send('screenshot-cancel');
+      }
+    });
+  </script>
+</body>
+</html>

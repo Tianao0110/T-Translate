@@ -46,7 +46,7 @@ const useTranslationStore = create(
       // OCR 状态
       ocrStatus: {
         isProcessing: false,
-        engine: "tesseract",
+        engine: "llm-vision",  // 默认使用 LLM Vision
         lastResult: null,
         error: null,
       },

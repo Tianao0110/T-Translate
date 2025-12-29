@@ -7,6 +7,7 @@ import {
 
 import useTranslationStore from '../stores/translation-store';
 import llmClient from '../utils/llm-client';
+import ocrManager from '../services/ocr-manager';
 import '../styles/components/TranslationPanel.css'; 
 
 /**
@@ -22,6 +23,7 @@ const TranslationPanel = ({ showNotification }) => {
   const [dragOver, setDragOver] = useState(false);
   const [translationMode, setTranslationMode] = useState('standard'); // standard, secure, offline
   const [isConnected, setIsConnected] = useState(false);
+  const [isOcrProcessing, setIsOcrProcessing] = useState(false); // OCR 处理状态
   
   // ========== Zustand Store ==========
   const {
@@ -29,6 +31,7 @@ const TranslationPanel = ({ showNotification }) => {
     useStreamOutput, // 流式输出开关
     autoTranslate,   // 自动翻译开关
     autoTranslateDelay, // 自动翻译延迟
+    ocrStatus,       // OCR 状态（包含引擎设置）
     setSourceText,
     setTranslatedText,
     setLanguages,
@@ -75,6 +78,66 @@ const TranslationPanel = ({ showNotification }) => {
     checkConnection();
     const interval = setInterval(checkConnection, 30000); 
     return () => clearInterval(interval);
+  }, []);
+
+  // 监听截图事件
+  useEffect(() => {
+    console.log('[Screenshot] Setting up listener, electron:', !!window.electron);
+    console.log('[Screenshot] screenshot API:', !!window.electron?.screenshot);
+    
+    if (!window.electron?.screenshot?.onCaptured) {
+      console.warn('[Screenshot] onCaptured not available');
+      return;
+    }
+
+    const unsubscribe = window.electron.screenshot.onCaptured(async (dataURL) => {
+      console.log('[Screenshot] Callback triggered, dataURL length:', dataURL?.length || 0);
+      
+      if (!dataURL) {
+        notify('截图失败', 'error');
+        return;
+      }
+
+      console.log('[Screenshot] Starting OCR...');
+      notify('正在识别文字...', 'info');
+      setIsOcrProcessing(true);
+
+      try {
+        // 使用 OCR 识别图片中的文字，传入引擎设置
+        const engineToUse = ocrStatus?.engine || 'llm-vision';
+        console.log('[OCR] Calling ocrManager.recognize with engine:', engineToUse);
+        const result = await ocrManager.recognize(dataURL, { engine: engineToUse });
+        console.log('[OCR] Result:', result);
+
+        if (result.success && result.text) {
+          const trimmedText = result.text.trim();
+          console.log('[OCR] Recognized text:', trimmedText.substring(0, 100) + '...');
+          
+          // 将识别的文字填入原文框
+          setSourceText(trimmedText);
+          notify(`识别成功 (${result.engine})`, 'success');
+
+          // 自动开始翻译
+          setTimeout(() => {
+            console.log('[Screenshot] Auto-translating...');
+            handleTranslate();
+          }, 200);
+        } else {
+          console.warn('[OCR] No text recognized:', result);
+          notify('未能识别到文字', 'warning');
+        }
+      } catch (error) {
+        console.error('[OCR] Error:', error);
+        notify('OCR 识别失败: ' + error.message, 'error');
+      } finally {
+        setIsOcrProcessing(false);
+      }
+    });
+
+    return () => {
+      console.log('[Screenshot] Cleaning up listener');
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const checkConnection = async () => {
@@ -347,15 +410,45 @@ const TranslationPanel = ({ showNotification }) => {
           onDragLeave={() => setDragOver(false)}
         >
           <div className="box-toolbar">
-            <span className="box-title">原文</span>
+            <span className="box-title">
+              {isOcrProcessing ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" style={{ marginRight: '6px', display: 'inline' }} />
+                  识别中...
+                </>
+              ) : '原文'}
+            </span>
             <div className="box-actions">
-              <button className="action-btn" onClick={() => fileInputRef.current?.click()} title="导入">
+              <button 
+                className="action-btn" 
+                onClick={() => window.electron?.screenshot?.capture()}
+                disabled={isOcrProcessing}
+                title="截图识别 (Alt+Q)"
+              >
+                <Camera size={15} />
+              </button>
+              <button 
+                className="action-btn" 
+                onClick={() => fileInputRef.current?.click()} 
+                disabled={isOcrProcessing}
+                title="导入图片"
+              >
                 <Image size={15} />
               </button>
-              <button className="action-btn" onClick={pasteFromClipboard} title="粘贴">
+              <button 
+                className="action-btn" 
+                onClick={pasteFromClipboard} 
+                disabled={isOcrProcessing}
+                title="粘贴"
+              >
                 <FileText size={15} />
               </button>
-              <button className="action-btn" onClick={clearCurrent} title="清空">
+              <button 
+                className="action-btn" 
+                onClick={clearCurrent} 
+                disabled={isOcrProcessing}
+                title="清空"
+              >
                 <RotateCcw size={15} />
               </button>
             </div>
@@ -367,8 +460,9 @@ const TranslationPanel = ({ showNotification }) => {
             value={currentTranslation.sourceText}
             onChange={(e) => setSourceText(e.target.value)}
             onPaste={handlePaste}
-            placeholder={dragOver ? '释放文件以导入...' : '输入要翻译的文本...'}
+            placeholder={isOcrProcessing ? '正在识别图片中的文字...' : (dragOver ? '释放文件以导入...' : '输入要翻译的文本...')}
             spellCheck={false}
+            disabled={isOcrProcessing}
             // 绑定快捷键 Ctrl+Enter
             onKeyDown={(e) => { if(e.ctrlKey && e.key === 'Enter') handleTranslate(); }}
           />
@@ -383,7 +477,7 @@ const TranslationPanel = ({ showNotification }) => {
           <button
             className={`translate-btn ${currentTranslation.status === 'translating' ? 'loading' : ''}`}
             onClick={handleTranslate}
-            disabled={!currentTranslation.sourceText.trim() || currentTranslation.status === 'translating'}
+            disabled={!currentTranslation.sourceText.trim() || currentTranslation.status === 'translating' || isOcrProcessing}
           >
             {currentTranslation.status === 'translating' ? (
               <>

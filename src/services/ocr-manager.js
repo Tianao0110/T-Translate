@@ -216,10 +216,15 @@ class OCRManager {
   async recognizeWithLLMVision(input, options = {}) {
     let base64Image;
     
+    console.log('[OCR] recognizeWithLLMVision input type:', typeof input);
+    console.log('[OCR] input starts with data:image?', typeof input === 'string' && input.startsWith('data:image'));
+    console.log('[OCR] input length:', input?.length);
+    
     // 处理不同类型的输入
     if (typeof input === 'string' && input.startsWith('data:image')) {
-      // Data URL
+      // Data URL - 提取 base64 部分
       base64Image = input.split(',')[1];
+      console.log('[OCR] Extracted base64 from dataURL, length:', base64Image?.length);
     } else if (input instanceof Blob || input instanceof File) {
       // Blob 或 File
       base64Image = await this.blobToBase64(input);
@@ -230,10 +235,15 @@ class OCRManager {
       throw new Error('不支持的图片格式');
     }
 
+    console.log('[OCR] Final base64 length:', base64Image?.length);
+    console.log('[OCR] Base64 preview:', base64Image?.substring(0, 50) + '...');
+
     const result = await llmClient.visionOCR(base64Image, {
       prompt: options.prompt || config.ocr.visionPrompt,
       model: options.model
     });
+
+    console.log('[OCR] LLM Vision result:', result);
 
     if (result.success) {
       return {

@@ -25,12 +25,12 @@ const config = {
   // OCR 配置
   ocr: {
     // 默认引擎：'tesseract' | 'llm-vision' | 'rapid'
-    defaultEngine: 'tesseract',
+    defaultEngine: 'llm-vision',
     
     // LLM 视觉识别提示词
-    visionPrompt: '请识别图片中的所有文字内容，保持原始格式和换行。如果有多列，请按照阅读顺序输出。',
+    visionPrompt: `Please read and extract all the text content from this image. Output only the text, nothing else.`,
     
-    // Tesseract 配置
+    // Tesseract 配置（备用）
     tesseract: {
       language: 'chi_sim+eng',  // 中文简体+英文
       psm: 3  // Page segmentation mode
@@ -65,7 +65,7 @@ Rules:
 - Prioritize accuracy over fluency
 - Do not add explanations or notes unless necessary for clarity
 
-Output only the translation. Do not include any thinking process, chain-of-thought, reasoning tags, or explanation.`,
+Output only the translation, no preamble.`,
 
       natural: `You are a skilled translator focused on natural, fluent communication.
 
@@ -79,7 +79,7 @@ Rules:
 - Use conversational language, contractions are acceptable
 - Avoid stiff or robotic phrasing
 
-Output only the translation. Do not include any thinking process, chain-of-thought, reasoning tags, or explanation.`,
+Output only the translation, no preamble.`,
 
       formal: `You are an expert translator for business and official communications.
 
@@ -93,7 +93,7 @@ Rules:
 - Avoid colloquialisms, slang, or overly casual expressions
 - Ensure clarity and precision in meaning
 
-OOutput only the translation. Do not include any thinking process, chain-of-thought, reasoning tags, or explanation.`
+Output only the translation, no preamble.`
     },
     
     // 批量翻译设置

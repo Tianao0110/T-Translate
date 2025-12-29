@@ -131,6 +131,16 @@ class LLMClient {
    */
   async visionOCR(imageBase64, options = {}) {
     try {
+      // 检测图片格式（截图通常是 PNG）
+      let mimeType = 'image/png';
+      if (imageBase64.startsWith('/9j/')) {
+        mimeType = 'image/jpeg';
+      } else if (imageBase64.startsWith('iVBOR')) {
+        mimeType = 'image/png';
+      }
+
+      console.log('[LLM] visionOCR called, image length:', imageBase64.length, 'mimeType:', mimeType);
+
       const messages = [
         {
           role: 'user',
@@ -142,33 +152,38 @@ class LLMClient {
             {
               type: 'image_url',
               image_url: {
-                url: `data:image/jpeg;base64,${imageBase64}`
+                url: `data:${mimeType};base64,${imageBase64}`
               }
             }
           ]
         }
       ];
 
+      // LM Studio 不需要指定模型名，会使用当前加载的模型
       const requestData = {
-        model: options.model || this.config.models.vision || 'llava-v1.5-7b',
         messages: messages,
-        max_tokens: options.max_tokens || 1000,
+        max_tokens: options.max_tokens || 2000,
         temperature: 0.1  // OCR 需要低温度
       };
 
+      console.log('[LLM] Sending vision request...');
+
       const response = await this.client.post('/chat/completions', requestData);
       
-      if (response.data?.choices?.[0]?.message) {
+      const content = response.data?.choices?.[0]?.message?.content;
+      console.log('[LLM] Vision response:', content?.substring(0, 200));
+
+      if (content) {
         return {
           success: true,
-          text: response.data.choices[0].message.content,
+          text: content,
           model: response.data.model
         };
       } else {
         throw new Error('Invalid vision response');
       }
     } catch (error) {
-      console.error('Vision OCR error:', error);
+      console.error('[LLM] Vision OCR error:', error.response?.data || error.message);
       return {
         success: false,
         error: error.message,

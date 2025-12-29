@@ -66,11 +66,15 @@ const SettingsPanel = ({ showNotification }) => {
       template: 'general'
     },
     ocr: {
-      engine: 'tesseract',
+      engine: 'llm-vision',
       language: 'chi_sim+eng',
       autoDetect: true,
       imageQuality: 'high',
       preprocessImage: true
+    },
+    screenshot: {
+      showConfirmButtons: true,  // 显示确认按钮
+      autoCapture: false         // 自动截图（不显示确认）
     },
     interface: {
       theme: 'light',
@@ -115,11 +119,20 @@ const SettingsPanel = ({ showNotification }) => {
         const savedSettings = await window.electron.store.get('settings');
         if (savedSettings) {
           setSettings(prev => ({ ...prev, ...savedSettings }));
+          // 同步 OCR 引擎到 Store
+          if (savedSettings.ocr?.engine && setOcrEngine) {
+            setOcrEngine(savedSettings.ocr.engine);
+          }
         }
       } else {
         const savedSettings = localStorage.getItem('settings');
         if (savedSettings) {
-          setSettings(JSON.parse(savedSettings));
+          const parsed = JSON.parse(savedSettings);
+          setSettings(parsed);
+          // 同步 OCR 引擎到 Store
+          if (parsed.ocr?.engine && setOcrEngine) {
+            setOcrEngine(parsed.ocr.engine);
+          }
         }
       }
     } catch (error) {
@@ -444,17 +457,54 @@ const SettingsPanel = ({ showNotification }) => {
             <h3>OCR 设置</h3>
             <div className="setting-group">
               <label className="setting-label">OCR 引擎</label>
-              <select className="setting-select" value={settings.ocr.engine} onChange={(e)=>updateSetting('ocr','engine',e.target.value)}>
-                <option value="tesseract">Tesseract.js (本地)</option>
-                <option value="llm-vision">LLM Vision</option>
+              <select 
+                className="setting-select" 
+                value={settings.ocr.engine} 
+                onChange={(e) => {
+                  updateSetting('ocr', 'engine', e.target.value);
+                  // 实时同步到 Store
+                  if (setOcrEngine) {
+                    setOcrEngine(e.target.value);
+                  }
+                }}
+              >
+                <option value="llm-vision">LLM Vision (推荐)</option>
+                <option value="tesseract">Tesseract.js (本地/隐私模式)</option>
               </select>
+              <p className="setting-hint">
+                {settings.ocr.engine === 'llm-vision' 
+                  ? 'LLM Vision 自动识别语言，质量更高' 
+                  : 'Tesseract 完全本地运行，适合隐私模式'}
+              </p>
             </div>
+            {settings.ocr.engine === 'tesseract' && (
+              <div className="setting-group">
+                <label className="setting-label">识别语言</label>
+                <select className="setting-select" value={settings.ocr.language} onChange={(e)=>updateSetting('ocr','language',e.target.value)}>
+                  <option value="chi_sim+eng">中英文混合</option>
+                  <option value="eng">仅英文</option>
+                  <option value="chi_sim">仅中文</option>
+                  <option value="jpn">日文</option>
+                  <option value="kor">韩文</option>
+                </select>
+                <p className="setting-hint">仅 Tesseract 引擎使用此设置</p>
+              </div>
+            )}
+            
+            <h3 style={{marginTop: '24px'}}>截图设置</h3>
             <div className="setting-group">
-              <label className="setting-label">识别语言</label>
-              <select className="setting-select" value={settings.ocr.language} onChange={(e)=>updateSetting('ocr','language',e.target.value)}>
-                <option value="chi_sim+eng">中英文混合</option>
-                <option value="eng">仅英文</option>
-              </select>
+              <label className="setting-label">
+                <input 
+                  type="checkbox" 
+                  checked={settings.screenshot?.showConfirmButtons ?? true}
+                  onChange={(e) => updateSetting('screenshot', 'showConfirmButtons', e.target.checked)}
+                  style={{marginRight: '8px'}}
+                />
+                显示截图确认按钮
+              </label>
+              <p className="setting-hint">
+                启用后，选择区域后需点击确认按钮或按 Enter 键确认；禁用后直接截图
+              </p>
             </div>
           </div>
         );

@@ -10,9 +10,14 @@ const {
   shell,
   nativeImage,
   clipboard,
+  screen,
+  desktopCapturer,
 } = require("electron");
 const path = require("path");
 const Store = require("electron-store");
+
+// 引入截图模块
+const screenshotModule = require('./screenshot-module');
 
 // 初始化配置存储
 const store = new Store({
@@ -35,6 +40,7 @@ ipcMain.handle("store-set", async (event, key, val) => {
 
 // 全局变量
 let mainWindow = null;
+let screenshotWindow = null;
 let tray = null;
 let isQuitting = false;
 
@@ -62,14 +68,14 @@ function createWindow() {
       contextIsolation: true,
       sandbox: false,
       preload: path.join(__dirname, "preload.js"),
-      webSecurity: false, // 开发环境如果遇到跨域图片问题可临时设为 false，生产环境建议 true
+      webSecurity: false,
     },
-    autoHideMenuBar: true, // 自动隐藏菜单栏
-    menuBarVisible: false, // 不显示菜单栏
+    autoHideMenuBar: true,
+    menuBarVisible: false,
     icon: path.join(__dirname, "../public/icon.png"),
     frame: false,
     titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
-    show: false, // 启动时先隐藏
+    show: false,
     backgroundColor: "#ffffff",
     alwaysOnTop: store.get("alwaysOnTop", false),
   });
@@ -120,6 +126,301 @@ function createWindow() {
     shell.openExternal(url);
     return { action: "deny" };
   });
+}
+
+/**
+ * 截图功能 - 创建选区窗口
+ * 优先使用 node-screenshots，回退到 desktopCapturer
+ */
+let screenshotData = null;
+let wasMainWindowVisible = false; // 记录截图前主窗口是否可见
+let screenshotFromHotkey = false; // 记录是否从快捷键触发
+
+async function startScreenshot(fromHotkey = false) {
+  // 如果已有截图窗口，先关闭
+  if (screenshotWindow) {
+    screenshotWindow.close();
+    screenshotWindow = null;
+  }
+
+  // 记录触发来源
+  screenshotFromHotkey = fromHotkey;
+  
+  // 记录主窗口当前状态
+  wasMainWindowVisible = mainWindow && mainWindow.isVisible();
+  
+  console.log('[Main] startScreenshot, fromHotkey:', fromHotkey, 'wasMainWindowVisible:', wasMainWindowVisible);
+  
+  // 隐藏主窗口
+  if (wasMainWindowVisible) {
+    mainWindow.hide();
+  }
+
+  // 等待主窗口完全隐藏
+  await new Promise(resolve => setTimeout(resolve, 300));
+
+  // 获取所有显示器信息
+  const displays = screen.getAllDisplays();
+  const primaryDisplay = screen.getPrimaryDisplay();
+  
+  console.log('[Main] All displays:', displays.map(d => ({
+    id: d.id,
+    bounds: d.bounds,
+    scaleFactor: d.scaleFactor
+  })));
+
+  // 计算所有显示器的总边界
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let maxScaleFactor = 1;
+  displays.forEach(display => {
+    minX = Math.min(minX, display.bounds.x);
+    minY = Math.min(minY, display.bounds.y);
+    maxX = Math.max(maxX, display.bounds.x + display.bounds.width);
+    maxY = Math.max(maxY, display.bounds.y + display.bounds.height);
+    maxScaleFactor = Math.max(maxScaleFactor, display.scaleFactor);
+  });
+  
+  const totalWidth = maxX - minX;
+  const totalHeight = maxY - minY;
+  const totalBounds = { minX, minY, maxX, maxY, totalWidth, totalHeight };
+  
+  console.log('[Main] Total screen area:', totalBounds);
+
+  // 优先使用 node-screenshots
+  if (screenshotModule.isNodeScreenshotsAvailable()) {
+    console.log('[Main] Using node-screenshots for capture');
+    screenshotData = await screenshotModule.captureWithNodeScreenshots(displays, totalBounds);
+  }
+  
+  // 回退到 desktopCapturer
+  if (!screenshotData) {
+    console.log('[Main] Using desktopCapturer fallback');
+    screenshotData = await screenshotModule.captureWithDesktopCapturer(
+      displays, primaryDisplay, totalBounds, maxScaleFactor
+    );
+  }
+  
+  if (screenshotData) {
+    screenshotModule.setScreenshotData(screenshotData);
+    console.log('[Main] Screenshot data saved, type:', screenshotData.type);
+  } else {
+    console.error('[Main] Failed to capture screenshot');
+  }
+
+  console.log('[Main] Total screen bounds:', { minX, minY, maxX, maxY });
+
+  // 注册临时的 ESC 全局快捷键用于取消截图
+  globalShortcut.register('Escape', () => {
+    console.log('[Main] ESC pressed (global shortcut), fromHotkey:', screenshotFromHotkey, 'wasMainWindowVisible:', wasMainWindowVisible);
+    if (screenshotWindow) {
+      screenshotWindow.close();
+      screenshotWindow = null;
+    }
+    // 清理截图数据
+    screenshotModule.clearScreenshotData();
+    screenshotData = null;
+    
+    // 如果是从快捷键触发的，取消时不显示主窗口
+    // 如果是从软件内按钮触发的，取消时恢复显示
+    if (!screenshotFromHotkey && wasMainWindowVisible && mainWindow) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+    
+    // 重置状态并取消注册
+    wasMainWindowVisible = false;
+    screenshotFromHotkey = false;
+    globalShortcut.unregister('Escape');
+  });
+
+  // 创建全屏透明窗口用于选区
+  // 尝试为每个显示器单独创建窗口，但先尝试单窗口方案
+  screenshotWindow = new BrowserWindow({
+    x: minX,
+    y: minY,
+    width: totalWidth,
+    height: totalHeight,
+    transparent: true,
+    frame: false,
+    fullscreen: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    movable: false,
+    focusable: true,
+    hasShadow: false,
+    enableLargerThanScreen: true, // 允许窗口大于单个屏幕
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+    },
+  });
+
+  // 设置窗口边界（确保覆盖所有屏幕）
+  screenshotWindow.setBounds({
+    x: minX,
+    y: minY,
+    width: totalWidth,
+    height: totalHeight
+  });
+
+  console.log('[Main] Screenshot window bounds set to:', screenshotWindow.getBounds());
+
+  // 传递屏幕边界信息和配置给选区窗口
+  screenshotWindow.webContents.on('did-finish-load', async () => {
+    screenshotWindow.webContents.send('screen-bounds', { minX, minY, maxX, maxY });
+    
+    // 读取设置中的确认按钮选项
+    let showConfirmButtons = true; // 默认显示
+    try {
+      const settings = store.get('settings');
+      if (settings?.screenshot?.showConfirmButtons !== undefined) {
+        showConfirmButtons = settings.screenshot.showConfirmButtons;
+      }
+    } catch (e) {
+      console.log('[Main] Could not read screenshot settings:', e.message);
+    }
+    
+    // 发送配置
+    screenshotWindow.webContents.send('screenshot-config', {
+      showConfirmButtons: showConfirmButtons
+    });
+    
+    // 确保窗口获得焦点
+    screenshotWindow.focus();
+    screenshotWindow.webContents.focus();
+    
+    // 打印实际窗口大小
+    console.log('[Main] Screenshot window actual bounds:', screenshotWindow.getBounds());
+  });
+
+  screenshotWindow.loadFile(path.join(__dirname, "screenshot.html"));
+  
+  // 在 Windows 上确保窗口置顶
+  screenshotWindow.setAlwaysOnTop(true, 'screen-saver');
+  
+  // 确保窗口获得焦点以接收键盘事件
+  screenshotWindow.focus();
+  
+  screenshotWindow.on("closed", () => {
+    screenshotWindow = null;
+    // 清理全局快捷键
+    globalShortcut.unregister('Escape');
+  });
+}
+
+/**
+ * 处理截图选区
+ */
+async function handleScreenshotSelection(bounds) {
+  console.log('[Main] handleScreenshotSelection called, bounds:', bounds);
+  
+  // 取消注册 ESC 快捷键
+  globalShortcut.unregister('Escape');
+  
+  try {
+    // 先关闭选区窗口
+    if (screenshotWindow) {
+      screenshotWindow.close();
+      screenshotWindow = null;
+    }
+
+    // 使用 screenshotModule 处理截图
+    const data = screenshotModule.getScreenshotData() || screenshotData;
+    
+    if (!data) {
+      throw new Error('没有预先截取的屏幕图像');
+    }
+
+    let dataURL;
+    
+    // 根据截图类型处理
+    if (data.type === 'node-screenshots') {
+      console.log('[Main] Processing with node-screenshots');
+      dataURL = screenshotModule.processSelection(bounds);
+    } else {
+      // desktopCapturer 回退处理
+      console.log('[Main] Processing with desktopCapturer fallback');
+      dataURL = processDesktopCapturerSelection(data, bounds);
+    }
+    
+    console.log('[Main] DataURL generated, length:', dataURL?.length || 0);
+
+    // 清理
+    screenshotData = null;
+    screenshotModule.clearScreenshotData();
+    wasMainWindowVisible = false;
+    screenshotFromHotkey = false;
+
+    // 截图成功后始终显示主窗口（需要显示结果）
+    if (mainWindow) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // 发送截图到渲染进程
+    if (mainWindow && dataURL) {
+      console.log('[Main] Sending screenshot-captured to renderer...');
+      mainWindow.webContents.send('screenshot-captured', dataURL);
+    }
+
+    return dataURL;
+  } catch (error) {
+    console.error('[Main] Screenshot error:', error);
+    
+    screenshotData = null;
+    screenshotModule.clearScreenshotData();
+    wasMainWindowVisible = false;
+    screenshotFromHotkey = false;
+    
+    if (mainWindow) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+    
+    return null;
+  }
+}
+
+/**
+ * 处理 desktopCapturer 的选区（回退方案）
+ */
+function processDesktopCapturerSelection(data, bounds) {
+  const { sources, displays, totalBounds } = data;
+  
+  if (!sources || sources.length === 0) {
+    throw new Error('没有可用的截图源');
+  }
+  
+  const fullScreenshot = sources[0].thumbnail;
+  const screenshotSize = fullScreenshot.getSize();
+  
+  // 计算缩放
+  const scaleX = screenshotSize.width / totalBounds.totalWidth;
+  const scaleY = screenshotSize.height / totalBounds.totalHeight;
+  
+  const relativeX = bounds.x - totalBounds.minX;
+  const relativeY = bounds.y - totalBounds.minY;
+  
+  let cropBounds = {
+    x: Math.round(relativeX * scaleX),
+    y: Math.round(relativeY * scaleY),
+    width: Math.round(bounds.width * scaleX),
+    height: Math.round(bounds.height * scaleY),
+  };
+  
+  // 边界检查
+  cropBounds.x = Math.max(0, Math.min(cropBounds.x, screenshotSize.width - 1));
+  cropBounds.y = Math.max(0, Math.min(cropBounds.y, screenshotSize.height - 1));
+  cropBounds.width = Math.max(1, Math.min(cropBounds.width, screenshotSize.width - cropBounds.x));
+  cropBounds.height = Math.max(1, Math.min(cropBounds.height, screenshotSize.height - cropBounds.y));
+  
+  console.log('[Main] Crop bounds:', cropBounds);
+  
+  const croppedImage = fullScreenshot.crop(cropBounds);
+  return croppedImage.toDataURL();
 }
 
 /**
@@ -253,14 +554,14 @@ function createMenu() {
       submenu: [
         {
           label: "截图翻译",
-          accelerator: "CmdOrCtrl+Shift+T",
+          accelerator: "Alt+Q",
           click: () => {
-            mainWindow.webContents.send("menu-action", "capture-translate");
+            startScreenshot();
           },
         },
         {
           label: "快速翻译",
-          accelerator: "CmdOrCtrl+Q",
+          accelerator: "CmdOrCtrl+Shift+T",
           click: () => {
             mainWindow.webContents.send("menu-action", "quick-translate");
           },
@@ -402,7 +703,7 @@ function createTray() {
     {
       label: "截图翻译",
       click: () => {
-        mainWindow.webContents.send("menu-action", "capture-translate");
+        startScreenshot();
       },
     },
     { type: "separator" },
@@ -440,9 +741,9 @@ function createTray() {
  * 注册全局快捷键
  */
 function registerShortcuts() {
-  // 截图翻译
-  globalShortcut.register("CommandOrControl+Shift+T", () => {
-    mainWindow.webContents.send("menu-action", "capture-translate");
+  // 截图翻译 Alt+Q
+  globalShortcut.register("Alt+Q", () => {
+    startScreenshot(true); // true 表示从快捷键触发
   });
 
   // 显示/隐藏窗口
@@ -530,7 +831,8 @@ function setupIPC() {
     }
     return null;
   });
-  // 补充 Store 相关方法 (Preload 需要)
+
+  // Store 相关方法
   ipcMain.handle("store-delete", async (event, key) => {
     store.delete(key);
   });
@@ -543,17 +845,46 @@ function setupIPC() {
     return store.has(key);
   });
 
-  // 补充 App 路径获取 (Preload 需要)
+  // App 路径获取
   ipcMain.handle("get-app-path", async (event, name) => {
-    // name 可以是 'home', 'appData', 'userData', 'temp' 等
-    // 如果没有传 name，默认返回 userData
     return app.getPath(name || "userData");
   });
 
-  // 补充截图功能占位
+  // 截图功能
   ipcMain.handle("capture-screen", async () => {
-    // 暂时返回 null，后续开发截图功能时在这里实现
-    return null;
+    return await startScreenshot();
+  });
+
+  // 截图选区完成
+  ipcMain.on("screenshot-selection", async (event, bounds) => {
+    await handleScreenshotSelection(bounds);
+  });
+
+  // 截图取消
+  ipcMain.on("screenshot-cancel", () => {
+    console.log('[Main] Screenshot cancelled, fromHotkey:', screenshotFromHotkey, 'wasMainWindowVisible:', wasMainWindowVisible);
+    // 清理预截图数据
+    screenshotData = null;
+    screenshotModule.clearScreenshotData();
+    
+    // 取消注册 ESC 快捷键
+    globalShortcut.unregister('Escape');
+    
+    if (screenshotWindow) {
+      screenshotWindow.close();
+      screenshotWindow = null;
+    }
+    
+    // 如果是从快捷键触发的，取消时不显示主窗口
+    // 如果是从软件内按钮触发的（主窗口之前是可见的），取消时恢复显示
+    if (!screenshotFromHotkey && wasMainWindowVisible && mainWindow) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+    
+    // 重置状态
+    wasMainWindowVisible = false;
+    screenshotFromHotkey = false;
   });
 }
 
@@ -561,7 +892,6 @@ function setupIPC() {
  * 检查更新（简化版）
  */
 function checkForUpdates() {
-  // 这里可以集成 electron-updater
   dialog.showMessageBox(mainWindow, {
     type: "info",
     title: "检查更新",
