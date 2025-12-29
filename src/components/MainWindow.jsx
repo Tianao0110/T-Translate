@@ -49,6 +49,11 @@ const MainWindow = () => {
     if(getStatistics) getStatistics();
   }, [getStatistics]);
 
+  // 切换到翻译标签的回调（供子组件调用）
+  const switchToTranslate = useCallback(() => {
+    setActiveTab('translate');
+  }, []);
+
   // 全局快捷键
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -139,7 +144,7 @@ const MainWindow = () => {
   const renderContent = () => {
     switch(activeTab) {
       case 'translate':
-        return <TranslationPanel showNotification={showNotification} />;
+        return <TranslationPanel showNotification={showNotification} onScreenshotComplete={switchToTranslate} />;
       case 'history':
         return <HistoryPanel searchQuery={searchQuery} filterOptions={filterOptions} showNotification={showNotification} />;
       case 'favorites':

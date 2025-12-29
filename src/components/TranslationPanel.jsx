@@ -13,7 +13,7 @@ import '../styles/components/TranslationPanel.css';
 /**
  * 翻译面板组件 (功能增强版)
  */
-const TranslationPanel = ({ showNotification }) => {
+const TranslationPanel = ({ showNotification, onScreenshotComplete }) => {
   // 兼容性处理：父组件可能传的是 showNotification 或 onNotification
   const notify = showNotification || ((msg, type) => console.log(`[${type}] ${msg}`));
 
@@ -93,6 +93,11 @@ const TranslationPanel = ({ showNotification }) => {
     const unsubscribe = window.electron.screenshot.onCaptured(async (dataURL) => {
       console.log('[Screenshot] Callback triggered, dataURL length:', dataURL?.length || 0);
       
+      // 先切换到翻译标签页
+      if (onScreenshotComplete) {
+        onScreenshotComplete();
+      }
+      
       if (!dataURL) {
         notify('截图失败', 'error');
         return;
@@ -138,7 +143,7 @@ const TranslationPanel = ({ showNotification }) => {
       console.log('[Screenshot] Cleaning up listener');
       if (unsubscribe) unsubscribe();
     };
-  }, []);
+  }, [onScreenshotComplete]);
 
   const checkConnection = async () => {
     try {
