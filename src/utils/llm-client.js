@@ -17,10 +17,27 @@ class LLMClient {
       }
     });
 
-    // 请求拦截器
+    // 连接状态缓存
+    this._connectionCache = {
+      result: null,
+      timestamp: 0,
+      ttl: 10000  // 缓存 10 秒
+    };
+    
+    // 模型列表缓存
+    this._modelsCache = {
+      models: null,
+      timestamp: 0,
+      ttl: 30000  // 缓存 30 秒
+    };
+
+    // 请求拦截器 - 减少日志噪音
     this.client.interceptors.request.use(
       (request) => {
-        console.log('[LLM] Request:', request.method, request.url);
+        // 只在非 models 请求时打印，或者开启 debug 模式
+        if (!request.url.includes('/models') || this.config.debug) {
+          console.log('[LLM] Request:', request.method, request.url);
+        }
         return request;
       },
       (error) => {
@@ -32,7 +49,9 @@ class LLMClient {
     // 响应拦截器
     this.client.interceptors.response.use(
       (response) => {
-        console.log('[LLM] Response:', response.status);
+        if (!response.config.url.includes('/models') || this.config.debug) {
+          console.log('[LLM] Response:', response.status);
+        }
         return response;
       },
       (error) => {
@@ -43,36 +62,89 @@ class LLMClient {
   }
 
   /**
-   * 测试连接
+   * 测试连接（带缓存）
+   * @param {boolean} forceRefresh - 强制刷新缓存
    */
-  async testConnection() {
+  async testConnection(forceRefresh = false) {
+    const now = Date.now();
+    
+    // 检查缓存是否有效
+    if (!forceRefresh && 
+        this._connectionCache.result && 
+        (now - this._connectionCache.timestamp) < this._connectionCache.ttl) {
+      return this._connectionCache.result;
+    }
+
     try {
       const response = await this.client.get('/models');
-      return {
+      const result = {
         success: true,
         models: response.data?.data || [],
         message: 'LM Studio 连接成功'
       };
+      
+      // 更新缓存
+      this._connectionCache.result = result;
+      this._connectionCache.timestamp = now;
+      
+      // 同时更新模型缓存
+      this._modelsCache.models = result.models;
+      this._modelsCache.timestamp = now;
+      
+      return result;
     } catch (error) {
-      return {
+      const result = {
         success: false,
         models: [],
         message: `连接失败: ${error.message}`
       };
+      
+      // 失败时也缓存，但时间更短（3秒）
+      this._connectionCache.result = result;
+      this._connectionCache.timestamp = now;
+      this._connectionCache.ttl = 3000;
+      
+      return result;
     }
   }
 
   /**
-   * 获取可用模型列表
+   * 获取可用模型列表（带缓存）
+   * @param {boolean} forceRefresh - 强制刷新缓存
    */
-  async getModels() {
+  async getModels(forceRefresh = false) {
+    const now = Date.now();
+    
+    // 检查缓存是否有效
+    if (!forceRefresh && 
+        this._modelsCache.models && 
+        (now - this._modelsCache.timestamp) < this._modelsCache.ttl) {
+      return this._modelsCache.models;
+    }
+
     try {
       const response = await this.client.get('/models');
-      return response.data?.data || [];
+      const models = response.data?.data || [];
+      
+      // 更新缓存
+      this._modelsCache.models = models;
+      this._modelsCache.timestamp = now;
+      
+      return models;
     } catch (error) {
       console.error('获取模型列表失败:', error);
-      return [];
+      return this._modelsCache.models || [];
     }
+  }
+  
+  /**
+   * 清除缓存
+   */
+  clearCache() {
+    this._connectionCache.result = null;
+    this._connectionCache.timestamp = 0;
+    this._modelsCache.models = null;
+    this._modelsCache.timestamp = 0;
   }
 
   /**

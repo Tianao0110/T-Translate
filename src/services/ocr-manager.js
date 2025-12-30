@@ -115,20 +115,22 @@ class OCRManager {
    * 初始化 LLM Vision
    */
   async initLLMVision() {
-    // 测试 LM Studio 连接
+    // 使用缓存的连接状态，避免重复请求
     const result = await llmClient.testConnection();
     if (!result.success) {
       throw new Error(`LM Studio 连接失败: ${result.message}`);
     }
     
-    // 检查是否有视觉模型
-    const models = await llmClient.getModels();
+    // 使用 testConnection 返回的 models（已缓存）
+    const models = result.models;
     const visionModel = models.find(m => 
-      m.id && (m.id.includes('llava') || m.id.includes('vision'))
+      m.id && (m.id.includes('llava') || m.id.includes('vision') || m.id.includes('qwen'))
     );
     
     if (!visionModel) {
-      console.warn('[OCR] 未找到视觉模型，请在 LM Studio 中加载 llava 或其他视觉模型');
+      console.warn('[OCR] 未找到视觉模型，请在 LM Studio 中加载 llava/vision/qwen 模型');
+    } else {
+      console.log('[OCR] 找到视觉模型:', visionModel.id);
     }
   }
 

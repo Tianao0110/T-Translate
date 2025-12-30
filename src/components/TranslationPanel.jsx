@@ -13,7 +13,7 @@ import '../styles/components/TranslationPanel.css';
 /**
  * 翻译面板组件 (功能增强版)
  */
-const TranslationPanel = ({ showNotification, onScreenshotComplete }) => {
+const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProcessed }) => {
   // 兼容性处理：父组件可能传的是 showNotification 或 onNotification
   const notify = showNotification || ((msg, type) => console.log(`[${type}] ${msg}`));
 
@@ -76,34 +76,18 @@ const TranslationPanel = ({ showNotification, onScreenshotComplete }) => {
   // 初始化连接检查
   useEffect(() => {
     checkConnection();
-    const interval = setInterval(checkConnection, 30000); 
+    // 降低检查频率：60秒检查一次
+    const interval = setInterval(checkConnection, 60000); 
     return () => clearInterval(interval);
   }, []);
 
-  // 监听截图事件
+  // 处理来自 MainWindow 的截图数据（通过 props 传递）
   useEffect(() => {
-    console.log('[Screenshot] Setting up listener, electron:', !!window.electron);
-    console.log('[Screenshot] screenshot API:', !!window.electron?.screenshot);
+    if (!screenshotData?.dataURL) return;
     
-    if (!window.electron?.screenshot?.onCaptured) {
-      console.warn('[Screenshot] onCaptured not available');
-      return;
-    }
-
-    const unsubscribe = window.electron.screenshot.onCaptured(async (dataURL) => {
-      console.log('[Screenshot] Callback triggered, dataURL length:', dataURL?.length || 0);
-      
-      // 先切换到翻译标签页
-      if (onScreenshotComplete) {
-        onScreenshotComplete();
-      }
-      
-      if (!dataURL) {
-        notify('截图失败', 'error');
-        return;
-      }
-
-      console.log('[Screenshot] Starting OCR...');
+    console.log('[TranslationPanel] Received screenshot data via props, processing OCR...');
+    
+    const processScreenshot = async () => {
       notify('正在识别文字...', 'info');
       setIsOcrProcessing(true);
 
@@ -111,7 +95,7 @@ const TranslationPanel = ({ showNotification, onScreenshotComplete }) => {
         // 使用 OCR 识别图片中的文字，传入引擎设置
         const engineToUse = ocrStatus?.engine || 'llm-vision';
         console.log('[OCR] Calling ocrManager.recognize with engine:', engineToUse);
-        const result = await ocrManager.recognize(dataURL, { engine: engineToUse });
+        const result = await ocrManager.recognize(screenshotData.dataURL, { engine: engineToUse });
         console.log('[OCR] Result:', result);
 
         if (result.success && result.text) {
@@ -136,14 +120,15 @@ const TranslationPanel = ({ showNotification, onScreenshotComplete }) => {
         notify('OCR 识别失败: ' + error.message, 'error');
       } finally {
         setIsOcrProcessing(false);
+        // 通知父组件处理完成
+        if (onScreenshotProcessed) {
+          onScreenshotProcessed();
+        }
       }
-    });
-
-    return () => {
-      console.log('[Screenshot] Cleaning up listener');
-      if (unsubscribe) unsubscribe();
     };
-  }, [onScreenshotComplete]);
+
+    processScreenshot();
+  }, [screenshotData]);
 
   const checkConnection = async () => {
     try {

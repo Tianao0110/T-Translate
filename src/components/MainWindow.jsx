@@ -38,20 +38,53 @@ const MainWindow = () => {
     clearCurrent,
     swapLanguages,
     copyToClipboard,
-    exportHistory
+    exportHistory,
+    setSourceText,
+    ocrStatus
   } = useTranslationStore();
 
   // Refs
   const searchInputRef = useRef(null);
+  
+  // 截图 OCR 数据（传递给 TranslationPanel）
+  const [screenshotData, setScreenshotData] = useState(null);
 
   // 初始化统计数据 (如果 store 没有自动初始化)
   useEffect(() => {
     if(getStatistics) getStatistics();
   }, [getStatistics]);
 
-  // 切换到翻译标签的回调（供子组件调用）
-  const switchToTranslate = useCallback(() => {
-    setActiveTab('translate');
+  // 全局截图监听 - 始终挂载，不会因标签切换而丢失
+  useEffect(() => {
+    if (!window.electron?.screenshot?.onCaptured) {
+      console.warn('[MainWindow] Screenshot onCaptured not available');
+      return;
+    }
+
+    console.log('[MainWindow] Setting up global screenshot listener');
+    
+    const unsubscribe = window.electron.screenshot.onCaptured(async (dataURL) => {
+      console.log('[MainWindow] Screenshot captured, dataURL length:', dataURL?.length || 0);
+      
+      // 1. 先切换到翻译标签
+      setActiveTab('translate');
+      
+      if (!dataURL) {
+        showNotification('截图失败', 'error');
+        return;
+      }
+      
+      // 2. 传递截图数据给 TranslationPanel 处理
+      setScreenshotData({
+        dataURL,
+        timestamp: Date.now()
+      });
+    });
+
+    return () => {
+      console.log('[MainWindow] Cleaning up global screenshot listener');
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   // 全局快捷键
@@ -144,7 +177,11 @@ const MainWindow = () => {
   const renderContent = () => {
     switch(activeTab) {
       case 'translate':
-        return <TranslationPanel showNotification={showNotification} onScreenshotComplete={switchToTranslate} />;
+        return <TranslationPanel 
+          showNotification={showNotification} 
+          screenshotData={screenshotData}
+          onScreenshotProcessed={() => setScreenshotData(null)}
+        />;
       case 'history':
         return <HistoryPanel searchQuery={searchQuery} filterOptions={filterOptions} showNotification={showNotification} />;
       case 'favorites':
@@ -204,24 +241,6 @@ const MainWindow = () => {
           </div>
         </div>
       </div>
-
-      {/* 搜索栏 (仅在历史/收藏页显示) */}
-      {(activeTab === 'history' || activeTab === 'favorites') && (
-        <div className="search-bar">
-          <div className="search-input-wrapper">
-            <Search size={16} className="search-icon" />
-            <input
-              ref={searchInputRef}
-              type="text"
-              className="search-input"
-              placeholder={`搜索${activeTab === 'history' ? '历史' : '收藏'}...`}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            {searchQuery && <button className="search-clear" onClick={() => setSearchQuery('')}><X size={14} /></button>}
-          </div>
-        </div>
-      )}
 
       {/* 主内容区 */}
       <div className="main-content">
