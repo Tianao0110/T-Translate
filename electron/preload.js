@@ -41,6 +41,8 @@ const validChannels = {
     "get-app-path",
     "capture-screen",
     "glass:open",  // 打开玻璃窗口
+    "selection:toggle",  // 切换划词翻译
+    "selection:get-enabled",  // 获取划词翻译状态
   ],
 };
 

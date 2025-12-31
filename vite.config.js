@@ -122,7 +122,8 @@ export default defineConfig(({ command, mode }) => {
       rollupOptions: {
         input: {
           main: path.resolve(__dirname, 'index.html'),
-          glass: path.resolve(__dirname, 'src/windows/glass.html')  // 玻璃翻译窗口入口
+          glass: path.resolve(__dirname, 'src/windows/glass.html'),  // 玻璃翻译窗口入口
+          selection: path.resolve(__dirname, 'selection.html')  // 划词翻译窗口入口
         },
         output: {
           // 入口文件名

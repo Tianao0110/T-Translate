@@ -83,8 +83,11 @@ ipcMain.handle("store-set", async (event, key, val) => {
 let mainWindow = null;
 let screenshotWindow = null;
 let glassWindow = null;  // 玻璃翻译窗口
+let selectionWindow = null;  // 划词翻译窗口
 let tray = null;
 let isQuitting = false;
+let selectionEnabled = true;  // 划词翻译开关
+let mouseHook = null;  // 全局鼠标监听
 
 // 开发环境检测
 const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
@@ -270,6 +273,315 @@ function toggleGlassWindow() {
   } else {
     createGlassWindow();
   }
+}
+
+// ==================== 划词翻译 ====================
+
+/**
+ * 创建划词翻译窗口
+ */
+function createSelectionWindow() {
+  if (selectionWindow && !selectionWindow.isDestroyed()) {
+    return selectionWindow;
+  }
+
+  selectionWindow = new BrowserWindow({
+    width: 450,
+    height: 200,
+    show: false,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    hasShadow: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload-selection.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+  });
+
+  // 设置窗口层级最高
+  selectionWindow.setAlwaysOnTop(true, 'screen-saver');
+  
+  // 点击穿透（初始状态，触发点显示时取消）
+  selectionWindow.setIgnoreMouseEvents(false);
+
+  if (isDev) {
+    selectionWindow.loadURL('http://localhost:5173/selection.html');
+  } else {
+    selectionWindow.loadFile(path.join(__dirname, '../dist/selection.html'));
+  }
+
+  selectionWindow.on('closed', () => {
+    selectionWindow = null;
+  });
+
+  // 失去焦点时隐藏
+  selectionWindow.on('blur', () => {
+    // 延迟隐藏，避免点击时立即消失
+    setTimeout(() => {
+      if (selectionWindow && !selectionWindow.isDestroyed()) {
+        selectionWindow.hide();
+      }
+    }, 100);
+  });
+
+  return selectionWindow;
+}
+
+/**
+ * 显示划词翻译触发点
+ */
+function showSelectionTrigger(text, x, y) {
+  if (!selectionEnabled || !text || text.length < 2) return;
+  
+  // 检查字符数限制
+  const settings = store.get('settings', {});
+  const selectionSettings = settings.selection || {};
+  const minChars = selectionSettings.minChars || 2;
+  const maxChars = selectionSettings.maxChars || 500;
+  
+  if (text.length < minChars || text.length > maxChars) return;
+  
+  // 排除纯数字和纯符号
+  if (/^[\d\s\p{P}]+$/u.test(text)) return;
+  
+  const win = createSelectionWindow();
+  
+  // 获取屏幕信息，确保窗口不超出边界
+  const display = screen.getDisplayNearestPoint({ x, y });
+  const { bounds } = display;
+  
+  // 调整位置，确保在屏幕内
+  let posX = x + 10;
+  let posY = y + 10;
+  
+  if (posX + 450 > bounds.x + bounds.width) {
+    posX = x - 460;
+  }
+  if (posY + 200 > bounds.y + bounds.height) {
+    posY = y - 210;
+  }
+  
+  win.setPosition(Math.round(posX), Math.round(posY));
+  win.setSize(50, 50); // 初始小尺寸（触发点）
+  win.show();
+  
+  // 发送数据到渲染进程
+  win.webContents.send('selection:show-trigger', {
+    text: text.trim(),
+    x: posX,
+    y: posY
+  });
+}
+
+/**
+ * 隐藏划词翻译窗口
+ */
+function hideSelectionWindow() {
+  if (selectionWindow && !selectionWindow.isDestroyed()) {
+    selectionWindow.hide();
+    selectionWindow.webContents.send('selection:hide');
+  }
+}
+
+/**
+ * 切换划词翻译开关
+ */
+function toggleSelectionTranslate() {
+  selectionEnabled = !selectionEnabled;
+  store.set('selectionEnabled', selectionEnabled);
+  
+  // 更新托盘菜单
+  updateTrayMenu();
+  
+  // 如果禁用，隐藏窗口并停止监听
+  if (!selectionEnabled) {
+    hideSelectionWindow();
+    stopMouseHook();
+  } else {
+    startMouseHook();
+  }
+  
+  console.log('[Selection] Enabled:', selectionEnabled);
+  return selectionEnabled;
+}
+
+/**
+ * 启动全局鼠标监听
+ */
+function startMouseHook() {
+  if (mouseHook || !selectionEnabled) return;
+  
+  try {
+    // 尝试加载 uiohook-napi
+    const { uIOhook } = require('uiohook-napi');
+    
+    let isSelecting = false;
+    let lastMouseUpTime = 0;
+    
+    uIOhook.on('mousedown', (e) => {
+      if (e.button === 1) { // 左键
+        isSelecting = true;
+        // 隐藏之前的翻译窗口
+        hideSelectionWindow();
+      }
+    });
+    
+    uIOhook.on('mouseup', (e) => {
+      if (e.button === 1 && isSelecting) {
+        isSelecting = false;
+        
+        // 防抖
+        const now = Date.now();
+        if (now - lastMouseUpTime < 300) return;
+        lastMouseUpTime = now;
+        
+        // 延迟获取选中文字
+        setTimeout(async () => {
+          try {
+            // 保存当前剪贴板内容
+            const oldClipboard = clipboard.readText();
+            
+            // 使用 koffi 模拟 Ctrl+C (Windows)
+            if (process.platform === 'win32') {
+              simulateCtrlC();
+            }
+            
+            // 等待剪贴板更新
+            await new Promise(resolve => setTimeout(resolve, 150));
+            
+            // 读取新内容
+            const selectedText = clipboard.readText();
+            
+            // 如果内容变化了，说明有选中文字
+            if (selectedText && selectedText.trim() && selectedText !== oldClipboard) {
+              showSelectionTrigger(selectedText.trim(), e.x, e.y);
+              // 恢复剪贴板
+              clipboard.writeText(oldClipboard);
+            }
+          } catch (err) {
+            console.error('[Selection] Failed to get selected text:', err);
+          }
+        }, 50);
+      }
+    });
+    
+    uIOhook.start();
+    mouseHook = uIOhook;
+    console.log('[Selection] Mouse hook started');
+    
+  } catch (err) {
+    console.warn('[Selection] Failed to start mouse hook:', err.message);
+    console.warn('[Selection] Install: npm install uiohook-napi');
+  }
+}
+
+/**
+ * 使用 Windows API 模拟 Ctrl+C
+ */
+function simulateCtrlC() {
+  if (process.platform !== 'win32') return;
+  
+  try {
+    const koffi = require('koffi');
+    const user32 = koffi.load('user32.dll');
+    
+    // 定义 keybd_event 函数
+    const keybd_event = user32.func('void keybd_event(uint8, uint8, uint32, void*)');
+    
+    const VK_CONTROL = 0x11;
+    const VK_C = 0x43;
+    const KEYEVENTF_KEYUP = 0x0002;
+    
+    // 按下 Ctrl
+    keybd_event(VK_CONTROL, 0, 0, null);
+    // 按下 C
+    keybd_event(VK_C, 0, 0, null);
+    // 释放 C
+    keybd_event(VK_C, 0, KEYEVENTF_KEYUP, null);
+    // 释放 Ctrl
+    keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, null);
+    
+  } catch (err) {
+    console.error('[Selection] Failed to simulate Ctrl+C:', err);
+  }
+}
+
+/**
+ * 停止全局鼠标监听
+ */
+function stopMouseHook() {
+  if (mouseHook) {
+    try {
+      mouseHook.stop();
+      mouseHook = null;
+      console.log('[Selection] Mouse hook stopped');
+    } catch (err) {
+      console.error('[Selection] Failed to stop mouse hook:', err);
+    }
+  }
+}
+
+/**
+ * 更新托盘菜单
+ */
+function updateTrayMenu() {
+  if (!tray) return;
+  
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: "显示窗口",
+      click: () => {
+        mainWindow.show();
+        mainWindow.focus();
+      },
+    },
+    {
+      label: "截图翻译",
+      click: () => {
+        startScreenshot();
+      },
+    },
+    {
+      label: "玻璃窗口",
+      click: () => {
+        toggleGlassWindow();
+      },
+    },
+    { type: "separator" },
+    {
+      label: "划词翻译",
+      type: "checkbox",
+      checked: selectionEnabled,
+      click: () => {
+        toggleSelectionTranslate();
+      },
+    },
+    {
+      label: "置顶",
+      type: "checkbox",
+      checked: store.get("alwaysOnTop", false),
+      click: (menuItem) => {
+        const alwaysOnTop = menuItem.checked;
+        mainWindow.setAlwaysOnTop(alwaysOnTop);
+        store.set("alwaysOnTop", alwaysOnTop);
+      },
+    },
+    { type: "separator" },
+    {
+      label: "退出",
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      },
+    },
+  ]);
+
+  tray.setContextMenu(contextMenu);
 }
 
 /**
@@ -835,44 +1147,15 @@ function createTray() {
     .resize({ width: 16, height: 16 });
 
   tray = new Tray(trayIcon);
-
-  const contextMenu = Menu.buildFromTemplate([
-    {
-      label: "显示窗口",
-      click: () => {
-        mainWindow.show();
-        mainWindow.focus();
-      },
-    },
-    {
-      label: "截图翻译",
-      click: () => {
-        startScreenshot();
-      },
-    },
-    { type: "separator" },
-    {
-      label: "置顶",
-      type: "checkbox",
-      checked: store.get("alwaysOnTop", false),
-      click: (menuItem) => {
-        const alwaysOnTop = menuItem.checked;
-        mainWindow.setAlwaysOnTop(alwaysOnTop);
-        store.set("alwaysOnTop", alwaysOnTop);
-      },
-    },
-    { type: "separator" },
-    {
-      label: "退出",
-      click: () => {
-        isQuitting = true;
-        app.quit();
-      },
-    },
-  ]);
-
   tray.setToolTip("T-Translate");
-  tray.setContextMenu(contextMenu);
+  
+  // 初始化菜单
+  updateTrayMenu();
+
+  // 单击托盘图标切换划词翻译
+  tray.on("click", () => {
+    toggleSelectionTranslate();
+  });
 
   // 双击托盘图标显示窗口
   tray.on("double-click", () => {
@@ -1240,6 +1523,54 @@ function setupIPC() {
   ipcMain.handle('clipboard:read-text', () => {
     return clipboard.readText();
   });
+
+  // ========== 划词翻译 IPC ==========
+  
+  // 获取划词翻译设置
+  ipcMain.handle('selection:get-settings', () => {
+    const settings = store.get('settings', {});
+    return settings.selection || {
+      triggerIcon: 'dot',
+      triggerSize: 24,
+      triggerColor: '#3b82f6',
+      customIconPath: '',
+      hoverDelay: 300,
+      triggerTimeout: 5000,
+      resultTimeout: 3000,
+      minChars: 2,
+      maxChars: 500,
+    };
+  });
+
+  // 隐藏划词翻译窗口
+  ipcMain.handle('selection:hide', () => {
+    hideSelectionWindow();
+    return true;
+  });
+
+  // 设置划词翻译窗口位置
+  ipcMain.handle('selection:set-position', (event, x, y) => {
+    if (selectionWindow && !selectionWindow.isDestroyed()) {
+      selectionWindow.setPosition(Math.round(x), Math.round(y));
+    }
+    return true;
+  });
+
+  // 划词翻译添加到历史记录
+  ipcMain.handle('selection:add-to-history', (event, item) => {
+    mainWindow?.webContents.send('add-to-history', item);
+    return true;
+  });
+
+  // 切换划词翻译
+  ipcMain.handle('selection:toggle', () => {
+    return toggleSelectionTranslate();
+  });
+
+  // 获取划词翻译状态
+  ipcMain.handle('selection:get-enabled', () => {
+    return selectionEnabled;
+  });
 }
 
 /**
@@ -1263,6 +1594,15 @@ app.whenReady().then(() => {
   createTray();
   registerShortcuts();
   setupIPC();
+  
+  // 初始化划词翻译
+  selectionEnabled = store.get('selectionEnabled', true);
+  if (selectionEnabled) {
+    // 延迟启动，等待其他组件初始化
+    setTimeout(() => {
+      startMouseHook();
+    }, 2000);
+  }
 });
 
 /**
@@ -1290,6 +1630,7 @@ app.on("activate", () => {
  */
 app.on("will-quit", () => {
   globalShortcut.unregisterAll();
+  stopMouseHook();
   if (tray) {
     tray.destroy();
   }

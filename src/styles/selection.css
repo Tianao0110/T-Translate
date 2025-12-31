@@ -1,0 +1,132 @@
+/* src/styles/selection.css */
+/* 划词翻译样式 */
+
+.selection-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 触发点 */
+.selection-trigger {
+  cursor: pointer;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+  opacity: 0.7;
+}
+
+.selection-trigger:hover {
+  transform: scale(1.2);
+  opacity: 1;
+}
+
+.trigger-dot {
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  transition: box-shadow 0.2s ease;
+}
+
+.trigger-dot:hover {
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.trigger-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+.trigger-custom {
+  border-radius: 4px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+/* 加载状态 */
+.selection-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #3b82f6;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 8px 12px;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+/* 旋转动画 */
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* 结果框 */
+.selection-result {
+  max-width: 400px;
+  min-width: 100px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  font-size: 14px;
+  line-height: 1.5;
+  color: #1a1a2e;
+  cursor: pointer;
+  user-select: text;
+  transition: transform 0.1s ease, box-shadow 0.2s ease;
+  word-break: break-word;
+}
+
+.selection-result:hover {
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2);
+}
+
+.selection-result:active {
+  transform: scale(0.98);
+}
+
+.selection-result .text {
+  display: block;
+}
+
+.selection-result .error {
+  color: #ef4444;
+}
+
+/* 复制反馈 */
+.selection-container.copied .selection-result {
+  background: rgba(34, 197, 94, 0.1);
+  box-shadow: 0 4px 20px rgba(34, 197, 94, 0.3);
+}
+
+/* 暗色主题 */
+@media (prefers-color-scheme: dark) {
+  .selection-loading {
+    background: rgba(40, 40, 55, 0.95);
+    color: #60a5fa;
+  }
+  
+  .selection-result {
+    background: rgba(40, 40, 55, 0.98);
+    color: #f0f0f5;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  }
+  
+  .selection-result:hover {
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  }
+  
+  .trigger-dot {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+  
+  .selection-container.copied .selection-result {
+    background: rgba(34, 197, 94, 0.15);
+  }
+}

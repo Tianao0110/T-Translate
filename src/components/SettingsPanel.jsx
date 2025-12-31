@@ -4,7 +4,7 @@ import {
   Settings, Globe, Shield, Zap, Database, Download, Upload, Moon, Sun, Monitor,
   Volume2, Keyboard, Info, AlertCircle, CheckCircle, WifiOff, Wifi, RefreshCw,
   Save, FolderOpen, Trash2, Eye, EyeOff, Lock, Unlock, GitBranch, HelpCircle,
-  ExternalLink, ChevronRight, Terminal, Code2, Palette, Layers
+  ExternalLink, ChevronRight, Terminal, Code2, Palette, Layers, MousePointer
 } from 'lucide-react';
 import llmClient from '../utils/llm-client';
 import translator from '../services/translator';
@@ -84,6 +84,18 @@ const SettingsPanel = ({ showNotification }) => {
       defaultOpacity: 0.85,      // 默认透明度
       rememberPosition: true,    // 记住窗口位置
       autoPin: true              // 默认置顶
+    },
+    selection: {
+      enabled: true,             // 启用划词翻译
+      triggerIcon: 'dot',        // 触发图标类型: dot | translate | custom
+      triggerSize: 24,           // 触发图标大小
+      triggerColor: '#3b82f6',   // 触发图标颜色
+      customIconPath: '',        // 自定义图标路径
+      hoverDelay: 300,           // 悬停触发延迟（毫秒）
+      triggerTimeout: 5000,      // 触发点消失时间（毫秒）
+      resultTimeout: 3000,       // 结果框自动关闭时间（毫秒）
+      minChars: 2,               // 最小字符数
+      maxChars: 500              // 最大字符数
     },
     interface: {
       theme: 'light',
@@ -678,6 +690,198 @@ const SettingsPanel = ({ showNotification }) => {
           </div>
         );
 
+      case 'selection':
+        return (
+          <div className="setting-content">
+            <h3>划词翻译设置</h3>
+            <p className="setting-description">选中文字后自动显示翻译触发点</p>
+            
+            <div className="setting-group">
+              <label className="setting-label">启用划词翻译</label>
+              <div className="toggle-wrapper">
+                <button
+                  className={`toggle-button ${settings.selection.enabled ? 'active' : ''}`}
+                  onClick={() => {
+                    updateSetting('selection', 'enabled', !settings.selection.enabled);
+                    // 通知主进程切换状态
+                    window.electron?.ipcRenderer?.invoke?.('selection:toggle');
+                  }}
+                >
+                  {settings.selection.enabled ? '开启' : '关闭'}
+                </button>
+                <span className="toggle-description">
+                  {settings.selection.enabled ? '选中文字后显示翻译触发点' : '已禁用划词翻译'}
+                </span>
+              </div>
+              <p className="setting-hint">也可以点击系统托盘图标快速切换</p>
+            </div>
+
+            <div className="setting-group">
+              <label className="setting-label">触发图标样式</label>
+              <select
+                className="setting-select"
+                value={settings.selection.triggerIcon}
+                onChange={(e) => updateSetting('selection', 'triggerIcon', e.target.value)}
+              >
+                <option value="dot">圆点</option>
+                <option value="translate">翻译图标</option>
+                <option value="custom">自定义图标</option>
+              </select>
+            </div>
+
+            {settings.selection.triggerIcon === 'custom' && (
+              <div className="setting-group">
+                <label className="setting-label">自定义图标路径</label>
+                <input
+                  type="text"
+                  className="setting-input"
+                  value={settings.selection.customIconPath}
+                  onChange={(e) => updateSetting('selection', 'customIconPath', e.target.value)}
+                  placeholder="图标文件路径 (PNG/SVG)"
+                />
+              </div>
+            )}
+
+            <div className="setting-group">
+              <label className="setting-label">触发图标大小</label>
+              <div className="setting-row">
+                <input
+                  type="range"
+                  className="setting-range"
+                  min="16"
+                  max="48"
+                  value={settings.selection.triggerSize}
+                  onChange={(e) => updateSetting('selection', 'triggerSize', parseInt(e.target.value))}
+                />
+                <span className="range-value">{settings.selection.triggerSize}px</span>
+              </div>
+            </div>
+
+            <div className="setting-group">
+              <label className="setting-label">触发图标颜色</label>
+              <div className="setting-row">
+                <input
+                  type="color"
+                  className="setting-color"
+                  value={settings.selection.triggerColor}
+                  onChange={(e) => updateSetting('selection', 'triggerColor', e.target.value)}
+                />
+                <span className="color-value">{settings.selection.triggerColor}</span>
+              </div>
+            </div>
+
+            <div className="setting-group">
+              <label className="setting-label">悬停触发延迟</label>
+              <div className="setting-row">
+                <input
+                  type="range"
+                  className="setting-range"
+                  min="100"
+                  max="1000"
+                  step="100"
+                  value={settings.selection.hoverDelay}
+                  onChange={(e) => updateSetting('selection', 'hoverDelay', parseInt(e.target.value))}
+                />
+                <span className="range-value">{settings.selection.hoverDelay}ms</span>
+              </div>
+              <p className="setting-hint">鼠标悬停在触发图标上多久后开始翻译</p>
+            </div>
+
+            <div className="setting-group">
+              <label className="setting-label">触发点消失时间</label>
+              <div className="setting-row">
+                <input
+                  type="range"
+                  className="setting-range"
+                  min="2000"
+                  max="10000"
+                  step="1000"
+                  value={settings.selection.triggerTimeout}
+                  onChange={(e) => updateSetting('selection', 'triggerTimeout', parseInt(e.target.value))}
+                />
+                <span className="range-value">{settings.selection.triggerTimeout / 1000}秒</span>
+              </div>
+              <p className="setting-hint">无操作后触发点自动消失的时间</p>
+            </div>
+
+            <div className="setting-group">
+              <label className="setting-label">结果框自动关闭</label>
+              <div className="setting-row">
+                <input
+                  type="range"
+                  className="setting-range"
+                  min="1000"
+                  max="10000"
+                  step="1000"
+                  value={settings.selection.resultTimeout}
+                  onChange={(e) => updateSetting('selection', 'resultTimeout', parseInt(e.target.value))}
+                />
+                <span className="range-value">{settings.selection.resultTimeout / 1000}秒</span>
+              </div>
+              <p className="setting-hint">鼠标移出结果框后自动关闭的时间</p>
+            </div>
+
+            <div className="setting-group">
+              <label className="setting-label">字符数限制</label>
+              <div className="setting-row double">
+                <div className="input-with-label">
+                  <label>最小</label>
+                  <input
+                    type="number"
+                    className="setting-input small"
+                    value={settings.selection.minChars}
+                    onChange={(e) => updateSetting('selection', 'minChars', parseInt(e.target.value) || 2)}
+                    min="1"
+                    max="10"
+                  />
+                </div>
+                <div className="input-with-label">
+                  <label>最大</label>
+                  <input
+                    type="number"
+                    className="setting-input small"
+                    value={settings.selection.maxChars}
+                    onChange={(e) => updateSetting('selection', 'maxChars', parseInt(e.target.value) || 500)}
+                    min="50"
+                    max="2000"
+                  />
+                </div>
+              </div>
+              <p className="setting-hint">少于最小或超过最大字符数的选中内容不会触发翻译</p>
+            </div>
+
+            <div className="setting-group">
+              <label className="setting-label">使用说明</label>
+              <div className="shortcut-info">
+                <div className="shortcut-item">
+                  <span className="step">1</span>
+                  <span>在任意应用中选中文字</span>
+                </div>
+                <div className="shortcut-item">
+                  <span className="step">2</span>
+                  <span>鼠标悬停在出现的触发点上</span>
+                </div>
+                <div className="shortcut-item">
+                  <span className="step">3</span>
+                  <span>自动翻译并显示结果</span>
+                </div>
+                <div className="shortcut-item">
+                  <kbd>左键点击</kbd>
+                  <span>关闭结果框</span>
+                </div>
+                <div className="shortcut-item">
+                  <kbd>右键拖动</kbd>
+                  <span>移动结果框位置</span>
+                </div>
+                <div className="shortcut-item">
+                  <kbd>双击结果</kbd>
+                  <span>复制译文</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
       default: return null;
     }
   };
@@ -689,6 +893,7 @@ const SettingsPanel = ({ showNotification }) => {
           <button className={`nav-item ${activeSection==='connection'?'active':''}`} onClick={()=>setActiveSection('connection')}><Wifi size={18}/><span>连接</span></button>
           <button className={`nav-item ${activeSection==='translation'?'active':''}`} onClick={()=>setActiveSection('translation')}><Globe size={18}/><span>翻译</span></button>
           <button className={`nav-item ${activeSection==='glassWindow'?'active':''}`} onClick={()=>setActiveSection('glassWindow')}><Layers size={18}/><span>玻璃窗</span></button>
+          <button className={`nav-item ${activeSection==='selection'?'active':''}`} onClick={()=>setActiveSection('selection')}><MousePointer size={18}/><span>划词</span></button>
           <button className={`nav-item ${activeSection==='privacy'?'active':''}`} onClick={()=>setActiveSection('privacy')}><Shield size={18}/><span>隐私</span></button>
           <button className={`nav-item ${activeSection==='ocr'?'active':''}`} onClick={()=>setActiveSection('ocr')}><Eye size={18}/><span>OCR</span></button>
           <button className={`nav-item ${activeSection==='interface'?'active':''}`} onClick={()=>setActiveSection('interface')}><Palette size={18}/><span>界面</span></button>
