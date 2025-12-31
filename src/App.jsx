@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import TitleBar from './components/TitleBar';
 import MainWindow from './components/MainWindow';
+import useTranslationStore from './stores/translation-store';
 import './styles/App.css'; 
 
 function App() {
@@ -9,6 +10,8 @@ function App() {
 
   try {
     const [theme, setTheme] = useState('light');
+    const setPendingScreenshot = useTranslationStore(state => state.setPendingScreenshot);
+    const addToFavorites = useTranslationStore(state => state.addToFavorites);
 
     useEffect(() => {
       console.log("▶ App useEffect running...");
@@ -45,6 +48,65 @@ function App() {
         clearTimeout(timer);
       };
     }, []);
+
+    // 全局截图监听（始终挂载，不会因标签切换而丢失）
+    useEffect(() => {
+      console.log('[App] Setting up global screenshot listener');
+      
+      if (!window.electron?.screenshot?.onCaptured) {
+        console.warn('[App] Screenshot API not available');
+        return;
+      }
+
+      const unsubscribe = window.electron.screenshot.onCaptured((dataURL) => {
+        console.log('[App] Screenshot captured, length:', dataURL?.length || 0);
+        if (dataURL) {
+          // 将截图数据存入 Store，TranslationPanel 会监听并处理
+          setPendingScreenshot(dataURL);
+        }
+      });
+
+      return () => {
+        console.log('[App] Cleaning up global screenshot listener');
+        if (unsubscribe) unsubscribe();
+      };
+    }, [setPendingScreenshot]);
+
+    // 监听玻璃窗口的收藏请求
+    useEffect(() => {
+      console.log('[App] Setting up glass window favorites listener');
+      
+      if (!window.electron?.ipcRenderer) {
+        console.warn('[App] IPC not available for glass favorites');
+        return;
+      }
+
+      const handleAddToFavorites = (event, item) => {
+        console.log('[App] Received add-to-favorites from glass window:', item);
+        if (item && addToFavorites) {
+          // 传递完整数据，包括 id、tags 等，以支持 AI 标签等功能
+          addToFavorites({
+            id: item.id || `glass-${Date.now()}`,
+            sourceText: item.sourceText || '',
+            translatedText: item.translatedText || '',
+            sourceLanguage: item.sourceLanguage || 'auto',
+            targetLanguage: item.targetLanguage || 'zh',
+            timestamp: item.timestamp || Date.now(),
+            tags: item.tags || [],
+            folderId: item.folderId || null,
+            isStyleReference: item.isStyleReference || false,
+            source: item.source || 'glass-translator'
+          });
+          console.log('[App] Added to favorites successfully');
+        }
+      };
+
+      window.electron.ipcRenderer.on('add-to-favorites', handleAddToFavorites);
+
+      return () => {
+        window.electron.ipcRenderer.removeListener('add-to-favorites', handleAddToFavorites);
+      };
+    }, [addToFavorites]);
 
     console.log("▶ App state initialized, rendering JSX...");
 

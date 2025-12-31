@@ -41,6 +41,7 @@ ipcMain.handle("store-set", async (event, key, val) => {
 // 全局变量
 let mainWindow = null;
 let screenshotWindow = null;
+let glassWindow = null;  // 玻璃翻译窗口
 let tray = null;
 let isQuitting = false;
 
@@ -126,6 +127,97 @@ function createWindow() {
     shell.openExternal(url);
     return { action: "deny" };
   });
+}
+
+/**
+ * 创建玻璃翻译窗口
+ */
+function createGlassWindow() {
+  if (glassWindow) {
+    glassWindow.focus();
+    return;
+  }
+
+  // 获取保存的玻璃窗口位置和大小
+  const glassBounds = store.get('glassBounds', {
+    width: 400,
+    height: 200,
+    x: undefined,
+    y: undefined
+  });
+
+  glassWindow = new BrowserWindow({
+    width: glassBounds.width,
+    height: glassBounds.height,
+    x: glassBounds.x,
+    y: glassBounds.y,
+    minWidth: 200,
+    minHeight: 100,
+    transparent: true,
+    frame: false,
+    alwaysOnTop: true,
+    skipTaskbar: false,
+    resizable: true,
+    hasShadow: false,
+    backgroundColor: '#00000000',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload-glass.js'),
+    },
+  });
+
+  // 加载玻璃窗口页面
+  if (isDev) {
+    glassWindow.loadURL('http://localhost:5173/src/windows/glass.html');
+  } else {
+    glassWindow.loadFile(path.join(__dirname, '../dist/src/windows/glass.html'));
+  }
+
+  // 窗口移动/缩放时保存位置
+  glassWindow.on('moved', () => {
+    if (glassWindow) {
+      const bounds = glassWindow.getBounds();
+      store.set('glassBounds', bounds);
+    }
+  });
+
+  glassWindow.on('resized', () => {
+    if (glassWindow) {
+      const bounds = glassWindow.getBounds();
+      store.set('glassBounds', bounds);
+    }
+  });
+
+  glassWindow.on('closed', () => {
+    glassWindow = null;
+  });
+
+  // 注册窗口内快捷键
+  glassWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.key === 'Escape') {
+      glassWindow.close();
+    } else if (input.key === ' ' && !input.control && !input.alt && !input.meta) {
+      // 空格键手动刷新
+      glassWindow.webContents.send('glass:refresh');
+    }
+  });
+}
+
+/**
+ * 切换玻璃窗口显示/隐藏
+ */
+function toggleGlassWindow() {
+  if (glassWindow) {
+    if (glassWindow.isVisible()) {
+      glassWindow.close();
+    } else {
+      glassWindow.show();
+      glassWindow.focus();
+    }
+  } else {
+    createGlassWindow();
+  }
 }
 
 /**
@@ -755,6 +847,11 @@ function registerShortcuts() {
       mainWindow.focus();
     }
   });
+
+  // 打开/关闭玻璃翻译窗口 Ctrl+Alt+G
+  globalShortcut.register("CommandOrControl+Alt+G", () => {
+    toggleGlassWindow();
+  });
 }
 
 /**
@@ -885,6 +982,169 @@ function setupIPC() {
     // 重置状态
     wasMainWindowVisible = false;
     screenshotFromHotkey = false;
+  });
+
+  // ========== 玻璃翻译窗口 IPC ==========
+  
+  // 获取玻璃窗口边界
+  ipcMain.handle('glass:get-bounds', () => {
+    if (glassWindow) {
+      return glassWindow.getBounds();
+    }
+    return null;
+  });
+
+  // 截取玻璃窗口覆盖区域
+  ipcMain.handle('glass:capture-region', async (event, bounds) => {
+    try {
+      // 检查窗口是否存在
+      if (!glassWindow || glassWindow.isDestroyed()) {
+        throw new Error('玻璃窗口不存在');
+      }
+      
+      // 通知渲染进程隐藏内容
+      glassWindow.webContents.send('glass:hide-for-capture');
+      
+      // 等待渲染完成
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      // 使用 node-screenshots 截取指定区域
+      const screenshot = await screenshotModule.captureRegion(bounds);
+      
+      // 通知渲染进程显示内容
+      glassWindow.webContents.send('glass:show-after-capture');
+      
+      if (screenshot) {
+        return { success: true, imageData: screenshot };
+      } else {
+        throw new Error('截图失败');
+      }
+    } catch (error) {
+      console.error('[Glass] Capture error:', error);
+      // 确保恢复显示
+      if (glassWindow && !glassWindow.isDestroyed()) {
+        glassWindow.webContents.send('glass:show-after-capture');
+      }
+      return { success: false, error: error.message };
+    }
+  });
+
+  // 翻译文本（玻璃窗口）
+  ipcMain.handle('glass:translate', async (event, text) => {
+    try {
+      // 发送翻译请求到主窗口的翻译服务
+      // 或者直接调用 LLM
+      mainWindow?.webContents.send('glass:translate-request', text);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // 设置穿透模式 - 使用智能穿透，控制栏始终可点击
+  ipcMain.handle('glass:set-pass-through', (event, enabled) => {
+    if (glassWindow && !glassWindow.isDestroyed()) {
+      console.log('[Glass] Setting pass-through mode:', enabled);
+      if (enabled) {
+        // 启用穿透，使用 forward 让渲染进程可以根据鼠标位置控制
+        glassWindow.setIgnoreMouseEvents(true, { forward: true });
+      } else {
+        // 完全关闭穿透
+        glassWindow.setIgnoreMouseEvents(false);
+      }
+      return true;
+    }
+    return false;
+  });
+  
+  // 动态设置穿透（根据鼠标位置，仅在穿透模式开启时使用）
+  ipcMain.handle('glass:set-ignore-mouse', (event, ignore) => {
+    if (glassWindow && !glassWindow.isDestroyed()) {
+      if (ignore) {
+        glassWindow.setIgnoreMouseEvents(true, { forward: true });
+      } else {
+        glassWindow.setIgnoreMouseEvents(false);
+      }
+      return true;
+    }
+    return false;
+  });
+
+  // 设置置顶
+  ipcMain.handle('glass:set-always-on-top', (event, enabled) => {
+    if (glassWindow) {
+      glassWindow.setAlwaysOnTop(enabled);
+      return true;
+    }
+    return false;
+  });
+
+  // 关闭玻璃窗口
+  ipcMain.handle('glass:close', () => {
+    if (glassWindow) {
+      glassWindow.close();
+      return true;
+    }
+    return false;
+  });
+
+  // 获取玻璃窗口设置（合并主程序设置和本地设置）
+  ipcMain.handle('glass:get-settings', () => {
+    // 从主程序设置读取
+    const mainSettings = store.get('settings', {});
+    const glassConfig = mainSettings.glassWindow || {};
+    
+    // 本地设置（窗口位置等）
+    const localSettings = store.get('glassLocalSettings', {});
+    
+    const merged = {
+      // 从主程序设置
+      refreshInterval: glassConfig.refreshInterval ?? 3000,
+      smartDetect: glassConfig.smartDetect ?? true,
+      streamOutput: glassConfig.streamOutput ?? true,
+      ocrEngine: glassConfig.ocrEngine ?? 'llm-vision',
+      defaultOpacity: glassConfig.defaultOpacity ?? 0.85,
+      autoPin: glassConfig.autoPin ?? true,
+      // 翻译设置
+      targetLanguage: mainSettings.translation?.defaultTargetLang ?? 'zh',
+      // 本地设置
+      opacity: localSettings.opacity ?? glassConfig.defaultOpacity ?? 0.85,
+      isPinned: localSettings.isPinned ?? glassConfig.autoPin ?? true,
+    };
+    
+    console.log('[Glass] Get settings:', merged);
+    return merged;
+  });
+
+  // 保存玻璃窗口本地设置（窗口位置、透明度等）
+  ipcMain.handle('glass:save-settings', (event, settings) => {
+    const current = store.get('glassLocalSettings', {});
+    store.set('glassLocalSettings', { ...current, ...settings });
+    return true;
+  });
+
+  // 添加到收藏（从玻璃窗口）
+  ipcMain.handle('glass:add-to-favorites', (event, item) => {
+    // 转发到主窗口处理
+    mainWindow?.webContents.send('add-to-favorites', item);
+    return true;
+  });
+  
+  // 打开玻璃窗口
+  ipcMain.handle('glass:open', () => {
+    createGlassWindow();
+    return true;
+  });
+
+  // ========== 剪贴板 IPC（玻璃窗口使用） ==========
+  
+  ipcMain.handle('clipboard:write-text', (event, text) => {
+    clipboard.writeText(text);
+    return true;
+  });
+
+  ipcMain.handle('clipboard:read-text', () => {
+    return clipboard.readText();
   });
 }
 

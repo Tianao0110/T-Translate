@@ -1,6 +1,7 @@
 // electron/preload.js
 const { contextBridge, ipcRenderer } = require("electron");
 const path = require("path");
+// 注意：main.js 必须设置 sandbox: false 才能使用 fs
 const fs = require("fs").promises;
 
 /**
@@ -15,13 +16,12 @@ const validChannels = {
     "open-external",
     "write-clipboard-text",
     "menu-action",
-    "screenshot-selection",
-    "screenshot-cancel",
   ],
   receive: [
     "menu-action", 
     "import-file",
-    "screenshot-captured",  // 新增：接收截图
+    "add-to-favorites",  // 玻璃窗口收藏
+    "glass:translate-request",  // 玻璃窗口翻译请求
   ],
   invoke: [
     "get-app-version",
@@ -37,6 +37,7 @@ const validChannels = {
     "store-has",
     "get-app-path",
     "capture-screen",
+    "glass:open",  // 打开玻璃窗口
   ],
 };
 
@@ -64,6 +65,7 @@ const electronAPI = {
     writeText: (text) => ipcRenderer.send("write-clipboard-text", text),
     readImage: () => ipcRenderer.invoke("read-clipboard-image"),
   },
+  // 简单的文件系统封装
   fs: {
     readJSON: async (filePath) => {
       try {
@@ -82,27 +84,22 @@ const electronAPI = {
       }
     },
   },
+  // Shell
   shell: {
     openExternal: (url) => ipcRenderer.send("open-external", url),
   },
+  // Electron Store
   store: {
     get: (key) => ipcRenderer.invoke("store-get", key),
     set: (key, val) => ipcRenderer.invoke("store-set", key, val),
     delete: (key) => ipcRenderer.invoke("store-delete", key),
     clear: () => ipcRenderer.invoke("store-clear"),
   },
-  // 截图相关 API
-  screenshot: {
-    // 触发截图
-    capture: () => ipcRenderer.invoke("capture-screen"),
-    // 监听截图完成
-    onCaptured: (callback) => {
-      const handler = (event, dataURL) => callback(dataURL);
-      ipcRenderer.on("screenshot-captured", handler);
-      return () => ipcRenderer.removeListener("screenshot-captured", handler);
-    },
+  // 玻璃翻译窗口
+  glass: {
+    open: () => ipcRenderer.invoke("glass:open"),
   },
-  // 通用 IPC
+  // 通用 IPC (带白名单检查)
   ipc: {
     on: (channel, func) => {
       if (validChannels.receive.includes(channel)) {
@@ -111,21 +108,32 @@ const electronAPI = {
         return () => ipcRenderer.removeListener(channel, subscription);
       }
     },
-    send: (channel, ...args) => {
-      if (validChannels.send.includes(channel)) {
-        ipcRenderer.send(channel, ...args);
+  },
+  // 直接暴露 ipcRenderer（用于玻璃窗口通信）
+  ipcRenderer: {
+    on: (channel, func) => {
+      if (validChannels.receive.includes(channel)) {
+        ipcRenderer.on(channel, func);
       }
+    },
+    removeListener: (channel, func) => {
+      ipcRenderer.removeListener(channel, func);
     },
   },
 };
 
-// 暴露 API
+// ============================================================
+// 暴露 API (带防重复检查)
+// ============================================================
+
 try {
+  // 只有当 window.electron 不存在时才暴露，防止热重载报错
   if (!window.electron) {
     contextBridge.exposeInMainWorld("electron", electronAPI);
     console.log("[Preload] electron API exposed");
   }
 } catch (error) {
+  // 忽略 "API already exists" 错误
   if (!error.message?.includes("bind an API on top of")) {
     console.error("Failed to expose electron API:", error);
   }

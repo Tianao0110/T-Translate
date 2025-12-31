@@ -118,10 +118,11 @@ export default defineConfig(({ command, mode }) => {
         }
       } : undefined,
       
-      // 代码分割
+      // 代码分割 - 多入口配置
       rollupOptions: {
         input: {
-          main: path.resolve(__dirname, 'index.html')
+          main: path.resolve(__dirname, 'index.html'),
+          glass: path.resolve(__dirname, 'src/windows/glass.html')  // 玻璃翻译窗口入口
         },
         output: {
           // 入口文件名
@@ -319,7 +320,7 @@ export default defineConfig(({ command, mode }) => {
     envPrefix: 'VITE_',
 
     // 应用类型
-    appType: 'spa'
+    appType: 'mpa'  // 改为多页应用
   };
 });
 

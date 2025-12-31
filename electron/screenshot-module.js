@@ -404,5 +404,147 @@ module.exports = {
   captureWithNodeScreenshots,
   captureWithDesktopCapturer,
   processSelection,
-  isNodeScreenshotsAvailable
+  isNodeScreenshotsAvailable,
+  
+  /**
+   * 截取指定区域（用于玻璃翻译窗口）
+   * @param {Object} bounds - { x, y, width, height }
+   * @returns {Promise<string|null>} - base64 图片数据
+   */
+  async captureRegion(bounds) {
+    try {
+      if (!nodeScreenshots) {
+        console.error('[Screenshot] node-screenshots not available for captureRegion');
+        return null;
+      }
+      
+      const { Monitor } = nodeScreenshots;
+      const { screen, nativeImage } = require('electron');
+      
+      // 获取 Electron 的 displays 信息（逻辑坐标）
+      const displays = screen.getAllDisplays();
+      
+      // 获取 node-screenshots 的 monitors
+      const monitors = Monitor.all();
+      
+      if (monitors.length === 0) {
+        console.error('[Screenshot] No monitors found');
+        return null;
+      }
+      
+      // 处理 monitors 数据
+      const processedMonitors = monitors.map(m => {
+        const getValue = (obj, key) => typeof obj[key] === 'function' ? obj[key]() : obj[key];
+        return {
+          id: getValue(m, 'id'),
+          x: getValue(m, 'x'),
+          y: getValue(m, 'y'),
+          width: getValue(m, 'width'),
+          height: getValue(m, 'height'),
+          scaleFactor: getValue(m, 'scaleFactor') || 1,
+          monitor: m
+        };
+      });
+      
+      console.log('[Screenshot] Electron displays:', displays.map(d => ({
+        bounds: d.bounds,
+        scaleFactor: d.scaleFactor
+      })));
+      console.log('[Screenshot] node-screenshots monitors:', processedMonitors.map(m => ({
+        id: m.id, x: m.x, y: m.y, width: m.width, height: m.height
+      })));
+      
+      // 找到选区中心点
+      const centerX = bounds.x + bounds.width / 2;
+      const centerY = bounds.y + bounds.height / 2;
+      
+      console.log('[Screenshot] Selection center (logical):', { centerX, centerY });
+      
+      // 找到选区所在的 Electron display（使用逻辑坐标）
+      let targetDisplay = displays[0];
+      for (const display of displays) {
+        const { x, y, width, height } = display.bounds;
+        if (centerX >= x && centerX < x + width &&
+            centerY >= y && centerY < y + height) {
+          targetDisplay = display;
+          break;
+        }
+      }
+      
+      console.log('[Screenshot] Target display (Electron):', targetDisplay.bounds, 'scaleFactor:', targetDisplay.scaleFactor);
+      
+      // 使用 Electron display 的 scaleFactor
+      const scaleFactor = targetDisplay.scaleFactor;
+      
+      // 找到对应的 node-screenshots monitor
+      let targetMonitor = processedMonitors[0];
+      
+      // 将 Electron 的逻辑中心坐标转换为物理坐标来匹配
+      const physicalCenterX = centerX * scaleFactor;
+      const physicalCenterY = centerY * scaleFactor;
+      
+      for (const monitor of processedMonitors) {
+        if (physicalCenterX >= monitor.x && physicalCenterX < monitor.x + monitor.width &&
+            physicalCenterY >= monitor.y && physicalCenterY < monitor.y + monitor.height) {
+          targetMonitor = monitor;
+          break;
+        }
+      }
+      
+      // 如果按物理坐标找不到，尝试用逻辑坐标匹配
+      if (targetMonitor === processedMonitors[0]) {
+        for (const monitor of processedMonitors) {
+          if (centerX >= monitor.x && centerX < monitor.x + monitor.width &&
+              centerY >= monitor.y && centerY < monitor.y + monitor.height) {
+            targetMonitor = monitor;
+            break;
+          }
+        }
+      }
+      
+      console.log('[Screenshot] Target monitor:', targetMonitor.id, 
+        'at', targetMonitor.x, targetMonitor.y, 
+        'size:', targetMonitor.width, 'x', targetMonitor.height);
+      
+      // 截取目标显示器
+      const image = targetMonitor.monitor.captureImageSync();
+      const pngBuffer = image.toPngSync();
+      
+      // 计算选区相对于 Electron display 的逻辑偏移
+      const logicalRelativeX = bounds.x - targetDisplay.bounds.x;
+      const logicalRelativeY = bounds.y - targetDisplay.bounds.y;
+      
+      console.log('[Screenshot] Logical relative position:', { x: logicalRelativeX, y: logicalRelativeY });
+      
+      // 转换为物理像素坐标用于裁剪
+      const cropBounds = {
+        x: Math.max(0, Math.round(logicalRelativeX * scaleFactor)),
+        y: Math.max(0, Math.round(logicalRelativeY * scaleFactor)),
+        width: Math.round(bounds.width * scaleFactor),
+        height: Math.round(bounds.height * scaleFactor)
+      };
+      
+      // 确保不超出截图边界
+      const imgWidth = targetMonitor.width;
+      const imgHeight = targetMonitor.height;
+      cropBounds.x = Math.min(cropBounds.x, imgWidth - 1);
+      cropBounds.y = Math.min(cropBounds.y, imgHeight - 1);
+      cropBounds.width = Math.min(cropBounds.width, imgWidth - cropBounds.x);
+      cropBounds.height = Math.min(cropBounds.height, imgHeight - cropBounds.y);
+      
+      console.log('[Screenshot] Final crop bounds:', cropBounds, 'from image:', imgWidth, 'x', imgHeight);
+      
+      // 使用 nativeImage 裁剪
+      const fullImage = nativeImage.createFromBuffer(pngBuffer);
+      const actualSize = fullImage.getSize();
+      console.log('[Screenshot] Actual image size:', actualSize);
+      
+      const croppedImage = fullImage.crop(cropBounds);
+      
+      return croppedImage.toDataURL();
+    } catch (error) {
+      console.error('[Screenshot] captureRegion error:', error);
+      return null;
+    }
+  }
 };

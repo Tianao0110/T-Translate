@@ -4,7 +4,7 @@ import {
   Settings, Globe, Shield, Zap, Database, Download, Upload, Moon, Sun, Monitor,
   Volume2, Keyboard, Info, AlertCircle, CheckCircle, WifiOff, Wifi, RefreshCw,
   Save, FolderOpen, Trash2, Eye, EyeOff, Lock, Unlock, GitBranch, HelpCircle,
-  ExternalLink, ChevronRight, Terminal, Code2, Palette
+  ExternalLink, ChevronRight, Terminal, Code2, Palette, Layers
 } from 'lucide-react';
 import llmClient from '../utils/llm-client';
 import translator from '../services/translator';
@@ -75,6 +75,15 @@ const SettingsPanel = ({ showNotification }) => {
     screenshot: {
       showConfirmButtons: true,  // 显示确认按钮
       autoCapture: false         // 自动截图（不显示确认）
+    },
+    glassWindow: {
+      refreshInterval: 3000,     // 自动刷新间隔（毫秒）
+      smartDetect: true,         // 智能检测变化
+      streamOutput: true,        // 流式输出
+      ocrEngine: 'llm-vision',   // OCR 引擎
+      defaultOpacity: 0.85,      // 默认透明度
+      rememberPosition: true,    // 记住窗口位置
+      autoPin: true              // 默认置顶
     },
     interface: {
       theme: 'light',
@@ -547,6 +556,128 @@ const SettingsPanel = ({ showNotification }) => {
           </div>
         );
 
+      case 'glassWindow':
+        return (
+          <div className="setting-content">
+            <h3>翻译玻璃窗设置</h3>
+            <p className="setting-description">配置悬浮翻译窗口的行为和外观</p>
+            
+            <div className="setting-group">
+              <label className="setting-label">自动刷新间隔</label>
+              <div className="setting-row">
+                <input
+                  type="range"
+                  className="setting-range"
+                  min="1000"
+                  max="10000"
+                  step="500"
+                  value={settings.glassWindow.refreshInterval}
+                  onChange={(e) => updateSetting('glassWindow', 'refreshInterval', parseInt(e.target.value))}
+                />
+                <span className="range-value">{settings.glassWindow.refreshInterval / 1000}秒</span>
+              </div>
+              <p className="setting-hint">开启自动刷新时，每隔此时间重新识别并翻译</p>
+            </div>
+
+            <div className="setting-group">
+              <label className="setting-label">智能检测</label>
+              <div className="toggle-wrapper">
+                <button
+                  className={`toggle-button ${settings.glassWindow.smartDetect ? 'active' : ''}`}
+                  onClick={() => updateSetting('glassWindow', 'smartDetect', !settings.glassWindow.smartDetect)}
+                >
+                  {settings.glassWindow.smartDetect ? '开启' : '关闭'}
+                </button>
+                <span className="toggle-description">
+                  {settings.glassWindow.smartDetect ? '自动跳过未变化的内容' : '每次都重新识别翻译'}
+                </span>
+              </div>
+            </div>
+
+            <div className="setting-group">
+              <label className="setting-label">流式输出</label>
+              <div className="toggle-wrapper">
+                <button
+                  className={`toggle-button ${settings.glassWindow.streamOutput ? 'active' : ''}`}
+                  onClick={() => updateSetting('glassWindow', 'streamOutput', !settings.glassWindow.streamOutput)}
+                >
+                  {settings.glassWindow.streamOutput ? '开启' : '关闭'}
+                </button>
+                <span className="toggle-description">
+                  {settings.glassWindow.streamOutput ? '翻译结果逐字显示' : '翻译完成后一次性显示'}
+                </span>
+              </div>
+            </div>
+
+            <div className="setting-group">
+              <label className="setting-label">OCR 引擎</label>
+              <select
+                className="setting-select"
+                value={settings.glassWindow.ocrEngine}
+                onChange={(e) => updateSetting('glassWindow', 'ocrEngine', e.target.value)}
+              >
+                <option value="llm-vision">LLM Vision（更准确）</option>
+                <option value="tesseract">Tesseract（更快速）</option>
+              </select>
+            </div>
+
+            <div className="setting-group">
+              <label className="setting-label">默认透明度</label>
+              <div className="setting-row">
+                <input
+                  type="range"
+                  className="setting-range"
+                  min="30"
+                  max="100"
+                  value={Math.round(settings.glassWindow.defaultOpacity * 100)}
+                  onChange={(e) => updateSetting('glassWindow', 'defaultOpacity', parseInt(e.target.value) / 100)}
+                />
+                <span className="range-value">{Math.round(settings.glassWindow.defaultOpacity * 100)}%</span>
+              </div>
+            </div>
+
+            <div className="setting-group">
+              <label className="setting-label">其他选项</label>
+              <div className="checkbox-group">
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={settings.glassWindow.rememberPosition}
+                    onChange={(e) => updateSetting('glassWindow', 'rememberPosition', e.target.checked)}
+                  />
+                  <span>记住窗口位置</span>
+                </label>
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={settings.glassWindow.autoPin}
+                    onChange={(e) => updateSetting('glassWindow', 'autoPin', e.target.checked)}
+                  />
+                  <span>默认置顶显示</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="setting-group">
+              <label className="setting-label">快捷键</label>
+              <div className="shortcut-info">
+                <div className="shortcut-item">
+                  <kbd>Ctrl+Alt+G</kbd>
+                  <span>打开/关闭玻璃窗口</span>
+                </div>
+                <div className="shortcut-item">
+                  <kbd>Space</kbd>
+                  <span>手动刷新</span>
+                </div>
+                <div className="shortcut-item">
+                  <kbd>Esc</kbd>
+                  <span>关闭窗口</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
       default: return null;
     }
   };
@@ -557,6 +688,7 @@ const SettingsPanel = ({ showNotification }) => {
         <div className="settings-nav">
           <button className={`nav-item ${activeSection==='connection'?'active':''}`} onClick={()=>setActiveSection('connection')}><Wifi size={18}/><span>连接</span></button>
           <button className={`nav-item ${activeSection==='translation'?'active':''}`} onClick={()=>setActiveSection('translation')}><Globe size={18}/><span>翻译</span></button>
+          <button className={`nav-item ${activeSection==='glassWindow'?'active':''}`} onClick={()=>setActiveSection('glassWindow')}><Layers size={18}/><span>玻璃窗</span></button>
           <button className={`nav-item ${activeSection==='privacy'?'active':''}`} onClick={()=>setActiveSection('privacy')}><Shield size={18}/><span>隐私</span></button>
           <button className={`nav-item ${activeSection==='ocr'?'active':''}`} onClick={()=>setActiveSection('ocr')}><Eye size={18}/><span>OCR</span></button>
           <button className={`nav-item ${activeSection==='interface'?'active':''}`} onClick={()=>setActiveSection('interface')}><Palette size={18}/><span>界面</span></button>
