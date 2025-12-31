@@ -5,6 +5,11 @@ import MainWindow from './components/MainWindow';
 import useTranslationStore from './stores/translation-store';
 import './styles/App.css'; 
 
+// 暴露 store 到 window，供玻璃窗口通过 IPC 获取设置
+if (typeof window !== 'undefined') {
+  window.__TRANSLATION_STORE__ = useTranslationStore;
+}
+
 function App() {
   console.log("▶ App component started rendering...");
 
@@ -12,6 +17,8 @@ function App() {
     const [theme, setTheme] = useState('light');
     const setPendingScreenshot = useTranslationStore(state => state.setPendingScreenshot);
     const addToFavorites = useTranslationStore(state => state.addToFavorites);
+    const addToHistory = useTranslationStore(state => state.addToHistory);
+    const setTargetLanguage = useTranslationStore(state => state.setTargetLanguage);
 
     useEffect(() => {
       console.log("▶ App useEffect running...");
@@ -107,6 +114,52 @@ function App() {
         window.electron.ipcRenderer.removeListener('add-to-favorites', handleAddToFavorites);
       };
     }, [addToFavorites]);
+
+    // 监听玻璃窗口的历史记录请求
+    useEffect(() => {
+      if (!window.electron?.ipcRenderer) return;
+
+      const handleAddToHistory = (event, item) => {
+        console.log('[App] Received add-to-history from glass window:', item);
+        if (item && addToHistory) {
+          addToHistory({
+            id: item.id || `glass-${Date.now()}`,
+            sourceText: item.sourceText || '',
+            translatedText: item.translatedText || '',
+            sourceLanguage: item.sourceLanguage || 'auto',
+            targetLanguage: item.targetLanguage || 'en',
+            timestamp: item.timestamp || Date.now(),
+            source: 'glass-translator'
+          });
+          console.log('[App] Added to history successfully');
+        }
+      };
+
+      window.electron.ipcRenderer.on('add-to-history', handleAddToHistory);
+
+      return () => {
+        window.electron.ipcRenderer.removeListener('add-to-history', handleAddToHistory);
+      };
+    }, [addToHistory]);
+
+    // 监听玻璃窗口的目标语言同步
+    useEffect(() => {
+      if (!window.electron?.ipcRenderer) return;
+
+      const handleSyncLanguage = (event, langCode) => {
+        console.log('[App] Received sync-target-language from glass window:', langCode);
+        if (langCode && setTargetLanguage) {
+          setTargetLanguage(langCode);
+          console.log('[App] Target language synced to:', langCode);
+        }
+      };
+
+      window.electron.ipcRenderer.on('sync-target-language', handleSyncLanguage);
+
+      return () => {
+        window.electron.ipcRenderer.removeListener('sync-target-language', handleSyncLanguage);
+      };
+    }, [setTargetLanguage]);
 
     console.log("▶ App state initialized, rendering JSX...");
 

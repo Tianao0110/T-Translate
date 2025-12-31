@@ -38,6 +38,12 @@ contextBridge.exposeInMainWorld('electron', {
     // 添加到收藏
     addToFavorites: (item) => ipcRenderer.invoke('glass:add-to-favorites', item),
     
+    // 添加到历史记录
+    addToHistory: (item) => ipcRenderer.invoke('glass:add-to-history', item),
+    
+    // 同步目标语言到主程序
+    syncTargetLanguage: (langCode) => ipcRenderer.invoke('glass:sync-target-language', langCode),
+    
     // 监听隐藏（截图前）
     onHideForCapture: (callback) => {
       const handler = () => callback();

@@ -1,164 +1,176 @@
-/* src/styles/glass.css */
-/* 翻译玻璃窗样式 */
+/* src/styles/glass.css - v25 */
 
 :root {
-  --glass-bg: rgba(255, 255, 255, var(--glass-opacity, 0.85));
-  --glass-border: rgba(255, 255, 255, 0.3);
-  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
-  --glass-blur: 12px;
   --text-primary: #1a1a2e;
-  --text-secondary: #4a4a6a;
-  --text-muted: #8a8aa0;
+  --text-muted: #6a6a80;
   --accent: #3b82f6;
-  --accent-hover: #2563eb;
-  --success: #10b981;
+  --success: #22c55e;
   --error: #ef4444;
-  --control-bg: rgba(0, 0, 0, 0.05);
-  --control-hover: rgba(0, 0, 0, 0.1);
-  --control-active: rgba(59, 130, 246, 0.15);
 }
 
-/* 暗色主题 */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --glass-bg: rgba(30, 30, 45, var(--glass-opacity, 0.85));
-    --glass-border: rgba(255, 255, 255, 0.1);
-    --text-primary: #f0f0f5;
-    --text-secondary: #a0a0b5;
-    --text-muted: #6a6a80;
-    --control-bg: rgba(255, 255, 255, 0.05);
-    --control-hover: rgba(255, 255, 255, 0.1);
-    --control-active: rgba(59, 130, 246, 0.2);
-  }
-}
-
-/* ==================== 主容器 ==================== */
-.glass-container {
+/* 主窗口 */
+.glass-window {
   width: 100%;
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: rgba(255, 255, 255, var(--glass-opacity, 0.85));
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, calc(var(--glass-opacity, 0.85) * 0.9));
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
   border-radius: 12px;
-  box-shadow: var(--glass-shadow);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
   overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   position: relative;
 }
 
-/* 暗色模式下的背景 */
-@media (prefers-color-scheme: dark) {
-  .glass-container {
-    background: rgba(30, 30, 45, var(--glass-opacity, 0.85));
-  }
-}
-
-/* ==================== 拖动区域 ==================== */
-.glass-drag-region {
+/* 全区域拖动层 */
+.glass-drag-area {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: calc(100% - 40px); /* 排除控制栏 */
+  bottom: 44px; /* 留出控制栏 */
   -webkit-app-region: drag;
   z-index: 1;
 }
 
-/* ==================== 内容区域 ==================== */
-.glass-content {
+/* 内容区域 */
+.glass-body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 16px;
+  min-height: 0;
   overflow: hidden;
   position: relative;
-  z-index: 2;
+  z-index: 0;
 }
 
-.glass-text {
+/* 翻译结果 - 可滚动，隐藏滚动条 */
+.glass-result {
+  flex: 1;
+  padding: 12px 16px;
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.7;
   color: var(--text-primary);
-  text-align: left;
-  word-break: break-word;
   white-space: pre-wrap;
-  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.3);
+  word-break: break-word;
   overflow-y: auto;
-  width: 100%;
-  height: 100%;
-  padding-right: 8px;
+  overflow-x: hidden;
+  min-height: 0;
+  /* 隐藏滚动条但保持可滚动 */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
 }
 
-/* 自定义滚动条 */
-.glass-text::-webkit-scrollbar {
-  width: 6px;
+.glass-result::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
 }
 
-.glass-text::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.1);
-  border-radius: 3px;
-}
-
-.glass-text::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 3px;
-}
-
-.glass-text::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.3);
-}
-
-/* 加载覆盖层（双层窗口用） */
-.glass-loading-overlay {
-  position: absolute;
-  bottom: 50px;
-  right: 10px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  background: rgba(0, 0, 0, 0.6);
-  border-radius: 12px;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(4px);
-  z-index: 10;
-}
-
-.glass-loading-overlay .spinning {
-  animation: spin 1s linear infinite;
-}
-
-.glass-placeholder {
+/* 消息 */
+.glass-message {
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 8px;
+  padding: 20px;
   color: var(--text-muted);
   font-size: 14px;
   text-align: center;
 }
 
-.glass-loading {
+.glass-message.error { color: var(--error); }
+.glass-message.loading { color: var(--accent); }
+
+/* ========== 底部控制栏 ========== */
+.glass-toolbar {
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
   align-items: center;
-  gap: 10px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.04);
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  min-height: 44px;
+  position: relative;
+  z-index: 10;
+  -webkit-app-region: no-drag;
+}
+
+.toolbar-left,
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 20px;
+  background: rgba(0, 0, 0, 0.1);
+  margin: 0 4px;
+}
+
+/* 按钮 */
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn:hover { background: rgba(0, 0, 0, 0.1); }
+.btn:active { transform: scale(0.96); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn.active { background: var(--accent); color: white; }
+.btn.success { background: var(--success); color: white; }
+.btn.close:hover { background: var(--error); color: white; }
+.btn.sm { padding: 4px 6px; }
+
+/* 语言切换器 - 左右箭头 */
+.lang-switcher {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.lang-display {
+  min-width: 52px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 500;
   color: var(--accent);
+  padding: 0 4px;
 }
 
-.glass-loading .spinning {
-  animation: spin 1s linear infinite;
-}
-
-.glass-error {
+/* 中间工具栏（滚动按钮） */
+.toolbar-center {
   display: flex;
   align-items: center;
-  gap: 8px;
-  color: var(--error);
-  font-size: 14px;
+  gap: 2px;
+}
+
+.scroll-btn {
+  padding: 4px 6px !important;
+}
+
+.scroll-btn:disabled {
+  opacity: 0.3;
+}
+
+/* 旋转动画 */
+.spin {
+  animation: spin 1s linear infinite;
 }
 
 @keyframes spin {
@@ -166,326 +178,49 @@
   to { transform: rotate(360deg); }
 }
 
-/* ==================== 控制栏 ==================== */
-.glass-controls {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 10px;
-  background: var(--control-bg);
-  border-top: 1px solid var(--glass-border);
-  height: 40px;
-  min-height: 40px;
-  position: relative;
-  z-index: 10;
-  -webkit-app-region: no-drag;
-  opacity: 0;
-  transform: translateY(10px);
-  transition: opacity 0.2s, transform 0.2s;
-}
-
-.glass-controls.visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.controls-left,
-.controls-center,
-.controls-right {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.controls-center {
-  flex: 1;
-  justify-content: center;
-}
-
-.status-text {
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-/* ==================== 控制按钮 ==================== */
-.control-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 6px 10px;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  color: var(--text-secondary);
-  font-size: 11px;
-  cursor: pointer;
-  transition: all 0.15s;
-  -webkit-app-region: no-drag;
-}
-
-.control-btn:hover:not(:disabled) {
-  background: var(--control-hover);
-  color: var(--text-primary);
-}
-
-.control-btn.active {
-  background: var(--control-active);
-  color: var(--accent);
-}
-
-.control-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.control-btn.small {
-  padding: 4px 6px;
-}
-
-.control-btn.close:hover {
-  background: rgba(239, 68, 68, 0.15);
-  color: var(--error);
-}
-
-.control-btn svg {
-  flex-shrink: 0;
-}
-
-.control-btn span {
-  white-space: nowrap;
-}
-
-/* ==================== 缩放手柄 ==================== */
+/* ========== 缩放手柄 ========== */
 .resize-handle {
   position: absolute;
-  z-index: 100;
-}
-
-.resize-n {
-  top: 0;
-  left: 10px;
-  right: 10px;
-  height: 6px;
-  cursor: n-resize;
-}
-
-.resize-s {
-  bottom: 0;
-  left: 10px;
-  right: 10px;
-  height: 6px;
-  cursor: s-resize;
-}
-
-.resize-e {
-  top: 10px;
-  right: 0;
-  bottom: 10px;
-  width: 6px;
-  cursor: e-resize;
-}
-
-.resize-w {
-  top: 10px;
-  left: 0;
-  bottom: 10px;
-  width: 6px;
-  cursor: w-resize;
-}
-
-.resize-ne {
-  top: 0;
-  right: 0;
-  width: 12px;
-  height: 12px;
-  cursor: ne-resize;
-}
-
-.resize-nw {
-  top: 0;
-  left: 0;
-  width: 12px;
-  height: 12px;
-  cursor: nw-resize;
-}
-
-.resize-se {
-  bottom: 0;
-  right: 0;
-  width: 12px;
-  height: 12px;
-  cursor: se-resize;
-}
-
-.resize-sw {
-  bottom: 0;
-  left: 0;
-  width: 12px;
-  height: 12px;
-  cursor: sw-resize;
-}
-
-/* ==================== 滚动条 ==================== */
-.glass-text::-webkit-scrollbar {
-  width: 6px;
-}
-
-.glass-text::-webkit-scrollbar-track {
   background: transparent;
-}
-
-.glass-text::-webkit-scrollbar-thumb {
-  background: var(--control-hover);
-  border-radius: 3px;
-}
-
-.glass-text::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
-}
-
-/* ==================== 穿透模式样式 ==================== */
-.glass-container.pass-through-mode {
-  /* 穿透模式下内容区域半透明提示 */
-}
-
-.glass-container.pass-through-mode .glass-content {
-  opacity: 0.7;
-}
-
-.glass-container.pass-through-mode .glass-controls {
-  /* 控制栏始终可见且不透明 */
-  opacity: 1 !important;
-  background: rgba(0, 0, 0, 0.15);
-}
-
-/* 穿透模式指示器 */
-.glass-container.pass-through-mode::before {
-  content: '👆 穿透模式';
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  font-size: 10px;
-  color: var(--accent);
-  background: rgba(59, 130, 246, 0.1);
-  padding: 2px 6px;
-  border-radius: 4px;
   z-index: 100;
+  -webkit-app-region: no-drag;
 }
 
-/* ==================== 截图模式（隐藏背景，保留文字） ==================== */
-.glass-container.capturing-mode {
-  background: transparent !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  box-shadow: none !important;
-  border: none !important;
-}
+.resize-n { top: 0; left: 12px; right: 12px; height: 6px; cursor: n-resize; }
+.resize-s { bottom: 0; left: 12px; right: 12px; height: 6px; cursor: s-resize; }
+.resize-e { right: 0; top: 12px; bottom: 12px; width: 6px; cursor: e-resize; }
+.resize-w { left: 0; top: 12px; bottom: 12px; width: 6px; cursor: w-resize; }
+.resize-ne { top: 0; right: 0; width: 12px; height: 12px; cursor: ne-resize; }
+.resize-nw { top: 0; left: 0; width: 12px; height: 12px; cursor: nw-resize; }
+.resize-se { bottom: 0; right: 0; width: 12px; height: 12px; cursor: se-resize; }
+.resize-sw { bottom: 0; left: 0; width: 12px; height: 12px; cursor: sw-resize; }
 
-.glass-container.capturing-mode::before {
-  display: none !important;
-}
-
-.glass-container.capturing-mode .glass-content,
-.glass-container.capturing-mode .glass-controls,
-.glass-container.capturing-mode .glass-drag-region,
-.glass-container.capturing-mode .resize-handle {
-  opacity: 0 !important;
-  visibility: hidden !important;
-}
-
-/* ==================== 设置面板 ==================== */
-.glass-settings-panel {
-  position: absolute;
-  bottom: 48px;
-  left: 8px;
-  background: rgba(0, 0, 0, 0.85);
-  border-radius: 8px;
-  padding: 12px;
-  min-width: 180px;
-  z-index: 200;
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.settings-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 6px 0;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.settings-row:not(:last-child) {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.settings-control {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.settings-control button {
-  width: 20px;
-  height: 20px;
-  border: none;
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.settings-control button:hover {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.settings-row select {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-}
-
-.toggle-btn {
-  padding: 4px 12px;
-  border: none;
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.7);
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 11px;
-}
-
-.toggle-btn.active {
-  background: var(--accent);
-  color: white;
-}
-
-.settings-info {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.5);
-  text-align: center;
-  padding-top: 8px;
-  margin-top: 4px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.settings-hint {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.4);
-  text-align: center;
-  padding: 8px 0 4px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  margin-top: 8px;
-}
-
-/* ==================== 按钮成功状态 ==================== */
-.control-btn.success {
-  background: rgba(34, 197, 94, 0.3) !important;
-  color: #22c55e !important;
+/* 暗色主题 */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text-primary: #f0f0f5;
+    --text-muted: #8a8a9a;
+  }
+  
+  .glass-window {
+    background: rgba(30, 30, 45, calc(var(--glass-opacity, 0.85) * 0.9));
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+  
+  .glass-toolbar {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.06);
+  }
+  
+  .toolbar-divider {
+    background: rgba(255, 255, 255, 0.1);
+  }
+  
+  .btn {
+    background: rgba(255, 255, 255, 0.08);
+  }
+  
+  .btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+  }
 }

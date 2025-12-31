@@ -19,6 +19,47 @@ const Store = require("electron-store");
 // 引入截图模块
 const screenshotModule = require('./screenshot-module');
 
+// Windows 截图穿透功能（让窗口在截图中不可见）
+let setWindowDisplayAffinity = null;
+const WDA_EXCLUDEFROMCAPTURE = 0x00000011;
+
+if (process.platform === 'win32') {
+  try {
+    const koffi = require('koffi');
+    const user32 = koffi.load('user32.dll');
+    setWindowDisplayAffinity = user32.func('SetWindowDisplayAffinity', 'bool', ['void*', 'uint']);
+    console.log('[Main] Windows SetWindowDisplayAffinity API loaded');
+  } catch (e) {
+    console.warn('[Main] Failed to load koffi for Windows API:', e.message);
+    console.warn('[Main] Glass window will flash during capture. Install koffi: npm install koffi');
+  }
+}
+
+/**
+ * 设置窗口为截图不可见（仅 Windows）
+ * 调用后，该窗口在所有截图中都不会出现
+ */
+function makeWindowInvisibleToCapture(electronWindow) {
+  if (process.platform !== 'win32' || !setWindowDisplayAffinity) {
+    return false;
+  }
+  
+  try {
+    const hwnd = electronWindow.getNativeWindowHandle();
+    const result = setWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE);
+    if (result) {
+      console.log('[Main] Window set to capture-invisible mode');
+      return true;
+    } else {
+      console.warn('[Main] SetWindowDisplayAffinity returned false');
+      return false;
+    }
+  } catch (e) {
+    console.error('[Main] Failed to set window display affinity:', e);
+    return false;
+  }
+}
+
 // 初始化配置存储
 const store = new Store({
   defaults: {
@@ -166,6 +207,17 @@ function createGlassWindow() {
       preload: path.join(__dirname, 'preload-glass.js'),
     },
   });
+
+  // Windows: 设置窗口为截图不可见（零闪烁方案）
+  if (process.platform === 'win32') {
+    // 需要在窗口显示后设置
+    glassWindow.once('ready-to-show', () => {
+      const success = makeWindowInvisibleToCapture(glassWindow);
+      if (success) {
+        console.log('[Glass] Window is now invisible to screen capture');
+      }
+    });
+  }
 
   // 加载玻璃窗口页面
   if (isDev) {
@@ -997,22 +1049,26 @@ function setupIPC() {
   // 截取玻璃窗口覆盖区域
   ipcMain.handle('glass:capture-region', async (event, bounds) => {
     try {
-      // 检查窗口是否存在
       if (!glassWindow || glassWindow.isDestroyed()) {
         throw new Error('玻璃窗口不存在');
       }
       
-      // 通知渲染进程隐藏内容
-      glassWindow.webContents.send('glass:hide-for-capture');
+      // Windows 下窗口已设置为截图不可见，无需隐藏
+      // macOS/Linux 仍需要隐藏窗口（后续可实现 macOS 原生方案）
+      const needHideWindow = process.platform !== 'win32' || !setWindowDisplayAffinity;
       
-      // 等待渲染完成
-      await new Promise(resolve => setTimeout(resolve, 50));
+      if (needHideWindow) {
+        // 非 Windows 或 API 不可用时，使用隐藏窗口方案
+        glassWindow.webContents.send('glass:hide-for-capture');
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
       
       // 使用 node-screenshots 截取指定区域
       const screenshot = await screenshotModule.captureRegion(bounds);
       
-      // 通知渲染进程显示内容
-      glassWindow.webContents.send('glass:show-after-capture');
+      if (needHideWindow) {
+        glassWindow.webContents.send('glass:show-after-capture');
+      }
       
       if (screenshot) {
         return { success: true, imageData: screenshot };
@@ -1021,7 +1077,6 @@ function setupIPC() {
       }
     } catch (error) {
       console.error('[Glass] Capture error:', error);
-      // 确保恢复显示
       if (glassWindow && !glassWindow.isDestroyed()) {
         glassWindow.webContents.send('glass:show-after-capture');
       }
@@ -1089,13 +1144,38 @@ function setupIPC() {
   });
 
   // 获取玻璃窗口设置（合并主程序设置和本地设置）
-  ipcMain.handle('glass:get-settings', () => {
+  ipcMain.handle('glass:get-settings', async () => {
     // 从主程序设置读取
     const mainSettings = store.get('settings', {});
     const glassConfig = mainSettings.glassWindow || {};
     
     // 本地设置（窗口位置等）
     const localSettings = store.get('glassLocalSettings', {});
+    
+    // 尝试从主窗口获取当前目标语言
+    let currentTargetLang = mainSettings.translation?.defaultTargetLang ?? 'zh';
+    
+    // 通过 IPC 从主窗口获取实时的目标语言
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      try {
+        currentTargetLang = await mainWindow.webContents.executeJavaScript(`
+          (function() {
+            try {
+              // 尝试从 Zustand store 获取
+              const store = window.__TRANSLATION_STORE__;
+              if (store) {
+                return store.getState().currentTranslation.targetLanguage || 'zh';
+              }
+              return 'zh';
+            } catch(e) {
+              return 'zh';
+            }
+          })()
+        `);
+      } catch (e) {
+        console.log('[Glass] Could not get target language from main window:', e.message);
+      }
+    }
     
     const merged = {
       // 从主程序设置
@@ -1105,8 +1185,8 @@ function setupIPC() {
       ocrEngine: glassConfig.ocrEngine ?? 'llm-vision',
       defaultOpacity: glassConfig.defaultOpacity ?? 0.85,
       autoPin: glassConfig.autoPin ?? true,
-      // 翻译设置
-      targetLanguage: mainSettings.translation?.defaultTargetLang ?? 'zh',
+      // 翻译设置 - 使用实时获取的目标语言
+      targetLanguage: currentTargetLang,
       // 本地设置
       opacity: localSettings.opacity ?? glassConfig.defaultOpacity ?? 0.85,
       isPinned: localSettings.isPinned ?? glassConfig.autoPin ?? true,
@@ -1127,6 +1207,20 @@ function setupIPC() {
   ipcMain.handle('glass:add-to-favorites', (event, item) => {
     // 转发到主窗口处理
     mainWindow?.webContents.send('add-to-favorites', item);
+    return true;
+  });
+  
+  // 添加到历史记录（从玻璃窗口）
+  ipcMain.handle('glass:add-to-history', (event, item) => {
+    // 转发到主窗口处理
+    mainWindow?.webContents.send('add-to-history', item);
+    return true;
+  });
+  
+  // 同步目标语言到主程序（从玻璃窗口）
+  ipcMain.handle('glass:sync-target-language', (event, langCode) => {
+    // 转发到主窗口处理
+    mainWindow?.webContents.send('sync-target-language', langCode);
     return true;
   });
   

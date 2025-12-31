@@ -114,6 +114,12 @@ const useTranslationStore = create(
           if (target) state.currentTranslation.targetLanguage = target;
         }),
 
+      // 单独设置目标语言（供玻璃窗口同步使用）
+      setTargetLanguage: (target) =>
+        set((state) => {
+          if (target) state.currentTranslation.targetLanguage = target;
+        }),
+
       swapLanguages: () =>
         set((state) => {
           if (state.currentTranslation.sourceLanguage === "auto") return;
@@ -617,6 +623,36 @@ const useTranslationStore = create(
           state.history = [];
           state.statistics.totalTranslations = 0;
           state.statistics.totalCharacters = 0;
+        }),
+
+      // 添加到历史记录（供外部调用，如玻璃窗口）
+      addToHistory: (item) =>
+        set((state) => {
+          const historyItem = {
+            id: item.id || `history-${Date.now()}`,
+            sourceText: item.sourceText || '',
+            translatedText: item.translatedText || '',
+            sourceLanguage: item.sourceLanguage || 'auto',
+            targetLanguage: item.targetLanguage || 'zh',
+            timestamp: item.timestamp || Date.now(),
+            source: item.source || 'unknown'
+          };
+          
+          // 检查是否已存在相同内容
+          const exists = state.history.some(
+            h => h.sourceText === historyItem.sourceText && 
+                 h.translatedText === historyItem.translatedText
+          );
+          
+          if (!exists) {
+            state.history.unshift(historyItem);
+            if (state.history.length > state.historyLimit) {
+              state.history = state.history.slice(0, state.historyLimit);
+            }
+            // 更新统计
+            state.statistics.totalTranslations++;
+            state.statistics.totalCharacters += (historyItem.sourceText?.length || 0);
+          }
         }),
 
       removeFromHistory: (id) =>

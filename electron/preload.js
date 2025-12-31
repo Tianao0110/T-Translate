@@ -21,7 +21,10 @@ const validChannels = {
     "menu-action", 
     "import-file",
     "add-to-favorites",  // 玻璃窗口收藏
+    "add-to-history",    // 玻璃窗口历史记录
+    "sync-target-language",  // 玻璃窗口语言同步
     "glass:translate-request",  // 玻璃窗口翻译请求
+    "screenshot-captured",  // 截图完成
   ],
   invoke: [
     "get-app-version",
@@ -98,6 +101,15 @@ const electronAPI = {
   // 玻璃翻译窗口
   glass: {
     open: () => ipcRenderer.invoke("glass:open"),
+  },
+  // 截图 API
+  screenshot: {
+    capture: () => ipcRenderer.invoke("capture-screen"),
+    onCaptured: (callback) => {
+      const handler = (event, data) => callback(data);
+      ipcRenderer.on("screenshot-captured", handler);
+      return () => ipcRenderer.removeListener("screenshot-captured", handler);
+    },
   },
   // 通用 IPC (带白名单检查)
   ipc: {

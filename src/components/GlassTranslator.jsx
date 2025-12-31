@@ -1,604 +1,466 @@
 // src/components/GlassTranslator.jsx
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+// 玻璃翻译窗口 - v25
+import React, { useState, useEffect, useRef } from 'react';
 import {
-  Play, Pause, RefreshCw, MousePointer2, Hand, Pin, PinOff,
-  X, Copy, Star, Loader2, AlertCircle, Minus, Plus, Check
+  Play, Pause, RefreshCw, Pin, PinOff,
+  X, Copy, Star, Loader2, AlertCircle, Minus, Plus, Check,
+  ChevronDown, ChevronUp, ChevronLeft, ChevronRight
 } from 'lucide-react';
 
-// 导入 OCR 和 LLM 服务
 import ocrManager from '../services/ocr-manager';
 import llmClient from '../utils/llm-client';
 
-// 生成唯一 ID
 const generateId = () => `glass-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-/**
- * 翻译玻璃窗组件 - 双层窗口版本
- * 截图时显示缓存的上一次结果，新结果准备好后替换
- */
+// 支持的语言列表
+const LANGUAGES = [
+  { code: 'en', name: 'English', flag: '🇺🇸' },
+  { code: 'zh', name: '中文', flag: '🇨🇳' },
+  { code: 'ja', name: '日本語', flag: '🇯🇵' },
+  { code: 'ko', name: '한국어', flag: '🇰🇷' },
+  { code: 'fr', name: 'Français', flag: '🇫🇷' },
+  { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
+  { code: 'es', name: 'Español', flag: '🇪🇸' },
+  { code: 'ru', name: 'Русский', flag: '🇷🇺' },
+];
+
 const GlassTranslator = () => {
-  // 当前显示的翻译结果（用于显示）
-  const [displayText, setDisplayText] = useState('');
-  // 正在处理的翻译结果（后台处理）
-  const [pendingText, setPendingText] = useState('');
-  // OCR 识别的原文
-  const [ocrText, setOcrText] = useState('');
-  // 检测到的源语言
+  // 翻译内容
+  const [sourceText, setSourceText] = useState('');
+  const [translatedText, setTranslatedText] = useState('');
   const [detectedSourceLang, setDetectedSourceLang] = useState('');
   
-  const [status, setStatus] = useState('idle'); // idle, capturing, recognizing, translating, done, error
+  // 状态
+  const [status, setStatus] = useState('idle');
   const [errorMessage, setErrorMessage] = useState('');
-  const [isHidden, setIsHidden] = useState(false);
   
-  // 控制状态
+  // 控制
   const [autoRefresh, setAutoRefresh] = useState(false);
-  const [isPassThrough, setIsPassThrough] = useState(false);
   const [isPinned, setIsPinned] = useState(true);
   const [opacity, setOpacity] = useState(0.85);
-  const [showControls, setShowControls] = useState(true);
   
-  // 从全局设置读取的配置
+  // 滚动状态
+  const [hasOverflow, setHasOverflow] = useState(false);
+  const [canScrollUp, setCanScrollUp] = useState(false);
+  const [canScrollDown, setCanScrollDown] = useState(false);
+  
+  // 设置
   const [refreshInterval, setRefreshInterval] = useState(3000);
   const [smartDetect, setSmartDetect] = useState(true);
   const [streamOutput, setStreamOutput] = useState(true);
   const [ocrEngine, setOcrEngine] = useState('llm-vision');
-  const [targetLanguage, setTargetLanguage] = useState('zh');
+  const [targetLanguage, setTargetLanguage] = useState('en');
   
-  // 反馈状态
+  // 反馈
   const [copySuccess, setCopySuccess] = useState(false);
   const [favoriteSuccess, setFavoriteSuccess] = useState(false);
   
   // Refs
+  const contentRef = useRef(null);
   const refreshTimerRef = useRef(null);
   const isCapturingRef = useRef(false);
-  const containerRef = useRef(null);
   const lastImageHashRef = useRef(null);
-  const lastOcrTextRef = useRef('');
-  const settingsRef = useRef({});
+  const lastTextRef = useRef('');
 
   // 初始化
   useEffect(() => {
     loadSettings();
     initOCR();
-    setupCaptureListeners();
     
-    // 键盘快捷键
     const handleKeyDown = (e) => {
       if (e.code === 'Space' && !e.repeat) {
         e.preventDefault();
-        captureAndRecognize();
+        handleRefresh();
       } else if (e.code === 'Escape') {
         handleClose();
       }
     };
     
     window.addEventListener('keydown', handleKeyDown);
-    
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      if (refreshTimerRef.current) {
-        clearInterval(refreshTimerRef.current);
-      }
-    };
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // 初始化 OCR
-  const initOCR = async () => {
-    try {
-      await ocrManager.init(ocrEngine);
-      console.log('[Glass] OCR 初始化成功');
-    } catch (error) {
-      console.error('[Glass] OCR 初始化失败:', error);
-    }
-  };
-
-  // 设置截图时隐藏/显示监听
-  const setupCaptureListeners = () => {
-    if (window.electron?.glass?.onHideForCapture) {
-      window.electron.glass.onHideForCapture(() => {
-        setIsHidden(true);
-      });
-    }
-    if (window.electron?.glass?.onShowAfterCapture) {
-      window.electron.glass.onShowAfterCapture(() => {
-        setIsHidden(false);
-      });
-    }
-  };
-
-  // 自动刷新控制
+  // 自动刷新
   useEffect(() => {
-    // 清除之前的定时器
     if (refreshTimerRef.current) {
       clearInterval(refreshTimerRef.current);
       refreshTimerRef.current = null;
     }
     
-    // 只有在自动刷新开启时才启动定时器
     if (autoRefresh) {
-      console.log('[Glass] 启动自动刷新，间隔:', refreshInterval, 'ms');
       refreshTimerRef.current = setInterval(() => {
-        // 检查状态，防止重叠
         if (!isCapturingRef.current) {
-          captureAndRecognize();
+          captureAndTranslate();
         }
       }, refreshInterval);
     }
-
+    
     return () => {
       if (refreshTimerRef.current) {
         clearInterval(refreshTimerRef.current);
-        refreshTimerRef.current = null;
       }
     };
   }, [autoRefresh, refreshInterval]);
 
-  // 加载设置（从 main 进程获取合并后的设置）
-  const loadSettings = async () => {
+  const initOCR = async () => {
     try {
-      console.log('[Glass] Loading settings...');
-      
-      if (window.electron?.glass?.getSettings) {
-        const settings = await window.electron.glass.getSettings();
-        console.log('[Glass] Received settings:', settings);
-        
-        if (settings) {
-          setRefreshInterval(settings.refreshInterval ?? 3000);
-          setSmartDetect(settings.smartDetect ?? true);
-          setStreamOutput(settings.streamOutput ?? true);
-          setOcrEngine(settings.ocrEngine ?? 'llm-vision');
-          setOpacity(settings.opacity ?? settings.defaultOpacity ?? 0.85);
-          setIsPinned(settings.isPinned ?? settings.autoPin ?? true);
-          setTargetLanguage(settings.targetLanguage ?? 'zh');
-          
-          // 保存到 ref 供闭包使用
-          settingsRef.current = settings;
-          
-          console.log('[Glass] Settings applied:', {
-            refreshInterval: settings.refreshInterval,
-            smartDetect: settings.smartDetect,
-            streamOutput: settings.streamOutput,
-            ocrEngine: settings.ocrEngine,
-            targetLanguage: settings.targetLanguage
-          });
-        }
-      } else {
-        console.warn('[Glass] glass.getSettings not available');
-      }
+      await ocrManager.init(ocrEngine);
     } catch (error) {
-      console.error('[Glass] Failed to load settings:', error);
+      console.error('[Glass] OCR init failed:', error);
     }
   };
 
-  // 保存设置
-  const saveSettings = useCallback(async (newSettings) => {
+  const loadSettings = async () => {
+    try {
+      if (!window.electron?.glass?.getSettings) return;
+      
+      const settings = await window.electron.glass.getSettings();
+      if (settings) {
+        setRefreshInterval(settings.refreshInterval ?? 3000);
+        setSmartDetect(settings.smartDetect ?? true);
+        setStreamOutput(settings.streamOutput ?? true);
+        setOcrEngine(settings.ocrEngine ?? 'llm-vision');
+        setOpacity(settings.opacity ?? 0.85);
+        setIsPinned(settings.isPinned ?? true);
+        setTargetLanguage(settings.targetLanguage ?? 'en');
+      }
+    } catch (error) {
+      console.error('[Glass] Load settings failed:', error);
+    }
+  };
+
+  const saveSettings = async (newSettings) => {
     if (window.electron?.glass?.saveSettings) {
       await window.electron.glass.saveSettings(newSettings);
     }
-  }, []);
-
-  // 简单的图像哈希（用于检测变化）
-  const simpleImageHash = (dataUrl) => {
-    if (!dataUrl) return null;
-    return dataUrl.slice(100, 200);
   };
 
-  // 截图并识别（双层窗口：显示层保持不变，后台处理新内容）
-  const captureAndRecognize = useCallback(async () => {
-    if (isCapturingRef.current) {
-      console.log('[Glass] Already capturing, skip');
-      return;
-    }
+  const imageHash = (dataUrl) => {
+    if (!dataUrl) return null;
+    return dataUrl.slice(100, 300);
+  };
 
+  const detectLanguage = (text) => {
+    const chineseChars = text.match(/[\u4e00-\u9fff]/g) || [];
+    return chineseChars.length / text.length > 0.3 ? 'zh' : 'en';
+  };
+
+  // 截图并翻译
+  const captureAndTranslate = async () => {
+    if (isCapturingRef.current) return;
+    
     isCapturingRef.current = true;
-    // 不改变 displayText，用户看到的是上一次结果
     setStatus('capturing');
     setErrorMessage('');
-
+    
     try {
-      if (!window.electron?.glass?.captureRegion) {
-        throw new Error('截图功能不可用');
-      }
-      
       const bounds = await window.electron.glass.getBounds();
-      if (!bounds) {
-        throw new Error('无法获取窗口位置');
-      }
+      if (!bounds) throw new Error('无法获取窗口位置');
       
-      const controlBarHeight = 40;
+      // 底部控制栏高度
+      const bottomBarHeight = 44;
       
-      // 请求截图（此时窗口会短暂隐藏，但 displayText 保持显示）
       const result = await window.electron.glass.captureRegion({
         x: bounds.x,
         y: bounds.y,
         width: bounds.width,
-        height: bounds.height - controlBarHeight
+        height: bounds.height - bottomBarHeight
       });
       
-      if (result.success && result.imageData) {
-        // 智能检测：检查图像是否变化
-        const newHash = simpleImageHash(result.imageData);
-        if (smartDetect && autoRefresh && newHash === lastImageHashRef.current) {
-          console.log('[Glass] Image unchanged, skip OCR');
-          setStatus('done');
-          isCapturingRef.current = false;
-          return;
-        }
-        lastImageHashRef.current = newHash;
-        
-        // OCR 识别
-        setStatus('recognizing');
-        const ocrResult = await ocrManager.recognize(result.imageData, {
-          engine: ocrEngine
-        });
-        
-        if (ocrResult.success && ocrResult.text) {
-          const recognizedText = ocrResult.text.trim();
-          
-          // 智能检测：检查文字是否变化
-          if (smartDetect && autoRefresh && recognizedText === lastOcrTextRef.current) {
-            console.log('[Glass] Text unchanged, skip translation');
-            setStatus('done');
-            isCapturingRef.current = false;
-            return;
-          }
-          lastOcrTextRef.current = recognizedText;
-          setOcrText(recognizedText);
-          
-          // 检测源语言
-          const sourceLang = detectLanguage(recognizedText);
-          setDetectedSourceLang(sourceLang);
-          
-          if (recognizedText.length > 0) {
-            setStatus('translating');
-            
-            // 翻译（结果会更新到 pendingText 或直接到 displayText）
-            const translationResult = await translateText(recognizedText, sourceLang);
-            
-            if (translationResult.success) {
-              // 翻译完成，更新显示层
-              setDisplayText(translationResult.text);
-              setStatus('done');
-            } else {
-              throw new Error(translationResult.error || '翻译失败');
-            }
-          } else {
-            setDisplayText('（未识别到文字）');
-            setStatus('done');
-          }
-        } else {
-          throw new Error(ocrResult.error || 'OCR 识别失败');
-        }
-      } else {
-        throw new Error(result.error || '截图失败');
+      if (!result.success) throw new Error(result.error || '截图失败');
+      
+      // 智能检测
+      const hash = imageHash(result.imageData);
+      if (smartDetect && autoRefresh && hash === lastImageHashRef.current) {
+        setStatus('done');
+        isCapturingRef.current = false;
+        return;
       }
-    } catch (error) {
-      console.error('[Glass] Capture error:', error);
-      setErrorMessage(error.message);
-      setStatus('error');
-    } finally {
-      // 确保重置标志位
-      isCapturingRef.current = false;
-    }
-  }, [ocrEngine, autoRefresh, smartDetect, streamOutput, targetLanguage]);
+      lastImageHashRef.current = hash;
+      
+      // OCR
+      setStatus('recognizing');
+      const ocrResult = await ocrManager.recognize(result.imageData, { engine: ocrEngine });
+      
+      if (!ocrResult.success) throw new Error(ocrResult.error || 'OCR 失败');
+      
+      const text = ocrResult.text?.trim();
+      if (!text) {
+        setTranslatedText('（未识别到文字）');
+        setStatus('done');
+        isCapturingRef.current = false;
+        return;
+      }
+      
+      if (smartDetect && autoRefresh && text === lastTextRef.current) {
+        setStatus('done');
+        isCapturingRef.current = false;
+        return;
+      }
+      lastTextRef.current = text;
+      setSourceText(text);
+      
+      const sourceLang = detectLanguage(text);
+      setDetectedSourceLang(sourceLang);
+      
+      // 翻译 - 使用用户选择的目标语言
+      setStatus('translating');
+      // 如果源语言和目标语言相同，自动切换
+      const actualTargetLang = sourceLang === targetLanguage 
+        ? (targetLanguage === 'zh' ? 'en' : 'zh')
+        : targetLanguage;
+      
+      const langNames = {
+        'zh': '中文', 'en': '英文', 'ja': '日文', 'ko': '韩文',
+        'fr': '法文', 'de': '德文', 'es': '西班牙文', 'ru': '俄文'
+      };
+      
+      const systemPrompt = `你是一个专业翻译助手。请将以下文本翻译成${langNames[actualTargetLang] || actualTargetLang}。
+要求：保留原文的格式和排版，只输出翻译结果，不要添加任何解释。`;
 
-  // 检测源语言
-  const detectLanguage = (text) => {
-    // 简单检测：如果包含大量中文字符，认为是中文
-    const chineseChars = text.match(/[\u4e00-\u9fff]/g) || [];
-    const ratio = chineseChars.length / text.length;
-    return ratio > 0.3 ? 'zh' : 'en';
-  };
-
-  // 翻译文本（支持流式/普通模式）
-  const translateText = async (text, sourceLang) => {
-    // 决定翻译方向：中文→英文，其他→目标语言
-    const targetLang = sourceLang === 'zh' ? 'en' : targetLanguage;
-    
-    const langNames = {
-      'zh': '中文',
-      'en': '英文',
-      'ja': '日文',
-      'ko': '韩文',
-      'fr': '法文',
-      'de': '德文',
-      'es': '西班牙文',
-      'ru': '俄文'
-    };
-    
-    const targetLangName = langNames[targetLang] || targetLang;
-    
-    const systemPrompt = `你是一个专业翻译助手。请将以下文本翻译成${targetLangName}。
-
-重要要求：
-1. 保留原文的格式和排版（包括换行、列表、段落等）
-2. 只输出翻译结果，不要添加任何解释
-3. 如果原文有编号列表，翻译后也要保持编号列表格式`;
-
-    console.log('[Glass] Translating:', { streamOutput, sourceLang, targetLang });
-
-    try {
+      let finalText = '';
+      
       if (streamOutput) {
-        // 流式输出 - 直接更新 displayText
-        let fullText = '';
-        
+        setTranslatedText('');
         const stream = llmClient.streamChat([
           { role: 'system', content: systemPrompt },
           { role: 'user', content: text }
         ]);
         
         for await (const chunk of stream) {
-          fullText += chunk;
-          setDisplayText(fullText); // 流式更新显示层
-        }
-        
-        if (fullText) {
-          return { success: true, text: fullText.trim(), targetLang };
-        } else {
-          throw new Error('翻译响应为空');
+          finalText += chunk;
+          setTranslatedText(finalText);
         }
       } else {
-        // 普通模式 - 完成后一次性更新
-        const result = await llmClient.chatCompletion([
+        const response = await llmClient.chatCompletion([
           { role: 'system', content: systemPrompt },
           { role: 'user', content: text }
         ]);
-        
-        if (result?.content) {
-          return { success: true, text: result.content.trim(), targetLang };
-        } else {
-          throw new Error('翻译响应为空');
+        finalText = response?.content?.trim() || '';
+        setTranslatedText(finalText);
+      }
+      
+      setStatus('done');
+      
+      // 添加到历史记录
+      if (finalText && window.electron?.glass?.addToHistory) {
+        try {
+          await window.electron.glass.addToHistory({
+            id: generateId(),
+            sourceText: text,
+            translatedText: finalText,
+            sourceLanguage: sourceLang,
+            targetLanguage: actualTargetLang,
+            timestamp: Date.now(),
+            source: 'glass-translator'
+          });
+        } catch (e) {
+          console.error('[Glass] History error:', e);
         }
       }
+      
     } catch (error) {
-      console.error('[Glass] Translation error:', error);
-      return { success: false, error: error.message };
-    }
-  };
-
-  // 手动刷新
-  const handleRefresh = () => {
-    captureAndRecognize();
-  };
-
-  // 切换自动刷新
-  const toggleAutoRefresh = () => {
-    const newValue = !autoRefresh;
-    setAutoRefresh(newValue);
-    if (!newValue) {
-      // 关闭自动刷新时重置状态
+      console.error('[Glass] Error:', error);
+      setErrorMessage(error.message);
+      setStatus('error');
+    } finally {
       isCapturingRef.current = false;
     }
   };
 
-  // 切换穿透模式
-  const togglePassThrough = useCallback(() => {
-    const newValue = !isPassThrough;
-    
-    // 先禁用穿透，确保状态能正确切换
-    if (window.electron?.glass?.setIgnoreMouse) {
-      window.electron.glass.setIgnoreMouse(false);
-    }
-    
-    // 更新状态
-    setIsPassThrough(newValue);
-    
-    // 设置穿透模式
-    if (window.electron?.glass?.setPassThrough) {
-      window.electron.glass.setPassThrough(newValue);
-    }
-    
-    // 穿透模式下始终显示控制栏
-    if (newValue) {
-      setShowControls(true);
-    }
-  }, [isPassThrough]);
-
-  // 鼠标移动处理 - 穿透模式下动态切换
-  const handleMouseMove = useCallback((e) => {
-    if (!isPassThrough) return;
-    if (!containerRef.current) return;
-    
-    const rect = containerRef.current.getBoundingClientRect();
-    
-    // 控制栏高度 40px
-    const controlBarTop = rect.height - 40;
-    const mouseY = e.clientY - rect.top;
-    
-    // 鼠标在控制栏区域时，禁用穿透
-    const inControlBar = mouseY >= controlBarTop;
-    
-    if (window.electron?.glass?.setIgnoreMouse) {
-      // 在控制栏区域时不穿透，其他区域穿透
-      window.electron.glass.setIgnoreMouse(!inControlBar);
-    }
-  }, [isPassThrough]);
-
-  // 鼠标离开窗口
-  const handleMouseLeave = useCallback(() => {
-    if (isPassThrough && window.electron?.glass?.setIgnoreMouse) {
-      // 鼠标离开时恢复穿透
-      window.electron.glass.setIgnoreMouse(true);
-    }
-  }, [isPassThrough]);
-
-  // 切换置顶
+  const handleRefresh = () => captureAndTranslate();
+  
+  const toggleAutoRefresh = () => setAutoRefresh(!autoRefresh);
+  
   const togglePinned = () => {
     const newValue = !isPinned;
     setIsPinned(newValue);
-    if (window.electron?.glass?.setAlwaysOnTop) {
-      window.electron.glass.setAlwaysOnTop(newValue);
-    }
+    window.electron?.glass?.setAlwaysOnTop?.(newValue);
     saveSettings({ isPinned: newValue });
   };
 
-  // 调节透明度
   const adjustOpacity = (delta) => {
     const newOpacity = Math.max(0.3, Math.min(1, opacity + delta));
     setOpacity(newOpacity);
     saveSettings({ opacity: newOpacity });
   };
 
-  // 复制翻译结果
   const handleCopy = async () => {
-    if (displayText) {
-      try {
-        if (window.electron?.clipboard?.writeText) {
-          await window.electron.clipboard.writeText(displayText);
-        } else {
-          await navigator.clipboard.writeText(displayText);
-        }
-        setCopySuccess(true);
-        setTimeout(() => setCopySuccess(false), 1500);
-        console.log('[Glass] Copied to clipboard');
-      } catch (error) {
-        console.error('[Glass] Copy failed:', error);
+    if (!translatedText) return;
+    try {
+      if (window.electron?.clipboard?.writeText) {
+        await window.electron.clipboard.writeText(translatedText);
+      } else {
+        await navigator.clipboard.writeText(translatedText);
       }
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 1500);
+    } catch (error) {
+      console.error('[Glass] Copy failed:', error);
     }
   };
 
-  // 收藏（包含完整信息以支持 AI 标签等功能）
   const handleFavorite = async () => {
-    if (displayText && ocrText) {
-      try {
-        const favoriteItem = {
+    if (!translatedText || !sourceText) return;
+    try {
+      if (window.electron?.glass?.addToFavorites) {
+        await window.electron.glass.addToFavorites({
           id: generateId(),
-          sourceText: ocrText,
-          translatedText: displayText,
+          sourceText,
+          translatedText,
           sourceLanguage: detectedSourceLang || 'auto',
-          targetLanguage: detectedSourceLang === 'zh' ? 'en' : targetLanguage,
+          targetLanguage,
           timestamp: Date.now(),
-          tags: [],  // 空标签，可以后续通过 AI 生成
+          tags: [],
           folderId: null,
           isStyleReference: false,
-          source: 'glass-translator'  // 标记来源
-        };
-        
-        console.log('[Glass] Adding to favorites:', favoriteItem);
-        
-        if (window.electron?.glass?.addToFavorites) {
-          await window.electron.glass.addToFavorites(favoriteItem);
-          setFavoriteSuccess(true);
-          setTimeout(() => setFavoriteSuccess(false), 1500);
-          console.log('[Glass] Added to favorites successfully');
-        }
-      } catch (error) {
-        console.error('[Glass] Favorite failed:', error);
+          source: 'glass-translator'
+        });
+        setFavoriteSuccess(true);
+        setTimeout(() => setFavoriteSuccess(false), 1500);
       }
+    } catch (error) {
+      console.error('[Glass] Favorite failed:', error);
     }
   };
 
-  // 关闭窗口
-  const handleClose = () => {
-    // 先停止自动刷新
-    setAutoRefresh(false);
-    if (refreshTimerRef.current) {
-      clearInterval(refreshTimerRef.current);
-    }
+  const handleClose = () => window.electron?.glass?.close?.();
+
+  // 左右切换语言
+  const switchLanguage = (direction) => {
+    const currentIndex = LANGUAGES.findIndex(l => l.code === targetLanguage);
+    let newIndex = currentIndex + direction;
+    if (newIndex < 0) newIndex = LANGUAGES.length - 1;
+    if (newIndex >= LANGUAGES.length) newIndex = 0;
+    const newLang = LANGUAGES[newIndex].code;
+    setTargetLanguage(newLang);
+    saveSettings({ targetLanguage: newLang });
     
-    if (window.electron?.glass?.close) {
-      window.electron.glass.close();
+    // 同步到主程序
+    if (window.electron?.glass?.syncTargetLanguage) {
+      window.electron.glass.syncTargetLanguage(newLang);
     }
   };
 
-  // 获取状态显示文字
+  // 检测内容是否溢出
+  const checkOverflow = () => {
+    if (contentRef.current) {
+      const el = contentRef.current;
+      const overflow = el.scrollHeight > el.clientHeight;
+      setHasOverflow(overflow);
+      setCanScrollUp(el.scrollTop > 0);
+      setCanScrollDown(el.scrollTop < el.scrollHeight - el.clientHeight - 1);
+    }
+  };
+
+  // 内容变化时检测溢出
+  useEffect(() => {
+    checkOverflow();
+  }, [translatedText]);
+
+  // 控制栏滚动
+  const handleToolbarScroll = (e) => {
+    if (contentRef.current) {
+      contentRef.current.scrollTop += e.deltaY;
+      checkOverflow();
+    }
+  };
+
+  // 按钮滚动
+  const scrollContent = (delta) => {
+    if (contentRef.current) {
+      contentRef.current.scrollTop += delta;
+      checkOverflow();
+    }
+  };
+
+  const isLoading = ['capturing', 'recognizing', 'translating'].includes(status);
+  
   const getStatusText = () => {
     switch (status) {
       case 'capturing': return '截图中...';
       case 'recognizing': return '识别中...';
       case 'translating': return '翻译中...';
-      case 'done': return '';
-      case 'error': return errorMessage;
-      default: return '点击 🔄 开始';
+      default: return '';
     }
   };
 
-  // 是否正在加载
-  const isLoading = ['capturing', 'recognizing', 'translating'].includes(status);
+  const currentLang = LANGUAGES.find(l => l.code === targetLanguage) || LANGUAGES[0];
 
   return (
-    <div 
-      ref={containerRef}
-      className={`glass-container ${isPassThrough ? 'pass-through-mode' : ''} ${isHidden ? 'capturing-mode' : ''}`}
-      style={{ '--glass-opacity': opacity }}
-      onMouseEnter={() => setShowControls(true)}
-      onMouseLeave={() => {
-        if (!isPassThrough) setShowControls(false);
-        handleMouseLeave();
-      }}
-      onMouseMove={handleMouseMove}
-    >
-      {/* 拖动区域 */}
-      <div className="glass-drag-region" />
-
-      {/* 翻译结果区域 - 双层窗口：始终显示 displayText */}
-      <div className="glass-content">
+    <div className="glass-window" style={{ '--glass-opacity': opacity }}>
+      {/* 整个内容区域可拖动 */}
+      <div className="glass-drag-area" />
+      
+      {/* 内容区域 */}
+      <div className="glass-body">
         {status === 'error' ? (
-          <div className="glass-error">
+          <div className="glass-message error">
             <AlertCircle size={20} />
             <span>{errorMessage}</span>
           </div>
-        ) : displayText ? (
-          <>
-            <div className="glass-text">
-              {displayText}
-            </div>
-            {/* 加载指示器（覆盖在文字上方） */}
-            {isLoading && (
-              <div className="glass-loading-overlay">
-                <Loader2 className="spinning" size={16} />
-                <span>{getStatusText()}</span>
-              </div>
-            )}
-          </>
+        ) : translatedText ? (
+          <div className="glass-result" ref={contentRef}>
+            {translatedText}
+          </div>
         ) : isLoading ? (
-          <div className="glass-loading">
-            <Loader2 className="spinning" size={24} />
+          <div className="glass-message loading">
+            <Loader2 className="spin" size={24} />
             <span>{getStatusText()}</span>
           </div>
         ) : (
-          <div className="glass-placeholder">
-            <span>🔲 将窗口移动到要翻译的区域</span>
-            <span>点击 🔄 或按 Space 开始识别</span>
+          <div className="glass-message placeholder">
+            <span>将窗口移动到要翻译的区域</span>
+            <span>点击 🔄 或按 Space 开始</span>
           </div>
         )}
       </div>
 
-      {/* 底部控制栏 */}
-      <div className={`glass-controls ${showControls ? 'visible' : ''}`}>
-        <div className="controls-left">
-          {/* 自动刷新 */}
+      {/* 底部控制栏 - 可滚动内容 */}
+      <div className="glass-toolbar" onWheel={handleToolbarScroll}>
+        <div className="toolbar-left">
+          {/* 语言选择器 - 左右切换 */}
+          <div className="lang-switcher">
+            <button
+              className="btn sm"
+              onClick={() => switchLanguage(-1)}
+              title="上一个语言"
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <span className="lang-display" title={currentLang.name}>
+              {currentLang.flag} {currentLang.code.toUpperCase()}
+            </span>
+            <button
+              className="btn sm"
+              onClick={() => switchLanguage(1)}
+              title="下一个语言"
+            >
+              <ChevronRight size={14} />
+            </button>
+          </div>
+
+          <div className="toolbar-divider" />
+
           <button
-            className={`control-btn ${autoRefresh ? 'active' : ''}`}
+            className={`btn ${autoRefresh ? 'active' : ''}`}
             onClick={toggleAutoRefresh}
-            title={autoRefresh ? '暂停自动刷新' : '开启自动刷新'}
+            title={autoRefresh ? '暂停' : '自动刷新'}
           >
             {autoRefresh ? <Pause size={14} /> : <Play size={14} />}
-            <span>{autoRefresh ? '自动' : '手动'}</span>
           </button>
 
-          {/* 手动刷新 */}
           <button
-            className="control-btn"
+            className="btn"
             onClick={handleRefresh}
             disabled={isLoading}
             title="刷新 (Space)"
           >
-            <RefreshCw size={14} className={isLoading ? 'spinning' : ''} />
+            <RefreshCw size={14} className={isLoading ? 'spin' : ''} />
           </button>
 
-          {/* 穿透模式 */}
           <button
-            className={`control-btn ${isPassThrough ? 'active' : ''}`}
-            onClick={togglePassThrough}
-            title={isPassThrough ? '关闭穿透' : '开启穿透'}
-          >
-            {isPassThrough ? <Hand size={14} /> : <MousePointer2 size={14} />}
-          </button>
-
-          {/* 置顶 */}
-          <button
-            className={`control-btn ${isPinned ? 'active' : ''}`}
+            className={`btn ${isPinned ? 'active' : ''}`}
             onClick={togglePinned}
             title={isPinned ? '取消置顶' : '置顶'}
           >
@@ -606,56 +468,55 @@ const GlassTranslator = () => {
           </button>
         </div>
 
-        <div className="controls-center">
-          {/* 状态显示 */}
-          {status !== 'done' && status !== 'idle' && (
-            <span className="status-text">{getStatusText()}</span>
-          )}
-        </div>
+        {/* 中间：滚动控制（内容超出时显示） */}
+        {hasOverflow && (
+          <div className="toolbar-center">
+            <button 
+              className="btn sm scroll-btn" 
+              onClick={() => scrollContent(-50)}
+              disabled={!canScrollUp}
+              title="向上滚动"
+            >
+              <ChevronUp size={14} />
+            </button>
+            <button 
+              className="btn sm scroll-btn" 
+              onClick={() => scrollContent(50)}
+              disabled={!canScrollDown}
+              title="向下滚动"
+            >
+              <ChevronDown size={14} />
+            </button>
+          </div>
+        )}
 
-        <div className="controls-right">
-          {/* 透明度调节 */}
-          <button
-            className="control-btn small"
-            onClick={() => adjustOpacity(-0.1)}
-            title="减少透明度"
-          >
+        <div className="toolbar-right">
+          <button className="btn sm" onClick={() => adjustOpacity(-0.1)} title="减少透明度">
             <Minus size={12} />
           </button>
-          <button
-            className="control-btn small"
-            onClick={() => adjustOpacity(0.1)}
-            title="增加透明度"
-          >
+          <button className="btn sm" onClick={() => adjustOpacity(0.1)} title="增加透明度">
             <Plus size={12} />
           </button>
 
-          {/* 复制 */}
           <button
-            className={`control-btn ${copySuccess ? 'success' : ''}`}
+            className={`btn ${copySuccess ? 'success' : ''}`}
             onClick={handleCopy}
-            disabled={!displayText}
+            disabled={!translatedText}
             title="复制"
           >
             {copySuccess ? <Check size={14} /> : <Copy size={14} />}
           </button>
 
-          {/* 收藏 */}
           <button
-            className={`control-btn ${favoriteSuccess ? 'success' : ''}`}
+            className={`btn ${favoriteSuccess ? 'success' : ''}`}
             onClick={handleFavorite}
-            disabled={!displayText || !ocrText}
+            disabled={!translatedText || !sourceText}
             title="收藏"
           >
             {favoriteSuccess ? <Check size={14} /> : <Star size={14} />}
           </button>
 
-          {/* 关闭 */}
-          <button
-            className="control-btn close"
-            onClick={handleClose}
-            title="关闭 (Esc)"
-          >
+          <button className="btn close" onClick={handleClose} title="关闭 (Esc)">
             <X size={14} />
           </button>
         </div>
