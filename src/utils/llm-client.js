@@ -152,8 +152,17 @@ class LLMClient {
    */
   async chatCompletion(messages, options = {}) {
     try {
+      // 如果没有指定模型，尝试获取可用模型列表
+      let modelName = options.model || this.config.models.chat;
+      if (!modelName || modelName === 'local-model') {
+        const models = await this.getModels();
+        if (models && models.length > 0) {
+          modelName = models[0].id;
+        }
+      }
+      
       const requestData = {
-        model: options.model || this.config.models.chat || 'local-model',
+        model: modelName || 'local-model',
         messages: messages,
         temperature: options.temperature || this.config.defaultParams.temperature,
         max_tokens: options.max_tokens || this.config.defaultParams.max_tokens,

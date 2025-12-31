@@ -1,631 +1,645 @@
 // src/components/FavoritesPanel.jsx
+// Muse Memory - 灵感记忆收藏面板
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
-  Star, Search, Trash2, Copy, Edit3, Save, X,
-  ChevronDown, ChevronRight, LayoutGrid, Table, GitBranch,
-  BarChart3, Calendar, TrendingUp, Activity, Hash, Type,
-  Languages, FileText, Download, Upload, CheckSquare, Square,
-  Trash, ArrowUpDown, FolderOpen, Tag, Clock, RotateCcw, Bookmark
+  Star, Search, Trash2, Copy, Edit3, Save, X, Plus,
+  Folder, FolderPlus, ChevronDown, ChevronRight,
+  Tag, Hash, MoreVertical, GripVertical,
+  Check, Palette, RotateCcw, Bookmark
 } from 'lucide-react';
 import useTranslationStore from '../stores/translation-store';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import 'dayjs/locale/zh-cn';
 import '../styles/components/FavoritesPanel.css';
 
 dayjs.extend(relativeTime);
-dayjs.extend(isSameOrAfter);
 dayjs.locale('zh-cn');
+
+// 预设文件夹颜色
+const FOLDER_COLORS = [
+  '#3b82f6', // 蓝
+  '#10b981', // 绿
+  '#f59e0b', // 橙
+  '#ef4444', // 红
+  '#8b5cf6', // 紫
+  '#ec4899', // 粉
+  '#06b6d4', // 青
+  '#6b7280', // 灰
+];
+
+// 搜索高亮组件
+const HighlightText = ({ text, search }) => {
+  if (!search || !text) return text;
+  
+  const parts = text.split(new RegExp(`(${search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'));
+  
+  return parts.map((part, i) =>
+    part.toLowerCase() === search.toLowerCase() ? (
+      <mark key={i} className="search-highlight">{part}</mark>
+    ) : part
+  );
+};
+
+// 默认文件夹
+const DEFAULT_FOLDERS = [
+  { id: 'work', name: '工作', color: '#3b82f6', order: 0 },
+  { id: 'study', name: '学习', color: '#10b981', order: 1 },
+  { id: 'life', name: '生活', color: '#f59e0b', order: 2 },
+  { id: 'style_library', name: '风格库', color: '#8b5cf6', order: 3, isSystem: true, icon: 'palette' },
+];
 
 /**
  * 收藏卡片组件
  */
-const FavoriteCard = ({ item, onCopy, onRestore, onDelete, onEdit, isSelected, onSelect, showCheckbox, categories }) => {
+const FavoriteCard = ({ 
+  item, 
+  folders,
+  searchQuery,
+  onCopy, 
+  onEdit, 
+  onDelete,
+  onMove,
+  onUpdateTags,
+  onUpdateNote,
+  onUpdateStyleRef,
+  isSelected,
+  onSelect
+}) => {
   const [showTranslated, setShowTranslated] = useState(true);
-  const categoryName = categories.find(c => c.id === item.category)?.name;
-  
+  const [isEditing, setIsEditing] = useState(false);
+  const [editNote, setEditNote] = useState(item.note || '');
+  const [editTags, setEditTags] = useState(item.tags?.join(', ') || '');
+  const [editStyleRef, setEditStyleRef] = useState(item.isStyleReference || false);
+  const [showMoveMenu, setShowMoveMenu] = useState(false);
+
+  const folder = folders.find(f => f.id === item.folderId);
+
+  const handleSaveEdit = () => {
+    const newTags = editTags
+      .split(/[,，]/)
+      .map(t => t.trim())
+      .filter(t => t.length > 0);
+    onUpdateTags(item.id, newTags);
+    onUpdateNote(item.id, editNote);
+    // 如果切换了风格参考状态
+    if (editStyleRef !== item.isStyleReference) {
+      onUpdateStyleRef(item.id, editStyleRef);
+    }
+    setIsEditing(false);
+  };
+
+  const handleCancelEdit = () => {
+    setEditNote(item.note || '');
+    setEditTags(item.tags?.join(', ') || '');
+    setEditStyleRef(item.isStyleReference || false);
+    setIsEditing(false);
+  };
+
   return (
     <div className={`favorite-card ${isSelected ? 'selected' : ''}`}>
+      {/* 卡片头部 */}
       <div className="card-header">
-        <span className="card-lang">{item.sourceLanguage || 'auto'} → {item.targetLanguage || 'zh'}</span>
-        <div className="card-header-right">
-          {categoryName && <span className="card-category">{categoryName}</span>}
-          <span className="card-time">{dayjs(item.timestamp).format('HH:mm')}</span>
-          {showCheckbox && (
-            <button className="card-checkbox" onClick={(e) => { e.stopPropagation(); onSelect(item.id); }}>
-              {isSelected ? <CheckSquare size={16} /> : <Square size={16} />}
-            </button>
+        <div className="card-header-left">
+          <span className="card-lang">
+            {item.sourceLanguage || 'auto'} → {item.targetLanguage || 'zh'}
+          </span>
+          {folder && (
+            <span className="card-folder" style={{ color: folder.color }}>
+              <Folder size={12} />
+              {folder.name}
+            </span>
           )}
         </div>
+        <span className="card-time">{dayjs(item.timestamp).fromNow()}</span>
       </div>
-      
-      <div className="card-body" onClick={() => setShowTranslated(!showTranslated)} title="点击切换原文/译文">
+
+      {/* 卡片内容 - 点击切换 */}
+      <div 
+        className="card-body" 
+        onClick={() => !isEditing && setShowTranslated(!showTranslated)}
+      >
         <div className="card-text-label">
           {showTranslated ? '译文' : '原文'}
           <RotateCcw size={12} className="switch-hint" />
         </div>
         <div className={`card-text ${showTranslated ? 'translated' : 'source'}`}>
-          {showTranslated ? item.translatedText : item.sourceText}
+          <HighlightText 
+            text={showTranslated ? item.translatedText : item.sourceText} 
+            search={searchQuery}
+          />
         </div>
       </div>
 
-      {item.note && (
-        <div className="card-note">
-          <Bookmark size={12} />
-          <span>{item.note}</span>
+      {/* 标签区域 */}
+      {!isEditing && item.tags && item.tags.length > 0 && (
+        <div className="card-tags">
+          {item.tags.map((tag, idx) => (
+            <span key={idx} className="tag-chip">
+              <Tag size={10} />
+              {tag}
+            </span>
+          ))}
         </div>
       )}
-      
-      <div className="card-actions">
-        <button onClick={() => onCopy(item.translatedText)} title="复制译文">
-          <Copy size={14} />
-        </button>
-        <button onClick={() => onRestore(item)} title="恢复编辑">
-          <Edit3 size={14} />
-        </button>
-        <button onClick={() => onEdit(item)} title="编辑笔记/分类">
-          <Tag size={14} />
-        </button>
-        <button onClick={() => onDelete(item.id)} className="danger" title="取消收藏">
-          <Trash2 size={14} />
-        </button>
-      </div>
+
+      {/* 笔记区域 */}
+      {!isEditing && item.note && (
+        <div className="card-note">
+          <Bookmark size={12} />
+          <span><HighlightText text={item.note} search={searchQuery} /></span>
+        </div>
+      )}
+
+      {/* 编辑模式 */}
+      {isEditing && (
+        <div className="card-edit-form">
+          <div className="edit-field">
+            <label><Tag size={12} /> 标签（逗号分隔）</label>
+            <input
+              type="text"
+              value={editTags}
+              onChange={(e) => setEditTags(e.target.value)}
+              placeholder="正式, 学术, 重要..."
+            />
+          </div>
+          <div className="edit-field">
+            <label><Bookmark size={12} /> 笔记</label>
+            <textarea
+              value={editNote}
+              onChange={(e) => setEditNote(e.target.value)}
+              placeholder="添加笔记..."
+              rows={3}
+            />
+          </div>
+          <div className="edit-field style-ref-toggle">
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={editStyleRef}
+                onChange={(e) => setEditStyleRef(e.target.checked)}
+              />
+              <Palette size={14} />
+              <span>标记为风格参考</span>
+            </label>
+            <span className="toggle-hint">
+              {editStyleRef ? '将移动到风格库' : '普通收藏'}
+            </span>
+          </div>
+          <div className="edit-actions">
+            <button className="btn-cancel" onClick={handleCancelEdit}>
+              <X size={14} /> 取消
+            </button>
+            <button className="btn-save" onClick={handleSaveEdit}>
+              <Check size={14} /> 保存
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 操作按钮 */}
+      {!isEditing && (
+        <div className="card-actions">
+          <button onClick={() => onCopy(item.translatedText)} title="复制译文">
+            <Copy size={14} />
+          </button>
+          <button onClick={() => setIsEditing(true)} title="编辑标签和笔记">
+            <Edit3 size={14} />
+          </button>
+          <div className="move-menu-wrapper">
+            <button 
+              onClick={() => setShowMoveMenu(!showMoveMenu)} 
+              title="移动到文件夹"
+              className={showMoveMenu ? 'active' : ''}
+            >
+              <Folder size={14} />
+            </button>
+            {showMoveMenu && (
+              <div className="move-menu">
+                <div className="move-menu-header">移动到</div>
+                <button 
+                  className={!item.folderId ? 'active' : ''}
+                  onClick={() => { onMove(item.id, null, false); setShowMoveMenu(false); }}
+                >
+                  <Folder size={14} /> 未分类
+                </button>
+                {folders.filter(f => !f.isSystem).map(f => (
+                  <button
+                    key={f.id}
+                    className={item.folderId === f.id ? 'active' : ''}
+                    onClick={() => { onMove(item.id, f.id, false); setShowMoveMenu(false); }}
+                  >
+                    <Folder size={14} style={{ color: f.color }} />
+                    {f.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <button onClick={() => onDelete(item.id)} className="danger" title="删除">
+            <Trash2 size={14} />
+          </button>
+        </div>
+      )}
     </div>
   );
 };
 
 /**
- * 收藏面板
+ * 主面板组件
  */
 const FavoritesPanel = ({ showNotification }) => {
   const notify = showNotification || ((msg, type) => console.log(`[${type}] ${msg}`));
 
-  // 状态
-  const [viewMode, setViewMode] = useState('card');
-  const [groupBy, setGroupBy] = useState('date');
-  const [showStats, setShowStats] = useState(false);
-  const [dateRange, setDateRange] = useState('all');
-  const [localSearch, setLocalSearch] = useState('');
-  const [expandedGroups, setExpandedGroups] = useState(new Set(['今天', '昨天']));
-  const [selectedIds, setSelectedIds] = useState(new Set());
-  const [selectMode, setSelectMode] = useState(false);
-  const [sortConfig, setSortConfig] = useState({ key: 'timestamp', direction: 'desc' });
-  
-  // 编辑弹窗
-  const [editingItem, setEditingItem] = useState(null);
-  const [editNote, setEditNote] = useState('');
-  const [editCategory, setEditCategory] = useState('');
+  // 文件夹状态
+  const [folders, setFolders] = useState(() => {
+    const saved = localStorage.getItem('t-translate-folders');
+    return saved ? JSON.parse(saved) : DEFAULT_FOLDERS;
+  });
+  const [selectedFolder, setSelectedFolder] = useState('all');
+  const [editingFolder, setEditingFolder] = useState(null);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [newFolderColor, setNewFolderColor] = useState(FOLDER_COLORS[0]);
+  const [showAddFolder, setShowAddFolder] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
 
-  // 分类 (本地状态，可以后续持久化到 store)
-  const [categories] = useState([
-    { id: 'work', name: '工作', color: '#3b82f6' },
-    { id: 'study', name: '学习', color: '#10b981' },
-    { id: 'life', name: '生活', color: '#f59e0b' },
-    { id: 'other', name: '其他', color: '#6b7280' }
-  ]);
+  // 搜索和筛选
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTag, setSelectedTag] = useState(null);
 
   // Store
   const {
     favorites,
     removeFromFavorites,
-    restoreFromHistory,
-    updateFavoriteItem,
-    addToHistory
+    updateFavoriteItem
   } = useTranslationStore();
 
-  // 统计
-  const stats = useMemo(() => {
-    if (!Array.isArray(favorites) || favorites.length === 0) {
-      return { total: 0, today: 0, thisWeek: 0, totalChars: 0, categoryCount: {} };
-    }
+  // 保存文件夹到 localStorage
+  useEffect(() => {
+    localStorage.setItem('t-translate-folders', JSON.stringify(folders));
+  }, [folders]);
 
-    const now = dayjs();
-    let today = 0, thisWeek = 0, totalChars = 0;
-    const categoryCount = {};
-
-    favorites.forEach(item => {
-      const d = dayjs(item.timestamp);
-      totalChars += (item.sourceText?.length || 0);
-      if (d.isSameOrAfter(now.startOf('day'))) today++;
-      if (d.isSameOrAfter(now.startOf('week'))) thisWeek++;
-      const cat = item.category || 'uncategorized';
-      categoryCount[cat] = (categoryCount[cat] || 0) + 1;
+  // 提取所有标签
+  const allTags = useMemo(() => {
+    const tags = new Set();
+    favorites?.forEach(item => {
+      item.tags?.forEach(tag => tags.add(tag));
     });
-
-    return { total: favorites.length, today, thisWeek, totalChars, categoryCount };
+    return Array.from(tags).sort();
   }, [favorites]);
 
-  // 过滤
+  // 计算每个文件夹的数量
+  const folderCounts = useMemo(() => {
+    const counts = { all: favorites?.length || 0, uncategorized: 0 };
+    favorites?.forEach(item => {
+      if (!item.folderId) {
+        counts.uncategorized++;
+      } else {
+        counts[item.folderId] = (counts[item.folderId] || 0) + 1;
+      }
+    });
+    return counts;
+  }, [favorites]);
+
+  // 过滤收藏
   const filteredFavorites = useMemo(() => {
     if (!Array.isArray(favorites)) return [];
+    
     let filtered = [...favorites];
 
-    if (localSearch) {
-      const q = localSearch.toLowerCase();
+    // 文件夹筛选
+    if (selectedFolder === 'uncategorized') {
+      filtered = filtered.filter(item => !item.folderId);
+    } else if (selectedFolder !== 'all') {
+      filtered = filtered.filter(item => item.folderId === selectedFolder);
+    }
+
+    // 标签筛选
+    if (selectedTag) {
+      filtered = filtered.filter(item => item.tags?.includes(selectedTag));
+    }
+
+    // 搜索
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
       filtered = filtered.filter(item =>
-        (item.sourceText || '').toLowerCase().includes(q) ||
-        (item.translatedText || '').toLowerCase().includes(q) ||
-        (item.note || '').toLowerCase().includes(q)
+        (item.sourceText || '').toLowerCase().includes(query) ||
+        (item.translatedText || '').toLowerCase().includes(query) ||
+        (item.note || '').toLowerCase().includes(query) ||
+        (item.tags || []).some(tag => tag.toLowerCase().includes(query))
       );
     }
 
-    const now = dayjs();
-    switch (dateRange) {
-      case 'today': filtered = filtered.filter(item => dayjs(item.timestamp).isSameOrAfter(now.startOf('day'))); break;
-      case 'week': filtered = filtered.filter(item => dayjs(item.timestamp).isSameOrAfter(now.startOf('week'))); break;
-      case 'month': filtered = filtered.filter(item => dayjs(item.timestamp).isSameOrAfter(now.startOf('month'))); break;
-    }
-
-    filtered.sort((a, b) => {
-      const aVal = sortConfig.key === 'timestamp' ? (a.timestamp || 0) : (a.sourceText?.length || 0);
-      const bVal = sortConfig.key === 'timestamp' ? (b.timestamp || 0) : (b.sourceText?.length || 0);
-      return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal;
-    });
+    // 按时间倒序
+    filtered.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
     return filtered;
-  }, [favorites, localSearch, dateRange, sortConfig]);
+  }, [favorites, selectedFolder, selectedTag, searchQuery]);
 
-  // 分组
-  const groupedFavorites = useMemo(() => {
-    const groups = {};
-    const now = dayjs();
+  // 文件夹操作
+  const handleAddFolder = () => {
+    if (!newFolderName.trim()) return;
+    
+    const id = `folder_${Date.now()}`;
+    const newFolder = {
+      id,
+      name: newFolderName.trim(),
+      color: newFolderColor,
+      order: folders.length
+    };
+    
+    setFolders([...folders, newFolder]);
+    setNewFolderName('');
+    setNewFolderColor(FOLDER_COLORS[0]);
+    setShowAddFolder(false);
+    notify('文件夹已创建', 'success');
+  };
 
-    filteredFavorites.forEach(item => {
-      let key;
-      if (groupBy === 'date') {
-        const d = dayjs(item.timestamp);
-        if (d.isSame(now, 'day')) key = '今天';
-        else if (d.isSame(now.subtract(1, 'day'), 'day')) key = '昨天';
-        else if (d.isSame(now, 'week')) key = '本周';
-        else if (d.isSame(now, 'month')) key = '本月';
-        else key = d.format('YYYY年MM月');
-      } else if (groupBy === 'category') {
-        const cat = categories.find(c => c.id === item.category);
-        key = cat ? cat.name : '未分类';
-      } else {
-        key = `${item.sourceLanguage || 'auto'} → ${item.targetLanguage || 'zh'}`;
+  const handleUpdateFolder = (id, updates) => {
+    setFolders(folders.map(f => f.id === id ? { ...f, ...updates } : f));
+    setEditingFolder(null);
+  };
+
+  const handleDeleteFolder = (id) => {
+    if (!window.confirm('删除文件夹后，其中的收藏将移至"未分类"')) return;
+    
+    // 移动该文件夹下的收藏到未分类
+    favorites?.forEach(item => {
+      if (item.folderId === id) {
+        updateFavoriteItem(item.id, { folderId: null });
       }
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(item);
     });
-
-    const order = ['今天', '昨天', '本周', '本月'];
-    return Object.entries(groups)
-      .sort((a, b) => {
-        const ai = order.indexOf(a[0]), bi = order.indexOf(b[0]);
-        if (ai !== -1 && bi !== -1) return ai - bi;
-        if (ai !== -1) return -1;
-        if (bi !== -1) return 1;
-        return b[0].localeCompare(a[0]);
-      })
-      .map(([title, items]) => ({ title, items, count: items.length }));
-  }, [filteredFavorites, groupBy, categories]);
-
-  // 操作
-  const toggleGroup = (title) => {
-    setExpandedGroups(prev => {
-      const next = new Set(prev);
-      next.has(title) ? next.delete(title) : next.add(title);
-      return next;
-    });
+    
+    setFolders(folders.filter(f => f.id !== id));
+    if (selectedFolder === id) setSelectedFolder('all');
+    notify('文件夹已删除', 'success');
   };
 
-  const toggleSelect = (id) => {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
-
-  const deleteSelected = () => {
-    if (selectedIds.size === 0) return;
-    if (window.confirm(`确定取消收藏选中的 ${selectedIds.size} 条？`)) {
-      selectedIds.forEach(id => removeFromFavorites(id));
-      setSelectedIds(new Set());
-      setSelectMode(false);
-      notify(`已取消 ${selectedIds.size} 条收藏`, 'success');
-    }
-  };
-
+  // 收藏操作
   const handleCopy = useCallback((text) => {
     navigator.clipboard.writeText(text);
     notify('已复制译文', 'success');
   }, [notify]);
 
-  const handleRestore = useCallback((item) => {
-    // 恢复到翻译区
-    if (restoreFromHistory) {
-      restoreFromHistory(item.id);
+  const handleMove = useCallback((itemId, folderId) => {
+    updateFavoriteItem(itemId, { folderId });
+    notify('已移动', 'success');
+  }, [updateFavoriteItem, notify]);
+
+  const handleUpdateTags = useCallback((itemId, tags) => {
+    updateFavoriteItem(itemId, { tags });
+  }, [updateFavoriteItem]);
+
+  const handleUpdateNote = useCallback((itemId, note) => {
+    updateFavoriteItem(itemId, { note });
+  }, [updateFavoriteItem]);
+
+  const handleUpdateStyleRef = useCallback((itemId, isStyleReference) => {
+    // 更新风格参考状态，同时更新文件夹
+    updateFavoriteItem(itemId, { 
+      isStyleReference,
+      folderId: isStyleReference ? 'style_library' : null
+    });
+    notify(isStyleReference ? '已移动到风格库' : '已移出风格库', 'success');
+  }, [updateFavoriteItem, notify]);
+
+  const handleDelete = useCallback((itemId) => {
+    if (window.confirm('确定要删除这条收藏吗？')) {
+      removeFromFavorites(itemId);
+      notify('已删除', 'success');
     }
-    notify('已恢复到编辑区', 'success');
-  }, [restoreFromHistory, notify]);
+  }, [removeFromFavorites, notify]);
 
-  const handleEdit = (item) => {
-    setEditingItem(item);
-    setEditNote(item.note || '');
-    setEditCategory(item.category || '');
-  };
-
-  const handleSaveEdit = () => {
-    if (editingItem && updateFavoriteItem) {
-      updateFavoriteItem(editingItem.id, { 
-        note: editNote, 
-        category: editCategory 
-      });
-      notify('已保存', 'success');
-    }
-    setEditingItem(null);
-  };
-
-  const handleExport = useCallback(() => {
-    try {
-      const data = { favorites, exportedAt: new Date().toISOString() };
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `t-translate-favorites-${dayjs().format('YYYY-MM-DD')}.json`;
-      a.click();
-      notify('导出成功', 'success');
-    } catch { notify('导出失败', 'error'); }
-  }, [favorites, notify]);
-
-  const highlightText = (text, search) => {
-    if (!search || !text) return text;
-    const parts = text.split(new RegExp(`(${search})`, 'gi'));
-    return parts.map((part, i) =>
-      part.toLowerCase() === search.toLowerCase() ?
-        <mark key={i} className="search-highlight">{part}</mark> : part
-    );
-  };
-
-  // 渲染统计
-  const renderStats = () => {
-    if (!showStats) return null;
-    return (
-      <div className="stats-panel">
-        <div className="stats-header">
-          <h3><BarChart3 size={18} /> 收藏统计</h3>
-          <button className="stats-close-btn" onClick={() => setShowStats(false)}><X size={16} /></button>
+  return (
+    <div className="favorites-panel">
+      {/* 左侧边栏 - 文件夹 */}
+      <div className="favorites-sidebar">
+        <div className="sidebar-header">
+          <h3>收藏夹</h3>
+          <button 
+            className="add-folder-btn"
+            onClick={() => setShowAddFolder(!showAddFolder)}
+            title="新建文件夹"
+          >
+            <FolderPlus size={18} />
+          </button>
         </div>
-        <div className="stats-grid">
-          <div className="stat-card primary">
-            <div className="stat-icon"><Star size={20} /></div>
-            <div className="stat-info"><span className="stat-value">{stats.total}</span><span className="stat-label">总收藏</span></div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon"><Calendar size={20} /></div>
-            <div className="stat-info"><span className="stat-value">{stats.today}</span><span className="stat-label">今日</span></div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon"><TrendingUp size={20} /></div>
-            <div className="stat-info"><span className="stat-value">{stats.thisWeek}</span><span className="stat-label">本周</span></div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon"><Type size={20} /></div>
-            <div className="stat-info"><span className="stat-value">{stats.totalChars.toLocaleString()}</span><span className="stat-label">总字符</span></div>
-          </div>
-        </div>
-        {categories.length > 0 && (
-          <div className="stats-categories">
-            <h4><FolderOpen size={16} /> 分类统计</h4>
-            {categories.map(cat => (
-              <div key={cat.id} className="category-bar">
-                <span className="cat-name" style={{ color: cat.color }}>{cat.name}</span>
-                <div className="cat-progress">
-                  <div className="cat-fill" style={{ 
-                    width: `${stats.total > 0 ? (stats.categoryCount[cat.id] || 0) / stats.total * 100 : 0}%`,
-                    background: cat.color 
-                  }} />
+
+        {/* 新建文件夹表单 */}
+        {showAddFolder && (
+          <div className="add-folder-form">
+            <input
+              type="text"
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              placeholder="文件夹名称"
+              onKeyDown={(e) => e.key === 'Enter' && handleAddFolder()}
+              autoFocus
+            />
+            <div className="folder-color-row">
+              <button 
+                className="color-preview"
+                style={{ background: newFolderColor }}
+                onClick={() => setShowColorPicker(!showColorPicker)}
+              >
+                <Palette size={12} />
+              </button>
+              {showColorPicker && (
+                <div className="color-picker">
+                  {FOLDER_COLORS.map(color => (
+                    <button
+                      key={color}
+                      className={`color-option ${newFolderColor === color ? 'active' : ''}`}
+                      style={{ background: color }}
+                      onClick={() => { setNewFolderColor(color); setShowColorPicker(false); }}
+                    />
+                  ))}
                 </div>
-                <span className="cat-count">{stats.categoryCount[cat.id] || 0}</span>
-              </div>
-            ))}
+              )}
+              <button className="btn-create" onClick={handleAddFolder}>
+                <Plus size={14} /> 创建
+              </button>
+            </div>
           </div>
         )}
-      </div>
-    );
-  };
 
-  // 渲染时间轴项
-  const renderTimelineItem = (item) => (
-    <div key={item.id} className={`timeline-item ${selectedIds.has(item.id) ? 'selected' : ''}`}>
-      <div className="timeline-content">
-        <div className="timeline-header">
-          <span className="timeline-time">{dayjs(item.timestamp).format('HH:mm')}</span>
-          <span className="timeline-lang">{item.sourceLanguage || 'auto'} → {item.targetLanguage || 'zh'}</span>
-          {item.category && (
-            <span className="timeline-category" style={{ color: categories.find(c => c.id === item.category)?.color }}>
-              {categories.find(c => c.id === item.category)?.name}
-            </span>
-          )}
-          {selectMode && (
-            <button className="item-checkbox" onClick={() => toggleSelect(item.id)}>
-              {selectedIds.has(item.id) ? <CheckSquare size={16} /> : <Square size={16} />}
-            </button>
-          )}
-        </div>
-        <div className="timeline-bubble source">
-          <span className="bubble-label">原文</span>
-          <p>{highlightText(item.sourceText, localSearch)}</p>
-        </div>
-        <div className="timeline-bubble translated">
-          <span className="bubble-label">译文</span>
-          <p>{highlightText(item.translatedText, localSearch)}</p>
-        </div>
-        {item.note && (
-          <div className="timeline-note">
-            <Bookmark size={12} /> {item.note}
+        {/* 文件夹列表 */}
+        <div className="folder-list">
+          {/* 全部 */}
+          <div
+            className={`folder-item ${selectedFolder === 'all' ? 'active' : ''}`}
+            onClick={() => { setSelectedFolder('all'); setSelectedTag(null); }}
+          >
+            <Star size={16} className="folder-icon" />
+            <span className="folder-name">全部收藏</span>
+            <span className="folder-count">{folderCounts.all}</span>
           </div>
-        )}
-        <div className="timeline-actions">
-          <button onClick={() => handleCopy(item.translatedText)} title="复制译文"><Copy size={14} /></button>
-          <button onClick={() => handleRestore(item)} title="恢复编辑"><Edit3 size={14} /></button>
-          <button onClick={() => handleEdit(item)} title="编辑"><Tag size={14} /></button>
-          <button onClick={() => removeFromFavorites(item.id)} className="danger" title="取消收藏"><Trash2 size={14} /></button>
-        </div>
-      </div>
-    </div>
-  );
 
-  // 渲染表格
-  const renderTableGroup = (group) => (
-    <div key={group.title} className="table-group">
-      <div className="table-group-header" onClick={() => toggleGroup(group.title)}>
-        {expandedGroups.has(group.title) ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-        <span>{group.title}</span>
-        <span className="group-count">{group.count}</span>
-      </div>
-      {expandedGroups.has(group.title) && (
-        <table className="favorites-table">
-          <thead>
-            <tr>
-              {selectMode && <th className="col-check"><Square size={16} /></th>}
-              <th className="col-time">时间</th>
-              <th className="col-lang">语言</th>
-              <th className="col-source">原文</th>
-              <th className="col-translated">译文</th>
-              <th className="col-note">笔记</th>
-              <th className="col-actions">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {group.items.map(item => (
-              <tr key={item.id} className={selectedIds.has(item.id) ? 'selected' : ''}>
-                {selectMode && (
-                  <td className="col-check">
-                    <button onClick={() => toggleSelect(item.id)}>
-                      {selectedIds.has(item.id) ? <CheckSquare size={16} /> : <Square size={16} />}
+          {/* 未分类 */}
+          <div
+            className={`folder-item ${selectedFolder === 'uncategorized' ? 'active' : ''}`}
+            onClick={() => { setSelectedFolder('uncategorized'); setSelectedTag(null); }}
+          >
+            <Folder size={16} className="folder-icon" style={{ color: '#6b7280' }} />
+            <span className="folder-name">未分类</span>
+            <span className="folder-count">{folderCounts.uncategorized}</span>
+          </div>
+
+          <div className="folder-divider" />
+
+          {/* 用户文件夹 */}
+          {folders.map(folder => (
+            <div
+              key={folder.id}
+              className={`folder-item ${selectedFolder === folder.id ? 'active' : ''} ${folder.isSystem ? 'system-folder' : ''}`}
+            >
+              {editingFolder === folder.id ? (
+                <div className="folder-edit-form">
+                  <input
+                    type="text"
+                    defaultValue={folder.name}
+                    id={`folder-edit-${folder.id}`}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleUpdateFolder(folder.id, { name: e.target.value });
+                      } else if (e.key === 'Escape') {
+                        setEditingFolder(null);
+                      }
+                    }}
+                    autoFocus
+                  />
+                  <div className="folder-edit-actions">
+                    <button 
+                      className="btn-confirm"
+                      onClick={() => {
+                        const input = document.getElementById(`folder-edit-${folder.id}`);
+                        handleUpdateFolder(folder.id, { name: input.value });
+                      }}
+                      title="确认"
+                    >
+                      <Check size={14} />
                     </button>
-                  </td>
-                )}
-                <td className="col-time">{dayjs(item.timestamp).format('HH:mm')}</td>
-                <td className="col-lang">{item.sourceLanguage || 'auto'} → {item.targetLanguage || 'zh'}</td>
-                <td className="col-source"><div className="cell-text">{highlightText(item.sourceText, localSearch)}</div></td>
-                <td className="col-translated"><div className="cell-text">{highlightText(item.translatedText, localSearch)}</div></td>
-                <td className="col-note"><div className="cell-text">{item.note || '-'}</div></td>
-                <td className="col-actions">
-                  <button onClick={() => handleCopy(item.translatedText)} title="复制译文"><Copy size={14} /></button>
-                  <button onClick={() => handleEdit(item)} title="编辑"><Tag size={14} /></button>
-                  <button onClick={() => removeFromFavorites(item.id)} className="danger" title="取消收藏"><Trash2 size={14} /></button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </div>
-  );
-
-  // 渲染内容
-  const renderContent = () => {
-    if (filteredFavorites.length === 0) {
-      return (
-        <div className="empty-state">
-          <Star size={48} />
-          <p>{localSearch ? '没有找到匹配的收藏' : '暂无收藏'}</p>
-          <span>在历史记录中点击星标可添加收藏</span>
-        </div>
-      );
-    }
-
-    if (viewMode === 'table') {
-      return <div className="favorites-table-wrapper">{groupedFavorites.map(renderTableGroup)}</div>;
-    }
-
-    if (viewMode === 'timeline') {
-      return (
-        <div className="favorites-timeline">
-          {groupedFavorites.map(group => (
-            <div key={group.title} className="timeline-group">
-              <div className="timeline-group-header" onClick={() => toggleGroup(group.title)}>
-                {expandedGroups.has(group.title) ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                <span>{group.title}</span>
-                <span className="group-count">{group.count}</span>
-              </div>
-              {expandedGroups.has(group.title) && (
-                <div className="timeline-items">{group.items.map(renderTimelineItem)}</div>
+                    <button 
+                      className="btn-cancel-small"
+                      onClick={() => setEditingFolder(null)}
+                      title="取消"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div 
+                    className="folder-item-main"
+                    onClick={() => { setSelectedFolder(folder.id); setSelectedTag(null); }}
+                  >
+                    {folder.icon === 'palette' ? (
+                      <Palette size={16} className="folder-icon" style={{ color: folder.color }} />
+                    ) : (
+                      <Folder size={16} className="folder-icon" style={{ color: folder.color }} />
+                    )}
+                    <span className="folder-name">{folder.name}</span>
+                    <span className="folder-count">{folderCounts[folder.id] || 0}</span>
+                  </div>
+                  {!folder.isSystem && (
+                    <div className="folder-item-actions">
+                      <button onClick={(e) => { e.stopPropagation(); setEditingFolder(folder.id); }}>
+                        <Edit3 size={12} />
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder.id); }}>
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           ))}
         </div>
-      );
-    }
 
-    // 卡片视图
-    return (
-      <div className="favorites-cards">
-        {groupedFavorites.map(group => (
-          <div key={group.title} className="card-group">
-            <div className="card-group-header" onClick={() => toggleGroup(group.title)}>
-              {expandedGroups.has(group.title) ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-              <span>{group.title}</span>
-              <span className="group-count">{group.count}</span>
+        {/* 标签列表 */}
+        {allTags.length > 0 && (
+          <>
+            <div className="sidebar-section-title">
+              <Tag size={14} /> 标签
             </div>
-            {expandedGroups.has(group.title) && (
-              <div className="card-grid">
-                {group.items.map(item => (
-                  <FavoriteCard
-                    key={item.id}
-                    item={item}
-                    onCopy={handleCopy}
-                    onRestore={handleRestore}
-                    onDelete={removeFromFavorites}
-                    onEdit={handleEdit}
-                    isSelected={selectedIds.has(item.id)}
-                    onSelect={toggleSelect}
-                    showCheckbox={selectMode}
-                    categories={categories}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
+            <div className="tag-list">
+              {allTags.map(tag => (
+                <button
+                  key={tag}
+                  className={`tag-item ${selectedTag === tag ? 'active' : ''}`}
+                  onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
+                >
+                  <Hash size={12} />
+                  {tag}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </div>
-    );
-  };
 
-  return (
-    <div className="favorites-panel">
-      {/* 工具栏 */}
-      <div className="favorites-toolbar">
-        <div className="toolbar-left">
+      {/* 右侧主内容区 */}
+      <div className="favorites-main">
+        {/* 搜索栏 */}
+        <div className="favorites-toolbar">
           <div className="toolbar-search">
             <Search size={16} />
-            <input type="text" placeholder="搜索收藏..." value={localSearch} onChange={(e) => setLocalSearch(e.target.value)} />
-            {localSearch && <button onClick={() => setLocalSearch('')}><X size={14} /></button>}
+            <input
+              type="text"
+              placeholder="搜索收藏..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')}>
+                <X size={14} />
+              </button>
+            )}
           </div>
 
-          <div className="toolbar-divider" />
-
-          <div className="view-toggle">
-            <button className={viewMode === 'card' ? 'active' : ''} onClick={() => setViewMode('card')} title="卡片">
-              <LayoutGrid size={16} /><span>卡片</span>
-            </button>
-            <button className={viewMode === 'timeline' ? 'active' : ''} onClick={() => setViewMode('timeline')} title="时间轴">
-              <GitBranch size={16} /><span>时间轴</span>
-            </button>
-            <button className={viewMode === 'table' ? 'active' : ''} onClick={() => setViewMode('table')} title="表格">
-              <Table size={16} /><span>表格</span>
-            </button>
+          <div className="toolbar-info">
+            {selectedTag && (
+              <span className="active-filter">
+                <Tag size={12} /> {selectedTag}
+                <button onClick={() => setSelectedTag(null)}><X size={12} /></button>
+              </span>
+            )}
+            <span className="result-count">
+              {filteredFavorites.length} 条收藏
+            </span>
           </div>
-
-          <div className="toolbar-divider" />
-
-          <button className={`toolbar-btn ${showStats ? 'active' : ''}`} onClick={() => setShowStats(!showStats)}>
-            <BarChart3 size={16} /><span>统计</span>
-          </button>
-
-          <button className={`toolbar-btn ${selectMode ? 'active' : ''}`} onClick={() => { setSelectMode(!selectMode); setSelectedIds(new Set()); }}>
-            <CheckSquare size={16} /><span>选择</span>
-          </button>
         </div>
 
-        <div className="toolbar-center">
-          <select className="toolbar-select" value={dateRange} onChange={(e) => setDateRange(e.target.value)}>
-            <option value="all">全部时间</option>
-            <option value="today">今天</option>
-            <option value="week">本周</option>
-            <option value="month">本月</option>
-          </select>
-
-          <select className="toolbar-select" value={groupBy} onChange={(e) => setGroupBy(e.target.value)}>
-            <option value="date">按日期</option>
-            <option value="category">按分类</option>
-            <option value="language">按语言</option>
-          </select>
-        </div>
-
-        <div className="toolbar-right">
-          {selectMode && selectedIds.size > 0 && (
-            <button className="toolbar-btn danger" onClick={deleteSelected}>
-              <Trash size={16} /><span>取消收藏 ({selectedIds.size})</span>
-            </button>
-          )}
-
-          <button className="toolbar-btn" onClick={handleExport} title="导出"><Download size={16} /></button>
-
-          <div className="toolbar-divider" />
-
-          <button className="toolbar-btn danger" onClick={() => {
-            if (favorites.length > 0 && window.confirm(`确定清空所有 ${favorites.length} 条收藏？`)) {
-              favorites.forEach(f => removeFromFavorites(f.id));
-              notify('已清空收藏', 'success');
-            }
-          }}>
-            <Trash2 size={16} /><span>清空</span>
-          </button>
-        </div>
-      </div>
-
-      {renderStats()}
-
-      {localSearch && (
-        <div className="search-hint">
-          搜索 "<strong>{localSearch}</strong>" 找到 <strong>{filteredFavorites.length}</strong> 条收藏
-        </div>
-      )}
-
-      <div className="favorites-content">
-        {renderContent()}
-      </div>
-
-      {filteredFavorites.length > 0 && (
-        <div className="favorites-footer">
-          <span>共 {filteredFavorites.length} 条收藏</span>
-          {selectMode && <span className="select-hint">已选 {selectedIds.size} 条</span>}
-        </div>
-      )}
-
-      {/* 编辑弹窗 */}
-      {editingItem && (
-        <div className="edit-modal-overlay" onClick={() => setEditingItem(null)}>
-          <div className="edit-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="edit-modal-header">
-              <h3>编辑收藏</h3>
-              <button onClick={() => setEditingItem(null)}><X size={18} /></button>
+        {/* 收藏列表 */}
+        <div className="favorites-content">
+          {filteredFavorites.length === 0 ? (
+            <div className="empty-state">
+              <Star size={48} />
+              <p>{searchQuery || selectedTag ? '没有找到匹配的收藏' : '暂无收藏'}</p>
+              <span>在翻译结果中点击星标可添加收藏</span>
             </div>
-            <div className="edit-modal-body">
-              <div className="edit-field">
-                <label>分类</label>
-                <div className="category-chips">
-                  {categories.map(cat => (
-                    <button
-                      key={cat.id}
-                      className={`category-chip ${editCategory === cat.id ? 'active' : ''}`}
-                      style={{ '--chip-color': cat.color }}
-                      onClick={() => setEditCategory(cat.id)}
-                    >
-                      {cat.name}
-                    </button>
-                  ))}
-                  <button
-                    className={`category-chip ${!editCategory ? 'active' : ''}`}
-                    onClick={() => setEditCategory('')}
-                  >
-                    无分类
-                  </button>
-                </div>
-              </div>
-              <div className="edit-field">
-                <label>笔记</label>
-                <textarea
-                  value={editNote}
-                  onChange={(e) => setEditNote(e.target.value)}
-                  placeholder="添加笔记..."
-                  rows={4}
+          ) : (
+            <div className="favorites-grid">
+              {filteredFavorites.map(item => (
+                <FavoriteCard
+                  key={item.id}
+                  item={item}
+                  folders={folders}
+                  searchQuery={searchQuery}
+                  onCopy={handleCopy}
+                  onDelete={handleDelete}
+                  onMove={handleMove}
+                  onUpdateTags={handleUpdateTags}
+                  onUpdateNote={handleUpdateNote}
+                  onUpdateStyleRef={handleUpdateStyleRef}
                 />
-              </div>
+              ))}
             </div>
-            <div className="edit-modal-footer">
-              <button className="btn-cancel" onClick={() => setEditingItem(null)}>取消</button>
-              <button className="btn-save" onClick={handleSaveEdit}>保存</button>
-            </div>
-          </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 };

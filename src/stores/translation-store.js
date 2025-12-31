@@ -35,6 +35,9 @@ const useTranslationStore = create(
           model: null,
           template: "general",
         },
+        // 版本管理
+        versions: [], // [{ id, type, text, createdAt, styleRef?, styleName?, styleStrength? }]
+        currentVersionId: null,
       },
 
       history: [],
@@ -50,6 +53,9 @@ const useTranslationStore = create(
         lastResult: null,
         error: null,
       },
+
+      // 截图数据（用于跨组件传递）
+      pendingScreenshot: null,
 
       // 统计数据
       statistics: {
@@ -185,6 +191,16 @@ const useTranslationStore = create(
               template: options.template || state.currentTranslation.metadata.template,
             };
 
+            // 初始化版本管理 - 原始翻译作为 v1
+            const originalVersion = {
+              id: 'v1',
+              type: 'original',
+              text: fullText,
+              createdAt: Date.now(),
+            };
+            state.currentTranslation.versions = [originalVersion];
+            state.currentTranslation.currentVersionId = 'v1';
+
             // 添加到历史（非无痕模式）
             if (mode !== "secure" && fullText) {
               const historyItem = {
@@ -287,6 +303,16 @@ const useTranslationStore = create(
                   options.template ||
                   state.currentTranslation.metadata.template,
               };
+
+              // 初始化版本管理 - 原始翻译作为 v1
+              const originalVersion = {
+                id: 'v1',
+                type: 'original',
+                text: finalTranslatedText,
+                createdAt: Date.now(),
+              };
+              state.currentTranslation.versions = [originalVersion];
+              state.currentTranslation.currentVersionId = 'v1';
 
               // 添加到历史
               if (mode !== "secure") {
@@ -450,7 +476,19 @@ const useTranslationStore = create(
           state.ocrStatus.engine = engine;
         }),
 
-      addToFavorites: (item = null) =>
+      // 设置待处理的截图数据
+      setPendingScreenshot: (dataURL) =>
+        set((state) => {
+          state.pendingScreenshot = dataURL;
+        }),
+
+      // 清除待处理的截图数据
+      clearPendingScreenshot: () =>
+        set((state) => {
+          state.pendingScreenshot = null;
+        }),
+
+      addToFavorites: (item = null, isStyleReference = false) =>
         set((state) => {
           const favoriteItem = item || {
             id: uuidv4(),
@@ -460,7 +498,14 @@ const useTranslationStore = create(
             targetLanguage: state.currentTranslation.targetLanguage,
             timestamp: Date.now(),
             tags: [],
+            folderId: isStyleReference ? 'style_library' : null,
+            isStyleReference: isStyleReference,
           };
+          // 如果传入的 item 需要标记为风格参考
+          if (item && isStyleReference) {
+            favoriteItem.folderId = 'style_library';
+            favoriteItem.isStyleReference = true;
+          }
           const exists = state.favorites.some(
             (f) =>
               f.sourceText === favoriteItem.sourceText &&
@@ -482,12 +527,89 @@ const useTranslationStore = create(
           }
         }),
 
+      // ==================== 版本管理 ====================
+      // 添加风格改写版本
+      addStyleVersion: (text, styleRef, styleName, styleStrength) =>
+        set((state) => {
+          const versions = state.currentTranslation.versions || [];
+          
+          // 查找是否已有风格改写版本
+          const existingStyleIndex = versions.findIndex(v => v.type === 'style_rewrite');
+          
+          const newVersion = {
+            id: existingStyleIndex >= 0 ? versions[existingStyleIndex].id : `v${versions.length + 1}`,
+            type: 'style_rewrite',
+            text,
+            createdAt: Date.now(),
+            styleRef,
+            styleName,
+            styleStrength,
+          };
+          
+          if (existingStyleIndex >= 0) {
+            // 覆盖已有的风格版本
+            versions[existingStyleIndex] = newVersion;
+          } else {
+            // 添加新版本
+            versions.push(newVersion);
+          }
+          
+          state.currentTranslation.versions = versions;
+          state.currentTranslation.currentVersionId = newVersion.id;
+          state.currentTranslation.translatedText = text;
+        }),
+
+      // 添加用户编辑版本
+      addUserEditVersion: (text) =>
+        set((state) => {
+          const versions = state.currentTranslation.versions || [];
+          
+          // 查找是否已有用户编辑版本
+          const existingEditIndex = versions.findIndex(v => v.type === 'user_edit');
+          
+          const newVersion = {
+            id: existingEditIndex >= 0 ? versions[existingEditIndex].id : `v${versions.length + 1}`,
+            type: 'user_edit',
+            text,
+            createdAt: Date.now(),
+          };
+          
+          if (existingEditIndex >= 0) {
+            versions[existingEditIndex] = newVersion;
+          } else {
+            versions.push(newVersion);
+          }
+          
+          state.currentTranslation.versions = versions;
+          state.currentTranslation.currentVersionId = newVersion.id;
+          state.currentTranslation.translatedText = text;
+        }),
+
+      // 切换版本
+      switchVersion: (versionId) =>
+        set((state) => {
+          const version = state.currentTranslation.versions?.find(v => v.id === versionId);
+          if (version) {
+            state.currentTranslation.currentVersionId = versionId;
+            state.currentTranslation.translatedText = version.text;
+          }
+        }),
+
+      // 获取当前版本信息
+      getCurrentVersion: () => {
+        const state = get();
+        const { versions, currentVersionId } = state.currentTranslation;
+        return versions?.find(v => v.id === currentVersionId) || null;
+      },
+
       clearCurrent: () =>
         set((state) => {
           state.currentTranslation.sourceText = "";
           state.currentTranslation.translatedText = "";
           state.currentTranslation.status = "idle";
           state.currentTranslation.error = null;
+          state.currentTranslation.versions = [];
+          state.currentTranslation.currentVersionId = null;
         }),
 
       clearHistory: () =>
