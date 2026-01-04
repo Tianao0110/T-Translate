@@ -405,3 +405,52 @@ input:checked + .switch-slider:before {
 [data-theme="dark"] .mode-card.selected {
   background: rgba(59, 130, 246, 0.1);
 }
+/* 划词翻译设置样式 */
+.setting-color {
+  width: 40px;
+  height: 32px;
+  padding: 2px;
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  cursor: pointer;
+  background: var(--bg-secondary);
+}
+
+.color-value {
+  font-family: monospace;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.setting-row.double {
+  display: flex;
+  gap: 20px;
+}
+
+.input-with-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.input-with-label label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.setting-input.small {
+  width: 80px;
+}
+
+.shortcut-item .step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: var(--accent-primary);
+  color: white;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 600;
+}

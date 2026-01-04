@@ -86,7 +86,7 @@ const SettingsPanel = ({ showNotification }) => {
       autoPin: true              // 默认置顶
     },
     selection: {
-      enabled: true,             // 启用划词翻译
+      enabled: false,            // 启用划词翻译 - 默认关闭
       triggerIcon: 'dot',        // 触发图标类型: dot | translate | custom
       triggerSize: 24,           // 触发图标大小
       triggerColor: '#3b82f6',   // 触发图标颜色
@@ -710,7 +710,7 @@ const SettingsPanel = ({ showNotification }) => {
                   {settings.selection.enabled ? '开启' : '关闭'}
                 </button>
                 <span className="toggle-description">
-                  {settings.selection.enabled ? '选中文字后显示翻译触发点' : '已禁用划词翻译'}
+                  {settings.selection.enabled ? '选中文字后自动显示翻译触发点' : '已禁用划词翻译'}
                 </span>
               </div>
               <p className="setting-hint">也可以点击系统托盘图标快速切换</p>
@@ -855,29 +855,30 @@ const SettingsPanel = ({ showNotification }) => {
               <div className="shortcut-info">
                 <div className="shortcut-item">
                   <span className="step">1</span>
-                  <span>在任意应用中选中文字</span>
+                  <span>在任意应用中拖拽选中文字</span>
                 </div>
                 <div className="shortcut-item">
                   <span className="step">2</span>
-                  <span>鼠标悬停在出现的触发点上</span>
+                  <span>松开鼠标后自动出现触发点</span>
                 </div>
                 <div className="shortcut-item">
                   <span className="step">3</span>
-                  <span>自动翻译并显示结果</span>
+                  <span>鼠标悬停触发点开始翻译</span>
                 </div>
                 <div className="shortcut-item">
-                  <kbd>左键点击</kbd>
-                  <span>关闭结果框</span>
-                </div>
-                <div className="shortcut-item">
-                  <kbd>右键拖动</kbd>
-                  <span>移动结果框位置</span>
-                </div>
-                <div className="shortcut-item">
-                  <kbd>双击结果</kbd>
+                  <kbd>点击</kbd>
                   <span>复制译文</span>
                 </div>
+                <div className="shortcut-item">
+                  <kbd>拖动</kbd>
+                  <span>移动便利贴</span>
+                </div>
+                <div className="shortcut-item">
+                  <kbd>右键/Esc</kbd>
+                  <span>关闭</span>
+                </div>
               </div>
+              <p className="setting-hint">如果复制失败，会自动使用 OCR 识别选中区域</p>
             </div>
           </div>
         );

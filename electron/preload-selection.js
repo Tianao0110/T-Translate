@@ -1,36 +1,36 @@
 // electron/preload-selection.js
-// 划词翻译窗口的 preload 脚本
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer } = require("electron");
 
-contextBridge.exposeInMainWorld('electron', {
-  // 划词翻译 API
+contextBridge.exposeInMainWorld("electron", {
   selection: {
-    // 获取设置
-    getSettings: () => ipcRenderer.invoke('selection:get-settings'),
-    
-    // 隐藏窗口
-    hide: () => ipcRenderer.invoke('selection:hide'),
-    
-    // 设置窗口位置
-    setPosition: (x, y) => ipcRenderer.invoke('selection:set-position', x, y),
-    
-    // 添加到历史记录
-    addToHistory: (item) => ipcRenderer.invoke('selection:add-to-history', item),
-    
-    // 监听显示触发点
+    hide: () => ipcRenderer.invoke("selection:hide"),
+    setBounds: (bounds) => ipcRenderer.invoke("selection:set-bounds", bounds),
+    moveWindow: (delta) => ipcRenderer.invoke("selection:move-window", delta),
+    addToHistory: (item) =>
+      ipcRenderer.invoke("selection:add-to-history", item),
+    getText: (rect) => ipcRenderer.invoke("selection:get-text", rect),
+    resize: (size) => ipcRenderer.invoke("selection:resize", size),
+
+    // 获取选中的文字（传递 rect 用于 OCR 兜底）
+    getText: (rect) => ipcRenderer.invoke("selection:get-text", rect),
+
+    resize: (size) => ipcRenderer.invoke("selection:resize", size),
+
     onShowTrigger: (callback) => {
-      ipcRenderer.on('selection:show-trigger', (event, data) => callback(data));
+      const listener = (event, data) => callback(data);
+      ipcRenderer.on("selection:show-trigger", listener);
+      // 返回移除监听器的函数
+      return () =>
+        ipcRenderer.removeListener("selection:show-trigger", listener);
     },
-    
-    // 监听隐藏
     onHide: (callback) => {
-      ipcRenderer.on('selection:hide', () => callback());
+      const listener = () => callback();
+      ipcRenderer.on("selection:hide", listener);
+      return () => ipcRenderer.removeListener("selection:hide", listener);
     },
   },
-  
-  // 剪贴板
+
   clipboard: {
-    writeText: (text) => ipcRenderer.invoke('clipboard:write-text', text),
-    readText: () => ipcRenderer.invoke('clipboard:read-text'),
+    writeText: (text) => ipcRenderer.invoke("clipboard:write-text", text),
   },
 });
