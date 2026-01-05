@@ -1873,21 +1873,6 @@ function setupIPC() {
     return null;
   });
 
-  // 移动窗口（拖动中）- 使用 setBounds 明确保持大小不变
-  ipcMain.handle("selection:move-window", (event, { deltaX, deltaY }) => {
-    if (selectionWindow && !selectionWindow.isDestroyed()) {
-      const bounds = selectionWindow.getBounds();
-
-      // 使用 setBounds 而不是 setPosition，明确指定所有参数
-      selectionWindow.setBounds({
-        x: Math.round(bounds.x + deltaX),
-        y: Math.round(bounds.y + deltaY),
-        width: bounds.width, // 保持原大小
-        height: bounds.height, // 保持原大小
-      });
-    }
-  });
-
   // 获取选中的文字（点击圆点时调用）
   // 先尝试 Ctrl+C，失败则 OCR 兜底
   ipcMain.handle("selection:get-text", async (event, rect) => {
