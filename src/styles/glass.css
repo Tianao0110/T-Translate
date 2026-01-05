@@ -195,32 +195,40 @@
 .resize-se { bottom: 0; right: 0; width: 12px; height: 12px; cursor: se-resize; }
 .resize-sw { bottom: 0; left: 0; width: 12px; height: 12px; cursor: sw-resize; }
 
-/* 暗色主题 */
+/* 暗色主题 - 跟随主程序设置 */
+[data-theme="dark"] {
+  --text-primary: #f0f0f5;
+  --text-muted: #8a8a9a;
+}
+
+[data-theme="dark"] .glass-window {
+  background: rgba(30, 30, 45, calc(var(--glass-opacity, 0.85) * 0.9));
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .glass-toolbar {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="dark"] .toolbar-divider {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .btn {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="dark"] .btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* 系统偏好深色模式（作为后备） */
 @media (prefers-color-scheme: dark) {
-  :root {
+  .glass-window:not([data-theme="light"]) {
     --text-primary: #f0f0f5;
     --text-muted: #8a8a9a;
-  }
-  
-  .glass-window {
     background: rgba(30, 30, 45, calc(var(--glass-opacity, 0.85) * 0.9));
     border-color: rgba(255, 255, 255, 0.1);
-  }
-  
-  .glass-toolbar {
-    background: rgba(255, 255, 255, 0.04);
-    border-color: rgba(255, 255, 255, 0.06);
-  }
-  
-  .toolbar-divider {
-    background: rgba(255, 255, 255, 0.1);
-  }
-  
-  .btn {
-    background: rgba(255, 255, 255, 0.08);
-  }
-  
-  .btn:hover {
-    background: rgba(255, 255, 255, 0.12);
   }
 }

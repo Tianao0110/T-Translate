@@ -128,6 +128,16 @@ const SelectionTranslator = () => {
       setError('');
       setMode('overlay');
       
+      // 添加到历史记录
+      if (translationResult) {
+        window.electron?.selection?.addToHistory?.({
+          source: text,
+          result: translationResult,
+          timestamp: Date.now(),
+          from: 'selection', // 标记来源
+        });
+      }
+      
       if (!sizedRef.current) {
         sizedRef.current = true;
         setWindowSize(translationResult);

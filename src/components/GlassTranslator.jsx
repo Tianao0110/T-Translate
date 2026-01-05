@@ -39,6 +39,9 @@ const GlassTranslator = () => {
   const [isPinned, setIsPinned] = useState(true);
   const [opacity, setOpacity] = useState(0.85);
   
+  // 主题
+  const [theme, setTheme] = useState('light');
+  
   // 滚动状态
   const [hasOverflow, setHasOverflow] = useState(false);
   const [canScrollUp, setCanScrollUp] = useState(false);
@@ -123,6 +126,8 @@ const GlassTranslator = () => {
         setOpacity(settings.opacity ?? 0.85);
         setIsPinned(settings.isPinned ?? true);
         setTargetLanguage(settings.targetLanguage ?? 'en');
+        // 加载主题
+        setTheme(settings.theme ?? 'light');
       }
     } catch (error) {
       console.error('[Glass] Load settings failed:', error);
@@ -388,7 +393,7 @@ const GlassTranslator = () => {
   const currentLang = LANGUAGES.find(l => l.code === targetLanguage) || LANGUAGES[0];
 
   return (
-    <div className="glass-window" style={{ '--glass-opacity': opacity }}>
+    <div className="glass-window" style={{ '--glass-opacity': opacity }} data-theme={theme}>
       {/* 整个内容区域可拖动 */}
       <div className="glass-drag-area" />
       

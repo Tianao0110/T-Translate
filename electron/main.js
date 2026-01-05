@@ -1768,6 +1768,8 @@ function setupIPC() {
       autoPin: glassConfig.autoPin ?? true,
       // 翻译设置 - 使用实时获取的目标语言
       targetLanguage: currentTargetLang,
+      // 主题 - 跟随主程序
+      theme: mainSettings.interface?.theme ?? "light",
       // 本地设置
       opacity: localSettings.opacity ?? glassConfig.defaultOpacity ?? 0.85,
       isPinned: localSettings.isPinned ?? glassConfig.autoPin ?? true,
