@@ -87,15 +87,11 @@ const SettingsPanel = ({ showNotification }) => {
     },
     selection: {
       enabled: false,            // 启用划词翻译 - 默认关闭
-      triggerIcon: 'dot',        // 触发图标类型: dot | translate | custom
-      triggerSize: 24,           // 触发图标大小
-      triggerColor: '#3b82f6',   // 触发图标颜色
-      customIconPath: '',        // 自定义图标路径
-      hoverDelay: 300,           // 悬停触发延迟（毫秒）
-      triggerTimeout: 5000,      // 触发点消失时间（毫秒）
-      resultTimeout: 3000,       // 结果框自动关闭时间（毫秒）
+      triggerTimeout: 4000,      // 触发点消失时间（毫秒）
+      showSourceByDefault: false, // 默认显示原文
       minChars: 2,               // 最小字符数
-      maxChars: 500              // 最大字符数
+      maxChars: 500,             // 最大字符数
+      autoCloseOnCopy: false,    // 复制后自动关闭
     },
     interface: {
       theme: 'light',
@@ -694,7 +690,7 @@ const SettingsPanel = ({ showNotification }) => {
         return (
           <div className="setting-content">
             <h3>划词翻译设置</h3>
-            <p className="setting-description">选中文字后自动显示翻译触发点</p>
+            <p className="setting-description">选中文字后显示翻译按钮，点击即可翻译</p>
             
             <div className="setting-group">
               <label className="setting-label">启用划词翻译</label>
@@ -703,92 +699,20 @@ const SettingsPanel = ({ showNotification }) => {
                   className={`toggle-button ${settings.selection.enabled ? 'active' : ''}`}
                   onClick={() => {
                     updateSetting('selection', 'enabled', !settings.selection.enabled);
-                    // 通知主进程切换状态
                     window.electron?.ipcRenderer?.invoke?.('selection:toggle');
                   }}
                 >
                   {settings.selection.enabled ? '开启' : '关闭'}
                 </button>
                 <span className="toggle-description">
-                  {settings.selection.enabled ? '选中文字后自动显示翻译触发点' : '已禁用划词翻译'}
+                  {settings.selection.enabled ? '选中文字后显示翻译按钮' : '已禁用划词翻译'}
                 </span>
               </div>
               <p className="setting-hint">也可以点击系统托盘图标快速切换</p>
             </div>
 
             <div className="setting-group">
-              <label className="setting-label">触发图标样式</label>
-              <select
-                className="setting-select"
-                value={settings.selection.triggerIcon}
-                onChange={(e) => updateSetting('selection', 'triggerIcon', e.target.value)}
-              >
-                <option value="dot">圆点</option>
-                <option value="translate">翻译图标</option>
-                <option value="custom">自定义图标</option>
-              </select>
-            </div>
-
-            {settings.selection.triggerIcon === 'custom' && (
-              <div className="setting-group">
-                <label className="setting-label">自定义图标路径</label>
-                <input
-                  type="text"
-                  className="setting-input"
-                  value={settings.selection.customIconPath}
-                  onChange={(e) => updateSetting('selection', 'customIconPath', e.target.value)}
-                  placeholder="图标文件路径 (PNG/SVG)"
-                />
-              </div>
-            )}
-
-            <div className="setting-group">
-              <label className="setting-label">触发图标大小</label>
-              <div className="setting-row">
-                <input
-                  type="range"
-                  className="setting-range"
-                  min="16"
-                  max="48"
-                  value={settings.selection.triggerSize}
-                  onChange={(e) => updateSetting('selection', 'triggerSize', parseInt(e.target.value))}
-                />
-                <span className="range-value">{settings.selection.triggerSize}px</span>
-              </div>
-            </div>
-
-            <div className="setting-group">
-              <label className="setting-label">触发图标颜色</label>
-              <div className="setting-row">
-                <input
-                  type="color"
-                  className="setting-color"
-                  value={settings.selection.triggerColor}
-                  onChange={(e) => updateSetting('selection', 'triggerColor', e.target.value)}
-                />
-                <span className="color-value">{settings.selection.triggerColor}</span>
-              </div>
-            </div>
-
-            <div className="setting-group">
-              <label className="setting-label">悬停触发延迟</label>
-              <div className="setting-row">
-                <input
-                  type="range"
-                  className="setting-range"
-                  min="100"
-                  max="1000"
-                  step="100"
-                  value={settings.selection.hoverDelay}
-                  onChange={(e) => updateSetting('selection', 'hoverDelay', parseInt(e.target.value))}
-                />
-                <span className="range-value">{settings.selection.hoverDelay}ms</span>
-              </div>
-              <p className="setting-hint">鼠标悬停在触发图标上多久后开始翻译</p>
-            </div>
-
-            <div className="setting-group">
-              <label className="setting-label">触发点消失时间</label>
+              <label className="setting-label">按钮自动消失时间</label>
               <div className="setting-row">
                 <input
                   type="range"
@@ -801,24 +725,37 @@ const SettingsPanel = ({ showNotification }) => {
                 />
                 <span className="range-value">{settings.selection.triggerTimeout / 1000}秒</span>
               </div>
-              <p className="setting-hint">无操作后触发点自动消失的时间</p>
+              <p className="setting-hint">划词后翻译按钮自动消失的时间</p>
             </div>
 
             <div className="setting-group">
-              <label className="setting-label">结果框自动关闭</label>
-              <div className="setting-row">
-                <input
-                  type="range"
-                  className="setting-range"
-                  min="1000"
-                  max="10000"
-                  step="1000"
-                  value={settings.selection.resultTimeout}
-                  onChange={(e) => updateSetting('selection', 'resultTimeout', parseInt(e.target.value))}
-                />
-                <span className="range-value">{settings.selection.resultTimeout / 1000}秒</span>
+              <label className="setting-label">默认显示原文</label>
+              <div className="toggle-wrapper">
+                <button
+                  className={`toggle-button ${settings.selection.showSourceByDefault ? 'active' : ''}`}
+                  onClick={() => updateSetting('selection', 'showSourceByDefault', !settings.selection.showSourceByDefault)}
+                >
+                  {settings.selection.showSourceByDefault ? '开启' : '关闭'}
+                </button>
+                <span className="toggle-description">
+                  {settings.selection.showSourceByDefault ? '翻译结果默认显示原文对照' : '只显示翻译结果'}
+                </span>
               </div>
-              <p className="setting-hint">鼠标移出结果框后自动关闭的时间</p>
+            </div>
+
+            <div className="setting-group">
+              <label className="setting-label">复制后自动关闭</label>
+              <div className="toggle-wrapper">
+                <button
+                  className={`toggle-button ${settings.selection.autoCloseOnCopy ? 'active' : ''}`}
+                  onClick={() => updateSetting('selection', 'autoCloseOnCopy', !settings.selection.autoCloseOnCopy)}
+                >
+                  {settings.selection.autoCloseOnCopy ? '开启' : '关闭'}
+                </button>
+                <span className="toggle-description">
+                  {settings.selection.autoCloseOnCopy ? '点击复制后自动关闭翻译窗口' : '复制后保持窗口打开'}
+                </span>
+              </div>
             </div>
 
             <div className="setting-group">
@@ -852,33 +789,23 @@ const SettingsPanel = ({ showNotification }) => {
 
             <div className="setting-group">
               <label className="setting-label">使用说明</label>
-              <div className="shortcut-info">
-                <div className="shortcut-item">
-                  <span className="step">1</span>
-                  <span>在任意应用中拖拽选中文字</span>
-                </div>
-                <div className="shortcut-item">
-                  <span className="step">2</span>
-                  <span>松开鼠标后自动出现触发点</span>
-                </div>
-                <div className="shortcut-item">
-                  <span className="step">3</span>
-                  <span>鼠标悬停触发点开始翻译</span>
-                </div>
-                <div className="shortcut-item">
-                  <kbd>点击</kbd>
-                  <span>复制译文</span>
-                </div>
-                <div className="shortcut-item">
-                  <kbd>拖动</kbd>
-                  <span>移动便利贴</span>
-                </div>
-                <div className="shortcut-item">
-                  <kbd>右键/Esc</kbd>
-                  <span>关闭</span>
-                </div>
+              <div className="help-box">
+                <p><strong>划词翻译流程：</strong></p>
+                <ol>
+                  <li>用鼠标选中需要翻译的文字</li>
+                  <li>松开鼠标后，旁边出现翻译按钮</li>
+                  <li>点击按钮开始翻译</li>
+                  <li>翻译完成后显示结果卡片</li>
+                </ol>
+                <p style={{marginTop: '8px'}}><strong>快捷操作：</strong></p>
+                <ul>
+                  <li>拖动标题栏移动窗口</li>
+                  <li>右下角调整大小</li>
+                  <li>点击「原文」显示原文对照</li>
+                  <li>点击「复制」或直接选中文字复制</li>
+                  <li>按 ESC 或右键关闭</li>
+                </ul>
               </div>
-              <p className="setting-hint">如果复制失败，会自动使用 OCR 识别选中区域</p>
             </div>
           </div>
         );

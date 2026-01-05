@@ -351,6 +351,13 @@ function showSelectionTrigger(mouseX, mouseY, rect) {
 
   if (!selectionEnabled) return;
 
+  // 获取设置
+  const settings = store.get("settings", {});
+  const selectionSettings = settings.selection || {};
+  const interfaceSettings = settings.interface || {};
+  
+  // 检查字符数限制（这里还没有文字，先跳过）
+  
   // 保存 rect 供后续 OCR 使用
   lastSelectionRect = rect;
 
@@ -384,8 +391,16 @@ function showSelectionTrigger(mouseX, mouseY, rect) {
     win.webContents.send("selection:show-trigger", {
       mouseX,
       mouseY,
-      rect, // 传递 rect 给渲染进程
-      theme: store.get("theme", "light"),
+      rect,
+      // 传递主题和设置
+      theme: interfaceSettings.theme || "light",
+      settings: {
+        triggerTimeout: selectionSettings.triggerTimeout || 4000,
+        showSourceByDefault: selectionSettings.showSourceByDefault || false,
+        autoCloseOnCopy: selectionSettings.autoCloseOnCopy || false,
+        minChars: selectionSettings.minChars || 2,
+        maxChars: selectionSettings.maxChars || 500,
+      }
     });
   };
 

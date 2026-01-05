@@ -3,7 +3,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import '../styles/selection.css';
 
 const API_ENDPOINT = 'http://localhost:1234/v1';
-const TRIGGER_AUTO_HIDE_DELAY = 4000;
+
+// 默认设置
+const DEFAULT_SETTINGS = {
+  triggerTimeout: 4000,
+  showSourceByDefault: false,
+  autoCloseOnCopy: false,
+  minChars: 2,
+  maxChars: 500,
+};
 
 const SelectionTranslator = () => {
   const [mode, setMode] = useState('idle');
@@ -15,6 +23,7 @@ const SelectionTranslator = () => {
   const [copied, setCopied] = useState(false);
   const [theme, setTheme] = useState('light');
   const [showSource, setShowSource] = useState(false);
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
 
   const sizedRef = useRef(false);
   const resizeRef = useRef({ startX: 0, startY: 0, startW: 0, startH: 0 });
@@ -26,21 +35,29 @@ const SelectionTranslator = () => {
       
       setMousePos({ x: data.mouseX, y: data.mouseY });
       setRect(data.rect);
+      
+      // 应用主题
       if (data.theme) setTheme(data.theme);
+      
+      // 应用设置
+      const newSettings = { ...DEFAULT_SETTINGS, ...data.settings };
+      setSettings(newSettings);
+      
+      // 根据设置决定是否默认显示原文
+      setShowSource(newSettings.showSourceByDefault);
       
       setMode('trigger');
       setError('');
       setSourceText('');
       setTranslatedText('');
       setCopied(false);
-      setShowSource(false);
       sizedRef.current = false;
       
-      // 圆点 4 秒后自动消失
+      // 使用设置中的自动消失时间
       autoHideTimerRef.current = setTimeout(() => {
         setMode('idle');
         window.electron?.selection?.hide?.();
-      }, TRIGGER_AUTO_HIDE_DELAY);
+      }, newSettings.triggerTimeout);
     });
     
     const removeHideListener = window.electron?.selection?.onHide?.(() => {
@@ -72,8 +89,18 @@ const SelectionTranslator = () => {
       const result = await window.electron?.selection?.getText?.(rect);
       if (!result?.text) throw new Error('未获取到文字');
       
-      setSourceText(result.text);
-      const translation = await translateText(result.text);
+      const text = result.text.trim();
+      
+      // 检查字符数限制
+      if (text.length < settings.minChars) {
+        throw new Error(`文字太短（最少 ${settings.minChars} 字符）`);
+      }
+      if (text.length > settings.maxChars) {
+        throw new Error(`文字太长（最多 ${settings.maxChars} 字符）`);
+      }
+      
+      setSourceText(text);
+      const translation = await translateText(text);
       setTranslatedText(translation);
       setError('');
       setMode('overlay');
@@ -106,7 +133,6 @@ const SelectionTranslator = () => {
     height = Math.max(height, 100);
     height = Math.min(height, 400);
     
-    // 屏幕边缘检测
     const sw = window.screen?.availWidth || 1920;
     const sh = window.screen?.availHeight || 1080;
     
@@ -175,7 +201,16 @@ const SelectionTranslator = () => {
     if (translatedText) {
       window.electron?.clipboard?.writeText?.(translatedText);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1200);
+      
+      // 如果设置了复制后自动关闭
+      if (settings.autoCloseOnCopy) {
+        setTimeout(() => {
+          setMode('idle');
+          window.electron?.selection?.hide?.();
+        }, 500);
+      } else {
+        setTimeout(() => setCopied(false), 1200);
+      }
     }
   };
 
