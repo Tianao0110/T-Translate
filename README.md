@@ -1,337 +1,237 @@
-# T-Translate 🚀
+# T-Translate
 
-<div align="center">
-  <img src="public/icon.png" alt="T-Translate Logo" width="128" height="128">
-  
-  # 专业的离线翻译工具
-  
-  [![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/Tianao0110/T-Translate/)
-  [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-  [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/Tianao0110/T-Translate/)
-  
-  **完全离线** | **隐私优先** | **本地 LLM** | **OCR 支持**
-</div>
-<img width="2560" height="1464" alt="image" src="https://github.com/user-attachments/assets/45928535-c6be-424f-aacf-b7938fb03304" />
+<p align="center">
+  <img src="docs/images/logo.png" alt="T-Translate Logo" width="128" height="128">
+</p>
+
+<p align="center">
+  <b>一款注重隐私的本地 AI 翻译工具</b>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/平台-Windows-blue" alt="Platform">
+  <img src="https://img.shields.io/badge/框架-Electron-47848F" alt="Electron">
+  <img src="https://img.shields.io/badge/AI-本地LLM-green" alt="Local LLM">
+  <img src="https://img.shields.io/badge/许可证-MIT-yellow" alt="License">
+</p>
 
 ---
+
+## 📖 简介
+
+**T-Translate** 是一款基于本地大语言模型的桌面翻译工具。所有翻译请求都在本地处理，无需联网，确保您的隐私安全。
+
+在 QTranslate 停止更新的背景下，结合大模型时代的技术红利，T-Translate 旨在提供一个**现代化、注重隐私、功能丰富**的翻译解决方案。
 
 ## ✨ 特性
 
-### 🔒 **完全离线 & 隐私保护**
+### 🔒 隐私优先
 
-- 100% 本地运行，无需联网
-- 所有数据存储在本地，不上传任何信息
-- 支持安全模式，敏感内容不保存历史
-- 可选的历史记录加密存储
+- **完全本地化** - 所有翻译由本地 LLM 完成，数据不出设备
+- **无需联网** - 离线可用，无隐私泄露风险
+- **开源透明** - 代码完全开放，可自行审查
 
-### 🤖 **本地 LLM 翻译**
+### 🎯 三种翻译模式
 
-- 基于 LM Studio 的本地大语言模型
-- 支持多种开源模型（Llama, Mistral, Qwen 等）
-- 自定义翻译提示词模板
-- 批量翻译支持
+| 模式         | 说明                           | 适用场景             |
+| ------------ | ------------------------------ | -------------------- |
+| **主窗口**   | 传统翻译界面，输入文本获取翻译 | 长文本翻译、精细编辑 |
+| **玻璃窗口** | 置顶透明窗口，实时翻译         | 看视频、对照阅读     |
+| **划词翻译** | 选中文字即时翻译               | 浏览网页、阅读文档   |
 
-### 👁️ **OCR 文字识别**
+### 🤖 AI 增强功能
 
-- 内置 Tesseract.js 离线 OCR
-- 支持 LLM Vision 视觉识别
-- 截图翻译功能
-- 支持多语言识别
+- **智能标签** - AI 自动为收藏内容生成分类标签
+- **上下文理解** - LLM 理解语境，翻译更准确
+- **多语言检测** - 自动识别源语言
 
-### 🎨 **现代化界面**
+### 💡 其他亮点
 
-- 优雅的用户界面设计
-- 深色/浅色主题切换
-- 响应式布局
-- 丰富的动画效果
+- **收藏管理** - 带 AI 标签的收藏系统，快速检索
+- **历史记录** - 翻译历史自动保存，支持搜索
+- **OCR 识别** - 截图识别文字，图片也能翻译
+- **深色模式** - 支持亮色/深色主题切换
+- **系统托盘** - 后台运行，随时唤起
 
-### 📚 **强大的管理功能**
+## 📸 截图
 
-- 翻译历史记录
-- 收藏夹管理
-- 分类和标签系统
-- 导入导出功能
+### 主窗口
 
----
+![主窗口](docs/images/main-window.png)
 
-## 📦 安装
+### 玻璃窗口
 
-### 前置要求
+![玻璃窗口](docs/images/glass-window.png)
 
-1. **Node.js** (v16 或更高版本)
+### 划词翻译
 
-   - 下载地址: https://nodejs.org/
+![划词翻译](docs/images/selection-translate.png)
 
-2. **LM Studio** (用于本地 LLM)
-   - 下载地址: https://lmstudio.ai/
-   - 安装后下载并加载一个模型（推荐 Qwen, Llama 或 Mistral）
+### 收藏管理
+
+![收藏](docs/images/favorites.png)
+
+### 设置面板
+
+![设置](docs/images/settings.png)
+
+## 🚀 快速开始
+
+### 环境要求
+
+- **操作系统**: Windows 10/11
+- **本地 LLM**: [LM Studio](https://lmstudio.ai/) 或兼容 OpenAI API 的服务
+- **推荐模型**: Qwen3-VL 或其他支持中英翻译的模型
 
 ### 安装步骤
 
-```bash
-# 1. 克隆项目
-git clone https://github.com/Tianao0110/T-Translate.git
-cd T-Translate
+1. **下载并安装 LM Studio**
 
-# 2. 安装依赖
-npm install
-
-# 3. 启动开发模式
-npm start
-
-# 4. 构建应用
-npm run build
-
-# 5. 打包安装程序
-npm run dist
-```
-
-### 快速开始
-
-1. **启动 LM Studio**
-
-   - 打开 LM Studio
-   - 加载一个模型
+   - 访问 [lmstudio.ai](https://lmstudio.ai/) 下载
+   - 安装后下载翻译模型（推荐 Qwen3-VL）
    - 启动本地服务器（默认端口 1234）
 
-2. **运行 T-Translate Core**
+2. **下载 T-Translate**
 
-   - 运行 `npm start` 或打开构建好的应用
-   - 应用会自动连接到 LM Studio
+   ```bash
+   # 克隆仓库
+   git clone https://github.com/yourusername/t-translate.git
+   cd t-translate
 
-3. **开始翻译**
-   - 输入或粘贴文本
-   - 选择目标语言
-   - 点击翻译按钮或按 Ctrl+Enter
+   # 安装依赖
+   npm install
 
----
+   # 启动应用
+   npm run dev
+   ```
 
-## 🎯 使用指南
+3. **配置连接**
+   - 打开设置 → 连接
+   - 确认 API 地址为 `http://localhost:1234/v1`
+   - 点击「测试连接」
 
-### 基础翻译
-
-1. 在左侧输入框输入要翻译的文本
-2. 选择源语言和目标语言
-3. 点击翻译按钮或按 `Ctrl+Enter`
-4. 翻译结果会显示在右侧
-
-### OCR 识别
-
-1. 点击图片图标上传图片，或
-2. 直接拖拽图片到输入框，或
-3. 从剪贴板粘贴图片
-4. 系统会自动识别文字并显示
-
-### 快捷键
-
-| 功能     | 快捷键             |
-| -------- | ------------------ |
-| 翻译     | `Ctrl + Enter`     |
-| 切换语言 | `Ctrl + L`         |
-| 清空内容 | `Ctrl + Shift + C` |
-| 截图翻译 | `Ctrl + Shift + T` |
-| 快速翻译 | `Ctrl + Q`         |
-| 打开设置 | `Ctrl + ,`         |
-| 切换标签 | `Ctrl + 1-4`       |
-
-### 高级功能
-
-#### 🔐 隐私模式
-
-- **标准模式**: 正常保存历史记录
-- **安全模式**: 不保存敏感内容
-- **离线模式**: 使用缓存，完全断网
-
-#### 📝 翻译模板
-
-- **通用**: 标准翻译
-- **技术文档**: 保留术语准确性
-- **学术论文**: 严谨的学术用语
-- **商务**: 正式商务用语
-- **口语化**: 自然流畅的表达
-
-#### 🗂️ 历史管理
-
-- 按日期、语言分组
-- 搜索和筛选功能
-- 批量操作
-- 导出为 JSON/CSV
-
----
-
-## 🛠️ 配置
-
-### LM Studio 设置
-
-默认配置：
-
-```javascript
-{
-  endpoint: "http://localhost:1234/v1",
-  timeout: 60000
-}
-```
-
-如果使用不同端口，在设置中修改 API 端点。
-
-### 支持的模型
-
-推荐使用以下模型获得最佳翻译效果：
-
-- Qwen 系列（推荐）
-- Llama 3
-- Mistral
-- DeepSeek
-
-### OCR 语言包
-
-默认支持：
-
-- 中文简体 + 英文
-- 可在设置中切换其他语言
-
----
-
-## 🏗️ 项目结构
-
-```
-T-Translate/
-├── electron/          # Electron 主进程
-├── src/
-│   ├── components/    # React 组件
-│   ├── services/      # 业务服务
-│   ├── stores/        # 状态管理
-│   ├── utils/         # 工具函数
-│   └── styles/        # 样式文件
-├── public/           # 静态资源
-└── dist/            # 构建输出
-```
-
----
-
-## 🔧 开发
-
-### 技术栈
-
-- **框架**: Electron + React
-- **构建工具**: Vite
-- **状态管理**: Zustand
-- **样式**: CSS3 + CSS Variables
-- **OCR**: Tesseract.js
-- **本地 LLM**: LM Studio API
-
-### 开发命令
+### 打包发布
 
 ```bash
-# 开发模式
-npm start
-
-# 构建应用
+# 构建生产版本
 npm run build
 
-# 打包 Windows
-npm run dist:win
-
-# 打包 macOS
-npm run dist:mac
-
-# 打包 Linux
-npm run dist:linux
+# 打包 Windows 安装程序
+npm run package
 ```
 
-### 调试
+## ⌨️ 快捷键
 
-开发模式下按 `F12` 打开开发者工具。
+| 快捷键             | 功能            |
+| ------------------ | --------------- |
+| `Ctrl + Shift + T` | 打开/隐藏主窗口 |
+| `Ctrl + Shift + G` | 打开玻璃窗口    |
+| `Ctrl + Shift + S` | 截图 OCR        |
+| `Esc`              | 关闭当前窗口    |
 
----
+_划词翻译：选中文字后点击出现的翻译按钮_
 
-## 📊 性能优化
+## 🏗️ 技术架构
 
-- **轻量级**: 基础内存占用 < 150MB
-- **快速启动**: 冷启动 < 3 秒
-- **流畅动画**: 60fps 渲染
-- **智能缓存**: 减少重复翻译
+```
+T-Translate
+├── Electron (桌面框架)
+│   ├── 主进程 (main.js)
+│   │   ├── 窗口管理
+│   │   ├── 系统托盘
+│   │   ├── 全局快捷键
+│   │   ├── 划词监听 (uiohook-napi)
+│   │   └── IPC 通信
+│   │
+│   └── 渲染进程 (React)
+│       ├── 主窗口 (翻译、历史、收藏)
+│       ├── 玻璃窗口 (置顶翻译)
+│       └── 划词窗口 (便利贴式翻译)
+│
+├── 本地 LLM (LM Studio)
+│   └── OpenAI 兼容 API
+│
+└── 数据存储 (electron-store)
+    ├── 设置
+    ├── 历史记录
+    └── 收藏夹
+```
 
----
+## 📁 项目结构
 
-## 🔐 隐私说明
+```
+t-translate/
+├── electron/
+│   ├── main.js              # 主进程
+│   ├── preload.js           # 主窗口预加载
+│   ├── preload-glass.js     # 玻璃窗口预加载
+│   └── preload-selection.js # 划词窗口预加载
+├── src/
+│   ├── components/
+│   │   ├── TranslatorPanel.jsx   # 翻译面板
+│   │   ├── HistoryPanel.jsx      # 历史记录
+│   │   ├── FavoritesPanel.jsx    # 收藏夹
+│   │   ├── SettingsPanel.jsx     # 设置
+│   │   ├── GlassWindow.jsx       # 玻璃窗口
+│   │   └── SelectionTranslator.jsx # 划词翻译
+│   ├── styles/
+│   └── App.jsx
+├── public/
+│   ├── index.html
+│   ├── glass.html
+│   └── selection.html
+└── package.json
+```
 
-### 数据存储位置
+## 🔄 与其他工具对比
 
-- **Windows**: `%APPDATA%/T-Translate/`
-- **macOS**: `~/Library/Application Support/T-Translate/`
-- **Linux**: `~/.config/T-Translate/`
+| 功能       | T-Translate     | QTranslate | 有道词典 | DeepL |
+| ---------- | --------------- | ---------- | -------- | ----- |
+| 本地翻译   | ✅ 完全本地     | ❌         | ❌       | ❌    |
+| 隐私保护   | ✅ 数据不出设备 | ⚠️         | ❌       | ⚠️    |
+| 划词翻译   | ✅              | ✅         | ✅       | ✅    |
+| AI 标签    | ✅              | ❌         | ❌       | ❌    |
+| 玻璃窗口   | ✅              | ❌         | ❌       | ❌    |
+| 开源免费   | ✅              | ✅         | ❌       | ❌    |
+| 自定义模型 | ✅              | ❌         | ❌       | ❌    |
+| 持续更新   | ✅              | ❌ 已停更  | ✅       | ✅    |
 
-### 网络请求
+## 🛣️ 路线图
 
-唯一的网络请求是到本地的 LM Studio (localhost:1234)，不连接任何外部服务器。
+### 已完成 ✅
 
-### 更新机制
+- [x] 主窗口翻译
+- [x] 玻璃窗口
+- [x] 划词翻译
+- [x] OCR 截图识别
+- [x] 收藏夹 + AI 标签
+- [x] 历史记录
+- [x] 设置面板
+- [x] 深色模式
 
-- 手动更新：从 GitHub Releases 下载新版本
-- 自动更新：可选功能，默认关闭
+### 计划中 📋
 
----
+- [ ] 多显示器优化
+- [ ] 自动更新
+- [ ] 更多语言支持
+- [ ] 词典模式（单词详解）
+- [ ] macOS 支持
+- [ ] 插件系统
 
 ## 🤝 贡献
 
-欢迎贡献代码、报告问题或提出建议！
-
-1. Fork 项目
-2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 开启 Pull Request
-
----
-
-## 📝 更新日志
-
-### v1.0.0 (2024-01-01)
-
-- 🎉 首次发布
-- ✨ 基础翻译功能
-- 👁️ OCR 文字识别
-- 📚 历史记录管理
-- ⭐ 收藏夹功能
-- 🔐 隐私模式
-- 🎨 深色/浅色主题
-
----
-
-## 🐛 已知问题
-
-- 首次启动可能需要下载 Tesseract 语言包
-- 某些复杂布局的 PDF 可能识别不完整
-- 超长文本（>10000 字）翻译可能较慢
-
----
-
-## 📄 许可证
-
-MIT License - 详见 [LICENSE](LICENSE) 文件
-
----
-
-## 🙏 致谢
-
-- [Electron](https://www.electronjs.org/)
-- [React](https://react.dev/)
-- [LM Studio](https://lmstudio.ai/)
-- [Tesseract.js](https://tesseract.projectnaptha.com/)
-- [Zustand](https://zustand-demo.pmnd.rs/)
-
----
-
-## 📮 联系方式
+欢迎提交 Issue 和 Pull Request！## 📮 联系方式
 
 - **GitHub Issues**: [报告问题](https://github.com/Tianao0110/T-Translate/issues)
 - **Email**: Edanzeng0110@outlook.com
 
+## 📄 许可证
+
+[MIT License](LICENSE)
+
 ---
 
-<div align="center">
-  Made with ❤️ by Your Name
-  
-  如果这个项目对你有帮助，请给一个 ⭐ Star！
-</div>
+<p align="center">
+  <b>用 ❤️ 构建</b>
+  <b>如果这个项目对你有帮助，请给一个 ⭐ Star！</b>
+</p>

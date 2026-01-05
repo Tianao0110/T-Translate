@@ -104,6 +104,11 @@ const electronAPI = {
   glass: {
     open: () => ipcRenderer.invoke("glass:open"),
   },
+  // 划词翻译
+  selection: {
+    toggle: () => ipcRenderer.invoke("selection:toggle"),
+    getEnabled: () => ipcRenderer.invoke("selection:get-enabled"),
+  },
   // 截图 API
   screenshot: {
     capture: () => ipcRenderer.invoke("capture-screen"),

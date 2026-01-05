@@ -697,9 +697,11 @@ const SettingsPanel = ({ showNotification }) => {
               <div className="toggle-wrapper">
                 <button
                   className={`toggle-button ${settings.selection.enabled ? 'active' : ''}`}
-                  onClick={() => {
-                    updateSetting('selection', 'enabled', !settings.selection.enabled);
-                    window.electron?.ipcRenderer?.invoke?.('selection:toggle');
+                  onClick={async () => {
+                    // 先调用主进程切换状态
+                    const newState = await window.electron?.selection?.toggle?.();
+                    // 同步到设置
+                    updateSetting('selection', 'enabled', newState);
                   }}
                 >
                   {settings.selection.enabled ? '开启' : '关闭'}

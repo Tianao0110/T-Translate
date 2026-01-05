@@ -4,6 +4,19 @@ import '../styles/selection.css';
 
 const API_ENDPOINT = 'http://localhost:1234/v1';
 
+// 语言代码映射
+const LANG_MAP = {
+  'zh': 'Simplified Chinese',
+  'en': 'English',
+  'ja': 'Japanese',
+  'ko': 'Korean',
+  'fr': 'French',
+  'de': 'German',
+  'es': 'Spanish',
+  'ru': 'Russian',
+  'auto': 'auto'
+};
+
 // 默认设置
 const DEFAULT_SETTINGS = {
   triggerTimeout: 4000,
@@ -11,6 +24,11 @@ const DEFAULT_SETTINGS = {
   autoCloseOnCopy: false,
   minChars: 2,
   maxChars: 500,
+};
+
+const DEFAULT_TRANSLATION = {
+  targetLanguage: 'zh',
+  sourceLanguage: 'auto',
 };
 
 const SelectionTranslator = () => {
@@ -24,6 +42,7 @@ const SelectionTranslator = () => {
   const [theme, setTheme] = useState('light');
   const [showSource, setShowSource] = useState(false);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [translation, setTranslation] = useState(DEFAULT_TRANSLATION);
 
   const sizedRef = useRef(false);
   const resizeRef = useRef({ startX: 0, startY: 0, startW: 0, startH: 0 });
@@ -42,6 +61,10 @@ const SelectionTranslator = () => {
       // 应用设置
       const newSettings = { ...DEFAULT_SETTINGS, ...data.settings };
       setSettings(newSettings);
+      
+      // 应用翻译设置（与主程序一致）
+      const newTranslation = { ...DEFAULT_TRANSLATION, ...data.translation };
+      setTranslation(newTranslation);
       
       // 根据设置决定是否默认显示原文
       setShowSource(newSettings.showSourceByDefault);
@@ -100,14 +123,14 @@ const SelectionTranslator = () => {
       }
       
       setSourceText(text);
-      const translation = await translateText(text);
-      setTranslatedText(translation);
+      const translationResult = await translateText(text);
+      setTranslatedText(translationResult);
       setError('');
       setMode('overlay');
       
       if (!sizedRef.current) {
         sizedRef.current = true;
-        setWindowSize(translation);
+        setWindowSize(translationResult);
       }
     } catch (err) {
       setError(err.message || '翻译失败');
@@ -150,9 +173,27 @@ const SelectionTranslator = () => {
     });
   };
 
+  // 使用主程序的翻译设置
   const translateText = async (text) => {
+    // 检测源语言
     const isChinese = (text.match(/[\u4e00-\u9fff]/g) || []).length / text.length > 0.3;
-    const target = isChinese ? 'English' : 'Simplified Chinese';
+    const isJapanese = (text.match(/[\u3040-\u309f\u30a0-\u30ff]/g) || []).length > 0;
+    const isKorean = (text.match(/[\uac00-\ud7af]/g) || []).length > 0;
+    
+    let detectedLang = 'en';
+    if (isChinese) detectedLang = 'zh';
+    else if (isJapanese) detectedLang = 'ja';
+    else if (isKorean) detectedLang = 'ko';
+    
+    // 确定目标语言（使用主程序设置）
+    let targetLang = translation.targetLanguage || 'zh';
+    
+    // 如果源语言和目标语言相同，智能切换
+    if (detectedLang === targetLang) {
+      targetLang = detectedLang === 'en' ? 'zh' : 'en';
+    }
+    
+    const targetLangName = LANG_MAP[targetLang] || 'Simplified Chinese';
     
     const res = await fetch(`${API_ENDPOINT}/chat/completions`, {
       method: 'POST',
@@ -160,7 +201,7 @@ const SelectionTranslator = () => {
       body: JSON.stringify({
         model: 'gpt-3.5-turbo',
         messages: [
-          { role: 'system', content: `Translate into ${target}. Output ONLY the result.` },
+          { role: 'system', content: `Translate into ${targetLangName}. Output ONLY the translation result, no explanations.` },
           { role: 'user', content: text }
         ],
         temperature: 0.3,
@@ -198,19 +239,19 @@ const SelectionTranslator = () => {
 
   const handleCopy = (e) => {
     e.stopPropagation();
-    if (translatedText) {
-      window.electron?.clipboard?.writeText?.(translatedText);
-      setCopied(true);
-      
-      // 如果设置了复制后自动关闭
-      if (settings.autoCloseOnCopy) {
-        setTimeout(() => {
-          setMode('idle');
-          window.electron?.selection?.hide?.();
-        }, 500);
-      } else {
-        setTimeout(() => setCopied(false), 1200);
-      }
+    if (!translatedText) return;
+    
+    window.electron?.clipboard?.writeText?.(translatedText);
+    setCopied(true);
+    
+    // 如果设置了复制后自动关闭
+    if (settings.autoCloseOnCopy) {
+      setTimeout(() => {
+        setMode('idle');
+        window.electron?.selection?.hide?.();
+      }, 300);
+    } else {
+      setTimeout(() => setCopied(false), 1200);
     }
   };
 

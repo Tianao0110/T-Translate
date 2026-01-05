@@ -355,8 +355,7 @@ function showSelectionTrigger(mouseX, mouseY, rect) {
   const settings = store.get("settings", {});
   const selectionSettings = settings.selection || {};
   const interfaceSettings = settings.interface || {};
-  
-  // 检查字符数限制（这里还没有文字，先跳过）
+  const translationSettings = settings.translation || {};
   
   // 保存 rect 供后续 OCR 使用
   lastSelectionRect = rect;
@@ -400,6 +399,11 @@ function showSelectionTrigger(mouseX, mouseY, rect) {
         autoCloseOnCopy: selectionSettings.autoCloseOnCopy || false,
         minChars: selectionSettings.minChars || 2,
         maxChars: selectionSettings.maxChars || 500,
+      },
+      // 传递翻译设置（与主程序一致）
+      translation: {
+        targetLanguage: translationSettings.targetLanguage || "zh",
+        sourceLanguage: translationSettings.sourceLanguage || "auto",
       }
     });
   };
@@ -564,8 +568,11 @@ function startSelectionHook() {
           duration
         );
 
-        // 防误触：距离 > 20px 且时间 > 150ms 才视为划词
-        if (distance > 20 && duration > 150) {
+        // 防误触：
+        // - 距离 > 50px（过滤双击、右键菜单、拖拽文件等短距离操作）
+        // - 时间 > 200ms（过滤快速点击）
+        // - 时间 < 5000ms（过滤长时间按住不动）
+        if (distance > 50 && duration > 200 && duration < 5000) {
           console.log(
             "[Selection] Drag detected! Showing trigger (no copy yet)"
           );
