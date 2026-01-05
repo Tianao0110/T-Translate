@@ -482,3 +482,179 @@ input:checked + .switch-slider:before {
 .help-box strong {
   color: var(--text-primary);
 }
+
+/* ========== OCR 引擎管理样式 ========== */
+.ocr-engines-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ocr-engine-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: var(--bg-secondary);
+  border: 2px solid transparent;
+  border-radius: 10px;
+  transition: all 0.2s ease;
+}
+
+.ocr-engine-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.ocr-engine-item.active {
+  border-color: var(--accent-primary);
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.ocr-engine-item.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.engine-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.engine-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.engine-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.engine-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.engine-badge.builtin {
+  background: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+}
+
+.engine-badge.system {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+
+.engine-badge.download {
+  background: rgba(249, 115, 22, 0.1);
+  color: #f97316;
+}
+
+.engine-badge.online {
+  background: rgba(168, 85, 247, 0.1);
+  color: #a855f7;
+}
+
+.engine-badge.free {
+  background: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+}
+
+.engine-size {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.engine-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0 0 4px 0;
+  line-height: 1.4;
+}
+
+.engine-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.engine-actions {
+  flex-shrink: 0;
+  margin-left: 16px;
+}
+
+.engine-actions .btn {
+  min-width: 80px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.engine-actions .btn:hover {
+  background: var(--accent-primary);
+  color: white;
+}
+
+.engine-actions .btn.active {
+  background: var(--accent-primary);
+  color: white;
+}
+
+.engine-actions .btn.download {
+  background: #f97316;
+  color: white;
+}
+
+.engine-actions .btn.download:hover {
+  background: #ea580c;
+}
+
+.engine-unavailable {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+}
+
+/* 下载进度 */
+.engine-download-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.download-progress-bar {
+  width: 80px;
+  height: 6px;
+  background: var(--bg-tertiary);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.download-progress-fill {
+  height: 100%;
+  background: var(--accent-primary);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.download-progress-text {
+  font-size: 12px;
+  color: var(--text-muted);
+  min-width: 40px;
+}

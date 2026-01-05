@@ -1,4 +1,4 @@
-/* src/styles/glass.css - v25 */
+/* src/styles/glass.css - v26 */
 
 :root {
   --text-primary: #1a1a2e;
@@ -36,6 +36,34 @@
   z-index: 1;
 }
 
+/* ========== 悬浮关闭按钮（始终可见） ========== */
+.glass-close-float {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.15);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  z-index: 100;
+  -webkit-app-region: no-drag;
+  opacity: 0.6;
+}
+
+.glass-close-float:hover {
+  background: var(--error);
+  color: white;
+  opacity: 1;
+  transform: scale(1.1);
+}
+
 /* 内容区域 */
 .glass-body {
   flex: 1;
@@ -51,6 +79,7 @@
 .glass-result {
   flex: 1;
   padding: 12px 16px;
+  padding-right: 36px; /* 为悬浮关闭按钮留空间 */
   font-size: 14px;
   line-height: 1.7;
   color: var(--text-primary);
@@ -97,6 +126,8 @@
   position: relative;
   z-index: 10;
   -webkit-app-region: no-drag;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 .toolbar-left,
@@ -104,6 +135,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
 }
 
 .toolbar-divider {
@@ -127,6 +159,7 @@
   font-size: 12px;
   cursor: pointer;
   transition: all 0.15s ease;
+  flex-shrink: 0;
 }
 
 .btn:hover { background: rgba(0, 0, 0, 0.1); }
@@ -168,6 +201,43 @@
   opacity: 0.3;
 }
 
+/* ========== 响应式 - 窗口小时简化工具栏 ========== */
+
+/* 宽度小于 280px 时隐藏次要按钮 */
+@media (max-width: 280px) {
+  .toolbar-divider,
+  .toolbar-center {
+    display: none !important;
+  }
+  
+  .glass-toolbar {
+    justify-content: center;
+  }
+  
+  .toolbar-left,
+  .toolbar-right {
+    gap: 4px;
+  }
+}
+
+/* 宽度小于 220px 时只保留核心按钮 */
+@media (max-width: 220px) {
+  .lang-switcher {
+    display: none !important;
+  }
+  
+  .glass-message {
+    font-size: 12px;
+    padding: 10px;
+  }
+  
+  .glass-result {
+    font-size: 13px;
+    padding: 8px 12px;
+    padding-right: 30px;
+  }
+}
+
 /* 旋转动画 */
 .spin {
   animation: spin 1s linear infinite;
@@ -195,7 +265,7 @@
 .resize-se { bottom: 0; right: 0; width: 12px; height: 12px; cursor: se-resize; }
 .resize-sw { bottom: 0; left: 0; width: 12px; height: 12px; cursor: sw-resize; }
 
-/* 暗色主题 - 跟随主程序设置 */
+/* ========== 暗色主题 ========== */
 [data-theme="dark"] {
   --text-primary: #f0f0f5;
   --text-muted: #8a8a9a;
@@ -221,6 +291,11 @@
 
 [data-theme="dark"] .btn:hover {
   background: rgba(255, 255, 255, 0.12);
+}
+
+[data-theme="dark"] .glass-close-float {
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--text-primary);
 }
 
 /* 系统偏好深色模式（作为后备） */

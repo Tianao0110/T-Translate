@@ -266,7 +266,18 @@ const GlassTranslator = () => {
       
     } catch (error) {
       console.error('[Glass] Error:', error);
-      setErrorMessage(error.message);
+      
+      // 友好错误提示
+      let friendlyMessage = error.message;
+      if (error.message.includes('fetch') || error.message.includes('network') || error.message.includes('ECONNREFUSED')) {
+        friendlyMessage = '无法连接翻译服务，请确保 LM Studio 已启动';
+      } else if (error.message.includes('timeout') || error.message.includes('Timeout')) {
+        friendlyMessage = '翻译超时，模型可能正在加载中';
+      } else if (error.message.includes('Invalid') || error.message.includes('format')) {
+        friendlyMessage = '翻译响应格式错误，请检查模型是否正常';
+      }
+      
+      setErrorMessage(friendlyMessage);
       setStatus('error');
     } finally {
       isCapturingRef.current = false;
@@ -397,6 +408,11 @@ const GlassTranslator = () => {
       {/* 整个内容区域可拖动 */}
       <div className="glass-drag-area" />
       
+      {/* 悬浮关闭按钮（始终可见） */}
+      <button className="glass-close-float" onClick={handleClose} title="关闭 (Esc)">
+        <X size={14} />
+      </button>
+      
       {/* 内容区域 */}
       <div className="glass-body">
         {status === 'error' ? (
@@ -519,10 +535,6 @@ const GlassTranslator = () => {
             title="收藏"
           >
             {favoriteSuccess ? <Check size={14} /> : <Star size={14} />}
-          </button>
-
-          <button className="btn close" onClick={handleClose} title="关闭 (Esc)">
-            <X size={14} />
           </button>
         </div>
       </div>

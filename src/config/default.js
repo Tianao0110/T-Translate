@@ -24,17 +24,27 @@ const config = {
   
   // OCR 配置
   ocr: {
-    // 默认引擎：'tesseract' | 'llm-vision' | 'rapid'
+    // 默认引擎：'llm-vision' | 'windows-ocr' | 'paddle-ocr' | 'rapid-ocr'
     defaultEngine: 'llm-vision',
     
     // LLM 视觉识别提示词
     visionPrompt: `Please read and extract all the text content from this image. Output only the text, nothing else.`,
     
-    // Tesseract 配置（备用）
-    tesseract: {
-      language: 'chi_sim+eng',  // 中文简体+英文
-      psm: 3  // Page segmentation mode
-    }
+    // Windows OCR 配置
+    windowsOCR: {
+      language: 'zh-Hans',  // 默认简体中文
+    },
+    
+    // PaddleOCR 配置（预留）
+    paddleOCR: {
+      useGpu: false,
+      language: 'ch',
+    },
+    
+    // RapidOCR 配置（预留）
+    rapidOCR: {
+      useGpu: false,
+    },
   },
   
   // 翻译配置

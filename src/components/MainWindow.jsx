@@ -1,8 +1,7 @@
 // src/components/MainWindow.jsx
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  FileText, Languages, Settings, History, Star, Copy, Download, Upload, RefreshCw, X,
-  Mic, Camera, Volume2, Loader2, ChevronDown, Search, Filter, MoreVertical, Sparkles,
+  FileText, Languages, Settings, History, Star, Sparkles,
   AlertCircle, CheckCircle, Info
 } from 'lucide-react';
 
@@ -20,7 +19,6 @@ const MainWindow = () => {
   // UI 状态
   const [activeTab, setActiveTab] = useState('translate');
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showQuickActions, setShowQuickActions] = useState(false);
   const [notification, setNotification] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterOptions, setFilterOptions] = useState({
@@ -124,37 +122,6 @@ const MainWindow = () => {
   }, []);
 
   // 快速操作菜单
-  const quickActions = [
-    {
-      label: '清空',
-      icon: X,
-      onClick: () => { clearCurrent(); showNotification('内容已清空', 'success'); }
-    },
-    {
-      label: '切换语言',
-      icon: RefreshCw,
-      onClick: () => { swapLanguages(); showNotification('语言已切换', 'success'); },
-      disabled: currentTranslation.sourceLanguage === 'auto'
-    },
-    {
-      label: '复制译文',
-      icon: Copy,
-      onClick: () => {
-        if (copyToClipboard('translated')) showNotification('已复制', 'success');
-        else showNotification('无内容', 'warning');
-      }
-    },
-    {
-      label: '导出历史',
-      icon: Download,
-      onClick: () => {
-        // exportHistory 返回数据，这里不再重复实现下载，或者在 Store 里实现
-        // 简单提示
-        showNotification('请在历史面板导出', 'info'); 
-      }
-    }
-  ];
-
   // 渲染通知
   const renderNotification = () => {
     if (!notification) return null;
@@ -222,23 +189,6 @@ const MainWindow = () => {
               {tab.badge > 0 && <span className="tab-badge">{tab.badge}</span>}
             </button>
           ))}
-        </div>
-
-        <div className="toolbar-actions">
-          <div className="quick-actions-wrapper">
-            <button className="quick-actions-trigger" onClick={() => setShowQuickActions(!showQuickActions)}>
-              <MoreVertical size={18} />
-            </button>
-            {showQuickActions && (
-              <div className="quick-actions-dropdown">
-                {quickActions.map((action, idx) => (
-                  <button key={idx} className="quick-action-item" onClick={()=>{action.onClick(); setShowQuickActions(false);}} disabled={action.disabled}>
-                    <action.icon size={14} /><span>{action.label}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
       </div>
 

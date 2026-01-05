@@ -30,6 +30,7 @@
     "wait-on": "^7.2.0"
   },
   "dependencies": {
+    "@gutenye/ocr-node": "^1.4.8",
     "@monaco-editor/react": "^4.6.0",
     "axios": "^1.6.2",
     "dayjs": "^1.11.19",
@@ -46,6 +47,7 @@
     "react-hotkeys-hook": "^4.4.1",
     "react-markdown": "^9.0.1",
     "react-router-dom": "^6.21.1",
+    "sharp": "^0.34.5",
     "tesseract.js": "^5.1.1",
     "uiohook-napi": "^1.5.4",
     "uuid": "^13.0.0",

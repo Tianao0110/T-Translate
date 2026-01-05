@@ -109,6 +109,41 @@ const electronAPI = {
     toggle: () => ipcRenderer.invoke("selection:toggle"),
     getEnabled: () => ipcRenderer.invoke("selection:get-enabled"),
   },
+  // API 健康检查
+  api: {
+    healthCheck: () => ipcRenderer.invoke("api:health-check"),
+  },
+  // OCR API
+  ocr: {
+    // 本地 OCR
+    checkWindowsOCR: () => ipcRenderer.invoke("ocr:check-windows-ocr"),
+    recognizeWithWindowsOCR: (imageData, options) => 
+      ipcRenderer.invoke("ocr:windows-ocr", imageData, options),
+    checkPaddleOCR: () => ipcRenderer.invoke("ocr:check-paddle-ocr"),
+    recognizeWithPaddleOCR: (imageData, options) =>
+      ipcRenderer.invoke("ocr:paddle-ocr", imageData, options),
+    
+    // 在线 OCR API
+    recognizeWithOCRSpace: (imageData, options) =>
+      ipcRenderer.invoke("ocr:ocrspace", imageData, options),
+    recognizeWithGoogleVision: (imageData, options) =>
+      ipcRenderer.invoke("ocr:google-vision", imageData, options),
+    recognizeWithAzureOCR: (imageData, options) =>
+      ipcRenderer.invoke("ocr:azure-ocr", imageData, options),
+    recognizeWithBaiduOCR: (imageData, options) =>
+      ipcRenderer.invoke("ocr:baidu-ocr", imageData, options),
+    
+    // 管理功能
+    getAvailableEngines: () => ipcRenderer.invoke("ocr:get-available-engines"),
+    checkInstalled: () => ipcRenderer.invoke("ocr:check-installed"),
+    downloadEngine: (engineId) => ipcRenderer.invoke("ocr:download-engine", engineId),
+    removeEngine: (engineId) => ipcRenderer.invoke("ocr:remove-engine", engineId),
+    onDownloadProgress: (callback) => {
+      const handler = (event, data) => callback(data);
+      ipcRenderer.on("ocr:download-progress", handler);
+      return () => ipcRenderer.removeListener("ocr:download-progress", handler);
+    },
+  },
   // 截图 API
   screenshot: {
     capture: () => ipcRenderer.invoke("capture-screen"),

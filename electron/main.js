@@ -199,8 +199,8 @@ function createGlassWindow() {
     height: glassBounds.height,
     x: glassBounds.x,
     y: glassBounds.y,
-    minWidth: 200,
-    minHeight: 100,
+    minWidth: 150,
+    minHeight: 80,
     transparent: true,
     frame: false,
     alwaysOnTop: true,
@@ -1484,6 +1484,44 @@ function setupIPC() {
   ipcMain.handle("get-platform", () => {
     return process.platform;
   });
+  
+  // API 健康检查
+  ipcMain.handle("api:health-check", async () => {
+    try {
+      const settings = store.get("settings", {});
+      const endpoint = settings.connection?.apiEndpoint || "http://localhost:1234/v1";
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
+      const response = await fetch(`${endpoint}/models`, {
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (response.ok) {
+        const data = await response.json();
+        return {
+          success: true,
+          models: data?.data || [],
+          message: "连接正常"
+        };
+      } else {
+        return {
+          success: false,
+          models: [],
+          message: `服务器返回 ${response.status}`
+        };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        models: [],
+        message: error.name === 'AbortError' ? '连接超时' : '无法连接服务'
+      };
+    }
+  });
 
   ipcMain.handle("selection:resize", (event, { width, height }) => {
     if (selectionWindow && !selectionWindow.isDestroyed()) {
@@ -1937,6 +1975,718 @@ function setupIPC() {
   ipcMain.handle("selection:hide", () => {
     hideSelectionWindow();
   });
+
+  // ========== OCR 相关 IPC ==========
+
+  // 检查 Windows OCR 是否可用
+  ipcMain.handle("ocr:check-windows-ocr", async () => {
+    if (process.platform !== "win32") {
+      return false;
+    }
+
+    try {
+      // 检查 Windows 10+ 版本
+      const os = require("os");
+      const release = os.release();
+      const majorVersion = parseInt(release.split(".")[0]);
+      return majorVersion >= 10;
+    } catch (error) {
+      console.error("[OCR] Check Windows OCR failed:", error);
+      return false;
+    }
+  });
+
+  // 使用 Windows OCR 识别
+  ipcMain.handle("ocr:windows-ocr", async (event, imageData, options = {}) => {
+    if (process.platform !== "win32") {
+      return { success: false, error: "Windows OCR 仅在 Windows 系统上可用" };
+    }
+
+    try {
+      // 从 data URL 提取 base64
+      let base64Data = imageData;
+      if (imageData.startsWith("data:image")) {
+        base64Data = imageData.split(",")[1];
+      }
+
+      // 保存临时图片文件
+      const tempDir = require("os").tmpdir();
+      const tempFile = require("path").join(
+        tempDir,
+        `t-translate-ocr-${Date.now()}.png`
+      );
+      const fs = require("fs");
+      fs.writeFileSync(tempFile, Buffer.from(base64Data, "base64"));
+
+      // 使用 PowerShell 调用 Windows OCR API
+      const { execSync } = require("child_process");
+      const language = options.language || "zh-Hans";
+
+      // PowerShell 脚本调用 Windows.Media.Ocr
+      const psScript = `
+        Add-Type -AssemblyName System.Runtime.WindowsRuntime
+        
+        $null = [Windows.Media.Ocr.OcrEngine, Windows.Foundation, ContentType = WindowsRuntime]
+        $null = [Windows.Graphics.Imaging.BitmapDecoder, Windows.Foundation, ContentType = WindowsRuntime]
+        $null = [Windows.Storage.Streams.RandomAccessStream, Windows.Storage.Streams, ContentType = WindowsRuntime]
+        
+        # 异步方法转同步
+        $asTaskGeneric = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation\`1' })[0]
+        Function Await($WinRtTask, $ResultType) {
+            $asTask = $asTaskGeneric.MakeGenericMethod($ResultType)
+            $netTask = $asTask.Invoke($null, @($WinRtTask))
+            $netTask.Wait(-1) | Out-Null
+            $netTask.Result
+        }
+        
+        # 打开图片文件
+        $filePath = "${tempFile.replace(/\\/g, "\\\\")}"
+        $file = [System.IO.File]::OpenRead($filePath)
+        $stream = [Windows.Storage.Streams.RandomAccessStream]::FromStream($file)
+        
+        # 解码图片
+        $decoder = Await ([Windows.Graphics.Imaging.BitmapDecoder]::CreateAsync($stream)) ([Windows.Graphics.Imaging.BitmapDecoder])
+        $bitmap = Await ($decoder.GetSoftwareBitmapAsync()) ([Windows.Graphics.Imaging.SoftwareBitmap])
+        
+        # 获取 OCR 引擎
+        $ocrEngine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage("${language}")
+        if ($null -eq $ocrEngine) {
+            $ocrEngine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages()
+        }
+        
+        # 识别
+        $result = Await ($ocrEngine.RecognizeAsync($bitmap)) ([Windows.Media.Ocr.OcrResult])
+        
+        # 输出结果
+        $result.Text
+        
+        # 清理
+        $stream.Dispose()
+        $file.Dispose()
+      `;
+
+      const result = execSync(
+        `powershell -NoProfile -ExecutionPolicy Bypass -Command "${psScript.replace(
+          /"/g,
+          '\\"'
+        )}"`,
+        {
+          encoding: "utf8",
+          maxBuffer: 10 * 1024 * 1024,
+          windowsHide: true,
+        }
+      );
+
+      // 删除临时文件
+      try {
+        fs.unlinkSync(tempFile);
+      } catch (e) {
+        // 忽略删除错误
+      }
+
+      const text = result.trim();
+      console.log("[OCR] Windows OCR result:", text.substring(0, 100));
+
+      return {
+        success: true,
+        text: text,
+        confidence: 0.9,
+      };
+    } catch (error) {
+      console.error("[OCR] Windows OCR failed:", error);
+      return {
+        success: false,
+        error: error.message || "Windows OCR 识别失败",
+      };
+    }
+  });
+
+  // 检查 PaddleOCR 是否可用
+  ipcMain.handle("ocr:check-paddle-ocr", async () => {
+    try {
+      // 优先尝试新的 paddleocr 包
+      require("paddleocr");
+      return { available: true, version: "v5" };
+    } catch (error) {
+      try {
+        // 回退到 @gutenye/ocr-node
+        require("@gutenye/ocr-node");
+        return { available: true, version: "gutenye" };
+      } catch (e) {
+        console.log("[OCR] PaddleOCR not available:", error.message);
+        return { available: false };
+      }
+    }
+  });
+
+  // 使用 PaddleOCR 识别
+  ipcMain.handle("ocr:paddle-ocr", async (event, imageData, options = {}) => {
+    const path = require("path");
+    const fs = require("fs");
+    const os = require("os");
+
+    // 从 data URL 提取 base64
+    let base64Data = imageData;
+    if (imageData.startsWith("data:image")) {
+      base64Data = imageData.split(",")[1];
+    }
+
+    // 转换为 Buffer
+    const imageBuffer = Buffer.from(base64Data, "base64");
+
+    // 保存临时文件
+    const tempDir = os.tmpdir();
+    const tempFile = path.join(tempDir, `t-translate-paddle-${Date.now()}.png`);
+    fs.writeFileSync(tempFile, imageBuffer);
+
+    try {
+      // 优先尝试新的 paddleocr 包 (PaddleOCR v5)
+      let result;
+      
+      try {
+        const paddleocr = require("paddleocr");
+        
+        // 初始化 OCR（懒加载）
+        if (!global.paddleOcrV5Instance) {
+          console.log("[OCR] Initializing PaddleOCR v5...");
+          
+          // 语言映射
+          const langMap = {
+            'zh-Hans': 'ch',      // 简体中文
+            'zh-Hant': 'chinese_cht', // 繁体中文
+            'en': 'en',           // 英文
+            'ja': 'japan',        // 日文
+            'ko': 'korean',       // 韩文
+            'fr': 'french',       // 法文
+            'de': 'german',       // 德文
+            'ru': 'russian',      // 俄文
+            'ar': 'arabic',       // 阿拉伯文
+            'hi': 'devanagari',   // 印地文
+            'ta': 'tamil',        // 泰米尔文
+            'te': 'telugu',       // 泰卢固文
+            'vi': 'vietnamese',   // 越南文
+            'th': 'thai',         // 泰文
+          };
+          
+          const lang = langMap[options.language] || 'ch';
+          global.paddleOcrV5Instance = await paddleocr.create({ lang });
+          global.paddleOcrV5Lang = lang;
+          console.log("[OCR] PaddleOCR v5 initialized with language:", lang);
+        }
+        
+        // 如果语言改变，重新初始化
+        const langMap = {
+          'zh-Hans': 'ch', 'zh-Hant': 'chinese_cht', 'en': 'en',
+          'ja': 'japan', 'ko': 'korean', 'fr': 'french',
+          'de': 'german', 'ru': 'russian', 'ar': 'arabic',
+        };
+        const requestedLang = langMap[options.language] || 'ch';
+        if (global.paddleOcrV5Lang !== requestedLang) {
+          console.log("[OCR] Switching language to:", requestedLang);
+          global.paddleOcrV5Instance = await paddleocr.create({ lang: requestedLang });
+          global.paddleOcrV5Lang = requestedLang;
+        }
+
+        // 识别
+        result = await global.paddleOcrV5Instance.ocr(tempFile);
+        
+        // 处理 v5 格式结果
+        if (result && result.length > 0) {
+          const lines = result.map((item) => ({
+            text: item.text || item[1]?.[0] || '',
+            confidence: item.score || item[1]?.[1] || 0.9,
+            box: item.box || item[0],
+          }));
+
+          const fullText = lines.map((l) => l.text).join("\n");
+          const avgConfidence = lines.reduce((sum, l) => sum + l.confidence, 0) / lines.length;
+
+          console.log("[OCR] PaddleOCR v5 result:", fullText.substring(0, 100));
+
+          return {
+            success: true,
+            text: fullText,
+            confidence: avgConfidence,
+            lines: lines,
+            engine: "paddleocr-v5",
+          };
+        }
+      } catch (v5Error) {
+        console.log("[OCR] PaddleOCR v5 not available, trying @gutenye/ocr-node...");
+        
+        // 回退到 @gutenye/ocr-node
+        const { Ocr } = require("@gutenye/ocr-node");
+        
+        if (!global.paddleOcrInstance) {
+          console.log("[OCR] Initializing @gutenye/ocr-node...");
+          global.paddleOcrInstance = await Ocr.create();
+          console.log("[OCR] @gutenye/ocr-node initialized");
+        }
+
+        result = await global.paddleOcrInstance.detect(tempFile);
+        
+        if (result && result.length > 0) {
+          const lines = result.map((item) => ({
+            text: item.text,
+            confidence: item.score || 0.9,
+            box: item.box,
+          }));
+
+          const fullText = lines.map((l) => l.text).join("\n");
+          const avgConfidence = lines.reduce((sum, l) => sum + l.confidence, 0) / lines.length;
+
+          console.log("[OCR] @gutenye/ocr-node result:", fullText.substring(0, 100));
+
+          return {
+            success: true,
+            text: fullText,
+            confidence: avgConfidence,
+            lines: lines,
+            engine: "gutenye-ocr",
+          };
+        }
+      }
+
+      // 没有识别到文字
+      return {
+        success: true,
+        text: "",
+        confidence: 0,
+        lines: [],
+      };
+    } catch (error) {
+      console.error("[OCR] PaddleOCR failed:", error);
+      return {
+        success: false,
+        error: error.message || "PaddleOCR 识别失败",
+      };
+    } finally {
+      // 删除临时文件
+      try {
+        fs.unlinkSync(tempFile);
+      } catch (e) {
+        // 忽略删除错误
+      }
+    }
+  });
+
+  // 获取可用的 OCR 引擎列表
+  ipcMain.handle("ocr:get-available-engines", async () => {
+    const engines = [
+      {
+        id: "llm-vision",
+        name: "LLM Vision",
+        description: "使用本地 LLM 视觉模型识别",
+        available: true,
+        isOnline: false,
+      },
+    ];
+
+    // 检查 Windows OCR
+    if (process.platform === "win32") {
+      engines.push({
+        id: "windows-ocr",
+        name: "Windows OCR",
+        description: "Windows 系统内置 OCR",
+        available: true,
+        isOnline: false,
+      });
+    }
+
+    // 检查 PaddleOCR
+    let paddleAvailable = false;
+    try {
+      require("@gutenye/ocr-node");
+      paddleAvailable = true;
+    } catch (e) {
+      // 模块未安装
+    }
+
+    engines.push({
+      id: "paddle-ocr",
+      name: "PaddleOCR",
+      description: "基于 PaddleOCR 的本地 OCR",
+      available: paddleAvailable,
+      isOnline: false,
+    });
+
+    engines.push({
+      id: "rapid-ocr",
+      name: "RapidOCR",
+      description: "轻量级本地 OCR（与 PaddleOCR 相同）",
+      available: paddleAvailable,
+      isOnline: false,
+    });
+
+    return engines;
+  });
+
+  // 检查 OCR 引擎安装状态
+  ipcMain.handle("ocr:check-installed", async () => {
+    const status = {
+      'llm-vision': true,  // 内置
+      'windows-ocr': process.platform === 'win32',
+      'paddle-ocr': false,
+      'rapid-ocr': false,
+    };
+
+    // 检查 paddleocr
+    try {
+      require("paddleocr");
+      status['paddle-ocr'] = true;
+      status['rapid-ocr'] = true;  // 共用
+    } catch (e) {
+      // 尝试 @gutenye/ocr-node
+      try {
+        require("@gutenye/ocr-node");
+        status['paddle-ocr'] = true;
+        status['rapid-ocr'] = true;
+      } catch (e2) {
+        // 都未安装
+      }
+    }
+
+    return status;
+  });
+
+  // 下载 OCR 引擎
+  ipcMain.handle("ocr:download-engine", async (event, engineId) => {
+    const { exec } = require("child_process");
+    const util = require("util");
+    const execAsync = util.promisify(exec);
+
+    console.log(`[OCR] Downloading engine: ${engineId}`);
+
+    try {
+      let packageName;
+      
+      switch (engineId) {
+        case 'paddle-ocr':
+          packageName = 'paddleocr';
+          break;
+        case 'rapid-ocr':
+          packageName = 'paddleocr';  // 共用同一个包
+          break;
+        default:
+          return { success: false, error: '未知的引擎 ID' };
+      }
+
+      // 获取应用目录
+      const appPath = app.getAppPath();
+      const isPackaged = app.isPackaged;
+      
+      // 在开发环境中使用项目目录，打包后使用 userData
+      const installPath = isPackaged 
+        ? path.join(app.getPath('userData'), 'node_modules')
+        : path.dirname(appPath);
+
+      console.log(`[OCR] Installing ${packageName} to ${installPath}`);
+
+      // 发送进度
+      mainWindow?.webContents.send('ocr:download-progress', { 
+        engineId, 
+        progress: 0, 
+        status: '正在下载...' 
+      });
+
+      // 执行 npm install
+      const { stdout, stderr } = await execAsync(
+        `npm install ${packageName} --save`,
+        { 
+          cwd: isPackaged ? app.getPath('userData') : path.dirname(appPath),
+          timeout: 300000,  // 5 分钟超时
+        }
+      );
+
+      console.log('[OCR] npm install stdout:', stdout);
+      if (stderr) console.log('[OCR] npm install stderr:', stderr);
+
+      // 发送完成
+      mainWindow?.webContents.send('ocr:download-progress', { 
+        engineId, 
+        progress: 100, 
+        status: '安装完成' 
+      });
+
+      return { success: true, message: `${packageName} 安装成功` };
+    } catch (error) {
+      console.error('[OCR] Download failed:', error);
+      return { 
+        success: false, 
+        error: error.message || '下载失败，请检查网络连接'
+      };
+    }
+  });
+
+  // 删除 OCR 引擎
+  ipcMain.handle("ocr:remove-engine", async (event, engineId) => {
+    const { exec } = require("child_process");
+    const util = require("util");
+    const execAsync = util.promisify(exec);
+
+    console.log(`[OCR] Removing engine: ${engineId}`);
+
+    try {
+      let packageName;
+      
+      switch (engineId) {
+        case 'paddle-ocr':
+        case 'rapid-ocr':
+          packageName = 'paddleocr';
+          break;
+        default:
+          return { success: false, error: '无法删除该引擎' };
+      }
+
+      const appPath = app.getAppPath();
+      const isPackaged = app.isPackaged;
+
+      await execAsync(
+        `npm uninstall ${packageName}`,
+        { 
+          cwd: isPackaged ? app.getPath('userData') : path.dirname(appPath),
+          timeout: 60000,
+        }
+      );
+
+      // 清理全局实例
+      global.paddleOcrV5Instance = null;
+      global.paddleOcrInstance = null;
+
+      return { success: true, message: `${packageName} 已删除` };
+    } catch (error) {
+      console.error('[OCR] Remove failed:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // ========== 在线 OCR API ==========
+
+  // OCR.space API
+  ipcMain.handle("ocr:ocrspace", async (event, imageData, options = {}) => {
+    try {
+      const apiKey = options.apiKey;
+      if (!apiKey) {
+        return { success: false, error: "未配置 OCR.space API Key" };
+      }
+
+      // 从 data URL 提取 base64
+      let base64Data = imageData;
+      if (imageData.startsWith("data:image")) {
+        base64Data = imageData.split(",")[1];
+      }
+
+      const FormData = require("form-data");
+      const formData = new FormData();
+      formData.append("base64Image", `data:image/png;base64,${base64Data}`);
+      formData.append("language", options.language || "chs"); // chs=简体中文
+      formData.append("isOverlayRequired", "false");
+      formData.append("OCREngine", options.engine || "2"); // Engine 2 更准确
+
+      const response = await fetch("https://api.ocr.space/parse/image", {
+        method: "POST",
+        headers: {
+          apikey: apiKey,
+        },
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (result.IsErroredOnProcessing) {
+        return { success: false, error: result.ErrorMessage || "OCR.space 处理失败" };
+      }
+
+      const text = result.ParsedResults?.[0]?.ParsedText || "";
+      console.log("[OCR] OCR.space result:", text.substring(0, 100));
+
+      return {
+        success: true,
+        text: text.trim(),
+        confidence: 0.95,
+        engine: "ocrspace",
+      };
+    } catch (error) {
+      console.error("[OCR] OCR.space failed:", error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Google Cloud Vision API
+  ipcMain.handle("ocr:google-vision", async (event, imageData, options = {}) => {
+    try {
+      const apiKey = options.apiKey;
+      if (!apiKey) {
+        return { success: false, error: "未配置 Google Cloud Vision API Key" };
+      }
+
+      // 从 data URL 提取 base64
+      let base64Data = imageData;
+      if (imageData.startsWith("data:image")) {
+        base64Data = imageData.split(",")[1];
+      }
+
+      const response = await fetch(
+        `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            requests: [{
+              image: { content: base64Data },
+              features: [{ type: "TEXT_DETECTION" }],
+              imageContext: {
+                languageHints: options.languages || ["zh", "en"],
+              },
+            }],
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (result.error) {
+        return { success: false, error: result.error.message };
+      }
+
+      const text = result.responses?.[0]?.fullTextAnnotation?.text || "";
+      console.log("[OCR] Google Vision result:", text.substring(0, 100));
+
+      return {
+        success: true,
+        text: text.trim(),
+        confidence: 0.98,
+        engine: "google-vision",
+      };
+    } catch (error) {
+      console.error("[OCR] Google Vision failed:", error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Microsoft Azure OCR API
+  ipcMain.handle("ocr:azure-ocr", async (event, imageData, options = {}) => {
+    try {
+      const apiKey = options.apiKey;
+      const region = options.region || "eastus";
+      
+      if (!apiKey) {
+        return { success: false, error: "未配置 Azure OCR API Key" };
+      }
+
+      // 从 data URL 提取 base64
+      let base64Data = imageData;
+      if (imageData.startsWith("data:image")) {
+        base64Data = imageData.split(",")[1];
+      }
+
+      const imageBuffer = Buffer.from(base64Data, "base64");
+
+      const response = await fetch(
+        `https://${region}.api.cognitive.microsoft.com/vision/v3.2/ocr?language=${options.language || "zh-Hans"}&detectOrientation=true`,
+        {
+          method: "POST",
+          headers: {
+            "Ocp-Apim-Subscription-Key": apiKey,
+            "Content-Type": "application/octet-stream",
+          },
+          body: imageBuffer,
+        }
+      );
+
+      const result = await response.json();
+
+      if (result.error) {
+        return { success: false, error: result.error.message };
+      }
+
+      // 提取文字
+      const lines = [];
+      for (const region of result.regions || []) {
+        for (const line of region.lines || []) {
+          const lineText = line.words?.map(w => w.text).join(" ") || "";
+          lines.push(lineText);
+        }
+      }
+
+      const text = lines.join("\n");
+      console.log("[OCR] Azure OCR result:", text.substring(0, 100));
+
+      return {
+        success: true,
+        text: text.trim(),
+        confidence: 0.95,
+        engine: "azure-ocr",
+      };
+    } catch (error) {
+      console.error("[OCR] Azure OCR failed:", error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // 百度 OCR API
+  ipcMain.handle("ocr:baidu-ocr", async (event, imageData, options = {}) => {
+    try {
+      const apiKey = options.apiKey;
+      const secretKey = options.secretKey;
+      
+      if (!apiKey || !secretKey) {
+        return { success: false, error: "未配置百度 OCR API Key" };
+      }
+
+      // 获取 access_token
+      const tokenResponse = await fetch(
+        `https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=${apiKey}&client_secret=${secretKey}`,
+        { method: "POST" }
+      );
+      const tokenResult = await tokenResponse.json();
+
+      if (!tokenResult.access_token) {
+        return { success: false, error: "获取百度 access_token 失败" };
+      }
+
+      // 从 data URL 提取 base64
+      let base64Data = imageData;
+      if (imageData.startsWith("data:image")) {
+        base64Data = imageData.split(",")[1];
+      }
+
+      // 调用 OCR API
+      const params = new URLSearchParams();
+      params.append("image", base64Data);
+      params.append("language_type", options.language || "CHN_ENG");
+      params.append("detect_direction", "true");
+      params.append("paragraph", "true");
+
+      const response = await fetch(
+        `https://aip.baidubce.com/rest/2.0/ocr/v1/accurate_basic?access_token=${tokenResult.access_token}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: params,
+        }
+      );
+
+      const result = await response.json();
+
+      if (result.error_code) {
+        return { success: false, error: result.error_msg || "百度 OCR 失败" };
+      }
+
+      const text = result.words_result?.map(w => w.words).join("\n") || "";
+      console.log("[OCR] Baidu OCR result:", text.substring(0, 100));
+
+      return {
+        success: true,
+        text: text.trim(),
+        confidence: 0.96,
+        engine: "baidu-ocr",
+      };
+    } catch (error) {
+      console.error("[OCR] Baidu OCR failed:", error);
+      return { success: false, error: error.message };
+    }
+  });
 }
 
 /**
@@ -1969,6 +2719,31 @@ app.whenReady().then(() => {
       startSelectionHook();
     }, 2000);
   }
+  
+  // 内存监控（每5分钟检查一次）
+  setInterval(() => {
+    const usage = process.memoryUsage();
+    const heapUsedMB = Math.round(usage.heapUsed / 1024 / 1024);
+    console.log(`[Memory] Heap: ${heapUsedMB}MB`);
+    
+    // 如果内存超过 500MB，尝试垃圾回收
+    if (heapUsedMB > 500 && global.gc) {
+      console.log('[Memory] Running garbage collection...');
+      global.gc();
+    }
+  }, 5 * 60 * 1000);
+});
+
+/**
+ * 全局未捕获异常处理
+ */
+process.on('uncaughtException', (error) => {
+  console.error('[FATAL] Uncaught exception:', error);
+  // 不立即退出，尝试继续运行
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[ERROR] Unhandled rejection at:', promise, 'reason:', reason);
 });
 
 /**

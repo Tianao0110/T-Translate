@@ -17,7 +17,7 @@ import '../styles/components/SettingsPanel.css';
 const defaultConfig = {
   llm: { endpoint: 'http://localhost:1234/v1', timeout: 60000 },
   translation: { sourceLanguage: 'auto', targetLanguage: 'zh', batch: { maxLength: 5000 } },
-  ocr: { defaultEngine: 'tesseract', tesseract: { language: 'chi_sim+eng' } },
+  ocr: { defaultEngine: 'llm-vision', windowsLanguage: 'zh-Hans' },
   ui: { theme: 'light', fontSize: 14 },
   logging: { level: 'info' },
   shortcuts: {
@@ -471,40 +471,404 @@ const SettingsPanel = ({ showNotification }) => {
       case 'ocr':
         return (
           <div className="setting-content">
-            <h3>OCR 设置</h3>
-            <div className="setting-group">
-              <label className="setting-label">OCR 引擎</label>
-              <select 
-                className="setting-select" 
-                value={settings.ocr.engine} 
-                onChange={(e) => {
-                  updateSetting('ocr', 'engine', e.target.value);
-                  // 实时同步到 Store
-                  if (setOcrEngine) {
-                    setOcrEngine(e.target.value);
-                  }
-                }}
-              >
-                <option value="llm-vision">LLM Vision (推荐)</option>
-                <option value="tesseract">Tesseract.js (本地/隐私模式)</option>
-              </select>
-              <p className="setting-hint">
-                {settings.ocr.engine === 'llm-vision' 
-                  ? 'LLM Vision 自动识别语言，质量更高' 
-                  : 'Tesseract 完全本地运行，适合隐私模式'}
-              </p>
+            <h3>OCR 引擎管理</h3>
+            <p className="setting-hint" style={{marginBottom: '16px'}}>
+              选择并下载需要的 OCR 引擎，未下载的引擎不可用
+            </p>
+            
+            {/* 引擎列表 */}
+            <div className="ocr-engines-list">
+              {/* LLM Vision */}
+              <div className={`ocr-engine-item ${settings.ocr.engine === 'llm-vision' ? 'active' : ''}`}>
+                <div className="engine-info">
+                  <div className="engine-header">
+                    <span className="engine-name">LLM Vision</span>
+                    <span className="engine-badge builtin">内置</span>
+                  </div>
+                  <p className="engine-desc">使用本地 LLM 视觉模型，识别准确度高，支持复杂布局</p>
+                  <p className="engine-meta">需要：LM Studio + 视觉模型（如 Qwen-VL）</p>
+                </div>
+                <div className="engine-actions">
+                  <button 
+                    className={`btn ${settings.ocr.engine === 'llm-vision' ? 'active' : ''}`}
+                    onClick={() => {
+                      updateSetting('ocr', 'engine', 'llm-vision');
+                      if (setOcrEngine) setOcrEngine('llm-vision');
+                    }}
+                  >
+                    {settings.ocr.engine === 'llm-vision' ? '✓ 使用中' : '使用'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Windows OCR */}
+              <div className={`ocr-engine-item ${settings.ocr.engine === 'windows-ocr' ? 'active' : ''} ${process.platform !== 'win32' ? 'disabled' : ''}`}>
+                <div className="engine-info">
+                  <div className="engine-header">
+                    <span className="engine-name">Windows OCR</span>
+                    <span className="engine-badge system">系统</span>
+                  </div>
+                  <p className="engine-desc">Windows 系统内置 OCR，无需下载，速度快</p>
+                  <p className="engine-meta">支持语言：简体中文、繁体中文、英文、日文、韩文</p>
+                </div>
+                <div className="engine-actions">
+                  {typeof window !== 'undefined' && navigator.platform?.includes('Win') ? (
+                    <button 
+                      className={`btn ${settings.ocr.engine === 'windows-ocr' ? 'active' : ''}`}
+                      onClick={() => {
+                        updateSetting('ocr', 'engine', 'windows-ocr');
+                        if (setOcrEngine) setOcrEngine('windows-ocr');
+                      }}
+                    >
+                      {settings.ocr.engine === 'windows-ocr' ? '✓ 使用中' : '使用'}
+                    </button>
+                  ) : (
+                    <span className="engine-unavailable">仅 Windows</span>
+                  )}
+                </div>
+              </div>
+
+              {/* PaddleOCR */}
+              <div className={`ocr-engine-item ${settings.ocr.engine === 'paddle-ocr' ? 'active' : ''}`}>
+                <div className="engine-info">
+                  <div className="engine-header">
+                    <span className="engine-name">PaddleOCR v5</span>
+                    <span className="engine-badge download">需下载</span>
+                    <span className="engine-size">~15MB</span>
+                  </div>
+                  <p className="engine-desc">百度开源 OCR，支持 80+ 语言，中文识别效果优秀</p>
+                  <p className="engine-meta">完全本地运行，无需联网</p>
+                </div>
+                <div className="engine-actions">
+                  {settings.ocr.paddleInstalled ? (
+                    <button 
+                      className={`btn ${settings.ocr.engine === 'paddle-ocr' ? 'active' : ''}`}
+                      onClick={() => {
+                        updateSetting('ocr', 'engine', 'paddle-ocr');
+                        if (setOcrEngine) setOcrEngine('paddle-ocr');
+                      }}
+                    >
+                      {settings.ocr.engine === 'paddle-ocr' ? '✓ 使用中' : '使用'}
+                    </button>
+                  ) : (
+                    <button 
+                      className="btn download"
+                      onClick={async () => {
+                        notify('开始下载 PaddleOCR...', 'info');
+                        try {
+                          const result = await window.electron?.ocr?.downloadEngine?.('paddle-ocr');
+                          if (result?.success) {
+                            updateSetting('ocr', 'paddleInstalled', true);
+                            notify('PaddleOCR 下载完成！', 'success');
+                          } else {
+                            notify(result?.error || '下载失败', 'error');
+                          }
+                        } catch (e) {
+                          notify('下载失败: ' + e.message, 'error');
+                        }
+                      }}
+                    >
+                      下载
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* RapidOCR */}
+              <div className={`ocr-engine-item ${settings.ocr.engine === 'rapid-ocr' ? 'active' : ''}`}>
+                <div className="engine-info">
+                  <div className="engine-header">
+                    <span className="engine-name">RapidOCR</span>
+                    <span className="engine-badge download">需下载</span>
+                    <span className="engine-size">~12MB</span>
+                  </div>
+                  <p className="engine-desc">轻量级 OCR，基于 PaddleOCR 优化，启动更快</p>
+                  <p className="engine-meta">完全本地运行，无需联网</p>
+                </div>
+                <div className="engine-actions">
+                  {settings.ocr.rapidInstalled ? (
+                    <button 
+                      className={`btn ${settings.ocr.engine === 'rapid-ocr' ? 'active' : ''}`}
+                      onClick={() => {
+                        updateSetting('ocr', 'engine', 'rapid-ocr');
+                        if (setOcrEngine) setOcrEngine('rapid-ocr');
+                      }}
+                    >
+                      {settings.ocr.engine === 'rapid-ocr' ? '✓ 使用中' : '使用'}
+                    </button>
+                  ) : (
+                    <button 
+                      className="btn download"
+                      onClick={async () => {
+                        notify('开始下载 RapidOCR...', 'info');
+                        try {
+                          const result = await window.electron?.ocr?.downloadEngine?.('rapid-ocr');
+                          if (result?.success) {
+                            updateSetting('ocr', 'rapidInstalled', true);
+                            notify('RapidOCR 下载完成！', 'success');
+                          } else {
+                            notify(result?.error || '下载失败', 'error');
+                          }
+                        } catch (e) {
+                          notify('下载失败: ' + e.message, 'error');
+                        }
+                      }}
+                    >
+                      下载
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
-            {settings.ocr.engine === 'tesseract' && (
-              <div className="setting-group">
+
+            {/* 在线 OCR API 服务 */}
+            <h3 style={{marginTop: '28px'}}>在线 OCR 服务 <span className="engine-badge online" style={{marginLeft: '8px'}}>需联网</span></h3>
+            <p className="setting-hint" style={{marginBottom: '16px'}}>
+              配置 API Key 后可使用在线 OCR 服务，识别效果更好。隐私模式下会自动禁用。
+            </p>
+            
+            <div className="ocr-engines-list">
+              {/* OCR.space - 免费额度最高 */}
+              <div className={`ocr-engine-item ${settings.ocr.engine === 'ocrspace' ? 'active' : ''}`}>
+                <div className="engine-info">
+                  <div className="engine-header">
+                    <span className="engine-name">OCR.space</span>
+                    <span className="engine-badge free">免费 25000次/月</span>
+                  </div>
+                  <p className="engine-desc">免费额度最高，支持 25+ 语言，无需信用卡</p>
+                  <p className="engine-meta">
+                    <a href="https://ocr.space/ocrapi/freekey" target="_blank" rel="noopener" 
+                       onClick={(e) => { e.preventDefault(); window.electron?.shell?.openExternal?.('https://ocr.space/ocrapi/freekey'); }}>
+                      获取免费 API Key →
+                    </a>
+                  </p>
+                </div>
+                <div className="engine-actions">
+                  <button 
+                    className={`btn ${settings.ocr.engine === 'ocrspace' ? 'active' : ''} ${!settings.ocr.ocrspaceKey ? 'disabled' : ''}`}
+                    onClick={() => {
+                      if (settings.ocr.ocrspaceKey) {
+                        updateSetting('ocr', 'engine', 'ocrspace');
+                        if (setOcrEngine) setOcrEngine('ocrspace');
+                      } else {
+                        notify('请先配置 API Key', 'warning');
+                      }
+                    }}
+                  >
+                    {settings.ocr.engine === 'ocrspace' ? '✓ 使用中' : settings.ocr.ocrspaceKey ? '使用' : '未配置'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Google Cloud Vision */}
+              <div className={`ocr-engine-item ${settings.ocr.engine === 'google-vision' ? 'active' : ''}`}>
+                <div className="engine-info">
+                  <div className="engine-header">
+                    <span className="engine-name">Google Cloud Vision</span>
+                    <span className="engine-badge free">免费 1000次/月</span>
+                  </div>
+                  <p className="engine-desc">识别效果最好，支持 200+ 语言，手写识别强</p>
+                  <p className="engine-meta">
+                    <a href="https://cloud.google.com/vision" target="_blank" rel="noopener"
+                       onClick={(e) => { e.preventDefault(); window.electron?.shell?.openExternal?.('https://cloud.google.com/vision'); }}>
+                      访问 Google Cloud →
+                    </a>
+                  </p>
+                </div>
+                <div className="engine-actions">
+                  <button 
+                    className={`btn ${settings.ocr.engine === 'google-vision' ? 'active' : ''} ${!settings.ocr.googleVisionKey ? 'disabled' : ''}`}
+                    onClick={() => {
+                      if (settings.ocr.googleVisionKey) {
+                        updateSetting('ocr', 'engine', 'google-vision');
+                        if (setOcrEngine) setOcrEngine('google-vision');
+                      } else {
+                        notify('请先配置 API Key', 'warning');
+                      }
+                    }}
+                  >
+                    {settings.ocr.engine === 'google-vision' ? '✓ 使用中' : settings.ocr.googleVisionKey ? '使用' : '未配置'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Microsoft Azure OCR */}
+              <div className={`ocr-engine-item ${settings.ocr.engine === 'azure-ocr' ? 'active' : ''}`}>
+                <div className="engine-info">
+                  <div className="engine-header">
+                    <span className="engine-name">Microsoft Azure OCR</span>
+                    <span className="engine-badge free">免费 5000次/月</span>
+                  </div>
+                  <p className="engine-desc">免费额度高，手写识别强，支持多语言</p>
+                  <p className="engine-meta">
+                    <a href="https://azure.microsoft.com/en-us/products/ai-services/ai-vision" target="_blank" rel="noopener"
+                       onClick={(e) => { e.preventDefault(); window.electron?.shell?.openExternal?.('https://azure.microsoft.com/en-us/products/ai-services/ai-vision'); }}>
+                      访问 Azure AI Vision →
+                    </a>
+                  </p>
+                </div>
+                <div className="engine-actions">
+                  <button 
+                    className={`btn ${settings.ocr.engine === 'azure-ocr' ? 'active' : ''} ${!settings.ocr.azureKey ? 'disabled' : ''}`}
+                    onClick={() => {
+                      if (settings.ocr.azureKey) {
+                        updateSetting('ocr', 'engine', 'azure-ocr');
+                        if (setOcrEngine) setOcrEngine('azure-ocr');
+                      } else {
+                        notify('请先配置 API Key', 'warning');
+                      }
+                    }}
+                  >
+                    {settings.ocr.engine === 'azure-ocr' ? '✓ 使用中' : settings.ocr.azureKey ? '使用' : '未配置'}
+                  </button>
+                </div>
+              </div>
+
+              {/* 百度 OCR */}
+              <div className={`ocr-engine-item ${settings.ocr.engine === 'baidu-ocr' ? 'active' : ''}`}>
+                <div className="engine-info">
+                  <div className="engine-header">
+                    <span className="engine-name">百度 OCR</span>
+                    <span className="engine-badge free">免费 1000次/月</span>
+                  </div>
+                  <p className="engine-desc">中文识别最强，国内访问快，支持多种场景</p>
+                  <p className="engine-meta">
+                    <a href="https://cloud.baidu.com/product/ocr" target="_blank" rel="noopener"
+                       onClick={(e) => { e.preventDefault(); window.electron?.shell?.openExternal?.('https://cloud.baidu.com/product/ocr'); }}>
+                      访问百度智能云 →
+                    </a>
+                  </p>
+                </div>
+                <div className="engine-actions">
+                  <button 
+                    className={`btn ${settings.ocr.engine === 'baidu-ocr' ? 'active' : ''} ${!settings.ocr.baiduApiKey ? 'disabled' : ''}`}
+                    onClick={() => {
+                      if (settings.ocr.baiduApiKey) {
+                        updateSetting('ocr', 'engine', 'baidu-ocr');
+                        if (setOcrEngine) setOcrEngine('baidu-ocr');
+                      } else {
+                        notify('请先配置 API Key', 'warning');
+                      }
+                    }}
+                  >
+                    {settings.ocr.engine === 'baidu-ocr' ? '✓ 使用中' : settings.ocr.baiduApiKey ? '使用' : '未配置'}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* API Key 配置区域 */}
+            <h3 style={{marginTop: '28px'}}>API 配置</h3>
+            
+            {/* OCR.space Key */}
+            <div className="setting-group">
+              <label className="setting-label">OCR.space API Key</label>
+              <input 
+                type="password"
+                className="setting-input"
+                placeholder="输入 API Key"
+                value={settings.ocr.ocrspaceKey || ''}
+                onChange={(e) => updateSetting('ocr', 'ocrspaceKey', e.target.value)}
+              />
+            </div>
+
+            {/* Google Vision Key */}
+            <div className="setting-group">
+              <label className="setting-label">Google Cloud Vision API Key</label>
+              <input 
+                type="password"
+                className="setting-input"
+                placeholder="输入 API Key"
+                value={settings.ocr.googleVisionKey || ''}
+                onChange={(e) => updateSetting('ocr', 'googleVisionKey', e.target.value)}
+              />
+            </div>
+
+            {/* Azure Key */}
+            <div className="setting-group">
+              <label className="setting-label">Azure OCR Key</label>
+              <input 
+                type="password"
+                className="setting-input"
+                placeholder="输入 API Key"
+                value={settings.ocr.azureKey || ''}
+                onChange={(e) => updateSetting('ocr', 'azureKey', e.target.value)}
+              />
+              <input 
+                type="text"
+                className="setting-input"
+                placeholder="Azure 区域 (如 eastus, westeurope)"
+                value={settings.ocr.azureRegion || ''}
+                onChange={(e) => updateSetting('ocr', 'azureRegion', e.target.value)}
+                style={{marginTop: '8px'}}
+              />
+            </div>
+
+            {/* 百度 OCR Key */}
+            <div className="setting-group">
+              <label className="setting-label">百度 OCR</label>
+              <input 
+                type="text"
+                className="setting-input"
+                placeholder="API Key"
+                value={settings.ocr.baiduApiKey || ''}
+                onChange={(e) => updateSetting('ocr', 'baiduApiKey', e.target.value)}
+              />
+              <input 
+                type="password"
+                className="setting-input"
+                placeholder="Secret Key"
+                value={settings.ocr.baiduSecretKey || ''}
+                onChange={(e) => updateSetting('ocr', 'baiduSecretKey', e.target.value)}
+                style={{marginTop: '8px'}}
+              />
+            </div>
+
+            {/* 当前引擎的语言设置 */}
+            {settings.ocr.engine === 'windows-ocr' && (
+              <div className="setting-group" style={{marginTop: '20px'}}>
                 <label className="setting-label">识别语言</label>
-                <select className="setting-select" value={settings.ocr.language} onChange={(e)=>updateSetting('ocr','language',e.target.value)}>
-                  <option value="chi_sim+eng">中英文混合</option>
-                  <option value="eng">仅英文</option>
-                  <option value="chi_sim">仅中文</option>
-                  <option value="jpn">日文</option>
-                  <option value="kor">韩文</option>
+                <select 
+                  className="setting-select" 
+                  value={settings.ocr.windowsLanguage || 'zh-Hans'} 
+                  onChange={(e) => updateSetting('ocr', 'windowsLanguage', e.target.value)}
+                >
+                  <option value="zh-Hans">简体中文</option>
+                  <option value="zh-Hant">繁体中文</option>
+                  <option value="en">英文</option>
+                  <option value="ja">日文</option>
+                  <option value="ko">韩文</option>
                 </select>
-                <p className="setting-hint">仅 Tesseract 引擎使用此设置</p>
+              </div>
+            )}
+            
+            {(settings.ocr.engine === 'paddle-ocr' || settings.ocr.engine === 'rapid-ocr') && (
+              <div className="setting-group" style={{marginTop: '20px'}}>
+                <label className="setting-label">识别语言</label>
+                <select 
+                  className="setting-select" 
+                  value={settings.ocr.paddleLanguage || 'zh-Hans'} 
+                  onChange={(e) => updateSetting('ocr', 'paddleLanguage', e.target.value)}
+                >
+                  <optgroup label="东亚语言">
+                    <option value="zh-Hans">简体中文</option>
+                    <option value="zh-Hant">繁体中文</option>
+                    <option value="ja">日文</option>
+                    <option value="ko">韩文</option>
+                  </optgroup>
+                  <optgroup label="欧洲语言">
+                    <option value="en">英文</option>
+                    <option value="fr">法文</option>
+                    <option value="de">德文</option>
+                    <option value="ru">俄文</option>
+                  </optgroup>
+                  <optgroup label="其他语言">
+                    <option value="ar">阿拉伯文</option>
+                    <option value="hi">印地文</option>
+                    <option value="vi">越南文</option>
+                    <option value="th">泰文</option>
+                  </optgroup>
+                </select>
               </div>
             )}
             
