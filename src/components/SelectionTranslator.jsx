@@ -3,39 +3,51 @@ import React, { useState, useEffect, useRef } from 'react';
 import '../styles/selection.css';
 
 const API_ENDPOINT = 'http://localhost:1234/v1';
+const TRIGGER_AUTO_HIDE_DELAY = 4000;
 
 const SelectionTranslator = () => {
-  const [mode, setMode] = useState('idle'); // idle | trigger | loading | overlay
+  const [mode, setMode] = useState('idle');
+  const [sourceText, setSourceText] = useState('');
   const [translatedText, setTranslatedText] = useState('');
   const [error, setError] = useState('');
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [rect, setRect] = useState(null);
   const [copied, setCopied] = useState(false);
   const [theme, setTheme] = useState('light');
+  const [showSource, setShowSource] = useState(false);
 
-  // 缓存数据
   const sizedRef = useRef(false);
-  // 用于 Resize 逻辑
   const resizeRef = useRef({ startX: 0, startY: 0, startW: 0, startH: 0 });
+  const autoHideTimerRef = useRef(null);
 
   useEffect(() => {
-    // 监听显示信号
     const removeShowListener = window.electron?.selection?.onShowTrigger?.((data) => {
+      if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
+      
       setMousePos({ x: data.mouseX, y: data.mouseY });
       setRect(data.rect);
       if (data.theme) setTheme(data.theme);
       
       setMode('trigger');
       setError('');
+      setSourceText('');
       setTranslatedText('');
       setCopied(false);
+      setShowSource(false);
       sizedRef.current = false;
+      
+      // 圆点 4 秒后自动消失
+      autoHideTimerRef.current = setTimeout(() => {
+        setMode('idle');
+        window.electron?.selection?.hide?.();
+      }, TRIGGER_AUTO_HIDE_DELAY);
     });
     
-    // 监听隐藏信号
-    const removeHideListener = window.electron?.selection?.onHide?.(() => setMode('idle'));
+    const removeHideListener = window.electron?.selection?.onHide?.(() => {
+      setMode('idle');
+      if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
+    });
     
-    // ESC 关闭
     const handleKey = (e) => {
       if (e.code === 'Escape') {
         setMode('idle');
@@ -44,145 +56,122 @@ const SelectionTranslator = () => {
     };
     window.addEventListener('keydown', handleKey);
 
-    // 清理函数
     return () => {
       if (removeShowListener) removeShowListener();
       if (removeHideListener) removeHideListener();
       window.removeEventListener('keydown', handleKey);
+      if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
     };
   }, []);
 
-  // 点击圆点 -> 触发翻译
   const handleTriggerClick = async () => {
+    if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
     setMode('loading');
     
     try {
-      // 1. 获取文字
       const result = await window.electron?.selection?.getText?.(rect);
       if (!result?.text) throw new Error('未获取到文字');
       
-      // 2. 翻译
+      setSourceText(result.text);
       const translation = await translateText(result.text);
       setTranslatedText(translation);
       setError('');
       setMode('overlay');
       
-      // 3. 初始自动调整大小 (只执行一次)
       if (!sizedRef.current) {
         sizedRef.current = true;
         setWindowSize(translation);
       }
-      
     } catch (err) {
-      const errMsg = err.message || '翻译失败';
-      setError(errMsg);
+      setError(err.message || '翻译失败');
       setTranslatedText('');
       setMode('overlay');
-      
       if (!sizedRef.current) {
         sizedRef.current = true;
-        setWindowSize(errMsg);
+        setWindowSize(err.message || '翻译失败');
       }
     }
   };
 
-  // 初始窗口大小计算
   const setWindowSize = (text) => {
-    const charWidth = 8;
-    const lineHeight = 22;
-    const padding = 40;
-    const footerHeight = 32;
-    const maxWidth = 380;
-    const minWidth = 140;
+    const charWidth = 8, lineHeight = 22, padding = 40, toolbarHeight = 36;
+    const maxWidth = 420, minWidth = 180;
     
     let width = Math.min(text.length * charWidth + padding, maxWidth);
     width = Math.max(width, minWidth);
     
     const charsPerLine = Math.floor((width - padding) / charWidth);
     const lines = Math.ceil(text.length / charsPerLine);
-    let height = lines * lineHeight + padding + footerHeight;
-    height = Math.max(height, 80);
-    height = Math.min(height, 300);
+    let height = lines * lineHeight + padding + toolbarHeight;
+    height = Math.max(height, 100);
+    height = Math.min(height, 400);
     
-    // 定位在圆点下方
-    const x = mousePos.x - width / 2;
-    const y = mousePos.y + 20;
+    // 屏幕边缘检测
+    const sw = window.screen?.availWidth || 1920;
+    const sh = window.screen?.availHeight || 1080;
+    
+    let x = mousePos.x - width / 2;
+    let y = mousePos.y + 20;
+    
+    if (x < 10) x = 10;
+    if (x + width > sw - 10) x = sw - width - 10;
+    if (y + height > sh - 10) y = mousePos.y - height - 10;
+    if (y < 10) y = 10;
     
     window.electron?.selection?.setBounds?.({
-      x: Math.round(Math.max(x, 10)),
-      y: Math.round(y),
-      width: Math.round(width),
-      height: Math.round(height)
+      x: Math.round(x), y: Math.round(y),
+      width: Math.round(width), height: Math.round(height)
     });
   };
 
-  // 翻译接口 (优化版)
   const translateText = async (text) => {
     const isChinese = (text.match(/[\u4e00-\u9fff]/g) || []).length / text.length > 0.3;
     const target = isChinese ? 'English' : 'Simplified Chinese';
     
-    try {
-      const res = await fetch(`${API_ENDPOINT}/chat/completions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: [
-            { 
-              role: 'system', 
-              content: `You are a translator. Translate the following text into ${target}. Output ONLY the translation result.` 
-            },
-            { role: 'user', content: text }
-          ],
-          temperature: 0.3,
-        }),
-      });
-      
-      if (!res.ok) throw new Error(`API Error: ${res.status}`);
-      const data = await res.json();
-      return data.choices?.[0]?.message?.content?.trim() || 'No translation';
-    } catch (e) {
-      console.error(e);
-      return '翻译失败: 连接不上本地服务';
-    }
+    const res = await fetch(`${API_ENDPOINT}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gpt-3.5-turbo',
+        messages: [
+          { role: 'system', content: `Translate into ${target}. Output ONLY the result.` },
+          { role: 'user', content: text }
+        ],
+        temperature: 0.3,
+      }),
+    });
+    
+    if (!res.ok) throw new Error(`API ${res.status}`);
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content?.trim() || '';
   };
 
-  // 🟢 手动调整大小逻辑 (Resize Handle)
   const handleResizeDown = (e) => {
     e.preventDefault(); 
     e.stopPropagation();
-
-    // 记录初始状态
     resizeRef.current = {
-      startX: e.screenX,
-      startY: e.screenY,
-      // 使用 document.body 获取当前窗口大小
-      startW: document.body.offsetWidth,
-      startH: document.body.offsetHeight
+      startX: e.screenX, startY: e.screenY,
+      startW: document.body.offsetWidth, startH: document.body.offsetHeight
     };
 
-    const handleMouseMove = (ev) => {
+    const onMove = (ev) => {
       const dx = ev.screenX - resizeRef.current.startX;
       const dy = ev.screenY - resizeRef.current.startY;
-      
-      const newWidth = Math.max(resizeRef.current.startW + dx, 160); // 最小宽度
-      const newHeight = Math.max(resizeRef.current.startH + dy, 100); // 最小高度
-      
-      // 调用 Main 进程调整大小
-      window.electron?.selection?.resize?.({ width: newWidth, height: newHeight });
+      window.electron?.selection?.resize?.({
+        width: Math.max(resizeRef.current.startW + dx, 160),
+        height: Math.max(resizeRef.current.startH + dy, 80)
+      });
     };
-
-    const handleMouseUp = () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
     };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
   };
 
-  // 点击复制
-  const handleClick = () => {
+  const handleCopy = (e) => {
+    e.stopPropagation();
     if (translatedText) {
       window.electron?.clipboard?.writeText?.(translatedText);
       setCopied(true);
@@ -190,8 +179,13 @@ const SelectionTranslator = () => {
     }
   };
 
-  const handleContext = (e) => {
-    e.preventDefault();
+  const toggleSource = (e) => {
+    e.stopPropagation();
+    setShowSource(!showSource);
+  };
+
+  const handleClose = (e) => {
+    if (e) e.preventDefault();
     setMode('idle');
     window.electron?.selection?.hide?.();
   };
@@ -215,21 +209,32 @@ const SelectionTranslator = () => {
       )}
       
       {mode === 'overlay' && (
-        <div 
-          className={`sel-card ${copied ? 'copied' : ''}`}
-          onClick={handleClick}
-          onContextMenu={handleContext}
-        >
+        <div className={`sel-card ${copied ? 'copied' : ''}`} onContextMenu={handleClose}>
+          <div className="sel-toolbar">
+            <button className={`sel-btn ${showSource ? 'active' : ''}`} onClick={toggleSource} title="显示原文">
+              原文
+            </button>
+            <button className={`sel-btn ${copied ? 'success' : ''}`} onClick={handleCopy} title="复制译文">
+              {copied ? '已复制' : '复制'}
+            </button>
+            <div className="sel-spacer" />
+            <button className="sel-btn sel-btn-close" onClick={handleClose} title="关闭 (ESC)">✕</button>
+          </div>
+          
           <div className="sel-content">
             {error ? (
               <div className="sel-error">{error}</div>
             ) : (
-              <div className="sel-text">{translatedText}</div>
+              <>
+                {showSource && sourceText && (
+                  <div className="sel-source">{sourceText}</div>
+                )}
+                <div className="sel-text">{translatedText}</div>
+              </>
             )}
           </div>
 
-          {/* 🟢 Resize Handle (右下角抓手) */}
-          <div className="sel-resize-handle" onMouseDown={handleResizeDown} title="拖动调整大小" />
+          <div className="sel-resize-handle" onMouseDown={handleResizeDown} />
         </div>
       )}
     </div>
