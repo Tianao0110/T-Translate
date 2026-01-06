@@ -436,7 +436,39 @@ class OCRManager {
     
     try {
       const startTime = Date.now();
-      const result = await engine.recognize(input, recognizeOptions);
+      
+      // ========== 图片预处理：放大小图片 ==========
+      let processedInput = input;
+      let preprocessInfo = null;
+      
+      // 读取设置中的预处理选项
+      const settings = await this.getSettingsFromStorage();
+      const enablePreprocess = settings?.ocr?.enablePreprocess ?? true;
+      const configuredScaleFactor = settings?.ocr?.scaleFactor || 2;
+      
+      // 只有本地 OCR 引擎需要预处理（在线 API 通常自带预处理）
+      // 且用户启用了预处理功能
+      if (!engine.isOnline && enablePreprocess && options.preprocess !== false) {
+        try {
+          const imageData = await this.prepareImageData(input);
+          preprocessInfo = await this.preprocessImage(imageData, {
+            minHeight: options.minHeight || 100,
+            minWidth: options.minWidth || 200,
+            scaleFactor: options.scaleFactor || configuredScaleFactor,
+          });
+          
+          if (preprocessInfo.scaled) {
+            processedInput = preprocessInfo.dataURL;
+            console.log(`[OCR] 预处理完成：${preprocessInfo.originalSize.width}x${preprocessInfo.originalSize.height} → ${preprocessInfo.newSize.width}x${preprocessInfo.newSize.height}`);
+          }
+        } catch (preprocessError) {
+          console.warn('[OCR] 预处理失败，使用原图:', preprocessError.message);
+        }
+      } else if (!enablePreprocess) {
+        console.log('[OCR] 预处理已禁用');
+      }
+      
+      const result = await engine.recognize(processedInput, recognizeOptions);
       const duration = Date.now() - startTime;
       
       console.log(`[OCR] 识别完成，耗时: ${duration}ms`);
@@ -448,6 +480,8 @@ class OCRManager {
         engine: engine.name,
         language: ocrLanguage,
         duration,
+        preprocessed: preprocessInfo?.scaled || false,
+        scaleFactor: preprocessInfo?.scaleFactor || 1,
         ...result
       };
     } catch (error) {
@@ -631,6 +665,103 @@ class OCRManager {
     } else {
       throw new Error('不支持的图片格式');
     }
+  }
+
+  /**
+   * 图片预处理 - 放大小图片以提高 OCR 识别率
+   * 
+   * 原理：OCR 对高度小于 15-20px 的文字识别率会暴跌
+   * 解决：如果图片较小，用 Canvas 放大 1.5-2 倍
+   * 
+   * @param {string} dataURL - 图片的 data URL
+   * @param {Object} options - 预处理选项
+   * @returns {Promise<{dataURL: string, scaled: boolean, scaleFactor: number, originalSize: {width, height}}>}
+   */
+  async preprocessImage(dataURL, options = {}) {
+    const {
+      minHeight = 100,      // 最小高度阈值，低于此值会放大
+      minWidth = 200,       // 最小宽度阈值
+      scaleFactor = 2,      // 放大倍数
+      maxScale = 3,         // 最大放大倍数
+      quality = 0.95,       // 输出图片质量
+    } = options;
+
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      
+      img.onload = () => {
+        const originalWidth = img.width;
+        const originalHeight = img.height;
+        
+        console.log(`[OCR] 原始图片尺寸: ${originalWidth}x${originalHeight}`);
+        
+        // 判断是否需要放大
+        let needScale = false;
+        let actualScaleFactor = 1;
+        
+        if (originalHeight < minHeight || originalWidth < minWidth) {
+          needScale = true;
+          // 根据图片大小动态计算放大倍数
+          const heightRatio = minHeight / originalHeight;
+          const widthRatio = minWidth / originalWidth;
+          actualScaleFactor = Math.min(Math.max(heightRatio, widthRatio, scaleFactor), maxScale);
+          console.log(`[OCR] 图片较小，将放大 ${actualScaleFactor.toFixed(1)} 倍`);
+        }
+        
+        // 如果不需要放大，直接返回原图
+        if (!needScale) {
+          resolve({
+            dataURL,
+            scaled: false,
+            scaleFactor: 1,
+            originalSize: { width: originalWidth, height: originalHeight }
+          });
+          return;
+        }
+        
+        // 使用 Canvas 放大图片
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        const newWidth = Math.round(originalWidth * actualScaleFactor);
+        const newHeight = Math.round(originalHeight * actualScaleFactor);
+        
+        canvas.width = newWidth;
+        canvas.height = newHeight;
+        
+        // 使用高质量的图片缩放算法
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        
+        // 绘制放大后的图片
+        ctx.drawImage(img, 0, 0, newWidth, newHeight);
+        
+        // 转换为 data URL
+        const scaledDataURL = canvas.toDataURL('image/png', quality);
+        
+        console.log(`[OCR] 放大后尺寸: ${newWidth}x${newHeight}`);
+        
+        resolve({
+          dataURL: scaledDataURL,
+          scaled: true,
+          scaleFactor: actualScaleFactor,
+          originalSize: { width: originalWidth, height: originalHeight },
+          newSize: { width: newWidth, height: newHeight }
+        });
+      };
+      
+      img.onerror = () => {
+        console.warn('[OCR] 图片加载失败，跳过预处理');
+        resolve({
+          dataURL,
+          scaled: false,
+          scaleFactor: 1,
+          error: '图片加载失败'
+        });
+      };
+      
+      img.src = dataURL;
+    });
   }
 
   /**

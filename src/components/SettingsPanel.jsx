@@ -597,6 +597,38 @@ const SettingsPanel = ({ showNotification }) => {
               </p>
             </div>
 
+            {/* 3. 图片预处理设置 */}
+            <div className="setting-group">
+              <label className="setting-label">
+                <input 
+                  type="checkbox" 
+                  checked={settings.ocr?.enablePreprocess ?? true}
+                  onChange={(e) => updateSetting('ocr', 'enablePreprocess', e.target.checked)}
+                  style={{marginRight: '8px'}}
+                />
+                自动放大小图片
+              </label>
+              <p className="setting-hint">
+                小字体（&lt;15px）识别率低，自动放大 2 倍可显著提升准确率
+              </p>
+              {(settings.ocr?.enablePreprocess ?? true) && (
+                <div style={{marginTop: '8px', paddingLeft: '24px'}}>
+                  <label className="setting-label-small">放大倍数</label>
+                  <select 
+                    className="setting-select compact"
+                    value={settings.ocr?.scaleFactor || 2}
+                    onChange={(e) => updateSetting('ocr', 'scaleFactor', parseFloat(e.target.value))}
+                    style={{width: '100px', marginLeft: '8px'}}
+                  >
+                    <option value="1.5">1.5x</option>
+                    <option value="2">2x（推荐）</option>
+                    <option value="2.5">2.5x</option>
+                    <option value="3">3x</option>
+                  </select>
+                </div>
+              )}
+            </div>
+
             {/* ========== 分层 OCR 策略 ========== */}
             
             {/* 第一梯队：本地 OCR（主力先锋） */}
