@@ -380,7 +380,7 @@ const HistoryPanel = ({ showNotification }) => {
     const isFocused = index === focusIndex;
     
     return (
-      <div key={item.id} className={`timeline-item ${isFocused ? 'focused' : ''} ${selectedIds.has(item.id) ? 'selected' : ''}`}>
+      <div key={`${item.id}-${index}`} className={`timeline-item ${isFocused ? 'focused' : ''} ${selectedIds.has(item.id) ? 'selected' : ''}`}>
         <div className="timeline-content">
           <div className="timeline-header">
             <span className="timeline-time">{dayjs(item.timestamp).format('HH:mm')}</span>
@@ -445,7 +445,7 @@ const HistoryPanel = ({ showNotification }) => {
               const isFavorite = favorites?.some(f => f.id === item.id);
               const isFocused = filteredHistory.indexOf(item) === focusIndex;
               return (
-                <tr key={item.id} className={`${isFocused ? 'focused' : ''} ${selectedIds.has(item.id) ? 'selected' : ''}`}>
+                <tr key={`${item.id}-${index}`} className={`${isFocused ? 'focused' : ''} ${selectedIds.has(item.id) ? 'selected' : ''}`}>
                   {selectMode && (
                     <td className="col-check">
                       <button onClick={() => toggleSelect(item.id)}>
@@ -511,7 +511,7 @@ const HistoryPanel = ({ showNotification }) => {
               </div>
               {expandedGroups.has(group.title) && (
                 <div className="timeline-items">
-                  {group.items.map((item, i) => renderTimelineItem(item, filteredHistory.indexOf(item)))}
+                  {group.items.map((item, i) => renderTimelineItem(item, i))}
                 </div>
               )}
             </div>
@@ -532,9 +532,9 @@ const HistoryPanel = ({ showNotification }) => {
             </div>
             {expandedGroups.has(group.title) && (
               <div className="card-grid">
-                {group.items.map(item => (
+                {group.items.map((item, index) => (
                   <HistoryCard
-                    key={item.id}
+                    key={`${item.id}-${index}`}
                     item={item}
                     onCopy={handleCopy}
                     onRestore={handleRestore}

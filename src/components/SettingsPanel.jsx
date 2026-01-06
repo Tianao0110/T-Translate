@@ -163,7 +163,6 @@ const SettingsPanel = ({ showNotification }) => {
       if (window.electron?.ocr?.checkInstalled) {
         try {
           const installedStatus = await window.electron.ocr.checkInstalled();
-          paddleInstalled = installedStatus?.['paddle-ocr'] || false;
           rapidInstalled = installedStatus?.['rapid-ocr'] || false;
         } catch (e) {
           console.log('OCR install check failed:', e);

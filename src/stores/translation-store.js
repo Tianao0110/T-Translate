@@ -629,7 +629,7 @@ const useTranslationStore = create(
       addToHistory: (item) =>
         set((state) => {
           const historyItem = {
-            id: item.id || `history-${Date.now()}`,
+            id: item.id || uuidv4(),  // 使用 UUID 避免重复
             sourceText: item.sourceText || '',
             translatedText: item.translatedText || '',
             sourceLanguage: item.sourceLanguage || 'auto',

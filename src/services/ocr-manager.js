@@ -1,18 +1,22 @@
 // src/services/ocr-manager.js
-// OCR 管理器 v2 - 重构版
-// 支持：LLM Vision、Windows OCR、PaddleOCR（预留）、RapidOCR（预留）
+// OCR 管理器 v3 - 分层策略版
+// 支持：RapidOCR（本地首选）、LLM Vision（深度识别）、在线 OCR API（精准模式）
 
 import llmClient from '../utils/llm-client.js';
 import config from '../config/default.js';
 
 /**
  * OCR 引擎类型
+ * 
+ * 分层策略：
+ * - 第一梯队（Tier 1）：本地 OCR，毫秒级响应
+ * - 第二梯队（Tier 2）：视觉大模型，处理复杂场景
+ * - 第三梯队（Tier 3）：在线 OCR API，高精度兜底
  */
 const OCR_ENGINES = {
+  // 本地引擎
+  RAPID_OCR: 'rapid-ocr',        // RapidOCR（本地首选，基于 PP-OCRv4）
   LLM_VISION: 'llm-vision',      // LLM 视觉模型（需要 LM Studio）
-  WINDOWS_OCR: 'windows-ocr',    // Windows 系统 OCR
-  PADDLE_OCR: 'paddle-ocr',      // PaddleOCR（本地）
-  RAPID_OCR: 'rapid-ocr',        // RapidOCR（本地）
   // 在线 OCR API
   OCRSPACE: 'ocrspace',          // OCR.space（免费额度高）
   GOOGLE_VISION: 'google-vision',// Google Cloud Vision
@@ -177,17 +181,6 @@ class OCRManager {
     }
 
     console.log('[OCR] 检测到平台:', this.platform);
-
-    // 更新 Windows OCR 可用性
-    if (this.platform === 'win32') {
-      const windowsOCR = this.engines.get(OCR_ENGINES.WINDOWS_OCR);
-      if (windowsOCR) {
-        windowsOCR.isAvailable = true;
-        console.log('[OCR] Windows OCR 已标记为可用');
-      }
-    } else {
-      console.log('[OCR] 非 Windows 平台，Windows OCR 不可用');
-    }
 
     return this.platform;
   }
