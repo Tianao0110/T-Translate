@@ -51,7 +51,8 @@ const GlassTranslator = () => {
   const [refreshInterval, setRefreshInterval] = useState(3000);
   const [smartDetect, setSmartDetect] = useState(true);
   const [streamOutput, setStreamOutput] = useState(true);
-  const [ocrEngine, setOcrEngine] = useState('llm-vision');
+  const [ocrEngine, setOcrEngine] = useState('llm-vision');  // 将从全局设置加载
+  const [sourceLanguage, setSourceLanguage] = useState('auto');  // 原文语言
   const [targetLanguage, setTargetLanguage] = useState('en');
   
   // 反馈
@@ -122,7 +123,9 @@ const GlassTranslator = () => {
         setRefreshInterval(settings.refreshInterval ?? 3000);
         setSmartDetect(settings.smartDetect ?? true);
         setStreamOutput(settings.streamOutput ?? true);
-        setOcrEngine(settings.ocrEngine ?? 'llm-vision');
+        // 使用全局 OCR 设置
+        setOcrEngine(settings.ocrEngine ?? settings.globalOcrEngine ?? 'llm-vision');
+        setSourceLanguage(settings.sourceLanguage ?? 'auto');
         setOpacity(settings.opacity ?? 0.85);
         setIsPinned(settings.isPinned ?? true);
         setTargetLanguage(settings.targetLanguage ?? 'en');
@@ -183,9 +186,15 @@ const GlassTranslator = () => {
       }
       lastImageHashRef.current = hash;
       
-      // OCR
+      // OCR - 传递语言设置以便自动选择识别语言
       setStatus('recognizing');
-      const ocrResult = await ocrManager.recognize(result.imageData, { engine: ocrEngine });
+      const ocrResult = await ocrManager.recognize(result.imageData, { 
+        engine: ocrEngine,
+        settings: {
+          sourceLanguage: sourceLanguage,
+          recognitionLanguage: 'auto',  // 使用自动模式
+        }
+      });
       
       if (!ocrResult.success) throw new Error(ocrResult.error || 'OCR 失败');
       

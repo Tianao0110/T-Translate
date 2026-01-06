@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   FileText, Languages, Settings, History, Star, Sparkles,
-  AlertCircle, CheckCircle, Info
+  AlertCircle, CheckCircle, Info, X
 } from 'lucide-react';
 
 import useTranslationStore from '../stores/translation-store';

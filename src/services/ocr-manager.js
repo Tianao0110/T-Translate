@@ -170,9 +170,24 @@ class OCRManager {
   async detectPlatform() {
     // 检测运行平台
     if (typeof window !== 'undefined' && window.electron?.getPlatform) {
-      this.platform = await window.electron.getPlatform();
-    } else if (typeof process !== 'undefined') {
-      this.platform = process.platform;
+      try {
+        this.platform = await window.electron.getPlatform();
+      } catch (e) {
+        console.warn('[OCR] getPlatform failed:', e);
+      }
+    }
+    
+    // 备选方案
+    if (!this.platform && typeof navigator !== 'undefined') {
+      // 从 userAgent 检测
+      const ua = navigator.userAgent.toLowerCase();
+      if (ua.includes('win')) {
+        this.platform = 'win32';
+      } else if (ua.includes('mac')) {
+        this.platform = 'darwin';
+      } else if (ua.includes('linux')) {
+        this.platform = 'linux';
+      }
     }
 
     console.log('[OCR] 检测到平台:', this.platform);
@@ -182,8 +197,10 @@ class OCRManager {
       const windowsOCR = this.engines.get(OCR_ENGINES.WINDOWS_OCR);
       if (windowsOCR) {
         windowsOCR.isAvailable = true;
-        console.log('[OCR] Windows OCR 可用');
+        console.log('[OCR] Windows OCR 已标记为可用');
       }
+    } else {
+      console.log('[OCR] 非 Windows 平台，Windows OCR 不可用');
     }
 
     return this.platform;
@@ -357,6 +374,59 @@ class OCRManager {
   // ========== 文字识别 ==========
 
   /**
+   * 语言代码映射表
+   */
+  static LANGUAGE_MAP = {
+    // 翻译语言代码 -> OCR 语言代码
+    'zh': 'zh-Hans',
+    'zh-CN': 'zh-Hans',
+    'zh-TW': 'zh-Hant',
+    'zh-HK': 'zh-Hant',
+    'en': 'en',
+    'ja': 'ja',
+    'ko': 'ko',
+    'fr': 'fr',
+    'de': 'de',
+    'es': 'es',
+    'ru': 'ru',
+    'ar': 'ar',
+    'hi': 'hi',
+    'vi': 'vi',
+    'th': 'th',
+    'auto': 'zh-Hans',  // 自动检测时默认中文
+  };
+
+  /**
+   * 获取 OCR 识别语言
+   * @param {object} options - 选项
+   * @returns {string} OCR 语言代码
+   */
+  getOcrLanguage(options = {}) {
+    // 如果明确指定了语言，使用指定的
+    if (options.language && options.language !== 'auto') {
+      return options.language;
+    }
+    
+    // 从设置中获取
+    const settings = options.settings || {};
+    const recognitionLanguage = settings.recognitionLanguage || 'auto';
+    
+    if (recognitionLanguage !== 'auto') {
+      return recognitionLanguage;
+    }
+    
+    // 自动模式：根据翻译原文语言确定
+    const sourceLanguage = settings.sourceLanguage || options.sourceLanguage || 'auto';
+    
+    if (sourceLanguage && sourceLanguage !== 'auto') {
+      return OCRManager.LANGUAGE_MAP[sourceLanguage] || sourceLanguage;
+    }
+    
+    // 默认中文
+    return 'zh-Hans';
+  }
+
+  /**
    * 识别图片中的文字 - 主接口
    */
   async recognize(input, options = {}) {
@@ -379,11 +449,15 @@ class OCRManager {
       throw new Error(`OCR 引擎 ${engine.name} 不符合当前隐私设置`);
     }
 
-    console.log(`[OCR] 使用 ${engine.name} 进行识别...`);
+    // 获取 OCR 识别语言
+    const ocrLanguage = this.getOcrLanguage(options);
+    const recognizeOptions = { ...options, language: ocrLanguage };
+
+    console.log(`[OCR] 使用 ${engine.name} 进行识别，语言: ${ocrLanguage}`);
     
     try {
       const startTime = Date.now();
-      const result = await engine.recognize(input, options);
+      const result = await engine.recognize(input, recognizeOptions);
       const duration = Date.now() - startTime;
       
       console.log(`[OCR] 识别完成，耗时: ${duration}ms`);
@@ -393,6 +467,7 @@ class OCRManager {
         text: result.text,
         confidence: result.confidence,
         engine: engine.name,
+        language: ocrLanguage,
         duration,
         ...result
       };
@@ -401,7 +476,7 @@ class OCRManager {
       
       // 如果允许降级，尝试备用引擎
       if (options.fallback !== false) {
-        return await this.recognizeWithFallback(input, options, engineName);
+        return await this.recognizeWithFallback(input, recognizeOptions, engineName);
       }
       
       return {

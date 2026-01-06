@@ -589,11 +589,14 @@ input:checked + .switch-slider:before {
 .engine-actions {
   flex-shrink: 0;
   margin-left: 16px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 .engine-actions .btn {
-  min-width: 80px;
-  padding: 8px 16px;
+  min-width: 60px;
+  padding: 8px 14px;
   border: none;
   border-radius: 6px;
   font-size: 13px;
@@ -621,6 +624,84 @@ input:checked + .switch-slider:before {
 
 .engine-actions .btn.download:hover {
   background: #ea580c;
+}
+
+.engine-actions .btn.uninstall {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border-primary);
+  min-width: 50px;
+  padding: 8px 12px;
+}
+
+.engine-actions .btn.uninstall:hover {
+  background: #ef4444;
+  color: white;
+  border-color: #ef4444;
+}
+
+.engine-actions .btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 禁用的引擎样式 */
+.ocr-engine-item.disabled-engine {
+  opacity: 0.6;
+  background: var(--bg-tertiary);
+}
+
+.ocr-engine-item.disabled-engine .engine-name {
+  color: var(--text-muted);
+}
+
+.engine-badge.unavailable {
+  background: var(--text-muted);
+  color: white;
+}
+
+/* 在线 OCR 折叠区域 */
+.online-ocr-section {
+  margin-top: 24px;
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.online-ocr-section summary {
+  cursor: pointer;
+  padding: 12px 16px;
+  background: var(--bg-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+}
+
+.online-ocr-section summary:hover {
+  background: var(--bg-hover);
+}
+
+.online-ocr-section summary h3 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+}
+
+.online-ocr-section summary .expand-icon {
+  transition: transform 0.2s ease;
+}
+
+.online-ocr-section[open] summary .expand-icon {
+  transform: rotate(90deg);
+}
+
+.online-ocr-section summary::-webkit-details-marker {
+  display: none;
+}
+
+.online-ocr-section > *:not(summary) {
+  padding: 0 16px 16px;
 }
 
 .engine-unavailable {
@@ -657,4 +738,143 @@ input:checked + .switch-slider:before {
   font-size: 12px;
   color: var(--text-muted);
   min-width: 40px;
+}
+
+/* ========== 链接按钮样式 ========== */
+.link-button {
+  background: none;
+  border: none;
+  color: var(--accent-primary);
+  cursor: pointer;
+  font-size: inherit;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.link-button:hover {
+  color: var(--accent-hover);
+}
+
+/* ========== 内联提示样式 ========== */
+.setting-hint-inline {
+  font-size: 13px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* ========== 新 OCR 设置布局 ========== */
+.ocr-section {
+  margin-top: 20px;
+  border: 1px solid var(--border-primary);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.ocr-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: var(--bg-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.ocr-section-header:hover {
+  background: var(--bg-tertiary);
+}
+
+.ocr-section-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ocr-section-title h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.current-engine-badge {
+  font-size: 12px;
+  padding: 2px 8px;
+  background: var(--accent-primary);
+  color: white;
+  border-radius: 10px;
+}
+
+.current-engine-badge.online {
+  background: var(--success-color, #22c55e);
+}
+
+.ocr-section[open] > .ocr-section-header .expand-icon {
+  transform: rotate(90deg);
+}
+
+.ocr-section > .ocr-engines-list {
+  padding: 12px;
+}
+
+/* 引擎详情折叠 */
+.engine-details {
+  margin-top: 8px;
+}
+
+.engine-details-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.engine-details-summary:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.engine-details[open] > .engine-details-summary .expand-icon-small {
+  transform: rotate(90deg);
+}
+
+.engine-details > .ocr-engine-item {
+  margin-top: 8px;
+}
+
+/* 推荐标签 */
+.engine-badge.recommend {
+  background: var(--warning-color, #f59e0b);
+  color: white;
+}
+
+.engine-badge.installed {
+  background: var(--success-color, #22c55e);
+  color: white;
+}
+
+/* 紧凑输入框 */
+.setting-input.compact {
+  margin-top: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+/* 小号卸载按钮 */
+.btn-small.uninstall {
+  padding: 4px 8px;
+  font-size: 12px;
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border-primary);
+}
+
+.btn-small.uninstall:hover {
+  color: var(--danger-color, #ef4444);
+  border-color: var(--danger-color, #ef4444);
 }
