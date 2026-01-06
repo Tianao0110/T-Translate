@@ -46,68 +46,51 @@ class OCRManager {
 
   /**
    * 注册所有 OCR 引擎
+   * 
+   * 分层策略（The Tiered Strategy）：
+   * 1. 主力先锋：本地 OCR (RapidOCR) - 处理 95% 的请求，毫秒级响应
+   * 2. 特种部队：视觉大模型 (LLM Vision) - "深度识别"模式，处理复杂排版/手写/模糊
+   * 3. 最终防线：在线 OCR API - 高精度模式或无显卡时的兜底
    */
   registerEngines() {
-    // LLM Vision 引擎（使用 LM Studio 的视觉模型）
-    this.registerEngine(OCR_ENGINES.LLM_VISION, {
-      name: 'LLM Vision',
-      description: '使用本地 LLM 视觉模型识别（如 Qwen-VL）',
-      type: 'local-llm',
-      isOnline: false,  // 本地 LLM 不算在线
-      init: this.initLLMVision.bind(this),
-      recognize: this.recognizeWithLLMVision.bind(this),
-      isAvailable: true,
-      priority: 1,
-      requirements: ['LM Studio', '视觉模型'],
-    });
-
-    // Windows OCR 引擎（系统内置）
-    this.registerEngine(OCR_ENGINES.WINDOWS_OCR, {
-      name: 'Windows OCR',
-      description: 'Windows 系统内置 OCR，无需安装',
-      type: 'system',
-      isOnline: false,
-      init: this.initWindowsOCR.bind(this),
-      recognize: this.recognizeWithWindowsOCR.bind(this),
-      isAvailable: false,  // 需要检测平台
-      priority: 2,
-      requirements: ['Windows 10+'],
-    });
-
-    // PaddleOCR 引擎（通过 @gutenye/ocr-node 实现，与 RapidOCR 合并）
-    // 注意：PaddleOCR 和 RapidOCR 底层都是 PaddleOCR 模型，这里合并为一个
-    this.registerEngine(OCR_ENGINES.PADDLE_OCR, {
-      name: 'PaddleOCR',
-      description: '基于 PaddleOCR 的本地 OCR，中文识别强',
-      type: 'local',
-      isOnline: false,
-      init: this.initPaddleOCR.bind(this),
-      recognize: this.recognizeWithPaddleOCR.bind(this),
-      isAvailable: true,  // 已实现
-      priority: 3,
-      requirements: [],
-    });
-
-    // RapidOCR 作为 PaddleOCR 的别名（底层相同）
+    // ========== 第一梯队：本地 OCR（主力先锋）==========
+    // RapidOCR - 默认首选，毫秒级响应
     this.registerEngine(OCR_ENGINES.RAPID_OCR, {
       name: 'RapidOCR',
-      description: '轻量级本地 OCR（基于 PaddleOCR）',
+      description: '本地 OCR，基于 PP-OCRv4，速度快',
       type: 'local',
+      tier: 1,  // 第一梯队
       isOnline: false,
       init: this.initRapidOCR.bind(this),
       recognize: this.recognizeWithRapidOCR.bind(this),
-      isAvailable: true,  // 已实现
-      priority: 4,
-      requirements: [],
+      isAvailable: true,
+      priority: 1,  // 最高优先级
+      requirements: ['需下载 ~60MB'],
     });
 
-    // ========== 在线 OCR API ==========
+    // ========== 第二梯队：视觉大模型（特种部队）==========
+    // LLM Vision - 深度识别模式，处理复杂场景
+    this.registerEngine(OCR_ENGINES.LLM_VISION, {
+      name: 'LLM Vision',
+      description: '视觉大模型，处理复杂排版/手写/模糊',
+      type: 'local-llm',
+      tier: 2,  // 第二梯队
+      isOnline: false,
+      init: this.initLLMVision.bind(this),
+      recognize: this.recognizeWithLLMVision.bind(this),
+      isAvailable: true,
+      priority: 2,
+      requirements: ['LM Studio', '视觉模型'],
+    });
+
+    // ========== 第三梯队：在线 OCR API（最终防线）==========
 
     // OCR.space（免费额度最高）
     this.registerEngine(OCR_ENGINES.OCRSPACE, {
       name: 'OCR.space',
-      description: '免费在线 OCR，25000次/月',
+      description: '在线 OCR，免费 25000次/月',
       type: 'online',
+      tier: 3,  // 第三梯队
       isOnline: true,
       init: this.initOnlineOCR.bind(this),
       recognize: this.recognizeWithOCRSpace.bind(this),
@@ -121,6 +104,7 @@ class OCRManager {
       name: 'Google Cloud Vision',
       description: '识别效果最好，200+ 语言',
       type: 'online',
+      tier: 3,
       isOnline: true,
       init: this.initOnlineOCR.bind(this),
       recognize: this.recognizeWithGoogleVision.bind(this),
@@ -134,6 +118,7 @@ class OCRManager {
       name: 'Azure OCR',
       description: '免费额度高，5000次/月',
       type: 'online',
+      tier: 3,
       isOnline: true,
       init: this.initOnlineOCR.bind(this),
       recognize: this.recognizeWithAzureOCR.bind(this),
@@ -147,6 +132,7 @@ class OCRManager {
       name: '百度 OCR',
       description: '中文识别最强，国内快',
       type: 'online',
+      tier: 3,
       isOnline: true,
       init: this.initOnlineOCR.bind(this),
       recognize: this.recognizeWithBaiduOCR.bind(this),
@@ -574,11 +560,12 @@ class OCRManager {
       throw new Error('不支持的图片格式');
     }
 
-    // 调用主进程的 PaddleOCR
+    // 调用主进程的 PaddleOCR/RapidOCR
     if (!window.electron?.ocr?.recognizeWithPaddleOCR) {
-      throw new Error('PaddleOCR IPC 接口未就绪');
+      throw new Error('RapidOCR IPC 接口未就绪，请检查是否已安装');
     }
 
+    console.log('[OCR] Calling RapidOCR via IPC...');
     const result = await window.electron.ocr.recognizeWithPaddleOCR(imageData, options);
 
     if (result.success) {
@@ -588,16 +575,44 @@ class OCRManager {
         lines: result.lines,
       };
     } else {
-      throw new Error(result.error || 'PaddleOCR 识别失败');
+      throw new Error(result.error || 'RapidOCR 识别失败');
     }
   }
 
   /**
-   * 使用 RapidOCR 识别（与 PaddleOCR 相同实现）
+   * 使用 RapidOCR 识别
    */
   async recognizeWithRapidOCR(input, options = {}) {
-    // RapidOCR 底层使用相同的实现
-    return this.recognizeWithPaddleOCR(input, options);
+    let imageData;
+    
+    // 处理输入
+    if (typeof input === 'string' && input.startsWith('data:image')) {
+      imageData = input;
+    } else if (input instanceof Blob || input instanceof File) {
+      imageData = await this.blobToDataURL(input);
+    } else if (typeof input === 'string') {
+      imageData = `data:image/png;base64,${input}`;
+    } else {
+      throw new Error('不支持的图片格式');
+    }
+
+    // 调用主进程的 RapidOCR（使用 paddle-ocr IPC 通道）
+    if (!window.electron?.ocr?.recognizeWithPaddleOCR) {
+      throw new Error('RapidOCR IPC 接口未就绪，请检查是否已安装');
+    }
+
+    console.log('[OCR] Calling RapidOCR via IPC...');
+    const result = await window.electron.ocr.recognizeWithPaddleOCR(imageData, options);
+
+    if (result.success) {
+      return {
+        text: result.text,
+        confidence: result.confidence || 0.9,
+        lines: result.lines,
+      };
+    } else {
+      throw new Error(result.error || 'RapidOCR 识别失败');
+    }
   }
 
   // ========== 在线 OCR API ==========
@@ -626,6 +641,32 @@ class OCRManager {
   }
 
   /**
+   * 从存储读取设置（支持 electron store 和 localStorage）
+   */
+  async getSettingsFromStorage() {
+    try {
+      // 优先从 electron store 读取
+      if (window.electron?.store?.get) {
+        const settings = await window.electron.store.get('settings');
+        if (settings) {
+          console.log('[OCR] Settings loaded from electron store');
+          return settings;
+        }
+      }
+      
+      // 回退到 localStorage
+      const savedSettings = localStorage.getItem('settings');
+      if (savedSettings) {
+        console.log('[OCR] Settings loaded from localStorage');
+        return JSON.parse(savedSettings);
+      }
+    } catch (e) {
+      console.warn('[OCR] Failed to read settings from storage:', e);
+    }
+    return null;
+  }
+
+  /**
    * 使用 OCR.space 识别
    */
   async recognizeWithOCRSpace(input, options = {}) {
@@ -635,8 +676,21 @@ class OCRManager {
       throw new Error('OCR.space IPC 接口未就绪');
     }
 
+    // 从设置中读取 API Key（如果没有在 options 中传递）
+    let apiKey = options.apiKey;
+    if (!apiKey) {
+      const settings = await this.getSettingsFromStorage();
+      apiKey = settings?.ocr?.ocrspaceKey;
+      console.log('[OCR] OCR.space API Key from settings:', apiKey ? '已配置' : '未配置');
+    }
+    
+    if (!apiKey) {
+      throw new Error('未配置 OCR.space API Key，请在设置中配置');
+    }
+
+    console.log('[OCR] Calling OCR.space API...');
     const result = await window.electron.ocr.recognizeWithOCRSpace(imageData, {
-      apiKey: options.apiKey,
+      apiKey: apiKey,
       language: options.language || 'chs',
     });
 
@@ -660,8 +714,20 @@ class OCRManager {
       throw new Error('Google Vision IPC 接口未就绪');
     }
 
+    // 从设置中读取 API Key
+    let apiKey = options.apiKey;
+    if (!apiKey) {
+      const settings = await this.getSettingsFromStorage();
+      apiKey = settings?.ocr?.googleVisionKey;
+    }
+    
+    if (!apiKey) {
+      throw new Error('未配置 Google Vision API Key，请在设置中配置');
+    }
+
+    console.log('[OCR] Calling Google Vision API...');
     const result = await window.electron.ocr.recognizeWithGoogleVision(imageData, {
-      apiKey: options.apiKey,
+      apiKey: apiKey,
       languages: options.languages || ['zh', 'en'],
     });
 
@@ -685,8 +751,20 @@ class OCRManager {
       throw new Error('Azure OCR IPC 接口未就绪');
     }
 
+    // 从设置中读取 API Key
+    let apiKey = options.apiKey;
+    if (!apiKey) {
+      const settings = await this.getSettingsFromStorage();
+      apiKey = settings?.ocr?.azureKey;
+    }
+    
+    if (!apiKey) {
+      throw new Error('未配置 Azure OCR API Key，请在设置中配置');
+    }
+
+    console.log('[OCR] Calling Azure OCR API...');
     const result = await window.electron.ocr.recognizeWithAzureOCR(imageData, {
-      apiKey: options.apiKey,
+      apiKey: apiKey,
       region: options.region || 'eastus',
       language: options.language || 'zh-Hans',
     });
@@ -711,9 +789,23 @@ class OCRManager {
       throw new Error('百度 OCR IPC 接口未就绪');
     }
 
+    // 从设置中读取 API Key
+    let apiKey = options.apiKey;
+    let secretKey = options.secretKey;
+    if (!apiKey || !secretKey) {
+      const settings = await this.getSettingsFromStorage();
+      apiKey = apiKey || settings?.ocr?.baiduApiKey;
+      secretKey = secretKey || settings?.ocr?.baiduSecretKey;
+    }
+    
+    if (!apiKey) {
+      throw new Error('未配置百度 OCR API Key，请在设置中配置');
+    }
+
+    console.log('[OCR] Calling Baidu OCR API...');
     const result = await window.electron.ocr.recognizeWithBaiduOCR(imageData, {
-      apiKey: options.apiKey,
-      secretKey: options.secretKey,
+      apiKey: apiKey,
+      secretKey: secretKey,
       language: options.language || 'CHN_ENG',
     });
 
@@ -728,19 +820,71 @@ class OCRManager {
   }
 
   /**
-   * 备用引擎识别
+   * 检查引擎是否配置了 API Key
+   */
+  async checkEngineApiKey(engineName) {
+    const settings = await this.getSettingsFromStorage();
+    if (!settings?.ocr) return false;
+    
+    switch (engineName) {
+      case OCR_ENGINES.OCRSPACE:
+        return !!settings.ocr.ocrspaceKey;
+      case OCR_ENGINES.GOOGLE_VISION:
+        return !!settings.ocr.googleVisionKey;
+      case OCR_ENGINES.AZURE_OCR:
+        return !!settings.ocr.azureKey;
+      case OCR_ENGINES.BAIDU_OCR:
+        return !!settings.ocr.baiduApiKey;
+      default:
+        return true;  // 本地引擎不需要 API Key
+    }
+  }
+
+  /**
+   * 备用引擎识别（分层策略）
+   * 
+   * 回退顺序：
+   * 1. 如果本地 OCR 失败 → 尝试 LLM Vision（第二梯队）
+   * 2. 如果 LLM Vision 也失败 → 尝试在线 OCR API（第三梯队）
+   * 3. 如果用户开启了隐私模式，跳过在线 API
    */
   async recognizeWithFallback(input, options, failedEngine) {
-    const engines = Array.from(this.engines.entries())
-      .filter(([name, engine]) => 
-        name !== failedEngine && 
-        engine.isAvailable && 
-        this.isEngineAllowedByPrivacy(engine)
-      )
-      .sort((a, b) => a[1].priority - b[1].priority);
+    const settings = await this.getSettingsFromStorage();
+    const privacyMode = settings?.privacy?.enabled;
+    
+    // 获取所有引擎
+    const allEngines = Array.from(this.engines.entries());
+    
+    // 过滤可用引擎（异步检查 API Key）
+    const availableEngines = [];
+    for (const [name, engine] of allEngines) {
+      // 排除已失败的引擎
+      if (name === failedEngine) continue;
+      // 排除不可用的引擎
+      if (!engine.isAvailable) continue;
+      // 隐私模式下排除在线引擎
+      if (privacyMode && engine.isOnline) continue;
+      // 检查 API Key（在线引擎需要配置）
+      if (engine.isOnline) {
+        const hasApiKey = await this.checkEngineApiKey(name);
+        if (!hasApiKey) {
+          console.log(`[OCR] 跳过 ${engine.name}：未配置 API Key`);
+          continue;
+        }
+      }
+      availableEngines.push([name, engine]);
+    }
+    
+    // 按 tier 和 priority 排序
+    availableEngines.sort((a, b) => {
+      const tierA = a[1].tier || 99;
+      const tierB = b[1].tier || 99;
+      if (tierA !== tierB) return tierA - tierB;
+      return a[1].priority - b[1].priority;
+    });
 
-    for (const [name, engine] of engines) {
-      console.log(`[OCR] 尝试备用引擎: ${engine.name}`);
+    for (const [name, engine] of availableEngines) {
+      console.log(`[OCR] 尝试备用引擎: ${engine.name} (Tier ${engine.tier || '?'})`);
       try {
         const result = await engine.recognize(input, options);
         return {
@@ -749,17 +893,18 @@ class OCRManager {
           confidence: result.confidence,
           engine: engine.name,
           fallback: true,
+          tier: engine.tier,
           ...result
         };
       } catch (error) {
-        console.error(`[OCR] 备用引擎 ${engine.name} 也失败:`, error);
+        console.error(`[OCR] 备用引擎 ${engine.name} 也失败:`, error.message);
       }
     }
 
     return {
       success: false,
       error: '所有 OCR 引擎都失败了',
-      engines: engines.map(e => e[0])
+      engines: availableEngines.map(e => e[0])
     };
   }
 

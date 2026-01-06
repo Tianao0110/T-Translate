@@ -59,6 +59,43 @@ contextBridge.exposeInMainWorld('electron', {
     },
   },
   
+  // OCR API（与主窗口共享）
+  ocr: {
+    // PaddleOCR / RapidOCR
+    recognizeWithPaddleOCR: (imageData, options) =>
+      ipcRenderer.invoke("ocr:paddle-ocr", imageData, options),
+    // OCR.space
+    recognizeWithOCRSpace: (imageData, options) =>
+      ipcRenderer.invoke("ocr:ocrspace", imageData, options),
+    // Google Vision
+    recognizeWithGoogleVision: (imageData, options) =>
+      ipcRenderer.invoke("ocr:google-vision", imageData, options),
+    // Azure OCR
+    recognizeWithAzureOCR: (imageData, options) =>
+      ipcRenderer.invoke("ocr:azure-ocr", imageData, options),
+    // 百度 OCR
+    recognizeWithBaiduOCR: (imageData, options) =>
+      ipcRenderer.invoke("ocr:baidu-ocr", imageData, options),
+    // 获取可用引擎
+    getAvailableEngines: () => ipcRenderer.invoke("ocr:get-available-engines"),
+    // 检查安装状态
+    checkInstalled: () => ipcRenderer.invoke("ocr:check-installed"),
+  },
+  
+  // 翻译 API
+  translate: {
+    // 调用翻译
+    translate: (text, options) => ipcRenderer.invoke('translate:translate', text, options),
+    // 流式翻译
+    streamTranslate: (text, options) => ipcRenderer.invoke('translate:stream', text, options),
+    // 监听流式输出
+    onStreamChunk: (callback) => {
+      const handler = (event, data) => callback(data);
+      ipcRenderer.on('translate:stream-chunk', handler);
+      return () => ipcRenderer.removeListener('translate:stream-chunk', handler);
+    },
+  },
+  
   // 剪贴板
   clipboard: {
     writeText: (text) => ipcRenderer.invoke('clipboard:write-text', text),

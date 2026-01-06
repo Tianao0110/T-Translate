@@ -80,7 +80,7 @@ ipcMain.handle("store-get", async (event, key) => {
   try {
     return store.get(key);
   } catch (error) {
-    console.error('[Store] Get error:', error);
+    console.error("[Store] Get error:", error);
     return null;
   }
 });
@@ -90,7 +90,7 @@ ipcMain.handle("store-set", async (event, key, val) => {
     store.set(key, val);
     return { success: true };
   } catch (error) {
-    console.error('[Store] Set error:', error);
+    console.error("[Store] Set error:", error);
     return { success: false, error: error.message };
   }
 });
@@ -367,7 +367,7 @@ function showSelectionTrigger(mouseX, mouseY, rect) {
   const selectionSettings = settings.selection || {};
   const interfaceSettings = settings.interface || {};
   const translationSettings = settings.translation || {};
-  
+
   // 保存 rect 供后续 OCR 使用
   lastSelectionRect = rect;
 
@@ -415,7 +415,7 @@ function showSelectionTrigger(mouseX, mouseY, rect) {
       translation: {
         targetLanguage: translationSettings.targetLanguage || "zh",
         sourceLanguage: translationSettings.sourceLanguage || "auto",
-      }
+      },
     });
   };
 
@@ -1495,41 +1495,42 @@ function setupIPC() {
   ipcMain.handle("get-platform", () => {
     return process.platform;
   });
-  
+
   // API 健康检查
   ipcMain.handle("api:health-check", async () => {
     try {
       const settings = store.get("settings", {});
-      const endpoint = settings.connection?.apiEndpoint || "http://localhost:1234/v1";
-      
+      const endpoint =
+        settings.connection?.apiEndpoint || "http://localhost:1234/v1";
+
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
+
       const response = await fetch(`${endpoint}/models`, {
-        signal: controller.signal
+        signal: controller.signal,
       });
-      
+
       clearTimeout(timeoutId);
-      
+
       if (response.ok) {
         const data = await response.json();
         return {
           success: true,
           models: data?.data || [],
-          message: "连接正常"
+          message: "连接正常",
         };
       } else {
         return {
           success: false,
           models: [],
-          message: `服务器返回 ${response.status}`
+          message: `服务器返回 ${response.status}`,
         };
       }
     } catch (error) {
       return {
         success: false,
         models: [],
-        message: error.name === 'AbortError' ? '连接超时' : '无法连接服务'
+        message: error.name === "AbortError" ? "连接超时" : "无法连接服务",
       };
     }
   });
@@ -1782,7 +1783,8 @@ function setupIPC() {
 
     // 尝试从主窗口获取当前目标语言和原文语言
     let currentTargetLang = mainSettings.translation?.defaultTargetLang ?? "zh";
-    let currentSourceLang = mainSettings.translation?.defaultSourceLang ?? "auto";
+    let currentSourceLang =
+      mainSettings.translation?.defaultSourceLang ?? "auto";
 
     // 通过 IPC 从主窗口获取实时的目标语言
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -1822,7 +1824,7 @@ function setupIPC() {
       streamOutput: glassConfig.streamOutput ?? true,
       // 使用全局 OCR 引擎设置
       ocrEngine: ocrConfig.engine ?? glassConfig.ocrEngine ?? "llm-vision",
-      globalOcrEngine: ocrConfig.engine ?? "llm-vision",  // 全局设置
+      globalOcrEngine: ocrConfig.engine ?? "llm-vision", // 全局设置
       defaultOpacity: glassConfig.defaultOpacity ?? 0.85,
       autoPin: glassConfig.autoPin ?? true,
       // 翻译设置 - 使用实时获取的语言
@@ -2006,11 +2008,11 @@ function setupIPC() {
       const os = require("os");
       const release = os.release();
       const majorVersion = parseInt(release.split(".")[0]);
-      
+
       if (majorVersion < 10) {
         return { available: false, reason: "需要 Windows 10 或更高版本" };
       }
-      
+
       // 检查可用的 OCR 语言
       const { execSync } = require("child_process");
       const psScript = `
@@ -2020,20 +2022,26 @@ $null = [Windows.Media.Ocr.OcrEngine, Windows.Foundation, ContentType = WindowsR
 $langs = [Windows.Media.Ocr.OcrEngine]::AvailableRecognizerLanguages
 $langs | ForEach-Object { $_.LanguageTag }
       `.trim();
-      
+
       try {
         const result = execSync(
-          `powershell -NoProfile -ExecutionPolicy Bypass -Command "${psScript.replace(/"/g, '\\"')}"`,
+          `powershell -NoProfile -ExecutionPolicy Bypass -Command "${psScript.replace(
+            /"/g,
+            '\\"'
+          )}"`,
           { encoding: "utf8", timeout: 10000, windowsHide: true }
         );
-        
-        const languages = result.trim().split('\n').filter(l => l.trim());
+
+        const languages = result
+          .trim()
+          .split("\n")
+          .filter((l) => l.trim());
         console.log("[OCR] Windows OCR available languages:", languages);
-        
-        return { 
-          available: languages.length > 0, 
+
+        return {
+          available: languages.length > 0,
           languages: languages,
-          reason: languages.length > 0 ? null : "未安装任何 OCR 语言包"
+          reason: languages.length > 0 ? null : "未安装任何 OCR 语言包",
         };
       } catch (e) {
         console.error("[OCR] Failed to get Windows OCR languages:", e.message);
@@ -2066,25 +2074,25 @@ $langs | ForEach-Object { $_.LanguageTag }
       );
       const fs = require("fs");
       fs.writeFileSync(tempFile, Buffer.from(base64Data, "base64"));
-      
+
       console.log("[OCR] Windows OCR temp file:", tempFile);
       console.log("[OCR] Windows OCR language:", options.language || "zh-Hans");
 
       // 使用 PowerShell 调用 Windows OCR API
       const { execSync } = require("child_process");
       const language = options.language || "zh-Hans";
-      
+
       // 语言代码映射（Windows OCR 使用 BCP-47 标签）
       const langMap = {
-        'zh-Hans': 'zh-Hans-CN',
-        'zh-Hant': 'zh-Hant-TW', 
-        'en': 'en-US',
-        'ja': 'ja-JP',
-        'ko': 'ko-KR',
-        'fr': 'fr-FR',
-        'de': 'de-DE',
-        'es': 'es-ES',
-        'ru': 'ru-RU',
+        "zh-Hans": "zh-Hans-CN",
+        "zh-Hant": "zh-Hant-TW",
+        en: "en-US",
+        ja: "ja-JP",
+        ko: "ko-KR",
+        fr: "fr-FR",
+        de: "de-DE",
+        es: "es-ES",
+        ru: "ru-RU",
       };
       const winLang = langMap[language] || language;
 
@@ -2168,9 +2176,12 @@ try {
       `.trim();
 
       console.log("[OCR] Executing Windows OCR PowerShell script...");
-      
+
       const result = execSync(
-        `powershell -NoProfile -ExecutionPolicy Bypass -Command "${psScript.replace(/"/g, '\\"')}"`,
+        `powershell -NoProfile -ExecutionPolicy Bypass -Command "${psScript.replace(
+          /"/g,
+          '\\"'
+        )}"`,
         {
           encoding: "utf8",
           maxBuffer: 10 * 1024 * 1024,
@@ -2187,7 +2198,10 @@ try {
 
       const text = result.trim();
       console.log("[OCR] Windows OCR raw result length:", result.length);
-      console.log("[OCR] Windows OCR result:", text.substring(0, 200) || "(empty)");
+      console.log(
+        "[OCR] Windows OCR result:",
+        text.substring(0, 200) || "(empty)"
+      );
 
       return {
         success: true,
@@ -2213,7 +2227,7 @@ try {
     } catch (e) {
       console.log("[OCR] @gutenye/ocr-node not available:", e.message);
     }
-    
+
     // 尝试 multilingual-purejs-ocr
     try {
       await import("multilingual-purejs-ocr");
@@ -2222,7 +2236,7 @@ try {
     } catch (e) {
       console.log("[OCR] multilingual-purejs-ocr not available:", e.message);
     }
-    
+
     return { available: false };
   });
 
@@ -2252,59 +2266,77 @@ try {
     try {
       let result;
       let lastError = null;
-      
+
       // 尝试 multilingual-purejs-ocr（优先，因为有明确的 API）
       try {
         console.log("[OCR] Trying multilingual-purejs-ocr (dynamic import)...");
         const pureJsModule = await import("multilingual-purejs-ocr");
-        console.log("[OCR] multilingual-purejs-ocr imported, keys:", Object.keys(pureJsModule));
-        
+        console.log(
+          "[OCR] multilingual-purejs-ocr imported, keys:",
+          Object.keys(pureJsModule)
+        );
+
         // 获取 Ocr 类
-        const OcrClass = pureJsModule.Ocr || pureJsModule.default?.Ocr || pureJsModule.default;
-        console.log("[OCR] OcrClass type:", typeof OcrClass, "name:", OcrClass?.name);
-        
-        if (typeof OcrClass !== 'function') {
+        const OcrClass =
+          pureJsModule.Ocr || pureJsModule.default?.Ocr || pureJsModule.default;
+        console.log(
+          "[OCR] OcrClass type:",
+          typeof OcrClass,
+          "name:",
+          OcrClass?.name
+        );
+
+        if (typeof OcrClass !== "function") {
           throw new Error("Ocr class not found in multilingual-purejs-ocr");
         }
-        
+
         // 使用懒加载的实例
         if (!global.pureJsOcrInstance) {
           console.log("[OCR] Creating new multilingual-purejs-ocr instance...");
           global.pureJsOcrInstance = new OcrClass();
           console.log("[OCR] multilingual-purejs-ocr instance created");
         }
-        
+
         // 读取图片为 Buffer
         const imgBuffer = fs.readFileSync(tempFile);
-        
+
         console.log("[OCR] Running multilingual-purejs-ocr.recognize...");
         // 根据 API 文档调用
         result = await global.pureJsOcrInstance.recognize(imgBuffer);
-        console.log("[OCR] multilingual-purejs-ocr raw result:", typeof result, result);
-        
+        console.log(
+          "[OCR] multilingual-purejs-ocr raw result:",
+          typeof result,
+          result
+        );
+
         if (result) {
-          let text = '';
+          let text = "";
           let lines = [];
-          
+
           // 处理不同的返回格式
-          if (typeof result === 'string') {
+          if (typeof result === "string") {
             text = result;
           } else if (result.text) {
             text = result.text;
             lines = result.lines || [];
           } else if (Array.isArray(result)) {
-            lines = result.map(item => ({
+            lines = result.map((item) => ({
               text: item.text || item[1]?.[0] || String(item),
               confidence: item.score || item.confidence || item[1]?.[1] || 0.9,
             }));
-            text = lines.map(l => l.text).join('\n');
+            text = lines.map((l) => l.text).join("\n");
           }
-          
+
           if (text) {
-            console.log("[OCR] multilingual-purejs-ocr result:", text.substring(0, 100));
+            console.log(
+              "[OCR] multilingual-purejs-ocr result:",
+              text.substring(0, 100)
+            );
 
             // 清理临时文件
-            try { fs.unlinkSync(tempFile); } catch (e) {}
+            try {
+              fs.unlinkSync(tempFile);
+            } catch (e) {}
 
             return {
               success: true,
@@ -2316,34 +2348,43 @@ try {
           }
         }
       } catch (pureJsError) {
-        console.log("[OCR] multilingual-purejs-ocr failed:", pureJsError.message);
+        console.log(
+          "[OCR] multilingual-purejs-ocr failed:",
+          pureJsError.message
+        );
         lastError = pureJsError;
       }
-      
+
       // 尝试 @gutenye/ocr-node
       try {
         console.log("[OCR] Trying @gutenye/ocr-node (dynamic import)...");
         const ocrModule = await import("@gutenye/ocr-node");
-        console.log("[OCR] @gutenye/ocr-node imported, keys:", Object.keys(ocrModule));
-        
+        console.log(
+          "[OCR] @gutenye/ocr-node imported, keys:",
+          Object.keys(ocrModule)
+        );
+
         // 尝试各种可能的导出方式
         let Ocr = ocrModule.default;
-        if (!Ocr || typeof Ocr.create !== 'function') {
+        if (!Ocr || typeof Ocr.create !== "function") {
           Ocr = ocrModule.Ocr;
         }
-        if (!Ocr || typeof Ocr.create !== 'function') {
+        if (!Ocr || typeof Ocr.create !== "function") {
           // 可能模块本身就是 Ocr 类
-          if (typeof ocrModule.create === 'function') {
+          if (typeof ocrModule.create === "function") {
             Ocr = ocrModule;
           }
         }
-        
-        console.log("[OCR] Ocr object:", Ocr ? Object.keys(Ocr) : 'undefined');
-        
-        if (!Ocr || typeof Ocr.create !== 'function') {
-          throw new Error("Cannot find Ocr.create in @gutenye/ocr-node, available: " + Object.keys(ocrModule).join(', '));
+
+        console.log("[OCR] Ocr object:", Ocr ? Object.keys(Ocr) : "undefined");
+
+        if (!Ocr || typeof Ocr.create !== "function") {
+          throw new Error(
+            "Cannot find Ocr.create in @gutenye/ocr-node, available: " +
+              Object.keys(ocrModule).join(", ")
+          );
         }
-        
+
         if (!global.gutenyeOcrInstance) {
           console.log("[OCR] Initializing @gutenye/ocr-node...");
           global.gutenyeOcrInstance = await Ocr.create();
@@ -2353,7 +2394,7 @@ try {
         console.log("[OCR] Running OCR detection...");
         result = await global.gutenyeOcrInstance.detect(tempFile);
         console.log("[OCR] Detection result:", result?.length || 0, "items");
-        
+
         if (result && result.length > 0) {
           const lines = result.map((item) => ({
             text: item.text,
@@ -2362,12 +2403,18 @@ try {
           }));
 
           const fullText = lines.map((l) => l.text).join("\n");
-          const avgConfidence = lines.reduce((sum, l) => sum + l.confidence, 0) / lines.length;
+          const avgConfidence =
+            lines.reduce((sum, l) => sum + l.confidence, 0) / lines.length;
 
-          console.log("[OCR] @gutenye/ocr-node result:", fullText.substring(0, 100));
+          console.log(
+            "[OCR] @gutenye/ocr-node result:",
+            fullText.substring(0, 100)
+          );
 
           // 清理临时文件
-          try { fs.unlinkSync(tempFile); } catch (e) {}
+          try {
+            fs.unlinkSync(tempFile);
+          } catch (e) {}
 
           return {
             success: true,
@@ -2383,7 +2430,9 @@ try {
       }
 
       // 清理临时文件
-      try { fs.unlinkSync(tempFile); } catch (e) {}
+      try {
+        fs.unlinkSync(tempFile);
+      } catch (e) {}
 
       // 没有可用的 OCR 引擎或无结果
       if (lastError) {
@@ -2392,7 +2441,7 @@ try {
           error: `PaddleOCR 引擎加载失败: ${lastError.message}`,
         };
       }
-      
+
       // 识别成功但没有文字
       return {
         success: true,
@@ -2401,11 +2450,12 @@ try {
         lines: [],
         engine: "purejs-ocr",
       };
-      
     } catch (error) {
       console.error("[OCR] PaddleOCR failed:", error);
       // 清理临时文件
-      try { fs.unlinkSync(tempFile); } catch (e) {}
+      try {
+        fs.unlinkSync(tempFile);
+      } catch (e) {}
       return {
         success: false,
         error: error.message || "PaddleOCR 识别失败",
@@ -2472,10 +2522,8 @@ try {
   // 检查 OCR 引擎安装状态
   ipcMain.handle("ocr:check-installed", async () => {
     const status = {
-      'llm-vision': true,  // 内置
-      'windows-ocr': process.platform === 'win32',
-      'paddle-ocr': false,
-      'rapid-ocr': false,
+      "llm-vision": true, // 内置
+      "rapid-ocr": false,
     };
 
     // 检查模块是否安装 (安全方式)
@@ -2488,17 +2536,12 @@ try {
       }
     };
 
-    // 检查 multilingual-purejs-ocr (PaddleOCR)
-    if (checkModule("multilingual-purejs-ocr")) {
-      status['paddle-ocr'] = true;
-    }
-    
     // 检查 @gutenye/ocr-node (RapidOCR)
     if (checkModule("@gutenye/ocr-node")) {
-      status['rapid-ocr'] = true;
+      status["rapid-ocr"] = true;
     }
 
-    console.log('[OCR] Installed status:', status);
+    console.log("[OCR] Installed status:", status);
     return status;
   });
 
@@ -2513,53 +2556,56 @@ try {
     try {
       let packageName;
       let packageDesc;
-      
+
       switch (engineId) {
-        case 'paddle-ocr':
+        case "paddle-ocr":
           // 使用 multilingual-purejs-ocr - 基于 PaddleOCR v3/v4 的纯 JS 实现
-          packageName = 'multilingual-purejs-ocr';
-          packageDesc = 'PaddleOCR (multilingual-purejs-ocr)';
+          packageName = "multilingual-purejs-ocr";
+          packageDesc = "PaddleOCR (multilingual-purejs-ocr)";
           break;
-        case 'rapid-ocr':
+        case "rapid-ocr":
           // 使用 @gutenye/ocr-node - 基于 PP-OCRv4 + ONNX Runtime
-          packageName = '@gutenye/ocr-node';
-          packageDesc = 'RapidOCR (@gutenye/ocr-node)';
+          packageName = "@gutenye/ocr-node";
+          packageDesc = "RapidOCR (@gutenye/ocr-node)";
           break;
         default:
-          return { success: false, error: '未知的引擎 ID' };
+          return { success: false, error: "未知的引擎 ID" };
       }
 
       // 获取应用目录
       const appPath = app.getAppPath();
       const isPackaged = app.isPackaged;
-      
+
       // 安装路径 - 开发模式下使用项目根目录
       let installPath;
       if (isPackaged) {
-        installPath = app.getPath('userData');
+        installPath = app.getPath("userData");
       } else {
         // 开发模式：尝试多种方式找到项目根目录
-        const fs = require('fs');
+        const fs = require("fs");
         const possiblePaths = [
           appPath,
           path.dirname(appPath),
           process.cwd(),
-          path.join(process.cwd(), '..'),
-          path.resolve(__dirname, '..'),
-          path.resolve(__dirname, '../..'),
+          path.join(process.cwd(), ".."),
+          path.resolve(__dirname, ".."),
+          path.resolve(__dirname, "../.."),
         ];
-        
-        console.log('[OCR] Searching for project root, checking paths:', possiblePaths);
-        
+
+        console.log(
+          "[OCR] Searching for project root, checking paths:",
+          possiblePaths
+        );
+
         for (const checkPath of possiblePaths) {
           try {
-            const packageJsonPath = path.join(checkPath, 'package.json');
+            const packageJsonPath = path.join(checkPath, "package.json");
             if (fs.existsSync(packageJsonPath)) {
               // 验证这是我们的项目（检查 package.json 内容）
-              const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-              if (pkg.name === 't-translate' || pkg.dependencies?.electron) {
+              const pkg = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
+              if (pkg.name === "t-translate" || pkg.dependencies?.electron) {
                 installPath = checkPath;
-                console.log('[OCR] Found project root:', installPath);
+                console.log("[OCR] Found project root:", installPath);
                 break;
               }
             }
@@ -2567,20 +2613,30 @@ try {
             // 忽略错误，继续尝试下一个路径
           }
         }
-        
+
         // 最后备选：使用 process.cwd()
         if (!installPath) {
           installPath = process.cwd();
-          console.log('[OCR] Using process.cwd() as fallback:', installPath);
+          console.log("[OCR] Using process.cwd() as fallback:", installPath);
         }
       }
 
       // 安全检查：确保路径不是根目录
-      if (installPath === '/' || installPath === 'C:\\' || installPath === 'F:\\' || installPath.match(/^[A-Z]:\\$/)) {
-        console.error('[OCR] Invalid install path (root directory):', installPath);
-        return { 
-          success: false, 
-          error: '无法确定安装路径，请手动在项目目录运行: npm install ' + packageName 
+      if (
+        installPath === "/" ||
+        installPath === "C:\\" ||
+        installPath === "F:\\" ||
+        installPath.match(/^[A-Z]:\\$/)
+      ) {
+        console.error(
+          "[OCR] Invalid install path (root directory):",
+          installPath
+        );
+        return {
+          success: false,
+          error:
+            "无法确定安装路径，请手动在项目目录运行: npm install " +
+            packageName,
         };
       }
 
@@ -2589,86 +2645,92 @@ try {
 
       // 发送进度
       if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('ocr:download-progress', { 
-          engineId, 
-          progress: 10, 
-          status: `正在下载 ${packageDesc}...` 
+        mainWindow.webContents.send("ocr:download-progress", {
+          engineId,
+          progress: 10,
+          status: `正在下载 ${packageDesc}...`,
         });
       }
 
       // 检查 npm 是否可用
       try {
-        await execAsync('npm --version', { timeout: 10000 });
+        await execAsync("npm --version", { timeout: 10000 });
       } catch (e) {
-        return { 
-          success: false, 
-          error: 'npm 不可用，请确保已安装 Node.js 并添加到环境变量' 
+        return {
+          success: false,
+          error: "npm 不可用，请确保已安装 Node.js 并添加到环境变量",
         };
       }
 
       // 发送进度
       if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('ocr:download-progress', { 
-          engineId, 
-          progress: 30, 
-          status: '正在安装依赖...' 
+        mainWindow.webContents.send("ocr:download-progress", {
+          engineId,
+          progress: 30,
+          status: "正在安装依赖...",
         });
       }
 
       // 执行 npm install
       const { stdout, stderr } = await execAsync(
         `npm install ${packageName} --save --legacy-peer-deps`,
-        { 
+        {
           cwd: installPath,
-          timeout: 600000,  // 10 分钟超时（模型文件可能较大）
-          env: { ...process.env, npm_config_loglevel: 'error' }
+          timeout: 600000, // 10 分钟超时（模型文件可能较大）
+          env: { ...process.env, npm_config_loglevel: "error" },
         }
       );
 
-      console.log('[OCR] npm install stdout:', stdout);
-      if (stderr && !stderr.includes('npm WARN')) {
-        console.log('[OCR] npm install stderr:', stderr);
+      console.log("[OCR] npm install stdout:", stdout);
+      if (stderr && !stderr.includes("npm WARN")) {
+        console.log("[OCR] npm install stderr:", stderr);
       }
 
       // 清理全局 OCR 实例缓存，以便下次使用新安装的模块
-      if (engineId === 'paddle-ocr') {
+      if (engineId === "paddle-ocr") {
         global.pureJsOcrInstance = null;
-      } else if (engineId === 'rapid-ocr') {
+      } else if (engineId === "rapid-ocr") {
         global.gutenyeOcrInstance = null;
       }
 
       // 发送完成
       if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('ocr:download-progress', { 
-          engineId, 
-          progress: 100, 
-          status: '安装完成！' 
+        mainWindow.webContents.send("ocr:download-progress", {
+          engineId,
+          progress: 100,
+          status: "安装完成！",
         });
       }
 
-      return { 
-        success: true, 
+      return {
+        success: true,
         message: `${packageDesc} 安装成功`,
-        needRestart: true,  // 提示需要重启
-        restartMessage: '为确保 OCR 引擎正常工作，建议重启应用'
+        needRestart: true, // 提示需要重启
+        restartMessage: "为确保 OCR 引擎正常工作，建议重启应用",
       };
     } catch (error) {
-      console.error('[OCR] Download failed:', error);
-      
+      console.error("[OCR] Download failed:", error);
+
       // 更友好的错误信息
-      let errorMessage = '下载失败';
-      if (error.message?.includes('ENOENT')) {
-        errorMessage = 'npm 命令未找到，请确保已安装 Node.js';
-      } else if (error.message?.includes('ETIMEDOUT') || error.message?.includes('timeout')) {
-        errorMessage = '下载超时，请检查网络连接后重试';
-      } else if (error.message?.includes('EACCES')) {
-        errorMessage = '权限不足，请以管理员身份运行';
-      } else if (error.message?.includes('404') || error.message?.includes('Not Found')) {
-        errorMessage = '包不存在或已下架，请稍后重试';
+      let errorMessage = "下载失败";
+      if (error.message?.includes("ENOENT")) {
+        errorMessage = "npm 命令未找到，请确保已安装 Node.js";
+      } else if (
+        error.message?.includes("ETIMEDOUT") ||
+        error.message?.includes("timeout")
+      ) {
+        errorMessage = "下载超时，请检查网络连接后重试";
+      } else if (error.message?.includes("EACCES")) {
+        errorMessage = "权限不足，请以管理员身份运行";
+      } else if (
+        error.message?.includes("404") ||
+        error.message?.includes("Not Found")
+      ) {
+        errorMessage = "包不存在或已下架，请稍后重试";
       } else if (error.message) {
         errorMessage = error.message.substring(0, 200);
       }
-      
+
       return { success: false, error: errorMessage };
     }
   });
@@ -2694,7 +2756,7 @@ try {
 
       const paddleInstalled = checkModule("multilingual-purejs-ocr");
       const rapidInstalled = checkModule("@gutenye/ocr-node");
-      
+
       // 计算可用的本地 OCR 引擎数量（不含 Windows OCR 和 LLM Vision）
       let localEngineCount = 0;
       if (paddleInstalled) localEngineCount++;
@@ -2703,97 +2765,95 @@ try {
       // 确定要删除的包
       let packageName;
       let isTargetInstalled = false;
-      
+
       switch (engineId) {
-        case 'paddle-ocr':
-          packageName = 'multilingual-purejs-ocr';
+        case "paddle-ocr":
+          packageName = "multilingual-purejs-ocr";
           isTargetInstalled = paddleInstalled;
           break;
-        case 'rapid-ocr':
-          packageName = '@gutenye/ocr-node';
+        case "rapid-ocr":
+          packageName = "@gutenye/ocr-node";
           isTargetInstalled = rapidInstalled;
           break;
-        case 'llm-vision':
-          return { success: false, error: 'LLM Vision 是内置引擎，无法卸载' };
-        case 'windows-ocr':
-          return { success: false, error: 'Windows OCR 是系统引擎，无法卸载' };
+        case "llm-vision":
+          return { success: false, error: "LLM Vision 是内置引擎，无法卸载" };
+        case "windows-ocr":
+          return { success: false, error: "Windows OCR 是系统引擎，无法卸载" };
         default:
-          return { success: false, error: '无法删除该引擎' };
+          return { success: false, error: "无法删除该引擎" };
       }
 
       // 检查是否已安装
       if (!isTargetInstalled) {
-        return { success: false, error: '该引擎未安装' };
+        return { success: false, error: "该引擎未安装" };
       }
 
       // 保护：至少保留一个本地 OCR 引擎（不含 Windows OCR）
       if (localEngineCount <= 1) {
-        return { 
-          success: false, 
-          error: '无法卸载：必须保留至少一个本地 OCR 引擎。请先安装其他引擎后再卸载此引擎。' 
+        return {
+          success: false,
+          error:
+            "无法卸载：必须保留至少一个本地 OCR 引擎。请先安装其他引擎后再卸载此引擎。",
         };
       }
 
       const appPath = app.getAppPath();
       const isPackaged = app.isPackaged;
-      
+
       // 获取安装路径（与安装时使用相同逻辑）
       let installPath;
       if (isPackaged) {
-        installPath = app.getPath('userData');
+        installPath = app.getPath("userData");
       } else {
-        const fs = require('fs');
+        const fs = require("fs");
         const possiblePaths = [
           appPath,
           path.dirname(appPath),
           process.cwd(),
-          path.join(process.cwd(), '..'),
+          path.join(process.cwd(), ".."),
         ];
-        
+
         for (const checkPath of possiblePaths) {
           try {
-            const packageJsonPath = path.join(checkPath, 'package.json');
+            const packageJsonPath = path.join(checkPath, "package.json");
             if (fs.existsSync(packageJsonPath)) {
-              const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-              if (pkg.name === 't-translate' || pkg.dependencies?.electron) {
+              const pkg = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
+              if (pkg.name === "t-translate" || pkg.dependencies?.electron) {
                 installPath = checkPath;
                 break;
               }
             }
           } catch (e) {}
         }
-        
+
         if (!installPath) {
           installPath = process.cwd();
         }
       }
-      
+
       // 安全检查
-      if (installPath === '/' || installPath.match(/^[A-Z]:\\$/)) {
-        return { success: false, error: '无法确定卸载路径' };
+      if (installPath === "/" || installPath.match(/^[A-Z]:\\$/)) {
+        return { success: false, error: "无法确定卸载路径" };
       }
 
       console.log(`[OCR] Uninstalling ${packageName} from ${installPath}`);
 
-      await execAsync(
-        `npm uninstall ${packageName}`,
-        { 
-          cwd: installPath,
-          timeout: 60000,
-        }
-      );
+      await execAsync(`npm uninstall ${packageName}`, {
+        cwd: installPath,
+        timeout: 60000,
+      });
 
       // 清理全局实例
-      if (engineId === 'paddle-ocr') {
+      if (engineId === "paddle-ocr") {
         global.paddleOcrInstance = null;
-      } else if (engineId === 'rapid-ocr') {
+      } else if (engineId === "rapid-ocr") {
         global.rapidOcrInstance = null;
       }
 
       return { success: true, message: `${packageName} 已卸载` };
     } catch (error) {
-      console.error('[OCR] Remove failed:', error);
-      return { success: false, error: error.message || '卸载失败' };
+      console.error("[OCR] Remove failed:", error);
+      return { success: false, error: error.message || "卸载失败" };
     }
   });
 
@@ -2801,37 +2861,96 @@ try {
 
   // OCR.space API
   ipcMain.handle("ocr:ocrspace", async (event, imageData, options = {}) => {
+    // 🟢 统一使用一个大的 try...catch 即可，不需要嵌套
     try {
       const apiKey = options.apiKey;
       if (!apiKey) {
         return { success: false, error: "未配置 OCR.space API Key" };
       }
 
-      // 从 data URL 提取 base64
+      // 1. 数据准备
       let base64Data = imageData;
+      let mimeType = "image/png";
       if (imageData.startsWith("data:image")) {
+        const mimeMatch = imageData.match(/^data:(image\/\w+);base64,/);
+        if (mimeMatch) {
+          mimeType = mimeMatch[1];
+        }
         base64Data = imageData.split(",")[1];
       }
 
-      const FormData = require("form-data");
-      const formData = new FormData();
-      formData.append("base64Image", `data:image/png;base64,${base64Data}`);
-      formData.append("language", options.language || "chs"); // chs=简体中文
-      formData.append("isOverlayRequired", "false");
-      formData.append("OCREngine", options.engine || "2"); // Engine 2 更准确
+      const fileTypeMap = {
+        "image/png": "PNG",
+        "image/jpeg": "JPG",
+        "image/jpg": "JPG",
+        "image/gif": "GIF",
+        "image/bmp": "BMP",
+        "image/webp": "WEBP",
+        "image/tiff": "TIFF",
+      };
+      const fileType = fileTypeMap[mimeType] || "PNG";
+      // OCR.space 专用代码表：https://ocr.space/OCRAPI#PostParameters
+      let targetLang = options.language || "chs";
 
+      const langMap = {
+        "zh-Hans": "chs", // 简体中文
+        "zh-CN": "chs",
+        "zh-Hant": "cht", // 繁体中文
+        "zh-TW": "cht",
+        en: "eng", // 英语
+        "en-US": "eng",
+        ja: "jpn", // 日语
+        ko: "kor", // 韩语
+        fr: "fre", // 法语
+        de: "ger", // 德语
+        ru: "rus", // 俄语
+      };
+
+      // 如果映射表中存在，就用映射后的代码，否则默认用 chs
+      if (langMap[targetLang]) {
+        targetLang = langMap[targetLang];
+      }
+      console.log(
+        "[OCR] OCR.space request - filetype:",
+        fileType,
+        "language (mapped):", // 打印一下映射后的结果
+        targetLang
+      );
+
+      // 2. 构建请求参数 (URLSearchParams 方案)
+      const params = new URLSearchParams();
+      params.append("base64Image", `data:${mimeType};base64,${base64Data}`);
+      params.append("filetype", fileType);
+      params.append("language", targetLang);
+      params.append("isOverlayRequired", "false");
+      params.append("OCREngine", options.engine || "2");
+
+      // 3. 发送请求
       const response = await fetch("https://api.ocr.space/parse/image", {
         method: "POST",
         headers: {
           apikey: apiKey,
+          "Content-Type": "application/x-www-form-urlencoded",
         },
-        body: formData,
+        body: params,
       });
 
       const result = await response.json();
 
+      // 日志记录 (截取前200字符防止刷屏)
+      console.log(
+        "[OCR] OCR.space response:",
+        JSON.stringify(result).substring(0, 200)
+      );
+
       if (result.IsErroredOnProcessing) {
-        return { success: false, error: result.ErrorMessage || "OCR.space 处理失败" };
+        return {
+          success: false,
+          error:
+            result.ErrorMessage?.[0] ||
+            result.ErrorMessage ||
+            "OCR.space 处理失败",
+        };
       }
 
       const text = result.ParsedResults?.[0]?.ParsedText || "";
@@ -2850,63 +2969,71 @@ try {
   });
 
   // Google Cloud Vision API
-  ipcMain.handle("ocr:google-vision", async (event, imageData, options = {}) => {
-    try {
-      const apiKey = options.apiKey;
-      if (!apiKey) {
-        return { success: false, error: "未配置 Google Cloud Vision API Key" };
-      }
-
-      // 从 data URL 提取 base64
-      let base64Data = imageData;
-      if (imageData.startsWith("data:image")) {
-        base64Data = imageData.split(",")[1];
-      }
-
-      const response = await fetch(
-        `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            requests: [{
-              image: { content: base64Data },
-              features: [{ type: "TEXT_DETECTION" }],
-              imageContext: {
-                languageHints: options.languages || ["zh", "en"],
-              },
-            }],
-          }),
+  ipcMain.handle(
+    "ocr:google-vision",
+    async (event, imageData, options = {}) => {
+      try {
+        const apiKey = options.apiKey;
+        if (!apiKey) {
+          return {
+            success: false,
+            error: "未配置 Google Cloud Vision API Key",
+          };
         }
-      );
 
-      const result = await response.json();
+        // 从 data URL 提取 base64
+        let base64Data = imageData;
+        if (imageData.startsWith("data:image")) {
+          base64Data = imageData.split(",")[1];
+        }
 
-      if (result.error) {
-        return { success: false, error: result.error.message };
+        const response = await fetch(
+          `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              requests: [
+                {
+                  image: { content: base64Data },
+                  features: [{ type: "TEXT_DETECTION" }],
+                  imageContext: {
+                    languageHints: options.languages || ["zh", "en"],
+                  },
+                },
+              ],
+            }),
+          }
+        );
+
+        const result = await response.json();
+
+        if (result.error) {
+          return { success: false, error: result.error.message };
+        }
+
+        const text = result.responses?.[0]?.fullTextAnnotation?.text || "";
+        console.log("[OCR] Google Vision result:", text.substring(0, 100));
+
+        return {
+          success: true,
+          text: text.trim(),
+          confidence: 0.98,
+          engine: "google-vision",
+        };
+      } catch (error) {
+        console.error("[OCR] Google Vision failed:", error);
+        return { success: false, error: error.message };
       }
-
-      const text = result.responses?.[0]?.fullTextAnnotation?.text || "";
-      console.log("[OCR] Google Vision result:", text.substring(0, 100));
-
-      return {
-        success: true,
-        text: text.trim(),
-        confidence: 0.98,
-        engine: "google-vision",
-      };
-    } catch (error) {
-      console.error("[OCR] Google Vision failed:", error);
-      return { success: false, error: error.message };
     }
-  });
+  );
 
   // Microsoft Azure OCR API
   ipcMain.handle("ocr:azure-ocr", async (event, imageData, options = {}) => {
     try {
       const apiKey = options.apiKey;
       const region = options.region || "eastus";
-      
+
       if (!apiKey) {
         return { success: false, error: "未配置 Azure OCR API Key" };
       }
@@ -2920,7 +3047,9 @@ try {
       const imageBuffer = Buffer.from(base64Data, "base64");
 
       const response = await fetch(
-        `https://${region}.api.cognitive.microsoft.com/vision/v3.2/ocr?language=${options.language || "zh-Hans"}&detectOrientation=true`,
+        `https://${region}.api.cognitive.microsoft.com/vision/v3.2/ocr?language=${
+          options.language || "zh-Hans"
+        }&detectOrientation=true`,
         {
           method: "POST",
           headers: {
@@ -2941,7 +3070,7 @@ try {
       const lines = [];
       for (const region of result.regions || []) {
         for (const line of region.lines || []) {
-          const lineText = line.words?.map(w => w.text).join(" ") || "";
+          const lineText = line.words?.map((w) => w.text).join(" ") || "";
           lines.push(lineText);
         }
       }
@@ -2966,7 +3095,7 @@ try {
     try {
       const apiKey = options.apiKey;
       const secretKey = options.secretKey;
-      
+
       if (!apiKey || !secretKey) {
         return { success: false, error: "未配置百度 OCR API Key" };
       }
@@ -3010,7 +3139,7 @@ try {
         return { success: false, error: result.error_msg || "百度 OCR 失败" };
       }
 
-      const text = result.words_result?.map(w => w.words).join("\n") || "";
+      const text = result.words_result?.map((w) => w.words).join("\n") || "";
       console.log("[OCR] Baidu OCR result:", text.substring(0, 100));
 
       return {
@@ -3056,16 +3185,16 @@ app.whenReady().then(() => {
       startSelectionHook();
     }, 2000);
   }
-  
+
   // 内存监控（每5分钟检查一次）
   setInterval(() => {
     const usage = process.memoryUsage();
     const heapUsedMB = Math.round(usage.heapUsed / 1024 / 1024);
     console.log(`[Memory] Heap: ${heapUsedMB}MB`);
-    
+
     // 如果内存超过 500MB，尝试垃圾回收
     if (heapUsedMB > 500 && global.gc) {
-      console.log('[Memory] Running garbage collection...');
+      console.log("[Memory] Running garbage collection...");
       global.gc();
     }
   }, 5 * 60 * 1000);
@@ -3074,13 +3203,13 @@ app.whenReady().then(() => {
 /**
  * 全局未捕获异常处理
  */
-process.on('uncaughtException', (error) => {
-  console.error('[FATAL] Uncaught exception:', error);
+process.on("uncaughtException", (error) => {
+  console.error("[FATAL] Uncaught exception:", error);
   // 不立即退出，尝试继续运行
 });
 
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('[ERROR] Unhandled rejection at:', promise, 'reason:', reason);
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("[ERROR] Unhandled rejection at:", promise, "reason:", reason);
 });
 
 /**
