@@ -25,6 +25,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   const [translationMode, setTranslationMode] = useState('standard'); // standard, secure, offline
   const [isConnected, setIsConnected] = useState(false);
   const [isOcrProcessing, setIsOcrProcessing] = useState(false); // OCR 处理状态
+  const [isOcrSource, setIsOcrSource] = useState(false); // 标记当前文本是否来自 OCR（用于自动选择 OCR 纠错模板）
   
   // ========== 术语一致性提示 ==========
   const [termSuggestions, setTermSuggestions] = useState([]); // 术语替换建议
@@ -130,11 +131,13 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
           
           // 将识别的文字填入原文框
           setSourceText(trimmedText);
+          // 标记为 OCR 来源（翻译时自动使用 OCR 纠错模板）
+          setIsOcrSource(true);
           notify(`识别成功 (${result.engine})`, 'success');
 
           // 自动开始翻译
           setTimeout(() => {
-            console.log('[Screenshot] Auto-translating...');
+            console.log('[Screenshot] Auto-translating with OCR template...');
             handleTranslate();
           }, 200);
         } else {
@@ -202,8 +205,14 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
       notify('LM Studio 未连接，请检查连接或使用离线模式', 'error');
     }
 
+    // 如果是 OCR 来源的文本，自动使用 OCR 纠错模板
+    const effectiveTemplate = isOcrSource ? 'ocr' : selectedTemplate;
+    if (isOcrSource) {
+      console.log('[Translate] Using OCR template for error correction');
+    }
+
     const options = {
-      template: selectedTemplate,
+      template: effectiveTemplate,
       saveHistory: translationMode !== 'secure' 
     };
 
@@ -218,6 +227,11 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
       }
       // 翻译成功后，检测术语一致性
       checkTermConsistency(currentTranslation.sourceText, result.translatedText || useTranslationStore.getState().currentTranslation.translatedText);
+      
+      // 翻译完成后，清除 OCR 来源标记（下次手动输入时不再使用 OCR 模板）
+      if (isOcrSource) {
+        setIsOcrSource(false);
+      }
     } else {
       notify('翻译失败: ' + result.error, 'error');
     }
@@ -787,7 +801,11 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
             ref={sourceTextareaRef}
             className="translation-textarea"
             value={currentTranslation.sourceText}
-            onChange={(e) => setSourceText(e.target.value)}
+            onChange={(e) => {
+              setSourceText(e.target.value);
+              // 用户手动输入时，清除 OCR 来源标记
+              if (isOcrSource) setIsOcrSource(false);
+            }}
             onPaste={handlePaste}
             placeholder={isOcrProcessing ? '正在识别图片中的文字...' : (dragOver ? '释放文件以导入...' : '输入要翻译的文本...')}
             spellCheck={false}

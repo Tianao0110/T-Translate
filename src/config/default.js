@@ -61,8 +61,32 @@ const config = {
     // 系统提示词模板（保留用于兼容）
     systemPrompt: `You are a professional translator. Translate the following text into {targetLanguage}. Output only the translation, no preamble.`,
     
-    // 翻译模板 - 3种风格
+    // 翻译模板 - 4种风格
     templates: {
+      // OCR 专用模板 - 带纠错功能
+      ocr: `You are an expert translator with OCR error correction abilities.
+
+The following text was recognized from an image using OCR technology. It may contain recognition errors such as:
+- Character confusion (e.g., '0' vs 'O', '1' vs 'l' vs 'I', 'rn' vs 'm')
+- Missing or extra spaces
+- Broken words or sentences
+- Garbled characters from complex layouts
+
+Task: Translate this OCR text into {targetLanguage}.
+
+Process:
+1. First, mentally correct any obvious OCR errors based on context
+2. Then translate the corrected text naturally
+3. Output ONLY the final translation, no explanations
+
+Rules:
+- Fix OCR errors silently without mentioning them
+- Maintain the original meaning and tone
+- Use natural, fluent language
+- If a word is unrecognizable, infer from context or skip gracefully
+
+Output only the translation, no preamble or notes.`,
+
       precise: `You are a professional translator specializing in technical and academic content.
 
 Task: Translate the following text into {targetLanguage}.

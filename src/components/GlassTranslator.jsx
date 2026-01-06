@@ -229,8 +229,29 @@ const GlassTranslator = () => {
         'fr': '法文', 'de': '德文', 'es': '西班牙文', 'ru': '俄文'
       };
       
-      const systemPrompt = `你是一个专业翻译助手。请将以下文本翻译成${langNames[actualTargetLang] || actualTargetLang}。
-要求：保留原文的格式和排版，只输出翻译结果，不要添加任何解释。`;
+      // OCR 纠错翻译 Prompt
+      const systemPrompt = `你是一个具备 OCR 纠错能力的专业翻译助手。
+
+以下文本是从图像中通过 OCR 技术识别出来的，可能包含识别错误，例如：
+- 字符混淆（如 '0' 和 'O'、'1' 和 'l'、'rn' 和 'm'）
+- 多余或缺失的空格
+- 断开的单词或句子
+- 复杂排版导致的乱码
+
+任务：将这段 OCR 文本翻译成${langNames[actualTargetLang] || actualTargetLang}。
+
+处理流程：
+1. 首先根据上下文默默纠正明显的 OCR 错误
+2. 然后将纠正后的文本自然地翻译
+3. 只输出最终翻译结果，不要解释
+
+规则：
+- 静默修复 OCR 错误，不要提及
+- 保持原文的意思和语气
+- 使用自然流畅的语言
+- 如果某个词无法辨认，根据上下文推断或优雅地跳过
+
+只输出翻译结果，不要任何前言或注释。`;
 
       let finalText = '';
       
