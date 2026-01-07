@@ -1,0 +1,452 @@
+/* src/styles/components/ProviderSettings.css */
+/* 翻译源设置组件样式 */
+
+.provider-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.provider-settings.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 40px;
+  color: #666;
+}
+
+.provider-header h4 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+}
+
+.provider-hint {
+  margin: 0;
+  font-size: 12px;
+  color: #888;
+}
+
+/* 翻译源列表 */
+.provider-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.provider-item {
+  border: 1px solid #e5e5e5;
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.provider-item.disabled {
+  opacity: 0.6;
+}
+
+.provider-item.expanded {
+  border-color: #3b82f6;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
+}
+
+/* 主信息行 */
+.provider-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+}
+
+/* 拖拽/优先级控制 */
+.provider-drag {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.drag-btn {
+  width: 20px;
+  height: 16px;
+  border: none;
+  background: transparent;
+  color: #999;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  transition: all 0.15s;
+}
+
+.drag-btn:hover:not(:disabled) {
+  background: #f0f0f0;
+  color: #333;
+}
+
+.drag-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.priority-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: #666;
+  background: #f0f0f0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 图标 */
+.provider-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+/* 信息 */
+.provider-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.provider-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 2px;
+}
+
+.provider-desc {
+  font-size: 12px;
+  color: #888;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 操作按钮 */
+.provider-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toggle-btn {
+  padding: 4px 10px;
+  border: 1px solid #e5e5e5;
+  border-radius: 6px;
+  background: #f5f5f5;
+  color: #666;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.toggle-btn.active {
+  background: #10b981;
+  border-color: #10b981;
+  color: #fff;
+}
+
+.toggle-btn:hover {
+  border-color: #ccc;
+}
+
+.expand-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: #666;
+  cursor: pointer;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.expand-btn:hover {
+  background: #f0f0f0;
+}
+
+.test-result {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.test-result.success {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.test-result.error {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+/* 配置面板 */
+.provider-config {
+  padding: 12px 16px 16px;
+  border-top: 1px solid #f0f0f0;
+  background: #fafafa;
+}
+
+.provider-config-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.config-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.config-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #555;
+}
+
+.config-input,
+.config-select {
+  padding: 8px 10px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 13px;
+  background: #fff;
+  transition: border-color 0.15s;
+}
+
+.config-input:focus,
+.config-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+.config-input::placeholder {
+  color: #bbb;
+}
+
+.config-password-wrapper {
+  position: relative;
+  display: flex;
+}
+
+.config-password-wrapper .config-input {
+  flex: 1;
+  padding-right: 36px;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: #888;
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.password-toggle:hover {
+  background: #f0f0f0;
+  color: #333;
+}
+
+.config-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #555;
+}
+
+.config-checkbox input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* 配置操作 */
+.config-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e5e5e5;
+}
+
+.test-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid #3b82f6;
+  border-radius: 6px;
+  background: #fff;
+  color: #3b82f6;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.test-btn:hover:not(:disabled) {
+  background: #3b82f6;
+  color: #fff;
+}
+
+.test-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.test-message {
+  font-size: 12px;
+  flex: 1;
+}
+
+.test-message.success {
+  color: #059669;
+}
+
+.test-message.error {
+  color: #dc2626;
+}
+
+.help-link {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #3b82f6;
+  text-decoration: none;
+}
+
+.help-link:hover {
+  text-decoration: underline;
+}
+
+/* 底部保存 */
+.provider-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 8px;
+}
+
+.save-btn {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 8px;
+  background: #3b82f6;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.save-btn:hover {
+  background: #2563eb;
+}
+
+/* 旋转动画 */
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* 深色模式 */
+@media (prefers-color-scheme: dark) {
+  .provider-header h4 {
+    color: #e5e5e5;
+  }
+  
+  .provider-item {
+    background: #2d2d2d;
+    border-color: #404040;
+  }
+  
+  .provider-item.expanded {
+    border-color: #3b82f6;
+  }
+  
+  .provider-name {
+    color: #e5e5e5;
+  }
+  
+  .provider-desc {
+    color: #999;
+  }
+  
+  .toggle-btn {
+    background: #404040;
+    border-color: #505050;
+    color: #ccc;
+  }
+  
+  .toggle-btn.active {
+    background: #10b981;
+    border-color: #10b981;
+  }
+  
+  .provider-config {
+    background: #252525;
+    border-top-color: #404040;
+  }
+  
+  .config-input,
+  .config-select {
+    background: #333;
+    border-color: #505050;
+    color: #e5e5e5;
+  }
+  
+  .config-actions {
+    border-top-color: #404040;
+  }
+  
+  .drag-btn:hover:not(:disabled) {
+    background: #404040;
+    color: #e5e5e5;
+  }
+  
+  .priority-badge {
+    background: #404040;
+    color: #ccc;
+  }
+}

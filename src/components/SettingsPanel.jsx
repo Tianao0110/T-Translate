@@ -4,12 +4,14 @@ import {
   Settings, Globe, Shield, Zap, Database, Download, Upload, Moon, Sun, Monitor,
   Volume2, Keyboard, Info, AlertCircle, CheckCircle, WifiOff, Wifi, RefreshCw,
   Save, FolderOpen, Trash2, Eye, EyeOff, Lock, Unlock, GitBranch, HelpCircle,
-  ExternalLink, ChevronRight, Terminal, Code2, Palette, Layers, MousePointer
+  ExternalLink, ChevronRight, Terminal, Code2, Palette, Layers, MousePointer, Server
 } from 'lucide-react';
 import llmClient from '../utils/llm-client';
 import translator from '../services/translator';
 import useTranslationStore from '../stores/translation-store';
-import '../styles/components/SettingsPanel.css'; 
+import ProviderSettings from './ProviderSettings';
+import '../styles/components/SettingsPanel.css';
+import '../styles/components/ProviderSettings.css'; 
 
 /**
  * 默认配置 (内联，防止 import 报错)
@@ -96,6 +98,19 @@ const SettingsPanel = ({ showNotification }) => {
       minChars: 2,               // 最小字符数
       maxChars: 500,             // 最大字符数
       autoCloseOnCopy: false,    // 复制后自动关闭
+    },
+    providers: {
+      list: [
+        { id: 'local-llm', enabled: true, priority: 0 },
+        { id: 'openai', enabled: false, priority: 1 },
+        { id: 'deepl', enabled: false, priority: 2 },
+      ],
+      configs: {
+        'local-llm': { endpoint: 'http://localhost:1234/v1', model: '' },
+        'openai': { apiKey: '', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
+        'deepl': { apiKey: '', useFreeApi: true },
+      },
+      subtitleProvider: null,    // 字幕模式专用翻译源（null 表示自动选择）
     },
     interface: {
       theme: 'light',
@@ -414,6 +429,20 @@ const SettingsPanel = ({ showNotification }) => {
                 </div>
               </div>
             )}
+          </div>
+        );
+
+      case 'providers':
+        return (
+          <div className="setting-content">
+            <h3>翻译源设置</h3>
+            <p className="setting-description">配置翻译服务，支持本地模型和在线 API</p>
+            
+            <ProviderSettings 
+              settings={settings}
+              updateSettings={updateSetting}
+              notify={notify}
+            />
           </div>
         );
 
@@ -1262,6 +1291,7 @@ const SettingsPanel = ({ showNotification }) => {
       <div className="settings-sidebar">
         <div className="settings-nav">
           <button className={`nav-item ${activeSection==='connection'?'active':''}`} onClick={()=>setActiveSection('connection')}><Wifi size={18}/><span>连接</span></button>
+          <button className={`nav-item ${activeSection==='providers'?'active':''}`} onClick={()=>setActiveSection('providers')}><Server size={18}/><span>翻译源</span></button>
           <button className={`nav-item ${activeSection==='translation'?'active':''}`} onClick={()=>setActiveSection('translation')}><Globe size={18}/><span>翻译</span></button>
           <button className={`nav-item ${activeSection==='glassWindow'?'active':''}`} onClick={()=>setActiveSection('glassWindow')}><Layers size={18}/><span>玻璃窗</span></button>
           <button className={`nav-item ${activeSection==='selection'?'active':''}`} onClick={()=>setActiveSection('selection')}><MousePointer size={18}/><span>划词</span></button>
