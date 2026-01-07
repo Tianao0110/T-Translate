@@ -42,6 +42,10 @@ const validChannels = {
     "capture-screen",
     "glass:open",  // 打开玻璃窗口
     "glass:notify-settings-changed",  // 通知玻璃窗设置更新
+    "secure-storage:encrypt",  // 加密存储
+    "secure-storage:decrypt",  // 解密读取
+    "secure-storage:delete",   // 删除
+    "secure-storage:is-available",  // 检查加密是否可用
     "selection:toggle",  // 切换划词翻译
     "selection:get-enabled",  // 获取划词翻译状态
   ],
@@ -100,6 +104,13 @@ const electronAPI = {
     set: (key, val) => ipcRenderer.invoke("store-set", key, val),
     delete: (key) => ipcRenderer.invoke("store-delete", key),
     clear: () => ipcRenderer.invoke("store-clear"),
+  },
+  // 安全存储（加密 API Key 等）
+  secureStorage: {
+    encrypt: (key, value) => ipcRenderer.invoke("secure-storage:encrypt", key, value),
+    decrypt: (key) => ipcRenderer.invoke("secure-storage:decrypt", key),
+    delete: (key) => ipcRenderer.invoke("secure-storage:delete", key),
+    isAvailable: () => ipcRenderer.invoke("secure-storage:is-available"),
   },
   // 玻璃翻译窗口
   glass: {

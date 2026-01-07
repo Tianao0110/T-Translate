@@ -12,6 +12,7 @@ const {
   clipboard,
   screen,
   desktopCapturer,
+  safeStorage,  // 用于加密存储 API Key
 } = require("electron");
 const path = require("path");
 const Store = require("electron-store");
@@ -1724,6 +1725,67 @@ function setupIPC() {
 
   ipcMain.handle("store-has", async (event, key) => {
     return store.has(key);
+  });
+
+  // ========== 安全存储（加密 API Key 等敏感信息） ==========
+  
+  // 加密存储
+  ipcMain.handle("secure-storage:encrypt", async (event, key, value) => {
+    try {
+      if (!safeStorage.isEncryptionAvailable()) {
+        console.warn("[SecureStorage] Encryption not available, using fallback");
+        // 回退：使用普通存储（不安全，但至少能用）
+        store.set(`__encrypted_${key}`, Buffer.from(value).toString('base64'));
+        return { success: true, encrypted: false };
+      }
+      
+      const encrypted = safeStorage.encryptString(value);
+      store.set(`__encrypted_${key}`, encrypted.toString('base64'));
+      console.log(`[SecureStorage] Encrypted and stored: ${key}`);
+      return { success: true, encrypted: true };
+    } catch (error) {
+      console.error("[SecureStorage] Encrypt failed:", error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // 解密读取
+  ipcMain.handle("secure-storage:decrypt", async (event, key) => {
+    try {
+      const stored = store.get(`__encrypted_${key}`);
+      if (!stored) {
+        return null;
+      }
+
+      if (!safeStorage.isEncryptionAvailable()) {
+        // 回退：直接解码
+        return Buffer.from(stored, 'base64').toString('utf-8');
+      }
+
+      const buffer = Buffer.from(stored, 'base64');
+      const decrypted = safeStorage.decryptString(buffer);
+      return decrypted;
+    } catch (error) {
+      console.error("[SecureStorage] Decrypt failed:", error);
+      return null;
+    }
+  });
+
+  // 删除
+  ipcMain.handle("secure-storage:delete", async (event, key) => {
+    try {
+      store.delete(`__encrypted_${key}`);
+      console.log(`[SecureStorage] Deleted: ${key}`);
+      return { success: true };
+    } catch (error) {
+      console.error("[SecureStorage] Delete failed:", error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // 检查加密是否可用
+  ipcMain.handle("secure-storage:is-available", async () => {
+    return safeStorage.isEncryptionAvailable();
   });
 
   // App 路径获取

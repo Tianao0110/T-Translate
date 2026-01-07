@@ -134,6 +134,14 @@ contextBridge.exposeInMainWorld('electron', {
     },
   },
   
+  // 安全存储（加密 API Key 等）
+  secureStorage: {
+    encrypt: (key, value) => ipcRenderer.invoke('secure-storage:encrypt', key, value),
+    decrypt: (key) => ipcRenderer.invoke('secure-storage:decrypt', key),
+    delete: (key) => ipcRenderer.invoke('secure-storage:delete', key),
+    isAvailable: () => ipcRenderer.invoke('secure-storage:is-available'),
+  },
+  
   // 剪贴板
   clipboard: {
     writeText: (text) => ipcRenderer.invoke('clipboard:write-text', text),
