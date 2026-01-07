@@ -60,6 +60,13 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.on('glass:show-after-capture', handler);
       return () => ipcRenderer.removeListener('glass:show-after-capture', handler);
     },
+    
+    // 监听设置更新（从主程序）
+    onSettingsChanged: (callback) => {
+      const handler = () => callback();
+      ipcRenderer.on('glass:settings-changed', handler);
+      return () => ipcRenderer.removeListener('glass:settings-changed', handler);
+    },
   },
   
   // 字幕采集区 API

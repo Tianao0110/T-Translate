@@ -32,17 +32,19 @@
   -webkit-app-region: drag;
 }
 
-/* 字幕模式 - 半透明背景 + 清晰边框 */
+/* 字幕模式 - 完全透明 + 虚线边框 */
 .glass-window.subtitle-mode {
-  background: rgba(0, 0, 0, 0.3) !important;
-  backdrop-filter: blur(5px) !important;
-  border: 2px solid rgba(255, 255, 255, 0.4) !important;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  border: 2px dashed rgba(255, 255, 255, 0.4) !important;
 }
 
-/* 字幕模式下整个顶部区域可拖动 */
+/* 字幕模式下顶部区域 */
 .subtitle-mode .glass-top-area {
-  -webkit-app-region: drag;
-  min-height: 50px;
+  background: transparent;
+  justify-content: flex-start;
+  padding-left: 10px;
+  min-height: 36px;
 }
 
 /* ========== 顶部区域 ========== */
@@ -51,43 +53,30 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 8px 12px;
-  min-height: 40px;
+  padding: 4px 8px;
+  min-height: 32px;  /* 缩小高度 */
   -webkit-app-region: drag;
-}
-
-/* 工具栏两侧的拖动区域 */
-.glass-top-area::before,
-.glass-top-area::after {
-  content: '';
-  flex: 1;
-  min-width: 40px;
-}
-
-/* 字幕模式下顶部区域 */
-.subtitle-mode .glass-top-area {
-  background: transparent;
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 10;
-  min-height: 50px;
 }
 
 /* ========== 工具栏 ========== */
 .glass-toolbar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   -webkit-app-region: no-drag;
+  pointer-events: auto;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1001;
 }
 
 .toolbar-btn {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   background: rgba(0, 0, 0, 0.05);
   color: var(--glass-text);
   cursor: pointer;
@@ -95,9 +84,10 @@
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
-  -webkit-app-region: no-drag;  /* 确保可点击 */
+  -webkit-app-region: no-drag;
+  pointer-events: auto;
   position: relative;
-  z-index: 10;
+  z-index: 1001;
 }
 
 .toolbar-btn:hover {
@@ -119,21 +109,22 @@
   color: var(--glass-accent);
 }
 
-/* 小横条 - 拖动手柄 */
+/* 小横条 - 点击调节透明度 */
 .toolbar-handle {
-  width: 48px;
-  height: 24px;
-  border-radius: 12px;
+  width: 40px;
+  height: 20px;
+  border-radius: 10px;
   background: rgba(0, 0, 0, 0.08);
-  cursor: grab;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--glass-text-muted);
   transition: all 0.2s ease;
-  -webkit-app-region: no-drag;  /* 允许长按事件 */
+  -webkit-app-region: no-drag;
+  pointer-events: auto;
   position: relative;
-  z-index: 10;
+  z-index: 1001;
 }
 
 .toolbar-handle:hover {
@@ -147,13 +138,13 @@
 /* ========== 关闭按钮 ========== */
 .glass-close-btn {
   position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 24px;
-  height: 24px;
+  top: 4px;
+  right: 4px;
+  width: 28px;
+  height: 28px;
   border: none;
   border-radius: 6px;
-  background: rgba(239, 68, 68, 0.1);
+  background: rgba(239, 68, 68, 0.15);
   color: #ef4444;
   cursor: pointer;
   display: flex;
@@ -162,6 +153,7 @@
   opacity: 0;
   transition: all 0.2s ease;
   -webkit-app-region: no-drag;
+  z-index: 1001;
 }
 
 .glass-close-btn.visible {
@@ -169,30 +161,40 @@
 }
 
 .glass-close-btn:hover {
-  background: rgba(239, 68, 68, 0.2);
+  background: rgba(239, 68, 68, 0.4);
+  transform: scale(1.05);
 }
 
-/* 字幕模式下关闭按钮样式 */
+/* 字幕模式下关闭按钮样式 - 更醒目 */
 .subtitle-mode .glass-close-btn {
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.7);
   color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  opacity: 1;  /* 字幕模式下始终显示 */
 }
 
 .subtitle-mode .glass-close-btn:hover {
-  background: rgba(239, 68, 68, 0.8);
+  background: rgba(239, 68, 68, 0.9);
+  border-color: transparent;
 }
 
-/* ========== 字幕状态点 ========== */
+/* ========== 字幕状态点和顶栏 ========== */
 .subtitle-top-bar {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 12px;
+  gap: 10px;
   -webkit-app-region: no-drag;
+  pointer-events: auto;
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1001;
 }
 
 .subtitle-status-dot {
-  width: 10px;
+  width: 12px;
+  height: 12px;
   height: 10px;
   border-radius: 50%;
   background: #22c55e;
@@ -201,12 +203,21 @@
 }
 
 .subtitle-capture-btn {
-  background: rgba(255, 255, 255, 0.2) !important;
+  width: 28px !important;
+  height: 28px !important;
+  background: rgba(0, 0, 0, 0.6) !important;
   color: #fff !important;
+  border: 1px solid rgba(255, 255, 255, 0.4) !important;
+  -webkit-app-region: no-drag !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  position: relative !important;
+  z-index: 1001 !important;
 }
 
 .subtitle-capture-btn:hover {
-  background: rgba(255, 255, 255, 0.3) !important;
+  background: rgba(59, 130, 246, 0.8) !important;
+  border-color: rgba(255, 255, 255, 0.6) !important;
 }
 
 .subtitle-status-dot.recognizing {
@@ -219,6 +230,12 @@
   background: #f59e0b;
   box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
   animation: status-pulse 0.3s ease-in-out infinite;
+}
+
+.subtitle-status-dot.editing {
+  background: #8b5cf6;
+  box-shadow: 0 0 8px rgba(139, 92, 246, 0.5);
+  animation: status-pulse 1s ease-in-out infinite;
 }
 
 @keyframes status-pulse {
@@ -396,6 +413,19 @@
   color: rgba(255, 255, 255, 0.5);
   font-size: 14px;
   text-shadow: 0 0 8px rgba(0, 0, 0, 0.8);
+}
+
+/* 编辑中提示 */
+.subtitle-editing {
+  color: #a78bfa;
+  font-size: 14px;
+  text-shadow: 0 0 8px rgba(0, 0, 0, 0.8);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 /* ========== 滚动提示 ========== */

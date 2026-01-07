@@ -41,6 +41,7 @@ const validChannels = {
     "get-app-path",
     "capture-screen",
     "glass:open",  // 打开玻璃窗口
+    "glass:notify-settings-changed",  // 通知玻璃窗设置更新
     "selection:toggle",  // 切换划词翻译
     "selection:get-enabled",  // 获取划词翻译状态
   ],
@@ -103,6 +104,7 @@ const electronAPI = {
   // 玻璃翻译窗口
   glass: {
     open: () => ipcRenderer.invoke("glass:open"),
+    notifySettingsChanged: () => ipcRenderer.invoke("glass:notify-settings-changed"),
   },
   // 划词翻译
   selection: {

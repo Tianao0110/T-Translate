@@ -2025,6 +2025,7 @@ function setupIPC() {
       globalOcrEngine: ocrConfig.engine ?? "llm-vision",  // 全局设置
       defaultOpacity: glassConfig.defaultOpacity ?? 0.85,
       autoPin: glassConfig.autoPin ?? true,
+      lockTargetLang: glassConfig.lockTargetLang ?? true,  // 锁定目标语言
       // 翻译设置 - 使用实时获取的语言
       targetLanguage: currentTargetLang,
       sourceLanguage: currentSourceLang,
@@ -2083,6 +2084,15 @@ function setupIPC() {
     // 转发到主窗口处理
     mainWindow?.webContents.send("sync-target-language", langCode);
     return true;
+  });
+
+  // 通知玻璃窗重新加载设置（从主程序调用）
+  ipcMain.handle("glass:notify-settings-changed", () => {
+    if (glassWindow && !glassWindow.isDestroyed()) {
+      glassWindow.webContents.send("glass:settings-changed");
+      return true;
+    }
+    return false;
   });
 
   // 打开玻璃窗口

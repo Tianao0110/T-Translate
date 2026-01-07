@@ -284,6 +284,11 @@ const SettingsPanel = ({ showNotification }) => {
         setOcrEngine(settings.ocr.engine);
       }
 
+      // 通知玻璃窗重新加载设置
+      if (window.electron?.glass?.notifySettingsChanged) {
+        await window.electron.glass.notifySettingsChanged();
+      }
+
       notify('设置已保存', 'success');
     } catch (error) {
       console.error('Failed to save settings:', error);

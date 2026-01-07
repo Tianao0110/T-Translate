@@ -84,12 +84,22 @@ const GlassTranslator = () => {
       });
     }
     
+    // 监听设置更新（从主程序）
+    let unsubscribeSettings = null;
+    if (window.electron?.glass?.onSettingsChanged) {
+      unsubscribeSettings = window.electron.glass.onSettingsChanged(() => {
+        console.log('[Glass] Settings changed, reloading...');
+        loadSettings();
+      });
+    }
+    
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       if (subtitleWorkerRef.current) {
         subtitleWorkerRef.current.terminate();
       }
       if (unsubscribe) unsubscribe();
+      if (unsubscribeSettings) unsubscribeSettings();
       if (closeBtnTimerRef.current) clearTimeout(closeBtnTimerRef.current);
     };
   }, []);
@@ -465,6 +475,14 @@ const GlassTranslator = () => {
     subtitleFrameCountRef.current++;
     
     try {
+      // 检查红框窗口是否可见，如果可见则跳过（避免截到红框）
+      const captureWindowVisible = await window.electron?.subtitle?.isCaptureWindowVisible?.();
+      if (captureWindowVisible) {
+        setSubtitleStats(prev => ({ ...prev, status: 'editing' }));  // 编辑中状态
+        isCapturingRef.current = false;
+        return;
+      }
+      
       const result = await window.electron.subtitle.captureRegion();
       if (!result.success) {
         isCapturingRef.current = false;
@@ -647,7 +665,12 @@ const GlassTranslator = () => {
           <div className="glass-toolbar">
             <button 
               className="toolbar-btn"
-              onClick={captureAndTranslate}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('[Glass] Camera button clicked!');
+                captureAndTranslate();
+              }}
               disabled={isLoading}
               title="截图识别 (Space)"
             >
@@ -664,7 +687,12 @@ const GlassTranslator = () => {
             
             <button 
               className={`toolbar-btn ${captureRect ? 'has-capture' : ''}`}
-              onClick={toggleSubtitleMode}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('[Glass] Film button clicked!');
+                toggleSubtitleMode();
+              }}
               title={captureRect ? '开始字幕模式' : '设置字幕采集区'}
             >
               <Film size={16} />
@@ -677,12 +705,19 @@ const GlassTranslator = () => {
           <div className="subtitle-top-bar">
             <div className={`subtitle-status-dot ${subtitleStats.status}`} title={
               subtitleStats.status === 'listening' ? '监听中' :
-              subtitleStats.status === 'recognizing' ? '识别中' : '翻译中'
+              subtitleStats.status === 'recognizing' ? '识别中' :
+              subtitleStats.status === 'translating' ? '翻译中' :
+              subtitleStats.status === 'editing' ? '编辑采集区中（暂停）' : '空闲'
             } />
             
             <button 
               className="toolbar-btn subtitle-capture-btn"
-              onClick={openCaptureWindow}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('[Glass] Monitor button clicked!');
+                openCaptureWindow();
+              }}
               title="编辑字幕采集区"
             >
               <Monitor size={16} />
@@ -725,14 +760,20 @@ const GlassTranslator = () => {
           </div>
         ) : subtitleMode ? (
           <div className="subtitle-display">
-            {prevSubtitle && (
-              <div className="subtitle-prev" key={`prev-${prevSubtitle}`}>{prevSubtitle}</div>
-            )}
-            {currSubtitle && (
-              <div className="subtitle-curr" key={`curr-${currSubtitle}`}>{currSubtitle}</div>
-            )}
-            {!currSubtitle && !prevSubtitle && (
-              <div className="subtitle-waiting">等待字幕...</div>
+            {subtitleStats.status === 'editing' ? (
+              <div className="subtitle-editing">编辑采集区中，字幕暂停...</div>
+            ) : (
+              <>
+                {prevSubtitle && (
+                  <div className="subtitle-prev" key={`prev-${prevSubtitle}`}>{prevSubtitle}</div>
+                )}
+                {currSubtitle && (
+                  <div className="subtitle-curr" key={`curr-${currSubtitle}`}>{currSubtitle}</div>
+                )}
+                {!currSubtitle && !prevSubtitle && (
+                  <div className="subtitle-waiting">等待字幕...</div>
+                )}
+              </>
             )}
           </div>
         ) : isLoading ? (
