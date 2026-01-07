@@ -35,6 +35,9 @@ contextBridge.exposeInMainWorld('electron', {
     // 保存本地设置
     saveSettings: (settings) => ipcRenderer.invoke('glass:save-settings', settings),
     
+    // 实时设置透明度
+    setOpacity: (opacity) => ipcRenderer.invoke('glass:set-opacity', opacity),
+    
     // 添加到收藏
     addToFavorites: (item) => ipcRenderer.invoke('glass:add-to-favorites', item),
     
@@ -56,6 +59,34 @@ contextBridge.exposeInMainWorld('electron', {
       const handler = () => callback();
       ipcRenderer.on('glass:show-after-capture', handler);
       return () => ipcRenderer.removeListener('glass:show-after-capture', handler);
+    },
+  },
+  
+  // 字幕采集区 API
+  subtitle: {
+    // 打开/关闭采集区选择窗口
+    toggleCaptureWindow: () => ipcRenderer.invoke('subtitle:toggle-capture-window'),
+    
+    // 获取采集区坐标
+    getCaptureRect: () => ipcRenderer.invoke('subtitle:get-capture-rect'),
+    
+    // 设置采集区坐标
+    setCaptureRect: (rect) => ipcRenderer.invoke('subtitle:set-capture-rect', rect),
+    
+    // 清除采集区
+    clearCaptureRect: () => ipcRenderer.invoke('subtitle:clear-capture-rect'),
+    
+    // 截取采集区（字幕模式专用）
+    captureRegion: () => ipcRenderer.invoke('subtitle:capture-region'),
+    
+    // 检查采集区窗口是否可见
+    isCaptureWindowVisible: () => ipcRenderer.invoke('subtitle:is-capture-window-visible'),
+    
+    // 监听采集区更新
+    onCaptureRectUpdated: (callback) => {
+      const handler = (event, rect) => callback(rect);
+      ipcRenderer.on('subtitle:capture-rect-updated', handler);
+      return () => ipcRenderer.removeListener('subtitle:capture-rect-updated', handler);
     },
   },
   

@@ -99,6 +99,8 @@ ipcMain.handle("store-set", async (event, key, val) => {
 let mainWindow = null;
 let screenshotWindow = null;
 let glassWindow = null; // 玻璃翻译窗口
+let subtitleCaptureWindow = null; // 字幕采集区窗口
+let subtitleCaptureRect = null; // 字幕采集区坐标
 let selectionWindow = null; // 划词翻译窗口
 let tray = null;
 let isQuitting = false;
@@ -227,9 +229,9 @@ function createGlassWindow() {
   });
 
   // Windows: 设置窗口为截图不可见（零闪烁方案）
-  if (process.platform === "win32") {
-    // 需要在窗口显示后设置
-    glassWindow.once("ready-to-show", () => {
+  if (process.platform === "win32" && setWindowDisplayAffinity) {
+    // 在窗口加载完成后设置（比 ready-to-show 更可靠）
+    glassWindow.webContents.on("did-finish-load", () => {
       const success = makeWindowInvisibleToCapture(glassWindow);
       if (success) {
         console.log("[Glass] Window is now invisible to screen capture");
@@ -294,6 +296,115 @@ function toggleGlassWindow() {
     }
   } else {
     createGlassWindow();
+  }
+}
+
+// ==================== 字幕采集区窗口 ====================
+
+/**
+ * 创建字幕采集区选择窗口
+ * 这是一个透明的红框窗口，用于让用户框选视频字幕区域
+ */
+function createSubtitleCaptureWindow() {
+  if (subtitleCaptureWindow && !subtitleCaptureWindow.isDestroyed()) {
+    subtitleCaptureWindow.show();
+    subtitleCaptureWindow.focus();
+    return;
+  }
+
+  // 获取保存的采集区位置
+  const savedRect = store.get("subtitleCaptureRect", {
+    width: 600,
+    height: 80,
+    x: undefined,
+    y: undefined,
+  });
+
+  subtitleCaptureWindow = new BrowserWindow({
+    width: savedRect.width,
+    height: savedRect.height,
+    x: savedRect.x,
+    y: savedRect.y,
+    minWidth: 100,
+    minHeight: 40,
+    transparent: true,
+    frame: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: true,
+    hasShadow: false,
+    backgroundColor: "#00000000",
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, "preload-subtitle-capture.js"),
+    },
+  });
+
+  // Windows: 设置窗口为截图不可见（关键！否则会截到红框）
+  if (process.platform === "win32" && setWindowDisplayAffinity) {
+    // 在窗口加载完成后设置
+    subtitleCaptureWindow.webContents.on("did-finish-load", () => {
+      makeWindowInvisibleToCapture(subtitleCaptureWindow);
+    });
+  }
+
+  // 加载采集区窗口页面
+  if (isDev) {
+    subtitleCaptureWindow.loadURL("http://localhost:5173/src/windows/subtitle-capture.html");
+  } else {
+    subtitleCaptureWindow.loadFile(
+      path.join(__dirname, "../dist/src/windows/subtitle-capture.html")
+    );
+  }
+
+  // 窗口移动/缩放时保存位置并更新采集区坐标
+  const updateCaptureRect = () => {
+    if (subtitleCaptureWindow && !subtitleCaptureWindow.isDestroyed()) {
+      const bounds = subtitleCaptureWindow.getBounds();
+      subtitleCaptureRect = bounds;
+      store.set("subtitleCaptureRect", bounds);
+      // 通知玻璃窗口更新采集区
+      if (glassWindow && !glassWindow.isDestroyed()) {
+        glassWindow.webContents.send("subtitle:capture-rect-updated", bounds);
+      }
+    }
+  };
+
+  subtitleCaptureWindow.on("moved", updateCaptureRect);
+  subtitleCaptureWindow.on("resized", updateCaptureRect);
+
+  subtitleCaptureWindow.on("closed", () => {
+    subtitleCaptureWindow = null;
+  });
+
+  // ESC 关闭窗口
+  subtitleCaptureWindow.webContents.on("before-input-event", (event, input) => {
+    if (input.key === "Escape") {
+      subtitleCaptureWindow.close();
+    }
+  });
+
+  // 初始化采集区坐标
+  subtitleCaptureRect = savedRect;
+  console.log("[Main] Subtitle capture window created, rect:", subtitleCaptureRect);
+}
+
+/**
+ * 切换字幕采集区窗口显示/隐藏
+ */
+function toggleSubtitleCaptureWindow() {
+  if (subtitleCaptureWindow && !subtitleCaptureWindow.isDestroyed()) {
+    if (subtitleCaptureWindow.isVisible()) {
+      // 关闭窗口（释放资源，坐标已保存）
+      subtitleCaptureWindow.close();
+      subtitleCaptureWindow = null;
+    } else {
+      subtitleCaptureWindow.show();
+      subtitleCaptureWindow.focus();
+    }
+  } else {
+    createSubtitleCaptureWindow();
   }
 }
 
@@ -1672,6 +1783,81 @@ function setupIPC() {
     return null;
   });
 
+  // ========== 字幕采集区 IPC ==========
+
+  // 打开/关闭字幕采集区选择窗口
+  ipcMain.handle("subtitle:toggle-capture-window", () => {
+    toggleSubtitleCaptureWindow();
+    return { success: true };
+  });
+
+  // 获取字幕采集区坐标
+  ipcMain.handle("subtitle:get-capture-rect", () => {
+    if (subtitleCaptureRect) {
+      return subtitleCaptureRect;
+    }
+    // 尝试从存储读取
+    const saved = store.get("subtitleCaptureRect");
+    if (saved) {
+      subtitleCaptureRect = saved;
+      return saved;
+    }
+    return null;
+  });
+
+  // 设置字幕采集区坐标（从设置面板手动输入）
+  ipcMain.handle("subtitle:set-capture-rect", (event, rect) => {
+    if (rect && rect.x !== undefined && rect.y !== undefined) {
+      subtitleCaptureRect = rect;
+      store.set("subtitleCaptureRect", rect);
+      // 如果采集区窗口存在，同步位置
+      if (subtitleCaptureWindow && !subtitleCaptureWindow.isDestroyed()) {
+        subtitleCaptureWindow.setBounds(rect);
+      }
+      return { success: true };
+    }
+    return { success: false, error: "Invalid rect" };
+  });
+
+  // 清除字幕采集区
+  ipcMain.handle("subtitle:clear-capture-rect", () => {
+    subtitleCaptureRect = null;
+    store.delete("subtitleCaptureRect");
+    if (subtitleCaptureWindow && !subtitleCaptureWindow.isDestroyed()) {
+      subtitleCaptureWindow.close();
+    }
+    return { success: true };
+  });
+
+  // 截取字幕采集区（用于字幕模式）
+  ipcMain.handle("subtitle:capture-region", async () => {
+    try {
+      if (!subtitleCaptureRect) {
+        throw new Error("未设置字幕采集区");
+      }
+
+      // 使用 node-screenshots 截取指定区域
+      const screenshot = await screenshotModule.captureRegion(subtitleCaptureRect);
+
+      if (screenshot) {
+        return { success: true, imageData: screenshot };
+      } else {
+        throw new Error("截图失败");
+      }
+    } catch (error) {
+      console.error("[Subtitle] Capture error:", error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // 检查采集区窗口是否可见
+  ipcMain.handle("subtitle:is-capture-window-visible", () => {
+    if (subtitleCaptureWindow && !subtitleCaptureWindow.isDestroyed()) {
+      return subtitleCaptureWindow.isVisible();
+    }
+    return false;
+  });
+
   // 截取玻璃窗口覆盖区域
   ipcMain.handle("glass:capture-region", async (event, bounds) => {
     try {
@@ -1679,22 +1865,31 @@ function setupIPC() {
         throw new Error("玻璃窗口不存在");
       }
 
-      // Windows 下窗口已设置为截图不可见，无需隐藏
-      // macOS/Linux 仍需要隐藏窗口（后续可实现 macOS 原生方案）
-      const needHideWindow =
-        process.platform !== "win32" || !setWindowDisplayAffinity;
+      // 保存原始透明度
+      let originalOpacity = 1;
+      try {
+        originalOpacity = glassWindow.getOpacity();
+      } catch (e) {
+        originalOpacity = 0.85;
+      }
 
-      if (needHideWindow) {
-        // 非 Windows 或 API 不可用时，使用隐藏窗口方案
-        glassWindow.webContents.send("glass:hide-for-capture");
-        await new Promise((resolve) => setTimeout(resolve, 50));
+      // 强制隐藏窗口（设置透明度为 0）
+      // 即使 koffi 存在，也要这样做，因为 koffi 可能在热重载后失效
+      try {
+        glassWindow.setOpacity(0);
+        await new Promise((resolve) => setTimeout(resolve, 80));
+      } catch (e) {
+        console.warn("[Glass] Failed to set opacity:", e.message);
       }
 
       // 使用 node-screenshots 截取指定区域
       const screenshot = await screenshotModule.captureRegion(bounds);
 
-      if (needHideWindow) {
-        glassWindow.webContents.send("glass:show-after-capture");
+      // 恢复窗口透明度
+      try {
+        glassWindow.setOpacity(originalOpacity > 0 ? originalOpacity : 0.85);
+      } catch (e) {
+        console.warn("[Glass] Failed to restore opacity:", e.message);
       }
 
       if (screenshot) {
@@ -1704,8 +1899,13 @@ function setupIPC() {
       }
     } catch (error) {
       console.error("[Glass] Capture error:", error);
+      // 确保窗口恢复可见
       if (glassWindow && !glassWindow.isDestroyed()) {
-        glassWindow.webContents.send("glass:show-after-capture");
+        try {
+          glassWindow.setOpacity(0.85);
+        } catch (e) {
+          // 忽略
+        }
       }
       return { success: false, error: error.message };
     }
@@ -1843,7 +2043,25 @@ function setupIPC() {
   ipcMain.handle("glass:save-settings", (event, settings) => {
     const current = store.get("glassLocalSettings", {});
     store.set("glassLocalSettings", { ...current, ...settings });
+    
+    // 如果设置了透明度，实时应用
+    if (settings.opacity !== undefined && glassWindow && !glassWindow.isDestroyed()) {
+      glassWindow.setOpacity(settings.opacity);
+    }
+    
     return true;
+  });
+
+  // 实时设置透明度
+  ipcMain.handle("glass:set-opacity", (event, opacity) => {
+    if (glassWindow && !glassWindow.isDestroyed()) {
+      glassWindow.setOpacity(opacity);
+      // 同时保存
+      const current = store.get("glassLocalSettings", {});
+      store.set("glassLocalSettings", { ...current, opacity });
+      return true;
+    }
+    return false;
   });
 
   // 添加到收藏（从玻璃窗口）

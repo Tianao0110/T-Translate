@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>字幕采集区</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    .capture-frame {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      border: 3px dashed #ef4444;
+      border-radius: 4px;
+      background: rgba(239, 68, 68, 0.1);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: move;
+      -webkit-app-region: drag;
+    }
+
+    .capture-frame:hover {
+      background: rgba(239, 68, 68, 0.15);
+    }
+
+    .label {
+      color: #ef4444;
+      font-size: 14px;
+      font-weight: 600;
+      text-shadow: 
+        1px 1px 0 #fff,
+        -1px -1px 0 #fff,
+        1px -1px 0 #fff,
+        -1px 1px 0 #fff;
+      pointer-events: none;
+    }
+
+    .hint {
+      color: #ef4444;
+      font-size: 11px;
+      margin-top: 4px;
+      opacity: 0.8;
+      text-shadow: 
+        1px 1px 0 #fff,
+        -1px -1px 0 #fff;
+      pointer-events: none;
+    }
+
+    .close-btn {
+      position: absolute;
+      top: -12px;
+      right: -12px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #ef4444;
+      border: 2px solid #fff;
+      color: #fff;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      -webkit-app-region: no-drag;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      transition: transform 0.1s;
+    }
+
+    .close-btn:hover {
+      transform: scale(1.1);
+      background: #dc2626;
+    }
+
+    /* 四角调整手柄 */
+    .resize-handle {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      background: #ef4444;
+      border: 2px solid #fff;
+      border-radius: 2px;
+      -webkit-app-region: no-drag;
+    }
+
+    .resize-handle.nw { top: -6px; left: -6px; cursor: nw-resize; }
+    .resize-handle.ne { top: -6px; right: -6px; cursor: ne-resize; }
+    .resize-handle.sw { bottom: -6px; left: -6px; cursor: sw-resize; }
+    .resize-handle.se { bottom: -6px; right: -6px; cursor: se-resize; }
+  </style>
+</head>
+<body>
+  <div class="capture-frame">
+    <span class="label">📺 字幕采集区</span>
+    <span class="hint">拖动调整位置 · 拖角调整大小</span>
+    <button class="close-btn" onclick="window.electron.close()" title="关闭">×</button>
+    <div class="resize-handle nw"></div>
+    <div class="resize-handle ne"></div>
+    <div class="resize-handle sw"></div>
+    <div class="resize-handle se"></div>
+  </div>
+</body>
+</html>

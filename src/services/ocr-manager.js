@@ -292,8 +292,9 @@ class OCRManager {
       throw new Error(`LM Studio 连接失败: ${result.message}`);
     }
     
+    // 检测是否有视觉模型加载（仅用于提示，实际使用时会用当前加载的模型）
     const models = result.models;
-    const visionModel = models.find(m => 
+    const visionModels = models.filter(m => 
       m.id && (
         m.id.toLowerCase().includes('llava') || 
         m.id.toLowerCase().includes('vision') || 
@@ -302,10 +303,12 @@ class OCRManager {
       )
     );
     
-    if (!visionModel) {
-      console.warn('[OCR] 未找到视觉模型，请加载支持视觉的模型（如 Qwen-VL、LLaVA）');
+    if (visionModels.length === 0) {
+      console.warn('[OCR] 未检测到视觉模型，LLM Vision 可能无法正常工作');
+      console.warn('[OCR] 建议加载支持视觉的模型（如 Qwen-VL、LLaVA、MiniCPM-V）');
     } else {
-      console.log('[OCR] 找到视觉模型:', visionModel.id);
+      console.log('[OCR] 检测到可用的视觉模型:', visionModels.map(m => m.id).join(', '));
+      console.log('[OCR] 注意：实际使用时将采用 LM Studio 当前加载的模型');
     }
   }
 
@@ -683,85 +686,87 @@ class OCRManager {
       minWidth = 200,       // 最小宽度阈值
       scaleFactor = 2,      // 放大倍数
       maxScale = 3,         // 最大放大倍数
-      quality = 0.95,       // 输出图片质量
+      quality = 0.92,       // 输出图片质量（降低以提高速度）
     } = options;
 
-    return new Promise((resolve, reject) => {
-      const img = new Image();
+    // 使用 createImageBitmap 更高效地处理图片
+    try {
+      // 将 dataURL 转换为 Blob
+      const response = await fetch(dataURL);
+      const blob = await response.blob();
       
-      img.onload = () => {
-        const originalWidth = img.width;
-        const originalHeight = img.height;
-        
-        console.log(`[OCR] 原始图片尺寸: ${originalWidth}x${originalHeight}`);
-        
-        // 判断是否需要放大
-        let needScale = false;
-        let actualScaleFactor = 1;
-        
-        if (originalHeight < minHeight || originalWidth < minWidth) {
-          needScale = true;
-          // 根据图片大小动态计算放大倍数
-          const heightRatio = minHeight / originalHeight;
-          const widthRatio = minWidth / originalWidth;
-          actualScaleFactor = Math.min(Math.max(heightRatio, widthRatio, scaleFactor), maxScale);
-          console.log(`[OCR] 图片较小，将放大 ${actualScaleFactor.toFixed(1)} 倍`);
-        }
-        
-        // 如果不需要放大，直接返回原图
-        if (!needScale) {
-          resolve({
-            dataURL,
-            scaled: false,
-            scaleFactor: 1,
-            originalSize: { width: originalWidth, height: originalHeight }
-          });
-          return;
-        }
-        
-        // 使用 Canvas 放大图片
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        
-        const newWidth = Math.round(originalWidth * actualScaleFactor);
-        const newHeight = Math.round(originalHeight * actualScaleFactor);
-        
-        canvas.width = newWidth;
-        canvas.height = newHeight;
-        
-        // 使用高质量的图片缩放算法
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-        
-        // 绘制放大后的图片
-        ctx.drawImage(img, 0, 0, newWidth, newHeight);
-        
-        // 转换为 data URL
-        const scaledDataURL = canvas.toDataURL('image/png', quality);
-        
-        console.log(`[OCR] 放大后尺寸: ${newWidth}x${newHeight}`);
-        
-        resolve({
-          dataURL: scaledDataURL,
-          scaled: true,
-          scaleFactor: actualScaleFactor,
-          originalSize: { width: originalWidth, height: originalHeight },
-          newSize: { width: newWidth, height: newHeight }
-        });
-      };
+      // 使用 createImageBitmap（比 Image 更快）
+      const imageBitmap = await createImageBitmap(blob);
       
-      img.onerror = () => {
-        console.warn('[OCR] 图片加载失败，跳过预处理');
-        resolve({
+      const originalWidth = imageBitmap.width;
+      const originalHeight = imageBitmap.height;
+      
+      // 快速检查：如果图片已经足够大，直接返回
+      if (originalHeight >= minHeight && originalWidth >= minWidth) {
+        imageBitmap.close();  // 释放资源
+        return {
           dataURL,
           scaled: false,
           scaleFactor: 1,
-          error: '图片加载失败'
-        });
+          originalSize: { width: originalWidth, height: originalHeight }
+        };
+      }
+      
+      // 需要放大
+      const heightRatio = minHeight / originalHeight;
+      const widthRatio = minWidth / originalWidth;
+      const actualScaleFactor = Math.min(Math.max(heightRatio, widthRatio, scaleFactor), maxScale);
+      
+      console.log(`[OCR] 图片 ${originalWidth}x${originalHeight} 较小，放大 ${actualScaleFactor.toFixed(1)}x`);
+      
+      const newWidth = Math.round(originalWidth * actualScaleFactor);
+      const newHeight = Math.round(originalHeight * actualScaleFactor);
+      
+      // 使用 OffscreenCanvas（如果支持）或普通 Canvas
+      let canvas, ctx;
+      if (typeof OffscreenCanvas !== 'undefined') {
+        canvas = new OffscreenCanvas(newWidth, newHeight);
+        ctx = canvas.getContext('2d');
+      } else {
+        canvas = document.createElement('canvas');
+        canvas.width = newWidth;
+        canvas.height = newHeight;
+        ctx = canvas.getContext('2d');
+      }
+      
+      // 使用高质量缩放
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(imageBitmap, 0, 0, newWidth, newHeight);
+      
+      imageBitmap.close();  // 释放资源
+      
+      // 转换为 data URL
+      let scaledDataURL;
+      if (canvas instanceof OffscreenCanvas) {
+        const scaledBlob = await canvas.convertToBlob({ type: 'image/png', quality });
+        scaledDataURL = await this.blobToDataURL(scaledBlob);
+      } else {
+        scaledDataURL = canvas.toDataURL('image/png', quality);
+      }
+      
+      return {
+        dataURL: scaledDataURL,
+        scaled: true,
+        scaleFactor: actualScaleFactor,
+        originalSize: { width: originalWidth, height: originalHeight },
+        newSize: { width: newWidth, height: newHeight }
       };
       
-      img.src = dataURL;
-    });
+    } catch (error) {
+      console.warn('[OCR] 预处理失败，使用原图:', error.message);
+      return {
+        dataURL,
+        scaled: false,
+        scaleFactor: 1,
+        error: error.message
+      };
+    }
   }
 
   /**

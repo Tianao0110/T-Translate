@@ -86,7 +86,8 @@ const SettingsPanel = ({ showNotification }) => {
       ocrEngine: 'llm-vision',   // OCR 引擎
       defaultOpacity: 0.85,      // 默认透明度
       rememberPosition: true,    // 记住窗口位置
-      autoPin: true              // 默认置顶
+      autoPin: true,             // 默认置顶
+      lockTargetLang: true       // 锁定目标语言（避免回译）
     },
     selection: {
       enabled: false,            // 启用划词翻译 - 默认关闭
@@ -169,6 +170,17 @@ const SettingsPanel = ({ showNotification }) => {
         }
       }
       
+      // 获取划词翻译的真实状态（从主进程）
+      let selectionEnabled = false;
+      if (window.electron?.selection?.getEnabled) {
+        try {
+          selectionEnabled = await window.electron.selection.getEnabled();
+          console.log('[Settings] Selection translate state from main:', selectionEnabled);
+        } catch (e) {
+          console.log('Selection state check failed:', e);
+        }
+      }
+      
       // 优先从 Electron Store 读取
       if (window.electron && window.electron.store) {
         const savedSettings = await window.electron.store.get('settings');
@@ -182,6 +194,12 @@ const SettingsPanel = ({ showNotification }) => {
               isWindows,
               paddleInstalled,
               rapidInstalled,
+            },
+            // 使用主进程的真实状态覆盖
+            selection: {
+              ...prev.selection,
+              ...savedSettings.selection,
+              enabled: selectionEnabled,  // 以主进程状态为准
             }
           }));
           // 同步 OCR 引擎到 Store
@@ -189,10 +207,11 @@ const SettingsPanel = ({ showNotification }) => {
             setOcrEngine(savedSettings.ocr.engine);
           }
         } else {
-          // 没有保存的设置，只更新平台检测
+          // 没有保存的设置，只更新平台检测和划词翻译状态
           setSettings(prev => ({
             ...prev,
-            ocr: { ...prev.ocr, isWindows, paddleInstalled, rapidInstalled }
+            ocr: { ...prev.ocr, isWindows, paddleInstalled, rapidInstalled },
+            selection: { ...prev.selection, enabled: selectionEnabled }
           }));
         }
       } else {
@@ -207,6 +226,11 @@ const SettingsPanel = ({ showNotification }) => {
               isWindows,
               paddleInstalled,
               rapidInstalled,
+            },
+            selection: {
+              ...prev.selection,
+              ...parsed.selection,
+              enabled: selectionEnabled,
             }
           }));
           // 同步 OCR 引擎到 Store
@@ -216,7 +240,8 @@ const SettingsPanel = ({ showNotification }) => {
         } else {
           setSettings(prev => ({
             ...prev,
-            ocr: { ...prev.ocr, isWindows, paddleInstalled, rapidInstalled }
+            ocr: { ...prev.ocr, isWindows, paddleInstalled, rapidInstalled },
+            selection: { ...prev.selection, enabled: selectionEnabled }
           }));
         }
       }
@@ -982,20 +1007,19 @@ const SettingsPanel = ({ showNotification }) => {
             <p className="setting-description">配置悬浮翻译窗口的行为和外观</p>
             
             <div className="setting-group">
-              <label className="setting-label">自动刷新间隔</label>
-              <div className="setting-row">
-                <input
-                  type="range"
-                  className="setting-range"
-                  min="1000"
-                  max="10000"
-                  step="500"
-                  value={settings.glassWindow.refreshInterval}
-                  onChange={(e) => updateSetting('glassWindow', 'refreshInterval', parseInt(e.target.value))}
-                />
-                <span className="range-value">{settings.glassWindow.refreshInterval / 1000}秒</span>
+              <label className="setting-label">锁定目标语言</label>
+              <div className="toggle-wrapper">
+                <button
+                  className={`toggle-button ${settings.glassWindow.lockTargetLang ? 'active' : ''}`}
+                  onClick={() => updateSetting('glassWindow', 'lockTargetLang', !settings.glassWindow.lockTargetLang)}
+                >
+                  {settings.glassWindow.lockTargetLang ? '开启' : '关闭'}
+                </button>
+                <span className="toggle-description">
+                  {settings.glassWindow.lockTargetLang ? '始终翻译成目标语言' : '根据原文自动切换（可能导致回译）'}
+                </span>
               </div>
-              <p className="setting-hint">开启自动刷新时，每隔此时间重新识别并翻译</p>
+              <p className="setting-hint">建议开启，避免中英文来回切换</p>
             </div>
 
             <div className="setting-group">
@@ -1009,21 +1033,6 @@ const SettingsPanel = ({ showNotification }) => {
                 </button>
                 <span className="toggle-description">
                   {settings.glassWindow.smartDetect ? '自动跳过未变化的内容' : '每次都重新识别翻译'}
-                </span>
-              </div>
-            </div>
-
-            <div className="setting-group">
-              <label className="setting-label">流式输出</label>
-              <div className="toggle-wrapper">
-                <button
-                  className={`toggle-button ${settings.glassWindow.streamOutput ? 'active' : ''}`}
-                  onClick={() => updateSetting('glassWindow', 'streamOutput', !settings.glassWindow.streamOutput)}
-                >
-                  {settings.glassWindow.streamOutput ? '开启' : '关闭'}
-                </button>
-                <span className="toggle-description">
-                  {settings.glassWindow.streamOutput ? '翻译结果逐字显示' : '翻译完成后一次性显示'}
                 </span>
               </div>
             </div>
@@ -1059,10 +1068,11 @@ const SettingsPanel = ({ showNotification }) => {
                 />
                 <span className="range-value">{Math.round(settings.glassWindow.defaultOpacity * 100)}%</span>
               </div>
+              <p className="setting-hint">在玻璃窗中点击小横条可实时调节</p>
             </div>
 
             <div className="setting-group">
-              <label className="setting-label">其他选项</label>
+              <label className="setting-label">窗口选项</label>
               <div className="checkbox-group">
                 <label className="checkbox-label">
                   <input
@@ -1092,12 +1102,21 @@ const SettingsPanel = ({ showNotification }) => {
                 </div>
                 <div className="shortcut-item">
                   <kbd>Space</kbd>
-                  <span>手动刷新</span>
+                  <span>手动截图识别</span>
                 </div>
                 <div className="shortcut-item">
                   <kbd>Esc</kbd>
-                  <span>关闭窗口</span>
+                  <span>退出字幕模式/关闭窗口</span>
                 </div>
+              </div>
+            </div>
+
+            <div className="setting-group">
+              <label className="setting-label">使用说明</label>
+              <div className="info-box">
+                <p><strong>普通模式：</strong>点击 📷 截图识别当前区域</p>
+                <p><strong>字幕模式：</strong>点击 🎬 开启实时字幕翻译</p>
+                <p><strong>首次使用字幕模式：</strong>需要先框选视频原字幕区域</p>
               </div>
             </div>
           </div>
