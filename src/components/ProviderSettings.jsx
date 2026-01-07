@@ -108,15 +108,10 @@ const CONFIG_SCHEMA = {
       placeholder: 'https://api.openai.com/v1',
     },
     model: {
-      type: 'select',
-      label: '模型',
-      options: [
-        { value: 'gpt-4o-mini', label: 'GPT-4o Mini (推荐)' },
-        { value: 'gpt-4o', label: 'GPT-4o' },
-        { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
-        { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' },
-      ],
+      type: 'text',
+      label: '模型名称',
       default: 'gpt-4o-mini',
+      placeholder: 'gpt-4o-mini',
     },
   },
   'deepl': {

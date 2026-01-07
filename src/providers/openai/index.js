@@ -22,7 +22,7 @@ class OpenAIProvider extends BaseProvider {
         label: 'API Key',
         required: true,
         placeholder: 'sk-...',
-        encrypted: true,  // 标记需要加密存储
+        encrypted: true,
       },
       baseUrl: {
         type: 'text',
@@ -32,16 +32,11 @@ class OpenAIProvider extends BaseProvider {
         placeholder: 'https://api.openai.com/v1',
       },
       model: {
-        type: 'select',
-        label: '模型',
-        options: [
-          { value: 'gpt-4o-mini', label: 'GPT-4o Mini (推荐)' },
-          { value: 'gpt-4o', label: 'GPT-4o' },
-          { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
-          { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' },
-        ],
+        type: 'text',
+        label: '模型名称',
         default: 'gpt-4o-mini',
         required: false,
+        placeholder: 'gpt-4o-mini',
       },
       timeout: {
         type: 'number',
