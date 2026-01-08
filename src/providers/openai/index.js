@@ -2,6 +2,7 @@
 // OpenAI 翻译源 - 支持 GPT-4/3.5
 
 import { BaseProvider, LANGUAGE_CODES } from '../base.js';
+import icon from './icon.svg';
 
 /**
  * OpenAI 翻译源
@@ -13,8 +14,10 @@ class OpenAIProvider extends BaseProvider {
     id: 'openai',
     name: 'OpenAI',
     description: '使用 GPT 模型翻译，质量高、速度快',
-    icon: 'openai',
+    icon: icon,
+    color: '#10a37f',
     type: 'llm',
+    helpUrl: 'https://platform.openai.com/api-keys',
     
     configSchema: {
       apiKey: {
@@ -37,12 +40,6 @@ class OpenAIProvider extends BaseProvider {
         default: 'gpt-4o-mini',
         required: false,
         placeholder: 'gpt-4o-mini',
-      },
-      timeout: {
-        type: 'number',
-        label: '超时时间 (ms)',
-        default: 15000,
-        required: false,
       },
     },
   };

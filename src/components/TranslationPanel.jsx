@@ -7,8 +7,7 @@ import {
 } from 'lucide-react';
 
 import useTranslationStore from '../stores/translation-store';
-import llmClient from '../utils/llm-client';
-import ocrManager from '../services/ocr-manager';
+import translationService from '../services/translation-service.js';
 import '../styles/components/TranslationPanel.css'; 
 
 /**
@@ -119,21 +118,22 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
       setIsOcrProcessing(true);
 
       try {
-        // 使用 OCR 识别图片中的文字，传入引擎设置
+        // 使用 store 的 recognizeImage 方法（内部调用 mainTranslation service）
         const engineToUse = ocrStatus?.engine || 'llm-vision';
-        console.log('[OCR] Calling ocrManager.recognize with engine:', engineToUse);
-        const result = await ocrManager.recognize(screenshotData.dataURL, { engine: engineToUse });
+        console.log('[OCR] Calling recognizeImage with engine:', engineToUse);
+        
+        const result = await recognizeImage(screenshotData.dataURL, { 
+          engine: engineToUse,
+          autoSetSource: true  // 自动设置 sourceText
+        });
         console.log('[OCR] Result:', result);
 
         if (result.success && result.text) {
-          const trimmedText = result.text.trim();
-          console.log('[OCR] Recognized text:', trimmedText.substring(0, 100) + '...');
+          console.log('[OCR] Recognized text:', result.text.substring(0, 100) + '...');
           
-          // 将识别的文字填入原文框
-          setSourceText(trimmedText);
           // 标记为 OCR 来源（翻译时自动使用 OCR 纠错模板）
           setIsOcrSource(true);
-          notify(`识别成功 (${result.engine})`, 'success');
+          notify(`识别成功 (${result.engine || engineToUse})`, 'success');
 
           // 自动开始翻译
           setTimeout(() => {
@@ -161,7 +161,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
 
   const checkConnection = async () => {
     try {
-      const result = await llmClient.testConnection();
+      const result = await translationService.testConnection();
       setIsConnected(result.success);
     } catch (error) {
       setIsConnected(false);
@@ -376,7 +376,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
 改写后的译文：`;
 
       // 调用 LLM 进行改写
-      const result = await llmClient.chatCompletion([
+      const result = await translationService.chatCompletion([
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
       ]);
@@ -475,7 +475,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
 
 请分析并返回 JSON 格式的标签、摘要和风格建议。`;
 
-      const result = await llmClient.chatCompletion([
+      const result = await translationService.chatCompletion([
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
       ]);

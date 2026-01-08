@@ -32,6 +32,9 @@ contextBridge.exposeInMainWorld('electron', {
     // 获取设置（合并主程序设置）
     getSettings: () => ipcRenderer.invoke('glass:get-settings'),
     
+    // 获取翻译源配置
+    getProviderConfigs: () => ipcRenderer.invoke('glass:get-provider-configs'),
+    
     // 保存本地设置
     saveSettings: (settings) => ipcRenderer.invoke('glass:save-settings', settings),
     

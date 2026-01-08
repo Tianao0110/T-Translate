@@ -2,6 +2,7 @@
 // 本地 LLM 翻译源 - 通过 LM Studio / Ollama 等本地服务
 
 import { BaseProvider, LANGUAGE_CODES } from '../base.js';
+import icon from './icon.svg';
 
 /**
  * 本地 LLM 翻译源
@@ -13,8 +14,10 @@ class LocalLLMProvider extends BaseProvider {
     id: 'local-llm',
     name: 'LM Studio (本地)',
     description: '使用本地大模型翻译，隐私安全、免费',
-    icon: 'local-llm',  // 使用内置图标 ID
+    icon: icon,
+    color: '#10b981',
     type: 'llm',
+    helpUrl: 'https://lmstudio.ai/',
     
     // 配置字段声明
     configSchema: {
@@ -31,12 +34,6 @@ class LocalLLMProvider extends BaseProvider {
         default: '',
         required: false,
         placeholder: '留空自动检测',
-      },
-      timeout: {
-        type: 'number',
-        label: '超时时间 (ms)',
-        default: 30000,
-        required: false,
       },
     },
   };
@@ -298,6 +295,64 @@ class LocalLLMProvider extends BaseProvider {
     } catch (error) {
       clearTimeout(timeoutId);
       throw error;
+    }
+  }
+
+  /**
+   * 通用聊天完成（用于非翻译场景，如 AI 分析、风格改写）
+   * @param {Array} messages - OpenAI 格式的消息数组
+   * @param {object} options - 选项
+   */
+  async chat(messages, options = {}) {
+    try {
+      const model = this.config.model || await this._getFirstModel();
+      
+      const response = await fetch(`${this.config.endpoint}/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: model || 'local-model',
+          messages,
+          temperature: options.temperature ?? 0.7,
+          max_tokens: options.max_tokens ?? 2048,
+          stream: false,
+        }),
+        signal: AbortSignal.timeout(this.config.timeout || 30000),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        return { success: false, error: `API 错误: ${response.status} - ${errorText}` };
+      }
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content;
+
+      if (!content) {
+        return { success: false, error: '无响应内容' };
+      }
+
+      return {
+        success: true,
+        content,
+        usage: data.usage,
+        model: data.model,
+      };
+    } catch (error) {
+      console.error('[LocalLLM] Chat error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * 获取第一个可用模型
+   */
+  async _getFirstModel() {
+    try {
+      const models = await this.getModels();
+      return models?.[0]?.id || null;
+    } catch {
+      return null;
     }
   }
 }

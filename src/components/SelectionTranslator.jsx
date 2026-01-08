@@ -1,10 +1,9 @@
 // src/components/SelectionTranslator.jsx
 import React, { useState, useEffect, useRef } from 'react';
+import translationService from '../services/translation.js';
 import '../styles/selection.css';
 
-const API_ENDPOINT = 'http://localhost:1234/v1';
-
-// 语言代码映射
+// 语言代码映射（用于显示）
 const LANG_MAP = {
   'zh': 'Simplified Chinese',
   'en': 'English',
@@ -183,7 +182,7 @@ const SelectionTranslator = () => {
     });
   };
 
-  // 使用主程序的翻译设置
+  // 使用 translationService 进行翻译
   const translateText = async (text, retryCount = 0) => {
     // 检测源语言
     const isChinese = (text.match(/[\u4e00-\u9fff]/g) || []).length / text.length > 0.3;
@@ -203,60 +202,33 @@ const SelectionTranslator = () => {
       targetLang = detectedLang === 'en' ? 'zh' : 'en';
     }
     
-    const targetLangName = LANG_MAP[targetLang] || 'Simplified Chinese';
-    
-    // 创建 AbortController 用于超时控制
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超时
-    
     try {
-      const res = await fetch(`${API_ENDPOINT}/chat/completions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: [
-            { role: 'system', content: `Translate into ${targetLangName}. Output ONLY the translation result, no explanations.` },
-            { role: 'user', content: text }
-          ],
-          temperature: 0.3,
-        }),
-        signal: controller.signal,
+      // 使用 translationService 进行翻译
+      const result = await translationService.translate(text, {
+        sourceLang: detectedLang,
+        targetLang: targetLang,
       });
       
-      clearTimeout(timeoutId);
-      
-      if (!res.ok) {
-        if (res.status === 503 || res.status === 502) {
-          throw new Error('服务暂时不可用，请稍后重试');
-        }
-        throw new Error(`服务器错误 (${res.status})`);
+      if (!result.success) {
+        throw new Error(result.error || '翻译失败');
       }
       
-      const data = await res.json();
-      const result = data.choices?.[0]?.message?.content?.trim();
-      
-      if (!result) {
+      if (!result.text) {
         throw new Error('翻译结果为空');
       }
       
-      return result;
+      return result.text;
     } catch (err) {
-      clearTimeout(timeoutId);
-      
       // 网络错误自动重试一次
-      if (retryCount < 1 && (err.name === 'AbortError' || err.message.includes('fetch'))) {
+      if (retryCount < 1 && (err.message.includes('fetch') || err.message.includes('network'))) {
         console.log('[Selection] Retrying translation...');
         await new Promise(r => setTimeout(r, 1000));
         return translateText(text, retryCount + 1);
       }
       
       // 友好错误提示
-      if (err.name === 'AbortError') {
-        throw new Error('翻译超时，请检查 LM Studio 是否正常运行');
-      }
       if (err.message.includes('fetch') || err.message.includes('network')) {
-        throw new Error('无法连接翻译服务，请确保 LM Studio 已启动');
+        throw new Error('无法连接翻译服务，请确保翻译源已启动');
       }
       
       throw err;

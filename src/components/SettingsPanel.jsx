@@ -6,8 +6,7 @@ import {
   Save, FolderOpen, Trash2, Eye, EyeOff, Lock, Unlock, GitBranch, HelpCircle,
   ExternalLink, ChevronRight, Terminal, Code2, Palette, Layers, MousePointer, Server
 } from 'lucide-react';
-import llmClient from '../utils/llm-client';
-import translator from '../services/translator';
+import translationService from '../services/translation-service.js';
 import useTranslationStore from '../stores/translation-store';
 import ProviderSettings from './ProviderSettings';
 import '../styles/components/SettingsPanel.css';
@@ -286,14 +285,6 @@ const SettingsPanel = ({ showNotification }) => {
         localStorage.setItem('settings', JSON.stringify(settingsToSave));
       }
       
-      // 应用设置到各个模块
-      if (llmClient && llmClient.updateConfig) {
-        llmClient.updateConfig({
-          endpoint: settings.connection?.endpoint,
-          timeout: settings.connection?.timeout
-        });
-      }
-      
       // 同步 OCR 引擎到 Store
       if (setOcrEngine && settings.ocr?.engine) {
         setOcrEngine(settings.ocr.engine);
@@ -316,21 +307,16 @@ const SettingsPanel = ({ showNotification }) => {
   const testConnection = async () => {
     setIsTesting(true);
     setConnectionStatus('testing');
-    
-    // 临时更新客户端配置进行测试
-    if (llmClient.updateConfig) {
-        llmClient.updateConfig({ endpoint: settings.connection.endpoint });
-    }
 
     try {
-      const result = await llmClient.testConnection();
+      const result = await translationService.testConnection();
       if (result.success) {
         setConnectionStatus('connected');
         setModels(result.models || []);
-        notify(`连接成功！检测到 ${result.models?.length || 0} 个模型`, 'success');
+        notify(`连接成功！${result.models?.length ? `检测到 ${result.models.length} 个模型` : ''}`, 'success');
       } else {
         setConnectionStatus('disconnected');
-        notify('连接失败: ' + result.message, 'error');
+        notify('连接失败: ' + (result.error || result.message || '未知错误'), 'error');
       }
     } catch (error) {
       setConnectionStatus('error');
@@ -506,21 +492,18 @@ const SettingsPanel = ({ showNotification }) => {
                 <p className="setting-hint" style={{marginBottom: '12px'}}>
                   缓存已翻译的内容，相同文本再次翻译时直接返回结果，节省时间和资源。
                   <br />
-                  当前缓存: {translator.getCacheStats().valid} 条 / 最大 {translator.getCacheStats().maxSize} 条
-                  <br />
-                  自动过期: {translator.getCacheStats().ttlDays} 天
+                  缓存状态: 已迁移至新翻译源系统
                 </p>
                 <button 
                   className="danger-button"
                   onClick={() => {
-                    if (window.confirm('确定要清除所有翻译缓存吗？')) {
-                      translator.clearCache();
-                      notify('翻译缓存已清除', 'success');
-                      setActiveSection('translation'); // 刷新显示
+                    if (window.confirm('确定要清除浏览器本地存储吗？这将清除所有缓存数据。')) {
+                      localStorage.removeItem('translation-cache');
+                      notify('缓存已清除', 'success');
                     }
                   }}
                 >
-                  <Trash2 size={16} /> 清除翻译缓存
+                  <Trash2 size={16} /> 清除本地缓存
                 </button>
             </div>
           </div>

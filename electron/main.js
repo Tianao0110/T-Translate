@@ -2102,6 +2102,46 @@ function setupIPC() {
     return merged;
   });
 
+  // 获取翻译源配置（用于玻璃窗初始化翻译服务）
+  ipcMain.handle("glass:get-provider-configs", async () => {
+    const mainSettings = store.get("settings", {});
+    const providerSettings = mainSettings.providers || {};
+    
+    // 解密 API Keys
+    const configs = JSON.parse(JSON.stringify(providerSettings.configs || {}));
+    
+    for (const providerId of Object.keys(configs)) {
+      const config = configs[providerId];
+      if (config?.apiKey === '***encrypted***') {
+        // 尝试解密 - 使用与 secure-storage handler 相同的逻辑
+        const encryptKey = `provider_${providerId}_apiKey`;
+        const stored = store.get(`__encrypted_${encryptKey}`);
+        
+        if (stored) {
+          try {
+            if (safeStorage.isEncryptionAvailable()) {
+              const buffer = Buffer.from(stored, 'base64');
+              configs[providerId].apiKey = safeStorage.decryptString(buffer);
+            } else {
+              // 回退：直接解码
+              configs[providerId].apiKey = Buffer.from(stored, 'base64').toString('utf-8');
+            }
+          } catch (e) {
+            console.error(`[Glass] Failed to decrypt ${providerId} API key:`, e);
+            configs[providerId].apiKey = '';
+          }
+        } else {
+          configs[providerId].apiKey = '';
+        }
+      }
+    }
+    
+    return {
+      list: providerSettings.list || [],
+      configs,
+    };
+  });
+
   // 保存玻璃窗口本地设置（窗口位置、透明度等）
   ipcMain.handle("glass:save-settings", (event, settings) => {
     const current = store.get("glassLocalSettings", {});

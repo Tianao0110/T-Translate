@@ -2,6 +2,7 @@
 // DeepL 翻译源 - 专业翻译 API
 
 import { BaseProvider, LANGUAGE_CODES } from '../base.js';
+import icon from './icon.svg';
 
 /**
  * DeepL 翻译源
@@ -13,8 +14,10 @@ class DeepLProvider extends BaseProvider {
     id: 'deepl',
     name: 'DeepL',
     description: '专业翻译 API，翻译质量极高',
-    icon: 'deepl',
+    icon: icon,
+    color: '#0f2b46',
     type: 'api',
+    helpUrl: 'https://www.deepl.com/pro-api',
     
     configSchema: {
       apiKey: {
@@ -26,22 +29,8 @@ class DeepLProvider extends BaseProvider {
       },
       useFreeApi: {
         type: 'checkbox',
-        label: '使用免费 API',
+        label: '使用免费 API（Key 以 :fx 结尾）',
         default: true,
-        required: false,
-        description: 'Free API 的 Key 以 :fx 结尾',
-      },
-      formality: {
-        type: 'select',
-        label: '正式程度',
-        options: [
-          { value: 'default', label: '默认' },
-          { value: 'more', label: '更正式' },
-          { value: 'less', label: '更随意' },
-          { value: 'prefer_more', label: '偏正式' },
-          { value: 'prefer_less', label: '偏随意' },
-        ],
-        default: 'default',
         required: false,
       },
     },
