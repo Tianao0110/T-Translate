@@ -3,6 +3,10 @@
 
 import RapidOCREngine from './rapid.js';
 import LLMVisionEngine from './llm-vision.js';
+import OCRSpaceEngine from './ocrspace.js';
+import GoogleVisionEngine from './google-vision.js';
+import AzureOCREngine from './azure-ocr.js';
+import BaiduOCREngine from './baidu-ocr.js';
 
 /**
  * 所有已注册的 OCR 引擎
@@ -10,12 +14,24 @@ import LLMVisionEngine from './llm-vision.js';
 const engines = {
   'rapid-ocr': RapidOCREngine,
   'llm-vision': LLMVisionEngine,
+  'ocrspace': OCRSpaceEngine,
+  'google-vision': GoogleVisionEngine,
+  'azure-ocr': AzureOCREngine,
+  'baidu-ocr': BaiduOCREngine,
 };
 
 /**
  * 默认优先级（从高到低）
+ * 本地引擎优先，然后是在线 API
  */
-export const DEFAULT_OCR_PRIORITY = ['rapid-ocr', 'llm-vision'];
+export const DEFAULT_OCR_PRIORITY = [
+  'rapid-ocr',      // 本地 - 最快
+  'llm-vision',     // 本地 LLM - 高质量
+  'ocrspace',       // 在线 - 免费
+  'google-vision',  // 在线 - 高质量
+  'azure-ocr',      // 在线 - 高质量
+  'baidu-ocr',      // 在线 - 中文优化
+];
 
 /**
  * 获取所有 OCR 引擎元信息
@@ -59,14 +75,54 @@ class OCREngineManager {
 
   /**
    * 初始化
+   * @param {object} settings - settings.ocr 配置对象
    */
-  async init(configs = {}) {
-    this.configs = configs;
+  async init(settings = {}) {
+    // 从 settings 构建各引擎配置
+    this.configs = this._buildConfigs(settings);
     
-    // 预创建常用引擎
-    for (const id of this.priority) {
-      this.getOrCreate(id);
-    }
+    console.log('[OCR Manager] Initialized with configs:', Object.keys(this.configs));
+    
+    // 清除旧实例
+    this.instances = {};
+  }
+
+  /**
+   * 从 settings.ocr 构建各引擎配置
+   */
+  _buildConfigs(settings) {
+    return {
+      'rapid-ocr': {
+        // RapidOCR 通常不需要额外配置
+      },
+      'llm-vision': {
+        // LLM Vision 使用翻译源的配置
+      },
+      'ocrspace': {
+        apiKey: settings.ocrspaceKey || '',
+        language: settings.recognitionLanguage || 'chs',
+      },
+      'google-vision': {
+        apiKey: settings.googleVisionKey || '',
+      },
+      'azure-ocr': {
+        apiKey: settings.azureKey || '',
+        endpoint: settings.azureEndpoint || '',
+      },
+      'baidu-ocr': {
+        apiKey: settings.baiduApiKey || '',
+        secretKey: settings.baiduSecretKey || '',
+      },
+    };
+  }
+
+  /**
+   * 更新配置
+   */
+  updateConfigs(settings) {
+    this.configs = this._buildConfigs(settings);
+    // 清除实例，下次使用时重新创建
+    this.instances = {};
   }
 
   /**

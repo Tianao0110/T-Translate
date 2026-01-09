@@ -1,10 +1,12 @@
 // src/components/ProviderSettings.jsx
-// 翻译源设置组件 - 动态从 registry 读取翻译源
+// 翻译源设置组件 - 分组卡片风格
+// M-V-S-P 架构：View 层，只负责展示和用户交互
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   ChevronDown, ChevronUp, Check, X, AlertCircle,
-  RefreshCw, Eye, EyeOff, ExternalLink
+  RefreshCw, Eye, EyeOff, ExternalLink, GripVertical,
+  Zap, Globe
 } from 'lucide-react';
 import { getAllProviderMetadata } from '../providers/registry.js';
 import translationService from '../services/translation.js';
@@ -33,8 +35,25 @@ const secureStorage = {
   }
 };
 
+// ========== 图标映射（Emoji 占位） ==========
+const PROVIDER_ICONS = {
+  'local-llm': '🖥️',
+  'openai': '🤖',
+  'gemini': '✨',
+  'deepseek': '⚡',
+  'deepl': '📘',
+  'google-translate': '🌐',
+};
+
+// ========== 类型标签 ==========
+const TYPE_LABELS = {
+  'llm': { label: 'AI 大模型', color: '#8b5cf6' },
+  'api': { label: '专业 API', color: '#3b82f6' },
+  'traditional': { label: '传统翻译', color: '#10b981' },
+};
+
 /**
- * 翻译源设置组件
+ * 翻译源设置组件 - 分组卡片风格
  */
 const ProviderSettings = ({ settings, updateSettings, notify }) => {
   // 从 registry 获取所有翻译源元信息
@@ -55,53 +74,55 @@ const ProviderSettings = ({ settings, updateSettings, notify }) => {
   // 测试状态
   const [testingProvider, setTestingProvider] = useState(null);
   const [testResults, setTestResults] = useState({});
+  
+  // 保存状态
+  const [isSaving, setIsSaving] = useState(false);
 
   // 初始化：从 registry 和 settings 加载
   useEffect(() => {
     const initProviders = async () => {
-      // 从 settings 加载已保存的配置
       const savedProviders = settings?.translation?.providers || [];
       const savedConfigs = settings?.translation?.providerConfigs || {};
       
-      // 构建 providers 列表（合并 registry 和已保存的状态）
+      // 构建 providers 列表
       const providerList = allProvidersMeta.map((meta, index) => {
         const saved = savedProviders.find(p => p.id === meta.id);
         return {
           id: meta.id,
-          enabled: saved?.enabled ?? (index === 0), // 默认第一个启用
+          enabled: saved?.enabled ?? (index === 0),
           priority: saved?.priority ?? index,
         };
       });
       
-      // 按优先级排序
       providerList.sort((a, b) => a.priority - b.priority);
       setProviders(providerList);
       
-      // 构建配置（合并默认值和已保存的配置）
+      // 构建配置
       const configs = {};
       for (const meta of allProvidersMeta) {
         const defaultConfig = {};
         if (meta.configSchema) {
           for (const [key, field] of Object.entries(meta.configSchema)) {
-            defaultConfig[key] = field.default ?? '';
+            defaultConfig[key] = field.default || '';
           }
         }
+        
         configs[meta.id] = { ...defaultConfig, ...savedConfigs[meta.id] };
         
-        // 解密加密字段
+        // 解密敏感字段 - 总是尝试从 secure storage 读取
         if (meta.configSchema) {
           for (const [key, field] of Object.entries(meta.configSchema)) {
-            if (field.encrypted && configs[meta.id][key]) {
-              try {
-                const decrypted = await secureStorage.get(`provider_${meta.id}_${key}`);
-                if (decrypted) {
-                  configs[meta.id][key] = decrypted;
-                }
-              } catch {}
+            if (field.encrypted) {
+              // 无论当前值是什么，都尝试从 secure storage 读取
+              const decrypted = await secureStorage.get(`provider_${meta.id}_${key}`);
+              if (decrypted) {
+                configs[meta.id][key] = decrypted;
+              }
             }
           }
         }
       }
+      
       setProviderConfigs(configs);
     };
     
@@ -110,29 +131,27 @@ const ProviderSettings = ({ settings, updateSettings, notify }) => {
 
   // 保存设置
   const saveSettings = useCallback(async () => {
-    // 准备保存的配置（加密敏感字段）
-    const configsToSave = {};
+    setIsSaving(true);
     
-    for (const meta of allProvidersMeta) {
-      configsToSave[meta.id] = { ...providerConfigs[meta.id] };
+    try {
+      const configsToSave = {};
       
-      // 加密敏感字段
-      if (meta.configSchema) {
-        for (const [key, field] of Object.entries(meta.configSchema)) {
-          if (field.encrypted && configsToSave[meta.id][key]) {
-            await secureStorage.set(`provider_${meta.id}_${key}`, configsToSave[meta.id][key]);
-            configsToSave[meta.id][key] = '***encrypted***';
+      for (const meta of allProvidersMeta) {
+        configsToSave[meta.id] = { ...providerConfigs[meta.id] };
+        
+        if (meta.configSchema) {
+          for (const [key, field] of Object.entries(meta.configSchema)) {
+            if (field.encrypted && configsToSave[meta.id][key]) {
+              await secureStorage.set(`provider_${meta.id}_${key}`, configsToSave[meta.id][key]);
+              configsToSave[meta.id][key] = '***encrypted***';
+            }
           }
         }
       }
-    }
-    
-    // 更新父组件 state
-    updateSettings('translation', 'providers', providers);
-    updateSettings('translation', 'providerConfigs', configsToSave);
-    
-    // 直接保存到 electron-store（确保立即生效）
-    try {
+      
+      updateSettings('translation', 'providers', providers);
+      updateSettings('translation', 'providerConfigs', configsToSave);
+      
       if (window.electron?.store) {
         const currentSettings = await window.electron.store.get('settings') || {};
         const newSettings = {
@@ -146,15 +165,13 @@ const ProviderSettings = ({ settings, updateSettings, notify }) => {
         await window.electron.store.set('settings', newSettings);
       }
       
-      // 刷新 translationService 配置
       await translationService.reload({
         providers: {
           list: providers,
-          configs: providerConfigs,  // 使用未加密的版本
+          configs: providerConfigs,
         }
       });
       
-      // 通知玻璃窗重新加载
       if (window.electron?.glass?.notifySettingsChanged) {
         await window.electron.glass.notifySettingsChanged();
       }
@@ -163,6 +180,8 @@ const ProviderSettings = ({ settings, updateSettings, notify }) => {
     } catch (error) {
       console.error('[ProviderSettings] Save failed:', error);
       notify?.('保存失败: ' + error.message, 'error');
+    } finally {
+      setIsSaving(false);
     }
   }, [providers, providerConfigs, updateSettings, notify, allProvidersMeta]);
 
@@ -181,15 +200,13 @@ const ProviderSettings = ({ settings, updateSettings, notify }) => {
     }));
   };
 
-  // 测试连接（通过 Service）
+  // 测试连接
   const testConnection = async (providerId) => {
     setTestingProvider(providerId);
     setTestResults(prev => ({ ...prev, [providerId]: null }));
     
     try {
       const config = providerConfigs[providerId];
-      
-      // 使用 translationService 测试连接
       const result = await translationService.testProviderWithConfig(providerId, config);
       setTestResults(prev => ({ ...prev, [providerId]: result }));
     } catch (error) {
@@ -215,31 +232,57 @@ const ProviderSettings = ({ settings, updateSettings, notify }) => {
     setProviders(newProviders);
   };
 
+  // 获取状态
+  const getStatusColor = (providerId) => {
+    const result = testResults[providerId];
+    if (result?.success) return '#10b981';
+    if (result?.success === false) return '#ef4444';
+    return '#9ca3af';
+  };
+
+  const getStatusText = (providerId) => {
+    const result = testResults[providerId];
+    if (testingProvider === providerId) return '测试中...';
+    if (result?.success) return '已连接';
+    if (result?.success === false) return result.message || '连接失败';
+    return '未测试';
+  };
+
   // 渲染配置表单
   const renderConfigForm = (providerId) => {
     const meta = allProvidersMeta.find(m => m.id === providerId);
     const config = providerConfigs[providerId] || {};
     
-    if (!meta?.configSchema) return null;
+    if (!meta?.configSchema || Object.keys(meta.configSchema).length === 0) {
+      return (
+        <div className="ps-config-empty">
+          <Globe size={20} />
+          <span>此翻译源无需额外配置，开箱即用</span>
+        </div>
+      );
+    }
     
     return (
-      <div className="provider-config-form">
+      <div className="ps-config-form">
         {Object.entries(meta.configSchema).map(([key, field]) => (
-          <div key={key} className="config-field">
-            <label className="config-label">{field.label}</label>
+          <div key={key} className="ps-field">
+            <label className="ps-label">
+              {field.label}
+              {field.required && <span className="ps-required">*</span>}
+            </label>
             
             {field.type === 'password' ? (
-              <div className="password-input-wrapper">
+              <div className="ps-input-group">
                 <input
                   type={showPasswords[`${providerId}_${key}`] ? 'text' : 'password'}
                   value={config[key] || ''}
                   onChange={(e) => updateConfig(providerId, key, e.target.value)}
                   placeholder={field.placeholder}
-                  className="config-input"
+                  className="ps-input"
                 />
                 <button
                   type="button"
-                  className="password-toggle"
+                  className="ps-input-btn"
                   onClick={() => setShowPasswords(prev => ({
                     ...prev,
                     [`${providerId}_${key}`]: !prev[`${providerId}_${key}`]
@@ -249,7 +292,7 @@ const ProviderSettings = ({ settings, updateSettings, notify }) => {
                 </button>
               </div>
             ) : field.type === 'checkbox' ? (
-              <label className="checkbox-wrapper">
+              <label className="ps-checkbox">
                 <input
                   type="checkbox"
                   checked={config[key] || false}
@@ -261,7 +304,7 @@ const ProviderSettings = ({ settings, updateSettings, notify }) => {
               <select
                 value={config[key] || field.default || ''}
                 onChange={(e) => updateConfig(providerId, key, e.target.value)}
-                className="config-select"
+                className="ps-select"
               >
                 {field.options?.map(opt => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -273,20 +316,14 @@ const ProviderSettings = ({ settings, updateSettings, notify }) => {
                 value={config[key] || ''}
                 onChange={(e) => updateConfig(providerId, key, e.target.value)}
                 placeholder={field.placeholder}
-                className="config-input"
+                className="ps-input"
               />
             )}
           </div>
         ))}
         
-        {/* 帮助链接 */}
         {meta.helpUrl && (
-          <a 
-            href={meta.helpUrl} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="help-link"
-          >
+          <a href={meta.helpUrl} target="_blank" rel="noopener noreferrer" className="ps-help-link">
             <ExternalLink size={14} />
             获取 API Key
           </a>
@@ -296,109 +333,117 @@ const ProviderSettings = ({ settings, updateSettings, notify }) => {
   };
 
   return (
-    <div className="provider-settings">
-      <div className="provider-settings-header">
-        <h3>翻译源管理</h3>
-        <p className="provider-settings-desc">
-          拖动调整优先级，启用的翻译源将按顺序尝试
-        </p>
+    <div className="ps-container">
+      {/* 说明 */}
+      <div className="ps-tip">
+        <AlertCircle size={14} />
+        <span>按优先级顺序尝试翻译，第一个成功的将被使用。拖动卡片调整顺序。</span>
       </div>
 
-      <div className="provider-list">
+      {/* 翻译源列表 */}
+      <div className="ps-list">
         {providers.map((provider, index) => {
           const meta = allProvidersMeta.find(m => m.id === provider.id);
           if (!meta) return null;
           
           const isExpanded = expandedProvider === provider.id;
-          const testResult = testResults[provider.id];
+          const typeInfo = TYPE_LABELS[meta.type] || TYPE_LABELS['api'];
           
           return (
             <div 
               key={provider.id}
-              className={`provider-item ${provider.enabled ? 'enabled' : 'disabled'}`}
+              className={`ps-card ${provider.enabled ? 'enabled' : 'disabled'} ${isExpanded ? 'expanded' : ''}`}
+              style={{ '--accent': meta.color || '#6b7280' }}
             >
-              {/* 头部 */}
-              <div className="provider-header">
-                <div className="provider-drag">
+              {/* 左侧彩色条 */}
+              <div className="ps-accent-bar"></div>
+
+              {/* 卡片头部 */}
+              <div className="ps-card-header">
+                {/* 优先级 */}
+                <div className="ps-rank">#{index + 1}</div>
+
+                {/* 拖拽区域 */}
+                <div className="ps-drag">
                   <button 
-                    className="move-btn"
+                    className="ps-drag-btn"
                     onClick={() => moveProvider(index, -1)}
                     disabled={index === 0}
                   >
-                    <ChevronUp size={16} />
+                    <ChevronUp size={14} />
                   </button>
+                  <GripVertical size={14} className="ps-grip-icon" />
                   <button 
-                    className="move-btn"
+                    className="ps-drag-btn"
                     onClick={() => moveProvider(index, 1)}
                     disabled={index === providers.length - 1}
                   >
-                    <ChevronDown size={16} />
+                    <ChevronDown size={14} />
                   </button>
                 </div>
-                
-                <div 
-                  className="provider-icon"
-                  style={{ backgroundColor: meta.color || '#666' }}
-                >
-                  <img src={meta.icon} alt={meta.name} />
+
+                {/* 图标 */}
+                <div className="ps-icon">
+                  {PROVIDER_ICONS[provider.id] || '📦'}
                 </div>
-                
-                <div className="provider-info">
-                  <div className="provider-name">{meta.name}</div>
-                  <div className="provider-desc">{meta.description}</div>
+
+                {/* 信息 */}
+                <div className="ps-info">
+                  <div className="ps-title">
+                    <span className="ps-name">{meta.name}</span>
+                    <span className="ps-tag" style={{ background: typeInfo.color }}>
+                      {typeInfo.label}
+                    </span>
+                  </div>
+                  <div className="ps-desc">{meta.description}</div>
                 </div>
-                
-                <div className="provider-actions">
-                  {/* 测试按钮 */}
-                  <button
-                    className={`test-btn ${testResult?.success ? 'success' : testResult?.success === false ? 'error' : ''}`}
-                    onClick={() => testConnection(provider.id)}
-                    disabled={testingProvider === provider.id}
-                    title={testResult?.message || '测试连接'}
-                  >
-                    {testingProvider === provider.id ? (
-                      <RefreshCw size={16} className="spinning" />
-                    ) : testResult?.success ? (
-                      <Check size={16} />
-                    ) : testResult?.success === false ? (
-                      <X size={16} />
-                    ) : (
-                      <RefreshCw size={16} />
-                    )}
-                  </button>
-                  
-                  {/* 启用开关 */}
-                  <label className="toggle-switch">
-                    <input
-                      type="checkbox"
-                      checked={provider.enabled}
-                      onChange={() => toggleProvider(provider.id)}
-                    />
-                    <span className="toggle-slider"></span>
-                  </label>
-                  
-                  {/* 展开按钮 */}
-                  <button
-                    className="expand-btn"
-                    onClick={() => setExpandedProvider(isExpanded ? null : provider.id)}
-                  >
-                    {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                  </button>
-                </div>
+
+                {/* 开关 */}
+                <label className="ps-switch">
+                  <input
+                    type="checkbox"
+                    checked={provider.enabled}
+                    onChange={() => toggleProvider(provider.id)}
+                  />
+                  <span className="ps-switch-track"></span>
+                  <span className="ps-switch-text">{provider.enabled ? 'ON' : 'OFF'}</span>
+                </label>
               </div>
-              
-              {/* 配置面板 */}
+
+              {/* 展开按钮 */}
+              <button 
+                className="ps-expand-trigger"
+                onClick={() => setExpandedProvider(isExpanded ? null : provider.id)}
+              >
+                <span>配置详情</span>
+                {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </button>
+
+              {/* 展开内容 */}
               {isExpanded && (
-                <div className="provider-config">
+                <div className="ps-expand-content">
                   {renderConfigForm(provider.id)}
                   
-                  {/* 测试结果 */}
-                  {testResult && (
-                    <div className={`test-result ${testResult.success ? 'success' : 'error'}`}>
-                      {testResult.success ? <Check size={16} /> : <AlertCircle size={16} />}
-                      <span>{testResult.message || (testResult.success ? '连接成功' : '连接失败')}</span>
+                  {/* 测试区 */}
+                  <div className="ps-test-row">
+                    <button
+                      className={`ps-test-btn ${testResults[provider.id]?.success ? 'success' : testResults[provider.id]?.success === false ? 'error' : ''}`}
+                      onClick={() => testConnection(provider.id)}
+                      disabled={testingProvider === provider.id}
+                    >
+                      {testingProvider === provider.id ? (
+                        <RefreshCw size={14} className="spinning" />
+                      ) : (
+                        <Zap size={14} />
+                      )}
+                      <span>测试连接</span>
+                    </button>
+                    
+                    <div className="ps-status">
+                      <span className="ps-status-dot" style={{ background: getStatusColor(provider.id) }}></span>
+                      <span>{getStatusText(provider.id)}</span>
                     </div>
-                  )}
+                  </div>
                 </div>
               )}
             </div>
@@ -407,10 +452,10 @@ const ProviderSettings = ({ settings, updateSettings, notify }) => {
       </div>
 
       {/* 保存按钮 */}
-      <div className="provider-settings-footer">
-        <button className="save-btn" onClick={saveSettings}>
-          <Check size={16} />
-          保存设置
+      <div className="ps-actions">
+        <button className="ps-save-btn" onClick={saveSettings} disabled={isSaving}>
+          {isSaving ? <RefreshCw size={16} className="spinning" /> : <Check size={16} />}
+          <span>{isSaving ? '保存中...' : '保存设置'}</span>
         </button>
       </div>
     </div>

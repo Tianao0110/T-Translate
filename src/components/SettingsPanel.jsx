@@ -7,6 +7,7 @@ import {
   ExternalLink, ChevronRight, Terminal, Code2, Palette, Layers, MousePointer, Server
 } from 'lucide-react';
 import translationService from '../services/translation-service.js';
+import { ocrManager } from '../providers/ocr/index.js';
 import useTranslationStore from '../stores/translation-store';
 import ProviderSettings from './ProviderSettings';
 import '../styles/components/SettingsPanel.css';
@@ -75,6 +76,13 @@ const SettingsPanel = ({ showNotification }) => {
       isWindows: false,  // 是否 Windows 系统
       paddleInstalled: false,  // PaddleOCR 是否已安装
       rapidInstalled: false,   // RapidOCR 是否已安装
+      // 第三方 OCR API Keys
+      ocrspaceKey: '',
+      googleVisionKey: '',
+      azureKey: '',
+      azureEndpoint: '',
+      baiduApiKey: '',
+      baiduSecretKey: '',
     },
     screenshot: {
       showConfirmButtons: true,  // 显示确认按钮
@@ -288,6 +296,16 @@ const SettingsPanel = ({ showNotification }) => {
       // 同步 OCR 引擎到 Store
       if (setOcrEngine && settings.ocr?.engine) {
         setOcrEngine(settings.ocr.engine);
+      }
+
+      // 刷新 OCR Manager 配置
+      if (settings.ocr) {
+        try {
+          ocrManager.updateConfigs(settings.ocr);
+          console.log('[Settings] OCR configs updated');
+        } catch (e) {
+          console.warn('[Settings] ocrManager update failed:', e);
+        }
       }
 
       // 刷新 translationService 配置（如果有翻译源配置变更）
@@ -927,16 +945,25 @@ const SettingsPanel = ({ showNotification }) => {
                       {showApiKeys.azure ? <EyeOff size={14} /> : <Eye size={14} />}
                     </button>
                   </div>
+                  <div className="api-key-input-wrapper" style={{marginTop: '6px'}}>
+                    <input 
+                      type="text"
+                      className="setting-input compact"
+                      placeholder="Endpoint (https://xxx.cognitiveservices.azure.com/)"
+                      value={settings.ocr.azureEndpoint || ''}
+                      onChange={(e) => updateSetting('ocr', 'azureEndpoint', e.target.value)}
+                    />
+                  </div>
                 </div>
                 <div className="engine-actions">
                   <button 
-                    className={`btn ${settings.ocr.engine === 'azure-ocr' ? 'active' : ''} ${!settings.ocr.azureKey ? 'disabled' : ''}`}
+                    className={`btn ${settings.ocr.engine === 'azure-ocr' ? 'active' : ''} ${!(settings.ocr.azureKey && settings.ocr.azureEndpoint) ? 'disabled' : ''}`}
                     onClick={() => {
-                      if (settings.ocr.azureKey) {
+                      if (settings.ocr.azureKey && settings.ocr.azureEndpoint) {
                         updateSetting('ocr', 'engine', 'azure-ocr');
                         if (setOcrEngine) setOcrEngine('azure-ocr');
                       } else {
-                        notify('请先配置 API Key', 'warning');
+                        notify('请先配置 API Key 和 Endpoint', 'warning');
                       }
                     }}
                   >
@@ -973,16 +1000,36 @@ const SettingsPanel = ({ showNotification }) => {
                       {showApiKeys.baidu ? <EyeOff size={14} /> : <Eye size={14} />}
                     </button>
                   </div>
+                  <div className="api-key-input-wrapper" style={{marginTop: '6px'}}>
+                    <input 
+                      type={showApiKeys.baiduSecret ? "text" : "password"}
+                      className="setting-input compact"
+                      placeholder="Secret Key"
+                      value={settings.ocr.baiduSecretKey || ''}
+                      onChange={(e) => updateSetting('ocr', 'baiduSecretKey', e.target.value)}
+                    />
+                    <button 
+                      type="button"
+                      className="api-key-toggle"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowApiKeys(prev => ({ ...prev, baiduSecret: !prev.baiduSecret }));
+                      }}
+                      title={showApiKeys.baiduSecret ? "隐藏" : "显示"}
+                    >
+                      {showApiKeys.baiduSecret ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
                 </div>
                 <div className="engine-actions">
                   <button 
-                    className={`btn ${settings.ocr.engine === 'baidu-ocr' ? 'active' : ''} ${!settings.ocr.baiduApiKey ? 'disabled' : ''}`}
+                    className={`btn ${settings.ocr.engine === 'baidu-ocr' ? 'active' : ''} ${!(settings.ocr.baiduApiKey && settings.ocr.baiduSecretKey) ? 'disabled' : ''}`}
                     onClick={() => {
-                      if (settings.ocr.baiduApiKey) {
+                      if (settings.ocr.baiduApiKey && settings.ocr.baiduSecretKey) {
                         updateSetting('ocr', 'engine', 'baidu-ocr');
                         if (setOcrEngine) setOcrEngine('baidu-ocr');
                       } else {
-                        notify('请先配置 API Key', 'warning');
+                        notify('请先配置 API Key 和 Secret Key', 'warning');
                       }
                     }}
                   >

@@ -63,31 +63,60 @@ class TranslationService {
     console.log('[TranslationService] Initializing...');
     
     try {
-      let providerSettings = settings?.providers;
+      let providerList = null;   // 启用状态列表
+      let providerConfigs = null; // 配置对象
       
-      // 尝试从玻璃窗 API 获取（已解密）
-      if (!providerSettings && window.electron?.glass?.getProviderConfigs) {
-        providerSettings = await window.electron.glass.getProviderConfigs();
-        console.log('[TranslationService] Loaded configs from glass API');
+      // 优先使用传入的 settings
+      if (settings?.providers) {
+        // 新格式：{ providers: { list, configs } }
+        providerList = settings.providers.list;
+        providerConfigs = settings.providers.configs;
+        console.log('[TranslationService] Loaded from passed settings');
       }
       
-      // 如果还没有，尝试从主窗口存储加载
-      if (!providerSettings && window.electron?.store) {
-        const saved = await window.electron.store.get('settings');
-        providerSettings = saved?.providers;
-        
-        // 需要解密
-        if (providerSettings) {
-          providerSettings.configs = await this._decryptConfigs(providerSettings.configs || {});
+      // 尝试从玻璃窗 API 获取（已解密）
+      if (!providerConfigs && window.electron?.glass?.getProviderConfigs) {
+        const glassConfigs = await window.electron.glass.getProviderConfigs();
+        if (glassConfigs) {
+          providerList = glassConfigs.list;
+          providerConfigs = glassConfigs.configs;
+          console.log('[TranslationService] Loaded configs from glass API');
         }
       }
       
-      if (providerSettings) {
-        // 初始化 Registry 的配置
-        initConfigs(providerSettings.configs || {});
+      // 如果还没有，尝试从主窗口存储加载
+      if (!providerConfigs && window.electron?.store) {
+        const saved = await window.electron.store.get('settings');
         
-        // 提取用户优先级
-        this._userPriority = this._extractPriority(providerSettings.list);
+        // 兼容两种格式
+        if (saved?.translation?.providers) {
+          // 新格式：settings.translation.providers (数组)
+          providerList = saved.translation.providers;
+          providerConfigs = await this._decryptConfigs(saved.translation.providerConfigs || {});
+          console.log('[TranslationService] Loaded from store (new format)');
+        } else if (saved?.providers?.list) {
+          // 旧格式：settings.providers.list
+          providerList = saved.providers.list;
+          providerConfigs = await this._decryptConfigs(saved.providers.configs || {});
+          console.log('[TranslationService] Loaded from store (old format)');
+        }
+      }
+      
+      // 即使没有存储的配置，也尝试从 secure storage 恢复加密字段
+      if (!providerConfigs) {
+        providerConfigs = await this._decryptConfigs({});
+        console.log('[TranslationService] Recovered configs from secure storage');
+      }
+      
+      if (providerConfigs) {
+        // 初始化 Registry 的配置
+        initConfigs(providerConfigs);
+      }
+      
+      if (providerList) {
+        // 提取用户优先级（只包含启用的）
+        this._userPriority = this._extractPriority(providerList);
+        console.log('[TranslationService] User priority:', this._userPriority);
       }
       
       this._initialized = true;
@@ -100,17 +129,30 @@ class TranslationService {
 
   /**
    * 解密配置中的敏感字段
+   * 对于所有 provider，尝试从 secure storage 恢复加密字段
    */
   async _decryptConfigs(configs) {
+    const { getAllProviderMetadata } = await import('../providers/registry.js');
+    const allMeta = getAllProviderMetadata();
     const decrypted = {};
     
-    for (const [providerId, config] of Object.entries(configs)) {
-      decrypted[providerId] = { ...config };
+    for (const meta of allMeta) {
+      const providerId = meta.id;
+      decrypted[providerId] = { ...(configs[providerId] || {}) };
       
-      if (config.apiKey === '***encrypted***') {
-        const key = await secureStorage.get(`provider_${providerId}_apiKey`);
-        if (key) {
-          decrypted[providerId].apiKey = key;
+      // 检查每个加密字段
+      if (meta.configSchema) {
+        for (const [key, field] of Object.entries(meta.configSchema)) {
+          if (field.encrypted) {
+            // 如果值是占位符或者为空，尝试从 secure storage 读取
+            const currentValue = decrypted[providerId][key];
+            if (!currentValue || currentValue === '***encrypted***') {
+              const stored = await secureStorage.get(`provider_${providerId}_${key}`);
+              if (stored) {
+                decrypted[providerId][key] = stored;
+              }
+            }
+          }
         }
       }
     }

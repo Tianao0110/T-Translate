@@ -1,80 +1,112 @@
 /* src/styles/components/ProviderSettings.css */
-/* 翻译源设置组件样式 */
+/* 翻译源设置组件样式 - 分组卡片风格 v2 */
 
-.provider-settings {
+/* ========== 容器 ========== */
+.ps-container {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  padding: 8px 0;
 }
 
-.provider-settings.loading {
+/* ========== 提示 ========== */
+.ps-tip {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 8px;
-  padding: 40px;
-  color: #666;
+  padding: 10px 14px;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #0369a1;
 }
 
-.provider-header h4 {
-  margin: 0 0 4px;
-  font-size: 15px;
-  font-weight: 600;
-  color: #333;
+.ps-tip svg {
+  flex-shrink: 0;
 }
 
-.provider-hint {
-  margin: 0;
-  font-size: 12px;
-  color: #888;
-}
-
-/* 翻译源列表 */
-.provider-list {
+/* ========== 列表 ========== */
+.ps-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
 }
 
-.provider-item {
-  border: 1px solid #e5e5e5;
-  border-radius: 10px;
+/* ========== 卡片 ========== */
+.ps-card {
+  position: relative;
   background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
   overflow: hidden;
   transition: all 0.2s ease;
 }
 
-.provider-item.disabled {
+.ps-card:hover {
+  border-color: #d1d5db;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.ps-card.expanded {
+  border-color: var(--accent, #3b82f6);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.ps-card.disabled {
   opacity: 0.6;
 }
 
-.provider-item.expanded {
-  border-color: #3b82f6;
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
+.ps-card.disabled .ps-accent-bar {
+  background: #9ca3af !important;
 }
 
-/* 主信息行 */
-.provider-main {
+/* 左侧彩色条 */
+.ps-accent-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--accent, #3b82f6);
+}
+
+/* ========== 卡片头部 ========== */
+.ps-card-header {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px;
+  padding: 16px 16px 16px 20px;
 }
 
-/* 拖拽/优先级控制 */
-.provider-drag {
+/* 优先级数字 */
+.ps-rank {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #9ca3af;
+  background: #f3f4f6;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* 拖拽区域 */
+.ps-drag {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 2px;
+  margin-right: 4px;
 }
 
-.drag-btn {
+.ps-drag-btn {
   width: 20px;
   height: 16px;
   border: none;
   background: transparent;
-  color: #999;
+  color: #9ca3af;
   cursor: pointer;
   padding: 0;
   display: flex;
@@ -84,369 +116,408 @@
   transition: all 0.15s;
 }
 
-.drag-btn:hover:not(:disabled) {
-  background: #f0f0f0;
-  color: #333;
+.ps-drag-btn:hover:not(:disabled) {
+  background: #f3f4f6;
+  color: #374151;
 }
 
-.drag-btn:disabled {
+.ps-drag-btn:disabled {
   opacity: 0.3;
   cursor: not-allowed;
 }
 
-.priority-badge {
-  font-size: 10px;
-  font-weight: 600;
-  color: #666;
-  background: #f0f0f0;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.ps-grip-icon {
+  color: #d1d5db;
 }
 
 /* 图标 */
-.provider-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
+.ps-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border: 1px solid #e2e8f0;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  font-size: 22px;
   flex-shrink: 0;
 }
 
-/* 信息 */
-.provider-info {
+/* 信息区 */
+.ps-info {
   flex: 1;
   min-width: 0;
 }
 
-.provider-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 2px;
+.ps-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
 }
 
-.provider-desc {
-  font-size: 12px;
-  color: #888;
+.ps-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.ps-tag {
+  font-size: 10px;
+  font-weight: 500;
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.ps-desc {
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.4;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* 操作按钮 */
-.provider-actions {
+/* ========== 开关 ========== */
+.ps-switch {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.toggle-btn {
-  padding: 4px 10px;
-  border: 1px solid #e5e5e5;
-  border-radius: 6px;
-  background: #f5f5f5;
-  color: #666;
-  font-size: 12px;
   cursor: pointer;
-  transition: all 0.2s;
+  margin-left: auto;
+  padding-right: 40px;
 }
 
-.toggle-btn.active {
+.ps-switch input {
+  display: none;
+}
+
+.ps-switch-track {
+  width: 40px;
+  height: 22px;
+  background: #e5e7eb;
+  border-radius: 11px;
+  position: relative;
+  transition: background 0.2s;
+}
+
+.ps-switch-track::after {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  background: #fff;
+  border-radius: 50%;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.ps-switch input:checked + .ps-switch-track {
   background: #10b981;
-  border-color: #10b981;
-  color: #fff;
 }
 
-.toggle-btn:hover {
-  border-color: #ccc;
+.ps-switch input:checked + .ps-switch-track::after {
+  transform: translateX(18px);
 }
 
-.expand-btn {
-  width: 28px;
-  height: 28px;
-  border: none;
-  background: transparent;
-  color: #666;
-  cursor: pointer;
-  border-radius: 6px;
+.ps-switch-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: #9ca3af;
+  min-width: 28px;
+}
+
+.ps-switch input:checked ~ .ps-switch-text {
+  color: #10b981;
+}
+
+/* ========== 展开按钮 ========== */
+.ps-expand-trigger {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-top: 1px solid #f3f4f6;
+  background: #fafafa;
+  color: #6b7280;
+  font-size: 13px;
+  cursor: pointer;
   transition: all 0.15s;
 }
 
-.expand-btn:hover {
-  background: #f0f0f0;
+.ps-expand-trigger:hover {
+  background: #f3f4f6;
+  color: #374151;
 }
 
-.test-result {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.ps-card.expanded .ps-expand-trigger {
+  background: #f8fafc;
+  border-color: #e5e7eb;
 }
 
-.test-result.success {
-  background: #d1fae5;
-  color: #059669;
-}
-
-.test-result.error {
-  background: #fee2e2;
-  color: #dc2626;
-}
-
-/* 配置面板 */
-.provider-config {
-  padding: 12px 16px 16px;
-  border-top: 1px solid #f0f0f0;
+/* ========== 展开内容 ========== */
+.ps-expand-content {
+  padding: 16px 20px;
+  border-top: 1px solid #e5e7eb;
   background: #fafafa;
 }
 
-.provider-config-form {
+/* ========== 配置表单 ========== */
+.ps-config-form {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
-.config-field {
+.ps-config-empty {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.config-label {
-  font-size: 12px;
-  font-weight: 500;
-  color: #555;
-}
-
-.config-input,
-.config-select {
-  padding: 8px 10px;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px;
+  color: #9ca3af;
   font-size: 13px;
-  background: #fff;
-  transition: border-color 0.15s;
 }
 
-.config-input:focus,
-.config-select:focus {
+.ps-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ps-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.ps-required {
+  color: #ef4444;
+  margin-left: 2px;
+}
+
+.ps-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  background: #fff;
+  transition: all 0.15s;
+}
+
+.ps-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.ps-input::placeholder {
+  color: #9ca3af;
+}
+
+.ps-input-group {
+  display: flex;
+  gap: 0;
+}
+
+.ps-input-group .ps-input {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-right: none;
+}
+
+.ps-input-btn {
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+  background: #f9fafb;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.ps-input-btn:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.ps-select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.ps-select:focus {
   outline: none;
   border-color: #3b82f6;
 }
 
-.config-input::placeholder {
-  color: #bbb;
-}
-
-.config-password-wrapper {
-  position: relative;
-  display: flex;
-}
-
-.config-password-wrapper .config-input {
-  flex: 1;
-  padding-right: 36px;
-}
-
-.password-toggle {
-  position: absolute;
-  right: 4px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 28px;
-  height: 28px;
-  border: none;
-  background: transparent;
-  color: #888;
-  cursor: pointer;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.password-toggle:hover {
-  background: #f0f0f0;
-  color: #333;
-}
-
-.config-checkbox {
+.ps-checkbox {
   display: flex;
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  font-size: 13px;
-  color: #555;
+  font-size: 14px;
+  color: #374151;
 }
 
-.config-checkbox input {
+.ps-checkbox input {
   width: 16px;
   height: 16px;
   cursor: pointer;
 }
 
-/* 配置操作 */
-.config-actions {
-  display: flex;
+.ps-help-link {
+  display: inline-flex;
   align-items: center;
-  gap: 12px;
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid #e5e5e5;
+  gap: 6px;
+  font-size: 13px;
+  color: #3b82f6;
+  text-decoration: none;
+  margin-top: 4px;
 }
 
-.test-btn {
+.ps-help-link:hover {
+  text-decoration: underline;
+}
+
+/* ========== 测试区域 ========== */
+.ps-test-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed #e5e7eb;
+}
+
+.ps-test-btn {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
-  border: 1px solid #3b82f6;
-  border-radius: 6px;
+  padding: 8px 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
   background: #fff;
-  color: #3b82f6;
-  font-size: 12px;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.15s;
 }
 
-.test-btn:hover:not(:disabled) {
-  background: #3b82f6;
-  color: #fff;
+.ps-test-btn:hover:not(:disabled) {
+  background: #f9fafb;
+  border-color: #d1d5db;
 }
 
-.test-btn:disabled {
+.ps-test-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
-.test-message {
-  font-size: 12px;
-  flex: 1;
-}
-
-.test-message.success {
+.ps-test-btn.success {
+  background: #ecfdf5;
+  border-color: #10b981;
   color: #059669;
 }
 
-.test-message.error {
+.ps-test-btn.error {
+  background: #fef2f2;
+  border-color: #ef4444;
   color: #dc2626;
 }
 
-.help-link {
+.ps-status {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  color: #3b82f6;
-  text-decoration: none;
+  gap: 8px;
+  font-size: 13px;
+  color: #6b7280;
 }
 
-.help-link:hover {
-  text-decoration: underline;
+.ps-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #9ca3af;
 }
 
-/* 底部保存 */
-.provider-footer {
+/* ========== 底部操作 ========== */
+.ps-actions {
   display: flex;
   justify-content: flex-end;
   padding-top: 8px;
 }
 
-.save-btn {
-  padding: 8px 20px;
+.ps-save-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
   border: none;
   border-radius: 8px;
-  background: #3b82f6;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
   color: #fff;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
 }
 
-.save-btn:hover {
-  background: #2563eb;
+.ps-save-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4);
 }
 
-/* 旋转动画 */
-.spin {
-  animation: spin 1s linear infinite;
+.ps-save-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
+/* ========== 动画 ========== */
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
 
-/* 深色模式 */
-@media (prefers-color-scheme: dark) {
-  .provider-header h4 {
-    color: #e5e5e5;
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+/* ========== 响应式 ========== */
+@media (max-width: 600px) {
+  .ps-card-header {
+    flex-wrap: wrap;
+    gap: 10px;
   }
   
-  .provider-item {
-    background: #2d2d2d;
-    border-color: #404040;
+  .ps-info {
+    flex: 1 1 60%;
   }
   
-  .provider-item.expanded {
-    border-color: #3b82f6;
+  .ps-switch {
+    padding-right: 0;
   }
   
-  .provider-name {
-    color: #e5e5e5;
-  }
-  
-  .provider-desc {
-    color: #999;
-  }
-  
-  .toggle-btn {
-    background: #404040;
-    border-color: #505050;
-    color: #ccc;
-  }
-  
-  .toggle-btn.active {
-    background: #10b981;
-    border-color: #10b981;
-  }
-  
-  .provider-config {
-    background: #252525;
-    border-top-color: #404040;
-  }
-  
-  .config-input,
-  .config-select {
-    background: #333;
-    border-color: #505050;
-    color: #e5e5e5;
-  }
-  
-  .config-actions {
-    border-top-color: #404040;
-  }
-  
-  .drag-btn:hover:not(:disabled) {
-    background: #404040;
-    color: #e5e5e5;
-  }
-  
-  .priority-badge {
-    background: #404040;
-    color: #ccc;
+  .ps-rank {
+    position: static;
+    order: -1;
   }
 }

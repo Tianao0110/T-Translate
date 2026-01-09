@@ -58,14 +58,23 @@ class GoogleTranslateProvider extends BaseProvider {
    */
   async testConnection() {
     try {
-      const response = await fetch(`https://translate.google.${this.config.domain}/`, {
-        method: 'GET',
-        signal: AbortSignal.timeout(5000),
-      });
-
-      return { success: response.ok, message: response.ok ? 'Google 翻译可用' : '连接失败' };
+      // 尝试实际翻译一个简单文本，比直接访问首页更可靠
+      const result = await this.translate('test', 'en', 'zh');
+      
+      if (result.success) {
+        return { success: true, message: 'Google 翻译可用' };
+      } else {
+        return { success: false, message: result.error || '翻译测试失败' };
+      }
     } catch (error) {
-      return { success: false, error: error.message };
+      // 检查是否是网络问题
+      if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
+        return { 
+          success: false, 
+          message: `无法连接 (${this.config.domain})，请检查网络或尝试其他服务器` 
+        };
+      }
+      return { success: false, message: error.message || '连接失败' };
     }
   }
 
