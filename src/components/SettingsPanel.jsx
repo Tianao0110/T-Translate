@@ -1,5 +1,5 @@
 // src/components/SettingsPanel.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Settings, Globe, Shield, Zap, Database, Download, Upload, Moon, Sun, Monitor,
   Volume2, Keyboard, Info, AlertCircle, CheckCircle, WifiOff, Wifi, RefreshCw,
@@ -50,6 +50,9 @@ const SettingsPanel = ({ showNotification }) => {
     autoTranslateDelay,
     setAutoTranslateDelay
   } = useTranslationStore();
+
+  // Ref for ProviderSettings
+  const providerSettingsRef = useRef(null);
 
   // 设置状态
   const [settings, setSettings] = useState({
@@ -275,6 +278,11 @@ const SettingsPanel = ({ showNotification }) => {
   const saveSettings = async () => {
     setIsSaving(true);
     try {
+      // 如果在翻译源设置页面，先调用 ProviderSettings 的保存逻辑
+      if (activeSection === 'providers' && providerSettingsRef.current?.save) {
+        await providerSettingsRef.current.save();
+      }
+      
       // 清理掉不需要保存的临时状态
       const settingsToSave = {
         ...settings,
@@ -327,7 +335,10 @@ const SettingsPanel = ({ showNotification }) => {
         await window.electron.glass.notifySettingsChanged();
       }
 
-      notify('设置已保存', 'success');
+      // 只有非 providers tab 才显示通知（providers tab 有自己的通知）
+      if (activeSection !== 'providers') {
+        notify('设置已保存', 'success');
+      }
     } catch (error) {
       console.error('Failed to save settings:', error);
       notify('保存设置失败', 'error');
@@ -457,6 +468,7 @@ const SettingsPanel = ({ showNotification }) => {
             <p className="setting-description">配置翻译服务，支持本地模型和在线 API</p>
             
             <ProviderSettings 
+              ref={providerSettingsRef}
               settings={settings}
               updateSettings={updateSetting}
               notify={notify}

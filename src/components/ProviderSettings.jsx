@@ -2,7 +2,7 @@
 // 翻译源设置组件 - 分组卡片风格
 // M-V-S-P 架构：View 层，只负责展示和用户交互
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
 import {
   ChevronDown, ChevronUp, Check, X, AlertCircle,
   RefreshCw, Eye, EyeOff, ExternalLink, GripVertical,
@@ -55,7 +55,7 @@ const TYPE_LABELS = {
 /**
  * 翻译源设置组件 - 分组卡片风格
  */
-const ProviderSettings = ({ settings, updateSettings, notify }) => {
+const ProviderSettings = forwardRef(({ settings, updateSettings, notify }, ref) => {
   // 从 registry 获取所有翻译源元信息
   const allProvidersMeta = getAllProviderMetadata();
   
@@ -184,6 +184,11 @@ const ProviderSettings = ({ settings, updateSettings, notify }) => {
       setIsSaving(false);
     }
   }, [providers, providerConfigs, updateSettings, notify, allProvidersMeta]);
+
+  // 暴露 save 方法给父组件
+  useImperativeHandle(ref, () => ({
+    save: saveSettings
+  }), [saveSettings]);
 
   // 切换启用状态
   const toggleProvider = (providerId) => {
@@ -450,16 +455,8 @@ const ProviderSettings = ({ settings, updateSettings, notify }) => {
           );
         })}
       </div>
-
-      {/* 保存按钮 */}
-      <div className="ps-actions">
-        <button className="ps-save-btn" onClick={saveSettings} disabled={isSaving}>
-          {isSaving ? <RefreshCw size={16} className="spinning" /> : <Check size={16} />}
-          <span>{isSaving ? '保存中...' : '保存设置'}</span>
-        </button>
-      </div>
     </div>
   );
-};
+});
 
 export default ProviderSettings;

@@ -93,27 +93,29 @@ class GoogleTranslateProvider extends BaseProvider {
       // 计算 tk 参数
       const tk = this._generateTk(text);
       
-      // 构建请求 URL
+      // 构建请求 URL - 注意 dt 参数需要多次添加
       const baseUrl = `https://translate.google.${this.config.domain}`;
-      const params = new URLSearchParams({
-        client: 'gtx',
-        sl: sl,
-        tl: tl,
-        hl: tl,
-        dt: 't',      // 翻译结果
-        dt: 'bd',     // 词典
-        ie: 'UTF-8',
-        oe: 'UTF-8',
-        tk: tk,
-        q: text,
-      });
+      const params = new URLSearchParams();
+      params.append('client', 'gtx');
+      params.append('sl', sl);
+      params.append('tl', tl);
+      params.append('hl', tl);
+      params.append('dt', 't');   // 翻译文本
+      params.append('dt', 'bd');  // 词典
+      params.append('dt', 'at');  // 替代翻译
+      params.append('ie', 'UTF-8');
+      params.append('oe', 'UTF-8');
+      params.append('tk', tk);
+      params.append('q', text);
 
       // 对于长文本使用 POST
       const usePost = text.length > 1500;
       
       let response;
       if (usePost) {
-        response = await fetch(`${baseUrl}/translate_a/single?${params.toString().replace(/&q=[^&]*/, '')}`, {
+        const paramsWithoutQ = new URLSearchParams(params);
+        paramsWithoutQ.delete('q');
+        response = await fetch(`${baseUrl}/translate_a/single?${paramsWithoutQ.toString()}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -133,6 +135,7 @@ class GoogleTranslateProvider extends BaseProvider {
       }
 
       const data = await response.json();
+      console.log('[GoogleTranslate] Response:', JSON.stringify(data).slice(0, 500));
       
       // 解析响应
       const translatedText = this._parseResponse(data);
@@ -142,7 +145,7 @@ class GoogleTranslateProvider extends BaseProvider {
       }
 
       // 检测到的源语言
-      const detectedLang = data[8]?.[0]?.[0] || sourceLang;
+      const detectedLang = data[2] || sourceLang;
 
       return {
         success: true,
@@ -160,18 +163,31 @@ class GoogleTranslateProvider extends BaseProvider {
    * 解析翻译响应
    */
   _parseResponse(data) {
-    if (!data || !data[0]) return '';
-
-    let result = '';
-    const sentences = data[0];
+    if (!data) return '';
     
-    for (const sentence of sentences) {
-      if (sentence && sentence[0]) {
-        result += sentence[0];
+    // 尝试多种解析方式
+    let result = '';
+    
+    // 方式 1: 标准格式 data[0] 是句子数组
+    if (Array.isArray(data[0])) {
+      for (const sentence of data[0]) {
+        if (Array.isArray(sentence) && sentence[0]) {
+          result += sentence[0];
+        }
       }
     }
-
-    return result;
+    
+    // 方式 2: 直接字符串
+    if (!result && typeof data[0] === 'string') {
+      result = data[0];
+    }
+    
+    // 方式 3: 嵌套更深
+    if (!result && data[0]?.[0]?.[0]) {
+      result = data[0][0][0];
+    }
+    
+    return result.trim();
   }
 
   /**
