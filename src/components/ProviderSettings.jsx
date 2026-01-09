@@ -127,10 +127,43 @@ const ProviderSettings = ({ settings, updateSettings, notify }) => {
       }
     }
     
+    // 更新父组件 state
     updateSettings('translation', 'providers', providers);
     updateSettings('translation', 'providerConfigs', configsToSave);
     
-    notify?.('翻译源设置已保存', 'success');
+    // 直接保存到 electron-store（确保立即生效）
+    try {
+      if (window.electron?.store) {
+        const currentSettings = await window.electron.store.get('settings') || {};
+        const newSettings = {
+          ...currentSettings,
+          translation: {
+            ...currentSettings.translation,
+            providers,
+            providerConfigs: configsToSave,
+          }
+        };
+        await window.electron.store.set('settings', newSettings);
+      }
+      
+      // 刷新 translationService 配置
+      await translationService.reload({
+        providers: {
+          list: providers,
+          configs: providerConfigs,  // 使用未加密的版本
+        }
+      });
+      
+      // 通知玻璃窗重新加载
+      if (window.electron?.glass?.notifySettingsChanged) {
+        await window.electron.glass.notifySettingsChanged();
+      }
+      
+      notify?.('翻译源设置已保存', 'success');
+    } catch (error) {
+      console.error('[ProviderSettings] Save failed:', error);
+      notify?.('保存失败: ' + error.message, 'error');
+    }
   }, [providers, providerConfigs, updateSettings, notify, allProvidersMeta]);
 
   // 切换启用状态

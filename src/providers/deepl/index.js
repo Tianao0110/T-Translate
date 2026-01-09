@@ -1,35 +1,34 @@
 // src/providers/deepl/index.js
 // DeepL 翻译源 - 专业翻译 API
 
-import { BaseProvider, LANGUAGE_CODES } from '../base.js';
-import icon from './icon.svg';
+import { BaseProvider, LANGUAGE_CODES } from "../base.js";
+import icon from "./icon.svg";
 
 /**
  * DeepL 翻译源
  * 专业翻译 API，质量极高
  */
 class DeepLProvider extends BaseProvider {
-  
   static metadata = {
-    id: 'deepl',
-    name: 'DeepL',
-    description: '专业翻译 API，翻译质量极高',
+    id: "deepl",
+    name: "DeepL",
+    description: "专业翻译 API，翻译质量极高",
     icon: icon,
-    color: '#0f2b46',
-    type: 'api',
-    helpUrl: 'https://www.deepl.com/pro-api',
-    
+    color: "#0f2b46",
+    type: "api",
+    helpUrl: "https://www.deepl.com/pro-api",
+
     configSchema: {
       apiKey: {
-        type: 'password',
-        label: 'API Key',
+        type: "password",
+        label: "API Key",
         required: true,
-        placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx:fx',
+        placeholder: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx:fx",
         encrypted: true,
       },
       useFreeApi: {
-        type: 'checkbox',
-        label: '使用免费 API（Key 以 :fx 结尾）',
+        type: "checkbox",
+        label: "使用免费 API（Key 以 :fx 结尾）",
         default: true,
         required: false,
       },
@@ -38,15 +37,15 @@ class DeepLProvider extends BaseProvider {
 
   constructor(config = {}) {
     super({
-      apiKey: '',
+      apiKey: "",
       useFreeApi: true,
-      formality: 'default',
+      formality: "default",
       ...config,
     });
   }
 
   get latencyLevel() {
-    return 'fast';
+    return "fast";
   }
 
   get requiresNetwork() {
@@ -54,7 +53,7 @@ class DeepLProvider extends BaseProvider {
   }
 
   get supportsStreaming() {
-    return false;  // DeepL API 不支持流式
+    return false; // DeepL API 不支持流式
   }
 
   /**
@@ -62,12 +61,12 @@ class DeepLProvider extends BaseProvider {
    */
   get baseUrl() {
     // 检查是否是免费 API Key（以 :fx 结尾）
-    const isFreeKey = this.config.apiKey?.endsWith(':fx');
+    const isFreeKey = this.config.apiKey?.endsWith(":fx");
     const useFree = this.config.useFreeApi || isFreeKey;
-    
-    return useFree 
-      ? 'https://api-free.deepl.com/v2'
-      : 'https://api.deepl.com/v2';
+
+    return useFree
+      ? "https://api-free.deepl.com/v2"
+      : "https://api.deepl.com/v2";
   }
 
   /**
@@ -75,80 +74,83 @@ class DeepLProvider extends BaseProvider {
    */
   _convertLangCode(code, isTarget = false) {
     const mapping = {
-      'auto': null,
-      'zh': 'ZH',
-      'zh-TW': 'ZH',  // DeepL 不区分简繁
-      'en': isTarget ? 'EN-US' : 'EN',  // 目标语言需要指定变体
-      'ja': 'JA',
-      'ko': 'KO',
-      'fr': 'FR',
-      'de': 'DE',
-      'es': 'ES',
-      'ru': 'RU',
-      'pt': isTarget ? 'PT-BR' : 'PT',
-      'it': 'IT',
-      'nl': 'NL',
-      'pl': 'PL',
+      auto: null,
+      zh: "ZH",
+      "zh-TW": "ZH", // DeepL 不区分简繁
+      en: isTarget ? "EN-US" : "EN", // 目标语言需要指定变体
+      ja: "JA",
+      ko: "KO",
+      fr: "FR",
+      de: "DE",
+      es: "ES",
+      ru: "RU",
+      pt: isTarget ? "PT-BR" : "PT",
+      it: "IT",
+      nl: "NL",
+      pl: "PL",
     };
-    
+
     return mapping[code] || code?.toUpperCase();
   }
 
   /**
    * 翻译文本
    */
-  async translate(text, sourceLang = 'auto', targetLang = 'zh') {
+  async translate(text, sourceLang = "auto", targetLang = "zh") {
     if (!text?.trim()) {
-      return { success: false, error: '文本为空' };
+      return { success: false, error: "文本为空" };
     }
 
     if (!this.config.apiKey) {
-      return { success: false, error: '未配置 API Key' };
+      return { success: false, error: "未配置 API Key" };
     }
 
     try {
       const params = new URLSearchParams();
-      params.append('text', text);
-      params.append('target_lang', this._convertLangCode(targetLang, true));
-      
+      params.append("text", text);
+      params.append("target_lang", this._convertLangCode(targetLang, true));
+
       // 源语言（auto 时不传）
-      if (sourceLang !== 'auto') {
-        params.append('source_lang', this._convertLangCode(sourceLang, false));
+      if (sourceLang !== "auto") {
+        params.append("source_lang", this._convertLangCode(sourceLang, false));
       }
-      
+
       // 正式程度（仅部分语言支持）
-      if (this.config.formality && this.config.formality !== 'default') {
-        params.append('formality', this.config.formality);
+      if (this.config.formality && this.config.formality !== "default") {
+        params.append("formality", this.config.formality);
       }
 
       const response = await fetch(`${this.baseUrl}/translate`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Authorization': `DeepL-Auth-Key ${this.config.apiKey}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
+          Authorization: `DeepL-Auth-Key ${this.config.apiKey}`,
+          "Content-Type": "application/x-www-form-urlencoded",
         },
         body: params,
         signal: AbortSignal.timeout(15000),
       });
 
       if (response.status === 403) {
-        return { success: false, error: 'API Key 无效或已过期' };
+        return { success: false, error: "API Key 无效或已过期" };
       }
 
       if (response.status === 456) {
-        return { success: false, error: '配额已用完' };
+        return { success: false, error: "配额已用完" };
       }
 
       if (!response.ok) {
         const errorText = await response.text();
-        return { success: false, error: `DeepL 错误: ${response.status} - ${errorText}` };
+        return {
+          success: false,
+          error: `DeepL 错误: ${response.status} - ${errorText}`,
+        };
       }
 
       const data = await response.json();
       const translatedText = data.translations?.[0]?.text;
 
       if (!translatedText) {
-        return { success: false, error: '翻译结果为空' };
+        return { success: false, error: "翻译结果为空" };
       }
 
       return {
@@ -158,14 +160,14 @@ class DeepLProvider extends BaseProvider {
       };
     } catch (error) {
       this._lastError = error;
-      
-      if (error.name === 'AbortError') {
-        return { success: false, error: '请求超时' };
+
+      if (error.name === "AbortError") {
+        return { success: false, error: "请求超时" };
       }
-      
+
       return {
         success: false,
-        error: error.message || '未知错误',
+        error: error.message || "未知错误",
       };
     }
   }
@@ -175,20 +177,20 @@ class DeepLProvider extends BaseProvider {
    */
   async testConnection() {
     if (!this.config.apiKey) {
-      return { success: false, message: '未配置 API Key' };
+      return { success: false, message: "未配置 API Key" };
     }
 
     try {
       const response = await fetch(`${this.baseUrl}/usage`, {
-        method: 'GET',
+        method: "GET",
         headers: {
-          'Authorization': `DeepL-Auth-Key ${this.config.apiKey}`,
+          Authorization: `DeepL-Auth-Key ${this.config.apiKey}`,
         },
         signal: AbortSignal.timeout(10000),
       });
 
       if (response.status === 403) {
-        return { success: false, message: 'API Key 无效' };
+        return { success: false, message: "API Key 无效" };
       }
 
       if (!response.ok) {
@@ -199,7 +201,7 @@ class DeepLProvider extends BaseProvider {
       const used = data.character_count || 0;
       const limit = data.character_limit || 0;
       const remaining = limit - used;
-      
+
       return {
         success: true,
         message: `连接成功，剩余字符: ${remaining.toLocaleString()} / ${limit.toLocaleString()}`,
@@ -208,7 +210,7 @@ class DeepLProvider extends BaseProvider {
     } catch (error) {
       return {
         success: false,
-        message: error.message || '连接失败',
+        message: error.message || "连接失败",
       };
     }
   }
@@ -221,9 +223,9 @@ class DeepLProvider extends BaseProvider {
 
     try {
       const response = await fetch(`${this.baseUrl}/usage`, {
-        method: 'GET',
+        method: "GET",
         headers: {
-          'Authorization': `DeepL-Auth-Key ${this.config.apiKey}`,
+          Authorization: `DeepL-Auth-Key ${this.config.apiKey}`,
         },
         signal: AbortSignal.timeout(10000),
       });
@@ -249,9 +251,9 @@ class DeepLProvider extends BaseProvider {
 
     try {
       const response = await fetch(`${this.baseUrl}/languages`, {
-        method: 'GET',
+        method: "GET",
         headers: {
-          'Authorization': `DeepL-Auth-Key ${this.config.apiKey}`,
+          Authorization: `DeepL-Auth-Key ${this.config.apiKey}`,
         },
         signal: AbortSignal.timeout(10000),
       });
@@ -259,7 +261,7 @@ class DeepLProvider extends BaseProvider {
       if (!response.ok) return [];
 
       const data = await response.json();
-      return data.map(lang => ({
+      return data.map((lang) => ({
         code: lang.language,
         name: lang.name,
         supportsFormality: lang.supports_formality || false,

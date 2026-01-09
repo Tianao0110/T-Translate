@@ -207,8 +207,14 @@ export function getProviderConfig(id) {
 /**
  * 批量初始化配置
  * @param {object} allConfigs - { providerId: config }
+ * @param {boolean} clearExisting - 是否清除现有实例（默认 true）
  */
-export function initConfigs(allConfigs) {
+export function initConfigs(allConfigs, clearExisting = true) {
+  // 清除现有实例，强制下次重新创建
+  if (clearExisting) {
+    instances.clear();
+  }
+  
   for (const [id, config] of Object.entries(allConfigs)) {
     if (config && Object.keys(config).length > 0) {
       configs.set(id, config);

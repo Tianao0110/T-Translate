@@ -290,6 +290,20 @@ const SettingsPanel = ({ showNotification }) => {
         setOcrEngine(settings.ocr.engine);
       }
 
+      // 刷新 translationService 配置（如果有翻译源配置变更）
+      if (settings.translation?.providers || settings.translation?.providerConfigs) {
+        try {
+          await translationService.reload({
+            providers: {
+              list: settings.translation.providers,
+              configs: settings.translation.providerConfigs,
+            }
+          });
+        } catch (e) {
+          console.warn('[Settings] translationService reload failed:', e);
+        }
+      }
+
       // 通知玻璃窗重新加载设置
       if (window.electron?.glass?.notifySettingsChanged) {
         await window.electron.glass.notifySettingsChanged();
