@@ -32,8 +32,8 @@ const STATUS = {
 
 // 显示样式
 const DISPLAY_STYLES = [
-  { id: 'below', name: '下方对照', icon: '⬇️' },
-  { id: 'inline', name: '行内对照', icon: '↔️' },
+  { id: 'below', name: '上下对照', icon: '⬇️' },
+  { id: 'side-by-side', name: '左右对照', icon: '⬛' },
   { id: 'source-only', name: '仅原文', icon: '📄' },
   { id: 'translated-only', name: '仅译文', icon: '🌐' },
 ];
@@ -138,6 +138,7 @@ const DocumentTranslator = ({
   
   // 拖放区域 ref
   const dropZoneRef = useRef(null);
+  const fileInputRef = useRef(null);
   const [isDragOver, setIsDragOver] = useState(false);
   
   // 虚拟滚动
@@ -169,27 +170,9 @@ const DocumentTranslator = ({
     setIsDragOver(false);
   }, []);
 
-  const handleDrop = useCallback(async (e) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    
-    const file = e.dataTransfer.files[0];
-    if (file) {
-      await loadFile(file);
-    }
-  }, []);
-
-  // 处理文件选择
-  const handleFileSelect = useCallback(async (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      await loadFile(file);
-    }
-    e.target.value = null;
-  }, []);
-
-  // 加载文件
-  const loadFile = async (file) => {
+  // 加载文件（放在前面，供其他函数调用）
+  const loadFile = useCallback(async (file) => {
+    console.log('[DocumentTranslator] loadFile called:', file.name);
     setIsLoading(true);
     
     try {
@@ -200,6 +183,8 @@ const DocumentTranslator = ({
           targetLang,
         },
       });
+      
+      console.log('[DocumentTranslator] parseDocument result:', result);
       
       if (result.success) {
         setDocument({
@@ -216,11 +201,37 @@ const DocumentTranslator = ({
         notify?.(result.error || '文件解析失败', 'error');
       }
     } catch (error) {
+      console.error('[DocumentTranslator] Error:', error);
       notify?.(error.message, 'error');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [filters, targetLang, notify]);
+
+  // 拖放文件
+  const handleDrop = useCallback(async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+    
+    console.log('[DocumentTranslator] File dropped:', e.dataTransfer.files);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      console.log('[DocumentTranslator] Loading dropped file:', file.name);
+      await loadFile(file);
+    }
+  }, [loadFile]);
+
+  // 选择文件
+  const handleFileSelect = useCallback(async (e) => {
+    console.log('[DocumentTranslator] File selected:', e.target.files);
+    const file = e.target.files?.[0];
+    if (file) {
+      console.log('[DocumentTranslator] Loading file:', file.name, file.type, file.size);
+      await loadFile(file);
+    }
+    e.target.value = null;
+  }, [loadFile]);
 
   // 开始翻译
   const startTranslation = async () => {
@@ -250,19 +261,21 @@ const DocumentTranslator = ({
       ));
       
       try {
-        // 调用翻译服务
-        const result = await translationService.translate(
-          segment.original,
+        // 调用翻译服务 - 注意：translate(text, options) 第二个参数是对象
+        const result = await translationService.translate(segment.original, {
           sourceLang,
-          targetLang
-        );
+          targetLang,
+        });
+        
+        console.log('[DocumentTranslator] Translation result:', result);
         
         if (result.success) {
+          // 翻译服务返回 result.text，不是 result.translatedText
           setSegments(prev => prev.map(s => 
             s.id === segment.id ? { 
               ...s, 
               status: STATUS.COMPLETED, 
-              translated: result.translatedText,
+              translated: result.text || result.translatedText || '',
             } : s
           ));
         } else {
@@ -312,18 +325,17 @@ const DocumentTranslator = ({
     ));
     
     try {
-      const result = await translationService.translate(
-        segment.original,
+      const result = await translationService.translate(segment.original, {
         sourceLang,
-        targetLang
-      );
+        targetLang,
+      });
       
       if (result.success) {
         setSegments(prev => prev.map(s => 
           s.id === segmentId ? { 
             ...s, 
             status: STATUS.COMPLETED, 
-            translated: result.translatedText,
+            translated: result.text || result.translatedText || '',
           } : s
         ));
         notify?.('重试成功', 'success');
@@ -506,6 +518,7 @@ const DocumentTranslator = ({
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
           >
             {isLoading ? (
               <div className="loading-state">
@@ -519,10 +532,11 @@ const DocumentTranslator = ({
                 <p>或点击选择文件</p>
                 <p className="format-hint">支持：{supportedExtensions}</p>
                 <input
+                  ref={fileInputRef}
                   type="file"
-                  accept={supportedExtensions}
+                  accept=".txt,.md,.srt,.vtt"
                   onChange={handleFileSelect}
-                  className="file-input"
+                  style={{ display: 'none' }}
                 />
               </>
             )}

@@ -696,8 +696,8 @@ const SettingsPanel = ({ showNotification }) => {
                   value={settings.document?.displayStyle || 'below'}
                   onChange={(e) => updateSetting('document', 'displayStyle', e.target.value)}
                 >
-                  <option value="below">⬇️ 下方对照 - 译文显示在原文下方</option>
-                  <option value="inline">↔️ 行内对照 - 译文紧跟原文后</option>
+                  <option value="below">⬇️ 上下对照 - 译文显示在原文下方</option>
+                  <option value="side-by-side">⬛ 左右对照 - 原文和译文并排显示</option>
                   <option value="source-only">📄 仅原文 - 隐藏译文</option>
                   <option value="translated-only">🌐 仅译文 - 隐藏原文</option>
                 </select>

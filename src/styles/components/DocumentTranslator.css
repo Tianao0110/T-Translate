@@ -507,14 +507,35 @@
   color: #ef4444;
 }
 
-/* 行内对照样式 */
-.segment-item.inline .segment-translated {
-  display: inline;
-  margin: 0 0 0 8px;
-  padding: 2px 8px;
-  background: rgba(59, 130, 246, 0.1);
-  border-radius: 4px;
-  font-size: 13px;
+/* 左右对照样式 */
+.segment-item.side-by-side {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto 1fr;
+  gap: 0 16px;
+}
+
+.segment-item.side-by-side .segment-header {
+  grid-column: 1 / -1;
+}
+
+.segment-item.side-by-side .segment-original {
+  padding-right: 12px;
+  border-right: 1px solid var(--border-primary);
+}
+
+.segment-item.side-by-side .segment-translated {
+  margin-top: 0;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  border-left: none;
+}
+
+.segment-item.side-by-side .segment-translated.completed {
+  background: transparent;
+  border-left: none;
+  color: var(--accent-primary);
 }
 
 /* 仅原文/仅译文样式 */
