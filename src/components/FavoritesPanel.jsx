@@ -5,9 +5,10 @@ import {
   Star, Search, Trash2, Copy, Edit3, Save, X, Plus,
   Folder, FolderPlus, ChevronDown, ChevronRight,
   Tag, Hash, MoreVertical, GripVertical,
-  Check, Palette, RotateCcw, Bookmark
+  Check, Palette, RotateCcw, Bookmark, Sparkles, RefreshCw
 } from 'lucide-react';
 import useTranslationStore from '../stores/translation-store';
+import translationService from '../services/translation.js';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/zh-cn';
@@ -64,7 +65,8 @@ const FavoriteCard = ({
   onUpdateNote,
   onUpdateStyleRef,
   isSelected,
-  onSelect
+  onSelect,
+  notify
 }) => {
   const [showTranslated, setShowTranslated] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -72,8 +74,82 @@ const FavoriteCard = ({
   const [editTags, setEditTags] = useState(item.tags?.join(', ') || '');
   const [editStyleRef, setEditStyleRef] = useState(item.isStyleReference || false);
   const [showMoveMenu, setShowMoveMenu] = useState(false);
+  const [isGeneratingTags, setIsGeneratingTags] = useState(false);
 
   const folder = folders.find(f => f.id === item.folderId);
+
+  // AI 生成标签
+  const generateAITags = async () => {
+    setIsGeneratingTags(true);
+    
+    try {
+      const systemPrompt = `你是一个智能标签和摘要生成助手。根据用户提供的原文和译文，生成合适的标签和摘要。
+
+请严格按照以下 JSON 格式返回，不要包含任何其他内容：
+{
+  "tags": ["标签1", "标签2", "标签3"],
+  "summary": "简短摘要（20字以内）",
+  "isStyleSuggested": true/false
+}
+
+标签规则：
+- 生成 3-5 个相关标签
+- 标签应该反映内容的主题、领域、风格等
+- 使用中文标签
+
+摘要规则：
+- 20字以内的简短描述
+- 概括内容的核心特点
+
+风格参考判断规则（isStyleSuggested）：
+- 如果文本具有独特的文学风格、修辞手法、或值得模仿的表达方式，返回 true
+- 如果只是普通的术语、短语、或日常表达，返回 false
+- 长度超过 30 字且有明显风格特点的文本更适合作为风格参考`;
+
+      const userPrompt = `原文：${item.sourceText}
+译文：${item.translatedText}
+
+请分析并返回 JSON 格式的标签、摘要和风格建议。`;
+
+      const result = await translationService.chatCompletion([
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ]);
+
+      if (result.success && result.content) {
+        let parsed;
+        try {
+          let content = result.content.trim();
+          content = content.replace(/^```json\s*/, '').replace(/```\s*$/, '');
+          content = content.replace(/^```\s*/, '').replace(/```\s*$/, '');
+          parsed = JSON.parse(content);
+        } catch (parseError) {
+          console.error('JSON parse error:', parseError);
+          parsed = {
+            tags: ['未分类'],
+            summary: '',
+            isStyleSuggested: item.translatedText?.length > 30
+          };
+        }
+        
+        // 更新编辑状态
+        setEditTags(parsed.tags?.join(', ') || '');
+        if (parsed.summary) {
+          setEditNote(parsed.summary);
+        }
+        setEditStyleRef(parsed.isStyleSuggested || false);
+        
+        notify?.('AI 标签生成成功', 'success');
+      } else {
+        throw new Error(result.error || '生成失败');
+      }
+    } catch (error) {
+      console.error('AI tag generation error:', error);
+      notify?.('AI 标签生成失败: ' + error.message, 'error');
+    } finally {
+      setIsGeneratingTags(false);
+    }
+  };
 
   const handleSaveEdit = () => {
     const newTags = editTags
@@ -155,7 +231,22 @@ const FavoriteCard = ({
       {isEditing && (
         <div className="card-edit-form">
           <div className="edit-field">
-            <label><Tag size={12} /> 标签（逗号分隔）</label>
+            <div className="edit-field-header">
+              <label><Tag size={12} /> 标签（逗号分隔）</label>
+              <button 
+                className="btn-ai-generate"
+                onClick={generateAITags}
+                disabled={isGeneratingTags}
+                title="AI 智能生成标签"
+              >
+                {isGeneratingTags ? (
+                  <RefreshCw size={12} className="spinning" />
+                ) : (
+                  <Sparkles size={12} />
+                )}
+                <span>{isGeneratingTags ? '生成中...' : 'AI 生成'}</span>
+              </button>
+            </div>
             <input
               type="text"
               value={editTags}
@@ -634,6 +725,7 @@ const FavoritesPanel = ({ showNotification }) => {
                   onUpdateTags={handleUpdateTags}
                   onUpdateNote={handleUpdateNote}
                   onUpdateStyleRef={handleUpdateStyleRef}
+                  notify={notify}
                 />
               ))}
             </div>

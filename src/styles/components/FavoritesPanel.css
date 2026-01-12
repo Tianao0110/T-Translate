@@ -666,6 +666,17 @@
   margin-bottom: 0;
 }
 
+.edit-field-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.edit-field-header label {
+  margin-bottom: 0;
+}
+
 .edit-field label {
   display: flex;
   align-items: center;
@@ -674,6 +685,41 @@
   font-weight: 500;
   color: var(--text-secondary);
   margin-bottom: 6px;
+}
+
+/* AI 生成按钮 */
+.btn-ai-generate {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+  border: none;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-ai-generate:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.4);
+}
+
+.btn-ai-generate:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.btn-ai-generate .spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .edit-field input,

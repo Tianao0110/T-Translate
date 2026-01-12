@@ -477,31 +477,26 @@ const useTranslationStore = create(
         return {
           ...currentState,
           ...persistedState,
+          // 只恢复语言设置，不恢复翻译内容
           currentTranslation: {
             ...currentState.currentTranslation,
-            ...(persistedState.currentTranslation || {}),
-            // 强制兜底：如果硬盘里没有 sourceText，就用初始值的空字符串
-            sourceText:
-              persistedState.currentTranslation?.sourceText ||
-              currentState.currentTranslation.sourceText ||
-              "",
-            translatedText:
-              persistedState.currentTranslation?.translatedText ||
-              currentState.currentTranslation.translatedText ||
-              "",
+            sourceLanguage: persistedState.currentTranslation?.sourceLanguage || currentState.currentTranslation.sourceLanguage,
+            targetLanguage: persistedState.currentTranslation?.targetLanguage || currentState.currentTranslation.targetLanguage,
+            // 翻译内容始终为空
+            sourceText: "",
+            translatedText: "",
           },
         };
       },
       partialize: (state) => ({
+        // 持久化历史、收藏、统计
         history: state.history,
         favorites: state.favorites,
         statistics: state.statistics,
+        // 只持久化语言设置，不持久化翻译内容
         currentTranslation: {
           sourceLanguage: state.currentTranslation.sourceLanguage,
           targetLanguage: state.currentTranslation.targetLanguage,
-          sourceText: state.currentTranslation.sourceText,
-          translatedText: state.currentTranslation.translatedText,
-          metadata: state.currentTranslation.metadata,
         },
         ocrStatus: { engine: state.ocrStatus.engine },
       }),

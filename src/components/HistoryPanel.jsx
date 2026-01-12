@@ -19,9 +19,27 @@ dayjs.extend(isSameOrAfter);
 dayjs.locale('zh-cn');
 
 /**
+ * 搜索高亮组件
+ */
+const HighlightText = ({ text, search }) => {
+  if (!search || !text) return text;
+  try {
+    const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const parts = text.split(new RegExp(`(${escapedSearch})`, 'gi'));
+    return parts.map((part, i) =>
+      part.toLowerCase() === search.toLowerCase() ? (
+        <mark key={i} className="search-highlight">{part}</mark>
+      ) : part
+    );
+  } catch {
+    return text;
+  }
+};
+
+/**
  * 卡片组件 - 点击切换原文/译文
  */
-const HistoryCard = ({ item, onCopy, onRestore, onFavorite, onDelete, isFavorite, isSelected, onSelect, showCheckbox }) => {
+const HistoryCard = ({ item, onCopy, onRestore, onFavorite, onDelete, isFavorite, isSelected, onSelect, showCheckbox, searchQuery }) => {
   const [showTranslated, setShowTranslated] = useState(true);
   
   return (
@@ -44,7 +62,10 @@ const HistoryCard = ({ item, onCopy, onRestore, onFavorite, onDelete, isFavorite
           <RotateCcw size={12} className="switch-hint" />
         </div>
         <div className={`card-text ${showTranslated ? 'translated' : 'source'}`}>
-          {showTranslated ? item.translatedText : item.sourceText}
+          <HighlightText 
+            text={showTranslated ? item.translatedText : item.sourceText} 
+            search={searchQuery}
+          />
         </div>
       </div>
       
@@ -72,6 +93,10 @@ const HistoryCard = ({ item, onCopy, onRestore, onFavorite, onDelete, isFavorite
 const HistoryPanel = ({ showNotification }) => {
   const notify = showNotification || ((msg, type) => console.log(`[${type}] ${msg}`));
 
+  // 分页配置
+  const PAGE_SIZE = 50; // 每页显示数量
+  const LOAD_MORE_THRESHOLD = 100; // 滚动到底部多少像素时加载更多
+
   // 状态
   const [viewMode, setViewMode] = useState('card'); // card | timeline | table
   const [groupBy, setGroupBy] = useState('date'); // date | language
@@ -83,6 +108,8 @@ const HistoryPanel = ({ showNotification }) => {
   const [selectMode, setSelectMode] = useState(false);
   const [sortConfig, setSortConfig] = useState({ key: 'timestamp', direction: 'desc' });
   const [focusIndex, setFocusIndex] = useState(-1);
+  const [displayCount, setDisplayCount] = useState(PAGE_SIZE); // 当前显示数量
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   
   const contentRef = useRef(null);
   
@@ -166,12 +193,52 @@ const HistoryPanel = ({ showNotification }) => {
     return filtered;
   }, [history, localSearch, dateRange, sortConfig]);
 
-  // 分组 - 所有视图都支持
+  // 分页后的数据
+  const paginatedHistory = useMemo(() => {
+    return filteredHistory.slice(0, displayCount);
+  }, [filteredHistory, displayCount]);
+
+  // 是否还有更多数据
+  const hasMore = filteredHistory.length > displayCount;
+
+  // 加载更多
+  const loadMore = useCallback(() => {
+    if (isLoadingMore || !hasMore) return;
+    setIsLoadingMore(true);
+    // 模拟异步加载，提供更好的用户体验
+    setTimeout(() => {
+      setDisplayCount(prev => Math.min(prev + PAGE_SIZE, filteredHistory.length));
+      setIsLoadingMore(false);
+    }, 100);
+  }, [isLoadingMore, hasMore, filteredHistory.length, PAGE_SIZE]);
+
+  // 滚动加载更多
+  useEffect(() => {
+    const container = contentRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      if (scrollHeight - scrollTop - clientHeight < LOAD_MORE_THRESHOLD) {
+        loadMore();
+      }
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [loadMore, LOAD_MORE_THRESHOLD]);
+
+  // 搜索时重置分页
+  useEffect(() => {
+    setDisplayCount(PAGE_SIZE);
+  }, [localSearch, dateRange, PAGE_SIZE]);
+
+  // 分组 - 使用分页后的数据
   const groupedHistory = useMemo(() => {
     const groups = {};
     const now = dayjs();
     
-    filteredHistory.forEach(item => {
+    paginatedHistory.forEach(item => {
       let key;
       if (groupBy === 'date') {
         const d = dayjs(item.timestamp);
@@ -197,7 +264,7 @@ const HistoryPanel = ({ showNotification }) => {
         return b[0].localeCompare(a[0]);
       })
       .map(([title, items]) => ({ title, items, count: items.length }));
-  }, [filteredHistory, groupBy]);
+  }, [paginatedHistory, groupBy]);
 
   // 键盘导航
   useEffect(() => {
@@ -315,14 +382,19 @@ const HistoryPanel = ({ showNotification }) => {
     }));
   };
 
-  // 高亮搜索文字
+  // 高亮搜索文字（与 HighlightText 组件保持一致）
   const highlightText = (text, search) => {
     if (!search || !text) return text;
-    const parts = text.split(new RegExp(`(${search})`, 'gi'));
-    return parts.map((part, i) => 
-      part.toLowerCase() === search.toLowerCase() ? 
-        <mark key={i} className="search-highlight">{part}</mark> : part
-    );
+    try {
+      const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const parts = text.split(new RegExp(`(${escapedSearch})`, 'gi'));
+      return parts.map((part, i) => 
+        part.toLowerCase() === search.toLowerCase() ? 
+          <mark key={i} className="search-highlight">{part}</mark> : part
+      );
+    } catch {
+      return text;
+    }
   };
 
   // 渲染统计面板
@@ -544,6 +616,7 @@ const HistoryPanel = ({ showNotification }) => {
                     isSelected={selectedIds.has(item.id)}
                     onSelect={toggleSelect}
                     showCheckbox={selectMode}
+                    searchQuery={localSearch}
                   />
                 ))}
               </div>
@@ -641,11 +714,31 @@ const HistoryPanel = ({ showNotification }) => {
 
       <div className="history-content" ref={contentRef}>
         {renderContent()}
+        
+        {/* 加载更多 */}
+        {hasMore && (
+          <div className="load-more-wrapper">
+            <button 
+              className="load-more-btn" 
+              onClick={loadMore}
+              disabled={isLoadingMore}
+            >
+              {isLoadingMore ? (
+                <>
+                  <span className="loading-spinner"></span>
+                  加载中...
+                </>
+              ) : (
+                <>加载更多 ({filteredHistory.length - displayCount} 条)</>
+              )}
+            </button>
+          </div>
+        )}
       </div>
 
       {filteredHistory.length > 0 && (
         <div className="history-footer">
-          <span>共 {filteredHistory.length} 条</span>
+          <span>显示 {Math.min(displayCount, filteredHistory.length)} / {filteredHistory.length} 条</span>
           {selectMode && <span className="select-hint">已选 {selectedIds.size} 条 | 空格选择，Esc 退出</span>}
         </div>
       )}
