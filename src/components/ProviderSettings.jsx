@@ -68,6 +68,10 @@ const ProviderSettings = forwardRef(({ settings, updateSettings, notify }, ref) 
   // 展开的配置面板
   const [expandedProvider, setExpandedProvider] = useState(null);
   
+  // 拖拽状态
+  const [draggedIndex, setDraggedIndex] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
+  
   // 显示密码状态
   const [showPasswords, setShowPasswords] = useState({});
   
@@ -237,6 +241,50 @@ const ProviderSettings = forwardRef(({ settings, updateSettings, notify }, ref) 
     setProviders(newProviders);
   };
 
+  // 拖拽开始
+  const handleDragStart = (e, index) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    // 添加拖拽效果
+    e.target.closest('.ps-card')?.classList.add('dragging');
+  };
+
+  // 拖拽结束
+  const handleDragEnd = (e) => {
+    e.target.closest('.ps-card')?.classList.remove('dragging');
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  // 拖拽经过
+  const handleDragOver = (e, index) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (draggedIndex !== null && index !== draggedIndex) {
+      setDragOverIndex(index);
+    }
+  };
+
+  // 拖拽离开
+  const handleDragLeave = () => {
+    setDragOverIndex(null);
+  };
+
+  // 放置
+  const handleDrop = (e, targetIndex) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === targetIndex) return;
+
+    const newProviders = [...providers];
+    const [draggedItem] = newProviders.splice(draggedIndex, 1);
+    newProviders.splice(targetIndex, 0, draggedItem);
+    newProviders.forEach((p, i) => p.priority = i);
+    
+    setProviders(newProviders);
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
   // 获取状态
   const getStatusColor = (providerId) => {
     const result = testResults[providerId];
@@ -353,12 +401,19 @@ const ProviderSettings = forwardRef(({ settings, updateSettings, notify }, ref) 
           
           const isExpanded = expandedProvider === provider.id;
           const typeInfo = TYPE_LABELS[meta.type] || TYPE_LABELS['api'];
+          const isDragOver = dragOverIndex === index && draggedIndex !== index;
           
           return (
             <div 
               key={provider.id}
-              className={`ps-card ${provider.enabled ? 'enabled' : 'disabled'} ${isExpanded ? 'expanded' : ''}`}
+              className={`ps-card ${provider.enabled ? 'enabled' : 'disabled'} ${isExpanded ? 'expanded' : ''} ${isDragOver ? 'drag-over' : ''}`}
               style={{ '--accent': meta.color || '#6b7280' }}
+              draggable
+              onDragStart={(e) => handleDragStart(e, index)}
+              onDragEnd={handleDragEnd}
+              onDragOver={(e) => handleDragOver(e, index)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, index)}
             >
               {/* 左侧彩色条 */}
               <div className="ps-accent-bar"></div>
@@ -372,7 +427,7 @@ const ProviderSettings = forwardRef(({ settings, updateSettings, notify }, ref) 
                 <div className="ps-drag">
                   <button 
                     className="ps-drag-btn"
-                    onClick={() => moveProvider(index, -1)}
+                    onClick={(e) => { e.stopPropagation(); moveProvider(index, -1); }}
                     disabled={index === 0}
                   >
                     <ChevronUp size={14} />
@@ -380,7 +435,7 @@ const ProviderSettings = forwardRef(({ settings, updateSettings, notify }, ref) 
                   <GripVertical size={14} className="ps-grip-icon" />
                   <button 
                     className="ps-drag-btn"
-                    onClick={() => moveProvider(index, 1)}
+                    onClick={(e) => { e.stopPropagation(); moveProvider(index, 1); }}
                     disabled={index === providers.length - 1}
                   >
                     <ChevronDown size={14} />

@@ -735,3 +735,84 @@
 [data-theme="dark"] .shortcut-hints {
   background: var(--bg-secondary);
 }
+/* ==================== 工具栏分隔线 ==================== */
+.toolbar-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--border-primary);
+  margin: 0 8px;
+}
+
+/* ==================== 文档翻译按钮 ==================== */
+.doc-translate-btn {
+  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%) !important;
+  color: #fff !important;
+}
+
+.doc-translate-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.4);
+}
+
+/* ==================== 文档翻译弹窗 ==================== */
+.doc-translator-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.doc-translator-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}
+
+.doc-translator-container {
+  position: relative;
+  width: 100%;
+  max-width: 1000px;
+  height: 90vh;
+  max-height: 800px;
+  background: var(--bg-primary);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  animation: modalSlideUp 0.3s ease;
+}
+
+@keyframes modalSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .doc-translator-modal {
+    padding: 10px;
+  }
+  
+  .doc-translator-container {
+    height: 95vh;
+    max-height: none;
+    border-radius: 12px;
+  }
+  
+  .toolbar-divider {
+    display: none;
+  }
+  
+  .doc-translate-btn span {
+    display: none;
+  }
+}

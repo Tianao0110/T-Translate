@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   FileText, Languages, Settings, History, Star, Sparkles,
-  AlertCircle, CheckCircle, Info, X
+  AlertCircle, CheckCircle, Info, X, FileUp
 } from 'lucide-react';
 
 import useTranslationStore from '../stores/translation-store';
@@ -10,6 +10,7 @@ import TranslationPanel from './TranslationPanel';
 import HistoryPanel from './HistoryPanel';
 import SettingsPanel from './SettingsPanel';
 import FavoritesPanel from './FavoritesPanel';
+import DocumentTranslator from './DocumentTranslator';
 import '../styles/components/MainWindow.css'; 
 
 /**
@@ -26,6 +27,9 @@ const MainWindow = () => {
     dateRange: 'all',
     favorites: false
   });
+  
+  // 文档翻译弹窗
+  const [showDocTranslator, setShowDocTranslator] = useState(false);
   
   // Store
   const {
@@ -189,6 +193,19 @@ const MainWindow = () => {
               {tab.badge > 0 && <span className="tab-badge">{tab.badge}</span>}
             </button>
           ))}
+          
+          {/* 分隔线 */}
+          <div className="toolbar-divider" />
+          
+          {/* 文档翻译按钮 */}
+          <button
+            className="tab-button doc-translate-btn"
+            onClick={() => setShowDocTranslator(true)}
+            title="文档翻译"
+          >
+            <FileUp size={16} />
+            <span>文档</span>
+          </button>
         </div>
       </div>
 
@@ -222,6 +239,21 @@ const MainWindow = () => {
       </div>
 
       {renderNotification()}
+      
+      {/* 文档翻译弹窗 */}
+      {showDocTranslator && (
+        <div className="doc-translator-modal">
+          <div className="doc-translator-overlay" onClick={() => setShowDocTranslator(false)} />
+          <div className="doc-translator-container">
+            <DocumentTranslator
+              onClose={() => setShowDocTranslator(false)}
+              notify={showNotification}
+              sourceLang={currentTranslation.sourceLanguage}
+              targetLang={currentTranslation.targetLanguage}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

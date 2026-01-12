@@ -926,3 +926,32 @@ input:checked + .switch-slider:before {
   color: var(--text-primary);
   background: var(--bg-tertiary);
 }
+
+/* ==================== 文档设置专用样式 ==================== */
+.format-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.format-tag {
+  padding: 4px 12px;
+  background: var(--accent-primary);
+  color: #fff;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.format-tag.coming-soon {
+  background: var(--bg-tertiary);
+  color: var(--text-tertiary);
+  border: 1px dashed var(--border-primary);
+}
+
+.sub-setting {
+  margin-left: 24px;
+  padding-left: 12px;
+  border-left: 2px solid var(--border-primary);
+}

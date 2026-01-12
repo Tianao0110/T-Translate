@@ -4,7 +4,8 @@ import {
   Settings, Globe, Shield, Zap, Database, Download, Upload, Moon, Sun, Monitor,
   Volume2, Keyboard, Info, AlertCircle, CheckCircle, WifiOff, Wifi, RefreshCw,
   Save, FolderOpen, Trash2, Eye, EyeOff, Lock, Unlock, GitBranch, HelpCircle,
-  ExternalLink, ChevronRight, Terminal, Code2, Palette, Layers, MousePointer, Server
+  ExternalLink, ChevronRight, Terminal, Code2, Palette, Layers, MousePointer, Server,
+  FileText, Filter
 } from 'lucide-react';
 import translationService from '../services/translation-service.js';
 import { ocrManager } from '../providers/ocr/index.js';
@@ -136,6 +137,20 @@ const SettingsPanel = ({ showNotification }) => {
       autoDeleteDays: 0,
       secureMode: false,
       logLevel: 'info'
+    },
+    document: {
+      maxCharsPerSegment: 800,
+      batchMaxTokens: 2000,
+      batchMaxSegments: 5,
+      filters: {
+        skipShort: true,
+        minLength: 10,
+        skipNumbers: true,
+        skipCode: true,
+        skipTargetLang: true,
+        skipKeywords: [],
+      },
+      displayStyle: 'below',
     },
     shortcuts: defaultConfig.shortcuts,
     advanced: {
@@ -552,6 +567,157 @@ const SettingsPanel = ({ showNotification }) => {
             </div>
           </div>
         );
+
+        case 'document':
+          return (
+            <div className="setting-content">
+              <h3>文档翻译设置</h3>
+              <p className="setting-description">配置文档翻译的分段策略、过滤规则和显示样式</p>
+
+              {/* 分段设置 */}
+              <div className="setting-group">
+                <label className="setting-label">分段设置</label>
+                <div className="setting-row">
+                  <span>单段最大字符数</span>
+                  <input
+                    type="number"
+                    className="setting-input small"
+                    value={settings.document?.maxCharsPerSegment || 800}
+                    onChange={(e) => updateSetting('document', 'maxCharsPerSegment', parseInt(e.target.value) || 800)}
+                    min="200"
+                    max="2000"
+                    step="100"
+                  />
+                </div>
+                <p className="setting-hint">过长的段落会按此限制自动分割</p>
+              </div>
+
+              {/* 批量设置 */}
+              <div className="setting-group">
+                <label className="setting-label">批量翻译</label>
+                <div className="setting-row">
+                  <span>每批最大 Tokens</span>
+                  <input
+                    type="number"
+                    className="setting-input small"
+                    value={settings.document?.batchMaxTokens || 2000}
+                    onChange={(e) => updateSetting('document', 'batchMaxTokens', parseInt(e.target.value) || 2000)}
+                    min="500"
+                    max="4000"
+                    step="500"
+                  />
+                </div>
+                <div className="setting-row">
+                  <span>每批最大段落数</span>
+                  <input
+                    type="number"
+                    className="setting-input small"
+                    value={settings.document?.batchMaxSegments || 5}
+                    onChange={(e) => updateSetting('document', 'batchMaxSegments', parseInt(e.target.value) || 5)}
+                    min="1"
+                    max="10"
+                  />
+                </div>
+                <p className="setting-hint">合并短段落可减少 API 调用次数</p>
+              </div>
+
+              {/* 过滤规则 */}
+              <div className="setting-group">
+                <label className="setting-label">
+                  <Filter size={16} /> 智能过滤
+                </label>
+                <label className="setting-toggle">
+                  <input
+                    type="checkbox"
+                    checked={settings.document?.filters?.skipShort ?? true}
+                    onChange={(e) => updateSetting('document', 'filters', {
+                      ...settings.document?.filters,
+                      skipShort: e.target.checked
+                    })}
+                  />
+                  <span>跳过过短段落</span>
+                </label>
+                {settings.document?.filters?.skipShort && (
+                  <div className="setting-row sub-setting">
+                    <span>最小字符数</span>
+                    <input
+                      type="number"
+                      className="setting-input small"
+                      value={settings.document?.filters?.minLength || 10}
+                      onChange={(e) => updateSetting('document', 'filters', {
+                        ...settings.document?.filters,
+                        minLength: parseInt(e.target.value) || 10
+                      })}
+                      min="1"
+                      max="50"
+                    />
+                  </div>
+                )}
+                <label className="setting-toggle">
+                  <input
+                    type="checkbox"
+                    checked={settings.document?.filters?.skipNumbers ?? true}
+                    onChange={(e) => updateSetting('document', 'filters', {
+                      ...settings.document?.filters,
+                      skipNumbers: e.target.checked
+                    })}
+                  />
+                  <span>跳过纯数字段落（如页码）</span>
+                </label>
+                <label className="setting-toggle">
+                  <input
+                    type="checkbox"
+                    checked={settings.document?.filters?.skipCode ?? true}
+                    onChange={(e) => updateSetting('document', 'filters', {
+                      ...settings.document?.filters,
+                      skipCode: e.target.checked
+                    })}
+                  />
+                  <span>保留代码块不翻译</span>
+                </label>
+                <label className="setting-toggle">
+                  <input
+                    type="checkbox"
+                    checked={settings.document?.filters?.skipTargetLang ?? true}
+                    onChange={(e) => updateSetting('document', 'filters', {
+                      ...settings.document?.filters,
+                      skipTargetLang: e.target.checked
+                    })}
+                  />
+                  <span>跳过已是目标语言的段落</span>
+                </label>
+              </div>
+
+              {/* 显示样式 */}
+              <div className="setting-group">
+                <label className="setting-label">默认显示样式</label>
+                <select
+                  className="setting-select"
+                  value={settings.document?.displayStyle || 'below'}
+                  onChange={(e) => updateSetting('document', 'displayStyle', e.target.value)}
+                >
+                  <option value="below">⬇️ 下方对照 - 译文显示在原文下方</option>
+                  <option value="inline">↔️ 行内对照 - 译文紧跟原文后</option>
+                  <option value="source-only">📄 仅原文 - 隐藏译文</option>
+                  <option value="translated-only">🌐 仅译文 - 隐藏原文</option>
+                </select>
+              </div>
+
+              {/* 支持格式 */}
+              <div className="setting-group">
+                <label className="setting-label">支持的文件格式</label>
+                <div className="format-tags">
+                  <span className="format-tag">TXT</span>
+                  <span className="format-tag">MD</span>
+                  <span className="format-tag">SRT</span>
+                  <span className="format-tag">VTT</span>
+                  <span className="format-tag coming-soon">PDF</span>
+                  <span className="format-tag coming-soon">DOCX</span>
+                </div>
+                <p className="setting-hint">PDF 和 DOCX 支持即将推出</p>
+              </div>
+            </div>
+          );
 
         case 'privacy':
           return (
@@ -1349,6 +1515,7 @@ const SettingsPanel = ({ showNotification }) => {
           <button className={`nav-item ${activeSection==='connection'?'active':''}`} onClick={()=>setActiveSection('connection')}><Wifi size={18}/><span>连接</span></button>
           <button className={`nav-item ${activeSection==='providers'?'active':''}`} onClick={()=>setActiveSection('providers')}><Server size={18}/><span>翻译源</span></button>
           <button className={`nav-item ${activeSection==='translation'?'active':''}`} onClick={()=>setActiveSection('translation')}><Globe size={18}/><span>翻译</span></button>
+          <button className={`nav-item ${activeSection==='document'?'active':''}`} onClick={()=>setActiveSection('document')}><FileText size={18}/><span>文档</span></button>
           <button className={`nav-item ${activeSection==='glassWindow'?'active':''}`} onClick={()=>setActiveSection('glassWindow')}><Layers size={18}/><span>玻璃窗</span></button>
           <button className={`nav-item ${activeSection==='selection'?'active':''}`} onClick={()=>setActiveSection('selection')}><MousePointer size={18}/><span>划词</span></button>
           <button className={`nav-item ${activeSection==='privacy'?'active':''}`} onClick={()=>setActiveSection('privacy')}><Shield size={18}/><span>隐私</span></button>

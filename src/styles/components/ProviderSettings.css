@@ -41,6 +41,11 @@
   border-radius: 12px;
   overflow: hidden;
   transition: all 0.2s ease;
+  cursor: grab;
+}
+
+.ps-card:active {
+  cursor: grabbing;
 }
 
 .ps-card:hover {
@@ -59,6 +64,31 @@
 
 .ps-card.disabled .ps-accent-bar {
   background: #9ca3af !important;
+}
+
+/* 拖拽中的卡片 */
+.ps-card.dragging {
+  opacity: 0.5;
+  transform: scale(1.02);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+/* 拖拽悬停目标 */
+.ps-card.drag-over {
+  border-color: var(--accent, #3b82f6);
+  border-style: dashed;
+  background: #f8fafc;
+}
+
+.ps-card.drag-over::before {
+  content: '';
+  position: absolute;
+  top: -3px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--accent, #3b82f6);
+  border-radius: 3px;
 }
 
 /* 左侧彩色条 */
@@ -99,6 +129,13 @@
   align-items: center;
   gap: 2px;
   margin-right: 4px;
+  padding: 4px;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.ps-drag:hover {
+  background: #f3f4f6;
 }
 
 .ps-drag-btn {
@@ -114,6 +151,8 @@
   justify-content: center;
   border-radius: 3px;
   transition: all 0.15s;
+  position: relative;
+  z-index: 10;
 }
 
 .ps-drag-btn:hover:not(:disabled) {
