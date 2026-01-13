@@ -43,11 +43,27 @@ const SelectionTranslator = () => {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [translation, setTranslation] = useState(DEFAULT_TRANSLATION);
   const [triggerReady, setTriggerReady] = useState(false);  // 圆点是否就绪可点击
+  const [privacyMode, setPrivacyMode] = useState('standard'); // 隐私模式
 
   const sizedRef = useRef(false);
   const resizeRef = useRef({ startX: 0, startY: 0, startW: 0, startH: 0 });
   const autoHideTimerRef = useRef(null);
   const triggerReadyTimerRef = useRef(null);  // 圆点就绪计时器
+
+  // 获取隐私模式
+  useEffect(() => {
+    const getPrivacyMode = async () => {
+      try {
+        if (window.electron?.privacy?.getMode) {
+          const mode = await window.electron.privacy.getMode();
+          setPrivacyMode(mode);
+        }
+      } catch (e) {
+        console.log('[Selection] Failed to get privacy mode:', e);
+      }
+    };
+    getPrivacyMode();
+  }, []);
 
   useEffect(() => {
     const removeShowListener = window.electron?.selection?.onShowTrigger?.((data) => {
@@ -249,10 +265,11 @@ const SelectionTranslator = () => {
     }
     
     try {
-      // 使用 translationService 进行翻译
+      // 使用 translationService 进行翻译（传递隐私模式）
       const result = await translationService.translate(text, {
         sourceLang: detectedLang,
         targetLang: targetLang,
+        privacyMode: privacyMode, // 传递隐私模式
       });
       
       if (!result.success) {

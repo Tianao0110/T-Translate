@@ -21,7 +21,6 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   const [isRecording, setIsRecording] = useState(false);
   const [showPrivacyInfo, setShowPrivacyInfo] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-  const [translationMode, setTranslationMode] = useState('standard'); // standard, secure, offline
   const [isConnected, setIsConnected] = useState(false);
   const [isOcrProcessing, setIsOcrProcessing] = useState(false); // OCR 处理状态
   const [isOcrSource, setIsOcrSource] = useState(false); // 标记当前文本是否来自 OCR（用于自动选择 OCR 纠错模板）
@@ -55,6 +54,10 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     autoTranslate,   // 自动翻译开关
     autoTranslateDelay, // 自动翻译延迟
     ocrStatus,       // OCR 状态（包含引擎设置）
+    translationMode, // 隐私模式（从全局store读取）
+    setTranslationMode, // 设置隐私模式
+    isFeatureEnabled, // 检查功能是否可用
+    isProviderAllowed, // 检查翻译源是否可用
     setSourceText,
     setTranslatedText,
     setLanguages,

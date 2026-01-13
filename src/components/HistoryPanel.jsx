@@ -117,8 +117,12 @@ const HistoryPanel = ({ showNotification }) => {
   const {
     history, favorites, clearHistory, restoreFromHistory,
     addToFavorites, removeFromFavorites, removeFromHistory,
-    exportHistory, importHistory
+    exportHistory, importHistory,
+    translationMode, // 隐私模式
   } = useTranslationStore();
+
+  // 无痕模式检查
+  const isSecureMode = translationMode === 'secure';
 
   // 统计数据
   const enhancedStats = useMemo(() => {
@@ -629,6 +633,17 @@ const HistoryPanel = ({ showNotification }) => {
 
   return (
     <div className="history-panel">
+      {/* 无痕模式提示 */}
+      {isSecureMode && (
+        <div className="secure-mode-banner">
+          <div className="secure-banner-icon">🔒</div>
+          <div className="secure-banner-content">
+            <h4>无痕模式已启用</h4>
+            <p>当前模式下不会保存任何翻译历史记录。如需保存历史，请切换到标准模式。</p>
+          </div>
+        </div>
+      )}
+      
       {/* 工具栏 */}
       <div className="history-toolbar">
         <div className="toolbar-left">

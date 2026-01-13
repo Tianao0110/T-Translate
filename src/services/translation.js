@@ -6,6 +6,7 @@
 // - 流式翻译封装
 // - 模式管理（normal / subtitle）
 // - 初始化配置加载
+// - 隐私模式检查（离线模式下只允许本地翻译源）
 //
 // 不负责：
 // - 缓存管理（独立模块）
@@ -22,6 +23,8 @@ import {
   updateProviderConfig,
   DEFAULT_PRIORITY,
 } from '../providers/registry.js';
+
+import { isProviderAllowed } from '../config/privacy-modes.js';
 
 // ========== 安全存储访问 ==========
 
@@ -258,6 +261,7 @@ class TranslationService {
       targetLang = 'zh',
       mode = this._mode,
       enableFallback = true,
+      privacyMode = 'standard', // 隐私模式
     } = options;
     
     const priority = this.getPriority();
@@ -265,6 +269,12 @@ class TranslationService {
     let allSkipped = true;  // 是否所有翻译源都被跳过
     
     for (const id of priority) {
+      // 检查隐私模式限制
+      if (!isProviderAllowed(privacyMode, id)) {
+        console.log(`[TranslationService] Provider ${id} not allowed in ${privacyMode} mode`);
+        continue;
+      }
+      
       if (!isProviderConfigured(id)) continue;
       
       // 检查是否因连续失败而临时跳过
@@ -313,6 +323,15 @@ class TranslationService {
       console.log('[TranslationService] All providers skipped, resetting failure counts...');
       this._failureCount = {};
       return this.translate(text, options);  // 递归重试
+    }
+    
+    // 离线模式特殊提示
+    if (privacyMode === 'offline' && tried.length === 0) {
+      return {
+        success: false,
+        error: '离线模式下仅支持本地 LLM 翻译，请确保已配置并启动本地服务',
+        provider: null,
+      };
     }
     
     return {

@@ -182,6 +182,7 @@ const DocumentTranslator = ({
   
   // 获取术语表
   const getGlossaryTerms = useTranslationStore(state => state.getGlossaryTerms);
+  const translationMode = useTranslationStore(state => state.translationMode);
   
   // 计时
   const [startTime, setStartTime] = useState(null);
@@ -845,7 +846,7 @@ const DocumentTranslator = ({
         </div>
       </div>
 
-            {/* 主体内容 */}
+      {/* 主体内容 */}
       <div className="dt-body">
         {/* 无文件时显示上传区域 */}
         {!document && (
@@ -881,7 +882,7 @@ const DocumentTranslator = ({
         )}
 
         {/* 有文件时显示翻译界面 */}
-        {document && stats && ( /* 建议加一个 stats 判断防止报错 */
+        {document && stats && (
           <>
             {/* 文件信息栏 */}
             <div className="dt-file-info">
@@ -911,7 +912,7 @@ const DocumentTranslator = ({
                 <span className="progress-percent">{stats.progress}%</span>
                 <span className="progress-detail">
                   已完成 {stats.completed}/{stats.total - stats.skipped}
-                  {stats.skipped > 0 && <span> · 跳过 {stats.skipped}</span>} {/* 修复：用span包裹 */}
+                  {stats.skipped > 0 && <span> · 跳过 {stats.skipped}</span>}
                   {stats.failed > 0 && <span className="failed"> · 失败 {stats.failed}</span>}
                   {stats.cacheHits > 0 && <span className="cache-hits"> · 缓存 {stats.cacheHits}</span>}
                 </span>
@@ -944,7 +945,7 @@ const DocumentTranslator = ({
                 </div>
               )}
 
-              {/* 段落列表 */}
+              {/* 段落列表 - 使用 CSS content-visibility 优化渲染 */}
               <div 
                 className={`dt-segments ${outline?.length > 0 ? 'with-outline' : ''}`}
                 ref={listRef}
@@ -965,7 +966,6 @@ const DocumentTranslator = ({
             <button 
               className={`scroll-top-btn ${showScrollTop ? 'visible' : ''}`} 
               onClick={scrollToTop}
-              // 注意：aria-hidden 在 React 中最好接收 boolean 或 "true"/"false" 字符串
               aria-hidden={!showScrollTop}
             >
               <ArrowUp size={18} />
@@ -988,12 +988,30 @@ const DocumentTranslator = ({
                         <span className="stat-number">{stats.total}</span>
                         <span className="stat-desc">总段落</span>
                       </div>
-                      {/* ... 其他统计卡片保持不变 ... */}
                       <div className="stat-card completed">
                         <span className="stat-number">{stats.completed}</span>
                         <span className="stat-desc">已翻译</span>
                       </div>
-                      {/* 省略部分卡片代码以节省空间 */}
+                      <div className="stat-card">
+                        <span className="stat-number">{stats.pending}</span>
+                        <span className="stat-desc">待翻译</span>
+                      </div>
+                      <div className="stat-card skipped">
+                        <span className="stat-number">{stats.skipped}</span>
+                        <span className="stat-desc">已跳过</span>
+                      </div>
+                      {stats.failed > 0 && (
+                        <div className="stat-card error">
+                          <span className="stat-number">{stats.failed}</span>
+                          <span className="stat-desc">失败</span>
+                        </div>
+                      )}
+                      {stats.cacheHits > 0 && (
+                        <div className="stat-card cache">
+                          <span className="stat-number">{stats.cacheHits}</span>
+                          <span className="stat-desc">缓存命中</span>
+                        </div>
+                      )}
                     </div>
                     
                     <div className="stats-detail">
@@ -1003,10 +1021,18 @@ const DocumentTranslator = ({
                       </div>
                       <div className="detail-row">
                         <span>预估 Tokens</span>
-                        {/* 这里加个问号防止 crash */}
                         <span>{stats.totalTokens?.toLocaleString()}</span>
                       </div>
-                      {/* ... */}
+                      <div className="detail-row">
+                        <span>已用 Tokens</span>
+                        <span>{stats.usedTokens?.toLocaleString()}</span>
+                      </div>
+                      {elapsedTime > 0 && (
+                        <div className="detail-row">
+                          <span>翻译用时</span>
+                          <span>{formatTime(elapsedTime)}</span>
+                        </div>
+                      )}
                     </div>
                     
                     <div className="stats-footer">

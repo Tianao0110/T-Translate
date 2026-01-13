@@ -1596,15 +1596,37 @@ function createTray() {
 
 /**
  * 注册全局快捷键
+ * 从设置中读取自定义快捷键，否则使用默认值
  */
 function registerShortcuts() {
-  // 截图翻译 Alt+Q
-  globalShortcut.register("Alt+Q", () => {
-    startScreenshot(true); // true 表示从快捷键触发
+  const settings = store.get("settings", {});
+  const shortcuts = settings.shortcuts || {};
+  
+  // 默认快捷键配置
+  const defaultShortcuts = {
+    screenshot: "Alt+Q",
+    toggleWindow: "CommandOrControl+Shift+W",
+    glassWindow: "CommandOrControl+Alt+G",
+    selectionTranslate: "CommandOrControl+Shift+T",
+  };
+  
+  // 将渲染进程格式转换为Electron格式的辅助函数
+  const toElectronFormat = (shortcut) => {
+    return shortcut
+      .replace(/Ctrl/g, "CommandOrControl")
+      .replace(/Meta/g, "Command");
+  };
+  
+  // 截图翻译
+  const screenshotKey = toElectronFormat(shortcuts.screenshot || defaultShortcuts.screenshot);
+  globalShortcut.register(screenshotKey, () => {
+    startScreenshot(true);
   });
+  console.log(`[Shortcuts] Registered screenshot: ${screenshotKey}`);
 
   // 显示/隐藏窗口
-  globalShortcut.register("CommandOrControl+Shift+W", () => {
+  const toggleKey = toElectronFormat(shortcuts.toggleWindow || defaultShortcuts.toggleWindow);
+  globalShortcut.register(toggleKey, () => {
     if (mainWindow.isVisible()) {
       mainWindow.hide();
     } else {
@@ -1612,13 +1634,26 @@ function registerShortcuts() {
       mainWindow.focus();
     }
   });
+  console.log(`[Shortcuts] Registered toggleWindow: ${toggleKey}`);
 
-  // 打开/关闭玻璃翻译窗口 Ctrl+Alt+G
-  globalShortcut.register("CommandOrControl+Alt+G", () => {
+  // 打开/关闭玻璃翻译窗口
+  const glassKey = toElectronFormat(shortcuts.glassWindow || defaultShortcuts.glassWindow);
+  globalShortcut.register(glassKey, () => {
     toggleGlassWindow();
   });
-
-  // 划词翻译现在是鼠标拖拽自动触发，不需要快捷键
+  console.log(`[Shortcuts] Registered glassWindow: ${glassKey}`);
+  
+  // 划词翻译开关（可选）
+  const selectionKey = toElectronFormat(shortcuts.selectionTranslate || defaultShortcuts.selectionTranslate);
+  if (selectionKey) {
+    globalShortcut.register(selectionKey, () => {
+      const current = store.get("selectionEnabled", false);
+      store.set("selectionEnabled", !current);
+      mainWindow?.webContents?.send("selection-state-changed", !current);
+      console.log(`[Shortcuts] Selection translate toggled: ${!current}`);
+    });
+    console.log(`[Shortcuts] Registered selectionTranslate: ${selectionKey}`);
+  }
 }
 
 /**
@@ -1633,6 +1668,183 @@ function setupIPC() {
   // 获取平台信息
   ipcMain.handle("get-platform", () => {
     return process.platform;
+  });
+  
+  // ==================== 快捷键管理 ====================
+  // 暂时禁用某个全局快捷键（用于编辑时防止误触发）
+  ipcMain.handle("shortcuts:pause", (event, action) => {
+    try {
+      const settings = store.get("settings", {});
+      const defaultShortcuts = {
+        screenshot: "Alt+Q",
+        toggleWindow: "CommandOrControl+Shift+W",
+        glassWindow: "CommandOrControl+Alt+G",
+        selectionTranslate: "CommandOrControl+Shift+T",
+      };
+      
+      const shortcut = settings.shortcuts?.[action] || defaultShortcuts[action];
+      if (!shortcut) return { success: false };
+      
+      const electronShortcut = shortcut
+        .replace(/Ctrl/g, "CommandOrControl")
+        .replace(/Meta/g, "Command");
+      
+      globalShortcut.unregister(electronShortcut);
+      console.log(`[Shortcuts] Paused: ${action} (${electronShortcut})`);
+      return { success: true, shortcut };
+    } catch (e) {
+      console.error("[Shortcuts] Pause error:", e);
+      return { success: false };
+    }
+  });
+  
+  // 恢复某个全局快捷键
+  ipcMain.handle("shortcuts:resume", (event, action) => {
+    try {
+      const settings = store.get("settings", {});
+      const defaultShortcuts = {
+        screenshot: "Alt+Q",
+        toggleWindow: "CommandOrControl+Shift+W",
+        glassWindow: "CommandOrControl+Alt+G",
+        selectionTranslate: "CommandOrControl+Shift+T",
+      };
+      
+      const shortcutMapping = {
+        screenshot: () => startScreenshot(true),
+        toggleWindow: () => {
+          if (mainWindow.isVisible()) {
+            mainWindow.hide();
+          } else {
+            mainWindow.show();
+            mainWindow.focus();
+          }
+        },
+        glassWindow: () => toggleGlassWindow(),
+        selectionTranslate: () => {
+          const current = store.get("selectionEnabled", false);
+          store.set("selectionEnabled", !current);
+          mainWindow?.webContents?.send("selection-state-changed", !current);
+        }
+      };
+      
+      const shortcut = settings.shortcuts?.[action] || defaultShortcuts[action];
+      const handler = shortcutMapping[action];
+      if (!shortcut || !handler) return { success: false };
+      
+      const electronShortcut = shortcut
+        .replace(/Ctrl/g, "CommandOrControl")
+        .replace(/Meta/g, "Command");
+      
+      globalShortcut.register(electronShortcut, handler);
+      console.log(`[Shortcuts] Resumed: ${action} (${electronShortcut})`);
+      return { success: true };
+    } catch (e) {
+      console.error("[Shortcuts] Resume error:", e);
+      return { success: false };
+    }
+  });
+  
+  // 更新全局快捷键
+  ipcMain.handle("shortcuts:update", (event, action, shortcut) => {
+    try {
+      // 快捷键映射表
+      const shortcutMapping = {
+        screenshot: { old: "Alt+Q", handler: () => startScreenshot(true) },
+        toggleWindow: { old: "CommandOrControl+Shift+W", handler: () => {
+          if (mainWindow.isVisible()) {
+            mainWindow.hide();
+          } else {
+            mainWindow.show();
+            mainWindow.focus();
+          }
+        }},
+        glassWindow: { old: "CommandOrControl+Alt+G", handler: () => toggleGlassWindow() },
+        selectionTranslate: { old: "CommandOrControl+Shift+T", handler: () => {
+          const current = store.get("selectionEnabled", false);
+          store.set("selectionEnabled", !current);
+          // 通知渲染进程
+          mainWindow?.webContents?.send("selection-state-changed", !current);
+        }}
+      };
+      
+      const config = shortcutMapping[action];
+      if (!config) {
+        console.log(`[Shortcuts] Unknown action: ${action}`);
+        return { success: false, error: "Unknown action" };
+      }
+      
+      // 将渲染进程的快捷键格式转换为Electron格式
+      const electronShortcut = shortcut
+        .replace(/Ctrl/g, "CommandOrControl")
+        .replace(/Meta/g, "Command");
+      
+      // 先注销旧的快捷键
+      const settings = store.get("settings", {});
+      const oldShortcut = settings.shortcuts?.[action] || config.old;
+      const oldElectronShortcut = oldShortcut
+        .replace(/Ctrl/g, "CommandOrControl")
+        .replace(/Meta/g, "Command");
+      
+      try {
+        globalShortcut.unregister(oldElectronShortcut);
+      } catch (e) {
+        console.log(`[Shortcuts] Failed to unregister old: ${oldElectronShortcut}`);
+      }
+      
+      // 注册新的快捷键
+      const success = globalShortcut.register(electronShortcut, config.handler);
+      
+      if (success) {
+        // 保存到设置
+        const newSettings = {
+          ...settings,
+          shortcuts: {
+            ...settings.shortcuts,
+            [action]: shortcut
+          }
+        };
+        store.set("settings", newSettings);
+        console.log(`[Shortcuts] Updated ${action}: ${oldShortcut} → ${shortcut}`);
+        return { success: true };
+      } else {
+        // 如果注册失败，尝试恢复旧的
+        globalShortcut.register(oldElectronShortcut, config.handler);
+        return { success: false, error: "快捷键已被占用" };
+      }
+    } catch (error) {
+      console.error("[Shortcuts] Update error:", error);
+      return { success: false, error: error.message };
+    }
+  });
+  
+  // 获取当前快捷键配置
+  ipcMain.handle("shortcuts:get", () => {
+    const settings = store.get("settings", {});
+    return settings.shortcuts || {};
+  });
+  
+  // ==================== 隐私模式管理 ====================
+  // 设置隐私模式
+  ipcMain.handle("privacy:setMode", (event, mode) => {
+    try {
+      store.set("privacyMode", mode);
+      console.log(`[Privacy] Mode changed to: ${mode}`);
+      
+      // 根据模式调整行为
+      if (mode === "offline") {
+        // 离线模式：可以在这里禁用某些网络功能
+        console.log("[Privacy] Offline mode enabled - network features restricted");
+      }
+      
+      return { success: true, mode };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+  
+  // 获取当前隐私模式
+  ipcMain.handle("privacy:getMode", () => {
+    return store.get("privacyMode", "standard");
   });
   
   // API 健康检查

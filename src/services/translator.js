@@ -195,11 +195,15 @@ class Translator {
       to = 'zh',
       template = 'natural',
       useCache = true,
+      privacyMode = 'standard', // 隐私模式
     } = options;
 
+    // 无痕模式下不使用缓存
+    const shouldUseCache = useCache && privacyMode !== 'secure';
+    
     // 检查缓存
     const cacheKey = translationCache.generateKey(text, from, to, template);
-    if (useCache) {
+    if (shouldUseCache) {
       const cached = translationCache.get(cacheKey);
       if (cached) {
         console.log('[Translator] Using cached translation (stream mode)');
@@ -231,10 +235,11 @@ class Translator {
         return;
       }
 
-      // 调用翻译服务
+      // 调用翻译服务（传递隐私模式）
       const result = await translationService.translate(text, {
         sourceLang: detectedLang,
         targetLang: to,
+        privacyMode, // 传递隐私模式
       });
 
       if (!result.success) {

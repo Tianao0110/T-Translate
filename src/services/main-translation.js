@@ -51,12 +51,14 @@ class MainTranslationService {
     });
 
     try {
-      // 调用 translator 的流式翻译
+      // 调用 translator 的流式翻译（传递隐私模式）
       const stream = translator.streamTranslate(sourceText, {
         from: sourceLanguage,
         to: targetLanguage,
         template: options.template || state.currentTranslation.metadata.template,
         saveHistory: mode !== 'secure',
+        privacyMode: mode, // 传递隐私模式
+        useCache: mode !== 'secure', // 无痕模式不使用缓存
       });
 
       let fullText = '';

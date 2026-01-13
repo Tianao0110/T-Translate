@@ -1,6 +1,7 @@
 // src/services/pipeline.js
 // 翻译流水线 - 核心大脑
 // 串联：截图 -> OCR -> 翻译
+// 支持隐私模式检查
 
 import { ocrManager } from '../providers/ocr/index.js';
 import translationService from './translation.js';
@@ -8,10 +9,26 @@ import useSessionStore from '../stores/session.js';
 import useConfigStore from '../stores/config.js';
 import { calculateHash } from '../utils/image.js';
 import { detectLanguage, cleanTranslationOutput, shouldTranslateText } from '../utils/text.js';
+import { isProviderAllowed, isOcrEngineAllowed } from '../config/privacy-modes.js';
 
 // ========== 状态缓存 ==========
 let lastImageHash = '';
 let lastText = '';
+
+/**
+ * 获取当前隐私模式
+ * 从主进程或本地存储获取
+ */
+async function getPrivacyMode() {
+  try {
+    if (window.electron?.privacy?.getMode) {
+      return await window.electron.privacy.getMode();
+    }
+  } catch (e) {
+    console.log('[Pipeline] Failed to get privacy mode from main:', e);
+  }
+  return 'standard';
+}
 
 /**
  * 翻译流水线类
@@ -153,11 +170,20 @@ class TranslationPipeline {
       
       const mode = options.mode || 'normal';
       
-      // 调用翻译
+      // 获取隐私模式
+      const privacyMode = await getPrivacyMode();
+      
+      // 离线模式下检查翻译源
+      if (privacyMode === 'offline') {
+        console.log('[Pipeline] Offline mode - using local-llm only');
+      }
+      
+      // 调用翻译（传递隐私模式）
       const result = await translationService.translate(text, {
         sourceLang,
         targetLang,
         mode,
+        privacyMode, // 传递隐私模式
       });
       
       if (!result.success) {

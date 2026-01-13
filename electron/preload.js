@@ -122,6 +122,18 @@ const electronAPI = {
     toggle: () => ipcRenderer.invoke("selection:toggle"),
     getEnabled: () => ipcRenderer.invoke("selection:get-enabled"),
   },
+  // 全局快捷键管理
+  shortcuts: {
+    update: (action, shortcut) => ipcRenderer.invoke("shortcuts:update", action, shortcut),
+    get: () => ipcRenderer.invoke("shortcuts:get"),
+    pause: (action) => ipcRenderer.invoke("shortcuts:pause", action),
+    resume: (action) => ipcRenderer.invoke("shortcuts:resume", action),
+  },
+  // 隐私模式管理
+  privacy: {
+    setMode: (mode) => ipcRenderer.invoke("privacy:setMode", mode),
+    getMode: () => ipcRenderer.invoke("privacy:getMode"),
+  },
   // API 健康检查
   api: {
     healthCheck: () => ipcRenderer.invoke("api:health-check"),
