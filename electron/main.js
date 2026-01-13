@@ -581,6 +581,7 @@ function toggleSelectionTranslate() {
 let selectionHook = null;
 let mouseDownPos = null;
 let mouseDownTime = 0;
+let isNativeDragging = false;  // 原生拖拽标志（拖拽文件/图片）
 
 /**
  * 启动划词监听
@@ -588,12 +589,27 @@ let mouseDownTime = 0;
 function startSelectionHook() {
   if (selectionHook || !selectionEnabled) return;
 
+  // 获取划词敏感度设置
+  const settings = store.get("settings", {});
+  const selectionSettings = settings.selection || {};
+  const minDistance = selectionSettings.minDistance || 10;  // 最小拖动距离（像素）
+  const minDuration = selectionSettings.minDuration || 150; // 最小按住时间（毫秒）
+  const maxDuration = selectionSettings.maxDuration || 5000; // 最大按住时间（毫秒）
+
   try {
     const { uIOhook } = require("uiohook-napi");
+
+    // 监听原生拖拽开始（拖拽文件/图片时不触发划词）
+    uIOhook.on("wheel", () => {
+      // 滚轮事件期间不处理划词
+    });
 
     uIOhook.on("mousedown", (e) => {
       if (e.button === 1) {
         // 左键
+        // 重置原生拖拽标志
+        isNativeDragging = false;
+        
         // 获取当前鼠标的屏幕坐标
         const cursorPos = screen.getCursorScreenPoint();
 
@@ -692,11 +708,19 @@ function startSelectionHook() {
           duration
         );
 
-        // 防误触：
-        // - 距离 > 50px（过滤双击、右键菜单、拖拽文件等短距离操作）
-        // - 时间 > 200ms（过滤快速点击）
-        // - 时间 < 5000ms（过滤长时间按住不动）
-        if (distance > 50 && duration > 200 && duration < 5000) {
+        // 动态读取设置（允许运行时调整）
+        const currentSettings = store.get("settings", {});
+        const currentSelectionSettings = currentSettings.selection || {};
+        const minDist = currentSelectionSettings.minDistance || 10;
+        const minDur = currentSelectionSettings.minDuration || 150;
+        const maxDur = currentSelectionSettings.maxDuration || 5000;
+
+        // 防误触判断：
+        // - 距离 > minDist（默认 10px，过滤手抖点击）
+        // - 时间 > minDur（默认 150ms，过滤快速点击）
+        // - 时间 < maxDur（默认 5000ms，过滤长按不动）
+        // - 非原生拖拽（拖拽文件/图片时不触发）
+        if (distance > minDist && duration > minDur && duration < maxDur && !isNativeDragging) {
           console.log(
             "[Selection] Drag detected! Showing trigger (no copy yet)"
           );
@@ -711,6 +735,8 @@ function startSelectionHook() {
 
           // 只显示圆点，不复制。点击圆点时才复制
           showSelectionTrigger(mouseUpPos.x, mouseUpPos.y, rect);
+        } else {
+          console.log("[Selection] Filtered out - distance:", distance.toFixed(0), "min:", minDist, "duration:", duration, "minDur:", minDur);
         }
 
         mouseDownPos = null;

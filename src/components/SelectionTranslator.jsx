@@ -42,14 +42,17 @@ const SelectionTranslator = () => {
   const [showSource, setShowSource] = useState(false);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [translation, setTranslation] = useState(DEFAULT_TRANSLATION);
+  const [triggerReady, setTriggerReady] = useState(false);  // 圆点是否就绪可点击
 
   const sizedRef = useRef(false);
   const resizeRef = useRef({ startX: 0, startY: 0, startW: 0, startH: 0 });
   const autoHideTimerRef = useRef(null);
+  const triggerReadyTimerRef = useRef(null);  // 圆点就绪计时器
 
   useEffect(() => {
     const removeShowListener = window.electron?.selection?.onShowTrigger?.((data) => {
       if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
+      if (triggerReadyTimerRef.current) clearTimeout(triggerReadyTimerRef.current);
       
       setMousePos({ x: data.mouseX, y: data.mouseY });
       setRect(data.rect);
@@ -75,6 +78,12 @@ const SelectionTranslator = () => {
       setCopied(false);
       sizedRef.current = false;
       
+      // 圆点就绪延迟（防止松开鼠标时误触）
+      setTriggerReady(false);
+      triggerReadyTimerRef.current = setTimeout(() => {
+        setTriggerReady(true);
+      }, 100);  // 100ms 后才能点击
+      
       // 使用设置中的自动消失时间
       autoHideTimerRef.current = setTimeout(() => {
         setMode('idle');
@@ -85,6 +94,7 @@ const SelectionTranslator = () => {
     const removeHideListener = window.electron?.selection?.onHide?.(() => {
       setMode('idle');
       if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
+      if (triggerReadyTimerRef.current) clearTimeout(triggerReadyTimerRef.current);
     });
     
     const handleKey = (e) => {
@@ -100,10 +110,17 @@ const SelectionTranslator = () => {
       if (removeHideListener) removeHideListener();
       window.removeEventListener('keydown', handleKey);
       if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
+      if (triggerReadyTimerRef.current) clearTimeout(triggerReadyTimerRef.current);
     };
   }, []);
 
   const handleTriggerClick = async () => {
+    // 防手抖：圆点未就绪时不响应点击
+    if (!triggerReady) {
+      console.log('[Selection] Trigger not ready yet, ignoring click');
+      return;
+    }
+    
     if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
     setMode('loading');
     
@@ -113,12 +130,35 @@ const SelectionTranslator = () => {
       
       const text = result.text.trim();
       
-      // 检查字符数限制
+      // === 内容校验 ===
+      
+      // 1. 检查是否为空或纯空白
+      if (!text || /^[\s\r\n]+$/.test(text)) {
+        throw new Error('选中内容为空');
+      }
+      
+      // 2. 检查字符数限制
       if (text.length < settings.minChars) {
         throw new Error(`文字太短（最少 ${settings.minChars} 字符）`);
       }
       if (text.length > settings.maxChars) {
         throw new Error(`文字太长（最多 ${settings.maxChars} 字符）`);
+      }
+      
+      // 3. 过滤纯符号（必须包含至少一个字母、数字或中日韩文字）
+      // \w = 字母数字下划线, \u4e00-\u9fff = 中文, \u3040-\u30ff = 日文假名, \uac00-\ud7af = 韩文
+      if (!/[\w\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]/.test(text)) {
+        throw new Error('选中内容无有效文字');
+      }
+      
+      // 4. 过滤可能的乱码（同一字符重复超过 10 次）
+      if (/(.)\1{10,}/.test(text)) {
+        throw new Error('选中内容可能是乱码');
+      }
+      
+      // 5. 过滤文件路径（通常不需要翻译）
+      if (/^[A-Za-z]:\\|^\/(?:home|usr|var|etc|tmp)\/|^file:\/\//.test(text)) {
+        throw new Error('选中内容是文件路径');
       }
       
       setSourceText(text);
@@ -299,7 +339,7 @@ const SelectionTranslator = () => {
   return (
     <div className="sel-root" data-theme={theme}>
       {mode === 'trigger' && (
-        <div className="sel-trigger" onClick={handleTriggerClick}>
+        <div className={`sel-trigger ${triggerReady ? 'ready' : ''}`} onClick={handleTriggerClick}>
           <svg viewBox="0 0 24 24" fill="white" width="14" height="14">
             <path d="M12.87 15.07l-2.54-2.51.03-.03A17.52 17.52 0 0014.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z"/>
           </svg>
