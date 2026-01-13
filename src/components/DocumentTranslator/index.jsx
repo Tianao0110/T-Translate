@@ -4,9 +4,10 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   FileText, Upload, X, Play, Pause, RotateCcw, Download,
-  ChevronDown, Settings, AlertCircle, CheckCircle, Clock,
+  ChevronDown, ChevronRight, Settings, AlertCircle, CheckCircle, Clock,
   Loader, Eye, EyeOff, ArrowUp, Filter, FileDown, Trash2,
-  SkipForward, RefreshCw, Languages, Zap
+  SkipForward, RefreshCw, Languages, Zap, Lock, Key,
+  List, Hash, DollarSign, Database, BookOpen, ChevronLeft
 } from 'lucide-react';
 import {
   parseDocument,
@@ -16,9 +17,12 @@ import {
   exportTranslatedOnly,
   exportSRT,
   exportVTT,
+  exportDOCX,
+  exportPDFHTML,
   SUPPORTED_FORMATS,
 } from '../../utils/document-parser.js';
 import translationService from '../../services/translation.js';
+import useTranslationStore from '../../stores/translation-store';
 import '../../styles/components/DocumentTranslator.css';
 
 // 段落状态
@@ -41,7 +45,7 @@ const DISPLAY_STYLES = [
 /**
  * 单个段落组件
  */
-const SegmentItem = ({ segment, displayStyle, onRetry }) => {
+const SegmentItem = React.memo(({ segment, displayStyle, onRetry }) => {
   const statusIcon = {
     [STATUS.PENDING]: <Clock size={14} className="status-icon pending" />,
     [STATUS.TRANSLATING]: <Loader size={14} className="status-icon translating" />,
@@ -53,7 +57,10 @@ const SegmentItem = ({ segment, displayStyle, onRetry }) => {
   const isSubtitle = segment.type === 'subtitle';
 
   return (
-    <div className={`segment-item ${segment.status} ${displayStyle}`}>
+    <div 
+      className={`segment-item ${segment.status} ${displayStyle}`}
+      data-segment-id={segment.id}
+    >
       {/* 段落序号和状态 */}
       <div className="segment-header">
         <span className="segment-index">#{segment.id + 1}</span>
@@ -99,6 +106,47 @@ const SegmentItem = ({ segment, displayStyle, onRetry }) => {
       )}
     </div>
   );
+});
+
+/**
+ * 大纲项组件
+ */
+const OutlineItem = ({ item, onNavigate, level = 0 }) => {
+  const [expanded, setExpanded] = useState(true);
+  const hasChildren = item.children && item.children.length > 0;
+  
+  return (
+    <div className="outline-item" style={{ paddingLeft: level * 12 }}>
+      <div 
+        className="outline-item-header"
+        onClick={() => onNavigate(item.segmentId)}
+      >
+        {hasChildren && (
+          <button 
+            className="outline-toggle"
+            onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
+          >
+            {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          </button>
+        )}
+        <span className={`outline-text level-${item.level}`}>
+          {item.text}
+        </span>
+      </div>
+      {hasChildren && expanded && (
+        <div className="outline-children">
+          {item.children.map((child, idx) => (
+            <OutlineItem 
+              key={idx} 
+              item={child} 
+              onNavigate={onNavigate}
+              level={level + 1}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
 };
 
 /**
@@ -115,16 +163,41 @@ const DocumentTranslator = ({
   const [segments, setSegments] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   
+  // 大纲导航
+  const [outline, setOutline] = useState([]);
+  
+  // 翻译记忆缓存
+  const translationCache = useRef(new Map());
+  
   // 翻译状态
   const [isTranslating, setIsTranslating] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const pauseRef = useRef(false);
   const abortRef = useRef(false);
   
+  // 批量翻译模式
+  const [batchMode, setBatchMode] = useState(true);  // 默认启用批量模式
+  const [batchSize, setBatchSize] = useState(10);     // 每批处理数量
+  const [useGlossary, setUseGlossary] = useState(true);  // 启用术语表
+  
+  // 获取术语表
+  const getGlossaryTerms = useTranslationStore(state => state.getGlossaryTerms);
+  
+  // 计时
+  const [startTime, setStartTime] = useState(null);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  
   // UI 状态
   const [displayStyle, setDisplayStyle] = useState('below');
   const [showFilters, setShowFilters] = useState(false);
   const [showExport, setShowExport] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  
+  // 密码弹窗
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [pendingFile, setPendingFile] = useState(null);
+  const [password, setPassword] = useState('');
   
   // 过滤设置
   const [filters, setFilters] = useState({
@@ -141,9 +214,8 @@ const DocumentTranslator = ({
   const fileInputRef = useRef(null);
   const [isDragOver, setIsDragOver] = useState(false);
   
-  // 虚拟滚动
+  // 列表引用
   const listRef = useRef(null);
-  const [visibleRange, setVisibleRange] = useState({ start: 0, end: 50 });
   
   // 统计信息
   const stats = useMemo(() => {
@@ -154,10 +226,37 @@ const DocumentTranslator = ({
     const pending = segments.filter(s => s.status === STATUS.PENDING).length;
     const translating = segments.filter(s => s.status === STATUS.TRANSLATING).length;
     const totalTokens = segments.reduce((sum, s) => sum + (s.tokens || 0), 0);
+    const usedTokens = segments
+      .filter(s => s.status === STATUS.COMPLETED)
+      .reduce((sum, s) => sum + (s.tokens || 0), 0);
     const progress = total > 0 ? Math.round((completed / (total - skipped)) * 100) : 0;
     
-    return { total, completed, failed, skipped, pending, translating, totalTokens, progress };
+    // 缓存命中数
+    const cacheHits = segments.filter(s => s.fromCache).length;
+    
+    return { 
+      total, completed, failed, skipped, pending, translating, 
+      totalTokens, usedTokens, progress, cacheHits 
+    };
   }, [segments]);
+
+  // 计时器
+  useEffect(() => {
+    let timer;
+    if (isTranslating && !isPaused && startTime) {
+      timer = setInterval(() => {
+        setElapsedTime(Math.floor((Date.now() - startTime) / 1000));
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [isTranslating, isPaused, startTime]);
+
+  // 格式化时间
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   // 处理文件拖放
   const handleDragOver = useCallback((e) => {
@@ -171,13 +270,14 @@ const DocumentTranslator = ({
   }, []);
 
   // 加载文件（放在前面，供其他函数调用）
-  const loadFile = useCallback(async (file) => {
-    console.log('[DocumentTranslator] loadFile called:', file.name);
+  const loadFile = useCallback(async (file, filePassword = null) => {
+    console.log('[DocumentTranslator] loadFile called:', file.name, filePassword ? '(with password)' : '');
     setIsLoading(true);
     
     try {
       const result = await parseDocument(file, {
         maxCharsPerSegment: 800,
+        password: filePassword,
         filters: {
           ...filters,
           targetLang,
@@ -192,11 +292,26 @@ const DocumentTranslator = ({
           format: result.format,
           formatName: result.formatName,
           stats: result.stats,
+          pageCount: result.pageCount,
         });
         setSegments(result.segments);
-        notify?.(`文件加载成功：${result.segments.length} 个段落`, 'success');
+        setOutline(result.outline || []);
+        setShowPasswordModal(false);
+        setPendingFile(null);
+        setPassword('');
+        // 重置计时
+        setStartTime(null);
+        setElapsedTime(0);
+        notify?.(`文件加载成功：${result.segments.length} 个段落${result.pageCount ? ` (${result.pageCount} 页)` : ''}`, 'success');
       } else if (result.needPassword) {
-        notify?.('该文件需要密码，暂不支持', 'warning');
+        // 需要密码，显示密码弹窗
+        setPendingFile(file);
+        setShowPasswordModal(true);
+        setIsLoading(false);
+        if (filePassword) {
+          notify?.('密码错误，请重试', 'error');
+        }
+        return;
       } else {
         notify?.(result.error || '文件解析失败', 'error');
       }
@@ -207,6 +322,19 @@ const DocumentTranslator = ({
       setIsLoading(false);
     }
   }, [filters, targetLang, notify]);
+
+  // 提交密码
+  const handlePasswordSubmit = useCallback(async () => {
+    if (!pendingFile || !password) return;
+    await loadFile(pendingFile, password);
+  }, [pendingFile, password, loadFile]);
+
+  // 取消密码输入
+  const handlePasswordCancel = useCallback(() => {
+    setShowPasswordModal(false);
+    setPendingFile(null);
+    setPassword('');
+  }, []);
 
   // 拖放文件
   const handleDrop = useCallback(async (e) => {
@@ -241,19 +369,159 @@ const DocumentTranslator = ({
     setIsPaused(false);
     pauseRef.current = false;
     abortRef.current = false;
+    setStartTime(Date.now());
     
-    const pendingSegments = segments.filter(s => s.status === STATUS.PENDING || s.status === STATUS.ERROR);
+    // 获取待翻译的段落
+    let pendingSegments = segments.filter(s => s.status === STATUS.PENDING || s.status === STATUS.ERROR);
     
-    for (let i = 0; i < pendingSegments.length; i++) {
-      // 检查暂停/中止
+    // 先检查缓存，标记可从缓存获取的段落
+    const toTranslate = [];
+    for (const segment of pendingSegments) {
+      const cacheKey = `${segment.original}|${sourceLang}|${targetLang}`;
+      const cachedTranslation = translationCache.current.get(cacheKey);
+      
+      if (cachedTranslation) {
+        // 使用缓存
+        setSegments(prev => prev.map(s => 
+          s.id === segment.id ? { 
+            ...s, 
+            status: STATUS.COMPLETED, 
+            translated: cachedTranslation,
+            fromCache: true,
+          } : s
+        ));
+      } else {
+        toTranslate.push(segment);
+      }
+    }
+    
+    if (toTranslate.length === 0) {
+      setIsTranslating(false);
+      notify?.('翻译完成（全部来自缓存）', 'success');
+      return;
+    }
+    
+    // 根据模式选择翻译方式
+    if (batchMode) {
+      // 批量翻译模式
+      await translateBatchMode(toTranslate);
+    } else {
+      // 单条翻译模式
+      await translateSingleMode(toTranslate);
+    }
+    
+    setIsTranslating(false);
+    if (!abortRef.current) {
+      notify?.('翻译完成', 'success');
+    }
+  };
+
+  // 批量翻译模式
+  const translateBatchMode = async (toTranslate) => {
+    // 获取术语表（如果启用）
+    const glossary = useGlossary ? getGlossaryTerms() : [];
+    if (glossary.length > 0) {
+      console.log(`[DocumentTranslator] Using glossary with ${glossary.length} terms`);
+    }
+    
+    // 分批处理
+    for (let i = 0; i < toTranslate.length; i += batchSize) {
       if (abortRef.current) break;
+      
+      // 暂停检查
       while (pauseRef.current) {
         await new Promise(resolve => setTimeout(resolve, 100));
         if (abortRef.current) break;
       }
       if (abortRef.current) break;
       
-      const segment = pendingSegments[i];
+      const batch = toTranslate.slice(i, i + batchSize);
+      const batchIds = batch.map(s => s.id);
+      const batchTexts = batch.map(s => s.original);
+      
+      // 标记这批段落为翻译中
+      setSegments(prev => prev.map(s => 
+        batchIds.includes(s.id) ? { ...s, status: STATUS.TRANSLATING } : s
+      ));
+      
+      try {
+        console.log(`[DocumentTranslator] Batch ${Math.floor(i/batchSize) + 1}: translating ${batch.length} segments`);
+        
+        const result = await translationService.translateBatch(batchTexts, {
+          sourceLang,
+          targetLang,
+          maxBatchSize: batchSize,
+          glossary,  // 传递术语表
+        });
+        
+        if (result.success && result.results) {
+          // 更新每个段落的状态
+          result.results.forEach((r, idx) => {
+            const segment = batch[idx];
+            const cacheKey = `${segment.original}|${sourceLang}|${targetLang}`;
+            
+            if (r.success) {
+              // 保存到缓存
+              translationCache.current.set(cacheKey, r.text);
+              
+              setSegments(prev => prev.map(s => 
+                s.id === segment.id ? { 
+                  ...s, 
+                  status: STATUS.COMPLETED, 
+                  translated: r.text,
+                } : s
+              ));
+            } else {
+              setSegments(prev => prev.map(s => 
+                s.id === segment.id ? { 
+                  ...s, 
+                  status: STATUS.ERROR, 
+                  error: r.error || '翻译失败',
+                } : s
+              ));
+            }
+          });
+        } else {
+          // 批量翻译失败，标记所有为错误
+          setSegments(prev => prev.map(s => 
+            batchIds.includes(s.id) ? { 
+              ...s, 
+              status: STATUS.ERROR, 
+              error: result.error || '批量翻译失败',
+            } : s
+          ));
+        }
+      } catch (error) {
+        console.error('[DocumentTranslator] Batch translation error:', error);
+        setSegments(prev => prev.map(s => 
+          batchIds.includes(s.id) ? { 
+            ...s, 
+            status: STATUS.ERROR, 
+            error: error.message,
+          } : s
+        ));
+      }
+      
+      // 批次间小延迟
+      if (i + batchSize < toTranslate.length) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+    }
+  };
+
+  // 单条翻译模式
+  const translateSingleMode = async (toTranslate) => {
+    for (let i = 0; i < toTranslate.length; i++) {
+      if (abortRef.current) break;
+      
+      // 暂停检查
+      while (pauseRef.current) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        if (abortRef.current) break;
+      }
+      if (abortRef.current) break;
+      
+      const segment = toTranslate[i];
       
       // 更新状态为翻译中
       setSegments(prev => prev.map(s => 
@@ -261,21 +529,21 @@ const DocumentTranslator = ({
       ));
       
       try {
-        // 调用翻译服务 - 注意：translate(text, options) 第二个参数是对象
         const result = await translationService.translate(segment.original, {
           sourceLang,
           targetLang,
         });
         
-        console.log('[DocumentTranslator] Translation result:', result);
-        
         if (result.success) {
-          // 翻译服务返回 result.text，不是 result.translatedText
+          const translatedText = result.text || result.translatedText || '';
+          const cacheKey = `${segment.original}|${sourceLang}|${targetLang}`;
+          translationCache.current.set(cacheKey, translatedText);
+          
           setSegments(prev => prev.map(s => 
             s.id === segment.id ? { 
               ...s, 
               status: STATUS.COMPLETED, 
-              translated: result.text || result.translatedText || '',
+              translated: translatedText,
             } : s
           ));
         } else {
@@ -291,13 +559,8 @@ const DocumentTranslator = ({
         ));
       }
       
-      // 小延迟，避免请求过快
+      // 小延迟
       await new Promise(resolve => setTimeout(resolve, 100));
-    }
-    
-    setIsTranslating(false);
-    if (!abortRef.current) {
-      notify?.('翻译完成', 'success');
     }
   };
 
@@ -363,50 +626,91 @@ const DocumentTranslator = ({
   };
 
   // 导出
-  const handleExport = (type) => {
+  const handleExport = async (type) => {
     if (segments.length === 0) return;
     
     let content = '';
     let filename = document?.filename?.replace(/\.[^.]+$/, '') || 'translated';
     let ext = 'txt';
+    let blob = null;
     
-    switch (type) {
-      case 'bilingual-txt':
-        content = exportBilingual(segments, { style: 'below' });
-        filename += '_双语';
-        break;
-      case 'bilingual-md':
-        content = exportBilingual(segments, { style: 'below', format: 'md' });
-        filename += '_双语';
-        ext = 'md';
-        break;
-      case 'translated-only':
-        content = exportTranslatedOnly(segments);
-        filename += '_译文';
-        break;
-      case 'srt':
-        content = exportSRT(segments);
-        filename += '_translated';
-        ext = 'srt';
-        break;
-      case 'vtt':
-        content = exportVTT(segments);
-        filename += '_translated';
-        ext = 'vtt';
-        break;
+    try {
+      switch (type) {
+        case 'bilingual-txt':
+          content = exportBilingual(segments, { style: 'below' });
+          filename += '_双语';
+          break;
+        case 'bilingual-md':
+          content = exportBilingual(segments, { style: 'below', format: 'md' });
+          filename += '_双语';
+          ext = 'md';
+          break;
+        case 'translated-only':
+          content = exportTranslatedOnly(segments);
+          filename += '_译文';
+          break;
+        case 'srt':
+          content = exportSRT(segments);
+          filename += '_translated';
+          ext = 'srt';
+          break;
+        case 'vtt':
+          content = exportVTT(segments);
+          filename += '_translated';
+          ext = 'vtt';
+          break;
+        case 'docx':
+          blob = exportDOCX(segments, { 
+            style: 'bilingual', 
+            title: document?.filename || '翻译文档' 
+          });
+          filename += '_双语';
+          ext = 'doc';
+          break;
+        case 'docx-translated':
+          blob = exportDOCX(segments, { 
+            style: 'translated-only', 
+            title: document?.filename || '翻译文档' 
+          });
+          filename += '_译文';
+          ext = 'doc';
+          break;
+        case 'pdf':
+          // 生成 HTML 并打开打印对话框
+          const pdfHtml = exportPDFHTML(segments, { 
+            style: 'bilingual', 
+            title: document?.filename || '翻译文档' 
+          });
+          const printWindow = window.open('', '_blank', 'width=800,height=600');
+          printWindow.document.write(pdfHtml);
+          printWindow.document.close();
+          printWindow.onload = () => {
+            printWindow.print();
+          };
+          setShowExport(false);
+          notify?.('请在打印对话框中选择"保存为 PDF"', 'info');
+          return;
+        default:
+          return;
+      }
+      
+      // 下载文件
+      if (!blob) {
+        blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      }
+      const url = URL.createObjectURL(blob);
+      const a = window.document.createElement('a');
+      a.href = url;
+      a.download = `${filename}.${ext}`;
+      a.click();
+      URL.revokeObjectURL(url);
+      
+      setShowExport(false);
+      notify?.('导出成功', 'success');
+    } catch (error) {
+      console.error('[DocumentTranslator] Export error:', error);
+      notify?.(`导出失败: ${error.message}`, 'error');
     }
-    
-    // 下载文件
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = window.document.createElement('a');
-    a.href = url;
-    a.download = `${filename}.${ext}`;
-    a.click();
-    URL.revokeObjectURL(url);
-    
-    setShowExport(false);
-    notify?.('导出成功', 'success');
   };
 
   // 清空文档
@@ -416,23 +720,41 @@ const DocumentTranslator = ({
     }
     setDocument(null);
     setSegments([]);
+    setOutline([]);
+    setStartTime(null);
+    setElapsedTime(0);
   };
 
-  // 滚动处理（虚拟滚动）
+  // 滚动处理 - 仅用于显示/隐藏滚动到顶部按钮
+  const lastScrollTopState = useRef(false);
+  
   const handleScroll = useCallback((e) => {
-    const container = e.target;
-    const scrollTop = container.scrollTop;
-    const itemHeight = 120; // 估算每项高度
-    const visibleCount = Math.ceil(container.clientHeight / itemHeight) + 10;
-    const start = Math.max(0, Math.floor(scrollTop / itemHeight) - 5);
-    const end = Math.min(segments.length, start + visibleCount);
+    const scrollTop = e.target.scrollTop;
+    const shouldShow = scrollTop > 400;
     
-    setVisibleRange({ start, end });
-  }, [segments.length]);
+    if (shouldShow !== lastScrollTopState.current) {
+      lastScrollTopState.current = shouldShow;
+      setShowScrollTop(shouldShow);
+    }
+  }, []);
 
   // 滚动到顶部
   const scrollToTop = () => {
     listRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // 跳转到指定段落（使用 DOM 查询实际位置）
+  const scrollToSegment = (segmentId) => {
+    const element = listRef.current?.querySelector(`[data-segment-id="${segmentId}"]`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
+
+  // 清除翻译记忆缓存
+  const clearCache = () => {
+    translationCache.current.clear();
+    notify?.('翻译记忆缓存已清除', 'success');
   };
 
   // 获取支持的格式列表
@@ -477,6 +799,7 @@ const DocumentTranslator = ({
                 </button>
                 {showExport && (
                   <div className="export-menu">
+                    <div className="export-section-title">文本格式</div>
                     <button onClick={() => handleExport('bilingual-txt')}>
                       <FileDown size={14} /> 双语 TXT
                     </button>
@@ -484,11 +807,25 @@ const DocumentTranslator = ({
                       <FileDown size={14} /> 双语 Markdown
                     </button>
                     <button onClick={() => handleExport('translated-only')}>
-                      <FileDown size={14} /> 仅译文
+                      <FileDown size={14} /> 仅译文 TXT
                     </button>
+                    
+                    <div className="export-divider" />
+                    <div className="export-section-title">文档格式</div>
+                    <button onClick={() => handleExport('docx')}>
+                      <FileText size={14} /> 双语 Word (.doc)
+                    </button>
+                    <button onClick={() => handleExport('docx-translated')}>
+                      <FileText size={14} /> 仅译文 Word (.doc)
+                    </button>
+                    <button onClick={() => handleExport('pdf')}>
+                      <FileText size={14} /> 导出 PDF (打印)
+                    </button>
+                    
                     {segments[0]?.type === 'subtitle' && (
                       <>
                         <div className="export-divider" />
+                        <div className="export-section-title">字幕格式</div>
                         <button onClick={() => handleExport('srt')}>
                           <FileDown size={14} /> SRT 字幕
                         </button>
@@ -534,7 +871,7 @@ const DocumentTranslator = ({
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".txt,.md,.srt,.vtt"
+                  accept=".txt,.md,.srt,.vtt,.pdf,.docx,.csv,.json,.epub"
                   onChange={handleFileSelect}
                   style={{ display: 'none' }}
                 />
@@ -552,13 +889,14 @@ const DocumentTranslator = ({
                 <FileText size={18} />
                 <span className="filename">{document.filename}</span>
                 <span className="format-badge">{document.formatName}</span>
-                <span className="stats">
+                <span 
+                  className="stats clickable" 
+                  onClick={() => setShowStats(!showStats)}
+                  title="点击查看详细统计"
+                >
                   {stats.total} 段 · {document.stats?.totalChars?.toLocaleString()} 字 · ~{stats.totalTokens.toLocaleString()} tokens
                 </span>
               </div>
-              <button className="clear-btn" onClick={clearDocument} title="清除文件">
-                <Trash2 size={16} />
-              </button>
             </div>
 
             {/* 进度条 */}
@@ -575,37 +913,136 @@ const DocumentTranslator = ({
                   已完成 {stats.completed}/{stats.total - stats.skipped}
                   {stats.skipped > 0 && ` · 跳过 ${stats.skipped}`}
                   {stats.failed > 0 && <span className="failed"> · 失败 {stats.failed}</span>}
+                  {stats.cacheHits > 0 && <span className="cache-hits"> · 缓存 {stats.cacheHits}</span>}
                 </span>
+                {isTranslating && (
+                  <span className="elapsed-time">
+                    <Clock size={12} /> {formatTime(elapsedTime)}
+                  </span>
+                )}
               </div>
             </div>
 
-            {/* 段落列表 */}
-            <div 
-              className="dt-segments" 
-              ref={listRef}
-              onScroll={handleScroll}
-            >
-              {/* 虚拟滚动占位 */}
-              <div style={{ height: visibleRange.start * 120 }} />
-              
-              {segments.slice(visibleRange.start, visibleRange.end).map(segment => (
-                <SegmentItem
-                  key={segment.id}
-                  segment={segment}
-                  displayStyle={displayStyle}
-                  onRetry={retrySegment}
-                />
-              ))}
-              
-              {/* 虚拟滚动占位 */}
-              <div style={{ height: (segments.length - visibleRange.end) * 120 }} />
+            {/* 主内容区（带侧边栏） */}
+            <div className="dt-main-content">
+              {/* 大纲侧边栏 - 有大纲时自动显示 */}
+              {outline.length > 0 && (
+                <div className="dt-outline">
+                  <div className="outline-header">
+                    <BookOpen size={14} />
+                    <span>大纲</span>
+                  </div>
+                  <div className="outline-tree">
+                    {outline.map((item, idx) => (
+                      <OutlineItem 
+                        key={idx} 
+                        item={item} 
+                        onNavigate={scrollToSegment}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 段落列表 - 使用 CSS content-visibility 优化渲染 */}
+              <div 
+                className={`dt-segments ${outline.length > 0 ? 'with-outline' : ''}`}
+                ref={listRef}
+                onScroll={handleScroll}
+              >
+                {segments.map(segment => (
+                  <SegmentItem
+                    key={segment.id}
+                    segment={segment}
+                    displayStyle={displayStyle}
+                    onRetry={retrySegment}
+                  />
+                ))}
+              </div>
             </div>
 
             {/* 滚动到顶部 */}
-            {visibleRange.start > 5 && (
-              <button className="scroll-top-btn" onClick={scrollToTop}>
-                <ArrowUp size={18} />
-              </button>
+            <button 
+              className={`scroll-top-btn ${showScrollTop ? 'visible' : ''}`} 
+              onClick={scrollToTop}
+              aria-hidden={!showScrollTop}
+            >
+              <ArrowUp size={18} />
+            </button>
+
+            {/* 统计弹出卡片 */}
+            {showStats && (
+              <>
+                <div className="stats-overlay" onClick={() => setShowStats(false)} />
+                <div className="stats-popup">
+                  <div className="stats-popup-header">
+                    <span>📊 详细统计</span>
+                    <button className="close-btn" onClick={() => setShowStats(false)}>
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <div className="stats-popup-content">
+                    <div className="stats-grid">
+                      <div className="stat-card">
+                        <span className="stat-number">{stats.total}</span>
+                        <span className="stat-desc">总段落</span>
+                      </div>
+                      <div className="stat-card completed">
+                        <span className="stat-number">{stats.completed}</span>
+                        <span className="stat-desc">已翻译</span>
+                      </div>
+                      <div className="stat-card">
+                        <span className="stat-number">{stats.pending}</span>
+                        <span className="stat-desc">待翻译</span>
+                      </div>
+                      <div className="stat-card skipped">
+                        <span className="stat-number">{stats.skipped}</span>
+                        <span className="stat-desc">已跳过</span>
+                      </div>
+                      {stats.failed > 0 && (
+                        <div className="stat-card error">
+                          <span className="stat-number">{stats.failed}</span>
+                          <span className="stat-desc">失败</span>
+                        </div>
+                      )}
+                      {stats.cacheHits > 0 && (
+                        <div className="stat-card cache">
+                          <span className="stat-number">{stats.cacheHits}</span>
+                          <span className="stat-desc">缓存命中</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="stats-detail">
+                      <div className="detail-row">
+                        <span>总字符</span>
+                        <span>{document.stats?.totalChars?.toLocaleString() || 0}</span>
+                      </div>
+                      <div className="detail-row">
+                        <span>预估 Tokens</span>
+                        <span>{stats.totalTokens.toLocaleString()}</span>
+                      </div>
+                      <div className="detail-row">
+                        <span>已用 Tokens</span>
+                        <span>{stats.usedTokens.toLocaleString()}</span>
+                      </div>
+                      {elapsedTime > 0 && (
+                        <div className="detail-row">
+                          <span>翻译用时</span>
+                          <span>{formatTime(elapsedTime)}</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="stats-footer">
+                      <button className="cache-btn" onClick={clearCache}>
+                        <Database size={12} /> 清除缓存 ({translationCache.current.size})
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
             )}
           </>
         )}
@@ -619,6 +1056,31 @@ const DocumentTranslator = ({
               <Languages size={16} />
               <span>{sourceLang === 'auto' ? '自动' : sourceLang} → {targetLang}</span>
             </div>
+            {/* 批量模式开关 */}
+            <label className="batch-mode-toggle" title={batchMode ? `批量模式：每次翻译 ${batchSize} 段，速度更快` : '逐条模式：一段一段翻译，更稳定'}>
+              <input 
+                type="checkbox" 
+                checked={batchMode}
+                onChange={(e) => setBatchMode(e.target.checked)}
+                disabled={isTranslating}
+              />
+              <Zap size={14} />
+              <span>批量</span>
+            </label>
+            {/* 术语表开关 */}
+            <label 
+              className="batch-mode-toggle glossary-toggle" 
+              title={useGlossary ? `术语表已启用（${getGlossaryTerms().length} 条）` : '术语表已禁用'}
+            >
+              <input 
+                type="checkbox" 
+                checked={useGlossary}
+                onChange={(e) => setUseGlossary(e.target.checked)}
+                disabled={isTranslating}
+              />
+              <BookOpen size={14} />
+              <span>术语{getGlossaryTerms().length > 0 ? ` (${getGlossaryTerms().length})` : ''}</span>
+            </label>
           </div>
           
           <div className="control-center">
@@ -668,6 +1130,44 @@ const DocumentTranslator = ({
                 翻译中 {stats.translating > 0 && `(${stats.completed + 1}/${stats.total - stats.skipped})`}
               </span>
             )}
+          </div>
+        </div>
+      )}
+      
+      {/* 密码输入弹窗 */}
+      {showPasswordModal && (
+        <div className="password-modal-overlay" onClick={handlePasswordCancel}>
+          <div className="password-modal" onClick={e => e.stopPropagation()}>
+            <div className="password-modal-header">
+              <Lock size={24} />
+              <h3>文件已加密</h3>
+            </div>
+            <p className="password-modal-desc">
+              文件 <strong>{pendingFile?.name}</strong> 需要密码才能打开
+            </p>
+            <div className="password-input-group">
+              <Key size={18} />
+              <input
+                type="password"
+                placeholder="请输入密码"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handlePasswordSubmit()}
+                autoFocus
+              />
+            </div>
+            <div className="password-modal-actions">
+              <button className="btn-secondary" onClick={handlePasswordCancel}>
+                取消
+              </button>
+              <button 
+                className="btn-primary" 
+                onClick={handlePasswordSubmit}
+                disabled={!password}
+              >
+                确定
+              </button>
+            </div>
           </div>
         </div>
       )}

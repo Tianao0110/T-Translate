@@ -24,4 +24,16 @@ contextBridge.exposeInMainWorld("electron", {
   clipboard: {
     writeText: (text) => ipcRenderer.invoke("clipboard:write-text", text),
   },
+  
+  // 添加 store 访问，让翻译服务可以读取配置
+  store: {
+    get: (key) => ipcRenderer.invoke("store:get", key),
+    set: (key, value) => ipcRenderer.invoke("store:set", key, value),
+  },
+  
+  // 添加 secureStorage 访问，让翻译服务可以读取加密的 API keys
+  secureStorage: {
+    encrypt: (key, value) => ipcRenderer.invoke("secure-storage:encrypt", key, value),
+    decrypt: (key) => ipcRenderer.invoke("secure-storage:decrypt", key),
+  },
 });

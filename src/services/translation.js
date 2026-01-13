@@ -49,6 +49,8 @@ class TranslationService {
     this._initialized = false;
     this._mode = 'normal';  // 'normal' | 'subtitle'
     this._userPriority = null;  // 用户自定义优先级
+    this._failureCount = {};    // 翻译源连续失败计数 { providerId: count }
+    this._skipThreshold = 3;    // 连续失败多少次后跳过
   }
 
   // ========== 初始化 ==========
@@ -176,7 +178,29 @@ class TranslationService {
    */
   async reload(settings) {
     this._initialized = false;
+    this._failureCount = {};  // 重置失败计数
     await this.init(settings);
+  }
+
+  /**
+   * 重置失败计数器
+   * 用于手动重置所有翻译源的失败状态
+   */
+  resetFailureCount(providerId = null) {
+    if (providerId) {
+      this._failureCount[providerId] = 0;
+      console.log(`[TranslationService] Reset failure count for: ${providerId}`);
+    } else {
+      this._failureCount = {};
+      console.log('[TranslationService] Reset all failure counts');
+    }
+  }
+
+  /**
+   * 获取失败计数状态
+   */
+  getFailureStatus() {
+    return { ...this._failureCount };
   }
 
   // ========== 模式管理 ==========
@@ -238,9 +262,18 @@ class TranslationService {
     
     const priority = this.getPriority();
     const tried = [];
+    let allSkipped = true;  // 是否所有翻译源都被跳过
     
     for (const id of priority) {
       if (!isProviderConfigured(id)) continue;
+      
+      // 检查是否因连续失败而临时跳过
+      if (this._failureCount[id] >= this._skipThreshold) {
+        console.log(`[TranslationService] Skipping ${id} (failed ${this._failureCount[id]} times)`);
+        continue;
+      }
+      
+      allSkipped = false;  // 至少有一个翻译源没被跳过
       
       const provider = getProvider(id);
       if (!provider) continue;
@@ -252,21 +285,34 @@ class TranslationService {
         const result = await provider.translate(text, sourceLang, targetLang);
         
         if (result.success) {
+          // 成功：重置失败计数
+          this._failureCount[id] = 0;
           return { ...result, provider: id };
         }
         
-        console.warn(`[TranslationService] Provider ${id} failed:`, result.error);
+        // 失败：增加计数
+        this._failureCount[id] = (this._failureCount[id] || 0) + 1;
+        console.warn(`[TranslationService] Provider ${id} failed (${this._failureCount[id]}/${this._skipThreshold}):`, result.error);
         
         if (!enableFallback) {
           return { ...result, provider: id };
         }
       } catch (error) {
-        console.error(`[TranslationService] Provider ${id} threw error:`, error);
+        // 异常：增加计数
+        this._failureCount[id] = (this._failureCount[id] || 0) + 1;
+        console.error(`[TranslationService] Provider ${id} threw error (${this._failureCount[id]}/${this._skipThreshold}):`, error);
         
         if (!enableFallback) {
           return { success: false, error: error.message, provider: id };
         }
       }
+    }
+    
+    // 如果所有翻译源都被跳过，重置计数并重试一次
+    if (allSkipped && Object.keys(this._failureCount).length > 0) {
+      console.log('[TranslationService] All providers skipped, resetting failure counts...');
+      this._failureCount = {};
+      return this.translate(text, options);  // 递归重试
     }
     
     return {
@@ -276,6 +322,195 @@ class TranslationService {
         : '没有可用的翻译源，请先配置',
       provider: null,
     };
+  }
+
+  /**
+   * 批量翻译（将多段文本合并为一次请求）
+   * @param {string[]} texts - 要翻译的文本数组
+   * @param {object} options - 选项
+   * @returns {Promise<{success: boolean, results?: Array<{success: boolean, text?: string, error?: string}>, error?: string}>}
+   */
+  async translateBatch(texts, options = {}) {
+    if (!this._initialized) {
+      await this.init();
+    }
+    
+    if (!texts || texts.length === 0) {
+      return { success: false, error: '没有要翻译的文本' };
+    }
+    
+    // 如果只有一条，直接使用单条翻译
+    if (texts.length === 1) {
+      const result = await this.translate(texts[0], options);
+      return {
+        success: result.success,
+        results: [result],
+        provider: result.provider,
+      };
+    }
+    
+    const {
+      sourceLang = 'auto',
+      targetLang = 'zh',
+      glossary = [],  // 术语表 [{source: '原文', target: '译文'}]
+      maxBatchSize = 10,  // 单批最大段落数
+    } = options;
+    
+    // 分隔符（用于连接和拆分）
+    const SEPARATOR = '\n|||SPLIT|||\n';
+    
+    // 分批处理
+    const batches = [];
+    for (let i = 0; i < texts.length; i += maxBatchSize) {
+      batches.push(texts.slice(i, i + maxBatchSize));
+    }
+    
+    const allResults = [];
+    let lastProvider = null;
+    
+    for (const batch of batches) {
+      // 将批次文本用分隔符连接
+      const combinedText = batch.join(SEPARATOR);
+      
+      // 构造批量翻译 prompt
+      const batchPrompt = this._buildBatchPrompt(batch, targetLang, glossary, SEPARATOR);
+      
+      const priority = this.getPriority();
+      let batchSuccess = false;
+      
+      for (const id of priority) {
+        if (!isProviderConfigured(id)) continue;
+        if (this._failureCount[id] >= this._skipThreshold) continue;
+        
+        const provider = getProvider(id);
+        if (!provider) continue;
+        
+        try {
+          console.log(`[TranslationService] Batch translate with ${id}, ${batch.length} items`);
+          
+          // 使用 chat 方法发送批量翻译请求
+          let result;
+          if (typeof provider.chat === 'function') {
+            result = await provider.chat([
+              { role: 'system', content: batchPrompt.system },
+              { role: 'user', content: batchPrompt.user },
+            ]);
+          } else {
+            // 回退到普通翻译（每条单独翻译）
+            console.log(`[TranslationService] Provider ${id} no chat, falling back to single translate`);
+            for (const text of batch) {
+              const singleResult = await this.translate(text, { sourceLang, targetLang });
+              allResults.push(singleResult);
+            }
+            batchSuccess = true;
+            lastProvider = id;
+            break;
+          }
+          
+          if (result.success && result.content) {
+            // 解析批量翻译结果
+            const translations = this._parseBatchResult(result.content, batch.length, SEPARATOR);
+            
+            if (translations.length === batch.length) {
+              // 完美匹配
+              translations.forEach(text => {
+                allResults.push({ success: true, text });
+              });
+              this._failureCount[id] = 0;
+              batchSuccess = true;
+              lastProvider = id;
+              break;
+            } else {
+              // 数量不匹配，降级为单条翻译
+              console.warn(`[TranslationService] Batch result mismatch: expected ${batch.length}, got ${translations.length}`);
+              for (const text of batch) {
+                const singleResult = await this.translate(text, { sourceLang, targetLang });
+                allResults.push(singleResult);
+              }
+              batchSuccess = true;
+              lastProvider = id;
+              break;
+            }
+          }
+          
+          this._failureCount[id] = (this._failureCount[id] || 0) + 1;
+        } catch (error) {
+          console.error(`[TranslationService] Batch translate error with ${id}:`, error);
+          this._failureCount[id] = (this._failureCount[id] || 0) + 1;
+        }
+      }
+      
+      // 如果所有 provider 都失败，降级为单条翻译
+      if (!batchSuccess) {
+        console.log('[TranslationService] All batch providers failed, falling back to single translate');
+        for (const text of batch) {
+          const singleResult = await this.translate(text, { sourceLang, targetLang });
+          allResults.push(singleResult);
+        }
+      }
+    }
+    
+    return {
+      success: allResults.some(r => r.success),
+      results: allResults,
+      provider: lastProvider,
+    };
+  }
+
+  /**
+   * 构造批量翻译的 prompt
+   */
+  _buildBatchPrompt(texts, targetLang, glossary, separator) {
+    const targetName = {
+      'zh': '中文', 'en': 'English', 'ja': '日本語', 
+      'ko': '한국어', 'fr': 'Français', 'de': 'Deutsch',
+      'es': 'Español', 'ru': 'Русский',
+    }[targetLang] || targetLang;
+    
+    let systemPrompt = `You are a professional translator. Translate each paragraph to ${targetName}.
+
+IMPORTANT RULES:
+1. Each input paragraph is separated by "${separator.trim()}"
+2. Output ONLY the translations, separated by the same separator "${separator.trim()}"
+3. Maintain the exact same number of paragraphs as input (${texts.length} paragraphs)
+4. Do not add explanations, numbering, or any extra text
+5. Preserve the original formatting and line breaks within each paragraph`;
+
+    // 术语表注入
+    if (glossary && glossary.length > 0) {
+      systemPrompt += `\n\nGLOSSARY (use these translations for specific terms):`;
+      glossary.forEach(term => {
+        systemPrompt += `\n- "${term.source}" → "${term.target}"`;
+      });
+    }
+
+    const userPrompt = texts.join(separator);
+    
+    return { system: systemPrompt, user: userPrompt };
+  }
+
+  /**
+   * 解析批量翻译结果
+   */
+  _parseBatchResult(content, expectedCount, separator) {
+    // 尝试按分隔符拆分
+    let results = content.split(separator.trim()).map(s => s.trim()).filter(s => s.length > 0);
+    
+    // 如果分隔符拆分不成功，尝试其他方式
+    if (results.length !== expectedCount) {
+      // 尝试按换行+数字编号拆分
+      const numberedPattern = /^\d+[\.\)]\s*/gm;
+      if (numberedPattern.test(content)) {
+        results = content.split(/\n\d+[\.\)]\s*/).filter(s => s.trim().length > 0);
+      }
+    }
+    
+    // 如果还是不匹配，尝试按双换行拆分
+    if (results.length !== expectedCount) {
+      results = content.split(/\n\n+/).map(s => s.trim()).filter(s => s.length > 0);
+    }
+    
+    return results;
   }
 
   /**
@@ -297,9 +532,18 @@ class TranslationService {
     } = options;
     
     const priority = this.getPriority();
+    let allSkipped = true;
     
     for (const id of priority) {
       if (!isProviderConfigured(id)) continue;
+      
+      // 检查是否因连续失败而临时跳过
+      if (this._failureCount[id] >= this._skipThreshold) {
+        console.log(`[TranslationService] Skipping stream ${id} (failed ${this._failureCount[id]} times)`);
+        continue;
+      }
+      
+      allSkipped = false;
       
       const provider = getProvider(id);
       if (!provider) continue;
@@ -309,19 +553,34 @@ class TranslationService {
         const result = await provider.translateStream(text, sourceLang, targetLang, onChunk);
         
         if (result.success) {
+          // 成功：重置失败计数
+          this._failureCount[id] = 0;
           return { ...result, provider: id };
         }
+        
+        // 失败：增加计数
+        this._failureCount[id] = (this._failureCount[id] || 0) + 1;
+        console.warn(`[TranslationService] Stream provider ${id} failed (${this._failureCount[id]}/${this._skipThreshold})`);
         
         if (!enableFallback) {
           return { ...result, provider: id };
         }
       } catch (error) {
-        console.error(`[TranslationService] Stream provider ${id} error:`, error);
+        // 异常：增加计数
+        this._failureCount[id] = (this._failureCount[id] || 0) + 1;
+        console.error(`[TranslationService] Stream provider ${id} error (${this._failureCount[id]}/${this._skipThreshold}):`, error);
         
         if (!enableFallback) {
           return { success: false, error: error.message, provider: id };
         }
       }
+    }
+    
+    // 如果所有翻译源都被跳过，重置计数并重试
+    if (allSkipped && Object.keys(this._failureCount).length > 0) {
+      console.log('[TranslationService] All stream providers skipped, resetting failure counts...');
+      this._failureCount = {};
+      return this.translateStream(text, options, onChunk);
     }
     
     return { success: false, error: '所有翻译源均失败' };

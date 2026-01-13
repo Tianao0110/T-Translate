@@ -5,7 +5,7 @@ import {
   Star, Search, Trash2, Copy, Edit3, Save, X, Plus,
   Folder, FolderPlus, ChevronDown, ChevronRight,
   Tag, Hash, MoreVertical, GripVertical,
-  Check, Palette, RotateCcw, Bookmark, Sparkles, RefreshCw
+  Check, Palette, RotateCcw, Bookmark, Sparkles, RefreshCw, BookOpen
 } from 'lucide-react';
 import useTranslationStore from '../stores/translation-store';
 import translationService from '../services/translation.js';
@@ -47,7 +47,8 @@ const DEFAULT_FOLDERS = [
   { id: 'work', name: '工作', color: '#3b82f6', order: 0 },
   { id: 'study', name: '学习', color: '#10b981', order: 1 },
   { id: 'life', name: '生活', color: '#f59e0b', order: 2 },
-  { id: 'style_library', name: '风格库', color: '#8b5cf6', order: 3, isSystem: true, icon: 'palette' },
+  { id: 'glossary', name: '术语库', color: '#06b6d4', order: 3, isSystem: true, icon: 'book' },
+  { id: 'style_library', name: '风格库', color: '#8b5cf6', order: 4, isSystem: true, icon: 'palette' },
 ];
 
 /**
@@ -627,6 +628,8 @@ const FavoritesPanel = ({ showNotification }) => {
                   >
                     {folder.icon === 'palette' ? (
                       <Palette size={16} className="folder-icon" style={{ color: folder.color }} />
+                    ) : folder.icon === 'book' ? (
+                      <BookOpen size={16} className="folder-icon" style={{ color: folder.color }} />
                     ) : (
                       <Folder size={16} className="folder-icon" style={{ color: folder.color }} />
                     )}

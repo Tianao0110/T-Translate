@@ -2,7 +2,7 @@
 // 翻译源设置组件 - 分组卡片风格
 // M-V-S-P 架构：View 层，只负责展示和用户交互
 
-import React, { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
+import React, { useState, useEffect, useCallback, useImperativeHandle, forwardRef, useRef } from 'react';
 import {
   ChevronDown, ChevronUp, Check, X, AlertCircle,
   RefreshCw, Eye, EyeOff, ExternalLink, GripVertical,
@@ -82,8 +82,15 @@ const ProviderSettings = forwardRef(({ settings, updateSettings, notify }, ref) 
   // 保存状态
   const [isSaving, setIsSaving] = useState(false);
 
-  // 初始化：从 registry 和 settings 加载
+  // 是否已初始化
+  const initializedRef = useRef(false);
+  
+  // 初始化：从 registry 和 settings 加载（只在首次挂载时）
   useEffect(() => {
+    // 防止重复初始化
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+    
     const initProviders = async () => {
       const savedProviders = settings?.translation?.providers || [];
       const savedConfigs = settings?.translation?.providerConfigs || {};
@@ -131,7 +138,7 @@ const ProviderSettings = forwardRef(({ settings, updateSettings, notify }, ref) 
     };
     
     initProviders();
-  }, [settings]);
+  }, []); // 空依赖数组，只在挂载时执行
 
   // 保存设置
   const saveSettings = useCallback(async () => {

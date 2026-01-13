@@ -69,7 +69,18 @@ const SettingsPanel = ({ showNotification }) => {
       autoTranslate: false,
       translationDelay: 500,
       maxLength: 5000,
-      template: 'general'
+      template: 'general',
+      providers: [
+        { id: 'local-llm', enabled: true, priority: 0 },
+        { id: 'openai', enabled: false, priority: 1 },
+        { id: 'deepl', enabled: false, priority: 2 },
+      ],
+      providerConfigs: {
+        'local-llm': { endpoint: 'http://localhost:1234/v1', model: '' },
+        'openai': { apiKey: '', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
+        'deepl': { apiKey: '', useFreeApi: true },
+      },
+      subtitleProvider: null,
     },
     ocr: {
       engine: 'llm-vision',
@@ -109,19 +120,6 @@ const SettingsPanel = ({ showNotification }) => {
       minChars: 2,               // 最小字符数
       maxChars: 500,             // 最大字符数
       autoCloseOnCopy: false,    // 复制后自动关闭
-    },
-    providers: {
-      list: [
-        { id: 'local-llm', enabled: true, priority: 0 },
-        { id: 'openai', enabled: false, priority: 1 },
-        { id: 'deepl', enabled: false, priority: 2 },
-      ],
-      configs: {
-        'local-llm': { endpoint: 'http://localhost:1234/v1', model: '' },
-        'openai': { apiKey: '', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
-        'deepl': { apiKey: '', useFreeApi: true },
-      },
-      subtitleProvider: null,    // 字幕模式专用翻译源（null 表示自动选择）
     },
     interface: {
       theme: 'light',
@@ -225,12 +223,29 @@ const SettingsPanel = ({ showNotification }) => {
       if (window.electron && window.electron.store) {
         const savedSettings = await window.electron.store.get('settings');
         if (savedSettings) {
+          // 迁移旧格式：settings.providers -> settings.translation.providers
+          let migratedSettings = { ...savedSettings };
+          if (savedSettings.providers?.list && !savedSettings.translation?.providers) {
+            console.log('[Settings] Migrating old providers format...');
+            migratedSettings = {
+              ...savedSettings,
+              translation: {
+                ...savedSettings.translation,
+                providers: savedSettings.providers.list,
+                providerConfigs: savedSettings.providers.configs,
+                subtitleProvider: savedSettings.providers.subtitleProvider,
+              }
+            };
+            // 删除旧字段
+            delete migratedSettings.providers;
+          }
+          
           setSettings(prev => ({ 
             ...prev, 
-            ...savedSettings,
+            ...migratedSettings,
             ocr: {
               ...prev.ocr,
-              ...savedSettings.ocr,
+              ...migratedSettings.ocr,
               isWindows,
               paddleInstalled,
               rapidInstalled,
@@ -238,8 +253,13 @@ const SettingsPanel = ({ showNotification }) => {
             // 使用主进程的真实状态覆盖
             selection: {
               ...prev.selection,
-              ...savedSettings.selection,
+              ...migratedSettings.selection,
               enabled: selectionEnabled,  // 以主进程状态为准
+            },
+            // 确保 translation.providers 存在
+            translation: {
+              ...prev.translation,
+              ...migratedSettings.translation,
             }
           }));
           // 同步 OCR 引擎到 Store
@@ -257,8 +277,25 @@ const SettingsPanel = ({ showNotification }) => {
       } else {
         const savedSettings = localStorage.getItem('settings');
         if (savedSettings) {
-          const parsed = JSON.parse(savedSettings);
+          let parsed = JSON.parse(savedSettings);
+          
+          // 迁移旧格式：settings.providers -> settings.translation.providers
+          if (parsed.providers?.list && !parsed.translation?.providers) {
+            console.log('[Settings] Migrating old providers format (localStorage)...');
+            parsed = {
+              ...parsed,
+              translation: {
+                ...parsed.translation,
+                providers: parsed.providers.list,
+                providerConfigs: parsed.providers.configs,
+                subtitleProvider: parsed.providers.subtitleProvider,
+              }
+            };
+            delete parsed.providers;
+          }
+          
           setSettings(prev => ({
+            ...prev,
             ...parsed,
             ocr: {
               ...prev.ocr,
@@ -271,6 +308,10 @@ const SettingsPanel = ({ showNotification }) => {
               ...prev.selection,
               ...parsed.selection,
               enabled: selectionEnabled,
+            },
+            translation: {
+              ...prev.translation,
+              ...parsed.translation,
             }
           }));
           // 同步 OCR 引擎到 Store
@@ -293,9 +334,12 @@ const SettingsPanel = ({ showNotification }) => {
   const saveSettings = async () => {
     setIsSaving(true);
     try {
-      // 如果在翻译源设置页面，先调用 ProviderSettings 的保存逻辑
+      // 如果在翻译源设置页面，调用 ProviderSettings 的保存逻辑后直接返回
+      // 因为 ProviderSettings.save() 已经完成了所有保存工作
       if (activeSection === 'providers' && providerSettingsRef.current?.save) {
         await providerSettingsRef.current.save();
+        setIsSaving(false);
+        return; // 直接返回，不要再用旧的 settings state 覆盖
       }
       
       // 清理掉不需要保存的临时状态
@@ -711,10 +755,13 @@ const SettingsPanel = ({ showNotification }) => {
                   <span className="format-tag">MD</span>
                   <span className="format-tag">SRT</span>
                   <span className="format-tag">VTT</span>
-                  <span className="format-tag coming-soon">PDF</span>
-                  <span className="format-tag coming-soon">DOCX</span>
+                  <span className="format-tag">PDF</span>
+                  <span className="format-tag">DOCX</span>
+                  <span className="format-tag">CSV</span>
+                  <span className="format-tag">JSON</span>
+                  <span className="format-tag">EPUB</span>
                 </div>
-                <p className="setting-hint">PDF 和 DOCX 支持即将推出</p>
+                <p className="setting-hint">支持加密 PDF · 自动识别章节大纲 · 翻译记忆复用</p>
               </div>
             </div>
           );

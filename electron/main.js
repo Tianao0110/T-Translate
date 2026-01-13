@@ -436,6 +436,7 @@ function createSelectionWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      webSecurity: false,  // 允许跨域请求
     },
   });
 

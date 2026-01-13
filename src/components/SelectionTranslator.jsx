@@ -184,6 +184,12 @@ const SelectionTranslator = () => {
 
   // 使用 translationService 进行翻译
   const translateText = async (text, retryCount = 0) => {
+    // 确保翻译服务已初始化
+    if (!translationService.initialized) {
+      console.log('[Selection] Initializing translation service...');
+      await translationService.init();
+    }
+    
     // 检测源语言
     const isChinese = (text.match(/[\u4e00-\u9fff]/g) || []).length / text.length > 0.3;
     const isJapanese = (text.match(/[\u3040-\u309f\u30a0-\u30ff]/g) || []).length > 0;

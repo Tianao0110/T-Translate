@@ -460,6 +460,21 @@ const useTranslationStore = create(
         return state.statistics;
       },
 
+      /**
+       * 获取术语表（从收藏的术语库文件夹中提取）
+       * @returns {Array<{source: string, target: string}>} 术语列表
+       */
+      getGlossaryTerms: () => {
+        const state = get();
+        return state.favorites
+          .filter(item => item.folderId === 'glossary')
+          .map(item => ({
+            source: item.sourceText,
+            target: item.translatedText,
+          }))
+          .filter(term => term.source && term.target);
+      },
+
       reset: () =>
         set((state) => {
           const { sourceLanguage, targetLanguage } = state.currentTranslation;
