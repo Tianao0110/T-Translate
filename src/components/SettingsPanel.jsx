@@ -400,6 +400,28 @@ const SettingsPanel = ({ showNotification }) => {
     loadSettings();
   }, []);
 
+  // 监听划词翻译状态变化（来自快捷键或托盘）
+  useEffect(() => {
+    const handleSelectionStateChange = (enabled) => {
+      console.log('[Settings] Selection state changed from main process:', enabled);
+      setSettings(prev => ({
+        ...prev,
+        selection: { ...prev.selection, enabled }
+      }));
+    };
+
+    // 注册监听器
+    let cleanup = null;
+    if (window.electron?.ipc?.on) {
+      cleanup = window.electron.ipc.on('selection-state-changed', handleSelectionStateChange);
+    }
+
+    // 清理
+    return () => {
+      if (cleanup) cleanup();
+    };
+  }, []);
+
   const loadSettings = async () => {
     try {
       // 1. 检测运行时环境

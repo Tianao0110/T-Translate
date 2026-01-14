@@ -26,8 +26,9 @@ const TitleBar = () => {
   return (
     <div className="titlebar">
       <div className="title-drag-region">
-        {/* 这里可以放 Logo 图片 */}
-        {/* <img src="/icon.png" alt="logo" className="window-icon" /> */}
+        <img src="./icon.png" alt="logo" className="window-icon" onError={(e) => {
+          e.target.style.display = 'none';
+        }} />
         <span className="window-title">T-Translate</span>
       </div>
       

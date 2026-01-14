@@ -176,8 +176,12 @@ const MainWindow = () => {
       {/* 顶部工具栏 */}
       <div className="main-toolbar">
         <div className="toolbar-brand">
-          <div className="brand-logo"><Sparkles size={18} /></div>
-          <span className="brand-title">T-Translate</span>
+          <img src="./icon.png" alt="Logo" className="brand-logo-img" onError={(e) => {
+            // 如果图片加载失败，显示备用图标
+            e.target.style.display = 'none';
+            e.target.nextSibling.style.display = 'flex';
+          }} />
+          <div className="brand-logo" style={{display: 'none'}}><Sparkles size={18} /></div>
         </div>
 
         <div className="toolbar-tabs">

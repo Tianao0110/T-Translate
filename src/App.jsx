@@ -115,21 +115,24 @@ function App() {
       };
     }, [addToFavorites]);
 
-    // 监听玻璃窗口的历史记录请求
+    // 监听玻璃窗口和划词翻译的历史记录请求
     useEffect(() => {
       if (!window.electron?.ipcRenderer) return;
 
       const handleAddToHistory = (event, item) => {
-        console.log('[App] Received add-to-history from glass window:', item);
+        console.log('[App] Received add-to-history:', item);
         if (item && addToHistory) {
+          // 兼容不同来源的字段名
+          // glass: sourceText, translatedText
+          // selection: source, result
           addToHistory({
-            id: item.id || `glass-${Date.now()}`,
-            sourceText: item.sourceText || '',
-            translatedText: item.translatedText || '',
+            id: item.id || `${item.from || 'unknown'}-${Date.now()}`,
+            sourceText: item.sourceText || item.source || '',
+            translatedText: item.translatedText || item.result || '',
             sourceLanguage: item.sourceLanguage || 'auto',
             targetLanguage: item.targetLanguage || 'en',
             timestamp: item.timestamp || Date.now(),
-            source: 'glass-translator'
+            source: item.from || item.source || 'unknown'
           });
           console.log('[App] Added to history successfully');
         }

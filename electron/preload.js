@@ -25,6 +25,7 @@ const validChannels = {
     "sync-target-language",  // 玻璃窗口语言同步
     "glass:translate-request",  // 玻璃窗口翻译请求
     "screenshot-captured",  // 截图完成
+    "selection-state-changed",  // 划词翻译状态变化
   ],
   invoke: [
     "get-app-version",

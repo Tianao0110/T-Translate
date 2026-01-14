@@ -24,15 +24,43 @@ const screenshotModule = require("./screenshot-module");
 let setWindowDisplayAffinity = null;
 const WDA_EXCLUDEFROMCAPTURE = 0x00000011;
 
+// Windows 划词翻译 API（模块级别初始化，避免重复定义）
+let win32SelectionAPI = null;
+
 if (process.platform === "win32") {
   try {
     const koffi = require("koffi");
     const user32 = koffi.load("user32.dll");
+    const kernel32 = koffi.load("kernel32.dll");
+    const psapi = koffi.load("psapi.dll");
+    
+    // 截图穿透 API
     setWindowDisplayAffinity = user32.func("SetWindowDisplayAffinity", "bool", [
       "void*",
       "uint",
     ]);
     console.log("[Main] Windows SetWindowDisplayAffinity API loaded");
+    
+    // 划词翻译窗口检测 API
+    const POINT = koffi.struct("POINT", {
+      x: "int32",
+      y: "int32"
+    });
+    
+    win32SelectionAPI = {
+      WindowFromPoint: user32.func("void* WindowFromPoint(POINT)"),
+      GetAncestor: user32.func("void* GetAncestor(void*, uint32)"),
+      GetWindowThreadProcessId: user32.func("uint32 GetWindowThreadProcessId(void*, uint32*)"),
+      OpenProcess: kernel32.func("void* OpenProcess(uint32, int, uint32)"),
+      CloseHandle: kernel32.func("int CloseHandle(void*)"),
+      GetModuleBaseNameW: psapi.func("uint32 GetModuleBaseNameW(void*, void*, uint16*, uint32)"),
+      GetClassNameW: user32.func("int GetClassNameW(void*, uint16*, int)"),
+      GA_ROOT: 2,
+      PROCESS_QUERY_INFORMATION: 0x0400,
+      PROCESS_VM_READ: 0x0010,
+    };
+    console.log("[Main] Windows Selection API loaded");
+    
   } catch (e) {
     console.warn("[Main] Failed to load koffi for Windows API:", e.message);
     console.warn(
@@ -453,7 +481,7 @@ function createSelectionWindow() {
   }
 
   selectionWindow.webContents.on("did-finish-load", () => {
-    console.log("[Selection] Window content loaded");
+    // console.log("[Selection] Window content loaded");
   });
 
   selectionWindow.on("closed", () => {
@@ -471,7 +499,7 @@ function createSelectionWindow() {
  * @param {Object} rect - 选区矩形（用于 OCR 兜底）
  */
 function showSelectionTrigger(mouseX, mouseY, rect) {
-  console.log("[Selection] showSelectionTrigger at:", mouseX, mouseY);
+  // console.log("[Selection] showSelectionTrigger at:", mouseX, mouseY);
 
   if (!selectionEnabled) return;
 
@@ -573,6 +601,9 @@ function toggleSelectionTranslate() {
     startSelectionHook();
   }
 
+  // 通知渲染进程状态变化
+  mainWindow?.webContents?.send("selection-state-changed", selectionEnabled);
+
   console.log("[Selection] Enabled:", selectionEnabled);
   return selectionEnabled;
 }
@@ -642,11 +673,8 @@ function startSelectionHook() {
         mouseDownPos = { x: cursorPos.x, y: cursorPos.y };
         mouseDownTime = Date.now();
 
-        console.log("[Selection] Mouse down at:", mouseDownPos);
-
         // 检查是否点击在主窗口/玻璃窗内
         if (isClickInOurWindows(mouseDownPos.x, mouseDownPos.y)) {
-          console.log("[Selection] Click in main/glass window, ignoring");
           mouseDownPos = null;
           return;
         }
@@ -660,7 +688,6 @@ function startSelectionHook() {
       if (e.button === 1) {
         // 🔴 核心修复：如果正在拖动便利贴，忽略这次 mouseup
         if (isDraggingOverlay) {
-          console.log("[Selection] Was dragging overlay, ignoring mouseup");
           isDraggingOverlay = false;
           mouseDownPos = null;
           return;
@@ -685,28 +712,16 @@ function startSelectionHook() {
             mouseUpPos.y >= bounds.y &&
             mouseUpPos.y <= bounds.y + bounds.height
           ) {
-            console.log(
-              "[Selection] Mouse up on selection window, ignoring drag detection"
-            );
             mouseDownPos = null;
             return;
           }
         }
-
-        console.log("[Selection] Mouse up at:", mouseUpPos);
 
         const distance = Math.sqrt(
           Math.pow(mouseUpPos.x - mouseDownPos.x, 2) +
             Math.pow(mouseUpPos.y - mouseDownPos.y, 2)
         );
         const duration = Date.now() - mouseDownTime;
-
-        console.log(
-          "[Selection] Distance:",
-          distance.toFixed(0),
-          "Duration:",
-          duration
-        );
 
         // 动态读取设置（允许运行时调整）
         const currentSettings = store.get("settings", {});
@@ -721,22 +736,29 @@ function startSelectionHook() {
         // - 时间 < maxDur（默认 5000ms，过滤长按不动）
         // - 非原生拖拽（拖拽文件/图片时不触发）
         if (distance > minDist && duration > minDur && duration < maxDur && !isNativeDragging) {
-          console.log(
-            "[Selection] Drag detected! Showing trigger (no copy yet)"
-          );
+          
+          // 🔴 保存副本，防止异步期间被清空
+          const startPos = { ...mouseDownPos };
+          const endPos = { ...mouseUpPos };
+          
+          // 🔴 安全检测：通过窗口和拖拽特征判断，不使用 Ctrl+C
+          const shouldTrigger = await shouldShowSelectionTrigger(startPos, endPos, distance);
+          
+          if (!shouldTrigger) {
+            mouseDownPos = null;
+            return;
+          }
 
-          // 计算选区矩形（用于 OCR 兜底）
+          // 计算选区矩形（用于 OCR 兜底）- 使用保存的副本
           const rect = {
-            x: Math.min(mouseDownPos.x, mouseUpPos.x),
-            y: Math.min(mouseDownPos.y, mouseUpPos.y),
-            width: Math.abs(mouseUpPos.x - mouseDownPos.x),
-            height: Math.abs(mouseUpPos.y - mouseDownPos.y),
+            x: Math.min(startPos.x, endPos.x),
+            y: Math.min(startPos.y, endPos.y),
+            width: Math.abs(endPos.x - startPos.x),
+            height: Math.abs(endPos.y - startPos.y),
           };
 
-          // 只显示圆点，不复制。点击圆点时才复制
-          showSelectionTrigger(mouseUpPos.x, mouseUpPos.y, rect);
-        } else {
-          console.log("[Selection] Filtered out - distance:", distance.toFixed(0), "min:", minDist, "duration:", duration, "minDur:", minDur);
+          // 显示翻译触发器（点击时才获取文本）
+          showSelectionTrigger(endPos.x, endPos.y, rect);
         }
 
         mouseDownPos = null;
@@ -793,16 +815,147 @@ function isClickInOurWindows(x, y) {
 }
 
 /**
+ * 判断是否应该显示划词翻译触发器
+ * 智能防误触 (Anti-Mistouch) 方案
+ * 
+ * 过滤漏斗：
+ * 1. 物理防抖：Distance < 10px → 忽略（在调用前已过滤）
+ * 2. 通用方向检测：过滤明显的拖拽动作
+ * 3. 白名单放行：Edit 输入框直接通过
+ * 4. 黑名单检测：Explorer 和文件管理器使用严格判定
+ */
+async function shouldShowSelectionTrigger(startPos, endPos, distance) {
+  try {
+    const deltaX = Math.abs(endPos.x - startPos.x);
+    const deltaY = Math.abs(endPos.y - startPos.y);
+    
+    // ========== 通用方向检测（所有平台）==========
+    // 规则1：纯垂直移动（deltaX < 5px 且 deltaY > 30px）很可能是拖拽
+    if (deltaX < 5 && deltaY > 30) {
+      return false;
+    }
+    
+    // 规则2：斜向拖拽 - 垂直位移超过水平位移，且垂直 > 50px
+    if (deltaY > deltaX && deltaY > 50) {
+      return false;
+    }
+    
+    // 仅 Windows 需要窗口检测
+    if (process.platform !== "win32") {
+      return true;
+    }
+    
+    // ========== Windows 平台：使用 Win32 API 检测 ==========
+    if (!win32SelectionAPI) {
+      return true;
+    }
+    
+    try {
+      const {
+        WindowFromPoint, GetAncestor, GetWindowThreadProcessId,
+        OpenProcess, CloseHandle, GetModuleBaseNameW, GetClassNameW,
+        GA_ROOT, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ
+      } = win32SelectionAPI;
+      
+      // 使用鼠标抬起位置获取窗口
+      const point = { x: Math.round(endPos.x), y: Math.round(endPos.y) };
+      const childHwnd = WindowFromPoint(point);
+      
+      if (!childHwnd) {
+        return true;
+      }
+      
+      // 先检查子窗口（可能是 Edit 控件）
+      const childClassBuffer = Buffer.alloc(512);
+      GetClassNameW(childHwnd, childClassBuffer, 256);
+      const childClassName = childClassBuffer.toString("utf16le").replace(/\0/g, "");
+      
+      // ========== 白名单：输入框直接放行 ==========
+      const inputBoxClasses = [
+        "Edit", "RICHEDIT50W", "RichEdit20W", "RichEdit", "TextBox", "_WwG",
+        "Chrome_RenderWidgetHostHWND", "MozillaWindowClass", "CASCADIA_HOSTING_WINDOW_CLASS",
+      ];
+      
+      if (inputBoxClasses.some(cls => childClassName.includes(cls))) {
+        return true;
+      }
+      
+      // 获取顶层父窗口用于黑名单检测
+      const rootHwnd = GetAncestor(childHwnd, GA_ROOT) || childHwnd;
+      
+      // 获取顶层窗口类名
+      const classNameBuffer = Buffer.alloc(512);
+      GetClassNameW(rootHwnd, classNameBuffer, 256);
+      const className = classNameBuffer.toString("utf16le").replace(/\0/g, "");
+      
+      // 获取进程名
+      const pidBuffer = Buffer.alloc(4);
+      GetWindowThreadProcessId(rootHwnd, pidBuffer);
+      const pid = pidBuffer.readUInt32LE(0);
+      
+      const hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, 0, pid);
+      
+      let processName = "";
+      if (hProcess) {
+        const processNameBuffer = Buffer.alloc(512);
+        GetModuleBaseNameW(hProcess, null, processNameBuffer, 256);
+        processName = processNameBuffer.toString("utf16le").replace(/\0/g, "").toLowerCase();
+        CloseHandle(hProcess);
+      }
+      
+      // ========== 文件管理器黑名单检测 ==========
+      const fileManagerProcesses = [
+        "explorer.exe", "totalcmd.exe", "totalcmd64.exe",
+        "doublecmd.exe", "xyplorer.exe", "q-dir.exe", "freecommander.exe",
+      ];
+      
+      const isFileManager = fileManagerProcesses.includes(processName);
+      
+      // 桌面窗口类
+      const desktopClasses = ["Progman", "WorkerW"];
+      
+      // 文件视图窗口类
+      const fileViewClasses = [
+        "SHELLDLL_DefView", "DirectUIHWND", "SysListView32", "SysTreeView32",
+        "CabinetWClass", "ExploreWClass", "TMyListBox", "LCLListBox",
+      ];
+      
+      const isDesktop = desktopClasses.some(cls => className.includes(cls));
+      const isFileView = fileViewClasses.some(cls => className.includes(cls));
+      
+      // 桌面：直接拒绝所有拖拽
+      if (isDesktop) {
+        return false;
+      }
+      
+      // 文件管理器：应用严格规则
+      if (isFileManager || isFileView) {
+        if (distance > 150) return false;
+        if (deltaY > 15) return false;
+        if (deltaX > 5 && deltaY > deltaX * 0.2) return false;
+        if (deltaX < 30) return false;
+      }
+      
+      return true;
+      
+    } catch (err) {
+      // API 调用失败，允许显示
+      return true;
+    }
+    
+  } catch (err) {
+    console.error("[Selection] shouldShowSelectionTrigger error:", err);
+    return true;
+  }
+}
+
+/**
  * 稳定获取选中文字（清空+轮询方案）
  */
 async function fetchSelectedText() {
   try {
     // 1. 备份现有剪贴板
     const backup = clipboard.readText();
-    console.log(
-      "[Selection] Backup clipboard:",
-      backup?.substring(0, 30) || "(empty)"
-    );
 
     // 2. 清空剪贴板（关键！作为信号量）
     clipboard.clear();
@@ -815,7 +968,6 @@ async function fetchSelectedText() {
       await new Promise((resolve) => setTimeout(resolve, 50));
       const text = clipboard.readText();
       if (text && text.trim()) {
-        console.log("[Selection] Got text after", (i + 1) * 50, "ms");
         // 延迟恢复剪贴板
         setTimeout(() => {
           if (backup) clipboard.writeText(backup);
@@ -825,7 +977,6 @@ async function fetchSelectedText() {
     }
 
     // 5. 超时，恢复剪贴板
-    console.log("[Selection] Clipboard polling timeout");
     if (backup) clipboard.writeText(backup);
     return null;
   } catch (err) {
@@ -841,7 +992,6 @@ async function getTextByOCR(rect) {
   try {
     // 区域太小则跳过
     if (rect.width < 20 || rect.height < 10) {
-      console.log("[Selection] Region too small for OCR");
       return null;
     }
 
@@ -854,13 +1004,10 @@ async function getTextByOCR(rect) {
       height: rect.height + padding * 2,
     };
 
-    console.log("[Selection] OCR region:", captureRect);
-
     // 截取区域
     const screenshot = await screenshotModule.captureRegion(captureRect);
 
     if (!screenshot) {
-      console.log("[Selection] Screenshot failed");
       return null;
     }
 
@@ -905,8 +1052,6 @@ function simulateCtrlC() {
     keybd_event(VK_C, 0x2e, KEYEVENTF_KEYUP, 0);
     // 释放 Ctrl
     keybd_event(VK_CONTROL, 0x1d, KEYEVENTF_KEYUP, 0);
-
-    console.log("[Selection] Ctrl+C simulated");
   } catch (err) {
     console.error("[Selection] Failed to simulate Ctrl+C:", err);
   }
@@ -1647,10 +1792,9 @@ function registerShortcuts() {
   const selectionKey = toElectronFormat(shortcuts.selectionTranslate || defaultShortcuts.selectionTranslate);
   if (selectionKey) {
     globalShortcut.register(selectionKey, () => {
-      const current = store.get("selectionEnabled", false);
-      store.set("selectionEnabled", !current);
-      mainWindow?.webContents?.send("selection-state-changed", !current);
-      console.log(`[Shortcuts] Selection translate toggled: ${!current}`);
+      // 调用统一的切换函数，确保状态同步
+      const newState = toggleSelectionTranslate();
+      console.log(`[Shortcuts] Selection translate toggled: ${newState}`);
     });
     console.log(`[Shortcuts] Registered selectionTranslate: ${selectionKey}`);
   }
@@ -1720,11 +1864,7 @@ function setupIPC() {
           }
         },
         glassWindow: () => toggleGlassWindow(),
-        selectionTranslate: () => {
-          const current = store.get("selectionEnabled", false);
-          store.set("selectionEnabled", !current);
-          mainWindow?.webContents?.send("selection-state-changed", !current);
-        }
+        selectionTranslate: () => toggleSelectionTranslate()
       };
       
       const shortcut = settings.shortcuts?.[action] || defaultShortcuts[action];
@@ -1759,12 +1899,7 @@ function setupIPC() {
           }
         }},
         glassWindow: { old: "CommandOrControl+Alt+G", handler: () => toggleGlassWindow() },
-        selectionTranslate: { old: "CommandOrControl+Shift+T", handler: () => {
-          const current = store.get("selectionEnabled", false);
-          store.set("selectionEnabled", !current);
-          // 通知渲染进程
-          mainWindow?.webContents?.send("selection-state-changed", !current);
-        }}
+        selectionTranslate: { old: "CommandOrControl+Shift+T", handler: () => toggleSelectionTranslate() }
       };
       
       const config = shortcutMapping[action];
@@ -2506,7 +2641,7 @@ function setupIPC() {
   // 设置划词翻译窗口位置和大小（用于便利贴模式）
   ipcMain.handle("selection:set-bounds", (event, bounds) => {
     if (selectionWindow && !selectionWindow.isDestroyed()) {
-      console.log("[Selection] Setting bounds:", bounds);
+      // console.log("[Selection] Setting bounds:", bounds);
       selectionWindow.setBounds({
         x: Math.round(bounds.x),
         y: Math.round(bounds.y),
@@ -2527,30 +2662,56 @@ function setupIPC() {
   });
 
   // 获取选中的文字（点击圆点时调用）
-  // 先尝试 Ctrl+C，失败则 OCR 兜底
+  // 智能防误触：二次验身 - 检查剪贴板内容是文字还是文件
   ipcMain.handle("selection:get-text", async (event, rect) => {
-    console.log("[Selection] Getting selected text...");
-
     // 1. 先尝试 Ctrl+C 复制
     const text = await fetchSelectedText();
+    
+    // 2. 检查剪贴板格式 (二次验身)
+    const formats = clipboard.availableFormats();
+    
+    // 3. 判断是文件还是文本
+    const isFileDrop = formats.some(f => 
+      f.includes("FileNameW") || 
+      f.includes("FileContents") ||
+      f.includes("CF_HDROP") ||
+      f === "text/uri-list"
+    );
+    
+    if (isFileDrop) {
+      // 检查是否有纯文本（某些情况下文件名也会作为文本复制）
+      if (text && text.trim()) {
+        // 检查文本是否像是文件路径
+        const looksLikePath = /^[A-Za-z]:\\|^\/|^\\\\|^file:\/\//.test(text.trim());
+        
+        if (looksLikePath) {
+          // 是文件路径，提取文件名进行翻译
+          const filename = extractFilenameForTranslation(text.trim());
+          if (filename) {
+            return { text: filename, method: "filename", original: text.trim() };
+          }
+        } else {
+          // 虽然有文件格式，但文本不是路径，可能是选中了文件名的文本
+          return { text: text.trim(), method: "clipboard" };
+        }
+      }
+      
+      // 没有文本，可能用户只是在拖拽文件，返回 null
+      return { text: null, method: null, reason: "file_drop" };
+    }
 
+    // 4. 正常文本处理
     if (text && text.trim()) {
-      console.log("[Selection] Got text via Ctrl+C:", text.substring(0, 50));
       return { text: text.trim(), method: "clipboard" };
     }
 
-    // 2. 复制失败，尝试 OCR 兜底
-    console.log("[Selection] Ctrl+C failed, trying OCR...");
+    // 5. 复制失败，尝试 OCR 兜底
     const ocrRect = rect || lastSelectionRect;
 
     if (ocrRect && ocrRect.width > 10 && ocrRect.height > 5) {
       try {
         const ocrText = await getTextByOCR(ocrRect);
         if (ocrText && ocrText.trim()) {
-          console.log(
-            "[Selection] Got text via OCR:",
-            ocrText.substring(0, 50)
-          );
           return { text: ocrText.trim(), method: "ocr" };
         }
       } catch (err) {
@@ -2558,9 +2719,49 @@ function setupIPC() {
       }
     }
 
-    console.log("[Selection] Both methods failed");
     return { text: null, method: null };
   });
+
+  /**
+   * 从文件路径提取可翻译的文件名
+   * @param {string} path - 文件路径
+   * @returns {string|null} - 提取的文件名（不含扩展名），或 null
+   */
+  function extractFilenameForTranslation(filePath) {
+    try {
+      // 处理不同格式的路径
+      let filename = filePath;
+      
+      // file:// URL
+      if (filename.startsWith("file://")) {
+        filename = decodeURIComponent(filename.replace("file://", ""));
+      }
+      
+      // 提取文件名
+      const pathParts = filename.split(/[/\\]/);
+      filename = pathParts[pathParts.length - 1];
+      
+      // 移除扩展名
+      const dotIndex = filename.lastIndexOf(".");
+      if (dotIndex > 0) {
+        filename = filename.substring(0, dotIndex);
+      }
+      
+      // 清理特殊字符，保留有意义的文本
+      filename = filename.replace(/[_-]+/g, " ").trim();
+      
+      // 太短或只有数字/符号的文件名没有翻译价值
+      if (filename.length < 2 || /^[\d\s\W]+$/.test(filename)) {
+        return null;
+      }
+      
+      // console.log("[Selection] Extracted filename for translation:", filename);
+      return filename;
+    } catch (err) {
+      console.error("[Selection] extractFilenameForTranslation error:", err);
+      return null;
+    }
+  }
 
   // ========== OCR 相关 IPC ==========
 
@@ -3687,14 +3888,10 @@ app.whenReady().then(() => {
   registerShortcuts();
   setupIPC();
 
-  // 初始化划词翻译
-  selectionEnabled = store.get("selectionEnabled", false);
-  if (selectionEnabled) {
-    // 延迟启动，等待其他组件初始化
-    setTimeout(() => {
-      startSelectionHook();
-    }, 2000);
-  }
+  // 初始化划词翻译 - 每次启动默认关闭，避免状态不同步
+  // 不读取之前保存的状态，用户需要手动开启
+  selectionEnabled = false;
+  store.set("selectionEnabled", false);  // 同步更新存储
   
   // 内存监控（每5分钟检查一次）
   setInterval(() => {
