@@ -1,17 +1,17 @@
-// src/components/MainWindow.jsx
+// src/components/MainWindow/index.jsx
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   FileText, Languages, Settings, History, Star, Sparkles,
   AlertCircle, CheckCircle, Info, X, FileUp
 } from 'lucide-react';
 
-import useTranslationStore from '../stores/translation-store';
-import TranslationPanel from './TranslationPanel';
-import HistoryPanel from './HistoryPanel';
-import SettingsPanel from './SettingsPanel';
-import FavoritesPanel from './FavoritesPanel';
-import DocumentTranslator from './DocumentTranslator';
-import '../styles/components/MainWindow.css'; 
+import useTranslationStore from '../../stores/translation-store';
+import TranslationPanel from '../TranslationPanel';
+import HistoryPanel from '../HistoryPanel';
+import SettingsPanel from '../SettingsPanel';
+import FavoritesPanel from '../FavoritesPanel';
+import DocumentTranslator from '../DocumentTranslator';
+import './styles.css'; 
 
 /**
  * 主窗口组件

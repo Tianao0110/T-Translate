@@ -1,4 +1,4 @@
-// src/components/SettingsPanel.jsx
+// src/components/SettingsPanel/index.jsx
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   Globe, Shield, Zap, Download, Upload, Moon, Sun,
@@ -7,304 +7,27 @@ import {
   Code2, Palette, Layers, MousePointer, Server,
   FileText, Filter
 } from 'lucide-react';
-import translationService from '../services/translation-service.js';
-import { ocrManager } from '../providers/ocr/index.js';
-import useTranslationStore from '../stores/translation-store';
-import ProviderSettings from './ProviderSettings';
-import '../styles/components/SettingsPanel.css';
-import '../styles/components/ProviderSettings.css'; 
+import translationService from '../../services/translation.js';
+import { ocrManager } from '../../providers/ocr/index.js';
+import useTranslationStore from '../../stores/translation-store';
+import ProviderSettings from '../ProviderSettings';
+import './styles.css';
 
-/**
- * 默认配置 (内联，防止 import 报错)
- */
-const defaultConfig = {
-  llm: { endpoint: 'http://localhost:1234/v1', timeout: 60000 },
-  translation: { sourceLanguage: 'auto', targetLanguage: 'zh', batch: { maxLength: 5000 } },
-  ocr: { defaultEngine: 'llm-vision', windowsLanguage: 'zh-Hans' },
-  ui: { theme: 'light', fontSize: 14 },
-  logging: { level: 'info' },
-  shortcuts: {
-    // 应用内快捷键
-    translate: 'Ctrl+Enter',
-    swapLanguages: 'Ctrl+L',
-    clear: 'Ctrl+Shift+C',
-    paste: 'Ctrl+V',
-    copy: 'Ctrl+C',
-    // 全局快捷键（需要同步到主进程）
-    screenshot: 'Alt+Q',
-    toggleWindow: 'Ctrl+Shift+W',
-    glassWindow: 'Ctrl+Alt+G',
-    selectionTranslate: 'Ctrl+Shift+T',
-  },
-  dev: { debugMode: false },
-  storage: { cache: { maxSize: 100 }, history: { maxItems: 1000 } }
-};
+// 从 constants.js 导入常量
+import {
+  defaultConfig,
+  PRIVACY_MODES,
+  getModeFeatures,
+  isFeatureEnabled,
+  isProviderAllowed,
+  SHORTCUT_LABELS,
+  GLOBAL_SHORTCUT_KEYS,
+  NAV_ITEMS,
+  DEFAULT_SETTINGS,
+  LANGUAGE_OPTIONS,
+  migrateOldSettings
+} from './constants.js'; 
 
-/**
- * 隐私模式配置
- * 定义每个模式下的行为规则
- * 这是全局状态，影响所有功能模块
- */
-const PRIVACY_MODES = {
-  standard: {
-    id: 'standard',
-    name: '标准模式',
-    icon: 'Zap',
-    color: '#3b82f6',
-    description: '功能全开，自动保存历史记录',
-    features: {
-      saveHistory: true,        // 保存历史记录
-      useCache: true,           // 使用翻译缓存
-      onlineApi: true,          // 允许在线API
-      analytics: true,          // 统计数据
-      autoSave: true,           // 自动保存设置
-      selectionTranslate: true, // 划词翻译
-      glassWindow: true,        // 玻璃窗口
-      documentTranslate: true,  // 文档翻译
-      exportData: true,         // 导出数据
-    },
-    allowedProviders: null,     // null表示全部允许
-    allowedOcrEngines: null,    // null表示全部允许
-  },
-  secure: {
-    id: 'secure',
-    name: '无痕模式',
-    icon: 'Shield',
-    color: '#f59e0b',
-    description: '不保存任何记录，关闭窗口即清除',
-    features: {
-      saveHistory: false,       // 不保存历史
-      useCache: false,          // 不使用缓存（每次都重新翻译）
-      onlineApi: true,          // 允许在线API
-      analytics: false,         // 不统计数据
-      autoSave: false,          // 不自动保存
-      selectionTranslate: true, // 划词翻译（但不保存）
-      glassWindow: true,        // 玻璃窗口（但不保存）
-      documentTranslate: true,  // 文档翻译（但不保存）
-      exportData: false,        // 禁止导出（无数据可导出）
-    },
-    allowedProviders: null,
-    allowedOcrEngines: null,
-  },
-  offline: {
-    id: 'offline',
-    name: '离线模式',
-    icon: 'Lock',
-    color: '#10b981',
-    description: '完全离线，不发送任何网络请求',
-    features: {
-      saveHistory: true,        // 保存历史
-      useCache: true,           // 使用缓存
-      onlineApi: false,         // 禁止在线API（核心限制）
-      analytics: true,          // 统计数据
-      autoSave: true,           // 自动保存
-      selectionTranslate: true, // 划词翻译
-      glassWindow: true,        // 玻璃窗口
-      documentTranslate: true,  // 文档翻译
-      exportData: true,         // 允许导出
-    },
-    // 离线模式下仅允许本地翻译源
-    allowedProviders: ['local-llm'],
-    // 离线模式下仅允许本地OCR引擎
-    allowedOcrEngines: ['llm-vision', 'rapid-ocr', 'windows-ocr'],
-    // 离线模式下禁用的在线服务
-    disabledServices: ['openai', 'deepl', 'gemini', 'deepseek', 'google-translate', 'ocr-space', 'google-vision', 'azure-ocr', 'baidu-ocr'],
-  }
-};
-
-/**
- * 获取当前模式的功能配置
- */
-const getModeFeatures = (mode) => {
-  return PRIVACY_MODES[mode]?.features || PRIVACY_MODES.standard.features;
-};
-
-/**
- * 检查某功能在当前模式下是否可用
- */
-const isFeatureEnabled = (mode, featureName) => {
-  const features = getModeFeatures(mode);
-  return features[featureName] !== false;
-};
-
-/**
- * 检查某翻译源在当前模式下是否可用
- */
-const isProviderAllowed = (mode, providerId) => {
-  const modeConfig = PRIVACY_MODES[mode];
-  if (!modeConfig?.allowedProviders) return true; // null表示全部允许
-  return modeConfig.allowedProviders.includes(providerId);
-};
-
-/**
- * 快捷键标签映射
- */
-const SHORTCUT_LABELS = {
-  // 应用内快捷键
-  translate: '执行翻译',
-  swapLanguages: '切换语言',
-  clear: '清空内容',
-  paste: '粘贴文本',
-  copy: '复制结果',
-  // 全局快捷键
-  screenshot: '📷 截图翻译',
-  toggleWindow: '🪟 显示/隐藏窗口',
-  glassWindow: '🔮 玻璃窗口',
-  selectionTranslate: '✏️ 划词翻译开关',
-};
-
-/**
- * 全局快捷键列表（需要同步到主进程）
- */
-const GLOBAL_SHORTCUT_KEYS = ['screenshot', 'toggleWindow', 'glassWindow', 'selectionTranslate'];
-
-/**
- * 导航项配置（静态数据，移到组件外部提高性能）
- */
-const NAV_ITEMS = [
-  { id: 'connection', icon: Wifi, label: 'LM Studio', group: '连接', keywords: ['连接', '端点', 'api', 'endpoint', 'lmstudio', '超时', 'timeout'] },
-  { id: 'providers', icon: Server, label: '翻译源', group: '连接', keywords: ['翻译源', 'provider', 'openai', 'deepl', 'gemini', 'deepseek', '本地', 'api'] },
-  { id: 'translation', icon: Globe, label: '翻译设置', group: '翻译', keywords: ['翻译', '语言', '源语言', '目标语言', '自动', 'stream', '流式'] },
-  { id: 'document', icon: FileText, label: '文档翻译', group: '翻译', keywords: ['文档', 'pdf', 'docx', 'epub', 'srt', '字幕', '批量'] },
-  { id: 'selection', icon: MousePointer, label: '划词翻译', group: '翻译', keywords: ['划词', '选中', '鼠标', '触发', '按钮'] },
-  { id: 'glassWindow', icon: Layers, label: '玻璃窗口', group: '翻译', keywords: ['玻璃', '透明', '窗口', '置顶', 'glass'] },
-  { id: 'ocr', icon: Eye, label: 'OCR 识别', group: '系统', keywords: ['ocr', '识别', '截图', '图片', '文字识别', 'rapidocr', 'llm'] },
-  { id: 'interface', icon: Palette, label: '界面外观', group: '系统', keywords: ['界面', '主题', '深色', '浅色', '字体', '外观'] },
-  { id: 'privacy', icon: Shield, label: '隐私模式', group: '系统', keywords: ['隐私', '安全', '模式', '历史', '记录'] },
-  { id: 'about', icon: Info, label: '关于', group: '系统', keywords: ['关于', '版本', '信息', 'about'] },
-];
-
-/**
- * 默认设置状态
- */
-const DEFAULT_SETTINGS = {
-  connection: {
-    endpoint: 'http://localhost:1234/v1',
-    timeout: 60000,
-    autoReconnect: true,
-    reconnectInterval: 30000
-  },
-  translation: {
-    defaultSourceLang: 'auto',
-    defaultTargetLang: 'zh',
-    autoTranslate: false,
-    translationDelay: 500,
-    maxLength: 5000,
-    template: 'general',
-    providers: [
-      { id: 'local-llm', enabled: true, priority: 0 },
-      { id: 'openai', enabled: false, priority: 1 },
-      { id: 'deepl', enabled: false, priority: 2 },
-    ],
-    providerConfigs: {
-      'local-llm': { endpoint: 'http://localhost:1234/v1', model: '' },
-      'openai': { apiKey: '', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
-      'deepl': { apiKey: '', useFreeApi: true },
-    },
-    subtitleProvider: null,
-  },
-  ocr: {
-    engine: 'llm-vision',
-    language: 'chi_sim+eng',
-    autoDetect: true,
-    imageQuality: 'high',
-    preprocessImage: true,
-    isWindows: false,
-    paddleInstalled: false,
-    rapidInstalled: false,
-    ocrspaceKey: '',
-    googleVisionKey: '',
-    azureKey: '',
-    azureEndpoint: '',
-    baiduApiKey: '',
-    baiduSecretKey: '',
-  },
-  screenshot: {
-    showConfirmButtons: true,
-    autoCapture: false
-  },
-  glassWindow: {
-    refreshInterval: 3000,
-    smartDetect: true,
-    streamOutput: true,
-    ocrEngine: 'llm-vision',
-    defaultOpacity: 0.85,
-    rememberPosition: true,
-    autoPin: true,
-    lockTargetLang: true
-  },
-  selection: {
-    enabled: false,
-    triggerTimeout: 4000,
-    showSourceByDefault: false,
-    minChars: 2,
-    maxChars: 500,
-    autoCloseOnCopy: false,
-  },
-  interface: {
-    theme: 'light',
-    fontSize: 14,
-    fontFamily: 'system',
-    compactMode: false,
-    showLineNumbers: false,
-    highlightSyntax: true
-  },
-  privacy: {
-    saveHistory: true,
-    encryptHistory: false,
-    autoDeleteDays: 0,
-    secureMode: false,
-    logLevel: 'info'
-  },
-  document: {
-    maxCharsPerSegment: 800,
-    batchMaxTokens: 2000,
-    batchMaxSegments: 5,
-    filters: {
-      skipShort: true,
-      minLength: 10,
-      skipNumbers: true,
-      skipCode: true,
-      skipTargetLang: true,
-      skipKeywords: [],
-    },
-    displayStyle: 'below',
-  },
-  shortcuts: defaultConfig.shortcuts,
-  advanced: {
-    debugMode: false,
-    experimentalFeatures: false,
-    cacheSize: 100,
-    maxHistoryItems: 1000,
-    exportFormat: 'json'
-  }
-};
-
-/**
- * 迁移旧版设置格式
- */
-const migrateOldSettings = (savedSettings) => {
-  if (!savedSettings) return null;
-  
-  let migrated = { ...savedSettings };
-  
-  // 迁移旧格式：settings.providers -> settings.translation.providers
-  if (savedSettings.providers?.list && !savedSettings.translation?.providers) {
-    console.log('[Settings] Migrating old providers format...');
-    migrated = {
-      ...savedSettings,
-      translation: {
-        ...savedSettings.translation,
-        providers: savedSettings.providers.list,
-        providerConfigs: savedSettings.providers.configs,
-        subtitleProvider: savedSettings.providers.subtitleProvider,
-      }
-    };
-    delete migrated.providers;
-  }
-  
-  return migrated;
-};
 
 /**
  * 设置面板组件
@@ -436,34 +159,23 @@ const SettingsPanel = ({ showNotification }) => {
         savedSettings = stored ? JSON.parse(stored) : null;
       }
       
-      // 3. 迁移旧格式
+      // 3. 迁移旧格式（已包含与 DEFAULT_SETTINGS 的深度合并）
       const migratedSettings = migrateOldSettings(savedSettings);
       
       // 4. 合并设置
       let finalSettings;
       if (migratedSettings) {
         finalSettings = { 
-          ...DEFAULT_SETTINGS, 
-          ...migratedSettings,
+          ...migratedSettings,  // migratedSettings 已经包含完整的默认值
+          // 确保运行时状态覆盖
           ocr: {
-            ...DEFAULT_SETTINGS.ocr,
             ...migratedSettings.ocr,
             ...runtimeState.ocr,
           },
           selection: {
-            ...DEFAULT_SETTINGS.selection,
             ...migratedSettings.selection,
             enabled: runtimeState.selectionEnabled,
           },
-          translation: {
-            ...DEFAULT_SETTINGS.translation,
-            ...migratedSettings.translation,
-          },
-          // 确保快捷键配置完整（合并默认值和用户设置）
-          shortcuts: {
-            ...defaultConfig.shortcuts,
-            ...migratedSettings.shortcuts,
-          }
         };
         
         // 同步 OCR 引擎到 Store
@@ -471,7 +183,7 @@ const SettingsPanel = ({ showNotification }) => {
           setOcrEngine(migratedSettings.ocr.engine);
         }
       } else {
-        // 没有保存的设置，只更新运行时状态
+        // 没有保存的设置，使用默认值 + 运行时状态
         finalSettings = {
           ...DEFAULT_SETTINGS,
           ocr: { ...DEFAULT_SETTINGS.ocr, ...runtimeState.ocr },

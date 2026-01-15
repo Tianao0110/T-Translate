@@ -2,148 +2,116 @@
 
 ## 📊 审查概览
 
-| 类别 | 数量 | 严重程度 |
-|------|------|----------|
-| 🔴 Bug | 1 | 已修复 |
-| 🟠 代码质量 | 6 | 需优化 |
-| 🟡 功能连接 | 3 | 需验证 |
-| 🟢 可精简 | 4 | 建议 |
-| 🔵 新功能建议 | 5 | 可选 |
+| 类别 | 数量 | 状态 |
+|------|------|------|
+| 🔴 Bug | 2 | ✅ 已修复 |
+| 🟠 代码质量 | 6 | ✅ 已优化 |
+| 🟡 功能连接 | 3 | ✅ 已修复 |
+| 🟢 代码精简 | 4 | ✅ 已完成 |
+| 🔵 新功能 | 7 | ✅ 已添加 |
 
 ---
 
 ## 🔴 已修复的Bug
 
 ### 1. `setActiveTab` 函数不存在
-- **位置**: Line 1408 (原)
-- **问题**: 调用了不存在的 `setActiveTab`
 - **修复**: 改为 `handleSectionChange('ocr')`
 
----
-
-## 🟠 代码质量问题
-
-### 1. `loadSettings` 函数过长 (~160行)
-```
-问题：函数职责过多，包含平台检测、OCR检测、设置加载、数据迁移
-建议：拆分为多个小函数
-```
-
-### 2. Electron API 调用风格不一致
-```javascript
-// 风格1: 可选链 (推荐)
-window.electron?.app?.getPlatform()
-
-// 风格2: && 检查 (不推荐)
-window.electron && window.electron.store
-```
-
-### 3. 版本号硬编码
-```javascript
-// 当前
-<p>版本 1.0.0</p>
-
-// 建议：从 package.json 读取
-```
-
-### 4. GitHub链接是Placeholder
-```javascript
-// 当前
-'https://github.com'
-
-// 应该改为实际项目地址
-```
-
-### 5. 界面设置功能过少
-当前只有主题和字体大小，建议添加更多选项。
-
-### 6. 重复代码
-隐私模式三个卡片结构相同，可提取为组件。
+### 2. 滚动问题
+- **修复**: `.setting-content-animated` 添加 flex 属性
 
 ---
 
-## 🟡 功能连接问题
+## 🔵 v101 新增/完善功能
 
-### 1. endpoint 修改未同步到 translationService
-```javascript
-// 问题：修改 settings.connection.endpoint 后
-// testConnection() 调用的是 translationService.testConnection()
-// 但没有传入新的 endpoint
+### 1. 完整快捷键系统 ✅
+- **应用内快捷键**: 翻译、切换语言、清空、粘贴、复制
+- **全局快捷键**: 
+  - `Alt+Q` - 截图翻译 📷
+  - `Ctrl+Shift+W` - 显示/隐藏窗口 🪟
+  - `Ctrl+Alt+G` - 玻璃窗口 🔮
+  - `Ctrl+Shift+T` - 划词翻译开关 ✏️
+- 快捷键可自定义，全局快捷键会同步到主进程
+- 显示 🌐 标记区分全局快捷键
 
-// 建议：testConnection 前先保存设置，或传入当前endpoint
-```
+### 2. 隐私模式全面升级 ✅
+- **标准模式**: 功能全开，保存历史
+- **无痕模式**: 
+  - 不保存任何历史记录
+  - 不使用翻译缓存
+  - 切换时自动清除现有历史
+  - 退出即焚
+- **离线模式**: 
+  - 仅允许本地 LLM
+  - 禁用所有在线 API
+  - 允许的翻译源: `local-llm`
+  - 允许的 OCR 引擎: `llm-vision`, `rapid-ocr`, `windows-ocr`
 
-### 2. 字体大小修改未即时应用
-```javascript
-// 当前：只更新 state
-updateSetting('interface','fontSize',parseInt(e.target.value))
+### 3. 隐私模式功能控制 ✅
+每种模式控制以下功能:
+- `saveHistory` - 历史记录
+- `useCache` - 翻译缓存
+- `onlineApi` - 在线 API
+- `analytics` - 使用统计
+- `selectionTranslate` - 划词翻译
+- `glassWindow` - 玻璃窗口
+- `documentTranslate` - 文档翻译
+- `exportData` - 导出数据
 
-// 建议：同时应用到 document
-document.documentElement.style.setProperty('--font-size', `${value}px`)
-```
+### 4. translation-store 隐私模式集成 ✅
+- `setTranslationMode()` - 切换模式时自动清理（无痕模式）
+- `isFeatureEnabled()` - 检查功能是否可用
+- `isProviderAllowed()` - 检查翻译源是否可用
+- `addToHistory()` - 自动检查模式，无痕模式下不保存
 
-### 3. 主题切换需要保存才生效
-建议：主题切换应该即时预览。
+### 5. 未保存更改检测 ✅
+- 底部显示橙色提示
+- 离开页面确认对话框
 
----
+### 6. 搜索高亮 ✅
+- 导航项匹配时显示蓝色边框
 
-## 🟢 可精简的地方
-
-### 1. 未使用的导入 (已清理)
-- Settings, Database, Volume2, Keyboard, AlertCircle
-- WifiOff, FolderOpen, Unlock, HelpCircle
-- ExternalLink, ChevronRight, Terminal, Monitor
-
-### 2. 重复的迁移逻辑
-`loadSettings` 中 Electron Store 和 localStorage 的迁移代码几乎相同。
-
-### 3. 模式卡片重复代码
-三个模式卡片 (标准/无痕/离线) 结构相同，可抽取。
-
-### 4. OCR引擎列表重复模式
-每个引擎卡片结构相同，可用数据驱动渲染。
-
----
-
-## 🔵 建议添加的功能
-
-### 1. 未保存更改检测
-```javascript
-const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-// 离开时提醒用户
-```
-
-### 2. 设置搜索高亮
-搜索时高亮匹配的设置项。
-
-### 3. 快捷键自定义界面
-当前快捷键是只读显示。
-
-### 4. 自动保存选项
-某些设置（主题、字体）即时生效。
-
-### 5. 设置备份/恢复历史
-支持多个设置配置切换。
+### 7. 界面设置增强 ✅
+- 窗口透明度
+- 紧凑模式
+- 即时预览
 
 ---
 
-## 📝 修复清单
+## 📁 文件变更
 
-### 立即修复 ✅
-- [x] setActiveTab bug
-- [x] 清理未使用导入
-- [x] useMemo/useCallback 优化
-- [x] NAV_ITEMS 外移
-- [x] 设置导入验证
+| 文件 | 行数 | 变化 |
+|------|------|------|
+| SettingsPanel.jsx | 2119 | +200 |
+| SettingsPanel.css | 2250 | +20 |
+| translation-store.js | 616 | +25 |
 
-### 本次优化 🔄
-- [ ] loadSettings 拆分
-- [ ] 模式卡片组件化
-- [ ] API调用风格统一
-- [ ] endpoint 同步问题
-- [ ] 字体即时预览
+---
 
-### 后续迭代 📋
-- [ ] 未保存检测
-- [ ] 设置版本管理
-- [ ] 快捷键自定义
+## 🏗️ 架构说明
+
+### 隐私模式数据流
+```
+SettingsPanel (UI)
+    ↓ setTranslationMode()
+translation-store (状态)
+    ↓ 
+window.electron.privacy.setMode()
+    ↓
+主进程 IPC (electron/main.js)
+    ↓
+store.set("privacyMode", mode)
+```
+
+### 快捷键数据流
+```
+快捷键编辑器 (UI)
+    ↓ updateSetting()
+settings.shortcuts (本地状态)
+    ↓ 
+window.electron.shortcuts.update()
+    ↓
+主进程 globalShortcut.register()
+    ↓
+store.set("settings.shortcuts", ...)
+```

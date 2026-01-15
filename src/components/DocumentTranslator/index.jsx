@@ -23,7 +23,7 @@ import {
 } from '../../utils/document-parser.js';
 import translationService from '../../services/translation.js';
 import useTranslationStore from '../../stores/translation-store';
-import '../../styles/components/DocumentTranslator.css';
+import './styles.css';
 
 // 段落状态
 const STATUS = {

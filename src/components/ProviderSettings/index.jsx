@@ -1,4 +1,4 @@
-// src/components/ProviderSettings.jsx
+// src/components/ProviderSettings/index.jsx
 // 翻译源设置组件 - 分组卡片风格
 // M-V-S-P 架构：View 层，只负责展示和用户交互
 
@@ -8,8 +8,9 @@ import {
   RefreshCw, Eye, EyeOff, ExternalLink, GripVertical,
   Zap, Globe
 } from 'lucide-react';
-import { getAllProviderMetadata } from '../providers/registry.js';
-import translationService from '../services/translation.js';
+import { getAllProviderMetadata } from '../../providers/registry.js';
+import translationService from '../../services/translation.js';
+import './styles.css';
 
 // ========== 安全存储 ==========
 const secureStorage = {

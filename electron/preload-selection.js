@@ -27,8 +27,8 @@ contextBridge.exposeInMainWorld("electron", {
   
   // 添加 store 访问，让翻译服务可以读取配置
   store: {
-    get: (key) => ipcRenderer.invoke("store:get", key),
-    set: (key, value) => ipcRenderer.invoke("store:set", key, value),
+    get: (key) => ipcRenderer.invoke("store-get", key),
+    set: (key, value) => ipcRenderer.invoke("store-set", key, value),
   },
   
   // 添加 secureStorage 访问，让翻译服务可以读取加密的 API keys

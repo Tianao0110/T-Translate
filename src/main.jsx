@@ -97,15 +97,16 @@ if (process.env.NODE_ENV === 'development') {
     };
   }
 
-  // 监控长任务
+  // 监控长任务（仅报告超过 200ms 的任务，避免干扰）
   if ('PerformanceObserver' in window) {
     const observer = new PerformanceObserver((list) => {
       for (const entry of list.getEntries()) {
-        if (entry.duration > 50) {
+        // 只报告超过 200ms 的任务（正常 React 渲染可能需要 50-100ms）
+        if (entry.duration > 200) {
           console.warn('Long Task detected:', {
             name: entry.name,
-            duration: entry.duration,
-            startTime: entry.startTime
+            duration: Math.round(entry.duration),
+            startTime: Math.round(entry.startTime)
           });
         }
       }
@@ -114,7 +115,7 @@ if (process.env.NODE_ENV === 'development') {
     try {
       observer.observe({ entryTypes: ['longtask'] });
     } catch (e) {
-      console.log('LongTask monitoring not supported');
+      // LongTask API 不支持，静默忽略
     }
   }
 }

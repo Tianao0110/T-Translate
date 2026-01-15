@@ -1,13 +1,15 @@
 // src/components/GlassTranslator/index.jsx
 // 玻璃翻译窗口 - 纯 UI 组件
 // 所有业务逻辑已移至 services/pipeline.js
+//
+// 修复：loadSettings 现在会同步主窗口的目标语言
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Camera, Film, Monitor, X, Loader2, AlertCircle, ChevronDown, GripHorizontal } from 'lucide-react';
 import useSessionStore, { STATUS } from '../../stores/session.js';
 import useConfigStore from '../../stores/config.js';
 import pipeline from '../../services/pipeline.js';
-import '../../styles/glass.css';
+import './styles.css';
 
 /**
  * 玻璃翻译窗口组件
@@ -35,6 +37,10 @@ const GlassTranslator = () => {
     lockTargetLang,
     ocrEngine,
     setGlassOpacity,
+    setTargetLanguage,  // ← 新增：用于同步目标语言
+    setSourceLanguage,  // ← 新增：用于同步源语言
+    setLockTargetLang,  // ← 新增：用于同步锁定设置
+    setOcrEngine,       // ← 新增：用于同步 OCR 引擎
   } = useConfigStore();
 
   // ========== 纯 UI 状态 ==========
@@ -97,13 +103,39 @@ const GlassTranslator = () => {
     }
   }, [translatedText, currSubtitle]);
 
-  // ========== 加载设置 ==========
+  // ========== 加载设置（修复版）==========
   const loadSettings = async () => {
     try {
       const settings = await window.electron?.glass?.getSettings?.();
       if (settings) {
-        if (settings.opacity !== undefined) setGlassOpacity(settings.opacity);
-        // 其他设置已在 configStore 中管理
+        console.log('[Glass] Loaded settings from main:', settings);
+        
+        // 同步透明度
+        if (settings.opacity !== undefined) {
+          setGlassOpacity(settings.opacity);
+        }
+        
+        // ========== 修复：同步目标语言 ==========
+        if (settings.targetLanguage) {
+          console.log('[Glass] Syncing targetLanguage:', settings.targetLanguage);
+          setTargetLanguage(settings.targetLanguage);
+        }
+        
+        // 同步源语言
+        if (settings.sourceLanguage) {
+          setSourceLanguage(settings.sourceLanguage);
+        }
+        
+        // 同步锁定目标语言设置
+        if (settings.lockTargetLang !== undefined) {
+          setLockTargetLang(settings.lockTargetLang);
+        }
+        
+        // 同步 OCR 引擎
+        if (settings.ocrEngine || settings.globalOcrEngine) {
+          setOcrEngine(settings.ocrEngine || settings.globalOcrEngine);
+        }
+        // ========== 修复结束 ==========
       }
     } catch (error) {
       console.error('[Glass] Load settings failed:', error);

@@ -7,12 +7,12 @@ import {
   Tag, Hash, MoreVertical, GripVertical,
   Check, Palette, RotateCcw, Bookmark, Sparkles, RefreshCw, BookOpen
 } from 'lucide-react';
-import useTranslationStore from '../stores/translation-store';
-import translationService from '../services/translation.js';
+import useTranslationStore from '../../stores/translation-store';
+import translationService from '../../services/translation.js';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/zh-cn';
-import '../styles/components/FavoritesPanel.css';
+import './styles.css';
 
 dayjs.extend(relativeTime);
 dayjs.locale('zh-cn');

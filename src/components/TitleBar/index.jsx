@@ -1,7 +1,7 @@
 // src/components/TitleBar.jsx
 import React from 'react';
 import { Minus, Square, X } from 'lucide-react';
-import '../styles/components/TitleBar.css'; // 我们稍后会创建这个简单的 CSS
+import './styles.css'; // 我们稍后会创建这个简单的 CSS
 
 const TitleBar = () => {
   // 安全地调用 Electron API

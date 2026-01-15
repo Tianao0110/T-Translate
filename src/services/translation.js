@@ -1,17 +1,18 @@
 // src/services/translation.js
-// 翻译服务 - Service 层核心
+// 翻译服务 - Service 层核心（重构版）
 //
 // 职责：
-// - 翻译调度（选择 Provider、Fallback）
-// - 流式翻译封装
-// - 模式管理（normal / subtitle）
-// - 初始化配置加载
-// - 隐私模式检查（离线模式下只允许本地翻译源）
+// - 翻译统一入口（门面模式）
+// - 预处理（免译名单/正则保护）
+// - 两级缓存（L1 内存 + L2 持久化）
+// - 模板系统
+// - Provider 调度与 Fallback
+// - 后处理（恢复保护内容）
+// - 隐私模式检查
 //
-// 不负责：
-// - 缓存管理（独立模块）
-// - 历史记录（Store 层）
-// - UI 状态（Store 层）
+// 调用关系：
+// UI Components → Store → MainTranslation → TranslationService → Providers
+//                         Pipeline ────────────↗
 
 import {
   getProvider,
@@ -25,6 +26,9 @@ import {
 } from '../providers/registry.js';
 
 import { isProviderAllowed } from '../config/privacy-modes.js';
+import { getEnabledFilters, DEFAULT_FILTERS } from '../config/filters.js';
+import { getSystemPrompt, LANGUAGE_NAMES } from '../config/templates.js';
+import translationCache from './cache.js';
 
 // ========== 安全存储访问 ==========
 
@@ -54,6 +58,21 @@ class TranslationService {
     this._userPriority = null;  // 用户自定义优先级
     this._failureCount = {};    // 翻译源连续失败计数 { providerId: count }
     this._skipThreshold = 3;    // 连续失败多少次后跳过
+    
+    // ========== 新增：预处理过滤器 ==========
+    this._filters = [];
+    this._filtersInitialized = false;
+    
+    // ========== 新增：L1 内存缓存 ==========
+    this._l1Cache = new Map();
+    this._l1MaxSize = 100;  // 内存缓存最大条数
+    
+    // ========== 新增：缓存统计 ==========
+    this._cacheStats = {
+      l1Hits: 0,
+      l2Hits: 0,
+      misses: 0,
+    };
   }
 
   // ========== 初始化 ==========
@@ -73,7 +92,6 @@ class TranslationService {
       
       // 优先使用传入的 settings
       if (settings?.providers) {
-        // 新格式：{ providers: { list, configs } }
         providerList = settings.providers.list;
         providerConfigs = settings.providers.configs;
         console.log('[TranslationService] Loaded from passed settings');
@@ -93,14 +111,11 @@ class TranslationService {
       if (!providerConfigs && window.electron?.store) {
         const saved = await window.electron.store.get('settings');
         
-        // 兼容两种格式
         if (saved?.translation?.providers) {
-          // 新格式：settings.translation.providers (数组)
           providerList = saved.translation.providers;
           providerConfigs = await this._decryptConfigs(saved.translation.providerConfigs || {});
           console.log('[TranslationService] Loaded from store (new format)');
         } else if (saved?.providers?.list) {
-          // 旧格式：settings.providers.list
           providerList = saved.providers.list;
           providerConfigs = await this._decryptConfigs(saved.providers.configs || {});
           console.log('[TranslationService] Loaded from store (old format)');
@@ -114,27 +129,56 @@ class TranslationService {
       }
       
       if (providerConfigs) {
-        // 初始化 Registry 的配置
         initConfigs(providerConfigs);
       }
       
       if (providerList) {
-        // 提取用户优先级（只包含启用的）
         this._userPriority = this._extractPriority(providerList);
         console.log('[TranslationService] User priority:', this._userPriority);
       }
+      
+      // 初始化过滤器
+      this._initFilters();
       
       this._initialized = true;
       console.log('[TranslationService] Initialized successfully');
     } catch (error) {
       console.error('[TranslationService] Init failed:', error);
-      this._initialized = true; // 避免重复尝试
+      this._initialized = true;
     }
   }
 
   /**
+   * 初始化免译过滤器
+   */
+  _initFilters() {
+    if (this._filtersInitialized) return;
+    
+    // 加载用户自定义过滤器
+    let userFilters = [];
+    try {
+      const saved = localStorage.getItem('translation.customFilters');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // 重新编译正则表达式
+        userFilters = parsed.map(f => ({
+          ...f,
+          pattern: new RegExp(f.patternStr || f.pattern.source, 'g'),
+        }));
+      }
+    } catch (e) {
+      console.warn('[TranslationService] Failed to load custom filters:', e);
+    }
+    
+    // 合并默认和用户过滤器
+    this._filters = getEnabledFilters(userFilters);
+    this._filtersInitialized = true;
+    
+    console.log('[TranslationService] Filters initialized:', this._filters.map(f => f.name));
+  }
+
+  /**
    * 解密配置中的敏感字段
-   * 对于所有 provider，尝试从 secure storage 恢复加密字段
    */
   async _decryptConfigs(configs) {
     const { getAllProviderMetadata } = await import('../providers/registry.js');
@@ -145,11 +189,9 @@ class TranslationService {
       const providerId = meta.id;
       decrypted[providerId] = { ...(configs[providerId] || {}) };
       
-      // 检查每个加密字段
       if (meta.configSchema) {
         for (const [key, field] of Object.entries(meta.configSchema)) {
           if (field.encrypted) {
-            // 如果值是占位符或者为空，尝试从 secure storage 读取
             const currentValue = decrypted[providerId][key];
             if (!currentValue || currentValue === '***encrypted***') {
               const stored = await secureStorage.get(`provider_${providerId}_${key}`);
@@ -181,14 +223,214 @@ class TranslationService {
    */
   async reload(settings) {
     this._initialized = false;
-    this._failureCount = {};  // 重置失败计数
+    this._failureCount = {};
+    this._filtersInitialized = false;
     await this.init(settings);
   }
 
+  // ========== 预处理/后处理（免译名单）==========
+
   /**
-   * 重置失败计数器
-   * 用于手动重置所有翻译源的失败状态
+   * 预处理：提取需要保护的内容
+   * @param {string} text - 原始文本
+   * @returns {{ processed: string, protectedMap: Map }}
    */
+  _preProcess(text) {
+    if (!this._filters || this._filters.length === 0) {
+      return { processed: text, protectedMap: new Map() };
+    }
+    
+    const protectedMap = new Map();
+    let processed = text;
+    let index = 0;
+    
+    for (const filter of this._filters) {
+      if (!filter.enabled || !filter.pattern) continue;
+      
+      // 重置正则状态（因为有 g 标志）
+      filter.pattern.lastIndex = 0;
+      
+      processed = processed.replace(filter.pattern, (match) => {
+        // 生成唯一占位符
+        const placeholder = `⟦${filter.name}_${index++}⟧`;
+        protectedMap.set(placeholder, match);
+        return placeholder;
+      });
+    }
+    
+    if (protectedMap.size > 0) {
+      console.log(`[PreProcess] Protected ${protectedMap.size} items:`, 
+        Array.from(protectedMap.entries()).slice(0, 3));
+    }
+    
+    return { processed, protectedMap };
+  }
+
+  /**
+   * 后处理：恢复保护的内容
+   * @param {string} text - 翻译后的文本
+   * @param {Map} protectedMap - 保护映射
+   * @returns {string}
+   */
+  _postProcess(text, protectedMap) {
+    if (!protectedMap || protectedMap.size === 0) {
+      return text;
+    }
+    
+    let result = text;
+    for (const [placeholder, original] of protectedMap) {
+      // 使用 split/join 而不是 replaceAll，处理特殊字符
+      result = result.split(placeholder).join(original);
+    }
+    
+    return result;
+  }
+
+  // ========== 两级缓存 ==========
+
+  /**
+   * 生成缓存 Key
+   */
+  _getCacheKey(text, options) {
+    const { targetLang = 'zh', template = 'natural' } = options;
+    // 使用文本前100字符 + 长度 + 目标语言 + 模板
+    const textKey = text.length > 100 
+      ? text.substring(0, 100) + '_' + text.length 
+      : text;
+    return `${targetLang}-${template}-${textKey}`;
+  }
+
+  /**
+   * 检查缓存 (L1 → L2)
+   * @returns {{ value: any, source: string } | null}
+   */
+  _checkCache(key, options = {}) {
+    const { useCache = true, privacyMode = 'standard' } = options;
+    
+    if (!useCache) return null;
+    
+    // L1: 内存缓存（最快）
+    if (this._l1Cache.has(key)) {
+      this._cacheStats.l1Hits++;
+      console.log('[Cache] L1 HIT (memory)');
+      
+      // LRU: 移到末尾
+      const value = this._l1Cache.get(key);
+      this._l1Cache.delete(key);
+      this._l1Cache.set(key, value);
+      
+      return { value, source: 'l1' };
+    }
+    
+    // L2: 持久化缓存（非无痕模式）
+    if (privacyMode !== 'secure') {
+      const l2Result = translationCache.get(key);
+      if (l2Result) {
+        this._cacheStats.l2Hits++;
+        console.log('[Cache] L2 HIT (disk)');
+        
+        // 回填 L1（热点数据预热）
+        this._setL1Cache(key, l2Result);
+        
+        return { value: l2Result, source: 'l2' };
+      }
+    }
+    
+    this._cacheStats.misses++;
+    return null;
+  }
+
+  /**
+   * 写入缓存 (L1 + L2)
+   */
+  _saveCache(key, result, options = {}) {
+    const { useCache = true, privacyMode = 'standard' } = options;
+    
+    if (!useCache) return;
+    
+    // L1: 总是写入（保证当前会话快）
+    this._setL1Cache(key, result);
+    
+    // L2: 非无痕模式写入持久化
+    if (privacyMode !== 'secure') {
+      // 构造 L2 需要的结构
+      const cacheEntry = {
+        success: true,
+        translated: result.text || result,
+        from: result.from,
+        to: result.to,
+        timestamp: Date.now(),
+      };
+      translationCache.set(key, cacheEntry);
+    }
+  }
+
+  /**
+   * 设置 L1 缓存（带 LRU 淘汰）
+   */
+  _setL1Cache(key, value) {
+    // LRU: 超出限制时删除最早的
+    if (this._l1Cache.size >= this._l1MaxSize) {
+      const firstKey = this._l1Cache.keys().next().value;
+      this._l1Cache.delete(firstKey);
+    }
+    this._l1Cache.set(key, value);
+  }
+
+  /**
+   * 清空缓存
+   */
+  clearCache(level = 'all') {
+    if (level === 'l1' || level === 'all') {
+      this._l1Cache.clear();
+      console.log('[Cache] L1 cleared');
+    }
+    if (level === 'l2' || level === 'all') {
+      translationCache.clear();
+      console.log('[Cache] L2 cleared');
+    }
+    // 重置统计
+    this._cacheStats = { l1Hits: 0, l2Hits: 0, misses: 0 };
+  }
+
+  /**
+   * 获取缓存统计
+   */
+  getCacheStats() {
+    const total = this._cacheStats.l1Hits + this._cacheStats.l2Hits + this._cacheStats.misses;
+    return {
+      ...this._cacheStats,
+      l1Size: this._l1Cache.size,
+      l2Stats: translationCache.getStats(),
+      hitRate: total > 0 
+        ? ((this._cacheStats.l1Hits + this._cacheStats.l2Hits) / total * 100).toFixed(1) + '%'
+        : '0%',
+    };
+  }
+
+  // ========== 模式管理 ==========
+
+  setMode(mode) {
+    this._mode = mode;
+    console.log(`[TranslationService] Mode set to: ${mode}`);
+  }
+
+  getMode() {
+    return this._mode;
+  }
+
+  setPriority(priority) {
+    this._userPriority = priority;
+    console.log('[TranslationService] Priority set to:', priority);
+  }
+
+  getPriority() {
+    if (this._userPriority && this._userPriority.length > 0) {
+      return this._userPriority;
+    }
+    return DEFAULT_PRIORITY[this._mode] || DEFAULT_PRIORITY.normal;
+  }
+
   resetFailureCount(providerId = null) {
     if (providerId) {
       this._failureCount[providerId] = 0;
@@ -199,57 +441,17 @@ class TranslationService {
     }
   }
 
-  /**
-   * 获取失败计数状态
-   */
   getFailureStatus() {
     return { ...this._failureCount };
   }
 
-  // ========== 模式管理 ==========
+  // ========== 核心翻译（门面入口）==========
 
   /**
-   * 设置翻译模式
-   * @param {'normal'|'subtitle'} mode
-   */
-  setMode(mode) {
-    this._mode = mode;
-    console.log(`[TranslationService] Mode set to: ${mode}`);
-  }
-
-  /**
-   * 获取当前模式
-   */
-  getMode() {
-    return this._mode;
-  }
-
-  /**
-   * 设置用户优先级
-   * @param {string[]} priority - Provider ID 数组
-   */
-  setPriority(priority) {
-    this._userPriority = priority;
-    console.log('[TranslationService] Priority set to:', priority);
-  }
-
-  /**
-   * 获取当前优先级列表
-   */
-  getPriority() {
-    if (this._userPriority && this._userPriority.length > 0) {
-      return this._userPriority;
-    }
-    return DEFAULT_PRIORITY[this._mode] || DEFAULT_PRIORITY.normal;
-  }
-
-  // ========== 核心翻译 ==========
-
-  /**
-   * 翻译文本（带自动 Fallback）
+   * 翻译文本（统一入口）
    * @param {string} text - 要翻译的文本
    * @param {object} options - 选项
-   * @returns {Promise<{success: boolean, text?: string, error?: string, provider?: string}>}
+   * @returns {Promise<{success: boolean, text?: string, error?: string, provider?: string, fromCache?: boolean}>}
    */
   async translate(text, options = {}) {
     if (!this._initialized) {
@@ -259,14 +461,35 @@ class TranslationService {
     const {
       sourceLang = 'auto',
       targetLang = 'zh',
+      template = 'natural',
       mode = this._mode,
       enableFallback = true,
-      privacyMode = 'standard', // 隐私模式
+      privacyMode = 'standard',
+      useCache = true,
     } = options;
     
+    // ========== Phase 1: 预处理（免译名单）==========
+    const { processed, protectedMap } = this._preProcess(text);
+    
+    // ========== Phase 2: 检查缓存 ==========
+    const cacheKey = this._getCacheKey(processed, { targetLang, template });
+    const cached = this._checkCache(cacheKey, { useCache, privacyMode });
+    
+    if (cached) {
+      // 从缓存获取，需要后处理恢复保护内容
+      const cachedText = cached.value?.translated || cached.value?.text || cached.value;
+      return {
+        success: true,
+        text: this._postProcess(cachedText, protectedMap),
+        fromCache: true,
+        cacheSource: cached.source,
+      };
+    }
+    
+    // ========== Phase 3: 调用 Provider ==========
     const priority = this.getPriority();
     const tried = [];
-    let allSkipped = true;  // 是否所有翻译源都被跳过
+    let allSkipped = true;
     
     for (const id of priority) {
       // 检查隐私模式限制
@@ -283,7 +506,7 @@ class TranslationService {
         continue;
       }
       
-      allSkipped = false;  // 至少有一个翻译源没被跳过
+      allSkipped = false;
       
       const provider = getProvider(id);
       if (!provider) continue;
@@ -292,25 +515,49 @@ class TranslationService {
       
       try {
         console.log(`[TranslationService] Trying provider: ${id}`);
-        const result = await provider.translate(text, sourceLang, targetLang);
+        
+        // 获取模板 system prompt
+        const systemPrompt = getSystemPrompt(template, targetLang);
+        
+        // 调用 Provider
+        const result = await provider.translate(processed, sourceLang, targetLang, {
+          systemPrompt,
+          template,
+        });
         
         if (result.success) {
           // 成功：重置失败计数
           this._failureCount[id] = 0;
-          return { ...result, provider: id };
+          
+          // ========== Phase 4: 后处理 ==========
+          const finalText = this._postProcess(result.text, protectedMap);
+          
+          // ========== Phase 5: 写入缓存 ==========
+          this._saveCache(cacheKey, { 
+            text: result.text,  // 存原始结果（不含后处理）
+            from: sourceLang, 
+            to: targetLang 
+          }, { useCache, privacyMode });
+          
+          return {
+            success: true,
+            text: finalText,
+            provider: id,
+            fromCache: false,
+          };
         }
         
         // 失败：增加计数
         this._failureCount[id] = (this._failureCount[id] || 0) + 1;
-        console.warn(`[TranslationService] Provider ${id} failed (${this._failureCount[id]}/${this._skipThreshold}):`, result.error);
+        console.warn(`[TranslationService] Provider ${id} failed (${this._failureCount[id]}/${this._skipThreshold})`);
         
         if (!enableFallback) {
-          return { ...result, provider: id };
+          return { success: false, error: result.error, provider: id };
         }
+        
       } catch (error) {
-        // 异常：增加计数
         this._failureCount[id] = (this._failureCount[id] || 0) + 1;
-        console.error(`[TranslationService] Provider ${id} threw error (${this._failureCount[id]}/${this._skipThreshold}):`, error);
+        console.error(`[TranslationService] Provider ${id} error:`, error);
         
         if (!enableFallback) {
           return { success: false, error: error.message, provider: id };
@@ -322,221 +569,22 @@ class TranslationService {
     if (allSkipped && Object.keys(this._failureCount).length > 0) {
       console.log('[TranslationService] All providers skipped, resetting failure counts...');
       this._failureCount = {};
-      return this.translate(text, options);  // 递归重试
-    }
-    
-    // 离线模式特殊提示
-    if (privacyMode === 'offline' && tried.length === 0) {
-      return {
-        success: false,
-        error: '离线模式下仅支持本地 LLM 翻译，请确保已配置并启动本地服务',
-        provider: null,
-      };
+      return this.translate(text, options);
     }
     
     return {
       success: false,
       error: tried.length > 0 
         ? `所有翻译源均失败 (尝试了: ${tried.join(', ')})`
-        : '没有可用的翻译源，请先配置',
-      provider: null,
+        : '没有可用的翻译源',
     };
   }
 
   /**
-   * 批量翻译（将多段文本合并为一次请求）
-   * @param {string[]} texts - 要翻译的文本数组
-   * @param {object} options - 选项
-   * @returns {Promise<{success: boolean, results?: Array<{success: boolean, text?: string, error?: string}>, error?: string}>}
-   */
-  async translateBatch(texts, options = {}) {
-    if (!this._initialized) {
-      await this.init();
-    }
-    
-    if (!texts || texts.length === 0) {
-      return { success: false, error: '没有要翻译的文本' };
-    }
-    
-    // 如果只有一条，直接使用单条翻译
-    if (texts.length === 1) {
-      const result = await this.translate(texts[0], options);
-      return {
-        success: result.success,
-        results: [result],
-        provider: result.provider,
-      };
-    }
-    
-    const {
-      sourceLang = 'auto',
-      targetLang = 'zh',
-      glossary = [],  // 术语表 [{source: '原文', target: '译文'}]
-      maxBatchSize = 10,  // 单批最大段落数
-    } = options;
-    
-    // 分隔符（用于连接和拆分）
-    const SEPARATOR = '\n|||SPLIT|||\n';
-    
-    // 分批处理
-    const batches = [];
-    for (let i = 0; i < texts.length; i += maxBatchSize) {
-      batches.push(texts.slice(i, i + maxBatchSize));
-    }
-    
-    const allResults = [];
-    let lastProvider = null;
-    
-    for (const batch of batches) {
-      // 将批次文本用分隔符连接
-      const combinedText = batch.join(SEPARATOR);
-      
-      // 构造批量翻译 prompt
-      const batchPrompt = this._buildBatchPrompt(batch, targetLang, glossary, SEPARATOR);
-      
-      const priority = this.getPriority();
-      let batchSuccess = false;
-      
-      for (const id of priority) {
-        if (!isProviderConfigured(id)) continue;
-        if (this._failureCount[id] >= this._skipThreshold) continue;
-        
-        const provider = getProvider(id);
-        if (!provider) continue;
-        
-        try {
-          console.log(`[TranslationService] Batch translate with ${id}, ${batch.length} items`);
-          
-          // 使用 chat 方法发送批量翻译请求
-          let result;
-          if (typeof provider.chat === 'function') {
-            result = await provider.chat([
-              { role: 'system', content: batchPrompt.system },
-              { role: 'user', content: batchPrompt.user },
-            ]);
-          } else {
-            // 回退到普通翻译（每条单独翻译）
-            console.log(`[TranslationService] Provider ${id} no chat, falling back to single translate`);
-            for (const text of batch) {
-              const singleResult = await this.translate(text, { sourceLang, targetLang });
-              allResults.push(singleResult);
-            }
-            batchSuccess = true;
-            lastProvider = id;
-            break;
-          }
-          
-          if (result.success && result.content) {
-            // 解析批量翻译结果
-            const translations = this._parseBatchResult(result.content, batch.length, SEPARATOR);
-            
-            if (translations.length === batch.length) {
-              // 完美匹配
-              translations.forEach(text => {
-                allResults.push({ success: true, text });
-              });
-              this._failureCount[id] = 0;
-              batchSuccess = true;
-              lastProvider = id;
-              break;
-            } else {
-              // 数量不匹配，降级为单条翻译
-              console.warn(`[TranslationService] Batch result mismatch: expected ${batch.length}, got ${translations.length}`);
-              for (const text of batch) {
-                const singleResult = await this.translate(text, { sourceLang, targetLang });
-                allResults.push(singleResult);
-              }
-              batchSuccess = true;
-              lastProvider = id;
-              break;
-            }
-          }
-          
-          this._failureCount[id] = (this._failureCount[id] || 0) + 1;
-        } catch (error) {
-          console.error(`[TranslationService] Batch translate error with ${id}:`, error);
-          this._failureCount[id] = (this._failureCount[id] || 0) + 1;
-        }
-      }
-      
-      // 如果所有 provider 都失败，降级为单条翻译
-      if (!batchSuccess) {
-        console.log('[TranslationService] All batch providers failed, falling back to single translate');
-        for (const text of batch) {
-          const singleResult = await this.translate(text, { sourceLang, targetLang });
-          allResults.push(singleResult);
-        }
-      }
-    }
-    
-    return {
-      success: allResults.some(r => r.success),
-      results: allResults,
-      provider: lastProvider,
-    };
-  }
-
-  /**
-   * 构造批量翻译的 prompt
-   */
-  _buildBatchPrompt(texts, targetLang, glossary, separator) {
-    const targetName = {
-      'zh': '中文', 'en': 'English', 'ja': '日本語', 
-      'ko': '한국어', 'fr': 'Français', 'de': 'Deutsch',
-      'es': 'Español', 'ru': 'Русский',
-    }[targetLang] || targetLang;
-    
-    let systemPrompt = `You are a professional translator. Translate each paragraph to ${targetName}.
-
-IMPORTANT RULES:
-1. Each input paragraph is separated by "${separator.trim()}"
-2. Output ONLY the translations, separated by the same separator "${separator.trim()}"
-3. Maintain the exact same number of paragraphs as input (${texts.length} paragraphs)
-4. Do not add explanations, numbering, or any extra text
-5. Preserve the original formatting and line breaks within each paragraph`;
-
-    // 术语表注入
-    if (glossary && glossary.length > 0) {
-      systemPrompt += `\n\nGLOSSARY (use these translations for specific terms):`;
-      glossary.forEach(term => {
-        systemPrompt += `\n- "${term.source}" → "${term.target}"`;
-      });
-    }
-
-    const userPrompt = texts.join(separator);
-    
-    return { system: systemPrompt, user: userPrompt };
-  }
-
-  /**
-   * 解析批量翻译结果
-   */
-  _parseBatchResult(content, expectedCount, separator) {
-    // 尝试按分隔符拆分
-    let results = content.split(separator.trim()).map(s => s.trim()).filter(s => s.length > 0);
-    
-    // 如果分隔符拆分不成功，尝试其他方式
-    if (results.length !== expectedCount) {
-      // 尝试按换行+数字编号拆分
-      const numberedPattern = /^\d+[\.\)]\s*/gm;
-      if (numberedPattern.test(content)) {
-        results = content.split(/\n\d+[\.\)]\s*/).filter(s => s.trim().length > 0);
-      }
-    }
-    
-    // 如果还是不匹配，尝试按双换行拆分
-    if (results.length !== expectedCount) {
-      results = content.split(/\n\n+/).map(s => s.trim()).filter(s => s.length > 0);
-    }
-    
-    return results;
-  }
-
-  /**
-   * 流式翻译（带自动 Fallback）
+   * 流式翻译
    * @param {string} text - 要翻译的文本
    * @param {object} options - 选项
-   * @param {function} onChunk - 流式回调
+   * @param {function} onChunk - 流式回调 (chunk) => void
    */
   async translateStream(text, options = {}, onChunk) {
     if (!this._initialized) {
@@ -546,19 +594,46 @@ IMPORTANT RULES:
     const {
       sourceLang = 'auto',
       targetLang = 'zh',
+      template = 'natural',
       mode = this._mode,
       enableFallback = true,
+      privacyMode = 'standard',
+      useCache = true,
     } = options;
     
+    // 预处理
+    const { processed, protectedMap } = this._preProcess(text);
+    
+    // 检查缓存（流式也可以用缓存，直接返回完整结果）
+    const cacheKey = this._getCacheKey(processed, { targetLang, template });
+    const cached = this._checkCache(cacheKey, { useCache, privacyMode });
+    
+    if (cached) {
+      const cachedText = cached.value?.translated || cached.value?.text || cached.value;
+      const finalText = this._postProcess(cachedText, protectedMap);
+      
+      // 模拟流式输出缓存结果
+      if (onChunk) {
+        onChunk(finalText);
+      }
+      
+      return {
+        success: true,
+        text: finalText,
+        fromCache: true,
+      };
+    }
+    
+    // 找支持流式的 Provider
     const priority = this.getPriority();
     let allSkipped = true;
     
     for (const id of priority) {
+      if (!isProviderAllowed(privacyMode, id)) continue;
       if (!isProviderConfigured(id)) continue;
       
-      // 检查是否因连续失败而临时跳过
       if (this._failureCount[id] >= this._skipThreshold) {
-        console.log(`[TranslationService] Skipping stream ${id} (failed ${this._failureCount[id]} times)`);
+        console.log(`[TranslationService] Skipping stream ${id}`);
         continue;
       }
       
@@ -569,25 +644,89 @@ IMPORTANT RULES:
       
       try {
         console.log(`[TranslationService] Trying stream provider: ${id}`);
-        const result = await provider.translateStream(text, sourceLang, targetLang, onChunk);
         
-        if (result.success) {
-          // 成功：重置失败计数
-          this._failureCount[id] = 0;
-          return { ...result, provider: id };
+        const systemPrompt = getSystemPrompt(template, targetLang);
+        
+        // 检查 Provider 是否支持真流式
+        if (provider.supportsStreaming && typeof provider.translateStream === 'function') {
+          // 真流式
+          let fullText = '';
+          
+          const result = await provider.translateStream(
+            processed,
+            sourceLang,
+            targetLang,
+            (chunk) => {
+              fullText += chunk;
+              if (onChunk) {
+                // 实时后处理（可能有部分占位符）
+                onChunk(this._postProcess(fullText, protectedMap));
+              }
+            },
+            { systemPrompt, template }
+          );
+          
+          if (result.success) {
+            this._failureCount[id] = 0;
+            
+            const finalText = this._postProcess(result.text || fullText, protectedMap);
+            
+            // 写入缓存
+            this._saveCache(cacheKey, { 
+              text: result.text || fullText, 
+              from: sourceLang, 
+              to: targetLang 
+            }, { useCache, privacyMode });
+            
+            return {
+              success: true,
+              text: finalText,
+              provider: id,
+              fromCache: false,
+            };
+          }
+        } else {
+          // 不支持真流式，回退到普通翻译
+          const result = await provider.translate(processed, sourceLang, targetLang, {
+            systemPrompt,
+            template,
+          });
+          
+          if (result.success) {
+            this._failureCount[id] = 0;
+            
+            const finalText = this._postProcess(result.text, protectedMap);
+            
+            // 一次性返回
+            if (onChunk) {
+              onChunk(finalText);
+            }
+            
+            this._saveCache(cacheKey, { 
+              text: result.text, 
+              from: sourceLang, 
+              to: targetLang 
+            }, { useCache, privacyMode });
+            
+            return {
+              success: true,
+              text: finalText,
+              provider: id,
+              fromCache: false,
+            };
+          }
         }
         
-        // 失败：增加计数
+        // 失败
         this._failureCount[id] = (this._failureCount[id] || 0) + 1;
-        console.warn(`[TranslationService] Stream provider ${id} failed (${this._failureCount[id]}/${this._skipThreshold})`);
         
         if (!enableFallback) {
-          return { ...result, provider: id };
+          return { success: false, error: 'Translation failed', provider: id };
         }
+        
       } catch (error) {
-        // 异常：增加计数
         this._failureCount[id] = (this._failureCount[id] || 0) + 1;
-        console.error(`[TranslationService] Stream provider ${id} error (${this._failureCount[id]}/${this._skipThreshold}):`, error);
+        console.error(`[TranslationService] Stream provider ${id} error:`, error);
         
         if (!enableFallback) {
           return { success: false, error: error.message, provider: id };
@@ -595,29 +734,27 @@ IMPORTANT RULES:
       }
     }
     
-    // 如果所有翻译源都被跳过，重置计数并重试
+    // 重置并重试
     if (allSkipped && Object.keys(this._failureCount).length > 0) {
-      console.log('[TranslationService] All stream providers skipped, resetting failure counts...');
+      console.log('[TranslationService] All stream providers skipped, resetting...');
       this._failureCount = {};
       return this.translateStream(text, options, onChunk);
     }
     
-    return { success: false, error: '所有翻译源均失败' };
+    return { success: false, error: '没有可用的翻译源' };
   }
 
   // ========== 辅助方法 ==========
 
   /**
-   * 通用聊天完成（用于非翻译场景，如 AI 分析、风格改写）
-   * @param {Array} messages - OpenAI 格式的消息数组
-   * @param {object} options - 选项
+   * 通用聊天完成（用于 AI 分析、风格改写等）
    */
   async chatCompletion(messages, options = {}) {
     if (!this._initialized) {
       await this.init();
     }
     
-    // 获取 local-llm provider（优先用于 chat）
+    // 获取 local-llm provider
     const provider = getProvider('local-llm');
     
     if (provider && typeof provider.chat === 'function') {
@@ -635,13 +772,9 @@ IMPORTANT RULES:
     // 检测目标语言
     let targetLang = 'zh';
     if (systemMessage?.content) {
-      if (/English|英文/i.test(systemMessage.content)) {
-        targetLang = 'en';
-      } else if (/日本語|日文/i.test(systemMessage.content)) {
-        targetLang = 'ja';
-      } else if (/한국어|韩文/i.test(systemMessage.content)) {
-        targetLang = 'ko';
-      }
+      if (/English|英文/i.test(systemMessage.content)) targetLang = 'en';
+      else if (/日本語|日文/i.test(systemMessage.content)) targetLang = 'ja';
+      else if (/한국어|韩文/i.test(systemMessage.content)) targetLang = 'ko';
     }
     
     const result = await this.translate(userMessage.content, {
@@ -655,14 +788,13 @@ IMPORTANT RULES:
         content: result.text,
         provider: result.provider,
       };
-    } else {
-      return { success: false, error: result.error || '翻译失败' };
     }
+    
+    return { success: false, error: result.error || '翻译失败' };
   }
 
   /**
    * 测试指定翻译源连接
-   * @param {string} providerId - Provider ID
    */
   async testProvider(providerId) {
     const provider = getProvider(providerId);
@@ -676,31 +808,6 @@ IMPORTANT RULES:
     }
     
     return provider.testConnection();
-  }
-
-  /**
-   * 使用自定义配置测试翻译源连接
-   * 用于设置面板中测试未保存的配置
-   * @param {string} providerId - Provider ID
-   * @param {object} config - 自定义配置
-   */
-  async testProviderWithConfig(providerId, config) {
-    const { createProvider } = await import('../providers/registry.js');
-    
-    try {
-      const provider = createProvider(providerId, config);
-      if (!provider) {
-        return { success: false, message: '翻译源不存在' };
-      }
-      
-      if (typeof provider.testConnection !== 'function') {
-        return { success: false, message: '该翻译源不支持连接测试' };
-      }
-      
-      return await provider.testConnection();
-    } catch (error) {
-      return { success: false, message: error.message || '测试失败' };
-    }
   }
 
   /**
@@ -741,25 +848,33 @@ IMPORTANT RULES:
     return null;
   }
 
-  /**
-   * 获取所有翻译源状态
-   */
   getProvidersStatus() {
     return getAllProvidersStatus();
   }
 
-  /**
-   * 更新翻译源配置
-   */
   updateProviderConfig(providerId, config) {
     updateProviderConfig(providerId, config);
   }
 
-  /**
-   * 检查是否已初始化
-   */
   get initialized() {
     return this._initialized;
+  }
+
+  /**
+   * 注册自定义过滤器
+   */
+  registerFilter(filter) {
+    if (filter && filter.name && filter.pattern) {
+      this._filters.push(filter);
+      console.log(`[TranslationService] Filter registered: ${filter.name}`);
+    }
+  }
+
+  /**
+   * 获取当前过滤器列表
+   */
+  getFilters() {
+    return [...this._filters];
   }
 }
 

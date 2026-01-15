@@ -1,0 +1,368 @@
+// src/components/SettingsPanel/constants.js
+// SettingsPanel 共享常量
+
+import {
+  Globe, Shield, Zap, Moon, Sun,
+  Info, Wifi, Eye, Lock,
+  Code2, Palette, Layers, MousePointer, Server,
+  FileText
+} from 'lucide-react';
+
+/**
+ * 默认配置
+ */
+export const defaultConfig = {
+  llm: { endpoint: 'http://localhost:1234/v1', timeout: 60000 },
+  translation: { sourceLanguage: 'auto', targetLanguage: 'zh', batch: { maxLength: 5000 } },
+  ocr: { defaultEngine: 'llm-vision', windowsLanguage: 'zh-Hans' },
+  ui: { theme: 'light', fontSize: 14 },
+  logging: { level: 'info' },
+  shortcuts: {
+    translate: 'Ctrl+Enter',
+    swapLanguages: 'Ctrl+L',
+    clear: 'Ctrl+Shift+C',
+    paste: 'Ctrl+V',
+    copy: 'Ctrl+C',
+    screenshot: 'Alt+Q',
+    toggleWindow: 'Ctrl+Shift+W',
+    glassWindow: 'Ctrl+Alt+G',
+    selectionTranslate: 'Ctrl+Shift+T',
+  },
+  dev: { debugMode: false },
+  storage: { cache: { maxSize: 100 }, history: { maxItems: 1000 } }
+};
+
+/**
+ * 隐私模式配置
+ */
+export const PRIVACY_MODES = {
+  standard: {
+    id: 'standard',
+    name: '标准模式',
+    icon: 'Zap',
+    color: '#3b82f6',
+    description: '功能全开，自动保存历史记录',
+    features: {
+      saveHistory: true,
+      useCache: true,
+      onlineApi: true,
+      analytics: true,
+      autoSave: true,
+      selectionTranslate: true,
+      glassWindow: true,
+      documentTranslate: true,
+      exportData: true,
+    },
+    allowedProviders: null,
+    allowedOcrEngines: null,
+  },
+  secure: {
+    id: 'secure',
+    name: '无痕模式',
+    icon: 'Shield',
+    color: '#f59e0b',
+    description: '不保存任何记录，关闭窗口即清除',
+    features: {
+      saveHistory: false,
+      useCache: false,
+      onlineApi: true,
+      analytics: false,
+      autoSave: false,
+      selectionTranslate: true,
+      glassWindow: true,
+      documentTranslate: true,
+      exportData: false,
+    },
+    allowedProviders: null,
+    allowedOcrEngines: null,
+  },
+  offline: {
+    id: 'offline',
+    name: '离线模式',
+    icon: 'Lock',
+    color: '#10b981',
+    description: '完全离线，不发送任何网络请求',
+    features: {
+      saveHistory: true,
+      useCache: true,
+      onlineApi: false,
+      analytics: true,
+      autoSave: true,
+      selectionTranslate: true,
+      glassWindow: true,
+      documentTranslate: true,
+      exportData: true,
+    },
+    allowedProviders: ['local-llm'],
+    allowedOcrEngines: ['llm-vision', 'rapid-ocr', 'windows-ocr'],
+    disabledServices: ['openai', 'deepl', 'gemini', 'deepseek', 'google-translate', 'ocr-space', 'google-vision', 'azure-ocr', 'baidu-ocr'],
+  }
+};
+
+/**
+ * 获取当前模式的功能配置
+ */
+export const getModeFeatures = (mode) => {
+  return PRIVACY_MODES[mode]?.features || PRIVACY_MODES.standard.features;
+};
+
+/**
+ * 检查某功能在当前模式下是否可用
+ */
+export const isFeatureEnabled = (mode, featureName) => {
+  const features = getModeFeatures(mode);
+  return features[featureName] !== false;
+};
+
+/**
+ * 检查某翻译源在当前模式下是否可用
+ */
+export const isProviderAllowed = (mode, providerId) => {
+  const modeConfig = PRIVACY_MODES[mode];
+  if (!modeConfig?.allowedProviders) return true;
+  return modeConfig.allowedProviders.includes(providerId);
+};
+
+/**
+ * 快捷键标签映射
+ */
+export const SHORTCUT_LABELS = {
+  translate: '执行翻译',
+  swapLanguages: '切换语言',
+  clear: '清空内容',
+  paste: '粘贴文本',
+  copy: '复制结果',
+  screenshot: '📷 截图翻译',
+  toggleWindow: '🪟 显示/隐藏窗口',
+  glassWindow: '🔮 玻璃窗口',
+  selectionTranslate: '✏️ 划词翻译开关',
+};
+
+/**
+ * 全局快捷键列表
+ */
+export const GLOBAL_SHORTCUT_KEYS = ['screenshot', 'toggleWindow', 'glassWindow', 'selectionTranslate'];
+
+/**
+ * 导航项配置
+ */
+export const NAV_ITEMS = [
+  { id: 'connection', icon: Wifi, label: 'LM Studio', group: '连接', keywords: ['连接', '端点', 'api', 'endpoint', 'lmstudio', '超时', 'timeout'] },
+  { id: 'providers', icon: Server, label: '翻译源', group: '连接', keywords: ['翻译源', 'provider', 'openai', 'deepl', 'gemini', 'deepseek', '本地', 'api'] },
+  { id: 'translation', icon: Globe, label: '翻译设置', group: '翻译', keywords: ['翻译', '语言', '源语言', '目标语言', '自动', 'stream', '流式'] },
+  { id: 'document', icon: FileText, label: '文档翻译', group: '翻译', keywords: ['文档', 'pdf', 'docx', 'epub', 'srt', '字幕', '批量'] },
+  { id: 'selection', icon: MousePointer, label: '划词翻译', group: '翻译', keywords: ['划词', '选中', '鼠标', '触发', '按钮'] },
+  { id: 'glassWindow', icon: Layers, label: '玻璃窗口', group: '翻译', keywords: ['玻璃', '透明', '窗口', '置顶', 'glass'] },
+  { id: 'ocr', icon: Eye, label: 'OCR 识别', group: '系统', keywords: ['ocr', '识别', '截图', '图片', '文字识别', 'rapidocr', 'llm'] },
+  { id: 'interface', icon: Palette, label: '界面外观', group: '系统', keywords: ['界面', '主题', '深色', '浅色', '字体', '外观'] },
+  { id: 'privacy', icon: Shield, label: '隐私模式', group: '系统', keywords: ['隐私', '安全', '模式', '历史', '记录'] },
+  { id: 'about', icon: Info, label: '关于', group: '系统', keywords: ['关于', '版本', '信息', 'about'] },
+];
+
+/**
+ * 默认设置状态
+ */
+export const DEFAULT_SETTINGS = {
+  // LLM 连接 (嵌套结构)
+  connection: {
+    endpoint: defaultConfig.llm.endpoint,
+    timeout: defaultConfig.llm.timeout,
+    model: '',
+  },
+  
+  // 翻译设置 (嵌套结构)
+  translation: {
+    defaultSourceLang: defaultConfig.translation.sourceLanguage,
+    defaultTargetLang: defaultConfig.translation.targetLanguage,
+    providers: [],
+    providerConfigs: {},
+    subtitleProvider: null,
+  },
+  
+  // 翻译设置 (顶层兼容)
+  sourceLanguage: defaultConfig.translation.sourceLanguage,
+  targetLanguage: defaultConfig.translation.targetLanguage,
+  autoTranslate: false,
+  streamOutput: true,
+  contextMemory: false,
+  termCorrection: true,
+  
+  // 文档翻译
+  document: {
+    preserveFormatting: true,
+    translateHeaders: true,
+    translateFooters: false,
+    translateCaptions: true,
+    maxParagraphLength: 1000,
+    batchSize: 5,
+    retryOnError: true,
+    outputFormat: 'same',
+    showProgress: true,
+  },
+  
+  // 玻璃窗口
+  glass: {
+    width: 400,
+    height: 300,
+    opacity: 0.95,
+    alwaysOnTop: true,
+    autoTranslate: true,
+    fontSize: 14,
+    showSourceText: false,
+  },
+  
+  // 划词翻译
+  selection: {
+    enabled: false,
+    showButton: true,
+    autoTranslate: false,
+    buttonPosition: 'cursor',
+    buttonDelay: 0,
+    minDistance: 10,
+    minDuration: 150,
+    maxDuration: 5000,
+  },
+  
+  // 外观
+  theme: defaultConfig.ui.theme,
+  fontSize: defaultConfig.ui.fontSize,
+  
+  // 快捷键
+  shortcuts: { ...defaultConfig.shortcuts },
+  
+  // 隐私模式
+  privacyMode: 'standard',
+  
+  // 其他
+  saveHistory: true,
+  maxHistory: defaultConfig.storage.history.maxItems,
+  cacheEnabled: true,
+  maxCache: defaultConfig.storage.cache.maxSize,
+  
+  // OCR 设置
+  ocr: {
+    engine: defaultConfig.ocr.defaultEngine,
+    language: defaultConfig.ocr.windowsLanguage,
+    preprocess: true,
+    autoDetect: true,
+    confidence: 0.6,
+  },
+  
+  // 开发选项
+  debugMode: defaultConfig.dev.debugMode,
+};
+
+/**
+ * 语言选项
+ */
+export const LANGUAGE_OPTIONS = [
+  { value: 'auto', label: '🔍 自动检测' },
+  { value: 'zh', label: '🇨🇳 中文' },
+  { value: 'zh-TW', label: '🇹🇼 繁体中文' },
+  { value: 'en', label: '🇺🇸 英语' },
+  { value: 'ja', label: '🇯🇵 日语' },
+  { value: 'ko', label: '🇰🇷 韩语' },
+  { value: 'fr', label: '🇫🇷 法语' },
+  { value: 'de', label: '🇩🇪 德语' },
+  { value: 'es', label: '🇪🇸 西班牙语' },
+  { value: 'ru', label: '🇷🇺 俄语' },
+  { value: 'pt', label: '🇵🇹 葡萄牙语' },
+  { value: 'it', label: '🇮🇹 意大利语' },
+  { value: 'ar', label: '🇸🇦 阿拉伯语' },
+  { value: 'th', label: '🇹🇭 泰语' },
+  { value: 'vi', label: '🇻🇳 越南语' },
+];
+
+/**
+ * 迁移旧设置（合并多种格式迁移）
+ */
+export const migrateOldSettings = (savedSettings) => {
+  if (!savedSettings) return null;
+  
+  // 深拷贝并与默认设置合并，确保所有嵌套对象存在
+  let migrated = {
+    ...DEFAULT_SETTINGS,
+    ...savedSettings,
+    // 确保嵌套对象正确合并
+    connection: {
+      ...DEFAULT_SETTINGS.connection,
+      ...(savedSettings.connection || {}),
+    },
+    translation: {
+      ...DEFAULT_SETTINGS.translation,
+      ...(savedSettings.translation || {}),
+    },
+    document: {
+      ...DEFAULT_SETTINGS.document,
+      ...(savedSettings.document || {}),
+    },
+    glass: {
+      ...DEFAULT_SETTINGS.glass,
+      ...(savedSettings.glass || {}),
+    },
+    selection: {
+      ...DEFAULT_SETTINGS.selection,
+      ...(savedSettings.selection || {}),
+    },
+    ocr: {
+      ...DEFAULT_SETTINGS.ocr,
+      ...(savedSettings.ocr || {}),
+    },
+    shortcuts: {
+      ...DEFAULT_SETTINGS.shortcuts,
+      ...(savedSettings.shortcuts || {}),
+    },
+  };
+  
+  // 迁移旧格式：扁平的 endpoint/timeout -> connection 对象
+  if (savedSettings.endpoint && !savedSettings.connection) {
+    migrated.connection = {
+      endpoint: savedSettings.endpoint,
+      timeout: savedSettings.timeout || DEFAULT_SETTINGS.connection.timeout,
+      model: savedSettings.model || '',
+    };
+  }
+  
+  // 迁移旧格式：settings.providers -> settings.translation.providers
+  if (savedSettings.providers?.list && !savedSettings.translation?.providers) {
+    console.log('[Settings] Migrating old providers format...');
+    migrated.translation = {
+      ...migrated.translation,
+      providers: savedSettings.providers.list,
+      providerConfigs: savedSettings.providers.configs,
+      subtitleProvider: savedSettings.providers.subtitleProvider,
+    };
+    delete migrated.providers;
+  }
+  
+  // 迁移旧格式 selection 设置
+  if (!savedSettings.selection || typeof savedSettings.selection !== 'object') {
+    migrated.selection = {
+      ...DEFAULT_SETTINGS.selection,
+      enabled: savedSettings.selectionEnabled || false,
+      showButton: savedSettings.selectionShowButton ?? true,
+      autoTranslate: savedSettings.selectionAutoTranslate || false,
+      buttonPosition: savedSettings.selectionButtonPosition || 'cursor',
+      buttonDelay: savedSettings.selectionButtonDelay || 0,
+      minDistance: savedSettings.selectionMinDistance || 10,
+      minDuration: savedSettings.selectionMinDuration || 150,
+      maxDuration: savedSettings.selectionMaxDuration || 5000,
+    };
+  }
+  
+  // 迁移旧格式 glass 设置
+  if (!savedSettings.glass || typeof savedSettings.glass !== 'object') {
+    migrated.glass = {
+      ...DEFAULT_SETTINGS.glass,
+      width: savedSettings.glassWidth || 400,
+      height: savedSettings.glassHeight || 300,
+      opacity: savedSettings.glassOpacity || 0.95,
+      alwaysOnTop: savedSettings.glassAlwaysOnTop ?? true,
+      autoTranslate: savedSettings.glassAutoTranslate ?? true,
+      fontSize: savedSettings.glassFontSize || 14,
+      showSourceText: savedSettings.glassShowSourceText || false,
+    };
+  }
+  
+  return migrated;
+};

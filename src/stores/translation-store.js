@@ -99,7 +99,40 @@ const useTranslationStore = create(
       setTranslationMode: (mode) =>
         set((state) => {
           state.translationMode = mode;
+          
+          // 无痕模式：清除历史和统计
+          if (mode === 'secure') {
+            state.history = [];
+            state.statistics = {
+              totalTranslations: 0,
+              totalCharacters: 0,
+              todayTranslations: 0,
+              weekTranslations: 0,
+              mostUsedLanguagePair: null,
+              averageTranslationTime: 0,
+              lastUpdated: new Date().toISOString(),
+            };
+          }
         }),
+
+      // 检查当前模式下某功能是否可用
+      isFeatureEnabled: (featureName) => {
+        const mode = get().translationMode;
+        const features = {
+          standard: { saveHistory: true, useCache: true, onlineApi: true, analytics: true },
+          secure: { saveHistory: false, useCache: false, onlineApi: true, analytics: false },
+          offline: { saveHistory: true, useCache: true, onlineApi: false, analytics: true },
+        };
+        return features[mode]?.[featureName] !== false;
+      },
+
+      // 检查翻译源是否在当前模式下可用
+      isProviderAllowed: (providerId) => {
+        const mode = get().translationMode;
+        if (mode !== 'offline') return true;
+        // 离线模式仅允许本地LLM
+        return providerId === 'local-llm';
+      },
 
       setUseStreamOutput: (value) =>
         set((state) => {
@@ -328,11 +361,65 @@ const useTranslationStore = create(
           state.statistics.totalCharacters = 0;
         }),
 
+      // ==================== 隐私模式辅助方法 ====================
+      // 检查当前模式下是否允许保存历史
+      canSaveHistory: () => {
+        const state = get();
+        return state.translationMode !== 'secure';
+      },
+      
+      // 检查当前模式下是否允许使用在线API
+      canUseOnlineApi: () => {
+        const state = get();
+        return state.translationMode !== 'offline';
+      },
+      
+      // 检查当前模式下是否允许使用缓存
+      canUseCache: () => {
+        const state = get();
+        return state.translationMode !== 'secure';
+      },
+      
+      // 获取当前模式配置
+      getModeConfig: () => {
+        const state = get();
+        const configs = {
+          standard: {
+            saveHistory: true,
+            useCache: true,
+            onlineApi: true,
+            analytics: true,
+          },
+          secure: {
+            saveHistory: false,
+            useCache: false,
+            onlineApi: true,
+            analytics: false,
+          },
+          offline: {
+            saveHistory: true,
+            useCache: true,
+            onlineApi: false,
+            analytics: true,
+            allowedProviders: ['local-llm'],
+            allowedOcrEngines: ['llm-vision', 'rapid-ocr', 'windows-ocr'],
+          }
+        };
+        return configs[state.translationMode] || configs.standard;
+      },
+
       // 添加到历史记录（供外部调用，如玻璃窗口）
+      // 自动检查隐私模式
       addToHistory: (item) =>
         set((state) => {
+          // 无痕模式下不保存历史
+          if (state.translationMode === 'secure') {
+            console.log('[Store] Secure mode - history not saved');
+            return;
+          }
+          
           const historyItem = {
-            id: item.id || uuidv4(),  // 使用 UUID 避免重复
+            id: item.id || uuidv4(),
             sourceText: item.sourceText || '',
             translatedText: item.translatedText || '',
             sourceLanguage: item.sourceLanguage || 'auto',
@@ -352,9 +439,11 @@ const useTranslationStore = create(
             if (state.history.length > state.historyLimit) {
               state.history = state.history.slice(0, state.historyLimit);
             }
-            // 更新统计
-            state.statistics.totalTranslations++;
-            state.statistics.totalCharacters += (historyItem.sourceText?.length || 0);
+            // 更新统计（标准模式和离线模式都统计）
+            if (state.translationMode !== 'secure') {
+              state.statistics.totalTranslations++;
+              state.statistics.totalCharacters += (historyItem.sourceText?.length || 0);
+            }
           }
         }),
 
@@ -492,6 +581,8 @@ const useTranslationStore = create(
         return {
           ...currentState,
           ...persistedState,
+          // 恢复隐私模式
+          translationMode: persistedState.translationMode || currentState.translationMode,
           // 只恢复语言设置，不恢复翻译内容
           currentTranslation: {
             ...currentState.currentTranslation,
@@ -508,6 +599,8 @@ const useTranslationStore = create(
         history: state.history,
         favorites: state.favorites,
         statistics: state.statistics,
+        // 持久化隐私模式
+        translationMode: state.translationMode,
         // 只持久化语言设置，不持久化翻译内容
         currentTranslation: {
           sourceLanguage: state.currentTranslation.sourceLanguage,

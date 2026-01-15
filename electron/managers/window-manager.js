@@ -1,0 +1,441 @@
+// electron/managers/window-manager.js
+// 窗口管理器 - 负责创建、管理各种窗口
+// 使用依赖注入，避免循环依赖
+
+const { BrowserWindow, shell } = require('electron');
+const path = require('path');
+
+// 依赖（通过 init 注入）
+let store = null;
+let runtime = null;
+let windows = null;
+let isDev = false;
+let logger = null;
+let makeWindowInvisibleToCapture = null;
+let CHANNELS = null;
+
+/**
+ * 初始化窗口管理器
+ * @param {Object} deps - 依赖注入
+ */
+function init(deps) {
+  store = deps.store;
+  runtime = deps.runtime;
+  windows = deps.windows;
+  isDev = deps.isDev;
+  logger = deps.logger || console;
+  makeWindowInvisibleToCapture = deps.makeWindowInvisibleToCapture || (() => {});
+  CHANNELS = deps.CHANNELS || {};
+  
+  logger.info?.('Window manager initialized') || console.log('Window manager initialized');
+}
+
+// ==================== 主窗口 ====================
+
+/**
+ * 创建主窗口
+ */
+function createMainWindow() {
+  if (windows.main) {
+    windows.main.focus();
+    return windows.main;
+  }
+
+  const windowBounds = store.get('windowBounds');
+  const windowPosition = store.get('windowPosition');
+
+  const mainWindow = new BrowserWindow({
+    width: windowBounds.width,
+    height: windowBounds.height,
+    x: windowPosition?.x,
+    y: windowPosition?.y,
+    minWidth: 800,
+    minHeight: 600,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: false,
+      preload: path.join(__dirname, '../preload.js'),
+      webSecurity: false,
+    },
+    autoHideMenuBar: true,
+    menuBarVisible: false,
+    icon: path.join(__dirname, '../../public/icon.png'),
+    frame: false,
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    show: false,
+    backgroundColor: '#ffffff',
+    alwaysOnTop: store.get('alwaysOnTop', false),
+  });
+
+  mainWindow.removeMenu();
+
+  // 加载应用
+  if (isDev) {
+    mainWindow.loadURL('http://localhost:5173');
+    mainWindow.webContents.openDevTools();
+  } else {
+    mainWindow.loadFile(path.join(__dirname, '../../dist/index.html'));
+  }
+
+  // 窗口准备好后显示
+  mainWindow.once('ready-to-show', () => {
+    if (!store.get('startMinimized')) {
+      mainWindow.show();
+    }
+  });
+
+  // 保存窗口状态
+  mainWindow.on('resize', () => {
+    if (!mainWindow.isMaximized()) {
+      store.set('windowBounds', mainWindow.getBounds());
+    }
+  });
+
+  mainWindow.on('move', () => {
+    if (!mainWindow.isMaximized()) {
+      store.set('windowPosition', mainWindow.getPosition());
+    }
+  });
+
+  // 关闭窗口处理
+  mainWindow.on('close', (event) => {
+    if (!runtime.isQuitting && process.platform !== 'darwin') {
+      event.preventDefault();
+      mainWindow.hide();
+    }
+  });
+
+  mainWindow.on('closed', () => {
+    windows.main = null;
+  });
+
+  // 处理外部链接
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: 'deny' };
+  });
+
+  windows.main = mainWindow;
+  logger.info?.('Main window created');
+  return mainWindow;
+}
+
+// ==================== 玻璃窗口 ====================
+
+/**
+ * 创建玻璃翻译窗口
+ */
+function createGlassWindow() {
+  if (windows.glass) {
+    windows.glass.focus();
+    return windows.glass;
+  }
+
+  const glassBounds = store.get('glassBounds', {
+    width: 400,
+    height: 200,
+    x: undefined,
+    y: undefined,
+  });
+
+  const glassWindow = new BrowserWindow({
+    width: glassBounds.width,
+    height: glassBounds.height,
+    x: glassBounds.x,
+    y: glassBounds.y,
+    minWidth: 150,
+    minHeight: 80,
+    transparent: true,
+    frame: false,
+    alwaysOnTop: true,
+    skipTaskbar: false,
+    resizable: true,
+    hasShadow: false,
+    backgroundColor: '#00000000',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, '../preload-glass.js'),
+    },
+  });
+
+  // Windows: 设置窗口为截图不可见
+  if (process.platform === 'win32') {
+    glassWindow.webContents.on('did-finish-load', () => {
+      makeWindowInvisibleToCapture(glassWindow);
+    });
+  }
+
+  // 加载页面
+  if (isDev) {
+    glassWindow.loadURL('http://localhost:5173/src/windows/glass.html');
+  } else {
+    glassWindow.loadFile(path.join(__dirname, '../../dist/src/windows/glass.html'));
+  }
+
+  // 保存位置
+  glassWindow.on('moved', () => {
+    if (glassWindow) {
+      store.set('glassBounds', glassWindow.getBounds());
+    }
+  });
+
+  glassWindow.on('resized', () => {
+    if (glassWindow) {
+      store.set('glassBounds', glassWindow.getBounds());
+    }
+  });
+
+  glassWindow.on('closed', () => {
+    windows.glass = null;
+  });
+
+  // 快捷键
+  glassWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.key === 'Escape') {
+      glassWindow.close();
+    } else if (input.key === ' ' && !input.control && !input.alt && !input.meta) {
+      glassWindow.webContents.send(CHANNELS.GLASS?.REFRESH || 'glass:refresh');
+    }
+  });
+
+  windows.glass = glassWindow;
+  logger.info?.('Glass window created');
+  return glassWindow;
+}
+
+/**
+ * 切换玻璃窗口
+ */
+function toggleGlassWindow() {
+  if (windows.glass) {
+    if (windows.glass.isVisible()) {
+      windows.glass.close();
+    } else {
+      windows.glass.show();
+      windows.glass.focus();
+    }
+  } else {
+    createGlassWindow();
+  }
+}
+
+// ==================== 字幕采集窗口 ====================
+
+/**
+ * 创建字幕采集区窗口
+ */
+function createSubtitleCaptureWindow() {
+  if (windows.subtitleCapture && !windows.subtitleCapture.isDestroyed()) {
+    windows.subtitleCapture.show();
+    windows.subtitleCapture.focus();
+    return windows.subtitleCapture;
+  }
+
+  const savedRect = store.get('subtitleCaptureRect', {
+    width: 600,
+    height: 80,
+    x: undefined,
+    y: undefined,
+  });
+
+  const subtitleWindow = new BrowserWindow({
+    width: savedRect.width,
+    height: savedRect.height,
+    x: savedRect.x,
+    y: savedRect.y,
+    minWidth: 100,
+    minHeight: 40,
+    transparent: true,
+    frame: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: true,
+    hasShadow: false,
+    backgroundColor: '#00000000',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, '../preload-subtitle-capture.js'),
+    },
+  });
+
+  // Windows: 设置窗口为截图不可见
+  if (process.platform === 'win32') {
+    subtitleWindow.webContents.on('did-finish-load', () => {
+      makeWindowInvisibleToCapture(subtitleWindow);
+    });
+  }
+
+  // 加载页面
+  if (isDev) {
+    subtitleWindow.loadURL('http://localhost:5173/src/windows/subtitle-capture.html');
+  } else {
+    subtitleWindow.loadFile(path.join(__dirname, '../../dist/src/windows/subtitle-capture.html'));
+  }
+
+  // 更新采集区坐标
+  const updateCaptureRect = () => {
+    if (subtitleWindow && !subtitleWindow.isDestroyed()) {
+      const bounds = subtitleWindow.getBounds();
+      runtime.subtitleCaptureRect = bounds;
+      store.set('subtitleCaptureRect', bounds);
+      // 通知玻璃窗口
+      if (windows.glass && !windows.glass.isDestroyed()) {
+        windows.glass.webContents.send(
+          CHANNELS.SUBTITLE?.CAPTURE_RECT_UPDATED || 'subtitle:capture-rect-updated',
+          bounds
+        );
+      }
+    }
+  };
+
+  subtitleWindow.on('moved', updateCaptureRect);
+  subtitleWindow.on('resized', updateCaptureRect);
+
+  subtitleWindow.on('closed', () => {
+    windows.subtitleCapture = null;
+  });
+
+  // ESC 关闭
+  subtitleWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.key === 'Escape') {
+      subtitleWindow.close();
+    }
+  });
+
+  runtime.subtitleCaptureRect = savedRect;
+  windows.subtitleCapture = subtitleWindow;
+  logger.info?.('Subtitle capture window created');
+  return subtitleWindow;
+}
+
+/**
+ * 切换字幕采集区窗口
+ */
+function toggleSubtitleCaptureWindow() {
+  if (windows.subtitleCapture && !windows.subtitleCapture.isDestroyed()) {
+    if (windows.subtitleCapture.isVisible()) {
+      windows.subtitleCapture.close();
+      windows.subtitleCapture = null;
+    } else {
+      windows.subtitleCapture.show();
+      windows.subtitleCapture.focus();
+    }
+  } else {
+    createSubtitleCaptureWindow();
+  }
+}
+
+// ==================== 划词翻译窗口 ====================
+
+/**
+ * 创建划词翻译窗口
+ */
+function createSelectionWindow() {
+  if (windows.selection && !windows.selection.isDestroyed()) {
+    return windows.selection;
+  }
+
+  const selectionWindow = new BrowserWindow({
+    width: 450,
+    height: 200,
+    show: false,
+    frame: false,
+    transparent: true,
+    resizable: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    hasShadow: false,
+    focusable: false,
+    webPreferences: {
+      preload: path.join(__dirname, '../preload-selection.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+      webSecurity: false,
+    },
+  });
+
+  selectionWindow.setAlwaysOnTop(true, 'screen-saver');
+  selectionWindow.setIgnoreMouseEvents(false);
+
+  if (isDev) {
+    selectionWindow.loadURL('http://localhost:5173/selection.html');
+  } else {
+    selectionWindow.loadFile(path.join(__dirname, '../../dist/selection.html'));
+  }
+
+  selectionWindow.on('closed', () => {
+    windows.selection = null;
+  });
+
+  windows.selection = selectionWindow;
+  logger.debug?.('Selection window created');
+  return selectionWindow;
+}
+
+// ==================== 截图窗口 ====================
+
+/**
+ * 创建截图选区窗口
+ * @param {Object} bounds - 屏幕边界
+ */
+function createScreenshotWindow(bounds) {
+  if (windows.screenshot) {
+    windows.screenshot.close();
+    windows.screenshot = null;
+  }
+
+  const { minX, minY, totalWidth, totalHeight } = bounds;
+
+  const screenshotWindow = new BrowserWindow({
+    x: minX,
+    y: minY,
+    width: totalWidth,
+    height: totalHeight,
+    transparent: true,
+    frame: false,
+    fullscreen: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    movable: false,
+    focusable: true,
+    hasShadow: false,
+    enableLargerThanScreen: true,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+    },
+  });
+
+  screenshotWindow.setBounds({ x: minX, y: minY, width: totalWidth, height: totalHeight });
+  screenshotWindow.loadFile(path.join(__dirname, '../screenshot.html'));
+  screenshotWindow.setAlwaysOnTop(true, 'screen-saver');
+  screenshotWindow.focus();
+
+  screenshotWindow.on('closed', () => {
+    windows.screenshot = null;
+  });
+
+  windows.screenshot = screenshotWindow;
+  logger.info?.('Screenshot window created');
+  return screenshotWindow;
+}
+
+// ==================== 导出 ====================
+
+module.exports = {
+  init,
+  // 窗口创建
+  createMainWindow,
+  createGlassWindow,
+  createSubtitleCaptureWindow,
+  createSelectionWindow,
+  createScreenshotWindow,
+  // 窗口切换
+  toggleGlassWindow,
+  toggleSubtitleCaptureWindow,
+};

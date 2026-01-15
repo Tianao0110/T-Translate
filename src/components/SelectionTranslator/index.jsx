@@ -1,7 +1,7 @@
 // src/components/SelectionTranslator.jsx
 import React, { useState, useEffect, useRef } from 'react';
-import translationService from '../services/translation.js';
-import '../styles/selection.css';
+import translationService from '../../services/translation.js';
+import './styles.css';
 
 // 语言代码映射（用于显示）
 const LANG_MAP = {

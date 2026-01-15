@@ -6,9 +6,9 @@ import {
   Lightbulb, Check, X, ArrowRight, Palette, ChevronUp, Bot, Tag, FileEdit
 } from 'lucide-react';
 
-import useTranslationStore from '../stores/translation-store';
-import translationService from '../services/translation-service.js';
-import '../styles/components/TranslationPanel.css'; 
+import useTranslationStore from '../../stores/translation-store';
+import translationService from '../../services/translation.js';
+import './styles.css'; 
 
 /**
  * 翻译面板组件 (功能增强版)

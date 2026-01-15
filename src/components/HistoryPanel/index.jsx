@@ -7,12 +7,12 @@ import {
   FileText, Hash, Type, Languages, Activity, RotateCcw,
   Table, GitBranch, CheckSquare, Square, Trash, ArrowUpDown
 } from 'lucide-react';
-import useTranslationStore from '../stores/translation-store';
+import useTranslationStore from '../../stores/translation-store';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import 'dayjs/locale/zh-cn';
-import '../styles/components/HistoryPanel.css'; 
+import './styles.css'; 
 
 dayjs.extend(relativeTime);
 dayjs.extend(isSameOrAfter);
