@@ -16,6 +16,10 @@ const { CHANNELS } = require('./shared/channels');
 const { initIPC } = require('./ipc');
 const { registerAllShortcuts, unregisterAllShortcuts } = require('./ipc/shortcuts');
 const { makeWindowInvisibleToCapture, getWindowInfoAtPoint } = require('./utils/native-helper');
+const { SelectionStateMachine, STATES } = require('./utils/selection-state-machine');
+
+// 全局状态机实例
+let selectionStateMachine = null;
 const logger = require('./utils/logger')('Main');
 
 // 管理器
@@ -33,6 +37,8 @@ const screenshotModule = require('./screenshot-module');
  * 从主窗口获取实时语言设置
  */
 async function showSelectionTrigger(mouseX, mouseY, rect) {
+  logger.debug('showSelectionTrigger called');
+  
   if (!runtime.selectionEnabled) return;
 
   const settings = store.get('settings', {});
@@ -51,26 +57,35 @@ async function showSelectionTrigger(mouseX, mouseY, rect) {
       const langSettings = await windows.main.webContents.executeJavaScript(`
         (function() {
           try {
-            // 优先从 config store 获取
-            const configStore = window.__CONFIG_STORE__;
-            if (configStore) {
-              const state = configStore.getState();
-              return {
-                targetLanguage: state.targetLanguage || 'zh',
-                sourceLanguage: state.sourceLanguage || 'auto'
-              };
-            }
-            // 备选：从 translation store 获取
+            // 优先从 translation store 获取（当前正在使用的语言）
             const transStore = window.__TRANSLATION_STORE__;
             if (transStore) {
               const state = transStore.getState();
+              const targetLang = state.currentTranslation?.targetLanguage;
+              if (targetLang) {
+                console.log('[Selection] Translation store found, targetLanguage:', targetLang);
+                return {
+                  targetLanguage: targetLang,
+                  sourceLanguage: state.currentTranslation?.sourceLanguage || 'auto',
+                  source: 'translation'
+                };
+              }
+            }
+            // 备选：从 config store 获取（持久化配置）
+            const configStore = window.__CONFIG_STORE__;
+            if (configStore) {
+              const state = configStore.getState();
+              console.log('[Selection] Config store found, targetLanguage:', state.targetLanguage);
               return {
-                targetLanguage: state.currentTranslation?.targetLanguage || 'zh',
-                sourceLanguage: state.currentTranslation?.sourceLanguage || 'auto'
+                targetLanguage: state.targetLanguage || 'zh',
+                sourceLanguage: state.sourceLanguage || 'auto',
+                source: 'config'
               };
             }
+            console.log('[Selection] No store found');
             return null;
           } catch(e) {
+            console.error('[Selection] Error getting language:', e);
             return null;
           }
         })()
@@ -78,10 +93,15 @@ async function showSelectionTrigger(mouseX, mouseY, rect) {
       if (langSettings) {
         currentTargetLang = langSettings.targetLanguage;
         currentSourceLang = langSettings.sourceLanguage;
+        logger.debug(`Language from ${langSettings.source} store: ${currentTargetLang}`);
+      } else {
+        logger.debug('No language settings from main window, using default');
       }
     } catch (e) {
-      // 忽略错误，使用默认值
+      logger.debug('Failed to get language from main window:', e.message);
     }
+  } else {
+    logger.debug('Main window not available for language sync');
   }
 
   const win = windowManager.createSelectionWindow();
@@ -168,107 +188,122 @@ function toggleSelectionTranslate() {
 }
 
 /**
- * 启动划词监听
+ * 启动划词监听（状态机版本）
  */
 function startSelectionHook() {
   if (runtime.selectionHook || !runtime.selectionEnabled) return;
 
   try {
     const { uIOhook } = require('uiohook-napi');
+    
+    // 初始化状态机
+    if (!selectionStateMachine) {
+      selectionStateMachine = new SelectionStateMachine();
+    }
+    selectionStateMachine.reset();
 
+    // ==================== mousedown ====================
     uIOhook.on('mousedown', (e) => {
-      if (e.button === 1) {
-        runtime.isNativeDragging = false;
-        const cursorPos = screen.getCursorScreenPoint();
+      if (e.button !== 1) return; // 只处理左键
+      
+      const cursorPos = screen.getCursorScreenPoint();
+      const { x, y } = cursorPos;
 
-        // 检查是否点击在 selectionWindow 内
-        if (windows.selection && !windows.selection.isDestroyed() && windows.selection.isVisible()) {
-          const bounds = windows.selection.getBounds();
-          if (cursorPos.x >= bounds.x && cursorPos.x <= bounds.x + bounds.width &&
-              cursorPos.y >= bounds.y && cursorPos.y <= bounds.y + bounds.height) {
-            runtime.isDraggingOverlay = true;
-            runtime.mouseDownPos = null;
-            return;
-          }
-        }
-
-        runtime.isDraggingOverlay = false;
-        runtime.mouseDownPos = { x: cursorPos.x, y: cursorPos.y };
-        runtime.mouseDownTime = Date.now();
-
-        if (isClickInOurWindows(runtime.mouseDownPos.x, runtime.mouseDownPos.y)) {
-          runtime.mouseDownPos = null;
+      // 检查是否点击在 selectionWindow 内
+      if (windows.selection && !windows.selection.isDestroyed() && windows.selection.isVisible()) {
+        const bounds = windows.selection.getBounds();
+        if (x >= bounds.x && x <= bounds.x + bounds.width &&
+            y >= bounds.y && y <= bounds.y + bounds.height) {
+          runtime.isDraggingOverlay = true;
           return;
         }
-
-        hideSelectionWindow();
       }
+
+      runtime.isDraggingOverlay = false;
+
+      // 检查是否在我们的窗口内
+      if (isClickInOurWindows(x, y)) {
+        return;
+      }
+
+      // 隐藏现有的划词窗口
+      hideSelectionWindow();
+      
+      // 状态机处理 mousedown
+      selectionStateMachine.onMouseDown(x, y);
     });
 
+    // ==================== mousemove ====================
+    uIOhook.on('mousemove', (e) => {
+      if (runtime.isDraggingOverlay) return;
+      if (!selectionStateMachine) return;
+      
+      const state = selectionStateMachine.getState();
+      if (state === STATES.IDLE) return;
+      
+      // 只有在 Possible 或 Likely 状态下才处理
+      const cursorPos = screen.getCursorScreenPoint();
+      selectionStateMachine.onMouseMove(cursorPos.x, cursorPos.y);
+    });
+
+    // ==================== mouseup ====================
     uIOhook.on('mouseup', async (e) => {
-      if (e.button === 1) {
-        if (runtime.isDraggingOverlay) {
-          runtime.isDraggingOverlay = false;
-          runtime.mouseDownPos = null;
+      if (e.button !== 1) return;
+      
+      if (runtime.isDraggingOverlay) {
+        runtime.isDraggingOverlay = false;
+        return;
+      }
+
+      if (!selectionStateMachine) return;
+      
+      const state = selectionStateMachine.getState();
+      if (state === STATES.IDLE) return;
+
+      const cursorPos = screen.getCursorScreenPoint();
+      const { x, y } = cursorPos;
+
+      // 检查是否在 selectionWindow 内
+      if (windows.selection && !windows.selection.isDestroyed() && windows.selection.isVisible()) {
+        const bounds = windows.selection.getBounds();
+        if (x >= bounds.x && x <= bounds.x + bounds.width &&
+            y >= bounds.y && y <= bounds.y + bounds.height) {
+          selectionStateMachine.reset();
           return;
         }
-
-        if (!runtime.mouseDownPos) return;
-
-        const cursorPos = screen.getCursorScreenPoint();
-        const mouseUpPos = { x: cursorPos.x, y: cursorPos.y };
-
-        // 检查是否在 selectionWindow 内
-        if (windows.selection && !windows.selection.isDestroyed() && windows.selection.isVisible()) {
-          const bounds = windows.selection.getBounds();
-          if (mouseUpPos.x >= bounds.x && mouseUpPos.x <= bounds.x + bounds.width &&
-              mouseUpPos.y >= bounds.y && mouseUpPos.y <= bounds.y + bounds.height) {
-            runtime.mouseDownPos = null;
-            return;
-          }
-        }
-
-        const distance = Math.sqrt(
-          Math.pow(mouseUpPos.x - runtime.mouseDownPos.x, 2) +
-          Math.pow(mouseUpPos.y - runtime.mouseDownPos.y, 2)
-        );
-        const duration = Date.now() - runtime.mouseDownTime;
-
-        // 动态读取设置
-        const currentSettings = store.get('settings', {});
-        const currentSelectionSettings = currentSettings.selection || {};
-        const minDist = currentSelectionSettings.minDistance || 10;
-        const minDur = currentSelectionSettings.minDuration || 150;
-        const maxDur = currentSelectionSettings.maxDuration || 5000;
-
-        if (distance > minDist && duration > minDur && duration < maxDur && !runtime.isNativeDragging) {
-          const startPos = { ...runtime.mouseDownPos };
-          const endPos = { ...mouseUpPos };
-
-          const shouldTrigger = await shouldShowSelectionTrigger(startPos, endPos, distance);
-
-          if (!shouldTrigger) {
-            runtime.mouseDownPos = null;
-            return;
-          }
-
-          const rect = {
-            x: Math.min(startPos.x, endPos.x),
-            y: Math.min(startPos.y, endPos.y),
-            width: Math.abs(endPos.x - startPos.x),
-            height: Math.abs(endPos.y - startPos.y),
-          };
-
-          showSelectionTrigger(endPos.x, endPos.y, rect);
-        }
-
-        runtime.mouseDownPos = null;
       }
+
+      // 状态机处理 mouseup
+      const result = selectionStateMachine.onMouseUp(x, y);
+      
+      if (result.shouldShow) {
+        // 额外的窗口类型检查（保留桌面/文件管理器检测）
+        const windowInfo = getWindowInfoAtPoint(x, y);
+        if (windowInfo) {
+          if (windowInfo.isDesktop) {
+            logger.debug('Desktop detected, skip trigger');
+            selectionStateMachine.reset();
+            return;
+          }
+        }
+        
+        const rect = result.rect || {
+          x: x - 50,
+          y: y - 20,
+          width: 100,
+          height: 40,
+        };
+        
+        showSelectionTrigger(x, y, rect);
+      }
+      
+      // 重置状态机准备下次
+      selectionStateMachine.reset();
     });
 
     uIOhook.start();
     runtime.selectionHook = uIOhook;
-    logger.info('Selection hook started');
+    logger.info('Selection hook started (state machine mode)');
   } catch (err) {
     logger.error('Failed to start selection hook:', err.message);
     runtime.selectionEnabled = false;
@@ -281,6 +316,11 @@ function startSelectionHook() {
  * 停止划词监听
  */
 function stopSelectionHook() {
+  // 重置状态机（清除定时器）
+  if (selectionStateMachine) {
+    selectionStateMachine.reset();
+  }
+  
   if (runtime.selectionHook) {
     try {
       runtime.selectionHook.stop();
@@ -618,7 +658,55 @@ app.whenReady().then(() => {
   }, 5 * 60 * 1000);
 
   logger.success('App initialized');
+  
+  // 预热机制：延迟加载划词翻译相关模块，避免首次使用卡顿
+  setTimeout(() => {
+    preheatSelectionModules();
+  }, 3000); // 等应用稳定后再预热
 });
+
+/**
+ * 预热划词翻译相关模块
+ */
+function preheatSelectionModules() {
+  logger.info('Preheating selection modules...');
+  
+  try {
+    // 1. 预加载 uiohook-napi
+    require('uiohook-napi');
+    logger.debug('uiohook-napi preloaded');
+    
+    // 2. 预加载 koffi（Windows API）
+    if (process.platform === 'win32') {
+      try {
+        require('koffi');
+        logger.debug('koffi preloaded');
+      } catch (e) {
+        // 忽略，不是必须的
+      }
+    }
+    
+    // 3. 预创建 SelectionWindow（隐藏）
+    const preWin = windowManager.createSelectionWindow();
+    if (preWin && !preWin.isDestroyed()) {
+      // 确保窗口加载完成
+      preWin.webContents.once('did-finish-load', () => {
+        logger.debug('SelectionWindow preheated');
+      });
+    }
+    
+    // 4. 预初始化状态机
+    if (!selectionStateMachine) {
+      const { SelectionStateMachine } = require('./utils/selection-state-machine');
+      selectionStateMachine = new SelectionStateMachine();
+      logger.debug('SelectionStateMachine preheated');
+    }
+    
+    logger.success('Selection modules preheated');
+  } catch (err) {
+    logger.warn('Preheat failed (non-critical):', err.message);
+  }
+}
 
 // 全局异常处理
 process.on('uncaughtException', (error) => {
