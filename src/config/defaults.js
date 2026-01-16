@@ -1,5 +1,7 @@
 // src/config/defaults.js
+// ============================================================
 // 配置中心化 - 桥接层 (前端入口)
+// ============================================================
 
 import {
   PRIVACY_MODES,
@@ -10,9 +12,15 @@ import {
   LANGUAGE_CODES,
   DEFAULTS,
   PROVIDER_IDS,
+  // 语言相关
+  LANGUAGES,
+  getLanguageOptions,
+  getLanguageList,
+  getLanguageByCode,
 } from './constants.js';
 
-// 重新导出
+// ==================== 重新导出常量 ====================
+
 export {
   PRIVACY_MODES,
   THEMES,
@@ -22,20 +30,49 @@ export {
   LANGUAGE_CODES,
   DEFAULTS,
   PROVIDER_IDS,
+  // 语言相关
+  LANGUAGES,
+  getLanguageOptions,
+  getLanguageList,
+  getLanguageByCode,
 };
 
-// 便捷对象
+// ==================== 便捷访问对象 ====================
+
 export const translationDefaults = {
   targetLanguage: DEFAULTS.TARGET_LANGUAGE,
   sourceLanguage: DEFAULTS.SOURCE_LANGUAGE,
   template: DEFAULTS.DEFAULT_TEMPLATE,
 };
 
+export const uiDefaults = {
+  theme: DEFAULTS.THEME,
+  fontSize: DEFAULTS.FONT_SIZE,
+  window: {
+    width: DEFAULTS.WINDOW_WIDTH,
+    height: DEFAULTS.WINDOW_HEIGHT,
+    minWidth: DEFAULTS.WINDOW_MIN_WIDTH,
+    minHeight: DEFAULTS.WINDOW_MIN_HEIGHT,
+  },
+};
+
 export const selectionDefaults = {
   triggerTimeout: DEFAULTS.SELECTION_TRIGGER_TIMEOUT,
   minChars: DEFAULTS.SELECTION_MIN_CHARS,
   maxChars: DEFAULTS.SELECTION_MAX_CHARS,
+  minDistance: DEFAULTS.SELECTION_MIN_DISTANCE,
+  minDuration: DEFAULTS.SELECTION_MIN_DURATION,
+  maxDuration: DEFAULTS.SELECTION_MAX_DURATION,
 };
+
+export const llmDefaults = {
+  endpoint: DEFAULTS.LLM_ENDPOINT,
+  timeout: DEFAULTS.LLM_TIMEOUT,
+  temperature: DEFAULTS.LLM_TEMPERATURE,
+  maxTokens: DEFAULTS.LLM_MAX_TOKENS,
+};
+
+// ==================== 默认导出 ====================
 
 export default {
   PRIVACY_MODES,
@@ -46,4 +83,8 @@ export default {
   LANGUAGE_CODES,
   DEFAULTS,
   PROVIDER_IDS,
+  LANGUAGES,
+  getLanguageOptions,
+  getLanguageList,
+  getLanguageByCode,
 };

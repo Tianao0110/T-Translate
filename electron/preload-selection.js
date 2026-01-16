@@ -8,6 +8,13 @@ contextBridge.exposeInMainWorld("electron", {
     addToHistory: (item) => ipcRenderer.invoke("selection:add-to-history", item),
     getText: (rect) => ipcRenderer.invoke("selection:get-text", rect),
     resize: (size) => ipcRenderer.invoke("selection:resize", size),
+    startDrag: () => ipcRenderer.invoke("selection:start-drag"),
+    
+    // 多窗口支持
+    freeze: () => ipcRenderer.invoke("selection:freeze"),
+    closeFrozen: (windowId) => ipcRenderer.invoke("selection:close-frozen", windowId),
+    getWindowId: () => ipcRenderer.invoke("selection:get-window-id"),
+    getFrozenCount: () => ipcRenderer.invoke("selection:frozen-windows-count"),
 
     onShowTrigger: (callback) => {
       const listener = (event, data) => callback(data);

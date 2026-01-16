@@ -10,6 +10,7 @@ import {
 
 // 从配置中心导入隐私模式
 import { PRIVACY_MODES, getModeFeatures, isFeatureEnabled, isProviderAllowed as isProviderAllowedByMode, PRIVACY_MODE_IDS } from '@config/privacy-modes';
+import { getLanguageOptions } from '@config/defaults';
 
 /**
  * 默认配置
@@ -167,25 +168,9 @@ export const DEFAULT_SETTINGS = {
 };
 
 /**
- * 语言选项
+ * 语言选项（从配置中心获取）
  */
-export const LANGUAGE_OPTIONS = [
-  { value: 'auto', label: '🔍 自动检测' },
-  { value: 'zh', label: '🇨🇳 中文' },
-  { value: 'zh-TW', label: '🇹🇼 繁体中文' },
-  { value: 'en', label: '🇺🇸 英语' },
-  { value: 'ja', label: '🇯🇵 日语' },
-  { value: 'ko', label: '🇰🇷 韩语' },
-  { value: 'fr', label: '🇫🇷 法语' },
-  { value: 'de', label: '🇩🇪 德语' },
-  { value: 'es', label: '🇪🇸 西班牙语' },
-  { value: 'ru', label: '🇷🇺 俄语' },
-  { value: 'pt', label: '🇵🇹 葡萄牙语' },
-  { value: 'it', label: '🇮🇹 意大利语' },
-  { value: 'ar', label: '🇸🇦 阿拉伯语' },
-  { value: 'th', label: '🇹🇭 泰语' },
-  { value: 'vi', label: '🇻🇳 越南语' },
-];
+export const LANGUAGE_OPTIONS = getLanguageOptions(true);
 
 /**
  * 迁移旧设置（合并多种格式迁移）

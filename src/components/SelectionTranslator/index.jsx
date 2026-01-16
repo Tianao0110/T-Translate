@@ -47,9 +47,13 @@ const SelectionTranslator = () => {
   const [translation, setTranslation] = useState(DEFAULT_TRANSLATION);
   const [triggerReady, setTriggerReady] = useState(false);  // 圆点是否就绪可点击
   const [privacyMode, setPrivacyMode] = useState(PRIVACY_MODES.STANDARD); // 隐私模式
+  const [isFrozen, setIsFrozen] = useState(false); // 是否已冻结（拖动后变成独立窗口）
+  const [windowId, setWindowId] = useState(null); // 当前窗口 ID
+  const [initialBounds, setInitialBounds] = useState(null); // 初始位置，用于检测是否移动
 
   const sizedRef = useRef(false);
   const resizeRef = useRef({ startX: 0, startY: 0, startW: 0, startH: 0 });
+  const frozenRef = useRef(false);  // 用于定时器回调中访问最新的 isFrozen 状态
   const autoHideTimerRef = useRef(null);
   const triggerReadyTimerRef = useRef(null);  // 圆点就绪计时器
 
@@ -70,6 +74,12 @@ const SelectionTranslator = () => {
 
   useEffect(() => {
     const removeShowListener = window.electron?.selection?.onShowTrigger?.((data) => {
+      // 如果窗口已冻结，忽略所有新的触发事件
+      if (frozenRef.current) {
+        console.log('[Selection] Window is frozen, ignoring show trigger');
+        return;
+      }
+      
       if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
       if (triggerReadyTimerRef.current) clearTimeout(triggerReadyTimerRef.current);
       
@@ -96,6 +106,8 @@ const SelectionTranslator = () => {
       setTranslatedText('');
       setCopied(false);
       sizedRef.current = false;
+      setIsFrozen(false);  // 重置固定状态
+      setInitialBounds(null);  // 重置初始位置
       
       // 圆点就绪延迟（防止松开鼠标时误触）
       setTriggerReady(false);
@@ -103,14 +115,20 @@ const SelectionTranslator = () => {
         setTriggerReady(true);
       }, 100);  // 100ms 后才能点击
       
-      // 使用设置中的自动消失时间
+      // 使用设置中的自动消失时间（固定模式下不自动隐藏）
       autoHideTimerRef.current = setTimeout(() => {
-        setMode('idle');
-        window.electron?.selection?.hide?.();
+        // 注意：这里无法直接访问最新的 isFrozen 状态
+        // 所以在 handleAutoHide 中检查
+        handleAutoHide();
       }, newSettings.triggerTimeout);
     });
     
     const removeHideListener = window.electron?.selection?.onHide?.(() => {
+      // 冻结窗口忽略 hide 事件
+      if (frozenRef.current) {
+        console.log('[Selection] Frozen window ignoring hide event');
+        return;
+      }
       setMode('idle');
       if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
       if (triggerReadyTimerRef.current) clearTimeout(triggerReadyTimerRef.current);
@@ -348,11 +366,103 @@ const SelectionTranslator = () => {
     setShowSource(!showSource);
   };
 
-  const handleClose = (e) => {
+  const handleClose = async (e) => {
     if (e) e.preventDefault();
+    
+    // 如果是冻结窗口，使用特殊的关闭方法
+    if (isFrozen && windowId) {
+      console.log(`[Selection] Closing frozen window ${windowId}`);
+      await window.electron?.selection?.closeFrozen?.(windowId);
+    } else {
+      window.electron?.selection?.hide?.();
+    }
+    
+    setMode('idle');
+    setIsFrozen(false);
+    setWindowId(null);
+  };
+
+  // 自动隐藏处理（检查是否固定）
+  const handleAutoHide = () => {
+    // 使用 ref 获取最新状态
+    if (frozenRef.current) {
+      console.log('[Selection] Window is pinned, skip auto-hide');
+      return;
+    }
     setMode('idle');
     window.electron?.selection?.hide?.();
   };
+
+  // 同步 isFrozen 到 ref（用于定时器回调）
+  useEffect(() => {
+    frozenRef.current = isFrozen;
+  }, [isFrozen]);
+
+  // 使用定时器检测窗口位置变化（因为 -webkit-app-region: drag 不触发 mouseup）
+  useEffect(() => {
+    if (mode !== 'overlay' || isFrozen) return;
+    
+    let lastCheckBounds = null;
+    let checkCount = 0;
+    const maxChecks = 100; // 最多检测 10 秒
+    
+    const checkInterval = setInterval(async () => {
+      checkCount++;
+      if (checkCount > maxChecks) {
+        clearInterval(checkInterval);
+        return;
+      }
+      
+      try {
+        const currentBounds = await window.electron?.selection?.startDrag?.();
+        if (!currentBounds) return;
+        
+        // 第一次，保存初始位置
+        if (!lastCheckBounds) {
+          lastCheckBounds = currentBounds;
+          setInitialBounds(currentBounds);
+          return;
+        }
+        
+        // 检测是否移动
+        const dx = Math.abs(currentBounds.x - lastCheckBounds.x);
+        const dy = Math.abs(currentBounds.y - lastCheckBounds.y);
+        
+        if (dx > 10 || dy > 10) {
+          console.log('[Selection] Window moved detected, freezing...');
+          clearInterval(checkInterval);
+          
+          // 调用主进程冻结窗口
+          const result = await window.electron?.selection?.freeze?.();
+          if (result?.success) {
+            setIsFrozen(true);
+            setWindowId(result.windowId);
+            console.log(`[Selection] Window ${result.windowId} frozen`);
+            
+            // 清除自动隐藏定时器
+            if (autoHideTimerRef.current) {
+              clearTimeout(autoHideTimerRef.current);
+              autoHideTimerRef.current = null;
+            }
+            
+            // 保存到历史
+            if (sourceText && translatedText) {
+              window.electron?.selection?.addToHistory?.({
+                source: sourceText,
+                result: translatedText,
+                timestamp: Date.now(),
+                from: 'selection-frozen',
+              });
+            }
+          }
+        }
+      } catch (e) {
+        // 忽略错误
+      }
+    }, 100); // 每 100ms 检查一次
+    
+    return () => clearInterval(checkInterval);
+  }, [mode, isFrozen, sourceText, translatedText]);
 
   if (mode === 'idle') return null;
 
@@ -373,8 +483,11 @@ const SelectionTranslator = () => {
       )}
       
       {mode === 'overlay' && (
-        <div className={`sel-card ${copied ? 'copied' : ''}`} onContextMenu={handleClose}>
+        <div className={`sel-card ${copied ? 'copied' : ''} ${isFrozen ? 'frozen' : ''}`} onContextMenu={handleClose}>
           <div className="sel-toolbar">
+            {isFrozen && (
+              <span className="sel-frozen-badge" title="已固定 - 点击关闭按钮关闭">📌</span>
+            )}
             <button className={`sel-btn ${showSource ? 'active' : ''}`} onClick={toggleSource} title="显示原文">
               原文
             </button>

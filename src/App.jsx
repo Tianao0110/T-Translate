@@ -3,14 +3,16 @@ import React, { useEffect, useState } from 'react';
 import TitleBar from './components/TitleBar';
 import MainWindow from './components/MainWindow';
 import useTranslationStore from './stores/translation-store';
+import useConfigStore from './stores/config';
 import './styles/App.css';
 
 // 从配置中心导入常量
 import { THEMES } from '@config/defaults'; 
 
-// 暴露 store 到 window，供玻璃窗口通过 IPC 获取设置
+// 暴露 store 到 window，供玻璃窗口/划词翻译通过 IPC 获取设置
 if (typeof window !== 'undefined') {
   window.__TRANSLATION_STORE__ = useTranslationStore;
+  window.__CONFIG_STORE__ = useConfigStore;
 }
 
 function App() {

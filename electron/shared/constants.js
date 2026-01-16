@@ -1,8 +1,9 @@
 // electron/shared/constants.js
 // ============================================================
-// 配置中心化 - 源头层 (Single Source of Truth)
+// 配置中心化 - 源头层 (主进程专用)
 // ============================================================
-// 格式: CommonJS (Electron 主进程原生支持，Vite 会自动转换)
+// 格式: CommonJS
+// 注意: 前端使用 src/config/constants.js (ESM 版本)
 
 const PRIVACY_MODES = {
   STANDARD: 'standard',
@@ -42,6 +43,7 @@ const TRANSLATION_STATUS = {
   ERROR: 'error',
 };
 
+// 语言代码（与前端 src/config/constants.js 保持同步）
 const LANGUAGE_CODES = {
   AUTO: 'auto',
   ZH: 'zh',
@@ -53,6 +55,12 @@ const LANGUAGE_CODES = {
   DE: 'de',
   ES: 'es',
   RU: 'ru',
+  PA: 'pa',   // Punjabi
+  PT: 'pt',   // Portuguese
+  IT: 'it',   // Italian
+  AR: 'ar',   // Arabic
+  TH: 'th',   // Thai
+  VI: 'vi',   // Vietnamese
 };
 
 const DEFAULTS = {

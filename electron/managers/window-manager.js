@@ -14,6 +14,11 @@ let logger = null;
 let makeWindowInvisibleToCapture = null;
 let CHANNELS = null;
 
+// 冻结的划词翻译窗口池
+const frozenSelectionWindows = new Map();  // Map<windowId, BrowserWindow>
+let selectionWindowIdCounter = 0;
+const MAX_FROZEN_WINDOWS = 8;  // 最大冻结窗口数
+
 /**
  * 初始化窗口管理器
  * @param {Object} deps - 依赖注入
@@ -328,15 +333,25 @@ function toggleSubtitleCaptureWindow() {
   }
 }
 
-// ==================== 划词翻译窗口 ====================
+// ==================== 划词翻译窗口（多窗口支持） ====================
 
 /**
  * 创建划词翻译窗口
+ * 每次创建新窗口，支持多窗口共存
  */
 function createSelectionWindow() {
+  // 如果当前有活动窗口且未冻结，复用它
   if (windows.selection && !windows.selection.isDestroyed()) {
-    return windows.selection;
+    // 检查是否已冻结
+    const isFrozen = windows.selection._isFrozen;
+    if (!isFrozen) {
+      return windows.selection;
+    }
+    // 已冻结，创建新窗口
   }
+
+  // 生成唯一 ID
+  const windowId = ++selectionWindowIdCounter;
 
   const selectionWindow = new BrowserWindow({
     width: 450,
@@ -358,6 +373,10 @@ function createSelectionWindow() {
     },
   });
 
+  // 存储窗口 ID
+  selectionWindow._windowId = windowId;
+  selectionWindow._isFrozen = false;
+
   selectionWindow.setAlwaysOnTop(true, 'screen-saver');
   selectionWindow.setIgnoreMouseEvents(false);
 
@@ -368,12 +387,94 @@ function createSelectionWindow() {
   }
 
   selectionWindow.on('closed', () => {
-    windows.selection = null;
+    // 从冻结窗口池中移除
+    if (selectionWindow._isFrozen) {
+      frozenSelectionWindows.delete(selectionWindow._windowId);
+      logger.debug?.(`Frozen selection window ${selectionWindow._windowId} closed, remaining: ${frozenSelectionWindows.size}`);
+    }
+    // 如果是当前活动窗口，清除引用
+    if (windows.selection === selectionWindow) {
+      windows.selection = null;
+    }
   });
 
   windows.selection = selectionWindow;
-  logger.debug?.('Selection window created');
+  logger.debug?.(`Selection window ${windowId} created`);
   return selectionWindow;
+}
+
+/**
+ * 冻结当前划词翻译窗口
+ * 冻结后窗口变成独立的，新划词会创建新窗口
+ */
+function freezeSelectionWindow() {
+  const currentWindow = windows.selection;
+  if (!currentWindow || currentWindow.isDestroyed()) {
+    return { success: false, error: 'No active window' };
+  }
+
+  if (currentWindow._isFrozen) {
+    return { success: false, error: 'Already frozen' };
+  }
+
+  // 检查是否达到最大数量
+  if (frozenSelectionWindows.size >= MAX_FROZEN_WINDOWS) {
+    // 关闭最早的冻结窗口
+    const oldestId = frozenSelectionWindows.keys().next().value;
+    const oldestWindow = frozenSelectionWindows.get(oldestId);
+    if (oldestWindow && !oldestWindow.isDestroyed()) {
+      oldestWindow.close();
+    }
+    frozenSelectionWindows.delete(oldestId);
+    logger.debug?.(`Closed oldest frozen window ${oldestId} due to limit`);
+  }
+
+  // 标记为冻结
+  currentWindow._isFrozen = true;
+  frozenSelectionWindows.set(currentWindow._windowId, currentWindow);
+  
+  // 清除活动窗口引用，下次划词会创建新窗口
+  windows.selection = null;
+
+  logger.info?.(`Selection window ${currentWindow._windowId} frozen, total frozen: ${frozenSelectionWindows.size}`);
+  
+  return { 
+    success: true, 
+    windowId: currentWindow._windowId,
+    frozenCount: frozenSelectionWindows.size 
+  };
+}
+
+/**
+ * 关闭指定的冻结窗口
+ */
+function closeFrozenSelectionWindow(windowId) {
+  const frozenWindow = frozenSelectionWindows.get(windowId);
+  if (frozenWindow && !frozenWindow.isDestroyed()) {
+    frozenWindow.close();
+    return { success: true };
+  }
+  return { success: false, error: 'Window not found' };
+}
+
+/**
+ * 获取冻结窗口数量
+ */
+function getFrozenSelectionWindowsCount() {
+  return frozenSelectionWindows.size;
+}
+
+/**
+ * 关闭所有冻结窗口
+ */
+function closeAllFrozenSelectionWindows() {
+  for (const [id, win] of frozenSelectionWindows) {
+    if (win && !win.isDestroyed()) {
+      win.close();
+    }
+  }
+  frozenSelectionWindows.clear();
+  logger.info?.('All frozen selection windows closed');
 }
 
 // ==================== 截图窗口 ====================
@@ -438,4 +539,9 @@ module.exports = {
   // 窗口切换
   toggleGlassWindow,
   toggleSubtitleCaptureWindow,
+  // 划词多窗口管理
+  freezeSelectionWindow,
+  closeFrozenSelectionWindow,
+  getFrozenSelectionWindowsCount,
+  closeAllFrozenSelectionWindows,
 };

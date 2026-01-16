@@ -30,8 +30,9 @@ const screenshotModule = require('./screenshot-module');
 
 /**
  * 显示划词翻译触发点
+ * 从主窗口获取实时语言设置
  */
-function showSelectionTrigger(mouseX, mouseY, rect) {
+async function showSelectionTrigger(mouseX, mouseY, rect) {
   if (!runtime.selectionEnabled) return;
 
   const settings = store.get('settings', {});
@@ -40,6 +41,48 @@ function showSelectionTrigger(mouseX, mouseY, rect) {
   const translationSettings = settings.translation || {};
 
   runtime.lastSelectionRect = rect;
+
+  // 从主窗口获取实时的目标语言（与主程序同步）
+  let currentTargetLang = translationSettings.targetLanguage || 'zh';
+  let currentSourceLang = translationSettings.sourceLanguage || 'auto';
+  
+  if (windows.main && !windows.main.isDestroyed()) {
+    try {
+      const langSettings = await windows.main.webContents.executeJavaScript(`
+        (function() {
+          try {
+            // 优先从 config store 获取
+            const configStore = window.__CONFIG_STORE__;
+            if (configStore) {
+              const state = configStore.getState();
+              return {
+                targetLanguage: state.targetLanguage || 'zh',
+                sourceLanguage: state.sourceLanguage || 'auto'
+              };
+            }
+            // 备选：从 translation store 获取
+            const transStore = window.__TRANSLATION_STORE__;
+            if (transStore) {
+              const state = transStore.getState();
+              return {
+                targetLanguage: state.currentTranslation?.targetLanguage || 'zh',
+                sourceLanguage: state.currentTranslation?.sourceLanguage || 'auto'
+              };
+            }
+            return null;
+          } catch(e) {
+            return null;
+          }
+        })()
+      `);
+      if (langSettings) {
+        currentTargetLang = langSettings.targetLanguage;
+        currentSourceLang = langSettings.sourceLanguage;
+      }
+    } catch (e) {
+      // 忽略错误，使用默认值
+    }
+  }
 
   const win = windowManager.createSelectionWindow();
 
@@ -80,8 +123,8 @@ function showSelectionTrigger(mouseX, mouseY, rect) {
         maxChars: selectionSettings.maxChars || 500,
       },
       translation: {
-        targetLanguage: translationSettings.targetLanguage || 'zh',
-        sourceLanguage: translationSettings.sourceLanguage || 'auto',
+        targetLanguage: currentTargetLang,
+        sourceLanguage: currentSourceLang,
       },
     });
   };

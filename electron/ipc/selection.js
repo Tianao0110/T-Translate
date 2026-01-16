@@ -192,6 +192,43 @@ function register(ctx) {
     return { text: null, method: null };
   });
   
+  // ==================== 多窗口管理 ====================
+  
+  /**
+   * 冻结当前窗口（变成独立窗口）
+   */
+  ipcMain.handle(CHANNELS.SELECTION.FREEZE, () => {
+    const windowManager = require('../managers/window-manager');
+    return windowManager.freezeSelectionWindow();
+  });
+  
+  /**
+   * 关闭冻结的窗口
+   */
+  ipcMain.handle(CHANNELS.SELECTION.CLOSE_FROZEN, (event, windowId) => {
+    const windowManager = require('../managers/window-manager');
+    return windowManager.closeFrozenSelectionWindow(windowId);
+  });
+  
+  /**
+   * 获取当前窗口 ID
+   */
+  ipcMain.handle(CHANNELS.SELECTION.GET_WINDOW_ID, (event) => {
+    const selectionWindow = getSelectionWindow();
+    if (selectionWindow && !selectionWindow.isDestroyed()) {
+      return selectionWindow._windowId || null;
+    }
+    return null;
+  });
+  
+  /**
+   * 获取冻结窗口数量
+   */
+  ipcMain.handle(CHANNELS.SELECTION.FROZEN_WINDOWS_COUNT, () => {
+    const windowManager = require('../managers/window-manager');
+    return windowManager.getFrozenSelectionWindowsCount();
+  });
+
   // ==================== 数据同步 ====================
   
   /**

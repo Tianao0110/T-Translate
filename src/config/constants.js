@@ -1,6 +1,10 @@
 // src/config/constants.js
-// 前端常量 (ESM) - 与 electron/shared/constants.js 保持同步
+// ============================================================
+// 配置中心化 - 前端常量 (ESM)
+// ============================================================
+// 与 electron/shared/constants.js 保持同步
 
+// ==================== 隐私模式 ====================
 export const PRIVACY_MODES = {
   STANDARD: 'standard',
   OFFLINE: 'offline',
@@ -8,12 +12,14 @@ export const PRIVACY_MODES = {
   SECURE: 'secure',
 };
 
+// ==================== 主题 ====================
 export const THEMES = {
   LIGHT: 'light',
   DARK: 'dark',
   AUTO: 'auto',
 };
 
+// ==================== OCR 引擎 ====================
 export const OCR_ENGINES = {
   LLM_VISION: 'llm-vision',
   RAPID_OCR: 'rapid-ocr',
@@ -25,6 +31,7 @@ export const OCR_ENGINES = {
   BAIDU_OCR: 'baidu-ocr',
 };
 
+// ==================== 翻译模板 ====================
 export const TEMPLATE_KEYS = {
   OCR: 'ocr',
   PRECISE: 'precise',
@@ -32,6 +39,7 @@ export const TEMPLATE_KEYS = {
   FORMAL: 'formal',
 };
 
+// ==================== 翻译状态 ====================
 export const TRANSLATION_STATUS = {
   IDLE: 'idle',
   TRANSLATING: 'translating',
@@ -39,6 +47,7 @@ export const TRANSLATION_STATUS = {
   ERROR: 'error',
 };
 
+// ==================== 语言代码 ====================
 export const LANGUAGE_CODES = {
   AUTO: 'auto',
   ZH: 'zh',
@@ -50,8 +59,72 @@ export const LANGUAGE_CODES = {
   DE: 'de',
   ES: 'es',
   RU: 'ru',
+  PA: 'pa',
+  PT: 'pt',
+  IT: 'it',
+  AR: 'ar',
+  TH: 'th',
+  VI: 'vi',
 };
 
+// ==================== 语言列表（单一数据源）====================
+// 所有组件从这里获取语言选项
+export const LANGUAGES = [
+  { code: 'auto', name: '自动检测', nativeName: 'Auto Detect', flag: '🌐' },
+  { code: 'zh', name: '中文', nativeName: '中文', flag: '🇨🇳' },
+  { code: 'zh-TW', name: '繁体中文', nativeName: '繁體中文', flag: '🇹🇼' },
+  { code: 'en', name: '英语', nativeName: 'English', flag: '🇺🇸' },
+  { code: 'ja', name: '日语', nativeName: '日本語', flag: '🇯🇵' },
+  { code: 'ko', name: '韩语', nativeName: '한국어', flag: '🇰🇷' },
+  { code: 'fr', name: '法语', nativeName: 'Français', flag: '🇫🇷' },
+  { code: 'de', name: '德语', nativeName: 'Deutsch', flag: '🇩🇪' },
+  { code: 'es', name: '西班牙语', nativeName: 'Español', flag: '🇪🇸' },
+  { code: 'ru', name: '俄语', nativeName: 'Русский', flag: '🇷🇺' },
+  { code: 'pa', name: '旁遮普语', nativeName: 'ਪੰਜਾਬੀ', flag: '🇮🇳' },
+  { code: 'pt', name: '葡萄牙语', nativeName: 'Português', flag: '🇵🇹' },
+  { code: 'it', name: '意大利语', nativeName: 'Italiano', flag: '🇮🇹' },
+  { code: 'ar', name: '阿拉伯语', nativeName: 'العربية', flag: '🇸🇦' },
+  { code: 'th', name: '泰语', nativeName: 'ไทย', flag: '🇹🇭' },
+  { code: 'vi', name: '越南语', nativeName: 'Tiếng Việt', flag: '🇻🇳' },
+];
+
+// ==================== 语言选项转换函数 ====================
+
+/**
+ * 获取设置面板用的语言选项 (value/label 格式)
+ * @param {boolean} includeAuto - 是否包含"自动检测"选项
+ */
+export const getLanguageOptions = (includeAuto = true) => {
+  return LANGUAGES
+    .filter(lang => includeAuto || lang.code !== 'auto')
+    .map(lang => ({
+      value: lang.code,
+      label: `${lang.flag} ${lang.name}`,
+    }));
+};
+
+/**
+ * 获取翻译面板用的语言列表 (code/name/flag 格式)
+ * @param {boolean} includeAuto - 是否包含"自动检测"选项
+ */
+export const getLanguageList = (includeAuto = true) => {
+  return LANGUAGES
+    .filter(lang => includeAuto || lang.code !== 'auto')
+    .map(lang => ({
+      code: lang.code,
+      name: lang.nativeName,  // 使用原生语言名
+      flag: lang.flag,
+    }));
+};
+
+/**
+ * 根据语言代码获取语言信息
+ */
+export const getLanguageByCode = (code) => {
+  return LANGUAGES.find(lang => lang.code === code);
+};
+
+// ==================== 默认配置 ====================
 export const DEFAULTS = {
   LLM_ENDPOINT: 'http://localhost:1234/v1',
   LLM_TIMEOUT: 60000,
@@ -81,6 +154,7 @@ export const DEFAULTS = {
   CACHE_TTL: 7 * 24 * 60 * 60 * 1000,
 };
 
+// ==================== 翻译源 ID ====================
 export const PROVIDER_IDS = {
   LOCAL_LLM: 'local-llm',
   OPENAI: 'openai',

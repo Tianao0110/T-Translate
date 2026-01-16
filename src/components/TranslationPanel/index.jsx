@@ -11,7 +11,7 @@ import translationService from '../../services/translation.js';
 import './styles.css';
 
 // 从配置中心导入常量
-import { PRIVACY_MODES, TRANSLATION_STATUS } from '@config/defaults'; 
+import { PRIVACY_MODES, TRANSLATION_STATUS, getLanguageList } from '@config/defaults'; 
 
 /**
  * 翻译面板组件 (功能增强版)
@@ -81,19 +81,8 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   const sourceTextareaRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  // 语言选项
-  const languages = [
-    { code: 'auto', name: '自动检测', flag: '🌐' },
-    { code: 'zh', name: '中文', flag: '🇨🇳' },
-    { code: 'en', name: 'English', flag: '🇺🇸' },
-    { code: 'ja', name: '日本語', flag: '🇯🇵' },
-    { code: 'ko', name: '한국어', flag: '🇰🇷' },
-    { code: 'es', name: 'Español', flag: '🇪🇸' },
-    { code: 'fr', name: 'Français', flag: '🇫🇷' },
-    { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
-    { code: 'ru', name: 'Русский', flag: '🇷🇺' },
-    { code: 'ar', name: 'العربية', flag: '🇸🇦' }
-  ];
+  // 语言选项（从配置中心获取）
+  const languages = useMemo(() => getLanguageList(true), []);
 
   // 翻译模板（精简版：3个）
   const templates = [
@@ -211,7 +200,8 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   }, [currentTranslation.sourceText, autoTranslate, autoTranslateDelay]);
 
   // 处理翻译（根据设置选择流式或非流式）
-  const handleTranslate = async () => {
+  // overrideTemplate: 可选参数，用于模板切换时强制使用新模板
+  const handleTranslate = async (overrideTemplate = null) => {
     if (!currentTranslation.sourceText.trim()) {
       notify('请输入要翻译的内容', 'warning');
       return;
@@ -222,7 +212,8 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     }
 
     // 如果是 OCR 来源的文本，自动使用 OCR 纠错模板
-    const effectiveTemplate = isOcrSource ? 'ocr' : selectedTemplate;
+    // overrideTemplate 优先级最高，用于模板切换时的即时翻译
+    const effectiveTemplate = isOcrSource ? 'ocr' : (overrideTemplate || selectedTemplate);
     if (isOcrSource) {
       console.log('[Translate] Using OCR template for error correction');
     }
@@ -252,6 +243,51 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
       notify('翻译失败: ' + result.error, 'error');
     }
   };
+
+  // ========== 模板切换处理 ==========
+  // 切换翻译模板时，如果已有内容则重新翻译
+  const handleTemplateChange = (newTemplateId) => {
+    // 如果选择的是当前模板，不做任何操作
+    if (newTemplateId === selectedTemplate) {
+      return;
+    }
+    
+    // 更新模板状态
+    setSelectedTemplate(newTemplateId);
+    
+    // 如果已有源文本，使用新模板重新翻译
+    // 注意：这里直接传入新模板ID，避免状态更新延迟问题
+    if (currentTranslation.sourceText.trim()) {
+      console.log(`[Template] Switching to "${newTemplateId}", re-translating...`);
+      // 使用 setTimeout 确保状态更新后再翻译（可选，但更安全）
+      // 直接传入新模板，不依赖状态更新
+      handleTranslate(newTemplateId);
+    }
+  };
+
+  // ========== 语言设置同步到主进程 ==========
+  // 当语言改变时，同步到 electron-store，供划词翻译使用
+  useEffect(() => {
+    const syncLanguageSettings = async () => {
+      try {
+        const settings = await window.electron?.store?.get?.('settings') || {};
+        const newSettings = {
+          ...settings,
+          translation: {
+            ...settings.translation,
+            sourceLanguage: currentTranslation.sourceLanguage,
+            targetLanguage: currentTranslation.targetLanguage,
+          }
+        };
+        await window.electron?.store?.set?.('settings', newSettings);
+        console.log('[Sync] Language settings synced:', currentTranslation.sourceLanguage, '->', currentTranslation.targetLanguage);
+      } catch (e) {
+        console.log('[Sync] Failed to sync language settings:', e);
+      }
+    };
+    
+    syncLanguageSettings();
+  }, [currentTranslation.sourceLanguage, currentTranslation.targetLanguage]);
 
   // ========== 术语一致性检测 ==========
   const checkTermConsistency = useCallback((sourceText, translatedText) => {
@@ -750,7 +786,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
             <button
               key={template.id}
               className={`template-btn ${selectedTemplate === template.id ? 'active' : ''}`}
-              onClick={() => setSelectedTemplate(template.id)}
+              onClick={() => handleTemplateChange(template.id)}
               title={template.name}
             >
               <template.icon size={14} />

@@ -92,6 +92,11 @@ const CHANNELS = {
     ADD_TO_HISTORY: 'selection:add-to-history',
     SHOW_TRIGGER: 'selection:show-trigger',
     STATE_CHANGED: 'selection-state-changed',
+    // 多窗口支持
+    FREEZE: 'selection:freeze',           // 冻结当前窗口（变成独立窗口）
+    CLOSE_FROZEN: 'selection:close-frozen', // 关闭冻结的窗口
+    GET_WINDOW_ID: 'selection:get-window-id', // 获取当前窗口 ID
+    FROZEN_WINDOWS_COUNT: 'selection:frozen-windows-count', // 获取冻结窗口数量
   },
   CLIPBOARD: {
     WRITE_TEXT: 'clipboard:write-text',
@@ -148,3 +153,6 @@ const MENU_ACTIONS = {
 
 // CommonJS 导出
 module.exports = { CHANNELS, MENU_ACTIONS };
+
+// 为 Vite ESM 添加 default 导出
+module.exports.default = module.exports;
