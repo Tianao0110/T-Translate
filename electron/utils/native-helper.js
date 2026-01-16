@@ -27,6 +27,22 @@ function initWin32API() {
       y: 'int32',
     });
     
+    // 定义 GUITHREADINFO 结构体
+    const GUITHREADINFO = koffi.struct('GUITHREADINFO', {
+      cbSize: 'uint32',
+      flags: 'uint32',
+      hwndActive: 'void*',
+      hwndFocus: 'void*',
+      hwndCapture: 'void*',
+      hwndMenuOwner: 'void*',
+      hwndMoveSize: 'void*',
+      hwndCaret: 'void*',
+      rcCaret_left: 'int32',
+      rcCaret_top: 'int32',
+      rcCaret_right: 'int32',
+      rcCaret_bottom: 'int32',
+    });
+    
     win32API = {
       // 键盘模拟
       keybd_event: user32.func('void keybd_event(uint8, uint8, uint32, uintptr)'),
@@ -36,6 +52,9 @@ function initWin32API() {
       GetAncestor: user32.func('void* GetAncestor(void*, uint32)'),
       GetWindowThreadProcessId: user32.func('uint32 GetWindowThreadProcessId(void*, uint32*)'),
       GetClassNameW: user32.func('int GetClassNameW(void*, uint16*, int)'),
+      GetForegroundWindow: user32.func('void* GetForegroundWindow()'),
+      GetGUIThreadInfo: user32.func('int GetGUIThreadInfo(uint32, GUITHREADINFO*)'),
+      SendMessageW: user32.func('intptr SendMessageW(void*, uint32, uintptr*, uintptr*)'),
       
       // 进程信息
       OpenProcess: kernel32.func('void* OpenProcess(uint32, int, uint32)'),
@@ -53,6 +72,11 @@ function initWin32API() {
       PROCESS_QUERY_INFORMATION: 0x0400,
       PROCESS_VM_READ: 0x0010,
       WDA_EXCLUDEFROMCAPTURE: 0x00000011,
+      EM_GETSEL: 0x00B0,
+      GUI_CARETBLINKING: 0x0001,
+      
+      // 结构体类型引用
+      GUITHREADINFO,
     };
     
     logger.info('Windows API loaded successfully');
@@ -241,7 +265,289 @@ function makeWindowInvisibleToCapture(electronWindow) {
   }
 }
 
-// ==================== 导出 ====================
+// ==================== 选区检测（三层混合检测） ====================
+
+// 防抖：记录上次剪贴板检测时间
+let lastClipboardCheckTime = 0;
+const CLIPBOARD_CHECK_COOLDOWN = 100; // 100ms 内不重复检测（避免双击时重复触发）
+
+/**
+ * 混合分层检测：判断当前是否有文本选区
+ * 
+ * 第一层：焦点 + 控件类型判定（Cheap Filter）
+ *   - 过滤掉 100% 不可能有选区的情况
+ *   - 零副作用，快速
+ * 
+ * 第二层：标准控件快速路径（Strong & Clean）
+ *   - Edit / RichEdit 控件使用 EM_GETSEL
+ *   - 零剪贴板，同步，快
+ * 
+ * 第三层：复杂应用剪贴板兜底（Controlled Fallback）
+ *   - 仅在前两层无法判断时使用
+ *   - 保存 → Ctrl+C → 读取 → 恢复
+ *   - 有防抖机制
+ * 
+ * @returns {Object} { hasSelection: boolean|null, method: string, reason: string }
+ */
+function hasTextSelection() {
+  if (process.platform !== 'win32') {
+    return { hasSelection: null, method: 'none', reason: 'not windows' };
+  }
+  
+  const api = initWin32API();
+  if (!api) {
+    return { hasSelection: null, method: 'none', reason: 'api not available' };
+  }
+  
+  try {
+    // ========== 第一层：焦点 + 控件类型判定 ==========
+    const focusInfo = getFocusedWindowInfo(api);
+    
+    if (!focusInfo.hwndFocus) {
+      // 没有前台窗口 → 需要兜底检测
+      return { hasSelection: null, method: 'focus', reason: focusInfo.reason || 'no window' };
+    }
+    
+    logger.debug(`Focus window: "${focusInfo.className}" (caret: ${focusInfo.hasCaret}, usedForeground: ${focusInfo.usedForeground})`);
+    
+    // 检查是否是"肯定无选区"的控件类型
+    const noTextClasses = [
+      'Progman', 'WorkerW',           // 桌面
+      'SHELLDLL_DefView',             // 文件管理器视图
+      'SysListView32', 'SysTreeView32', // 列表/树控件
+      'Button', 'Static',             // 按钮、标签
+      'msctls_trackbar32',            // 滑块
+      'ScrollBar',                    // 滚动条
+    ];
+    
+    if (noTextClasses.some(cls => focusInfo.className.includes(cls))) {
+      return { hasSelection: false, method: 'class_filter', reason: `non-text control: ${focusInfo.className}` };
+    }
+    
+    // ========== 第二层：标准控件快速路径 ==========
+    const standardEditClasses = [
+      'Edit',                         // 标准输入框
+      'RICHEDIT50W', 'RichEdit20W', 'RichEdit', // RichEdit 系列
+      'TextBox',                      // .NET TextBox
+      '_WwG',                         // Word 编辑区
+    ];
+    
+    if (standardEditClasses.some(cls => focusInfo.className.includes(cls))) {
+      const selResult = getEditControlSelection(api, focusInfo.hwndFocus);
+      if (selResult.success) {
+        const hasSelection = selResult.start !== selResult.end;
+        return { 
+          hasSelection, 
+          method: 'em_getsel', 
+          reason: hasSelection ? `range ${selResult.start}-${selResult.end}` : 'empty selection'
+        };
+      }
+      // EM_GETSEL 失败，继续到第三层
+      logger.debug('EM_GETSEL failed, falling back');
+    }
+    
+    // ========== 第三层准备：判断是否需要剪贴板兜底 ==========
+    
+    // 复杂应用（浏览器 / VSCode / Electron）
+    // 复杂应用（浏览器 / VSCode / Electron）
+    // 包括顶层窗口和渲染内容区域的类名
+    const complexAppClasses = [
+      // Chrome/Edge/Electron
+      'Chrome_RenderWidgetHostHWND',  // 渲染内容区域
+      'Chrome_WidgetWin_',            // 顶层窗口（Chrome_WidgetWin_0, Chrome_WidgetWin_1 等）
+      
+      // Firefox
+      'MozillaWindowClass',           // 顶层窗口和内容区域
+      
+      // Windows Terminal
+      'CASCADIA_HOSTING_WINDOW_CLASS',
+      
+      // VSCode
+      'vloVw32', 'vloVw64',
+      
+      // Office
+      'EXCEL7', 'PPTFrameClass', 'OpusApp',  // Excel, PowerPoint, Word
+      
+      // 其他 Electron 应用
+      'Electron',
+    ];
+    
+    const isComplexApp = complexAppClasses.some(cls => focusInfo.className.includes(cls));
+    
+    if (isComplexApp || focusInfo.hasCaret) {
+      // 复杂应用或有光标，需要剪贴板兜底
+      return { 
+        hasSelection: null, 
+        method: 'needs_clipboard', 
+        reason: isComplexApp ? `complex app: ${focusInfo.className}` : 'has caret, unknown control'
+      };
+    }
+    
+    // 未知控件，且没有光标，大概率无选区
+    return { hasSelection: false, method: 'unknown_no_caret', reason: `unknown class without caret: ${focusInfo.className}` };
+    
+  } catch (e) {
+    logger.error('hasTextSelection error:', e);
+    return { hasSelection: null, method: 'error', reason: e.message };
+  }
+}
+
+/**
+ * 获取焦点窗口信息
+ */
+function getFocusedWindowInfo(api) {
+  const {
+    GetForegroundWindow, GetWindowThreadProcessId, GetGUIThreadInfo,
+    GetClassNameW, GUITHREADINFO,
+  } = api;
+  
+  // 获取前台窗口
+  const hwndForeground = GetForegroundWindow();
+  if (!hwndForeground) {
+    return { hwndFocus: null, reason: 'no foreground window' };
+  }
+  
+  // 获取线程 ID
+  const pidBuffer = Buffer.alloc(4);
+  const threadId = GetWindowThreadProcessId(hwndForeground, pidBuffer);
+  if (!threadId) {
+    return { hwndFocus: null, reason: 'no thread id' };
+  }
+  
+  // 获取 GUI 线程信息
+  const guiInfo = {
+    cbSize: 48,
+    flags: 0,
+    hwndActive: null,
+    hwndFocus: null,
+    hwndCapture: null,
+    hwndMenuOwner: null,
+    hwndMoveSize: null,
+    hwndCaret: null,
+    rcCaret_left: 0,
+    rcCaret_top: 0,
+    rcCaret_right: 0,
+    rcCaret_bottom: 0,
+  };
+  
+  const result = GetGUIThreadInfo(threadId, guiInfo);
+  
+  // 使用焦点窗口，如果为空则使用前台窗口
+  const targetHwnd = (result && guiInfo.hwndFocus) ? guiInfo.hwndFocus : hwndForeground;
+  
+  // 获取窗口类名
+  const classBuffer = Buffer.alloc(512);
+  GetClassNameW(targetHwnd, classBuffer, 256);
+  const className = classBuffer.toString('utf16le').replace(/\0/g, '');
+  
+  logger.debug(`getFocusedWindowInfo: foreground=${!!hwndForeground}, focus=${!!guiInfo.hwndFocus}, class="${className}"`);
+  
+  return {
+    hwndFocus: targetHwnd,
+    hwndCaret: guiInfo.hwndCaret,
+    className,
+    hasCaret: !!guiInfo.hwndCaret,
+    usedForeground: !guiInfo.hwndFocus,  // 标记是否使用了前台窗口
+  };
+}
+
+/**
+ * 获取 Edit 控件的选区范围
+ */
+function getEditControlSelection(api, hwnd) {
+  const { SendMessageW, EM_GETSEL } = api;
+  
+  try {
+    const startBuffer = Buffer.alloc(8);
+    const endBuffer = Buffer.alloc(8);
+    SendMessageW(hwnd, EM_GETSEL, startBuffer, endBuffer);
+    
+    const start = startBuffer.readUInt32LE(0);
+    const end = endBuffer.readUInt32LE(0);
+    
+    return { success: true, start, end };
+  } catch (e) {
+    logger.debug('getEditControlSelection failed:', e.message);
+    return { success: false };
+  }
+}
+
+/**
+ * 第三层：剪贴板兜底检测（受控使用）
+ * 仅在 hasTextSelection 返回 null 时调用
+ * 
+ * @returns {Promise<{hasSelection: boolean, text: string}>}
+ */
+async function checkSelectionViaClipboard() {
+  if (process.platform !== 'win32') {
+    return { hasSelection: false, text: '' };
+  }
+  
+  // 防抖检查
+  const now = Date.now();
+  if (now - lastClipboardCheckTime < CLIPBOARD_CHECK_COOLDOWN) {
+    logger.debug('Clipboard check skipped (cooldown)');
+    return { hasSelection: null, text: '' };
+  }
+  lastClipboardCheckTime = now;
+  
+  const { clipboard } = require('electron');
+  
+  try {
+    // 1. 保存剪贴板快照（含格式）
+    const snapshot = {
+      text: clipboard.readText(),
+      html: clipboard.readHTML(),
+      rtf: clipboard.readRTF(),
+    };
+    
+    // 2. 模拟 Ctrl+C（不清空剪贴板！）
+    simulateCtrlC();
+    
+    // 3. 延迟等待（20-40ms）
+    await new Promise(resolve => setTimeout(resolve, 30));
+    
+    // 4. 读取当前剪贴板
+    const currentText = clipboard.readText();
+    
+    // 5. 与快照比较，判断是否有"有意义的变化"
+    const textChanged = currentText !== snapshot.text;
+    const hasNewContent = currentText && currentText.trim().length > 0;
+    
+    // 6. 恢复剪贴板（无论是否变化都恢复，保持安静）
+    if (snapshot.html) {
+      clipboard.write({ text: snapshot.text, html: snapshot.html, rtf: snapshot.rtf });
+    } else if (snapshot.text) {
+      clipboard.writeText(snapshot.text);
+    } else {
+      // 原本为空，也恢复为空
+      clipboard.clear();
+    }
+    
+    // 7. 判定逻辑：
+    //    - 剪贴板未变化 → 无 selection（Ctrl+C 没复制到东西）
+    //    - 剪贴板变化且非空 → 有 selection
+    if (!textChanged) {
+      logger.debug('Clipboard unchanged, no selection');
+      return { hasSelection: false, text: '' };
+    }
+    
+    if (hasNewContent) {
+      logger.debug(`Clipboard changed, has selection: "${currentText.substring(0, 20)}..."`);
+      return { hasSelection: true, text: currentText };
+    }
+    
+    // 变化但为空（极少见情况）
+    logger.debug('Clipboard changed but empty');
+    return { hasSelection: false, text: '' };
+    
+  } catch (e) {
+    logger.error('checkSelectionViaClipboard error:', e);
+    return { hasSelection: null, text: '' };
+  }
+}
+
+// ==================== 导出 ====================// ==================== 导出 ====================
 
 module.exports = {
   // API 初始化
@@ -253,6 +559,10 @@ module.exports = {
   
   // 窗口检测
   getWindowInfoAtPoint,
+  
+  // 选区检测（三层混合）
+  hasTextSelection,           // 第一层 + 第二层（零剪贴板）
+  checkSelectionViaClipboard, // 第三层（剪贴板兜底）
   
   // 截图穿透
   makeWindowInvisibleToCapture,

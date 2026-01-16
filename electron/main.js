@@ -33,6 +33,54 @@ const screenshotModule = require('./screenshot-module');
 // ==================== 划词翻译逻辑 ====================
 
 /**
+ * 延迟确认：检测双击是否真的选中了文本
+ * 通过 Ctrl+C 获取选中内容，如果有内容则显示触发图标
+ */
+async function handleDelayedConfirm(x, y, rect) {
+  const { hasTextSelection, checkSelectionViaClipboard } = require('./utils/native-helper');
+  
+  // 等待一小段时间确保双击选中完成（系统需要时间响应）
+  await new Promise(resolve => setTimeout(resolve, 30));
+  
+  // ========== 第一层 + 第二层：零剪贴板检测 ==========
+  const selectionCheck = hasTextSelection();
+  logger.debug(`Selection check: ${selectionCheck.hasSelection} (${selectionCheck.method}: ${selectionCheck.reason})`);
+  
+  if (selectionCheck.hasSelection === true) {
+    // 确认有选区，显示图标
+    logger.debug('Delayed confirm: selection detected via Win32 API (layer 1-2)');
+    showSelectionTrigger(x, y, rect);
+    selectionStateMachine.reset();
+    return;
+  }
+  
+  if (selectionCheck.hasSelection === false) {
+    // 确认无选区，不显示
+    logger.debug('Delayed confirm: no selection detected (layer 1-2)');
+    selectionStateMachine.reset();
+    return;
+  }
+  
+  // ========== 第三层：剪贴板兜底（复杂应用） ==========
+  logger.debug('Delayed confirm: layer 3 - clipboard fallback');
+  
+  const clipboardResult = await checkSelectionViaClipboard();
+  
+  if (clipboardResult.hasSelection === true) {
+    logger.debug(`Delayed confirm: text selected via clipboard "${clipboardResult.text.substring(0, 20)}..."`);
+    showSelectionTrigger(x, y, rect);
+  } else if (clipboardResult.hasSelection === null) {
+    // 防抖跳过或出错，静默处理
+    logger.debug('Delayed confirm: clipboard check skipped or failed');
+  } else {
+    logger.debug('Delayed confirm: no text selected, skip trigger');
+  }
+  
+  // 重置状态机
+  selectionStateMachine.reset();
+}
+
+/**
  * 显示划词翻译触发点
  * 从主窗口获取实时语言设置
  */
@@ -226,10 +274,16 @@ function startSelectionHook() {
         return;
       }
 
-      // 隐藏现有的划词窗口
-      hideSelectionWindow();
+      // 检测是否是连续点击（双击/三击）
+      // 如果是，先不隐藏窗口，避免闪烁
+      const isMultiClick = selectionStateMachine.peekMultiClick(x, y);
       
-      // 状态机处理 mousedown
+      if (!isMultiClick) {
+        // 单击：隐藏现有的划词窗口
+        hideSelectionWindow();
+      }
+      
+      // 状态机处理 mousedown（双击/三击会在 mouseup 后延迟确认）
       selectionStateMachine.onMouseDown(x, y);
     });
 
@@ -277,16 +331,6 @@ function startSelectionHook() {
       const result = selectionStateMachine.onMouseUp(x, y);
       
       if (result.shouldShow) {
-        // 额外的窗口类型检查（保留桌面/文件管理器检测）
-        const windowInfo = getWindowInfoAtPoint(x, y);
-        if (windowInfo) {
-          if (windowInfo.isDesktop) {
-            logger.debug('Desktop detected, skip trigger');
-            selectionStateMachine.reset();
-            return;
-          }
-        }
-        
         const rect = result.rect || {
           x: x - 50,
           y: y - 20,
@@ -294,11 +338,45 @@ function startSelectionHook() {
           height: 40,
         };
         
-        showSelectionTrigger(x, y, rect);
+        // 双击/三击：走延迟确认（三层检测）
+        if (result.needsDelayedConfirm) {
+          handleDelayedConfirm(x, y, rect);
+          return;
+        }
+        
+        // 正常划选：也做选区检测
+        const { hasTextSelection, checkSelectionViaClipboard } = require('./utils/native-helper');
+        const selectionCheck = hasTextSelection();
+        logger.debug(`Normal drag selection check: ${selectionCheck.hasSelection} (${selectionCheck.method}: ${selectionCheck.reason})`);
+        
+        if (selectionCheck.hasSelection === true) {
+          // 第一/二层确认有选区
+          showSelectionTrigger(x, y, rect);
+          selectionStateMachine.reset();
+          return;
+        }
+        
+        if (selectionCheck.hasSelection === false) {
+          // 第一层确认无选区（桌面、文件管理器等）
+          logger.debug('Normal drag: no selection detected, skip trigger');
+          selectionStateMachine.reset();
+          return;
+        }
+        
+        // hasSelection 为 null（浏览器等复杂应用），走剪贴板兜底
+        logger.debug('Normal drag: complex app, using clipboard fallback');
+        const clipboardResult = await checkSelectionViaClipboard();
+        
+        if (clipboardResult.hasSelection === true) {
+          showSelectionTrigger(x, y, rect);
+        } else {
+          logger.debug('Normal drag: clipboard check found no selection');
+        }
+        selectionStateMachine.reset();
+      } else {
+        // 重置状态机准备下次
+        selectionStateMachine.reset();
       }
-      
-      // 重置状态机准备下次
-      selectionStateMachine.reset();
     });
 
     uIOhook.start();

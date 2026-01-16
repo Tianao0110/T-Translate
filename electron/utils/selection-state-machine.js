@@ -51,6 +51,7 @@ class SelectionStateMachine {
     this.reset();
     this.clickHistory = [];   // 点击历史，用于检测双击/三击
     this.onStateChange = null; // 状态变化回调
+    this.isMultiClickTriggered = false; // 是否由双击触发
   }
   
   /**
@@ -68,6 +69,7 @@ class SelectionStateMachine {
     this.lastSampleTime = 0;
     this.likelyEnteredAt = null; // 进入 Likely 的时间
     this.retreatCount = 0;       // 连续异常计数
+    this.isMultiClickTriggered = false; // 重置双击标记
   }
   
   /**
@@ -127,33 +129,37 @@ class SelectionStateMachine {
   
   /**
    * 鼠标按下
+   * @param {number} x - 鼠标 X 坐标
+   * @param {number} y - 鼠标 Y 坐标
    */
   onMouseDown(x, y) {
     const now = Date.now();
     
     // 检测双击/三击 (条件 C)
-    if (this.isMultiClick(x, y, now)) {
-      logger.debug('Multi-click detected, skip to Likely');
-      this.startPos = { x, y };
-      this.startTime = now;
-      this.transitionTo(STATES.LIKELY);
-      return;
-    }
+    const isMulti = this.isMultiClick(x, y, now);
     
     // 记录点击历史
     this.clickHistory.push({ x, y, t: now });
-    // 只保留最近 3 次
     if (this.clickHistory.length > 3) {
       this.clickHistory.shift();
     }
     
-    // 正常流程：进入 Possible
+    // 重置状态
     this.reset();
+    this.isMultiClickTriggered = isMulti;  // 标记是否双击
     this.startPos = { x, y };
     this.startTime = now;
     this.samples.push({ x, y, t: now });
     this.lastSampleTime = now;
-    this.transitionTo(STATES.POSSIBLE);
+    
+    if (isMulti) {
+      // 双击直接进入 Likely，但 mouseUp 时需要延迟确认
+      logger.debug('Multi-click detected, entering Likely (needs delayed confirm)');
+      this.transitionTo(STATES.LIKELY);
+    } else {
+      // 正常流程：进入 Possible
+      this.transitionTo(STATES.POSSIBLE);
+    }
   }
   
   /**
@@ -216,9 +222,20 @@ class SelectionStateMachine {
     if (this.state === STATES.LIKELY) {
       // 从 Likely 进入 Confirmed
       this.transitionTo(STATES.CONFIRMED);
+      
+      // 双击触发的需要延迟确认（检测是否真的选中了文本）
+      if (this.isMultiClickTriggered) {
+        logger.debug('Multi-click needs delayed confirmation');
+        return { 
+          shouldShow: true, 
+          rect: this.getSelectionRect(), 
+          needsDelayedConfirm: true  // 需要延迟确认
+        };
+      }
+      
       return { shouldShow: true, rect: this.getSelectionRect() };
     } else if (this.state === STATES.POSSIBLE) {
-      // 还在 Possible，不显示
+      // 不满足条件，回到 IDLE
       this.transitionTo(STATES.IDLE);
       return { shouldShow: false };
     }
@@ -245,6 +262,33 @@ class SelectionStateMachine {
     
     return timeDiff < CONFIG.DOUBLE_CLICK_TIME && 
            distance < CONFIG.DOUBLE_CLICK_DISTANCE;
+  }
+  
+  /**
+   * 预检测是否是连续点击（不修改状态）
+   * 用于 mousedown 时决定是否隐藏窗口
+   */
+  peekMultiClick(x, y) {
+    const now = Date.now();
+    if (this.clickHistory.length === 0) return false;
+    
+    const lastClick = this.clickHistory[this.clickHistory.length - 1];
+    if (!lastClick.upTime) return false;
+    
+    const timeDiff = now - lastClick.upTime;
+    const distance = Math.sqrt(
+      Math.pow(x - lastClick.x, 2) + 
+      Math.pow(y - lastClick.y, 2)
+    );
+    
+    const isMulti = timeDiff < CONFIG.DOUBLE_CLICK_TIME && 
+                    distance < CONFIG.DOUBLE_CLICK_DISTANCE;
+    
+    if (isMulti) {
+      logger.debug(`peekMultiClick: true (timeDiff=${timeDiff}ms, distance=${distance.toFixed(1)}px)`);
+    }
+    
+    return isMulti;
   }
   
   /**
