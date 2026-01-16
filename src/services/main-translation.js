@@ -20,6 +20,9 @@ import translationService from './translation.js';
 import { ocrManager } from '../providers/ocr/index.js';
 import useTranslationStore from '../stores/translation-store.js';
 
+// 从配置中心导入常量
+import { PRIVACY_MODES, TRANSLATION_STATUS } from '@config/defaults';
+
 /**
  * 主窗口翻译服务
  */
@@ -65,7 +68,7 @@ class MainTranslationService {
 
     // 更新状态：开始翻译
     useTranslationStore.setState((draft) => {
-      draft.currentTranslation.status = 'translating';
+      draft.currentTranslation.status = TRANSLATION_STATUS.TRANSLATING;
       draft.currentTranslation.error = null;
       draft.currentTranslation.translatedText = '';
       draft.currentTranslation.id = translationId;
@@ -80,7 +83,7 @@ class MainTranslationService {
           targetLang: targetLanguage,
           template: options.template || state.currentTranslation.metadata.template,
           privacyMode: mode,
-          useCache: mode !== 'secure',
+          useCache: mode !== PRIVACY_MODES.SECURE,
         },
         // onChunk 回调：实时更新 UI
         (fullText) => {
@@ -95,7 +98,7 @@ class MainTranslationService {
       if (result.success) {
         // 完成后更新状态
         useTranslationStore.setState((draft) => {
-          draft.currentTranslation.status = 'success';
+          draft.currentTranslation.status = TRANSLATION_STATUS.SUCCESS;
           draft.currentTranslation.translatedText = result.text;
           draft.currentTranslation.metadata = {
             timestamp: Date.now(),
@@ -116,7 +119,7 @@ class MainTranslationService {
           draft.currentTranslation.currentVersionId = 'v1';
 
           // 添加到历史（非无痕模式）
-          if (mode !== 'secure' && result.text) {
+          if (mode !== PRIVACY_MODES.SECURE && result.text) {
             this._addToHistory(draft, {
               id: translationId,
               sourceText,
@@ -138,7 +141,7 @@ class MainTranslationService {
     } catch (error) {
       console.error('[MainTranslation] Stream translation error:', error);
       useTranslationStore.setState((draft) => {
-        draft.currentTranslation.status = 'error';
+        draft.currentTranslation.status = TRANSLATION_STATUS.ERROR;
         draft.currentTranslation.error = error.message;
       });
       return { success: false, error: error.message };
@@ -164,7 +167,7 @@ class MainTranslationService {
 
     // 更新状态：开始翻译
     useTranslationStore.setState((draft) => {
-      draft.currentTranslation.status = 'translating';
+      draft.currentTranslation.status = TRANSLATION_STATUS.TRANSLATING;
       draft.currentTranslation.error = null;
       draft.currentTranslation.id = translationId;
     });
@@ -176,7 +179,7 @@ class MainTranslationService {
         targetLang: targetLanguage,
         template: options.template || state.currentTranslation.metadata.template,
         privacyMode: mode,
-        useCache: mode !== 'secure',
+        useCache: mode !== PRIVACY_MODES.SECURE,
       });
 
       const duration = Date.now() - startTime;
@@ -184,7 +187,7 @@ class MainTranslationService {
       if (result.success) {
         useTranslationStore.setState((draft) => {
           draft.currentTranslation.translatedText = result.text;
-          draft.currentTranslation.status = 'success';
+          draft.currentTranslation.status = TRANSLATION_STATUS.SUCCESS;
           draft.currentTranslation.metadata = {
             timestamp: Date.now(),
             duration,
@@ -204,7 +207,7 @@ class MainTranslationService {
           draft.currentTranslation.currentVersionId = 'v1';
 
           // 添加到历史（非无痕模式）
-          if (mode !== 'secure') {
+          if (mode !== PRIVACY_MODES.SECURE) {
             this._addToHistory(draft, {
               id: translationId,
               sourceText,
@@ -226,7 +229,7 @@ class MainTranslationService {
     } catch (error) {
       console.error('[MainTranslation] Translation error:', error);
       useTranslationStore.setState((draft) => {
-        draft.currentTranslation.status = 'error';
+        draft.currentTranslation.status = TRANSLATION_STATUS.ERROR;
         draft.currentTranslation.error = error.message;
       });
       return { success: false, error: error.message };
@@ -273,7 +276,7 @@ class MainTranslationService {
           targetLang: state.currentTranslation.targetLanguage,
           template: options.template,
           privacyMode: state.translationMode,
-          useCache: state.translationMode !== 'secure',
+          useCache: state.translationMode !== PRIVACY_MODES.SECURE,
         });
 
         useTranslationStore.setState((draft) => {
@@ -290,7 +293,7 @@ class MainTranslationService {
         useTranslationStore.setState((draft) => {
           const queueItem = draft.queue.find((q) => q.id === item.id);
           if (queueItem) {
-            queueItem.status = 'error';
+            queueItem.status = TRANSLATION_STATUS.ERROR;
             queueItem.error = error.message;
           }
         });

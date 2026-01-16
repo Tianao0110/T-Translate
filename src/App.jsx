@@ -3,7 +3,10 @@ import React, { useEffect, useState } from 'react';
 import TitleBar from './components/TitleBar';
 import MainWindow from './components/MainWindow';
 import useTranslationStore from './stores/translation-store';
-import './styles/App.css'; 
+import './styles/App.css';
+
+// 从配置中心导入常量
+import { THEMES } from '@config/defaults'; 
 
 // 暴露 store 到 window，供玻璃窗口通过 IPC 获取设置
 if (typeof window !== 'undefined') {
@@ -14,7 +17,7 @@ function App() {
   console.log("▶ App component started rendering...");
 
   try {
-    const [theme, setTheme] = useState('light');
+    const [theme, setTheme] = useState(THEMES.LIGHT);
     const setPendingScreenshot = useTranslationStore(state => state.setPendingScreenshot);
     const addToFavorites = useTranslationStore(state => state.addToFavorites);
     const addToHistory = useTranslationStore(state => state.addToHistory);

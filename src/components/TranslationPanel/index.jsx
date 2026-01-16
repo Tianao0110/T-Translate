@@ -8,7 +8,10 @@ import {
 
 import useTranslationStore from '../../stores/translation-store';
 import translationService from '../../services/translation.js';
-import './styles.css'; 
+import './styles.css';
+
+// 从配置中心导入常量
+import { PRIVACY_MODES, TRANSLATION_STATUS } from '@config/defaults'; 
 
 /**
  * 翻译面板组件 (功能增强版)
@@ -138,11 +141,21 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
           setIsOcrSource(true);
           notify(`识别成功 (${result.engine || engineToUse})`, 'success');
 
-          // 自动开始翻译
-          setTimeout(() => {
-            console.log('[Screenshot] Auto-translating with OCR template...');
-            handleTranslate();
-          }, 200);
+          // 如果开启了自动翻译，延迟后自动开始翻译
+          if (autoTranslate) {
+            const delay = Math.max(autoTranslateDelay || 500, 300); // 至少 300ms，让用户看到识别结果
+            console.log(`[Screenshot] Will auto-translate in ${delay}ms...`);
+            setTimeout(() => {
+              // 再次检查是否有内容（防止用户清空）
+              const currentText = useTranslationStore.getState().currentTranslation.sourceText;
+              if (currentText?.trim()) {
+                console.log('[Screenshot] Auto-translating with OCR template...');
+                handleTranslate();
+              }
+            }, delay);
+          } else {
+            console.log('[Screenshot] Auto-translate disabled, waiting for manual trigger');
+          }
         } else {
           console.warn('[OCR] No text recognized:', result);
           notify('未能识别到文字', 'warning');
@@ -180,7 +193,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     if (!currentTranslation.sourceText.trim()) return;
     
     // 如果正在翻译中，不触发新的翻译
-    if (currentTranslation.status === 'translating') return;
+    if (currentTranslation.status === TRANSLATION_STATUS.TRANSLATING) return;
 
     // 设置防抖定时器
     const timer = setTimeout(() => {
@@ -188,7 +201,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
       const state = useTranslationStore.getState();
       if (state.autoTranslate && 
           state.currentTranslation.sourceText.trim() && 
-          state.currentTranslation.status !== 'translating') {
+          state.currentTranslation.status !== TRANSLATION_STATUS.TRANSLATING) {
         handleTranslate();
       }
     }, autoTranslateDelay);
@@ -204,7 +217,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
       return;
     }
 
-    if (!isConnected && translationMode !== 'offline') {
+    if (!isConnected && translationMode !== PRIVACY_MODES.OFFLINE) {
       notify('LM Studio 未连接，请检查连接或使用离线模式', 'error');
     }
 
@@ -216,7 +229,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
 
     const options = {
       template: effectiveTemplate,
-      saveHistory: translationMode !== 'secure' 
+      saveHistory: translationMode !== PRIVACY_MODES.SECURE 
     };
 
     // 根据设置选择流式或非流式翻译
@@ -225,7 +238,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
       : await translate(options);
 
     if (result.success) {
-      if (translationMode === 'secure') {
+      if (translationMode === PRIVACY_MODES.SECURE) {
         console.log('[SECURE] Translation done, history skipped.');
       }
       // 翻译成功后，检测术语一致性
@@ -664,22 +677,22 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
 
       <div className="translation-modes">
         <button
-          className={`mode-btn ${translationMode === 'standard' ? 'active' : ''}`}
-          onClick={() => setTranslationMode('standard')}
+          className={`mode-btn ${translationMode === PRIVACY_MODES.STANDARD ? 'active' : ''}`}
+          onClick={() => setTranslationMode(PRIVACY_MODES.STANDARD)}
           title="标准模式"
         >
           <Zap size={14} /> <span>标准</span>
         </button>
         <button
-          className={`mode-btn ${translationMode === 'secure' ? 'active' : ''}`}
-          onClick={() => setTranslationMode('secure')}
+          className={`mode-btn ${translationMode === PRIVACY_MODES.SECURE ? 'active' : ''}`}
+          onClick={() => setTranslationMode(PRIVACY_MODES.SECURE)}
           title="不保存历史"
         >
           <Shield size={14} /> <span>无痕</span>
         </button>
         <button
-          className={`mode-btn ${translationMode === 'offline' ? 'active' : ''}`}
-          onClick={() => setTranslationMode('offline')}
+          className={`mode-btn ${translationMode === PRIVACY_MODES.OFFLINE ? 'active' : ''}`}
+          onClick={() => setTranslationMode(PRIVACY_MODES.OFFLINE)}
           title="强制离线"
         >
           <Lock size={14} /> <span>离线</span>
@@ -825,11 +838,11 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
         {/* 中间：翻译按钮 */}
         <div className="translation-controls">
           <button
-            className={`translate-btn ${currentTranslation.status === 'translating' ? 'loading' : ''}`}
+            className={`translate-btn ${currentTranslation.status === TRANSLATION_STATUS.TRANSLATING ? 'loading' : ''}`}
             onClick={handleTranslate}
-            disabled={!currentTranslation.sourceText.trim() || currentTranslation.status === 'translating' || isOcrProcessing}
+            disabled={!currentTranslation.sourceText.trim() || currentTranslation.status === TRANSLATION_STATUS.TRANSLATING || isOcrProcessing}
           >
-            {currentTranslation.status === 'translating' ? (
+            {currentTranslation.status === TRANSLATION_STATUS.TRANSLATING ? (
               <>
                 <Loader2 size={18} className="animate-spin" />
                 <span>翻译中</span>

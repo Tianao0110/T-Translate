@@ -18,6 +18,10 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 import { v4 as uuidv4 } from "uuid";
 
+// 从配置中心导入常量
+import { PRIVACY_MODES, TRANSLATION_STATUS, LANGUAGE_CODES, DEFAULTS, PROVIDER_IDS } from "@config/defaults";
+import { getModeFeatures } from "@config/privacy-modes";
+
 // Service 引用（延迟绑定，避免循环依赖）
 let _mainTranslation = null;
 const getMainTranslation = async () => {
@@ -37,7 +41,7 @@ const useTranslationStore = create(
     immer((set, get) => ({
       // ==================== 1. 状态 (保留原样) ====================
       // 当前翻译任务
-      translationMode: "standard", // 'standard' | 'secure' | 'offline'
+      translationMode: PRIVACY_MODES.STANDARD, // 'standard' | 'secure' | 'offline'
       useStreamOutput: true, // 是否使用流式输出（打字机效果）
       autoTranslate: false, // 是否自动翻译
       autoTranslateDelay: 500, // 自动翻译延迟（毫秒）
@@ -45,9 +49,9 @@ const useTranslationStore = create(
         id: null,
         sourceText: "",
         translatedText: "",
-        sourceLanguage: "auto",
-        targetLanguage: "zh",
-        status: "idle", // idle | translating | success | error
+        sourceLanguage: LANGUAGE_CODES.AUTO,
+        targetLanguage: LANGUAGE_CODES.ZH,
+        status: TRANSLATION_STATUS.IDLE, // idle | translating | success | error
         error: null,
         metadata: {
           timestamp: null,
@@ -101,7 +105,7 @@ const useTranslationStore = create(
           state.translationMode = mode;
           
           // 无痕模式：清除历史和统计
-          if (mode === 'secure') {
+          if (mode === PRIVACY_MODES.SECURE) {
             state.history = [];
             state.statistics = {
               totalTranslations: 0,
@@ -118,20 +122,16 @@ const useTranslationStore = create(
       // 检查当前模式下某功能是否可用
       isFeatureEnabled: (featureName) => {
         const mode = get().translationMode;
-        const features = {
-          standard: { saveHistory: true, useCache: true, onlineApi: true, analytics: true },
-          secure: { saveHistory: false, useCache: false, onlineApi: true, analytics: false },
-          offline: { saveHistory: true, useCache: true, onlineApi: false, analytics: true },
-        };
-        return features[mode]?.[featureName] !== false;
+        const features = getModeFeatures(mode);
+        return features[featureName] !== false;
       },
 
       // 检查翻译源是否在当前模式下可用
       isProviderAllowed: (providerId) => {
         const mode = get().translationMode;
-        if (mode !== 'offline') return true;
+        if (mode !== PRIVACY_MODES.OFFLINE) return true;
         // 离线模式仅允许本地LLM
-        return providerId === 'local-llm';
+        return providerId === PROVIDER_IDS.LOCAL_LLM;
       },
 
       setUseStreamOutput: (value) =>
@@ -365,19 +365,19 @@ const useTranslationStore = create(
       // 检查当前模式下是否允许保存历史
       canSaveHistory: () => {
         const state = get();
-        return state.translationMode !== 'secure';
+        return state.translationMode !== PRIVACY_MODES.SECURE;
       },
       
       // 检查当前模式下是否允许使用在线API
       canUseOnlineApi: () => {
         const state = get();
-        return state.translationMode !== 'offline';
+        return state.translationMode !== PRIVACY_MODES.OFFLINE;
       },
       
       // 检查当前模式下是否允许使用缓存
       canUseCache: () => {
         const state = get();
-        return state.translationMode !== 'secure';
+        return state.translationMode !== PRIVACY_MODES.SECURE;
       },
       
       // 获取当前模式配置
@@ -401,7 +401,7 @@ const useTranslationStore = create(
             useCache: true,
             onlineApi: false,
             analytics: true,
-            allowedProviders: ['local-llm'],
+            allowedProviders: [PROVIDER_IDS.LOCAL_LLM],
             allowedOcrEngines: ['llm-vision', 'rapid-ocr', 'windows-ocr'],
           }
         };
@@ -413,7 +413,7 @@ const useTranslationStore = create(
       addToHistory: (item) =>
         set((state) => {
           // 无痕模式下不保存历史
-          if (state.translationMode === 'secure') {
+          if (state.translationMode === PRIVACY_MODES.SECURE) {
             console.log('[Store] Secure mode - history not saved');
             return;
           }
@@ -440,7 +440,7 @@ const useTranslationStore = create(
               state.history = state.history.slice(0, state.historyLimit);
             }
             // 更新统计（标准模式和离线模式都统计）
-            if (state.translationMode !== 'secure') {
+            if (state.translationMode !== PRIVACY_MODES.SECURE) {
               state.statistics.totalTranslations++;
               state.statistics.totalCharacters += (historyItem.sourceText?.length || 0);
             }

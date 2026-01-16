@@ -86,6 +86,11 @@ export default defineConfig(({ command, mode }) => {
         interval: 100,
         // 忽略文件
         ignored: ['**/node_modules/**', '**/dist/**', '**/.git/**']
+      },
+
+      // 文件系统访问配置（允许访问 electron/shared）
+      fs: {
+        allow: ['..']
       }
     },
 
@@ -191,7 +196,8 @@ export default defineConfig(({ command, mode }) => {
       // 预构建
       commonjsOptions: {
         transformMixedEsModules: true,
-        include: [/node_modules/]
+        // 包含 node_modules 和 electron/shared 的 CommonJS 模块
+        include: [/node_modules/, /electron\/shared/]
       }
     },
 
@@ -233,7 +239,10 @@ export default defineConfig(({ command, mode }) => {
         'zustand',
         'dayjs',
         'lucide-react',
-        'tesseract.js'
+        'tesseract.js',
+        // 强制预构建 electron/shared 的 CommonJS 文件
+        'electron/shared/constants.js',
+        'electron/shared/channels.js'
       ],
       
       // 排除的依赖

@@ -25,7 +25,7 @@ import {
   DEFAULT_PRIORITY,
 } from '../providers/registry.js';
 
-import { isProviderAllowed } from '../config/privacy-modes.js';
+import { isProviderAllowed, PRIVACY_MODE_IDS } from '../config/privacy-modes.js';
 import { getEnabledFilters, DEFAULT_FILTERS } from '../config/filters.js';
 import { getSystemPrompt, LANGUAGE_NAMES } from '../config/templates.js';
 import translationCache from './cache.js';
@@ -305,7 +305,7 @@ class TranslationService {
    * @returns {{ value: any, source: string } | null}
    */
   _checkCache(key, options = {}) {
-    const { useCache = true, privacyMode = 'standard' } = options;
+    const { useCache = true, privacyMode = PRIVACY_MODE_IDS.STANDARD } = options;
     
     if (!useCache) return null;
     
@@ -323,7 +323,7 @@ class TranslationService {
     }
     
     // L2: 持久化缓存（非无痕模式）
-    if (privacyMode !== 'secure') {
+    if (privacyMode !== PRIVACY_MODE_IDS.SECURE) {
       const l2Result = translationCache.get(key);
       if (l2Result) {
         this._cacheStats.l2Hits++;
@@ -344,7 +344,7 @@ class TranslationService {
    * 写入缓存 (L1 + L2)
    */
   _saveCache(key, result, options = {}) {
-    const { useCache = true, privacyMode = 'standard' } = options;
+    const { useCache = true, privacyMode = PRIVACY_MODE_IDS.STANDARD } = options;
     
     if (!useCache) return;
     
@@ -352,7 +352,7 @@ class TranslationService {
     this._setL1Cache(key, result);
     
     // L2: 非无痕模式写入持久化
-    if (privacyMode !== 'secure') {
+    if (privacyMode !== PRIVACY_MODE_IDS.SECURE) {
       // 构造 L2 需要的结构
       const cacheEntry = {
         success: true,
@@ -464,7 +464,7 @@ class TranslationService {
       template = 'natural',
       mode = this._mode,
       enableFallback = true,
-      privacyMode = 'standard',
+      privacyMode = PRIVACY_MODE_IDS.STANDARD,
       useCache = true,
     } = options;
     
@@ -597,7 +597,7 @@ class TranslationService {
       template = 'natural',
       mode = this._mode,
       enableFallback = true,
-      privacyMode = 'standard',
+      privacyMode = PRIVACY_MODE_IDS.STANDARD,
       useCache = true,
     } = options;
     

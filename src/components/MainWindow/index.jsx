@@ -11,7 +11,10 @@ import HistoryPanel from '../HistoryPanel';
 import SettingsPanel from '../SettingsPanel';
 import FavoritesPanel from '../FavoritesPanel';
 import DocumentTranslator from '../DocumentTranslator';
-import './styles.css'; 
+import './styles.css';
+
+// 从配置中心导入常量
+import { TRANSLATION_STATUS } from '@config/defaults'; 
 
 /**
  * 主窗口组件
@@ -222,9 +225,9 @@ const MainWindow = () => {
       <div className="status-bar">
         <div className="status-left">
           <div className="status-item">
-            <div className={`status-indicator ${currentTranslation.status === 'translating' ? 'busy' : 'ready'}`}></div>
+            <div className={`status-indicator ${currentTranslation.status === TRANSLATION_STATUS.TRANSLATING ? 'busy' : 'ready'}`}></div>
             <span className="status-text">
-              {currentTranslation.status === 'translating' ? '翻译中...' : '就绪'}
+              {currentTranslation.status === TRANSLATION_STATUS.TRANSLATING ? '翻译中...' : '就绪'}
             </span>
           </div>
           <div className="status-item">

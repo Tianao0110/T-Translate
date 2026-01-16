@@ -17,6 +17,7 @@ import './styles.css';
 import {
   defaultConfig,
   PRIVACY_MODES,
+  PRIVACY_MODE_IDS,
   getModeFeatures,
   isFeatureEnabled,
   isProviderAllowed,
@@ -734,7 +735,7 @@ const SettingsPanel = ({ showNotification }) => {
           );
 
         case 'privacy':
-          const currentMode = useTranslationStore.getState().translationMode || 'standard';
+          const currentMode = useTranslationStore.getState().translationMode || PRIVACY_MODE_IDS.STANDARD;
           const modeConfig = PRIVACY_MODES[currentMode];
           
           return (
@@ -745,9 +746,9 @@ const SettingsPanel = ({ showNotification }) => {
               {/* 当前模式状态提示 */}
               <div className={`current-mode-banner mode-${currentMode}`}>
                 <div className="mode-banner-icon">
-                  {currentMode === 'standard' && <Zap size={20} />}
-                  {currentMode === 'secure' && <Shield size={20} />}
-                  {currentMode === 'offline' && <Lock size={20} />}
+                  {currentMode === PRIVACY_MODE_IDS.STANDARD && <Zap size={20} />}
+                  {currentMode === PRIVACY_MODE_IDS.SECURE && <Shield size={20} />}
+                  {currentMode === PRIVACY_MODE_IDS.OFFLINE && <Lock size={20} />}
                 </div>
                 <div className="mode-banner-info">
                   <span className="mode-banner-label">当前模式</span>
@@ -810,14 +811,14 @@ const SettingsPanel = ({ showNotification }) => {
                   </div>
                 </div>
                 
-                {currentMode === 'offline' && (
+                {currentMode === PRIVACY_MODE_IDS.OFFLINE && (
                   <div className="mode-warning">
                     <AlertCircle size={16} />
                     <span>离线模式下仅可使用本地 LLM 翻译，在线翻译源（OpenAI、DeepL等）将被禁用</span>
                   </div>
                 )}
                 
-                {currentMode === 'secure' && (
+                {currentMode === PRIVACY_MODE_IDS.SECURE && (
                   <div className="mode-warning secure">
                     <Shield size={16} />
                     <span>无痕模式下所有翻译记录仅存在于当前会话，关闭应用后自动清除</span>
@@ -839,12 +840,12 @@ const SettingsPanel = ({ showNotification }) => {
                       onChange={(e) => updateSetting('privacy', 'autoDeleteDays', parseInt(e.target.value) || 0)}
                       min="0"
                       max="365"
-                      disabled={currentMode === 'secure'}
+                      disabled={currentMode === PRIVACY_MODE_IDS.SECURE}
                     />
                     <span className="input-suffix">天后</span>
                   </div>
                 </div>
-                <p className="setting-hint">设为 0 表示永不自动删除{currentMode === 'secure' ? '（无痕模式下此选项无效）' : ''}</p>
+                <p className="setting-hint">设为 0 表示永不自动删除{currentMode === PRIVACY_MODE_IDS.SECURE ? '（无痕模式下此选项无效）' : ''}</p>
               </div>
   
               <div className="setting-group">

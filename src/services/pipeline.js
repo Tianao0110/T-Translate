@@ -9,7 +9,7 @@ import useSessionStore from '../stores/session.js';
 import useConfigStore from '../stores/config.js';
 import { calculateHash } from '../utils/image.js';
 import { detectLanguage, cleanTranslationOutput, shouldTranslateText } from '../utils/text.js';
-import { isProviderAllowed, isOcrEngineAllowed } from '../config/privacy-modes.js';
+import { isProviderAllowed, isOcrEngineAllowed, PRIVACY_MODE_IDS } from '../config/privacy-modes.js';
 
 // ========== 状态缓存 ==========
 let lastImageHash = '';
@@ -27,7 +27,7 @@ async function getPrivacyMode() {
   } catch (e) {
     console.log('[Pipeline] Failed to get privacy mode from main:', e);
   }
-  return 'standard';
+  return PRIVACY_MODE_IDS.STANDARD;
 }
 
 /**
@@ -174,7 +174,7 @@ class TranslationPipeline {
       const privacyMode = await getPrivacyMode();
       
       // 离线模式下检查翻译源
-      if (privacyMode === 'offline') {
+      if (privacyMode === PRIVACY_MODE_IDS.OFFLINE) {
         console.log('[Pipeline] Offline mode - using local-llm only');
       }
       

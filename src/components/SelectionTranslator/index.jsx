@@ -3,6 +3,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import translationService from '../../services/translation.js';
 import './styles.css';
 
+// 从配置中心导入常量
+import { PRIVACY_MODES, THEMES, LANGUAGE_CODES, selectionDefaults } from '@config/defaults';
+
 // 语言代码映射（用于显示）
 const LANG_MAP = {
   'zh': 'Simplified Chinese',
@@ -38,12 +41,12 @@ const SelectionTranslator = () => {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [rect, setRect] = useState(null);
   const [copied, setCopied] = useState(false);
-  const [theme, setTheme] = useState('light');
+  const [theme, setTheme] = useState(THEMES.LIGHT);
   const [showSource, setShowSource] = useState(false);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [translation, setTranslation] = useState(DEFAULT_TRANSLATION);
   const [triggerReady, setTriggerReady] = useState(false);  // 圆点是否就绪可点击
-  const [privacyMode, setPrivacyMode] = useState('standard'); // 隐私模式
+  const [privacyMode, setPrivacyMode] = useState(PRIVACY_MODES.STANDARD); // 隐私模式
 
   const sizedRef = useRef(false);
   const resizeRef = useRef({ startX: 0, startY: 0, startW: 0, startH: 0 });

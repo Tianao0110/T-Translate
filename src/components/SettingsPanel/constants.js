@@ -8,6 +8,9 @@ import {
   FileText
 } from 'lucide-react';
 
+// 从配置中心导入隐私模式
+import { PRIVACY_MODES, getModeFeatures, isFeatureEnabled, isProviderAllowed as isProviderAllowedByMode, PRIVACY_MODE_IDS } from '@config/privacy-modes';
+
 /**
  * 默认配置
  */
@@ -32,96 +35,7 @@ export const defaultConfig = {
   storage: { cache: { maxSize: 100 }, history: { maxItems: 1000 } }
 };
 
-/**
- * 隐私模式配置
- */
-export const PRIVACY_MODES = {
-  standard: {
-    id: 'standard',
-    name: '标准模式',
-    icon: 'Zap',
-    color: '#3b82f6',
-    description: '功能全开，自动保存历史记录',
-    features: {
-      saveHistory: true,
-      useCache: true,
-      onlineApi: true,
-      analytics: true,
-      autoSave: true,
-      selectionTranslate: true,
-      glassWindow: true,
-      documentTranslate: true,
-      exportData: true,
-    },
-    allowedProviders: null,
-    allowedOcrEngines: null,
-  },
-  secure: {
-    id: 'secure',
-    name: '无痕模式',
-    icon: 'Shield',
-    color: '#f59e0b',
-    description: '不保存任何记录，关闭窗口即清除',
-    features: {
-      saveHistory: false,
-      useCache: false,
-      onlineApi: true,
-      analytics: false,
-      autoSave: false,
-      selectionTranslate: true,
-      glassWindow: true,
-      documentTranslate: true,
-      exportData: false,
-    },
-    allowedProviders: null,
-    allowedOcrEngines: null,
-  },
-  offline: {
-    id: 'offline',
-    name: '离线模式',
-    icon: 'Lock',
-    color: '#10b981',
-    description: '完全离线，不发送任何网络请求',
-    features: {
-      saveHistory: true,
-      useCache: true,
-      onlineApi: false,
-      analytics: true,
-      autoSave: true,
-      selectionTranslate: true,
-      glassWindow: true,
-      documentTranslate: true,
-      exportData: true,
-    },
-    allowedProviders: ['local-llm'],
-    allowedOcrEngines: ['llm-vision', 'rapid-ocr', 'windows-ocr'],
-    disabledServices: ['openai', 'deepl', 'gemini', 'deepseek', 'google-translate', 'ocr-space', 'google-vision', 'azure-ocr', 'baidu-ocr'],
-  }
-};
 
-/**
- * 获取当前模式的功能配置
- */
-export const getModeFeatures = (mode) => {
-  return PRIVACY_MODES[mode]?.features || PRIVACY_MODES.standard.features;
-};
-
-/**
- * 检查某功能在当前模式下是否可用
- */
-export const isFeatureEnabled = (mode, featureName) => {
-  const features = getModeFeatures(mode);
-  return features[featureName] !== false;
-};
-
-/**
- * 检查某翻译源在当前模式下是否可用
- */
-export const isProviderAllowed = (mode, providerId) => {
-  const modeConfig = PRIVACY_MODES[mode];
-  if (!modeConfig?.allowedProviders) return true;
-  return modeConfig.allowedProviders.includes(providerId);
-};
 
 /**
  * 快捷键标签映射
@@ -231,7 +145,7 @@ export const DEFAULT_SETTINGS = {
   shortcuts: { ...defaultConfig.shortcuts },
   
   // 隐私模式
-  privacyMode: 'standard',
+  privacyMode: PRIVACY_MODE_IDS.STANDARD,
   
   // 其他
   saveHistory: true,
@@ -366,3 +280,6 @@ export const migrateOldSettings = (savedSettings) => {
   
   return migrated;
 };
+
+// 重新导出 PRIVACY_MODES 供组件使用
+export { PRIVACY_MODES, getModeFeatures, isFeatureEnabled, isProviderAllowedByMode as isProviderAllowed, PRIVACY_MODE_IDS };

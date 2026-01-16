@@ -5,6 +5,15 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
+// 从配置中心导入常量
+import { 
+  LANGUAGE_CODES, 
+  THEMES, 
+  PROVIDER_IDS, 
+  OCR_ENGINES,
+  DEFAULTS 
+} from '@config/defaults';
+
 /**
  * 配置 Store
  * 存储用户偏好设置（持久化）
@@ -13,23 +22,23 @@ const useConfigStore = create(
   persist(
     (set, get) => ({
       // ========== 翻译设置 ==========
-      sourceLanguage: 'auto',
-      targetLanguage: 'zh',
-      lockTargetLang: true,       // 锁定目标语言（避免回译）
+      sourceLanguage: LANGUAGE_CODES.AUTO,
+      targetLanguage: LANGUAGE_CODES.ZH,
+      lockTargetLang: true,
       
       // ========== 翻译源设置 ==========
-      translationEngine: 'local-llm',  // 当前选中的翻译引擎
-      subtitleEngine: null,            // 字幕模式专用引擎（null=自动）
-      providerPriority: ['local-llm', 'openai', 'deepl'],
+      translationEngine: PROVIDER_IDS.LOCAL_LLM,
+      subtitleEngine: null,
+      providerPriority: [PROVIDER_IDS.LOCAL_LLM, PROVIDER_IDS.OPENAI, PROVIDER_IDS.DEEPL],
       
       // ========== OCR 设置 ==========
-      ocrEngine: 'rapid-ocr',
-      ocrPriority: ['rapid-ocr', 'llm-vision'],
+      ocrEngine: OCR_ENGINES.RAPID_OCR,
+      ocrPriority: [OCR_ENGINES.RAPID_OCR, OCR_ENGINES.LLM_VISION],
       
       // ========== 界面设置 ==========
-      theme: 'light',
+      theme: THEMES.LIGHT,
       glassOpacity: 0.85,
-      fontSize: 14,
+      fontSize: DEFAULTS.FONT_SIZE,
       
       // ========== 玻璃窗设置 ==========
       glassWindow: {
@@ -70,24 +79,23 @@ const useConfigStore = create(
       
       // 重置为默认值
       reset: () => set({
-        sourceLanguage: 'auto',
-        targetLanguage: 'zh',
+        sourceLanguage: LANGUAGE_CODES.AUTO,
+        targetLanguage: LANGUAGE_CODES.ZH,
         lockTargetLang: true,
-        translationEngine: 'local-llm',
+        translationEngine: PROVIDER_IDS.LOCAL_LLM,
         subtitleEngine: null,
-        providerPriority: ['local-llm', 'openai', 'deepl'],
-        ocrEngine: 'rapid-ocr',
-        ocrPriority: ['rapid-ocr', 'llm-vision'],
-        theme: 'light',
+        providerPriority: [PROVIDER_IDS.LOCAL_LLM, PROVIDER_IDS.OPENAI, PROVIDER_IDS.DEEPL],
+        ocrEngine: OCR_ENGINES.RAPID_OCR,
+        ocrPriority: [OCR_ENGINES.RAPID_OCR, OCR_ENGINES.LLM_VISION],
+        theme: THEMES.LIGHT,
         glassOpacity: 0.85,
-        fontSize: 14,
+        fontSize: DEFAULTS.FONT_SIZE,
       }),
     }),
     {
       name: 't-translate-config',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        // 只持久化这些字段
         sourceLanguage: state.sourceLanguage,
         targetLanguage: state.targetLanguage,
         lockTargetLang: state.lockTargetLang,

@@ -12,7 +12,10 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import 'dayjs/locale/zh-cn';
-import './styles.css'; 
+import './styles.css';
+
+// 从配置中心导入常量
+import { PRIVACY_MODES } from '@config/defaults'; 
 
 dayjs.extend(relativeTime);
 dayjs.extend(isSameOrAfter);
@@ -122,7 +125,7 @@ const HistoryPanel = ({ showNotification }) => {
   } = useTranslationStore();
 
   // 无痕模式检查
-  const isSecureMode = translationMode === 'secure';
+  const isSecureMode = translationMode === PRIVACY_MODES.SECURE;
 
   // 统计数据
   const enhancedStats = useMemo(() => {
