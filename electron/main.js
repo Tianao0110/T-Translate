@@ -172,8 +172,8 @@ async function showSelectionTrigger(mouseX, mouseY, rect) {
   win.setBounds({
     x: Math.round(triggerX),
     y: Math.round(triggerY),
-    width: 32,
-    height: 32,
+    width: 20,
+    height: 20,
   });
   win.show();
 
@@ -257,14 +257,10 @@ function startSelectionHook() {
       const cursorPos = screen.getCursorScreenPoint();
       const { x, y } = cursorPos;
 
-      // 检查是否点击在 selectionWindow 内
-      if (windows.selection && !windows.selection.isDestroyed() && windows.selection.isVisible()) {
-        const bounds = windows.selection.getBounds();
-        if (x >= bounds.x && x <= bounds.x + bounds.width &&
-            y >= bounds.y && y <= bounds.y + bounds.height) {
-          runtime.isDraggingOverlay = true;
-          return;
-        }
+      // 检查是否点击在任何划词窗口内（包括冻结窗口）
+      if (windowManager.isPointInSelectionWindows(x, y)) {
+        runtime.isDraggingOverlay = true;
+        return;
       }
 
       runtime.isDraggingOverlay = false;

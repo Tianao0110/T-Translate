@@ -15,12 +15,20 @@ html, body, #root, .sel-root {
   width: 100%; height: 100%;
   display: flex; align-items: center; justify-content: center;
   cursor: default;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #4FC3F7;  /* 浅蓝色 */
   border-radius: 50%;
-  box-shadow: 0 2px 12px rgba(102, 126, 234, 0.5);
-  animation: triggerIn 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+  box-shadow: 0 2px 8px rgba(79, 195, 247, 0.4);
+  animation: triggerIn 0.2s ease-out;
   transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
-  opacity: 0.6;
+  opacity: 0.7;
+}
+
+.sel-trigger-text {
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1;
 }
 
 /* 圆点就绪后才可点击 */
@@ -30,8 +38,8 @@ html, body, #root, .sel-root {
 }
 
 .sel-trigger.ready:hover {
-  transform: scale(1.15);
-  box-shadow: 0 4px 20px rgba(102, 126, 234, 0.7);
+  transform: scale(1.1);
+  box-shadow: 0 3px 12px rgba(79, 195, 247, 0.5);
 }
 
 .sel-trigger.ready:active { transform: scale(0.95); }
@@ -72,8 +80,8 @@ html, body, #root, .sel-root {
   border-radius: 10px;
   overflow: hidden;
   background: #ffffff;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.02);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  box-sizing: border-box;
   animation: cardIn 0.2s ease-out;
 }
 
@@ -148,10 +156,10 @@ html, body, #root, .sel-root {
    ========================================== */
 .sel-content {
   flex: 1;
-  padding: 12px 14px;
+  padding: 8px 12px;
   overflow-y: auto;
   font-size: 14px;
-  line-height: 1.65;
+  line-height: 1.5;
   color: #1e293b;
   -webkit-app-region: no-drag;
   user-select: text;
@@ -159,17 +167,21 @@ html, body, #root, .sel-root {
 }
 
 .sel-source {
-  padding: 8px 10px;
-  margin-bottom: 10px;
+  padding: 6px 8px;
+  margin-bottom: 8px;
   background: #f1f5f9;
-  border-radius: 6px;
+  border-radius: 4px;
   font-size: 13px;
   color: #64748b;
   border-left: 3px solid #cbd5e1;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .sel-text {
   color: #1e293b;
+  white-space: pre-wrap;  /* 保留换行符，同时允许自动换行 */
+  word-break: break-word; /* 长单词换行 */
 }
 
 .sel-error {
@@ -183,20 +195,7 @@ html, body, #root, .sel-root {
 /* ==========================================
    调整大小抓手
    ========================================== */
-.sel-resize-handle {
-  position: absolute;
-  bottom: 0; right: 0;
-  width: 14px; height: 14px;
-  cursor: nwse-resize;
-  -webkit-app-region: no-drag;
-  background: linear-gradient(135deg, transparent 50%, rgba(0, 0, 0, 0.1) 50%);
-  border-bottom-right-radius: 10px;
-  transition: background 0.15s;
-}
-
-.sel-resize-handle:hover {
-  background: linear-gradient(135deg, transparent 50%, #667eea 50%);
-}
+/* resize-handle 已移除，使用窗口边框拖动 */
 
 /* ==========================================
    滚动条
@@ -266,13 +265,7 @@ html, body, #root, .sel-root {
   color: #fca5a5;
 }
 
-[data-theme="dark"] .sel-resize-handle {
-  background: linear-gradient(135deg, transparent 50%, rgba(255, 255, 255, 0.1) 50%);
-}
 
-[data-theme="dark"] .sel-resize-handle:hover {
-  background: linear-gradient(135deg, transparent 50%, #818cf8 50%);
-}
 
 [data-theme="dark"] .sel-content::-webkit-scrollbar-thumb {
   background: #475569;

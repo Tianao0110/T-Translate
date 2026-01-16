@@ -52,10 +52,11 @@ const SelectionTranslator = () => {
   const [initialBounds, setInitialBounds] = useState(null); // 初始位置，用于检测是否移动
 
   const sizedRef = useRef(false);
-  const resizeRef = useRef({ startX: 0, startY: 0, startW: 0, startH: 0 });
+
   const frozenRef = useRef(false);  // 用于定时器回调中访问最新的 isFrozen 状态
   const autoHideTimerRef = useRef(null);
   const triggerReadyTimerRef = useRef(null);  // 圆点就绪计时器
+  const contentRef = useRef(null);  // 内容区域引用，用于测量实际大小
 
   // 获取隐私模式
   useEffect(() => {
@@ -159,6 +160,22 @@ const SelectionTranslator = () => {
     }
     
     if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
+    
+    // 先设置一个合理的窗口大小用于 loading 状态
+    const sw = window.screen?.availWidth || 1920;
+    const sh = window.screen?.availHeight || 1080;
+    const loadingSize = 60;
+    let x = mousePos.x - loadingSize / 2;
+    let y = mousePos.y + 15;
+    if (x < 10) x = 10;
+    if (x + loadingSize > sw - 10) x = sw - loadingSize - 10;
+    if (y + loadingSize > sh - 10) y = mousePos.y - loadingSize - 10;
+    
+    window.electron?.selection?.setBounds?.({
+      x: Math.round(x), y: Math.round(y),
+      width: loadingSize, height: loadingSize
+    });
+    
     setMode('loading');
     
     try {
@@ -214,37 +231,61 @@ const SelectionTranslator = () => {
         });
       }
       
-      if (!sizedRef.current) {
-        sizedRef.current = true;
-        setWindowSize(translationResult);
-      }
+      // 窗口大小由 useEffect 自动调整
     } catch (err) {
       setError(err.message || '翻译失败');
       setTranslatedText('');
       setMode('overlay');
-      if (!sizedRef.current) {
-        sizedRef.current = true;
-        setWindowSize(err.message || '翻译失败');
-      }
+      // 窗口大小由 useEffect 自动调整
     }
   };
 
-  const setWindowSize = (text) => {
-    const charWidth = 8, lineHeight = 22, padding = 40, toolbarHeight = 36;
-    const maxWidth = 420, minWidth = 180;
+  // 自适应窗口大小
+  const adjustWindowToContent = async () => {
+    const contentEl = contentRef.current;
+    if (!contentEl) return;
     
-    let width = Math.min(text.length * charWidth + padding, maxWidth);
-    width = Math.max(width, minWidth);
-    
-    const charsPerLine = Math.floor((width - padding) / charWidth);
-    const lines = Math.ceil(text.length / charsPerLine);
-    let height = lines * lineHeight + padding + toolbarHeight;
-    height = Math.max(height, 100);
-    height = Math.min(height, 400);
+    const maxWidth = 400, minWidth = 160;
+    const maxHeight = 350, minHeight = 65;
+    const toolbarHeight = 36;
     
     const sw = window.screen?.availWidth || 1920;
     const sh = window.screen?.availHeight || 1080;
     
+    // 获取文本
+    const text = contentEl.innerText || '';
+    const hasNewlines = text.includes('\n');
+    
+    // 计算宽度：根据字符数估算
+    const charCount = [...text].reduce((sum, ch) => sum + (/[\u4e00-\u9fff]/.test(ch) ? 1.6 : 1), 0);
+    let width;
+    if (hasNewlines || charCount > 40) {
+      width = maxWidth;
+    } else {
+      width = Math.min(Math.max(charCount * 9 + 50, minWidth), maxWidth);
+    }
+    
+    // 先设置宽度，让内容换行
+    await window.electron?.selection?.setBounds?.({
+      x: Math.round(mousePos.x - width / 2),
+      y: Math.round(mousePos.y + 20),
+      width: width, height: maxHeight
+    });
+    
+    await new Promise(r => setTimeout(r, 20));
+    
+    // 临时设置 height: auto 来测量真实高度
+    const origFlex = contentEl.style.flex;
+    contentEl.style.flex = '0 0 auto';
+    void contentEl.offsetHeight;
+    
+    const contentHeight = contentEl.scrollHeight;
+    contentEl.style.flex = origFlex;
+    
+    // 计算最终高度
+    let height = Math.min(Math.max(contentHeight + toolbarHeight + 16, minHeight), maxHeight);
+    
+    // 计算位置
     let x = mousePos.x - width / 2;
     let y = mousePos.y + 20;
     
@@ -258,6 +299,13 @@ const SelectionTranslator = () => {
       width: Math.round(width), height: Math.round(height)
     });
   };
+  
+  // 内容渲染后调整窗口大小
+  useEffect(() => {
+    if (mode === 'overlay' && (translatedText || error)) {
+      adjustWindowToContent();
+    }
+  }, [mode, translatedText, error, showSource]);
 
   // 使用 translationService 进行翻译
   const translateText = async (text, retryCount = 0) => {
@@ -317,30 +365,6 @@ const SelectionTranslator = () => {
       
       throw err;
     }
-  };
-
-  const handleResizeDown = (e) => {
-    e.preventDefault(); 
-    e.stopPropagation();
-    resizeRef.current = {
-      startX: e.screenX, startY: e.screenY,
-      startW: document.body.offsetWidth, startH: document.body.offsetHeight
-    };
-
-    const onMove = (ev) => {
-      const dx = ev.screenX - resizeRef.current.startX;
-      const dy = ev.screenY - resizeRef.current.startY;
-      window.electron?.selection?.resize?.({
-        width: Math.max(resizeRef.current.startW + dx, 160),
-        height: Math.max(resizeRef.current.startH + dy, 80)
-      });
-    };
-    const onUp = () => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-    };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
   };
 
   const handleCopy = (e) => {
@@ -470,9 +494,7 @@ const SelectionTranslator = () => {
     <div className="sel-root" data-theme={theme}>
       {mode === 'trigger' && (
         <div className={`sel-trigger ${triggerReady ? 'ready' : ''}`} onClick={handleTriggerClick}>
-          <svg viewBox="0 0 24 24" fill="white" width="14" height="14">
-            <path d="M12.87 15.07l-2.54-2.51.03-.03A17.52 17.52 0 0014.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z"/>
-          </svg>
+          <span className="sel-trigger-text">T</span>
         </div>
       )}
       
@@ -498,7 +520,7 @@ const SelectionTranslator = () => {
             <button className="sel-btn sel-btn-close" onClick={handleClose} title="关闭 (ESC)">✕</button>
           </div>
           
-          <div className="sel-content">
+          <div className="sel-content" ref={contentRef}>
             {error ? (
               <div className="sel-error">{error}</div>
             ) : (
@@ -511,7 +533,7 @@ const SelectionTranslator = () => {
             )}
           </div>
 
-          <div className="sel-resize-handle" onMouseDown={handleResizeDown} />
+
         </div>
       )}
     </div>

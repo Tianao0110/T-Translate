@@ -528,7 +528,33 @@ function createScreenshotWindow(bounds) {
 
 // ==================== 导出 ====================
 
+// 检查点是否在任何划词窗口内
+function isPointInSelectionWindows(x, y) {
+  // 检查当前活动窗口
+  if (windows.selection && !windows.selection.isDestroyed() && windows.selection.isVisible()) {
+    const bounds = windows.selection.getBounds();
+    if (x >= bounds.x && x <= bounds.x + bounds.width &&
+        y >= bounds.y && y <= bounds.y + bounds.height) {
+      return true;
+    }
+  }
+  
+  // 检查所有冻结窗口
+  for (const [id, win] of frozenSelectionWindows) {
+    if (win && !win.isDestroyed() && win.isVisible()) {
+      const bounds = win.getBounds();
+      if (x >= bounds.x && x <= bounds.x + bounds.width &&
+          y >= bounds.y && y <= bounds.y + bounds.height) {
+        return true;
+      }
+    }
+  }
+  
+  return false;
+}
+
 module.exports = {
+  isPointInSelectionWindows,
   init,
   // 窗口创建
   createMainWindow,
