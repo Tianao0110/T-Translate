@@ -356,6 +356,9 @@ function hasTextSelection() {
       'Chrome_RenderWidgetHostHWND',  // 渲染内容区域
       'Chrome_WidgetWin_',            // 顶层窗口（Chrome_WidgetWin_0, Chrome_WidgetWin_1 等）
       
+      // WebView2 (Edge-based)
+      'WebView',                      // 通用 WebView（包括 TeamsWebView 等）
+      
       // Firefox
       'MozillaWindowClass',           // 顶层窗口和内容区域
       

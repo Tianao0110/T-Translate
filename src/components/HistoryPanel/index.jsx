@@ -94,7 +94,7 @@ const HistoryCard = ({ item, onCopy, onRestore, onFavorite, onDelete, isFavorite
  * 历史记录面板
  */
 const HistoryPanel = ({ showNotification }) => {
-  const notify = showNotification || ((msg, type) => console.log(`[${type}] ${msg}`));
+  const notify = showNotification || ((msg, type) => {});
 
   // 分页配置
   const PAGE_SIZE = 50; // 每页显示数量

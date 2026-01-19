@@ -7,6 +7,11 @@
 // - 容量管理
 // - 持久化到 localStorage
 
+import createLogger from '../utils/logger.js';
+
+// 日志实例
+const logger = createLogger('Cache');
+
 /**
  * 翻译缓存管理器
  */
@@ -34,10 +39,10 @@ class TranslationCache {
         Object.entries(parsed).forEach(([key, value]) => {
           this.cache.set(key, value);
         });
-        console.log(`[Cache] Loaded ${this.cache.size} cached translations`);
+        logger.debug(`Loaded ${this.cache.size} cached translations`);
       }
     } catch (error) {
-      console.error('[Cache] Failed to load cache:', error);
+      logger.error(' Failed to load cache:', error);
       this.cache = new Map();
     }
   }
@@ -53,7 +58,7 @@ class TranslationCache {
       });
       localStorage.setItem(this.storageKey, JSON.stringify(obj));
     } catch (error) {
-      console.error('[Cache] Failed to save cache:', error);
+      logger.error(' Failed to save cache:', error);
       // 如果存储失败（可能超出配额），清理一半的缓存
       if (error.name === 'QuotaExceededError') {
         this.evict(Math.floor(this.cache.size / 2));
@@ -120,7 +125,7 @@ class TranslationCache {
   evict(count) {
     const keysToDelete = Array.from(this.cache.keys()).slice(0, count);
     keysToDelete.forEach(key => this.cache.delete(key));
-    console.log(`[Cache] Evicted ${keysToDelete.length} old entries`);
+    logger.debug(`Evicted ${keysToDelete.length} old entries`);
   }
 
   /**
@@ -139,7 +144,7 @@ class TranslationCache {
 
     if (cleaned > 0) {
       this.save();
-      console.log(`[Cache] Cleaned ${cleaned} expired entries`);
+      logger.debug(`Cleaned ${cleaned} expired entries`);
     }
   }
 
@@ -149,7 +154,7 @@ class TranslationCache {
   clear() {
     this.cache.clear();
     localStorage.removeItem(this.storageKey);
-    console.log('[Cache] All cache cleared');
+    logger.debug(' All cache cleared');
   }
 
   /**

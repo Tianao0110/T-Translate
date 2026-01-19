@@ -10,6 +10,11 @@ import useConfigStore from '../stores/config.js';
 import { calculateHash } from '../utils/image.js';
 import { detectLanguage, cleanTranslationOutput, shouldTranslateText } from '../utils/text.js';
 import { isProviderAllowed, isOcrEngineAllowed, PRIVACY_MODE_IDS } from '../config/privacy-modes.js';
+import createLogger from '../utils/logger.js';
+import { getShortErrorMessage } from '../utils/error-handler.js';
+
+// 日志实例
+const logger = createLogger('Pipeline');
 
 // ========== 状态缓存 ==========
 let lastImageHash = '';
@@ -25,7 +30,7 @@ async function getPrivacyMode() {
       return await window.electron.privacy.getMode();
     }
   } catch (e) {
-    console.log('[Pipeline] Failed to get privacy mode from main:', e);
+    logger.debug('Failed to get privacy mode from main:', e.message);
   }
   return PRIVACY_MODE_IDS.STANDARD;
 }
@@ -44,7 +49,7 @@ class TranslationPipeline {
   async init() {
     if (this._initialized) return;
     
-    console.log('[Pipeline] Initializing...');
+    logger.debug(' Initializing...');
     
     // 初始化 OCR 管理器
     const config = useConfigStore.getState();
@@ -58,7 +63,7 @@ class TranslationPipeline {
     // 配置从 electron store 加载（在 GlassTranslator 中已处理）
     
     this._initialized = true;
-    console.log('[Pipeline] Initialized');
+    logger.debug(' Initialized');
   }
 
   /**
@@ -82,9 +87,10 @@ class TranslationPipeline {
       return await this.runFromImage(captureResult.imageData);
       
     } catch (error) {
-      console.error('[Pipeline] Capture error:', error);
-      session.setError(error.message);
-      return { success: false, error: error.message };
+      logger.error('Capture error:', error);
+      const errorMsg = getShortErrorMessage(error);
+      session.setError(errorMsg);
+      return { success: false, error: errorMsg };
     }
   }
 
@@ -100,7 +106,7 @@ class TranslationPipeline {
       // 1. 图片去重检查
       const hash = await calculateHash(imageData);
       if (hash === lastImageHash) {
-        console.log('[Pipeline] Image unchanged, skipping');
+        logger.debug(' Image unchanged, skipping');
         return { success: true, skipped: true };
       }
       lastImageHash = hash;
@@ -124,7 +130,7 @@ class TranslationPipeline {
       
       // 3. 文本去重检查
       if (text === lastText) {
-        console.log('[Pipeline] Text unchanged, skipping');
+        logger.debug(' Text unchanged, skipping');
         return { success: true, skipped: true };
       }
       lastText = text;
@@ -141,9 +147,10 @@ class TranslationPipeline {
       return await this.runFromText(text);
       
     } catch (error) {
-      console.error('[Pipeline] Image processing error:', error);
-      session.setError(error.message);
-      return { success: false, error: error.message };
+      logger.error('Image processing error:', error);
+      const errorMsg = getShortErrorMessage(error, { context: 'ocr' });
+      session.setError(errorMsg);
+      return { success: false, error: errorMsg };
     }
   }
 
@@ -175,7 +182,7 @@ class TranslationPipeline {
       
       // 离线模式下检查翻译源
       if (privacyMode === PRIVACY_MODE_IDS.OFFLINE) {
-        console.log('[Pipeline] Offline mode - using local-llm only');
+        logger.debug(' Offline mode - using local-llm only');
       }
       
       // 调用翻译（传递隐私模式）
@@ -209,9 +216,10 @@ class TranslationPipeline {
       return { success: true, text: cleaned, provider: result.provider };
       
     } catch (error) {
-      console.error('[Pipeline] Translation error:', error);
-      session.setError(error.message);
-      return { success: false, error: error.message };
+      logger.error('Translation error:', error);
+      const errorMsg = getShortErrorMessage(error, { context: 'translation' });
+      session.setError(errorMsg);
+      return { success: false, error: errorMsg };
     }
   }
 
@@ -286,9 +294,10 @@ class TranslationPipeline {
       return { success: true, text: result.text };
       
     } catch (error) {
-      console.error('[Pipeline] Subtitle frame error:', error);
+      logger.error('Subtitle frame error:', error);
       session.setSubtitleStatus('listening');
-      return { success: false, error: error.message };
+      const errorMsg = getShortErrorMessage(error);
+      return { success: false, error: errorMsg };
     }
   }
 

@@ -11,6 +11,7 @@ import translationService from '../../services/translation.js';
 import { ocrManager } from '../../providers/ocr/index.js';
 import useTranslationStore from '../../stores/translation-store';
 import ProviderSettings from '../ProviderSettings';
+import createLogger from '../../utils/logger.js';
 import './styles.css';
 
 // 从 constants.js 导入常量
@@ -29,13 +30,15 @@ import {
   migrateOldSettings
 } from './constants.js'; 
 
+// 日志实例
+const logger = createLogger('Settings');
 
 /**
  * 设置面板组件
  */
 const SettingsPanel = ({ showNotification }) => {
   // 兼容 props
-  const notify = showNotification || ((msg, type) => console.log(`[${type}] ${msg}`));
+  const notify = showNotification || ((msg, type) => logger.debug(`[${type}] ${msg}`));
 
   // Store actions
   const { 
@@ -127,7 +130,7 @@ const SettingsPanel = ({ showNotification }) => {
   // 监听划词翻译状态变化（来自快捷键或托盘）
   useEffect(() => {
     const handleSelectionStateChange = (enabled) => {
-      console.log('[Settings] Selection state changed from main process:', enabled);
+      logger.debug(' Selection state changed from main process:', enabled);
       setSettings(prev => ({
         ...prev,
         selection: { ...prev.selection, enabled }
@@ -195,7 +198,7 @@ const SettingsPanel = ({ showNotification }) => {
       setSettings(finalSettings);
       setInitialSettings(JSON.parse(JSON.stringify(finalSettings))); // 深拷贝保存初始状态
     } catch (error) {
-      console.error('Failed to load settings:', error);
+      logger.error('Failed to load settings:', error);
     }
   };
 
@@ -220,7 +223,7 @@ const SettingsPanel = ({ showNotification }) => {
                               navigator.userAgent?.toLowerCase().includes('windows');
       }
     } catch (e) {
-      console.log('Platform detection failed:', e);
+      logger.debug('Platform detection failed:', e);
     }
 
     // 检测 OCR 引擎安装状态
@@ -230,7 +233,7 @@ const SettingsPanel = ({ showNotification }) => {
         state.ocr.rapidInstalled = installedStatus?.['rapid-ocr'] || false;
       }
     } catch (e) {
-      console.log('OCR install check failed:', e);
+      logger.debug('OCR install check failed:', e);
     }
 
     // 获取划词翻译状态（从主进程获取实际状态）
@@ -238,12 +241,12 @@ const SettingsPanel = ({ showNotification }) => {
       if (window.electron?.selection?.getEnabled) {
         const enabled = await window.electron.selection.getEnabled();
         state.selectionEnabled = enabled === true; // 确保是布尔值
-        console.log('[Settings] Selection translate state from main process:', state.selectionEnabled);
+        logger.debug(' Selection translate state from main process:', state.selectionEnabled);
       } else {
-        console.log('[Settings] selection.getEnabled not available');
+        logger.debug(' selection.getEnabled not available');
       }
     } catch (e) {
-      console.error('[Settings] Selection state check failed:', e);
+      logger.error(' Selection state check failed:', e);
     }
 
     return state;
@@ -288,9 +291,9 @@ const SettingsPanel = ({ showNotification }) => {
       if (settings.ocr) {
         try {
           ocrManager.updateConfigs(settings.ocr);
-          console.log('[Settings] OCR configs updated');
+          logger.debug(' OCR configs updated');
         } catch (e) {
-          console.warn('[Settings] ocrManager update failed:', e);
+          logger.warn(' ocrManager update failed:', e);
         }
       }
 
@@ -304,7 +307,7 @@ const SettingsPanel = ({ showNotification }) => {
             }
           });
         } catch (e) {
-          console.warn('[Settings] translationService reload failed:', e);
+          logger.warn(' translationService reload failed:', e);
         }
       }
 
@@ -321,7 +324,7 @@ const SettingsPanel = ({ showNotification }) => {
       // 更新初始设置状态（用于检测未保存更改）
       setInitialSettings(JSON.parse(JSON.stringify(settings)));
     } catch (error) {
-      console.error('Failed to save settings:', error);
+      logger.error('Failed to save settings:', error);
       notify('保存设置失败', 'error');
     } finally {
       setIsSaving(false);
@@ -431,7 +434,7 @@ const SettingsPanel = ({ showNotification }) => {
         
         notify('设置已导入，请保存以生效', 'success');
       } catch (error) {
-        console.error('Import settings error:', error);
+        logger.error('Import settings error:', error);
         notify('无效的设置文件', 'error');
       }
     };
@@ -1709,14 +1712,14 @@ const SettingsPanel = ({ showNotification }) => {
                     try {
                       // 调用主进程切换状态
                       const newState = await window.electron?.selection?.toggle?.();
-                      console.log('[Settings] Selection toggle result:', newState);
+                      logger.debug(' Selection toggle result:', newState);
                       // 同步到设置（使用主进程返回的实际状态）
                       if (typeof newState === 'boolean') {
                         updateSetting('selection', 'enabled', newState);
                         notify(newState ? '划词翻译已开启' : '划词翻译已关闭', 'success');
                       }
                     } catch (e) {
-                      console.error('[Settings] Selection toggle error:', e);
+                      logger.error(' Selection toggle error:', e);
                       notify('切换划词翻译失败', 'error');
                     }
                   }}

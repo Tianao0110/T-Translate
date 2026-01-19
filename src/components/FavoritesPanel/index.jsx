@@ -341,7 +341,7 @@ const FavoriteCard = ({
  * 主面板组件
  */
 const FavoritesPanel = ({ showNotification }) => {
-  const notify = showNotification || ((msg, type) => console.log(`[${type}] ${msg}`));
+  const notify = showNotification || ((msg, type) => {});
 
   // 文件夹状态
   const [folders, setFolders] = useState(() => {

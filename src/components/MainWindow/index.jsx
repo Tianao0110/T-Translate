@@ -1,4 +1,6 @@
 // src/components/MainWindow/index.jsx
+import createLogger from '../../utils/logger.js';
+const logger = createLogger('MainWindow');
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   FileText, Languages, Settings, History, Star, Sparkles,
@@ -62,14 +64,14 @@ const MainWindow = () => {
   // 全局截图监听 - 始终挂载，不会因标签切换而丢失
   useEffect(() => {
     if (!window.electron?.screenshot?.onCaptured) {
-      console.warn('[MainWindow] Screenshot onCaptured not available');
+      logger.warn(' Screenshot onCaptured not available');
       return;
     }
 
-    console.log('[MainWindow] Setting up global screenshot listener');
+    logger.debug(' Setting up global screenshot listener');
     
     const unsubscribe = window.electron.screenshot.onCaptured(async (dataURL) => {
-      console.log('[MainWindow] Screenshot captured, dataURL length:', dataURL?.length || 0);
+      logger.debug(' Screenshot captured, dataURL length:', dataURL?.length || 0);
       
       // 1. 先切换到翻译标签
       setActiveTab('translate');
@@ -87,7 +89,7 @@ const MainWindow = () => {
     });
 
     return () => {
-      console.log('[MainWindow] Cleaning up global screenshot listener');
+      logger.debug(' Cleaning up global screenshot listener');
       if (unsubscribe) unsubscribe();
     };
   }, []);

@@ -1,10 +1,15 @@
 // src/components/SelectionTranslator.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import translationService from '../../services/translation.js';
+import createLogger from '../../utils/logger.js';
+import { getShortErrorMessage } from '../../utils/error-handler.js';
 import './styles.css';
 
 // 从配置中心导入常量
 import { PRIVACY_MODES, THEMES, LANGUAGE_CODES, selectionDefaults } from '@config/defaults';
+
+// 日志实例
+const logger = createLogger('Selection');
 
 // 语言代码映射（用于显示）
 const LANG_MAP = {
@@ -67,7 +72,7 @@ const SelectionTranslator = () => {
           setPrivacyMode(mode);
         }
       } catch (e) {
-        console.log('[Selection] Failed to get privacy mode:', e);
+        logger.debug('Failed to get privacy mode:', e);
       }
     };
     getPrivacyMode();
@@ -77,7 +82,7 @@ const SelectionTranslator = () => {
     const removeShowListener = window.electron?.selection?.onShowTrigger?.((data) => {
       // 如果窗口已冻结，忽略所有新的触发事件
       if (frozenRef.current) {
-        console.log('[Selection] Window is frozen, ignoring show trigger');
+        logger.debug('Window is frozen, ignoring show trigger');
         return;
       }
       
@@ -127,7 +132,7 @@ const SelectionTranslator = () => {
     const removeHideListener = window.electron?.selection?.onHide?.(() => {
       // 冻结窗口忽略 hide 事件
       if (frozenRef.current) {
-        console.log('[Selection] Frozen window ignoring hide event');
+        logger.debug('Frozen window ignoring hide event');
         return;
       }
       setMode('idle');
@@ -155,7 +160,7 @@ const SelectionTranslator = () => {
   const handleTriggerClick = async () => {
     // 防手抖：圆点未就绪时不响应点击
     if (!triggerReady) {
-      console.log('[Selection] Trigger not ready yet, ignoring click');
+      logger.debug('Trigger not ready yet, ignoring click');
       return;
     }
     
@@ -311,7 +316,7 @@ const SelectionTranslator = () => {
   const translateText = async (text, retryCount = 0) => {
     // 确保翻译服务已初始化
     if (!translationService.initialized) {
-      console.log('[Selection] Initializing translation service...');
+      logger.debug('Initializing translation service...');
       await translationService.init();
     }
     
@@ -342,7 +347,9 @@ const SelectionTranslator = () => {
       });
       
       if (!result.success) {
-        throw new Error(result.error || '翻译失败');
+        // 使用友好错误消息
+        const errorMsg = getShortErrorMessage(result.error, { provider: result.provider });
+        throw new Error(errorMsg);
       }
       
       if (!result.text) {
@@ -352,18 +359,15 @@ const SelectionTranslator = () => {
       return result.text;
     } catch (err) {
       // 网络错误自动重试一次
-      if (retryCount < 1 && (err.message.includes('fetch') || err.message.includes('network'))) {
-        console.log('[Selection] Retrying translation...');
+      if (retryCount < 1 && (err.message.includes('fetch') || err.message.includes('network') || err.message.includes('连接'))) {
+        logger.debug('Retrying translation...');
         await new Promise(r => setTimeout(r, 1000));
         return translateText(text, retryCount + 1);
       }
       
-      // 友好错误提示
-      if (err.message.includes('fetch') || err.message.includes('network')) {
-        throw new Error('无法连接翻译服务，请确保翻译源已启动');
-      }
-      
-      throw err;
+      // 使用 error-handler 转换错误消息
+      const errorMsg = getShortErrorMessage(err);
+      throw new Error(errorMsg);
     }
   };
 
@@ -395,7 +399,7 @@ const SelectionTranslator = () => {
     
     // 如果是冻结窗口，使用特殊的关闭方法
     if (isFrozen && windowId) {
-      console.log(`[Selection] Closing frozen window ${windowId}`);
+      logger.debug(`Closing frozen window ${windowId}`);
       await window.electron?.selection?.closeFrozen?.(windowId);
     } else {
       window.electron?.selection?.hide?.();
@@ -410,7 +414,7 @@ const SelectionTranslator = () => {
   const handleAutoHide = () => {
     // 使用 ref 获取最新状态
     if (frozenRef.current) {
-      console.log('[Selection] Window is pinned, skip auto-hide');
+      logger.debug('Window is pinned, skip auto-hide');
       return;
     }
     setMode('idle');
@@ -453,7 +457,7 @@ const SelectionTranslator = () => {
         const dy = Math.abs(currentBounds.y - lastCheckBounds.y);
         
         if (dx > 10 || dy > 10) {
-          console.log('[Selection] Window moved detected, freezing...');
+          logger.debug('Window moved detected, freezing...');
           clearInterval(checkInterval);
           
           // 调用主进程冻结窗口
@@ -461,7 +465,7 @@ const SelectionTranslator = () => {
           if (result?.success) {
             setIsFrozen(true);
             setWindowId(result.windowId);
-            console.log(`[Selection] Window ${result.windowId} frozen`);
+            logger.debug(`Window ${result.windowId} frozen`);
             
             // 清除自动隐藏定时器
             if (autoHideTimerRef.current) {

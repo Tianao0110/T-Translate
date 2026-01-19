@@ -2,10 +2,16 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import SelectionTranslator from '../components/SelectionTranslator';
-// CSS 已在 SelectionTranslator 组件内部导入
+import ErrorBoundary from '../components/ErrorBoundary';
+import { initGlobalErrorHandler } from '../utils/global-error-handler.js';
+
+// 初始化全局错误处理
+initGlobalErrorHandler();
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <SelectionTranslator />
+    <ErrorBoundary minimal windowName="划词翻译">
+      <SelectionTranslator />
+    </ErrorBoundary>
   </React.StrictMode>
 );

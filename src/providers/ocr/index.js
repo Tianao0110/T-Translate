@@ -56,7 +56,7 @@ export function getOCREngineClass(id) {
 export function createOCREngine(id, config = {}) {
   const EngineClass = engines[id];
   if (!EngineClass) {
-    console.error(`[OCR Registry] Unknown engine: ${id}`);
+    // logger.error(`[OCR Registry] Unknown engine: ${id}`);
     return null;
   }
   return new EngineClass(config);
@@ -81,7 +81,7 @@ class OCREngineManager {
     // 从 settings 构建各引擎配置
     this.configs = this._buildConfigs(settings);
     
-    console.log('[OCR Manager] Initialized with configs:', Object.keys(this.configs));
+    // logger.debug('[OCR Manager] Initialized with configs:', Object.keys(this.configs));
     
     // 清除旧实例
     this.instances = {};
@@ -175,7 +175,7 @@ class OCREngineManager {
           return result;
         }
       } catch (error) {
-        console.warn(`[OCR Manager] Engine ${id} failed:`, error);
+        // logger.warn(`[OCR Manager] Engine ${id} failed:`, error);
       }
     }
 

@@ -87,42 +87,26 @@ function initIPC(deps) {
   
   // 批次 3.1: 系统/窗口控制
   registerSystemIPC(context);
-  logger.debug('System IPC registered');
   
   // 批次 3.2: 存储 & 快捷键
   registerStoreIPC(context);
-  logger.debug('Store IPC registered');
-  
   registerShortcutsIPC(context);
-  logger.debug('Shortcuts IPC registered');
   
   // 批次 3.3: 截图 & 剪贴板
   registerScreenshotIPC(context);
-  logger.debug('Screenshot IPC registered');
-  
   registerClipboardIPC(context);
-  logger.debug('Clipboard IPC registered');
   
   // 批次 3.4: 玻璃窗口 & 字幕
   registerGlassIPC(context);
-  logger.debug('Glass IPC registered');
-  
   registerSubtitleIPC(context);
-  logger.debug('Subtitle IPC registered');
   
   // 批次 3.5: 划词翻译 & 安全存储
   registerSelectionIPC(context);
-  logger.debug('Selection IPC registered');
-  
   registerSecureStorageIPC(context);
-  logger.debug('SecureStorage IPC registered');
   
   // 批次 3.6: OCR & 隐私
   registerOcrIPC(context);
-  logger.debug('OCR IPC registered');
-  
   registerPrivacyIPC(context);
-  logger.debug('Privacy IPC registered');
   
   logger.success('All IPC handlers initialized');
   

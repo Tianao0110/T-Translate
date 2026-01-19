@@ -14,6 +14,8 @@
 // UI Components → Store → MainTranslation → TranslationService → Providers
 //                         Pipeline ────────────↗
 
+import createLogger from '../utils/logger.js';
+
 import {
   getProvider,
   isProviderConfigured,
@@ -29,6 +31,9 @@ import { isProviderAllowed, PRIVACY_MODE_IDS } from '../config/privacy-modes.js'
 import { getEnabledFilters, DEFAULT_FILTERS } from '../config/filters.js';
 import { getSystemPrompt, LANGUAGE_NAMES } from '../config/templates.js';
 import translationCache from './cache.js';
+
+// 日志实例
+const logger = createLogger('Translation');
 
 // ========== 安全存储访问 ==========
 
@@ -84,7 +89,7 @@ class TranslationService {
   async init(settings = null) {
     if (this._initialized) return;
     
-    console.log('[TranslationService] Initializing...');
+    logger.debug('Initializing...');
     
     try {
       let providerList = null;   // 启用状态列表
@@ -94,7 +99,7 @@ class TranslationService {
       if (settings?.providers) {
         providerList = settings.providers.list;
         providerConfigs = settings.providers.configs;
-        console.log('[TranslationService] Loaded from passed settings');
+        logger.debug('Loaded from passed settings');
       }
       
       // 尝试从玻璃窗 API 获取（已解密）
@@ -103,7 +108,7 @@ class TranslationService {
         if (glassConfigs) {
           providerList = glassConfigs.list;
           providerConfigs = glassConfigs.configs;
-          console.log('[TranslationService] Loaded configs from glass API');
+          logger.debug('Loaded configs from glass API');
         }
       }
       
@@ -114,18 +119,18 @@ class TranslationService {
         if (saved?.translation?.providers) {
           providerList = saved.translation.providers;
           providerConfigs = await this._decryptConfigs(saved.translation.providerConfigs || {});
-          console.log('[TranslationService] Loaded from store (new format)');
+          logger.debug('Loaded from store (new format)');
         } else if (saved?.providers?.list) {
           providerList = saved.providers.list;
           providerConfigs = await this._decryptConfigs(saved.providers.configs || {});
-          console.log('[TranslationService] Loaded from store (old format)');
+          logger.debug('Loaded from store (old format)');
         }
       }
       
       // 即使没有存储的配置，也尝试从 secure storage 恢复加密字段
       if (!providerConfigs) {
         providerConfigs = await this._decryptConfigs({});
-        console.log('[TranslationService] Recovered configs from secure storage');
+        logger.debug('Recovered configs from secure storage');
       }
       
       if (providerConfigs) {
@@ -134,16 +139,16 @@ class TranslationService {
       
       if (providerList) {
         this._userPriority = this._extractPriority(providerList);
-        console.log('[TranslationService] User priority:', this._userPriority);
+        logger.debug('User priority:', this._userPriority);
       }
       
       // 初始化过滤器
       this._initFilters();
       
       this._initialized = true;
-      console.log('[TranslationService] Initialized successfully');
+      logger.debug('Initialized successfully');
     } catch (error) {
-      console.error('[TranslationService] Init failed:', error);
+      logger.error('Init failed:', error);
       this._initialized = true;
     }
   }
@@ -167,14 +172,14 @@ class TranslationService {
         }));
       }
     } catch (e) {
-      console.warn('[TranslationService] Failed to load custom filters:', e);
+      logger.warn('Failed to load custom filters:', e);
     }
     
     // 合并默认和用户过滤器
     this._filters = getEnabledFilters(userFilters);
     this._filtersInitialized = true;
     
-    console.log('[TranslationService] Filters initialized:', this._filters.map(f => f.name));
+    logger.debug('Filters initialized:', this._filters.map(f => f.name));
   }
 
   /**
@@ -259,7 +264,7 @@ class TranslationService {
     }
     
     if (protectedMap.size > 0) {
-      console.log(`[PreProcess] Protected ${protectedMap.size} items:`, 
+      logger.debug(`[PreProcess] Protected ${protectedMap.size} items:`, 
         Array.from(protectedMap.entries()).slice(0, 3));
     }
     
@@ -312,7 +317,7 @@ class TranslationService {
     // L1: 内存缓存（最快）
     if (this._l1Cache.has(key)) {
       this._cacheStats.l1Hits++;
-      console.log('[Cache] L1 HIT (memory)');
+      logger.debug('[Cache] L1 HIT (memory)');
       
       // LRU: 移到末尾
       const value = this._l1Cache.get(key);
@@ -327,7 +332,7 @@ class TranslationService {
       const l2Result = translationCache.get(key);
       if (l2Result) {
         this._cacheStats.l2Hits++;
-        console.log('[Cache] L2 HIT (disk)');
+        logger.debug('[Cache] L2 HIT (disk)');
         
         // 回填 L1（热点数据预热）
         this._setL1Cache(key, l2Result);
@@ -383,11 +388,11 @@ class TranslationService {
   clearCache(level = 'all') {
     if (level === 'l1' || level === 'all') {
       this._l1Cache.clear();
-      console.log('[Cache] L1 cleared');
+      logger.debug('[Cache] L1 cleared');
     }
     if (level === 'l2' || level === 'all') {
       translationCache.clear();
-      console.log('[Cache] L2 cleared');
+      logger.debug('[Cache] L2 cleared');
     }
     // 重置统计
     this._cacheStats = { l1Hits: 0, l2Hits: 0, misses: 0 };
@@ -412,7 +417,7 @@ class TranslationService {
 
   setMode(mode) {
     this._mode = mode;
-    console.log(`[TranslationService] Mode set to: ${mode}`);
+    logger.debug(`Mode set to: ${mode}`);
   }
 
   getMode() {
@@ -421,7 +426,7 @@ class TranslationService {
 
   setPriority(priority) {
     this._userPriority = priority;
-    console.log('[TranslationService] Priority set to:', priority);
+    logger.debug('Priority set to:', priority);
   }
 
   getPriority() {
@@ -434,10 +439,10 @@ class TranslationService {
   resetFailureCount(providerId = null) {
     if (providerId) {
       this._failureCount[providerId] = 0;
-      console.log(`[TranslationService] Reset failure count for: ${providerId}`);
+      logger.debug(`Reset failure count for: ${providerId}`);
     } else {
       this._failureCount = {};
-      console.log('[TranslationService] Reset all failure counts');
+      logger.debug('Reset all failure counts');
     }
   }
 
@@ -494,7 +499,7 @@ class TranslationService {
     for (const id of priority) {
       // 检查隐私模式限制
       if (!isProviderAllowed(privacyMode, id)) {
-        console.log(`[TranslationService] Provider ${id} not allowed in ${privacyMode} mode`);
+        logger.debug(`Provider ${id} not allowed in ${privacyMode} mode`);
         continue;
       }
       
@@ -502,7 +507,7 @@ class TranslationService {
       
       // 检查是否因连续失败而临时跳过
       if (this._failureCount[id] >= this._skipThreshold) {
-        console.log(`[TranslationService] Skipping ${id} (failed ${this._failureCount[id]} times)`);
+        logger.debug(`Skipping ${id} (failed ${this._failureCount[id]} times)`);
         continue;
       }
       
@@ -514,7 +519,7 @@ class TranslationService {
       tried.push(id);
       
       try {
-        console.log(`[TranslationService] Trying provider: ${id}`);
+        logger.debug(`Trying provider: ${id}`);
         
         // 获取模板 system prompt
         const systemPrompt = getSystemPrompt(template, targetLang);
@@ -549,7 +554,7 @@ class TranslationService {
         
         // 失败：增加计数
         this._failureCount[id] = (this._failureCount[id] || 0) + 1;
-        console.warn(`[TranslationService] Provider ${id} failed (${this._failureCount[id]}/${this._skipThreshold})`);
+        logger.warn(`Provider ${id} failed (${this._failureCount[id]}/${this._skipThreshold})`);
         
         if (!enableFallback) {
           return { success: false, error: result.error, provider: id };
@@ -557,7 +562,7 @@ class TranslationService {
         
       } catch (error) {
         this._failureCount[id] = (this._failureCount[id] || 0) + 1;
-        console.error(`[TranslationService] Provider ${id} error:`, error);
+        logger.error(`Provider ${id} error:`, error);
         
         if (!enableFallback) {
           return { success: false, error: error.message, provider: id };
@@ -567,7 +572,7 @@ class TranslationService {
     
     // 如果所有翻译源都被跳过，重置计数并重试一次
     if (allSkipped && Object.keys(this._failureCount).length > 0) {
-      console.log('[TranslationService] All providers skipped, resetting failure counts...');
+      logger.debug('All providers skipped, resetting failure counts...');
       this._failureCount = {};
       return this.translate(text, options);
     }
@@ -633,7 +638,7 @@ class TranslationService {
       if (!isProviderConfigured(id)) continue;
       
       if (this._failureCount[id] >= this._skipThreshold) {
-        console.log(`[TranslationService] Skipping stream ${id}`);
+        logger.debug(`Skipping stream ${id}`);
         continue;
       }
       
@@ -643,7 +648,7 @@ class TranslationService {
       if (!provider) continue;
       
       try {
-        console.log(`[TranslationService] Trying stream provider: ${id}`);
+        logger.debug(`Trying stream provider: ${id}`);
         
         const systemPrompt = getSystemPrompt(template, targetLang);
         
@@ -726,7 +731,7 @@ class TranslationService {
         
       } catch (error) {
         this._failureCount[id] = (this._failureCount[id] || 0) + 1;
-        console.error(`[TranslationService] Stream provider ${id} error:`, error);
+        logger.error(`Stream provider ${id} error:`, error);
         
         if (!enableFallback) {
           return { success: false, error: error.message, provider: id };
@@ -736,7 +741,7 @@ class TranslationService {
     
     // 重置并重试
     if (allSkipped && Object.keys(this._failureCount).length > 0) {
-      console.log('[TranslationService] All stream providers skipped, resetting...');
+      logger.debug('All stream providers skipped, resetting...');
       this._failureCount = {};
       return this.translateStream(text, options, onChunk);
     }
@@ -866,7 +871,7 @@ class TranslationService {
   registerFilter(filter) {
     if (filter && filter.name && filter.pattern) {
       this._filters.push(filter);
-      console.log(`[TranslationService] Filter registered: ${filter.name}`);
+      logger.debug(`Filter registered: ${filter.name}`);
     }
   }
 

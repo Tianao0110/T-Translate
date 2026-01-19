@@ -3,22 +3,27 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import {
   Send, Mic, MicOff, Camera, Image, FileText, Volume2, Copy, Download,
   RotateCcw, Sparkles, Loader2, ChevronDown, Clock, Zap, Shield, Eye, EyeOff, Lock,
-  Lightbulb, Check, X, ArrowRight, Palette, ChevronUp, Bot, Tag, FileEdit
+  Lightbulb, Check, X, ArrowRight, Palette, ChevronUp, Bot, Tag, FileEdit, AlertTriangle
 } from 'lucide-react';
 
 import useTranslationStore from '../../stores/translation-store';
 import translationService from '../../services/translation.js';
+import createLogger from '../../utils/logger.js';
+import { formatError, getShortErrorMessage, isRetryable } from '../../utils/error-handler.js';
 import './styles.css';
 
 // 从配置中心导入常量
 import { PRIVACY_MODES, TRANSLATION_STATUS, getLanguageList } from '@config/defaults'; 
+
+// 日志实例
+const logger = createLogger('TranslationPanel');
 
 /**
  * 翻译面板组件 (功能增强版)
  */
 const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProcessed }) => {
   // 兼容性处理：父组件可能传的是 showNotification 或 onNotification
-  const notify = showNotification || ((msg, type) => console.log(`[${type}] ${msg}`));
+  const notify = showNotification || ((msg, type) => logger.debug(`[Notify] ${type}: ${msg}`));
 
   // ========== 本地 UI 状态 ==========
   const [isRecording, setIsRecording] = useState(false);
@@ -101,7 +106,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   useEffect(() => {
     if (!screenshotData?.dataURL) return;
     
-    console.log('[TranslationPanel] Received screenshot data via props, processing OCR...');
+    logger.debug(' Received screenshot data via props, processing OCR...');
     
     const processScreenshot = async () => {
       notify('正在识别文字...', 'info');
@@ -110,16 +115,16 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
       try {
         // 使用 store 的 recognizeImage 方法（内部调用 mainTranslation service）
         const engineToUse = ocrStatus?.engine || 'llm-vision';
-        console.log('[OCR] Calling recognizeImage with engine:', engineToUse);
+        logger.debug('[OCR] Calling recognizeImage with engine:', engineToUse);
         
         const result = await recognizeImage(screenshotData.dataURL, { 
           engine: engineToUse,
           autoSetSource: true  // 自动设置 sourceText
         });
-        console.log('[OCR] Result:', result);
+        logger.debug('[OCR] Result:', result);
 
         if (result.success && result.text) {
-          console.log('[OCR] Recognized text:', result.text.substring(0, 100) + '...');
+          logger.debug('[OCR] Recognized text:', result.text.substring(0, 100) + '...');
           
           // 标记为 OCR 来源（翻译时自动使用 OCR 纠错模板）
           setIsOcrSource(true);
@@ -128,25 +133,26 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
           // 如果开启了自动翻译，延迟后自动开始翻译
           if (autoTranslate) {
             const delay = Math.max(autoTranslateDelay || 500, 300); // 至少 300ms，让用户看到识别结果
-            console.log(`[Screenshot] Will auto-translate in ${delay}ms...`);
+            logger.debug(`[Screenshot] Will auto-translate in ${delay}ms...`);
             setTimeout(() => {
               // 再次检查是否有内容（防止用户清空）
               const currentText = useTranslationStore.getState().currentTranslation.sourceText;
               if (currentText?.trim()) {
-                console.log('[Screenshot] Auto-translating with OCR template...');
+                logger.debug('[Screenshot] Auto-translating with OCR template...');
                 handleTranslate();
               }
             }, delay);
           } else {
-            console.log('[Screenshot] Auto-translate disabled, waiting for manual trigger');
+            logger.debug('[Screenshot] Auto-translate disabled, waiting for manual trigger');
           }
         } else {
-          console.warn('[OCR] No text recognized:', result);
+          logger.warn('[OCR] No text recognized:', result);
           notify('未能识别到文字', 'warning');
         }
       } catch (error) {
-        console.error('[OCR] Error:', error);
-        notify('OCR 识别失败: ' + error.message, 'error');
+        logger.error('[OCR] Error:', error);
+        const errorMsg = getShortErrorMessage(error, { context: 'ocr' });
+        notify(errorMsg, 'error');
       } finally {
         setIsOcrProcessing(false);
         // 通知父组件处理完成
@@ -210,7 +216,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     // overrideTemplate 优先级最高，用于模板切换时的即时翻译
     const effectiveTemplate = isOcrSource ? 'ocr' : (overrideTemplate || selectedTemplate);
     if (isOcrSource) {
-      console.log('[Translate] Using OCR template for error correction');
+      logger.debug('[Translate] Using OCR template for error correction');
     }
 
     const options = {
@@ -225,7 +231,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
 
     if (result.success) {
       if (translationMode === PRIVACY_MODES.SECURE) {
-        console.log('[SECURE] Translation done, history skipped.');
+        logger.debug('[Secure] Translation done, history skipped.');
       }
       // 翻译成功后，检测术语一致性
       checkTermConsistency(currentTranslation.sourceText, result.translatedText || useTranslationStore.getState().currentTranslation.translatedText);
@@ -235,7 +241,13 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
         setIsOcrSource(false);
       }
     } else {
-      notify('翻译失败: ' + result.error, 'error');
+      // 使用友好的错误消息
+      const errorMsg = getShortErrorMessage(result.error, { 
+        provider: result.provider,
+        context: 'translation' 
+      });
+      notify(errorMsg, 'error');
+      logger.warn('Translation failed:', result.error, 'provider:', result.provider);
     }
   };
 
@@ -253,7 +265,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     // 如果已有源文本，使用新模板重新翻译
     // 注意：这里直接传入新模板ID，避免状态更新延迟问题
     if (currentTranslation.sourceText.trim()) {
-      console.log(`[Template] Switching to "${newTemplateId}", re-translating...`);
+      logger.debug(`[Template] Switching to "${newTemplateId}", re-translating...`);
       // 使用 setTimeout 确保状态更新后再翻译（可选，但更安全）
       // 直接传入新模板，不依赖状态更新
       handleTranslate(newTemplateId);
@@ -275,9 +287,9 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
           }
         };
         await window.electron?.store?.set?.('settings', newSettings);
-        console.log('[Sync] Language settings synced:', currentTranslation.sourceLanguage, '->', currentTranslation.targetLanguage);
+        logger.debug('[Sync] Language settings synced:', currentTranslation.sourceLanguage, '->', currentTranslation.targetLanguage);
       } catch (e) {
-        console.log('[Sync] Failed to sync language settings:', e);
+        logger.debug('[Sync] Failed to sync language settings:', e);
       }
     };
     
@@ -446,8 +458,9 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
         throw new Error(result.error || '改写失败');
       }
     } catch (error) {
-      console.error('Style rewrite error:', error);
-      notify('风格改写失败: ' + error.message, 'error');
+      logger.error('Style rewrite:', error);
+      const errorMsg = getShortErrorMessage(error, { context: 'translation' });
+      notify('风格改写失败：' + errorMsg, 'error');
     } finally {
       setIsRewriting(false);
     }
@@ -537,7 +550,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
           content = content.replace(/^```\s*/, '').replace(/```\s*$/, '');
           parsed = JSON.parse(content);
         } catch (parseError) {
-          console.error('JSON parse error:', parseError);
+          logger.error('JSON parse:', parseError);
           // 如果解析失败，使用默认值
           parsed = {
             tags: ['未分类'],
@@ -554,7 +567,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
         throw new Error(result.error || '分析失败');
       }
     } catch (error) {
-      console.error('AI analysis error:', error);
+      logger.error('AI analysis:', error);
       // 分析失败时使用默认值
       setAiSuggestions({
         tags: [],
@@ -613,7 +626,8 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
         if (result.success) {
           notify('文字识别成功', 'success');
         } else {
-          notify('识别失败: ' + result.error, 'error');
+          const errorMsg = getShortErrorMessage(result.error, { context: 'ocr' });
+          notify(errorMsg, 'error');
         }
       };
       reader.readAsDataURL(file);
@@ -638,7 +652,10 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
         notify('正在识别...', 'info');
         const result = await recognizeImage(event.target.result);
         if (result.success) notify('识别成功', 'success');
-        else notify('识别失败', 'error');
+        else {
+          const errorMsg = getShortErrorMessage(result.error, { context: 'ocr' });
+          notify(errorMsg, 'error');
+        }
       };
       reader.readAsDataURL(file);
     } else {

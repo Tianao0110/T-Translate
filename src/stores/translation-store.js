@@ -414,7 +414,7 @@ const useTranslationStore = create(
         set((state) => {
           // 无痕模式下不保存历史
           if (state.translationMode === PRIVACY_MODES.SECURE) {
-            console.log('[Store] Secure mode - history not saved');
+            // logger.debug(' Secure mode - history not saved');
             return;
           }
           

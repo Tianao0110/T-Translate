@@ -9,6 +9,7 @@ import {
   SkipForward, RefreshCw, Languages, Zap, Lock, Key,
   List, Hash, DollarSign, Database, BookOpen, ChevronLeft
 } from 'lucide-react';
+import createLogger from '../../utils/logger.js';
 import {
   parseDocument,
   batchSegments,
@@ -149,6 +150,9 @@ const OutlineItem = ({ item, onNavigate, level = 0 }) => {
   );
 };
 
+// 日志实例
+const logger = createLogger('DocTranslator');
+
 /**
  * 主组件
  */
@@ -272,7 +276,7 @@ const DocumentTranslator = ({
 
   // 加载文件（放在前面，供其他函数调用）
   const loadFile = useCallback(async (file, filePassword = null) => {
-    console.log('[DocumentTranslator] loadFile called:', file.name, filePassword ? '(with password)' : '');
+    logger.debug('loadFile called:', file.name, filePassword ? '(with password)' : '');
     setIsLoading(true);
     
     try {
@@ -285,7 +289,7 @@ const DocumentTranslator = ({
         },
       });
       
-      console.log('[DocumentTranslator] parseDocument result:', result);
+      logger.debug('parseDocument result:', result);
       
       if (result.success) {
         setDocument({
@@ -317,7 +321,7 @@ const DocumentTranslator = ({
         notify?.(result.error || '文件解析失败', 'error');
       }
     } catch (error) {
-      console.error('[DocumentTranslator] Error:', error);
+      logger.error('Error:', error);
       notify?.(error.message, 'error');
     } finally {
       setIsLoading(false);
@@ -343,20 +347,20 @@ const DocumentTranslator = ({
     e.stopPropagation();
     setIsDragOver(false);
     
-    console.log('[DocumentTranslator] File dropped:', e.dataTransfer.files);
+    logger.debug('File dropped:', e.dataTransfer.files);
     const file = e.dataTransfer.files?.[0];
     if (file) {
-      console.log('[DocumentTranslator] Loading dropped file:', file.name);
+      logger.debug('Loading dropped file:', file.name);
       await loadFile(file);
     }
   }, [loadFile]);
 
   // 选择文件
   const handleFileSelect = useCallback(async (e) => {
-    console.log('[DocumentTranslator] File selected:', e.target.files);
+    logger.debug('File selected:', e.target.files);
     const file = e.target.files?.[0];
     if (file) {
-      console.log('[DocumentTranslator] Loading file:', file.name, file.type, file.size);
+      logger.debug('Loading file:', file.name, file.type, file.size);
       await loadFile(file);
     }
     e.target.value = null;
@@ -422,7 +426,7 @@ const DocumentTranslator = ({
     // 获取术语表（如果启用）
     const glossary = useGlossary ? getGlossaryTerms() : [];
     if (glossary.length > 0) {
-      console.log(`[DocumentTranslator] Using glossary with ${glossary.length} terms`);
+      logger.debug(`Using glossary with ${glossary.length} terms`);
     }
     
     // 分批处理
@@ -446,7 +450,7 @@ const DocumentTranslator = ({
       ));
       
       try {
-        console.log(`[DocumentTranslator] Batch ${Math.floor(i/batchSize) + 1}: translating ${batch.length} segments`);
+        logger.debug(`Batch ${Math.floor(i/batchSize) + 1}: translating ${batch.length} segments`);
         
         const result = await translationService.translateBatch(batchTexts, {
           sourceLang,
@@ -493,7 +497,7 @@ const DocumentTranslator = ({
           ));
         }
       } catch (error) {
-        console.error('[DocumentTranslator] Batch translation error:', error);
+        logger.error('Batch translation error:', error);
         setSegments(prev => prev.map(s => 
           batchIds.includes(s.id) ? { 
             ...s, 
@@ -709,7 +713,7 @@ const DocumentTranslator = ({
       setShowExport(false);
       notify?.('导出成功', 'success');
     } catch (error) {
-      console.error('[DocumentTranslator] Export error:', error);
+      logger.error('Export error:', error);
       notify?.(`导出失败: ${error.message}`, 'error');
     }
   };

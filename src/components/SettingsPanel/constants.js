@@ -224,7 +224,7 @@ export const migrateOldSettings = (savedSettings) => {
   
   // 迁移旧格式：settings.providers -> settings.translation.providers
   if (savedSettings.providers?.list && !savedSettings.translation?.providers) {
-    console.log('[Settings] Migrating old providers format...');
+    // Migration log:  old providers format...');
     migrated.translation = {
       ...migrated.translation,
       providers: savedSettings.providers.list,

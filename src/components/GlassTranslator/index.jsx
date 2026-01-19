@@ -9,7 +9,11 @@ import { Camera, Film, Monitor, X, Loader2, AlertCircle, ChevronDown, GripHorizo
 import useSessionStore, { STATUS } from '../../stores/session.js';
 import useConfigStore from '../../stores/config.js';
 import pipeline from '../../services/pipeline.js';
+import createLogger from '../../utils/logger.js';
 import './styles.css';
+
+// 日志实例
+const logger = createLogger('Glass');
 
 /**
  * 玻璃翻译窗口组件
@@ -108,7 +112,7 @@ const GlassTranslator = () => {
     try {
       const settings = await window.electron?.glass?.getSettings?.();
       if (settings) {
-        console.log('[Glass] Loaded settings from main:', settings);
+        logger.debug(' Loaded settings from main:', settings);
         
         // 同步透明度
         if (settings.opacity !== undefined) {
@@ -117,7 +121,7 @@ const GlassTranslator = () => {
         
         // ========== 修复：同步目标语言 ==========
         if (settings.targetLanguage) {
-          console.log('[Glass] Syncing targetLanguage:', settings.targetLanguage);
+          logger.debug(' Syncing targetLanguage:', settings.targetLanguage);
           setTargetLanguage(settings.targetLanguage);
         }
         
@@ -138,7 +142,7 @@ const GlassTranslator = () => {
         // ========== 修复结束 ==========
       }
     } catch (error) {
-      console.error('[Glass] Load settings failed:', error);
+      logger.error(' Load settings failed:', error);
     }
   };
 
@@ -147,7 +151,7 @@ const GlassTranslator = () => {
       const rect = await window.electron?.subtitle?.getCaptureRect?.();
       if (rect) setCaptureRect(rect);
     } catch (error) {
-      console.error('[Glass] Load capture rect failed:', error);
+      logger.error(' Load capture rect failed:', error);
     }
   };
 
@@ -199,7 +203,7 @@ const GlassTranslator = () => {
         height: bounds.height - topBarHeight,
       });
     } catch (error) {
-      console.error('[Glass] Capture failed:', error);
+      logger.error(' Capture failed:', error);
     }
   }, []);
 
@@ -238,7 +242,7 @@ const GlassTranslator = () => {
           await pipeline.processSubtitleFrame(result.imageData);
         }
       } catch (error) {
-        console.error('[Subtitle] Frame error:', error);
+        logger.error('[Subtitle] Frame error:', error);
       }
     }, 1000);
   };
@@ -259,7 +263,7 @@ const GlassTranslator = () => {
         setCaptureRect(result.rect);
       }
     } catch (error) {
-      console.error('[Glass] Open capture window failed:', error);
+      logger.error(' Open capture window failed:', error);
     }
   };
 

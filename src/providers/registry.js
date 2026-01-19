@@ -18,6 +18,10 @@ import DeepLProvider from './deepl';
 import GeminiProvider from './gemini';
 import DeepSeekProvider from './deepseek';
 import GoogleTranslateProvider from './google-translate';
+import createLogger from '../utils/logger.js';
+
+// 日志实例
+const logger = createLogger('Registry');
 
 // ========== 注册表 ==========
 
@@ -127,7 +131,7 @@ export function getProvider(id, config = null) {
   // 创建新实例
   const ProviderClass = providerClasses[id];
   if (!ProviderClass) {
-    console.error(`[Registry] Unknown provider: ${id}`);
+    logger.error(`Unknown provider: ${id}`);
     return null;
   }
   
@@ -135,7 +139,7 @@ export function getProvider(id, config = null) {
   const instance = new ProviderClass(savedConfig);
   instances.set(id, instance);
   
-  console.log(`[Registry] Created instance: ${id}`);
+  logger.debug(`Created instance: ${id}`);
   return instance;
 }
 
@@ -149,7 +153,7 @@ export function getProvider(id, config = null) {
 export function createProvider(id, config = {}) {
   const ProviderClass = providerClasses[id];
   if (!ProviderClass) {
-    console.error(`[Registry] Unknown provider: ${id}`);
+    logger.error(`Unknown provider: ${id}`);
     return null;
   }
   return new ProviderClass(config);
@@ -192,7 +196,7 @@ export function updateProviderConfig(id, config) {
     instances.get(id).updateConfig(newConfig);
   }
   
-  console.log(`[Registry] Updated config for ${id}`);
+  logger.debug(`Updated config for ${id}`);
 }
 
 /**
@@ -220,7 +224,7 @@ export function initConfigs(allConfigs, clearExisting = true) {
       configs.set(id, config);
     }
   }
-  console.log(`[Registry] Initialized configs for: ${Object.keys(allConfigs).join(', ')}`);
+  logger.debug(`Initialized configs for: ${Object.keys(allConfigs).join(', ')}`);
 }
 
 /**
@@ -264,7 +268,7 @@ export function getAllProvidersStatus() {
  */
 export function registerProvider(id, ProviderClass) {
   if (providerClasses[id]) {
-    console.warn(`[Registry] Provider ${id} already exists, overwriting...`);
+    logger.warn(`Provider ${id} already exists, overwriting...`);
   }
   providerClasses[id] = ProviderClass;
 }
@@ -274,7 +278,7 @@ export function registerProvider(id, ProviderClass) {
  */
 export function clearInstances() {
   instances.clear();
-  console.log('[Registry] Cleared all instances');
+  logger.debug(' Cleared all instances');
 }
 
 // ========== 默认导出 ==========
