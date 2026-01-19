@@ -1,381 +1,287 @@
 # 文件结构优化计划
 
 **创建日期**: 2025-01-14  
-**当前版本**: v0.1.3
+**完成日期**: 2025-01-17  
+**当前版本**: v0.1.3  
+**状态**: ✅ **Phase 1-6 已全部完成**
 
 ---
 
-## 📊 现状分析
+## 📊 执行摘要
 
-### 当前文件统计
+### ✅ 已完成的重构
 
-| 目录 | 文件数 | 总行数 | 问题 |
-|------|:------:|:------:|------|
-| components | 11 | ~8,200 | SettingsPanel 过大 (2,198行) |
-| services | 7 | ~2,000 | 4个翻译相关文件职责重叠 |
-| providers | 12 | ~1,500 | 结构良好 ✅ |
-| stores | 4 | ~900 | 结构良好 ✅ |
-| styles | 13 | N/A | 位置不统一 |
-
-### 发现的问题
-
-#### 🔴 问题 1: Services 层冗余
-
-```
-services/
-├── translation.js        # 核心调度 (771行)
-├── translator.js         # 模板+缓存 (310行)  ← 与上面重叠
-├── main-translation.js   # 主窗口逻辑 (399行)
-├── translation-service.js # 仅重定向 (10行)   ← 完全冗余
-├── pipeline.js           # 玻璃窗口 (308行)
-├── cache.js              # 缓存 (185行)
-└── index.js              # 导出
-```
-
-**问题**: 
-- `translation-service.js` 仅是重定向，完全多余
-- `translation.js` 和 `translator.js` 功能重叠
+| 阶段 | 内容 | 状态 |
+|------|------|------|
+| Phase 1 | Preload 文件整理到 `electron/preloads/` | ✅ 完成 |
+| Phase 2 | HTML 文件统一到 `public/` | ✅ 完成 |
+| Phase 3 | OCR 资源移动到 `resources/ocr/` | ✅ 完成 |
+| Phase 4 | 配置常量同步机制 | ✅ 完成 |
+| Phase 5 | 路径引用集中配置 | ✅ 完成 |
+| Phase 6 | 清理与文档 | ✅ 完成 |
 
 ---
 
-#### 🔴 问题 2: 组件目录结构不一致
-
-```
-components/
-├── DocumentTranslator/     # 文件夹 + index.jsx
-│   └── index.jsx
-├── GlassTranslator/        # 文件夹 + index.jsx
-│   └── index.jsx
-├── SelectionTranslator.jsx # 单文件           ← 不一致
-├── TranslationPanel.jsx    # 单文件 (1,206行)
-├── SettingsPanel.jsx       # 单文件 (2,198行) ← 太大
-└── ...
-```
-
-**问题**:
-- 有的用文件夹，有的用单文件
-- SettingsPanel 太大，需要拆分
-
----
-
-#### 🟡 问题 3: 样式文件位置不统一
-
-```
-styles/
-├── App.css               # 根目录
-├── index.css             # 根目录
-├── main.css              # 根目录
-├── glass.css             # 根目录 ← 应该在 components/
-├── selection.css         # 根目录 ← 应该在 components/
-└── components/
-    ├── DocumentTranslator.css
-    ├── FavoritesPanel.css
-    └── ...               # 其他组件样式
-```
-
-**问题**: `glass.css` 和 `selection.css` 应该移到 `components/`
-
----
-
-#### 🟡 问题 4: 命名风格不统一
-
-| 类型 | 当前命名 | 期望 |
-|------|----------|------|
-| 组件 | `TranslationPanel.jsx` | PascalCase ✅ |
-| Service | `main-translation.js` | kebab-case ✅ |
-| Service | `translationService` (导出名) | camelCase ✅ |
-| Store | `translation-store.js` | kebab-case ✅ |
-| CSS | `TranslationPanel.css` | PascalCase ✅ |
-
-**结论**: 命名基本统一，无需大改
-
----
-
-## 📋 优化计划
-
-### 🔴 优先级 1: 必须做（影响维护性）
-
-#### 1.1 删除冗余文件
-
-```bash
-# 删除仅重定向的兼容层
-rm src/services/translation-service.js
-
-# 更新所有引用
-# SelectionTranslator.jsx: import translationService from '../services/translation.js'
-```
-
-**工作量**: 5 分钟
-
----
-
-#### 1.2 拆分 SettingsPanel (2,198行 → 多个子组件)
-
-**当前结构**:
-```jsx
-// SettingsPanel.jsx (2,198行)
-- 翻译设置 (TranslationSettings)
-- 翻译源配置 (ProviderConfig)  
-- 快捷键设置 (ShortcutSettings)
-- 划词翻译设置 (SelectionSettings)
-- 界面设置 (AppearanceSettings)
-- 隐私设置 (PrivacySettings)
-- 关于页面 (AboutSection)
-```
-
-**优化后**:
-```
-components/
-└── SettingsPanel/
-    ├── index.jsx              # 主入口 (~200行)
-    ├── TranslationSettings.jsx # 翻译设置 (~300行)
-    ├── ProviderConfig.jsx      # 翻译源配置 (~400行)
-    ├── ShortcutSettings.jsx    # 快捷键设置 (~300行)
-    ├── SelectionSettings.jsx   # 划词翻译设置 (~300行)
-    ├── AppearanceSettings.jsx  # 界面设置 (~200行)
-    ├── PrivacySettings.jsx     # 隐私设置 (~200行)
-    └── AboutSection.jsx        # 关于页面 (~150行)
-```
-
-**工作量**: 2-3 小时
-
----
-
-### 🟡 优先级 2: 建议做（提升一致性）
-
-#### 2.1 统一组件目录结构
-
-**方案 A: 全部改为文件夹** (推荐)
-```
-components/
-├── DocumentTranslator/
-│   ├── index.jsx
-│   └── DocumentTranslator.css  # CSS 移入
-├── FavoritesPanel/
-│   ├── index.jsx
-│   └── FavoritesPanel.css
-├── GlassTranslator/
-│   ├── index.jsx
-│   └── GlassTranslator.css     # 从 styles/glass.css 移入
-├── HistoryPanel/
-│   ├── index.jsx
-│   └── HistoryPanel.css
-├── SelectionTranslator/
-│   ├── index.jsx
-│   └── SelectionTranslator.css # 从 styles/selection.css 移入
-├── SettingsPanel/
-│   ├── index.jsx
-│   ├── ...子组件
-│   └── SettingsPanel.css
-├── TranslationPanel/
-│   ├── index.jsx
-│   └── TranslationPanel.css
-├── MainWindow/
-│   ├── index.jsx
-│   └── MainWindow.css
-├── TitleBar/
-│   ├── index.jsx
-│   └── TitleBar.css
-└── ProviderSettings/
-    ├── index.jsx
-    └── ProviderSettings.css
-```
-
-**方案 B: 全部改为单文件** (简单但不推荐)
-- 将 DocumentTranslator/index.jsx → DocumentTranslator.jsx
-- 将 GlassTranslator/index.jsx → GlassTranslator.jsx
-
-**推荐**: 方案 A，每个组件有独立文件夹，便于管理
-
-**工作量**: 1-2 小时
-
----
-
-#### 2.2 合并 Services 翻译模块
-
-**当前** (4个文件):
-```
-translation.js     → 核心调度
-translator.js      → 模板+缓存
-main-translation.js → 主窗口逻辑
-pipeline.js        → 玻璃窗口
-```
-
-**优化后** (3个文件):
-```
-translation.js     → 核心调度 + 模板 (合并 translator.js)
-main-translation.js → 主窗口逻辑 (不变)
-pipeline.js        → 玻璃窗口 (不变)
-```
-
-**或者保持不变**: 当前职责已经比较清晰，合并可能引入风险
-
-**建议**: 暂不合并，仅删除 translation-service.js
-
----
-
-### 🟢 优先级 3: 可选做（进一步优化）
-
-#### 3.1 拆分 electron/main.js (3,971行)
-
-**当前所有功能都在一个文件**:
-- 窗口管理
-- 托盘管理
-- 快捷键管理
-- IPC 处理
-- 划词翻译逻辑
-- 截图逻辑
-
-**可拆分为**:
-```
-electron/
-├── main.js              # 入口 + 窗口管理 (~1000行)
-├── tray.js              # 托盘管理 (~200行)
-├── shortcuts.js         # 快捷键管理 (~300行)
-├── ipc-handlers.js      # IPC 处理 (~500行)
-├── selection-hook.js    # 划词翻译 (~800行)
-├── screenshot-module.js # 截图 (已独立)
-└── preload*.js          # 预加载脚本
-```
-
-**工作量**: 4-6 小时  
-**风险**: 中等（需要仔细处理模块间依赖）
-
----
-
-#### 3.2 整理 windows 目录
-
-**当前**:
-```
-windows/
-├── glass-entry.jsx       # 玻璃窗口入口
-├── glass.html            # 玻璃窗口 HTML
-├── selection-entry.jsx   # 划词窗口入口
-└── subtitle-capture.html # 字幕捕获
-```
-
-**建议**: 保持不变，当前结构合理
-
----
-
-## 📊 工作量评估
-
-| 任务 | 优先级 | 工作量 | 风险 |
-|------|:------:|:------:|:----:|
-| 删除 translation-service.js | 🔴 高 | 5分钟 | 低 |
-| 拆分 SettingsPanel | 🔴 高 | 2-3小时 | 低 |
-| 统一组件目录结构 | 🟡 中 | 1-2小时 | 低 |
-| 合并 Services | 🟡 中 | 1小时 | 中 |
-| 拆分 main.js | 🟢 低 | 4-6小时 | 中 |
-
-**总计**: 
-- 必须做: ~3 小时
-- 建议做: ~3 小时
-- 可选做: ~6 小时
-
----
-
-## 🎯 推荐执行顺序
-
-### 第一阶段（立即执行）
-1. ✅ 删除 `translation-service.js`
-2. ✅ 拆分 `SettingsPanel.jsx`
-
-### 第二阶段（下次迭代）
-3. 统一组件目录结构（CSS 移入组件文件夹）
-4. 评估是否合并 Services
-
-### 第三阶段（稳定后）
-5. 拆分 `electron/main.js`
-
----
-
-## 📁 目标文件结构
+## 📁 重构后的目录结构
 
 ```
 t-translate/
-├── electron/
+├── electron/                   # 主进程代码
 │   ├── main.js                 # 主进程入口
-│   ├── screenshot-module.js    # 截图模块
-│   ├── preload.js             # 主窗口预加载
-│   ├── preload-glass.js       # 玻璃窗口预加载
-│   └── preload-selection.js   # 划词窗口预加载
-├── src/
-│   ├── components/            # View 层
-│   │   ├── DocumentTranslator/
-│   │   │   ├── index.jsx
-│   │   │   └── styles.css
-│   │   ├── FavoritesPanel/
-│   │   │   ├── index.jsx
-│   │   │   └── styles.css
-│   │   ├── GlassTranslator/
-│   │   │   ├── index.jsx
-│   │   │   └── styles.css
-│   │   ├── HistoryPanel/
-│   │   │   ├── index.jsx
-│   │   │   └── styles.css
-│   │   ├── MainWindow/
-│   │   │   ├── index.jsx
-│   │   │   └── styles.css
-│   │   ├── SelectionTranslator/
-│   │   │   ├── index.jsx
-│   │   │   └── styles.css
-│   │   ├── SettingsPanel/          # 拆分后
-│   │   │   ├── index.jsx
-│   │   │   ├── TranslationSettings.jsx
-│   │   │   ├── ProviderConfig.jsx
-│   │   │   ├── ShortcutSettings.jsx
-│   │   │   ├── SelectionSettings.jsx
-│   │   │   ├── AppearanceSettings.jsx
-│   │   │   ├── PrivacySettings.jsx
-│   │   │   ├── AboutSection.jsx
-│   │   │   └── styles.css
-│   │   ├── TranslationPanel/
-│   │   │   ├── index.jsx
-│   │   │   └── styles.css
-│   │   ├── TitleBar/
-│   │   │   ├── index.jsx
-│   │   │   └── styles.css
-│   │   └── ProviderSettings/
-│   │       ├── index.jsx
-│   │       └── styles.css
-│   ├── services/              # Service 层
-│   │   ├── translation.js     # 核心翻译调度
-│   │   ├── main-translation.js # 主窗口逻辑
-│   │   ├── pipeline.js        # 玻璃窗口流水线
-│   │   ├── translator.js      # 模板+缓存
-│   │   ├── cache.js           # 缓存服务
-│   │   └── index.js           # 统一导出
-│   ├── providers/             # Provider 层 (保持不变)
-│   ├── stores/                # Model 层 (保持不变)
-│   ├── config/                # 配置 (保持不变)
-│   ├── utils/                 # 工具 (保持不变)
-│   ├── windows/               # 窗口入口 (保持不变)
-│   ├── workers/               # Web Workers (保持不变)
-│   └── styles/                # 全局样式
-│       ├── index.css          # 全局样式
-│       ├── App.css            # App 样式
-│       └── variables.css      # CSS 变量 (新增)
-├── public/
-└── docs/
+│   ├── state.js                # 状态管理 (store, runtime, windows)
+│   ├── screenshot-module.js    # 截图核心逻辑
+│   │
+│   ├── preloads/               # ✅ Preload 脚本 (重构后)
+│   │   ├── main.js             # 原 preload.js
+│   │   ├── selection.js        # 原 preload-selection.js
+│   │   ├── glass.js            # 原 preload-glass.js
+│   │   └── subtitle-capture.js # 原 preload-subtitle-capture.js
+│   │
+│   ├── shared/                 # 主/渲染进程共享
+│   │   ├── paths.js            # ✅ 路径配置中心 (新建)
+│   │   ├── channels.js         # IPC 通道定义
+│   │   ├── constants.js        # 常量定义 (单一数据源)
+│   │   └── index.js
+│   │
+│   ├── ipc/                    # IPC 处理器
+│   │   ├── index.js            # IPC 初始化入口
+│   │   ├── system.js           # 系统级 IPC
+│   │   ├── store.js            # 存储 IPC
+│   │   ├── shortcuts.js        # 快捷键管理
+│   │   ├── screenshot.js       # 截图功能
+│   │   ├── clipboard.js        # 剪贴板操作
+│   │   ├── glass.js            # 玻璃窗口 IPC
+│   │   ├── subtitle.js         # 字幕采集 IPC
+│   │   ├── selection.js        # 划词翻译 IPC
+│   │   ├── secure-storage.js   # 安全存储
+│   │   ├── ocr.js              # OCR 引擎管理
+│   │   └── privacy.js          # 隐私模式
+│   │
+│   ├── managers/               # 管理器
+│   │   ├── window-manager.js   # 窗口管理 (已更新使用 PATHS)
+│   │   ├── tray-manager.js     # 托盘管理 (已更新使用 PATHS)
+│   │   └── menu-manager.js     # 菜单管理
+│   │
+│   └── utils/                  # 工具函数
+│       ├── logger.js           # 日志系统
+│       ├── native-helper.js    # Windows API 调用
+│       └── selection-state-machine.js # 划词状态机
+│
+├── src/                        # 渲染进程代码
+│   ├── main.jsx                # 主窗口入口
+│   ├── App.jsx                 # 主应用组件
+│   │
+│   ├── components/             # React 组件
+│   │   ├── DocumentTranslator/ # 文档翻译
+│   │   ├── FavoritesPanel/     # 收藏功能
+│   │   ├── GlassTranslator/    # 玻璃窗口组件
+│   │   ├── HistoryPanel/       # 历史记录
+│   │   ├── MainWindow/         # 主窗口布局
+│   │   ├── ProviderSettings/   # 翻译源设置
+│   │   ├── SelectionTranslator/# 划词翻译组件
+│   │   ├── SettingsPanel/      # 设置面板
+│   │   ├── TitleBar/           # 标题栏
+│   │   └── TranslationPanel/   # 翻译面板
+│   │
+│   ├── providers/              # 翻译源 Provider
+│   │   ├── base.js             # BaseProvider 基类
+│   │   ├── registry.js         # Provider 注册中心
+│   │   ├── local-llm/          # 本地 LLM
+│   │   ├── openai/             # OpenAI API
+│   │   ├── deepl/              # DeepL
+│   │   ├── gemini/             # Gemini
+│   │   ├── deepseek/           # DeepSeek
+│   │   ├── google-translate/   # Google 翻译
+│   │   └── ocr/                # OCR 引擎
+│   │
+│   ├── services/               # 服务层
+│   │   ├── translation.js      # 翻译服务（门面）
+│   │   ├── main-translation.js # 主窗口翻译服务
+│   │   ├── pipeline.js         # 玻璃窗口流水线
+│   │   └── cache.js            # 翻译缓存
+│   │
+│   ├── stores/                 # Zustand 状态管理
+│   │   ├── translation-store.js# 翻译状态
+│   │   ├── config.js           # 配置状态
+│   │   └── session.js          # 会话状态
+│   │
+│   ├── config/                 # 前端配置
+│   │   ├── constants.js        # 常量定义 (同步副本)
+│   │   ├── defaults.js         # 默认值
+│   │   ├── templates.js        # 翻译模板
+│   │   ├── privacy-modes.js    # 隐私模式配置
+│   │   └── filters.js          # 免译过滤器
+│   │
+│   ├── utils/                  # 工具函数
+│   ├── styles/                 # 全局样式
+│   ├── windows/                # 子窗口入口
+│   │   ├── glass-entry.jsx
+│   │   └── selection-entry.jsx
+│   └── workers/                # Web Workers
+│
+├── public/                     # ✅ HTML 入口 + 静态资源 (重构后)
+│   ├── index.html              # 主窗口 (原根目录)
+│   ├── selection.html          # 划词翻译 (原根目录)
+│   ├── glass.html              # 玻璃窗口 (原 src/windows/)
+│   ├── subtitle-capture.html   # 字幕采集 (原 src/windows/)
+│   ├── screenshot.html         # 截图选区 (原 electron/)
+│   ├── icon.png                # 应用图标
+│   └── *.ico                   # 图标文件
+│
+├── resources/                  # ✅ 应用资源 (重构后)
+│   └── ocr/
+│       ├── chi_sim.traineddata # 原根目录
+│       └── eng.traineddata     # 原根目录
+│
+├── scripts/                    # ✅ 工具脚本 (新建)
+│   └── check-constants.js      # 常量同步检查
+│
+├── docs/                       # 文档
+│   ├── ARCHITECTURE.md         # 架构文档
+│   ├── REFACTOR_PLAN.md        # 重构计划
+│   └── ...
+│
+└── build/                      # Vite 构建输出
 ```
 
 ---
 
-## ❓ 需要决策
+## 📋 详细变更记录
 
-1. **SettingsPanel 是否立即拆分？**
-   - 是 → 执行第一阶段
-   - 否 → 仅删除冗余文件
+### Phase 1: Preload 文件整理
 
-2. **组件目录结构是否统一？**
-   - 方案 A (全部文件夹) → 更规范
-   - 方案 B (保持现状) → 改动小
+**移动的文件**:
+| 原路径 | 新路径 |
+|--------|--------|
+| `electron/preload.js` | `electron/preloads/main.js` |
+| `electron/preload-selection.js` | `electron/preloads/selection.js` |
+| `electron/preload-glass.js` | `electron/preloads/glass.js` |
+| `electron/preload-subtitle-capture.js` | `electron/preloads/subtitle-capture.js` |
 
-3. **main.js 是否需要拆分？**
-   - 是 → 第三阶段执行
-   - 否 → 保持现状
+**修改的文件**:
+- `electron/managers/window-manager.js` (4 处 preload 路径)
 
 ---
 
-**请告诉我您的决定，我将开始执行。**
+### Phase 2: HTML 文件统一
+
+**移动的文件**:
+| 原路径 | 新路径 |
+|--------|--------|
+| `index.html` | `public/index.html` |
+| `selection.html` | `public/selection.html` |
+| `src/windows/glass.html` | `public/glass.html` |
+| `src/windows/subtitle-capture.html` | `public/subtitle-capture.html` |
+| `electron/screenshot.html` | `public/screenshot.html` |
+
+**修改的文件**:
+- `vite.config.js` (rollupOptions.input)
+- `electron/managers/window-manager.js` (5 处 HTML 路径)
+- `electron/ipc/screenshot.js` (1 处 HTML 路径)
+
+---
+
+### Phase 3: 资源文件整理
+
+**移动的文件**:
+| 原路径 | 新路径 |
+|--------|--------|
+| `chi_sim.traineddata` | `resources/ocr/chi_sim.traineddata` |
+| `eng.traineddata` | `resources/ocr/eng.traineddata` |
+
+**修改的文件**:
+- `package.json` (extraResources 配置)
+
+---
+
+### Phase 4: 配置常量同步机制
+
+**新建文件**:
+- `scripts/check-constants.js` - 常量同步检查脚本
+
+**修改的文件**:
+- `electron/shared/constants.js` - 添加同步标记
+- `src/config/constants.js` - 添加同步标记
+- `package.json` - 添加 `npm run check:constants` 命令
+
+---
+
+### Phase 5: 路径引用集中配置
+
+**新建文件**:
+- `electron/shared/paths.js` - 路径配置中心
+
+**修改的文件**:
+- `electron/managers/window-manager.js` - 使用 PATHS 配置
+- `electron/managers/tray-manager.js` - 使用 PATHS 配置
+- `electron/ipc/screenshot.js` - 使用 PATHS 配置
+
+---
+
+### Phase 6: 清理与文档
+
+**删除的目录**:
+- `src/entries/` (空目录)
+
+**新建的文档**:
+- `docs/ARCHITECTURE.md` - 架构文档
+- `docs/REFACTOR_PLAN.md` - 重构计划
+
+---
+
+## 🔧 路径配置中心
+
+所有文件路径通过 `electron/shared/paths.js` 统一管理：
+
+```javascript
+const PATHS = require('./shared/paths');
+
+// Preload 脚本
+PATHS.preloads.main
+PATHS.preloads.selection
+PATHS.preloads.glass
+PATHS.preloads.subtitleCapture
+
+// HTML 页面
+PATHS.pages.main.url    // 开发环境 URL
+PATHS.pages.main.file   // 生产环境文件路径
+
+// 资源文件
+PATHS.resources.icon
+PATHS.resources.ocrData
+```
+
+---
+
+## 📊 后续优化建议
+
+### 待办项（未执行）
+
+| 优化项 | 优先级 | 工作量 | 状态 |
+|--------|:------:|:------:|:----:|
+| 拆分 SettingsPanel (2,198行) | 🔴 高 | 2-3小时 | 待定 |
+| 统一组件目录结构 | 🟡 中 | 1-2小时 | 待定 |
+| screenshot.html 安全改造 | 🟡 中 | 1小时 | 待定 |
+| 常量完全统一 (ESM) | 🟢 低 | 2小时 | 待定 |
+| TypeScript 支持 | 🟢 低 | 8小时+ | 待定 |
+
+---
+
+## ✅ 验证命令
+
+```bash
+# 检查常量同步
+npm run check:constants
+
+# 开发环境启动
+npm install
+npm start
+
+# 生产构建
+npm run build
+npm run dist
+```
+
+---
+
+**文档更新日期**: 2025-01-17

@@ -135,7 +135,6 @@ class GoogleTranslateProvider extends BaseProvider {
       }
 
       const data = await response.json();
-      console.log('[GoogleTranslate] Response:', JSON.stringify(data).slice(0, 500));
       
       // 解析响应
       const translatedText = this._parseResponse(data);

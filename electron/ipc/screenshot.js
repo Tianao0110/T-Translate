@@ -6,6 +6,7 @@
 const { ipcMain, globalShortcut, screen, BrowserWindow } = require('electron');
 const path = require('path');
 const { CHANNELS } = require('../shared/channels');
+const PATHS = require('../shared/paths');
 const logger = require('../utils/logger')('IPC:Screenshot');
 
 /**
@@ -272,7 +273,7 @@ async function startScreenshot(options, fromHotkey = false) {
   });
   
   // 加载截图页面
-  screenshotWindow.loadFile(path.join(__dirname, '../screenshot.html'));
+  screenshotWindow.loadFile(PATHS.pages.screenshot.file);
   
   // 置顶
   screenshotWindow.setAlwaysOnTop(true, 'screen-saver');

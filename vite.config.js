@@ -15,6 +15,12 @@ export default defineConfig(({ command, mode }) => {
   console.log(`🔧 Building in ${mode} mode...`);
 
   return {
+    // 根目录设为 public（HTML 入口所在位置）
+    root: 'public',
+    
+    // 静态资源目录（相对于 root）
+    publicDir: false,  // 禁用，因为我们已经在 public 目录了
+    
     // 插件配置
     plugins: [
       react({
@@ -23,8 +29,8 @@ export default defineConfig(({ command, mode }) => {
         // Babel 配置
         babel: {
           plugins: [
-            // 生产环境移除 console
-            isProd && ['transform-remove-console', { exclude: ['error', 'warn'] }]
+            // 生产环境移除 console (需要 babel-plugin-transform-remove-console)
+            // isProd && ['transform-remove-console', { exclude: ['error', 'warn'] }]
           ].filter(Boolean)
         }
       })
@@ -33,17 +39,18 @@ export default defineConfig(({ command, mode }) => {
     // 基础路径
     base: isProd ? './' : '/',
 
-    // 路径别名
+    // 路径别名（关键：把 /src 映射到项目根目录的 src）
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, './src'),
-        '@components': path.resolve(__dirname, './src/components'),
-        '@services': path.resolve(__dirname, './src/services'),
-        '@utils': path.resolve(__dirname, './src/utils'),
-        '@stores': path.resolve(__dirname, './src/stores'),
-        '@styles': path.resolve(__dirname, './src/styles'),
-        '@config': path.resolve(__dirname, './src/config'),
-        '@assets': path.resolve(__dirname, './src/assets')
+        '/src': path.resolve(__dirname, 'src'),
+        '@': path.resolve(__dirname, 'src'),
+        '@components': path.resolve(__dirname, 'src/components'),
+        '@services': path.resolve(__dirname, 'src/services'),
+        '@utils': path.resolve(__dirname, 'src/utils'),
+        '@stores': path.resolve(__dirname, 'src/stores'),
+        '@styles': path.resolve(__dirname, 'src/styles'),
+        '@config': path.resolve(__dirname, 'src/config'),
+        '@assets': path.resolve(__dirname, 'src/assets')
       }
     },
 
@@ -88,16 +95,23 @@ export default defineConfig(({ command, mode }) => {
         ignored: ['**/node_modules/**', '**/dist/**', '**/.git/**']
       },
 
-      // 文件系统访问配置（允许访问 electron/shared）
+      // 文件系统访问配置
       fs: {
-        allow: ['..']
+        // 允许访问项目根目录（因为 root 是 public，需要访问外层的 src）
+        allow: [
+          path.resolve(__dirname, 'src'),
+          path.resolve(__dirname, 'node_modules'),
+          path.resolve(__dirname, 'public'),
+          path.resolve(__dirname),
+        ],
+        strict: false,  // 允许通过 /@fs/ 访问
       }
     },
 
     // 构建配置
     build: {
-      // 输出目录
-      outDir: 'build',
+      // 输出目录（相对于 root，即 public/../build）
+      outDir: '../build',
       
       // 资源目录
       assetsDir: 'static',
@@ -126,9 +140,9 @@ export default defineConfig(({ command, mode }) => {
       // 代码分割 - 多入口配置
       rollupOptions: {
         input: {
-          main: path.resolve(__dirname, 'index.html'),
-          glass: path.resolve(__dirname, 'src/windows/glass.html'),  // 玻璃翻译窗口入口
-          selection: path.resolve(__dirname, 'selection.html')  // 划词翻译窗口入口
+          main: path.resolve(__dirname, 'public/index.html'),
+          glass: path.resolve(__dirname, 'public/glass.html'),  // 玻璃翻译窗口入口
+          selection: path.resolve(__dirname, 'public/selection.html')  // 划词翻译窗口入口
         },
         output: {
           // 入口文件名

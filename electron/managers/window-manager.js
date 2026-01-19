@@ -4,6 +4,7 @@
 
 const { BrowserWindow, shell } = require('electron');
 const path = require('path');
+const PATHS = require('../shared/paths');
 
 // 依赖（通过 init 注入）
 let store = null;
@@ -60,12 +61,12 @@ function createMainWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
-      preload: path.join(__dirname, '../preload.js'),
+      preload: PATHS.preloads.main,
       webSecurity: false,
     },
     autoHideMenuBar: true,
     menuBarVisible: false,
-    icon: path.join(__dirname, '../../public/icon.png'),
+    icon: PATHS.resources.icon,
     frame: false,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     show: false,
@@ -77,10 +78,10 @@ function createMainWindow() {
 
   // 加载应用
   if (isDev) {
-    mainWindow.loadURL('http://localhost:5173');
+    mainWindow.loadURL(PATHS.pages.main.url);
     mainWindow.webContents.openDevTools();
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../../dist/index.html'));
+    mainWindow.loadFile(PATHS.pages.main.file);
   }
 
   // 窗口准备好后显示
@@ -161,7 +162,7 @@ function createGlassWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, '../preload-glass.js'),
+      preload: PATHS.preloads.glass,
     },
   });
 
@@ -174,9 +175,9 @@ function createGlassWindow() {
 
   // 加载页面
   if (isDev) {
-    glassWindow.loadURL('http://localhost:5173/src/windows/glass.html');
+    glassWindow.loadURL(PATHS.pages.glass.url);
   } else {
-    glassWindow.loadFile(path.join(__dirname, '../../dist/src/windows/glass.html'));
+    glassWindow.loadFile(PATHS.pages.glass.file);
   }
 
   // 保存位置
@@ -262,7 +263,7 @@ function createSubtitleCaptureWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, '../preload-subtitle-capture.js'),
+      preload: PATHS.preloads.subtitleCapture,
     },
   });
 
@@ -275,9 +276,9 @@ function createSubtitleCaptureWindow() {
 
   // 加载页面
   if (isDev) {
-    subtitleWindow.loadURL('http://localhost:5173/src/windows/subtitle-capture.html');
+    subtitleWindow.loadURL(PATHS.pages.subtitleCapture.url);
   } else {
-    subtitleWindow.loadFile(path.join(__dirname, '../../dist/src/windows/subtitle-capture.html'));
+    subtitleWindow.loadFile(PATHS.pages.subtitleCapture.file);
   }
 
   // 更新采集区坐标
@@ -365,7 +366,7 @@ function createSelectionWindow() {
     hasShadow: false,
     focusable: false,
     webPreferences: {
-      preload: path.join(__dirname, '../preload-selection.js'),
+      preload: PATHS.preloads.selection,
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
@@ -381,9 +382,9 @@ function createSelectionWindow() {
   selectionWindow.setIgnoreMouseEvents(false);
 
   if (isDev) {
-    selectionWindow.loadURL('http://localhost:5173/selection.html');
+    selectionWindow.loadURL(PATHS.pages.selection.url);
   } else {
-    selectionWindow.loadFile(path.join(__dirname, '../../dist/selection.html'));
+    selectionWindow.loadFile(PATHS.pages.selection.file);
   }
 
   selectionWindow.on('closed', () => {
@@ -513,7 +514,7 @@ function createScreenshotWindow(bounds) {
   });
 
   screenshotWindow.setBounds({ x: minX, y: minY, width: totalWidth, height: totalHeight });
-  screenshotWindow.loadFile(path.join(__dirname, '../screenshot.html'));
+  screenshotWindow.loadFile(PATHS.pages.screenshot.file);
   screenshotWindow.setAlwaysOnTop(true, 'screen-saver');
   screenshotWindow.focus();
 

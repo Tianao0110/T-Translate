@@ -5,6 +5,7 @@
 const { Tray, Menu, nativeImage, app } = require('electron');
 const path = require('path');
 const { store } = require('../state');
+const PATHS = require('../shared/paths');
 const logger = require('../utils/logger')('Tray');
 
 // 托盘实例
@@ -50,7 +51,7 @@ function createTray(ctx) {
     return tray;
   }
 
-  const iconPath = path.join(__dirname, '../../public/icon.png');
+  const iconPath = PATHS.resources.icon;
   const trayIcon = nativeImage
     .createFromPath(iconPath)
     .resize({ width: 16, height: 16 });

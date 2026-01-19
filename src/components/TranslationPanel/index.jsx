@@ -94,13 +94,8 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   // [UI 状态] 当前选中的模板
   const [selectedTemplate, setSelectedTemplate] = useState('natural');
 
-  // 初始化连接检查
-  useEffect(() => {
-    checkConnection();
-    // 降低检查频率：60秒检查一次
-    const interval = setInterval(checkConnection, 60000); 
-    return () => clearInterval(interval);
-  }, []);
+  // 连接状态改为手动检查（设置面板有测试按钮）
+  // 移除了自动轮询检查，减少不必要的网络请求
 
   // 处理来自 MainWindow 的截图数据（通过 props 传递）
   useEffect(() => {
