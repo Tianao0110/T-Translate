@@ -481,7 +481,7 @@ function getEditControlSelection(api, hwnd) {
  * 
  * @returns {Promise<{hasSelection: boolean, text: string}>}
  */
-async function checkSelectionViaClipboard() {
+async function checkSelectionViaClipboard(options = {}) {
   if (process.platform !== 'win32') {
     return { hasSelection: false, text: '' };
   }
@@ -496,6 +496,11 @@ async function checkSelectionViaClipboard() {
   
   const { clipboard } = require('electron');
   
+  // 复杂应用（Office 等）需要更长的等待时间
+  const isComplexApp = options.isComplexApp || false;
+  const waitTime = isComplexApp ? 80 : 50; // Office 应用等待更长
+  const maxRetries = isComplexApp ? 2 : 1;  // Office 应用可重试
+  
   try {
     // 1. 保存剪贴板快照（含格式）
     const snapshot = {
@@ -504,17 +509,33 @@ async function checkSelectionViaClipboard() {
       rtf: clipboard.readRTF(),
     };
     
-    // 2. 模拟 Ctrl+C（不清空剪贴板！）
-    simulateCtrlC();
+    let currentText = snapshot.text;
+    let textChanged = false;
     
-    // 3. 延迟等待（20-40ms）
-    await new Promise(resolve => setTimeout(resolve, 30));
+    // 尝试复制（可能重试）
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      // 2. 模拟 Ctrl+C
+      simulateCtrlC();
+      
+      // 3. 延迟等待
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+      
+      // 4. 读取当前剪贴板
+      currentText = clipboard.readText();
+      
+      // 5. 与快照比较
+      textChanged = currentText !== snapshot.text;
+      
+      if (textChanged) {
+        logger.debug(`Clipboard changed on attempt ${attempt + 1}`);
+        break;
+      }
+      
+      if (attempt < maxRetries - 1) {
+        logger.debug(`Clipboard unchanged, retrying (attempt ${attempt + 1}/${maxRetries})`);
+      }
+    }
     
-    // 4. 读取当前剪贴板
-    const currentText = clipboard.readText();
-    
-    // 5. 与快照比较，判断是否有"有意义的变化"
-    const textChanged = currentText !== snapshot.text;
     const hasNewContent = currentText && currentText.trim().length > 0;
     
     // 6. 恢复剪贴板（无论是否变化都恢复，保持安静）
@@ -531,7 +552,7 @@ async function checkSelectionViaClipboard() {
     //    - 剪贴板未变化 → 无 selection（Ctrl+C 没复制到东西）
     //    - 剪贴板变化且非空 → 有 selection
     if (!textChanged) {
-      logger.debug('Clipboard unchanged, no selection');
+      logger.debug('Clipboard unchanged after all attempts, no selection');
       return { hasSelection: false, text: '' };
     }
     

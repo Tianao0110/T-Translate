@@ -90,23 +90,62 @@ const ProviderSettings = forwardRef(({ settings, updateSettings, notify }, ref) 
   useEffect(() => {
     // 防止重复初始化
     if (initializedRef.current) return;
-    initializedRef.current = true;
     
     const initProviders = async () => {
-      const savedProviders = settings?.translation?.providers || [];
-      const savedConfigs = settings?.translation?.providerConfigs || {};
+      // 等待 settings 加载完成（有数据时 providers 可能不为空）
+      // 最多等待 500ms
+      let savedProviders = settings?.translation?.providers || [];
+      let savedConfigs = settings?.translation?.providerConfigs || {};
       
-      // 构建 providers 列表
-      const providerList = allProvidersMeta.map((meta, index) => {
-        const saved = savedProviders.find(p => p.id === meta.id);
-        return {
+      // 如果 settings 还没有加载完成（providers 为空），等待一下
+      if (savedProviders.length === 0) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        savedProviders = settings?.translation?.providers || [];
+        savedConfigs = settings?.translation?.providerConfigs || {};
+      }
+      
+      const hasStoredProviders = savedProviders.length > 0;
+      
+      let providerList;
+      
+      if (hasStoredProviders) {
+        // 使用存储的顺序，但确保包含所有 provider
+        providerList = [];
+        const savedIds = new Set(savedProviders.map(p => p.id));
+        
+        // 先添加存储中的 providers（保持顺序）
+        for (const saved of savedProviders) {
+          const meta = allProvidersMeta.find(m => m.id === saved.id);
+          if (meta) {
+            providerList.push({
+              id: saved.id,
+              enabled: saved.enabled ?? false,
+              priority: saved.priority ?? providerList.length,
+            });
+          }
+        }
+        
+        // 再添加新的 providers（存储中没有的）
+        for (const meta of allProvidersMeta) {
+          if (!savedIds.has(meta.id)) {
+            providerList.push({
+              id: meta.id,
+              enabled: false,
+              priority: providerList.length,
+            });
+          }
+        }
+      } else {
+        // 没有存储数据，使用默认顺序
+        providerList = allProvidersMeta.map((meta, index) => ({
           id: meta.id,
-          enabled: saved?.enabled ?? (index === 0),
-          priority: saved?.priority ?? index,
-        };
-      });
+          enabled: index === 0, // 默认只启用第一个
+          priority: index,
+        }));
+      }
       
-      providerList.sort((a, b) => a.priority - b.priority);
+      // 确保 priority 连续
+      providerList.forEach((p, i) => p.priority = i);
       setProviders(providerList);
       
       // 构建配置
@@ -121,11 +160,10 @@ const ProviderSettings = forwardRef(({ settings, updateSettings, notify }, ref) 
         
         configs[meta.id] = { ...defaultConfig, ...savedConfigs[meta.id] };
         
-        // 解密敏感字段 - 总是尝试从 secure storage 读取
+        // 解密敏感字段
         if (meta.configSchema) {
           for (const [key, field] of Object.entries(meta.configSchema)) {
             if (field.encrypted) {
-              // 无论当前值是什么，都尝试从 secure storage 读取
               const decrypted = await secureStorage.get(`provider_${meta.id}_${key}`);
               if (decrypted) {
                 configs[meta.id][key] = decrypted;
@@ -136,10 +174,11 @@ const ProviderSettings = forwardRef(({ settings, updateSettings, notify }, ref) 
       }
       
       setProviderConfigs(configs);
+      initializedRef.current = true;
     };
     
     initProviders();
-  }, []); // 空依赖数组，只在挂载时执行
+  }, [settings?.translation?.providers]); // 监听 settings 加载完成
 
   // 保存设置
   const saveSettings = useCallback(async () => {
@@ -161,8 +200,8 @@ const ProviderSettings = forwardRef(({ settings, updateSettings, notify }, ref) 
         }
       }
       
-      updateSettings('translation', 'providers', providers);
-      updateSettings('translation', 'providerConfigs', configsToSave);
+      updateSettings('translation', 'providers', providers, true); // silent: 不触发 dirty
+      updateSettings('translation', 'providerConfigs', configsToSave, true); // silent
       
       if (window.electron?.store) {
         const currentSettings = await window.electron.store.get('settings') || {};
@@ -204,17 +243,29 @@ const ProviderSettings = forwardRef(({ settings, updateSettings, notify }, ref) 
 
   // 切换启用状态
   const toggleProvider = (providerId) => {
-    setProviders(prev => prev.map(p => 
+    const newProviders = providers.map(p => 
       p.id === providerId ? { ...p, enabled: !p.enabled } : p
-    ));
+    );
+    setProviders(newProviders);
+    
+    // 通知父组件（触发保存按钮显示）
+    if (updateSettings) {
+      updateSettings('translation', 'providers', newProviders);
+    }
   };
 
   // 更新配置
   const updateConfig = (providerId, key, value) => {
-    setProviderConfigs(prev => ({
-      ...prev,
-      [providerId]: { ...prev[providerId], [key]: value }
-    }));
+    const newConfigs = {
+      ...providerConfigs,
+      [providerId]: { ...providerConfigs[providerId], [key]: value }
+    };
+    setProviderConfigs(newConfigs);
+    
+    // 通知父组件
+    if (updateSettings) {
+      updateSettings('translation', 'providerConfigs', newConfigs);
+    }
   };
 
   // 测试连接
@@ -247,6 +298,11 @@ const ProviderSettings = forwardRef(({ settings, updateSettings, notify }, ref) 
     newProviders.forEach((p, i) => p.priority = i);
     
     setProviders(newProviders);
+    
+    // 通知父组件
+    if (updateSettings) {
+      updateSettings('translation', 'providers', newProviders);
+    }
   };
 
   // 拖拽开始
@@ -291,6 +347,11 @@ const ProviderSettings = forwardRef(({ settings, updateSettings, notify }, ref) 
     setProviders(newProviders);
     setDraggedIndex(null);
     setDragOverIndex(null);
+    
+    // 通知父组件
+    if (updateSettings) {
+      updateSettings('translation', 'providers', newProviders);
+    }
   };
 
   // 获取状态

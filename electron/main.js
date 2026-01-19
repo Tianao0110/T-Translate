@@ -41,7 +41,8 @@ async function handleDelayedConfirm(x, y, rect) {
     const { hasTextSelection, checkSelectionViaClipboard } = require('./utils/native-helper');
     
     // 等待一小段时间确保双击选中完成（系统需要时间响应）
-    await new Promise(resolve => setTimeout(resolve, 30));
+    // Office 等复杂应用可能需要更长时间
+    await new Promise(resolve => setTimeout(resolve, 50));
     
     // ========== 第一层 + 第二层：零剪贴板检测 ==========
     const selectionCheck = hasTextSelection();
@@ -63,9 +64,13 @@ async function handleDelayedConfirm(x, y, rect) {
     }
     
     // ========== 第三层：剪贴板兜底（复杂应用） ==========
-    logger.debug('Delayed confirm: layer 3 - clipboard fallback');
+    // 检测是否是 Office 应用（需要更长的等待时间）
+    const isOfficeApp = selectionCheck.reason?.includes('OpusApp') || 
+                        selectionCheck.reason?.includes('EXCEL') ||
+                        selectionCheck.reason?.includes('PPTFrameClass');
+    logger.debug(`Delayed confirm: layer 3 - clipboard fallback (office=${isOfficeApp})`);
     
-    const clipboardResult = await checkSelectionViaClipboard();
+    const clipboardResult = await checkSelectionViaClipboard({ isComplexApp: isOfficeApp });
     
     if (clipboardResult.hasSelection === true) {
       logger.debug(`Delayed confirm: text selected via clipboard "${clipboardResult.text.substring(0, 20)}..."`);
@@ -105,8 +110,9 @@ async function showSelectionTrigger(mouseX, mouseY, rect) {
   runtime.lastSelectionRect = rect;
 
   // 从主窗口获取实时的目标语言（与主程序同步）
-  let currentTargetLang = translationSettings.targetLanguage || 'zh';
-  let currentSourceLang = translationSettings.sourceLanguage || 'auto';
+  // 优先级：translation store > settings.translation.defaultTargetLang > settings.targetLanguage
+  let currentTargetLang = translationSettings.defaultTargetLang || settings.targetLanguage || 'zh';
+  let currentSourceLang = translationSettings.defaultSourceLang || settings.sourceLanguage || 'auto';
   
   if (windows.main && !windows.main.isDestroyed()) {
     try {
@@ -370,8 +376,12 @@ function startSelectionHook() {
           }
           
           // hasSelection 为 null（浏览器等复杂应用），走剪贴板兜底
-          logger.debug('Normal drag: complex app, using clipboard fallback');
-          const clipboardResult = await checkSelectionViaClipboard();
+          // 检测是否是 Office 应用（需要更长的等待时间）
+          const isOfficeApp = selectionCheck.reason?.includes('OpusApp') || 
+                              selectionCheck.reason?.includes('EXCEL') ||
+                              selectionCheck.reason?.includes('PPTFrameClass');
+          logger.debug(`Normal drag: complex app, using clipboard fallback (office=${isOfficeApp})`);
+          const clipboardResult = await checkSelectionViaClipboard({ isComplexApp: isOfficeApp });
           
           if (clipboardResult.hasSelection === true) {
             showSelectionTrigger(x, y, rect);

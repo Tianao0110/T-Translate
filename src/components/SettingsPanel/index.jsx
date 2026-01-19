@@ -70,9 +70,10 @@ const SettingsPanel = ({ showNotification }) => {
 
   // 设置状态 - 使用外部默认值
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
-  const [initialSettings, setInitialSettings] = useState(null); // 用于检测未保存更改
+  const [isDirty, setIsDirty] = useState(false); // 是否有未保存的更改（简单标志）
+  const isInitializingRef = useRef(true); // 是否正在初始化
 
-  const [activeSection, setActiveSection] = useState('connection');
+  const [activeSection, setActiveSection] = useState('providers');
   const [connectionStatus, setConnectionStatus] = useState('unknown');
   const [isTesting, setIsTesting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -82,11 +83,8 @@ const SettingsPanel = ({ showNotification }) => {
   const [collapsedGroups, setCollapsedGroups] = useState({});
   const [editingShortcut, setEditingShortcut] = useState(null); // 正在编辑的快捷键
 
-  // 检测是否有未保存的更改
-  const hasUnsavedChanges = useMemo(() => {
-    if (!initialSettings) return false;
-    return JSON.stringify(settings) !== JSON.stringify(initialSettings);
-  }, [settings, initialSettings]);
+  // 简化：只要有操作就标记为 dirty
+  const hasUnsavedChanges = isDirty;
 
   // 离开页面时提醒
   useEffect(() => {
@@ -210,7 +208,13 @@ const SettingsPanel = ({ showNotification }) => {
       }
       
       setSettings(finalSettings);
-      setInitialSettings(JSON.parse(JSON.stringify(finalSettings))); // 深拷贝保存初始状态
+      setIsDirty(false); // 初始加载后没有未保存更改
+      
+      // 延迟关闭初始化标志，等待子组件完成初始化
+      // ProviderSettings 初始化可能需要 100ms 等待 + 解密操作
+      setTimeout(() => {
+        isInitializingRef.current = false;
+      }, 500);
     } catch (error) {
       logger.error('Failed to load settings:', error);
     }
@@ -273,6 +277,7 @@ const SettingsPanel = ({ showNotification }) => {
       // 因为 ProviderSettings.save() 已经完成了所有保存工作
       if (activeSection === 'providers' && providerSettingsRef.current?.save) {
         await providerSettingsRef.current.save();
+        setIsDirty(false); // 重置 dirty 标志
         setIsSaving(false);
         return; // 直接返回，不要再用旧的 settings state 覆盖
       }
@@ -335,8 +340,8 @@ const SettingsPanel = ({ showNotification }) => {
         notify('设置已保存', 'success');
       }
       
-      // 更新初始设置状态（用于检测未保存更改）
-      setInitialSettings(JSON.parse(JSON.stringify(settings)));
+      // 保存后重置 dirty 标志
+      setIsDirty(false);
     } catch (error) {
       logger.error('Failed to save settings:', error);
       notify('保存设置失败', 'error');
@@ -457,7 +462,8 @@ const SettingsPanel = ({ showNotification }) => {
   };
 
   // 更新设置 - 使用 useCallback 优化
-  const updateSetting = useCallback((section, key, value) => {
+  // silent: 为 true 时不触发 isDirty（用于保存时的状态同步）
+  const updateSetting = useCallback((section, key, value, silent = false) => {
     setSettings(prev => ({
       ...prev,
       [section]: {
@@ -465,6 +471,10 @@ const SettingsPanel = ({ showNotification }) => {
         [key]: value
       }
     }));
+    // 只有在非 silent 且初始化完成后才标记为 dirty
+    if (!silent && !isInitializingRef.current) {
+      setIsDirty(true);
+    }
   }, []);
 
   // 渲染设置内容
@@ -629,18 +639,18 @@ const SettingsPanel = ({ showNotification }) => {
         <div key={activeSection} className="setting-content-animated">
           {renderSettingContent()}
         </div>
-        <div className="settings-footer">
-            {/* 未保存更改提示 */}
-            {hasUnsavedChanges && (
-              <div className="unsaved-indicator">
-                有未保存的更改
-              </div>
-            )}
+        {/* 只在有未保存更改时显示底部保存栏 */}
+        {hasUnsavedChanges && (
+          <div className="settings-footer">
+            <div className="unsaved-indicator">
+              有未保存的更改
+            </div>
             <button className="save-button" onClick={saveSettings} disabled={isSaving}>
                 {isSaving ? <RefreshCw className="animate-spin" size={16}/> : <Save size={16}/>}
-                {isSaving ? ' 保存中...' : hasUnsavedChanges ? ' 保存更改' : ' 保存设置'}
+                {isSaving ? ' 保存中...' : ' 保存更改'}
             </button>
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

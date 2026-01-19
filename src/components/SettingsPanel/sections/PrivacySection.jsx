@@ -127,7 +127,7 @@ const PrivacySection = ({
         {currentMode === PRIVACY_MODE_IDS.SECURE && (
           <div className="mode-warning secure">
             <Shield size={16} />
-            <span>无痕模式下所有翻译记录仅存在于当前会话，关闭应用后自动清除</span>
+            <span>无痕模式已开启：翻译记录暂停保存，退出后恢复之前的历史</span>
           </div>
         )}
       </div>

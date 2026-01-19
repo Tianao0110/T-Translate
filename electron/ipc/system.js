@@ -43,6 +43,14 @@ function register(ctx) {
   });
 
   /**
+   * 获取窗口是否最大化
+   */
+  ipcMain.handle("is-maximized", () => {
+    const mainWindow = getMainWindow();
+    return mainWindow ? mainWindow.isMaximized() : false;
+  });
+
+  /**
    * 关闭窗口
    */
   ipcMain.on(CHANNELS.SYSTEM.CLOSE, () => {

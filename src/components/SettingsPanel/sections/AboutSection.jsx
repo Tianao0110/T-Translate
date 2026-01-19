@@ -2,7 +2,7 @@
 // 关于页面区块组件 - 从 SettingsPanel 拆分
 
 import React from 'react';
-import { Zap, GitBranch, RefreshCw } from 'lucide-react';
+import { GitBranch, RefreshCw } from 'lucide-react';
 
 /**
  * 关于页面区块
@@ -21,7 +21,7 @@ const AboutSection = ({ notify }) => {
   return (
     <div className="setting-content about-section">
       <div className="app-info">
-        <Zap size={48} className="app-icon"/>
+        <div className="app-logo-text">T</div>
         <h2>T-Translate</h2>
         <p className="version-tag">v1.0.0</p>
         <p className="app-desc">智能离线翻译工具</p>

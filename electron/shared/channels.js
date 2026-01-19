@@ -157,8 +157,15 @@ const MENU_ACTIONS = {
   SWITCH_LANGUAGE: 'switch-language',
 };
 
+// 隐私模式常量
+const PRIVACY_MODES = {
+  STANDARD: 'standard',
+  OFFLINE: 'offline',
+  STRICT: 'strict',
+};
+
 // CommonJS 导出
-module.exports = { CHANNELS, MENU_ACTIONS };
+module.exports = { CHANNELS, MENU_ACTIONS, PRIVACY_MODES };
 
 // 为 Vite ESM 添加 default 导出
 module.exports.default = module.exports;

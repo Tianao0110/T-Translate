@@ -1861,6 +1861,34 @@ input:checked + .switch-slider::before {
   padding: 20px 0;
 }
 
+/* Logo 文字样式 */
+.app-logo-text {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  font-size: 32px;
+  font-weight: 700;
+  color: white;
+  background: linear-gradient(135deg, #60a5fa, #3b82f6);
+  border-radius: 16px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+/* 青绿主题 Logo */
+[data-theme="rainbow"] .app-logo-text {
+  background: linear-gradient(135deg, #34d399, #10b981);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+/* 深色主题 Logo */
+[data-theme="dark"] .app-logo-text {
+  background: linear-gradient(135deg, #818cf8, #6366f1);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
 .app-info h2 {
   margin: 12px 0 8px;
   font-size: 24px;

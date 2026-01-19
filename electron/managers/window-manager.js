@@ -104,6 +104,15 @@ function createMainWindow() {
     }
   });
 
+  // 最大化/还原状态变化通知渲染进程
+  mainWindow.on('maximize', () => {
+    mainWindow.webContents.send('maximize-change', true);
+  });
+
+  mainWindow.on('unmaximize', () => {
+    mainWindow.webContents.send('maximize-change', false);
+  });
+
   // 关闭窗口处理
   mainWindow.on('close', (event) => {
     if (!runtime.isQuitting && process.platform !== 'darwin') {

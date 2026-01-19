@@ -1,9 +1,28 @@
 // src/components/TitleBar.jsx
-import React from 'react';
-import { Minus, Square, X } from 'lucide-react';
-import './styles.css'; // 我们稍后会创建这个简单的 CSS
+import React, { useState, useEffect } from 'react';
+import { Minus, Maximize2, Minimize2, X } from 'lucide-react';
+import './styles.css';
 
 const TitleBar = () => {
+  const [isMaximized, setIsMaximized] = useState(false);
+
+  // 监听窗口最大化状态变化
+  useEffect(() => {
+    // 初始获取状态
+    window.electron?.window?.isMaximized?.().then(setIsMaximized);
+    
+    // 监听状态变化
+    const handleMaximizeChange = (maximized) => {
+      setIsMaximized(maximized);
+    };
+    
+    window.electron?.window?.onMaximizeChange?.(handleMaximizeChange);
+    
+    return () => {
+      window.electron?.window?.offMaximizeChange?.(handleMaximizeChange);
+    };
+  }, []);
+
   // 安全地调用 Electron API
   const handleMinimize = () => {
     if (window.electron && window.electron.window) {
@@ -41,9 +60,9 @@ const TitleBar = () => {
         <button 
           className="window-control-btn" 
           onClick={handleMaximize} 
-          title="最大化"
+          title={isMaximized ? "还原" : "最大化"}
         >
-          <Square size={12} />
+          {isMaximized ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
         </button>
         <button 
           className="window-control-btn close" 

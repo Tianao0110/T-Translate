@@ -69,6 +69,10 @@ const useTranslationStore = create(
       favorites: [],
       queue: [], // 批量翻译队列
       isProcessingQueue: false,
+      
+      // 无痕模式暂存区（不持久化）
+      _savedHistory: null,
+      _savedStatistics: null,
 
       // OCR 状态
       ocrStatus: {
@@ -102,10 +106,15 @@ const useTranslationStore = create(
       // ==================== 2. Actions  ====================
       setTranslationMode: (mode) =>
         set((state) => {
+          const previousMode = state.translationMode;
           state.translationMode = mode;
           
-          // 无痕模式：清除历史和统计
-          if (mode === PRIVACY_MODES.SECURE) {
+          // 切换到无痕模式：暂存当前历史，使用空白历史
+          if (mode === PRIVACY_MODES.SECURE && previousMode !== PRIVACY_MODES.SECURE) {
+            // 保存当前历史和统计到暂存区
+            state._savedHistory = [...state.history];
+            state._savedStatistics = { ...state.statistics };
+            // 使用空白历史（无痕期间的记录不保存）
             state.history = [];
             state.statistics = {
               totalTranslations: 0,
@@ -116,6 +125,18 @@ const useTranslationStore = create(
               averageTranslationTime: 0,
               lastUpdated: new Date().toISOString(),
             };
+          }
+          
+          // 退出无痕模式：恢复之前的历史
+          if (mode !== PRIVACY_MODES.SECURE && previousMode === PRIVACY_MODES.SECURE) {
+            if (state._savedHistory) {
+              state.history = state._savedHistory;
+              state._savedHistory = null;
+            }
+            if (state._savedStatistics) {
+              state.statistics = state._savedStatistics;
+              state._savedStatistics = null;
+            }
           }
         }),
 

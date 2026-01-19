@@ -27,6 +27,7 @@ const validChannels = {
     "screenshot-captured",  // 截图完成
     "selection-state-changed",  // 划词翻译状态变化
     "theme:changed",  // 主题变化通知
+    "maximize-change",  // 窗口最大化状态变化
   ],
   invoke: [
     "get-app-version",
@@ -70,6 +71,14 @@ const electronAPI = {
     maximize: () => ipcRenderer.send("maximize-window"),
     close: () => ipcRenderer.send("close-window"),
     setAlwaysOnTop: (flag) => ipcRenderer.send("set-always-on-top", flag),
+    isMaximized: () => ipcRenderer.invoke("is-maximized"),
+    onMaximizeChange: (callback) => {
+      const handler = (event, maximized) => callback(maximized);
+      ipcRenderer.on("maximize-change", handler);
+    },
+    offMaximizeChange: (callback) => {
+      ipcRenderer.removeAllListeners("maximize-change");
+    },
   },
   dialog: {
     showSaveDialog: (opts) => ipcRenderer.invoke("show-save-dialog", opts),

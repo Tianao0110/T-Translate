@@ -133,54 +133,6 @@ const InterfaceSection = ({
         </div>
         <p className="setting-hint">主题切换即时生效并自动保存</p>
       </div>
-      
-      {/* 字体大小 */}
-      <div className="setting-group">
-        <label className="setting-label">字体大小: {settings.interface.fontSize}px</label>
-        <input 
-          type="range" 
-          className="setting-range" 
-          min="12" 
-          max="20" 
-          value={settings.interface.fontSize} 
-          onChange={(e) => {
-            const size = parseInt(e.target.value);
-            updateSetting('interface', 'fontSize', size);
-            document.documentElement.style.setProperty('--base-font-size', `${size}px`);
-          }} 
-        />
-        <p className="setting-hint">调整翻译文本的显示大小</p>
-      </div>
-
-      {/* 窗口透明度 */}
-      <div className="setting-group">
-        <label className="setting-label">窗口透明度</label>
-        <div className="setting-row">
-          <input 
-            type="range" 
-            className="setting-range" 
-            min="50" 
-            max="100" 
-            value={settings.interface.windowOpacity || 100} 
-            onChange={(e) => updateSetting('interface', 'windowOpacity', parseInt(e.target.value))} 
-          />
-          <span className="range-value">{settings.interface.windowOpacity || 100}%</span>
-        </div>
-        <p className="setting-hint">调整主窗口透明度（需重启生效）</p>
-      </div>
-
-      {/* 紧凑模式 */}
-      <div className="setting-group">
-        <label className="setting-toggle">
-          <input 
-            type="checkbox" 
-            checked={settings.interface.compactMode || false}
-            onChange={(e) => updateSetting('interface', 'compactMode', e.target.checked)}
-          />
-          <span>紧凑模式</span>
-        </label>
-        <p className="setting-hint">减少界面元素间距，显示更多内容</p>
-      </div>
 
       {/* 快捷键设置 */}
       <div className="setting-group" style={{marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border-primary)'}}>

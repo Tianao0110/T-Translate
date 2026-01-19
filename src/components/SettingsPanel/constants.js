@@ -59,17 +59,19 @@ export const SHORTCUT_LABELS = {
 export const GLOBAL_SHORTCUT_KEYS = ['screenshot', 'toggleWindow', 'glassWindow', 'selectionTranslate'];
 
 /**
- * 导航项配置
+ * 导航项配置 - 按使用频率排序
  */
 export const NAV_ITEMS = [
-  { id: 'connection', icon: Wifi, label: 'LM Studio', group: '连接', keywords: ['连接', '端点', 'api', 'endpoint', 'lmstudio', '超时', 'timeout'] },
-  { id: 'providers', icon: Server, label: '翻译源', group: '连接', keywords: ['翻译源', 'provider', 'openai', 'deepl', 'gemini', 'deepseek', '本地', 'api'] },
+  // 翻译组 - 最常用的放前面
+  { id: 'providers', icon: Server, label: '翻译源', group: '翻译', keywords: ['翻译源', 'provider', 'openai', 'deepl', 'gemini', 'deepseek', '本地', 'api'] },
   { id: 'translation', icon: Globe, label: '翻译设置', group: '翻译', keywords: ['翻译', '语言', '源语言', '目标语言', '自动', 'stream', '流式'] },
-  { id: 'document', icon: FileText, label: '文档翻译', group: '翻译', keywords: ['文档', 'pdf', 'docx', 'epub', 'srt', '字幕', '批量'] },
   { id: 'selection', icon: MousePointer, label: '划词翻译', group: '翻译', keywords: ['划词', '选中', '鼠标', '触发', '按钮'] },
   { id: 'glassWindow', icon: Layers, label: '玻璃窗口', group: '翻译', keywords: ['玻璃', '透明', '窗口', '置顶', 'glass'] },
+  { id: 'document', icon: FileText, label: '文档翻译', group: '翻译', keywords: ['文档', 'pdf', 'docx', 'epub', 'srt', '字幕', '批量'] },
+  // 系统组
   { id: 'ocr', icon: Eye, label: 'OCR 识别', group: '系统', keywords: ['ocr', '识别', '截图', '图片', '文字识别', 'rapidocr', 'llm'] },
   { id: 'interface', icon: Palette, label: '界面外观', group: '系统', keywords: ['界面', '主题', '深色', '浅色', '字体', '外观'] },
+  { id: 'connection', icon: Wifi, label: 'LM Studio', group: '系统', keywords: ['连接', '端点', 'api', 'endpoint', 'lmstudio', '超时', 'timeout'] },
   { id: 'privacy', icon: Shield, label: '隐私模式', group: '系统', keywords: ['隐私', '安全', '模式', '历史', '记录'] },
   { id: 'about', icon: Info, label: '关于', group: '系统', keywords: ['关于', '版本', '信息', 'about'] },
 ];
