@@ -52,6 +52,7 @@ const GlassTranslator = () => {
   const [showOpacitySlider, setShowOpacitySlider] = useState(false);
   const [hasOverflow, setHasOverflow] = useState(false);
   const [captureRect, setCaptureRect] = useState(null);
+  const [theme, setTheme] = useState('light'); // 主题状态
   
   // ========== Refs ==========
   const contentRef = useRef(null);
@@ -66,6 +67,19 @@ const GlassTranslator = () => {
     // 加载设置
     loadSettings();
     loadCaptureRect();
+    
+    // 加载主题
+    const loadTheme = async () => {
+      try {
+        const settings = await window.electron?.store?.get?.('settings') || {};
+        const savedTheme = settings.interface?.theme || 'light';
+        setTheme(savedTheme);
+        document.documentElement.setAttribute('data-theme', savedTheme);
+      } catch (e) {
+        logger.debug('Failed to load theme:', e);
+      }
+    };
+    loadTheme();
     
     // 键盘事件
     const handleKeyDown = (e) => {
@@ -83,11 +97,16 @@ const GlassTranslator = () => {
     
     window.addEventListener('keydown', handleKeyDown);
     
-    // 监听设置变化
+    // 监听设置变化（包括主题）
     let unsubscribeSettings = null;
     if (window.electron?.glass?.onSettingsChanged) {
-      unsubscribeSettings = window.electron.glass.onSettingsChanged(() => {
+      unsubscribeSettings = window.electron.glass.onSettingsChanged((newSettings) => {
         loadSettings();
+        // 同步主题
+        if (newSettings?.interface?.theme) {
+          setTheme(newSettings.interface.theme);
+          document.documentElement.setAttribute('data-theme', newSettings.interface.theme);
+        }
       });
     }
     
@@ -274,6 +293,7 @@ const GlassTranslator = () => {
     <div 
       className={`glass-window ${subtitleMode ? 'subtitle-mode' : ''}`}
       style={{ '--glass-opacity': subtitleMode ? 0 : glassOpacity }}
+      data-theme={theme}
     >
       {/* 顶部区域 */}
       <div 

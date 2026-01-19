@@ -26,6 +26,7 @@ const validChannels = {
     "glass:translate-request",  // 玻璃窗口翻译请求
     "screenshot-captured",  // 截图完成
     "selection-state-changed",  // 划词翻译状态变化
+    "theme:changed",  // 主题变化通知
   ],
   invoke: [
     "get-app-version",
@@ -49,6 +50,9 @@ const validChannels = {
     "secure-storage:is-available",  // 检查加密是否可用
     "selection:toggle",  // 切换划词翻译
     "selection:get-enabled",  // 获取划词翻译状态
+    "theme:get",   // 获取主题
+    "theme:set",   // 设置主题
+    "theme:sync",  // 同步主题
   ],
 };
 
@@ -122,6 +126,17 @@ const electronAPI = {
   selection: {
     toggle: () => ipcRenderer.invoke("selection:toggle"),
     getEnabled: () => ipcRenderer.invoke("selection:get-enabled"),
+  },
+  // 主题管理（统一 API）
+  theme: {
+    get: () => ipcRenderer.invoke("theme:get"),
+    set: (theme) => ipcRenderer.invoke("theme:set", theme),
+    sync: () => ipcRenderer.invoke("theme:sync"),
+    onChanged: (callback) => {
+      const handler = (event, theme) => callback(theme);
+      ipcRenderer.on("theme:changed", handler);
+      return () => ipcRenderer.removeListener("theme:changed", handler);
+    },
   },
   // 全局快捷键管理
   shortcuts: {

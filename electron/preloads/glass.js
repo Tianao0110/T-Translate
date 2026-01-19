@@ -52,21 +52,21 @@ contextBridge.exposeInMainWorld('electron', {
     
     // 监听隐藏（截图前）
     onHideForCapture: (callback) => {
-      const handler = () => callback();
+      const handler = (event, settings) => callback(settings);
       ipcRenderer.on('glass:hide-for-capture', handler);
       return () => ipcRenderer.removeListener('glass:hide-for-capture', handler);
     },
     
     // 监听显示（截图后）
     onShowAfterCapture: (callback) => {
-      const handler = () => callback();
+      const handler = (event, settings) => callback(settings);
       ipcRenderer.on('glass:show-after-capture', handler);
       return () => ipcRenderer.removeListener('glass:show-after-capture', handler);
     },
     
     // 监听设置更新（从主程序）
     onSettingsChanged: (callback) => {
-      const handler = () => callback();
+      const handler = (event, settings) => callback(settings);
       ipcRenderer.on('glass:settings-changed', handler);
       return () => ipcRenderer.removeListener('glass:settings-changed', handler);
     },
@@ -149,5 +149,15 @@ contextBridge.exposeInMainWorld('electron', {
   clipboard: {
     writeText: (text) => ipcRenderer.invoke('clipboard:write-text', text),
     readText: () => ipcRenderer.invoke('clipboard:read-text'),
+  },
+  
+  // 主题管理
+  theme: {
+    sync: () => ipcRenderer.invoke('theme:sync'),
+    onChanged: (callback) => {
+      const handler = (event, theme) => callback(theme);
+      ipcRenderer.on('theme:changed', handler);
+      return () => ipcRenderer.removeListener('theme:changed', handler);
+    },
   },
 });

@@ -465,3 +465,133 @@
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
 }
+
+/* ========== 🌈 彩虹主题 ========== */
+[data-theme="rainbow"] .glass-window {
+  --glass-bg: rgba(250, 245, 255, var(--glass-opacity, 0.9));
+  --glass-border: rgba(168, 85, 247, 0.25);
+  --glass-text: #4c1d95;
+  --glass-text-muted: #7c3aed;
+  --glass-accent: #a855f7;
+}
+
+[data-theme="rainbow"] .glass-window::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, 
+    rgba(244, 114, 182, 0.05),
+    rgba(167, 139, 250, 0.05),
+    rgba(96, 165, 250, 0.05),
+    rgba(52, 211, 153, 0.03));
+  pointer-events: none;
+  border-radius: var(--glass-radius);
+  z-index: 0;
+}
+
+[data-theme="rainbow"] .glass-top-area {
+  position: relative;
+  z-index: 1;
+}
+
+[data-theme="rainbow"] .glass-content {
+  position: relative;
+  z-index: 1;
+}
+
+[data-theme="rainbow"] .toolbar-btn {
+  background: rgba(168, 85, 247, 0.1);
+  color: #7c3aed;
+}
+
+[data-theme="rainbow"] .toolbar-btn:hover {
+  background: rgba(168, 85, 247, 0.2);
+  color: #6d28d9;
+}
+
+[data-theme="rainbow"] .toolbar-btn.active {
+  background: linear-gradient(135deg, #a855f7, #ec4899);
+  color: white;
+}
+
+[data-theme="rainbow"] .glass-status {
+  color: #8b5cf6;
+}
+
+[data-theme="rainbow"] .lang-tag {
+  background: rgba(168, 85, 247, 0.15);
+  color: #7c3aed;
+}
+
+[data-theme="rainbow"] .translation-text {
+  color: #4c1d95;
+}
+
+[data-theme="rainbow"] .glass-content::-webkit-scrollbar-thumb {
+  background: rgba(168, 85, 247, 0.3);
+}
+
+[data-theme="rainbow"] .glass-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(168, 85, 247, 0.5);
+}
+
+/* ========== 深色主题 ========== */
+[data-theme="dark"] .glass-window {
+  --glass-bg: rgba(30, 41, 59, var(--glass-opacity, 0.9));
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-text: #e2e8f0;
+  --glass-text-muted: #94a3b8;
+  --glass-accent: #60a5fa;
+}
+
+[data-theme="dark"] .glass-top-area {
+  background: rgba(15, 23, 42, 0.5);
+}
+
+[data-theme="dark"] .glass-content {
+  color: #e2e8f0;
+}
+
+[data-theme="dark"] .toolbar-btn {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+}
+
+[data-theme="dark"] .toolbar-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="dark"] .toolbar-btn.active {
+  background: #3b82f6;
+  color: white;
+}
+
+[data-theme="dark"] .glass-status {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .lang-tag {
+  background: rgba(96, 165, 250, 0.2);
+  color: #60a5fa;
+}
+
+[data-theme="dark"] .translation-text {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .glass-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="dark"] .glass-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+[data-theme="dark"] .scroll-hint {
+  background: rgba(255, 255, 255, 0.2);
+  color: #e2e8f0;
+}
+
+[data-theme="dark"] .scroll-hint:hover {
+  background: rgba(255, 255, 255, 0.3);
+}

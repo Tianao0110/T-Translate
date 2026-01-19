@@ -31,6 +31,7 @@ const DEFAULT_SETTINGS = {
   autoCloseOnCopy: false,
   minChars: 2,
   maxChars: 500,
+  windowOpacity: 95,  // 窗口透明度
 };
 
 const DEFAULT_TRANSLATION = {
@@ -166,21 +167,7 @@ const SelectionTranslator = () => {
     
     if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
     
-    // 先设置一个合理的窗口大小用于 loading 状态
-    const sw = window.screen?.availWidth || 1920;
-    const sh = window.screen?.availHeight || 1080;
-    const loadingSize = 60;
-    let x = mousePos.x - loadingSize / 2;
-    let y = mousePos.y + 15;
-    if (x < 10) x = 10;
-    if (x + loadingSize > sw - 10) x = sw - loadingSize - 10;
-    if (y + loadingSize > sh - 10) y = mousePos.y - loadingSize - 10;
-    
-    window.electron?.selection?.setBounds?.({
-      x: Math.round(x), y: Math.round(y),
-      width: loadingSize, height: loadingSize
-    });
-    
+    // 🔧 不再改变窗口位置和大小，让 loading 在原地显示
     setMode('loading');
     
     try {
@@ -509,7 +496,11 @@ const SelectionTranslator = () => {
       )}
       
       {mode === 'overlay' && (
-        <div className={`sel-card ${copied ? 'copied' : ''} ${isFrozen ? 'frozen' : ''}`} onContextMenu={handleClose}>
+        <div 
+          className={`sel-card ${copied ? 'copied' : ''} ${isFrozen ? 'frozen' : ''}`} 
+          onContextMenu={handleClose}
+          style={{ '--sel-opacity': (settings.windowOpacity || 95) / 100 }}
+        >
           <div className="sel-toolbar">
             {isFrozen && (
               <span className="sel-frozen-badge" title="已固定 - 点击关闭按钮关闭">📌</span>

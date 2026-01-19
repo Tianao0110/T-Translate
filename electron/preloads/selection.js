@@ -43,4 +43,14 @@ contextBridge.exposeInMainWorld("electron", {
     encrypt: (key, value) => ipcRenderer.invoke("secure-storage:encrypt", key, value),
     decrypt: (key) => ipcRenderer.invoke("secure-storage:decrypt", key),
   },
+  
+  // 主题管理
+  theme: {
+    sync: () => ipcRenderer.invoke("theme:sync"),
+    onChanged: (callback) => {
+      const handler = (event, theme) => callback(theme);
+      ipcRenderer.on("theme:changed", handler);
+      return () => ipcRenderer.removeListener("theme:changed", handler);
+    },
+  },
 });

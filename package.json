@@ -34,8 +34,8 @@
     "@gutenye/ocr-node": "^1.4.8",
     "dayjs": "^1.11.19",
     "electron-store": "^8.1.0",
-    "jszip": "^3.10.1",
     "immer": "^11.1.0",
+    "jszip": "^3.10.1",
     "koffi": "^2.15.0",
     "lucide-react": "^0.303.0",
     "mammoth": "^1.8.0",
@@ -46,7 +46,7 @@
     "tesseract.js": "^5.1.1",
     "uiohook-napi": "^1.5.4",
     "uuid": "^13.0.0",
-    "zustand": "^4.4.7"
+    "zustand": "^5.0.10"
   },
   "build": {
     "appId": "com.ttranslate.core",
@@ -72,14 +72,19 @@
     "mac": {
       "category": "public.app-category.productivity",
       "icon": "public/icon.icns",
-      "target": ["dmg", "zip"]
+      "target": [
+        "dmg",
+        "zip"
+      ]
     },
     "win": {
       "icon": "public/icon.ico",
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ]
     },
@@ -92,7 +97,10 @@
     },
     "linux": {
       "icon": "public/icon.png",
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "category": "Utility"
     }
   }

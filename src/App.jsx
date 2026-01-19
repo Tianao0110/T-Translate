@@ -28,20 +28,56 @@ function App() {
     const setTargetLanguage = useTranslationStore(state => state.setTargetLanguage);
 
     useEffect(() => {
-      // 1. 初始化主题
-      const savedTheme = localStorage.getItem('theme') || 'light';
-      setTheme(savedTheme);
-      document.documentElement.setAttribute('data-theme', savedTheme);
-
-      const handleStorageChange = () => {
-        const newTheme = localStorage.getItem('theme') || 'light';
-        setTheme(newTheme);
-        document.documentElement.setAttribute('data-theme', newTheme);
+      // 1. 初始化主题 - 优先从 store 获取，确保与设置同步
+      const initTheme = async () => {
+        let savedTheme = 'light';
+        
+        try {
+          // 优先从 store 获取（settings 中的主题是权威来源）
+          if (window.electron?.theme?.get) {
+            const result = await window.electron.theme.get();
+            if (result?.success && result.theme) {
+              savedTheme = result.theme;
+            }
+          } else {
+            // 降级：从 localStorage 获取
+            savedTheme = localStorage.getItem('theme') || 'light';
+          }
+        } catch (e) {
+          // 出错时从 localStorage 获取
+          savedTheme = localStorage.getItem('theme') || 'light';
+        }
+        
+        // 同步到 localStorage（确保一致性）
+        localStorage.setItem('theme', savedTheme);
+        setTheme(savedTheme);
+        document.documentElement.setAttribute('data-theme', savedTheme);
       };
       
+      initTheme();
+
+      // 2. 监听主题变化（来自 IPC 广播）
+      let unsubscribeTheme = null;
+      if (window.electron?.theme?.onChanged) {
+        unsubscribeTheme = window.electron.theme.onChanged((newTheme) => {
+          logger.debug('Theme changed via IPC:', newTheme);
+          setTheme(newTheme);
+          document.documentElement.setAttribute('data-theme', newTheme);
+          localStorage.setItem('theme', newTheme);
+        });
+      }
+
+      // 3. 监听 storage 事件（跨标签页同步）
+      const handleStorageChange = (e) => {
+        if (e.key === 'theme') {
+          const newTheme = e.newValue || 'light';
+          setTheme(newTheme);
+          document.documentElement.setAttribute('data-theme', newTheme);
+        }
+      };
       window.addEventListener('storage', handleStorageChange);
 
-      // 通知 index.html 移除加载动画
+      // 4. 通知 index.html 移除加载动画
       const timer = setTimeout(() => {
         if (window) {
             window.__APP_LOADED__ = true;
@@ -51,6 +87,7 @@ function App() {
 
       return () => {
         window.removeEventListener('storage', handleStorageChange);
+        if (unsubscribeTheme) unsubscribeTheme();
         clearTimeout(timer);
       };
     }, []);

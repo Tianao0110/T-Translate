@@ -180,8 +180,8 @@ async function showSelectionTrigger(mouseX, mouseY, rect) {
   win.setBounds({
     x: Math.round(triggerX),
     y: Math.round(triggerY),
-    width: 20,
-    height: 20,
+    width: 26,
+    height: 26,
   });
   win.show();
 
@@ -197,6 +197,7 @@ async function showSelectionTrigger(mouseX, mouseY, rect) {
         autoCloseOnCopy: selectionSettings.autoCloseOnCopy || false,
         minChars: selectionSettings.minChars || 2,
         maxChars: selectionSettings.maxChars || 500,
+        windowOpacity: selectionSettings.windowOpacity || 95,  // 窗口透明度
       },
       translation: {
         targetLanguage: currentTargetLang,

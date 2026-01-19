@@ -250,7 +250,8 @@ function register(ctx) {
   ipcMain.handle(CHANNELS.GLASS.NOTIFY_SETTINGS_CHANGED, () => {
     const glassWindow = getGlassWindow();
     if (glassWindow && !glassWindow.isDestroyed()) {
-      glassWindow.webContents.send(CHANNELS.GLASS.SETTINGS_CHANGED);
+      const settings = store.get('settings', {});
+      glassWindow.webContents.send(CHANNELS.GLASS.SETTINGS_CHANGED, settings);
       return true;
     }
     return false;

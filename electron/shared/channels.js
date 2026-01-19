@@ -129,6 +129,12 @@ const CHANNELS = {
     ADD_TO_HISTORY: 'add-to-history',
     SYNC_TARGET_LANGUAGE: 'sync-target-language',
   },
+  THEME: {
+    GET: 'theme:get',                    // 获取当前主题
+    SET: 'theme:set',                    // 设置主题（广播到所有窗口）
+    CHANGED: 'theme:changed',            // 主题变化通知
+    SYNC: 'theme:sync',                  // 同步主题到子窗口
+  },
   SECURE_STORAGE: {
     ENCRYPT: 'secure-storage:encrypt',
     DECRYPT: 'secure-storage:decrypt',

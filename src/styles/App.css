@@ -62,6 +62,42 @@
   --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.4);
 }
 
+/* 🌿 青绿主题 - 清新自然 */
+[data-theme="rainbow"] {
+  /* 背景使用非常浅的青绿色 */
+  --bg-primary: #f5fafa;
+  --bg-secondary: #edf7f6;
+  --bg-tertiary: #e0f2f0;
+  --bg-hover: rgba(16, 185, 129, 0.08);
+  --bg-active: rgba(16, 185, 129, 0.15);
+  
+  /* 文字使用正常深色 */
+  --text-primary: #1f2937;
+  --text-secondary: #4b5563;
+  --text-tertiary: #9ca3af;
+  --text-inverse: #ffffff;
+  
+  /* 边框使用淡青绿色 */
+  --border-primary: rgba(16, 185, 129, 0.2);
+  --border-secondary: rgba(16, 185, 129, 0.12);
+  
+  /* 强调色使用青绿色 */
+  --accent-primary: #10b981;
+  --accent-hover: #059669;
+  --accent-active: #047857;
+  
+  /* 状态色 */
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --info: #0ea5e9;
+  
+  /* 柔和阴影 */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.08);
+}
+
 /* ==================== 全局样式 ==================== */
 * {
   margin: 0;

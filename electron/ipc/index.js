@@ -16,6 +16,7 @@ const registerSelectionIPC = require('./selection');
 const registerSecureStorageIPC = require('./secure-storage');
 const registerOcrIPC = require('./ocr');
 const registerPrivacyIPC = require('./privacy');
+const { registerThemeIPC } = require('./theme');
 
 /**
  * 初始化所有 IPC handler
@@ -107,6 +108,9 @@ function initIPC(deps) {
   // 批次 3.6: OCR & 隐私
   registerOcrIPC(context);
   registerPrivacyIPC(context);
+  
+  // 批次 3.7: 主题管理
+  registerThemeIPC({ store: deps.store, logger });
   
   logger.success('All IPC handlers initialized');
   
