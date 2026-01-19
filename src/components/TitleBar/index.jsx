@@ -26,9 +26,7 @@ const TitleBar = () => {
   return (
     <div className="titlebar">
       <div className="title-drag-region">
-        <img src="./icon.png" alt="logo" className="window-icon" onError={(e) => {
-          e.target.style.display = 'none';
-        }} />
+        <span className="window-icon-text">T</span>
         <span className="window-title">T-Translate</span>
       </div>
       

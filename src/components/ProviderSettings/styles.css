@@ -33,10 +33,14 @@
   gap: 12px;
 }
 
-/* 单列模式（小屏幕） */
-@media (max-width: 700px) {
+/* 单列模式（宽度不够时自动切换） */
+@media (max-width: 850px) {
   .ps-list {
     grid-template-columns: 1fr;
+  }
+  
+  .ps-card.expanded {
+    grid-column: 1;
   }
 }
 

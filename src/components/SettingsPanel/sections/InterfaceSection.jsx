@@ -128,7 +128,7 @@ const InterfaceSection = ({
             className={`theme-option rainbow ${settings.interface.theme === 'rainbow' ? 'active' : ''}`} 
             onClick={() => switchTheme('rainbow')}
           >
-            <Sparkles size={16}/>彩虹
+            <Sparkles size={16}/>清新
           </button>
         </div>
         <p className="setting-hint">主题切换即时生效并自动保存</p>

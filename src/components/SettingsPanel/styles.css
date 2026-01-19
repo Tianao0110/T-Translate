@@ -3270,3 +3270,47 @@ input:checked + .switch-slider::before {
 [data-theme="rainbow"] .ps-switch input:checked + span {
   background: linear-gradient(135deg, #34d399, #10b981) !important;
 }
+
+/* ==================== 青绿主题补充样式 ==================== */
+
+/* 侧边栏底部操作按钮区域 - 使用与侧边栏一致的渐变 */
+[data-theme="rainbow"] .settings-actions {
+  background: linear-gradient(180deg, 
+    #a7f3d0 0%,
+    #6ee7b7 100%
+  ) !important;
+  border-top-color: rgba(16, 185, 129, 0.2) !important;
+}
+
+[data-theme="rainbow"] .action-button {
+  background: rgba(255, 255, 255, 0.7) !important;
+  border-color: rgba(16, 185, 129, 0.2) !important;
+  color: #059669 !important;
+}
+
+[data-theme="rainbow"] .action-button:hover {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border-color: #10b981 !important;
+}
+
+[data-theme="rainbow"] .action-button.danger:hover {
+  background: rgba(254, 226, 226, 0.9) !important;
+  border-color: #ef4444 !important;
+  color: #dc2626 !important;
+}
+
+/* 移除主题选项按钮顶部的装饰条（可能导致视觉问题） */
+.theme-option.rainbow::before {
+  display: none !important;
+}
+
+/* 内容区域背景确保正确 */
+[data-theme="rainbow"] .settings-content-wrapper {
+  background: #fafffe !important;
+}
+
+/* 页脚保存按钮区域 */
+[data-theme="rainbow"] .settings-footer {
+  background: #fafffe !important;
+  border-top-color: rgba(16, 185, 129, 0.12) !important;
+}
