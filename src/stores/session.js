@@ -197,17 +197,26 @@ const useSessionStore = create((set, get) => ({
     
     if (!pane) return;
     
-    // 检查冻结数量限制（最多8个）
-    if (state.frozenPanes.length >= 8) {
-      console.warn('已达到最大冻结数量 (8个)');
-      return;
+    // 如果已达到最大数量，删除最早的（第一个）
+    let newFrozenPanes = [...state.frozenPanes];
+    while (newFrozenPanes.length >= 15) {
+      newFrozenPanes.shift();  // 删除最早的
     }
     
     // 从 childPanes 移除，添加到 frozenPanes
     set({
       childPanes: state.childPanes.filter((p) => p.id !== id),
-      frozenPanes: [...state.frozenPanes, { ...pane, isFrozen: true }],
+      frozenPanes: [...newFrozenPanes, { ...pane, isFrozen: true }],
     });
+  },
+  
+  /**
+   * 移除子玻璃板（用于创建独立窗口后）
+   */
+  removeChildPane: (id) => {
+    set((state) => ({
+      childPanes: state.childPanes.filter((p) => p.id !== id),
+    }));
   },
   
   /**

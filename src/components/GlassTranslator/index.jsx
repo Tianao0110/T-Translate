@@ -40,6 +40,7 @@ const GlassTranslator = () => {
     setSubtitleStatus,
     updateChildPanePosition,
     freezeChildPane,
+    removeChildPane,
     closeFrozenPane,
     clearChildPanes,
     clear,
@@ -113,12 +114,18 @@ const GlassTranslator = () => {
     const updateContentBounds = () => {
       if (contentRef.current) {
         const rect = contentRef.current.getBoundingClientRect();
-        setGlassBounds({
+        const newBounds = {
           x: rect.left,
           y: rect.top,
           width: rect.width,
           height: rect.height,
-        });
+        };
+        setGlassBounds(newBounds);
+        // 调试日志（每 5 秒打印一次）
+        if (!window._lastBoundsLog || Date.now() - window._lastBoundsLog > 5000) {
+          console.log('[GlassTranslator] Content bounds:', newBounds);
+          window._lastBoundsLog = Date.now();
+        }
       }
     };
     
@@ -133,7 +140,8 @@ const GlassTranslator = () => {
         passThroughRef.current = true;
         try {
           await window.electron?.glass?.setPassThrough?.(true);
-          await window.electron?.glass?.setOpacity?.(0.3);
+          // 不再使用窗口透明度，改用 CSS 控制
+          // await window.electron?.glass?.setOpacity?.(0.3);
         } catch (err) {
           logger.error('Failed to enter pass-through mode:', err);
         }
@@ -180,8 +188,7 @@ const GlassTranslator = () => {
         passThroughRef.current = false;
         try {
           await window.electron?.glass?.setPassThrough?.(false);
-          // 恢复透明度（使用保存的值）
-          await window.electron?.glass?.setOpacity?.(savedOpacityRef.current);
+          // 不再使用窗口透明度
         } catch (err) {
           logger.error('Failed to exit pass-through mode:', err);
         }
@@ -196,7 +203,7 @@ const GlassTranslator = () => {
         passThroughRef.current = false;
         try {
           await window.electron?.glass?.setPassThrough?.(false);
-          await window.electron?.glass?.setOpacity?.(savedOpacityRef.current);
+          // 不再使用窗口透明度
         } catch (err) {
           logger.error('Failed to exit pass-through mode on blur:', err);
         }
@@ -228,10 +235,11 @@ const GlassTranslator = () => {
     if (window.electron?.glass?.onSettingsChanged) {
       unsubscribeSettings = window.electron.glass.onSettingsChanged((newSettings) => {
         loadSettings();
-        // 同步主题
-        if (newSettings?.interface?.theme) {
-          setTheme(newSettings.interface.theme);
-          document.documentElement.setAttribute('data-theme', newSettings.interface.theme);
+        // 同步主题（只在有明确的主题设置时更新）
+        const newTheme = newSettings?.interface?.theme;
+        if (newTheme && ['light', 'dark', 'rainbow'].includes(newTheme)) {
+          setTheme(newTheme);
+          document.documentElement.setAttribute('data-theme', newTheme);
         }
       });
     }
@@ -319,7 +327,14 @@ const GlassTranslator = () => {
     }, 300);
   };
 
-  const handleClose = () => {
+  const handleClose = async () => {
+    // 先关闭所有独立子窗口
+    try {
+      await window.electron?.glass?.closeAllChildWindows?.();
+    } catch (e) {
+      console.error('Failed to close child windows:', e);
+    }
+    
     if (subtitleMode) {
       exitSubtitleMode();
     } else {
@@ -368,12 +383,50 @@ const GlassTranslator = () => {
   }, [updateChildPanePosition]);
 
   /**
-   * 冻结子玻璃板（拖出母板时）
+   * 冻结子玻璃板（双击触发）→ 创建独立窗口
+   * v9: 改为双击触发，不再是拖出边界触发
+   * @param {string} id - 子玻璃板 ID
+   * @param {object} viewportPos - 视口坐标 { viewportX, viewportY }
    */
-  const handleChildPaneFreeze = useCallback((id) => {
-    freezeChildPane(id);
-    logger.debug('Frozen child pane:', id);
-  }, [freezeChildPane]);
+  const handleChildPaneFreeze = useCallback(async (id, viewportPos) => {
+    // 获取子玻璃板信息
+    const pane = childPanes.find(p => p.id === id);
+    if (!pane) return;
+    
+    // 获取窗口位置，计算屏幕坐标
+    const windowBounds = await window.electron?.glass?.getBounds?.();
+    if (!windowBounds) {
+      logger.error('Cannot get window bounds');
+      return;
+    }
+    
+    // 使用传入的视口坐标，转换为屏幕坐标
+    // 视口坐标是相对于窗口左上角的，需要加上窗口在屏幕上的位置
+    const screenX = windowBounds.x + (viewportPos?.viewportX ?? pane.bbox.x);
+    const screenY = windowBounds.y + (viewportPos?.viewportY ?? pane.bbox.y);
+    
+    logger.debug('Creating child window at screen:', { screenX, screenY, viewportPos, windowBounds });
+    
+    // 创建独立窗口 - 传递文本长度让主进程计算合适的大小
+    const result = await window.electron?.glass?.createChildWindow?.({
+      id: pane.id,
+      text: pane.translatedText || pane.sourceText,
+      x: screenX,
+      y: screenY,
+      // 不再传递固定大小，让主进程根据文本长度计算
+      theme: theme,
+    });
+    
+    if (result?.success) {
+      // 从 childPanes 中移除（不再使用 frozenPanes）
+      removeChildPane(id);
+      logger.debug('Created independent child window:', id);
+    } else {
+      logger.error('Failed to create child window:', result?.error);
+      // 失败时回退到内部冻结
+      freezeChildPane(id);
+    }
+  }, [childPanes, theme, removeChildPane, freezeChildPane]);
 
   // ========== 穿透模式 ==========
   
@@ -557,7 +610,7 @@ const GlassTranslator = () => {
 
   return (
     <div 
-      className={`glass-window ${subtitleMode ? 'subtitle-mode' : ''} ${showToolbar ? 'show-toolbar' : ''} ${isPassThrough ? 'pass-through' : ''}`}
+      className={`glass-window ${subtitleMode ? 'subtitle-mode' : ''} ${showToolbar ? 'show-toolbar' : ''} ${isPassThrough ? 'pass-through' : ''} ${displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0 ? 'scattered-mode' : ''}`}
       style={{ '--glass-opacity': subtitleMode ? 0 : glassOpacity }}
       data-theme={theme}
       onMouseEnter={handleMouseEnterWindow}

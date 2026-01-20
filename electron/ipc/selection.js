@@ -23,6 +23,17 @@ function register(ctx) {
     return screenshotModule;
   };
   
+  /**
+   * 清理文本：限制连续空白行最多 2 行
+   * 解决段落识别时产生过多空行的问题
+   */
+  const cleanTextBlankLines = (text) => {
+    if (!text) return text;
+    // 将连续的空白行（超过2行）替换为2行
+    // \n\n\n+ -> \n\n
+    return text.replace(/(\n\s*){3,}/g, '\n\n');
+  };
+  
   // ==================== 开关控制 ====================
   
   /**
@@ -162,7 +173,7 @@ function register(ctx) {
           }
         } else {
           // 虽然有文件格式，但文本不是路径
-          return { text: text.trim(), method: 'clipboard' };
+          return { text: cleanTextBlankLines(text.trim()), method: 'clipboard' };
         }
       }
       
@@ -172,7 +183,7 @@ function register(ctx) {
     
     // 4. 正常文本处理
     if (text && text.trim()) {
-      return { text: text.trim(), method: 'clipboard' };
+      return { text: cleanTextBlankLines(text.trim()), method: 'clipboard' };
     }
     
     // 5. 复制失败，尝试 OCR 兜底
@@ -182,7 +193,7 @@ function register(ctx) {
       try {
         const ocrText = await getTextByOCR(ocrRect, getScreenshotModule());
         if (ocrText && ocrText.trim()) {
-          return { text: ocrText.trim(), method: 'ocr' };
+          return { text: cleanTextBlankLines(ocrText.trim()), method: 'ocr' };
         }
       } catch (err) {
         logger.error('OCR failed:', err);

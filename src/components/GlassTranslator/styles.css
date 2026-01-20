@@ -32,6 +32,11 @@
   -webkit-app-region: drag;
 }
 
+/* 散点模式下允许子玻璃板溢出 */
+.glass-window.scattered-mode {
+  overflow: visible;
+}
+
 /* 字幕模式 - 完全透明 + 虚线边框 */
 .glass-window.subtitle-mode {
   background: transparent !important;
@@ -648,11 +653,15 @@
   width: 100%;
   height: 100%;
   min-height: 100%;
+  /* 关键：允许子玻璃板溢出，才能拖到外面 */
+  overflow: visible;
 }
 
 /* 散点模式下，移除内容区 padding，让子玻璃板直接对齐截图区域 */
+/* 同时允许溢出，才能拖动子玻璃板到外面 */
 .glass-content.scattered-mode {
   padding: 0;
+  overflow: visible;
 }
 
 /* 冻结子玻璃板容器 */
@@ -663,7 +672,7 @@
   right: 0;
   bottom: 0;
   pointer-events: none;
-  z-index: 1100;
+  z-index: 2000;  /* 提高优先级，确保在所有元素之上 */
 }
 
 .frozen-panes-container .child-glass-pane {
@@ -716,20 +725,20 @@
 
 /* 拖动手柄 */
 .child-pane-handle {
-  width: 16px;
+  width: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.03);
+  background: rgba(0, 0, 0, 0.02);
   cursor: grab;
-  color: #9ca3af;
+  color: #c0c4cc;
   flex-shrink: 0;
   transition: background 0.15s, color 0.15s;
 }
 
 .child-pane-handle:hover {
-  background: rgba(0, 0, 0, 0.06);
-  color: #6b7280;
+  background: rgba(0, 0, 0, 0.04);
+  color: #9ca3af;
 }
 
 .child-pane-handle:active {
@@ -739,7 +748,7 @@
 /* 内容区 */
 .child-pane-content {
   flex: 1;
-  padding: 6px 8px;
+  padding: 4px 8px;
   min-width: 0;
   overflow: hidden;
 }
@@ -1029,8 +1038,29 @@
 }
 
 /* 穿透模式下的窗口样式 */
+/* 不再设置整个窗口透明度，而是分别控制各部分 */
 .glass-window.pass-through {
-  opacity: 0.3 !important;
+  background: rgba(255, 255, 255, 0.15) !important;  /* 背景更透明 */
+  backdrop-filter: blur(5px) !important;
+}
+
+.glass-window.pass-through .glass-top-area {
+  opacity: 0.3;
+}
+
+.glass-window.pass-through .glass-content {
+  opacity: 0.3;
+}
+
+/* 冻结的子玻璃板不透明 */
+.glass-window.pass-through .frozen-panes-container {
+  opacity: 1 !important;
+}
+
+.glass-window.pass-through .frozen-panes-container .child-glass-pane {
+  opacity: 1 !important;
+  /* 穿透模式下冻结的子玻璃板更醒目 */
+  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
 }
 
 /* 工具栏按钮激活状态 */

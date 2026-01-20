@@ -12,6 +12,7 @@ const execAsync = util.promisify(exec);
 
 const { CHANNELS, OCR_ENGINES } = require('../shared/channels');
 const logger = require('../utils/logger')('IPC:OCR');
+const { smartMerge, mergedBlocksToText } = require('../utils/text-merger');
 
 /**
  * 注册 OCR 相关 IPC handlers
@@ -518,14 +519,25 @@ function registerOCRRecognizers(ctx) {
               };
             });
             
-            const fullText = blocks.map(b => b.text).join('\n');
+            // 智能段落合并：将碎片化的 OCR 行合并为自然段落
+            const mergedBlocks = smartMerge(blocks, {
+              lineGapThreshold: 1.5,
+              xOverlapRatio: 0.3,
+            });
+            
+            // 合并后的文本（段落之间用双换行分隔）
+            const fullText = mergedBlocksToText(mergedBlocks);
+            
+            logger.debug(`OCR merge: ${blocks.length} blocks -> ${mergedBlocks.length} paragraphs`);
+            
             try { fs.unlinkSync(tempFile); } catch (e) {}
             
             return {
               success: true,
               text: fullText,
-              blocks: blocks,  // 新增：包含坐标的文本块数组
-              confidence: blocks.reduce((sum, b) => sum + b.confidence, 0) / blocks.length,
+              blocks: mergedBlocks,  // 返回合并后的块
+              rawBlocks: blocks,     // 保留原始块供调试
+              confidence: mergedBlocks.reduce((sum, b) => sum + b.confidence, 0) / mergedBlocks.length,
               engine: 'gutenye-ocr',
             };
           }

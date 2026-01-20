@@ -72,6 +72,12 @@ const CHANNELS = {
     REFRESH: 'glass:refresh',
     SETTINGS_CHANGED: 'glass:settings-changed',
     TRANSLATE_REQUEST: 'glass:translate-request',
+    // 子玻璃板独立窗口
+    CREATE_CHILD_WINDOW: 'glass:create-child-window',
+    CLOSE_CHILD_WINDOW: 'glass:close-child-window',
+    UPDATE_CHILD_WINDOW: 'glass:update-child-window',
+    MOVE_CHILD_WINDOW: 'glass:move-child-window',
+    CLOSE_ALL_CHILD_WINDOWS: 'glass:close-all-child-windows',
   },
   SUBTITLE: {
     TOGGLE_CAPTURE_WINDOW: 'subtitle:toggle-capture-window',

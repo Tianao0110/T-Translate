@@ -253,10 +253,7 @@ export default defineConfig(({ command, mode }) => {
         'zustand',
         'dayjs',
         'lucide-react',
-        'tesseract.js',
-        // 强制预构建 electron/shared 的 CommonJS 文件
-        'electron/shared/constants.js',
-        'electron/shared/channels.js'
+        'tesseract.js'
       ],
       
       // 排除的依赖

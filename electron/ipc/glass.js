@@ -404,6 +404,242 @@ function register(ctx) {
     return true;
   });
   
+  // ==================== 子玻璃板独立窗口 ====================
+  
+  // 存储子窗口的 Map: paneId -> { window, createdAt }
+  const childPaneWindows = new Map();
+  const MAX_CHILD_WINDOWS = 15;  // 最大子窗口数量
+  
+  /**
+   * 删除最早创建的子窗口
+   */
+  function removeOldestChildWindow() {
+    let oldest = null;
+    let oldestId = null;
+    
+    for (const [id, data] of childPaneWindows) {
+      if (!oldest || data.createdAt < oldest.createdAt) {
+        oldest = data;
+        oldestId = id;
+      }
+    }
+    
+    if (oldestId && oldest) {
+      try {
+        if (!oldest.window.isDestroyed()) {
+          oldest.window.close();
+        }
+      } catch (e) {}
+      childPaneWindows.delete(oldestId);
+      logger.debug('Removed oldest child window:', oldestId);
+    }
+  }
+  
+  /**
+   * 创建子玻璃板独立窗口
+   */
+  ipcMain.handle(CHANNELS.GLASS.CREATE_CHILD_WINDOW, async (event, options) => {
+    const { BrowserWindow } = require('electron');
+    const path = require('path');
+    const PATHS = require('../shared/paths');
+    
+    const { id, text, x, y, width, height, theme } = options;
+    
+    // 如果已存在，先关闭
+    if (childPaneWindows.has(id)) {
+      try {
+        childPaneWindows.get(id).window.close();
+      } catch (e) {}
+      childPaneWindows.delete(id);
+    }
+    
+    // 超出限制时删除最早的
+    while (childPaneWindows.size >= MAX_CHILD_WINDOWS) {
+      removeOldestChildWindow();
+    }
+    
+    // 计算窗口大小 - 根据文本长度自适应
+    const textLength = (text || '').length;
+    const lineCount = (text || '').split('\n').length;
+    // 宽度：根据最长行估算，最小 120，最大 400
+    const estimatedWidth = Math.min(Math.max(textLength * 8 + 80, 120), 400);
+    const winWidth = width ? Math.min(Math.max(width, 120), 400) : estimatedWidth;
+    // 高度：根据行数和文本长度，最小 36，最大 300
+    const estimatedHeight = Math.min(Math.max(lineCount * 20 + 16, 36), 300);
+    const winHeight = height ? Math.min(Math.max(height, 36), 300) : estimatedHeight;
+    
+    try {
+      const childWindow = new BrowserWindow({
+        x: Math.round(x),
+        y: Math.round(y),
+        width: winWidth,
+        height: winHeight,
+        minWidth: 100,
+        minHeight: 36,
+        maxWidth: 600,
+        maxHeight: 400,
+        frame: false,
+        transparent: true,
+        resizable: true,  // 允许调整大小
+        movable: true,
+        minimizable: false,
+        maximizable: false,
+        closable: true,
+        alwaysOnTop: true,
+        skipTaskbar: true,
+        hasShadow: false,
+        show: false,
+        webPreferences: {
+          preload: PATHS.preloads.childPane,
+          contextIsolation: true,
+          nodeIntegration: false,
+        },
+      });
+      
+      // 构建 URL
+      const encodedText = encodeURIComponent(text || '');
+      const queryParams = `?id=${id}&text=${encodedText}&theme=${theme || 'light'}`;
+      
+      if (process.env.NODE_ENV === 'development' || !require('electron').app.isPackaged) {
+        childWindow.loadURL(`http://localhost:5173/child-pane.html${queryParams}`);
+      } else {
+        childWindow.loadFile(PATHS.pages.childPane.file, { 
+          query: { id, text: text || '', theme: theme || 'light' } 
+        });
+      }
+      
+      childWindow.once('ready-to-show', () => {
+        childWindow.show();
+      });
+      
+      // 监听关闭
+      childWindow.on('closed', () => {
+        childPaneWindows.delete(id);
+        // 通知渲染进程
+        const glassWindow = getGlassWindow();
+        if (glassWindow && !glassWindow.isDestroyed()) {
+          glassWindow.webContents.send('child-pane:closed', id);
+        }
+      });
+      
+      // 监听来自子窗口的关闭请求
+      ipcMain.once(`child-pane:close:${id}`, () => {
+        if (childPaneWindows.has(id)) {
+          try {
+            childPaneWindows.get(id).window.close();
+          } catch (e) {}
+        }
+      });
+      
+      // 存储窗口和创建时间
+      childPaneWindows.set(id, {
+        window: childWindow,
+        createdAt: Date.now(),
+      });
+      
+      logger.debug('Created child pane window:', id, 'Total:', childPaneWindows.size);
+      return { success: true, id };
+    } catch (error) {
+      logger.error('Failed to create child pane window:', error);
+      return { success: false, error: error.message };
+    }
+  });
+  
+  /**
+   * 关闭子玻璃板窗口
+   */
+  ipcMain.handle(CHANNELS.GLASS.CLOSE_CHILD_WINDOW, (event, id) => {
+    if (childPaneWindows.has(id)) {
+      try {
+        const data = childPaneWindows.get(id);
+        if (data.window && !data.window.isDestroyed()) {
+          data.window.close();
+        }
+        childPaneWindows.delete(id);
+        return true;
+      } catch (e) {
+        logger.error('Failed to close child pane window:', e);
+      }
+    }
+    return false;
+  });
+  
+  /**
+   * 更新子玻璃板窗口内容
+   */
+  ipcMain.handle(CHANNELS.GLASS.UPDATE_CHILD_WINDOW, (event, id, data) => {
+    if (childPaneWindows.has(id)) {
+      const paneData = childPaneWindows.get(id);
+      if (paneData.window && !paneData.window.isDestroyed()) {
+        paneData.window.webContents.send('child-pane:update', data);
+        return true;
+      }
+    }
+    return false;
+  });
+  
+  /**
+   * 移动子玻璃板窗口
+   */
+  ipcMain.handle(CHANNELS.GLASS.MOVE_CHILD_WINDOW, (event, id, x, y) => {
+    if (childPaneWindows.has(id)) {
+      const paneData = childPaneWindows.get(id);
+      if (paneData.window && !paneData.window.isDestroyed()) {
+        paneData.window.setPosition(Math.round(x), Math.round(y));
+        return true;
+      }
+    }
+    return false;
+  });
+  
+  /**
+   * 关闭所有子玻璃板窗口
+   */
+  ipcMain.handle(CHANNELS.GLASS.CLOSE_ALL_CHILD_WINDOWS, () => {
+    let count = 0;
+    for (const [id, data] of childPaneWindows) {
+      try {
+        if (data.window && !data.window.isDestroyed()) {
+          data.window.close();
+          count++;
+        }
+      } catch (e) {}
+    }
+    childPaneWindows.clear();
+    logger.debug('Closed all child pane windows:', count);
+    return count;
+  });
+  
+  // 监听子窗口的关闭请求
+  ipcMain.on('child-pane:close', (event) => {
+    // 找到发送事件的窗口并关闭
+    for (const [id, data] of childPaneWindows) {
+      if (data.window && data.window.webContents === event.sender) {
+        try {
+          data.window.close();
+        } catch (e) {}
+        break;
+      }
+    }
+  });
+  
+  // 监听子窗口的调整大小请求
+  ipcMain.on('child-pane:resize', (event, width, height) => {
+    // 找到发送事件的窗口并调整大小
+    for (const [id, data] of childPaneWindows) {
+      if (data.window && data.window.webContents === event.sender) {
+        try {
+          if (!data.window.isDestroyed()) {
+            data.window.setSize(Math.round(width), Math.round(height));
+          }
+        } catch (e) {
+          logger.error('Failed to resize child pane:', e);
+        }
+        break;
+      }
+    }
+  });
+  
   logger.info('Glass IPC handlers registered');
 }
 

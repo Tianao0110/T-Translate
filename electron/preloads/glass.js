@@ -73,6 +73,30 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.on('glass:settings-changed', handler);
       return () => ipcRenderer.removeListener('glass:settings-changed', handler);
     },
+    
+    // ========== 子玻璃板独立窗口 ==========
+    
+    // 创建子玻璃板独立窗口
+    createChildWindow: (options) => ipcRenderer.invoke('glass:create-child-window', options),
+    
+    // 关闭子玻璃板窗口
+    closeChildWindow: (id) => ipcRenderer.invoke('glass:close-child-window', id),
+    
+    // 更新子玻璃板窗口内容
+    updateChildWindow: (id, data) => ipcRenderer.invoke('glass:update-child-window', id, data),
+    
+    // 移动子玻璃板窗口
+    moveChildWindow: (id, x, y) => ipcRenderer.invoke('glass:move-child-window', id, x, y),
+    
+    // 关闭所有子玻璃板窗口
+    closeAllChildWindows: () => ipcRenderer.invoke('glass:close-all-child-windows'),
+    
+    // 监听子窗口关闭事件
+    onChildWindowClosed: (callback) => {
+      const handler = (event, id) => callback(id);
+      ipcRenderer.on('child-pane:closed', handler);
+      return () => ipcRenderer.removeListener('child-pane:closed', handler);
+    },
   },
   
   // 字幕采集区 API

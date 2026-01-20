@@ -11,6 +11,7 @@ import useConfigStore from '../stores/config.js';
 import { calculateHash } from '../utils/image.js';
 import { detectLanguage, cleanTranslationOutput, shouldTranslateText } from '../utils/text.js';
 import { isProviderAllowed, isOcrEngineAllowed, PRIVACY_MODE_IDS } from '../config/privacy-modes.js';
+import { smartMerge } from '../utils/text-merger.js';
 import createLogger from '../utils/logger.js';
 import { getShortErrorMessage } from '../utils/error-handler.js';
 
@@ -105,11 +106,20 @@ class TranslationPipeline {
     
     logger.debug(' Initializing...');
     
+    // 从设置中读取 LLM endpoint
+    let llmEndpoint = 'http://localhost:1234/v1';
+    try {
+      const settings = await window.electron?.store?.get?.('settings') || {};
+      llmEndpoint = settings.llm?.endpoint || llmEndpoint;
+    } catch (e) {
+      logger.debug(' Failed to get LLM endpoint from settings:', e);
+    }
+    
     // 初始化 OCR 管理器
     const config = useConfigStore.getState();
     await ocrManager.init({
       'rapid-ocr': {},
-      'llm-vision': { endpoint: 'http://localhost:1234/v1' },
+      'llm-vision': { endpoint: llmEndpoint },
     });
     ocrManager.setPriority(config.ocrPriority);
     
@@ -131,6 +141,10 @@ class TranslationPipeline {
     try {
       // 清除之前的子玻璃板（保留冻结的）
       session.clearChildPanes();
+      
+      // 重置图片缓存，允许重新识别相同图片
+      lastImageHash = '';
+      lastText = '';
       
       // 1. 截图
       session.startCapture();
@@ -191,6 +205,10 @@ class TranslationPipeline {
       const useScattered = shouldUseScatteredMode(blocks);
       
       logger.debug(` Display mode: ${useScattered ? 'scattered' : 'unified'}, blocks: ${blocks.length}`);
+      if (blocks.length > 0) {
+        logger.debug(' First block bbox:', blocks[0]?.bbox);
+        logger.debug(' Capture options:', captureOptions);
+      }
       
       if (useScattered && blocks.length > 0) {
         // 散点模式：使用子玻璃板
@@ -234,29 +252,76 @@ class TranslationPipeline {
     const config = useConfigStore.getState();
     
     try {
+      // 获取 DPI 缩放因子
+      const scaleFactor = window.devicePixelRatio || 1;
+      logger.debug(` ScaleFactor for coordinate conversion: ${scaleFactor}`);
+      
       // 1. 过滤有效的文本块（有坐标且有文字）
-      const validBlocks = blocks.filter(b => 
-        b.text?.trim() && 
-        b.bbox && 
-        b.bbox.width > 0 && 
-        b.bbox.height > 0
-      );
+      // 同时将物理像素坐标转换为逻辑像素坐标
+      const validBlocks = blocks
+        .filter(b => 
+          b.text?.trim() && 
+          b.bbox && 
+          b.bbox.width > 0 && 
+          b.bbox.height > 0
+        )
+        .map(b => ({
+          ...b,
+          // OCR 返回的是物理像素坐标，需要转换为 CSS 逻辑像素
+          bbox: {
+            x: Math.round(b.bbox.x / scaleFactor),
+            y: Math.round(b.bbox.y / scaleFactor),
+            width: Math.round(b.bbox.width / scaleFactor),
+            height: Math.round(b.bbox.height / scaleFactor),
+          }
+        }));
       
       if (validBlocks.length === 0) {
         session.setResult('（未识别到有效文字）');
         return { success: true, text: '' };
       }
       
-      // 2. 设置为散点模式，创建子玻璃板
+      logger.debug(` Raw blocks count: ${validBlocks.length}`);
+      logger.debug(` First block after conversion:`, validBlocks[0]?.bbox);
+      
+      // 2. 智能段落合并：将碎片化的 OCR 结果合并为自然段落
+      // 检查是否已在主进程合并过（有 mergedCount 属性）
+      const alreadyMerged = validBlocks.some(b => b.mergedCount && b.mergedCount > 1);
+      
+      let mergedBlocks;
+      if (alreadyMerged) {
+        // 主进程已合并，直接使用
+        mergedBlocks = validBlocks;
+        logger.debug(` Blocks already merged in main process`);
+      } else {
+        // 前端合并（兼容旧版本或其他 OCR 引擎）
+        mergedBlocks = smartMerge(validBlocks, {
+          lineGapThreshold: 1.5,
+          xOverlapRatio: 0.3,
+          preserveLineBreaks: true,
+        });
+        logger.debug(` Frontend merge: ${validBlocks.length} -> ${mergedBlocks.length} paragraphs`);
+      }
+      
+      if (mergedBlocks.length > 0) {
+        logger.debug(` First block:`, {
+          text: mergedBlocks[0].text?.substring(0, 50),
+          bbox: mergedBlocks[0].bbox,
+          mergedCount: mergedBlocks[0].mergedCount,
+        });
+      }
+      
+      // 3. 设置为散点模式，创建子玻璃板
       session.setDisplayMode(DISPLAY_MODE.SCATTERED);
-      const createdPanes = session.setChildPanes(validBlocks);  // 使用返回的 panes
+      const createdPanes = session.setChildPanes(mergedBlocks);
       session.setStatus('translating');
       
       // 3. 获取翻译配置
       const privacyMode = await getPrivacyMode();
       
-      // 4. 并行翻译所有文本块
-      const translationPromises = createdPanes.map(async (pane, index) => {
+      // 4. 限制并发翻译数量（每次最多2个，避免卡顿）
+      const CONCURRENCY_LIMIT = 2;
+      const translatePane = async (pane, index) => {
         const paneId = pane.id;
         
         try {
@@ -310,10 +375,13 @@ class TranslationPipeline {
             error: getShortErrorMessage(error),
           });
         }
-      });
+      };
       
-      // 等待所有翻译完成
-      await Promise.all(translationPromises);
+      // 分批执行翻译，每批最多 CONCURRENCY_LIMIT 个
+      for (let i = 0; i < createdPanes.length; i += CONCURRENCY_LIMIT) {
+        const batch = createdPanes.slice(i, i + CONCURRENCY_LIMIT);
+        await Promise.all(batch.map((pane, idx) => translatePane(pane, i + idx)));
+      }
       
       // 5. 设置整体状态为完成
       session.setStatus('success');

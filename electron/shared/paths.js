@@ -32,6 +32,7 @@ const preloads = {
   selection: path.join(ELECTRON_DIR, 'preloads/selection.js'),
   glass: path.join(ELECTRON_DIR, 'preloads/glass.js'),
   subtitleCapture: path.join(ELECTRON_DIR, 'preloads/subtitle-capture.js'),
+  childPane: path.join(ELECTRON_DIR, 'preloads/child-pane.js'),
 };
 
 /**
@@ -60,6 +61,11 @@ const pages = {
     // 截图页面不经过 Vite 构建，直接从 public 加载
     url: path.join(BASE_DIR, 'public/screenshot.html'),
     file: path.join(BASE_DIR, 'public/screenshot.html'),
+  },
+  childPane: {
+    // 子玻璃板独立窗口
+    url: `${DEV_SERVER}/child-pane.html`,
+    file: path.join(BASE_DIR, 'build/child-pane.html'),
   },
 };
 
