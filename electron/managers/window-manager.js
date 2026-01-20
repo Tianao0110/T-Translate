@@ -63,6 +63,9 @@ function createMainWindow() {
       sandbox: false,
       preload: PATHS.preloads.main,
       webSecurity: false,
+      // 性能优化
+      v8CacheOptions: 'bypassHeatCheck', // 加速 V8 代码缓存
+      backgroundThrottling: true,         // 后台时降低 CPU 使用
     },
     autoHideMenuBar: true,
     menuBarVisible: false,
@@ -172,6 +175,9 @@ function createGlassWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       preload: PATHS.preloads.glass,
+      // 性能优化
+      v8CacheOptions: 'bypassHeatCheck',
+      backgroundThrottling: false, // 玻璃窗口需要实时响应，不节流
     },
   });
 
