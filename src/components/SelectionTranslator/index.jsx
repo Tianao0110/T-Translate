@@ -63,6 +63,7 @@ const SelectionTranslator = () => {
   const autoHideTimerRef = useRef(null);
   const triggerReadyTimerRef = useRef(null);  // 圆点就绪计时器
   const contentRef = useRef(null);  // 内容区域引用，用于测量实际大小
+  const translateTextRef = useRef(null);  // 存储最新的翻译函数引用
 
   // 获取隐私模式
   useEffect(() => {
@@ -130,6 +131,98 @@ const SelectionTranslator = () => {
       }, newSettings.triggerTimeout);
     });
     
+    // 监听截图翻译联动
+    // 支持三种模式：
+    // 1. { isLoading: true } - 显示加载状态
+    // 2. { text: "..." } - 收到 OCR 文字，自己翻译
+    // 3. { sourceText, translatedText } - 直接显示结果（保留兼容）
+    const removeShowResultListener = window.electron?.selection?.onShowResult?.(async (data) => {
+      if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
+      if (triggerReadyTimerRef.current) clearTimeout(triggerReadyTimerRef.current);
+      
+      // 应用主题
+      if (data.theme) setTheme(data.theme);
+      
+      // 应用设置
+      const newSettings = { ...DEFAULT_SETTINGS, ...data.settings };
+      setSettings(newSettings);
+      
+      // 模式 1: 加载状态
+      if (data.isLoading) {
+        logger.debug('Showing loading state');
+        setSourceText('');
+        setTranslatedText('');
+        setError('');
+        setCopied(false);
+        sizedRef.current = false;
+        setIsFrozen(false);
+        setInitialBounds(null);
+        setMode('loading');
+        return;
+      }
+      
+      // 模式 2: 收到 OCR 文字，自己翻译（复用划词翻译的流程）
+      if (data.text && !data.translatedText) {
+        logger.debug('Received OCR text, translating...');
+        setSourceText(data.text);
+        setShowSource(true);
+        setError('');
+        setCopied(false);
+        sizedRef.current = false;
+        setIsFrozen(false);
+        setInitialBounds(null);
+        // 保持 loading 状态，开始翻译
+        setMode('loading');
+        
+        try {
+          // 使用 ref 来获取最新的翻译函数
+          const translationResult = await translateTextRef.current(data.text);
+          setTranslatedText(translationResult);
+          setError('');
+          setMode('overlay');
+          
+          // 添加到历史记录
+          if (translationResult) {
+            window.electron?.selection?.addToHistory?.({
+              source: data.text,
+              result: translationResult,
+              timestamp: Date.now(),
+              from: 'screenshot',
+            });
+          }
+        } catch (err) {
+          setError(err.message || '翻译失败');
+          setTranslatedText('');
+          setMode('overlay');
+        }
+        return;
+      }
+      
+      // 模式 3: 直接显示结果（兼容旧逻辑）
+      if (data.sourceText && data.translatedText) {
+        logger.debug('Received translation result');
+        setTranslation({
+          targetLanguage: data.targetLanguage || 'zh',
+          sourceLanguage: data.sourceLanguage || 'auto',
+        });
+        setShowSource(true);
+        setSourceText(data.sourceText);
+        setTranslatedText(data.translatedText);
+        setError('');
+        setCopied(false);
+        sizedRef.current = false;
+        setIsFrozen(false);
+        setInitialBounds(null);
+        setMode('overlay');
+        
+        if (newSettings.triggerTimeout > 0) {
+          autoHideTimerRef.current = setTimeout(() => {
+            handleAutoHide();
+          }, newSettings.triggerTimeout);
+        }
+      }
+    });
+    
     const removeHideListener = window.electron?.selection?.onHide?.(() => {
       // 冻结窗口忽略 hide 事件
       if (frozenRef.current) {
@@ -151,6 +244,7 @@ const SelectionTranslator = () => {
 
     return () => {
       if (removeShowListener) removeShowListener();
+      if (removeShowResultListener) removeShowResultListener();
       if (removeHideListener) removeHideListener();
       window.removeEventListener('keydown', handleKey);
       if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
@@ -357,6 +451,11 @@ const SelectionTranslator = () => {
       throw new Error(errorMsg);
     }
   };
+  
+  // 保持 translateTextRef 是最新的函数引用
+  useEffect(() => {
+    translateTextRef.current = translateText;
+  });
 
   const handleCopy = (e) => {
     e.stopPropagation();

@@ -106,6 +106,29 @@ function register(ctx) {
     runtime.screenshotFromHotkey = false;
   });
   
+  // ==================== 截图翻译完成（联动划词窗口） ====================
+  
+  /**
+   * OCR 完成，发送文字给划词窗口翻译
+   */
+  ipcMain.on(CHANNELS.SCREENSHOT.OCR_COMPLETE, (event, data) => {
+    if (data.success && data.text) {
+      logger.info('OCR complete, sending text to selection window for translation');
+      // 调用 managers 中的 showSelectionWithText
+      if (managers.showSelectionWithText) {
+        managers.showSelectionWithText(data.text);
+      } else {
+        logger.warn('showSelectionWithText not available in managers');
+      }
+    } else {
+      logger.warn('OCR failed:', data.error);
+      // OCR 失败，关闭加载窗口
+      if (managers.hideSelectionLoading) {
+        managers.hideSelectionLoading(data.error || 'OCR 识别失败');
+      }
+    }
+  });
+  
   logger.info('Screenshot IPC handlers registered');
 }
 

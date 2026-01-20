@@ -46,8 +46,10 @@ const CHANNELS = {
     SELECTION: 'screenshot-selection',
     CANCEL: 'screenshot-cancel',
     CAPTURED: 'screenshot-captured',
+    CAPTURED_SILENT: 'screenshot-captured-silent', // 静默模式（不显示主窗口）
     CONFIG: 'screenshot-config',
     SCREEN_BOUNDS: 'screen-bounds',
+    OCR_COMPLETE: 'screenshot:ocr-complete', // OCR 完成，发送文字给划词窗口翻译
   },
   GLASS: {
     OPEN: 'glass:open',
@@ -91,6 +93,7 @@ const CHANNELS = {
     START_DRAG: 'selection:start-drag',
     ADD_TO_HISTORY: 'selection:add-to-history',
     SHOW_TRIGGER: 'selection:show-trigger',
+    SHOW_RESULT: 'selection:show-result',     // 直接显示翻译结果（截图联动用）
     STATE_CHANGED: 'selection-state-changed',
     // 多窗口支持
     FREEZE: 'selection:freeze',           // 冻结当前窗口（变成独立窗口）

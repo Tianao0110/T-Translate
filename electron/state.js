@@ -68,6 +68,8 @@ const runtime = {
   screenshotData: null,
   wasMainWindowVisible: false,
   screenshotFromHotkey: false,
+  lastScreenshotBounds: null,      // 最近截图的位置
+  screenshotSelectionWindow: null, // 截图翻译的加载窗口引用
   
   // 字幕采集区坐标缓存
   subtitleCaptureRect: null,

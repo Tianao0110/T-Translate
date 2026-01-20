@@ -25,6 +25,7 @@ const validChannels = {
     "sync-target-language",  // 玻璃窗口语言同步
     "glass:translate-request",  // 玻璃窗口翻译请求
     "screenshot-captured",  // 截图完成
+    "screenshot-captured-silent",  // 截图完成（静默模式）
     "selection-state-changed",  // 划词翻译状态变化
     "theme:changed",  // 主题变化通知
     "maximize-change",  // 窗口最大化状态变化
@@ -201,6 +202,16 @@ const electronAPI = {
       const handler = (event, data) => callback(data);
       ipcRenderer.on("screenshot-captured", handler);
       return () => ipcRenderer.removeListener("screenshot-captured", handler);
+    },
+    // 静默模式截图完成（不显示主窗口，后台处理）
+    onCapturedSilent: (callback) => {
+      const handler = (event, data) => callback(data);
+      ipcRenderer.on("screenshot-captured-silent", handler);
+      return () => ipcRenderer.removeListener("screenshot-captured-silent", handler);
+    },
+    // 通知 OCR 完成（主窗口后台 OCR 完成后调用）
+    notifyOcrComplete: (data) => {
+      ipcRenderer.send("screenshot:ocr-complete", data);
     },
   },
   // 通用 IPC (带白名单检查)

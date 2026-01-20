@@ -230,6 +230,118 @@ function hideSelectionWindow() {
 }
 
 /**
+ * 显示划词翻译窗口并直接显示翻译结果（截图翻译联动用）
+ * @param {Object} data - 翻译结果数据
+ * @param {string} data.sourceText - 原文
+ * @param {string} data.translatedText - 译文
+ * @param {string} data.sourceLanguage - 源语言
+ * @param {string} data.targetLanguage - 目标语言
+ */
+/**
+ * 发送 OCR 文字给划词窗口翻译
+ */
+function showSelectionWithText(text) {
+  const win = runtime.screenshotSelectionWindow;
+  
+  if (!win || win.isDestroyed()) {
+    logger.warn('No selection window to send text to');
+    return;
+  }
+  
+  logger.debug('Sending OCR text to selection window');
+  
+  const settings = store.get('settings', {});
+  const interfaceSettings = settings.interface || {};
+  const selectionSettings = settings.selection || {};
+  
+  // 发送文字，划词窗口收到后会自己翻译
+  win.webContents.send(CHANNELS.SELECTION.SHOW_RESULT, {
+    text: text,  // 模式2：有 text 无 translatedText，划词窗口自己翻译
+    theme: interfaceSettings.theme || 'light',
+    settings: {
+      windowOpacity: selectionSettings.windowOpacity || 95,
+      autoCloseOnCopy: selectionSettings.autoCloseOnCopy || false,
+    },
+  });
+}
+
+/**
+ * 关闭截图加载窗口（OCR 失败时调用）
+ */
+function hideSelectionLoading(errorMsg) {
+  const win = runtime.screenshotSelectionWindow;
+  
+  if (win && !win.isDestroyed()) {
+    if (errorMsg) {
+      // 显示错误，2秒后关闭
+      win.webContents.send(CHANNELS.SELECTION.SHOW_RESULT, {
+        sourceText: '',
+        translatedText: '',
+        error: errorMsg,
+      });
+      setTimeout(() => {
+        if (win && !win.isDestroyed()) win.close();
+      }, 2000);
+    } else {
+      win.close();
+    }
+  }
+  
+  runtime.screenshotSelectionWindow = null;
+}
+
+/**
+ * 显示截图加载窗口
+ */
+async function showSelectionLoading(bounds) {
+  logger.debug('Showing selection loading window');
+
+  const settings = store.get('settings', {});
+  const interfaceSettings = settings.interface || {};
+  const selectionSettings = settings.selection || {};
+
+  const win = windowManager.createSelectionWindow();
+  runtime.screenshotSelectionWindow = win;
+
+  // 定位到截图区域右下角
+  let posX = bounds.x + bounds.width + 10;
+  let posY = bounds.y + bounds.height + 10;
+
+  const display = screen.getDisplayNearestPoint({ x: posX, y: posY });
+  const screenBounds = display.bounds;
+  // 正方形窗口，与划词翻译的 loading 一致
+  const winSize = 50;
+
+  if (posX + winSize > screenBounds.x + screenBounds.width) {
+    posX = bounds.x - winSize - 10;
+  }
+  if (posY + winSize > screenBounds.y + screenBounds.height) {
+    posY = bounds.y - winSize - 10;
+  }
+
+  posX = Math.max(screenBounds.x, Math.min(posX, screenBounds.x + screenBounds.width - winSize));
+  posY = Math.max(screenBounds.y, Math.min(posY, screenBounds.y + screenBounds.height - winSize));
+
+  win.setBounds({ x: Math.round(posX), y: Math.round(posY), width: winSize, height: winSize });
+  win.show();
+
+  // 发送 loading 状态
+  const sendData = () => {
+    win.webContents.send(CHANNELS.SELECTION.SHOW_RESULT, {
+      isLoading: true,
+      theme: interfaceSettings.theme || 'light',
+      settings: { windowOpacity: selectionSettings.windowOpacity || 95 },
+    });
+  };
+
+  if (win.webContents.isLoading()) {
+    win.webContents.once('did-finish-load', sendData);
+  } else {
+    setTimeout(sendData, 50);
+  }
+}
+
+/**
  * 切换划词翻译开关
  */
 function toggleSelectionTranslate() {
@@ -617,20 +729,59 @@ async function handleScreenshotSelection(bounds) {
       dataURL = processDesktopCapturerSelection(data, bounds);
     }
 
+    // 记录截图位置（用于联动划词窗口）
+    runtime.lastScreenshotBounds = {
+      x: bounds.x + bounds.width,  // 右下角 x
+      y: bounds.y + bounds.height, // 右下角 y
+      centerX: bounds.x + bounds.width / 2,
+      centerY: bounds.y + bounds.height / 2,
+      timestamp: Date.now(),
+    };
+    logger.debug('Screenshot position saved:', runtime.lastScreenshotBounds);
+
     runtime.screenshotData = null;
     screenshotModule.clearScreenshotData();
-    runtime.wasMainWindowVisible = false;
     runtime.screenshotFromHotkey = false;
 
-    if (windows.main) {
-      windows.main.show();
-      windows.main.focus();
-    }
-
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-    if (windows.main && dataURL) {
-      windows.main.webContents.send(CHANNELS.SCREENSHOT.CAPTURED, dataURL);
+    // 获取截图输出模式设置
+    const settings = store.get('settings', {});
+    const screenshotSettings = settings.screenshot || {};
+    const outputMode = screenshotSettings.outputMode || 'bubble'; // 默认气泡模式
+    
+    if (outputMode === 'main') {
+      // 主窗口模式：显示主窗口，发送截图数据
+      runtime.wasMainWindowVisible = false;
+      if (windows.main) {
+        windows.main.show();
+        windows.main.focus();
+      }
+      await new Promise(resolve => setTimeout(resolve, 100));
+      if (windows.main && dataURL) {
+        windows.main.webContents.send(CHANNELS.SCREENSHOT.CAPTURED, dataURL);
+      }
+    } else {
+      // 气泡模式：后台处理，不显示主窗口
+      logger.info('Screenshot bubble mode: processing in background');
+      
+      // 先显示加载状态的划词窗口
+      await showSelectionLoading(bounds);
+      
+      // 确保主窗口已加载（用于后台处理）
+      if (!windows.main) {
+        windowManager.createMainWindow();
+        // 等待窗口加载，但确保不显示
+        await new Promise(resolve => setTimeout(resolve, 500));
+        // 强制隐藏（防止 ready-to-show 触发显示）
+        if (windows.main && !windows.main.isDestroyed()) {
+          windows.main.hide();
+        }
+      }
+      
+      // 发送截图数据到主窗口（后台处理）
+      if (windows.main && dataURL) {
+        // 使用字符串而非常量，确保兼容性
+        windows.main.webContents.send('screenshot-captured-silent', dataURL);
+      }
     }
 
     return dataURL;
@@ -642,7 +793,8 @@ async function handleScreenshotSelection(bounds) {
     runtime.wasMainWindowVisible = false;
     runtime.screenshotFromHotkey = false;
 
-    if (windows.main) {
+    // 出错时恢复主窗口
+    if (windows.main && runtime.wasMainWindowVisible) {
       windows.main.show();
       windows.main.focus();
     }
@@ -709,6 +861,8 @@ app.whenReady().then(() => {
   const managers = {
     startScreenshot,
     handleScreenshotSelection,
+    showSelectionWithText,      // OCR 完成后发送文字给划词窗口
+    hideSelectionLoading,       // OCR 失败时关闭加载窗口
     toggleGlassWindow: windowManager.toggleGlassWindow,
     createGlassWindow: windowManager.createGlassWindow,
     toggleSelectionTranslate,

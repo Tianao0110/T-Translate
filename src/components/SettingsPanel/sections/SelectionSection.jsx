@@ -120,6 +120,27 @@ const SelectionSection = ({
         <p className="setting-hint">调整划词翻译窗口的透明度</p>
       </div>
 
+      {/* 截图翻译输出模式 */}
+      <div className="setting-group">
+        <label className="setting-label">截图翻译输出</label>
+        <div className="toggle-wrapper">
+          <button
+            className={`toggle-button ${(settings.screenshot?.outputMode || 'bubble') === 'bubble' ? 'active' : ''}`}
+            onClick={() => updateSetting('screenshot', 'outputMode', 
+              (settings.screenshot?.outputMode || 'bubble') === 'bubble' ? 'main' : 'bubble'
+            )}
+          >
+            {(settings.screenshot?.outputMode || 'bubble') === 'bubble' ? '气泡窗口' : '主窗口'}
+          </button>
+          <span className="toggle-description">
+            {(settings.screenshot?.outputMode || 'bubble') === 'bubble' 
+              ? '截图翻译结果显示在悬浮气泡中' 
+              : '截图翻译结果显示在主窗口中'}
+          </span>
+        </div>
+        <p className="setting-hint">气泡模式下，截图后后台处理，完成后弹出结果</p>
+      </div>
+
       {/* 字符数限制 */}
       <div className="setting-group">
         <label className="setting-label">字符数限制</label>

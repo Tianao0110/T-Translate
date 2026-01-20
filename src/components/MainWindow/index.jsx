@@ -47,7 +47,8 @@ const MainWindow = () => {
     copyToClipboard,
     exportHistory,
     setSourceText,
-    ocrStatus
+    ocrStatus,
+    recognizeImage, // OCR 识别
   } = useTranslationStore();
 
   // Refs
@@ -93,6 +94,65 @@ const MainWindow = () => {
       if (unsubscribe) unsubscribe();
     };
   }, []);
+
+  // 静默模式截图监听 - 后台处理，不显示主窗口
+  useEffect(() => {
+    if (!window.electron?.screenshot?.onCapturedSilent) {
+      logger.debug(' Screenshot onCapturedSilent not available');
+      return;
+    }
+
+    logger.debug(' Setting up silent screenshot listener');
+    
+    const unsubscribe = window.electron.screenshot.onCapturedSilent(async (dataURL) => {
+      logger.debug(' [Silent] Screenshot captured, processing OCR...');
+      
+      if (!dataURL) {
+        logger.error(' [Silent] Screenshot failed: no data');
+        return;
+      }
+      
+      try {
+        // OCR 识别
+        const engineToUse = ocrStatus?.engine || 'llm-vision';
+        logger.debug('[Silent] OCR with engine:', engineToUse);
+        
+        const ocrResult = await recognizeImage(dataURL, { 
+          engine: engineToUse,
+          autoSetSource: false
+        });
+        
+        if (!ocrResult.success || !ocrResult.text) {
+          logger.warn('[Silent] OCR failed or no text:', ocrResult);
+          // 通知主进程 OCR 失败
+          window.electron?.screenshot?.notifyOcrComplete?.({ 
+            success: false, 
+            error: ocrResult.error || '未识别到文字' 
+          });
+          return;
+        }
+        
+        logger.debug('[Silent] OCR success, sending text to selection window');
+        
+        // OCR 完成，把文字发给划词窗口让它自己翻译
+        window.electron?.screenshot?.notifyOcrComplete?.({
+          success: true,
+          text: ocrResult.text,
+        });
+      } catch (error) {
+        logger.error('[Silent] OCR error:', error);
+        window.electron?.screenshot?.notifyOcrComplete?.({ 
+          success: false, 
+          error: error.message 
+        });
+      }
+    });
+
+    return () => {
+      logger.debug(' Cleaning up silent screenshot listener');
+      if (unsubscribe) unsubscribe();
+    };
+  }, [ocrStatus, recognizeImage, translate]);
 
   // 全局快捷键
   useEffect(() => {

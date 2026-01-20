@@ -86,29 +86,30 @@ const ProviderSettings = forwardRef(({ settings, updateSettings, notify }, ref) 
   // 是否已初始化
   const initializedRef = useRef(false);
   
-  // 初始化：从 registry 和 settings 加载（只在首次挂载时）
+  // 初始化：从 registry 和 settings 加载
   useEffect(() => {
-    // 防止重复初始化
-    if (initializedRef.current) return;
+    // 只有当 settings 真正从 store 加载完成后才初始化
+    // settings.translation.providers 为 undefined 或有值时才进行初始化
+    // 空数组 [] 是 DEFAULT_SETTINGS 的默认值，需要等待真实数据
+    
+    const savedProviders = settings?.translation?.providers;
+    const savedConfigs = settings?.translation?.providerConfigs || {};
+    
+    // 如果已经初始化，且不是因为 settings 变化，则跳过
+    // 但如果是第一次加载到真实数据，仍然需要重新初始化
+    const hasRealData = savedProviders && savedProviders.length > 0;
+    
+    // 第一次初始化，或者从空数组变为有数据时需要重新加载
+    const needsInit = !initializedRef.current || 
+      (hasRealData && providers.length > 0 && 
+       JSON.stringify(savedProviders.map(p => p.id)) !== JSON.stringify(providers.map(p => p.id)));
+    
+    if (!needsInit) return;
     
     const initProviders = async () => {
-      // 等待 settings 加载完成（有数据时 providers 可能不为空）
-      // 最多等待 500ms
-      let savedProviders = settings?.translation?.providers || [];
-      let savedConfigs = settings?.translation?.providerConfigs || {};
-      
-      // 如果 settings 还没有加载完成（providers 为空），等待一下
-      if (savedProviders.length === 0) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        savedProviders = settings?.translation?.providers || [];
-        savedConfigs = settings?.translation?.providerConfigs || {};
-      }
-      
-      const hasStoredProviders = savedProviders.length > 0;
-      
       let providerList;
       
-      if (hasStoredProviders) {
+      if (hasRealData) {
         // 使用存储的顺序，但确保包含所有 provider
         providerList = [];
         const savedIds = new Set(savedProviders.map(p => p.id));
@@ -178,7 +179,7 @@ const ProviderSettings = forwardRef(({ settings, updateSettings, notify }, ref) 
     };
     
     initProviders();
-  }, [settings?.translation?.providers]); // 监听 settings 加载完成
+  }, [settings?.translation?.providers, allProvidersMeta]); // 监听 settings.translation.providers 变化
 
   // 保存设置
   const saveSettings = useCallback(async () => {

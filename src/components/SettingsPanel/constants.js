@@ -165,6 +165,11 @@ export const DEFAULT_SETTINGS = {
     confidence: 0.6,
   },
   
+  // 截图设置
+  screenshot: {
+    outputMode: 'bubble',  // 'bubble' | 'main' - 输出到气泡窗口或主窗口
+  },
+  
   // 开发选项
   debugMode: defaultConfig.dev.debugMode,
 };
@@ -208,6 +213,10 @@ export const migrateOldSettings = (savedSettings) => {
     ocr: {
       ...DEFAULT_SETTINGS.ocr,
       ...(savedSettings.ocr || {}),
+    },
+    screenshot: {
+      ...DEFAULT_SETTINGS.screenshot,
+      ...(savedSettings.screenshot || {}),
     },
     shortcuts: {
       ...DEFAULT_SETTINGS.shortcuts,

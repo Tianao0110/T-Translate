@@ -39,12 +39,20 @@
   border: 2px dashed rgba(255, 255, 255, 0.4) !important;
 }
 
-/* 字幕模式下顶部区域 */
+/* 字幕模式下顶部区域始终显示 */
 .subtitle-mode .glass-top-area {
   background: transparent;
   justify-content: flex-start;
   padding-left: 10px;
-  min-height: 36px;
+  min-height: 24px;
+  opacity: 1 !important;
+  max-height: 24px !important;
+  padding: 3px 6px 3px 10px !important;
+}
+
+/* 字幕模式下关闭按钮始终显示 */
+.subtitle-mode .glass-close-btn {
+  opacity: 1 !important;
 }
 
 /* ========== 顶部区域 ========== */
@@ -53,16 +61,31 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4px 8px;
-  min-height: 32px;  /* 缩小高度 */
+  padding: 3px 6px;
+  min-height: 24px;  /* 缩小 30%: 32 → 24 */
   -webkit-app-region: drag;
+  background: rgba(0, 0, 0, 0.06);  /* 背景加深，与识别区区分 */
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  /* 默认隐藏，鼠标移入显示 */
+  opacity: 0;
+  max-height: 0;
+  padding: 0;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+/* 鼠标移入玻璃窗口时显示顶部区域 */
+.glass-window.show-toolbar .glass-top-area {
+  opacity: 1;
+  max-height: 24px;
+  padding: 3px 6px;
 }
 
 /* ========== 工具栏 ========== */
 .glass-toolbar {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;  /* 缩小: 6 → 4 */
   -webkit-app-region: no-drag;
   pointer-events: auto;
   position: absolute;
@@ -73,11 +96,11 @@
 }
 
 .toolbar-btn {
-  width: 28px;
-  height: 28px;
+  width: 20px;   /* 缩小 30%: 28 → 20 */
+  height: 20px;
   border: none;
-  border-radius: 6px;
-  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;  /* 缩小: 6 → 4 */
+  background: rgba(255, 255, 255, 0.6);  /* 更亮，与背景区分 */
   color: var(--glass-text);
   cursor: pointer;
   display: flex;
@@ -91,7 +114,7 @@
 }
 
 .toolbar-btn:hover {
-  background: rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.9);
 }
 
 .toolbar-btn:active {
@@ -105,16 +128,16 @@
 
 /* 已设置采集区的按钮高亮 */
 .toolbar-btn.has-capture {
-  background: rgba(59, 130, 246, 0.1);
+  background: rgba(59, 130, 246, 0.2);
   color: var(--glass-accent);
 }
 
 /* 小横条 - 点击调节透明度 */
 .toolbar-handle {
-  width: 40px;
-  height: 20px;
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.08);
+  width: 28px;   /* 缩小: 40 → 28 */
+  height: 14px;  /* 缩小: 20 → 14 */
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.5);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -128,7 +151,7 @@
 }
 
 .toolbar-handle:hover {
-  background: rgba(0, 0, 0, 0.12);
+  background: rgba(255, 255, 255, 0.8);
 }
 
 .toolbar-handle:active {
@@ -138,12 +161,12 @@
 /* ========== 关闭按钮 ========== */
 .glass-close-btn {
   position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 28px;
-  height: 28px;
+  top: 3px;
+  right: 3px;
+  width: 20px;   /* 缩小: 28 → 20 */
+  height: 20px;
   border: none;
-  border-radius: 6px;
+  border-radius: 4px;
   background: rgba(239, 68, 68, 0.15);
   color: #ef4444;
   cursor: pointer;
@@ -156,7 +179,8 @@
   z-index: 1001;
 }
 
-.glass-close-btn.visible {
+/* 鼠标移入玻璃窗口时显示关闭按钮 */
+.glass-window.show-toolbar .glass-close-btn {
   opacity: 1;
 }
 
@@ -170,7 +194,6 @@
   background: rgba(0, 0, 0, 0.7);
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.4);
-  opacity: 1;  /* 字幕模式下始终显示 */
 }
 
 .subtitle-mode .glass-close-btn:hover {
@@ -352,6 +375,7 @@
   line-height: 1.7;
   color: var(--glass-text);
   word-wrap: break-word;
+  white-space: pre-wrap;  /* 保留换行符 */
 }
 
 /* ========== 字幕显示 ========== */
@@ -492,6 +516,8 @@
 [data-theme="rainbow"] .glass-top-area {
   position: relative;
   z-index: 1;
+  background: rgba(168, 85, 247, 0.08);
+  border-bottom-color: rgba(168, 85, 247, 0.1);
 }
 
 [data-theme="rainbow"] .glass-content {
@@ -500,13 +526,22 @@
 }
 
 [data-theme="rainbow"] .toolbar-btn {
-  background: rgba(168, 85, 247, 0.1);
+  background: rgba(255, 255, 255, 0.7);
   color: #7c3aed;
 }
 
 [data-theme="rainbow"] .toolbar-btn:hover {
-  background: rgba(168, 85, 247, 0.2);
+  background: rgba(255, 255, 255, 0.9);
   color: #6d28d9;
+}
+
+[data-theme="rainbow"] .toolbar-handle {
+  background: rgba(255, 255, 255, 0.6);
+  color: #8b5cf6;
+}
+
+[data-theme="rainbow"] .toolbar-handle:hover {
+  background: rgba(255, 255, 255, 0.85);
 }
 
 [data-theme="rainbow"] .toolbar-btn.active {
@@ -558,6 +593,15 @@
 }
 
 [data-theme="dark"] .toolbar-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="dark"] .toolbar-handle {
+  background: rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .toolbar-handle:hover {
   background: rgba(255, 255, 255, 0.2);
 }
 

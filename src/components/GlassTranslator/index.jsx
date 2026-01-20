@@ -48,7 +48,7 @@ const GlassTranslator = () => {
   } = useConfigStore();
 
   // ========== 纯 UI 状态 ==========
-  const [showCloseBtn, setShowCloseBtn] = useState(false);
+  const [showToolbar, setShowToolbar] = useState(false);  // 工具栏显示状态
   const [showOpacitySlider, setShowOpacitySlider] = useState(false);
   const [hasOverflow, setHasOverflow] = useState(false);
   const [captureRect, setCaptureRect] = useState(null);
@@ -56,7 +56,7 @@ const GlassTranslator = () => {
   
   // ========== Refs ==========
   const contentRef = useRef(null);
-  const closeBtnTimerRef = useRef(null);
+  const toolbarTimerRef = useRef(null);  // 工具栏隐藏计时器
   const subtitleTimerRef = useRef(null);
 
   // ========== 初始化 ==========
@@ -113,7 +113,7 @@ const GlassTranslator = () => {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       if (subtitleTimerRef.current) clearInterval(subtitleTimerRef.current);
-      if (closeBtnTimerRef.current) clearTimeout(closeBtnTimerRef.current);
+      if (toolbarTimerRef.current) clearTimeout(toolbarTimerRef.current);
       if (unsubscribeSettings) unsubscribeSettings();
     };
   }, []);
@@ -175,13 +175,17 @@ const GlassTranslator = () => {
   };
 
   // ========== UI 事件处理 ==========
-  const handleMouseEnterTop = () => {
-    if (closeBtnTimerRef.current) clearTimeout(closeBtnTimerRef.current);
-    setShowCloseBtn(true);
+  const handleMouseEnterWindow = () => {
+    if (toolbarTimerRef.current) clearTimeout(toolbarTimerRef.current);
+    setShowToolbar(true);
   };
 
-  const handleMouseLeaveTop = () => {
-    closeBtnTimerRef.current = setTimeout(() => setShowCloseBtn(false), 800);
+  const handleMouseLeaveWindow = () => {
+    // 延迟隐藏，避免误触
+    toolbarTimerRef.current = setTimeout(() => {
+      setShowToolbar(false);
+      setShowOpacitySlider(false);  // 同时关闭透明度滑块
+    }, 300);
   };
 
   const handleClose = () => {
@@ -291,16 +295,14 @@ const GlassTranslator = () => {
 
   return (
     <div 
-      className={`glass-window ${subtitleMode ? 'subtitle-mode' : ''}`}
+      className={`glass-window ${subtitleMode ? 'subtitle-mode' : ''} ${showToolbar ? 'show-toolbar' : ''}`}
       style={{ '--glass-opacity': subtitleMode ? 0 : glassOpacity }}
       data-theme={theme}
+      onMouseEnter={handleMouseEnterWindow}
+      onMouseLeave={handleMouseLeaveWindow}
     >
       {/* 顶部区域 */}
-      <div 
-        className="glass-top-area"
-        onMouseEnter={handleMouseEnterTop}
-        onMouseLeave={handleMouseLeaveTop}
-      >
+      <div className="glass-top-area">
         {/* 普通模式工具栏 */}
         {!subtitleMode && (
           <div className="glass-toolbar">
@@ -314,7 +316,7 @@ const GlassTranslator = () => {
               disabled={isLoading}
               title="截图识别 (Space)"
             >
-              <Camera size={16} />
+              <Camera size={12} />
             </button>
             
             <div 
@@ -322,7 +324,7 @@ const GlassTranslator = () => {
               onClick={handleBarClick}
               title="点击调节透明度"
             >
-              <GripHorizontal size={20} />
+              <GripHorizontal size={14} />
             </div>
             
             <button 
@@ -334,7 +336,7 @@ const GlassTranslator = () => {
               }}
               title={captureRect ? '开始字幕模式' : '设置字幕采集区'}
             >
-              <Film size={16} />
+              <Film size={12} />
             </button>
           </div>
         )}
@@ -361,18 +363,18 @@ const GlassTranslator = () => {
               }}
               title="编辑字幕采集区"
             >
-              <Monitor size={16} />
+              <Monitor size={12} />
             </button>
           </div>
         )}
         
         {/* 关闭按钮 */}
         <button 
-          className={`glass-close-btn ${showCloseBtn || subtitleMode ? 'visible' : ''}`}
+          className="glass-close-btn"
           onClick={handleClose}
           title={subtitleMode ? '退出字幕模式 (Esc)' : '关闭 (Esc)'}
         >
-          <X size={14} />
+          <X size={12} />
         </button>
       </div>
       

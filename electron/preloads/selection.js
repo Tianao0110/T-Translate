@@ -26,6 +26,13 @@ contextBridge.exposeInMainWorld("electron", {
       ipcRenderer.on("selection:hide", listener);
       return () => ipcRenderer.removeListener("selection:hide", listener);
     },
+    // 直接显示翻译结果（截图翻译联动用）
+    // 支持两种模式：isLoading=true 显示加载，否则显示结果
+    onShowResult: (callback) => {
+      const listener = (event, data) => callback(data);
+      ipcRenderer.on("selection:show-result", listener);
+      return () => ipcRenderer.removeListener("selection:show-result", listener);
+    },
   },
 
   clipboard: {
