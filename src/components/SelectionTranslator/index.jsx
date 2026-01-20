@@ -261,7 +261,7 @@ const SelectionTranslator = () => {
     
     if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
     
-    // 🔧 不再改变窗口位置和大小，让 loading 在原地显示
+    // 窗口大小已统一为 40x40，直接切换到 loading 状态
     setMode('loading');
     
     try {

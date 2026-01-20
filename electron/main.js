@@ -186,8 +186,8 @@ async function showSelectionTrigger(mouseX, mouseY, rect) {
   win.setBounds({
     x: Math.round(triggerX),
     y: Math.round(triggerY),
-    width: 26,
-    height: 26,
+    width: 40,
+    height: 40,
   });
   win.show();
 
@@ -310,7 +310,7 @@ async function showSelectionLoading(bounds) {
   const display = screen.getDisplayNearestPoint({ x: posX, y: posY });
   const screenBounds = display.bounds;
   // 正方形窗口，与划词翻译的 loading 一致
-  const winSize = 50;
+  const winSize = 40;
 
   if (posX + winSize > screenBounds.x + screenBounds.width) {
     posX = bounds.x - winSize - 10;
