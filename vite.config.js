@@ -178,8 +178,7 @@ export default defineConfig(({ command, mode }) => {
             'utils-vendor': ['axios', 'dayjs', 'uuid'],
             
             // 大型库单独打包
-            'monaco': ['@monaco-editor/react', 'monaco-editor'],
-            'tesseract': ['tesseract.js']
+            'monaco': ['@monaco-editor/react', 'monaco-editor']
           }
         },
         
@@ -252,8 +251,7 @@ export default defineConfig(({ command, mode }) => {
         'axios',
         'zustand',
         'dayjs',
-        'lucide-react',
-        'tesseract.js'
+        'lucide-react'
       ],
       
       // 排除的依赖

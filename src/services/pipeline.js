@@ -201,18 +201,22 @@ class TranslationPipeline {
       }
       
       // 3. 判断显示模式
-      const blocks = ocrResult.blocks || [];
-      const useScattered = shouldUseScatteredMode(blocks);
+      // 玻璃板需要覆盖原文，使用原始块（rawBlocks）保持每行独立
+      // 合并块（blocks）用于整体翻译模式的文本
+      const mergedBlocks = ocrResult.blocks || [];
+      const rawBlocks = ocrResult.rawBlocks || mergedBlocks;
+      const useScattered = shouldUseScatteredMode(rawBlocks);
       
-      logger.debug(` Display mode: ${useScattered ? 'scattered' : 'unified'}, blocks: ${blocks.length}`);
-      if (blocks.length > 0) {
-        logger.debug(' First block bbox:', blocks[0]?.bbox);
+      logger.debug(` Display mode: ${useScattered ? 'scattered' : 'unified'}`);
+      logger.debug(` Raw blocks: ${rawBlocks.length}, Merged blocks: ${mergedBlocks.length}`);
+      if (rawBlocks.length > 0) {
+        logger.debug(' First raw block bbox:', rawBlocks[0]?.bbox);
         logger.debug(' Capture options:', captureOptions);
       }
       
-      if (useScattered && blocks.length > 0) {
-        // 散点模式：使用子玻璃板
-        return await this.runScatteredMode(blocks, captureOptions);
+      if (useScattered && rawBlocks.length > 0) {
+        // 散点模式：使用原始块（每行独立），覆盖在原文位置
+        return await this.runScatteredMode(rawBlocks, captureOptions);
       }
       
       // 整体模式：继续原有流程
@@ -244,7 +248,7 @@ class TranslationPipeline {
 
   /**
    * 散点模式：为每个文本块创建子玻璃板并翻译
-   * @param {Array} blocks - OCR 文本块数组
+   * @param {Array} blocks - OCR 文本块数组（已合并）
    * @param {object} captureOptions - 截图选项
    */
   async runScatteredMode(blocks, captureOptions = {}) {
@@ -281,39 +285,19 @@ class TranslationPipeline {
         return { success: true, text: '' };
       }
       
-      logger.debug(` Raw blocks count: ${validBlocks.length}`);
-      logger.debug(` First block after conversion:`, validBlocks[0]?.bbox);
-      
-      // 2. 智能段落合并：将碎片化的 OCR 结果合并为自然段落
-      // 检查是否已在主进程合并过（有 mergedCount 属性）
-      const alreadyMerged = validBlocks.some(b => b.mergedCount && b.mergedCount > 1);
-      
-      let mergedBlocks;
-      if (alreadyMerged) {
-        // 主进程已合并，直接使用
-        mergedBlocks = validBlocks;
-        logger.debug(` Blocks already merged in main process`);
-      } else {
-        // 前端合并（兼容旧版本或其他 OCR 引擎）
-        mergedBlocks = smartMerge(validBlocks, {
-          lineGapThreshold: 1.5,
-          xOverlapRatio: 0.3,
-          preserveLineBreaks: true,
-        });
-        logger.debug(` Frontend merge: ${validBlocks.length} -> ${mergedBlocks.length} paragraphs`);
-      }
-      
-      if (mergedBlocks.length > 0) {
+      logger.debug(` Valid blocks count: ${validBlocks.length}`);
+      if (validBlocks.length > 0) {
         logger.debug(` First block:`, {
-          text: mergedBlocks[0].text?.substring(0, 50),
-          bbox: mergedBlocks[0].bbox,
-          mergedCount: mergedBlocks[0].mergedCount,
+          text: validBlocks[0].text?.substring(0, 50),
+          bbox: validBlocks[0].bbox,
+          mergedCount: validBlocks[0].mergedCount,
         });
       }
       
-      // 3. 设置为散点模式，创建子玻璃板
+      // 2. 设置为散点模式，创建子玻璃板
+      // 注意：传入的 blocks 已经在主进程合并过了
       session.setDisplayMode(DISPLAY_MODE.SCATTERED);
-      const createdPanes = session.setChildPanes(mergedBlocks);
+      const createdPanes = session.setChildPanes(validBlocks);
       session.setStatus('translating');
       
       // 3. 获取翻译配置

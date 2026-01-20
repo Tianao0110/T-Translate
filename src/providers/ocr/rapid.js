@@ -62,7 +62,8 @@ class RapidOCREngine extends BaseOCREngine {
         success: true,
         text: cleanedText,
         raw: result.text,
-        blocks: result.blocks || [],  // 包含坐标的文本块数组
+        blocks: result.blocks || [],      // 合并后的文本块数组
+        rawBlocks: result.rawBlocks || result.blocks || [],  // 原始文本块数组
         engine: 'rapid-ocr',
       };
     } catch (error) {

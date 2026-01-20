@@ -293,7 +293,7 @@ async function fetchSelectedText() {
 }
 
 /**
- * OCR 兜底方案
+ * OCR 兜底方案 - 使用 RapidOCR (PaddleOCR)
  */
 async function getTextByOCR(rect, screenshotModule) {
   try {
@@ -318,15 +318,15 @@ async function getTextByOCR(rect, screenshotModule) {
       return null;
     }
     
-    // 使用 Tesseract OCR
-    const Tesseract = require('tesseract.js');
-    const result = await Tesseract.recognize(
-      Buffer.from(screenshot.replace(/^data:image\/\w+;base64,/, ''), 'base64'),
-      'chi_sim+eng',
-      { logger: () => {} }
-    );
+    // 使用 RapidOCR (PaddleOCR)
+    const { recognizeWithRapidOCR } = require('../utils/ocr-helper');
+    const result = await recognizeWithRapidOCR(screenshot, { merge: true });
     
-    return result.data.text;
+    if (result.success && result.text) {
+      return result.text;
+    }
+    
+    return null;
   } catch (err) {
     logger.error('OCR error:', err);
     return null;
