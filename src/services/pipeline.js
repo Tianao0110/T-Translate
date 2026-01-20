@@ -2,10 +2,11 @@
 // 翻译流水线 - 核心大脑
 // 串联：截图 -> OCR -> 翻译
 // 支持隐私模式检查
+// 支持散点模式（子玻璃板）
 
 import { ocrManager } from '../providers/ocr/index.js';
 import translationService from './translation.js';
-import useSessionStore from '../stores/session.js';
+import useSessionStore, { DISPLAY_MODE, CHILD_PANE_STATUS } from '../stores/session.js';
 import useConfigStore from '../stores/config.js';
 import { calculateHash } from '../utils/image.js';
 import { detectLanguage, cleanTranslationOutput, shouldTranslateText } from '../utils/text.js';
@@ -33,6 +34,59 @@ async function getPrivacyMode() {
     logger.debug('Failed to get privacy mode from main:', e.message);
   }
   return PRIVACY_MODE_IDS.STANDARD;
+}
+
+/**
+ * 判断是否应使用散点模式
+ * @param {Array} blocks - OCR 文本块数组
+ * @returns {boolean}
+ */
+function shouldUseScatteredMode(blocks) {
+  if (!blocks || blocks.length === 0) return false;
+  if (blocks.length === 1) return false;
+  
+  // 检查是否有坐标信息
+  const hasCoordinates = blocks.some(b => b.bbox && b.bbox.width > 0);
+  if (!hasCoordinates) return false;
+  
+  // 计算平均行高
+  const validBlocks = blocks.filter(b => b.bbox && b.bbox.height > 0);
+  if (validBlocks.length < 2) return false;
+  
+  const avgHeight = validBlocks.reduce((sum, b) => sum + b.bbox.height, 0) / validBlocks.length;
+  
+  // 按 Y 坐标排序
+  const sorted = [...validBlocks].sort((a, b) => a.bbox.y - b.bbox.y);
+  
+  // 检查是否垂直紧密排列
+  let isVerticallyAligned = true;
+  let maxHorizontalOffset = 0;
+  
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = sorted[i - 1];
+    const curr = sorted[i];
+    
+    // 计算垂直间距
+    const verticalGap = curr.bbox.y - (prev.bbox.y + prev.bbox.height);
+    
+    // 计算水平偏移
+    const horizontalOffset = Math.abs(curr.bbox.x - prev.bbox.x);
+    maxHorizontalOffset = Math.max(maxHorizontalOffset, horizontalOffset);
+    
+    // 如果垂直间距过大（超过2倍行高）或有较大重叠
+    if (verticalGap > avgHeight * 2 || verticalGap < -avgHeight * 0.3) {
+      isVerticallyAligned = false;
+      break;
+    }
+  }
+  
+  // 如果水平偏移过大（超过平均宽度的40%），认为是散点
+  const avgWidth = validBlocks.reduce((sum, b) => sum + b.bbox.width, 0) / validBlocks.length;
+  if (maxHorizontalOffset > avgWidth * 0.4) {
+    isVerticallyAligned = false;
+  }
+  
+  return !isVerticallyAligned;
 }
 
 /**
@@ -75,6 +129,9 @@ class TranslationPipeline {
     const config = useConfigStore.getState();
     
     try {
+      // 清除之前的子玻璃板（保留冻结的）
+      session.clearChildPanes();
+      
       // 1. 截图
       session.startCapture();
       
@@ -84,7 +141,7 @@ class TranslationPipeline {
       }
       
       // 2. 运行 OCR -> 翻译
-      return await this.runFromImage(captureResult.imageData);
+      return await this.runFromImage(captureResult.imageData, captureOptions);
       
     } catch (error) {
       logger.error('Capture error:', error);
@@ -97,8 +154,9 @@ class TranslationPipeline {
   /**
    * 从图片执行翻译（OCR -> 翻译）
    * @param {string} imageData - base64 图片数据
+   * @param {object} captureOptions - 截图选项（用于计算坐标偏移）
    */
-  async runFromImage(imageData) {
+  async runFromImage(imageData, captureOptions = {}) {
     const session = useSessionStore.getState();
     const config = useConfigStore.getState();
     
@@ -128,14 +186,26 @@ class TranslationPipeline {
         return { success: true, text: '' };
       }
       
-      // 3. 文本去重检查
+      // 3. 判断显示模式
+      const blocks = ocrResult.blocks || [];
+      const useScattered = shouldUseScatteredMode(blocks);
+      
+      logger.debug(` Display mode: ${useScattered ? 'scattered' : 'unified'}, blocks: ${blocks.length}`);
+      
+      if (useScattered && blocks.length > 0) {
+        // 散点模式：使用子玻璃板
+        return await this.runScatteredMode(blocks, captureOptions);
+      }
+      
+      // 整体模式：继续原有流程
+      // 4. 文本去重检查
       if (text === lastText) {
         logger.debug(' Text unchanged, skipping');
         return { success: true, skipped: true };
       }
       lastText = text;
       
-      // 4. 检查是否值得翻译
+      // 5. 检查是否值得翻译
       if (!shouldTranslateText(text)) {
         session.setResult(text);  // 直接显示原文
         return { success: true, text };
@@ -143,12 +213,133 @@ class TranslationPipeline {
       
       session.setSourceText(text);
       
-      // 5. 翻译
+      // 6. 翻译
       return await this.runFromText(text);
       
     } catch (error) {
       logger.error('Image processing error:', error);
       const errorMsg = getShortErrorMessage(error, { context: 'ocr' });
+      session.setError(errorMsg);
+      return { success: false, error: errorMsg };
+    }
+  }
+
+  /**
+   * 散点模式：为每个文本块创建子玻璃板并翻译
+   * @param {Array} blocks - OCR 文本块数组
+   * @param {object} captureOptions - 截图选项
+   */
+  async runScatteredMode(blocks, captureOptions = {}) {
+    const session = useSessionStore.getState();
+    const config = useConfigStore.getState();
+    
+    try {
+      // 1. 过滤有效的文本块（有坐标且有文字）
+      const validBlocks = blocks.filter(b => 
+        b.text?.trim() && 
+        b.bbox && 
+        b.bbox.width > 0 && 
+        b.bbox.height > 0
+      );
+      
+      if (validBlocks.length === 0) {
+        session.setResult('（未识别到有效文字）');
+        return { success: true, text: '' };
+      }
+      
+      // 2. 设置为散点模式，创建子玻璃板
+      session.setDisplayMode(DISPLAY_MODE.SCATTERED);
+      const createdPanes = session.setChildPanes(validBlocks);  // 使用返回的 panes
+      session.setStatus('translating');
+      
+      // 3. 获取翻译配置
+      const privacyMode = await getPrivacyMode();
+      
+      // 4. 并行翻译所有文本块
+      const translationPromises = createdPanes.map(async (pane, index) => {
+        const paneId = pane.id;
+        
+        try {
+          // 更新状态为翻译中
+          session.updateChildPane(paneId, { status: CHILD_PANE_STATUS.TRANSLATING });
+          
+          const text = pane.sourceText.trim();
+          
+          // 检查是否值得翻译
+          if (!shouldTranslateText(text)) {
+            session.updateChildPane(paneId, {
+              status: CHILD_PANE_STATUS.DONE,
+              translatedText: text,  // 直接显示原文
+            });
+            return;
+          }
+          
+          // 检测源语言
+          const sourceLang = detectLanguage(text);
+          
+          // 确定目标语言
+          let targetLang = config.targetLanguage;
+          if (!config.lockTargetLang && sourceLang === targetLang) {
+            targetLang = targetLang === 'zh' ? 'en' : 'zh';
+          }
+          
+          // 执行翻译
+          const result = await translationService.translate(text, {
+            sourceLang,
+            targetLang,
+            mode: 'normal',
+            privacyMode,
+          });
+          
+          if (result.success && result.text) {
+            const cleaned = cleanTranslationOutput(result.text, text);
+            session.updateChildPane(paneId, {
+              status: CHILD_PANE_STATUS.DONE,
+              translatedText: cleaned || result.text,
+            });
+          } else {
+            session.updateChildPane(paneId, {
+              status: CHILD_PANE_STATUS.ERROR,
+              error: result.error || '翻译失败',
+            });
+          }
+        } catch (error) {
+          logger.error(`Block ${index} translation error:`, error);
+          session.updateChildPane(paneId, {
+            status: CHILD_PANE_STATUS.ERROR,
+            error: getShortErrorMessage(error),
+          });
+        }
+      });
+      
+      // 等待所有翻译完成
+      await Promise.all(translationPromises);
+      
+      // 5. 设置整体状态为完成
+      session.setStatus('success');
+      
+      // 6. 添加到历史记录（合并所有文本）
+      const currentState = useSessionStore.getState();
+      const allSource = createdPanes.map(p => p.sourceText).join('\n');
+      const allTranslated = currentState.childPanes
+        .map(p => p.translatedText)
+        .filter(Boolean)
+        .join('\n');
+      
+      if (allTranslated) {
+        currentState.addToHistory({
+          source: allSource,
+          translated: allTranslated,
+          mode: 'scattered',
+          blockCount: createdPanes.length,
+        });
+      }
+      
+      return { success: true, mode: 'scattered', blockCount: createdPanes.length };
+      
+    } catch (error) {
+      logger.error('Scattered mode error:', error);
+      const errorMsg = getShortErrorMessage(error);
       session.setError(errorMsg);
       return { success: false, error: errorMsg };
     }

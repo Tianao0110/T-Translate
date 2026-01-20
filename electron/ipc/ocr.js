@@ -490,18 +490,42 @@ function registerOCRRecognizers(ctx) {
           result = await global.gutenyeOcrInstance.detect(tempFile);
           
           if (result?.length > 0) {
-            const lines = result.map(item => ({
-              text: item.text,
-              confidence: item.score || 0.9,
-            }));
+            // 提取文本块，包含坐标信息
+            const blocks = result.map((item, index) => {
+              // 尝试获取坐标（不同版本可能有不同的字段名）
+              let bbox = null;
+              
+              if (item.box || item.bbox || item.position) {
+                const box = item.box || item.bbox || item.position;
+                // box 通常是 [[x1,y1], [x2,y2], [x3,y3], [x4,y4]] 格式
+                if (Array.isArray(box) && box.length >= 4) {
+                  const xs = box.map(p => p[0] || p.x || 0);
+                  const ys = box.map(p => p[1] || p.y || 0);
+                  bbox = {
+                    x: Math.min(...xs),
+                    y: Math.min(...ys),
+                    width: Math.max(...xs) - Math.min(...xs),
+                    height: Math.max(...ys) - Math.min(...ys),
+                  };
+                }
+              }
+              
+              return {
+                text: item.text,
+                confidence: item.score || 0.9,
+                bbox: bbox,
+                index,
+              };
+            });
             
-            const fullText = lines.map(l => l.text).join('\n');
+            const fullText = blocks.map(b => b.text).join('\n');
             try { fs.unlinkSync(tempFile); } catch (e) {}
             
             return {
               success: true,
               text: fullText,
-              confidence: lines.reduce((sum, l) => sum + l.confidence, 0) / lines.length,
+              blocks: blocks,  // 新增：包含坐标的文本块数组
+              confidence: blocks.reduce((sum, b) => sum + b.confidence, 0) / blocks.length,
               engine: 'gutenye-ocr',
             };
           }
@@ -516,7 +540,7 @@ function registerOCRRecognizers(ctx) {
         return { success: false, error: `PaddleOCR 引擎加载失败: ${lastError.message}` };
       }
       
-      return { success: true, text: '', confidence: 0, engine: 'purejs-ocr' };
+      return { success: true, text: '', blocks: [], confidence: 0, engine: 'purejs-ocr' };
     } catch (error) {
       logger.error('PaddleOCR failed:', error);
       return { success: false, error: error.message };

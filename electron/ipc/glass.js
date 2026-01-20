@@ -352,6 +352,50 @@ function register(ctx) {
   });
   
   /**
+   * 获取历史记录（从主窗口）
+   */
+  ipcMain.handle(CHANNELS.GLASS.GET_HISTORY, async (event, limit = 20) => {
+    const mainWindow = getMainWindow();
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      return [];
+    }
+    
+    try {
+      // 从主窗口获取历史记录
+      // localStorage key 是 'translation-store'（Zustand persist 配置）
+      const history = await mainWindow.webContents.executeJavaScript(`
+        (function() {
+          try {
+            const stored = localStorage.getItem('translation-store');
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              // Zustand persist 存储格式: { state: { history: [...] } }
+              const state = parsed.state || parsed;
+              const items = state.history || [];
+              return items.slice(0, ${limit}).map(item => ({
+                id: item.id,
+                source: item.sourceText,
+                translated: item.translatedText,
+                timestamp: item.timestamp,
+                sourceLang: item.sourceLanguage,
+                targetLang: item.targetLanguage,
+              }));
+            }
+            return [];
+          } catch(e) {
+            console.error('Failed to get history:', e);
+            return [];
+          }
+        })()
+      `);
+      return history || [];
+    } catch (e) {
+      logger.debug('Could not get history from main window:', e.message);
+      return [];
+    }
+  });
+  
+  /**
    * 同步目标语言到主程序
    */
   ipcMain.handle(CHANNELS.GLASS.SYNC_TARGET_LANGUAGE, (event, langCode) => {

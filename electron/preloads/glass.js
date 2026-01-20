@@ -47,6 +47,9 @@ contextBridge.exposeInMainWorld('electron', {
     // 添加到历史记录
     addToHistory: (item) => ipcRenderer.invoke('glass:add-to-history', item),
     
+    // 获取历史记录
+    getHistory: (limit) => ipcRenderer.invoke('glass:get-history', limit),
+    
     // 同步目标语言到主程序
     syncTargetLanguage: (langCode) => ipcRenderer.invoke('glass:sync-target-language', langCode),
     

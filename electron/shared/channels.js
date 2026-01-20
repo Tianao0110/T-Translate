@@ -67,6 +67,7 @@ const CHANNELS = {
     NOTIFY_SETTINGS_CHANGED: 'glass:notify-settings-changed',
     ADD_TO_FAVORITES: 'glass:add-to-favorites',
     ADD_TO_HISTORY: 'glass:add-to-history',
+    GET_HISTORY: 'glass:get-history',  // 新增：获取历史记录
     SYNC_TARGET_LANGUAGE: 'glass:sync-target-language',
     REFRESH: 'glass:refresh',
     SETTINGS_CHANGED: 'glass:settings-changed',

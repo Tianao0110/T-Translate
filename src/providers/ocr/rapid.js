@@ -33,6 +33,9 @@ class RapidOCREngine extends BaseOCREngine {
 
   /**
    * 识别图片
+   * @param {string} input - base64 图片数据
+   * @param {object} options - 选项
+   * @returns {Promise<{success, text, blocks?, engine}>}
    */
   async recognize(input, options = {}) {
     try {
@@ -54,10 +57,12 @@ class RapidOCREngine extends BaseOCREngine {
       // 清理文本
       const cleanedText = this.cleanText(result.text);
 
+      // 返回结果，包含坐标信息
       return {
         success: true,
         text: cleanedText,
         raw: result.text,
+        blocks: result.blocks || [],  // 包含坐标的文本块数组
         engine: 'rapid-ocr',
       };
     } catch (error) {

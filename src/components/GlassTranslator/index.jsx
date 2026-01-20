@@ -2,13 +2,14 @@
 // 玻璃翻译窗口 - 纯 UI 组件
 // 所有业务逻辑已移至 services/pipeline.js
 //
-// 修复：loadSettings 现在会同步主窗口的目标语言
+// 支持散点模式（子玻璃板）
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Camera, Film, Monitor, X, Loader2, AlertCircle, ChevronDown, GripHorizontal } from 'lucide-react';
-import useSessionStore, { STATUS } from '../../stores/session.js';
+import { Camera, Film, Monitor, X, Loader2, AlertCircle, ChevronDown, GripHorizontal, History, Clock } from 'lucide-react';
+import useSessionStore, { STATUS, DISPLAY_MODE } from '../../stores/session.js';
 import useConfigStore from '../../stores/config.js';
 import pipeline from '../../services/pipeline.js';
+import ChildGlassPane from './ChildGlassPane.jsx';
 import createLogger from '../../utils/logger.js';
 import './styles.css';
 
@@ -30,8 +31,17 @@ const GlassTranslator = () => {
     subtitleStats,
     prevSubtitle,
     currSubtitle,
+    // 子玻璃板状态
+    displayMode,
+    childPanes,
+    frozenPanes,
+    // Actions
     setSubtitleMode,
     setSubtitleStatus,
+    updateChildPanePosition,
+    freezeChildPane,
+    closeFrozenPane,
+    clearChildPanes,
     clear,
   } = useSessionStore();
   
@@ -50,14 +60,32 @@ const GlassTranslator = () => {
   // ========== 纯 UI 状态 ==========
   const [showToolbar, setShowToolbar] = useState(false);  // 工具栏显示状态
   const [showOpacitySlider, setShowOpacitySlider] = useState(false);
+  const [showHistoryPanel, setShowHistoryPanel] = useState(false);  // 历史记录面板
   const [hasOverflow, setHasOverflow] = useState(false);
   const [captureRect, setCaptureRect] = useState(null);
   const [theme, setTheme] = useState('light'); // 主题状态
+  const [glassBounds, setGlassBounds] = useState(null);  // 玻璃窗口边界
+  const [isPassThrough, setIsPassThrough] = useState(false);  // 穿透模式
+  const [historyItems, setHistoryItems] = useState([]);  // 历史记录
   
   // ========== Refs ==========
   const contentRef = useRef(null);
   const toolbarTimerRef = useRef(null);  // 工具栏隐藏计时器
   const subtitleTimerRef = useRef(null);
+  const glassRef = useRef(null);  // 玻璃窗口 ref
+  const passThroughRef = useRef(false);  // 穿透模式 ref（避免闭包问题）
+  const showHistoryPanelRef = useRef(false);  // 历史面板状态 ref
+  const savedOpacityRef = useRef(0.85);  // 保存的透明度（穿透模式恢复用）
+  
+  // 同步 ref
+  useEffect(() => {
+    showHistoryPanelRef.current = showHistoryPanel;
+  }, [showHistoryPanel]);
+  
+  // 同步透明度到 ref
+  useEffect(() => {
+    savedOpacityRef.current = glassOpacity;
+  }, [glassOpacity]);
 
   // ========== 初始化 ==========
   useEffect(() => {
@@ -81,10 +109,46 @@ const GlassTranslator = () => {
     };
     loadTheme();
     
+    // 获取内容区边界（用于子玻璃板拖动检测）
+    const updateContentBounds = () => {
+      if (contentRef.current) {
+        const rect = contentRef.current.getBoundingClientRect();
+        setGlassBounds({
+          x: rect.left,
+          y: rect.top,
+          width: rect.width,
+          height: rect.height,
+        });
+      }
+    };
+    
+    // 初始获取 + 定时更新
+    updateContentBounds();
+    const boundsInterval = setInterval(updateContentBounds, 500);
+    
     // 键盘事件
-    const handleKeyDown = (e) => {
+    const handleKeyDown = async (e) => {
+      // Alt 键按下 → 进入穿透模式
+      if (e.key === 'Alt' && !passThroughRef.current) {
+        passThroughRef.current = true;
+        try {
+          await window.electron?.glass?.setPassThrough?.(true);
+          await window.electron?.glass?.setOpacity?.(0.3);
+        } catch (err) {
+          logger.error('Failed to enter pass-through mode:', err);
+        }
+        // 强制更新 UI
+        window.dispatchEvent(new CustomEvent('passthrough-change', { detail: true }));
+        return;
+      }
+      
       if (e.key === 'Escape') {
-        if (subtitleMode) {
+        // 优先级：历史面板 > 散点模式子玻璃板 > 字幕模式 > 关闭窗口
+        if (showHistoryPanelRef.current) {
+          setShowHistoryPanel(false);
+        } else if (displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0) {
+          clearChildPanes();
+        } else if (subtitleMode) {
           exitSubtitleMode();
         } else {
           handleClose();
@@ -92,10 +156,72 @@ const GlassTranslator = () => {
       } else if (e.code === 'Space' && !subtitleMode) {
         e.preventDefault();
         captureAndTranslate();
+      } else if (e.key === 'h' && (e.ctrlKey || e.metaKey)) {
+        // Ctrl+H 打开/关闭历史面板
+        e.preventDefault();
+        if (showHistoryPanelRef.current) {
+          setShowHistoryPanel(false);
+        } else {
+          // 加载历史记录
+          try {
+            const history = await window.electron?.glass?.getHistory?.(20);
+            setHistoryItems(history || []);
+          } catch (err) {
+            logger.error('Failed to load history:', err);
+          }
+          setShowHistoryPanel(true);
+        }
+      }
+    };
+    
+    // Alt 键释放 → 退出穿透模式
+    const handleKeyUp = async (e) => {
+      if (e.key === 'Alt' && passThroughRef.current) {
+        passThroughRef.current = false;
+        try {
+          await window.electron?.glass?.setPassThrough?.(false);
+          // 恢复透明度（使用保存的值）
+          await window.electron?.glass?.setOpacity?.(savedOpacityRef.current);
+        } catch (err) {
+          logger.error('Failed to exit pass-through mode:', err);
+        }
+        // 强制更新 UI
+        window.dispatchEvent(new CustomEvent('passthrough-change', { detail: false }));
+      }
+    };
+    
+    // 窗口失焦时也要退出穿透模式
+    const handleBlur = async () => {
+      if (passThroughRef.current) {
+        passThroughRef.current = false;
+        try {
+          await window.electron?.glass?.setPassThrough?.(false);
+          await window.electron?.glass?.setOpacity?.(savedOpacityRef.current);
+        } catch (err) {
+          logger.error('Failed to exit pass-through mode on blur:', err);
+        }
+        window.dispatchEvent(new CustomEvent('passthrough-change', { detail: false }));
+      }
+    };
+    
+    // 右键清除子玻璃板
+    const handleContextMenu = (e) => {
+      if (displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0) {
+        e.preventDefault();
+        clearChildPanes();
       }
     };
     
     window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
+    window.addEventListener('contextmenu', handleContextMenu);
+    
+    // 监听穿透模式变化（用于更新 UI）
+    const handlePassThroughChange = (e) => {
+      setIsPassThrough(e.detail);
+    };
+    window.addEventListener('passthrough-change', handlePassThroughChange);
     
     // 监听设置变化（包括主题）
     let unsubscribeSettings = null;
@@ -112,9 +238,14 @@ const GlassTranslator = () => {
     
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('contextmenu', handleContextMenu);
+      window.removeEventListener('passthrough-change', handlePassThroughChange);
       if (subtitleTimerRef.current) clearInterval(subtitleTimerRef.current);
       if (toolbarTimerRef.current) clearTimeout(toolbarTimerRef.current);
       if (unsubscribeSettings) unsubscribeSettings();
+      if (boundsInterval) clearInterval(boundsInterval);
     };
   }, []);
 
@@ -212,19 +343,150 @@ const GlassTranslator = () => {
     }
   };
 
+  // ========== 子玻璃板事件处理 ==========
+  
+  /**
+   * 点击内容区空白处清除子玻璃板
+   */
+  const handleContentClick = useCallback((e) => {
+    // 只有点击容器本身（不是子玻璃板）才清除
+    if (
+      e.target === e.currentTarget || 
+      e.target.classList.contains('scattered-panes-container')
+    ) {
+      if (displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0) {
+        clearChildPanes();
+      }
+    }
+  }, [displayMode, childPanes.length, clearChildPanes]);
+
+  /**
+   * 子玻璃板位置变化
+   */
+  const handleChildPanePositionChange = useCallback((id, position) => {
+    updateChildPanePosition(id, position);
+  }, [updateChildPanePosition]);
+
+  /**
+   * 冻结子玻璃板（拖出母板时）
+   */
+  const handleChildPaneFreeze = useCallback((id) => {
+    freezeChildPane(id);
+    logger.debug('Frozen child pane:', id);
+  }, [freezeChildPane]);
+
+  // ========== 穿透模式 ==========
+  
+  /**
+   * 进入穿透模式
+   * - 窗口变透明
+   * - 鼠标可穿透（除了冻结的子玻璃板）
+   */
+  const enterPassThroughMode = useCallback(async () => {
+    if (passThroughRef.current) return;
+    
+    passThroughRef.current = true;
+    setIsPassThrough(true);
+    
+    logger.debug('Enter pass-through mode');
+    
+    try {
+      // 设置窗口穿透
+      await window.electron?.glass?.setPassThrough?.(true);
+      // 降低透明度
+      await window.electron?.glass?.setOpacity?.(0.3);
+    } catch (e) {
+      logger.error('Failed to enter pass-through mode:', e);
+    }
+  }, []);
+  
+  /**
+   * 退出穿透模式
+   */
+  const exitPassThroughMode = useCallback(async () => {
+    if (!passThroughRef.current) return;
+    
+    passThroughRef.current = false;
+    setIsPassThrough(false);
+    
+    logger.debug('Exit pass-through mode');
+    
+    try {
+      // 取消穿透
+      await window.electron?.glass?.setPassThrough?.(false);
+      // 恢复透明度
+      await window.electron?.glass?.setOpacity?.(glassOpacity);
+    } catch (e) {
+      logger.error('Failed to exit pass-through mode:', e);
+    }
+  }, [glassOpacity]);
+
+  // ========== 历史记录 ==========
+  
+  /**
+   * 切换历史记录面板
+   */
+  const toggleHistoryPanel = useCallback(async () => {
+    if (showHistoryPanel) {
+      setShowHistoryPanel(false);
+    } else {
+      // 加载历史记录
+      await loadHistory();
+      setShowHistoryPanel(true);
+    }
+  }, [showHistoryPanel]);
+  
+  /**
+   * 加载历史记录
+   */
+  const loadHistory = useCallback(async () => {
+    try {
+      const history = await window.electron?.glass?.getHistory?.(20);
+      setHistoryItems(history || []);
+    } catch (e) {
+      logger.error('Failed to load history:', e);
+      setHistoryItems([]);
+    }
+  }, []);
+  
+  /**
+   * 选择历史记录项
+   */
+  const selectHistoryItem = useCallback((item) => {
+    // 设置翻译结果
+    if (item.translated) {
+      const session = useSessionStore.getState();
+      session.setSourceText(item.source || '');
+      session.setResult(item.translated);
+    }
+    setShowHistoryPanel(false);
+  }, []);
+
   // ========== 核心功能（调用 pipeline）==========
   const captureAndTranslate = useCallback(async () => {
     try {
-      const bounds = await window.electron?.glass?.getBounds?.();
-      if (!bounds) return;
+      // 使用内容区的实际边界来截图，避免坐标偏移
+      if (!contentRef.current) return;
       
-      const topBarHeight = 40;
-      await pipeline.runFromCapture({
-        x: bounds.x,
-        y: bounds.y + topBarHeight,
-        width: bounds.width,
-        height: bounds.height - topBarHeight,
-      });
+      const contentRect = contentRef.current.getBoundingClientRect();
+      // getBoundingClientRect 返回的是相对于视口的坐标
+      // 在 Electron 无边框窗口中，视口就是窗口内容
+      const windowBounds = await window.electron?.glass?.getBounds?.();
+      if (!windowBounds) return;
+      
+      // 计算内容区在屏幕上的绝对位置
+      const captureRect = {
+        x: Math.round(windowBounds.x + contentRect.left),
+        y: Math.round(windowBounds.y + contentRect.top),
+        width: Math.round(contentRect.width),
+        height: Math.round(contentRect.height),
+      };
+      
+      logger.debug('Capture rect:', captureRect);
+      logger.debug('Content rect:', contentRect);
+      logger.debug('Window bounds:', windowBounds);
+      
+      await pipeline.runFromCapture(captureRect);
     } catch (error) {
       logger.error(' Capture failed:', error);
     }
@@ -295,7 +557,7 @@ const GlassTranslator = () => {
 
   return (
     <div 
-      className={`glass-window ${subtitleMode ? 'subtitle-mode' : ''} ${showToolbar ? 'show-toolbar' : ''}`}
+      className={`glass-window ${subtitleMode ? 'subtitle-mode' : ''} ${showToolbar ? 'show-toolbar' : ''} ${isPassThrough ? 'pass-through' : ''}`}
       style={{ '--glass-opacity': subtitleMode ? 0 : glassOpacity }}
       data-theme={theme}
       onMouseEnter={handleMouseEnterWindow}
@@ -317,6 +579,18 @@ const GlassTranslator = () => {
               title="截图识别 (Space)"
             >
               <Camera size={12} />
+            </button>
+            
+            <button 
+              className={`toolbar-btn ${showHistoryPanel ? 'active' : ''}`}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleHistoryPanel();
+              }}
+              title="历史记录 (Ctrl+H)"
+            >
+              <History size={12} />
             </button>
             
             <div 
@@ -395,7 +669,11 @@ const GlassTranslator = () => {
       )}
       
       {/* 内容区域 */}
-      <div className="glass-content" ref={contentRef}>
+      <div 
+        className={`glass-content ${displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0 ? 'scattered-mode' : ''}`}
+        ref={contentRef}
+        onClick={handleContentClick}
+      >
         {status === STATUS.ERROR ? (
           <div className="glass-message error">
             <AlertCircle size={20} />
@@ -414,6 +692,21 @@ const GlassTranslator = () => {
                 )}
               </>
             )}
+          </div>
+        ) : displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0 ? (
+          // 散点模式：显示子玻璃板
+          <div className="scattered-panes-container">
+            {childPanes.map((pane) => (
+              <ChildGlassPane
+                key={pane.id}
+                pane={pane}
+                parentBounds={glassBounds}
+                onPositionChange={handleChildPanePositionChange}
+                onFreeze={handleChildPaneFreeze}
+                onClose={null}  // 未冻结的不显示关闭按钮
+                theme={theme}
+              />
+            ))}
           </div>
         ) : isLoading ? (
           <div className="glass-message loading">
@@ -435,11 +728,77 @@ const GlassTranslator = () => {
       </div>
       
       {/* 滚动提示 */}
-      {hasOverflow && !subtitleMode && (
+      {hasOverflow && !subtitleMode && displayMode !== DISPLAY_MODE.SCATTERED && (
         <button className="scroll-hint" onClick={scrollToBottom}>
           <ChevronDown size={14} />
           <span>更多</span>
         </button>
+      )}
+      
+      {/* 冻结的子玻璃板（固定定位，可在窗口内自由移动） */}
+      {frozenPanes.length > 0 && (
+        <div className="frozen-panes-container">
+          {frozenPanes.map((pane) => (
+            <ChildGlassPane
+              key={pane.id}
+              pane={pane}
+              parentBounds={null}  // 冻结的不需要检测是否拖出
+              onPositionChange={handleChildPanePositionChange}
+              onFreeze={null}  // 已经冻结了
+              onClose={closeFrozenPane}
+              theme={theme}
+            />
+          ))}
+        </div>
+      )}
+      
+      {/* 历史记录面板 */}
+      {showHistoryPanel && (
+        <div className="glass-history-panel">
+          <div className="history-header">
+            <span className="history-title">
+              <Clock size={14} />
+              历史记录
+            </span>
+            <button 
+              className="history-close-btn"
+              onClick={() => setShowHistoryPanel(false)}
+            >
+              <X size={14} />
+            </button>
+          </div>
+          <div className="history-list">
+            {historyItems.length === 0 ? (
+              <div className="history-empty">暂无历史记录</div>
+            ) : (
+              historyItems.map((item, index) => (
+                <div 
+                  key={item.id || index}
+                  className="history-item"
+                  onClick={() => selectHistoryItem(item)}
+                >
+                  <div className="history-source">{item.source?.slice(0, 50) || '...'}</div>
+                  <div className="history-translated">{item.translated?.slice(0, 50) || '...'}</div>
+                  <div className="history-meta">
+                    {item.timestamp && new Date(item.timestamp).toLocaleString('zh-CN', {
+                      month: 'numeric',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+      
+      {/* 穿透模式指示器 */}
+      {isPassThrough && (
+        <div className="pass-through-indicator">
+          <span>穿透模式 (松开 Alt 退出)</span>
+        </div>
       )}
     </div>
   );
