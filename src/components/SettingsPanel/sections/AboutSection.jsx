@@ -163,7 +163,7 @@ const AboutSection = ({ notify }) => {
       
       <div className="about-footer">
         <p>Made with ❤️ for translators</p>
-        <p className="copyright">© 2024-2025 T-Translate</p>
+        <p className="copyright">© 2026 T-Translate</p>
       </div>
 
       {/* 更新弹窗 */}

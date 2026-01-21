@@ -1,19 +1,95 @@
 # T-Translate
 
-基于 Electron + React + Vite 的离线翻译工具。
+<p align="center">
+  <img src="public/icon.png" width="128" height="128" alt="T-Translate Logo">
+</p>
+
+<p align="center">
+  <strong>智能离线翻译工具</strong><br>
+  基于 Electron + React + Vite 构建，支持本地 LLM 翻译
+</p>
+
+<p align="center">
+  <a href="https://github.com/Tianao0110/T-Translate/releases">
+    <img src="https://img.shields.io/github/v/release/Tianao0110/T-Translate?style=flat-square" alt="Release">
+  </a>
+  <a href="https://github.com/Tianao0110/T-Translate/blob/main/LICENSE">
+    <img src="https://img.shields.io/github/license/Tianao0110/T-Translate?style=flat-square" alt="License">
+  </a>
+  <a href="https://github.com/Tianao0110/T-Translate/stargazers">
+    <img src="https://img.shields.io/github/stars/Tianao0110/T-Translate?style=flat-square" alt="Stars">
+  </a>
+</p>
+
+---
 
 ## ✨ 功能特性
 
-- 🔤 **划词翻译** - 选中文字自动弹出翻译（支持最多 8 个冻结窗口）
-- 📸 **截图翻译** - 截取屏幕区域进行 OCR + 翻译
-- 🪟 **玻璃窗口** - 透明悬浮窗实时翻译
-- 🎬 **字幕采集** - 实时采集屏幕区域字幕并翻译
-- 🔒 **隐私模式** - 支持标准/离线/无痕/严格四种模式
-- 🤖 **多翻译源** - 本地 LLM、OpenAI、DeepL、Gemini、DeepSeek、Google 翻译
+### 🔤 划词翻译
+- 选中任意文字自动弹出翻译窗口
+- 支持最多 8 个冻结窗口同时显示
+- 智能检测源语言
+
+### 📸 截图 OCR 翻译
+- 截取屏幕区域进行文字识别
+- 支持多种 OCR 引擎 (RapidOCR、Windows OCR、LLM Vision)
+- 识别后自动翻译
+
+### 🪟 玻璃窗口
+- 透明悬浮窗实时翻译
+- 支持拖拽、缩放、置顶
+- 可创建多个独立子面板
+
+### 🎬 字幕采集
+- 实时采集屏幕指定区域
+- 适用于视频字幕翻译
+- 自动去重和连续翻译
+
+### 📄 文档翻译
+- 支持 PDF、DOCX、EPUB、TXT 格式
+- 保持原文档结构
+- 批量翻译导出
+
+### 🔊 TTS 朗读
+- 翻译结果语音朗读
+- 支持多种语音引擎
+- 可调节语速
+
+### 🔒 隐私模式
+| 模式 | 历史记录 | 缓存 | 云端翻译 |
+|------|:--------:|:----:|:--------:|
+| 标准模式 | ✅ | ✅ | ✅ |
+| 离线模式 | ✅ | ✅ | ❌ |
+| 无痕模式 | ❌ | ❌ | ✅ |
+| 严格模式 | ❌ | ❌ | ❌ |
+
+### 🤖 多翻译源
+- **本地 LLM**: LM Studio / Ollama (完全离线)
+- **OpenAI**: GPT-4 / GPT-3.5
+- **DeepL**: 高质量翻译
+- **Gemini**: Google AI
+- **DeepSeek**: 国产大模型
+- **Google 翻译**: 快速翻译
+
+---
 
 ## 🚀 快速开始
 
+### 下载安装
+
+从 [Releases](https://github.com/Tianao0110/T-Translate/releases) 页面下载最新版本：
+
+- **Windows**: `T-Translate-Setup-x.x.x.exe`
+- **macOS**: `T-Translate-x.x.x.dmg`
+- **Linux**: `T-Translate-x.x.x.AppImage`
+
+### 从源码构建
+
 ```bash
+# 克隆仓库
+git clone https://github.com/Tianao0110/T-Translate.git
+cd T-Translate
+
 # 安装依赖
 npm install
 
@@ -27,41 +103,78 @@ npm run build
 npm run dist
 ```
 
+---
+
+## ⌨️ 快捷键
+
+| 快捷键 | 功能 |
+|--------|------|
+| `Ctrl+Shift+T` | 显示/隐藏主窗口 |
+| `Ctrl+Shift+S` | 截图翻译 |
+| `Ctrl+Shift+G` | 打开玻璃窗口 |
+| `Ctrl+Shift+D` | 开启/关闭划词翻译 |
+| `Ctrl+Enter` | 执行翻译 |
+| `Ctrl+Shift+C` | 复制翻译结果 |
+
+*快捷键可在设置中自定义*
+
+---
+
 ## 📁 项目结构
 
 ```
 t-translate/
-├── electron/           # 主进程代码
-│   ├── main.js         # 主进程入口
-│   ├── preloads/       # Preload 脚本
-│   ├── shared/         # 共享常量和配置
-│   ├── ipc/            # IPC 处理器
-│   ├── managers/       # 窗口/托盘/菜单管理器
-│   └── utils/          # 工具函数
+├── electron/               # 主进程代码
+│   ├── main.js             # 主进程入口
+│   ├── preloads/           # Preload 脚本
+│   ├── shared/             # 共享常量和配置
+│   ├── ipc/                # IPC 处理器
+│   ├── managers/           # 窗口/托盘/菜单管理器
+│   └── utils/              # 工具函数
 │
-├── src/                # 渲染进程代码
-│   ├── components/     # React 组件
-│   ├── providers/      # 翻译源 Provider
-│   ├── services/       # 服务层
-│   ├── stores/         # Zustand 状态管理
-│   └── config/         # 前端配置
+├── src/                    # 渲染进程代码
+│   ├── components/         # React 组件
+│   ├── providers/          # 翻译源 Provider
+│   ├── services/           # 服务层
+│   ├── stores/             # Zustand 状态管理
+│   └── config/             # 前端配置
 │
-├── public/             # HTML 入口 + 静态资源
-├── resources/          # 应用资源 (OCR 训练数据)
-├── scripts/            # 工具脚本
-└── docs/               # 项目文档
+├── public/                 # HTML 入口 + 静态资源
+├── resources/              # 应用资源 (OCR 训练数据)
+├── scripts/                # 工具脚本
+└── docs/                   # 项目文档
 ```
+
+---
 
 ## 📚 文档
 
 详细文档请查看 `docs/` 目录：
 
-- [架构设计](docs/ARCHITECTURE.md) - 项目架构和分层设计
-- [重构计划](docs/REFACTOR_PLAN.md) - 目录结构重构详情
-- [文件结构](docs/FILE_STRUCTURE_PLAN.md) - 文件组织规范
-- [开发指南](docs/DEVELOPMENT.md) - 开发环境配置和流程
-- [功能说明](docs/FEATURES.md) - 功能特性详解
-- [划词翻译技术](docs/SELECTION_TRANSLATOR_TECH.md) - 划词翻译实现原理
+| 文档 | 说明 |
+|------|------|
+| [架构设计](docs/ARCHITECTURE.md) | 项目架构和分层设计 |
+| [开发指南](docs/DEVELOPMENT.md) | 自定义翻译源和 OCR 引擎开发 |
+| [功能说明](docs/FEATURES.md) | 功能特性详解 |
+| [划词翻译技术](docs/SELECTION_TRANSLATOR_TECH.md) | 划词翻译实现原理 |
+| [主题定制](docs/THEME_CUSTOMIZATION.md) | 主题和样式定制 |
+| [TTS 开发](docs/TTS_DEVELOPMENT.md) | 语音朗读功能开发 |
+
+---
+
+## 🏗️ 技术栈
+
+| 类别 | 技术 |
+|------|------|
+| 框架 | Electron 28 + React 18 |
+| 构建 | Vite 5 |
+| 状态管理 | Zustand |
+| 样式 | CSS Variables + CSS Modules |
+| OCR | @gutenye/ocr-node (RapidOCR) / Windows OCR / LLM Vision |
+| 本地 LLM | LM Studio / Ollama 兼容 API |
+| 打包 | electron-builder |
+
+---
 
 ## 🔧 开发命令
 
@@ -72,20 +185,40 @@ npm run dist           # 打包安装程序
 npm run check:constants # 检查常量同步状态
 ```
 
-## 🏗️ 技术栈
+---
 
-- **框架**: Electron 28 + React 18
-- **构建**: Vite 5
-- **状态管理**: Zustand
-- **样式**: CSS Modules
-- **OCR**: Tesseract.js / LLM Vision
-- **本地 LLM**: LM Studio 兼容 API
+## 🤝 贡献
 
-## 📄 许可证
+欢迎提交 Issue 和 Pull Request！
 
-MIT License
+1. Fork 本仓库
+2. 创建功能分支 (`git checkout -b feature/amazing-feature`)
+3. 提交更改 (`git commit -m 'Add amazing feature'`)
+4. 推送到分支 (`git push origin feature/amazing-feature`)
+5. 提交 Pull Request
 
 ---
 
-**版本**: v0.1.3  
-**最后更新**: 2025-01-17
+## 📄 许可证
+
+本项目基于 [MIT License](LICENSE) 开源。
+
+---
+
+## 🙏 致谢
+
+- [Electron](https://www.electronjs.org/)
+- [React](https://react.dev/)
+- [Vite](https://vitejs.dev/)
+- [LM Studio](https://lmstudio.ai/)
+- [RapidOCR](https://github.com/RapidAI/RapidOCR)
+
+---
+
+<p align="center">
+  Made with ❤️ by <a href="https://github.com/Tianao0110">Tianao</a>
+</p>
+
+<p align="center">
+  <strong>版本</strong>: v0.1.4 &nbsp;|&nbsp; <strong>更新日期</strong>: 2026-01-21
+</p>
