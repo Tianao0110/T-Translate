@@ -1,6 +1,7 @@
 // src/components/SelectionTranslator.jsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import translationService from '../../services/translation.js';
+import ttsManager, { TTS_STATUS } from '../../services/tts/index.js';
 import createLogger from '../../utils/logger.js';
 import { getShortErrorMessage } from '../../utils/error-handler.js';
 import './styles.css';
@@ -56,6 +57,9 @@ const SelectionTranslator = () => {
   const [isFrozen, setIsFrozen] = useState(false); // 是否已冻结（拖动后变成独立窗口）
   const [windowId, setWindowId] = useState(null); // 当前窗口 ID
   const [initialBounds, setInitialBounds] = useState(null); // 初始位置，用于检测是否移动
+  
+  // TTS 状态
+  const [ttsStatus, setTtsStatus] = useState(TTS_STATUS.IDLE);
 
   const sizedRef = useRef(false);
 
@@ -64,6 +68,34 @@ const SelectionTranslator = () => {
   const triggerReadyTimerRef = useRef(null);  // 圆点就绪计时器
   const contentRef = useRef(null);  // 内容区域引用，用于测量实际大小
   const translateTextRef = useRef(null);  // 存储最新的翻译函数引用
+
+  // TTS 初始化
+  useEffect(() => {
+    ttsManager.init().catch(e => {
+      logger.debug('TTS init failed:', e.message);
+    });
+    
+    ttsManager.onStatusChange((status) => {
+      setTtsStatus(status);
+    });
+    
+    return () => {
+      ttsManager.stop();
+    };
+  }, []);
+
+  // 朗读译文
+  const speakTranslation = useCallback(() => {
+    if (!translatedText?.trim()) return;
+    
+    if (ttsStatus === TTS_STATUS.SPEAKING) {
+      ttsManager.stop();
+    } else {
+      ttsManager.speak(translatedText, { lang: translation.targetLanguage }).catch(e => {
+        logger.error('TTS error:', e);
+      });
+    }
+  }, [translatedText, translation.targetLanguage, ttsStatus]);
 
   // 获取隐私模式
   useEffect(() => {
@@ -609,6 +641,14 @@ const SelectionTranslator = () => {
             </button>
             <button className={`sel-btn ${copied ? 'success' : ''}`} onClick={handleCopy} title="复制译文">
               {copied ? '已复制' : '复制'}
+            </button>
+            <button 
+              className={`sel-btn ${ttsStatus === TTS_STATUS.SPEAKING ? 'active' : ''}`} 
+              onClick={speakTranslation} 
+              disabled={!translatedText}
+              title={ttsStatus === TTS_STATUS.SPEAKING ? '停止朗读' : '朗读'}
+            >
+              {ttsStatus === TTS_STATUS.SPEAKING ? '🔇' : '🔊'}
             </button>
             <div className="sel-spacer" />
             <button className="sel-btn sel-btn-close" onClick={handleClose} title="关闭 (ESC)">✕</button>

@@ -1194,7 +1194,7 @@
   cursor: not-allowed;
 }
 
-/* ==================== 收藏弹窗 ==================== */
+/* ==================== 收藏弹窗 (🔧 已修复四角圆角) ==================== */
 .save-modal-overlay {
   position: fixed;
   top: 0;
@@ -1211,10 +1211,11 @@
 
 .save-modal {
   background: var(--bg-primary);
-  border-radius: 12px;
+  border-radius: 16px;  /* 🔧 修复: 12px -> 16px 统一圆角 */
   width: 90%;
   max-width: 450px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  overflow: hidden;  /* 🔧 修复: 新增，确保内容不溢出圆角 */
 }
 
 .save-modal-header {
@@ -1296,11 +1297,43 @@
   color: var(--text-primary);
 }
 
+/* 🔧 修复: .save-option 复选框使用自定义样式 */
 .save-option .checkbox-label input[type="checkbox"] {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
   width: 18px;
   height: 18px;
-  accent-color: #8b5cf6;
+  min-width: 18px;
+  background: var(--bg-primary);
+  border: 2px solid var(--border-primary);
+  border-radius: 5px;
   cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.save-option .checkbox-label input[type="checkbox"]:hover {
+  border-color: #8b5cf6;
+}
+
+.save-option .checkbox-label input[type="checkbox"]:checked {
+  background: #8b5cf6;
+  border-color: #8b5cf6;
+}
+
+.save-option .checkbox-label input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 2px;
+  width: 5px;
+  height: 9px;
+  border: solid white;
+  border-width: 0 2.5px 2.5px 0;
+  transform: rotate(45deg);
 }
 
 .save-option .checkbox-label svg {
@@ -1362,9 +1395,10 @@
   margin-bottom: 12px;
 }
 
-/* ==================== AI 分析收藏弹窗 ==================== */
+/* ==================== AI 分析收藏弹窗 (🔧 已修复) ==================== */
 .save-modal-with-ai {
   max-width: 500px;
+  overflow: hidden;  /* 🔧 修复: 新增，确保内容不溢出圆角 */
 }
 
 .ai-suggestions-section {
@@ -1418,11 +1452,6 @@
 
 .spinning {
   animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
 }
 
 .ai-analyzing {
@@ -1480,6 +1509,7 @@
   color: var(--text-tertiary);
 }
 
+/* ==================== 风格参考复选框 (🔧 已修复样式) ==================== */
 .style-ref-suggestion {
   padding-top: 12px;
   border-top: 1px solid var(--border-primary);
@@ -1495,11 +1525,44 @@
   color: var(--text-primary);
 }
 
+/* 🔧 修复: 使用自定义复选框样式替代 accent-color */
 .style-ref-suggestion .checkbox-label input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  accent-color: #8b5cf6;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  background: var(--bg-primary);
+  border: 2px solid var(--border-primary);
+  border-radius: 5px;
   cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.style-ref-suggestion .checkbox-label input[type="checkbox"]:hover {
+  border-color: #8b5cf6;
+}
+
+.style-ref-suggestion .checkbox-label input[type="checkbox"]:checked {
+  background: #8b5cf6;
+  border-color: #8b5cf6;
+}
+
+/* 🔧 修复: 选中状态显示勾号 - 居中对齐 */
+.style-ref-suggestion .checkbox-label input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 2px;
+  width: 5px;
+  height: 9px;
+  border: solid white;
+  border-width: 0 2.5px 2.5px 0;
+  transform: rotate(45deg);
 }
 
 .style-ref-suggestion .checkbox-label svg {

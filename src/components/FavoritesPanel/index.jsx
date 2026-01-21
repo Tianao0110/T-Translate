@@ -1,14 +1,19 @@
 // src/components/FavoritesPanel.jsx
 // Muse Memory - 灵感记忆收藏面板
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
   Star, Search, Trash2, Copy, Edit3, Save, X, Plus,
   Folder, FolderPlus, ChevronDown, ChevronRight,
   Tag, Hash, MoreVertical, GripVertical,
-  Check, Palette, RotateCcw, Bookmark, Sparkles, RefreshCw, BookOpen
+  Check, Palette, RotateCcw, Bookmark, Sparkles, RefreshCw, BookOpen,
+  Download, Upload
 } from 'lucide-react';
 import useTranslationStore from '../../stores/translation-store';
 import translationService from '../../services/translation.js';
+import { 
+  exportToJSON, exportToCSV, exportToTBX, 
+  autoImport, downloadFile 
+} from '../../utils/glossary-io.js';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/zh-cn';
@@ -315,6 +320,7 @@ const FavoriteCard = ({
                 >
                   <Folder size={14} /> 未分类
                 </button>
+                {/* 用户文件夹 */}
                 {folders.filter(f => !f.isSystem).map(f => (
                   <button
                     key={f.id}
@@ -322,6 +328,21 @@ const FavoriteCard = ({
                     onClick={() => { onMove(item.id, f.id, false); setShowMoveMenu(false); }}
                   >
                     <Folder size={14} style={{ color: f.color }} />
+                    {f.name}
+                  </button>
+                ))}
+                {/* 系统文件夹分隔线 */}
+                <div className="move-menu-divider" />
+                {/* 系统文件夹（术语库、风格库）*/}
+                {folders.filter(f => f.isSystem).map(f => (
+                  <button
+                    key={f.id}
+                    className={item.folderId === f.id ? 'active' : ''}
+                    onClick={() => { onMove(item.id, f.id, false); setShowMoveMenu(false); }}
+                  >
+                    {f.icon === 'book' ? <BookOpen size={14} style={{ color: f.color }} /> : 
+                     f.icon === 'palette' ? <Palette size={14} style={{ color: f.color }} /> :
+                     <Folder size={14} style={{ color: f.color }} />}
                     {f.name}
                   </button>
                 ))}
@@ -343,10 +364,25 @@ const FavoriteCard = ({
 const FavoritesPanel = ({ showNotification }) => {
   const notify = showNotification || ((msg, type) => {});
 
-  // 文件夹状态
+  // 文件夹状态 - 确保系统文件夹始终存在
   const [folders, setFolders] = useState(() => {
     const saved = localStorage.getItem('t-translate-folders');
-    return saved ? JSON.parse(saved) : DEFAULT_FOLDERS;
+    if (saved) {
+      const savedFolders = JSON.parse(saved);
+      const savedIds = savedFolders.map(f => f.id);
+      
+      // 找出缺失的系统文件夹
+      const missingSystemFolders = DEFAULT_FOLDERS.filter(
+        f => f.isSystem && !savedIds.includes(f.id)
+      );
+      
+      // 合并并按 order 排序
+      const merged = [...savedFolders, ...missingSystemFolders];
+      merged.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+      
+      return merged;
+    }
+    return DEFAULT_FOLDERS;
   });
   const [selectedFolder, setSelectedFolder] = useState('all');
   const [editingFolder, setEditingFolder] = useState(null);
@@ -354,6 +390,10 @@ const FavoritesPanel = ({ showNotification }) => {
   const [newFolderColor, setNewFolderColor] = useState(FOLDER_COLORS[0]);
   const [showAddFolder, setShowAddFolder] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
+  
+  // 术语库导入导出
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const glossaryInputRef = useRef(null);
 
   // 搜索和筛选
   const [searchQuery, setSearchQuery] = useState('');
@@ -365,6 +405,91 @@ const FavoritesPanel = ({ showNotification }) => {
     removeFromFavorites,
     updateFavoriteItem
   } = useTranslationStore();
+
+  // 获取术语库数据
+  const glossaryItems = useMemo(() => {
+    return favorites?.filter(item => item.folderId === 'glossary') || [];
+  }, [favorites]);
+
+  // 导出术语库
+  const handleExportGlossary = (format) => {
+    if (glossaryItems.length === 0) {
+      notify('术语库为空', 'warning');
+      return;
+    }
+    
+    const timestamp = dayjs().format('YYYYMMDD');
+    let content, filename, mimeType;
+    
+    switch (format) {
+      case 'json':
+        content = exportToJSON(glossaryItems);
+        filename = `glossary_${timestamp}.json`;
+        mimeType = 'application/json';
+        break;
+      case 'csv':
+        content = exportToCSV(glossaryItems);
+        filename = `glossary_${timestamp}.csv`;
+        mimeType = 'text/csv';
+        break;
+      case 'tbx':
+        content = exportToTBX(glossaryItems);
+        filename = `glossary_${timestamp}.tbx`;
+        mimeType = 'application/xml';
+        break;
+      default:
+        return;
+    }
+    
+    downloadFile(content, filename, mimeType);
+    notify(`已导出 ${glossaryItems.length} 条术语 (${format.toUpperCase()})`, 'success');
+    setShowExportMenu(false);
+  };
+
+  // 导入术语库
+  const handleImportGlossary = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    try {
+      const content = await file.text();
+      const terms = autoImport(content, file.name);
+      
+      if (terms.length === 0) {
+        notify('未找到有效术语', 'warning');
+        return;
+      }
+      
+      // 添加到收藏
+      const { addToFavorites } = useTranslationStore.getState();
+      let added = 0;
+      
+      for (const term of terms) {
+        // 检查是否已存在（避免重复）
+        const exists = favorites?.some(
+          f => f.sourceText === term.sourceText && f.translatedText === term.translatedText
+        );
+        
+        if (!exists) {
+          addToFavorites({
+            sourceText: term.sourceText,
+            translatedText: term.translatedText,
+            note: term.note,
+            tags: term.tags,
+            folderId: 'glossary',
+          });
+          added++;
+        }
+      }
+      
+      notify(`已导入 ${added} 条术语${added < terms.length ? ` (跳过 ${terms.length - added} 条重复)` : ''}`, 'success');
+    } catch (e) {
+      notify(`导入失败: ${e.message}`, 'error');
+    }
+    
+    // 清除文件选择
+    event.target.value = '';
+  };
 
   // 保存文件夹到 localStorage
   useEffect(() => {
@@ -382,16 +507,26 @@ const FavoritesPanel = ({ showNotification }) => {
 
   // 计算每个文件夹的数量
   const folderCounts = useMemo(() => {
-    const counts = { all: favorites?.length || 0, uncategorized: 0 };
+    const systemFolderIds = folders.filter(f => f.isSystem).map(f => f.id);
+    let allCount = 0;
+    let uncategorizedCount = 0;
+    const counts = {};
+    
     favorites?.forEach(item => {
       if (!item.folderId) {
-        counts.uncategorized++;
+        uncategorizedCount++;
+        allCount++; // 未分类算在"全部"里
       } else {
         counts[item.folderId] = (counts[item.folderId] || 0) + 1;
+        // 系统文件夹的内容不计入"全部"
+        if (!systemFolderIds.includes(item.folderId)) {
+          allCount++;
+        }
       }
     });
-    return counts;
-  }, [favorites]);
+    
+    return { all: allCount, uncategorized: uncategorizedCount, ...counts };
+  }, [favorites, folders]);
 
   // 过滤收藏
   const filteredFavorites = useMemo(() => {
@@ -402,7 +537,11 @@ const FavoritesPanel = ({ showNotification }) => {
     // 文件夹筛选
     if (selectedFolder === 'uncategorized') {
       filtered = filtered.filter(item => !item.folderId);
-    } else if (selectedFolder !== 'all') {
+    } else if (selectedFolder === 'all') {
+      // "全部收藏"排除系统文件夹（术语库、风格库）的内容
+      const systemFolderIds = folders.filter(f => f.isSystem).map(f => f.id);
+      filtered = filtered.filter(item => !systemFolderIds.includes(item.folderId));
+    } else {
       filtered = filtered.filter(item => item.folderId === selectedFolder);
     }
 
@@ -426,7 +565,7 @@ const FavoritesPanel = ({ showNotification }) => {
     filtered.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
     return filtered;
-  }, [favorites, selectedFolder, selectedTag, searchQuery]);
+  }, [favorites, selectedFolder, selectedTag, searchQuery, folders]);
 
   // 文件夹操作
   const handleAddFolder = () => {
@@ -636,6 +775,39 @@ const FavoritesPanel = ({ showNotification }) => {
                     <span className="folder-name">{folder.name}</span>
                     <span className="folder-count">{folderCounts[folder.id] || 0}</span>
                   </div>
+                  {/* 术语库的导入导出按钮 */}
+                  {folder.id === 'glossary' && (
+                    <div className="folder-item-actions glossary-actions">
+                      <input
+                        ref={glossaryInputRef}
+                        type="file"
+                        accept=".json,.csv,.tbx,.xml"
+                        style={{ display: 'none' }}
+                        onChange={handleImportGlossary}
+                      />
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); glossaryInputRef.current?.click(); }}
+                        title="导入术语"
+                      >
+                        <Upload size={12} />
+                      </button>
+                      <div className="export-menu-wrapper">
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); setShowExportMenu(!showExportMenu); }}
+                          title="导出术语"
+                        >
+                          <Download size={12} />
+                        </button>
+                        {showExportMenu && (
+                          <div className="export-menu" onClick={(e) => e.stopPropagation()}>
+                            <button onClick={() => handleExportGlossary('json')}>JSON</button>
+                            <button onClick={() => handleExportGlossary('csv')}>CSV</button>
+                            <button onClick={() => handleExportGlossary('tbx')}>TBX</button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   {!folder.isSystem && (
                     <div className="folder-item-actions">
                       <button onClick={(e) => { e.stopPropagation(); setEditingFolder(folder.id); }}>
@@ -701,7 +873,7 @@ const FavoritesPanel = ({ showNotification }) => {
               </span>
             )}
             <span className="result-count">
-              {filteredFavorites.length} 条收藏
+              {filteredFavorites.length} 条{selectedFolder === 'glossary' ? '术语' : '收藏'}
             </span>
           </div>
         </div>
@@ -713,6 +885,37 @@ const FavoritesPanel = ({ showNotification }) => {
               <Star size={48} />
               <p>{searchQuery || selectedTag ? '没有找到匹配的收藏' : '暂无收藏'}</p>
               <span>在翻译结果中点击星标可添加收藏</span>
+            </div>
+          ) : selectedFolder === 'glossary' ? (
+            /* 术语库表格视图 */
+            <div className="glossary-table-wrapper">
+              <table className="glossary-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '35%' }}>原文</th>
+                    <th style={{ width: '35%' }}>译文</th>
+                    <th style={{ width: '20%' }}>备注</th>
+                    <th style={{ width: '10%' }}>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredFavorites.map(item => (
+                    <tr key={item.id}>
+                      <td className="glossary-source">{item.sourceText}</td>
+                      <td className="glossary-target">{item.translatedText}</td>
+                      <td className="glossary-note">{item.note || '-'}</td>
+                      <td className="glossary-actions">
+                        <button onClick={() => handleCopy(item.translatedText)} title="复制">
+                          <Copy size={14} />
+                        </button>
+                        <button onClick={() => handleDelete(item.id)} className="danger" title="删除">
+                          <Trash2 size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           ) : (
             <div className="favorites-grid">

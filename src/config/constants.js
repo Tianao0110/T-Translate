@@ -22,8 +22,20 @@ export const PRIVACY_MODES = {
 export const THEMES = {
   LIGHT: 'light',
   DARK: 'dark',
-  AUTO: 'auto',
+  FRESH: 'fresh',  // 清新（青绿色）
 };
+
+// 预设主题色（用于自定义强调色）
+export const PRESET_ACCENT_COLORS = [
+  { id: 'blue', name: '蓝色', color: '#3b82f6' },
+  { id: 'green', name: '绿色', color: '#10b981' },
+  { id: 'purple', name: '紫色', color: '#8b5cf6' },
+  { id: 'orange', name: '橙色', color: '#f97316' },
+  { id: 'pink', name: '粉色', color: '#ec4899' },
+  { id: 'cyan', name: '青色', color: '#06b6d4' },
+  { id: 'red', name: '红色', color: '#ef4444' },
+  { id: 'amber', name: '琥珀', color: '#f59e0b' },
+];
 
 // ==================== OCR 引擎 ====================
 export const OCR_ENGINES = {

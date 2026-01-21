@@ -30,6 +30,9 @@ const windowManager = require('./managers/window-manager');
 // 截图模块
 const screenshotModule = require('./screenshot-module');
 
+// 多显示器支持
+const displayHelper = require('./utils/display-helper');
+
 // ==================== 划词翻译逻辑 ====================
 
 /**
@@ -842,6 +845,36 @@ function processDesktopCapturerSelection(data, bounds) {
 
 app.whenReady().then(() => {
   logger.info('App ready, initializing...');
+  
+  // 记录显示器信息
+  logger.info('Displays:', displayHelper.getDisplaySummary());
+  
+  // 监听显示器变化
+  displayHelper.onDisplayChange((eventType, display) => {
+    logger.info(`Display ${eventType}:`, display?.id, displayHelper.getDisplaySummary());
+    
+    // 显示器移除时，验证所有窗口位置
+    if (eventType === 'removed') {
+      // 验证主窗口
+      if (windows.main && !windows.main.isDestroyed()) {
+        const bounds = windows.main.getBounds();
+        const validBounds = displayHelper.ensureBoundsOnDisplay(bounds);
+        if (validBounds.adjusted) {
+          logger.info('Main window moved to valid display');
+          windows.main.setBounds(validBounds);
+        }
+      }
+      // 验证玻璃板窗口
+      if (windows.glass && !windows.glass.isDestroyed()) {
+        const bounds = windows.glass.getBounds();
+        const validBounds = displayHelper.ensureBoundsOnDisplay(bounds);
+        if (validBounds.adjusted) {
+          logger.info('Glass window moved to valid display');
+          windows.glass.setBounds(validBounds);
+        }
+      }
+    }
+  });
 
   // 初始化窗口管理器
   windowManager.init({

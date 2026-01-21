@@ -1878,7 +1878,7 @@ input:checked + .switch-slider::before {
 }
 
 /* 青绿主题 Logo */
-[data-theme="rainbow"] .app-logo-text {
+[data-theme="fresh"] .app-logo-text {
   background: linear-gradient(135deg, #34d399, #10b981);
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
@@ -2771,7 +2771,35 @@ input:checked + .switch-slider::before {
   transform: scale(1.1);
 }
 
-/* ==================== 模式卡片优化 ==================== */
+/* 清新主题按钮特殊样式 */
+.theme-option.fresh {
+  position: relative;
+  overflow: hidden;
+}
+
+.theme-option.fresh::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #10b981, #34d399);
+  opacity: 0.8;
+}
+
+.theme-option.fresh:hover::before {
+  height: 4px;
+}
+
+.theme-option.fresh.active {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.05);
+  color: #10b981;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
+}
+
+/* ==================== 模式卡片优化 ==================== */ */
 .mode-selection-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -3086,12 +3114,12 @@ input:checked + .switch-slider::before {
 
 
 /* ==================== 青绿主题选项按钮 ==================== */
-.theme-option.rainbow {
+.theme-option.fresh {
   background: linear-gradient(135deg, #f0fdf9 0%, #e0f7f3 50%, #d1fae5 100%);
   border-color: rgba(16, 185, 129, 0.3);
 }
 
-.theme-option.rainbow::before {
+.theme-option.fresh::before {
   content: '';
   position: absolute;
   top: 0;
@@ -3104,11 +3132,11 @@ input:checked + .switch-slider::before {
   border-radius: 6px 6px 0 0;
 }
 
-.theme-option.rainbow:hover {
+.theme-option.fresh:hover {
   border-color: #34d399;
 }
 
-.theme-option.rainbow.active {
+.theme-option.fresh.active {
   border-color: #10b981;
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
 }
@@ -3116,7 +3144,7 @@ input:checked + .switch-slider::before {
 /* ==================== 青绿主题全局样式 ==================== */
 
 /* 侧边栏 - 青绿色渐变 */
-[data-theme="rainbow"] .settings-sidebar {
+[data-theme="fresh"] .settings-sidebar {
   background: linear-gradient(180deg, 
     #ecfdf5 0%,
     #d1fae5 50%,
@@ -3126,14 +3154,14 @@ input:checked + .switch-slider::before {
 }
 
 /* 导航激活项 - 青绿色 */
-[data-theme="rainbow"] .nav-item.active {
+[data-theme="fresh"] .nav-item.active {
   background: linear-gradient(135deg, #10b981, #059669) !important;
   color: white !important;
   box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25) !important;
 }
 
 /* 标题 - 青绿渐变文字 */
-[data-theme="rainbow"] .setting-content h3 {
+[data-theme="fresh"] .setting-content h3 {
   background: linear-gradient(90deg, 
     #059669, #10b981, #34d399, #6ee7b7
   ) !important;
@@ -3143,114 +3171,114 @@ input:checked + .switch-slider::before {
 }
 
 /* 卡片 */
-[data-theme="rainbow"] .setting-card {
+[data-theme="fresh"] .setting-card {
   border-color: rgba(16, 185, 129, 0.15) !important;
   background: #fafffe !important;
 }
 
-[data-theme="rainbow"] .setting-card:hover {
+[data-theme="fresh"] .setting-card:hover {
   border-color: rgba(16, 185, 129, 0.25) !important;
   box-shadow: 0 2px 8px rgba(16, 185, 129, 0.08) !important;
 }
 
 /* 开关 - 青绿色 */
-[data-theme="rainbow"] input:checked + .switch-slider {
+[data-theme="fresh"] input:checked + .switch-slider {
   background: linear-gradient(135deg, #34d399, #10b981) !important;
 }
 
 /* 复选框 */
-[data-theme="rainbow"] .setting-toggle input[type="checkbox"]:checked {
+[data-theme="fresh"] .setting-toggle input[type="checkbox"]:checked {
   background: linear-gradient(135deg, #34d399, #10b981) !important;
   border-color: transparent !important;
 }
 
 /* 滑块 - 青绿色 */
-[data-theme="rainbow"] .setting-range::-webkit-slider-thumb {
+[data-theme="fresh"] .setting-range::-webkit-slider-thumb {
   background: linear-gradient(135deg, #34d399, #10b981) !important;
 }
 
 /* 滑块数值 */
-[data-theme="rainbow"] .range-value {
+[data-theme="fresh"] .range-value {
   color: #059669 !important;
   background: rgba(16, 185, 129, 0.1) !important;
 }
 
 /* 主按钮 - 青绿色 */
-[data-theme="rainbow"] .btn-primary,
-[data-theme="rainbow"] .save-button {
+[data-theme="fresh"] .btn-primary,
+[data-theme="fresh"] .save-button {
   background: linear-gradient(135deg, #10b981, #059669) !important;
   box-shadow: 0 2px 6px rgba(16, 185, 129, 0.25) !important;
 }
 
-[data-theme="rainbow"] .btn-primary:hover,
-[data-theme="rainbow"] .save-button:hover {
+[data-theme="fresh"] .btn-primary:hover,
+[data-theme="fresh"] .save-button:hover {
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35) !important;
 }
 
 /* 切换按钮 */
-[data-theme="rainbow"] .toggle-button.active {
+[data-theme="fresh"] .toggle-button.active {
   background: linear-gradient(135deg, #10b981, #059669) !important;
   border-color: transparent !important;
   color: white !important;
 }
 
 /* 输入框聚焦 - 青绿色 */
-[data-theme="rainbow"] .setting-input:focus,
-[data-theme="rainbow"] .setting-select:focus {
+[data-theme="fresh"] .setting-input:focus,
+[data-theme="fresh"] .setting-select:focus {
   border-color: #34d399 !important;
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1) !important;
 }
 
 /* 模式卡片 */
-[data-theme="rainbow"] .mode-card.selected .mode-icon {
+[data-theme="fresh"] .mode-card.selected .mode-icon {
   background: linear-gradient(135deg, #10b981, #059669) !important;
 }
 
-[data-theme="rainbow"] .mode-check {
+[data-theme="fresh"] .mode-check {
   background: linear-gradient(135deg, #34d399, #10b981) !important;
 }
 
 /* 快捷键行 */
-[data-theme="rainbow"] .shortcut-row.global {
+[data-theme="fresh"] .shortcut-row.global {
   background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), transparent) !important;
   border-color: rgba(16, 185, 129, 0.12) !important;
 }
 
 /* 信息卡片 */
-[data-theme="rainbow"] .info-card {
+[data-theme="fresh"] .info-card {
   border-color: rgba(16, 185, 129, 0.15) !important;
 }
 
-[data-theme="rainbow"] .info-card:hover {
+[data-theme="fresh"] .info-card:hover {
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.1) !important;
 }
 
 /* 版本标签 */
-[data-theme="rainbow"] .app-info .version-tag {
+[data-theme="fresh"] .app-info .version-tag {
   background: linear-gradient(135deg, #10b981, #059669) !important;
 }
 
 /* 应用图标 - 青绿色 */
-[data-theme="rainbow"] .app-info .app-icon {
+[data-theme="fresh"] .app-info .app-icon {
   background: linear-gradient(135deg, 
     #6ee7b7, #34d399, #10b981, #059669
   ) !important;
 }
 
 /* 帮助框 */
-[data-theme="rainbow"] .help-box {
+[data-theme="fresh"] .help-box {
   background: rgba(236, 253, 245, 0.8) !important;
   border-color: rgba(16, 185, 129, 0.2) !important;
 }
 
 /* 测试按钮 */
-[data-theme="rainbow"] .test-button:hover {
+[data-theme="fresh"] .test-button:hover {
   border-color: #34d399 !important;
   color: #059669 !important;
 }
 
 /* 分割线 - 青绿渐变 */
-[data-theme="rainbow"] .nav-divider {
+[data-theme="fresh"] .nav-divider {
   background: linear-gradient(90deg, 
     rgba(110, 231, 183, 0.5),
     rgba(52, 211, 153, 0.5),
@@ -3260,7 +3288,7 @@ input:checked + .switch-slider::before {
 }
 
 /* 滚动条 - 青绿色 */
-[data-theme="rainbow"] .setting-content::-webkit-scrollbar-thumb {
+[data-theme="fresh"] .setting-content::-webkit-scrollbar-thumb {
   background: linear-gradient(180deg, 
     #6ee7b7, #34d399, #10b981
   ) !important;
@@ -3268,41 +3296,41 @@ input:checked + .switch-slider::before {
 }
 
 /* 设置描述文字 */
-[data-theme="rainbow"] .setting-description,
-[data-theme="rainbow"] .setting-hint {
+[data-theme="fresh"] .setting-description,
+[data-theme="fresh"] .setting-hint {
   color: #6b7280 !important;
 }
 
-[data-theme="rainbow"] .setting-label {
+[data-theme="fresh"] .setting-label {
   color: #374151 !important;
 }
 
-[data-theme="rainbow"] .nav-group-title {
+[data-theme="fresh"] .nav-group-title {
   color: #9ca3af !important;
 }
 
 /* 翻译源卡片 */
-[data-theme="rainbow"] .ps-card {
+[data-theme="fresh"] .ps-card {
   border-color: rgba(16, 185, 129, 0.15) !important;
 }
 
-[data-theme="rainbow"] .ps-card:hover {
+[data-theme="fresh"] .ps-card:hover {
   border-color: rgba(16, 185, 129, 0.25) !important;
 }
 
-[data-theme="rainbow"] .ps-card.enabled {
+[data-theme="fresh"] .ps-card.enabled {
   border-color: rgba(16, 185, 129, 0.3) !important;
   background: linear-gradient(135deg, #f0fdf9, #ffffff) !important;
 }
 
-[data-theme="rainbow"] .ps-switch input:checked + span {
+[data-theme="fresh"] .ps-switch input:checked + span {
   background: linear-gradient(135deg, #34d399, #10b981) !important;
 }
 
 /* ==================== 青绿主题补充样式 ==================== */
 
 /* 侧边栏底部操作按钮区域 - 使用与侧边栏一致的渐变 */
-[data-theme="rainbow"] .settings-actions {
+[data-theme="fresh"] .settings-actions {
   background: linear-gradient(180deg, 
     #a7f3d0 0%,
     #6ee7b7 100%
@@ -3310,35 +3338,35 @@ input:checked + .switch-slider::before {
   border-top-color: rgba(16, 185, 129, 0.2) !important;
 }
 
-[data-theme="rainbow"] .action-button {
+[data-theme="fresh"] .action-button {
   background: rgba(255, 255, 255, 0.7) !important;
   border-color: rgba(16, 185, 129, 0.2) !important;
   color: #059669 !important;
 }
 
-[data-theme="rainbow"] .action-button:hover {
+[data-theme="fresh"] .action-button:hover {
   background: rgba(255, 255, 255, 0.9) !important;
   border-color: #10b981 !important;
 }
 
-[data-theme="rainbow"] .action-button.danger:hover {
+[data-theme="fresh"] .action-button.danger:hover {
   background: rgba(254, 226, 226, 0.9) !important;
   border-color: #ef4444 !important;
   color: #dc2626 !important;
 }
 
 /* 移除主题选项按钮顶部的装饰条（可能导致视觉问题） */
-.theme-option.rainbow::before {
+.theme-option.fresh::before {
   display: none !important;
 }
 
 /* 内容区域背景确保正确 */
-[data-theme="rainbow"] .settings-content-wrapper {
+[data-theme="fresh"] .settings-content-wrapper {
   background: #fafffe !important;
 }
 
 /* 页脚保存按钮区域 */
-[data-theme="rainbow"] .settings-footer {
+[data-theme="fresh"] .settings-footer {
   background: #fafffe !important;
   border-top-color: rgba(16, 185, 129, 0.12) !important;
 }

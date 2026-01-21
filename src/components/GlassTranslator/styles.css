@@ -496,7 +496,7 @@
 }
 
 /* ========== 🌈 彩虹主题 ========== */
-[data-theme="rainbow"] .glass-window {
+[data-theme="fresh"] .glass-window {
   --glass-bg: rgba(250, 245, 255, var(--glass-opacity, 0.9));
   --glass-border: rgba(168, 85, 247, 0.25);
   --glass-text: #4c1d95;
@@ -504,7 +504,7 @@
   --glass-accent: #a855f7;
 }
 
-[data-theme="rainbow"] .glass-window::before {
+[data-theme="fresh"] .glass-window::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -518,60 +518,60 @@
   z-index: 0;
 }
 
-[data-theme="rainbow"] .glass-top-area {
+[data-theme="fresh"] .glass-top-area {
   position: relative;
   z-index: 1;
   background: rgba(168, 85, 247, 0.08);
   border-bottom-color: rgba(168, 85, 247, 0.1);
 }
 
-[data-theme="rainbow"] .glass-content {
+[data-theme="fresh"] .glass-content {
   position: relative;
   z-index: 1;
 }
 
-[data-theme="rainbow"] .toolbar-btn {
+[data-theme="fresh"] .toolbar-btn {
   background: rgba(255, 255, 255, 0.7);
   color: #7c3aed;
 }
 
-[data-theme="rainbow"] .toolbar-btn:hover {
+[data-theme="fresh"] .toolbar-btn:hover {
   background: rgba(255, 255, 255, 0.9);
   color: #6d28d9;
 }
 
-[data-theme="rainbow"] .toolbar-handle {
+[data-theme="fresh"] .toolbar-handle {
   background: rgba(255, 255, 255, 0.6);
   color: #8b5cf6;
 }
 
-[data-theme="rainbow"] .toolbar-handle:hover {
+[data-theme="fresh"] .toolbar-handle:hover {
   background: rgba(255, 255, 255, 0.85);
 }
 
-[data-theme="rainbow"] .toolbar-btn.active {
+[data-theme="fresh"] .toolbar-btn.active {
   background: linear-gradient(135deg, #a855f7, #ec4899);
   color: white;
 }
 
-[data-theme="rainbow"] .glass-status {
+[data-theme="fresh"] .glass-status {
   color: #8b5cf6;
 }
 
-[data-theme="rainbow"] .lang-tag {
+[data-theme="fresh"] .lang-tag {
   background: rgba(168, 85, 247, 0.15);
   color: #7c3aed;
 }
 
-[data-theme="rainbow"] .translation-text {
+[data-theme="fresh"] .translation-text {
   color: #4c1d95;
 }
 
-[data-theme="rainbow"] .glass-content::-webkit-scrollbar-thumb {
+[data-theme="fresh"] .glass-content::-webkit-scrollbar-thumb {
   background: rgba(168, 85, 247, 0.3);
 }
 
-[data-theme="rainbow"] .glass-content::-webkit-scrollbar-thumb:hover {
+[data-theme="fresh"] .glass-content::-webkit-scrollbar-thumb:hover {
   background: rgba(168, 85, 247, 0.5);
 }
 
@@ -860,36 +860,36 @@
 
 /* ========== 子玻璃板彩虹主题 ========== */
 
-[data-theme="rainbow"] .child-glass-pane {
+[data-theme="fresh"] .child-glass-pane {
   background: rgba(255, 250, 245, 0.95);
   border-color: rgba(168, 85, 247, 0.15);
   box-shadow: 0 2px 8px rgba(168, 85, 247, 0.1);
 }
 
-[data-theme="rainbow"] .child-glass-pane:hover {
+[data-theme="fresh"] .child-glass-pane:hover {
   box-shadow: 0 4px 12px rgba(168, 85, 247, 0.15);
 }
 
-[data-theme="rainbow"] .child-glass-pane.frozen {
+[data-theme="fresh"] .child-glass-pane.frozen {
   border-color: #a855f7;
   box-shadow: 0 4px 16px rgba(168, 85, 247, 0.25);
 }
 
-[data-theme="rainbow"] .child-pane-handle {
+[data-theme="fresh"] .child-pane-handle {
   background: rgba(168, 85, 247, 0.05);
   color: #a78bfa;
 }
 
-[data-theme="rainbow"] .child-pane-handle:hover {
+[data-theme="fresh"] .child-pane-handle:hover {
   background: rgba(168, 85, 247, 0.1);
   color: #8b5cf6;
 }
 
-[data-theme="rainbow"] .child-pane-text {
+[data-theme="fresh"] .child-pane-text {
   color: #4c1d95;
 }
 
-[data-theme="rainbow"] .child-pane-btn:hover {
+[data-theme="fresh"] .child-pane-btn:hover {
   background: rgba(168, 85, 247, 0.1);
   color: #7c3aed;
 }
@@ -1117,29 +1117,29 @@
 
 /* ========== 历史记录彩虹主题 ========== */
 
-[data-theme="rainbow"] .glass-history-panel {
+[data-theme="fresh"] .glass-history-panel {
   background: rgba(255, 250, 245, 0.98);
   border-color: rgba(168, 85, 247, 0.15);
   box-shadow: 0 4px 16px rgba(168, 85, 247, 0.15);
 }
 
-[data-theme="rainbow"] .history-header {
+[data-theme="fresh"] .history-header {
   border-bottom-color: rgba(168, 85, 247, 0.1);
   background: rgba(168, 85, 247, 0.03);
 }
 
-[data-theme="rainbow"] .history-title {
+[data-theme="fresh"] .history-title {
   color: #7c3aed;
 }
 
-[data-theme="rainbow"] .history-item:hover {
+[data-theme="fresh"] .history-item:hover {
   background: rgba(168, 85, 247, 0.08);
 }
 
-[data-theme="rainbow"] .history-source {
+[data-theme="fresh"] .history-source {
   color: #8b5cf6;
 }
 
-[data-theme="rainbow"] .history-translated {
+[data-theme="fresh"] .history-translated {
   color: #4c1d95;
 }

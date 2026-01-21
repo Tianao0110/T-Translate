@@ -237,7 +237,7 @@ const GlassTranslator = () => {
         loadSettings();
         // 同步主题（只在有明确的主题设置时更新）
         const newTheme = newSettings?.interface?.theme;
-        if (newTheme && ['light', 'dark', 'rainbow'].includes(newTheme)) {
+        if (newTheme && ['light', 'dark', 'fresh'].includes(newTheme)) {
           setTheme(newTheme);
           document.documentElement.setAttribute('data-theme', newTheme);
         }

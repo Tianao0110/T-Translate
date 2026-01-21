@@ -1,13 +1,14 @@
 // src/components/TranslationPanel.jsx
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
-  Send, Mic, MicOff, Camera, Image, FileText, Volume2, Copy, Download,
+  Send, Mic, MicOff, Camera, Image, FileText, Volume2, VolumeX, Copy,
   RotateCcw, Sparkles, Loader2, ChevronDown, Clock, Zap, Shield, Eye, EyeOff, Lock,
   Lightbulb, Check, X, ArrowRight, Palette, ChevronUp, Bot, Tag, FileEdit, AlertTriangle
 } from 'lucide-react';
 
 import useTranslationStore from '../../stores/translation-store';
 import translationService from '../../services/translation.js';
+import ttsManager, { TTS_STATUS } from '../../services/tts/index.js';
 import createLogger from '../../utils/logger.js';
 import { formatError, getShortErrorMessage, isRetryable } from '../../utils/error-handler.js';
 import './styles.css';
@@ -48,6 +49,10 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   const [showSaveModal, setShowSaveModal] = useState(false); // 显示收藏弹窗
   const [saveAsStyleRef, setSaveAsStyleRef] = useState(false); // 是否标记为风格参考
   
+  // ========== TTS 朗读 ==========
+  const [ttsStatus, setTtsStatus] = useState(TTS_STATUS.IDLE); // TTS 状态
+  const [ttsTarget, setTtsTarget] = useState(null); // 'source' | 'target' 当前朗读的是原文还是译文
+  
   // ========== AI 自动分析 ==========
   const [isAnalyzing, setIsAnalyzing] = useState(false); // 正在分析
   const [aiSuggestions, setAiSuggestions] = useState(null); // AI 建议 { tags, summary, isStyleSuggested }
@@ -85,6 +90,48 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   // Refs
   const sourceTextareaRef = useRef(null);
   const fileInputRef = useRef(null);
+
+  // ========== TTS 初始化 ==========
+  useEffect(() => {
+    // 初始化 TTS 管理器
+    ttsManager.init().catch(e => {
+      logger.warn('TTS init failed:', e.message);
+    });
+    
+    // 设置状态回调
+    ttsManager.onStatusChange((status) => {
+      setTtsStatus(status);
+      if (status === TTS_STATUS.IDLE || status === TTS_STATUS.ERROR) {
+        setTtsTarget(null);
+      }
+    });
+    
+    return () => {
+      ttsManager.stop();
+    };
+  }, []);
+
+  // 朗读文本
+  const speakText = useCallback(async (text, target, lang) => {
+    if (!text?.trim()) {
+      notify('没有可朗读的文本', 'warning');
+      return;
+    }
+    
+    // 如果正在朗读同一个目标，则停止
+    if (ttsStatus === TTS_STATUS.SPEAKING && ttsTarget === target) {
+      ttsManager.stop();
+      return;
+    }
+    
+    try {
+      setTtsTarget(target);
+      await ttsManager.speak(text, { lang });
+    } catch (e) {
+      logger.error('TTS speak error:', e);
+      notify('朗读失败: ' + e.message, 'error');
+    }
+  }, [ttsStatus, ttsTarget, notify]);
 
   // 语言选项（从配置中心获取）
   const languages = useMemo(() => getLanguageList(true), []);
@@ -134,12 +181,13 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
           if (autoTranslate) {
             const delay = Math.max(autoTranslateDelay || 500, 300); // 至少 300ms，让用户看到识别结果
             logger.debug(`[Screenshot] Will auto-translate in ${delay}ms...`);
-            setTimeout(() => {
+            setTimeout(async () => {
               // 再次检查是否有内容（防止用户清空）
               const currentText = useTranslationStore.getState().currentTranslation.sourceText;
               if (currentText?.trim()) {
                 logger.debug('[Screenshot] Auto-translating with OCR template...');
-                handleTranslate();
+                await handleTranslate();
+                // 联动逻辑已在 handleTranslate 中处理
               }
             }, delay);
           } else {
@@ -236,6 +284,21 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
       // 翻译成功后，检测术语一致性
       checkTermConsistency(currentTranslation.sourceText, result.translatedText || useTranslationStore.getState().currentTranslation.translatedText);
       
+      // 如果是 OCR 来源（截图翻译），通知主进程显示到划词窗口
+      if (isOcrSource && window.electron?.screenshot?.notifyTranslationComplete) {
+        const state = useTranslationStore.getState();
+        const translatedText = result.translatedText || state.currentTranslation.translatedText;
+        if (translatedText) {
+          logger.debug('[Screenshot] Notifying main process for selection window display');
+          window.electron.screenshot.notifyTranslationComplete({
+            sourceText: currentTranslation.sourceText,
+            translatedText: translatedText,
+            sourceLanguage: state.currentTranslation.sourceLanguage || 'auto',
+            targetLanguage: state.currentTranslation.targetLanguage || 'zh',
+          });
+        }
+      }
+      
       // 翻译完成后，清除 OCR 来源标记（下次手动输入时不再使用 OCR 模板）
       if (isOcrSource) {
         setIsOcrSource(false);
@@ -297,6 +360,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   }, [currentTranslation.sourceLanguage, currentTranslation.targetLanguage]);
 
   // ========== 术语一致性检测 ==========
+  // 只检测术语库（glossary 文件夹）中的内容
   const checkTermConsistency = useCallback((sourceText, translatedText) => {
     if (!favorites || favorites.length === 0) return;
     if (!sourceText || !translatedText) return;
@@ -305,7 +369,10 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     const sourceLower = sourceText.toLowerCase();
     const translatedLower = translatedText.toLowerCase();
 
-    favorites.forEach(fav => {
+    // 只检测术语库中的内容
+    const glossaryItems = favorites.filter(fav => fav.folderId === 'glossary');
+    
+    glossaryItems.forEach(fav => {
       if (!fav.sourceText || !fav.translatedText) return;
       
       const favSourceLower = fav.sourceText.toLowerCase().trim();
@@ -858,6 +925,22 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
               >
                 <RotateCcw size={15} />
               </button>
+              <button 
+                className={`action-btn ${ttsStatus === TTS_STATUS.SPEAKING && ttsTarget === 'source' ? 'active' : ''}`}
+                onClick={() => speakText(
+                  currentTranslation.sourceText, 
+                  'source', 
+                  currentTranslation.sourceLang
+                )}
+                disabled={!currentTranslation.sourceText || isOcrProcessing}
+                title={ttsStatus === TTS_STATUS.SPEAKING && ttsTarget === 'source' ? '停止朗读' : '朗读原文'}
+              >
+                {ttsStatus === TTS_STATUS.SPEAKING && ttsTarget === 'source' ? (
+                  <VolumeX size={15} />
+                ) : (
+                  <Volume2 size={15} />
+                )}
+              </button>
             </div>
           </div>
 
@@ -970,11 +1053,20 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
                 <Sparkles size={15} />
               </button>
               <button 
-                className="action-btn" 
-                title="导出 (未实现)"
+                className={`action-btn ${ttsStatus === TTS_STATUS.SPEAKING && ttsTarget === 'target' ? 'active' : ''}`}
+                onClick={() => speakText(
+                  currentTranslation.translatedText, 
+                  'target', 
+                  currentTranslation.targetLang
+                )}
                 disabled={!currentTranslation.translatedText}
+                title={ttsStatus === TTS_STATUS.SPEAKING && ttsTarget === 'target' ? '停止朗读' : '朗读译文'}
               >
-                <Download size={15} />
+                {ttsStatus === TTS_STATUS.SPEAKING && ttsTarget === 'target' ? (
+                  <VolumeX size={15} />
+                ) : (
+                  <Volume2 size={15} />
+                )}
               </button>
             </div>
           </div>

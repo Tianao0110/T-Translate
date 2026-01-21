@@ -33,6 +33,7 @@ const preloads = {
   glass: path.join(ELECTRON_DIR, 'preloads/glass.js'),
   subtitleCapture: path.join(ELECTRON_DIR, 'preloads/subtitle-capture.js'),
   childPane: path.join(ELECTRON_DIR, 'preloads/child-pane.js'),
+  screenshot: path.join(ELECTRON_DIR, 'preloads/screenshot.js'),
 };
 
 /**

@@ -596,34 +596,34 @@
 }
 
 /* ========== 彩虹主题 ========== */
-[data-theme="rainbow"] .ps-card {
+[data-theme="fresh"] .ps-card {
   border-color: rgba(167, 139, 250, 0.2);
 }
 
-[data-theme="rainbow"] .ps-card:hover {
+[data-theme="fresh"] .ps-card:hover {
   border-color: rgba(167, 139, 250, 0.4);
   box-shadow: 0 2px 12px rgba(167, 139, 250, 0.1);
 }
 
-[data-theme="rainbow"] .ps-card.expanded {
+[data-theme="fresh"] .ps-card.expanded {
   border-color: #a78bfa;
 }
 
-[data-theme="rainbow"] .ps-switch input:checked + .ps-switch-track {
+[data-theme="fresh"] .ps-switch input:checked + .ps-switch-track {
   background: linear-gradient(135deg, #34d399, #60a5fa);
 }
 
-[data-theme="rainbow"] .ps-input:focus,
-[data-theme="rainbow"] .ps-select:focus {
+[data-theme="fresh"] .ps-input:focus,
+[data-theme="fresh"] .ps-select:focus {
   border-color: #a78bfa;
   box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.15);
 }
 
-[data-theme="rainbow"] .ps-save-btn {
+[data-theme="fresh"] .ps-save-btn {
   background: linear-gradient(135deg, #f472b6, #a78bfa);
 }
 
-[data-theme="rainbow"] .ps-tip {
+[data-theme="fresh"] .ps-tip {
   background: linear-gradient(135deg, rgba(244, 114, 182, 0.1), rgba(167, 139, 250, 0.1));
   border-color: rgba(167, 139, 250, 0.3);
   color: #8b5cf6;

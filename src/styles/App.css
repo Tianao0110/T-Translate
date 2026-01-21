@@ -2,6 +2,9 @@
 
 /* ==================== 根变量定义 ==================== */
 :root {
+  /* 字体大小（用户可调整） */
+  --base-font-size: 14px;
+  
   /* 浅色主题 */
   --bg-primary: #ffffff;
   --bg-secondary: #f5f5f5;
@@ -37,6 +40,20 @@
   --transition: all 0.2s ease;
 }
 
+/* 应用基础字体大小 */
+body {
+  font-size: var(--base-font-size);
+}
+
+/* 主要内容区域使用基础字体 */
+.app-content,
+.translation-panel,
+.setting-content,
+.sel-text,
+.glass-content {
+  font-size: var(--base-font-size);
+}
+
 /* 深色主题 */
 [data-theme="dark"] {
   --bg-primary: #1a1a1a;
@@ -63,7 +80,7 @@
 }
 
 /* 🌿 青绿主题 - 清新自然 */
-[data-theme="rainbow"] {
+[data-theme="fresh"] {
   /* 背景使用非常浅的青绿色 */
   --bg-primary: #f5fafa;
   --bg-secondary: #edf7f6;
@@ -98,7 +115,19 @@
   --shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.08);
 }
 
-/* ==================== 全局样式 ==================== */
+/* ==================== 自定义主题色 ==================== */
+/* 通过 JS 设置 --custom-accent 变量来改变强调色 */
+/* 用法：document.documentElement.style.setProperty('--custom-accent', '#your-color') */
+:root {
+  --custom-accent: var(--accent-primary);
+}
+
+/* 当设置了自定义强调色时应用（添加 data-custom-accent 属性） */
+[data-custom-accent] {
+  --accent-primary: var(--custom-accent);
+}
+
+/* ==================== 全局样式 ==================== */ */
 * {
   margin: 0;
   padding: 0;

@@ -235,7 +235,8 @@
     </div>
 
     <script>
-      const { ipcRenderer } = require("electron");
+      // 使用 preload 暴露的安全 API
+      const screenshot = window.electronScreenshot;
 
       const overlay = document.getElementById("overlay");
       const selection = document.getElementById("selection");
@@ -256,7 +257,7 @@
       let showConfirmButtons = true; // 可通过 IPC 配置
 
       // 接收配置
-      ipcRenderer.on("screenshot-config", (event, config) => {
+      screenshot.onConfig((config) => {
         if (config.showConfirmButtons !== undefined) {
           showConfirmButtons = config.showConfirmButtons;
         }
@@ -459,7 +460,7 @@
       // 发送选区
       function sendSelection() {
         if (selectionBounds) {
-          ipcRenderer.send("screenshot-selection", selectionBounds);
+          screenshot.sendSelection(selectionBounds);
         }
       }
 
@@ -472,7 +473,7 @@
       // 取消按钮点击
       btnCancel.addEventListener("click", (e) => {
         e.stopPropagation();
-        ipcRenderer.send("screenshot-cancel");
+        screenshot.cancel();
       });
 
       // 键盘事件
@@ -480,7 +481,7 @@
         console.log("[Screenshot] Key pressed:", e.key);
         if (e.key === "Escape") {
           e.preventDefault();
-          ipcRenderer.send("screenshot-cancel");
+          screenshot.cancel();
         } else if (e.key === "Enter" && hasSelection) {
           e.preventDefault();
           sendSelection();
@@ -490,7 +491,7 @@
       window.addEventListener("keydown", (e) => {
         if (e.key === "Escape") {
           e.preventDefault();
-          ipcRenderer.send("screenshot-cancel");
+          screenshot.cancel();
         } else if (e.key === "Enter" && hasSelection) {
           e.preventDefault();
           sendSelection();
@@ -500,13 +501,13 @@
       // 右键取消
       document.addEventListener("contextmenu", (e) => {
         e.preventDefault();
-        ipcRenderer.send("screenshot-cancel");
+        screenshot.cancel();
       });
 
       document.addEventListener("mousedown", (e) => {
         if (e.button === 2) {
           e.preventDefault();
-          ipcRenderer.send("screenshot-cancel");
+          screenshot.cancel();
         }
       });
     </script>

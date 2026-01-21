@@ -2,7 +2,7 @@
 // 关于页面区块组件 - 从 SettingsPanel 拆分
 
 import React from 'react';
-import { GitBranch, RefreshCw } from 'lucide-react';
+import { GitBranch, RefreshCw, FolderOpen } from 'lucide-react';
 
 /**
  * 关于页面区块
@@ -16,6 +16,20 @@ const AboutSection = ({ notify }) => {
   // 检查更新
   const checkUpdate = () => {
     notify('检查更新功能开发中', 'info');
+  };
+
+  // 打开日志目录
+  const openLogDirectory = async () => {
+    try {
+      const result = await window.electron?.logs?.openDirectory?.();
+      if (result?.success) {
+        notify('已打开日志目录', 'success');
+      } else {
+        notify(result?.message || '无法打开日志目录', 'error');
+      }
+    } catch (e) {
+      notify('打开日志目录失败', 'error');
+    }
   };
 
   return (
@@ -54,6 +68,9 @@ const AboutSection = ({ notify }) => {
         </button>
         <button className="link-button" onClick={checkUpdate}>
           <RefreshCw size={16}/> 检查更新
+        </button>
+        <button className="link-button" onClick={openLogDirectory}>
+          <FolderOpen size={16}/> 打开日志目录
         </button>
       </div>
       

@@ -14,7 +14,7 @@ import {
   Calendar, ChevronDown, ChevronRight, LayoutGrid,
   BarChart3, TrendingUp, X, Edit3, Download, Upload,
   FileText, Hash, Type, Languages, Activity, RotateCcw,
-  Table, GitBranch, CheckSquare, Square, Trash, ArrowUpDown
+  Table, CheckSquare, Square, Trash, ArrowUpDown
 } from 'lucide-react';
 import useTranslationStore from '../../stores/translation-store';
 import { useDebounce } from '../../utils/performance';
@@ -64,7 +64,8 @@ const HistoryCard = memo(({
   isSelected, 
   onSelect, 
   showCheckbox, 
-  searchQuery 
+  searchQuery,
+  onDoubleClick
 }) => {
   const [showTranslated, setShowTranslated] = useState(true);
   
@@ -93,9 +94,16 @@ const HistoryCard = memo(({
   const handleDeleteClick = useCallback(() => {
     onDelete(item.id);
   }, [onDelete, item.id]);
+  
+  // 双击查看详情
+  const handleDoubleClick = useCallback(() => {
+    if (onDoubleClick) {
+      onDoubleClick(item);
+    }
+  }, [onDoubleClick, item]);
 
   return (
-    <div className={`history-card ${isSelected ? 'selected' : ''}`}>
+    <div className={`history-card ${isSelected ? 'selected' : ''}`} onDoubleClick={handleDoubleClick}>
       <div className="card-header">
         <span className="card-lang">{item.sourceLanguage || 'auto'} → {item.targetLanguage || 'zh'}</span>
         <div className="card-header-right">
@@ -108,7 +116,7 @@ const HistoryCard = memo(({
         </div>
       </div>
       
-      <div className="card-body" onClick={handleToggle} title="点击切换原文/译文">
+      <div className="card-body" onClick={handleToggle} title="点击切换原文/译文，双击查看详情">
         <div className="card-text-label">
           {showTranslated ? '译文' : '原文'}
           <RotateCcw size={12} className="switch-hint" />
@@ -176,6 +184,9 @@ const HistoryPanel = ({ showNotification }) => {
   const [focusIndex, setFocusIndex] = useState(-1);
   const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  
+  // 详情弹窗状态
+  const [detailItem, setDetailItem] = useState(null);
   
   // 🔧 搜索防抖 - 300ms 延迟
   const debouncedSearch = useDebounce(searchInput, 300);
@@ -550,23 +561,6 @@ const HistoryPanel = ({ showNotification }) => {
     );
   };
 
-  // 渲染时间轴项目
-  const renderTimelineItem = useCallback((item, index) => (
-    <div key={`${item.id}-${index}`} className={`timeline-item ${focusIndex === index ? 'focused' : ''}`}>
-      <div className="timeline-dot" />
-      <div className="timeline-content">
-        <div className="timeline-time">{dayjs(item.timestamp).format('HH:mm')}</div>
-        <div className="timeline-text">
-          <HighlightText text={item.translatedText} search={debouncedSearch} />
-        </div>
-        <div className="timeline-actions">
-          <button onClick={() => handleCopy(item.translatedText)}><Copy size={12} /></button>
-          <button onClick={() => handleRestore(item.id)}><Edit3 size={12} /></button>
-        </div>
-      </div>
-    </div>
-  ), [focusIndex, debouncedSearch, handleCopy, handleRestore]);
-
   // 渲染表格
   const renderTableGroup = useCallback((group) => (
     <div key={group.title} className="table-group">
@@ -579,35 +573,40 @@ const HistoryPanel = ({ showNotification }) => {
         <table className="history-table">
           <thead>
             <tr>
-              {selectMode && <th style={{width: '40px'}}></th>}
-              <th onClick={() => handleSort('timestamp')} style={{cursor: 'pointer'}}>
+              {selectMode && <th className="col-check"></th>}
+              <th className="col-time" onClick={() => handleSort('timestamp')} style={{cursor: 'pointer'}}>
                 时间 {sortConfig.key === 'timestamp' && <ArrowUpDown size={12} />}
               </th>
-              <th onClick={() => handleSort('language')} style={{cursor: 'pointer'}}>
+              <th className="col-lang" onClick={() => handleSort('language')} style={{cursor: 'pointer'}}>
                 语言 {sortConfig.key === 'language' && <ArrowUpDown size={12} />}
               </th>
-              <th onClick={() => handleSort('sourceLength')} style={{cursor: 'pointer'}}>
+              <th className="col-source" onClick={() => handleSort('sourceLength')} style={{cursor: 'pointer'}}>
                 原文 {sortConfig.key === 'sourceLength' && <ArrowUpDown size={12} />}
               </th>
-              <th>译文</th>
-              <th style={{width: '100px'}}>操作</th>
+              <th className="col-translated">译文</th>
+              <th className="col-actions">操作</th>
             </tr>
           </thead>
           <tbody>
             {group.items.map((item, index) => (
-              <tr key={`${item.id}-${index}`} className={selectedIds.has(item.id) ? 'selected' : ''}>
+              <tr 
+                key={`${item.id}-${index}`} 
+                className={selectedIds.has(item.id) ? 'selected' : ''}
+                onDoubleClick={() => setDetailItem(item)}
+                style={{ cursor: 'pointer' }}
+              >
                 {selectMode && (
-                  <td>
-                    <button onClick={() => toggleSelect(item.id)}>
+                  <td className="col-check">
+                    <button onClick={(e) => { e.stopPropagation(); toggleSelect(item.id); }}>
                       {selectedIds.has(item.id) ? <CheckSquare size={14} /> : <Square size={14} />}
                     </button>
                   </td>
                 )}
                 <td className="cell-time">{dayjs(item.timestamp).format('HH:mm')}</td>
                 <td className="cell-lang">{item.sourceLanguage || 'auto'} → {item.targetLanguage || 'zh'}</td>
-                <td className="cell-text"><HighlightText text={item.sourceText?.slice(0, 50)} search={debouncedSearch} />{item.sourceText?.length > 50 ? '...' : ''}</td>
-                <td className="cell-text"><HighlightText text={item.translatedText?.slice(0, 50)} search={debouncedSearch} />{item.translatedText?.length > 50 ? '...' : ''}</td>
-                <td className="cell-actions">
+                <td><div className="cell-text"><HighlightText text={item.sourceText?.slice(0, 60)} search={debouncedSearch} />{item.sourceText?.length > 60 ? '...' : ''}</div></td>
+                <td><div className="cell-text"><HighlightText text={item.translatedText?.slice(0, 60)} search={debouncedSearch} />{item.translatedText?.length > 60 ? '...' : ''}</div></td>
+                <td className="cell-actions" onClick={(e) => e.stopPropagation()}>
                   <button onClick={() => handleCopy(item.translatedText)} title="复制"><Copy size={12} /></button>
                   <button onClick={() => handleRestore(item.id)} title="恢复"><Edit3 size={12} /></button>
                   <button onClick={() => handleFavorite(item)} title="收藏" className={favoriteIds.has(item.id) ? 'active' : ''}>
@@ -645,28 +644,6 @@ const HistoryPanel = ({ showNotification }) => {
       );
     }
 
-    // 时间轴视图
-    if (viewMode === 'timeline') {
-      return (
-        <div className="history-timeline">
-          {groupedHistory.map(group => (
-            <div key={group.title} className="timeline-group">
-              <div className="timeline-group-header" onClick={() => toggleGroup(group.title)}>
-                {expandedGroups.has(group.title) ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                <span>{group.title}</span>
-                <span className="group-count">{group.count}</span>
-              </div>
-              {expandedGroups.has(group.title) && (
-                <div className="timeline-items">
-                  {group.items.map((item, i) => renderTimelineItem(item, i))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      );
-    }
-
     // 卡片视图
     return (
       <div className="history-cards">
@@ -692,6 +669,7 @@ const HistoryPanel = ({ showNotification }) => {
                     onSelect={toggleSelect}
                     showCheckbox={selectMode}
                     searchQuery={debouncedSearch}
+                    onDoubleClick={setDetailItem}
                   />
                 ))}
               </div>
@@ -738,9 +716,6 @@ const HistoryPanel = ({ showNotification }) => {
           <div className="view-toggle">
             <button className={viewMode === 'card' ? 'active' : ''} onClick={() => setViewMode('card')} title="卡片">
               <LayoutGrid size={16} /><span>卡片</span>
-            </button>
-            <button className={viewMode === 'timeline' ? 'active' : ''} onClick={() => setViewMode('timeline')} title="时间轴">
-              <GitBranch size={16} /><span>时间轴</span>
             </button>
             <button className={viewMode === 'table' ? 'active' : ''} onClick={() => setViewMode('table')} title="表格">
               <Table size={16} /><span>表格</span>
@@ -830,6 +805,51 @@ const HistoryPanel = ({ showNotification }) => {
         <div className="history-footer">
           <span>显示 {Math.min(displayCount, filteredHistory.length)} / {filteredHistory.length} 条</span>
           {selectMode && <span className="select-hint">已选 {selectedIds.size} 条 | 空格选择，Esc 退出</span>}
+        </div>
+      )}
+
+      {/* 详情弹窗 */}
+      {detailItem && (
+        <div className="detail-modal-overlay" onClick={() => setDetailItem(null)}>
+          <div className="detail-modal" onClick={e => e.stopPropagation()}>
+            <div className="detail-modal-header">
+              <span className="detail-lang">{detailItem.sourceLanguage || 'auto'} → {detailItem.targetLanguage || 'zh'}</span>
+              <span className="detail-time">{dayjs(detailItem.timestamp).format('YYYY-MM-DD HH:mm:ss')}</span>
+              <button className="detail-close" onClick={() => setDetailItem(null)}>
+                <X size={18} />
+              </button>
+            </div>
+            
+            <div className="detail-modal-body">
+              <div className="detail-section">
+                <div className="detail-label">原文</div>
+                <div className="detail-text source">{detailItem.sourceText}</div>
+              </div>
+              <div className="detail-section">
+                <div className="detail-label">译文</div>
+                <div className="detail-text translated">{detailItem.translatedText}</div>
+              </div>
+            </div>
+            
+            <div className="detail-modal-footer">
+              <button className="detail-btn" onClick={() => { handleCopy(detailItem.sourceText); }}>
+                <Copy size={14} /> 复制原文
+              </button>
+              <button className="detail-btn" onClick={() => { handleCopy(detailItem.translatedText); }}>
+                <Copy size={14} /> 复制译文
+              </button>
+              <button className="detail-btn primary" onClick={() => { handleRestore(detailItem.id); setDetailItem(null); }}>
+                <Edit3 size={14} /> 恢复编辑
+              </button>
+              <button 
+                className={`detail-btn ${favoriteIds.has(detailItem.id) ? 'active' : ''}`} 
+                onClick={() => handleFavorite(detailItem)}
+              >
+                <Star size={14} fill={favoriteIds.has(detailItem.id) ? 'currentColor' : 'none'} /> 
+                {favoriteIds.has(detailItem.id) ? '取消收藏' : '收藏'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

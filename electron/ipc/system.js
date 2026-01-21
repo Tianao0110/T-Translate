@@ -203,6 +203,38 @@ function register(ctx) {
     }
   });
 
+  // ==================== 日志管理 ====================
+  
+  /**
+   * 打开日志目录
+   */
+  ipcMain.handle(CHANNELS.LOGS.OPEN_DIRECTORY, async () => {
+    const { getLogDirectory } = require('../utils/logger');
+    const logDir = getLogDirectory();
+    
+    if (logDir) {
+      // 确保目录存在
+      const fs = require('fs');
+      if (!fs.existsSync(logDir)) {
+        fs.mkdirSync(logDir, { recursive: true });
+      }
+      
+      shell.openPath(logDir);
+      logger.info('Opened log directory:', logDir);
+      return { success: true, path: logDir };
+    }
+    
+    return { success: false, message: '无法获取日志目录' };
+  });
+  
+  /**
+   * 获取日志目录路径
+   */
+  ipcMain.handle(CHANNELS.LOGS.GET_DIRECTORY, () => {
+    const { getLogDirectory } = require('../utils/logger');
+    return getLogDirectory();
+  });
+
   logger.info("System IPC handlers registered");
 }
 

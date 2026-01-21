@@ -5,6 +5,7 @@
 const { ipcMain, safeStorage } = require('electron');
 const { CHANNELS } = require('../shared/channels');
 const logger = require('../utils/logger')('IPC:Glass');
+const displayHelper = require('../utils/display-helper');
 
 /**
  * 注册玻璃窗口相关 IPC handlers
@@ -468,12 +469,23 @@ function register(ctx) {
     const estimatedHeight = Math.min(Math.max(lineCount * 20 + 16, 36), 300);
     const winHeight = height ? Math.min(Math.max(height, 36), 300) : estimatedHeight;
     
+    // 验证窗口位置在有效显示器上
+    const validBounds = displayHelper.ensureBoundsOnDisplay({
+      x: x,
+      y: y,
+      width: winWidth,
+      height: winHeight,
+    }, {
+      minVisiblePixels: 50,
+      centerOnInvalid: false, // 不居中，而是移到最近的显示器
+    });
+    
     try {
       const childWindow = new BrowserWindow({
-        x: Math.round(x),
-        y: Math.round(y),
-        width: winWidth,
-        height: winHeight,
+        x: Math.round(validBounds.x),
+        y: Math.round(validBounds.y),
+        width: validBounds.width,
+        height: validBounds.height,
         minWidth: 100,
         minHeight: 36,
         maxWidth: 600,

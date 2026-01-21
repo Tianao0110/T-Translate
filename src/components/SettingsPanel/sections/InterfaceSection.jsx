@@ -2,7 +2,7 @@
 // 界面设置区块组件 - 从 SettingsPanel 拆分
 
 import React from 'react';
-import { Sun, Moon, Sparkles, RefreshCw } from 'lucide-react';
+import { Sun, Moon, Leaf, RefreshCw } from 'lucide-react';
 import { defaultConfig } from '../constants.js';
 
 /**
@@ -125,10 +125,10 @@ const InterfaceSection = ({
             <Moon size={16}/>深色
           </button>
           <button 
-            className={`theme-option rainbow ${settings.interface.theme === 'rainbow' ? 'active' : ''}`} 
-            onClick={() => switchTheme('rainbow')}
+            className={`theme-option fresh ${settings.interface.theme === 'fresh' ? 'active' : ''}`} 
+            onClick={() => switchTheme('fresh')}
           >
-            <Sparkles size={16}/>清新
+            <Leaf size={16}/>清新
           </button>
         </div>
         <p className="setting-hint">主题切换即时生效并自动保存</p>

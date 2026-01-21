@@ -31,6 +31,10 @@ const CHANNELS = {
     GET_PLATFORM: 'get-platform',
     HEALTH_CHECK: 'api:health-check',
   },
+  LOGS: {
+    OPEN_DIRECTORY: 'logs:open-directory',
+    GET_DIRECTORY: 'logs:get-directory',
+  },
   PRIVACY: {
     SET_MODE: 'privacy:setMode',
     GET_MODE: 'privacy:getMode',

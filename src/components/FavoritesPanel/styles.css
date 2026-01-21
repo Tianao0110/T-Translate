@@ -276,6 +276,49 @@
   color: white;
 }
 
+/* 术语库导入导出按钮 */
+.folder-item-actions.glossary-actions {
+  display: flex;
+}
+
+.export-menu-wrapper {
+  position: relative;
+}
+
+.export-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  z-index: 100;
+  overflow: hidden;
+}
+
+.export-menu button {
+  display: block;
+  width: 100%;
+  padding: 8px 16px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.export-menu button:hover {
+  background: var(--bg-hover);
+}
+
+.export-menu button:not(:last-child) {
+  border-bottom: 1px solid var(--border-secondary);
+}
+
 .folder-edit-form {
   flex: 1;
   display: flex;
@@ -513,6 +556,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 16px;
+  align-items: start;  /* 🔧 修复：让每个卡片高度独立，不会被拉伸 */
 }
 
 /* ==================== 收藏卡片 ==================== */
@@ -722,7 +766,7 @@
   to { transform: rotate(360deg); }
 }
 
-.edit-field input,
+.edit-field input[type="text"],
 .edit-field textarea {
   width: 100%;
   padding: 8px 12px;
@@ -734,7 +778,7 @@
   resize: vertical;
 }
 
-.edit-field input:focus,
+.edit-field input[type="text"]:focus,
 .edit-field textarea:focus {
   outline: none;
   border-color: var(--accent-primary);
@@ -873,6 +917,12 @@
   color: white;
 }
 
+.move-menu-divider {
+  height: 1px;
+  background: var(--border-primary);
+  margin: 4px 0;
+}
+
 /* ==================== 空状态 ==================== */
 .empty-state {
   display: flex;
@@ -974,12 +1024,12 @@
   color: white;
 }
 
-/* ==================== 风格参考开关样式 ==================== */
+/* ==================== 风格参考复选框样式 ==================== */
 .style-ref-toggle {
-  padding: 12px;
-  background: rgba(139, 92, 246, 0.05);
+  padding: 12px 14px;
+  background: rgba(139, 92, 246, 0.06);
   border-radius: 8px;
-  border: 1px solid rgba(139, 92, 246, 0.2);
+  border: 1px solid rgba(139, 92, 246, 0.15);
 }
 
 .style-ref-toggle .checkbox-label {
@@ -992,15 +1042,51 @@
   color: var(--text-primary);
 }
 
+/* 正方形复选框 16x16 */
 .style-ref-toggle .checkbox-label input[type="checkbox"] {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
   width: 16px;
   height: 16px;
-  accent-color: #8b5cf6;
+  min-width: 16px;
+  background: #fff;
+  border: 1.5px solid #d1d5db;
+  border-radius: 3px;
   cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+  margin: 0;
+  padding: 0;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.style-ref-toggle .checkbox-label input[type="checkbox"]:hover {
+  border-color: #8b5cf6;
+}
+
+.style-ref-toggle .checkbox-label input[type="checkbox"]:checked {
+  background: #8b5cf6;
+  border-color: #8b5cf6;
+}
+
+/* 勾号居中 */
+.style-ref-toggle .checkbox-label input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  width: 4px;
+  height: 8px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: translate(-50%, -50%) rotate(45deg);
 }
 
 .style-ref-toggle .checkbox-label svg {
   color: #8b5cf6;
+  flex-shrink: 0;
 }
 
 .style-ref-toggle .toggle-hint {
@@ -1009,4 +1095,78 @@
   margin-left: 24px;
   font-size: 11px;
   color: var(--text-tertiary);
+}
+
+/* ==================== 术语库表格 ==================== */
+.glossary-table-wrapper {
+  overflow-x: auto;
+  padding: 0 4px;
+}
+
+.glossary-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.glossary-table th {
+  padding: 12px 16px;
+  text-align: left;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border-primary);
+  position: sticky;
+  top: 0;
+}
+
+.glossary-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-secondary);
+  vertical-align: top;
+}
+
+.glossary-table tr:hover td {
+  background: var(--bg-hover);
+}
+
+.glossary-table .glossary-source {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.glossary-table .glossary-target {
+  color: var(--accent-primary);
+}
+
+.glossary-table .glossary-note {
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.glossary-table .glossary-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.glossary-table .glossary-actions button {
+  padding: 6px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.glossary-table .glossary-actions button:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.glossary-table .glossary-actions button.danger:hover {
+  color: var(--error-color);
 }

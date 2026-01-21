@@ -5,6 +5,7 @@
 const { BrowserWindow, shell } = require('electron');
 const path = require('path');
 const PATHS = require('../shared/paths');
+const displayHelper = require('../utils/display-helper');
 
 // 依赖（通过 init 注入）
 let store = null;
@@ -50,11 +51,28 @@ function createMainWindow() {
   const windowBounds = store.get('windowBounds');
   const windowPosition = store.get('windowPosition');
 
-  const mainWindow = new BrowserWindow({
+  // 合并位置和尺寸，验证是否在有效显示器上
+  const savedBounds = {
     width: windowBounds.width,
     height: windowBounds.height,
     x: windowPosition?.x,
     y: windowPosition?.y,
+  };
+  
+  const validBounds = displayHelper.ensureBoundsOnDisplay(savedBounds, {
+    minVisiblePixels: 100,
+    centerOnInvalid: true,
+  });
+  
+  if (validBounds.adjusted) {
+    logger?.info?.('Main window position adjusted to valid display');
+  }
+
+  const mainWindow = new BrowserWindow({
+    width: validBounds.width,
+    height: validBounds.height,
+    x: validBounds.x,
+    y: validBounds.y,
     minWidth: 800,
     minHeight: 600,
     webPreferences: {
@@ -148,12 +166,23 @@ function createGlassWindow() {
     return windows.glass;
   }
 
-  const glassBounds = store.get('glassBounds', {
+  // 获取保存的位置
+  const savedBounds = store.get('glassBounds', {
     width: 400,
     height: 200,
     x: undefined,
     y: undefined,
   });
+
+  // 验证位置是否在有效显示器上，如果无效则调整
+  const glassBounds = displayHelper.ensureBoundsOnDisplay(savedBounds, {
+    minVisiblePixels: 100,
+    centerOnInvalid: true,
+  });
+  
+  if (glassBounds.adjusted) {
+    logger?.info?.('Glass window position adjusted to valid display');
+  }
 
   const glassWindow = new BrowserWindow({
     width: glassBounds.width,
@@ -519,8 +548,9 @@ function createScreenshotWindow(bounds) {
     hasShadow: false,
     enableLargerThanScreen: true,
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
+      preload: PATHS.preloads.screenshot,
+      contextIsolation: true,
+      nodeIntegration: false,
     },
   });
 

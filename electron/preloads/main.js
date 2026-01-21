@@ -55,6 +55,8 @@ const validChannels = {
     "theme:get",   // 获取主题
     "theme:set",   // 设置主题
     "theme:sync",  // 同步主题
+    "logs:open-directory",  // 打开日志目录
+    "logs:get-directory",   // 获取日志目录路径
   ],
 };
 
@@ -112,6 +114,11 @@ const electronAPI = {
   // Shell
   shell: {
     openExternal: (url) => ipcRenderer.send("open-external", url),
+  },
+  // 日志管理
+  logs: {
+    openDirectory: () => ipcRenderer.invoke("logs:open-directory"),
+    getDirectory: () => ipcRenderer.invoke("logs:get-directory"),
   },
   // Electron Store
   store: {

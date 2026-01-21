@@ -98,7 +98,7 @@ html, body, #root {
 }
 
 /* 彩虹主题加载 - 保留 */
-[data-theme="rainbow"] .sel-loading {
+[data-theme="fresh"] .sel-loading {
   background: rgba(255, 250, 245, 0.98);
   box-shadow: 
     0 4px 20px rgba(139, 92, 246, 0.15),
@@ -145,7 +145,7 @@ html, body, #root {
 }
 
 /* 🌈 彩虹主题卡片 - 保留 */
-[data-theme="rainbow"] .sel-card {
+[data-theme="fresh"] .sel-card {
   background: linear-gradient(135deg, 
     rgba(255, 255, 255, var(--sel-opacity, 0.95)), 
     rgba(240, 248, 255, var(--sel-opacity, 0.95)));
@@ -176,7 +176,7 @@ html, body, #root {
 }
 
 /* 🌈 彩虹主题工具栏 - 保留 */
-[data-theme="rainbow"] .sel-toolbar {
+[data-theme="fresh"] .sel-toolbar {
   background: linear-gradient(90deg, 
     rgba(255, 182, 193, 0.3),
     rgba(255, 218, 185, 0.3),
@@ -222,7 +222,7 @@ html, body, #root {
 }
 
 /* 🌈 彩虹主题按钮 - 保留 */
-[data-theme="rainbow"] .sel-btn.active {
+[data-theme="fresh"] .sel-btn.active {
   background: linear-gradient(135deg, #f472b6, #8b5cf6);
   border-color: transparent;
 }
@@ -270,7 +270,7 @@ html, body, #root {
   color: #e2e8f0;
 }
 
-[data-theme="rainbow"] .sel-content {
+[data-theme="fresh"] .sel-content {
   color: #4b5563;
 }
 
@@ -294,7 +294,7 @@ html, body, #root {
 }
 
 /* 🌈 彩虹主题原文 - 保留 */
-[data-theme="rainbow"] .sel-source {
+[data-theme="fresh"] .sel-source {
   background: linear-gradient(to right, 
     rgba(255, 182, 193, 0.2),
     rgba(186, 225, 255, 0.2)
@@ -315,7 +315,7 @@ html, body, #root {
   color: #f1f5f9;
 }
 
-[data-theme="rainbow"] .sel-text {
+[data-theme="fresh"] .sel-text {
   color: #374151;
 }
 
@@ -361,7 +361,7 @@ html, body, #root {
   background: linear-gradient(to right, rgba(251, 191, 36, 0.15), #1e293b);
 }
 
-[data-theme="rainbow"] .sel-card.frozen .sel-toolbar {
+[data-theme="fresh"] .sel-card.frozen .sel-toolbar {
   background: linear-gradient(90deg, 
     rgba(251, 191, 36, 0.3),
     rgba(255, 218, 185, 0.3)
