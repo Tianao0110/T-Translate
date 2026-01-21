@@ -169,16 +169,13 @@ export default defineConfig(({ command, mode }) => {
           // 手动代码分割
           manualChunks: {
             // React 相关
-            'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+            'react-vendor': ['react', 'react-dom'],
             
             // UI 库
-            'ui-vendor': ['lucide-react', 'framer-motion'],
+            'ui-vendor': ['lucide-react'],
             
             // 工具库
-            'utils-vendor': ['axios', 'dayjs', 'uuid'],
-            
-            // 大型库单独打包
-            'monaco': ['@monaco-editor/react', 'monaco-editor']
+            'utils-vendor': ['dayjs', 'uuid']
           }
         },
         
