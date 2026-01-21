@@ -59,7 +59,7 @@ class TTSManager {
           config = stored;
         }
       } catch (e) {
-        console.log('[TTS] Could not load config from store:', e.message);
+        // 配置加载失败时使用默认配置
       }
     }
     
@@ -203,7 +203,6 @@ class TTSManager {
   async speak(text, options = {}) {
     // 检查是否启用
     if (!this._config.enabled) {
-      console.log('[TTS] Disabled, skipping');
       return;
     }
     

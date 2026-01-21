@@ -74,12 +74,22 @@ function register(ctx) {
   });
 
   /**
-   * 打开外部链接
+   * 打开外部链接（带安全验证）
    */
   ipcMain.on(CHANNELS.SYSTEM.OPEN_EXTERNAL, (event, url) => {
     if (url && typeof url === "string") {
-      shell.openExternal(url);
-      logger.debug("Opening external URL:", url.substring(0, 50));
+      // 安全检查：只允许 http/https 协议
+      try {
+        const parsedUrl = new URL(url);
+        if (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') {
+          shell.openExternal(url);
+          logger.debug("Opening external URL:", url.substring(0, 50));
+        } else {
+          logger.warn("Blocked non-http URL:", parsedUrl.protocol);
+        }
+      } catch (e) {
+        logger.warn("Invalid URL:", url.substring(0, 50));
+      }
     }
   });
 
@@ -91,6 +101,131 @@ function register(ctx) {
   ipcMain.handle(CHANNELS.APP.GET_VERSION, () => {
     return app.getVersion();
   });
+
+  /**
+   * 检查更新 - 从 GitHub Releases 获取最新版本
+   */
+  ipcMain.handle(CHANNELS.APP.CHECK_UPDATE, async () => {
+    const currentVersion = app.getVersion();
+    const repoUrl = 'https://api.github.com/repos/Tianao0110/T-Translate/releases/latest';
+    
+    try {
+      logger.info('Checking for updates...');
+      
+      // 使用 net 模块请求 GitHub API
+      const { net } = require('electron');
+      
+      const response = await new Promise((resolve, reject) => {
+        const request = net.request({
+          method: 'GET',
+          url: repoUrl,
+        });
+        
+        request.setHeader('User-Agent', 'T-Translate-Updater');
+        request.setHeader('Accept', 'application/vnd.github.v3+json');
+        
+        let data = '';
+        let statusCode = 0;
+        
+        request.on('response', (resp) => {
+          statusCode = resp.statusCode;
+          
+          resp.on('data', (chunk) => {
+            data += chunk.toString();
+          });
+          
+          resp.on('end', () => {
+            // 404 表示没有发布任何 Release
+            if (statusCode === 404) {
+              resolve({ noRelease: true });
+              return;
+            }
+            
+            if (statusCode !== 200) {
+              reject(new Error(`HTTP ${statusCode}`));
+              return;
+            }
+            
+            try {
+              resolve(JSON.parse(data));
+            } catch (e) {
+              reject(new Error('Invalid JSON response'));
+            }
+          });
+        });
+        
+        request.on('error', (error) => {
+          reject(error);
+        });
+        
+        // 设置超时
+        setTimeout(() => {
+          request.abort();
+          reject(new Error('Request timeout'));
+        }, 15000);
+        
+        request.end();
+      });
+      
+      // 没有发布任何 Release
+      if (response.noRelease) {
+        logger.info('No releases found on GitHub');
+        return {
+          success: true,
+          hasUpdate: false,
+          currentVersion: currentVersion.replace(/^v/, ''),
+          latestVersion: null,
+          message: '暂无发布版本',
+        };
+      }
+      
+      // 解析版本号 (去掉 v 前缀)
+      const latestVersion = (response.tag_name || '').replace(/^v/, '');
+      const current = currentVersion.replace(/^v/, '');
+      
+      // 比较版本号
+      const hasUpdate = compareVersions(latestVersion, current) > 0;
+      
+      logger.info(`Current: ${current}, Latest: ${latestVersion}, HasUpdate: ${hasUpdate}`);
+      
+      return {
+        success: true,
+        hasUpdate,
+        currentVersion: current,
+        latestVersion,
+        releaseUrl: response.html_url,
+        releaseName: response.name,
+        releaseNotes: response.body || '',
+        publishedAt: response.published_at,
+      };
+      
+    } catch (error) {
+      logger.error('Check update failed:', error.message);
+      return {
+        success: false,
+        error: error.message || '检查更新失败',
+      };
+    }
+  });
+
+  /**
+   * 版本号比较函数
+   * @returns 1 if a > b, -1 if a < b, 0 if equal
+   */
+  function compareVersions(a, b) {
+    const partsA = a.split('.').map(Number);
+    const partsB = b.split('.').map(Number);
+    
+    for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
+      const numA = partsA[i] || 0;
+      const numB = partsB[i] || 0;
+      
+      if (numA > numB) return 1;
+      if (numA < numB) return -1;
+    }
+    
+    return 0;
+  }
 
   /**
    * 获取平台信息

@@ -72,11 +72,15 @@ const pages = {
 
 /**
  * 资源文件路径
+ * 注意：extraResources 在打包后位于 process.resourcesPath
  */
 const resources = {
   icon: path.join(BASE_DIR, 'public/icon.png'),
   trayIcon: path.join(BASE_DIR, 'public/tray-icon.ico'),
-  ocrData: path.join(BASE_DIR, 'resources/ocr'),
+  // OCR 数据在打包后位于 resources 目录
+  ocrData: isDev 
+    ? path.join(BASE_DIR, 'resources/ocr')
+    : path.join(process.resourcesPath, 'resources/ocr'),
 };
 
 /**

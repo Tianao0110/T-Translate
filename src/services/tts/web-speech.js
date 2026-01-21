@@ -153,7 +153,6 @@ export class WebSpeechEngine extends BaseTTSEngine {
     let actualLang = lang;
     if (!lang || lang === 'auto') {
       actualLang = this._detectLanguage(text);
-      console.log('[TTS] Auto-detected language:', actualLang, 'from text:', text.substring(0, 20));
     }
     
     // 根据语言查找
@@ -244,10 +243,8 @@ export class WebSpeechEngine extends BaseTTSEngine {
       if (voice) {
         utterance.voice = voice;
         utterance.lang = voice.lang;
-        console.log('[TTS] Using voice:', voice.name, voice.lang);
       } else if (lang && lang !== 'auto') {
         utterance.lang = lang;
-        console.log('[TTS] No voice found for', lang, ', using default');
       }
       
       // 设置参数

@@ -159,7 +159,14 @@ if (import.meta.hot) {
 
 // 导出一些全局函数供调试使用（仅开发环境有日志输出）
 window.TTranslate = {
-  version: '1.0.0',
+  // 版本号 - 动态获取
+  getVersion: async () => {
+    try {
+      return await window.electron?.app?.getVersion?.() || '0.0.0';
+    } catch {
+      return '0.0.0';
+    }
+  },
   
   // 调试函数
   debug: {

@@ -19,7 +19,7 @@ const PRIVACY_MODES = {
 const THEMES = {
   LIGHT: 'light',
   DARK: 'dark',
-  AUTO: 'auto',
+  FRESH: 'fresh',  // 清新（青绿色）
 };
 
 const OCR_ENGINES = {

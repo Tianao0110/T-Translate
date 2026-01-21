@@ -59,8 +59,6 @@ const ChildGlassPane = ({
     const rect = paneRef.current?.getBoundingClientRect();
     if (!rect) return;
     
-    console.log('[ChildPane] Double-click freeze at:', { x: rect.left, y: rect.top });
-    
     // 调用冻结回调，传递视口坐标
     onFreeze?.(id, { viewportX: rect.left, viewportY: rect.top });
   }, [id, status, isFrozen, onFreeze]);

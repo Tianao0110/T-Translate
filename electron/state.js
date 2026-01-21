@@ -41,6 +41,14 @@ const store = new Store({
       glassWindow: {},
       providers: {},
       connection: {},
+      tts: {
+        enabled: true,
+        engine: 'web-speech',
+        voiceId: '',
+        rate: 1.0,
+        pitch: 1.0,
+        volume: 0.8,
+      },
     },
   },
 });

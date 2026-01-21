@@ -934,8 +934,8 @@ app.whenReady().then(() => {
   runtime.selectionEnabled = false;
   store.set('selectionEnabled', false);
 
-  // 内存监控
-  setInterval(() => {
+  // 内存监控（保存定时器ID以便清理）
+  runtime.memoryMonitorInterval = setInterval(() => {
     const usage = process.memoryUsage();
     const heapUsedMB = Math.round(usage.heapUsed / 1024 / 1024);
     logger.debug(`Memory: ${heapUsedMB}MB`);
@@ -1005,6 +1005,20 @@ process.on('unhandledRejection', (reason, promise) => {
   logger.error('Unhandled rejection:', reason);
 });
 
+// 处理控制台退出 (Ctrl+C)
+process.on('SIGINT', () => {
+  logger.info('Received SIGINT, quitting...');
+  runtime.isQuitting = true;
+  app.quit();
+});
+
+// 处理终止信号
+process.on('SIGTERM', () => {
+  logger.info('Received SIGTERM, quitting...');
+  runtime.isQuitting = true;
+  app.quit();
+});
+
 // 窗口全部关闭
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
@@ -1021,11 +1035,36 @@ app.on('activate', () => {
   }
 });
 
+// 应用准备退出 - 设置标志并强制销毁所有窗口
+app.on('before-quit', () => {
+  runtime.isQuitting = true;
+  
+  // 先停止划词翻译钩子（避免在窗口关闭过程中触发）
+  stopSelectionHook();
+  
+  // 强制销毁所有窗口
+  const allWindows = BrowserWindow.getAllWindows();
+  allWindows.forEach(win => {
+    if (win && !win.isDestroyed()) {
+      win.removeAllListeners('close');
+      win.destroy();
+    }
+  });
+});
+
 // 应用退出前清理
 app.on('will-quit', () => {
+  // 清理内存监控定时器
+  if (runtime.memoryMonitorInterval) {
+    clearInterval(runtime.memoryMonitorInterval);
+    runtime.memoryMonitorInterval = null;
+  }
+  
   unregisterAllShortcuts();
-  stopSelectionHook();
+  // stopSelectionHook 已在 before-quit 中调用
   destroyTray();
+  
+  logger.info('App cleanup completed');
 });
 
 // 单实例锁

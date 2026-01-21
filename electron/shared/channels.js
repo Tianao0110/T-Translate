@@ -30,6 +30,7 @@ const CHANNELS = {
     GET_VERSION: 'get-app-version',
     GET_PLATFORM: 'get-platform',
     HEALTH_CHECK: 'api:health-check',
+    CHECK_UPDATE: 'app:check-update',
   },
   LOGS: {
     OPEN_DIRECTORY: 'logs:open-directory',

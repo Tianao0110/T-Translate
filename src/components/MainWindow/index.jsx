@@ -1,22 +1,32 @@
 // src/components/MainWindow/index.jsx
 import createLogger from '../../utils/logger.js';
 const logger = createLogger('MainWindow');
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import {
-  FileText, Languages, Settings, History, Star, Sparkles,
-  AlertCircle, CheckCircle, Info, X, FileUp
+  FileText, Languages, Settings, History, Star,
+  AlertCircle, CheckCircle, Info, X, FileUp, Loader2
 } from 'lucide-react';
 
 import useTranslationStore from '../../stores/translation-store';
+// TranslationPanel 是首屏必需，直接导入
 import TranslationPanel from '../TranslationPanel';
-import HistoryPanel from '../HistoryPanel';
-import SettingsPanel from '../SettingsPanel';
-import FavoritesPanel from '../FavoritesPanel';
-import DocumentTranslator from '../DocumentTranslator';
+// 其他面板懒加载
+const HistoryPanel = lazy(() => import('../HistoryPanel'));
+const SettingsPanel = lazy(() => import('../SettingsPanel'));
+const FavoritesPanel = lazy(() => import('../FavoritesPanel'));
+const DocumentTranslator = lazy(() => import('../DocumentTranslator'));
 import './styles.css';
 
 // 从配置中心导入常量
 import { TRANSLATION_STATUS } from '@config/defaults'; 
+
+// 懒加载 Loading 组件
+const LazyLoadingFallback = () => (
+  <div className="lazy-loading-fallback">
+    <Loader2 className="spinning" size={24} />
+    <span>加载中...</span>
+  </div>
+); 
 
 /**
  * 主窗口组件
@@ -32,6 +42,9 @@ const MainWindow = () => {
     dateRange: 'all',
     favorites: false
   });
+  
+  // 版本号
+  const [version, setVersion] = useState('');
   
   // 文档翻译弹窗
   const [showDocTranslator, setShowDocTranslator] = useState(false);
@@ -61,6 +74,19 @@ const MainWindow = () => {
   useEffect(() => {
     if(getStatistics) getStatistics();
   }, [getStatistics]);
+
+  // 获取应用版本号
+  useEffect(() => {
+    const fetchVersion = async () => {
+      try {
+        const ver = await window.electron?.app?.getVersion?.();
+        setVersion(ver || '0.0.0');
+      } catch {
+        setVersion('0.0.0');
+      }
+    };
+    fetchVersion();
+  }, []);
 
   // 全局截图监听 - 始终挂载，不会因标签切换而丢失
   useEffect(() => {
@@ -219,11 +245,23 @@ const MainWindow = () => {
           onScreenshotProcessed={() => setScreenshotData(null)}
         />;
       case 'history':
-        return <HistoryPanel searchQuery={searchQuery} filterOptions={filterOptions} showNotification={showNotification} />;
+        return (
+          <Suspense fallback={<LazyLoadingFallback />}>
+            <HistoryPanel searchQuery={searchQuery} filterOptions={filterOptions} showNotification={showNotification} />
+          </Suspense>
+        );
       case 'favorites':
-        return <FavoritesPanel searchQuery={searchQuery} showNotification={showNotification} />;
+        return (
+          <Suspense fallback={<LazyLoadingFallback />}>
+            <FavoritesPanel searchQuery={searchQuery} showNotification={showNotification} />
+          </Suspense>
+        );
       case 'settings':
-        return <SettingsPanel showNotification={showNotification} />;
+        return (
+          <Suspense fallback={<LazyLoadingFallback />}>
+            <SettingsPanel showNotification={showNotification} />
+          </Suspense>
+        );
       default:
         return null;
     }
@@ -241,12 +279,7 @@ const MainWindow = () => {
       {/* 顶部工具栏 */}
       <div className="main-toolbar">
         <div className="toolbar-brand">
-          <img src="./icon.png" alt="Logo" className="brand-logo-img" onError={(e) => {
-            // 如果图片加载失败，显示备用图标
-            e.target.style.display = 'none';
-            e.target.nextSibling.style.display = 'flex';
-          }} />
-          <div className="brand-logo" style={{display: 'none'}}><Sparkles size={18} /></div>
+          <img src="./icon.png" alt="T-Translate" className="brand-logo-img" />
         </div>
 
         <div className="toolbar-tabs">
@@ -302,7 +335,7 @@ const MainWindow = () => {
             <span className="status-text">今日: {statistics.todayTranslations} 次</span>
           </div>
           <div className="status-item">
-            <span className="status-text">v1.0.0</span>
+            <span className="status-text">v{version}</span>
           </div>
         </div>
       </div>
@@ -314,12 +347,14 @@ const MainWindow = () => {
         <div className="doc-translator-modal">
           <div className="doc-translator-overlay" onClick={() => setShowDocTranslator(false)} />
           <div className="doc-translator-container">
-            <DocumentTranslator
-              onClose={() => setShowDocTranslator(false)}
-              notify={showNotification}
-              sourceLang={currentTranslation.sourceLanguage}
-              targetLang={currentTranslation.targetLanguage}
-            />
+            <Suspense fallback={<LazyLoadingFallback />}>
+              <DocumentTranslator
+                onClose={() => setShowDocTranslator(false)}
+                notify={showNotification}
+                sourceLang={currentTranslation.sourceLanguage}
+                targetLang={currentTranslation.targetLanguage}
+              />
+            </Suspense>
           </div>
         </div>
       )}

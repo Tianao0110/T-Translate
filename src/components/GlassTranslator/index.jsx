@@ -121,11 +121,6 @@ const GlassTranslator = () => {
           height: rect.height,
         };
         setGlassBounds(newBounds);
-        // 调试日志（每 5 秒打印一次）
-        if (!window._lastBoundsLog || Date.now() - window._lastBoundsLog > 5000) {
-          console.log('[GlassTranslator] Content bounds:', newBounds);
-          window._lastBoundsLog = Date.now();
-        }
       }
     };
     

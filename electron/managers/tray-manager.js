@@ -51,7 +51,9 @@ function createTray(ctx) {
     return tray;
   }
 
-  const iconPath = PATHS.resources.icon;
+  const iconPath = process.platform === 'win32' 
+    ? PATHS.resources.trayIcon  // Windows 使用 .ico
+    : PATHS.resources.icon;     // 其他系统使用 .png
   const trayIcon = nativeImage
     .createFromPath(iconPath)
     .resize({ width: 16, height: 16 });
@@ -161,6 +163,7 @@ function updateMenu() {
     {
       label: '退出',
       click: () => {
+        runtime.isQuitting = true;
         app.quit();
       },
     },

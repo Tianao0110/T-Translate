@@ -68,6 +68,7 @@ const electronAPI = {
     getVersion: () => ipcRenderer.invoke("get-app-version"),
     getPlatform: () => ipcRenderer.invoke("get-platform"),
     getPath: (name) => ipcRenderer.invoke("get-app-path", name),
+    checkUpdate: () => ipcRenderer.invoke("app:check-update"),
   },
   window: {
     minimize: () => ipcRenderer.send("minimize-window"),
