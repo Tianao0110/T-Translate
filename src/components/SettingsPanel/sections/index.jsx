@@ -8,6 +8,7 @@ export { default as SelectionSection } from './SelectionSection.jsx';
 export { default as PrivacySection } from './PrivacySection.jsx';
 export { default as DocumentSection } from './DocumentSection.jsx';
 export { default as TranslationSection } from './TranslationSection.jsx';
+export { default as TTSSection } from './TTSSection.jsx';
 export { default as AboutSection } from './AboutSection.jsx';
 export { default as ConnectionSection } from './ConnectionSection.jsx';
 export { default as ProvidersSection } from './ProvidersSection.jsx';

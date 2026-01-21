@@ -19,6 +19,18 @@ const engines = {
 };
 
 /**
+ * 默认 TTS 配置
+ */
+export const DEFAULT_TTS_CONFIG = {
+  enabled: true,
+  engine: 'web-speech',
+  rate: 1.0,
+  pitch: 1.0,
+  volume: 0.8,
+  voiceId: '',  // 空表示自动选择
+};
+
+/**
  * TTS 服务管理器
  * 单例模式，统一管理所有 TTS 引擎
  */
@@ -27,26 +39,57 @@ class TTSManager {
     this._engines = new Map();
     this._currentEngine = null;
     this._currentEngineId = null;
-    this._config = {
-      defaultEngine: 'web-speech',
-      rate: 1,
-      pitch: 1,
-      volume: 1,
-    };
+    this._config = { ...DEFAULT_TTS_CONFIG };
     this._onStatusChange = null;
+    this._initialized = false;
   }
 
   /**
    * 初始化管理器
-   * @param {Object} config - 配置
+   * @param {Object} config - 配置（可选，会自动从 store 读取）
    */
-  async init(config = {}) {
-    this._config = { ...this._config, ...config };
+  async init(config = null) {
+    if (this._initialized) return this;
     
-    // 初始化默认引擎
-    await this.setEngine(this._config.defaultEngine);
+    // 尝试从 store 读取配置
+    if (!config) {
+      try {
+        const stored = await window.electron?.store?.get('settings.tts');
+        if (stored) {
+          config = stored;
+        }
+      } catch (e) {
+        console.log('[TTS] Could not load config from store:', e.message);
+      }
+    }
     
+    this._config = { ...DEFAULT_TTS_CONFIG, ...config };
+    
+    // 如果启用，初始化引擎
+    if (this._config.enabled) {
+      try {
+        await this.setEngine(this._config.engine || 'web-speech');
+      } catch (e) {
+        console.error('[TTS] Failed to init engine:', e);
+      }
+    }
+    
+    this._initialized = true;
     return this;
+  }
+
+  /**
+   * 获取当前配置
+   */
+  get config() {
+    return { ...this._config };
+  }
+
+  /**
+   * 是否已启用
+   */
+  get enabled() {
+    return this._config.enabled;
   }
 
   /**
@@ -73,7 +116,11 @@ class TTSManager {
       throw new Error(`Unknown TTS engine: ${engineId}`);
     }
     
-    const engine = new EngineClass(this._config);
+    const engine = new EngineClass({
+      defaultRate: this._config.rate,
+      defaultPitch: this._config.pitch,
+      defaultVolume: this._config.volume,
+    });
     
     // 检查可用性
     const available = await engine.isAvailable();
@@ -143,7 +190,7 @@ class TTSManager {
    */
   async getVoices() {
     if (!this._currentEngine) {
-      await this.setEngine(this._config.defaultEngine);
+      await this.setEngine(this._config.engine || 'web-speech');
     }
     return this._currentEngine.getVoices();
   }
@@ -154,14 +201,21 @@ class TTSManager {
    * @param {Object} options - 选项
    */
   async speak(text, options = {}) {
+    // 检查是否启用
+    if (!this._config.enabled) {
+      console.log('[TTS] Disabled, skipping');
+      return;
+    }
+    
     if (!this._currentEngine) {
-      await this.setEngine(this._config.defaultEngine);
+      await this.setEngine(this._config.engine || 'web-speech');
     }
     
     const mergedOptions = {
       rate: this._config.rate,
       pitch: this._config.pitch,
       volume: this._config.volume,
+      voiceId: this._config.voiceId,
       ...options,
     };
     
@@ -192,9 +246,28 @@ class TTSManager {
   /**
    * 更新配置
    * @param {Object} config
+   * @param {boolean} persist - 是否持久化到 store
    */
-  updateConfig(config) {
+  async updateConfig(config, persist = true) {
     this._config = { ...this._config, ...config };
+    
+    // 更新引擎配置
+    if (this._currentEngine) {
+      this._currentEngine.updateConfig({
+        defaultRate: this._config.rate,
+        defaultPitch: this._config.pitch,
+        defaultVolume: this._config.volume,
+      });
+    }
+    
+    // 持久化到 store
+    if (persist) {
+      try {
+        await window.electron?.store?.set('settings.tts', this._config);
+      } catch (e) {
+        console.error('[TTS] Failed to save config:', e);
+      }
+    }
   }
 
   /**
@@ -206,6 +279,7 @@ class TTSManager {
     }
     this._engines.clear();
     this._currentEngine = null;
+    this._initialized = false;
   }
 }
 

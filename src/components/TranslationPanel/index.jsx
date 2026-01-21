@@ -52,6 +52,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   // ========== TTS 朗读 ==========
   const [ttsStatus, setTtsStatus] = useState(TTS_STATUS.IDLE); // TTS 状态
   const [ttsTarget, setTtsTarget] = useState(null); // 'source' | 'target' 当前朗读的是原文还是译文
+  const [ttsEnabled, setTtsEnabled] = useState(true); // TTS 是否启用
   
   // ========== AI 自动分析 ==========
   const [isAnalyzing, setIsAnalyzing] = useState(false); // 正在分析
@@ -94,7 +95,10 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   // ========== TTS 初始化 ==========
   useEffect(() => {
     // 初始化 TTS 管理器
-    ttsManager.init().catch(e => {
+    ttsManager.init().then(() => {
+      // 获取 TTS 启用状态
+      setTtsEnabled(ttsManager.enabled);
+    }).catch(e => {
       logger.warn('TTS init failed:', e.message);
     });
     
@@ -122,6 +126,13 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     if (ttsStatus === TTS_STATUS.SPEAKING && ttsTarget === target) {
       ttsManager.stop();
       return;
+    }
+    
+    // 如果正在朗读其他目标，先停止
+    if (ttsStatus === TTS_STATUS.SPEAKING) {
+      ttsManager.stop();
+      // 等待一小段时间确保停止完成
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
     
     try {
@@ -925,22 +936,24 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
               >
                 <RotateCcw size={15} />
               </button>
-              <button 
-                className={`action-btn ${ttsStatus === TTS_STATUS.SPEAKING && ttsTarget === 'source' ? 'active' : ''}`}
-                onClick={() => speakText(
-                  currentTranslation.sourceText, 
-                  'source', 
-                  currentTranslation.sourceLang
-                )}
-                disabled={!currentTranslation.sourceText || isOcrProcessing}
-                title={ttsStatus === TTS_STATUS.SPEAKING && ttsTarget === 'source' ? '停止朗读' : '朗读原文'}
-              >
-                {ttsStatus === TTS_STATUS.SPEAKING && ttsTarget === 'source' ? (
-                  <VolumeX size={15} />
-                ) : (
-                  <Volume2 size={15} />
-                )}
-              </button>
+              {ttsEnabled && (
+                <button 
+                  className={`action-btn ${ttsStatus === TTS_STATUS.SPEAKING && ttsTarget === 'source' ? 'active' : ''}`}
+                  onClick={() => speakText(
+                    currentTranslation.sourceText, 
+                    'source', 
+                    currentTranslation.sourceLang
+                  )}
+                  disabled={!currentTranslation.sourceText || isOcrProcessing}
+                  title={ttsStatus === TTS_STATUS.SPEAKING && ttsTarget === 'source' ? '停止朗读' : '朗读原文'}
+                >
+                  {ttsStatus === TTS_STATUS.SPEAKING && ttsTarget === 'source' ? (
+                    <VolumeX size={15} />
+                  ) : (
+                    <Volume2 size={15} />
+                  )}
+                </button>
+              )}
             </div>
           </div>
 
@@ -1052,22 +1065,24 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
               >
                 <Sparkles size={15} />
               </button>
-              <button 
-                className={`action-btn ${ttsStatus === TTS_STATUS.SPEAKING && ttsTarget === 'target' ? 'active' : ''}`}
-                onClick={() => speakText(
-                  currentTranslation.translatedText, 
-                  'target', 
-                  currentTranslation.targetLang
-                )}
-                disabled={!currentTranslation.translatedText}
-                title={ttsStatus === TTS_STATUS.SPEAKING && ttsTarget === 'target' ? '停止朗读' : '朗读译文'}
-              >
-                {ttsStatus === TTS_STATUS.SPEAKING && ttsTarget === 'target' ? (
-                  <VolumeX size={15} />
-                ) : (
-                  <Volume2 size={15} />
-                )}
-              </button>
+              {ttsEnabled && (
+                <button 
+                  className={`action-btn ${ttsStatus === TTS_STATUS.SPEAKING && ttsTarget === 'target' ? 'active' : ''}`}
+                  onClick={() => speakText(
+                    currentTranslation.translatedText, 
+                    'target', 
+                    currentTranslation.targetLang
+                  )}
+                  disabled={!currentTranslation.translatedText}
+                  title={ttsStatus === TTS_STATUS.SPEAKING && ttsTarget === 'target' ? '停止朗读' : '朗读译文'}
+                >
+                  {ttsStatus === TTS_STATUS.SPEAKING && ttsTarget === 'target' ? (
+                    <VolumeX size={15} />
+                  ) : (
+                    <Volume2 size={15} />
+                  )}
+                </button>
+              )}
             </div>
           </div>
 

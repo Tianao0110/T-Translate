@@ -74,6 +74,17 @@ export const llmDefaults = {
   maxTokens: DEFAULTS.LLM_MAX_TOKENS,
 };
 
+// ==================== TTS 默认配置 ====================
+
+export const ttsDefaults = {
+  enabled: true,
+  engine: 'web-speech',
+  rate: 1.0,
+  pitch: 1.0,
+  volume: 0.8,
+  voiceId: '',  // 空表示自动选择
+};
+
 // ==================== 默认导出 ====================
 
 export default {

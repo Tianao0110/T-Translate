@@ -39,6 +39,7 @@ import {
   PrivacySection,
   DocumentSection,
   TranslationSection,
+  TTSSection,
   AboutSection,
   ConnectionSection,
   ProvidersSection
@@ -543,6 +544,14 @@ const SettingsPanel = ({ showNotification }) => {
             showApiKeys={showApiKeys}
             setShowApiKeys={setShowApiKeys}
             setOcrEngine={setOcrEngine}
+          />
+        );
+      case 'tts':
+        return (
+          <TTSSection
+            settings={settings}
+            updateSetting={updateSetting}
+            notify={notify}
           />
         );
       case 'interface':

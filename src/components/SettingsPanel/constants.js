@@ -3,7 +3,7 @@
 
 import {
   Globe, Shield, Zap, Moon, Sun,
-  Info, Wifi, Eye, Lock,
+  Info, Wifi, Eye, Lock, Volume2,
   Code2, Palette, Layers, MousePointer, Server,
   FileText
 } from 'lucide-react';
@@ -70,6 +70,7 @@ export const NAV_ITEMS = [
   { id: 'document', icon: FileText, label: '文档翻译', group: '翻译', keywords: ['文档', 'pdf', 'docx', 'epub', 'srt', '字幕', '批量'] },
   // 系统组
   { id: 'ocr', icon: Eye, label: 'OCR 识别', group: '系统', keywords: ['ocr', '识别', '截图', '图片', '文字识别', 'rapidocr', 'llm'] },
+  { id: 'tts', icon: Volume2, label: '朗读设置', group: '系统', keywords: ['朗读', '语音', '播放', 'tts', 'speech', '音量', '语速'] },
   { id: 'interface', icon: Palette, label: '界面外观', group: '系统', keywords: ['界面', '主题', '深色', '浅色', '字体', '外观'] },
   { id: 'connection', icon: Wifi, label: 'LM Studio', group: '系统', keywords: ['连接', '端点', 'api', 'endpoint', 'lmstudio', '超时', 'timeout'] },
   { id: 'privacy', icon: Shield, label: '隐私模式', group: '系统', keywords: ['隐私', '安全', '模式', '历史', '记录'] },
@@ -165,6 +166,16 @@ export const DEFAULT_SETTINGS = {
     confidence: 0.6,
   },
   
+  // TTS 朗读设置
+  tts: {
+    enabled: true,
+    engine: 'web-speech',
+    rate: 1.0,
+    pitch: 1.0,
+    volume: 0.8,
+    voiceId: '',
+  },
+  
   // 截图设置
   screenshot: {
     outputMode: 'bubble',  // 'bubble' | 'main' - 输出到气泡窗口或主窗口
@@ -213,6 +224,10 @@ export const migrateOldSettings = (savedSettings) => {
     ocr: {
       ...DEFAULT_SETTINGS.ocr,
       ...(savedSettings.ocr || {}),
+    },
+    tts: {
+      ...DEFAULT_SETTINGS.tts,
+      ...(savedSettings.tts || {}),
     },
     screenshot: {
       ...DEFAULT_SETTINGS.screenshot,

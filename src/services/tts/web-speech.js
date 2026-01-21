@@ -15,32 +15,7 @@ export class WebSpeechEngine extends BaseTTSEngine {
     type: 'local',
     isOnline: false,
     supportedLanguages: ['*'],  // 取决于系统安装的语音包
-    configSchema: {
-      defaultRate: {
-        type: 'number',
-        label: '默认语速',
-        default: 1,
-        min: 0.5,
-        max: 2,
-        step: 0.1,
-      },
-      defaultPitch: {
-        type: 'number',
-        label: '默认音调',
-        default: 1,
-        min: 0.5,
-        max: 2,
-        step: 0.1,
-      },
-      defaultVolume: {
-        type: 'number',
-        label: '默认音量',
-        default: 1,
-        min: 0,
-        max: 1,
-        step: 0.1,
-      },
-    },
+    configSchema: {},
   };
 
   constructor(config = {}) {
@@ -51,54 +26,72 @@ export class WebSpeechEngine extends BaseTTSEngine {
       ...config,
     });
     
-    this._synth = window.speechSynthesis;
+    this._synth = typeof window !== 'undefined' ? window.speechSynthesis : null;
     this._voices = [];
     this._voicesLoaded = false;
+    this._voicesPromise = null;
     
     // 加载语音列表
-    this._loadVoices();
-    
-    // 某些浏览器需要监听 voiceschanged 事件
     if (this._synth) {
-      this._synth.onvoiceschanged = () => this._loadVoices();
+      this._voicesPromise = this._loadVoicesAsync();
     }
   }
 
   /**
-   * 加载可用语音列表
+   * 异步加载语音列表
    * @private
    */
-  _loadVoices() {
-    if (!this._synth) return;
+  async _loadVoicesAsync() {
+    if (!this._synth) return [];
     
-    this._voices = this._synth.getVoices();
-    this._voicesLoaded = this._voices.length > 0;
+    // 先尝试直接获取
+    let voices = this._synth.getVoices();
+    
+    // 如果为空，等待 voiceschanged 事件
+    if (!voices.length) {
+      voices = await new Promise((resolve) => {
+        const timeout = setTimeout(() => {
+          resolve(this._synth.getVoices());
+        }, 1000);
+        
+        const handler = () => {
+          clearTimeout(timeout);
+          this._synth.removeEventListener('voiceschanged', handler);
+          resolve(this._synth.getVoices());
+        };
+        
+        this._synth.addEventListener('voiceschanged', handler);
+        
+        // 再次尝试获取（某些浏览器需要）
+        const retry = this._synth.getVoices();
+        if (retry.length) {
+          clearTimeout(timeout);
+          this._synth.removeEventListener('voiceschanged', handler);
+          resolve(retry);
+        }
+      });
+    }
+    
+    this._voices = voices;
+    this._voicesLoaded = true;
+    console.log('[TTS] Loaded', voices.length, 'voices');
+    return voices;
   }
 
   /**
    * 检查引擎是否可用
    */
   async isAvailable() {
-    return 'speechSynthesis' in window;
+    return typeof window !== 'undefined' && 'speechSynthesis' in window;
   }
 
   /**
    * 获取可用的语音列表
    */
   async getVoices() {
-    // 等待语音加载
-    if (!this._voicesLoaded) {
-      await new Promise(resolve => {
-        const checkVoices = () => {
-          this._loadVoices();
-          if (this._voicesLoaded) {
-            resolve();
-          } else {
-            setTimeout(checkVoices, 100);
-          }
-        };
-        checkVoices();
-      });
+    // 等待语音加载完成
+    if (this._voicesPromise) {
+      await this._voicesPromise;
     }
     
     return this._voices.map(voice => ({
@@ -111,46 +104,98 @@ export class WebSpeechEngine extends BaseTTSEngine {
   }
 
   /**
+   * 简单的文本语言检测
+   * @private
+   */
+  _detectLanguage(text) {
+    if (!text) return null;
+    
+    // 检测中文
+    if (/[\u4e00-\u9fa5]/.test(text)) {
+      return 'zh';
+    }
+    // 检测日文（平假名、片假名）
+    if (/[\u3040-\u309f\u30a0-\u30ff]/.test(text)) {
+      return 'ja';
+    }
+    // 检测韩文
+    if (/[\uac00-\ud7af]/.test(text)) {
+      return 'ko';
+    }
+    // 检测俄文
+    if (/[\u0400-\u04ff]/.test(text)) {
+      return 'ru';
+    }
+    // 检测阿拉伯文
+    if (/[\u0600-\u06ff]/.test(text)) {
+      return 'ar';
+    }
+    // 默认英文
+    return 'en';
+  }
+
+  /**
    * 根据语言代码查找最佳语音
    * @private
    */
-  _findVoice(lang, voiceId) {
+  _findVoice(lang, voiceId, text = '') {
     if (!this._voices.length) {
-      this._loadVoices();
+      return null;
     }
     
     // 如果指定了 voiceId，优先使用
     if (voiceId) {
-      const voice = this._voices.find(v => v.voiceURI === voiceId);
+      const voice = this._voices.find(v => v.voiceURI === voiceId || v.name === voiceId);
       if (voice) return voice;
     }
     
+    // 处理 'auto' 语言 - 通过文本检测
+    let actualLang = lang;
+    if (!lang || lang === 'auto') {
+      actualLang = this._detectLanguage(text);
+      console.log('[TTS] Auto-detected language:', actualLang, 'from text:', text.substring(0, 20));
+    }
+    
     // 根据语言查找
-    if (lang) {
+    if (actualLang) {
+      const langLower = actualLang.toLowerCase();
+      
       // 精确匹配
-      let voice = this._voices.find(v => v.lang.toLowerCase() === lang.toLowerCase());
+      let voice = this._voices.find(v => v.lang.toLowerCase() === langLower);
       if (voice) return voice;
       
       // 前缀匹配（如 'zh' 匹配 'zh-CN'）
-      voice = this._voices.find(v => v.lang.toLowerCase().startsWith(lang.toLowerCase()));
+      voice = this._voices.find(v => v.lang.toLowerCase().startsWith(langLower + '-'));
       if (voice) return voice;
       
-      // 语言代码映射
+      // 包含匹配
+      voice = this._voices.find(v => v.lang.toLowerCase().startsWith(langLower));
+      if (voice) return voice;
+      
+      // 语言代码映射（扩展版）
       const langMap = {
-        'zh': ['zh-CN', 'zh-TW', 'zh-HK'],
-        'en': ['en-US', 'en-GB', 'en-AU'],
-        'ja': ['ja-JP'],
-        'ko': ['ko-KR'],
-        'fr': ['fr-FR'],
-        'de': ['de-DE'],
-        'es': ['es-ES'],
-        'ru': ['ru-RU'],
+        'zh': ['zh-CN', 'zh-TW', 'zh-HK', 'cmn', 'yue'],
+        'zh-hans': ['zh-CN'],
+        'zh-hant': ['zh-TW', 'zh-HK'],
+        'en': ['en-US', 'en-GB', 'en-AU', 'en-IN'],
+        'ja': ['ja-JP', 'ja'],
+        'ko': ['ko-KR', 'ko'],
+        'fr': ['fr-FR', 'fr-CA', 'fr'],
+        'de': ['de-DE', 'de-AT', 'de'],
+        'es': ['es-ES', 'es-MX', 'es'],
+        'ru': ['ru-RU', 'ru'],
+        'pt': ['pt-BR', 'pt-PT', 'pt'],
+        'it': ['it-IT', 'it'],
+        'ar': ['ar-SA', 'ar'],
       };
       
-      const variants = langMap[lang.toLowerCase()];
+      const variants = langMap[langLower];
       if (variants) {
         for (const variant of variants) {
-          voice = this._voices.find(v => v.lang.toLowerCase() === variant.toLowerCase());
+          voice = this._voices.find(v => 
+            v.lang.toLowerCase() === variant.toLowerCase() ||
+            v.lang.toLowerCase().startsWith(variant.toLowerCase())
+          );
           if (voice) return voice;
         }
       }
@@ -168,8 +213,20 @@ export class WebSpeechEngine extends BaseTTSEngine {
       throw new Error('SpeechSynthesis not available');
     }
     
-    // 停止当前朗读
-    this.stop();
+    if (!text?.trim()) {
+      return;
+    }
+    
+    // 确保语音已加载
+    if (this._voicesPromise) {
+      await this._voicesPromise;
+    }
+    
+    // 停止当前朗读，并等待一小段时间确保完全停止
+    if (this._synth.speaking || this._synth.pending) {
+      this.stop();
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
     
     const {
       lang,
@@ -182,13 +239,15 @@ export class WebSpeechEngine extends BaseTTSEngine {
     return new Promise((resolve, reject) => {
       const utterance = new SpeechSynthesisUtterance(text);
       
-      // 设置语音
-      const voice = this._findVoice(lang, voiceId);
+      // 设置语音（传入text用于自动检测语言）
+      const voice = this._findVoice(lang, voiceId, text);
       if (voice) {
         utterance.voice = voice;
         utterance.lang = voice.lang;
-      } else if (lang) {
+        console.log('[TTS] Using voice:', voice.name, voice.lang);
+      } else if (lang && lang !== 'auto') {
         utterance.lang = lang;
+        console.log('[TTS] No voice found for', lang, ', using default');
       }
       
       // 设置参数
@@ -208,9 +267,15 @@ export class WebSpeechEngine extends BaseTTSEngine {
       };
       
       utterance.onerror = (event) => {
+        console.error('[TTS] Error:', event.error);
         this._setStatus(TTS_STATUS.ERROR);
         this._currentUtterance = null;
-        reject(new Error(event.error || 'Speech synthesis error'));
+        // 某些错误不需要 reject（如 canceled）
+        if (event.error === 'canceled' || event.error === 'interrupted') {
+          resolve();
+        } else {
+          reject(new Error(event.error || 'Speech synthesis error'));
+        }
       };
       
       utterance.onpause = () => {
@@ -221,18 +286,15 @@ export class WebSpeechEngine extends BaseTTSEngine {
         this._setStatus(TTS_STATUS.SPEAKING);
       };
       
-      utterance.onboundary = (event) => {
-        if (this._onProgress) {
-          this._onProgress({
-            charIndex: event.charIndex,
-            charLength: event.charLength,
-            word: text.substring(event.charIndex, event.charIndex + event.charLength),
-          });
-        }
-      };
-      
       this._currentUtterance = utterance;
-      this._synth.speak(utterance);
+      
+      // Chrome 有时会卡住，需要先 cancel
+      this._synth.cancel();
+      
+      // 延迟一帧再播放（解决某些浏览器的问题）
+      setTimeout(() => {
+        this._synth.speak(utterance);
+      }, 10);
     });
   }
 
@@ -269,10 +331,8 @@ export class WebSpeechEngine extends BaseTTSEngine {
    * 释放资源
    */
   dispose() {
+    this.stop();
     super.dispose();
-    if (this._synth) {
-      this._synth.onvoiceschanged = null;
-    }
   }
 }
 

@@ -57,6 +57,77 @@ const DEFAULT_FOLDERS = [
 ];
 
 /**
+ * 术语库行组件 - 支持内联编辑
+ */
+const GlossaryRow = ({ item, onCopy, onDelete, onUpdateNote, onUpdateTags, notify }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editNote, setEditNote] = useState(item.note || '');
+  const [editTags, setEditTags] = useState(item.tags?.join(', ') || '');
+
+  const handleSave = () => {
+    const newTags = editTags
+      .split(/[,，]/)
+      .map(t => t.trim())
+      .filter(t => t.length > 0);
+    onUpdateTags(item.id, newTags);
+    onUpdateNote(item.id, editNote);
+    setIsEditing(false);
+    notify?.('术语已更新', 'success');
+  };
+
+  const handleCancel = () => {
+    setEditNote(item.note || '');
+    setEditTags(item.tags?.join(', ') || '');
+    setIsEditing(false);
+  };
+
+  if (isEditing) {
+    return (
+      <tr className="glossary-editing">
+        <td className="glossary-source">{item.sourceText}</td>
+        <td className="glossary-target">{item.translatedText}</td>
+        <td className="glossary-note-edit">
+          <input
+            type="text"
+            value={editNote}
+            onChange={(e) => setEditNote(e.target.value)}
+            placeholder="添加备注..."
+            autoFocus
+          />
+        </td>
+        <td className="glossary-actions">
+          <button onClick={handleSave} className="save" title="保存">
+            <Check size={16} />
+          </button>
+          <button onClick={handleCancel} title="取消">
+            <X size={16} />
+          </button>
+        </td>
+      </tr>
+    );
+  }
+
+  return (
+    <tr>
+      <td className="glossary-source">{item.sourceText}</td>
+      <td className="glossary-target">{item.translatedText}</td>
+      <td className="glossary-note">{item.note || '-'}</td>
+      <td className="glossary-actions">
+        <button onClick={() => onCopy(item.translatedText)} title="复制">
+          <Copy size={16} />
+        </button>
+        <button onClick={() => setIsEditing(true)} title="编辑">
+          <Edit3 size={16} />
+        </button>
+        <button onClick={() => onDelete(item.id)} className="danger" title="删除">
+          <Trash2 size={16} />
+        </button>
+      </td>
+    </tr>
+  );
+};
+
+/**
  * 收藏卡片组件
  */
 const FavoriteCard = ({ 
@@ -892,27 +963,23 @@ const FavoritesPanel = ({ showNotification }) => {
               <table className="glossary-table">
                 <thead>
                   <tr>
-                    <th style={{ width: '35%' }}>原文</th>
-                    <th style={{ width: '35%' }}>译文</th>
-                    <th style={{ width: '20%' }}>备注</th>
-                    <th style={{ width: '10%' }}>操作</th>
+                    <th style={{ width: '30%' }}>原文</th>
+                    <th style={{ width: '30%' }}>译文</th>
+                    <th style={{ width: '25%' }}>备注</th>
+                    <th style={{ width: '15%' }}>操作</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredFavorites.map(item => (
-                    <tr key={item.id}>
-                      <td className="glossary-source">{item.sourceText}</td>
-                      <td className="glossary-target">{item.translatedText}</td>
-                      <td className="glossary-note">{item.note || '-'}</td>
-                      <td className="glossary-actions">
-                        <button onClick={() => handleCopy(item.translatedText)} title="复制">
-                          <Copy size={14} />
-                        </button>
-                        <button onClick={() => handleDelete(item.id)} className="danger" title="删除">
-                          <Trash2 size={14} />
-                        </button>
-                      </td>
-                    </tr>
+                    <GlossaryRow
+                      key={item.id}
+                      item={item}
+                      onCopy={handleCopy}
+                      onDelete={handleDelete}
+                      onUpdateNote={handleUpdateNote}
+                      onUpdateTags={handleUpdateTags}
+                      notify={notify}
+                    />
                   ))}
                 </tbody>
               </table>
