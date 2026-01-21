@@ -20,7 +20,6 @@
     <img src="https://img.shields.io/github/stars/Tianao0110/T-Translate?style=flat-square" alt="Stars">
   </a>
 </p>
-
 ---
 
 ## ✨ 功能特性
