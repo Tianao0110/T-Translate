@@ -3167,7 +3167,7 @@ input:checked + .switch-slider::before {
   box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
 }
 
-/* ==================== 模式卡片优化 ==================== */ */
+/* ==================== 模式卡片优化 ==================== */
 .mode-selection-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
