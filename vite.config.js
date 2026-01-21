@@ -122,20 +122,8 @@ export default defineConfig(({ command, mode }) => {
       // 源码映射
       sourcemap: isDev ? 'inline' : false,
       
-      // 压缩配置
-      minify: isProd ? 'terser' : false,
-      
-      // Terser 配置
-      terserOptions: isProd ? {
-        compress: {
-          drop_console: true,
-          drop_debugger: true,
-          pure_funcs: ['console.log', 'console.info']
-        },
-        format: {
-          comments: false
-        }
-      } : undefined,
+      // 压缩配置 - 使用 esbuild (Vite 内置，无需额外安装)
+      minify: isProd ? 'esbuild' : false,
       
       // 代码分割 - 多入口配置
       rollupOptions: {
