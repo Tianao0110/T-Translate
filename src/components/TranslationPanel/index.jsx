@@ -1,5 +1,6 @@
 // src/components/TranslationPanel.jsx
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Send, Mic, MicOff, Camera, Image, FileText, Volume2, VolumeX, Copy,
   RotateCcw, Sparkles, Loader2, ChevronDown, Clock, Zap, Shield, Eye, EyeOff, Lock,
@@ -23,6 +24,8 @@ const logger = createLogger('TranslationPanel');
  * 翻译面板组件 (功能增强版)
  */
 const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProcessed }) => {
+  const { t } = useTranslation();
+  
   // 兼容性处理：父组件可能传的是 showNotification 或 onNotification
   const notify = showNotification || ((msg, type) => logger.debug(`[Notify] ${type}: ${msg}`));
 
@@ -118,7 +121,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   // 朗读文本
   const speakText = useCallback(async (text, target, lang) => {
     if (!text?.trim()) {
-      notify('没有可朗读的文本', 'warning');
+      notify(t('translation.noTextToSpeak'), 'warning');
       return;
     }
     
@@ -140,7 +143,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
       await ttsManager.speak(text, { lang });
     } catch (e) {
       logger.error('TTS speak error:', e);
-      notify('朗读失败: ' + e.message, 'error');
+      notify(t('translation.speakFailed') + ': ' + e.message, 'error');
     }
   }, [ttsStatus, ttsTarget, notify]);
 
@@ -149,9 +152,9 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
 
   // 翻译模板（精简版：3个）
   const templates = [
-    { id: 'natural', name: '自然', icon: FileText, desc: '日常/口语' },
-    { id: 'precise', name: '精确', icon: Zap, desc: '技术/学术' },
-    { id: 'formal', name: '正式', icon: Sparkles, desc: '商务/官方' },
+    { id: 'natural', name: t('templates.natural'), icon: FileText, desc: t('templates.naturalDesc') },
+    { id: 'precise', name: t('templates.precise'), icon: Zap, desc: t('templates.preciseDesc') },
+    { id: 'formal', name: t('templates.formal'), icon: Sparkles, desc: t('templates.formalDesc') },
   ];
 
   // [UI 状态] 当前选中的模板
@@ -167,7 +170,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     logger.debug(' Received screenshot data via props, processing OCR...');
     
     const processScreenshot = async () => {
-      notify('正在识别文字...', 'info');
+      notify(t('translation.ocrRecognizing'), 'info');
       setIsOcrProcessing(true);
 
       try {
@@ -186,7 +189,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
           
           // 标记为 OCR 来源（翻译时自动使用 OCR 纠错模板）
           setIsOcrSource(true);
-          notify(`识别成功 (${result.engine || engineToUse})`, 'success');
+          notify(t('translation.ocrSuccess', { engine: result.engine || engineToUse }), 'success');
 
           // 如果开启了自动翻译，延迟后自动开始翻译
           if (autoTranslate) {
@@ -206,7 +209,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
           }
         } else {
           logger.warn('[OCR] No text recognized:', result);
-          notify('未能识别到文字', 'warning');
+          notify(t('translation.ocrFailed'), 'warning');
         }
       } catch (error) {
         logger.error('[OCR] Error:', error);
@@ -263,12 +266,12 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   // overrideTemplate: 可选参数，用于模板切换时强制使用新模板
   const handleTranslate = async (overrideTemplate = null) => {
     if (!currentTranslation.sourceText.trim()) {
-      notify('请输入要翻译的内容', 'warning');
+      notify(t('translation.enterText'), 'warning');
       return;
     }
 
     if (!isConnected && translationMode !== PRIVACY_MODES.OFFLINE) {
-      notify('LM Studio 未连接，请检查连接或使用离线模式', 'error');
+      notify(t('translation.notConnected'), 'error');
     }
 
     // 如果是 OCR 来源的文本，自动使用 OCR 纠错模板
@@ -443,10 +446,10 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     // 策略3：无法自动替换，复制到剪贴板
     if (replaced) {
       setTranslatedText(newText);
-      notify(`已自动替换: ${replaceInfo}`, 'success');
+      notify(t('translation.autoReplaced', { info: replaceInfo }), 'success');
     } else {
       navigator.clipboard.writeText(suggestion.savedTranslation);
-      notify(`已复制 "${suggestion.savedTranslation}"，请在译文中手动替换`, 'info');
+      notify(t('translation.copiedForManualReplace', { text: suggestion.savedTranslation }), 'info');
     }
     
     setTermSuggestions(prev => prev.filter(s => s.id !== suggestion.id));
@@ -463,7 +466,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   // 始终使用此术语（未来自动替换）
   const alwaysUseTerm = (suggestion) => {
     // 可以保存到设置中，标记这个术语总是自动替换
-    notify(`已设置: "${suggestion.originalTerm}" 将始终翻译为 "${suggestion.savedTranslation}"`, 'success');
+    notify(t('translation.termSet') + `: "${suggestion.originalTerm}" → "${suggestion.savedTranslation}"`, 'success');
     setTermSuggestions(prev => prev.filter(s => s.id !== suggestion.id));
   };
 
@@ -471,7 +474,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   // 打开风格选择弹窗
   const openStyleModal = () => {
     if (!currentTranslation.translatedText) {
-      notify('请先进行翻译', 'warning');
+      notify(t('translation.translateFirst'), 'warning');
       return;
     }
     setShowStyleModal(true);
@@ -482,7 +485,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   // 执行风格改写
   const executeStyleRewrite = async () => {
     if (!selectedStyle) {
-      notify('请选择一个参考风格', 'warning');
+      notify(t('translation.selectStyle'), 'warning');
       return;
     }
 
@@ -531,14 +534,14 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
           styleStrength
         );
         
-        notify('风格改写完成', 'success');
+        notify(t('translation.styleRewriteComplete'), 'success');
       } else {
         throw new Error(result.error || '改写失败');
       }
     } catch (error) {
       logger.error('Style rewrite:', error);
       const errorMsg = getShortErrorMessage(error, { context: 'translation' });
-      notify('风格改写失败：' + errorMsg, 'error');
+      notify(t('translation.styleRewriteFailed') + ': ' + errorMsg, 'error');
     } finally {
       setIsRewriting(false);
     }
@@ -564,7 +567,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   // 打开收藏弹窗并触发 AI 分析
   const openSaveModal = () => {
     if (!currentTranslation.translatedText) {
-      notify('请先进行翻译', 'warning');
+      notify(t('translation.translateFirst'), 'warning');
       return;
     }
     setSaveAsStyleRef(false);
@@ -682,7 +685,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     };
     
     addToFavorites(favoriteItem, saveAsStyleRef);
-    notify(saveAsStyleRef ? '已收藏到风格库' : '已收藏', 'success');
+    notify(saveAsStyleRef ? t('translation.savedToStyle') : t('translation.saved'), 'success');
     setShowSaveModal(false);
   };
 
@@ -699,10 +702,10 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
       // 图片 OCR
       const reader = new FileReader();
       reader.onload = async (event) => {
-        notify('正在识别图片文字...', 'info');
+        notify(t('translation.imageOcrRecognizing'), 'info');
         const result = await recognizeImage(event.target.result);
         if (result.success) {
-          notify('文字识别成功', 'success');
+          notify(t('translation.imageOcrSuccess'), 'success');
         } else {
           const errorMsg = getShortErrorMessage(result.error, { context: 'ocr' });
           notify(errorMsg, 'error');
@@ -713,9 +716,9 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
       // 文本文件
       const text = await file.text();
       setSourceText(text);
-      notify('文件导入成功', 'success');
+      notify(t('translation.fileImportSuccess'), 'success');
     } else {
-      notify('不支持的文件类型', 'warning');
+      notify(t('translation.unsupportedFileType'), 'warning');
     }
   }, [recognizeImage, setSourceText, notify]);
 
@@ -727,9 +730,9 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     if (file.type.startsWith('image/')) {
       const reader = new FileReader();
       reader.onload = async (event) => {
-        notify('正在识别...', 'info');
+        notify(t('translation.ocrRecognizing'), 'info');
         const result = await recognizeImage(event.target.result);
-        if (result.success) notify('识别成功', 'success');
+        if (result.success) notify(t('translation.ocrSuccess'), 'success');
         else {
           const errorMsg = getShortErrorMessage(result.error, { context: 'ocr' });
           notify(errorMsg, 'error');
@@ -740,7 +743,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
       const reader = new FileReader();
       reader.onload = (e) => {
         setSourceText(e.target.result);
-        notify('导入成功', 'success');
+        notify(t('translation.fileImportSuccess'), 'success');
       };
       reader.readAsText(file);
     }
@@ -760,9 +763,9 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
         const blob = item.getAsFile();
         const reader = new FileReader();
         reader.onload = async (event) => {
-          notify('发现剪贴板图片，正在识别...', 'info');
+          notify(t('translation.recognizingClipboard'), 'info');
           const result = await recognizeImage(event.target.result);
-          if (result.success) notify('识别成功', 'success');
+          if (result.success) notify(t('translation.ocrSuccess'), 'success');
         };
         reader.readAsDataURL(blob);
         break; 
@@ -899,16 +902,16 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
               {isOcrProcessing ? (
                 <>
                   <Loader2 size={14} className="animate-spin" style={{ marginRight: '6px', display: 'inline' }} />
-                  识别中...
+                  {t('translation.recognizing')}
                 </>
-              ) : '原文'}
+              ) : t('translation.source')}
             </span>
             <div className="box-actions">
               <button 
                 className="action-btn" 
                 onClick={() => window.electron?.screenshot?.capture()}
                 disabled={isOcrProcessing}
-                title="截图识别 (Alt+Q)"
+                title={t('translation.screenshot')}
               >
                 <Camera size={15} />
               </button>
@@ -916,7 +919,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
                 className="action-btn" 
                 onClick={() => fileInputRef.current?.click()} 
                 disabled={isOcrProcessing}
-                title="导入图片"
+                title={t('translation.importImage')}
               >
                 <Image size={15} />
               </button>
@@ -924,7 +927,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
                 className="action-btn" 
                 onClick={pasteFromClipboard} 
                 disabled={isOcrProcessing}
-                title="粘贴"
+                title={t('translation.paste')}
               >
                 <FileText size={15} />
               </button>
@@ -932,7 +935,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
                 className="action-btn" 
                 onClick={clearCurrent} 
                 disabled={isOcrProcessing}
-                title="清空"
+                title={t('translation.clear')}
               >
                 <RotateCcw size={15} />
               </button>
@@ -945,7 +948,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
                     currentTranslation.sourceLang
                   )}
                   disabled={!currentTranslation.sourceText || isOcrProcessing}
-                  title={ttsStatus === TTS_STATUS.SPEAKING && ttsTarget === 'source' ? '停止朗读' : '朗读原文'}
+                  title={ttsStatus === TTS_STATUS.SPEAKING && ttsTarget === 'source' ? t('translation.stopSpeak') : t('translation.speakSource')}
                 >
                   {ttsStatus === TTS_STATUS.SPEAKING && ttsTarget === 'source' ? (
                     <VolumeX size={15} />
@@ -967,7 +970,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
               if (isOcrSource) setIsOcrSource(false);
             }}
             onPaste={handlePaste}
-            placeholder={isOcrProcessing ? '正在识别图片中的文字...' : (dragOver ? '释放文件以导入...' : '输入要翻译的文本...')}
+            placeholder={isOcrProcessing ? t('translation.ocrProcessing') : (dragOver ? t('translation.dropFile') : t('translation.inputPlaceholder'))}
             spellCheck={false}
             disabled={isOcrProcessing}
             // 绑定快捷键 Ctrl+Enter
@@ -975,7 +978,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
           />
 
           <div className="box-footer">
-            <span className="char-count">{(currentTranslation.sourceText || '').length} 字符</span>
+            <span className="char-count">{(currentTranslation.sourceText || '').length} {t('translation.characters')}</span>
           </div>
         </div>
 
@@ -989,19 +992,19 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
             {currentTranslation.status === TRANSLATION_STATUS.TRANSLATING ? (
               <>
                 <Loader2 size={18} className="animate-spin" />
-                <span>翻译中</span>
+                <span>{t('translation.translating')}</span>
               </>
             ) : (
               <>
                 <Send size={18} />
-                <span>翻译</span>
+                <span>{t('translation.translate')}</span>
               </>
             )}
           </button>
           
           <div className={`connection-indicator ${isConnected ? 'connected' : 'disconnected'}`}>
             <div className="indicator-dot"></div>
-            <span>{isConnected ? '在线' : '离线'}</span>
+            <span>{isConnected ? t('status.online') : t('status.offline')}</span>
           </div>
         </div>
 
@@ -1009,7 +1012,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
         <div className="translation-box target-box">
           <div className="box-toolbar">
             <div className="box-title-group">
-              <span className="box-title">译文</span>
+              <span className="box-title">{t('translation.target')}</span>
               {/* 版本切换 */}
               {currentTranslation.versions?.length > 1 && (
                 <div className="version-selector">
@@ -1043,7 +1046,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
             <div className="box-actions">
               <button 
                 className="action-btn" 
-                onClick={() => copyToClipboard('translated') && notify('已复制', 'success')}
+                onClick={() => copyToClipboard('translated') && notify(t('translation.copied'), 'success')}
                 disabled={!currentTranslation.translatedText}
                 title="复制"
               >
@@ -1090,7 +1093,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
             className="translation-textarea"
             value={currentTranslation.translatedText}
             onChange={(e) => setTranslatedText(e.target.value)}
-            placeholder="等待翻译..."
+            placeholder={t('translation.outputPlaceholder')}
             spellCheck={false}
           />
 

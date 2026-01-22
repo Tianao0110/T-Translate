@@ -1,7 +1,8 @@
 // src/components/SettingsPanel/sections/SelectionSection.jsx
-// 划词翻译设置区块组件
+// 划词翻译设置区块组件 - 国际化版
 
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import createLogger from '../../../utils/logger.js';
 
 const logger = createLogger('Settings:Selection');
@@ -14,6 +15,8 @@ const SelectionSection = ({
   updateSetting,
   notify
 }) => {
+  const { t } = useTranslation();
+
   // 切换划词翻译开关
   const handleToggleSelection = async () => {
     try {
@@ -21,41 +24,41 @@ const SelectionSection = ({
       logger.debug('Selection toggle result:', newState);
       if (typeof newState === 'boolean') {
         updateSetting('selection', 'enabled', newState);
-        notify(newState ? '划词翻译已开启' : '划词翻译已关闭', 'success');
+        notify(newState ? t('selection.enabled') : t('selection.disabled'), 'success');
       }
     } catch (e) {
       logger.error('Selection toggle error:', e);
-      notify('切换划词翻译失败', 'error');
+      notify(t('selection.toggleFailed'), 'error');
     }
   };
 
   return (
     <div className="setting-content">
-      <h3>划词翻译设置</h3>
-      <p className="setting-description">选中文字后显示翻译按钮，点击即可翻译</p>
+      <h3>{t('settings.selection.title')}</h3>
+      <p className="setting-description">{t('selection.description')}</p>
       
       {/* 启用/禁用 */}
       <div className="setting-group">
-        <label className="setting-label">启用划词翻译</label>
+        <label className="setting-label">{t('selection.enableSelection')}</label>
         <div className="toggle-wrapper">
           <button
             className={`toggle-button ${settings.selection.enabled ? 'active' : ''}`}
             onClick={handleToggleSelection}
           >
-            {settings.selection.enabled ? '开启' : '关闭'}
+            {settings.selection.enabled ? t('common.on') : t('common.off')}
           </button>
           <span className="toggle-description">
-            {settings.selection.enabled ? '选中文字后显示翻译按钮' : '已禁用划词翻译'}
+            {settings.selection.enabled ? t('selection.enabledDesc') : t('selection.disabledDesc')}
           </span>
         </div>
         <p className="setting-hint">
-          也可以使用快捷键 {settings.shortcuts?.selectionTranslate || 'Ctrl+Shift+T'} 快速切换
+          {t('selection.shortcutHint', {shortcut: settings.shortcuts?.selectionTranslate || 'Ctrl+Shift+T'})}
         </p>
       </div>
 
       {/* 按钮自动消失时间 */}
       <div className="setting-group">
-        <label className="setting-label">按钮自动消失时间</label>
+        <label className="setting-label">{t('selection.triggerTimeout')}</label>
         <div className="setting-row">
           <input
             type="range"
@@ -66,46 +69,46 @@ const SelectionSection = ({
             value={settings.selection.triggerTimeout}
             onChange={(e) => updateSetting('selection', 'triggerTimeout', parseInt(e.target.value))}
           />
-          <span className="range-value">{settings.selection.triggerTimeout / 1000}秒</span>
+          <span className="range-value">{settings.selection.triggerTimeout / 1000}{t('selection.seconds')}</span>
         </div>
-        <p className="setting-hint">划词后翻译按钮自动消失的时间</p>
+        <p className="setting-hint">{t('selection.triggerTimeoutHint')}</p>
       </div>
 
       {/* 默认显示原文 */}
       <div className="setting-group">
-        <label className="setting-label">默认显示原文</label>
+        <label className="setting-label">{t('selection.showSourceByDefault')}</label>
         <div className="toggle-wrapper">
           <button
             className={`toggle-button ${settings.selection.showSourceByDefault ? 'active' : ''}`}
             onClick={() => updateSetting('selection', 'showSourceByDefault', !settings.selection.showSourceByDefault)}
           >
-            {settings.selection.showSourceByDefault ? '开启' : '关闭'}
+            {settings.selection.showSourceByDefault ? t('common.on') : t('common.off')}
           </button>
           <span className="toggle-description">
-            {settings.selection.showSourceByDefault ? '翻译结果默认显示原文对照' : '只显示翻译结果'}
+            {settings.selection.showSourceByDefault ? t('selection.showSourceOnDesc') : t('selection.showSourceOffDesc')}
           </span>
         </div>
       </div>
 
       {/* 复制后自动关闭 */}
       <div className="setting-group">
-        <label className="setting-label">复制后自动关闭</label>
+        <label className="setting-label">{t('selection.autoCloseOnCopy')}</label>
         <div className="toggle-wrapper">
           <button
             className={`toggle-button ${settings.selection.autoCloseOnCopy ? 'active' : ''}`}
             onClick={() => updateSetting('selection', 'autoCloseOnCopy', !settings.selection.autoCloseOnCopy)}
           >
-            {settings.selection.autoCloseOnCopy ? '开启' : '关闭'}
+            {settings.selection.autoCloseOnCopy ? t('common.on') : t('common.off')}
           </button>
           <span className="toggle-description">
-            {settings.selection.autoCloseOnCopy ? '点击复制后自动关闭翻译窗口' : '复制后保持窗口打开'}
+            {settings.selection.autoCloseOnCopy ? t('selection.autoCloseOnDesc') : t('selection.autoCloseOffDesc')}
           </span>
         </div>
       </div>
 
       {/* 窗口透明度 */}
       <div className="setting-group">
-        <label className="setting-label">窗口透明度</label>
+        <label className="setting-label">{t('selection.windowOpacity')}</label>
         <div className="setting-row">
           <input
             type="range"
@@ -117,12 +120,12 @@ const SelectionSection = ({
           />
           <span className="range-value">{settings.selection.windowOpacity || 95}%</span>
         </div>
-        <p className="setting-hint">调整划词翻译窗口的透明度</p>
+        <p className="setting-hint">{t('selection.opacityHint')}</p>
       </div>
 
       {/* 截图翻译输出模式 */}
       <div className="setting-group">
-        <label className="setting-label">截图翻译输出</label>
+        <label className="setting-label">{t('selection.screenshotOutput')}</label>
         <div className="toggle-wrapper">
           <button
             className={`toggle-button ${(settings.screenshot?.outputMode || 'bubble') === 'bubble' ? 'active' : ''}`}
@@ -130,23 +133,23 @@ const SelectionSection = ({
               (settings.screenshot?.outputMode || 'bubble') === 'bubble' ? 'main' : 'bubble'
             )}
           >
-            {(settings.screenshot?.outputMode || 'bubble') === 'bubble' ? '气泡窗口' : '主窗口'}
+            {(settings.screenshot?.outputMode || 'bubble') === 'bubble' ? t('selection.bubble') : t('selection.mainWindow')}
           </button>
           <span className="toggle-description">
             {(settings.screenshot?.outputMode || 'bubble') === 'bubble' 
-              ? '截图翻译结果显示在悬浮气泡中' 
-              : '截图翻译结果显示在主窗口中'}
+              ? t('selection.bubbleDesc') 
+              : t('selection.mainWindowDesc')}
           </span>
         </div>
-        <p className="setting-hint">气泡模式下，截图后后台处理，完成后弹出结果</p>
+        <p className="setting-hint">{t('selection.outputHint')}</p>
       </div>
 
       {/* 字符数限制 */}
       <div className="setting-group">
-        <label className="setting-label">字符数限制</label>
+        <label className="setting-label">{t('selection.charLimit')}</label>
         <div className="setting-row double">
           <div className="input-with-label">
-            <label>最小</label>
+            <label>{t('selection.minChars')}</label>
             <input
               type="number"
               className="setting-input small"
@@ -157,7 +160,7 @@ const SelectionSection = ({
             />
           </div>
           <div className="input-with-label">
-            <label>最大</label>
+            <label>{t('selection.maxChars')}</label>
             <input
               type="number"
               className="setting-input small"
@@ -168,27 +171,27 @@ const SelectionSection = ({
             />
           </div>
         </div>
-        <p className="setting-hint">少于最小或超过最大字符数的选中内容不会触发翻译</p>
+        <p className="setting-hint">{t('selection.charLimitHint')}</p>
       </div>
 
       {/* 使用说明 */}
       <div className="setting-group">
-        <label className="setting-label">使用说明</label>
+        <label className="setting-label">{t('selection.instructions')}</label>
         <div className="help-box">
-          <p><strong>划词翻译流程：</strong></p>
+          <p><strong>{t('selection.workflow')}:</strong></p>
           <ol>
-            <li>用鼠标选中需要翻译的文字</li>
-            <li>松开鼠标后，旁边出现翻译按钮</li>
-            <li>点击按钮开始翻译</li>
-            <li>翻译完成后显示结果卡片</li>
+            <li>{t('selection.step1')}</li>
+            <li>{t('selection.step2')}</li>
+            <li>{t('selection.step3')}</li>
+            <li>{t('selection.step4')}</li>
           </ol>
-          <p style={{marginTop: '8px'}}><strong>快捷操作：</strong></p>
+          <p style={{marginTop: '8px'}}><strong>{t('selection.quickActions')}:</strong></p>
           <ul>
-            <li>拖动标题栏移动窗口</li>
-            <li>右下角调整大小</li>
-            <li>点击「原文」显示原文对照</li>
-            <li>点击「复制」或直接选中文字复制</li>
-            <li>按 ESC 或右键关闭</li>
+            <li>{t('selection.action1')}</li>
+            <li>{t('selection.action2')}</li>
+            <li>{t('selection.action3')}</li>
+            <li>{t('selection.action4')}</li>
+            <li>{t('selection.action5')}</li>
           </ul>
         </div>
       </div>

@@ -1,7 +1,8 @@
 // src/components/SettingsPanel/sections/TTSSection.jsx
-// TTS 朗读设置 - 样式统一版
+// TTS 朗读设置 - 国际化版
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Play, Square, RefreshCw } from 'lucide-react';
 import ttsManager, { DEFAULT_TTS_CONFIG, TTS_STATUS } from '../../../services/tts/index.js';
 
@@ -9,6 +10,7 @@ import ttsManager, { DEFAULT_TTS_CONFIG, TTS_STATUS } from '../../../services/tt
  * TTS 设置区块
  */
 const TTSSection = ({ settings, updateSetting, notify }) => {
+  const { t } = useTranslation();
   const [voices, setVoices] = useState([]);
   const [isLoadingVoices, setIsLoadingVoices] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
@@ -29,11 +31,11 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
       setVoices(voiceList);
     } catch (e) {
       console.error('Failed to load voices:', e);
-      notify?.('加载语音列表失败', 'error');
+      notify?.(t('tts.loadVoicesFailed'), 'error');
     } finally {
       setIsLoadingVoices(false);
     }
-  }, [notify]);
+  }, [notify, t]);
 
   // 初始化
   useEffect(() => {
@@ -65,8 +67,8 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
     setIsTesting(true);
     try {
       const testText = ttsConfig.voiceId 
-        ? '这是语音朗读测试。This is a TTS test.'
-        : '你好，这是语音朗读功能测试。';
+        ? t('tts.testTextMixed')
+        : t('tts.testTextChinese');
       
       await ttsManager.speak(testText, {
         lang: 'zh',
@@ -77,7 +79,7 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
       });
     } catch (e) {
       console.error('TTS test failed:', e);
-      notify?.('试听失败: ' + e.message, 'error');
+      notify?.(t('tts.testFailed') + ': ' + e.message, 'error');
     } finally {
       setIsTesting(false);
     }
@@ -87,16 +89,16 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
   const groupedVoices = voices.reduce((groups, voice) => {
     const langCode = voice.lang.split('-')[0];
     const langNames = {
-      'zh': '中文',
-      'en': '英语',
-      'ja': '日语',
-      'ko': '韩语',
-      'fr': '法语',
-      'de': '德语',
-      'es': '西班牙语',
-      'ru': '俄语',
-      'pt': '葡萄牙语',
-      'it': '意大利语',
+      'zh': t('tts.langNames.zh'),
+      'en': t('tts.langNames.en'),
+      'ja': t('tts.langNames.ja'),
+      'ko': t('tts.langNames.ko'),
+      'fr': t('tts.langNames.fr'),
+      'de': t('tts.langNames.de'),
+      'es': t('tts.langNames.es'),
+      'ru': t('tts.langNames.ru'),
+      'pt': t('tts.langNames.pt'),
+      'it': t('tts.langNames.it'),
     };
     const groupName = langNames[langCode] || voice.lang;
     
@@ -109,8 +111,8 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
 
   return (
     <div className="setting-content">
-      <h3>朗读设置</h3>
-      <p className="setting-description">配置文本朗读功能和语音参数</p>
+      <h3>{t('settings.tts.title')}</h3>
+      <p className="setting-description">{t('tts.description')}</p>
 
       {/* 启用开关 */}
       <div className="setting-group">
@@ -121,16 +123,16 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
             onChange={(e) => updateTTSConfig('enabled', e.target.checked)}
           />
           <span className="switch-slider"></span>
-          <span className="switch-label">启用文本朗读</span>
+          <span className="switch-label">{t('tts.enableTTS')}</span>
         </label>
-        <p className="setting-hint">在翻译面板显示朗读按钮</p>
+        <p className="setting-hint">{t('tts.enableHint')}</p>
       </div>
 
       {ttsConfig.enabled && (
         <>
           {/* 语音选择 */}
           <div className="setting-group">
-            <label className="setting-label">默认语音</label>
+            <label className="setting-label">{t('tts.defaultVoice')}</label>
             <div className="setting-row">
               <select
                 className="setting-select"
@@ -139,7 +141,7 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
                 disabled={isLoadingVoices}
                 style={{ flex: 1 }}
               >
-                <option value="">自动选择</option>
+                <option value="">{t('tts.autoSelect')}</option>
                 {Object.entries(groupedVoices).map(([lang, langVoices]) => (
                   <optgroup key={lang} label={lang}>
                     {langVoices.map(voice => (
@@ -154,21 +156,21 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
                 className="setting-btn-icon" 
                 onClick={loadVoices}
                 disabled={isLoadingVoices}
-                title="刷新语音列表"
+                title={t('tts.refreshVoices')}
               >
                 <RefreshCw size={14} className={isLoadingVoices ? 'spinning' : ''} />
               </button>
             </div>
             <p className="setting-hint">
               {voices.length > 0 
-                ? `已加载 ${voices.length} 个可用语音` 
-                : '自动根据文本语言选择合适的语音'}
+                ? t('tts.voicesLoaded', {count: voices.length})
+                : t('tts.autoSelectHint')}
             </p>
           </div>
 
           {/* 语速 */}
           <div className="setting-group">
-            <label className="setting-label">语速: {ttsConfig.rate.toFixed(1)}x</label>
+            <label className="setting-label">{t('tts.rate')}: {ttsConfig.rate.toFixed(1)}x</label>
             <input
               type="range"
               className="setting-range"
@@ -178,12 +180,12 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
               value={ttsConfig.rate}
               onChange={(e) => updateTTSConfig('rate', parseFloat(e.target.value))}
             />
-            <p className="setting-hint">调整朗读速度，1.0 为正常语速</p>
+            <p className="setting-hint">{t('tts.rateHint')}</p>
           </div>
 
           {/* 音调 */}
           <div className="setting-group">
-            <label className="setting-label">音调: {ttsConfig.pitch.toFixed(1)}</label>
+            <label className="setting-label">{t('tts.pitch')}: {ttsConfig.pitch.toFixed(1)}</label>
             <input
               type="range"
               className="setting-range"
@@ -193,12 +195,12 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
               value={ttsConfig.pitch}
               onChange={(e) => updateTTSConfig('pitch', parseFloat(e.target.value))}
             />
-            <p className="setting-hint">调整声音音调，1.0 为正常音调</p>
+            <p className="setting-hint">{t('tts.pitchHint')}</p>
           </div>
 
           {/* 音量 */}
           <div className="setting-group">
-            <label className="setting-label">音量: {Math.round(ttsConfig.volume * 100)}%</label>
+            <label className="setting-label">{t('tts.volume')}: {Math.round(ttsConfig.volume * 100)}%</label>
             <input
               type="range"
               className="setting-range"
@@ -208,13 +210,13 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
               value={ttsConfig.volume}
               onChange={(e) => updateTTSConfig('volume', parseFloat(e.target.value))}
             />
-            <p className="setting-hint">调整朗读音量大小</p>
+            <p className="setting-hint">{t('tts.volumeHint')}</p>
           </div>
 
           {/* 试听 */}
           <div className="setting-group" style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border-primary)' }}>
-            <label className="setting-label">试听效果</label>
-            <p className="setting-hint" style={{ marginBottom: '12px' }}>使用当前设置播放测试语音</p>
+            <label className="setting-label">{t('tts.preview')}</label>
+            <p className="setting-hint" style={{ marginBottom: '12px' }}>{t('tts.previewHint')}</p>
             <button 
               className={`action-button ${isTesting ? 'danger' : 'primary'}`}
               onClick={handleTest}
@@ -223,12 +225,12 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
               {isTesting ? (
                 <>
                   <Square size={14} />
-                  停止播放
+                  {t('tts.stop')}
                 </>
               ) : (
                 <>
                   <Play size={14} />
-                  播放试听
+                  {t('tts.play')}
                 </>
               )}
             </button>

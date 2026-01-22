@@ -9,6 +9,8 @@
 // 5. 分组计算使用 useMemo
 
 import React, { useState, useMemo, useCallback, useEffect, useRef, memo } from 'react';
+import { useTranslation } from 'react-i18next';
+import i18n from '../../i18n.js';
 import {
   Clock, Search, Trash2, Copy, Star, 
   Calendar, ChevronDown, ChevronRight, LayoutGrid,
@@ -67,6 +69,7 @@ const HistoryCard = memo(({
   searchQuery,
   onDoubleClick
 }) => {
+  const { t } = useTranslation();
   const [showTranslated, setShowTranslated] = useState(true);
   
   // 使用 useCallback 避免内联函数
@@ -116,9 +119,9 @@ const HistoryCard = memo(({
         </div>
       </div>
       
-      <div className="card-body" onClick={handleToggle} title="点击切换原文/译文，双击查看详情">
+      <div className="card-body" onClick={handleToggle} title={t('history.card.clickHint')}>
         <div className="card-text-label">
-          {showTranslated ? '译文' : '原文'}
+          {showTranslated ? t('history.card.target') : t('history.card.source')}
           <RotateCcw size={12} className="switch-hint" />
         </div>
         <div className={`card-text ${showTranslated ? 'translated' : 'source'}`}>
@@ -130,16 +133,16 @@ const HistoryCard = memo(({
       </div>
       
       <div className="card-actions">
-        <button onClick={handleCopyClick} title="复制译文">
+        <button onClick={handleCopyClick} title={t('history.copyTarget')}>
           <Copy size={14} />
         </button>
-        <button onClick={handleRestoreClick} title="恢复编辑">
+        <button onClick={handleRestoreClick} title={t('history.restore')}>
           <Edit3 size={14} />
         </button>
-        <button onClick={handleFavoriteClick} className={isFavorite ? 'active' : ''} title={isFavorite ? '取消收藏' : '收藏'}>
+        <button onClick={handleFavoriteClick} className={isFavorite ? 'active' : ''} title={isFavorite ? t('history.unfavorite') : t('history.favorite')}>
           <Star size={14} fill={isFavorite ? 'currentColor' : 'none'} />
         </button>
-        <button onClick={handleDeleteClick} className="danger" title="删除">
+        <button onClick={handleDeleteClick} className="danger" title={t('history.delete')}>
           <Trash2 size={14} />
         </button>
       </div>
@@ -163,6 +166,8 @@ HistoryCard.displayName = 'HistoryCard';
  * 历史记录面板 - 性能优化版
  */
 const HistoryPanel = ({ showNotification }) => {
+  const { t } = useTranslation();
+  
   const notify = useCallback((msg, type) => {
     if (showNotification) showNotification(msg, type);
   }, [showNotification]);
@@ -177,7 +182,7 @@ const HistoryPanel = ({ showNotification }) => {
   const [showStats, setShowStats] = useState(false);
   const [dateRange, setDateRange] = useState('all');
   const [searchInput, setSearchInput] = useState(''); // 原始输入
-  const [expandedGroups, setExpandedGroups] = useState(new Set(['今天', '昨天']));
+  const [expandedGroups, setExpandedGroups] = useState(new Set(['today', 'yesterday']));
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [selectMode, setSelectMode] = useState(false);
   const [sortConfig, setSortConfig] = useState({ key: 'timestamp', direction: 'desc' });
@@ -337,11 +342,11 @@ const HistoryPanel = ({ showNotification }) => {
       let key;
       if (groupBy === 'date') {
         const d = dayjs(item.timestamp);
-        if (d.isSame(now, 'day')) key = '今天';
-        else if (d.isSame(now.subtract(1, 'day'), 'day')) key = '昨天';
-        else if (d.isSame(now, 'week')) key = '本周';
-        else if (d.isSame(now, 'month')) key = '本月';
-        else key = d.format('YYYY年MM月');
+        if (d.isSame(now, 'day')) key = 'today';
+        else if (d.isSame(now.subtract(1, 'day'), 'day')) key = 'yesterday';
+        else if (d.isSame(now, 'week')) key = 'thisWeek';
+        else if (d.isSame(now, 'month')) key = 'thisMonth';
+        else key = d.format('YYYY-MM'); // 使用标准格式作为 key
       } else {
         key = `${item.sourceLanguage || 'auto'} → ${item.targetLanguage || 'zh'}`;
       }
@@ -349,7 +354,7 @@ const HistoryPanel = ({ showNotification }) => {
       groups[key].push(item);
     }
 
-    const order = ['今天', '昨天', '本周', '本月'];
+    const order = ['today', 'yesterday', 'thisWeek', 'thisMonth'];
     return Object.entries(groups)
       .sort((a, b) => {
         const ai = order.indexOf(a[0]), bi = order.indexOf(b[0]);
@@ -358,8 +363,27 @@ const HistoryPanel = ({ showNotification }) => {
         if (bi !== -1) return 1;
         return b[0].localeCompare(a[0]);
       })
-      .map(([title, items]) => ({ title, items, count: items.length }));
+      .map(([key, items]) => ({ key, items, count: items.length }));
   }, [paginatedHistory, groupBy]);
+
+  // 日期分组标题翻译
+  const getGroupTitle = useCallback((key) => {
+    const dateGroupLabels = {
+      today: t('history.today'),
+      yesterday: t('history.yesterday'),
+      thisWeek: t('history.thisWeek'),
+      thisMonth: t('history.thisMonth'),
+    };
+    if (dateGroupLabels[key]) return dateGroupLabels[key];
+    // 如果是 YYYY-MM 格式，格式化为本地化月份
+    if (/^\d{4}-\d{2}$/.test(key)) {
+      const date = dayjs(key + '-01');
+      // 根据当前语言返回不同格式
+      const lang = i18n.language;
+      return lang === 'zh' ? date.format('YYYY年MM月') : date.format('MMMM YYYY');
+    }
+    return key;
+  }, [t]);
 
   // 🔧 所有回调函数使用 useCallback
 
@@ -389,30 +413,30 @@ const HistoryPanel = ({ showNotification }) => {
 
   const deleteSelected = useCallback(() => {
     if (selectedIds.size === 0) return;
-    if (window.confirm(`确定删除选中的 ${selectedIds.size} 条记录？`)) {
+    if (window.confirm(t('history.deleteSelectedConfirm', { count: selectedIds.size }))) {
       selectedIds.forEach(id => removeFromHistory(id));
       setSelectedIds(new Set());
       setSelectMode(false);
-      notify(`已删除 ${selectedIds.size} 条`, 'success');
+      notify(t('history.deletedCount', { count: selectedIds.size }), 'success');
     }
-  }, [selectedIds, removeFromHistory, notify]);
+  }, [selectedIds, removeFromHistory, notify, t]);
 
   const handleCopy = useCallback((text) => {
     navigator.clipboard.writeText(text);
-    notify('已复制译文', 'success');
-  }, [notify]);
+    notify(t('history.copied'), 'success');
+  }, [notify, t]);
 
   const handleRestore = useCallback((id) => {
     restoreFromHistory(id);
-    notify('已恢复到编辑区', 'success');
-  }, [restoreFromHistory, notify]);
+    notify(t('history.restored'), 'success');
+  }, [restoreFromHistory, notify, t]);
 
   // 🔧 使用 favoriteIds Set 优化查找
   const handleFavorite = useCallback((item) => {
     const isFav = favoriteIds.has(item.id);
     isFav ? removeFromFavorites(item.id) : addToFavorites(item);
-    notify(isFav ? '已取消收藏' : '已收藏', 'success');
-  }, [favoriteIds, addToFavorites, removeFromFavorites, notify]);
+    notify(isFav ? t('history.unfavorited') : t('history.favorited'), 'success');
+  }, [favoriteIds, addToFavorites, removeFromFavorites, notify, t]);
 
   const handleExport = useCallback(() => {
     try {
@@ -423,11 +447,11 @@ const HistoryPanel = ({ showNotification }) => {
       a.download = `t-translate-history-${dayjs().format('YYYY-MM-DD')}.json`;
       a.click();
       URL.revokeObjectURL(a.href); // 清理
-      notify('导出成功', 'success');
+      notify(t('history.exportSuccess'), 'success');
     } catch { 
-      notify('导出失败', 'error'); 
+      notify(t('history.exportFailed'), 'error'); 
     }
-  }, [exportHistory, notify]);
+  }, [exportHistory, notify, t]);
 
   const handleImport = useCallback((e) => {
     const file = e.target.files?.[0];
@@ -461,11 +485,11 @@ const HistoryPanel = ({ showNotification }) => {
   }, []);
 
   const handleClearHistory = useCallback(() => {
-    if (window.confirm(`确定清空所有 ${history.length} 条记录？`)) {
+    if (window.confirm(t('history.clearAllConfirm', { count: history.length }))) {
       clearHistory();
-      notify('已清空', 'success');
+      notify(t('history.cleared'), 'success');
     }
-  }, [history.length, clearHistory, notify]);
+  }, [history.length, clearHistory, notify, t]);
 
   const toggleSelectMode = useCallback(() => {
     setSelectMode(prev => !prev);
@@ -492,7 +516,7 @@ const HistoryPanel = ({ showNotification }) => {
         const item = filteredHistory[focusIndex];
         if (item) {
           navigator.clipboard.writeText(item.translatedText);
-          notify('已复制译文', 'success');
+          notify(t('history.copied'), 'success');
         }
       } else if (e.key === ' ' && focusIndex >= 0 && selectMode) {
         e.preventDefault();
@@ -517,37 +541,37 @@ const HistoryPanel = ({ showNotification }) => {
           <div className="stat-card">
             <Hash size={20} />
             <div className="stat-value">{enhancedStats.total}</div>
-            <div className="stat-label">总记录</div>
+            <div className="stat-label">{t("history.stats.total")}</div>
           </div>
           <div className="stat-card highlight">
             <Calendar size={20} />
             <div className="stat-value">{enhancedStats.today}</div>
-            <div className="stat-label">今日翻译</div>
+            <div className="stat-label">{t("history.stats.today")}</div>
           </div>
           <div className="stat-card">
             <TrendingUp size={20} />
             <div className="stat-value">{enhancedStats.thisWeek}</div>
-            <div className="stat-label">本周</div>
+            <div className="stat-label">{t("history.stats.thisWeek")}</div>
           </div>
           <div className="stat-card">
             <Type size={20} />
             <div className="stat-value">{enhancedStats.totalChars.toLocaleString()}</div>
-            <div className="stat-label">总字符</div>
+            <div className="stat-label">{t("history.stats.totalChars")}</div>
           </div>
           <div className="stat-card">
             <Activity size={20} />
             <div className="stat-value">{enhancedStats.avgLength}</div>
-            <div className="stat-label">平均长度</div>
+            <div className="stat-label">{t("history.stats.avgLength")}</div>
           </div>
           <div className="stat-card">
             <Clock size={20} />
             <div className="stat-value">{enhancedStats.streak}</div>
-            <div className="stat-label">连续天数</div>
+            <div className="stat-label">{t("history.stats.streak")}</div>
           </div>
         </div>
         {enhancedStats.languagePairs.length > 0 && (
           <div className="lang-stats">
-            <div className="lang-stats-title"><Languages size={14} /> 常用语言对</div>
+            <div className="lang-stats-title"><Languages size={14} /> {t('history.stats.languagePairs')}</div>
             {enhancedStats.languagePairs.map(({ pair, count, percent }) => (
               <div key={pair} className="lang-stat-item">
                 <span className="lang-pair">{pair}</span>
@@ -563,28 +587,28 @@ const HistoryPanel = ({ showNotification }) => {
 
   // 渲染表格
   const renderTableGroup = useCallback((group) => (
-    <div key={group.title} className="table-group">
-      <div className="table-group-header" onClick={() => toggleGroup(group.title)}>
-        {expandedGroups.has(group.title) ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-        <span>{group.title}</span>
+    <div key={group.key} className="table-group">
+      <div className="table-group-header" onClick={() => toggleGroup(group.key)}>
+        {expandedGroups.has(group.key) ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+        <span>{getGroupTitle(group.key)}</span>
         <span className="group-count">{group.count}</span>
       </div>
-      {expandedGroups.has(group.title) && (
+      {expandedGroups.has(group.key) && (
         <table className="history-table">
           <thead>
             <tr>
               {selectMode && <th className="col-check"></th>}
               <th className="col-time" onClick={() => handleSort('timestamp')} style={{cursor: 'pointer'}}>
-                时间 {sortConfig.key === 'timestamp' && <ArrowUpDown size={12} />}
+                {t('history.table.time')} {sortConfig.key === 'timestamp' && <ArrowUpDown size={12} />}
               </th>
               <th className="col-lang" onClick={() => handleSort('language')} style={{cursor: 'pointer'}}>
-                语言 {sortConfig.key === 'language' && <ArrowUpDown size={12} />}
+                {t('history.table.language')} {sortConfig.key === 'language' && <ArrowUpDown size={12} />}
               </th>
               <th className="col-source" onClick={() => handleSort('sourceLength')} style={{cursor: 'pointer'}}>
-                原文 {sortConfig.key === 'sourceLength' && <ArrowUpDown size={12} />}
+                {t('history.table.source')} {sortConfig.key === 'sourceLength' && <ArrowUpDown size={12} />}
               </th>
-              <th className="col-translated">译文</th>
-              <th className="col-actions">操作</th>
+              <th className="col-translated">{t("history.table.target")}</th>
+              <th className="col-actions">{t("history.table.actions")}</th>
             </tr>
           </thead>
           <tbody>
@@ -648,13 +672,13 @@ const HistoryPanel = ({ showNotification }) => {
     return (
       <div className="history-cards">
         {groupedHistory.map(group => (
-          <div key={group.title} className="card-group">
-            <div className="card-group-header" onClick={() => toggleGroup(group.title)}>
-              {expandedGroups.has(group.title) ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-              <span>{group.title}</span>
+          <div key={group.key} className="card-group">
+            <div className="card-group-header" onClick={() => toggleGroup(group.key)}>
+              {expandedGroups.has(group.key) ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+              <span>{getGroupTitle(group.key)}</span>
               <span className="group-count">{group.count}</span>
             </div>
-            {expandedGroups.has(group.title) && (
+            {expandedGroups.has(group.key) && (
               <div className="card-grid">
                 {group.items.map((item, index) => (
                   <HistoryCard
@@ -687,8 +711,8 @@ const HistoryPanel = ({ showNotification }) => {
         <div className="secure-mode-banner">
           <div className="secure-banner-icon">🔒</div>
           <div className="secure-banner-content">
-            <h4>无痕模式已启用</h4>
-            <p>当前模式下不会保存任何翻译历史记录。如需保存历史，请切换到标准模式。</p>
+            <h4>{t('history.secureMode.title')}</h4>
+            <p>{t('history.secureMode.desc')}</p>
           </div>
         </div>
       )}
@@ -700,7 +724,7 @@ const HistoryPanel = ({ showNotification }) => {
             <Search size={16} />
             <input 
               type="text" 
-              placeholder="搜索历史..." 
+              placeholder={t('history.search')} 
               value={searchInput} 
               onChange={handleSearchChange} 
             />
@@ -714,48 +738,48 @@ const HistoryPanel = ({ showNotification }) => {
           <div className="toolbar-divider" />
 
           <div className="view-toggle">
-            <button className={viewMode === 'card' ? 'active' : ''} onClick={() => setViewMode('card')} title="卡片">
-              <LayoutGrid size={16} /><span>卡片</span>
+            <button className={viewMode === 'card' ? 'active' : ''} onClick={() => setViewMode('card')} title={t('history.view.card')}>
+              <LayoutGrid size={16} /><span>{t('history.view.card')}</span>
             </button>
-            <button className={viewMode === 'table' ? 'active' : ''} onClick={() => setViewMode('table')} title="表格">
-              <Table size={16} /><span>表格</span>
+            <button className={viewMode === 'table' ? 'active' : ''} onClick={() => setViewMode('table')} title={t('history.view.table')}>
+              <Table size={16} /><span>{t('history.view.table')}</span>
             </button>
           </div>
 
           <div className="toolbar-divider" />
 
           <button className={`toolbar-btn ${showStats ? 'active' : ''}`} onClick={toggleStats}>
-            <BarChart3 size={16} /><span>统计</span>
+            <BarChart3 size={16} /><span>{t('history.stats.title')}</span>
           </button>
           
           <button className={`toolbar-btn ${selectMode ? 'active' : ''}`} onClick={toggleSelectMode}>
-            <CheckSquare size={16} /><span>选择</span>
+            <CheckSquare size={16} /><span>{t('history.select')}</span>
           </button>
         </div>
 
         <div className="toolbar-center">
           <select className="toolbar-select" value={dateRange} onChange={(e) => setDateRange(e.target.value)}>
-            <option value="all">全部时间</option>
-            <option value="today">今天</option>
-            <option value="week">本周</option>
-            <option value="month">本月</option>
+            <option value="all">{t('history.filter.all')}</option>
+            <option value="today">{t('history.filter.today')}</option>
+            <option value="week">{t('history.filter.week')}</option>
+            <option value="month">{t('history.filter.month')}</option>
           </select>
 
           <select className="toolbar-select" value={groupBy} onChange={(e) => setGroupBy(e.target.value)}>
-            <option value="date">按日期</option>
-            <option value="language">按语言</option>
+            <option value="date">{t('history.group.date')}</option>
+            <option value="language">{t('history.group.language')}</option>
           </select>
         </div>
 
         <div className="toolbar-right">
           {selectMode && selectedIds.size > 0 && (
             <button className="toolbar-btn danger" onClick={deleteSelected}>
-              <Trash size={16} /><span>删除 ({selectedIds.size})</span>
+              <Trash size={16} /><span>{t('history.deleteSelected', {count: selectedIds.size})}</span>
             </button>
           )}
           
-          <button className="toolbar-btn" onClick={handleExport} title="导出"><Download size={16} /></button>
-          <label className="toolbar-btn" title="导入">
+          <button className="toolbar-btn" onClick={handleExport} title={t('history.export')}><Download size={16} /></button>
+          <label className="toolbar-btn" title={t('history.import')}>
             <Upload size={16} />
             <input type="file" accept=".json" onChange={handleImport} style={{ display: 'none' }} />
           </label>
@@ -763,7 +787,7 @@ const HistoryPanel = ({ showNotification }) => {
           <div className="toolbar-divider" />
           
           <button className="toolbar-btn danger" onClick={handleClearHistory}>
-            <Trash2 size={16} /><span>清空</span>
+            <Trash2 size={16} /><span>{t('history.clearAll')}</span>
           </button>
         </div>
       </div>
@@ -772,8 +796,8 @@ const HistoryPanel = ({ showNotification }) => {
 
       {debouncedSearch && (
         <div className="search-hint">
-          搜索 "<strong>{debouncedSearch}</strong>" 找到 <strong>{filteredHistory.length}</strong> 条结果
-          {filteredHistory.length > 0 && <span className="hint-tip">（↑↓ 导航，Enter 复制）</span>}
+          {t('history.searchResult', {keyword: debouncedSearch, count: filteredHistory.length})}
+          {filteredHistory.length > 0 && <span className="hint-tip">{t('history.searchHint')}</span>}
         </div>
       )}
 
@@ -791,10 +815,10 @@ const HistoryPanel = ({ showNotification }) => {
               {isLoadingMore ? (
                 <>
                   <span className="loading-spinner"></span>
-                  加载中...
+                  {t('common.loading')}
                 </>
               ) : (
-                <>加载更多 ({filteredHistory.length - displayCount} 条)</>
+                <>{t('history.loadMore', {count: filteredHistory.length - displayCount})}</>
               )}
             </button>
           </div>
@@ -803,8 +827,8 @@ const HistoryPanel = ({ showNotification }) => {
 
       {filteredHistory.length > 0 && (
         <div className="history-footer">
-          <span>显示 {Math.min(displayCount, filteredHistory.length)} / {filteredHistory.length} 条</span>
-          {selectMode && <span className="select-hint">已选 {selectedIds.size} 条 | 空格选择，Esc 退出</span>}
+          <span>{t('history.showing', {current: Math.min(displayCount, filteredHistory.length), total: filteredHistory.length})}</span>
+          {selectMode && <span className="select-hint">{t('history.selectedHint', {count: selectedIds.size})}</span>}
         </div>
       )}
 
@@ -822,31 +846,31 @@ const HistoryPanel = ({ showNotification }) => {
             
             <div className="detail-modal-body">
               <div className="detail-section">
-                <div className="detail-label">原文</div>
+                <div className="detail-label">{t('translation.source')}</div>
                 <div className="detail-text source">{detailItem.sourceText}</div>
               </div>
               <div className="detail-section">
-                <div className="detail-label">译文</div>
+                <div className="detail-label">{t('translation.target')}</div>
                 <div className="detail-text translated">{detailItem.translatedText}</div>
               </div>
             </div>
             
             <div className="detail-modal-footer">
               <button className="detail-btn" onClick={() => { handleCopy(detailItem.sourceText); }}>
-                <Copy size={14} /> 复制原文
+                <Copy size={14} /> {t('history.copySource')}
               </button>
               <button className="detail-btn" onClick={() => { handleCopy(detailItem.translatedText); }}>
-                <Copy size={14} /> 复制译文
+                <Copy size={14} /> {t('history.copyTarget')}
               </button>
               <button className="detail-btn primary" onClick={() => { handleRestore(detailItem.id); setDetailItem(null); }}>
-                <Edit3 size={14} /> 恢复编辑
+                <Edit3 size={14} /> {t('history.restore')}
               </button>
               <button 
                 className={`detail-btn ${favoriteIds.has(detailItem.id) ? 'active' : ''}`} 
                 onClick={() => handleFavorite(detailItem)}
               >
                 <Star size={14} fill={favoriteIds.has(detailItem.id) ? 'currentColor' : 'none'} /> 
-                {favoriteIds.has(detailItem.id) ? '取消收藏' : '收藏'}
+                {favoriteIds.has(detailItem.id) ? t('history.unfavorite') : t('history.favorite')}
               </button>
             </div>
           </div>

@@ -2,6 +2,7 @@
 import createLogger from '../../utils/logger.js';
 const logger = createLogger('MainWindow');
 import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   FileText, Languages, Settings, History, Star,
   AlertCircle, CheckCircle, Info, X, FileUp, Loader2
@@ -24,7 +25,7 @@ import { TRANSLATION_STATUS } from '@config/defaults';
 const LazyLoadingFallback = () => (
   <div className="lazy-loading-fallback">
     <Loader2 className="spinning" size={24} />
-    <span>加载中...</span>
+    <span>Loading...</span>
   </div>
 ); 
 
@@ -32,6 +33,8 @@ const LazyLoadingFallback = () => (
  * 主窗口组件
  */
 const MainWindow = () => {
+  const { t } = useTranslation();
+  
   // UI 状态
   const [activeTab, setActiveTab] = useState('translate');
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -104,7 +107,7 @@ const MainWindow = () => {
       setActiveTab('translate');
       
       if (!dataURL) {
-        showNotification('截图失败', 'error');
+        showNotification(t('screenshot.failed'), 'error');
         return;
       }
       
@@ -268,10 +271,10 @@ const MainWindow = () => {
   };
 
   const tabs = [
-    { id: 'translate', label: '翻译', icon: Languages, shortcut: '1' },
-    { id: 'history', label: '历史', icon: History, shortcut: '2' },
-    { id: 'favorites', label: '收藏', icon: Star, shortcut: '3' },
-    { id: 'settings', label: '设置', icon: Settings, shortcut: '4' }
+    { id: 'translate', label: t('nav.translate'), icon: Languages, shortcut: '1' },
+    { id: 'history', label: t('nav.history'), icon: History, shortcut: '2' },
+    { id: 'favorites', label: t('nav.favorites'), icon: Star, shortcut: '3' },
+    { id: 'settings', label: t('nav.settings'), icon: Settings, shortcut: '4' }
   ];
 
   return (
@@ -303,10 +306,10 @@ const MainWindow = () => {
           <button
             className="tab-button doc-translate-btn"
             onClick={() => setShowDocTranslator(true)}
-            title="文档翻译"
+            title={t('nav.documents')}
           >
             <FileUp size={16} />
-            <span>文档</span>
+            <span>{t('nav.documents')}</span>
           </button>
         </div>
       </div>
@@ -322,7 +325,7 @@ const MainWindow = () => {
           <div className="status-item">
             <div className={`status-indicator ${currentTranslation.status === TRANSLATION_STATUS.TRANSLATING ? 'busy' : 'ready'}`}></div>
             <span className="status-text">
-              {currentTranslation.status === TRANSLATION_STATUS.TRANSLATING ? '翻译中...' : '就绪'}
+              {currentTranslation.status === TRANSLATION_STATUS.TRANSLATING ? t('translation.translating') : t('status.ready')}
             </span>
           </div>
           <div className="status-item">
@@ -332,7 +335,7 @@ const MainWindow = () => {
         </div>
         <div className="status-right">
           <div className="status-item">
-            <span className="status-text">今日: {statistics.todayTranslations} 次</span>
+            <span className="status-text">{t('status.today')}: {statistics.todayTranslations}</span>
           </div>
           <div className="status-item">
             <span className="status-text">v{version}</span>

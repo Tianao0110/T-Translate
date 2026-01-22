@@ -1,7 +1,8 @@
 // src/components/SettingsPanel/sections/ProvidersSection.jsx
-// 翻译源设置区块组件 - 从 SettingsPanel 拆分
+// 翻译源设置区块组件 - 国际化版
 
 import React, { forwardRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import ProviderSettings from '../../ProviderSettings';
 
 /**
@@ -13,10 +14,12 @@ const ProvidersSection = forwardRef(({
   updateSetting,
   notify
 }, ref) => {
+  const { t } = useTranslation();
+
   return (
     <div className="setting-content">
-      <h3>翻译源设置</h3>
-      <p className="setting-description">配置翻译服务，支持本地模型和在线 API</p>
+      <h3>{t('providerSettings.title')}</h3>
+      <p className="setting-description">{t('providerSettings.description')}</p>
       
       <ProviderSettings 
         ref={ref}

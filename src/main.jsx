@@ -1,6 +1,7 @@
 // src/main.jsx
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import './i18n'; // 国际化配置 - 必须在组件导入前
 import App from './App';
 import ErrorBoundary from './components/ErrorBoundary';
 import createLogger from './utils/logger.js';

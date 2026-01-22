@@ -1,7 +1,8 @@
 // src/components/SettingsPanel/sections/ConnectionSection.jsx
-// 连接设置区块组件 - 从 SettingsPanel 拆分
+// 连接设置区块组件 - 国际化版
 
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Wifi, RefreshCw, Code2 } from 'lucide-react';
 
 /**
@@ -15,13 +16,15 @@ const ConnectionSection = ({
   testConnection,
   models
 }) => {
+  const { t } = useTranslation();
+
   return (
     <div className="setting-content">
-      <h3>LM Studio 连接设置</h3>
+      <h3>{t('connectionSettings.title')}</h3>
       
       {/* API 端点 */}
       <div className="setting-group">
-        <label className="setting-label">API 端点</label>
+        <label className="setting-label">{t('connectionSettings.endpoint')}</label>
         <div className="input-group">
           <input
             type="text"
@@ -40,14 +43,14 @@ const ConnectionSection = ({
             ) : (
               <Wifi size={16}/>
             )}
-            {isTesting ? '测试中...' : '测试连接'}
+            {isTesting ? t('connectionSettings.testing') : t('connectionSettings.testConnection')}
           </button>
         </div>
       </div>
       
       {/* 超时时间 */}
       <div className="setting-group">
-        <label className="setting-label">超时时间 (ms)</label>
+        <label className="setting-label">{t('connectionSettings.timeout')}</label>
         <input 
           type="number" 
           className="setting-input" 
@@ -60,7 +63,7 @@ const ConnectionSection = ({
       {/* 可用模型列表 */}
       {models.length > 0 && (
         <div className="setting-group">
-          <label className="setting-label">可用模型</label>
+          <label className="setting-label">{t('connectionSettings.availableModels')}</label>
           <div className="models-list">
             {models.map((m, i) => (
               <div key={i} className="model-item">

@@ -1,6 +1,7 @@
 // src/components/FavoritesPanel.jsx
 // Muse Memory - 灵感记忆收藏面板
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Star, Search, Trash2, Copy, Edit3, Save, X, Plus,
   Folder, FolderPlus, ChevronDown, ChevronRight,
@@ -59,7 +60,7 @@ const DEFAULT_FOLDERS = [
 /**
  * 术语库行组件 - 支持内联编辑
  */
-const GlossaryRow = ({ item, onCopy, onDelete, onUpdateNote, onUpdateTags, notify }) => {
+const GlossaryRow = ({ item, onCopy, onDelete, onUpdateNote, onUpdateTags, notify, t }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editNote, setEditNote] = useState(item.note || '');
   const [editTags, setEditTags] = useState(item.tags?.join(', ') || '');
@@ -72,7 +73,7 @@ const GlossaryRow = ({ item, onCopy, onDelete, onUpdateNote, onUpdateTags, notif
     onUpdateTags(item.id, newTags);
     onUpdateNote(item.id, editNote);
     setIsEditing(false);
-    notify?.('术语已更新', 'success');
+    notify?.(t('favorites.termUpdated'), 'success');
   };
 
   const handleCancel = () => {
@@ -91,15 +92,15 @@ const GlossaryRow = ({ item, onCopy, onDelete, onUpdateNote, onUpdateTags, notif
             type="text"
             value={editNote}
             onChange={(e) => setEditNote(e.target.value)}
-            placeholder="添加备注..."
+            placeholder={t('favorites.addNote')}
             autoFocus
           />
         </td>
         <td className="glossary-actions">
-          <button onClick={handleSave} className="save" title="保存">
+          <button onClick={handleSave} className="save" title={t('favorites.save')}>
             <Check size={16} />
           </button>
-          <button onClick={handleCancel} title="取消">
+          <button onClick={handleCancel} title={t('favorites.cancel')}>
             <X size={16} />
           </button>
         </td>
@@ -113,13 +114,13 @@ const GlossaryRow = ({ item, onCopy, onDelete, onUpdateNote, onUpdateTags, notif
       <td className="glossary-target">{item.translatedText}</td>
       <td className="glossary-note">{item.note || '-'}</td>
       <td className="glossary-actions">
-        <button onClick={() => onCopy(item.translatedText)} title="复制">
+        <button onClick={() => onCopy(item.translatedText)} title={t('favorites.copy')}>
           <Copy size={16} />
         </button>
-        <button onClick={() => setIsEditing(true)} title="编辑">
+        <button onClick={() => setIsEditing(true)} title={t('favorites.edit')}>
           <Edit3 size={16} />
         </button>
-        <button onClick={() => onDelete(item.id)} className="danger" title="删除">
+        <button onClick={() => onDelete(item.id)} className="danger" title={t('favorites.delete')}>
           <Trash2 size={16} />
         </button>
       </td>
@@ -145,6 +146,7 @@ const FavoriteCard = ({
   onSelect,
   notify
 }) => {
+  const { t } = useTranslation();
   const [showTranslated, setShowTranslated] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [editNote, setEditNote] = useState(item.note || '');
@@ -154,6 +156,21 @@ const FavoriteCard = ({
   const [isGeneratingTags, setIsGeneratingTags] = useState(false);
 
   const folder = folders.find(f => f.id === item.folderId);
+  
+  // 获取文件夹的翻译名称
+  const getFolderDisplayName = (f) => {
+    const folderNameKeys = {
+      work: 'favorites.folders.work',
+      study: 'favorites.folders.study',
+      life: 'favorites.folders.life',
+      glossary: 'favorites.folders.glossary',
+      style_library: 'favorites.folders.styleLibrary',
+    };
+    if (folderNameKeys[f.id]) {
+      return t(folderNameKeys[f.id]);
+    }
+    return f.name;
+  };
 
   // AI 生成标签
   const generateAITags = async () => {
@@ -216,13 +233,13 @@ const FavoriteCard = ({
         }
         setEditStyleRef(parsed.isStyleSuggested || false);
         
-        notify?.('AI 标签生成成功', 'success');
+        notify?.(t('favorites.aiTagSuccess'), 'success');
       } else {
-        throw new Error(result.error || '生成失败');
+        throw new Error(result.error || t('favorites.aiTagFailed'));
       }
     } catch (error) {
       console.error('AI tag generation error:', error);
-      notify?.('AI 标签生成失败: ' + error.message, 'error');
+      notify?.(t('favorites.aiTagFailed') + ': ' + error.message, 'error');
     } finally {
       setIsGeneratingTags(false);
     }
@@ -260,7 +277,7 @@ const FavoriteCard = ({
           {folder && (
             <span className="card-folder" style={{ color: folder.color }}>
               <Folder size={12} />
-              {folder.name}
+              {getFolderDisplayName(folder)}
             </span>
           )}
         </div>
@@ -314,14 +331,14 @@ const FavoriteCard = ({
                 className="btn-ai-generate"
                 onClick={generateAITags}
                 disabled={isGeneratingTags}
-                title="AI 智能生成标签"
+                title={t('favorites.aiGenerateTags')}
               >
                 {isGeneratingTags ? (
                   <RefreshCw size={12} className="spinning" />
                 ) : (
                   <Sparkles size={12} />
                 )}
-                <span>{isGeneratingTags ? '生成中...' : 'AI 生成'}</span>
+                <span>{isGeneratingTags ? t('favorites.generating') : t('favorites.aiGenerate')}</span>
               </button>
             </div>
             <input
@@ -348,18 +365,18 @@ const FavoriteCard = ({
                 onChange={(e) => setEditStyleRef(e.target.checked)}
               />
               <Palette size={14} />
-              <span>标记为风格参考</span>
+              <span>{t('favorites.markAsStyle')}</span>
             </label>
             <span className="toggle-hint">
-              {editStyleRef ? '将移动到风格库' : '普通收藏'}
+              {editStyleRef ? t('favorites.willMoveToStyle') : t('favorites.normalFavorite')}
             </span>
           </div>
           <div className="edit-actions">
             <button className="btn-cancel" onClick={handleCancelEdit}>
-              <X size={14} /> 取消
+              <X size={14} /> {t('favorites.cancel')}
             </button>
             <button className="btn-save" onClick={handleSaveEdit}>
-              <Check size={14} /> 保存
+              <Check size={14} /> {t('favorites.save')}
             </button>
           </div>
         </div>
@@ -368,28 +385,28 @@ const FavoriteCard = ({
       {/* 操作按钮 */}
       {!isEditing && (
         <div className="card-actions">
-          <button onClick={() => onCopy(item.translatedText)} title="复制译文">
+          <button onClick={() => onCopy(item.translatedText)} title={t('favorites.copyTarget')}>
             <Copy size={14} />
           </button>
-          <button onClick={() => setIsEditing(true)} title="编辑标签和笔记">
+          <button onClick={() => setIsEditing(true)} title={t('favorites.editTagsNotes')}>
             <Edit3 size={14} />
           </button>
           <div className="move-menu-wrapper">
             <button 
               onClick={() => setShowMoveMenu(!showMoveMenu)} 
-              title="移动到文件夹"
+              title={t('favorites.moveToFolder')}
               className={showMoveMenu ? 'active' : ''}
             >
               <Folder size={14} />
             </button>
             {showMoveMenu && (
               <div className="move-menu">
-                <div className="move-menu-header">移动到</div>
+                <div className="move-menu-header">{t('favorites.moveTo')}</div>
                 <button 
                   className={!item.folderId ? 'active' : ''}
                   onClick={() => { onMove(item.id, null, false); setShowMoveMenu(false); }}
                 >
-                  <Folder size={14} /> 未分类
+                  <Folder size={14} /> {t('favorites.uncategorized')}
                 </button>
                 {/* 用户文件夹 */}
                 {folders.filter(f => !f.isSystem).map(f => (
@@ -399,7 +416,7 @@ const FavoriteCard = ({
                     onClick={() => { onMove(item.id, f.id, false); setShowMoveMenu(false); }}
                   >
                     <Folder size={14} style={{ color: f.color }} />
-                    {f.name}
+                    {getFolderDisplayName(f)}
                   </button>
                 ))}
                 {/* 系统文件夹分隔线 */}
@@ -414,13 +431,13 @@ const FavoriteCard = ({
                     {f.icon === 'book' ? <BookOpen size={14} style={{ color: f.color }} /> : 
                      f.icon === 'palette' ? <Palette size={14} style={{ color: f.color }} /> :
                      <Folder size={14} style={{ color: f.color }} />}
-                    {f.name}
+                    {getFolderDisplayName(f)}
                   </button>
                 ))}
               </div>
             )}
           </div>
-          <button onClick={() => onDelete(item.id)} className="danger" title="删除">
+          <button onClick={() => onDelete(item.id)} className="danger" title={t('favorites.delete')}>
             <Trash2 size={14} />
           </button>
         </div>
@@ -433,7 +450,23 @@ const FavoriteCard = ({
  * 主面板组件
  */
 const FavoritesPanel = ({ showNotification }) => {
+  const { t } = useTranslation();
   const notify = showNotification || ((msg, type) => {});
+
+  // 获取文件夹的翻译名称
+  const getFolderName = useCallback((folder) => {
+    const folderNameKeys = {
+      work: 'favorites.folders.work',
+      study: 'favorites.folders.study',
+      life: 'favorites.folders.life',
+      glossary: 'favorites.folders.glossary',
+      style_library: 'favorites.folders.styleLibrary',
+    };
+    if (folderNameKeys[folder.id]) {
+      return t(folderNameKeys[folder.id]);
+    }
+    return folder.name;
+  }, [t]);
 
   // 文件夹状态 - 确保系统文件夹始终存在
   const [folders, setFolders] = useState(() => {
@@ -485,7 +518,7 @@ const FavoritesPanel = ({ showNotification }) => {
   // 导出术语库
   const handleExportGlossary = (format) => {
     if (glossaryItems.length === 0) {
-      notify('术语库为空', 'warning');
+      notify(t('favorites.glossaryEmpty'), 'warning');
       return;
     }
     
@@ -513,7 +546,7 @@ const FavoritesPanel = ({ showNotification }) => {
     }
     
     downloadFile(content, filename, mimeType);
-    notify(`已导出 ${glossaryItems.length} 条术语 (${format.toUpperCase()})`, 'success');
+    notify(t('favorites.exportedTerms', { count: glossaryItems.length, format: format.toUpperCase() }), 'success');
     setShowExportMenu(false);
   };
 
@@ -527,7 +560,7 @@ const FavoritesPanel = ({ showNotification }) => {
       const terms = autoImport(content, file.name);
       
       if (terms.length === 0) {
-        notify('未找到有效术语', 'warning');
+        notify(t('favorites.noValidTerms'), 'warning');
         return;
       }
       
@@ -553,9 +586,10 @@ const FavoritesPanel = ({ showNotification }) => {
         }
       }
       
-      notify(`已导入 ${added} 条术语${added < terms.length ? ` (跳过 ${terms.length - added} 条重复)` : ''}`, 'success');
+      const skipped = terms.length - added;
+      notify(t('favorites.importedTerms', { count: added }) + (skipped > 0 ? t('favorites.importSkipped', { skipped }) : ''), 'success');
     } catch (e) {
-      notify(`导入失败: ${e.message}`, 'error');
+      notify(t('favorites.importFailed') + ': ' + e.message, 'error');
     }
     
     // 清除文件选择
@@ -654,7 +688,7 @@ const FavoritesPanel = ({ showNotification }) => {
     setNewFolderName('');
     setNewFolderColor(FOLDER_COLORS[0]);
     setShowAddFolder(false);
-    notify('文件夹已创建', 'success');
+    notify(t('favorites.folderCreated'), 'success');
   };
 
   const handleUpdateFolder = (id, updates) => {
@@ -663,7 +697,7 @@ const FavoritesPanel = ({ showNotification }) => {
   };
 
   const handleDeleteFolder = (id) => {
-    if (!window.confirm('删除文件夹后，其中的收藏将移至"未分类"')) return;
+    if (!window.confirm(t('favorites.deleteFolderConfirm'))) return;
     
     // 移动该文件夹下的收藏到未分类
     favorites?.forEach(item => {
@@ -674,19 +708,19 @@ const FavoritesPanel = ({ showNotification }) => {
     
     setFolders(folders.filter(f => f.id !== id));
     if (selectedFolder === id) setSelectedFolder('all');
-    notify('文件夹已删除', 'success');
+    notify(t('favorites.folderDeleted'), 'success');
   };
 
   // 收藏操作
   const handleCopy = useCallback((text) => {
     navigator.clipboard.writeText(text);
-    notify('已复制译文', 'success');
-  }, [notify]);
+    notify(t('favorites.copied'), 'success');
+  }, [notify, t]);
 
   const handleMove = useCallback((itemId, folderId) => {
     updateFavoriteItem(itemId, { folderId });
-    notify('已移动', 'success');
-  }, [updateFavoriteItem, notify]);
+    notify(t('favorites.moved'), 'success');
+  }, [updateFavoriteItem, notify, t]);
 
   const handleUpdateTags = useCallback((itemId, tags) => {
     updateFavoriteItem(itemId, { tags });
@@ -702,26 +736,26 @@ const FavoritesPanel = ({ showNotification }) => {
       isStyleReference,
       folderId: isStyleReference ? 'style_library' : null
     });
-    notify(isStyleReference ? '已移动到风格库' : '已移出风格库', 'success');
+    notify(isStyleReference ? t('favorites.movedToStyle') : t('favorites.movedFromStyle'), 'success');
   }, [updateFavoriteItem, notify]);
 
   const handleDelete = useCallback((itemId) => {
-    if (window.confirm('确定要删除这条收藏吗？')) {
+    if (window.confirm(t('favorites.deleteConfirm'))) {
       removeFromFavorites(itemId);
-      notify('已删除', 'success');
+      notify(t('favorites.deleted'), 'success');
     }
-  }, [removeFromFavorites, notify]);
+  }, [removeFromFavorites, notify, t]);
 
   return (
     <div className="favorites-panel">
       {/* 左侧边栏 - 文件夹 */}
       <div className="favorites-sidebar">
         <div className="sidebar-header">
-          <h3>收藏夹</h3>
+          <h3>{t('favorites.title')}</h3>
           <button 
             className="add-folder-btn"
             onClick={() => setShowAddFolder(!showAddFolder)}
-            title="新建文件夹"
+            title={t('favorites.newFolder')}
           >
             <FolderPlus size={18} />
           </button>
@@ -734,7 +768,7 @@ const FavoritesPanel = ({ showNotification }) => {
               type="text"
               value={newFolderName}
               onChange={(e) => setNewFolderName(e.target.value)}
-              placeholder="文件夹名称"
+              placeholder={t('favorites.folderName')}
               onKeyDown={(e) => e.key === 'Enter' && handleAddFolder()}
               autoFocus
             />
@@ -759,7 +793,7 @@ const FavoritesPanel = ({ showNotification }) => {
                 </div>
               )}
               <button className="btn-create" onClick={handleAddFolder}>
-                <Plus size={14} /> 创建
+                <Plus size={14} /> {t('favorites.create')}
               </button>
             </div>
           </div>
@@ -773,7 +807,7 @@ const FavoritesPanel = ({ showNotification }) => {
             onClick={() => { setSelectedFolder('all'); setSelectedTag(null); }}
           >
             <Star size={16} className="folder-icon" />
-            <span className="folder-name">全部收藏</span>
+            <span className="folder-name">{t('favorites.allFavorites')}</span>
             <span className="folder-count">{folderCounts.all}</span>
           </div>
 
@@ -783,7 +817,7 @@ const FavoritesPanel = ({ showNotification }) => {
             onClick={() => { setSelectedFolder('uncategorized'); setSelectedTag(null); }}
           >
             <Folder size={16} className="folder-icon" style={{ color: '#6b7280' }} />
-            <span className="folder-name">未分类</span>
+            <span className="folder-name">{t('favorites.uncategorized')}</span>
             <span className="folder-count">{folderCounts.uncategorized}</span>
           </div>
 
@@ -843,7 +877,7 @@ const FavoritesPanel = ({ showNotification }) => {
                     ) : (
                       <Folder size={16} className="folder-icon" style={{ color: folder.color }} />
                     )}
-                    <span className="folder-name">{folder.name}</span>
+                    <span className="folder-name">{getFolderName(folder)}</span>
                     <span className="folder-count">{folderCounts[folder.id] || 0}</span>
                   </div>
                   {/* 术语库的导入导出按钮 */}
@@ -858,14 +892,14 @@ const FavoritesPanel = ({ showNotification }) => {
                       />
                       <button 
                         onClick={(e) => { e.stopPropagation(); glossaryInputRef.current?.click(); }}
-                        title="导入术语"
+                        title={t('favorites.importTerms')}
                       >
                         <Upload size={12} />
                       </button>
                       <div className="export-menu-wrapper">
                         <button 
                           onClick={(e) => { e.stopPropagation(); setShowExportMenu(!showExportMenu); }}
-                          title="导出术语"
+                          title={t('favorites.exportTerms')}
                         >
                           <Download size={12} />
                         </button>
@@ -899,7 +933,7 @@ const FavoritesPanel = ({ showNotification }) => {
         {allTags.length > 0 && (
           <>
             <div className="sidebar-section-title">
-              <Tag size={14} /> 标签
+              <Tag size={14} /> {t('favorites.tags')}
             </div>
             <div className="tag-list">
               {allTags.map(tag => (
@@ -925,7 +959,7 @@ const FavoritesPanel = ({ showNotification }) => {
             <Search size={16} />
             <input
               type="text"
-              placeholder="搜索收藏..."
+              placeholder={t('favorites.search')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -944,7 +978,7 @@ const FavoritesPanel = ({ showNotification }) => {
               </span>
             )}
             <span className="result-count">
-              {filteredFavorites.length} 条{selectedFolder === 'glossary' ? '术语' : '收藏'}
+              {filteredFavorites.length} {selectedFolder === 'glossary' ? t('favorites.terms') : t('favorites.items')}
             </span>
           </div>
         </div>
@@ -954,8 +988,8 @@ const FavoritesPanel = ({ showNotification }) => {
           {filteredFavorites.length === 0 ? (
             <div className="empty-state">
               <Star size={48} />
-              <p>{searchQuery || selectedTag ? '没有找到匹配的收藏' : '暂无收藏'}</p>
-              <span>在翻译结果中点击星标可添加收藏</span>
+              <p>{searchQuery || selectedTag ? t('favorites.noMatch') : t('favorites.empty')}</p>
+              <span>{t('favorites.emptyHint')}</span>
             </div>
           ) : selectedFolder === 'glossary' ? (
             /* 术语库表格视图 */
@@ -963,10 +997,10 @@ const FavoritesPanel = ({ showNotification }) => {
               <table className="glossary-table">
                 <thead>
                   <tr>
-                    <th style={{ width: '30%' }}>原文</th>
-                    <th style={{ width: '30%' }}>译文</th>
-                    <th style={{ width: '25%' }}>备注</th>
-                    <th style={{ width: '15%' }}>操作</th>
+                    <th style={{ width: '30%' }}>{t('translation.source')}</th>
+                    <th style={{ width: '30%' }}>{t('translation.target')}</th>
+                    <th style={{ width: '25%' }}>{t('favorites.note')}</th>
+                    <th style={{ width: '15%' }}>{t('favorites.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>

@@ -3,6 +3,7 @@
 // M-V-S-P 架构：View 层，只负责展示和用户交互
 
 import React, { useState, useEffect, useCallback, useImperativeHandle, forwardRef, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ChevronDown, ChevronUp, Check, X, AlertCircle,
   RefreshCw, Eye, EyeOff, ExternalLink, GripVertical,
@@ -46,17 +47,19 @@ const PROVIDER_ICONS = {
   'google-translate': '🌐',
 };
 
-// ========== 类型标签 ==========
-const TYPE_LABELS = {
-  'llm': { label: 'AI 大模型', color: '#8b5cf6' },
-  'api': { label: '专业 API', color: '#3b82f6' },
-  'traditional': { label: '传统翻译', color: '#10b981' },
+// ========== 类型标签 - 颜色映射 ==========
+const TYPE_COLORS = {
+  'llm': '#8b5cf6',
+  'api': '#3b82f6',
+  'traditional': '#10b981',
 };
 
 /**
  * 翻译源设置组件 - 分组卡片风格
  */
 const ProviderSettings = forwardRef(({ settings, updateSettings, notify }, ref) => {
+  const { t } = useTranslation();
+  
   // 从 registry 获取所有翻译源元信息
   const allProvidersMeta = getAllProviderMetadata();
   
@@ -228,10 +231,10 @@ const ProviderSettings = forwardRef(({ settings, updateSettings, notify }, ref) 
         await window.electron.glass.notifySettingsChanged();
       }
       
-      notify?.('翻译源设置已保存', 'success');
+      notify?.(t('providerSettings.saved'), 'success');
     } catch (error) {
       console.error('[ProviderSettings] Save failed:', error);
-      notify?.('保存失败: ' + error.message, 'error');
+      notify?.(t('providerSettings.saveFailed') + ': ' + error.message, 'error');
     } finally {
       setIsSaving(false);
     }
@@ -365,10 +368,10 @@ const ProviderSettings = forwardRef(({ settings, updateSettings, notify }, ref) 
 
   const getStatusText = (providerId) => {
     const result = testResults[providerId];
-    if (testingProvider === providerId) return '测试中...';
-    if (result?.success) return '已连接';
-    if (result?.success === false) return result.message || '连接失败';
-    return '未测试';
+    if (testingProvider === providerId) return t('providerSettings.testing');
+    if (result?.success) return t('providerSettings.connected');
+    if (result?.success === false) return result.message || t('providerSettings.connectionFailed');
+    return t('providerSettings.notTested');
   };
 
   // 渲染配置表单
@@ -380,7 +383,7 @@ const ProviderSettings = forwardRef(({ settings, updateSettings, notify }, ref) 
       return (
         <div className="ps-config-empty">
           <Globe size={20} />
-          <span>此翻译源无需额外配置，开箱即用</span>
+          <span>{t('providerSettings.noConfig')}</span>
         </div>
       );
     }
@@ -460,7 +463,7 @@ const ProviderSettings = forwardRef(({ settings, updateSettings, notify }, ref) 
       {/* 说明 */}
       <div className="ps-tip">
         <AlertCircle size={14} />
-        <span>按优先级顺序尝试翻译，第一个成功的将被使用。拖动卡片调整顺序。</span>
+        <span>{t('providerSettings.priorityHint')}</span>
       </div>
 
       {/* 翻译源列表 */}
@@ -470,7 +473,8 @@ const ProviderSettings = forwardRef(({ settings, updateSettings, notify }, ref) 
           if (!meta) return null;
           
           const isExpanded = expandedProvider === provider.id;
-          const typeInfo = TYPE_LABELS[meta.type] || TYPE_LABELS['api'];
+          const typeColor = TYPE_COLORS[meta.type] || TYPE_COLORS['api'];
+          const typeLabel = t(`providerSettings.typeLabels.${meta.type}`) || meta.type;
           const isDragOver = dragOverIndex === index && draggedIndex !== index;
           
           return (
@@ -521,8 +525,8 @@ const ProviderSettings = forwardRef(({ settings, updateSettings, notify }, ref) 
                 <div className="ps-info">
                   <div className="ps-title">
                     <span className="ps-name">{meta.name}</span>
-                    <span className="ps-tag" style={{ background: typeInfo.color }}>
-                      {typeInfo.label}
+                    <span className="ps-tag" style={{ background: typeColor }}>
+                      {typeLabel}
                     </span>
                   </div>
                   <div className="ps-desc">{meta.description}</div>
@@ -545,7 +549,7 @@ const ProviderSettings = forwardRef(({ settings, updateSettings, notify }, ref) 
                 className="ps-expand-trigger"
                 onClick={() => setExpandedProvider(isExpanded ? null : provider.id)}
               >
-                <span>配置详情</span>
+                <span>{t('providerSettings.configDetails')}</span>
                 {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
               </button>
 
@@ -566,7 +570,7 @@ const ProviderSettings = forwardRef(({ settings, updateSettings, notify }, ref) 
                       ) : (
                         <Zap size={14} />
                       )}
-                      <span>测试连接</span>
+                      <span>{t('providerSettings.testConnection')}</span>
                     </button>
                     
                     <div className="ps-status">

@@ -1,5 +1,6 @@
 // src/components/SettingsPanel/index.jsx
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Globe, Shield, Zap, Download, Upload, Moon, Sun,
   Info, CheckCircle, Wifi, RefreshCw, AlertCircle,
@@ -52,8 +53,30 @@ const logger = createLogger('Settings');
  * 设置面板组件
  */
 const SettingsPanel = ({ showNotification }) => {
+  const { t } = useTranslation();
+  
   // 兼容 props
   const notify = showNotification || ((msg, type) => logger.debug(`[${type}] ${msg}`));
+
+  // 侧边栏菜单翻译映射
+  const navLabels = {
+    providers: t('settingsNav.providers'),
+    translation: t('settingsNav.translation'),
+    selection: t('settingsNav.selection'),
+    glassWindow: t('settingsNav.glassWindow'),
+    document: t('settingsNav.document'),
+    ocr: t('settingsNav.ocr'),
+    tts: t('settingsNav.tts'),
+    interface: t('settingsNav.interface'),
+    connection: t('settingsNav.connection'),
+    privacy: t('settingsNav.privacy'),
+    about: t('settingsNav.about'),
+  };
+  
+  const groupLabels = {
+    '翻译': t('settingsNav.groupTranslation'),
+    '系统': t('settingsNav.groupSystem'),
+  };
 
   // Store actions
   const { 
@@ -338,14 +361,14 @@ const SettingsPanel = ({ showNotification }) => {
 
       // 只有非 providers tab 才显示通知（providers tab 有自己的通知）
       if (activeSection !== 'providers') {
-        notify('设置已保存', 'success');
+        notify(t('settings.saved'), 'success');
       }
       
       // 保存后重置 dirty 标志
       setIsDirty(false);
     } catch (error) {
       logger.error('Failed to save settings:', error);
-      notify('保存设置失败', 'error');
+      notify(t('settings.saveFailed'), 'error');
     } finally {
       setIsSaving(false);
     }
@@ -363,21 +386,21 @@ const SettingsPanel = ({ showNotification }) => {
       if (result.success) {
         setConnectionStatus('connected');
         setModels(result.models || []);
-        notify(`连接成功！${result.models?.length ? `检测到 ${result.models.length} 个模型` : ''}`, 'success');
+        notify(t('connectionSettings.connectionSuccess', { count: result.models?.length || 0 }), 'success');
       } else {
         setConnectionStatus('disconnected');
-        notify('连接失败: ' + (result.error || result.message || '未知错误'), 'error');
+        notify(t('connectionSettings.connectionFailed') + ': ' + (result.error || result.message || t('notify.unknownError')), 'error');
       }
     } catch (error) {
       setConnectionStatus('error');
-      notify('连接错误: ' + error.message, 'error');
+      notify(t('connectionSettings.connectionError') + ': ' + error.message, 'error');
     } finally {
       setIsTesting(false);
     }
   };
 
   const resetSettings = (section = null) => {
-    if (!window.confirm(section ? `重置 "${section}" 的设置？` : '重置所有设置？这将清除所有自定义配置。')) return;
+    if (!window.confirm(section ? t('settings.resetSectionConfirm', { section }) : t('settings.resetAllConfirm'))) return;
 
     if (section) {
       // 部分重置 - 使用默认值覆盖指定部分
@@ -386,9 +409,9 @@ const SettingsPanel = ({ showNotification }) => {
           ...prev,
           [section]: { ...DEFAULT_SETTINGS[section] }
         }));
-        notify(`${section} 设置已重置`, 'success');
+        notify(t('settings.sectionReset', { section }), 'success');
       } else {
-        notify(`未找到 ${section} 的默认设置`, 'error');
+        notify(t('settings.sectionNotFound', { section }), 'error');
       }
     } else {
       // 全部重置
@@ -397,7 +420,7 @@ const SettingsPanel = ({ showNotification }) => {
         window.electron.store.delete('settings');
       }
       setSettings({ ...DEFAULT_SETTINGS });
-      notify('所有设置已重置', 'success');
+      notify(t('settings.allReset'), 'success');
     }
   };
 
@@ -415,7 +438,7 @@ const SettingsPanel = ({ showNotification }) => {
     a.download = `t-translate-settings_${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    notify('设置已导出', 'success');
+    notify(t('settings.exported'), 'success');
   };
 
   const importSettings = (event) => {
@@ -435,7 +458,7 @@ const SettingsPanel = ({ showNotification }) => {
         const hasRequiredSections = requiredSections.some(s => settingsData[s]);
         
         if (!hasRequiredSections) {
-          notify('设置文件格式不正确', 'error');
+          notify(t('settings.invalidFormat'), 'error');
           return;
         }
         
@@ -452,10 +475,10 @@ const SettingsPanel = ({ showNotification }) => {
           return merged;
         });
         
-        notify('设置已导入，请保存以生效', 'success');
+        notify(t('settings.importedPleasesSave'), 'success');
       } catch (error) {
         logger.error('Import settings error:', error);
-        notify('无效的设置文件', 'error');
+        notify(t('settings.invalidFile'), 'error');
       }
     };
     reader.readAsText(file);
@@ -597,7 +620,7 @@ const SettingsPanel = ({ showNotification }) => {
         <div className="settings-search">
           <input
             type="text"
-            placeholder="搜索设置..."
+            placeholder={t('settingsNav.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="search-input"
@@ -609,7 +632,7 @@ const SettingsPanel = ({ showNotification }) => {
           {Object.entries(groupedNavItems).map(([group, items], groupIndex) => (
             <React.Fragment key={group}>
               {groupIndex > 0 && <div className="nav-divider" />}
-              <div className="nav-group-title">{group}</div>
+              <div className="nav-group-title">{groupLabels[group] || group}</div>
               {items.map(item => {
                 const Icon = item.icon;
                 const isSearchMatch = searchQuery.trim() && (
@@ -623,7 +646,7 @@ const SettingsPanel = ({ showNotification }) => {
                     onClick={() => handleSectionChange(item.id)}
                   >
                     <Icon size={16}/>
-                    <span>{item.label}</span>
+                    <span>{navLabels[item.id] || item.label}</span>
                   </button>
                 );
               })}
@@ -633,14 +656,14 @@ const SettingsPanel = ({ showNotification }) => {
           {/* 搜索无结果提示 */}
           {filteredNavItems.length === 0 && (
             <div className="nav-empty">
-              <p>未找到匹配的设置</p>
+              <p>{t('settingsNav.noMatch')}</p>
             </div>
           )}
         </div>
         <div className="settings-actions">
-            <button className="action-button" onClick={exportSettings}><Download size={14}/> 导出</button>
-            <label className="action-button"><Upload size={14}/> 导入 <input type="file" accept=".json" onChange={importSettings} style={{display:'none'}}/></label>
-            <button className="action-button danger" onClick={()=>resetSettings()}><RefreshCw size={14}/> 重置</button>
+            <button className="action-button" onClick={exportSettings}><Download size={14}/> {t('settingsNav.export')}</button>
+            <label className="action-button"><Upload size={14}/> {t('settingsNav.import')} <input type="file" accept=".json" onChange={importSettings} style={{display:'none'}}/></label>
+            <button className="action-button danger" onClick={()=>resetSettings()}><RefreshCw size={14}/> {t('settingsNav.reset')}</button>
         </div>
       </div>
 
@@ -652,11 +675,11 @@ const SettingsPanel = ({ showNotification }) => {
         {hasUnsavedChanges && (
           <div className="settings-footer">
             <div className="unsaved-indicator">
-              有未保存的更改
+              {t('settingsNav.unsavedChanges')}
             </div>
             <button className="save-button" onClick={saveSettings} disabled={isSaving}>
                 {isSaving ? <RefreshCw className="animate-spin" size={16}/> : <Save size={16}/>}
-                {isSaving ? ' 保存中...' : ' 保存更改'}
+                {isSaving ? ` ${t('settingsNav.saving')}` : ` ${t('settingsNav.saveChanges')}`}
             </button>
           </div>
         )}

@@ -2,12 +2,14 @@
 // 关于页面区块组件 - 包含检查更新功能
 
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { GitBranch, RefreshCw, FolderOpen, Download, X, Loader2 } from 'lucide-react';
 
 /**
  * 关于页面区块
  */
 const AboutSection = ({ notify }) => {
+  const { t, i18n } = useTranslation();
   const [version, setVersion] = useState('');
   const [isChecking, setIsChecking] = useState(false);
   const [updateInfo, setUpdateInfo] = useState(null);
@@ -41,18 +43,18 @@ const AboutSection = ({ notify }) => {
       const result = await window.electron?.app?.checkUpdate?.();
       
       if (!result) {
-        notify('检查更新功能不可用', 'error');
+        notify(t('about.updateUnavailable'), 'error');
         return;
       }
       
       if (!result.success) {
-        notify(result.error || '检查更新失败', 'error');
+        notify(result.error || t('about.updateFailed'), 'error');
         return;
       }
       
       // 暂无发布版本
       if (result.latestVersion === null) {
-        notify('暂无发布版本，已是最新 ✓', 'success');
+        notify(t('about.noReleases'), 'success');
         return;
       }
       
@@ -60,11 +62,11 @@ const AboutSection = ({ notify }) => {
         setUpdateInfo(result);
         setShowUpdateModal(true);
       } else {
-        notify('已是最新版本 ✓', 'success');
+        notify(t('settings.about.upToDate') + ' ✓', 'success');
       }
       
     } catch (e) {
-      notify('检查更新失败: ' + (e.message || '网络错误'), 'error');
+      notify(t('about.updateFailed') + ': ' + (e.message || t('notify.networkError')), 'error');
     } finally {
       setIsChecking(false);
     }
@@ -83,12 +85,12 @@ const AboutSection = ({ notify }) => {
     try {
       const result = await window.electron?.logs?.openDirectory?.();
       if (result?.success) {
-        notify('已打开日志目录', 'success');
+        notify(t('about.logDirOpened'), 'success');
       } else {
-        notify(result?.message || '无法打开日志目录', 'error');
+        notify(result?.message || t('about.logDirFailed'), 'error');
       }
     } catch (e) {
-      notify('打开日志目录失败', 'error');
+      notify(t('about.logDirFailed'), 'error');
     }
   };
 
@@ -97,7 +99,7 @@ const AboutSection = ({ notify }) => {
     if (!dateStr) return '';
     try {
       const date = new Date(dateStr);
-      return date.toLocaleDateString('zh-CN', {
+      return date.toLocaleDateString(i18n.language === 'zh' ? 'zh-CN' : 'en-US', {
         year: 'numeric',
         month: 'long',
         day: 'numeric'
@@ -113,25 +115,25 @@ const AboutSection = ({ notify }) => {
         <img src="./icon.png" alt="T-Translate" className="app-logo-img" />
         <h2>T-Translate</h2>
         <p className="version-tag">v{version}</p>
-        <p className="app-desc">智能离线翻译工具</p>
+        <p className="app-desc">{t('about.desc')}</p>
       </div>
       
       <div className="info-cards">
         <div className="info-card">
-          <h4>🚀 核心特性</h4>
+          <h4>🚀 {t('about.features')}</h4>
           <ul>
-            <li>本地 LLM 翻译，数据不出设备</li>
-            <li>多引擎 OCR 文字识别</li>
-            <li>PDF/DOCX/EPUB 文档翻译</li>
-            <li>划词翻译 + 玻璃窗口</li>
+            <li>{t('about.feature1')}</li>
+            <li>{t('about.feature2')}</li>
+            <li>{t('about.feature3')}</li>
+            <li>{t('about.feature4')}</li>
           </ul>
         </div>
         <div className="info-card">
-          <h4>⚙️ 技术栈</h4>
+          <h4>⚙️ {t('about.techStack')}</h4>
           <ul>
             <li>Electron + React 18</li>
-            <li>Zustand 状态管理</li>
-            <li>LM Studio / Ollama 后端</li>
+            <li>Zustand State Management</li>
+            <li>LM Studio / Ollama</li>
             <li>RapidOCR / LLM Vision</li>
           </ul>
         </div>
@@ -148,22 +150,22 @@ const AboutSection = ({ notify }) => {
         >
           {isChecking ? (
             <>
-              <Loader2 size={16} className="spinning" /> 检查中...
+              <Loader2 size={16} className="spinning" /> {t('settings.about.checking')}
             </>
           ) : (
             <>
-              <RefreshCw size={16}/> 检查更新
+              <RefreshCw size={16}/> {t('settings.about.checkUpdate')}
             </>
           )}
         </button>
         <button className="link-button" onClick={openLogDirectory}>
-          <FolderOpen size={16}/> 打开日志目录
+          <FolderOpen size={16}/> {t('about.openLogs')}
         </button>
       </div>
       
       <div className="about-footer">
         <p>Made with ❤️ for translators</p>
-        <p className="copyright">© 2026 T-Translate</p>
+        <p className="copyright">{t('settings.about.copyright')}</p>
       </div>
 
       {/* 更新弹窗 */}
@@ -171,7 +173,7 @@ const AboutSection = ({ notify }) => {
         <div className="update-modal-overlay" onClick={() => setShowUpdateModal(false)}>
           <div className="update-modal" onClick={e => e.stopPropagation()}>
             <div className="update-modal-header">
-              <h3>🎉 发现新版本</h3>
+              <h3>🎉 {t('settings.about.newVersion')}</h3>
               <button className="close-btn" onClick={() => setShowUpdateModal(false)}>
                 <X size={18} />
               </button>
@@ -180,12 +182,12 @@ const AboutSection = ({ notify }) => {
             <div className="update-modal-body">
               <div className="version-compare">
                 <div className="version-item current">
-                  <span className="label">当前版本</span>
+                  <span className="label">{t('about.currentVersion')}</span>
                   <span className="value">v{updateInfo.currentVersion}</span>
                 </div>
                 <div className="version-arrow">→</div>
                 <div className="version-item latest">
-                  <span className="label">最新版本</span>
+                  <span className="label">{t('about.latestVersion')}</span>
                   <span className="value">v{updateInfo.latestVersion}</span>
                 </div>
               </div>
@@ -198,13 +200,13 @@ const AboutSection = ({ notify }) => {
               
               {updateInfo.publishedAt && (
                 <div className="release-date">
-                  发布日期: {formatDate(updateInfo.publishedAt)}
+                  {t('settings.about.publishedAt')}: {formatDate(updateInfo.publishedAt)}
                 </div>
               )}
               
               {updateInfo.releaseNotes && (
                 <div className="release-notes">
-                  <h4>更新内容</h4>
+                  <h4>{t('settings.about.releaseNotes')}</h4>
                   <div className="notes-content">
                     {updateInfo.releaseNotes}
                   </div>
@@ -214,10 +216,10 @@ const AboutSection = ({ notify }) => {
             
             <div className="update-modal-footer">
               <button className="btn-secondary" onClick={() => setShowUpdateModal(false)}>
-                稍后再说
+                {t('settings.about.later')}
               </button>
               <button className="btn-primary" onClick={openDownloadPage}>
-                <Download size={16} /> 前往下载
+                <Download size={16} /> {t('settings.about.download')}
               </button>
             </div>
           </div>

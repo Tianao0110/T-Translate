@@ -2,8 +2,15 @@
 // 界面设置区块组件 - 从 SettingsPanel 拆分
 
 import React from 'react';
-import { Sun, Moon, Leaf, RefreshCw } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { Sun, Moon, Leaf, RefreshCw, Globe } from 'lucide-react';
 import { defaultConfig } from '../constants.js';
+
+// 可用语言列表
+const LANGUAGES = [
+  { code: 'zh', name: '简体中文', nativeName: '简体中文' },
+  { code: 'en', name: 'English', nativeName: 'English' }
+];
 
 /**
  * 界面设置区块
@@ -17,6 +24,13 @@ const InterfaceSection = ({
   setEditingShortcut,
   saveSettings  // 新增：保存设置函数
 }) => {
+  const { t, i18n } = useTranslation();
+  
+  // 切换界面语言
+  const switchLanguage = (langCode) => {
+    i18n.changeLanguage(langCode);
+    notify(langCode === 'zh' ? '界面语言已切换为中文' : 'Language changed to English', 'success');
+  };
   
   // 切换主题并立即保存（确保子窗口同步）
   const switchTheme = async (theme) => {
@@ -48,15 +62,15 @@ const InterfaceSection = ({
   };
   // 快捷键配置
   const shortcutConfig = {
-    translate: { label: '执行翻译', global: false, icon: '⏎' },
-    swapLanguages: { label: '切换语言', global: false, icon: '🔄' },
-    clear: { label: '清空内容', global: false, icon: '🗑️' },
-    paste: { label: '粘贴文本', global: false, icon: '📋' },
-    copy: { label: '复制结果', global: false, icon: '📄' },
-    screenshot: { label: '截图翻译', global: true, icon: '📷' },
-    toggleWindow: { label: '显示/隐藏窗口', global: true, icon: '🪟' },
-    glassWindow: { label: '玻璃窗口', global: true, icon: '🔮' },
-    selectionTranslate: { label: '划词翻译开关', global: true, icon: '✏️' },
+    translate: { label: t('shortcuts.translate'), global: false, icon: '⏎' },
+    swapLanguages: { label: t('shortcuts.swapLanguages'), global: false, icon: '🔄' },
+    clear: { label: t('shortcuts.clear'), global: false, icon: '🗑️' },
+    paste: { label: t('shortcuts.paste'), global: false, icon: '📋' },
+    copy: { label: t('shortcuts.copy'), global: false, icon: '📄' },
+    screenshot: { label: t('shortcuts.screenshot'), global: true, icon: '📷' },
+    toggleWindow: { label: t('shortcuts.toggleWindow'), global: true, icon: '🪟' },
+    glassWindow: { label: t('shortcuts.glassWindow'), global: true, icon: '🔮' },
+    selectionTranslate: { label: t('shortcuts.selectionTranslate'), global: true, icon: '✏️' },
   };
 
   // 开始编辑快捷键
@@ -83,9 +97,9 @@ const InterfaceSection = ({
     if (config.global && window.electron?.shortcuts?.update) {
       const result = await window.electron.shortcuts.update(action, newShortcut);
       if (result?.success) {
-        notify(`全局快捷键已更新: ${config.label} → ${newShortcut}`, 'success');
+        notify(t('shortcuts.updated', { label: config.label, shortcut: newShortcut }), 'success');
       } else {
-        notify(`快捷键更新失败: ${result?.error || '未知错误'}`, 'error');
+        notify(t('shortcuts.updateFailed', { error: result?.error || 'Unknown error' }), 'error');
         await window.electron.shortcuts.resume(action);
       }
     }
@@ -100,45 +114,65 @@ const InterfaceSection = ({
         window.electron.shortcuts.update(action, defaultConfig.shortcuts[action]);
       });
     }
-    notify('快捷键已重置为默认值', 'success');
+    notify(t('shortcuts.reset'), 'success');
   };
 
   return (
     <div className="setting-content">
-      <h3>界面设置</h3>
-      <p className="setting-description">自定义应用外观和显示效果</p>
+      <h3>{t('settings.general.title')}</h3>
+      <p className="setting-description">{t('settings.general.themeDesc')}</p>
+      
+      {/* 界面语言 */}
+      <div className="setting-group">
+        <label className="setting-label">
+          <Globe size={16} style={{marginRight: '6px', verticalAlign: 'middle'}} />
+          {t('settings.general.language')}
+        </label>
+        <div className="language-selector">
+          {LANGUAGES.map(lang => (
+            <button
+              key={lang.code}
+              className={`language-option ${i18n.language === lang.code ? 'active' : ''}`}
+              onClick={() => switchLanguage(lang.code)}
+            >
+              {lang.nativeName}
+            </button>
+          ))}
+        </div>
+        <p className="setting-hint">{t('settings.general.languageDesc')}</p>
+      </div>
       
       {/* 主题 */}
       <div className="setting-group">
-        <label className="setting-label">主题</label>
+        <label className="setting-label">{t('settings.general.theme')}</label>
         <div className="theme-selector">
           <button 
             className={`theme-option ${settings.interface.theme === 'light' ? 'active' : ''}`} 
             onClick={() => switchTheme('light')}
           >
-            <Sun size={16}/>经典
+            <Sun size={16}/>{t('settings.general.themes.default')}
           </button>
           <button 
             className={`theme-option ${settings.interface.theme === 'dark' ? 'active' : ''}`} 
             onClick={() => switchTheme('dark')}
           >
-            <Moon size={16}/>深色
+            <Moon size={16}/>{t('settings.general.themes.dark')}
           </button>
           <button 
             className={`theme-option fresh ${settings.interface.theme === 'fresh' ? 'active' : ''}`} 
             onClick={() => switchTheme('fresh')}
           >
-            <Leaf size={16}/>清新
+            <Leaf size={16}/>{t('settings.general.themes.fresh')}
           </button>
         </div>
-        <p className="setting-hint">主题切换即时生效并自动保存</p>
+        <p className="setting-hint">{t('settings.general.themeDesc')}</p>
       </div>
 
       {/* 快捷键设置 */}
       <div className="setting-group" style={{marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border-primary)'}}>
-        <label className="setting-label">⌨️ 快捷键设置</label>
+        <label className="setting-label">⌨️ {t('settings.shortcuts.title')}</label>
         <p className="setting-hint" style={{marginBottom: '12px'}}>
-          点击快捷键可进行修改，按 Esc 取消。带 🌐 标记的为全局快捷键（系统级生效）
+          {t('shortcuts.hint')}
         </p>
         
         <div className="shortcut-editor">
@@ -184,7 +218,7 @@ const InterfaceSection = ({
                       }
                     }}
                     onBlur={() => cancelEditing(action, config)}
-                    placeholder="按下快捷键..."
+                    placeholder={t('shortcuts.pressKey')}
                   />
                 ) : (
                   <button
@@ -206,7 +240,7 @@ const InterfaceSection = ({
           style={{marginTop: '12px'}}
           onClick={resetShortcuts}
         >
-          <RefreshCw size={14} /> 重置为默认
+          <RefreshCw size={14} /> {t('shortcuts.resetDefault')}
         </button>
       </div>
     </div>

@@ -1,7 +1,8 @@
 // src/components/SettingsPanel/sections/TranslationSection.jsx
-// 翻译设置区块组件 - 从 SettingsPanel 拆分
+// 翻译设置区块组件 - 国际化版
 
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Trash2 } from 'lucide-react';
 
 /**
@@ -19,18 +20,20 @@ const TranslationSection = ({
   useStreamOutput,
   setUseStreamOutput
 }) => {
+  const { t } = useTranslation();
+
   // 清除缓存
   const handleClearCache = () => {
-    if (window.confirm('确定要清除翻译缓存吗？')) {
+    if (window.confirm(t('translationSettings.clearCacheConfirm'))) {
       localStorage.removeItem('translation-cache');
-      notify('缓存已清除', 'success');
+      notify(t('translationSettings.cacheCleared'), 'success');
     }
   };
 
   return (
     <div className="setting-content">
-      <h3>翻译设置</h3>
-      <p className="setting-description">配置翻译行为和输出方式</p>
+      <h3>{t('translationSettings.title')}</h3>
+      <p className="setting-description">{t('translationSettings.description')}</p>
       
       {/* 自动翻译 */}
       <div className="setting-group">
@@ -41,15 +44,15 @@ const TranslationSection = ({
             onChange={(e) => setAutoTranslate(e.target.checked)} 
           />
           <span className="switch-slider"></span>
-          <span className="switch-label">自动翻译</span>
+          <span className="switch-label">{t('translationSettings.autoTranslate')}</span>
         </label>
-        <p className="setting-hint">输入停止后自动开始翻译</p>
+        <p className="setting-hint">{t('translationSettings.autoTranslateHint')}</p>
       </div>
       
       {/* 自动翻译延迟 - 只在开启自动翻译时显示 */}
       {autoTranslate && (
         <div className="setting-group">
-          <label className="setting-label">自动翻译延迟: {autoTranslateDelay}ms</label>
+          <label className="setting-label">{t('translationSettings.autoDelay')}: {autoTranslateDelay}ms</label>
           <input 
             type="range" 
             className="setting-range" 
@@ -59,7 +62,7 @@ const TranslationSection = ({
             value={autoTranslateDelay} 
             onChange={(e) => setAutoTranslateDelay(parseInt(e.target.value))} 
           />
-          <p className="setting-hint">停止输入后等待多久开始翻译</p>
+          <p className="setting-hint">{t('translationSettings.autoDelayHint')}</p>
         </div>
       )}
       
@@ -72,19 +75,19 @@ const TranslationSection = ({
             onChange={(e) => setUseStreamOutput(e.target.checked)} 
           />
           <span className="switch-slider"></span>
-          <span className="switch-label">流式输出（打字机效果）</span>
+          <span className="switch-label">{t('translationSettings.streamOutput')}</span>
         </label>
-        <p className="setting-hint">开启后翻译结果将逐字显示</p>
+        <p className="setting-hint">{t('translationSettings.streamOutputHint')}</p>
       </div>
       
       {/* 缓存管理 */}
       <div className="setting-group" style={{marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border-primary)'}}>
-        <h4 style={{marginBottom: '12px', color: 'var(--text-secondary)'}}>翻译缓存</h4>
+        <h4 style={{marginBottom: '12px', color: 'var(--text-secondary)'}}>{t('translationSettings.cache')}</h4>
         <p className="setting-hint" style={{marginBottom: '12px'}}>
-          缓存已翻译的内容，相同文本再次翻译时直接返回结果
+          {t('translationSettings.cacheHint')}
         </p>
         <button className="danger-button" onClick={handleClearCache}>
-          <Trash2 size={16} /> 清除缓存
+          <Trash2 size={16} /> {t('translationSettings.clearCache')}
         </button>
       </div>
     </div>
