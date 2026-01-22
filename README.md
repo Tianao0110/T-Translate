@@ -9,18 +9,6 @@
   基于 Electron + React + Vite 构建，支持本地 LLM 翻译
 </p>
 
-<p align="center">
-  <a href="https://github.com/Tianao0110/T-Translate/releases">
-    <img src="https://img.shields.io/github/v/release/Tianao0110/T-Translate?style=flat-square" alt="Release">
-  </a>
-  <a href="https://github.com/Tianao0110/T-Translate/blob/main/LICENSE">
-    <img src="https://img.shields.io/github/license/Tianao0110/T-Translate?style=flat-square" alt="License">
-  </a>
-  <a href="https://github.com/Tianao0110/T-Translate/stargazers">
-    <img src="https://img.shields.io/github/stars/Tianao0110/T-Translate?style=flat-square" alt="Stars">
-  </a>
-</p>
-
 ---
 
 ## ✨ 功能特性
