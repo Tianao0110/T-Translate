@@ -1,0 +1,972 @@
+/* src/styles/glass.css */
+/* 玻璃翻译窗口 - v29 极简版 */
+
+/* ========== 基础变量 ========== */
+:root {
+  --glass-bg: rgba(255, 255, 255, var(--glass-opacity, 0.85));
+  --glass-border: rgba(200, 200, 200, 0.3);
+  --glass-text: #333;
+  --glass-text-muted: #666;
+  --glass-accent: #3b82f6;
+  --glass-radius: 12px;
+}
+
+/* ========== 主窗口 ========== */
+.glass-window {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: var(--glass-text);
+  user-select: text;
+  -webkit-app-region: drag;
+}
+
+/* 散点模式下允许子玻璃板溢出 */
+.glass-window.scattered-mode {
+  overflow: visible;
+}
+
+/* 字幕模式 - 完全透明 + 虚线边框 */
+/* ========== 顶部区域 ========== */
+.glass-top-area {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 6px;
+  min-height: 24px;  /* 缩小 30%: 32 → 24 */
+  -webkit-app-region: drag;
+  background: rgba(0, 0, 0, 0.06);  /* 背景加深，与识别区区分 */
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  /* 默认隐藏，鼠标移入显示 */
+  opacity: 0;
+  max-height: 0;
+  padding: 0;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+/* 鼠标移入玻璃窗口时显示顶部区域 */
+.glass-window.show-toolbar .glass-top-area {
+  opacity: 1;
+  max-height: 24px;
+  padding: 3px 6px;
+}
+
+/* ========== 工具栏 ========== */
+.glass-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;  /* 缩小: 6 → 4 */
+  -webkit-app-region: no-drag;
+  pointer-events: auto;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1001;
+}
+
+.toolbar-btn {
+  width: 20px;   /* 缩小 30%: 28 → 20 */
+  height: 20px;
+  border: none;
+  border-radius: 4px;  /* 缩小: 6 → 4 */
+  background: rgba(255, 255, 255, 0.6);  /* 更亮，与背景区分 */
+  color: var(--glass-text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  -webkit-app-region: no-drag;
+  pointer-events: auto;
+  position: relative;
+  z-index: 1001;
+}
+
+.toolbar-btn:hover {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.toolbar-btn:active {
+  transform: scale(0.95);
+}
+
+.toolbar-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* 已设置采集区的按钮高亮 */
+.toolbar-btn.has-capture {
+  background: rgba(59, 130, 246, 0.2);
+  color: var(--glass-accent);
+}
+
+/* 小横条 - 点击调节透明度 */
+.toolbar-handle {
+  width: 28px;   /* 缩小: 40 → 28 */
+  height: 14px;  /* 缩小: 20 → 14 */
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--glass-text-muted);
+  transition: all 0.2s ease;
+  -webkit-app-region: no-drag;
+  pointer-events: auto;
+  position: relative;
+  z-index: 1001;
+}
+
+.toolbar-handle:hover {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.toolbar-handle:active {
+  cursor: grabbing;
+}
+
+/* ========== 关闭按钮 ========== */
+.glass-close-btn {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 20px;   /* 缩小: 28 → 20 */
+  height: 20px;
+  border: none;
+  border-radius: 4px;
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: all 0.2s ease;
+  -webkit-app-region: no-drag;
+  z-index: 1001;
+}
+
+/* 鼠标移入玻璃窗口时显示关闭按钮 */
+.glass-window.show-toolbar .glass-close-btn {
+  opacity: 1;
+}
+
+.glass-close-btn:hover {
+  background: rgba(239, 68, 68, 0.4);
+  transform: scale(1.05);
+}
+
+/* ========== 透明度弹窗 ========== */
+.opacity-popup {
+  position: absolute;
+  top: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  -webkit-app-region: no-drag;
+}
+
+.opacity-popup .opacity-label {
+  font-size: 12px;
+  color: var(--glass-text-muted);
+  white-space: nowrap;
+}
+
+.opacity-popup input[type="range"] {
+  width: 100px;
+  height: 4px;
+  -webkit-appearance: none;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.opacity-popup input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  background: var(--glass-accent);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.opacity-popup .opacity-value {
+  font-size: 12px;
+  color: var(--glass-text);
+  font-weight: 500;
+  min-width: 36px;
+  text-align: right;
+}
+
+/* ========== 内容区域 ========== */
+.glass-content {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-app-region: no-drag;
+}
+
+.glass-content::-webkit-scrollbar {
+  width: 4px;
+}
+
+.glass-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.glass-content::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 2px;
+}
+
+/* 消息样式 */
+.glass-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 100%;
+  color: var(--glass-text-muted);
+  text-align: center;
+  font-size: 14px;
+}
+
+.glass-message.error {
+  color: #ef4444;
+}
+
+.glass-message.loading svg {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* 占位提示 */
+.glass-message.placeholder {
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+/* 翻译结果 */
+.glass-result {
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--glass-text);
+  word-wrap: break-word;
+  white-space: pre-wrap;  /* 保留换行符 */
+}
+
+/* ========== 滚动提示 ========== */
+.scroll-hint {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border: none;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  -webkit-app-region: no-drag;
+}
+
+.scroll-hint:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+/* ========== 动画 ========== */
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+.pulse {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ========== 🌈 彩虹主题 ========== */
+[data-theme="fresh"] .glass-window {
+  --glass-bg: rgba(250, 245, 255, var(--glass-opacity, 0.9));
+  --glass-border: rgba(168, 85, 247, 0.25);
+  --glass-text: #4c1d95;
+  --glass-text-muted: #7c3aed;
+  --glass-accent: #a855f7;
+}
+
+[data-theme="fresh"] .glass-window::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, 
+    rgba(244, 114, 182, 0.05),
+    rgba(167, 139, 250, 0.05),
+    rgba(96, 165, 250, 0.05),
+    rgba(52, 211, 153, 0.03));
+  pointer-events: none;
+  border-radius: var(--glass-radius);
+  z-index: 0;
+}
+
+[data-theme="fresh"] .glass-top-area {
+  position: relative;
+  z-index: 1;
+  background: rgba(168, 85, 247, 0.08);
+  border-bottom-color: rgba(168, 85, 247, 0.1);
+}
+
+[data-theme="fresh"] .glass-content {
+  position: relative;
+  z-index: 1;
+}
+
+[data-theme="fresh"] .toolbar-btn {
+  background: rgba(255, 255, 255, 0.7);
+  color: #7c3aed;
+}
+
+[data-theme="fresh"] .toolbar-btn:hover {
+  background: rgba(255, 255, 255, 0.9);
+  color: #6d28d9;
+}
+
+[data-theme="fresh"] .toolbar-handle {
+  background: rgba(255, 255, 255, 0.6);
+  color: #8b5cf6;
+}
+
+[data-theme="fresh"] .toolbar-handle:hover {
+  background: rgba(255, 255, 255, 0.85);
+}
+
+[data-theme="fresh"] .toolbar-btn.active {
+  background: linear-gradient(135deg, #a855f7, #ec4899);
+  color: white;
+}
+
+[data-theme="fresh"] .glass-status {
+  color: #8b5cf6;
+}
+
+[data-theme="fresh"] .lang-tag {
+  background: rgba(168, 85, 247, 0.15);
+  color: #7c3aed;
+}
+
+[data-theme="fresh"] .translation-text {
+  color: #4c1d95;
+}
+
+[data-theme="fresh"] .glass-content::-webkit-scrollbar-thumb {
+  background: rgba(168, 85, 247, 0.3);
+}
+
+[data-theme="fresh"] .glass-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(168, 85, 247, 0.5);
+}
+
+/* ========== 深色主题 ========== */
+[data-theme="dark"] .glass-window {
+  --glass-bg: rgba(30, 41, 59, var(--glass-opacity, 0.9));
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-text: #e2e8f0;
+  --glass-text-muted: #94a3b8;
+  --glass-accent: #60a5fa;
+}
+
+[data-theme="dark"] .glass-top-area {
+  background: rgba(15, 23, 42, 0.5);
+}
+
+[data-theme="dark"] .glass-content {
+  color: #e2e8f0;
+}
+
+[data-theme="dark"] .toolbar-btn {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+}
+
+[data-theme="dark"] .toolbar-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="dark"] .toolbar-handle {
+  background: rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .toolbar-handle:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="dark"] .toolbar-btn.active {
+  background: #3b82f6;
+  color: white;
+}
+
+[data-theme="dark"] .glass-status {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .lang-tag {
+  background: rgba(96, 165, 250, 0.2);
+  color: #60a5fa;
+}
+
+[data-theme="dark"] .translation-text {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .glass-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="dark"] .glass-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+[data-theme="dark"] .scroll-hint {
+  background: rgba(255, 255, 255, 0.2);
+  color: #e2e8f0;
+}
+
+[data-theme="dark"] .scroll-hint:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* ========== 子玻璃板样式 ========== */
+
+/* 散点模式容器 */
+.scattered-panes-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  /* 关键：允许子玻璃板溢出，才能拖到外面 */
+  overflow: visible;
+}
+
+/* 散点模式下，移除内容区 padding，让子玻璃板直接对齐截图区域 */
+/* 同时允许溢出，才能拖动子玻璃板到外面 */
+.glass-content.scattered-mode {
+  padding: 0;
+  overflow: visible;
+}
+
+/* 冻结子玻璃板容器 */
+.frozen-panes-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 2000;  /* 提高优先级，确保在所有元素之上 */
+}
+
+.frozen-panes-container .child-glass-pane {
+  pointer-events: auto;
+}
+
+.child-glass-pane {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: stretch;
+  cursor: grab;  /* 整个面板可拖动 */
+  transition: box-shadow 0.2s, border-color 0.2s;
+  -webkit-app-region: no-drag;
+  /* 关键：限制最大宽度，允许换行 */
+  max-width: calc(100% - 16px);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  /* 确保可以接收事件 */
+  pointer-events: auto;
+  user-select: none;
+}
+
+.child-glass-pane:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.child-glass-pane.dragging {
+  cursor: grabbing;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  opacity: 0.9;
+}
+
+.child-glass-pane.frozen {
+  border-color: var(--glass-accent);
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.25);
+}
+
+.child-glass-pane.translating {
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.child-glass-pane.error {
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* 拖动手柄 */
+.child-pane-handle {
+  width: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.02);
+  cursor: grab;
+  color: #c0c4cc;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.child-pane-handle:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: #9ca3af;
+}
+
+.child-pane-handle:active {
+  cursor: grabbing;
+}
+
+/* 内容区 */
+.child-pane-content {
+  flex: 1;
+  padding: 4px 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.child-pane-text {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #1f2937;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.child-pane-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  color: var(--glass-accent);
+}
+
+.child-pane-loading .spin {
+  animation: spin 1s linear infinite;
+}
+
+.child-pane-error {
+  font-size: 12px;
+  color: #ef4444;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 控制按钮 */
+.child-pane-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 4px 4px 0;
+}
+
+.child-pane-btn {
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.05);
+  color: #6b7280;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.child-pane-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: #374151;
+}
+
+.child-pane-btn.copy:hover {
+  color: var(--glass-accent);
+}
+
+.child-pane-btn.close:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+/* ========== 子玻璃板深色主题 ========== */
+
+[data-theme="dark"] .child-glass-pane {
+  background: rgba(30, 41, 59, 0.95);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .child-glass-pane:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .child-glass-pane.frozen {
+  border-color: #60a5fa;
+  box-shadow: 0 4px 16px rgba(96, 165, 250, 0.3);
+}
+
+[data-theme="dark"] .child-pane-handle {
+  background: rgba(255, 255, 255, 0.03);
+  color: #64748b;
+}
+
+[data-theme="dark"] .child-pane-handle:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .child-pane-text {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .child-pane-btn {
+  background: rgba(255, 255, 255, 0.05);
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .child-pane-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+}
+
+/* ========== 子玻璃板彩虹主题 ========== */
+
+[data-theme="fresh"] .child-glass-pane {
+  background: rgba(255, 250, 245, 0.95);
+  border-color: rgba(168, 85, 247, 0.15);
+  box-shadow: 0 2px 8px rgba(168, 85, 247, 0.1);
+}
+
+[data-theme="fresh"] .child-glass-pane:hover {
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.15);
+}
+
+[data-theme="fresh"] .child-glass-pane.frozen {
+  border-color: #a855f7;
+  box-shadow: 0 4px 16px rgba(168, 85, 247, 0.25);
+}
+
+[data-theme="fresh"] .child-pane-handle {
+  background: rgba(168, 85, 247, 0.05);
+  color: #a78bfa;
+}
+
+[data-theme="fresh"] .child-pane-handle:hover {
+  background: rgba(168, 85, 247, 0.1);
+  color: #8b5cf6;
+}
+
+[data-theme="fresh"] .child-pane-text {
+  color: #4c1d95;
+}
+
+[data-theme="fresh"] .child-pane-btn:hover {
+  background: rgba(168, 85, 247, 0.1);
+  color: #7c3aed;
+}
+
+/* ========== 历史记录面板 ========== */
+
+.glass-history-panel {
+  position: absolute;
+  top: 32px;
+  left: 8px;
+  right: 8px;
+  max-height: calc(100% - 48px);
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: slideDown 0.15s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.history-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.history-close-btn {
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.history-close-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: #374151;
+}
+
+.history-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.history-empty {
+  padding: 24px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+.history-item {
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+  margin-bottom: 2px;
+}
+
+.history-item:hover {
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.history-item:active {
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.history-source {
+  font-size: 12px;
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+
+.history-translated {
+  font-size: 13px;
+  color: #1f2937;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-meta {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-top: 4px;
+}
+
+/* ========== 穿透模式指示器 ========== */
+
+.pass-through-indicator {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  z-index: 9999;
+  pointer-events: none;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 穿透模式下的窗口样式 */
+/* 不再设置整个窗口透明度，而是分别控制各部分 */
+.glass-window.pass-through {
+  background: rgba(255, 255, 255, 0.15) !important;  /* 背景更透明 */
+  backdrop-filter: blur(5px) !important;
+}
+
+.glass-window.pass-through .glass-top-area {
+  opacity: 0.3;
+}
+
+.glass-window.pass-through .glass-content {
+  opacity: 0.3;
+}
+
+/* 冻结的子玻璃板不透明 */
+.glass-window.pass-through .frozen-panes-container {
+  opacity: 1 !important;
+}
+
+.glass-window.pass-through .frozen-panes-container .child-glass-pane {
+  opacity: 1 !important;
+  /* 穿透模式下冻结的子玻璃板更醒目 */
+  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+}
+
+/* 工具栏按钮激活状态 */
+.toolbar-btn.active {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--glass-accent);
+}
+
+/* ========== 历史记录深色主题 ========== */
+
+[data-theme="dark"] .glass-history-panel {
+  background: rgba(30, 41, 59, 0.98);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .history-header {
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+[data-theme="dark"] .history-title {
+  color: #e2e8f0;
+}
+
+[data-theme="dark"] .history-close-btn {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .history-close-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #e2e8f0;
+}
+
+[data-theme="dark"] .history-empty {
+  color: #64748b;
+}
+
+[data-theme="dark"] .history-item:hover {
+  background: rgba(96, 165, 250, 0.1);
+}
+
+[data-theme="dark"] .history-source {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .history-translated {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .history-meta {
+  color: #64748b;
+}
+
+/* ========== 历史记录彩虹主题 ========== */
+
+[data-theme="fresh"] .glass-history-panel {
+  background: rgba(255, 250, 245, 0.98);
+  border-color: rgba(168, 85, 247, 0.15);
+  box-shadow: 0 4px 16px rgba(168, 85, 247, 0.15);
+}
+
+[data-theme="fresh"] .history-header {
+  border-bottom-color: rgba(168, 85, 247, 0.1);
+  background: rgba(168, 85, 247, 0.03);
+}
+
+[data-theme="fresh"] .history-title {
+  color: #7c3aed;
+}
+
+[data-theme="fresh"] .history-item:hover {
+  background: rgba(168, 85, 247, 0.08);
+}
+
+[data-theme="fresh"] .history-source {
+  color: #8b5cf6;
+}
+
+[data-theme="fresh"] .history-translated {
+  color: #4c1d95;
+}

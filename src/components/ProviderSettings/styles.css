@@ -1,0 +1,767 @@
+/* src/components/ProviderSettings/styles.css */
+/* 翻译源设置 - 分组面板风格 */
+
+/* ========== 容器 ========== */
+.ps-container {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding: 4px 0;
+}
+
+/* ========== 区域 ========== */
+.ps-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ps-section-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ps-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.ps-section-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ps-section-dot.enabled {
+  background: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+.ps-section-dot.disabled {
+  background: #d1d5db;
+}
+
+.ps-section-count {
+  background: #f3f4f6;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #9ca3af;
+}
+
+.ps-section-hint {
+  font-size: 12px;
+  color: #9ca3af;
+  font-weight: 400;
+  line-height: 1.4;
+  padding-left: 16px;
+}
+
+/* ========== 空状态 ========== */
+.ps-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 32px 16px;
+  background: #f9fafb;
+  border: 1px dashed #e5e7eb;
+  border-radius: 12px;
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+/* ========== 已启用列表 ========== */
+.ps-active-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ========== 已启用卡片 ========== */
+.ps-card {
+  position: relative;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-left: 3px solid var(--accent, #3b82f6);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+  cursor: grab;
+}
+
+.ps-card:active {
+  cursor: grabbing;
+}
+
+.ps-card:hover {
+  border-color: #d1d5db;
+  border-left-color: var(--accent, #3b82f6);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.ps-card.expanded {
+  border-color: var(--accent, #3b82f6);
+  border-left-color: var(--accent, #3b82f6);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.ps-card.dragging {
+  opacity: 0.5;
+  transform: scale(1.01);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.ps-card.drag-over {
+  border-color: var(--accent, #3b82f6);
+  border-style: dashed;
+  border-left-style: solid;
+  background: #f8fafc;
+}
+
+.ps-card.drag-over::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent, #3b82f6);
+  border-radius: 2px;
+}
+
+/* 拖拽手柄 (隐藏，hover 时显示) */
+.ps-drag-hint {
+  position: absolute;
+  left: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #d1d5db;
+  opacity: 0;
+  transition: opacity 0.15s;
+  pointer-events: none;
+}
+
+.ps-card:hover .ps-drag-hint {
+  opacity: 1;
+}
+
+/* ========== 卡片头部 ========== */
+.ps-card-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px 14px 20px;
+}
+
+/* 优先级数字 */
+.ps-priority {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent, #3b82f6);
+  min-width: 28px;
+  text-align: center;
+  line-height: 1;
+  opacity: 0.7;
+}
+
+/* 图标 */
+.ps-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+/* 信息区 */
+.ps-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.ps-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.ps-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.ps-tag {
+  font-size: 10px;
+  font-weight: 500;
+  color: #fff;
+  padding: 1px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.3px;
+}
+
+.ps-desc {
+  font-size: 12px;
+  color: #9ca3af;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ========== 卡片操作区 ========== */
+.ps-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* 配置按钮 */
+.ps-config-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  color: #9ca3af;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.ps-config-btn:hover {
+  background: #f3f4f6;
+  color: #374151;
+  border-color: #d1d5db;
+}
+
+.ps-config-btn.active {
+  background: var(--accent, #3b82f6);
+  border-color: var(--accent, #3b82f6);
+  color: #fff;
+}
+
+/* ========== 开关 ========== */
+.ps-switch {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.ps-switch input {
+  display: none;
+}
+
+.ps-switch-track {
+  width: 40px;
+  height: 22px;
+  background: #e5e7eb;
+  border-radius: 11px;
+  position: relative;
+  transition: background 0.2s;
+}
+
+.ps-switch-track::after {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  background: #fff;
+  border-radius: 50%;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.ps-switch input:checked + .ps-switch-track {
+  background: #10b981;
+}
+
+.ps-switch input:checked + .ps-switch-track::after {
+  transform: translateX(18px);
+}
+
+/* ========== 展开内容 ========== */
+.ps-expand-content {
+  padding: 14px 20px 16px;
+  border-top: 1px solid #f3f4f6;
+  background: #fafbfc;
+}
+
+/* ========== 配置表单 ========== */
+.ps-config-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ps-config-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.ps-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ps-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.ps-required {
+  color: #ef4444;
+  margin-left: 2px;
+}
+
+.ps-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 13px;
+  background: #fff;
+  transition: all 0.15s;
+}
+
+.ps-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.ps-input::placeholder {
+  color: #9ca3af;
+}
+
+.ps-input-group {
+  display: flex;
+  gap: 0;
+}
+
+.ps-input-group .ps-input {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-right: none;
+}
+
+.ps-input-btn {
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
+  border-left: none;
+  border-radius: 0 6px 6px 0;
+  background: #f9fafb;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.ps-input-btn:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.ps-select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 13px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.ps-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+.ps-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #374151;
+}
+
+.ps-checkbox input {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
+.ps-help-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #3b82f6;
+  text-decoration: none;
+  margin-top: 2px;
+}
+
+.ps-help-link:hover {
+  text-decoration: underline;
+}
+
+/* ========== 测试区域 ========== */
+.ps-test-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed #e5e7eb;
+}
+
+.ps-test-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.ps-test-btn:hover:not(:disabled) {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.ps-test-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ps-test-btn.success {
+  background: #ecfdf5;
+  border-color: #10b981;
+  color: #059669;
+}
+
+.ps-test-btn.error {
+  background: #fef2f2;
+  border-color: #ef4444;
+  color: #dc2626;
+}
+
+.ps-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.ps-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #9ca3af;
+}
+
+/* ========== 未启用网格 ========== */
+.ps-disabled-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+.ps-mini-card {
+  background: #fff;
+  border: 1px dashed #e5e7eb;
+  border-radius: 10px;
+  overflow: hidden;
+  transition: all 0.15s;
+}
+
+.ps-mini-card:hover {
+  border-color: #d1d5db;
+  border-style: solid;
+  background: #fafbfc;
+}
+
+.ps-mini-card.expanded {
+  border-style: solid;
+  border-color: #d1d5db;
+  grid-column: 1 / -1;
+}
+
+.ps-mini-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+.ps-mini-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  background: #f8fafc;
+  flex-shrink: 0;
+}
+
+.ps-mini-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.ps-mini-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.ps-mini-desc {
+  font-size: 11px;
+  color: #bdc3cb;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 启用按钮 */
+.ps-enable-btn {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+  color: #3b82f6;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.ps-enable-btn:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+/* mini-card 的展开内容 */
+.ps-mini-card .ps-expand-content {
+  padding: 12px 14px 14px;
+  border-top: 1px solid #f3f4f6;
+}
+
+/* ========== 动画 ========== */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+/* ========== 深色主题 ========== */
+[data-theme="dark"] .ps-section-title {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .ps-section-count {
+  background: #334155;
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .ps-section-hint {
+  color: #64748b;
+}
+
+[data-theme="dark"] .ps-card {
+  background: #1e293b;
+  border-color: #334155;
+  border-left-color: var(--accent, #3b82f6);
+}
+
+[data-theme="dark"] .ps-card:hover {
+  border-color: #475569;
+  border-left-color: var(--accent, #3b82f6);
+}
+
+[data-theme="dark"] .ps-card.expanded {
+  border-color: var(--accent, #3b82f6);
+}
+
+[data-theme="dark"] .ps-name {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .ps-desc {
+  color: #64748b;
+}
+
+[data-theme="dark"] .ps-icon {
+  background: linear-gradient(135deg, #1e293b, #0f172a);
+  border-color: #334155;
+}
+
+[data-theme="dark"] .ps-config-btn {
+  background: #1e293b;
+  border-color: #475569;
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .ps-config-btn:hover {
+  background: #334155;
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .ps-config-btn.active {
+  background: var(--accent, #3b82f6);
+  border-color: var(--accent, #3b82f6);
+  color: #fff;
+}
+
+[data-theme="dark"] .ps-expand-content {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+[data-theme="dark"] .ps-input,
+[data-theme="dark"] .ps-select {
+  background: #1e293b;
+  border-color: #475569;
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .ps-empty {
+  background: #0f172a;
+  border-color: #334155;
+  color: #64748b;
+}
+
+[data-theme="dark"] .ps-mini-card {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+[data-theme="dark"] .ps-mini-card:hover {
+  background: #1e293b;
+  border-color: #475569;
+}
+
+[data-theme="dark"] .ps-mini-name {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .ps-mini-desc {
+  color: #475569;
+}
+
+[data-theme="dark"] .ps-enable-btn {
+  background: #1e293b;
+  border-color: #475569;
+  color: #60a5fa;
+}
+
+[data-theme="dark"] .ps-enable-btn:hover {
+  background: #172554;
+  border-color: #3b82f6;
+}
+
+/* ========== 清新主题 ========== */
+[data-theme="fresh"] .ps-card {
+  border-color: rgba(167, 139, 250, 0.2);
+  border-left-color: var(--accent, #a78bfa);
+}
+
+[data-theme="fresh"] .ps-card:hover {
+  border-color: rgba(167, 139, 250, 0.35);
+  border-left-color: var(--accent, #a78bfa);
+  box-shadow: 0 2px 12px rgba(167, 139, 250, 0.08);
+}
+
+[data-theme="fresh"] .ps-card.expanded {
+  border-color: #a78bfa;
+}
+
+[data-theme="fresh"] .ps-switch input:checked + .ps-switch-track {
+  background: linear-gradient(135deg, #34d399, #60a5fa);
+}
+
+[data-theme="fresh"] .ps-input:focus,
+[data-theme="fresh"] .ps-select:focus {
+  border-color: #a78bfa;
+  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.15);
+}
+
+[data-theme="fresh"] .ps-mini-card:hover {
+  border-color: rgba(167, 139, 250, 0.4);
+}
+
+[data-theme="fresh"] .ps-enable-btn {
+  color: #8b5cf6;
+}
+
+[data-theme="fresh"] .ps-enable-btn:hover {
+  background: rgba(139, 92, 246, 0.08);
+  border-color: rgba(139, 92, 246, 0.3);
+}
+
+[data-theme="fresh"] .ps-section-dot.enabled {
+  background: linear-gradient(135deg, #34d399, #60a5fa);
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.15);
+}
+
+/* ========== 响应式 ========== */
+@media (max-width: 550px) {
+  .ps-disabled-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ps-card-header {
+    padding: 12px 14px 12px 16px;
+    gap: 10px;
+  }
+
+  .ps-priority {
+    font-size: 18px;
+    min-width: 22px;
+  }
+}

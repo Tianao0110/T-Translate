@@ -1,0 +1,143 @@
+/* TranslationPanel - 术语一致性提示 */
+
+/* ==================== 术语一致性提示 ==================== */
+.term-suggestions {
+  margin: 0;
+  padding: 12px;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.1), rgba(245, 158, 11, 0.05));
+  border-top: 1px solid var(--border-primary);
+  border-radius: 0 0 12px 12px;
+}
+
+.term-suggestions-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--warning);
+  margin-bottom: 10px;
+}
+
+.term-suggestion-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  transition: all 0.2s;
+}
+
+.term-suggestion-item:last-child {
+  margin-bottom: 0;
+}
+
+.term-suggestion-item:hover {
+  border-color: var(--warning);
+  box-shadow: 0 2px 8px rgba(251, 191, 36, 0.15);
+}
+
+.term-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.term-original {
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.term-info svg {
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.term-saved {
+  color: var(--success);
+  font-weight: 600;
+  background: rgba(16, 185, 129, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.term-note {
+  color: var(--text-tertiary);
+  font-size: 11px;
+  margin-left: 4px;
+}
+
+.term-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 12px;
+}
+
+.term-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.term-btn.apply {
+  background: var(--success);
+  color: white;
+}
+
+.term-btn.apply:hover {
+  background: #059669;
+}
+
+.term-btn.ignore {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  padding: 4px 8px;
+}
+
+.term-btn.ignore:hover {
+  background: var(--error);
+  color: white;
+}
+
+.term-btn.always {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  color: var(--text-secondary);
+}
+
+.term-btn.always:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+/* 响应式 */
+@media (max-width: 600px) {
+  .term-suggestion-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  
+  .term-actions {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+

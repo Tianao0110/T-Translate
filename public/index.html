@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <script>
+      window.process = { env: { NODE_ENV: 'development' } };
+  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  
+  <!-- 应用信息 -->
+  <title>T-Translate</title>
+  <meta name="description" content="专业的离线翻译工具，支持OCR识别和本地LLM翻译">
+  <meta name="author" content="Your Name">
+  
+  <!-- 安全策略 -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net;
+	worker-src 'self' blob: https://cdn.jsdelivr.net;
+    img-src 'self' data: blob: https:;
+    connect-src 'self' http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:* https: data:;
+    style-src 'self' 'unsafe-inline';
+    font-src 'self' data:;
+  ">
+  
+  <!-- 禁止缓存（开发环境） -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  
+  <!-- 主题色 -->
+  <meta name="theme-color" content="#3b82f6">
+  
+  <!-- 图标 -->
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  
+  
+  <!-- 基础样式 -->
+  <style>
+    /* 加载画面样式 */
+    #loading-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      transition: opacity 0.5s ease;
+    }
+
+    #loading-screen.fade-out {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .loading-logo {
+      width: 80px;
+      height: 80px;
+      margin-bottom: 20px;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+      }
+      50% {
+        transform: scale(1.1);
+        opacity: 0.8;
+      }
+    }
+
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 20px;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .loading-text {
+      color: white;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 16px;
+      font-weight: 500;
+      margin-top: 10px;
+    }
+
+    .loading-progress {
+      width: 200px;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 2px;
+      margin-top: 20px;
+      overflow: hidden;
+    }
+
+    .loading-progress-bar {
+      height: 100%;
+      background: white;
+      border-radius: 2px;
+      animation: progress 2s ease-in-out infinite;
+    }
+
+    @keyframes progress {
+      0% {
+        width: 0%;
+        margin-left: 0;
+      }
+      50% {
+        width: 60%;
+        margin-left: 0;
+      }
+      100% {
+        width: 100%;
+        margin-left: 100%;
+      }
+    }
+
+    /* 错误提示样式 */
+    .error-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #f5f5f5;
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 9998;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .error-icon {
+      font-size: 64px;
+      margin-bottom: 20px;
+    }
+
+    .error-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 10px;
+    }
+
+    .error-message {
+      font-size: 16px;
+      color: #666;
+      margin-bottom: 20px;
+      max-width: 500px;
+    }
+
+    .error-details {
+      font-family: monospace;
+      font-size: 12px;
+      color: #999;
+      background: white;
+      padding: 10px;
+      border-radius: 4px;
+      max-width: 600px;
+      max-height: 200px;
+      overflow: auto;
+      margin-top: 10px;
+    }
+
+    .retry-button {
+      padding: 10px 20px;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .retry-button:hover {
+      background: #2563eb;
+    }
+
+    /* 防止闪烁 */
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #ffffff;
+      opacity: 0;
+      animation: fadeIn 0.3s ease forwards;
+      animation-delay: 0.1s;
+    }
+
+    @keyframes fadeIn {
+      to {
+        opacity: 1;
+      }
+    }
+
+    /* 根元素样式 */
+    #root {
+      width: 100%;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* 无脚本提示 */
+    noscript {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background: #f5f5f5;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 18px;
+      color: #333;
+      text-align: center;
+      padding: 20px;
+    }
+  </style>
+</head>
+<body>
+  <!-- 加载画面 -->
+  <div id="loading-screen">
+    <svg class="loading-logo" viewBox="0 0 100 100">
+      <rect x="20" y="20" width="60" height="60" fill="white" rx="8"/>
+      <text x="50" y="58" font-family="Arial" font-size="32" font-weight="bold" fill="#667eea" text-anchor="middle">T</text>
+    </svg>
+    <div class="loading-spinner"></div>
+    <div class="loading-text">T-Translate Core 启动中...</div>
+    <div class="loading-progress">
+      <div class="loading-progress-bar"></div>
+    </div>
+  </div>
+
+  <!-- 错误提示 -->
+  <div id="error-screen" class="error-screen">
+    <div class="error-icon">⚠️</div>
+    <div class="error-title">加载失败</div>
+    <div class="error-message">应用程序遇到了一些问题，请尝试刷新页面</div>
+    <button class="retry-button" onclick="window.location.reload()">重新加载</button>
+    <div id="error-details" class="error-details"></div>
+  </div>
+
+  <!-- React 根节点 -->
+  <div id="root"></div>
+
+  <!-- 无脚本提示 -->
+  <noscript>
+    <div>
+      <h1>⚠️ JavaScript 被禁用</h1>
+      <p>T-Translate Core 需要 JavaScript 才能正常运行。</p>
+      <p>请在浏览器设置中启用 JavaScript 后刷新页面。</p>
+    </div>
+  </noscript>
+
+  <!-- 加载检测脚本 -->
+  <script>
+    // 方案 A: 简单粗暴地定义它，防止报错
+    //window.dragEvent = null;
+
+    // 方案 B: 如果你想知道到底是谁在调用它，可以用下面这段（会打印调用栈）
+    try {
+      Object.defineProperty(window, 'dragEvent', {
+        get: function() {
+          console.warn("🕵️‍♂️ 抓到了！有个地方正在尝试读取 dragEvent");
+          console.trace(); // 这会在控制台打印出是谁调用的
+          return {}; // 返回一个空对象，防止 crash
+        },
+        set: function(val) {
+          // 允许赋值
+        }
+      });
+    } catch (e) {}
+  </script>
+  <script>
+    // 错误捕获
+    window.addEventListener('error', function(event) {
+      console.error('Global error:', event.error);
+      
+      // 如果是加载阶段的错误，显示错误页面
+      if (!window.__APP_LOADED__) {
+        const errorScreen = document.getElementById('error-screen');
+        const errorDetails = document.getElementById('error-details');
+        
+        if (errorScreen) {
+          errorScreen.style.display = 'flex';
+          if (errorDetails && event.error) {
+            errorDetails.textContent = event.error.stack || event.error.message || '未知错误';
+          }
+        }
+        
+        // 隐藏加载画面
+        const loadingScreen = document.getElementById('loading-screen');
+        if (loadingScreen) {
+          loadingScreen.style.display = 'none';
+        }
+      }
+    });
+
+    // 未处理的 Promise 错误
+    window.addEventListener('unhandledrejection', function(event) {
+      console.error('Unhandled promise rejection:', event.reason);
+    });
+
+    // 检测 Electron 环境
+    if (typeof window !== 'undefined' && window.process && window.process.type === 'renderer') {
+      console.log('Running in Electron');
+      
+      // Electron 特定的初始化
+      document.addEventListener('DOMContentLoaded', function() {
+        // 禁止默认的拖拽行为
+        document.addEventListener('dragover', function(e) {
+          e.preventDefault();
+          return false;
+        });
+        
+        document.addEventListener('drop', function(e) {
+          e.preventDefault();
+          return false;
+        });
+      });
+    } else {
+      console.log('Running in Browser');
+    }
+
+    // 应用加载完成标记
+    window.__APP_LOADED__ = false;
+
+    // 监听应用加载完成
+    window.addEventListener('app-ready', function() {
+      window.__APP_LOADED__ = true;
+      
+      // 淡出加载画面
+      const loadingScreen = document.getElementById('loading-screen');
+      if (loadingScreen) {
+        loadingScreen.classList.add('fade-out');
+        setTimeout(function() {
+          loadingScreen.style.display = 'none';
+        }, 500);
+      }
+    });
+
+    // 超时处理（10秒）
+    setTimeout(function() {
+      if (!window.__APP_LOADED__) {
+        console.warn('App loading timeout');
+        
+        const loadingScreen = document.getElementById('loading-screen');
+        const loadingText = loadingScreen?.querySelector('.loading-text');
+        
+        if (loadingText) {
+          loadingText.textContent = '加载时间较长，请稍候...';
+        }
+        
+        // 再等待10秒
+        setTimeout(function() {
+          if (!window.__APP_LOADED__) {
+            const errorScreen = document.getElementById('error-screen');
+            if (errorScreen) {
+              errorScreen.style.display = 'flex';
+              const errorMessage = errorScreen.querySelector('.error-message');
+              if (errorMessage) {
+                errorMessage.textContent = '加载超时，请检查网络连接或刷新页面重试';
+              }
+            }
+            if (loadingScreen) {
+              loadingScreen.style.display = 'none';
+            }
+          }
+        }, 10000);
+      }
+    }, 10000);
+
+    // 开发环境热重载支持
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Development mode enabled');
+    }
+  </script>
+
+  <!-- Vite/React 入口脚本 -->
+  <script type="module" src="/src/main.jsx"></script>
+</body>
+</html>

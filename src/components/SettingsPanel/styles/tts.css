@@ -1,0 +1,354 @@
+/* ==================== TTS 朗读设置样式 ==================== */
+
+/* ====== 自定义语音下拉 ====== */
+.tts-dropdown {
+  position: relative;
+  flex: 1;
+}
+
+.tts-dropdown-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--bg-primary);
+  border: 1.5px solid var(--border-primary);
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.tts-dropdown-trigger:hover:not(:disabled) {
+  border-color: var(--accent-primary);
+}
+
+.tts-dropdown-trigger.open {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.tts-dropdown-trigger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tts-dropdown-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tts-dropdown-arrow {
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+  transition: transform 0.2s ease;
+}
+
+.tts-dropdown-arrow.rotated {
+  transform: rotate(180deg);
+}
+
+.tts-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  z-index: 100;
+  padding: 4px;
+  animation: ttsDropIn 0.15s ease-out;
+}
+
+@keyframes ttsDropIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.tts-dropdown-menu::-webkit-scrollbar {
+  width: 5px;
+}
+
+.tts-dropdown-menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tts-dropdown-menu::-webkit-scrollbar-thumb {
+  background: var(--border-primary);
+  border-radius: 3px;
+}
+
+.tts-dropdown-group {
+  padding: 6px 10px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 4px;
+}
+
+.tts-dropdown-group:first-child {
+  margin-top: 0;
+}
+
+.tts-dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+
+.tts-dropdown-item:hover {
+  background: var(--bg-hover);
+}
+
+.tts-dropdown-item.selected {
+  color: var(--accent-primary);
+  font-weight: 500;
+}
+
+.tts-dropdown-item.selected:hover {
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.tts-dropdown-voice-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 空语音列表警告 */
+.tts-voice-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-top: 8px;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.tts-voice-warning-icon {
+  flex-shrink: 0;
+  color: #f59e0b;
+  margin-top: 1px;
+}
+
+.tts-voice-warning-text {
+  flex: 1;
+}
+
+.tts-voice-warning-title {
+  font-weight: 600;
+  color: #d97706;
+  margin-bottom: 2px;
+}
+
+.tts-voice-warning-hint {
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+/* 语速/音调/音量滑块区域 */
+.tts-slider-group {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 12px 0;
+}
+
+.tts-slider-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tts-slider-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tts-slider-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-primary);
+  background: var(--bg-hover);
+  padding: 2px 8px;
+  border-radius: 4px;
+  min-width: 40px;
+  text-align: center;
+}
+
+/* 试听区域 */
+.tts-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-secondary);
+}
+
+.tts-preview-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tts-preview-btn.play {
+  background: var(--accent-primary);
+  color: white;
+}
+
+.tts-preview-btn.play:hover {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.tts-preview-btn.stop {
+  background: var(--error);
+  color: white;
+}
+
+.tts-preview-btn.stop:hover {
+  background: #dc2626;
+}
+
+.tts-preview-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.tts-preview-status {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+/* 语音数量标签 */
+.tts-voice-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.tts-voice-count.empty {
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+}
+
+/* ==================== 深色主题 ==================== */
+[data-theme="dark"] .tts-dropdown-trigger {
+  background: var(--bg-secondary);
+  border-color: var(--border-primary);
+}
+
+[data-theme="dark"] .tts-dropdown-menu {
+  background: var(--bg-secondary);
+  border-color: var(--border-primary);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .tts-dropdown-item:hover {
+  background: var(--bg-hover);
+}
+
+[data-theme="dark"] .tts-voice-warning {
+  background: rgba(245, 158, 11, 0.06);
+  border-color: rgba(245, 158, 11, 0.15);
+}
+
+[data-theme="dark"] .tts-voice-warning-title {
+  color: #fbbf24;
+}
+
+[data-theme="dark"] .tts-slider-value {
+  background: rgba(59, 130, 246, 0.15);
+}
+
+[data-theme="dark"] .tts-voice-count {
+  background: rgba(16, 185, 129, 0.15);
+}
+
+[data-theme="dark"] .tts-voice-count.empty {
+  background: rgba(245, 158, 11, 0.15);
+}
+
+/* ==================== 清新主题 ==================== */
+[data-theme="fresh"] .tts-dropdown-trigger.open {
+  border-color: #14b8a6;
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
+}
+
+[data-theme="fresh"] .tts-dropdown-trigger:hover:not(:disabled) {
+  border-color: #14b8a6;
+}
+
+[data-theme="fresh"] .tts-dropdown-item.selected {
+  color: #0d9488;
+}
+
+[data-theme="fresh"] .tts-dropdown-item.selected:hover {
+  background: rgba(20, 184, 166, 0.08);
+}
+
+[data-theme="fresh"] .tts-voice-warning {
+  background: rgba(245, 158, 11, 0.06);
+  border-color: rgba(245, 158, 11, 0.18);
+}
+
+[data-theme="fresh"] .tts-preview-btn.play {
+  background: linear-gradient(135deg, #14b8a6, #0d9488);
+}
+
+[data-theme="fresh"] .tts-preview-btn.play:hover {
+  box-shadow: 0 2px 8px rgba(20, 184, 166, 0.3);
+}
+
+[data-theme="fresh"] .tts-slider-value {
+  color: #0d9488;
+  background: rgba(20, 184, 166, 0.1);
+}
+
+[data-theme="fresh"] .tts-voice-count {
+  background: rgba(20, 184, 166, 0.1);
+  color: #0d9488;
+}

@@ -1,0 +1,84 @@
+/* TranslationPanel - 版本切换 */
+
+/* ==================== 版本切换 ==================== */
+.box-title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.version-selector {
+  position: relative;
+}
+
+.version-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.version-btn:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.version-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  min-width: 180px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  z-index: 100;
+  overflow: hidden;
+}
+
+.version-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.2s;
+}
+
+.version-item:hover {
+  background: var(--bg-hover);
+}
+
+.version-item.active {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--accent-primary);
+}
+
+.version-name {
+  flex: 1;
+}
+
+/* 风格改写按钮 */
+.action-btn.style-btn {
+  color: var(--text-secondary);
+}
+
+.action-btn.style-btn:hover:not(:disabled) {
+  color: #8b5cf6;
+  background: rgba(139, 92, 246, 0.1);
+}
+

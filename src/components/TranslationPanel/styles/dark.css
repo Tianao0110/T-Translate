@@ -1,0 +1,27 @@
+/* TranslationPanel - 深色模式 */
+
+/* ==================== 深色模式优化 ==================== */
+[data-theme="dark"] .translation-box {
+  background: var(--bg-secondary);
+}
+
+[data-theme="dark"] .translation-textarea {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dark"] .translation-textarea:focus {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .privacy-panel {
+  background: var(--bg-secondary);
+}
+
+[data-theme="dark"] .translate-btn {
+  box-shadow: 0 4px 15px rgba(96, 165, 250, 0.2);
+}
+
+[data-theme="dark"] .translate-btn:hover:not(:disabled) {
+  box-shadow: 0 6px 20px rgba(96, 165, 250, 0.3);
+}
+

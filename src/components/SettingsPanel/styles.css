@@ -1,0 +1,22 @@
+/* SettingsPanel 样式入口
+ *
+ * 拆分为 8 个模块文件，按职责分离：
+ * - layout:    面板布局、侧边栏、内容区、响应式
+ * - controls:  输入框、开关、复选框、滑块、按钮
+ * - sections:  主题选择器、模式卡片、关于页、TTS
+ * - ocr:       OCR 引擎列表和配置
+ * - shortcuts:  快捷键显示和编辑器
+ * - privacy:   隐私模式
+ * - updates:   更新弹窗
+ * - themes:    深色模式、青绿主题覆盖
+ */
+
+@import './styles/layout.css';
+@import './styles/controls.css';
+@import './styles/sections.css';
+@import './styles/ocr.css';
+@import './styles/shortcuts.css';
+@import './styles/privacy.css';
+@import './styles/tts.css';
+@import './styles/updates.css';
+@import './styles/themes.css';

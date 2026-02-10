@@ -1,0 +1,651 @@
+/* TranslationPanel - 弹窗样式 */
+/* 风格改写, 收藏弹窗, AI分析, 风格参考 */
+
+/* ==================== 风格改写弹窗 ==================== */
+.style-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(2px);
+}
+
+.style-modal {
+  background: var(--bg-primary);
+  border-radius: 12px;
+  width: 90%;
+  max-width: 550px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+}
+
+.style-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-primary);
+  color: #8b5cf6;
+  font-weight: 600;
+}
+
+.style-modal-header span {
+  flex: 1;
+}
+
+.style-modal-header .close-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+
+.style-modal-header .close-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.style-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.style-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.style-item {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  background: var(--bg-secondary);
+  border: 2px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.style-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.style-item.selected {
+  border-color: #8b5cf6;
+  background: rgba(139, 92, 246, 0.05);
+}
+
+.style-item-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.style-source {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.style-translated {
+  font-size: 14px;
+  color: var(--text-primary);
+  line-height: 1.4;
+  margin-bottom: 6px;
+}
+
+.style-tags {
+  display: flex;
+  gap: 6px;
+}
+
+.style-tag {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  background: var(--bg-primary);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.style-check {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #8b5cf6;
+  border-radius: 50%;
+  color: white;
+  margin-left: 12px;
+}
+
+.empty-styles {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-tertiary);
+}
+
+.empty-styles p {
+  margin-bottom: 8px;
+  color: var(--text-secondary);
+}
+
+/* 风格强度 */
+.style-strength-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-primary);
+}
+
+.strength-slider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.strength-slider input[type="range"] {
+  flex: 1;
+  height: 6px;
+  -webkit-appearance: none;
+  background: var(--bg-tertiary);
+  border-radius: 3px;
+  outline: none;
+}
+
+.strength-slider input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  background: #8b5cf6;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(139, 92, 246, 0.4);
+}
+
+.strength-label {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.strength-value {
+  text-align: center;
+  font-size: 24px;
+  font-weight: 600;
+  color: #8b5cf6;
+  margin-bottom: 8px;
+}
+
+.strength-desc {
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.style-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border-primary);
+  background: var(--bg-secondary);
+}
+
+.style-modal-footer .btn-cancel,
+.style-modal-footer .btn-rewrite {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.style-modal-footer .btn-cancel {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  color: var(--text-secondary);
+}
+
+.style-modal-footer .btn-cancel:hover {
+  border-color: var(--text-tertiary);
+}
+
+.style-modal-footer .btn-rewrite {
+  background: #8b5cf6;
+  border: none;
+  color: white;
+}
+
+.style-modal-footer .btn-rewrite:hover:not(:disabled) {
+  background: #7c3aed;
+}
+
+.style-modal-footer .btn-rewrite:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ==================== 收藏弹窗 (🔧 已修复四角圆角) ==================== */
+.save-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(2px);
+}
+
+.save-modal {
+  background: var(--bg-primary);
+  border-radius: 16px;  /* 🔧 修复: 12px -> 16px 统一圆角 */
+  width: 90%;
+  max-width: 450px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  overflow: hidden;  /* 🔧 修复: 新增，确保内容不溢出圆角 */
+}
+
+.save-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-primary);
+  color: var(--warning);
+  font-weight: 600;
+}
+
+.save-modal-header span {
+  flex: 1;
+}
+
+.save-modal-header .close-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+
+.save-modal-header .close-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.save-modal-body {
+  padding: 20px;
+}
+
+.save-preview {
+  margin-bottom: 20px;
+}
+
+.save-preview .preview-item {
+  margin-bottom: 12px;
+}
+
+.save-preview .preview-item label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.save-preview .preview-text {
+  padding: 10px 12px;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.save-option {
+  padding: 16px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--border-primary);
+}
+
+.save-option .checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* 🔧 修复: .save-option 复选框使用自定义样式 */
+.save-option .checkbox-label input[type="checkbox"] {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  background: var(--bg-primary);
+  border: 2px solid var(--border-primary);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.save-option .checkbox-label input[type="checkbox"]:hover {
+  border-color: #8b5cf6;
+}
+
+.save-option .checkbox-label input[type="checkbox"]:checked {
+  background: #8b5cf6;
+  border-color: #8b5cf6;
+}
+
+.save-option .checkbox-label input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 2px;
+  width: 5px;
+  height: 9px;
+  border: solid white;
+  border-width: 0 2.5px 2.5px 0;
+  transform: rotate(45deg);
+}
+
+.save-option .checkbox-label svg {
+  color: #8b5cf6;
+}
+
+.save-option .option-hint {
+  margin-top: 8px;
+  margin-left: 28px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.save-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border-primary);
+  background: var(--bg-secondary);
+}
+
+.save-modal-footer .btn-cancel,
+.save-modal-footer .btn-save {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.save-modal-footer .btn-cancel {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  color: var(--text-secondary);
+}
+
+.save-modal-footer .btn-cancel:hover {
+  border-color: var(--text-tertiary);
+}
+
+.save-modal-footer .btn-save {
+  background: var(--warning);
+  border: none;
+  color: white;
+}
+
+.save-modal-footer .btn-save:hover {
+  background: #d97706;
+}
+
+/* 空风格库样式更新 */
+.empty-styles svg {
+  color: var(--text-tertiary);
+  margin-bottom: 12px;
+}
+
+/* ==================== AI 分析收藏弹窗 (🔧 已修复) ==================== */
+.save-modal-with-ai {
+  max-width: 500px;
+  overflow: hidden;  /* 🔧 修复: 新增，确保内容不溢出圆角 */
+}
+
+.ai-suggestions-section {
+  margin-top: 16px;
+  padding: 16px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(139, 92, 246, 0.05));
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 10px;
+}
+
+.ai-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.ai-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #3b82f6;
+}
+
+.btn-reanalyze {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-reanalyze:hover:not(:disabled) {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.btn-reanalyze:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+.ai-analyzing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.ai-analyzing svg {
+  color: #3b82f6;
+}
+
+.ai-suggestions-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.suggestion-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.suggestion-field label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+}
+
+.suggestion-field input {
+  padding: 10px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-primary);
+  transition: border-color 0.2s;
+}
+
+.suggestion-field input:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+.suggestion-field input::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* ==================== 风格参考复选框 (🔧 已修复样式) ==================== */
+.style-ref-suggestion {
+  padding-top: 12px;
+  border-top: 1px solid var(--border-primary);
+}
+
+.style-ref-suggestion .checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* 🔧 修复: 使用自定义复选框样式替代 accent-color */
+.style-ref-suggestion .checkbox-label input[type="checkbox"] {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  background: var(--bg-primary);
+  border: 2px solid var(--border-primary);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.style-ref-suggestion .checkbox-label input[type="checkbox"]:hover {
+  border-color: #8b5cf6;
+}
+
+.style-ref-suggestion .checkbox-label input[type="checkbox"]:checked {
+  background: #8b5cf6;
+  border-color: #8b5cf6;
+}
+
+/* 🔧 修复: 选中状态显示勾号 - 居中对齐 */
+.style-ref-suggestion .checkbox-label input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 2px;
+  width: 5px;
+  height: 9px;
+  border: solid white;
+  border-width: 0 2.5px 2.5px 0;
+  transform: rotate(45deg);
+}
+
+.style-ref-suggestion .checkbox-label svg {
+  color: #8b5cf6;
+}
+
+.ai-recommended {
+  font-size: 10px;
+  font-weight: 600;
+  color: white;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 8px;
+}
+
+.style-ref-suggestion .option-hint {
+  margin-top: 6px;
+  margin-left: 24px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+}

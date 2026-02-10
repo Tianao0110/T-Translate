@@ -1,0 +1,458 @@
+/* src/components/SelectionTranslator/styles.css */
+/* 划词翻译窗口样式 - 修复版 v3 (保留彩虹色) */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body, #root {
+  width: 100%; 
+  height: 100%;
+  overflow: hidden; 
+  background: transparent !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* ==========================================
+   🔧 关键修复：根元素完全透明
+   ========================================== */
+.sel-root {
+  width: 100%; 
+  height: 100%;
+  padding: 4px;
+  box-sizing: border-box;
+  overflow: hidden;
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ==========================================
+   触发圆点 - 保留原样式
+   ========================================== */
+.sel-trigger {
+  width: 100%;
+  height: 100%;
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+  cursor: default;
+  background: linear-gradient(135deg, #60a5fa, #3b82f6);
+  border-radius: 50%;
+  box-shadow: 0 1px 4px rgba(59, 130, 246, 0.4);
+  animation: triggerIn 0.15s ease-out;
+  transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+  opacity: 0.9;
+}
+
+.sel-trigger.ready {
+  cursor: pointer;
+  opacity: 1;
+}
+
+.sel-trigger.ready:hover {
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.5);
+}
+
+.sel-trigger.ready:active {
+  transform: scale(0.95);
+}
+
+.sel-trigger-text {
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+}
+
+/* ==========================================
+   加载状态 - 保留圆形
+   ========================================== */
+.sel-loading {
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(8px);
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+  border-radius: 50%;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="dark"] .sel-loading {
+  background: rgba(30, 41, 59, 0.98);
+  box-shadow: 
+    0 4px 24px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* 彩虹主题加载 - 保留 */
+[data-theme="fresh"] .sel-loading {
+  background: rgba(255, 250, 245, 0.98);
+  box-shadow: 
+    0 4px 20px rgba(139, 92, 246, 0.15),
+    0 0 0 1px rgba(139, 92, 246, 0.1);
+  border-color: rgba(139, 92, 246, 0.15);
+}
+
+.sel-spinner {
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid rgba(102, 126, 234, 0.2);
+  border-top-color: #667eea;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* ==========================================
+   卡片主体
+   ========================================== */
+.sel-card {
+  width: 100%; 
+  height: 100%;
+  display: flex; 
+  flex-direction: column;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, var(--sel-opacity, 0.95));
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  box-shadow: 
+    0 4px 20px rgba(0, 0, 0, 0.12),
+    0 0 0 1px rgba(0, 0, 0, 0.05);
+  box-sizing: border-box;
+  animation: cardIn 0.2s ease-out;
+  backdrop-filter: blur(12px);
+}
+
+[data-theme="dark"] .sel-card {
+  background: rgba(30, 41, 59, var(--sel-opacity, 0.95));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 
+    0 4px 24px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+}
+
+/* 🌈 彩虹主题卡片 - 保留 */
+[data-theme="fresh"] .sel-card {
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, var(--sel-opacity, 0.95)), 
+    rgba(240, 248, 255, var(--sel-opacity, 0.95)));
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  box-shadow: 
+    0 4px 20px rgba(139, 92, 246, 0.15),
+    0 0 0 1px rgba(59, 130, 246, 0.1);
+  backdrop-filter: blur(12px);
+}
+
+/* ==========================================
+   工具栏缩小30%
+   ========================================== */
+.sel-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 6px;
+  background: linear-gradient(to bottom, #f8fafc, #f1f5f9);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  -webkit-app-region: drag;
+  min-height: 24px;
+}
+
+[data-theme="dark"] .sel-toolbar {
+  background: linear-gradient(to bottom, #1e293b, #0f172a);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+/* 🌈 彩虹主题工具栏 - 保留 */
+[data-theme="fresh"] .sel-toolbar {
+  background: linear-gradient(90deg, 
+    rgba(255, 182, 193, 0.3),
+    rgba(255, 218, 185, 0.3),
+    rgba(255, 255, 186, 0.3),
+    rgba(186, 255, 201, 0.3),
+    rgba(186, 225, 255, 0.3),
+    rgba(221, 186, 255, 0.3)
+  );
+  border-color: rgba(139, 92, 246, 0.1);
+}
+
+/* 按钮 */
+.sel-btn {
+  -webkit-app-region: no-drag;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 500;
+  color: #64748b;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sel-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: #334155;
+}
+
+.sel-btn.active {
+  background: #667eea;
+  color: white;
+  border-color: #667eea;
+  box-shadow: 0 1px 3px rgba(102, 126, 234, 0.3);
+}
+
+.sel-btn.success {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: white;
+  border-color: transparent;
+  box-shadow: 0 1px 3px rgba(34, 197, 94, 0.3);
+}
+
+/* 🌈 彩虹主题按钮 - 保留 */
+[data-theme="fresh"] .sel-btn.active {
+  background: linear-gradient(135deg, #f472b6, #8b5cf6);
+  border-color: transparent;
+}
+
+/* 关闭按钮 */
+.sel-btn-close {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  border-radius: 4px;
+}
+
+.sel-btn-close:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+[data-theme="dark"] .sel-btn-close:hover {
+  background: rgba(220, 38, 38, 0.2);
+  color: #fca5a5;
+}
+
+.sel-spacer { flex: 1; }
+
+/* ==========================================
+   内容区
+   ========================================== */
+.sel-content {
+  flex: 1;
+  padding: 8px 12px;
+  overflow-y: auto;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #1e293b;
+  -webkit-app-region: no-drag;
+  user-select: text;
+  cursor: text;
+}
+
+[data-theme="dark"] .sel-content {
+  color: #e2e8f0;
+}
+
+[data-theme="fresh"] .sel-content {
+  color: #4b5563;
+}
+
+/* 原文显示 */
+.sel-source {
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  background: linear-gradient(to right, #f1f5f9, #f8fafc);
+  border-radius: 6px;
+  font-size: 12px;
+  color: #64748b;
+  border-left: 3px solid #94a3b8;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+[data-theme="dark"] .sel-source {
+  background: linear-gradient(to right, #334155, #1e293b);
+  color: #94a3b8;
+  border-color: #475569;
+}
+
+/* 🌈 彩虹主题原文 - 保留 */
+[data-theme="fresh"] .sel-source {
+  background: linear-gradient(to right, 
+    rgba(255, 182, 193, 0.2),
+    rgba(186, 225, 255, 0.2)
+  );
+  border-color: #f472b6;
+  color: #6b7280;
+}
+
+/* 译文 */
+.sel-text {
+  color: #1e293b;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-weight: 450;
+}
+
+[data-theme="dark"] .sel-text {
+  color: #f1f5f9;
+}
+
+[data-theme="fresh"] .sel-text {
+  color: #374151;
+}
+
+/* ==========================================
+   状态样式
+   ========================================== */
+
+/* 已复制状态 */
+.sel-card.copied {
+  border-color: #86efac;
+  box-shadow: 
+    0 4px 20px rgba(34, 197, 94, 0.2),
+    0 0 0 2px rgba(34, 197, 94, 0.2);
+}
+
+[data-theme="dark"] .sel-card.copied {
+  border-color: #059669;
+  box-shadow: 
+    0 4px 20px rgba(5, 150, 105, 0.3),
+    0 0 0 2px rgba(5, 150, 105, 0.2);
+}
+
+/* 固定模式 */
+.sel-card.frozen {
+  border-color: #fbbf24;
+  box-shadow: 
+    0 4px 20px rgba(251, 191, 36, 0.25),
+    0 0 0 2px rgba(251, 191, 36, 0.3);
+}
+
+.sel-card.frozen .sel-toolbar {
+  background: linear-gradient(to right, #fef3c7, #f8fafc);
+}
+
+[data-theme="dark"] .sel-card.frozen {
+  border-color: #f59e0b;
+  box-shadow: 
+    0 4px 20px rgba(245, 158, 11, 0.3),
+    0 0 0 2px rgba(245, 158, 11, 0.3);
+}
+
+[data-theme="dark"] .sel-card.frozen .sel-toolbar {
+  background: linear-gradient(to right, rgba(251, 191, 36, 0.15), #1e293b);
+}
+
+[data-theme="fresh"] .sel-card.frozen .sel-toolbar {
+  background: linear-gradient(90deg, 
+    rgba(251, 191, 36, 0.3),
+    rgba(255, 218, 185, 0.3)
+  );
+}
+
+/* ==========================================
+   错误状态
+   ========================================== */
+.sel-error {
+  padding: 10px;
+  background: linear-gradient(to right, #fef2f2, #fff);
+  border-radius: 6px;
+  color: #dc2626;
+  font-size: 12px;
+  border-left: 3px solid #ef4444;
+}
+
+[data-theme="dark"] .sel-error {
+  background: linear-gradient(to right, rgba(127, 29, 29, 0.3), transparent);
+  color: #fca5a5;
+  border-color: #dc2626;
+}
+
+/* ==========================================
+   固定模式徽章
+   ========================================== */
+.sel-frozen-badge {
+  font-size: 9px;
+  margin-right: 2px;
+  animation: freezeBounce 0.3s ease;
+}
+
+@keyframes freezeBounce {
+  0% { transform: scale(0); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+/* ==========================================
+   滚动条
+   ========================================== */
+.sel-content::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sel-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sel-content::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 4px;
+}
+
+.sel-content::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
+}
+
+[data-theme="dark"] .sel-content::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+
+[data-theme="dark"] .sel-content::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* ==========================================
+   动画
+   ========================================== */
+@keyframes cardIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes triggerIn {
+  from {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

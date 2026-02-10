@@ -1,0 +1,537 @@
+/* SettingsPanel - OCR 引擎 */
+
+/* ==================== OCR 引擎列表 ==================== */
+.ocr-engines-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ocr-engine-item {
+  display: flex;
+  align-items: center;
+  padding: 14px 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 10px;
+  transition: all 0.15s;
+}
+
+.ocr-engine-item:hover {
+  border-color: var(--border-secondary);
+}
+
+.ocr-engine-item.selected {
+  border-color: var(--accent-primary);
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.engine-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  margin-right: 14px;
+  color: var(--text-secondary);
+}
+
+.ocr-engine-item.selected .engine-icon {
+  background: var(--accent-primary);
+  color: white;
+}
+
+.engine-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.engine-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+
+.engine-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.engine-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.engine-badge.builtin {
+  background: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+}
+
+.engine-badge.system {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+
+.engine-badge.download {
+  background: rgba(249, 115, 22, 0.1);
+  color: #f97316;
+}
+
+.engine-badge.online {
+  background: rgba(168, 85, 247, 0.1);
+  color: #a855f7;
+}
+
+.engine-badge.free {
+  background: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+}
+
+.engine-badge.recommend {
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+}
+
+.engine-badge.installed {
+  background: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+}
+
+.engine-badge.unavailable {
+  background: var(--bg-tertiary);
+  color: var(--text-tertiary);
+}
+
+.engine-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.engine-meta {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-top: 4px;
+}
+
+.engine-size {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.engine-actions {
+  flex-shrink: 0;
+  margin-left: 16px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.engine-actions .btn {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  min-width: 50px;
+}
+
+.engine-actions .btn:hover {
+  background: var(--accent-primary);
+  color: white;
+}
+
+.engine-actions .btn.active {
+  background: var(--accent-primary);
+  color: white;
+}
+
+.engine-actions .btn.download {
+  background: #f97316;
+  color: white;
+}
+
+.engine-actions .btn.download:hover {
+  background: #ea580c;
+}
+
+.engine-actions .btn.uninstall {
+  background: transparent;
+  color: var(--text-tertiary);
+  border: 1px solid var(--border-primary);
+}
+
+.engine-actions .btn.uninstall:hover {
+  background: #ef4444;
+  color: white;
+  border-color: #ef4444;
+}
+
+.engine-actions .btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ocr-engine-item.disabled-engine {
+  opacity: 0.5;
+}
+
+.ocr-engine-item.disabled-engine .engine-name {
+  color: var(--text-tertiary);
+}
+
+/* ==================== OCR 折叠区域 ==================== */
+.ocr-section {
+  margin-top: 20px;
+  border: 1px solid var(--border-primary);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.ocr-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: var(--bg-secondary);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+}
+
+.ocr-section-header:hover {
+  background: var(--bg-hover);
+}
+
+.ocr-section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ocr-section-title h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.current-engine-badge {
+  font-size: 11px;
+  padding: 3px 10px;
+  background: var(--accent-primary);
+  color: white;
+  border-radius: 12px;
+}
+
+.current-engine-badge.online {
+  background: #22c55e;
+}
+
+.ocr-section[open] > .ocr-section-header .expand-icon {
+  transform: rotate(90deg);
+}
+
+.expand-icon {
+  transition: transform 0.2s ease;
+  color: var(--text-tertiary);
+}
+
+.expand-icon-small {
+  transition: transform 0.2s ease;
+  color: var(--text-tertiary);
+}
+
+.ocr-section > .ocr-engines-list {
+  padding: 12px;
+}
+
+/* 在线 OCR 折叠区域 */
+.online-ocr-section {
+  margin-top: 24px;
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.online-ocr-section summary {
+  cursor: pointer;
+  padding: 12px 16px;
+  background: var(--bg-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+}
+
+.online-ocr-section summary:hover {
+  background: var(--bg-hover);
+}
+
+.online-ocr-section summary h3 {
+  margin: 0;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+}
+
+.online-ocr-section summary .expand-icon {
+  transition: transform 0.2s ease;
+}
+
+.online-ocr-section[open] summary .expand-icon {
+  transform: rotate(90deg);
+}
+
+.online-ocr-section summary::-webkit-details-marker {
+  display: none;
+}
+
+.online-ocr-section > *:not(summary) {
+  padding: 0 16px 16px;
+}
+
+.engine-unavailable {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+}
+
+/* 引擎详情折叠 */
+.engine-details {
+  margin-top: 8px;
+}
+
+.engine-details-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.engine-details-summary:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.engine-details[open] > .engine-details-summary .expand-icon-small {
+  transform: rotate(90deg);
+}
+
+.engine-details > .ocr-engine-item {
+  margin-top: 8px;
+}
+
+/* 下载进度 */
+.engine-download-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.download-progress-bar {
+  width: 80px;
+  height: 6px;
+  background: var(--bg-tertiary);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.download-progress-fill {
+  height: 100%;
+  background: var(--accent-primary);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.download-progress-text {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  min-width: 40px;
+}
+
+/* ==================== OCR 引擎卡片优化 ==================== */
+.ocr-engine-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 18px 20px;
+  background: var(--bg-primary);
+  border: 2px solid var(--border-primary);
+  border-radius: 14px;
+  margin-bottom: 12px;
+  transition: all 0.2s ease;
+}
+
+.ocr-engine-item:hover {
+  border-color: var(--border-secondary);
+}
+
+.ocr-engine-item.active {
+  border-color: var(--accent-primary);
+  background: rgba(59, 130, 246, 0.03);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.engine-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.engine-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.engine-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.engine-badge.local {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+}
+
+.engine-badge.online {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+
+.engine-desc {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  margin: 0 0 10px 0;
+  line-height: 1.4;
+}
+
+/* ==================== 引擎健康检查 & 修复 ==================== */
+
+.ocr-engine-item.engine-broken {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.03);
+}
+
+.ocr-engine-item.engine-broken:hover {
+  border-color: #dc2626;
+}
+
+.engine-badge.error {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.engine-badge.checking {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+
+.engine-error-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-top: 8px;
+  background: rgba(239, 68, 68, 0.06);
+  border: 1px solid rgba(239, 68, 68, 0.15);
+  border-radius: 8px;
+  color: #dc2626;
+}
+
+.engine-error-box svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.error-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.error-title {
+  font-size: 12px;
+  font-weight: 600;
+  margin: 0 0 2px 0;
+  color: #dc2626;
+}
+
+.error-detail {
+  font-size: 11px;
+  margin: 0;
+  color: #b91c1c;
+  word-break: break-word;
+}
+
+.repair-progress {
+  font-size: 11px;
+  margin: 4px 0 0 0;
+  color: #3b82f6;
+  font-weight: 500;
+}
+
+.engine-actions .btn.repair {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: linear-gradient(135deg, #f97316, #ea580c);
+  color: white;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.engine-actions .btn.repair:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(249, 115, 22, 0.3);
+}
+
+.engine-actions .btn.repair:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+

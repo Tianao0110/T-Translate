@@ -1,0 +1,17 @@
+/* TranslationPanel 样式入口
+ *
+ * 拆分为 6 个模块文件：
+ * - layout:    核心布局、语言选择器、翻译区域、响应式
+ * - privacy:   隐私保护面板
+ * - terms:     术语一致性提示
+ * - versions:  版本切换
+ * - modals:    风格改写/收藏/AI分析弹窗
+ * - dark:      深色模式覆盖
+ */
+
+@import './styles/layout.css';
+@import './styles/privacy.css';
+@import './styles/terms.css';
+@import './styles/versions.css';
+@import './styles/modals.css';
+@import './styles/dark.css';

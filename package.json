@@ -1,0 +1,148 @@
+{
+  "name": "t-translate",
+  "private": true,
+  "version": "0.2.0",
+  "description": "Professional offline translation tool with AI support",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "concurrently --kill-others --kill-others-on-fail \"npm run react:start\" \"wait-on http://localhost:5173 && npm run electron:start\"",
+    "react:start": "vite",
+    "electron:start": "electron .",
+    "build": "vite build && electron-builder",
+    "dist": "vite build && electron-builder --publish=never",
+    "lint": "eslint src/ electron/",
+    "lint:fix": "eslint src/ electron/ --fix",
+    "format": "prettier --write \"src/**/*.{js,jsx,css}\" \"electron/**/*.js\"",
+    "format:check": "prettier --check \"src/**/*.{js,jsx,css}\" \"electron/**/*.js\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "check:constants": "node scripts/check-constants.js"
+  },
+  "keywords": [
+    "translation",
+    "ai",
+    "offline",
+    "electron",
+    "react"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@vitejs/plugin-react": "^4.2.1",
+    "concurrently": "^8.2.2",
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1",
+    "eslint": "^10.0.0",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "globals": "^17.3.0",
+    "jsdom": "^28.0.0",
+    "prettier": "^3.8.1",
+    "vite": "^5.0.10",
+    "vitest": "^4.0.18",
+    "wait-on": "^7.2.0"
+  },
+  "dependencies": {
+    "@gutenye/ocr-node": "^1.4.8",
+    "dayjs": "^1.11.19",
+    "electron-store": "^8.1.0",
+    "i18next": "^23.7.16",
+    "immer": "^11.1.0",
+    "jszip": "^3.10.1",
+    "koffi": "^2.15.0",
+    "lucide-react": "^0.303.0",
+    "mammoth": "^1.8.0",
+    "node-screenshots": "^0.2.1",
+    "pdfjs-dist": "^4.0.379",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-i18next": "^14.0.1",
+    "uiohook-napi": "^1.5.4",
+    "uuid": "^13.0.0",
+    "zustand": "^4.4.7"
+  },
+  "build": {
+    "appId": "com.ttranslate.core",
+    "productName": "T-Translate",
+    "directories": {
+      "output": "release"
+    },
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/@gutenye/**",
+      "node_modules/koffi/**",
+      "node_modules/uiohook-napi/**",
+      "node_modules/node-screenshots/**"
+    ],
+    "files": [
+      "electron/**/*",
+      "build/**/*",
+      "!**/*.map",
+      "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
+      "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
+      "!**/node_modules/*.d.ts",
+      "!**/node_modules/.bin",
+      "!**/*.{iml,o,hprof,orig,pyc,pyo,rbc,swp,csproj,sln,xproj}",
+      "!.editorconfig",
+      "!**/._*",
+      "!**/{.DS_Store,.git,.hg,.svn,CVS,RCS,SCCS,.gitignore,.gitattributes}",
+      "!**/{__pycache__,thumbs.db,.flowconfig,.idea,.vs,.nyc_output}",
+      "!**/{appveyor.yml,.travis.yml,circle.yml}",
+      "!**/{npm-debug.log,yarn.lock,.yarn-integrity,.yarn-metadata.json}",
+      "!**/node_modules/**/LICENSE*",
+      "!**/node_modules/**/LICENCE*",
+      "!**/node_modules/**/*.md",
+      "!**/node_modules/**/docs/**",
+      "!**/node_modules/**/doc/**"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/ocr",
+        "to": "resources/ocr",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "public/icon.icns",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "icon": "public/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "public/icon.ico",
+      "uninstallerIcon": "public/icon.ico",
+      "installerHeaderIcon": "public/icon.ico",
+      "differentialPackage": false
+    },
+    "linux": {
+      "icon": "public/icon.png",
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility"
+    }
+  }
+}

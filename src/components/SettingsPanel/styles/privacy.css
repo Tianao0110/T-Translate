@@ -1,0 +1,164 @@
+/* SettingsPanel - 隐私模式 */
+
+/* ==================== 隐私模式增强 ==================== */
+.current-mode-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  background: var(--bg-secondary);
+  border: 2px solid var(--border-primary);
+}
+
+.current-mode-banner.mode-standard {
+  border-color: var(--accent-primary);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.current-mode-banner.mode-secure {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.current-mode-banner.mode-offline {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.mode-banner-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: var(--bg-primary);
+}
+
+.mode-standard .mode-banner-icon { color: var(--accent-primary); }
+.mode-secure .mode-banner-icon { color: #10b981; }
+.mode-offline .mode-banner-icon { color: #f59e0b; }
+
+.mode-banner-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mode-banner-label {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.mode-banner-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* 模式功能面板 */
+.mode-features-panel {
+  margin-top: 20px;
+  padding: 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 10px;
+}
+
+.mode-features-panel h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.feature-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.feature-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--bg-primary);
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.feature-item.enabled {
+  border-left: 3px solid #10b981;
+}
+
+.feature-item.disabled {
+  border-left: 3px solid #ef4444;
+  opacity: 0.7;
+}
+
+.feature-icon {
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.feature-item.enabled .feature-icon { color: #10b981; }
+.feature-item.disabled .feature-icon { color: #ef4444; }
+
+.feature-name {
+  flex: 1;
+  color: var(--text-primary);
+}
+
+.feature-status {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.mode-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 6px;
+  font-size: 12px;
+  color: #b45309;
+}
+
+.mode-warning.secure {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: #047857;
+}
+
+.mode-warning svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* 危险操作区域 */
+.danger-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* 输入框后缀 */
+.input-with-suffix {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.input-suffix {
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
