@@ -63,8 +63,6 @@
 从 [Releases](https://github.com/Tianao0110/T-Translate/releases) 页面下载最新版本：
 
 - **Windows**: `T-Translate-Setup-x.x.x.exe`
-- **macOS**: `T-Translate-x.x.x.dmg`
-- **Linux**: `T-Translate-x.x.x.AppImage`
 
 ### 从源码构建
 
