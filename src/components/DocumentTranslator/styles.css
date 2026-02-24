@@ -1124,3 +1124,326 @@
 [data-theme="dark"] .dt-dropzone.drag-over {
   background: rgba(59, 130, 246, 0.08);
 }
+
+/* ==================== 段落操作按钮 ==================== */
+.segment-actions {
+  display: none;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.segment-item:hover .segment-actions {
+  display: flex;
+}
+
+.seg-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-tertiary, #9ca3af);
+  cursor: pointer;
+  transition: all 0.15s;
+  padding: 0;
+}
+
+.seg-btn:hover {
+  background: var(--bg-hover, rgba(59, 130, 246, 0.08));
+  color: var(--accent-primary, #3b82f6);
+}
+
+.seg-btn.replace:hover {
+  color: var(--warning, #f59e0b);
+}
+
+/* 已编辑标记 */
+.edited-badge {
+  font-size: 11px;
+  margin-left: 2px;
+}
+
+.segment-item.edited {
+  border-left: 2px solid var(--warning, #f59e0b);
+}
+
+/* ==================== 编辑模式 ==================== */
+.translated-text {
+  cursor: text;
+}
+
+.edit-area {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.edit-textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--accent-primary, #3b82f6);
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  background: var(--bg-primary, #fff);
+  color: var(--text-primary, #1f2937);
+  resize: vertical;
+  min-height: 50px;
+  font-family: inherit;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  outline: none;
+}
+
+.edit-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.edit-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.edit-btn.save {
+  background: var(--accent-primary, #3b82f6);
+  color: #fff;
+}
+
+.edit-btn.save:hover {
+  background: var(--accent-hover, #2563eb);
+}
+
+.edit-btn.cancel {
+  background: var(--bg-secondary, #f3f4f6);
+  color: var(--text-secondary, #6b7280);
+}
+
+.edit-btn.cancel:hover {
+  background: var(--bg-tertiary, #e5e7eb);
+}
+
+/* ==================== 搜索替换栏 ==================== */
+.dt-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--bg-secondary, #f9fafb);
+  border-bottom: 1px solid var(--border-secondary, #e5e7eb);
+  position: relative;
+  flex-wrap: wrap;
+}
+
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 200px;
+}
+
+.search-icon {
+  color: var(--text-tertiary, #9ca3af);
+  flex-shrink: 0;
+}
+
+.search-input {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid var(--border-primary, #d1d5db);
+  border-radius: 4px;
+  font-size: 13px;
+  background: var(--bg-primary, #fff);
+  color: var(--text-primary, #1f2937);
+  outline: none;
+  min-width: 120px;
+}
+
+.search-input:focus {
+  border-color: var(--accent-primary, #3b82f6);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.search-count {
+  font-size: 12px;
+  color: var(--text-tertiary, #9ca3af);
+  white-space: nowrap;
+}
+
+.search-btn {
+  padding: 5px 12px;
+  border: 1px solid var(--border-primary, #d1d5db);
+  border-radius: 4px;
+  background: var(--bg-primary, #fff);
+  color: var(--text-secondary, #6b7280);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+
+.search-btn:hover:not(:disabled) {
+  background: var(--bg-hover, rgba(59, 130, 246, 0.08));
+  border-color: var(--accent-primary, #3b82f6);
+  color: var(--accent-primary, #3b82f6);
+}
+
+.search-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.search-close {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-tertiary, #9ca3af);
+  cursor: pointer;
+}
+
+.search-close:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.search-highlight {
+  background: rgba(250, 204, 21, 0.4);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+/* ==================== 进度恢复横幅 ==================== */
+.dt-restore-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(16, 185, 129, 0.08) 100%);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 8px;
+  margin: 8px 16px 0;
+  gap: 12px;
+}
+
+.restore-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-primary, #1f2937);
+}
+
+.restore-info svg {
+  color: var(--accent-primary, #3b82f6);
+}
+
+.restore-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.restore-btn {
+  padding: 5px 14px;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.restore-btn.primary {
+  background: var(--accent-primary, #3b82f6);
+  color: #fff;
+}
+
+.restore-btn.primary:hover {
+  background: var(--accent-hover, #2563eb);
+}
+
+.restore-btn.secondary {
+  background: transparent;
+  color: var(--text-secondary, #6b7280);
+}
+
+.restore-btn.secondary:hover {
+  background: var(--bg-hover);
+}
+
+/* ==================== 头部搜索按钮 ==================== */
+.dt-btn.icon-only {
+  padding: 6px;
+  min-width: auto;
+}
+
+.dt-btn.icon-only.active {
+  background: var(--bg-active, rgba(59, 130, 246, 0.12));
+  color: var(--accent-primary, #3b82f6);
+}
+
+/* 统计卡片 - 已编辑 */
+.stat-card.edited {
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.stat-card.edited .stat-number {
+  color: #d97706;
+}
+
+/* 进度条 - 已编辑计数 */
+.edited-count {
+  color: #d97706;
+}
+
+/* ==================== 深色模式 - 新增 ==================== */
+[data-theme="dark"] .edit-textarea {
+  background: var(--bg-tertiary, #374151);
+  color: var(--text-primary, #f3f4f6);
+  border-color: var(--accent-primary, #3b82f6);
+}
+
+[data-theme="dark"] .dt-search-bar {
+  background: var(--bg-secondary, #1f2937);
+  border-bottom-color: var(--border-secondary, #374151);
+}
+
+[data-theme="dark"] .search-input {
+  background: var(--bg-tertiary, #374151);
+  color: var(--text-primary, #f3f4f6);
+  border-color: var(--border-primary, #4b5563);
+}
+
+[data-theme="dark"] .search-highlight {
+  background: rgba(250, 204, 21, 0.3);
+}
+
+[data-theme="dark"] .dt-restore-banner {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(16, 185, 129, 0.12) 100%);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+[data-theme="dark"] .segment-item.edited {
+  border-left-color: #d97706;
+}

@@ -58,7 +58,7 @@ const TYPE_COLORS = {
 /**
  * 翻译源设置组件 - 分组面板风格
  */
-const ProviderSettings = forwardRef(({ settings, updateSettings, notify }, ref) => {
+const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, notify }, ref) => {
   const { t } = useTranslation();
   
   const allProvidersMeta = getAllProviderMetadata();
@@ -91,6 +91,9 @@ const ProviderSettings = forwardRef(({ settings, updateSettings, notify }, ref) 
 
   // ========== 初始化 ==========
   useEffect(() => {
+    // 等待 settings 从磁盘加载完成再初始化，防止用默认值覆盖已保存的配置
+    if (!settingsReady) return;
+    
     const savedProviders = settings?.translation?.providers;
     const savedConfigs = settings?.translation?.providerConfigs || {};
     
@@ -98,7 +101,8 @@ const ProviderSettings = forwardRef(({ settings, updateSettings, notify }, ref) 
     
     const needsInit = !initializedRef.current || 
       (hasRealData && providers.length > 0 && 
-       JSON.stringify(savedProviders.map(p => p.id)) !== JSON.stringify(providers.map(p => p.id)));
+       JSON.stringify(savedProviders.map(p => ({ id: p.id, enabled: p.enabled }))) !== 
+       JSON.stringify(providers.map(p => ({ id: p.id, enabled: p.enabled }))));
     
     if (!needsInit) return;
     
@@ -168,7 +172,7 @@ const ProviderSettings = forwardRef(({ settings, updateSettings, notify }, ref) 
     };
     
     initProviders();
-  }, [settings?.translation?.providers, allProvidersMeta]);
+  }, [settingsReady, settings?.translation?.providers, allProvidersMeta]);
 
   // ========== 保存 ==========
   const saveSettings = useCallback(async () => {
@@ -193,17 +197,10 @@ const ProviderSettings = forwardRef(({ settings, updateSettings, notify }, ref) 
       updateSettings('translation', 'providers', providers, true);
       updateSettings('translation', 'providerConfigs', configsToSave, true);
       
+      // 使用点路径直接写入，避免读-改-写竞态
       if (window.electron?.store) {
-        const currentSettings = await window.electron.store.get('settings') || {};
-        const newSettings = {
-          ...currentSettings,
-          translation: {
-            ...currentSettings.translation,
-            providers,
-            providerConfigs: configsToSave,
-          }
-        };
-        await window.electron.store.set('settings', newSettings);
+        await window.electron.store.set('settings.translation.providers', providers);
+        await window.electron.store.set('settings.translation.providerConfigs', configsToSave);
       }
       
       await translationService.reload({

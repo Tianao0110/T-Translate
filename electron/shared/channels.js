@@ -16,6 +16,7 @@ const CHANNELS = {
   },
   DIALOG: {
     SAVE: 'show-save-dialog',
+    SAVE_FILE: 'dialog-save-file',
     OPEN: 'show-open-dialog',
     MESSAGE: 'show-message-box',
   },

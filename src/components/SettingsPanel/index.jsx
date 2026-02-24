@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Shield, Zap, Download, Upload, Moon, Sun,
+  Globe, Shield, Zap, Download, Upload, Moon, Sun,
   Info, CheckCircle, Wifi, RefreshCw, AlertCircle,
   Save, Trash2, Eye, EyeOff, Lock, GitBranch,
   Code2, Palette, Layers, MousePointer, Server,
@@ -59,12 +59,14 @@ const SettingsPanel = ({ showNotification }) => {
   // 侧边栏菜单翻译映射
   const navLabels = {
     providers: t('settingsNav.providers'),
+    translation: t('settingsNav.translation'),
     selection: t('settingsNav.selection'),
     glassWindow: t('settingsNav.glassWindow'),
     document: t('settingsNav.document'),
     ocr: t('settingsNav.ocr'),
     tts: t('settingsNav.tts'),
     interface: t('settingsNav.interface'),
+    connection: t('settingsNav.connection'),
     privacy: t('settingsNav.privacy'),
     about: t('settingsNav.about'),
   };
@@ -90,11 +92,15 @@ const SettingsPanel = ({ showNotification }) => {
 
   // 设置状态 - 使用外部默认值
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [settingsReady, setSettingsReady] = useState(false); // settings 是否从磁盘加载完成
   const [isDirty, setIsDirty] = useState(false); // 是否有未保存的更改（简单标志）
   const isInitializingRef = useRef(true); // 是否正在初始化
 
   const [activeSection, setActiveSection] = useState('providers');
+  const [connectionStatus, setConnectionStatus] = useState('unknown');
+  const [isTesting, setIsTesting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [models, setModels] = useState([]);
   const [showApiKeys, setShowApiKeys] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
   const [collapsedGroups, setCollapsedGroups] = useState({});
@@ -225,6 +231,7 @@ const SettingsPanel = ({ showNotification }) => {
       }
       
       setSettings(finalSettings);
+      setSettingsReady(true); // 磁盘数据已加载，子组件可以初始化
       setIsDirty(false); // 初始加载后没有未保存更改
       
       // 延迟关闭初始化标志，等待子组件完成初始化
@@ -294,42 +301,90 @@ const SettingsPanel = ({ showNotification }) => {
       // 因为 ProviderSettings.save() 已经完成了所有保存工作
       if (activeSection === 'providers' && providerSettingsRef.current?.save) {
         await providerSettingsRef.current.save();
-        setIsDirty(false); // 重置 dirty 标志
+        setIsDirty(false);
         setIsSaving(false);
-        return; // 直接返回，不要再用旧的 settings state 覆盖
+        return;
       }
       
-      // 清理掉不需要保存的临时状态
-      const settingsToSave = {
-        ...settings,
-        ocr: {
-          ...settings.ocr,
-          // 不保存这些运行时状态，每次启动重新检测
-          isWindows: undefined,
-          paddleInstalled: undefined,
-          rapidInstalled: undefined,
-        }
-      };
-
-      // 确保 interface.theme 与当前实际主题一致
-      const currentTheme = document.documentElement.getAttribute('data-theme') || localStorage.getItem('theme') || 'light';
-      settingsToSave.interface = {
-        ...settingsToSave.interface,
-        theme: currentTheme,
-      };
-      
-      // 保存到存储（合并而非覆盖，保护 theme.js 等独立保存的字段）
+      // 使用点路径逐个 section 写入，避免读-改-写竞态
+      // 每个 store.set('settings.xxx', value) 是原子操作，不会覆盖其他 section
       if (window.electron?.store) {
-        const existingSettings = await window.electron.store.get('settings') || {};
-        await window.electron.store.set('settings', {
-          ...existingSettings,
-          ...settingsToSave,
-          // 深度合并关键嵌套对象，防止覆盖其他模块独立保存的字段
-          interface: { ...existingSettings.interface, ...settingsToSave.interface },
-          translation: { ...existingSettings.translation, ...settingsToSave.translation },
+        const store = window.electron.store;
+        
+        // 连接设置
+        if (settings.connection) {
+          await store.set('settings.connection', settings.connection);
+        }
+        
+        // 翻译设置（不覆盖 providers/providerConfigs，那些由 ProviderSettings 独立管理）
+        if (settings.translation) {
+          const { providers, providerConfigs, ...translationRest } = settings.translation;
+          // 只写非 provider 的翻译设置字段
+          for (const [key, value] of Object.entries(translationRest)) {
+            await store.set(`settings.translation.${key}`, value);
+          }
+        }
+        
+        // 文档翻译
+        if (settings.document) {
+          await store.set('settings.document', settings.document);
+        }
+        
+        // 玻璃窗口
+        if (settings.glass) {
+          await store.set('settings.glass', settings.glass);
+        }
+        
+        // 划词翻译
+        if (settings.selection) {
+          await store.set('settings.selection', settings.selection);
+        }
+        
+        // 快捷键
+        if (settings.shortcuts) {
+          await store.set('settings.shortcuts', settings.shortcuts);
+        }
+        
+        // OCR（去掉运行时状态）
+        if (settings.ocr) {
+          const { isWindows, paddleInstalled, rapidInstalled, ...ocrToSave } = settings.ocr;
+          await store.set('settings.ocr', ocrToSave);
+        }
+        
+        // TTS
+        if (settings.tts) {
+          await store.set('settings.tts', settings.tts);
+        }
+        
+        // 截图
+        if (settings.screenshot) {
+          await store.set('settings.screenshot', settings.screenshot);
+        }
+        
+        // 界面设置（含主题）
+        const currentTheme = document.documentElement.getAttribute('data-theme') || localStorage.getItem('theme') || 'light';
+        await store.set('settings.interface', {
+          ...settings.interface,
+          theme: currentTheme,
         });
+        
+        // 顶层标量设置
+        await store.set('settings.sourceLanguage', settings.sourceLanguage);
+        await store.set('settings.targetLanguage', settings.targetLanguage);
+        await store.set('settings.autoTranslate', settings.autoTranslate);
+        await store.set('settings.streamOutput', settings.streamOutput);
+        await store.set('settings.contextMemory', settings.contextMemory);
+        await store.set('settings.termCorrection', settings.termCorrection);
+        await store.set('settings.privacyMode', settings.privacyMode);
+        await store.set('settings.saveHistory', settings.saveHistory);
+        await store.set('settings.maxHistory', settings.maxHistory);
+        await store.set('settings.cacheEnabled', settings.cacheEnabled);
+        await store.set('settings.maxCache', settings.maxCache);
+        await store.set('settings.theme', settings.theme);
+        await store.set('settings.fontSize', settings.fontSize);
+        await store.set('settings.debugMode', settings.debugMode);
       } else {
-        localStorage.setItem('settings', JSON.stringify(settingsToSave));
+        localStorage.setItem('settings', JSON.stringify(settings));
       }
       
       // 同步 OCR 引擎到 Store
@@ -347,9 +402,6 @@ const SettingsPanel = ({ showNotification }) => {
         }
       }
 
-      // 注意：翻译源配置由 ProviderSettings.save() 单独处理
-      // 这里不需要 reload translationService，避免用 state 中的旧数据覆盖实际配置
-
       // 通知玻璃窗重新加载设置
       if (window.electron?.glass?.notifySettingsChanged) {
         await window.electron.glass.notifySettingsChanged();
@@ -360,13 +412,37 @@ const SettingsPanel = ({ showNotification }) => {
         notify(t('settings.saved'), 'success');
       }
       
-      // 保存后重置 dirty 标志
       setIsDirty(false);
     } catch (error) {
       logger.error('Failed to save settings:', error);
       notify(t('settings.saveFailed'), 'error');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const testConnection = async () => {
+    setIsTesting(true);
+    setConnectionStatus('testing');
+
+    try {
+      // 先临时更新 translationService 的 endpoint
+      const currentEndpoint = settings.connection.endpoint;
+      
+      const result = await translationService.testConnection(currentEndpoint);
+      if (result.success) {
+        setConnectionStatus('connected');
+        setModels(result.models || []);
+        notify(t('connectionSettings.connectionSuccess', { count: result.models?.length || 0 }), 'success');
+      } else {
+        setConnectionStatus('disconnected');
+        notify(t('connectionSettings.connectionFailed') + ': ' + (result.error || result.message || t('notify.unknownError')), 'error');
+      }
+    } catch (error) {
+      setConnectionStatus('error');
+      notify(t('connectionSettings.connectionError') + ': ' + error.message, 'error');
+    } finally {
+      setIsTesting(false);
     }
   };
 
@@ -425,7 +501,7 @@ const SettingsPanel = ({ showNotification }) => {
         const { _version, _exportedAt, ...settingsData } = imported;
         
         // 验证基本结构
-        const requiredSections = ['translation', 'ocr', 'interface'];
+        const requiredSections = ['connection', 'translation', 'ocr', 'interface'];
         const hasRequiredSections = requiredSections.some(s => settingsData[s]);
         
         if (!hasRequiredSections) {
@@ -480,14 +556,9 @@ const SettingsPanel = ({ showNotification }) => {
           <ProvidersSection
             ref={providerSettingsRef}
             settings={settings}
+            settingsReady={settingsReady}
             updateSetting={updateSetting}
             notify={notify}
-            autoTranslate={autoTranslate}
-            setAutoTranslate={setAutoTranslate}
-            autoTranslateDelay={autoTranslateDelay}
-            setAutoTranslateDelay={setAutoTranslateDelay}
-            useStreamOutput={useStreamOutput}
-            setUseStreamOutput={setUseStreamOutput}
           />
         );
 

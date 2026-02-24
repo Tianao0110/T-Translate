@@ -60,7 +60,7 @@ const secureStorage = {
 class TranslationService {
   constructor() {
     this._initialized = false;
-    this._mode = 'normal';
+    this._mode = 'normal';  // 'normal' | 'subtitle'
     this._userPriority = null;  // 用户自定义优先级
     this._failureCount = {};    // 翻译源连续失败计数 { providerId: count }
     this._skipThreshold = 3;    // 连续失败多少次后跳过
@@ -299,11 +299,16 @@ class TranslationService {
    */
   _getCacheKey(text, options) {
     const { targetLang = 'zh', template = 'natural' } = options;
-    // 使用文本前100字符 + 长度 + 目标语言 + 模板
-    const textKey = text.length > 100 
-      ? text.substring(0, 100) + '_' + text.length 
-      : text;
-    return `${targetLang}-${template}-${textKey}`;
+    // 使用 djb2 双哈希避免碰撞（与 L2 cache 一致的策略）
+    let h1 = 5381;
+    let h2 = 52711;
+    for (let i = 0; i < text.length; i++) {
+      const c = text.charCodeAt(i);
+      h1 = (h1 * 33) ^ c;
+      h2 = (h2 * 33) ^ c;
+    }
+    const hash = ((h1 >>> 0) * 4096 + (h2 >>> 0)).toString(36);
+    return `${targetLang}-${template}-${hash}`;
   }
 
   /**
@@ -748,6 +753,45 @@ class TranslationService {
     }
     
     return { success: false, error: '没有可用的翻译源' };
+  }
+
+  // ========== 批量翻译 ==========
+
+  /**
+   * 批量翻译多段文本
+   * @param {string[]} texts - 要翻译的文本数组
+   * @param {object} options - 选项（同 translate）
+   * @returns {Promise<{success: boolean, translations?: string[], error?: string}>}
+   */
+  async translateBatch(texts, options = {}) {
+    if (!texts || texts.length === 0) {
+      return { success: true, translations: [] };
+    }
+
+    const translations = [];
+    let lastError = null;
+
+    for (const text of texts) {
+      try {
+        const result = await this.translate(text, options);
+        if (result.success) {
+          translations.push(result.text);
+        } else {
+          lastError = result.error;
+          translations.push(''); // 占位，保持索引对齐
+        }
+      } catch (error) {
+        lastError = error.message;
+        translations.push('');
+      }
+    }
+
+    // 只要有一条成功就算成功
+    const hasAny = translations.some(t => t.length > 0);
+    if (hasAny) {
+      return { success: true, translations };
+    }
+    return { success: false, error: lastError || '批量翻译全部失败', translations };
   }
 
   // ========== 辅助方法 ==========

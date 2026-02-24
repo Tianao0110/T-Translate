@@ -262,6 +262,34 @@ function register(ctx) {
   });
 
   /**
+   * 保存文件：弹出对话框 + 写入文件（支持文本和二进制）
+   * options: { defaultPath, filters, data, encoding }
+   * data: string (文本) 或 Array<number> (二进制，从 Uint8Array 序列化)
+   * encoding: 'utf8' | 'binary'（默认 utf8）
+   */
+  ipcMain.handle(CHANNELS.DIALOG.SAVE_FILE, async (event, options) => {
+    const mainWindow = getMainWindow();
+    const { data, encoding = 'utf8', ...dialogOpts } = options;
+    try {
+      const result = await dialog.showSaveDialog(mainWindow, dialogOpts);
+      if (result.canceled || !result.filePath) {
+        return { success: false, canceled: true };
+      }
+      const fs = require('fs');
+      if (encoding === 'binary') {
+        fs.writeFileSync(result.filePath, Buffer.from(data));
+      } else {
+        fs.writeFileSync(result.filePath, data, 'utf8');
+      }
+      logger.debug('File saved:', result.filePath);
+      return { success: true, filePath: result.filePath };
+    } catch (error) {
+      logger.error('Save file error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  /**
    * 显示打开对话框
    */
   ipcMain.handle(CHANNELS.DIALOG.OPEN, async (event, options) => {

@@ -31,12 +31,9 @@ const InterfaceSection = ({
     i18n.changeLanguage(langCode);
     // 更新本地状态
     updateSetting('interface', 'language', langCode);
-    // 立即写入 store（托盘菜单监听 store.onDidChange 自动更新）
+    // 立即写入 store（点路径，不读取整个 settings）
     try {
-      const currentSettings = await window.electron.store.get('settings') || {};
-      currentSettings.interface = currentSettings.interface || {};
-      currentSettings.interface.language = langCode;
-      await window.electron.store.set('settings', currentSettings);
+      await window.electron?.store?.set('settings.interface.language', langCode);
     } catch (e) {
       console.warn('Failed to save language to store:', e);
     }
@@ -59,10 +56,8 @@ const InterfaceSection = ({
       if (window.electron?.theme?.set) {
         await window.electron.theme.set(theme);
       } else {
-        // 降级：旧方式保存
-        const currentSettings = await window.electron?.store?.get?.('settings') || {};
-        currentSettings.interface = { ...currentSettings.interface, theme };
-        await window.electron?.store?.set?.('settings', currentSettings);
+        // 降级：点路径直接写入
+        await window.electron?.store?.set?.('settings.interface.theme', theme);
         
         // 通知玻璃窗口刷新主题
         await window.electron?.glass?.notifySettingsChanged?.();

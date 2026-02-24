@@ -9,7 +9,8 @@ import {
   ChevronDown, ChevronRight, Settings, AlertCircle, CheckCircle, Clock,
   Loader, Eye, EyeOff, ArrowUp, Filter, FileDown, Trash2,
   SkipForward, RefreshCw, Languages, Zap, Lock, Key,
-  List, Hash, DollarSign, Database, BookOpen, ChevronLeft
+  List, Hash, DollarSign, Database, BookOpen, ChevronLeft,
+  Edit3, Check, Copy, Search, Replace
 } from 'lucide-react';
 import createLogger from '../../utils/logger.js';
 import {
@@ -37,10 +38,40 @@ const STATUS = {
   SKIPPED: 'skipped',
 };
 
+// 进度持久化
+const PROGRESS_KEY = 'dt_progress_';
+
+function getFileFingerprint(file) {
+  return `${file.name}_${file.size}_${file.lastModified}`;
+}
+
+function saveProgress(fp, segments, sLang, tLang) {
+  try {
+    const data = { ts: Date.now(), sLang, tLang,
+      segs: segments.filter(s => s.status === STATUS.COMPLETED).map(s => ({ id: s.id, t: s.translated }))
+    };
+    localStorage.setItem(PROGRESS_KEY + fp, JSON.stringify(data));
+  } catch { /* full */ }
+}
+
+function loadProgress(fp) {
+  try {
+    const raw = localStorage.getItem(PROGRESS_KEY + fp);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (Date.now() - data.ts > 7 * 86400000) { localStorage.removeItem(PROGRESS_KEY + fp); return null; }
+    return data;
+  } catch { return null; }
+}
+
 /**
  * 单个段落组件
  */
-const SegmentItem = React.memo(({ segment, displayStyle, onRetry, t }) => {
+const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate, onEdit, onCopy, searchQuery, replaceQuery, onReplace, t }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState('');
+  const editRef = useRef(null);
+
   const statusIcon = {
     [STATUS.PENDING]: <Clock size={14} className="status-icon pending" />,
     [STATUS.TRANSLATING]: <Loader size={14} className="status-icon translating" />,
@@ -51,32 +82,76 @@ const SegmentItem = React.memo(({ segment, displayStyle, onRetry, t }) => {
 
   const isSubtitle = segment.type === 'subtitle';
 
+  const startEdit = () => {
+    setEditText(segment.translated || '');
+    setIsEditing(true);
+    setTimeout(() => editRef.current?.focus(), 50);
+  };
+  const saveEdit = () => {
+    if (editText.trim() !== (segment.translated || '')) onEdit(segment.id, editText.trim());
+    setIsEditing(false);
+  };
+  const cancelEdit = () => { setIsEditing(false); setEditText(''); };
+
+  // 高亮搜索匹配
+  const highlightText = (text) => {
+    if (!searchQuery || !text) return text;
+    try {
+      const regex = new RegExp(`(${searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+      const parts = text.split(regex);
+      return parts.map((part, i) => regex.test(part) ? <mark key={i} className="search-highlight">{part}</mark> : part);
+    } catch { return text; }
+  };
+
+  const hasSearchMatch = searchQuery && segment.translated && segment.translated.toLowerCase().includes(searchQuery.toLowerCase());
+
   return (
     <div 
-      className={`segment-item ${segment.status} ${displayStyle}`}
+      className={`segment-item ${segment.status} ${displayStyle} ${segment.edited ? 'edited' : ''}`}
       data-segment-id={segment.id}
     >
       {/* 段落序号和状态 */}
       <div className="segment-header">
         <span className="segment-index">#{segment.id + 1}</span>
         {statusIcon[segment.status]}
+        {segment.edited && <span className="edited-badge" title={t('documentTranslator.segment.edited')}>✏️</span>}
         {segment.status === STATUS.SKIPPED && segment.filterReason && (
           <span className="skip-reason">{segment.filterReason}</span>
         )}
-        {isSubtitle && (
-          <span className="timecode">{segment.timecode}</span>
-        )}
-        {segment.status === STATUS.ERROR && (
-          <button className="retry-btn" onClick={() => onRetry(segment.id)} title={t('documentTranslator.actions.retry')}>
-            <RotateCcw size={12} />
-          </button>
-        )}
+        {isSubtitle && <span className="timecode">{segment.timecode}</span>}
+        
+        {/* 段落操作按钮 */}
+        <div className="segment-actions">
+          {segment.status === STATUS.ERROR && (
+            <button className="seg-btn" onClick={() => onRetry(segment.id)} title={t('documentTranslator.actions.retry')}>
+              <RotateCcw size={12} />
+            </button>
+          )}
+          {segment.status === STATUS.COMPLETED && (
+            <>
+              <button className="seg-btn" onClick={() => onRetranslate(segment.id)} title={t('documentTranslator.segment.retranslate')}>
+                <RefreshCw size={12} />
+              </button>
+              <button className="seg-btn" onClick={startEdit} title={t('documentTranslator.segment.edit')}>
+                <Edit3 size={12} />
+              </button>
+              <button className="seg-btn" onClick={() => onCopy(segment.translated)} title={t('documentTranslator.segment.copy')}>
+                <Copy size={12} />
+              </button>
+              {hasSearchMatch && replaceQuery !== undefined && (
+                <button className="seg-btn replace" onClick={() => onReplace(segment.id)} title={t('documentTranslator.search.replaceThis')}>
+                  <Replace size={12} />
+                </button>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* 原文 */}
       {displayStyle !== 'translated-only' && (
         <div className="segment-original">
-          {segment.original}
+          {highlightText(segment.original)}
         </div>
       )}
 
@@ -88,7 +163,31 @@ const SegmentItem = React.memo(({ segment, displayStyle, onRetry, t }) => {
               <Loader size={14} className="spinning" /> {t('documentTranslator.status.translating')}
             </span>
           )}
-          {segment.status === STATUS.COMPLETED && segment.translated}
+          {segment.status === STATUS.COMPLETED && !isEditing && (
+            <span onDoubleClick={startEdit} className="translated-text">
+              {highlightText(segment.translated)}
+            </span>
+          )}
+          {segment.status === STATUS.COMPLETED && isEditing && (
+            <div className="edit-area">
+              <textarea
+                ref={editRef}
+                value={editText}
+                onChange={e => setEditText(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && e.ctrlKey) saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
+                className="edit-textarea"
+                rows={Math.max(2, editText.split('\n').length)}
+              />
+              <div className="edit-actions">
+                <button className="edit-btn save" onClick={saveEdit} title="Ctrl+Enter">
+                  <Check size={12} /> {t('documentTranslator.segment.save')}
+                </button>
+                <button className="edit-btn cancel" onClick={cancelEdit} title="Esc">
+                  <X size={12} /> {t('documentTranslator.segment.cancel')}
+                </button>
+              </div>
+            </div>
+          )}
           {segment.status === STATUS.ERROR && (
             <span className="error-hint">
               <AlertCircle size={14} /> {segment.error || t('documentTranslator.status.failed')}
@@ -162,14 +261,15 @@ const DocumentTranslator = ({
   const DISPLAY_STYLES = useMemo(() => [
     { id: 'below', name: t('documentTranslator.displayStyles.below'), icon: '⬇️' },
     { id: 'side-by-side', name: t('documentTranslator.displayStyles.sideBySide'), icon: '⬛' },
-    { id: 'source-only', name: t('documentTranslator.displayStyles.sourceOnly'), icon: '📄' },
-    { id: 'translated-only', name: t('documentTranslator.displayStyles.translatedOnly'), icon: '🌐' },
   ], [t]);
   
   // 文件状态
   const [document, setDocument] = useState(null);
   const [segments, setSegments] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // 文件指纹（进度持久化）
+  const fileFingerprint = useRef(null);
   
   // 大纲导航
   const [outline, setOutline] = useState([]);
@@ -202,6 +302,15 @@ const DocumentTranslator = ({
   const [showExport, setShowExport] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  
+  // 搜索替换
+  const [searchQuery, setSearchQuery] = useState('');
+  const [replaceQuery, setReplaceQuery] = useState('');
+  const [searchMatchCount, setSearchMatchCount] = useState(0);
+  
+  // 进度恢复提示
+  const [pendingRestore, setPendingRestore] = useState(null);
   
   // 密码弹窗
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -239,11 +348,12 @@ const DocumentTranslator = ({
       .filter(s => s.status === STATUS.COMPLETED)
       .reduce((sum, s) => sum + (s.tokens || 0), 0);
     const cacheHits = segments.filter(s => s.fromCache).length;
+    const edited = segments.filter(s => s.edited).length;
     const progress = total > 0 ? Math.round((completed / (total - skipped)) * 100) : 0;
     
     return { 
       total, completed, failed, skipped, pending, translating,
-      totalTokens, usedTokens, cacheHits, progress 
+      totalTokens, usedTokens, cacheHits, edited, progress 
     };
   }, [segments]);
 
@@ -257,6 +367,33 @@ const DocumentTranslator = ({
     }
     return () => clearInterval(timer);
   }, [isTranslating, startTime, isPaused]);
+
+  // 搜索匹配计数
+  useEffect(() => {
+    if (!searchQuery) { setSearchMatchCount(0); return; }
+    const count = segments.filter(s => 
+      s.status === STATUS.COMPLETED && s.translated &&
+      s.translated.toLowerCase().includes(searchQuery.toLowerCase())
+    ).length;
+    setSearchMatchCount(count);
+  }, [searchQuery, segments]);
+
+  // 自动保存进度
+  useEffect(() => {
+    if (fileFingerprint.current && stats.completed > 0 && !isTranslating) {
+      saveProgress(fileFingerprint.current, segments, sourceLang, targetLang);
+    }
+  }, [stats.completed, isTranslating]);
+
+  // 键盘快捷键 Ctrl+F / Ctrl+H
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.ctrlKey && e.key === 'f' && document) { e.preventDefault(); setShowSearch(prev => !prev); }
+      if (e.ctrlKey && e.key === 'h' && document) { e.preventDefault(); setShowSearch(true); }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [document]);
 
   // 格式化时间
   const formatTime = (ms) => {
@@ -301,6 +438,9 @@ const DocumentTranslator = ({
       logger.debug('parseDocument result:', result);
       
       if (result.success) {
+        const fingerprint = getFileFingerprint(file);
+        fileFingerprint.current = fingerprint;
+        
         setDocument({
           filename: result.filename,
           format: result.format,
@@ -316,6 +456,14 @@ const DocumentTranslator = ({
         // 重置计时
         setStartTime(null);
         setElapsedTime(0);
+        
+        // 检查是否有可恢复的进度
+        const saved = loadProgress(fingerprint);
+        if (saved && saved.segs.length > 0 && saved.sLang === sourceLang && saved.tLang === targetLang) {
+          setPendingRestore(saved);
+        } else {
+          setPendingRestore(null);
+        }
         
         // 通知消息
         const message = result.pageCount
@@ -619,6 +767,102 @@ const DocumentTranslator = ({
     }
   };
 
+  // 重新翻译已完成段落
+  const retranslateSegment = async (segmentId) => {
+    const segment = segments.find(s => s.id === segmentId);
+    if (!segment || segment.status !== STATUS.COMPLETED) return;
+    const cacheKey = `${segment.original}|${sourceLang}|${targetLang}`;
+    translationCache.current.delete(cacheKey);
+    setSegments(prev => prev.map(s => s.id === segmentId ? { ...s, status: STATUS.TRANSLATING, edited: false } : s));
+    try {
+      const result = await translationService.translate(segment.original, { sourceLang, targetLang });
+      if (result.success) {
+        const translated = result.text || result.translatedText || '';
+        translationCache.current.set(cacheKey, translated);
+        setSegments(prev => prev.map(s => s.id === segmentId ? { ...s, status: STATUS.COMPLETED, translated, edited: false } : s));
+        notify?.(t('documentTranslator.notify.retranslateSuccess'), 'success');
+      } else { throw new Error(result.error); }
+    } catch (error) {
+      setSegments(prev => prev.map(s => s.id === segmentId ? { ...s, status: STATUS.ERROR, error: error.message } : s));
+      notify?.(t('documentTranslator.notify.retryFailed', { error: error.message }), 'error');
+    }
+  };
+
+  // 编辑段落译文
+  const editSegment = useCallback((segmentId, newText) => {
+    setSegments(prev => prev.map(s => s.id === segmentId ? { ...s, translated: newText, edited: true } : s));
+    const segment = segments.find(s => s.id === segmentId);
+    if (segment) {
+      const cacheKey = `${segment.original}|${sourceLang}|${targetLang}`;
+      translationCache.current.set(cacheKey, newText);
+    }
+  }, [segments, sourceLang, targetLang]);
+
+  // 复制译文
+  const copySegmentText = useCallback((text) => {
+    if (text) { navigator.clipboard.writeText(text); notify?.(t('documentTranslator.notify.copied'), 'success'); }
+  }, [notify, t]);
+
+  // 替换单个段落中的搜索匹配
+  const replaceInSegment = useCallback((segmentId) => {
+    if (!searchQuery || replaceQuery === undefined) return;
+    setSegments(prev => prev.map(s => {
+      if (s.id === segmentId && s.status === STATUS.COMPLETED && s.translated) {
+        const regex = new RegExp(searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+        const newText = s.translated.replace(regex, replaceQuery);
+        if (newText !== s.translated) {
+          const cacheKey = `${s.original}|${sourceLang}|${targetLang}`;
+          translationCache.current.set(cacheKey, newText);
+          return { ...s, translated: newText, edited: true };
+        }
+      }
+      return s;
+    }));
+  }, [searchQuery, replaceQuery, sourceLang, targetLang]);
+
+  // 全部替换
+  const replaceAll = useCallback(() => {
+    if (!searchQuery || replaceQuery === undefined) return;
+    let count = 0;
+    setSegments(prev => prev.map(s => {
+      if (s.status === STATUS.COMPLETED && s.translated) {
+        const regex = new RegExp(searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+        const newText = s.translated.replace(regex, replaceQuery);
+        if (newText !== s.translated) {
+          count++;
+          const cacheKey = `${s.original}|${sourceLang}|${targetLang}`;
+          translationCache.current.set(cacheKey, newText);
+          return { ...s, translated: newText, edited: true };
+        }
+      }
+      return s;
+    }));
+    if (count > 0) notify?.(t('documentTranslator.notify.replacedCount', { count }), 'success');
+  }, [searchQuery, replaceQuery, sourceLang, targetLang, notify, t]);
+
+  // 恢复进度
+  const restoreProgress = useCallback(() => {
+    if (!pendingRestore) return;
+    const restoredMap = new Map(pendingRestore.segs.map(s => [s.id, s.t]));
+    setSegments(prev => prev.map(s => {
+      const restored = restoredMap.get(s.id);
+      if (restored) {
+        const cacheKey = `${s.original}|${sourceLang}|${targetLang}`;
+        translationCache.current.set(cacheKey, restored);
+        return { ...s, status: STATUS.COMPLETED, translated: restored, fromCache: true };
+      }
+      return s;
+    }));
+    setPendingRestore(null);
+    notify?.(t('documentTranslator.notify.progressRestored', { count: restoredMap.size }), 'success');
+  }, [pendingRestore, sourceLang, targetLang, notify, t]);
+
+  // 忽略恢复
+  const dismissRestore = useCallback(() => {
+    setPendingRestore(null);
+    if (fileFingerprint.current) localStorage.removeItem(PROGRESS_KEY + fileFingerprint.current);
+  }, []);
+
   // 导出
   const handleExport = async (type) => {
     if (segments.length === 0) return;
@@ -626,81 +870,105 @@ const DocumentTranslator = ({
     let content = '';
     let filename = document?.filename?.replace(/\.[^.]+$/, '') || 'translated';
     let ext = 'txt';
-    let blob = null;
+    let filterName = 'Text';
+    let isBinary = false;
     
     try {
       switch (type) {
         case 'bilingual-txt':
           content = exportBilingual(segments, { style: 'below' });
           filename += t('documentTranslator.fileSuffix.bilingual');
+          filterName = 'Text';
           break;
         case 'bilingual-md':
           content = exportBilingual(segments, { style: 'below', format: 'md' });
           filename += t('documentTranslator.fileSuffix.bilingual');
           ext = 'md';
+          filterName = 'Markdown';
           break;
         case 'translated-only':
           content = exportTranslatedOnly(segments);
           filename += t('documentTranslator.fileSuffix.translatedOnly');
+          filterName = 'Text';
           break;
         case 'srt':
           content = exportSRT(segments);
           filename += '_translated';
           ext = 'srt';
+          filterName = 'SRT Subtitle';
           break;
         case 'vtt':
           content = exportVTT(segments);
           filename += '_translated';
           ext = 'vtt';
+          filterName = 'VTT Subtitle';
           break;
-        case 'docx':
-          blob = exportDOCX(segments, { 
+        case 'docx': {
+          const blob = exportDOCX(segments, { 
+            style: 'bilingual', 
+            title: document?.filename || t('documentTranslator.defaultDocTitle')
+          });
+          content = await blob.text();
+          filename += t('documentTranslator.fileSuffix.bilingual');
+          ext = 'doc';
+          filterName = 'Word Document';
+          break;
+        }
+        case 'docx-translated': {
+          const blob = exportDOCX(segments, { 
+            style: 'translated-only', 
+            title: document?.filename || t('documentTranslator.defaultDocTitle')
+          });
+          content = await blob.text();
+          filename += t('documentTranslator.fileSuffix.translatedOnly');
+          ext = 'doc';
+          filterName = 'Word Document';
+          break;
+        }
+        case 'pdf':
+          content = exportPDFHTML(segments, { 
             style: 'bilingual', 
             title: document?.filename || t('documentTranslator.defaultDocTitle')
           });
           filename += t('documentTranslator.fileSuffix.bilingual');
-          ext = 'doc';
+          ext = 'html';
+          filterName = 'HTML (Print to PDF)';
           break;
-        case 'docx-translated':
-          blob = exportDOCX(segments, { 
-            style: 'translated-only', 
-            title: document?.filename || t('documentTranslator.defaultDocTitle')
-          });
-          filename += t('documentTranslator.fileSuffix.translatedOnly');
-          ext = 'doc';
-          break;
-        case 'pdf':
-          // 生成 HTML 并打开打印对话框
-          const pdfHtml = exportPDFHTML(segments, { 
-            style: 'bilingual', 
-            title: document?.filename || t('documentTranslator.defaultDocTitle')
-          });
-          const printWindow = window.open('', '_blank', 'width=800,height=600');
-          printWindow.document.write(pdfHtml);
-          printWindow.document.close();
-          printWindow.onload = () => {
-            printWindow.print();
-          };
-          setShowExport(false);
-          notify?.(t('documentTranslator.notify.printToPdf'), 'info');
-          return;
         default:
           return;
       }
       
-      // 下载文件
-      if (!blob) {
-        blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      // 使用 Electron 保存对话框
+      const saveFile = window.electron?.dialog?.saveFile;
+      if (saveFile) {
+        const result = await saveFile({
+          defaultPath: `${filename}.${ext}`,
+          filters: [
+            { name: filterName, extensions: [ext] },
+            { name: 'All Files', extensions: ['*'] },
+          ],
+          data: content,
+          encoding: isBinary ? 'binary' : 'utf8',
+        });
+        
+        if (result.success) {
+          setShowExport(false);
+          notify?.(t('documentTranslator.notify.exportSuccess'), 'success');
+        } else if (!result.canceled) {
+          throw new Error(result.error || 'Save failed');
+        }
+      } else {
+        // 回退：浏览器环境或 preload 不可用时用 blob 下载
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = window.document.createElement('a');
+        a.href = url;
+        a.download = `${filename}.${ext}`;
+        a.click();
+        URL.revokeObjectURL(url);
+        setShowExport(false);
+        notify?.(t('documentTranslator.notify.exportSuccess'), 'success');
       }
-      const url = URL.createObjectURL(blob);
-      const a = window.document.createElement('a');
-      a.href = url;
-      a.download = `${filename}.${ext}`;
-      a.click();
-      URL.revokeObjectURL(url);
-      
-      setShowExport(false);
-      notify?.(t('documentTranslator.notify.exportSuccess'), 'success');
     } catch (error) {
       logger.error('Export error:', error);
       notify?.(t('documentTranslator.notify.exportFailed', { error: error.message }), 'error');
@@ -717,6 +985,11 @@ const DocumentTranslator = ({
     setOutline([]);
     setStartTime(null);
     setElapsedTime(0);
+    setPendingRestore(null);
+    setShowSearch(false);
+    setSearchQuery('');
+    setReplaceQuery('');
+    fileFingerprint.current = null;
   };
 
   // 滚动处理 - 仅用于显示/隐藏滚动到顶部按钮
@@ -767,6 +1040,15 @@ const DocumentTranslator = ({
         <div className="dt-actions">
           {document && (
             <>
+              {/* 搜索按钮 */}
+              <button 
+                className={`dt-btn icon-only ${showSearch ? 'active' : ''}`}
+                onClick={() => setShowSearch(!showSearch)}
+                title={t('documentTranslator.search.title') + ' (Ctrl+F)'}
+              >
+                <Search size={16} />
+              </button>
+
               {/* 显示样式 */}
               <div className="style-selector">
                 {DISPLAY_STYLES.map(style => (
@@ -839,6 +1121,29 @@ const DocumentTranslator = ({
         </div>
       </div>
 
+      {/* 搜索替换栏 */}
+      {showSearch && document && (
+        <div className="dt-search-bar">
+          <div className="search-row">
+            <Search size={14} className="search-icon" />
+            <input type="text" placeholder={t('documentTranslator.search.searchPlaceholder')} value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)} autoFocus className="search-input" />
+            {searchQuery && <span className="search-count">{searchMatchCount} {t('documentTranslator.search.matches')}</span>}
+          </div>
+          <div className="search-row">
+            <Replace size={14} className="search-icon" />
+            <input type="text" placeholder={t('documentTranslator.search.replacePlaceholder')} value={replaceQuery}
+              onChange={e => setReplaceQuery(e.target.value)} className="search-input" />
+            <button className="search-btn" onClick={replaceAll} disabled={!searchQuery || searchMatchCount === 0}>
+              {t('documentTranslator.search.replaceAll')}
+            </button>
+          </div>
+          <button className="search-close" onClick={() => { setShowSearch(false); setSearchQuery(''); setReplaceQuery(''); }}>
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
       {/* 主体内容 */}
       <div className="dt-body">
         {/* 无文件时显示上传区域 */}
@@ -877,6 +1182,20 @@ const DocumentTranslator = ({
         {/* 有文件时显示翻译界面 */}
         {document && stats && (
           <>
+            {/* 进度恢复提示 */}
+            {pendingRestore && (
+              <div className="dt-restore-banner">
+                <div className="restore-info">
+                  <RefreshCw size={16} />
+                  <span>{t('documentTranslator.restore.found', { count: pendingRestore.segs.length })}</span>
+                </div>
+                <div className="restore-actions">
+                  <button className="restore-btn primary" onClick={restoreProgress}>{t('documentTranslator.restore.restore')}</button>
+                  <button className="restore-btn secondary" onClick={dismissRestore}>{t('documentTranslator.restore.dismiss')}</button>
+                </div>
+              </div>
+            )}
+
             {/* 文件信息栏 */}
             <div className="dt-file-info">
               <div className="file-details">
@@ -908,6 +1227,7 @@ const DocumentTranslator = ({
                   {stats.skipped > 0 && <span> · {t('documentTranslator.progress.skipped')} {stats.skipped}</span>}
                   {stats.failed > 0 && <span className="failed"> · {t('documentTranslator.progress.failed')} {stats.failed}</span>}
                   {stats.cacheHits > 0 && <span className="cache-hits"> · {t('documentTranslator.progress.cached')} {stats.cacheHits}</span>}
+                  {stats.edited > 0 && <span className="edited-count"> · {t('documentTranslator.progress.edited')} {stats.edited}</span>}
                 </span>
                 {isTranslating && (
                   <span className="elapsed-time">
@@ -950,6 +1270,12 @@ const DocumentTranslator = ({
                     segment={segment}
                     displayStyle={displayStyle}
                     onRetry={retrySegment}
+                    onRetranslate={retranslateSegment}
+                    onEdit={editSegment}
+                    onCopy={copySegmentText}
+                    searchQuery={showSearch ? searchQuery : ''}
+                    replaceQuery={showSearch ? replaceQuery : undefined}
+                    onReplace={replaceInSegment}
                     t={t}
                   />
                 ))}
@@ -1004,6 +1330,12 @@ const DocumentTranslator = ({
                         <div className="stat-card cache">
                           <span className="stat-number">{stats.cacheHits}</span>
                           <span className="stat-desc">{t('documentTranslator.stats.cacheHits')}</span>
+                        </div>
+                      )}
+                      {stats.edited > 0 && (
+                        <div className="stat-card edited">
+                          <span className="stat-number">{stats.edited}</span>
+                          <span className="stat-desc">{t('documentTranslator.stats.edited')}</span>
                         </div>
                       )}
                     </div>

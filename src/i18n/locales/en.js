@@ -364,7 +364,11 @@ const en = {
       exportSuccess: "Export successful",
       exportFailed: "Export failed: {{error}}",
       printToPdf: "Please select \"Save as PDF\" in the print dialog",
-      cacheCleared: "Translation memory cache cleared"
+      cacheCleared: "Translation memory cache cleared",
+      retranslateSuccess: "Re-translation successful",
+      copied: "Copied to clipboard",
+      replacedCount: "Replaced {{count}} occurrences",
+      progressRestored: "Restored {{count}} translated segments"
     },
     // Export menu
     export: {
@@ -393,14 +397,16 @@ const en = {
       estimatedTokens: "Estimated Tokens",
       usedTokens: "Used Tokens",
       elapsedTime: "Elapsed Time",
-      clearCache: "Clear Cache"
+      clearCache: "Clear Cache",
+      edited: "Edited"
     },
     // Progress
     progress: {
       completed: "Completed",
       skipped: "Skipped",
       failed: "Failed",
-      cached: "Cached"
+      cached: "Cached",
+      edited: "Edited"
     },
     // Footer
     footer: {
@@ -423,7 +429,31 @@ const en = {
       translatedOnly: "_translated"
     },
     // Default doc title
-    defaultDocTitle: "Translated Document"
+    defaultDocTitle: "Translated Document",
+    // Segment actions
+    segment: {
+      retranslate: "Re-translate",
+      edit: "Edit translation",
+      copy: "Copy translation",
+      save: "Save",
+      cancel: "Cancel",
+      edited: "Manually edited"
+    },
+    // Search & Replace
+    search: {
+      title: "Search & Replace",
+      searchPlaceholder: "Search in translations...",
+      replacePlaceholder: "Replace with...",
+      matches: "matches",
+      replaceThis: "Replace this",
+      replaceAll: "Replace All"
+    },
+    // Progress restore
+    restore: {
+      found: "Previous progress found ({{count}} segments). Restore?",
+      restore: "Restore",
+      dismiss: "Dismiss"
+    }
   },
   // ========== New: Tray menu translation keys ==========
   tray: {

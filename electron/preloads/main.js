@@ -88,6 +88,7 @@ const electronAPI = {
   dialog: {
     showSaveDialog: (opts) => ipcRenderer.invoke("show-save-dialog", opts),
     showOpenDialog: (opts) => ipcRenderer.invoke("show-open-dialog", opts),
+    saveFile: (opts) => ipcRenderer.invoke("dialog-save-file", opts),
   },
   clipboard: {
     readText: () => ipcRenderer.invoke("read-clipboard-text"),

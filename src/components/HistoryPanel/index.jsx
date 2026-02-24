@@ -438,16 +438,34 @@ const HistoryPanel = ({ showNotification }) => {
     notify(isFav ? t('history.unfavorited') : t('history.favorited'), 'success');
   }, [favoriteIds, addToFavorites, removeFromFavorites, notify, t]);
 
-  const handleExport = useCallback(() => {
+  const handleExport = useCallback(async () => {
     try {
       const data = exportHistory('json');
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `t-translate-history-${dayjs().format('YYYY-MM-DD')}.json`;
-      a.click();
-      URL.revokeObjectURL(a.href); // 清理
-      notify(t('history.exportSuccess'), 'success');
+      const content = JSON.stringify(data, null, 2);
+      const filename = `t-translate-history-${dayjs().format('YYYY-MM-DD')}.json`;
+      
+      const saveFile = window.electron?.dialog?.saveFile;
+      if (saveFile) {
+        const result = await saveFile({
+          defaultPath: filename,
+          filters: [{ name: 'JSON', extensions: ['json'] }],
+          data: content,
+        });
+        if (result.success) {
+          notify(t('history.exportSuccess'), 'success');
+        } else if (!result.canceled) {
+          throw new Error(result.error);
+        }
+      } else {
+        // 回退
+        const blob = new Blob([content], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(a.href);
+        notify(t('history.exportSuccess'), 'success');
+      }
     } catch { 
       notify(t('history.exportFailed'), 'error'); 
     }

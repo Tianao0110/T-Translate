@@ -9,6 +9,29 @@ const {
   screen,
 } = require('electron');
 const path = require('path');
+const Module = require('module');
+
+// ==================== 用户目录模块路径 ====================
+// 打包后，某些原生模块（onnxruntime-node, sharp 等）可能与目标机器不兼容。
+// 用户通过"修复"功能 npm install 到 userData 后，需要优先从 userData 加载，
+// 否则重启后仍会加载 asar.unpacked 里不兼容的版本。
+const userDataModules = path.join(app.getPath('userData'), 'node_modules');
+if (app.isPackaged) {
+  // 将 userData/node_modules 插入到模块搜索路径最前面
+  const originalResolveFilename = Module._resolveFilename;
+  Module._resolveFilename = function (request, parent, isMain, options) {
+    // 仅对 @gutenye / onnxruntime / sharp 等 OCR 相关模块做优先查找
+    if (request.startsWith('@gutenye') || request === 'onnxruntime-node' || request === 'sharp') {
+      try {
+        const userPath = require.resolve(request, { paths: [userDataModules] });
+        if (userPath) return userPath;
+      } catch (e) {
+        // userData 里没有，回退到默认路径
+      }
+    }
+    return originalResolveFilename.call(this, request, parent, isMain, options);
+  };
+}
 
 // ==================== 模块导入 ====================
 const { store, runtime, windows, isDev } = require('./state');

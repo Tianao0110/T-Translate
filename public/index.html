@@ -4,6 +4,27 @@
   <meta charset="UTF-8">
   <script>
       window.process = { env: { NODE_ENV: 'development' } };
+      // 阻止 Vite HMR 断连重连时的整页刷新（开发模式）
+      // 后台失焦后 WebSocket 断开，唤醒时 Vite 会触发 full-reload 导致丢失状态
+      if (window.location.hostname === 'localhost') {
+        const _origReload = window.location.reload.bind(window.location);
+        let _lastUserAction = Date.now();
+        // 记录用户主动操作时间
+        ['click', 'keydown'].forEach(e => window.addEventListener(e, () => { _lastUserAction = Date.now(); }, true));
+        Object.defineProperty(window.location, 'reload', {
+          value: function() {
+            // 只允许最近 2 秒内有用户操作时的 reload（手动刷新）
+            // 自动触发的 reload（HMR 断连恢复）被阻止
+            if (Date.now() - _lastUserAction < 2000) {
+              _origReload();
+            } else {
+              console.warn('[T-Translate] Blocked auto-reload from Vite HMR reconnect');
+            }
+          },
+          writable: false,
+          configurable: true,
+        });
+      }
   </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="ie=edge">

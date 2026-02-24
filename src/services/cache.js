@@ -21,6 +21,7 @@ class TranslationCache {
     this.maxSize = options.maxSize || 200;  // 最大缓存条数
     this.ttl = options.ttl || 7 * 24 * 60 * 60 * 1000;  // 7天过期
     this.cache = new Map();
+    this._saveTimer = null;
     
     // 启动时加载缓存
     this.load();
@@ -68,6 +69,15 @@ class TranslationCache {
   }
 
   /**
+   * 防抖保存 - 批量写入时避免频繁序列化
+   * @param {number} delay - 延迟毫秒数，默认 500ms
+   */
+  debouncedSave(delay = 500) {
+    clearTimeout(this._saveTimer);
+    this._saveTimer = setTimeout(() => this.save(), delay);
+  }
+
+  /**
    * 生成缓存键（使用 djb2 哈希避免碰撞）
    */
   generateKey(text, from, to, template = 'natural') {
@@ -100,7 +110,7 @@ class TranslationCache {
     // 检查是否过期
     if (Date.now() - item.timestamp > this.ttl) {
       this.cache.delete(key);
-      this.save();
+      this.debouncedSave();
       return null;
     }
 
@@ -121,7 +131,7 @@ class TranslationCache {
       timestamp: Date.now()
     });
 
-    this.save();
+    this.debouncedSave();  // 防抖保存，批量翻译时避免每条都序列化
   }
 
   /**

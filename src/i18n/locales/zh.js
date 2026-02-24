@@ -364,7 +364,11 @@ const zh = {
       exportSuccess: "导出成功",
       exportFailed: "导出失败: {{error}}",
       printToPdf: "请在打印对话框中选择\"保存为 PDF\"",
-      cacheCleared: "翻译记忆缓存已清除"
+      cacheCleared: "翻译记忆缓存已清除",
+      retranslateSuccess: "重新翻译成功",
+      copied: "已复制到剪贴板",
+      replacedCount: "已替换 {{count}} 处",
+      progressRestored: "已恢复 {{count}} 个段落的翻译"
     },
     // 导出菜单
     export: {
@@ -393,14 +397,16 @@ const zh = {
       estimatedTokens: "预估 Tokens",
       usedTokens: "已用 Tokens",
       elapsedTime: "翻译用时",
-      clearCache: "清除缓存"
+      clearCache: "清除缓存",
+      edited: "已编辑"
     },
     // 进度信息
     progress: {
       completed: "已完成",
       skipped: "跳过",
       failed: "失败",
-      cached: "缓存"
+      cached: "缓存",
+      edited: "已编辑"
     },
     // 底部控制栏
     footer: {
@@ -423,7 +429,31 @@ const zh = {
       translatedOnly: "_译文"
     },
     // 默认文档标题
-    defaultDocTitle: "翻译文档"
+    defaultDocTitle: "翻译文档",
+    // 段落操作
+    segment: {
+      retranslate: "重新翻译",
+      edit: "编辑译文",
+      copy: "复制译文",
+      save: "保存",
+      cancel: "取消",
+      edited: "已手动编辑"
+    },
+    // 搜索替换
+    search: {
+      title: "搜索替换",
+      searchPlaceholder: "在译文中搜索...",
+      replacePlaceholder: "替换为...",
+      matches: "处匹配",
+      replaceThis: "替换此处",
+      replaceAll: "全部替换"
+    },
+    // 进度恢复
+    restore: {
+      found: "发现上次翻译进度（{{count}} 个段落），是否恢复？",
+      restore: "恢复进度",
+      dismiss: "忽略"
+    }
   },
   // ========== 新增：托盘菜单翻译键 ==========
   tray: {

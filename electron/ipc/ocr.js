@@ -14,6 +14,49 @@ const { CHANNELS, OCR_ENGINES } = require('../shared/channels');
 const logger = require('../utils/logger')('IPC:OCR');
 const { smartMerge, mergedBlocksToText } = require('../utils/text-merger');
 
+// ==================== OCR 模块加载辅助 ====================
+// 打包后原生模块可能不兼容目标机器。修复后模块装在 userData/node_modules 中。
+// 此 helper 优先从 userData 加载，回退到默认路径（asar.unpacked）。
+const userDataModules = path.join(app.getPath('userData'), 'node_modules');
+
+/**
+ * 尝试 resolve @gutenye/ocr-node 模块路径
+ * @returns {string|null} 模块路径或 null
+ */
+function resolveOcrModule() {
+  // 优先 userData
+  try {
+    return require.resolve('@gutenye/ocr-node', { paths: [userDataModules] });
+  } catch (e) {}
+  // 回退默认
+  try {
+    return require.resolve('@gutenye/ocr-node');
+  } catch (e) {}
+  return null;
+}
+
+/**
+ * 动态加载 @gutenye/ocr-node 模块
+ * @returns {Promise<object|null>} 模块对象或 null
+ */
+async function loadOcrModule() {
+  const resolved = resolveOcrModule();
+  if (!resolved) return null;
+  try {
+    // 使用 file:// URL 确保 dynamic import 能找到正确路径
+    const moduleUrl = require('url').pathToFileURL(resolved).href;
+    return await import(moduleUrl);
+  } catch (e) {
+    logger.warn('loadOcrModule failed for', resolved, ':', e.message);
+    // 回退：直接 import 模块名（走默认 resolve）
+    try {
+      return await import('@gutenye/ocr-node');
+    } catch (e2) {
+      return null;
+    }
+  }
+}
+
 /**
  * 注册 OCR 相关 IPC handlers
  * @param {Object} ctx - 共享上下文
@@ -78,9 +121,12 @@ $langs | ForEach-Object { $_.LanguageTag }
   ipcMain.handle(CHANNELS.OCR.CHECK_PADDLE_OCR, async () => {
     // 尝试 @gutenye/ocr-node
     try {
-      await import('@gutenye/ocr-node');
-      logger.debug('@gutenye/ocr-node is available');
-      return { available: true, version: 'gutenye' };
+      const mod = await loadOcrModule();
+      if (mod) {
+        logger.debug('@gutenye/ocr-node is available');
+        return { available: true, version: 'gutenye' };
+      }
+      throw new Error('module not found');
     } catch (e) {
       logger.debug('@gutenye/ocr-node not available:', e.message);
     }
@@ -107,6 +153,7 @@ $langs | ForEach-Object { $_.LanguageTag }
     };
     
     const checkModule = (moduleName) => {
+      if (moduleName === '@gutenye/ocr-node') return !!resolveOcrModule();
       try {
         require.resolve(moduleName);
         return true;
@@ -141,14 +188,13 @@ $langs | ForEach-Object { $_.LanguageTag }
     // 检查 RapidOCR
     let rapidAvailable = false;
     try {
-      require.resolve('@gutenye/ocr-node');
-      rapidAvailable = true;
-    } catch (e) {
-      try {
+      if (resolveOcrModule()) {
+        rapidAvailable = true;
+      } else {
         require.resolve('multilingual-purejs-ocr');
         rapidAvailable = true;
-      } catch (e2) {}
-    }
+      }
+    } catch (e) {}
     
     engines.push({
       id: OCR_ENGINES.RAPID_OCR,
@@ -290,6 +336,7 @@ $langs | ForEach-Object { $_.LanguageTag }
     
     try {
       const checkModule = (moduleName) => {
+        if (moduleName === '@gutenye/ocr-node') return !!resolveOcrModule();
         try {
           require.resolve(moduleName);
           return true;
@@ -376,8 +423,11 @@ $langs | ForEach-Object { $_.LanguageTag }
       // 第一步：检查模块是否能 resolve
       let moduleAvailable = false;
       try {
-        require.resolve('@gutenye/ocr-node');
-        moduleAvailable = true;
+        if (resolveOcrModule()) {
+          moduleAvailable = true;
+        } else {
+          throw new Error('not found');
+        }
       } catch (e) {
         return {
           healthy: false,
@@ -389,7 +439,7 @@ $langs | ForEach-Object { $_.LanguageTag }
       
       // 第二步：尝试实际 import
       try {
-        const ocrModule = await import('@gutenye/ocr-node');
+        const ocrModule = await loadOcrModule();
         let Ocr = ocrModule.default;
         if (!Ocr?.create) Ocr = ocrModule.Ocr;
         if (!Ocr?.create && typeof ocrModule.create === 'function') Ocr = ocrModule;
@@ -516,10 +566,14 @@ $langs | ForEach-Object { $_.LanguageTag }
       
       // 第四步：验证安装
       try {
-        // 注意：由于 require 缓存可能有问题，这里用 execAsync 验证
+        // 设置 NODE_PATH 指向安装目录，确保能找到刚装的模块
         const verifyResult = await execAsync(
           'node -e "require(\'@gutenye/ocr-node\'); console.log(\'OK\')"',
-          { cwd: installPath, timeout: 15000 }
+          { 
+            cwd: installPath, 
+            timeout: 15000,
+            env: { ...process.env, NODE_PATH: path.join(installPath, 'node_modules') },
+          }
         );
         
         if (!verifyResult.stdout.includes('OK')) {
@@ -658,7 +712,8 @@ function registerOCRRecognizers(ctx) {
       
       // 尝试 @gutenye/ocr-node
       try {
-        const ocrModule = await import('@gutenye/ocr-node');
+        const ocrModule = await loadOcrModule();
+        if (!ocrModule) throw new Error('OCR module not available');
         let Ocr = ocrModule.default;
         if (!Ocr?.create) Ocr = ocrModule.Ocr;
         if (!Ocr?.create && typeof ocrModule.create === 'function') Ocr = ocrModule;
