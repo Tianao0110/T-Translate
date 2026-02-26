@@ -205,3 +205,125 @@
   cursor: not-allowed;
 }
 
+/* ==================== 下载进度 ==================== */
+
+.update-download-progress {
+  padding: 12px 0;
+}
+
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.progress-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary, #1f2937);
+}
+
+.progress-percent {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent-primary, #3b82f6);
+}
+
+.progress-bar-track {
+  width: 100%;
+  height: 8px;
+  background: var(--bg-tertiary, #e5e7eb);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #2563eb);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+  min-width: 2%;
+}
+
+.progress-detail {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-tertiary, #9ca3af);
+  text-align: center;
+}
+
+/* ==================== 下载完成 ==================== */
+
+.update-ready {
+  text-align: center;
+  padding: 16px 0;
+}
+
+.update-ready .ready-icon {
+  color: #10b981;
+  margin-bottom: 12px;
+}
+
+.update-ready .ready-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #1f2937);
+  margin: 0 0 8px 0;
+}
+
+.update-ready .ready-hint {
+  font-size: 13px;
+  color: var(--text-tertiary, #9ca3af);
+  margin: 0;
+}
+
+/* ==================== 安装中 ==================== */
+
+.update-installing {
+  text-align: center;
+  padding: 24px 0;
+  color: var(--text-secondary, #6b7280);
+}
+
+.update-installing p {
+  margin-top: 12px;
+  font-size: 14px;
+}
+
+/* ==================== 错误状态 ==================== */
+
+.update-error {
+  text-align: center;
+  padding: 16px 0;
+}
+
+.update-error .error-icon {
+  color: #ef4444;
+  margin-bottom: 12px;
+}
+
+.update-error .error-text {
+  font-size: 14px;
+  color: var(--text-primary, #1f2937);
+  margin: 0 0 8px 0;
+  word-break: break-word;
+}
+
+.update-error .error-hint {
+  font-size: 13px;
+  color: var(--text-tertiary, #9ca3af);
+  margin: 0;
+}
+
+/* ==================== 下载信息 ==================== */
+
+.download-info {
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+  background: var(--bg-secondary, #f9fafb);
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
