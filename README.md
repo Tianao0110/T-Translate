@@ -39,7 +39,7 @@
 
 ### 📄 文档翻译
 
-支持 PDF、DOCX、EPUB、TXT 格式，尽量保持原文档结构，批量翻译导出。
+支持 PDF、DOCX、EPUB、TXT 格式，尽量保持原文档结构，批量翻译导出。(等待时间根据不同得设备有所不同）
 
 <p align="center">
   <img src="docs/screenshots/document-translate.png" width="600" alt="文档翻译">
@@ -47,7 +47,7 @@
 
 ### 🔊 简易版TTS 朗读
 
-翻译结果语音朗读，支持多种语音引擎，可调节语速。
+翻译结果语音朗读，支持多种语音引擎，可调节语速。根据您的window离线语音来加载。
 
 <p align="center">
   <img src="docs/screenshots/tts.png" width="600" alt="TTS 朗读">
