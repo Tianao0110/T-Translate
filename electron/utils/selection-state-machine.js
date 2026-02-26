@@ -31,8 +31,8 @@ const CONFIG = {
   MIN_DURATION_B: 100,        // 最小持续时间 (ms)
   
   // 条件 C: 双击/三击
-  DOUBLE_CLICK_TIME: 300,     // 双击时间窗口 (ms)
-  DOUBLE_CLICK_DISTANCE: 5,   // 双击距离阈值 (px)
+  DOUBLE_CLICK_TIME: 400,     // 双击时间窗口 (ms)
+  DOUBLE_CLICK_DISTANCE: 15,  // 双击距离阈值 (px)
   
   // 回退配置
   GRACE_PERIOD: 120,          // 进入 Likely 后的宽容期 (ms)

@@ -16,7 +16,6 @@ const CHANNELS = {
   },
   DIALOG: {
     SAVE: 'show-save-dialog',
-    SAVE_FILE: 'dialog-save-file',
     OPEN: 'show-open-dialog',
     MESSAGE: 'show-message-box',
   },
@@ -32,6 +31,8 @@ const CHANNELS = {
     GET_PLATFORM: 'get-platform',
     HEALTH_CHECK: 'api:health-check',
     CHECK_UPDATE: 'app:check-update',
+    DOWNLOAD_UPDATE: 'app:download-update',
+    INSTALL_UPDATE: 'app:install-update',
   },
   LOGS: {
     OPEN_DIRECTORY: 'logs:open-directory',
@@ -85,6 +86,15 @@ const CHANNELS = {
     MOVE_CHILD_WINDOW: 'glass:move-child-window',
     CLOSE_ALL_CHILD_WINDOWS: 'glass:close-all-child-windows',
   },
+  SUBTITLE: {
+    TOGGLE_CAPTURE_WINDOW: 'subtitle:toggle-capture-window',
+    GET_CAPTURE_RECT: 'subtitle:get-capture-rect',
+    SET_CAPTURE_RECT: 'subtitle:set-capture-rect',
+    CLEAR_CAPTURE_RECT: 'subtitle:clear-capture-rect',
+    CAPTURE_REGION: 'subtitle:capture-region',
+    IS_CAPTURE_WINDOW_VISIBLE: 'subtitle:is-capture-window-visible',
+    CAPTURE_RECT_UPDATED: 'subtitle:capture-rect-updated',
+  },
   SELECTION: {
     TOGGLE: 'selection:toggle',
     HIDE: 'selection:hide',
@@ -119,8 +129,6 @@ const CHANNELS = {
     GET_AVAILABLE_ENGINES: 'ocr:get-available-engines',
     DOWNLOAD_ENGINE: 'ocr:download-engine',
     REMOVE_ENGINE: 'ocr:remove-engine',
-    REPAIR_ENGINE: 'ocr:repair-engine',
-    HEALTH_CHECK: 'ocr:health-check',
     DOWNLOAD_PROGRESS: 'ocr:download-progress',
     WINDOWS_OCR: 'ocr:windows-ocr',
     PADDLE_OCR: 'ocr:paddle-ocr',
@@ -128,6 +136,8 @@ const CHANNELS = {
     GOOGLE_VISION: 'ocr:google-vision',
     AZURE_OCR: 'ocr:azure-ocr',
     BAIDU_OCR: 'ocr:baidu-ocr',
+    HEALTH_CHECK: 'ocr:health-check',
+    REPAIR_ENGINE: 'ocr:repair-engine',
   },
   MENU: {
     ACTION: 'menu-action',

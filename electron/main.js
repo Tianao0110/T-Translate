@@ -9,29 +9,6 @@ const {
   screen,
 } = require('electron');
 const path = require('path');
-const Module = require('module');
-
-// ==================== 用户目录模块路径 ====================
-// 打包后，某些原生模块（onnxruntime-node, sharp 等）可能与目标机器不兼容。
-// 用户通过"修复"功能 npm install 到 userData 后，需要优先从 userData 加载，
-// 否则重启后仍会加载 asar.unpacked 里不兼容的版本。
-const userDataModules = path.join(app.getPath('userData'), 'node_modules');
-if (app.isPackaged) {
-  // 将 userData/node_modules 插入到模块搜索路径最前面
-  const originalResolveFilename = Module._resolveFilename;
-  Module._resolveFilename = function (request, parent, isMain, options) {
-    // 仅对 @gutenye / onnxruntime / sharp 等 OCR 相关模块做优先查找
-    if (request.startsWith('@gutenye') || request === 'onnxruntime-node' || request === 'sharp') {
-      try {
-        const userPath = require.resolve(request, { paths: [userDataModules] });
-        if (userPath) return userPath;
-      } catch (e) {
-        // userData 里没有，回退到默认路径
-      }
-    }
-    return originalResolveFilename.call(this, request, parent, isMain, options);
-  };
-}
 
 // ==================== 模块导入 ====================
 const { store, runtime, windows, isDev } = require('./state');
@@ -67,8 +44,8 @@ async function handleDelayedConfirm(x, y, rect) {
     const { hasTextSelection, checkSelectionViaClipboard } = require('./utils/native-helper');
     
     // 等待一小段时间确保双击选中完成（系统需要时间响应）
-    // Office 等复杂应用可能需要更长时间
-    await new Promise(resolve => setTimeout(resolve, 50));
+    // Office/Outlook 等复杂应用可能需要更长时间（弹出工具栏等）
+    await new Promise(resolve => setTimeout(resolve, 80));
     
     // ========== 第一层 + 第二层：零剪贴板检测 ==========
     const selectionCheck = hasTextSelection();
@@ -90,10 +67,17 @@ async function handleDelayedConfirm(x, y, rect) {
     }
     
     // ========== 第三层：剪贴板兜底（复杂应用） ==========
-    // 检测是否是 Office 应用（需要更长的等待时间）
-    const isOfficeApp = selectionCheck.reason?.includes('OpusApp') || 
-                        selectionCheck.reason?.includes('EXCEL') ||
-                        selectionCheck.reason?.includes('PPTFrameClass');
+    // 检测是否是 Office/Outlook 应用（需要更长的等待时间和更多重试）
+    const reason = selectionCheck.reason || '';
+    const isOfficeApp = reason.includes('OpusApp') || 
+                        reason.includes('EXCEL') ||
+                        reason.includes('PPTFrameClass') ||
+                        reason.includes('rctrl_renwnd32') ||
+                        reason.includes('AfxWndW') ||
+                        reason.includes('NetUIHWND') ||
+                        reason.includes('SUPERGRID') ||
+                        reason.includes('OlkPeoplePickerEdit') ||
+                        reason.includes('Outlook Host');
     logger.debug(`Delayed confirm: layer 3 - clipboard fallback (office=${isOfficeApp})`);
     
     const clipboardResult = await checkSelectionViaClipboard({ isComplexApp: isOfficeApp });
@@ -102,7 +86,7 @@ async function handleDelayedConfirm(x, y, rect) {
       logger.debug(`Delayed confirm: text selected via clipboard "${clipboardResult.text.substring(0, 20)}..."`);
       showSelectionTrigger(x, y, rect);
     } else if (clipboardResult.hasSelection === null) {
-      // 防抖跳过或出错，静默处理
+      // 防抖跳过或出错
       logger.debug('Delayed confirm: clipboard check skipped or failed');
     } else {
       logger.debug('Delayed confirm: no text selected, skip trigger');
@@ -151,25 +135,25 @@ async function showSelectionTrigger(mouseX, mouseY, rect) {
   const win = windowManager.createSelectionWindow();
 
   // 圆点位置
-  let triggerX = mouseX + 5;
-  let triggerY = mouseY + 5;
+  let triggerX = mouseX + 8;
+  let triggerY = mouseY + 8;
 
   // 屏幕边界检测
   const display = screen.getDisplayNearestPoint({ x: mouseX, y: mouseY });
   const bounds = display.bounds;
 
-  if (triggerX + 24 > bounds.x + bounds.width) {
-    triggerX = mouseX - 29;
+  if (triggerX + 28 > bounds.x + bounds.width) {
+    triggerX = mouseX - 36;
   }
-  if (triggerY + 24 > bounds.y + bounds.height) {
-    triggerY = mouseY - 29;
+  if (triggerY + 28 > bounds.y + bounds.height) {
+    triggerY = mouseY - 36;
   }
 
   win.setBounds({
     x: Math.round(triggerX),
     y: Math.round(triggerY),
-    width: 24,
-    height: 24,
+    width: 28,
+    height: 28,
   });
   win.show();
 
@@ -292,7 +276,7 @@ async function showSelectionLoading(bounds) {
   const display = screen.getDisplayNearestPoint({ x: posX, y: posY });
   const screenBounds = display.bounds;
   // 正方形窗口，与划词翻译的 loading 一致
-  const winSize = 24;
+  const winSize = 28;
 
   if (posX + winSize > screenBounds.x + screenBounds.width) {
     posX = bounds.x - winSize - 10;
@@ -470,10 +454,17 @@ function startSelectionHook() {
           }
           
           // hasSelection 为 null（浏览器等复杂应用），走剪贴板兜底
-          // 检测是否是 Office 应用（需要更长的等待时间）
-          const isOfficeApp = selectionCheck.reason?.includes('OpusApp') || 
-                              selectionCheck.reason?.includes('EXCEL') ||
-                              selectionCheck.reason?.includes('PPTFrameClass');
+          // 检测是否是 Office/Outlook 应用（需要更长的等待时间和更多重试）
+          const dragReason = selectionCheck.reason || '';
+          const isOfficeApp = dragReason.includes('OpusApp') || 
+                              dragReason.includes('EXCEL') ||
+                              dragReason.includes('PPTFrameClass') ||
+                              dragReason.includes('rctrl_renwnd32') ||
+                              dragReason.includes('AfxWndW') ||
+                              dragReason.includes('NetUIHWND') ||
+                              dragReason.includes('SUPERGRID') ||
+                              dragReason.includes('OlkPeoplePickerEdit') ||
+                              dragReason.includes('Outlook Host');
           logger.debug(`Normal drag: complex app, using clipboard fallback (office=${isOfficeApp})`);
           const clipboardResult = await checkSelectionViaClipboard({ isComplexApp: isOfficeApp });
           
@@ -866,20 +857,30 @@ app.whenReady().then(() => {
     CHANNELS,
   });
 
-  // 创建主窗口
-  windowManager.createMainWindow();
-
   // managers 对象（用于依赖注入）
+  // 使用箭头函数包装 windowManager 方法，避免在定义时就绑定
   const managers = {
     startScreenshot,
     handleScreenshotSelection,
     showSelectionWithText,      // OCR 完成后发送文字给划词窗口
     hideSelectionLoading,       // OCR 失败时关闭加载窗口
-    toggleGlassWindow: windowManager.toggleGlassWindow,
-    createGlassWindow: windowManager.createGlassWindow,
+    toggleGlassWindow: (...args) => windowManager.toggleGlassWindow(...args),
+    createGlassWindow: (...args) => windowManager.createGlassWindow(...args),
     toggleSelectionTranslate,
-    toggleGlassWindow: windowManager.toggleGlassWindow,
+    toggleSubtitleCaptureWindow: (...args) => windowManager.toggleSubtitleCaptureWindow(...args),
   };
+
+  // 初始化所有 IPC（必须在窗口创建之前，否则渲染进程可能在 handler 注册前就调用 IPC）
+  initIPC({
+    windows,
+    runtime,
+    store,
+    app,
+    managers,
+  });
+
+  // 创建主窗口（loadURL 是异步的，渲染进程加载后会立即调用 IPC）
+  windowManager.createMainWindow();
 
   // 创建上下文（共享给菜单和托盘）
   const ctx = {
@@ -892,15 +893,6 @@ app.whenReady().then(() => {
   // 创建菜单和托盘
   createMenu(ctx);
   createTray(ctx);
-
-  // 初始化 IPC
-  initIPC({
-    windows,
-    runtime,
-    store,
-    app,
-    managers,
-  });
 
   // 注册全局快捷键
   registerAllShortcuts({
@@ -929,7 +921,7 @@ app.whenReady().then(() => {
   // 预热机制：延迟加载划词翻译相关模块，避免首次使用卡顿
   setTimeout(() => {
     preheatSelectionModules();
-  }, 1000); // 1秒后预热
+  }, 3000); // 等应用稳定后再预热
 });
 
 /**
@@ -939,18 +931,9 @@ function preheatSelectionModules() {
   logger.info('Preheating selection modules...');
   
   try {
-    // 1. 预加载 uiohook-napi 并预热 native binding
-    const { uIOhook } = require('uiohook-napi');
+    // 1. 预加载 uiohook-napi
+    require('uiohook-napi');
     logger.debug('uiohook-napi preloaded');
-    
-    // 预热：start → stop 让 native 层完成初始化，后续启动几乎零延迟
-    try {
-      uIOhook.start();
-      uIOhook.stop();
-      logger.debug('uiohook native binding warmed up');
-    } catch (e) {
-      logger.debug('uiohook warm-up skipped:', e.message);
-    }
     
     // 2. 预加载 koffi（Windows API）
     if (process.platform === 'win32') {
@@ -990,7 +973,17 @@ process.on('uncaughtException', (error) => {
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  logger.error('Unhandled rejection:', reason);
+  // 详细打印 rejection 信息，避免空对象 {} 无法调试
+  if (reason instanceof Error) {
+    logger.error('Unhandled rejection:', reason.message);
+    logger.error('Stack:', reason.stack);
+  } else {
+    try {
+      logger.error('Unhandled rejection:', JSON.stringify(reason, null, 2));
+    } catch {
+      logger.error('Unhandled rejection:', reason);
+    }
+  }
 });
 
 // 处理控制台退出 (Ctrl+C)

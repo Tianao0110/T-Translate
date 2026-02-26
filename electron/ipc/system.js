@@ -102,130 +102,72 @@ function register(ctx) {
     return app.getVersion();
   });
 
+  // ==================== 自动更新 ====================
+
+  const autoUpdater = require('../utils/auto-updater');
+
+  // 下载进度的临时存储（IPC 无法直接 stream，用轮询方式）
+  let _downloadProgress = null;
+  let _isDownloading = false;
+
   /**
    * 检查更新 - 从 GitHub Releases 获取最新版本
    */
   ipcMain.handle(CHANNELS.APP.CHECK_UPDATE, async () => {
-    const currentVersion = app.getVersion();
-    const repoUrl = 'https://api.github.com/repos/Tianao0110/T-Translate/releases/latest';
-    
     try {
-      logger.info('Checking for updates...');
-      
-      // 使用 net 模块请求 GitHub API
-      const { net } = require('electron');
-      
-      const response = await new Promise((resolve, reject) => {
-        const request = net.request({
-          method: 'GET',
-          url: repoUrl,
-        });
-        
-        request.setHeader('User-Agent', 'T-Translate-Updater');
-        request.setHeader('Accept', 'application/vnd.github.v3+json');
-        
-        let data = '';
-        let statusCode = 0;
-        
-        request.on('response', (resp) => {
-          statusCode = resp.statusCode;
-          
-          resp.on('data', (chunk) => {
-            data += chunk.toString();
-          });
-          
-          resp.on('end', () => {
-            // 404 表示没有发布任何 Release
-            if (statusCode === 404) {
-              resolve({ noRelease: true });
-              return;
-            }
-            
-            if (statusCode !== 200) {
-              reject(new Error(`HTTP ${statusCode}`));
-              return;
-            }
-            
-            try {
-              resolve(JSON.parse(data));
-            } catch (e) {
-              reject(new Error('Invalid JSON response'));
-            }
-          });
-        });
-        
-        request.on('error', (error) => {
-          reject(error);
-        });
-        
-        // 设置超时
-        setTimeout(() => {
-          request.abort();
-          reject(new Error('Request timeout'));
-        }, 15000);
-        
-        request.end();
-      });
-      
-      // 没有发布任何 Release
-      if (response.noRelease) {
-        logger.info('No releases found on GitHub');
-        return {
-          success: true,
-          hasUpdate: false,
-          currentVersion: currentVersion.replace(/^v/, ''),
-          latestVersion: null,
-          message: '暂无发布版本',
-        };
-      }
-      
-      // 解析版本号 (去掉 v 前缀)
-      const latestVersion = (response.tag_name || '').replace(/^v/, '');
-      const current = currentVersion.replace(/^v/, '');
-      
-      // 比较版本号
-      const hasUpdate = compareVersions(latestVersion, current) > 0;
-      
-      logger.info(`Current: ${current}, Latest: ${latestVersion}, HasUpdate: ${hasUpdate}`);
-      
-      return {
-        success: true,
-        hasUpdate,
-        currentVersion: current,
-        latestVersion,
-        releaseUrl: response.html_url,
-        releaseName: response.name,
-        releaseNotes: response.body || '',
-        publishedAt: response.published_at,
-      };
-      
+      return await autoUpdater.checkForUpdate();
     } catch (error) {
       logger.error('Check update failed:', error.message);
-      return {
-        success: false,
-        error: error.message || '检查更新失败',
-      };
+      return { success: false, error: error.message || '检查更新失败' };
     }
   });
 
   /**
-   * 版本号比较函数
-   * @returns 1 if a > b, -1 if a < b, 0 if equal
+   * 下载更新安装包
+   * 参数: { downloadUrl, downloadName }
+   * 返回: { success, filePath, error }
+   * 下载过程中通过 DOWNLOAD_PROGRESS 事件推送进度
    */
-  function compareVersions(a, b) {
-    const partsA = a.split('.').map(Number);
-    const partsB = b.split('.').map(Number);
-    
-    for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
-      const numA = partsA[i] || 0;
-      const numB = partsB[i] || 0;
-      
-      if (numA > numB) return 1;
-      if (numA < numB) return -1;
+  ipcMain.handle(CHANNELS.APP.DOWNLOAD_UPDATE, async (event, { downloadUrl, downloadName }) => {
+    if (_isDownloading) {
+      return { success: false, error: '已在下载中' };
     }
-    
-    return 0;
-  }
+
+    _isDownloading = true;
+    _downloadProgress = { downloaded: 0, total: 0, percent: 0 };
+
+    try {
+      const filePath = await autoUpdater.downloadUpdate(downloadUrl, downloadName, (progress) => {
+        _downloadProgress = progress;
+        // 向渲染进程推送进度
+        const mainWindow = getMainWindow();
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('update:download-progress', progress);
+        }
+      });
+
+      _isDownloading = false;
+      return { success: true, filePath };
+    } catch (error) {
+      _isDownloading = false;
+      _downloadProgress = null;
+      logger.error('Download update failed:', error.message);
+      return { success: false, error: error.message || '下载失败' };
+    }
+  });
+
+  /**
+   * 安装更新（运行安装包并退出）
+   */
+  ipcMain.handle(CHANNELS.APP.INSTALL_UPDATE, async (event, { filePath }) => {
+    try {
+      await autoUpdater.installUpdate(filePath);
+      return { success: true };
+    } catch (error) {
+      logger.error('Install update failed:', error.message);
+      return { success: false, error: error.message || '安装失败' };
+    }
+  });
 
   /**
    * 获取平台信息
@@ -258,34 +200,6 @@ function register(ctx) {
     } catch (error) {
       logger.error("Save dialog error:", error);
       return { canceled: true, error: error.message };
-    }
-  });
-
-  /**
-   * 保存文件：弹出对话框 + 写入文件（支持文本和二进制）
-   * options: { defaultPath, filters, data, encoding }
-   * data: string (文本) 或 Array<number> (二进制，从 Uint8Array 序列化)
-   * encoding: 'utf8' | 'binary'（默认 utf8）
-   */
-  ipcMain.handle(CHANNELS.DIALOG.SAVE_FILE, async (event, options) => {
-    const mainWindow = getMainWindow();
-    const { data, encoding = 'utf8', ...dialogOpts } = options;
-    try {
-      const result = await dialog.showSaveDialog(mainWindow, dialogOpts);
-      if (result.canceled || !result.filePath) {
-        return { success: false, canceled: true };
-      }
-      const fs = require('fs');
-      if (encoding === 'binary') {
-        fs.writeFileSync(result.filePath, Buffer.from(data));
-      } else {
-        fs.writeFileSync(result.filePath, data, 'utf8');
-      }
-      logger.debug('File saved:', result.filePath);
-      return { success: true, filePath: result.filePath };
-    } catch (error) {
-      logger.error('Save file error:', error);
-      return { success: false, error: error.message };
     }
   });
 

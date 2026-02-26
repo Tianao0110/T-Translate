@@ -1,39 +1,27 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
   <meta charset="UTF-8">
   <script>
-      window.process = { env: { NODE_ENV: 'development' } };
-      // 阻止 Vite HMR 断连重连时的整页刷新（开发模式）
-      // 后台失焦后 WebSocket 断开，唤醒时 Vite 会触发 full-reload 导致丢失状态
-      if (window.location.hostname === 'localhost') {
-        const _origReload = window.location.reload.bind(window.location);
-        let _lastUserAction = Date.now();
-        // 记录用户主动操作时间
-        ['click', 'keydown'].forEach(e => window.addEventListener(e, () => { _lastUserAction = Date.now(); }, true));
-        Object.defineProperty(window.location, 'reload', {
-          value: function() {
-            // 只允许最近 2 秒内有用户操作时的 reload（手动刷新）
-            // 自动触发的 reload（HMR 断连恢复）被阻止
-            if (Date.now() - _lastUserAction < 2000) {
-              _origReload();
-            } else {
-              console.warn('[T-Translate] Blocked auto-reload from Vite HMR reconnect');
-            }
-          },
-          writable: false,
-          configurable: true,
-        });
-      }
+    window.process = {env: {NODE_ENV: 'development'}};
+    // 阻止 Vite HMR 断连重连时的整页刷新（开发模式）
+    // 后台失焦后 WebSocket 断开，唤醒时 Vite 会触发 full-reload 导致丢失状态
+    if (window.location.hostname === 'localhost') {
+      const _origReload = window.location.reload.bind(window.location);
+      let _lastUserAction = Date.now();
+      // 记录用户主动操作时间
+      ['click', 'keydown'].forEach(e => window.addEventListener(e, () => {_lastUserAction = Date.now();}, true));
+    }
   </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="ie=edge">
-  
+
   <!-- 应用信息 -->
   <title>T-Translate</title>
   <meta name="description" content="专业的离线翻译工具，支持OCR识别和本地LLM翻译">
   <meta name="author" content="Your Name">
-  
+
   <!-- 安全策略 -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
@@ -44,21 +32,21 @@
     style-src 'self' 'unsafe-inline';
     font-src 'self' data:;
   ">
-  
+
   <!-- 禁止缓存（开发环境） -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  
+
   <!-- 主题色 -->
   <meta name="theme-color" content="#3b82f6">
-  
+
   <!-- 图标 -->
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-  
-  
+
+
   <!-- 基础样式 -->
   <style>
     /* 加载画面样式 */
@@ -90,10 +78,13 @@
     }
 
     @keyframes pulse {
-      0%, 100% {
+
+      0%,
+      100% {
         transform: scale(1);
         opacity: 1;
       }
+
       50% {
         transform: scale(1.1);
         opacity: 0.8;
@@ -145,10 +136,12 @@
         width: 0%;
         margin-left: 0;
       }
+
       50% {
         width: 60%;
         margin-left: 0;
       }
+
       100% {
         width: 100%;
         margin-left: 100%;
@@ -258,12 +251,14 @@
     }
   </style>
 </head>
+
 <body>
   <!-- 加载画面 -->
   <div id="loading-screen">
     <svg class="loading-logo" viewBox="0 0 100 100">
-      <rect x="20" y="20" width="60" height="60" fill="white" rx="8"/>
-      <text x="50" y="58" font-family="Arial" font-size="32" font-weight="bold" fill="#667eea" text-anchor="middle">T</text>
+      <rect x="20" y="20" width="60" height="60" fill="white" rx="8" />
+      <text x="50" y="58" font-family="Arial" font-size="32" font-weight="bold" fill="#667eea"
+        text-anchor="middle">T</text>
     </svg>
     <div class="loading-spinner"></div>
     <div class="loading-text">T-Translate Core 启动中...</div>
@@ -301,34 +296,34 @@
     // 方案 B: 如果你想知道到底是谁在调用它，可以用下面这段（会打印调用栈）
     try {
       Object.defineProperty(window, 'dragEvent', {
-        get: function() {
+        get: function () {
           console.warn("🕵️‍♂️ 抓到了！有个地方正在尝试读取 dragEvent");
           console.trace(); // 这会在控制台打印出是谁调用的
           return {}; // 返回一个空对象，防止 crash
         },
-        set: function(val) {
+        set: function (val) {
           // 允许赋值
         }
       });
-    } catch (e) {}
+    } catch (e) { }
   </script>
   <script>
     // 错误捕获
-    window.addEventListener('error', function(event) {
+    window.addEventListener('error', function (event) {
       console.error('Global error:', event.error);
-      
+
       // 如果是加载阶段的错误，显示错误页面
       if (!window.__APP_LOADED__) {
         const errorScreen = document.getElementById('error-screen');
         const errorDetails = document.getElementById('error-details');
-        
+
         if (errorScreen) {
           errorScreen.style.display = 'flex';
           if (errorDetails && event.error) {
             errorDetails.textContent = event.error.stack || event.error.message || '未知错误';
           }
         }
-        
+
         // 隐藏加载画面
         const loadingScreen = document.getElementById('loading-screen');
         if (loadingScreen) {
@@ -338,23 +333,23 @@
     });
 
     // 未处理的 Promise 错误
-    window.addEventListener('unhandledrejection', function(event) {
+    window.addEventListener('unhandledrejection', function (event) {
       console.error('Unhandled promise rejection:', event.reason);
     });
 
     // 检测 Electron 环境
     if (typeof window !== 'undefined' && window.process && window.process.type === 'renderer') {
       console.log('Running in Electron');
-      
+
       // Electron 特定的初始化
-      document.addEventListener('DOMContentLoaded', function() {
+      document.addEventListener('DOMContentLoaded', function () {
         // 禁止默认的拖拽行为
-        document.addEventListener('dragover', function(e) {
+        document.addEventListener('dragover', function (e) {
           e.preventDefault();
           return false;
         });
-        
-        document.addEventListener('drop', function(e) {
+
+        document.addEventListener('drop', function (e) {
           e.preventDefault();
           return false;
         });
@@ -367,33 +362,33 @@
     window.__APP_LOADED__ = false;
 
     // 监听应用加载完成
-    window.addEventListener('app-ready', function() {
+    window.addEventListener('app-ready', function () {
       window.__APP_LOADED__ = true;
-      
+
       // 淡出加载画面
       const loadingScreen = document.getElementById('loading-screen');
       if (loadingScreen) {
         loadingScreen.classList.add('fade-out');
-        setTimeout(function() {
+        setTimeout(function () {
           loadingScreen.style.display = 'none';
         }, 500);
       }
     });
 
     // 超时处理（10秒）
-    setTimeout(function() {
+    setTimeout(function () {
       if (!window.__APP_LOADED__) {
         console.warn('App loading timeout');
-        
+
         const loadingScreen = document.getElementById('loading-screen');
         const loadingText = loadingScreen?.querySelector('.loading-text');
-        
+
         if (loadingText) {
           loadingText.textContent = '加载时间较长，请稍候...';
         }
-        
+
         // 再等待10秒
-        setTimeout(function() {
+        setTimeout(function () {
           if (!window.__APP_LOADED__) {
             const errorScreen = document.getElementById('error-screen');
             if (errorScreen) {
@@ -420,4 +415,5 @@
   <!-- Vite/React 入口脚本 -->
   <script type="module" src="/src/main.jsx"></script>
 </body>
+
 </html>

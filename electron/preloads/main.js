@@ -19,7 +19,6 @@ const validChannels = {
   ],
   receive: [
     "menu-action", 
-    "navigate",  // 托盘菜单导航
     "import-file",
     "add-to-favorites",  // 玻璃窗口收藏
     "add-to-history",    // 玻璃窗口历史记录
@@ -70,6 +69,13 @@ const electronAPI = {
     getPlatform: () => ipcRenderer.invoke("get-platform"),
     getPath: (name) => ipcRenderer.invoke("get-app-path", name),
     checkUpdate: () => ipcRenderer.invoke("app:check-update"),
+    downloadUpdate: (info) => ipcRenderer.invoke("app:download-update", info),
+    installUpdate: (info) => ipcRenderer.invoke("app:install-update", info),
+    onDownloadProgress: (callback) => {
+      const handler = (event, progress) => callback(progress);
+      ipcRenderer.on("update:download-progress", handler);
+      return () => ipcRenderer.removeListener("update:download-progress", handler);
+    },
   },
   window: {
     minimize: () => ipcRenderer.send("minimize-window"),
@@ -88,7 +94,6 @@ const electronAPI = {
   dialog: {
     showSaveDialog: (opts) => ipcRenderer.invoke("show-save-dialog", opts),
     showOpenDialog: (opts) => ipcRenderer.invoke("show-open-dialog", opts),
-    saveFile: (opts) => ipcRenderer.invoke("dialog-save-file", opts),
   },
   clipboard: {
     readText: () => ipcRenderer.invoke("read-clipboard-text"),
@@ -199,8 +204,8 @@ const electronAPI = {
     checkInstalled: () => ipcRenderer.invoke("ocr:check-installed"),
     downloadEngine: (engineId) => ipcRenderer.invoke("ocr:download-engine", engineId),
     removeEngine: (engineId) => ipcRenderer.invoke("ocr:remove-engine", engineId),
-    repairEngine: (engineId) => ipcRenderer.invoke("ocr:repair-engine", engineId),
     healthCheck: (engineId) => ipcRenderer.invoke("ocr:health-check", engineId),
+    repairEngine: (engineId) => ipcRenderer.invoke("ocr:repair-engine", engineId),
     onDownloadProgress: (callback) => {
       const handler = (event, data) => callback(data);
       ipcRenderer.on("ocr:download-progress", handler);

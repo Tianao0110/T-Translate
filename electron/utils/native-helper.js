@@ -368,8 +368,17 @@ function hasTextSelection() {
       // VSCode
       'vloVw32', 'vloVw64',
       
-      // Office
+      // Office 通用
       'EXCEL7', 'PPTFrameClass', 'OpusApp',  // Excel, PowerPoint, Word
+      '_WwG',                         // Word 编辑区域
+      
+      // Outlook (classic desktop) - 多种内部控件
+      'rctrl_renwnd32',              // Outlook 阅读窗格 / 编辑器
+      'Olk',                         // 通配：OlkPeoplePickerEdit, OlkBrowserHost 等所有 Outlook 控件
+      'AfxWndW',                     // MFC 通用窗口（Outlook 内部大量使用）
+      'NetUIHWND',                   // Office Ribbon / NetUI 控件
+      'SUPERGRID',                   // Outlook 邮件列表
+      'Outlook Host',                // Outlook 主内容区域（新版 Outlook）
       
       // 其他 Electron 应用
       'Electron',
@@ -498,8 +507,8 @@ async function checkSelectionViaClipboard(options = {}) {
   
   // 复杂应用（Office 等）需要更长的等待时间
   const isComplexApp = options.isComplexApp || false;
-  const waitTime = isComplexApp ? 80 : 50; // Office 应用等待更长
-  const maxRetries = isComplexApp ? 2 : 1;  // Office 应用可重试
+  const waitTime = isComplexApp ? 150 : 50; // Office/Outlook 应用等待更长（工具栏弹出需要时间）
+  const maxRetries = isComplexApp ? 3 : 1;  // Office/Outlook 应用可重试更多次
   
   try {
     // 1. 保存剪贴板快照（含格式）
