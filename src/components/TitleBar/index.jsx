@@ -1,9 +1,11 @@
 // src/components/TitleBar.jsx
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Minus, Maximize2, Minimize2, X } from 'lucide-react';
 import './styles.css';
 
 const TitleBar = () => {
+  const { t } = useTranslation();
   const [isMaximized, setIsMaximized] = useState(false);
 
   // 监听窗口最大化状态变化
@@ -53,21 +55,21 @@ const TitleBar = () => {
         <button 
           className="window-control-btn" 
           onClick={handleMinimize} 
-          title="最小化"
+          title={t('titleBar.minimize', '最小化')}
         >
           <Minus size={14} />
         </button>
         <button 
           className="window-control-btn" 
           onClick={handleMaximize} 
-          title={isMaximized ? "还原" : "最大化"}
+          title={isMaximized ? t('titleBar.restore', '还原') : t('titleBar.maximize', '最大化')}
         >
           {isMaximized ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
         </button>
         <button 
           className="window-control-btn close" 
           onClick={handleClose} 
-          title="关闭"
+          title={t('titleBar.close', '关闭')}
         >
           <X size={14} />
         </button>
