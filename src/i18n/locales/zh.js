@@ -158,6 +158,12 @@ const zh = {
     currentMode: "当前模式",
     featuresTitle: "当前模式功能说明",
     switchedTo: "已切换到 {{mode}}",
+    modes: {
+      standard: "标准模式", standardDesc: "功能全开，自动保存历史记录",
+      incognito: "无痕模式", incognitoDesc: "不保存任何记录，关闭窗口即清除",
+      offline: "离线模式", offlineDesc: "完全离线，不发送任何网络请求",
+      strict: "严格模式", strictDesc: "最高隐私保护，仅本地处理"
+    },
     clearHistoryConfirm: "确定要清除所有翻译历史吗？",
     historyCleared: "历史记录已清除",
     clearAllConfirm: "确定要清除所有本地数据吗？这将重置所有设置。",
@@ -454,6 +460,15 @@ const zh = {
     },
     // 默认文档标题
     defaultDocTitle: "翻译文档"
+  },
+  // ========== 错误边界 ==========
+  errorBoundary: {
+    title: "出现了一些问题",
+    windowError: "{{name}}出现了问题",
+    description: "应用遇到了错误，请尝试重试或刷新页面",
+    retry: "重试",
+    reload: "刷新页面",
+    details: "错误详情"
   },
   // ========== 新增：托盘菜单翻译键 ==========
   tray: {

@@ -33,23 +33,23 @@ const PrivacySection = ({
   // 获取国际化的模式名称
   const getModeName = (modeId) => {
     const modeKeys = {
-      [PRIVACY_MODE_IDS.STANDARD]: 'settings.privacy.modes.standard',
-      [PRIVACY_MODE_IDS.OFFLINE]: 'settings.privacy.modes.offline',
-      [PRIVACY_MODE_IDS.SECURE]: 'settings.privacy.modes.incognito',
-      [PRIVACY_MODE_IDS.STRICT]: 'settings.privacy.modes.strict',
+      [PRIVACY_MODE_IDS.STANDARD]: 'privacy.modes.standard',
+      [PRIVACY_MODE_IDS.OFFLINE]: 'privacy.modes.offline',
+      [PRIVACY_MODE_IDS.SECURE]: 'privacy.modes.incognito',
+      [PRIVACY_MODE_IDS.STRICT]: 'privacy.modes.strict',
     };
-    return t(modeKeys[modeId] || 'settings.privacy.modes.standard');
+    return t(modeKeys[modeId] || 'privacy.modes.standard');
   };
 
   // 获取国际化的模式描述
   const getModeDesc = (modeId) => {
     const descKeys = {
-      [PRIVACY_MODE_IDS.STANDARD]: 'settings.privacy.modes.standardDesc',
-      [PRIVACY_MODE_IDS.OFFLINE]: 'settings.privacy.modes.offlineDesc',
-      [PRIVACY_MODE_IDS.SECURE]: 'settings.privacy.modes.incognitoDesc',
-      [PRIVACY_MODE_IDS.STRICT]: 'settings.privacy.modes.strictDesc',
+      [PRIVACY_MODE_IDS.STANDARD]: 'privacy.modes.standardDesc',
+      [PRIVACY_MODE_IDS.OFFLINE]: 'privacy.modes.offlineDesc',
+      [PRIVACY_MODE_IDS.SECURE]: 'privacy.modes.incognitoDesc',
+      [PRIVACY_MODE_IDS.STRICT]: 'privacy.modes.strictDesc',
     };
-    return t(descKeys[modeId] || 'settings.privacy.modes.standardDesc');
+    return t(descKeys[modeId] || 'privacy.modes.standardDesc');
   };
 
   // 切换隐私模式

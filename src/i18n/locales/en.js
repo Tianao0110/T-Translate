@@ -158,6 +158,12 @@ const en = {
     currentMode: "Current Mode",
     featuresTitle: "Current Mode Features",
     switchedTo: "Switched to {{mode}}",
+    modes: {
+      standard: "Standard", standardDesc: "Full features, auto-save history",
+      incognito: "Incognito", incognitoDesc: "No records saved, cleared on close",
+      offline: "Offline", offlineDesc: "Fully offline, no network requests",
+      strict: "Strict", strictDesc: "Maximum privacy, local processing only"
+    },
     clearHistoryConfirm: "Are you sure to clear all translation history?",
     historyCleared: "History cleared",
     clearAllConfirm: "Are you sure to clear all local data? This will reset all settings.",
@@ -449,6 +455,15 @@ const en = {
     },
     // Default doc title
     defaultDocTitle: "Translated Document"
+  },
+  // ========== Error Boundary ==========
+  errorBoundary: {
+    title: "Something went wrong",
+    windowError: "{{name}} encountered a problem",
+    description: "An error occurred. Please try again or reload the page.",
+    retry: "Retry",
+    reload: "Reload",
+    details: "Error Details"
   },
   // ========== New: Tray menu translation keys ==========
   tray: {

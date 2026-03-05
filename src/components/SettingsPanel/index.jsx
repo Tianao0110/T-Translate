@@ -72,8 +72,8 @@ const SettingsPanel = ({ showNotification }) => {
   };
   
   const groupLabels = {
-    '翻译': t('settingsNav.groupTranslation'),
-    '系统': t('settingsNav.groupSystem'),
+    'translation': t('settingsNav.groupTranslation'),
+    'system': t('settingsNav.groupSystem'),
   };
 
   // Store actions
@@ -162,7 +162,8 @@ const SettingsPanel = ({ showNotification }) => {
     let items = searchQuery.trim() 
       ? NAV_ITEMS.filter(item => {
           const query = searchQuery.toLowerCase();
-          return item.label.toLowerCase().includes(query) ||
+          const translatedLabel = (navLabels[item.id] || item.id).toLowerCase();
+          return translatedLabel.includes(query) ||
                  item.keywords.some(k => k.toLowerCase().includes(query));
         })
       : simpleMode
@@ -176,7 +177,7 @@ const SettingsPanel = ({ showNotification }) => {
     }, {});
     
     return { filteredNavItems: items, groupedNavItems: grouped };
-  }, [searchQuery, simpleMode]);
+  }, [searchQuery, simpleMode, navLabels]);
 
   // 加载设置
   useEffect(() => {
@@ -693,7 +694,7 @@ const SettingsPanel = ({ showNotification }) => {
               {items.map(item => {
                 const Icon = item.icon;
                 const isSearchMatch = searchQuery.trim() && (
-                  item.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  (navLabels[item.id] || item.id).toLowerCase().includes(searchQuery.toLowerCase()) ||
                   item.keywords.some(k => k.toLowerCase().includes(searchQuery.toLowerCase()))
                 );
                 return (
@@ -703,7 +704,7 @@ const SettingsPanel = ({ showNotification }) => {
                     onClick={() => handleSectionChange(item.id)}
                   >
                     <Icon size={16}/>
-                    <span>{navLabels[item.id] || item.label}</span>
+                    <span>{navLabels[item.id] || item.id}</span>
                   </button>
                 );
               })}

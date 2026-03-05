@@ -2,9 +2,16 @@
 // 通用错误边界组件 - 捕获 React 渲染错误，防止应用崩溃
 
 import React from 'react';
+import i18n from '../../i18n.js';
 import createLogger from '../../utils/logger.js';
 
 const logger = createLogger('ErrorBoundary');
+
+// Class component 不能用 useTranslation hook，直接用 i18n.t()
+const t = (key, fallback) => {
+  const result = i18n.t(key);
+  return result === key ? fallback : result;
+};
 
 /**
  * 错误边界组件
@@ -78,7 +85,7 @@ class ErrorBoundary extends React.Component {
           fontSize: '13px',
           textAlign: 'center',
         }}>
-          <div style={{ marginBottom: '8px' }}>😕 出错了</div>
+          <div style={{ marginBottom: '8px' }}>😕 {t('errorBoundary.title', 'Something went wrong')}</div>
           <div style={{ display: 'flex', gap: '8px' }}>
             {retryCount < 3 && (
               <button
@@ -93,7 +100,7 @@ class ErrorBoundary extends React.Component {
                   fontSize: '12px',
                 }}
               >
-                重试
+                {t('errorBoundary.retry', 'Retry')}
               </button>
             )}
             <button
@@ -108,7 +115,7 @@ class ErrorBoundary extends React.Component {
                 fontSize: '12px',
               }}
             >
-              刷新
+              {t('errorBoundary.reload', 'Reload')}
             </button>
           </div>
         </div>
@@ -144,7 +151,10 @@ class ErrorBoundary extends React.Component {
             fontWeight: '600',
             marginBottom: '8px',
           }}>
-            {windowName ? `${windowName}出现了问题` : '出现了一些问题'}
+            {windowName 
+              ? t('errorBoundary.windowError', '{{name}} encountered a problem').replace('{{name}}', windowName)
+              : t('errorBoundary.title', 'Something went wrong')
+            }
           </h1>
           
           <p style={{ 
@@ -152,7 +162,7 @@ class ErrorBoundary extends React.Component {
             fontSize: '14px',
             marginBottom: '24px',
           }}>
-            应用遇到了错误，请尝试重试或刷新页面
+            {t('errorBoundary.description', 'An error occurred. Please try again or reload the page.')}
           </p>
 
           <div style={{ 
@@ -178,7 +188,7 @@ class ErrorBoundary extends React.Component {
                 onMouseOver={(e) => e.target.style.backgroundColor = '#2563eb'}
                 onMouseOut={(e) => e.target.style.backgroundColor = '#3b82f6'}
               >
-                重试
+                {t('errorBoundary.retry', 'Retry')}
               </button>
             )}
             <button
@@ -197,7 +207,7 @@ class ErrorBoundary extends React.Component {
               onMouseOver={(e) => e.target.style.backgroundColor = '#e5e7eb'}
               onMouseOut={(e) => e.target.style.backgroundColor = '#f3f4f6'}
             >
-              刷新页面
+              {t('errorBoundary.reload', 'Reload')}
             </button>
           </div>
 
@@ -215,7 +225,7 @@ class ErrorBoundary extends React.Component {
               fontWeight: '500',
               marginBottom: '8px',
             }}>
-              错误详情
+              {t('errorBoundary.details', 'Error Details')}
             </summary>
             <pre style={{ 
               whiteSpace: 'pre-wrap',
