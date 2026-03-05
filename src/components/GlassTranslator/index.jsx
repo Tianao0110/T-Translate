@@ -5,6 +5,7 @@
 // 支持散点模式（子玻璃板）
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Camera, X, Loader2, AlertCircle, ChevronDown, GripHorizontal, History, Clock } from 'lucide-react';
 import useSessionStore, { STATUS, DISPLAY_MODE } from '../../stores/session.js';
 import useConfigStore from '../../stores/config.js';
@@ -21,6 +22,7 @@ const logger = createLogger('Glass');
  * 职责：纯 UI 渲染，监听 store 变化
  */
 const GlassTranslator = () => {
+  const { t } = useTranslation();
   // ========== Store 状态 ==========
   const {
     status,
@@ -558,7 +560,7 @@ const GlassTranslator = () => {
                 captureAndTranslate();
               }}
               disabled={isLoading}
-              title="截图识别 (Space)"
+              title={t('glass.captureSpace', '截图识别 (Space)')}
             >
               <Camera size={12} />
             </button>
@@ -570,7 +572,7 @@ const GlassTranslator = () => {
                 e.stopPropagation();
                 toggleHistoryPanel();
               }}
-              title="历史记录 (Ctrl+H)"
+              title={t('glass.historyCtrlH', '历史记录 (Ctrl+H)')}
             >
               <History size={12} />
             </button>
@@ -578,7 +580,7 @@ const GlassTranslator = () => {
             <div 
               className="toolbar-handle"
               onClick={handleBarClick}
-              title="点击调节透明度"
+              title={t('glass.adjustOpacity', '点击调节透明度')}
             >
               <GripHorizontal size={14} />
             </div>
@@ -588,7 +590,7 @@ const GlassTranslator = () => {
         <button 
           className="glass-close-btn"
           onClick={handleClose}
-          title="关闭 (Esc)"
+          title={t('glass.closeEsc', '关闭 (Esc)')}
         >
           <X size={12} />
         </button>
@@ -597,7 +599,7 @@ const GlassTranslator = () => {
       {/* 透明度滑块 */}
       {showOpacitySlider && (
         <div className="opacity-popup" onMouseLeave={() => setShowOpacitySlider(false)}>
-          <span className="opacity-label">透明度</span>
+          <span className="opacity-label">{t('glass.opacity', '透明度')}</span>
           <input 
             type="range" 
             min="0.3" 
@@ -640,16 +642,16 @@ const GlassTranslator = () => {
           <div className="glass-message loading">
             <Loader2 className="spin" size={24} />
             <span>
-              {status === STATUS.CAPTURING && '截图中...'}
-              {status === STATUS.OCR_PROCESSING && '识别中...'}
-              {status === STATUS.TRANSLATING && '翻译中...'}
+              {status === STATUS.CAPTURING && t('glass.capturing', '截图中...')}
+              {status === STATUS.OCR_PROCESSING && t('glass.recognizing', '识别中...')}
+              {status === STATUS.TRANSLATING && t('glass.translating', '翻译中...')}
             </span>
           </div>
         ) : translatedText ? (
           <div className="glass-result">{translatedText}</div>
         ) : (
           <div className="glass-message placeholder">
-            <span>点击 📷 或按 Space 截图识别</span>
+            <span>{t('glass.captureHint', '点击 📷 或按 Space 截图识别')}</span>
           </div>
         )}
       </div>
@@ -658,7 +660,7 @@ const GlassTranslator = () => {
       {hasOverflow && displayMode !== DISPLAY_MODE.SCATTERED && (
         <button className="scroll-hint" onClick={scrollToBottom}>
           <ChevronDown size={14} />
-          <span>更多</span>
+          <span>{t('selection.more', '更多')}</span>
         </button>
       )}
       
@@ -685,7 +687,7 @@ const GlassTranslator = () => {
           <div className="history-header">
             <span className="history-title">
               <Clock size={14} />
-              历史记录
+              {t('history.title', '历史记录')}
             </span>
             <button 
               className="history-close-btn"
@@ -696,7 +698,7 @@ const GlassTranslator = () => {
           </div>
           <div className="history-list">
             {historyItems.length === 0 ? (
-              <div className="history-empty">暂无历史记录</div>
+              <div className="history-empty">{t('history.empty', '暂无历史记录')}</div>
             ) : (
               historyItems.map((item, index) => (
                 <div 
