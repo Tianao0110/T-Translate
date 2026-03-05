@@ -188,12 +188,22 @@ const useTranslationStore = create(
         set((state) => {
           if (source) state.currentTranslation.sourceLanguage = source;
           if (target) state.currentTranslation.targetLanguage = target;
+          // 同步到 electron-store，供主进程读取（划词翻译等）
+          try {
+            const src = source || state.currentTranslation.sourceLanguage;
+            const tgt = target || state.currentTranslation.targetLanguage;
+            window.electron?.store?.set('settings.translation.sourceLanguage', src);
+            window.electron?.store?.set('settings.translation.targetLanguage', tgt);
+          } catch {}
         }),
 
       // 单独设置目标语言（供玻璃窗口同步使用）
       setTargetLanguage: (target) =>
         set((state) => {
           if (target) state.currentTranslation.targetLanguage = target;
+          try {
+            window.electron?.store?.set('settings.translation.targetLanguage', target);
+          } catch {}
         }),
 
       swapLanguages: () =>
@@ -204,6 +214,10 @@ const useTranslationStore = create(
           state.currentTranslation.sourceLanguage =
             state.currentTranslation.targetLanguage;
           state.currentTranslation.targetLanguage = temp;
+          try {
+            window.electron?.store?.set('settings.translation.sourceLanguage', state.currentTranslation.sourceLanguage);
+            window.electron?.store?.set('settings.translation.targetLanguage', state.currentTranslation.targetLanguage);
+          } catch {}
 
           const tempText = state.currentTranslation.sourceText;
           state.currentTranslation.sourceText =
