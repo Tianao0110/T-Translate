@@ -3,6 +3,7 @@
 // v9: 双击触发冻结/创建独立窗口，拖动只用于移动位置
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, Copy, Check, Loader2 } from 'lucide-react';
 import { CHILD_PANE_STATUS } from '../../stores/session.js';
 
@@ -25,6 +26,7 @@ const ChildGlassPane = ({
   onClose,
   theme = 'light',
 }) => {
+  const { t } = useTranslation();
   const [isDragging, setIsDragging] = useState(false);
   const [renderPos, setRenderPos] = useState({ x: 0, y: 0 });  // 仅用于渲染
   const [copied, setCopied] = useState(false);
@@ -209,7 +211,7 @@ const ChildGlassPane = ({
       onMouseLeave={handleMouseLeave}
       onMouseDown={handleMouseDown}
       onDoubleClick={handleDoubleClick}
-      title={status === CHILD_PANE_STATUS.DONE && !isFrozen ? '双击固定为独立窗口' : ''}
+      title={status === CHILD_PANE_STATUS.DONE && !isFrozen ? t('glass.doubleClickFreeze', '双击固定为独立窗口') : ''}
     >
       {/* 内容区 */}
       <div className="child-pane-content">
@@ -218,7 +220,7 @@ const ChildGlassPane = ({
             <Loader2 className="spin" size={14} />
           </div>
         ) : status === CHILD_PANE_STATUS.ERROR ? (
-          <div className="child-pane-error">{error || '翻译失败'}</div>
+          <div className="child-pane-error">{error || t('selection.translateFailed', '翻译失败')}</div>
         ) : (
           <div className="child-pane-text">{translatedText || sourceText}</div>
         )}
@@ -230,7 +232,7 @@ const ChildGlassPane = ({
           <button 
             className="child-pane-btn"
             onClick={handleCopy}
-            title="复制译文"
+            title={t('selection.copyTarget', '复制译文')}
           >
             {copied ? <Check size={12} /> : <Copy size={12} />}
           </button>
@@ -241,7 +243,7 @@ const ChildGlassPane = ({
                 e.stopPropagation();
                 onClose(id);
               }}
-              title="关闭"
+              title={t('titleBar.close', '关闭')}
             >
               <X size={12} />
             </button>
