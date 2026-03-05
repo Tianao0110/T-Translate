@@ -2,8 +2,8 @@
 // SettingsPanel 共享常量
 
 import {
-  Shield, Zap, Moon, Sun,
-  Info, Eye, Lock, Volume2,
+  Globe, Shield, Zap, Moon, Sun,
+  Info, Wifi, Eye, Lock, Volume2,
   Code2, Palette, Layers, MousePointer, Server,
   FileText
 } from 'lucide-react';
@@ -60,19 +60,21 @@ export const GLOBAL_SHORTCUT_KEYS = ['screenshot', 'toggleWindow', 'glassWindow'
 
 /**
  * 导航项配置 - 按使用频率排序
+ * basic: true 表示简洁模式下显示的项目
  */
 export const NAV_ITEMS = [
   // 翻译组 - 最常用的放前面
-  { id: 'providers', icon: Server, label: '翻译源', group: '翻译', keywords: ['翻译源', 'provider', 'openai', 'deepl', 'gemini', 'deepseek', '本地', 'api', '翻译', '自动', 'stream', '流式'] },
+  { id: 'providers', icon: Server, label: '翻译源', group: '翻译', basic: true, keywords: ['翻译源', 'provider', 'openai', 'deepl', 'gemini', 'deepseek', '本地', 'api'] },
+  { id: 'translation', icon: Globe, label: '翻译设置', group: '翻译', basic: true, keywords: ['翻译', '语言', '源语言', '目标语言', '自动', 'stream', '流式'] },
   { id: 'selection', icon: MousePointer, label: '划词翻译', group: '翻译', keywords: ['划词', '选中', '鼠标', '触发', '按钮'] },
   { id: 'glassWindow', icon: Layers, label: '玻璃窗口', group: '翻译', keywords: ['玻璃', '透明', '窗口', '置顶', 'glass'] },
   { id: 'document', icon: FileText, label: '文档翻译', group: '翻译', keywords: ['文档', 'pdf', 'docx', 'epub', 'srt', '字幕', '批量'] },
   // 系统组
   { id: 'ocr', icon: Eye, label: 'OCR 识别', group: '系统', keywords: ['ocr', '识别', '截图', '图片', '文字识别', 'rapidocr', 'llm'] },
   { id: 'tts', icon: Volume2, label: '朗读设置', group: '系统', keywords: ['朗读', '语音', '播放', 'tts', 'speech', '音量', '语速'] },
-  { id: 'interface', icon: Palette, label: '界面外观', group: '系统', keywords: ['界面', '主题', '深色', '浅色', '字体', '外观'] },
+  { id: 'interface', icon: Palette, label: '界面外观', group: '系统', basic: true, keywords: ['界面', '主题', '深色', '浅色', '字体', '外观'] },
   { id: 'privacy', icon: Shield, label: '隐私模式', group: '系统', keywords: ['隐私', '安全', '模式', '历史', '记录'] },
-  { id: 'about', icon: Info, label: '关于', group: '系统', keywords: ['关于', '版本', '信息', 'about'] },
+  { id: 'about', icon: Info, label: '关于', group: '系统', basic: true, keywords: ['关于', '版本', '信息', 'about'] },
 ];
 
 /**
@@ -92,6 +94,7 @@ export const DEFAULT_SETTINGS = {
     defaultTargetLang: defaultConfig.translation.targetLanguage,
     providers: [],
     providerConfigs: {},
+    subtitleProvider: null,
   },
   
   // 翻译设置 (顶层兼容)
@@ -126,15 +129,6 @@ export const DEFAULT_SETTINGS = {
     showSourceText: false,
   },
   
-  // 玻璃窗口（GlassWindowSection 读取的 key）
-  glassWindow: {
-    defaultOpacity: 0.95,
-    rememberPosition: false,
-    autoPin: true,
-    lockTargetLang: false,
-    smartDetect: true,
-  },
-  
   // 划词翻译
   selection: {
     enabled: false,
@@ -154,10 +148,6 @@ export const DEFAULT_SETTINGS = {
   },
   
   // 外观
-  interface: {
-    theme: defaultConfig.ui.theme,
-    language: 'zh',
-  },
   theme: defaultConfig.ui.theme,
   fontSize: defaultConfig.ui.fontSize,
   
@@ -249,14 +239,6 @@ export const migrateOldSettings = (savedSettings) => {
       ...DEFAULT_SETTINGS.screenshot,
       ...(savedSettings.screenshot || {}),
     },
-    interface: {
-      ...DEFAULT_SETTINGS.interface,
-      ...(savedSettings.interface || {}),
-    },
-    glassWindow: {
-      ...DEFAULT_SETTINGS.glassWindow,
-      ...(savedSettings.glassWindow || {}),
-    },
     shortcuts: {
       ...DEFAULT_SETTINGS.shortcuts,
       ...(savedSettings.shortcuts || {}),
@@ -279,6 +261,7 @@ export const migrateOldSettings = (savedSettings) => {
       ...migrated.translation,
       providers: savedSettings.providers.list,
       providerConfigs: savedSettings.providers.configs,
+      subtitleProvider: savedSettings.providers.subtitleProvider,
     };
     delete migrated.providers;
   }

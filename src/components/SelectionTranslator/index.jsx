@@ -197,7 +197,7 @@ const SelectionTranslator = () => {
       if (data.text && !data.translatedText) {
         logger.debug('Received OCR text, translating...');
         setSourceText(data.text);
-        setShowSource(true);
+        setShowSource(newSettings.showSourceByDefault);
         setError('');
         setCopied(false);
         sizedRef.current = false;
@@ -230,7 +230,7 @@ const SelectionTranslator = () => {
         return;
       }
       
-      // 模式 3: 直接显示结果（兼容旧逻辑）
+      // 模式 3: 直接显示结果（截图翻译、OCR 错误等）
       if (data.sourceText && data.translatedText) {
         logger.debug('Received translation result');
         setTranslation({
@@ -242,9 +242,8 @@ const SelectionTranslator = () => {
         setTranslatedText(data.translatedText);
         setError('');
         setCopied(false);
-        sizedRef.current = false;
         setIsFrozen(false);
-        setInitialBounds(null);
+        // 不重置 sizedRef 和 initialBounds，窗口已经在截图位置
         setMode('overlay');
         
         if (newSettings.triggerTimeout > 0) {
@@ -369,7 +368,10 @@ const SelectionTranslator = () => {
     
     const sw = window.screen?.availWidth || 1920;
     const sh = window.screen?.availHeight || 1080;
-    
+
+    // 截图模式：mousePos 未设置，只调整大小不重新定位
+    const hasValidMousePos = mousePos.x !== 0 || mousePos.y !== 0;
+
     // 获取文本
     const text = contentEl.innerText || '';
     const hasNewlines = text.includes('\n');
@@ -384,11 +386,22 @@ const SelectionTranslator = () => {
     }
     
     // 先设置宽度，让内容换行
-    await window.electron?.selection?.setBounds?.({
-      x: Math.round(mousePos.x - width / 2),
-      y: Math.round(mousePos.y + 20),
-      width: width, height: maxHeight
-    });
+    if (hasValidMousePos) {
+      await window.electron?.selection?.setBounds?.({
+        x: Math.round(mousePos.x - width / 2),
+        y: Math.round(mousePos.y + 20),
+        width: width, height: maxHeight
+      });
+    } else {
+      // 截图模式：只调整宽高，保持原位置
+      const currentBounds = await window.electron?.selection?.startDrag?.();
+      if (currentBounds) {
+        await window.electron?.selection?.setBounds?.({
+          x: currentBounds.x, y: currentBounds.y,
+          width: width, height: maxHeight
+        });
+      }
+    }
     
     await new Promise(r => setTimeout(r, 20));
     
@@ -403,19 +416,26 @@ const SelectionTranslator = () => {
     // 计算最终高度
     let height = Math.min(Math.max(contentHeight + toolbarHeight + 16, minHeight), maxHeight);
     
-    // 计算位置
-    let x = mousePos.x - width / 2;
-    let y = mousePos.y + 20;
-    
-    if (x < 10) x = 10;
-    if (x + width > sw - 10) x = sw - width - 10;
-    if (y + height > sh - 10) y = mousePos.y - height - 10;
-    if (y < 10) y = 10;
-    
-    window.electron?.selection?.setBounds?.({
-      x: Math.round(x), y: Math.round(y),
-      width: Math.round(width), height: Math.round(height)
-    });
+    if (hasValidMousePos) {
+      let x = mousePos.x - width / 2;
+      let y = mousePos.y + 20;
+      if (x < 10) x = 10;
+      if (x + width > sw - 10) x = sw - width - 10;
+      if (y + height > sh - 10) y = mousePos.y - height - 10;
+      if (y < 10) y = 10;
+      window.electron?.selection?.setBounds?.({
+        x: Math.round(x), y: Math.round(y),
+        width: Math.round(width), height: Math.round(height)
+      });
+    } else {
+      const cb = await window.electron?.selection?.startDrag?.();
+      if (cb) {
+        window.electron?.selection?.setBounds?.({
+          x: cb.x, y: cb.y,
+          width: Math.round(width), height: Math.round(height)
+        });
+      }
+    }
   };
   
   // 内容渲染后调整窗口大小
@@ -433,28 +453,13 @@ const SelectionTranslator = () => {
       await translationService.init();
     }
     
-    // 检测源语言
-    const isChinese = (text.match(/[\u4e00-\u9fff]/g) || []).length / text.length > 0.3;
-    const isJapanese = (text.match(/[\u3040-\u309f\u30a0-\u30ff]/g) || []).length > 0;
-    const isKorean = (text.match(/[\uac00-\ud7af]/g) || []).length > 0;
-    
-    let detectedLang = 'en';
-    if (isChinese) detectedLang = 'zh';
-    else if (isJapanese) detectedLang = 'ja';
-    else if (isKorean) detectedLang = 'ko';
-    
-    // 确定目标语言（使用主程序设置）
-    let targetLang = translation.targetLanguage || 'zh';
-    
-    // 如果源语言和目标语言相同，智能切换
-    if (detectedLang === targetLang) {
-      targetLang = detectedLang === 'en' ? 'zh' : 'en';
-    }
+    // 直接使用用户设置的目标语言，源语言 auto 由翻译引擎检测
+    const targetLang = translation.targetLanguage || 'zh';
     
     try {
       // 使用 translationService 进行翻译（传递隐私模式）
       const result = await translationService.translate(text, {
-        sourceLang: detectedLang,
+        sourceLang: 'auto',
         targetLang: targetLang,
         privacyMode: privacyMode, // 传递隐私模式
       });
@@ -634,7 +639,7 @@ const SelectionTranslator = () => {
         >
           <div className="sel-toolbar">
             {isFrozen && (
-              <span className="sel-frozen-badge" title="已固定 - 点击关闭按钮关闭">📌</span>
+              <span className="sel-frozen-badge" title="已固定 - 右键点击关闭">📌</span>
             )}
             <button className={`sel-btn ${showSource ? 'active' : ''}`} onClick={toggleSource} title="显示原文">
               原文

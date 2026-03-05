@@ -10,6 +10,7 @@ export { default as DocumentSection } from './DocumentSection.jsx';
 export { default as TTSSection } from './TTSSection.jsx';
 export { default as AboutSection } from './AboutSection.jsx';
 export { default as ProvidersSection } from './ProvidersSection.jsx';
+export { default as TranslationSection } from './TranslationSection.jsx';
 
 // 共享组件和工具
 export * from './shared.jsx';

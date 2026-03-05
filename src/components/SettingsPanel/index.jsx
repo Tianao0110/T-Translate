@@ -41,7 +41,8 @@ import {
   DocumentSection,
   TTSSection,
   AboutSection,
-  ProvidersSection
+  ProvidersSection,
+  TranslationSection
 } from './sections/index.jsx'; 
 
 // 日志实例
@@ -66,7 +67,6 @@ const SettingsPanel = ({ showNotification }) => {
     ocr: t('settingsNav.ocr'),
     tts: t('settingsNav.tts'),
     interface: t('settingsNav.interface'),
-    connection: t('settingsNav.connection'),
     privacy: t('settingsNav.privacy'),
     about: t('settingsNav.about'),
   };
@@ -105,6 +105,10 @@ const SettingsPanel = ({ showNotification }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [collapsedGroups, setCollapsedGroups] = useState({});
   const [editingShortcut, setEditingShortcut] = useState(null); // 正在编辑的快捷键
+  const [simpleMode, setSimpleMode] = useState(() => {
+    const saved = localStorage.getItem('settings-simple-mode');
+    return saved === null ? true : saved === 'true';
+  });
 
   // 简化：只要有操作就标记为 dirty
   const hasUnsavedChanges = isDirty;
@@ -138,24 +142,41 @@ const SettingsPanel = ({ showNotification }) => {
     }));
   }, []);
 
+  // 切换简洁/完整模式
+  const toggleSimpleMode = useCallback(() => {
+    setSimpleMode(prev => {
+      const next = !prev;
+      localStorage.setItem('settings-simple-mode', String(next));
+      if (next) {
+        const basicIds = NAV_ITEMS.filter(i => i.basic).map(i => i.id);
+        if (!basicIds.includes(activeSection)) {
+          setActiveSection(basicIds[0] || 'providers');
+        }
+      }
+      return next;
+    });
+  }, [activeSection]);
+
   // 使用 useMemo 优化搜索过滤
   const { filteredNavItems, groupedNavItems } = useMemo(() => {
-    const filtered = searchQuery.trim() 
+    let items = searchQuery.trim() 
       ? NAV_ITEMS.filter(item => {
           const query = searchQuery.toLowerCase();
           return item.label.toLowerCase().includes(query) ||
                  item.keywords.some(k => k.toLowerCase().includes(query));
         })
-      : NAV_ITEMS;
+      : simpleMode
+        ? NAV_ITEMS.filter(item => item.basic)
+        : NAV_ITEMS;
     
-    const grouped = filtered.reduce((acc, item) => {
+    const grouped = items.reduce((acc, item) => {
       if (!acc[item.group]) acc[item.group] = [];
       acc[item.group].push(item);
       return acc;
     }, {});
     
-    return { filteredNavItems: filtered, groupedNavItems: grouped };
-  }, [searchQuery]);
+    return { filteredNavItems: items, groupedNavItems: grouped };
+  }, [searchQuery, simpleMode]);
 
   // 加载设置
   useEffect(() => {
@@ -614,6 +635,20 @@ const SettingsPanel = ({ showNotification }) => {
           <AboutSection notify={notify} />
         );
 
+      case 'translation':
+        return (
+          <TranslationSection
+            settings={settings}
+            updateSetting={updateSetting}
+            notify={notify}
+            useStreamOutput={useStreamOutput}
+            setUseStreamOutput={setUseStreamOutput}
+            autoTranslate={autoTranslate}
+            setAutoTranslate={setAutoTranslate}
+            autoTranslateDelay={autoTranslateDelay}
+            setAutoTranslateDelay={setAutoTranslateDelay}
+          />
+        );
       case 'glassWindow':
         return (
           <GlassWindowSection
@@ -647,6 +682,7 @@ const SettingsPanel = ({ showNotification }) => {
             className="search-input"
           />
         </div>
+        
         
         <div className="settings-nav">
           {/* 动态渲染分组和导航项 */}
@@ -682,6 +718,9 @@ const SettingsPanel = ({ showNotification }) => {
           )}
         </div>
         <div className="settings-actions">
+            <button className="mode-text-link" onClick={toggleSimpleMode}>
+              {simpleMode ? t('settingsNav.switchToFull') : t('settingsNav.switchToSimple')}
+            </button>
             <button className="action-button" onClick={exportSettings}><Download size={14}/> {t('settingsNav.export')}</button>
             <label className="action-button"><Upload size={14}/> {t('settingsNav.import')} <input type="file" accept=".json" onChange={importSettings} style={{display:'none'}}/></label>
             <button className="action-button danger" onClick={()=>resetSettings()}><RefreshCw size={14}/> {t('settingsNav.reset')}</button>

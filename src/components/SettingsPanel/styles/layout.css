@@ -8,7 +8,6 @@
 .settings-panel {
   display: flex;
   height: 100%;
-  width: 100%;
   background: var(--bg-primary);
   overflow: hidden;
 }
@@ -155,9 +154,10 @@
 
 .setting-content {
   flex: 1;
-  padding: 28px 32px;
+  padding: 28px 32px 28px 32px;
   overflow-y: auto;
   overflow-x: hidden;
+  /* 滚动条贴近内容 */
   max-width: 100%;
 }
 
@@ -704,4 +704,21 @@
 }
 
 
+/* ========== Simple/Full Mode Text Link ========== */
+.mode-text-link {
+  display: block;
+  width: 100%;
+  padding: 6px 0;
+  margin-bottom: 4px;
+  border: none;
+  background: none;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: color 0.15s;
+  text-align: center;
+}
 
+.mode-text-link:hover {
+  color: var(--accent-primary);
+}
