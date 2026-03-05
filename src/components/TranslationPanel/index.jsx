@@ -325,7 +325,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
             className="swap-button"
             onClick={swapLanguages}
             disabled={currentTranslation.sourceLanguage === 'auto'}
-            title="切换语言"
+            title={t('translation.swap', '切换语言')}
           >
             <RotateCcw size={16} />
           </button>
@@ -470,13 +470,13 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
               )}
             </div>
             <div className="box-actions">
-              <button className="action-btn" onClick={() => copyToClipboard('translated') && notify(t('translation.copied'), 'success')} disabled={!currentTranslation.translatedText} title="复制">
+              <button className="action-btn" onClick={() => copyToClipboard('translated') && notify(t('translation.copied'), 'success')} disabled={!currentTranslation.translatedText} title={t('translation.copy', '复制')}>
                 <Copy size={15} />
               </button>
-              <button className="action-btn style-btn" onClick={styleRewrite.openStyleModal} disabled={!currentTranslation.translatedText || styleRewrite.isRewriting} title="风格改写">
+              <button className="action-btn style-btn" onClick={styleRewrite.openStyleModal} disabled={!currentTranslation.translatedText || styleRewrite.isRewriting} title={t('translation.styleRewrite', '风格改写')}>
                 {styleRewrite.isRewriting ? <Loader2 size={15} className="animate-spin" /> : <Palette size={15} />}
               </button>
-              <button className="action-btn" onClick={saveModal.openSaveModal} disabled={!currentTranslation.translatedText} title="收藏">
+              <button className="action-btn" onClick={saveModal.openSaveModal} disabled={!currentTranslation.translatedText} title={t('translation.favorite', '收藏')}>
                 <Sparkles size={15} />
               </button>
               {tts.ttsEnabled && (
@@ -484,7 +484,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
                   className={`action-btn ${tts.ttsStatus === TTS_STATUS.SPEAKING && tts.ttsTarget === 'target' ? 'active' : ''}`}
                   onClick={() => tts.speakText(currentTranslation.translatedText, 'target', currentTranslation.targetLang)}
                   disabled={!currentTranslation.translatedText}
-                  title={tts.ttsStatus === TTS_STATUS.SPEAKING && tts.ttsTarget === 'target' ? '停止朗读' : '朗读译文'}
+                  title={tts.ttsStatus === TTS_STATUS.SPEAKING && tts.ttsTarget === 'target' ? t('translation.stopSpeak', '停止朗读') : t('translation.speakTarget', '朗读译文')}
                 >
                   {tts.ttsStatus === TTS_STATUS.SPEAKING && tts.ttsTarget === 'target' ? <VolumeX size={15} /> : <Volume2 size={15} />}
                 </button>
@@ -505,7 +505,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
             <div className="term-suggestions">
               <div className="term-suggestions-header">
                 <Lightbulb size={14} />
-                <span>发现可替换术语</span>
+                <span>{t('translation.termFound', '发现可替换术语')}</span>
               </div>
               {termCheck.termSuggestions.map(suggestion => (
                 <div key={suggestion.id} className="term-suggestion-item">
@@ -516,14 +516,14 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
                     {suggestion.note && <span className="term-note">({suggestion.note})</span>}
                   </div>
                   <div className="term-actions">
-                    <button className="term-btn apply" onClick={() => termCheck.applyTermSuggestion(suggestion, currentTranslation.translatedText)} title="应用此翻译">
-                      <Check size={12} /> 应用
+                    <button className="term-btn apply" onClick={() => termCheck.applyTermSuggestion(suggestion, currentTranslation.translatedText)} title={t('translation.applyTerm', '应用此翻译')}>
+                      <Check size={12} /> {t('translation.apply', '应用')}
                     </button>
-                    <button className="term-btn ignore" onClick={() => termCheck.dismissTermSuggestion(suggestion)} title="忽略此次">
+                    <button className="term-btn ignore" onClick={() => termCheck.dismissTermSuggestion(suggestion)} title={t('translation.ignoreTerm', '忽略此次')}>
                       <X size={12} />
                     </button>
-                    <button className="term-btn always" onClick={() => termCheck.alwaysUseTerm(suggestion)} title="不再提示此术语">
-                      不再提示
+                    <button className="term-btn always" onClick={() => termCheck.alwaysUseTerm(suggestion)} title={t('translation.neverRemind', '不再提示此术语')}>
+                      {t('translation.neverRemind', '不再提示')}
                     </button>
                   </div>
                 </div>

@@ -4,6 +4,7 @@
 // 这些组件从主 TranslationPanel 拆分出来，避免不必要的重渲染
 
 import React, { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   X, Check, Lightbulb, ArrowRight, Palette, ChevronUp, ChevronDown,
   Sparkles, Loader2, Tag, FileEdit, Bot, RotateCcw
@@ -18,13 +19,14 @@ export const TermSuggestionBar = memo(({
   onDismiss, 
   onAlwaysUse 
 }) => {
+  const { t } = useTranslation();
   if (!suggestions || suggestions.length === 0) return null;
 
   return (
     <div className="term-suggestions-bar">
       <div className="term-suggestions-header">
         <Lightbulb size={14} />
-        <span>术语一致性提示</span>
+        <span>{t('translation.termFound', '术语一致性提示')}</span>
         <span className="badge">{suggestions.length}</span>
       </div>
       <div className="term-suggestions-list">
@@ -42,21 +44,21 @@ export const TermSuggestionBar = memo(({
               <button 
                 className="btn-apply" 
                 onClick={() => onApply(suggestion)}
-                title="应用此术语"
+                title={t('translation.applyTerm', '应用此术语')}
               >
-                <Check size={12} /> 应用
+                <Check size={12} /> {t('translation.apply', '应用')}
               </button>
               <button 
                 className="btn-always"
                 onClick={() => onAlwaysUse(suggestion)}
-                title="始终使用此术语"
+                title={t('translation.alwaysUseTerm', '始终使用此术语')}
               >
-                始终
+                {t('translation.always', '始终')}
               </button>
               <button 
                 className="btn-dismiss"
                 onClick={() => onDismiss(suggestion, false)}
-                title="忽略（本次）"
+                title={t('translation.ignoreTerm', '忽略（本次）')}
               >
                 <X size={12} />
               </button>
@@ -122,6 +124,7 @@ export const StyleModal = memo(({
   onConfirm,
   onClose 
 }) => {
+  const { t } = useTranslation();
   if (!show) return null;
 
   // 过滤风格库收藏
@@ -136,7 +139,7 @@ export const StyleModal = memo(({
       <div className="style-modal" onClick={e => e.stopPropagation()}>
         <div className="style-modal-header">
           <Palette size={18} />
-          <span>选择参考风格</span>
+          <span>{t('translation.selectStyle', '选择参考风格')}</span>
           <button className="close-btn" onClick={onClose}>
             <X size={18} />
           </button>
@@ -144,7 +147,7 @@ export const StyleModal = memo(({
         
         <div className="style-modal-body">
           <div className="style-list-section">
-            <div className="section-title">从风格库中选择</div>
+            <div className="section-title">{t('translation.fromStyleLib', '从风格库中选择')}</div>
             {styleLibrary.length > 0 ? (
               <div className="style-list">
                 {styleLibrary.map(fav => (
@@ -177,17 +180,17 @@ export const StyleModal = memo(({
             ) : (
               <div className="empty-styles">
                 <Palette size={32} />
-                <p>风格库为空</p>
-                <span>收藏时勾选"标记为风格参考"添加到风格库</span>
+                <p>{t('translation.styleLibEmpty', '风格库为空')}</p>
+                <span>{t('translation.styleLibHint', '收藏时勾选"标记为风格参考"添加到风格库')}</span>
               </div>
             )}
           </div>
 
           {selectedStyle && (
             <div className="style-strength-section">
-              <div className="section-title">风格强度</div>
+              <div className="section-title">{t('translation.styleStrength', '风格强度')}</div>
               <div className="strength-slider">
-                <span className="strength-label">轻微</span>
+                <span className="strength-label">{t('translation.strengthLight', '轻微')}</span>
                 <input
                   type="range"
                   min="0"
@@ -195,26 +198,26 @@ export const StyleModal = memo(({
                   value={styleStrength}
                   onChange={(e) => onStrengthChange(Number(e.target.value))}
                 />
-                <span className="strength-label">完全模仿</span>
+                <span className="strength-label">{t('translation.strengthFull', '完全模仿')}</span>
               </div>
               <div className="strength-value">{styleStrength}%</div>
               <div className="strength-desc">
-                {styleStrength <= 30 ? '轻微调整，基本保持原译文风格' : 
-                 styleStrength <= 70 ? '中等程度模仿参考风格' : 
-                 '高度模仿，尽量贴近参考风格的语气和表达'}
+                {styleStrength <= 30 ? t('translation.strengthDescLight', '轻微调整，基本保持原译文风格') : 
+                 styleStrength <= 70 ? t('translation.strengthDescMedium', '中等程度模仿参考风格') : 
+                 t('translation.strengthDescHigh', '高度模仿，尽量贴近参考风格的语气和表达')}
               </div>
             </div>
           )}
         </div>
 
         <div className="style-modal-footer">
-          <button className="btn-cancel" onClick={onClose}>取消</button>
+          <button className="btn-cancel" onClick={onClose}>{t('favorites.cancel', '取消')}</button>
           <button 
             className="btn-rewrite" 
             onClick={onConfirm}
             disabled={!selectedStyle}
           >
-            <Palette size={14} /> 开始改写
+            <Palette size={14} /> {t('translation.startRewrite', '开始改写')}
           </button>
         </div>
       </div>
@@ -242,6 +245,7 @@ export const SaveModal = memo(({
   onSave,
   onClose
 }) => {
+  const { t } = useTranslation();
   if (!show) return null;
 
   return (
@@ -249,7 +253,7 @@ export const SaveModal = memo(({
       <div className="save-modal save-modal-with-ai" onClick={e => e.stopPropagation()}>
         <div className="save-modal-header">
           <Sparkles size={18} />
-          <span>添加到收藏</span>
+          <span>{t('translation.addToFavorites', '添加到收藏')}</span>
           <button className="close-btn" onClick={onClose}>
             <X size={18} />
           </button>
@@ -259,13 +263,13 @@ export const SaveModal = memo(({
           {/* 预览区 */}
           <div className="save-preview">
             <div className="preview-item">
-              <label>原文</label>
+              <label>{t('translation.source', '原文')}</label>
               <div className="preview-text">
                 {sourceText?.slice(0, 100)}{sourceText?.length > 100 ? '...' : ''}
               </div>
             </div>
             <div className="preview-item">
-              <label>译文</label>
+              <label>{t('translation.target', '译文')}</label>
               <div className="preview-text">
                 {translatedText?.slice(0, 100)}{translatedText?.length > 100 ? '...' : ''}
               </div>
@@ -277,13 +281,13 @@ export const SaveModal = memo(({
             <div className="ai-section-header">
               <div className="ai-title">
                 <Bot size={16} />
-                <span>AI 建议</span>
+                <span>{t('translation.aiSuggestions', 'AI 建议')}</span>
               </div>
               <button 
                 className="btn-reanalyze"
                 onClick={onAnalyze}
                 disabled={isAnalyzing}
-                title="重新分析"
+                title={t('translation.reanalyze', '重新分析')}
               >
                 <RotateCcw size={14} className={isAnalyzing ? 'spinning' : ''} />
               </button>
@@ -292,27 +296,27 @@ export const SaveModal = memo(({
             {isAnalyzing ? (
               <div className="ai-analyzing">
                 <Loader2 size={20} className="spinning" />
-                <span>AI 正在分析内容...</span>
+                <span>{t('translation.aiAnalyzing', 'AI 正在分析内容...')}</span>
               </div>
             ) : (
               <div className="ai-suggestions-content">
                 <div className="suggestion-field">
-                  <label><Tag size={12} /> 标签</label>
+                  <label><Tag size={12} /> {t('favorites.tags', '标签')}</label>
                   <input
                     type="text"
                     value={editableTags}
                     onChange={(e) => onTagsChange(e.target.value)}
-                    placeholder="标签（逗号分隔）"
+                    placeholder={t('favorites.tagsPlaceholder', '标签（逗号分隔）')}
                   />
                 </div>
 
                 <div className="suggestion-field">
-                  <label><FileEdit size={12} /> 摘要/笔记</label>
+                  <label><FileEdit size={12} /> {t('translation.summaryNote', '摘要/笔记')}</label>
                   <input
                     type="text"
                     value={editableSummary}
                     onChange={(e) => onSummaryChange(e.target.value)}
-                    placeholder="简短描述..."
+                    placeholder={t('translation.shortDesc', '简短描述...')}
                   />
                 </div>
 
@@ -324,15 +328,15 @@ export const SaveModal = memo(({
                       onChange={(e) => onStyleRefChange(e.target.checked)}
                     />
                     <Palette size={14} />
-                    <span>标记为风格参考</span>
+                    <span>{t('favorites.markAsStyle', '标记为风格参考')}</span>
                     {aiSuggestions?.isStyleSuggested && (
-                      <span className="ai-recommended">AI 推荐</span>
+                      <span className="ai-recommended">{t('translation.aiRecommended', 'AI 推荐')}</span>
                     )}
                   </label>
                   <div className="option-hint">
                     {saveAsStyleRef 
-                      ? '将保存到"风格库"，可用于风格改写' 
-                      : '保存为普通收藏'}
+                      ? t('translation.saveToStyleLib', '将保存到"风格库"，可用于风格改写') 
+                      : t('translation.saveAsNormal', '保存为普通收藏')}
                   </div>
                 </div>
               </div>
@@ -341,9 +345,9 @@ export const SaveModal = memo(({
         </div>
 
         <div className="save-modal-footer">
-          <button className="btn-cancel" onClick={onClose}>取消</button>
+          <button className="btn-cancel" onClick={onClose}>{t('favorites.cancel', '取消')}</button>
           <button className="btn-save" onClick={onSave} disabled={isAnalyzing}>
-            <Sparkles size={14} /> {saveAsStyleRef ? '保存到风格库' : '保存收藏'}
+            <Sparkles size={14} /> {saveAsStyleRef ? t('translation.saveToStyleLibBtn', '保存到风格库') : t('translation.saveFavorite', '保存收藏')}
           </button>
         </div>
       </div>
