@@ -17,7 +17,11 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "check:constants": "node scripts/check-constants.js"
+    "check:constants": "node scripts/check-constants.js",
+    "check:i18n": "node scripts/check-i18n.js",
+    "check:hardcoded": "node scripts/check-hardcoded-chinese.js",
+    "check:i18n:strict": "node scripts/check-i18n.js --strict",
+    "check:all": "npm run check:constants && npm run check:i18n && npm run check:hardcoded"
   },
   "keywords": [
     "translation",
