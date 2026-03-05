@@ -42,6 +42,15 @@ const zh = {
       'google-translate': '免费使用，支持语言多，速度快'
     }
   },
+  providerConfig: {
+    'local-llm': { endpoint: 'API 地址', model: '模型名称', timeout: '超时时间 (ms)' },
+    'openai': { apiKey: 'API Key', endpoint: 'API 地址', model: '模型名称' },
+    'deepl': { apiKey: 'API Key', freeApi: '使用免费 API（Key 以 :fx 结尾）' },
+    'gemini': { apiKey: 'API Key', model: '模型' },
+    'deepseek': { apiKey: 'API Key', model: '模型', endpoint: 'API 地址' },
+    'google-translate': { domain: '服务器', domain_com: 'google.com (国际)', domain_cn: 'google.cn (中国)', 'domain_com.hk': 'google.com.hk (香港)' },
+    ocr: { language: '识别语言', language_chs: '简体中文', language_cht: '繁体中文', language_eng: 'English', language_jpn: '日本語', language_kor: '한국어' }
+  },
   translationSettings: {
     title: "翻译设置", description: "配置翻译行为和输出方式",
     autoTranslate: "自动翻译", autoTranslateHint: "输入停止后自动开始翻译",
@@ -317,6 +326,10 @@ const zh = {
   // ========== 新增：文档翻译组件翻译键 ==========
   documentTranslator: {
     title: "文档翻译",
+    formats: {
+      "纯文本": "纯文本", "Markdown": "Markdown", "SRT 字幕": "SRT 字幕", "WebVTT 字幕": "WebVTT 字幕",
+      "PDF 文档": "PDF 文档", "Word 文档": "Word 文档", "CSV 表格": "CSV 表格", "JSON 文件": "JSON 文件", "EPUB 电子书": "EPUB 电子书"
+    },
     // 搜索替换
     search: {
       title: "搜索",

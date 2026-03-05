@@ -357,6 +357,27 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
   };
 
   // ========== 配置表单 ==========
+  
+  /**
+   * 翻译 Provider 配置字段 label
+   * 优先使用 i18n key: providerConfig.{providerId}.{fieldKey}
+   * 找不到则 fallback 到原始 label
+   */
+  const getFieldLabel = (providerId, fieldKey, originalLabel) => {
+    const i18nKey = `providerConfig.${providerId}.${fieldKey}`;
+    const translated = t(i18nKey);
+    return translated !== i18nKey ? translated : originalLabel;
+  };
+  
+  /**
+   * 翻译 select option label
+   */
+  const getOptionLabel = (providerId, fieldKey, optValue, originalLabel) => {
+    const i18nKey = `providerConfig.${providerId}.${fieldKey}_${optValue}`;
+    const translated = t(i18nKey);
+    return translated !== i18nKey ? translated : originalLabel;
+  };
+  
   const renderConfigForm = (providerId) => {
     const meta = allProvidersMeta.find(m => m.id === providerId);
     const config = providerConfigs[providerId] || {};
@@ -375,7 +396,7 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
         {Object.entries(meta.configSchema).map(([key, field]) => (
           <div key={key} className="ps-field">
             <label className="ps-label">
-              {field.label}
+              {getFieldLabel(providerId, key, field.label)}
               {field.required && <span className="ps-required">*</span>}
             </label>
             
@@ -406,7 +427,7 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
                   checked={config[key] || false}
                   onChange={(e) => updateConfig(providerId, key, e.target.checked)}
                 />
-                <span>{field.label}</span>
+                <span>{getFieldLabel(providerId, key, field.label)}</span>
               </label>
             ) : field.type === 'select' ? (
               <select
@@ -415,7 +436,7 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
                 className="ps-select"
               >
                 {field.options?.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  <option key={opt.value} value={opt.value}>{getOptionLabel(providerId, key, opt.value, opt.label)}</option>
                 ))}
               </select>
             ) : (

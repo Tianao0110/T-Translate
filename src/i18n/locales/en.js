@@ -42,6 +42,15 @@ const en = {
       'google-translate': 'Free to use, supports many languages, fast'
     }
   },
+  providerConfig: {
+    'local-llm': { endpoint: 'API Endpoint', model: 'Model Name', timeout: 'Timeout (ms)' },
+    'openai': { apiKey: 'API Key', endpoint: 'API Endpoint', model: 'Model Name' },
+    'deepl': { apiKey: 'API Key', freeApi: 'Use Free API (Key ending with :fx)' },
+    'gemini': { apiKey: 'API Key', model: 'Model' },
+    'deepseek': { apiKey: 'API Key', model: 'Model', endpoint: 'API Endpoint' },
+    'google-translate': { domain: 'Server', domain_com: 'google.com (International)', domain_cn: 'google.cn (China)', 'domain_com.hk': 'google.com.hk (Hong Kong)' },
+    ocr: { language: 'Recognition Language', language_chs: 'Simplified Chinese', language_cht: 'Traditional Chinese', language_eng: 'English', language_jpn: 'Japanese', language_kor: 'Korean' }
+  },
   translationSettings: {
     title: "Translation Settings", description: "Configure translation behavior and output",
     autoTranslate: "Auto Translate", autoTranslateHint: "Start translation automatically after input stops",
@@ -312,6 +321,10 @@ const en = {
   // ========== New: DocumentTranslator translation keys ==========
   documentTranslator: {
     title: "Document Translation",
+    formats: {
+      "纯文本": "Plain Text", "Markdown": "Markdown", "SRT 字幕": "SRT Subtitle", "WebVTT 字幕": "WebVTT Subtitle",
+      "PDF 文档": "PDF Document", "Word 文档": "Word Document", "CSV 表格": "CSV Spreadsheet", "JSON 文件": "JSON File", "EPUB 电子书": "EPUB eBook"
+    },
     // Search & Replace
     search: {
       title: "Search",

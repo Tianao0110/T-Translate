@@ -1186,7 +1186,7 @@ const DocumentTranslator = ({
               <div className="file-details">
                 <FileText size={18} />
                 <span className="filename">{document.filename}</span>
-                <span className="format-badge">{document.formatName}</span>
+                <span className="format-badge">{t(`documentTranslator.formats.${document.formatName}`, document.formatName)}</span>
                 <span 
                   className="stats clickable" 
                   onClick={() => setShowStats(!showStats)}
