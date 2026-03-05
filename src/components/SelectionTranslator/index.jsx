@@ -1,5 +1,6 @@
 // src/components/SelectionTranslator.jsx
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import translationService from '../../services/translation.js';
 import ttsManager, { TTS_STATUS } from '../../services/tts/index.js';
 import createLogger from '../../utils/logger.js';
@@ -41,6 +42,7 @@ const DEFAULT_TRANSLATION = {
 };
 
 const SelectionTranslator = () => {
+  const { t } = useTranslation();
   const [mode, setMode] = useState('idle');
   const [sourceText, setSourceText] = useState('');
   const [translatedText, setTranslatedText] = useState('');
@@ -223,7 +225,7 @@ const SelectionTranslator = () => {
             });
           }
         } catch (err) {
-          setError(err.message || '翻译失败');
+          setError(err.message || t('selection.translateFailed', '翻译失败'));
           setTranslatedText('');
           setMode('overlay');
         }
@@ -297,7 +299,7 @@ const SelectionTranslator = () => {
     
     try {
       const result = await window.electron?.selection?.getText?.(rect);
-      if (!result?.text) throw new Error('未获取到文字');
+      if (!result?.text) throw new Error(t('selection.noText', '未获取到文字'));
       
       const text = result.text.trim();
       
@@ -305,31 +307,31 @@ const SelectionTranslator = () => {
       
       // 1. 检查是否为空或纯空白
       if (!text || /^[\s\r\n]+$/.test(text)) {
-        throw new Error('选中内容为空');
+        throw new Error(t('selection.emptyContent', '选中内容为空'));
       }
       
       // 2. 检查字符数限制
       if (text.length < settings.minChars) {
-        throw new Error(`文字太短（最少 ${settings.minChars} 字符）`);
+        throw new Error(t('selection.tooShort', '文字太短（最少 {{min}} 字符）').replace('{{min}}', settings.minChars));
       }
       if (text.length > settings.maxChars) {
-        throw new Error(`文字太长（最多 ${settings.maxChars} 字符）`);
+        throw new Error(t('selection.tooLong', '文字太长（最多 {{max}} 字符）').replace('{{max}}', settings.maxChars));
       }
       
       // 3. 过滤纯符号（必须包含至少一个字母、数字或中日韩文字）
       // \w = 字母数字下划线, \u4e00-\u9fff = 中文, \u3040-\u30ff = 日文假名, \uac00-\ud7af = 韩文
       if (!/[\w\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]/.test(text)) {
-        throw new Error('选中内容无有效文字');
+        throw new Error(t('selection.noValidText', '选中内容无有效文字'));
       }
       
       // 4. 过滤可能的乱码（同一字符重复超过 10 次）
       if (/(.)\1{10,}/.test(text)) {
-        throw new Error('选中内容可能是乱码');
+        throw new Error(t('selection.possibleGarbage', '选中内容可能是乱码'));
       }
       
       // 5. 过滤文件路径（通常不需要翻译）
       if (/^[A-Za-z]:\\|^\/(?:home|usr|var|etc|tmp)\/|^file:\/\//.test(text)) {
-        throw new Error('选中内容是文件路径');
+        throw new Error(t('selection.isFilePath', '选中内容是文件路径'));
       }
       
       setSourceText(text);
@@ -350,7 +352,7 @@ const SelectionTranslator = () => {
       
       // 窗口大小由 useEffect 自动调整
     } catch (err) {
-      setError(err.message || '翻译失败');
+      setError(err.message || t('selection.translateFailed', '翻译失败'));
       setTranslatedText('');
       setMode('overlay');
       // 窗口大小由 useEffect 自动调整
@@ -471,7 +473,7 @@ const SelectionTranslator = () => {
       }
       
       if (!result.text) {
-        throw new Error('翻译结果为空');
+        throw new Error(t('selection.emptyResult', '翻译结果为空'));
       }
       
       return result.text;
@@ -639,24 +641,24 @@ const SelectionTranslator = () => {
         >
           <div className="sel-toolbar">
             {isFrozen && (
-              <span className="sel-frozen-badge" title="已固定 - 右键点击关闭">📌</span>
+              <span className="sel-frozen-badge" title={t('selection.frozenHint', '已固定 - 右键点击关闭')}>📌</span>
             )}
-            <button className={`sel-btn ${showSource ? 'active' : ''}`} onClick={toggleSource} title="显示原文">
-              原文
+            <button className={`sel-btn ${showSource ? 'active' : ''}`} onClick={toggleSource} title={t('selection.showSource', '显示原文')}>
+              {t('translation.source', '原文')}
             </button>
-            <button className={`sel-btn ${copied ? 'success' : ''}`} onClick={handleCopy} title="复制译文">
-              {copied ? '已复制' : '复制'}
+            <button className={`sel-btn ${copied ? 'success' : ''}`} onClick={handleCopy} title={t('selection.copyTarget', '复制译文')}>
+              {copied ? t('translation.copied', '已复制') : t('translation.copy', '复制')}
             </button>
             <button 
               className={`sel-btn ${ttsStatus === TTS_STATUS.SPEAKING ? 'active' : ''}`} 
               onClick={speakTranslation} 
               disabled={!translatedText}
-              title={ttsStatus === TTS_STATUS.SPEAKING ? '停止朗读' : '朗读'}
+              title={ttsStatus === TTS_STATUS.SPEAKING ? t('translation.stopSpeak', '停止朗读') : t('translation.speak', '朗读')}
             >
               {ttsStatus === TTS_STATUS.SPEAKING ? '🔇' : '🔊'}
             </button>
             <div className="sel-spacer" />
-            <button className="sel-btn sel-btn-close" onClick={handleClose} title="关闭 (ESC)">✕</button>
+            <button className="sel-btn sel-btn-close" onClick={handleClose} title={t('selection.closeEsc', '关闭 (ESC)')}>✕</button>
           </div>
           
           <div className="sel-content" ref={contentRef}>
