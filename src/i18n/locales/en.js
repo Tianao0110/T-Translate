@@ -101,7 +101,25 @@ const en = {
     fileImportSuccess: "File imported successfully", unsupportedFileType: "Unsupported file type",
     recognizingClipboard: "Found clipboard image, recognizing...",
     autoReplaced: "Auto replaced: {{info}}", copiedForManualReplace: "Copied \"{{text}}\", please replace manually in target",
-    termSet: "Term set"
+    termSet: "Term set",
+    styleRewrite: "Style Rewrite",
+    termFound: "Replaceable terms found",
+    applyTerm: "Apply this translation", apply: "Apply",
+    ignoreTerm: "Ignore this time",
+    neverRemind: "Don't remind again",
+    alwaysUseTerm: "Always use this term", always: "Always",
+    selectStyle: "Select Reference Style", fromStyleLib: "Choose from Style Library",
+    styleLibEmpty: "Style library is empty", styleLibHint: "Check \"Mark as style reference\" when saving to add to style library",
+    styleStrength: "Style Strength", strengthLight: "Light", strengthFull: "Full imitation",
+    strengthDescLight: "Light adjustment, mostly keeping original style",
+    strengthDescMedium: "Moderate imitation of reference style",
+    strengthDescHigh: "Heavy imitation, closely matching reference tone and expression",
+    startRewrite: "Start Rewrite",
+    addToFavorites: "Add to Favorites", aiSuggestions: "AI Suggestions", reanalyze: "Reanalyze",
+    aiAnalyzing: "AI is analyzing content...", summaryNote: "Summary/Note", shortDesc: "Short description...",
+    aiRecommended: "AI Recommended",
+    saveToStyleLib: "Will be saved to Style Library for style rewriting", saveAsNormal: "Save as regular favorite",
+    saveToStyleLibBtn: "Save to Style Library", saveFavorite: "Save Favorite"
   },
   languages: { auto: "Auto Detect", zh: "Chinese", "zh-TW": "Traditional Chinese", en: "English", ja: "Japanese", ko: "Korean", fr: "French", de: "German", es: "Spanish", ru: "Russian", pt: "Portuguese", it: "Italian" },
   history: { 
@@ -198,7 +216,13 @@ const en = {
     instructions: "Instructions",
     normalMode: "Normal Mode", normalModeDesc: "Click 📷 to capture current area",
     subtitleMode: "Subtitle Mode", subtitleModeDesc: "Click 🎬 to enable real-time subtitle translation",
-    firstUse: "First Use Subtitle Mode", firstUseDesc: "Need to select subtitle area first"
+    firstUse: "First Use Subtitle Mode", firstUseDesc: "Need to select subtitle area first",
+    // Glass window component strings
+    captureSpace: "Screenshot (Space)", historyCtrlH: "History (Ctrl+H)",
+    adjustOpacity: "Adjust opacity", closeEsc: "Close (Esc)",
+    capturing: "Capturing...", recognizing: "Recognizing...", translating: "Translating...",
+    captureHint: "Click 📷 or press Space to capture",
+    doubleClickFreeze: "Double-click to pin as independent window"
   },
   selection: { 
     freeze: "Freeze", unfreeze: "Unfreeze", close: "Close", copy: "Copy", more: "More",
@@ -215,7 +239,21 @@ const en = {
     charLimit: "Character Limit", minChars: "Min", maxChars: "Max", charLimitHint: "Content below min or above max characters won't trigger translation",
     instructions: "Instructions", workflow: "Workflow",
     step1: "Select text with mouse", step2: "Translate button appears nearby", step3: "Click button to translate", step4: "Result card shows after translation",
-    quickActions: "Quick Actions", action1: "Drag title bar to move", action2: "Resize from bottom-right corner", action3: "Click 'Source' to show comparison", action4: "Click 'Copy' or select text to copy", action5: "Press ESC or right-click to close"
+    quickActions: "Quick Actions", action1: "Drag title bar to move", action2: "Resize from bottom-right corner", action3: "Click 'Source' to show comparison", action4: "Click 'Copy' or select text to copy", action5: "Press ESC or right-click to close",
+    // Selection translator component strings
+    translateFailed: "Translation failed",
+    noText: "No text captured",
+    emptyContent: "Selection is empty",
+    tooShort: "Text too short (minimum {{min}} characters)",
+    tooLong: "Text too long (maximum {{max}} characters)",
+    noValidText: "Selection contains no valid text",
+    possibleGarbage: "Selection may be garbled text",
+    isFilePath: "Selection is a file path",
+    emptyResult: "Translation result is empty",
+    frozenHint: "Pinned - right-click to close",
+    showSource: "Show source",
+    copyTarget: "Copy translation",
+    closeEsc: "Close (ESC)"
   },
   settings: {
     title: "Settings",
@@ -301,7 +339,12 @@ const en = {
     use: "Use", inUse: "✓ In Use", download: "Download", uninstall: "Uninstall",
     downloading: "Downloading RapidOCR...", downloadComplete: "Download complete! Recommend restart", downloadFailed: "Download failed",
     uninstallConfirm: "Are you sure to uninstall RapidOCR?", uninstalling: "Uninstalling...", uninstalled: "Uninstalled", uninstallFailed: "Uninstall failed",
-    configKeyFirst: "Please configure API Key first", configKeyEndpoint: "Please configure API Key and Endpoint", configKeySecret: "Please configure API Key and Secret Key"
+    configKeyFirst: "Please configure API Key first", configKeyEndpoint: "Please configure API Key and Endpoint", configKeySecret: "Please configure API Key and Secret Key",
+    llmVision: {
+      notSupported: "Current model does not support image recognition. Please load a vision model (e.g., Qwen-VL, LLaVA)",
+      noText: "No text recognized",
+      timeout: "OCR recognition timed out. Please check if the model supports vision."
+    }
   },
   tts: {
     description: "Configure text-to-speech settings",
@@ -479,6 +522,9 @@ const en = {
     details: "Error Details"
   },
   // ========== New: Tray menu translation keys ==========
+  titleBar: {
+    minimize: "Minimize", maximize: "Maximize", restore: "Restore", close: "Close"
+  },
   tray: {
     showWindow: "Show Window",
     screenshot: "Screenshot Translate",

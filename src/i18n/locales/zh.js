@@ -101,7 +101,25 @@ const zh = {
     fileImportSuccess: "文件导入成功", unsupportedFileType: "不支持的文件类型",
     recognizingClipboard: "发现剪贴板图片，正在识别...",
     autoReplaced: "已自动替换: {{info}}", copiedForManualReplace: "已复制 \"{{text}}\"，请在译文中手动替换",
-    termSet: "已设置术语"
+    termSet: "已设置术语",
+    styleRewrite: "风格改写",
+    termFound: "发现可替换术语",
+    applyTerm: "应用此翻译", apply: "应用",
+    ignoreTerm: "忽略此次",
+    neverRemind: "不再提示",
+    alwaysUseTerm: "始终使用此术语", always: "始终",
+    selectStyle: "选择参考风格", fromStyleLib: "从风格库中选择",
+    styleLibEmpty: "风格库为空", styleLibHint: "收藏时勾选\"标记为风格参考\"添加到风格库",
+    styleStrength: "风格强度", strengthLight: "轻微", strengthFull: "完全模仿",
+    strengthDescLight: "轻微调整，基本保持原译文风格",
+    strengthDescMedium: "中等程度模仿参考风格",
+    strengthDescHigh: "高度模仿，尽量贴近参考风格的语气和表达",
+    startRewrite: "开始改写",
+    addToFavorites: "添加到收藏", aiSuggestions: "AI 建议", reanalyze: "重新分析",
+    aiAnalyzing: "AI 正在分析内容...", summaryNote: "摘要/笔记", shortDesc: "简短描述...",
+    aiRecommended: "AI 推荐",
+    saveToStyleLib: "将保存到\"风格库\"，可用于风格改写", saveAsNormal: "保存为普通收藏",
+    saveToStyleLibBtn: "保存到风格库", saveFavorite: "保存收藏"
   },
   languages: { auto: "自动检测", zh: "中文", "zh-TW": "繁体中文", en: "English", ja: "日本語", ko: "한국어", fr: "Français", de: "Deutsch", es: "Español", ru: "Русский", pt: "Português", it: "Italiano" },
   history: { 
@@ -198,7 +216,13 @@ const zh = {
     instructions: "使用说明",
     normalMode: "普通模式", normalModeDesc: "点击 📷 截图识别当前区域",
     subtitleMode: "字幕模式", subtitleModeDesc: "点击 🎬 开启实时字幕翻译",
-    firstUse: "首次使用字幕模式", firstUseDesc: "需要先框选视频原字幕区域"
+    firstUse: "首次使用字幕模式", firstUseDesc: "需要先框选视频原字幕区域",
+    // 玻璃窗口组件内文案
+    captureSpace: "截图识别 (Space)", historyCtrlH: "历史记录 (Ctrl+H)",
+    adjustOpacity: "点击调节透明度", closeEsc: "关闭 (Esc)",
+    capturing: "截图中...", recognizing: "识别中...", translating: "翻译中...",
+    captureHint: "点击 📷 或按 Space 截图识别",
+    doubleClickFreeze: "双击固定为独立窗口"
   },
   selection: { 
     freeze: "冻结", unfreeze: "解冻", close: "关闭", copy: "复制", more: "更多",
@@ -215,7 +239,21 @@ const zh = {
     charLimit: "字符数限制", minChars: "最小", maxChars: "最大", charLimitHint: "少于最小或超过最大字符数的选中内容不会触发翻译",
     instructions: "使用说明", workflow: "划词翻译流程",
     step1: "用鼠标选中需要翻译的文字", step2: "松开鼠标后，旁边出现翻译按钮", step3: "点击按钮开始翻译", step4: "翻译完成后显示结果卡片",
-    quickActions: "快捷操作", action1: "拖动标题栏移动窗口", action2: "右下角调整大小", action3: "点击「原文」显示原文对照", action4: "点击「复制」或直接选中文字复制", action5: "按 ESC 或右键关闭"
+    quickActions: "快捷操作", action1: "拖动标题栏移动窗口", action2: "右下角调整大小", action3: "点击「原文」显示原文对照", action4: "点击「复制」或直接选中文字复制", action5: "按 ESC 或右键关闭",
+    // 划词翻译组件内文案
+    translateFailed: "翻译失败",
+    noText: "未获取到文字",
+    emptyContent: "选中内容为空",
+    tooShort: "文字太短（最少 {{min}} 字符）",
+    tooLong: "文字太长（最多 {{max}} 字符）",
+    noValidText: "选中内容无有效文字",
+    possibleGarbage: "选中内容可能是乱码",
+    isFilePath: "选中内容是文件路径",
+    emptyResult: "翻译结果为空",
+    frozenHint: "已固定 - 右键点击关闭",
+    showSource: "显示原文",
+    copyTarget: "复制译文",
+    closeEsc: "关闭 (ESC)"
   },
   settings: {
     title: "设置",
@@ -484,6 +522,9 @@ const zh = {
     details: "错误详情"
   },
   // ========== 新增：托盘菜单翻译键 ==========
+  titleBar: {
+    minimize: "最小化", maximize: "最大化", restore: "还原", close: "关闭"
+  },
   tray: {
     showWindow: "显示窗口",
     screenshot: "截图翻译",
