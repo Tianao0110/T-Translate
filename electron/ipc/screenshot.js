@@ -114,7 +114,6 @@ function register(ctx) {
   ipcMain.on(CHANNELS.SCREENSHOT.OCR_COMPLETE, (event, data) => {
     if (data.success && data.text) {
       logger.info('OCR complete, sending text to selection window for translation');
-      // 调用 managers 中的 showSelectionWithText
       if (managers.showSelectionWithText) {
         managers.showSelectionWithText(data.text);
       } else {
@@ -122,9 +121,35 @@ function register(ctx) {
       }
     } else {
       logger.warn('OCR failed:', data.error);
-      // OCR 失败，关闭加载窗口
-      if (managers.hideSelectionLoading) {
-        managers.hideSelectionLoading(data.error || 'OCR 识别失败');
+      // OCR 失败，根据目标语言显示错误提示
+      const settings = store?.get('settings', {}) || {};
+      const targetLang = settings.translation?.targetLanguage || 'zh';
+      const errorText = data.error || '';
+      const isZh = targetLang.startsWith('zh');
+
+      // 根据错误类型生成友好提示
+      let displayError;
+      if (errorText.includes('vision') || errorText.includes('not support') || errorText.includes('不支持')) {
+        displayError = isZh
+          ? '当前模型不支持图片识别，请加载视觉模型（如 Qwen-VL、LLaVA）'
+          : 'Current model does not support image recognition. Please load a vision model (e.g. Qwen-VL, LLaVA).';
+      } else if (errorText.includes('timeout') || errorText.includes('超时')) {
+        displayError = isZh
+          ? 'OCR 识别超时，请检查模型是否正常运行'
+          : 'OCR recognition timed out. Please check if the model is running.';
+      } else {
+        displayError = isZh
+          ? 'OCR 识别失败：' + errorText
+          : 'OCR failed: ' + errorText;
+      }
+
+      if (managers.showSelectionResult) {
+        managers.showSelectionResult({
+          sourceText: isZh ? 'OCR 错误' : 'OCR Error',
+          translatedText: displayError,
+        });
+      } else if (managers.hideSelectionLoading) {
+        managers.hideSelectionLoading();
       }
     }
   });

@@ -196,6 +196,7 @@ function registerAllShortcuts(ctx) {
   
   const settings = store.get('settings', {});
   const shortcuts = settings.shortcuts || {};
+  const failed = [];  // 记录注册失败的快捷键
   
   const handlers = {
     screenshot: () => managers.startScreenshot?.(true),
@@ -226,15 +227,18 @@ function registerAllShortcuts(ctx) {
         if (success) {
           logger.debug(`Registered: ${action} [${electronShortcut}]`);
         } else {
-          logger.warn(`Failed to register: ${action} [${electronShortcut}]`);
+          logger.warn(`Failed to register: ${action} [${electronShortcut}] (may be in use by another app)`);
+          failed.push({ action, shortcut });
         }
       } catch (e) {
         logger.error(`Error registering ${action}:`, e.message);
+        failed.push({ action, shortcut });
       }
     }
   }
   
-  logger.info('All shortcuts registered');
+  logger.info(`Shortcuts registered (${failed.length} failed)`);
+  return failed;
 }
 
 /**

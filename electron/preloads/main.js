@@ -29,6 +29,7 @@ const validChannels = {
     "selection-state-changed",  // 划词翻译状态变化
     "theme:changed",  // 主题变化通知
     "maximize-change",  // 窗口最大化状态变化
+    "shortcut-conflict",  // 快捷键冲突通知
   ],
   invoke: [
     "get-app-version",

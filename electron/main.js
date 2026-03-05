@@ -81,7 +81,7 @@ async function handleDelayedConfirm(x, y, rect) {
     logger.debug(`Delayed confirm: layer 3 - clipboard fallback (office=${isOfficeApp})`);
     
     const clipboardResult = await checkSelectionViaClipboard({ isComplexApp: isOfficeApp });
-    
+
     if (clipboardResult.hasSelection === true) {
       logger.debug(`Delayed confirm: text selected via clipboard "${clipboardResult.text.substring(0, 20)}..."`);
       showSelectionTrigger(x, y, rect);
@@ -232,6 +232,32 @@ function showSelectionWithText(text) {
 }
 
 /**
+ * 直接在截图划词窗口显示结果（不走翻译，用于 OCR 失败等）
+ */
+function showSelectionResult(data) {
+  const win = runtime.screenshotSelectionWindow;
+
+  if (!win || win.isDestroyed()) {
+    logger.warn('No selection window to show result');
+    return;
+  }
+
+  const settings = store.get('settings', {});
+  const interfaceSettings = settings.interface || {};
+  const selectionSettings = settings.selection || {};
+
+  win.webContents.send(CHANNELS.SELECTION.SHOW_RESULT, {
+    sourceText: data.sourceText || '',
+    translatedText: data.translatedText || '',
+    theme: interfaceSettings.theme || 'light',
+    settings: {
+      windowOpacity: selectionSettings.windowOpacity || 95,
+      autoCloseOnCopy: selectionSettings.autoCloseOnCopy || false,
+    },
+  });
+}
+
+/**
  * 关闭截图加载窗口（OCR 失败时调用）
  */
 function hideSelectionLoading(errorMsg) {
@@ -247,7 +273,7 @@ function hideSelectionLoading(errorMsg) {
       });
       setTimeout(() => {
         if (win && !win.isDestroyed()) win.close();
-      }, 2000);
+      }, 4000);
     } else {
       win.close();
     }
@@ -863,6 +889,7 @@ app.whenReady().then(() => {
     startScreenshot,
     handleScreenshotSelection,
     showSelectionWithText,      // OCR 完成后发送文字给划词窗口
+    showSelectionResult,        // 直接显示结果（不翻译）
     hideSelectionLoading,       // OCR 失败时关闭加载窗口
     toggleGlassWindow: (...args) => windowManager.toggleGlassWindow(...args),
     createGlassWindow: (...args) => windowManager.createGlassWindow(...args),
@@ -895,11 +922,18 @@ app.whenReady().then(() => {
   createTray(ctx);
 
   // 注册全局快捷键
-  registerAllShortcuts({
+  const failedShortcuts = registerAllShortcuts({
     store,
     getMainWindow: () => windows.main,
     managers,
   });
+  
+  // 如果有快捷键注册失败，等主窗口加载后通知用户
+  if (failedShortcuts.length > 0 && windows.main) {
+    windows.main.webContents.once('did-finish-load', () => {
+      windows.main.webContents.send('shortcut-conflict', failedShortcuts);
+    });
+  }
 
   // 划词翻译默认关闭
   runtime.selectionEnabled = false;
@@ -970,6 +1004,8 @@ function preheatSelectionModules() {
 // 全局异常处理
 process.on('uncaughtException', (error) => {
   logger.error('Uncaught exception:', error);
+  // 确保原生钩子被停止，避免进程残留
+  try { stopSelectionHook(); } catch (e) { /* ignore */ }
 });
 
 process.on('unhandledRejection', (reason, promise) => {
@@ -990,6 +1026,7 @@ process.on('unhandledRejection', (reason, promise) => {
 process.on('SIGINT', () => {
   logger.info('Received SIGINT, quitting...');
   runtime.isQuitting = true;
+  try { stopSelectionHook(); } catch (e) { /* ignore */ }
   app.quit();
 });
 
@@ -997,6 +1034,7 @@ process.on('SIGINT', () => {
 process.on('SIGTERM', () => {
   logger.info('Received SIGTERM, quitting...');
   runtime.isQuitting = true;
+  try { stopSelectionHook(); } catch (e) { /* ignore */ }
   app.quit();
 });
 
@@ -1042,10 +1080,19 @@ app.on('will-quit', () => {
   }
   
   unregisterAllShortcuts();
-  // stopSelectionHook 已在 before-quit 中调用
+  
+  // 双保险：确保原生钩子被停止（before-quit 里已调用一次）
+  try { stopSelectionHook(); } catch (e) { /* ignore */ }
+  
   destroyTray();
   
   logger.info('App cleanup completed');
+  
+  // 兜底：如果 uIOhook 原生线程阻止进程退出，5秒后强制退出
+  setTimeout(() => {
+    logger.warn('Force exit: process still alive after 5s');
+    process.exit(0);
+  }, 5000).unref();
 });
 
 // 单实例锁
