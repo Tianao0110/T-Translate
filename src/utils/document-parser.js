@@ -5,6 +5,12 @@ import createLogger from './logger.js';
 const logger = createLogger('DocumentParser');
 
 /**
+ * 文件大小限制
+ */
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+const MAX_FILE_SIZE_LABEL = '20MB';
+
+/**
  * 支持的文件格式
  */
 export const SUPPORTED_FORMATS = {
@@ -355,9 +361,18 @@ export async function parsePDF(file, options = {}) {
   // 动态导入 pdfjs-dist
   const pdfjsLib = await import('pdfjs-dist');
   
-  // 设置 worker
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 
-    `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+  // Worker 设置：优先本地，失败则禁用 worker 在主线程运行
+  if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+    try {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+        'pdfjs-dist/build/pdf.worker.min.mjs',
+        import.meta.url
+      ).toString();
+    } catch {
+      // 回退：禁用 worker，用主线程解析（慢但可用）
+      pdfjsLib.GlobalWorkerOptions.workerPort = null;
+    }
+  }
   
   const arrayBuffer = await file.arrayBuffer();
   
@@ -370,26 +385,78 @@ export async function parsePDF(file, options = {}) {
   const numPages = pdf.numPages;
   
   let allText = '';
+  const pageTexts = [];
   
   for (let i = 1; i <= numPages; i++) {
     const page = await pdf.getPage(i);
     const textContent = await page.getTextContent();
     
-    let pageText = '';
+    // 收集每行文本及其 Y 坐标
+    const lines = [];
+    let currentLine = '';
     let lastY = null;
+    let lastX = 0;
     
     for (const item of textContent.items) {
-      if (item.str) {
-        if (lastY !== null && Math.abs(item.transform[5] - lastY) > 5) {
-          pageText += '\n';
+      if (!item.str) continue;
+      
+      const y = Math.round(item.transform[5]);
+      const x = item.transform[4];
+      
+      if (lastY !== null && Math.abs(y - lastY) > 3) {
+        // 新行
+        if (currentLine.trim()) {
+          lines.push(currentLine.trim());
         }
-        pageText += item.str;
-        lastY = item.transform[5];
+        currentLine = item.str;
+      } else {
+        // 同行：如果 X 距离超过一个字符宽度，加空格
+        if (currentLine && x - lastX > 10) {
+          currentLine += ' ';
+        }
+        currentLine += item.str;
+      }
+      lastY = y;
+      lastX = x + (item.width || item.str.length * 6);
+    }
+    if (currentLine.trim()) {
+      lines.push(currentLine.trim());
+    }
+    
+    // 智能拼接：短行拼接为段落，空行作为段落分隔
+    let pageText = '';
+    for (let j = 0; j < lines.length; j++) {
+      const line = lines[j];
+      const nextLine = lines[j + 1];
+      
+      // 跳过疑似页眉/页脚（纯数字且在页面首尾）
+      if ((j === 0 || j === lines.length - 1) && /^\d{1,4}$/.test(line)) {
+        continue;
+      }
+      
+      pageText += line;
+      
+      // 判断是否需要换行：
+      // - 以句号结尾（.!?。！？）→ 段落分隔
+      // - 短行（<40字符）且下一行存在 → 可能是标题/列表，保持换行
+      // - 否则拼接（同一段落被 PDF 断行）
+      const endsWithPunctuation = /[.!?。！？;:；：]$/.test(line);
+      const isShortLine = line.length < 40;
+      
+      if (endsWithPunctuation || isShortLine || !nextLine) {
+        pageText += '\n';
+      } else {
+        // 英文加空格拼接，中文直接拼
+        const lastChar = line[line.length - 1];
+        const isCJK = /[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff]/.test(lastChar);
+        pageText += isCJK ? '' : ' ';
       }
     }
     
-    allText += pageText + '\n\n';
+    pageTexts.push(pageText.trim());
   }
+  
+  allText = pageTexts.filter(t => t).join('\n\n');
   
   const segments = splitIntoSegments(allText, {
     maxCharsPerSegment,
@@ -399,6 +466,7 @@ export async function parsePDF(file, options = {}) {
   return {
     segments,
     pageCount: numPages,
+    isPdf: true,
   };
 }
 
@@ -664,6 +732,12 @@ export async function parseDocument(file, options = {}) {
         const pdfResult = await parsePDF(file, options);
         segments = pdfResult.segments;
         extra.pageCount = pdfResult.pageCount;
+        extra.isPdf = true;
+        if (pdfResult.usedOcr) extra.usedOcr = true;
+        if (pdfResult.warning === 'scanned_no_ocr') {
+          extra.isScanned = true;
+          extra.warning = 'scanned_no_ocr';
+        }
         break;
         
       case 'docx':

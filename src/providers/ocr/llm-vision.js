@@ -78,14 +78,23 @@ class LLMVisionEngine extends BaseOCREngine {
 
       if (!response.ok) {
         const errorText = await response.text();
-        return { success: false, error: `API 错误: ${response.status} - ${errorText}` };
+        const lower = errorText.toLowerCase();
+        // 检测常见的"不支持视觉"错误
+        if (response.status === 400 && (
+          lower.includes('image') || lower.includes('vision') || 
+          lower.includes('multimodal') || lower.includes('content type') ||
+          lower.includes('does not support')
+        )) {
+          return { success: false, error: 'Model does not support vision / 当前模型不支持图片识别，请加载视觉模型 (Qwen-VL, LLaVA)' };
+        }
+        return { success: false, error: `API 错误: ${response.status} - ${errorText.slice(0, 200)}` };
       }
 
       const data = await response.json();
       const text = data.choices?.[0]?.message?.content;
 
       if (!text) {
-        return { success: false, error: '未识别到文字' };
+        return { success: false, error: 'No text recognized / 未识别到文字' };
       }
 
       // 清理输出
@@ -99,6 +108,9 @@ class LLMVisionEngine extends BaseOCREngine {
       };
     } catch (error) {
       logger.error('Error:', error);
+      if (error.name === 'AbortError' || error.name === 'TimeoutError') {
+        return { success: false, error: 'OCR timeout - check if model supports vision / OCR 超时，请检查模型是否支持视觉' };
+      }
       return { success: false, error: error.message };
     }
   }

@@ -1,4 +1,3 @@
-// src/components/DocumentTranslator/index.jsx
 // 文档翻译组件 - 沉浸式双语对照翻译
 // 已国际化版本
 
@@ -6,11 +5,11 @@ import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next';
 import {
   FileText, Upload, X, Play, Pause, RotateCcw, Download,
-  ChevronDown, ChevronRight, Settings, AlertCircle, CheckCircle, Clock,
+  ChevronUp, ChevronDown, ChevronRight, Settings, AlertCircle, CheckCircle, Clock,
   Loader, Eye, EyeOff, ArrowUp, Filter, FileDown, Trash2,
   SkipForward, RefreshCw, Languages, Zap, Lock, Key,
   List, Hash, DollarSign, Database, BookOpen, ChevronLeft,
-  Edit3, Check, Copy, Search, Replace
+  Edit3, Check, Copy, Search
 } from 'lucide-react';
 import createLogger from '../../utils/logger.js';
 import {
@@ -25,6 +24,7 @@ import {
   exportPDFHTML,
   SUPPORTED_FORMATS,
 } from '../../utils/document-parser.js';
+import { ocrManager } from '../../providers/ocr/index.js';
 import translationService from '../../services/translation.js';
 import useTranslationStore from '../../stores/translation-store';
 import './styles.css';
@@ -67,7 +67,7 @@ function loadProgress(fp) {
 /**
  * 单个段落组件
  */
-const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate, onEdit, onCopy, searchQuery, replaceQuery, onReplace, t }) => {
+const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate, onEdit, onCopy, searchQuery, t }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState('');
   const editRef = useRef(null);
@@ -138,11 +138,7 @@ const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate,
               <button className="seg-btn" onClick={() => onCopy(segment.translated)} title={t('documentTranslator.segment.copy')}>
                 <Copy size={12} />
               </button>
-              {hasSearchMatch && replaceQuery !== undefined && (
-                <button className="seg-btn replace" onClick={() => onReplace(segment.id)} title={t('documentTranslator.search.replaceThis')}>
-                  <Replace size={12} />
-                </button>
-              )}
+
             </>
           )}
         </div>
@@ -306,8 +302,9 @@ const DocumentTranslator = ({
   
   // 搜索替换
   const [searchQuery, setSearchQuery] = useState('');
-  const [replaceQuery, setReplaceQuery] = useState('');
   const [searchMatchCount, setSearchMatchCount] = useState(0);
+  const [searchMatchIndex, setSearchMatchIndex] = useState(-1);
+  const [searchMatchIds, setSearchMatchIds] = useState([]);
   
   // 进度恢复提示
   const [pendingRestore, setPendingRestore] = useState(null);
@@ -433,6 +430,13 @@ const DocumentTranslator = ({
           ...filters,
           targetLang,
         },
+        ocrRecognize: async (imageData) => {
+          try {
+            return await ocrManager.recognize(imageData);
+          } catch {
+            return { success: false, error: 'OCR unavailable' };
+          }
+        },
       });
       
       logger.debug('parseDocument result:', result);
@@ -466,10 +470,21 @@ const DocumentTranslator = ({
         }
         
         // 通知消息
-        const message = result.pageCount
-          ? t('documentTranslator.notify.fileLoadedWithPages', { count: result.segments.length, pages: result.pageCount })
-          : t('documentTranslator.notify.fileLoaded', { count: result.segments.length });
-        notify?.(message, 'success');
+        if (result.warning === 'scanned_no_ocr') {
+          notify?.(t('documentTranslator.notify.scannedNoOcr') || '该 PDF 为扫描件，无法提取文字。请在设置中配置 OCR 引擎后重试', 'warning');
+        } else {
+          const ocrNote = result.usedOcr ? ' (OCR)' : '';
+          const message = result.pageCount
+            ? t('documentTranslator.notify.fileLoadedWithPages', { count: result.segments.length, pages: result.pageCount }) + ocrNote
+            : t('documentTranslator.notify.fileLoaded', { count: result.segments.length }) + ocrNote;
+          notify?.(message, 'success');
+          // PDF 提示
+          if (result.isPdf) {
+            setTimeout(() => {
+              notify?.(t('documentTranslator.notify.pdfHint') || 'PDF 仅提取文字内容，图片及复杂排版可能丢失', 'info');
+            }, 1500);
+          }
+        }
       } else if (result.needPassword) {
         // 需要密码，显示密码弹窗
         setPendingFile(file);
@@ -804,41 +819,10 @@ const DocumentTranslator = ({
   }, [notify, t]);
 
   // 替换单个段落中的搜索匹配
-  const replaceInSegment = useCallback((segmentId) => {
-    if (!searchQuery || replaceQuery === undefined) return;
-    setSegments(prev => prev.map(s => {
-      if (s.id === segmentId && s.status === STATUS.COMPLETED && s.translated) {
-        const regex = new RegExp(searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-        const newText = s.translated.replace(regex, replaceQuery);
-        if (newText !== s.translated) {
-          const cacheKey = `${s.original}|${sourceLang}|${targetLang}`;
-          translationCache.current.set(cacheKey, newText);
-          return { ...s, translated: newText, edited: true };
-        }
-      }
-      return s;
-    }));
-  }, [searchQuery, replaceQuery, sourceLang, targetLang]);
+  
 
   // 全部替换
-  const replaceAll = useCallback(() => {
-    if (!searchQuery || replaceQuery === undefined) return;
-    let count = 0;
-    setSegments(prev => prev.map(s => {
-      if (s.status === STATUS.COMPLETED && s.translated) {
-        const regex = new RegExp(searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-        const newText = s.translated.replace(regex, replaceQuery);
-        if (newText !== s.translated) {
-          count++;
-          const cacheKey = `${s.original}|${sourceLang}|${targetLang}`;
-          translationCache.current.set(cacheKey, newText);
-          return { ...s, translated: newText, edited: true };
-        }
-      }
-      return s;
-    }));
-    if (count > 0) notify?.(t('documentTranslator.notify.replacedCount', { count }), 'success');
-  }, [searchQuery, replaceQuery, sourceLang, targetLang, notify, t]);
+
 
   // 恢复进度
   const restoreProgress = useCallback(() => {
@@ -988,7 +972,7 @@ const DocumentTranslator = ({
     setPendingRestore(null);
     setShowSearch(false);
     setSearchQuery('');
-    setReplaceQuery('');
+    
     fileFingerprint.current = null;
   };
 
@@ -1043,7 +1027,7 @@ const DocumentTranslator = ({
               {/* 搜索按钮 */}
               <button 
                 className={`dt-btn icon-only ${showSearch ? 'active' : ''}`}
-                onClick={() => setShowSearch(!showSearch)}
+                onClick={() => { const next = !showSearch; setShowSearch(next); if (!next) { setSearchQuery(''); setSearchMatchIndex(-1); } }}
                 title={t('documentTranslator.search.title') + ' (Ctrl+F)'}
               >
                 <Search size={16} />
@@ -1121,26 +1105,27 @@ const DocumentTranslator = ({
         </div>
       </div>
 
-      {/* 搜索替换栏 */}
+      {/* 搜索栏 */}
       {showSearch && document && (
         <div className="dt-search-bar">
           <div className="search-row">
-            <Search size={14} className="search-icon" />
             <input type="text" placeholder={t('documentTranslator.search.searchPlaceholder')} value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)} autoFocus className="search-input" />
-            {searchQuery && <span className="search-count">{searchMatchCount} {t('documentTranslator.search.matches')}</span>}
-          </div>
-          <div className="search-row">
-            <Replace size={14} className="search-icon" />
-            <input type="text" placeholder={t('documentTranslator.search.replacePlaceholder')} value={replaceQuery}
-              onChange={e => setReplaceQuery(e.target.value)} className="search-input" />
-            <button className="search-btn" onClick={replaceAll} disabled={!searchQuery || searchMatchCount === 0}>
-              {t('documentTranslator.search.replaceAll')}
+              onChange={e => setSearchQuery(e.target.value)} autoFocus className="search-input"
+              onKeyDown={e => { if (e.key === 'Enter') navigateSearch(e.shiftKey ? 'prev' : 'next'); }}
+            />
+            {searchQuery && (
+              <span className="search-count">
+                {searchMatchCount > 0 ? `${searchMatchIndex + 1}/${searchMatchCount}` : `0 ${t('documentTranslator.search.matches')}`}
+              </span>
+            )}
+            <button className="search-nav-btn" onClick={() => navigateSearch('prev')} disabled={searchMatchCount === 0} title={t('documentTranslator.search.prev') || '上一个'}>
+              <ChevronUp size={14} />
+            </button>
+            <button className="search-nav-btn" onClick={() => navigateSearch('next')} disabled={searchMatchCount === 0} title={t('documentTranslator.search.next') || '下一个'}>
+              <ChevronDown size={14} />
             </button>
           </div>
-          <button className="search-close" onClick={() => { setShowSearch(false); setSearchQuery(''); setReplaceQuery(''); }}>
-            <X size={14} />
-          </button>
+
         </div>
       )}
 
@@ -1227,7 +1212,18 @@ const DocumentTranslator = ({
                   {stats.skipped > 0 && <span> · {t('documentTranslator.progress.skipped')} {stats.skipped}</span>}
                   {stats.failed > 0 && <span className="failed"> · {t('documentTranslator.progress.failed')} {stats.failed}</span>}
                   {stats.cacheHits > 0 && <span className="cache-hits"> · {t('documentTranslator.progress.cached')} {stats.cacheHits}</span>}
-                  {stats.edited > 0 && <span className="edited-count"> · {t('documentTranslator.progress.edited')} {stats.edited}</span>}
+                  {stats.edited > 0 && (
+                    <button
+                      className="edited-count edited-locate-btn"
+                      onClick={() => {
+                        const el = document.querySelector('.segment-item.edited');
+                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }}
+                      title={t('documentTranslator.progress.editedHint') || '点击定位到已修改的译文'}
+                    >
+                       · {t('documentTranslator.progress.edited')} {stats.edited}
+                    </button>
+                  )}
                 </span>
                 {isTranslating && (
                   <span className="elapsed-time">
@@ -1274,8 +1270,7 @@ const DocumentTranslator = ({
                     onEdit={editSegment}
                     onCopy={copySegmentText}
                     searchQuery={showSearch ? searchQuery : ''}
-                    replaceQuery={showSearch ? replaceQuery : undefined}
-                    onReplace={replaceInSegment}
+                    
                     t={t}
                   />
                 ))}
