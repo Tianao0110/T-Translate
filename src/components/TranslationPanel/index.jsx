@@ -140,7 +140,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
             }, delay);
           }
         } else {
-          notify(t('translation.ocrFailed'), 'warning');
+          notify(result.error || t('translation.ocrFailed'), 'warning');
         }
       } catch (error) {
         logger.error('[OCR] Error:', error);

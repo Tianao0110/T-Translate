@@ -328,6 +328,7 @@ function hasTextSelection() {
     const standardEditClasses = [
       'Edit',                         // 标准输入框
       'RICHEDIT50W', 'RichEdit20W', 'RichEdit', // RichEdit 系列
+      'RichEditD2DPT',                // Win11 新版记事本编辑区
       'TextBox',                      // .NET TextBox
       '_WwG',                         // Word 编辑区
     ];
@@ -382,6 +383,9 @@ function hasTextSelection() {
       
       // 其他 Electron 应用
       'Electron',
+      
+      // Win11 新版记事本（顶层窗口，子控件可能是 RichEditD2DPT）
+      'Notepad',
     ];
     
     const isComplexApp = complexAppClasses.some(cls => focusInfo.className.includes(cls));
@@ -427,8 +431,10 @@ function getFocusedWindowInfo(api) {
   }
   
   // 获取 GUI 线程信息
+  // cbSize 必须精确匹配结构体大小，64位系统上是 72 字节
+  // uint32(4) + uint32(4) + 6×void*(6×8=48) + 4×int32(16) = 72
   const guiInfo = {
-    cbSize: 48,
+    cbSize: 72,
     flags: 0,
     hwndActive: null,
     hwndFocus: null,

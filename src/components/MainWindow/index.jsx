@@ -91,15 +91,7 @@ const MainWindow = () => {
     fetchVersion();
   }, []);
 
-  // 监听托盘菜单导航事件
-  useEffect(() => {
-    const cleanup = window.electron?.ipc?.on?.('navigate', (target) => {
-      if (target === 'settings') {
-        setActiveTab('settings');
-      }
-    });
-    return () => cleanup?.();
-  }, []);
+
 
   // 全局截图监听 - 始终挂载，不会因标签切换而丢失
   useEffect(() => {
@@ -229,17 +221,21 @@ const MainWindow = () => {
     setTimeout(() => setNotification(null), duration);
   }, []);
 
-  // 监听划词翻译状态变化 - 显示通知
+  // 监听快捷键冲突通知（启动时检测）
   useEffect(() => {
-    const cleanup = window.electron?.ipc?.on?.('selection-state-changed', (enabled) => {
-      showNotification(
-        enabled ? t('toolbar.selectionOn') : t('toolbar.selectionOff'),
-        enabled ? 'success' : 'info',
-        1500
-      );
+    const cleanup = window.electron?.ipc?.on('shortcut-conflict', (failedList) => {
+      if (failedList?.length > 0) {
+        const names = failedList.map(f => f.shortcut).join(', ');
+        showNotification(
+          t('shortcuts.conflictNotice', { shortcuts: names }) || 
+          '快捷键被其他程序占用: ' + names + '，可在设置中修改',
+          'warning',
+          6000
+        );
+      }
     });
     return () => cleanup?.();
-  }, [showNotification, t]);
+  }, [t, showNotification]);
 
   // 快速操作菜单
   // 渲染通知
