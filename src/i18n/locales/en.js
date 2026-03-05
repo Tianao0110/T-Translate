@@ -10,9 +10,10 @@ const en = {
   settingsNav: {
     searchPlaceholder: "Search settings...",
     groupTranslation: "Translation", groupSystem: "System",
-    providers: "Providers", translation: "Translation", selection: "Selection", glassWindow: "Floating Translate", document: "Documents",
+    providers: "Providers", translation: "Translation", selection: "Selection", glassWindow: "Glass Window", document: "Documents",
     ocr: "OCR", tts: "Text to Speech", interface: "Appearance", connection: "LM Studio", privacy: "Privacy", about: "About",
     export: "Export", import: "Import", reset: "Reset",
+    simpleMode: "Simple", fullMode: "Full", switchToFull: "Switch to full mode", switchToSimple: "Switch to simple mode",
     noMatch: "No matching settings found",
     unsavedChanges: "Unsaved changes", saving: "Saving...", saveChanges: "Save Changes"
   },
@@ -23,8 +24,6 @@ const en = {
     testing: "Testing...", connected: "Connected", connectionFailed: "Connection failed", notTested: "Not tested",
     noConfig: "This provider requires no configuration, ready to use",
     saved: "Provider settings saved", saveFailed: "Save failed",
-    enabledSection: "Enabled", disabledSection: "Not Enabled",
-    noEnabled: "No translation providers enabled", enable: "Enable", getApiKey: "Get API Key",
     typeLabels: { llm: "AI Model", api: "Pro API", traditional: "Traditional" },
     names: {
       'local-llm': 'LM Studio (Local)',
@@ -66,12 +65,13 @@ const en = {
   shortcuts: {
     title: "Shortcuts",
     translate: "Translate", swapLanguages: "Swap Languages", clear: "Clear", paste: "Paste", copy: "Copy Result",
-    screenshot: "Screenshot", toggleWindow: "Show/Hide Window", glassWindow: "Floating Translate", selectionTranslate: "Toggle Selection",
+    screenshot: "Screenshot", toggleWindow: "Show/Hide Window", glassWindow: "Glass Window", selectionTranslate: "Toggle Selection",
     hint: "Click to edit shortcut, press Esc to cancel. 🌐 marks global shortcuts",
     pressKey: "Press shortcut...", resetDefault: "Reset to Default",
-    updated: "Shortcut updated: {{label}} → {{shortcut}}", updateFailed: "Shortcut update failed: {{error}}", reset: "Shortcuts reset to default"
+    updated: "Shortcut updated: {{label}} → {{shortcut}}", updateFailed: "Shortcut update failed: {{error}}", reset: "Shortcuts reset to default",
+    conflictNotice: "Shortcuts occupied by other apps: {{shortcuts}}. You can change them in Settings."
   },
-  toolbar: { glass: "Floating Translate", screenshot: "Screenshot", selection: "Selection", selectionOn: "Selection ON", selectionOff: "Selection OFF", privacy: "Privacy Mode", theme: "Theme" },
+  toolbar: { glass: "Glass Window", screenshot: "Screenshot", selection: "Selection", selectionOn: "Selection ON", selectionOff: "Selection OFF", privacy: "Privacy Mode", theme: "Theme" },
   templates: { natural: "Natural", naturalDesc: "Daily/Casual", precise: "Precise", preciseDesc: "Tech/Academic", formal: "Formal", formalDesc: "Business/Official" },
   translation: {
     sourceLang: "Source", targetLang: "Target", auto: "Auto Detect",
@@ -172,16 +172,18 @@ const en = {
     incognitoDisabled: " (Disabled in incognito mode)"
   },
   glass: { 
-    title: "Floating Translate", pin: "Pin", unpin: "Unpin", opacity: "Opacity", close: "Close", addPanel: "Add Panel", removePanel: "Remove Panel", clearAll: "Clear All",
+    title: "Glass Window", pin: "Pin", unpin: "Unpin", opacity: "Opacity", close: "Close", addPanel: "Add Panel", removePanel: "Remove Panel", clearAll: "Clear All",
     description: "Configure floating translation window behavior and appearance",
     lockTargetLang: "Lock Target Language", lockTargetLangOnDesc: "Always translate to target language", lockTargetLangOffDesc: "Auto switch based on source (may cause back-translation)", lockTargetLangHint: "Recommended to enable to avoid language switching",
     smartDetect: "Smart Detect", smartDetectOnDesc: "Auto skip unchanged content", smartDetectOffDesc: "Re-recognize and translate every time",
     ocrEngine: "OCR Engine", useGlobalOcr: "Using global OCR settings (Current: {{engine}})", goToSettings: "Go to Settings",
     defaultOpacity: "Default Opacity", opacityHint: "Click the bar in glass window to adjust in real-time",
     windowOptions: "Window Options", rememberPosition: "Remember Position", autoPin: "Always on Top",
-    shortcut: { toggle: "Toggle Floating Translate", capture: "Manual Screenshot", exit: "Close" },
+    shortcut: { toggle: "Toggle Glass Window", capture: "Manual Screenshot", exit: "Exit Subtitle Mode / Close" },
     instructions: "Instructions",
     normalMode: "Normal Mode", normalModeDesc: "Click 📷 to capture current area",
+    subtitleMode: "Subtitle Mode", subtitleModeDesc: "Click 🎬 to enable real-time subtitle translation",
+    firstUse: "First Use Subtitle Mode", firstUseDesc: "Need to select subtitle area first"
   },
   selection: { 
     freeze: "Freeze", unfreeze: "Unfreeze", close: "Close", copy: "Copy", more: "More",
@@ -222,7 +224,7 @@ const en = {
       gemini: { name: "Gemini", desc: "Google AI translation" }, deepseek: { name: "DeepSeek", desc: "DeepSeek AI translation" }, google: { name: "Google Translate", desc: "Free Google translation" }
     },
     ocr: { title: "OCR Settings", engine: "OCR Engine", engineDesc: "Select text recognition engine", engines: { rapid: "RapidOCR (Local)", windows: "Windows OCR", llmVision: "LLM Vision" }, language: "Recognition Language", languageDesc: "Select language to recognize" },
-    shortcuts: { title: "Keyboard Shortcuts", desc: "Customize global shortcuts", showWindow: "Show/Hide Window", screenshot: "Screenshot Translate", glassWindow: "Floating Translate", selectionToggle: "Toggle Selection", recording: "Press shortcut...", conflict: "Shortcut conflict", reset: "Reset Default" },
+    shortcuts: { title: "Keyboard Shortcuts", desc: "Customize global shortcuts", showWindow: "Show/Hide Window", screenshot: "Screenshot Translate", glassWindow: "Glass Window", selectionToggle: "Toggle Selection", recording: "Press shortcut...", conflict: "Shortcut conflict", reset: "Reset Default" },
     privacy: {
       title: "Privacy Settings", mode: "Privacy Mode", modeDesc: "Control data storage and network",
       modes: { standard: "Standard", standardDesc: "Normal features, save history", offline: "Offline", offlineDesc: "Local translation only", incognito: "Incognito", incognitoDesc: "No history or cache", strict: "Strict", strictDesc: "Offline + Incognito" },
@@ -232,7 +234,7 @@ const en = {
     glossary: { title: "Glossary", desc: "Custom translation terms for consistent terminology", add: "Add Term", source: "Source", target: "Translation", empty: "No terms yet", import: "Import", export: "Export", delete: "Delete", save: "Save" },
     about: { title: "About", version: "Version", checkUpdate: "Check for Updates", checking: "Checking...", upToDate: "You're up to date", newVersion: "New version available", download: "Download", later: "Later", releaseNotes: "Release Notes", publishedAt: "Published", github: "GitHub", feedback: "Feedback", license: "License", copyright: "© 2026 T-Translate" },
     selection: { title: "Selection Translate" },
-    glass: { title: "Floating Translate" }
+    glass: { title: "Glass Window" }
   },
   about: {
     desc: "Smart Offline Translation Tool",
@@ -254,7 +256,7 @@ const en = {
   notify: { 
     success: "Success", error: "Error", warning: "Warning", info: "Info", 
     copySuccess: "Copied to clipboard", copyFailed: "Copy failed", 
-    saveSuccess: "Saved successfully", saveFailed: "Save failed",
+    saveSuccess: "Saved successfully", saveFailed: "Save failed", 
     networkError: "Network error", translateError: "Translation failed", ocrError: "Recognition failed", 
     shortcutRegistered: "Shortcut registered", shortcutConflict: "Shortcut conflict"
   },
@@ -284,13 +286,7 @@ const en = {
     use: "Use", inUse: "✓ In Use", download: "Download", uninstall: "Uninstall",
     downloading: "Downloading RapidOCR...", downloadComplete: "Download complete! Recommend restart", downloadFailed: "Download failed",
     uninstallConfirm: "Are you sure to uninstall RapidOCR?", uninstalling: "Uninstalling...", uninstalled: "Uninstalled", uninstallFailed: "Uninstall failed",
-    configKeyFirst: "Please configure API Key first", configKeyEndpoint: "Please configure API Key and Endpoint", configKeySecret: "Please configure API Key and Secret Key",
-    // Health check & repair
-    engineBroken: "Error", checking: "Checking", healthUnknownError: "Unknown error",
-    engineErrorTitle: "OCR Engine Error",
-    repair: "Repair", repairing: "Repairing...", repairStarting: "Preparing repair...",
-    repairSuccess: "RapidOCR repaired successfully, please restart", repairFailed: "Repair failed", repairRestartHint: "Please restart the app to complete repair",
-    recheckHealth: "Recheck engine health"
+    configKeyFirst: "Please configure API Key first", configKeyEndpoint: "Please configure API Key and Endpoint", configKeySecret: "Please configure API Key and Secret Key"
   },
   tts: {
     description: "Configure text-to-speech settings",
@@ -305,14 +301,37 @@ const en = {
     testTextMixed: "This is a TTS test. 这是语音朗读测试。",
     testTextChinese: "Hello, this is a TTS test.",
     testFailed: "Preview failed", loadVoicesFailed: "Failed to load voices",
-    noVoicesInstalled: "No voice packs installed. Please install voices in system settings.",
-    noVoiceForLang: "No {{lang}} voice pack installed on your system",
-    installVoiceHint: "Windows: Settings → Time & Language → Speech; macOS: System Settings → Accessibility → Spoken Content",
     langNames: { zh: "Chinese", en: "English", ja: "Japanese", ko: "Korean", fr: "French", de: "German", es: "Spanish", ru: "Russian", pt: "Portuguese", it: "Italian" }
   },
   // ========== New: DocumentTranslator translation keys ==========
   documentTranslator: {
     title: "Document Translation",
+    // Search & Replace
+    search: {
+      title: "Search",
+      searchPlaceholder: "Search segments...",
+      replacePlaceholder: "Replace with...",
+      replaceAll: "Replace All",
+      replaceThis: "Replace",
+      matches: "matches",
+      prev: "Previous",
+      next: "Next"
+    },
+    // Segment
+    segment: {
+      edited: "Translation modified",
+      retranslate: "Retranslate",
+      edit: "Edit translation",
+      copy: "Copy translation",
+      save: "Save",
+      cancel: "Cancel"
+    },
+    // Progress restore
+    restore: {
+      found: "Previous progress found ({{count}} translated)",
+      restore: "Restore",
+      dismiss: "Dismiss"
+    },
     // Display styles
     displayStyles: {
       below: "Top-bottom",
@@ -365,10 +384,10 @@ const en = {
       exportFailed: "Export failed: {{error}}",
       printToPdf: "Please select \"Save as PDF\" in the print dialog",
       cacheCleared: "Translation memory cache cleared",
-      retranslateSuccess: "Re-translation successful",
-      copied: "Copied to clipboard",
-      replacedCount: "Replaced {{count}} occurrences",
-      progressRestored: "Restored {{count}} translated segments"
+      scannedNoOcr: "This PDF is scanned (image-based). Please configure an OCR engine in Settings and try again.",
+      ocrUsed: "OCR recognized",
+      fileTooLarge: "File too large, max 20MB supported",
+      pdfHint: "PDF: text content only. Images and complex layouts may be lost."
     },
     // Export menu
     export: {
@@ -397,8 +416,7 @@ const en = {
       estimatedTokens: "Estimated Tokens",
       usedTokens: "Used Tokens",
       elapsedTime: "Elapsed Time",
-      clearCache: "Clear Cache",
-      edited: "Edited"
+      clearCache: "Clear Cache"
     },
     // Progress
     progress: {
@@ -406,7 +424,8 @@ const en = {
       skipped: "Skipped",
       failed: "Failed",
       cached: "Cached",
-      edited: "Edited"
+      edited: "Edited",
+      editedHint: "Click to locate edited translations"
     },
     // Footer
     footer: {
@@ -429,37 +448,13 @@ const en = {
       translatedOnly: "_translated"
     },
     // Default doc title
-    defaultDocTitle: "Translated Document",
-    // Segment actions
-    segment: {
-      retranslate: "Re-translate",
-      edit: "Edit translation",
-      copy: "Copy translation",
-      save: "Save",
-      cancel: "Cancel",
-      edited: "Manually edited"
-    },
-    // Search & Replace
-    search: {
-      title: "Search & Replace",
-      searchPlaceholder: "Search in translations...",
-      replacePlaceholder: "Replace with...",
-      matches: "matches",
-      replaceThis: "Replace this",
-      replaceAll: "Replace All"
-    },
-    // Progress restore
-    restore: {
-      found: "Previous progress found ({{count}} segments). Restore?",
-      restore: "Restore",
-      dismiss: "Dismiss"
-    }
+    defaultDocTitle: "Translated Document"
   },
   // ========== New: Tray menu translation keys ==========
   tray: {
     showWindow: "Show Window",
     screenshot: "Screenshot Translate",
-    glassWindow: "Floating Translate",
+    glassWindow: "Glass Window",
     selectionTranslate: "Selection Translate",
     alwaysOnTop: "Always on Top",
     quit: "Quit"

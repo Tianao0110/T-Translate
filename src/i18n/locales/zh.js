@@ -10,9 +10,10 @@ const zh = {
   settingsNav: {
     searchPlaceholder: "搜索设置...",
     groupTranslation: "翻译", groupSystem: "系统",
-    providers: "翻译源", translation: "翻译设置", selection: "划词翻译", glassWindow: "悬浮翻译", document: "文档翻译",
+    providers: "翻译源", translation: "翻译设置", selection: "划词翻译", glassWindow: "玻璃窗口", document: "文档翻译",
     ocr: "OCR 识别", tts: "朗读设置", interface: "界面外观", connection: "LM Studio", privacy: "隐私模式", about: "关于",
     export: "导出", import: "导入", reset: "重置",
+    simpleMode: "简洁", fullMode: "完整", switchToFull: "切换到完整模式", switchToSimple: "切换到简洁模式",
     noMatch: "未找到匹配的设置",
     unsavedChanges: "有未保存的更改", saving: "保存中...", saveChanges: "保存更改"
   },
@@ -23,8 +24,6 @@ const zh = {
     testing: "测试中...", connected: "已连接", connectionFailed: "连接失败", notTested: "未测试",
     noConfig: "此翻译源无需额外配置，开箱即用",
     saved: "翻译源设置已保存", saveFailed: "保存失败",
-    enabledSection: "已启用", disabledSection: "未启用",
-    noEnabled: "尚未启用任何翻译源", enable: "启用", getApiKey: "获取 API Key",
     typeLabels: { llm: "AI 大模型", api: "专业 API", traditional: "传统翻译" },
     names: {
       'local-llm': 'LM Studio (本地)',
@@ -66,12 +65,13 @@ const zh = {
   shortcuts: {
     title: "快捷键",
     translate: "执行翻译", swapLanguages: "切换语言", clear: "清空内容", paste: "粘贴文本", copy: "复制结果",
-    screenshot: "截图翻译", toggleWindow: "显示/隐藏窗口", glassWindow: "悬浮翻译", selectionTranslate: "划词翻译开关",
+    screenshot: "截图翻译", toggleWindow: "显示/隐藏窗口", glassWindow: "玻璃窗口", selectionTranslate: "划词翻译开关",
     hint: "点击快捷键可进行修改，按 Esc 取消。带 🌐 标记的为全局快捷键",
     pressKey: "按下快捷键...", resetDefault: "重置为默认",
-    updated: "快捷键已更新: {{label}} → {{shortcut}}", updateFailed: "快捷键更新失败: {{error}}", reset: "快捷键已重置为默认值"
+    updated: "快捷键已更新: {{label}} → {{shortcut}}", updateFailed: "快捷键更新失败: {{error}}", reset: "快捷键已重置为默认值",
+    conflictNotice: "快捷键被其他程序占用: {{shortcuts}}，可在设置中修改"
   },
-  toolbar: { glass: "悬浮翻译", screenshot: "截图翻译", selection: "划词翻译", selectionOn: "划词已开启", selectionOff: "划词已关闭", privacy: "隐私模式", theme: "主题" },
+  toolbar: { glass: "玻璃窗口", screenshot: "截图翻译", selection: "划词翻译", selectionOn: "划词已开启", selectionOff: "划词已关闭", privacy: "隐私模式", theme: "主题" },
   templates: { natural: "自然", naturalDesc: "日常/口语", precise: "精确", preciseDesc: "技术/学术", formal: "正式", formalDesc: "商务/官方" },
   translation: {
     sourceLang: "源语言", targetLang: "目标语言", auto: "自动检测",
@@ -172,16 +172,18 @@ const zh = {
     incognitoDisabled: "（无痕模式下此选项无效）"
   },
   glass: { 
-    title: "悬浮翻译", pin: "置顶", unpin: "取消置顶", opacity: "透明度", close: "关闭", addPanel: "添加子面板", removePanel: "移除子面板", clearAll: "清空全部",
+    title: "玻璃窗口", pin: "置顶", unpin: "取消置顶", opacity: "透明度", close: "关闭", addPanel: "添加子面板", removePanel: "移除子面板", clearAll: "清空全部",
     description: "配置悬浮翻译窗口的行为和外观",
     lockTargetLang: "锁定目标语言", lockTargetLangOnDesc: "始终翻译成目标语言", lockTargetLangOffDesc: "根据原文自动切换（可能导致回译）", lockTargetLangHint: "建议开启，避免中英文来回切换",
     smartDetect: "智能检测", smartDetectOnDesc: "自动跳过未变化的内容", smartDetectOffDesc: "每次都重新识别翻译",
     ocrEngine: "OCR 引擎", useGlobalOcr: "使用全局 OCR 设置（当前：{{engine}}）", goToSettings: "前往设置",
     defaultOpacity: "默认透明度", opacityHint: "在玻璃窗中点击小横条可实时调节",
     windowOptions: "窗口选项", rememberPosition: "记住窗口位置", autoPin: "默认置顶显示",
-    shortcut: { toggle: "打开/关闭悬浮翻译", capture: "手动截图识别", exit: "关闭窗口" },
+    shortcut: { toggle: "打开/关闭玻璃窗口", capture: "手动截图识别", exit: "退出字幕模式/关闭窗口" },
     instructions: "使用说明",
     normalMode: "普通模式", normalModeDesc: "点击 📷 截图识别当前区域",
+    subtitleMode: "字幕模式", subtitleModeDesc: "点击 🎬 开启实时字幕翻译",
+    firstUse: "首次使用字幕模式", firstUseDesc: "需要先框选视频原字幕区域"
   },
   selection: { 
     freeze: "冻结", unfreeze: "解冻", close: "关闭", copy: "复制", more: "更多",
@@ -222,7 +224,7 @@ const zh = {
       gemini: { name: "Gemini", desc: "Google AI 翻译" }, deepseek: { name: "DeepSeek", desc: "国产大模型翻译" }, google: { name: "Google 翻译", desc: "Google 免费翻译服务" }
     },
     ocr: { title: "OCR 设置", engine: "OCR 引擎", engineDesc: "选择文字识别引擎", engines: { rapid: "RapidOCR（本地）", windows: "Windows OCR", llmVision: "LLM Vision" }, language: "识别语言", languageDesc: "选择要识别的语言" },
-    shortcuts: { title: "快捷键设置", desc: "自定义全局快捷键", showWindow: "显示/隐藏主窗口", screenshot: "截图翻译", glassWindow: "悬浮翻译", selectionToggle: "开启/关闭划词翻译", recording: "按下快捷键...", conflict: "快捷键冲突", reset: "重置默认" },
+    shortcuts: { title: "快捷键设置", desc: "自定义全局快捷键", showWindow: "显示/隐藏主窗口", screenshot: "截图翻译", glassWindow: "玻璃窗口", selectionToggle: "开启/关闭划词翻译", recording: "按下快捷键...", conflict: "快捷键冲突", reset: "重置默认" },
     privacy: {
       title: "隐私设置", mode: "隐私模式", modeDesc: "控制数据存储和网络请求",
       modes: { standard: "标准模式", standardDesc: "正常功能，记录历史", offline: "离线模式", offlineDesc: "仅使用本地翻译源", incognito: "无痕模式", incognitoDesc: "不记录历史和缓存", strict: "严格模式", strictDesc: "离线 + 无痕" },
@@ -232,7 +234,7 @@ const zh = {
     glossary: { title: "术语表", desc: "自定义翻译术语，确保专业词汇翻译一致", add: "添加术语", source: "原文", target: "译文", empty: "暂无术语", import: "导入", export: "导出", delete: "删除", save: "保存" },
     about: { title: "关于", version: "版本", checkUpdate: "检查更新", checking: "检查中...", upToDate: "已是最新版本", newVersion: "发现新版本", download: "前往下载", later: "稍后再说", releaseNotes: "更新内容", publishedAt: "发布时间", github: "GitHub", feedback: "反馈问题", license: "开源协议", copyright: "© 2026 T-Translate" },
     selection: { title: "划词翻译" },
-    glass: { title: "悬浮翻译" }
+    glass: { title: "玻璃窗口" }
   },
   about: {
     desc: "智能离线翻译工具",
@@ -240,7 +242,7 @@ const zh = {
     feature1: "本地 LLM 翻译，数据不出设备",
     feature2: "多引擎 OCR 文字识别",
     feature3: "PDF/DOCX/EPUB 文档翻译",
-    feature4: "划词翻译 + 悬浮翻译",
+    feature4: "划词翻译 + 玻璃窗口",
     techStack: "技术栈",
     openLogs: "打开日志目录",
     logDirOpened: "已打开日志目录",
@@ -254,7 +256,7 @@ const zh = {
   notify: { 
     success: "成功", error: "错误", warning: "警告", info: "提示", 
     copySuccess: "已复制到剪贴板", copyFailed: "复制失败", 
-    saveSuccess: "保存成功", saveFailed: "保存失败",
+    saveSuccess: "保存成功", saveFailed: "保存失败", 
     networkError: "网络错误", translateError: "翻译失败", ocrError: "识别失败", 
     shortcutRegistered: "快捷键已注册", shortcutConflict: "快捷键冲突"
   },
@@ -285,12 +287,11 @@ const zh = {
     downloading: "开始下载 RapidOCR...", downloadComplete: "下载完成！建议重启应用", downloadFailed: "下载失败",
     uninstallConfirm: "确定要卸载 RapidOCR 吗？", uninstalling: "正在卸载...", uninstalled: "已卸载", uninstallFailed: "卸载失败",
     configKeyFirst: "请先配置 API Key", configKeyEndpoint: "请先配置 API Key 和 Endpoint", configKeySecret: "请先配置 API Key 和 Secret Key",
-    // 健康检查与修复
-    engineBroken: "异常", checking: "检查中", healthUnknownError: "未知错误",
-    engineErrorTitle: "OCR 引擎异常", 
-    repair: "修复", repairing: "修复中...", repairStarting: "正在准备修复...",
-    repairSuccess: "RapidOCR 修复成功，建议重启应用", repairFailed: "修复失败", repairRestartHint: "请重启应用以确保修复生效",
-    recheckHealth: "重新检查引擎状态"
+    llmVision: {
+      notSupported: "当前模型不支持图片识别，请加载支持视觉的模型（如 Qwen-VL、LLaVA 等）",
+      noText: "未识别到文字",
+      timeout: "OCR 识别超时，请检查模型是否支持视觉功能"
+    }
   },
   tts: {
     description: "配置文本朗读功能和语音参数",
@@ -305,14 +306,37 @@ const zh = {
     testTextMixed: "这是语音朗读测试。This is a TTS test.",
     testTextChinese: "你好，这是语音朗读功能测试。",
     testFailed: "试听失败", loadVoicesFailed: "加载语音列表失败",
-    noVoicesInstalled: "系统未安装任何语音包，请在系统设置中安装语音",
-    noVoiceForLang: "系统未安装{{lang}}语音包，无法朗读此语言",
-    installVoiceHint: "Windows: 设置 → 时间和语言 → 语音；macOS: 系统设置 → 辅助功能 → 语音内容",
     langNames: { zh: "中文", en: "英语", ja: "日语", ko: "韩语", fr: "法语", de: "德语", es: "西班牙语", ru: "俄语", pt: "葡萄牙语", it: "意大利语" }
   },
   // ========== 新增：文档翻译组件翻译键 ==========
   documentTranslator: {
     title: "文档翻译",
+    // 搜索替换
+    search: {
+      title: "搜索",
+      searchPlaceholder: "搜索段落内容...",
+      replacePlaceholder: "替换为...",
+      replaceAll: "全部替换",
+      replaceThis: "替换当前",
+      matches: "个匹配",
+      prev: "上一个",
+      next: "下一个"
+    },
+    // 段落
+    segment: {
+      edited: "译文已修改",
+      retranslate: "重新翻译",
+      edit: "编辑译文",
+      copy: "复制译文",
+      save: "保存",
+      cancel: "取消"
+    },
+    // 进度恢复
+    restore: {
+      found: "发现上次的翻译进度（{{count}} 条已译）",
+      restore: "恢复进度",
+      dismiss: "忽略"
+    },
     // 显示样式
     displayStyles: {
       below: "上下对照",
@@ -365,10 +389,10 @@ const zh = {
       exportFailed: "导出失败: {{error}}",
       printToPdf: "请在打印对话框中选择\"保存为 PDF\"",
       cacheCleared: "翻译记忆缓存已清除",
-      retranslateSuccess: "重新翻译成功",
-      copied: "已复制到剪贴板",
-      replacedCount: "已替换 {{count}} 处",
-      progressRestored: "已恢复 {{count}} 个段落的翻译"
+      scannedNoOcr: "该 PDF 为扫描件，无法提取文字。请在设置中配置 OCR 引擎后重试",
+      ocrUsed: "OCR 识别",
+      fileTooLarge: "文件过大，最大支持 20MB",
+      pdfHint: "PDF 仅提取文字内容，图片及复杂排版可能丢失，建议使用纯文本格式"
     },
     // 导出菜单
     export: {
@@ -397,8 +421,7 @@ const zh = {
       estimatedTokens: "预估 Tokens",
       usedTokens: "已用 Tokens",
       elapsedTime: "翻译用时",
-      clearCache: "清除缓存",
-      edited: "已编辑"
+      clearCache: "清除缓存"
     },
     // 进度信息
     progress: {
@@ -406,7 +429,8 @@ const zh = {
       skipped: "跳过",
       failed: "失败",
       cached: "缓存",
-      edited: "已编辑"
+      edited: "已修改译文",
+      editedHint: "点击定位到已修改的译文"
     },
     // 底部控制栏
     footer: {
@@ -429,37 +453,13 @@ const zh = {
       translatedOnly: "_译文"
     },
     // 默认文档标题
-    defaultDocTitle: "翻译文档",
-    // 段落操作
-    segment: {
-      retranslate: "重新翻译",
-      edit: "编辑译文",
-      copy: "复制译文",
-      save: "保存",
-      cancel: "取消",
-      edited: "已手动编辑"
-    },
-    // 搜索替换
-    search: {
-      title: "搜索替换",
-      searchPlaceholder: "在译文中搜索...",
-      replacePlaceholder: "替换为...",
-      matches: "处匹配",
-      replaceThis: "替换此处",
-      replaceAll: "全部替换"
-    },
-    // 进度恢复
-    restore: {
-      found: "发现上次翻译进度（{{count}} 个段落），是否恢复？",
-      restore: "恢复进度",
-      dismiss: "忽略"
-    }
+    defaultDocTitle: "翻译文档"
   },
   // ========== 新增：托盘菜单翻译键 ==========
   tray: {
     showWindow: "显示窗口",
     screenshot: "截图翻译",
-    glassWindow: "悬浮翻译",
+    glassWindow: "玻璃窗口",
     selectionTranslate: "划词翻译",
     alwaysOnTop: "置顶",
     quit: "退出"
