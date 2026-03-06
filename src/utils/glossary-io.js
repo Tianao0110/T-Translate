@@ -2,6 +2,11 @@
 // 术语库导入/导出工具
 // 支持格式：JSON, CSV, TBX
 
+import i18n from '../i18n.js';
+const _t = (key, fallback) => {
+  try { const r = i18n.t(key); return r === key ? fallback : r; } catch { return fallback; }
+};
+
 /**
  * 导出为 JSON 格式
  * @param {Array} items - 术语列表
@@ -43,7 +48,7 @@ export function importFromJSON(jsonString) {
       // 简单数组格式
       terms = data;
     } else {
-      throw new Error('不支持的 JSON 格式');
+      throw new Error(_t('glossary.unsupportedJson', '不支持的 JSON 格式'));
     }
     
     return terms.map((term, index) => ({
@@ -56,7 +61,7 @@ export function importFromJSON(jsonString) {
       createdAt: term.createdAt || new Date().toISOString(),
     })).filter(t => t.sourceText && t.translatedText);
   } catch (e) {
-    throw new Error(`JSON 解析失败: ${e.message}`);
+    throw new Error(_t('glossary.jsonParseFailed', 'JSON 解析失败') + ': ' + e.message);
   }
 }
 
@@ -67,7 +72,7 @@ export function importFromJSON(jsonString) {
  */
 export function exportToCSV(items) {
   // CSV 头
-  const header = '原文,译文,备注,标签';
+  const header = [_t('translation.source', '原文'), _t('translation.target', '译文'), _t('favorites.note', '备注'), _t('favorites.tags', '标签')].join(',');
   
   // 转义 CSV 字段
   const escapeCSV = (str) => {
@@ -102,7 +107,7 @@ export function importFromCSV(csvString) {
   
   const lines = content.split(/\r?\n/).filter(line => line.trim());
   if (lines.length < 2) {
-    throw new Error('CSV 文件为空或格式错误');
+    throw new Error(_t('glossary.csvEmpty', 'CSV 文件为空或格式错误'));
   }
   
   // 解析 CSV 行
@@ -314,7 +319,7 @@ export function autoImport(content, filename) {
         try {
           return importFromCSV(content);
         } catch {
-          throw new Error('无法识别文件格式，请使用 JSON、CSV 或 TBX 格式');
+          throw new Error(_t('glossary.unknownFormat', '无法识别文件格式，请使用 JSON、CSV 或 TBX 格式'));
         }
       }
   }
