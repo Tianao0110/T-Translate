@@ -25,11 +25,8 @@ t-translate/
 ├── docs/                       # 项目文档
 │   ├── ARCHITECTURE.md         # 架构设计（本文件）
 │   ├── DEVELOPMENT.md          # 开发者指南
-│   ├── FEATURES.md             # 功能特性
 │   ├── I18N_GUIDE.md           # 国际化指南
-│   ├── SELECTION_TRANSLATOR_TECH.md  # 划词翻译原理
-│   ├── THEME_CUSTOMIZATION.md  # 主题定制
-│   └── TTS_DEVELOPMENT.md      # TTS 开发指南
+│   └── THEME_CUSTOMIZATION.md  # 主题定制
 │
 ├── electron/                   # 主进程代码
 │   ├── main.js                 # 主进程入口
@@ -61,13 +58,18 @@ t-translate/
 │   │
 │   ├── providers/              # 翻译源 Provider（kebab-case 目录）
 │   │   ├── base.js             # BaseProvider 基类
+│   │   ├── openai-compatible.js# OpenAI 兼容 API 基类
 │   │   ├── registry.js         # Provider 注册中心
-│   │   ├── local-llm/          # 本地 LLM
+│   │   ├── local-llm/          # LM Studio (本地 LLM)
+│   │   ├── ollama/             # Ollama (本地 LLM)
 │   │   ├── openai/             # OpenAI API
+│   │   ├── anthropic/          # Anthropic Claude
 │   │   ├── deepl/              # DeepL
 │   │   ├── gemini/             # Gemini
 │   │   ├── deepseek/           # DeepSeek
 │   │   ├── google-translate/   # Google 翻译
+│   │   ├── microsoft-translator/ # Microsoft Translator
+│   │   ├── baidu-translate/    # 百度翻译
 │   │   └── ocr/                # OCR 引擎 (base, rapid, llm-vision 等)
 │   │
 │   ├── services/               # 服务层
@@ -121,7 +123,9 @@ t-translate/
 │   └── ocr/                    # OCR 训练数据
 │
 ├── scripts/                    # 工具脚本
-│   └── check-constants.js      # 常量同步检查
+│   ├── check-constants.js      # 常量同步检查
+│   ├── check-i18n.js           # i18n key 一致性检查
+│   └── check-hardcoded-chinese.js  # 硬编码中文扫描
 │
 └── tests/                      # 测试
     ├── setup.js                # 测试环境配置
@@ -151,7 +155,9 @@ t-translate/
                                  ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                      Provider Layer                             │
-│  registry.js → local-llm, openai, deepl, gemini, ocr/*          │
+│  registry.js → local-llm, ollama, openai, anthropic, deepl,     │
+│                gemini, deepseek, google-translate, microsoft,    │
+│                baidu, ocr/*                                      │
 └────────────────────────────────┬────────────────────────────────┘
                                  │ IPC
                                  ▼

@@ -68,7 +68,7 @@
 
 ### 🤖 多翻译源
 
-支持本地 LLM（LM Studio / Ollama）、OpenAI、DeepL、Gemini、DeepSeek、Google 翻译，可自由切换和排序。
+支持本地 LLM（LM Studio / Ollama）、OpenAI、Anthropic Claude、DeepL、Gemini、DeepSeek、Google 翻译、Microsoft 翻译、百度翻译，可自由切换和排序。
 
 <p align="center">
   <img src="docs/screenshots/providers.png" width="600" alt="多翻译源">
@@ -175,6 +175,7 @@ t-translate/
 | 样式     | CSS Variables + CSS Modules                             |
 | OCR      | @gutenye/ocr-node (RapidOCR) / Windows OCR / LLM Vision |
 | 本地 LLM | LM Studio / Ollama 兼容 API                             |
+| 在线翻译 | OpenAI / Anthropic Claude / Gemini / DeepSeek / DeepL / Microsoft / 百度 |
 | 打包     | electron-builder                                        |
 
 ---

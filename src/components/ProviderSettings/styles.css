@@ -188,6 +188,12 @@
   flex-shrink: 0;
 }
 
+.ps-icon-img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
 /* 信息区 */
 .ps-info {
   flex: 1;

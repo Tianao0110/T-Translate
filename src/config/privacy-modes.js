@@ -72,7 +72,7 @@ export const PRIVACY_MODES = {
       exportData: true,
       ocr: true,
     },
-    allowedProviders: [PROVIDER_IDS.LOCAL_LLM],
+    allowedProviders: [PROVIDER_IDS.LOCAL_LLM, PROVIDER_IDS.OLLAMA],
     allowedOcrEngines: [OCR_ENGINES.LLM_VISION, OCR_ENGINES.WINDOWS_OCR, OCR_ENGINES.RAPID_OCR],
   },
   
@@ -94,7 +94,7 @@ export const PRIVACY_MODES = {
       exportData: false,
       ocr: true,
     },
-    allowedProviders: [PROVIDER_IDS.LOCAL_LLM],
+    allowedProviders: [PROVIDER_IDS.LOCAL_LLM, PROVIDER_IDS.OLLAMA],
     allowedOcrEngines: [OCR_ENGINES.LLM_VISION, OCR_ENGINES.WINDOWS_OCR],
   },
 };

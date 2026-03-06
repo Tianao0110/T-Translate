@@ -1,22 +1,20 @@
 // src/providers/deepseek/index.js
 // DeepSeek AI 翻译源
-// OpenAI 兼容 API，价格便宜
+// 继承 OpenAICompatibleProvider，OpenAI 兼容 API
 
-import { BaseProvider, LANGUAGE_CODES } from '../base.js';
+import OpenAICompatibleProvider from '../openai-compatible.js';
 import icon from './icon.svg';
-import createLogger from '../../utils/logger.js';
-const logger = createLogger('DeepSeek');
 
 /**
  * DeepSeek AI 翻译源
  * 国产大模型，OpenAI 兼容接口
  */
-class DeepSeekProvider extends BaseProvider {
+class DeepSeekProvider extends OpenAICompatibleProvider {
   
   static metadata = {
     id: 'deepseek',
     name: 'DeepSeek',
-    description: '国产 AI 大模型，价格实惠，中文翻译质量好',
+    description: 'DeepSeek AI, affordable, excellent for Chinese',
     icon: icon,
     color: '#5b6ef8',
     type: 'llm',
@@ -33,14 +31,14 @@ class DeepSeekProvider extends BaseProvider {
       },
       model: {
         type: 'text',
-        label: '模型',
+        label: 'Model',
         default: 'deepseek-chat',
         required: false,
         placeholder: 'deepseek-chat',
       },
       endpoint: {
         type: 'text',
-        label: 'API 地址',
+        label: 'API Endpoint',
         default: 'https://api.deepseek.com/v1',
         required: false,
         placeholder: 'https://api.deepseek.com/v1',
@@ -67,90 +65,28 @@ class DeepSeekProvider extends BaseProvider {
   }
 
   /**
+   * 需要 API Key
+   */
+  _checkApiKey() {
+    if (!this.config.apiKey) {
+      return { success: false, error: '请配置 DeepSeek API Key' };
+    }
+    return null;
+  }
+
+  /**
    * 测试连接
    */
   async testConnection() {
     if (!this.config.apiKey) {
-      return { success: false, error: '请配置 API Key' };
+      return { success: false, message: '请配置 API Key' };
     }
 
-    try {
-      const response = await fetch(`${this.config.endpoint}/models`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${this.config.apiKey}`,
-        },
-        signal: AbortSignal.timeout(10000),
-      });
-
-      if (response.ok) {
-        return { success: true, message: 'DeepSeek 连接成功' };
-      } else {
-        const error = await response.json();
-        return { success: false, error: error.error?.message || `HTTP ${response.status}` };
-      }
-    } catch (error) {
-      return { success: false, error: error.message };
+    const result = await super.testConnection();
+    if (result.success) {
+      result.message = 'DeepSeek 连接成功';
     }
-  }
-
-  /**
-   * 翻译文本
-   */
-  async translate(text, sourceLang = 'auto', targetLang = 'zh', options = {}) {
-    if (!text?.trim()) {
-      return { success: false, error: '文本为空' };
-    }
-
-    if (!this.config.apiKey) {
-      return { success: false, error: '请配置 DeepSeek API Key' };
-    }
-
-    try {
-      const systemPrompt = options.systemPrompt || 
-        `You are a professional translator. Translate the following text to ${LANGUAGE_CODES[targetLang]?.name || targetLang}. Output only the translation, no explanations or additional text.`;
-
-      const response = await fetch(`${this.config.endpoint}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.config.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: this.config.model,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: text },
-          ],
-          temperature: 0.3,
-          max_tokens: 2048,
-        }),
-        signal: AbortSignal.timeout(this.config.timeout),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        return { success: false, error: error.error?.message || `HTTP ${response.status}` };
-      }
-
-      const data = await response.json();
-      const translatedText = data.choices?.[0]?.message?.content;
-
-      if (!translatedText) {
-        return { success: false, error: '无翻译结果' };
-      }
-
-      return {
-        success: true,
-        text: translatedText.trim(),
-        provider: 'deepseek',
-        model: this.config.model,
-        usage: data.usage,
-      };
-    } catch (error) {
-      logger.error('Translation error:', error);
-      return { success: false, error: error.message };
-    }
+    return result;
   }
 }
 

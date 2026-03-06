@@ -118,7 +118,7 @@ const SettingsPanel = ({ showNotification }) => {
     const handleBeforeUnload = (e) => {
       if (hasUnsavedChanges) {
         e.preventDefault();
-        e.returnValue = '您有未保存的更改，确定要离开吗？';
+        e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
         return e.returnValue;
       }
     };
@@ -633,7 +633,7 @@ const SettingsPanel = ({ showNotification }) => {
         );
       case 'about':
         return (
-          <AboutSection notify={notify} />
+          <AboutSection notify={notify} resetSettings={resetSettings} />
         );
 
       case 'translation':
@@ -687,7 +687,9 @@ const SettingsPanel = ({ showNotification }) => {
         
         <div className="settings-nav">
           {/* 动态渲染分组和导航项 */}
-          {Object.entries(groupedNavItems).map(([group, items], groupIndex) => (
+          {Object.entries(groupedNavItems).map(([group, items], groupIndex) => {
+            if (items.length === 0) return null;
+            return (
             <React.Fragment key={group}>
               {groupIndex > 0 && <div className="nav-divider" />}
               <div className="nav-group-title">{groupLabels[group] || group}</div>
@@ -709,7 +711,8 @@ const SettingsPanel = ({ showNotification }) => {
                 );
               })}
             </React.Fragment>
-          ))}
+            );
+          })}
           
           {/* 搜索无结果提示 */}
           {filteredNavItems.length === 0 && (
@@ -719,12 +722,9 @@ const SettingsPanel = ({ showNotification }) => {
           )}
         </div>
         <div className="settings-actions">
-            <button className="mode-text-link" onClick={toggleSimpleMode}>
-              {simpleMode ? t('settingsNav.switchToFull') : t('settingsNav.switchToSimple')}
-            </button>
-            <button className="action-button" onClick={exportSettings}><Download size={14}/> {t('settingsNav.export')}</button>
-            <label className="action-button"><Upload size={14}/> {t('settingsNav.import')} <input type="file" accept=".json" onChange={importSettings} style={{display:'none'}}/></label>
-            <button className="action-button danger" onClick={()=>resetSettings()}><RefreshCw size={14}/> {t('settingsNav.reset')}</button>
+            <span className="mode-text-link" onClick={toggleSimpleMode}>
+              {simpleMode ? t('settingsNav.simpleMode') : t('settingsNav.fullMode')}
+            </span>
         </div>
       </div>
 

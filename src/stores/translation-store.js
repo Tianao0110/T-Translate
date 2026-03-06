@@ -19,10 +19,13 @@ import { immer } from "zustand/middleware/immer";
 import { v4 as uuidv4 } from "uuid";
 
 // 从配置中心导入常量
-import { PRIVACY_MODES, TRANSLATION_STATUS, LANGUAGE_CODES, DEFAULTS, PROVIDER_IDS } from "@config/defaults";
+import { PRIVACY_MODES, TRANSLATION_STATUS, LANGUAGE_CODES, DEFAULTS, PROVIDER_IDS, LANGUAGES } from "@config/defaults";
 import { getModeFeatures } from "@config/privacy-modes";
 import createLogger from '../utils/logger.js';
 const logger = createLogger('TranslationStore');
+
+// 合法语言代码集合（用于写入校验）
+const VALID_LANG_CODES = new Set(LANGUAGES.map(l => l.code));
 
 // Service 引用（延迟绑定，避免循环依赖）
 let _mainTranslation = null;
@@ -153,8 +156,8 @@ const useTranslationStore = create(
       isProviderAllowed: (providerId) => {
         const mode = get().translationMode;
         if (mode !== PRIVACY_MODES.OFFLINE) return true;
-        // 离线模式仅允许本地LLM
-        return providerId === PROVIDER_IDS.LOCAL_LLM;
+        // 离线模式仅允许本地 LLM 和 Ollama
+        return providerId === PROVIDER_IDS.LOCAL_LLM || providerId === PROVIDER_IDS.OLLAMA;
       },
 
       setUseStreamOutput: (value) =>
@@ -186,6 +189,15 @@ const useTranslationStore = create(
 
       setLanguages: (source, target) =>
         set((state) => {
+          // 校验语言代码合法性
+          if (source && !VALID_LANG_CODES.has(source)) {
+            logger.warn(`Invalid source language code: ${source}, ignoring`);
+            source = null;
+          }
+          if (target && !VALID_LANG_CODES.has(target)) {
+            logger.warn(`Invalid target language code: ${target}, falling back to default`);
+            target = DEFAULTS.TARGET_LANGUAGE;
+          }
           if (source) state.currentTranslation.sourceLanguage = source;
           if (target) state.currentTranslation.targetLanguage = target;
           // 同步到 electron-store，供主进程读取（划词翻译等）
@@ -200,6 +212,10 @@ const useTranslationStore = create(
       // 单独设置目标语言（供玻璃窗口同步使用）
       setTargetLanguage: (target) =>
         set((state) => {
+          if (target && !VALID_LANG_CODES.has(target)) {
+            logger.warn(`Invalid target language code: ${target}, falling back to default`);
+            target = DEFAULTS.TARGET_LANGUAGE;
+          }
           if (target) state.currentTranslation.targetLanguage = target;
           try {
             window.electron?.store?.set('settings.translation.targetLanguage', target);
@@ -438,7 +454,7 @@ const useTranslationStore = create(
             useCache: true,
             onlineApi: false,
             analytics: true,
-            allowedProviders: [PROVIDER_IDS.LOCAL_LLM],
+            allowedProviders: [PROVIDER_IDS.LOCAL_LLM, PROVIDER_IDS.OLLAMA],
             allowedOcrEngines: ['llm-vision', 'rapid-ocr', 'windows-ocr'],
           }
         };

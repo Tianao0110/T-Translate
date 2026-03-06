@@ -15,7 +15,7 @@ class GeminiProvider extends BaseProvider {
   static metadata = {
     id: 'gemini',
     name: 'Google Gemini',
-    description: 'Google AI 大模型，免费额度，翻译质量高',
+    description: 'Google AI model, free tier available, high quality',
     icon: icon,
     color: '#4285f4',
     type: 'llm',
@@ -32,7 +32,7 @@ class GeminiProvider extends BaseProvider {
       },
       model: {
         type: 'text',
-        label: '模型',
+        label: 'Model',
         default: 'gemini-2.0-flash',
         required: false,
         placeholder: 'gemini-2.0-flash',
@@ -185,6 +185,7 @@ class GeminiProvider extends BaseProvider {
       'it': 'Italian',
       'vi': 'Vietnamese',
       'th': 'Thai',
+      'pa': 'Punjabi',
     };
     return names[code] || LANGUAGE_CODES[code]?.name || code;
   }

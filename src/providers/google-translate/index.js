@@ -15,8 +15,8 @@ class GoogleTranslateProvider extends BaseProvider {
   
   static metadata = {
     id: 'google-translate',
-    name: 'Google 翻译',
-    description: '免费使用，支持语言多，速度快',
+    name: 'Google Translate',
+    description: 'Free to use, many languages, fast',
     icon: icon,
     color: '#4285f4',
     type: 'traditional',
@@ -25,12 +25,12 @@ class GoogleTranslateProvider extends BaseProvider {
     configSchema: {
       domain: {
         type: 'select',
-        label: '服务器',
+        label: 'Server',
         default: 'com',
         options: [
-          { value: 'com', label: 'google.com (国际)' },
-          { value: 'cn', label: 'google.cn (中国)' },
-          { value: 'com.hk', label: 'google.com.hk (香港)' },
+          { value: 'com', label: 'google.com (International)' },
+          { value: 'cn', label: 'google.cn (China)' },
+          { value: 'com.hk', label: 'google.com.hk (Hong Kong)' },
         ],
       },
     },

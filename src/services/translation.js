@@ -509,7 +509,7 @@ class TranslationService {
     
     for (const id of priority) {
       // 检查隐私模式限制
-      if (!isProviderAllowed(privacyMode, id)) {
+      if (!isProviderAllowed(id, privacyMode)) {
         logger.debug(`Provider ${id} not allowed in ${privacyMode} mode`);
         continue;
       }
@@ -645,7 +645,7 @@ class TranslationService {
     let allSkipped = true;
     
     for (const id of priority) {
-      if (!isProviderAllowed(privacyMode, id)) continue;
+      if (!isProviderAllowed(id, privacyMode)) continue;
       if (!isProviderConfigured(id)) continue;
       
       if (this._failureCount[id] >= this._skipThreshold) {

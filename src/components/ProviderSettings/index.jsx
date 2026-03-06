@@ -38,16 +38,6 @@ const secureStorage = {
   }
 };
 
-// ========== 图标映射 ==========
-const PROVIDER_ICONS = {
-  'local-llm': '🖥️',
-  'openai': '🤖',
-  'gemini': '✨',
-  'deepseek': '⚡',
-  'deepl': '📘',
-  'google-translate': '🌐',
-};
-
 // ========== 类型标签颜色 ==========
 const TYPE_COLORS = {
   'llm': '#8b5cf6',
@@ -61,7 +51,8 @@ const TYPE_COLORS = {
 const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, notify }, ref) => {
   const { t } = useTranslation();
   
-  const allProvidersMeta = getAllProviderMetadata();
+  // useMemo 缓存，避免每次渲染生成新数组引用导致 useEffect 无限循环
+  const allProvidersMeta = useMemo(() => getAllProviderMetadata(), []);
   
   const [providers, setProviders] = useState([]);
   const [providerConfigs, setProviderConfigs] = useState({});
@@ -404,10 +395,12 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
       <div className="ps-config-form">
         {Object.entries(meta.configSchema).map(([key, field]) => (
           <div key={key} className="ps-field">
-            <label className="ps-label">
-              {getFieldLabel(providerId, key, field.label)}
-              {field.required && <span className="ps-required">*</span>}
-            </label>
+            {field.type !== 'checkbox' && (
+              <label className="ps-label">
+                {getFieldLabel(providerId, key, field.label)}
+                {field.required && <span className="ps-required">*</span>}
+              </label>
+            )}
             
             {field.type === 'password' ? (
               <div className="ps-input-group">
@@ -530,7 +523,7 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
                     <div className="ps-priority">{rank}</div>
 
                     <div className="ps-icon">
-                      {PROVIDER_ICONS[provider.id] || '📦'}
+                      {meta.icon ? <img src={meta.icon} alt="" className="ps-icon-img" /> : <span style={{ display: 'inline-block', width: 20, height: 20, borderRadius: '50%', background: meta.color || '#888' }} />}
                     </div>
 
                     <div className="ps-info">
@@ -628,7 +621,7 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
                     onClick={() => setExpandedProvider(isExpanded ? null : provider.id)}
                   >
                     <div className="ps-mini-icon">
-                      {PROVIDER_ICONS[provider.id] || '📦'}
+                      {meta.icon ? <img src={meta.icon} alt="" className="ps-icon-img" /> : <span style={{ display: 'inline-block', width: 16, height: 16, borderRadius: '50%', background: meta.color || '#888' }} />}
                     </div>
                     <div className="ps-mini-info">
                       <div className="ps-mini-name">{t(`providerSettings.names.${provider.id}`, { defaultValue: meta.name })}</div>

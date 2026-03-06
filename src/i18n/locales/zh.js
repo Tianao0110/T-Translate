@@ -13,7 +13,7 @@ const zh = {
     providers: "翻译源", translation: "翻译设置", selection: "划词翻译", glassWindow: "玻璃窗口", document: "文档翻译",
     ocr: "OCR 识别", tts: "朗读设置", interface: "界面外观", connection: "LM Studio", privacy: "隐私模式", about: "关于",
     export: "导出", import: "导入", reset: "重置",
-    simpleMode: "简洁", fullMode: "完整", switchToFull: "切换到完整模式", switchToSimple: "切换到简洁模式",
+    simpleMode: "简洁", fullMode: "完整", switchToFull: "完整", switchToSimple: "简洁",
     noMatch: "未找到匹配的设置",
     unsavedChanges: "有未保存的更改", saving: "保存中...", saveChanges: "保存更改"
   },
@@ -35,7 +35,11 @@ const zh = {
       'deepl': 'DeepL',
       'gemini': 'Google Gemini',
       'deepseek': 'DeepSeek',
-      'google-translate': 'Google 翻译'
+      'google-translate': 'Google 翻译',
+      'ollama': 'Ollama (本地)',
+      'anthropic': 'Anthropic Claude',
+      'microsoft-translator': 'Microsoft 翻译',
+      'baidu-translate': '百度翻译'
     },
     descriptions: {
       'local-llm': '使用本地大模型翻译，隐私安全、免费',
@@ -43,7 +47,11 @@ const zh = {
       'deepl': '专业翻译 API，翻译质量极高',
       'gemini': 'Google AI 大模型，免费额度，翻译质量高',
       'deepseek': '国产 AI 大模型，价格实惠，中文翻译质量好',
-      'google-translate': '免费使用，支持语言多，速度快'
+      'google-translate': '免费使用，支持语言多，速度快',
+      'ollama': '使用 Ollama 本地大模型翻译，隐私安全、免费',
+      'anthropic': 'Claude AI 大模型，翻译质量极高',
+      'microsoft-translator': '微软翻译 API，免费 200 万字/月',
+      'baidu-translate': '百度翻译 API，国内直连、免费额度'
     }
   },
   providerConfig: {
@@ -53,6 +61,10 @@ const zh = {
     'gemini': { apiKey: 'API Key', model: '模型' },
     'deepseek': { apiKey: 'API Key', model: '模型', endpoint: 'API 地址' },
     'google-translate': { domain: '服务器', domain_com: 'google.com (国际)', domain_cn: 'google.cn (中国)', 'domain_com.hk': 'google.com.hk (香港)' },
+    'ollama': { endpoint: 'API 地址', model: '模型名称', timeout: '超时时间 (ms)', model_placeholder: '留空自动检测（如 llama3, qwen2 等）' },
+    'anthropic': { apiKey: 'API Key', model: '模型', baseUrl: 'API 地址' },
+    'microsoft-translator': { apiKey: 'API Key', region: '区域' },
+    'baidu-translate': { appId: 'APP ID', secretKey: '密钥' },
     ocr: { language: '识别语言', language_chs: '简体中文', language_cht: '繁体中文', language_eng: 'English', language_jpn: '日本語', language_kor: '한국어' }
   },
   translationSettings: {
@@ -333,6 +345,14 @@ const zh = {
     saveSuccess: "保存成功", saveFailed: "保存失败", 
     networkError: "网络错误", translateError: "翻译失败", ocrError: "识别失败", 
     shortcutRegistered: "快捷键已注册", shortcutConflict: "快捷键冲突"
+  },
+  guide: {
+    subtitle: "快速了解核心功能",
+    dismiss: "不再显示",
+    selection: { title: "划词翻译", desc: "选中任意文字，自动弹出翻译" },
+    screenshot: { title: "截图翻译", desc: "框选屏幕区域，OCR 识别并翻译" },
+    glass: { title: "玻璃悬浮窗", desc: "透明窗口覆盖在原文上方，实时翻译" },
+    document: { title: "文档翻译", desc: "拖入文件，逐段翻译并导出双语对照" },
   },
   common: { confirm: "确定", cancel: "取消", save: "保存", delete: "删除", edit: "编辑", close: "关闭", open: "打开", enable: "启用", disable: "禁用", loading: "加载中...", noData: "暂无数据", retry: "重试", reset: "重置", search: "搜索", filter: "筛选", all: "全部", none: "无", yes: "是", no: "否", show: "显示", hide: "隐藏", on: "开启", off: "关闭" },
   ocr: {

@@ -103,6 +103,10 @@ const PROVIDER_IDS = {
   GEMINI: 'gemini',
   DEEPSEEK: 'deepseek',
   GOOGLE_TRANSLATE: 'google-translate',
+  OLLAMA: 'ollama',
+  ANTHROPIC: 'anthropic',
+  MICROSOFT_TRANSLATOR: 'microsoft-translator',
+  BAIDU_TRANSLATE: 'baidu-translate',
 };
 
 module.exports = {

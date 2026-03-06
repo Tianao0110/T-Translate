@@ -159,7 +159,7 @@ export const OcrEngineItem = ({
             className={`btn ${isActive ? 'active' : ''}`}
             onClick={onSelect}
           >
-            {isActive ? t('ocr.inUse', '✓ 使用中') : t('ocr.use', '使用')}
+            {isActive ? t('ocr.inUse') : t('ocr.use')}
           </button>
         )}
         {testButton}

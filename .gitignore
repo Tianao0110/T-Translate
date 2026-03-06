@@ -56,3 +56,9 @@ tmp/
 
 # Lint 缓存
 .eslintcache
+
+# 内部迁移文档（不公开）
+docs/migration/
+
+# Session 操作记录
+CHANGELOG-SESSION.md

@@ -13,7 +13,7 @@ const en = {
     providers: "Providers", translation: "Translation", selection: "Selection", glassWindow: "Glass Window", document: "Documents",
     ocr: "OCR", tts: "Text to Speech", interface: "Appearance", connection: "LM Studio", privacy: "Privacy", about: "About",
     export: "Export", import: "Import", reset: "Reset",
-    simpleMode: "Simple", fullMode: "Full", switchToFull: "Switch to full mode", switchToSimple: "Switch to simple mode",
+    simpleMode: "Simple", fullMode: "Full", switchToFull: "Full", switchToSimple: "Simple",
     noMatch: "No matching settings found",
     unsavedChanges: "Unsaved changes", saving: "Saving...", saveChanges: "Save Changes"
   },
@@ -35,7 +35,11 @@ const en = {
       'deepl': 'DeepL',
       'gemini': 'Google Gemini',
       'deepseek': 'DeepSeek',
-      'google-translate': 'Google Translate'
+      'google-translate': 'Google Translate',
+      'ollama': 'Ollama (Local)',
+      'anthropic': 'Anthropic Claude',
+      'microsoft-translator': 'Microsoft Translator',
+      'baidu-translate': 'Baidu Translate'
     },
     descriptions: {
       'local-llm': 'Local LLM translation, private and free',
@@ -43,7 +47,11 @@ const en = {
       'deepl': 'Professional translation API, excellent quality',
       'gemini': 'Google AI model, free tier available, high quality',
       'deepseek': 'DeepSeek AI model, affordable, excellent for Chinese',
-      'google-translate': 'Free to use, supports many languages, fast'
+      'google-translate': 'Free to use, supports many languages, fast',
+      'ollama': 'Local LLM via Ollama, private and free',
+      'anthropic': 'Claude AI model, extremely high translation quality',
+      'microsoft-translator': 'Microsoft Translator API, 2M chars/month free',
+      'baidu-translate': 'Baidu Translate API, direct access in China, free tier'
     }
   },
   providerConfig: {
@@ -53,6 +61,10 @@ const en = {
     'gemini': { apiKey: 'API Key', model: 'Model' },
     'deepseek': { apiKey: 'API Key', model: 'Model', endpoint: 'API Endpoint' },
     'google-translate': { domain: 'Server', domain_com: 'google.com (International)', domain_cn: 'google.cn (China)', 'domain_com.hk': 'google.com.hk (Hong Kong)' },
+    'ollama': { endpoint: 'API Endpoint', model: 'Model Name', timeout: 'Timeout (ms)', model_placeholder: 'Leave empty to auto-detect (e.g. llama3, qwen2)' },
+    'anthropic': { apiKey: 'API Key', model: 'Model', baseUrl: 'API Endpoint' },
+    'microsoft-translator': { apiKey: 'API Key', region: 'Region' },
+    'baidu-translate': { appId: 'APP ID', secretKey: 'Secret Key' },
     ocr: { language: 'Recognition Language', language_chs: 'Simplified Chinese', language_cht: 'Traditional Chinese', language_eng: 'English', language_jpn: 'Japanese', language_kor: 'Korean' }
   },
   translationSettings: {
@@ -333,6 +345,14 @@ const en = {
     saveSuccess: "Saved successfully", saveFailed: "Save failed", 
     networkError: "Network error", translateError: "Translation failed", ocrError: "Recognition failed", 
     shortcutRegistered: "Shortcut registered", shortcutConflict: "Shortcut conflict"
+  },
+  guide: {
+    subtitle: "Discover core features",
+    dismiss: "Don't show again",
+    selection: { title: "Selection Translate", desc: "Select any text to translate instantly" },
+    screenshot: { title: "Screenshot Translate", desc: "Capture a screen region for OCR and translation" },
+    glass: { title: "Glass Window", desc: "Transparent overlay that translates text in real-time" },
+    document: { title: "Document Translate", desc: "Drop a file to translate paragraph by paragraph" },
   },
   common: { confirm: "Confirm", cancel: "Cancel", save: "Save", delete: "Delete", edit: "Edit", close: "Close", open: "Open", enable: "Enable", disable: "Disable", loading: "Loading...", noData: "No data", retry: "Retry", reset: "Reset", search: "Search", filter: "Filter", all: "All", none: "None", yes: "Yes", no: "No", show: "Show", hide: "Hide", on: "On", off: "Off" },
   ocr: {

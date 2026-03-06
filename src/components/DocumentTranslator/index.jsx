@@ -471,7 +471,7 @@ const DocumentTranslator = ({
         
         // 通知消息
         if (result.warning === 'scanned_no_ocr') {
-          notify?.(t('documentTranslator.notify.scannedNoOcr') || '该 PDF 为扫描件，无法提取文字。请在设置中配置 OCR 引擎后重试', 'warning');
+          notify?.(t('documentTranslator.notify.scannedNoOcr'), 'warning');
         } else {
           const ocrNote = result.usedOcr ? ' (OCR)' : '';
           const message = result.pageCount
@@ -481,7 +481,7 @@ const DocumentTranslator = ({
           // PDF 提示
           if (result.isPdf) {
             setTimeout(() => {
-              notify?.(t('documentTranslator.notify.pdfHint') || 'PDF 仅提取文字内容，图片及复杂排版可能丢失', 'info');
+              notify?.(t('documentTranslator.notify.pdfHint'), 'info');
             }, 1500);
           }
         }
@@ -1118,10 +1118,10 @@ const DocumentTranslator = ({
                 {searchMatchCount > 0 ? `${searchMatchIndex + 1}/${searchMatchCount}` : `0 ${t('documentTranslator.search.matches')}`}
               </span>
             )}
-            <button className="search-nav-btn" onClick={() => navigateSearch('prev')} disabled={searchMatchCount === 0} title={t('documentTranslator.search.prev') || '上一个'}>
+            <button className="search-nav-btn" onClick={() => navigateSearch('prev')} disabled={searchMatchCount === 0} title={t('documentTranslator.search.prev')}>
               <ChevronUp size={14} />
             </button>
-            <button className="search-nav-btn" onClick={() => navigateSearch('next')} disabled={searchMatchCount === 0} title={t('documentTranslator.search.next') || '下一个'}>
+            <button className="search-nav-btn" onClick={() => navigateSearch('next')} disabled={searchMatchCount === 0} title={t('documentTranslator.search.next')}>
               <ChevronDown size={14} />
             </button>
           </div>
@@ -1219,7 +1219,7 @@ const DocumentTranslator = ({
                         const el = document.querySelector('.segment-item.edited');
                         if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                       }}
-                      title={t('documentTranslator.progress.editedHint') || '点击定位到已修改的译文'}
+                      title={t('documentTranslator.progress.editedHint')}
                     >
                        · {t('documentTranslator.progress.edited')} {stats.edited}
                     </button>

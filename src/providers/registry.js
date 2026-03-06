@@ -18,6 +18,10 @@ import DeepLProvider from './deepl';
 import GeminiProvider from './gemini';
 import DeepSeekProvider from './deepseek';
 import GoogleTranslateProvider from './google-translate';
+import OllamaProvider from './ollama';
+import AnthropicProvider from './anthropic';
+import MicrosoftTranslatorProvider from './microsoft-translator';
+import BaiduTranslateProvider from './baidu-translate';
 import createLogger from '../utils/logger.js';
 
 // 日志实例
@@ -35,13 +39,17 @@ const providerClasses = {
   'gemini': GeminiProvider,
   'deepseek': DeepSeekProvider,
   'google-translate': GoogleTranslateProvider,
+  'ollama': OllamaProvider,
+  'anthropic': AnthropicProvider,
+  'microsoft-translator': MicrosoftTranslatorProvider,
+  'baidu-translate': BaiduTranslateProvider,
 };
 
 /**
  * 默认优先级顺序（供 Service 层参考）
  */
 export const DEFAULT_PRIORITY = {
-  normal: ['local-llm', 'openai', 'gemini', 'deepseek', 'google-translate', 'deepl'],
+  normal: ['local-llm', 'ollama', 'openai', 'anthropic', 'gemini', 'deepseek', 'google-translate', 'microsoft-translator', 'baidu-translate', 'deepl'],
 };
 
 // ========== 实例缓存 ==========

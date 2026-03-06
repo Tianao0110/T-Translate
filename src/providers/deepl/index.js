@@ -13,7 +13,7 @@ class DeepLProvider extends BaseProvider {
   static metadata = {
     id: 'deepl',
     name: 'DeepL',
-    description: '专业翻译 API，翻译质量极高',
+    description: 'Professional translation API, excellent quality',
     icon: icon,
     color: '#0f2b46',
     type: 'api',
@@ -29,7 +29,7 @@ class DeepLProvider extends BaseProvider {
       },
       useFreeApi: {
         type: 'checkbox',
-        label: '使用免费 API（Key 以 :fx 结尾）',
+        label: 'Use Free API (Key ending with :fx)',
         default: true,
         required: false,
       },
