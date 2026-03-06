@@ -158,10 +158,8 @@ t-translate/
 | ---------------------------------------------- | --------------------------- |
 | [架构设计](docs/ARCHITECTURE.md)                  | 项目架构和分层设计          |
 | [开发指南](docs/DEVELOPMENT.md)                   | 自定义翻译源和 OCR 引擎开发 |
-| [功能说明](docs/FEATURES.md)                      | 功能特性详解                |
-| [划词翻译技术](docs/SELECTION_TRANSLATOR_TECH.md) | 划词翻译实现原理            |
+| [国际化指南](docs/I18N_GUIDE.md)                  | 多语言国际化开发            |
 | [主题定制](docs/THEME_CUSTOMIZATION.md)           | 主题和样式定制              |
-| [TTS 开发](docs/TTS_DEVELOPMENT.md)               | 语音朗读功能开发            |
 
 ---
 
@@ -225,5 +223,5 @@ npm run check:constants # 检查常量同步状态
 </p>
 
 <p align="center">
-  <strong>版本</strong>: v0.2.1  |  <strong>更新日期</strong>: 2026-02-23
+  <strong>版本</strong>: v0.2.1  |  <strong>更新日期</strong>: 2026-03-06
 </p>
