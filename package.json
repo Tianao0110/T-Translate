@@ -111,6 +111,22 @@
         "filter": [
           "**/*"
         ]
+      },
+      {
+        "from": "public/icon.png",
+        "to": "resources/icon.png"
+      },
+      {
+        "from": "public/tray-icon.ico",
+        "to": "resources/tray-icon.ico"
+      },
+      {
+        "from": "public/screenshot.html",
+        "to": "resources/screenshot.html"
+      },
+      {
+        "from": "public/child-pane.html",
+        "to": "resources/child-pane.html"
       }
     ],
     "mac": {

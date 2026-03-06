@@ -53,14 +53,18 @@ const pages = {
     file: path.join(BASE_DIR, 'build/glass.html'),
   },
   screenshot: {
-    // 截图页面不经过 Vite 构建，直接从 public 加载
+    // 截图页面不经过 Vite 构建，直接加载纯 HTML
     url: path.join(BASE_DIR, 'public/screenshot.html'),
-    file: path.join(BASE_DIR, 'public/screenshot.html'),
+    file: isDev
+      ? path.join(BASE_DIR, 'public/screenshot.html')
+      : path.join(process.resourcesPath, 'resources/screenshot.html'),
   },
   childPane: {
-    // 子玻璃板独立窗口
+    // 子玻璃板独立窗口（纯 HTML + 内联 JS）
     url: `${DEV_SERVER}/child-pane.html`,
-    file: path.join(BASE_DIR, 'build/child-pane.html'),
+    file: isDev
+      ? path.join(BASE_DIR, 'public/child-pane.html')
+      : path.join(process.resourcesPath, 'resources/child-pane.html'),
   },
 };
 
@@ -69,8 +73,12 @@ const pages = {
  * 注意：extraResources 在打包后位于 process.resourcesPath
  */
 const resources = {
-  icon: path.join(BASE_DIR, 'public/icon.png'),
-  trayIcon: path.join(BASE_DIR, 'public/tray-icon.ico'),
+  icon: isDev 
+    ? path.join(BASE_DIR, 'public/icon.png')
+    : path.join(process.resourcesPath, 'resources/icon.png'),
+  trayIcon: isDev
+    ? path.join(BASE_DIR, 'public/tray-icon.ico')
+    : path.join(process.resourcesPath, 'resources/tray-icon.ico'),
   // OCR 数据在打包后位于 resources 目录
   ocrData: isDev 
     ? path.join(BASE_DIR, 'resources/ocr')
