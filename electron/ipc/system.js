@@ -5,6 +5,7 @@
 const { ipcMain, dialog, shell } = require("electron");
 const { CHANNELS } = require("../shared/channels");
 const logger = require("../utils/logger")("IPC:System");
+const { t } = require("../shared/main-i18n");
 
 /**
  * 注册系统级 IPC handlers
@@ -118,7 +119,7 @@ function register(ctx) {
       return await autoUpdater.checkForUpdate();
     } catch (error) {
       logger.error('Check update failed:', error.message);
-      return { success: false, error: error.message || '检查更新失败' };
+      return { success: false, error: error.message || t('system.checkUpdateFailed', '检查更新失败') };
     }
   });
 
@@ -130,7 +131,7 @@ function register(ctx) {
    */
   ipcMain.handle(CHANNELS.APP.DOWNLOAD_UPDATE, async (event, { downloadUrl, downloadName }) => {
     if (_isDownloading) {
-      return { success: false, error: '已在下载中' };
+      return { success: false, error: t('system.alreadyDownloading', '已在下载中') };
     }
 
     _isDownloading = true;
@@ -152,7 +153,7 @@ function register(ctx) {
       _isDownloading = false;
       _downloadProgress = null;
       logger.error('Download update failed:', error.message);
-      return { success: false, error: error.message || '下载失败' };
+      return { success: false, error: error.message || t('system.downloadFailed', '下载失败') };
     }
   });
 
@@ -165,7 +166,7 @@ function register(ctx) {
       return { success: true };
     } catch (error) {
       logger.error('Install update failed:', error.message);
-      return { success: false, error: error.message || '安装失败' };
+      return { success: false, error: error.message || t('system.installFailed', '安装失败') };
     }
   });
 
@@ -261,13 +262,13 @@ function register(ctx) {
         return {
           success: true,
           models: data?.data || [],
-          message: "连接正常",
+          message: t('system.connectionOk', '连接正常'),
         };
       } else {
         return {
           success: false,
           models: [],
-          message: `服务器返回 ${response.status}`,
+          message: t('system.serverStatus', '服务器返回') + ` ${response.status}`,
         };
       }
     } catch (error) {
@@ -275,7 +276,7 @@ function register(ctx) {
       return {
         success: false,
         models: [],
-        message: error.name === "AbortError" ? "连接超时" : "无法连接服务",
+        message: error.name === "AbortError" ? t('system.timeout', '连接超时') : t('system.cannotConnect', '无法连接服务'),
       };
     }
   });
@@ -301,7 +302,7 @@ function register(ctx) {
       return { success: true, path: logDir };
     }
     
-    return { success: false, message: '无法获取日志目录' };
+    return { success: false, message: t('system.logDirFailed', '无法获取日志目录') };
   });
   
   /**

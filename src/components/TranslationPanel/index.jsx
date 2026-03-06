@@ -317,7 +317,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
             className="language-select"
           >
             {languages.map(lang => (
-              <option key={lang.code} value={lang.code}>{lang.flag} {lang.name}</option>
+              <option key={lang.code} value={lang.code}>{lang.flag} {t(`languages.${lang.code}`, lang.name)}</option>
             ))}
           </select>
 
@@ -336,7 +336,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
             className="language-select"
           >
             {languages.filter(l => l.code !== 'auto').map(lang => (
-              <option key={lang.code} value={lang.code}>{lang.flag} {lang.name}</option>
+              <option key={lang.code} value={lang.code}>{lang.flag} {t(`languages.${lang.code}`, lang.name)}</option>
             ))}
           </select>
         </div>

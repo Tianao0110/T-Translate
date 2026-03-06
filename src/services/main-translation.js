@@ -23,7 +23,12 @@ import useTranslationStore from '../stores/translation-store.js';
 // 从配置中心导入常量
 import { PRIVACY_MODES, TRANSLATION_STATUS } from '@config/defaults';
 import createLogger from '../utils/logger.js';
+import i18n from '../i18n.js';
 const logger = createLogger('MainTranslation');
+
+const _t = (key, fallback) => {
+  try { const r = i18n.t(key); return r === key ? fallback : r; } catch { return fallback; }
+};
 
 /**
  * 主窗口翻译服务
@@ -62,7 +67,7 @@ class MainTranslationService {
     const { sourceText, sourceLanguage, targetLanguage } = state.currentTranslation;
 
     if (!sourceText.trim()) {
-      return { success: false, error: '请输入要翻译的文本' };
+      return { success: false, error: _t('translation.enterText', '请输入要翻译的文本') };
     }
 
     const startTime = Date.now();
@@ -137,7 +142,7 @@ class MainTranslationService {
 
         return { success: true, translated: result.text };
       } else {
-        throw new Error(result.error || '翻译失败');
+        throw new Error(result.error || _t('svc.translateFailed', '翻译失败'));
       }
 
     } catch (error) {
@@ -161,7 +166,7 @@ class MainTranslationService {
     const { sourceText, sourceLanguage, targetLanguage } = state.currentTranslation;
 
     if (!sourceText.trim()) {
-      return { success: false, error: '请输入要翻译的文本' };
+      return { success: false, error: _t('translation.enterText', '请输入要翻译的文本') };
     }
 
     const startTime = Date.now();
@@ -225,7 +230,7 @@ class MainTranslationService {
 
         return { success: true, translated: result.text };
       } else {
-        throw new Error(result.error || '翻译失败');
+        throw new Error(result.error || _t('svc.translateFailed', '翻译失败'));
       }
 
     } catch (error) {

@@ -90,7 +90,7 @@ export const LANGUAGE_CODES = {
 export const LANGUAGES = [
   { code: 'auto', name: '自动检测', nativeName: 'Auto Detect', flag: '🌐' },
   { code: 'zh', name: '中文', nativeName: '中文', flag: '🇨🇳' },
-  { code: 'zh-TW', name: '繁体中文', nativeName: '繁體中文', flag: '🇹🇼' },
+  { code: 'zh-TW', name: '繁体中文', nativeName: '繁體中文', flag: '🇨🇳' },
   { code: 'en', name: '英语', nativeName: 'English', flag: '🇺🇸' },
   { code: 'ja', name: '日语', nativeName: '日本語', flag: '🇯🇵' },
   { code: 'ko', name: '韩语', nativeName: '한국어', flag: '🇰🇷' },
@@ -98,7 +98,7 @@ export const LANGUAGES = [
   { code: 'de', name: '德语', nativeName: 'Deutsch', flag: '🇩🇪' },
   { code: 'es', name: '西班牙语', nativeName: 'Español', flag: '🇪🇸' },
   { code: 'ru', name: '俄语', nativeName: 'Русский', flag: '🇷🇺' },
-  { code: 'pa', name: '旁遮普语', nativeName: 'ਪੰਜਾਬੀ', flag: '🇮🇳' },
+  { code: 'pa', name: '旁遮普语', nativeName: 'ਪੰਜਾਬੀ', flag: 'PA' },
   { code: 'pt', name: '葡萄牙语', nativeName: 'Português', flag: '🇵🇹' },
   { code: 'it', name: '意大利语', nativeName: 'Italiano', flag: '🇮🇹' },
   { code: 'ar', name: '阿拉伯语', nativeName: 'العربية', flag: '🇸🇦' },

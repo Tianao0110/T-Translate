@@ -5,6 +5,7 @@
 const { ipcMain, globalShortcut } = require('electron');
 const { CHANNELS } = require('../shared/channels');
 const logger = require('../utils/logger')('IPC:Shortcuts');
+const { t } = require('../shared/main-i18n');
 
 // 默认快捷键配置
 const DEFAULT_SHORTCUTS = {
@@ -114,7 +115,7 @@ function register(ctx) {
           logger.error('Failed to restore old shortcut');
         }
         logger.warn('Shortcut registration failed (may be in use):', electronShortcut);
-        return { success: false, error: '快捷键已被占用' };
+        return { success: false, error: t('shortcuts.occupied', '快捷键已被占用') };
       }
     } catch (error) {
       logger.error('Update shortcut error:', error);
@@ -176,7 +177,7 @@ function register(ctx) {
         return { success: true };
       } else {
         logger.warn('Failed to resume shortcut:', electronShortcut);
-        return { success: false, error: '快捷键恢复失败' };
+        return { success: false, error: t('shortcuts.resumeFailed', '快捷键恢复失败') };
       }
     } catch (error) {
       logger.error('Resume shortcut error:', error);

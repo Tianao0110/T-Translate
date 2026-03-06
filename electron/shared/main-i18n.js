@@ -69,6 +69,56 @@ const messages = {
     'ocr.downloadTimeout': '下载超时，请检查网络连接后重试',
     'ocr.permissionDenied': '权限不足，请以管理员身份运行',
     'ocr.downloadFailed': '下载失败',
+    'ocr.invalidImageData': '无效的图片数据格式',
+    
+    // shortcuts
+    'shortcuts.occupied': '快捷键已被占用',
+    'shortcuts.resumeFailed': '快捷键恢复失败',
+    
+    // system
+    'system.checkUpdateFailed': '检查更新失败',
+    'system.alreadyDownloading': '已在下载中',
+    'system.downloadFailed': '下载失败',
+    'system.installFailed': '安装失败',
+    'system.logDirFailed': '无法获取日志目录',
+    'system.connectionOk': '连接正常',
+    'system.serverStatus': '服务器返回',
+    'system.timeout': '连接超时',
+    'system.cannotConnect': '无法连接服务',
+    
+    // glass
+    'glass.windowNotFound': '玻璃窗口不存在',
+    
+    // screenshot
+    'screenshot.failed': '截图失败',
+    'screenshot.visionNotSupported': '当前模型不支持图片识别，请加载视觉模型（如 Qwen-VL、LLaVA）',
+    'screenshot.ocrTimeout': 'OCR 识别超时，请检查模型是否正常运行',
+    'screenshot.ocrFailed': 'OCR 识别失败',
+    'screenshot.ocrError': 'OCR 错误',
+    'screenshot.noImage': '没有预先截取的屏幕图像',
+    'screenshot.noSource': '没有可用的截图源',
+    
+    // menu
+    'menu.file': '文件', 'menu.edit': '编辑', 'menu.view': '视图',
+    'menu.translate': '翻译', 'menu.settings': '设置', 'menu.help': '帮助',
+    'menu.about': '关于', 'menu.preferences': '偏好设置',
+    'menu.hide': '隐藏', 'menu.hideOthers': '隐藏其他', 'menu.showAll': '显示全部',
+    'menu.quit': '退出',
+    'menu.newTranslation': '新建翻译', 'menu.importText': '导入文本',
+    'menu.exportTranslation': '导出翻译',
+    'menu.textFiles': '文本文件', 'menu.allFiles': '所有文件',
+    'menu.undo': '撤销', 'menu.redo': '重做',
+    'menu.cut': '剪切', 'menu.copy': '复制', 'menu.paste': '粘贴', 'menu.selectAll': '全选',
+    'menu.reload': '重新加载', 'menu.devTools': '开发者工具',
+    'menu.actualSize': '实际大小', 'menu.zoomIn': '放大', 'menu.zoomOut': '缩小',
+    'menu.fullscreen': '全屏', 'menu.alwaysOnTop': '置顶',
+    'menu.screenshotTranslate': '截图翻译', 'menu.quickTranslate': '快速翻译',
+    'menu.switchLang': '切换语言', 'menu.clearContent': '清空内容',
+    'menu.lmStudioSettings': 'LM Studio 设置', 'menu.ocrSettings': 'OCR 设置',
+    'menu.userGuide': '使用指南', 'menu.shortcutList': '快捷键列表',
+    'menu.checkUpdate': '检查更新', 'menu.upToDate': '当前已是最新版本',
+    'menu.ok': '确定',
+    'menu.aboutDetail': '版本: {{version}}\n离线翻译工具\n\n基于 LM Studio 和本地 OCR',
   },
   en: {
     // OCR engine detection
@@ -133,6 +183,56 @@ const messages = {
     'ocr.downloadTimeout': 'Download timed out. Please check your network and try again.',
     'ocr.permissionDenied': 'Permission denied. Please run as administrator.',
     'ocr.downloadFailed': 'Download failed',
+    'ocr.invalidImageData': 'Invalid image data format',
+    
+    // shortcuts
+    'shortcuts.occupied': 'Shortcut is already in use',
+    'shortcuts.resumeFailed': 'Failed to restore shortcut',
+    
+    // system
+    'system.checkUpdateFailed': 'Failed to check for updates',
+    'system.alreadyDownloading': 'Already downloading',
+    'system.downloadFailed': 'Download failed',
+    'system.installFailed': 'Installation failed',
+    'system.logDirFailed': 'Cannot access log directory',
+    'system.connectionOk': 'Connection OK',
+    'system.serverStatus': 'Server returned',
+    'system.timeout': 'Connection timed out',
+    'system.cannotConnect': 'Cannot connect to service',
+    
+    // glass
+    'glass.windowNotFound': 'Glass window not found',
+    
+    // screenshot
+    'screenshot.failed': 'Screenshot failed',
+    'screenshot.visionNotSupported': 'Current model does not support image recognition. Please load a vision model (e.g. Qwen-VL, LLaVA).',
+    'screenshot.ocrTimeout': 'OCR recognition timed out. Please check if the model is running.',
+    'screenshot.ocrFailed': 'OCR recognition failed',
+    'screenshot.ocrError': 'OCR Error',
+    'screenshot.noImage': 'No pre-captured screen image',
+    'screenshot.noSource': 'No screenshot source available',
+    
+    // menu
+    'menu.file': 'File', 'menu.edit': 'Edit', 'menu.view': 'View',
+    'menu.translate': 'Translate', 'menu.settings': 'Settings', 'menu.help': 'Help',
+    'menu.about': 'About', 'menu.preferences': 'Preferences',
+    'menu.hide': 'Hide', 'menu.hideOthers': 'Hide Others', 'menu.showAll': 'Show All',
+    'menu.quit': 'Quit',
+    'menu.newTranslation': 'New Translation', 'menu.importText': 'Import Text',
+    'menu.exportTranslation': 'Export Translation',
+    'menu.textFiles': 'Text Files', 'menu.allFiles': 'All Files',
+    'menu.undo': 'Undo', 'menu.redo': 'Redo',
+    'menu.cut': 'Cut', 'menu.copy': 'Copy', 'menu.paste': 'Paste', 'menu.selectAll': 'Select All',
+    'menu.reload': 'Reload', 'menu.devTools': 'Developer Tools',
+    'menu.actualSize': 'Actual Size', 'menu.zoomIn': 'Zoom In', 'menu.zoomOut': 'Zoom Out',
+    'menu.fullscreen': 'Fullscreen', 'menu.alwaysOnTop': 'Always on Top',
+    'menu.screenshotTranslate': 'Screenshot Translate', 'menu.quickTranslate': 'Quick Translate',
+    'menu.switchLang': 'Switch Language', 'menu.clearContent': 'Clear Content',
+    'menu.lmStudioSettings': 'LM Studio Settings', 'menu.ocrSettings': 'OCR Settings',
+    'menu.userGuide': 'User Guide', 'menu.shortcutList': 'Keyboard Shortcuts',
+    'menu.checkUpdate': 'Check for Updates', 'menu.upToDate': 'You are up to date',
+    'menu.ok': 'OK',
+    'menu.aboutDetail': 'Version: {{version}}\nOffline Translation Tool\n\nPowered by LM Studio and Local OCR',
   },
 };
 

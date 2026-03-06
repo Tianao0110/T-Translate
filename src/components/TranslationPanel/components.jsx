@@ -394,6 +394,7 @@ export const LanguageSelector = memo(({
   onChange,
   disabled = false 
 }) => {
+  const { t } = useTranslation();
   const handleChange = useCallback((e) => {
     onChange(e.target.value);
   }, [onChange]);
@@ -407,7 +408,7 @@ export const LanguageSelector = memo(({
     >
       {options.map(lang => (
         <option key={lang.code} value={lang.code}>
-          {lang.name}
+          {t(`languages.${lang.code}`, lang.name)}
         </option>
       ))}
     </select>

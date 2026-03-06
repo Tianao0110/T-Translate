@@ -69,7 +69,7 @@ class OpenAIProvider extends BaseProvider {
   /**
    * 翻译文本
    */
-  async translate(text, sourceLang = 'auto', targetLang = 'zh') {
+  async translate(text, sourceLang = 'auto', targetLang = 'zh', options = {}) {
     if (!text?.trim()) {
       return { success: false, error: '文本为空' };
     }
@@ -79,12 +79,13 @@ class OpenAIProvider extends BaseProvider {
     }
 
     try {
-      const targetName = LANGUAGE_CODES[targetLang]?.name || targetLang;
+      const systemContent = options.systemPrompt || 
+        `You are a professional translator. Translate the following text to ${LANGUAGE_CODES[targetLang]?.name || targetLang}. Output only the translation, nothing else.`;
       
       const messages = [
         {
           role: 'system',
-          content: `You are a professional translator. Translate the following text to ${targetName}. Output only the translation, nothing else.`
+          content: systemContent
         },
         {
           role: 'user',
@@ -117,7 +118,7 @@ class OpenAIProvider extends BaseProvider {
   /**
    * 流式翻译
    */
-  async translateStream(text, sourceLang, targetLang, onChunk) {
+  async translateStream(text, sourceLang, targetLang, onChunk, options = {}) {
     if (!text?.trim()) {
       return { success: false, error: '文本为空' };
     }
@@ -127,12 +128,13 @@ class OpenAIProvider extends BaseProvider {
     }
 
     try {
-      const targetName = LANGUAGE_CODES[targetLang]?.name || targetLang;
+      const systemContent = options.systemPrompt || 
+        `You are a professional translator. Translate the following text to ${LANGUAGE_CODES[targetLang]?.name || targetLang}. Output only the translation, nothing else.`;
       
       const messages = [
         {
           role: 'system',
-          content: `You are a professional translator. Translate the following text to ${targetName}. Output only the translation, nothing else.`
+          content: systemContent
         },
         {
           role: 'user',

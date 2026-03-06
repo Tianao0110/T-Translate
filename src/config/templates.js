@@ -21,9 +21,9 @@ export const LANGUAGE_NAMES = {
   'pt': 'Portuguese',
   'it': 'Italian',
   'ar': 'Arabic',
-  'hi': 'Hindi',
   'th': 'Thai',
   'vi': 'Vietnamese',
+  'pa': 'Punjabi',
 };
 
 /**

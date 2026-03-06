@@ -77,7 +77,7 @@ export default function useSaveModal(currentTranslation, addToFavorites, notify,
         } catch (parseError) {
           logger.error('JSON parse:', parseError);
           parsed = {
-            tags: ['未分类'],
+            tags: [t ? t('favorites.uncategorized', '未分类') : '未分类'],
             summary: '',
             isStyleSuggested: translatedText.length > 30,
           };
@@ -88,7 +88,7 @@ export default function useSaveModal(currentTranslation, addToFavorites, notify,
         setEditableSummary(parsed.summary || '');
         setSaveAsStyleRef(parsed.isStyleSuggested || false);
       } else {
-        throw new Error(result.error || '分析失败');
+        throw new Error(result.error || (t ? t('translation.analysisFailed', '分析失败') : 'Analysis failed'));
       }
     } catch (error) {
       logger.error('AI analysis:', error);

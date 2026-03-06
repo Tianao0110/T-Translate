@@ -7,6 +7,7 @@ const fs = require('fs');
 const os = require('os');
 const logger = require('./logger')('OCR-Helper');
 const { smartMerge, mergedBlocksToText } = require('./text-merger');
+const { t } = require('../shared/main-i18n');
 
 /**
  * 使用 RapidOCR 识别图片中的文字
@@ -34,7 +35,7 @@ async function recognizeWithRapidOCR(imageData, options = {}) {
       }
       imageBuffer = Buffer.from(base64Data, 'base64');
     } else {
-      return { success: false, error: '无效的图片数据格式' };
+      return { success: false, error: t('ocr.invalidImageData', '无效的图片数据格式') };
     }
     
     // 写入临时文件
@@ -160,7 +161,7 @@ async function recognizeWithRapidOCR(imageData, options = {}) {
     cleanupTempFile(tempFile);
     
     if (lastError) {
-      return { success: false, error: `OCR 引擎加载失败: ${lastError.message}` };
+      return { success: false, error: t('ocr.loadFailed', { detail: lastError.message }) };
     }
     
     return { success: true, text: '', confidence: 0, engine: 'none' };

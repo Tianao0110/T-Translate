@@ -97,7 +97,7 @@ class DeepSeekProvider extends BaseProvider {
   /**
    * 翻译文本
    */
-  async translate(text, sourceLang = 'auto', targetLang = 'zh') {
+  async translate(text, sourceLang = 'auto', targetLang = 'zh', options = {}) {
     if (!text?.trim()) {
       return { success: false, error: '文本为空' };
     }
@@ -107,9 +107,8 @@ class DeepSeekProvider extends BaseProvider {
     }
 
     try {
-      const targetName = LANGUAGE_CODES[targetLang]?.name || targetLang;
-
-      const systemPrompt = `You are a professional translator. Translate the following text to ${targetName}. Output only the translation, no explanations or additional text.`;
+      const systemPrompt = options.systemPrompt || 
+        `You are a professional translator. Translate the following text to ${LANGUAGE_CODES[targetLang]?.name || targetLang}. Output only the translation, no explanations or additional text.`;
 
       const response = await fetch(`${this.config.endpoint}/chat/completions`, {
         method: 'POST',

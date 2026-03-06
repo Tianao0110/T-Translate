@@ -71,18 +71,20 @@ class LocalLLMProvider extends BaseProvider {
   /**
    * 翻译文本
    */
-  async translate(text, sourceLang = 'auto', targetLang = 'zh') {
+  async translate(text, sourceLang = 'auto', targetLang = 'zh', options = {}) {
     if (!text?.trim()) {
       return { success: false, error: '文本为空' };
     }
 
     try {
-      const targetName = LANGUAGE_CODES[targetLang]?.name || targetLang;
+      // 优先使用传入的 systemPrompt（来自 templates.js），否则构建简易 prompt
+      const systemContent = options.systemPrompt || 
+        `You are a translator. Translate the following text to ${LANGUAGE_CODES[targetLang]?.name || targetLang}. Output only the translation, no explanations.`;
       
       const messages = [
         {
           role: 'system',
-          content: `You are a translator. Translate the following text to ${targetName}. Output only the translation, no explanations.`
+          content: systemContent
         },
         {
           role: 'user',
@@ -115,18 +117,19 @@ class LocalLLMProvider extends BaseProvider {
   /**
    * 流式翻译
    */
-  async translateStream(text, sourceLang, targetLang, onChunk) {
+  async translateStream(text, sourceLang, targetLang, onChunk, options = {}) {
     if (!text?.trim()) {
       return { success: false, error: '文本为空' };
     }
 
     try {
-      const targetName = LANGUAGE_CODES[targetLang]?.name || targetLang;
+      const systemContent = options.systemPrompt || 
+        `You are a translator. Translate the following text to ${LANGUAGE_CODES[targetLang]?.name || targetLang}. Output only the translation, no explanations.`;
       
       const messages = [
         {
           role: 'system',
-          content: `You are a translator. Translate the following text to ${targetName}. Output only the translation, no explanations.`
+          content: systemContent
         },
         {
           role: 'user',

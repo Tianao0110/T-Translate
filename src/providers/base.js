@@ -141,6 +141,10 @@ export const LANGUAGE_CODES = {
   'ru': { name: 'Русский', deepl: 'RU', google: 'ru' },
   'pt': { name: 'Português', deepl: 'PT', google: 'pt' },
   'it': { name: 'Italiano', deepl: 'IT', google: 'it' },
+  'ar': { name: 'العربية', deepl: null, google: 'ar' },
+  'th': { name: 'ไทย', deepl: null, google: 'th' },
+  'vi': { name: 'Tiếng Việt', deepl: null, google: 'vi' },
+  'pa': { name: 'ਪੰਜਾਬੀ', deepl: null, google: 'pa' },
 };
 
 /**

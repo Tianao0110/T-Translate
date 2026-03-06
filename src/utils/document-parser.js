@@ -2,7 +2,12 @@
 // 文档解析工具 - 支持多种格式的文件解析和智能分段
 
 import createLogger from './logger.js';
+import i18n from '../i18n.js';
 const logger = createLogger('DocumentParser');
+
+const _t = (key, fallback) => {
+  try { const r = i18n.t(key); return r === key ? fallback : r; } catch { return fallback; }
+};
 
 /**
  * 文件大小限制
@@ -136,31 +141,31 @@ export function detectLanguage(text) {
  */
 export function shouldSkipSegment(text, filters = {}) {
   if (!text || !text.trim()) {
-    return { skip: true, reason: '空段落' };
+    return { skip: true, reason: _t('docParser.emptySegment', '空段落') };
   }
   
   const trimmed = text.trim();
   
   // 跳过过短段落
   if (filters.skipShort && trimmed.length < (filters.minLength || 10)) {
-    return { skip: true, reason: '过短' };
+    return { skip: true, reason: _t('docParser.tooShort', '过短') };
   }
   
   // 跳过纯数字
   if (filters.skipNumbers && /^\d+$/.test(trimmed)) {
-    return { skip: true, reason: '纯数字' };
+    return { skip: true, reason: _t('docParser.numbersOnly', '纯数字') };
   }
   
   // 跳过代码块
   if (filters.skipCode && /^```[\s\S]*```$/.test(trimmed)) {
-    return { skip: true, reason: '代码块' };
+    return { skip: true, reason: _t('docParser.codeBlock', '代码块') };
   }
   
   // 跳过已是目标语言
   if (filters.skipTargetLang && filters.targetLang) {
     const lang = detectLanguage(trimmed);
     if (lang === filters.targetLang) {
-      return { skip: true, reason: '已是目标语言' };
+      return { skip: true, reason: _t('docParser.alreadyTargetLang', '已是目标语言') };
     }
   }
   
@@ -168,7 +173,7 @@ export function shouldSkipSegment(text, filters = {}) {
   if (filters.skipKeywords && filters.skipKeywords.length > 0) {
     for (const keyword of filters.skipKeywords) {
       if (trimmed.toLowerCase().includes(keyword.toLowerCase())) {
-        return { skip: true, reason: `包含关键词: ${keyword}` };
+        return { skip: true, reason: _t('docParser.containsKeyword', '包含关键词') + `: ${keyword}` };
       }
     }
   }
@@ -587,13 +592,13 @@ export async function parseEPUB(file, options = {}) {
   // 解析 container.xml 获取 rootfile 路径
   const containerXml = await zip.file('META-INF/container.xml')?.async('text');
   if (!containerXml) {
-    throw new Error('无效的 EPUB 文件：缺少 container.xml');
+    throw new Error(_t('docParser.epubNoContainer', '无效的 EPUB 文件：缺少 container.xml'));
   }
   
   // 提取 rootfile 路径
   const rootfileMatch = containerXml.match(/full-path="([^"]+)"/);
   if (!rootfileMatch) {
-    throw new Error('无效的 EPUB 文件：找不到 rootfile');
+    throw new Error(_t('docParser.epubNoRootfile', '无效的 EPUB 文件：找不到 rootfile'));
   }
   
   const rootfilePath = rootfileMatch[1];
@@ -602,7 +607,7 @@ export async function parseEPUB(file, options = {}) {
   // 解析 OPF 文件获取内容顺序
   const opfContent = await zip.file(rootfilePath)?.async('text');
   if (!opfContent) {
-    throw new Error('无效的 EPUB 文件：找不到 OPF 文件');
+    throw new Error(_t('docParser.epubNoOpf', '无效的 EPUB 文件：找不到 OPF 文件'));
   }
   
   // 提取书名
@@ -648,7 +653,7 @@ export async function parseEPUB(file, options = {}) {
   }
   
   if (!allText.trim()) {
-    throw new Error('EPUB 文件中没有找到可翻译的文本内容');
+    throw new Error(_t('docParser.epubNoContent', 'EPUB 文件中没有找到可翻译的文本内容'));
   }
   
   const segments = splitIntoSegments(allText, {
@@ -704,7 +709,7 @@ export async function parseDocument(file, options = {}) {
   const format = SUPPORTED_FORMATS[ext];
   
   if (!format) {
-    throw new Error(`不支持的文件格式: .${ext}`);
+    throw new Error(_t('docParser.unsupportedFormat', '不支持的文件格式') + `: .${ext}`);
   }
   
   try {
@@ -766,7 +771,7 @@ export async function parseDocument(file, options = {}) {
         break;
         
       default:
-        throw new Error(`未实现的解析器: ${format.parser}`);
+        throw new Error('Unimplemented parser: ' + format.parser);
     }
     
     // 识别章节
@@ -796,7 +801,7 @@ export async function parseDocument(file, options = {}) {
       return {
         success: false,
         needPassword: true,
-        message: '文件需要密码',
+        message: _t('docParser.passwordRequired', '文件需要密码'),
       };
     }
     
@@ -814,7 +819,7 @@ function readAsText(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => resolve(e.target.result);
-    reader.onerror = () => reject(new Error('文件读取失败'));
+    reader.onerror = () => reject(new Error(_t('docParser.readFailed', '文件读取失败')));
     reader.readAsText(file);
   });
 }
@@ -969,7 +974,7 @@ export function exportVTT(segments) {
 export function exportDOCX(segments, options = {}) {
   const {
     style = 'bilingual',  // 'bilingual' | 'translated-only' | 'source-only'
-    title = '翻译文档',
+    title = _t('documentTranslator.defaultDocTitle', '翻译文档'),
     includeSkipped = false,
   } = options;
   
@@ -1058,7 +1063,7 @@ export function exportDOCX(segments, options = {}) {
 export function exportPDFHTML(segments, options = {}) {
   const {
     style = 'bilingual',
-    title = '翻译文档',
+    title = _t('documentTranslator.defaultDocTitle', '翻译文档'),
     includeSkipped = false,
   } = options;
   

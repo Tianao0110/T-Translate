@@ -37,7 +37,7 @@ const InterfaceSection = ({
     } catch (e) {
       console.warn('Failed to save language to store:', e);
     }
-    notify(langCode === 'zh' ? '界面语言已切换为中文' : 'Language changed to English', 'success');
+    notify(t('settings.general.langSwitched', langCode === 'zh' ? '界面语言已切换' : 'Language changed'), 'success');
   };
   
   // 切换主题并立即保存（确保子窗口同步）

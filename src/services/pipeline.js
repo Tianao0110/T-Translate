@@ -14,9 +14,14 @@ import { isProviderAllowed, isOcrEngineAllowed, PRIVACY_MODE_IDS } from '../conf
 import { smartMerge } from '../utils/text-merger.js';
 import createLogger from '../utils/logger.js';
 import { getShortErrorMessage } from '../utils/error-handler.js';
+import i18n from '../i18n.js';
 
 // 日志实例
 const logger = createLogger('Pipeline');
+
+const _t = (key, fallback) => {
+  try { const r = i18n.t(key); return r === key ? fallback : r; } catch { return fallback; }
+};
 
 // ========== 状态缓存 ==========
 let lastImageHash = '';
@@ -151,7 +156,7 @@ class TranslationPipeline {
       
       const captureResult = await window.electron?.glass?.captureRegion?.(captureOptions);
       if (!captureResult?.success) {
-        throw new Error(captureResult?.error || '截图失败');
+        throw new Error(captureResult?.error || _t('screenshot.failed', '截图失败'));
       }
       
       // 2. 运行 OCR -> 翻译
@@ -191,12 +196,12 @@ class TranslationPipeline {
       });
       
       if (!ocrResult.success) {
-        throw new Error(ocrResult.error || 'OCR 失败');
+        throw new Error(ocrResult.error || _t('svc.ocrFailed', 'OCR 失败'));
       }
       
       const text = ocrResult.text?.trim();
       if (!text) {
-        session.setResult('（未识别到文字）');
+        session.setResult(_t('svc.noTextRecognized', '（未识别到文字）'));
         return { success: true, text: '' };
       }
       
@@ -281,7 +286,7 @@ class TranslationPipeline {
         }));
       
       if (validBlocks.length === 0) {
-        session.setResult('（未识别到有效文字）');
+        session.setResult(_t('svc.noValidTextRecognized', '（未识别到有效文字）'));
         return { success: true, text: '' };
       }
       
@@ -349,7 +354,7 @@ class TranslationPipeline {
           } else {
             session.updateChildPane(paneId, {
               status: CHILD_PANE_STATUS.ERROR,
-              error: result.error || '翻译失败',
+              error: result.error || _t('svc.translateFailed', '翻译失败'),
             });
           }
         } catch (error) {
@@ -437,7 +442,7 @@ class TranslationPipeline {
       });
       
       if (!result.success) {
-        throw new Error(result.error || '翻译失败');
+        throw new Error(result.error || _t('svc.translateFailed', '翻译失败'));
       }
       
       // 清理输出

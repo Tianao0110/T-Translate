@@ -2,6 +2,7 @@
 // 设置面板子组件共享的工具和类型
 
 import { Eye, EyeOff } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 /**
  * 设置项通用 Props 类型定义（JSDoc）
@@ -138,6 +139,7 @@ export const OcrEngineItem = ({
   apiKeyInput,
   testButton
 }) => {
+  const { t } = useTranslation();
   return (
     <div className={`ocr-engine-item ${isActive ? 'active' : ''}`}>
       <div className="engine-info">
@@ -157,7 +159,7 @@ export const OcrEngineItem = ({
             className={`btn ${isActive ? 'active' : ''}`}
             onClick={onSelect}
           >
-            {isActive ? '✓ 使用中' : '使用'}
+            {isActive ? t('ocr.inUse', '✓ 使用中') : t('ocr.use', '使用')}
           </button>
         )}
         {testButton}

@@ -380,7 +380,7 @@ const HistoryPanel = ({ showNotification }) => {
       const date = dayjs(key + '-01');
       // 根据当前语言返回不同格式
       const lang = i18n.language;
-      return lang === 'zh' ? date.format('YYYY年MM月') : date.format('MMMM YYYY');
+      return lang === 'zh' ? date.format('YYYY年MM月') : date.format('MMM YYYY');
     }
     return key;
   }, [t]);
@@ -478,9 +478,9 @@ const HistoryPanel = ({ showNotification }) => {
     reader.onload = async () => {
       try {
         const result = await importHistory(file);
-        if (result?.success) notify(`导入 ${result.count || 0} 条`, 'success');
+        if (result?.success) notify(t('history.importedCount', { count: result.count || 0 }), 'success');
       } catch { 
-        notify('导入失败', 'error'); 
+        notify(t('history.importFailed', '导入失败'), 'error'); 
       }
     };
     reader.readAsText(file);
@@ -649,12 +649,12 @@ const HistoryPanel = ({ showNotification }) => {
                 <td><div className="cell-text"><HighlightText text={item.sourceText?.slice(0, 60)} search={debouncedSearch} />{item.sourceText?.length > 60 ? '...' : ''}</div></td>
                 <td><div className="cell-text"><HighlightText text={item.translatedText?.slice(0, 60)} search={debouncedSearch} />{item.translatedText?.length > 60 ? '...' : ''}</div></td>
                 <td className="cell-actions" onClick={(e) => e.stopPropagation()}>
-                  <button onClick={() => handleCopy(item.translatedText)} title="复制"><Copy size={12} /></button>
-                  <button onClick={() => handleRestore(item.id)} title="恢复"><Edit3 size={12} /></button>
-                  <button onClick={() => handleFavorite(item)} title="收藏" className={favoriteIds.has(item.id) ? 'active' : ''}>
+                  <button onClick={() => handleCopy(item.translatedText)} title={t('translation.copy', '复制')}><Copy size={12} /></button>
+                  <button onClick={() => handleRestore(item.id)} title={t('history.restore', '恢复')}><Edit3 size={12} /></button>
+                  <button onClick={() => handleFavorite(item)} title={t('translation.favorite', '收藏')} className={favoriteIds.has(item.id) ? 'active' : ''}>
                     <Star size={12} fill={favoriteIds.has(item.id) ? 'currentColor' : 'none'} />
                   </button>
-                  <button onClick={() => removeFromHistory(item.id)} title="删除" className="danger"><Trash2 size={12} /></button>
+                  <button onClick={() => removeFromHistory(item.id)} title={t('history.delete', '删除')} className="danger"><Trash2 size={12} /></button>
                 </td>
               </tr>
             ))}
@@ -671,8 +671,8 @@ const HistoryPanel = ({ showNotification }) => {
       return (
         <div className="empty-state">
           <Clock size={48} />
-          <p>{debouncedSearch ? '没有找到匹配的记录' : '暂无翻译历史'}</p>
-          <span>翻译内容会自动保存在这里</span>
+          <p>{debouncedSearch ? t('history.noMatch', '没有找到匹配的记录') : t('history.empty', '暂无翻译历史')}</p>
+          <span>{t('history.emptyHint', '翻译内容会自动保存在这里')}</span>
         </div>
       );
     }

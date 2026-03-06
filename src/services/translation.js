@@ -15,6 +15,11 @@
 //                         Pipeline ────────────↗
 
 import createLogger from '../utils/logger.js';
+import i18n from '../i18n.js';
+
+const _t = (key, fallback) => {
+  try { const r = i18n.t(key); return r === key ? fallback : r; } catch { return fallback; }
+};
 
 import {
   getProvider,
@@ -586,8 +591,8 @@ class TranslationService {
     return {
       success: false,
       error: tried.length > 0 
-        ? `所有翻译源均失败 (尝试了: ${tried.join(', ')})`
-        : '没有可用的翻译源',
+        ? _t('svc.allFailed', '所有翻译源均失败') + ` (${tried.join(', ')})`
+        : _t('svc.noProvider', '没有可用的翻译源'),
     };
   }
 
@@ -752,7 +757,7 @@ class TranslationService {
       return this.translateStream(text, options, onChunk);
     }
     
-    return { success: false, error: '没有可用的翻译源' };
+    return { success: false, error: _t('svc.noProvider', '没有可用的翻译源') };
   }
 
   // ========== 批量翻译 ==========
@@ -791,7 +796,7 @@ class TranslationService {
     if (hasAny) {
       return { success: true, translations };
     }
-    return { success: false, error: lastError || '批量翻译全部失败', translations };
+    return { success: false, error: lastError || _t('svc.batchFailed', '批量翻译全部失败'), translations };
   }
 
   // ========== 辅助方法 ==========
@@ -816,7 +821,7 @@ class TranslationService {
     const systemMessage = messages.find(m => m.role === 'system');
     
     if (!userMessage) {
-      return { success: false, error: '没有用户消息' };
+      return { success: false, error: _t('svc.noUserMsg', '没有用户消息') };
     }
     
     // 检测目标语言
@@ -840,7 +845,7 @@ class TranslationService {
       };
     }
     
-    return { success: false, error: result.error || '翻译失败' };
+    return { success: false, error: result.error || _t('svc.translateFailed', '翻译失败') };
   }
 
   /**
@@ -849,12 +854,12 @@ class TranslationService {
   async testProvider(providerId) {
     const provider = getProvider(providerId);
     if (!provider) {
-      return { success: false, message: '翻译源不存在' };
+      return { success: false, message: _t('svc.providerNotFound', '翻译源不存在') };
     }
     
     if (!provider.isConfigured()) {
       const missing = getMissingConfig(providerId);
-      return { success: false, message: `缺少配置: ${missing.join(', ')}` };
+      return { success: false, message: _t('svc.missingConfig', '缺少配置') + ': ' + missing.join(', ') };
     }
     
     return provider.testConnection();
@@ -871,7 +876,7 @@ class TranslationService {
       // 创建临时实例，使用传入的配置
       const tempProvider = createProvider(providerId, config);
       if (!tempProvider) {
-        return { success: false, message: '翻译源不存在' };
+        return { success: false, message: _t('svc.providerNotFound', '翻译源不存在') };
       }
 
       // 如果 provider 有 testConnection 方法，使用它
@@ -882,11 +887,11 @@ class TranslationService {
       // 否则尝试做一次简短翻译来测试
       const result = await tempProvider.translate('test', 'en', 'zh');
       if (result.success) {
-        return { success: true, message: '连接成功' };
+        return { success: true, message: _t('svc.connected', '连接成功') };
       }
-      return { success: false, message: result.error || '测试失败' };
+      return { success: false, message: result.error || _t('svc.testFailed', '测试失败') };
     } catch (error) {
-      return { success: false, message: error.message || '连接失败' };
+      return { success: false, message: error.message || _t('svc.connectFailed', '连接失败') };
     }
   }
 
@@ -906,7 +911,7 @@ class TranslationService {
       }
     }
     
-    return { success: false, error: '没有可用的翻译源' };
+    return { success: false, error: _t('svc.noProvider', '没有可用的翻译源') };
   }
 
   /**

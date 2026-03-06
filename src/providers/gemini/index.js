@@ -89,7 +89,7 @@ class GeminiProvider extends BaseProvider {
   /**
    * 翻译文本
    */
-  async translate(text, sourceLang = 'auto', targetLang = 'zh') {
+  async translate(text, sourceLang = 'auto', targetLang = 'zh', options = {}) {
     if (!text?.trim()) {
       return { success: false, error: '文本为空' };
     }
@@ -99,13 +99,17 @@ class GeminiProvider extends BaseProvider {
     }
 
     try {
-      const sourceName = this._getLanguageName(sourceLang);
-      const targetName = this._getLanguageName(targetLang);
-
-      // 构建提示词
-      const prompt = sourceLang === 'auto'
-        ? `Translate the following text to ${targetName}. Output only the translated text, no explanations.\n\n${text}`
-        : `Translate from ${sourceName} to ${targetName}. Output only the translated text, no explanations.\n\n${text}`;
+      let prompt;
+      if (options.systemPrompt) {
+        // 使用传入的 system prompt
+        prompt = options.systemPrompt.replace('{targetLang}', this._getLanguageName(targetLang)) + `\n\n${text}`;
+      } else {
+        const sourceName = this._getLanguageName(sourceLang);
+        const targetName = this._getLanguageName(targetLang);
+        prompt = sourceLang === 'auto'
+          ? `Translate the following text to ${targetName}. Output only the translated text, no explanations.\n\n${text}`
+          : `Translate from ${sourceName} to ${targetName}. Output only the translated text, no explanations.\n\n${text}`;
+      }
 
       const requestBody = {
         contents: [{ parts: [{ text: prompt }] }],

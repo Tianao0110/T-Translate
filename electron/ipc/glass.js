@@ -6,6 +6,7 @@ const { ipcMain, safeStorage } = require('electron');
 const { CHANNELS } = require('../shared/channels');
 const logger = require('../utils/logger')('IPC:Glass');
 const displayHelper = require('../utils/display-helper');
+const { t } = require('../shared/main-i18n');
 
 /**
  * 注册玻璃窗口相关 IPC handlers
@@ -283,7 +284,7 @@ function register(ctx) {
     
     try {
       if (!glassWindow || glassWindow.isDestroyed()) {
-        throw new Error('玻璃窗口不存在');
+        throw new Error(t('glass.windowNotFound', '玻璃窗口不存在'));
       }
       
       // 保存原始透明度
@@ -316,7 +317,7 @@ function register(ctx) {
       if (screenshot) {
         return { success: true, imageData: screenshot };
       } else {
-        throw new Error('截图失败');
+        throw new Error(t('screenshot.failed', '截图失败'));
       }
     } catch (error) {
       logger.error('Capture region error:', error);

@@ -8,6 +8,7 @@ const path = require('path');
 const { CHANNELS } = require('../shared/channels');
 const PATHS = require('../shared/paths');
 const logger = require('../utils/logger')('IPC:Screenshot');
+const { t } = require('../shared/main-i18n');
 
 /**
  * 注册截图相关 IPC handlers
@@ -130,22 +131,16 @@ function register(ctx) {
       // 根据错误类型生成友好提示
       let displayError;
       if (errorText.includes('vision') || errorText.includes('not support') || errorText.includes('不支持')) {
-        displayError = isZh
-          ? '当前模型不支持图片识别，请加载视觉模型（如 Qwen-VL、LLaVA）'
-          : 'Current model does not support image recognition. Please load a vision model (e.g. Qwen-VL, LLaVA).';
+        displayError = t('screenshot.visionNotSupported', '当前模型不支持图片识别，请加载视觉模型（如 Qwen-VL、LLaVA）');
       } else if (errorText.includes('timeout') || errorText.includes('超时')) {
-        displayError = isZh
-          ? 'OCR 识别超时，请检查模型是否正常运行'
-          : 'OCR recognition timed out. Please check if the model is running.';
+        displayError = t('screenshot.ocrTimeout', 'OCR 识别超时，请检查模型是否正常运行');
       } else {
-        displayError = isZh
-          ? 'OCR 识别失败：' + errorText
-          : 'OCR failed: ' + errorText;
+        displayError = t('screenshot.ocrFailed', 'OCR 识别失败') + '：' + errorText;
       }
 
       if (managers.showSelectionResult) {
         managers.showSelectionResult({
-          sourceText: isZh ? 'OCR 错误' : 'OCR Error',
+          sourceText: t('screenshot.ocrError', 'OCR 错误'),
           translatedText: displayError,
         });
       } else if (managers.hideSelectionLoading) {
@@ -369,7 +364,7 @@ async function handleScreenshotSelection(options, bounds) {
     const data = screenshotModule.getScreenshotData() || runtime.screenshotData;
     
     if (!data) {
-      throw new Error('没有预先截取的屏幕图像');
+      throw new Error(t('screenshot.noImage', '没有预先截取的屏幕图像'));
     }
     
     let dataURL;
@@ -432,7 +427,7 @@ function processDesktopCapturerSelection(data, bounds) {
   const { sources, displays, totalBounds } = data;
   
   if (!sources || sources.length === 0) {
-    throw new Error('没有可用的截图源');
+    throw new Error(t('screenshot.noSource', '没有可用的截图源'));
   }
   
   const fullScreenshot = sources[0].thumbnail;

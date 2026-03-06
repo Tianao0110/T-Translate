@@ -24,6 +24,10 @@ const en = {
     testing: "Testing...", connected: "Connected", connectionFailed: "Connection failed", notTested: "Not tested",
     noConfig: "This provider requires no configuration, ready to use",
     saved: "Provider settings saved", saveFailed: "Save failed",
+    enabledSection: "Enabled", disabledSection: "Not Enabled",
+    noEnabled: "No translation providers enabled",
+    enable: "Enable",
+    getApiKey: "Get API Key",
     typeLabels: { llm: "AI Model", api: "Pro API", traditional: "Traditional" },
     names: {
       'local-llm': 'LM Studio (Local)',
@@ -43,7 +47,7 @@ const en = {
     }
   },
   providerConfig: {
-    'local-llm': { endpoint: 'API Endpoint', model: 'Model Name', timeout: 'Timeout (ms)' },
+    'local-llm': { endpoint: 'API Endpoint', model: 'Model Name', timeout: 'Timeout (ms)', model_placeholder: 'Leave empty to auto-detect' },
     'openai': { apiKey: 'API Key', endpoint: 'API Endpoint', model: 'Model Name' },
     'deepl': { apiKey: 'API Key', freeApi: 'Use Free API (Key ending with :fx)' },
     'gemini': { apiKey: 'API Key', model: 'Model' },
@@ -119,9 +123,13 @@ const en = {
     aiAnalyzing: "AI is analyzing content...", summaryNote: "Summary/Note", shortDesc: "Short description...",
     aiRecommended: "AI Recommended",
     saveToStyleLib: "Will be saved to Style Library for style rewriting", saveAsNormal: "Save as regular favorite",
-    saveToStyleLibBtn: "Save to Style Library", saveFavorite: "Save Favorite"
+    saveToStyleLibBtn: "Save to Style Library", saveFavorite: "Save Favorite",
+    analysisFailed: "Analysis failed",
+    rewriteFailed: "Rewrite failed",
+    versionOriginal: "Original", versionOriginalFull: "Original Translation",
+    versionStyleRewrite: "Style Rewrite", versionUserEdit: "User Edit", versionUnknown: "Unknown"
   },
-  languages: { auto: "Auto Detect", zh: "Chinese", "zh-TW": "Traditional Chinese", en: "English", ja: "Japanese", ko: "Korean", fr: "French", de: "German", es: "Spanish", ru: "Russian", pt: "Portuguese", it: "Italian" },
+  languages: { auto: "Auto Detect", zh: "Chinese", "zh-TW": "Traditional Chinese", en: "English", ja: "Japanese", ko: "Korean", fr: "French", de: "German", es: "Spanish", ru: "Russian", pt: "Portuguese", it: "Italian", ar: "Arabic", th: "Thai", vi: "Vietnamese", pa: "Punjabi" },
   history: { 
     title: "Translation History", search: "Search history...", empty: "No history yet", clearAll: "Clear", clearConfirm: "Are you sure to clear all history?", 
     delete: "Delete", restore: "Restore to Edit", today: "Today", yesterday: "Yesterday", thisWeek: "This Week", thisMonth: "This Month", earlier: "Earlier",
@@ -138,6 +146,8 @@ const en = {
     copySource: "Copy Source", copyTarget: "Copy Target", favorite: "Favorite", unfavorite: "Unfavorite",
     copied: "Copied", restored: "Restored to editor", favorited: "Added to favorites", unfavorited: "Removed from favorites",
     exportSuccess: "Export successful", exportFailed: "Export failed", cleared: "Cleared",
+    importedCount: "Imported {{count}} records", importFailed: "Import failed", noMatch: "No matching records found",
+    emptyHint: "Translations will be saved here automatically",
     deleteSelectedConfirm: "Delete {{count}} selected records?",
     deletedCount: "Deleted {{count}} records",
     clearAllConfirm: "Clear all {{count}} records?",
@@ -267,7 +277,8 @@ const en = {
       theme: "Theme", themeDesc: "Select app appearance",
       themes: { default: "Default", fresh: "Fresh", dark: "Dark" },
       startup: "Start on Boot", startupDesc: "Run automatically on system startup", minimize: "Minimize to Tray", minimizeDesc: "Minimize to system tray when closed",
-      defaultSource: "Default Source Language", defaultTarget: "Default Target Language"
+      defaultSource: "Default Source Language", defaultTarget: "Default Target Language",
+      langSwitched: "Language changed"
     },
     providers: {
       title: "Translation Providers", enable: "Enable", disable: "Disable", test: "Test Connection", testing: "Testing...", testSuccess: "Connection successful", testFailed: "Connection failed",
@@ -304,7 +315,17 @@ const en = {
     updateFailed: "Update check failed",
     noReleases: "No releases yet, you're up to date",
     currentVersion: "Current Version",
-    latestVersion: "Latest Version"
+    latestVersion: "Latest Version",
+    downloading: "Downloading...",
+    downloadReady: "Download complete, ready to install",
+    downloadComplete: "Download Complete",
+    installHint: "Click the button below to launch the installer and close the app",
+    launching: "Launching installer...",
+    installNow: "Install Now",
+    installFailed: "Installation failed",
+    manualDownload: "Manual Download",
+    downloadInstall: "Download & Install",
+    githubHint: "You can also download manually from GitHub"
   },
   notify: { 
     success: "Success", error: "Error", warning: "Warning", info: "Info", 
@@ -359,7 +380,9 @@ const en = {
     testTextMixed: "This is a TTS test. 这是语音朗读测试。",
     testTextChinese: "Hello, this is a TTS test.",
     testFailed: "Preview failed", loadVoicesFailed: "Failed to load voices",
-    langNames: { zh: "Chinese", en: "English", ja: "Japanese", ko: "Korean", fr: "French", de: "German", es: "Spanish", ru: "Russian", pt: "Portuguese", it: "Italian" }
+    langNames: { zh: "Chinese", en: "English", ja: "Japanese", ko: "Korean", fr: "French", de: "German", es: "Spanish", ru: "Russian", pt: "Portuguese", it: "Italian" },
+    noVoicesInstalled: "No voice packs installed. Please install voices in system settings.",
+    noVoiceForLang: "No {{lang}} voice pack installed"
   },
   // ========== New: DocumentTranslator translation keys ==========
   documentTranslator: {
@@ -524,6 +547,67 @@ const en = {
   // ========== New: Tray menu translation keys ==========
   titleBar: {
     minimize: "Minimize", maximize: "Maximize", restore: "Restore", close: "Close"
+  },
+  errors: {
+    network: { title: "Network Error", message: "Cannot connect to translation service", s1: "Check your network connection", s2: "If using local LLM, make sure LM Studio is running", s3: "Check if firewall is blocking the connection" },
+    apiKey: { title: "Invalid API Key", message: "API key is not configured or has expired", s1: "Check if the API Key is entered correctly", s2: "Confirm the API Key has not expired", s3: "Go to settings to reconfigure" },
+    quota: { title: "Rate Limit Exceeded", message: "API call limit has been reached", s1: "Try again later", s2: "Switch to another translation provider", s3: "Check API account quota" },
+    timeout: { title: "Request Timeout", message: "Translation service took too long to respond", s1: "Network may be slow, please retry later", s2: "If using local LLM, the model may still be loading", s3: "Try translating shorter text" },
+    config: { title: "Configuration Error", message: "Translation provider is not configured correctly", s1: "Check if the API endpoint is correct", s2: "Confirm the provider is properly configured" },
+    provider: { title: "Provider Unavailable", message: "Current translation provider is temporarily unavailable", s1: "Try switching to another provider", s2: "Check provider configuration" },
+    ocr: { title: "OCR Failed", message: "Text recognition encountered a problem", s1: "Ensure the image is clear and contains text", s2: "Try adjusting the screenshot area", s3: "Switch to another OCR engine" },
+    unknown: { title: "Operation Failed", message: "An unknown error occurred", s1: "Please try again later", s2: "If the problem persists, check settings" },
+    openSettings: "Open Settings", switchProvider: "Switch Provider", retry: "Retry", checkSettings: "Check Settings",
+    p: {
+      localLlm: { network: "LM Studio is not running or unreachable. Please ensure LM Studio is started and a model is loaded.", config: "Please check LM Studio endpoint (default: http://localhost:1234)" },
+      openai: { apiKey: "OpenAI API Key is invalid. Please check your API Key in settings.", quota: "OpenAI API quota exhausted. Please check your account balance." },
+      deepl: { apiKey: "DeepL API Key is invalid. Please confirm you're using an API Key, not an account password.", quota: "DeepL free tier quota exhausted. Consider upgrading or switching providers." },
+      gemini: { apiKey: "Gemini API Key is invalid. Please get a valid Key from Google AI Studio." },
+      deepseek: { apiKey: "DeepSeek API Key is invalid. Please check your configuration." },
+      google: { network: "Google Translate is temporarily unreachable. A network proxy may be needed." }
+    }
+  },
+  svc: {
+    noProvider: "No translation providers available",
+    allFailed: "All translation providers failed",
+    batchFailed: "Batch translation failed entirely",
+    noUserMsg: "No user message",
+    translateFailed: "Translation failed",
+    providerNotFound: "Translation provider not found",
+    missingConfig: "Missing configuration",
+    connected: "Connected successfully",
+    testFailed: "Test failed",
+    connectFailed: "Connection failed",
+    ocrFailed: "OCR failed",
+    noTextRecognized: "(No text recognized)",
+    noValidTextRecognized: "(No valid text recognized)"
+  },
+  docParser: {
+    emptySegment: "Empty segment", tooShort: "Too short", numbersOnly: "Numbers only",
+    codeBlock: "Code block", alreadyTargetLang: "Already in target language", containsKeyword: "Contains keyword",
+    epubNoContainer: "Invalid EPUB: missing container.xml",
+    epubNoRootfile: "Invalid EPUB: rootfile not found",
+    epubNoOpf: "Invalid EPUB: OPF file not found",
+    epubNoContent: "No translatable text found in EPUB",
+    unsupportedFormat: "Unsupported file format",
+    passwordRequired: "File requires a password",
+    readFailed: "File read failed"
+  },
+  glossary: {
+    unsupportedJson: "Unsupported JSON format",
+    jsonParseFailed: "JSON parse failed",
+    csvEmpty: "CSV file is empty or malformed",
+    unknownFormat: "Unrecognized file format. Please use JSON, CSV, or TBX."
+  },
+  docParser: {
+    emptySegment: "Empty segment", tooShort: "Too short", numbersOnly: "Numbers only", codeBlock: "Code block",
+    alreadyTargetLang: "Already in target language", containsKeyword: "Contains keyword",
+    unsupportedFormat: "Unsupported file format", unimplementedParser: "Unimplemented parser",
+    passwordRequired: "File requires a password", readFailed: "File read failed",
+    invalidEpubContainer: "Invalid EPUB: missing container.xml",
+    invalidEpubRootfile: "Invalid EPUB: rootfile not found",
+    invalidEpubOpf: "Invalid EPUB: OPF file not found",
+    epubEmpty: "No translatable text found in EPUB"
   },
   tray: {
     showWindow: "Show Window",

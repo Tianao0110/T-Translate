@@ -378,6 +378,15 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
     return translated !== i18nKey ? translated : originalLabel;
   };
   
+  /**
+   * 翻译 placeholder
+   */
+  const getFieldPlaceholder = (providerId, fieldKey, originalPlaceholder) => {
+    const i18nKey = `providerConfig.${providerId}.${fieldKey}_placeholder`;
+    const translated = t(i18nKey);
+    return translated !== i18nKey ? translated : originalPlaceholder;
+  };
+  
   const renderConfigForm = (providerId) => {
     const meta = allProvidersMeta.find(m => m.id === providerId);
     const config = providerConfigs[providerId] || {};
@@ -406,7 +415,7 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
                   type={showPasswords[`${providerId}_${key}`] ? 'text' : 'password'}
                   value={config[key] || ''}
                   onChange={(e) => updateConfig(providerId, key, e.target.value)}
-                  placeholder={field.placeholder}
+                  placeholder={getFieldPlaceholder(providerId, key, field.placeholder)}
                   className="ps-input"
                 />
                 <button
@@ -444,7 +453,7 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
                 type={field.type || 'text'}
                 value={config[key] || ''}
                 onChange={(e) => updateConfig(providerId, key, e.target.value)}
-                placeholder={field.placeholder}
+                placeholder={getFieldPlaceholder(providerId, key, field.placeholder)}
                 className="ps-input"
               />
             )}

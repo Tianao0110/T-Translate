@@ -223,7 +223,7 @@ const FavoriteCard = ({
         } catch (parseError) {
           logger.error('JSON parse error:', parseError);
           parsed = {
-            tags: ['未分类'],
+            tags: [t('favorites.uncategorized', '未分类')],
             summary: '',
             isStyleSuggested: item.translatedText?.length > 30
           };
@@ -859,14 +859,14 @@ const FavoritesPanel = ({ showNotification }) => {
                         const input = document.getElementById(`folder-edit-${folder.id}`);
                         handleUpdateFolder(folder.id, { name: input.value });
                       }}
-                      title="确认"
+                      title={t('favorites.save', '确认')}
                     >
                       <Check size={14} />
                     </button>
                     <button 
                       className="btn-cancel-small"
                       onClick={() => setEditingFolder(null)}
-                      title="取消"
+                      title={t('favorites.cancel', '取消')}
                     >
                       <X size={14} />
                     </button>

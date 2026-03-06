@@ -150,7 +150,7 @@ const AboutSection = ({ notify }) => {
       await window.electron?.app?.installUpdate?.({ filePath: downloadedPath });
     } catch (e) {
       setUpdateStage(UPDATE_STAGE.ERROR);
-      setErrorMsg(e.message || '安装失败');
+      setErrorMsg(e.message || t('about.installFailed', '安装失败'));
     }
   }, [downloadedPath]);
 
@@ -187,7 +187,7 @@ const AboutSection = ({ notify }) => {
         <div className="update-download-progress">
           <div className="progress-info">
             <span className="progress-label">
-              {i18n.language === 'zh' ? '正在下载...' : 'Downloading...'}
+              {t('about.downloading', '正在下载...')}
             </span>
             <span className="progress-percent">
               {downloadProgress.percent >= 0 ? `${downloadProgress.percent}%` : ''}
@@ -212,12 +212,10 @@ const AboutSection = ({ notify }) => {
         <div className="update-ready">
           <CheckCircle size={40} className="ready-icon" />
           <p className="ready-text">
-            {i18n.language === 'zh' ? '下载完成，准备安装' : 'Download complete, ready to install'}
+            {t('about.downloadReady', '下载完成，准备安装')}
           </p>
           <p className="ready-hint">
-            {i18n.language === 'zh'
-              ? '点击下方按钮将启动安装程序并关闭应用'
-              : 'Click install to launch the installer and close the app'}
+            {t('about.installHint', '点击下方按钮将启动安装程序并关闭应用')}
           </p>
         </div>
       );
@@ -227,7 +225,7 @@ const AboutSection = ({ notify }) => {
       return (
         <div className="update-installing">
           <Loader2 size={40} className="spinning" />
-          <p>{i18n.language === 'zh' ? '正在启动安装程序...' : 'Launching installer...'}</p>
+          <p>{t('about.launching', '正在启动安装程序...')}</p>
         </div>
       );
     }
@@ -238,9 +236,7 @@ const AboutSection = ({ notify }) => {
           <AlertCircle size={40} className="error-icon" />
           <p className="error-text">{errorMsg}</p>
           <p className="error-hint">
-            {i18n.language === 'zh'
-              ? '你也可以手动前往 GitHub 下载'
-              : 'You can also download manually from GitHub'}
+            {t('about.githubHint', '你也可以手动前往 GitHub 下载')}
           </p>
         </div>
       );
@@ -301,7 +297,7 @@ const AboutSection = ({ notify }) => {
           </button>
           <button className="btn-primary" onClick={installNow}>
             <Download size={16} />
-            {i18n.language === 'zh' ? '立即安装' : 'Install Now'}
+            {t('about.installNow', '立即安装')}
           </button>
         </>
       );
@@ -311,11 +307,11 @@ const AboutSection = ({ notify }) => {
       return (
         <>
           <button className="btn-secondary" onClick={closeModal}>
-            {i18n.language === 'zh' ? '关闭' : 'Close'}
+            {t('titleBar.close', '关闭')}
           </button>
           <button className="btn-primary" onClick={openDownloadPage}>
             <ExternalLink size={16} />
-            {i18n.language === 'zh' ? '手动下载' : 'Manual Download'}
+            {t('about.manualDownload', '手动下载')}
           </button>
         </>
       );
@@ -329,7 +325,7 @@ const AboutSection = ({ notify }) => {
         {updateInfo?.downloadUrl ? (
           <button className="btn-primary" onClick={startDownload}>
             <Download size={16} />
-            {i18n.language === 'zh' ? '下载并安装' : 'Download & Install'}
+            {t('about.downloadInstall', '下载并安装')}
           </button>
         ) : (
           <button className="btn-primary" onClick={openDownloadPage}>
@@ -408,9 +404,9 @@ const AboutSection = ({ notify }) => {
                  updateStage === UPDATE_STAGE.ERROR ? '⚠️ ' :
                  updateStage === UPDATE_STAGE.DOWNLOADING ? '⬇️ ' : '🎉 '}
                 {updateStage === UPDATE_STAGE.READY
-                  ? (i18n.language === 'zh' ? '下载完成' : 'Download Complete')
+                  ? t('about.downloadComplete', '下载完成')
                   : updateStage === UPDATE_STAGE.ERROR
-                    ? (i18n.language === 'zh' ? '更新失败' : 'Update Failed')
+                    ? t('about.updateFailed', '更新失败')
                     : t('settings.about.newVersion')
                 }
               </h3>

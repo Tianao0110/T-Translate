@@ -88,7 +88,7 @@ export default function useStyleRewrite(currentTranslation, addStyleVersion, not
 
         notify(t('translation.styleRewriteComplete'), 'success');
       } else {
-        throw new Error(result.error || '改写失败');
+        throw new Error(result.error || (t ? t('translation.rewriteFailed', '改写失败') : 'Rewrite failed'));
       }
     } catch (error) {
       logger.error('Style rewrite:', error);
@@ -101,14 +101,14 @@ export default function useStyleRewrite(currentTranslation, addStyleVersion, not
 
   // 获取版本显示名称
   const getVersionName = useCallback((version) => {
-    if (!version) return '原始';
+    if (!version) return t ? t('translation.versionOriginal', '原始') : 'Original';
     switch (version.type) {
-      case 'original': return '原始翻译';
-      case 'style_rewrite': return `风格改写 (${version.styleName})`;
-      case 'user_edit': return '用户编辑';
-      default: return '未知';
+      case 'original': return t ? t('translation.versionOriginalFull', '原始翻译') : 'Original Translation';
+      case 'style_rewrite': return t ? t('translation.versionStyleRewrite', '风格改写') + ` (${version.styleName})` : `Style Rewrite (${version.styleName})`;
+      case 'user_edit': return t ? t('translation.versionUserEdit', '用户编辑') : 'User Edit';
+      default: return t ? t('translation.versionUnknown', '未知') : 'Unknown';
     }
-  }, []);
+  }, [t]);
 
   // 当前版本信息
   const currentVersion = currentTranslation.versions?.find(

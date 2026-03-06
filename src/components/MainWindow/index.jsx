@@ -158,7 +158,7 @@ const MainWindow = () => {
           // 通知主进程 OCR 失败
           window.electron?.screenshot?.notifyOcrComplete?.({ 
             success: false, 
-            error: ocrResult.error || '未识别到文字' 
+            error: ocrResult.error || t('translation.ocrFailed', '未识别到文字') 
           });
           return;
         }

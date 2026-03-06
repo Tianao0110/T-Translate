@@ -106,6 +106,14 @@ export function textSimilarity(text1, text2) {
  * @returns {string} 语言名称
  */
 export function getLanguageName(code) {
+  // Try i18n first
+  try {
+    const i18n = require('../i18n.js').default;
+    const key = `languages.${code}`;
+    const result = i18n.t(key);
+    if (result !== key) return result;
+  } catch {}
+  
   const names = {
     'auto': '自动',
     'zh': '中文',

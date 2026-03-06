@@ -24,6 +24,10 @@ const zh = {
     testing: "测试中...", connected: "已连接", connectionFailed: "连接失败", notTested: "未测试",
     noConfig: "此翻译源无需额外配置，开箱即用",
     saved: "翻译源设置已保存", saveFailed: "保存失败",
+    enabledSection: "已启用", disabledSection: "未启用",
+    noEnabled: "尚未启用任何翻译源",
+    enable: "启用",
+    getApiKey: "获取 API Key",
     typeLabels: { llm: "AI 大模型", api: "专业 API", traditional: "传统翻译" },
     names: {
       'local-llm': 'LM Studio (本地)',
@@ -43,7 +47,7 @@ const zh = {
     }
   },
   providerConfig: {
-    'local-llm': { endpoint: 'API 地址', model: '模型名称', timeout: '超时时间 (ms)' },
+    'local-llm': { endpoint: 'API 地址', model: '模型名称', timeout: '超时时间 (ms)', model_placeholder: '留空自动检测' },
     'openai': { apiKey: 'API Key', endpoint: 'API 地址', model: '模型名称' },
     'deepl': { apiKey: 'API Key', freeApi: '使用免费 API（Key 以 :fx 结尾）' },
     'gemini': { apiKey: 'API Key', model: '模型' },
@@ -119,9 +123,13 @@ const zh = {
     aiAnalyzing: "AI 正在分析内容...", summaryNote: "摘要/笔记", shortDesc: "简短描述...",
     aiRecommended: "AI 推荐",
     saveToStyleLib: "将保存到\"风格库\"，可用于风格改写", saveAsNormal: "保存为普通收藏",
-    saveToStyleLibBtn: "保存到风格库", saveFavorite: "保存收藏"
+    saveToStyleLibBtn: "保存到风格库", saveFavorite: "保存收藏",
+    analysisFailed: "分析失败",
+    rewriteFailed: "改写失败",
+    versionOriginal: "原始", versionOriginalFull: "原始翻译",
+    versionStyleRewrite: "风格改写", versionUserEdit: "用户编辑", versionUnknown: "未知"
   },
-  languages: { auto: "自动检测", zh: "中文", "zh-TW": "繁体中文", en: "English", ja: "日本語", ko: "한국어", fr: "Français", de: "Deutsch", es: "Español", ru: "Русский", pt: "Português", it: "Italiano" },
+  languages: { auto: "自动检测", zh: "中文", "zh-TW": "繁体中文", en: "English", ja: "日本語", ko: "한국어", fr: "Français", de: "Deutsch", es: "Español", ru: "Русский", pt: "Português", it: "Italiano", ar: "العربية", th: "ไทย", vi: "Tiếng Việt", pa: "ਪੰਜਾਬੀ" },
   history: { 
     title: "翻译历史", search: "搜索历史...", empty: "暂无历史记录", clearAll: "清空", clearConfirm: "确定要清空所有历史记录吗？", 
     delete: "删除", restore: "恢复编辑", today: "今天", yesterday: "昨天", thisWeek: "本周", thisMonth: "本月", earlier: "更早",
@@ -141,6 +149,8 @@ const zh = {
     copySource: "复制原文", copyTarget: "复制译文", favorite: "收藏", unfavorite: "取消收藏",
     copied: "已复制译文", restored: "已恢复到编辑区", favorited: "已收藏", unfavorited: "已取消收藏",
     exportSuccess: "导出成功", exportFailed: "导出失败", cleared: "已清空",
+    importedCount: "导入 {{count}} 条", importFailed: "导入失败", noMatch: "没有找到匹配的记录",
+    emptyHint: "翻译内容会自动保存在这里",
     secureMode: { title: "无痕模式已启用", desc: "当前模式下不会保存任何翻译历史记录。如需保存历史，请切换到标准模式。" },
     stats: { 
       title: "统计", total: "总记录", today: "今日翻译", thisWeek: "本周", 
@@ -267,7 +277,8 @@ const zh = {
       theme: "主题", themeDesc: "选择应用外观主题",
       themes: { default: "默认", fresh: "清新", dark: "暗色" },
       startup: "开机启动", startupDesc: "系统启动时自动运行", minimize: "最小化到托盘", minimizeDesc: "关闭窗口时最小化到系统托盘",
-      defaultSource: "默认源语言", defaultTarget: "默认目标语言"
+      defaultSource: "默认源语言", defaultTarget: "默认目标语言",
+      langSwitched: "界面语言已切换"
     },
     providers: {
       title: "翻译源设置", enable: "启用", disable: "禁用", test: "测试连接", testing: "测试中...", testSuccess: "连接成功", testFailed: "连接失败",
@@ -304,7 +315,17 @@ const zh = {
     updateFailed: "检查更新失败",
     noReleases: "暂无发布版本，已是最新",
     currentVersion: "当前版本",
-    latestVersion: "最新版本"
+    latestVersion: "最新版本",
+    downloading: "正在下载...",
+    downloadReady: "下载完成，准备安装",
+    downloadComplete: "下载完成",
+    installHint: "点击下方按钮将启动安装程序并关闭应用",
+    launching: "正在启动安装程序...",
+    installNow: "立即安装",
+    installFailed: "安装失败",
+    manualDownload: "手动下载",
+    downloadInstall: "下载并安装",
+    githubHint: "你也可以手动前往 GitHub 下载"
   },
   notify: { 
     success: "成功", error: "错误", warning: "警告", info: "提示", 
@@ -359,7 +380,9 @@ const zh = {
     testTextMixed: "这是语音朗读测试。This is a TTS test.",
     testTextChinese: "你好，这是语音朗读功能测试。",
     testFailed: "试听失败", loadVoicesFailed: "加载语音列表失败",
-    langNames: { zh: "中文", en: "英语", ja: "日语", ko: "韩语", fr: "法语", de: "德语", es: "西班牙语", ru: "俄语", pt: "葡萄牙语", it: "意大利语" }
+    langNames: { zh: "中文", en: "英语", ja: "日语", ko: "韩语", fr: "法语", de: "德语", es: "西班牙语", ru: "俄语", pt: "葡萄牙语", it: "意大利语" },
+    noVoicesInstalled: "系统未安装任何语音包，请在系统设置中安装语音",
+    noVoiceForLang: "系统未安装{{lang}}语音包"
   },
   // ========== 新增：文档翻译组件翻译键 ==========
   documentTranslator: {
@@ -524,6 +547,67 @@ const zh = {
   // ========== 新增：托盘菜单翻译键 ==========
   titleBar: {
     minimize: "最小化", maximize: "最大化", restore: "还原", close: "关闭"
+  },
+  errors: {
+    network: { title: "网络连接失败", message: "无法连接到翻译服务", s1: "检查网络连接是否正常", s2: "如果使用本地 LLM，请确保 LM Studio 正在运行", s3: "检查防火墙设置是否阻止了连接" },
+    apiKey: { title: "API 密钥无效", message: "API 密钥未配置或已失效", s1: "检查 API Key 是否正确输入", s2: "确认 API Key 没有过期", s3: "前往设置页面重新配置" },
+    quota: { title: "请求次数超限", message: "API 调用次数已达上限", s1: "稍后再试", s2: "切换到其他翻译源", s3: "检查 API 账户配额" },
+    timeout: { title: "请求超时", message: "翻译服务响应时间过长", s1: "网络可能较慢，请稍后重试", s2: "如果使用本地 LLM，模型可能正在加载", s3: "尝试翻译较短的文本" },
+    config: { title: "配置错误", message: "翻译源配置不正确", s1: "检查 API 地址是否正确", s2: "确认翻译源已正确配置" },
+    provider: { title: "翻译源不可用", message: "当前翻译源暂时无法使用", s1: "尝试切换到其他翻译源", s2: "检查翻译源配置" },
+    ocr: { title: "OCR 识别失败", message: "文字识别出现问题", s1: "确保图片清晰且包含文字", s2: "尝试调整截图区域", s3: "切换其他 OCR 引擎" },
+    unknown: { title: "操作失败", message: "发生未知错误", s1: "请稍后重试", s2: "如果问题持续，请检查设置" },
+    openSettings: "打开设置", switchProvider: "切换翻译源", retry: "重试", checkSettings: "检查设置",
+    p: {
+      localLlm: { network: "LM Studio 未运行或无法连接。请确保 LM Studio 已启动并加载了模型。", config: "请检查 LM Studio 地址配置（默认 http://localhost:1234）" },
+      openai: { apiKey: "OpenAI API Key 无效。请在设置中检查您的 API Key。", quota: "OpenAI API 配额已用尽。请检查您的账户余额。" },
+      deepl: { apiKey: "DeepL API Key 无效。请确认使用的是 API Key 而非账户密码。", quota: "DeepL 免费版配额已用尽。考虑升级或切换翻译源。" },
+      gemini: { apiKey: "Gemini API Key 无效。请前往 Google AI Studio 获取有效的 Key。" },
+      deepseek: { apiKey: "DeepSeek API Key 无效。请检查配置。" },
+      google: { network: "Google 翻译服务暂时无法访问。可能需要网络代理。" }
+    }
+  },
+  svc: {
+    noProvider: "没有可用的翻译源",
+    allFailed: "所有翻译源均失败",
+    batchFailed: "批量翻译全部失败",
+    noUserMsg: "没有用户消息",
+    translateFailed: "翻译失败",
+    providerNotFound: "翻译源不存在",
+    missingConfig: "缺少配置",
+    connected: "连接成功",
+    testFailed: "测试失败",
+    connectFailed: "连接失败",
+    ocrFailed: "OCR 失败",
+    noTextRecognized: "（未识别到文字）",
+    noValidTextRecognized: "（未识别到有效文字）"
+  },
+  docParser: {
+    emptySegment: "空段落", tooShort: "过短", numbersOnly: "纯数字",
+    codeBlock: "代码块", alreadyTargetLang: "已是目标语言", containsKeyword: "包含关键词",
+    epubNoContainer: "无效的 EPUB 文件：缺少 container.xml",
+    epubNoRootfile: "无效的 EPUB 文件：找不到 rootfile",
+    epubNoOpf: "无效的 EPUB 文件：找不到 OPF 文件",
+    epubNoContent: "EPUB 文件中没有找到可翻译的文本内容",
+    unsupportedFormat: "不支持的文件格式",
+    passwordRequired: "文件需要密码",
+    readFailed: "文件读取失败"
+  },
+  glossary: {
+    unsupportedJson: "不支持的 JSON 格式",
+    jsonParseFailed: "JSON 解析失败",
+    csvEmpty: "CSV 文件为空或格式错误",
+    unknownFormat: "无法识别文件格式，请使用 JSON、CSV 或 TBX 格式"
+  },
+  docParser: {
+    emptySegment: "空段落", tooShort: "过短", numbersOnly: "纯数字", codeBlock: "代码块",
+    alreadyTargetLang: "已是目标语言", containsKeyword: "包含关键词",
+    unsupportedFormat: "不支持的文件格式", unimplementedParser: "未实现的解析器",
+    passwordRequired: "文件需要密码", readFailed: "文件读取失败",
+    invalidEpubContainer: "无效的 EPUB 文件：缺少 container.xml",
+    invalidEpubRootfile: "无效的 EPUB 文件：找不到 rootfile",
+    invalidEpubOpf: "无效的 EPUB 文件：找不到 OPF 文件",
+    epubEmpty: "EPUB 文件中没有找到可翻译的文本内容"
   },
   tray: {
     showWindow: "显示窗口",
