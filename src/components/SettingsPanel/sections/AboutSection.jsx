@@ -253,7 +253,7 @@ const AboutSection = ({ notify, resetSettings }) => {
           <div className="version-arrow">→</div>
           <div className="version-item latest">
             <span className="label">{t('about.latestVersion')}</span>
-            <span className="value">v{updateInfo?.latestVersion}</span>
+            <span className="value">{updateInfo?.latestVersion}</span>
           </div>
         </div>
 
