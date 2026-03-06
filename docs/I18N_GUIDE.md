@@ -565,5 +565,5 @@ console.log('Missing in ZH:', missingInZh);
 
 ---
 
-**文档维护者**: Edan Zeng
+**文档维护者**: T-Translate 开发团队  
 **最后更新**: 2026-01-22

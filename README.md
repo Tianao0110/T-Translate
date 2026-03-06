@@ -223,5 +223,5 @@ npm run check:constants # 检查常量同步状态
 </p>
 
 <p align="center">
-  <strong>版本</strong>: v0.2.1  |  <strong>更新日期</strong>: 2026-03-06
+  <strong>版本</strong>: v0.3.0  |  <strong>更新日期</strong>: 2026-03-06
 </p>

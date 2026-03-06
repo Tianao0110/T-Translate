@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 
 import useTranslationStore from '../../stores/translation-store';
+import appIcon from '/icon.png';
 // TranslationPanel 是首屏必需，直接导入
 import TranslationPanel from '../TranslationPanel';
 // 其他面板懒加载
@@ -300,7 +301,7 @@ const MainWindow = () => {
       {/* 顶部工具栏 */}
       <div className="main-toolbar">
         <div className="toolbar-brand">
-          <img src="./icon.png" alt="T-Translate" className="brand-logo-img" />
+          <img src={appIcon} alt="T-Translate" className="brand-logo-img" />
         </div>
 
         <div className="toolbar-tabs">

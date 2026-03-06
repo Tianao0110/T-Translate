@@ -4,6 +4,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GitBranch, RefreshCw, FolderOpen, Download, X, Loader2, CheckCircle, AlertCircle, ExternalLink } from 'lucide-react';
+import appIcon from '/icon.png';
 
 // 更新阶段
 const UPDATE_STAGE = {
@@ -253,7 +254,7 @@ const AboutSection = ({ notify, resetSettings }) => {
           <div className="version-arrow">→</div>
           <div className="version-item latest">
             <span className="label">{t('about.latestVersion')}</span>
-            <span className="value">{updateInfo?.latestVersion}</span>
+            <span className="value">v{updateInfo?.latestVersion}</span>
           </div>
         </div>
 
@@ -342,7 +343,7 @@ const AboutSection = ({ notify, resetSettings }) => {
   return (
     <div className="setting-content about-section">
       <div className="app-info">
-        <img src="./icon.png" alt="T-Translate" className="app-logo-img" />
+        <img src={appIcon} alt="T-Translate" className="app-logo-img" />
         <h2>T-Translate</h2>
         <p className="version-tag">v{version}</p>
         <p className="app-desc">{t('about.desc')}</p>
