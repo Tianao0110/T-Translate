@@ -26,10 +26,14 @@ const OcrSection = ({
   const [repairing, setRepairing] = useState(false);
   const [repairProgress, setRepairProgress] = useState('');
 
-  // 启动时自动检查 RapidOCR 健康状态
+  // 启动时自动检查 RapidOCR 健康状态（仅当前选择的是 rapid-ocr 时）
   useEffect(() => {
-    if (settings.ocr.rapidInstalled) {
+    if (settings.ocr.rapidInstalled && settings.ocr.engine === 'rapid-ocr') {
       checkEngineHealth();
+    } else {
+      // 非 rapid-ocr 引擎时清除旧的健康检查状态
+      setEngineHealth(null);
+      setHealthError('');
     }
     
     // 监听修复进度
@@ -40,7 +44,7 @@ const OcrSection = ({
     });
     
     return () => cleanup?.();
-  }, []);
+  }, [settings.ocr.engine, settings.ocr.rapidInstalled]);
   
   const checkEngineHealth = useCallback(async () => {
     setEngineHealth('checking');
