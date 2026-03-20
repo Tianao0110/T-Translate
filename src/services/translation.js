@@ -303,7 +303,7 @@ class TranslationService {
    * 生成缓存 Key
    */
   _getCacheKey(text, options) {
-    const { targetLang = 'zh', template = 'natural' } = options;
+    const { targetLang = 'zh', template = 'natural', providerId = '' } = options;
     // 使用 djb2 双哈希避免碰撞（与 L2 cache 一致的策略）
     let h1 = 5381;
     let h2 = 52711;
@@ -313,7 +313,7 @@ class TranslationService {
       h2 = (h2 * 33) ^ c;
     }
     const hash = ((h1 >>> 0) * 4096 + (h2 >>> 0)).toString(36);
-    return `${targetLang}-${template}-${hash}`;
+    return `${targetLang}-${template}-${providerId}-${hash}`;
   }
 
   /**
@@ -487,8 +487,21 @@ class TranslationService {
     // ========== Phase 1: 预处理（免译名单）==========
     const { processed, protectedMap } = this._preProcess(text);
     
-    // ========== Phase 2: 检查缓存 ==========
-    const cacheKey = this._getCacheKey(processed, { targetLang, template });
+    // ========== Phase 2: 确定可用 Provider 并检查缓存 ==========
+    const priority = this.getPriority();
+    
+    // 找到第一个可用的 Provider ID（用于缓存 key）
+    let firstAvailableId = '';
+    const usableProviders = [];
+    for (const id of priority) {
+      if (!isProviderAllowed(id, privacyMode)) continue;
+      if (!isProviderConfigured(id)) continue;
+      if (this._failureCount[id] >= this._skipThreshold) continue;
+      if (!firstAvailableId) firstAvailableId = id;
+      usableProviders.push(id);
+    }
+    
+    const cacheKey = this._getCacheKey(processed, { targetLang, template, providerId: firstAvailableId });
     const cached = this._checkCache(cacheKey, { useCache, privacyMode });
     
     if (cached) {
@@ -503,27 +516,9 @@ class TranslationService {
     }
     
     // ========== Phase 3: 调用 Provider ==========
-    const priority = this.getPriority();
     const tried = [];
-    let allSkipped = true;
     
-    for (const id of priority) {
-      // 检查隐私模式限制
-      if (!isProviderAllowed(id, privacyMode)) {
-        logger.debug(`Provider ${id} not allowed in ${privacyMode} mode`);
-        continue;
-      }
-      
-      if (!isProviderConfigured(id)) continue;
-      
-      // 检查是否因连续失败而临时跳过
-      if (this._failureCount[id] >= this._skipThreshold) {
-        logger.debug(`Skipping ${id} (failed ${this._failureCount[id]} times)`);
-        continue;
-      }
-      
-      allSkipped = false;
-      
+    for (const id of usableProviders) {
       const provider = getProvider(id);
       if (!provider) continue;
       
@@ -581,8 +576,8 @@ class TranslationService {
       }
     }
     
-    // 如果所有翻译源都被跳过，重置计数并重试一次
-    if (allSkipped && Object.keys(this._failureCount).length > 0) {
+    // 如果没有可用翻译源且有失败计数，重置并重试一次
+    if (usableProviders.length === 0 && Object.keys(this._failureCount).length > 0) {
       logger.debug('All providers skipped, resetting failure counts...');
       this._failureCount = {};
       return this.translate(text, options);
@@ -620,8 +615,20 @@ class TranslationService {
     // 预处理
     const { processed, protectedMap } = this._preProcess(text);
     
+    // 找支持流式的 Provider（先确定可用列表，用于缓存 key）
+    const priority = this.getPriority();
+    let firstAvailableId = '';
+    const usableProviders = [];
+    for (const id of priority) {
+      if (!isProviderAllowed(id, privacyMode)) continue;
+      if (!isProviderConfigured(id)) continue;
+      if (this._failureCount[id] >= this._skipThreshold) continue;
+      if (!firstAvailableId) firstAvailableId = id;
+      usableProviders.push(id);
+    }
+    
     // 检查缓存（流式也可以用缓存，直接返回完整结果）
-    const cacheKey = this._getCacheKey(processed, { targetLang, template });
+    const cacheKey = this._getCacheKey(processed, { targetLang, template, providerId: firstAvailableId });
     const cached = this._checkCache(cacheKey, { useCache, privacyMode });
     
     if (cached) {
@@ -640,20 +647,7 @@ class TranslationService {
       };
     }
     
-    // 找支持流式的 Provider
-    const priority = this.getPriority();
-    let allSkipped = true;
-    
-    for (const id of priority) {
-      if (!isProviderAllowed(id, privacyMode)) continue;
-      if (!isProviderConfigured(id)) continue;
-      
-      if (this._failureCount[id] >= this._skipThreshold) {
-        logger.debug(`Skipping stream ${id}`);
-        continue;
-      }
-      
-      allSkipped = false;
+    for (const id of usableProviders) {
       
       const provider = getProvider(id);
       if (!provider) continue;
@@ -751,7 +745,7 @@ class TranslationService {
     }
     
     // 重置并重试
-    if (allSkipped && Object.keys(this._failureCount).length > 0) {
+    if (usableProviders.length === 0 && Object.keys(this._failureCount).length > 0) {
       logger.debug('All stream providers skipped, resetting...');
       this._failureCount = {};
       return this.translateStream(text, options, onChunk);
