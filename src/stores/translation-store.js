@@ -200,6 +200,10 @@ const useTranslationStore = create(
           }
           if (source) state.currentTranslation.sourceLanguage = source;
           if (target) state.currentTranslation.targetLanguage = target;
+          // 语言变更后清空译文，避免旧译文与新语言不匹配
+          state.currentTranslation.translatedText = '';
+          state.currentTranslation.status = TRANSLATION_STATUS.IDLE;
+          state.currentTranslation.error = null;
           // 同步到 electron-store，供主进程读取（划词翻译等）
           try {
             const src = source || state.currentTranslation.sourceLanguage;
