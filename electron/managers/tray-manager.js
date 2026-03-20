@@ -63,13 +63,13 @@ function init(dependencies) {
 
 /**
  * 在图标右下角绘制绿色指示点
- * @param {NativeImage} icon - 基础图标 (16x16)
+ * @param {NativeImage} icon - 基础图标 (32x32)
  * @returns {NativeImage} 带绿点的图标
  */
 function createIconWithDot(icon) {
   try {
-    const size = 16;
-    const dotSize = 6;
+    const size = 32;
+    const dotSize = 10;
     const dotOffset = size - dotSize; // 右下角
 
     // 获取原始 RGBA 像素数据
@@ -131,7 +131,7 @@ function createTray(ctx) {
   
   baseIcon = nativeImage
     .createFromPath(iconPath)
-    .resize({ width: 16, height: 16 });
+    .resize({ width: 32, height: 32 });
 
   // 生成带绿点的图标（划词翻译开启时使用）
   activeIcon = createIconWithDot(baseIcon);
@@ -142,16 +142,32 @@ function createTray(ctx) {
   // 初始化菜单
   updateMenu();
 
-  // 单击托盘图标切换划词翻译
+  // ========== 修复：单击/双击冲突 ==========
+  // Windows 上双击会先触发 click 再触发 double-click
+  // 用延迟区分：单击等 300ms，如果期间发生双击则取消单击操作
+  let clickTimer = null;
+
   tray.on('click', () => {
-    logger.debug('Tray clicked, toggleSelectionTranslate:', !!deps.toggleSelectionTranslate);
-    if (deps.toggleSelectionTranslate) {
-      deps.toggleSelectionTranslate();
-    }
+    // 清除上一次的定时器（防止快速多次单击）
+    if (clickTimer) clearTimeout(clickTimer);
+    
+    clickTimer = setTimeout(() => {
+      clickTimer = null;
+      logger.debug('Tray single-click, toggleSelectionTranslate:', !!deps.toggleSelectionTranslate);
+      if (deps.toggleSelectionTranslate) {
+        deps.toggleSelectionTranslate();
+      }
+    }, 300);
   });
 
   // 双击托盘图标显示窗口
   tray.on('double-click', () => {
+    // 取消单击操作，避免误触切换划词翻译
+    if (clickTimer) {
+      clearTimeout(clickTimer);
+      clickTimer = null;
+    }
+    
     const mainWindow = deps.getMainWindow?.();
     if (mainWindow) {
       mainWindow.show();
@@ -278,7 +294,7 @@ function updateMenu() {
   ]);
 
   tray.setContextMenu(contextMenu);
-  tray.setToolTip(selectionEnabled ? 'T-Translate (划词翻译已开启)' : 'T-Translate');
+  tray.setToolTip(selectionEnabled ? `T-Translate (${t('selectionTranslate')} ✓)` : 'T-Translate');
   logger.debug('Tray menu updated');
 }
 
@@ -316,7 +332,7 @@ function setIcon(iconPath) {
   if (tray) {
     const icon = nativeImage
       .createFromPath(iconPath)
-      .resize({ width: 16, height: 16 });
+      .resize({ width: 32, height: 32 });
     tray.setImage(icon);
   }
 }
