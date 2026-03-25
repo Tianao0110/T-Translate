@@ -385,7 +385,10 @@ const zh = {
       notSupported: "当前模型不支持图片识别，请加载支持视觉的模型（如 Qwen-VL、LLaVA 等）",
       noText: "未识别到文字",
       timeout: "OCR 识别超时，请检查模型是否支持视觉功能"
-    }
+    },
+    visionFallback: "当前模型不支持视觉识别，已自动切换到本地 OCR",
+    visionLocked: "LLM 视觉识别已因多次失败被禁用，已切换到本地 OCR。如需重新启用请前往 设置 > OCR",
+    allEnginesFailed: "所有 OCR 引擎均失败"
   },
   tts: {
     description: "配置文本朗读功能和语音参数",

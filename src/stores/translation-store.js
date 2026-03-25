@@ -85,6 +85,7 @@ const useTranslationStore = create(
         engine: "llm-vision",  // 默认使用 LLM Vision
         lastResult: null,
         error: null,
+        fallbackNotice: null,  // LLM Vision 降级通知（自动切换到本地 OCR 时显示）
       },
 
       // 截图数据（用于跨组件传递）

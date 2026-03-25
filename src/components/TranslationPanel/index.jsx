@@ -128,7 +128,15 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
 
         if (result.success && result.text) {
           setIsOcrSource(true);
-          notify(t('translation.ocrSuccess', { engine: result.engine || engineToUse }), 'success');
+          
+          // 如果发生了 LLM Vision → 本地 OCR 降级，先提示用户
+          if (result.fallbackFrom === 'llm-vision') {
+            const store = useTranslationStore.getState();
+            const notice = store.ocrStatus?.fallbackNotice;
+            notify(notice || t('ocr.visionFallback'), 'warning');
+          } else {
+            notify(t('translation.ocrSuccess', { engine: result.engine || engineToUse }), 'success');
+          }
 
           if (autoTranslate) {
             const delay = Math.max(autoTranslateDelay || 500, 300);

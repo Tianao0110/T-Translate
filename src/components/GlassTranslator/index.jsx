@@ -32,12 +32,15 @@ const GlassTranslator = () => {
     displayMode,
     childPanes,
     frozenPanes,
+    // 通知（OCR 降级等服务层通知）
+    notification,
     // Actions
     updateChildPanePosition,
     freezeChildPane,
     removeChildPane,
     closeFrozenPane,
     clearChildPanes,
+    clearNotification,
     clear,
   } = useSessionStore();
   
@@ -62,6 +65,18 @@ const GlassTranslator = () => {
   const [glassBounds, setGlassBounds] = useState(null);  // 玻璃窗口边界
   const [isPassThrough, setIsPassThrough] = useState(false);  // 穿透模式
   const [historyItems, setHistoryItems] = useState([]);  // 历史记录
+  const [toastMessage, setToastMessage] = useState(null);  // 浮动通知
+  
+  // ========== 服务层通知（OCR 降级等）==========
+  useEffect(() => {
+    if (notification) {
+      setToastMessage(notification);
+      clearNotification();
+      // 5 秒后自动消失
+      const timer = setTimeout(() => setToastMessage(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification, clearNotification]);
   
   // ========== Refs ==========
   const contentRef = useRef(null);
@@ -609,6 +624,16 @@ const GlassTranslator = () => {
             onChange={handleOpacityChange}
           />
           <span className="opacity-value">{Math.round(glassOpacity * 100)}%</span>
+        </div>
+      )}
+      
+      {/* OCR 降级等服务层通知 */}
+      {toastMessage && (
+        <div 
+          className={`glass-toast glass-toast-${toastMessage.type || 'info'}`}
+          onClick={() => setToastMessage(null)}
+        >
+          <span>{toastMessage.message}</span>
         </div>
       )}
       

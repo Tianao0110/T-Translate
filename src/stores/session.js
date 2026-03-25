@@ -249,6 +249,12 @@ const useSessionStore = create((set, get) => ({
   
   clearHistory: () => set({ recentHistory: [] }),
   
+  // ========== 通知（供 pipeline 等服务层使用）==========
+  notification: null,  // { message: string, type: 'info'|'warning'|'error'|'success' }
+  
+  setNotification: (notification) => set({ notification }),
+  clearNotification: () => set({ notification: null }),
+  
   // ========== 开始翻译流程 ==========
   
   startCapture: () => set({

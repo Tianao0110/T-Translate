@@ -4,6 +4,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff, AlertTriangle, RefreshCw, Wrench } from 'lucide-react';
+import { ocrManager } from '../../../providers/ocr/index.js';
 
 /**
  * OCR 设置区块
@@ -102,6 +103,11 @@ const OcrSection = ({
     }
     updateSetting('ocr', 'engine', engineId);
     if (setOcrEngine) setOcrEngine(engineId);
+    
+    // 用户手动选择 llm-vision 时，重置降级锁定状态
+    if (engineId === 'llm-vision') {
+      ocrManager.resetVisionFallback();
+    }
   };
 
   // API Key 输入框组件

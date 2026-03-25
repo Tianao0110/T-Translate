@@ -385,7 +385,10 @@ const en = {
       notSupported: "Current model does not support image recognition. Please load a vision model (e.g., Qwen-VL, LLaVA)",
       noText: "No text recognized",
       timeout: "OCR recognition timed out. Please check if the model supports vision."
-    }
+    },
+    visionFallback: "Current model does not support vision. Automatically switched to local OCR.",
+    visionLocked: "LLM Vision has been disabled due to repeated failures. Switched to local OCR. Re-enable in Settings > OCR.",
+    allEnginesFailed: "All OCR engines failed"
   },
   tts: {
     description: "Configure text-to-speech settings",
