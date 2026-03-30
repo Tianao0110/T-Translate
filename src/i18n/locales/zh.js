@@ -292,6 +292,16 @@ const zh = {
       defaultSource: "默认源语言", defaultTarget: "默认目标语言",
       langSwitched: "界面语言已切换"
     },
+    startup: {
+      title: "启动",
+      autoLaunch: "开机自启动",
+      autoLaunchHint: "系统启动时自动在后台运行，不弹出主窗口",
+      autoLaunchEnabled: "已开启开机自启动",
+      autoLaunchDisabled: "已关闭开机自启动",
+      autoLaunchFailed: "设置自启动失败",
+      autoSelection: "启动后自动开启划词翻译",
+      autoSelectionHint: "开机自启后自动开启划词翻译，选中文字即可翻译",
+    },
     providers: {
       title: "翻译源设置", enable: "启用", disable: "禁用", test: "测试连接", testing: "测试中...", testSuccess: "连接成功", testFailed: "连接失败",
       priority: "优先级", priorityDesc: "拖拽调整翻译源优先级", apiKey: "API Key", apiKeyPlaceholder: "请输入 API Key", baseUrl: "API 地址", model: "模型", getKey: "获取 Key",

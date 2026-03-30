@@ -842,6 +842,14 @@ function processDesktopCapturerSelection(data, bounds) {
 app.whenReady().then(() => {
   logger.info('App ready, initializing...');
   
+  // 检测是否是开机自启（静默模式）
+  const isStartup = process.argv.includes('--startup');
+  if (isStartup) {
+    logger.info('Started via auto-launch, running in silent mode');
+    // 开机自启时强制最小化，并设置 startMinimized
+    store.set('startMinimized', true);
+  }
+  
   // 记录显示器信息
   logger.info('Displays:', displayHelper.getDisplaySummary());
   
@@ -952,10 +960,23 @@ app.whenReady().then(() => {
 
   logger.success('App initialized');
   
-  // 预热机制：延迟加载划词翻译相关模块，避免首次使用卡顿
+  // 预热机制：延迟加载划词翻译相关模块
+  // 开机自启时延迟更久（8秒），避免影响开机性能
+  const preheatDelay = isStartup ? 8000 : 3000;
   setTimeout(() => {
     preheatSelectionModules();
-  }, 3000); // 等应用稳定后再预热
+    
+    // 开机自启时：预热完成后自动开启划词翻译（如果用户设置了）
+    if (isStartup && store.get('settings.startup.autoEnableSelection')) {
+      logger.info('Auto-enabling selection translate after startup');
+      toggleSelectionTranslate();
+    }
+    
+    // 重置 startMinimized，下次手动打开时正常显示
+    if (isStartup) {
+      store.set('startMinimized', false);
+    }
+  }, preheatDelay);
 });
 
 /**

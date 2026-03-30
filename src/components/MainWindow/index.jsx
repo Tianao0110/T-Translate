@@ -50,8 +50,8 @@ const MainWindow = () => {
   // 版本号
   const [version, setVersion] = useState('');
   
-  // 文档翻译弹窗
-  const [showDocTranslator, setShowDocTranslator] = useState(false);
+  // 文档翻译弹窗 → 改为 tab 内容
+  // const [showDocTranslator, setShowDocTranslator] = useState(false);
   
   // Store
   const {
@@ -189,10 +189,9 @@ const MainWindow = () => {
   // 全局快捷键
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Ctrl/Cmd + 1-4 切换标签
-      if ((e.ctrlKey || e.metaKey) && e.key >= '1' && e.key <= '4') {
-        // e.preventDefault(); // 暂时不阻止默认，防止影响输入数字
-        const tabs = ['translate', 'history', 'favorites', 'settings'];
+      // Ctrl/Cmd + 1-5 切换标签
+      if ((e.ctrlKey || e.metaKey) && e.key >= '1' && e.key <= '5') {
+        const tabs = ['translate', 'history', 'favorites', 'settings', 'document'];
         const index = parseInt(e.key) - 1;
         if (tabs[index]) setActiveTab(tabs[index]);
       }
@@ -299,6 +298,17 @@ const MainWindow = () => {
             <SettingsPanel showNotification={showNotification} />
           </Suspense>
         );
+      case 'document':
+        return (
+          <Suspense fallback={<LazyLoadingFallback />}>
+            <DocumentTranslator
+              onClose={() => setActiveTab('translate')}
+              notify={showNotification}
+              sourceLang={currentTranslation.sourceLanguage}
+              targetLang={currentTranslation.targetLanguage}
+            />
+          </Suspense>
+        );
       default:
         return null;
     }
@@ -338,8 +348,8 @@ const MainWindow = () => {
           
           {/* 文档翻译按钮 */}
           <button
-            className="tab-button doc-translate-btn"
-            onClick={() => setShowDocTranslator(true)}
+            className={`tab-button doc-translate-btn ${activeTab === 'document' ? 'active' : ''}`}
+            onClick={() => setActiveTab(activeTab === 'document' ? 'translate' : 'document')}
             title={t('nav.documents')}
           >
             <FileUp size={16} />
@@ -378,23 +388,6 @@ const MainWindow = () => {
       </div>
 
       {renderNotification()}
-      
-      {/* 文档翻译弹窗 */}
-      {showDocTranslator && (
-        <div className="doc-translator-modal">
-          <div className="doc-translator-overlay" onClick={() => setShowDocTranslator(false)} />
-          <div className="doc-translator-container">
-            <Suspense fallback={<LazyLoadingFallback />}>
-              <DocumentTranslator
-                onClose={() => setShowDocTranslator(false)}
-                notify={showNotification}
-                sourceLang={currentTranslation.sourceLanguage}
-                targetLang={currentTranslation.targetLanguage}
-              />
-            </Suspense>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

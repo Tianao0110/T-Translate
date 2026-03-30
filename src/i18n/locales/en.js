@@ -292,6 +292,16 @@ const en = {
       defaultSource: "Default Source Language", defaultTarget: "Default Target Language",
       langSwitched: "Language changed"
     },
+    startup: {
+      title: "Startup",
+      autoLaunch: "Launch at startup",
+      autoLaunchHint: "Automatically run in the background when the system starts",
+      autoLaunchEnabled: "Auto-launch enabled",
+      autoLaunchDisabled: "Auto-launch disabled",
+      autoLaunchFailed: "Failed to set auto-launch",
+      autoSelection: "Enable selection translate on startup",
+      autoSelectionHint: "Automatically enable selection translate after auto-launch",
+    },
     providers: {
       title: "Translation Providers", enable: "Enable", disable: "Disable", test: "Test Connection", testing: "Testing...", testSuccess: "Connection successful", testFailed: "Connection failed",
       priority: "Priority", priorityDesc: "Drag to adjust provider priority", apiKey: "API Key", apiKeyPlaceholder: "Enter API Key", baseUrl: "API URL", model: "Model", getKey: "Get Key",

@@ -46,6 +46,7 @@ function initWin32API() {
     win32API = {
       // 键盘模拟
       keybd_event: user32.func('void keybd_event(uint8, uint8, uint32, uintptr)'),
+      GetAsyncKeyState: user32.func('int16 GetAsyncKeyState(int)'),
       
       // 窗口检测
       WindowFromPoint: user32.func('void* WindowFromPoint(POINT)'),
@@ -92,6 +93,11 @@ function initWin32API() {
 
 /**
  * 模拟 Ctrl+C 复制（仅 Windows）
+ * 
+ * 修复 Word 等应用偶尔出现输入 'c' 的问题：
+ * - 检测 Ctrl/C 键是否处于按下状态（可能被前一次操作"粘住"）
+ * - 如果有粘住的按键，先发送释放事件清理
+ * - 然后再模拟完整的 Ctrl+C 序列
  * @returns {boolean} 是否成功
  */
 function simulateCtrlC() {
@@ -107,13 +113,28 @@ function simulateCtrlC() {
   }
   
   try {
-    const { keybd_event, VK_CONTROL, VK_C, KEYEVENTF_KEYUP } = api;
+    const { keybd_event, GetAsyncKeyState, VK_CONTROL, VK_C, KEYEVENTF_KEYUP } = api;
     
+    // 第一步：检查并清理粘滞按键状态
+    // GetAsyncKeyState 返回值的最高位 (0x8000) 表示按键当前处于按下状态
+    const ctrlDown = (GetAsyncKeyState(VK_CONTROL) & 0x8000) !== 0;
+    const cDown = (GetAsyncKeyState(VK_C) & 0x8000) !== 0;
+    
+    if (ctrlDown || cDown) {
+      logger.debug(`Cleaning stuck keys: Ctrl=${ctrlDown}, C=${cDown}`);
+      // 释放粘住的按键
+      if (cDown) keybd_event(VK_C, 0x2e, KEYEVENTF_KEYUP, 0);
+      if (ctrlDown) keybd_event(VK_CONTROL, 0x1d, KEYEVENTF_KEYUP, 0);
+      // 等待系统处理释放事件
+      // （使用同步忙等，因为这里不能用 async）
+    }
+    
+    // 第二步：模拟 Ctrl+C
     // 按下 Ctrl
     keybd_event(VK_CONTROL, 0x1d, 0, 0);
     // 按下 C
     keybd_event(VK_C, 0x2e, 0, 0);
-    // 释放 C
+    // 释放 C（先释放字符键）
     keybd_event(VK_C, 0x2e, KEYEVENTF_KEYUP, 0);
     // 释放 Ctrl
     keybd_event(VK_CONTROL, 0x1d, KEYEVENTF_KEYUP, 0);
@@ -513,8 +534,8 @@ async function checkSelectionViaClipboard(options = {}) {
   
   // 复杂应用（Office 等）需要更长的等待时间
   const isComplexApp = options.isComplexApp || false;
-  const waitTime = isComplexApp ? 150 : 50; // Office/Outlook 应用等待更长（工具栏弹出需要时间）
-  const maxRetries = isComplexApp ? 3 : 1;  // Office/Outlook 应用可重试更多次
+  const waitTime = isComplexApp ? 200 : 50; // Office/Outlook 应用等待更长
+  const maxRetries = isComplexApp ? 2 : 1;  // Office/Outlook 最多重试 2 次
   
   try {
     // 1. 保存剪贴板快照（含格式）

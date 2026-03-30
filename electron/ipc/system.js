@@ -313,6 +313,38 @@ function register(ctx) {
     return getLogDirectory();
   });
 
+  // ==================== 开机自启 ====================
+
+  /**
+   * 设置开机自启
+   */
+  ipcMain.handle(CHANNELS.APP.SET_AUTO_LAUNCH, (event, enabled) => {
+    try {
+      app.setLoginItemSettings({
+        openAtLogin: enabled,
+        // Windows: 以最小化方式启动（配合 --startup 参数）
+        args: enabled ? ['--startup'] : [],
+      });
+      logger.info('Auto launch set to:', enabled);
+      return { success: true, enabled };
+    } catch (e) {
+      logger.error('Failed to set auto launch:', e);
+      return { success: false, error: e.message };
+    }
+  });
+
+  /**
+   * 获取开机自启状态
+   */
+  ipcMain.handle(CHANNELS.APP.GET_AUTO_LAUNCH, () => {
+    try {
+      const settings = app.getLoginItemSettings();
+      return { success: true, enabled: settings.openAtLogin };
+    } catch (e) {
+      return { success: false, enabled: false };
+    }
+  });
+
   logger.info("System IPC handlers registered");
 }
 

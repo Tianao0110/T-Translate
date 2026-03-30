@@ -1,9 +1,9 @@
 // src/components/SettingsPanel/sections/InterfaceSection.jsx
 // 界面设置区块组件 - 从 SettingsPanel 拆分
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Sun, Moon, Leaf, RefreshCw, Globe } from 'lucide-react';
+import { Sun, Moon, Leaf, RefreshCw, Globe, Power, MousePointer } from 'lucide-react';
 import { defaultConfig } from '../constants.js';
 
 // 可用语言列表
@@ -25,6 +25,48 @@ const InterfaceSection = ({
   saveSettings  // 新增：保存设置函数
 }) => {
   const { t, i18n } = useTranslation();
+  
+  // 开机自启状态
+  const [autoLaunch, setAutoLaunch] = useState(false);
+  const [autoLaunchLoading, setAutoLaunchLoading] = useState(true);
+  
+  // 启动时读取自启状态
+  useEffect(() => {
+    (async () => {
+      try {
+        const result = await window.electron?.app?.getAutoLaunch?.();
+        if (result?.success) {
+          setAutoLaunch(result.enabled);
+        }
+      } catch {}
+      setAutoLaunchLoading(false);
+    })();
+  }, []);
+  
+  // 切换开机自启
+  const toggleAutoLaunch = async (enabled) => {
+    try {
+      const result = await window.electron?.app?.setAutoLaunch?.(enabled);
+      if (result?.success) {
+        setAutoLaunch(enabled);
+        notify(
+          enabled ? t('settings.startup.autoLaunchEnabled') : t('settings.startup.autoLaunchDisabled'),
+          'success'
+        );
+      } else {
+        notify(result?.error || t('settings.startup.autoLaunchFailed'), 'error');
+      }
+    } catch (e) {
+      notify(e.message, 'error');
+    }
+  };
+  
+  // 切换自启后自动开启划词
+  const toggleAutoSelection = (enabled) => {
+    updateSetting('startup', 'autoEnableSelection', enabled);
+    // 立即写入 store
+    window.electron?.store?.set?.('settings.startup.autoEnableSelection', enabled);
+  };
   
   // 切换界面语言
   const switchLanguage = async (langCode) => {
@@ -127,6 +169,39 @@ const InterfaceSection = ({
     <div className="setting-content">
       <h3>{t('settings.general.title')}</h3>
       <p className="setting-description">{t('settings.general.themeDesc')}</p>
+      
+      {/* 启动设置 */}
+      <div className="setting-group">
+        <label className="setting-label">
+          <Power size={16} style={{marginRight: '6px', verticalAlign: 'middle'}} />
+          {t('settings.startup.title')}
+        </label>
+        
+        <label className="setting-toggle">
+          <input 
+            type="checkbox" 
+            checked={autoLaunch}
+            disabled={autoLaunchLoading}
+            onChange={(e) => toggleAutoLaunch(e.target.checked)}
+          />
+          <span>{t('settings.startup.autoLaunch')}</span>
+        </label>
+        <p className="setting-hint">{t('settings.startup.autoLaunchHint')}</p>
+        
+        {autoLaunch && (
+          <label className="setting-toggle" style={{marginTop: '8px'}}>
+            <input 
+              type="checkbox" 
+              checked={settings.startup?.autoEnableSelection ?? false}
+              onChange={(e) => toggleAutoSelection(e.target.checked)}
+            />
+            <span>{t('settings.startup.autoSelection')}</span>
+          </label>
+        )}
+        {autoLaunch && (
+          <p className="setting-hint">{t('settings.startup.autoSelectionHint')}</p>
+        )}
+      </div>
       
       {/* 界面语言 */}
       <div className="setting-group">
