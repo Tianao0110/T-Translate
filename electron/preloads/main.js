@@ -30,6 +30,7 @@ const validChannels = {
     "theme:changed",  // 主题变化通知
     "maximize-change",  // 窗口最大化状态变化
     "shortcut-conflict",  // 快捷键冲突通知
+    "navigate",  // 托盘菜单导航（如跳转到设置页）
   ],
   invoke: [
     "get-app-version",

@@ -238,6 +238,21 @@ const MainWindow = () => {
     return () => cleanup?.();
   }, [t, showNotification]);
 
+  // 监听托盘菜单导航请求（如"设置"按钮）
+  useEffect(() => {
+    const cleanup = window.electron?.ipc?.on('navigate', (target) => {
+      logger.debug('Navigate request:', target);
+      if (target === 'settings') {
+        setActiveTab('settings');
+      } else if (target === 'history') {
+        setActiveTab('history');
+      } else if (target === 'translate') {
+        setActiveTab('translate');
+      }
+    });
+    return () => cleanup?.();
+  }, []);
+
   // 快速操作菜单
   // 渲染通知
   const renderNotification = () => {
