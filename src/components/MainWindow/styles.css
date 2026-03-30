@@ -310,7 +310,15 @@
   background: var(--bg-primary);
 }
 
-.main-content > * {
+.tab-panel {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.tab-panel > * {
   flex: 1;
   min-height: 0;
   width: 100%;

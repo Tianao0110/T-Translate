@@ -420,6 +420,9 @@ const zh = {
   // ========== 新增：文档翻译组件翻译键 ==========
   documentTranslator: {
     title: "文档翻译",
+    sourceLang: "源语言",
+    targetLang: "目标语言",
+    newDocument: "新建",
     formats: {
       "纯文本": "纯文本", "Markdown": "Markdown", "SRT 字幕": "SRT 字幕", "WebVTT 字幕": "WebVTT 字幕",
       "PDF 文档": "PDF 文档", "Word 文档": "Word 文档", "CSV 表格": "CSV 表格", "JSON 文件": "JSON 文件", "EPUB 电子书": "EPUB 电子书"

@@ -271,48 +271,17 @@ const MainWindow = () => {
     );
   };
 
-  // 渲染标签页内容
-  const renderContent = () => {
-    switch(activeTab) {
-      case 'translate':
-        return <TranslationPanel 
-          showNotification={showNotification} 
-          screenshotData={screenshotData}
-          onScreenshotProcessed={() => setScreenshotData(null)}
-        />;
-      case 'history':
-        return (
-          <Suspense fallback={<LazyLoadingFallback />}>
-            <HistoryPanel searchQuery={searchQuery} filterOptions={filterOptions} showNotification={showNotification} />
-          </Suspense>
-        );
-      case 'favorites':
-        return (
-          <Suspense fallback={<LazyLoadingFallback />}>
-            <FavoritesPanel searchQuery={searchQuery} showNotification={showNotification} />
-          </Suspense>
-        );
-      case 'settings':
-        return (
-          <Suspense fallback={<LazyLoadingFallback />}>
-            <SettingsPanel showNotification={showNotification} />
-          </Suspense>
-        );
-      case 'document':
-        return (
-          <Suspense fallback={<LazyLoadingFallback />}>
-            <DocumentTranslator
-              onClose={() => setActiveTab('translate')}
-              notify={showNotification}
-              sourceLang={currentTranslation.sourceLanguage}
-              targetLang={currentTranslation.targetLanguage}
-            />
-          </Suspense>
-        );
-      default:
-        return null;
-    }
-  };
+  // 记录哪些 tab 已经被访问过（延迟挂载：首次切换到才创建）
+  const [mountedTabs, setMountedTabs] = useState(new Set(['translate']));
+  
+  useEffect(() => {
+    setMountedTabs(prev => {
+      if (prev.has(activeTab)) return prev;
+      const next = new Set(prev);
+      next.add(activeTab);
+      return next;
+    });
+  }, [activeTab]);
 
   const tabs = [
     { id: 'translate', label: t('nav.translate'), icon: Languages, shortcut: '1' },
@@ -358,9 +327,56 @@ const MainWindow = () => {
         </div>
       </div>
 
-      {/* 主内容区 */}
+      {/* 主内容区 - 所有已访问的tab保持挂载，切换时不丢状态 */}
       <div className="main-content">
-        {renderContent()}
+        {/* 翻译面板 - 始终挂载 */}
+        <div className="tab-panel" style={{ display: activeTab === 'translate' ? 'flex' : 'none' }}>
+          <TranslationPanel 
+            showNotification={showNotification} 
+            screenshotData={screenshotData}
+            onScreenshotProcessed={() => setScreenshotData(null)}
+          />
+        </div>
+        
+        {/* 历史记录 - 首次访问后保持 */}
+        {mountedTabs.has('history') && (
+          <div className="tab-panel" style={{ display: activeTab === 'history' ? 'flex' : 'none' }}>
+            <Suspense fallback={<LazyLoadingFallback />}>
+              <HistoryPanel searchQuery={searchQuery} filterOptions={filterOptions} showNotification={showNotification} />
+            </Suspense>
+          </div>
+        )}
+        
+        {/* 收藏 */}
+        {mountedTabs.has('favorites') && (
+          <div className="tab-panel" style={{ display: activeTab === 'favorites' ? 'flex' : 'none' }}>
+            <Suspense fallback={<LazyLoadingFallback />}>
+              <FavoritesPanel searchQuery={searchQuery} showNotification={showNotification} />
+            </Suspense>
+          </div>
+        )}
+        
+        {/* 设置 */}
+        {mountedTabs.has('settings') && (
+          <div className="tab-panel" style={{ display: activeTab === 'settings' ? 'flex' : 'none' }}>
+            <Suspense fallback={<LazyLoadingFallback />}>
+              <SettingsPanel showNotification={showNotification} />
+            </Suspense>
+          </div>
+        )}
+        
+        {/* 文档翻译 - 首次访问后保持（翻译进度不丢失）*/}
+        {mountedTabs.has('document') && (
+          <div className="tab-panel" style={{ display: activeTab === 'document' ? 'flex' : 'none' }}>
+            <Suspense fallback={<LazyLoadingFallback />}>
+              <DocumentTranslator
+                notify={showNotification}
+                sourceLang={currentTranslation.sourceLanguage}
+                targetLang={currentTranslation.targetLanguage}
+              />
+            </Suspense>
+          </div>
+        )}
       </div>
 
       {/* 底部状态栏 */}

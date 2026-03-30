@@ -39,6 +39,40 @@
   gap: 12px;
 }
 
+/* 语言选择器 */
+.dt-lang-selector {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dt-lang-select {
+  padding: 4px 8px;
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  outline: none;
+  max-width: 140px;
+}
+
+.dt-lang-select:hover {
+  border-color: var(--accent-primary);
+}
+
+.dt-lang-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dt-lang-arrow {
+  color: var(--text-tertiary);
+  font-size: 14px;
+  user-select: none;
+}
+
 /* 样式选择器 */
 .style-selector {
   display: flex;

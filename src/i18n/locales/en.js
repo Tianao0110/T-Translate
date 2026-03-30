@@ -420,6 +420,9 @@ const en = {
   // ========== New: DocumentTranslator translation keys ==========
   documentTranslator: {
     title: "Document Translation",
+    sourceLang: "Source Language",
+    targetLang: "Target Language",
+    newDocument: "New",
     formats: {
       "纯文本": "Plain Text", "Markdown": "Markdown", "SRT 字幕": "SRT Subtitle", "WebVTT 字幕": "WebVTT Subtitle",
       "PDF 文档": "PDF Document", "Word 文档": "Word Document", "CSV 表格": "CSV Spreadsheet", "JSON 文件": "JSON File", "EPUB 电子书": "EPUB eBook"

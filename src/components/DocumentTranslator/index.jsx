@@ -27,6 +27,7 @@ import {
 import { ocrManager } from '../../providers/ocr/index.js';
 import translationService from '../../services/translation.js';
 import useTranslationStore from '../../stores/translation-store';
+import { LANGUAGES } from '../../config/constants.js';
 import './styles.css';
 
 // 段落状态
@@ -246,12 +247,19 @@ const logger = createLogger('DocTranslator');
  * 主组件
  */
 const DocumentTranslator = ({ 
-  onClose, 
   notify,
-  sourceLang = 'auto',
-  targetLang = 'zh',
+  sourceLang: initialSourceLang = 'auto',
+  targetLang: initialTargetLang = 'zh',
 }) => {
   const { t } = useTranslation();
+  
+  // 文档翻译独立的语言设置（初始值从主界面同步，之后独立控制）
+  const [sourceLang, setSourceLang] = useState(initialSourceLang);
+  const [targetLang, setTargetLang] = useState(initialTargetLang);
+  
+  // 语言选项（排除 auto 用于目标语言）
+  const targetLanguages = useMemo(() => LANGUAGES.filter(l => l.code !== 'auto'), []);
+  const sourceLanguages = useMemo(() => LANGUAGES, []);
   
   // 显示样式配置 - 使用 i18n
   const DISPLAY_STYLES = useMemo(() => [
@@ -1021,9 +1029,48 @@ const DocumentTranslator = ({
           <FileText size={20} />
           <span>{t('documentTranslator.title')}</span>
         </div>
+        
+        {/* 语言选择器 */}
+        <div className="dt-lang-selector">
+          <select 
+            className="dt-lang-select"
+            value={sourceLang}
+            onChange={(e) => setSourceLang(e.target.value)}
+            disabled={isTranslating}
+            title={t('documentTranslator.sourceLang')}
+          >
+            {sourceLanguages.map(l => (
+              <option key={l.code} value={l.code}>{l.flag} {l.nativeName}</option>
+            ))}
+          </select>
+          <span className="dt-lang-arrow">→</span>
+          <select 
+            className="dt-lang-select"
+            value={targetLang}
+            onChange={(e) => setTargetLang(e.target.value)}
+            disabled={isTranslating}
+            title={t('documentTranslator.targetLang')}
+          >
+            {targetLanguages.map(l => (
+              <option key={l.code} value={l.code}>{l.flag} {l.nativeName}</option>
+            ))}
+          </select>
+        </div>
+        
         <div className="dt-actions">
           {document && (
             <>
+              {/* 新建文档（清除当前文档，重新选择） */}
+              <button 
+                className="dt-btn"
+                onClick={clearDocument}
+                title={t('documentTranslator.newDocument')}
+                disabled={isTranslating}
+              >
+                <RotateCcw size={16} />
+                <span>{t('documentTranslator.newDocument')}</span>
+              </button>
+              
               {/* 搜索按钮 */}
               <button 
                 className={`dt-btn icon-only ${showSearch ? 'active' : ''}`}
@@ -1099,9 +1146,6 @@ const DocumentTranslator = ({
               </div>
             </>
           )}
-          <button className="dt-close" onClick={onClose}>
-            <X size={18} />
-          </button>
         </div>
       </div>
 
