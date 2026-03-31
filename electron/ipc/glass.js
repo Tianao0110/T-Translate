@@ -77,15 +77,11 @@ function register(ctx) {
    * 设置窗口透明度
    */
   ipcMain.handle(CHANNELS.GLASS.SET_OPACITY, (event, opacity) => {
-    const glassWindow = getGlassWindow();
-    if (glassWindow && !glassWindow.isDestroyed()) {
-      glassWindow.setOpacity(opacity);
-      // 同时保存
-      const current = store.get('glassLocalSettings', {});
-      store.set('glassLocalSettings', { ...current, opacity });
-      return true;
-    }
-    return false;
+    // 透明度现在通过 CSS 变量控制（不影响子窗口），不再用窗口级 setOpacity
+    // 只保存设置值，供下次启动恢复
+    const current = store.get('glassLocalSettings', {});
+    store.set('glassLocalSettings', { ...current, opacity });
+    return true;
   });
   
   // ==================== 鼠标穿透 ====================
@@ -198,10 +194,7 @@ function register(ctx) {
     const current = store.get('glassLocalSettings', {});
     store.set('glassLocalSettings', { ...current, ...settings });
     
-    // 如果设置了透明度，实时应用
-    if (settings.opacity !== undefined && glassWindow && !glassWindow.isDestroyed()) {
-      glassWindow.setOpacity(settings.opacity);
-    }
+    // 透明度通过 CSS 变量控制，不再调用窗口级 setOpacity
     
     return true;
   });
@@ -295,23 +288,23 @@ function register(ctx) {
         originalOpacity = 0.85;
       }
       
-      // 强制隐藏窗口
+      // 强制隐藏窗口（截图时不能出现自身）
       try {
         glassWindow.setOpacity(0);
         await new Promise(resolve => setTimeout(resolve, 80));
       } catch (e) {
-        logger.warn('Failed to set opacity:', e.message);
+        logger.warn('Failed to hide for capture:', e.message);
       }
       
       // 使用 node-screenshots 截取指定区域
       const screenshotMod = getScreenshotModule();
       const screenshot = await screenshotMod.captureRegion(bounds);
       
-      // 恢复窗口透明度
+      // 恢复窗口（窗口级 opacity 恢复为 1，视觉透明度由 CSS 控制）
       try {
-        glassWindow.setOpacity(originalOpacity > 0 ? originalOpacity : 0.85);
+        glassWindow.setOpacity(1);
       } catch (e) {
-        logger.warn('Failed to restore opacity:', e.message);
+        logger.warn('Failed to restore after capture:', e.message);
       }
       
       if (screenshot) {
@@ -324,7 +317,7 @@ function register(ctx) {
       // 确保窗口恢复可见
       if (glassWindow && !glassWindow.isDestroyed()) {
         try {
-          glassWindow.setOpacity(0.85);
+          glassWindow.setOpacity(1);
         } catch (e) {
           // 忽略
         }

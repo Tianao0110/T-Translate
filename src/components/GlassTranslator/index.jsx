@@ -172,7 +172,13 @@ const GlassTranslator = () => {
         }
       } else if (e.code === 'Space') {
         e.preventDefault();
-        captureAndTranslate();
+        // Toggle：有翻译内容就清空，没有就截图
+        if (translatedText || (displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0)) {
+          clearChildPanes();
+          clear();
+        } else {
+          captureAndTranslate();
+        }
       } else if (e.key === 'h' && (e.ctrlKey || e.metaKey)) {
         // Ctrl+H 打开/关闭历史面板
         e.preventDefault();
@@ -356,7 +362,8 @@ const GlassTranslator = () => {
   const handleOpacityChange = async (e) => {
     const newOpacity = parseFloat(e.target.value);
     setGlassOpacity(newOpacity);
-    await window.electron?.glass?.setOpacity?.(newOpacity);
+    // 不再使用 window.setOpacity()（窗口级透明度会影响所有子元素包括子窗口）
+    // 改为 CSS 变量控制背景透明度，子窗口保持独立不透明
   };
 
   const scrollToBottom = () => {
@@ -368,19 +375,54 @@ const GlassTranslator = () => {
   // ========== 子玻璃板事件处理 ==========
   
   /**
-   * 点击内容区空白处清除子玻璃板
+   * 截图并翻译（提前定义，供 handleContentClick 和键盘事件使用）
+   */
+  const captureAndTranslate = useCallback(async () => {
+    try {
+      // 使用内容区的实际边界来截图，避免坐标偏移
+      if (!contentRef.current) return;
+      
+      const contentRect = contentRef.current.getBoundingClientRect();
+      const windowBounds = await window.electron?.glass?.getBounds?.();
+      if (!windowBounds) return;
+      
+      // 计算内容区在屏幕上的绝对位置
+      const captureRect = {
+        x: Math.round(windowBounds.x + contentRect.left),
+        y: Math.round(windowBounds.y + contentRect.top),
+        width: Math.round(contentRect.width),
+        height: Math.round(contentRect.height),
+      };
+      
+      logger.debug('Capture rect:', captureRect);
+      logger.debug('Content rect:', contentRect);
+      logger.debug('Window bounds:', windowBounds);
+      
+      await pipeline.runFromCapture(captureRect);
+    } catch (error) {
+      logger.error(' Capture failed:', error);
+    }
+  }, []);
+
+  /**
+   * 点击内容区空白处 toggle：有内容清空，没内容截图
    */
   const handleContentClick = useCallback((e) => {
-    // 只有点击容器本身（不是子玻璃板）才清除
+    // 只有点击容器本身（不是子玻璃板或文本）才触发 toggle
     if (
       e.target === e.currentTarget || 
-      e.target.classList.contains('scattered-panes-container')
+      e.target.classList.contains('scattered-panes-container') ||
+      e.target.classList.contains('glass-message')
     ) {
-      if (displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0) {
+      // Toggle：有内容就清空，没有就截图
+      if (translatedText || (displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0)) {
         clearChildPanes();
+        clear();
+      } else {
+        captureAndTranslate();
       }
     }
-  }, [displayMode, childPanes.length, clearChildPanes]);
+  }, [displayMode, childPanes.length, translatedText, clearChildPanes, clear, captureAndTranslate]);
 
   /**
    * 子玻璃板位置变化
@@ -453,8 +495,7 @@ const GlassTranslator = () => {
     try {
       // 设置窗口穿透
       await window.electron?.glass?.setPassThrough?.(true);
-      // 降低透明度
-      await window.electron?.glass?.setOpacity?.(0.3);
+      // 穿透模式下通过 CSS 降低背景透明度（不影响子窗口）
     } catch (e) {
       logger.error('Failed to enter pass-through mode:', e);
     }
@@ -474,12 +515,11 @@ const GlassTranslator = () => {
     try {
       // 取消穿透
       await window.electron?.glass?.setPassThrough?.(false);
-      // 恢复透明度
-      await window.electron?.glass?.setOpacity?.(glassOpacity);
+      // 透明度由 CSS 变量自动恢复
     } catch (e) {
       logger.error('Failed to exit pass-through mode:', e);
     }
-  }, [glassOpacity]);
+  }, []);
 
   // ========== 历史记录 ==========
   
@@ -520,36 +560,6 @@ const GlassTranslator = () => {
       session.setResult(item.translated);
     }
     setShowHistoryPanel(false);
-  }, []);
-
-  // ========== 核心功能（调用 pipeline）==========
-  const captureAndTranslate = useCallback(async () => {
-    try {
-      // 使用内容区的实际边界来截图，避免坐标偏移
-      if (!contentRef.current) return;
-      
-      const contentRect = contentRef.current.getBoundingClientRect();
-      // getBoundingClientRect 返回的是相对于视口的坐标
-      // 在 Electron 无边框窗口中，视口就是窗口内容
-      const windowBounds = await window.electron?.glass?.getBounds?.();
-      if (!windowBounds) return;
-      
-      // 计算内容区在屏幕上的绝对位置
-      const captureRect = {
-        x: Math.round(windowBounds.x + contentRect.left),
-        y: Math.round(windowBounds.y + contentRect.top),
-        width: Math.round(contentRect.width),
-        height: Math.round(contentRect.height),
-      };
-      
-      logger.debug('Capture rect:', captureRect);
-      logger.debug('Content rect:', contentRect);
-      logger.debug('Window bounds:', windowBounds);
-      
-      await pipeline.runFromCapture(captureRect);
-    } catch (error) {
-      logger.error(' Capture failed:', error);
-    }
   }, []);
 
   // ========== 渲染 ==========
