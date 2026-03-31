@@ -322,9 +322,10 @@ function register(ctx) {
     try {
       app.setLoginItemSettings({
         openAtLogin: enabled,
-        // Windows: 以最小化方式启动（配合 --startup 参数）
         args: enabled ? ['--startup'] : [],
       });
+      // 同时保存到 store（getLoginItemSettings 在开发模式下不可靠）
+      store.set('settings.startup.autoLaunch', enabled);
       logger.info('Auto launch set to:', enabled);
       return { success: true, enabled };
     } catch (e) {
@@ -338,6 +339,11 @@ function register(ctx) {
    */
   ipcMain.handle(CHANNELS.APP.GET_AUTO_LAUNCH, () => {
     try {
+      // 优先读 store（可靠），fallback 到系统 API
+      const stored = store.get('settings.startup.autoLaunch');
+      if (stored !== undefined) {
+        return { success: true, enabled: !!stored };
+      }
       const settings = app.getLoginItemSettings();
       return { success: true, enabled: settings.openAtLogin };
     } catch (e) {
