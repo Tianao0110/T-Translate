@@ -141,3 +141,78 @@
   }
 }
 
+/* ==================== 术语库自动替换提示 ==================== */
+.glossary-applied-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.05));
+  border-top: 1px solid var(--border-primary);
+  font-size: 12px;
+  animation: glossary-fade-in 0.3s ease;
+}
+
+@keyframes glossary-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.glossary-notice-content {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--success);
+  flex: 1;
+  min-width: 0;
+}
+
+.glossary-notice-content span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.glossary-notice-expandable {
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
+
+.glossary-notice-expandable:hover {
+  color: var(--accent-primary);
+}
+
+.glossary-undo-btn {
+  padding: 3px 10px;
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.glossary-undo-btn:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.glossary-notice-details {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border-primary);
+}
+
+.glossary-detail-item {
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding: 2px 6px;
+  background: var(--bg-primary);
+  border-radius: 3px;
+}

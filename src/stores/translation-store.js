@@ -67,6 +67,8 @@ const useTranslationStore = create(
         // 版本管理
         versions: [], // [{ id, type, text, createdAt, styleRef?, styleName?, styleStrength? }]
         currentVersionId: null,
+        // 术语库自动替换记录（供UI显示撤销提示）
+        glossaryApplied: null, // { replacements: [{from, to}], originalText: string }
       },
 
       history: [],

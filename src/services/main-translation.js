@@ -82,6 +82,9 @@ class MainTranslationService {
     });
 
     try {
+      // 获取术语表
+      const glossaryTerms = useTranslationStore.getState().getGlossaryTerms?.() || [];
+      
       // 调用 translationService 的流式翻译
       const result = await translationService.translateStream(
         sourceText,
@@ -91,6 +94,7 @@ class MainTranslationService {
           template: options.template || state.currentTranslation.metadata.template,
           privacyMode: mode,
           useCache: mode !== PRIVACY_MODES.SECURE,
+          glossaryTerms,
         },
         // onChunk 回调：实时更新 UI
         (fullText) => {
@@ -114,6 +118,16 @@ class MainTranslationService {
             template: options.template || draft.currentTranslation.metadata.template,
             fromCache: result.fromCache,
           };
+          
+          // 记录术语替换信息（供 UI 显示撤销提示）
+          if (result.glossaryReplacements?.length > 0) {
+            draft.currentTranslation.glossaryApplied = {
+              replacements: result.glossaryReplacements,
+              originalText: result.originalText,
+            };
+          } else {
+            draft.currentTranslation.glossaryApplied = null;
+          }
 
           // 初始化版本管理 - 原始翻译作为 v1
           const originalVersion = {
@@ -180,6 +194,9 @@ class MainTranslationService {
     });
 
     try {
+      // 获取术语表
+      const glossaryTerms = useTranslationStore.getState().getGlossaryTerms?.() || [];
+      
       // 调用 translationService（不是 translator）
       const result = await translationService.translate(sourceText, {
         sourceLang: sourceLanguage,
@@ -187,6 +204,7 @@ class MainTranslationService {
         template: options.template || state.currentTranslation.metadata.template,
         privacyMode: mode,
         useCache: mode !== PRIVACY_MODES.SECURE,
+        glossaryTerms,
       });
 
       const duration = Date.now() - startTime;
@@ -202,6 +220,16 @@ class MainTranslationService {
             template: options.template || draft.currentTranslation.metadata.template,
             fromCache: result.fromCache,
           };
+          
+          // 记录术语替换信息（供 UI 显示撤销提示）
+          if (result.glossaryReplacements?.length > 0) {
+            draft.currentTranslation.glossaryApplied = {
+              replacements: result.glossaryReplacements,
+              originalText: result.originalText,
+            };
+          } else {
+            draft.currentTranslation.glossaryApplied = null;
+          }
 
           // 初始化版本管理
           const originalVersion = {
@@ -351,9 +379,15 @@ class MainTranslationService {
           if (options.autoSetSource !== false) {
             draft.currentTranslation.sourceText = result.text;
           }
+          // 如果发生了 LLM Vision 降级，记录到状态中供 UI 显示
+          if (result.fallbackFrom === 'llm-vision') {
+            draft.ocrStatus.fallbackNotice = ocrManager.isVisionLocked()
+              ? _t('ocr.visionLocked', 'LLM Vision has been disabled due to repeated failures. Switched to local OCR. Re-enable in Settings > OCR.')
+              : _t('ocr.visionFallback', 'Current model does not support vision. Using local OCR instead.');
+          }
         });
 
-        return { success: true, text: result.text, engine: result.engine };
+        return { success: true, text: result.text, engine: result.engine, fallbackFrom: result.fallbackFrom };
       } else {
         throw new Error(result.error);
       }

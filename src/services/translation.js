@@ -297,6 +297,41 @@ class TranslationService {
     return result;
   }
 
+  /**
+   * 术语表后处理替换
+   * 原文术语出现在译文中（未被翻译）时，直接替换为正确术语
+   * @param {string} translatedText - 译文
+   * @param {Array} glossaryTerms - [{source, target}]
+   * @returns {{ text: string, replacements: Array }} 替换后的译文和替换记录
+   */
+  _applyGlossary(translatedText, glossaryTerms) {
+    if (!translatedText || !glossaryTerms || glossaryTerms.length === 0) {
+      return { text: translatedText, replacements: [] };
+    }
+    
+    let result = translatedText;
+    const replacements = [];
+    
+    // 按源术语长度降序，优先匹配长的（避免短词误匹配）
+    const sorted = [...glossaryTerms].sort((a, b) => b.source.length - a.source.length);
+    
+    for (const term of sorted) {
+      if (!term.source || !term.target) continue;
+      if (term.source.length < 2) continue;
+      
+      const sourceEscaped = term.source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const sourceRegex = new RegExp(sourceEscaped, 'gi');
+      
+      if (sourceRegex.test(result)) {
+        result = result.replace(sourceRegex, term.target);
+        replacements.push({ from: term.source, to: term.target });
+        logger.debug(`Glossary replaced: "${term.source}" → "${term.target}"`);
+      }
+    }
+    
+    return { text: result, replacements };
+  }
+
   // ========== 两级缓存 ==========
 
   /**
@@ -482,6 +517,7 @@ class TranslationService {
       enableFallback = true,
       privacyMode = PRIVACY_MODE_IDS.STANDARD,
       useCache = true,
+      glossaryTerms = [],
     } = options;
     
     // ========== Phase 1: 预处理（免译名单）==========
@@ -541,7 +577,15 @@ class TranslationService {
           this._failureCount[id] = 0;
           
           // ========== Phase 4: 后处理 ==========
-          const finalText = this._postProcess(result.text, protectedMap);
+          let finalText = this._postProcess(result.text, protectedMap);
+          
+          // 术语表后处理替换
+          let glossaryReplacements = [];
+          if (glossaryTerms.length > 0) {
+            const glossaryResult = this._applyGlossary(finalText, glossaryTerms);
+            finalText = glossaryResult.text;
+            glossaryReplacements = glossaryResult.replacements;
+          }
           
           // ========== Phase 5: 写入缓存 ==========
           this._saveCache(cacheKey, { 
@@ -553,6 +597,8 @@ class TranslationService {
           return {
             success: true,
             text: finalText,
+            originalText: glossaryReplacements.length > 0 ? this._postProcess(result.text, protectedMap) : null,
+            glossaryReplacements,
             provider: id,
             fromCache: false,
           };
@@ -610,6 +656,7 @@ class TranslationService {
       enableFallback = true,
       privacyMode = PRIVACY_MODE_IDS.STANDARD,
       useCache = true,
+      glossaryTerms = [],
     } = options;
     
     // 预处理
@@ -679,7 +726,13 @@ class TranslationService {
           if (result.success) {
             this._failureCount[id] = 0;
             
-            const finalText = this._postProcess(result.text || fullText, protectedMap);
+            let finalText = this._postProcess(result.text || fullText, protectedMap);
+            let glossaryReplacements = [];
+            if (glossaryTerms.length > 0) {
+              const glossaryResult = this._applyGlossary(finalText, glossaryTerms);
+              finalText = glossaryResult.text;
+              glossaryReplacements = glossaryResult.replacements;
+            }
             
             // 写入缓存
             this._saveCache(cacheKey, { 
@@ -691,6 +744,8 @@ class TranslationService {
             return {
               success: true,
               text: finalText,
+              originalText: glossaryReplacements.length > 0 ? this._postProcess(result.text || fullText, protectedMap) : null,
+              glossaryReplacements,
               provider: id,
               fromCache: false,
             };
@@ -705,7 +760,13 @@ class TranslationService {
           if (result.success) {
             this._failureCount[id] = 0;
             
-            const finalText = this._postProcess(result.text, protectedMap);
+            let finalText = this._postProcess(result.text, protectedMap);
+            let glossaryReplacements = [];
+            if (glossaryTerms.length > 0) {
+              const glossaryResult = this._applyGlossary(finalText, glossaryTerms);
+              finalText = glossaryResult.text;
+              glossaryReplacements = glossaryResult.replacements;
+            }
             
             // 一次性返回
             if (onChunk) {
@@ -721,6 +782,8 @@ class TranslationService {
             return {
               success: true,
               text: finalText,
+              originalText: glossaryReplacements.length > 0 ? this._postProcess(result.text, protectedMap) : null,
+              glossaryReplacements,
               provider: id,
               fromCache: false,
             };

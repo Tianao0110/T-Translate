@@ -15,7 +15,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Send, Camera, Image, FileText, Volume2, VolumeX, Copy,
   RotateCcw, Sparkles, Loader2, Clock, Zap, Shield, Eye, EyeOff, Lock,
-  Lightbulb, Check, X, ArrowRight, Palette, ChevronUp, ChevronDown, AlertTriangle
+  Lightbulb, Check, X, ArrowRight, Palette, ChevronUp, ChevronDown, AlertTriangle, BookOpen
 } from 'lucide-react';
 
 import useTranslationStore from '../../stores/translation-store';
@@ -508,6 +508,29 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
             spellCheck={false}
           />
 
+          {/* 术语库自动替换提示（5秒自动消失，多条折叠） */}
+          {currentTranslation.glossaryApplied && currentTranslation.glossaryApplied.replacements.length > 0 && (() => {
+            const replacements = currentTranslation.glossaryApplied.replacements;
+            const count = replacements.length;
+            const first = `"${replacements[0].from}" → "${replacements[0].to}"`;
+            
+            return (
+              <GlossaryNotice
+                count={count}
+                first={first}
+                replacements={replacements}
+                onUndo={() => {
+                  setTranslatedText(currentTranslation.glossaryApplied.originalText);
+                  useTranslationStore.setState((draft) => {
+                    draft.currentTranslation.glossaryApplied = null;
+                  });
+                  notify(t('translation.glossaryUndone', '已撤销术语替换'), 'info');
+                }}
+                t={t}
+              />
+            );
+          })()}
+
           {/* 术语一致性提示 */}
           {termCheck.termSuggestions.length > 0 && (
             <div className="term-suggestions">
@@ -593,6 +616,65 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
         onSave={saveModal.executeSave}
         onClose={() => saveModal.setShowSaveModal(false)}
       />
+    </div>
+  );
+};
+
+/**
+ * 术语库自动替换通知（5秒自动消失，多条折叠）
+ */
+const GlossaryNotice = ({ count, first, replacements, onUndo, t }) => {
+  const [visible, setVisible] = useState(true);
+  const [expanded, setExpanded] = useState(false);
+  
+  useEffect(() => {
+    const timer = setTimeout(() => setVisible(false), 5000);
+    return () => clearTimeout(timer);
+  }, []);
+  
+  // 鼠标悬停时暂停消失
+  const [hovered, setHovered] = useState(false);
+  useEffect(() => {
+    if (hovered) return;
+    if (!visible) return;
+    const timer = setTimeout(() => setVisible(false), 5000);
+    return () => clearTimeout(timer);
+  }, [hovered, visible]);
+  
+  if (!visible) return null;
+  
+  return (
+    <div 
+      className="glossary-applied-notice"
+      onMouseEnter={() => { setHovered(true); setVisible(true); }}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <div className="glossary-notice-content">
+        <BookOpen size={14} />
+        {count === 1 ? (
+          <span>{t('translation.glossaryApplied', '术语库已自动替换')}: {first}</span>
+        ) : (
+          <span 
+            className="glossary-notice-expandable"
+            onClick={() => setExpanded(!expanded)}
+          >
+            {t('translation.glossaryApplied', '术语库已自动替换')} ({count} {t('translation.glossaryItems', '项')})
+            {!expanded && `: ${first}...`}
+          </span>
+        )}
+      </div>
+      <button className="glossary-undo-btn" onClick={onUndo}>
+        {t('translation.undo', '撤销')}
+      </button>
+      {expanded && count > 1 && (
+        <div className="glossary-notice-details">
+          {replacements.map((r, i) => (
+            <div key={i} className="glossary-detail-item">
+              "{r.from}" → "{r.to}"
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
