@@ -1417,10 +1417,6 @@ const DocumentTranslator = ({
       {document && (
         <div className="dt-footer">
           <div className="control-left">
-            <div className="lang-display">
-              <Languages size={16} />
-              <span>{sourceLang === 'auto' ? t('documentTranslator.footer.auto') : sourceLang} → {targetLang}</span>
-            </div>
             {/* 批量模式开关 */}
             <label className="batch-mode-toggle" title={batchMode ? t('documentTranslator.footer.batchModeOnHint', { count: batchSize }) : t('documentTranslator.footer.batchModeOffHint')}>
               <input 
