@@ -396,7 +396,7 @@ const AboutSection = ({ notify, resetSettings }) => {
       </div>
 
       <div className="about-footer">
-        <p>Made with ❤️ for translators</p>
+        <p>Made with ❤️ for Tianao</p>
         <p className="copyright">{t('settings.about.copyright')}</p>
       </div>
 
