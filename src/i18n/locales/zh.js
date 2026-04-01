@@ -368,6 +368,10 @@ const zh = {
     glass: { title: "玻璃悬浮窗", desc: "透明窗口覆盖在原文上方，实时翻译" },
     document: { title: "文档翻译", desc: "拖入文件，逐段翻译并导出双语对照" },
   },
+  security: {
+    suspiciousAccess: "⚠️ 安全警告：检测到异常的密钥访问（{{count}} 次，涉及 {{keys}} 个密钥）。如非您本人操作，请立即更换所有 API Key。",
+    encryptionUnavailable: "系统加密不可用，API Key 无法安全存储。请检查系统安全设置。",
+  },
   common: { confirm: "确定", cancel: "取消", save: "保存", delete: "删除", edit: "编辑", close: "关闭", open: "打开", enable: "启用", disable: "禁用", loading: "加载中...", noData: "暂无数据", retry: "重试", reset: "重置", search: "搜索", filter: "筛选", all: "全部", none: "无", yes: "是", no: "否", show: "显示", hide: "隐藏", on: "开启", off: "关闭" },
   ocr: {
     description: "配置文字识别引擎和语言",

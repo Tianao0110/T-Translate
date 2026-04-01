@@ -368,6 +368,10 @@ const en = {
     glass: { title: "Glass Window", desc: "Transparent overlay that translates text in real-time" },
     document: { title: "Document Translate", desc: "Drop a file to translate paragraph by paragraph" },
   },
+  security: {
+    suspiciousAccess: "⚠️ Security Alert: Suspicious key access detected ({{count}} operations, {{keys}} unique keys). If this was not you, change all API Keys immediately.",
+    encryptionUnavailable: "System encryption unavailable. API Keys cannot be stored securely.",
+  },
   common: { confirm: "Confirm", cancel: "Cancel", save: "Save", delete: "Delete", edit: "Edit", close: "Close", open: "Open", enable: "Enable", disable: "Disable", loading: "Loading...", noData: "No data", retry: "Retry", reset: "Reset", search: "Search", filter: "Filter", all: "All", none: "None", yes: "Yes", no: "No", show: "Show", hide: "Hide", on: "On", off: "Off" },
   ocr: {
     description: "Configure text recognition engine and language",

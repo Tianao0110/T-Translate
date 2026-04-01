@@ -252,6 +252,24 @@ const MainWindow = () => {
     return () => cleanup?.();
   }, []);
 
+  // 监听 API Key 安全告警
+  useEffect(() => {
+    const cleanup = window.electron?.ipc?.on('security-alert', (alert) => {
+      if (alert?.type === 'suspicious-key-access') {
+        showNotification(
+          t('security.suspiciousAccess', {
+            count: alert.count,
+            keys: alert.uniqueKeys,
+            defaultValue: `⚠️ 安全警告：检测到异常的密钥访问（${alert.count} 次，涉及 ${alert.uniqueKeys} 个密钥）。如非您本人操作，请立即更换所有 API Key。`
+          }),
+          'error',
+          15000
+        );
+      }
+    });
+    return () => cleanup?.();
+  }, [t, showNotification]);
+
   // 快速操作菜单
   // 渲染通知
   const renderNotification = () => {

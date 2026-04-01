@@ -161,6 +161,7 @@ const CHANNELS = {
     DECRYPT: 'secure-storage:decrypt',
     DELETE: 'secure-storage:delete',
     IS_AVAILABLE: 'secure-storage:isAvailable',
+    GET_ACCESS_LOG: 'secure-storage:getAccessLog',
   },
 };
 

@@ -31,6 +31,7 @@ const validChannels = {
     "maximize-change",  // 窗口最大化状态变化
     "shortcut-conflict",  // 快捷键冲突通知
     "navigate",  // 托盘菜单导航（如跳转到设置页）
+    "security-alert",  // API Key 访问异常告警
   ],
   invoke: [
     "get-app-version",
@@ -142,9 +143,10 @@ const electronAPI = {
   // 安全存储（加密 API Key 等）
   secureStorage: {
     encrypt: (key, value) => ipcRenderer.invoke("secure-storage:encrypt", key, value),
-    decrypt: (key) => ipcRenderer.invoke("secure-storage:decrypt", key),
+    decrypt: (key, options) => ipcRenderer.invoke("secure-storage:decrypt", key, options),
     delete: (key) => ipcRenderer.invoke("secure-storage:delete", key),
     isAvailable: () => ipcRenderer.invoke("secure-storage:is-available"),
+    getAccessLog: () => ipcRenderer.invoke("secure-storage:getAccessLog"),
   },
   // 玻璃翻译窗口
   glass: {

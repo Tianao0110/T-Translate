@@ -5,15 +5,35 @@
 </p>
 
 <p align="center">
-  <strong>智能离线翻译工具</strong><br>
-  基于 Electron + React + Vite 构建，支持本地 LLM 翻译
+  <strong>随手翻译，隐私无忧</strong><br>
+  划词即译 · 截图即译 · 本地 LLM 优先 · API Key 加密存储
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/version-0.2.3-green" alt="Version">
+  <img src="https://img.shields.io/badge/license-MIT-blue" alt="License">
+  <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform">
 </p>
 
 ---
 
-## ✨ 功能特性
+## 功能一览
 
-### 🔤 划词翻译
+| 功能                   | 说明                                                                                |
+| ---------------------- | ----------------------------------------------------------------------------------- |
+| **划词翻译**     | 系统级，任何应用中选中文字即翻译，支持 8 个冻结窗口                                 |
+| **截图 OCR**     | 截屏识别文字，6 个 OCR 引擎自动降级                                                 |
+| **悬浮窗口**     | 透明悬浮窗，空格截图翻译，复杂排版用                                                |
+| **文档翻译**     | PDF / DOCX / EPUB / TXT / SRT 等 9 种格式，逐段翻译，进度可恢复                     |
+| **术语库**       | 翻译后自动替换术语，支持撤销                                                        |
+| **TTS 朗读**     | 基于 Windows 离线语音引擎                                                           |
+| **10 个翻译源**  | LM Studio、Ollama、OpenAI、Claude、Gemini、DeepSeek、DeepL、Google、Microsoft、百度 |
+| **四档隐私模式** | 标准 / 离线 / 无痕 / 严格，离线模式下在线 API Key 禁止解密                          |
+| **开机自启**     | 静默运行到托盘，可选自动开启划词翻译                                                |
+
+---
+
+### 划词翻译
 
 选中任意文字自动弹出翻译窗口，支持最多 8 个冻结窗口同时显示，智能检测源语言。
 
@@ -21,94 +41,71 @@
   <img src="docs/screenshots/selection-translate.png" width="600" alt="划词翻译">
 </p>
 
-### 📸 截图 OCR 翻译
+### 截图 OCR 翻译
 
-截取屏幕区域进行文字识别，支持多种 OCR 引擎（RapidOCR、LLM Vision），识别后自动翻译。
+截取屏幕区域进行文字识别，引擎不可用时自动降级到下一个，使用无感。
 
 <p align="center">
   <img src="docs/screenshots/screenshot-ocr.png" width="600" alt="截图 OCR 翻译">
 </p>
 
-### 🪟 玻璃窗口
+### 悬浮窗口
 
-透明悬浮窗实时翻译，支持拖拽、缩放、置顶，可创建多个独立子面板。(可在设置界面取消子面板）
+透明悬浮窗实时翻译，支持拖拽、缩放、置顶，可创建多个独立子面板。空格键/左键 Toggle：有内容清空，无内容截图翻译。子窗口透明度独立于父窗口，始终清晰可读。
 
 <p align="center">
   <img src="docs/screenshots/glass-window.png" width="600" alt="玻璃窗口">
 </p>
 
-### 📄 文档翻译
+### 文档翻译
 
-支持 PDF、DOCX、EPUB、TXT 格式，尽量保持原文档结构，批量翻译导出。(等待时间根据不同得设备有所不同）
+支持 PDF、DOCX、EPUB、TXT、SRT、VTT、CSV、JSON 共 9 种格式。支持批量模式和术语库联动。等待时间因设备性能和翻译源而异。
 
 <p align="center">
   <img src="docs/screenshots/document-translate.png" width="600" alt="文档翻译">
 </p>
 
-### 🔊 简易版TTS 朗读
+### 隐私模式
 
-翻译结果语音朗读，支持多种语音引擎，可调节语速。根据您的window离线语音来加载。
-
-<p align="center">
-  <img src="docs/screenshots/tts.png" width="600" alt="TTS 朗读">
-</p>
-
-### 🔒 隐私模式
-
-| 模式     | 历史记录 | 缓存 | 云端翻译 |
-| -------- | :------: | :--: | :------: |
-| 标准模式 |    ✅    |  ✅  |    ✅    |
-| 离线模式 |    ✅    |  ✅  |    ❌    |
-| 无痕模式 |    ❌    |  ❌  |    ✅    |
-| 严格模式 |    ❌    |  ❌  |    ❌    |
+四档隐私控制，按需选择。离线/严格模式下仅使用本地 LLM，在线 API Key 禁止解密——即使程序内部被恶意代码调用也拿不到。
 
 <p align="center">
   <img src="docs/screenshots/privacy-mode.png" width="600" alt="隐私模式">
 </p>
 
-### 🤖 多翻译源
+### 多翻译源
 
-支持本地 LLM（LM Studio / Ollama）、OpenAI、Anthropic Claude、DeepL、Gemini、DeepSeek、Google 翻译、Microsoft 翻译、百度翻译，可自由切换和排序。
+支持本地 LLM（LM Studio / Ollama）、OpenAI、Anthropic Claude、Gemini、DeepSeek、DeepL、Google 翻译、Microsoft 翻译、百度翻译共 10 个翻译源，可自由切换、拖拽排序、设置优先级。翻译失败自动切换到下一个可用源。
 
 <p align="center">
   <img src="docs/screenshots/providers.png" width="600" alt="多翻译源">
 </p>
 
+### TTS 朗读
+
+翻译结果语音朗读，基于 Windows 离线语音引擎，可调节语速。语音列表根据系统已安装的离线语音包加载。
+
+<p align="center">
+  <img src="docs/screenshots/tts.png" width="600" alt="TTS 朗读">
+</p>
+
 ---
 
-## 🚀 快速开始
+## 快速开始
 
-### 下载安装
-
-从 [Releases](https://github.com/Tianao0110/T-Translate/releases) 页面下载最新版本：
-
-- **Windows**: `T-Translate-Setup-x.x.x.exe`
-- **macOS**: `T-Translate-x.x.x.dmg`
-- **Linux**: `T-Translate-x.x.x.AppImage`
-
-### 从源码构建
+从 [Releases](https://github.com/Tianao0110/T-Translate/releases) 下载安装包，或从源码构建：
 
 ```bash
-# 克隆仓库
 git clone https://github.com/Tianao0110/T-Translate.git
 cd T-Translate
-
-# 安装依赖
 npm install
-
-# 开发模式
-npm start
-
-# 构建生产版本
-npm run build
-
-# 打包安装程序
-npm run dist
+npm start        # 开发模式
+npm run dist     # 打包安装程序
 ```
 
 ---
 
-## ⌨️ 快捷键
+## 快捷键
 
 | 快捷键           | 功能              |
 | ---------------- | ----------------- |
@@ -117,9 +114,21 @@ npm run dist
 | `Ctrl+Shift+G` | 打开玻璃窗口      |
 | `Ctrl+Shift+D` | 开启/关闭划词翻译 |
 | `Ctrl+Enter`   | 执行翻译          |
-| `Ctrl+Shift+C` | 复制翻译结果      |
 
 *快捷键可在设置中自定义*
+
+---
+
+## 安全与隐私
+
+T-Translate 以隐私保护为核心设计理念：
+
+- **本地优先** — 本地 LLM 是第一优先级，完全离线可用
+- **加密存储** — API Key 使用 Windows DPAPI 加密，无明文回退
+- **访问审计** — 密钥解密操作全程记录，异常频率自动告警
+- **隐私联动** — 离线/严格模式下在线 API Key 禁止解密
+- **最小权限** — 每种窗口独立 Preload，只暴露必要的 API
+- **无 axios** — 不受近期 npm 供应链攻击影响
 
 ---
 
@@ -129,99 +138,56 @@ npm run dist
 t-translate/
 ├── electron/               # 主进程代码
 │   ├── main.js             # 主进程入口
-│   ├── preloads/           # Preload 脚本
+│   ├── preloads/           # Preload 脚本（最小权限隔离）
 │   ├── shared/             # 共享常量和配置
-│   ├── ipc/                # IPC 处理器
+│   ├── ipc/                # IPC 处理器（含安全存储审计）
 │   ├── managers/           # 窗口/托盘/菜单管理器
-│   └── utils/              # 工具函数
+│   └── utils/              # 原生工具（Win32 API、状态机）
 │
 ├── src/                    # 渲染进程代码
 │   ├── components/         # React 组件
-│   ├── providers/          # 翻译源 Provider
-│   ├── services/           # 服务层
+│   ├── providers/          # 翻译源 Provider（10 个）
+│   ├── services/           # 服务层（翻译、缓存、管线）
 │   ├── stores/             # Zustand 状态管理
-│   └── config/             # 前端配置
+│   ├── config/             # 配置（隐私模式、模板、常量）
+│   └── i18n/               # 国际化（中英双语 1000+ key）
 │
 ├── public/                 # HTML 入口 + 静态资源
-├── resources/              # 应用资源 (OCR 训练数据)
+├── resources/              # 应用资源（OCR 训练数据）
 ├── scripts/                # 工具脚本
 └── docs/                   # 项目文档
 ```
 
----
-
-## 📚 文档
-
-详细文档请查看 `docs/` 目录：
-
-| 文档                                           | 说明                        |
-| ---------------------------------------------- | --------------------------- |
-| [架构设计](docs/ARCHITECTURE.md)                  | 项目架构和分层设计          |
-| [开发指南](docs/DEVELOPMENT.md)                   | 自定义翻译源和 OCR 引擎开发 |
-| [国际化指南](docs/I18N_GUIDE.md)                  | 多语言国际化开发            |
-| [主题定制](docs/THEME_CUSTOMIZATION.md)           | 主题和样式定制              |
-
----
-
 ## 🏗️ 技术栈
 
-| 类别     | 技术                                                    |
-| -------- | ------------------------------------------------------- |
-| 框架     | Electron 28 + React 18                                  |
-| 构建     | Vite 5                                                  |
-| 状态管理 | Zustand                                                 |
-| 样式     | CSS Variables + CSS Modules                             |
-| OCR      | @gutenye/ocr-node (RapidOCR) / Windows OCR / LLM Vision |
-| 本地 LLM | LM Studio / Ollama 兼容 API                             |
-| 在线翻译 | OpenAI / Anthropic Claude / Gemini / DeepSeek / DeepL / Microsoft / 百度 |
-| 打包     | electron-builder                                        |
+| 类别     | 技术                                                                    |
+| -------- | ----------------------------------------------------------------------- |
+| 框架     | Electron 28 + React 18                                                  |
+| 构建     | Vite 5                                                                  |
+| 状态管理 | Zustand + Immer                                                         |
+| 样式     | CSS Variables                                                           |
+| 安全存储 | Electron safeStorage (Windows DPAPI) + 访问审计                         |
+| OCR      | RapidOCR / Windows OCR / LLM Vision / Google Vision / Azure / 百度      |
+| 本地 LLM | LM Studio / Ollama（OpenAI 兼容 API）                                   |
+| 在线翻译 | OpenAI / Claude / Gemini / DeepSeek / DeepL / Google / Microsoft / 百度 |
+| 打包     | electron-builder                                                        |
+
+详细文档见 `docs/` 目录：[架构设计](docs/ARCHITECTURE.md) · [开发指南](docs/DEVELOPMENT.md) · [国际化](docs/I18N_GUIDE.md) · [主题定制](docs/THEME_CUSTOMIZATION.md)
 
 ---
 
-## 🔧 开发命令
-
-```bash
-npm start              # 启动开发环境
-npm run build          # 构建生产版本
-npm run dist           # 打包安装程序
-npm test               # 运行测试
-npm run check:constants # 检查常量同步状态
-```
-
----
-
-## 🤝 贡献
+## 贡献
 
 欢迎提交 Issue 和 Pull Request！
 
-1. Fork 本仓库
-2. 创建功能分支 (`git checkout -b feature/amazing-feature`)
-3. 提交更改 (`git commit -m 'Add amazing feature'`)
-4. 推送到分支 (`git push origin feature/amazing-feature`)
-5. 提交 Pull Request
-
 ---
 
-## 📄 许可证
+## 许可证
 
-本项目基于 [MIT License](LICENSE) 开源。
-
----
-
-## 🙏 致谢
-
-- [Electron](https://www.electronjs.org/)
-- [React](https://react.dev/)
-- [Vite](https://vitejs.dev/)
-- [LM Studio](https://lmstudio.ai/)
-- [RapidOCR](https://github.com/RapidAI/RapidOCR)
+[MIT License](LICENSE)
 
 ---
 
 <p align="center">
   Made with ❤️ by <a href="https://github.com/Tianao0110">Tianao</a>
-</p>
-
-<p align="center">
-  <strong>版本</strong>: v0.3.0  |  <strong>更新日期</strong>: 2026-03-06
 </p>

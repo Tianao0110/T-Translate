@@ -16,25 +16,35 @@ const logger = createLogger('ProviderSettings');
 
 // ========== 安全存储 ==========
 const secureStorage = {
-  async get(key) {
+  async get(key, context) {
     if (window.electron?.secureStorage) {
-      return await window.electron.secureStorage.decrypt(key);
+      const value = await window.electron.secureStorage.decrypt(key, context ? { context } : undefined);
+      if (value) return value;
+      
+      // 兼容迁移：如果 safeStorage 没有但 localStorage 有旧数据，迁移过来
+      const legacy = localStorage.getItem(`__secure_${key}`);
+      if (legacy) {
+        try {
+          const migrated = decodeURIComponent(atob(legacy));
+          await window.electron.secureStorage.encrypt(key, migrated);
+          localStorage.removeItem(`__secure_${key}`); // 删除明文
+          logger.info(`Migrated key from localStorage to safeStorage: ${key}`);
+          return migrated;
+        } catch { /* 迁移失败，丢弃旧数据 */ }
+        localStorage.removeItem(`__secure_${key}`); // 无论如何清除明文
+      }
+      return null;
     }
-    const encoded = localStorage.getItem(`__secure_${key}`);
-    if (encoded) {
-      try {
-        return decodeURIComponent(atob(encoded));
-      } catch { return null; }
-    }
+    // 非 Electron 环境（不应该发生），不存储
     return null;
   },
   async set(key, value) {
     if (window.electron?.secureStorage) {
       return await window.electron.secureStorage.encrypt(key, value);
     }
-    const encoded = btoa(encodeURIComponent(value));
-    localStorage.setItem(`__secure_${key}`, encoded);
-    return true;
+    // 不再回退到 localStorage 明文存储
+    logger.warn('secureStorage unavailable, refusing to store key:', key);
+    return false;
   }
 };
 
@@ -149,7 +159,7 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
         if (meta.configSchema) {
           for (const [key, field] of Object.entries(meta.configSchema)) {
             if (field.encrypted) {
-              const decrypted = await secureStorage.get(`provider_${meta.id}_${key}`);
+              const decrypted = await secureStorage.get(`provider_${meta.id}_${key}`, 'settings-load');
               if (decrypted) {
                 configs[meta.id][key] = decrypted;
               }
@@ -179,7 +189,8 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
           for (const [key, field] of Object.entries(meta.configSchema)) {
             if (field.encrypted && configsToSave[meta.id][key]) {
               await secureStorage.set(`provider_${meta.id}_${key}`, configsToSave[meta.id][key]);
-              configsToSave[meta.id][key] = '***encrypted***';
+              // 不写入任何值到 providerConfigs（连占位符都不留）
+              delete configsToSave[meta.id][key];
             }
           }
         }

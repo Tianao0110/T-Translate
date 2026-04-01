@@ -280,15 +280,8 @@ function register(ctx) {
         throw new Error(t('glass.windowNotFound', '玻璃窗口不存在'));
       }
       
-      // 保存原始透明度
-      let originalOpacity = 1;
-      try {
-        originalOpacity = glassWindow.getOpacity();
-      } catch (e) {
-        originalOpacity = 0.85;
-      }
-      
-      // 强制隐藏窗口（截图时不能出现自身）
+      // 隐藏悬浮窗（避免截到自身内容）
+      // 注意：WDA_EXCLUDEFROMCAPTURE 在部分系统/驱动下不生效，仍需 opacity 隐藏
       try {
         glassWindow.setOpacity(0);
         await new Promise(resolve => setTimeout(resolve, 80));
@@ -296,11 +289,11 @@ function register(ctx) {
         logger.warn('Failed to hide for capture:', e.message);
       }
       
-      // 使用 node-screenshots 截取指定区域
+      // 截取指定区域
       const screenshotMod = getScreenshotModule();
       const screenshot = await screenshotMod.captureRegion(bounds);
       
-      // 恢复窗口（窗口级 opacity 恢复为 1，视觉透明度由 CSS 控制）
+      // 恢复窗口（视觉透明度由 CSS 控制）
       try {
         glassWindow.setOpacity(1);
       } catch (e) {
@@ -314,13 +307,8 @@ function register(ctx) {
       }
     } catch (error) {
       logger.error('Capture region error:', error);
-      // 确保窗口恢复可见
       if (glassWindow && !glassWindow.isDestroyed()) {
-        try {
-          glassWindow.setOpacity(1);
-        } catch (e) {
-          // 忽略
-        }
+        try { glassWindow.setOpacity(1); } catch {}
       }
       return { success: false, error: error.message };
     }
