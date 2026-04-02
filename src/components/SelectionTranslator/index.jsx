@@ -198,6 +198,10 @@ const SelectionTranslator = () => {
       // 模式 2: 收到 OCR 文字，自己翻译（复用划词翻译的流程）
       if (data.text && !data.translatedText) {
         logger.debug('Received OCR text, translating...');
+        // 使用传入的目标语言（截图翻译从主窗口设置读取）
+        if (data.targetLanguage) {
+          setTranslation(prev => ({ ...prev, targetLanguage: data.targetLanguage }));
+        }
         setSourceText(data.text);
         setShowSource(newSettings.showSourceByDefault);
         setError('');
@@ -209,8 +213,9 @@ const SelectionTranslator = () => {
         setMode('loading');
         
         try {
-          // 使用 ref 来获取最新的翻译函数
-          const translationResult = await translateTextRef.current(data.text);
+          // 直接传入目标语言，不依赖异步 state 更新
+          const overrideLang = data.targetLanguage || data.translation?.targetLanguage || null;
+          const translationResult = await translateTextRef.current(data.text, 0, overrideLang);
           setTranslatedText(translationResult);
           setError('');
           setMode('overlay');
@@ -448,15 +453,15 @@ const SelectionTranslator = () => {
   }, [mode, translatedText, error, showSource]);
 
   // 使用 translationService 进行翻译
-  const translateText = async (text, retryCount = 0) => {
+  const translateText = async (text, retryCount = 0, overrideTargetLang = null) => {
     // 确保翻译服务已初始化
     if (!translationService.initialized) {
       logger.debug('Initializing translation service...');
       await translationService.init();
     }
     
-    // 直接使用用户设置的目标语言，源语言 auto 由翻译引擎检测
-    const targetLang = translation.targetLanguage || 'zh';
+    // 优先使用传入的目标语言（截图翻译等场景），否则用 state
+    const targetLang = overrideTargetLang || translation.targetLanguage || 'zh';
     
     try {
       // 使用 translationService 进行翻译（传递隐私模式）
@@ -482,7 +487,7 @@ const SelectionTranslator = () => {
       if (retryCount < 1 && (err.message.includes('fetch') || err.message.includes('network') || err.message.includes('连接'))) {
         logger.debug('Retrying translation...');
         await new Promise(r => setTimeout(r, 1000));
-        return translateText(text, retryCount + 1);
+        return translateText(text, retryCount + 1, overrideTargetLang);
       }
       
       // 使用 error-handler 转换错误消息
