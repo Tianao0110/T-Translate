@@ -219,10 +219,17 @@ function showSelectionWithText(text) {
   const settings = store.get('settings', {});
   const interfaceSettings = settings.interface || {};
   const selectionSettings = settings.selection || {};
+  const translationSettings = settings.translation || {};
   
-  // 发送文字，划词窗口收到后会自己翻译
+  // 读取目标语言（与划词翻译 showSelectionTrigger 保持一致）
+  const currentTargetLang = translationSettings.targetLanguage
+    || settings.targetLanguage
+    || 'zh';
+  
+  // 发送文字 + 目标语言，划词窗口收到后会自己翻译
   win.webContents.send(CHANNELS.SELECTION.SHOW_RESULT, {
     text: text,  // 模式2：有 text 无 translatedText，划词窗口自己翻译
+    targetLanguage: currentTargetLang,
     theme: interfaceSettings.theme || 'light',
     settings: {
       windowOpacity: selectionSettings.windowOpacity || 95,
