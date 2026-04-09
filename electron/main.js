@@ -15,7 +15,7 @@ const { store, runtime, windows, isDev } = require('./state');
 const { CHANNELS } = require('./shared/channels');
 const { initIPC } = require('./ipc');
 const { registerAllShortcuts, unregisterAllShortcuts } = require('./ipc/shortcuts');
-const { makeWindowInvisibleToCapture, getWindowInfoAtPoint, isCapsLockOn } = require('./utils/native-helper');
+const { makeWindowInvisibleToCapture, isCapsLockOn } = require('./utils/native-helper');
 const { fetchSelectedText } = require('./ipc/selection');
 const { SelectionStateMachine, STATES } = require('./utils/selection-state-machine');
 
@@ -219,6 +219,10 @@ async function handleHotkeyDirectPath(x, y, rect) {
     || translationSettings.defaultTargetLang
     || settings.targetLanguage
     || 'zh';
+  const currentSourceLang = translationSettings.sourceLanguage
+    || translationSettings.defaultSourceLang
+    || settings.sourceLanguage
+    || 'auto';
 
   runtime.lastSelectionRect = rect;
 
@@ -255,15 +259,22 @@ async function handleHotkeyDirectPath(x, y, rect) {
   });
 
   // 5. 发 SHOW_DIRECT（等 webContents 就绪再发，防止 message 丢失）
+  // payload 结构故意和 SHOW_TRIGGER 对齐，这样 renderer 两条路径行为一致
   const sendData = () => {
     win.webContents.send(CHANNELS.SELECTION.SHOW_DIRECT, {
       text: text.trim(),
-      targetLanguage: currentTargetLang,
       theme: interfaceSettings.theme || 'light',
       settings: {
-        windowOpacity: selectionSettings.windowOpacity || 95,
-        autoCloseOnCopy: selectionSettings.autoCloseOnCopy || false,
         triggerTimeout: selectionSettings.triggerTimeout || 4000,
+        showSourceByDefault: selectionSettings.showSourceByDefault || false,
+        autoCloseOnCopy: selectionSettings.autoCloseOnCopy || false,
+        minChars: selectionSettings.minChars || 2,
+        maxChars: selectionSettings.maxChars || 500,
+        windowOpacity: selectionSettings.windowOpacity || 95,
+      },
+      translation: {
+        targetLanguage: currentTargetLang,
+        sourceLanguage: currentSourceLang,
       },
     });
     win.show();

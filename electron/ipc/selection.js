@@ -5,7 +5,7 @@
 const { ipcMain, clipboard, screen } = require('electron');
 const { CHANNELS } = require('../shared/channels');
 const logger = require('../utils/logger')('IPC:Selection');
-const { simulateCtrlC, getWindowInfoAtPoint } = require('../utils/native-helper');
+const { simulateCtrlC } = require('../utils/native-helper');
 
 /**
  * 注册划词翻译相关 IPC handlers
@@ -260,45 +260,69 @@ function register(ctx) {
 // ==================== 辅助函数 ====================
 
 /**
+ * 串行化锁 —— fetchSelectedText 通过 promise chain 保证任意时刻只有一个 in-flight
+ * 调用，避免跨 mouseup 周期的 clipboard 污染（上一次 fetch 的 500ms 延迟 restore
+ * 还没 fire，下一次 fetch 就读了脏 clipboard 当 backup，最后两次 restore 互相覆盖）。
+ */
+let lastRestoreComplete = Promise.resolve();
+
+/**
  * 稳定获取选中文字（清空+轮询方案）
- *
- * ⚠️ NOT REENTRANT —— 不要在上一次调用的 500ms 剪贴板恢复窗口内再次调用。
  *
  * 调用方：
  *   1. IPC handler CHANNELS.SELECTION.GET_TEXT（用户点图标时）
  *   2. main.js handleHotkeyDirectPath（CapsLock 直出路径）
- * 两者在同一 mouseup 周期内互斥：直出路径跳过图标，不会进 GET_TEXT handler。
+ *
+ * 两者可能在相邻 mouseup 周期内先后触发，lastRestoreComplete promise chain
+ * 保证下一次 fetch 必须等上一次的 restore 真正完成（包括 500ms 延迟）才开始。
  */
 async function fetchSelectedText() {
+  // 挂在 chain 末尾：等上一次 fetch 的 restore 完成
+  const prevRestore = lastRestoreComplete;
+  let resolveMyRestore;
+  const myRestorePromise = new Promise(r => { resolveMyRestore = r; });
+  lastRestoreComplete = myRestorePromise;
+
+  await prevRestore.catch(() => {});  // 上一次就算 reject 也不阻塞本次
+
+  let backup = null;
+  let foundText = null;
   try {
     // 1. 备份现有剪贴板
-    const backup = clipboard.readText();
-    
+    backup = clipboard.readText();
+
     // 2. 清空剪贴板（关键！作为信号量）
     clipboard.clear();
-    
+
     // 3. 触发系统复制
     simulateCtrlC();
-    
+
     // 4. 轮询等待（最多 500ms，每 50ms 检查一次）
     for (let i = 0; i < 10; i++) {
       await new Promise(resolve => setTimeout(resolve, 50));
       const text = clipboard.readText();
       if (text && text.trim()) {
-        // 延迟恢复剪贴板
-        setTimeout(() => {
-          if (backup) clipboard.writeText(backup);
-        }, 500);
-        return text.trim();
+        foundText = text.trim();
+        break;
       }
     }
-    
-    // 5. 超时，恢复剪贴板
-    if (backup) clipboard.writeText(backup);
-    return null;
+
+    return foundText;
   } catch (err) {
     logger.error('fetchSelectedText error:', err);
     return null;
+  } finally {
+    // 抓到文字：延迟 500ms 再 restore，让 caller 有时间同步读 clipboard formats
+    // 抓不到：立即 restore。无论哪种都要 resolveMyRestore，否则下一次 fetch 永远卡住。
+    if (foundText) {
+      setTimeout(() => {
+        try { if (backup !== null) clipboard.writeText(backup); } catch (e) { logger.warn('restore failed:', e.message); }
+        resolveMyRestore();
+      }, 500);
+    } else {
+      try { if (backup !== null) clipboard.writeText(backup); } catch (e) { logger.warn('restore failed:', e.message); }
+      resolveMyRestore();
+    }
   }
 }
 
