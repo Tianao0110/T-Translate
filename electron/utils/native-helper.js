@@ -114,20 +114,22 @@ function simulateCtrlC() {
   }
   
   try {
-    const { keybd_event, GetAsyncKeyState, VK_CONTROL, VK_C, KEYEVENTF_KEYUP } = api;
-    
+    const { keybd_event, GetAsyncKeyState, VK_CONTROL, VK_MENU, VK_C, KEYEVENTF_KEYUP } = api;
+
     // 第一步：检查并清理粘滞按键状态
     // GetAsyncKeyState 返回值的最高位 (0x8000) 表示按键当前处于按下状态
     const ctrlDown = (GetAsyncKeyState(VK_CONTROL) & 0x8000) !== 0;
+    const altDown = (GetAsyncKeyState(VK_MENU) & 0x8000) !== 0;  // v0.2.4: hotkey 路径下 Alt 还按着
     const cDown = (GetAsyncKeyState(VK_C) & 0x8000) !== 0;
-    
-    if (ctrlDown || cDown) {
-      logger.debug(`Cleaning stuck keys: Ctrl=${ctrlDown}, C=${cDown}`);
+
+    if (ctrlDown || altDown || cDown) {
+      logger.debug(`Cleaning stuck keys: Ctrl=${ctrlDown}, Alt=${altDown}, C=${cDown}`);
       // 释放粘住的按键
       if (cDown) keybd_event(VK_C, 0x2e, KEYEVENTF_KEYUP, 0);
       if (ctrlDown) keybd_event(VK_CONTROL, 0x1d, KEYEVENTF_KEYUP, 0);
-      // 等待系统处理释放事件
-      // （使用同步忙等，因为这里不能用 async）
+      // v0.2.4: 必须释放 Alt，否则 Ctrl+C 变成 Alt+Ctrl+C，Chrome 等应用不当复制处理
+      // 用户物理上可能还按着 Alt，但 Windows 全局键盘状态会被重置 —— 用户之后物理松开时系统会收到第二次 up 事件，无害
+      if (altDown) keybd_event(VK_MENU, 0x38, KEYEVENTF_KEYUP, 0);
     }
     
     // 第二步：模拟 Ctrl+C

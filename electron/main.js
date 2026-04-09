@@ -236,29 +236,25 @@ async function handleHotkeyDirectPath(x, y, rect) {
     return;
   }
 
-  // 4. 定位窗口到选区下方（不像 showSelectionTrigger 用 mouse+8 的 dot 位置）
-  // 初始尺寸给翻译面板预留空间，渲染进程拿到尺寸后会自己 resize
-  const winW = 400;
-  const winH = 200;
-  let posX = rect.x;
-  let posY = rect.y + rect.height + 8;
+  // 4. 定位窗口 —— 和 showSelectionTrigger 保持完全一致：
+  //    - 鼠标位置 + 8 偏移
+  //    - 初始尺寸 28×28（跟现有 trigger icon 一样）
+  // 翻译结果到达后，渲染进程会通过现有的 resize 机制自动放大窗口到翻译卡片尺寸
+  // （和"点击图标后 loading → overlay"的流程共用同一套 resize 逻辑）
+  const winW = 28;
+  const winH = 28;
+  let posX = x + 8;
+  let posY = y + 8;
 
   const display = screen.getDisplayNearestPoint({ x: posX, y: posY });
   const displayBounds = display.bounds;
 
-  // 防止跑出屏幕
+  // 屏幕边界检测（和 showSelectionTrigger line 145-150 的逻辑一致）
   if (posX + winW > displayBounds.x + displayBounds.width) {
-    posX = displayBounds.x + displayBounds.width - winW - 10;
-  }
-  if (posX < displayBounds.x) {
-    posX = displayBounds.x + 10;
+    posX = x - winW - 8;
   }
   if (posY + winH > displayBounds.y + displayBounds.height) {
-    // 屏幕下方装不下 → 放到选区上方
-    posY = rect.y - winH - 8;
-  }
-  if (posY < displayBounds.y) {
-    posY = displayBounds.y + 10;
+    posY = y - winH - 8;
   }
 
   win.setBounds({
