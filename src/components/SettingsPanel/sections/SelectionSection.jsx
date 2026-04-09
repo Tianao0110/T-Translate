@@ -1,7 +1,7 @@
 // src/components/SettingsPanel/sections/SelectionSection.jsx
 // 划词翻译设置区块组件 - 国际化版
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import createLogger from '../../../utils/logger.js';
 
@@ -16,6 +16,7 @@ const SelectionSection = ({
   notify
 }) => {
   const { t } = useTranslation();
+  const [showStickyWarning, setShowStickyWarning] = useState(false);
 
   // 切换划词翻译开关
   const handleToggleSelection = async () => {
@@ -30,6 +31,32 @@ const SelectionSection = ({
       logger.error('Selection toggle error:', e);
       notify(t('selection.toggleFailed'), 'error');
     }
+  };
+
+  // 切换 CapsLock 直出模式：首次开启时弹警告，之后静默
+  const handleToggleSticky = () => {
+    const current = !!settings.selection.stickyViaCapsLock;
+    if (current) {
+      // 关闭：直接关
+      updateSetting('selection', 'stickyViaCapsLock', false);
+      return;
+    }
+    // 开启：第一次弹警告，之后直接开
+    if (settings.selection.stickyWarningShown) {
+      updateSetting('selection', 'stickyViaCapsLock', true);
+    } else {
+      setShowStickyWarning(true);
+    }
+  };
+
+  const confirmStickyWarning = () => {
+    updateSetting('selection', 'stickyViaCapsLock', true);
+    updateSetting('selection', 'stickyWarningShown', true);
+    setShowStickyWarning(false);
+  };
+
+  const cancelStickyWarning = () => {
+    setShowStickyWarning(false);
   };
 
   return (
@@ -55,6 +82,31 @@ const SelectionSection = ({
           {t('selection.shortcutHint', {shortcut: settings.shortcuts?.selectionTranslate || 'Ctrl+Shift+T'})}
         </p>
       </div>
+
+      {/* CapsLock 直出模式（二级开关：主开关关闭时隐藏） */}
+      {settings.selection.enabled && (
+        <div
+          className="setting-group"
+          style={{
+            marginLeft: '16px',
+            paddingLeft: '16px',
+            borderLeft: '3px solid var(--border-primary, #e5e7eb)',
+          }}
+        >
+          <label className="setting-label">{t('selection.stickyCapsLockLabel')}</label>
+          <div className="toggle-wrapper">
+            <button
+              className={`toggle-button ${settings.selection.stickyViaCapsLock ? 'active' : ''}`}
+              onClick={handleToggleSticky}
+            >
+              {settings.selection.stickyViaCapsLock ? t('common.on') : t('common.off')}
+            </button>
+            <span className="toggle-description">
+              {t('selection.stickyCapsLockDesc')}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* 按钮自动消失时间 */}
       <div className="setting-group">
@@ -195,6 +247,30 @@ const SelectionSection = ({
           </ul>
         </div>
       </div>
+
+      {/* CapsLock 直出模式首次开启警告弹窗（复用 .update-modal-* 样式） */}
+      {showStickyWarning && (
+        <div className="update-modal-overlay" onClick={cancelStickyWarning}>
+          <div className="update-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="update-modal-header">
+              <h3>{t('selection.stickyWarningTitle')}</h3>
+            </div>
+            <div className="update-modal-body">
+              <p style={{ lineHeight: 1.6, margin: 0, whiteSpace: 'pre-line' }}>
+                {t('selection.stickyWarningBody')}
+              </p>
+            </div>
+            <div className="update-modal-footer">
+              <button className="btn-secondary" onClick={cancelStickyWarning}>
+                {t('common.cancel')}
+              </button>
+              <button className="btn-primary" onClick={confirmStickyWarning}>
+                {t('selection.stickyWarningConfirm')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -145,6 +145,9 @@ export const DEFAULT_SETTINGS = {
     minChars: 2,
     maxChars: 500,
     windowOpacity: 95,
+    // Sticky 直出模式（CapsLock 开着时划词直接出翻译卡片）
+    stickyViaCapsLock: false,
+    stickyWarningShown: false,  // 是否已展示过首次开启警告弹窗
   },
   
   // 外观

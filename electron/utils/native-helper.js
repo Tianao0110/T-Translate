@@ -47,7 +47,8 @@ function initWin32API() {
       // 键盘模拟
       keybd_event: user32.func('void keybd_event(uint8, uint8, uint32, uintptr)'),
       GetAsyncKeyState: user32.func('int16 GetAsyncKeyState(int)'),
-      
+      GetKeyState: user32.func('int16 GetKeyState(int)'),
+
       // 窗口检测
       WindowFromPoint: user32.func('void* WindowFromPoint(POINT)'),
       GetAncestor: user32.func('void* GetAncestor(void*, uint32)'),
@@ -56,17 +57,18 @@ function initWin32API() {
       GetForegroundWindow: user32.func('void* GetForegroundWindow()'),
       GetGUIThreadInfo: user32.func('int GetGUIThreadInfo(uint32, GUITHREADINFO*)'),
       SendMessageW: user32.func('intptr SendMessageW(void*, uint32, uintptr*, uintptr*)'),
-      
+
       // 进程信息
       OpenProcess: kernel32.func('void* OpenProcess(uint32, int, uint32)'),
       CloseHandle: kernel32.func('int CloseHandle(void*)'),
       GetModuleBaseNameW: psapi.func('uint32 GetModuleBaseNameW(void*, void*, uint16*, uint32)'),
-      
+
       // 截图穿透
       SetWindowDisplayAffinity: user32.func('SetWindowDisplayAffinity', 'bool', ['void*', 'uint']),
-      
+
       // 常量
       VK_CONTROL: 0x11,
+      VK_CAPITAL: 0x14,      // CapsLock 键
       VK_C: 0x43,
       KEYEVENTF_KEYUP: 0x0002,
       GA_ROOT: 2,
@@ -114,19 +116,17 @@ function simulateCtrlC() {
   
   try {
     const { keybd_event, GetAsyncKeyState, VK_CONTROL, VK_C, KEYEVENTF_KEYUP } = api;
-    
+
     // 第一步：检查并清理粘滞按键状态
     // GetAsyncKeyState 返回值的最高位 (0x8000) 表示按键当前处于按下状态
     const ctrlDown = (GetAsyncKeyState(VK_CONTROL) & 0x8000) !== 0;
     const cDown = (GetAsyncKeyState(VK_C) & 0x8000) !== 0;
-    
+
     if (ctrlDown || cDown) {
       logger.debug(`Cleaning stuck keys: Ctrl=${ctrlDown}, C=${cDown}`);
       // 释放粘住的按键
       if (cDown) keybd_event(VK_C, 0x2e, KEYEVENTF_KEYUP, 0);
       if (ctrlDown) keybd_event(VK_CONTROL, 0x1d, KEYEVENTF_KEYUP, 0);
-      // 等待系统处理释放事件
-      // （使用同步忙等，因为这里不能用 async）
     }
     
     // 第二步：模拟 Ctrl+C
@@ -166,6 +166,28 @@ function simulateKeyPress(vkCode, scanCode = 0) {
     return true;
   } catch (e) {
     logger.error('simulateKeyPress failed:', e);
+    return false;
+  }
+}
+
+/**
+ * 检查 CapsLock 是否开启（LED 灯亮/灭，不是物理按下）
+ *
+ * GetKeyState 低位 (0x0001) = toggle 状态；高位是物理按下（不是我们要的）。
+ *
+ * @returns {boolean} true=CapsLock 开启；false=关闭/非 Windows/API 不可用（fail-safe）
+ */
+function isCapsLockOn() {
+  if (process.platform !== 'win32') return false;
+
+  const api = initWin32API();
+  if (!api) return false;
+
+  try {
+    const { GetKeyState, VK_CAPITAL } = api;
+    return (GetKeyState(VK_CAPITAL) & 0x0001) !== 0;
+  } catch (e) {
+    logger.error('isCapsLockOn failed:', e);
     return false;
   }
 }
@@ -612,11 +634,12 @@ async function checkSelectionViaClipboard(options = {}) {
 module.exports = {
   // API 初始化
   initWin32API,
-  
+
   // 键盘模拟
   simulateCtrlC,
   simulateKeyPress,
-  
+  isCapsLockOn,            // sticky 直出模式用：同步查询 CapsLock toggle 状态
+
   // 窗口检测
   getWindowInfoAtPoint,
   

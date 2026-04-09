@@ -29,7 +29,14 @@ const CONFIG = {
   LOW_SPEED_THRESHOLD: 0.1,   // 低速阈值 (px/ms)
   MAX_INSTANT_DISTANCE: 3,    // 最大瞬时位移 (px)
   MIN_DURATION_B: 100,        // 最小持续时间 (ms)
-  
+
+  // 条件 D: 快速果断选词（修自动检测路径"快速划过单词漏判"）
+  MIN_DURATION_D: 10,          // 最小持续时间 (ms)，比 A/B 的 80-100ms 短得多
+  MIN_DISTANCE_D: 8,           // 最小总位移 (px)
+  MIN_HORIZONTAL_D: 5,         // 最小横向位移 (px)
+  MIN_SPEED_D: 0.2,            // 最小速度 (px/ms)，比 B 的 0.1 高（"快速"是核心）
+  MAX_VERTICAL_RATIO_D: 0.6,   // 最大 dy/dx 比例（防止把斜向拖拽误判为选词）
+
   // 条件 C: 双击/三击
   DOUBLE_CLICK_TIME: 400,     // 双击时间窗口 (ms)
   DOUBLE_CLICK_DISTANCE: 15,  // 双击距离阈值 (px)
@@ -70,6 +77,7 @@ class SelectionStateMachine {
     this.likelyEnteredAt = null; // 进入 Likely 的时间
     this.retreatCount = 0;       // 连续异常计数
     this.isMultiClickTriggered = false; // 重置双击标记
+    this.isHotkeyTriggered = false;     // 重置 sticky 直出标记
   }
   
   /**
@@ -131,28 +139,35 @@ class SelectionStateMachine {
    * 鼠标按下
    * @param {number} x - 鼠标 X 坐标
    * @param {number} y - 鼠标 Y 坐标
+   * @param {boolean} hotkeyActive - sticky 直出模式此刻是否激活（由 CapsLock toggle 决定）
    */
-  onMouseDown(x, y) {
+  onMouseDown(x, y, hotkeyActive = false) {
     const now = Date.now();
-    
+
     // 检测双击/三击 (条件 C)
     const isMulti = this.isMultiClick(x, y, now);
-    
+
     // 记录点击历史
     this.clickHistory.push({ x, y, t: now });
     if (this.clickHistory.length > 3) {
       this.clickHistory.shift();
     }
-    
+
     // 重置状态
     this.reset();
     this.isMultiClickTriggered = isMulti;  // 标记是否双击
+    this.isHotkeyTriggered = hotkeyActive;  // 标记 sticky 直出
     this.startPos = { x, y };
     this.startTime = now;
     this.samples.push({ x, y, t: now });
     this.lastSampleTime = now;
-    
-    if (isMulti) {
+
+    // 优先级：sticky 直出 > 双击 > 正常流程
+    // 即使是 sticky + 双击的组合也走直出路径（用户的明确意图）
+    if (hotkeyActive) {
+      logger.debug('Sticky direct (CapsLock on) detected, entering LIKELY direct');
+      this.transitionTo(STATES.LIKELY);
+    } else if (isMulti) {
       // 双击直接进入 Likely，但 mouseUp 时需要延迟确认
       logger.debug('Multi-click detected, entering Likely (needs delayed confirm)');
       this.transitionTo(STATES.LIKELY);
@@ -209,37 +224,55 @@ class SelectionStateMachine {
   
   /**
    * 鼠标释放
+   * @param {number} x - 鼠标 X 坐标
+   * @param {number} y - 鼠标 Y 坐标
+   * @param {boolean} hotkeyActive - sticky 直出模式此刻是否激活（由 CapsLock toggle 决定）
    */
-  onMouseUp(x, y) {
+  onMouseUp(x, y, hotkeyActive = false) {
     const now = Date.now();
-    
-    // 更新点击历史（用于双击检测）
+
+    // 更新点击历史（用于双击检测）—— 不论走哪条路径都要更新，
+    // 否则 sticky 直出路径之后的下一次双击会被误判
     if (this.clickHistory.length > 0) {
       const lastClick = this.clickHistory[this.clickHistory.length - 1];
       lastClick.upTime = now;
     }
-    
+
     if (this.state === STATES.LIKELY) {
       // 从 Likely 进入 Confirmed
       this.transitionTo(STATES.CONFIRMED);
-      
+
+      // Sticky 直出路径：mousedown 和 mouseup 时 CapsLock 都是开的
+      // 跳过图标步骤，调用方应直接抓文字 + 弹翻译卡片
+      // 注意：直出优先于 multi-click，即使两个 flag 都为 true 也走这条
+      if (this.isHotkeyTriggered && hotkeyActive) {
+        logger.debug('Sticky direct path (skipIcon)');
+        return {
+          shouldShow: true,
+          rect: this.getSelectionRect(),
+          skipIcon: true,
+        };
+      }
+
       // 双击触发的需要延迟确认（检测是否真的选中了文本）
       if (this.isMultiClickTriggered) {
         logger.debug('Multi-click needs delayed confirmation');
-        return { 
-          shouldShow: true, 
-          rect: this.getSelectionRect(), 
+        return {
+          shouldShow: true,
+          rect: this.getSelectionRect(),
           needsDelayedConfirm: true  // 需要延迟确认
         };
       }
-      
+
+      // 正常返回（也覆盖 "mousedown 时 CapsLock 开、mouseup 时已关" 的情况
+      // —— 用户拖拽过程中关了 CapsLock，把它当成普通选词处理）
       return { shouldShow: true, rect: this.getSelectionRect() };
     } else if (this.state === STATES.POSSIBLE) {
       // 不满足条件，回到 IDLE
       this.transitionTo(STATES.IDLE);
       return { shouldShow: false };
     }
-    
+
     return { shouldShow: false };
   }
   
@@ -296,14 +329,22 @@ class SelectionStateMachine {
    */
   evaluatePossible(now) {
     const duration = now - this.startTime;
-    
+
+    // 条件 D: 快速果断选词 —— D 只需要 ~10ms 就能决定，A/B 都要 ≥80ms
+    // 修自动检测路径"用户飞快划过单词被漏判"的 bug
+    if (this.checkFastDecisive(duration)) {
+      logger.debug('Condition D met: fast decisive selection');
+      this.transitionTo(STATES.LIKELY);
+      return;
+    }
+
     // 条件 A: 方向稳定
     if (this.checkDirectionStability(duration)) {
       logger.debug('Condition A met: direction stability');
       this.transitionTo(STATES.LIKELY);
       return;
     }
-    
+
     // 条件 B: 低速精细
     if (this.checkLowSpeedPrecision(duration)) {
       logger.debug('Condition B met: low speed precision');
@@ -377,10 +418,48 @@ class SelectionStateMachine {
       const dist = Math.sqrt(dx * dx + dy * dy);
       if (dist > CONFIG.MAX_INSTANT_DISTANCE) return false;
     }
-    
+
     return true;
   }
-  
+
+  /**
+   * 条件 D: 快速果断选词
+   *
+   * 修自动检测路径下的"用户飞快划过单词被漏判"bug。
+   * 触发条件：
+   *   - 持续时间 ≥10ms（A 要 80ms / B 要 100ms，D 时间窗最小）
+   *   - 总位移 ≥8px
+   *   - 横向位移 ≥5px（明确是水平 drag，不是斜向拖拽）
+   *   - 速度 ≥0.2 px/ms（B 是 ≤0.1，D 是 >0.2，互不重叠）
+   *   - dy/dx 比例 ≤0.6（防止把"用力斜向拖拽"误判）
+   */
+  checkFastDecisive(duration) {
+    if (duration < CONFIG.MIN_DURATION_D) return false;
+    if (this.samples.length < 2) return false;
+    if (!this.startPos) return false;
+
+    // 总位移
+    const totalDistance = this.getTotalDistance();
+    if (totalDistance < CONFIG.MIN_DISTANCE_D) return false;
+
+    // 横向 / 纵向位移（startPos → 最近一个采样点）
+    const lastSample = this.samples[this.samples.length - 1];
+    const dx = Math.abs(lastSample.x - this.startPos.x);
+    const dy = Math.abs(lastSample.y - this.startPos.y);
+
+    // 必须是明显的横向移动
+    if (dx < CONFIG.MIN_HORIZONTAL_D) return false;
+
+    // 纵向不能压过横向太多（防止把斜向拖拽误判）
+    if (dx > 0 && dy / dx > CONFIG.MAX_VERTICAL_RATIO_D) return false;
+
+    // 速度必须够快（区别于条件 B 的低速精细）
+    const speed = totalDistance / duration;
+    if (speed < CONFIG.MIN_SPEED_D) return false;
+
+    return true;
+  }
+
   /**
    * 在 Likely 状态下评估是否回退
    */

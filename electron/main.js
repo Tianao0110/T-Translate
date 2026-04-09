@@ -15,7 +15,8 @@ const { store, runtime, windows, isDev } = require('./state');
 const { CHANNELS } = require('./shared/channels');
 const { initIPC } = require('./ipc');
 const { registerAllShortcuts, unregisterAllShortcuts } = require('./ipc/shortcuts');
-const { makeWindowInvisibleToCapture, getWindowInfoAtPoint } = require('./utils/native-helper');
+const { makeWindowInvisibleToCapture, getWindowInfoAtPoint, isCapsLockOn } = require('./utils/native-helper');
+const { fetchSelectedText } = require('./ipc/selection');
 const { SelectionStateMachine, STATES } = require('./utils/selection-state-machine');
 
 // 全局状态机实例
@@ -176,6 +177,96 @@ async function showSelectionTrigger(mouseX, mouseY, rect) {
         sourceLanguage: currentSourceLang,
       },
     });
+  };
+
+  if (win.webContents.isLoading()) {
+    win.webContents.once('did-finish-load', sendData);
+  } else {
+    setTimeout(sendData, 50);
+  }
+}
+
+/**
+ * CapsLock 直出路径：跳过图标，直接抓文字 + 弹翻译卡片
+ *
+ * 由 mouseup 回调在 FSM 返回 { skipIcon: true } 时调用。
+ *   1. fetchSelectedText 预抓文字，失败则静默返回（不开窗口）
+ *   2. 创建/复用 selection window，失败 fail-safe 静默返回
+ *   3. 发 SHOW_DIRECT IPC（等 webContents 就绪再发，防止 message 丢失）
+ *   4. 渲染进程 onShowDirect listener 接文字 → loading → 翻译 → overlay
+ */
+async function handleHotkeyDirectPath(x, y, rect) {
+  logger.debug('handleHotkeyDirectPath called', { x, y, rect });
+
+  if (!runtime.selectionEnabled) {
+    logger.debug('Selection disabled, hotkey silent no-op');
+    return;
+  }
+
+  // 1. 预抓文字 —— 决定是否值得开窗口
+  const text = await fetchSelectedText();
+  if (!text || !text.trim()) {
+    logger.debug('Hotkey: no text captured, silent fail (no window opened)');
+    return;
+  }
+
+  // 2. 读取设置（和 showSelectionTrigger 现有做法一致）
+  const settings = store.get('settings', {});
+  const selectionSettings = settings.selection || {};
+  const interfaceSettings = settings.interface || {};
+  const translationSettings = settings.translation || {};
+  const currentTargetLang = translationSettings.targetLanguage
+    || translationSettings.defaultTargetLang
+    || settings.targetLanguage
+    || 'zh';
+
+  runtime.lastSelectionRect = rect;
+
+  // 3. 创建/复用 selection window（fail-safe）
+  const win = windowManager.createSelectionWindow();
+  if (!win || win.isDestroyed()) {
+    logger.warn('Hotkey: createSelectionWindow returned null/destroyed, aborting');
+    return;
+  }
+
+  // 4. 定位窗口 —— 和 showSelectionTrigger 一致（鼠标 +8 偏移，初始 28×28）。
+  // 翻译结果到达后渲染进程会 resize 窗口到翻译卡片尺寸。
+  const winW = 28;
+  const winH = 28;
+  let posX = x + 8;
+  let posY = y + 8;
+
+  const display = screen.getDisplayNearestPoint({ x: posX, y: posY });
+  const displayBounds = display.bounds;
+
+  // 屏幕边界检测
+  if (posX + winW > displayBounds.x + displayBounds.width) {
+    posX = x - winW - 8;
+  }
+  if (posY + winH > displayBounds.y + displayBounds.height) {
+    posY = y - winH - 8;
+  }
+
+  win.setBounds({
+    x: Math.round(posX),
+    y: Math.round(posY),
+    width: winW,
+    height: winH,
+  });
+
+  // 5. 发 SHOW_DIRECT（等 webContents 就绪再发，防止 message 丢失）
+  const sendData = () => {
+    win.webContents.send(CHANNELS.SELECTION.SHOW_DIRECT, {
+      text: text.trim(),
+      targetLanguage: currentTargetLang,
+      theme: interfaceSettings.theme || 'light',
+      settings: {
+        windowOpacity: selectionSettings.windowOpacity || 95,
+        autoCloseOnCopy: selectionSettings.autoCloseOnCopy || false,
+        triggerTimeout: selectionSettings.triggerTimeout || 4000,
+      },
+    });
+    win.show();
   };
 
   if (win.webContents.isLoading()) {
@@ -404,9 +495,13 @@ function startSelectionHook() {
         // 单击：隐藏现有的划词窗口
         hideSelectionWindow();
       }
-      
-      // 状态机处理 mousedown（双击/三击会在 mouseup 后延迟确认）
-      selectionStateMachine.onMouseDown(x, y);
+
+      // Sticky 直出模式：设置开 + CapsLock 灯亮 → 划词直接出翻译卡片
+      const selectionSettings = store.get('settings.selection', {});
+      const stickyActive = !!selectionSettings.stickyViaCapsLock && isCapsLockOn();
+
+      // stickyActive=true 会进直出路径，mouseup 时 FSM 返回 skipIcon: true
+      selectionStateMachine.onMouseDown(x, y, stickyActive);
     });
 
     // ==================== mousemove ====================
@@ -450,9 +545,12 @@ function startSelectionHook() {
           }
         }
 
-        // 状态机处理 mouseup
-        const result = selectionStateMachine.onMouseUp(x, y);
-        
+        // Sticky 直出模式（同 mousedown 判断一致）
+        const selectionSettings = store.get('settings.selection', {});
+        const stickyActive = !!selectionSettings.stickyViaCapsLock && isCapsLockOn();
+
+        const result = selectionStateMachine.onMouseUp(x, y, stickyActive);
+
         if (result.shouldShow) {
           const rect = result.rect || {
             x: x - 50,
@@ -460,7 +558,14 @@ function startSelectionHook() {
             width: 100,
             height: 40,
           };
-          
+
+          // Sticky 直出：跳过图标 + 自动检测 + clipboard 兜底，直出翻译卡片
+          if (result.skipIcon) {
+            await handleHotkeyDirectPath(x, y, rect);
+            selectionStateMachine.reset();
+            return;
+          }
+
           // 双击/三击：走延迟确认（三层检测）
           if (result.needsDelayedConfirm) {
             handleDelayedConfirm(x, y, rect);
@@ -567,41 +672,6 @@ function isClickInOurWindows(x, y) {
     }
   }
   return false;
-}
-
-/**
- * 判断是否应该显示划词翻译触发器
- */
-async function shouldShowSelectionTrigger(startPos, endPos, distance) {
-  try {
-    const deltaX = Math.abs(endPos.x - startPos.x);
-    const deltaY = Math.abs(endPos.y - startPos.y);
-
-    // 通用方向检测
-    if (deltaX < 5 && deltaY > 30) return false;
-    if (deltaY > deltaX && deltaY > 50) return false;
-
-    // 仅 Windows 需要窗口检测
-    if (process.platform !== 'win32') return true;
-
-    const windowInfo = getWindowInfoAtPoint(endPos.x, endPos.y);
-    if (!windowInfo) return true;
-
-    if (windowInfo.isInputBox) return true;
-    if (windowInfo.isDesktop) return false;
-
-    if (windowInfo.isFileManager || windowInfo.isFileView) {
-      if (distance > 150) return false;
-      if (deltaY > 15) return false;
-      if (deltaX > 5 && deltaY > deltaX * 0.2) return false;
-      if (deltaX < 30) return false;
-    }
-
-    return true;
-  } catch (err) {
-    logger.error('shouldShowSelectionTrigger error:', err);
-    return true;
-  }
 }
 
 // ==================== 截图功能 ====================

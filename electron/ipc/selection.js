@@ -121,11 +121,11 @@ function register(ctx) {
   // ==================== 设置 ====================
   
   /**
-   * 获取划词翻译设置
+   * 获取划词翻译设置（shallow-merge 默认值，老用户升级也会拿到新字段默认值）
    */
   ipcMain.handle(CHANNELS.SELECTION.GET_SETTINGS, () => {
     const settings = store.get('settings', {});
-    return settings.selection || {
+    const defaults = {
       triggerIcon: 'dot',
       triggerSize: 24,
       triggerColor: '#3b82f6',
@@ -135,7 +135,10 @@ function register(ctx) {
       resultTimeout: 3000,
       minChars: 2,
       maxChars: 500,
+      stickyViaCapsLock: false,
+      stickyWarningShown: false,
     };
+    return { ...defaults, ...(settings.selection || {}) };
   });
   
   // ==================== 文本获取 ====================
@@ -258,6 +261,13 @@ function register(ctx) {
 
 /**
  * 稳定获取选中文字（清空+轮询方案）
+ *
+ * ⚠️ NOT REENTRANT —— 不要在上一次调用的 500ms 剪贴板恢复窗口内再次调用。
+ *
+ * 调用方：
+ *   1. IPC handler CHANNELS.SELECTION.GET_TEXT（用户点图标时）
+ *   2. main.js handleHotkeyDirectPath（CapsLock 直出路径）
+ * 两者在同一 mouseup 周期内互斥：直出路径跳过图标，不会进 GET_TEXT handler。
  */
 async function fetchSelectedText() {
   try {
@@ -370,63 +380,5 @@ function extractFilenameForTranslation(filePath) {
   }
 }
 
-/**
- * 判断是否应该显示划词翻译触发器
- * 智能防误触方案
- */
-async function shouldShowSelectionTrigger(startPos, endPos, distance) {
-  try {
-    const deltaX = Math.abs(endPos.x - startPos.x);
-    const deltaY = Math.abs(endPos.y - startPos.y);
-    
-    // ========== 通用方向检测 ==========
-    // 规则1：纯垂直移动很可能是拖拽
-    if (deltaX < 5 && deltaY > 30) {
-      return false;
-    }
-    
-    // 规则2：斜向拖拽
-    if (deltaY > deltaX && deltaY > 50) {
-      return false;
-    }
-    
-    // 仅 Windows 需要窗口检测
-    if (process.platform !== 'win32') {
-      return true;
-    }
-    
-    // ========== Windows 平台：使用 Win32 API 检测 ==========
-    const windowInfo = getWindowInfoAtPoint(endPos.x, endPos.y);
-    
-    if (!windowInfo) {
-      return true;
-    }
-    
-    // 输入框直接放行
-    if (windowInfo.isInputBox) {
-      return true;
-    }
-    
-    // 桌面：直接拒绝
-    if (windowInfo.isDesktop) {
-      return false;
-    }
-    
-    // 文件管理器：应用严格规则
-    if (windowInfo.isFileManager || windowInfo.isFileView) {
-      if (distance > 150) return false;
-      if (deltaY > 15) return false;
-      if (deltaX > 5 && deltaY > deltaX * 0.2) return false;
-      if (deltaX < 30) return false;
-    }
-    
-    return true;
-  } catch (err) {
-    logger.error('shouldShowSelectionTrigger error:', err);
-    return true;
-  }
-}
-
 module.exports = register;
 module.exports.fetchSelectedText = fetchSelectedText;
-module.exports.shouldShowSelectionTrigger = shouldShowSelectionTrigger;

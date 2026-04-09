@@ -261,6 +261,66 @@ const SelectionTranslator = () => {
       }
     });
     
+    // Sticky 直出路径（由主进程 CapsLock 检测触发）
+    // 与 onShowResult Mode 2 类似（已有 text 直译显示），但独立语义：
+    // - 不与截图 OCR 联动混淆
+    // - 跳过 trigger 模式，直接 loading → translating → overlay
+    // - 失败也直接进 overlay 显示错误（不等用户点图标）
+    const removeShowDirectListener = window.electron?.selection?.onShowDirect?.(async (data) => {
+      logger.debug('SHOW_DIRECT received', { textLength: data?.text?.length });
+
+      // 取消任何已排好的 auto-hide / trigger-ready 计时器
+      if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
+      if (triggerReadyTimerRef.current) clearTimeout(triggerReadyTimerRef.current);
+
+      // 应用主题和设置
+      if (data.theme) setTheme(data.theme);
+      const newSettings = { ...DEFAULT_SETTINGS, ...data.settings };
+      setSettings(newSettings);
+
+      // 直接进 loading 态（跳过 trigger / icon 模式）
+      setSourceText(data.text || '');
+      setTranslatedText('');
+      setError('');
+      setCopied(false);
+      sizedRef.current = false;
+      setIsFrozen(false);
+      setInitialBounds(null);
+      setMode('loading');
+
+      // 翻译（复用 translateTextRef）
+      if (!data.text || !data.text.trim()) {
+        // 上层 handleHotkeyDirectPath 不应该送空 text 进来（它会预先检查）
+        // 但万一发生，进 error 态而不是死锁在 loading
+        setError(t('selection.noText', '未获取到文字'));
+        setMode('overlay');
+        return;
+      }
+
+      try {
+        const overrideLang = data.targetLanguage || null;
+        const translationResult = await translateTextRef.current(data.text, 0, overrideLang);
+        setTranslatedText(translationResult);
+        setError('');
+        setMode('overlay');
+
+        // 加入历史记录（标记 from: 'hotkey' 区分于 selection 和 screenshot）
+        if (translationResult) {
+          window.electron?.selection?.addToHistory?.({
+            source: data.text,
+            result: translationResult,
+            timestamp: Date.now(),
+            from: 'hotkey',
+          });
+        }
+      } catch (err) {
+        logger.error('SHOW_DIRECT translation failed:', err);
+        setError(err.message || t('selection.translateFailed', '翻译失败'));
+        setTranslatedText('');
+        setMode('overlay');
+      }
+    });
+
     const removeHideListener = window.electron?.selection?.onHide?.(() => {
       // 冻结窗口忽略 hide 事件
       if (frozenRef.current) {
@@ -283,6 +343,7 @@ const SelectionTranslator = () => {
     return () => {
       if (removeShowListener) removeShowListener();
       if (removeShowResultListener) removeShowResultListener();
+      if (removeShowDirectListener) removeShowDirectListener();
       if (removeHideListener) removeHideListener();
       window.removeEventListener('keydown', handleKey);
       if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);

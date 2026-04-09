@@ -33,6 +33,13 @@ contextBridge.exposeInMainWorld("electron", {
       ipcRenderer.on("selection:show-result", listener);
       return () => ipcRenderer.removeListener("selection:show-result", listener);
     },
+    // Sticky 直出路径：CapsLock 开着时划词跳过图标，直接显示翻译卡片
+    // payload: { text, targetLanguage, theme, settings }
+    onShowDirect: (callback) => {
+      const listener = (event, data) => callback(data);
+      ipcRenderer.on("selection:show-direct", listener);
+      return () => ipcRenderer.removeListener("selection:show-direct", listener);
+    },
   },
 
   clipboard: {
