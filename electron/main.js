@@ -569,41 +569,6 @@ function isClickInOurWindows(x, y) {
   return false;
 }
 
-/**
- * 判断是否应该显示划词翻译触发器
- */
-async function shouldShowSelectionTrigger(startPos, endPos, distance) {
-  try {
-    const deltaX = Math.abs(endPos.x - startPos.x);
-    const deltaY = Math.abs(endPos.y - startPos.y);
-
-    // 通用方向检测
-    if (deltaX < 5 && deltaY > 30) return false;
-    if (deltaY > deltaX && deltaY > 50) return false;
-
-    // 仅 Windows 需要窗口检测
-    if (process.platform !== 'win32') return true;
-
-    const windowInfo = getWindowInfoAtPoint(endPos.x, endPos.y);
-    if (!windowInfo) return true;
-
-    if (windowInfo.isInputBox) return true;
-    if (windowInfo.isDesktop) return false;
-
-    if (windowInfo.isFileManager || windowInfo.isFileView) {
-      if (distance > 150) return false;
-      if (deltaY > 15) return false;
-      if (deltaX > 5 && deltaY > deltaX * 0.2) return false;
-      if (deltaX < 30) return false;
-    }
-
-    return true;
-  } catch (err) {
-    logger.error('shouldShowSelectionTrigger error:', err);
-    return true;
-  }
-}
-
 // ==================== 截图功能 ====================
 
 /**
