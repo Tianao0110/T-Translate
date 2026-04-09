@@ -261,11 +261,11 @@ const SelectionTranslator = () => {
       }
     });
     
-    // hotkey 直出路径（v0.2.4）
-    // 与 onShowResult Mode 2 类似（已有 text，直接翻译显示），但语义独立：
-    // - 不会和截图 OCR 联动混淆
-    // - 跳过 trigger 模式，直接进 loading → translating → overlay
-    // - 失败时也直接进 overlay 显示错误（不等用户点图标）
+    // Sticky 直出路径（由主进程 CapsLock 检测触发）
+    // 与 onShowResult Mode 2 类似（已有 text 直译显示），但独立语义：
+    // - 不与截图 OCR 联动混淆
+    // - 跳过 trigger 模式，直接 loading → translating → overlay
+    // - 失败也直接进 overlay 显示错误（不等用户点图标）
     const removeShowDirectListener = window.electron?.selection?.onShowDirect?.(async (data) => {
       logger.debug('SHOW_DIRECT received', { textLength: data?.text?.length });
 

@@ -110,7 +110,7 @@ const CHANNELS = {
     ADD_TO_HISTORY: 'selection:add-to-history',
     SHOW_TRIGGER: 'selection:show-trigger',
     SHOW_RESULT: 'selection:show-result',     // 直接显示翻译结果（截图联动用）
-    SHOW_DIRECT: 'selection:show-direct',     // hotkey 直出路径（v0.2.4，跳过图标）
+    SHOW_DIRECT: 'selection:show-direct',     // Sticky 直出路径（跳过图标）
     STATE_CHANGED: 'selection-state-changed',
     // 多窗口支持
     FREEZE: 'selection:freeze',           // 冻结当前窗口（变成独立窗口）

@@ -121,11 +121,11 @@ function register(ctx) {
   // ==================== 设置 ====================
   
   /**
-   * 获取划词翻译设置
+   * 获取划词翻译设置（shallow-merge 默认值，老用户升级也会拿到新字段默认值）
    */
   ipcMain.handle(CHANNELS.SELECTION.GET_SETTINGS, () => {
     const settings = store.get('settings', {});
-    return settings.selection || {
+    const defaults = {
       triggerIcon: 'dot',
       triggerSize: 24,
       triggerColor: '#3b82f6',
@@ -135,7 +135,10 @@ function register(ctx) {
       resultTimeout: 3000,
       minChars: 2,
       maxChars: 500,
+      stickyViaCapsLock: false,
+      stickyWarningShown: false,
     };
+    return { ...defaults, ...(settings.selection || {}) };
   });
   
   // ==================== 文本获取 ====================
@@ -261,11 +264,10 @@ function register(ctx) {
  *
  * ⚠️ NOT REENTRANT —— 不要在上一次调用的 500ms 剪贴板恢复窗口内再次调用。
  *
- * 调用方目前有两个：
- *   1. IPC handler CHANNELS.SELECTION.GET_TEXT (用户点击图标时)
- *   2. main.js handleHotkeyDirectPath (Alt+mouseup 直出路径，v0.2.4)
- * 两者在同一 mouseup 周期内互斥（hotkey 路径跳过 icon 步骤，
- * 不会进入 IPC GET_TEXT handler），所以并发调用在设计上不会发生。
+ * 调用方：
+ *   1. IPC handler CHANNELS.SELECTION.GET_TEXT（用户点图标时）
+ *   2. main.js handleHotkeyDirectPath（CapsLock 直出路径）
+ * 两者在同一 mouseup 周期内互斥：直出路径跳过图标，不会进 GET_TEXT handler。
  */
 async function fetchSelectedText() {
   try {

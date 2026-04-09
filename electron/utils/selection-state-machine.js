@@ -30,7 +30,7 @@ const CONFIG = {
   MAX_INSTANT_DISTANCE: 3,    // 最大瞬时位移 (px)
   MIN_DURATION_B: 100,        // 最小持续时间 (ms)
 
-  // 条件 D: 快速果断选词（v0.2.4 新增 —— 修自动检测路径"快速划过单词漏判")
+  // 条件 D: 快速果断选词（修自动检测路径"快速划过单词漏判"）
   MIN_DURATION_D: 10,          // 最小持续时间 (ms)，比 A/B 的 80-100ms 短得多
   MIN_DISTANCE_D: 8,           // 最小总位移 (px)
   MIN_HORIZONTAL_D: 5,         // 最小横向位移 (px)
@@ -77,7 +77,7 @@ class SelectionStateMachine {
     this.likelyEnteredAt = null; // 进入 Likely 的时间
     this.retreatCount = 0;       // 连续异常计数
     this.isMultiClickTriggered = false; // 重置双击标记
-    this.isHotkeyTriggered = false;     // 重置 hotkey 标记（v0.2.4）
+    this.isHotkeyTriggered = false;     // 重置 sticky 直出标记
   }
   
   /**
@@ -139,9 +139,9 @@ class SelectionStateMachine {
    * 鼠标按下
    * @param {number} x - 鼠标 X 坐标
    * @param {number} y - 鼠标 Y 坐标
-   * @param {boolean} altHeld - Alt 键当前是否按下（v0.2.4 hotkey 路径）
+   * @param {boolean} hotkeyActive - sticky 直出模式此刻是否激活（由 CapsLock toggle 决定）
    */
-  onMouseDown(x, y, altHeld = false) {
+  onMouseDown(x, y, hotkeyActive = false) {
     const now = Date.now();
 
     // 检测双击/三击 (条件 C)
@@ -156,16 +156,16 @@ class SelectionStateMachine {
     // 重置状态
     this.reset();
     this.isMultiClickTriggered = isMulti;  // 标记是否双击
-    this.isHotkeyTriggered = altHeld;       // 标记 hotkey（v0.2.4）
+    this.isHotkeyTriggered = hotkeyActive;  // 标记 sticky 直出
     this.startPos = { x, y };
     this.startTime = now;
     this.samples.push({ x, y, t: now });
     this.lastSampleTime = now;
 
-    // 优先级：hotkey > 双击 > 正常流程
-    // 即使是 hotkey + 双击的组合也走 hotkey 路径（hotkey 用户的明确意图）
-    if (altHeld) {
-      logger.debug('Hotkey (Alt held) detected, entering LIKELY direct');
+    // 优先级：sticky 直出 > 双击 > 正常流程
+    // 即使是 sticky + 双击的组合也走直出路径（用户的明确意图）
+    if (hotkeyActive) {
+      logger.debug('Sticky direct (CapsLock on) detected, entering LIKELY direct');
       this.transitionTo(STATES.LIKELY);
     } else if (isMulti) {
       // 双击直接进入 Likely，但 mouseUp 时需要延迟确认
@@ -226,13 +226,13 @@ class SelectionStateMachine {
    * 鼠标释放
    * @param {number} x - 鼠标 X 坐标
    * @param {number} y - 鼠标 Y 坐标
-   * @param {boolean} altHeld - Alt 键此刻是否按下（v0.2.4 hotkey 路径）
+   * @param {boolean} hotkeyActive - sticky 直出模式此刻是否激活（由 CapsLock toggle 决定）
    */
-  onMouseUp(x, y, altHeld = false) {
+  onMouseUp(x, y, hotkeyActive = false) {
     const now = Date.now();
 
     // 更新点击历史（用于双击检测）—— 不论走哪条路径都要更新，
-    // 否则 hotkey 路径之后的下一次双击会被误判
+    // 否则 sticky 直出路径之后的下一次双击会被误判
     if (this.clickHistory.length > 0) {
       const lastClick = this.clickHistory[this.clickHistory.length - 1];
       lastClick.upTime = now;
@@ -242,11 +242,11 @@ class SelectionStateMachine {
       // 从 Likely 进入 Confirmed
       this.transitionTo(STATES.CONFIRMED);
 
-      // Hotkey 直出路径：mousedown 和 mouseup 时 Alt 都按住
+      // Sticky 直出路径：mousedown 和 mouseup 时 CapsLock 都是开的
       // 跳过图标步骤，调用方应直接抓文字 + 弹翻译卡片
-      // 注意：hotkey 优先于 multi-click，即使两个 flag 都为 true 也走这条
-      if (this.isHotkeyTriggered && altHeld) {
-        logger.debug('Hotkey direct path (skipIcon)');
+      // 注意：直出优先于 multi-click，即使两个 flag 都为 true 也走这条
+      if (this.isHotkeyTriggered && hotkeyActive) {
+        logger.debug('Sticky direct path (skipIcon)');
         return {
           shouldShow: true,
           rect: this.getSelectionRect(),
@@ -264,8 +264,8 @@ class SelectionStateMachine {
         };
       }
 
-      // 正常返回（也覆盖 "isHotkeyTriggered=true 但 Alt 中途松开" 的情况
-      // —— 用户表达意图后又改变主意，把它当成普通选词处理）
+      // 正常返回（也覆盖 "mousedown 时 CapsLock 开、mouseup 时已关" 的情况
+      // —— 用户拖拽过程中关了 CapsLock，把它当成普通选词处理）
       return { shouldShow: true, rect: this.getSelectionRect() };
     } else if (this.state === STATES.POSSIBLE) {
       // 不满足条件，回到 IDLE
@@ -330,9 +330,8 @@ class SelectionStateMachine {
   evaluatePossible(now) {
     const duration = now - this.startTime;
 
-    // 条件 D: 快速果断选词（v0.2.4 新增）
-    // 比 A/B 检查更早 —— D 只需要 ~10ms 就能决定，A/B 都要 ≥80ms
-    // 这是修自动检测路径"用户飞快划过单词被漏判"的 bug
+    // 条件 D: 快速果断选词 —— D 只需要 ~10ms 就能决定，A/B 都要 ≥80ms
+    // 修自动检测路径"用户飞快划过单词被漏判"的 bug
     if (this.checkFastDecisive(duration)) {
       logger.debug('Condition D met: fast decisive selection');
       this.transitionTo(STATES.LIKELY);
@@ -424,7 +423,7 @@ class SelectionStateMachine {
   }
 
   /**
-   * 条件 D: 快速果断选词（v0.2.4）
+   * 条件 D: 快速果断选词
    *
    * 修自动检测路径下的"用户飞快划过单词被漏判"bug。
    * 触发条件：

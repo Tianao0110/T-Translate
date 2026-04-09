@@ -259,6 +259,12 @@ const en = {
     triggerTimeout: "Button Auto-hide Time", seconds: "s", triggerTimeoutHint: "Time before translate button auto-hides",
     showSourceByDefault: "Show Source by Default", showSourceOnDesc: "Show source text comparison by default", showSourceOffDesc: "Only show translation",
     autoCloseOnCopy: "Auto Close on Copy", autoCloseOnDesc: "Auto close window after copying", autoCloseOffDesc: "Keep window open after copying",
+    // CapsLock sticky direct mode
+    stickyCapsLockLabel: "CapsLock Direct Mode",
+    stickyCapsLockDesc: "Use CapsLock as sticky direct-translate mode",
+    stickyWarningTitle: "Enable CapsLock Direct Mode?",
+    stickyWarningBody: "Once enabled, any text you select while the CapsLock LED is on will translate immediately (skipping the intermediate icon step).\n\nThis setting does NOT change CapsLock's normal 'type in uppercase' behavior. When you're typing normally (e.g. writing an email), just turn CapsLock off and the usual selection flow resumes.",
+    stickyWarningConfirm: "Got it, enable",
     windowOpacity: "Window Opacity", opacityHint: "Adjust selection translation window opacity",
     screenshotOutput: "Screenshot Output", bubble: "Bubble Window", mainWindow: "Main Window",
     bubbleDesc: "Show result in floating bubble", mainWindowDesc: "Show result in main window", outputHint: "In bubble mode, process in background and popup when done",

@@ -47,7 +47,8 @@ function initWin32API() {
       // 键盘模拟
       keybd_event: user32.func('void keybd_event(uint8, uint8, uint32, uintptr)'),
       GetAsyncKeyState: user32.func('int16 GetAsyncKeyState(int)'),
-      
+      GetKeyState: user32.func('int16 GetKeyState(int)'),
+
       // 窗口检测
       WindowFromPoint: user32.func('void* WindowFromPoint(POINT)'),
       GetAncestor: user32.func('void* GetAncestor(void*, uint32)'),
@@ -56,18 +57,18 @@ function initWin32API() {
       GetForegroundWindow: user32.func('void* GetForegroundWindow()'),
       GetGUIThreadInfo: user32.func('int GetGUIThreadInfo(uint32, GUITHREADINFO*)'),
       SendMessageW: user32.func('intptr SendMessageW(void*, uint32, uintptr*, uintptr*)'),
-      
+
       // 进程信息
       OpenProcess: kernel32.func('void* OpenProcess(uint32, int, uint32)'),
       CloseHandle: kernel32.func('int CloseHandle(void*)'),
       GetModuleBaseNameW: psapi.func('uint32 GetModuleBaseNameW(void*, void*, uint16*, uint32)'),
-      
+
       // 截图穿透
       SetWindowDisplayAffinity: user32.func('SetWindowDisplayAffinity', 'bool', ['void*', 'uint']),
-      
+
       // 常量
       VK_CONTROL: 0x11,
-      VK_MENU: 0x12,         // Alt 键（Win32 命名沿用历史，VK_MENU = Alt）
+      VK_CAPITAL: 0x14,      // CapsLock 键
       VK_C: 0x43,
       KEYEVENTF_KEYUP: 0x0002,
       GA_ROOT: 2,
@@ -114,22 +115,18 @@ function simulateCtrlC() {
   }
   
   try {
-    const { keybd_event, GetAsyncKeyState, VK_CONTROL, VK_MENU, VK_C, KEYEVENTF_KEYUP } = api;
+    const { keybd_event, GetAsyncKeyState, VK_CONTROL, VK_C, KEYEVENTF_KEYUP } = api;
 
     // 第一步：检查并清理粘滞按键状态
     // GetAsyncKeyState 返回值的最高位 (0x8000) 表示按键当前处于按下状态
     const ctrlDown = (GetAsyncKeyState(VK_CONTROL) & 0x8000) !== 0;
-    const altDown = (GetAsyncKeyState(VK_MENU) & 0x8000) !== 0;  // v0.2.4: hotkey 路径下 Alt 还按着
     const cDown = (GetAsyncKeyState(VK_C) & 0x8000) !== 0;
 
-    if (ctrlDown || altDown || cDown) {
-      logger.debug(`Cleaning stuck keys: Ctrl=${ctrlDown}, Alt=${altDown}, C=${cDown}`);
+    if (ctrlDown || cDown) {
+      logger.debug(`Cleaning stuck keys: Ctrl=${ctrlDown}, C=${cDown}`);
       // 释放粘住的按键
       if (cDown) keybd_event(VK_C, 0x2e, KEYEVENTF_KEYUP, 0);
       if (ctrlDown) keybd_event(VK_CONTROL, 0x1d, KEYEVENTF_KEYUP, 0);
-      // v0.2.4: 必须释放 Alt，否则 Ctrl+C 变成 Alt+Ctrl+C，Chrome 等应用不当复制处理
-      // 用户物理上可能还按着 Alt，但 Windows 全局键盘状态会被重置 —— 用户之后物理松开时系统会收到第二次 up 事件，无害
-      if (altDown) keybd_event(VK_MENU, 0x38, KEYEVENTF_KEYUP, 0);
     }
     
     // 第二步：模拟 Ctrl+C
@@ -174,29 +171,23 @@ function simulateKeyPress(vkCode, scanCode = 0) {
 }
 
 /**
- * 检查 Alt 键当前是否处于按下状态（仅 Windows）
+ * 检查 CapsLock 是否开启（LED 灯亮/灭，不是物理按下）
  *
- * 用于划词翻译的 hotkey 路径：在 mousedown / mouseup 时同步查询
- * 物理键状态。比订阅 keydown/keyup 事件更可靠：
- *   - 无 OS 自动重复事件噪音
- *   - 无事件丢失风险（uIOhook 偶尔会被独占输入应用阻塞）
- *   - 无线程同步问题（GetAsyncKeyState 是全局物理键状态，不是线程本地）
+ * GetKeyState 低位 (0x0001) = toggle 状态；高位是物理按下（不是我们要的）。
  *
- * @returns {boolean} true=Alt 当前按下；false=未按下、非 Windows、或
- *                    Win32 API 不可用（fail-safe：宁可漏触发也不要误触发）
+ * @returns {boolean} true=CapsLock 开启；false=关闭/非 Windows/API 不可用（fail-safe）
  */
-function isAltKeyHeld() {
+function isCapsLockOn() {
   if (process.platform !== 'win32') return false;
 
   const api = initWin32API();
   if (!api) return false;
 
   try {
-    const { GetAsyncKeyState, VK_MENU } = api;
-    // GetAsyncKeyState 返回的最高位 (0x8000) 表示按键当前处于按下状态
-    return (GetAsyncKeyState(VK_MENU) & 0x8000) !== 0;
+    const { GetKeyState, VK_CAPITAL } = api;
+    return (GetKeyState(VK_CAPITAL) & 0x0001) !== 0;
   } catch (e) {
-    logger.error('isAltKeyHeld failed:', e);
+    logger.error('isCapsLockOn failed:', e);
     return false;
   }
 }
@@ -643,12 +634,12 @@ async function checkSelectionViaClipboard(options = {}) {
 module.exports = {
   // API 初始化
   initWin32API,
-  
+
   // 键盘模拟
   simulateCtrlC,
   simulateKeyPress,
-  isAltKeyHeld,            // hotkey 路径用：同步查询 Alt 物理状态
-  
+  isCapsLockOn,            // sticky 直出模式用：同步查询 CapsLock toggle 状态
+
   // 窗口检测
   getWindowInfoAtPoint,
   

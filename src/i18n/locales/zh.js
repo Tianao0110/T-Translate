@@ -259,6 +259,12 @@ const zh = {
     triggerTimeout: "按钮自动消失时间", seconds: "秒", triggerTimeoutHint: "划词后翻译按钮自动消失的时间",
     showSourceByDefault: "默认显示原文", showSourceOnDesc: "翻译结果默认显示原文对照", showSourceOffDesc: "只显示翻译结果",
     autoCloseOnCopy: "复制后自动关闭", autoCloseOnDesc: "点击复制后自动关闭翻译窗口", autoCloseOffDesc: "复制后保持窗口打开",
+    // CapsLock 直出模式
+    stickyCapsLockLabel: "CapsLock 直出模式",
+    stickyCapsLockDesc: "使用 CapsLock 作为划词直出模式",
+    stickyWarningTitle: "开启 CapsLock 直出模式？",
+    stickyWarningBody: "开启后，只要 CapsLock 指示灯亮着，划词就会直接弹出翻译卡片（跳过中间的小图标）。\n\n这个设置不会改变 CapsLock 原本的「打大写字母」功能。当你正常打字（比如写邮件）时，关掉 CapsLock 即可恢复普通划词流程。",
+    stickyWarningConfirm: "我知道了，开启",
     windowOpacity: "窗口透明度", opacityHint: "调整划词翻译窗口的透明度",
     screenshotOutput: "截图翻译输出", bubble: "气泡窗口", mainWindow: "主窗口",
     bubbleDesc: "截图翻译结果显示在悬浮气泡中", mainWindowDesc: "截图翻译结果显示在主窗口中", outputHint: "气泡模式下，截图后后台处理，完成后弹出结果",

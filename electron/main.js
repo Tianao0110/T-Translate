@@ -15,7 +15,7 @@ const { store, runtime, windows, isDev } = require('./state');
 const { CHANNELS } = require('./shared/channels');
 const { initIPC } = require('./ipc');
 const { registerAllShortcuts, unregisterAllShortcuts } = require('./ipc/shortcuts');
-const { makeWindowInvisibleToCapture, getWindowInfoAtPoint, isAltKeyHeld } = require('./utils/native-helper');
+const { makeWindowInvisibleToCapture, getWindowInfoAtPoint, isCapsLockOn } = require('./utils/native-helper');
 const { fetchSelectedText } = require('./ipc/selection');
 const { SelectionStateMachine, STATES } = require('./utils/selection-state-machine');
 
@@ -187,20 +187,13 @@ async function showSelectionTrigger(mouseX, mouseY, rect) {
 }
 
 /**
- * Hotkey 直出路径（v0.2.4）
+ * CapsLock 直出路径：跳过图标，直接抓文字 + 弹翻译卡片
  *
- * 用户按住 Alt + 选词 → 状态机 onMouseUp 返回 { skipIcon: true }，
- * mouseup 回调调用本函数。流程：
- *   1. 预抓文字（fetchSelectedText 复用现有的 clipboard 模式）
- *   2. 失败 → 静默返回（不开窗口，用户看到的就是"什么都没发生"）
- *   3. 成功 → 创建/复用 selection window + 定位 + 发 SHOW_DIRECT IPC
- *   4. 渲染进程的 onShowDirect listener 接收 text，进 loading → 翻译 → overlay
- *
- * 设计取舍（来自 /plan-eng-review v3 design doc）：
- *   - 跳过图标步骤（不发 SHOW_TRIGGER），用户体验是"按一下立刻出翻译卡片"
- *   - 跳过严格模式检查（hotkey 是用户的明确意图，不受 allowlist 限制）
- *   - createSelectionWindow 失败时 fail-safe 静默返回（CRITICAL Gap #5）
- *   - SHOW_DIRECT 必须等 webContents 就绪后再发，防止 message 丢失（CRITICAL Gap #7）
+ * 由 mouseup 回调在 FSM 返回 { skipIcon: true } 时调用。
+ *   1. fetchSelectedText 预抓文字，失败则静默返回（不开窗口）
+ *   2. 创建/复用 selection window，失败 fail-safe 静默返回
+ *   3. 发 SHOW_DIRECT IPC（等 webContents 就绪再发，防止 message 丢失）
+ *   4. 渲染进程 onShowDirect listener 接文字 → loading → 翻译 → overlay
  */
 async function handleHotkeyDirectPath(x, y, rect) {
   logger.debug('handleHotkeyDirectPath called', { x, y, rect });
@@ -229,18 +222,15 @@ async function handleHotkeyDirectPath(x, y, rect) {
 
   runtime.lastSelectionRect = rect;
 
-  // 3. 创建/复用 selection window —— CRITICAL Gap #5: fail-safe
+  // 3. 创建/复用 selection window（fail-safe）
   const win = windowManager.createSelectionWindow();
   if (!win || win.isDestroyed()) {
     logger.warn('Hotkey: createSelectionWindow returned null/destroyed, aborting');
     return;
   }
 
-  // 4. 定位窗口 —— 和 showSelectionTrigger 保持完全一致：
-  //    - 鼠标位置 + 8 偏移
-  //    - 初始尺寸 28×28（跟现有 trigger icon 一样）
-  // 翻译结果到达后，渲染进程会通过现有的 resize 机制自动放大窗口到翻译卡片尺寸
-  // （和"点击图标后 loading → overlay"的流程共用同一套 resize 逻辑）
+  // 4. 定位窗口 —— 和 showSelectionTrigger 一致（鼠标 +8 偏移，初始 28×28）。
+  // 翻译结果到达后渲染进程会 resize 窗口到翻译卡片尺寸。
   const winW = 28;
   const winH = 28;
   let posX = x + 8;
@@ -249,7 +239,7 @@ async function handleHotkeyDirectPath(x, y, rect) {
   const display = screen.getDisplayNearestPoint({ x: posX, y: posY });
   const displayBounds = display.bounds;
 
-  // 屏幕边界检测（和 showSelectionTrigger line 145-150 的逻辑一致）
+  // 屏幕边界检测
   if (posX + winW > displayBounds.x + displayBounds.width) {
     posX = x - winW - 8;
   }
@@ -264,7 +254,7 @@ async function handleHotkeyDirectPath(x, y, rect) {
     height: winH,
   });
 
-  // 5. 发 SHOW_DIRECT —— CRITICAL Gap #7: 必须等 webContents 就绪
+  // 5. 发 SHOW_DIRECT（等 webContents 就绪再发，防止 message 丢失）
   const sendData = () => {
     win.webContents.send(CHANNELS.SELECTION.SHOW_DIRECT, {
       text: text.trim(),
@@ -506,13 +496,12 @@ function startSelectionHook() {
         hideSelectionWindow();
       }
 
-      // v0.2.4: 读取 Alt 键当前物理状态（用于 hotkey 直出路径）
-      const altHeld = isAltKeyHeld();
+      // Sticky 直出模式：设置开 + CapsLock 灯亮 → 划词直接出翻译卡片
+      const selectionSettings = store.get('settings.selection', {});
+      const stickyActive = !!selectionSettings.stickyViaCapsLock && isCapsLockOn();
 
-      // 状态机处理 mousedown
-      // - 双击/三击会在 mouseup 后延迟确认
-      // - altHeld=true 会进 hotkey 路径，mouseup 时返回 skipIcon: true
-      selectionStateMachine.onMouseDown(x, y, altHeld);
+      // stickyActive=true 会进直出路径，mouseup 时 FSM 返回 skipIcon: true
+      selectionStateMachine.onMouseDown(x, y, stickyActive);
     });
 
     // ==================== mousemove ====================
@@ -556,11 +545,11 @@ function startSelectionHook() {
           }
         }
 
-        // v0.2.4: 读取 Alt 键当前物理状态
-        const altHeld = isAltKeyHeld();
+        // Sticky 直出模式（同 mousedown 判断一致）
+        const selectionSettings = store.get('settings.selection', {});
+        const stickyActive = !!selectionSettings.stickyViaCapsLock && isCapsLockOn();
 
-        // 状态机处理 mouseup
-        const result = selectionStateMachine.onMouseUp(x, y, altHeld);
+        const result = selectionStateMachine.onMouseUp(x, y, stickyActive);
 
         if (result.shouldShow) {
           const rect = result.rect || {
@@ -570,8 +559,7 @@ function startSelectionHook() {
             height: 40,
           };
 
-          // ★ Hotkey 直出路径（v0.2.4）：跳过图标 + 自动检测 + clipboard 兜底，
-          // 直接抓文字 + 弹翻译卡片。这条 path 优先于双击和正常路径。
+          // Sticky 直出：跳过图标 + 自动检测 + clipboard 兜底，直出翻译卡片
           if (result.skipIcon) {
             await handleHotkeyDirectPath(x, y, rect);
             selectionStateMachine.reset();
