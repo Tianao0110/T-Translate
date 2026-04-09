@@ -258,6 +258,14 @@ function register(ctx) {
 
 /**
  * 稳定获取选中文字（清空+轮询方案）
+ *
+ * ⚠️ NOT REENTRANT —— 不要在上一次调用的 500ms 剪贴板恢复窗口内再次调用。
+ *
+ * 调用方目前有两个：
+ *   1. IPC handler CHANNELS.SELECTION.GET_TEXT (用户点击图标时)
+ *   2. main.js handleHotkeyDirectPath (Alt+mouseup 直出路径，v0.2.4)
+ * 两者在同一 mouseup 周期内互斥（hotkey 路径跳过 icon 步骤，
+ * 不会进入 IPC GET_TEXT handler），所以并发调用在设计上不会发生。
  */
 async function fetchSelectedText() {
   try {

@@ -33,6 +33,13 @@ contextBridge.exposeInMainWorld("electron", {
       ipcRenderer.on("selection:show-result", listener);
       return () => ipcRenderer.removeListener("selection:show-result", listener);
     },
+    // hotkey 直出路径（v0.2.4）：用户按住 Alt 选词，跳过图标，直接显示翻译卡片
+    // payload: { text, targetLanguage, theme, settings }
+    onShowDirect: (callback) => {
+      const listener = (event, data) => callback(data);
+      ipcRenderer.on("selection:show-direct", listener);
+      return () => ipcRenderer.removeListener("selection:show-direct", listener);
+    },
   },
 
   clipboard: {

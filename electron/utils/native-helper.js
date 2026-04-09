@@ -67,6 +67,7 @@ function initWin32API() {
       
       // 常量
       VK_CONTROL: 0x11,
+      VK_MENU: 0x12,         // Alt 键（Win32 命名沿用历史，VK_MENU = Alt）
       VK_C: 0x43,
       KEYEVENTF_KEYUP: 0x0002,
       GA_ROOT: 2,
@@ -166,6 +167,34 @@ function simulateKeyPress(vkCode, scanCode = 0) {
     return true;
   } catch (e) {
     logger.error('simulateKeyPress failed:', e);
+    return false;
+  }
+}
+
+/**
+ * 检查 Alt 键当前是否处于按下状态（仅 Windows）
+ *
+ * 用于划词翻译的 hotkey 路径：在 mousedown / mouseup 时同步查询
+ * 物理键状态。比订阅 keydown/keyup 事件更可靠：
+ *   - 无 OS 自动重复事件噪音
+ *   - 无事件丢失风险（uIOhook 偶尔会被独占输入应用阻塞）
+ *   - 无线程同步问题（GetAsyncKeyState 是全局物理键状态，不是线程本地）
+ *
+ * @returns {boolean} true=Alt 当前按下；false=未按下、非 Windows、或
+ *                    Win32 API 不可用（fail-safe：宁可漏触发也不要误触发）
+ */
+function isAltKeyHeld() {
+  if (process.platform !== 'win32') return false;
+
+  const api = initWin32API();
+  if (!api) return false;
+
+  try {
+    const { GetAsyncKeyState, VK_MENU } = api;
+    // GetAsyncKeyState 返回的最高位 (0x8000) 表示按键当前处于按下状态
+    return (GetAsyncKeyState(VK_MENU) & 0x8000) !== 0;
+  } catch (e) {
+    logger.error('isAltKeyHeld failed:', e);
     return false;
   }
 }
@@ -616,6 +645,7 @@ module.exports = {
   // 键盘模拟
   simulateCtrlC,
   simulateKeyPress,
+  isAltKeyHeld,            // hotkey 路径用：同步查询 Alt 物理状态
   
   // 窗口检测
   getWindowInfoAtPoint,

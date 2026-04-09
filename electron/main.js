@@ -15,7 +15,8 @@ const { store, runtime, windows, isDev } = require('./state');
 const { CHANNELS } = require('./shared/channels');
 const { initIPC } = require('./ipc');
 const { registerAllShortcuts, unregisterAllShortcuts } = require('./ipc/shortcuts');
-const { makeWindowInvisibleToCapture, getWindowInfoAtPoint } = require('./utils/native-helper');
+const { makeWindowInvisibleToCapture, getWindowInfoAtPoint, isAltKeyHeld } = require('./utils/native-helper');
+const { fetchSelectedText } = require('./ipc/selection');
 const { SelectionStateMachine, STATES } = require('./utils/selection-state-machine');
 
 // 全局状态机实例
@@ -176,6 +177,110 @@ async function showSelectionTrigger(mouseX, mouseY, rect) {
         sourceLanguage: currentSourceLang,
       },
     });
+  };
+
+  if (win.webContents.isLoading()) {
+    win.webContents.once('did-finish-load', sendData);
+  } else {
+    setTimeout(sendData, 50);
+  }
+}
+
+/**
+ * Hotkey 直出路径（v0.2.4）
+ *
+ * 用户按住 Alt + 选词 → 状态机 onMouseUp 返回 { skipIcon: true }，
+ * mouseup 回调调用本函数。流程：
+ *   1. 预抓文字（fetchSelectedText 复用现有的 clipboard 模式）
+ *   2. 失败 → 静默返回（不开窗口，用户看到的就是"什么都没发生"）
+ *   3. 成功 → 创建/复用 selection window + 定位 + 发 SHOW_DIRECT IPC
+ *   4. 渲染进程的 onShowDirect listener 接收 text，进 loading → 翻译 → overlay
+ *
+ * 设计取舍（来自 /plan-eng-review v3 design doc）：
+ *   - 跳过图标步骤（不发 SHOW_TRIGGER），用户体验是"按一下立刻出翻译卡片"
+ *   - 跳过严格模式检查（hotkey 是用户的明确意图，不受 allowlist 限制）
+ *   - createSelectionWindow 失败时 fail-safe 静默返回（CRITICAL Gap #5）
+ *   - SHOW_DIRECT 必须等 webContents 就绪后再发，防止 message 丢失（CRITICAL Gap #7）
+ */
+async function handleHotkeyDirectPath(x, y, rect) {
+  logger.debug('handleHotkeyDirectPath called', { x, y, rect });
+
+  if (!runtime.selectionEnabled) {
+    logger.debug('Selection disabled, hotkey silent no-op');
+    return;
+  }
+
+  // 1. 预抓文字 —— 决定是否值得开窗口
+  const text = await fetchSelectedText();
+  if (!text || !text.trim()) {
+    logger.debug('Hotkey: no text captured, silent fail (no window opened)');
+    return;
+  }
+
+  // 2. 读取设置（和 showSelectionTrigger 现有做法一致）
+  const settings = store.get('settings', {});
+  const selectionSettings = settings.selection || {};
+  const interfaceSettings = settings.interface || {};
+  const translationSettings = settings.translation || {};
+  const currentTargetLang = translationSettings.targetLanguage
+    || translationSettings.defaultTargetLang
+    || settings.targetLanguage
+    || 'zh';
+
+  runtime.lastSelectionRect = rect;
+
+  // 3. 创建/复用 selection window —— CRITICAL Gap #5: fail-safe
+  const win = windowManager.createSelectionWindow();
+  if (!win || win.isDestroyed()) {
+    logger.warn('Hotkey: createSelectionWindow returned null/destroyed, aborting');
+    return;
+  }
+
+  // 4. 定位窗口到选区下方（不像 showSelectionTrigger 用 mouse+8 的 dot 位置）
+  // 初始尺寸给翻译面板预留空间，渲染进程拿到尺寸后会自己 resize
+  const winW = 400;
+  const winH = 200;
+  let posX = rect.x;
+  let posY = rect.y + rect.height + 8;
+
+  const display = screen.getDisplayNearestPoint({ x: posX, y: posY });
+  const displayBounds = display.bounds;
+
+  // 防止跑出屏幕
+  if (posX + winW > displayBounds.x + displayBounds.width) {
+    posX = displayBounds.x + displayBounds.width - winW - 10;
+  }
+  if (posX < displayBounds.x) {
+    posX = displayBounds.x + 10;
+  }
+  if (posY + winH > displayBounds.y + displayBounds.height) {
+    // 屏幕下方装不下 → 放到选区上方
+    posY = rect.y - winH - 8;
+  }
+  if (posY < displayBounds.y) {
+    posY = displayBounds.y + 10;
+  }
+
+  win.setBounds({
+    x: Math.round(posX),
+    y: Math.round(posY),
+    width: winW,
+    height: winH,
+  });
+
+  // 5. 发 SHOW_DIRECT —— CRITICAL Gap #7: 必须等 webContents 就绪
+  const sendData = () => {
+    win.webContents.send(CHANNELS.SELECTION.SHOW_DIRECT, {
+      text: text.trim(),
+      targetLanguage: currentTargetLang,
+      theme: interfaceSettings.theme || 'light',
+      settings: {
+        windowOpacity: selectionSettings.windowOpacity || 95,
+        autoCloseOnCopy: selectionSettings.autoCloseOnCopy || false,
+        triggerTimeout: selectionSettings.triggerTimeout || 4000,
+      },
+    });
+    win.show();
   };
 
   if (win.webContents.isLoading()) {
@@ -404,9 +509,14 @@ function startSelectionHook() {
         // 单击：隐藏现有的划词窗口
         hideSelectionWindow();
       }
-      
-      // 状态机处理 mousedown（双击/三击会在 mouseup 后延迟确认）
-      selectionStateMachine.onMouseDown(x, y);
+
+      // v0.2.4: 读取 Alt 键当前物理状态（用于 hotkey 直出路径）
+      const altHeld = isAltKeyHeld();
+
+      // 状态机处理 mousedown
+      // - 双击/三击会在 mouseup 后延迟确认
+      // - altHeld=true 会进 hotkey 路径，mouseup 时返回 skipIcon: true
+      selectionStateMachine.onMouseDown(x, y, altHeld);
     });
 
     // ==================== mousemove ====================
@@ -450,9 +560,12 @@ function startSelectionHook() {
           }
         }
 
+        // v0.2.4: 读取 Alt 键当前物理状态
+        const altHeld = isAltKeyHeld();
+
         // 状态机处理 mouseup
-        const result = selectionStateMachine.onMouseUp(x, y);
-        
+        const result = selectionStateMachine.onMouseUp(x, y, altHeld);
+
         if (result.shouldShow) {
           const rect = result.rect || {
             x: x - 50,
@@ -460,7 +573,15 @@ function startSelectionHook() {
             width: 100,
             height: 40,
           };
-          
+
+          // ★ Hotkey 直出路径（v0.2.4）：跳过图标 + 自动检测 + clipboard 兜底，
+          // 直接抓文字 + 弹翻译卡片。这条 path 优先于双击和正常路径。
+          if (result.skipIcon) {
+            await handleHotkeyDirectPath(x, y, rect);
+            selectionStateMachine.reset();
+            return;
+          }
+
           // 双击/三击：走延迟确认（三层检测）
           if (result.needsDelayedConfirm) {
             handleDelayedConfirm(x, y, rect);
