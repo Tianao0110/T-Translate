@@ -63,8 +63,8 @@ function validateSelectionText(text, settings, t) {
   if (/(.)\1{10,}/.test(text)) {
     throw new Error(t('selection.possibleGarbage', '选中内容可能是乱码'));
   }
-  // 文件路径不翻译
-  if (/^[A-Za-z]:\\|^\/(?:home|usr|var|etc|tmp)\/|^file:\/\//.test(text)) {
+  // 文件路径不翻译：覆盖 Windows 盘符（\ 和 /）、UNC、macOS/Linux 常见绝对路径、file:// URL
+  if (/^(?:[A-Za-z]:[\\/]|\\\\[^\\/\s]+[\\/][^\\/\s]+|\/(?:Users|home|usr|var|etc|tmp)\/|file:\/\/)/.test(text)) {
     throw new Error(t('selection.isFilePath', '选中内容是文件路径'));
   }
 }
