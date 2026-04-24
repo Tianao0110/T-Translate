@@ -122,7 +122,11 @@ class SelectionStateMachine {
     } else if (newState === STATES.LIKELY) {
       this.likelyEnteredAt = Date.now();
       this.retreatCount = 0;
-      this.setTimeout(CONFIG.LIKELY_TIMEOUT);
+      // Sticky 直出路径不需要 watchdog —— 用户正按着鼠标拖选，mouseup 会解决；
+      // LIKELY_TIMEOUT (2s) 会把慢速长选词的直出路径误杀。
+      if (!this.isHotkeyTriggered) {
+        this.setTimeout(CONFIG.LIKELY_TIMEOUT);
+      }
     } else if (newState === STATES.IDLE) {
       this.reset();  // 重置所有状态（reset 内部会清除定时器）
     }

@@ -41,6 +41,34 @@ const DEFAULT_TRANSLATION = {
   sourceLanguage: 'auto',
 };
 
+/**
+ * 选中文字校验 —— 两条路径（点图标、CapsLock 直出）共用，保证行为一致。
+ * 校验失败时 throw 一个带 i18n 消息的 Error，caller 只需 try/catch。
+ */
+function validateSelectionText(text, settings, t) {
+  if (!text || /^[\s\r\n]+$/.test(text)) {
+    throw new Error(t('selection.emptyContent', '选中内容为空'));
+  }
+  if (text.length < settings.minChars) {
+    throw new Error(t('selection.tooShort', '文字太短（最少 {{min}} 字符）').replace('{{min}}', settings.minChars));
+  }
+  if (text.length > settings.maxChars) {
+    throw new Error(t('selection.tooLong', '文字太长（最多 {{max}} 字符）').replace('{{max}}', settings.maxChars));
+  }
+  // 必须包含至少一个字母、数字或中日韩文字
+  if (!/[\w\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]/.test(text)) {
+    throw new Error(t('selection.noValidText', '选中内容无有效文字'));
+  }
+  // 同一字符重复超过 10 次视为乱码
+  if (/(.)\1{10,}/.test(text)) {
+    throw new Error(t('selection.possibleGarbage', '选中内容可能是乱码'));
+  }
+  // 文件路径不翻译：覆盖 Windows 盘符（\ 和 /）、UNC、macOS/Linux 常见绝对路径、file:// URL
+  if (/^(?:[A-Za-z]:[\\/]|\\\\[^\\/\s]+[\\/][^\\/\s]+|\/(?:Users|home|usr|var|etc|tmp)\/|file:\/\/)/.test(text)) {
+    throw new Error(t('selection.isFilePath', '选中内容是文件路径'));
+  }
+}
+
 const SelectionTranslator = () => {
   const { t } = useTranslation();
   const [mode, setMode] = useState('idle');
@@ -262,10 +290,8 @@ const SelectionTranslator = () => {
     });
     
     // Sticky 直出路径（由主进程 CapsLock 检测触发）
-    // 与 onShowResult Mode 2 类似（已有 text 直译显示），但独立语义：
-    // - 不与截图 OCR 联动混淆
-    // - 跳过 trigger 模式，直接 loading → translating → overlay
-    // - 失败也直接进 overlay 显示错误（不等用户点图标）
+    // 与 onShowTrigger 共用同一套 settings / translation / validation，
+    // 差别只在于："跳过 trigger 图标，直接 loading → translating → overlay"。
     const removeShowDirectListener = window.electron?.selection?.onShowDirect?.(async (data) => {
       logger.debug('SHOW_DIRECT received', { textLength: data?.text?.length });
 
@@ -273,13 +299,16 @@ const SelectionTranslator = () => {
       if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
       if (triggerReadyTimerRef.current) clearTimeout(triggerReadyTimerRef.current);
 
-      // 应用主题和设置
+      // 应用主题、设置、翻译语言、showSource —— 与 onShowTrigger 完全对齐
       if (data.theme) setTheme(data.theme);
       const newSettings = { ...DEFAULT_SETTINGS, ...data.settings };
       setSettings(newSettings);
+      const newTranslation = { ...DEFAULT_TRANSLATION, ...data.translation };
+      setTranslation(newTranslation);
+      setShowSource(newSettings.showSourceByDefault);
 
-      // 直接进 loading 态（跳过 trigger / icon 模式）
-      setSourceText(data.text || '');
+      // 重置卡片状态进 loading
+      setSourceText('');
       setTranslatedText('');
       setError('');
       setCopied(false);
@@ -288,18 +317,15 @@ const SelectionTranslator = () => {
       setInitialBounds(null);
       setMode('loading');
 
-      // 翻译（复用 translateTextRef）
-      if (!data.text || !data.text.trim()) {
-        // 上层 handleHotkeyDirectPath 不应该送空 text 进来（它会预先检查）
-        // 但万一发生，进 error 态而不是死锁在 loading
-        setError(t('selection.noText', '未获取到文字'));
-        setMode('overlay');
-        return;
-      }
-
       try {
-        const overrideLang = data.targetLanguage || null;
-        const translationResult = await translateTextRef.current(data.text, 0, overrideLang);
+        const text = (data.text || '').trim();
+        // 内容校验（与 handleTriggerClick 共用同一套规则，保证两条路径行为一致）
+        validateSelectionText(text, newSettings, t);
+
+        setSourceText(text);
+
+        const overrideLang = newTranslation.targetLanguage || null;
+        const translationResult = await translateTextRef.current(text, 0, overrideLang);
         setTranslatedText(translationResult);
         setError('');
         setMode('overlay');
@@ -307,14 +333,14 @@ const SelectionTranslator = () => {
         // 加入历史记录（标记 from: 'hotkey' 区分于 selection 和 screenshot）
         if (translationResult) {
           window.electron?.selection?.addToHistory?.({
-            source: data.text,
+            source: text,
             result: translationResult,
             timestamp: Date.now(),
             from: 'hotkey',
           });
         }
       } catch (err) {
-        logger.error('SHOW_DIRECT translation failed:', err);
+        logger.error('SHOW_DIRECT failed:', err);
         setError(err.message || t('selection.translateFailed', '翻译失败'));
         setTranslatedText('');
         setMode('overlay');
@@ -368,38 +394,10 @@ const SelectionTranslator = () => {
       if (!result?.text) throw new Error(t('selection.noText', '未获取到文字'));
       
       const text = result.text.trim();
-      
-      // === 内容校验 ===
-      
-      // 1. 检查是否为空或纯空白
-      if (!text || /^[\s\r\n]+$/.test(text)) {
-        throw new Error(t('selection.emptyContent', '选中内容为空'));
-      }
-      
-      // 2. 检查字符数限制
-      if (text.length < settings.minChars) {
-        throw new Error(t('selection.tooShort', '文字太短（最少 {{min}} 字符）').replace('{{min}}', settings.minChars));
-      }
-      if (text.length > settings.maxChars) {
-        throw new Error(t('selection.tooLong', '文字太长（最多 {{max}} 字符）').replace('{{max}}', settings.maxChars));
-      }
-      
-      // 3. 过滤纯符号（必须包含至少一个字母、数字或中日韩文字）
-      // \w = 字母数字下划线, \u4e00-\u9fff = 中文, \u3040-\u30ff = 日文假名, \uac00-\ud7af = 韩文
-      if (!/[\w\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]/.test(text)) {
-        throw new Error(t('selection.noValidText', '选中内容无有效文字'));
-      }
-      
-      // 4. 过滤可能的乱码（同一字符重复超过 10 次）
-      if (/(.)\1{10,}/.test(text)) {
-        throw new Error(t('selection.possibleGarbage', '选中内容可能是乱码'));
-      }
-      
-      // 5. 过滤文件路径（通常不需要翻译）
-      if (/^[A-Za-z]:\\|^\/(?:home|usr|var|etc|tmp)\/|^file:\/\//.test(text)) {
-        throw new Error(t('selection.isFilePath', '选中内容是文件路径'));
-      }
-      
+
+      // 内容校验（与 CapsLock 直出路径共用同一套规则）
+      validateSelectionText(text, settings, t);
+
       setSourceText(text);
       const translationResult = await translateText(text);
       setTranslatedText(translationResult);

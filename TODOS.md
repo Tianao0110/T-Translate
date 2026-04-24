@@ -24,6 +24,20 @@ Long-lived work items tracked across releases. Things that are not a current rel
 
 **Blockers**: `tests/setup.js` must exist (v0.2.4 ships this).
 
+### 3. SelectionTranslator 里的 translation.sourceLanguage 从未被使用
+
+**Why**: Copilot 在 v0.2.4 PR 审查里发现的既有问题（非本 PR 引入）。`src/components/SelectionTranslator/index.jsx` 的 `translateText` 签名只接受 `overrideTargetLang`，内部硬编码 `sourceLang: 'auto'`（index.jsx:528）。三个调用点（L246 screenshot 路径、L328 CapsLock 直出路径、L402 icon 流）都只传 targetLanguage。结果：用户设置 / 主进程发来的 `translation.sourceLanguage` 完全不生效，但 payload 里一直带着这字段造成读代码时的误读。
+
+**Approach**: 二选一——
+- **A. 打通 sourceLanguage**：`translateText` 签名加 `overrideSourceLang`；三个调用点传进来；L528 改成 `sourceLang: overrideSourceLang || translation.sourceLanguage || 'auto'`。
+- **B. 删 dead payload**：`DEFAULT_TRANSLATION` / `data.translation` 摘掉 sourceLanguage；主进程同步不发送。
+
+选 A 前先确认产品是否希望「手动指定源语言」真的生效（目前 UI 里有这选项吗？）；选 B 前确认没有其他调用点依赖。
+
+**Why not v0.2.4**: 既有问题，非 b61adba 引入；跨 state shape + 3 调用点 + 翻译层，超 v0.2.4 scope。
+
+**Blockers**: 先拍 A/B 的产品决策。
+
 ---
 
 ## Conventions
