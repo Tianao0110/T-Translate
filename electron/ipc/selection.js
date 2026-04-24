@@ -192,7 +192,7 @@ function register(ctx) {
     // 5. 复制失败，尝试 OCR 兜底
     const ocrRect = rect || runtime.lastSelectionRect;
     
-    if (ocrRect && ocrRect.width > 10 && ocrRect.height > 5) {
+    if (ocrRect && ocrRect.width > 8 && ocrRect.height > 4) {
       try {
         const ocrText = await getTextByOCR(ocrRect, getScreenshotModule());
         if (ocrText && ocrText.trim()) {
@@ -297,8 +297,8 @@ async function fetchSelectedText() {
     // 3. 触发系统复制
     simulateCtrlC();
 
-    // 4. 轮询等待（最多 500ms，每 50ms 检查一次）
-    for (let i = 0; i < 10; i++) {
+    // 4. 轮询等待（最多 800ms，每 50ms 检查一次）
+    for (let i = 0; i < 16; i++) {
       await new Promise(resolve => setTimeout(resolve, 50));
       const text = clipboard.readText();
       if (text && text.trim()) {
@@ -332,7 +332,7 @@ async function fetchSelectedText() {
 async function getTextByOCR(rect, screenshotModule) {
   try {
     // 区域太小则跳过
-    if (rect.width < 20 || rect.height < 10) {
+    if (rect.width < 12 || rect.height < 6) {
       return null;
     }
     
