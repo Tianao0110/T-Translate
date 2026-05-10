@@ -85,7 +85,7 @@ async function handleDelayedConfirm(x, y, rect) {
 
     if (clipboardResult.hasSelection === true) {
       logger.debug(`Delayed confirm: text selected via clipboard "${clipboardResult.text.substring(0, 20)}..."`);
-      showSelectionTrigger(x, y, rect);
+      showSelectionTrigger(x, y, rect, clipboardResult.text);
     } else if (clipboardResult.hasSelection === null) {
       // 防抖跳过或出错
       logger.debug('Delayed confirm: clipboard check skipped or failed');
@@ -108,8 +108,8 @@ async function handleDelayedConfirm(x, y, rect) {
  * 显示划词翻译触发点
  * 从主窗口获取实时语言设置
  */
-async function showSelectionTrigger(mouseX, mouseY, rect) {
-  logger.debug('showSelectionTrigger called');
+async function showSelectionTrigger(mouseX, mouseY, rect, prefetchedText = null) {
+  logger.debug(`showSelectionTrigger called (prefetched=${prefetchedText ? prefetchedText.length + ' chars' : 'none'})`);
   
   if (!runtime.selectionEnabled) return;
 
@@ -176,6 +176,9 @@ async function showSelectionTrigger(mouseX, mouseY, rect) {
         targetLanguage: currentTargetLang,
         sourceLanguage: currentSourceLang,
       },
+      // Phase B pass-through: Layer 3 抓到的 text 一并送过去，
+      // 让 renderer 点击图标时可以直接用，跳过 GET_TEXT 二次 fetch（解 "按下没内容"）
+      text: prefetchedText,
     });
   };
 
@@ -618,7 +621,7 @@ function startSelectionHook() {
           const clipboardResult = await checkSelectionViaClipboard({ isComplexApp: isOfficeApp });
           
           if (clipboardResult.hasSelection === true) {
-            showSelectionTrigger(x, y, rect);
+            showSelectionTrigger(x, y, rect, clipboardResult.text);
           } else {
             logger.debug('Normal drag: clipboard check found no selection');
           }

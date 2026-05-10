@@ -98,6 +98,7 @@ const SelectionTranslator = () => {
   const triggerReadyTimerRef = useRef(null);  // 圆点就绪计时器
   const contentRef = useRef(null);  // 内容区域引用，用于测量实际大小
   const translateTextRef = useRef(null);  // 存储最新的翻译函数引用
+  const prefetchedTextRef = useRef(null);  // Phase B pass-through: SHOW_TRIGGER 里 Layer 3 抓到的 text，handleTriggerClick 优先用，避免二次 fetch
 
   // TTS 初始化
   useEffect(() => {
@@ -178,6 +179,11 @@ const SelectionTranslator = () => {
       sizedRef.current = false;
       setIsFrozen(false);  // 重置固定状态
       setInitialBounds(null);  // 重置初始位置
+
+      // Phase B pass-through: Layer 3 main 进程已抓 text 通过 payload 传过来，
+      // handleTriggerClick 优先用这个，跳过 GET_TEXT 二次 fetch。
+      // 新 SHOW_TRIGGER 自然覆盖；点击使用一次后置 null 防跨周期复用。
+      prefetchedTextRef.current = data.text || null;
       
       // 圆点就绪延迟（防止松开鼠标时误触）
       setTriggerReady(false);
@@ -392,10 +398,16 @@ const SelectionTranslator = () => {
     setMode('loading');
     
     try {
-      const result = await window.electron?.selection?.getText?.(rect);
-      if (!result?.text) throw new Error(t('selection.noText', '未获取到文字'));
-      
-      const text = result.text.trim();
+      // Phase B pass-through: 先用 SHOW_TRIGGER payload 里 Layer 3 抓到的 text；
+      // 没有（Layer 1/2 路径，payload 不带 text）才 fallback 到 GET_TEXT IPC 二次 fetch。
+      let text = prefetchedTextRef.current;
+      prefetchedTextRef.current = null;  // 单次使用，防跨 trigger 周期复用
+      if (!text) {
+        const result = await window.electron?.selection?.getText?.(rect);
+        text = result?.text;
+      }
+      if (!text) throw new Error(t('selection.noText', '未获取到文字'));
+      text = text.trim();
 
       // 内容校验（与 CapsLock 直出路径共用同一套规则）
       validateSelectionText(text, settings, t);
