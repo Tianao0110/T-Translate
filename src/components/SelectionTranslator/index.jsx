@@ -241,9 +241,10 @@ const SelectionTranslator = () => {
         setMode('loading');
         
         try {
-          // 直接传入目标语言，不依赖异步 state 更新
-          const overrideLang = data.targetLanguage || data.translation?.targetLanguage || null;
-          const translationResult = await translateTextRef.current(data.text, 0, overrideLang);
+          // 直接传入语言，不依赖异步 state 更新
+          const overrideTargetLang = data.targetLanguage || data.translation?.targetLanguage || null;
+          const overrideSourceLang = data.sourceLanguage || data.translation?.sourceLanguage || null;
+          const translationResult = await translateTextRef.current(data.text, 0, overrideTargetLang, overrideSourceLang);
           setTranslatedText(translationResult);
           setError('');
           setMode('overlay');
@@ -324,8 +325,9 @@ const SelectionTranslator = () => {
 
         setSourceText(text);
 
-        const overrideLang = newTranslation.targetLanguage || null;
-        const translationResult = await translateTextRef.current(text, 0, overrideLang);
+        const overrideTargetLang = newTranslation.targetLanguage || null;
+        const overrideSourceLang = newTranslation.sourceLanguage || null;
+        const translationResult = await translateTextRef.current(text, 0, overrideTargetLang, overrideSourceLang);
         setTranslatedText(translationResult);
         setError('');
         setMode('overlay');
@@ -512,20 +514,22 @@ const SelectionTranslator = () => {
   }, [mode, translatedText, error, showSource]);
 
   // 使用 translationService 进行翻译
-  const translateText = async (text, retryCount = 0, overrideTargetLang = null) => {
+  const translateText = async (text, retryCount = 0, overrideTargetLang = null, overrideSourceLang = null) => {
     // 确保翻译服务已初始化
     if (!translationService.initialized) {
       logger.debug('Initializing translation service...');
       await translationService.init();
     }
-    
+
     // 优先使用传入的目标语言（截图翻译等场景），否则用 state
     const targetLang = overrideTargetLang || translation.targetLanguage || 'zh';
-    
+    // 源语言同样优先 override 再 fallback state，最后兜底 'auto'
+    const sourceLang = overrideSourceLang || translation.sourceLanguage || 'auto';
+
     try {
       // 使用 translationService 进行翻译（传递隐私模式）
       const result = await translationService.translate(text, {
-        sourceLang: 'auto',
+        sourceLang: sourceLang,
         targetLang: targetLang,
         privacyMode: privacyMode, // 传递隐私模式
       });
