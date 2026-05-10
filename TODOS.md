@@ -38,6 +38,46 @@ Long-lived work items tracked across releases. Things that are not a current rel
 
 **Blockers**: 先拍 A/B 的产品决策。
 
+### 4. Layer 1/2 路径"按下没内容"根因修复
+
+**Why**: v0.2.5 Phase B 的 pass-through 方案只覆盖 Layer 3 场景（`checkSelectionViaClipboard` 抓到 text 就顺着 SHOW_TRIGGER 传给 renderer）。Layer 1/2 路径（Chrome/VSCode/Notepad++ 等简单应用）的 `hasTextSelection` 只返回布尔 —— 没捕获 text，图标显示后点击仍会走 `GET_TEXT` → `fetchSelectedText` 二次抓，理论上仍会出现"按下没内容"（实际比 Acrobat 类 Layer 3 场景少，因为简单应用焦点转移比较滞后）。
+
+**Approach**: 改 `hasTextSelection` 返回 Layer 1/2 成功时也主动调 Layer 3 fetch 拿到 text，再通过 `showSelectionTrigger(x, y, rect, text)` 传给 renderer。这样所有路径的 text 都在 mouseup 时捕获一次并传递，renderer 点击图标零二次 fetch。
+
+**Why not v0.2.5**: 当前 Phase B scope ~20 行；扩到 Layer 1/2 会变成 ~60-80 行（要改 `hasTextSelection` 返回 shape，或加一个"成功后额外抓"的辅助函数）。用户反馈没把 Layer 1/2 当主要痛点，Acrobat 场景才是高发 bug。等 v0.2.5 发布、Phase B pass-through 生效后，基于真实数据（Layer 1/2 场景是否仍有"按下没内容"用户投诉）决定要不要做。
+
+**Blockers**: Phase T toolchain 打通才能写测试验证；v0.2.5 发布一周观察期。
+
+### 5. Lint backlog（v0.2.5 Phase T 兜底，留待逐个修）
+
+**Why**: v0.2.5 Phase T 把 eslint 9 装通后，跑 `npm run lint` 出 539 warnings + 21 个 pre-existing errors（已在 eslint.config.js 里以 per-file 降级为 warning 兜底，让 lint exit 0）。这些不是 Phase T 引入的，是历史累积，但都是真问题，应该真修而不是永远 suppress。
+
+**Approach**: 一个文件一个文件清。具体：
+- `src/i18n/locales/en.js` + `zh.js`：`selectStyle`（L113 vs L131）/ `notify`（L9 vs L362）/ `docParser`（L635 vs L652）三对重复 key —— **后定义覆盖前定义、translation 字符串静默丢失**。需要语义判断：是改名（两边都保留语义）还是合并（保留正确的那条）。
+- `src/App.jsx`：8 个 `react-hooks/rules-of-hooks` errors —— L31-34 + L36/L102/L121/L153/L179 各种 hook 在 early return 之后被调。需要确认是 Zustand pattern 误报还是真违反 hook 规则；如真违反，重写 component shape 把 hooks 拉到顶部。
+- `src/components/DocumentTranslator/index.jsx`：3 个 `navigateSearch` undefined（L1158 / L1165 / L1168）—— 找出 `navigateSearch` 应该从哪 import，或者它该是别的名字。
+- `src/utils/logger.js`：`process` 'no-undef'（已被 `globals.node` 覆盖了，但 `no-constant-binary-expression` 在 L18 仍需要看）—— `??` 左侧 constant 是 dead code，删或改逻辑。
+
+去 v0.3 一次性清完（或拆几个小 PR）。**清完后把 eslint.config.js 里的 per-file 降级 override 删掉**，恢复全局严格。
+
+**Why not v0.2.5**: Phase T scope 是 toolchain 跑通；逐个修历史 lint error 跨文件 + 跨 component shape 改造，超 Phase T。Phase C（注释减脂）也不会顺手解 —— 那个是注释，不是代码 bug。
+
+**Blockers**: 无（toolchain 已通，可以独立做）。
+
+---
+
+## Dev environment
+
+### gstack 升级 0.16.1 → 1.12.2
+
+**Why**: 当前用的 gstack 0.16.1，最新是 1.12.2 —— 跨主版本号（0.x → 1.x 是 "首次 stable" 语义）。积累了若干主版本 bugfix + 新 skill；0.16 会越来越老，某些 bin 工具 schema 迟早被 deprecate。
+
+**Approach**: `cd ~/.claude/skills/gstack && git pull`（或跑 /gstack-upgrade skill）→ 过一遍常用 skill（office-hours / plan-eng-review / review / ship）的行为是否和 0.16 预期一致 → 看新版 CHANGELOG 挑有价值的变更用起来。
+
+**Why not v0.2.5 cycle 内**: v0.2.5 的 office-hours + plan-eng-review 已在 0.16.1 跑完、产物都已定稿；中途换工具版本会让同 cycle 内 skill 调用产出不一致，retrospective 时麻烦。
+
+**Blockers**: v0.2.5 tag 打完。
+
 ---
 
 ## Conventions

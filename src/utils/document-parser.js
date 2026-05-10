@@ -554,7 +554,7 @@ export async function parseJSON(file, options = {}) {
   function extractStrings(obj, path = '') {
     if (typeof obj === 'string' && obj.length >= (filters.minLength || 5)) {
       // 跳过看起来像 URL、日期、ID 的字符串
-      if (!/^(https?:\/\/|[\d\-T:Z]+$|[a-f0-9\-]{36}$)/i.test(obj)) {
+      if (!/^(https?:\/\/|[\dT:Z-]+$|[a-f0-9-]{36}$)/i.test(obj)) {
         segments.push({
           id: segmentId++,
           original: obj,
