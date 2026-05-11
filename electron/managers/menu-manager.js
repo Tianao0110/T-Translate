@@ -1,20 +1,11 @@
-// electron/managers/menu-manager.js
-// 应用菜单管理器
-// 包含：主菜单模板、右键菜单
+// Application menu builder (File / Edit / View / Translate / Settings / Help)
+// and standard dialogs.
 
 const { Menu, dialog, shell, app } = require('electron');
 const { CHANNELS, MENU_ACTIONS } = require('../shared/channels');
 const logger = require('../utils/logger')('MenuManager');
 const { t } = require('../shared/main-i18n');
 
-/**
- * 创建应用菜单
- * @param {Object} ctx - 上下文
- * @param {Function} ctx.getMainWindow - 获取主窗口
- * @param {Object} ctx.runtime - 运行时状态
- * @param {Object} ctx.store - 存储
- * @param {Object} ctx.managers - 管理器函数
- */
 function createMenu(ctx) {
   const { getMainWindow, runtime, store, managers } = ctx;
 
@@ -27,24 +18,20 @@ function createMenu(ctx) {
     createHelpMenu(ctx),
   ];
 
-  // macOS 特殊处理
   if (process.platform === 'darwin') {
     template.unshift(createMacAppMenu(ctx));
   }
 
   const menu = Menu.buildFromTemplate(template);
   Menu.setApplicationMenu(menu);
-  
+
   logger.info('Application menu created');
   return menu;
 }
 
-/**
- * macOS 应用菜单
- */
 function createMacAppMenu(ctx) {
   const { getMainWindow, runtime } = ctx;
-  
+
   return {
     label: app.getName(),
     submenu: [
@@ -72,12 +59,9 @@ function createMacAppMenu(ctx) {
   };
 }
 
-/**
- * 文件菜单
- */
 function createFileMenu(ctx) {
   const { getMainWindow, runtime } = ctx;
-  
+
   return {
     label: t('menu.file', '文件'),
     submenu: [
@@ -92,7 +76,7 @@ function createFileMenu(ctx) {
         click: async () => {
           const mainWindow = getMainWindow();
           if (!mainWindow) return;
-          
+
           const result = await dialog.showOpenDialog(mainWindow, {
             properties: ['openFile'],
             filters: [
@@ -100,7 +84,7 @@ function createFileMenu(ctx) {
               { name: t('menu.allFiles', '所有文件'), extensions: ['*'] },
             ],
           });
-          
+
           if (!result.canceled && result.filePaths[0]) {
             mainWindow.webContents.send(CHANNELS.MENU.IMPORT_FILE, result.filePaths[0]);
           }
@@ -124,9 +108,6 @@ function createFileMenu(ctx) {
   };
 }
 
-/**
- * 编辑菜单
- */
 function createEditMenu() {
   return {
     label: t('menu.edit', '编辑'),
@@ -142,12 +123,9 @@ function createEditMenu() {
   };
 }
 
-/**
- * 视图菜单
- */
 function createViewMenu(ctx) {
   const { getMainWindow, store } = ctx;
-  
+
   return {
     label: t('menu.view', '视图'),
     submenu: [
@@ -216,12 +194,9 @@ function createViewMenu(ctx) {
   };
 }
 
-/**
- * 翻译菜单
- */
 function createTranslateMenu(ctx) {
   const { getMainWindow, managers } = ctx;
-  
+
   return {
     label: t('menu.translate', '翻译'),
     submenu: [
@@ -250,12 +225,9 @@ function createTranslateMenu(ctx) {
   };
 }
 
-/**
- * 设置菜单
- */
 function createSettingsMenu(ctx) {
   const { getMainWindow } = ctx;
-  
+
   return {
     label: t('menu.settings', '设置'),
     submenu: [
@@ -276,12 +248,9 @@ function createSettingsMenu(ctx) {
   };
 }
 
-/**
- * 帮助菜单
- */
 function createHelpMenu(ctx) {
   const { getMainWindow } = ctx;
-  
+
   return {
     label: t('menu.help', '帮助'),
     submenu: [
@@ -306,9 +275,6 @@ function createHelpMenu(ctx) {
   };
 }
 
-/**
- * 显示更新对话框
- */
 function showUpdateDialog(mainWindow) {
   dialog.showMessageBox(mainWindow, {
     type: 'info',
@@ -318,9 +284,6 @@ function showUpdateDialog(mainWindow) {
   });
 }
 
-/**
- * 显示关于对话框
- */
 function showAboutDialog(mainWindow) {
   dialog.showMessageBox(mainWindow, {
     type: 'info',
