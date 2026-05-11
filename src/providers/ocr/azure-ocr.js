@@ -1,14 +1,9 @@
-// src/providers/ocr/azure-ocr.js
-// Azure Computer Vision OCR 引擎
+// Azure Computer Vision OCR (Read API v3.2). Asynchronous: submit, then poll.
 
 import { BaseOCREngine } from './base.js';
 import createLogger from '../../utils/logger.js';
 const logger = createLogger('AzureOCR');
 
-/**
- * Azure Computer Vision OCR 引擎
- * https://docs.microsoft.com/azure/cognitive-services/computer-vision/overview-ocr
- */
 class AzureOCREngine extends BaseOCREngine {
   static metadata = {
     id: 'azure-ocr',
@@ -51,20 +46,20 @@ class AzureOCREngine extends BaseOCREngine {
 
   async recognize(input, options = {}) {
     const { apiKey, endpoint } = this.config;
-    
+
     if (!apiKey || !endpoint) {
       return { success: false, error: '请配置 Azure OCR API Key 和 Endpoint' };
     }
 
     try {
       const base64Data = this.ensureBase64(input);
-      // 移除 data URL 前缀
+      // Read API wants raw bytes, not base64
       const pureBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
       const imageBytes = Uint8Array.from(atob(pureBase64), c => c.charCodeAt(0));
 
-      // 使用 Read API（OCR 3.2）
       const apiUrl = `${endpoint.replace(/\/$/, '')}/vision/v3.2/read/analyze`;
 
+      // Phase 1: submit. Returns 202 with the result URL in Operation-Location.
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
@@ -79,17 +74,16 @@ class AzureOCREngine extends BaseOCREngine {
         throw new Error(errorData.error?.message || `HTTP ${response.status}`);
       }
 
-      // 获取操作位置
       const operationLocation = response.headers.get('Operation-Location');
       if (!operationLocation) {
         throw new Error('未获取到操作位置');
       }
 
-      // 轮询获取结果
+      // Phase 2: poll. Azure returns 'running' until done; 10s budget at 1s intervals.
       let result;
       for (let i = 0; i < 10; i++) {
         await new Promise(resolve => setTimeout(resolve, 1000));
-        
+
         const resultResponse = await fetch(operationLocation, {
           headers: {
             'Ocp-Apim-Subscription-Key': apiKey,
@@ -101,7 +95,7 @@ class AzureOCREngine extends BaseOCREngine {
         }
 
         result = await resultResponse.json();
-        
+
         if (result.status === 'succeeded') {
           break;
         } else if (result.status === 'failed') {
@@ -113,10 +107,9 @@ class AzureOCREngine extends BaseOCREngine {
         throw new Error('OCR 处理超时');
       }
 
-      // 提取文本
       const readResults = result.analyzeResult?.readResults || [];
       const lines = [];
-      
+
       for (const page of readResults) {
         for (const line of page.lines || []) {
           lines.push(line.text);
