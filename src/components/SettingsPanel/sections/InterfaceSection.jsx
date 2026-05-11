@@ -1,20 +1,15 @@
-// src/components/SettingsPanel/sections/InterfaceSection.jsx
-// 界面设置区块组件 - 从 SettingsPanel 拆分
+// Interface settings: startup, language, theme, keyboard shortcuts.
 
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Sun, Moon, Leaf, RefreshCw, Globe, Power, MousePointer } from 'lucide-react';
 import { defaultConfig } from '../constants.js';
 
-// 可用语言列表
 const LANGUAGES = [
   { code: 'zh', name: '简体中文', nativeName: '简体中文' },
   { code: 'en', name: 'English', nativeName: 'English' }
 ];
 
-/**
- * 界面设置区块
- */
 const InterfaceSection = ({
   settings,
   updateSetting,
@@ -22,15 +17,13 @@ const InterfaceSection = ({
   notify,
   editingShortcut,
   setEditingShortcut,
-  saveSettings  // 新增：保存设置函数
+  saveSettings
 }) => {
   const { t, i18n } = useTranslation();
-  
-  // 开机自启状态
+
   const [autoLaunch, setAutoLaunch] = useState(false);
   const [autoLaunchLoading, setAutoLaunchLoading] = useState(true);
-  
-  // 启动时读取自启状态
+
   useEffect(() => {
     (async () => {
       try {
@@ -42,8 +35,7 @@ const InterfaceSection = ({
       setAutoLaunchLoading(false);
     })();
   }, []);
-  
-  // 切换开机自启
+
   const toggleAutoLaunch = async (enabled) => {
     try {
       const result = await window.electron?.app?.setAutoLaunch?.(enabled);
@@ -60,20 +52,16 @@ const InterfaceSection = ({
       notify(e.message, 'error');
     }
   };
-  
-  // 切换自启后自动开启划词
+
   const toggleAutoSelection = (enabled) => {
     updateSetting('startup', 'autoEnableSelection', enabled);
-    // 立即写入 store
     window.electron?.store?.set?.('settings.startup.autoEnableSelection', enabled);
   };
-  
-  // 切换界面语言
+
+  // Write language using the dot-path API so we don't round-trip the whole settings object
   const switchLanguage = async (langCode) => {
     i18n.changeLanguage(langCode);
-    // 更新本地状态
     updateSetting('interface', 'language', langCode);
-    // 立即写入 store（点路径，不读取整个 settings）
     try {
       await window.electron?.store?.set('settings.interface.language', langCode);
     } catch (e) {
@@ -81,34 +69,32 @@ const InterfaceSection = ({
     }
     notify(t('settings.general.langSwitched', langCode === 'zh' ? '界面语言已切换' : 'Language changed'), 'success');
   };
-  
-  // 切换主题并立即保存（确保子窗口同步）
+
+  // Theme propagation:
+  //   1. local React state
+  //   2. <html data-theme> for CSS variables
+  //   3. localStorage so a refresh/screenshot window picks it up
+  //   4. theme IPC broadcast so child windows re-theme without a full settings reload
   const switchTheme = async (theme) => {
-    // 1. 更新本地状态
     updateSetting('interface', 'theme', theme);
-    
-    // 2. 更新 DOM
     document.documentElement.setAttribute('data-theme', theme);
-    
-    // 3. 同步到 localStorage（确保页面刷新/截图后主题不丢失）
     localStorage.setItem('theme', theme);
-    
-    // 4. 使用统一的 theme IPC 广播到所有窗口
+
     try {
       if (window.electron?.theme?.set) {
         await window.electron.theme.set(theme);
       } else {
-        // 降级：点路径直接写入
+        // Fallback path for older preload bundles without theme.set
         await window.electron?.store?.set?.('settings.interface.theme', theme);
-        
-        // 通知玻璃窗口刷新主题
         await window.electron?.glass?.notifySettingsChanged?.();
       }
     } catch (e) {
       console.warn('Failed to save theme:', e);
     }
   };
-  // 快捷键配置
+
+  // `global: true` means the binding goes through Electron's globalShortcut
+  // and needs pause/resume during editing to avoid the user's chord triggering the action
   const shortcutConfig = {
     translate: { label: t('shortcuts.translate'), global: false, icon: '⏎' },
     swapLanguages: { label: t('shortcuts.swapLanguages'), global: false, icon: '🔄' },
@@ -121,7 +107,6 @@ const InterfaceSection = ({
     selectionTranslate: { label: t('shortcuts.selectionTranslate'), global: true, icon: '✏️' },
   };
 
-  // 开始编辑快捷键
   const startEditing = async (action, config) => {
     if (config.global && window.electron?.shortcuts?.pause) {
       await window.electron.shortcuts.pause(action);
@@ -129,7 +114,6 @@ const InterfaceSection = ({
     setEditingShortcut(action);
   };
 
-  // 取消编辑
   const cancelEditing = async (action, config) => {
     setEditingShortcut(null);
     if (config.global && window.electron?.shortcuts?.resume) {
@@ -137,11 +121,10 @@ const InterfaceSection = ({
     }
   };
 
-  // 完成编辑
   const finishEditing = async (action, config, newShortcut) => {
     updateSetting('shortcuts', action, newShortcut);
     setEditingShortcut(null);
-    
+
     if (config.global && window.electron?.shortcuts?.update) {
       const result = await window.electron.shortcuts.update(action, newShortcut);
       if (result?.success) {
@@ -153,7 +136,6 @@ const InterfaceSection = ({
     }
   };
 
-  // 重置所有快捷键
   const resetShortcuts = () => {
     updateSetting('shortcuts', null, defaultConfig.shortcuts);
     setSettings(prev => ({ ...prev, shortcuts: defaultConfig.shortcuts }));
@@ -169,17 +151,16 @@ const InterfaceSection = ({
     <div className="setting-content">
       <h3>{t('settings.general.title')}</h3>
       <p className="setting-description">{t('settings.general.themeDesc')}</p>
-      
-      {/* 启动设置 */}
+
       <div className="setting-group">
         <label className="setting-label">
           <Power size={16} style={{marginRight: '6px', verticalAlign: 'middle'}} />
           {t('settings.startup.title')}
         </label>
-        
+
         <label className="setting-toggle">
-          <input 
-            type="checkbox" 
+          <input
+            type="checkbox"
             checked={autoLaunch}
             disabled={autoLaunchLoading}
             onChange={(e) => toggleAutoLaunch(e.target.checked)}
@@ -187,11 +168,11 @@ const InterfaceSection = ({
           <span>{t('settings.startup.autoLaunch')}</span>
         </label>
         <p className="setting-hint">{t('settings.startup.autoLaunchHint')}</p>
-        
+
         {autoLaunch && (
           <label className="setting-toggle" style={{marginTop: '8px'}}>
-            <input 
-              type="checkbox" 
+            <input
+              type="checkbox"
               checked={settings.startup?.autoEnableSelection ?? false}
               onChange={(e) => toggleAutoSelection(e.target.checked)}
             />
@@ -202,8 +183,7 @@ const InterfaceSection = ({
           <p className="setting-hint">{t('settings.startup.autoSelectionHint')}</p>
         )}
       </div>
-      
-      {/* 界面语言 */}
+
       <div className="setting-group">
         <label className="setting-label">
           <Globe size={16} style={{marginRight: '6px', verticalAlign: 'middle'}} />
@@ -222,25 +202,24 @@ const InterfaceSection = ({
         </div>
         <p className="setting-hint">{t('settings.general.languageDesc')}</p>
       </div>
-      
-      {/* 主题 */}
+
       <div className="setting-group">
         <label className="setting-label">{t('settings.general.theme')}</label>
         <div className="theme-selector">
-          <button 
-            className={`theme-option ${settings.interface.theme === 'light' ? 'active' : ''}`} 
+          <button
+            className={`theme-option ${settings.interface.theme === 'light' ? 'active' : ''}`}
             onClick={() => switchTheme('light')}
           >
             <Sun size={16}/>{t('settings.general.themes.default')}
           </button>
-          <button 
-            className={`theme-option ${settings.interface.theme === 'dark' ? 'active' : ''}`} 
+          <button
+            className={`theme-option ${settings.interface.theme === 'dark' ? 'active' : ''}`}
             onClick={() => switchTheme('dark')}
           >
             <Moon size={16}/>{t('settings.general.themes.dark')}
           </button>
-          <button 
-            className={`theme-option fresh ${settings.interface.theme === 'fresh' ? 'active' : ''}`} 
+          <button
+            className={`theme-option fresh ${settings.interface.theme === 'fresh' ? 'active' : ''}`}
             onClick={() => switchTheme('fresh')}
           >
             <Leaf size={16}/>{t('settings.general.themes.fresh')}
@@ -249,18 +228,17 @@ const InterfaceSection = ({
         <p className="setting-hint">{t('settings.general.themeDesc')}</p>
       </div>
 
-      {/* 快捷键设置 */}
       <div className="setting-group" style={{marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border-primary)'}}>
         <label className="setting-label">⌨️ {t('settings.shortcuts.title')}</label>
         <p className="setting-hint" style={{marginBottom: '12px'}}>
           {t('shortcuts.hint')}
         </p>
-        
+
         <div className="shortcut-editor">
           {Object.entries({ ...defaultConfig.shortcuts, ...settings.shortcuts }).map(([action, shortcut]) => {
             const config = shortcutConfig[action];
             if (!config) return null;
-            
+
             return (
               <div key={action} className={`shortcut-row ${config.global ? 'global' : ''}`}>
                 <span className="shortcut-action">
@@ -277,23 +255,24 @@ const InterfaceSection = ({
                     onKeyDown={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      
+
                       if (e.key === 'Escape') {
                         cancelEditing(action, config);
                         return;
                       }
-                      
+
                       const keys = [];
                       if (e.ctrlKey) keys.push('Ctrl');
                       if (e.altKey) keys.push('Alt');
                       if (e.shiftKey) keys.push('Shift');
                       if (e.metaKey) keys.push('Meta');
-                      
+
                       const key = e.key.length === 1 ? e.key.toUpperCase() : e.key;
                       if (!['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) {
                         keys.push(key);
                       }
-                      
+
+                      // Require at least one non-modifier key before committing
                       if (keys.length > 0 && !['Control', 'Alt', 'Shift', 'Meta'].includes(keys[keys.length - 1])) {
                         finishEditing(action, config, keys.join('+'));
                       }
@@ -315,9 +294,9 @@ const InterfaceSection = ({
             );
           })}
         </div>
-        
-        <button 
-          className="link-button" 
+
+        <button
+          className="link-button"
           style={{marginTop: '12px'}}
           onClick={resetShortcuts}
         >

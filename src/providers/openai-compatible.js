@@ -1,18 +1,12 @@
-// src/providers/openai-compatible.js
-// OpenAI 兼容 API 基类
-// 适用于: local-llm, openai, deepseek, ollama 等所有 OpenAI 兼容接口
-//
-// 子类只需提供 metadata / constructor / 可选覆盖 testConnection / getModels
+// OpenAI-compatible chat/completions provider base. Used by local-llm, openai,
+// deepseek, ollama, and any other backend exposing /v1/chat/completions.
+// Subclasses typically only override metadata + _checkApiKey.
 
 import { BaseProvider, LANGUAGE_CODES } from './base.js';
 import createLogger from '../utils/logger.js';
 
 const logger = createLogger('OpenAICompat');
 
-/**
- * OpenAI 兼容 API Provider 基类
- * 封装了 chat/completions 的普通和流式调用
- */
 class OpenAICompatibleProvider extends BaseProvider {
 
   constructor(config = {}) {
@@ -29,8 +23,6 @@ class OpenAICompatibleProvider extends BaseProvider {
     return true;
   }
 
-  // ========== 翻译接口 ==========
-
   async translate(text, sourceLang = 'auto', targetLang = 'zh', options = {}) {
     if (!text?.trim()) {
       return { success: false, error: '文本为空' };
@@ -40,7 +32,7 @@ class OpenAICompatibleProvider extends BaseProvider {
     if (keyCheck) return keyCheck;
 
     try {
-      const systemContent = options.systemPrompt || 
+      const systemContent = options.systemPrompt ||
         `You are a professional translator. Translate the following text to ${LANGUAGE_CODES[targetLang]?.name || targetLang}. Output only the translation, nothing else.`;
 
       const messages = [
@@ -70,7 +62,7 @@ class OpenAICompatibleProvider extends BaseProvider {
     if (keyCheck) return keyCheck;
 
     try {
-      const systemContent = options.systemPrompt || 
+      const systemContent = options.systemPrompt ||
         `You are a professional translator. Translate the following text to ${LANGUAGE_CODES[targetLang]?.name || targetLang}. Output only the translation, nothing else.`;
 
       const messages = [
@@ -92,8 +84,7 @@ class OpenAICompatibleProvider extends BaseProvider {
     }
   }
 
-  // ========== 连接测试 ==========
-
+  // Probes /models — that's the cheapest endpoint that exercises auth
   async testConnection() {
     const keyCheck = this._checkApiKey();
     if (keyCheck) return { success: false, message: keyCheck.error };
@@ -146,8 +137,8 @@ class OpenAICompatibleProvider extends BaseProvider {
     }
   }
 
-  // ========== 通用聊天（用于 AI 分析、风格改写等）==========
-
+  // Generic chat for AI features (analysis, style rewrite) — higher temperature
+  // and token budget than translate()
   async chat(messages, options = {}) {
     try {
       const response = await fetch(`${this.config.endpoint}/chat/completions`, {
@@ -182,11 +173,6 @@ class OpenAICompatibleProvider extends BaseProvider {
     }
   }
 
-  // ========== 内部方法 ==========
-
-  /**
-   * 构建请求头（子类可覆盖）
-   */
   _buildHeaders() {
     const headers = { 'Content-Type': 'application/json' };
     if (this.config.apiKey) {
@@ -195,18 +181,13 @@ class OpenAICompatibleProvider extends BaseProvider {
     return headers;
   }
 
-  /**
-   * 检查 API Key（需要 key 的子类覆盖返回逻辑）
-   * @returns {null | {success: false, error: string}} null 表示通过
-   */
+  // Local providers (local-llm, ollama) override to always return null;
+  // hosted providers override to require a key.
   _checkApiKey() {
-    // 默认不检查（local-llm / ollama 不需要 key）
     return null;
   }
 
-  /**
-   * Chat Completion（非流式）
-   */
+  // Low temperature for translation (deterministic output preferred over creative)
   async _chatCompletion(messages) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
@@ -245,9 +226,7 @@ class OpenAICompatibleProvider extends BaseProvider {
     }
   }
 
-  /**
-   * Chat Completion（流式）
-   */
+  // SSE parser: data: lines carry JSON, terminator is data: [DONE]
   async _chatCompletionStream(messages, onChunk) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
@@ -280,8 +259,10 @@ class OpenAICompatibleProvider extends BaseProvider {
         const { done, value } = await reader.read();
         if (done) break;
 
+        // stream: true keeps multi-byte chars intact across chunk boundaries
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
+        // Last element might be partial — save for next iteration
         buffer = lines.pop() || '';
 
         for (const line of lines) {
