@@ -1,15 +1,10 @@
-// src/providers/deepl/index.js
-// DeepL 翻译源 - 专业翻译 API
+// DeepL translation provider.
 
 import { BaseProvider, LANGUAGE_CODES } from '../base.js';
 import icon from './icon.svg';
 
-/**
- * DeepL 翻译源
- * 专业翻译 API，质量极高
- */
 class DeepLProvider extends BaseProvider {
-  
+
   static metadata = {
     id: 'deepl',
     name: 'DeepL',
@@ -18,7 +13,7 @@ class DeepLProvider extends BaseProvider {
     color: '#0f2b46',
     type: 'api',
     helpUrl: 'https://www.deepl.com/pro-api',
-    
+
     configSchema: {
       apiKey: {
         type: 'password',
@@ -54,31 +49,26 @@ class DeepLProvider extends BaseProvider {
   }
 
   get supportsStreaming() {
-    return false;  // DeepL API 不支持流式
+    return false;
   }
 
-  /**
-   * 获取 API 基础地址
-   */
+  // Free-tier keys end in ":fx" and use a different host. Treat either explicit
+  // useFreeApi flag or the :fx suffix as free.
   get baseUrl() {
-    // 检查是否是免费 API Key（以 :fx 结尾）
     const isFreeKey = this.config.apiKey?.endsWith(':fx');
     const useFree = this.config.useFreeApi || isFreeKey;
-    
-    return useFree 
+
+    return useFree
       ? 'https://api-free.deepl.com/v2'
       : 'https://api.deepl.com/v2';
   }
 
-  /**
-   * 转换语言代码为 DeepL 格式
-   */
   _convertLangCode(code, isTarget = false) {
     const mapping = {
       'auto': null,
       'zh': 'ZH',
-      'zh-TW': 'ZH',  // DeepL 不区分简繁
-      'en': isTarget ? 'EN-US' : 'EN',  // 目标语言需要指定变体
+      'zh-TW': 'ZH', // DeepL has no Traditional Chinese — both map to ZH
+      'en': isTarget ? 'EN-US' : 'EN', // target needs an explicit regional variant
       'ja': 'JA',
       'ko': 'KO',
       'fr': 'FR',
@@ -90,13 +80,10 @@ class DeepLProvider extends BaseProvider {
       'nl': 'NL',
       'pl': 'PL',
     };
-    
+
     return mapping[code] || code?.toUpperCase();
   }
 
-  /**
-   * 翻译文本
-   */
   async translate(text, sourceLang = 'auto', targetLang = 'zh') {
     if (!text?.trim()) {
       return { success: false, error: '文本为空' };
@@ -110,13 +97,14 @@ class DeepLProvider extends BaseProvider {
       const params = new URLSearchParams();
       params.append('text', text);
       params.append('target_lang', this._convertLangCode(targetLang, true));
-      
-      // 源语言（auto 时不传）
+
+      // Omit source_lang for auto-detect
       if (sourceLang !== 'auto') {
         params.append('source_lang', this._convertLangCode(sourceLang, false));
       }
-      
-      // 正式程度（仅部分语言支持）
+
+      // Only some target languages accept the formality param; passing it
+      // unconditionally would 400 those
       if (this.config.formality && this.config.formality !== 'default') {
         params.append('formality', this.config.formality);
       }
@@ -135,6 +123,7 @@ class DeepLProvider extends BaseProvider {
         return { success: false, error: 'API Key 无效或已过期' };
       }
 
+      // DeepL-specific: 456 = quota exhausted (unique to their API)
       if (response.status === 456) {
         return { success: false, error: '配额已用完' };
       }
@@ -158,11 +147,11 @@ class DeepLProvider extends BaseProvider {
       };
     } catch (error) {
       this._lastError = error;
-      
+
       if (error.name === 'AbortError') {
         return { success: false, error: '请求超时' };
       }
-      
+
       return {
         success: false,
         error: error.message || '未知错误',
@@ -170,15 +159,13 @@ class DeepLProvider extends BaseProvider {
     }
   }
 
-  /**
-   * 测试连接
-   */
   async testConnection() {
     if (!this.config.apiKey) {
       return { success: false, message: '未配置 API Key' };
     }
 
     try {
+      // /usage is the cheapest endpoint and surfaces quota info as a bonus
       const response = await fetch(`${this.baseUrl}/usage`, {
         method: 'GET',
         headers: {
@@ -199,7 +186,7 @@ class DeepLProvider extends BaseProvider {
       const used = data.character_count || 0;
       const limit = data.character_limit || 0;
       const remaining = limit - used;
-      
+
       return {
         success: true,
         message: `连接成功，剩余字符: ${remaining.toLocaleString()} / ${limit.toLocaleString()}`,
@@ -213,9 +200,6 @@ class DeepLProvider extends BaseProvider {
     }
   }
 
-  /**
-   * 获取使用量
-   */
   async getUsage() {
     if (!this.config.apiKey) return null;
 
@@ -241,9 +225,6 @@ class DeepLProvider extends BaseProvider {
     }
   }
 
-  /**
-   * 获取支持的语言列表
-   */
   async getSupportedLanguages() {
     if (!this.config.apiKey) return [];
 
