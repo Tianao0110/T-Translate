@@ -1,6 +1,3 @@
-// src/i18n/locales/zh.js
-// 中文语言包 - 从 i18n.js 拆分
-
 const zh = {
   app: { name: "T-Translate", version: "版本" },
   nav: { translate: "翻译", history: "历史", favorites: "收藏", documents: "文档", settings: "设置" },
@@ -243,7 +240,7 @@ const zh = {
     normalMode: "普通模式", normalModeDesc: "点击 📷 截图识别当前区域",
     subtitleMode: "字幕模式", subtitleModeDesc: "点击 🎬 开启实时字幕翻译",
     firstUse: "首次使用字幕模式", firstUseDesc: "需要先框选视频原字幕区域",
-    // 玻璃窗口组件内文案
+    // Glass window strings
     captureSpace: "截图识别 (Space)", historyCtrlH: "历史记录 (Ctrl+H)",
     adjustOpacity: "点击调节透明度", closeEsc: "关闭 (Esc)",
     capturing: "截图中...", recognizing: "识别中...", translating: "翻译中...",
@@ -259,7 +256,7 @@ const zh = {
     triggerTimeout: "按钮自动消失时间", seconds: "秒", triggerTimeoutHint: "划词后翻译按钮自动消失的时间",
     showSourceByDefault: "默认显示原文", showSourceOnDesc: "翻译结果默认显示原文对照", showSourceOffDesc: "只显示翻译结果",
     autoCloseOnCopy: "复制后自动关闭", autoCloseOnDesc: "点击复制后自动关闭翻译窗口", autoCloseOffDesc: "复制后保持窗口打开",
-    // CapsLock 直出模式
+    // CapsLock sticky direct mode
     stickyCapsLockLabel: "CapsLock 直出模式",
     stickyCapsLockDesc: "使用 CapsLock 作为划词直出模式",
     stickyWarningTitle: "开启 CapsLock 直出模式？",
@@ -272,7 +269,7 @@ const zh = {
     instructions: "使用说明", workflow: "划词翻译流程",
     step1: "用鼠标选中需要翻译的文字", step2: "松开鼠标后，旁边出现翻译按钮", step3: "点击按钮开始翻译", step4: "翻译完成后显示结果卡片",
     quickActions: "快捷操作", action1: "拖动标题栏移动窗口", action2: "右下角调整大小", action3: "点击「原文」显示原文对照", action4: "点击「复制」或直接选中文字复制", action5: "按 ESC 或右键关闭",
-    // 划词翻译组件内文案
+    // Selection translator strings
     translateFailed: "翻译失败",
     noText: "未获取到文字",
     emptyContent: "选中内容为空",
@@ -431,7 +428,7 @@ const zh = {
     noVoicesInstalled: "系统未安装任何语音包，请在系统设置中安装语音",
     noVoiceForLang: "系统未安装{{lang}}语音包"
   },
-  // ========== 新增：文档翻译组件翻译键 ==========
+  // ===== DocumentTranslator keys =====
   documentTranslator: {
     title: "文档翻译",
     sourceLang: "源语言",
@@ -441,7 +438,7 @@ const zh = {
       "纯文本": "纯文本", "Markdown": "Markdown", "SRT 字幕": "SRT 字幕", "WebVTT 字幕": "WebVTT 字幕",
       "PDF 文档": "PDF 文档", "Word 文档": "Word 文档", "CSV 表格": "CSV 表格", "JSON 文件": "JSON 文件", "EPUB 电子书": "EPUB 电子书"
     },
-    // 搜索替换
+    // Search & replace
     search: {
       title: "搜索",
       searchPlaceholder: "搜索段落内容...",
@@ -452,7 +449,7 @@ const zh = {
       prev: "上一个",
       next: "下一个"
     },
-    // 段落
+    // Segments
     segment: {
       edited: "译文已修改",
       retranslate: "重新翻译",
@@ -461,26 +458,26 @@ const zh = {
       save: "保存",
       cancel: "取消"
     },
-    // 进度恢复
+    // Progress restore
     restore: {
       found: "发现上次的翻译进度（{{count}} 条已译）",
       restore: "恢复进度",
       dismiss: "忽略"
     },
-    // 显示样式
+    // Display styles
     displayStyles: {
       below: "上下对照",
       sideBySide: "左右对照",
       sourceOnly: "仅原文",
       translatedOnly: "仅译文"
     },
-    // 段落状态
+    // Segment status
     status: {
       translating: "翻译中...",
       pending: "等待翻译",
       failed: "翻译失败"
     },
-    // 按钮和操作
+    // Actions
     actions: {
       retry: "重试",
       export: "导出",
@@ -490,14 +487,14 @@ const zh = {
       stop: "停止",
       retryFailed: "重试失败 ({{count}})"
     },
-    // 上传区域
+    // Upload area
     upload: {
       dropHere: "拖放文件到这里",
       orClick: "或点击选择文件",
       supported: "支持：{{formats}}",
       parsing: "正在解析文件..."
     },
-    // 密码弹窗
+    // Password modal
     password: {
       title: "文件已加密",
       desc: "文件 <strong>{{filename}}</strong> 需要密码才能打开",
@@ -506,7 +503,7 @@ const zh = {
       confirm: "确定",
       wrongPassword: "密码错误，请重试"
     },
-    // 通知消息
+    // Notifications
     notify: {
       fileLoaded: "文件加载成功：{{count}} 个段落",
       fileLoadedWithPages: "文件加载成功：{{count}} 个段落 ({{pages}} 页)",
@@ -524,7 +521,7 @@ const zh = {
       fileTooLarge: "文件过大，最大支持 20MB",
       pdfHint: "PDF 仅提取文字内容，图片及复杂排版可能丢失，建议使用纯文本格式"
     },
-    // 导出菜单
+    // Export menu
     export: {
       textFormat: "文本格式",
       bilingualTxt: "双语 TXT",
@@ -538,7 +535,7 @@ const zh = {
       srtSubtitle: "SRT 字幕",
       vttSubtitle: "VTT 字幕"
     },
-    // 统计信息
+    // Stats
     stats: {
       title: "详细统计",
       totalSegments: "总段落",
@@ -553,7 +550,7 @@ const zh = {
       elapsedTime: "翻译用时",
       clearCache: "清除缓存"
     },
-    // 进度信息
+    // Progress
     progress: {
       completed: "已完成",
       skipped: "跳过",
@@ -562,7 +559,7 @@ const zh = {
       edited: "已修改译文",
       editedHint: "点击定位到已修改的译文"
     },
-    // 底部控制栏
+    // Footer
     footer: {
       auto: "自动",
       batchMode: "批量",
@@ -573,19 +570,19 @@ const zh = {
       glossaryDisabledHint: "术语表已禁用",
       translatingStatus: "翻译中"
     },
-    // 大纲
+    // Outline
     outline: {
       title: "大纲"
     },
-    // 文件名后缀
+    // File suffixes
     fileSuffix: {
       bilingual: "_双语",
       translatedOnly: "_译文"
     },
-    // 默认文档标题
+    // Default doc title
     defaultDocTitle: "翻译文档"
   },
-  // ========== 错误边界 ==========
+  // ===== Error Boundary =====
   errorBoundary: {
     title: "出现了一些问题",
     windowError: "{{name}}出现了问题",
@@ -594,7 +591,7 @@ const zh = {
     reload: "刷新页面",
     details: "错误详情"
   },
-  // ========== 新增：托盘菜单翻译键 ==========
+  // ===== Tray menu keys =====
   titleBar: {
     minimize: "最小化", maximize: "最大化", restore: "还原", close: "关闭"
   },
