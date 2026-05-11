@@ -1,5 +1,4 @@
-// src/components/SettingsPanel/sections/PrivacySection.jsx
-// 隐私与安全设置区块组件 - 从 SettingsPanel 拆分
+// Privacy mode picker + data-management actions.
 
 import React from 'react';
 import { useTranslation } from 'react-i18next';
@@ -7,9 +6,6 @@ import { Zap, Shield, Lock, CheckCircle, AlertCircle, Trash2 } from 'lucide-reac
 import useTranslationStore from '../../../stores/translation-store';
 import { PRIVACY_MODES, PRIVACY_MODE_IDS } from '../constants.js';
 
-/**
- * 隐私与安全设置区块
- */
 const PrivacySection = ({
   settings,
   updateSetting,
@@ -19,7 +15,8 @@ const PrivacySection = ({
   const currentMode = useTranslationStore.getState().translationMode || PRIVACY_MODE_IDS.STANDARD;
   const modeConfig = PRIVACY_MODES[currentMode];
 
-  // 获取模式图标组件
+  // PRIVACY_MODES stores icon names as strings (so the config file stays
+  // pure data); resolve them to actual lucide components here.
   const getModeIcon = (iconName, size = 24) => {
     const icons = {
       'Zap': Zap,
@@ -30,7 +27,6 @@ const PrivacySection = ({
     return <IconComponent size={size} />;
   };
 
-  // 获取国际化的模式名称
   const getModeName = (modeId) => {
     const modeKeys = {
       [PRIVACY_MODE_IDS.STANDARD]: 'privacy.modes.standard',
@@ -41,7 +37,6 @@ const PrivacySection = ({
     return t(modeKeys[modeId] || 'privacy.modes.standard');
   };
 
-  // 获取国际化的模式描述
   const getModeDesc = (modeId) => {
     const descKeys = {
       [PRIVACY_MODE_IDS.STANDARD]: 'privacy.modes.standardDesc',
@@ -52,7 +47,8 @@ const PrivacySection = ({
     return t(descKeys[modeId] || 'privacy.modes.standardDesc');
   };
 
-  // 切换隐私模式
+  // Mode change must hit three places: settings store, translation-store
+  // (for the secure-mode history stash), and main process (for the offline gate)
   const handleModeChange = (mode) => {
     updateSetting('privacy', 'mode', mode.id);
     useTranslationStore.getState().setTranslationMode(mode.id);
@@ -60,7 +56,6 @@ const PrivacySection = ({
     notify(t('privacy.switchedTo', { mode: getModeName(mode.id) }), 'success');
   };
 
-  // 清除历史记录
   const handleClearHistory = () => {
     if (window.confirm(t('privacy.clearHistoryConfirm'))) {
       useTranslationStore.getState().clearHistory?.();
@@ -68,7 +63,6 @@ const PrivacySection = ({
     }
   };
 
-  // 清除所有数据
   const handleClearAllData = () => {
     if (window.confirm(t('privacy.clearAllConfirm'))) {
       localStorage.clear();
@@ -77,7 +71,6 @@ const PrivacySection = ({
     }
   };
 
-  // 清除翻译缓存
   const handleClearCache = () => {
     if (window.confirm(t('translationSettings.clearCacheConfirm'))) {
       localStorage.removeItem('translation-cache');

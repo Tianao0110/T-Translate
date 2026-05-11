@@ -1,27 +1,11 @@
-// src/components/SettingsPanel/sections/shared.jsx
-// 设置面板子组件共享的工具和类型
+// Reusable building blocks for settings sections.
 
 import { Eye, EyeOff } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-/**
- * 设置项通用 Props 类型定义（JSDoc）
- * @typedef {Object} SectionProps
- * @property {Object} settings - 当前设置对象
- * @property {Function} updateSetting - 更新设置的函数 (category, key, value)
- * @property {Function} notify - 通知函数 (message, type)
- * @property {Object} [collapsedGroups] - 折叠状态
- * @property {Function} [toggleGroup] - 切换折叠状态
- * @property {Object} [showApiKeys] - API Key 显示状态
- * @property {Function} [setShowApiKeys] - 设置 API Key 显示状态
- */
-
-/**
- * API Key 输入框组件
- */
-export const ApiKeyInput = ({ 
-  value, 
-  onChange, 
+export const ApiKeyInput = ({
+  value,
+  onChange,
   placeholder = 'API Key',
   showKey,
   onToggleShow,
@@ -29,14 +13,14 @@ export const ApiKeyInput = ({
 }) => {
   return (
     <div className={`api-key-input-wrapper ${className}`}>
-      <input 
+      <input
         type={showKey ? "text" : "password"}
         className="setting-input compact"
         placeholder={placeholder}
         value={value || ''}
         onChange={(e) => onChange(e.target.value)}
       />
-      <button 
+      <button
         type="button"
         className="api-key-toggle"
         onClick={onToggleShow}
@@ -47,12 +31,9 @@ export const ApiKeyInput = ({
   );
 };
 
-/**
- * 设置分组组件
- */
-export const SettingGroup = ({ 
-  label, 
-  hint, 
+export const SettingGroup = ({
+  label,
+  hint,
   children,
   className = ''
 }) => {
@@ -65,9 +46,6 @@ export const SettingGroup = ({
   );
 };
 
-/**
- * 开关设置组件
- */
 export const ToggleSetting = ({
   checked,
   onChange,
@@ -78,8 +56,8 @@ export const ToggleSetting = ({
   return (
     <div className="setting-group">
       <label className="setting-toggle">
-        <input 
-          type="checkbox" 
+        <input
+          type="checkbox"
           checked={checked}
           onChange={(e) => onChange(e.target.checked)}
           disabled={disabled}
@@ -91,9 +69,6 @@ export const ToggleSetting = ({
   );
 };
 
-/**
- * 可折叠设置区块
- */
 export const CollapsibleSection = ({
   id,
   title,
@@ -104,14 +79,14 @@ export const CollapsibleSection = ({
   defaultOpen = true
 }) => {
   const isOpen = collapsed !== undefined ? !collapsed : defaultOpen;
-  
+
   return (
     <details className="setting-section" open={isOpen}>
-      <summary 
-        className="section-header" 
-        onClick={(e) => { 
-          e.preventDefault(); 
-          onToggle?.(id); 
+      <summary
+        className="section-header"
+        onClick={(e) => {
+          e.preventDefault();
+          onToggle?.(id);
         }}
       >
         <span className="section-title">{title}</span>
@@ -124,9 +99,6 @@ export const CollapsibleSection = ({
   );
 };
 
-/**
- * OCR 引擎项组件
- */
 export const OcrEngineItem = ({
   name,
   description,
@@ -155,7 +127,7 @@ export const OcrEngineItem = ({
       </div>
       <div className="engine-actions">
         {actions || (
-          <button 
+          <button
             className={`btn ${isActive ? 'active' : ''}`}
             onClick={onSelect}
           >

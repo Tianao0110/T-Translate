@@ -1,12 +1,8 @@
-// src/components/SettingsPanel/sections/GlassWindowSection.jsx
-// 玻璃窗口设置区块组件 - 国际化版
+// Glass overlay window settings.
 
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
-/**
- * 玻璃窗口设置区块
- */
 const GlassWindowSection = ({
   settings,
   updateSetting,
@@ -14,7 +10,8 @@ const GlassWindowSection = ({
 }) => {
   const { t } = useTranslation();
 
-  // 安全读取 glassWindow 设置，兼容 glass/glassWindow 两种 key
+  // Older settings versions stored these under `glass`; newer under `glassWindow`.
+  // Merge both so a migration-in-progress doesn't lose values.
   const gw = {
     defaultOpacity: 0.95,
     rememberPosition: false,
@@ -24,12 +21,11 @@ const GlassWindowSection = ({
     ...(settings.glass || {}),
     ...(settings.glassWindow || {}),
   };
-  // 兼容 opacity → defaultOpacity
+  // `opacity` (legacy) -> `defaultOpacity` (current)
   if (gw.defaultOpacity === undefined && gw.opacity !== undefined) {
     gw.defaultOpacity = gw.opacity;
   }
 
-  // 获取 OCR 引擎显示名称
   const getOcrEngineName = (engine) => {
     const names = {
       'llm-vision': 'LLM Vision',
