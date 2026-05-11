@@ -1,13 +1,10 @@
-// electron/ipc/shortcuts.js
-// 快捷键管理 IPC handlers
-// 包含：获取、更新、暂停、恢复快捷键
+// Global shortcut IPC: get/update/pause/resume + startup registration.
 
 const { ipcMain, globalShortcut } = require('electron');
 const { CHANNELS } = require('../shared/channels');
 const logger = require('../utils/logger')('IPC:Shortcuts');
 const { t } = require('../shared/main-i18n');
 
-// 默认快捷键配置
 const DEFAULT_SHORTCUTS = {
   screenshot: 'Alt+Q',
   toggleWindow: 'CommandOrControl+Shift+W',
@@ -15,25 +12,16 @@ const DEFAULT_SHORTCUTS = {
   selectionTranslate: 'CommandOrControl+Shift+T',
 };
 
-/**
- * 将渲染进程的快捷键格式转换为 Electron 格式
- * @param {string} shortcut - 快捷键字符串
- * @returns {string}
- */
+// Renderer uses Ctrl/Meta; Electron globalShortcut wants CommandOrControl/Command
 function toElectronFormat(shortcut) {
   return shortcut
     .replace(/Ctrl/g, 'CommandOrControl')
     .replace(/Meta/g, 'Command');
 }
 
-/**
- * 注册快捷键管理 IPC handlers
- * @param {Object} ctx - 共享上下文
- */
 function register(ctx) {
   const { store, getMainWindow, managers } = ctx;
-  
-  // 获取快捷键处理函数映射
+
   const getShortcutHandlers = () => ({
     screenshot: () => managers.startScreenshot?.(true),
     toggleWindow: () => {
@@ -50,53 +38,38 @@ function register(ctx) {
     glassWindow: () => managers.toggleGlassWindow?.(),
     selectionTranslate: () => managers.toggleSelectionTranslate?.(),
   });
-  
-  // ==================== 获取快捷键 ====================
-  
-  /**
-   * 获取当前快捷键配置
-   */
+
   ipcMain.handle(CHANNELS.SHORTCUTS.GET, () => {
     const settings = store.get('settings', {});
     return settings.shortcuts || {};
   });
-  
-  // ==================== 更新快捷键 ====================
-  
-  /**
-   * 更新某个快捷键
-   */
+
   ipcMain.handle(CHANNELS.SHORTCUTS.UPDATE, (event, action, shortcut) => {
     try {
       const handlers = getShortcutHandlers();
       const handler = handlers[action];
-      
+
       if (!handler) {
         logger.warn('Unknown action:', action);
         return { success: false, error: 'Unknown action' };
       }
-      
-      // 转换格式
+
       const electronShortcut = toElectronFormat(shortcut);
-      
-      // 获取旧的快捷键
+
       const settings = store.get('settings', {});
       const oldShortcut = settings.shortcuts?.[action] || DEFAULT_SHORTCUTS[action];
       const oldElectronShortcut = toElectronFormat(oldShortcut);
-      
-      // 先注销旧的快捷键
+
       try {
         globalShortcut.unregister(oldElectronShortcut);
         logger.debug('Unregistered old shortcut:', oldElectronShortcut);
       } catch (e) {
         logger.debug('Failed to unregister old shortcut:', oldElectronShortcut);
       }
-      
-      // 注册新的快捷键
+
       const success = globalShortcut.register(electronShortcut, handler);
-      
+
       if (success) {
-        // 保存到设置
         const newSettings = {
           ...settings,
           shortcuts: {
@@ -108,7 +81,7 @@ function register(ctx) {
         logger.info(`Shortcut updated: ${action} [${oldShortcut} → ${shortcut}]`);
         return { success: true };
       } else {
-        // 注册失败，尝试恢复旧的
+        // Restore previous binding if new one collides with another app
         try {
           globalShortcut.register(oldElectronShortcut, handler);
         } catch (e) {
@@ -122,24 +95,20 @@ function register(ctx) {
       return { success: false, error: error.message };
     }
   });
-  
-  // ==================== 暂停快捷键 ====================
-  
-  /**
-   * 暂时禁用某个全局快捷键（用于编辑时防止误触发）
-   */
+
+  // Pause = unregister so the user can press the key while editing the binding
   ipcMain.handle(CHANNELS.SHORTCUTS.PAUSE, (event, action) => {
     try {
       const settings = store.get('settings', {});
       const shortcut = settings.shortcuts?.[action] || DEFAULT_SHORTCUTS[action];
-      
+
       if (!shortcut) {
         return { success: false, error: 'Shortcut not found' };
       }
-      
+
       const electronShortcut = toElectronFormat(shortcut);
       globalShortcut.unregister(electronShortcut);
-      
+
       logger.debug('Paused shortcut:', action, electronShortcut);
       return { success: true, shortcut };
     } catch (error) {
@@ -147,31 +116,26 @@ function register(ctx) {
       return { success: false, error: error.message };
     }
   });
-  
-  // ==================== 恢复快捷键 ====================
-  
-  /**
-   * 恢复某个全局快捷键
-   */
+
   ipcMain.handle(CHANNELS.SHORTCUTS.RESUME, (event, action) => {
     try {
       const handlers = getShortcutHandlers();
       const handler = handlers[action];
-      
+
       if (!handler) {
         return { success: false, error: 'Unknown action' };
       }
-      
+
       const settings = store.get('settings', {});
       const shortcut = settings.shortcuts?.[action] || DEFAULT_SHORTCUTS[action];
-      
+
       if (!shortcut) {
         return { success: false, error: 'Shortcut not found' };
       }
-      
+
       const electronShortcut = toElectronFormat(shortcut);
       const success = globalShortcut.register(electronShortcut, handler);
-      
+
       if (success) {
         logger.debug('Resumed shortcut:', action, electronShortcut);
         return { success: true };
@@ -184,21 +148,18 @@ function register(ctx) {
       return { success: false, error: error.message };
     }
   });
-  
+
   logger.info('Shortcuts IPC handlers registered');
 }
 
-/**
- * 注册所有默认快捷键（在应用启动时调用）
- * @param {Object} ctx - 共享上下文
- */
+// Returns list of bindings that failed (likely held by another process)
 function registerAllShortcuts(ctx) {
   const { store, getMainWindow, managers } = ctx;
-  
+
   const settings = store.get('settings', {});
   const shortcuts = settings.shortcuts || {};
-  const failed = [];  // 记录注册失败的快捷键
-  
+  const failed = [];
+
   const handlers = {
     screenshot: () => managers.startScreenshot?.(true),
     toggleWindow: () => {
@@ -215,13 +176,12 @@ function registerAllShortcuts(ctx) {
     glassWindow: () => managers.toggleGlassWindow?.(),
     selectionTranslate: () => managers.toggleSelectionTranslate?.(),
   };
-  
-  // 注册每个快捷键
+
   for (const [action, defaultKey] of Object.entries(DEFAULT_SHORTCUTS)) {
     const shortcut = shortcuts[action] || defaultKey;
     const electronShortcut = toElectronFormat(shortcut);
     const handler = handlers[action];
-    
+
     if (handler) {
       try {
         const success = globalShortcut.register(electronShortcut, handler);
@@ -237,14 +197,11 @@ function registerAllShortcuts(ctx) {
       }
     }
   }
-  
+
   logger.info(`Shortcuts registered (${failed.length} failed)`);
   return failed;
 }
 
-/**
- * 注销所有快捷键（在应用退出时调用）
- */
 function unregisterAllShortcuts() {
   globalShortcut.unregisterAll();
   logger.info('All shortcuts unregistered');
