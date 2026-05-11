@@ -1,6 +1,5 @@
-// electron/main.js
-// 主进程入口 - 精简版
-// 窗口创建已移至 managers/window-manager.js
+// Main process entry — slimmed.
+// Window creation lives in managers/window-manager.js.
 
 const {
   app,
@@ -10,7 +9,6 @@ const {
 } = require('electron');
 const path = require('path');
 
-// ==================== 模块导入 ====================
 const { store, runtime, windows, isDev } = require('./state');
 const { CHANNELS } = require('./shared/channels');
 const { initIPC } = require('./ipc');
@@ -19,58 +17,50 @@ const { makeWindowInvisibleToCapture, isCapsLockOn } = require('./utils/native-h
 const { fetchSelectedText } = require('./ipc/selection');
 const { SelectionStateMachine, STATES } = require('./utils/selection-state-machine');
 
-// 全局状态机实例
 let selectionStateMachine = null;
 const logger = require('./utils/logger')('Main');
 
-// 管理器
 const { createMenu } = require('./managers/menu-manager');
 const { createTray, updateTrayMenu, destroyTray } = require('./managers/tray-manager');
 const windowManager = require('./managers/window-manager');
 
-// 截图模块
 const screenshotModule = require('./screenshot-module');
 
-// 多显示器支持
 const displayHelper = require('./utils/display-helper');
 
-// ==================== 划词翻译逻辑 ====================
+// ===== Selection translate logic =====
 
-/**
- * 延迟确认：检测双击是否真的选中了文本
- * 通过 Ctrl+C 获取选中内容，如果有内容则显示触发图标
- */
+// Delayed-confirm path for double/triple click. The system needs time to react before
+// we can check if text actually got selected.
 async function handleDelayedConfirm(x, y, rect) {
   try {
     const { hasTextSelection, checkSelectionViaClipboard } = require('./utils/native-helper');
-    
-    // 等待一小段时间确保双击选中完成（系统需要时间响应）
-    // Office/Outlook 等复杂应用可能需要更长时间（弹出工具栏等）
+
+    // Wait a beat — double-click selection is async on Windows. Office / Outlook
+    // may need longer (toolbars pop up etc.).
     await new Promise(resolve => setTimeout(resolve, 80));
-    
-    // ========== 第一层 + 第二层：零剪贴板检测 ==========
+
+    // ----- Layer 1+2: clipboard-free probe -----
     const selectionCheck = hasTextSelection();
     logger.debug(`Selection check: ${selectionCheck.hasSelection} (${selectionCheck.method}: ${selectionCheck.reason})`);
-    
+
     if (selectionCheck.hasSelection === true) {
-      // 确认有选区，显示图标
       logger.debug('Delayed confirm: selection detected via Win32 API (layer 1-2)');
       showSelectionTrigger(x, y, rect);
       selectionStateMachine.reset();
       return;
     }
-    
+
     if (selectionCheck.hasSelection === false) {
-      // 确认无选区，不显示
       logger.debug('Delayed confirm: no selection detected (layer 1-2)');
       selectionStateMachine.reset();
       return;
     }
-    
-    // ========== 第三层：剪贴板兜底（复杂应用） ==========
-    // 检测是否是 Office/Outlook 应用（需要更长的等待时间和更多重试）
+
+    // ----- Layer 3: clipboard fallback for complex apps -----
+    // Office / Outlook need longer waits + retry.
     const reason = selectionCheck.reason || '';
-    const isOfficeApp = reason.includes('OpusApp') || 
+    const isOfficeApp = reason.includes('OpusApp') ||
                         reason.includes('EXCEL') ||
                         reason.includes('PPTFrameClass') ||
                         reason.includes('rctrl_renwnd32') ||
@@ -80,37 +70,39 @@ async function handleDelayedConfirm(x, y, rect) {
                         reason.includes('OlkPeoplePickerEdit') ||
                         reason.includes('Outlook Host');
     logger.debug(`Delayed confirm: layer 3 - clipboard fallback (office=${isOfficeApp})`);
-    
+
     const clipboardResult = await checkSelectionViaClipboard({ isComplexApp: isOfficeApp });
 
     if (clipboardResult.hasSelection === true) {
       logger.debug(`Delayed confirm: text selected via clipboard "${clipboardResult.text.substring(0, 20)}..."`);
       showSelectionTrigger(x, y, rect, clipboardResult.text);
     } else if (clipboardResult.hasSelection === null) {
-      // 防抖跳过或出错
+      // Debounced or errored.
       logger.debug('Delayed confirm: clipboard check skipped or failed');
     } else {
       logger.debug('Delayed confirm: no text selected, skip trigger');
     }
-    
-    // 重置状态机
+
     selectionStateMachine.reset();
   } catch (err) {
     logger.error('handleDelayedConfirm error:', err);
-    // 确保状态机被重置，避免卡住
+    // Belt-and-suspenders reset.
     if (selectionStateMachine) {
       selectionStateMachine.reset();
     }
   }
 }
 
-/**
- * 显示划词翻译触发点
- * 从主窗口获取实时语言设置
- */
+// Show the trigger icon at (mouseX, mouseY). Reads language settings from electron-store
+// (TranslationPanel mirrors them on every change — single source of truth).
+//
+// `prefetchedText` (v0.2.5 Phase B): when the caller already captured selected text
+// (Layer 3 path), pass it through. The renderer stores it in a ref and uses it
+// directly on icon click, skipping the second clipboard fetch (which is the root cause
+// of the "press but no content" issue in complex apps with focus-transfer behavior).
 async function showSelectionTrigger(mouseX, mouseY, rect, prefetchedText = null) {
   logger.debug(`showSelectionTrigger called (prefetched=${prefetchedText ? prefetchedText.length + ' chars' : 'none'})`);
-  
+
   if (!runtime.selectionEnabled) return;
 
   const settings = store.get('settings', {});
@@ -120,9 +112,6 @@ async function showSelectionTrigger(mouseX, mouseY, rect, prefetchedText = null)
 
   runtime.lastSelectionRect = rect;
 
-  // 从 electron-store 读取语言设置
-  // TranslationPanel 在每次语言变化时已同步到 settings.translation
-  // 单一数据源: electron-store，无需 executeJavaScript 注入渲染进程
   const currentTargetLang = translationSettings.targetLanguage
     || translationSettings.defaultTargetLang
     || settings.targetLanguage
@@ -135,11 +124,10 @@ async function showSelectionTrigger(mouseX, mouseY, rect, prefetchedText = null)
 
   const win = windowManager.createSelectionWindow();
 
-  // 圆点位置
+  // Icon position with screen-edge clamping.
   let triggerX = mouseX + 8;
   let triggerY = mouseY + 8;
 
-  // 屏幕边界检测
   const display = screen.getDisplayNearestPoint({ x: mouseX, y: mouseY });
   const bounds = display.bounds;
 
@@ -170,14 +158,13 @@ async function showSelectionTrigger(mouseX, mouseY, rect, prefetchedText = null)
         autoCloseOnCopy: selectionSettings.autoCloseOnCopy || false,
         minChars: selectionSettings.minChars || 2,
         maxChars: selectionSettings.maxChars || 500,
-        windowOpacity: selectionSettings.windowOpacity || 95,  // 窗口透明度
+        windowOpacity: selectionSettings.windowOpacity || 95,
       },
       translation: {
         targetLanguage: currentTargetLang,
         sourceLanguage: currentSourceLang,
       },
-      // Phase B pass-through: Layer 3 抓到的 text 一并送过去，
-      // 让 renderer 点击图标时可以直接用，跳过 GET_TEXT 二次 fetch（解 "按下没内容"）
+      // v0.2.5 Phase B pass-through — see function docstring.
       text: prefetchedText,
     });
   };
@@ -190,13 +177,14 @@ async function showSelectionTrigger(mouseX, mouseY, rect, prefetchedText = null)
 }
 
 /**
- * CapsLock 直出路径：跳过图标，直接抓文字 + 弹翻译卡片
+ * CapsLock sticky direct path: skip the trigger icon, capture text and pop the card
+ * straight away. Invoked from the mouseup handler when FSM returns `{ skipIcon: true }`.
  *
- * 由 mouseup 回调在 FSM 返回 { skipIcon: true } 时调用。
- *   1. fetchSelectedText 预抓文字，失败则静默返回（不开窗口）
- *   2. 创建/复用 selection window，失败 fail-safe 静默返回
- *   3. 发 SHOW_DIRECT IPC（等 webContents 就绪再发，防止 message 丢失）
- *   4. 渲染进程 onShowDirect listener 接文字 → loading → 翻译 → overlay
+ * Failure modes are silent: if no text captured OR window create failed, the function
+ * returns without showing anything (the user sees nothing, not an error).
+ *
+ * payload shape intentionally mirrors SHOW_TRIGGER so the renderer's two paths stay
+ * consistent.
  */
 async function handleHotkeyDirectPath(x, y, rect) {
   logger.debug('handleHotkeyDirectPath called', { x, y, rect });
@@ -206,14 +194,12 @@ async function handleHotkeyDirectPath(x, y, rect) {
     return;
   }
 
-  // 1. 预抓文字 —— 决定是否值得开窗口
   const text = await fetchSelectedText();
   if (!text || !text.trim()) {
     logger.debug('Hotkey: no text captured, silent fail (no window opened)');
     return;
   }
 
-  // 2. 读取设置（和 showSelectionTrigger 现有做法一致）
   const settings = store.get('settings', {});
   const selectionSettings = settings.selection || {};
   const interfaceSettings = settings.interface || {};
@@ -229,15 +215,14 @@ async function handleHotkeyDirectPath(x, y, rect) {
 
   runtime.lastSelectionRect = rect;
 
-  // 3. 创建/复用 selection window（fail-safe）
   const win = windowManager.createSelectionWindow();
   if (!win || win.isDestroyed()) {
     logger.warn('Hotkey: createSelectionWindow returned null/destroyed, aborting');
     return;
   }
 
-  // 4. 定位窗口 —— 和 showSelectionTrigger 一致（鼠标 +8 偏移，初始 28×28）。
-  // 翻译结果到达后渲染进程会 resize 窗口到翻译卡片尺寸。
+  // Match showSelectionTrigger geometry (mouse + 8, 28×28). Renderer resizes to
+  // translation card size once result arrives.
   const winW = 28;
   const winH = 28;
   let posX = x + 8;
@@ -246,7 +231,6 @@ async function handleHotkeyDirectPath(x, y, rect) {
   const display = screen.getDisplayNearestPoint({ x: posX, y: posY });
   const displayBounds = display.bounds;
 
-  // 屏幕边界检测
   if (posX + winW > displayBounds.x + displayBounds.width) {
     posX = x - winW - 8;
   }
@@ -261,8 +245,7 @@ async function handleHotkeyDirectPath(x, y, rect) {
     height: winH,
   });
 
-  // 5. 发 SHOW_DIRECT（等 webContents 就绪再发，防止 message 丢失）
-  // payload 结构故意和 SHOW_TRIGGER 对齐，这样 renderer 两条路径行为一致
+  // SHOW_DIRECT must wait for webContents to be ready, otherwise the message is dropped.
   const sendData = () => {
     win.webContents.send(CHANNELS.SELECTION.SHOW_DIRECT, {
       text: text.trim(),
@@ -290,9 +273,6 @@ async function handleHotkeyDirectPath(x, y, rect) {
   }
 }
 
-/**
- * 隐藏划词翻译窗口
- */
 function hideSelectionWindow() {
   if (windows.selection && !windows.selection.isDestroyed()) {
     windows.selection.hide();
@@ -300,40 +280,29 @@ function hideSelectionWindow() {
   }
 }
 
-/**
- * 显示划词翻译窗口并直接显示翻译结果（截图翻译联动用）
- * @param {Object} data - 翻译结果数据
- * @param {string} data.sourceText - 原文
- * @param {string} data.translatedText - 译文
- * @param {string} data.sourceLanguage - 源语言
- * @param {string} data.targetLanguage - 目标语言
- */
-/**
- * 发送 OCR 文字给划词窗口翻译
- */
+// Send OCR'd text to the selection window — Mode 2 of SHOW_RESULT: the window receives
+// raw text and translates it itself (so the same translator + history flow gets reused).
 function showSelectionWithText(text) {
   const win = runtime.screenshotSelectionWindow;
-  
+
   if (!win || win.isDestroyed()) {
     logger.warn('No selection window to send text to');
     return;
   }
-  
+
   logger.debug('Sending OCR text to selection window');
-  
+
   const settings = store.get('settings', {});
   const interfaceSettings = settings.interface || {};
   const selectionSettings = settings.selection || {};
   const translationSettings = settings.translation || {};
-  
-  // 读取目标语言（与划词翻译 showSelectionTrigger 保持一致）
+
   const currentTargetLang = translationSettings.targetLanguage
     || settings.targetLanguage
     || 'zh';
-  
-  // 发送文字 + 目标语言，划词窗口收到后会自己翻译
+
   win.webContents.send(CHANNELS.SELECTION.SHOW_RESULT, {
-    text: text,  // 模式2：有 text 无 translatedText，划词窗口自己翻译
+    text: text,  // Mode 2: text only, renderer translates.
     targetLanguage: currentTargetLang,
     theme: interfaceSettings.theme || 'light',
     settings: {
@@ -343,9 +312,8 @@ function showSelectionWithText(text) {
   });
 }
 
-/**
- * 直接在截图划词窗口显示结果（不走翻译，用于 OCR 失败等）
- */
+// Show result directly (Mode 3): already-translated text. Used for OCR-failure paths
+// where the renderer should display content (or an error) without translating again.
 function showSelectionResult(data) {
   const win = runtime.screenshotSelectionWindow;
 
@@ -369,15 +337,12 @@ function showSelectionResult(data) {
   });
 }
 
-/**
- * 关闭截图加载窗口（OCR 失败时调用）
- */
+// Close the screenshot-OCR loading window. If errorMsg is provided, show it for 4s first.
 function hideSelectionLoading(errorMsg) {
   const win = runtime.screenshotSelectionWindow;
-  
+
   if (win && !win.isDestroyed()) {
     if (errorMsg) {
-      // 显示错误，2秒后关闭
       win.webContents.send(CHANNELS.SELECTION.SHOW_RESULT, {
         sourceText: '',
         translatedText: '',
@@ -390,13 +355,10 @@ function hideSelectionLoading(errorMsg) {
       win.close();
     }
   }
-  
+
   runtime.screenshotSelectionWindow = null;
 }
 
-/**
- * 显示截图加载窗口
- */
 async function showSelectionLoading(bounds) {
   logger.debug('Showing selection loading window');
 
@@ -407,14 +369,13 @@ async function showSelectionLoading(bounds) {
   const win = windowManager.createSelectionWindow();
   runtime.screenshotSelectionWindow = win;
 
-  // 定位到截图区域右下角
+  // Position at the bottom-right of the captured screenshot area.
   let posX = bounds.x + bounds.width + 10;
   let posY = bounds.y + bounds.height + 10;
 
   const display = screen.getDisplayNearestPoint({ x: posX, y: posY });
   const screenBounds = display.bounds;
-  // 正方形窗口，与划词翻译的 loading 一致
-  const winSize = 28;
+  const winSize = 28;  // Square loading window, matches selection-trigger size.
 
   if (posX + winSize > screenBounds.x + screenBounds.width) {
     posX = bounds.x - winSize - 10;
@@ -429,7 +390,6 @@ async function showSelectionLoading(bounds) {
   win.setBounds({ x: Math.round(posX), y: Math.round(posY), width: winSize, height: winSize });
   win.show();
 
-  // 发送 loading 状态
   const sendData = () => {
     win.webContents.send(CHANNELS.SELECTION.SHOW_RESULT, {
       isLoading: true,
@@ -445,9 +405,6 @@ async function showSelectionLoading(bounds) {
   }
 }
 
-/**
- * 切换划词翻译开关
- */
 function toggleSelectionTranslate() {
   runtime.selectionEnabled = !runtime.selectionEnabled;
   store.set('selectionEnabled', runtime.selectionEnabled);
@@ -466,29 +423,27 @@ function toggleSelectionTranslate() {
   return runtime.selectionEnabled;
 }
 
-/**
- * 启动划词监听（状态机版本）
- */
+// Wire the global mouse hook (uIOhook) and route mousedown/move/up into the FSM.
 function startSelectionHook() {
   if (runtime.selectionHook || !runtime.selectionEnabled) return;
 
   try {
     const { uIOhook } = require('uiohook-napi');
-    
-    // 初始化状态机
+
     if (!selectionStateMachine) {
       selectionStateMachine = new SelectionStateMachine();
     }
     selectionStateMachine.reset();
 
-    // ==================== mousedown ====================
+    // ----- mousedown -----
     uIOhook.on('mousedown', (e) => {
-      if (e.button !== 1) return; // 只处理左键
-      
+      if (e.button !== 1) return; // Left button only.
+
       const cursorPos = screen.getCursorScreenPoint();
       const { x, y } = cursorPos;
 
-      // 检查是否点击在任何划词窗口内（包括冻结窗口）
+      // Click inside any of our selection windows (including frozen ones) — treat
+      // as a drag-on-overlay and skip the FSM entirely.
       if (windowManager.isPointInSelectionWindows(x, y)) {
         runtime.isDraggingOverlay = true;
         return;
@@ -496,60 +451,58 @@ function startSelectionHook() {
 
       runtime.isDraggingOverlay = false;
 
-      // 检查是否在我们的窗口内
+      // Click on our other windows — also ignore.
       if (isClickInOurWindows(x, y)) {
         return;
       }
 
-      // 检测是否是连续点击（双击/三击）
-      // 如果是，先不隐藏窗口，避免闪烁
+      // Hide the existing trigger UNLESS this is a multi-click extending selection —
+      // hiding mid-double-click causes a visible flicker.
       const isMultiClick = selectionStateMachine.peekMultiClick(x, y);
-      
+
       if (!isMultiClick) {
-        // 单击：隐藏现有的划词窗口
         hideSelectionWindow();
       }
 
-      // Sticky 直出模式：设置开 + CapsLock 灯亮 → 划词直接出翻译卡片
+      // Sticky direct: setting on + CapsLock LED on → bypass trigger icon.
       const selectionSettings = store.get('settings.selection', {});
       const stickyActive = !!selectionSettings.stickyViaCapsLock && isCapsLockOn();
 
-      // stickyActive=true 会进直出路径，mouseup 时 FSM 返回 skipIcon: true
       selectionStateMachine.onMouseDown(x, y, stickyActive);
     });
 
-    // ==================== mousemove ====================
+    // ----- mousemove -----
     uIOhook.on('mousemove', (e) => {
       if (runtime.isDraggingOverlay) return;
       if (!selectionStateMachine) return;
-      
+
       const state = selectionStateMachine.getState();
       if (state === STATES.IDLE) return;
-      
-      // 只有在 Possible 或 Likely 状态下才处理
+
       const cursorPos = screen.getCursorScreenPoint();
       selectionStateMachine.onMouseMove(cursorPos.x, cursorPos.y);
     });
 
-    // ==================== mouseup ====================
+    // ----- mouseup -----
     uIOhook.on('mouseup', async (e) => {
       try {
         if (e.button !== 1) return;
-        
+
         if (runtime.isDraggingOverlay) {
           runtime.isDraggingOverlay = false;
           return;
         }
 
         if (!selectionStateMachine) return;
-        
+
         const state = selectionStateMachine.getState();
         if (state === STATES.IDLE) return;
 
         const cursorPos = screen.getCursorScreenPoint();
         const { x, y } = cursorPos;
 
-        // 检查是否在 selectionWindow 内
+        // Mouseup inside our selection window — user is clicking our trigger, not
+        // ending a fresh selection. Reset and let the renderer's click handler run.
         if (windows.selection && !windows.selection.isDestroyed() && windows.selection.isVisible()) {
           const bounds = windows.selection.getBounds();
           if (x >= bounds.x && x <= bounds.x + bounds.width &&
@@ -559,7 +512,7 @@ function startSelectionHook() {
           }
         }
 
-        // Sticky 直出模式（同 mousedown 判断一致）
+        // Re-read sticky state at mouseup (user may have released CapsLock mid-drag).
         const selectionSettings = store.get('settings.selection', {});
         const stickyActive = !!selectionSettings.stickyViaCapsLock && isCapsLockOn();
 
@@ -573,42 +526,41 @@ function startSelectionHook() {
             height: 40,
           };
 
-          // Sticky 直出：跳过图标 + 自动检测 + clipboard 兜底，直出翻译卡片
+          // Sticky direct: skip the icon, skip Layer 1+2 probe, go straight to capture + translate.
           if (result.skipIcon) {
             await handleHotkeyDirectPath(x, y, rect);
             selectionStateMachine.reset();
             return;
           }
 
-          // 双击/三击：走延迟确认（三层检测）
+          // Multi-click: needs delayed confirm (system selects text async after the click).
           if (result.needsDelayedConfirm) {
             handleDelayedConfirm(x, y, rect);
             return;
           }
-          
-          // 正常划选：也做选区检测
+
+          // Normal drag: run the three-layer selection probe.
           const { hasTextSelection, checkSelectionViaClipboard } = require('./utils/native-helper');
           const selectionCheck = hasTextSelection();
           logger.debug(`Normal drag selection check: ${selectionCheck.hasSelection} (${selectionCheck.method}: ${selectionCheck.reason})`);
-          
+
           if (selectionCheck.hasSelection === true) {
-            // 第一/二层确认有选区
+            // Layer 1+2 confirmed selection.
             showSelectionTrigger(x, y, rect);
             selectionStateMachine.reset();
             return;
           }
-          
+
           if (selectionCheck.hasSelection === false) {
-            // 第一层确认无选区（桌面、文件管理器等）
+            // Layer 1+2 confirmed no selection (desktop, file manager etc.).
             logger.debug('Normal drag: no selection detected, skip trigger');
             selectionStateMachine.reset();
             return;
           }
-          
-          // hasSelection 为 null（浏览器等复杂应用），走剪贴板兜底
-          // 检测是否是 Office/Outlook 应用（需要更长的等待时间和更多重试）
+
+          // hasSelection === null (complex app like browser) — run clipboard fallback.
           const dragReason = selectionCheck.reason || '';
-          const isOfficeApp = dragReason.includes('OpusApp') || 
+          const isOfficeApp = dragReason.includes('OpusApp') ||
                               dragReason.includes('EXCEL') ||
                               dragReason.includes('PPTFrameClass') ||
                               dragReason.includes('rctrl_renwnd32') ||
@@ -619,7 +571,7 @@ function startSelectionHook() {
                               dragReason.includes('Outlook Host');
           logger.debug(`Normal drag: complex app, using clipboard fallback (office=${isOfficeApp})`);
           const clipboardResult = await checkSelectionViaClipboard({ isComplexApp: isOfficeApp });
-          
+
           if (clipboardResult.hasSelection === true) {
             showSelectionTrigger(x, y, rect, clipboardResult.text);
           } else {
@@ -627,12 +579,10 @@ function startSelectionHook() {
           }
           selectionStateMachine.reset();
         } else {
-          // 重置状态机准备下次
           selectionStateMachine.reset();
         }
       } catch (err) {
         logger.error('mouseup handler error:', err);
-        // 确保状态机被重置
         if (selectionStateMachine) {
           selectionStateMachine.reset();
         }
@@ -650,15 +600,12 @@ function startSelectionHook() {
   }
 }
 
-/**
- * 停止划词监听
- */
 function stopSelectionHook() {
-  // 重置状态机（清除定时器）
+  // Reset state machine first (clears timers).
   if (selectionStateMachine) {
     selectionStateMachine.reset();
   }
-  
+
   if (runtime.selectionHook) {
     try {
       runtime.selectionHook.stop();
@@ -670,9 +617,6 @@ function stopSelectionHook() {
   }
 }
 
-/**
- * 检查坐标是否在我们的窗口内
- */
 function isClickInOurWindows(x, y) {
   const windowsToCheck = [windows.main, windows.glass];
   for (const win of windowsToCheck) {
@@ -688,11 +632,8 @@ function isClickInOurWindows(x, y) {
   return false;
 }
 
-// ==================== 截图功能 ====================
+// ===== Screenshot =====
 
-/**
- * 开始截图
- */
 async function startScreenshot(fromHotkey = false) {
   if (windows.screenshot) {
     windows.screenshot.close();
@@ -710,7 +651,7 @@ async function startScreenshot(fromHotkey = false) {
 
   await new Promise(resolve => setTimeout(resolve, 300));
 
-  // 获取显示器信息
+  // Span all displays — compute the union bounding box.
   const displays = screen.getAllDisplays();
   const primaryDisplay = screen.getPrimaryDisplay();
 
@@ -729,7 +670,7 @@ async function startScreenshot(fromHotkey = false) {
   const totalHeight = maxY - minY;
   const totalBounds = { minX, minY, maxX, maxY, totalWidth, totalHeight };
 
-  // 截图
+  // Prefer node-screenshots (faster) and fall back to Electron's desktopCapturer.
   let screenshotData = null;
   if (screenshotModule.isNodeScreenshotsAvailable()) {
     screenshotData = await screenshotModule.captureWithNodeScreenshots(displays, totalBounds);
@@ -748,7 +689,7 @@ async function startScreenshot(fromHotkey = false) {
     return null;
   }
 
-  // 注册 ESC 快捷键
+  // ESC cancels the screenshot selection.
   globalShortcut.register('Escape', () => {
     if (windows.screenshot) {
       windows.screenshot.close();
@@ -767,7 +708,6 @@ async function startScreenshot(fromHotkey = false) {
     globalShortcut.unregister('Escape');
   });
 
-  // 使用 window-manager 创建截图窗口
   const screenshotWindow = windowManager.createScreenshotWindow(totalBounds);
 
   screenshotWindow.webContents.on('did-finish-load', () => {
@@ -793,9 +733,6 @@ async function startScreenshot(fromHotkey = false) {
   return screenshotData;
 }
 
-/**
- * 处理截图选区
- */
 async function handleScreenshotSelection(bounds) {
   logger.info('Handling screenshot selection:', bounds);
 
@@ -809,7 +746,7 @@ async function handleScreenshotSelection(bounds) {
 
     const data = screenshotModule.getScreenshotData() || runtime.screenshotData;
     if (!data) {
-      throw new Error('没有预先截取的屏幕图像');
+      throw new Error('No screenshot data available');
     }
 
     let dataURL;
@@ -819,10 +756,10 @@ async function handleScreenshotSelection(bounds) {
       dataURL = processDesktopCapturerSelection(data, bounds);
     }
 
-    // 记录截图位置（用于联动划词窗口）
+    // Save screenshot position for chaining into the selection-translate window.
     runtime.lastScreenshotBounds = {
-      x: bounds.x + bounds.width,  // 右下角 x
-      y: bounds.y + bounds.height, // 右下角 y
+      x: bounds.x + bounds.width,
+      y: bounds.y + bounds.height,
       centerX: bounds.x + bounds.width / 2,
       centerY: bounds.y + bounds.height / 2,
       timestamp: Date.now(),
@@ -833,13 +770,12 @@ async function handleScreenshotSelection(bounds) {
     screenshotModule.clearScreenshotData();
     runtime.screenshotFromHotkey = false;
 
-    // 获取截图输出模式设置
     const settings = store.get('settings', {});
     const screenshotSettings = settings.screenshot || {};
-    const outputMode = screenshotSettings.outputMode || 'bubble'; // 默认气泡模式
-    
+    const outputMode = screenshotSettings.outputMode || 'bubble';
+
     if (outputMode === 'main') {
-      // 主窗口模式：显示主窗口，发送截图数据
+      // Main-window mode: show main window and hand off the captured dataURL.
       runtime.wasMainWindowVisible = false;
       if (windows.main) {
         windows.main.show();
@@ -850,26 +786,23 @@ async function handleScreenshotSelection(bounds) {
         windows.main.webContents.send(CHANNELS.SCREENSHOT.CAPTURED, dataURL);
       }
     } else {
-      // 气泡模式：后台处理，不显示主窗口
+      // Bubble mode: background-process the screenshot, no main-window show.
       logger.info('Screenshot bubble mode: processing in background');
-      
-      // 先显示加载状态的划词窗口
+
       await showSelectionLoading(bounds);
-      
-      // 确保主窗口已加载（用于后台处理）
+
+      // Make sure main window is loaded for background processing — but force it
+      // hidden so ready-to-show doesn't pop it visible.
       if (!windows.main) {
         windowManager.createMainWindow();
-        // 等待窗口加载，但确保不显示
         await new Promise(resolve => setTimeout(resolve, 500));
-        // 强制隐藏（防止 ready-to-show 触发显示）
         if (windows.main && !windows.main.isDestroyed()) {
           windows.main.hide();
         }
       }
-      
-      // 发送截图数据到主窗口（后台处理）
+
       if (windows.main && dataURL) {
-        // 使用字符串而非常量，确保兼容性
+        // String literal (not constant) for cross-version compat.
         windows.main.webContents.send('screenshot-captured-silent', dataURL);
       }
     }
@@ -883,7 +816,6 @@ async function handleScreenshotSelection(bounds) {
     runtime.wasMainWindowVisible = false;
     runtime.screenshotFromHotkey = false;
 
-    // 出错时恢复主窗口
     if (windows.main && runtime.wasMainWindowVisible) {
       windows.main.show();
       windows.main.focus();
@@ -893,14 +825,13 @@ async function handleScreenshotSelection(bounds) {
   }
 }
 
-/**
- * 处理 desktopCapturer 的选区
- */
+// Crop the captured desktopCapturer thumbnail to the user's selected rect.
+// Coordinates are translated from screen-space to thumbnail-space via scale factors.
 function processDesktopCapturerSelection(data, bounds) {
   const { sources, totalBounds } = data;
 
   if (!sources || sources.length === 0) {
-    throw new Error('没有可用的截图源');
+    throw new Error('No screenshot sources available');
   }
 
   const fullScreenshot = sources[0].thumbnail;
@@ -928,29 +859,26 @@ function processDesktopCapturerSelection(data, bounds) {
   return croppedImage.toDataURL();
 }
 
-// ==================== 应用生命周期 ====================
+// ===== App lifecycle =====
 
 app.whenReady().then(() => {
   logger.info('App ready, initializing...');
-  
-  // 检测是否是开机自启（静默模式）
+
+  // Auto-launch mode: --startup flag means started by OS, run silent.
   const isStartup = process.argv.includes('--startup');
   if (isStartup) {
     logger.info('Started via auto-launch, running in silent mode');
-    // 开机自启时强制最小化，并设置 startMinimized
     store.set('startMinimized', true);
   }
-  
-  // 记录显示器信息
+
   logger.info('Displays:', displayHelper.getDisplaySummary());
-  
-  // 监听显示器变化
+
+  // React to display add/remove: when a monitor disconnects, reposition windows
+  // that were on it back to a valid display.
   displayHelper.onDisplayChange((eventType, display) => {
     logger.info(`Display ${eventType}:`, display?.id, displayHelper.getDisplaySummary());
-    
-    // 显示器移除时，验证所有窗口位置
+
     if (eventType === 'removed') {
-      // 验证主窗口
       if (windows.main && !windows.main.isDestroyed()) {
         const bounds = windows.main.getBounds();
         const validBounds = displayHelper.ensureBoundsOnDisplay(bounds);
@@ -959,7 +887,6 @@ app.whenReady().then(() => {
           windows.main.setBounds(validBounds);
         }
       }
-      // 验证玻璃板窗口
       if (windows.glass && !windows.glass.isDestroyed()) {
         const bounds = windows.glass.getBounds();
         const validBounds = displayHelper.ensureBoundsOnDisplay(bounds);
@@ -971,7 +898,6 @@ app.whenReady().then(() => {
     }
   });
 
-  // 初始化窗口管理器
   windowManager.init({
     store,
     runtime,
@@ -982,21 +908,22 @@ app.whenReady().then(() => {
     CHANNELS,
   });
 
-  // managers 对象（用于依赖注入）
-  // 使用箭头函数包装 windowManager 方法，避免在定义时就绑定
+  // Use arrow-function wrappers so we don't capture windowManager methods at
+  // declaration time (which would freeze them to the initial — possibly null — state).
   const managers = {
     startScreenshot,
     handleScreenshotSelection,
-    showSelectionWithText,      // OCR 完成后发送文字给划词窗口
-    showSelectionResult,        // 直接显示结果（不翻译）
-    hideSelectionLoading,       // OCR 失败时关闭加载窗口
+    showSelectionWithText,
+    showSelectionResult,
+    hideSelectionLoading,
     toggleGlassWindow: (...args) => windowManager.toggleGlassWindow(...args),
     createGlassWindow: (...args) => windowManager.createGlassWindow(...args),
     toggleSelectionTranslate,
     toggleSubtitleCaptureWindow: (...args) => windowManager.toggleSubtitleCaptureWindow(...args),
   };
 
-  // 初始化所有 IPC（必须在窗口创建之前，否则渲染进程可能在 handler 注册前就调用 IPC）
+  // IPC must be initialized BEFORE any window is created — otherwise renderer may
+  // call IPC handlers that haven't been registered yet.
   initIPC({
     windows,
     runtime,
@@ -1005,10 +932,8 @@ app.whenReady().then(() => {
     managers,
   });
 
-  // 创建主窗口（loadURL 是异步的，渲染进程加载后会立即调用 IPC）
   windowManager.createMainWindow();
 
-  // 创建上下文（共享给菜单和托盘）
   const ctx = {
     getMainWindow: () => windows.main,
     runtime,
@@ -1016,29 +941,26 @@ app.whenReady().then(() => {
     managers,
   };
 
-  // 创建菜单和托盘
   createMenu(ctx);
   createTray(ctx);
 
-  // 注册全局快捷键
   const failedShortcuts = registerAllShortcuts({
     store,
     getMainWindow: () => windows.main,
     managers,
   });
-  
-  // 如果有快捷键注册失败，等主窗口加载后通知用户
+
   if (failedShortcuts.length > 0 && windows.main) {
     windows.main.webContents.once('did-finish-load', () => {
       windows.main.webContents.send('shortcut-conflict', failedShortcuts);
     });
   }
 
-  // 划词翻译默认关闭
+  // Selection translate is off by default — user opts in.
   runtime.selectionEnabled = false;
   store.set('selectionEnabled', false);
 
-  // 内存监控（保存定时器ID以便清理）
+  // Memory monitor; trigger GC if heap exceeds 500MB and gc is exposed.
   runtime.memoryMonitorInterval = setInterval(() => {
     const usage = process.memoryUsage();
     const heapUsedMB = Math.round(usage.heapUsed / 1024 / 1024);
@@ -1050,78 +972,69 @@ app.whenReady().then(() => {
   }, 5 * 60 * 1000);
 
   logger.success('App initialized');
-  
-  // 预热机制：延迟加载划词翻译相关模块
-  // 开机自启时延迟更久（8秒），避免影响开机性能
+
+  // Pre-warm selection-translate modules in the background. Longer delay on
+  // auto-launch so we don't impact OS boot performance.
   const preheatDelay = isStartup ? 8000 : 3000;
   setTimeout(() => {
     preheatSelectionModules();
-    
-    // 开机自启时：预热完成后自动开启划词翻译（如果用户设置了）
+
+    // Auto-launch + user opt-in: enable selection translate after preheat.
     if (isStartup && store.get('settings.startup.autoEnableSelection')) {
       logger.info('Auto-enabling selection translate after startup');
       toggleSelectionTranslate();
     }
-    
-    // 重置 startMinimized，下次手动打开时正常显示
+
     if (isStartup) {
       store.set('startMinimized', false);
     }
   }, preheatDelay);
 });
 
-/**
- * 预热划词翻译相关模块
- */
 function preheatSelectionModules() {
   logger.info('Preheating selection modules...');
-  
+
   try {
-    // 1. 预加载 uiohook-napi
     require('uiohook-napi');
     logger.debug('uiohook-napi preloaded');
-    
-    // 2. 预加载 koffi（Windows API）
+
     if (process.platform === 'win32') {
       try {
         require('koffi');
         logger.debug('koffi preloaded');
       } catch (e) {
-        // 忽略，不是必须的
+        // Not critical.
       }
     }
-    
-    // 3. 预创建 SelectionWindow（隐藏）
+
     const preWin = windowManager.createSelectionWindow();
     if (preWin && !preWin.isDestroyed()) {
-      // 确保窗口加载完成
       preWin.webContents.once('did-finish-load', () => {
         logger.debug('SelectionWindow preheated');
       });
     }
-    
-    // 4. 预初始化状态机
+
     if (!selectionStateMachine) {
       const { SelectionStateMachine } = require('./utils/selection-state-machine');
       selectionStateMachine = new SelectionStateMachine();
       logger.debug('SelectionStateMachine preheated');
     }
-    
+
     logger.success('Selection modules preheated');
   } catch (err) {
     logger.warn('Preheat failed (non-critical):', err.message);
   }
 }
 
-// 全局异常处理
+// Global exception handlers — make sure the native hook stops so the process can exit.
+
 process.on('uncaughtException', (error) => {
   logger.error('Uncaught exception:', error);
-  // 确保原生钩子被停止，避免进程残留
   try { stopSelectionHook(); } catch (e) { /* ignore */ }
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  // 详细打印 rejection 信息，避免空对象 {} 无法调试
+  // Print details — bare `{}` rejections are unhelpful otherwise.
   if (reason instanceof Error) {
     logger.error('Unhandled rejection:', reason.message);
     logger.error('Stack:', reason.stack);
@@ -1134,7 +1047,6 @@ process.on('unhandledRejection', (reason, promise) => {
   }
 });
 
-// 处理控制台退出 (Ctrl+C)
 process.on('SIGINT', () => {
   logger.info('Received SIGINT, quitting...');
   runtime.isQuitting = true;
@@ -1142,7 +1054,6 @@ process.on('SIGINT', () => {
   app.quit();
 });
 
-// 处理终止信号
 process.on('SIGTERM', () => {
   logger.info('Received SIGTERM, quitting...');
   runtime.isQuitting = true;
@@ -1150,14 +1061,12 @@ process.on('SIGTERM', () => {
   app.quit();
 });
 
-// 窗口全部关闭
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
 });
 
-// 激活应用
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     windowManager.createMainWindow();
@@ -1166,14 +1075,12 @@ app.on('activate', () => {
   }
 });
 
-// 应用准备退出 - 设置标志并强制销毁所有窗口
+// before-quit: stop native hooks first so we don't get callbacks during window destroy.
 app.on('before-quit', () => {
   runtime.isQuitting = true;
-  
-  // 先停止划词翻译钩子（避免在窗口关闭过程中触发）
+
   stopSelectionHook();
-  
-  // 强制销毁所有窗口
+
   const allWindows = BrowserWindow.getAllWindows();
   allWindows.forEach(win => {
     if (win && !win.isDestroyed()) {
@@ -1183,31 +1090,30 @@ app.on('before-quit', () => {
   });
 });
 
-// 应用退出前清理
 app.on('will-quit', () => {
-  // 清理内存监控定时器
   if (runtime.memoryMonitorInterval) {
     clearInterval(runtime.memoryMonitorInterval);
     runtime.memoryMonitorInterval = null;
   }
-  
+
   unregisterAllShortcuts();
-  
-  // 双保险：确保原生钩子被停止（before-quit 里已调用一次）
+
+  // Belt-and-suspenders — before-quit already calls this, but in case before-quit
+  // was skipped (race during force-close), make sure the native hook is stopped.
   try { stopSelectionHook(); } catch (e) { /* ignore */ }
-  
+
   destroyTray();
-  
+
   logger.info('App cleanup completed');
-  
-  // 兜底：如果 uIOhook 原生线程阻止进程退出，5秒后强制退出
+
+  // Last-resort exit: if uiohook's native thread keeps the process alive >5s, force.
   setTimeout(() => {
     logger.warn('Force exit: process still alive after 5s');
     process.exit(0);
   }, 5000).unref();
 });
 
-// 单实例锁
+// Single-instance lock.
 const gotTheLock = app.requestSingleInstanceLock();
 
 if (!gotTheLock) {
@@ -1220,6 +1126,3 @@ if (!gotTheLock) {
     }
   });
 }
-
-// 导出（用于测试）
-module.exports = { windows };
