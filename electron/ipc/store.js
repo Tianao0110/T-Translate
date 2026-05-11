@@ -1,23 +1,12 @@
-// electron/ipc/store.js
-// 存储相关 IPC handlers
-// 包含：配置读写、删除、清空等
+// electron-store CRUD IPC handlers.
 
 const { ipcMain } = require('electron');
 const { CHANNELS } = require('../shared/channels');
 const logger = require('../utils/logger')('IPC:Store');
 
-/**
- * 注册存储相关 IPC handlers
- * @param {Object} ctx - 共享上下文
- */
 function register(ctx) {
   const { store } = ctx;
-  
-  // ==================== 基础 CRUD ====================
-  
-  /**
-   * 获取存储值
-   */
+
   ipcMain.handle(CHANNELS.STORE.GET, async (event, key) => {
     try {
       const value = store.get(key);
@@ -28,10 +17,7 @@ function register(ctx) {
       return null;
     }
   });
-  
-  /**
-   * 设置存储值
-   */
+
   ipcMain.handle(CHANNELS.STORE.SET, async (event, key, val) => {
     try {
       store.set(key, val);
@@ -42,10 +28,7 @@ function register(ctx) {
       return { success: false, error: error.message };
     }
   });
-  
-  /**
-   * 删除存储项
-   */
+
   ipcMain.handle(CHANNELS.STORE.DELETE, async (event, key) => {
     try {
       store.delete(key);
@@ -56,11 +39,8 @@ function register(ctx) {
       return { success: false, error: error.message };
     }
   });
-  
-  /**
-   * 清空所有存储
-   * 危险操作，需要谨慎使用
-   */
+
+  // Wipe everything — destructive, expected only for "reset settings" UI action.
   ipcMain.handle(CHANNELS.STORE.CLEAR, async (event) => {
     try {
       store.clear();
@@ -71,10 +51,7 @@ function register(ctx) {
       return { success: false, error: error.message };
     }
   });
-  
-  /**
-   * 检查键是否存在
-   */
+
   ipcMain.handle(CHANNELS.STORE.HAS, async (event, key) => {
     try {
       return store.has(key);
@@ -83,7 +60,7 @@ function register(ctx) {
       return false;
     }
   });
-  
+
   logger.info('Store IPC handlers registered');
 }
 

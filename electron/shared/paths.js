@@ -1,32 +1,23 @@
-// electron/shared/paths.js
-// ============================================================
-// 路径配置中心 - 统一管理所有文件路径
-// ============================================================
-// 
-// 使用方法:
-// const PATHS = require('./shared/paths');
-// mainWindow.loadFile(PATHS.pages.main.file);
-// mainWindow.loadURL(PATHS.pages.main.url);
-// ============================================================
+// Path config — single place to manage HTML / preload / resource paths across dev and prod.
+//
+// Usage:
+//   const PATHS = require('./shared/paths');
+//   mainWindow.loadFile(PATHS.pages.main.file);
+//   mainWindow.loadURL(PATHS.pages.main.url);
 
 const path = require('path');
 
-// 检测是否为开发环境
-// 注意：此文件可能在 app ready 之前被加载，所以不能直接使用 app.isPackaged
-const isDev = process.env.NODE_ENV === 'development' || 
+// Detect dev mode without app.isPackaged — this file can load before app is ready.
+const isDev = process.env.NODE_ENV === 'development' ||
               process.argv.includes('--dev') ||
               !process.defaultApp === false;
 
-// 开发服务器地址
 const DEV_SERVER = 'http://localhost:5173';
 
-// 基础目录（相对于此文件所在位置 electron/shared/）
+// All paths resolve relative to electron/shared/.
 const BASE_DIR = path.join(__dirname, '../..');
 const ELECTRON_DIR = path.join(__dirname, '..');
 
-/**
- * Preload 脚本路径
- */
 const preloads = {
   main: path.join(ELECTRON_DIR, 'preloads/main.js'),
   selection: path.join(ELECTRON_DIR, 'preloads/selection.js'),
@@ -35,10 +26,7 @@ const preloads = {
   screenshot: path.join(ELECTRON_DIR, 'preloads/screenshot.js'),
 };
 
-/**
- * HTML 页面路径
- * 每个页面提供 url (开发环境) 和 file (生产环境) 两个路径
- */
+// Each page exposes both `url` (dev server) and `file` (prod build).
 const pages = {
   main: {
     url: DEV_SERVER,
@@ -53,14 +41,14 @@ const pages = {
     file: path.join(BASE_DIR, 'build/glass.html'),
   },
   screenshot: {
-    // 截图页面不经过 Vite 构建，直接加载纯 HTML
+    // Screenshot page is plain HTML — not processed by Vite.
     url: path.join(BASE_DIR, 'public/screenshot.html'),
     file: isDev
       ? path.join(BASE_DIR, 'public/screenshot.html')
       : path.join(process.resourcesPath, 'resources/screenshot.html'),
   },
   childPane: {
-    // 子玻璃板独立窗口（纯 HTML + 内联 JS）
+    // Child glass pane — standalone window (plain HTML + inline JS).
     url: `${DEV_SERVER}/child-pane.html`,
     file: isDev
       ? path.join(BASE_DIR, 'public/child-pane.html')
@@ -68,35 +56,26 @@ const pages = {
   },
 };
 
-/**
- * 资源文件路径
- * 注意：extraResources 在打包后位于 process.resourcesPath
- */
+// extraResources land in process.resourcesPath after packaging.
 const resources = {
-  icon: isDev 
+  icon: isDev
     ? path.join(BASE_DIR, 'public/icon.png')
     : path.join(process.resourcesPath, 'resources/icon.png'),
   trayIcon: isDev
     ? path.join(BASE_DIR, 'public/tray-icon.ico')
     : path.join(process.resourcesPath, 'resources/tray-icon.ico'),
-  // OCR 数据在打包后位于 resources 目录
-  ocrData: isDev 
+  ocrData: isDev
     ? path.join(BASE_DIR, 'resources/ocr')
     : path.join(process.resourcesPath, 'resources/ocr'),
 };
 
-/**
- * 辅助函数：根据环境加载页面
- * @param {BrowserWindow} window - Electron 窗口实例
- * @param {string} pageName - 页面名称 (main, selection, glass, screenshot)
- * @param {boolean} devMode - 是否为开发模式（可选，默认自动检测）
- */
+// Load a page, picking dev URL vs prod file based on environment.
 function loadPage(window, pageName, devMode = isDev) {
   const page = pages[pageName];
   if (!page) {
     throw new Error(`Unknown page: ${pageName}`);
   }
-  
+
   if (devMode && pageName !== 'screenshot') {
     window.loadURL(page.url);
   } else {
@@ -104,11 +83,6 @@ function loadPage(window, pageName, devMode = isDev) {
   }
 }
 
-/**
- * 获取 preload 脚本路径
- * @param {string} name - preload 名称 (main, selection, glass)
- * @returns {string} 完整路径
- */
 function getPreload(name) {
   const preload = preloads[name];
   if (!preload) {
@@ -118,16 +92,11 @@ function getPreload(name) {
 }
 
 module.exports = {
-  // 路径对象
   preloads,
   pages,
   resources,
-  
-  // 辅助函数
   loadPage,
   getPreload,
-  
-  // 环境变量
   isDev,
   DEV_SERVER,
   BASE_DIR,
