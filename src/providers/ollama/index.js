@@ -1,13 +1,9 @@
-// src/providers/ollama/index.js
-// Ollama 翻译源 - 本地大模型（OpenAI 兼容 API）
+// Ollama provider via its OpenAI-compatible endpoint, with fallback to the
+// native /api/tags endpoint for older Ollama versions.
 
 import OpenAICompatibleProvider from '../openai-compatible.js';
 import icon from './icon.svg';
 
-/**
- * Ollama 翻译源
- * 本地部署的大模型服务，通过 OpenAI 兼容 API 调用
- */
 class OllamaProvider extends OpenAICompatibleProvider {
 
   static metadata = {
@@ -18,7 +14,7 @@ class OllamaProvider extends OpenAICompatibleProvider {
     color: '#ffffff',
     type: 'llm',
     helpUrl: 'https://ollama.com/',
-    
+
     configSchema: {
       endpoint: {
         type: 'text',
@@ -61,13 +57,10 @@ class OllamaProvider extends OpenAICompatibleProvider {
     return false;
   }
 
-  /**
-   * Ollama 的 /v1/models 返回格式可能和标准 OpenAI 不同
-   * 覆盖以兼容两种格式
-   */
+  // Ollama's OpenAI-compat shim returns {data: [{id}]}; native returns {models: [{name}]}.
+  // Try the compat path first, fall back to /api/tags for older Ollama builds.
   async testConnection() {
     try {
-      // 先尝试 OpenAI 兼容 /v1/models
       const response = await fetch(`${this.config.endpoint}/models`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
@@ -84,7 +77,6 @@ class OllamaProvider extends OpenAICompatibleProvider {
         };
       }
 
-      // 回退尝试 Ollama 原生 /api/tags
       const baseUrl = this.config.endpoint.replace(/\/v1$/, '');
       const fallback = await fetch(`${baseUrl}/api/tags`, {
         method: 'GET',
@@ -109,7 +101,6 @@ class OllamaProvider extends OpenAICompatibleProvider {
 
   async getModels() {
     try {
-      // 先尝试 OpenAI 兼容接口
       const response = await fetch(`${this.config.endpoint}/models`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
@@ -121,7 +112,6 @@ class OllamaProvider extends OpenAICompatibleProvider {
         return data.data?.map(m => m.id) || data.models?.map(m => m.name) || [];
       }
 
-      // 回退 Ollama 原生接口
       const baseUrl = this.config.endpoint.replace(/\/v1$/, '');
       const fallback = await fetch(`${baseUrl}/api/tags`, {
         method: 'GET',
