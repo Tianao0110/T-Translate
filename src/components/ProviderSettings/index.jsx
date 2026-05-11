@@ -1,6 +1,3 @@
-// src/components/ProviderSettings/index.jsx
-// 翻译源设置组件 - 分组面板风格 (启用/停用分区)
-
 import React, { useState, useEffect, useCallback, useImperativeHandle, forwardRef, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -14,56 +11,53 @@ import './styles.css';
 import createLogger from '../../utils/logger.js';
 const logger = createLogger('ProviderSettings');
 
-// ========== 安全存储 ==========
 const secureStorage = {
   async get(key, context) {
     if (window.electron?.secureStorage) {
       const value = await window.electron.secureStorage.decrypt(key, context ? { context } : undefined);
       if (value) return value;
-      
-      // 兼容迁移：如果 safeStorage 没有但 localStorage 有旧数据，迁移过来
+
+      // One-shot migration: pull legacy plaintext from localStorage into
+      // safeStorage, then erase the plaintext. If migration fails we still
+      // wipe the legacy entry so plaintext never lingers.
       const legacy = localStorage.getItem(`__secure_${key}`);
       if (legacy) {
         try {
           const migrated = decodeURIComponent(atob(legacy));
           await window.electron.secureStorage.encrypt(key, migrated);
-          localStorage.removeItem(`__secure_${key}`); // 删除明文
+          localStorage.removeItem(`__secure_${key}`);
           logger.info(`Migrated key from localStorage to safeStorage: ${key}`);
           return migrated;
-        } catch { /* 迁移失败，丢弃旧数据 */ }
-        localStorage.removeItem(`__secure_${key}`); // 无论如何清除明文
+        } catch { /* fall through */ }
+        localStorage.removeItem(`__secure_${key}`);
       }
       return null;
     }
-    // 非 Electron 环境（不应该发生），不存储
     return null;
   },
   async set(key, value) {
     if (window.electron?.secureStorage) {
       return await window.electron.secureStorage.encrypt(key, value);
     }
-    // 不再回退到 localStorage 明文存储
+    // Refuse to fall back to plaintext localStorage — secrets must stay encrypted.
     logger.warn('secureStorage unavailable, refusing to store key:', key);
     return false;
   }
 };
 
-// ========== 类型标签颜色 ==========
 const TYPE_COLORS = {
   'llm': '#8b5cf6',
   'api': '#3b82f6',
   'traditional': '#10b981',
 };
 
-/**
- * 翻译源设置组件 - 分组面板风格
- */
 const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, notify }, ref) => {
   const { t } = useTranslation();
-  
-  // useMemo 缓存，避免每次渲染生成新数组引用导致 useEffect 无限循环
+
+  // useMemo so getAllProviderMetadata() returns a stable reference and
+  // doesn't retrigger the init effect on every render.
   const allProvidersMeta = useMemo(() => getAllProviderMetadata(), []);
-  
+
   const [providers, setProviders] = useState([]);
   const [providerConfigs, setProviderConfigs] = useState({});
   const [expandedProvider, setExpandedProvider] = useState(null);
@@ -74,8 +68,7 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
   const [testResults, setTestResults] = useState({});
   const [isSaving, setIsSaving] = useState(false);
   const initializedRef = useRef(false);
-  
-  // ========== 分组：启用 vs 停用 ==========
+
   const { enabledProviders, disabledProviders } = useMemo(() => {
     const enabled = [];
     const disabled = [];
@@ -90,30 +83,30 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
     return { enabledProviders: enabled, disabledProviders: disabled };
   }, [providers]);
 
-  // ========== 初始化 ==========
   useEffect(() => {
-    // 等待 settings 从磁盘加载完成再初始化，防止用默认值覆盖已保存的配置
+    // Wait for settings to load from disk before initializing — otherwise
+    // we'd overwrite saved provider configs with defaults.
     if (!settingsReady) return;
-    
+
     const savedProviders = settings?.translation?.providers;
     const savedConfigs = settings?.translation?.providerConfigs || {};
-    
+
     const hasRealData = savedProviders && savedProviders.length > 0;
-    
-    const needsInit = !initializedRef.current || 
-      (hasRealData && providers.length > 0 && 
-       JSON.stringify(savedProviders.map(p => ({ id: p.id, enabled: p.enabled }))) !== 
+
+    const needsInit = !initializedRef.current ||
+      (hasRealData && providers.length > 0 &&
+       JSON.stringify(savedProviders.map(p => ({ id: p.id, enabled: p.enabled }))) !==
        JSON.stringify(providers.map(p => ({ id: p.id, enabled: p.enabled }))));
-    
+
     if (!needsInit) return;
-    
+
     const initProviders = async () => {
       let providerList;
-      
+
       if (hasRealData) {
         providerList = [];
         const savedIds = new Set(savedProviders.map(p => p.id));
-        
+
         for (const saved of savedProviders) {
           const meta = allProvidersMeta.find(m => m.id === saved.id);
           if (meta) {
@@ -124,7 +117,7 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
             });
           }
         }
-        
+
         for (const meta of allProvidersMeta) {
           if (!savedIds.has(meta.id)) {
             providerList.push({
@@ -141,10 +134,10 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
           priority: index,
         }));
       }
-      
+
       providerList.forEach((p, i) => p.priority = i);
       setProviders(providerList);
-      
+
       const configs = {};
       for (const meta of allProvidersMeta) {
         const defaultConfig = {};
@@ -153,9 +146,9 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
             defaultConfig[key] = field.default || '';
           }
         }
-        
+
         configs[meta.id] = { ...defaultConfig, ...savedConfigs[meta.id] };
-        
+
         if (meta.configSchema) {
           for (const [key, field] of Object.entries(meta.configSchema)) {
             if (field.encrypted) {
@@ -167,55 +160,55 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
           }
         }
       }
-      
+
       setProviderConfigs(configs);
       initializedRef.current = true;
     };
-    
+
     initProviders();
   }, [settingsReady, settings?.translation?.providers, allProvidersMeta]);
 
-  // ========== 保存 ==========
   const saveSettings = useCallback(async () => {
     setIsSaving(true);
-    
+
     try {
       const configsToSave = {};
-      
+
       for (const meta of allProvidersMeta) {
         configsToSave[meta.id] = { ...providerConfigs[meta.id] };
-        
+
         if (meta.configSchema) {
           for (const [key, field] of Object.entries(meta.configSchema)) {
             if (field.encrypted && configsToSave[meta.id][key]) {
               await secureStorage.set(`provider_${meta.id}_${key}`, configsToSave[meta.id][key]);
-              // 不写入任何值到 providerConfigs（连占位符都不留）
+              // Don't leave any value (not even a placeholder) in providerConfigs.
               delete configsToSave[meta.id][key];
             }
           }
         }
       }
-      
+
       updateSettings('translation', 'providers', providers, true);
       updateSettings('translation', 'providerConfigs', configsToSave, true);
-      
-      // 使用点路径直接写入，避免读-改-写竞态
+
+      // Dot-path writes to avoid the read-modify-write race that bites
+      // when two updaters touch sibling fields concurrently.
       if (window.electron?.store) {
         await window.electron.store.set('settings.translation.providers', providers);
         await window.electron.store.set('settings.translation.providerConfigs', configsToSave);
       }
-      
+
       await translationService.reload({
         providers: {
           list: providers,
           configs: providerConfigs,
         }
       });
-      
+
       if (window.electron?.glass?.notifySettingsChanged) {
         await window.electron.glass.notifySettingsChanged();
       }
-      
+
       notify?.(t('providerSettings.saved'), 'success');
     } catch (error) {
       logger.error('Save failed:', error);
@@ -229,9 +222,8 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
     save: saveSettings
   }), [saveSettings]);
 
-  // ========== 切换启用 ==========
   const toggleProvider = (providerId) => {
-    const newProviders = providers.map(p => 
+    const newProviders = providers.map(p =>
       p.id === providerId ? { ...p, enabled: !p.enabled } : p
     );
     setProviders(newProviders);
@@ -240,9 +232,8 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
     }
   };
 
-  // ========== 快速启用（从停用区点击） ==========
   const enableProvider = (providerId) => {
-    const newProviders = providers.map(p => 
+    const newProviders = providers.map(p =>
       p.id === providerId ? { ...p, enabled: true } : p
     );
     setProviders(newProviders);
@@ -252,7 +243,6 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
     }
   };
 
-  // ========== 更新配置 ==========
   const updateConfig = (providerId, key, value) => {
     const newConfigs = {
       ...providerConfigs,
@@ -264,42 +254,39 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
     }
   };
 
-  // ========== 测试连接 ==========
   const testConnection = async (providerId) => {
     setTestingProvider(providerId);
     setTestResults(prev => ({ ...prev, [providerId]: null }));
-    
+
     try {
       const config = providerConfigs[providerId];
       const result = await translationService.testProviderWithConfig(providerId, config);
       setTestResults(prev => ({ ...prev, [providerId]: result }));
     } catch (error) {
-      setTestResults(prev => ({ 
-        ...prev, 
-        [providerId]: { success: false, message: error.message || '连接失败' }
+      setTestResults(prev => ({
+        ...prev,
+        [providerId]: { success: false, message: error.message || 'Connection failed' }
       }));
     } finally {
       setTestingProvider(null);
     }
   };
 
-  // ========== 移动优先级 ==========
   const moveProvider = (index, direction) => {
     const newProviders = [...providers];
     const targetIndex = index + direction;
-    
+
     if (targetIndex < 0 || targetIndex >= newProviders.length) return;
-    
+
     [newProviders[index], newProviders[targetIndex]] = [newProviders[targetIndex], newProviders[index]];
     newProviders.forEach((p, i) => p.priority = i);
-    
+
     setProviders(newProviders);
     if (updateSettings) {
       updateSettings('translation', 'providers', newProviders);
     }
   };
 
-  // ========== 拖拽 ==========
   const handleDragStart = (e, index) => {
     setDraggedIndex(index);
     e.dataTransfer.effectAllowed = 'move';
@@ -332,17 +319,16 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
     const [draggedItem] = newProviders.splice(draggedIndex, 1);
     newProviders.splice(targetIndex, 0, draggedItem);
     newProviders.forEach((p, i) => p.priority = i);
-    
+
     setProviders(newProviders);
     setDraggedIndex(null);
     setDragOverIndex(null);
-    
+
     if (updateSettings) {
       updateSettings('translation', 'providers', newProviders);
     }
   };
 
-  // ========== 状态 ==========
   const getStatusColor = (providerId) => {
     const result = testResults[providerId];
     if (result?.success) return '#10b981';
@@ -358,41 +344,32 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
     return t('providerSettings.notTested');
   };
 
-  // ========== 配置表单 ==========
-  
-  /**
-   * 翻译 Provider 配置字段 label
-   * 优先使用 i18n key: providerConfig.{providerId}.{fieldKey}
-   * 找不到则 fallback 到原始 label
-   */
+  // Field/option/placeholder lookups: prefer i18n key
+  // providerConfig.{providerId}.{fieldKey} (with `_<value>` for option
+  // labels and `_placeholder` for placeholders); fall back to the raw
+  // schema label if no translation exists.
   const getFieldLabel = (providerId, fieldKey, originalLabel) => {
     const i18nKey = `providerConfig.${providerId}.${fieldKey}`;
     const translated = t(i18nKey);
     return translated !== i18nKey ? translated : originalLabel;
   };
-  
-  /**
-   * 翻译 select option label
-   */
+
   const getOptionLabel = (providerId, fieldKey, optValue, originalLabel) => {
     const i18nKey = `providerConfig.${providerId}.${fieldKey}_${optValue}`;
     const translated = t(i18nKey);
     return translated !== i18nKey ? translated : originalLabel;
   };
-  
-  /**
-   * 翻译 placeholder
-   */
+
   const getFieldPlaceholder = (providerId, fieldKey, originalPlaceholder) => {
     const i18nKey = `providerConfig.${providerId}.${fieldKey}_placeholder`;
     const translated = t(i18nKey);
     return translated !== i18nKey ? translated : originalPlaceholder;
   };
-  
+
   const renderConfigForm = (providerId) => {
     const meta = allProvidersMeta.find(m => m.id === providerId);
     const config = providerConfigs[providerId] || {};
-    
+
     if (!meta?.configSchema || Object.keys(meta.configSchema).length === 0) {
       return (
         <div className="ps-config-empty">
@@ -401,7 +378,7 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
         </div>
       );
     }
-    
+
     return (
       <div className="ps-config-form">
         {Object.entries(meta.configSchema).map(([key, field]) => (
@@ -412,7 +389,7 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
                 {field.required && <span className="ps-required">*</span>}
               </label>
             )}
-            
+
             {field.type === 'password' ? (
               <div className="ps-input-group">
                 <input
@@ -463,18 +440,17 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
             )}
           </div>
         ))}
-        
+
         {meta.helpUrl && (
           <a href={meta.helpUrl} target="_blank" rel="noopener noreferrer" className="ps-help-link">
             <ExternalLink size={14} />
-            {t('providerSettings.getApiKey', { defaultValue: '获取 API Key' })}
+            {t('providerSettings.getApiKey', { defaultValue: 'Get API Key' })}
           </a>
         )}
       </div>
     );
   };
 
-  // ========== 已启用列表中的排名 ==========
   const getEnabledRank = (providerId) => {
     let rank = 0;
     for (const p of providers) {
@@ -489,12 +465,11 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
   return (
     <div className="ps-container">
 
-      {/* ===== 已启用区域 ===== */}
       <div className="ps-section">
         <div className="ps-section-header">
           <div className="ps-section-title">
             <span className="ps-section-dot enabled"></span>
-            <span>{t('providerSettings.enabledSection', { defaultValue: '已启用' })}</span>
+            <span>{t('providerSettings.enabledSection', { defaultValue: 'Enabled' })}</span>
             <span className="ps-section-count">{enabledProviders.length}</span>
           </div>
           <span className="ps-section-hint">{t('providerSettings.priorityHint')}</span>
@@ -503,22 +478,22 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
         {enabledProviders.length === 0 ? (
           <div className="ps-empty">
             <Power size={20} />
-            <span>{t('providerSettings.noEnabled', { defaultValue: '尚未启用任何翻译源' })}</span>
+            <span>{t('providerSettings.noEnabled', { defaultValue: 'No providers enabled' })}</span>
           </div>
         ) : (
           <div className="ps-active-list">
             {enabledProviders.map((provider) => {
               const meta = allProvidersMeta.find(m => m.id === provider.id);
               if (!meta) return null;
-              
+
               const isExpanded = expandedProvider === provider.id;
               const typeColor = TYPE_COLORS[meta.type] || TYPE_COLORS['api'];
               const typeLabel = t(`providerSettings.typeLabels.${meta.type}`) || meta.type;
               const rank = getEnabledRank(provider.id);
               const isDragOver = dragOverIndex === provider.originalIndex && draggedIndex !== provider.originalIndex;
-              
+
               return (
-                <div 
+                <div
                   key={provider.id}
                   className={`ps-card ${isExpanded ? 'expanded' : ''} ${isDragOver ? 'drag-over' : ''}`}
                   style={{ '--accent': meta.color || typeColor }}
@@ -529,7 +504,6 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, provider.originalIndex)}
                 >
-                  {/* 卡片头部 */}
                   <div className="ps-card-header">
                     <div className="ps-priority">{rank}</div>
 
@@ -548,7 +522,7 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
                     </div>
 
                     <div className="ps-card-actions">
-                      <button 
+                      <button
                         className={`ps-config-btn ${isExpanded ? 'active' : ''}`}
                         onClick={() => setExpandedProvider(isExpanded ? null : provider.id)}
                         title={t('providerSettings.configDetails')}
@@ -566,16 +540,14 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
                     </div>
                   </div>
 
-                  {/* 排序手柄 */}
                   <div className="ps-drag-hint">
                     <GripVertical size={12} />
                   </div>
 
-                  {/* 展开内容 */}
                   {isExpanded && (
                     <div className="ps-expand-content">
                       {renderConfigForm(provider.id)}
-                      
+
                       <div className="ps-test-row">
                         <button
                           className={`ps-test-btn ${testResults[provider.id]?.success ? 'success' : testResults[provider.id]?.success === false ? 'error' : ''}`}
@@ -589,7 +561,7 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
                           )}
                           <span>{t('providerSettings.testConnection')}</span>
                         </button>
-                        
+
                         <div className="ps-status">
                           <span className="ps-status-dot" style={{ background: getStatusColor(provider.id) }}></span>
                           <span>{getStatusText(provider.id)}</span>
@@ -604,13 +576,12 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
         )}
       </div>
 
-      {/* ===== 未启用区域 ===== */}
       {disabledProviders.length > 0 && (
         <div className="ps-section">
           <div className="ps-section-header">
             <div className="ps-section-title">
               <span className="ps-section-dot disabled"></span>
-              <span>{t('providerSettings.disabledSection', { defaultValue: '未启用' })}</span>
+              <span>{t('providerSettings.disabledSection', { defaultValue: 'Disabled' })}</span>
               <span className="ps-section-count">{disabledProviders.length}</span>
             </div>
           </div>
@@ -619,15 +590,15 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
             {disabledProviders.map((provider) => {
               const meta = allProvidersMeta.find(m => m.id === provider.id);
               if (!meta) return null;
-              
+
               const isExpanded = expandedProvider === provider.id;
 
               return (
-                <div 
-                  key={provider.id} 
+                <div
+                  key={provider.id}
                   className={`ps-mini-card ${isExpanded ? 'expanded' : ''}`}
                 >
-                  <div 
+                  <div
                     className="ps-mini-header"
                     onClick={() => setExpandedProvider(isExpanded ? null : provider.id)}
                   >
@@ -638,15 +609,15 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
                       <div className="ps-mini-name">{t(`providerSettings.names.${provider.id}`, { defaultValue: meta.name })}</div>
                       <div className="ps-mini-desc">{t(`providerSettings.descriptions.${provider.id}`, { defaultValue: meta.description })}</div>
                     </div>
-                    <button 
+                    <button
                       className="ps-enable-btn"
                       onClick={(e) => { e.stopPropagation(); enableProvider(provider.id); }}
                     >
                       <Plus size={13} />
-                      <span>{t('providerSettings.enable', { defaultValue: '启用' })}</span>
+                      <span>{t('providerSettings.enable', { defaultValue: 'Enable' })}</span>
                     </button>
                   </div>
-                  
+
                   {isExpanded && (
                     <div className="ps-expand-content">
                       {renderConfigForm(provider.id)}
