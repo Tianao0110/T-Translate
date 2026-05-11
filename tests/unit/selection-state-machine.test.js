@@ -1,9 +1,11 @@
-// FSM 全覆盖单测 — v0.2.5 Phase D per /plan-eng-review 用户决策（全覆盖 ~13 case）
-// 测试范围：状态转移 / 三个进入 LIKELY 条件 (A/B/D) / hotkey 直出 / 双击 / retreat / reset
+// Full coverage for SelectionStateMachine: state transitions, the three
+// LIKELY-entry conditions (A/B/D), hotkey sticky path, double-click, retreat,
+// and reset.
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-// FSM 用 require('./logger')('SelectionSM')，logger 又 require('electron') —— 都得 stub
+// FSM uses require('./logger')('SelectionSM'); logger in turn pulls in
+// `electron`. Stub the logger so neither dependency loads under Node.
 vi.mock('../../electron/utils/logger.js', () => ({
   default: () => ({ debug: () => {}, info: () => {}, warn: () => {}, error: () => {} }),
 }));
@@ -18,7 +20,7 @@ describe('SelectionStateMachine', () => {
     sm = new SelectionStateMachine();
   });
 
-  // ============= 基本状态转移 =============
+  // ===== Basic transitions =====
 
   it('starts in IDLE', () => {
     expect(sm.state).toBe(STATES.IDLE);
@@ -30,35 +32,35 @@ describe('SelectionStateMachine', () => {
     expect(sm.isHotkeyTriggered).toBe(false);
   });
 
-  it('IDLE → LIKELY on onMouseDown with hotkeyActive=true (sticky 直出)', () => {
+  it('IDLE → LIKELY on onMouseDown with hotkeyActive=true (sticky direct)', () => {
     sm.onMouseDown(100, 100, true);
     expect(sm.state).toBe(STATES.LIKELY);
     expect(sm.isHotkeyTriggered).toBe(true);
   });
 
-  // ============= Condition A: 长时间 + 方向稳定 =============
+  // ===== Condition A: long duration + stable direction =====
 
-  it('Condition A 触发：长时间 + 方向稳定 → POSSIBLE → LIKELY', async () => {
+  it('Condition A: long duration + stable direction → POSSIBLE → LIKELY', async () => {
     sm.onMouseDown(100, 100, false);
     expect(sm.state).toBe(STATES.POSSIBLE);
 
-    // 模拟横向稳定拖拽，超过 MIN_DURATION_A (80ms) 和 MIN_TOTAL_DISTANCE (12px)
-    const start = Date.now();
+    // Simulate a horizontally-stable drag exceeding MIN_DURATION_A (80ms)
+    // and MIN_TOTAL_DISTANCE (12px).
     for (let i = 1; i <= 10; i++) {
-      // 每步 30ms 间隔（>SAMPLE_INTERVAL 25），向右移动
+      // 30ms per step (> SAMPLE_INTERVAL 25), moving right.
       await new Promise(r => setTimeout(r, 30));
       sm.onMouseMove(100 + i * 4, 100);
     }
     expect(sm.state).toBe(STATES.LIKELY);
   });
 
-  // ============= Condition B: 长时间 + 低速精细 =============
+  // ===== Condition B: long duration + low speed (fine precision) =====
 
-  it('Condition B 触发：长时间 + 低速 → POSSIBLE → LIKELY', async () => {
+  it('Condition B: long duration + low speed → POSSIBLE → LIKELY', async () => {
     sm.onMouseDown(100, 100, false);
 
-    // 慢速拖（每步 50ms 移动 2px → 速度 0.04 px/ms < LOW_SPEED_THRESHOLD 0.1）
-    // 总时长 > MIN_DURATION_B (100ms)
+    // 50ms steps moving 2px → 0.04 px/ms < LOW_SPEED_THRESHOLD 0.1.
+    // Total duration > MIN_DURATION_B (100ms).
     for (let i = 1; i <= 6; i++) {
       await new Promise(r => setTimeout(r, 50));
       sm.onMouseMove(100 + i * 2, 100);
@@ -66,81 +68,82 @@ describe('SelectionStateMachine', () => {
     expect(sm.state).toBe(STATES.LIKELY);
   });
 
-  // ============= Condition D: 短时间 + 高速度横向（v0.2.4 修飞快划词漏判）=============
+  // ===== Condition D: short duration + high horizontal speed
+  //                    (v0.2.4 fix for fast selection drag misses) =====
 
-  it('Condition D 触发：短时间 + 高速度横向 → POSSIBLE → LIKELY', async () => {
+  it('Condition D: short duration + high horizontal speed → POSSIBLE → LIKELY', async () => {
     sm.onMouseDown(100, 100, false);
 
-    // 快划：~30ms 内移动 ~12px 横向 → 速度 0.4 px/ms > MIN_SPEED_D 0.2
-    // 满足 MIN_DURATION_D 10ms / MIN_DISTANCE_D 8px / MIN_HORIZONTAL_D 5px
+    // ~30ms / ~12px horizontal → 0.4 px/ms > MIN_SPEED_D 0.2.
+    // Satisfies MIN_DURATION_D 10ms / MIN_DISTANCE_D 8px / MIN_HORIZONTAL_D 5px.
     await new Promise(r => setTimeout(r, 15));
     sm.onMouseMove(108, 100);  // dx=8, dy=0
     await new Promise(r => setTimeout(r, 15));
-    sm.onMouseMove(115, 100);  // dx=15, dy=0 累计
+    sm.onMouseMove(115, 100);  // dx=15, dy=0 cumulative
 
     expect(sm.state).toBe(STATES.LIKELY);
   });
 
-  // ============= 退守 retreat：LIKELY → POSSIBLE 方向翻转 =============
+  // ===== Retreat: LIKELY → POSSIBLE when direction flips =====
 
-  // TODO(v0.3): retreat 测试时序敏感，不稳定触发。需要直接测 evaluateLikely
-  // 内部的角度计算 + retreatCount 累加逻辑（更稳定）。当前 FSM 主要 retreat 测试
-  // 还是依赖手测覆盖。
-  it.skip('retreat：LIKELY 进入后方向翻转触发回退到 POSSIBLE', async () => {
+  // TODO(v0.3): retreat tests are timing-sensitive and flaky. Better to
+  // unit-test evaluateLikely's angle calculation and retreatCount accumulation
+  // directly. Current FSM retreat behavior is still hand-tested.
+  it.skip('retreat: direction flip after entering LIKELY falls back to POSSIBLE', async () => {
     // skipped — see TODO above
   });
 
-  // ============= onMouseUp 三分支 =============
+  // ===== onMouseUp three branches =====
 
   it('onMouseUp: hotkeyActive=true + isHotkeyTriggered=true → skipIcon:true', () => {
-    sm.onMouseDown(100, 100, true);  // 进 LIKELY (sticky)
+    sm.onMouseDown(100, 100, true);  // sticky → LIKELY
     const result = sm.onMouseUp(100, 100, true);
     expect(result.shouldShow).toBe(true);
     expect(result.skipIcon).toBe(true);
     expect(result.rect).toBeDefined();
   });
 
-  it('onMouseUp: 中途松 CapsLock（hotkey=false）走普通流不 skipIcon', () => {
-    sm.onMouseDown(100, 100, true);  // mousedown 时 hotkey ON
-    const result = sm.onMouseUp(100, 100, false);  // mouseup 时 hotkey OFF
+  it('onMouseUp: CapsLock released mid-drag (hotkey=false) → normal flow, no skipIcon', () => {
+    sm.onMouseDown(100, 100, true);   // hotkey ON at mousedown
+    const result = sm.onMouseUp(100, 100, false);  // hotkey OFF at mouseup
     expect(result.shouldShow).toBe(true);
-    expect(result.skipIcon).toBeUndefined();  // 普通流，没有 skipIcon
+    expect(result.skipIcon).toBeUndefined();  // normal flow
   });
 
-  it('onMouseUp: POSSIBLE 状态（不满足任何条件）→ shouldShow:false', () => {
+  it('onMouseUp: POSSIBLE state (no condition met) → shouldShow:false', () => {
     sm.onMouseDown(100, 100, false);
     expect(sm.state).toBe(STATES.POSSIBLE);
     const result = sm.onMouseUp(100, 100, false);
     expect(result.shouldShow).toBe(false);
   });
 
-  // ============= peekMultiClick 双击 =============
+  // ===== peekMultiClick double-click =====
 
-  it('peekMultiClick: 第二次点击在双击窗口内同位置 → true', () => {
+  it('peekMultiClick: second click within window at same spot → true', () => {
     const t = Date.now();
     sm.clickHistory.push({ x: 100, y: 100, t, upTime: t + 50 });
     const result = sm.peekMultiClick(100, 100);
     expect(result).toBe(true);
   });
 
-  it('peekMultiClick: 上一次 click 时间太久 → false', () => {
-    const t = Date.now() - CONFIG.DOUBLE_CLICK_TIME - 100;  // 超出窗口
+  it('peekMultiClick: previous click too old → false', () => {
+    const t = Date.now() - CONFIG.DOUBLE_CLICK_TIME - 100;  // outside window
     sm.clickHistory.push({ x: 100, y: 100, t, upTime: t + 50 });
     const result = sm.peekMultiClick(100, 100);
     expect(result).toBe(false);
   });
 
-  it('peekMultiClick: 距离太远 → false', () => {
+  it('peekMultiClick: too far away → false', () => {
     const t = Date.now();
     sm.clickHistory.push({ x: 100, y: 100, t, upTime: t + 50 });
-    const result = sm.peekMultiClick(200, 100);  // 距离 100 > DOUBLE_CLICK_DISTANCE 15
+    const result = sm.peekMultiClick(200, 100);  // 100 > DOUBLE_CLICK_DISTANCE 15
     expect(result).toBe(false);
   });
 
-  // ============= clickHistory.upTime 保留（hotkey 路径回归保护）=============
+  // ===== clickHistory.upTime preserved (hotkey-path regression guard) =====
 
-  it('hotkey 路径 mouseup 仍正确更新 clickHistory.upTime（防双击误判）', () => {
-    sm.onMouseDown(100, 100, true);  // sticky 直出 → LIKELY
+  it('hotkey path mouseup still updates clickHistory.upTime (guards double-click misfire)', () => {
+    sm.onMouseDown(100, 100, true);  // sticky direct → LIKELY
     expect(sm.clickHistory.length).toBe(1);
     expect(sm.clickHistory[0].upTime).toBeUndefined();
 
@@ -149,9 +152,9 @@ describe('SelectionStateMachine', () => {
     expect(typeof sm.clickHistory[0].upTime).toBe('number');
   });
 
-  // ============= reset() =============
+  // ===== reset() =====
 
-  it('reset() 清空 isHotkeyTriggered + 状态机 internal state', () => {
+  it('reset() clears isHotkeyTriggered + FSM internal state', () => {
     sm.onMouseDown(100, 100, true);
     expect(sm.isHotkeyTriggered).toBe(true);
     expect(sm.state).toBe(STATES.LIKELY);
