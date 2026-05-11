@@ -1,8 +1,4 @@
-// electron/shared/channels.js
-// ============================================================
-// IPC 通道常量表 - 消灭魔术字符串
-// ============================================================
-// 格式: CommonJS (主进程原生支持)
+// IPC channel constants — kills magic strings.
 
 const CHANNELS = {
   SYSTEM: {
@@ -55,10 +51,10 @@ const CHANNELS = {
     SELECTION: 'screenshot-selection',
     CANCEL: 'screenshot-cancel',
     CAPTURED: 'screenshot-captured',
-    CAPTURED_SILENT: 'screenshot-captured-silent', // 静默模式（不显示主窗口）
+    CAPTURED_SILENT: 'screenshot-captured-silent', // Silent mode — no main window pop.
     CONFIG: 'screenshot-config',
     SCREEN_BOUNDS: 'screen-bounds',
-    OCR_COMPLETE: 'screenshot:ocr-complete', // OCR 完成，发送文字给划词窗口翻译
+    OCR_COMPLETE: 'screenshot:ocr-complete',       // OCR done — forward text to selection window for translation.
   },
   GLASS: {
     OPEN: 'glass:open',
@@ -76,12 +72,12 @@ const CHANNELS = {
     NOTIFY_SETTINGS_CHANGED: 'glass:notify-settings-changed',
     ADD_TO_FAVORITES: 'glass:add-to-favorites',
     ADD_TO_HISTORY: 'glass:add-to-history',
-    GET_HISTORY: 'glass:get-history',  // 新增：获取历史记录
+    GET_HISTORY: 'glass:get-history',
     SYNC_TARGET_LANGUAGE: 'glass:sync-target-language',
     REFRESH: 'glass:refresh',
     SETTINGS_CHANGED: 'glass:settings-changed',
     TRANSLATE_REQUEST: 'glass:translate-request',
-    // 子玻璃板独立窗口
+    // Child glass-pane standalone windows
     CREATE_CHILD_WINDOW: 'glass:create-child-window',
     CLOSE_CHILD_WINDOW: 'glass:close-child-window',
     UPDATE_CHILD_WINDOW: 'glass:update-child-window',
@@ -109,14 +105,14 @@ const CHANNELS = {
     START_DRAG: 'selection:start-drag',
     ADD_TO_HISTORY: 'selection:add-to-history',
     SHOW_TRIGGER: 'selection:show-trigger',
-    SHOW_RESULT: 'selection:show-result',     // 直接显示翻译结果（截图联动用）
-    SHOW_DIRECT: 'selection:show-direct',     // Sticky 直出路径（跳过图标）
+    SHOW_RESULT: 'selection:show-result',     // Direct result display (screenshot chain).
+    SHOW_DIRECT: 'selection:show-direct',     // Sticky-direct path (skip trigger icon).
     STATE_CHANGED: 'selection-state-changed',
-    // 多窗口支持
-    FREEZE: 'selection:freeze',           // 冻结当前窗口（变成独立窗口）
-    CLOSE_FROZEN: 'selection:close-frozen', // 关闭冻结的窗口
-    GET_WINDOW_ID: 'selection:get-window-id', // 获取当前窗口 ID
-    FROZEN_WINDOWS_COUNT: 'selection:frozen-windows-count', // 获取冻结窗口数量
+    // Multi-window support
+    FREEZE: 'selection:freeze',
+    CLOSE_FROZEN: 'selection:close-frozen',
+    GET_WINDOW_ID: 'selection:get-window-id',
+    FROZEN_WINDOWS_COUNT: 'selection:frozen-windows-count',
   },
   CLIPBOARD: {
     WRITE_TEXT: 'clipboard:write-text',
@@ -152,10 +148,10 @@ const CHANNELS = {
     SYNC_TARGET_LANGUAGE: 'sync-target-language',
   },
   THEME: {
-    GET: 'theme:get',                    // 获取当前主题
-    SET: 'theme:set',                    // 设置主题（广播到所有窗口）
-    CHANGED: 'theme:changed',            // 主题变化通知
-    SYNC: 'theme:sync',                  // 同步主题到子窗口
+    GET: 'theme:get',
+    SET: 'theme:set',
+    CHANGED: 'theme:changed',
+    SYNC: 'theme:sync',
   },
   SECURE_STORAGE: {
     ENCRYPT: 'secure-storage:encrypt',
@@ -180,15 +176,13 @@ const MENU_ACTIONS = {
   SWITCH_LANGUAGE: 'switch-language',
 };
 
-// 隐私模式常量
 const PRIVACY_MODES = {
   STANDARD: 'standard',
   OFFLINE: 'offline',
   STRICT: 'strict',
 };
 
-// CommonJS 导出
 module.exports = { CHANNELS, MENU_ACTIONS, PRIVACY_MODES };
 
-// 为 Vite ESM 添加 default 导出
+// Add `default` export for Vite ESM consumers.
 module.exports.default = module.exports;
