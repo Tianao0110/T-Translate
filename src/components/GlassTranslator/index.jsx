@@ -1,8 +1,6 @@
-// src/components/GlassTranslator/index.jsx
-// 玻璃翻译窗口 - 纯 UI 组件
-// 所有业务逻辑已移至 services/pipeline.js
-//
-// 支持散点模式（子玻璃板）
+// Glass overlay translation window. Pure UI shell over the session store;
+// all capture/OCR/translate logic lives in services/pipeline.js.
+// Supports scattered mode where each OCR block becomes its own child pane.
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,27 +12,19 @@ import ChildGlassPane from './ChildGlassPane.jsx';
 import createLogger from '../../utils/logger.js';
 import './styles.css';
 
-// 日志实例
 const logger = createLogger('Glass');
 
-/**
- * 玻璃翻译窗口组件
- * 职责：纯 UI 渲染，监听 store 变化
- */
 const GlassTranslator = () => {
   const { t } = useTranslation();
-  // ========== Store 状态 ==========
+
   const {
     status,
     translatedText,
     error,
-    // 子玻璃板状态
     displayMode,
     childPanes,
     frozenPanes,
-    // 通知（OCR 降级等服务层通知）
     notification,
-    // Actions
     updateChildPanePosition,
     freezeChildPane,
     removeChildPane,
@@ -43,68 +33,61 @@ const GlassTranslator = () => {
     clearNotification,
     clear,
   } = useSessionStore();
-  
+
   const {
     glassOpacity,
     targetLanguage,
     lockTargetLang,
     ocrEngine,
     setGlassOpacity,
-    setTargetLanguage,  // ← 新增：用于同步目标语言
-    setSourceLanguage,  // ← 新增：用于同步源语言
-    setLockTargetLang,  // ← 新增：用于同步锁定设置
-    setOcrEngine,       // ← 新增：用于同步 OCR 引擎
+    setTargetLanguage,
+    setSourceLanguage,
+    setLockTargetLang,
+    setOcrEngine,
   } = useConfigStore();
 
-  // ========== 纯 UI 状态 ==========
-  const [showToolbar, setShowToolbar] = useState(false);  // 工具栏显示状态
+  const [showToolbar, setShowToolbar] = useState(false);
   const [showOpacitySlider, setShowOpacitySlider] = useState(false);
-  const [showHistoryPanel, setShowHistoryPanel] = useState(false);  // 历史记录面板
+  const [showHistoryPanel, setShowHistoryPanel] = useState(false);
   const [hasOverflow, setHasOverflow] = useState(false);
-  const [theme, setTheme] = useState('light'); // 主题状态
-  const [glassBounds, setGlassBounds] = useState(null);  // 玻璃窗口边界
-  const [isPassThrough, setIsPassThrough] = useState(false);  // 穿透模式
-  const [historyItems, setHistoryItems] = useState([]);  // 历史记录
-  const [toastMessage, setToastMessage] = useState(null);  // 浮动通知
-  
-  // ========== 服务层通知（OCR 降级等）==========
+  const [theme, setTheme] = useState('light');
+  const [glassBounds, setGlassBounds] = useState(null);
+  const [isPassThrough, setIsPassThrough] = useState(false);
+  const [historyItems, setHistoryItems] = useState([]);
+  const [toastMessage, setToastMessage] = useState(null);
+
+  // Service-layer notifications (e.g. OCR engine fallback) bubble up via session store
   useEffect(() => {
     if (notification) {
       setToastMessage(notification);
       clearNotification();
-      // 5 秒后自动消失
       const timer = setTimeout(() => setToastMessage(null), 5000);
       return () => clearTimeout(timer);
     }
   }, [notification, clearNotification]);
-  
-  // ========== Refs ==========
+
   const contentRef = useRef(null);
-  const toolbarTimerRef = useRef(null);  // 工具栏隐藏计时器
-  const glassRef = useRef(null);  // 玻璃窗口 ref
-  const passThroughRef = useRef(false);  // 穿透模式 ref（避免闭包问题）
-  const showHistoryPanelRef = useRef(false);  // 历史面板状态 ref
-  const savedOpacityRef = useRef(0.85);  // 保存的透明度（穿透模式恢复用）
-  
-  // 同步 ref
+  const toolbarTimerRef = useRef(null);
+  const glassRef = useRef(null);
+  // Mirrors of state for closures inside event handlers (avoid stale-state bugs)
+  const passThroughRef = useRef(false);
+  const showHistoryPanelRef = useRef(false);
+  const savedOpacityRef = useRef(0.85);
+
   useEffect(() => {
     showHistoryPanelRef.current = showHistoryPanel;
   }, [showHistoryPanel]);
-  
-  // 同步透明度到 ref
+
   useEffect(() => {
     savedOpacityRef.current = glassOpacity;
   }, [glassOpacity]);
 
-  // ========== 初始化 ==========
   useEffect(() => {
-    // 初始化 pipeline
     pipeline.init();
-    
-    // 加载设置
+
     loadSettings();
-    
-    // 加载主题（优先使用 theme IPC，回退到 store）
+
+    // Theme: prefer the IPC sync handshake, fall back to store, then localStorage
     const loadTheme = async () => {
       try {
         if (window.electron?.theme?.sync) {
@@ -115,7 +98,6 @@ const GlassTranslator = () => {
             return;
           }
         }
-        // 回退：从 store 读取
         const settings = await window.electron?.store?.get?.('settings') || {};
         const savedTheme = settings.interface?.theme || localStorage.getItem('theme') || 'light';
         setTheme(savedTheme);
@@ -125,8 +107,9 @@ const GlassTranslator = () => {
       }
     };
     loadTheme();
-    
-    // 获取内容区边界（用于子玻璃板拖动检测）
+
+    // Track content-area bounds so child-pane drag detection knows the limits.
+    // Poll because layout shifts (resize, scrollbar appearing) don't fire events.
     const updateContentBounds = () => {
       if (contentRef.current) {
         const rect = contentRef.current.getBoundingClientRect();
@@ -139,30 +122,25 @@ const GlassTranslator = () => {
         setGlassBounds(newBounds);
       }
     };
-    
-    // 初始获取 + 定时更新
+
     updateContentBounds();
     const boundsInterval = setInterval(updateContentBounds, 500);
-    
-    // 键盘事件
+
     const handleKeyDown = async (e) => {
-      // Alt 键按下 → 进入穿透模式
+      // Alt = momentary pass-through (release reverts)
       if (e.key === 'Alt' && !passThroughRef.current) {
         passThroughRef.current = true;
         try {
           await window.electron?.glass?.setPassThrough?.(true);
-          // 不再使用窗口透明度，改用 CSS 控制
-          // await window.electron?.glass?.setOpacity?.(0.3);
         } catch (err) {
           logger.error('Failed to enter pass-through mode:', err);
         }
-        // 强制更新 UI
         window.dispatchEvent(new CustomEvent('passthrough-change', { detail: true }));
         return;
       }
-      
+
       if (e.key === 'Escape') {
-        // 优先级：历史面板 > 散点模式子玻璃板 > 关闭窗口
+        // ESC priority: history panel > scattered panes > close window
         if (showHistoryPanelRef.current) {
           setShowHistoryPanel(false);
         } else if (displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0) {
@@ -172,7 +150,7 @@ const GlassTranslator = () => {
         }
       } else if (e.code === 'Space') {
         e.preventDefault();
-        // Toggle：有翻译内容就清空，没有就截图
+        // Space toggles between capture and clear depending on current state
         if (translatedText || (displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0)) {
           clearChildPanes();
           clear();
@@ -180,12 +158,10 @@ const GlassTranslator = () => {
           captureAndTranslate();
         }
       } else if (e.key === 'h' && (e.ctrlKey || e.metaKey)) {
-        // Ctrl+H 打开/关闭历史面板
         e.preventDefault();
         if (showHistoryPanelRef.current) {
           setShowHistoryPanel(false);
         } else {
-          // 加载历史记录
           try {
             const history = await window.electron?.glass?.getHistory?.(20);
             setHistoryItems(history || []);
@@ -196,61 +172,53 @@ const GlassTranslator = () => {
         }
       }
     };
-    
-    // Alt 键释放 → 退出穿透模式
+
     const handleKeyUp = async (e) => {
       if (e.key === 'Alt' && passThroughRef.current) {
         passThroughRef.current = false;
         try {
           await window.electron?.glass?.setPassThrough?.(false);
-          // 不再使用窗口透明度
         } catch (err) {
           logger.error('Failed to exit pass-through mode:', err);
         }
-        // 强制更新 UI
         window.dispatchEvent(new CustomEvent('passthrough-change', { detail: false }));
       }
     };
-    
-    // 窗口失焦时也要退出穿透模式
+
+    // Window blur also exits pass-through, otherwise alt-tab leaves it stuck on
     const handleBlur = async () => {
       if (passThroughRef.current) {
         passThroughRef.current = false;
         try {
           await window.electron?.glass?.setPassThrough?.(false);
-          // 不再使用窗口透明度
         } catch (err) {
           logger.error('Failed to exit pass-through mode on blur:', err);
         }
         window.dispatchEvent(new CustomEvent('passthrough-change', { detail: false }));
       }
     };
-    
-    // 右键清除子玻璃板
+
     const handleContextMenu = (e) => {
       if (displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0) {
         e.preventDefault();
         clearChildPanes();
       }
     };
-    
+
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
     window.addEventListener('blur', handleBlur);
     window.addEventListener('contextmenu', handleContextMenu);
-    
-    // 监听穿透模式变化（用于更新 UI）
+
     const handlePassThroughChange = (e) => {
       setIsPassThrough(e.detail);
     };
     window.addEventListener('passthrough-change', handlePassThroughChange);
-    
-    // 监听设置变化（包括主题）
+
     let unsubscribeSettings = null;
     if (window.electron?.glass?.onSettingsChanged) {
       unsubscribeSettings = window.electron.glass.onSettingsChanged((newSettings) => {
         loadSettings();
-        // 同步主题（只在有明确的主题设置时更新）
         const newTheme = newSettings?.interface?.theme;
         if (newTheme && ['light', 'dark', 'fresh'].includes(newTheme)) {
           setTheme(newTheme);
@@ -258,8 +226,8 @@ const GlassTranslator = () => {
         }
       });
     }
-    
-    // 监听主题 IPC 广播（来自 theme.js 的统一广播）
+
+    // Theme IPC broadcast from main (so settings changes propagate without re-render)
     let unsubscribeTheme = null;
     if (window.electron?.theme?.onChanged) {
       unsubscribeTheme = window.electron.theme.onChanged((newTheme) => {
@@ -269,7 +237,7 @@ const GlassTranslator = () => {
         }
       });
     }
-    
+
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
@@ -283,7 +251,6 @@ const GlassTranslator = () => {
     };
   }, []);
 
-  // ========== 监听内容溢出 ==========
   useEffect(() => {
     if (contentRef.current) {
       const { scrollHeight, clientHeight } = contentRef.current;
@@ -291,67 +258,60 @@ const GlassTranslator = () => {
     }
   }, [translatedText]);
 
-  // ========== 加载设置（修复版）==========
   const loadSettings = async () => {
     try {
       const settings = await window.electron?.glass?.getSettings?.();
       if (settings) {
-        logger.debug(' Loaded settings from main:', settings);
-        
-        // 同步透明度
+        logger.debug('Loaded settings from main:', settings);
+
         if (settings.opacity !== undefined) {
           setGlassOpacity(settings.opacity);
         }
-        
-        // ========== 修复：同步目标语言 ==========
+
         if (settings.targetLanguage) {
-          logger.debug(' Syncing targetLanguage:', settings.targetLanguage);
+          logger.debug('Syncing targetLanguage:', settings.targetLanguage);
           setTargetLanguage(settings.targetLanguage);
         }
-        
-        // 同步源语言
+
         if (settings.sourceLanguage) {
           setSourceLanguage(settings.sourceLanguage);
         }
-        
-        // 同步锁定目标语言设置
+
         if (settings.lockTargetLang !== undefined) {
           setLockTargetLang(settings.lockTargetLang);
         }
-        
-        // 同步 OCR 引擎
+
         if (settings.ocrEngine || settings.globalOcrEngine) {
           setOcrEngine(settings.ocrEngine || settings.globalOcrEngine);
         }
-        // ========== 修复结束 ==========
       }
     } catch (error) {
-      logger.error(' Load settings failed:', error);
+      logger.error('Load settings failed:', error);
     }
   };
 
-  // ========== UI 事件处理 ==========
   const handleMouseEnterWindow = () => {
     if (toolbarTimerRef.current) clearTimeout(toolbarTimerRef.current);
     setShowToolbar(true);
   };
 
   const handleMouseLeaveWindow = () => {
-    // 延迟隐藏，避免误触
+    // 300ms delay catches the "mouse slipped off edge" case so the toolbar
+    // doesn't flicker when the cursor briefly leaves and re-enters
     toolbarTimerRef.current = setTimeout(() => {
       setShowToolbar(false);
-      setShowOpacitySlider(false);  // 同时关闭透明度滑块
+      setShowOpacitySlider(false);
     }, 300);
   };
 
   const handleClose = async () => {
-    // 先关闭所有独立子窗口
+    // Close detached child windows first so they don't outlive the parent
     try {
       await window.electron?.glass?.closeAllChildWindows?.();
     } catch (e) {
       logger.error('Failed to close child windows:', e);
     }
-    
+
     window.electron?.glass?.close?.();
   };
 
@@ -359,11 +319,11 @@ const GlassTranslator = () => {
     setShowOpacitySlider(prev => !prev);
   };
 
+  // Opacity is applied via CSS variable (--glass-opacity) so child panes stay opaque.
+  // BrowserWindow.setOpacity would dim children too.
   const handleOpacityChange = async (e) => {
     const newOpacity = parseFloat(e.target.value);
     setGlassOpacity(newOpacity);
-    // 不再使用 window.setOpacity()（窗口级透明度会影响所有子元素包括子窗口）
-    // 改为 CSS 变量控制背景透明度，子窗口保持独立不透明
   };
 
   const scrollToBottom = () => {
@@ -372,49 +332,41 @@ const GlassTranslator = () => {
     }
   };
 
-  // ========== 子玻璃板事件处理 ==========
-  
-  /**
-   * 截图并翻译（提前定义，供 handleContentClick 和键盘事件使用）
-   */
+  // Capture screen region that maps to this glass window's content area.
+  // Defined as a callback because the keyboard handler closes over it.
   const captureAndTranslate = useCallback(async () => {
     try {
-      // 使用内容区的实际边界来截图，避免坐标偏移
       if (!contentRef.current) return;
-      
+
       const contentRect = contentRef.current.getBoundingClientRect();
       const windowBounds = await window.electron?.glass?.getBounds?.();
       if (!windowBounds) return;
-      
-      // 计算内容区在屏幕上的绝对位置
+
+      // Window bounds are screen-absolute; contentRect is window-relative
       const captureRect = {
         x: Math.round(windowBounds.x + contentRect.left),
         y: Math.round(windowBounds.y + contentRect.top),
         width: Math.round(contentRect.width),
         height: Math.round(contentRect.height),
       };
-      
+
       logger.debug('Capture rect:', captureRect);
       logger.debug('Content rect:', contentRect);
       logger.debug('Window bounds:', windowBounds);
-      
+
       await pipeline.runFromCapture(captureRect);
     } catch (error) {
-      logger.error(' Capture failed:', error);
+      logger.error('Capture failed:', error);
     }
   }, []);
 
-  /**
-   * 点击内容区空白处 toggle：有内容清空，没内容截图
-   */
   const handleContentClick = useCallback((e) => {
-    // 只有点击容器本身（不是子玻璃板或文本）才触发 toggle
+    // Only fire toggle on bare-container clicks, not on child panes/text
     if (
-      e.target === e.currentTarget || 
+      e.target === e.currentTarget ||
       e.target.classList.contains('scattered-panes-container') ||
       e.target.classList.contains('glass-message')
     ) {
-      // Toggle：有内容就清空，没有就截图
       if (translatedText || (displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0)) {
         clearChildPanes();
         clear();
@@ -424,121 +376,87 @@ const GlassTranslator = () => {
     }
   }, [displayMode, childPanes.length, translatedText, clearChildPanes, clear, captureAndTranslate]);
 
-  /**
-   * 子玻璃板位置变化
-   */
   const handleChildPanePositionChange = useCallback((id, position) => {
     updateChildPanePosition(id, position);
   }, [updateChildPanePosition]);
 
-  /**
-   * 冻结子玻璃板（双击触发）→ 创建独立窗口
-   * v9: 改为双击触发，不再是拖出边界触发
-   * @param {string} id - 子玻璃板 ID
-   * @param {object} viewportPos - 视口坐标 { viewportX, viewportY }
-   */
+  // Double-click detaches a scattered pane into its own OS-level window.
+  // viewportPos comes from the child component's mouse handler.
   const handleChildPaneFreeze = useCallback(async (id, viewportPos) => {
-    // 获取子玻璃板信息
     const pane = childPanes.find(p => p.id === id);
     if (!pane) return;
-    
-    // 获取窗口位置，计算屏幕坐标
+
     const windowBounds = await window.electron?.glass?.getBounds?.();
     if (!windowBounds) {
       logger.error('Cannot get window bounds');
       return;
     }
-    
-    // 使用传入的视口坐标，转换为屏幕坐标
-    // 视口坐标是相对于窗口左上角的，需要加上窗口在屏幕上的位置
+
+    // viewport (relative to our window) -> screen-absolute
     const screenX = windowBounds.x + (viewportPos?.viewportX ?? pane.bbox.x);
     const screenY = windowBounds.y + (viewportPos?.viewportY ?? pane.bbox.y);
-    
+
     logger.debug('Creating child window at screen:', { screenX, screenY, viewportPos, windowBounds });
-    
-    // 创建独立窗口 - 传递文本长度让主进程计算合适的大小
+
+    // Main process sizes the window from the text length
     const result = await window.electron?.glass?.createChildWindow?.({
       id: pane.id,
       text: pane.translatedText || pane.sourceText,
       x: screenX,
       y: screenY,
-      // 不再传递固定大小，让主进程根据文本长度计算
       theme: theme,
     });
-    
+
     if (result?.success) {
-      // 从 childPanes 中移除（不再使用 frozenPanes）
       removeChildPane(id);
       logger.debug('Created independent child window:', id);
     } else {
       logger.error('Failed to create child window:', result?.error);
-      // 失败时回退到内部冻结
+      // Falling back to internal freeze keeps the pane usable even when
+      // BrowserWindow creation fails (e.g. low memory)
       freezeChildPane(id);
     }
   }, [childPanes, theme, removeChildPane, freezeChildPane]);
 
-  // ========== 穿透模式 ==========
-  
-  /**
-   * 进入穿透模式
-   * - 窗口变透明
-   * - 鼠标可穿透（除了冻结的子玻璃板）
-   */
   const enterPassThroughMode = useCallback(async () => {
     if (passThroughRef.current) return;
-    
+
     passThroughRef.current = true;
     setIsPassThrough(true);
-    
+
     logger.debug('Enter pass-through mode');
-    
+
     try {
-      // 设置窗口穿透
       await window.electron?.glass?.setPassThrough?.(true);
-      // 穿透模式下通过 CSS 降低背景透明度（不影响子窗口）
     } catch (e) {
       logger.error('Failed to enter pass-through mode:', e);
     }
   }, []);
-  
-  /**
-   * 退出穿透模式
-   */
+
   const exitPassThroughMode = useCallback(async () => {
     if (!passThroughRef.current) return;
-    
+
     passThroughRef.current = false;
     setIsPassThrough(false);
-    
+
     logger.debug('Exit pass-through mode');
-    
+
     try {
-      // 取消穿透
       await window.electron?.glass?.setPassThrough?.(false);
-      // 透明度由 CSS 变量自动恢复
     } catch (e) {
       logger.error('Failed to exit pass-through mode:', e);
     }
   }, []);
 
-  // ========== 历史记录 ==========
-  
-  /**
-   * 切换历史记录面板
-   */
   const toggleHistoryPanel = useCallback(async () => {
     if (showHistoryPanel) {
       setShowHistoryPanel(false);
     } else {
-      // 加载历史记录
       await loadHistory();
       setShowHistoryPanel(true);
     }
   }, [showHistoryPanel]);
-  
-  /**
-   * 加载历史记录
-   */
+
   const loadHistory = useCallback(async () => {
     try {
       const history = await window.electron?.glass?.getHistory?.(20);
@@ -548,12 +466,8 @@ const GlassTranslator = () => {
       setHistoryItems([]);
     }
   }, []);
-  
-  /**
-   * 选择历史记录项
-   */
+
   const selectHistoryItem = useCallback((item) => {
-    // 设置翻译结果
     if (item.translated) {
       const session = useSessionStore.getState();
       session.setSourceText(item.source || '');
@@ -562,22 +476,19 @@ const GlassTranslator = () => {
     setShowHistoryPanel(false);
   }, []);
 
-  // ========== 渲染 ==========
   const isLoading = [STATUS.CAPTURING, STATUS.OCR_PROCESSING, STATUS.TRANSLATING].includes(status);
 
   return (
-    <div 
+    <div
       className={`glass-window ${showToolbar ? 'show-toolbar' : ''} ${isPassThrough ? 'pass-through' : ''} ${displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0 ? 'scattered-mode' : ''}`}
       style={{ '--glass-opacity': glassOpacity }}
       data-theme={theme}
       onMouseEnter={handleMouseEnterWindow}
       onMouseLeave={handleMouseLeaveWindow}
     >
-      {/* 顶部区域 */}
       <div className="glass-top-area">
-        {/* 普通模式工具栏 */}
           <div className="glass-toolbar">
-            <button 
+            <button
               className="toolbar-btn"
               onClick={(e) => {
                 e.preventDefault();
@@ -589,8 +500,8 @@ const GlassTranslator = () => {
             >
               <Camera size={12} />
             </button>
-            
-            <button 
+
+            <button
               className={`toolbar-btn ${showHistoryPanel ? 'active' : ''}`}
               onClick={(e) => {
                 e.preventDefault();
@@ -601,8 +512,8 @@ const GlassTranslator = () => {
             >
               <History size={12} />
             </button>
-            
-            <div 
+
+            <div
               className="toolbar-handle"
               onClick={handleBarClick}
               title={t('glass.adjustOpacity', '点击调节透明度')}
@@ -610,9 +521,8 @@ const GlassTranslator = () => {
               <GripHorizontal size={14} />
             </div>
           </div>
-        
-        {/* 关闭按钮 */}
-        <button 
+
+        <button
           className="glass-close-btn"
           onClick={handleClose}
           title={t('glass.closeEsc', '关闭 (Esc)')}
@@ -620,35 +530,32 @@ const GlassTranslator = () => {
           <X size={12} />
         </button>
       </div>
-      
-      {/* 透明度滑块 */}
+
       {showOpacitySlider && (
         <div className="opacity-popup" onMouseLeave={() => setShowOpacitySlider(false)}>
           <span className="opacity-label">{t('glass.opacity', '透明度')}</span>
-          <input 
-            type="range" 
-            min="0.3" 
-            max="1" 
-            step="0.05" 
+          <input
+            type="range"
+            min="0.3"
+            max="1"
+            step="0.05"
             value={glassOpacity}
             onChange={handleOpacityChange}
           />
           <span className="opacity-value">{Math.round(glassOpacity * 100)}%</span>
         </div>
       )}
-      
-      {/* OCR 降级等服务层通知 */}
+
       {toastMessage && (
-        <div 
+        <div
           className={`glass-toast glass-toast-${toastMessage.type || 'info'}`}
           onClick={() => setToastMessage(null)}
         >
           <span>{toastMessage.message}</span>
         </div>
       )}
-      
-      {/* 内容区域 */}
-      <div 
+
+      <div
         className={`glass-content ${displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0 ? 'scattered-mode' : ''}`}
         ref={contentRef}
         onClick={handleContentClick}
@@ -659,7 +566,6 @@ const GlassTranslator = () => {
             <span>{error}</span>
           </div>
         ) : displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0 ? (
-          // 散点模式：显示子玻璃板
           <div className="scattered-panes-container">
             {childPanes.map((pane) => (
               <ChildGlassPane
@@ -668,7 +574,7 @@ const GlassTranslator = () => {
                 parentBounds={glassBounds}
                 onPositionChange={handleChildPanePositionChange}
                 onFreeze={handleChildPaneFreeze}
-                onClose={null}  // 未冻结的不显示关闭按钮
+                onClose={null}
                 theme={theme}
               />
             ))}
@@ -690,33 +596,30 @@ const GlassTranslator = () => {
           </div>
         )}
       </div>
-      
-      {/* 滚动提示 */}
+
       {hasOverflow && displayMode !== DISPLAY_MODE.SCATTERED && (
         <button className="scroll-hint" onClick={scrollToBottom}>
           <ChevronDown size={14} />
           <span>{t('selection.more', '更多')}</span>
         </button>
       )}
-      
-      {/* 冻结的子玻璃板（固定定位，可在窗口内自由移动） */}
+
       {frozenPanes.length > 0 && (
         <div className="frozen-panes-container">
           {frozenPanes.map((pane) => (
             <ChildGlassPane
               key={pane.id}
               pane={pane}
-              parentBounds={null}  // 冻结的不需要检测是否拖出
+              parentBounds={null}
               onPositionChange={handleChildPanePositionChange}
-              onFreeze={null}  // 已经冻结了
+              onFreeze={null}
               onClose={closeFrozenPane}
               theme={theme}
             />
           ))}
         </div>
       )}
-      
-      {/* 历史记录面板 */}
+
       {showHistoryPanel && (
         <div className="glass-history-panel">
           <div className="history-header">
@@ -724,7 +627,7 @@ const GlassTranslator = () => {
               <Clock size={14} />
               {t('history.title', '历史记录')}
             </span>
-            <button 
+            <button
               className="history-close-btn"
               onClick={() => setShowHistoryPanel(false)}
             >
@@ -736,7 +639,7 @@ const GlassTranslator = () => {
               <div className="history-empty">{t('history.empty', '暂无历史记录')}</div>
             ) : (
               historyItems.map((item, index) => (
-                <div 
+                <div
                   key={item.id || index}
                   className="history-item"
                   onClick={() => selectHistoryItem(item)}
@@ -757,8 +660,7 @@ const GlassTranslator = () => {
           </div>
         </div>
       )}
-      
-      {/* 穿透模式指示器 */}
+
       {isPassThrough && (
         <div className="pass-through-indicator">
           <span>穿透模式 (松开 Alt 退出)</span>
