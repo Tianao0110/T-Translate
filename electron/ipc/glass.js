@@ -1,6 +1,5 @@
-// electron/ipc/glass.js
-// 玻璃翻译窗口 IPC handlers
-// 包含：窗口控制、设置、翻译、截图等
+// Glass overlay window IPC: controls, settings, translate proxy, region capture,
+// child-pane sub-windows.
 
 const { ipcMain, safeStorage } = require('electron');
 const { CHANNELS } = require('../shared/channels');
@@ -8,14 +7,9 @@ const logger = require('../utils/logger')('IPC:Glass');
 const displayHelper = require('../utils/display-helper');
 const { t } = require('../shared/main-i18n');
 
-/**
- * 注册玻璃窗口相关 IPC handlers
- * @param {Object} ctx - 共享上下文
- */
 function register(ctx) {
   const { getMainWindow, getGlassWindow, store, managers } = ctx;
-  
-  // 获取截图模块（懒加载）
+
   let screenshotModule = null;
   const getScreenshotModule = () => {
     if (!screenshotModule) {
@@ -23,12 +17,9 @@ function register(ctx) {
     }
     return screenshotModule;
   };
-  
-  // ==================== 窗口控制 ====================
-  
-  /**
-   * 打开玻璃窗口
-   */
+
+  // ===== Window controls =====
+
   ipcMain.handle(CHANNELS.GLASS.OPEN, () => {
     if (managers.createGlassWindow) {
       managers.createGlassWindow();
@@ -37,10 +28,7 @@ function register(ctx) {
     logger.warn('createGlassWindow not available');
     return false;
   });
-  
-  /**
-   * 关闭玻璃窗口
-   */
+
   ipcMain.handle(CHANNELS.GLASS.CLOSE, () => {
     const glassWindow = getGlassWindow();
     if (glassWindow) {
@@ -49,10 +37,7 @@ function register(ctx) {
     }
     return false;
   });
-  
-  /**
-   * 获取玻璃窗口边界
-   */
+
   ipcMain.handle(CHANNELS.GLASS.GET_BOUNDS, () => {
     const glassWindow = getGlassWindow();
     if (glassWindow) {
@@ -60,10 +45,7 @@ function register(ctx) {
     }
     return null;
   });
-  
-  /**
-   * 设置窗口置顶
-   */
+
   ipcMain.handle(CHANNELS.GLASS.SET_ALWAYS_ON_TOP, (event, enabled) => {
     const glassWindow = getGlassWindow();
     if (glassWindow) {
@@ -72,23 +54,17 @@ function register(ctx) {
     }
     return false;
   });
-  
-  /**
-   * 设置窗口透明度
-   */
+
+  // Opacity is applied via CSS variable in the renderer (so child panes aren't
+  // affected). We only persist the value for next launch.
   ipcMain.handle(CHANNELS.GLASS.SET_OPACITY, (event, opacity) => {
-    // 透明度现在通过 CSS 变量控制（不影响子窗口），不再用窗口级 setOpacity
-    // 只保存设置值，供下次启动恢复
     const current = store.get('glassLocalSettings', {});
     store.set('glassLocalSettings', { ...current, opacity });
     return true;
   });
-  
-  // ==================== 鼠标穿透 ====================
-  
-  /**
-   * 设置穿透模式 - 使用智能穿透
-   */
+
+  // ===== Mouse pass-through =====
+
   ipcMain.handle(CHANNELS.GLASS.SET_PASS_THROUGH, (event, enabled) => {
     const glassWindow = getGlassWindow();
     if (glassWindow && !glassWindow.isDestroyed()) {
@@ -102,10 +78,7 @@ function register(ctx) {
     }
     return false;
   });
-  
-  /**
-   * 动态设置穿透（根据鼠标位置）
-   */
+
   ipcMain.handle(CHANNELS.GLASS.SET_IGNORE_MOUSE, (event, ignore) => {
     const glassWindow = getGlassWindow();
     if (glassWindow && !glassWindow.isDestroyed()) {
@@ -118,24 +91,21 @@ function register(ctx) {
     }
     return false;
   });
-  
-  // ==================== 设置管理 ====================
-  
-  /**
-   * 获取玻璃窗口设置（合并主程序设置和本地设置）
-   */
+
+  // ===== Settings =====
+
+  // Reads live language from main-window renderer store, falls back to persisted
+  // defaults if the main window isn't around yet
   ipcMain.handle(CHANNELS.GLASS.GET_SETTINGS, async () => {
     const mainWindow = getMainWindow();
     const mainSettings = store.get('settings', {});
     const glassConfig = mainSettings.glassWindow || {};
     const ocrConfig = mainSettings.ocr || {};
     const localSettings = store.get('glassLocalSettings', {});
-    
-    // 默认语言设置
+
     let currentTargetLang = mainSettings.translation?.defaultTargetLang ?? 'zh';
     let currentSourceLang = mainSettings.translation?.defaultSourceLang ?? 'auto';
-    
-    // 尝试从主窗口获取实时的目标语言
+
     if (mainWindow && !mainWindow.isDestroyed()) {
       try {
         const langSettings = await mainWindow.webContents.executeJavaScript(`
@@ -161,9 +131,8 @@ function register(ctx) {
         logger.debug('Could not get language settings from main window:', e.message);
       }
     }
-    
+
     const merged = {
-      // 从主程序设置
       refreshInterval: glassConfig.refreshInterval ?? 3000,
       smartDetect: glassConfig.smartDetect ?? true,
       streamOutput: glassConfig.streamOutput ?? true,
@@ -172,49 +141,37 @@ function register(ctx) {
       defaultOpacity: glassConfig.defaultOpacity ?? 0.85,
       autoPin: glassConfig.autoPin ?? true,
       lockTargetLang: glassConfig.lockTargetLang ?? true,
-      // 翻译设置
       targetLanguage: currentTargetLang,
       sourceLanguage: currentSourceLang,
-      // 主题
       theme: mainSettings.interface?.theme ?? 'light',
-      // 本地设置
       opacity: localSettings.opacity ?? glassConfig.defaultOpacity ?? 0.85,
       isPinned: localSettings.isPinned ?? glassConfig.autoPin ?? true,
     };
-    
+
     logger.debug('Get settings:', merged);
     return merged;
   });
-  
-  /**
-   * 保存玻璃窗口本地设置
-   */
+
   ipcMain.handle(CHANNELS.GLASS.SAVE_SETTINGS, (event, settings) => {
     const glassWindow = getGlassWindow();
     const current = store.get('glassLocalSettings', {});
     store.set('glassLocalSettings', { ...current, ...settings });
-    
-    // 透明度通过 CSS 变量控制，不再调用窗口级 setOpacity
-    
     return true;
   });
-  
-  /**
-   * 获取翻译源配置
-   */
+
+  // Decrypts the '***encrypted***' apiKey placeholder before returning
   ipcMain.handle(CHANNELS.GLASS.GET_PROVIDER_CONFIGS, async () => {
     const mainSettings = store.get('settings', {});
     const providerSettings = mainSettings.providers || {};
-    
-    // 解密 API Keys
+
     const configs = JSON.parse(JSON.stringify(providerSettings.configs || {}));
-    
+
     for (const providerId of Object.keys(configs)) {
       const config = configs[providerId];
       if (config?.apiKey === '***encrypted***') {
         const encryptKey = `provider_${providerId}_apiKey`;
         const stored = store.get(`__encrypted_${encryptKey}`);
-        
+
         if (stored) {
           try {
             if (safeStorage.isEncryptionAvailable()) {
@@ -232,16 +189,13 @@ function register(ctx) {
         }
       }
     }
-    
+
     return {
       list: providerSettings.list || [],
       configs,
     };
   });
-  
-  /**
-   * 通知玻璃窗重新加载设置
-   */
+
   ipcMain.handle(CHANNELS.GLASS.NOTIFY_SETTINGS_CHANGED, () => {
     const glassWindow = getGlassWindow();
     if (glassWindow && !glassWindow.isDestroyed()) {
@@ -251,12 +205,9 @@ function register(ctx) {
     }
     return false;
   });
-  
-  // ==================== 翻译 ====================
-  
-  /**
-   * 翻译文本（转发到主窗口）
-   */
+
+  // ===== Translation =====
+
   ipcMain.handle(CHANNELS.GLASS.TRANSLATE, async (event, text) => {
     try {
       const mainWindow = getMainWindow();
@@ -266,40 +217,36 @@ function register(ctx) {
       return { success: false, error: error.message };
     }
   });
-  
-  // ==================== 区域截图 ====================
-  
-  /**
-   * 截取玻璃窗口覆盖区域
-   */
+
+  // ===== Region capture =====
+
   ipcMain.handle(CHANNELS.GLASS.CAPTURE_REGION, async (event, bounds) => {
     const glassWindow = getGlassWindow();
-    
+
     try {
       if (!glassWindow || glassWindow.isDestroyed()) {
         throw new Error(t('glass.windowNotFound', '玻璃窗口不存在'));
       }
-      
-      // 隐藏悬浮窗（避免截到自身内容）
-      // 注意：WDA_EXCLUDEFROMCAPTURE 在部分系统/驱动下不生效，仍需 opacity 隐藏
+
+      // Hide self before capture so we don't OCR our own translation overlay.
+      // WDA_EXCLUDEFROMCAPTURE is unreliable on some GPU/driver combos, so we
+      // still drop opacity as a fallback.
       try {
         glassWindow.setOpacity(0);
         await new Promise(resolve => setTimeout(resolve, 80));
       } catch (e) {
         logger.warn('Failed to hide for capture:', e.message);
       }
-      
-      // 截取指定区域
+
       const screenshotMod = getScreenshotModule();
       const screenshot = await screenshotMod.captureRegion(bounds);
-      
-      // 恢复窗口（视觉透明度由 CSS 控制）
+
       try {
         glassWindow.setOpacity(1);
       } catch (e) {
         logger.warn('Failed to restore after capture:', e.message);
       }
-      
+
       if (screenshot) {
         return { success: true, imageData: screenshot };
       } else {
@@ -313,46 +260,36 @@ function register(ctx) {
       return { success: false, error: error.message };
     }
   });
-  
-  // ==================== 数据同步 ====================
-  
-  /**
-   * 添加到收藏（从玻璃窗口）
-   */
+
+  // ===== Data sync (forward to main window) =====
+
   ipcMain.handle(CHANNELS.GLASS.ADD_TO_FAVORITES, (event, item) => {
     const mainWindow = getMainWindow();
     mainWindow?.webContents.send(CHANNELS.DATA.ADD_TO_FAVORITES, item);
     return true;
   });
-  
-  /**
-   * 添加到历史记录（从玻璃窗口）
-   */
+
   ipcMain.handle(CHANNELS.GLASS.ADD_TO_HISTORY, (event, item) => {
     const mainWindow = getMainWindow();
     mainWindow?.webContents.send(CHANNELS.DATA.ADD_TO_HISTORY, item);
     return true;
   });
-  
-  /**
-   * 获取历史记录（从主窗口）
-   */
+
   ipcMain.handle(CHANNELS.GLASS.GET_HISTORY, async (event, limit = 20) => {
     const mainWindow = getMainWindow();
     if (!mainWindow || mainWindow.isDestroyed()) {
       return [];
     }
-    
+
     try {
-      // 从主窗口获取历史记录
-      // localStorage key 是 'translation-store'（Zustand persist 配置）
+      // Reaches into the renderer's Zustand-persisted store.
+      // Persist key 'translation-store' shape: { state: { history: [...] } }
       const history = await mainWindow.webContents.executeJavaScript(`
         (function() {
           try {
             const stored = localStorage.getItem('translation-store');
             if (stored) {
               const parsed = JSON.parse(stored);
-              // Zustand persist 存储格式: { state: { history: [...] } }
               const state = parsed.state || parsed;
               const items = state.history || [];
               return items.slice(0, ${limit}).map(item => ({
@@ -377,36 +314,29 @@ function register(ctx) {
       return [];
     }
   });
-  
-  /**
-   * 同步目标语言到主程序
-   */
+
   ipcMain.handle(CHANNELS.GLASS.SYNC_TARGET_LANGUAGE, (event, langCode) => {
     const mainWindow = getMainWindow();
     mainWindow?.webContents.send(CHANNELS.DATA.SYNC_TARGET_LANGUAGE, langCode);
     return true;
   });
-  
-  // ==================== 子玻璃板独立窗口 ====================
-  
-  // 存储子窗口的 Map: paneId -> { window, createdAt }
+
+  // ===== Child pane standalone windows =====
+
   const childPaneWindows = new Map();
-  const MAX_CHILD_WINDOWS = 15;  // 最大子窗口数量
-  
-  /**
-   * 删除最早创建的子窗口
-   */
+  const MAX_CHILD_WINDOWS = 15;
+
   function removeOldestChildWindow() {
     let oldest = null;
     let oldestId = null;
-    
+
     for (const [id, data] of childPaneWindows) {
       if (!oldest || data.createdAt < oldest.createdAt) {
         oldest = data;
         oldestId = id;
       }
     }
-    
+
     if (oldestId && oldest) {
       try {
         if (!oldest.window.isDestroyed()) {
@@ -417,41 +347,34 @@ function register(ctx) {
       logger.debug('Removed oldest child window:', oldestId);
     }
   }
-  
-  /**
-   * 创建子玻璃板独立窗口
-   */
+
   ipcMain.handle(CHANNELS.GLASS.CREATE_CHILD_WINDOW, async (event, options) => {
     const { BrowserWindow } = require('electron');
     const path = require('path');
     const PATHS = require('../shared/paths');
-    
+
     const { id, text, x, y, width, height, theme } = options;
-    
-    // 如果已存在，先关闭
+
     if (childPaneWindows.has(id)) {
       try {
         childPaneWindows.get(id).window.close();
       } catch (e) {}
       childPaneWindows.delete(id);
     }
-    
-    // 超出限制时删除最早的
+
     while (childPaneWindows.size >= MAX_CHILD_WINDOWS) {
       removeOldestChildWindow();
     }
-    
-    // 计算窗口大小 - 根据文本长度自适应
+
+    // Auto-size from text dimensions; clamp to keep tiny snippets readable
+    // and prevent giant overlays.
     const textLength = (text || '').length;
     const lineCount = (text || '').split('\n').length;
-    // 宽度：根据最长行估算，最小 120，最大 400
     const estimatedWidth = Math.min(Math.max(textLength * 8 + 80, 120), 400);
     const winWidth = width ? Math.min(Math.max(width, 120), 400) : estimatedWidth;
-    // 高度：根据行数和文本长度，最小 36，最大 300
     const estimatedHeight = Math.min(Math.max(lineCount * 20 + 16, 36), 300);
     const winHeight = height ? Math.min(Math.max(height, 36), 300) : estimatedHeight;
-    
-    // 验证窗口位置在有效显示器上
+
     const validBounds = displayHelper.ensureBoundsOnDisplay({
       x: x,
       y: y,
@@ -459,9 +382,9 @@ function register(ctx) {
       height: winHeight,
     }, {
       minVisiblePixels: 50,
-      centerOnInvalid: false, // 不居中，而是移到最近的显示器
+      centerOnInvalid: false, // snap to nearest display instead of centering
     });
-    
+
     try {
       const childWindow = new BrowserWindow({
         x: Math.round(validBounds.x),
@@ -474,7 +397,7 @@ function register(ctx) {
         maxHeight: 400,
         frame: false,
         transparent: true,
-        resizable: true,  // 允许调整大小
+        resizable: true,
         movable: true,
         minimizable: false,
         maximizable: false,
@@ -489,34 +412,30 @@ function register(ctx) {
           nodeIntegration: false,
         },
       });
-      
-      // 构建 URL
+
       const encodedText = encodeURIComponent(text || '');
       const queryParams = `?id=${id}&text=${encodedText}&theme=${theme || 'light'}`;
-      
+
       if (process.env.NODE_ENV === 'development' || !require('electron').app.isPackaged) {
         childWindow.loadURL(`http://localhost:5173/child-pane.html${queryParams}`);
       } else {
-        childWindow.loadFile(PATHS.pages.childPane.file, { 
-          query: { id, text: text || '', theme: theme || 'light' } 
+        childWindow.loadFile(PATHS.pages.childPane.file, {
+          query: { id, text: text || '', theme: theme || 'light' }
         });
       }
-      
+
       childWindow.once('ready-to-show', () => {
         childWindow.show();
       });
-      
-      // 监听关闭
+
       childWindow.on('closed', () => {
         childPaneWindows.delete(id);
-        // 通知渲染进程
         const glassWindow = getGlassWindow();
         if (glassWindow && !glassWindow.isDestroyed()) {
           glassWindow.webContents.send('child-pane:closed', id);
         }
       });
-      
-      // 监听来自子窗口的关闭请求
+
       ipcMain.once(`child-pane:close:${id}`, () => {
         if (childPaneWindows.has(id)) {
           try {
@@ -524,13 +443,12 @@ function register(ctx) {
           } catch (e) {}
         }
       });
-      
-      // 存储窗口和创建时间
+
       childPaneWindows.set(id, {
         window: childWindow,
         createdAt: Date.now(),
       });
-      
+
       logger.debug('Created child pane window:', id, 'Total:', childPaneWindows.size);
       return { success: true, id };
     } catch (error) {
@@ -538,10 +456,7 @@ function register(ctx) {
       return { success: false, error: error.message };
     }
   });
-  
-  /**
-   * 关闭子玻璃板窗口
-   */
+
   ipcMain.handle(CHANNELS.GLASS.CLOSE_CHILD_WINDOW, (event, id) => {
     if (childPaneWindows.has(id)) {
       try {
@@ -557,10 +472,7 @@ function register(ctx) {
     }
     return false;
   });
-  
-  /**
-   * 更新子玻璃板窗口内容
-   */
+
   ipcMain.handle(CHANNELS.GLASS.UPDATE_CHILD_WINDOW, (event, id, data) => {
     if (childPaneWindows.has(id)) {
       const paneData = childPaneWindows.get(id);
@@ -571,10 +483,7 @@ function register(ctx) {
     }
     return false;
   });
-  
-  /**
-   * 移动子玻璃板窗口
-   */
+
   ipcMain.handle(CHANNELS.GLASS.MOVE_CHILD_WINDOW, (event, id, x, y) => {
     if (childPaneWindows.has(id)) {
       const paneData = childPaneWindows.get(id);
@@ -585,10 +494,7 @@ function register(ctx) {
     }
     return false;
   });
-  
-  /**
-   * 关闭所有子玻璃板窗口
-   */
+
   ipcMain.handle(CHANNELS.GLASS.CLOSE_ALL_CHILD_WINDOWS, () => {
     let count = 0;
     for (const [id, data] of childPaneWindows) {
@@ -603,10 +509,8 @@ function register(ctx) {
     logger.debug('Closed all child pane windows:', count);
     return count;
   });
-  
-  // 监听子窗口的关闭请求
+
   ipcMain.on('child-pane:close', (event) => {
-    // 找到发送事件的窗口并关闭
     for (const [id, data] of childPaneWindows) {
       if (data.window && data.window.webContents === event.sender) {
         try {
@@ -616,10 +520,8 @@ function register(ctx) {
       }
     }
   });
-  
-  // 监听子窗口的调整大小请求
+
   ipcMain.on('child-pane:resize', (event, width, height) => {
-    // 找到发送事件的窗口并调整大小
     for (const [id, data] of childPaneWindows) {
       if (data.window && data.window.webContents === event.sender) {
         try {
@@ -633,7 +535,7 @@ function register(ctx) {
       }
     }
   });
-  
+
   logger.info('Glass IPC handlers registered');
 }
 

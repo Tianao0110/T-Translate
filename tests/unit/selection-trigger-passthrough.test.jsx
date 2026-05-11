@@ -1,16 +1,15 @@
-// Phase B pass-through 单测 — v0.2.5
-// 验：SHOW_TRIGGER 带 text 时 renderer 用 ref 存下来；点击图标先用 ref 再 fallback GET_TEXT；
-//     用过即清；新 SHOW_TRIGGER 覆盖。
+// Phase B text pass-through: SHOW_TRIGGER carries `text`, renderer stashes
+// it in a ref, the trigger click prefers the ref and falls back to GET_TEXT,
+// the prefetched value is cleared after one use, and a later SHOW_TRIGGER
+// overwrites any pending value.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, act, waitFor, cleanup } from '@testing-library/react';
 import React from 'react';
 
-// === 抓 listener callback 的 holder ===
 let triggerCb = null;
 
-// === Mocks（vi.mock 必须在所有 import 之前；vitest hoists 到顶）===
-
+// vi.mock must run before all imports — vitest hoists these.
 vi.mock('../../src/services/translation.js', () => ({
   default: {
     initialized: true,
@@ -64,7 +63,7 @@ beforeEach(() => {
   triggerCb = null;
   vi.clearAllMocks();
 
-  // 设置 window.electron mock，每次 useEffect 注册都被捕获
+  // Mock window.electron — capture the listener callback so the test can fire it.
   global.window = Object.assign(global.window || {}, {
     electron: {
       selection: {
@@ -87,7 +86,7 @@ afterEach(() => {
 
 const SelectionTranslator = (await import('../../src/components/SelectionTranslator/index.jsx')).default;
 
-// 工厂：触发 onShowTrigger callback 并等 React state flush
+// Helper: fire onShowTrigger callback and wait for React state to flush.
 async function fireShowTrigger(data) {
   await act(async () => {
     triggerCb({
@@ -98,13 +97,13 @@ async function fireShowTrigger(data) {
       translation: { sourceLanguage: 'auto', targetLanguage: 'zh' },
       ...data,
     });
-    // flush 100ms triggerReady 定时器（让图标 ready 接收点击）
+    // Flush the 100ms triggerReady timer so the icon can accept clicks.
     await new Promise(r => setTimeout(r, 120));
   });
 }
 
 describe('Phase B — text pass-through via SHOW_TRIGGER', () => {
-  it('SHOW_TRIGGER 带 text → 点击图标用 prefetched，不发 GET_TEXT', async () => {
+  it('SHOW_TRIGGER with text → trigger click uses prefetched, no GET_TEXT', async () => {
     const { container } = render(<SelectionTranslator />);
     expect(triggerCb).toBeTruthy();
 
@@ -118,7 +117,7 @@ describe('Phase B — text pass-through via SHOW_TRIGGER', () => {
       await new Promise(r => setTimeout(r, 50));
     });
 
-    // 关键断言：translate 被 'hello world' 调用，getText IPC 没被调
+    // Key assertion: translate called with 'hello world', getText not called.
     const translationService = (await import('../../src/services/translation.js')).default;
     await waitFor(() => {
       expect(translationService.translate).toHaveBeenCalled();
@@ -127,11 +126,11 @@ describe('Phase B — text pass-through via SHOW_TRIGGER', () => {
     expect(mockGetText).not.toHaveBeenCalled();
   });
 
-  it('SHOW_TRIGGER 不带 text（Layer 1/2）→ 点击图标 fallback GET_TEXT', async () => {
+  it('SHOW_TRIGGER without text (Layer 1/2) → trigger click falls back to GET_TEXT', async () => {
     const { container } = render(<SelectionTranslator />);
     mockGetText.mockResolvedValue({ text: 'fallback text' });
 
-    await fireShowTrigger({ text: null });  // 显式 null（Layer 1/2 路径）
+    await fireShowTrigger({ text: null });  // explicit null (Layer 1/2 path)
 
     const trigger = container.querySelector('.sel-trigger');
     await act(async () => {
@@ -147,7 +146,7 @@ describe('Phase B — text pass-through via SHOW_TRIGGER', () => {
     expect(translationService.translate.mock.calls[0][0]).toBe('fallback text');
   });
 
-  it('SHOW_TRIGGER 带空字符串 text → 视为 null fallback GET_TEXT', async () => {
+  it('SHOW_TRIGGER with empty-string text → treated as null, falls back to GET_TEXT', async () => {
     const { container } = render(<SelectionTranslator />);
     mockGetText.mockResolvedValue({ text: 'fetched after empty' });
 
@@ -162,11 +161,11 @@ describe('Phase B — text pass-through via SHOW_TRIGGER', () => {
     expect(mockGetText).toHaveBeenCalledTimes(1);
   });
 
-  it('点击使用一次后 prefetched 清空：第二次 SHOW_TRIGGER 不带 text 必须走 fallback', async () => {
+  it('prefetched cleared after one use: a second SHOW_TRIGGER without text must fall back', async () => {
     const { container } = render(<SelectionTranslator />);
     mockGetText.mockResolvedValue({ text: 'second fetch' });
 
-    // 第一次：带 text 点击用 prefetched
+    // First: with text → click uses prefetched.
     await fireShowTrigger({ text: 'first' });
     let trigger = container.querySelector('.sel-trigger');
     await act(async () => {
@@ -175,7 +174,8 @@ describe('Phase B — text pass-through via SHOW_TRIGGER', () => {
     });
     expect(mockGetText).not.toHaveBeenCalled();
 
-    // 第二次：不带 text，应该 fallback（如果没清，会错用 'first'）
+    // Second: no text → must fall back (if stale 'first' leaked, this would
+    // mis-translate).
     await fireShowTrigger({ text: null });
     trigger = container.querySelector('.sel-trigger');
     await act(async () => {
@@ -190,12 +190,12 @@ describe('Phase B — text pass-through via SHOW_TRIGGER', () => {
     });
   });
 
-  it('新 SHOW_TRIGGER 覆盖旧 prefetched（不点第一次直接 fire 第二次）', async () => {
+  it('new SHOW_TRIGGER overrides a pending prefetched value (no click between them)', async () => {
     const { container } = render(<SelectionTranslator />);
 
-    // 先送 'firstSelection' 不点
+    // Send 'firstSelection', do not click.
     await fireShowTrigger({ text: 'firstSelection' });
-    // 再送 'secondSelection' 覆盖
+    // Send 'secondSelection' to overwrite.
     await fireShowTrigger({ text: 'secondSelection' });
 
     const trigger = container.querySelector('.sel-trigger');

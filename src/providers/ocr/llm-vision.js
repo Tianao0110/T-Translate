@@ -1,16 +1,12 @@
-// src/providers/ocr/llm-vision.js
-// LLM Vision OCR 引擎 - 视觉大模型，处理复杂场景
+// LLM Vision OCR — uses a vision-capable LLM (Qwen-VL, LLaVA, etc.) via the
+// local OpenAI-compatible chat endpoint. Best for complex layout/handwriting/blur.
 
 import { BaseOCREngine } from './base.js';
 import createLogger from '../../utils/logger.js';
 const logger = createLogger('LLMVision');
 
-/**
- * LLM Vision OCR 引擎
- * 使用视觉大模型进行 OCR，适合复杂排版/手写/模糊
- */
 class LLMVisionEngine extends BaseOCREngine {
-  
+
   static metadata = {
     id: 'llm-vision',
     name: 'LLM Vision',
@@ -29,9 +25,6 @@ class LLMVisionEngine extends BaseOCREngine {
     });
   }
 
-  /**
-   * 检查是否可用
-   */
   async isAvailable() {
     try {
       const response = await fetch(`${this.config.endpoint}/models`, {
@@ -44,15 +37,11 @@ class LLMVisionEngine extends BaseOCREngine {
     }
   }
 
-  /**
-   * 识别图片
-   */
   async recognize(input, options = {}) {
     try {
       const imageData = this.ensureBase64(input);
       const { sourceLanguage = 'auto' } = options;
 
-      // 构建提示词
       const systemPrompt = this.buildSystemPrompt(sourceLanguage);
 
       const response = await fetch(`${this.config.endpoint}/chat/completions`, {
@@ -71,7 +60,7 @@ class LLMVisionEngine extends BaseOCREngine {
             }
           ],
           max_tokens: 4096,
-          temperature: 0.1,
+          temperature: 0.1, // OCR wants near-deterministic output, not creative
         }),
         signal: AbortSignal.timeout(30000),
       });
@@ -79,9 +68,10 @@ class LLMVisionEngine extends BaseOCREngine {
       if (!response.ok) {
         const errorText = await response.text();
         const lower = errorText.toLowerCase();
-        // 检测常见的"不支持视觉"错误
+        // ocrManager pattern-matches this error string to trigger auto-fallback
+        // to local OCR. Keep the keywords in sync with _isVisionUnsupportedError there.
         if (response.status === 400 && (
-          lower.includes('image') || lower.includes('vision') || 
+          lower.includes('image') || lower.includes('vision') ||
           lower.includes('multimodal') || lower.includes('content type') ||
           lower.includes('does not support')
         )) {
@@ -97,7 +87,6 @@ class LLMVisionEngine extends BaseOCREngine {
         return { success: false, error: 'No text recognized / 未识别到文字' };
       }
 
-      // 清理输出
       const cleanedText = this.cleanLLMOutput(text);
 
       return {
@@ -115,9 +104,6 @@ class LLMVisionEngine extends BaseOCREngine {
     }
   }
 
-  /**
-   * 构建系统提示词
-   */
   buildSystemPrompt(sourceLanguage) {
     const langHint = sourceLanguage === 'zh' ? '中文' :
                      sourceLanguage === 'en' ? 'English' :
@@ -133,23 +119,19 @@ Rules:
 ${langHint ? `5. The text is likely in ${langHint}` : ''}`;
   }
 
-  /**
-   * 清理 LLM 输出
-   */
+  // LLMs often prefix output with "Here is..." or wrap in ```code fences``` even
+  // when told not to. Strip those and detect the "no text" sentinel.
   cleanLLMOutput(text) {
     if (!text) return '';
 
-    // 移除常见的 LLM 前缀/后缀
     let cleaned = text
       .replace(/^(Here is the extracted text:|The text in the image is:|OCR Result:)/i, '')
       .replace(/^\s*```[\s\S]*?```\s*$/g, match => {
-        // 提取代码块内容
         return match.replace(/```\w*\n?/g, '').trim();
       })
       .trim();
 
-    // 检查是否未识别到文字
-    if (cleaned.includes('[NO TEXT DETECTED]') || 
+    if (cleaned.includes('[NO TEXT DETECTED]') ||
         cleaned.toLowerCase().includes('no text') ||
         cleaned.toLowerCase().includes('cannot detect')) {
       return '';

@@ -1,17 +1,12 @@
-// src/providers/gemini/index.js
-// Google Gemini AI 翻译源
+// Google Gemini provider via Google AI Studio API.
 
 import { BaseProvider, LANGUAGE_CODES } from '../base.js';
 import icon from './icon.svg';
 import createLogger from '../../utils/logger.js';
 const logger = createLogger('Gemini');
 
-/**
- * Google Gemini 翻译源
- * 使用 Google AI Studio API
- */
 class GeminiProvider extends BaseProvider {
-  
+
   static metadata = {
     id: 'gemini',
     name: 'Google Gemini',
@@ -20,7 +15,7 @@ class GeminiProvider extends BaseProvider {
     color: '#4285f4',
     type: 'llm',
     helpUrl: 'https://aistudio.google.com/apikey',
-    
+
     configSchema: {
       apiKey: {
         type: 'password',
@@ -58,15 +53,13 @@ class GeminiProvider extends BaseProvider {
     return true;
   }
 
-  /**
-   * 测试连接
-   */
   async testConnection() {
     if (!this.config.apiKey) {
       return { success: false, error: '请配置 API Key' };
     }
 
     try {
+      // Model-info endpoint is the cheapest way to validate the key
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1/models/${this.config.model}?key=${this.config.apiKey}`,
         {
@@ -86,9 +79,6 @@ class GeminiProvider extends BaseProvider {
     }
   }
 
-  /**
-   * 翻译文本
-   */
   async translate(text, sourceLang = 'auto', targetLang = 'zh', options = {}) {
     if (!text?.trim()) {
       return { success: false, error: '文本为空' };
@@ -101,7 +91,6 @@ class GeminiProvider extends BaseProvider {
     try {
       let prompt;
       if (options.systemPrompt) {
-        // 使用传入的 system prompt
         prompt = options.systemPrompt.replace('{targetLang}', this._getLanguageName(targetLang)) + `\n\n${text}`;
       } else {
         const sourceName = this._getLanguageName(sourceLang);
@@ -113,6 +102,9 @@ class GeminiProvider extends BaseProvider {
 
       const requestBody = {
         contents: [{ parts: [{ text: prompt }] }],
+        // Translation tasks legitimately need to handle text in any of these
+        // categories (e.g. translating news articles, fiction). Default thresholds
+        // would block too many legitimate inputs.
         safetySettings: [
           { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
           { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
@@ -142,11 +134,10 @@ class GeminiProvider extends BaseProvider {
 
       const data = await response.json();
 
-      // 解析响应
       const translatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
       if (!translatedText) {
-        // 检查是否被阻止
+        // Distinguish safety-block from generic empty response
         if (data.promptFeedback?.blockReason) {
           return { success: false, error: `内容被阻止: ${data.promptFeedback.blockReason}` };
         }
@@ -165,9 +156,6 @@ class GeminiProvider extends BaseProvider {
     }
   }
 
-  /**
-   * 获取语言名称
-   */
   _getLanguageName(code) {
     const names = {
       'auto': 'auto-detected language',

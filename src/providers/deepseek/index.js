@@ -1,16 +1,10 @@
-// src/providers/deepseek/index.js
-// DeepSeek AI 翻译源
-// 继承 OpenAICompatibleProvider，OpenAI 兼容 API
+// DeepSeek AI — OpenAI-compatible endpoint.
 
 import OpenAICompatibleProvider from '../openai-compatible.js';
 import icon from './icon.svg';
 
-/**
- * DeepSeek AI 翻译源
- * 国产大模型，OpenAI 兼容接口
- */
 class DeepSeekProvider extends OpenAICompatibleProvider {
-  
+
   static metadata = {
     id: 'deepseek',
     name: 'DeepSeek',
@@ -19,7 +13,7 @@ class DeepSeekProvider extends OpenAICompatibleProvider {
     color: '#5b6ef8',
     type: 'llm',
     helpUrl: 'https://platform.deepseek.com',
-    
+
     configSchema: {
       apiKey: {
         type: 'password',
@@ -64,9 +58,6 @@ class DeepSeekProvider extends OpenAICompatibleProvider {
     return true;
   }
 
-  /**
-   * 需要 API Key
-   */
   _checkApiKey() {
     if (!this.config.apiKey) {
       return { success: false, error: '请配置 DeepSeek API Key' };
@@ -74,9 +65,6 @@ class DeepSeekProvider extends OpenAICompatibleProvider {
     return null;
   }
 
-  /**
-   * 测试连接
-   */
   async testConnection() {
     if (!this.config.apiKey) {
       return { success: false, message: '请配置 API Key' };

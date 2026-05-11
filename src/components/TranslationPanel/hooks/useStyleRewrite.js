@@ -1,7 +1,5 @@
-// src/components/TranslationPanel/hooks/useStyleRewrite.js
-// 风格改写逻辑 - 从 TranslationPanel 抽出
-//
-// 管理风格选择弹窗、强度控制、LLM 改写调用
+// Style rewrite: takes a "style reference" from favorites and rewrites the
+// current translation to imitate its tone and register.
 
 import { useState, useCallback } from 'react';
 import translationService from '../../../services/translation.js';
@@ -10,14 +8,6 @@ import { getShortErrorMessage } from '../../../utils/error-handler.js';
 
 const logger = createLogger('useStyleRewrite');
 
-/**
- * 风格改写 Hook
- * @param {Object} currentTranslation - 当前翻译状态
- * @param {Function} addStyleVersion - store 方法：添加风格版本
- * @param {Function} notify - 通知函数
- * @param {Function} t - i18n 翻译函数
- * @returns {Object} 风格改写状态和操作方法
- */
 export default function useStyleRewrite(currentTranslation, addStyleVersion, notify, t) {
   const [showStyleModal, setShowStyleModal] = useState(false);
   const [selectedStyle, setSelectedStyle] = useState(null);
@@ -25,7 +15,6 @@ export default function useStyleRewrite(currentTranslation, addStyleVersion, not
   const [isRewriting, setIsRewriting] = useState(false);
   const [showVersionMenu, setShowVersionMenu] = useState(false);
 
-  // 打开风格选择弹窗
   const openStyleModal = useCallback(() => {
     if (!currentTranslation.translatedText) {
       notify(t('translation.translateFirst'), 'warning');
@@ -36,7 +25,6 @@ export default function useStyleRewrite(currentTranslation, addStyleVersion, not
     setStyleStrength(50);
   }, [currentTranslation.translatedText, notify, t]);
 
-  // 执行风格改写
   const executeStyleRewrite = useCallback(async () => {
     if (!selectedStyle) {
       notify(t('translation.selectStyle'), 'warning');
@@ -77,6 +65,7 @@ export default function useStyleRewrite(currentTranslation, addStyleVersion, not
 
       if (result.success && result.content) {
         let rewrittenText = result.content.trim();
+        // LLM tends to wrap output in quotes despite being told not to
         rewrittenText = rewrittenText.replace(/^["「『]|["」』]$/g, '').trim();
 
         addStyleVersion(
@@ -99,7 +88,6 @@ export default function useStyleRewrite(currentTranslation, addStyleVersion, not
     }
   }, [selectedStyle, styleStrength, currentTranslation.translatedText, addStyleVersion, notify, t]);
 
-  // 获取版本显示名称
   const getVersionName = useCallback((version) => {
     if (!version) return t ? t('translation.versionOriginal', '原始') : 'Original';
     switch (version.type) {
@@ -110,13 +98,11 @@ export default function useStyleRewrite(currentTranslation, addStyleVersion, not
     }
   }, [t]);
 
-  // 当前版本信息
   const currentVersion = currentTranslation.versions?.find(
     v => v.id === currentTranslation.currentVersionId
   );
 
   return {
-    // 风格弹窗
     showStyleModal,
     setShowStyleModal,
     selectedStyle,
@@ -126,7 +112,6 @@ export default function useStyleRewrite(currentTranslation, addStyleVersion, not
     openStyleModal,
     executeStyleRewrite,
     isRewriting,
-    // 版本管理
     showVersionMenu,
     setShowVersionMenu,
     getVersionName,

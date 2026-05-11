@@ -1,18 +1,8 @@
-// src/components/HistoryPanel/index.jsx
-// 历史记录面板 - 性能优化版
-// 
-// 优化点：
-// 1. HistoryCard 使用 React.memo
-// 2. 收藏状态使用 Set 缓存查找
-// 3. 搜索使用防抖
-// 4. 回调函数使用 useCallback
-// 5. 分组计算使用 useMemo
-
 import React, { useState, useMemo, useCallback, useEffect, useRef, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import i18n from '../../i18n.js';
 import {
-  Clock, Search, Trash2, Copy, Star, 
+  Clock, Search, Trash2, Copy, Star,
   Calendar, ChevronDown, ChevronRight, LayoutGrid,
   BarChart3, TrendingUp, X, Edit3, Download, Upload,
   FileText, Hash, Type, Languages, Activity, RotateCcw,
@@ -26,16 +16,12 @@ import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import 'dayjs/locale/zh-cn';
 import './styles.css';
 
-// 从配置中心导入常量
-import { PRIVACY_MODES } from '@config/defaults'; 
+import { PRIVACY_MODES } from '@config/defaults';
 
 dayjs.extend(relativeTime);
 dayjs.extend(isSameOrAfter);
 dayjs.locale('zh-cn');
 
-/**
- * 搜索高亮组件 - memo 优化
- */
 const HighlightText = memo(({ text, search }) => {
   if (!search || !text) return text;
   try {
@@ -52,27 +38,22 @@ const HighlightText = memo(({ text, search }) => {
 });
 HighlightText.displayName = 'HighlightText';
 
-/**
- * 卡片组件 - React.memo 优化
- * 只有当 props 变化时才重新渲染
- */
-const HistoryCard = memo(({ 
-  item, 
-  onCopy, 
-  onRestore, 
-  onFavorite, 
-  onDelete, 
-  isFavorite, 
-  isSelected, 
-  onSelect, 
-  showCheckbox, 
+const HistoryCard = memo(({
+  item,
+  onCopy,
+  onRestore,
+  onFavorite,
+  onDelete,
+  isFavorite,
+  isSelected,
+  onSelect,
+  showCheckbox,
   searchQuery,
   onDoubleClick
 }) => {
   const { t } = useTranslation();
   const [showTranslated, setShowTranslated] = useState(true);
-  
-  // 使用 useCallback 避免内联函数
+
   const handleToggle = useCallback(() => {
     setShowTranslated(prev => !prev);
   }, []);
@@ -97,8 +78,7 @@ const HistoryCard = memo(({
   const handleDeleteClick = useCallback(() => {
     onDelete(item.id);
   }, [onDelete, item.id]);
-  
-  // 双击查看详情
+
   const handleDoubleClick = useCallback(() => {
     if (onDoubleClick) {
       onDoubleClick(item);
@@ -118,20 +98,20 @@ const HistoryCard = memo(({
           )}
         </div>
       </div>
-      
+
       <div className="card-body" onClick={handleToggle} title={t('history.card.clickHint')}>
         <div className="card-text-label">
           {showTranslated ? t('history.card.target') : t('history.card.source')}
           <RotateCcw size={12} className="switch-hint" />
         </div>
         <div className={`card-text ${showTranslated ? 'translated' : 'source'}`}>
-          <HighlightText 
-            text={showTranslated ? item.translatedText : item.sourceText} 
+          <HighlightText
+            text={showTranslated ? item.translatedText : item.sourceText}
             search={searchQuery}
           />
         </div>
       </div>
-      
+
       <div className="card-actions">
         <button onClick={handleCopyClick} title={t('history.copyTarget')}>
           <Copy size={14} />
@@ -149,7 +129,7 @@ const HistoryCard = memo(({
     </div>
   );
 }, (prevProps, nextProps) => {
-  // 自定义比较函数 - 只比较会影响渲染的 props
+  // Custom comparator: only re-render on props that actually affect output.
   return (
     prevProps.item.id === nextProps.item.id &&
     prevProps.item.sourceText === nextProps.item.sourceText &&
@@ -162,26 +142,21 @@ const HistoryCard = memo(({
 });
 HistoryCard.displayName = 'HistoryCard';
 
-/**
- * 历史记录面板 - 性能优化版
- */
 const HistoryPanel = ({ showNotification }) => {
   const { t } = useTranslation();
-  
+
   const notify = useCallback((msg, type) => {
     if (showNotification) showNotification(msg, type);
   }, [showNotification]);
 
-  // 分页配置
   const PAGE_SIZE = 50;
   const LOAD_MORE_THRESHOLD = 100;
 
-  // 状态
   const [viewMode, setViewMode] = useState('card');
   const [groupBy, setGroupBy] = useState('date');
   const [showStats, setShowStats] = useState(false);
   const [dateRange, setDateRange] = useState('all');
-  const [searchInput, setSearchInput] = useState(''); // 原始输入
+  const [searchInput, setSearchInput] = useState('');
   const [expandedGroups, setExpandedGroups] = useState(new Set(['today', 'yesterday']));
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [selectMode, setSelectMode] = useState(false);
@@ -189,16 +164,15 @@ const HistoryPanel = ({ showNotification }) => {
   const [focusIndex, setFocusIndex] = useState(-1);
   const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  
-  // 详情弹窗状态
+
   const [detailItem, setDetailItem] = useState(null);
-  
-  // 🔧 搜索防抖 - 300ms 延迟
+
+  // Debounce typed search by 300ms — keeps filtering responsive without
+  // refiltering on every keystroke.
   const debouncedSearch = useDebounce(searchInput, 300);
-  
+
   const contentRef = useRef(null);
-  
-  // Store - 使用选择器减少重渲染
+
   const history = useTranslationStore(state => state.history);
   const favorites = useTranslationStore(state => state.favorites);
   const translationMode = useTranslationStore(state => state.translationMode);
@@ -210,15 +184,14 @@ const HistoryPanel = ({ showNotification }) => {
   const exportHistory = useTranslationStore(state => state.exportHistory);
   const importHistory = useTranslationStore(state => state.importHistory);
 
-  // 🔧 收藏 ID Set 缓存 - O(1) 查找替代 O(n) 遍历
+  // Set of favorite ids — O(1) lookup vs scanning the favorites array
+  // for every history card we render.
   const favoriteIds = useMemo(() => {
     return new Set(favorites?.map(f => f.id) || []);
   }, [favorites]);
 
-  // 无痕模式检查
   const isSecureMode = translationMode === PRIVACY_MODES.SECURE;
 
-  // 统计数据 - useMemo 缓存
   const enhancedStats = useMemo(() => {
     if (!Array.isArray(history) || history.length === 0) {
       return { total: 0, today: 0, thisWeek: 0, thisMonth: 0, totalChars: 0, avgLength: 0, languagePairs: [], peakHour: null, streak: 0 };
@@ -231,11 +204,11 @@ const HistoryPanel = ({ showNotification }) => {
     for (const item of history) {
       const itemDate = dayjs(item.timestamp);
       totalChars += item.sourceText?.length || 0;
-      
+
       if (itemDate.isSameOrAfter(now.startOf('day'))) today++;
       if (itemDate.isSameOrAfter(now.startOf('week'))) thisWeek++;
       if (itemDate.isSameOrAfter(now.startOf('month'))) thisMonth++;
-      
+
       const pair = `${item.sourceLanguage || 'auto'} → ${item.targetLanguage || 'zh'}`;
       langPairCount[pair] = (langPairCount[pair] || 0) + 1;
       hourCount[itemDate.hour()] = (hourCount[itemDate.hour()] || 0) + 1;
@@ -249,20 +222,18 @@ const HistoryPanel = ({ showNotification }) => {
       .map(([pair, count]) => ({ pair, count, percent: Math.round(count / history.length * 100) }));
     const peakHour = Object.entries(hourCount).sort((a, b) => b[1] - a[1])[0];
 
-    return { 
+    return {
       total: history.length, today, thisWeek, thisMonth, totalChars,
       avgLength: Math.round(totalChars / history.length), languagePairs,
-      peakHour: peakHour ? { hour: parseInt(peakHour[0]), count: peakHour[1] } : null, streak 
+      peakHour: peakHour ? { hour: parseInt(peakHour[0]), count: peakHour[1] } : null, streak
     };
   }, [history]);
 
-  // 过滤和排序 - 使用防抖后的搜索词
   const filteredHistory = useMemo(() => {
     if (!Array.isArray(history)) return [];
-    
+
     let filtered = [...history];
 
-    // 使用防抖后的搜索词
     if (debouncedSearch) {
       const query = debouncedSearch.toLowerCase();
       filtered = filtered.filter(item =>
@@ -278,7 +249,6 @@ const HistoryPanel = ({ showNotification }) => {
       case 'month': filtered = filtered.filter(item => dayjs(item.timestamp).isSameOrAfter(now.startOf('month'))); break;
     }
 
-    // 排序
     filtered.sort((a, b) => {
       let aVal, bVal;
       switch (sortConfig.key) {
@@ -294,15 +264,12 @@ const HistoryPanel = ({ showNotification }) => {
     return filtered;
   }, [history, debouncedSearch, dateRange, sortConfig]);
 
-  // 分页后的数据
   const paginatedHistory = useMemo(() => {
     return filteredHistory.slice(0, displayCount);
   }, [filteredHistory, displayCount]);
 
-  // 是否还有更多数据
   const hasMore = filteredHistory.length > displayCount;
 
-  // 加载更多 - useCallback
   const loadMore = useCallback(() => {
     if (isLoadingMore || !hasMore) return;
     setIsLoadingMore(true);
@@ -312,7 +279,6 @@ const HistoryPanel = ({ showNotification }) => {
     }, 100);
   }, [isLoadingMore, hasMore, filteredHistory.length]);
 
-  // 滚动加载更多
   useEffect(() => {
     const container = contentRef.current;
     if (!container) return;
@@ -328,16 +294,16 @@ const HistoryPanel = ({ showNotification }) => {
     return () => container.removeEventListener('scroll', handleScroll);
   }, [loadMore]);
 
-  // 搜索/筛选变化时重置分页
+  // Reset paging when the filter changes so the user sees results from
+  // the top, not whatever offset they had scrolled to.
   useEffect(() => {
     setDisplayCount(PAGE_SIZE);
   }, [debouncedSearch, dateRange]);
 
-  // 分组 - 使用分页后的数据
   const groupedHistory = useMemo(() => {
     const groups = {};
     const now = dayjs();
-    
+
     for (const item of paginatedHistory) {
       let key;
       if (groupBy === 'date') {
@@ -346,7 +312,7 @@ const HistoryPanel = ({ showNotification }) => {
         else if (d.isSame(now.subtract(1, 'day'), 'day')) key = 'yesterday';
         else if (d.isSame(now, 'week')) key = 'thisWeek';
         else if (d.isSame(now, 'month')) key = 'thisMonth';
-        else key = d.format('YYYY-MM'); // 使用标准格式作为 key
+        else key = d.format('YYYY-MM');
       } else {
         key = `${item.sourceLanguage || 'auto'} → ${item.targetLanguage || 'zh'}`;
       }
@@ -366,7 +332,6 @@ const HistoryPanel = ({ showNotification }) => {
       .map(([key, items]) => ({ key, items, count: items.length }));
   }, [paginatedHistory, groupBy]);
 
-  // 日期分组标题翻译
   const getGroupTitle = useCallback((key) => {
     const dateGroupLabels = {
       today: t('history.today'),
@@ -375,17 +340,14 @@ const HistoryPanel = ({ showNotification }) => {
       thisMonth: t('history.thisMonth'),
     };
     if (dateGroupLabels[key]) return dateGroupLabels[key];
-    // 如果是 YYYY-MM 格式，格式化为本地化月份
+    // YYYY-MM keys get localized: '2026年05月' for zh, 'May 2026' otherwise.
     if (/^\d{4}-\d{2}$/.test(key)) {
       const date = dayjs(key + '-01');
-      // 根据当前语言返回不同格式
       const lang = i18n.language;
       return lang === 'zh' ? date.format('YYYY年MM月') : date.format('MMM YYYY');
     }
     return key;
   }, [t]);
-
-  // 🔧 所有回调函数使用 useCallback
 
   const toggleGroup = useCallback((title) => {
     setExpandedGroups(prev => {
@@ -431,7 +393,6 @@ const HistoryPanel = ({ showNotification }) => {
     notify(t('history.restored'), 'success');
   }, [restoreFromHistory, notify, t]);
 
-  // 🔧 使用 favoriteIds Set 优化查找
   const handleFavorite = useCallback((item) => {
     const isFav = favoriteIds.has(item.id);
     isFav ? removeFromFavorites(item.id) : addToFavorites(item);
@@ -443,7 +404,7 @@ const HistoryPanel = ({ showNotification }) => {
       const data = exportHistory('json');
       const content = JSON.stringify(data, null, 2);
       const filename = `t-translate-history-${dayjs().format('YYYY-MM-DD')}.json`;
-      
+
       const saveFile = window.electron?.dialog?.saveFile;
       if (saveFile) {
         const result = await saveFile({
@@ -457,7 +418,7 @@ const HistoryPanel = ({ showNotification }) => {
           throw new Error(result.error);
         }
       } else {
-        // 回退
+        // Browser fallback when not running in Electron.
         const blob = new Blob([content], { type: 'application/json' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
@@ -466,8 +427,8 @@ const HistoryPanel = ({ showNotification }) => {
         URL.revokeObjectURL(a.href);
         notify(t('history.exportSuccess'), 'success');
       }
-    } catch { 
-      notify(t('history.exportFailed'), 'error'); 
+    } catch {
+      notify(t('history.exportFailed'), 'error');
     }
   }, [exportHistory, notify, t]);
 
@@ -479,8 +440,8 @@ const HistoryPanel = ({ showNotification }) => {
       try {
         const result = await importHistory(file);
         if (result?.success) notify(t('history.importedCount', { count: result.count || 0 }), 'success');
-      } catch { 
-        notify(t('history.importFailed', '导入失败'), 'error'); 
+      } catch {
+        notify(t('history.importFailed', 'Import failed'), 'error');
       }
     };
     reader.readAsText(file);
@@ -518,11 +479,10 @@ const HistoryPanel = ({ showNotification }) => {
     setShowStats(prev => !prev);
   }, []);
 
-  // 键盘导航
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (!contentRef.current) return;
-      
+
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         setFocusIndex(prev => Math.min(prev + 1, filteredHistory.length - 1));
@@ -550,7 +510,6 @@ const HistoryPanel = ({ showNotification }) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [focusIndex, filteredHistory, selectMode, notify, toggleSelect]);
 
-  // 统计面板
   const renderStats = () => {
     if (!showStats) return null;
     return (
@@ -603,7 +562,6 @@ const HistoryPanel = ({ showNotification }) => {
     );
   };
 
-  // 渲染表格
   const renderTableGroup = useCallback((group) => (
     <div key={group.key} className="table-group">
       <div className="table-group-header" onClick={() => toggleGroup(group.key)}>
@@ -631,8 +589,8 @@ const HistoryPanel = ({ showNotification }) => {
           </thead>
           <tbody>
             {group.items.map((item, index) => (
-              <tr 
-                key={`${item.id}-${index}`} 
+              <tr
+                key={`${item.id}-${index}`}
                 className={selectedIds.has(item.id) ? 'selected' : ''}
                 onDoubleClick={() => setDetailItem(item)}
                 style={{ cursor: 'pointer' }}
@@ -649,12 +607,12 @@ const HistoryPanel = ({ showNotification }) => {
                 <td><div className="cell-text"><HighlightText text={item.sourceText?.slice(0, 60)} search={debouncedSearch} />{item.sourceText?.length > 60 ? '...' : ''}</div></td>
                 <td><div className="cell-text"><HighlightText text={item.translatedText?.slice(0, 60)} search={debouncedSearch} />{item.translatedText?.length > 60 ? '...' : ''}</div></td>
                 <td className="cell-actions" onClick={(e) => e.stopPropagation()}>
-                  <button onClick={() => handleCopy(item.translatedText)} title={t('translation.copy', '复制')}><Copy size={12} /></button>
-                  <button onClick={() => handleRestore(item.id)} title={t('history.restore', '恢复')}><Edit3 size={12} /></button>
-                  <button onClick={() => handleFavorite(item)} title={t('translation.favorite', '收藏')} className={favoriteIds.has(item.id) ? 'active' : ''}>
+                  <button onClick={() => handleCopy(item.translatedText)} title={t('translation.copy', 'Copy')}><Copy size={12} /></button>
+                  <button onClick={() => handleRestore(item.id)} title={t('history.restore', 'Restore')}><Edit3 size={12} /></button>
+                  <button onClick={() => handleFavorite(item)} title={t('translation.favorite', 'Favorite')} className={favoriteIds.has(item.id) ? 'active' : ''}>
                     <Star size={12} fill={favoriteIds.has(item.id) ? 'currentColor' : 'none'} />
                   </button>
-                  <button onClick={() => removeFromHistory(item.id)} title={t('history.delete', '删除')} className="danger"><Trash2 size={12} /></button>
+                  <button onClick={() => removeFromHistory(item.id)} title={t('history.delete', 'Delete')} className="danger"><Trash2 size={12} /></button>
                 </td>
               </tr>
             ))}
@@ -662,22 +620,20 @@ const HistoryPanel = ({ showNotification }) => {
         </table>
       )}
     </div>
-  ), [expandedGroups, selectMode, sortConfig, selectedIds, debouncedSearch, favoriteIds, 
+  ), [expandedGroups, selectMode, sortConfig, selectedIds, debouncedSearch, favoriteIds,
       toggleGroup, handleSort, toggleSelect, handleCopy, handleRestore, handleFavorite, removeFromHistory]);
 
-  // 渲染内容
   const renderContent = () => {
     if (filteredHistory.length === 0) {
       return (
         <div className="empty-state">
           <Clock size={48} />
-          <p>{debouncedSearch ? t('history.noMatch', '没有找到匹配的记录') : t('history.empty', '暂无翻译历史')}</p>
-          <span>{t('history.emptyHint', '翻译内容会自动保存在这里')}</span>
+          <p>{debouncedSearch ? t('history.noMatch', 'No matching records') : t('history.empty', 'No translation history yet')}</p>
+          <span>{t('history.emptyHint', 'Translations are automatically saved here')}</span>
         </div>
       );
     }
 
-    // 表格视图
     if (viewMode === 'table') {
       return (
         <div className="history-table-wrapper">
@@ -686,7 +642,6 @@ const HistoryPanel = ({ showNotification }) => {
       );
     }
 
-    // 卡片视图
     return (
       <div className="history-cards">
         {groupedHistory.map(group => (
@@ -724,7 +679,6 @@ const HistoryPanel = ({ showNotification }) => {
 
   return (
     <div className="history-panel">
-      {/* 无痕模式提示 */}
       {isSecureMode && (
         <div className="secure-mode-banner">
           <div className="secure-banner-icon">🔒</div>
@@ -734,17 +688,16 @@ const HistoryPanel = ({ showNotification }) => {
           </div>
         </div>
       )}
-      
-      {/* 工具栏 */}
+
       <div className="history-toolbar">
         <div className="toolbar-left">
           <div className="toolbar-search">
             <Search size={16} />
-            <input 
-              type="text" 
-              placeholder={t('history.search')} 
-              value={searchInput} 
-              onChange={handleSearchChange} 
+            <input
+              type="text"
+              placeholder={t('history.search')}
+              value={searchInput}
+              onChange={handleSearchChange}
             />
             {searchInput && (
               <button onClick={handleClearSearch}>
@@ -769,7 +722,7 @@ const HistoryPanel = ({ showNotification }) => {
           <button className={`toolbar-btn ${showStats ? 'active' : ''}`} onClick={toggleStats}>
             <BarChart3 size={16} /><span>{t('history.stats.title')}</span>
           </button>
-          
+
           <button className={`toolbar-btn ${selectMode ? 'active' : ''}`} onClick={toggleSelectMode}>
             <CheckSquare size={16} /><span>{t('history.select')}</span>
           </button>
@@ -795,15 +748,15 @@ const HistoryPanel = ({ showNotification }) => {
               <Trash size={16} /><span>{t('history.deleteSelected', {count: selectedIds.size})}</span>
             </button>
           )}
-          
+
           <button className="toolbar-btn" onClick={handleExport} title={t('history.export')}><Download size={16} /></button>
           <label className="toolbar-btn" title={t('history.import')}>
             <Upload size={16} />
             <input type="file" accept=".json" onChange={handleImport} style={{ display: 'none' }} />
           </label>
-          
+
           <div className="toolbar-divider" />
-          
+
           <button className="toolbar-btn danger" onClick={handleClearHistory}>
             <Trash2 size={16} /><span>{t('history.clearAll')}</span>
           </button>
@@ -821,12 +774,11 @@ const HistoryPanel = ({ showNotification }) => {
 
       <div className="history-content" ref={contentRef}>
         {renderContent()}
-        
-        {/* 加载更多 */}
+
         {hasMore && (
           <div className="load-more-wrapper">
-            <button 
-              className="load-more-btn" 
+            <button
+              className="load-more-btn"
               onClick={loadMore}
               disabled={isLoadingMore}
             >
@@ -850,7 +802,6 @@ const HistoryPanel = ({ showNotification }) => {
         </div>
       )}
 
-      {/* 详情弹窗 */}
       {detailItem && (
         <div className="detail-modal-overlay" onClick={() => setDetailItem(null)}>
           <div className="detail-modal" onClick={e => e.stopPropagation()}>
@@ -861,7 +812,7 @@ const HistoryPanel = ({ showNotification }) => {
                 <X size={18} />
               </button>
             </div>
-            
+
             <div className="detail-modal-body">
               <div className="detail-section">
                 <div className="detail-label">{t('translation.source')}</div>
@@ -872,7 +823,7 @@ const HistoryPanel = ({ showNotification }) => {
                 <div className="detail-text translated">{detailItem.translatedText}</div>
               </div>
             </div>
-            
+
             <div className="detail-modal-footer">
               <button className="detail-btn" onClick={() => { handleCopy(detailItem.sourceText); }}>
                 <Copy size={14} /> {t('history.copySource')}
@@ -883,11 +834,11 @@ const HistoryPanel = ({ showNotification }) => {
               <button className="detail-btn primary" onClick={() => { handleRestore(detailItem.id); setDetailItem(null); }}>
                 <Edit3 size={14} /> {t('history.restore')}
               </button>
-              <button 
-                className={`detail-btn ${favoriteIds.has(detailItem.id) ? 'active' : ''}`} 
+              <button
+                className={`detail-btn ${favoriteIds.has(detailItem.id) ? 'active' : ''}`}
                 onClick={() => handleFavorite(detailItem)}
               >
-                <Star size={14} fill={favoriteIds.has(detailItem.id) ? 'currentColor' : 'none'} /> 
+                <Star size={14} fill={favoriteIds.has(detailItem.id) ? 'currentColor' : 'none'} />
                 {favoriteIds.has(detailItem.id) ? t('history.unfavorite') : t('history.favorite')}
               </button>
             </div>

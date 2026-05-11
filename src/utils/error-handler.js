@@ -1,6 +1,6 @@
-// src/utils/error-handler.js
-// 用户友好的错误处理工具
-// 将技术性错误转换为易理解的消息，并提供解决建议
+// Translates raw errors into user-friendly messages with suggestions.
+// Two layers: pattern-matched type (network/api_key/quota/etc.) plus
+// provider-specific overrides for higher-fidelity hints.
 
 import i18n from '../i18n.js';
 
@@ -8,9 +8,6 @@ const _t = (key, fallback) => {
   try { const r = i18n.t(key); return r === key ? fallback : r; } catch { return fallback; }
 };
 
-/**
- * 错误类型枚举
- */
 export const ERROR_TYPES = {
   NETWORK: 'network',
   API_KEY: 'api_key',
@@ -23,12 +20,7 @@ export const ERROR_TYPES = {
   UNKNOWN: 'unknown',
 };
 
-/**
- * 错误模式匹配规则
- * 用于识别错误类型
- */
 const ERROR_PATTERNS = [
-  // 网络错误
   {
     type: ERROR_TYPES.NETWORK,
     patterns: [
@@ -43,7 +35,6 @@ const ERROR_PATTERNS = [
       /网络/,
     ],
   },
-  // API Key 错误
   {
     type: ERROR_TYPES.API_KEY,
     patterns: [
@@ -57,7 +48,6 @@ const ERROR_PATTERNS = [
       /未配置/,
     ],
   },
-  // API 配额错误
   {
     type: ERROR_TYPES.API_QUOTA,
     patterns: [
@@ -69,7 +59,6 @@ const ERROR_PATTERNS = [
       /limit.*reached/i,
     ],
   },
-  // 超时错误
   {
     type: ERROR_TYPES.TIMEOUT,
     patterns: [
@@ -79,7 +68,6 @@ const ERROR_PATTERNS = [
       /请求超时/,
     ],
   },
-  // 配置错误
   {
     type: ERROR_TYPES.CONFIG,
     patterns: [
@@ -91,9 +79,7 @@ const ERROR_PATTERNS = [
   },
 ];
 
-/**
- * 用户友好的错误消息映射（延迟求值以支持 i18n）
- */
+// Lazy-evaluated so the running i18n locale is picked up at format time
 function getFriendlyMessages() {
   return {
     [ERROR_TYPES.NETWORK]: {
@@ -176,9 +162,6 @@ function getFriendlyMessages() {
   };
 }
 
-/**
- * Provider 特定的错误消息（延迟求值）
- */
 function getProviderMessages() {
   return {
     'local-llm': {
@@ -205,14 +188,9 @@ function getProviderMessages() {
   };
 }
 
-/**
- * 检测错误类型
- * @param {string|Error} error - 错误消息或错误对象
- * @returns {string} 错误类型
- */
 export function detectErrorType(error) {
   const message = typeof error === 'string' ? error : (error?.message || String(error));
-  
+
   for (const rule of ERROR_PATTERNS) {
     for (const pattern of rule.patterns) {
       if (pattern.test(message)) {
@@ -220,80 +198,58 @@ export function detectErrorType(error) {
       }
     }
   }
-  
+
   return ERROR_TYPES.UNKNOWN;
 }
 
-/**
- * 获取用户友好的错误信息
- * @param {string|Error} error - 原始错误
- * @param {object} options - 选项
- * @param {string} options.provider - 翻译源 ID
- * @param {string} options.context - 上下文（如 'translation', 'ocr'）
- * @returns {object} 格式化的错误信息
- */
 export function formatError(error, options = {}) {
   const { provider, context } = options;
   const errorMessage = typeof error === 'string' ? error : (error?.message || String(error));
   const errorType = detectErrorType(errorMessage);
-  
+
   const FRIENDLY_MESSAGES = getFriendlyMessages();
   const PROVIDER_MESSAGES = getProviderMessages();
-  
-  // 获取基础消息
+
   const baseInfo = FRIENDLY_MESSAGES[errorType] || FRIENDLY_MESSAGES[ERROR_TYPES.UNKNOWN];
-  
-  // 尝试获取 Provider 特定消息
+
   let specificMessage = null;
   if (provider && PROVIDER_MESSAGES[provider]) {
     const providerMsgs = PROVIDER_MESSAGES[provider];
     specificMessage = providerMsgs[errorType];
   }
-  
-  // 构建最终结果
+
   const result = {
     type: errorType,
     title: baseInfo.title,
     message: specificMessage || baseInfo.message,
-    detail: errorMessage, // 保留原始错误供调试
+    detail: errorMessage, // raw error preserved for debugging
     suggestions: baseInfo.suggestions,
     action: baseInfo.action,
     provider: provider || null,
   };
-  
-  // OCR 上下文特殊处理
+
+  // For OCR-context errors that weren't classified as OCR, prefix the title
+  // so the user knows which subsystem failed
   if (context === 'ocr' && errorType !== ERROR_TYPES.OCR) {
     result.title = 'OCR ' + result.title;
   }
-  
+
   return result;
 }
 
-/**
- * 生成简短的错误提示文本
- * 用于 notify 等简短提示场景
- * @param {string|Error} error - 原始错误
- * @param {object} options - 选项
- * @returns {string} 简短的错误提示
- */
+// Compact form for toasts / inline error labels
 export function getShortErrorMessage(error, options = {}) {
   const formatted = formatError(error, options);
   const FRIENDLY_MESSAGES = getFriendlyMessages();
-  
-  // 如果有 provider 特定消息，使用它
+
+  // Prefer the provider-specific message if one matched
   if (formatted.message !== FRIENDLY_MESSAGES[formatted.type]?.message) {
     return formatted.message;
   }
-  
-  // 否则返回 title + 简短说明
+
   return `${formatted.title}：${formatted.message}`;
 }
 
-/**
- * 检查是否是可重试的错误
- * @param {string} errorType - 错误类型
- * @returns {boolean}
- */
 export function isRetryable(errorType) {
   return [
     ERROR_TYPES.NETWORK,
@@ -302,11 +258,6 @@ export function isRetryable(errorType) {
   ].includes(errorType);
 }
 
-/**
- * 检查是否需要用户操作的错误
- * @param {string} errorType - 错误类型
- * @returns {boolean}
- */
 export function requiresUserAction(errorType) {
   return [
     ERROR_TYPES.API_KEY,
@@ -314,32 +265,24 @@ export function requiresUserAction(errorType) {
   ].includes(errorType);
 }
 
-/**
- * 获取建议的下一步操作
- * @param {object} formattedError - formatError 的返回值
- * @returns {object|null} { type, label } 或 null
- */
 export function getSuggestedAction(formattedError) {
   if (!formattedError) return null;
-  
-  // 如果错误本身有建议的操作
+
   if (formattedError.action) {
     return formattedError.action;
   }
-  
-  // 根据错误类型返回默认操作
+
   if (requiresUserAction(formattedError.type)) {
     return { type: 'openSettings', label: _t('errors.checkSettings', '检查设置') };
   }
-  
+
   if (isRetryable(formattedError.type)) {
     return { type: 'retry', label: _t('errors.retry', '重试') };
   }
-  
+
   return null;
 }
 
-// 默认导出
 export default {
   ERROR_TYPES,
   detectErrorType,

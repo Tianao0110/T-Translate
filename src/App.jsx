@@ -1,4 +1,3 @@
-// src/App.jsx
 import React, { useEffect, useState } from 'react';
 import TitleBar from './components/TitleBar';
 import MainWindow from './components/MainWindow';
@@ -8,21 +7,19 @@ import { initStoreSync } from './stores/sync-to-electron.js';
 import createLogger from './utils/logger.js';
 import './styles/App.css';
 
-// 从配置中心导入常量
-import { THEMES } from '@config/defaults'; 
+import { THEMES } from '@config/defaults';
 
-// 日志实例
 const logger = createLogger('App');
 
-// 暴露 store 到 window（仍保留，供玻璃窗口子进程通过 IPC 查询）
-// 但主进程语言同步已改为从 electron-store 读取，不再 executeJavaScript
+// Glass-window subprocess used to read these via executeJavaScript. We've
+// since switched to electron-store IPC, but the globals stay for any code
+// still reaching in through the DOM.
 if (typeof window !== 'undefined') {
   window.__TRANSLATION_STORE__ = useTranslationStore;
   window.__CONFIG_STORE__ = useConfigStore;
 }
 
-// 初始化 Zustand → electron-store 同步（语言、主题等）
-// 只需调用一次，subscribe 会持续监听
+// One-time wiring of Zustand -> electron-store (subscribes for the lifetime of the app)
 initStoreSync(useTranslationStore, useConfigStore);
 
 function App() {
@@ -34,35 +31,32 @@ function App() {
     const setTargetLanguage = useTranslationStore(state => state.setTargetLanguage);
 
     useEffect(() => {
-      // 1. 初始化主题 - 优先从 store 获取，确保与设置同步
+      // Theme source-of-truth precedence: settings store > localStorage. We
+      // mirror the resolved value back to localStorage so a refresh paints
+      // the correct theme before React mounts.
       const initTheme = async () => {
         let savedTheme = 'light';
-        
+
         try {
-          // 优先从 store 获取（settings 中的主题是权威来源）
           if (window.electron?.theme?.get) {
             const result = await window.electron.theme.get();
             if (result?.success && result.theme) {
               savedTheme = result.theme;
             }
           } else {
-            // 降级：从 localStorage 获取
             savedTheme = localStorage.getItem('theme') || 'light';
           }
         } catch (e) {
-          // 出错时从 localStorage 获取
           savedTheme = localStorage.getItem('theme') || 'light';
         }
-        
-        // 同步到 localStorage（确保一致性）
+
         localStorage.setItem('theme', savedTheme);
         setTheme(savedTheme);
         document.documentElement.setAttribute('data-theme', savedTheme);
       };
-      
+
       initTheme();
 
-      // 2. 监听主题变化（来自 IPC 广播）
       let unsubscribeTheme = null;
       if (window.electron?.theme?.onChanged) {
         unsubscribeTheme = window.electron.theme.onChanged((newTheme) => {
@@ -73,7 +67,8 @@ function App() {
         });
       }
 
-      // 3. 监听 storage 事件（跨标签页同步）
+      // localStorage 'storage' events fire on *other* tabs/windows — used to
+      // sync theme when the glass window changes it
       const handleStorageChange = (e) => {
         if (e.key === 'theme') {
           const newTheme = e.newValue || 'light';
@@ -83,11 +78,11 @@ function App() {
       };
       window.addEventListener('storage', handleStorageChange);
 
-      // 4. 通知 index.html 移除加载动画
+      // index.html shows a loading splash until __APP_LOADED__ flips
       const timer = setTimeout(() => {
         if (window) {
-            window.__APP_LOADED__ = true;
-            window.dispatchEvent(new Event('app-ready'));
+          window.__APP_LOADED__ = true;
+          window.dispatchEvent(new Event('app-ready'));
         }
       }, 500);
 
@@ -98,7 +93,6 @@ function App() {
       };
     }, []);
 
-    // 全局截图监听（始终挂载，不会因标签切换而丢失）
     useEffect(() => {
       if (!window.electron?.screenshot?.onCaptured) {
         logger.warn('Screenshot API not available');
@@ -117,7 +111,7 @@ function App() {
       };
     }, [setPendingScreenshot]);
 
-    // 监听玻璃窗口的收藏请求
+    // Glass window forwards user "add to favorites" through main -> this listener
     useEffect(() => {
       if (!window.electron?.ipcRenderer) {
         logger.warn('IPC not available for glass favorites');
@@ -149,7 +143,7 @@ function App() {
       };
     }, [addToFavorites]);
 
-    // 监听玻璃窗口和划词翻译的历史记录请求
+    // Selection translate and glass window route history adds through this listener
     useEffect(() => {
       if (!window.electron?.ipcRenderer) return;
 
@@ -175,7 +169,6 @@ function App() {
       };
     }, [addToHistory]);
 
-    // 监听玻璃窗口的目标语言同步
     useEffect(() => {
       if (!window.electron?.ipcRenderer) return;
 
@@ -195,10 +188,7 @@ function App() {
 
     return (
       <div className={`app ${theme} no-titlebar`}>
-        {/* Electron 标题栏 */}
         <TitleBar />
-        
-        {/* 主应用界面 */}
         <MainWindow />
       </div>
     );

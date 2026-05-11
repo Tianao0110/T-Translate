@@ -1,9 +1,9 @@
-// Phase A sourceLanguage 优先级单测 — v0.2.5
-// 验：translateText 内部 sourceLang = overrideSourceLang || translation.sourceLanguage || 'auto'
-//     三种触发路径的 sourceLang 透传是否正确：
-//       - handleTriggerClick（图标流）→ 走 state，不传 override
-//       - onShowDirect（CapsLock 直出）→ 传 newTranslation.sourceLanguage 作 override
-//       - onShowResult（截图 OCR）→ 传 data.sourceLanguage 作 override
+// Phase A sourceLanguage precedence: translateText resolves
+//   sourceLang = overrideSourceLang || translation.sourceLanguage || 'auto'
+// Verifies all three trigger paths pass the right sourceLang through:
+//   - handleTriggerClick (icon flow) — state, no override
+//   - onShowDirect (CapsLock sticky) — newTranslation.sourceLanguage as override
+//   - onShowResult (screenshot OCR) — data.sourceLanguage as override
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, act, waitFor, cleanup } from '@testing-library/react';
@@ -91,7 +91,7 @@ async function fireShowTrigger(data) {
       theme: 'light',
       settings: { triggerTimeout: 4000, minChars: 2, maxChars: 500 },
       translation: { sourceLanguage: 'auto', targetLanguage: 'zh' },
-      text: null,  // 默认 Layer 1/2 路径，无 prefetched
+      text: null,  // default Layer 1/2 path — no prefetched value
       ...data,
     });
     await new Promise(r => setTimeout(r, 120));
@@ -110,13 +110,13 @@ async function fireShowDirect(data) {
   });
 }
 
-describe('Phase A — translateText sourceLanguage 优先级', () => {
-  it('handleTriggerClick（图标流）→ translate 收到 state 的 sourceLanguage', async () => {
+describe('Phase A — translateText sourceLanguage precedence', () => {
+  it('handleTriggerClick (icon flow) → translate receives state sourceLanguage', async () => {
     const { container } = render(<SelectionTranslator />);
 
-    // SHOW_TRIGGER 把 translation.sourceLanguage='en' 写到 state
+    // SHOW_TRIGGER writes translation.sourceLanguage='en' into state.
     await fireShowTrigger({
-      text: 'someEnglishText',  // pass-through 路径，避免 GET_TEXT
+      text: 'someEnglishText',  // pass-through path, avoids GET_TEXT
       translation: { sourceLanguage: 'en', targetLanguage: 'zh' },
     });
 
@@ -131,12 +131,12 @@ describe('Phase A — translateText sourceLanguage 优先级', () => {
       expect(translationService.translate).toHaveBeenCalled();
     });
 
-    // translate 第二个参数是 options 对象
+    // translate's second arg is the options object.
     const options = translationService.translate.mock.calls[0][1];
     expect(options.sourceLang).toBe('en');
   });
 
-  it('onShowDirect（CapsLock 直出）→ translate 收到 newTranslation.sourceLanguage 作 override', async () => {
+  it('onShowDirect (CapsLock sticky) → translate receives newTranslation.sourceLanguage as override', async () => {
     render(<SelectionTranslator />);
 
     await fireShowDirect({
@@ -153,12 +153,12 @@ describe('Phase A — translateText sourceLanguage 优先级', () => {
     expect(options.sourceLang).toBe('ja');
   });
 
-  it('onShowDirect 无 sourceLanguage → fallback 到 \'auto\'', async () => {
+  it('onShowDirect without sourceLanguage → falls back to \'auto\'', async () => {
     render(<SelectionTranslator />);
 
     await fireShowDirect({
       text: 'noSourceLang',
-      translation: { targetLanguage: 'zh' },  // 不带 sourceLanguage
+      translation: { targetLanguage: 'zh' },  // no sourceLanguage
     });
 
     const translationService = (await import('../../src/services/translation.js')).default;
@@ -170,7 +170,7 @@ describe('Phase A — translateText sourceLanguage 优先级', () => {
     expect(options.sourceLang).toBe('auto');
   });
 
-  it('translation.sourceLanguage 为 \'auto\' 时 → translate 收到 \'auto\'（默认场景回归）', async () => {
+  it('translation.sourceLanguage = \'auto\' → translate receives \'auto\' (default-case regression)', async () => {
     const { container } = render(<SelectionTranslator />);
 
     await fireShowTrigger({

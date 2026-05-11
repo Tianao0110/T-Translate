@@ -1,14 +1,9 @@
-// src/providers/ocr/baidu-ocr.js
-// 百度 OCR 引擎
+// Baidu OCR — https://ai.baidu.com/tech/ocr
 
 import { BaseOCREngine } from './base.js';
 import createLogger from '../../utils/logger.js';
 const logger = createLogger('BaiduOCR');
 
-/**
- * 百度 OCR 引擎
- * https://ai.baidu.com/tech/ocr
- */
 class BaiduOCREngine extends BaseOCREngine {
   static metadata = {
     id: 'baidu-ocr',
@@ -51,17 +46,13 @@ class BaiduOCREngine extends BaseOCREngine {
     return !!(this.config.apiKey && this.config.secretKey);
   }
 
-  /**
-   * 获取 access_token
-   */
   async getAccessToken() {
-    // 检查缓存的 token 是否有效
     if (this._accessToken && Date.now() < this._tokenExpiry) {
       return this._accessToken;
     }
 
     const { apiKey, secretKey } = this.config;
-    
+
     const response = await fetch(
       `https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=${apiKey}&client_secret=${secretKey}`,
       { method: 'POST' }
@@ -72,13 +63,13 @@ class BaiduOCREngine extends BaseOCREngine {
     }
 
     const data = await response.json();
-    
+
     if (data.error) {
       throw new Error(data.error_description || data.error);
     }
 
     this._accessToken = data.access_token;
-    // token 有效期 30 天，提前 1 天刷新
+    // Baidu tokens last 30 days; refresh 1 day early so we don't race the expiry
     this._tokenExpiry = Date.now() + (data.expires_in - 86400) * 1000;
 
     return this._accessToken;
@@ -86,7 +77,7 @@ class BaiduOCREngine extends BaseOCREngine {
 
   async recognize(input, options = {}) {
     const { apiKey, secretKey } = this.config;
-    
+
     if (!apiKey || !secretKey) {
       return { success: false, error: '请配置百度 OCR API Key 和 Secret Key' };
     }
@@ -94,10 +85,10 @@ class BaiduOCREngine extends BaseOCREngine {
     try {
       const accessToken = await this.getAccessToken();
       const base64Data = this.ensureBase64(input);
-      // 移除 data URL 前缀
+      // Baidu expects bare base64 form-encoded, not a data: URL
       const pureBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
 
-      // 使用通用文字识别（高精度版）
+      // accurate_basic = high-accuracy general OCR (slower but more reliable than basicGeneral)
       const apiUrl = `https://aip.baidubce.com/rest/2.0/ocr/v1/accurate_basic?access_token=${accessToken}`;
 
       const formData = new URLSearchParams();

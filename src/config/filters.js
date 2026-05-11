@@ -1,20 +1,12 @@
-// src/config/filters.js
-// 免译名单（正则保护）配置
-//
+// Pre-translate filters: regex patterns whose matches are protected
+// (replaced with placeholders) before sending to the translator, then
+// restored after. Used to prevent code, URLs, emails etc. from being
+// rewritten by the LLM.
 
 import createLogger from '../utils/logger.js';
 const logger = createLogger('Filters');
-// 这些模式匹配的内容在翻译时会被保护，不会被翻译
-// 翻译完成后会自动恢复原内容
 
-/**
- * 默认免译过滤器
- * 每个过滤器包含：
- * - name: 唯一标识符
- * - pattern: 正则表达式（必须带 g 标志）
- * - description: 中文描述
- * - enabled: 是否默认启用
- */
+// Each filter: { name, pattern (RegExp, MUST be /g), description, enabled }.
 export const DEFAULT_FILTERS = [
   {
     name: 'code_block',
@@ -62,13 +54,13 @@ export const DEFAULT_FILTERS = [
     name: 'html_tag',
     pattern: /<\/?[a-zA-Z][^>]*>/g,
     description: 'HTML 标签',
-    enabled: false,  // 默认关闭，可能影响正常文本
+    enabled: false,  // off by default — too greedy for prose
   },
   {
     name: 'markdown_link',
     pattern: /\[([^\]]+)\]\([^)]+\)/g,
     description: 'Markdown 链接 [text](url)',
-    enabled: false,  // 默认关闭，保留链接文字翻译
+    enabled: false,  // off by default — usually we want link text translated
   },
   {
     name: 'version_number',
@@ -84,42 +76,24 @@ export const DEFAULT_FILTERS = [
   },
 ];
 
-/**
- * 用户自定义过滤器的存储 Key
- */
 export const USER_FILTERS_KEY = 'translation.customFilters';
 
-/**
- * 获取所有启用的过滤器
- * @param {Array} userFilters - 用户自定义过滤器
- * @returns {Array} 启用的过滤器列表
- */
 export function getEnabledFilters(userFilters = []) {
   const defaultEnabled = DEFAULT_FILTERS.filter(f => f.enabled);
-  
-  // 用户过滤器可以覆盖默认配置
   const userEnabled = userFilters.filter(f => f.enabled);
-  
-  // 合并：用户配置优先
+
+  // User filters with the same name override defaults.
   const filterMap = new Map();
   defaultEnabled.forEach(f => filterMap.set(f.name, f));
   userEnabled.forEach(f => filterMap.set(f.name, f));
-  
+
   return Array.from(filterMap.values());
 }
 
-/**
- * 创建自定义过滤器
- * @param {string} name - 过滤器名称
- * @param {string} patternStr - 正则表达式字符串
- * @param {string} description - 描述
- * @returns {object|null} 过滤器对象或 null（如果正则无效）
- */
 export function createCustomFilter(name, patternStr, description = '') {
   try {
-    // 验证正则表达式
     const pattern = new RegExp(patternStr, 'g');
-    
+
     return {
       name: `custom_${name}`,
       pattern,
@@ -133,16 +107,11 @@ export function createCustomFilter(name, patternStr, description = '') {
   }
 }
 
-/**
- * 验证过滤器是否有效
- * @param {object} filter - 过滤器对象
- * @returns {boolean}
- */
 export function validateFilter(filter) {
   if (!filter || typeof filter !== 'object') return false;
   if (!filter.name || typeof filter.name !== 'string') return false;
   if (!filter.pattern || !(filter.pattern instanceof RegExp)) return false;
-  if (!filter.pattern.global) return false;  // 必须有 g 标志
+  if (!filter.pattern.global) return false;  // global flag required
   return true;
 }
 

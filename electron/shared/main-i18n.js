@@ -1,19 +1,18 @@
-// electron/shared/main-i18n.js
-// 主进程国际化模块
-// 由于主进程无法使用 react-i18next，维护独立翻译表
-// 语言检测复用 tray-labels 的 getLanguage()
+// Main-process i18n.
+// react-i18next is renderer-only; the main process maintains its own translation table.
+// Language detection reuses tray-labels' getLanguage().
 
 const { getLanguage } = require('./tray-labels');
 
 const messages = {
   zh: {
-    // OCR 引擎检测
+    // OCR engine detection
     'ocr.notWindows': '非 Windows 系统',
     'ocr.needsWin10': '需要 Windows 10 或更高版本',
     'ocr.noLangPack': '未安装任何 OCR 语言包',
     'ocr.cantGetLangs': '无法获取语言列表',
     
-    // OCR 下载/安装
+    // OCR download / install
     'ocr.unknownEngine': '未知的引擎 ID',
     'ocr.cantFindPath': '无法确定安装路径，请手动在项目目录运行: npm install ',
     'ocr.npmUnavailable': 'npm 不可用，请确保已安装 Node.js 并添加到环境变量',
@@ -23,7 +22,7 @@ const messages = {
     'ocr.installSuccess': '{{name}} 安装成功',
     'ocr.restartHint': '为确保 OCR 引擎正常工作，建议重启应用',
     
-    // OCR 卸载
+    // OCR uninstall
     'ocr.builtinEngine': 'LLM Vision 是内置引擎，无法卸载',
     'ocr.systemEngine': 'Windows OCR 是系统引擎，无法卸载',
     'ocr.cantRemove': '无法删除该引擎',
@@ -33,7 +32,7 @@ const messages = {
     'ocr.uninstalled': '{{name}} 已卸载',
     'ocr.uninstallFailed': '卸载失败',
     
-    // OCR 健康检查
+    // OCR health check
     'ocr.moduleMissing': 'OCR 引擎模块未安装或已损坏',
     'ocr.moduleCorrupt': 'OCR 模块加载异常，无法创建实例',
     'ocr.instanceFailed': 'OCR 实例创建失败，模型文件可能损坏',
@@ -43,7 +42,7 @@ const messages = {
     'ocr.winOcrAvailable': 'Windows OCR 可用',
     'ocr.onlineNoCheck': '在线引擎无需健康检查',
     
-    // OCR 修复
+    // OCR repair
     'ocr.repairOnlyRapid': '仅支持修复 RapidOCR 引擎',
     'ocr.repairCantFindPath': '无法确定安装路径，请手动运行: npm install @gutenye/ocr-node',
     'ocr.repairChecking': '正在检查环境...',
@@ -54,7 +53,7 @@ const messages = {
     'ocr.repairSuccess': 'RapidOCR 修复成功',
     'ocr.repairRestartHint': '为确保修复生效，请重启应用',
     
-    // OCR 识别
+    // OCR recognition
     'ocr.winOnlyWindows': 'Windows OCR 仅在 Windows 系统上可用',
     'ocr.winOcrFailed': 'Windows OCR 识别失败',
     'ocr.paddleLoadFailed': 'PaddleOCR 引擎加载失败: {{detail}}',
@@ -236,21 +235,15 @@ const messages = {
   },
 };
 
-/**
- * 翻译主进程文案
- * @param {string} key - 翻译 key
- * @param {Object} params - 模板参数 {{name}} 等
- * @returns {string}
- */
+// Translate a main-process string. Supports {{param}} placeholders.
 function t(key, params = {}) {
   const lang = getLanguage();
   let text = messages[lang]?.[key] || messages.zh[key] || key;
-  
-  // 替换模板参数
+
   for (const [k, v] of Object.entries(params)) {
     text = text.replace(new RegExp(`\\{\\{${k}\\}\\}`, 'g'), v);
   }
-  
+
   return text;
 }
 

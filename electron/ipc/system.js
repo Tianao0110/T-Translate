@@ -1,24 +1,15 @@
-// electron/ipc/system.js
-// 系统级 IPC handlers
-// 包含：窗口控制、对话框、平台信息、外部链接等
+// System-level IPC handlers — window control, dialogs, platform info, external links.
 
 const { ipcMain, dialog, shell } = require("electron");
 const { CHANNELS } = require("../shared/channels");
 const logger = require("../utils/logger")("IPC:System");
 const { t } = require("../shared/main-i18n");
 
-/**
- * 注册系统级 IPC handlers
- * @param {Object} ctx - 共享上下文
- */
 function register(ctx) {
   const { getMainWindow, store, app } = ctx;
 
-  // ==================== 窗口控制 ====================
+  // ===== Window control =====
 
-  /**
-   * 最小化窗口
-   */
   ipcMain.on(CHANNELS.SYSTEM.MINIMIZE, () => {
     const mainWindow = getMainWindow();
     if (mainWindow) {
@@ -27,9 +18,7 @@ function register(ctx) {
     }
   });
 
-  /**
-   * 最大化/还原窗口
-   */
+  // Maximize toggles restore when already maximized.
   ipcMain.on(CHANNELS.SYSTEM.MAXIMIZE, () => {
     const mainWindow = getMainWindow();
     if (mainWindow) {
@@ -43,17 +32,11 @@ function register(ctx) {
     }
   });
 
-  /**
-   * 获取窗口是否最大化
-   */
   ipcMain.handle("is-maximized", () => {
     const mainWindow = getMainWindow();
     return mainWindow ? mainWindow.isMaximized() : false;
   });
 
-  /**
-   * 关闭窗口
-   */
   ipcMain.on(CHANNELS.SYSTEM.CLOSE, () => {
     const mainWindow = getMainWindow();
     if (mainWindow) {
@@ -62,9 +45,6 @@ function register(ctx) {
     }
   });
 
-  /**
-   * 设置窗口置顶
-   */
   ipcMain.on(CHANNELS.SYSTEM.SET_ALWAYS_ON_TOP, (event, alwaysOnTop) => {
     const mainWindow = getMainWindow();
     if (mainWindow) {
@@ -74,12 +54,9 @@ function register(ctx) {
     }
   });
 
-  /**
-   * 打开外部链接（带安全验证）
-   */
+  // Open external URL — gated to http/https only (block file://, javascript:, etc.).
   ipcMain.on(CHANNELS.SYSTEM.OPEN_EXTERNAL, (event, url) => {
     if (url && typeof url === "string") {
-      // 安全检查：只允许 http/https 协议
       try {
         const parsedUrl = new URL(url);
         if (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') {
@@ -94,26 +71,20 @@ function register(ctx) {
     }
   });
 
-  // ==================== 应用信息 ====================
+  // ===== App info =====
 
-  /**
-   * 获取应用版本
-   */
   ipcMain.handle(CHANNELS.APP.GET_VERSION, () => {
     return app.getVersion();
   });
 
-  // ==================== 自动更新 ====================
+  // ===== Auto update =====
 
   const autoUpdater = require('../utils/auto-updater');
 
-  // 下载进度的临时存储（IPC 无法直接 stream，用轮询方式）
+  // IPC doesn't stream — track download state here and poll/push via separate channel.
   let _downloadProgress = null;
   let _isDownloading = false;
 
-  /**
-   * 检查更新 - 从 GitHub Releases 获取最新版本
-   */
   ipcMain.handle(CHANNELS.APP.CHECK_UPDATE, async () => {
     try {
       return await autoUpdater.checkForUpdate();
@@ -123,12 +94,7 @@ function register(ctx) {
     }
   });
 
-  /**
-   * 下载更新安装包
-   * 参数: { downloadUrl, downloadName }
-   * 返回: { success, filePath, error }
-   * 下载过程中通过 DOWNLOAD_PROGRESS 事件推送进度
-   */
+  // Push download progress to renderer via 'update:download-progress'.
   ipcMain.handle(CHANNELS.APP.DOWNLOAD_UPDATE, async (event, { downloadUrl, downloadName }) => {
     if (_isDownloading) {
       return { success: false, error: t('system.alreadyDownloading', '已在下载中') };
@@ -140,7 +106,6 @@ function register(ctx) {
     try {
       const filePath = await autoUpdater.downloadUpdate(downloadUrl, downloadName, (progress) => {
         _downloadProgress = progress;
-        // 向渲染进程推送进度
         const mainWindow = getMainWindow();
         if (mainWindow && !mainWindow.isDestroyed()) {
           mainWindow.webContents.send('update:download-progress', progress);
@@ -157,9 +122,6 @@ function register(ctx) {
     }
   });
 
-  /**
-   * 安装更新（运行安装包并退出）
-   */
   ipcMain.handle(CHANNELS.APP.INSTALL_UPDATE, async (event, { filePath }) => {
     try {
       await autoUpdater.installUpdate(filePath);
@@ -170,25 +132,16 @@ function register(ctx) {
     }
   });
 
-  /**
-   * 获取平台信息
-   */
   ipcMain.handle(CHANNELS.SYSTEM.GET_PLATFORM, () => {
     return process.platform;
   });
 
-  /**
-   * 获取应用路径
-   */
   ipcMain.handle(CHANNELS.SYSTEM.GET_APP_PATH, async (event, name) => {
     return app.getPath(name || "userData");
   });
 
-  // ==================== 对话框 ====================
+  // ===== Dialogs =====
 
-  /**
-   * 显示保存对话框
-   */
   ipcMain.handle(CHANNELS.DIALOG.SAVE, async (event, options) => {
     const mainWindow = getMainWindow();
     try {
@@ -204,9 +157,6 @@ function register(ctx) {
     }
   });
 
-  /**
-   * 显示打开对话框
-   */
   ipcMain.handle(CHANNELS.DIALOG.OPEN, async (event, options) => {
     const mainWindow = getMainWindow();
     try {
@@ -222,9 +172,6 @@ function register(ctx) {
     }
   });
 
-  /**
-   * 显示消息对话框
-   */
   ipcMain.handle(CHANNELS.DIALOG.MESSAGE, async (event, options) => {
     const mainWindow = getMainWindow();
     try {
@@ -236,11 +183,8 @@ function register(ctx) {
     }
   });
 
-  // ==================== API 健康检查 ====================
+  // ===== LLM endpoint health check =====
 
-  /**
-   * 检查 LLM API 连接状态
-   */
   ipcMain.handle(CHANNELS.APP.HEALTH_CHECK, async () => {
     try {
       const settings = store.get("settings", {});
@@ -281,50 +225,41 @@ function register(ctx) {
     }
   });
 
-  // ==================== 日志管理 ====================
-  
-  /**
-   * 打开日志目录
-   */
+  // ===== Logs =====
+
   ipcMain.handle(CHANNELS.LOGS.OPEN_DIRECTORY, async () => {
     const { getLogDirectory } = require('../utils/logger');
     const logDir = getLogDirectory();
-    
+
     if (logDir) {
-      // 确保目录存在
+      // Ensure the directory exists before asking the shell to open it.
       const fs = require('fs');
       if (!fs.existsSync(logDir)) {
         fs.mkdirSync(logDir, { recursive: true });
       }
-      
+
       shell.openPath(logDir);
       logger.info('Opened log directory:', logDir);
       return { success: true, path: logDir };
     }
-    
+
     return { success: false, message: t('system.logDirFailed', '无法获取日志目录') };
   });
-  
-  /**
-   * 获取日志目录路径
-   */
+
   ipcMain.handle(CHANNELS.LOGS.GET_DIRECTORY, () => {
     const { getLogDirectory } = require('../utils/logger');
     return getLogDirectory();
   });
 
-  // ==================== 开机自启 ====================
+  // ===== Auto-launch (login item) =====
 
-  /**
-   * 设置开机自启
-   */
   ipcMain.handle(CHANNELS.APP.SET_AUTO_LAUNCH, (event, enabled) => {
     try {
       app.setLoginItemSettings({
         openAtLogin: enabled,
         args: enabled ? ['--startup'] : [],
       });
-      // 同时保存到 store（getLoginItemSettings 在开发模式下不可靠）
+      // Mirror to store: getLoginItemSettings is unreliable in dev mode.
       store.set('settings.startup.autoLaunch', enabled);
       logger.info('Auto launch set to:', enabled);
       return { success: true, enabled };
@@ -334,12 +269,9 @@ function register(ctx) {
     }
   });
 
-  /**
-   * 获取开机自启状态
-   */
   ipcMain.handle(CHANNELS.APP.GET_AUTO_LAUNCH, () => {
     try {
-      // 优先读 store（可靠），fallback 到系统 API
+      // Prefer store (reliable in dev), fall back to system API.
       const stored = store.get('settings.startup.autoLaunch');
       if (stored !== undefined) {
         return { success: true, enabled: !!stored };

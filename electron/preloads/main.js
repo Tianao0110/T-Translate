@@ -1,12 +1,12 @@
-// electron/preload.js
+// Main-window preload — exposes the `electron` API via contextBridge.
+// main.js MUST set `sandbox: false` for fs access (preload runs in renderer process).
+
 const { contextBridge, ipcRenderer } = require("electron");
 const path = require("path");
-// 注意：main.js 必须设置 sandbox: false 才能使用 fs
 const fs = require("fs").promises;
 
-/**
- * 安全通道白名单
- */
+// Channel allow-lists — generic on/send/invoke are gated by these to prevent
+// renderer code from talking to arbitrary IPC channels.
 const validChannels = {
   send: [
     "minimize-window",
@@ -18,20 +18,20 @@ const validChannels = {
     "menu-action",
   ],
   receive: [
-    "menu-action", 
+    "menu-action",
     "import-file",
-    "add-to-favorites",  // 玻璃窗口收藏
-    "add-to-history",    // 玻璃窗口历史记录
-    "sync-target-language",  // 玻璃窗口语言同步
-    "glass:translate-request",  // 玻璃窗口翻译请求
-    "screenshot-captured",  // 截图完成
-    "screenshot-captured-silent",  // 截图完成（静默模式）
-    "selection-state-changed",  // 划词翻译状态变化
-    "theme:changed",  // 主题变化通知
-    "maximize-change",  // 窗口最大化状态变化
-    "shortcut-conflict",  // 快捷键冲突通知
-    "navigate",  // 托盘菜单导航（如跳转到设置页）
-    "security-alert",  // API Key 访问异常告警
+    "add-to-favorites",
+    "add-to-history",
+    "sync-target-language",
+    "glass:translate-request",
+    "screenshot-captured",
+    "screenshot-captured-silent",
+    "selection-state-changed",
+    "theme:changed",
+    "maximize-change",
+    "shortcut-conflict",
+    "navigate",
+    "security-alert",
   ],
   invoke: [
     "get-app-version",
@@ -47,25 +47,22 @@ const validChannels = {
     "store-has",
     "get-app-path",
     "capture-screen",
-    "glass:open",  // 打开玻璃窗口
-    "glass:notify-settings-changed",  // 通知玻璃窗设置更新
-    "secure-storage:encrypt",  // 加密存储
-    "secure-storage:decrypt",  // 解密读取
-    "secure-storage:delete",   // 删除
-    "secure-storage:is-available",  // 检查加密是否可用
-    "selection:toggle",  // 切换划词翻译
-    "selection:get-enabled",  // 获取划词翻译状态
-    "theme:get",   // 获取主题
-    "theme:set",   // 设置主题
-    "theme:sync",  // 同步主题
-    "logs:open-directory",  // 打开日志目录
-    "logs:get-directory",   // 获取日志目录路径
+    "glass:open",
+    "glass:notify-settings-changed",
+    "secure-storage:encrypt",
+    "secure-storage:decrypt",
+    "secure-storage:delete",
+    "secure-storage:is-available",
+    "selection:toggle",
+    "selection:get-enabled",
+    "theme:get",
+    "theme:set",
+    "theme:sync",
+    "logs:open-directory",
+    "logs:get-directory",
   ],
 };
 
-/**
- * 主 API 定义
- */
 const electronAPI = {
   app: {
     getVersion: () => ipcRenderer.invoke("get-app-version"),
@@ -105,7 +102,7 @@ const electronAPI = {
     writeText: (text) => ipcRenderer.send("write-clipboard-text", text),
     readImage: () => ipcRenderer.invoke("read-clipboard-image"),
   },
-  // 简单的文件系统封装
+  // Minimal fs helpers — JSON read/write only.
   fs: {
     readJSON: async (filePath) => {
       try {
@@ -124,23 +121,20 @@ const electronAPI = {
       }
     },
   },
-  // Shell
   shell: {
     openExternal: (url) => ipcRenderer.send("open-external", url),
   },
-  // 日志管理
   logs: {
     openDirectory: () => ipcRenderer.invoke("logs:open-directory"),
     getDirectory: () => ipcRenderer.invoke("logs:get-directory"),
   },
-  // Electron Store
   store: {
     get: (key) => ipcRenderer.invoke("store-get", key),
     set: (key, val) => ipcRenderer.invoke("store-set", key, val),
     delete: (key) => ipcRenderer.invoke("store-delete", key),
     clear: () => ipcRenderer.invoke("store-clear"),
   },
-  // 安全存储（加密 API Key 等）
+  // Encrypted storage for API keys etc.
   secureStorage: {
     encrypt: (key, value) => ipcRenderer.invoke("secure-storage:encrypt", key, value),
     decrypt: (key, options) => ipcRenderer.invoke("secure-storage:decrypt", key, options),
@@ -148,17 +142,14 @@ const electronAPI = {
     isAvailable: () => ipcRenderer.invoke("secure-storage:is-available"),
     getAccessLog: () => ipcRenderer.invoke("secure-storage:getAccessLog"),
   },
-  // 玻璃翻译窗口
   glass: {
     open: () => ipcRenderer.invoke("glass:open"),
     notifySettingsChanged: () => ipcRenderer.invoke("glass:notify-settings-changed"),
   },
-  // 划词翻译
   selection: {
     toggle: () => ipcRenderer.invoke("selection:toggle"),
     getEnabled: () => ipcRenderer.invoke("selection:get-enabled"),
   },
-  // 主题管理（统一 API）
   theme: {
     get: () => ipcRenderer.invoke("theme:get"),
     set: (theme) => ipcRenderer.invoke("theme:set", theme),
@@ -169,33 +160,29 @@ const electronAPI = {
       return () => ipcRenderer.removeListener("theme:changed", handler);
     },
   },
-  // 全局快捷键管理
   shortcuts: {
     update: (action, shortcut) => ipcRenderer.invoke("shortcuts:update", action, shortcut),
     get: () => ipcRenderer.invoke("shortcuts:get"),
     pause: (action) => ipcRenderer.invoke("shortcuts:pause", action),
     resume: (action) => ipcRenderer.invoke("shortcuts:resume", action),
   },
-  // 隐私模式管理
   privacy: {
     setMode: (mode) => ipcRenderer.invoke("privacy:setMode", mode),
     getMode: () => ipcRenderer.invoke("privacy:getMode"),
   },
-  // API 健康检查
   api: {
     healthCheck: () => ipcRenderer.invoke("api:health-check"),
   },
-  // OCR API
   ocr: {
-    // 本地 OCR
+    // Local engines
     checkWindowsOCR: () => ipcRenderer.invoke("ocr:check-windows-ocr"),
-    recognizeWithWindowsOCR: (imageData, options) => 
+    recognizeWithWindowsOCR: (imageData, options) =>
       ipcRenderer.invoke("ocr:windows-ocr", imageData, options),
     checkPaddleOCR: () => ipcRenderer.invoke("ocr:check-paddle-ocr"),
     recognizeWithPaddleOCR: (imageData, options) =>
       ipcRenderer.invoke("ocr:paddle-ocr", imageData, options),
-    
-    // 在线 OCR API
+
+    // Online APIs
     recognizeWithOCRSpace: (imageData, options) =>
       ipcRenderer.invoke("ocr:ocrspace", imageData, options),
     recognizeWithGoogleVision: (imageData, options) =>
@@ -204,8 +191,8 @@ const electronAPI = {
       ipcRenderer.invoke("ocr:azure-ocr", imageData, options),
     recognizeWithBaiduOCR: (imageData, options) =>
       ipcRenderer.invoke("ocr:baidu-ocr", imageData, options),
-    
-    // 管理功能
+
+    // Engine management
     getAvailableEngines: () => ipcRenderer.invoke("ocr:get-available-engines"),
     checkInstalled: () => ipcRenderer.invoke("ocr:check-installed"),
     downloadEngine: (engineId) => ipcRenderer.invoke("ocr:download-engine", engineId),
@@ -218,7 +205,6 @@ const electronAPI = {
       return () => ipcRenderer.removeListener("ocr:download-progress", handler);
     },
   },
-  // 截图 API
   screenshot: {
     capture: () => ipcRenderer.invoke("capture-screen"),
     onCaptured: (callback) => {
@@ -226,18 +212,18 @@ const electronAPI = {
       ipcRenderer.on("screenshot-captured", handler);
       return () => ipcRenderer.removeListener("screenshot-captured", handler);
     },
-    // 静默模式截图完成（不显示主窗口，后台处理）
+    // Silent-mode capture — completes without showing main window (background processing).
     onCapturedSilent: (callback) => {
       const handler = (event, data) => callback(data);
       ipcRenderer.on("screenshot-captured-silent", handler);
       return () => ipcRenderer.removeListener("screenshot-captured-silent", handler);
     },
-    // 通知 OCR 完成（主窗口后台 OCR 完成后调用）
+    // Main window calls this after background OCR finishes.
     notifyOcrComplete: (data) => {
       ipcRenderer.send("screenshot:ocr-complete", data);
     },
   },
-  // 通用 IPC (带白名单检查)
+  // Generic IPC with allow-list check.
   ipc: {
     on: (channel, func) => {
       if (validChannels.receive.includes(channel)) {
@@ -247,7 +233,7 @@ const electronAPI = {
       }
     },
   },
-  // 直接暴露 ipcRenderer（用于玻璃窗口通信）
+  // Direct ipcRenderer for glass-window-style use cases.
   ipcRenderer: {
     on: (channel, func) => {
       if (validChannels.receive.includes(channel)) {
@@ -260,18 +246,14 @@ const electronAPI = {
   },
 };
 
-// ============================================================
-// 暴露 API (带防重复检查)
-// ============================================================
-
+// Expose API with dedup — hot-reload can re-execute preload.
 try {
-  // 只有当 window.electron 不存在时才暴露，防止热重载报错
   if (!window.electron) {
     contextBridge.exposeInMainWorld("electron", electronAPI);
     console.log("[Preload] electron API exposed");
   }
 } catch (error) {
-  // 忽略 "API already exists" 错误
+  // Ignore "API already exposed" — only that specific error is benign.
   if (!error.message?.includes("bind an API on top of")) {
     console.error("Failed to expose electron API:", error);
   }
@@ -287,5 +269,5 @@ try {
     });
   }
 } catch (error) {
-  // 忽略重复绑定错误
+  // Same dedup-error tolerance.
 }

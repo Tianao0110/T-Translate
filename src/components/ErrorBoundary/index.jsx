@@ -1,5 +1,5 @@
-// src/components/ErrorBoundary/index.jsx
-// 通用错误边界组件 - 捕获 React 渲染错误，防止应用崩溃
+// React error boundary. Class component because hooks can't be used here —
+// useTranslation is unavailable, so we call i18n.t() directly.
 
 import React from 'react';
 import i18n from '../../i18n.js';
@@ -7,16 +7,11 @@ import createLogger from '../../utils/logger.js';
 
 const logger = createLogger('ErrorBoundary');
 
-// Class component 不能用 useTranslation hook，直接用 i18n.t()
 const t = (key, fallback) => {
   const result = i18n.t(key);
   return result === key ? fallback : result;
 };
 
-/**
- * 错误边界组件
- * 用于捕获子组件的渲染错误，显示友好的错误界面
- */
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -40,8 +35,6 @@ class ErrorBoundary extends React.Component {
       error,
       errorInfo,
     });
-
-    // 可以在这里上报错误到日志系统
   }
 
   handleRetry = () => {
@@ -65,12 +58,11 @@ class ErrorBoundary extends React.Component {
       return children;
     }
 
-    // 自定义 fallback
     if (fallback) {
       return fallback;
     }
 
-    // 最小化模式（用于小窗口如划词翻译）
+    // Compact UI for small windows (e.g. selection translate overlay)
     if (minimal) {
       return (
         <div style={{
@@ -122,7 +114,6 @@ class ErrorBoundary extends React.Component {
       );
     }
 
-    // 完整错误界面
     return (
       <div style={{
         display: 'flex',

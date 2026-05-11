@@ -1,6 +1,5 @@
-// electron/utils/ocr-helper.js
-// OCR 工具函数 - 供主进程各模块调用
-// 基于 RapidOCR (PaddleOCR)，不依赖 Tesseract
+// OCR helper — used by main-process modules for image-to-text.
+// Backed by RapidOCR (PaddleOCR-via-Node). Tesseract is NOT used.
 
 const path = require('path');
 const fs = require('fs');
@@ -10,21 +9,21 @@ const { smartMerge, mergedBlocksToText } = require('./text-merger');
 const { t } = require('../shared/main-i18n');
 
 /**
- * 使用 RapidOCR 识别图片中的文字
- * 
- * @param {string|Buffer} imageData - base64 图片数据或 Buffer
- * @param {Object} options - 选项
- * @param {boolean} options.withBlocks - 是否返回文本块坐标
- * @param {boolean} options.merge - 是否智能合并段落，默认 true
- * @returns {Promise<{success: boolean, text?: string, blocks?: Array, error?: string}>}
+ * Recognize text via RapidOCR. Tries multilingual-purejs-ocr first (pure-JS, faster
+ * to load), falls back to @gutenye/ocr-node (native, more accurate on complex layouts).
+ *
+ * @param {string|Buffer} imageData - base64 string OR raw Buffer
+ * @param {Object} options
+ * @param {boolean} options.withBlocks - return per-block coords too
+ * @param {boolean} options.merge      - run smart paragraph merge (default true)
+ * @returns {Promise<{success, text?, blocks?, error?}>}
  */
 async function recognizeWithRapidOCR(imageData, options = {}) {
   const { withBlocks = false, merge = true } = options;
-  
+
   let tempFile = null;
-  
+
   try {
-    // 准备图片数据
     let imageBuffer;
     if (Buffer.isBuffer(imageData)) {
       imageBuffer = imageData;
@@ -37,33 +36,33 @@ async function recognizeWithRapidOCR(imageData, options = {}) {
     } else {
       return { success: false, error: t('ocr.invalidImageData', '无效的图片数据格式') };
     }
-    
-    // 写入临时文件
+
+    // Write to a temp file — both backends below accept a path.
     tempFile = path.join(os.tmpdir(), `t-translate-ocr-${Date.now()}.png`);
     fs.writeFileSync(tempFile, imageBuffer);
-    
+
     let result = null;
     let lastError = null;
-    
-    // 尝试 multilingual-purejs-ocr
+
+    // ----- Try 1: multilingual-purejs-ocr -----
     try {
       const pureJsModule = await import('multilingual-purejs-ocr');
       const OcrClass = pureJsModule.Ocr || pureJsModule.default?.Ocr || pureJsModule.default;
-      
+
       if (typeof OcrClass === 'function') {
         if (!global.pureJsOcrInstance) {
           global.pureJsOcrInstance = new OcrClass();
         }
-        
+
         const imgBuffer = fs.readFileSync(tempFile);
         result = await global.pureJsOcrInstance.recognize(imgBuffer);
-        
+
         if (result) {
           let text = typeof result === 'string' ? result : result.text || '';
           if (Array.isArray(result)) {
             text = result.map(item => item.text || item[1]?.[0] || String(item)).join('\n');
           }
-          
+
           if (text) {
             cleanupTempFile(tempFile);
             return {
@@ -79,26 +78,26 @@ async function recognizeWithRapidOCR(imageData, options = {}) {
       lastError = e;
       logger.debug('purejs-ocr failed:', e.message);
     }
-    
-    // 尝试 @gutenye/ocr-node
+
+    // ----- Try 2: @gutenye/ocr-node -----
     try {
       const ocrModule = await import('@gutenye/ocr-node');
       let Ocr = ocrModule.default;
       if (!Ocr?.create) Ocr = ocrModule.Ocr;
       if (!Ocr?.create && typeof ocrModule.create === 'function') Ocr = ocrModule;
-      
+
       if (Ocr?.create) {
         if (!global.gutenyeOcrInstance) {
           global.gutenyeOcrInstance = await Ocr.create();
         }
-        
+
         result = await global.gutenyeOcrInstance.detect(tempFile);
-        
+
         if (result?.length > 0) {
-          // 提取文本块
+          // Normalize the box format from each library variant.
           const blocks = result.map((item, index) => {
             let bbox = null;
-            
+
             if (item.box || item.bbox || item.position) {
               const box = item.box || item.bbox || item.position;
               if (Array.isArray(box) && box.length >= 4) {
@@ -112,7 +111,7 @@ async function recognizeWithRapidOCR(imageData, options = {}) {
                 };
               }
             }
-            
+
             return {
               text: item.text,
               confidence: item.score || 0.9,
@@ -120,11 +119,11 @@ async function recognizeWithRapidOCR(imageData, options = {}) {
               index,
             };
           });
-          
-          // 智能段落合并
+
+          // Smart paragraph merge (off by default in unit tests, on for real usage).
           let finalBlocks = blocks;
           let fullText;
-          
+
           if (merge) {
             finalBlocks = smartMerge(blocks, {
               lineGapThreshold: 1.5,
@@ -135,21 +134,21 @@ async function recognizeWithRapidOCR(imageData, options = {}) {
           } else {
             fullText = blocks.map(b => b.text).join('\n');
           }
-          
+
           cleanupTempFile(tempFile);
-          
+
           const response = {
             success: true,
             text: fullText.trim(),
             confidence: finalBlocks.reduce((sum, b) => sum + (b.confidence || 0.9), 0) / finalBlocks.length,
             engine: 'gutenye-ocr',
           };
-          
+
           if (withBlocks) {
             response.blocks = finalBlocks;
             response.rawBlocks = blocks;
           }
-          
+
           return response;
         }
       }
@@ -157,15 +156,15 @@ async function recognizeWithRapidOCR(imageData, options = {}) {
       lastError = lastError || e;
       logger.debug('gutenye-ocr failed:', e.message);
     }
-    
+
     cleanupTempFile(tempFile);
-    
+
     if (lastError) {
       return { success: false, error: t('ocr.loadFailed', { detail: lastError.message }) };
     }
-    
+
     return { success: true, text: '', confidence: 0, engine: 'none' };
-    
+
   } catch (error) {
     logger.error('RapidOCR failed:', error);
     cleanupTempFile(tempFile);
@@ -173,15 +172,12 @@ async function recognizeWithRapidOCR(imageData, options = {}) {
   }
 }
 
-/**
- * 清理临时文件
- */
 function cleanupTempFile(filePath) {
   if (filePath) {
     try {
       fs.unlinkSync(filePath);
     } catch (e) {
-      // 忽略
+      // Ignore — temp cleanup is best-effort.
     }
   }
 }

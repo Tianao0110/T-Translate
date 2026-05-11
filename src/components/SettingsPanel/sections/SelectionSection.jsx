@@ -1,5 +1,4 @@
-// src/components/SettingsPanel/sections/SelectionSection.jsx
-// 划词翻译设置区块组件 - 国际化版
+// Selection-translate settings section.
 
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -7,9 +6,6 @@ import createLogger from '../../../utils/logger.js';
 
 const logger = createLogger('Settings:Selection');
 
-/**
- * 划词翻译设置区块
- */
 const SelectionSection = ({
   settings,
   updateSetting,
@@ -18,14 +14,13 @@ const SelectionSection = ({
   const { t } = useTranslation();
   const [showStickyWarning, setShowStickyWarning] = useState(false);
 
-  // 切换划词翻译开关
   const handleToggleSelection = async () => {
     try {
       const newState = await window.electron?.selection?.toggle?.();
       logger.debug('Selection toggle result:', newState);
       if (typeof newState === 'boolean') {
         updateSetting('selection', 'enabled', newState);
-        notify(newState ? t('selection.enabled') : t('selection.disabled'), 'success');
+        notify(newState ? t('selection.enabled') : t('selection.disabledDesc'), 'success');
       }
     } catch (e) {
       logger.error('Selection toggle error:', e);
@@ -33,15 +28,14 @@ const SelectionSection = ({
     }
   };
 
-  // 切换 CapsLock 直出模式：首次开启时弹警告，之后静默
+  // First-time opt-in shows the warning modal (CapsLock-direct can fire on
+  // accidental key presses). After confirm, subsequent toggles are silent.
   const handleToggleSticky = () => {
     const current = !!settings.selection.stickyViaCapsLock;
     if (current) {
-      // 关闭：直接关
       updateSetting('selection', 'stickyViaCapsLock', false);
       return;
     }
-    // 开启：第一次弹警告，之后直接开
     if (settings.selection.stickyWarningShown) {
       updateSetting('selection', 'stickyViaCapsLock', true);
     } else {
@@ -63,8 +57,7 @@ const SelectionSection = ({
     <div className="setting-content">
       <h3>{t('settings.selection.title')}</h3>
       <p className="setting-description">{t('selection.description')}</p>
-      
-      {/* 启用/禁用 */}
+
       <div className="setting-group">
         <label className="setting-label">{t('selection.enableSelection')}</label>
         <div className="toggle-wrapper">
@@ -83,7 +76,7 @@ const SelectionSection = ({
         </p>
       </div>
 
-      {/* CapsLock 直出模式（二级开关：主开关关闭时隐藏） */}
+      {/* Nested under master selection toggle — hidden when selection is off */}
       {settings.selection.enabled && (
         <div
           className="setting-group"
@@ -108,7 +101,6 @@ const SelectionSection = ({
         </div>
       )}
 
-      {/* 按钮自动消失时间 */}
       <div className="setting-group">
         <label className="setting-label">{t('selection.triggerTimeout')}</label>
         <div className="setting-row">
@@ -126,7 +118,6 @@ const SelectionSection = ({
         <p className="setting-hint">{t('selection.triggerTimeoutHint')}</p>
       </div>
 
-      {/* 默认显示原文 */}
       <div className="setting-group">
         <label className="setting-label">{t('selection.showSourceByDefault')}</label>
         <div className="toggle-wrapper">
@@ -142,7 +133,6 @@ const SelectionSection = ({
         </div>
       </div>
 
-      {/* 复制后自动关闭 */}
       <div className="setting-group">
         <label className="setting-label">{t('selection.autoCloseOnCopy')}</label>
         <div className="toggle-wrapper">
@@ -158,7 +148,6 @@ const SelectionSection = ({
         </div>
       </div>
 
-      {/* 窗口透明度 */}
       <div className="setting-group">
         <label className="setting-label">{t('selection.windowOpacity')}</label>
         <div className="setting-row">
@@ -175,28 +164,26 @@ const SelectionSection = ({
         <p className="setting-hint">{t('selection.opacityHint')}</p>
       </div>
 
-      {/* 截图翻译输出模式 */}
       <div className="setting-group">
         <label className="setting-label">{t('selection.screenshotOutput')}</label>
         <div className="toggle-wrapper">
           <button
             className={`toggle-button ${(settings.screenshot?.outputMode || 'bubble') === 'bubble' ? 'active' : ''}`}
-            onClick={() => updateSetting('screenshot', 'outputMode', 
+            onClick={() => updateSetting('screenshot', 'outputMode',
               (settings.screenshot?.outputMode || 'bubble') === 'bubble' ? 'main' : 'bubble'
             )}
           >
             {(settings.screenshot?.outputMode || 'bubble') === 'bubble' ? t('selection.bubble') : t('selection.mainWindow')}
           </button>
           <span className="toggle-description">
-            {(settings.screenshot?.outputMode || 'bubble') === 'bubble' 
-              ? t('selection.bubbleDesc') 
+            {(settings.screenshot?.outputMode || 'bubble') === 'bubble'
+              ? t('selection.bubbleDesc')
               : t('selection.mainWindowDesc')}
           </span>
         </div>
         <p className="setting-hint">{t('selection.outputHint')}</p>
       </div>
 
-      {/* 字符数限制 */}
       <div className="setting-group">
         <label className="setting-label">{t('selection.charLimit')}</label>
         <div className="setting-row double">
@@ -226,7 +213,6 @@ const SelectionSection = ({
         <p className="setting-hint">{t('selection.charLimitHint')}</p>
       </div>
 
-      {/* 使用说明 */}
       <div className="setting-group">
         <label className="setting-label">{t('selection.instructions')}</label>
         <div className="help-box">
@@ -248,7 +234,6 @@ const SelectionSection = ({
         </div>
       </div>
 
-      {/* CapsLock 直出模式首次开启警告弹窗（复用 .update-modal-* 样式） */}
       {showStickyWarning && (
         <div className="update-modal-overlay" onClick={cancelStickyWarning}>
           <div className="update-modal" onClick={(e) => e.stopPropagation()}>

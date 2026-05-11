@@ -1,7 +1,6 @@
-// src/providers/baidu-translate/index.js
-// 百度翻译 API
-// 免费额度：标准版每月 5 万字符，高级版每月 100 万字符
-// 国内无需代理
+// Baidu Translate API (https://fanyi-api.baidu.com).
+// Free tier: 50k chars/month standard, 1M chars/month advanced.
+// Reachable inside mainland China without a proxy.
 
 import { BaseProvider } from '../base.js';
 import icon from './icon.svg';
@@ -9,10 +8,6 @@ import createLogger from '../../utils/logger.js';
 
 const logger = createLogger('BaiduTranslate');
 
-/**
- * 百度翻译 API
- * 使用通用翻译 API
- */
 class BaiduTranslateProvider extends BaseProvider {
 
   static metadata = {
@@ -64,8 +59,7 @@ class BaiduTranslateProvider extends BaseProvider {
     return false;
   }
 
-  // ========== 语言代码映射 ==========
-
+  // Baidu uses some non-BCP-47 codes (jp instead of ja, fra instead of fr, etc.)
   _mapLanguageCode(code) {
     const mapping = {
       'auto': 'auto',
@@ -88,17 +82,13 @@ class BaiduTranslateProvider extends BaseProvider {
     return mapping[code] || code;
   }
 
-  // ========== MD5 签名 ==========
-
   async _md5(str) {
-    // 使用 Web Crypto API 计算 MD5
-    // 注意: MD5 不在 SubtleCrypto 中，回退到手动实现
+    // SubtleCrypto omits MD5, so we drop to a manual implementation
     return this._md5Manual(str);
   }
 
-  /**
-   * 简易 MD5 实现（百度 API 签名用）
-   */
+  // Standard MD5 reference impl. Don't refactor — the algorithm is fixed and
+  // any change breaks the request signature.
   _md5Manual(string) {
     function md5cycle(x, k) {
       let a = x[0], b = x[1], c = x[2], d = x[3];
@@ -173,12 +163,10 @@ class BaiduTranslateProvider extends BaseProvider {
     function hex(x) { for (let i = 0; i < x.length; i++) x[i] = rhex(x[i]); return x.join(''); }
     function add32(a, b) { return (a + b) & 0xFFFFFFFF; }
 
-    // 百度要求 UTF-8 编码，先转换
+    // Baidu's sign field is computed over UTF-8 bytes, not raw JS strings
     const utf8 = unescape(encodeURIComponent(string));
     return hex(md51(utf8));
   }
-
-  // ========== 翻译 ==========
 
   async translate(text, sourceLang = 'auto', targetLang = 'zh') {
     if (!text?.trim()) {
@@ -192,6 +180,7 @@ class BaiduTranslateProvider extends BaseProvider {
       const from = this._mapLanguageCode(sourceLang);
       const to = this._mapLanguageCode(targetLang);
       const salt = Date.now().toString();
+      // Sign formula per API docs: md5(appId + q + salt + secretKey)
       const sign = this._md5Manual(`${this.config.appId}${text}${salt}${this.config.secretKey}`);
 
       const params = new URLSearchParams({
@@ -217,7 +206,7 @@ class BaiduTranslateProvider extends BaseProvider {
 
       const data = await response.json();
 
-      // 百度 API 错误码
+      // Known error codes mapped to human-readable Chinese messages
       if (data.error_code) {
         const errorMessages = {
           '52001': '请求超时',
@@ -239,6 +228,7 @@ class BaiduTranslateProvider extends BaseProvider {
         };
       }
 
+      // trans_result is one entry per paragraph; join with newlines to round-trip
       const translatedText = data.trans_result?.map(r => r.dst).join('\n');
 
       if (!translatedText) {
@@ -259,8 +249,6 @@ class BaiduTranslateProvider extends BaseProvider {
       return { success: false, error: error.message };
     }
   }
-
-  // ========== 测试连接 ==========
 
   async testConnection() {
     if (!this.config.appId || !this.config.secretKey) {

@@ -1,4 +1,5 @@
-// electron/preload-selection.js
+// Preload for the selection-translator window.
+
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("electron", {
@@ -9,8 +10,8 @@ contextBridge.exposeInMainWorld("electron", {
     getText: (rect) => ipcRenderer.invoke("selection:get-text", rect),
     resize: (size) => ipcRenderer.invoke("selection:resize", size),
     startDrag: () => ipcRenderer.invoke("selection:start-drag"),
-    
-    // 多窗口支持
+
+    // Multi-window support
     freeze: () => ipcRenderer.invoke("selection:freeze"),
     closeFrozen: (windowId) => ipcRenderer.invoke("selection:close-frozen", windowId),
     getWindowId: () => ipcRenderer.invoke("selection:get-window-id"),
@@ -26,14 +27,16 @@ contextBridge.exposeInMainWorld("electron", {
       ipcRenderer.on("selection:hide", listener);
       return () => ipcRenderer.removeListener("selection:hide", listener);
     },
-    // 直接显示翻译结果（截图翻译联动用）
-    // 支持两种模式：isLoading=true 显示加载，否则显示结果
+    // Direct result display (screenshot-OCR chain). Two modes:
+    //   - { isLoading: true }    → show loading state
+    //   - { text, translatedText } → show result
     onShowResult: (callback) => {
       const listener = (event, data) => callback(data);
       ipcRenderer.on("selection:show-result", listener);
       return () => ipcRenderer.removeListener("selection:show-result", listener);
     },
-    // Sticky 直出路径：CapsLock 开着时划词跳过图标，直接显示翻译卡片
+    // Sticky-direct path: when CapsLock toggle is on, selection skips the trigger icon
+    // and the renderer goes straight to translation.
     // payload: { text, targetLanguage, theme, settings }
     onShowDirect: (callback) => {
       const listener = (event, data) => callback(data);
@@ -45,20 +48,19 @@ contextBridge.exposeInMainWorld("electron", {
   clipboard: {
     writeText: (text) => ipcRenderer.invoke("clipboard:write-text", text),
   },
-  
-  // 添加 store 访问，让翻译服务可以读取配置
+
+  // Store access — translation service needs to read config.
   store: {
     get: (key) => ipcRenderer.invoke("store-get", key),
     set: (key, value) => ipcRenderer.invoke("store-set", key, value),
   },
-  
-  // 添加 secureStorage 访问，让翻译服务可以读取加密的 API keys
+
+  // secureStorage access — translation service reads encrypted API keys.
   secureStorage: {
     encrypt: (key, value) => ipcRenderer.invoke("secure-storage:encrypt", key, value),
     decrypt: (key) => ipcRenderer.invoke("secure-storage:decrypt", key),
   },
-  
-  // 主题管理
+
   theme: {
     sync: () => ipcRenderer.invoke("theme:sync"),
     onChanged: (callback) => {

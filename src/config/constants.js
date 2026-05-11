@@ -1,16 +1,6 @@
-// src/config/constants.js
-// ============================================================
-// 🔵 同步副本 - 前端常量 (ESM 版本)
-// ============================================================
-// 格式: ESM (渲染进程使用)
-//
-// ⚠️ 同步要求:
-// - 此文件从 electron/shared/constants.js 同步
-// - 修改常量请先修改源文件，然后同步到此处
-// - 运行 npm run check:constants 验证同步状态
-// ============================================================
+// Renderer-side mirror of electron/shared/constants.js.
+// IMPORTANT: keep in sync with the source — `npm run check:constants` verifies.
 
-// ==================== 隐私模式 ====================
 export const PRIVACY_MODES = {
   STANDARD: 'standard',
   OFFLINE: 'offline',
@@ -18,14 +8,12 @@ export const PRIVACY_MODES = {
   SECURE: 'secure',
 };
 
-// ==================== 主题 ====================
 export const THEMES = {
   LIGHT: 'light',
   DARK: 'dark',
-  FRESH: 'fresh',  // 清新（青绿色）
+  FRESH: 'fresh',
 };
 
-// 预设主题色（用于自定义强调色）
 export const PRESET_ACCENT_COLORS = [
   { id: 'blue', name: '蓝色', color: '#3b82f6' },
   { id: 'green', name: '绿色', color: '#10b981' },
@@ -37,7 +25,6 @@ export const PRESET_ACCENT_COLORS = [
   { id: 'amber', name: '琥珀', color: '#f59e0b' },
 ];
 
-// ==================== OCR 引擎 ====================
 export const OCR_ENGINES = {
   LLM_VISION: 'llm-vision',
   RAPID_OCR: 'rapid-ocr',
@@ -49,7 +36,6 @@ export const OCR_ENGINES = {
   BAIDU_OCR: 'baidu-ocr',
 };
 
-// ==================== 翻译模板 ====================
 export const TEMPLATE_KEYS = {
   OCR: 'ocr',
   PRECISE: 'precise',
@@ -57,7 +43,6 @@ export const TEMPLATE_KEYS = {
   FORMAL: 'formal',
 };
 
-// ==================== 翻译状态 ====================
 export const TRANSLATION_STATUS = {
   IDLE: 'idle',
   TRANSLATING: 'translating',
@@ -65,7 +50,6 @@ export const TRANSLATION_STATUS = {
   ERROR: 'error',
 };
 
-// ==================== 语言代码 ====================
 export const LANGUAGE_CODES = {
   AUTO: 'auto',
   ZH: 'zh',
@@ -85,8 +69,7 @@ export const LANGUAGE_CODES = {
   VI: 'vi',
 };
 
-// ==================== 语言列表（单一数据源）====================
-// 所有组件从这里获取语言选项
+// Single source of truth for language picker options across UI
 export const LANGUAGES = [
   { code: 'auto', name: '自动检测', nativeName: 'Auto Detect', flag: '🌐' },
   { code: 'zh', name: '中文', nativeName: '中文', flag: '🇨🇳' },
@@ -106,12 +89,7 @@ export const LANGUAGES = [
   { code: 'vi', name: '越南语', nativeName: 'Tiếng Việt', flag: '🇻🇳' },
 ];
 
-// ==================== 语言选项转换函数 ====================
-
-/**
- * 获取设置面板用的语言选项 (value/label 格式)
- * @param {boolean} includeAuto - 是否包含"自动检测"选项
- */
+// {value, label} shape — for native <select> usage in settings panel
 export const getLanguageOptions = (includeAuto = true) => {
   return LANGUAGES
     .filter(lang => includeAuto || lang.code !== 'auto')
@@ -121,28 +99,21 @@ export const getLanguageOptions = (includeAuto = true) => {
     }));
 };
 
-/**
- * 获取翻译面板用的语言列表 (code/name/flag 格式)
- * @param {boolean} includeAuto - 是否包含"自动检测"选项
- */
+// {code, name, flag} shape — uses nativeName for translation panel display
 export const getLanguageList = (includeAuto = true) => {
   return LANGUAGES
     .filter(lang => includeAuto || lang.code !== 'auto')
     .map(lang => ({
       code: lang.code,
-      name: lang.nativeName,  // 使用原生语言名
+      name: lang.nativeName,
       flag: lang.flag,
     }));
 };
 
-/**
- * 根据语言代码获取语言信息
- */
 export const getLanguageByCode = (code) => {
   return LANGUAGES.find(lang => lang.code === code);
 };
 
-// ==================== 默认配置 ====================
 export const DEFAULTS = {
   LLM_ENDPOINT: 'http://localhost:1234/v1',
   LLM_TIMEOUT: 60000,
@@ -172,7 +143,6 @@ export const DEFAULTS = {
   CACHE_TTL: 7 * 24 * 60 * 60 * 1000,
 };
 
-// ==================== 翻译源 ID ====================
 export const PROVIDER_IDS = {
   LOCAL_LLM: 'local-llm',
   OPENAI: 'openai',

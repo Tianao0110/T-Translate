@@ -1,8 +1,3 @@
-// src/config/defaults.js
-// ============================================================
-// 配置中心化 - 桥接层 (前端入口)
-// ============================================================
-
 import {
   PRIVACY_MODES,
   THEMES,
@@ -13,14 +8,11 @@ import {
   LANGUAGE_CODES,
   DEFAULTS,
   PROVIDER_IDS,
-  // 语言相关
   LANGUAGES,
   getLanguageOptions,
   getLanguageList,
   getLanguageByCode,
 } from './constants.js';
-
-// ==================== 重新导出常量 ====================
 
 export {
   PRIVACY_MODES,
@@ -32,14 +24,11 @@ export {
   LANGUAGE_CODES,
   DEFAULTS,
   PROVIDER_IDS,
-  // 语言相关
   LANGUAGES,
   getLanguageOptions,
   getLanguageList,
   getLanguageByCode,
 };
-
-// ==================== 便捷访问对象 ====================
 
 export const translationDefaults = {
   targetLanguage: DEFAULTS.TARGET_LANGUAGE,
@@ -74,18 +63,14 @@ export const llmDefaults = {
   maxTokens: DEFAULTS.LLM_MAX_TOKENS,
 };
 
-// ==================== TTS 默认配置 ====================
-
 export const ttsDefaults = {
   enabled: true,
   engine: 'web-speech',
   rate: 1.0,
   pitch: 1.0,
   volume: 0.8,
-  voiceId: '',  // 空表示自动选择
+  voiceId: '',
 };
-
-// ==================== 默认导出 ====================
 
 export default {
   PRIVACY_MODES,

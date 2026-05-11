@@ -1,14 +1,9 @@
-// src/providers/ocr/google-vision.js
-// Google Cloud Vision OCR 引擎
+// Google Cloud Vision OCR — https://cloud.google.com/vision/docs/ocr
 
 import { BaseOCREngine } from './base.js';
 import createLogger from '../../utils/logger.js';
 const logger = createLogger('GoogleVision');
 
-/**
- * Google Cloud Vision OCR 引擎
- * https://cloud.google.com/vision/docs/ocr
- */
 class GoogleVisionEngine extends BaseOCREngine {
   static metadata = {
     id: 'google-vision',
@@ -43,14 +38,14 @@ class GoogleVisionEngine extends BaseOCREngine {
 
   async recognize(input, options = {}) {
     const { apiKey } = this.config;
-    
+
     if (!apiKey) {
       return { success: false, error: '请配置 Google Vision API Key' };
     }
 
     try {
       const base64Data = this.ensureBase64(input);
-      // 移除 data URL 前缀
+      // Vision API wants bare base64 — no data: URL wrapper
       const pureBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
 
       const requestBody = {
@@ -100,7 +95,7 @@ class GoogleVisionEngine extends BaseOCREngine {
         return { success: false, error: '未识别到文字' };
       }
 
-      // 第一个 annotation 是完整文本
+      // textAnnotations[0] is the concatenated full text; [1..] are per-word boxes
       const fullText = textAnnotations[0]?.description || '';
 
       return {

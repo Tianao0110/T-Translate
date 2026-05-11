@@ -1,6 +1,7 @@
-// Vitest 用 electron 模块 mock
-// 单测里 import 主进程代码会触发 require('electron')；这里给最小 stub 让模块加载不挂。
-// 真要测某个 electron API 行为，在 test 文件里用 vi.mock 覆盖具体方法。
+// Minimal Electron-module stub for Vitest.
+// Importing main-process code in a unit test pulls in `require('electron')`,
+// which would otherwise fail under Node. Tests that care about a specific
+// API behavior should override the stub locally with vi.mock.
 
 import { vi } from 'vitest';
 

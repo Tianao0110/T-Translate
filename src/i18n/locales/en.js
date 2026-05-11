@@ -1,6 +1,3 @@
-// src/i18n/locales/en.js
-// English language pack - split from i18n.js
-
 const en = {
   app: { name: "T-Translate", version: "Version" },
   nav: { translate: "Translate", history: "History", favorites: "Favorites", documents: "Documents", settings: "Settings" },
@@ -431,7 +428,7 @@ const en = {
     noVoicesInstalled: "No voice packs installed. Please install voices in system settings.",
     noVoiceForLang: "No {{lang}} voice pack installed"
   },
-  // ========== New: DocumentTranslator translation keys ==========
+  // ===== DocumentTranslator keys =====
   documentTranslator: {
     title: "Document Translation",
     sourceLang: "Source Language",
@@ -585,7 +582,7 @@ const en = {
     // Default doc title
     defaultDocTitle: "Translated Document"
   },
-  // ========== Error Boundary ==========
+  // ===== Error Boundary =====
   errorBoundary: {
     title: "Something went wrong",
     windowError: "{{name}} encountered a problem",
@@ -594,7 +591,7 @@ const en = {
     reload: "Reload",
     details: "Error Details"
   },
-  // ========== New: Tray menu translation keys ==========
+  // ===== Tray menu keys =====
   titleBar: {
     minimize: "Minimize", maximize: "Maximize", restore: "Restore", close: "Close"
   },

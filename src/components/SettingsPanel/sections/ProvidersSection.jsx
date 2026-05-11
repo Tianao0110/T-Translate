@@ -1,14 +1,8 @@
-// src/components/SettingsPanel/sections/ProvidersSection.jsx
-// 翻译源设置区块组件 - 国际化版
-
 import React, { forwardRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import ProviderSettings from '../../ProviderSettings';
 
-/**
- * 翻译源设置区块
- * 使用 forwardRef 以支持 ref 传递给 ProviderSettings
- */
+// forwardRef so callers can grab the inner ProviderSettings ref.
 const ProvidersSection = forwardRef(({
   settings,
   settingsReady,
