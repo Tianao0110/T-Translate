@@ -293,10 +293,12 @@ const DocumentTranslator = ({
   const [showSearch, setShowSearch] = useState(false);
   
   // Search & replace
+  // -1 in matchIndex means "not yet positioned" — Enter / Next moves to 0,
+  // Prev moves to last. matchIds is derived from query+segments via useMemo
+  // (see below), so it stays in sync without resetting the cursor when
+  // segments stream in during translation.
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchMatchCount, setSearchMatchCount] = useState(0);
   const [searchMatchIndex, setSearchMatchIndex] = useState(-1);
-  const [searchMatchIds, setSearchMatchIds] = useState([]);
   
   // Progress restore prompt
   const [pendingRestore, setPendingRestore] = useState(null);
@@ -357,22 +359,22 @@ const DocumentTranslator = ({
     return () => clearInterval(timer);
   }, [isTranslating, startTime, isPaused]);
 
-  // Search match index — keeps matching segment ids + count + current cursor.
-  useEffect(() => {
-    if (!searchQuery) {
-      setSearchMatchIds([]);
-      setSearchMatchCount(0);
-      setSearchMatchIndex(-1);
-      return;
-    }
+  // Pure derivation so live segment updates (mid-translation) don't fight the
+  // cursor — recomputes ids without touching searchMatchIndex.
+  const searchMatchIds = useMemo(() => {
+    if (!searchQuery) return [];
     const query = searchQuery.toLowerCase();
-    const matchIds = segments
+    return segments
       .filter(s => s.status === STATUS.COMPLETED && s.translated && s.translated.toLowerCase().includes(query))
       .map(s => s.id);
-    setSearchMatchIds(matchIds);
-    setSearchMatchCount(matchIds.length);
-    setSearchMatchIndex(matchIds.length > 0 ? 0 : -1);
   }, [searchQuery, segments]);
+  const searchMatchCount = searchMatchIds.length;
+
+  // Only reset the cursor when the query itself changes. Streaming segment
+  // updates leave the cursor where the user put it.
+  useEffect(() => {
+    setSearchMatchIndex(-1);
+  }, [searchQuery]);
 
   // Auto-save progress
   useEffect(() => {
@@ -988,12 +990,20 @@ const DocumentTranslator = ({
     }
   };
 
-  // Cycle through search matches; wraps at both ends.
+  // Cycle through search matches. From the unpositioned (-1) state or any
+  // out-of-bounds index, jump to the first (next) or last (prev) match.
   const navigateSearch = (direction) => {
     if (searchMatchIds.length === 0) return;
-    const nextIndex = direction === 'next'
-      ? (searchMatchIndex + 1) % searchMatchIds.length
-      : (searchMatchIndex - 1 + searchMatchIds.length) % searchMatchIds.length;
+    const cur = searchMatchIndex;
+    const unpositioned = cur < 0 || cur >= searchMatchIds.length;
+    let nextIndex;
+    if (unpositioned) {
+      nextIndex = direction === 'next' ? 0 : searchMatchIds.length - 1;
+    } else {
+      nextIndex = direction === 'next'
+        ? (cur + 1) % searchMatchIds.length
+        : (cur - 1 + searchMatchIds.length) % searchMatchIds.length;
+    }
     setSearchMatchIndex(nextIndex);
     scrollToSegment(searchMatchIds[nextIndex]);
   };
@@ -1147,7 +1157,11 @@ const DocumentTranslator = ({
             />
             {searchQuery && (
               <span className="search-count">
-                {searchMatchCount > 0 ? `${searchMatchIndex + 1}/${searchMatchCount}` : `0 ${t('documentTranslator.search.matches')}`}
+                {searchMatchCount === 0
+                  ? `0 ${t('documentTranslator.search.matches')}`
+                  : searchMatchIndex < 0
+                    ? `${searchMatchCount} ${t('documentTranslator.search.matches')}`
+                    : `${searchMatchIndex + 1}/${searchMatchCount}`}
               </span>
             )}
             <button className="search-nav-btn" onClick={() => navigateSearch('prev')} disabled={searchMatchCount === 0} title={t('documentTranslator.search.prev')}>
