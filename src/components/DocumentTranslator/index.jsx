@@ -357,14 +357,21 @@ const DocumentTranslator = ({
     return () => clearInterval(timer);
   }, [isTranslating, startTime, isPaused]);
 
-  // Search match count
+  // Search match index — keeps matching segment ids + count + current cursor.
   useEffect(() => {
-    if (!searchQuery) { setSearchMatchCount(0); return; }
-    const count = segments.filter(s => 
-      s.status === STATUS.COMPLETED && s.translated &&
-      s.translated.toLowerCase().includes(searchQuery.toLowerCase())
-    ).length;
-    setSearchMatchCount(count);
+    if (!searchQuery) {
+      setSearchMatchIds([]);
+      setSearchMatchCount(0);
+      setSearchMatchIndex(-1);
+      return;
+    }
+    const query = searchQuery.toLowerCase();
+    const matchIds = segments
+      .filter(s => s.status === STATUS.COMPLETED && s.translated && s.translated.toLowerCase().includes(query))
+      .map(s => s.id);
+    setSearchMatchIds(matchIds);
+    setSearchMatchCount(matchIds.length);
+    setSearchMatchIndex(matchIds.length > 0 ? 0 : -1);
   }, [searchQuery, segments]);
 
   // Auto-save progress
@@ -979,6 +986,16 @@ const DocumentTranslator = ({
     if (element) {
       element.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
+  };
+
+  // Cycle through search matches; wraps at both ends.
+  const navigateSearch = (direction) => {
+    if (searchMatchIds.length === 0) return;
+    const nextIndex = direction === 'next'
+      ? (searchMatchIndex + 1) % searchMatchIds.length
+      : (searchMatchIndex - 1 + searchMatchIds.length) % searchMatchIds.length;
+    setSearchMatchIndex(nextIndex);
+    scrollToSegment(searchMatchIds[nextIndex]);
   };
 
   // Clear in-memory translation cache
