@@ -1,37 +1,21 @@
-// src/services/cache.js
-// 翻译缓存服务 - 独立模块
-//
-// 职责：
-// - 缓存翻译结果
-// - 支持 TTL 过期
-// - 容量管理
-// - 持久化到 localStorage
+// L2 translation cache. localStorage-backed, TTL'd, with debounced saves.
 
 import createLogger from '../utils/logger.js';
 
-// 日志实例
 const logger = createLogger('Cache');
 
-/**
- * 翻译缓存管理器
- */
 class TranslationCache {
   constructor(options = {}) {
     this.storageKey = options.storageKey || 'translation-cache';
-    this.maxSize = options.maxSize || 200;  // 最大缓存条数
-    this.ttl = options.ttl || 7 * 24 * 60 * 60 * 1000;  // 7天过期
+    this.maxSize = options.maxSize || 200;
+    this.ttl = options.ttl || 7 * 24 * 60 * 60 * 1000; // 7 days
     this.cache = new Map();
     this._saveTimer = null;
-    
-    // 启动时加载缓存
+
     this.load();
-    // 清理过期缓存
     this.cleanup();
   }
 
-  /**
-   * 从 localStorage 加载缓存
-   */
   load() {
     try {
       const data = localStorage.getItem(this.storageKey);
@@ -43,14 +27,11 @@ class TranslationCache {
         logger.debug(`Loaded ${this.cache.size} cached translations`);
       }
     } catch (error) {
-      logger.error(' Failed to load cache:', error);
+      logger.error('Failed to load cache:', error);
       this.cache = new Map();
     }
   }
 
-  /**
-   * 保存缓存到 localStorage
-   */
   save() {
     try {
       const obj = {};
@@ -59,8 +40,8 @@ class TranslationCache {
       });
       localStorage.setItem(this.storageKey, JSON.stringify(obj));
     } catch (error) {
-      logger.error(' Failed to save cache:', error);
-      // 如果存储失败（可能超出配额），清理一半的缓存
+      logger.error('Failed to save cache:', error);
+      // localStorage quota is ~5MB; on overflow drop half and retry once
       if (error.name === 'QuotaExceededError') {
         this.evict(Math.floor(this.cache.size / 2));
         this.save();
@@ -68,27 +49,19 @@ class TranslationCache {
     }
   }
 
-  /**
-   * 防抖保存 - 批量写入时避免频繁序列化
-   * @param {number} delay - 延迟毫秒数，默认 500ms
-   */
+  // Batched write — important for streaming translation where each chunk
+  // would otherwise trigger a full JSON.stringify of the cache
   debouncedSave(delay = 500) {
     clearTimeout(this._saveTimer);
     this._saveTimer = setTimeout(() => this.save(), delay);
   }
 
-  /**
-   * 生成缓存键（使用 djb2 哈希避免碰撞）
-   */
   generateKey(text, from, to, template = 'natural') {
     return `${from}-${to}-${template}-${this._hash(text)}`;
   }
 
-  /**
-   * djb2 哈希 — 快速、分布均匀、零依赖
-   * @param {string} str
-   * @returns {string} 十六进制哈希值
-   */
+  // djb2 dual-hash — same scheme as translation service's L1 key so the
+  // two layers can share keys
   _hash(str) {
     let h1 = 5381;
     let h2 = 52711;
@@ -100,14 +73,10 @@ class TranslationCache {
     return ((h1 >>> 0) * 4096 + (h2 >>> 0)).toString(36);
   }
 
-  /**
-   * 获取缓存
-   */
   get(key) {
     const item = this.cache.get(key);
     if (!item) return null;
 
-    // 检查是否过期
     if (Date.now() - item.timestamp > this.ttl) {
       this.cache.delete(key);
       this.debouncedSave();
@@ -117,13 +86,10 @@ class TranslationCache {
     return item.result;
   }
 
-  /**
-   * 设置缓存
-   */
   set(key, result) {
-    // 如果达到容量限制，先删除最旧的
+    // Bulk evict 20% rather than 1 — avoids re-evicting on every set near capacity
     if (this.cache.size >= this.maxSize) {
-      this.evict(Math.floor(this.maxSize * 0.2));  // 删除20%
+      this.evict(Math.floor(this.maxSize * 0.2));
     }
 
     this.cache.set(key, {
@@ -131,28 +97,20 @@ class TranslationCache {
       timestamp: Date.now()
     });
 
-    this.debouncedSave();  // 防抖保存，批量翻译时避免每条都序列化
+    this.debouncedSave();
   }
 
-  /**
-   * 检查缓存是否存在
-   */
   has(key) {
     return this.get(key) !== null;
   }
 
-  /**
-   * 删除指定数量的最旧缓存
-   */
+  // Map preserves insertion order; iterating keys() gives oldest first
   evict(count) {
     const keysToDelete = Array.from(this.cache.keys()).slice(0, count);
     keysToDelete.forEach(key => this.cache.delete(key));
     logger.debug(`Evicted ${keysToDelete.length} old entries`);
   }
 
-  /**
-   * 清理过期缓存
-   */
   cleanup() {
     const now = Date.now();
     let cleaned = 0;
@@ -170,18 +128,12 @@ class TranslationCache {
     }
   }
 
-  /**
-   * 清空所有缓存
-   */
   clear() {
     this.cache.clear();
     localStorage.removeItem(this.storageKey);
-    logger.debug(' All cache cleared');
+    logger.debug('All cache cleared');
   }
 
-  /**
-   * 获取缓存统计信息
-   */
   getStats() {
     let validCount = 0;
     let expiredCount = 0;
@@ -205,7 +157,6 @@ class TranslationCache {
   }
 }
 
-// 单例导出
 const translationCache = new TranslationCache();
 
 export default translationCache;
