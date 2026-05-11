@@ -562,7 +562,8 @@ const SelectionTranslator = () => {
       if (retryCount < 1 && (err.message.includes('fetch') || err.message.includes('network') || err.message.includes('连接'))) {
         logger.debug('Retrying translation...');
         await new Promise(r => setTimeout(r, 1000));
-        return translateText(text, retryCount + 1, overrideTargetLang);
+        // Phase A 修：retry 也要透传 overrideSourceLang，否则 retry 会 fallback 到 state.sourceLanguage
+        return translateText(text, retryCount + 1, overrideTargetLang, overrideSourceLang);
       }
       
       // 使用 error-handler 转换错误消息

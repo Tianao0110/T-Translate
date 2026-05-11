@@ -14,7 +14,7 @@
     "lint:fix": "eslint src/ electron/ --fix",
     "format": "prettier --write \"src/**/*.{js,jsx,css}\" \"electron/**/*.js\"",
     "format:check": "prettier --check \"src/**/*.{js,jsx,css}\" \"electron/**/*.js\"",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "check:constants": "node scripts/check-constants.js",
