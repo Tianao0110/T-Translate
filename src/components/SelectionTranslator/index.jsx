@@ -98,6 +98,7 @@ const SelectionTranslator = () => {
   const triggerReadyTimerRef = useRef(null);  // 圆点就绪计时器
   const contentRef = useRef(null);  // 内容区域引用，用于测量实际大小
   const translateTextRef = useRef(null);  // 存储最新的翻译函数引用
+  const prefetchedTextRef = useRef(null);  // Phase B pass-through: SHOW_TRIGGER 里 Layer 3 抓到的 text，handleTriggerClick 优先用，避免二次 fetch
 
   // TTS 初始化
   useEffect(() => {
@@ -178,6 +179,11 @@ const SelectionTranslator = () => {
       sizedRef.current = false;
       setIsFrozen(false);  // 重置固定状态
       setInitialBounds(null);  // 重置初始位置
+
+      // Phase B pass-through: Layer 3 main 进程已抓 text 通过 payload 传过来，
+      // handleTriggerClick 优先用这个，跳过 GET_TEXT 二次 fetch。
+      // 新 SHOW_TRIGGER 自然覆盖；点击使用一次后置 null 防跨周期复用。
+      prefetchedTextRef.current = data.text || null;
       
       // 圆点就绪延迟（防止松开鼠标时误触）
       setTriggerReady(false);
@@ -241,9 +247,10 @@ const SelectionTranslator = () => {
         setMode('loading');
         
         try {
-          // 直接传入目标语言，不依赖异步 state 更新
-          const overrideLang = data.targetLanguage || data.translation?.targetLanguage || null;
-          const translationResult = await translateTextRef.current(data.text, 0, overrideLang);
+          // 直接传入语言，不依赖异步 state 更新
+          const overrideTargetLang = data.targetLanguage || data.translation?.targetLanguage || null;
+          const overrideSourceLang = data.sourceLanguage || data.translation?.sourceLanguage || null;
+          const translationResult = await translateTextRef.current(data.text, 0, overrideTargetLang, overrideSourceLang);
           setTranslatedText(translationResult);
           setError('');
           setMode('overlay');
@@ -324,8 +331,9 @@ const SelectionTranslator = () => {
 
         setSourceText(text);
 
-        const overrideLang = newTranslation.targetLanguage || null;
-        const translationResult = await translateTextRef.current(text, 0, overrideLang);
+        const overrideTargetLang = newTranslation.targetLanguage || null;
+        const overrideSourceLang = newTranslation.sourceLanguage || null;
+        const translationResult = await translateTextRef.current(text, 0, overrideTargetLang, overrideSourceLang);
         setTranslatedText(translationResult);
         setError('');
         setMode('overlay');
@@ -390,10 +398,16 @@ const SelectionTranslator = () => {
     setMode('loading');
     
     try {
-      const result = await window.electron?.selection?.getText?.(rect);
-      if (!result?.text) throw new Error(t('selection.noText', '未获取到文字'));
-      
-      const text = result.text.trim();
+      // Phase B pass-through: 先用 SHOW_TRIGGER payload 里 Layer 3 抓到的 text；
+      // 没有（Layer 1/2 路径，payload 不带 text）才 fallback 到 GET_TEXT IPC 二次 fetch。
+      let text = prefetchedTextRef.current;
+      prefetchedTextRef.current = null;  // 单次使用，防跨 trigger 周期复用
+      if (!text) {
+        const result = await window.electron?.selection?.getText?.(rect);
+        text = result?.text;
+      }
+      if (!text) throw new Error(t('selection.noText', '未获取到文字'));
+      text = text.trim();
 
       // 内容校验（与 CapsLock 直出路径共用同一套规则）
       validateSelectionText(text, settings, t);
@@ -512,20 +526,22 @@ const SelectionTranslator = () => {
   }, [mode, translatedText, error, showSource]);
 
   // 使用 translationService 进行翻译
-  const translateText = async (text, retryCount = 0, overrideTargetLang = null) => {
+  const translateText = async (text, retryCount = 0, overrideTargetLang = null, overrideSourceLang = null) => {
     // 确保翻译服务已初始化
     if (!translationService.initialized) {
       logger.debug('Initializing translation service...');
       await translationService.init();
     }
-    
+
     // 优先使用传入的目标语言（截图翻译等场景），否则用 state
     const targetLang = overrideTargetLang || translation.targetLanguage || 'zh';
-    
+    // 源语言同样优先 override 再 fallback state，最后兜底 'auto'
+    const sourceLang = overrideSourceLang || translation.sourceLanguage || 'auto';
+
     try {
       // 使用 translationService 进行翻译（传递隐私模式）
       const result = await translationService.translate(text, {
-        sourceLang: 'auto',
+        sourceLang: sourceLang,
         targetLang: targetLang,
         privacyMode: privacyMode, // 传递隐私模式
       });
@@ -546,7 +562,8 @@ const SelectionTranslator = () => {
       if (retryCount < 1 && (err.message.includes('fetch') || err.message.includes('network') || err.message.includes('连接'))) {
         logger.debug('Retrying translation...');
         await new Promise(r => setTimeout(r, 1000));
-        return translateText(text, retryCount + 1, overrideTargetLang);
+        // Phase A 修：retry 也要透传 overrideSourceLang，否则 retry 会 fallback 到 state.sourceLanguage
+        return translateText(text, retryCount + 1, overrideTargetLang, overrideSourceLang);
       }
       
       // 使用 error-handler 转换错误消息

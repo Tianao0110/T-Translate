@@ -15,6 +15,9 @@ export default defineConfig({
       '@utils': path.resolve(__dirname, 'src/utils'),
       '@stores': path.resolve(__dirname, 'src/stores'),
       '@config': path.resolve(__dirname, 'src/config'),
+      // 测试里任何 import/require 'electron' 都重定向到 mock stub，
+      // 让主进程文件能在 jsdom 环境加载而不挂
+      electron: path.resolve(__dirname, 'tests/mocks/electron.js'),
     },
   },
   test: {
