@@ -64,24 +64,3 @@ Long-lived work items tracked across releases. Things that are not a current rel
 
 **Blockers**: 无（toolchain 已通，可以独立做）。
 
----
-
-## Dev environment
-
-### gstack 升级 0.16.1 → 1.12.2
-
-**Why**: 当前用的 gstack 0.16.1，最新是 1.12.2 —— 跨主版本号（0.x → 1.x 是 "首次 stable" 语义）。积累了若干主版本 bugfix + 新 skill；0.16 会越来越老，某些 bin 工具 schema 迟早被 deprecate。
-
-**Approach**: `cd ~/.claude/skills/gstack && git pull`（或跑 /gstack-upgrade skill）→ 过一遍常用 skill（office-hours / plan-eng-review / review / ship）的行为是否和 0.16 预期一致 → 看新版 CHANGELOG 挑有价值的变更用起来。
-
-**Why not v0.2.5 cycle 内**: v0.2.5 的 office-hours + plan-eng-review 已在 0.16.1 跑完、产物都已定稿；中途换工具版本会让同 cycle 内 skill 调用产出不一致，retrospective 时麻烦。
-
-**Blockers**: v0.2.5 tag 打完。
-
----
-
-## Conventions
-
-- **Stale-check**: Re-visit TODOs each time a new release ships (or quarterly). Delete anything completed or no longer relevant.
-- **Format**: Each TODO has Why / Approach / Why not now / Blockers. If you can't answer Why not now, you should probably do it now.
-- **Scope discipline**: Don't add "wouldn't it be cool if..." speculation here. This file is for known-valuable work with clear motivation, not idea storage.
