@@ -761,7 +761,7 @@ const GlassTranslator = () => {
       {/* 穿透模式指示器 */}
       {isPassThrough && (
         <div className="pass-through-indicator">
-          <span>穿透模式 (松开 Alt 退出)</span>
+          <span>{t('glass.passThroughMode')}</span>
         </div>
       )}
     </div>

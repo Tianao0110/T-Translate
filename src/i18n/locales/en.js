@@ -248,9 +248,10 @@ const en = {
     adjustOpacity: "Adjust opacity", closeEsc: "Close (Esc)",
     capturing: "Capturing...", recognizing: "Recognizing...", translating: "Translating...",
     captureHint: "Click 📷 or press Space to capture",
-    doubleClickFreeze: "Double-click to pin as independent window"
+    doubleClickFreeze: "Double-click to pin as independent window",
+    passThroughMode: "Pass-through mode (release Alt to exit)"
   },
-  selection: { 
+  selection: {
     freeze: "Freeze", unfreeze: "Unfreeze", close: "Close", copy: "Copy", more: "More",
     description: "Show translate button after selecting text",
     enableSelection: "Enable Selection Translation", enabled: "Selection translation enabled", disabled: "Selection translation disabled",
