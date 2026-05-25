@@ -32,7 +32,7 @@ import { PRIVACY_MODES, TRANSLATION_STATUS, getLanguageList } from '@config/defa
 import { useTTS, useTermCheck, useStyleRewrite, useSaveModal } from './hooks';
 
 // 子组件
-import { StyleModal, SaveModal } from './components.jsx';
+import { StyleModal, SaveModal, LanguageSelector } from './components.jsx';
 
 const logger = createLogger('TranslationPanel');
 
@@ -319,15 +319,11 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
       {/* 顶部工具栏 */}
       <div className="language-selector-bar">
         <div className="language-select-group">
-          <select
+          <LanguageSelector
             value={currentTranslation.sourceLanguage || ''}
-            onChange={(e) => setLanguages(e.target.value, null)}
-            className="language-select"
-          >
-            {languages.map(lang => (
-              <option key={lang.code} value={lang.code}>{lang.flag} {t(`languages.${lang.code}`, lang.name)}</option>
-            ))}
-          </select>
+            options={languages}
+            onChange={(code) => setLanguages(code, null)}
+          />
 
           <button
             className="swap-button"
@@ -338,15 +334,11 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
             <RotateCcw size={16} />
           </button>
 
-          <select
+          <LanguageSelector
             value={currentTranslation.targetLanguage}
-            onChange={(e) => setLanguages(null, e.target.value)}
-            className="language-select"
-          >
-            {languages.filter(l => l.code !== 'auto').map(lang => (
-              <option key={lang.code} value={lang.code}>{lang.flag} {t(`languages.${lang.code}`, lang.name)}</option>
-            ))}
-          </select>
+            options={languages.filter(l => l.code !== 'auto')}
+            onChange={(code) => setLanguages(null, code)}
+          />
         </div>
 
         {/* 模板选择器 */}
