@@ -17,10 +17,8 @@ import './styles.css';
 // 日志实例
 const logger = createLogger('Glass');
 
-/**
- * 判断错误是否跟 OCR 相关，决定是否显示"前往 OCR 设置"按钮
- * 新用户最常见的 OCR 错误是 LLM Vision 未配置（默认引擎，但需要本地视觉模型）
- */
+// Default OCR engine (llm-vision) needs a local vision model — new users without it
+// hit this path. Keyword match triggers a "Go to OCR Settings" button on the error.
 const OCR_ERROR_KEYWORDS = /ocr|vision|视觉|识别|视觉模型|qwen-vl|llava/i;
 function isOcrRelatedError(msg) {
   return typeof msg === 'string' && OCR_ERROR_KEYWORDS.test(msg);

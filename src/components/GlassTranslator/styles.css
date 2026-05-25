@@ -261,7 +261,7 @@
   color: #ef4444;
 }
 
-/* OCR 错误时的"前往设置"按钮 */
+/* "Go to OCR Settings" button shown on OCR errors */
 .glass-action-btn {
   margin-top: 10px;
   padding: 6px 14px;

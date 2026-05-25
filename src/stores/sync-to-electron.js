@@ -25,8 +25,8 @@ function debouncedSync(dotPath, value, delay = 100) {
       if (!window.electron?.store?.set) return;
       await window.electron.store.set(`settings.${dotPath}`, value);
       logger.debug(`Synced settings.${dotPath}`);
-      // 写完 store 后通知 glass 窗口重新读取，让目标语言/主题等实时同步
-      // 不阻塞 sync 本身，单独 debounce 合并多个字段的连续变更
+      // Notify glass so it can reload target lang / theme without restart.
+      // Separate debounce to merge bursts (e.g. user toggles src+tgt back-to-back).
       debouncedNotifyGlass();
     } catch (e) {
       logger.debug(`Sync failed for ${dotPath}:`, e.message);
@@ -34,7 +34,6 @@ function debouncedSync(dotPath, value, delay = 100) {
   }, delay);
 }
 
-/** 防抖通知 glass 窗口重新加载设置 */
 let _glassNotifyTimer = null;
 function debouncedNotifyGlass(delay = 50) {
   clearTimeout(_glassNotifyTimer);

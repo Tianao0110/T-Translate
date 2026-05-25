@@ -40,8 +40,7 @@ contextBridge.exposeInMainWorld("electron", {
       ipcRenderer.on("selection:show-direct", listener);
       return () => ipcRenderer.removeListener("selection:show-direct", listener);
     },
-    // 打开主窗口并跳转到 OCR 设置（OCR 错误引导用）
-    // 复用 glass IPC，channel 字符串只是标识，handler 不关心来源窗口
+    // Reuses glass:open-main-settings channel — handler doesn't care which window invoked it
     openOcrSettings: () => ipcRenderer.invoke("glass:open-main-settings", "ocr"),
   },
 

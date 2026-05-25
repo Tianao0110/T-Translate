@@ -134,14 +134,13 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
     }
   }, [activeSection]);
 
-  // 外部请求跳转到指定 section（如 glass 的"前往 OCR 设置"按钮）
+  // External section jump (e.g. glass "Go to OCR Settings" button)
   useEffect(() => {
     if (initialSection && initialSection !== activeSection) {
       setActiveSection(initialSection);
       setSearchQuery('');
     }
     if (initialSection) {
-      // 通知父级已消费，避免重复跳转
       onSectionConsumed?.();
     }
   }, [initialSection]);

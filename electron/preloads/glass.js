@@ -53,7 +53,6 @@ contextBridge.exposeInMainWorld('electron', {
     // 同步目标语言到主程序
     syncTargetLanguage: (langCode) => ipcRenderer.invoke('glass:sync-target-language', langCode),
 
-    // 打开主窗口并跳转到设置某 section（如 'ocr' / 'providers'）
     openMainSettings: (section) => ipcRenderer.invoke('glass:open-main-settings', section),
     
     // 监听隐藏（截图前）

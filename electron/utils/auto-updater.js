@@ -270,9 +270,7 @@ async function installUpdate(filePath) {
   const ext = path.extname(filePath).toLowerCase();
 
   if (process.platform === 'win32' && ext === '.exe') {
-    // Windows: 启动 detached 子进程，让安装程序独立于父进程存活
-    // 原本用 exec() 不 detach，父进程 1500ms 后 app.quit() 可能连带杀子进程
-    // 改用 spawn + detached + stdio:ignore + unref()，安装包能继续跑
+    // Detached spawn so the installer survives our app.quit() 1500ms later.
     const { spawn } = require('child_process');
     try {
       const child = spawn(filePath, [], {

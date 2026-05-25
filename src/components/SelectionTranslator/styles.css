@@ -380,7 +380,7 @@ html, body, #root {
   border-color: #dc2626;
 }
 
-/* OCR 错误时的"前往设置"按钮（引导新用户去 OCR 设置页）*/
+/* "Go to OCR Settings" button shown on OCR errors */
 .sel-action-btn {
   margin-top: 8px;
   padding: 5px 12px;

@@ -47,7 +47,7 @@ const SelectionTranslator = () => {
   const [sourceText, setSourceText] = useState('');
   const [translatedText, setTranslatedText] = useState('');
   const [error, setError] = useState('');
-  const [isOcrError, setIsOcrError] = useState(false);  // OCR 错误标记（用于显示"前往设置"按钮）
+  const [isOcrError, setIsOcrError] = useState(false);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [rect, setRect] = useState(null);
   const [copied, setCopied] = useState(false);
