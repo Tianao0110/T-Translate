@@ -39,6 +39,9 @@ npm-debug.log*
 *~
 *.code-workspace
 
+# AI 工具本地配置
+.claude/
+
 # 操作系统
 .DS_Store
 Thumbs.db
