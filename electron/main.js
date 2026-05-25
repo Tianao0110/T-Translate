@@ -347,6 +347,7 @@ function showSelectionResult(data) {
   win.webContents.send(CHANNELS.SELECTION.SHOW_RESULT, {
     sourceText: data.sourceText || '',
     translatedText: data.translatedText || '',
+    isOcrError: data.isOcrError === true,
     theme: interfaceSettings.theme || 'light',
     settings: {
       windowOpacity: selectionSettings.windowOpacity || 95,
