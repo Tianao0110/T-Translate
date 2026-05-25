@@ -270,11 +270,22 @@ async function installUpdate(filePath) {
   const ext = path.extname(filePath).toLowerCase();
 
   if (process.platform === 'win32' && ext === '.exe') {
-    // Windows: 运行安装程序，然后退出应用
-    const { exec } = require('child_process');
-    exec(`"${filePath}"`, (err) => {
-      if (err) logger.error('Failed to launch installer:', err);
-    });
+    // Windows: 启动 detached 子进程，让安装程序独立于父进程存活
+    // 原本用 exec() 不 detach，父进程 1500ms 后 app.quit() 可能连带杀子进程
+    // 改用 spawn + detached + stdio:ignore + unref()，安装包能继续跑
+    const { spawn } = require('child_process');
+    try {
+      const child = spawn(filePath, [], {
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: false,
+      });
+      child.on('error', (err) => logger.error('Failed to launch installer:', err));
+      child.unref();
+    } catch (err) {
+      logger.error('Failed to spawn installer:', err);
+      throw err;
+    }
     // 给安装程序一点时间启动
     setTimeout(() => app.quit(), 1500);
   } else if (process.platform === 'darwin' && ext === '.dmg') {
