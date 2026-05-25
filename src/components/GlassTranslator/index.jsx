@@ -18,6 +18,15 @@ import './styles.css';
 const logger = createLogger('Glass');
 
 /**
+ * 判断错误是否跟 OCR 相关，决定是否显示"前往 OCR 设置"按钮
+ * 新用户最常见的 OCR 错误是 LLM Vision 未配置（默认引擎，但需要本地视觉模型）
+ */
+const OCR_ERROR_KEYWORDS = /ocr|vision|视觉|识别|视觉模型|qwen-vl|llava/i;
+function isOcrRelatedError(msg) {
+  return typeof msg === 'string' && OCR_ERROR_KEYWORDS.test(msg);
+}
+
+/**
  * 玻璃翻译窗口组件
  * 职责：纯 UI 渲染，监听 store 变化
  */
@@ -657,6 +666,17 @@ const GlassTranslator = () => {
           <div className="glass-message error">
             <AlertCircle size={20} />
             <span>{error}</span>
+            {isOcrRelatedError(error) && (
+              <button
+                className="glass-action-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.electron?.glass?.openMainSettings?.('ocr');
+                }}
+              >
+                {t('glass.goToOcrSettings')}
+              </button>
+            )}
           </div>
         ) : displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0 ? (
           // 散点模式：显示子玻璃板

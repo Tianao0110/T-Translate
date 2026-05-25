@@ -249,7 +249,8 @@ const zh = {
     capturing: "截图中...", recognizing: "识别中...", translating: "翻译中...",
     captureHint: "点击 📷 或按 Space 截图识别",
     doubleClickFreeze: "双击固定为独立窗口",
-    passThroughMode: "穿透模式 (松开 Alt 退出)"
+    passThroughMode: "穿透模式 (松开 Alt 退出)",
+    goToOcrSettings: "前往 OCR 设置"
   },
   selection: {
     freeze: "冻结", unfreeze: "解冻", close: "关闭", copy: "复制", more: "更多",

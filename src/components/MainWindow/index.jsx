@@ -237,12 +237,21 @@ const MainWindow = () => {
     return () => cleanup?.();
   }, [t, showNotification]);
 
-  // 监听托盘菜单导航请求（如"设置"按钮）
+  // 设置面板待跳转的 section（支持 'settings:ocr' 这种带 section 的 navigate target）
+  const [pendingSettingsSection, setPendingSettingsSection] = useState(null);
+
+  // 监听托盘菜单导航请求（如"设置"按钮）+ glass 错误"前往设置"跳转
   useEffect(() => {
     const cleanup = window.electron?.ipc?.on('navigate', (target) => {
       logger.debug('Navigate request:', target);
-      if (target === 'settings') {
+      if (typeof target !== 'string') return;
+      if (target === 'settings' || target.startsWith('settings:')) {
         setActiveTab('settings');
+        // 形如 'settings:ocr' → 提取 ocr 作为 initial section
+        const sep = target.indexOf(':');
+        if (sep > 0) {
+          setPendingSettingsSection(target.slice(sep + 1));
+        }
       } else if (target === 'history') {
         setActiveTab('history');
       } else if (target === 'translate') {
@@ -378,7 +387,11 @@ const MainWindow = () => {
         {mountedTabs.has('settings') && (
           <div className="tab-panel" style={{ display: activeTab === 'settings' ? 'flex' : 'none' }}>
             <Suspense fallback={<LazyLoadingFallback />}>
-              <SettingsPanel showNotification={showNotification} />
+              <SettingsPanel
+                showNotification={showNotification}
+                initialSection={pendingSettingsSection}
+                onSectionConsumed={() => setPendingSettingsSection(null)}
+              />
             </Suspense>
           </div>
         )}

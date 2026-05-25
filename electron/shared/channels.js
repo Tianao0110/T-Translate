@@ -74,6 +74,7 @@ const CHANNELS = {
     SAVE_SETTINGS: 'glass:save-settings',
     GET_PROVIDER_CONFIGS: 'glass:get-provider-configs',
     NOTIFY_SETTINGS_CHANGED: 'glass:notify-settings-changed',
+    OPEN_MAIN_SETTINGS: 'glass:open-main-settings',  // glass 请求主窗口跳到设置某 section
     ADD_TO_FAVORITES: 'glass:add-to-favorites',
     ADD_TO_HISTORY: 'glass:add-to-history',
     GET_HISTORY: 'glass:get-history',  // 新增：获取历史记录

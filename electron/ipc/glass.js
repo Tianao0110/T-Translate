@@ -251,6 +251,28 @@ function register(ctx) {
     }
     return false;
   });
+
+  /**
+   * 从 glass 触发主窗口打开设置面板的指定 section
+   * 复用现有 'navigate' IPC（MainWindow 已监听），约定格式 'settings:<section>'
+   * 用于 OCR 错误时引导新用户去 OCR 设置页
+   */
+  ipcMain.handle(CHANNELS.GLASS.OPEN_MAIN_SETTINGS, (event, section) => {
+    const mainWindow = getMainWindow();
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      logger.warn('openMainSettings: main window not available');
+      return false;
+    }
+    // 显示并聚焦主窗口
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+    // 发送 navigate 指令，target = 'settings' 或 'settings:<section>'
+    const target = section ? `settings:${section}` : 'settings';
+    mainWindow.webContents.send('navigate', target);
+    logger.debug('openMainSettings dispatched:', target);
+    return true;
+  });
   
   // ==================== 翻译 ====================
   

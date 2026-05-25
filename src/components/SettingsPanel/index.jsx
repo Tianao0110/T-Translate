@@ -51,7 +51,7 @@ const logger = createLogger('Settings');
 /**
  * 设置面板组件
  */
-const SettingsPanel = ({ showNotification }) => {
+const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) => {
   const { t } = useTranslation();
   
   // 兼容 props
@@ -133,6 +133,18 @@ const SettingsPanel = ({ showNotification }) => {
       setSearchQuery('');
     }
   }, [activeSection]);
+
+  // 外部请求跳转到指定 section（如 glass 的"前往 OCR 设置"按钮）
+  useEffect(() => {
+    if (initialSection && initialSection !== activeSection) {
+      setActiveSection(initialSection);
+      setSearchQuery('');
+    }
+    if (initialSection) {
+      // 通知父级已消费，避免重复跳转
+      onSectionConsumed?.();
+    }
+  }, [initialSection]);
 
   // 切换分组折叠状态
   const toggleGroup = useCallback((groupId) => {

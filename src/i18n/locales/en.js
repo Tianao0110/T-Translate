@@ -249,7 +249,8 @@ const en = {
     capturing: "Capturing...", recognizing: "Recognizing...", translating: "Translating...",
     captureHint: "Click 📷 or press Space to capture",
     doubleClickFreeze: "Double-click to pin as independent window",
-    passThroughMode: "Pass-through mode (release Alt to exit)"
+    passThroughMode: "Pass-through mode (release Alt to exit)",
+    goToOcrSettings: "Go to OCR Settings"
   },
   selection: {
     freeze: "Freeze", unfreeze: "Unfreeze", close: "Close", copy: "Copy", more: "More",
