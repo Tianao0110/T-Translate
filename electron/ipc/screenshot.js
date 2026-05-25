@@ -142,6 +142,7 @@ function register(ctx) {
         managers.showSelectionResult({
           sourceText: t('screenshot.ocrError', 'OCR 错误'),
           translatedText: displayError,
+          isOcrError: true,  // 标记为 OCR 错误，SelectionTranslator 据此显示"前往设置"按钮
         });
       } else if (managers.hideSelectionLoading) {
         managers.hideSelectionLoading();
