@@ -271,11 +271,13 @@
   color: inherit;
   font-size: 12px;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s;
+  align-self: flex-start;
 }
+/* Avoid `background: currentColor` here — same-rule `color` change makes
+   currentColor resolve to the new color, painting the button solid white. */
 .glass-action-btn:hover {
-  background: currentColor;
-  color: #fff;
+  background: rgba(239, 68, 68, 0.12);
 }
 
 .glass-message.loading svg {
