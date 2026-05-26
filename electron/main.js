@@ -36,17 +36,32 @@ const displayHelper = require('./utils/display-helper');
 
 // ==================== 划词翻译逻辑 ====================
 
+// Cancellation for in-flight delayed-confirm. Triple-click fires two mouseups
+// back-to-back; without this, both confirms race and the first one (still inside
+// its 80ms wait) grabs the partial double-click word selection instead of the
+// final paragraph one. Newer confirm cancels older.
+let pendingConfirmCancel = null;
+
 /**
  * 延迟确认：检测双击是否真的选中了文本
  * 通过 Ctrl+C 获取选中内容，如果有内容则显示触发图标
  */
 async function handleDelayedConfirm(x, y, rect) {
+  if (pendingConfirmCancel) pendingConfirmCancel();
+  let cancelled = false;
+  const myCancel = () => { cancelled = true; };
+  pendingConfirmCancel = myCancel;
+
   try {
     const { hasTextSelection, checkSelectionViaClipboard } = require('./utils/native-helper');
-    
-    // 等待一小段时间确保双击选中完成（系统需要时间响应）
+
     // Office/Outlook 等复杂应用可能需要更长时间（弹出工具栏等）
     await new Promise(resolve => setTimeout(resolve, 80));
+
+    if (cancelled) {
+      logger.debug('Delayed confirm cancelled by newer mouseup (likely triple-click)');
+      return;
+    }
     
     // ========== 第一层 + 第二层：零剪贴板检测 ==========
     const selectionCheck = hasTextSelection();
@@ -83,6 +98,11 @@ async function handleDelayedConfirm(x, y, rect) {
     
     const clipboardResult = await checkSelectionViaClipboard({ isComplexApp: isOfficeApp });
 
+    if (cancelled) {
+      logger.debug('Delayed confirm cancelled mid-clipboard-fetch');
+      return;
+    }
+
     if (clipboardResult.hasSelection === true) {
       logger.debug(`Delayed confirm: text selected via clipboard "${clipboardResult.text.substring(0, 20)}..."`);
       showSelectionTrigger(x, y, rect);
@@ -101,6 +121,10 @@ async function handleDelayedConfirm(x, y, rect) {
     if (selectionStateMachine) {
       selectionStateMachine.reset();
     }
+  } finally {
+    // Only release the slot if I'm still the current owner — a newer confirm
+    // may have already overwritten pendingConfirmCancel with its own token.
+    if (pendingConfirmCancel === myCancel) pendingConfirmCancel = null;
   }
 }
 
