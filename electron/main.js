@@ -30,15 +30,31 @@ const displayHelper = require('./utils/display-helper');
 
 // ===== Selection translate logic =====
 
+// Cancellation for in-flight delayed-confirm. Triple-click fires two mouseups
+// back-to-back; without this, both confirms race and the first one (still inside
+// its 80ms wait) grabs the partial double-click word selection instead of the
+// final paragraph one. Newer confirm cancels older.
+let pendingConfirmCancel = null;
+
 // Delayed-confirm path for double/triple click. The system needs time to react before
 // we can check if text actually got selected.
 async function handleDelayedConfirm(x, y, rect) {
+  if (pendingConfirmCancel) pendingConfirmCancel();
+  let cancelled = false;
+  const myCancel = () => { cancelled = true; };
+  pendingConfirmCancel = myCancel;
+
   try {
     const { hasTextSelection, checkSelectionViaClipboard } = require('./utils/native-helper');
 
     // Wait a beat — double-click selection is async on Windows. Office / Outlook
     // may need longer (toolbars pop up etc.).
     await new Promise(resolve => setTimeout(resolve, 80));
+
+    if (cancelled) {
+      logger.debug('Delayed confirm cancelled by newer mouseup (likely triple-click)');
+      return;
+    }
 
     // ----- Layer 1+2: clipboard-free probe -----
     const selectionCheck = hasTextSelection();
@@ -73,6 +89,11 @@ async function handleDelayedConfirm(x, y, rect) {
 
     const clipboardResult = await checkSelectionViaClipboard({ isComplexApp: isOfficeApp });
 
+    if (cancelled) {
+      logger.debug('Delayed confirm cancelled mid-clipboard-fetch');
+      return;
+    }
+
     if (clipboardResult.hasSelection === true) {
       logger.debug(`Delayed confirm: text selected via clipboard "${clipboardResult.text.substring(0, 20)}..."`);
       showSelectionTrigger(x, y, rect, clipboardResult.text);
@@ -90,6 +111,10 @@ async function handleDelayedConfirm(x, y, rect) {
     if (selectionStateMachine) {
       selectionStateMachine.reset();
     }
+  } finally {
+    // Only release the slot if I'm still the current owner — a newer confirm
+    // may have already overwritten pendingConfirmCancel with its own token.
+    if (pendingConfirmCancel === myCancel) pendingConfirmCancel = null;
   }
 }
 
@@ -329,6 +354,7 @@ function showSelectionResult(data) {
   win.webContents.send(CHANNELS.SELECTION.SHOW_RESULT, {
     sourceText: data.sourceText || '',
     translatedText: data.translatedText || '',
+    isOcrError: data.isOcrError === true,
     theme: interfaceSettings.theme || 'light',
     settings: {
       windowOpacity: selectionSettings.windowOpacity || 95,

@@ -26,6 +26,45 @@ import {
 import { isProviderAllowed, PRIVACY_MODE_IDS } from '../config/privacy-modes.js';
 import { getEnabledFilters, DEFAULT_FILTERS } from '../config/filters.js';
 import { getSystemPrompt, LANGUAGE_NAMES } from '../config/templates.js';
+import { detectTemplateFromModel } from '../config/model-template-mapping.js';
+
+// MT detection cache. Keyed by model name — re-runs only when the active
+// provider's `config.model` changes (e.g. user picks a different LM Studio
+// model). Effectively "detect once at startup, re-detect when model changes",
+// which is what we want without subscribing to store events.
+let _mtCache = { model: null, isMT: false };
+function isMTActiveModel(modelName) {
+  if (!modelName) return false;
+  if (modelName === _mtCache.model) return _mtCache.isMT;
+  const isMT = !!detectTemplateFromModel(modelName);
+  _mtCache = { model: modelName, isMT };
+  return isMT;
+}
+
+// Short prompt for translation-only small models. Their chat templates don't
+// expect system role and long instructions get translated by mistake. Tone hint
+// preserved so the user's tone selection (natural/precise/formal) still applies.
+const _MT_TONE = {
+  natural: 'natural and conversational',
+  precise: 'precise and technically accurate',
+  formal: 'formal and professional',
+  ocr: 'natural and conversational',
+  creative: 'creative and literary',
+};
+function buildMTPrompt(toneTemplate, targetLang) {
+  const langName = LANGUAGE_NAMES[targetLang] || targetLang;
+  const tone = _MT_TONE[toneTemplate] || _MT_TONE.natural;
+  return {
+    content: `Translate the following text into ${langName} in a ${tone} tone. ONLY output the translated result without any explanation:`,
+    mode: 'user',
+  };
+}
+
+function resolveSystemPrompt(provider, template, targetLang) {
+  return isMTActiveModel(provider.config?.model)
+    ? buildMTPrompt(template, targetLang)
+    : getSystemPrompt(template, targetLang);
+}
 import translationCache from './cache.js';
 
 const logger = createLogger('Translation');
@@ -476,7 +515,7 @@ class TranslationService {
       try {
         logger.debug(`Trying provider: ${id}`);
 
-        const systemPrompt = getSystemPrompt(template, targetLang);
+        const systemPrompt = resolveSystemPrompt(provider, template, targetLang);
 
         const result = await provider.translate(processed, sourceLang, targetLang, {
           systemPrompt,
@@ -603,7 +642,7 @@ class TranslationService {
       try {
         logger.debug(`Trying stream provider: ${id}`);
 
-        const systemPrompt = getSystemPrompt(template, targetLang);
+        const systemPrompt = resolveSystemPrompt(provider, template, targetLang);
 
         if (provider.supportsStreaming && typeof provider.translateStream === 'function') {
           let fullText = '';

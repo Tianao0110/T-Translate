@@ -1,66 +1,71 @@
 # TODOS
 
-Long-lived work items tracked across releases. Things that are not a current release's scope but are worth remembering.
+Forward-looking work clipboard. Git history / GitHub release notes are the archive — these notes stay concise (1-3 lines each + file:line links). Stale-check on each release; delete shipped items.
+
+## v0.2.7 candidates
+
+### 1. Streaming render throttle (RAF + device tier)
+
+Replace per-token `setState` on the `<textarea>` with RAF-based buffering: accumulate tokens, flush one batch per frame, minimum 16ms interval floor (cap at 60fps even on 144/240Hz displays). Two device tiers via `navigator.hardwareConcurrency` + `deviceMemory`: high (≥8 cores, ≥16GB) → 16ms floor, mid/low → 33ms floor. Non-streaming providers (Google/DeepL/Baidu) bypass the throttle. Flush residual buffer on stream end.
+
+Project has no markdown rendering — translation output is a raw `<textarea>`. Expected peak memory reduction is ~1.5-2x on low-end. Verification artifact: before/after Memory snapshots.
+
+### 2. Cache key should include model name
+
+[services/translation.js _getCacheKey](src/services/translation.js:340) keys cache by `${targetLang}-${template}-${providerId}-${hash}`. Missing: **the active model name**. Symptom: user swaps LM Studio model from `hy-mt2-7b` → `qwen3-7b` (same provider id `local-llm`, same source text) → cache key collides → user gets the stale hy-mt2 translation back, not a fresh qwen3 one.
+
+Fix: include `provider.config.model` in the cache key. One-line change once verified the cache key has access to provider config.
+
+### 3. selectedTemplate persistence
+
+[TranslationPanel/index.jsx:53](src/components/TranslationPanel/index.jsx:53) `selectedTemplate` is React state only — resets to `'natural'` every restart. If user switches to `'precise'` or `'formal'`, the choice is lost on next launch. Persist to localStorage (or main electron-store). Low priority; v0.2.6 reset behavior is unchanged from v0.2.5.
+
+### 4. PDF selection translation: retry on non-Adobe readers
+
+v0.2.6 skipped this (Adobe didn't work). Worth re-testing on Foxit / Edge built-in PDF / SumatraPDF — different readers have different clipboard behavior across read-only vs editable modes. If any reader works reliably, document the supported set in README; if multiple fail, debug clipboard path (`electron/utils/native-helper.js` `simulateCtrlC` + `checkSelectionViaClipboard`).
+
+### 5. MT mode UI indicator (nice-to-have)
+
+When the auto-detect ([model-template-mapping.js](src/config/model-template-mapping.js)) flips the prompt to MT-friendly mode (user-only message + simplified instruction), there's no UI feedback. User wonders "why is my translation different now". Small tooltip / badge near the model name in ProviderSettings or near the tone buttons: "MT model detected — using direct prompt". Low priority but boosts confidence.
 
 ## v0.3 candidates
 
-### 1. Text caching to root-fix "按下没内容" on auto-detect path
+### "按下没内容" auto-detect path: text caching root-fix
 
-**Why**: The `/plan-eng-review` (2026-04-08) discovered the real root cause of the "按下没内容" bug. When the user auto-selects text via kinematics (not hotkey), the state machine + 3-layer filter (`hasTextSelection` → `checkSelectionViaClipboard`) succeeds pre-icon-click. Icon shows. User clicks icon → focus moves from target app to icon window → `fetchSelectedText` (second clipboard round) sends `simulateCtrlC` to the now-defocused target → fails. The 800ms poll extension in v0.2.4 only mitigates the timing symptom, not the focus-transfer root cause.
+v0.2.4 mitigated the symptom with an 800ms poll extension. True root cause is focus transfer: icon shows → user clicks icon → focus jumps from target app to icon window → simulateCtrlC fires at a now-defocused target → fails. Proper fix: cache successfully-fetched text + timestamp to `runtime.lastSelectionText` in the Layer 3 clipboard path; on subsequent `SELECTION.GET_TEXT` requests, use cache if <500ms old. Need to calibrate invalidation strategy (clear on mouseup? idle? new selection?).
 
-**Approach**: In the Layer 3 `checkSelectionViaClipboard` path, cache the successfully fetched text to `runtime.lastSelectionText` with a timestamp. When user clicks the icon and IPC `SELECTION.GET_TEXT` fires, check the cache first (if <500ms old, use it; otherwise fetch fresh).
+### Full onboarding wizard
 
-**Why not v0.2.4**: Scope creep. hotkey path already bypasses this bug region. Auto-detect path users rarely hit it. Needs cache invalidation strategy (how long? purge on mouseup? clear on idle?) that requires real usage data to calibrate.
+The v0.2.6 OCR error-to-guidance fix is the short version. Full version: first-launch welcome flow, guided OCR/LLM setup, feature tour. Needs design.
 
-**Blockers**: none. Can be done any time after v0.2.4 ships.
+### Incremental unit test coverage buildout
 
-### 2. Project-wide unit test coverage (incremental buildout)
+`tests/setup.js` exists since v0.2.4 but no `*.test.js` files yet (despite design doc mentioning ~10 pure-fn tests, those got deferred). Principle: add tests when you touch a file, new features ship with tests, bug fixes ship with regression tests. Not chasing 100% coverage.
 
-**Why**: The /plan-eng-review discovered the project has **zero existing tests** despite having a full vitest + jsdom + @testing-library setup. Running `npm test` currently fails because `tests/setup.js` was never created. v0.2.4 fixes this by creating `tests/setup.js` and adding 4 unit test files around the new code. But the other ~280 .js/.jsx files in the project remain uncovered.
+### Anthropic / Gemini provider consolidation evaluation
 
-**Approach**: Not a one-time task. Principle: **add a test whenever you touch a file**. Over time, coverage grows organically from the edges inward. Don't pursue 100% coverage (solo project, diminishing returns), but aim for "every new feature ships with a test" and "every bug fix ships with a regression test".
+v0.2.6 only merged OpenAI-compatible providers. Anthropic and Gemini have different API shapes (messages format / generateContent). Evaluate if they share enough structure with each other or with a "REST translator" abstraction. Risk: abstract base class is reverse-DRY (see `dry-merge-over-abstract` learning). May find the right call is "leave them be".
 
-**Why not v0.2.4**: Infinite scope. v0.2.4 covers the new code from this release.
+### SelectionTranslator: `translation.sourceLanguage` is dead payload
 
-**Blockers**: `tests/setup.js` must exist (v0.2.4 ships this).
+Copilot 在 v0.2.4 PR 审查发现的既有问题。`translateText` 内部硬编码 `sourceLang: 'auto'`（[SelectionTranslator/index.jsx:528](src/components/SelectionTranslator/index.jsx:528)）。三个调用点都只传 targetLanguage，sourceLanguage 字段一路传却从不读。二选一：
+- 打通：`translateText` 签名加 `overrideSourceLang`，三处调用传入
+- 删除：从 `DEFAULT_TRANSLATION` / IPC payload 移除 sourceLanguage
 
-### 3. SelectionTranslator 里的 translation.sourceLanguage 从未被使用
+先拍产品决策：UI 里"手动指定源语言"该不该真生效？
 
-**Why**: Copilot 在 v0.2.4 PR 审查里发现的既有问题（非本 PR 引入）。`src/components/SelectionTranslator/index.jsx` 的 `translateText` 签名只接受 `overrideTargetLang`，内部硬编码 `sourceLang: 'auto'`（index.jsx:528）。三个调用点（L246 screenshot 路径、L328 CapsLock 直出路径、L402 icon 流）都只传 targetLanguage。结果：用户设置 / 主进程发来的 `translation.sourceLanguage` 完全不生效，但 payload 里一直带着这字段造成读代码时的误读。
+### Layer 1/2 "按下没内容" root-fix
 
-**Approach**: 二选一——
-- **A. 打通 sourceLanguage**：`translateText` 签名加 `overrideSourceLang`；三个调用点传进来；L528 改成 `sourceLang: overrideSourceLang || translation.sourceLanguage || 'auto'`。
-- **B. 删 dead payload**：`DEFAULT_TRANSLATION` / `data.translation` 摘掉 sourceLanguage；主进程同步不发送。
+v0.2.5 Phase B 的 pass-through 只覆盖 Layer 3（剪贴板兜底）路径。Layer 1/2（Chrome/VSCode/Notepad++ 等简单应用）的 `hasTextSelection` 只返回布尔，没捕获 text，图标显示后点击仍会走二次 fetch。Acrobat 类 Layer 3 场景已经被 Phase B 修了，Layer 1/2 是次要痛点。
 
-选 A 前先确认产品是否希望「手动指定源语言」真的生效（目前 UI 里有这选项吗？）；选 B 前确认没有其他调用点依赖。
+修复：`hasTextSelection` 成功时主动调 Layer 3 fetch 拿 text，通过 `showSelectionTrigger(x, y, rect, text)` 传给 renderer，所有路径 text 都在 mouseup 时捕获，零二次 fetch。~60-80 行。
 
-**Why not v0.2.4**: 既有问题，非 b61adba 引入；跨 state shape + 3 调用点 + 翻译层，超 v0.2.4 scope。
+### Lint backlog cleanup
 
-**Blockers**: 先拍 A/B 的产品决策。
+v0.2.5 Phase T 装通 eslint 9 后跑 `npm run lint` 出 539 warnings + 21 pre-existing errors（已在 eslint.config.js per-file 降级兜底）。历史累积，需要逐个清：
+- `src/i18n/locales/{en,zh}.js`: 三对重复 key (selectStyle / notify / docParser) — 后定义静默覆盖前定义
+- `src/App.jsx`: 8 个 `react-hooks/rules-of-hooks` errors — hook 在 early return 后调
+- `src/components/DocumentTranslator/index.jsx`: 3 个 `navigateSearch` undefined
+- `src/utils/logger.js`: `??` 左侧 constant 是 dead code
 
-### 4. Layer 1/2 路径"按下没内容"根因修复
-
-**Why**: v0.2.5 Phase B 的 pass-through 方案只覆盖 Layer 3 场景（`checkSelectionViaClipboard` 抓到 text 就顺着 SHOW_TRIGGER 传给 renderer）。Layer 1/2 路径（Chrome/VSCode/Notepad++ 等简单应用）的 `hasTextSelection` 只返回布尔 —— 没捕获 text，图标显示后点击仍会走 `GET_TEXT` → `fetchSelectedText` 二次抓，理论上仍会出现"按下没内容"（实际比 Acrobat 类 Layer 3 场景少，因为简单应用焦点转移比较滞后）。
-
-**Approach**: 改 `hasTextSelection` 返回 Layer 1/2 成功时也主动调 Layer 3 fetch 拿到 text，再通过 `showSelectionTrigger(x, y, rect, text)` 传给 renderer。这样所有路径的 text 都在 mouseup 时捕获一次并传递，renderer 点击图标零二次 fetch。
-
-**Why not v0.2.5**: 当前 Phase B scope ~20 行；扩到 Layer 1/2 会变成 ~60-80 行（要改 `hasTextSelection` 返回 shape，或加一个"成功后额外抓"的辅助函数）。用户反馈没把 Layer 1/2 当主要痛点，Acrobat 场景才是高发 bug。等 v0.2.5 发布、Phase B pass-through 生效后，基于真实数据（Layer 1/2 场景是否仍有"按下没内容"用户投诉）决定要不要做。
-
-**Blockers**: Phase T toolchain 打通才能写测试验证；v0.2.5 发布一周观察期。
-
-### 5. Lint backlog（v0.2.5 Phase T 兜底，留待逐个修）
-
-**Why**: v0.2.5 Phase T 把 eslint 9 装通后，跑 `npm run lint` 出 539 warnings + 21 个 pre-existing errors（已在 eslint.config.js 里以 per-file 降级为 warning 兜底，让 lint exit 0）。这些不是 Phase T 引入的，是历史累积，但都是真问题，应该真修而不是永远 suppress。
-
-**Approach**: 一个文件一个文件清。具体：
-- `src/i18n/locales/en.js` + `zh.js`：`selectStyle`（L113 vs L131）/ `notify`（L9 vs L362）/ `docParser`（L635 vs L652）三对重复 key —— **后定义覆盖前定义、translation 字符串静默丢失**。需要语义判断：是改名（两边都保留语义）还是合并（保留正确的那条）。
-- `src/App.jsx`：8 个 `react-hooks/rules-of-hooks` errors —— L31-34 + L36/L102/L121/L153/L179 各种 hook 在 early return 之后被调。需要确认是 Zustand pattern 误报还是真违反 hook 规则；如真违反，重写 component shape 把 hooks 拉到顶部。
-- `src/components/DocumentTranslator/index.jsx`：3 个 `navigateSearch` undefined（L1158 / L1165 / L1168）—— 找出 `navigateSearch` 应该从哪 import，或者它该是别的名字。
-- `src/utils/logger.js`：`process` 'no-undef'（已被 `globals.node` 覆盖了，但 `no-constant-binary-expression` 在 L18 仍需要看）—— `??` 左侧 constant 是 dead code，删或改逻辑。
-
-去 v0.3 一次性清完（或拆几个小 PR）。**清完后把 eslint.config.js 里的 per-file 降级 override 删掉**，恢复全局严格。
-
-**Why not v0.2.5**: Phase T scope 是 toolchain 跑通；逐个修历史 lint error 跨文件 + 跨 component shape 改造，超 Phase T。Phase C（注释减脂）也不会顺手解 —— 那个是注释，不是代码 bug。
-
-**Blockers**: 无（toolchain 已通，可以独立做）。
-
+清完后删 eslint.config.js 里的 per-file override，恢复全局严格。

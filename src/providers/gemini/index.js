@@ -90,8 +90,11 @@ class GeminiProvider extends BaseProvider {
 
     try {
       let prompt;
-      if (options.systemPrompt) {
-        prompt = options.systemPrompt.replace('{targetLang}', this._getLanguageName(targetLang)) + `\n\n${text}`;
+      // Support both legacy string and `{ content, mode }` from services/translation.js
+      const promptOpt = options.systemPrompt;
+      const promptStr = promptOpt && typeof promptOpt === 'object' ? promptOpt.content : promptOpt;
+      if (promptStr) {
+        prompt = promptStr.replace('{targetLang}', this._getLanguageName(targetLang)) + `\n\n${text}`;
       } else {
         const sourceName = this._getLanguageName(sourceLang);
         const targetName = this._getLanguageName(targetLang);

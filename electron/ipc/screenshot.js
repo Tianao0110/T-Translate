@@ -105,6 +105,7 @@ function register(ctx) {
         managers.showSelectionResult({
           sourceText: t('screenshot.ocrError', 'OCR 错误'),
           translatedText: displayError,
+          isOcrError: true,  // SelectionTranslator shows "Go to OCR Settings" button when set
         });
       } else if (managers.hideSelectionLoading) {
         managers.hideSelectionLoading();

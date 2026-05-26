@@ -44,7 +44,7 @@ import {
 
 const logger = createLogger('Settings');
 
-const SettingsPanel = ({ showNotification }) => {
+const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) => {
   const { t } = useTranslation();
 
   const notify = showNotification || ((msg, type) => logger.debug(`[${type}] ${msg}`));
@@ -118,6 +118,17 @@ const SettingsPanel = ({ showNotification }) => {
       setSearchQuery('');
     }
   }, [activeSection]);
+
+  // External section jump (e.g. glass "Go to OCR Settings" button)
+  useEffect(() => {
+    if (initialSection && initialSection !== activeSection) {
+      setActiveSection(initialSection);
+      setSearchQuery('');
+    }
+    if (initialSection) {
+      onSectionConsumed?.();
+    }
+  }, [initialSection]);
 
   const toggleGroup = useCallback((groupId) => {
     setCollapsedGroups(prev => ({

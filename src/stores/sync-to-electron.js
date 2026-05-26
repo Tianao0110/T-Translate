@@ -20,8 +20,25 @@ function debouncedSync(dotPath, value, delay = 100) {
       if (!window.electron?.store?.set) return;
       await window.electron.store.set(`settings.${dotPath}`, value);
       logger.debug(`Synced settings.${dotPath}`);
+      // Notify glass so it can reload target lang / theme without restart.
+      // Separate debounce to merge bursts (e.g. user toggles src+tgt back-to-back).
+      debouncedNotifyGlass();
     } catch (e) {
       logger.debug(`Sync failed for ${dotPath}:`, e.message);
+    }
+  }, delay);
+}
+
+let _glassNotifyTimer = null;
+function debouncedNotifyGlass(delay = 50) {
+  clearTimeout(_glassNotifyTimer);
+  _glassNotifyTimer = setTimeout(async () => {
+    try {
+      if (!window.electron?.glass?.notifySettingsChanged) return;
+      await window.electron.glass.notifySettingsChanged();
+      logger.debug('Notified glass of settings change');
+    } catch (e) {
+      logger.debug('Glass notify failed:', e.message);
     }
   }, delay);
 }

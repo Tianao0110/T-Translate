@@ -215,6 +215,17 @@ function createGlassWindow() {
     windows.glass = null;
   });
 
+  // Electron on Windows can drop alwaysOnTop z-order when focus moves away.
+  // Re-apply on blur — keep default 'floating' level (no second arg), do NOT
+  // elevate to 'screen-saver' which would clobber the user's other pinned tools.
+  glassWindow.on('blur', () => {
+    if (glassWindow.isDestroyed()) return;
+    if (glassWindow.isAlwaysOnTop()) {
+      glassWindow.setAlwaysOnTop(false);
+      glassWindow.setAlwaysOnTop(true);
+    }
+  });
+
   glassWindow.webContents.on('before-input-event', (event, input) => {
     if (input.key === 'Escape') {
       glassWindow.close();

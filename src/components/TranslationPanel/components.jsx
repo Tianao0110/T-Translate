@@ -367,27 +367,38 @@ export const TemplateSelector = memo(({
 });
 TemplateSelector.displayName = 'TemplateSelector';
 
+// Shared language selector across TranslationPanel, DocumentTranslator, etc.
+// size: 'default' for hero selectors, 'compact' for toolbar usage.
 export const LanguageSelector = memo(({
   value,
   options,
   onChange,
-  disabled = false
+  size = 'default',
+  showFlag = true,
+  disabled = false,
+  title,
 }) => {
   const { t } = useTranslation();
   const handleChange = useCallback((e) => {
     onChange(e.target.value);
   }, [onChange]);
 
+  const className = size === 'compact'
+    ? 'language-select language-select-compact'
+    : 'language-select';
+
   return (
     <select
-      className="language-select"
+      className={className}
       value={value}
       onChange={handleChange}
       disabled={disabled}
+      title={title}
     >
       {options.map(lang => (
         <option key={lang.code} value={lang.code}>
-          {t(`languages.${lang.code}`, lang.name)}
+          {showFlag && lang.flag ? `${lang.flag} ` : ''}
+          {t(`languages.${lang.code}`, lang.nativeName || lang.name)}
         </option>
       ))}
     </select>

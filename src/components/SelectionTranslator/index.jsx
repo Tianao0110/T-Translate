@@ -68,6 +68,7 @@ const SelectionTranslator = () => {
   const [sourceText, setSourceText] = useState('');
   const [translatedText, setTranslatedText] = useState('');
   const [error, setError] = useState('');
+  const [isOcrError, setIsOcrError] = useState(false);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [rect, setRect] = useState(null);
   const [copied, setCopied] = useState(false);
@@ -258,6 +259,7 @@ const SelectionTranslator = () => {
         setSourceText(data.sourceText);
         setTranslatedText(data.translatedText);
         setError('');
+        setIsOcrError(data.isOcrError === true);
         setCopied(false);
         setIsFrozen(false);
         // Don't reset sizedRef/initialBounds — caller already positioned us
@@ -697,6 +699,17 @@ const SelectionTranslator = () => {
                   <div className="sel-source">{sourceText}</div>
                 )}
                 <div className="sel-text">{translatedText}</div>
+                {isOcrError && (
+                  <button
+                    className="sel-action-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.electron?.selection?.openOcrSettings?.();
+                    }}
+                  >
+                    {t('glass.goToOcrSettings')}
+                  </button>
+                )}
               </>
             )}
           </div>

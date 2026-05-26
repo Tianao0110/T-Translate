@@ -25,6 +25,7 @@ import { ocrManager } from '../../providers/ocr/index.js';
 import translationService from '../../services/translation.js';
 import useTranslationStore from '../../stores/translation-store';
 import { LANGUAGES } from '../../config/constants.js';
+import { LanguageSelector } from '../TranslationPanel/components.jsx';
 import './styles.css';
 
 // Segment status
@@ -1030,29 +1031,23 @@ const DocumentTranslator = ({
         
         {/* Language selectors */}
         <div className="dt-lang-selector">
-          <select 
-            className="dt-lang-select"
+          <LanguageSelector
             value={sourceLang}
-            onChange={(e) => setSourceLang(e.target.value)}
+            options={sourceLanguages}
+            onChange={setSourceLang}
+            size="compact"
             disabled={isTranslating}
             title={t('documentTranslator.sourceLang')}
-          >
-            {sourceLanguages.map(l => (
-              <option key={l.code} value={l.code}>{l.flag} {l.nativeName}</option>
-            ))}
-          </select>
+          />
           <span className="dt-lang-arrow">→</span>
-          <select 
-            className="dt-lang-select"
+          <LanguageSelector
             value={targetLang}
-            onChange={(e) => setTargetLang(e.target.value)}
+            options={targetLanguages}
+            onChange={setTargetLang}
+            size="compact"
             disabled={isTranslating}
             title={t('documentTranslator.targetLang')}
-          >
-            {targetLanguages.map(l => (
-              <option key={l.code} value={l.code}>{l.flag} {l.nativeName}</option>
-            ))}
-          </select>
+          />
         </div>
         
         <div className="dt-actions">

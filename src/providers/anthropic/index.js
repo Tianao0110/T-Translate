@@ -74,7 +74,9 @@ class AnthropicProvider extends BaseProvider {
     }
 
     try {
-      const systemPrompt = options.systemPrompt ||
+      // Support both legacy string and `{ content, mode }` from services/translation.js
+      const promptOpt = options.systemPrompt;
+      const systemPrompt = (promptOpt && typeof promptOpt === 'object' ? promptOpt.content : promptOpt) ||
         `You are a professional translator. Translate the following text to ${LANGUAGE_CODES[targetLang]?.name || targetLang}. Output only the translation, nothing else.`;
 
       const response = await fetch(`${this.config.baseUrl}/v1/messages`, {
@@ -128,7 +130,9 @@ class AnthropicProvider extends BaseProvider {
     }
 
     try {
-      const systemPrompt = options.systemPrompt ||
+      // Support both legacy string and `{ content, mode }` from services/translation.js
+      const promptOpt = options.systemPrompt;
+      const systemPrompt = (promptOpt && typeof promptOpt === 'object' ? promptOpt.content : promptOpt) ||
         `You are a professional translator. Translate the following text to ${LANGUAGE_CODES[targetLang]?.name || targetLang}. Output only the translation, nothing else.`;
 
       const response = await fetch(`${this.config.baseUrl}/v1/messages`, {

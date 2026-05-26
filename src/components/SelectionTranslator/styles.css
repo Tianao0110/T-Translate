@@ -380,6 +380,34 @@ html, body, #root {
   border-color: #dc2626;
 }
 
+/* "Go to OCR Settings" button shown on OCR errors */
+.sel-action-btn {
+  margin-top: 8px;
+  padding: 5px 12px;
+  border: 1px solid #94a3b8;
+  border-radius: 5px;
+  background: transparent;
+  color: #475569;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  align-self: flex-start;
+}
+.sel-action-btn:hover {
+  background: #475569;
+  color: #fff;
+  border-color: #475569;
+}
+[data-theme="dark"] .sel-action-btn {
+  border-color: #64748b;
+  color: #cbd5e1;
+}
+[data-theme="dark"] .sel-action-btn:hover {
+  background: #cbd5e1;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+
 /* ==========================================
    固定模式徽章
    ========================================== */

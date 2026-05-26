@@ -261,6 +261,25 @@
   color: #ef4444;
 }
 
+/* "Go to OCR Settings" button shown on OCR errors */
+.glass-action-btn {
+  margin-top: 10px;
+  padding: 6px 14px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+  align-self: flex-start;
+}
+/* Avoid `background: currentColor` here — same-rule `color` change makes
+   currentColor resolve to the new color, painting the button solid white. */
+.glass-action-btn:hover {
+  background: rgba(239, 68, 68, 0.12);
+}
+
 .glass-message.loading svg {
   animation: spin 1s linear infinite;
 }

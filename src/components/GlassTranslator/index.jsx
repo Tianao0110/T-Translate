@@ -14,6 +14,13 @@ import './styles.css';
 
 const logger = createLogger('Glass');
 
+// Default OCR engine (llm-vision) needs a local vision model — new users without it
+// hit this path. Keyword match triggers a "Go to OCR Settings" button on the error.
+const OCR_ERROR_KEYWORDS = /ocr|vision|视觉|识别|视觉模型|qwen-vl|llava/i;
+function isOcrRelatedError(msg) {
+  return typeof msg === 'string' && OCR_ERROR_KEYWORDS.test(msg);
+}
+
 const GlassTranslator = () => {
   const { t } = useTranslation();
 
@@ -564,6 +571,17 @@ const GlassTranslator = () => {
           <div className="glass-message error">
             <AlertCircle size={20} />
             <span>{error}</span>
+            {isOcrRelatedError(error) && (
+              <button
+                className="glass-action-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.electron?.glass?.openMainSettings?.('ocr');
+                }}
+              >
+                {t('glass.goToOcrSettings')}
+              </button>
+            )}
           </div>
         ) : displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0 ? (
           <div className="scattered-panes-container">
@@ -663,7 +681,7 @@ const GlassTranslator = () => {
 
       {isPassThrough && (
         <div className="pass-through-indicator">
-          <span>穿透模式 (松开 Alt 退出)</span>
+          <span>{t('glass.passThroughMode')}</span>
         </div>
       )}
     </div>

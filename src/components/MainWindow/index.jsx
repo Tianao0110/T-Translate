@@ -214,11 +214,19 @@ const MainWindow = () => {
     return () => cleanup?.();
   }, [t, showNotification]);
 
+  const [pendingSettingsSection, setPendingSettingsSection] = useState(null);
+
+  // navigate IPC: target = 'history' | 'translate' | 'settings' | 'settings:<section>'
   useEffect(() => {
     const cleanup = window.electron?.ipc?.on('navigate', (target) => {
       logger.debug('Navigate request:', target);
-      if (target === 'settings') {
+      if (typeof target !== 'string') return;
+      if (target === 'settings' || target.startsWith('settings:')) {
         setActiveTab('settings');
+        const sep = target.indexOf(':');
+        if (sep > 0) {
+          setPendingSettingsSection(target.slice(sep + 1));
+        }
       } else if (target === 'history') {
         setActiveTab('history');
       } else if (target === 'translate') {
@@ -345,7 +353,11 @@ const MainWindow = () => {
         {mountedTabs.has('settings') && (
           <div className="tab-panel" style={{ display: activeTab === 'settings' ? 'flex' : 'none' }}>
             <Suspense fallback={<LazyLoadingFallback />}>
-              <SettingsPanel showNotification={showNotification} />
+              <SettingsPanel
+                showNotification={showNotification}
+                initialSection={pendingSettingsSection}
+                onSectionConsumed={() => setPendingSettingsSection(null)}
+              />
             </Suspense>
           </div>
         )}

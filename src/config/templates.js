@@ -21,12 +21,18 @@ export const LANGUAGE_NAMES = {
   'pa': 'Punjabi',
 };
 
+// Templates here = "tone" (natural / precise / formal / ocr / creative).
+// The "message structure" (system+user vs user-only) is decided by
+// services/translation.js based on the active model — translation-only small
+// models (Hunyuan MT etc.) get a simpler prompt and user-only mode,
+// regardless of which tone template is selected.
 export const TEMPLATES = {
   natural: {
     id: 'natural',
     name: '自然',
     description: '日常对话、口语化表达',
     icon: 'FileText',
+    mode: 'system',
     systemPrompt: `You are a professional translator. Translate the following text into {targetLang}.
 
 Requirements:
@@ -41,6 +47,7 @@ Requirements:
     name: '精确',
     description: '技术文档、学术论文',
     icon: 'Zap',
+    mode: 'system',
     systemPrompt: `You are a professional technical translator. Translate the following text into {targetLang}.
 
 Requirements:
@@ -56,6 +63,7 @@ Requirements:
     name: '正式',
     description: '商务邮件、官方文档',
     icon: 'Sparkles',
+    mode: 'system',
     systemPrompt: `You are a professional business translator. Translate the following text into {targetLang}.
 
 Requirements:
@@ -71,6 +79,7 @@ Requirements:
     name: 'OCR纠错',
     description: 'OCR识别文本，自动纠正识别错误',
     icon: 'Camera',
+    mode: 'system',
     systemPrompt: `You are a professional translator with OCR post-processing expertise. The following text was extracted via OCR and may contain recognition errors.
 
 Your task:
@@ -90,6 +99,7 @@ Requirements:
     name: '创意',
     description: '文学作品、创意内容',
     icon: 'Palette',
+    mode: 'system',
     systemPrompt: `You are a literary translator. Translate the following text into {targetLang}.
 
 Requirements:
@@ -100,6 +110,7 @@ Requirements:
 - Output ONLY the translation, no explanations
 - Do NOT translate content inside special markers like ⟦...⟧`,
   },
+
 };
 
 export function getTemplateList() {
@@ -111,11 +122,15 @@ export function getTemplateList() {
   }));
 }
 
+// Returns { content, mode } — service layer expects this shape (see translation.js).
 export function getSystemPrompt(templateId, targetLang) {
   const template = TEMPLATES[templateId] || TEMPLATES.natural;
   const langName = LANGUAGE_NAMES[targetLang] || targetLang;
 
-  return template.systemPrompt.replace(/{targetLang}/g, langName);
+  return {
+    content: (template.systemPrompt || '').replace(/{targetLang}/g, langName),
+    mode: template.mode || 'system',
+  };
 }
 
 export function hasTemplate(templateId) {

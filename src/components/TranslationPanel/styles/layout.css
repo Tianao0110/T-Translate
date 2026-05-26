@@ -61,6 +61,21 @@
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
 }
 
+/* Compact variant for toolbar usage (e.g. DocumentTranslator) */
+.language-select.language-select-compact {
+  flex: none;
+  padding: 4px 10px;
+  font-size: 13px;
+  font-weight: 400;
+  max-width: 140px;
+  border-radius: 6px;
+}
+
+.language-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .swap-button {
   width: 40px;
   height: 40px;
@@ -112,8 +127,9 @@
 }
 
 .template-btn {
-  width: 36px;
+  min-width: 48px;
   height: 32px;
+  padding: 0 12px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -121,8 +137,11 @@
   border: none;
   border-radius: 6px;
   color: var(--text-tertiary);
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
 .template-btn:hover {

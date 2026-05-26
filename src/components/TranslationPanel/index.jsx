@@ -21,7 +21,7 @@ import { PRIVACY_MODES, TRANSLATION_STATUS, getLanguageList } from '@config/defa
 
 import { useTTS, useTermCheck, useStyleRewrite, useSaveModal } from './hooks';
 
-import { StyleModal, SaveModal } from './components.jsx';
+import { StyleModal, SaveModal, LanguageSelector } from './components.jsx';
 
 const logger = createLogger('TranslationPanel');
 
@@ -82,10 +82,13 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
 
   const languages = useMemo(() => getLanguageList(true), []);
 
+  // Tone templates. MT detection is handled in services/translation.js
+  // — when a translation-only model is active, prompt structure auto-switches
+  // (user-only message + simplified prompt) regardless of which tone is picked.
   const templates = [
-    { id: 'natural', name: t('templates.natural'), icon: FileText, desc: t('templates.naturalDesc') },
-    { id: 'precise', name: t('templates.precise'), icon: Zap, desc: t('templates.preciseDesc') },
-    { id: 'formal', name: t('templates.formal'), icon: Sparkles, desc: t('templates.formalDesc') },
+    { id: 'natural', name: t('templates.natural'), desc: t('templates.naturalDesc') },
+    { id: 'precise', name: t('templates.precise'), desc: t('templates.preciseDesc') },
+    { id: 'formal', name: t('templates.formal'), desc: t('templates.formalDesc') },
   ];
 
   // Triggered when MainWindow passes screenshot data in via props (capture flow)
@@ -292,15 +295,11 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
 
       <div className="language-selector-bar">
         <div className="language-select-group">
-          <select
+          <LanguageSelector
             value={currentTranslation.sourceLanguage || ''}
-            onChange={(e) => setLanguages(e.target.value, null)}
-            className="language-select"
-          >
-            {languages.map(lang => (
-              <option key={lang.code} value={lang.code}>{lang.flag} {t(`languages.${lang.code}`, lang.name)}</option>
-            ))}
-          </select>
+            options={languages}
+            onChange={(code) => setLanguages(code, null)}
+          />
 
           <button
             className="swap-button"
@@ -311,15 +310,11 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
             <RotateCcw size={16} />
           </button>
 
-          <select
+          <LanguageSelector
             value={currentTranslation.targetLanguage}
-            onChange={(e) => setLanguages(null, e.target.value)}
-            className="language-select"
-          >
-            {languages.filter(l => l.code !== 'auto').map(lang => (
-              <option key={lang.code} value={lang.code}>{lang.flag} {t(`languages.${lang.code}`, lang.name)}</option>
-            ))}
-          </select>
+            options={languages.filter(l => l.code !== 'auto')}
+            onChange={(code) => setLanguages(null, code)}
+          />
         </div>
 
         <div className="template-selector">
@@ -328,9 +323,9 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
               key={tmpl.id}
               className={`template-btn ${selectedTemplate === tmpl.id ? 'active' : ''}`}
               onClick={() => handleTemplateChange(tmpl.id)}
-              title={tmpl.name}
+              title={tmpl.desc}
             >
-              <tmpl.icon size={14} />
+              {tmpl.name}
             </button>
           ))}
         </div>

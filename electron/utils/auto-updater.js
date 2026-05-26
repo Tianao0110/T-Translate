@@ -241,10 +241,20 @@ async function installUpdate(filePath) {
   const ext = path.extname(filePath).toLowerCase();
 
   if (process.platform === 'win32' && ext === '.exe') {
-    const { exec } = require('child_process');
-    exec(`"${filePath}"`, (err) => {
-      if (err) logger.error('Failed to launch installer:', err);
-    });
+    // Detached spawn so the installer survives our app.quit() 1500ms later.
+    const { spawn } = require('child_process');
+    try {
+      const child = spawn(filePath, [], {
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: false,
+      });
+      child.on('error', (err) => logger.error('Failed to launch installer:', err));
+      child.unref();
+    } catch (err) {
+      logger.error('Failed to spawn installer:', err);
+      throw err;
+    }
     // Give NSIS a moment to spawn before we exit and release file locks
     setTimeout(() => app.quit(), 1500);
   } else if (process.platform === 'darwin' && ext === '.dmg') {

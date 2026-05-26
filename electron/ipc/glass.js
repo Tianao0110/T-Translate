@@ -206,6 +206,23 @@ function register(ctx) {
     return false;
   });
 
+  // Show + focus main window, then send 'navigate' with 'settings:<section>' format
+  // so MainWindow can switch tab AND jump to the right SettingsPanel section in one trip.
+  ipcMain.handle(CHANNELS.GLASS.OPEN_MAIN_SETTINGS, (event, section) => {
+    const mainWindow = getMainWindow();
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      logger.warn('openMainSettings: main window not available');
+      return false;
+    }
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+    const target = section ? `settings:${section}` : 'settings';
+    mainWindow.webContents.send('navigate', target);
+    logger.debug('openMainSettings dispatched:', target);
+    return true;
+  });
+
   // ===== Translation =====
 
   ipcMain.handle(CHANNELS.GLASS.TRANSLATE, async (event, text) => {

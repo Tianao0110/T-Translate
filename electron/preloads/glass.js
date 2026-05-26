@@ -37,6 +37,8 @@ contextBridge.exposeInMainWorld('electron', {
 
     syncTargetLanguage: (langCode) => ipcRenderer.invoke('glass:sync-target-language', langCode),
 
+    openMainSettings: (section) => ipcRenderer.invoke('glass:open-main-settings', section),
+
     // Hide before a screenshot is taken (so the glass window doesn't appear in the capture).
     onHideForCapture: (callback) => {
       const handler = (event, settings) => callback(settings);

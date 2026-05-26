@@ -245,9 +245,11 @@ const zh = {
     adjustOpacity: "点击调节透明度", closeEsc: "关闭 (Esc)",
     capturing: "截图中...", recognizing: "识别中...", translating: "翻译中...",
     captureHint: "点击 📷 或按 Space 截图识别",
-    doubleClickFreeze: "双击固定为独立窗口"
+    doubleClickFreeze: "双击固定为独立窗口",
+    passThroughMode: "穿透模式 (松开 Alt 退出)",
+    goToOcrSettings: "前往 OCR 设置"
   },
-  selection: { 
+  selection: {
     freeze: "冻结", unfreeze: "解冻", close: "关闭", copy: "复制", more: "更多",
     description: "选中文字后显示翻译按钮，点击即可翻译",
     enableSelection: "启用划词翻译", enabled: "划词翻译已开启", disabled: "划词翻译已关闭",
