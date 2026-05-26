@@ -15,7 +15,8 @@ import { useTranslation } from 'react-i18next';
 import {
   Send, Camera, Image, FileText, Volume2, VolumeX, Copy,
   RotateCcw, Sparkles, Loader2, Clock, Zap, Shield, Eye, EyeOff, Lock,
-  Lightbulb, Check, X, ArrowRight, Palette, ChevronUp, ChevronDown, AlertTriangle, BookOpen
+  Lightbulb, Check, X, ArrowRight, Palette, ChevronUp, ChevronDown, AlertTriangle, BookOpen,
+  Wand2, Languages
 } from 'lucide-react';
 
 import useTranslationStore from '../../stores/translation-store';
@@ -104,9 +105,11 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
 
   // 翻译模板
   const templates = [
+    { id: 'auto', name: 'Auto', icon: Wand2, desc: t('templates.autoDesc', 'Auto-detect by model name') },
     { id: 'natural', name: t('templates.natural'), icon: FileText, desc: t('templates.naturalDesc') },
     { id: 'precise', name: t('templates.precise'), icon: Zap, desc: t('templates.preciseDesc') },
     { id: 'formal', name: t('templates.formal'), icon: Sparkles, desc: t('templates.formalDesc') },
+    { id: 'mt-direct', name: 'MT', icon: Languages, desc: t('templates.mtDirectDesc', 'For translation-only models (Hunyuan MT, NLLB, etc.)') },
   ];
 
   // ========== 截图 OCR 处理 ==========
