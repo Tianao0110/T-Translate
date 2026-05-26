@@ -15,8 +15,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Send, Camera, Image, FileText, Volume2, VolumeX, Copy,
   RotateCcw, Sparkles, Loader2, Clock, Zap, Shield, Eye, EyeOff, Lock,
-  Lightbulb, Check, X, ArrowRight, Palette, ChevronUp, ChevronDown, AlertTriangle, BookOpen,
-  Wand2, Languages
+  Lightbulb, Check, X, ArrowRight, Palette, ChevronUp, ChevronDown, AlertTriangle, BookOpen
 } from 'lucide-react';
 
 import useTranslationStore from '../../stores/translation-store';
@@ -51,7 +50,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   );
   const [isOcrProcessing, setIsOcrProcessing] = useState(false);
   const [isOcrSource, setIsOcrSource] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState('auto');
+  const [selectedTemplate, setSelectedTemplate] = useState('natural');
 
   // ========== 网络状态监听 ==========
   useEffect(() => {
@@ -103,13 +102,13 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   // 语言选项
   const languages = useMemo(() => getLanguageList(true), []);
 
-  // 翻译模板
+  // Tone templates. MT detection is handled in services/translation.js
+  // — when a translation-only model is active, prompt structure auto-switches
+  // (user-only message + simplified prompt) regardless of which tone is picked.
   const templates = [
-    { id: 'auto', name: 'Auto', icon: Wand2, desc: t('templates.autoDesc', 'Auto-detect by model name') },
-    { id: 'natural', name: t('templates.natural'), icon: FileText, desc: t('templates.naturalDesc') },
-    { id: 'precise', name: t('templates.precise'), icon: Zap, desc: t('templates.preciseDesc') },
-    { id: 'formal', name: t('templates.formal'), icon: Sparkles, desc: t('templates.formalDesc') },
-    { id: 'mt-direct', name: 'MT', icon: Languages, desc: t('templates.mtDirectDesc', 'For translation-only models (Hunyuan MT, NLLB, etc.)') },
+    { id: 'natural', name: t('templates.natural'), desc: t('templates.naturalDesc') },
+    { id: 'precise', name: t('templates.precise'), desc: t('templates.preciseDesc') },
+    { id: 'formal', name: t('templates.formal'), desc: t('templates.formalDesc') },
   ];
 
   // ========== 截图 OCR 处理 ==========
@@ -351,9 +350,9 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
               key={tmpl.id}
               className={`template-btn ${selectedTemplate === tmpl.id ? 'active' : ''}`}
               onClick={() => handleTemplateChange(tmpl.id)}
-              title={tmpl.name}
+              title={tmpl.desc}
             >
-              <tmpl.icon size={14} />
+              {tmpl.name}
             </button>
           ))}
         </div>

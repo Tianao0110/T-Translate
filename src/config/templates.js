@@ -29,25 +29,13 @@ export const LANGUAGE_NAMES = {
 /**
  * 翻译模板定义
  *
- * Each template may declare a `mode`:
- *   'system' (default) — instruction goes in a system message, source text in user
- *   'user'             — instruction + source merged into a single user message
- *                        (required by translation-only small models e.g. Hunyuan MT
- *                        whose chat templates don't expect a system role)
- *   'auto'             — resolved at runtime by services/translation.js via
- *                        model-name detection; falls back to 'natural'
+ * Templates here = "tone" (natural / precise / formal / ocr / creative).
+ * The "message structure" (system+user vs user-only) is decided by
+ * services/translation.js based on the active model — translation-only small
+ * models (Hunyuan MT etc.) get a simpler prompt and user-only mode,
+ * regardless of which tone template is selected.
  */
 export const TEMPLATES = {
-  // 自动匹配（默认）— service 层根据当前模型名挑选最合适的模板
-  auto: {
-    id: 'auto',
-    name: 'Auto',
-    description: 'Auto-detect best template from current model name',
-    icon: 'Sparkles',
-    mode: 'auto',
-    systemPrompt: '',
-  },
-
   // 自然/日常翻译
   natural: {
     id: 'natural',
@@ -137,18 +125,6 @@ Requirements:
 - Do NOT translate content inside special markers like ⟦...⟧`,
   },
 
-  // Translation-only small models (Hunyuan MT, NLLB, Opus-MT, ...).
-  // These models' chat templates typically don't expect a system role and
-  // can mistakenly translate the system instructions themselves. Putting the
-  // instruction inline in the user message avoids the leak.
-  'mt-direct': {
-    id: 'mt-direct',
-    name: 'MT-Specialized',
-    description: 'For translation-only small models (Hunyuan MT, NLLB, etc.)',
-    icon: 'Languages',
-    mode: 'user',
-    systemPrompt: `Translate the following text into {targetLang}. Note that you must ONLY output the translated result without any additional explanation:`,
-  },
 };
 
 /**

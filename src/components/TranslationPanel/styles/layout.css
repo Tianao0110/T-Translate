@@ -127,8 +127,9 @@
 }
 
 .template-btn {
-  width: 36px;
+  min-width: 48px;
   height: 32px;
+  padding: 0 12px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -136,8 +137,11 @@
   border: none;
   border-radius: 6px;
   color: var(--text-tertiary);
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
 .template-btn:hover {

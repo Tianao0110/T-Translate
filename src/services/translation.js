@@ -37,6 +37,44 @@ import { isProviderAllowed, PRIVACY_MODE_IDS } from '../config/privacy-modes.js'
 import { getEnabledFilters, DEFAULT_FILTERS } from '../config/filters.js';
 import { getSystemPrompt, LANGUAGE_NAMES } from '../config/templates.js';
 import { detectTemplateFromModel } from '../config/model-template-mapping.js';
+
+// MT detection cache. Keyed by model name — re-runs only when the active
+// provider's `config.model` changes (e.g. user picks a different LM Studio
+// model). Effectively "detect once at startup, re-detect when model changes",
+// which is what we want without subscribing to store events.
+let _mtCache = { model: null, isMT: false };
+function isMTActiveModel(modelName) {
+  if (!modelName) return false;
+  if (modelName === _mtCache.model) return _mtCache.isMT;
+  const isMT = !!detectTemplateFromModel(modelName);
+  _mtCache = { model: modelName, isMT };
+  return isMT;
+}
+
+// Short prompt for translation-only small models. Their chat templates don't
+// expect system role and long instructions get translated by mistake. Tone hint
+// preserved so the user's tone selection (natural/precise/formal) still applies.
+const _MT_TONE = {
+  natural: 'natural and conversational',
+  precise: 'precise and technically accurate',
+  formal: 'formal and professional',
+  ocr: 'natural and conversational',
+  creative: 'creative and literary',
+};
+function buildMTPrompt(toneTemplate, targetLang) {
+  const langName = LANGUAGE_NAMES[targetLang] || targetLang;
+  const tone = _MT_TONE[toneTemplate] || _MT_TONE.natural;
+  return {
+    content: `Translate the following text into ${langName} in a ${tone} tone. ONLY output the translated result without any explanation:`,
+    mode: 'user',
+  };
+}
+
+function resolveSystemPrompt(provider, template, targetLang) {
+  return isMTActiveModel(provider.config?.model)
+    ? buildMTPrompt(template, targetLang)
+    : getSystemPrompt(template, targetLang);
+}
 import translationCache from './cache.js';
 
 // 日志实例
@@ -564,16 +602,12 @@ class TranslationService {
       try {
         logger.debug(`Trying provider: ${id}`);
 
-        // 'auto' template resolves per-provider based on its active model name
-        const effectiveTemplate = template === 'auto'
-          ? (detectTemplateFromModel(provider.config?.model) || 'natural')
-          : template;
-        const systemPrompt = getSystemPrompt(effectiveTemplate, targetLang);
+        const systemPrompt = resolveSystemPrompt(provider, template, targetLang);
 
         // 调用 Provider
         const result = await provider.translate(processed, sourceLang, targetLang, {
           systemPrompt,
-          template: effectiveTemplate,
+          template,
         });
         
         if (result.success) {
@@ -706,10 +740,7 @@ class TranslationService {
       try {
         logger.debug(`Trying stream provider: ${id}`);
 
-        const effectiveTemplate = template === 'auto'
-          ? (detectTemplateFromModel(provider.config?.model) || 'natural')
-          : template;
-        const systemPrompt = getSystemPrompt(effectiveTemplate, targetLang);
+        const systemPrompt = resolveSystemPrompt(provider, template, targetLang);
         
         // 检查 Provider 是否支持真流式
         if (provider.supportsStreaming && typeof provider.translateStream === 'function') {
@@ -727,7 +758,7 @@ class TranslationService {
                 onChunk(this._postProcess(fullText, protectedMap));
               }
             },
-            { systemPrompt, template: effectiveTemplate }
+            { systemPrompt, template }
           );
 
           if (result.success) {
@@ -761,7 +792,7 @@ class TranslationService {
           // 不支持真流式，回退到普通翻译
           const result = await provider.translate(processed, sourceLang, targetLang, {
             systemPrompt,
-            template: effectiveTemplate,
+            template,
           });
           
           if (result.success) {
