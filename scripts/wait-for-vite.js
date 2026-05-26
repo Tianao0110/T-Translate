@@ -1,5 +1,4 @@
-// scripts/wait-for-vite.js
-// 替代 wait-on，用原生 http 模块轮询 Vite 开发服务器
+// Native HTTP polling for the Vite dev server (replaces wait-on).
 const http = require('http');
 
 const url = process.argv[2] || 'http://localhost:5173';

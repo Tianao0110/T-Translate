@@ -1,13 +1,11 @@
-// electron/managers/window-manager.js
-// 窗口管理器 - 负责创建、管理各种窗口
-// 使用依赖注入，避免循环依赖
+// Window manager: main, glass overlay, selection (with freeze-multi support),
+// and screenshot windows. Deps injected via init() to avoid require cycles.
 
 const { BrowserWindow, shell } = require('electron');
 const path = require('path');
 const PATHS = require('../shared/paths');
 const displayHelper = require('../utils/display-helper');
 
-// 依赖（通过 init 注入）
 let store = null;
 let runtime = null;
 let windows = null;
@@ -16,15 +14,10 @@ let logger = null;
 let makeWindowInvisibleToCapture = null;
 let CHANNELS = null;
 
-// 冻结的划词翻译窗口池
-const frozenSelectionWindows = new Map();  // Map<windowId, BrowserWindow>
+const frozenSelectionWindows = new Map();
 let selectionWindowIdCounter = 0;
-const MAX_FROZEN_WINDOWS = 8;  // 最大冻结窗口数
+const MAX_FROZEN_WINDOWS = 8;
 
-/**
- * 初始化窗口管理器
- * @param {Object} deps - 依赖注入
- */
 function init(deps) {
   store = deps.store;
   runtime = deps.runtime;
@@ -33,15 +26,12 @@ function init(deps) {
   logger = deps.logger || console;
   makeWindowInvisibleToCapture = deps.makeWindowInvisibleToCapture || (() => {});
   CHANNELS = deps.CHANNELS || {};
-  
+
   logger.info?.('Window manager initialized') || console.log('Window manager initialized');
 }
 
-// ==================== 主窗口 ====================
+// ===== Main window =====
 
-/**
- * 创建主窗口
- */
 function createMainWindow() {
   if (windows.main) {
     windows.main.focus();
@@ -51,19 +41,19 @@ function createMainWindow() {
   const windowBounds = store.get('windowBounds');
   const windowPosition = store.get('windowPosition');
 
-  // 合并位置和尺寸，验证是否在有效显示器上
   const savedBounds = {
     width: windowBounds.width,
     height: windowBounds.height,
     x: windowPosition?.x,
     y: windowPosition?.y,
   };
-  
+
+  // Guard against orphaned positions when a monitor is unplugged
   const validBounds = displayHelper.ensureBoundsOnDisplay(savedBounds, {
     minVisiblePixels: 100,
     centerOnInvalid: true,
   });
-  
+
   if (validBounds.adjusted) {
     logger?.info?.('Main window position adjusted to valid display');
   }
@@ -81,7 +71,6 @@ function createMainWindow() {
       sandbox: false,
       preload: PATHS.preloads.main,
       webSecurity: false,
-      // backgroundThrottling 默认为 true，后台时自动节流 CPU
     },
     autoHideMenuBar: true,
     menuBarVisible: false,
@@ -95,7 +84,6 @@ function createMainWindow() {
 
   mainWindow.removeMenu();
 
-  // 加载应用
   if (isDev) {
     mainWindow.loadURL(PATHS.pages.main.url);
     mainWindow.webContents.openDevTools();
@@ -103,14 +91,12 @@ function createMainWindow() {
     mainWindow.loadFile(PATHS.pages.main.file);
   }
 
-  // 窗口准备好后显示
   mainWindow.once('ready-to-show', () => {
     if (!store.get('startMinimized')) {
       mainWindow.show();
     }
   });
 
-  // 保存窗口状态
   mainWindow.on('resize', () => {
     if (!mainWindow.isMaximized()) {
       store.set('windowBounds', mainWindow.getBounds());
@@ -123,7 +109,6 @@ function createMainWindow() {
     }
   });
 
-  // 最大化/还原状态变化通知渲染进程
   mainWindow.on('maximize', () => {
     mainWindow.webContents.send('maximize-change', true);
   });
@@ -132,7 +117,7 @@ function createMainWindow() {
     mainWindow.webContents.send('maximize-change', false);
   });
 
-  // 关闭窗口处理
+  // Hide instead of quit on close — let tray do final quit via isQuitting flag
   mainWindow.on('close', (event) => {
     if (!runtime.isQuitting && process.platform !== 'darwin') {
       event.preventDefault();
@@ -144,7 +129,6 @@ function createMainWindow() {
     windows.main = null;
   });
 
-  // 处理外部链接
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
@@ -155,18 +139,14 @@ function createMainWindow() {
   return mainWindow;
 }
 
-// ==================== 玻璃窗口 ====================
+// ===== Glass overlay window =====
 
-/**
- * 创建玻璃翻译窗口
- */
 function createGlassWindow() {
   if (windows.glass) {
     windows.glass.focus();
     return windows.glass;
   }
 
-  // 获取保存的位置
   const savedBounds = store.get('glassBounds', {
     width: 400,
     height: 200,
@@ -174,12 +154,11 @@ function createGlassWindow() {
     y: undefined,
   });
 
-  // 验证位置是否在有效显示器上，如果无效则调整
   const glassBounds = displayHelper.ensureBoundsOnDisplay(savedBounds, {
     minVisiblePixels: 100,
     centerOnInvalid: true,
   });
-  
+
   if (glassBounds.adjusted) {
     logger?.info?.('Glass window position adjusted to valid display');
   }
@@ -202,26 +181,24 @@ function createGlassWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       preload: PATHS.preloads.glass,
-      backgroundThrottling: false, // 玻璃窗口需要实时响应，不节流
-      webSecurity: false, // 允许跨域请求（Google Translate 等）
+      backgroundThrottling: false, // glass refresh must run while unfocused
+      webSecurity: false, // allow cross-origin (e.g. Google Translate)
     },
   });
 
-  // Windows: 设置窗口为截图不可见
+  // WDA_EXCLUDEFROMCAPTURE so OCR doesn't re-read our own overlay
   if (process.platform === 'win32') {
     glassWindow.webContents.on('did-finish-load', () => {
       makeWindowInvisibleToCapture(glassWindow);
     });
   }
 
-  // 加载页面
   if (isDev) {
     glassWindow.loadURL(PATHS.pages.glass.url);
   } else {
     glassWindow.loadFile(PATHS.pages.glass.file);
   }
 
-  // 保存位置
   glassWindow.on('moved', () => {
     if (glassWindow) {
       store.set('glassBounds', glassWindow.getBounds());
@@ -249,7 +226,6 @@ function createGlassWindow() {
     }
   });
 
-  // 快捷键
   glassWindow.webContents.on('before-input-event', (event, input) => {
     if (input.key === 'Escape') {
       glassWindow.close();
@@ -263,9 +239,6 @@ function createGlassWindow() {
   return glassWindow;
 }
 
-/**
- * 切换玻璃窗口
- */
 function toggleGlassWindow() {
   if (windows.glass) {
     if (windows.glass.isVisible()) {
@@ -279,26 +252,18 @@ function toggleGlassWindow() {
   }
 }
 
-// ==================== 字幕采集窗口 ====================
+// ===== Selection translate windows (freeze-to-multi pattern) =====
+// Active window gets replaced on each selection. User can "freeze" the current
+// window to detach it into the pool, so the next selection spawns a fresh one.
 
-// ==================== 划词翻译窗口（多窗口支持） ====================
-
-/**
- * 创建划词翻译窗口
- * 每次创建新窗口，支持多窗口共存
- */
 function createSelectionWindow() {
-  // 如果当前有活动窗口且未冻结，复用它
   if (windows.selection && !windows.selection.isDestroyed()) {
-    // 检查是否已冻结
     const isFrozen = windows.selection._isFrozen;
     if (!isFrozen) {
       return windows.selection;
     }
-    // 已冻结，创建新窗口
   }
 
-  // 生成唯一 ID
   const windowId = ++selectionWindowIdCounter;
 
   const selectionWindow = new BrowserWindow({
@@ -321,7 +286,6 @@ function createSelectionWindow() {
     },
   });
 
-  // 存储窗口 ID
   selectionWindow._windowId = windowId;
   selectionWindow._isFrozen = false;
 
@@ -335,12 +299,10 @@ function createSelectionWindow() {
   }
 
   selectionWindow.on('closed', () => {
-    // 从冻结窗口池中移除
     if (selectionWindow._isFrozen) {
       frozenSelectionWindows.delete(selectionWindow._windowId);
       logger.debug?.(`Frozen selection window ${selectionWindow._windowId} closed, remaining: ${frozenSelectionWindows.size}`);
     }
-    // 如果是当前活动窗口，清除引用
     if (windows.selection === selectionWindow) {
       windows.selection = null;
     }
@@ -351,10 +313,6 @@ function createSelectionWindow() {
   return selectionWindow;
 }
 
-/**
- * 冻结当前划词翻译窗口
- * 冻结后窗口变成独立的，新划词会创建新窗口
- */
 function freezeSelectionWindow() {
   const currentWindow = windows.selection;
   if (!currentWindow || currentWindow.isDestroyed()) {
@@ -365,9 +323,8 @@ function freezeSelectionWindow() {
     return { success: false, error: 'Already frozen' };
   }
 
-  // 检查是否达到最大数量
+  // Evict oldest frozen window when at capacity (Map preserves insertion order)
   if (frozenSelectionWindows.size >= MAX_FROZEN_WINDOWS) {
-    // 关闭最早的冻结窗口
     const oldestId = frozenSelectionWindows.keys().next().value;
     const oldestWindow = frozenSelectionWindows.get(oldestId);
     if (oldestWindow && !oldestWindow.isDestroyed()) {
@@ -377,25 +334,21 @@ function freezeSelectionWindow() {
     logger.debug?.(`Closed oldest frozen window ${oldestId} due to limit`);
   }
 
-  // 标记为冻结
   currentWindow._isFrozen = true;
   frozenSelectionWindows.set(currentWindow._windowId, currentWindow);
-  
-  // 清除活动窗口引用，下次划词会创建新窗口
+
+  // Detach from active slot so next selection spawns fresh
   windows.selection = null;
 
   logger.info?.(`Selection window ${currentWindow._windowId} frozen, total frozen: ${frozenSelectionWindows.size}`);
-  
-  return { 
-    success: true, 
+
+  return {
+    success: true,
     windowId: currentWindow._windowId,
-    frozenCount: frozenSelectionWindows.size 
+    frozenCount: frozenSelectionWindows.size
   };
 }
 
-/**
- * 关闭指定的冻结窗口
- */
 function closeFrozenSelectionWindow(windowId) {
   const frozenWindow = frozenSelectionWindows.get(windowId);
   if (frozenWindow && !frozenWindow.isDestroyed()) {
@@ -405,16 +358,10 @@ function closeFrozenSelectionWindow(windowId) {
   return { success: false, error: 'Window not found' };
 }
 
-/**
- * 获取冻结窗口数量
- */
 function getFrozenSelectionWindowsCount() {
   return frozenSelectionWindows.size;
 }
 
-/**
- * 关闭所有冻结窗口
- */
 function closeAllFrozenSelectionWindows() {
   for (const [id, win] of frozenSelectionWindows) {
     if (win && !win.isDestroyed()) {
@@ -425,12 +372,8 @@ function closeAllFrozenSelectionWindows() {
   logger.info?.('All frozen selection windows closed');
 }
 
-// ==================== 截图窗口 ====================
+// ===== Screenshot window =====
 
-/**
- * 创建截图选区窗口
- * @param {Object} bounds - 屏幕边界
- */
 function createScreenshotWindow(bounds) {
   if (windows.screenshot) {
     windows.screenshot.close();
@@ -475,11 +418,9 @@ function createScreenshotWindow(bounds) {
   return screenshotWindow;
 }
 
-// ==================== 导出 ====================
-
-// 检查点是否在任何划词窗口内
+// Hit-test against active + all frozen selection windows.
+// Used by global mouse hook to decide whether to suppress auto-close on click.
 function isPointInSelectionWindows(x, y) {
-  // 检查当前活动窗口
   if (windows.selection && !windows.selection.isDestroyed() && windows.selection.isVisible()) {
     const bounds = windows.selection.getBounds();
     if (x >= bounds.x && x <= bounds.x + bounds.width &&
@@ -487,8 +428,7 @@ function isPointInSelectionWindows(x, y) {
       return true;
     }
   }
-  
-  // 检查所有冻结窗口
+
   for (const [id, win] of frozenSelectionWindows) {
     if (win && !win.isDestroyed() && win.isVisible()) {
       const bounds = win.getBounds();
@@ -498,21 +438,18 @@ function isPointInSelectionWindows(x, y) {
       }
     }
   }
-  
+
   return false;
 }
 
 module.exports = {
   isPointInSelectionWindows,
   init,
-  // 窗口创建
   createMainWindow,
   createGlassWindow,
   createSelectionWindow,
   createScreenshotWindow,
-  // 窗口切换
   toggleGlassWindow,
-  // 划词多窗口管理
   freezeSelectionWindow,
   closeFrozenSelectionWindow,
   getFrozenSelectionWindowsCount,

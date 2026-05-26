@@ -1,20 +1,13 @@
-// src/components/SettingsPanel/sections/DocumentSection.jsx
-// 文档翻译设置区块组件 - 国际化版
-
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Filter } from 'lucide-react';
 
-/**
- * 文档翻译设置区块
- */
 const DocumentSection = ({
   settings,
   updateSetting
 }) => {
   const { t } = useTranslation();
 
-  // 更新过滤器设置的辅助函数
   const updateFilter = (key, value) => {
     updateSetting('document', 'filters', {
       ...settings.document?.filters,
@@ -27,7 +20,6 @@ const DocumentSection = ({
       <h3>{t('documentSettings.title')}</h3>
       <p className="setting-description">{t('documentSettings.description')}</p>
 
-      {/* 分段设置 */}
       <div className="setting-group">
         <label className="setting-label">{t('documentSettings.segmentSettings')}</label>
         <div className="setting-row">
@@ -45,7 +37,6 @@ const DocumentSection = ({
         <p className="setting-hint">{t('documentSettings.segmentHint')}</p>
       </div>
 
-      {/* 批量设置 */}
       <div className="setting-group">
         <label className="setting-label">{t('documentSettings.batchTranslation')}</label>
         <div className="setting-row">
@@ -74,7 +65,6 @@ const DocumentSection = ({
         <p className="setting-hint">{t('documentSettings.batchHint')}</p>
       </div>
 
-      {/* 过滤规则 */}
       <div className="setting-group">
         <label className="setting-label">
           <Filter size={16} /> {t('documentSettings.smartFilter')}
@@ -126,7 +116,6 @@ const DocumentSection = ({
         </label>
       </div>
 
-      {/* 显示样式 */}
       <div className="setting-group">
         <label className="setting-label">{t('documentSettings.displayStyle')}</label>
         <select
@@ -141,7 +130,6 @@ const DocumentSection = ({
         </select>
       </div>
 
-      {/* 支持格式 */}
       <div className="setting-group">
         <label className="setting-label">{t('documentSettings.supportedFormats')}</label>
         <div className="format-tags">

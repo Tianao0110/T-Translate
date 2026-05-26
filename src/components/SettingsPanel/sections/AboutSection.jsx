@@ -1,12 +1,10 @@
-// src/components/SettingsPanel/sections/AboutSection.jsx
-// 关于页面区块组件 - 包含应用内自动更新
+// About section — app info + in-app auto-updater.
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GitBranch, RefreshCw, FolderOpen, Download, X, Loader2, CheckCircle, AlertCircle, ExternalLink } from 'lucide-react';
 import appIcon from '/icon.png';
 
-// 更新阶段
 const UPDATE_STAGE = {
   IDLE: 'idle',
   CHECKING: 'checking',
@@ -27,7 +25,6 @@ const AboutSection = ({ notify, resetSettings }) => {
   const [errorMsg, setErrorMsg] = useState('');
   const cleanupRef = useRef(null);
 
-  // 获取版本号
   useEffect(() => {
     const fetchVersion = async () => {
       try {
@@ -40,7 +37,6 @@ const AboutSection = ({ notify, resetSettings }) => {
     fetchVersion();
   }, []);
 
-  // 监听下载进度
   useEffect(() => {
     const cleanup = window.electron?.app?.onDownloadProgress?.((progress) => {
       setDownloadProgress(progress);
@@ -71,7 +67,7 @@ const AboutSection = ({ notify, resetSettings }) => {
     }
   };
 
-  // ========== 更新流程 ==========
+  // ===== Update flow =====
 
   const checkUpdate = useCallback(async () => {
     if (updateStage === UPDATE_STAGE.CHECKING || updateStage === UPDATE_STAGE.DOWNLOADING) return;
@@ -180,8 +176,6 @@ const AboutSection = ({ notify, resetSettings }) => {
     }
   };
 
-  // ========== 弹窗内容 ==========
-
   const renderModalBody = () => {
     if (updateStage === UPDATE_STAGE.DOWNLOADING) {
       return (
@@ -243,7 +237,7 @@ const AboutSection = ({ notify, resetSettings }) => {
       );
     }
 
-    // 默认：更新信息
+    // Default state: "update available" info
     return (
       <>
         <div className="version-compare">
@@ -338,8 +332,6 @@ const AboutSection = ({ notify, resetSettings }) => {
     );
   };
 
-  // ========== 渲染 ==========
-
   return (
     <div className="setting-content about-section">
       <div className="app-info">
@@ -400,7 +392,6 @@ const AboutSection = ({ notify, resetSettings }) => {
         <p className="copyright">{t('settings.about.copyright')}</p>
       </div>
 
-      {/* 更新弹窗 */}
       {showUpdateModal && updateInfo && (
         <div className="update-modal-overlay" onClick={closeModal}>
           <div className="update-modal" onClick={e => e.stopPropagation()}>

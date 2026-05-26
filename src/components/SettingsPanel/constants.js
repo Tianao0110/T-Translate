@@ -1,5 +1,4 @@
-// src/components/SettingsPanel/constants.js
-// SettingsPanel 共享常量
+// Shared constants for SettingsPanel: defaults, nav, settings shape, migrations.
 
 import {
   Globe, Shield, Zap, Moon, Sun,
@@ -8,13 +7,9 @@ import {
   FileText
 } from 'lucide-react';
 
-// 从配置中心导入隐私模式
 import { PRIVACY_MODES, getModeFeatures, isFeatureEnabled, isProviderAllowed as isProviderAllowedByMode, PRIVACY_MODE_IDS } from '@config/privacy-modes';
 import { getLanguageOptions } from '@config/defaults';
 
-/**
- * 默认配置
- */
 export const defaultConfig = {
   llm: { endpoint: 'http://localhost:1234/v1', timeout: 60000 },
   translation: { sourceLanguage: 'auto', targetLanguage: 'zh', batch: { maxLength: 5000 } },
@@ -36,11 +31,6 @@ export const defaultConfig = {
   storage: { cache: { maxSize: 100 }, history: { maxItems: 1000 } }
 };
 
-
-
-/**
- * 快捷键标签映射
- */
 export const SHORTCUT_LABELS = {
   translate: '执行翻译',
   swapLanguages: '切换语言',
@@ -53,23 +43,16 @@ export const SHORTCUT_LABELS = {
   selectionTranslate: '✏️ 划词翻译开关',
 };
 
-/**
- * 全局快捷键列表
- */
 export const GLOBAL_SHORTCUT_KEYS = ['screenshot', 'toggleWindow', 'glassWindow', 'selectionTranslate'];
 
-/**
- * 导航项配置 - 按使用频率排序
- * basic: true 表示简洁模式下显示的项目
- */
+// `basic: true` flags items shown in the simplified settings view.
+// `keywords` powers the in-settings search.
 export const NAV_ITEMS = [
-  // Translation group
   { id: 'providers', icon: Server, group: 'translation', basic: true, keywords: ['provider', 'openai', 'deepl', 'gemini', 'deepseek', 'local', 'api', '翻译源', '本地'] },
   { id: 'translation', icon: Globe, group: 'translation', basic: true, keywords: ['language', 'source', 'target', 'auto', 'stream', '翻译', '语言', '流式'] },
   { id: 'selection', icon: MousePointer, group: 'translation', keywords: ['selection', 'mouse', 'trigger', 'button', '划词', '选中', '鼠标'] },
   { id: 'glassWindow', icon: Layers, group: 'translation', keywords: ['glass', 'floating', 'overlay', 'pin', '玻璃', '透明', '置顶'] },
   { id: 'document', icon: FileText, group: 'translation', keywords: ['document', 'pdf', 'docx', 'epub', 'srt', 'subtitle', '文档', '字幕'] },
-  // System group
   { id: 'ocr', icon: Eye, group: 'system', keywords: ['ocr', 'recognize', 'screenshot', 'image', 'rapidocr', 'llm', '识别', '截图'] },
   { id: 'tts', icon: Volume2, group: 'system', keywords: ['tts', 'speech', 'voice', 'volume', 'rate', '朗读', '语音', '语速'] },
   { id: 'interface', icon: Palette, group: 'system', basic: true, keywords: ['theme', 'dark', 'light', 'font', 'appearance', '界面', '主题', '外观'] },
@@ -77,18 +60,13 @@ export const NAV_ITEMS = [
   { id: 'about', icon: Info, group: 'system', basic: true, keywords: ['about', 'version', 'info', '关于', '版本'] },
 ];
 
-/**
- * 默认设置状态
- */
 export const DEFAULT_SETTINGS = {
-  // LLM 连接 (嵌套结构)
   connection: {
     endpoint: defaultConfig.llm.endpoint,
     timeout: defaultConfig.llm.timeout,
     model: '',
   },
-  
-  // 翻译设置 (嵌套结构)
+
   translation: {
     defaultSourceLang: defaultConfig.translation.sourceLanguage,
     defaultTargetLang: defaultConfig.translation.targetLanguage,
@@ -96,16 +74,15 @@ export const DEFAULT_SETTINGS = {
     providerConfigs: {},
     subtitleProvider: null,
   },
-  
-  // 翻译设置 (顶层兼容)
+
+  // Flat top-level aliases preserved for backward compat with older code paths
   sourceLanguage: defaultConfig.translation.sourceLanguage,
   targetLanguage: defaultConfig.translation.targetLanguage,
   autoTranslate: false,
   streamOutput: true,
   contextMemory: false,
   termCorrection: true,
-  
-  // 文档翻译
+
   document: {
     preserveFormatting: true,
     translateHeaders: true,
@@ -117,8 +94,7 @@ export const DEFAULT_SETTINGS = {
     outputFormat: 'same',
     showProgress: true,
   },
-  
-  // 玻璃窗口
+
   glass: {
     width: 400,
     height: 300,
@@ -128,8 +104,7 @@ export const DEFAULT_SETTINGS = {
     fontSize: 14,
     showSourceText: false,
   },
-  
-  // 划词翻译
+
   selection: {
     enabled: false,
     showButton: true,
@@ -145,28 +120,23 @@ export const DEFAULT_SETTINGS = {
     minChars: 2,
     maxChars: 500,
     windowOpacity: 95,
-    // Sticky 直出模式（CapsLock 开着时划词直接出翻译卡片）
+    // CapsLock-direct mode: bypass trigger UI when CapsLock is on
     stickyViaCapsLock: false,
-    stickyWarningShown: false,  // 是否已展示过首次开启警告弹窗
+    stickyWarningShown: false,
   },
-  
-  // 外观
+
   theme: defaultConfig.ui.theme,
   fontSize: defaultConfig.ui.fontSize,
-  
-  // 快捷键
+
   shortcuts: { ...defaultConfig.shortcuts },
-  
-  // 隐私模式
+
   privacyMode: PRIVACY_MODE_IDS.STANDARD,
-  
-  // 其他
+
   saveHistory: true,
   maxHistory: defaultConfig.storage.history.maxItems,
   cacheEnabled: true,
   maxCache: defaultConfig.storage.cache.maxSize,
-  
-  // OCR 设置
+
   ocr: {
     engine: defaultConfig.ocr.defaultEngine,
     language: defaultConfig.ocr.windowsLanguage,
@@ -174,8 +144,7 @@ export const DEFAULT_SETTINGS = {
     autoDetect: true,
     confidence: 0.6,
   },
-  
-  // TTS 朗读设置
+
   tts: {
     enabled: true,
     engine: 'web-speech',
@@ -184,32 +153,27 @@ export const DEFAULT_SETTINGS = {
     volume: 0.8,
     voiceId: '',
   },
-  
-  // 截图设置
+
   screenshot: {
-    outputMode: 'bubble',  // 'bubble' | 'main' - 输出到气泡窗口或主窗口
+    outputMode: 'bubble', // 'bubble' | 'main'
   },
-  
-  // 开发选项
+
   debugMode: defaultConfig.dev.debugMode,
 };
 
-/**
- * 语言选项（从配置中心获取）
- */
 export const LANGUAGE_OPTIONS = getLanguageOptions(true);
 
-/**
- * 迁移旧设置（合并多种格式迁移）
- */
+// Merges saved settings into the current default shape and rewrites any old
+// flat-keyed fields (endpoint, providers, selectionXxx, glassXxx) into the
+// current nested object layout.
 export const migrateOldSettings = (savedSettings) => {
   if (!savedSettings) return null;
-  
-  // 深拷贝并与默认设置合并，确保所有嵌套对象存在
+
+  // Deep-merge each known nested key so a partial saved object still gets all
+  // newly-added defaults
   let migrated = {
     ...DEFAULT_SETTINGS,
     ...savedSettings,
-    // 确保嵌套对象正确合并
     connection: {
       ...DEFAULT_SETTINGS.connection,
       ...(savedSettings.connection || {}),
@@ -247,8 +211,8 @@ export const migrateOldSettings = (savedSettings) => {
       ...(savedSettings.shortcuts || {}),
     },
   };
-  
-  // 迁移旧格式：扁平的 endpoint/timeout -> connection 对象
+
+  // Pre-v0.2 flat endpoint -> connection object
   if (savedSettings.endpoint && !savedSettings.connection) {
     migrated.connection = {
       endpoint: savedSettings.endpoint,
@@ -256,10 +220,9 @@ export const migrateOldSettings = (savedSettings) => {
       model: savedSettings.model || '',
     };
   }
-  
-  // 迁移旧格式：settings.providers -> settings.translation.providers
+
+  // settings.providers (old) -> settings.translation.providers
   if (savedSettings.providers?.list && !savedSettings.translation?.providers) {
-    // Migration log:  old providers format...');
     migrated.translation = {
       ...migrated.translation,
       providers: savedSettings.providers.list,
@@ -268,8 +231,8 @@ export const migrateOldSettings = (savedSettings) => {
     };
     delete migrated.providers;
   }
-  
-  // 迁移旧格式 selection 设置
+
+  // Pre-v0.2 flat selectionXxx -> selection nested object
   if (!savedSettings.selection || typeof savedSettings.selection !== 'object') {
     migrated.selection = {
       ...DEFAULT_SETTINGS.selection,
@@ -283,8 +246,8 @@ export const migrateOldSettings = (savedSettings) => {
       maxDuration: savedSettings.selectionMaxDuration || 5000,
     };
   }
-  
-  // 迁移旧格式 glass 设置
+
+  // Pre-v0.2 flat glassXxx -> glass nested object
   if (!savedSettings.glass || typeof savedSettings.glass !== 'object') {
     migrated.glass = {
       ...DEFAULT_SETTINGS.glass,
@@ -297,9 +260,8 @@ export const migrateOldSettings = (savedSettings) => {
       showSourceText: savedSettings.glassShowSourceText || false,
     };
   }
-  
+
   return migrated;
 };
 
-// 重新导出 PRIVACY_MODES 供组件使用
 export { PRIVACY_MODES, getModeFeatures, isFeatureEnabled, isProviderAllowedByMode as isProviderAllowed, PRIVACY_MODE_IDS };

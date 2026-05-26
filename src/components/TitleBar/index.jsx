@@ -1,4 +1,3 @@
-// src/components/TitleBar.jsx
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Minus, Maximize2, Minimize2, X } from 'lucide-react';
@@ -8,24 +7,20 @@ const TitleBar = () => {
   const { t } = useTranslation();
   const [isMaximized, setIsMaximized] = useState(false);
 
-  // 监听窗口最大化状态变化
   useEffect(() => {
-    // 初始获取状态
     window.electron?.window?.isMaximized?.().then(setIsMaximized);
-    
-    // 监听状态变化
+
     const handleMaximizeChange = (maximized) => {
       setIsMaximized(maximized);
     };
-    
+
     window.electron?.window?.onMaximizeChange?.(handleMaximizeChange);
-    
+
     return () => {
       window.electron?.window?.offMaximizeChange?.(handleMaximizeChange);
     };
   }, []);
 
-  // 安全地调用 Electron API
   const handleMinimize = () => {
     if (window.electron && window.electron.window) {
       window.electron.window.minimize();
@@ -50,26 +45,26 @@ const TitleBar = () => {
         <span className="window-icon-text">T</span>
         <span className="window-title">T-Translate</span>
       </div>
-      
+
       <div className="window-controls">
-        <button 
-          className="window-control-btn" 
-          onClick={handleMinimize} 
-          title={t('titleBar.minimize', '最小化')}
+        <button
+          className="window-control-btn"
+          onClick={handleMinimize}
+          title={t('titleBar.minimize', 'Minimize')}
         >
           <Minus size={14} />
         </button>
-        <button 
-          className="window-control-btn" 
-          onClick={handleMaximize} 
-          title={isMaximized ? t('titleBar.restore', '还原') : t('titleBar.maximize', '最大化')}
+        <button
+          className="window-control-btn"
+          onClick={handleMaximize}
+          title={isMaximized ? t('titleBar.restore', 'Restore') : t('titleBar.maximize', 'Maximize')}
         >
           {isMaximized ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
         </button>
-        <button 
-          className="window-control-btn close" 
-          onClick={handleClose} 
-          title={t('titleBar.close', '关闭')}
+        <button
+          className="window-control-btn close"
+          onClick={handleClose}
+          title={t('titleBar.close', 'Close')}
         >
           <X size={14} />
         </button>

@@ -1,14 +1,6 @@
-// src/components/TranslationPanel/index.jsx
-// 翻译面板组件 - 重构版
-//
-// 业务逻辑已拆分到 hooks/ 目录：
-//   useTTS.js        - TTS 朗读
-//   useTermCheck.js  - 术语一致性检测
-//   useStyleRewrite.js - 风格改写
-//   useSaveModal.js  - 收藏弹窗 + AI 分析
-//
-// UI 子组件在 components.jsx：
-//   StyleModal, SaveModal, TemplateSelector, LanguageSelector
+// Main translation panel. Thin shell: business logic lives in hooks/
+// (useTTS, useTermCheck, useStyleRewrite, useSaveModal) and presentational
+// pieces in components.jsx (StyleModal, SaveModal, etc.)
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -25,25 +17,18 @@ import createLogger from '../../utils/logger.js';
 import { getShortErrorMessage } from '../../utils/error-handler.js';
 import './styles.css';
 
-// 配置常量
 import { PRIVACY_MODES, TRANSLATION_STATUS, getLanguageList } from '@config/defaults';
 
-// 自定义 Hooks
 import { useTTS, useTermCheck, useStyleRewrite, useSaveModal } from './hooks';
 
-// 子组件
 import { StyleModal, SaveModal, LanguageSelector } from './components.jsx';
 
 const logger = createLogger('TranslationPanel');
 
-/**
- * 翻译面板组件
- */
 const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProcessed }) => {
   const { t } = useTranslation();
   const notify = showNotification || ((msg, type) => logger.debug(`[Notify] ${type}: ${msg}`));
 
-  // ========== 本地 UI 状态 ==========
   const [dragOver, setDragOver] = useState(false);
   const [isConnected, setIsConnected] = useState(
     typeof navigator !== 'undefined' ? navigator.onLine : true
@@ -52,7 +37,6 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   const [isOcrSource, setIsOcrSource] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState('natural');
 
-  // ========== 网络状态监听 ==========
   useEffect(() => {
     const goOnline = () => setIsConnected(true);
     const goOffline = () => setIsConnected(false);
@@ -64,7 +48,6 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     };
   }, []);
 
-  // ========== Zustand Store ==========
   const {
     currentTranslation,
     favorites,
@@ -89,17 +72,14 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     switchVersion,
   } = useTranslationStore();
 
-  // ========== 自定义 Hooks ==========
   const tts = useTTS(notify, t);
   const termCheck = useTermCheck(favorites, setTranslatedText, notify, t);
   const styleRewrite = useStyleRewrite(currentTranslation, addStyleVersion, notify, t);
   const saveModal = useSaveModal(currentTranslation, addToFavorites, notify, t);
 
-  // Refs
   const sourceTextareaRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  // 语言选项
   const languages = useMemo(() => getLanguageList(true), []);
 
   // Tone templates. MT detection is handled in services/translation.js
@@ -111,7 +91,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     { id: 'formal', name: t('templates.formal'), desc: t('templates.formalDesc') },
   ];
 
-  // ========== 截图 OCR 处理 ==========
+  // Triggered when MainWindow passes screenshot data in via props (capture flow)
   useEffect(() => {
     if (!screenshotData?.dataURL) return;
 
@@ -130,8 +110,9 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
 
         if (result.success && result.text) {
           setIsOcrSource(true);
-          
-          // 如果发生了 LLM Vision → 本地 OCR 降级，先提示用户
+
+          // LLM Vision -> local OCR fallback gets surfaced; ocrStatus.fallbackNotice
+          // is set by recognizeImage in main-translation.js
           if (result.fallbackFrom === 'llm-vision') {
             const store = useTranslationStore.getState();
             const notice = store.ocrStatus?.fallbackNotice;
@@ -141,6 +122,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
           }
 
           if (autoTranslate) {
+            // Floor at 300ms so the user sees the OCR result before translate kicks in
             const delay = Math.max(autoTranslateDelay || 500, 300);
             setTimeout(async () => {
               const currentText = useTranslationStore.getState().currentTranslation.sourceText;
@@ -164,7 +146,8 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     processScreenshot();
   }, [screenshotData]);
 
-  // ========== 自动翻译防抖 ==========
+  // Debounced auto-translate. Re-checks state inside the timer so a fast
+  // edit-then-clear doesn't fire a stale translation.
   useEffect(() => {
     if (!autoTranslate) return;
     if (!currentTranslation.sourceText.trim()) return;
@@ -182,10 +165,6 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     return () => clearTimeout(timer);
   }, [currentTranslation.sourceText, autoTranslate, autoTranslateDelay]);
 
-  // 语言同步到主进程: 已由 stores/sync-to-electron.js 统一处理
-
-  // ========== 核心操作 ==========
-
   const handleTranslate = async (overrideTemplate = null) => {
     if (!currentTranslation.sourceText.trim()) {
       notify(t('translation.enterText'), 'warning');
@@ -196,6 +175,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
       notify(t('translation.notConnected'), 'error');
     }
 
+    // OCR'd text gets the 'ocr' template (different prompt — better for fragments)
     const effectiveTemplate = isOcrSource ? 'ocr' : (overrideTemplate || selectedTemplate);
 
     const options = {
@@ -208,11 +188,10 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
       : await translate(options);
 
     if (result.success) {
-      // 检测术语一致性
       const translatedText = result.translatedText || useTranslationStore.getState().currentTranslation.translatedText;
       termCheck.checkTermConsistency(currentTranslation.sourceText, translatedText);
 
-      // OCR 截图联动
+      // Push result back to screenshot flow so the selection overlay can display it
       if (isOcrSource && window.electron?.screenshot?.notifyTranslationComplete) {
         const state = useTranslationStore.getState();
         if (translatedText) {
@@ -241,8 +220,6 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
       handleTranslate(newTemplateId);
     }
   };
-
-  // ========== 文件处理 ==========
 
   const handleDrop = useCallback(async (e) => {
     e.preventDefault();
@@ -313,12 +290,9 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     }
   }, [recognizeImage, notify, t]);
 
-  // ========== 渲染 ==========
-
   return (
     <div className="translation-panel">
 
-      {/* 顶部工具栏 */}
       <div className="language-selector-bar">
         <div className="language-select-group">
           <LanguageSelector
@@ -343,7 +317,6 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
           />
         </div>
 
-        {/* 模板选择器 */}
         <div className="template-selector">
           {templates.map(tmpl => (
             <button
@@ -358,10 +331,8 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
         </div>
       </div>
 
-      {/* 翻译主区域 */}
       <div className="translation-areas">
 
-        {/* 左侧：原文 */}
         <div
           className={`translation-box source-box ${dragOver ? 'drag-over' : ''}`}
           onDrop={handleDrop}
@@ -423,7 +394,6 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
           </div>
         </div>
 
-        {/* 中间：翻译按钮 */}
         <div className="translation-controls">
           <button
             className={`translate-btn ${currentTranslation.status === TRANSLATION_STATUS.TRANSLATING ? 'loading' : ''}`}
@@ -442,12 +412,10 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
           </div>
         </div>
 
-        {/* 右侧：译文 */}
         <div className="translation-box target-box">
           <div className="box-toolbar">
             <div className="box-title-group">
               <span className="box-title">{t('translation.target')}</span>
-              {/* 版本切换 */}
               {currentTranslation.versions?.length > 1 && (
                 <div className="version-selector">
                   <button className="version-btn" onClick={() => styleRewrite.setShowVersionMenu(!styleRewrite.showVersionMenu)}>
@@ -502,12 +470,11 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
             spellCheck={false}
           />
 
-          {/* 术语库自动替换提示（5秒自动消失，多条折叠） */}
           {currentTranslation.glossaryApplied && currentTranslation.glossaryApplied.replacements.length > 0 && (() => {
             const replacements = currentTranslation.glossaryApplied.replacements;
             const count = replacements.length;
             const first = `"${replacements[0].from}" → "${replacements[0].to}"`;
-            
+
             return (
               <GlossaryNotice
                 count={count}
@@ -525,7 +492,6 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
             );
           })()}
 
-          {/* 术语一致性提示 */}
           {termCheck.termSuggestions.length > 0 && (
             <div className="term-suggestions">
               <div className="term-suggestions-header">
@@ -572,7 +538,6 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
         </div>
       </div>
 
-      {/* 隐藏的文件 Input */}
       <input
         ref={fileInputRef}
         type="file"
@@ -581,7 +546,6 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
         style={{ display: 'none' }}
       />
 
-      {/* 风格改写弹窗 */}
       <StyleModal
         show={styleRewrite.showStyleModal}
         favorites={favorites}
@@ -593,7 +557,6 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
         onClose={() => styleRewrite.setShowStyleModal(false)}
       />
 
-      {/* 收藏弹窗 */}
       <SaveModal
         show={saveModal.showSaveModal}
         sourceText={currentTranslation.sourceText}
@@ -614,31 +577,29 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   );
 };
 
-/**
- * 术语库自动替换通知（5秒自动消失，多条折叠）
- */
+// Glossary auto-replacement toast. Dismisses on 5s timer; hover pauses the
+// timer so the user can read multi-item lists at their own pace.
 const GlossaryNotice = ({ count, first, replacements, onUndo, t }) => {
   const [visible, setVisible] = useState(true);
   const [expanded, setExpanded] = useState(false);
-  
+  const [hovered, setHovered] = useState(false);
+
   useEffect(() => {
     const timer = setTimeout(() => setVisible(false), 5000);
     return () => clearTimeout(timer);
   }, []);
-  
-  // 鼠标悬停时暂停消失
-  const [hovered, setHovered] = useState(false);
+
   useEffect(() => {
     if (hovered) return;
     if (!visible) return;
     const timer = setTimeout(() => setVisible(false), 5000);
     return () => clearTimeout(timer);
   }, [hovered, visible]);
-  
+
   if (!visible) return null;
-  
+
   return (
-    <div 
+    <div
       className="glossary-applied-notice"
       onMouseEnter={() => { setHovered(true); setVisible(true); }}
       onMouseLeave={() => setHovered(false)}
@@ -648,7 +609,7 @@ const GlossaryNotice = ({ count, first, replacements, onUndo, t }) => {
         {count === 1 ? (
           <span>{t('translation.glossaryApplied', '术语库已自动替换')}: {first}</span>
         ) : (
-          <span 
+          <span
             className="glossary-notice-expandable"
             onClick={() => setExpanded(!expanded)}
           >

@@ -1,14 +1,8 @@
-// src/utils/performance.js
-// 性能优化工具集 - React hooks 和工具函数
+// React performance hooks: debounce, throttle, lazy init, shallow selectors,
+// virtual list, render counter.
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 
-/**
- * 防抖 Hook
- * @param {any} value - 需要防抖的值
- * @param {number} delay - 延迟时间（毫秒）
- * @returns {any} - 防抖后的值
- */
 export function useDebounce(value, delay = 300) {
   const [debouncedValue, setDebouncedValue] = useState(value);
 
@@ -23,13 +17,6 @@ export function useDebounce(value, delay = 300) {
   return debouncedValue;
 }
 
-/**
- * 防抖回调 Hook
- * @param {Function} callback - 需要防抖的回调函数
- * @param {number} delay - 延迟时间（毫秒）
- * @param {Array} deps - 依赖数组
- * @returns {Function} - 防抖后的回调函数
- */
 export function useDebouncedCallback(callback, delay = 300, deps = []) {
   const timeoutRef = useRef(null);
 
@@ -43,7 +30,6 @@ export function useDebouncedCallback(callback, delay = 300, deps = []) {
     }, delay);
   }, [delay, ...deps]);
 
-  // 清理
   useEffect(() => {
     return () => {
       if (timeoutRef.current) {
@@ -55,13 +41,8 @@ export function useDebouncedCallback(callback, delay = 300, deps = []) {
   return debouncedCallback;
 }
 
-/**
- * 节流回调 Hook
- * @param {Function} callback - 需要节流的回调函数
- * @param {number} limit - 节流间隔（毫秒）
- * @param {Array} deps - 依赖数组
- * @returns {Function} - 节流后的回调函数
- */
+// Leading-then-trailing throttle: fires immediately on first call, then again
+// once `limit` has elapsed if more calls came in during the cooldown.
 export function useThrottledCallback(callback, limit = 100, deps = []) {
   const lastRunRef = useRef(0);
   const timeoutRef = useRef(null);
@@ -97,11 +78,6 @@ export function useThrottledCallback(callback, limit = 100, deps = []) {
   return throttledCallback;
 }
 
-/**
- * 惰性初始化 Hook
- * @param {Function} initializer - 初始化函数
- * @returns {any} - 初始化后的值
- */
 export function useLazyInit(initializer) {
   const ref = useRef(null);
   const initialized = useRef(false);
@@ -114,11 +90,6 @@ export function useLazyInit(initializer) {
   return ref.current;
 }
 
-/**
- * 前一个值 Hook
- * @param {any} value - 当前值
- * @returns {any} - 前一个值
- */
 export function usePrevious(value) {
   const ref = useRef();
 
@@ -129,11 +100,8 @@ export function usePrevious(value) {
   return ref.current;
 }
 
-/**
- * 稳定回调 Hook（避免依赖数组问题）
- * @param {Function} callback - 回调函数
- * @returns {Function} - 稳定的回调函数引用
- */
+// Returns a stable callback identity even when the underlying function changes.
+// Useful when a child memo'd component would otherwise re-render on every parent render.
 export function useStableCallback(callback) {
   const callbackRef = useRef(callback);
 
@@ -146,11 +114,6 @@ export function useStableCallback(callback) {
   }, []);
 }
 
-/**
- * 合并状态 Hook（减少多个 useState）
- * @param {Object} initialState - 初始状态对象
- * @returns {[Object, Function]} - [状态, 更新函数]
- */
 export function useMergedState(initialState) {
   const [state, setState] = useState(initialState);
 
@@ -164,13 +127,6 @@ export function useMergedState(initialState) {
   return [state, mergeState];
 }
 
-/**
- * 创建选择器 Hook（避免不必要的重渲染）
- * @param {Object} store - Zustand store 或任意对象
- * @param {Function} selector - 选择器函数
- * @param {Function} equalityFn - 相等性比较函数
- * @returns {any} - 选择的值
- */
 export function useShallowSelector(store, selector, equalityFn = shallowEqual) {
   const prev = useRef();
   const selected = selector(store);
@@ -183,9 +139,6 @@ export function useShallowSelector(store, selector, equalityFn = shallowEqual) {
   return selected;
 }
 
-/**
- * 浅比较
- */
 export function shallowEqual(a, b) {
   if (a === b) return true;
   if (!a || !b) return false;
@@ -203,12 +156,6 @@ export function shallowEqual(a, b) {
   return true;
 }
 
-/**
- * 创建缓存 Map（用于大型列表的查找优化）
- * @param {Array} items - 数组
- * @param {string|Function} keyGetter - 键获取器
- * @returns {Map} - 缓存 Map
- */
 export function createLookupMap(items, keyGetter = 'id') {
   const map = new Map();
   const getKey = typeof keyGetter === 'function' ? keyGetter : (item) => item[keyGetter];
@@ -220,11 +167,8 @@ export function createLookupMap(items, keyGetter = 'id') {
   return map;
 }
 
-/**
- * 虚拟列表 Hook（简易版）
- * @param {Object} options - 配置选项
- * @returns {Object} - 虚拟列表状态和方法
- */
+// Windowed-list helper: returns indices/offsets for rendering only the visible
+// slice. Caller wraps the rendered items in a container with `totalHeight`.
 export function useVirtualList({
   itemCount,
   itemHeight,
@@ -261,10 +205,6 @@ export function useVirtualList({
   };
 }
 
-/**
- * 性能监控 Hook（开发环境）
- * @param {string} componentName - 组件名称
- */
 export function useRenderCount(componentName) {
   const renderCount = useRef(0);
   renderCount.current += 1;
@@ -278,12 +218,9 @@ export function useRenderCount(componentName) {
   return renderCount.current;
 }
 
-/**
- * 批量更新 Helper（React 18 自动批处理，但手动场景可能需要）
- */
+// React 18 auto-batches updates; this wrapper exists for callers that still
+// imported the React-17-style helper.
 export function batchUpdates(callback) {
-  // React 18 中 ReactDOM.unstable_batchedUpdates 已不需要
-  // 但保留此函数以兼容旧代码
   callback();
 }
 

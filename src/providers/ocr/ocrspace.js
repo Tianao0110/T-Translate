@@ -1,14 +1,9 @@
-// src/providers/ocr/ocrspace.js
-// OCR.space API 引擎
+// OCR.space API engine — https://ocr.space/ocrapi
 
 import { BaseOCREngine } from './base.js';
 import createLogger from '../../utils/logger.js';
 const logger = createLogger('OCRSpace');
 
-/**
- * OCR.space API 引擎
- * https://ocr.space/ocrapi
- */
 class OCRSpaceEngine extends BaseOCREngine {
   static metadata = {
     id: 'ocrspace',
@@ -56,15 +51,14 @@ class OCRSpaceEngine extends BaseOCREngine {
 
   async recognize(input, options = {}) {
     const { apiKey, language } = this.config;
-    
+
     if (!apiKey) {
       return { success: false, error: '请配置 OCR.space API Key' };
     }
 
     try {
       const base64Data = this.ensureBase64(input);
-      
-      // 构建 FormData
+
       const formData = new FormData();
       formData.append('apikey', apiKey);
       formData.append('language', options.language || language);
@@ -72,7 +66,8 @@ class OCRSpaceEngine extends BaseOCREngine {
       formData.append('isOverlayRequired', 'false');
       formData.append('detectOrientation', 'true');
       formData.append('scale', 'true');
-      formData.append('OCREngine', '2'); // 使用 OCR Engine 2（更准确）
+      // Engine 2 has materially better accuracy on small/styled text than the default
+      formData.append('OCREngine', '2');
 
       const response = await fetch('https://api.ocr.space/parse/image', {
         method: 'POST',
@@ -95,7 +90,7 @@ class OCRSpaceEngine extends BaseOCREngine {
       }
 
       const text = parsedResults.map(r => r.ParsedText).join('\n');
-      
+
       return {
         success: true,
         text: this.cleanText(text),

@@ -1,6 +1,5 @@
-// src/providers/microsoft-translator/index.js
-// Microsoft Translator API 翻译源
-// 免费额度：每月 200 万字符
+// Microsoft Translator (Azure Cognitive Services).
+// Free tier: 2M chars/month.
 
 import { BaseProvider } from '../base.js';
 import icon from './icon.svg';
@@ -8,10 +7,6 @@ import createLogger from '../../utils/logger.js';
 
 const logger = createLogger('MicrosoftTranslator');
 
-/**
- * Microsoft Translator API
- * Azure Cognitive Services 翻译 API
- */
 class MicrosoftTranslatorProvider extends BaseProvider {
 
   static metadata = {
@@ -63,11 +58,9 @@ class MicrosoftTranslatorProvider extends BaseProvider {
     return false;
   }
 
-  // ========== 语言代码映射 ==========
-
   _mapLanguageCode(code) {
     const mapping = {
-      'auto': '',  // 空字符串让 API 自动检测
+      'auto': '', // Empty string == let API auto-detect
       'zh': 'zh-Hans',
       'zh-TW': 'zh-Hant',
       'en': 'en',
@@ -86,8 +79,6 @@ class MicrosoftTranslatorProvider extends BaseProvider {
     };
     return mapping[code] || code;
   }
-
-  // ========== 翻译 ==========
 
   async translate(text, sourceLang = 'auto', targetLang = 'zh') {
     if (!text?.trim()) {
@@ -113,7 +104,7 @@ class MicrosoftTranslatorProvider extends BaseProvider {
         'Ocp-Apim-Subscription-Key': this.config.apiKey,
         'Content-Type': 'application/json',
       };
-      // 非 global 区域需要加 region header
+      // Region-bound keys require the region header; global keys don't
       if (this.config.region && this.config.region !== 'global') {
         headers['Ocp-Apim-Subscription-Region'] = this.config.region;
       }
@@ -123,6 +114,7 @@ class MicrosoftTranslatorProvider extends BaseProvider {
         {
           method: 'POST',
           headers,
+          // Body is an array — Azure supports batch in one call
           body: JSON.stringify([{ Text: text }]),
           signal: AbortSignal.timeout(this.config.timeout),
         }
@@ -161,8 +153,6 @@ class MicrosoftTranslatorProvider extends BaseProvider {
       return { success: false, error: error.message };
     }
   }
-
-  // ========== 测试连接 ==========
 
   async testConnection() {
     if (!this.config.apiKey) {

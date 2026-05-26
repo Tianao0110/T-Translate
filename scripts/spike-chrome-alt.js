@@ -1,70 +1,68 @@
-// scripts/spike-chrome-alt.js
-//
 // PHASE 0.5 SPIKE — Chrome Alt+drag verification
 //
-// 这是一个一次性 disposable 脚本。验证完之后可以删掉。
+// One-shot disposable spike. Delete after the matrix below is filled in.
 //
-// === 目的 ===
-// 在动手实现 v0.2.4 hotkey 之前，先确认 3 件事：
-//   1. uIOhook 能不能在 Chrome 是前景窗口的时候看到 Alt 键和鼠标事件
-//   2. Chrome 自己会不会拦截或破坏 Alt+drag 选词（最关键，是你 D2L 主场景）
-//   3. 事件到达顺序符合预期 (mousedown → mouseup, altHeld 状态稳定)
+// === Goal ===
+// Before implementing the v0.2.4 hotkey, confirm three things:
+//   1. uIOhook can see Alt key and mouse events while Chrome is focused
+//   2. Chrome itself doesn't intercept or break Alt+drag selection
+//      (this is the critical case — D2L is the main scenario)
+//   3. Event order is sane (mousedown → mouseup, altHeld stays consistent)
 //
-// === 怎么运行 ===
-//   在你的 git bash 里:
+// === How to run ===
+//   In git bash:
 //     cd F:/T-Translate
 //     npx electron scripts/spike-chrome-alt.js
+//   Stop with Ctrl+C.
 //
-//   终止: Ctrl+C
+// === ⚠️ Before running ===
+// If T-Translate main app is running (selection translator on), quit it
+// from the system tray first. Two uIOhook instances will conflict.
 //
-// === ⚠️ 运行前必读 ===
-// 如果 T-Translate 主程序此刻正在运行（划词翻译开着），
-// 必须先退出它（系统托盘 → Quit）。两个 uIOhook 实例会冲突。
+// === Manual test steps ===
+//   1. Wait for "uIOhook started successfully"
+//   2. Switch to Chrome on a page with English text (Wikipedia, D2L, news)
+//   3. Hold LEFT Alt
+//   4. Drag-select a word with the left mouse button
+//   5. Release the mouse
+//   6. Release Alt
+//   7. Watch both:
+//      (a) this terminal: should see KEYDOWN/MOUSEDOWN/MOUSEUP/KEYUP
+//      (b) Chrome itself: nothing odd should happen (no save-link dialog,
+//          no menu activation, no weird rectangle selection)
 //
-// === 测试步骤（运行后照做）===
-//   1. 看到终端打印 "uIOhook started successfully" 之后
-//   2. 切到 Chrome（任何有英文文字的网页：维基百科、D2L、新闻都行）
-//   3. 按住 LEFT Alt 键
-//   4. 用鼠标按住左键拖过一个英文单词
-//   5. 松开鼠标
-//   6. 松开 Alt 键
-//   7. **同时观察两个东西**：
-//      (a) 这个终端：应该出现 KEYDOWN/MOUSEDOWN/MOUSEUP/KEYUP 事件
-//      (b) Chrome 本身：应该什么都没发生（没弹保存链接的对话框、没激活菜单、
-//          没出现矩形选区奇怪行为）
+// === Required scenarios ===
+//   A) Plain Wikipedia paragraph × 3
+//   B) Text inside an <a href> link × 3
+//   C) Text next to an image × 3
+//   D) D2L assignment page × 3 (any English ed-site if D2L isn't available)
+//   E) Edge browser × ~3
 //
-// === 5 个必测场景 ===
-//   A) 维基百科文章纯文字段落 × 3 次
-//   B) 一个 <a href> 链接里的文字 × 3 次
-//   C) 一张图片旁边的文字 × 3 次
-//   D) D2L 作业页面 × 3 次（如果没法登录用任何英文教育网站代替）
-//   E) Edge 浏览器（顺便测一下，~3 次）
-//
-// === 终端输出示例（一次成功的 Alt+drag）===
+// === Sample successful run ===
 //   12:34:56.789 KEYDOWN LeftAlt (keycode=56) altHeld=true
 //   12:34:57.012 MOUSEDOWN at (450, 320) altHeld=true
 //   12:34:57.234 MOUSEUP at (520, 320) altHeld=true (was true at down) samealt=true
 //                 ↑ HOTKEY PATH WOULD TRIGGER (altHeld both at down and up)
 //   12:34:57.456 KEYUP LeftAlt (keycode=56) altHeld=false
 //
-// === 决策矩阵（spike 跑完之后）===
+// === Decision matrix ===
 //
-//   ✓ PASS:   纯文字 + 链接 + 图片 + D2L 全部场景下 Chrome 行为正常，
-//             终端事件也都正确。→ 按 v3 design doc 计划继续 Phase 0 → Phase 1
+//   ✓ PASS:    Plain text + links + images + D2L all behave; events look right.
+//              → Proceed with the v3 design doc plan (Phase 0 → Phase 1).
 //
-//   ⚠ PARTIAL: 纯文字场景 OK，但是链接/图片附近 Chrome 弹了什么东西。
-//             → hotkey 仍然可行，但要在 CHANGELOG 里说明 "尽量在纯文字
-//                区域使用 hotkey，链接和图片附近可能触发 Chrome 自身行为"
+//   ⚠ PARTIAL: Plain text OK, but Chrome misbehaves near links/images.
+//              → Hotkey is still viable; document in CHANGELOG that hotkey
+//                works best in plain-text regions.
 //
-//   ✗ FAIL:   纯文字场景下 Chrome 也有奇怪行为，或者终端根本看不到事件。
-//             → hotkey 在主场景废了。回到 design doc T2 备选方案：
-//                Ctrl+Alt / 用户可配置 modifier。重新调整 Phase 1。
+//   ✗ FAIL:    Even plain text misbehaves, or no events show up in the terminal.
+//              → Hotkey is dead in the main scenario. Fall back to T2 in the
+//                design doc: Ctrl+Alt or user-configurable modifier.
 //
 // =====================================================================
 
 const { app } = require('electron');
 
-// 加载 uiohook-napi。如果加载失败说明 native binding 有问题
+// Load uiohook-napi. If this throws, the native binding is bad.
 let uIOhook;
 try {
   ({ uIOhook } = require('uiohook-napi'));
@@ -80,16 +78,15 @@ try {
   process.exit(1);
 }
 
-// Win32 keycodes (uiohook-napi 映射的)
+// Win32 keycodes (as remapped by uiohook-napi)
 //   Left Alt:  56  (0x38)
 //   Right Alt: 312 (0x138) — aka AltGr on international keyboards
 const VK_LALT = 56;
 const VK_RALT = 312;
 
-// 状态追踪 —— 用 keydown/keyup 维护一个布尔
-// （注：生产实现会用 GetAsyncKeyState via koffi。这里 spike 用 keydown/keyup
-//      足够，因为我们只想确认 uIOhook 能不能 SEE 这些事件。如果 uIOhook 看不到
-//      事件，GetAsyncKeyState 也救不了 — 它是不同的 Win32 API 但同样的 hook 层级。）
+// Spike tracks Alt with keydown/keyup state. Production will use
+// GetAsyncKeyState via koffi, but if uIOhook can't see these events at all,
+// GetAsyncKeyState wouldn't help — same hook layer, different Win32 API.
 let altHeld = false;
 let mouseDownAltState = false;
 let eventCount = 0;
@@ -132,14 +129,14 @@ app.whenReady().then(() => {
     if (e.keycode === VK_LALT) {
       altHeld = false;
       log(`KEYUP LeftAlt (keycode=${e.keycode}) altHeld=false`);
-      console.log(''); // blank line between Alt cycles
+      console.log('');
     } else if (e.keycode === VK_RALT) {
       log(`KEYUP RightAlt (keycode=${e.keycode})`);
     }
   });
 
   uIOhook.on('mousedown', (e) => {
-    if (e.button !== 1) return; // 只关注左键
+    if (e.button !== 1) return;  // only left button
     mouseDownAltState = altHeld;
     log(`MOUSEDOWN at (${e.x}, ${e.y}) altHeld=${altHeld}`);
   });
@@ -173,7 +170,6 @@ app.whenReady().then(() => {
   }
 });
 
-// graceful shutdown
 const shutdown = () => {
   console.log('');
   console.log('====================================================================');
@@ -199,7 +195,7 @@ const shutdown = () => {
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
-// 没有窗口，all-windows-closed 时不要 quit
+// Windowless spike: don't quit when all windows close (we never opened any).
 app.on('window-all-closed', () => {
-  // no-op: spike 是 windowless 的
+  // no-op
 });

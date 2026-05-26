@@ -1,14 +1,10 @@
-// src/components/SettingsPanel/sections/OcrSection.jsx
-// OCR 设置区块组件
+// OCR settings: language, preprocessing, and per-engine config (local / vision / online).
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff, AlertTriangle, RefreshCw, Wrench } from 'lucide-react';
 import { ocrManager } from '../../../providers/ocr/index.js';
 
-/**
- * OCR 设置区块
- */
 const OcrSection = ({
   settings,
   updateSetting,
@@ -20,33 +16,32 @@ const OcrSection = ({
   setOcrEngine
 }) => {
   const { t } = useTranslation();
-  
-  // 引擎健康状态: null=未检查, 'checking'=检查中, 'healthy'=正常, 'broken'=损坏
+
+  // null = unchecked, 'checking', 'healthy', 'broken'
   const [engineHealth, setEngineHealth] = useState(null);
   const [healthError, setHealthError] = useState('');
   const [repairing, setRepairing] = useState(false);
   const [repairProgress, setRepairProgress] = useState('');
 
-  // 启动时自动检查 RapidOCR 健康状态（仅当前选择的是 rapid-ocr 时）
+  // Auto-health-check rapid-ocr on entry only if user is actively using it
+  // (avoid running model load on every settings open if they're on another engine)
   useEffect(() => {
     if (settings.ocr.rapidInstalled && settings.ocr.engine === 'rapid-ocr') {
       checkEngineHealth();
     } else {
-      // 非 rapid-ocr 引擎时清除旧的健康检查状态
       setEngineHealth(null);
       setHealthError('');
     }
-    
-    // 监听修复进度
+
     const cleanup = window.electron?.ocr?.onDownloadProgress?.((data) => {
       if (data.engineId === 'rapid-ocr' && repairing) {
         setRepairProgress(data.status || '');
       }
     });
-    
+
     return () => cleanup?.();
   }, [settings.ocr.engine, settings.ocr.rapidInstalled]);
-  
+
   const checkEngineHealth = useCallback(async () => {
     setEngineHealth('checking');
     setHealthError('');
@@ -63,7 +58,7 @@ const OcrSection = ({
       setHealthError(e.message);
     }
   }, [t]);
-  
+
   const handleRepair = useCallback(async () => {
     setRepairing(true);
     setRepairProgress(t('ocr.repairStarting'));
@@ -88,13 +83,11 @@ const OcrSection = ({
     }
   }, [notify, updateSetting, t]);
 
-  // 切换 API Key 显示状态的辅助函数
   const toggleApiKeyVisibility = (key, e) => {
     e?.stopPropagation();
     setShowApiKeys(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
-  // 选择引擎的辅助函数
   const selectEngine = (engineId, requiredKeys = []) => {
     const missingKey = requiredKeys.find(key => !settings.ocr[key]);
     if (missingKey) {
@@ -103,17 +96,17 @@ const OcrSection = ({
     }
     updateSetting('ocr', 'engine', engineId);
     if (setOcrEngine) setOcrEngine(engineId);
-    
-    // 用户手动选择 llm-vision 时，重置降级锁定状态
+
+    // Manual re-select of llm-vision clears the auto-degrade lock so the user
+    // can re-enable it after fixing their model setup
     if (engineId === 'llm-vision') {
       ocrManager.resetVisionFallback();
     }
   };
 
-  // API Key 输入框组件
   const ApiKeyInput = ({ keyName, placeholder = 'API Key', value, showKey }) => (
     <div className="api-key-input-wrapper">
-      <input 
+      <input
         type={showKey ? "text" : "password"}
         className="setting-input compact"
         placeholder={placeholder}
@@ -121,7 +114,7 @@ const OcrSection = ({
         onChange={(e) => updateSetting('ocr', keyName, e.target.value)}
         onClick={(e) => e.stopPropagation()}
       />
-      <button 
+      <button
         type="button"
         className="api-key-toggle"
         onClick={(e) => toggleApiKeyVisibility(keyName.replace('Key', '').replace('Secret', 'Secret'), e)}
@@ -136,13 +129,12 @@ const OcrSection = ({
     <div className="setting-content animate-fade-in">
       <h3>{t('settings.ocr.title')}</h3>
       <p className="setting-description">{t('ocr.description')}</p>
-      
-      {/* 1. OCR 识别语言 */}
+
       <div className="setting-group">
         <label className="setting-label">{t('ocr.recognitionLanguage')}</label>
-        <select 
-          className="setting-select" 
-          value={settings.ocr.recognitionLanguage || 'auto'} 
+        <select
+          className="setting-select"
+          value={settings.ocr.recognitionLanguage || 'auto'}
           onChange={(e) => updateSetting('ocr', 'recognitionLanguage', e.target.value)}
         >
           <option value="auto">🔄 {t('ocr.lang.auto')}</option>
@@ -158,12 +150,11 @@ const OcrSection = ({
         </select>
         <p className="setting-hint">{t('ocr.autoLangHint')}</p>
       </div>
-      
-      {/* 2. 截图设置 */}
+
       <div className="setting-group">
         <label className="setting-toggle">
-          <input 
-            type="checkbox" 
+          <input
+            type="checkbox"
             checked={settings.screenshot?.showConfirmButtons ?? true}
             onChange={(e) => updateSetting('screenshot', 'showConfirmButtons', e.target.checked)}
           />
@@ -172,11 +163,10 @@ const OcrSection = ({
         <p className="setting-hint">{t('ocr.confirmButtonsHint')}</p>
       </div>
 
-      {/* 3. 图片预处理设置 */}
       <div className="setting-group">
         <label className="setting-toggle">
-          <input 
-            type="checkbox" 
+          <input
+            type="checkbox"
             checked={settings.ocr?.enablePreprocess ?? true}
             onChange={(e) => updateSetting('ocr', 'enablePreprocess', e.target.checked)}
           />
@@ -186,7 +176,7 @@ const OcrSection = ({
         {(settings.ocr?.enablePreprocess ?? true) && (
           <div className="sub-setting">
             <label className="setting-label">{t('ocr.scaleFactor')}</label>
-            <select 
+            <select
               className="setting-select"
               value={settings.ocr?.scaleFactor || 2}
               onChange={(e) => updateSetting('ocr', 'scaleFactor', parseFloat(e.target.value))}
@@ -201,7 +191,7 @@ const OcrSection = ({
         )}
       </div>
 
-      {/* ========== 第一梯队：本地 OCR ========== */}
+      {/* Tier 1: local engines */}
       <details className="setting-section" open={!collapsedGroups['ocr-local']}>
         <summary className="section-header" onClick={(e) => { e.preventDefault(); toggleGroup('ocr-local'); }}>
           <span className="section-title">🚀 {t('ocr.localEngines')}</span>
@@ -209,7 +199,6 @@ const OcrSection = ({
         </summary>
         <div className="section-content">
           <div className="ocr-engines-list">
-            {/* RapidOCR */}
             <div className={`ocr-engine-item ${settings.ocr.engine === 'rapid-ocr' ? 'active' : ''} ${engineHealth === 'broken' ? 'engine-broken' : ''}`}>
               <div className="engine-info">
                 <div className="engine-header">
@@ -233,8 +222,7 @@ const OcrSection = ({
                   )}
                 </div>
                 <p className="engine-desc">{t('ocr.rapidDesc')}</p>
-                
-                {/* 引擎异常提示 */}
+
                 {engineHealth === 'broken' && (
                   <div className="engine-error-box">
                     <AlertTriangle size={14} />
@@ -252,7 +240,7 @@ const OcrSection = ({
                 {settings.ocr.rapidInstalled ? (
                   <>
                     {engineHealth === 'broken' ? (
-                      <button 
+                      <button
                         className="btn repair"
                         disabled={repairing}
                         onClick={handleRepair}
@@ -264,14 +252,14 @@ const OcrSection = ({
                         )}
                       </button>
                     ) : (
-                      <button 
+                      <button
                         className={`btn ${settings.ocr.engine === 'rapid-ocr' ? 'active' : ''}`}
                         onClick={() => selectEngine('rapid-ocr')}
                       >
                         {settings.ocr.engine === 'rapid-ocr' ? t('ocr.inUse') : t('ocr.use')}
                       </button>
                     )}
-                    <button 
+                    <button
                       className="btn-small"
                       onClick={checkEngineHealth}
                       disabled={engineHealth === 'checking'}
@@ -280,7 +268,7 @@ const OcrSection = ({
                     >
                       <RefreshCw size={12} className={engineHealth === 'checking' ? 'spinning' : ''} />
                     </button>
-                    <button 
+                    <button
                       className="btn-small uninstall"
                       onClick={async () => {
                         if (!window.confirm(t('ocr.uninstallConfirm'))) return;
@@ -289,6 +277,7 @@ const OcrSection = ({
                           const result = await window.electron?.ocr?.removeEngine?.('rapid-ocr');
                           if (result?.success) {
                             updateSetting('ocr', 'rapidInstalled', false);
+                            // Switching off the currently-active engine: fall back to builtin
                             if (settings.ocr.engine === 'rapid-ocr') selectEngine('llm-vision');
                             notify(t('ocr.uninstalled'), 'success');
                           } else {
@@ -303,7 +292,7 @@ const OcrSection = ({
                     </button>
                   </>
                 ) : (
-                  <button 
+                  <button
                     className="btn download"
                     onClick={async () => {
                       notify(t('ocr.downloading'), 'info');
@@ -329,7 +318,7 @@ const OcrSection = ({
         </div>
       </details>
 
-      {/* ========== 第二梯队：视觉大模型 ========== */}
+      {/* Tier 2: vision LLM */}
       <details className="setting-section" open={!collapsedGroups['ocr-vision']}>
         <summary className="section-header" onClick={(e) => { e.preventDefault(); toggleGroup('ocr-vision'); }}>
           <span className="section-title">⚡ {t('ocr.visionModels')}</span>
@@ -347,7 +336,7 @@ const OcrSection = ({
                 <p className="engine-meta">{t('ocr.llmVisionMeta')}</p>
               </div>
               <div className="engine-actions">
-                <button 
+                <button
                   className={`btn ${settings.ocr.engine === 'llm-vision' ? 'active' : ''}`}
                   onClick={() => selectEngine('llm-vision')}
                 >
@@ -359,7 +348,7 @@ const OcrSection = ({
         </div>
       </details>
 
-      {/* ========== 第三梯队：在线 OCR API ========== */}
+      {/* Tier 3: online APIs */}
       <details className="setting-section" open={!collapsedGroups['ocr-online']}>
         <summary className="section-header" onClick={(e) => { e.preventDefault(); toggleGroup('ocr-online'); }}>
           <span className="section-title">🌐 {t('ocr.onlineServices')}</span>
@@ -368,7 +357,6 @@ const OcrSection = ({
         <div className="section-content">
           <p className="setting-hint" style={{marginBottom: '12px'}}>{t('ocr.onlineNote')}</p>
           <div className="ocr-engines-list">
-            {/* OCR.space */}
             <div className={`ocr-engine-item ${settings.ocr.engine === 'ocrspace' ? 'active' : ''}`}>
               <div className="engine-info">
                 <div className="engine-header">
@@ -379,7 +367,7 @@ const OcrSection = ({
                 <ApiKeyInput keyName="ocrspaceKey" value={settings.ocr.ocrspaceKey} showKey={showApiKeys.ocrspace} />
               </div>
               <div className="engine-actions">
-                <button 
+                <button
                   className={`btn ${settings.ocr.engine === 'ocrspace' ? 'active' : ''} ${!settings.ocr.ocrspaceKey ? 'disabled' : ''}`}
                   onClick={() => selectEngine('ocrspace', ['ocrspaceKey'])}
                 >
@@ -388,7 +376,6 @@ const OcrSection = ({
               </div>
             </div>
 
-            {/* Google Vision */}
             <div className={`ocr-engine-item ${settings.ocr.engine === 'google-vision' ? 'active' : ''}`}>
               <div className="engine-info">
                 <div className="engine-header">
@@ -399,7 +386,7 @@ const OcrSection = ({
                 <ApiKeyInput keyName="googleVisionKey" value={settings.ocr.googleVisionKey} showKey={showApiKeys.googleVision} />
               </div>
               <div className="engine-actions">
-                <button 
+                <button
                   className={`btn ${settings.ocr.engine === 'google-vision' ? 'active' : ''} ${!settings.ocr.googleVisionKey ? 'disabled' : ''}`}
                   onClick={() => selectEngine('google-vision', ['googleVisionKey'])}
                 >
@@ -408,7 +395,6 @@ const OcrSection = ({
               </div>
             </div>
 
-            {/* Azure OCR */}
             <div className={`ocr-engine-item ${settings.ocr.engine === 'azure-ocr' ? 'active' : ''}`}>
               <div className="engine-info">
                 <div className="engine-header">
@@ -423,7 +409,7 @@ const OcrSection = ({
                 </div>
               </div>
               <div className="engine-actions">
-                <button 
+                <button
                   className={`btn ${settings.ocr.engine === 'azure-ocr' ? 'active' : ''} ${!(settings.ocr.azureKey && settings.ocr.azureEndpoint) ? 'disabled' : ''}`}
                   onClick={() => {
                     if (settings.ocr.azureKey && settings.ocr.azureEndpoint) selectEngine('azure-ocr');
@@ -435,7 +421,6 @@ const OcrSection = ({
               </div>
             </div>
 
-            {/* 百度 OCR */}
             <div className={`ocr-engine-item ${settings.ocr.engine === 'baidu-ocr' ? 'active' : ''}`}>
               <div className="engine-info">
                 <div className="engine-header">
@@ -453,7 +438,7 @@ const OcrSection = ({
                 </div>
               </div>
               <div className="engine-actions">
-                <button 
+                <button
                   className={`btn ${settings.ocr.engine === 'baidu-ocr' ? 'active' : ''} ${!(settings.ocr.baiduApiKey && settings.ocr.baiduSecretKey) ? 'disabled' : ''}`}
                   onClick={() => {
                     if (settings.ocr.baiduApiKey && settings.ocr.baiduSecretKey) selectEngine('baidu-ocr');

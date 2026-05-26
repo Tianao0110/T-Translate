@@ -1,98 +1,92 @@
-// electron/utils/selection-state-machine.js
-// 划词翻译状态机 - 智能识别文本选择行为
+// Selection state machine — kinematic detection of intentional text-selection gestures.
 
 const logger = require('./logger')('SelectionSM');
 
-// ==================== 常量定义 ====================
+// ===== Constants =====
 
 const STATES = {
   IDLE: 'idle',
-  POSSIBLE: 'possible',      // PossibleSelection - 采样中
-  LIKELY: 'likely',          // LikelyTextSelection - 准备显示
-  CONFIRMED: 'confirmed',    // ConfirmedSelection - 确认显示
+  POSSIBLE: 'possible',      // Sampling — too early to decide
+  LIKELY: 'likely',          // Conditions met — about to show trigger
+  CONFIRMED: 'confirmed',    // mouseup confirmed
 };
 
 const CONFIG = {
-  // 采样配置
-  SAMPLE_INTERVAL: 25,        // 采样间隔 (ms)
-  MIN_DISTANCE: 1.5,          // 最小有效位移 (px)
-  MIN_DELTA_TIME: 10,         // 最小有效时间间隔 (ms)
-  MIN_DELTA_DISTANCE: 3,      // 配合 MIN_DELTA_TIME 的最小位移 (px)
-  
-  // 条件 A: 方向稳定
-  DIRECTION_WINDOW_SIZE: 5,   // 方向计算窗口大小
-  DIRECTION_THRESHOLD: 15,    // 方向变化阈值 (度)
-  MIN_TOTAL_DISTANCE: 12,     // 最小总位移 (px)
-  MIN_DURATION_A: 80,         // 最小持续时间 (ms)
-  
-  // 条件 B: 低速精细
-  LOW_SPEED_THRESHOLD: 0.1,   // 低速阈值 (px/ms)
-  MAX_INSTANT_DISTANCE: 3,    // 最大瞬时位移 (px)
-  MIN_DURATION_B: 100,        // 最小持续时间 (ms)
+  // Sampling
+  SAMPLE_INTERVAL: 25,        // Sampling interval (ms)
+  MIN_DISTANCE: 1.5,          // Min valid displacement (px)
+  MIN_DELTA_TIME: 10,         // Min valid time delta (ms)
+  MIN_DELTA_DISTANCE: 3,      // Min displacement paired with MIN_DELTA_TIME (px)
 
-  // 条件 D: 快速果断选词（修自动检测路径"快速划过单词漏判"）
-  MIN_DURATION_D: 10,          // 最小持续时间 (ms)，比 A/B 的 80-100ms 短得多
-  MIN_DISTANCE_D: 8,           // 最小总位移 (px)
-  MIN_HORIZONTAL_D: 5,         // 最小横向位移 (px)
-  MIN_SPEED_D: 0.2,            // 最小速度 (px/ms)，比 B 的 0.1 高（"快速"是核心）
-  MAX_VERTICAL_RATIO_D: 0.6,   // 最大 dy/dx 比例（防止把斜向拖拽误判为选词）
+  // Condition A: direction stability
+  DIRECTION_WINDOW_SIZE: 5,
+  DIRECTION_THRESHOLD: 15,    // Direction-change tolerance (degrees)
+  MIN_TOTAL_DISTANCE: 12,     // Min total displacement (px)
+  MIN_DURATION_A: 80,         // Min duration (ms)
 
-  // 条件 C: 双击/三击
-  DOUBLE_CLICK_TIME: 400,     // 双击时间窗口 (ms)
-  DOUBLE_CLICK_DISTANCE: 15,  // 双击距离阈值 (px)
-  
-  // 回退配置
-  GRACE_PERIOD: 120,          // 进入 Likely 后的宽容期 (ms)
-  RETREAT_ANGLE: 60,          // 回退角度阈值 (度)
-  RETREAT_COUNT: 3,           // 连续异常次数
-  
-  // 超时配置
-  POSSIBLE_TIMEOUT: 4000,     // Possible 状态超时 (ms)
-  LIKELY_TIMEOUT: 2000,       // Likely 状态超时 (ms)
+  // Condition B: slow & precise (deliberate)
+  LOW_SPEED_THRESHOLD: 0.1,   // Max avg speed (px/ms)
+  MAX_INSTANT_DISTANCE: 3,    // Max instantaneous jump (px)
+  MIN_DURATION_B: 100,        // Min duration (ms)
+
+  // Condition D: fast decisive selection
+  // Added to fix auto-detect path missing "user drags fast across a word" cases.
+  // Threshold rationale: D fires in ~10ms while A/B need ≥80ms; speed must be >0.2 px/ms
+  // (B requires ≤0.1 — non-overlapping); horizontal-dominant motion only (filters out
+  // diagonal drags which are typically not selection).
+  MIN_DURATION_D: 10,
+  MIN_DISTANCE_D: 8,
+  MIN_HORIZONTAL_D: 5,
+  MIN_SPEED_D: 0.2,
+  MAX_VERTICAL_RATIO_D: 0.6,  // dy/dx upper bound
+
+  // Condition C: double / triple click
+  DOUBLE_CLICK_TIME: 400,     // Multi-click time window (ms)
+  DOUBLE_CLICK_DISTANCE: 15,  // Multi-click distance threshold (px)
+
+  // Retreat (LIKELY → POSSIBLE rollback)
+  GRACE_PERIOD: 120,          // No retreat checks during this window after entering LIKELY (ms)
+  RETREAT_ANGLE: 60,          // Min direction-change angle counted as a retreat sample (deg)
+  RETREAT_COUNT: 3,           // Consecutive retreat samples required
+
+  // State timeouts
+  POSSIBLE_TIMEOUT: 4000,
+  LIKELY_TIMEOUT: 2000,
 };
 
-// ==================== 状态机类 ====================
+// ===== State machine =====
 
 class SelectionStateMachine {
   constructor() {
     this.reset();
-    this.clickHistory = [];   // 点击历史，用于检测双击/三击
-    this.onStateChange = null; // 状态变化回调
-    this.isMultiClickTriggered = false; // 是否由双击触发
+    this.clickHistory = [];
+    this.onStateChange = null;
+    this.isMultiClickTriggered = false;
   }
-  
-  /**
-   * 重置状态机
-   */
+
   reset() {
-    // 先清除定时器（必须在设置 timeoutId = null 之前）
+    // clearTimeout MUST run before nulling timeoutId.
     this.clearTimeout();
-    
+
     this.state = STATES.IDLE;
-    this.samples = [];           // 采样点 [{x, y, t}, ...]
-    this.directions = [];        // 方向角序列
+    this.samples = [];           // [{x, y, t}, ...]
+    this.directions = [];        // Direction angles
     this.startPos = null;
     this.startTime = null;
     this.lastSampleTime = 0;
-    this.likelyEnteredAt = null; // 进入 Likely 的时间
-    this.retreatCount = 0;       // 连续异常计数
-    this.isMultiClickTriggered = false; // 重置双击标记
-    this.isHotkeyTriggered = false;     // 重置 sticky 直出标记
+    this.likelyEnteredAt = null;
+    this.retreatCount = 0;
+    this.isMultiClickTriggered = false;
+    this.isHotkeyTriggered = false;
   }
-  
-  /**
-   * 清除超时定时器
-   */
+
   clearTimeout() {
     if (this.timeoutId) {
       clearTimeout(this.timeoutId);
       this.timeoutId = null;
     }
   }
-  
-  /**
-   * 设置超时
-   */
+
   setTimeout(duration, nextState = STATES.IDLE) {
     this.clearTimeout();
     this.timeoutId = setTimeout(() => {
@@ -100,151 +94,138 @@ class SelectionStateMachine {
       this.transitionTo(nextState);
     }, duration);
   }
-  
-  /**
-   * 状态转换
-   */
+
   transitionTo(newState) {
     const oldState = this.state;
-    
-    // 避免无意义的状态转换（已经是 IDLE 就不再处理）
+
+    // No-op: already IDLE.
     if (oldState === newState && newState === STATES.IDLE) {
       return;
     }
-    
+
     this.state = newState;
-    
+
     logger.debug(`State: ${oldState} -> ${newState}`);
-    
-    // 设置超时
+
     if (newState === STATES.POSSIBLE) {
       this.setTimeout(CONFIG.POSSIBLE_TIMEOUT);
     } else if (newState === STATES.LIKELY) {
       this.likelyEnteredAt = Date.now();
       this.retreatCount = 0;
-      this.setTimeout(CONFIG.LIKELY_TIMEOUT);
+      // Sticky direct path needs no watchdog: the user is actively dragging and mouseup
+      // resolves the state. The 2s LIKELY_TIMEOUT would falsely kill long slow selections
+      // on the direct path.
+      if (!this.isHotkeyTriggered) {
+        this.setTimeout(CONFIG.LIKELY_TIMEOUT);
+      }
     } else if (newState === STATES.IDLE) {
-      this.reset();  // 重置所有状态（reset 内部会清除定时器）
+      this.reset();
     }
-    
-    // 触发回调
+
     if (this.onStateChange) {
       this.onStateChange(newState, oldState);
     }
   }
-  
-  // ==================== 事件处理 ====================
-  
+
+  // ===== Event handlers =====
+
   /**
-   * 鼠标按下
-   * @param {number} x - 鼠标 X 坐标
-   * @param {number} y - 鼠标 Y 坐标
-   * @param {boolean} hotkeyActive - sticky 直出模式此刻是否激活（由 CapsLock toggle 决定）
+   * @param {number} x
+   * @param {number} y
+   * @param {boolean} hotkeyActive — sticky direct mode (CapsLock toggle) on at this moment
    */
   onMouseDown(x, y, hotkeyActive = false) {
     const now = Date.now();
 
-    // 检测双击/三击 (条件 C)
     const isMulti = this.isMultiClick(x, y, now);
 
-    // 记录点击历史
     this.clickHistory.push({ x, y, t: now });
     if (this.clickHistory.length > 3) {
       this.clickHistory.shift();
     }
 
-    // 重置状态
     this.reset();
-    this.isMultiClickTriggered = isMulti;  // 标记是否双击
-    this.isHotkeyTriggered = hotkeyActive;  // 标记 sticky 直出
+    this.isMultiClickTriggered = isMulti;
+    this.isHotkeyTriggered = hotkeyActive;
     this.startPos = { x, y };
     this.startTime = now;
     this.samples.push({ x, y, t: now });
     this.lastSampleTime = now;
 
-    // 优先级：sticky 直出 > 双击 > 正常流程
-    // 即使是 sticky + 双击的组合也走直出路径（用户的明确意图）
+    // Priority: sticky direct > multi-click > normal flow.
+    // Sticky direct + multi-click together still goes through the direct path
+    // (user's explicit intent wins).
     if (hotkeyActive) {
       logger.debug('Sticky direct (CapsLock on) detected, entering LIKELY direct');
       this.transitionTo(STATES.LIKELY);
     } else if (isMulti) {
-      // 双击直接进入 Likely，但 mouseUp 时需要延迟确认
       logger.debug('Multi-click detected, entering Likely (needs delayed confirm)');
       this.transitionTo(STATES.LIKELY);
     } else {
-      // 正常流程：进入 Possible
       this.transitionTo(STATES.POSSIBLE);
     }
   }
-  
-  /**
-   * 鼠标移动
-   */
+
   onMouseMove(x, y) {
     if (this.state === STATES.IDLE) return;
-    
+
     const now = Date.now();
-    
-    // 节流采样
+
+    // Throttle by sample interval.
     if (now - this.lastSampleTime < CONFIG.SAMPLE_INTERVAL) {
       return;
     }
-    
+
     const lastSample = this.samples[this.samples.length - 1];
     if (!lastSample) return;
-    
+
     const dx = x - lastSample.x;
     const dy = y - lastSample.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
     const dt = now - lastSample.t;
-    
-    // 过滤无意义点
+
+    // Drop noise: tiny moves or too-fast samples with tiny displacement.
     if (distance < CONFIG.MIN_DISTANCE) {
       return;
     }
     if (dt < CONFIG.MIN_DELTA_TIME && distance < CONFIG.MIN_DELTA_DISTANCE) {
       return;
     }
-    
-    // 添加采样点
+
     this.samples.push({ x, y, t: now });
     this.lastSampleTime = now;
-    
-    // 计算方向角
+
     const angle = Math.atan2(dy, dx) * 180 / Math.PI;
     this.directions.push(angle);
-    
-    // 根据当前状态处理
+
     if (this.state === STATES.POSSIBLE) {
       this.evaluatePossible(now);
     } else if (this.state === STATES.LIKELY) {
       this.evaluateLikely(now);
     }
   }
-  
+
   /**
-   * 鼠标释放
-   * @param {number} x - 鼠标 X 坐标
-   * @param {number} y - 鼠标 Y 坐标
-   * @param {boolean} hotkeyActive - sticky 直出模式此刻是否激活（由 CapsLock toggle 决定）
+   * @param {number} x
+   * @param {number} y
+   * @param {boolean} hotkeyActive — sticky direct mode on at this moment
    */
   onMouseUp(x, y, hotkeyActive = false) {
     const now = Date.now();
 
-    // 更新点击历史（用于双击检测）—— 不论走哪条路径都要更新，
-    // 否则 sticky 直出路径之后的下一次双击会被误判
+    // Always stamp upTime (even on hotkey path) — otherwise the next double-click
+    // after a sticky direct can be misclassified.
     if (this.clickHistory.length > 0) {
       const lastClick = this.clickHistory[this.clickHistory.length - 1];
       lastClick.upTime = now;
     }
 
     if (this.state === STATES.LIKELY) {
-      // 从 Likely 进入 Confirmed
       this.transitionTo(STATES.CONFIRMED);
 
-      // Sticky 直出路径：mousedown 和 mouseup 时 CapsLock 都是开的
-      // 跳过图标步骤，调用方应直接抓文字 + 弹翻译卡片
-      // 注意：直出优先于 multi-click，即使两个 flag 都为 true 也走这条
+      // Sticky direct path: hotkey was active at BOTH mousedown and mouseup.
+      // Caller skips the trigger icon and goes straight to capture+translate.
+      // Note: direct beats multi-click — both flags true still uses this branch.
       if (this.isHotkeyTriggered && hotkeyActive) {
         logger.debug('Sticky direct path (skipIcon)');
         return {
@@ -254,164 +235,144 @@ class SelectionStateMachine {
         };
       }
 
-      // 双击触发的需要延迟确认（检测是否真的选中了文本）
+      // Multi-click needs delayed confirm — system needs time to actually select.
       if (this.isMultiClickTriggered) {
         logger.debug('Multi-click needs delayed confirmation');
         return {
           shouldShow: true,
           rect: this.getSelectionRect(),
-          needsDelayedConfirm: true  // 需要延迟确认
+          needsDelayedConfirm: true,
         };
       }
 
-      // 正常返回（也覆盖 "mousedown 时 CapsLock 开、mouseup 时已关" 的情况
-      // —— 用户拖拽过程中关了 CapsLock，把它当成普通选词处理）
+      // Normal return — also covers "CapsLock was on at mousedown but off at mouseup"
+      // (user released sticky mid-drag). Falls back to ordinary trigger-icon flow.
       return { shouldShow: true, rect: this.getSelectionRect() };
     } else if (this.state === STATES.POSSIBLE) {
-      // 不满足条件，回到 IDLE
       this.transitionTo(STATES.IDLE);
       return { shouldShow: false };
     }
 
     return { shouldShow: false };
   }
-  
-  // ==================== 条件判断 ====================
-  
-  /**
-   * 检测双击/三击
-   */
+
+  // ===== Conditions =====
+
   isMultiClick(x, y, now) {
     if (this.clickHistory.length === 0) return false;
-    
+
     const lastClick = this.clickHistory[this.clickHistory.length - 1];
     if (!lastClick.upTime) return false;
-    
+
     const timeDiff = now - lastClick.upTime;
     const distance = Math.sqrt(
-      Math.pow(x - lastClick.x, 2) + 
+      Math.pow(x - lastClick.x, 2) +
       Math.pow(y - lastClick.y, 2)
     );
-    
-    return timeDiff < CONFIG.DOUBLE_CLICK_TIME && 
+
+    return timeDiff < CONFIG.DOUBLE_CLICK_TIME &&
            distance < CONFIG.DOUBLE_CLICK_DISTANCE;
   }
-  
-  /**
-   * 预检测是否是连续点击（不修改状态）
-   * 用于 mousedown 时决定是否隐藏窗口
-   */
+
+  // Non-mutating peek used during mousedown to decide whether to hide the existing
+  // window (avoid flicker when a double-click is about to extend selection).
   peekMultiClick(x, y) {
     const now = Date.now();
     if (this.clickHistory.length === 0) return false;
-    
+
     const lastClick = this.clickHistory[this.clickHistory.length - 1];
     if (!lastClick.upTime) return false;
-    
+
     const timeDiff = now - lastClick.upTime;
     const distance = Math.sqrt(
-      Math.pow(x - lastClick.x, 2) + 
+      Math.pow(x - lastClick.x, 2) +
       Math.pow(y - lastClick.y, 2)
     );
-    
-    const isMulti = timeDiff < CONFIG.DOUBLE_CLICK_TIME && 
+
+    const isMulti = timeDiff < CONFIG.DOUBLE_CLICK_TIME &&
                     distance < CONFIG.DOUBLE_CLICK_DISTANCE;
-    
+
     if (isMulti) {
       logger.debug(`peekMultiClick: true (timeDiff=${timeDiff}ms, distance=${distance.toFixed(1)}px)`);
     }
-    
+
     return isMulti;
   }
-  
-  /**
-   * 在 Possible 状态下评估是否进入 Likely
-   */
+
+  // Evaluate POSSIBLE → LIKELY transition. Conditions D / A / B checked in that order;
+  // D wins fastest (~10ms) so we test it first.
   evaluatePossible(now) {
     const duration = now - this.startTime;
 
-    // 条件 D: 快速果断选词 —— D 只需要 ~10ms 就能决定，A/B 都要 ≥80ms
-    // 修自动检测路径"用户飞快划过单词被漏判"的 bug
     if (this.checkFastDecisive(duration)) {
       logger.debug('Condition D met: fast decisive selection');
       this.transitionTo(STATES.LIKELY);
       return;
     }
 
-    // 条件 A: 方向稳定
     if (this.checkDirectionStability(duration)) {
       logger.debug('Condition A met: direction stability');
       this.transitionTo(STATES.LIKELY);
       return;
     }
 
-    // 条件 B: 低速精细
     if (this.checkLowSpeedPrecision(duration)) {
       logger.debug('Condition B met: low speed precision');
       this.transitionTo(STATES.LIKELY);
       return;
     }
   }
-  
-  /**
-   * 条件 A: 方向稳定性检测
-   */
+
   checkDirectionStability(duration) {
     if (duration < CONFIG.MIN_DURATION_A) return false;
     if (this.directions.length < CONFIG.DIRECTION_WINDOW_SIZE) return false;
-    
-    // 检查总位移
+
     const totalDistance = this.getTotalDistance();
     if (totalDistance < CONFIG.MIN_TOTAL_DISTANCE) return false;
-    
-    // 计算最近 N 个方向变化的中位数
+
+    // Median direction-change across the recent window. Wrapping handled at 180°;
+    // outliers (>120°) ignored — they're usually transient noise.
     const recentDirections = this.directions.slice(-CONFIG.DIRECTION_WINDOW_SIZE);
     const changes = [];
-    
+
     for (let i = 1; i < recentDirections.length; i++) {
       let change = Math.abs(recentDirections[i] - recentDirections[i - 1]);
-      // 处理 180° 边界
       if (change > 180) change = 360 - change;
-      // 忽略离群值
       if (change > 120) continue;
       changes.push(change);
     }
-    
+
     if (changes.length === 0) return false;
-    
-    // 计算中位数
+
     changes.sort((a, b) => a - b);
     const median = changes[Math.floor(changes.length / 2)];
-    
+
     return median < CONFIG.DIRECTION_THRESHOLD;
   }
-  
-  /**
-   * 条件 B: 低速精细检测
-   */
+
   checkLowSpeedPrecision(duration) {
     if (duration < CONFIG.MIN_DURATION_B) return false;
     if (this.samples.length < 3) return false;
-    
-    // 检查最近一段时间的速度
+
+    // Speed-check the recent N samples, not the whole trajectory.
     const recentSamples = this.samples.slice(-5);
     if (recentSamples.length < 2) return false;
-    
+
     const firstSample = recentSamples[0];
     const lastSample = recentSamples[recentSamples.length - 1];
-    
+
     const totalDist = Math.sqrt(
       Math.pow(lastSample.x - firstSample.x, 2) +
       Math.pow(lastSample.y - firstSample.y, 2)
     );
     const totalTime = lastSample.t - firstSample.t;
-    
+
     if (totalTime < CONFIG.MIN_DURATION_B) return false;
-    
+
     const avgSpeed = totalDist / totalTime;
     if (avgSpeed > CONFIG.LOW_SPEED_THRESHOLD) return false;
-    
-    // 检查最大瞬时位移
+
+    // Even with low avg speed, reject if any single hop is large (likely a fast pan).
     for (let i = 1; i < recentSamples.length; i++) {
       const dx = recentSamples[i].x - recentSamples[i - 1].x;
       const dy = recentSamples[i].y - recentSamples[i - 1].y;
@@ -422,62 +383,50 @@ class SelectionStateMachine {
     return true;
   }
 
-  /**
-   * 条件 D: 快速果断选词
-   *
-   * 修自动检测路径下的"用户飞快划过单词被漏判"bug。
-   * 触发条件：
-   *   - 持续时间 ≥10ms（A 要 80ms / B 要 100ms，D 时间窗最小）
-   *   - 总位移 ≥8px
-   *   - 横向位移 ≥5px（明确是水平 drag，不是斜向拖拽）
-   *   - 速度 ≥0.2 px/ms（B 是 ≤0.1，D 是 >0.2，互不重叠）
-   *   - dy/dx 比例 ≤0.6（防止把"用力斜向拖拽"误判）
-   */
+  // Condition D — fixes "user drags fast across one word and FSM misses it" on the
+  // auto-detect path. See CONFIG for threshold rationale.
   checkFastDecisive(duration) {
     if (duration < CONFIG.MIN_DURATION_D) return false;
     if (this.samples.length < 2) return false;
     if (!this.startPos) return false;
 
-    // 总位移
     const totalDistance = this.getTotalDistance();
     if (totalDistance < CONFIG.MIN_DISTANCE_D) return false;
 
-    // 横向 / 纵向位移（startPos → 最近一个采样点）
+    // Horizontal vs vertical: from startPos to the latest sample.
     const lastSample = this.samples[this.samples.length - 1];
     const dx = Math.abs(lastSample.x - this.startPos.x);
     const dy = Math.abs(lastSample.y - this.startPos.y);
 
-    // 必须是明显的横向移动
+    // Must be clearly horizontal-dominant.
     if (dx < CONFIG.MIN_HORIZONTAL_D) return false;
 
-    // 纵向不能压过横向太多（防止把斜向拖拽误判）
+    // Reject diagonal drags (dy must not exceed dx by too much).
     if (dx > 0 && dy / dx > CONFIG.MAX_VERTICAL_RATIO_D) return false;
 
-    // 速度必须够快（区别于条件 B 的低速精细）
+    // Must be fast (distinguishes from Condition B's slow & precise).
     const speed = totalDistance / duration;
     if (speed < CONFIG.MIN_SPEED_D) return false;
 
     return true;
   }
 
-  /**
-   * 在 Likely 状态下评估是否回退
-   */
+  // Evaluate LIKELY → POSSIBLE retreat. RETREAT_COUNT consecutive samples with
+  // sharp direction change (>RETREAT_ANGLE) rolls the state back.
   evaluateLikely(now) {
-    // 宽容期内不检测
+    // No retreat checks during the grace period.
     if (now - this.likelyEnteredAt < CONFIG.GRACE_PERIOD) {
       return;
     }
-    
-    // 检查是否需要回退
+
     if (this.directions.length < 2) return;
-    
+
     const lastAngle = this.directions[this.directions.length - 1];
     const prevAngle = this.directions[this.directions.length - 2];
-    
+
     let change = Math.abs(lastAngle - prevAngle);
     if (change > 180) change = 360 - change;
-    
+
     if (change > CONFIG.RETREAT_ANGLE) {
       this.retreatCount++;
       if (this.retreatCount >= CONFIG.RETREAT_COUNT) {
@@ -488,30 +437,24 @@ class SelectionStateMachine {
       this.retreatCount = 0;
     }
   }
-  
-  // ==================== 辅助方法 ====================
-  
-  /**
-   * 获取总位移
-   */
+
+  // ===== Helpers =====
+
   getTotalDistance() {
     if (!this.startPos || this.samples.length === 0) return 0;
-    
+
     const lastSample = this.samples[this.samples.length - 1];
     return Math.sqrt(
       Math.pow(lastSample.x - this.startPos.x, 2) +
       Math.pow(lastSample.y - this.startPos.y, 2)
     );
   }
-  
-  /**
-   * 获取选区矩形
-   */
+
   getSelectionRect() {
     if (!this.startPos || this.samples.length === 0) {
       return null;
     }
-    
+
     const lastSample = this.samples[this.samples.length - 1];
     return {
       x: Math.min(this.startPos.x, lastSample.x),
@@ -520,24 +463,16 @@ class SelectionStateMachine {
       height: Math.abs(lastSample.y - this.startPos.y),
     };
   }
-  
-  /**
-   * 获取当前状态
-   */
+
   getState() {
     return this.state;
   }
-  
-  /**
-   * 获取最后位置
-   */
+
   getLastPosition() {
     if (this.samples.length === 0) return this.startPos;
     return this.samples[this.samples.length - 1];
   }
 }
-
-// ==================== 导出 ====================
 
 module.exports = {
   SelectionStateMachine,

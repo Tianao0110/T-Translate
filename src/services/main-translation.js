@@ -1,26 +1,12 @@
-// src/services/main-translation.js
-// 主窗口翻译服务 - Service 层（精简版）
-//
-// 职责：
-// - 主窗口的 UI 状态管理
-// - 调用 translationService 进行翻译
-// - 历史记录管理
-// - OCR 识别处理
-//
-// 重构说明：
-// - 移除了对 translator.js 的依赖
-// - 所有翻译逻辑统一走 translationService（门面）
-// - 本模块只负责 UI 状态更新和历史管理
-//
-// 调用关系：
-// TranslationPanel → translation-store → mainTranslation → translationService → providers
+// Main-window translation service. Wires UI store state to translationService
+// and ocrManager, drives status transitions, and writes history.
+// Call graph: TranslationPanel -> translation-store -> this -> translationService -> providers
 
 import { v4 as uuidv4 } from 'uuid';
 import translationService from './translation.js';
 import { ocrManager } from '../providers/ocr/index.js';
 import useTranslationStore from '../stores/translation-store.js';
 
-// 从配置中心导入常量
 import { PRIVACY_MODES, TRANSLATION_STATUS } from '@config/defaults';
 import createLogger from '../utils/logger.js';
 import i18n from '../i18n.js';
@@ -30,21 +16,12 @@ const _t = (key, fallback) => {
   try { const r = i18n.t(key); return r === key ? fallback : r; } catch { return fallback; }
 };
 
-/**
- * 主窗口翻译服务
- */
 class MainTranslationService {
   constructor() {
     this._isTranslating = false;
   }
 
-  /**
-   * 执行翻译（统一入口）
-   * 根据 store 中的 useStreamOutput 设置决定是否流式输出
-   * 
-   * @param {object} options - 翻译选项
-   * @returns {Promise<{success: boolean, translated?: string, error?: string}>}
-   */
+  // Picks stream vs one-shot based on user preference in the store
   async execute(options = {}) {
     const state = useTranslationStore.getState();
     const { useStreamOutput, translationMode } = state;
@@ -56,11 +33,6 @@ class MainTranslationService {
     }
   }
 
-  /**
-   * 流式翻译（打字机效果）
-   * @param {object} options - 翻译选项
-   * @returns {Promise<{success: boolean, translated?: string, error?: string}>}
-   */
   async streamTranslate(options = {}) {
     const state = useTranslationStore.getState();
     const mode = state.translationMode;
@@ -73,7 +45,6 @@ class MainTranslationService {
     const startTime = Date.now();
     const translationId = uuidv4();
 
-    // 更新状态：开始翻译
     useTranslationStore.setState((draft) => {
       draft.currentTranslation.status = TRANSLATION_STATUS.TRANSLATING;
       draft.currentTranslation.error = null;
@@ -82,10 +53,8 @@ class MainTranslationService {
     });
 
     try {
-      // 获取术语表
       const glossaryTerms = useTranslationStore.getState().getGlossaryTerms?.() || [];
-      
-      // 调用 translationService 的流式翻译
+
       const result = await translationService.translateStream(
         sourceText,
         {
@@ -96,7 +65,7 @@ class MainTranslationService {
           useCache: mode !== PRIVACY_MODES.SECURE,
           glossaryTerms,
         },
-        // onChunk 回调：实时更新 UI
+        // Per-chunk UI update for typewriter effect
         (fullText) => {
           useTranslationStore.setState((draft) => {
             draft.currentTranslation.translatedText = fullText;
@@ -107,7 +76,6 @@ class MainTranslationService {
       const duration = Date.now() - startTime;
 
       if (result.success) {
-        // 完成后更新状态
         useTranslationStore.setState((draft) => {
           draft.currentTranslation.status = TRANSLATION_STATUS.SUCCESS;
           draft.currentTranslation.translatedText = result.text;
@@ -118,8 +86,7 @@ class MainTranslationService {
             template: options.template || draft.currentTranslation.metadata.template,
             fromCache: result.fromCache,
           };
-          
-          // 记录术语替换信息（供 UI 显示撤销提示）
+
           if (result.glossaryReplacements?.length > 0) {
             draft.currentTranslation.glossaryApplied = {
               replacements: result.glossaryReplacements,
@@ -129,7 +96,7 @@ class MainTranslationService {
             draft.currentTranslation.glossaryApplied = null;
           }
 
-          // 初始化版本管理 - 原始翻译作为 v1
+          // Seed version list with the original translation as v1
           const originalVersion = {
             id: 'v1',
             type: 'original',
@@ -139,7 +106,6 @@ class MainTranslationService {
           draft.currentTranslation.versions = [originalVersion];
           draft.currentTranslation.currentVersionId = 'v1';
 
-          // 添加到历史（非无痕模式）
           if (mode !== PRIVACY_MODES.SECURE && result.text) {
             this._addToHistory(draft, {
               id: translationId,
@@ -169,11 +135,6 @@ class MainTranslationService {
     }
   }
 
-  /**
-   * 非流式翻译
-   * @param {object} options - 翻译选项
-   * @returns {Promise<{success: boolean, translated?: string, error?: string}>}
-   */
   async translate(options = {}) {
     const state = useTranslationStore.getState();
     const mode = state.translationMode;
@@ -186,7 +147,6 @@ class MainTranslationService {
     const startTime = Date.now();
     const translationId = uuidv4();
 
-    // 更新状态：开始翻译
     useTranslationStore.setState((draft) => {
       draft.currentTranslation.status = TRANSLATION_STATUS.TRANSLATING;
       draft.currentTranslation.error = null;
@@ -194,10 +154,8 @@ class MainTranslationService {
     });
 
     try {
-      // 获取术语表
       const glossaryTerms = useTranslationStore.getState().getGlossaryTerms?.() || [];
-      
-      // 调用 translationService（不是 translator）
+
       const result = await translationService.translate(sourceText, {
         sourceLang: sourceLanguage,
         targetLang: targetLanguage,
@@ -220,8 +178,7 @@ class MainTranslationService {
             template: options.template || draft.currentTranslation.metadata.template,
             fromCache: result.fromCache,
           };
-          
-          // 记录术语替换信息（供 UI 显示撤销提示）
+
           if (result.glossaryReplacements?.length > 0) {
             draft.currentTranslation.glossaryApplied = {
               replacements: result.glossaryReplacements,
@@ -231,7 +188,6 @@ class MainTranslationService {
             draft.currentTranslation.glossaryApplied = null;
           }
 
-          // 初始化版本管理
           const originalVersion = {
             id: 'v1',
             type: 'original',
@@ -241,7 +197,6 @@ class MainTranslationService {
           draft.currentTranslation.versions = [originalVersion];
           draft.currentTranslation.currentVersionId = 'v1';
 
-          // 添加到历史（非无痕模式）
           if (mode !== PRIVACY_MODES.SECURE) {
             this._addToHistory(draft, {
               id: translationId,
@@ -271,16 +226,9 @@ class MainTranslationService {
     }
   }
 
-  /**
-   * 批量翻译
-   * @param {string[]} texts - 文本数组
-   * @param {object} options - 选项
-   * @returns {Promise<Array<{success: boolean, text?: string, error?: string}>>}
-   */
   async batchTranslate(texts, options = {}) {
     const state = useTranslationStore.getState();
 
-    // 初始化队列
     const queue = texts.map((text) => ({
       id: uuidv4(),
       text,
@@ -298,14 +246,12 @@ class MainTranslationService {
     for (let i = 0; i < queue.length; i++) {
       const item = queue[i];
 
-      // 更新当前项状态
       useTranslationStore.setState((draft) => {
         const queueItem = draft.queue.find((q) => q.id === item.id);
         if (queueItem) queueItem.status = 'processing';
       });
 
       try {
-        // 使用 translationService
         const result = await translationService.translate(item.text, {
           sourceLang: state.currentTranslation.sourceLanguage,
           targetLang: state.currentTranslation.targetLanguage,
@@ -348,12 +294,6 @@ class MainTranslationService {
     return results;
   }
 
-  /**
-   * OCR 识别
-   * @param {string} image - 图片数据（base64 或 URL）
-   * @param {object} options - 选项
-   * @returns {Promise<{success: boolean, text?: string, error?: string}>}
-   */
   async recognizeImage(image, options = {}) {
     if (!ocrManager) {
       return { success: false, error: 'OCR not initialized' };
@@ -379,7 +319,8 @@ class MainTranslationService {
           if (options.autoSetSource !== false) {
             draft.currentTranslation.sourceText = result.text;
           }
-          // 如果发生了 LLM Vision 降级，记录到状态中供 UI 显示
+          // Surface LLM-Vision fallback so the user knows they're on a different engine.
+          // Two variants: hard-lock (repeated failures disabled it) vs soft (model doesn't support vision).
           if (result.fallbackFrom === 'llm-vision') {
             draft.ocrStatus.fallbackNotice = ocrManager.isVisionLocked()
               ? _t('ocr.visionLocked', 'LLM Vision has been disabled due to repeated failures. Switched to local OCR. Re-enable in Settings > OCR.')
@@ -401,13 +342,8 @@ class MainTranslationService {
     }
   }
 
-  /**
-   * 添加到历史记录（内部方法）
-   * @param {object} draft - immer draft
-   * @param {object} item - 历史记录项
-   */
   _addToHistory(draft, item) {
-    // 检查是否已存在相同内容
+    // De-dupe on (source, translated) so retries don't double-log
     const exists = draft.history.some(
       (h) => h.sourceText === item.sourceText && h.translatedText === item.translatedText
     );
@@ -419,11 +355,9 @@ class MainTranslationService {
         draft.history = draft.history.slice(0, draft.historyLimit);
       }
 
-      // 更新统计
       draft.statistics.totalTranslations++;
       draft.statistics.totalCharacters += item.sourceText?.length || 0;
 
-      // 更新今日统计
       const today = new Date().toDateString();
       const historyToday = draft.history.filter(
         (h) => new Date(h.timestamp).toDateString() === today
@@ -432,22 +366,15 @@ class MainTranslationService {
     }
   }
 
-  /**
-   * 获取缓存统计（透传）
-   */
   getCacheStats() {
     return translationService.getCacheStats();
   }
 
-  /**
-   * 清空缓存（透传）
-   */
   clearCache(level = 'all') {
     translationService.clearCache(level);
   }
 }
 
-// 单例导出
 const mainTranslation = new MainTranslationService();
 
 export default mainTranslation;

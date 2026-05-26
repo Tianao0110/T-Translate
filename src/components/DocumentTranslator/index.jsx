@@ -1,6 +1,3 @@
-// 文档翻译组件 - 沉浸式双语对照翻译
-// 已国际化版本
-
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -31,7 +28,7 @@ import { LANGUAGES } from '../../config/constants.js';
 import { LanguageSelector } from '../TranslationPanel/components.jsx';
 import './styles.css';
 
-// 段落状态
+// Segment status
 const STATUS = {
   PENDING: 'pending',
   TRANSLATING: 'translating',
@@ -40,7 +37,7 @@ const STATUS = {
   SKIPPED: 'skipped',
 };
 
-// 进度持久化
+// Progress persistence
 const PROGRESS_KEY = 'dt_progress_';
 
 function getFileFingerprint(file) {
@@ -53,7 +50,7 @@ function saveProgress(fp, segments, sLang, tLang) {
       segs: segments.filter(s => s.status === STATUS.COMPLETED).map(s => ({ id: s.id, t: s.translated }))
     };
     localStorage.setItem(PROGRESS_KEY + fp, JSON.stringify(data));
-  } catch { /* full */ }
+  } catch { /* localStorage full */ }
 }
 
 function loadProgress(fp) {
@@ -66,9 +63,6 @@ function loadProgress(fp) {
   } catch { return null; }
 }
 
-/**
- * 单个段落组件
- */
 const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate, onEdit, onCopy, searchQuery, t }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState('');
@@ -95,7 +89,7 @@ const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate,
   };
   const cancelEdit = () => { setIsEditing(false); setEditText(''); };
 
-  // 高亮搜索匹配
+  // Highlight search matches
   const highlightText = (text) => {
     if (!searchQuery || !text) return text;
     try {
@@ -112,7 +106,7 @@ const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate,
       className={`segment-item ${segment.status} ${displayStyle} ${segment.edited ? 'edited' : ''}`}
       data-segment-id={segment.id}
     >
-      {/* 段落序号和状态 */}
+      {/* index + status */}
       <div className="segment-header">
         <span className="segment-index">#{segment.id + 1}</span>
         {statusIcon[segment.status]}
@@ -122,7 +116,7 @@ const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate,
         )}
         {isSubtitle && <span className="timecode">{segment.timecode}</span>}
         
-        {/* 段落操作按钮 */}
+        {/* per-segment actions */}
         <div className="segment-actions">
           {segment.status === STATUS.ERROR && (
             <button className="seg-btn" onClick={() => onRetry(segment.id)} title={t('documentTranslator.actions.retry')}>
@@ -146,14 +140,14 @@ const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate,
         </div>
       </div>
 
-      {/* 原文 */}
+      {/* source */}
       {displayStyle !== 'translated-only' && (
         <div className="segment-original">
           {highlightText(segment.original)}
         </div>
       )}
 
-      {/* 译文 */}
+      {/* translation */}
       {displayStyle !== 'source-only' && segment.status !== STATUS.SKIPPED && (
         <div className={`segment-translated ${segment.status}`}>
           {segment.status === STATUS.TRANSLATING && (
@@ -200,9 +194,6 @@ const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate,
   );
 });
 
-/**
- * 大纲项组件
- */
 const OutlineItem = ({ item, onNavigate, level = 0 }) => {
   const [expanded, setExpanded] = useState(true);
   const hasChildren = item.children && item.children.length > 0;
@@ -241,12 +232,8 @@ const OutlineItem = ({ item, onNavigate, level = 0 }) => {
   );
 };
 
-// 日志实例
 const logger = createLogger('DocTranslator');
 
-/**
- * 主组件
- */
 const DocumentTranslator = ({ 
   notify,
   sourceLang: initialSourceLang = 'auto',
@@ -254,54 +241,51 @@ const DocumentTranslator = ({
 }) => {
   const { t } = useTranslation();
   
-  // 文档翻译独立的语言设置（初始值从主界面同步，之后独立控制）
+  // Document-translator keeps its own language state, seeded from the
+  // main UI but free to diverge.
   const [sourceLang, setSourceLang] = useState(initialSourceLang);
   const [targetLang, setTargetLang] = useState(initialTargetLang);
   
-  // 语言选项（排除 auto 用于目标语言）
+  // Source allows auto; target does not.
   const targetLanguages = useMemo(() => LANGUAGES.filter(l => l.code !== 'auto'), []);
   const sourceLanguages = useMemo(() => LANGUAGES, []);
   
-  // 显示样式配置 - 使用 i18n
   const DISPLAY_STYLES = useMemo(() => [
     { id: 'below', name: t('documentTranslator.displayStyles.below'), icon: '⬇️' },
     { id: 'side-by-side', name: t('documentTranslator.displayStyles.sideBySide'), icon: '⬛' },
   ], [t]);
   
-  // 文件状态
+  // File state
   const [document, setDocument] = useState(null);
   const [segments, setSegments] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   
-  // 文件指纹（进度持久化）
+  // Fingerprint used to key progress in localStorage.
   const fileFingerprint = useRef(null);
   
-  // 大纲导航
+  // Outline navigation
   const [outline, setOutline] = useState([]);
   
-  // 翻译记忆缓存
+  // In-memory translation memory for this session.
   const translationCache = useRef(new Map());
   
-  // 翻译状态
+  // Translation lifecycle flags
   const [isTranslating, setIsTranslating] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const pauseRef = useRef(false);
   const abortRef = useRef(false);
   
-  // 批量翻译模式
-  const [batchMode, setBatchMode] = useState(true);  // 默认启用批量模式
-  const [batchSize, setBatchSize] = useState(10);     // 每批处理数量
-  const [useGlossary, setUseGlossary] = useState(true);  // 启用术语表
+  const [batchMode, setBatchMode] = useState(true);
+  const [batchSize, setBatchSize] = useState(10);
+  const [useGlossary, setUseGlossary] = useState(true);
   
-  // 获取术语表
   const getGlossaryTerms = useTranslationStore(state => state.getGlossaryTerms);
   const translationMode = useTranslationStore(state => state.translationMode);
   
-  // 计时
   const [startTime, setStartTime] = useState(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   
-  // UI 状态
+  // UI state
   const [displayStyle, setDisplayStyle] = useState('below');
   const [showFilters, setShowFilters] = useState(false);
   const [showExport, setShowExport] = useState(false);
@@ -309,21 +293,23 @@ const DocumentTranslator = ({
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   
-  // 搜索替换
+  // Search & replace
+  // -1 in matchIndex means "not yet positioned" — Enter / Next moves to 0,
+  // Prev moves to last. matchIds is derived from query+segments via useMemo
+  // (see below), so it stays in sync without resetting the cursor when
+  // segments stream in during translation.
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchMatchCount, setSearchMatchCount] = useState(0);
   const [searchMatchIndex, setSearchMatchIndex] = useState(-1);
-  const [searchMatchIds, setSearchMatchIds] = useState([]);
   
-  // 进度恢复提示
+  // Progress restore prompt
   const [pendingRestore, setPendingRestore] = useState(null);
   
-  // 密码弹窗
+  // Password modal
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [pendingFile, setPendingFile] = useState(null);
   const [password, setPassword] = useState('');
   
-  // 过滤设置
+  // Filter settings
   const [filters, setFilters] = useState({
     skipShort: true,
     minLength: 10,
@@ -333,15 +319,15 @@ const DocumentTranslator = ({
     skipKeywords: [],
   });
   
-  // 拖放区域 ref
+  // Drop-zone refs
   const dropZoneRef = useRef(null);
   const fileInputRef = useRef(null);
   const [isDragOver, setIsDragOver] = useState(false);
   
-  // 列表引用
+  // Segment list ref
   const listRef = useRef(null);
   
-  // 统计信息
+  // Stats
   const stats = useMemo(() => {
     const total = segments.length;
     const completed = segments.filter(s => s.status === STATUS.COMPLETED).length;
@@ -363,7 +349,7 @@ const DocumentTranslator = ({
     };
   }, [segments]);
 
-  // 计时器
+  // Timer effect
   useEffect(() => {
     let timer;
     if (isTranslating && startTime && !isPaused) {
@@ -374,24 +360,31 @@ const DocumentTranslator = ({
     return () => clearInterval(timer);
   }, [isTranslating, startTime, isPaused]);
 
-  // 搜索匹配计数
-  useEffect(() => {
-    if (!searchQuery) { setSearchMatchCount(0); return; }
-    const count = segments.filter(s => 
-      s.status === STATUS.COMPLETED && s.translated &&
-      s.translated.toLowerCase().includes(searchQuery.toLowerCase())
-    ).length;
-    setSearchMatchCount(count);
+  // Pure derivation so live segment updates (mid-translation) don't fight the
+  // cursor — recomputes ids without touching searchMatchIndex.
+  const searchMatchIds = useMemo(() => {
+    if (!searchQuery) return [];
+    const query = searchQuery.toLowerCase();
+    return segments
+      .filter(s => s.status === STATUS.COMPLETED && s.translated && s.translated.toLowerCase().includes(query))
+      .map(s => s.id);
   }, [searchQuery, segments]);
+  const searchMatchCount = searchMatchIds.length;
 
-  // 自动保存进度
+  // Only reset the cursor when the query itself changes. Streaming segment
+  // updates leave the cursor where the user put it.
+  useEffect(() => {
+    setSearchMatchIndex(-1);
+  }, [searchQuery]);
+
+  // Auto-save progress
   useEffect(() => {
     if (fileFingerprint.current && stats.completed > 0 && !isTranslating) {
       saveProgress(fileFingerprint.current, segments, sourceLang, targetLang);
     }
   }, [stats.completed, isTranslating]);
 
-  // 键盘快捷键 Ctrl+F / Ctrl+H
+  // Ctrl+F / Ctrl+H
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.ctrlKey && e.key === 'f' && document) { e.preventDefault(); setShowSearch(prev => !prev); }
@@ -401,7 +394,7 @@ const DocumentTranslator = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [document]);
 
-  // 格式化时间
+  // Format elapsed time
   const formatTime = (ms) => {
     const seconds = Math.floor(ms / 1000);
     const minutes = Math.floor(seconds / 60);
@@ -413,7 +406,7 @@ const DocumentTranslator = ({
     return `${minutes}:${String(seconds % 60).padStart(2, '0')}`;
   };
 
-  // 拖放处理
+  // Drag-drop handlers
   const handleDragOver = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -426,7 +419,7 @@ const DocumentTranslator = ({
     setIsDragOver(false);
   }, []);
 
-  // 加载文件
+  // Load file
   const loadFile = useCallback(async (file, filePassword = null) => {
     logger.debug('Loading file:', file.name, file.type, file.size);
     setIsLoading(true);
@@ -466,11 +459,11 @@ const DocumentTranslator = ({
         setShowPasswordModal(false);
         setPendingFile(null);
         setPassword('');
-        // 重置计时
+        // Reset timer
         setStartTime(null);
         setElapsedTime(0);
         
-        // 检查是否有可恢复的进度
+        // Check for resumable progress
         const saved = loadProgress(fingerprint);
         if (saved && saved.segs.length > 0 && saved.sLang === sourceLang && saved.tLang === targetLang) {
           setPendingRestore(saved);
@@ -478,7 +471,7 @@ const DocumentTranslator = ({
           setPendingRestore(null);
         }
         
-        // 通知消息
+        // Notify user
         if (result.warning === 'scanned_no_ocr') {
           notify?.(t('documentTranslator.notify.scannedNoOcr'), 'warning');
         } else {
@@ -487,7 +480,7 @@ const DocumentTranslator = ({
             ? t('documentTranslator.notify.fileLoadedWithPages', { count: result.segments.length, pages: result.pageCount }) + ocrNote
             : t('documentTranslator.notify.fileLoaded', { count: result.segments.length }) + ocrNote;
           notify?.(message, 'success');
-          // PDF 提示
+          // PDF hint
           if (result.isPdf) {
             setTimeout(() => {
               notify?.(t('documentTranslator.notify.pdfHint'), 'info');
@@ -495,7 +488,7 @@ const DocumentTranslator = ({
           }
         }
       } else if (result.needPassword) {
-        // 需要密码，显示密码弹窗
+        // PDF requires a password — open the password modal.
         setPendingFile(file);
         setShowPasswordModal(true);
         setIsLoading(false);
@@ -514,20 +507,20 @@ const DocumentTranslator = ({
     }
   }, [filters, targetLang, notify, t]);
 
-  // 提交密码
+  // Submit password
   const handlePasswordSubmit = useCallback(async () => {
     if (!pendingFile || !password) return;
     await loadFile(pendingFile, password);
   }, [pendingFile, password, loadFile]);
 
-  // 取消密码输入
+  // Cancel password input
   const handlePasswordCancel = useCallback(() => {
     setShowPasswordModal(false);
     setPendingFile(null);
     setPassword('');
   }, []);
 
-  // 拖放文件
+  // Drop file
   const handleDrop = useCallback(async (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -541,7 +534,7 @@ const DocumentTranslator = ({
     }
   }, [loadFile]);
 
-  // 选择文件
+  // Pick file
   const handleFileSelect = useCallback(async (e) => {
     logger.debug('File selected:', e.target.files);
     const file = e.target.files?.[0];
@@ -552,7 +545,7 @@ const DocumentTranslator = ({
     e.target.value = null;
   }, [loadFile]);
 
-  // 开始翻译
+  // Start translation
   const startTranslation = async () => {
     if (isTranslating) return;
     
@@ -562,17 +555,17 @@ const DocumentTranslator = ({
     abortRef.current = false;
     setStartTime(Date.now());
     
-    // 获取待翻译的段落
+    // Collect pending segments
     let pendingSegments = segments.filter(s => s.status === STATUS.PENDING || s.status === STATUS.ERROR);
     
-    // 先检查缓存，标记可从缓存获取的段落
+    // Fill in any cached translations up front — saves a round trip.
     const toTranslate = [];
     for (const segment of pendingSegments) {
       const cacheKey = `${segment.original}|${sourceLang}|${targetLang}`;
       const cachedTranslation = translationCache.current.get(cacheKey);
       
       if (cachedTranslation) {
-        // 使用缓存
+        // Cache hit
         setSegments(prev => prev.map(s => 
           s.id === segment.id ? { 
             ...s, 
@@ -592,12 +585,10 @@ const DocumentTranslator = ({
       return;
     }
     
-    // 根据模式选择翻译方式
+    // Branch on translation mode
     if (batchMode) {
-      // 批量翻译模式
-      await translateBatchMode(toTranslate);
+          await translateBatchMode(toTranslate);
     } else {
-      // 单条翻译模式
       await translateSingleMode(toTranslate);
     }
     
@@ -607,19 +598,18 @@ const DocumentTranslator = ({
     }
   };
 
-  // 批量翻译模式
   const translateBatchMode = async (toTranslate) => {
-    // 获取术语表（如果启用）
+    // Pick up glossary if enabled
     const glossary = useGlossary ? getGlossaryTerms() : [];
     if (glossary.length > 0) {
       logger.debug(`Using glossary with ${glossary.length} terms`);
     }
     
-    // 分批处理
+    // Process in batches
     for (let i = 0; i < toTranslate.length; i += batchSize) {
       if (abortRef.current) break;
       
-      // 暂停检查
+      // Pause check
       while (pauseRef.current) {
         await new Promise(resolve => setTimeout(resolve, 100));
         if (abortRef.current) break;
@@ -630,13 +620,12 @@ const DocumentTranslator = ({
       const batchIds = batch.map(s => s.id);
       const batchTexts = batch.map(s => s.original);
       
-      // 标记这批段落为翻译中
+      // Mark this batch as translating
       setSegments(prev => prev.map(s => 
         batchIds.includes(s.id) ? { ...s, status: STATUS.TRANSLATING } : s
       ));
       
       try {
-        // 批量翻译
         const result = await translationService.translateBatch(batchTexts, {
           sourceLang,
           targetLang,
@@ -644,12 +633,12 @@ const DocumentTranslator = ({
         });
         
         if (result.success && result.translations) {
-          // 更新翻译结果
+          // Apply results
           setSegments(prev => prev.map(s => {
             const batchIndex = batchIds.indexOf(s.id);
             if (batchIndex >= 0) {
               const translation = result.translations[batchIndex];
-              // 缓存翻译结果
+              // Cache the translation
               const cacheKey = `${s.original}|${sourceLang}|${targetLang}`;
               translationCache.current.set(cacheKey, translation);
               
@@ -665,7 +654,7 @@ const DocumentTranslator = ({
           throw new Error(result.error || 'Batch translation failed');
         }
       } catch (error) {
-        // 批量失败，回退到单条翻译
+        // Batch failed — fall back to single-segment loop.
         logger.warn('Batch translation failed, falling back to single mode:', error);
         for (const segment of batch) {
           if (abortRef.current) break;
@@ -675,12 +664,11 @@ const DocumentTranslator = ({
     }
   };
 
-  // 单条翻译模式
   const translateSingleMode = async (toTranslate) => {
     for (const segment of toTranslate) {
       if (abortRef.current) break;
       
-      // 暂停检查
+      // Pause check
       while (pauseRef.current) {
         await new Promise(resolve => setTimeout(resolve, 100));
         if (abortRef.current) break;
@@ -691,7 +679,6 @@ const DocumentTranslator = ({
     }
   };
 
-  // 翻译单个段落
   const translateSingleSegment = async (segment) => {
     setSegments(prev => prev.map(s => 
       s.id === segment.id ? { ...s, status: STATUS.TRANSLATING } : s
@@ -705,8 +692,7 @@ const DocumentTranslator = ({
       
       if (result.success) {
         const translated = result.text || result.translatedText || '';
-        // 缓存翻译结果
-        const cacheKey = `${segment.original}|${sourceLang}|${targetLang}`;
+          const cacheKey = `${segment.original}|${sourceLang}|${targetLang}`;
         translationCache.current.set(cacheKey, translated);
         
         setSegments(prev => prev.map(s => 
@@ -730,13 +716,13 @@ const DocumentTranslator = ({
     }
   };
 
-  // 暂停/继续
+  // Pause / resume
   const togglePause = () => {
     pauseRef.current = !pauseRef.current;
     setIsPaused(pauseRef.current);
   };
 
-  // 停止翻译
+  // Stop translation
   const stopTranslation = () => {
     abortRef.current = true;
     pauseRef.current = false;
@@ -744,7 +730,7 @@ const DocumentTranslator = ({
     setIsTranslating(false);
   };
 
-  // 重试单个段落
+  // Retry one segment
   const retrySegment = async (segmentId) => {
     const segment = segments.find(s => s.id === segmentId);
     if (!segment) return;
@@ -783,7 +769,7 @@ const DocumentTranslator = ({
     }
   };
 
-  // 重试所有失败
+  // Retry all failed
   const retryAllFailed = async () => {
     const failedIds = segments.filter(s => s.status === STATUS.ERROR).map(s => s.id);
     for (const id of failedIds) {
@@ -791,7 +777,7 @@ const DocumentTranslator = ({
     }
   };
 
-  // 重新翻译已完成段落
+  // Re-translate a completed segment
   const retranslateSegment = async (segmentId) => {
     const segment = segments.find(s => s.id === segmentId);
     if (!segment || segment.status !== STATUS.COMPLETED) return;
@@ -812,7 +798,7 @@ const DocumentTranslator = ({
     }
   };
 
-  // 编辑段落译文
+  // Edit segment translation
   const editSegment = useCallback((segmentId, newText) => {
     setSegments(prev => prev.map(s => s.id === segmentId ? { ...s, translated: newText, edited: true } : s));
     const segment = segments.find(s => s.id === segmentId);
@@ -822,18 +808,13 @@ const DocumentTranslator = ({
     }
   }, [segments, sourceLang, targetLang]);
 
-  // 复制译文
+  // Copy translation
   const copySegmentText = useCallback((text) => {
     if (text) { navigator.clipboard.writeText(text); notify?.(t('documentTranslator.notify.copied'), 'success'); }
   }, [notify, t]);
 
-  // 替换单个段落中的搜索匹配
-  
 
-  // 全部替换
-
-
-  // 恢复进度
+  // Restore progress
   const restoreProgress = useCallback(() => {
     if (!pendingRestore) return;
     const restoredMap = new Map(pendingRestore.segs.map(s => [s.id, s.t]));
@@ -850,13 +831,12 @@ const DocumentTranslator = ({
     notify?.(t('documentTranslator.notify.progressRestored', { count: restoredMap.size }), 'success');
   }, [pendingRestore, sourceLang, targetLang, notify, t]);
 
-  // 忽略恢复
+  // Dismiss the restore banner
   const dismissRestore = useCallback(() => {
     setPendingRestore(null);
     if (fileFingerprint.current) localStorage.removeItem(PROGRESS_KEY + fileFingerprint.current);
   }, []);
 
-  // 导出
   const handleExport = async (type) => {
     if (segments.length === 0) return;
     
@@ -931,7 +911,7 @@ const DocumentTranslator = ({
           return;
       }
       
-      // 使用 Electron 保存对话框
+      // Electron save dialog
       const saveFile = window.electron?.dialog?.saveFile;
       if (saveFile) {
         const result = await saveFile({
@@ -951,7 +931,7 @@ const DocumentTranslator = ({
           throw new Error(result.error || 'Save failed');
         }
       } else {
-        // 回退：浏览器环境或 preload 不可用时用 blob 下载
+        // Fallback: browser blob download (preload unavailable).
         const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const a = window.document.createElement('a');
@@ -968,7 +948,7 @@ const DocumentTranslator = ({
     }
   };
 
-  // 清空文档
+  // Clear current document
   const clearDocument = () => {
     if (isTranslating) {
       stopTranslation();
@@ -985,7 +965,7 @@ const DocumentTranslator = ({
     fileFingerprint.current = null;
   };
 
-  // 滚动处理 - 仅用于显示/隐藏滚动到顶部按钮
+  // Scroll handler — only used to toggle the scroll-to-top button.
   const lastScrollTopState = useRef(false);
   
   const handleScroll = useCallback((e) => {
@@ -998,12 +978,12 @@ const DocumentTranslator = ({
     }
   }, []);
 
-  // 滚动到顶部
+  // Scroll to top
   const scrollToTop = () => {
     listRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // 跳转到指定段落（使用 DOM 查询实际位置）
+  // Jump to a segment by querying its DOM node.
   const scrollToSegment = (segmentId) => {
     const element = listRef.current?.querySelector(`[data-segment-id="${segmentId}"]`);
     if (element) {
@@ -1011,27 +991,45 @@ const DocumentTranslator = ({
     }
   };
 
-  // 清除翻译记忆缓存
+  // Cycle through search matches. From the unpositioned (-1) state or any
+  // out-of-bounds index, jump to the first (next) or last (prev) match.
+  const navigateSearch = (direction) => {
+    if (searchMatchIds.length === 0) return;
+    const cur = searchMatchIndex;
+    const unpositioned = cur < 0 || cur >= searchMatchIds.length;
+    let nextIndex;
+    if (unpositioned) {
+      nextIndex = direction === 'next' ? 0 : searchMatchIds.length - 1;
+    } else {
+      nextIndex = direction === 'next'
+        ? (cur + 1) % searchMatchIds.length
+        : (cur - 1 + searchMatchIds.length) % searchMatchIds.length;
+    }
+    setSearchMatchIndex(nextIndex);
+    scrollToSegment(searchMatchIds[nextIndex]);
+  };
+
+  // Clear in-memory translation cache
   const clearCache = () => {
     translationCache.current.clear();
     notify?.(t('documentTranslator.notify.cacheCleared'), 'success');
   };
 
-  // 获取支持的格式列表
+  // Supported extensions, for the file picker hint
   const supportedExtensions = Object.keys(SUPPORTED_FORMATS)
     .map(ext => `.${ext}`)
     .join(', ');
 
   return (
     <div className="document-translator">
-      {/* 头部 */}
+      {/* Header */}
       <div className="dt-header">
         <div className="dt-title">
           <FileText size={20} />
           <span>{t('documentTranslator.title')}</span>
         </div>
         
-        {/* 语言选择器 */}
+        {/* Language selectors */}
         <div className="dt-lang-selector">
           <LanguageSelector
             value={sourceLang}
@@ -1055,7 +1053,7 @@ const DocumentTranslator = ({
         <div className="dt-actions">
           {document && (
             <>
-              {/* 新建文档（清除当前文档，重新选择） */}
+              {/* New document — clears the current file. */}
               <button 
                 className="dt-btn"
                 onClick={clearDocument}
@@ -1066,7 +1064,7 @@ const DocumentTranslator = ({
                 <span>{t('documentTranslator.newDocument')}</span>
               </button>
               
-              {/* 搜索按钮 */}
+              {/* Search toggle */}
               <button 
                 className={`dt-btn icon-only ${showSearch ? 'active' : ''}`}
                 onClick={() => { const next = !showSearch; setShowSearch(next); if (!next) { setSearchQuery(''); setSearchMatchIndex(-1); } }}
@@ -1075,7 +1073,7 @@ const DocumentTranslator = ({
                 <Search size={16} />
               </button>
 
-              {/* 显示样式 */}
+              {/* Display style toggle */}
               <div className="style-selector">
                 {DISPLAY_STYLES.map(style => (
                   <button
@@ -1089,7 +1087,7 @@ const DocumentTranslator = ({
                 ))}
               </div>
               
-              {/* 导出 */}
+              {/* Export menu */}
               <div className="export-dropdown">
                 <button 
                   className="dt-btn"
@@ -1144,7 +1142,7 @@ const DocumentTranslator = ({
         </div>
       </div>
 
-      {/* 搜索栏 */}
+      {/* Search bar */}
       {showSearch && document && (
         <div className="dt-search-bar">
           <div className="search-row">
@@ -1154,7 +1152,11 @@ const DocumentTranslator = ({
             />
             {searchQuery && (
               <span className="search-count">
-                {searchMatchCount > 0 ? `${searchMatchIndex + 1}/${searchMatchCount}` : `0 ${t('documentTranslator.search.matches')}`}
+                {searchMatchCount === 0
+                  ? `0 ${t('documentTranslator.search.matches')}`
+                  : searchMatchIndex < 0
+                    ? `${searchMatchCount} ${t('documentTranslator.search.matches')}`
+                    : `${searchMatchIndex + 1}/${searchMatchCount}`}
               </span>
             )}
             <button className="search-nav-btn" onClick={() => navigateSearch('prev')} disabled={searchMatchCount === 0} title={t('documentTranslator.search.prev')}>
@@ -1168,9 +1170,9 @@ const DocumentTranslator = ({
         </div>
       )}
 
-      {/* 主体内容 */}
+      {/* Body */}
       <div className="dt-body">
-        {/* 无文件时显示上传区域 */}
+        {/* Upload zone when no document is loaded */}
         {!document && (
           <div 
             className={`dt-dropzone ${isDragOver ? 'drag-over' : ''}`}
@@ -1203,10 +1205,10 @@ const DocumentTranslator = ({
           </div>
         )}
 
-        {/* 有文件时显示翻译界面 */}
+        {/* Translation UI when a document is loaded */}
         {document && stats && (
           <>
-            {/* 进度恢复提示 */}
+            {/* Progress restore banner */}
             {pendingRestore && (
               <div className="dt-restore-banner">
                 <div className="restore-info">
@@ -1220,7 +1222,7 @@ const DocumentTranslator = ({
               </div>
             )}
 
-            {/* 文件信息栏 */}
+            {/* File info bar */}
             <div className="dt-file-info">
               <div className="file-details">
                 <FileText size={18} />
@@ -1236,7 +1238,7 @@ const DocumentTranslator = ({
               </div>
             </div>
 
-            {/* 进度条 */}
+            {/* Progress bar */}
             <div className="dt-progress">
               <div className="progress-bar">
                 <div 
@@ -1272,9 +1274,9 @@ const DocumentTranslator = ({
               </div>
             </div>
 
-            {/* 主内容区（带侧边栏） */}
+            {/* Main content area with optional outline sidebar */}
             <div className="dt-main-content">
-              {/* 大纲侧边栏 - 安全访问 outline */}
+              {/* Outline sidebar */}
               {outline && outline.length > 0 && (
                 <div className="dt-outline">
                   <div className="outline-header">
@@ -1293,7 +1295,7 @@ const DocumentTranslator = ({
                 </div>
               )}
 
-              {/* 段落列表 - 使用 CSS content-visibility 优化渲染 */}
+              {/* Segment list — CSS content-visibility keeps rendering cheap */}
               <div 
                 className={`dt-segments ${outline?.length > 0 ? 'with-outline' : ''}`}
                 ref={listRef}
@@ -1316,7 +1318,7 @@ const DocumentTranslator = ({
               </div>
             </div>
 
-            {/* 滚动到顶部 */}
+            {/* Scroll-to-top */}
             <button 
               className={`scroll-top-btn ${showScrollTop ? 'visible' : ''}`} 
               onClick={scrollToTop}
@@ -1325,7 +1327,7 @@ const DocumentTranslator = ({
               <ArrowUp size={18} />
             </button>
 
-            {/* 统计弹出卡片 */}
+            {/* Stats popover */}
             {showStats && (
               <>
                 <div className="stats-overlay" onClick={() => setShowStats(false)} />
@@ -1408,11 +1410,11 @@ const DocumentTranslator = ({
         )}
       </div>
 
-      {/* 底部控制栏 */}
+      {/* Footer controls */}
       {document && (
         <div className="dt-footer">
           <div className="control-left">
-            {/* 批量模式开关 */}
+            {/* Batch mode toggle */}
             <label className="batch-mode-toggle" title={batchMode ? t('documentTranslator.footer.batchModeOnHint', { count: batchSize }) : t('documentTranslator.footer.batchModeOffHint')}>
               <input 
                 type="checkbox" 
@@ -1423,7 +1425,7 @@ const DocumentTranslator = ({
               <Zap size={14} />
               <span>{t('documentTranslator.footer.batchMode')}</span>
             </label>
-            {/* 术语表开关 */}
+            {/* Glossary toggle */}
             <label 
               className="batch-mode-toggle glossary-toggle" 
               title={useGlossary ? t('documentTranslator.footer.glossaryEnabledHint') : t('documentTranslator.footer.glossaryDisabledHint')}
@@ -1490,7 +1492,7 @@ const DocumentTranslator = ({
         </div>
       )}
       
-      {/* 密码输入弹窗 */}
+      {/* Password prompt modal */}
       {showPasswordModal && (
         <div className="password-modal-overlay" onClick={handlePasswordCancel}>
           <div className="password-modal" onClick={e => e.stopPropagation()}>

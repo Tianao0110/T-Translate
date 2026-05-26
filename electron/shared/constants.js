@@ -1,13 +1,7 @@
-// electron/shared/constants.js
-// ============================================================
-// 🔴 单一数据源 - 配置常量定义
-// ============================================================
-// 格式: CommonJS (主进程使用)
-// 
-// ⚠️ 同步要求:
-// - 修改此文件后，必须同步更新 src/config/constants.js (ESM 版本)
-// - 运行 npm run check:constants 验证同步状态
-// ============================================================
+// 🔴 Single source of truth — config constants (CommonJS).
+//
+// ⚠️ Sync requirement: when this file changes, mirror the same values into
+// src/config/constants.js (ESM version). Run `npm run check:constants` to verify.
 
 const PRIVACY_MODES = {
   STANDARD: 'standard',
@@ -19,7 +13,7 @@ const PRIVACY_MODES = {
 const THEMES = {
   LIGHT: 'light',
   DARK: 'dark',
-  FRESH: 'fresh',  // 清新（青绿色）
+  FRESH: 'fresh',  // Fresh — cyan/green accent.
 };
 
 const OCR_ENGINES = {
@@ -47,7 +41,7 @@ const TRANSLATION_STATUS = {
   ERROR: 'error',
 };
 
-// 语言代码（与前端 src/config/constants.js 保持同步）
+// Language codes — keep in sync with src/config/constants.js.
 const LANGUAGE_CODES = {
   AUTO: 'auto',
   ZH: 'zh',

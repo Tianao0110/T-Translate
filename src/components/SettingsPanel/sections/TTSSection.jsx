@@ -1,5 +1,5 @@
-// src/components/SettingsPanel/sections/TTSSection.jsx
-// TTS 朗读设置 - 自定义语音选择下拉
+// TTS settings section. Replaces the native <select> with a custom dropdown
+// because Electron's native select stutters when the option list is long.
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -8,9 +8,6 @@ import ttsManager, { DEFAULT_TTS_CONFIG, TTS_STATUS } from '../../../services/tt
 import createLogger from '../../../utils/logger.js';
 const logger = createLogger('TTSSection');
 
-/**
- * 自定义语音选择下拉（替代原生 select，解决 Electron 卡顿）
- */
 const VoiceDropdown = ({ value, onChange, groupedVoices, noVoices, isLoading, autoLabel, emptyLabel }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -81,9 +78,6 @@ const VoiceDropdown = ({ value, onChange, groupedVoices, noVoices, isLoading, au
   );
 };
 
-/**
- * TTS 设置区块
- */
 const TTSSection = ({ settings, updateSetting, notify }) => {
   const { t } = useTranslation();
   const [voices, setVoices] = useState([]);
@@ -123,6 +117,8 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
     ttsManager.updateConfig({ [key]: value });
   }, [updateSetting]);
 
+  // Maps thrown error strings (from web-speech.speak()) to localized UI messages.
+  // NO_VOICES = OS has no speech voices installed at all; NO_VOICE_FOR_LANG = none match the target lang.
   const getTTSErrorMessage = (e) => {
     const msg = e.message || '';
     if (msg === 'NO_VOICES') {
@@ -137,6 +133,7 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
   };
 
   const handleTest = async () => {
+    // Same button toggles play and stop
     if (isTesting || ttsStatus === TTS_STATUS.SPEAKING) {
       ttsManager.stop();
       setIsTesting(false);
@@ -144,6 +141,7 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
     }
     setIsTesting(true);
     try {
+      // Pick test text by whether a specific voice was selected (mixed-lang for any voice, zh-only for auto)
       const testText = ttsConfig.voiceId ? t('tts.testTextMixed') : t('tts.testTextChinese');
       await ttsManager.speak(testText, {
         lang: 'zh',
@@ -185,7 +183,6 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
       <h3>{t('settings.tts.title')}</h3>
       <p className="setting-description">{t('tts.description')}</p>
 
-      {/* 启用开关 */}
       <div className="setting-group">
         <label className="setting-switch">
           <input
@@ -201,7 +198,6 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
 
       {ttsConfig.enabled && (
         <>
-          {/* 语音选择 */}
           <div className="setting-group">
             <div className="tts-slider-header">
               <label className="setting-label">{t('tts.defaultVoice')}</label>
@@ -247,7 +243,6 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
             )}
           </div>
 
-          {/* 语速 / 音调 / 音量 */}
           <div className="tts-slider-group">
             <div className="setting-group tts-slider-item">
               <div className="tts-slider-header">
@@ -286,7 +281,6 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
             </div>
           </div>
 
-          {/* 试听 */}
           <div className="tts-preview">
             <button
               className={`tts-preview-btn ${isTesting ? 'stop' : 'play'}`}

@@ -45,3 +45,27 @@ The v0.2.6 OCR error-to-guidance fix is the short version. Full version: first-l
 ### Anthropic / Gemini provider consolidation evaluation
 
 v0.2.6 only merged OpenAI-compatible providers. Anthropic and Gemini have different API shapes (messages format / generateContent). Evaluate if they share enough structure with each other or with a "REST translator" abstraction. Risk: abstract base class is reverse-DRY (see `dry-merge-over-abstract` learning). May find the right call is "leave them be".
+
+### SelectionTranslator: `translation.sourceLanguage` is dead payload
+
+Copilot 在 v0.2.4 PR 审查发现的既有问题。`translateText` 内部硬编码 `sourceLang: 'auto'`（[SelectionTranslator/index.jsx:528](src/components/SelectionTranslator/index.jsx:528)）。三个调用点都只传 targetLanguage，sourceLanguage 字段一路传却从不读。二选一：
+- 打通：`translateText` 签名加 `overrideSourceLang`，三处调用传入
+- 删除：从 `DEFAULT_TRANSLATION` / IPC payload 移除 sourceLanguage
+
+先拍产品决策：UI 里"手动指定源语言"该不该真生效？
+
+### Layer 1/2 "按下没内容" root-fix
+
+v0.2.5 Phase B 的 pass-through 只覆盖 Layer 3（剪贴板兜底）路径。Layer 1/2（Chrome/VSCode/Notepad++ 等简单应用）的 `hasTextSelection` 只返回布尔，没捕获 text，图标显示后点击仍会走二次 fetch。Acrobat 类 Layer 3 场景已经被 Phase B 修了，Layer 1/2 是次要痛点。
+
+修复：`hasTextSelection` 成功时主动调 Layer 3 fetch 拿 text，通过 `showSelectionTrigger(x, y, rect, text)` 传给 renderer，所有路径 text 都在 mouseup 时捕获，零二次 fetch。~60-80 行。
+
+### Lint backlog cleanup
+
+v0.2.5 Phase T 装通 eslint 9 后跑 `npm run lint` 出 539 warnings + 21 pre-existing errors（已在 eslint.config.js per-file 降级兜底）。历史累积，需要逐个清：
+- `src/i18n/locales/{en,zh}.js`: 三对重复 key (selectStyle / notify / docParser) — 后定义静默覆盖前定义
+- `src/App.jsx`: 8 个 `react-hooks/rules-of-hooks` errors — hook 在 early return 后调
+- `src/components/DocumentTranslator/index.jsx`: 3 个 `navigateSearch` undefined
+- `src/utils/logger.js`: `??` 左侧 constant 是 dead code
+
+清完后删 eslint.config.js 里的 per-file override，恢复全局严格。

@@ -1,7 +1,4 @@
-// src/components/TranslationPanel/hooks/useSaveModal.js
-// 收藏弹窗逻辑（含 AI 分析）- 从 TranslationPanel 抽出
-//
-// 管理收藏弹窗状态、AI 标签/摘要生成、保存操作
+// Save-to-favorites modal: AI-generated tags/summary + persist action.
 
 import { useState, useCallback } from 'react';
 import i18n from 'i18next';
@@ -10,9 +7,7 @@ import createLogger from '../../../utils/logger.js';
 
 const logger = createLogger('useSaveModal');
 
-/**
- * 根据界面语言生成 AI 分析 prompt
- */
+// Prompts switch by UI language so the LLM returns tags in the user's language
 function getAnalysisPrompts(sourceText, translatedText) {
   const lang = i18n.language || 'zh';
   const isZh = lang.startsWith('zh');
@@ -70,25 +65,15 @@ Style reference rules (isStyleSuggested):
   return { systemPrompt, userPrompt };
 }
 
-/**
- * 收藏弹窗 Hook
- * @param {Object} currentTranslation - 当前翻译状态
- * @param {Function} addToFavorites - store 方法：添加收藏
- * @param {Function} notify - 通知函数
- * @param {Function} t - i18n 翻译函数
- * @returns {Object} 收藏弹窗状态和操作方法
- */
 export default function useSaveModal(currentTranslation, addToFavorites, notify, t) {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [saveAsStyleRef, setSaveAsStyleRef] = useState(false);
 
-  // AI 分析状态
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState(null);
   const [editableTags, setEditableTags] = useState('');
   const [editableSummary, setEditableSummary] = useState('');
 
-  // AI 分析内容
   const analyzeContent = useCallback(async () => {
     setIsAnalyzing(true);
 
@@ -104,12 +89,14 @@ export default function useSaveModal(currentTranslation, addToFavorites, notify,
       if (result.success && result.content) {
         let parsed;
         try {
+          // LLMs often wrap JSON in ```json fences despite being told not to
           let content = result.content.trim();
           content = content.replace(/^```json\s*/, '').replace(/```\s*$/, '');
           content = content.replace(/^```\s*/, '').replace(/```\s*$/, '');
           parsed = JSON.parse(content);
         } catch (parseError) {
           logger.error('JSON parse:', parseError);
+          // Fallback: treat length-30+ text as worth offering style-ref by default
           parsed = {
             tags: [t ? t('favorites.uncategorized', '未分类') : '未分类'],
             summary: '',
@@ -134,7 +121,6 @@ export default function useSaveModal(currentTranslation, addToFavorites, notify,
     }
   }, [currentTranslation]);
 
-  // 打开收藏弹窗
   const openSaveModal = useCallback(() => {
     if (!currentTranslation.translatedText) {
       notify(t('translation.translateFirst'), 'warning');
@@ -146,12 +132,12 @@ export default function useSaveModal(currentTranslation, addToFavorites, notify,
     setEditableSummary('');
     setShowSaveModal(true);
 
-    // 自动触发 AI 分析
+    // Kick off analysis as soon as the modal opens so the user doesn't wait
     analyzeContent();
   }, [currentTranslation.translatedText, analyzeContent, notify, t]);
 
-  // 执行保存
   const executeSave = useCallback(() => {
+    // Accept both ASCII and fullwidth Chinese commas as separators
     const tags = editableTags
       .split(/[,，]/)
       .map(tag => tag.trim())

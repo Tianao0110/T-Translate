@@ -1,5 +1,5 @@
-// src/utils/document-parser.js
-// 文档解析工具 - 支持多种格式的文件解析和智能分段
+// Document parsing helpers: format-specific loaders, smart segmentation,
+// outline detection, batch grouping, and bilingual export.
 
 import createLogger from './logger.js';
 import i18n from '../i18n.js';
@@ -9,64 +9,47 @@ const _t = (key, fallback) => {
   try { const r = i18n.t(key); return r === key ? fallback : r; } catch { return fallback; }
 };
 
-/**
- * 文件大小限制
- */
-const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+const MAX_FILE_SIZE = 20 * 1024 * 1024;
 const MAX_FILE_SIZE_LABEL = '20MB';
 
-/**
- * 支持的文件格式
- */
 export const SUPPORTED_FORMATS = {
-  // 文本
   txt: { name: '纯文本', mime: 'text/plain', parser: 'text' },
   md: { name: 'Markdown', mime: 'text/markdown', parser: 'text' },
-  
-  // 字幕
+
   srt: { name: 'SRT 字幕', mime: 'text/plain', parser: 'srt' },
   vtt: { name: 'WebVTT 字幕', mime: 'text/vtt', parser: 'vtt' },
-  
-  // 文档
+
   pdf: { name: 'PDF 文档', mime: 'application/pdf', parser: 'pdf' },
   docx: { name: 'Word 文档', mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', parser: 'docx' },
-  
-  // 表格
+
   csv: { name: 'CSV 表格', mime: 'text/csv', parser: 'csv' },
-  
-  // 结构化
+
   json: { name: 'JSON 文件', mime: 'application/json', parser: 'json' },
-  
-  // 电子书
+
   epub: { name: 'EPUB 电子书', mime: 'application/epub+zip', parser: 'epub' },
 };
 
-/**
- * 章节识别模式
- */
+// Heading patterns tried in order. The first match wins per segment.
 const HEADING_PATTERNS = [
-  // Markdown 标题
+  // Markdown ATX headings.
   { regex: /^(#{1,6})\s+(.+)$/m, level: (m) => m[1].length, text: (m) => m[2] },
-  // 数字编号标题 (1. 1.1 1.1.1)
+  // Numeric (1. / 1.1 / 1.1.1 ...) — level = depth of dot chain.
   { regex: /^(\d+(?:\.\d+)*)[.、]\s*(.+)$/m, level: (m) => m[1].split('.').length, text: (m) => m[2] },
-  // 中文编号 (一、 第一章)
+  // Chinese chapter markers (e.g. 第一章, 一、).
   { regex: /^(第?[一二三四五六七八九十百千]+[章节篇部])[、.\s]*(.*)$/m, level: () => 1, text: (m) => m[1] + (m[2] ? ' ' + m[2] : '') },
-  // 英文编号 (Chapter 1, Section 1)
+  // English Chapter/Section/Part numbering.
   { regex: /^(Chapter|Section|Part)\s+(\d+)[.:]\s*(.*)$/im, level: (m) => m[1].toLowerCase() === 'chapter' ? 1 : 2, text: (m) => `${m[1]} ${m[2]}${m[3] ? ': ' + m[3] : ''}` },
-  // 全大写标题 (至少3个单词)
+  // ALL CAPS line at least 11 chars long.
   { regex: /^([A-Z][A-Z\s]{10,})$/m, level: () => 1, text: (m) => m[1].trim() },
 ];
 
-/**
- * 识别章节标题
- */
 export function detectHeadings(segments) {
   const headings = [];
-  
+
   for (const segment of segments) {
     const text = segment.original?.trim() || '';
-    if (!text || text.length > 200) continue; // 标题不应太长
-    
+    if (!text || text.length > 200) continue;  // headings shouldn't be paragraphs
+
     for (const pattern of HEADING_PATTERNS) {
       const match = text.match(pattern.regex);
       if (match) {
@@ -80,40 +63,32 @@ export function detectHeadings(segments) {
       }
     }
   }
-  
+
   return headings;
 }
 
-/**
- * 生成大纲树
- */
 export function buildOutlineTree(headings) {
   const tree = [];
   const stack = [{ level: 0, children: tree }];
-  
+
   for (const heading of headings) {
     const node = {
       ...heading,
       children: [],
     };
-    
-    // 找到合适的父节点
+
     while (stack.length > 1 && stack[stack.length - 1].level >= heading.level) {
       stack.pop();
     }
-    
+
     stack[stack.length - 1].children.push(node);
     stack.push(node);
   }
-  
+
   return tree;
 }
 
-/**
- * Token 估算
- * 中文：1字 ≈ 2 tokens
- * 英文：1词 ≈ 1.3 tokens，约 4字符/词
- */
+// Token estimate: CJK ≈ 2 tokens/char, Latin ≈ 0.35 tokens/char (~4 chars/word, 1.3 tokens/word).
 export function estimateTokens(text) {
   if (!text) return 0;
   const chineseChars = (text.match(/[\u4e00-\u9fff]/g) || []).length;
@@ -121,87 +96,71 @@ export function estimateTokens(text) {
   return Math.ceil(chineseChars * 2 + otherChars * 0.35);
 }
 
-/**
- * 检测文本主要语言
- */
 export function detectLanguage(text) {
   if (!text) return 'unknown';
   const chineseRatio = (text.match(/[\u4e00-\u9fff]/g) || []).length / text.length;
   const japaneseRatio = (text.match(/[\u3040-\u309f\u30a0-\u30ff]/g) || []).length / text.length;
   const koreanRatio = (text.match(/[\uac00-\ud7af]/g) || []).length / text.length;
-  
+
   if (chineseRatio > 0.3) return 'zh';
   if (japaneseRatio > 0.1) return 'ja';
   if (koreanRatio > 0.1) return 'ko';
-  return 'en'; // 默认英文
+  return 'en';
 }
 
-/**
- * 检查是否应该跳过该段落
- */
 export function shouldSkipSegment(text, filters = {}) {
   if (!text || !text.trim()) {
-    return { skip: true, reason: _t('docParser.emptySegment', '空段落') };
+    return { skip: true, reason: _t('docParser.emptySegment', 'Empty segment') };
   }
-  
+
   const trimmed = text.trim();
-  
-  // 跳过过短段落
+
   if (filters.skipShort && trimmed.length < (filters.minLength || 10)) {
-    return { skip: true, reason: _t('docParser.tooShort', '过短') };
+    return { skip: true, reason: _t('docParser.tooShort', 'Too short') };
   }
-  
-  // 跳过纯数字
+
   if (filters.skipNumbers && /^\d+$/.test(trimmed)) {
-    return { skip: true, reason: _t('docParser.numbersOnly', '纯数字') };
+    return { skip: true, reason: _t('docParser.numbersOnly', 'Numbers only') };
   }
-  
-  // 跳过代码块
+
   if (filters.skipCode && /^```[\s\S]*```$/.test(trimmed)) {
-    return { skip: true, reason: _t('docParser.codeBlock', '代码块') };
+    return { skip: true, reason: _t('docParser.codeBlock', 'Code block') };
   }
-  
-  // 跳过已是目标语言
+
   if (filters.skipTargetLang && filters.targetLang) {
     const lang = detectLanguage(trimmed);
     if (lang === filters.targetLang) {
-      return { skip: true, reason: _t('docParser.alreadyTargetLang', '已是目标语言') };
+      return { skip: true, reason: _t('docParser.alreadyTargetLang', 'Already in target language') };
     }
   }
-  
-  // 自定义关键词跳过
+
   if (filters.skipKeywords && filters.skipKeywords.length > 0) {
     for (const keyword of filters.skipKeywords) {
       if (trimmed.toLowerCase().includes(keyword.toLowerCase())) {
-        return { skip: true, reason: _t('docParser.containsKeyword', '包含关键词') + `: ${keyword}` };
+        return { skip: true, reason: _t('docParser.containsKeyword', 'Contains keyword') + `: ${keyword}` };
       }
     }
   }
-  
+
   return { skip: false };
 }
 
-/**
- * 智能分段
- */
 export function splitIntoSegments(text, options = {}) {
   const {
     maxCharsPerSegment = 800,
     filters = {},
   } = options;
-  
+
   const segments = [];
   let segmentId = 0;
-  
-  // 按段落分割（双换行）
+
   const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim());
-  
+
   for (const para of paragraphs) {
     const trimmedPara = para.trim();
-    
-    // 检查是否跳过
+
     const skipCheck = shouldSkipSegment(trimmedPara, filters);
-    
+
     if (skipCheck.skip) {
       segments.push({
         id: segmentId++,
@@ -214,8 +173,7 @@ export function splitIntoSegments(text, options = {}) {
       });
       continue;
     }
-    
-    // 段落长度合适，直接添加
+
     if (trimmedPara.length <= maxCharsPerSegment) {
       segments.push({
         id: segmentId++,
@@ -225,7 +183,7 @@ export function splitIntoSegments(text, options = {}) {
         tokens: estimateTokens(trimmedPara),
       });
     } else {
-      // 过长段落，按句子分割
+      // Paragraph too long — split on sentence boundaries first.
       const sentences = splitBySentence(trimmedPara, maxCharsPerSegment);
       for (const sentence of sentences) {
         if (sentence.trim()) {
@@ -240,23 +198,20 @@ export function splitIntoSegments(text, options = {}) {
       }
     }
   }
-  
+
   return segments;
 }
 
-/**
- * 按句子分割长段落
- */
 function splitBySentence(text, maxChars) {
   const sentenceEnders = /([.。!！?？]+[\s]*)/g;
   const parts = text.split(sentenceEnders);
-  
+
   const result = [];
   let current = '';
-  
+
   for (let i = 0; i < parts.length; i++) {
     const part = parts[i];
-    
+
     if (current.length + part.length <= maxChars) {
       current += part;
     } else {
@@ -266,12 +221,12 @@ function splitBySentence(text, maxChars) {
       current = part;
     }
   }
-  
+
   if (current.trim()) {
     result.push(current.trim());
   }
-  
-  // 强制分割过长片段
+
+  // Last-resort hard split for sentences that exceed maxChars on their own.
   const finalResult = [];
   for (const segment of result) {
     if (segment.length <= maxChars) {
@@ -282,25 +237,22 @@ function splitBySentence(text, maxChars) {
       }
     }
   }
-  
+
   return finalResult;
 }
 
-/**
- * 解析 SRT 字幕
- */
 export function parseSRT(content) {
   const segments = [];
   const blocks = content.trim().split(/\n\s*\n/);
-  
+
   for (const block of blocks) {
     const lines = block.trim().split('\n');
     if (lines.length < 3) continue;
-    
+
     const index = parseInt(lines[0]);
     const timecode = lines[1];
     const text = lines.slice(2).join('\n');
-    
+
     if (!isNaN(index) && timecode.includes('-->')) {
       segments.push({
         id: index - 1,
@@ -314,31 +266,28 @@ export function parseSRT(content) {
       });
     }
   }
-  
+
   return segments;
 }
 
-/**
- * 解析 VTT 字幕
- */
 export function parseVTT(content) {
   const segments = [];
   const body = content.replace(/^WEBVTT[\s\S]*?\n\n/, '');
   const blocks = body.trim().split(/\n\s*\n/);
-  
+
   let index = 0;
   for (const block of blocks) {
     const lines = block.trim().split('\n');
     if (lines.length < 2) continue;
-    
+
     let timecodeIndex = 0;
     if (!lines[0].includes('-->')) {
       timecodeIndex = 1;
     }
-    
+
     const timecode = lines[timecodeIndex];
     const text = lines.slice(timecodeIndex + 1).join('\n');
-    
+
     if (timecode && timecode.includes('-->')) {
       segments.push({
         id: index,
@@ -353,20 +302,17 @@ export function parseVTT(content) {
       index++;
     }
   }
-  
+
   return segments;
 }
 
-/**
- * 解析 PDF 文档
- */
 export async function parsePDF(file, options = {}) {
   const { password, maxCharsPerSegment = 800, filters = {} } = options;
-  
-  // 动态导入 pdfjs-dist
+
   const pdfjsLib = await import('pdfjs-dist');
-  
-  // Worker 设置：优先本地，失败则禁用 worker 在主线程运行
+
+  // Prefer the local worker; fall back to main-thread parsing if the
+  // URL can't be resolved (slower but always works).
   if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
     try {
       pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -374,48 +320,46 @@ export async function parsePDF(file, options = {}) {
         import.meta.url
       ).toString();
     } catch {
-      // 回退：禁用 worker，用主线程解析（慢但可用）
       pdfjsLib.GlobalWorkerOptions.workerPort = null;
     }
   }
-  
+
   const arrayBuffer = await file.arrayBuffer();
-  
+
   const loadingTask = pdfjsLib.getDocument({
     data: arrayBuffer,
     password: password || undefined,
   });
-  
+
   const pdf = await loadingTask.promise;
   const numPages = pdf.numPages;
-  
+
   let allText = '';
   const pageTexts = [];
-  
+
   for (let i = 1; i <= numPages; i++) {
     const page = await pdf.getPage(i);
     const textContent = await page.getTextContent();
-    
-    // 收集每行文本及其 Y 坐标
+
+    // Group text-run items into visual lines by Y coordinate.
     const lines = [];
     let currentLine = '';
     let lastY = null;
     let lastX = 0;
-    
+
     for (const item of textContent.items) {
       if (!item.str) continue;
-      
+
       const y = Math.round(item.transform[5]);
       const x = item.transform[4];
-      
+
       if (lastY !== null && Math.abs(y - lastY) > 3) {
-        // 新行
         if (currentLine.trim()) {
           lines.push(currentLine.trim());
         }
         currentLine = item.str;
       } else {
-        // 同行：如果 X 距离超过一个字符宽度，加空格
+        // Same line: insert a space if there's a visible horizontal gap.
         if (currentLine && x - lastX > 10) {
           currentLine += ' ';
         }
@@ -427,47 +371,45 @@ export async function parsePDF(file, options = {}) {
     if (currentLine.trim()) {
       lines.push(currentLine.trim());
     }
-    
-    // 智能拼接：短行拼接为段落，空行作为段落分隔
+
+    // Stitch lines into paragraphs: keep newline at sentence-ending
+    // punctuation or short lines (likely headings / list items),
+    // otherwise join (a paragraph was wrapped mid-sentence in the PDF).
     let pageText = '';
     for (let j = 0; j < lines.length; j++) {
       const line = lines[j];
       const nextLine = lines[j + 1];
-      
-      // 跳过疑似页眉/页脚（纯数字且在页面首尾）
+
+      // Drop suspected page numbers in headers/footers.
       if ((j === 0 || j === lines.length - 1) && /^\d{1,4}$/.test(line)) {
         continue;
       }
-      
+
       pageText += line;
-      
-      // 判断是否需要换行：
-      // - 以句号结尾（.!?。！？）→ 段落分隔
-      // - 短行（<40字符）且下一行存在 → 可能是标题/列表，保持换行
-      // - 否则拼接（同一段落被 PDF 断行）
+
       const endsWithPunctuation = /[.!?。！？;:；：]$/.test(line);
       const isShortLine = line.length < 40;
-      
+
       if (endsWithPunctuation || isShortLine || !nextLine) {
         pageText += '\n';
       } else {
-        // 英文加空格拼接，中文直接拼
+        // CJK doesn't need a join space; Latin scripts do.
         const lastChar = line[line.length - 1];
         const isCJK = /[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff]/.test(lastChar);
         pageText += isCJK ? '' : ' ';
       }
     }
-    
+
     pageTexts.push(pageText.trim());
   }
-  
+
   allText = pageTexts.filter(t => t).join('\n\n');
-  
+
   const segments = splitIntoSegments(allText, {
     maxCharsPerSegment,
     filters,
   });
-  
+
   return {
     segments,
     pageCount: numPages,
@@ -475,55 +417,49 @@ export async function parsePDF(file, options = {}) {
   };
 }
 
-/**
- * 解析 DOCX 文档
- */
 export async function parseDOCX(file, options = {}) {
   const { maxCharsPerSegment = 800, filters = {} } = options;
-  
+
   const mammoth = await import('mammoth');
   const arrayBuffer = await file.arrayBuffer();
-  
+
   const result = await mammoth.extractRawText({ arrayBuffer });
   const text = result.value;
-  
+
   const segments = splitIntoSegments(text, {
     maxCharsPerSegment,
     filters,
   });
-  
+
   const warnings = result.messages
     .filter(m => m.type === 'warning')
     .map(m => m.message);
-  
+
   return {
     segments,
     warnings,
   };
 }
 
-/**
- * 解析 CSV 文件
- */
 export async function parseCSV(file, options = {}) {
   const { maxCharsPerSegment = 800, filters = {} } = options;
-  
+
   const text = await readAsText(file);
   const lines = text.split('\n');
   const segments = [];
   let segmentId = 0;
-  
-  // 跳过表头
+
+  // Skip the header row if line 0 looks like comma-delimited.
   const startLine = lines[0]?.includes(',') ? 1 : 0;
-  
+
   for (let i = startLine; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
-    
-    // 简单解析 CSV 行，提取文本列
+
+    // Naive CSV parse — extracts text-bearing cells joined with " | ".
     const cells = line.split(',').map(c => c.trim().replace(/^["']|["']$/g, ''));
     const textContent = cells.filter(c => c.length > 5 && !/^\d+$/.test(c)).join(' | ');
-    
+
     if (textContent && textContent.length >= (filters.minLength || 5)) {
       segments.push({
         id: segmentId++,
@@ -535,26 +471,22 @@ export async function parseCSV(file, options = {}) {
       });
     }
   }
-  
+
   return { segments };
 }
 
-/**
- * 解析 JSON 文件（提取字符串值）
- */
+// Extracts string leaves from arbitrary JSON, skipping URLs/dates/UUIDs.
 export async function parseJSON(file, options = {}) {
   const { filters = {} } = options;
-  
+
   const text = await readAsText(file);
   const data = JSON.parse(text);
   const segments = [];
   let segmentId = 0;
-  
-  // 递归提取字符串
+
   function extractStrings(obj, path = '') {
     if (typeof obj === 'string' && obj.length >= (filters.minLength || 5)) {
-      // 跳过看起来像 URL、日期、ID 的字符串
-      if (!/^(https?:\/\/|[\d\-T:Z]+$|[a-f0-9\-]{36}$)/i.test(obj)) {
+      if (!/^(https?:\/\/|[\dT:Z-]+$|[a-f0-9-]{36}$)/i.test(obj)) {
         segments.push({
           id: segmentId++,
           original: obj,
@@ -572,95 +504,83 @@ export async function parseJSON(file, options = {}) {
       });
     }
   }
-  
+
   extractStrings(data);
-  
+
   return { segments };
 }
 
-/**
- * 解析 EPUB 电子书
- * EPUB 本质是 ZIP 压缩包，包含 HTML/XHTML 内容
- */
+// EPUB is a ZIP of (X)HTML — we follow container.xml → OPF → spine.
 export async function parseEPUB(file, options = {}) {
   const { maxCharsPerSegment = 800, filters = {} } = options;
-  
+
   const JSZip = (await import('jszip')).default;
   const arrayBuffer = await file.arrayBuffer();
   const zip = await JSZip.loadAsync(arrayBuffer);
-  
-  // 解析 container.xml 获取 rootfile 路径
+
   const containerXml = await zip.file('META-INF/container.xml')?.async('text');
   if (!containerXml) {
-    throw new Error(_t('docParser.epubNoContainer', '无效的 EPUB 文件：缺少 container.xml'));
+    throw new Error(_t('docParser.epubNoContainer', 'Invalid EPUB: missing container.xml'));
   }
-  
-  // 提取 rootfile 路径
+
   const rootfileMatch = containerXml.match(/full-path="([^"]+)"/);
   if (!rootfileMatch) {
-    throw new Error(_t('docParser.epubNoRootfile', '无效的 EPUB 文件：找不到 rootfile'));
+    throw new Error(_t('docParser.epubNoRootfile', 'Invalid EPUB: rootfile not found'));
   }
-  
+
   const rootfilePath = rootfileMatch[1];
   const rootfileDir = rootfilePath.substring(0, rootfilePath.lastIndexOf('/') + 1);
-  
-  // 解析 OPF 文件获取内容顺序
+
   const opfContent = await zip.file(rootfilePath)?.async('text');
   if (!opfContent) {
-    throw new Error(_t('docParser.epubNoOpf', '无效的 EPUB 文件：找不到 OPF 文件'));
+    throw new Error(_t('docParser.epubNoOpf', 'Invalid EPUB: OPF file not found'));
   }
-  
-  // 提取书名
+
   const titleMatch = opfContent.match(/<dc:title[^>]*>([^<]+)<\/dc:title>/i);
   const title = titleMatch ? titleMatch[1].trim() : file.name.replace(/\.epub$/i, '');
-  
-  // 提取 spine 中的阅读顺序
+
   const spineMatch = opfContent.match(/<spine[^>]*>([\s\S]*?)<\/spine>/i);
   const itemrefMatches = spineMatch ? spineMatch[1].matchAll(/idref="([^"]+)"/g) : [];
   const spineIds = [...itemrefMatches].map(m => m[1]);
-  
-  // 提取 manifest 中的文件映射
+
   const manifestMatch = opfContent.match(/<manifest[^>]*>([\s\S]*?)<\/manifest>/i);
   const itemMatches = manifestMatch ? manifestMatch[1].matchAll(/<item[^>]+id="([^"]+)"[^>]+href="([^"]+)"[^>]*>/g) : [];
-  
+
   const manifest = {};
   for (const match of itemMatches) {
     manifest[match[1]] = match[2];
   }
-  
-  // 按顺序读取内容文件
+
   let allText = '';
   let chapterCount = 0;
-  
+
   for (const id of spineIds) {
     const href = manifest[id];
     if (!href) continue;
-    
-    // 只处理 HTML/XHTML 文件
+
     if (!/\.(x?html?|xml)$/i.test(href)) continue;
-    
+
     const filePath = rootfileDir + decodeURIComponent(href);
     const content = await zip.file(filePath)?.async('text');
-    
+
     if (content) {
       chapterCount++;
-      // 移除 HTML 标签，提取纯文本
       const text = extractTextFromHTML(content);
       if (text.trim()) {
         allText += text + '\n\n';
       }
     }
   }
-  
+
   if (!allText.trim()) {
-    throw new Error(_t('docParser.epubNoContent', 'EPUB 文件中没有找到可翻译的文本内容'));
+    throw new Error(_t('docParser.epubNoContent', 'No translatable text found in EPUB'));
   }
-  
+
   const segments = splitIntoSegments(allText, {
     maxCharsPerSegment,
     filters,
   });
-  
+
   return {
     segments,
     title,
@@ -668,22 +588,16 @@ export async function parseEPUB(file, options = {}) {
   };
 }
 
-/**
- * 从 HTML 内容提取纯文本
- */
 function extractTextFromHTML(html) {
-  // 移除 script 和 style 标签及其内容
   let text = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
   text = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
-  
-  // 将块级标签转换为换行
+
+  // Convert block-level tags to newlines.
   text = text.replace(/<\/(p|div|h[1-6]|br|li|tr)>/gi, '\n');
   text = text.replace(/<(p|div|h[1-6]|br|li|tr)[^>]*>/gi, '\n');
-  
-  // 移除所有其他 HTML 标签
+
   text = text.replace(/<[^>]+>/g, '');
-  
-  // 解码 HTML 实体
+
   text = text.replace(/&nbsp;/g, ' ');
   text = text.replace(/&lt;/g, '<');
   text = text.replace(/&gt;/g, '>');
@@ -691,48 +605,44 @@ function extractTextFromHTML(html) {
   text = text.replace(/&quot;/g, '"');
   text = text.replace(/&#(\d+);/g, (_, code) => String.fromCharCode(code));
   text = text.replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCharCode(parseInt(code, 16)));
-  
-  // 清理多余空白
+
   text = text.replace(/[ \t]+/g, ' ');
   text = text.replace(/\n\s*\n/g, '\n\n');
-  
+
   return text.trim();
 }
 
-/**
- * 主解析函数
- */
 export async function parseDocument(file, options = {}) {
   const { password } = options;
-  
+
   const ext = file.name.split('.').pop().toLowerCase();
   const format = SUPPORTED_FORMATS[ext];
-  
+
   if (!format) {
-    throw new Error(_t('docParser.unsupportedFormat', '不支持的文件格式') + `: .${ext}`);
+    throw new Error(_t('docParser.unsupportedFormat', 'Unsupported file format') + `: .${ext}`);
   }
-  
+
   try {
     let content;
     let segments;
     let extra = {};
-    
+
     switch (format.parser) {
       case 'text':
         content = await readAsText(file);
         segments = splitIntoSegments(content, options);
         break;
-        
+
       case 'srt':
         content = await readAsText(file);
         segments = parseSRT(content);
         break;
-        
+
       case 'vtt':
         content = await readAsText(file);
         segments = parseVTT(content);
         break;
-        
+
       case 'pdf':
         const pdfResult = await parsePDF(file, options);
         segments = pdfResult.segments;
@@ -744,7 +654,7 @@ export async function parseDocument(file, options = {}) {
           extra.warning = 'scanned_no_ocr';
         }
         break;
-        
+
       case 'docx':
         const docxResult = await parseDOCX(file, options);
         segments = docxResult.segments;
@@ -752,34 +662,33 @@ export async function parseDocument(file, options = {}) {
           extra.warnings = docxResult.warnings;
         }
         break;
-        
+
       case 'csv':
         const csvResult = await parseCSV(file, options);
         segments = csvResult.segments;
         break;
-        
+
       case 'json':
         const jsonResult = await parseJSON(file, options);
         segments = jsonResult.segments;
         break;
-        
+
       case 'epub':
         const epubResult = await parseEPUB(file, options);
         segments = epubResult.segments;
         extra.title = epubResult.title;
         extra.chapterCount = epubResult.chapterCount;
         break;
-        
+
       default:
         throw new Error('Unimplemented parser: ' + format.parser);
     }
-    
-    // 识别章节
+
     const headings = detectHeadings(segments);
     const outline = buildOutlineTree(headings);
-    
+
     const stats = calculateStats(segments);
-    
+
     return {
       success: true,
       filename: file.name,
@@ -791,20 +700,20 @@ export async function parseDocument(file, options = {}) {
       headings,
       ...extra,
     };
-    
+
   } catch (error) {
     logger.error('Error:', error);
-    
-    if (error.message?.includes('password') || 
+
+    if (error.message?.includes('password') ||
         error.name === 'PasswordException' ||
         error.message?.includes('Incorrect Password')) {
       return {
         success: false,
         needPassword: true,
-        message: _t('docParser.passwordRequired', '文件需要密码'),
+        message: _t('docParser.passwordRequired', 'File requires a password'),
       };
     }
-    
+
     return {
       success: false,
       error: error.message,
@@ -812,28 +721,22 @@ export async function parseDocument(file, options = {}) {
   }
 }
 
-/**
- * 读取文件为文本
- */
 function readAsText(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => resolve(e.target.result);
-    reader.onerror = () => reject(new Error(_t('docParser.readFailed', '文件读取失败')));
+    reader.onerror = () => reject(new Error(_t('docParser.readFailed', 'Failed to read file')));
     reader.readAsText(file);
   });
 }
 
-/**
- * 计算文档统计信息
- */
 function calculateStats(segments) {
   const total = segments.length;
   const pending = segments.filter(s => s.status === 'pending').length;
   const skipped = segments.filter(s => s.status === 'skipped').length;
   const totalChars = segments.reduce((sum, s) => sum + (s.original?.length || 0), 0);
   const totalTokens = segments.reduce((sum, s) => sum + (s.tokens || 0), 0);
-  
+
   return {
     total,
     pending,
@@ -844,27 +747,24 @@ function calculateStats(segments) {
   };
 }
 
-/**
- * 批量合并短段落
- */
 export function batchSegments(segments, options = {}) {
   const {
     maxTokensPerBatch = 2000,
     maxSegmentsPerBatch = 5,
     separator = '\n[SEP]\n',
   } = options;
-  
+
   const batches = [];
   let currentBatch = [];
   let currentTokens = 0;
-  
+
   for (const segment of segments) {
     if (segment.status !== 'pending') continue;
-    
-    const canAdd = 
+
+    const canAdd =
       currentBatch.length < maxSegmentsPerBatch &&
       currentTokens + segment.tokens <= maxTokensPerBatch;
-    
+
     if (canAdd) {
       currentBatch.push(segment);
       currentTokens += segment.tokens;
@@ -880,7 +780,7 @@ export function batchSegments(segments, options = {}) {
       currentTokens = segment.tokens;
     }
   }
-  
+
   if (currentBatch.length > 0) {
     batches.push({
       segments: currentBatch,
@@ -888,27 +788,24 @@ export function batchSegments(segments, options = {}) {
       text: currentBatch.map(s => s.original).join(separator),
     });
   }
-  
+
   return batches;
 }
 
-/**
- * 导出为双语文本
- */
 export function exportBilingual(segments, options = {}) {
   const {
     style = 'below',
     includeSkipped = false,
   } = options;
-  
+
   let output = '';
-  
+
   for (const segment of segments) {
     if (!includeSkipped && segment.status === 'skipped') continue;
-    
+
     const original = segment.original || '';
     const translated = segment.translated || '';
-    
+
     switch (style) {
       case 'below':
         output += original + '\n';
@@ -917,35 +814,29 @@ export function exportBilingual(segments, options = {}) {
         }
         output += '\n';
         break;
-        
+
       case 'side-by-side':
         output += `| ${original.replace(/\|/g, '\\|').replace(/\n/g, ' ')} | ${translated.replace(/\|/g, '\\|').replace(/\n/g, ' ')} |\n`;
         break;
     }
   }
-  
+
   if (style === 'side-by-side') {
     output = '| 原文 | 译文 |\n|------|------|\n' + output;
   }
-  
+
   return output;
 }
 
-/**
- * 导出为纯译文
- */
 export function exportTranslatedOnly(segments, options = {}) {
   const { includeSkipped = false } = options;
-  
+
   return segments
     .filter(s => includeSkipped || s.status !== 'skipped')
     .map(s => s.translated || s.original)
     .join('\n\n');
 }
 
-/**
- * 导出为 SRT 字幕
- */
 export function exportSRT(segments) {
   return segments
     .filter(s => s.type === 'subtitle')
@@ -953,41 +844,33 @@ export function exportSRT(segments) {
     .join('\n\n');
 }
 
-/**
- * 导出为 VTT 字幕
- */
 export function exportVTT(segments) {
   const body = segments
     .filter(s => s.type === 'subtitle')
     .map(s => `${s.timecode}\n${s.translated || s.original}`)
     .join('\n\n');
-  
+
   return `WEBVTT\n\n${body}`;
 }
 
-/**
- * 导出为 DOCX 文档（使用 HTML 格式，Word 可直接打开）
- * @param {Array} segments - 翻译段落
- * @param {object} options - 导出选项
- * @returns {Blob} Word 文件 Blob
- */
+// Exports a Word-compatible HTML document — Word opens it directly.
 export function exportDOCX(segments, options = {}) {
   const {
-    style = 'bilingual',  // 'bilingual' | 'translated-only' | 'source-only'
+    style = 'bilingual',
     title = _t('documentTranslator.defaultDocTitle', '翻译文档'),
     includeSkipped = false,
   } = options;
-  
+
   const now = new Date().toLocaleString('zh-CN');
-  
+
   let content = '';
-  
+
   for (const segment of segments) {
     if (!includeSkipped && segment.status === 'skipped') continue;
-    
+
     const original = escapeHtml(segment.original || '');
     const translated = escapeHtml(segment.translated || '');
-    
+
     if (style === 'bilingual') {
       content += `
         <p style="color: #666; margin-bottom: 8px; font-size: 11pt;">${original}</p>
@@ -999,11 +882,10 @@ export function exportDOCX(segments, options = {}) {
       content += `<p style="margin-bottom: 16px;">${original}</p>`;
     }
   }
-  
-  // 生成 Word 兼容的 HTML 文档
+
   const html = `
 <!DOCTYPE html>
-<html xmlns:o="urn:schemas-microsoft-com:office:office" 
+<html xmlns:o="urn:schemas-microsoft-com:office:office"
       xmlns:w="urn:schemas-microsoft-com:office:word"
       xmlns="http://www.w3.org/TR/REC-html40">
 <head>
@@ -1054,29 +936,24 @@ export function exportDOCX(segments, options = {}) {
   return new Blob([html], { type: 'application/msword' });
 }
 
-/**
- * 导出为 PDF（生成 HTML 供打印）
- * @param {Array} segments - 翻译段落
- * @param {object} options - 导出选项
- * @returns {string} HTML 内容
- */
+// Exports an HTML document for the browser print-to-PDF flow.
 export function exportPDFHTML(segments, options = {}) {
   const {
     style = 'bilingual',
     title = _t('documentTranslator.defaultDocTitle', '翻译文档'),
     includeSkipped = false,
   } = options;
-  
+
   const now = new Date().toLocaleString('zh-CN');
-  
+
   let content = '';
-  
+
   for (const segment of segments) {
     if (!includeSkipped && segment.status === 'skipped') continue;
-    
+
     const original = segment.original || '';
     const translated = segment.translated || '';
-    
+
     if (style === 'bilingual') {
       content += `
         <div class="segment">
@@ -1090,7 +967,7 @@ export function exportPDFHTML(segments, options = {}) {
       content += `<p class="text">${escapeHtml(original)}</p>`;
     }
   }
-  
+
   return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -1156,9 +1033,6 @@ export function exportPDFHTML(segments, options = {}) {
 </html>`;
 }
 
-/**
- * HTML 转义
- */
 function escapeHtml(text) {
   const map = {
     '&': '&amp;',

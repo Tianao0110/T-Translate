@@ -1,21 +1,13 @@
-// electron/ipc/clipboard.js
-// 剪贴板操作 IPC handlers
-// 包含：读写文本、读取图片
+// Clipboard IPC handlers — text r/w + image read.
 
 const { ipcMain, clipboard } = require('electron');
 const { CHANNELS } = require('../shared/channels');
 const logger = require('../utils/logger')('IPC:Clipboard');
 
-/**
- * 注册剪贴板相关 IPC handlers
- * @param {Object} ctx - 共享上下文
- */
 function register(ctx) {
-  // ==================== 文本操作 ====================
-  
-  /**
-   * 写入文本到剪贴板 (handle 版本，用于玻璃窗口等)
-   */
+  // ===== Text =====
+
+  // handle() version — used by glass window and similar.
   ipcMain.handle(CHANNELS.CLIPBOARD.WRITE_TEXT, (event, text) => {
     try {
       clipboard.writeText(text);
@@ -26,10 +18,8 @@ function register(ctx) {
       return false;
     }
   });
-  
-  /**
-   * 写入文本到剪贴板 (on 版本，兼容旧代码)
-   */
+
+  // on() version — legacy channel name kept for backwards compatibility.
   ipcMain.on(CHANNELS.CLIPBOARD.WRITE_TEXT_LEGACY, (event, text) => {
     try {
       clipboard.writeText(text);
@@ -38,10 +28,7 @@ function register(ctx) {
       logger.error('Write text error:', error.message);
     }
   });
-  
-  /**
-   * 读取剪贴板文本 (handle 版本)
-   */
+
   ipcMain.handle(CHANNELS.CLIPBOARD.READ_TEXT, () => {
     try {
       const text = clipboard.readText();
@@ -52,10 +39,8 @@ function register(ctx) {
       return '';
     }
   });
-  
-  /**
-   * 读取剪贴板文本 (handle 版本，兼容旧通道名)
-   */
+
+  // Legacy channel name.
   ipcMain.handle(CHANNELS.CLIPBOARD.READ_TEXT_LEGACY, () => {
     try {
       return clipboard.readText();
@@ -64,13 +49,10 @@ function register(ctx) {
       return '';
     }
   });
-  
-  // ==================== 图片操作 ====================
-  
-  /**
-   * 读取剪贴板图片
-   * @returns {string|null} 图片的 DataURL，或 null
-   */
+
+  // ===== Image =====
+
+  // Returns a DataURL or null if clipboard has no image.
   ipcMain.handle(CHANNELS.CLIPBOARD.READ_IMAGE, () => {
     try {
       const image = clipboard.readImage();
@@ -85,27 +67,19 @@ function register(ctx) {
       return null;
     }
   });
-  
-  // ==================== 辅助函数 ====================
-  
-  /**
-   * 获取剪贴板可用格式（内部使用，不暴露给渲染进程）
-   * @returns {string[]}
-   */
+
+  // ===== Internal helpers (not exposed to renderer) =====
+
   function getAvailableFormats() {
     return clipboard.availableFormats();
   }
-  
-  /**
-   * 清空剪贴板（内部使用）
-   */
+
   function clearClipboard() {
     clipboard.clear();
   }
-  
+
   logger.info('Clipboard IPC handlers registered');
-  
-  // 返回辅助函数供其他模块使用
+
   return {
     getAvailableFormats,
     clearClipboard,

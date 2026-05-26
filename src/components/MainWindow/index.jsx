@@ -1,4 +1,3 @@
-// src/components/MainWindow/index.jsx
 import createLogger from '../../utils/logger.js';
 const logger = createLogger('MainWindow');
 import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
@@ -10,33 +9,26 @@ import {
 
 import useTranslationStore from '../../stores/translation-store';
 import appIcon from '/icon.png';
-// TranslationPanel 是首屏必需，直接导入
+// TranslationPanel is the initial view — keep it eagerly imported to avoid first-paint stall
 import TranslationPanel from '../TranslationPanel';
-// 其他面板懒加载
 const HistoryPanel = lazy(() => import('../HistoryPanel'));
 const SettingsPanel = lazy(() => import('../SettingsPanel'));
 const FavoritesPanel = lazy(() => import('../FavoritesPanel'));
 const DocumentTranslator = lazy(() => import('../DocumentTranslator'));
 import './styles.css';
 
-// 从配置中心导入常量
-import { TRANSLATION_STATUS } from '@config/defaults'; 
+import { TRANSLATION_STATUS } from '@config/defaults';
 
-// 懒加载 Loading 组件
 const LazyLoadingFallback = () => (
   <div className="lazy-loading-fallback">
     <Loader2 className="spinning" size={24} />
     <span>Loading...</span>
   </div>
-); 
+);
 
-/**
- * 主窗口组件
- */
 const MainWindow = () => {
   const { t } = useTranslation();
-  
-  // UI 状态
+
   const [activeTab, setActiveTab] = useState('translate');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [notification, setNotification] = useState(null);
@@ -46,18 +38,13 @@ const MainWindow = () => {
     dateRange: 'all',
     favorites: false
   });
-  
-  // 版本号
+
   const [version, setVersion] = useState('');
-  
-  // 文档翻译弹窗 → 改为 tab 内容
-  // const [showDocTranslator, setShowDocTranslator] = useState(false);
-  
-  // Store
+
   const {
     currentTranslation,
-    statistics, // 这个可能是旧的，如果 store 没有实时计算，可能需要 getStatistics
-    getStatistics, // 获取最新的统计数据方法
+    statistics,
+    getStatistics,
     translate,
     clearCurrent,
     swapLanguages,
@@ -65,21 +52,18 @@ const MainWindow = () => {
     exportHistory,
     setSourceText,
     ocrStatus,
-    recognizeImage, // OCR 识别
+    recognizeImage,
   } = useTranslationStore();
 
-  // Refs
   const searchInputRef = useRef(null);
-  
-  // 截图 OCR 数据（传递给 TranslationPanel）
+
+  // Bridge from main-process screenshot capture down to TranslationPanel
   const [screenshotData, setScreenshotData] = useState(null);
 
-  // 初始化统计数据 (如果 store 没有自动初始化)
   useEffect(() => {
-    if(getStatistics) getStatistics();
+    if (getStatistics) getStatistics();
   }, [getStatistics]);
 
-  // 获取应用版本号
   useEffect(() => {
     const fetchVersion = async () => {
       try {
@@ -92,29 +76,26 @@ const MainWindow = () => {
     fetchVersion();
   }, []);
 
-
-
-  // 全局截图监听 - 始终挂载，不会因标签切换而丢失
+  // Global screenshot listener: stays mounted regardless of active tab so a
+  // screenshot triggered from outside the app doesn't get lost
   useEffect(() => {
     if (!window.electron?.screenshot?.onCaptured) {
-      logger.warn(' Screenshot onCaptured not available');
+      logger.warn('Screenshot onCaptured not available');
       return;
     }
 
-    logger.debug(' Setting up global screenshot listener');
-    
+    logger.debug('Setting up global screenshot listener');
+
     const unsubscribe = window.electron.screenshot.onCaptured(async (dataURL) => {
-      logger.debug(' Screenshot captured, dataURL length:', dataURL?.length || 0);
-      
-      // 1. 先切换到翻译标签
+      logger.debug('Screenshot captured, dataURL length:', dataURL?.length || 0);
+
       setActiveTab('translate');
-      
+
       if (!dataURL) {
         showNotification(t('screenshot.failed'), 'error');
         return;
       }
-      
-      // 2. 传递截图数据给 TranslationPanel 处理
+
       setScreenshotData({
         dataURL,
         timestamp: Date.now()
@@ -122,89 +103,86 @@ const MainWindow = () => {
     });
 
     return () => {
-      logger.debug(' Cleaning up global screenshot listener');
+      logger.debug('Cleaning up global screenshot listener');
       if (unsubscribe) unsubscribe();
     };
   }, []);
 
-  // 静默模式截图监听 - 后台处理，不显示主窗口
+  // Silent-mode screenshot: OCR + push result to selection overlay,
+  // without showing the main window. Used by Alt+Q hotkey path.
   useEffect(() => {
     if (!window.electron?.screenshot?.onCapturedSilent) {
-      logger.debug(' Screenshot onCapturedSilent not available');
+      logger.debug('Screenshot onCapturedSilent not available');
       return;
     }
 
-    logger.debug(' Setting up silent screenshot listener');
-    
+    logger.debug('Setting up silent screenshot listener');
+
     const unsubscribe = window.electron.screenshot.onCapturedSilent(async (dataURL) => {
-      logger.debug(' [Silent] Screenshot captured, processing OCR...');
-      
+      logger.debug('[Silent] Screenshot captured, processing OCR...');
+
       if (!dataURL) {
-        logger.error(' [Silent] Screenshot failed: no data');
+        logger.error('[Silent] Screenshot failed: no data');
         return;
       }
-      
+
       try {
-        // OCR 识别
         const engineToUse = ocrStatus?.engine || 'llm-vision';
         logger.debug('[Silent] OCR with engine:', engineToUse);
-        
-        const ocrResult = await recognizeImage(dataURL, { 
+
+        const ocrResult = await recognizeImage(dataURL, {
           engine: engineToUse,
           autoSetSource: false
         });
-        
+
         if (!ocrResult.success || !ocrResult.text) {
           logger.warn('[Silent] OCR failed or no text:', ocrResult);
-          // 通知主进程 OCR 失败
-          window.electron?.screenshot?.notifyOcrComplete?.({ 
-            success: false, 
-            error: ocrResult.error || t('translation.ocrFailed', '未识别到文字') 
+          window.electron?.screenshot?.notifyOcrComplete?.({
+            success: false,
+            error: ocrResult.error || t('translation.ocrFailed', '未识别到文字')
           });
           return;
         }
-        
+
         logger.debug('[Silent] OCR success, sending text to selection window');
-        
-        // OCR 完成，把文字发给划词窗口让它自己翻译
+
+        // Selection window will run its own translation pass on this text
         window.electron?.screenshot?.notifyOcrComplete?.({
           success: true,
           text: ocrResult.text,
         });
       } catch (error) {
         logger.error('[Silent] OCR error:', error);
-        window.electron?.screenshot?.notifyOcrComplete?.({ 
-          success: false, 
-          error: error.message 
+        window.electron?.screenshot?.notifyOcrComplete?.({
+          success: false,
+          error: error.message
         });
       }
     });
 
     return () => {
-      logger.debug(' Cleaning up silent screenshot listener');
+      logger.debug('Cleaning up silent screenshot listener');
       if (unsubscribe) unsubscribe();
     };
   }, [ocrStatus, recognizeImage, translate]);
 
-  // 全局快捷键
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Ctrl/Cmd + 1-5 切换标签
+      // Ctrl/Cmd + 1-5 jumps to that tab
       if ((e.ctrlKey || e.metaKey) && e.key >= '1' && e.key <= '5') {
         const tabs = ['translate', 'history', 'favorites', 'settings', 'document'];
         const index = parseInt(e.key) - 1;
         if (tabs[index]) setActiveTab(tabs[index]);
       }
-      
-      // Ctrl/Cmd + F 搜索
+
+      // Ctrl/Cmd + F focuses search (only valid in history/favorites tabs)
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
         if (activeTab === 'history' || activeTab === 'favorites') {
           e.preventDefault();
           searchInputRef.current?.focus();
         }
       }
-      
-      // Esc 退出全屏或清除搜索
+
       if (e.key === 'Escape') {
         if (isFullscreen) setIsFullscreen(false);
         if (searchQuery) setSearchQuery('');
@@ -215,19 +193,18 @@ const MainWindow = () => {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [activeTab, isFullscreen, searchQuery]);
 
-  // 显示通知
   const showNotification = useCallback((message, type = 'info', duration = 3000) => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), duration);
   }, []);
 
-  // 监听快捷键冲突通知（启动时检测）
+  // Startup may report shortcuts that another app already grabbed
   useEffect(() => {
     const cleanup = window.electron?.ipc?.on('shortcut-conflict', (failedList) => {
       if (failedList?.length > 0) {
         const names = failedList.map(f => f.shortcut).join(', ');
         showNotification(
-          t('shortcuts.conflictNotice', { shortcuts: names }) || 
+          t('shortcuts.conflictNotice', { shortcuts: names }) ||
           '快捷键被其他程序占用: ' + names + '，可在设置中修改',
           'warning',
           6000
@@ -259,7 +236,7 @@ const MainWindow = () => {
     return () => cleanup?.();
   }, []);
 
-  // 监听 API Key 安全告警
+  // Surface secure-storage anomaly alerts (e.g. mass-decrypt of API keys)
   useEffect(() => {
     const cleanup = window.electron?.ipc?.on('security-alert', (alert) => {
       if (alert?.type === 'suspicious-key-access') {
@@ -277,8 +254,6 @@ const MainWindow = () => {
     return () => cleanup?.();
   }, [t, showNotification]);
 
-  // 快速操作菜单
-  // 渲染通知
   const renderNotification = () => {
     if (!notification) return null;
     const icons = {
@@ -296,9 +271,10 @@ const MainWindow = () => {
     );
   };
 
-  // 记录哪些 tab 已经被访问过（延迟挂载：首次切换到才创建）
+  // Lazy-mount pattern: each tab is created on first visit, then kept mounted
+  // so the user doesn't lose in-flight state (e.g. document translation progress)
   const [mountedTabs, setMountedTabs] = useState(new Set(['translate']));
-  
+
   useEffect(() => {
     setMountedTabs(prev => {
       if (prev.has(activeTab)) return prev;
@@ -317,7 +293,6 @@ const MainWindow = () => {
 
   return (
     <div className={`main-window ${isFullscreen ? 'fullscreen' : ''}`}>
-      {/* 顶部工具栏 */}
       <div className="main-toolbar">
         <div className="toolbar-brand">
           <img src={appIcon} alt="T-Translate" className="brand-logo-img" />
@@ -336,11 +311,9 @@ const MainWindow = () => {
               {tab.badge > 0 && <span className="tab-badge">{tab.badge}</span>}
             </button>
           ))}
-          
-          {/* 分隔线 */}
+
           <div className="toolbar-divider" />
-          
-          {/* 文档翻译按钮 */}
+
           <button
             className={`tab-button doc-translate-btn ${activeTab === 'document' ? 'active' : ''}`}
             onClick={() => setActiveTab(activeTab === 'document' ? 'translate' : 'document')}
@@ -352,18 +325,15 @@ const MainWindow = () => {
         </div>
       </div>
 
-      {/* 主内容区 - 所有已访问的tab保持挂载，切换时不丢状态 */}
       <div className="main-content">
-        {/* 翻译面板 - 始终挂载 */}
         <div className="tab-panel" style={{ display: activeTab === 'translate' ? 'flex' : 'none' }}>
-          <TranslationPanel 
-            showNotification={showNotification} 
+          <TranslationPanel
+            showNotification={showNotification}
             screenshotData={screenshotData}
             onScreenshotProcessed={() => setScreenshotData(null)}
           />
         </div>
-        
-        {/* 历史记录 - 首次访问后保持 */}
+
         {mountedTabs.has('history') && (
           <div className="tab-panel" style={{ display: activeTab === 'history' ? 'flex' : 'none' }}>
             <Suspense fallback={<LazyLoadingFallback />}>
@@ -371,8 +341,7 @@ const MainWindow = () => {
             </Suspense>
           </div>
         )}
-        
-        {/* 收藏 */}
+
         {mountedTabs.has('favorites') && (
           <div className="tab-panel" style={{ display: activeTab === 'favorites' ? 'flex' : 'none' }}>
             <Suspense fallback={<LazyLoadingFallback />}>
@@ -380,8 +349,7 @@ const MainWindow = () => {
             </Suspense>
           </div>
         )}
-        
-        {/* 设置 */}
+
         {mountedTabs.has('settings') && (
           <div className="tab-panel" style={{ display: activeTab === 'settings' ? 'flex' : 'none' }}>
             <Suspense fallback={<LazyLoadingFallback />}>
@@ -393,8 +361,7 @@ const MainWindow = () => {
             </Suspense>
           </div>
         )}
-        
-        {/* 文档翻译 - 首次访问后保持（翻译进度不丢失）*/}
+
         {mountedTabs.has('document') && (
           <div className="tab-panel" style={{ display: activeTab === 'document' ? 'flex' : 'none' }}>
             <Suspense fallback={<LazyLoadingFallback />}>
@@ -408,7 +375,6 @@ const MainWindow = () => {
         )}
       </div>
 
-      {/* 底部状态栏 */}
       <div className="status-bar">
         <div className="status-left">
           <div className="status-item">

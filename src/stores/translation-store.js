@@ -1,33 +1,20 @@
-// src/stores/translation-store.js
-// 翻译状态管理 - 主窗口用
-// 
-// 架构说明 (M-V-S-P):
-// TranslationPanel (V) → mainTranslation (S) → translator/translation (S) → registry (P)
-//                      ↘ translation-store (M) ← 写入结果
-// 
-// 职责 (Model 层)：
-// - 管理主窗口的翻译状态（sourceText, translatedText, status）
-// - 版本管理（多版本译文、风格改写）
-// - 历史记录、收藏功能
-// - 流式输出状态管理
-//
-// 注意：玻璃窗口使用独立的 stores/session.js + services/pipeline.js
+// Main-window translation store. Owns source/translated text, versions,
+// history, favorites, OCR status, and privacy-mode behavior.
+// Glass window uses a separate stores/session.js + services/pipeline.js.
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 import { v4 as uuidv4 } from "uuid";
 
-// 从配置中心导入常量
 import { PRIVACY_MODES, TRANSLATION_STATUS, LANGUAGE_CODES, DEFAULTS, PROVIDER_IDS, LANGUAGES } from "@config/defaults";
 import { getModeFeatures } from "@config/privacy-modes";
 import createLogger from '../utils/logger.js';
 const logger = createLogger('TranslationStore');
 
-// 合法语言代码集合（用于写入校验）
 const VALID_LANG_CODES = new Set(LANGUAGES.map(l => l.code));
 
-// Service 引用（延迟绑定，避免循环依赖）
+// Lazy-bound to avoid circular dep with main-translation service
 let _mainTranslation = null;
 const getMainTranslation = async () => {
   if (!_mainTranslation) {
@@ -37,26 +24,20 @@ const getMainTranslation = async () => {
   return _mainTranslation;
 };
 
-/**
- * 翻译状态管理 (完整修复版)
- * 使用 Zustand 进行状态管理
- */
 const useTranslationStore = create(
   persist(
     immer((set, get) => ({
-      // ==================== 1. 状态 (保留原样) ====================
-      // 当前翻译任务
-      translationMode: PRIVACY_MODES.STANDARD, // 'standard' | 'secure' | 'offline'
-      useStreamOutput: true, // 是否使用流式输出（打字机效果）
-      autoTranslate: false, // 是否自动翻译
-      autoTranslateDelay: 500, // 自动翻译延迟（毫秒）
+      translationMode: PRIVACY_MODES.STANDARD,
+      useStreamOutput: true,
+      autoTranslate: false,
+      autoTranslateDelay: 500,
       currentTranslation: {
         id: null,
         sourceText: "",
         translatedText: "",
         sourceLanguage: LANGUAGE_CODES.AUTO,
         targetLanguage: LANGUAGE_CODES.ZH,
-        status: TRANSLATION_STATUS.IDLE, // idle | translating | success | error
+        status: TRANSLATION_STATUS.IDLE,
         error: null,
         metadata: {
           timestamp: null,
@@ -64,36 +45,34 @@ const useTranslationStore = create(
           model: null,
           template: "general",
         },
-        // 版本管理
-        versions: [], // [{ id, type, text, createdAt, styleRef?, styleName?, styleStrength? }]
+        // [{ id, type, text, createdAt, styleRef?, styleName?, styleStrength? }]
+        versions: [],
         currentVersionId: null,
-        // 术语库自动替换记录（供UI显示撤销提示）
-        glossaryApplied: null, // { replacements: [{from, to}], originalText: string }
+        // { replacements: [{from, to}], originalText } — drives the undo hint in UI
+        glossaryApplied: null,
       },
 
       history: [],
       historyLimit: 1000,
       favorites: [],
-      queue: [], // 批量翻译队列
+      queue: [],
       isProcessingQueue: false,
-      
-      // 无痕模式暂存区（不持久化）
+
+      // Stash for Secure mode — not persisted, restored on mode exit
       _savedHistory: null,
       _savedStatistics: null,
 
-      // OCR 状态
       ocrStatus: {
         isProcessing: false,
-        engine: "llm-vision",  // 默认使用 LLM Vision
+        engine: "llm-vision",
         lastResult: null,
         error: null,
-        fallbackNotice: null,  // LLM Vision 降级通知（自动切换到本地 OCR 时显示）
+        // Set when LLM-Vision auto-fell-back to a local OCR engine
+        fallbackNotice: null,
       },
 
-      // 截图数据（用于跨组件传递）
       pendingScreenshot: null,
 
-      // 统计数据
       statistics: {
         totalTranslations: 0,
         totalCharacters: 0,
@@ -104,25 +83,25 @@ const useTranslationStore = create(
         lastUpdated: new Date().toISOString(),
       },
 
-      // 临时剪贴板
       clipboard: {
         source: "",
         translated: "",
         timestamp: null,
       },
 
-      // ==================== 2. Actions  ====================
+      // ===== Actions =====
+
+      // Secure-mode round-trip: on enter, stash history/stats and run with
+      // empty ones; on exit, restore the stash so Secure-mode entries never
+      // bleed into persistent history.
       setTranslationMode: (mode) =>
         set((state) => {
           const previousMode = state.translationMode;
           state.translationMode = mode;
-          
-          // 切换到无痕模式：暂存当前历史，使用空白历史
+
           if (mode === PRIVACY_MODES.SECURE && previousMode !== PRIVACY_MODES.SECURE) {
-            // 保存当前历史和统计到暂存区
             state._savedHistory = [...state.history];
             state._savedStatistics = { ...state.statistics };
-            // 使用空白历史（无痕期间的记录不保存）
             state.history = [];
             state.statistics = {
               totalTranslations: 0,
@@ -134,8 +113,7 @@ const useTranslationStore = create(
               lastUpdated: new Date().toISOString(),
             };
           }
-          
-          // 退出无痕模式：恢复之前的历史
+
           if (mode !== PRIVACY_MODES.SECURE && previousMode === PRIVACY_MODES.SECURE) {
             if (state._savedHistory) {
               state.history = state._savedHistory;
@@ -148,18 +126,16 @@ const useTranslationStore = create(
           }
         }),
 
-      // 检查当前模式下某功能是否可用
       isFeatureEnabled: (featureName) => {
         const mode = get().translationMode;
         const features = getModeFeatures(mode);
         return features[featureName] !== false;
       },
 
-      // 检查翻译源是否在当前模式下可用
+      // Offline mode only permits local LLM + Ollama
       isProviderAllowed: (providerId) => {
         const mode = get().translationMode;
         if (mode !== PRIVACY_MODES.OFFLINE) return true;
-        // 离线模式仅允许本地 LLM 和 Ollama
         return providerId === PROVIDER_IDS.LOCAL_LLM || providerId === PROVIDER_IDS.OLLAMA;
       },
 
@@ -192,7 +168,6 @@ const useTranslationStore = create(
 
       setLanguages: (source, target) =>
         set((state) => {
-          // 校验语言代码合法性
           if (source && !VALID_LANG_CODES.has(source)) {
             logger.warn(`Invalid source language code: ${source}, ignoring`);
             source = null;
@@ -203,11 +178,11 @@ const useTranslationStore = create(
           }
           if (source) state.currentTranslation.sourceLanguage = source;
           if (target) state.currentTranslation.targetLanguage = target;
-          // 语言变更后清空译文，避免旧译文与新语言不匹配
+          // Stale translation in the wrong language is worse than empty
           state.currentTranslation.translatedText = '';
           state.currentTranslation.status = TRANSLATION_STATUS.IDLE;
           state.currentTranslation.error = null;
-          // 同步到 electron-store，供主进程读取（划词翻译等）
+          // Mirror to electron-store so main can read it (selection translate, etc.)
           try {
             const src = source || state.currentTranslation.sourceLanguage;
             const tgt = target || state.currentTranslation.targetLanguage;
@@ -216,7 +191,6 @@ const useTranslationStore = create(
           } catch {}
         }),
 
-      // 单独设置目标语言（供玻璃窗口同步使用）
       setTargetLanguage: (target) =>
         set((state) => {
           if (target && !VALID_LANG_CODES.has(target)) {
@@ -248,26 +222,23 @@ const useTranslationStore = create(
           state.currentTranslation.translatedText = tempText;
         }),
 
-      // ==================== 流式翻译 (委托给 Service) ====================
+      // ===== Translation delegates to service =====
+
       streamTranslate: async (options = {}) => {
-        // 委托给 main-translation service
         const service = await getMainTranslation();
         return service.streamTranslate(options);
       },
 
-      // 核心翻译逻辑（委托给 Service）
       translate: async (options = {}) => {
         const service = await getMainTranslation();
         return service.translate(options);
       },
 
-      // 批量翻译（委托给 Service）
       batchTranslate: async (texts, options = {}) => {
         const service = await getMainTranslation();
         return service.batchTranslate(texts, options);
       },
 
-      // OCR 识别（委托给 Service）
       recognizeImage: async (image, options = {}) => {
         const service = await getMainTranslation();
         return service.recognizeImage(image, options);
@@ -278,13 +249,11 @@ const useTranslationStore = create(
           state.ocrStatus.engine = engine;
         }),
 
-      // 设置待处理的截图数据
       setPendingScreenshot: (dataURL) =>
         set((state) => {
           state.pendingScreenshot = dataURL;
         }),
 
-      // 清除待处理的截图数据
       clearPendingScreenshot: () =>
         set((state) => {
           state.pendingScreenshot = null;
@@ -303,11 +272,11 @@ const useTranslationStore = create(
             folderId: isStyleReference ? 'style_library' : null,
             isStyleReference: isStyleReference,
           };
-          // 如果传入的 item 需要标记为风格参考
           if (item && isStyleReference) {
             favoriteItem.folderId = 'style_library';
             favoriteItem.isStyleReference = true;
           }
+          // De-dupe on (source, targetLanguage) so the same phrase isn't favorited twice
           const exists = state.favorites.some(
             (f) =>
               f.sourceText === favoriteItem.sourceText &&
@@ -320,7 +289,7 @@ const useTranslationStore = create(
         set((state) => {
           state.favorites = state.favorites.filter((f) => f.id !== id);
         }),
-        
+
       updateFavoriteItem: (id, updates) =>
         set((state) => {
           const item = state.favorites.find((f) => f.id === id);
@@ -329,15 +298,17 @@ const useTranslationStore = create(
           }
         }),
 
-      // ==================== 版本管理 ====================
-      // 添加风格改写版本
+      // ===== Versions =====
+      // Style-rewrite and user-edit are tracked as separate versions so the
+      // user can flip between them. We collapse repeats: a second style rewrite
+      // overwrites the existing style version (same for user edits).
+
       addStyleVersion: (text, styleRef, styleName, styleStrength) =>
         set((state) => {
           const versions = state.currentTranslation.versions || [];
-          
-          // 查找是否已有风格改写版本
+
           const existingStyleIndex = versions.findIndex(v => v.type === 'style_rewrite');
-          
+
           const newVersion = {
             id: existingStyleIndex >= 0 ? versions[existingStyleIndex].id : `v${versions.length + 1}`,
             type: 'style_rewrite',
@@ -347,47 +318,42 @@ const useTranslationStore = create(
             styleName,
             styleStrength,
           };
-          
+
           if (existingStyleIndex >= 0) {
-            // 覆盖已有的风格版本
             versions[existingStyleIndex] = newVersion;
           } else {
-            // 添加新版本
             versions.push(newVersion);
           }
-          
+
           state.currentTranslation.versions = versions;
           state.currentTranslation.currentVersionId = newVersion.id;
           state.currentTranslation.translatedText = text;
         }),
 
-      // 添加用户编辑版本
       addUserEditVersion: (text) =>
         set((state) => {
           const versions = state.currentTranslation.versions || [];
-          
-          // 查找是否已有用户编辑版本
+
           const existingEditIndex = versions.findIndex(v => v.type === 'user_edit');
-          
+
           const newVersion = {
             id: existingEditIndex >= 0 ? versions[existingEditIndex].id : `v${versions.length + 1}`,
             type: 'user_edit',
             text,
             createdAt: Date.now(),
           };
-          
+
           if (existingEditIndex >= 0) {
             versions[existingEditIndex] = newVersion;
           } else {
             versions.push(newVersion);
           }
-          
+
           state.currentTranslation.versions = versions;
           state.currentTranslation.currentVersionId = newVersion.id;
           state.currentTranslation.translatedText = text;
         }),
 
-      // 切换版本
       switchVersion: (versionId) =>
         set((state) => {
           const version = state.currentTranslation.versions?.find(v => v.id === versionId);
@@ -397,7 +363,6 @@ const useTranslationStore = create(
           }
         }),
 
-      // 获取当前版本信息
       getCurrentVersion: () => {
         const state = get();
         const { versions, currentVersionId } = state.currentTranslation;
@@ -421,26 +386,23 @@ const useTranslationStore = create(
           state.statistics.totalCharacters = 0;
         }),
 
-      // ==================== 隐私模式辅助方法 ====================
-      // 检查当前模式下是否允许保存历史
+      // ===== Privacy mode helpers =====
+
       canSaveHistory: () => {
         const state = get();
         return state.translationMode !== PRIVACY_MODES.SECURE;
       },
-      
-      // 检查当前模式下是否允许使用在线API
+
       canUseOnlineApi: () => {
         const state = get();
         return state.translationMode !== PRIVACY_MODES.OFFLINE;
       },
-      
-      // 检查当前模式下是否允许使用缓存
+
       canUseCache: () => {
         const state = get();
         return state.translationMode !== PRIVACY_MODES.SECURE;
       },
-      
-      // 获取当前模式配置
+
       getModeConfig: () => {
         const state = get();
         const configs = {
@@ -468,16 +430,14 @@ const useTranslationStore = create(
         return configs[state.translationMode] || configs.standard;
       },
 
-      // 添加到历史记录（供外部调用，如玻璃窗口）
-      // 自动检查隐私模式
+      // External callers (e.g. glass window) route through this, so privacy
+      // gating happens here rather than at each call site.
       addToHistory: (item) =>
         set((state) => {
-          // 无痕模式下不保存历史
           if (state.translationMode === PRIVACY_MODES.SECURE) {
-            // logger.debug(' Secure mode - history not saved');
             return;
           }
-          
+
           const historyItem = {
             id: item.id || uuidv4(),
             sourceText: item.sourceText || '',
@@ -487,19 +447,18 @@ const useTranslationStore = create(
             timestamp: item.timestamp || Date.now(),
             source: item.source || 'unknown'
           };
-          
-          // 检查是否已存在相同内容
+
+          // De-dupe on (sourceText, translatedText) so retries don't double-log
           const exists = state.history.some(
-            h => h.sourceText === historyItem.sourceText && 
+            h => h.sourceText === historyItem.sourceText &&
                  h.translatedText === historyItem.translatedText
           );
-          
+
           if (!exists) {
             state.history.unshift(historyItem);
             if (state.history.length > state.historyLimit) {
               state.history = state.history.slice(0, state.historyLimit);
             }
-            // 更新统计（标准模式和离线模式都统计）
             if (state.translationMode !== PRIVACY_MODES.SECURE) {
               state.statistics.totalTranslations++;
               state.statistics.totalCharacters += (historyItem.sourceText?.length || 0);
@@ -568,7 +527,7 @@ const useTranslationStore = create(
 
       exportHistory: (format = "json") => {
         const data = get().history;
-        return data; // 仅返回数据，让组件处理下载逻辑
+        return data;
       },
 
       importHistory: async (file) => {
@@ -602,17 +561,14 @@ const useTranslationStore = create(
 
       getStatistics: () => {
         const state = get();
-        // 简单触发一次状态更新以刷新时间
+        // Bump lastUpdated so observers get a fresh value
         set((state) => {
           state.statistics.lastUpdated = new Date().toISOString();
         });
         return state.statistics;
       },
 
-      /**
-       * 获取术语表（从收藏的术语库文件夹中提取）
-       * @returns {Array<{source: string, target: string}>} 术语列表
-       */
+      // Glossary terms live in the favorites pile under folderId === 'glossary'
       getGlossaryTerms: () => {
         const state = get();
         return state.favorites
@@ -635,33 +591,28 @@ const useTranslationStore = create(
     })),
     {
       name: "translation-store",
-      // Electron 环境下 localStorage 也是持久化的，且同步加载，不会闪屏
+      // localStorage works in Electron and loads synchronously (no flash)
       storage: createJSONStorage(() => localStorage),
       merge: (persistedState, currentState) => {
         return {
           ...currentState,
           ...persistedState,
-          // 恢复隐私模式
           translationMode: persistedState.translationMode || currentState.translationMode,
-          // 只恢复语言设置，不恢复翻译内容
+          // Persist langs only — never restore in-flight translation text
           currentTranslation: {
             ...currentState.currentTranslation,
             sourceLanguage: persistedState.currentTranslation?.sourceLanguage || currentState.currentTranslation.sourceLanguage,
             targetLanguage: persistedState.currentTranslation?.targetLanguage || currentState.currentTranslation.targetLanguage,
-            // 翻译内容始终为空
             sourceText: "",
             translatedText: "",
           },
         };
       },
       partialize: (state) => ({
-        // 持久化历史、收藏、统计
         history: state.history,
         favorites: state.favorites,
         statistics: state.statistics,
-        // 持久化隐私模式
         translationMode: state.translationMode,
-        // 只持久化语言设置，不持久化翻译内容
         currentTranslation: {
           sourceLanguage: state.currentTranslation.sourceLanguage,
           targetLanguage: state.currentTranslation.targetLanguage,

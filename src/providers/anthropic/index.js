@@ -1,6 +1,4 @@
-// src/providers/anthropic/index.js
-// Anthropic Claude 翻译源
-// 使用 Anthropic Messages API（非 OpenAI 兼容）
+// Anthropic Messages API provider (not OpenAI-compatible).
 
 import { BaseProvider, LANGUAGE_CODES } from '../base.js';
 import icon from './icon.svg';
@@ -8,10 +6,6 @@ import createLogger from '../../utils/logger.js';
 
 const logger = createLogger('Anthropic');
 
-/**
- * Anthropic Claude 翻译源
- * 翻译质量极高，支持流式输出
- */
 class AnthropicProvider extends BaseProvider {
 
   static metadata = {
@@ -71,8 +65,6 @@ class AnthropicProvider extends BaseProvider {
     return true;
   }
 
-  // ========== 翻译 ==========
-
   async translate(text, sourceLang = 'auto', targetLang = 'zh', options = {}) {
     if (!text?.trim()) {
       return { success: false, error: '文本为空' };
@@ -129,8 +121,6 @@ class AnthropicProvider extends BaseProvider {
     }
   }
 
-  // ========== 流式翻译 ==========
-
   async translateStream(text, sourceLang, targetLang, onChunk, options = {}) {
     if (!text?.trim()) {
       return { success: false, error: '文本为空' };
@@ -186,7 +176,7 @@ class AnthropicProvider extends BaseProvider {
           try {
             const json = JSON.parse(data);
 
-            // Anthropic SSE: content_block_delta 事件包含文本增量
+            // Anthropic streams several event types; only content_block_delta carries token text
             if (json.type === 'content_block_delta' && json.delta?.text) {
               fullText += json.delta.text;
               if (onChunk) onChunk(json.delta.text);
@@ -202,15 +192,13 @@ class AnthropicProvider extends BaseProvider {
     }
   }
 
-  // ========== 测试连接 ==========
-
   async testConnection() {
     if (!this.config.apiKey) {
       return { success: false, message: '未配置 API Key' };
     }
 
     try {
-      // 发送一条极短的测试消息
+      // Minimum-cost ping: 10 tokens output for "Hi"
       const response = await fetch(`${this.config.baseUrl}/v1/messages`, {
         method: 'POST',
         headers: this._buildHeaders(),
@@ -242,8 +230,7 @@ class AnthropicProvider extends BaseProvider {
     }
   }
 
-  // ========== 内部方法 ==========
-
+  // anthropic-dangerous-direct-browser-access lets us call from renderer (no CORS proxy)
   _buildHeaders() {
     return {
       'Content-Type': 'application/json',

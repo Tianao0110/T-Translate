@@ -1,12 +1,7 @@
-// src/config/templates.js
-// 翻译模板配置
-//
-// 模板定义了发送给 LLM 的 system prompt
-// 不同场景使用不同模板可以获得更好的翻译效果
+// Translation templates. Each template is a system prompt sent to the LLM;
+// different templates yield different styles (natural / precise / formal /
+// OCR-correction / creative).
 
-/**
- * 语言名称映射
- */
 export const LANGUAGE_NAMES = {
   'auto': 'the same language as the source',
   'zh': 'Chinese (Simplified)',
@@ -26,17 +21,12 @@ export const LANGUAGE_NAMES = {
   'pa': 'Punjabi',
 };
 
-/**
- * 翻译模板定义
- *
- * Templates here = "tone" (natural / precise / formal / ocr / creative).
- * The "message structure" (system+user vs user-only) is decided by
- * services/translation.js based on the active model — translation-only small
- * models (Hunyuan MT etc.) get a simpler prompt and user-only mode,
- * regardless of which tone template is selected.
- */
+// Templates here = "tone" (natural / precise / formal / ocr / creative).
+// The "message structure" (system+user vs user-only) is decided by
+// services/translation.js based on the active model — translation-only small
+// models (Hunyuan MT etc.) get a simpler prompt and user-only mode,
+// regardless of which tone template is selected.
 export const TEMPLATES = {
-  // 自然/日常翻译
   natural: {
     id: 'natural',
     name: '自然',
@@ -52,7 +42,6 @@ Requirements:
 - Do NOT translate content inside special markers like ⟦...⟧`,
   },
 
-  // 精确/技术翻译
   precise: {
     id: 'precise',
     name: '精确',
@@ -69,7 +58,6 @@ Requirements:
 - Do NOT translate content inside special markers like ⟦...⟧`,
   },
 
-  // 正式/商务翻译
   formal: {
     id: 'formal',
     name: '正式',
@@ -86,7 +74,6 @@ Requirements:
 - Do NOT translate content inside special markers like ⟦...⟧`,
   },
 
-  // OCR 纠错翻译
   ocr: {
     id: 'ocr',
     name: 'OCR纠错',
@@ -107,7 +94,6 @@ Requirements:
 - Do NOT translate content inside special markers like ⟦...⟧`,
   },
 
-  // 创意/文学翻译
   creative: {
     id: 'creative',
     name: '创意',
@@ -127,9 +113,6 @@ Requirements:
 
 };
 
-/**
- * 获取模板列表（用于 UI 显示）
- */
 export function getTemplateList() {
   return Object.values(TEMPLATES).map(t => ({
     id: t.id,
@@ -139,12 +122,7 @@ export function getTemplateList() {
   }));
 }
 
-/**
- * 获取模板的 system prompt
- * @param {string} templateId - 模板 ID
- * @param {string} targetLang - 目标语言代码
- * @returns {{ content: string, mode: 'system' | 'user' | 'auto' }}
- */
+// Returns { content, mode } — service layer expects this shape (see translation.js).
 export function getSystemPrompt(templateId, targetLang) {
   const template = TEMPLATES[templateId] || TEMPLATES.natural;
   const langName = LANGUAGE_NAMES[targetLang] || targetLang;
@@ -155,9 +133,6 @@ export function getSystemPrompt(templateId, targetLang) {
   };
 }
 
-/**
- * 检查模板是否存在
- */
 export function hasTemplate(templateId) {
   return templateId in TEMPLATES;
 }

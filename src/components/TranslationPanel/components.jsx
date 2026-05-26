@@ -1,7 +1,5 @@
-// src/components/TranslationPanel/components.jsx
-// TranslationPanel 子组件 - 使用 React.memo 优化
-// 
-// 这些组件从主 TranslationPanel 拆分出来，避免不必要的重渲染
+// Memoized sub-components for TranslationPanel — split out to keep the main
+// component's re-render footprint small.
 
 import React, { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,14 +8,11 @@ import {
   Sparkles, Loader2, Tag, FileEdit, Bot, RotateCcw
 } from 'lucide-react';
 
-/**
- * 术语建议提示条 - memo 优化
- */
-export const TermSuggestionBar = memo(({ 
-  suggestions, 
-  onApply, 
-  onDismiss, 
-  onAlwaysUse 
+export const TermSuggestionBar = memo(({
+  suggestions,
+  onApply,
+  onDismiss,
+  onAlwaysUse
 }) => {
   const { t } = useTranslation();
   if (!suggestions || suggestions.length === 0) return null;
@@ -41,21 +36,21 @@ export const TermSuggestionBar = memo(({
               )}
             </div>
             <div className="term-actions">
-              <button 
-                className="btn-apply" 
+              <button
+                className="btn-apply"
                 onClick={() => onApply(suggestion)}
                 title={t('translation.applyTerm', '应用此术语')}
               >
                 <Check size={12} /> {t('translation.apply', '应用')}
               </button>
-              <button 
+              <button
                 className="btn-always"
                 onClick={() => onAlwaysUse(suggestion)}
                 title={t('translation.alwaysUseTerm', '始终使用此术语')}
               >
                 {t('translation.always', '始终')}
               </button>
-              <button 
+              <button
                 className="btn-dismiss"
                 onClick={() => onDismiss(suggestion, false)}
                 title={t('translation.ignoreTerm', '忽略（本次）')}
@@ -71,15 +66,12 @@ export const TermSuggestionBar = memo(({
 });
 TermSuggestionBar.displayName = 'TermSuggestionBar';
 
-/**
- * 版本菜单 - memo 优化
- */
-export const VersionMenu = memo(({ 
-  versions, 
-  currentVersionId, 
-  onSwitch, 
+export const VersionMenu = memo(({
+  versions,
+  currentVersionId,
+  onSwitch,
   onClose,
-  getVersionName 
+  getVersionName
 }) => {
   if (!versions || versions.length === 0) return null;
 
@@ -91,7 +83,7 @@ export const VersionMenu = memo(({
       </div>
       <div className="version-list">
         {versions.map(version => (
-          <div 
+          <div
             key={version.id}
             className={`version-item ${version.id === currentVersionId ? 'active' : ''}`}
             onClick={() => onSwitch(version.id)}
@@ -111,26 +103,24 @@ export const VersionMenu = memo(({
 });
 VersionMenu.displayName = 'VersionMenu';
 
-/**
- * 风格选择弹窗 - memo 优化
- */
-export const StyleModal = memo(({ 
+export const StyleModal = memo(({
   show,
-  favorites, 
-  selectedStyle, 
+  favorites,
+  selectedStyle,
   styleStrength,
   onSelectStyle,
   onStrengthChange,
   onConfirm,
-  onClose 
+  onClose
 }) => {
   const { t } = useTranslation();
   if (!show) return null;
 
-  // 过滤风格库收藏
+  // Style library = favorites flagged as style references with a usable translation
+  // (>= 5 chars filters out trivial one-word entries that yield poor rewrites)
   const styleLibrary = favorites?.filter(
-    f => (f.isStyleReference || f.folderId === 'style_library') && 
-         f.translatedText && 
+    f => (f.isStyleReference || f.folderId === 'style_library') &&
+         f.translatedText &&
          f.translatedText.length >= 5
   ) || [];
 
@@ -144,14 +134,14 @@ export const StyleModal = memo(({
             <X size={18} />
           </button>
         </div>
-        
+
         <div className="style-modal-body">
           <div className="style-list-section">
             <div className="section-title">{t('translation.fromStyleLib', '从风格库中选择')}</div>
             {styleLibrary.length > 0 ? (
               <div className="style-list">
                 {styleLibrary.map(fav => (
-                  <div 
+                  <div
                     key={fav.id}
                     className={`style-item ${selectedStyle?.id === fav.id ? 'selected' : ''}`}
                     onClick={() => onSelectStyle(fav)}
@@ -202,8 +192,8 @@ export const StyleModal = memo(({
               </div>
               <div className="strength-value">{styleStrength}%</div>
               <div className="strength-desc">
-                {styleStrength <= 30 ? t('translation.strengthDescLight', '轻微调整，基本保持原译文风格') : 
-                 styleStrength <= 70 ? t('translation.strengthDescMedium', '中等程度模仿参考风格') : 
+                {styleStrength <= 30 ? t('translation.strengthDescLight', '轻微调整，基本保持原译文风格') :
+                 styleStrength <= 70 ? t('translation.strengthDescMedium', '中等程度模仿参考风格') :
                  t('translation.strengthDescHigh', '高度模仿，尽量贴近参考风格的语气和表达')}
               </div>
             </div>
@@ -212,8 +202,8 @@ export const StyleModal = memo(({
 
         <div className="style-modal-footer">
           <button className="btn-cancel" onClick={onClose}>{t('favorites.cancel', '取消')}</button>
-          <button 
-            className="btn-rewrite" 
+          <button
+            className="btn-rewrite"
             onClick={onConfirm}
             disabled={!selectedStyle}
           >
@@ -226,9 +216,6 @@ export const StyleModal = memo(({
 });
 StyleModal.displayName = 'StyleModal';
 
-/**
- * 收藏弹窗 - memo 优化
- */
 export const SaveModal = memo(({
   show,
   sourceText,
@@ -258,9 +245,8 @@ export const SaveModal = memo(({
             <X size={18} />
           </button>
         </div>
-        
+
         <div className="save-modal-body">
-          {/* 预览区 */}
           <div className="save-preview">
             <div className="preview-item">
               <label>{t('translation.source', '原文')}</label>
@@ -276,14 +262,13 @@ export const SaveModal = memo(({
             </div>
           </div>
 
-          {/* AI 分析区域 */}
           <div className="ai-suggestions-section">
             <div className="ai-section-header">
               <div className="ai-title">
                 <Bot size={16} />
                 <span>{t('translation.aiSuggestions', 'AI 建议')}</span>
               </div>
-              <button 
+              <button
                 className="btn-reanalyze"
                 onClick={onAnalyze}
                 disabled={isAnalyzing}
@@ -334,8 +319,8 @@ export const SaveModal = memo(({
                     )}
                   </label>
                   <div className="option-hint">
-                    {saveAsStyleRef 
-                      ? t('translation.saveToStyleLib', '将保存到"风格库"，可用于风格改写') 
+                    {saveAsStyleRef
+                      ? t('translation.saveToStyleLib', '将保存到"风格库"，可用于风格改写')
                       : t('translation.saveAsNormal', '保存为普通收藏')}
                   </div>
                 </div>
@@ -356,13 +341,10 @@ export const SaveModal = memo(({
 });
 SaveModal.displayName = 'SaveModal';
 
-/**
- * 翻译模板选择器 - memo 优化
- */
-export const TemplateSelector = memo(({ 
-  templates, 
-  selectedTemplate, 
-  onSelect 
+export const TemplateSelector = memo(({
+  templates,
+  selectedTemplate,
+  onSelect
 }) => {
   return (
     <div className="template-selector">
@@ -385,10 +367,8 @@ export const TemplateSelector = memo(({
 });
 TemplateSelector.displayName = 'TemplateSelector';
 
-/**
- * Shared language selector across TranslationPanel, DocumentTranslator, etc.
- * size: 'default' for hero selectors, 'compact' for toolbar usage.
- */
+// Shared language selector across TranslationPanel, DocumentTranslator, etc.
+// size: 'default' for hero selectors, 'compact' for toolbar usage.
 export const LanguageSelector = memo(({
   value,
   options,

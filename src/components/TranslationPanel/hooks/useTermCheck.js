@@ -1,26 +1,15 @@
-// src/components/TranslationPanel/hooks/useTermCheck.js
-// 术语一致性检测逻辑 - 从 TranslationPanel 抽出
-//
-// 检测译文中是否使用了术语库中的推荐翻译
+// Detects glossary terms in source/translation pairs and offers the saved
+// canonical translation when the LLM picked a different rendering.
 
 import { useState, useCallback } from 'react';
 import createLogger from '../../../utils/logger.js';
 
 const logger = createLogger('useTermCheck');
 
-/**
- * 术语一致性检测 Hook
- * @param {Array} favorites - 收藏列表（包含术语库）
- * @param {Function} setTranslatedText - 设置译文的函数
- * @param {Function} notify - 通知函数
- * @param {Function} t - i18n 翻译函数
- * @returns {Object} 术语检测状态和操作方法
- */
 export default function useTermCheck(favorites, setTranslatedText, notify, t) {
   const [termSuggestions, setTermSuggestions] = useState([]);
   const [dismissedTerms, setDismissedTerms] = useState(new Set());
 
-  // 检测术语一致性
   const checkTermConsistency = useCallback((sourceText, translatedText) => {
     if (!favorites || favorites.length === 0) return;
     if (!sourceText || !translatedText) return;
@@ -29,7 +18,6 @@ export default function useTermCheck(favorites, setTranslatedText, notify, t) {
     const sourceLower = sourceText.toLowerCase();
     const translatedLower = translatedText.toLowerCase();
 
-    // 只检测术语库中的内容
     const glossaryItems = favorites.filter(fav => fav.folderId === 'glossary');
 
     glossaryItems.forEach(fav => {
@@ -38,9 +26,10 @@ export default function useTermCheck(favorites, setTranslatedText, notify, t) {
       const favSourceLower = fav.sourceText.toLowerCase().trim();
       const favTranslatedLower = fav.translatedText.toLowerCase().trim();
 
-      // 只检测短术语（2-50字符）
+      // Limit to short terms — multi-sentence glossary entries cause too many false positives
       if (favSourceLower.length <= 50 && favSourceLower.length >= 2) {
         if (sourceLower.includes(favSourceLower)) {
+          // Surface only when the canonical translation is *missing* from the output
           if (!translatedLower.includes(favTranslatedLower)) {
             suggestions.push({
               id: fav.id,
@@ -53,18 +42,17 @@ export default function useTermCheck(favorites, setTranslatedText, notify, t) {
       }
     });
 
-    // 过滤已忽略的
     const filtered = suggestions.filter(s => !dismissedTerms.has(s.id));
     setTermSuggestions(filtered);
   }, [favorites, dismissedTerms]);
 
-  // 应用术语 - 尝试自动替换，失败则复制到剪贴板
+  // Three-tier substitution: exact match -> word-of-term match -> manual via clipboard
   const applyTermSuggestion = useCallback((suggestion, currentTranslatedText) => {
     let newText = currentTranslatedText;
     let replaced = false;
     let replaceInfo = '';
 
-    // 策略1：原术语直接出现在译文中
+    // Strategy 1: source term appears verbatim in translation (LLM left it untranslated)
     const termRegex = new RegExp(
       suggestion.originalTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'
     );
@@ -74,7 +62,7 @@ export default function useTermCheck(favorites, setTranslatedText, notify, t) {
       replaceInfo = `"${suggestion.originalTerm}" → "${suggestion.savedTranslation}"`;
     }
 
-    // 策略2：术语的单词出现在译文中
+    // Strategy 2: any individual word of the term appears (partial verbatim)
     if (!replaced) {
       const termWords = suggestion.originalTerm.split(/\s+/);
       for (const word of termWords) {
@@ -90,7 +78,7 @@ export default function useTermCheck(favorites, setTranslatedText, notify, t) {
       }
     }
 
-    // 策略3：无法自动替换，复制到剪贴板
+    // Strategy 3: copy canonical translation to clipboard so user pastes manually
     if (replaced) {
       setTranslatedText(newText);
       notify(t('translation.autoReplaced', { info: replaceInfo }), 'success');
@@ -102,7 +90,7 @@ export default function useTermCheck(favorites, setTranslatedText, notify, t) {
     setTermSuggestions(prev => prev.filter(s => s.id !== suggestion.id));
   }, [setTranslatedText, notify, t]);
 
-  // 忽略术语建议
+  // permanent=true adds to the dismiss set; otherwise just hides for this translation
   const dismissTermSuggestion = useCallback((suggestion, permanent = false) => {
     setTermSuggestions(prev => prev.filter(s => s.id !== suggestion.id));
     if (permanent) {
@@ -110,7 +98,6 @@ export default function useTermCheck(favorites, setTranslatedText, notify, t) {
     }
   }, []);
 
-  // 始终使用此术语
   const alwaysUseTerm = useCallback((suggestion) => {
     notify(
       t('translation.termSet') + `: "${suggestion.originalTerm}" → "${suggestion.savedTranslation}"`,
