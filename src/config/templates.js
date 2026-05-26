@@ -28,14 +28,33 @@ export const LANGUAGE_NAMES = {
 
 /**
  * 翻译模板定义
+ *
+ * Each template may declare a `mode`:
+ *   'system' (default) — instruction goes in a system message, source text in user
+ *   'user'             — instruction + source merged into a single user message
+ *                        (required by translation-only small models e.g. Hunyuan MT
+ *                        whose chat templates don't expect a system role)
+ *   'auto'             — resolved at runtime by services/translation.js via
+ *                        model-name detection; falls back to 'natural'
  */
 export const TEMPLATES = {
+  // 自动匹配（默认）— service 层根据当前模型名挑选最合适的模板
+  auto: {
+    id: 'auto',
+    name: 'Auto',
+    description: 'Auto-detect best template from current model name',
+    icon: 'Sparkles',
+    mode: 'auto',
+    systemPrompt: '',
+  },
+
   // 自然/日常翻译
   natural: {
     id: 'natural',
     name: '自然',
     description: '日常对话、口语化表达',
     icon: 'FileText',
+    mode: 'system',
     systemPrompt: `You are a professional translator. Translate the following text into {targetLang}.
 
 Requirements:
@@ -51,6 +70,7 @@ Requirements:
     name: '精确',
     description: '技术文档、学术论文',
     icon: 'Zap',
+    mode: 'system',
     systemPrompt: `You are a professional technical translator. Translate the following text into {targetLang}.
 
 Requirements:
@@ -67,6 +87,7 @@ Requirements:
     name: '正式',
     description: '商务邮件、官方文档',
     icon: 'Sparkles',
+    mode: 'system',
     systemPrompt: `You are a professional business translator. Translate the following text into {targetLang}.
 
 Requirements:
@@ -83,6 +104,7 @@ Requirements:
     name: 'OCR纠错',
     description: 'OCR识别文本，自动纠正识别错误',
     icon: 'Camera',
+    mode: 'system',
     systemPrompt: `You are a professional translator with OCR post-processing expertise. The following text was extracted via OCR and may contain recognition errors.
 
 Your task:
@@ -103,6 +125,7 @@ Requirements:
     name: '创意',
     description: '文学作品、创意内容',
     icon: 'Palette',
+    mode: 'system',
     systemPrompt: `You are a literary translator. Translate the following text into {targetLang}.
 
 Requirements:
@@ -112,6 +135,19 @@ Requirements:
 - Use creative expression while staying true to the original meaning
 - Output ONLY the translation, no explanations
 - Do NOT translate content inside special markers like ⟦...⟧`,
+  },
+
+  // Translation-only small models (Hunyuan MT, NLLB, Opus-MT, ...).
+  // These models' chat templates typically don't expect a system role and
+  // can mistakenly translate the system instructions themselves. Putting the
+  // instruction inline in the user message avoids the leak.
+  'mt-direct': {
+    id: 'mt-direct',
+    name: 'MT-Specialized',
+    description: 'For translation-only small models (Hunyuan MT, NLLB, etc.)',
+    icon: 'Languages',
+    mode: 'user',
+    systemPrompt: `Translate the following text into {targetLang}. Note that you must ONLY output the translated result without any additional explanation:`,
   },
 };
 
@@ -131,13 +167,16 @@ export function getTemplateList() {
  * 获取模板的 system prompt
  * @param {string} templateId - 模板 ID
  * @param {string} targetLang - 目标语言代码
- * @returns {string} 替换后的 system prompt
+ * @returns {{ content: string, mode: 'system' | 'user' | 'auto' }}
  */
 export function getSystemPrompt(templateId, targetLang) {
   const template = TEMPLATES[templateId] || TEMPLATES.natural;
   const langName = LANGUAGE_NAMES[targetLang] || targetLang;
-  
-  return template.systemPrompt.replace(/{targetLang}/g, langName);
+
+  return {
+    content: (template.systemPrompt || '').replace(/{targetLang}/g, langName),
+    mode: template.mode || 'system',
+  };
 }
 
 /**

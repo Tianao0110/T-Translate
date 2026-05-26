@@ -71,13 +71,7 @@ class OpenAICompatibleProvider extends BaseProvider {
     if (keyCheck) return keyCheck;
 
     try {
-      const systemContent = options.systemPrompt || 
-        `You are a professional translator. Translate the following text to ${LANGUAGE_CODES[targetLang]?.name || targetLang}. Output only the translation, nothing else.`;
-
-      const messages = [
-        { role: 'system', content: systemContent },
-        { role: 'user', content: text },
-      ];
+      const messages = this._buildMessages(text, targetLang, options);
 
       const response = await this._chatCompletion(messages);
 
@@ -101,13 +95,7 @@ class OpenAICompatibleProvider extends BaseProvider {
     if (keyCheck) return keyCheck;
 
     try {
-      const systemContent = options.systemPrompt || 
-        `You are a professional translator. Translate the following text to ${LANGUAGE_CODES[targetLang]?.name || targetLang}. Output only the translation, nothing else.`;
-
-      const messages = [
-        { role: 'system', content: systemContent },
-        { role: 'user', content: text },
-      ];
+      const messages = this._buildMessages(text, targetLang, options);
 
       let fullText = '';
 
@@ -227,6 +215,30 @@ class OpenAICompatibleProvider extends BaseProvider {
   }
 
   // ========== 内部方法 ==========
+
+  /**
+   * Build chat messages, branching on template mode.
+   * `options.systemPrompt` may be a string (legacy) or `{ content, mode }`.
+   * - `mode === 'user'` merges instruction + source into one user message;
+   *   needed by some translation-only small models whose chat templates don't
+   *   expect a system role and would otherwise translate the instruction text.
+   * - default `'system'` keeps the standard two-message layout.
+   */
+  _buildMessages(text, targetLang, options = {}) {
+    let prompt = options.systemPrompt;
+    let mode = 'system';
+    if (prompt && typeof prompt === 'object') {
+      mode = prompt.mode || 'system';
+      prompt = prompt.content;
+    }
+    if (!prompt) {
+      const langName = LANGUAGE_CODES[targetLang]?.name || targetLang;
+      prompt = `You are a professional translator. Translate the following text to ${langName}. Output only the translation, nothing else.`;
+    }
+    return mode === 'user'
+      ? [{ role: 'user', content: `${prompt}\n\n${text}` }]
+      : [{ role: 'system', content: prompt }, { role: 'user', content: text }];
+  }
 
   /**
    * 构建请求头（子类可覆盖）

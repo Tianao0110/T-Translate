@@ -36,6 +36,7 @@ import {
 import { isProviderAllowed, PRIVACY_MODE_IDS } from '../config/privacy-modes.js';
 import { getEnabledFilters, DEFAULT_FILTERS } from '../config/filters.js';
 import { getSystemPrompt, LANGUAGE_NAMES } from '../config/templates.js';
+import { detectTemplateFromModel } from '../config/model-template-mapping.js';
 import translationCache from './cache.js';
 
 // 日志实例
@@ -562,14 +563,17 @@ class TranslationService {
       
       try {
         logger.debug(`Trying provider: ${id}`);
-        
-        // 获取模板 system prompt
-        const systemPrompt = getSystemPrompt(template, targetLang);
-        
+
+        // 'auto' template resolves per-provider based on its active model name
+        const effectiveTemplate = template === 'auto'
+          ? (detectTemplateFromModel(provider.config?.model) || 'natural')
+          : template;
+        const systemPrompt = getSystemPrompt(effectiveTemplate, targetLang);
+
         // 调用 Provider
         const result = await provider.translate(processed, sourceLang, targetLang, {
           systemPrompt,
-          template,
+          template: effectiveTemplate,
         });
         
         if (result.success) {
@@ -701,8 +705,11 @@ class TranslationService {
       
       try {
         logger.debug(`Trying stream provider: ${id}`);
-        
-        const systemPrompt = getSystemPrompt(template, targetLang);
+
+        const effectiveTemplate = template === 'auto'
+          ? (detectTemplateFromModel(provider.config?.model) || 'natural')
+          : template;
+        const systemPrompt = getSystemPrompt(effectiveTemplate, targetLang);
         
         // 检查 Provider 是否支持真流式
         if (provider.supportsStreaming && typeof provider.translateStream === 'function') {
@@ -720,9 +727,9 @@ class TranslationService {
                 onChunk(this._postProcess(fullText, protectedMap));
               }
             },
-            { systemPrompt, template }
+            { systemPrompt, template: effectiveTemplate }
           );
-          
+
           if (result.success) {
             this._failureCount[id] = 0;
             
@@ -754,7 +761,7 @@ class TranslationService {
           // 不支持真流式，回退到普通翻译
           const result = await provider.translate(processed, sourceLang, targetLang, {
             systemPrompt,
-            template,
+            template: effectiveTemplate,
           });
           
           if (result.success) {

@@ -50,7 +50,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   );
   const [isOcrProcessing, setIsOcrProcessing] = useState(false);
   const [isOcrSource, setIsOcrSource] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState('natural');
+  const [selectedTemplate, setSelectedTemplate] = useState('auto');
 
   // ========== 网络状态监听 ==========
   useEffect(() => {
