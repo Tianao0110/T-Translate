@@ -270,6 +270,7 @@ class OpenAICompatibleProvider extends BaseProvider {
   async _chatCompletion(messages) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
+    logger.debug(`[${this.preset?.id || 'openai-compat'}] POST ${this.config.endpoint}/chat/completions model="${this.config.model || '(empty)'}"`);
 
     try {
       const response = await fetch(`${this.config.endpoint}/chat/completions`, {
@@ -311,6 +312,7 @@ class OpenAICompatibleProvider extends BaseProvider {
   async _chatCompletionStream(messages, onChunk) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
+    logger.debug(`[${this.preset?.id || 'openai-compat'}] STREAM ${this.config.endpoint}/chat/completions model="${this.config.model || '(empty)'}"`);
 
     try {
       const response = await fetch(`${this.config.endpoint}/chat/completions`, {
