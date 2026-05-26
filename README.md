@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.2.5-green" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.2.6-green" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="License">
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform">
 </p>
