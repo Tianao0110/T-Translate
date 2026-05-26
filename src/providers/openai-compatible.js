@@ -146,20 +146,35 @@ class OpenAICompatibleProvider extends BaseProvider {
   }
 
   /**
-   * Fetch models from /v1/models; if empty / fails AND a fallback endpoint is
-   * configured (e.g. Ollama's /api/tags), try that too.
+   * Fetch models from /v1/models; if it fails (non-2xx, network error) OR
+   * returns empty AND a fallback endpoint is configured (e.g. Ollama's
+   * /api/tags), try that too. Catches primary errors so old Ollama setups
+   * that only expose /api/tags can still list models.
    */
   async _fetchModelsWithFallback() {
+    let primaryError = null;
+    let primary = [];
+
     // Primary: /v1/models (OpenAI-compatible)
-    const primary = await this._fetchModelsFrom(`${this.config.endpoint}/models`);
-    if (primary.length > 0) return primary;
+    try {
+      primary = await this._fetchModelsFrom(`${this.config.endpoint}/models`);
+      if (primary.length > 0) return primary;
+    } catch (err) {
+      primaryError = err;
+    }
 
     // Fallback: vendor-specific endpoint (e.g. Ollama /api/tags off the base URL)
     if (this.hooks.modelsFallbackEndpoint) {
       const baseUrl = this.config.endpoint.replace(/\/v1$/, '');
-      return await this._fetchModelsFrom(`${baseUrl}${this.hooks.modelsFallbackEndpoint}`);
+      try {
+        return await this._fetchModelsFrom(`${baseUrl}${this.hooks.modelsFallbackEndpoint}`);
+      } catch (fallbackErr) {
+        // Surface the primary error if available — usually closer to root cause
+        throw primaryError || fallbackErr;
+      }
     }
 
+    if (primaryError) throw primaryError;
     return primary;
   }
 
