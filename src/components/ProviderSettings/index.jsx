@@ -522,7 +522,9 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
                   key={provider.id}
                   className={`ps-card ${isExpanded ? 'expanded' : ''} ${isDragOver ? 'drag-over' : ''}`}
                   style={{ '--accent': meta.color || typeColor }}
-                  draggable
+                  // Only draggable when collapsed — otherwise HTML5 drag intercepts
+                  // mousedown inside inputs, breaking text selection by click+drag.
+                  draggable={!isExpanded}
                   onDragStart={(e) => handleDragStart(e, provider.originalIndex)}
                   onDragEnd={handleDragEnd}
                   onDragOver={(e) => handleDragOver(e, provider.originalIndex)}
