@@ -12,13 +12,11 @@
 // - 优先级选择
 // - 翻译调度
 
-import LocalLLMProvider from './local-llm';
-import OpenAIProvider from './openai';
+import OpenAICompatibleProvider from './openai-compatible.js';
+import { PRESETS, createPresetProviderClass } from './openai-compatible/presets.js';
 import DeepLProvider from './deepl';
 import GeminiProvider from './gemini';
-import DeepSeekProvider from './deepseek';
 import GoogleTranslateProvider from './google-translate';
-import OllamaProvider from './ollama';
 import AnthropicProvider from './anthropic';
 import MicrosoftTranslatorProvider from './microsoft-translator';
 import BaiduTranslateProvider from './baidu-translate';
@@ -29,17 +27,27 @@ const logger = createLogger('Registry');
 
 // ========== 注册表 ==========
 
+// OpenAI-compatible providers come from presets — one wrapper class per preset.
+// Adding a new compatible provider = add an entry to presets.js, no class file needed.
+const presetClasses = Object.fromEntries(
+  PRESETS.map(preset => {
+    try {
+      return [preset.id, createPresetProviderClass(preset, OpenAICompatibleProvider)];
+    } catch (err) {
+      logger.error(`Failed to register preset ${preset.id}:`, err);
+      return null;
+    }
+  }).filter(Boolean)
+);
+
 /**
  * 所有已注册的翻译源类
  */
 const providerClasses = {
-  'local-llm': LocalLLMProvider,
-  'openai': OpenAIProvider,
+  ...presetClasses,
   'deepl': DeepLProvider,
   'gemini': GeminiProvider,
-  'deepseek': DeepSeekProvider,
   'google-translate': GoogleTranslateProvider,
-  'ollama': OllamaProvider,
   'anthropic': AnthropicProvider,
   'microsoft-translator': MicrosoftTranslatorProvider,
   'baidu-translate': BaiduTranslateProvider,

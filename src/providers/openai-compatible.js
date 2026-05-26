@@ -1,21 +1,31 @@
 // src/providers/openai-compatible.js
-// OpenAI 兼容 API 基类
-// 适用于: local-llm, openai, deepseek, ollama 等所有 OpenAI 兼容接口
-//
-// 子类只需提供 metadata / constructor / 可选覆盖 testConnection / getModels
+// Shared base for all OpenAI-compatible providers (openai / deepseek / ollama / local-llm).
+// Per-provider differences live in presets (./openai-compatible/presets.js) as small hooks:
+//   - requireApiKey / apiKeyErrorMessage  → _checkApiKey behavior
+//   - filterModels                         → post-filter model list (e.g. gpt-* only)
+//   - modelsFallbackEndpoint               → secondary models endpoint (e.g. Ollama /api/tags)
+//   - fieldAdapter                         → normalize config (e.g. baseUrl → endpoint)
+//   - testConnectionMessage                → custom success message
 
 import { BaseProvider, LANGUAGE_CODES } from './base.js';
 import createLogger from '../utils/logger.js';
 
 const logger = createLogger('OpenAICompat');
 
+// Unified model-list parser — supports both OpenAI shape ({data:[{id}]})
+// and Ollama native shape ({models:[{name}]}).
+function parseModelList(data) {
+  return data.data?.map(m => m.id) || data.models?.map(m => m.name) || [];
+}
+
 /**
- * OpenAI 兼容 API Provider 基类
- * 封装了 chat/completions 的普通和流式调用
+ * OpenAI-compatible provider base.
+ * @param {object} config - runtime config (endpoint, apiKey, model, timeout, ...)
+ * @param {object|null} preset - optional preset metadata + hooks (see presets.js)
  */
 class OpenAICompatibleProvider extends BaseProvider {
 
-  constructor(config = {}) {
+  constructor(config = {}, preset = null) {
     super({
       endpoint: '',
       apiKey: '',
@@ -23,10 +33,31 @@ class OpenAICompatibleProvider extends BaseProvider {
       timeout: 30000,
       ...config,
     });
+    this.preset = preset;
+    this.hooks = preset?.hooks || {};
+    // Apply field adapter (e.g. OpenAI's baseUrl → endpoint mapping)
+    if (this.hooks.fieldAdapter) {
+      Object.assign(this.config, this.hooks.fieldAdapter(this.config));
+    }
   }
 
   get supportsStreaming() {
     return true;
+  }
+
+  get latencyLevel() {
+    return this.preset?.latencyLevel || super.latencyLevel;
+  }
+
+  get requiresNetwork() {
+    return this.preset?.requiresNetwork ?? super.requiresNetwork;
+  }
+
+  updateConfig(newConfig) {
+    super.updateConfig(newConfig);
+    if (this.hooks.fieldAdapter) {
+      Object.assign(this.config, this.hooks.fieldAdapter(this.config));
+    }
   }
 
   // ========== 翻译接口 ==========
@@ -99,29 +130,17 @@ class OpenAICompatibleProvider extends BaseProvider {
     if (keyCheck) return { success: false, message: keyCheck.error };
 
     try {
-      const response = await fetch(`${this.config.endpoint}/models`, {
-        method: 'GET',
-        headers: this._buildHeaders(),
-        signal: AbortSignal.timeout(10000),
-      });
+      const models = await this._fetchModelsWithFallback();
+      const filtered = this.hooks.filterModels ? this.hooks.filterModels(models) : models;
 
-      if (response.status === 401) {
-        return { success: false, message: 'API Key 无效' };
-      }
+      const msg = this.hooks.testConnectionMessage
+        ? this.hooks.testConnectionMessage(filtered.length)
+        : `连接成功，检测到 ${filtered.length} 个模型`;
 
-      if (!response.ok) {
-        return { success: false, message: `连接失败: ${response.status}` };
-      }
-
-      const data = await response.json();
-      const models = data.data?.map(m => m.id) || [];
-
-      return {
-        success: true,
-        message: `连接成功，检测到 ${models.length} 个模型`,
-        models,
-      };
+      return { success: true, message: msg, models: filtered };
     } catch (error) {
+      if (error.status === 401) return { success: false, message: 'API Key 无效' };
+      if (error.status) return { success: false, message: `连接失败: ${error.status}` };
       return { success: false, message: error.message || '连接失败' };
     }
   }
@@ -131,19 +150,44 @@ class OpenAICompatibleProvider extends BaseProvider {
     if (keyCheck) return [];
 
     try {
-      const response = await fetch(`${this.config.endpoint}/models`, {
-        method: 'GET',
-        headers: this._buildHeaders(),
-        signal: AbortSignal.timeout(10000),
-      });
-
-      if (!response.ok) return [];
-
-      const data = await response.json();
-      return data.data?.map(m => m.id) || [];
+      const models = await this._fetchModelsWithFallback();
+      return this.hooks.filterModels ? this.hooks.filterModels(models) : models;
     } catch {
       return [];
     }
+  }
+
+  /**
+   * Fetch models from /v1/models; if empty / fails AND a fallback endpoint is
+   * configured (e.g. Ollama's /api/tags), try that too.
+   */
+  async _fetchModelsWithFallback() {
+    // Primary: /v1/models (OpenAI-compatible)
+    const primary = await this._fetchModelsFrom(`${this.config.endpoint}/models`);
+    if (primary.length > 0) return primary;
+
+    // Fallback: vendor-specific endpoint (e.g. Ollama /api/tags off the base URL)
+    if (this.hooks.modelsFallbackEndpoint) {
+      const baseUrl = this.config.endpoint.replace(/\/v1$/, '');
+      return await this._fetchModelsFrom(`${baseUrl}${this.hooks.modelsFallbackEndpoint}`);
+    }
+
+    return primary;
+  }
+
+  async _fetchModelsFrom(url) {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: this._buildHeaders(),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!response.ok) {
+      const err = new Error(`HTTP ${response.status}`);
+      err.status = response.status;
+      throw err;
+    }
+    const data = await response.json();
+    return parseModelList(data);
   }
 
   // ========== 通用聊天（用于 AI 分析、风格改写等）==========
@@ -196,11 +240,15 @@ class OpenAICompatibleProvider extends BaseProvider {
   }
 
   /**
-   * 检查 API Key（需要 key 的子类覆盖返回逻辑）
-   * @returns {null | {success: false, error: string}} null 表示通过
+   * Gated on preset hook. Default = no key required (local-llm / ollama).
    */
   _checkApiKey() {
-    // 默认不检查（local-llm / ollama 不需要 key）
+    if (this.hooks.requireApiKey && !this.config.apiKey) {
+      return {
+        success: false,
+        error: this.hooks.apiKeyErrorMessage || '未配置 API Key',
+      };
+    }
     return null;
   }
 
