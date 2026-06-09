@@ -229,13 +229,17 @@ export default defineConfig(({ command, mode }) => {
 
     // 依赖优化
     optimizeDeps: {
-      // 包含的依赖
+      // 包含的依赖。dayjs 深路径只被懒加载面板引用，不写进来会在面板首次
+      // 打开时才被发现，触发二次预构建 + 504 竞态（历史/收藏页白屏）。
       include: [
         'react',
         'react-dom',
-        'axios',
         'zustand',
         'dayjs',
+        'dayjs/plugin/relativeTime',
+        'dayjs/plugin/isSameOrAfter',
+        'dayjs/locale/zh-cn',
+        'dayjs/locale/en',
         'lucide-react'
       ],
       
