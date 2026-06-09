@@ -101,6 +101,8 @@ const zh = {
     translate: "翻译", translating: "翻译中...", copy: "复制", copied: "已复制", clear: "清空",
     swap: "交换语言", speak: "朗读", stop: "停止", favorite: "收藏", favorited: "已收藏", characters: "字符",
     source: "原文", target: "译文", recognizing: "识别中...",
+    mtModeBadge: "MT 模式",
+    mtModeHint: "检测到翻译专用模型，已自动切换为直接翻译提示词（语气选择仍然生效）",
     screenshot: "截图识别", importImage: "导入图片", paste: "粘贴",
     speakSource: "朗读原文", speakTarget: "朗读译文", stopSpeak: "停止朗读",
     ocrProcessing: "正在识别图片中的文字...", dropFile: "释放文件以导入...",
@@ -217,11 +219,20 @@ const zh = {
     clearHistoryConfirm: "确定要清除所有翻译历史吗？",
     historyCleared: "历史记录已清除",
     clearAllConfirm: "确定要清除所有本地数据吗？这将重置所有设置。",
-    features: { history: "历史记录", cache: "翻译缓存", onlineApi: "在线翻译API", analytics: "使用统计" },
-    save: "保存", noSave: "不保存", allow: "允许", deny: "禁止", collect: "收集", noCollect: "不收集",
+    features: { history: "历史记录", cache: "翻译缓存", onlineApi: "在线翻译API", analytics: "本地使用统计" },
+    save: "保存", noSave: "不保存", allow: "允许", deny: "禁止", collect: "记录在本机", noCollect: "不记录",
     offlineWarning: "离线模式下仅可使用本地 LLM 翻译，在线翻译源（OpenAI、DeepL等）将被禁用",
     incognitoWarning: "无痕模式已开启：翻译记录暂停保存，退出后恢复之前的历史",
     dataManagement: "数据管理",
+    stats: {
+      history: "历史记录",
+      favorites: "收藏",
+      cache: "翻译缓存",
+      localData: "界面数据",
+      settingsFile: "设置文件",
+      logs: "日志文件",
+      items: "条",
+    },
     autoDeleteHistory: "自动删除历史记录",
     daysLater: "天后",
     zeroMeansNever: "设为 0 表示永不自动删除",
@@ -596,6 +607,11 @@ const zh = {
   // ===== Tray menu keys =====
   titleBar: {
     minimize: "最小化", maximize: "最大化", restore: "还原", close: "关闭"
+  },
+  providerError: {
+    requestTimeout: "请求超时，可在翻译源设置中调大超时时间",
+    waitTimeout: "等待模型响应超时，可在翻译源设置中调大超时时间",
+    streamStalled: "生成中断：超过超时时间无新内容",
   },
   errors: {
     network: { title: "网络连接失败", message: "无法连接到翻译服务", s1: "检查网络连接是否正常", s2: "如果使用本地 LLM，请确保 LM Studio 正在运行", s3: "检查防火墙设置是否阻止了连接" },

@@ -9,8 +9,13 @@
 
 import { BaseProvider, LANGUAGE_CODES } from './base.js';
 import createLogger from '../utils/logger.js';
+import i18n from '../i18n.js';
 
 const logger = createLogger('OpenAICompat');
+
+const _t = (key, fallback) => {
+  try { const r = i18n.t(key); return r === key ? fallback : r; } catch { return fallback; }
+};
 
 // Unified model-list parser — supports both OpenAI shape ({data:[{id}]})
 // and Ollama native shape ({models:[{name}]}).
@@ -60,7 +65,7 @@ class OpenAICompatibleProvider extends BaseProvider {
     }
   }
 
-  // ========== 翻译接口 ==========
+  // ===== Translate =====
 
   async translate(text, sourceLang = 'auto', targetLang = 'zh', options = {}) {
     if (!text?.trim()) {
@@ -94,10 +99,9 @@ class OpenAICompatibleProvider extends BaseProvider {
     const keyCheck = this._checkApiKey();
     if (keyCheck) return keyCheck;
 
+    let fullText = '';
     try {
       const messages = this._buildMessages(text, targetLang, options);
-
-      let fullText = '';
 
       await this._chatCompletionStream(messages, (chunk) => {
         fullText += chunk;
@@ -107,11 +111,21 @@ class OpenAICompatibleProvider extends BaseProvider {
       return { success: true, text: fullText.trim() };
     } catch (error) {
       this._lastError = error;
+      if (error.name === 'AbortError') {
+        // Distinguish "never started" from "died mid-generation" so the user
+        // knows whether to raise the timeout or check the server.
+        return {
+          success: false,
+          error: fullText
+            ? _t('providerError.streamStalled', '生成中断：超过超时时间无新内容')
+            : _t('providerError.waitTimeout', '等待模型响应超时，可在翻译源设置中调大超时时间'),
+        };
+      }
       return { success: false, error: error.message || '流式翻译失败' };
     }
   }
 
-  // ========== 连接测试 ==========
+  // ===== Connection test =====
 
   async testConnection() {
     const keyCheck = this._checkApiKey();
@@ -193,7 +207,7 @@ class OpenAICompatibleProvider extends BaseProvider {
     return parseModelList(data);
   }
 
-  // ========== 通用聊天（用于 AI 分析、风格改写等）==========
+  // ===== Generic chat (AI analysis, style rewrite) =====
 
   async chat(messages, options = {}) {
     try {
@@ -204,7 +218,7 @@ class OpenAICompatibleProvider extends BaseProvider {
           model: this.config.model || undefined,
           messages,
           temperature: options.temperature ?? 0.7,
-          max_tokens: options.max_tokens ?? 2048,
+          ...(options.max_tokens ? { max_tokens: options.max_tokens } : {}),
           stream: false,
         }),
         signal: AbortSignal.timeout(this.config.timeout || 30000),
@@ -229,7 +243,7 @@ class OpenAICompatibleProvider extends BaseProvider {
     }
   }
 
-  // ========== 内部方法 ==========
+  // ===== Internals =====
 
   /**
    * Build chat messages, branching on template mode.
@@ -256,7 +270,7 @@ class OpenAICompatibleProvider extends BaseProvider {
   }
 
   /**
-   * 构建请求头（子类可覆盖）
+   * Build request headers (overridable by subclasses)
    */
   _buildHeaders() {
     const headers = { 'Content-Type': 'application/json' };
@@ -280,7 +294,7 @@ class OpenAICompatibleProvider extends BaseProvider {
   }
 
   /**
-   * Chat Completion（非流式）
+   * Chat completion (non-streaming)
    */
   async _chatCompletion(messages) {
     const controller = new AbortController();
@@ -294,7 +308,9 @@ class OpenAICompatibleProvider extends BaseProvider {
           model: this.config.model || undefined,
           messages,
           temperature: 0.3,
-          max_tokens: 2048,
+          // No max_tokens unless configured — a fixed cap silently truncates
+          // long output (CJK translations expand vs the source text)
+          ...(this.config.maxTokens ? { max_tokens: this.config.maxTokens } : {}),
         }),
         signal: controller.signal,
       });
@@ -314,18 +330,19 @@ class OpenAICompatibleProvider extends BaseProvider {
     } catch (error) {
       clearTimeout(timeoutId);
       if (error.name === 'AbortError') {
-        return { success: false, error: '请求超时' };
+        return { success: false, error: _t('providerError.requestTimeout', '请求超时，可在翻译源设置中调大超时时间') };
       }
       return { success: false, error: error.message };
     }
   }
 
   /**
-   * Chat Completion（流式）
+   * Chat completion (streaming)
    */
   async _chatCompletionStream(messages, onChunk) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
+    let idleTimer = null;
 
     try {
       const response = await fetch(`${this.config.endpoint}/chat/completions`, {
@@ -335,7 +352,9 @@ class OpenAICompatibleProvider extends BaseProvider {
           model: this.config.model || undefined,
           messages,
           temperature: 0.3,
-          max_tokens: 2048,
+          // No max_tokens unless configured — a fixed cap silently truncates
+          // long output (CJK translations expand vs the source text)
+          ...(this.config.maxTokens ? { max_tokens: this.config.maxTokens } : {}),
           stream: true,
         }),
         signal: controller.signal,
@@ -347,12 +366,24 @@ class OpenAICompatibleProvider extends BaseProvider {
         throw new Error(`API 错误: ${response.status}`);
       }
 
+      // Idle watchdog: abort only when the stream goes fully silent for
+      // `timeout`. Re-armed on ANY received bytes — reasoning deltas and
+      // heartbeats included — so thinking models and slow hardware are never
+      // killed while still producing.
+      const idleMs = this.config.timeout || 30000;
+      const armIdleWatchdog = () => {
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => controller.abort(), idleMs);
+      };
+      armIdleWatchdog();
+
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
 
       while (true) {
         const { done, value } = await reader.read();
+        armIdleWatchdog();
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
@@ -379,6 +410,8 @@ class OpenAICompatibleProvider extends BaseProvider {
     } catch (error) {
       clearTimeout(timeoutId);
       throw error;
+    } finally {
+      clearTimeout(idleTimer);
     }
   }
 }

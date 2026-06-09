@@ -251,6 +251,39 @@ function register(ctx) {
     return getLogDirectory();
   });
 
+  // On-disk footprint for the privacy page's data-management panel.
+  ipcMain.handle(CHANNELS.APP.GET_DATA_STATS, () => {
+    const fs = require('fs');
+    const path = require('path');
+    const stats = { settingsFileSize: 0, logsDirSize: 0, logsFileCount: 0 };
+
+    try {
+      if (store.path && fs.existsSync(store.path)) {
+        stats.settingsFileSize = fs.statSync(store.path).size;
+      }
+    } catch (e) {
+      logger.debug('Settings file stat failed:', e.message);
+    }
+
+    try {
+      const { getLogDirectory } = require('../utils/logger');
+      const logDir = getLogDirectory();
+      if (logDir && fs.existsSync(logDir)) {
+        for (const file of fs.readdirSync(logDir)) {
+          const st = fs.statSync(path.join(logDir, file));
+          if (st.isFile()) {
+            stats.logsDirSize += st.size;
+            stats.logsFileCount++;
+          }
+        }
+      }
+    } catch (e) {
+      logger.debug('Log dir stat failed:', e.message);
+    }
+
+    return stats;
+  });
+
   // ===== Auto-launch (login item) =====
 
   ipcMain.handle(CHANNELS.APP.SET_AUTO_LAUNCH, (event, enabled) => {

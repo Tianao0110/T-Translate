@@ -3,7 +3,7 @@
 // Glass window uses a separate stores/session.js + services/pipeline.js.
 
 import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
+import { persist } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 import { v4 as uuidv4 } from "uuid";
 
@@ -13,6 +13,56 @@ import createLogger from '../utils/logger.js';
 const logger = createLogger('TranslationStore');
 
 const VALID_LANG_CODES = new Set(LANGUAGES.map(l => l.code));
+
+// zustand persist re-serializes the partialized state — history alone can hold
+// 1000 entries — on EVERY setState: per keystroke and, while streaming, per
+// flush. Throttle the stringify+write; beforeunload covers the tail.
+const PERSIST_WRITE_MS = 1000;
+
+function createThrottledJSONStorage(interval = PERSIST_WRITE_MS) {
+  let timer = null;
+  let pending = null; // [name, value]
+
+  const write = () => {
+    timer = null;
+    if (!pending) return;
+    const [name, value] = pending;
+    pending = null;
+    try {
+      localStorage.setItem(name, JSON.stringify(value));
+    } catch (e) {
+      logger.error('Persist write failed:', e);
+    }
+  };
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', write);
+  }
+
+  return {
+    getItem: (name) => {
+      const raw = localStorage.getItem(name);
+      if (!raw) return null;
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return null;
+      }
+    },
+    setItem: (name, value) => {
+      // Immer snapshots are immutable — holding the latest reference is safe;
+      // stringify is deferred to write time.
+      pending = [name, value];
+      if (timer === null) timer = setTimeout(write, interval);
+    },
+    removeItem: (name) => {
+      if (timer !== null) clearTimeout(timer);
+      timer = null;
+      pending = null;
+      localStorage.removeItem(name);
+    },
+  };
+}
 
 // Lazy-bound to avoid circular dep with main-translation service
 let _mainTranslation = null;
@@ -592,7 +642,7 @@ const useTranslationStore = create(
     {
       name: "translation-store",
       // localStorage works in Electron and loads synchronously (no flash)
-      storage: createJSONStorage(() => localStorage),
+      storage: createThrottledJSONStorage(),
       merge: (persistedState, currentState) => {
         return {
           ...currentState,

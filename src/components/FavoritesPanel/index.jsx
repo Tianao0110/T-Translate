@@ -7,6 +7,7 @@ import {
   Check, Palette, RotateCcw, Bookmark, Sparkles, RefreshCw, BookOpen,
   Download, Upload
 } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 import useTranslationStore from '../../stores/translation-store';
 import translationService from '../../services/translation.js';
 import {
@@ -479,11 +480,17 @@ const FavoritesPanel = ({ showNotification }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState(null);
 
+  // useShallow: favorites tab stays mounted behind other tabs — without a
+  // selector every streaming flush would re-render it
   const {
     favorites,
     removeFromFavorites,
     updateFavoriteItem
-  } = useTranslationStore();
+  } = useTranslationStore(useShallow((s) => ({
+    favorites: s.favorites,
+    removeFromFavorites: s.removeFromFavorites,
+    updateFavoriteItem: s.updateFavoriteItem,
+  })));
 
   const glossaryItems = useMemo(() => {
     return favorites?.filter(item => item.folderId === 'glossary') || [];

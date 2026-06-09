@@ -101,6 +101,8 @@ const en = {
     translate: "Translate", translating: "Translating...", copy: "Copy", copied: "Copied", clear: "Clear",
     swap: "Swap Languages", speak: "Speak", stop: "Stop", favorite: "Favorite", favorited: "Favorited", characters: "characters",
     source: "Source", target: "Target", recognizing: "Recognizing...",
+    mtModeBadge: "MT mode",
+    mtModeHint: "Translation-only model detected — using direct prompt (tone selection still applies)",
     screenshot: "Screenshot OCR", importImage: "Import Image", paste: "Paste",
     speakSource: "Speak Source", speakTarget: "Speak Target", stopSpeak: "Stop Speaking",
     ocrProcessing: "Recognizing text from image...", dropFile: "Drop file to import...",
@@ -217,11 +219,20 @@ const en = {
     clearHistoryConfirm: "Are you sure to clear all translation history?",
     historyCleared: "History cleared",
     clearAllConfirm: "Are you sure to clear all local data? This will reset all settings.",
-    features: { history: "History", cache: "Translation Cache", onlineApi: "Online Translation API", analytics: "Usage Analytics" },
-    save: "Save", noSave: "No Save", allow: "Allow", deny: "Deny", collect: "Collect", noCollect: "No Collect",
+    features: { history: "History", cache: "Translation Cache", onlineApi: "Online Translation API", analytics: "Local Usage Stats" },
+    save: "Save", noSave: "No Save", allow: "Allow", deny: "Deny", collect: "Recorded locally", noCollect: "Not recorded",
     offlineWarning: "In offline mode, only local LLM translation is available. Online sources (OpenAI, DeepL, etc.) are disabled.",
     incognitoWarning: "Incognito mode is on: Translation history is paused. Previous history will be restored when you exit.",
     dataManagement: "Data Management",
+    stats: {
+      history: "History",
+      favorites: "Favorites",
+      cache: "Translation cache",
+      localData: "UI data",
+      settingsFile: "Settings file",
+      logs: "Log files",
+      items: "items",
+    },
     autoDeleteHistory: "Auto-delete history after",
     daysLater: "days",
     zeroMeansNever: "Set to 0 to never auto-delete",
@@ -596,6 +607,11 @@ const en = {
   // ===== Tray menu keys =====
   titleBar: {
     minimize: "Minimize", maximize: "Maximize", restore: "Restore", close: "Close"
+  },
+  providerError: {
+    requestTimeout: "Request timeout — you can raise the timeout in provider settings",
+    waitTimeout: "Model response timeout — you can raise the timeout in provider settings",
+    streamStalled: "Generation stalled — no new output within the timeout",
   },
   errors: {
     network: { title: "Network Error", message: "Cannot connect to translation service", s1: "Check your network connection", s2: "If using local LLM, make sure LM Studio is running", s3: "Check if firewall is blocking the connection" },

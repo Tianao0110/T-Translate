@@ -73,6 +73,7 @@ const electronAPI = {
     installUpdate: (info) => ipcRenderer.invoke("app:install-update", info),
     setAutoLaunch: (enabled) => ipcRenderer.invoke("app:set-auto-launch", enabled),
     getAutoLaunch: () => ipcRenderer.invoke("app:get-auto-launch"),
+    getDataStats: () => ipcRenderer.invoke("app:get-data-stats"),
     onDownloadProgress: (callback) => {
       const handler = (event, progress) => callback(progress);
       ipcRenderer.on("update:download-progress", handler);

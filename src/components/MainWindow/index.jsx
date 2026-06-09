@@ -41,19 +41,15 @@ const MainWindow = () => {
 
   const [version, setVersion] = useState('');
 
-  const {
-    currentTranslation,
-    statistics,
-    getStatistics,
-    translate,
-    clearCurrent,
-    swapLanguages,
-    copyToClipboard,
-    exportHistory,
-    setSourceText,
-    ocrStatus,
-    recognizeImage,
-  } = useTranslationStore();
+  // Narrow selectors: streaming rewrites currentTranslation.translatedText
+  // dozens of times per second — the window shell must not re-render on it.
+  const translationStatus = useTranslationStore((s) => s.currentTranslation.status);
+  const sourceLanguage = useTranslationStore((s) => s.currentTranslation.sourceLanguage);
+  const targetLanguage = useTranslationStore((s) => s.currentTranslation.targetLanguage);
+  const todayTranslations = useTranslationStore((s) => s.statistics.todayTranslations);
+  const ocrEngine = useTranslationStore((s) => s.ocrStatus.engine);
+  const getStatistics = useTranslationStore((s) => s.getStatistics);
+  const recognizeImage = useTranslationStore((s) => s.recognizeImage);
 
   const searchInputRef = useRef(null);
 
@@ -127,7 +123,7 @@ const MainWindow = () => {
       }
 
       try {
-        const engineToUse = ocrStatus?.engine || 'llm-vision';
+        const engineToUse = ocrEngine || 'llm-vision';
         logger.debug('[Silent] OCR with engine:', engineToUse);
 
         const ocrResult = await recognizeImage(dataURL, {
@@ -164,7 +160,7 @@ const MainWindow = () => {
       logger.debug('Cleaning up silent screenshot listener');
       if (unsubscribe) unsubscribe();
     };
-  }, [ocrStatus, recognizeImage, translate]);
+  }, [ocrEngine, recognizeImage, t]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -367,8 +363,8 @@ const MainWindow = () => {
             <Suspense fallback={<LazyLoadingFallback />}>
               <DocumentTranslator
                 notify={showNotification}
-                sourceLang={currentTranslation.sourceLanguage}
-                targetLang={currentTranslation.targetLanguage}
+                sourceLang={sourceLanguage}
+                targetLang={targetLanguage}
               />
             </Suspense>
           </div>
@@ -378,19 +374,19 @@ const MainWindow = () => {
       <div className="status-bar">
         <div className="status-left">
           <div className="status-item">
-            <div className={`status-indicator ${currentTranslation.status === TRANSLATION_STATUS.TRANSLATING ? 'busy' : 'ready'}`}></div>
+            <div className={`status-indicator ${translationStatus === TRANSLATION_STATUS.TRANSLATING ? 'busy' : 'ready'}`}></div>
             <span className="status-text">
-              {currentTranslation.status === TRANSLATION_STATUS.TRANSLATING ? t('translation.translating') : t('status.ready')}
+              {translationStatus === TRANSLATION_STATUS.TRANSLATING ? t('translation.translating') : t('status.ready')}
             </span>
           </div>
           <div className="status-item">
             <Languages size={12} />
-            <span className="status-text">{currentTranslation.sourceLanguage} → {currentTranslation.targetLanguage}</span>
+            <span className="status-text">{sourceLanguage} → {targetLanguage}</span>
           </div>
         </div>
         <div className="status-right">
           <div className="status-item">
-            <span className="status-text">{t('status.today')}: {statistics.todayTranslations}</span>
+            <span className="status-text">{t('status.today')}: {todayTranslations}</span>
           </div>
           <div className="status-item">
             <span className="status-text">v{version}</span>

@@ -30,6 +30,14 @@ const displayHelper = require('./utils/display-helper');
 
 // ===== Selection translate logic =====
 
+// Cached mirror of settings.selection — electron-store re-reads and re-parses
+// the whole settings file from disk on every .get(), too slow for the global
+// mousedown/mouseup hot path.
+let cachedSelectionSettings = store.get('settings.selection', {});
+store.onDidChange('settings.selection', (value) => {
+  cachedSelectionSettings = value || {};
+});
+
 // Cancellation for in-flight delayed-confirm. Triple-click fires two mouseups
 // back-to-back; without this, both confirms race and the first one (still inside
 // its 80ms wait) grabs the partial double-click word selection instead of the
@@ -491,8 +499,7 @@ function startSelectionHook() {
       }
 
       // Sticky direct: setting on + CapsLock LED on → bypass trigger icon.
-      const selectionSettings = store.get('settings.selection', {});
-      const stickyActive = !!selectionSettings.stickyViaCapsLock && isCapsLockOn();
+      const stickyActive = !!cachedSelectionSettings.stickyViaCapsLock && isCapsLockOn();
 
       selectionStateMachine.onMouseDown(x, y, stickyActive);
     });
@@ -539,8 +546,7 @@ function startSelectionHook() {
         }
 
         // Re-read sticky state at mouseup (user may have released CapsLock mid-drag).
-        const selectionSettings = store.get('settings.selection', {});
-        const stickyActive = !!selectionSettings.stickyViaCapsLock && isCapsLockOn();
+        const stickyActive = !!cachedSelectionSettings.stickyViaCapsLock && isCapsLockOn();
 
         const result = selectionStateMachine.onMouseUp(x, y, stickyActive);
 

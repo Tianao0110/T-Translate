@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import translationService from '../../services/translation.js';
 import { ocrManager } from '../../providers/ocr/index.js';
+import { useShallow } from 'zustand/react/shallow';
 import useTranslationStore from '../../stores/translation-store';
 import ProviderSettings from '../ProviderSettings';
 import createLogger from '../../utils/logger.js';
@@ -67,6 +68,8 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
     'system': t('settingsNav.groupSystem'),
   };
 
+  // useShallow: settings stay mounted behind other tabs — without a selector
+  // every streaming flush would re-render this whole panel
   const {
     setOcrEngine,
     useStreamOutput,
@@ -75,7 +78,15 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
     setAutoTranslate,
     autoTranslateDelay,
     setAutoTranslateDelay
-  } = useTranslationStore();
+  } = useTranslationStore(useShallow((s) => ({
+    setOcrEngine: s.setOcrEngine,
+    useStreamOutput: s.useStreamOutput,
+    setUseStreamOutput: s.setUseStreamOutput,
+    autoTranslate: s.autoTranslate,
+    setAutoTranslate: s.setAutoTranslate,
+    autoTranslateDelay: s.autoTranslateDelay,
+    setAutoTranslateDelay: s.setAutoTranslateDelay,
+  })));
 
   const providerSettingsRef = useRef(null);
 

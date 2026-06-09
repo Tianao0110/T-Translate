@@ -10,6 +10,7 @@ import {
   Lightbulb, Check, X, ArrowRight, Palette, ChevronUp, ChevronDown, AlertTriangle, BookOpen
 } from 'lucide-react';
 
+import { useShallow } from 'zustand/react/shallow';
 import useTranslationStore from '../../stores/translation-store';
 import translationService from '../../services/translation.js';
 import { TTS_STATUS } from '../../services/tts/index.js';
@@ -18,6 +19,7 @@ import { getShortErrorMessage } from '../../utils/error-handler.js';
 import './styles.css';
 
 import { PRIVACY_MODES, TRANSLATION_STATUS, getLanguageList } from '@config/defaults';
+import { detectTemplateFromModel } from '../../config/model-template-mapping.js';
 
 import { useTTS, useTermCheck, useStyleRewrite, useSaveModal } from './hooks';
 
@@ -35,7 +37,10 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   );
   const [isOcrProcessing, setIsOcrProcessing] = useState(false);
   const [isOcrSource, setIsOcrSource] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState('natural');
+  const [selectedTemplate, setSelectedTemplate] = useState(() => {
+    const saved = localStorage.getItem('translation.selectedTemplate');
+    return ['natural', 'precise', 'formal'].includes(saved) ? saved : 'natural';
+  });
 
   useEffect(() => {
     const goOnline = () => setIsConnected(true);
@@ -48,6 +53,8 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     };
   }, []);
 
+  // useShallow: re-render only when a selected slice changes — history,
+  // statistics and queue updates no longer touch this panel
   const {
     currentTranslation,
     favorites,
@@ -56,7 +63,6 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     autoTranslateDelay,
     ocrStatus,
     translationMode,
-    setTranslationMode,
     setSourceText,
     setTranslatedText,
     setLanguages,
@@ -70,7 +76,28 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     pasteFromClipboard,
     addStyleVersion,
     switchVersion,
-  } = useTranslationStore();
+  } = useTranslationStore(useShallow((s) => ({
+    currentTranslation: s.currentTranslation,
+    favorites: s.favorites,
+    useStreamOutput: s.useStreamOutput,
+    autoTranslate: s.autoTranslate,
+    autoTranslateDelay: s.autoTranslateDelay,
+    ocrStatus: s.ocrStatus,
+    translationMode: s.translationMode,
+    setSourceText: s.setSourceText,
+    setTranslatedText: s.setTranslatedText,
+    setLanguages: s.setLanguages,
+    translate: s.translate,
+    streamTranslate: s.streamTranslate,
+    recognizeImage: s.recognizeImage,
+    clearCurrent: s.clearCurrent,
+    swapLanguages: s.swapLanguages,
+    addToFavorites: s.addToFavorites,
+    copyToClipboard: s.copyToClipboard,
+    pasteFromClipboard: s.pasteFromClipboard,
+    addStyleVersion: s.addStyleVersion,
+    switchVersion: s.switchVersion,
+  })));
 
   const tts = useTTS(notify, t);
   const termCheck = useTermCheck(favorites, setTranslatedText, notify, t);
@@ -90,6 +117,10 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     { id: 'precise', name: t('templates.precise'), desc: t('templates.preciseDesc') },
     { id: 'formal', name: t('templates.formal'), desc: t('templates.formalDesc') },
   ];
+
+  // Surface the auto-switch so users know why output style changed.
+  // Recomputed per render — cheap registry lookup, no subscription needed.
+  const isMTModel = !!detectTemplateFromModel(translationService.getCurrentProvider()?.model || '');
 
   // Triggered when MainWindow passes screenshot data in via props (capture flow)
   useEffect(() => {
@@ -216,6 +247,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   const handleTemplateChange = (newTemplateId) => {
     if (newTemplateId === selectedTemplate) return;
     setSelectedTemplate(newTemplateId);
+    localStorage.setItem('translation.selectedTemplate', newTemplateId);
     if (currentTranslation.sourceText.trim()) {
       handleTranslate(newTemplateId);
     }
@@ -328,6 +360,11 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
               {tmpl.name}
             </button>
           ))}
+          {isMTModel && (
+            <span className="mt-mode-badge" title={t('translation.mtModeHint')}>
+              {t('translation.mtModeBadge')}
+            </span>
+          )}
         </div>
       </div>
 

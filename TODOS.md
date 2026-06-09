@@ -34,9 +34,13 @@ Replace per-token `setState` on the `<textarea>` with RAF-based buffering: accum
 
 [translation.js:323](src/services/translation.js:323) `_getCacheKey` 缺 `provider.config.model`：LM Studio 换模型（同 provider id）命中旧模型译文。一行修复。
 
-#### 7. 流式 idle watchdog
+#### 7. 流式 idle watchdog（思考模型友好）
 
-[openai-compatible.js:344](src/providers/openai-compatible.js:344) 响应头到达即 `clearTimeout`，之后 read 循环无任何超时；本地模型卡死 → UI 永久"翻译中"。加 per-chunk 重置的 inactivity timer（如 30s 无新 chunk 则 abort）。
+[openai-compatible.js:344](src/providers/openai-compatible.js:344) 响应头到达即 `clearTimeout`，之后 read 循环无任何超时；服务端卡死 → UI 永久"翻译中"。设计约束：**不能误杀慢硬件和思考型模型**——冷加载 + thinking 阶段静默可达数分钟。规格：
+
+- idle 上限 = `config.timeout`（与请求超时同一个旋钮，本地 preset 默认已放宽 180s，设置界面可调）
+- 计时器在**任何 SSE 数据**到达时重置，包括 `reasoning_content` delta 和心跳——思考模型只要在流式输出 reasoning 就永远不会被杀
+- 触发后报错文案区分"等待响应超时"和"生成中断"，提示用户可在设置中调大超时
 
 #### 8. chatCompletion 走 priority 列表
 
@@ -75,6 +79,10 @@ Replace per-token `setState` on the `<textarea>` with RAF-based buffering: accum
 [translation.js:201](src/services/translation.js:201) `_decryptConfigs` 串行 await ~10 次 secureStorage IPC。`Promise.all` 并行化加快各窗口冷启动（注意解密审计日志是否依赖顺序）。
 
 ## v0.2.8 / v0.3 candidates
+
+### Electron 28 → 42 + electron-builder 24 → 26 平台升级（v0.2.8 主题，单独分支）
+
+Electron 28 EOL 两年半，audit 报 17 个已知 CVE，数条命中本项目场景（`setLoginItemSettings` 自启、clipboard、ASAR 完整性）。四个 native 模块（koffi/uiohook-napi/node-screenshots/@gutenye OCR）均为 N-API，预期平滑，但必须完整回归：划词钩子、截屏、OCR、safeStorage 解密。electron-builder 26 同时清掉构建链 tar/tmp 漏洞（npm audit 剩余 8 项全在此）。顺带 Vite 5 → 7（esbuild dev-server 漏洞随之消失）。不与 v0.2.7 性能包混分支——避免性能对比数据被 Chromium 升级污染。
 
 ### 划词检测完整性计划（v0.3 主题）
 

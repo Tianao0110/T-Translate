@@ -31,6 +31,7 @@ const CHANNELS = {
     INSTALL_UPDATE: 'app:install-update',
     SET_AUTO_LAUNCH: 'app:set-auto-launch',
     GET_AUTO_LAUNCH: 'app:get-auto-launch',
+    GET_DATA_STATS: 'app:get-data-stats',
   },
   LOGS: {
     OPEN_DIRECTORY: 'logs:open-directory',
