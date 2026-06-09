@@ -1,9 +1,8 @@
-/* TranslationPanel - 核心布局 */
-/* 面板容器, 语言选择器, 翻译区域, 控制按钮, 响应式, 动画 */
+/* TranslationPanel — core layout: containers, selectors, areas, controls, responsive, animations */
 
 /* src/styles/components/TranslationPanel.css */
 
-/* ==================== 翻译面板容器 ==================== */
+/* ==================== Panel container ==================== */
 .translation-panel {
   display: flex;
   flex-direction: column;
@@ -15,7 +14,7 @@
   overflow: auto;
 }
 
-/* ==================== 语言选择器 ==================== */
+/* ==================== Language selector bar ==================== */
 .language-selector-bar {
   display: flex;
   align-items: center;
@@ -117,7 +116,7 @@
   opacity: 1;
 }
 
-/* 模板选择器 */
+/* Tone template selector */
 .template-selector {
   display: flex;
   gap: 4px;
@@ -168,7 +167,7 @@
   cursor: help;
 }
 
-/* ==================== 翻译区域 ==================== */
+/* ==================== Translation areas ==================== */
 .translation-areas {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -186,7 +185,7 @@
   overflow: hidden;
   transition: all 0.3s ease;
   position: relative;
-  min-width: 0; /* 防止 grid 子元素撑开父容器 */
+  min-width: 0; /* keep grid children from stretching the parent */
 }
 
 .translation-box:hover {
@@ -279,7 +278,7 @@
   background: var(--bg-secondary);
 }
 
-/* 自定义滚动条 */
+/* Custom scrollbar */
 .translation-textarea::-webkit-scrollbar {
   width: 8px;
 }
@@ -325,7 +324,7 @@
   color: var(--success);
 }
 
-/* ==================== 翻译控制区 ==================== */
+/* ==================== Controls column ==================== */
 .translation-controls {
   display: flex;
   flex-direction: column;
@@ -387,7 +386,7 @@
   font-family: monospace;
 }
 
-/* 波纹效果 */
+/* Ripple effect */
 .translate-btn::before {
   content: '';
   position: absolute;
@@ -406,7 +405,7 @@
   height: 300px;
 }
 
-/* 连接指示器 */
+/* Connection indicator */
 .connection-indicator {
   display: flex;
   align-items: center;
@@ -453,7 +452,7 @@
   50% { opacity: 0.3; }
 }
 
-/* ==================== 安全提示 ==================== */
+/* ==================== Privacy notice ==================== */
 .security-notice {
   display: flex;
   align-items: center;
@@ -474,9 +473,9 @@
   flex-shrink: 0;
 }
 
-/* ==================== 响应式设计 ==================== */
+/* ==================== Responsive ==================== */
 @media (max-width: 1024px) {
-  /* 保持左右布局，不切换为上下 */
+  /* keep side-by-side layout on narrow widths */
   .translation-areas {
     gap: 12px;
   }
@@ -544,7 +543,7 @@
     justify-content: flex-start;
   }
 }
-/* ==================== 动画效果 ==================== */
+/* ==================== Animations ==================== */
 .animate-spin {
   animation: spin 1s linear infinite;
 }
@@ -578,7 +577,7 @@
   }
 }
 
-/* ==================== 深色模式优化 ==================== */
+/* ==================== Dark mode ==================== */
 [data-theme="dark"] .translation-box {
   background: var(--bg-secondary);
 }

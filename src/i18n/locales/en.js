@@ -608,6 +608,11 @@ const en = {
   titleBar: {
     minimize: "Minimize", maximize: "Maximize", restore: "Restore", close: "Close"
   },
+  providerError: {
+    requestTimeout: "Request timeout — you can raise the timeout in provider settings",
+    waitTimeout: "Model response timeout — you can raise the timeout in provider settings",
+    streamStalled: "Generation stalled — no new output within the timeout",
+  },
   errors: {
     network: { title: "Network Error", message: "Cannot connect to translation service", s1: "Check your network connection", s2: "If using local LLM, make sure LM Studio is running", s3: "Check if firewall is blocking the connection" },
     apiKey: { title: "Invalid API Key", message: "API key is not configured or has expired", s1: "Check if the API Key is entered correctly", s2: "Confirm the API Key has not expired", s3: "Go to settings to reconfigure" },

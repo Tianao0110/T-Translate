@@ -608,6 +608,11 @@ const zh = {
   titleBar: {
     minimize: "最小化", maximize: "最大化", restore: "还原", close: "关闭"
   },
+  providerError: {
+    requestTimeout: "请求超时，可在翻译源设置中调大超时时间",
+    waitTimeout: "等待模型响应超时，可在翻译源设置中调大超时时间",
+    streamStalled: "生成中断：超过超时时间无新内容",
+  },
   errors: {
     network: { title: "网络连接失败", message: "无法连接到翻译服务", s1: "检查网络连接是否正常", s2: "如果使用本地 LLM，请确保 LM Studio 正在运行", s3: "检查防火墙设置是否阻止了连接" },
     apiKey: { title: "API 密钥无效", message: "API 密钥未配置或已失效", s1: "检查 API Key 是否正确输入", s2: "确认 API Key 没有过期", s3: "前往设置页面重新配置" },

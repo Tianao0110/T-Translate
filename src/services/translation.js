@@ -819,8 +819,7 @@ class TranslationService {
       await this.init();
     }
 
-    // Route through priority like translate() does — was hardcoded to
-    // local-llm, which broke style rewrite for OpenAI/Ollama-first users
+    // Same provider routing as translate(): first usable one wins
     const { privacyMode = PRIVACY_MODE_IDS.STANDARD } = options;
     for (const id of this.getPriority()) {
       if (!isProviderAllowed(id, privacyMode)) continue;

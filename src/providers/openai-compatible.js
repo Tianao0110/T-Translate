@@ -9,8 +9,13 @@
 
 import { BaseProvider, LANGUAGE_CODES } from './base.js';
 import createLogger from '../utils/logger.js';
+import i18n from '../i18n.js';
 
 const logger = createLogger('OpenAICompat');
+
+const _t = (key, fallback) => {
+  try { const r = i18n.t(key); return r === key ? fallback : r; } catch { return fallback; }
+};
 
 // Unified model-list parser — supports both OpenAI shape ({data:[{id}]})
 // and Ollama native shape ({models:[{name}]}).
@@ -60,7 +65,7 @@ class OpenAICompatibleProvider extends BaseProvider {
     }
   }
 
-  // ========== 翻译接口 ==========
+  // ===== Translate =====
 
   async translate(text, sourceLang = 'auto', targetLang = 'zh', options = {}) {
     if (!text?.trim()) {
@@ -112,15 +117,15 @@ class OpenAICompatibleProvider extends BaseProvider {
         return {
           success: false,
           error: fullText
-            ? '生成中断：超过超时时间无新内容'
-            : '等待模型响应超时，可在翻译源设置中调大超时时间',
+            ? _t('providerError.streamStalled', '生成中断：超过超时时间无新内容')
+            : _t('providerError.waitTimeout', '等待模型响应超时，可在翻译源设置中调大超时时间'),
         };
       }
       return { success: false, error: error.message || '流式翻译失败' };
     }
   }
 
-  // ========== 连接测试 ==========
+  // ===== Connection test =====
 
   async testConnection() {
     const keyCheck = this._checkApiKey();
@@ -202,7 +207,7 @@ class OpenAICompatibleProvider extends BaseProvider {
     return parseModelList(data);
   }
 
-  // ========== 通用聊天（用于 AI 分析、风格改写等）==========
+  // ===== Generic chat (AI analysis, style rewrite) =====
 
   async chat(messages, options = {}) {
     try {
@@ -238,7 +243,7 @@ class OpenAICompatibleProvider extends BaseProvider {
     }
   }
 
-  // ========== 内部方法 ==========
+  // ===== Internals =====
 
   /**
    * Build chat messages, branching on template mode.
@@ -265,7 +270,7 @@ class OpenAICompatibleProvider extends BaseProvider {
   }
 
   /**
-   * 构建请求头（子类可覆盖）
+   * Build request headers (overridable by subclasses)
    */
   _buildHeaders() {
     const headers = { 'Content-Type': 'application/json' };
@@ -289,7 +294,7 @@ class OpenAICompatibleProvider extends BaseProvider {
   }
 
   /**
-   * Chat Completion（非流式）
+   * Chat completion (non-streaming)
    */
   async _chatCompletion(messages) {
     const controller = new AbortController();
@@ -325,14 +330,14 @@ class OpenAICompatibleProvider extends BaseProvider {
     } catch (error) {
       clearTimeout(timeoutId);
       if (error.name === 'AbortError') {
-        return { success: false, error: '请求超时，可在翻译源设置中调大超时时间' };
+        return { success: false, error: _t('providerError.requestTimeout', '请求超时，可在翻译源设置中调大超时时间') };
       }
       return { success: false, error: error.message };
     }
   }
 
   /**
-   * Chat Completion（流式）
+   * Chat completion (streaming)
    */
   async _chatCompletionStream(messages, onChunk) {
     const controller = new AbortController();

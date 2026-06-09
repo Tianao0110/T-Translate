@@ -128,7 +128,7 @@ const PrivacySection = ({
       <h3>{t('settings.privacy.title')}</h3>
       <p className="setting-description">{t('privacy.modeDescription')}</p>
       
-      {/* 当前模式状态提示 */}
+      {/* Current mode banner */}
       <div className={`current-mode-banner mode-${currentMode}`}>
         <div className="mode-banner-icon">
           {getModeIcon(modeConfig?.icon, 20)}
@@ -139,7 +139,7 @@ const PrivacySection = ({
         </div>
       </div>
       
-      {/* 模式选择卡片 */}
+      {/* Mode selection cards */}
       <div className="mode-selection-grid">
         {Object.values(PRIVACY_MODES).map((mode) => {
           const isSelected = currentMode === mode.id;
@@ -161,7 +161,7 @@ const PrivacySection = ({
         })}
       </div>
 
-      {/* 当前模式功能说明 */}
+      {/* Feature matrix for the active mode */}
       <div className="mode-features-panel">
         <h4>📋 {t('privacy.featuresTitle')}</h4>
         <div className="feature-list">
@@ -202,7 +202,7 @@ const PrivacySection = ({
         )}
       </div>
 
-      {/* 数据管理 */}
+      {/* Data management */}
       <div className="setting-group" style={{marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border-primary)'}}>
         <h4 style={{marginBottom: '16px', color: 'var(--text-primary)'}}>🗂️ {t('privacy.dataManagement')}</h4>
 

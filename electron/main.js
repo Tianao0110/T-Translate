@@ -32,7 +32,7 @@ const displayHelper = require('./utils/display-helper');
 
 // Cached mirror of settings.selection — electron-store re-reads and re-parses
 // the whole settings file from disk on every .get(), too slow for the global
-// mousedown/mouseup hot path (was 2 sync disk reads per click).
+// mousedown/mouseup hot path.
 let cachedSelectionSettings = store.get('settings.selection', {});
 store.onDidChange('settings.selection', (value) => {
   cachedSelectionSettings = value || {};

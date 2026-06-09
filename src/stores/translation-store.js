@@ -641,8 +641,7 @@ const useTranslationStore = create(
     })),
     {
       name: "translation-store",
-      // localStorage works in Electron and loads synchronously (no flash);
-      // writes go through the throttled wrapper above
+      // localStorage works in Electron and loads synchronously (no flash)
       storage: createThrottledJSONStorage(),
       merge: (persistedState, currentState) => {
         return {
