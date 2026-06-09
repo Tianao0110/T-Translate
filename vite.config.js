@@ -20,7 +20,6 @@ export default defineConfig(({ mode }) => {
 
     plugins: [
       react({
-        fastRefresh: true,
         babel: {
           plugins: [
             // isProd && ['transform-remove-console', { exclude: ['error', 'warn'] }]
@@ -147,7 +146,8 @@ export default defineConfig(({ mode }) => {
       chunkSizeWarningLimit: isProd ? 1000 : 2000,
       assetsInlineLimit: 4096,
       cssCodeSplit: true,
-      target: 'chrome89',
+      // Must track the Chromium shipped by our Electron (42 -> Chromium 148)
+      target: 'chrome148',
 
       commonjsOptions: {
         transformMixedEsModules: true,
@@ -202,7 +202,7 @@ export default defineConfig(({ mode }) => {
       minifySyntax: isProd,
       minifyWhitespace: isProd,
       legalComments: 'none',
-      target: 'chrome89',
+      target: 'chrome148',
       jsxFactory: 'React.createElement',
       jsxFragment: 'React.Fragment'
     },
@@ -220,7 +220,8 @@ export default defineConfig(({ mode }) => {
 
     worker: {
       format: 'es',
-      plugins: [react()]
+      // Array form is deprecated since Vite 5 (startup warning)
+      plugins: () => [react()]
     },
 
     logLevel: isDev ? 'info' : 'warn',
