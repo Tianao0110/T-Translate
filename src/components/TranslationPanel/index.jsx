@@ -36,7 +36,10 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   );
   const [isOcrProcessing, setIsOcrProcessing] = useState(false);
   const [isOcrSource, setIsOcrSource] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState('natural');
+  const [selectedTemplate, setSelectedTemplate] = useState(() => {
+    const saved = localStorage.getItem('translation.selectedTemplate');
+    return ['natural', 'precise', 'formal'].includes(saved) ? saved : 'natural';
+  });
 
   useEffect(() => {
     const goOnline = () => setIsConnected(true);
@@ -239,6 +242,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   const handleTemplateChange = (newTemplateId) => {
     if (newTemplateId === selectedTemplate) return;
     setSelectedTemplate(newTemplateId);
+    localStorage.setItem('translation.selectedTemplate', newTemplateId);
     if (currentTranslation.sourceText.trim()) {
       handleTranslate(newTemplateId);
     }
