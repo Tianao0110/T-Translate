@@ -76,6 +76,10 @@ Replace per-token `setState` on the `<textarea>` with RAF-based buffering: accum
 
 ## v0.2.8 / v0.3 candidates
 
+### Electron 28 → 42 + electron-builder 24 → 26 平台升级（v0.2.8 主题，单独分支）
+
+Electron 28 EOL 两年半，audit 报 17 个已知 CVE，数条命中本项目场景（`setLoginItemSettings` 自启、clipboard、ASAR 完整性）。四个 native 模块（koffi/uiohook-napi/node-screenshots/@gutenye OCR）均为 N-API，预期平滑，但必须完整回归：划词钩子、截屏、OCR、safeStorage 解密。electron-builder 26 同时清掉构建链 tar/tmp 漏洞（npm audit 剩余 8 项全在此）。顺带 Vite 5 → 7（esbuild dev-server 漏洞随之消失）。不与 v0.2.7 性能包混分支——避免性能对比数据被 Chromium 升级污染。
+
 ### 划词检测完整性计划（v0.3 主题）
 
 目标：主流应用全覆盖 + 覆盖不到的场景优雅降级并给用户明确提示。"任何程序都能识别"技术上无法承诺（UIPI 隔离的提权窗口、DRM/反截屏应用、独占全屏游戏），按分层推进：
