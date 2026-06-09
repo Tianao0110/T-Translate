@@ -2,87 +2,30 @@
 
 Forward-looking work clipboard. Git history / GitHub release notes are the archive — these notes stay concise (1-3 lines each + file:line links). Stale-check on each release; delete shipped items.
 
-## v0.2.7 scope（按优先级）
+## v0.2.8 scope
 
-主题：流式翻译性能包（P0 四件是同一条热路径，一起做）+ 正确性小修 + 用户可感知的 UX 死角。
+主题：平台升级（Electron + electron-builder），单独分支 `v0.2.8`，不混入功能改动。
 
-### P0 — 流式热路径
+### Electron 28 → 42 + electron-builder 24 → 26 平台升级（主项）
 
-#### 1. RAF 节流 + 设备分档（原计划项）
+Electron 28 EOL 两年半，audit 报 17 个已知 CVE，数条命中本项目场景（`setLoginItemSettings` 自启、clipboard、ASAR 完整性）。四个 native 模块（koffi/uiohook-napi/node-screenshots/@gutenye OCR）均为 N-API，预期平滑，但必须完整回归：划词钩子、截屏、OCR、safeStorage 解密。electron-builder 26 同时清掉构建链 tar/tmp 漏洞（npm audit 剩余 8 项全在此）。顺带 Vite 5 → 7（esbuild dev-server 漏洞随之消失）。注意 vite.config 的 `build.target: 'chrome89'` 与 esbuild target 要同步升到对应 Chromium 版本。
 
-Replace per-token `setState` on the `<textarea>` with RAF-based buffering: accumulate tokens, flush one batch per frame, minimum 16ms interval floor (cap at 60fps even on 144/240Hz displays). Two device tiers via `navigator.hardwareConcurrency` + `deviceMemory`: high (≥8 cores, ≥16GB) → 16ms floor, mid/low → 33ms floor. Non-streaming providers (Google/DeepL/Baidu) bypass the throttle. Flush residual buffer on stream end. Verification artifact: before/after Memory snapshots + Performance profile（能看到 stringify/render 占比变化）.
+### 更新体验：差分下载 + 静默安装（依赖 builder 26，伪热更新先行）
 
-#### 2. 流式中间态不进 persist store
+现状：[auto-updater.js](electron/utils/auto-updater.js) 手写 GitHub API 全量下载 .exe，`differentialPackage: false`。
 
-[translation-store.js:592](src/stores/translation-store.js:592) zustand persist 无防抖：每次 setState 都对 partialize 后的状态（含最多 1000 条 history）全量 `JSON.stringify` + 同步 `localStorage.setItem`。流式每 chunk、源文本框每击键都付这笔。流式中间文本改走非持久化路径，翻译完成才 commit；或给 persist storage 包一层防抖。
+- **第一步（推荐）**：迁移 electron-updater — blockmap 差分下载（更新包降到全量 10-30%）、SHA512 校验、断点续传、`quitAndInstall(isSilent)` 静默安装。体验 ≈ 热更新，风险低
+- **第二步（仅评估，不承诺）**：真 asar 热替换只覆盖纯 JS 改动；koffi/uiohook/node-screenshots/OCR 全在 asarUnpack，native 或 Electron 版本一变必须回全量；且热更新通道必须做包签名校验，否则是供应链攻击口
 
-#### 3. Store 订阅 selector 化
+### NSIS 安装界面美化（轻量版，不自研）
 
-[TranslationPanel:73](src/components/TranslationPanel/index.jsx:73)、[MainWindow:56](src/components/MainWindow/index.jsx:56)、[SettingsPanel:78](src/components/SettingsPanel/index.jsx:78)、[FavoritesPanel:486](src/components/FavoritesPanel/index.jsx:486) 裸 `useTranslationStore()` 订阅整个 store，任何字段变化四个组件全部重渲染（MainWindow 是窗口壳 → 全树）。改 `useShallow` selector 后流式 flush 只重渲染译文子树。与 RAF 节流是乘法关系。
+默认 NSIS 向导确实简陋。方案：electron-builder `installerSidebar`/`installerHeader` 位图 + 自定义 .nsh（MUI 欢迎/完成页、中文文案），1-2 天拿 80% 视觉收益。**不自研安装器**：杀软误报、签名、卸载/注册表正确性都是坑，收益不成比例。若未来要全自定义 UI，正确姿势是"Electron 壳 + 后台静默 NSIS `/S`"。
 
-#### 4. postProcess 挪进 flush
+### 文档翻译并发（在线 provider 3-5x，独立小项）
 
-[translation.js:659](src/services/translation.js:659) 每 chunk 对**累计全文**跑占位符还原（每个占位符一次 split/join），整条流 O(N²)。chunk 回调只 `buffer += chunk`，postProcess 在每帧 flush 时做一次。
+[translation.js](src/services/translation.js) `translateBatch` 逐条 await；DocumentTranslator 的 batch 只是 UI 分组。在线 API（OpenAI/DeepSeek/DeepL）可并发 3-5 路，本地 LLM 保持串行（GPU 排队无益）。presets 已有 `requiresNetwork` 字段，正好做并发度开关依据。
 
-### P1 — 正确性
-
-#### 5. max_tokens 硬编码 2048 截断长译文
-
-[openai-compatible.js:297](src/providers/openai-compatible.js:297) 与 [:338](src/providers/openai-compatible.js:338)。CJK 译文 token 膨胀，文档长段落静默截断且无报错。省略该参数（服务端默认到模型上限）或 preset 可配。
-
-#### 6. 缓存 key 加 model 名
-
-[translation.js:323](src/services/translation.js:323) `_getCacheKey` 缺 `provider.config.model`：LM Studio 换模型（同 provider id）命中旧模型译文。一行修复。
-
-#### 7. 流式 idle watchdog（思考模型友好）
-
-[openai-compatible.js:344](src/providers/openai-compatible.js:344) 响应头到达即 `clearTimeout`，之后 read 循环无任何超时；服务端卡死 → UI 永久"翻译中"。设计约束：**不能误杀慢硬件和思考型模型**——冷加载 + thinking 阶段静默可达数分钟。规格：
-
-- idle 上限 = `config.timeout`（与请求超时同一个旋钮，本地 preset 默认已放宽 180s，设置界面可调）
-- 计时器在**任何 SSE 数据**到达时重置，包括 `reasoning_content` delta 和心跳——思考模型只要在流式输出 reasoning 就永远不会被杀
-- 触发后报错文案区分"等待响应超时"和"生成中断"，提示用户可在设置中调大超时
-
-#### 8. chatCompletion 走 priority 列表
-
-[translation.js:797](src/services/translation.js:797) 硬编码 `getProvider('local-llm')` 且不查 `isConfigured`：主力用 OpenAI/DeepSeek/Ollama 的用户，风格改写 / AI 分析必坏。改为 priority 中第一个可用且有 `chat()` 的 provider。
-
-### P2 — UX 死角 + 易胜
-
-#### 9. electron-log 落地，"打开日志目录"变有用
-
-[logger.js:8](electron/utils/logger.js:8) 整套按 electron-log 设计（轮转/脱敏/清理已配好）但依赖从未安装，永远走 console fallback → 不生成日志文件，About 页按钮形同虚设。`npm i electron-log` 即激活主进程文件日志。renderer 日志 IPC 转发可后做。
-
-#### 10. 隐私页数据管理显示数据量
-
-[PrivacySection.jsx:160](src/components/SettingsPanel/sections/PrivacySection.jsx:160) 只有清除按钮，看不到现有多少数据。显示：历史 N 条 / 收藏 N 条 / 缓存 N 条（`getCacheStats()` 现成）/ 设置与日志文件大小（新增小 IPC）。
-
-#### 11. selectedTemplate 持久化
-
-[TranslationPanel/index.jsx:38](src/components/TranslationPanel/index.jsx:38) React state only，重启回 `'natural'`。persist 到 localStorage（或主进程 electron-store）。
-
-#### 12. 点击热路径去同步读盘
-
-[main.js:494](electron/main.js:494) 与 [:542](electron/main.js:542) 全局 mousedown/mouseup 里 `store.get('settings.selection')`——electron-store 每次 `.get` 都 `readFileSync` + 全文件 JSON.parse，即每次左键 2 次同步磁盘 I/O。缓存进 `runtime` + `store.onDidChange` 刷新。
-
-### P3 — 时间允许
-
-#### 13. MT mode UI indicator
-
-自动检测（[model-template-mapping.js](src/config/model-template-mapping.js)）切到 MT 直出模板时无 UI 反馈，用户疑惑"为什么译文风格变了"。模型名旁加小 badge："MT model detected — using direct prompt"。
-
-#### 14. 隐私页"使用统计"措辞
-
-[PrivacySection.jsx:138](src/components/SettingsPanel/sections/PrivacySection.jsx:138) 标准模式显示"使用统计 ✓ 收集"，但代码库无任何遥测实现。隐私优先的应用不该自称在收集——改为"本地统计"或删行。
-
-#### 15. 启动解密并行化
-
-[translation.js:201](src/services/translation.js:201) `_decryptConfigs` 串行 await ~10 次 secureStorage IPC。`Promise.all` 并行化加快各窗口冷启动（注意解密审计日志是否依赖顺序）。
-
-## v0.2.8 / v0.3 candidates
-
-### Electron 28 → 42 + electron-builder 24 → 26 平台升级（v0.2.8 主题，单独分支）
-
-Electron 28 EOL 两年半，audit 报 17 个已知 CVE，数条命中本项目场景（`setLoginItemSettings` 自启、clipboard、ASAR 完整性）。四个 native 模块（koffi/uiohook-napi/node-screenshots/@gutenye OCR）均为 N-API，预期平滑，但必须完整回归：划词钩子、截屏、OCR、safeStorage 解密。electron-builder 26 同时清掉构建链 tar/tmp 漏洞（npm audit 剩余 8 项全在此）。顺带 Vite 5 → 7（esbuild dev-server 漏洞随之消失）。不与 v0.2.7 性能包混分支——避免性能对比数据被 Chromium 升级污染。
+## v0.3 candidates
 
 ### 划词检测完整性计划（v0.3 主题）
 
@@ -94,21 +37,6 @@ Electron 28 EOL 两年半，audit 报 17 个已知 CVE，数条命中本项目�
 - **权限对齐（UIPI）** — 提权目标窗口会静默吞掉合成 Ctrl+C。检测目标进程 elevation，提示"目标程序以管理员运行"而非无响应；评估 manifest `uiAccess` 的代价（需签名 + Program Files）
 - **PDF 阅读器矩阵重测** — Adobe 已确认不行；重测 Foxit / Edge 内置 / SumatraPDF，可用的写进 README 支持列表，全不可用则 debug 剪贴板路径（[native-helper.js](electron/utils/native-helper.js) `simulateCtrlC` + `checkSelectionViaClipboard`）
 - **验收**：应用矩阵清单（Chrome/Edge/VSCode/Word/Excel/Outlook/Acrobat/Foxit/IntelliJ/Windows Terminal/UWP 设置/记事本），逐项标注走哪一层、已知限制
-
-### 更新体验：差分下载 + 静默安装（伪热更新先行）
-
-现状：[auto-updater.js](electron/utils/auto-updater.js) 手写 GitHub API 全量下载 .exe，`differentialPackage: false`。
-
-- **第一步（推荐）**：迁移 electron-updater — blockmap 差分下载（更新包降到全量 10-30%）、SHA512 校验、断点续传、`quitAndInstall(isSilent)` 静默安装。体验 ≈ 热更新，风险低
-- **第二步（仅评估，不承诺）**：真 asar 热替换只覆盖纯 JS 改动；koffi/uiohook/node-screenshots/OCR 全在 asarUnpack，native 或 Electron 版本一变必须回全量；且热更新通道必须做包签名校验，否则是供应链攻击口
-
-### NSIS 安装界面美化（轻量版，不自研）
-
-默认 NSIS 向导确实简陋。方案：electron-builder `installerSidebar`/`installerHeader` 位图 + 自定义 .nsh（MUI 欢迎/完成页、中文文案），1-2 天拿 80% 视觉收益。**不自研安装器**：杀软误报、签名、卸载/注册表正确性都是坑，收益不成比例。若未来要全自定义 UI，正确姿势是"Electron 壳 + 后台静默 NSIS `/S`"。
-
-### 文档翻译并发（在线 provider 3-5x）
-
-[translation.js:757](src/services/translation.js:757) `translateBatch` 逐条 await；DocumentTranslator 的 batch 只是 UI 分组。在线 API（OpenAI/DeepSeek/DeepL）可并发 3-5 路，本地 LLM 保持串行（GPU 排队无益）。presets 已有 `requiresNetwork` 字段，正好做并发度开关依据。
 
 ### 翻译栈下沉主进程评估
 
@@ -124,7 +52,7 @@ The v0.2.6 OCR error-to-guidance fix is the short version. Full version: first-l
 
 ### Incremental unit test coverage buildout
 
-`tests/unit/` 现有 3 个测试文件（selection-state-machine / selection-trigger-passthrough / translate-text-sourcelang）。Principle: add tests when you touch a file, new features ship with tests, bug fixes ship with regression tests. Not chasing 100% coverage.
+`tests/unit/` 现有 4 个测试文件（selection-state-machine / selection-trigger-passthrough / translate-text-sourcelang / stream-throttle）。Principle: add tests when you touch a file, new features ship with tests, bug fixes ship with regression tests. Not chasing 100% coverage.
 
 ### SelectionTranslator: `translation.sourceLanguage` is dead payload
 
@@ -143,3 +71,7 @@ v0.2.5 Phase T 装通 eslint 9 后跑 `npm run lint` 出 539 warnings + 21 pre-e
 - `src/utils/logger.js`: `??` 左侧 constant 是 dead code
 
 清完后删 eslint.config.js 里的 per-file override，恢复全局严格。
+
+### Provider 层存量硬编码中文字符串迁 i18n
+
+[openai-compatible.js](src/providers/openai-compatible.js) 与 [presets.js](src/providers/openai-compatible/presets.js) 仍有十余条 v0.2.5 前的硬编码中文（`文本为空`/`连接失败`/`testConnectionMessage` 等）。v0.2.7 已建立 `providerError.*` + `_t()` 模式，照搬即可。注意 [error-handler.js](src/utils/error-handler.js) 靠 `/timeout/i` + `/超时/` 正则分类，英文文案需保留关键词。
