@@ -133,16 +133,18 @@ export const PRESETS = [
         timeout: {
           type: 'number',
           label: 'Timeout (ms)',
-          default: 120000,
+          default: 180000,
           required: false,
-          placeholder: '120000',
+          placeholder: '180000',
         },
       },
     },
     defaults: {
       endpoint: 'http://localhost:11434/v1',
       model: '',
-      timeout: 120000,
+      // Local generation is hardware-bound: cold model load + reasoning models'
+      // thinking phase can take minutes. User-tunable in settings.
+      timeout: 180000,
     },
     latencyLevel: 'slow',
     requiresNetwork: false,
@@ -180,16 +182,18 @@ export const PRESETS = [
         timeout: {
           type: 'number',
           label: 'Timeout (ms)',
-          default: 60000,
+          default: 180000,
           required: false,
-          placeholder: '60000',
+          placeholder: '180000',
         },
       },
     },
     defaults: {
       endpoint: 'http://localhost:1234/v1',
       model: '',
-      timeout: 60000,
+      // LM Studio JIT-loads models — first request after idle pays the full
+      // load, plus reasoning models' thinking phase. User-tunable in settings.
+      timeout: 180000,
     },
     latencyLevel: 'slow',
     requiresNetwork: false,

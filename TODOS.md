@@ -34,9 +34,13 @@ Replace per-token `setState` on the `<textarea>` with RAF-based buffering: accum
 
 [translation.js:323](src/services/translation.js:323) `_getCacheKey` 缺 `provider.config.model`：LM Studio 换模型（同 provider id）命中旧模型译文。一行修复。
 
-#### 7. 流式 idle watchdog
+#### 7. 流式 idle watchdog（思考模型友好）
 
-[openai-compatible.js:344](src/providers/openai-compatible.js:344) 响应头到达即 `clearTimeout`，之后 read 循环无任何超时；本地模型卡死 → UI 永久"翻译中"。加 per-chunk 重置的 inactivity timer（如 30s 无新 chunk 则 abort）。
+[openai-compatible.js:344](src/providers/openai-compatible.js:344) 响应头到达即 `clearTimeout`，之后 read 循环无任何超时；服务端卡死 → UI 永久"翻译中"。设计约束：**不能误杀慢硬件和思考型模型**——冷加载 + thinking 阶段静默可达数分钟。规格：
+
+- idle 上限 = `config.timeout`（与请求超时同一个旋钮，本地 preset 默认已放宽 180s，设置界面可调）
+- 计时器在**任何 SSE 数据**到达时重置，包括 `reasoning_content` delta 和心跳——思考模型只要在流式输出 reasoning 就永远不会被杀
+- 触发后报错文案区分"等待响应超时"和"生成中断"，提示用户可在设置中调大超时
 
 #### 8. chatCompletion 走 priority 列表
 
