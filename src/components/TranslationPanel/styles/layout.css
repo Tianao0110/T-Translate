@@ -154,6 +154,20 @@
   color: white;
 }
 
+/* Auto-switched MT prompt indicator — explains why output style changed */
+.mt-mode-badge {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  border-radius: 6px;
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--success, #10b981);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: help;
+}
+
 /* ==================== 翻译区域 ==================== */
 .translation-areas {
   display: grid;

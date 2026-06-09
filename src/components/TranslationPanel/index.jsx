@@ -19,6 +19,7 @@ import { getShortErrorMessage } from '../../utils/error-handler.js';
 import './styles.css';
 
 import { PRIVACY_MODES, TRANSLATION_STATUS, getLanguageList } from '@config/defaults';
+import { detectTemplateFromModel } from '../../config/model-template-mapping.js';
 
 import { useTTS, useTermCheck, useStyleRewrite, useSaveModal } from './hooks';
 
@@ -116,6 +117,10 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     { id: 'precise', name: t('templates.precise'), desc: t('templates.preciseDesc') },
     { id: 'formal', name: t('templates.formal'), desc: t('templates.formalDesc') },
   ];
+
+  // Surface the auto-switch so users know why output style changed.
+  // Recomputed per render — cheap registry lookup, no subscription needed.
+  const isMTModel = !!detectTemplateFromModel(translationService.getCurrentProvider()?.model || '');
 
   // Triggered when MainWindow passes screenshot data in via props (capture flow)
   useEffect(() => {
@@ -355,6 +360,11 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
               {tmpl.name}
             </button>
           ))}
+          {isMTModel && (
+            <span className="mt-mode-badge" title={t('translation.mtModeHint')}>
+              {t('translation.mtModeBadge')}
+            </span>
+          )}
         </div>
       </div>
 
