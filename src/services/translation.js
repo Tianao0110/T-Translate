@@ -203,26 +203,30 @@ class TranslationService {
     const { getAllProviderMetadata } = await import('../providers/registry.js');
     const allMeta = getAllProviderMetadata();
     const decrypted = {};
+    const tasks = [];
 
     for (const meta of allMeta) {
       const providerId = meta.id;
       decrypted[providerId] = { ...(configs[providerId] || {}) };
 
-      if (meta.configSchema) {
-        for (const [key, field] of Object.entries(meta.configSchema)) {
-          if (field.encrypted) {
-            const currentValue = decrypted[providerId][key];
-            if (!currentValue || currentValue === '***encrypted***') {
-              const stored = await secureStorage.get(`provider_${providerId}_${key}`);
-              if (stored) {
-                decrypted[providerId][key] = stored;
-              }
-            }
-          }
-        }
+      if (!meta.configSchema) continue;
+      for (const [key, field] of Object.entries(meta.configSchema)) {
+        if (!field.encrypted) continue;
+        const currentValue = decrypted[providerId][key];
+        if (currentValue && currentValue !== '***encrypted***') continue;
+
+        // Independent IPC roundtrips — run in parallel to cut window cold-start.
+        // Audit alerting counts decrypts per time window, so the burst shape
+        // (serial vs parallel) doesn't change what it sees.
+        tasks.push(
+          secureStorage.get(`provider_${providerId}_${key}`).then((stored) => {
+            if (stored) decrypted[providerId][key] = stored;
+          })
+        );
       }
     }
 
+    await Promise.all(tasks);
     return decrypted;
   }
 
@@ -920,6 +924,7 @@ class TranslationService {
         return {
           id,
           name: provider?.constructor?.metadata?.name,
+          model: provider?.config?.model || null,
         };
       }
     }
