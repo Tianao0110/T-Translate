@@ -322,7 +322,7 @@ class TranslationService {
   // djb2 dual-hash for short, collision-resistant cache keys.
   // Same scheme as L2 cache so a key generated here matches a key stored on disk.
   _getCacheKey(text, options) {
-    const { targetLang = 'zh', template = 'natural', providerId = '' } = options;
+    const { targetLang = 'zh', template = 'natural', providerId = '', model = '' } = options;
     let h1 = 5381;
     let h2 = 52711;
     for (let i = 0; i < text.length; i++) {
@@ -331,7 +331,9 @@ class TranslationService {
       h2 = (h2 * 33) ^ c;
     }
     const hash = ((h1 >>> 0) * 4096 + (h2 >>> 0)).toString(36);
-    return `${targetLang}-${template}-${providerId}-${hash}`;
+    // model is part of the key: same provider id can serve different local
+    // models (LM Studio model swap) with very different output
+    return `${targetLang}-${template}-${providerId}-${model}-${hash}`;
   }
 
   _checkCache(key, options = {}) {
@@ -481,18 +483,22 @@ class TranslationService {
     // Filter to providers usable right now (privacy / configured / not failing)
     const priority = this.getPriority();
     let firstAvailableId = '';
+    let firstModel = '';
     const usableProviders = [];
     for (const id of priority) {
       if (!isProviderAllowed(id, privacyMode)) continue;
       if (!isProviderConfigured(id)) continue;
       if (this._failureCount[id] >= this._skipThreshold) continue;
-      if (!firstAvailableId) firstAvailableId = id;
+      if (!firstAvailableId) {
+        firstAvailableId = id;
+        firstModel = getProvider(id)?.config?.model || '';
+      }
       usableProviders.push(id);
     }
 
-    // Cache key bound to the first available provider so a provider switch
-    // invalidates the cache (different providers translate differently)
-    const cacheKey = this._getCacheKey(processed, { targetLang, template, providerId: firstAvailableId });
+    // Cache key bound to the first available provider + model so switching
+    // either invalidates the cache
+    const cacheKey = this._getCacheKey(processed, { targetLang, template, providerId: firstAvailableId, model: firstModel });
     const cached = this._checkCache(cacheKey, { useCache, privacyMode });
 
     if (cached) {
@@ -607,16 +613,20 @@ class TranslationService {
 
     const priority = this.getPriority();
     let firstAvailableId = '';
+    let firstModel = '';
     const usableProviders = [];
     for (const id of priority) {
       if (!isProviderAllowed(id, privacyMode)) continue;
       if (!isProviderConfigured(id)) continue;
       if (this._failureCount[id] >= this._skipThreshold) continue;
-      if (!firstAvailableId) firstAvailableId = id;
+      if (!firstAvailableId) {
+        firstAvailableId = id;
+        firstModel = getProvider(id)?.config?.model || '';
+      }
       usableProviders.push(id);
     }
 
-    const cacheKey = this._getCacheKey(processed, { targetLang, template, providerId: firstAvailableId });
+    const cacheKey = this._getCacheKey(processed, { targetLang, template, providerId: firstAvailableId, model: firstModel });
     const cached = this._checkCache(cacheKey, { useCache, privacyMode });
 
     if (cached) {
@@ -799,16 +809,22 @@ class TranslationService {
   // ===== Misc =====
 
   // Generic chat completion for AI features (analysis, rewriting).
-  // Falls back to translating the user message if the provider lacks chat().
+  // Falls back to translating the user message if no provider has chat().
   async chatCompletion(messages, options = {}) {
     if (!this._initialized) {
       await this.init();
     }
 
-    const provider = getProvider('local-llm');
-
-    if (provider && typeof provider.chat === 'function') {
-      return provider.chat(messages, options);
+    // Route through priority like translate() does — was hardcoded to
+    // local-llm, which broke style rewrite for OpenAI/Ollama-first users
+    const { privacyMode = PRIVACY_MODE_IDS.STANDARD } = options;
+    for (const id of this.getPriority()) {
+      if (!isProviderAllowed(id, privacyMode)) continue;
+      if (!isProviderConfigured(id)) continue;
+      const provider = getProvider(id);
+      if (provider && typeof provider.chat === 'function') {
+        return provider.chat(messages, options);
+      }
     }
 
     const userMessage = messages.find(m => m.role === 'user');
