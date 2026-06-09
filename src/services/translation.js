@@ -66,6 +66,7 @@ function resolveSystemPrompt(provider, template, targetLang) {
     : getSystemPrompt(template, targetLang);
 }
 import translationCache from './cache.js';
+import { createStreamThrottle } from '../utils/stream-throttle.js';
 
 const logger = createLogger('Translation');
 
@@ -647,20 +648,30 @@ class TranslationService {
         if (provider.supportsStreaming && typeof provider.translateStream === 'function') {
           let fullText = '';
 
-          const result = await provider.translateStream(
-            processed,
-            sourceLang,
-            targetLang,
-            (chunk) => {
-              fullText += chunk;
-              if (onChunk) {
-                // Run post-process on each partial chunk so placeholders that
-                // appear in mid-stream get replaced visibly
-                onChunk(this._postProcess(fullText, protectedMap));
-              }
-            },
-            { systemPrompt, template }
-          );
+          // Frame-aligned flush: placeholder restore + UI update run once per
+          // frame instead of per token. Placeholders still resolve visibly
+          // mid-stream; the per-chunk work is just string concat.
+          const throttle = createStreamThrottle(() => {
+            onChunk(this._postProcess(fullText, protectedMap));
+          });
+
+          let result;
+          try {
+            result = await provider.translateStream(
+              processed,
+              sourceLang,
+              targetLang,
+              (chunk) => {
+                fullText += chunk;
+                if (onChunk) throttle.schedule();
+              },
+              { systemPrompt, template }
+            );
+          } finally {
+            // A flush firing after the final setState downstream would
+            // overwrite glossary-applied text with a stale partial.
+            throttle.cancel();
+          }
 
           if (result.success) {
             this._failureCount[id] = 0;
