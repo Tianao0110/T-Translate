@@ -10,6 +10,7 @@ import {
   Lightbulb, Check, X, ArrowRight, Palette, ChevronUp, ChevronDown, AlertTriangle, BookOpen
 } from 'lucide-react';
 
+import { useShallow } from 'zustand/react/shallow';
 import useTranslationStore from '../../stores/translation-store';
 import translationService from '../../services/translation.js';
 import { TTS_STATUS } from '../../services/tts/index.js';
@@ -48,6 +49,8 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     };
   }, []);
 
+  // useShallow: re-render only when a selected slice changes — history,
+  // statistics and queue updates no longer touch this panel
   const {
     currentTranslation,
     favorites,
@@ -56,7 +59,6 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     autoTranslateDelay,
     ocrStatus,
     translationMode,
-    setTranslationMode,
     setSourceText,
     setTranslatedText,
     setLanguages,
@@ -70,7 +72,28 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     pasteFromClipboard,
     addStyleVersion,
     switchVersion,
-  } = useTranslationStore();
+  } = useTranslationStore(useShallow((s) => ({
+    currentTranslation: s.currentTranslation,
+    favorites: s.favorites,
+    useStreamOutput: s.useStreamOutput,
+    autoTranslate: s.autoTranslate,
+    autoTranslateDelay: s.autoTranslateDelay,
+    ocrStatus: s.ocrStatus,
+    translationMode: s.translationMode,
+    setSourceText: s.setSourceText,
+    setTranslatedText: s.setTranslatedText,
+    setLanguages: s.setLanguages,
+    translate: s.translate,
+    streamTranslate: s.streamTranslate,
+    recognizeImage: s.recognizeImage,
+    clearCurrent: s.clearCurrent,
+    swapLanguages: s.swapLanguages,
+    addToFavorites: s.addToFavorites,
+    copyToClipboard: s.copyToClipboard,
+    pasteFromClipboard: s.pasteFromClipboard,
+    addStyleVersion: s.addStyleVersion,
+    switchVersion: s.switchVersion,
+  })));
 
   const tts = useTTS(notify, t);
   const termCheck = useTermCheck(favorites, setTranslatedText, notify, t);
