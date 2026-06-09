@@ -1,10 +1,17 @@
 // Privacy mode picker + data-management actions.
 
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Zap, Shield, Lock, CheckCircle, AlertCircle, Trash2 } from 'lucide-react';
 import useTranslationStore from '../../../stores/translation-store';
+import translationService from '../../../services/translation.js';
 import { PRIVACY_MODES, PRIVACY_MODE_IDS } from '../constants.js';
+
+const formatBytes = (bytes) => {
+  if (!bytes) return '0 KB';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+};
 
 const PrivacySection = ({
   settings,
@@ -47,6 +54,42 @@ const PrivacySection = ({
     return t(descKeys[modeId] || 'privacy.modes.standardDesc');
   };
 
+  // Storage footprint for the data-management panel. Counts come from the
+  // store, sizes from localStorage scan + a main-process stat call.
+  const [dataStats, setDataStats] = useState(null);
+
+  const refreshDataStats = useCallback(async () => {
+    const state = useTranslationStore.getState();
+
+    let localStorageBytes = 0;
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        localStorageBytes += k.length + (localStorage.getItem(k)?.length || 0);
+      }
+    } catch { /* size stays 0 */ }
+
+    let cacheCount = 0;
+    try {
+      cacheCount = translationService.getCacheStats()?.l2Stats?.total ?? 0;
+    } catch { /* count stays 0 */ }
+
+    const main = (await window.electron?.app?.getDataStats?.()) || {};
+
+    setDataStats({
+      historyCount: state.history.length,
+      favoritesCount: state.favorites.length,
+      cacheCount,
+      localStorageBytes,
+      settingsFileSize: main.settingsFileSize || 0,
+      logsDirSize: main.logsDirSize || 0,
+    });
+  }, []);
+
+  useEffect(() => {
+    refreshDataStats();
+  }, [refreshDataStats]);
+
   // Mode change must hit three places: settings store, translation-store
   // (for the secure-mode history stash), and main process (for the offline gate)
   const handleModeChange = (mode) => {
@@ -60,6 +103,7 @@ const PrivacySection = ({
     if (window.confirm(t('privacy.clearHistoryConfirm'))) {
       useTranslationStore.getState().clearHistory?.();
       notify(t('privacy.historyCleared'), 'success');
+      refreshDataStats();
     }
   };
 
@@ -73,8 +117,9 @@ const PrivacySection = ({
 
   const handleClearCache = () => {
     if (window.confirm(t('translationSettings.clearCacheConfirm'))) {
-      localStorage.removeItem('translation-cache');
+      translationService.clearCache();
       notify(t('translationSettings.cacheCleared'), 'success');
+      refreshDataStats();
     }
   };
 
@@ -160,7 +205,27 @@ const PrivacySection = ({
       {/* 数据管理 */}
       <div className="setting-group" style={{marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border-primary)'}}>
         <h4 style={{marginBottom: '16px', color: 'var(--text-primary)'}}>🗂️ {t('privacy.dataManagement')}</h4>
-        
+
+        {dataStats && (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr 1fr',
+            gap: '8px 16px',
+            marginBottom: '16px',
+            padding: '12px',
+            background: 'var(--bg-secondary)',
+            borderRadius: '8px',
+            fontSize: '13px',
+          }}>
+            <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.history')}</span><br/>{dataStats.historyCount} {t('privacy.stats.items')}</div>
+            <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.favorites')}</span><br/>{dataStats.favoritesCount} {t('privacy.stats.items')}</div>
+            <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.cache')}</span><br/>{dataStats.cacheCount} {t('privacy.stats.items')}</div>
+            <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.localData')}</span><br/>{formatBytes(dataStats.localStorageBytes)}</div>
+            <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.settingsFile')}</span><br/>{formatBytes(dataStats.settingsFileSize)}</div>
+            <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.logs')}</span><br/>{formatBytes(dataStats.logsDirSize)}</div>
+          </div>
+        )}
+
         <div className="setting-row">
           <span>{t('privacy.autoDeleteHistory')}</span>
           <div className="input-with-suffix">
