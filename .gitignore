@@ -5,7 +5,7 @@ node_modules/
 dist/
 build/
 out/
-release/
+release*/
 *.asar
 
 # Electron 打包
