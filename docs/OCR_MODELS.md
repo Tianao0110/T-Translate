@@ -86,5 +86,6 @@ npx electron temp/ocr-probe/probe-ipc.js      # IPC 注册完整性 + 健康检�
 ## 已知边界
 
 - 语言包 rec 模型现为 PP-OCRv4 代际（上游 eSearch-OCR 尚未转换 v5 多语言模型）；v5 的 korean/latin/eslav ONNX 出现后按上述「更新模型」流程换入即可
+- **旁遮普语（Punjabi/古木基文 Gurmukhi）无法支持**：已核对 PP-OCRv5 全部 11 个多语言模型的语种表（2026-06），PaddleOCR 系没有 Gurmukhi 模型，做不成语言包。巴基斯坦写法（Shahmukhi，阿拉伯字母系）与 arabic 包覆盖的乌尔都文接近、可能部分可用但非官方支持；印度写法只能走在线引擎（Google Vision 支持 pa）或 LLM Vision。上游若新增 Gurmukhi 模型，按「新增语言包」流程接入
 - 引擎未接角度分类器（doc_cls）：整图旋转 / 倒置文本不纠正；v5 基础模型自带竖排识别，截图场景足够
 - Windows OCR 引擎走系统语言包（设置 → 时间和语言 → 语言 安装），与本仓库模型体系无关
