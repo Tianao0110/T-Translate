@@ -6,9 +6,9 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 
 主题：平台升级（Electron + electron-builder），单独分支 `v0.2.8`，不混入功能改动。
 
-### Electron 28 → 42 + electron-builder 24 → 26 平台升级（主项）
+### Electron 28 → 42 + electron-builder 24 → 26 平台升级（主项）— ✅ 已完成（7b52fd1，待人工回归 + merge）
 
-Electron 28 EOL 两年半，audit 报 17 个已知 CVE，数条命中本项目场景（`setLoginItemSettings` 自启、clipboard、ASAR 完整性）。四个 native 模块（koffi/uiohook-napi/node-screenshots/@gutenye OCR）均为 N-API，预期平滑，但必须完整回归：划词钩子、截屏、OCR、safeStorage 解密。electron-builder 26 同时清掉构建链 tar/tmp 漏洞（npm audit 剩余 8 项全在此）。顺带 Vite 5 → 7（esbuild dev-server 漏洞随之消失）。注意 vite.config 的 `build.target: 'chrome89'` 与 esbuild target 要同步升到对应 Chromium 版本。
+2026-06-09 完成于分支 `v0.2.8`：E42.4.0（Chromium 148/Node 24）+ builder 26.15.2 + Vite 7.3.5 + plugin-react 5.2.0，target 同步 chrome148。四条 native 线 + safeStorage E28→E42 跨版本解密实测通过，NSIS 打包验证 OK，npm audit 8→0。回归探针在 temp/（gitignored）。待人工回归项：真实划词、玻璃窗、文档翻译、设置页 API key 存取。
 
 ### 更新体验：差分下载 + 静默安装（依赖 builder 26，伪热更新先行）
 
@@ -17,9 +17,15 @@ Electron 28 EOL 两年半，audit 报 17 个已知 CVE，数条命中本项目�
 - **第一步（推荐）**：迁移 electron-updater — blockmap 差分下载（更新包降到全量 10-30%）、SHA512 校验、断点续传、`quitAndInstall(isSilent)` 静默安装。体验 ≈ 热更新，风险低
 - **第二步（仅评估，不承诺）**：真 asar 热替换只覆盖纯 JS 改动；koffi/uiohook/node-screenshots/OCR 全在 asarUnpack，native 或 Electron 版本一变必须回全量；且热更新通道必须做包签名校验，否则是供应链攻击口
 
-### NSIS 安装界面美化（轻量版，不自研）
+### NSIS 安装界面美化（轻量版，不自研）— 范围已锁定 2026-06-09
 
-默认 NSIS 向导确实简陋。方案：electron-builder `installerSidebar`/`installerHeader` 位图 + 自定义 .nsh（MUI 欢迎/完成页、中文文案），1-2 天拿 80% 视觉收益。**不自研安装器**：杀软误报、签名、卸载/注册表正确性都是坑，收益不成比例。若未来要全自定义 UI，正确姿势是"Electron 壳 + 后台静默 NSIS `/S`"。
+方案：electron-builder `installerSidebar`/`installerHeader` 位图 + 自定义 .nsh（MUI 欢迎/完成页），1-2 天拿 80% 视觉收益。**双语已拍板**：`installerLanguages: ['en_US', 'zh_CN']` + multiLanguageInstaller，en_US 排第一 = 兜底语言；NSIS 自动按系统 locale 选语言 → 系统中文显示中文、其他语言一律英文，正好是需求行为，不出语言选择对话框。.nsh 文案用 LangString 写双语。**进度条回弹已定位（2026-06-10，结论：wontfix）**：app-builder-lib NSIS 模板的安装 Section 里同一条 bar 被四段先后驱动——①静默 ExecWait 旧版卸载器（bar 停滞不动）→ ②`File` 把 ~200MB 内嵌 app-64.7z 写入 $PLUGINSDIR（NSIS 按 File 字节算进度，bar 冲高）→ ③`Nsis7z::Extract` 插件接管 bar 从 0 重爬（**回弹主因**）→ ④`CopyFiles` 临时目录→安装目录再动一段。见 installSection.nsh:52/66 与 extractAppPackage.nsh:92-138。解压宏不在 electron-builder 的 customInstall 等 hook 覆盖范围，干净修复=整个覆盖 nsis.template，违背"轻量/不自研"原则且每次 builder 升级都要重新对齐——不做。缓解事实：updater 迁移后老用户走静默更新不再见向导；首装用户只见一次②→③回弹。**不自研安装器**：杀软误报、签名、卸载/注册表正确性都是坑，收益不成比例。注意：updater 迁移上线后老用户基本不再见到安装向导（静默更新），此项投入锁死轻量版不加码。
+
+### 设置目录弱引导（一次性提示，范围已锁定 2026-06-09）
+
+设置页已有简洁/完整双目录：[constants.js](src/components/SettingsPanel/constants.js) `NAV_ITEMS` 的 `basic` 标志（简洁=翻译源/翻译/界面/关于 4 项，完整=10 项两组），切换链接在侧栏底部 [index.jsx:690](src/components/SettingsPanel/index.jsx:690) `mode-text-link`，状态存 localStorage `settings-simple-mode`（默认简洁）。
+
+弱引导 = 仅一件事：首次打开设置时在该链接旁出一次性气泡/高亮，告知"当前为简洁目录，可切换完整目录（划词/玻璃窗/OCR/隐私等）"。看过或点过即记 localStorage 标志，永不再现。zh/en 双语 i18n。**不做**欢迎页、分步向导、功能导览（完整版 onboarding 是 v0.3 候选）。预估 ≤60 行含样式。
 
 ### 文档翻译并发（在线 provider 3-5x，独立小项）
 
