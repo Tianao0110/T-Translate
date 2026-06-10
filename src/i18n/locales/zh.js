@@ -11,6 +11,8 @@ const zh = {
     ocr: "OCR 识别", tts: "朗读设置", interface: "界面外观", connection: "LM Studio", privacy: "隐私模式", about: "关于",
     export: "导出", import: "导入", reset: "重置",
     simpleMode: "简洁", fullMode: "完整", switchToFull: "完整", switchToSimple: "简洁",
+    modeHint: "当前为简洁目录，点下方「完整」可查看全部设置（划词、玻璃窗、OCR、隐私等）",
+    modeHintGotIt: "知道了",
     noMatch: "未找到匹配的设置",
     unsavedChanges: "有未保存的更改", saving: "保存中...", saveChanges: "保存更改"
   },

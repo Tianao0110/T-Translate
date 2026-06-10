@@ -108,6 +108,15 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
     const saved = localStorage.getItem('settings-simple-mode');
     return saved === null ? true : saved === 'true';
   });
+  // One-time hint that the simple/full catalog toggle exists
+  const [showModeHint, setShowModeHint] = useState(() =>
+    localStorage.getItem('settings-mode-hint-seen') !== 'true'
+  );
+
+  const dismissModeHint = useCallback(() => {
+    localStorage.setItem('settings-mode-hint-seen', 'true');
+    setShowModeHint(false);
+  }, []);
 
   const hasUnsavedChanges = isDirty;
 
@@ -149,6 +158,7 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
   }, []);
 
   const toggleSimpleMode = useCallback(() => {
+    dismissModeHint();
     setSimpleMode(prev => {
       const next = !prev;
       localStorage.setItem('settings-simple-mode', String(next));
@@ -160,7 +170,7 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
       }
       return next;
     });
-  }, [activeSection]);
+  }, [activeSection, dismissModeHint]);
 
   const { filteredNavItems, groupedNavItems } = useMemo(() => {
     let items = searchQuery.trim()
@@ -687,6 +697,14 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
           )}
         </div>
         <div className="settings-actions">
+            {showModeHint && simpleMode && (
+              <div className="mode-hint" role="note">
+                {t('settingsNav.modeHint')}
+                <button className="mode-hint-dismiss" onClick={dismissModeHint}>
+                  {t('settingsNav.modeHintGotIt')}
+                </button>
+              </div>
+            )}
             <span className="mode-text-link" onClick={toggleSimpleMode}>
               {simpleMode ? t('settingsNav.simpleMode') : t('settingsNav.fullMode')}
             </span>
