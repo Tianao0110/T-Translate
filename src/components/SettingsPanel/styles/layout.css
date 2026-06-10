@@ -92,9 +92,52 @@
 
 /* 底部操作按钮 */
 .settings-actions {
+  position: relative; /* anchors the one-time .mode-hint bubble */
   display: flex;
   justify-content: center;
   padding: 8px 12px;
+}
+
+/* One-time catalog hint bubble above the simple/full toggle */
+.mode-hint {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: calc(100% + 6px);
+  padding: 10px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  z-index: 5;
+}
+
+.mode-hint::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -5px;
+  border: 5px solid transparent;
+  border-top-color: var(--border-color);
+}
+
+.mode-hint-dismiss {
+  display: block;
+  margin: 6px 0 0 auto;
+  padding: 2px 8px;
+  border: none;
+  background: none;
+  color: var(--accent-primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.mode-hint-dismiss:hover {
+  text-decoration: underline;
 }
 
 .action-button {

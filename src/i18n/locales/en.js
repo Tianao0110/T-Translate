@@ -11,6 +11,8 @@ const en = {
     ocr: "OCR", tts: "Text to Speech", interface: "Appearance", connection: "LM Studio", privacy: "Privacy", about: "About",
     export: "Export", import: "Import", reset: "Reset",
     simpleMode: "Simple", fullMode: "Full", switchToFull: "Full", switchToSimple: "Simple",
+    modeHint: "You're viewing the simple catalog. Click Full below for all settings (selection, glass window, OCR, privacy...)",
+    modeHintGotIt: "Got it",
     noMatch: "No matching settings found",
     unsavedChanges: "Unsaved changes", saving: "Saving...", saveChanges: "Save Changes"
   },

@@ -1,280 +1,139 @@
-// In-app updater. Polls GitHub Releases, downloads the platform-matching
-// installer with progress, and hands off to the OS installer on launch.
+// In-app updater backed by electron-updater: blockmap differential downloads,
+// SHA512 verification, resumable transfers, silent NSIS install.
+// The IPC-facing result shapes are kept identical to the previous hand-rolled
+// GitHub updater so preload/renderer stay untouched.
 
-const { app, net, shell } = require('electron');
-const fs = require('fs');
-const path = require('path');
+const { app } = require('electron');
 const logger = require('./logger')('AutoUpdater');
 
-const GITHUB_REPO = 'Tianao0110/T-Translate';
-const API_URL = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
-const REQUEST_TIMEOUT = 20000;
+const GITHUB_OWNER = 'Tianao0110';
+const GITHUB_REPO = 'T-Translate';
 
-// ===== Version compare =====
+let _updater = null;
 
-function compareVersions(a, b) {
-  const partsA = (a || '').split('.').map(Number);
-  const partsB = (b || '').split('.').map(Number);
-  for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
-    const numA = partsA[i] || 0;
-    const numB = partsB[i] || 0;
-    if (numA > numB) return 1;
-    if (numA < numB) return -1;
+function getUpdater() {
+  if (_updater) return _updater;
+
+  const { autoUpdater } = require('electron-updater');
+
+  // Test hook: lets an unpackaged probe point the updater at a local feed.
+  if (!app.isPackaged && process.env.TT_UPDATE_CONFIG) {
+    autoUpdater.forceDevUpdateConfig = true;
+    autoUpdater.updateConfigPath = process.env.TT_UPDATE_CONFIG;
   }
-  return 0;
+
+  // Download stays user-triggered from the About page, but a downloaded
+  // update still applies if the user quits without clicking install.
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.logger = logger;
+
+  _updater = autoUpdater;
+  return _updater;
 }
 
-// ===== Platform asset matching =====
-
-function getExpectedAssetPattern() {
-  const platform = process.platform;
-  const arch = process.arch;
-
-  if (platform === 'win32') {
-    // T-Translate-Setup-x.x.x.exe or T-Translate-Setup-x.x.x-x64.exe
-    return /\.exe$/i;
-  } else if (platform === 'darwin') {
-    // T-Translate-x.x.x.dmg or T-Translate-x.x.x-arm64.dmg
-    if (arch === 'arm64') return /arm64.*\.dmg$/i;
-    return /\.dmg$/i;
+// GitHub provider returns release notes as HTML; the About modal renders plain
+// text, so strip tags and decode the entities that survive.
+function normalizeReleaseNotes(notes) {
+  if (!notes) return '';
+  let text;
+  if (typeof notes === 'string') {
+    text = notes;
+  } else if (Array.isArray(notes)) {
+    text = notes.map(n => (typeof n === 'string' ? n : n?.note || '')).join('\n');
   } else {
-    return /\.AppImage$/i;
+    text = String(notes);
   }
+  return text
+    .replace(/<\/(p|div|li|h[1-6]|ul|ol|br)>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
-
-function findDownloadAsset(assets) {
-  if (!assets || assets.length === 0) return null;
-
-  const pattern = getExpectedAssetPattern();
-
-  let match = assets.find(a => pattern.test(a.name));
-
-  // Fall back to anything installer-shaped if exact platform asset is missing
-  if (!match) {
-    const fallbackPatterns = [/\.exe$/i, /\.dmg$/i, /\.AppImage$/i, /\.deb$/i];
-    for (const fp of fallbackPatterns) {
-      match = assets.find(a => fp.test(a.name));
-      if (match) break;
-    }
-  }
-
-  return match;
-}
-
-// ===== GitHub API =====
-
-function fetchJSON(url) {
-  return new Promise((resolve, reject) => {
-    const request = net.request({ method: 'GET', url });
-    request.setHeader('User-Agent', 'T-Translate-Updater');
-    request.setHeader('Accept', 'application/vnd.github.v3+json');
-
-    let data = '';
-    let statusCode = 0;
-
-    request.on('response', (resp) => {
-      statusCode = resp.statusCode;
-      resp.on('data', (chunk) => { data += chunk.toString(); });
-      resp.on('end', () => {
-        if (statusCode === 404) return resolve(null);
-        if (statusCode !== 200) return reject(new Error(`HTTP ${statusCode}`));
-        try { resolve(JSON.parse(data)); }
-        catch { reject(new Error('Invalid JSON')); }
-      });
-    });
-
-    request.on('error', reject);
-
-    const timer = setTimeout(() => {
-      request.abort();
-      reject(new Error('Request timeout'));
-    }, REQUEST_TIMEOUT);
-
-    request.on('close', () => clearTimeout(timer));
-    request.end();
-  });
-}
-
-// ===== Download (with progress + redirect handling) =====
-
-function downloadFile(url, destPath, onProgress) {
-  return new Promise((resolve, reject) => {
-    const request = net.request({ method: 'GET', url });
-    request.setHeader('User-Agent', 'T-Translate-Updater');
-
-    request.on('response', (resp) => {
-      // GitHub asset URLs 302 to S3 — follow the redirect chain manually
-      if ([301, 302, 303, 307, 308].includes(resp.statusCode)) {
-        const redirectUrl = resp.headers.location;
-        if (redirectUrl) {
-          downloadFile(
-            Array.isArray(redirectUrl) ? redirectUrl[0] : redirectUrl,
-            destPath,
-            onProgress
-          ).then(resolve).catch(reject);
-          return;
-        }
-        return reject(new Error(`Redirect without location: ${resp.statusCode}`));
-      }
-
-      if (resp.statusCode !== 200) {
-        return reject(new Error(`Download HTTP ${resp.statusCode}`));
-      }
-
-      const contentLength = parseInt(
-        (Array.isArray(resp.headers['content-length'])
-          ? resp.headers['content-length'][0]
-          : resp.headers['content-length']) || '0',
-        10
-      );
-
-      const file = fs.createWriteStream(destPath);
-      let downloaded = 0;
-      let lastProgressTime = 0;
-
-      resp.on('data', (chunk) => {
-        file.write(chunk);
-        downloaded += chunk.length;
-
-        // Throttle to ~4 events/sec so the UI doesn't thrash
-        const now = Date.now();
-        if (now - lastProgressTime > 250) {
-          lastProgressTime = now;
-          const percent = contentLength > 0
-            ? Math.round((downloaded / contentLength) * 100)
-            : -1;
-          onProgress?.({ downloaded, total: contentLength, percent });
-        }
-      });
-
-      resp.on('end', () => {
-        file.end(() => {
-          onProgress?.({ downloaded, total: contentLength, percent: 100 });
-          resolve(destPath);
-        });
-      });
-
-      resp.on('error', (e) => {
-        file.close();
-        fs.unlink(destPath, () => {});
-        reject(e);
-      });
-    });
-
-    request.on('error', (e) => {
-      fs.unlink(destPath, () => {});
-      reject(e);
-    });
-
-    request.end();
-  });
-}
-
-// ===== Public API =====
 
 async function checkForUpdate() {
   const currentVersion = app.getVersion().replace(/^v/, '');
 
-  logger.info(`Checking for updates... (current: ${currentVersion})`);
-
-  const release = await fetchJSON(API_URL);
-
-  if (!release) {
-    logger.info('No releases found');
-    return {
-      success: true,
-      hasUpdate: false,
-      currentVersion,
-      latestVersion: null,
-    };
+  // electron-updater needs the packaged app-update.yml; dev mode is a no-op
+  // (renderer shows "no releases") unless the TT_UPDATE_CONFIG hook is set.
+  if (!app.isPackaged && !process.env.TT_UPDATE_CONFIG) {
+    logger.info('Dev mode - update check skipped');
+    return { success: true, hasUpdate: false, currentVersion, latestVersion: null };
   }
 
-  const latestVersion = (release.tag_name || '').replace(/^v/, '');
-  const hasUpdate = compareVersions(latestVersion, currentVersion) > 0;
-  const asset = findDownloadAsset(release.assets);
+  logger.info(`Checking for updates... (current: ${currentVersion})`);
 
-  logger.info(`Latest: ${latestVersion}, HasUpdate: ${hasUpdate}, Asset: ${asset?.name || 'none'}`);
+  const result = await getUpdater().checkForUpdates();
+  const info = result?.updateInfo;
+
+  if (!info) {
+    logger.info('No releases found');
+    return { success: true, hasUpdate: false, currentVersion, latestVersion: null };
+  }
+
+  const hasUpdate = result.isUpdateAvailable === true;
+  const file = info.files?.[0];
+  const downloadName = file?.url || null;
+
+  logger.info(`Latest: ${info.version}, HasUpdate: ${hasUpdate}, Asset: ${downloadName || 'none'}`);
 
   return {
     success: true,
     hasUpdate,
     currentVersion,
-    latestVersion,
-    releaseUrl: release.html_url,
-    releaseName: release.name,
-    releaseNotes: release.body || '',
-    publishedAt: release.published_at,
-    downloadUrl: asset?.browser_download_url || null,
-    downloadName: asset?.name || null,
-    downloadSize: asset?.size || 0,
+    latestVersion: info.version,
+    releaseUrl: `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`,
+    releaseName: info.releaseName || `v${info.version}`,
+    releaseNotes: normalizeReleaseNotes(info.releaseNotes),
+    publishedAt: info.releaseDate || null,
+    // Renderer only needs these truthy/for display - the actual download is
+    // driven by electron-updater from the same feed.
+    downloadUrl: downloadName
+      ? `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest/download/${encodeURIComponent(downloadName)}`
+      : null,
+    downloadName,
+    downloadSize: file?.size || 0,
   };
 }
 
-async function downloadUpdate(downloadUrl, fileName, onProgress) {
-  if (!downloadUrl) throw new Error('No download URL');
+async function downloadUpdate(onProgress) {
+  const updater = getUpdater();
 
-  const downloadDir = path.join(app.getPath('temp'), 'T-Translate-Update');
+  const progressHandler = (p) => {
+    onProgress?.({
+      downloaded: p.transferred,
+      total: p.total,
+      percent: Math.round(p.percent),
+    });
+  };
+  updater.on('download-progress', progressHandler);
 
-  fs.mkdirSync(downloadDir, { recursive: true });
-
-  const destPath = path.join(downloadDir, fileName);
-
-  if (fs.existsSync(destPath)) {
-    fs.unlinkSync(destPath);
-  }
-
-  logger.info(`Downloading: ${fileName} → ${destPath}`);
-
-  await downloadFile(downloadUrl, destPath, onProgress);
-
-  logger.info(`Download complete: ${destPath}`);
-  return destPath;
-}
-
-async function installUpdate(filePath) {
-  if (!filePath || !fs.existsSync(filePath)) {
-    throw new Error('Installer file not found');
-  }
-
-  logger.info(`Installing update: ${filePath}`);
-
-  const ext = path.extname(filePath).toLowerCase();
-
-  if (process.platform === 'win32' && ext === '.exe') {
-    // Detached spawn so the installer survives our app.quit() 1500ms later.
-    const { spawn } = require('child_process');
-    try {
-      const child = spawn(filePath, [], {
-        detached: true,
-        stdio: 'ignore',
-        windowsHide: false,
-      });
-      child.on('error', (err) => logger.error('Failed to launch installer:', err));
-      child.unref();
-    } catch (err) {
-      logger.error('Failed to spawn installer:', err);
-      throw err;
-    }
-    // Give NSIS a moment to spawn before we exit and release file locks
-    setTimeout(() => app.quit(), 1500);
-  } else if (process.platform === 'darwin' && ext === '.dmg') {
-    shell.openPath(filePath);
-    setTimeout(() => app.quit(), 1500);
-  } else {
-    shell.openPath(filePath);
+  try {
+    logger.info('Downloading update (differential when blockmaps allow)...');
+    const files = await updater.downloadUpdate();
+    const filePath = Array.isArray(files) ? files[0] : files;
+    logger.info(`Download complete: ${filePath}`);
+    return filePath;
+  } finally {
+    updater.removeListener('download-progress', progressHandler);
   }
 }
 
-function formatSize(bytes) {
-  if (bytes <= 0) return '';
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+async function installUpdate() {
+  logger.info('Installing update (silent NSIS, relaunch after)');
+  // isSilent: NSIS runs with /S - no wizard, no progress-bar bounce.
+  // isForceRunAfter: relaunch the app once the update is applied.
+  getUpdater().quitAndInstall(true, true);
 }
 
 module.exports = {
   checkForUpdate,
   downloadUpdate,
   installUpdate,
-  compareVersions,
-  formatSize,
 };

@@ -157,25 +157,35 @@ async function showSelectionTrigger(mouseX, mouseY, rect, prefetchedText = null)
 
   const win = windowManager.createSelectionWindow();
 
+  // Trigger window must be square, else the icon's border-radius:50% renders
+  // an ellipse. Electron 42 on Windows clamps frameless/transparent windows to
+  // a ~30x37 minimum, so the old 28x28 came out non-square. 40 clears the clamp
+  // on every DPI tested; the renderer also pins the icon to a fixed size so a
+  // clamp on some other DPI still can't distort it.
+  const TRIGGER_SIZE = 40;
+  const GAP = 8;
+
   // Icon position with screen-edge clamping.
-  let triggerX = mouseX + 8;
-  let triggerY = mouseY + 8;
+  let triggerX = mouseX + GAP;
+  let triggerY = mouseY + GAP;
 
   const display = screen.getDisplayNearestPoint({ x: mouseX, y: mouseY });
-  const bounds = display.bounds;
+  // workArea (not bounds) so the icon never tucks under the taskbar, and shares
+  // the same reference frame as the card's renderer-side availWidth/Height clamp.
+  const bounds = display.workArea;
 
-  if (triggerX + 28 > bounds.x + bounds.width) {
-    triggerX = mouseX - 36;
+  if (triggerX + TRIGGER_SIZE > bounds.x + bounds.width) {
+    triggerX = mouseX - TRIGGER_SIZE - GAP;
   }
-  if (triggerY + 28 > bounds.y + bounds.height) {
-    triggerY = mouseY - 36;
+  if (triggerY + TRIGGER_SIZE > bounds.y + bounds.height) {
+    triggerY = mouseY - TRIGGER_SIZE - GAP;
   }
 
   win.setBounds({
     x: Math.round(triggerX),
     y: Math.round(triggerY),
-    width: 28,
-    height: 28,
+    width: TRIGGER_SIZE,
+    height: TRIGGER_SIZE,
   });
   win.show();
 
@@ -254,15 +264,15 @@ async function handleHotkeyDirectPath(x, y, rect) {
     return;
   }
 
-  // Match showSelectionTrigger geometry (mouse + 8, 28×28). Renderer resizes to
-  // translation card size once result arrives.
-  const winW = 28;
-  const winH = 28;
+  // Match showSelectionTrigger geometry (mouse + 8, 40×40 square — see the
+  // border-radius/clamp note there). Renderer resizes to card size on result.
+  const winW = 40;
+  const winH = 40;
   let posX = x + 8;
   let posY = y + 8;
 
   const display = screen.getDisplayNearestPoint({ x: posX, y: posY });
-  const displayBounds = display.bounds;
+  const displayBounds = display.workArea; // keep off the taskbar (matches trigger path)
 
   if (posX + winW > displayBounds.x + displayBounds.width) {
     posX = x - winW - 8;
