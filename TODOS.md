@@ -12,9 +12,7 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 
 ### 更新体验：差分下载 + 静默安装（依赖 builder 26，伪热更新先行）
 
-现状：[auto-updater.js](electron/utils/auto-updater.js) 手写 GitHub API 全量下载 .exe，`differentialPackage: false`。
-
-- **第一步（推荐）**：迁移 electron-updater — blockmap 差分下载（更新包降到全量 10-30%）、SHA512 校验、断点续传、`quitAndInstall(isSilent)` 静默安装。体验 ≈ 热更新，风险低
+- **第一步 ✅ 已完成（2026-06-10，feat/electron-updater 187a36e）**：electron-updater 迁移落地，净 -95 行。**发布流程从 v0.2.8 起变更**：GitHub Release 必须上传三件套 `T-Translate-Setup-x.x.x.exe`（连字符名，artifactName 已固定）+ `.exe.blockmap` + `latest.yml`，缺 latest.yml 用户端检查更新直接报错。0.2.7→0.2.8 首跳全量（旧 Release 无 blockmap），0.2.8→0.2.9 起差分。差分代价：安装包 187→207MB（+10%，分块压缩）。quitAndInstall 静默安装待首次真实版本跳变人工验证
 - **第二步（仅评估，不承诺）**：真 asar 热替换只覆盖纯 JS 改动；koffi/uiohook/node-screenshots/OCR 全在 asarUnpack，native 或 Electron 版本一变必须回全量；且热更新通道必须做包签名校验，否则是供应链攻击口
 
 ### NSIS 安装界面美化（轻量版，不自研）— 范围已锁定 2026-06-09
