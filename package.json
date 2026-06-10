@@ -161,6 +161,14 @@
       "installerIcon": "public/icon.ico",
       "uninstallerIcon": "public/icon.ico",
       "installerHeaderIcon": "public/icon.ico",
+      "installerSidebar": "installer/installerSidebar.bmp",
+      "installerHeader": "installer/installerHeader.bmp",
+      "include": "installer/installer.nsh",
+      "installerLanguages": [
+        "en_US",
+        "zh_CN"
+      ],
+      "multiLanguageInstaller": true,
       "differentialPackage": true
     },
     "linux": {
