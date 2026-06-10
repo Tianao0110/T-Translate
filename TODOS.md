@@ -15,11 +15,15 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 - **第一步 ✅ 已完成（2026-06-10，feat/electron-updater 187a36e）**：electron-updater 迁移落地，净 -95 行。**发布流程从 v0.2.8 起变更**：GitHub Release 必须上传三件套 `T-Translate-Setup-x.x.x.exe`（连字符名，artifactName 已固定）+ `.exe.blockmap` + `latest.yml`，缺 latest.yml 用户端检查更新直接报错。0.2.7→0.2.8 首跳全量（旧 Release 无 blockmap），0.2.8→0.2.9 起差分。差分代价：安装包 187→207MB（+10%，分块压缩）。quitAndInstall 静默安装待首次真实版本跳变人工验证
 - **第二步（仅评估，不承诺）**：真 asar 热替换只覆盖纯 JS 改动；koffi/uiohook/node-screenshots/OCR 全在 asarUnpack，native 或 Electron 版本一变必须回全量；且热更新通道必须做包签名校验，否则是供应链攻击口
 
-### NSIS 安装界面美化（轻量版，不自研）— 范围已锁定 2026-06-09
+### NSIS 安装界面美化（轻量版，不自研）— ✅ 已完成（2026-06-10，feat/nsis-installer-ui 485f27d）
+
+落地：双语 en_US/zh_CN 自动选语言（系统中文→中文，其余英文）、MUI 欢迎页（内置本地化文案）、品牌侧栏/header 位图（installer/ 目录，生成脚本 temp/make-installer-bmps.ps1）。语言选择框验证两语言在包内后已移除。中文向导视觉待有中文显示语言的机器人工过目（本机显示语言 en-GB 只能验英文路径）。原计划备忘如下：
 
 方案：electron-builder `installerSidebar`/`installerHeader` 位图 + 自定义 .nsh（MUI 欢迎/完成页），1-2 天拿 80% 视觉收益。**双语已拍板**：`installerLanguages: ['en_US', 'zh_CN']` + multiLanguageInstaller，en_US 排第一 = 兜底语言；NSIS 自动按系统 locale 选语言 → 系统中文显示中文、其他语言一律英文，正好是需求行为，不出语言选择对话框。.nsh 文案用 LangString 写双语。**进度条回弹已定位（2026-06-10，结论：wontfix）**：app-builder-lib NSIS 模板的安装 Section 里同一条 bar 被四段先后驱动——①静默 ExecWait 旧版卸载器（bar 停滞不动）→ ②`File` 把 ~200MB 内嵌 app-64.7z 写入 $PLUGINSDIR（NSIS 按 File 字节算进度，bar 冲高）→ ③`Nsis7z::Extract` 插件接管 bar 从 0 重爬（**回弹主因**）→ ④`CopyFiles` 临时目录→安装目录再动一段。见 installSection.nsh:52/66 与 extractAppPackage.nsh:92-138。解压宏不在 electron-builder 的 customInstall 等 hook 覆盖范围，干净修复=整个覆盖 nsis.template，违背"轻量/不自研"原则且每次 builder 升级都要重新对齐——不做。缓解事实：updater 迁移后老用户走静默更新不再见向导；首装用户只见一次②→③回弹。**不自研安装器**：杀软误报、签名、卸载/注册表正确性都是坑，收益不成比例。注意：updater 迁移上线后老用户基本不再见到安装向导（静默更新），此项投入锁死轻量版不加码。
 
-### 设置目录弱引导（一次性提示，范围已锁定 2026-06-09）
+### 设置目录弱引导（一次性提示）— ✅ 已完成（2026-06-10，feat/settings-catalog-hint 1459bab）
+
+落地 66 行：首开设置且简洁目录时切换链接上方气泡提示，「知道了」/点切换均记 localStorage 永不再现，zh/en 双语。headless 浏览器实测渲染/消失/持久化全过。原计划备忘如下：
 
 设置页已有简洁/完整双目录：[constants.js](src/components/SettingsPanel/constants.js) `NAV_ITEMS` 的 `basic` 标志（简洁=翻译源/翻译/界面/关于 4 项，完整=10 项两组），切换链接在侧栏底部 [index.jsx:690](src/components/SettingsPanel/index.jsx:690) `mode-text-link`，状态存 localStorage `settings-simple-mode`（默认简洁）。
 
