@@ -151,8 +151,13 @@ function register(ctx) {
 
     if (ocrRect && ocrRect.width > 8 && ocrRect.height > 4) {
       try {
-        const ocrLanguage = store.get('settings.ocr.recognitionLanguage', 'auto');
-        const ocrText = await getTextByOCR(ocrRect, getScreenshotModule(), ocrLanguage);
+        const ocrText = await getTextByOCR(ocrRect, getScreenshotModule(), {
+          language: store.get('settings.ocr.recognitionLanguage', 'auto'),
+          preprocess: {
+            enabled: store.get('settings.ocr.enablePreprocess', true),
+            scale: store.get('settings.ocr.scaleFactor', 2),
+          },
+        });
         if (ocrText && ocrText.trim()) {
           return { text: cleanTextBlankLines(ocrText.trim()), method: 'ocr' };
         }
@@ -262,7 +267,7 @@ async function fetchSelectedText() {
 }
 
 // OCR fallback via the local PP-OCR engine.
-async function getTextByOCR(rect, screenshotModule, language) {
+async function getTextByOCR(rect, screenshotModule, ocrOptions = {}) {
   try {
     // Reject sub-word regions: PaddleOCR produces garbage on tiny crops.
     if (rect.width < 12 || rect.height < 6) {
@@ -284,7 +289,7 @@ async function getTextByOCR(rect, screenshotModule, language) {
     }
 
     const ocrEngine = require('../utils/ocr-engine');
-    const result = await ocrEngine.recognize(screenshot, { language });
+    const result = await ocrEngine.recognize(screenshot, ocrOptions);
 
     if (result.success && result.text) {
       return result.text;

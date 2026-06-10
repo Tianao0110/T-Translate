@@ -169,35 +169,57 @@ function stripDataUrl(s) {
   return s.startsWith('data:image') ? s.split(',')[1] : s;
 }
 
-async function decodeToImageData(imageInput) {
+// Small captures (selection strips, tiny screenshot regions) carry small
+// glyphs that hurt recognition; upscaling before detection recovers them.
+// Larger images skip it — cost outweighs gain.
+const PREPROCESS_MAX_DIM = 1200;
+
+async function decodeToImageData(imageInput, preprocess = {}) {
   const { canvasKit } = ensureEnv();
   const buf = Buffer.isBuffer(imageInput)
     ? imageInput
     : Buffer.from(stripDataUrl(String(imageInput)), 'base64');
   const img = await canvasKit.loadImage(buf);
-  const canvas = canvasKit.createCanvas(img.width, img.height);
+
+  let scale = 1;
+  if (
+    preprocess.enabled &&
+    preprocess.scale > 1 &&
+    Math.max(img.width, img.height) < PREPROCESS_MAX_DIM
+  ) {
+    scale = preprocess.scale;
+  }
+
+  const w = Math.round(img.width * scale);
+  const h = Math.round(img.height * scale);
+  const canvas = canvasKit.createCanvas(w, h);
   const ctx = canvas.getContext('2d');
-  ctx.drawImage(img, 0, 0);
-  return ctx.getImageData(0, 0, img.width, img.height);
+  if (scale !== 1) {
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+  }
+  ctx.drawImage(img, 0, 0, w, h);
+  return { imageData: ctx.getImageData(0, 0, w, h), scale };
 }
 
-// esearch box: [↖,↗,↘,↙] points -> axis-aligned rect
-function boxToBBox(box) {
+// esearch box: [↖,↗,↘,↙] points -> axis-aligned rect. `scale` undoes
+// preprocessing upscale so callers always see source-image pixel coords.
+function boxToBBox(box, scale = 1) {
   if (!Array.isArray(box) || box.length < 4) return null;
-  const xs = box.map((p) => p[0] || 0);
-  const ys = box.map((p) => p[1] || 0);
+  const xs = box.map((p) => (p[0] || 0) / scale);
+  const ys = box.map((p) => (p[1] || 0) / scale);
   const x = Math.min(...xs);
   const y = Math.min(...ys);
   return { x, y, width: Math.max(...xs) - x, height: Math.max(...ys) - y };
 }
 
-function toBlocks(lines) {
+function toBlocks(lines, scale = 1) {
   return (lines || [])
     .filter((l) => l.text && l.text.trim())
     .map((l, index) => ({
       text: l.text,
       confidence: typeof l.mean === 'number' ? l.mean : 0.9,
-      bbox: boxToBBox(l.box),
+      bbox: boxToBBox(l.box, scale),
       index,
     }));
 }
@@ -208,6 +230,7 @@ function toBlocks(lines) {
  * @param {string|Buffer} imageInput - dataURL / base64 string / raw Buffer
  * @param {Object} options
  * @param {string} options.language - OCR language (settings value, e.g. 'zh-Hans', 'ko', 'auto')
+ * @param {{enabled: boolean, scale: number}} [options.preprocess] - auto-enlarge small captures
  * @returns {Promise<{success, text?, blocks?, rawBlocks?, confidence?, engine, pack?, packFallback?, error?, errorCode?}>}
  */
 async function recognize(imageInput, options = {}) {
@@ -224,12 +247,12 @@ async function recognize(imageInput, options = {}) {
 
   try {
     const session = await getSession(packId);
-    const imageData = await decodeToImageData(imageInput);
+    const { imageData, scale } = await decodeToImageData(imageInput, options.preprocess);
     const out = await session.ocr(imageData);
 
     // Per-paragraph (layout-aware merge by the lib) and per-line variants.
-    const blocks = toBlocks(out.parragraphs);
-    const rawBlocks = toBlocks(out.src);
+    const blocks = toBlocks(out.parragraphs, scale);
+    const rawBlocks = toBlocks(out.src, scale);
     const text = blocks.map((b) => b.text).join('\n').trim();
     const confidence = blocks.length
       ? blocks.reduce((s, b) => s + b.confidence, 0) / blocks.length

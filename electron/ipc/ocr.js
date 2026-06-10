@@ -166,10 +166,10 @@ function registerOCRRecognizers(ctx) {
       const tempFile = path.join(os.tmpdir(), `t-translate-ocr-${Date.now()}.png`);
       fs.writeFileSync(tempFile, Buffer.from(base64Data, 'base64'));
 
-      // 'auto' has no langMap entry -> TryCreateFromLanguage fails -> the PS
-      // script falls back to the user's Windows profile languages.
+      // 'auto' maps to '' -> the PS script skips TryCreateFromLanguage and
+      // uses the user's Windows profile languages directly.
       const language =
-        options.language || store.get('settings.ocr.recognitionLanguage', 'zh-Hans');
+        options.language || store.get('settings.ocr.recognitionLanguage', 'auto');
       const langMap = {
         'zh-Hans': 'zh-Hans-CN',
         'zh-Hant': 'zh-Hant-TW',
@@ -181,7 +181,7 @@ function registerOCRRecognizers(ctx) {
         'es': 'es-ES',
         'ru': 'ru-RU',
       };
-      const winLang = langMap[language] || language;
+      const winLang = langMap[language] || '';
 
       const psScript = getWindowsOCRScript(tempFile, winLang);
 
@@ -192,7 +192,14 @@ function registerOCRRecognizers(ctx) {
 
       try { fs.unlinkSync(tempFile); } catch (e) {}
 
-      const text = result.stdout.trim();
+      // Windows OCR inserts a space between every CJK glyph; strip spaces
+      // touching a CJK char (latin-latin gaps stay intact).
+      const CJK = '[\\u3040-\\u30ff\\u3400-\\u4dbf\\u4e00-\\u9fff\\uf900-\\ufaff\\uff00-\\uffef]';
+      const text = result.stdout
+        .trim()
+        .replace(new RegExp(`(${CJK}) +(?=${CJK})`, 'g'), '$1')
+        .replace(new RegExp(`(${CJK}) +`, 'g'), '$1')
+        .replace(new RegExp(` +(?=${CJK})`, 'g'), '');
       logger.debug('Windows OCR result length:', text.length);
 
       return {
@@ -202,8 +209,11 @@ function registerOCRRecognizers(ctx) {
         engine: 'windows-ocr',
       };
     } catch (error) {
-      logger.error('Windows OCR failed:', error);
-      return { success: false, error: error.message || t('ocr.winOcrFailed') };
+      // stderr carries the whole PS dump; keep the first meaningful line
+      const firstLine = String(error.stderr || error.message || '')
+        .split('\n').map(s => s.trim()).filter(Boolean)[0] || t('ocr.winOcrFailed');
+      logger.error('Windows OCR failed:', firstLine);
+      return { success: false, error: firstLine };
     }
   });
 
@@ -211,7 +221,11 @@ function registerOCRRecognizers(ctx) {
   ipcMain.handle(CHANNELS.OCR.PADDLE_OCR, async (event, imageData, options = {}) => {
     const language =
       options.language || store.get('settings.ocr.recognitionLanguage', 'auto');
-    const result = await ocrEngine.recognize(imageData, { ...options, language });
+    const preprocess = {
+      enabled: store.get('settings.ocr.enablePreprocess', true),
+      scale: store.get('settings.ocr.scaleFactor', 2),
+    };
+    const result = await ocrEngine.recognize(imageData, { ...options, language, preprocess });
 
     if (!result.success && result.errorCode === 'BASE_MODELS_MISSING') {
       result.error = t('ocr.baseModelsMissing');
@@ -420,25 +434,34 @@ function sendPackProgress(mainWindow, packId, progress, phase) {
 }
 
 // PowerShell driver for Windows.Media.Ocr. Uses AsyncOperation-AsTask shim
-// because PS5 lacks native await for WinRT IAsyncOperation<T>.
+// because PS5 lacks native await for WinRT IAsyncOperation<T>. Image loads
+// via StorageFile.GetFileFromPathAsync (the documented WinRT route — there is
+// no RandomAccessStream::FromStream static). Empty winLang = user profile
+// languages.
 function getWindowsOCRScript(tempFile, winLang) {
   return `
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 Add-Type -AssemblyName System.Runtime.WindowsRuntime
 $null = [Windows.Media.Ocr.OcrEngine, Windows.Foundation, ContentType = WindowsRuntime]
 $null = [Windows.Graphics.Imaging.BitmapDecoder, Windows.Foundation, ContentType = WindowsRuntime]
+$null = [Windows.Storage.StorageFile, Windows.Storage, ContentType = WindowsRuntime]
+$null = [Windows.Globalization.Language, Windows.Globalization, ContentType = WindowsRuntime]
 $asTaskGeneric = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation\`1' })[0]
 Function Await($WinRtTask, $ResultType) { $asTask = $asTaskGeneric.MakeGenericMethod($ResultType); $netTask = $asTask.Invoke($null, @($WinRtTask)); $netTask.Wait(-1) | Out-Null; $netTask.Result }
 try {
-  $file = [System.IO.File]::OpenRead("${tempFile.replace(/\\/g, '\\\\')}")
-  $stream = [Windows.Storage.Streams.RandomAccessStream]::FromStream($file)
+  $storageFile = Await ([Windows.Storage.StorageFile]::GetFileFromPathAsync("${tempFile.replace(/\\/g, '\\\\')}")) ([Windows.Storage.StorageFile])
+  $stream = Await ($storageFile.OpenAsync([Windows.Storage.FileAccessMode]::Read)) ([Windows.Storage.Streams.IRandomAccessStream])
   $decoder = Await ([Windows.Graphics.Imaging.BitmapDecoder]::CreateAsync($stream)) ([Windows.Graphics.Imaging.BitmapDecoder])
   $bitmap = Await ($decoder.GetSoftwareBitmapAsync()) ([Windows.Graphics.Imaging.SoftwareBitmap])
-  $ocrEngine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage("${winLang}")
+  $ocrEngine = $null
+  if ('${winLang}' -ne '') {
+    try { $langObj = New-Object Windows.Globalization.Language('${winLang}'); $ocrEngine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage($langObj) } catch {}
+  }
   if ($null -eq $ocrEngine) { $ocrEngine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages() }
+  if ($null -eq $ocrEngine) { Write-Error 'no usable OCR language pack'; exit 1 }
   $result = Await ($ocrEngine.RecognizeAsync($bitmap)) ([Windows.Media.Ocr.OcrResult])
-  if ($result.Text) { $result.Text } else { ($result.Lines | ForEach-Object { $_.Text }) -join [Environment]::NewLine }
-  $stream.Dispose(); $file.Dispose()
+  ($result.Lines | ForEach-Object { $_.Text }) -join [Environment]::NewLine
+  $stream.Dispose()
 } catch { Write-Error $_.Exception.Message; exit 1 }
   `.trim();
 }

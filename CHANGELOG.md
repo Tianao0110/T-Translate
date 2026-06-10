@@ -15,8 +15,16 @@
 - 识别全程内存直通，不再写临时 PNG；主进程两条 OCR 调用路径（截图 / 划词）统一收敛到单引擎模块
 - 引擎「修复」由运行时 npm 重装改为直接重新下载模型文件——不再要求用户机器装有 Node/npm
 
+### 修复（首轮人工回归反馈）
+- Windows OCR 识别路径自始即坏：脚本调用了不存在的 `RandomAccessStream::FromStream`，按 WinRT 规范路径（StorageFile）重写；「自动检测」语言跟随系统语言包；中日文输出逐字空格清理（保留英文词间空格）
+- 玻璃窗更改目标语言后，画面 / 文本未变化时不重新翻译（去重键未含目标语言）
+- 划词卡片：源文本已是目标语言时原样直出 → 自动翻转 zh↔en，与玻璃窗行为一致
+- 设置页 OCR 语言包列表窄窗下排版破裂（徽章换行压按钮）
+- 「自动放大小图片」设置自始为纯 UI 摆设 → 在主进程引擎真实现（<1200px 截图放大识别、坐标换算回原图空间）
+
 ### 内部
 - 删除运行时 npm install 引擎安装机制及全部相关 IPC / UI / 文案
+- 删除 renderer 侧 text-merger 死代码（pipeline 仅 import 未调用；段落合并已由 esearch-ocr 排版分析接管）
 - 基础模型经 scripts/fetch-ocr-models.js 拉取到 resources/ocr（gitignored），打包前执行；scripts/build-ocr-release.js 生成 ocr-models Release 资产（zips + manifest.json 含 sha256）
 - 新增 electron/utils/ocr-engine.js（会话缓存 / 语言包解析）与 ocr-pack-manager.js（下载校验安装卸载）；ocr-packs 纯函数单测 13 例
 - 依赖：+ esearch-ocr + @napi-rs/canvas + onnxruntime-node（转直接依赖）；- @gutenye/ocr-node（连带其内置 sharp）

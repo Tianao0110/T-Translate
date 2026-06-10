@@ -8,7 +8,6 @@ import useConfigStore from '../stores/config.js';
 import { calculateHash } from '../utils/image.js';
 import { detectLanguage, cleanTranslationOutput, shouldTranslateText } from '../utils/text.js';
 import { isProviderAllowed, isOcrEngineAllowed, PRIVACY_MODE_IDS } from '../config/privacy-modes.js';
-import { smartMerge } from '../utils/text-merger.js';
 import createLogger from '../utils/logger.js';
 import { getShortErrorMessage } from '../utils/error-handler.js';
 import i18n from '../i18n.js';
@@ -141,12 +140,15 @@ class TranslationPipeline {
     const config = useConfigStore.getState();
 
     try {
+      // Dedupe key includes the target language: switching languages must
+      // retranslate even when the captured frame is byte-identical.
       const hash = await calculateHash(imageData);
-      if (hash === lastImageHash) {
-        logger.debug('Image unchanged, skipping');
+      const imageKey = `${hash}::${config.targetLanguage}`;
+      if (imageKey === lastImageHash) {
+        logger.debug('Image and target language unchanged, skipping');
         return { success: true, skipped: true };
       }
-      lastImageHash = hash;
+      lastImageHash = imageKey;
 
       session.startOcr();
 
@@ -181,11 +183,12 @@ class TranslationPipeline {
         return await this.runScatteredMode(rawBlocks, captureOptions);
       }
 
-      if (text === lastText) {
-        logger.debug('Text unchanged, skipping');
+      const textKey = `${text}::${config.targetLanguage}`;
+      if (textKey === lastText) {
+        logger.debug('Text and target language unchanged, skipping');
         return { success: true, skipped: true };
       }
-      lastText = text;
+      lastText = textKey;
 
       // Skip translation entirely for content that's already in target lang or trivial
       if (!shouldTranslateText(text)) {
