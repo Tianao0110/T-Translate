@@ -85,6 +85,9 @@ const SelectionTranslator = () => {
   const [ttsStatus, setTtsStatus] = useState(TTS_STATUS.IDLE);
 
   const sizedRef = useRef(false);
+  // Bumped on every adjustWindowToContent run; a later run supersedes an
+  // in-flight one so overlapping passes can't fight over the final bounds.
+  const positionTokenRef = useRef(0);
 
   const frozenRef = useRef(false); // mirror of isFrozen for timer callbacks
   const autoHideTimerRef = useRef(null);
@@ -408,6 +411,10 @@ const SelectionTranslator = () => {
     const contentEl = contentRef.current;
     if (!contentEl) return;
 
+    // Latest-wins guard: a re-run (e.g. toggling source) supersedes any pass
+    // still waiting on its reflow timeout.
+    const myToken = ++positionTokenRef.current;
+
     const maxWidth = 400, minWidth = 160;
     const maxHeight = 350, minHeight = 65;
     const toolbarHeight = 36;
@@ -429,24 +436,31 @@ const SelectionTranslator = () => {
       width = Math.min(Math.max(charCount * 9 + 50, minWidth), maxWidth);
     }
 
-    // Set width first so the content reflows, then measure actual height below
+    width = Math.round(width);
+
+    // Anchor X (and the top Y) is computed ONCE and reused for both the measure
+    // pass and the final pass, so the card can't shift horizontally between them.
+    // Only Y is refined after height is known (flip above the cursor on overflow).
+    let anchorX, topY;
     if (hasValidMousePos) {
-      await window.electron?.selection?.setBounds?.({
-        x: Math.round(mousePos.x - width / 2),
-        y: Math.round(mousePos.y + 20),
-        width: width, height: maxHeight
-      });
+      anchorX = mousePos.x - width / 2;
+      if (anchorX < 10) anchorX = 10;
+      if (anchorX + width > sw - 10) anchorX = sw - width - 10;
+      anchorX = Math.round(anchorX);
+      topY = Math.round(mousePos.y + 20);
     } else {
-      const currentBounds = await window.electron?.selection?.startDrag?.();
-      if (currentBounds) {
-        await window.electron?.selection?.setBounds?.({
-          x: currentBounds.x, y: currentBounds.y,
-          width: width, height: maxHeight
-        });
-      }
+      const cb = await window.electron?.selection?.startDrag?.();
+      anchorX = Math.round(cb?.x ?? 100);
+      topY = Math.round(cb?.y ?? 100);
     }
 
+    // Measure pass: lock width + tall height at the final X so content reflows.
+    await window.electron?.selection?.setBounds?.({
+      x: anchorX, y: topY, width, height: maxHeight
+    });
+
     await new Promise(r => setTimeout(r, 20));
+    if (positionTokenRef.current !== myToken) return; // superseded by a newer run
 
     // Temporarily allow content to size naturally so scrollHeight reflects real layout
     const origFlex = contentEl.style.flex;
@@ -456,29 +470,17 @@ const SelectionTranslator = () => {
     const contentHeight = contentEl.scrollHeight;
     contentEl.style.flex = origFlex;
 
-    let height = Math.min(Math.max(contentHeight + toolbarHeight + 16, minHeight), maxHeight);
+    const height = Math.min(Math.max(contentHeight + toolbarHeight + 16, minHeight), maxHeight);
 
-    if (hasValidMousePos) {
-      // Keep card on-screen: shift inside left/right edges, flip above mouse if it overflows bottom
-      let x = mousePos.x - width / 2;
-      let y = mousePos.y + 20;
-      if (x < 10) x = 10;
-      if (x + width > sw - 10) x = sw - width - 10;
-      if (y + height > sh - 10) y = mousePos.y - height - 10;
-      if (y < 10) y = 10;
-      window.electron?.selection?.setBounds?.({
-        x: Math.round(x), y: Math.round(y),
-        width: Math.round(width), height: Math.round(height)
-      });
-    } else {
-      const cb = await window.electron?.selection?.startDrag?.();
-      if (cb) {
-        window.electron?.selection?.setBounds?.({
-          x: cb.x, y: cb.y,
-          width: Math.round(width), height: Math.round(height)
-        });
-      }
-    }
+    // Final pass: identical X/width, refine Y only.
+    let y = topY;
+    if (hasValidMousePos && y + height > sh - 10) y = mousePos.y - height - 10;
+    if (y < 10) y = 10;
+
+    window.electron?.selection?.setBounds?.({
+      x: anchorX, y: Math.round(y),
+      width, height: Math.round(height)
+    });
   };
 
   useEffect(() => {

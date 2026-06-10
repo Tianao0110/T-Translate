@@ -170,7 +170,9 @@ async function showSelectionTrigger(mouseX, mouseY, rect, prefetchedText = null)
   let triggerY = mouseY + GAP;
 
   const display = screen.getDisplayNearestPoint({ x: mouseX, y: mouseY });
-  const bounds = display.bounds;
+  // workArea (not bounds) so the icon never tucks under the taskbar, and shares
+  // the same reference frame as the card's renderer-side availWidth/Height clamp.
+  const bounds = display.workArea;
 
   if (triggerX + TRIGGER_SIZE > bounds.x + bounds.width) {
     triggerX = mouseX - TRIGGER_SIZE - GAP;
@@ -270,7 +272,7 @@ async function handleHotkeyDirectPath(x, y, rect) {
   let posY = y + 8;
 
   const display = screen.getDisplayNearestPoint({ x: posX, y: posY });
-  const displayBounds = display.bounds;
+  const displayBounds = display.workArea; // keep off the taskbar (matches trigger path)
 
   if (posX + winW > displayBounds.x + displayBounds.width) {
     posX = x - winW - 8;
