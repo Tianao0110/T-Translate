@@ -1,15 +1,17 @@
 {
   "name": "t-translate",
   "private": true,
-  "version": "0.2.8",
+  "version": "0.2.8-OCR",
   "description": "Professional offline translation tool with AI support",
   "main": "electron/main.js",
   "scripts": {
     "start": "concurrently --kill-others --kill-others-on-fail \"npm run react:start\" \"node scripts/wait-for-vite.js http://localhost:5173 && npm run electron:start\"",
     "react:start": "vite",
     "electron:start": "electron .",
-    "build": "vite build && electron-builder",
-    "dist": "vite build && electron-builder --publish=never",
+    "build": "node scripts/fetch-ocr-models.js && vite build && electron-builder",
+    "dist": "node scripts/fetch-ocr-models.js && vite build && electron-builder --publish=never",
+    "ocr:models": "node scripts/fetch-ocr-models.js",
+    "ocr:release": "node scripts/build-ocr-release.js",
     "lint": "eslint src/ electron/",
     "lint:fix": "eslint src/ electron/ --fix",
     "format": "prettier --write \"src/**/*.{js,jsx,css}\" \"electron/**/*.js\"",
@@ -51,11 +53,12 @@
     "vitest": "^4.0.18"
   },
   "dependencies": {
-    "@gutenye/ocr-node": "^1.4.8",
+    "@napi-rs/canvas": "^1.0.0",
     "dayjs": "^1.11.19",
     "electron-log": "^5.4.4",
     "electron-store": "^8.1.0",
     "electron-updater": "^6.8.9",
+    "esearch-ocr": "^8.5.0",
     "i18next": "^23.7.16",
     "immer": "^11.1.0",
     "jszip": "^3.10.1",
@@ -63,6 +66,7 @@
     "lucide-react": "^0.303.0",
     "mammoth": "^1.8.0",
     "node-screenshots": "^0.2.1",
+    "onnxruntime-node": "^1.26.0",
     "pdfjs-dist": "^4.0.379",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -84,7 +88,8 @@
     },
     "asar": true,
     "asarUnpack": [
-      "node_modules/@gutenye/**",
+      "node_modules/onnxruntime-node/**",
+      "node_modules/@napi-rs/**",
       "node_modules/koffi/**",
       "node_modules/uiohook-napi/**",
       "node_modules/node-screenshots/**"

@@ -1,6 +1,7 @@
 // OCR engine registry + manager with auto-fallback chain.
 
 import RapidOCREngine from './rapid.js';
+import WindowsOCREngine from './windows.js';
 import LLMVisionEngine from './llm-vision.js';
 import OCRSpaceEngine from './ocrspace.js';
 import GoogleVisionEngine from './google-vision.js';
@@ -17,6 +18,7 @@ const _t = (key, fallback) => {
 
 const engines = {
   'rapid-ocr': RapidOCREngine,
+  'windows-ocr': WindowsOCREngine,
   'llm-vision': LLMVisionEngine,
   'ocrspace': OCRSpaceEngine,
   'google-vision': GoogleVisionEngine,
@@ -28,6 +30,7 @@ const engines = {
 // quality/availability
 export const DEFAULT_OCR_PRIORITY = [
   'rapid-ocr',
+  'windows-ocr',
   'llm-vision',
   'ocrspace',
   'google-vision',
@@ -70,7 +73,9 @@ class OCREngineManager {
     this._visionFailThreshold = 2;
     this._visionLocked = false;
     this._onFallbackNotify = null;
-    this._localFallbackEngine = 'rapid-ocr';
+    // Walked in order when llm-vision degrades or local models are missing:
+    // PP-OCR first, Windows OCR as the zero-download bedrock.
+    this._localFallbackChain = ['rapid-ocr', 'windows-ocr'];
   }
 
   async init(settings = {}) {
@@ -96,6 +101,7 @@ class OCREngineManager {
   _buildConfigs(settings) {
     return {
       'rapid-ocr': {},
+      'windows-ocr': {},
       'llm-vision': {}, // reuses the active translation provider
       'ocrspace': {
         apiKey: settings.ocrspaceKey || '',
@@ -141,7 +147,7 @@ class OCREngineManager {
 
     if (preferredEngine === 'llm-vision' && this._visionLocked) {
       logger.info('LLM Vision locked due to repeated failures, using local OCR');
-      return this._recognizeWithEngine(this._localFallbackEngine, input, options);
+      return this._recognizeWithLocalChain(input, options);
     }
 
     if (preferredEngine) {
@@ -151,6 +157,19 @@ class OCREngineManager {
         if (this._isVisionUnsupportedError(result.error)) {
           return this._handleVisionFallback(input, options, result.error);
         }
+      }
+
+      // Local models missing/corrupt -> degrade to Windows OCR instead of
+      // failing the capture; the result carries fallbackFrom for a UI notice.
+      if (!result.success && preferredEngine === 'rapid-ocr' &&
+          result.errorCode === 'BASE_MODELS_MISSING') {
+        const fallback = await this._recognizeWithEngine('windows-ocr', input, options);
+        if (fallback.success) {
+          fallback.fallbackFrom = 'rapid-ocr';
+          fallback.fallbackReason = result.error;
+          return fallback;
+        }
+        return result;
       }
 
       // Success resets the fail counter so transient errors don't accumulate forever
@@ -231,9 +250,9 @@ class OCREngineManager {
       }
     }
 
-    logger.info(`LLM Vision failed (${this._visionFailCount}/${this._visionFailThreshold}), falling back to ${this._localFallbackEngine}`);
+    logger.info(`LLM Vision failed (${this._visionFailCount}/${this._visionFailThreshold}), falling back to local chain`);
 
-    const fallbackResult = await this._recognizeWithEngine(this._localFallbackEngine, input, options);
+    const fallbackResult = await this._recognizeWithLocalChain(input, options);
 
     // Caller (main-translation) reads these to surface a "we switched engines" notice
     if (fallbackResult.success) {
@@ -242,6 +261,20 @@ class OCREngineManager {
     }
 
     return fallbackResult;
+  }
+
+  // Walk rapid-ocr -> windows-ocr; first success wins. Last failure is
+  // returned so the caller still sees a meaningful error.
+  async _recognizeWithLocalChain(input, options) {
+    let lastResult = null;
+    for (const engineId of this._localFallbackChain) {
+      const instance = this.getOrCreate(engineId);
+      if (!instance || !(await instance.isAvailable())) continue;
+
+      lastResult = await this._recognizeWithEngine(engineId, input, options);
+      if (lastResult.success) return lastResult;
+    }
+    return lastResult || { success: false, error: _t('ocr.allEnginesFailed', 'All OCR engines failed') };
   }
 
   _incrementVisionFail() {

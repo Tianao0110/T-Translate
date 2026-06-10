@@ -1,6 +1,8 @@
-// OCR IPC: engine detection, install/repair, recognition handlers per engine.
+// OCR IPC: engine detection, model-pack management, recognition handlers.
+// Local recognition runs on electron/utils/ocr-engine (PP-OCRv5 via
+// esearch-ocr); downloadable language packs live in ocr-pack-manager.
 
-const { ipcMain, app } = require('electron');
+const { ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -8,41 +10,11 @@ const { exec } = require('child_process');
 const util = require('util');
 const execAsync = util.promisify(exec);
 
-const { CHANNELS, OCR_ENGINES } = require('../shared/channels');
+const { CHANNELS } = require('../shared/channels');
 const logger = require('../utils/logger')('IPC:OCR');
-const { smartMerge, mergedBlocksToText } = require('../utils/text-merger');
 const { t } = require('../shared/main-i18n');
-
-// Packaged native modules may be incompatible with the user's CPU/Windows build.
-// After repair, replacements live in userData/node_modules, so try that first.
-const userDataModules = path.join(app.getPath('userData'), 'node_modules');
-
-function resolveOcrModule() {
-  try {
-    return require.resolve('@gutenye/ocr-node', { paths: [userDataModules] });
-  } catch (e) {}
-  try {
-    return require.resolve('@gutenye/ocr-node');
-  } catch (e) {}
-  return null;
-}
-
-async function loadOcrModule() {
-  const resolved = resolveOcrModule();
-  if (!resolved) return null;
-  try {
-    // Use file:// URL so dynamic import resolves the userData copy, not the default
-    const moduleUrl = require('url').pathToFileURL(resolved).href;
-    return await import(moduleUrl);
-  } catch (e) {
-    logger.warn('loadOcrModule failed for', resolved, ':', e.message);
-    try {
-      return await import('@gutenye/ocr-node');
-    } catch (e2) {
-      return null;
-    }
-  }
-}
+const ocrEngine = require('../utils/ocr-engine');
+const packManager = require('../utils/ocr-pack-manager');
 
 function register(ctx) {
   const { getMainWindow, store } = ctx;
@@ -76,7 +48,7 @@ $langs | ForEach-Object { $_.LanguageTag }
           { encoding: 'utf8', timeout: 10000, windowsHide: true }
         );
 
-        const languages = result.stdout.trim().split('\n').filter(l => l.trim());
+        const languages = result.stdout.trim().split('\n').filter(l => l.trim()).map(l => l.trim());
         logger.debug('Windows OCR available languages:', languages);
 
         return {
@@ -94,336 +66,31 @@ $langs | ForEach-Object { $_.LanguageTag }
     }
   });
 
-  ipcMain.handle(CHANNELS.OCR.CHECK_PADDLE_OCR, async () => {
-    try {
-      const mod = await loadOcrModule();
-      if (mod) {
-        logger.debug('@gutenye/ocr-node is available');
-        return { available: true, version: 'gutenye' };
-      }
-      throw new Error('module not found');
-    } catch (e) {
-      logger.debug('@gutenye/ocr-node not available:', e.message);
-    }
-
-    try {
-      await import('multilingual-purejs-ocr');
-      logger.debug('multilingual-purejs-ocr is available');
-      return { available: true, version: 'purejs' };
-    } catch (e) {
-      logger.debug('multilingual-purejs-ocr not available:', e.message);
-    }
-
-    return { available: false };
-  });
-
   ipcMain.handle(CHANNELS.OCR.CHECK_INSTALLED, async () => {
     const status = {
       'llm-vision': true, // builtin
-      'rapid-ocr': false,
+      'rapid-ocr': ocrEngine.isPackInstalled('base-v5'),
+      'windows-ocr': process.platform === 'win32',
     };
-
-    const checkModule = (moduleName) => {
-      if (moduleName === '@gutenye/ocr-node') return !!resolveOcrModule();
-      try {
-        require.resolve(moduleName);
-        return true;
-      } catch (e) {
-        return false;
-      }
-    };
-
-    if (checkModule('@gutenye/ocr-node')) {
-      status['rapid-ocr'] = true;
-    }
-
     logger.debug('Installed status:', status);
     return status;
   });
 
-  ipcMain.handle(CHANNELS.OCR.GET_AVAILABLE_ENGINES, async () => {
-    const engines = [
-      {
-        id: OCR_ENGINES.LLM_VISION,
-        name: 'LLM Vision',
-        description: '使用本地 LLM 视觉模型识别',
-        available: true,
-        isOnline: false,
-        tier: 2,
-      },
-    ];
-
-    let rapidAvailable = false;
-    try {
-      if (resolveOcrModule()) {
-        rapidAvailable = true;
-      } else {
-        require.resolve('multilingual-purejs-ocr');
-        rapidAvailable = true;
-      }
-    } catch (e) {}
-
-    engines.push({
-      id: OCR_ENGINES.RAPID_OCR,
-      name: 'RapidOCR',
-      description: '本地 OCR，基于 PP-OCRv4，速度快',
-      available: rapidAvailable,
-      isOnline: false,
-      tier: 1,
-    });
-
-    engines.push(
-      {
-        id: OCR_ENGINES.OCRSPACE,
-        name: 'OCR.space',
-        description: '在线 OCR，免费 25000次/月',
-        available: true,
-        isOnline: true,
-        tier: 3,
-      },
-      {
-        id: OCR_ENGINES.GOOGLE_VISION,
-        name: 'Google Vision',
-        description: '识别效果最好，200+ 语言',
-        available: true,
-        isOnline: true,
-        tier: 3,
-      },
-      {
-        id: OCR_ENGINES.AZURE_OCR,
-        name: 'Azure OCR',
-        description: '免费额度高，5000次/月',
-        available: true,
-        isOnline: true,
-        tier: 3,
-      },
-      {
-        id: OCR_ENGINES.BAIDU_OCR,
-        name: '百度 OCR',
-        description: '中文识别最强，国内快',
-        available: true,
-        isOnline: true,
-        tier: 3,
-      }
-    );
-
-    return engines;
-  });
-
-  // ===== Engine install / uninstall =====
-
-  ipcMain.handle(CHANNELS.OCR.DOWNLOAD_ENGINE, async (event, engineId) => {
-    const mainWindow = getMainWindow();
-    logger.info('Downloading engine:', engineId);
-
-    try {
-      let packageName, packageDesc;
-
-      switch (engineId) {
-        case 'paddle-ocr':
-          packageName = 'multilingual-purejs-ocr';
-          packageDesc = 'PaddleOCR (multilingual-purejs-ocr)';
-          break;
-        case 'rapid-ocr':
-          packageName = '@gutenye/ocr-node';
-          packageDesc = 'RapidOCR (@gutenye/ocr-node)';
-          break;
-        default:
-          return { success: false, error: t('ocr.unknownEngine') };
-      }
-
-      const installPath = getInstallPath();
-      if (!installPath) {
-        return {
-          success: false,
-          error: t('ocr.cantFindPath') + packageName,
-        };
-      }
-
-      logger.info(`Installing ${packageName} to ${installPath}`);
-
-      sendProgress(mainWindow, engineId, 10, t('ocr.downloading', { name: packageDesc }));
-
-      try {
-        await execAsync('npm --version', { timeout: 10000 });
-      } catch (e) {
-        return {
-          success: false,
-          error: t('ocr.npmUnavailable'),
-        };
-      }
-
-      sendProgress(mainWindow, engineId, 30, t('ocr.installing'));
-
-      const { stdout, stderr } = await execAsync(
-        `npm install ${packageName} --save --legacy-peer-deps`,
-        {
-          cwd: installPath,
-          timeout: 600000,
-          env: { ...process.env, npm_config_loglevel: 'error' },
-        }
-      );
-
-      logger.debug('npm install stdout:', stdout);
-
-      // Drop cached instance so next call picks up the fresh module
-      if (engineId === 'paddle-ocr') {
-        global.pureJsOcrInstance = null;
-      } else if (engineId === 'rapid-ocr') {
-        global.gutenyeOcrInstance = null;
-      }
-
-      sendProgress(mainWindow, engineId, 100, t('ocr.installDone'));
-
-      return {
-        success: true,
-        message: t('ocr.installSuccess', { name: packageDesc }),
-        needRestart: true,
-        restartMessage: t('ocr.restartHint'),
-      };
-    } catch (error) {
-      logger.error('Download failed:', error);
-      return { success: false, error: formatError(error) };
-    }
-  });
-
-  ipcMain.handle(CHANNELS.OCR.REMOVE_ENGINE, async (event, engineId) => {
-    logger.info('Removing engine:', engineId);
-
-    try {
-      const checkModule = (moduleName) => {
-        if (moduleName === '@gutenye/ocr-node') return !!resolveOcrModule();
-        try {
-          require.resolve(moduleName);
-          return true;
-        } catch (e) {
-          return false;
-        }
-      };
-
-      const paddleInstalled = checkModule('multilingual-purejs-ocr');
-      const rapidInstalled = checkModule('@gutenye/ocr-node');
-
-      let localEngineCount = 0;
-      if (paddleInstalled) localEngineCount++;
-      if (rapidInstalled) localEngineCount++;
-
-      let packageName, isTargetInstalled;
-
-      switch (engineId) {
-        case 'paddle-ocr':
-          packageName = 'multilingual-purejs-ocr';
-          isTargetInstalled = paddleInstalled;
-          break;
-        case 'rapid-ocr':
-          packageName = '@gutenye/ocr-node';
-          isTargetInstalled = rapidInstalled;
-          break;
-        case 'llm-vision':
-          return { success: false, error: t('ocr.builtinEngine') };
-        case 'windows-ocr':
-          return { success: false, error: t('ocr.systemEngine') };
-        default:
-          return { success: false, error: t('ocr.cantRemove') };
-      }
-
-      if (!isTargetInstalled) {
-        return { success: false, error: t('ocr.notInstalled') };
-      }
-
-      // Refuse removal if it would leave zero local engines installed
-      if (localEngineCount <= 1) {
-        return {
-          success: false,
-          error: t('ocr.keepOneLocal'),
-        };
-      }
-
-      const installPath = getInstallPath();
-      if (!installPath) {
-        return { success: false, error: t('ocr.cantFindUninstallPath') };
-      }
-
-      logger.info(`Uninstalling ${packageName} from ${installPath}`);
-
-      await execAsync(`npm uninstall ${packageName}`, {
-        cwd: installPath,
-        timeout: 60000,
-      });
-
-      if (engineId === 'paddle-ocr') {
-        global.paddleOcrInstance = null;
-      } else if (engineId === 'rapid-ocr') {
-        global.rapidOcrInstance = null;
-      }
-
-      return { success: true, message: t('ocr.uninstalled', { name: packageName }) };
-    } catch (error) {
-      logger.error('Remove failed:', error);
-      return { success: false, error: error.message || t('ocr.uninstallFailed') };
-    }
-  });
-
-  // ===== Health check + repair =====
-
-  // Loads the engine and creates an instance (which loads model files) to
-  // detect "module installed but native binding broken" cases.
+  // Loads the base models into a session — catches missing/corrupt model
+  // files and broken onnxruntime bindings without running a recognition.
   ipcMain.handle(CHANNELS.OCR.HEALTH_CHECK, async (event, engineId) => {
     logger.info('Health check for engine:', engineId);
 
     if (engineId === 'rapid-ocr') {
-      let moduleAvailable = false;
-      try {
-        if (resolveOcrModule()) {
-          moduleAvailable = true;
-        } else {
-          throw new Error('not found');
-        }
-      } catch (e) {
-        return {
-          healthy: false,
-          error: 'module_missing',
-          message: t('ocr.moduleMissing'),
-          details: { resolveError: e.message },
-        };
-      }
-
-      try {
-        const ocrModule = await loadOcrModule();
-        let Ocr = ocrModule.default;
-        if (!Ocr?.create) Ocr = ocrModule.Ocr;
-        if (!Ocr?.create && typeof ocrModule.create === 'function') Ocr = ocrModule;
-
-        if (!Ocr?.create) {
-          return {
-            healthy: false,
-            error: 'module_corrupt',
-            message: t('ocr.moduleCorrupt'),
-          };
-        }
-
-        const instance = await Ocr.create();
-
-        if (!instance) {
-          return {
-            healthy: false,
-            error: 'instance_failed',
-            message: t('ocr.instanceFailed'),
-          };
-        }
-
-        global.gutenyeOcrInstance = instance;
-
+      const result = await ocrEngine.healthCheck();
+      if (result.healthy) {
         return { healthy: true, message: t('ocr.engineHealthy') };
-      } catch (e) {
-        logger.error('Health check failed:', e);
-        return {
-          healthy: false,
-          error: 'load_failed',
-          message: t('ocr.loadFailed', { detail: e.message }),
-          details: { loadError: e.message },
-        };
       }
+      const message =
+        result.error === 'BASE_MODELS_MISSING'
+          ? t('ocr.baseModelsMissing')
+          : t('ocr.loadFailed', { detail: result.detail || result.error });
+      return { healthy: false, error: result.error, message };
     }
 
     if (engineId === 'llm-vision') {
@@ -440,101 +107,37 @@ $langs | ForEach-Object { $_.LanguageTag }
     return { healthy: true, message: t('ocr.onlineNoCheck') };
   });
 
-  // Force-reinstall: nuke instance + module + require cache, then install fresh.
-  // Only supports rapid-ocr because its native binary is the main failure mode.
-  ipcMain.handle(CHANNELS.OCR.REPAIR_ENGINE, async (event, engineId) => {
-    const mainWindow = getMainWindow();
-    logger.info('Repairing engine:', engineId);
+  // ===== Model packs =====
 
-    if (engineId !== 'rapid-ocr') {
-      return { success: false, error: t('ocr.repairOnlyRapid') };
-    }
-
+  ipcMain.handle(CHANNELS.OCR.PACKS_LIST, async (event, options = {}) => {
     try {
-      const installPath = getInstallPath();
-      if (!installPath) {
-        return {
-          success: false,
-          error: t('ocr.repairCantFindPath'),
-        };
-      }
-
-      sendProgress(mainWindow, engineId, 5, t('ocr.repairChecking'));
-
-      try {
-        await execAsync('npm --version', { timeout: 10000 });
-      } catch (e) {
-        return {
-          success: false,
-          error: t('ocr.npmUnavailable'),
-        };
-      }
-
-      global.gutenyeOcrInstance = null;
-
-      sendProgress(mainWindow, engineId, 15, t('ocr.repairUninstalling'));
-
-      try {
-        await execAsync('npm uninstall @gutenye/ocr-node @gutenye/ocr-models @gutenye/ocr-common', {
-          cwd: installPath,
-          timeout: 60000,
-          env: { ...process.env, npm_config_loglevel: 'error' },
-        });
-      } catch (e) {
-        logger.warn('Uninstall step had issues (may be OK):', e.message);
-      }
-
-      // Evict any cached references so the next require picks up the new copy
-      for (const key of Object.keys(require.cache)) {
-        if (key.includes('@gutenye') || key.includes('ocr-node') || key.includes('ocr-models') || key.includes('ocr-common')) {
-          delete require.cache[key];
-        }
-      }
-
-      sendProgress(mainWindow, engineId, 40, t('ocr.repairDownloading'));
-
-      const { stdout, stderr } = await execAsync(
-        'npm install @gutenye/ocr-node --save --legacy-peer-deps',
-        {
-          cwd: installPath,
-          timeout: 600000,
-          env: { ...process.env, npm_config_loglevel: 'error' },
-        }
-      );
-
-      logger.debug('Repair install stdout:', stdout);
-
-      sendProgress(mainWindow, engineId, 80, t('ocr.repairVerifying'));
-
-      try {
-        // NODE_PATH points node at the freshly-installed module
-        const verifyResult = await execAsync(
-          'node -e "require(\'@gutenye/ocr-node\'); console.log(\'OK\')"',
-          {
-            cwd: installPath,
-            timeout: 15000,
-            env: { ...process.env, NODE_PATH: path.join(installPath, 'node_modules') },
-          }
-        );
-
-        if (!verifyResult.stdout.includes('OK')) {
-          throw new Error('Verification failed');
-        }
-      } catch (verifyError) {
-        logger.warn('In-process verify failed, but module may work after restart:', verifyError.message);
-      }
-
-      sendProgress(mainWindow, engineId, 100, t('ocr.repairDone'));
-
-      return {
-        success: true,
-        message: t('ocr.repairSuccess'),
-        needRestart: true,
-        restartMessage: t('ocr.repairRestartHint'),
-      };
+      return { success: true, ...(await packManager.listPacks(options)) };
     } catch (error) {
-      logger.error('Repair failed:', error);
-      return { success: false, error: formatError(error) };
+      logger.error('Pack list failed:', error);
+      return { success: false, error: error.message, errorCode: error.code };
+    }
+  });
+
+  ipcMain.handle(CHANNELS.OCR.PACKS_DOWNLOAD, async (event, packId) => {
+    const mainWindow = getMainWindow();
+    try {
+      const result = await packManager.downloadPack(packId, (progress, phase) => {
+        sendPackProgress(mainWindow, packId, progress, phase);
+      });
+      return result;
+    } catch (error) {
+      logger.error(`Pack download failed (${packId}):`, error);
+      sendPackProgress(mainWindow, packId, -1, 'error');
+      return { success: false, error: error.message, errorCode: error.code };
+    }
+  });
+
+  ipcMain.handle(CHANNELS.OCR.PACKS_REMOVE, async (event, packId) => {
+    try {
+      return await packManager.removePack(packId);
+    } catch (error) {
+      logger.error(`Pack remove failed (${packId}):`, error);
+      return { success: false, error: error.message, errorCode: error.code };
     }
   });
 
@@ -563,13 +166,20 @@ function registerOCRRecognizers(ctx) {
       const tempFile = path.join(os.tmpdir(), `t-translate-ocr-${Date.now()}.png`);
       fs.writeFileSync(tempFile, Buffer.from(base64Data, 'base64'));
 
-      const language = options.language || 'zh-Hans';
+      // 'auto' has no langMap entry -> TryCreateFromLanguage fails -> the PS
+      // script falls back to the user's Windows profile languages.
+      const language =
+        options.language || store.get('settings.ocr.recognitionLanguage', 'zh-Hans');
       const langMap = {
         'zh-Hans': 'zh-Hans-CN',
         'zh-Hant': 'zh-Hant-TW',
         'en': 'en-US',
         'ja': 'ja-JP',
         'ko': 'ko-KR',
+        'fr': 'fr-FR',
+        'de': 'de-DE',
+        'es': 'es-ES',
+        'ru': 'ru-RU',
       };
       const winLang = langMap[language] || language;
 
@@ -597,133 +207,16 @@ function registerOCRRecognizers(ctx) {
     }
   });
 
-  // PaddleOCR — tries purejs (pure JS), then gutenye (native, faster)
+  // Local PP-OCR — language picks the model pack (missing pack falls back to base)
   ipcMain.handle(CHANNELS.OCR.PADDLE_OCR, async (event, imageData, options = {}) => {
-    try {
-      let base64Data = imageData;
-      if (imageData.startsWith('data:image')) {
-        base64Data = imageData.split(',')[1];
-      }
+    const language =
+      options.language || store.get('settings.ocr.recognitionLanguage', 'auto');
+    const result = await ocrEngine.recognize(imageData, { ...options, language });
 
-      const imageBuffer = Buffer.from(base64Data, 'base64');
-      const tempFile = path.join(os.tmpdir(), `t-translate-paddle-${Date.now()}.png`);
-      fs.writeFileSync(tempFile, imageBuffer);
-
-      let result = null;
-      let lastError = null;
-
-      try {
-        const pureJsModule = await import('multilingual-purejs-ocr');
-        const OcrClass = pureJsModule.Ocr || pureJsModule.default?.Ocr || pureJsModule.default;
-
-        if (typeof OcrClass === 'function') {
-          if (!global.pureJsOcrInstance) {
-            global.pureJsOcrInstance = new OcrClass();
-          }
-
-          const imgBuffer = fs.readFileSync(tempFile);
-          result = await global.pureJsOcrInstance.recognize(imgBuffer);
-
-          if (result) {
-            let text = typeof result === 'string' ? result : result.text || '';
-            if (Array.isArray(result)) {
-              text = result.map(item => item.text || item[1]?.[0] || String(item)).join('\n');
-            }
-
-            if (text) {
-              try { fs.unlinkSync(tempFile); } catch (e) {}
-              return {
-                success: true,
-                text,
-                confidence: 0.9,
-                engine: 'purejs-ocr',
-              };
-            }
-          }
-        }
-      } catch (e) {
-        lastError = e;
-      }
-
-      try {
-        const ocrModule = await loadOcrModule();
-        if (!ocrModule) throw new Error('OCR module not available');
-        let Ocr = ocrModule.default;
-        if (!Ocr?.create) Ocr = ocrModule.Ocr;
-        if (!Ocr?.create && typeof ocrModule.create === 'function') Ocr = ocrModule;
-
-        if (Ocr?.create) {
-          if (!global.gutenyeOcrInstance) {
-            global.gutenyeOcrInstance = await Ocr.create();
-          }
-
-          result = await global.gutenyeOcrInstance.detect(tempFile);
-
-          if (result?.length > 0) {
-            const blocks = result.map((item, index) => {
-              // Bbox field naming varies between versions. Each box is
-              // [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]; reduce to axis-aligned rect.
-              let bbox = null;
-
-              if (item.box || item.bbox || item.position) {
-                const box = item.box || item.bbox || item.position;
-                if (Array.isArray(box) && box.length >= 4) {
-                  const xs = box.map(p => p[0] || p.x || 0);
-                  const ys = box.map(p => p[1] || p.y || 0);
-                  bbox = {
-                    x: Math.min(...xs),
-                    y: Math.min(...ys),
-                    width: Math.max(...xs) - Math.min(...xs),
-                    height: Math.max(...ys) - Math.min(...ys),
-                  };
-                }
-              }
-
-              return {
-                text: item.text,
-                confidence: item.score || 0.9,
-                bbox: bbox,
-                index,
-              };
-            });
-
-            // Stitch fragmented per-line detections back into paragraphs
-            const mergedBlocks = smartMerge(blocks, {
-              lineGapThreshold: 1.5,
-              xOverlapRatio: 0.3,
-            });
-
-            const fullText = mergedBlocksToText(mergedBlocks);
-
-            logger.debug(`OCR merge: ${blocks.length} blocks -> ${mergedBlocks.length} paragraphs`);
-
-            try { fs.unlinkSync(tempFile); } catch (e) {}
-
-            return {
-              success: true,
-              text: fullText,
-              blocks: mergedBlocks,
-              rawBlocks: blocks,
-              confidence: mergedBlocks.reduce((sum, b) => sum + b.confidence, 0) / mergedBlocks.length,
-              engine: 'gutenye-ocr',
-            };
-          }
-        }
-      } catch (e) {
-        lastError = lastError || e;
-      }
-
-      try { fs.unlinkSync(tempFile); } catch (e) {}
-
-      if (lastError) {
-        return { success: false, error: t('ocr.paddleLoadFailed', { detail: lastError.message }) };
-      }
-
-      return { success: true, text: '', blocks: [], confidence: 0, engine: 'purejs-ocr' };
-    } catch (error) {
-      logger.error('PaddleOCR failed:', error);
-      return { success: false, error: error.message };
+    if (!result.success && result.errorCode === 'BASE_MODELS_MISSING') {
+      result.error = t('ocr.baseModelsMissing');
     }
+    return result;
   });
 
   ipcMain.handle(CHANNELS.OCR.OCRSPACE, async (event, imageData, options = {}) => {
@@ -918,63 +411,12 @@ function registerOCRRecognizers(ctx) {
 
 // ===== Helpers =====
 
-// Returns the directory where npm install should run. In packaged builds we
-// install into userData (writable + persists across upgrades). In dev we walk
-// up from __dirname looking for the project package.json.
-function getInstallPath() {
-  const appPath = app.getAppPath();
-  const isPackaged = app.isPackaged;
-
-  if (isPackaged) {
-    return app.getPath('userData');
-  }
-
-  const possiblePaths = [
-    appPath,
-    path.dirname(appPath),
-    process.cwd(),
-    path.join(process.cwd(), '..'),
-    path.resolve(__dirname, '..'),
-    path.resolve(__dirname, '../..'),
-  ];
-
-  for (const checkPath of possiblePaths) {
-    try {
-      const packageJsonPath = path.join(checkPath, 'package.json');
-      if (fs.existsSync(packageJsonPath)) {
-        const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-        if (pkg.name === 't-translate' || pkg.dependencies?.electron) {
-          return checkPath;
-        }
-      }
-    } catch (e) {}
-  }
-
-  const cwd = process.cwd();
-  if (cwd !== '/' && !cwd.match(/^[A-Z]:\\$/)) {
-    return cwd;
-  }
-
-  return null;
-}
-
-function sendProgress(mainWindow, engineId, progress, status) {
+function sendPackProgress(mainWindow, packId, progress, phase) {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send(CHANNELS.OCR.DOWNLOAD_PROGRESS, {
-      engineId, progress, status,
+      packId, progress, phase,
     });
   }
-}
-
-function formatError(error) {
-  if (error.message?.includes('ENOENT')) {
-    return t('ocr.npmNotFound');
-  } else if (error.message?.includes('ETIMEDOUT') || error.message?.includes('timeout')) {
-    return t('ocr.downloadTimeout');
-  } else if (error.message?.includes('EACCES')) {
-    return t('ocr.permissionDenied');
-  }
-  return error.message?.substring(0, 200) || t('ocr.downloadFailed');
 }
 
 // PowerShell driver for Windows.Media.Ocr. Uses AsyncOperation-AsTask shim

@@ -60,6 +60,9 @@ tmp/
 # Lint 缓存
 .eslintcache
 
+# OCR 模型（scripts/fetch-ocr-models.js 按需拉取，不入库）
+resources/ocr/
+
 # 内部迁移文档（不公开）
 docs/migration/
 

@@ -275,7 +275,7 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
 
   const detectRuntimeState = async () => {
     const state = {
-      ocr: { isWindows: false, paddleInstalled: false, rapidInstalled: false },
+      ocr: { isWindows: false, rapidInstalled: false },
       selectionEnabled: false
     };
 
