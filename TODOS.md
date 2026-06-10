@@ -46,10 +46,6 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 - **PDF 阅读器矩阵重测** — Adobe 已确认不行；重测 Foxit / Edge 内置 / SumatraPDF，可用的写进 README 支持列表，全不可用则 debug 剪贴板路径（[native-helper.js](electron/utils/native-helper.js) `simulateCtrlC` + `checkSelectionViaClipboard`）
 - **验收**：应用矩阵清单（Chrome/Edge/VSCode/Word/Excel/Outlook/Acrobat/Foxit/IntelliJ/Windows Terminal/UWP 设置/记事本），逐项标注走哪一层、已知限制
 
-### 划词 UI 动效/加载现代化评估（低优先级，user 提出）
-
-现状判断：触发/加载/卡片动画全是 CSS transform/opacity（GPU 合成，已是低开销路径），窗口常驻预热（见 selection window persistent 设计意图），没有性能问题要解。可评估的增量：① 加载态从 spinner 换骨架/进度环等更现代形态；② Chromium 148 支持的 CSS `linear()` 缓动做弹簧手感（纯 CSS，零 JS 开销）；③ "换框架呈现"结论倾向否——透明 frameless 窗口 + CSS 已是 Electron 下最轻方案，引入动画库（framer-motion 等）增包增耗不成比例。注意透明窗口视觉铁律：任何效果不得超出窗口矩形（模糊阴影会被硬裁成方形，2ad56a9 的教训）。
-
 ### 翻译栈下沉主进程评估
 
 主窗口/划词/玻璃窗三个 renderer 各持一份 provider 实例 + L1 缓存 + failure count，互不共享；L2 经 localStorage 共享但写入互相覆盖。下沉主进程后：跨窗口缓存命中、密钥单点解密、隐私模式单点强制。改动大，与下条 provider 合并评估同档期权衡。
