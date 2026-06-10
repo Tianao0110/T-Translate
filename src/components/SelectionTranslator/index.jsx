@@ -484,7 +484,10 @@ const SelectionTranslator = () => {
   };
 
   useEffect(() => {
-    if (mode === 'overlay' && (translatedText || error)) {
+    // Fit the window to the card whenever we're in overlay mode — even on an
+    // empty translation. Gating on (translatedText || error) meant an empty
+    // result skipped the resize and the window stayed at the 40px trigger size.
+    if (mode === 'overlay') {
       adjustWindowToContent();
     }
   }, [mode, translatedText, error, showSource]);
