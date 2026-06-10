@@ -95,7 +95,9 @@ function register(ctx) {
   });
 
   // Push download progress to renderer via 'update:download-progress'.
-  ipcMain.handle(CHANNELS.APP.DOWNLOAD_UPDATE, async (event, { downloadUrl, downloadName }) => {
+  // Renderer still sends {downloadUrl, downloadName} - ignored, electron-updater
+  // downloads whatever the preceding check resolved from the feed.
+  ipcMain.handle(CHANNELS.APP.DOWNLOAD_UPDATE, async () => {
     if (_isDownloading) {
       return { success: false, error: t('system.alreadyDownloading', '已在下载中') };
     }
@@ -104,7 +106,7 @@ function register(ctx) {
     _downloadProgress = { downloaded: 0, total: 0, percent: 0 };
 
     try {
-      const filePath = await autoUpdater.downloadUpdate(downloadUrl, downloadName, (progress) => {
+      const filePath = await autoUpdater.downloadUpdate((progress) => {
         _downloadProgress = progress;
         const mainWindow = getMainWindow();
         if (mainWindow && !mainWindow.isDestroyed()) {
@@ -122,9 +124,9 @@ function register(ctx) {
     }
   });
 
-  ipcMain.handle(CHANNELS.APP.INSTALL_UPDATE, async (event, { filePath }) => {
+  ipcMain.handle(CHANNELS.APP.INSTALL_UPDATE, async () => {
     try {
-      await autoUpdater.installUpdate(filePath);
+      await autoUpdater.installUpdate();
       return { success: true };
     } catch (error) {
       logger.error('Install update failed:', error.message);

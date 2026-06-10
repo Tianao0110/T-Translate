@@ -55,6 +55,7 @@
     "dayjs": "^1.11.19",
     "electron-log": "^5.4.4",
     "electron-store": "^8.1.0",
+    "electron-updater": "^6.8.9",
     "i18next": "^23.7.16",
     "immer": "^11.1.0",
     "jszip": "^3.10.1",
@@ -73,6 +74,11 @@
   "build": {
     "appId": "com.ttranslate.core",
     "productName": "T-Translate",
+    "publish": {
+      "provider": "github",
+      "owner": "Tianao0110",
+      "repo": "T-Translate"
+    },
     "directories": {
       "output": "release"
     },
@@ -149,12 +155,13 @@
       ]
     },
     "nsis": {
+      "artifactName": "${productName}-Setup-${version}.${ext}",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "installerIcon": "public/icon.ico",
       "uninstallerIcon": "public/icon.ico",
       "installerHeaderIcon": "public/icon.ico",
-      "differentialPackage": false
+      "differentialPackage": true
     },
     "linux": {
       "icon": "public/icon.png",
