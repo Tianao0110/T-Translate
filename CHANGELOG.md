@@ -2,6 +2,25 @@
 
 本文档记录 T-Translate 各版本变更。早于 v0.2.4 的历史请查 git log 与版本 tag。
 
+## v0.2.8-OCR — 2026-06-10（开发中）
+
+### 新增
+- 本地 OCR 升级 PP-OCRv5：单模型覆盖简中/繁中/英/日，手写、竖排识别显著增强；引擎库由停更的 @gutenye/ocr-node 切换到 esearch-ocr（Apache-2.0，活跃维护）
+- OCR 语言包按需下载：韩文 / 拉丁（法德西）/ 西里尔（俄文）/ 天城文（印地文）/ 阿拉伯字母 5 个语言包（各 ~8MB），设置页一键下载 / 更新 / 卸载，卸载即删整个包目录不留残留；清单与模型托管在 GitHub Release（tag `ocr-models`），日后更新模型只改 Release 资产、无需发新版
+- Windows OCR 复活为正式引擎：系统自带零下载，作为本地兜底；本地模型缺失时自动降级并提示
+- OCR 识别语言新增印地文、阿拉伯文
+
+### 优化
+- 本地 OCR 段落合并改用 esearch-ocr 排版分析（分栏 / 阅读方向感知），替代自研行合并
+- 识别全程内存直通，不再写临时 PNG；主进程两条 OCR 调用路径（截图 / 划词）统一收敛到单引擎模块
+- 引擎「修复」由运行时 npm 重装改为直接重新下载模型文件——不再要求用户机器装有 Node/npm
+
+### 内部
+- 删除运行时 npm install 引擎安装机制及全部相关 IPC / UI / 文案
+- 基础模型经 scripts/fetch-ocr-models.js 拉取到 resources/ocr（gitignored），打包前执行；scripts/build-ocr-release.js 生成 ocr-models Release 资产（zips + manifest.json 含 sha256）
+- 新增 electron/utils/ocr-engine.js（会话缓存 / 语言包解析）与 ocr-pack-manager.js（下载校验安装卸载）；ocr-packs 纯函数单测 13 例
+- 依赖：+ esearch-ocr + @napi-rs/canvas + onnxruntime-node（转直接依赖）；- @gutenye/ocr-node（连带其内置 sharp）
+
 ## v0.2.7 — 2026-06-09
 
 ### 新增

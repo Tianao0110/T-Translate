@@ -103,8 +103,9 @@
 git clone https://github.com/Tianao0110/T-Translate.git
 cd T-Translate
 npm install
-npm start        # 开发模式
-npm run dist     # 打包安装程序
+npm run ocr:models   # 拉取本地 OCR 基础模型（一次性，~19MB）
+npm start            # 开发模式
+npm run dist         # 打包安装程序（自动含上一步）
 ```
 
 ---
@@ -171,7 +172,7 @@ t-translate/
 | 状态管理 | Zustand + Immer                                                         |
 | 样式     | CSS Variables                                                           |
 | 安全存储 | Electron safeStorage (Windows DPAPI) + 访问审计                         |
-| OCR      | RapidOCR / Windows OCR / LLM Vision / Google Vision / Azure / 百度      |
+| OCR      | PP-OCRv5 本地（语言包可下载）/ Windows OCR / LLM Vision / Google Vision / Azure / 百度 |
 | 本地 LLM | LM Studio / Ollama（OpenAI 兼容 API）                                   |
 | 在线翻译 | OpenAI / Claude / Gemini / DeepSeek / DeepL / Google / Microsoft / 百度 |
 | 打包     | electron-builder                                                        |

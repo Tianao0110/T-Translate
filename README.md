@@ -103,8 +103,9 @@ Download an installer from [Releases](https://github.com/Tianao0110/T-Translate/
 git clone https://github.com/Tianao0110/T-Translate.git
 cd T-Translate
 npm install
-npm start        # dev mode
-npm run dist     # build installer
+npm run ocr:models   # fetch local OCR base models (one-time, ~19MB)
+npm start            # dev mode
+npm run dist         # build installer (runs the fetch automatically)
 ```
 
 ---
@@ -171,7 +172,7 @@ t-translate/
 | State | Zustand + Immer |
 | Styling | CSS Variables |
 | Secure storage | Electron safeStorage (Windows DPAPI) + access audit |
-| OCR | RapidOCR / Windows OCR / LLM Vision / Google Vision / Azure / Baidu |
+| OCR | PP-OCRv5 local (downloadable language packs) / Windows OCR / LLM Vision / Google Vision / Azure / Baidu |
 | Local LLM | LM Studio / Ollama (OpenAI-compatible API) |
 | Online translation | OpenAI / Claude / Gemini / DeepSeek / DeepL / Google / Microsoft / Baidu |
 | Packaging | electron-builder |

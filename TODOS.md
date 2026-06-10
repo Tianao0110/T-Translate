@@ -33,6 +33,21 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 
 [translation.js](src/services/translation.js) `translateBatch` 逐条 await；DocumentTranslator 的 batch 只是 UI 分组。在线 API（OpenAI/DeepSeek/DeepL）可并发 3-5 路，本地 LLM 保持串行（GPU 排队无益）。presets 已有 `requiresNetwork` 字段，正好做并发度开关依据。
 
+## v0.2.8-OCR scope
+
+主题：本地 OCR 升级（PP-OCRv5 + 语言包下载 + Windows OCR 兜底），分支 `v0.2.8-OCR`。维护手册见 [docs/OCR_MODELS.md](docs/OCR_MODELS.md)。
+
+### 已完成（2026-06-10）
+
+引擎 @gutenye(停更,v4,中英) → esearch-ocr(Apache-2.0,v5)：单模型简/繁/英/日+手写竖排，probe 实测 ja 0.999 conf。语言包（韩/拉丁/西里尔/天城/阿拉伯，各 ~8MB）经 GitHub Release `ocr-models` 的 manifest.json 分发，设置页下载/更新/卸载（删净目录）+ sha256 校验 + 失败零残留，probe 8 场景全过。windows-ocr 渲染端引擎类补齐（后端原已存在），优先级链 rapid→windows→llm-vision，BASE_MODELS_MISSING 自动降级。运行时 npm install 机制全删（终端用户无 npm 不再是问题）。模型 gitignored，scripts/fetch-ocr-models.js 拉取（build/dist 自动跑）。
+
+### 发布前人工步骤
+
+- [ ] `ocr-models` Release 首发：`npm run ocr:release` 产物已在 release-ocr-models/，按 OCR_MODELS.md 上传 7 个文件（**记得勾 pre-release**）。上传前应用内语言包列表会显示「无法获取清单」属预期
+- [ ] 人工回归：设置页语言包下载/更新徽章/卸载、截图翻译（中英日 + 装包后韩语）、划词 OCR 兜底、玻璃窗、Windows OCR 切换、隐私模式引擎过滤
+- [ ] 发版时版本号 `0.2.8-OCR` 改为 `0.2.9`：semver 规则 `0.2.8-OCR < 0.2.8`，electron-updater 不会向 0.2.8 用户推送 prerelease 版本号
+- [ ] 语言包 rec 模型目前 v4 代际；上游出 v5 多语言 ONNX 后按 OCR_MODELS.md「更新模型」流程换入（bump version 即可，无需发版）
+
 ## v0.3 candidates
 
 ### 划词检测完整性计划（v0.3 主题）

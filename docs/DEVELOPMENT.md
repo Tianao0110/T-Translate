@@ -20,7 +20,8 @@ src/
 ├── providers/ocr/            # OCR 引擎
 │   ├── base.js               # OCR 引擎基类
 │   ├── index.js              # OCR 引擎注册表
-│   ├── rapid.js              # RapidOCR 引擎
+│   ├── rapid.js              # 本地 OCR 引擎（PP-OCRv5，主进程 esearch-ocr，见 docs/OCR_MODELS.md）
+│   ├── windows.js            # Windows OCR 系统引擎（兜底）
 │   ├── llm-vision.js         # LLM Vision 引擎
 │   └── ...
 ├── services/                 # 服务层
@@ -517,6 +518,7 @@ import MyOCREngine from './my-ocr.js';
 // 2. 添加到 engines
 const engines = {
   'rapid-ocr': RapidOCREngine,
+  'windows-ocr': WindowsOCREngine,
   'llm-vision': LLMVisionEngine,
   // ... 其他
   'my-ocr': MyOCREngine,  // 添加这行
@@ -525,6 +527,7 @@ const engines = {
 // 3. 添加到默认优先级（可选）
 export const DEFAULT_OCR_PRIORITY = [
   'rapid-ocr',
+  'windows-ocr',
   'llm-vision',
   'my-ocr',  // 添加这行
   // ...
