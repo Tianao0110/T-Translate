@@ -32,10 +32,13 @@ html, body, #root {
    触发圆点 - 保留原样式
    ========================================== */
 .sel-trigger {
-  width: 100%;
-  height: 100%;
-  display: flex; 
-  align-items: center; 
+  /* Fixed size + flex-centered in .sel-root: stays a perfect circle even if the
+     OS clamps the host window to a non-square minimum (see showSelectionTrigger). */
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
   justify-content: center;
   cursor: default;
   background: linear-gradient(135deg, #60a5fa, #3b82f6);
@@ -71,8 +74,10 @@ html, body, #root {
    加载状态 - 保留圆形
    ========================================== */
 .sel-loading {
-  width: 100%;
-  height: 100%;
+  /* Fixed size for the same reason as .sel-trigger — keep the spinner disc round. */
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
   background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(8px);
   display: flex; 
