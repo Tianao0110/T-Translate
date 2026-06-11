@@ -9,7 +9,7 @@ initGlobalErrorHandler();
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <ErrorBoundary windowName={i18n.t('glass.title', 'Glass Window')}>
+    <ErrorBoundary windowName={i18n.t('glass.title', 'Floating Window')}>
       <GlassTranslator />
     </ErrorBoundary>
   </React.StrictMode>

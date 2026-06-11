@@ -99,7 +99,7 @@ const zh = {
   providerSettings: { ... },        // 翻译源设置
   translationSettings: { ... },     // 翻译设置
   selectionSettings: { ... },       // 划词翻译
-  glassWindowSettings: { ... },     // 玻璃窗口
+  glassWindowSettings: { ... },     // 悬浮窗口
   documentSettings: { ... },        // 文档翻译
   connectionSettings: { ... },      // LM Studio 连接
   
@@ -541,7 +541,7 @@ console.log('Missing in ZH:', missingInZh);
 | `providerSettings` | 15+ | 翻译源设置 |
 | `translationSettings` | 30+ | 翻译设置 |
 | `selectionSettings` | 25+ | 划词翻译 |
-| `glassWindowSettings` | 25+ | 玻璃窗口 |
+| `glassWindowSettings` | 25+ | 悬浮窗口 |
 | `documentSettings` | 20+ | 文档翻译 |
 | `connectionSettings` | 10+ | LM Studio 连接 |
 | `translation` | 40+ | 翻译面板 |

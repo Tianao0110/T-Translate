@@ -43,7 +43,7 @@ const messages = {
     'system.cannotConnect': '无法连接服务',
     
     // glass
-    'glass.windowNotFound': '玻璃窗口不存在',
+    'glass.windowNotFound': '悬浮窗口不存在',
     
     // screenshot
     'screenshot.failed': '截图失败',
@@ -114,7 +114,7 @@ const messages = {
     'system.cannotConnect': 'Cannot connect to service',
     
     // glass
-    'glass.windowNotFound': 'Glass window not found',
+    'glass.windowNotFound': 'Floating window not found',
     
     // screenshot
     'screenshot.failed': 'Screenshot failed',

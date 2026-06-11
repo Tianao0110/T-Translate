@@ -58,7 +58,7 @@
   transition: all 0.2s ease;
 }
 
-/* 鼠标移入玻璃窗口时显示顶部区域 */
+/* 鼠标移入悬浮窗口时显示顶部区域 */
 .glass-window.show-toolbar .glass-top-area {
   opacity: 1;
   max-height: 24px;
@@ -163,7 +163,7 @@
   z-index: 1001;
 }
 
-/* 鼠标移入玻璃窗口时显示关闭按钮 */
+/* 鼠标移入悬浮窗口时显示关闭按钮 */
 .glass-window.show-toolbar .glass-close-btn {
   opacity: 1;
 }

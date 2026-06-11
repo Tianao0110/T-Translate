@@ -39,7 +39,7 @@ export const SHORTCUT_LABELS = {
   copy: '复制结果',
   screenshot: '📷 截图翻译',
   toggleWindow: '🪟 显示/隐藏窗口',
-  glassWindow: '🔮 玻璃窗口',
+  glassWindow: '🔮 悬浮窗口',
   selectionTranslate: '✏️ 划词翻译开关',
 };
 

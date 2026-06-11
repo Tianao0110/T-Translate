@@ -4,14 +4,14 @@
 const trayLabels = {
   zh: {
     screenshot: '截图翻译',
-    glassWindow: '悬浮翻译',
+    glassWindow: '悬浮窗口',
     selectionTranslate: '划词翻译',
     settings: '设置',
     quit: '退出'
   },
   en: {
     screenshot: 'Screenshot Translate',
-    glassWindow: 'Floating Translate',
+    glassWindow: 'Floating Window',
     selectionTranslate: 'Selection Translate',
     settings: 'Settings',
     quit: 'Quit'
