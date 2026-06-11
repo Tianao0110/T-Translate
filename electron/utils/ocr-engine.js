@@ -52,7 +52,13 @@ function resolvePackDir(packId) {
 }
 
 function readPackMeta(dir) {
-  return JSON.parse(fs.readFileSync(path.join(dir, 'pack.json'), 'utf8'));
+  const meta = JSON.parse(fs.readFileSync(path.join(dir, 'pack.json'), 'utf8'));
+  // Model files always live flat inside the pack dir; basename() keeps a
+  // hand-edited or malformed pack.json from referencing paths outside it.
+  for (const key of Object.keys(meta.files || {})) {
+    meta.files[key] = path.basename(meta.files[key]);
+  }
+  return meta;
 }
 
 function isPackInstalled(packId) {

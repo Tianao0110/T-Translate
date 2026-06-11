@@ -94,7 +94,12 @@ async function recognize(imageData, options = {}) {
       base64Data = imageData.split(',')[1];
     }
 
-    tempFile = path.join(os.tmpdir(), `t-translate-winocr-${Date.now()}.png`);
+    // random suffix: concurrent recognitions in the same millisecond must not
+    // share a temp file
+    tempFile = path.join(
+      os.tmpdir(),
+      `t-translate-winocr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.png`
+    );
     fs.writeFileSync(tempFile, Buffer.from(base64Data, 'base64'));
 
     const winLang = WIN_LANG_MAP[options.language] || '';
