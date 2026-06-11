@@ -3,7 +3,6 @@
 
 /* ========== 基础变量 ========== */
 :root {
-  --glass-bg: rgba(255, 255, 255, var(--glass-opacity, 0.85));
   --glass-border: rgba(200, 200, 200, 0.3);
   --glass-text: #333;
   --glass-text-muted: #666;
@@ -18,9 +17,12 @@
   left: 0;
   width: 100%;
   height: 100%;
+  /* var() resolves where a custom property is DECLARED — --glass-bg must live
+     here (not :root) to see the inline --glass-opacity set on this element */
+  --glass-bg: rgba(255, 255, 255, var(--glass-opacity, 0.85));
   background: var(--glass-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  /* no backdrop-filter here: a transparent BrowserWindow has nothing behind
+     it to sample — the blur was a no-op costing compositor work */
   /* 清晰边界：即使透明度拉到最低也能看到窗口范围 */
   border: 2px solid rgba(100, 100, 100, 0.4);
   border-radius: var(--glass-radius);
@@ -31,11 +33,6 @@
   color: var(--glass-text);
   user-select: text;
   -webkit-app-region: drag;
-}
-
-/* 散点模式下允许子玻璃板溢出 */
-.glass-window.scattered-mode {
-  overflow: visible;
 }
 
 /* 字幕模式 - 完全透明 + 虚线边框 */
@@ -506,11 +503,11 @@
   overflow: visible;
 }
 
-/* 散点模式下，移除内容区 padding，让子玻璃板直接对齐截图区域 */
-/* 同时允许溢出，才能拖动子玻璃板到外面 */
+/* 散点模式：移除内容区 padding，子窗格坐标 1:1 对齐截图区域。
+   溢出保持裁剪——web 内容不可能渲染到窗口外，拖出窗口请用双击分离 */
 .glass-content.scattered-mode {
   padding: 0;
-  overflow: visible;
+  overflow: hidden;
 }
 
 /* 冻结子玻璃板容器 */
@@ -890,7 +887,6 @@
 /* 不再设置整个窗口透明度，而是分别控制各部分 */
 .glass-window.pass-through {
   background: rgba(255, 255, 255, 0.15) !important;  /* 背景更透明 */
-  backdrop-filter: blur(5px) !important;
 }
 
 .glass-window.pass-through .glass-top-area {

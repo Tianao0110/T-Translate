@@ -21,48 +21,21 @@ contextBridge.exposeInMainWorld('electron', {
 
     captureRegion: (bounds) => ipcRenderer.invoke('glass:capture-region', bounds),
 
-    translate: (text) => ipcRenderer.invoke('glass:translate', text),
-
     setPassThrough: (enabled) => ipcRenderer.invoke('glass:set-pass-through', enabled),
-
-    // Mouse-event ignore toggle — used to switch between draggable and click-through modes.
-    setIgnoreMouse: (ignore) => ipcRenderer.invoke('glass:set-ignore-mouse', ignore),
-
-    setAlwaysOnTop: (enabled) => ipcRenderer.invoke('glass:set-always-on-top', enabled),
 
     close: () => ipcRenderer.invoke('glass:close'),
 
-    // Returns merged settings (main app + window-local).
+    // Merged settings (main app + window-local)
     getSettings: () => ipcRenderer.invoke('glass:get-settings'),
 
     getProviderConfigs: () => ipcRenderer.invoke('glass:get-provider-configs'),
 
-    saveSettings: (settings) => ipcRenderer.invoke('glass:save-settings', settings),
-
+    // Persists window-locally (survives relaunch and settings broadcasts)
     setOpacity: (opacity) => ipcRenderer.invoke('glass:set-opacity', opacity),
-
-    addToFavorites: (item) => ipcRenderer.invoke('glass:add-to-favorites', item),
-
-    addToHistory: (item) => ipcRenderer.invoke('glass:add-to-history', item),
 
     getHistory: (limit) => ipcRenderer.invoke('glass:get-history', limit),
 
-    syncTargetLanguage: (langCode) => ipcRenderer.invoke('glass:sync-target-language', langCode),
-
     openMainSettings: (section) => ipcRenderer.invoke('glass:open-main-settings', section),
-
-    // Hide before a screenshot is taken (so the glass window doesn't appear in the capture).
-    onHideForCapture: (callback) => {
-      const handler = (event, settings) => callback(settings);
-      ipcRenderer.on('glass:hide-for-capture', handler);
-      return () => ipcRenderer.removeListener('glass:hide-for-capture', handler);
-    },
-
-    onShowAfterCapture: (callback) => {
-      const handler = (event, settings) => callback(settings);
-      ipcRenderer.on('glass:show-after-capture', handler);
-      return () => ipcRenderer.removeListener('glass:show-after-capture', handler);
-    },
 
     onSettingsChanged: (callback) => {
       const handler = (event, settings) => callback(settings);
@@ -70,12 +43,10 @@ contextBridge.exposeInMainWorld('electron', {
       return () => ipcRenderer.removeListener('glass:settings-changed', handler);
     },
 
-    // ===== Child glass panes (standalone windows spawned from main glass) =====
+    // ===== Detached child panes (standalone windows) =====
 
     createChildWindow: (options) => ipcRenderer.invoke('glass:create-child-window', options),
     closeChildWindow: (id) => ipcRenderer.invoke('glass:close-child-window', id),
-    updateChildWindow: (id, data) => ipcRenderer.invoke('glass:update-child-window', id, data),
-    moveChildWindow: (id, x, y) => ipcRenderer.invoke('glass:move-child-window', id, x, y),
     closeAllChildWindows: () => ipcRenderer.invoke('glass:close-all-child-windows'),
 
     onChildWindowClosed: (callback) => {

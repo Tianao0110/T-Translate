@@ -293,8 +293,8 @@ const GlassTranslator = () => {
           setLockTargetLang(settings.lockTargetLang);
         }
 
-        if (settings.ocrEngine || settings.globalOcrEngine) {
-          setOcrEngine(settings.ocrEngine || settings.globalOcrEngine);
+        if (settings.ocrEngine) {
+          setOcrEngine(settings.ocrEngine);
         }
       }
     } catch (error) {
@@ -331,11 +331,17 @@ const GlassTranslator = () => {
     setShowOpacitySlider(prev => !prev);
   };
 
-  // Opacity is applied via CSS variable (--glass-opacity) so child panes stay opaque.
-  // BrowserWindow.setOpacity would dim children too.
+  // Opacity is applied via CSS variable (--glass-opacity) so child panes stay
+  // opaque; the IPC call persists it window-locally so it survives relaunch
+  // and settings-changed broadcasts.
   const handleOpacityChange = async (e) => {
     const newOpacity = parseFloat(e.target.value);
     setGlassOpacity(newOpacity);
+    try {
+      await window.electron?.glass?.setOpacity?.(newOpacity);
+    } catch (err) {
+      logger.debug('Failed to persist opacity:', err.message);
+    }
   };
 
   const scrollToBottom = () => {

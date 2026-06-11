@@ -23,7 +23,6 @@ const validChannels = {
     "add-to-favorites",
     "add-to-history",
     "sync-target-language",
-    "glass:translate-request",
     "screenshot-captured",
     "screenshot-captured-silent",
     "selection-state-changed",

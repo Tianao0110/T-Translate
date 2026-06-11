@@ -417,28 +417,34 @@ module.exports = {
 
       const scaleFactor = targetDisplay.scaleFactor;
 
-      let targetMonitor = processedMonitors[0];
-
-      const physicalCenterX = centerX * scaleFactor;
-      const physicalCenterY = centerY * scaleFactor;
-
-      for (const monitor of processedMonitors) {
-        if (physicalCenterX >= monitor.x && physicalCenterX < monitor.x + monitor.width &&
-            physicalCenterY >= monitor.y && physicalCenterY < monitor.y + monitor.height) {
-          targetMonitor = monitor;
-          break;
-        }
+      // Match the node-screenshots monitor to targetDisplay by PHYSICAL origin
+      // (display.nativeOrigin). `logicalCenter × scaleFactor` is NOT a global
+      // physical coordinate in mixed-DPI setups — each display's physical
+      // origin is laid out independently — and could pick the wrong monitor.
+      let targetMonitor = null;
+      const nativeOrigin = targetDisplay.nativeOrigin;
+      if (nativeOrigin) {
+        targetMonitor = processedMonitors.find(m =>
+          Math.abs(m.x - nativeOrigin.x) <= 1 && Math.abs(m.y - nativeOrigin.y) <= 1
+        ) || null;
       }
 
-      // Logical-coordinate fallback (see cropFromNodeScreenshots)
-      if (targetMonitor === processedMonitors[0]) {
-        for (const monitor of processedMonitors) {
-          if (centerX >= monitor.x && centerX < monitor.x + monitor.width &&
-              centerY >= monitor.y && centerY < monitor.y + monitor.height) {
-            targetMonitor = monitor;
-            break;
-          }
-        }
+      // Fallback 1: physical-center heuristic (correct on uniform-DPI setups)
+      if (!targetMonitor) {
+        const physicalCenterX = centerX * scaleFactor;
+        const physicalCenterY = centerY * scaleFactor;
+        targetMonitor = processedMonitors.find(m =>
+          physicalCenterX >= m.x && physicalCenterX < m.x + m.width &&
+          physicalCenterY >= m.y && physicalCenterY < m.y + m.height
+        ) || null;
+      }
+
+      // Fallback 2: logical-coordinate match (some Linux setups)
+      if (!targetMonitor) {
+        targetMonitor = processedMonitors.find(m =>
+          centerX >= m.x && centerX < m.x + m.width &&
+          centerY >= m.y && centerY < m.y + m.height
+        ) || processedMonitors[0];
       }
 
       console.log('[Screenshot] Target monitor:', targetMonitor.id,

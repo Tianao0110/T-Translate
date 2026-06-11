@@ -95,16 +95,11 @@ export const DEFAULT_SETTINGS = {
     showProgress: true,
   },
 
-  // Floating window (glass). Single source of truth for its defaults —
+  // Floating window. Single source of truth for its defaults —
   // electron/ipc/glass.js GET_SETTINGS fallbacks must stay in sync.
   glassWindow: {
     defaultOpacity: 0.85,
-    rememberPosition: false,
-    autoPin: true,
     lockTargetLang: false,
-    smartDetect: true,
-    refreshInterval: 3000,
-    streamOutput: true,
   },
 
   selection: {

@@ -134,7 +134,10 @@ class TranslationPipeline {
         throw new Error(captureResult?.error || _t('screenshot.failed', '截图失败'));
       }
 
-      return await this.runFromImage(captureResult.imageData, captureOptions);
+      return await this.runFromImage(captureResult.imageData, {
+        ...captureOptions,
+        scaleFactor: captureResult.scaleFactor,
+      });
 
     } catch (error) {
       logger.error('Capture error:', error);
@@ -225,8 +228,10 @@ class TranslationPipeline {
     const config = useConfigStore.getState();
 
     try {
-      // OCR returns physical pixels; CSS needs logical pixels (divide by DPR)
-      const scaleFactor = window.devicePixelRatio || 1;
+      // OCR returns physical pixels of the captured display; CSS needs logical
+      // px. Prefer the capture-time scaleFactor — our own devicePixelRatio can
+      // belong to a different monitor in mixed-DPI setups.
+      const scaleFactor = captureOptions.scaleFactor || window.devicePixelRatio || 1;
       logger.debug(`ScaleFactor for coordinate conversion: ${scaleFactor}`);
 
       const validBlocks = blocks

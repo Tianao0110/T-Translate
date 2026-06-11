@@ -88,15 +88,6 @@ function register(ctx) {
     return null;
   });
 
-  ipcMain.handle(CHANNELS.GLASS.SET_ALWAYS_ON_TOP, (event, enabled) => {
-    const glassWindow = getGlassWindow();
-    if (glassWindow) {
-      glassWindow.setAlwaysOnTop(enabled);
-      return true;
-    }
-    return false;
-  });
-
   // Opacity is applied via CSS variable in the renderer (so child panes aren't
   // affected). We only persist the value for next launch.
   ipcMain.handle(CHANNELS.GLASS.SET_OPACITY, (event, opacity) => {
@@ -112,19 +103,6 @@ function register(ctx) {
     if (glassWindow && !glassWindow.isDestroyed()) {
       logger.debug('Setting pass-through mode:', enabled);
       if (enabled) {
-        glassWindow.setIgnoreMouseEvents(true, { forward: true });
-      } else {
-        glassWindow.setIgnoreMouseEvents(false);
-      }
-      return true;
-    }
-    return false;
-  });
-
-  ipcMain.handle(CHANNELS.GLASS.SET_IGNORE_MOUSE, (event, ignore) => {
-    const glassWindow = getGlassWindow();
-    if (glassWindow && !glassWindow.isDestroyed()) {
-      if (ignore) {
         glassWindow.setIgnoreMouseEvents(true, { forward: true });
       } else {
         glassWindow.setIgnoreMouseEvents(false);
@@ -177,30 +155,17 @@ function register(ctx) {
     // Fallbacks mirror DEFAULT_SETTINGS.glassWindow in
     // src/components/SettingsPanel/constants.js — keep both in sync.
     const merged = {
-      refreshInterval: glassConfig.refreshInterval ?? 3000,
-      smartDetect: glassConfig.smartDetect ?? true,
-      streamOutput: glassConfig.streamOutput ?? true,
-      ocrEngine: ocrConfig.engine ?? glassConfig.ocrEngine ?? 'llm-vision',
-      globalOcrEngine: ocrConfig.engine ?? 'llm-vision',
-      defaultOpacity: glassConfig.defaultOpacity ?? 0.85,
-      autoPin: glassConfig.autoPin ?? true,
+      ocrEngine: ocrConfig.engine ?? 'llm-vision',
       lockTargetLang: glassConfig.lockTargetLang ?? false,
       targetLanguage: currentTargetLang,
       sourceLanguage: currentSourceLang,
       theme: mainSettings.interface?.theme ?? 'light',
+      // window-local slider value wins over the settings-page default
       opacity: localSettings.opacity ?? glassConfig.defaultOpacity ?? 0.85,
-      isPinned: localSettings.isPinned ?? glassConfig.autoPin ?? true,
     };
 
     logger.debug('Get settings:', merged);
     return merged;
-  });
-
-  ipcMain.handle(CHANNELS.GLASS.SAVE_SETTINGS, (event, settings) => {
-    const glassWindow = getGlassWindow();
-    const current = store.get('glassLocalSettings', {});
-    store.set('glassLocalSettings', { ...current, ...settings });
-    return true;
   });
 
   // Decrypts the '***encrypted***' apiKey placeholder before returning
@@ -267,18 +232,6 @@ function register(ctx) {
     return true;
   });
 
-  // ===== Translation =====
-
-  ipcMain.handle(CHANNELS.GLASS.TRANSLATE, async (event, text) => {
-    try {
-      const mainWindow = getMainWindow();
-      mainWindow?.webContents.send(CHANNELS.GLASS.TRANSLATE_REQUEST, text);
-      return { success: true };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  });
-
   // ===== Region capture =====
 
   ipcMain.handle(CHANNELS.GLASS.CAPTURE_REGION, async (event, bounds) => {
@@ -319,7 +272,17 @@ function register(ctx) {
       }
 
       if (screenshot) {
-        return { success: true, imageData: screenshot };
+        // Renderer needs the CAPTURED display's scale to map OCR pixel coords
+        // back to CSS px — its own devicePixelRatio may belong to a different
+        // monitor in mixed-DPI setups.
+        const { screen } = require('electron');
+        const scaleFactor = screen.getDisplayMatching({
+          x: Math.round(bounds.x),
+          y: Math.round(bounds.y),
+          width: Math.max(1, Math.round(bounds.width)),
+          height: Math.max(1, Math.round(bounds.height)),
+        }).scaleFactor;
+        return { success: true, imageData: screenshot, scaleFactor };
       } else {
         throw new Error(t('screenshot.failed', '截图失败'));
       }
@@ -332,19 +295,7 @@ function register(ctx) {
     }
   });
 
-  // ===== Data sync (forward to main window) =====
-
-  ipcMain.handle(CHANNELS.GLASS.ADD_TO_FAVORITES, (event, item) => {
-    const mainWindow = getMainWindow();
-    mainWindow?.webContents.send(CHANNELS.DATA.ADD_TO_FAVORITES, item);
-    return true;
-  });
-
-  ipcMain.handle(CHANNELS.GLASS.ADD_TO_HISTORY, (event, item) => {
-    const mainWindow = getMainWindow();
-    mainWindow?.webContents.send(CHANNELS.DATA.ADD_TO_HISTORY, item);
-    return true;
-  });
+  // ===== Data sync =====
 
   ipcMain.handle(CHANNELS.GLASS.GET_HISTORY, async (event, limit = 20) => {
     const mainWindow = getMainWindow();
@@ -384,12 +335,6 @@ function register(ctx) {
       logger.debug('Could not get history from main window:', e.message);
       return [];
     }
-  });
-
-  ipcMain.handle(CHANNELS.GLASS.SYNC_TARGET_LANGUAGE, (event, langCode) => {
-    const mainWindow = getMainWindow();
-    mainWindow?.webContents.send(CHANNELS.DATA.SYNC_TARGET_LANGUAGE, langCode);
-    return true;
   });
 
   // ===== Child pane standalone windows =====
@@ -519,28 +464,6 @@ function register(ctx) {
         return true;
       } catch (e) {
         logger.error('Failed to close child pane window:', e);
-      }
-    }
-    return false;
-  });
-
-  ipcMain.handle(CHANNELS.GLASS.UPDATE_CHILD_WINDOW, (event, id, data) => {
-    if (childPaneWindows.has(id)) {
-      const paneData = childPaneWindows.get(id);
-      if (paneData.window && !paneData.window.isDestroyed()) {
-        paneData.window.webContents.send('child-pane:update', data);
-        return true;
-      }
-    }
-    return false;
-  });
-
-  ipcMain.handle(CHANNELS.GLASS.MOVE_CHILD_WINDOW, (event, id, x, y) => {
-    if (childPaneWindows.has(id)) {
-      const paneData = childPaneWindows.get(id);
-      if (paneData.window && !paneData.window.isDestroyed()) {
-        paneData.window.setPosition(Math.round(x), Math.round(y));
-        return true;
       }
     }
     return false;

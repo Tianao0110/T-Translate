@@ -25,16 +25,13 @@ describe('migrateOldSettings: glassWindow unification', () => {
     });
     expect(m.glassWindow.defaultOpacity).toBe(0.6);
     expect(m.glassWindow.lockTargetLang).toBe(true);
-    // unspecified keys still come from defaults
-    expect(m.glassWindow.smartDetect).toBe(true);
     expect(m.glass).toBeUndefined();
   });
 
   it('partial glassWindow gets all newly-added defaults', () => {
-    const m = migrateOldSettings({ glassWindow: { autoPin: false } });
-    expect(m.glassWindow.autoPin).toBe(false);
-    expect(m.glassWindow.rememberPosition).toBe(false);
-    expect(m.glassWindow.refreshInterval).toBe(3000);
+    const m = migrateOldSettings({ glassWindow: { lockTargetLang: true } });
+    expect(m.glassWindow.lockTargetLang).toBe(true);
+    expect(m.glassWindow.defaultOpacity).toBe(0.85);
   });
 });
 

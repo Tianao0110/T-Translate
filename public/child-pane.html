@@ -25,13 +25,12 @@
       right: 0;
       bottom: 0;
       background: rgba(255, 255, 255, 0.95);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(59, 130, 246, 0.3);
+      /* 透明独立窗口：backdrop-filter 采不到桌面、贴边 box-shadow 会被窗口
+         边界硬裁——一律不用，边界感交给实线边框（项目透明窗口铁律） */
+      border: 1px solid rgba(59, 130, 246, 0.45);
       border-radius: 6px;
       display: flex;
       align-items: stretch;
-      box-shadow: 0 2px 12px rgba(59, 130, 246, 0.2);
       cursor: grab;
       user-select: none;
       /* 整个窗口可拖动 */
@@ -212,16 +211,22 @@
     
     document.addEventListener('mousemove', (e) => {
       if (!isResizing) return;
+      // 鼠标跑出小窗后松键，mouseup 收不到——按键已抬起就终止，防卡死
+      if ((e.buttons & 1) === 0) {
+        isResizing = false;
+        document.body.style.cursor = '';
+        return;
+      }
       const deltaX = e.screenX - startX;
       const deltaY = e.screenY - startY;
       const newWidth = Math.max(100, Math.min(600, startWidth + deltaX));
       const newHeight = Math.max(36, Math.min(400, startHeight + deltaY));
-      
+
       if (window.electronChildPane) {
         window.electronChildPane.resize(newWidth, newHeight);
       }
     });
-    
+
     document.addEventListener('mouseup', () => {
       if (isResizing) {
         isResizing = false;
@@ -229,17 +234,6 @@
       }
     });
     
-    // 监听来自主进程的消息
-    if (window.electronChildPane) {
-      window.electronChildPane.onUpdate((data) => {
-        if (data.text !== undefined) {
-          document.getElementById('text').textContent = data.text;
-        }
-        if (data.theme !== undefined) {
-          document.documentElement.setAttribute('data-theme', data.theme);
-        }
-      });
-    }
   </script>
 </body>
 </html>

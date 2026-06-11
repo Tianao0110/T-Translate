@@ -79,8 +79,17 @@ const ChildGlassPane = ({
     const handleMouseMove = (e) => {
       if (!dragStateRef.current.isDragging) return;
 
-      const newX = e.clientX - dragStateRef.current.offsetX;
-      const newY = e.clientY - dragStateRef.current.offsetY;
+      let newX = e.clientX - dragStateRef.current.offsetX;
+      let newY = e.clientY - dragStateRef.current.offsetY;
+
+      // Web content can't render outside the BrowserWindow — clamp to the
+      // viewport so panes can't be "lost" past an edge. Double-click detach
+      // is the way to move a pane out of the window.
+      const rect = paneRef.current?.getBoundingClientRect();
+      const maxX = window.innerWidth - (rect?.width ?? 80);
+      const maxY = window.innerHeight - (rect?.height ?? 32);
+      newX = Math.min(Math.max(newX, 0), Math.max(maxX, 0));
+      newY = Math.min(Math.max(newY, 0), Math.max(maxY, 0));
 
       dragStateRef.current.currentX = newX;
       dragStateRef.current.currentY = newY;

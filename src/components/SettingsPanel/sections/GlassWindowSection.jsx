@@ -10,14 +10,10 @@ const GlassWindowSection = ({
 }) => {
   const { t } = useTranslation();
 
-  // Fallbacks mirror DEFAULT_SETTINGS.glassWindow (migrateOldSettings folds the
-  // legacy `glass` bucket in before this component ever sees settings).
+  // Fallbacks mirror DEFAULT_SETTINGS.glassWindow.
   const gw = {
     defaultOpacity: 0.85,
-    rememberPosition: false,
-    autoPin: true,
     lockTargetLang: false,
-    smartDetect: true,
     ...(settings.glassWindow || {}),
   };
 
@@ -52,22 +48,6 @@ const GlassWindowSection = ({
         <p className="setting-hint">{t('glass.lockTargetLangHint')}</p>
       </div>
 
-      {/* 智能检测 */}
-      <div className="setting-group">
-        <label className="setting-label">{t('glass.smartDetect')}</label>
-        <div className="toggle-wrapper">
-          <button
-            className={`toggle-button ${gw.smartDetect ? 'active' : ''}`}
-            onClick={() => updateSetting('glassWindow', 'smartDetect', !gw.smartDetect)}
-          >
-            {gw.smartDetect ? t('common.on') : t('common.off')}
-          </button>
-          <span className="toggle-description">
-            {gw.smartDetect ? t('glass.smartDetectOnDesc') : t('glass.smartDetectOffDesc')}
-          </span>
-        </div>
-      </div>
-
       {/* OCR 引擎 */}
       <div className="setting-group">
         <label className="setting-label">{t('glass.ocrEngine')}</label>
@@ -98,29 +78,6 @@ const GlassWindowSection = ({
           <span className="range-value">{Math.round(gw.defaultOpacity * 100)}%</span>
         </div>
         <p className="setting-hint">{t('glass.opacityHint')}</p>
-      </div>
-
-      {/* 窗口选项 */}
-      <div className="setting-group">
-        <label className="setting-label">{t('glass.windowOptions')}</label>
-        <div className="checkbox-group">
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={gw.rememberPosition}
-              onChange={(e) => updateSetting('glassWindow', 'rememberPosition', e.target.checked)}
-            />
-            <span>{t('glass.rememberPosition')}</span>
-          </label>
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={gw.autoPin}
-              onChange={(e) => updateSetting('glassWindow', 'autoPin', e.target.checked)}
-            />
-            <span>{t('glass.autoPin')}</span>
-          </label>
-        </div>
       </div>
 
       {/* 快捷键 */}
