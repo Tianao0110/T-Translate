@@ -95,14 +95,16 @@ export const DEFAULT_SETTINGS = {
     showProgress: true,
   },
 
-  glass: {
-    width: 400,
-    height: 300,
-    opacity: 0.95,
-    alwaysOnTop: true,
-    autoTranslate: true,
-    fontSize: 14,
-    showSourceText: false,
+  // Floating window (glass). Single source of truth for its defaults —
+  // electron/ipc/glass.js GET_SETTINGS fallbacks must stay in sync.
+  glassWindow: {
+    defaultOpacity: 0.85,
+    rememberPosition: false,
+    autoPin: true,
+    lockTargetLang: false,
+    smartDetect: true,
+    refreshInterval: 3000,
+    streamOutput: true,
   },
 
   selection: {
@@ -186,9 +188,9 @@ export const migrateOldSettings = (savedSettings) => {
       ...DEFAULT_SETTINGS.document,
       ...(savedSettings.document || {}),
     },
-    glass: {
-      ...DEFAULT_SETTINGS.glass,
-      ...(savedSettings.glass || {}),
+    glassWindow: {
+      ...DEFAULT_SETTINGS.glassWindow,
+      ...(savedSettings.glassWindow || {}),
     },
     selection: {
       ...DEFAULT_SETTINGS.selection,
@@ -247,18 +249,22 @@ export const migrateOldSettings = (savedSettings) => {
     };
   }
 
-  // Pre-v0.2 flat glassXxx -> glass nested object
-  if (!savedSettings.glass || typeof savedSettings.glass !== 'object') {
-    migrated.glass = {
-      ...DEFAULT_SETTINGS.glass,
-      width: savedSettings.glassWidth || 400,
-      height: savedSettings.glassHeight || 300,
-      opacity: savedSettings.glassOpacity || 0.95,
-      alwaysOnTop: savedSettings.glassAlwaysOnTop ?? true,
-      autoTranslate: savedSettings.glassAutoTranslate ?? true,
-      fontSize: savedSettings.glassFontSize || 14,
-      showSourceText: savedSettings.glassShowSourceText || false,
-    };
+  // Legacy `settings.glass` bucket -> `glassWindow`. Only `opacity` maps to a
+  // live key; the rest (width/height/fontSize/...) were dead for several
+  // versions. The old bucket is dropped so it never gets re-persisted.
+  if (savedSettings.glass && typeof savedSettings.glass === 'object') {
+    if (savedSettings.glassWindow?.defaultOpacity === undefined &&
+        typeof savedSettings.glass.opacity === 'number') {
+      migrated.glassWindow.defaultOpacity = savedSettings.glass.opacity;
+    }
+    delete migrated.glass;
+  }
+
+  // 'paddle-ocr' engine id was removed from the registry; without this remap
+  // an old persisted value would leave OCR permanently failing (no fallback
+  // chain covers an unknown preferred engine).
+  if (migrated.ocr?.engine === 'paddle-ocr') {
+    migrated.ocr.engine = 'rapid-ocr';
   }
 
   return migrated;

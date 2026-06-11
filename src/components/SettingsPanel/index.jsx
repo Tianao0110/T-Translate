@@ -349,8 +349,8 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
           await store.set('settings.document', settings.document);
         }
 
-        if (settings.glass) {
-          await store.set('settings.glass', settings.glass);
+        if (settings.glassWindow) {
+          await store.set('settings.glassWindow', settings.glassWindow);
         }
 
         if (settings.selection) {

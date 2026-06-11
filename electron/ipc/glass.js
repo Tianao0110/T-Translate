@@ -7,6 +7,48 @@ const logger = require('../utils/logger')('IPC:Glass');
 const displayHelper = require('../utils/display-helper');
 const { t } = require('../shared/main-i18n');
 
+// Module scope (not per-register) so window-manager can close panes when the
+// glass window itself goes away — panes must never outlive their parent.
+const childPaneWindows = new Map();
+const MAX_CHILD_WINDOWS = 15;
+
+function removeOldestChildWindow() {
+  let oldest = null;
+  let oldestId = null;
+
+  for (const [id, data] of childPaneWindows) {
+    if (!oldest || data.createdAt < oldest.createdAt) {
+      oldest = data;
+      oldestId = id;
+    }
+  }
+
+  if (oldestId && oldest) {
+    try {
+      if (!oldest.window.isDestroyed()) {
+        oldest.window.close();
+      }
+    } catch (e) {}
+    childPaneWindows.delete(oldestId);
+    logger.debug('Removed oldest child window:', oldestId);
+  }
+}
+
+function closeAllChildPaneWindows() {
+  let count = 0;
+  for (const [, data] of childPaneWindows) {
+    try {
+      if (data.window && !data.window.isDestroyed()) {
+        data.window.close();
+        count++;
+      }
+    } catch (e) {}
+  }
+  childPaneWindows.clear();
+  if (count > 0) logger.debug('Closed all child pane windows:', count);
+  return count;
+}
+
 function register(ctx) {
   const { getMainWindow, getGlassWindow, store, managers } = ctx;
 
@@ -132,6 +174,8 @@ function register(ctx) {
       }
     }
 
+    // Fallbacks mirror DEFAULT_SETTINGS.glassWindow in
+    // src/components/SettingsPanel/constants.js — keep both in sync.
     const merged = {
       refreshInterval: glassConfig.refreshInterval ?? 3000,
       smartDetect: glassConfig.smartDetect ?? true,
@@ -140,7 +184,7 @@ function register(ctx) {
       globalOcrEngine: ocrConfig.engine ?? 'llm-vision',
       defaultOpacity: glassConfig.defaultOpacity ?? 0.85,
       autoPin: glassConfig.autoPin ?? true,
-      lockTargetLang: glassConfig.lockTargetLang ?? true,
+      lockTargetLang: glassConfig.lockTargetLang ?? false,
       targetLanguage: currentTargetLang,
       sourceLanguage: currentSourceLang,
       theme: mainSettings.interface?.theme ?? 'light',
@@ -245,23 +289,33 @@ function register(ctx) {
         throw new Error(t('glass.windowNotFound', '玻璃窗口不存在'));
       }
 
-      // Hide self before capture so we don't OCR our own translation overlay.
-      // WDA_EXCLUDEFROMCAPTURE is unreliable on some GPU/driver combos, so we
-      // still drop opacity as a fallback.
-      try {
-        glassWindow.setOpacity(0);
-        await new Promise(resolve => setTimeout(resolve, 80));
-      } catch (e) {
-        logger.warn('Failed to hide for capture:', e.message);
-      }
+      // Hide self AND detached child panes before capture so we don't OCR our
+      // own translation overlays. WDA_EXCLUDEFROMCAPTURE is unreliable on some
+      // GPU/driver combos, so we still drop opacity as a fallback.
+      const hideForCapture = (visible) => {
+        try {
+          glassWindow.setOpacity(visible ? 1 : 0);
+        } catch (e) {
+          logger.warn('Failed to toggle glass for capture:', e.message);
+        }
+        for (const [, data] of childPaneWindows) {
+          try {
+            if (data.window && !data.window.isDestroyed()) {
+              data.window.setOpacity(visible ? 1 : 0);
+            }
+          } catch (e) {}
+        }
+      };
+
+      hideForCapture(false);
+      await new Promise(resolve => setTimeout(resolve, 80));
 
       const screenshotMod = getScreenshotModule();
-      const screenshot = await screenshotMod.captureRegion(bounds);
-
+      let screenshot;
       try {
-        glassWindow.setOpacity(1);
-      } catch (e) {
-        logger.warn('Failed to restore after capture:', e.message);
+        screenshot = await screenshotMod.captureRegion(bounds);
+      } finally {
+        hideForCapture(true);
       }
 
       if (screenshot) {
@@ -339,31 +393,6 @@ function register(ctx) {
   });
 
   // ===== Child pane standalone windows =====
-
-  const childPaneWindows = new Map();
-  const MAX_CHILD_WINDOWS = 15;
-
-  function removeOldestChildWindow() {
-    let oldest = null;
-    let oldestId = null;
-
-    for (const [id, data] of childPaneWindows) {
-      if (!oldest || data.createdAt < oldest.createdAt) {
-        oldest = data;
-        oldestId = id;
-      }
-    }
-
-    if (oldestId && oldest) {
-      try {
-        if (!oldest.window.isDestroyed()) {
-          oldest.window.close();
-        }
-      } catch (e) {}
-      childPaneWindows.delete(oldestId);
-      logger.debug('Removed oldest child window:', oldestId);
-    }
-  }
 
   ipcMain.handle(CHANNELS.GLASS.CREATE_CHILD_WINDOW, async (event, options) => {
     const { BrowserWindow } = require('electron');
@@ -445,19 +474,24 @@ function register(ctx) {
         childWindow.show();
       });
 
+      // Panes sit directly over the source text — without this the next
+      // capture would OCR the pane's own translation.
+      if (process.platform === 'win32') {
+        childWindow.webContents.once('did-finish-load', () => {
+          try {
+            const { makeWindowInvisibleToCapture } = require('../utils/native-helper');
+            makeWindowInvisibleToCapture(childWindow);
+          } catch (e) {
+            logger.warn('Failed to exclude child pane from capture:', e.message);
+          }
+        });
+      }
+
       childWindow.on('closed', () => {
         childPaneWindows.delete(id);
         const glassWindow = getGlassWindow();
         if (glassWindow && !glassWindow.isDestroyed()) {
           glassWindow.webContents.send('child-pane:closed', id);
-        }
-      });
-
-      ipcMain.once(`child-pane:close:${id}`, () => {
-        if (childPaneWindows.has(id)) {
-          try {
-            childPaneWindows.get(id).window.close();
-          } catch (e) {}
         }
       });
 
@@ -513,18 +547,7 @@ function register(ctx) {
   });
 
   ipcMain.handle(CHANNELS.GLASS.CLOSE_ALL_CHILD_WINDOWS, () => {
-    let count = 0;
-    for (const [id, data] of childPaneWindows) {
-      try {
-        if (data.window && !data.window.isDestroyed()) {
-          data.window.close();
-          count++;
-        }
-      } catch (e) {}
-    }
-    childPaneWindows.clear();
-    logger.debug('Closed all child pane windows:', count);
-    return count;
+    return closeAllChildPaneWindows();
   });
 
   ipcMain.on('child-pane:close', (event) => {
@@ -557,3 +580,4 @@ function register(ctx) {
 }
 
 module.exports = register;
+module.exports.closeAllChildPaneWindows = closeAllChildPaneWindows;

@@ -10,28 +10,22 @@ const GlassWindowSection = ({
 }) => {
   const { t } = useTranslation();
 
-  // Older settings versions stored these under `glass`; newer under `glassWindow`.
-  // Merge both so a migration-in-progress doesn't lose values.
+  // Fallbacks mirror DEFAULT_SETTINGS.glassWindow (migrateOldSettings folds the
+  // legacy `glass` bucket in before this component ever sees settings).
   const gw = {
-    defaultOpacity: 0.95,
+    defaultOpacity: 0.85,
     rememberPosition: false,
     autoPin: true,
     lockTargetLang: false,
     smartDetect: true,
-    ...(settings.glass || {}),
     ...(settings.glassWindow || {}),
   };
-  // `opacity` (legacy) -> `defaultOpacity` (current)
-  if (gw.defaultOpacity === undefined && gw.opacity !== undefined) {
-    gw.defaultOpacity = gw.opacity;
-  }
 
   const getOcrEngineName = (engine) => {
     const names = {
       'llm-vision': 'LLM Vision',
       'windows-ocr': 'Windows OCR',
-      'paddle-ocr': 'PaddleOCR',
-      'rapid-ocr': 'RapidOCR',
+      'rapid-ocr': t('ocr.localOcrName', 'Local OCR (PP-OCRv5)'),
     };
     return names[engine] || engine;
   };
