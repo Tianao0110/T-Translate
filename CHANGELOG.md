@@ -16,7 +16,7 @@
 - 引擎「修复」由运行时 npm 重装改为直接重新下载模型文件——不再要求用户机器装有 Node/npm
 
 ### 修复（首轮人工回归反馈）
-- Windows OCR 识别路径自始即坏：脚本调用了不存在的 `RandomAccessStream::FromStream`，按 WinRT 规范路径（StorageFile）重写；「自动检测」语言跟随系统语言包；中日文输出逐字空格清理（保留英文词间空格）
+- Windows OCR 识别路径自始即坏，两层根因都修了：①脚本调用了不存在的 `RandomAccessStream::FromStream`，按 WinRT 规范路径（StorageFile）重写；②脚本以内联 `-Command` 经 cmd.exe + PowerShell 双重解析传输，引号/换行被绞坏——改为 `-EncodedCommand`（base64）传输并抽成独立模块 electron/utils/windows-ocr.js（纯 Node 可测）。「自动检测」语言跟随系统语言包；中日文输出逐字空格清理（保留英文词间空格）
 - 玻璃窗更改目标语言后，画面 / 文本未变化时不重新翻译（去重键未含目标语言）
 - 划词卡片：源文本已是目标语言时原样直出 → 自动翻转 zh↔en，与玻璃窗行为一致
 - 设置页 OCR 语言包列表窄窗下排版破裂（徽章换行压按钮）

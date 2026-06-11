@@ -10,7 +10,6 @@ const messages = {
     'ocr.notWindows': '非 Windows 系统',
     'ocr.needsWin10': '需要 Windows 10 或更高版本',
     'ocr.noLangPack': '未安装任何 OCR 语言包',
-    'ocr.cantGetLangs': '无法获取语言列表',
     
     // OCR health check
     'ocr.engineHealthy': 'OCR 引擎运行正常',
@@ -22,7 +21,6 @@ const messages = {
 
     // OCR recognition
     'ocr.winOnlyWindows': 'Windows OCR 仅在 Windows 系统上可用',
-    'ocr.winOcrFailed': 'Windows OCR 识别失败',
     'ocr.noApiKey': '未配置 {{service}} API Key',
     'ocr.noApiKeySecret': '未配置百度 OCR API Key',
     'ocr.baiduTokenFailed': '获取百度 access_token 失败',
@@ -83,7 +81,6 @@ const messages = {
     'ocr.notWindows': 'Not a Windows system',
     'ocr.needsWin10': 'Requires Windows 10 or later',
     'ocr.noLangPack': 'No OCR language packs installed',
-    'ocr.cantGetLangs': 'Unable to get language list',
     
     // OCR health check
     'ocr.engineHealthy': 'OCR engine is running normally',
@@ -95,7 +92,6 @@ const messages = {
 
     // OCR recognition
     'ocr.winOnlyWindows': 'Windows OCR is only available on Windows',
-    'ocr.winOcrFailed': 'Windows OCR recognition failed',
     'ocr.noApiKey': '{{service}} API Key is not configured',
     'ocr.noApiKeySecret': 'Baidu OCR API Key is not configured',
     'ocr.baiduTokenFailed': 'Failed to obtain Baidu access_token',
