@@ -1,6 +1,6 @@
 // Main-window translation store. Owns source/translated text, versions,
 // history, favorites, OCR status, and privacy-mode behavior.
-// Glass window uses a separate stores/session.js + services/pipeline.js.
+// Floating window uses a separate stores/session.js + services/pipeline.js.
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
@@ -480,7 +480,7 @@ const useTranslationStore = create(
         return configs[state.translationMode] || configs.standard;
       },
 
-      // External callers (e.g. glass window) route through this, so privacy
+      // External callers (e.g. floating window) route through this, so privacy
       // gating happens here rather than at each call site.
       addToHistory: (item) =>
         set((state) => {

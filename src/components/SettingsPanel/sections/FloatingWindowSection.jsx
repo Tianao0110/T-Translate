@@ -1,4 +1,4 @@
-// Glass overlay window settings.
+// Floating-window settings section.
 
 import React from 'react';
 import { useTranslation } from 'react-i18next';

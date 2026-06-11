@@ -1,5 +1,4 @@
-﻿// Glass overlay window IPC: controls, settings, translate proxy, region capture,
-// child-pane sub-windows.
+// Floating-window IPC: window controls, settings merge, region capture, and detached child-pane windows.
 
 const { ipcMain, safeStorage } = require('electron');
 const { CHANNELS } = require('../shared/channels');
@@ -8,7 +7,7 @@ const displayHelper = require('../utils/display-helper');
 const { t } = require('../shared/main-i18n');
 
 // Module scope (not per-register) so window-manager can close panes when the
-// glass window itself goes away — panes must never outlive their parent.
+// floating window itself goes away — panes must never outlive their parent.
 const childPaneWindows = new Map();
 const MAX_CHILD_WINDOWS = 15;
 
@@ -119,7 +118,7 @@ function register(ctx) {
   ipcMain.handle(CHANNELS.FLOATING_WINDOW.GET_SETTINGS, async () => {
     const mainWindow = getMainWindow();
     const mainSettings = store.get('settings', {});
-    const glassConfig = mainSettings.floatingWindow || {};
+    const fwConfig = mainSettings.floatingWindow || {};
     const ocrConfig = mainSettings.ocr || {};
     const localSettings = store.get('floatingWindowLocal', {});
 
@@ -156,12 +155,12 @@ function register(ctx) {
     // src/components/SettingsPanel/constants.js — keep both in sync.
     const merged = {
       ocrEngine: ocrConfig.engine ?? 'llm-vision',
-      lockTargetLang: glassConfig.lockTargetLang ?? false,
+      lockTargetLang: fwConfig.lockTargetLang ?? false,
       targetLanguage: currentTargetLang,
       sourceLanguage: currentSourceLang,
       theme: mainSettings.interface?.theme ?? 'light',
       // window-local slider value wins over the settings-page default
-      opacity: localSettings.opacity ?? glassConfig.defaultOpacity ?? 0.85,
+      opacity: localSettings.opacity ?? fwConfig.defaultOpacity ?? 0.85,
     };
 
     logger.debug('Get settings:', merged);
@@ -249,7 +248,7 @@ function register(ctx) {
         try {
           floatingWindow.setOpacity(visible ? 1 : 0);
         } catch (e) {
-          logger.warn('Failed to toggle glass for capture:', e.message);
+          logger.warn('Failed to toggle overlay for capture:', e.message);
         }
         for (const [, data] of childPaneWindows) {
           try {
@@ -499,7 +498,7 @@ function register(ctx) {
     }
   });
 
-  logger.info('Glass IPC handlers registered');
+  logger.info('Floating-window IPC handlers registered');
 }
 
 module.exports = register;

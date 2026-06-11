@@ -1,4 +1,4 @@
-﻿// Main process entry — slimmed.
+// Main process entry — slimmed.
 // Window creation lives in managers/window-manager.js.
 
 const {
@@ -933,7 +933,7 @@ app.whenReady().then(() => {
         const bounds = windows.floatingWindow.getBounds();
         const validBounds = displayHelper.ensureBoundsOnDisplay(bounds);
         if (validBounds.adjusted) {
-          logger.info('Glass window moved to valid display');
+          logger.info('Floating window moved to valid display');
           windows.floatingWindow.setBounds(validBounds);
         }
       }

@@ -1,4 +1,4 @@
-﻿// Window manager: main, glass overlay, selection (with freeze-multi support),
+// Window manager: main, floating window, selection (with freeze-multi support),
 // and screenshot windows. Deps injected via init() to avoid require cycles.
 
 const { BrowserWindow, shell } = require('electron');
@@ -139,7 +139,7 @@ function createMainWindow() {
   return mainWindow;
 }
 
-// ===== Glass overlay window =====
+// ===== Floating window =====
 
 function createFloatingWindow() {
   if (windows.floatingWindow) {
@@ -160,7 +160,7 @@ function createFloatingWindow() {
   });
 
   if (floatingWindowBounds.adjusted) {
-    logger?.info?.('Glass window position adjusted to valid display');
+    logger?.info?.('Floating window position adjusted to valid display');
   }
 
   const floatingWindow = new BrowserWindow({
@@ -181,7 +181,7 @@ function createFloatingWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       preload: PATHS.preloads.floatingWindow,
-      backgroundThrottling: false, // glass refresh must run while unfocused
+      backgroundThrottling: false, // floating-window refresh must run while unfocused
       webSecurity: false, // allow cross-origin (e.g. Google Translate)
     },
   });
@@ -218,7 +218,7 @@ function createFloatingWindow() {
     try {
       require('../ipc/floating-window').closeAllChildPaneWindows();
     } catch (e) {
-      logger.warn?.('Failed to close child panes with glass window:', e.message);
+      logger.warn?.('Failed to close child panes with floating window:', e.message);
     }
   });
 
@@ -239,7 +239,7 @@ function createFloatingWindow() {
   // would bypass all of that — deliberately absent.
 
   windows.floatingWindow = floatingWindow;
-  logger.info?.('Glass window created');
+  logger.info?.('Floating window created');
   return floatingWindow;
 }
 

@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import TitleBar from './components/TitleBar';
 import MainWindow from './components/MainWindow';
 import useTranslationStore from './stores/translation-store';
@@ -11,7 +11,7 @@ import { THEMES } from '@config/defaults';
 
 const logger = createLogger('App');
 
-// Glass-window subprocess used to read these via executeJavaScript. We've
+// The floating window used to read these via executeJavaScript. We've
 // since switched to electron-store IPC, but the globals stay for any code
 // still reaching in through the DOM.
 if (typeof window !== 'undefined') {
@@ -68,7 +68,7 @@ function App() {
       }
 
       // localStorage 'storage' events fire on *other* tabs/windows — used to
-      // sync theme when the glass window changes it
+      // sync theme when the floating window changes it
       const handleStorageChange = (e) => {
         if (e.key === 'theme') {
           const newTheme = e.newValue || 'light';
@@ -111,10 +111,10 @@ function App() {
       };
     }, [setPendingScreenshot]);
 
-    // Glass window forwards user "add to favorites" through main -> this listener
+    // Floating window forwards user "add to favorites" through main -> this listener
     useEffect(() => {
       if (!window.electron?.ipcRenderer) {
-        logger.warn('IPC not available for glass favorites');
+        logger.warn('IPC not available for floating-window favorites');
         return;
       }
 
@@ -143,7 +143,7 @@ function App() {
       };
     }, [addToFavorites]);
 
-    // Selection translate and glass window route history adds through this listener
+    // Selection translate and floating window route history adds through this listener
     useEffect(() => {
       if (!window.electron?.ipcRenderer) return;
 

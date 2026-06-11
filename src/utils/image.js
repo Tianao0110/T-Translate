@@ -1,7 +1,7 @@
 // Image helpers: hashing for dedupe, base64 conversion.
 
 // Sample-based hash (every 100th byte) — cheap and good enough to detect
-// "same screenshot as last tick" for the glass refresh loop. Not cryptographic.
+// "same screenshot as last tick" for the floating-window refresh loop. Not cryptographic.
 export async function calculateHash(imageData) {
   try {
     let buffer;

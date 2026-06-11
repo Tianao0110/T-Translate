@@ -1,4 +1,4 @@
-// Glass overlay translation window. Pure UI shell over the session store;
+// Floating translation overlay window. Pure UI shell over the session store;
 // all capture/OCR/translate logic lives in services/pipeline.js.
 // Supports scattered mode where each OCR block becomes its own child pane.
 
@@ -350,7 +350,7 @@ const FloatingWindow = () => {
     }
   };
 
-  // Capture screen region that maps to this glass window's content area.
+  // Capture screen region that maps to this floating window's content area.
   // Defined as a callback because the keyboard handler closes over it.
   const captureAndTranslate = useCallback(async () => {
     try {

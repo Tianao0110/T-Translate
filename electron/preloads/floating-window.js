@@ -1,4 +1,4 @@
-// Preload for the glass (floating-overlay) translator window.
+// Preload for the floating-window (screen translation overlay).
 // Exposes window-specific IPC plus shared OCR / translate / clipboard / theme APIs.
 
 const { contextBridge, ipcRenderer } = require('electron');
@@ -88,7 +88,7 @@ contextBridge.exposeInMainWorld('electron', {
     encrypt: (key, value) => ipcRenderer.invoke('secure-storage:encrypt', key, value),
     decrypt: (key) => ipcRenderer.invoke('secure-storage:decrypt', key),
     delete: (key) => ipcRenderer.invoke('secure-storage:delete', key),
-    isAvailable: () => ipcRenderer.invoke('secure-storage:is-available'),
+    isAvailable: () => ipcRenderer.invoke('secure-storage:isAvailable'),
   },
 
   clipboard: {

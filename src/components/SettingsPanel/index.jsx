@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Globe, Shield, Zap, Download, Upload, Moon, Sun,
@@ -139,7 +139,7 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
     }
   }, [activeSection]);
 
-  // External section jump (e.g. glass "Go to OCR Settings" button)
+  // External section jump (e.g. floating window "Go to OCR Settings" button)
   useEffect(() => {
     if (initialSection && initialSection !== activeSection) {
       setActiveSection(initialSection);

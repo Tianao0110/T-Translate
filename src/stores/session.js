@@ -1,4 +1,4 @@
-// Glass-window session store — runtime state only (not persisted).
+// Floating-window session store — runtime state only (not persisted).
 // Tracks translation status, child panes, recent history.
 
 import { create } from 'zustand';
@@ -195,7 +195,7 @@ const useSessionStore = create((set, get) => ({
 
   clearHistory: () => set({ recentHistory: [] }),
 
-  // Used by pipeline / service layer to surface fallback notices to glass UI
+  // Used by pipeline / service layer to surface fallback notices to floating-window UI
   notification: null, // { message, type: 'info'|'warning'|'error'|'success' }
 
   setNotification: (notification) => set({ notification }),

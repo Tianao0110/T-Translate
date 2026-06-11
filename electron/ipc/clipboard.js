@@ -7,7 +7,7 @@ const logger = require('../utils/logger')('IPC:Clipboard');
 function register(ctx) {
   // ===== Text =====
 
-  // handle() version — used by glass window and similar.
+  // handle() version — used by floating window and similar.
   ipcMain.handle(CHANNELS.CLIPBOARD.WRITE_TEXT, (event, text) => {
     try {
       clipboard.writeText(text);

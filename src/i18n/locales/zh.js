@@ -253,7 +253,7 @@ const zh = {
     normalMode: "普通模式", normalModeDesc: "点击 📷 截图识别当前区域",
     subtitleMode: "字幕模式", subtitleModeDesc: "点击 🎬 开启实时字幕翻译",
     firstUse: "首次使用字幕模式", firstUseDesc: "需要先框选视频原字幕区域",
-    // Glass window strings
+    // Floating window strings
     captureSpace: "截图识别 (Space)", historyCtrlH: "历史记录 (Ctrl+H)",
     adjustOpacity: "点击调节透明度", closeEsc: "关闭 (Esc)",
     capturing: "截图中...", recognizing: "识别中...", translating: "翻译中...",

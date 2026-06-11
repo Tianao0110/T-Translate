@@ -357,7 +357,7 @@ module.exports = {
   processSelection,
   isNodeScreenshotsAvailable,
 
-  // On-demand capture for glass overlay region OCR (no pre-capture step).
+  // On-demand capture for floating window region OCR (no pre-capture step).
   // Uses the same logical/physical coordinate handling as cropFromNodeScreenshots.
   async captureRegion(bounds) {
     try {

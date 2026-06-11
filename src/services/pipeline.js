@@ -1,4 +1,4 @@
-﻿// Glass-window translation pipeline: capture -> OCR -> (scattered or unified) -> translate.
+// Floating-window translation pipeline: capture -> OCR -> (scattered or unified) -> translate.
 // Owns dedupe-by-hash, target-language flip, and child-pane lifecycle.
 
 import { ocrManager } from '../providers/ocr/index.js';
@@ -109,7 +109,7 @@ class TranslationPipeline {
 
   async runFromCapture(captureOptions = {}) {
     // Single-flight: a second capture while one is running would un-hide the
-    // glass window mid-screenshot (the IPC handler's opacity dance) and
+    // floating window mid-screenshot (the IPC handler's opacity dance) and
     // interleave session state.
     if (captureInFlight) {
       logger.debug('Capture already in flight, ignoring');
@@ -180,7 +180,7 @@ class TranslationPipeline {
         return { success: true, text: '' };
       }
 
-      // Glass overlay needs per-line positioning => prefer rawBlocks.
+      // Floating window needs per-line positioning => prefer rawBlocks.
       // Merged blocks are only used for the unified-mode single text body.
       const mergedBlocks = ocrResult.blocks || [];
       const rawBlocks = ocrResult.rawBlocks || mergedBlocks;

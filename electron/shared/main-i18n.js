@@ -1,4 +1,4 @@
-﻿// Main-process i18n.
+// Main-process i18n.
 // react-i18next is renderer-only; the main process maintains its own translation table.
 // Language detection reuses tray-labels' getLanguage().
 
@@ -42,7 +42,7 @@ const messages = {
     'system.timeout': '连接超时',
     'system.cannotConnect': '无法连接服务',
     
-    // glass
+    // floating window
     'floatingWindow.notFound': '悬浮窗口不存在',
     
     // screenshot
@@ -113,7 +113,7 @@ const messages = {
     'system.timeout': 'Connection timed out',
     'system.cannotConnect': 'Cannot connect to service',
     
-    // glass
+    // floating window
     'floatingWindow.notFound': 'Floating window not found',
     
     // screenshot

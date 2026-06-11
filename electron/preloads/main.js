@@ -1,4 +1,4 @@
-﻿// Main-window preload — exposes the `electron` API via contextBridge.
+// Main-window preload — exposes the `electron` API via contextBridge.
 // main.js MUST set `sandbox: false` for fs access (preload runs in renderer process).
 
 const { contextBridge, ipcRenderer } = require("electron");
@@ -51,7 +51,7 @@ const validChannels = {
     "secure-storage:encrypt",
     "secure-storage:decrypt",
     "secure-storage:delete",
-    "secure-storage:is-available",
+    "secure-storage:isAvailable",
     "selection:toggle",
     "selection:get-enabled",
     "theme:get",
@@ -139,7 +139,7 @@ const electronAPI = {
     encrypt: (key, value) => ipcRenderer.invoke("secure-storage:encrypt", key, value),
     decrypt: (key, options) => ipcRenderer.invoke("secure-storage:decrypt", key, options),
     delete: (key) => ipcRenderer.invoke("secure-storage:delete", key),
-    isAvailable: () => ipcRenderer.invoke("secure-storage:is-available"),
+    isAvailable: () => ipcRenderer.invoke("secure-storage:isAvailable"),
     getAccessLog: () => ipcRenderer.invoke("secure-storage:getAccessLog"),
   },
   floatingWindow: {

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import translationService from '../../services/translation.js';
 import ttsManager, { TTS_STATUS } from '../../services/tts/index.js';
@@ -507,7 +507,7 @@ const SelectionTranslator = () => {
     // Selected text already in the target language would round-trip through
     // the provider unchanged ("translation" = the source text). The card has
     // no language picker, so flip to the other primary language — same
-    // behavior as the glass window.
+    // behavior as the floating window.
     if (detectLanguage(text) === targetLang) {
       targetLang = targetLang === 'zh' ? 'en' : 'zh';
       logger.debug(`Source already in target language, flipping to ${targetLang}`);
