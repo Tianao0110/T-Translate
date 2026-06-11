@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Eye, EyeOff, AlertTriangle, RefreshCw, Wrench } from 'lucide-react';
+import { Eye, EyeOff, AlertTriangle, RefreshCw, Download, Trash2 } from 'lucide-react';
 import { ocrManager } from '../../../providers/ocr/index.js';
 
 const OcrSection = ({
@@ -20,27 +20,34 @@ const OcrSection = ({
   // null = unchecked, 'checking', 'healthy', 'broken'
   const [engineHealth, setEngineHealth] = useState(null);
   const [healthError, setHealthError] = useState('');
-  const [repairing, setRepairing] = useState(false);
-  const [repairProgress, setRepairProgress] = useState('');
 
-  // Auto-health-check rapid-ocr on entry only if user is actively using it
-  // (avoid running model load on every settings open if they're on another engine)
-  useEffect(() => {
-    if (settings.ocr.rapidInstalled && settings.ocr.engine === 'rapid-ocr') {
-      checkEngineHealth();
-    } else {
-      setEngineHealth(null);
-      setHealthError('');
-    }
+  // Model packs: merged manifest + installed list from the main process
+  const [packs, setPacks] = useState([]);
+  const [manifestError, setManifestError] = useState(null);
+  const [packsLoading, setPacksLoading] = useState(false);
+  const [busyPackId, setBusyPackId] = useState(null);
+  const [packProgress, setPackProgress] = useState(null); // { packId, progress, phase }
 
-    const cleanup = window.electron?.ocr?.onDownloadProgress?.((data) => {
-      if (data.engineId === 'rapid-ocr' && repairing) {
-        setRepairProgress(data.status || '');
+  // Windows OCR system engine info
+  const [winOcrLangs, setWinOcrLangs] = useState(null);
+
+  const loadPacks = useCallback(async (refresh = false) => {
+    if (!window.electron?.ocr?.listPacks) return;
+    setPacksLoading(true);
+    try {
+      const res = await window.electron.ocr.listPacks({ refresh });
+      if (res?.success) {
+        setPacks(res.packs || []);
+        setManifestError(res.manifestError || null);
+      } else {
+        setManifestError(res?.error || 'unknown');
       }
-    });
-
-    return () => cleanup?.();
-  }, [settings.ocr.engine, settings.ocr.rapidInstalled]);
+    } catch (e) {
+      setManifestError(e.message);
+    } finally {
+      setPacksLoading(false);
+    }
+  }, []);
 
   const checkEngineHealth = useCallback(async () => {
     setEngineHealth('checking');
@@ -59,29 +66,70 @@ const OcrSection = ({
     }
   }, [t]);
 
-  const handleRepair = useCallback(async () => {
-    setRepairing(true);
-    setRepairProgress(t('ocr.repairStarting'));
+  // Auto-health-check rapid-ocr on entry only if user is actively using it
+  // (avoid running model load on every settings open if they're on another engine)
+  useEffect(() => {
+    if (settings.ocr.rapidInstalled && settings.ocr.engine === 'rapid-ocr') {
+      checkEngineHealth();
+    } else {
+      setEngineHealth(null);
+      setHealthError('');
+    }
+  }, [settings.ocr.engine, settings.ocr.rapidInstalled, checkEngineHealth]);
+
+  useEffect(() => {
+    loadPacks(false);
+
+    const cleanup = window.electron?.ocr?.onPackProgress?.((data) => {
+      setPackProgress(data.progress >= 100 || data.progress < 0 ? null : data);
+    });
+
+    if (settings.ocr.isWindows && window.electron?.ocr?.checkWindowsOCR) {
+      window.electron.ocr.checkWindowsOCR()
+        .then((r) => setWinOcrLangs(r?.languages || []))
+        .catch(() => setWinOcrLangs([]));
+    }
+
+    return () => cleanup?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleDownloadPack = useCallback(async (packId) => {
+    setBusyPackId(packId);
     try {
-      const result = await window.electron?.ocr?.repairEngine?.('rapid-ocr');
+      const result = await window.electron?.ocr?.downloadPack?.(packId);
       if (result?.success) {
-        notify(t('ocr.repairSuccess'), 'success');
-        setEngineHealth('healthy');
-        setHealthError('');
-        updateSetting('ocr', 'rapidInstalled', true);
-        if (result.needRestart) {
-          notify(result.restartMessage || t('ocr.repairRestartHint'), 'info');
+        notify(t('ocr.packs.downloaded'), 'success');
+        if (packId === 'base-v5') {
+          updateSetting('ocr', 'rapidInstalled', true);
+          checkEngineHealth();
         }
+        await loadPacks(false);
       } else {
-        notify(result?.error || t('ocr.repairFailed'), 'error');
+        notify(result?.error || t('ocr.packs.downloadFailed'), 'error');
       }
     } catch (e) {
-      notify(t('ocr.repairFailed') + ': ' + e.message, 'error');
+      notify(t('ocr.packs.downloadFailed') + ': ' + e.message, 'error');
     } finally {
-      setRepairing(false);
-      setRepairProgress('');
+      setBusyPackId(null);
+      setPackProgress(null);
     }
-  }, [notify, updateSetting, t]);
+  }, [notify, t, updateSetting, checkEngineHealth, loadPacks]);
+
+  const handleRemovePack = useCallback(async (packId) => {
+    if (!window.confirm(t('ocr.packs.removeConfirm'))) return;
+    try {
+      const result = await window.electron?.ocr?.removePack?.(packId);
+      if (result?.success) {
+        notify(t('ocr.packs.removed'), 'success');
+        await loadPacks(false);
+      } else {
+        notify(result?.error || t('ocr.packs.removeFailed'), 'error');
+      }
+    } catch (e) {
+      notify(t('ocr.packs.removeFailed') + ': ' + e.message, 'error');
+    }
+  }, [notify, t, loadPacks]);
 
   const toggleApiKeyVisibility = (key, e) => {
     e?.stopPropagation();
@@ -125,6 +173,77 @@ const OcrSection = ({
     </div>
   );
 
+  const packDisplayName = (pack) =>
+    t(`ocr.packs.names.${pack.id}`, pack.name || pack.id);
+
+  const packStatusBadge = (status) => {
+    switch (status) {
+      case 'installed':
+        return <span className="engine-badge installed">{t('ocr.packs.installed')}</span>;
+      case 'update-available':
+        return <span className="engine-badge download">{t('ocr.packs.updateAvailable')}</span>;
+      case 'orphaned':
+        return <span className="engine-badge installed">{t('ocr.packs.installed')}</span>;
+      default:
+        return <span className="engine-badge unavailable">{t('ocr.packs.notInstalled')}</span>;
+    }
+  };
+
+  const langPacks = packs.filter((p) => p.type === 'lang');
+  const basePack = packs.find((p) => p.type === 'base');
+
+  const renderPackRow = (pack) => {
+    const busy = busyPackId === pack.id;
+    const progress = packProgress?.packId === pack.id ? packProgress : null;
+    const sizeMB = pack.size ? (pack.size / 1024 / 1024).toFixed(1) : null;
+
+    return (
+      <div key={pack.id} className="ocr-pack-row">
+        <div className="pack-info">
+          <div className="pack-header">
+            <span className="pack-name">{packDisplayName(pack)}</span>
+            {packStatusBadge(pack.status)}
+            {sizeMB && <span className="engine-size">{sizeMB} MB</span>}
+          </div>
+          {progress && (
+            <div className="engine-download-progress" style={{ marginTop: 6 }}>
+              <div className="download-progress-bar">
+                <div className="download-progress-fill" style={{ width: `${Math.max(progress.progress, 2)}%` }} />
+              </div>
+              <span className="download-progress-text">
+                {progress.progress}% {t(`ocr.packs.phase.${progress.phase}`, '')}
+              </span>
+            </div>
+          )}
+        </div>
+        <div className="pack-actions">
+          {(pack.status === 'not-installed' || pack.status === 'update-available') && (
+            <button
+              className="btn-small download"
+              disabled={busy || busyPackId !== null}
+              onClick={() => handleDownloadPack(pack.id)}
+              title={pack.status === 'update-available' ? t('ocr.packs.update') : t('ocr.packs.download')}
+            >
+              {busy
+                ? <RefreshCw size={12} className="spinning" />
+                : <><Download size={12} /> {pack.status === 'update-available' ? t('ocr.packs.update') : t('ocr.packs.download')}</>}
+            </button>
+          )}
+          {(pack.status === 'installed' || pack.status === 'update-available' || pack.status === 'orphaned') && (
+            <button
+              className="btn-small uninstall"
+              disabled={busy || busyPackId !== null}
+              onClick={() => handleRemovePack(pack.id)}
+              title={t('ocr.packs.uninstall')}
+            >
+              <Trash2 size={12} />
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="setting-content animate-fade-in">
       <h3>{t('settings.ocr.title')}</h3>
@@ -147,8 +266,11 @@ const OcrSection = ({
           <option value="de">🇩🇪 {t('ocr.lang.de')}</option>
           <option value="es">🇪🇸 {t('ocr.lang.es')}</option>
           <option value="ru">🇷🇺 {t('ocr.lang.ru')}</option>
+          <option value="hi">🇮🇳 {t('ocr.lang.hi')}</option>
+          <option value="ar">🇸🇦 {t('ocr.lang.ar')}</option>
         </select>
         <p className="setting-hint">{t('ocr.autoLangHint')}</p>
+        <p className="setting-hint">{t('ocr.langPackHint')}</p>
       </div>
 
       <div className="setting-group">
@@ -199,10 +321,12 @@ const OcrSection = ({
         </summary>
         <div className="section-content">
           <div className="ocr-engines-list">
+
+            {/* Local PP-OCRv5 engine */}
             <div className={`ocr-engine-item ${settings.ocr.engine === 'rapid-ocr' ? 'active' : ''} ${engineHealth === 'broken' ? 'engine-broken' : ''}`}>
               <div className="engine-info">
                 <div className="engine-header">
-                  <span className="engine-name">RapidOCR</span>
+                  <span className="engine-name">{t('ocr.localOcrName')}</span>
                   {settings.ocr.rapidInstalled ? (
                     engineHealth === 'broken' ? (
                       <span className="engine-badge error">
@@ -229,12 +353,44 @@ const OcrSection = ({
                     <div className="error-content">
                       <p className="error-title">{t('ocr.engineErrorTitle')}</p>
                       <p className="error-detail">{healthError}</p>
-                      {repairing && repairProgress && (
-                        <p className="repair-progress">{repairProgress}</p>
-                      )}
                     </div>
                   </div>
                 )}
+
+                {/* Language packs */}
+                <div className="ocr-pack-section">
+                  <div className="ocr-pack-section-header">
+                    <span className="pack-section-title">{t('ocr.packs.title')}</span>
+                    <button
+                      className="btn-small"
+                      onClick={() => loadPacks(true)}
+                      disabled={packsLoading}
+                      title={t('ocr.packs.refresh')}
+                    >
+                      <RefreshCw size={12} className={packsLoading ? 'spinning' : ''} />
+                      <span style={{marginLeft: 4}}>{t('ocr.packs.refresh')}</span>
+                    </button>
+                  </div>
+
+                  {manifestError && (
+                    <p className="pack-manifest-error">
+                      <AlertTriangle size={12} style={{marginRight: 4, verticalAlign: -2}} />
+                      {t('ocr.packs.manifestError')}
+                    </p>
+                  )}
+
+                  {/* Base pack: only surfaces when re-downloadable (missing or update) */}
+                  {basePack && (basePack.status === 'update-available' || !settings.ocr.rapidInstalled) &&
+                    renderPackRow({ ...basePack, id: 'base-v5' })}
+
+                  {langPacks.length > 0
+                    ? langPacks.map(renderPackRow)
+                    : !manifestError && (
+                        <p className="setting-hint" style={{margin: '6px 0 0'}}>
+                          {packsLoading ? t('ocr.packs.loading') : t('ocr.packs.empty')}
+                        </p>
+                      )}
+                </div>
               </div>
               <div className="engine-actions">
                 {settings.ocr.rapidInstalled ? (
@@ -242,13 +398,13 @@ const OcrSection = ({
                     {engineHealth === 'broken' ? (
                       <button
                         className="btn repair"
-                        disabled={repairing}
-                        onClick={handleRepair}
+                        disabled={busyPackId !== null}
+                        onClick={() => handleDownloadPack('base-v5')}
                       >
-                        {repairing ? (
+                        {busyPackId === 'base-v5' ? (
                           <><RefreshCw size={13} className="spinning" /> {t('ocr.repairing')}</>
                         ) : (
-                          <><Wrench size={13} /> {t('ocr.repair')}</>
+                          <><Download size={13} /> {t('ocr.packs.redownloadBase')}</>
                         )}
                       </button>
                     ) : (
@@ -268,52 +424,44 @@ const OcrSection = ({
                     >
                       <RefreshCw size={12} className={engineHealth === 'checking' ? 'spinning' : ''} />
                     </button>
-                    <button
-                      className="btn-small uninstall"
-                      onClick={async () => {
-                        if (!window.confirm(t('ocr.uninstallConfirm'))) return;
-                        notify(t('ocr.uninstalling'), 'info');
-                        try {
-                          const result = await window.electron?.ocr?.removeEngine?.('rapid-ocr');
-                          if (result?.success) {
-                            updateSetting('ocr', 'rapidInstalled', false);
-                            // Switching off the currently-active engine: fall back to builtin
-                            if (settings.ocr.engine === 'rapid-ocr') selectEngine('llm-vision');
-                            notify(t('ocr.uninstalled'), 'success');
-                          } else {
-                            notify(result?.error || t('ocr.uninstallFailed'), 'error');
-                          }
-                        } catch (e) {
-                          notify(t('ocr.uninstallFailed'), 'error');
-                        }
-                      }}
-                    >
-                      {t('ocr.uninstall')}
-                    </button>
                   </>
                 ) : (
                   <button
                     className="btn download"
-                    onClick={async () => {
-                      notify(t('ocr.downloading'), 'info');
-                      try {
-                        const result = await window.electron?.ocr?.downloadEngine?.('rapid-ocr');
-                        if (result?.success) {
-                          updateSetting('ocr', 'rapidInstalled', true);
-                          notify(t('ocr.downloadComplete'), 'success');
-                        } else {
-                          notify(result?.error || t('ocr.downloadFailed'), 'error');
-                        }
-                      } catch (e) {
-                        notify(t('ocr.downloadFailed'), 'error');
-                      }
-                    }}
+                    disabled={busyPackId !== null}
+                    onClick={() => handleDownloadPack('base-v5')}
                   >
-                    {t('ocr.download')}
+                    {busyPackId === 'base-v5'
+                      ? <><RefreshCw size={13} className="spinning" /> {t('ocr.packs.downloadingShort')}</>
+                      : t('ocr.download')}
                   </button>
                 )}
               </div>
             </div>
+
+            {/* Windows OCR (system engine) */}
+            {settings.ocr.isWindows && (
+              <div className={`ocr-engine-item ${settings.ocr.engine === 'windows-ocr' ? 'active' : ''}`}>
+                <div className="engine-info">
+                  <div className="engine-header">
+                    <span className="engine-name">Windows OCR</span>
+                    <span className="engine-badge system">{t('ocr.windowsOcr.badge')}</span>
+                  </div>
+                  <p className="engine-desc">{t('ocr.windowsOcr.desc')}</p>
+                  {winOcrLangs && winOcrLangs.length > 0 && (
+                    <p className="engine-meta">{t('ocr.windowsOcr.langs', { langs: winOcrLangs.join(', ') })}</p>
+                  )}
+                </div>
+                <div className="engine-actions">
+                  <button
+                    className={`btn ${settings.ocr.engine === 'windows-ocr' ? 'active' : ''}`}
+                    onClick={() => selectEngine('windows-ocr')}
+                  >
+                    {settings.ocr.engine === 'windows-ocr' ? t('ocr.inUse') : t('ocr.use')}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </details>

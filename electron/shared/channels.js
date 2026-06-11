@@ -125,11 +125,10 @@ const CHANNELS = {
   },
   OCR: {
     CHECK_WINDOWS_OCR: 'ocr:check-windows-ocr',
-    CHECK_PADDLE_OCR: 'ocr:check-paddle-ocr',
     CHECK_INSTALLED: 'ocr:check-installed',
-    GET_AVAILABLE_ENGINES: 'ocr:get-available-engines',
-    DOWNLOAD_ENGINE: 'ocr:download-engine',
-    REMOVE_ENGINE: 'ocr:remove-engine',
+    PACKS_LIST: 'ocr:packs-list',
+    PACKS_DOWNLOAD: 'ocr:packs-download',
+    PACKS_REMOVE: 'ocr:packs-remove',
     DOWNLOAD_PROGRESS: 'ocr:download-progress',
     WINDOWS_OCR: 'ocr:windows-ocr',
     PADDLE_OCR: 'ocr:paddle-ocr',
@@ -138,7 +137,6 @@ const CHANNELS = {
     AZURE_OCR: 'ocr:azure-ocr',
     BAIDU_OCR: 'ocr:baidu-ocr',
     HEALTH_CHECK: 'ocr:health-check',
-    REPAIR_ENGINE: 'ocr:repair-engine',
   },
   MENU: {
     ACTION: 'menu-action',

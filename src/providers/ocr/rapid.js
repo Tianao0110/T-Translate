@@ -1,16 +1,16 @@
-// RapidOCR — local PP-OCRv4-based engine. Lives in main process; renderer
-// calls through IPC.
+// Local OCR — PP-OCRv5 via esearch-ocr in the main process; renderer calls
+// through IPC. Engine id stays 'rapid-ocr' for stored-settings compatibility.
 
 import { BaseOCREngine } from './base.js';
 import createLogger from '../../utils/logger.js';
-const logger = createLogger('RapidOCR');
+const logger = createLogger('LocalOCR');
 
 class RapidOCREngine extends BaseOCREngine {
 
   static metadata = {
     id: 'rapid-ocr',
-    name: 'RapidOCR',
-    description: '本地 OCR，基于 PP-OCRv4，速度快',
+    name: 'Local OCR (PP-OCRv5)',
+    description: 'Local PP-OCRv5 engine with downloadable language packs',
     type: 'local',
     tier: 1,
     priority: 1,
@@ -36,7 +36,11 @@ class RapidOCREngine extends BaseOCREngine {
       const result = await window.electron.ocr.recognizeWithPaddleOCR(imageData, options);
 
       if (!result.success) {
-        return { success: false, error: result.error || 'OCR 识别失败' };
+        return {
+          success: false,
+          error: result.error || 'OCR 识别失败',
+          errorCode: result.errorCode,
+        };
       }
 
       const cleanedText = this.cleanText(result.text);
@@ -49,6 +53,10 @@ class RapidOCREngine extends BaseOCREngine {
         blocks: result.blocks || [],
         rawBlocks: result.rawBlocks || result.blocks || [],
         engine: 'rapid-ocr',
+        // pack metadata: which model pack served this + language-pack fallback hint
+        pack: result.pack,
+        packFallback: result.packFallback || false,
+        requestedLanguage: result.requestedLanguage,
       };
     } catch (error) {
       logger.error('Error:', error);

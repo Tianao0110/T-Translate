@@ -179,7 +179,6 @@ const electronAPI = {
     checkWindowsOCR: () => ipcRenderer.invoke("ocr:check-windows-ocr"),
     recognizeWithWindowsOCR: (imageData, options) =>
       ipcRenderer.invoke("ocr:windows-ocr", imageData, options),
-    checkPaddleOCR: () => ipcRenderer.invoke("ocr:check-paddle-ocr"),
     recognizeWithPaddleOCR: (imageData, options) =>
       ipcRenderer.invoke("ocr:paddle-ocr", imageData, options),
 
@@ -194,13 +193,14 @@ const electronAPI = {
       ipcRenderer.invoke("ocr:baidu-ocr", imageData, options),
 
     // Engine management
-    getAvailableEngines: () => ipcRenderer.invoke("ocr:get-available-engines"),
     checkInstalled: () => ipcRenderer.invoke("ocr:check-installed"),
-    downloadEngine: (engineId) => ipcRenderer.invoke("ocr:download-engine", engineId),
-    removeEngine: (engineId) => ipcRenderer.invoke("ocr:remove-engine", engineId),
     healthCheck: (engineId) => ipcRenderer.invoke("ocr:health-check", engineId),
-    repairEngine: (engineId) => ipcRenderer.invoke("ocr:repair-engine", engineId),
-    onDownloadProgress: (callback) => {
+
+    // Model packs (download/refresh/uninstall in settings)
+    listPacks: (options) => ipcRenderer.invoke("ocr:packs-list", options),
+    downloadPack: (packId) => ipcRenderer.invoke("ocr:packs-download", packId),
+    removePack: (packId) => ipcRenderer.invoke("ocr:packs-remove", packId),
+    onPackProgress: (callback) => {
       const handler = (event, data) => callback(data);
       ipcRenderer.on("ocr:download-progress", handler);
       return () => ipcRenderer.removeListener("ocr:download-progress", handler);

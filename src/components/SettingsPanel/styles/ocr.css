@@ -396,6 +396,7 @@
 .engine-header {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 6px;
 }
@@ -413,6 +414,7 @@
   border-radius: 5px;
   text-transform: uppercase;
   letter-spacing: 0.3px;
+  white-space: nowrap;
 }
 
 .engine-badge.local {
@@ -533,5 +535,109 @@
 
 .spinning {
   animation: spin 1s linear infinite;
+}
+
+/* ==================== 语言包管理 ==================== */
+
+.ocr-pack-section {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border-primary);
+}
+
+.ocr-pack-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.pack-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.ocr-pack-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  row-gap: 6px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+
+.ocr-pack-row:hover {
+  background: var(--bg-tertiary);
+}
+
+.pack-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.pack-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  row-gap: 4px;
+}
+
+.pack-name {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.pack-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: auto;
+  padding-left: 10px;
+}
+
+.pack-actions .btn-small,
+.ocr-pack-section-header .btn-small {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.pack-actions .btn-small:hover:not(:disabled),
+.ocr-pack-section-header .btn-small:hover:not(:disabled) {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.pack-actions .btn-small.download {
+  gap: 4px;
+}
+
+.pack-actions .btn-small.uninstall:hover:not(:disabled) {
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.pack-actions .btn-small:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pack-manifest-error {
+  font-size: 11.5px;
+  color: #f59e0b;
+  margin: 4px 0 6px;
 }
 

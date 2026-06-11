@@ -4,6 +4,7 @@ import translationService from '../../services/translation.js';
 import ttsManager, { TTS_STATUS } from '../../services/tts/index.js';
 import createLogger from '../../utils/logger.js';
 import { getShortErrorMessage } from '../../utils/error-handler.js';
+import { detectLanguage } from '../../utils/text.js';
 import './styles.css';
 
 import { PRIVACY_MODES, THEMES, LANGUAGE_CODES, selectionDefaults } from '@config/defaults';
@@ -500,8 +501,17 @@ const SelectionTranslator = () => {
 
     // Override > state > default. Used by screenshot path which knows the lang
     // before the state hook update has propagated.
-    const targetLang = overrideTargetLang || translation.targetLanguage || 'zh';
+    let targetLang = overrideTargetLang || translation.targetLanguage || 'zh';
     const sourceLang = overrideSourceLang || translation.sourceLanguage || 'auto';
+
+    // Selected text already in the target language would round-trip through
+    // the provider unchanged ("translation" = the source text). The card has
+    // no language picker, so flip to the other primary language — same
+    // behavior as the glass window.
+    if (detectLanguage(text) === targetLang) {
+      targetLang = targetLang === 'zh' ? 'en' : 'zh';
+      logger.debug(`Source already in target language, flipping to ${targetLang}`);
+    }
 
     try {
       const result = await translationService.translate(text, {

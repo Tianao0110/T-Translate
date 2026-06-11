@@ -77,6 +77,8 @@ contextBridge.exposeInMainWorld('electron', {
   ocr: {
     recognizeWithPaddleOCR: (imageData, options) =>
       ipcRenderer.invoke('ocr:paddle-ocr', imageData, options),
+    recognizeWithWindowsOCR: (imageData, options) =>
+      ipcRenderer.invoke('ocr:windows-ocr', imageData, options),
     recognizeWithOCRSpace: (imageData, options) =>
       ipcRenderer.invoke('ocr:ocrspace', imageData, options),
     recognizeWithGoogleVision: (imageData, options) =>
@@ -85,7 +87,6 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke('ocr:azure-ocr', imageData, options),
     recognizeWithBaiduOCR: (imageData, options) =>
       ipcRenderer.invoke('ocr:baidu-ocr', imageData, options),
-    getAvailableEngines: () => ipcRenderer.invoke('ocr:get-available-engines'),
     checkInstalled: () => ipcRenderer.invoke('ocr:check-installed'),
   },
 
