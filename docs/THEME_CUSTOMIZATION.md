@@ -1,4 +1,4 @@
-# T-Translate 主题自定义指南
+﻿# T-Translate 主题自定义指南
 
 本文档介绍如何自定义 T-Translate 的主题样式。
 
@@ -92,18 +92,18 @@ document.documentElement.removeAttribute('data-custom-accent');
 
 ### 步骤 2：添加悬浮窗口主题（可选）
 
-如果需要悬浮窗口也支持新主题，在 `src/components/GlassTranslator/styles.css` 中添加：
+如果需要悬浮窗口也支持新主题，在 `src/components/FloatingWindow/styles.css` 中添加：
 
 ```css
-[data-theme="sakura"] .glass-window {
-  --glass-bg: rgba(253, 242, 248, var(--glass-opacity, 0.92));
-  --glass-border: rgba(236, 72, 153, 0.2);
-  --glass-text: #831843;
-  --glass-text-muted: #9d174d;
-  --glass-accent: #ec4899;
+[data-theme="sakura"] .floating-window {
+  --floating-bg: rgba(253, 242, 248, var(--floating-opacity, 0.92));
+  --floating-border: rgba(236, 72, 153, 0.2);
+  --floating-text: #831843;
+  --floating-text-muted: #9d174d;
+  --floating-accent: #ec4899;
 }
 
-[data-theme="sakura"] .glass-top-area {
+[data-theme="sakura"] .floating-top-area {
   background: rgba(236, 72, 153, 0.08);
   border-bottom-color: rgba(236, 72, 153, 0.12);
 }
@@ -181,7 +181,7 @@ export const THEMES = {
 </button>
 ```
 
-3. 在 `src/components/GlassTranslator/index.jsx` 中更新主题验证：
+3. 在 `src/components/FloatingWindow/index.jsx` 中更新主题验证：
 
 ```javascript
 if (newTheme && ['light', 'dark', 'fresh', 'sakura'].includes(newTheme)) {
@@ -231,12 +231,12 @@ if (newTheme && ['light', 'dark', 'fresh', 'sakura'].includes(newTheme)) {
 
 | 变量 | 用途 |
 |------|------|
-| `--glass-bg` | 玻璃背景色 |
-| `--glass-border` | 玻璃边框色 |
-| `--glass-text` | 悬浮窗口文字色 |
-| `--glass-text-muted` | 悬浮窗口次要文字色 |
-| `--glass-accent` | 悬浮窗口强调色 |
-| `--glass-opacity` | 玻璃透明度（0-1） |
+| `--floating-bg` | 玻璃背景色 |
+| `--floating-border` | 玻璃边框色 |
+| `--floating-text` | 悬浮窗口文字色 |
+| `--floating-text-muted` | 悬浮窗口次要文字色 |
+| `--floating-accent` | 悬浮窗口强调色 |
+| `--floating-opacity` | 玻璃透明度（0-1） |
 
 ---
 
@@ -277,7 +277,7 @@ if (newTheme && ['light', 'dark', 'fresh', 'sakura'].includes(newTheme)) {
 A: 确保 CSS 选择器优先级足够高，可以使用浏览器开发者工具检查。
 
 ### Q: 悬浮窗口主题和主窗口不同步？
-A: 检查 `GlassTranslator/index.jsx` 中的主题验证列表是否包含新主题。
+A: 检查 `FloatingWindow/index.jsx` 中的主题验证列表是否包含新主题。
 
 ### Q: 如何只修改某个组件的样式？
 A: 使用更具体的选择器，如 `[data-theme="sakura"] .specific-component`。

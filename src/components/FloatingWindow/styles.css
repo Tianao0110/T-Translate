@@ -1,36 +1,36 @@
-/* src/styles/glass.css */
+﻿/* src/styles/glass.css */
 /* 玻璃翻译窗口 - v29 极简版 */
 
 /* ========== 基础变量 ========== */
 :root {
-  --glass-border: rgba(200, 200, 200, 0.3);
-  --glass-text: #333;
-  --glass-text-muted: #666;
-  --glass-accent: #3b82f6;
-  --glass-radius: 12px;
+  --floating-border: rgba(200, 200, 200, 0.3);
+  --floating-text: #333;
+  --floating-text-muted: #666;
+  --floating-accent: #3b82f6;
+  --floating-radius: 12px;
 }
 
 /* ========== 主窗口 ========== */
-.glass-window {
+.floating-window {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  /* var() resolves where a custom property is DECLARED — --glass-bg must live
-     here (not :root) to see the inline --glass-opacity set on this element */
-  --glass-bg: rgba(255, 255, 255, var(--glass-opacity, 0.85));
-  background: var(--glass-bg);
+  /* var() resolves where a custom property is DECLARED — --floating-bg must live
+     here (not :root) to see the inline --floating-opacity set on this element */
+  --floating-bg: rgba(255, 255, 255, var(--floating-opacity, 0.85));
+  background: var(--floating-bg);
   /* no backdrop-filter here: a transparent BrowserWindow has nothing behind
      it to sample — the blur was a no-op costing compositor work */
   /* 清晰边界：即使透明度拉到最低也能看到窗口范围 */
   border: 2px solid rgba(100, 100, 100, 0.4);
-  border-radius: var(--glass-radius);
+  border-radius: var(--floating-radius);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  color: var(--glass-text);
+  color: var(--floating-text);
   user-select: text;
   -webkit-app-region: drag;
 }
@@ -39,7 +39,7 @@
 /* ========== 顶部区域 ========== */
 /* Overlay, NOT in-flow: the content area is the capture origin and the
    scattered panes' coordinate space — toolbar visibility must never move it. */
-.glass-top-area {
+.floating-top-area {
   position: absolute;
   top: 0;
   left: 0;
@@ -60,13 +60,13 @@
 }
 
 /* 鼠标移入悬浮窗口时显示顶部区域 */
-.glass-window.show-toolbar .glass-top-area {
+.floating-window.show-toolbar .floating-top-area {
   opacity: 1;
   pointer-events: auto;
 }
 
 /* ========== 工具栏 ========== */
-.glass-toolbar {
+.floating-toolbar {
   display: flex;
   align-items: center;
   gap: 4px;  /* 缩小: 6 → 4 */
@@ -85,7 +85,7 @@
   border: none;
   border-radius: 4px;  /* 缩小: 6 → 4 */
   background: rgba(255, 255, 255, 0.6);  /* 更亮，与背景区分 */
-  color: var(--glass-text);
+  color: var(--floating-text);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -113,7 +113,7 @@
 /* 已设置采集区的按钮高亮 */
 .toolbar-btn.has-capture {
   background: rgba(59, 130, 246, 0.2);
-  color: var(--glass-accent);
+  color: var(--floating-accent);
 }
 
 /* 小横条 - 点击调节透明度 */
@@ -126,7 +126,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--glass-text-muted);
+  color: var(--floating-text-muted);
   transition: all 0.2s ease;
   -webkit-app-region: no-drag;
   pointer-events: auto;
@@ -143,7 +143,7 @@
 }
 
 /* ========== 关闭按钮 ========== */
-.glass-close-btn {
+.floating-close-btn {
   position: absolute;
   top: 3px;
   right: 3px;
@@ -164,11 +164,11 @@
 }
 
 /* 鼠标移入悬浮窗口时显示关闭按钮 */
-.glass-window.show-toolbar .glass-close-btn {
+.floating-window.show-toolbar .floating-close-btn {
   opacity: 1;
 }
 
-.glass-close-btn:hover {
+.floating-close-btn:hover {
   background: rgba(239, 68, 68, 0.4);
   transform: scale(1.05);
 }
@@ -192,7 +192,7 @@
 
 .opacity-popup .opacity-label {
   font-size: 12px;
-  color: var(--glass-text-muted);
+  color: var(--floating-text-muted);
   white-space: nowrap;
 }
 
@@ -209,21 +209,21 @@
   -webkit-appearance: none;
   width: 14px;
   height: 14px;
-  background: var(--glass-accent);
+  background: var(--floating-accent);
   border-radius: 50%;
   cursor: pointer;
 }
 
 .opacity-popup .opacity-value {
   font-size: 12px;
-  color: var(--glass-text);
+  color: var(--floating-text);
   font-weight: 500;
   min-width: 36px;
   text-align: right;
 }
 
 /* ========== 内容区域 ========== */
-.glass-content {
+.floating-content {
   flex: 1;
   padding: 16px;
   overflow-y: auto;
@@ -231,38 +231,38 @@
   -webkit-app-region: no-drag;
 }
 
-.glass-content::-webkit-scrollbar {
+.floating-content::-webkit-scrollbar {
   width: 4px;
 }
 
-.glass-content::-webkit-scrollbar-track {
+.floating-content::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.glass-content::-webkit-scrollbar-thumb {
+.floating-content::-webkit-scrollbar-thumb {
   background: rgba(0, 0, 0, 0.1);
   border-radius: 2px;
 }
 
 /* 消息样式 */
-.glass-message {
+.floating-message {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 8px;
   height: 100%;
-  color: var(--glass-text-muted);
+  color: var(--floating-text-muted);
   text-align: center;
   font-size: 14px;
 }
 
-.glass-message.error {
+.floating-message.error {
   color: #ef4444;
 }
 
 /* "Go to OCR Settings" button shown on OCR errors */
-.glass-action-btn {
+.floating-action-btn {
   margin-top: 10px;
   padding: 6px 14px;
   border: 1px solid currentColor;
@@ -276,11 +276,11 @@
 }
 /* Avoid `background: currentColor` here — same-rule `color` change makes
    currentColor resolve to the new color, painting the button solid white. */
-.glass-action-btn:hover {
+.floating-action-btn:hover {
   background: rgba(239, 68, 68, 0.12);
 }
 
-.glass-message.loading svg {
+.floating-message.loading svg {
   animation: spin 1s linear infinite;
 }
 
@@ -290,16 +290,16 @@
 }
 
 /* 占位提示 */
-.glass-message.placeholder {
+.floating-message.placeholder {
   font-size: 13px;
   line-height: 1.8;
 }
 
 /* 翻译结果 */
-.glass-result {
+.floating-result {
   font-size: 15px;
   line-height: 1.7;
-  color: var(--glass-text);
+  color: var(--floating-text);
   word-wrap: break-word;
   white-space: pre-wrap;  /* 保留换行符 */
 }
@@ -343,15 +343,15 @@
 }
 
 /* ========== 清新主题 ========== */
-[data-theme="fresh"] .glass-window {
-  --glass-bg: rgba(245, 250, 250, var(--glass-opacity, 0.9));
-  --glass-border: rgba(16, 185, 129, 0.25);
-  --glass-text: #1f2937;
-  --glass-text-muted: #059669;
-  --glass-accent: #10b981;
+[data-theme="fresh"] .floating-window {
+  --floating-bg: rgba(245, 250, 250, var(--floating-opacity, 0.9));
+  --floating-border: rgba(16, 185, 129, 0.25);
+  --floating-text: #1f2937;
+  --floating-text-muted: #059669;
+  --floating-accent: #10b981;
 }
 
-[data-theme="fresh"] .glass-window::before {
+[data-theme="fresh"] .floating-window::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -360,18 +360,18 @@
     rgba(52, 211, 153, 0.03),
     rgba(6, 182, 212, 0.03));
   pointer-events: none;
-  border-radius: var(--glass-radius);
+  border-radius: var(--floating-radius);
   z-index: 0;
 }
 
-[data-theme="fresh"] .glass-top-area {
+[data-theme="fresh"] .floating-top-area {
   position: relative;
   z-index: 1;
   background: rgba(16, 185, 129, 0.08);
   border-bottom-color: rgba(16, 185, 129, 0.1);
 }
 
-[data-theme="fresh"] .glass-content {
+[data-theme="fresh"] .floating-content {
   position: relative;
   z-index: 1;
 }
@@ -400,7 +400,7 @@
   color: white;
 }
 
-[data-theme="fresh"] .glass-status {
+[data-theme="fresh"] .floating-status {
   color: #10b981;
 }
 
@@ -413,28 +413,28 @@
   color: #1f2937;
 }
 
-[data-theme="fresh"] .glass-content::-webkit-scrollbar-thumb {
+[data-theme="fresh"] .floating-content::-webkit-scrollbar-thumb {
   background: rgba(16, 185, 129, 0.3);
 }
 
-[data-theme="fresh"] .glass-content::-webkit-scrollbar-thumb:hover {
+[data-theme="fresh"] .floating-content::-webkit-scrollbar-thumb:hover {
   background: rgba(16, 185, 129, 0.5);
 }
 
 /* ========== 深色主题 ========== */
-[data-theme="dark"] .glass-window {
-  --glass-bg: rgba(30, 41, 59, var(--glass-opacity, 0.9));
-  --glass-border: rgba(255, 255, 255, 0.1);
-  --glass-text: #e2e8f0;
-  --glass-text-muted: #94a3b8;
-  --glass-accent: #60a5fa;
+[data-theme="dark"] .floating-window {
+  --floating-bg: rgba(30, 41, 59, var(--floating-opacity, 0.9));
+  --floating-border: rgba(255, 255, 255, 0.1);
+  --floating-text: #e2e8f0;
+  --floating-text-muted: #94a3b8;
+  --floating-accent: #60a5fa;
 }
 
-[data-theme="dark"] .glass-top-area {
+[data-theme="dark"] .floating-top-area {
   background: rgba(15, 23, 42, 0.5);
 }
 
-[data-theme="dark"] .glass-content {
+[data-theme="dark"] .floating-content {
   color: #e2e8f0;
 }
 
@@ -461,7 +461,7 @@
   color: white;
 }
 
-[data-theme="dark"] .glass-status {
+[data-theme="dark"] .floating-status {
   color: #94a3b8;
 }
 
@@ -474,11 +474,11 @@
   color: #f1f5f9;
 }
 
-[data-theme="dark"] .glass-content::-webkit-scrollbar-thumb {
+[data-theme="dark"] .floating-content::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.2);
 }
 
-[data-theme="dark"] .glass-content::-webkit-scrollbar-thumb:hover {
+[data-theme="dark"] .floating-content::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
 }
 
@@ -505,7 +505,7 @@
 
 /* 散点模式：移除内容区 padding，子窗格坐标 1:1 对齐截图区域。
    溢出保持裁剪——web 内容不可能渲染到窗口外，拖出窗口请用双击分离 */
-.glass-content.scattered-mode {
+.floating-content.scattered-mode {
   padding: 0;
   overflow: hidden;
 }
@@ -521,13 +521,13 @@
   z-index: 2000;  /* 提高优先级，确保在所有元素之上 */
 }
 
-.frozen-panes-container .child-glass-pane {
+.frozen-panes-container .floating-child-pane {
   pointer-events: auto;
 }
 
-.child-glass-pane {
+.floating-child-pane {
   position: absolute;
-  /* 固定不透明背景，不受父窗口 --glass-opacity 影响 */
+  /* 固定不透明背景，不受父窗口 --floating-opacity 影响 */
   background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(12px);
   border: 1.5px solid rgba(0, 0, 0, 0.15);
@@ -546,26 +546,26 @@
   user-select: text;
 }
 
-.child-glass-pane:hover {
+.floating-child-pane:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.child-glass-pane.dragging {
+.floating-child-pane.dragging {
   cursor: grabbing;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
   opacity: 0.9;
 }
 
-.child-glass-pane.frozen {
-  border-color: var(--glass-accent);
+.floating-child-pane.frozen {
+  border-color: var(--floating-accent);
   box-shadow: 0 4px 16px rgba(59, 130, 246, 0.25);
 }
 
-.child-glass-pane.translating {
+.floating-child-pane.translating {
   border-color: rgba(59, 130, 246, 0.3);
 }
 
-.child-glass-pane.error {
+.floating-child-pane.error {
   border-color: rgba(239, 68, 68, 0.3);
 }
 
@@ -612,7 +612,7 @@
   align-items: center;
   justify-content: center;
   padding: 4px;
-  color: var(--glass-accent);
+  color: var(--floating-accent);
 }
 
 .child-pane-loading .spin {
@@ -655,7 +655,7 @@
 }
 
 .child-pane-btn.copy:hover {
-  color: var(--glass-accent);
+  color: var(--floating-accent);
 }
 
 .child-pane-btn.close:hover {
@@ -665,17 +665,17 @@
 
 /* ========== 子玻璃板深色主题 ========== */
 
-[data-theme="dark"] .child-glass-pane {
+[data-theme="dark"] .floating-child-pane {
   background: rgba(30, 41, 59, 0.98);
   border-color: rgba(255, 255, 255, 0.15);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
 }
 
-[data-theme="dark"] .child-glass-pane:hover {
+[data-theme="dark"] .floating-child-pane:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
-[data-theme="dark"] .child-glass-pane.frozen {
+[data-theme="dark"] .floating-child-pane.frozen {
   border-color: #60a5fa;
   box-shadow: 0 4px 16px rgba(96, 165, 250, 0.3);
 }
@@ -706,17 +706,17 @@
 
 /* ========== 子玻璃板彩虹主题 ========== */
 
-[data-theme="fresh"] .child-glass-pane {
+[data-theme="fresh"] .floating-child-pane {
   background: rgba(245, 250, 250, 0.98);
   border-color: rgba(16, 185, 129, 0.2);
   box-shadow: 0 2px 12px rgba(16, 185, 129, 0.15);
 }
 
-[data-theme="fresh"] .child-glass-pane:hover {
+[data-theme="fresh"] .floating-child-pane:hover {
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
 }
 
-[data-theme="fresh"] .child-glass-pane.frozen {
+[data-theme="fresh"] .floating-child-pane.frozen {
   border-color: #10b981;
   box-shadow: 0 4px 16px rgba(16, 185, 129, 0.25);
 }
@@ -742,7 +742,7 @@
 
 /* ========== 历史记录面板 ========== */
 
-.glass-history-panel {
+.floating-history-panel {
   position: absolute;
   top: 32px;
   left: 8px;
@@ -885,24 +885,24 @@
 
 /* 穿透模式下的窗口样式 */
 /* 不再设置整个窗口透明度，而是分别控制各部分 */
-.glass-window.pass-through {
+.floating-window.pass-through {
   background: rgba(255, 255, 255, 0.15) !important;  /* 背景更透明 */
 }
 
-.glass-window.pass-through .glass-top-area {
+.floating-window.pass-through .floating-top-area {
   opacity: 0.3;
 }
 
-.glass-window.pass-through .glass-content {
+.floating-window.pass-through .floating-content {
   opacity: 0.3;
 }
 
 /* 冻结的子玻璃板不透明 */
-.glass-window.pass-through .frozen-panes-container {
+.floating-window.pass-through .frozen-panes-container {
   opacity: 1 !important;
 }
 
-.glass-window.pass-through .frozen-panes-container .child-glass-pane {
+.floating-window.pass-through .frozen-panes-container .floating-child-pane {
   opacity: 1 !important;
   /* 穿透模式下冻结的子玻璃板更醒目 */
   box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
@@ -911,12 +911,12 @@
 /* 工具栏按钮激活状态 */
 .toolbar-btn.active {
   background: rgba(59, 130, 246, 0.15);
-  color: var(--glass-accent);
+  color: var(--floating-accent);
 }
 
 /* ========== 历史记录深色主题 ========== */
 
-[data-theme="dark"] .glass-history-panel {
+[data-theme="dark"] .floating-history-panel {
   background: rgba(30, 41, 59, 0.98);
   border-color: rgba(255, 255, 255, 0.1);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
@@ -962,7 +962,7 @@
 
 /* ========== 历史记录彩虹主题 ========== */
 
-[data-theme="fresh"] .glass-history-panel {
+[data-theme="fresh"] .floating-history-panel {
   background: rgba(245, 250, 250, 0.98);
   border-color: rgba(16, 185, 129, 0.15);
   box-shadow: 0 4px 16px rgba(16, 185, 129, 0.15);
@@ -991,7 +991,7 @@
 
 /* ========== 浮动通知条（OCR 降级等） ========== */
 
-.glass-toast {
+.floating-toast {
   position: absolute;
   top: 36px;
   left: 8px;
@@ -1002,26 +1002,26 @@
   font-size: 12px;
   line-height: 1.4;
   cursor: pointer;
-  animation: glass-toast-in 0.3s ease-out;
+  animation: floating-toast-in 0.3s ease-out;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
-.glass-toast-info {
+.floating-toast-info {
   background: rgba(59, 130, 246, 0.9);
   color: #fff;
 }
 
-.glass-toast-warning {
+.floating-toast-warning {
   background: rgba(245, 158, 11, 0.9);
   color: #fff;
 }
 
-.glass-toast-error {
+.floating-toast-error {
   background: rgba(239, 68, 68, 0.9);
   color: #fff;
 }
 
-@keyframes glass-toast-in {
+@keyframes floating-toast-in {
   from {
     opacity: 0;
     transform: translateY(-8px);

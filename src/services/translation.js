@@ -1,4 +1,4 @@
-// Translation service facade. Owns preprocessing (do-not-translate filters),
+﻿// Translation service facade. Owns preprocessing (do-not-translate filters),
 // two-level cache (L1 memory + L2 disk), template selection, provider routing
 // with fallback, privacy-mode gating, and glossary post-processing.
 //
@@ -127,8 +127,8 @@ class TranslationService {
       }
 
       // Glass overlay calls into main which returns already-decrypted configs
-      if (!providerConfigs && window.electron?.glass?.getProviderConfigs) {
-        const glassConfigs = await window.electron.glass.getProviderConfigs();
+      if (!providerConfigs && window.electron?.floatingWindow?.getProviderConfigs) {
+        const glassConfigs = await window.electron.floatingWindow.getProviderConfigs();
         if (glassConfigs) {
           providerList = glassConfigs.list;
           providerConfigs = glassConfigs.configs;

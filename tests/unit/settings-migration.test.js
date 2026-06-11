@@ -1,37 +1,37 @@
-// migrateOldSettings coverage for the glass -> glassWindow bucket unification
+﻿// migrateOldSettings coverage for the glass -> floatingWindow bucket unification
 // and the paddle-ocr engine id remap.
 
 import { describe, it, expect } from 'vitest';
 import { migrateOldSettings, DEFAULT_SETTINGS } from '../../src/components/SettingsPanel/constants.js';
 
-describe('migrateOldSettings: glassWindow unification', () => {
-  it('fills glassWindow defaults when nothing was saved', () => {
+describe('migrateOldSettings: floatingWindow unification', () => {
+  it('fills floatingWindow defaults when nothing was saved', () => {
     const m = migrateOldSettings({});
-    expect(m.glassWindow).toEqual(DEFAULT_SETTINGS.glassWindow);
-    expect(m.glassWindow.lockTargetLang).toBe(false);
-    expect(m.glassWindow.defaultOpacity).toBe(0.85);
+    expect(m.floatingWindow).toEqual(DEFAULT_SETTINGS.floatingWindow);
+    expect(m.floatingWindow.lockTargetLang).toBe(false);
+    expect(m.floatingWindow.defaultOpacity).toBe(0.85);
   });
 
-  it('maps legacy glass.opacity to glassWindow.defaultOpacity and drops the old bucket', () => {
+  it('maps legacy glass.opacity to floatingWindow.defaultOpacity and drops the old bucket', () => {
     const m = migrateOldSettings({ glass: { opacity: 0.7, width: 400, fontSize: 14 } });
-    expect(m.glassWindow.defaultOpacity).toBe(0.7);
+    expect(m.floatingWindow.defaultOpacity).toBe(0.7);
     expect(m.glass).toBeUndefined();
   });
 
-  it('existing glassWindow values win over legacy glass values', () => {
+  it('existing floatingWindow values win over legacy glass values', () => {
     const m = migrateOldSettings({
       glass: { opacity: 0.7 },
-      glassWindow: { defaultOpacity: 0.6, lockTargetLang: true },
+      floatingWindow: { defaultOpacity: 0.6, lockTargetLang: true },
     });
-    expect(m.glassWindow.defaultOpacity).toBe(0.6);
-    expect(m.glassWindow.lockTargetLang).toBe(true);
+    expect(m.floatingWindow.defaultOpacity).toBe(0.6);
+    expect(m.floatingWindow.lockTargetLang).toBe(true);
     expect(m.glass).toBeUndefined();
   });
 
-  it('partial glassWindow gets all newly-added defaults', () => {
-    const m = migrateOldSettings({ glassWindow: { lockTargetLang: true } });
-    expect(m.glassWindow.lockTargetLang).toBe(true);
-    expect(m.glassWindow.defaultOpacity).toBe(0.85);
+  it('partial floatingWindow gets all newly-added defaults', () => {
+    const m = migrateOldSettings({ floatingWindow: { lockTargetLang: true } });
+    expect(m.floatingWindow.lockTargetLang).toBe(true);
+    expect(m.floatingWindow.defaultOpacity).toBe(0.85);
   });
 });
 

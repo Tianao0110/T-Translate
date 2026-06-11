@@ -1,4 +1,4 @@
-// Shared constants for SettingsPanel: defaults, nav, settings shape, migrations.
+﻿// Shared constants for SettingsPanel: defaults, nav, settings shape, migrations.
 
 import {
   Globe, Shield, Zap, Moon, Sun,
@@ -24,7 +24,7 @@ export const defaultConfig = {
     copy: 'Ctrl+C',
     screenshot: 'Alt+Q',
     toggleWindow: 'Ctrl+Shift+W',
-    glassWindow: 'Ctrl+Alt+G',
+    floatingWindow: 'Ctrl+Alt+G',
     selectionTranslate: 'Ctrl+Shift+T',
   },
   dev: { debugMode: false },
@@ -39,11 +39,11 @@ export const SHORTCUT_LABELS = {
   copy: '复制结果',
   screenshot: '📷 截图翻译',
   toggleWindow: '🪟 显示/隐藏窗口',
-  glassWindow: '🔮 悬浮窗口',
+  floatingWindow: '🔮 悬浮窗口',
   selectionTranslate: '✏️ 划词翻译开关',
 };
 
-export const GLOBAL_SHORTCUT_KEYS = ['screenshot', 'toggleWindow', 'glassWindow', 'selectionTranslate'];
+export const GLOBAL_SHORTCUT_KEYS = ['screenshot', 'toggleWindow', 'floatingWindow', 'selectionTranslate'];
 
 // `basic: true` flags items shown in the simplified settings view.
 // `keywords` powers the in-settings search.
@@ -51,7 +51,7 @@ export const NAV_ITEMS = [
   { id: 'providers', icon: Server, group: 'translation', basic: true, keywords: ['provider', 'openai', 'deepl', 'gemini', 'deepseek', 'local', 'api', '翻译源', '本地'] },
   { id: 'translation', icon: Globe, group: 'translation', basic: true, keywords: ['language', 'source', 'target', 'auto', 'stream', '翻译', '语言', '流式'] },
   { id: 'selection', icon: MousePointer, group: 'translation', keywords: ['selection', 'mouse', 'trigger', 'button', '划词', '选中', '鼠标'] },
-  { id: 'glassWindow', icon: Layers, group: 'translation', keywords: ['glass', 'floating', 'overlay', 'pin', '玻璃', '透明', '置顶'] },
+  { id: 'floatingWindow', icon: Layers, group: 'translation', keywords: ['glass', 'floating', 'overlay', 'pin', '玻璃', '透明', '置顶'] },
   { id: 'document', icon: FileText, group: 'translation', keywords: ['document', 'pdf', 'docx', 'epub', 'srt', 'subtitle', '文档', '字幕'] },
   { id: 'ocr', icon: Eye, group: 'system', keywords: ['ocr', 'recognize', 'screenshot', 'image', 'rapidocr', 'llm', '识别', '截图'] },
   { id: 'tts', icon: Volume2, group: 'system', keywords: ['tts', 'speech', 'voice', 'volume', 'rate', '朗读', '语音', '语速'] },
@@ -96,8 +96,8 @@ export const DEFAULT_SETTINGS = {
   },
 
   // Floating window. Single source of truth for its defaults —
-  // electron/ipc/glass.js GET_SETTINGS fallbacks must stay in sync.
-  glassWindow: {
+  // electron/ipc/floating-window.js GET_SETTINGS fallbacks must stay in sync.
+  floatingWindow: {
     defaultOpacity: 0.85,
     lockTargetLang: false,
   },
@@ -183,9 +183,9 @@ export const migrateOldSettings = (savedSettings) => {
       ...DEFAULT_SETTINGS.document,
       ...(savedSettings.document || {}),
     },
-    glassWindow: {
-      ...DEFAULT_SETTINGS.glassWindow,
-      ...(savedSettings.glassWindow || {}),
+    floatingWindow: {
+      ...DEFAULT_SETTINGS.floatingWindow,
+      ...(savedSettings.floatingWindow || {}),
     },
     selection: {
       ...DEFAULT_SETTINGS.selection,
@@ -244,13 +244,13 @@ export const migrateOldSettings = (savedSettings) => {
     };
   }
 
-  // Legacy `settings.glass` bucket -> `glassWindow`. Only `opacity` maps to a
+  // Legacy `settings.glass` bucket -> `floatingWindow`. Only `opacity` maps to a
   // live key; the rest (width/height/fontSize/...) were dead for several
   // versions. The old bucket is dropped so it never gets re-persisted.
   if (savedSettings.glass && typeof savedSettings.glass === 'object') {
-    if (savedSettings.glassWindow?.defaultOpacity === undefined &&
+    if (savedSettings.floatingWindow?.defaultOpacity === undefined &&
         typeof savedSettings.glass.opacity === 'number') {
-      migrated.glassWindow.defaultOpacity = savedSettings.glass.opacity;
+      migrated.floatingWindow.defaultOpacity = savedSettings.glass.opacity;
     }
     delete migrated.glass;
   }

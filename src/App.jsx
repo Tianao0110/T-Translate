@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import TitleBar from './components/TitleBar';
 import MainWindow from './components/MainWindow';
 import useTranslationStore from './stores/translation-store';
@@ -122,7 +122,7 @@ function App() {
         logger.debug('Received add-to-favorites:', item?.sourceText?.substring(0, 30));
         if (item && addToFavorites) {
           addToFavorites({
-            id: item.id || `glass-${Date.now()}`,
+            id: item.id || `floating-${Date.now()}`,
             sourceText: item.sourceText || '',
             translatedText: item.translatedText || '',
             sourceLanguage: item.sourceLanguage || 'auto',
@@ -131,7 +131,7 @@ function App() {
             tags: item.tags || [],
             folderId: item.folderId || null,
             isStyleReference: item.isStyleReference || false,
-            source: item.source || 'glass-translator'
+            source: item.source || 'floating-translator'
           });
         }
       };

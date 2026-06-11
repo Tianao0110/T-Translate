@@ -1,4 +1,4 @@
-// Preload for the selection-translator window.
+﻿// Preload for the selection-translator window.
 
 const { contextBridge, ipcRenderer } = require("electron");
 
@@ -44,7 +44,7 @@ contextBridge.exposeInMainWorld("electron", {
       return () => ipcRenderer.removeListener("selection:show-direct", listener);
     },
     // Reuses glass:open-main-settings channel — handler doesn't care which window invoked it
-    openOcrSettings: () => ipcRenderer.invoke("glass:open-main-settings", "ocr"),
+    openOcrSettings: () => ipcRenderer.invoke("floating-window:open-main-settings", "ocr"),
   },
 
   clipboard: {

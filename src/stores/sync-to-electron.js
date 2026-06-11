@@ -1,4 +1,4 @@
-// Bridges Zustand store changes to electron-store so main-process windows
+﻿// Bridges Zustand store changes to electron-store so main-process windows
 // (selection translator, glass window) can read settings via the same
 // electron-store API without round-tripping JavaScript into a renderer.
 //
@@ -22,7 +22,7 @@ function debouncedSync(dotPath, value, delay = 100) {
       logger.debug(`Synced settings.${dotPath}`);
       // Notify glass so it can reload target lang / theme without restart.
       // Separate debounce to merge bursts (e.g. user toggles src+tgt back-to-back).
-      debouncedNotifyGlass();
+      debouncedNotifyFloatingWindow();
     } catch (e) {
       logger.debug(`Sync failed for ${dotPath}:`, e.message);
     }
@@ -30,12 +30,12 @@ function debouncedSync(dotPath, value, delay = 100) {
 }
 
 let _glassNotifyTimer = null;
-function debouncedNotifyGlass(delay = 50) {
+function debouncedNotifyFloatingWindow(delay = 50) {
   clearTimeout(_glassNotifyTimer);
   _glassNotifyTimer = setTimeout(async () => {
     try {
-      if (!window.electron?.glass?.notifySettingsChanged) return;
-      await window.electron.glass.notifySettingsChanged();
+      if (!window.electron?.floatingWindow?.notifySettingsChanged) return;
+      await window.electron.floatingWindow.notifySettingsChanged();
       logger.debug('Notified glass of settings change');
     } catch (e) {
       logger.debug('Glass notify failed:', e.message);

@@ -1,4 +1,4 @@
-/* src/styles/App.css */
+﻿/* src/styles/App.css */
 /* 全局共享样式 + 遗留组件样式 (待逐步迁移到各组件目录) */
 
 
@@ -52,7 +52,7 @@ body {
 .translation-panel,
 .setting-content,
 .sel-text,
-.glass-content {
+.floating-content {
   font-size: var(--base-font-size);
 }
 

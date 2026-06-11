@@ -1,17 +1,17 @@
-// Tray-menu translation table for the main process.
+﻿// Tray-menu translation table for the main process.
 // react-i18next is renderer-only; the main process needs its own minimal table.
 
 const trayLabels = {
   zh: {
     screenshot: '截图翻译',
-    glassWindow: '悬浮窗口',
+    floatingWindow: '悬浮窗口',
     selectionTranslate: '划词翻译',
     settings: '设置',
     quit: '退出'
   },
   en: {
     screenshot: 'Screenshot Translate',
-    glassWindow: 'Floating Window',
+    floatingWindow: 'Floating Window',
     selectionTranslate: 'Selection Translate',
     settings: 'Settings',
     quit: 'Quit'

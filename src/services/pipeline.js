@@ -1,4 +1,4 @@
-// Glass-window translation pipeline: capture -> OCR -> (scattered or unified) -> translate.
+﻿// Glass-window translation pipeline: capture -> OCR -> (scattered or unified) -> translate.
 // Owns dedupe-by-hash, target-language flip, and child-pane lifecycle.
 
 import { ocrManager } from '../providers/ocr/index.js';
@@ -129,7 +129,7 @@ class TranslationPipeline {
 
       session.startCapture();
 
-      const captureResult = await window.electron?.glass?.captureRegion?.(captureOptions);
+      const captureResult = await window.electron?.floatingWindow?.captureRegion?.(captureOptions);
       if (!captureResult?.success) {
         throw new Error(captureResult?.error || _t('screenshot.failed', '截图失败'));
       }

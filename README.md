@@ -1,4 +1,4 @@
-# T-Translate
+﻿# T-Translate
 
 <p align="right">
   English | <a href="./README.zh-CN.md">简体中文</a>
@@ -58,7 +58,7 @@ Capture a screen region for text recognition. When an OCR engine is unavailable,
 Transparent overlay window for live translation. Drag, resize, pin on top. Spawn independent child panes. Space-bar / left-click acts as a toggle: with content → clear, without content → screenshot-and-translate. Child window opacity is independent of the parent, always readable.
 
 <p align="center">
-  <img src="docs/screenshots/glass-window.png" width="600" alt="Floating window">
+  <img src="docs/screenshots/floating-window.png" width="600" alt="Floating window">
 </p>
 
 ### Document translation

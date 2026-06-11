@@ -16,38 +16,38 @@ contextBridge.exposeInMainWorld('electron', {
     get: (key) => ipcRenderer.invoke('store-get', key),
   },
 
-  glass: {
-    getBounds: () => ipcRenderer.invoke('glass:get-bounds'),
+  floatingWindow: {
+    getBounds: () => ipcRenderer.invoke('floating-window:get-bounds'),
 
-    captureRegion: (bounds) => ipcRenderer.invoke('glass:capture-region', bounds),
+    captureRegion: (bounds) => ipcRenderer.invoke('floating-window:capture-region', bounds),
 
-    setPassThrough: (enabled) => ipcRenderer.invoke('glass:set-pass-through', enabled),
+    setPassThrough: (enabled) => ipcRenderer.invoke('floating-window:set-pass-through', enabled),
 
-    close: () => ipcRenderer.invoke('glass:close'),
+    close: () => ipcRenderer.invoke('floating-window:close'),
 
     // Merged settings (main app + window-local)
-    getSettings: () => ipcRenderer.invoke('glass:get-settings'),
+    getSettings: () => ipcRenderer.invoke('floating-window:get-settings'),
 
-    getProviderConfigs: () => ipcRenderer.invoke('glass:get-provider-configs'),
+    getProviderConfigs: () => ipcRenderer.invoke('floating-window:get-provider-configs'),
 
     // Persists window-locally (survives relaunch and settings broadcasts)
-    setOpacity: (opacity) => ipcRenderer.invoke('glass:set-opacity', opacity),
+    setOpacity: (opacity) => ipcRenderer.invoke('floating-window:set-opacity', opacity),
 
-    getHistory: (limit) => ipcRenderer.invoke('glass:get-history', limit),
+    getHistory: (limit) => ipcRenderer.invoke('floating-window:get-history', limit),
 
-    openMainSettings: (section) => ipcRenderer.invoke('glass:open-main-settings', section),
+    openMainSettings: (section) => ipcRenderer.invoke('floating-window:open-main-settings', section),
 
     onSettingsChanged: (callback) => {
       const handler = (event, settings) => callback(settings);
-      ipcRenderer.on('glass:settings-changed', handler);
-      return () => ipcRenderer.removeListener('glass:settings-changed', handler);
+      ipcRenderer.on('floating-window:settings-changed', handler);
+      return () => ipcRenderer.removeListener('floating-window:settings-changed', handler);
     },
 
     // ===== Detached child panes (standalone windows) =====
 
-    createChildWindow: (options) => ipcRenderer.invoke('glass:create-child-window', options),
-    closeChildWindow: (id) => ipcRenderer.invoke('glass:close-child-window', id),
-    closeAllChildWindows: () => ipcRenderer.invoke('glass:close-all-child-windows'),
+    createChildWindow: (options) => ipcRenderer.invoke('floating-window:create-child-window', options),
+    closeChildWindow: (id) => ipcRenderer.invoke('floating-window:close-child-window', id),
+    closeAllChildWindows: () => ipcRenderer.invoke('floating-window:close-all-child-windows'),
 
     onChildWindowClosed: (callback) => {
       const handler = (event, id) => callback(id);

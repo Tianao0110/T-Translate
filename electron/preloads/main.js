@@ -1,4 +1,4 @@
-// Main-window preload — exposes the `electron` API via contextBridge.
+﻿// Main-window preload — exposes the `electron` API via contextBridge.
 // main.js MUST set `sandbox: false` for fs access (preload runs in renderer process).
 
 const { contextBridge, ipcRenderer } = require("electron");
@@ -46,8 +46,8 @@ const validChannels = {
     "store-has",
     "get-app-path",
     "capture-screen",
-    "glass:open",
-    "glass:notify-settings-changed",
+    "floating-window:open",
+    "floating-window:notify-settings-changed",
     "secure-storage:encrypt",
     "secure-storage:decrypt",
     "secure-storage:delete",
@@ -142,9 +142,9 @@ const electronAPI = {
     isAvailable: () => ipcRenderer.invoke("secure-storage:is-available"),
     getAccessLog: () => ipcRenderer.invoke("secure-storage:getAccessLog"),
   },
-  glass: {
-    open: () => ipcRenderer.invoke("glass:open"),
-    notifySettingsChanged: () => ipcRenderer.invoke("glass:notify-settings-changed"),
+  floatingWindow: {
+    open: () => ipcRenderer.invoke("floating-window:open"),
+    notifySettingsChanged: () => ipcRenderer.invoke("floating-window:notify-settings-changed"),
   },
   selection: {
     toggle: () => ipcRenderer.invoke("selection:toggle"),
@@ -233,7 +233,7 @@ const electronAPI = {
       }
     },
   },
-  // Direct ipcRenderer for glass-window-style use cases.
+  // Direct ipcRenderer for floating-window-style use cases.
   ipcRenderer: {
     on: (channel, func) => {
       if (validChannels.receive.includes(channel)) {

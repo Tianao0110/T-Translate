@@ -1,4 +1,4 @@
-// Interface settings: startup, language, theme, keyboard shortcuts.
+﻿// Interface settings: startup, language, theme, keyboard shortcuts.
 
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -86,7 +86,7 @@ const InterfaceSection = ({
       } else {
         // Fallback path for older preload bundles without theme.set
         await window.electron?.store?.set?.('settings.interface.theme', theme);
-        await window.electron?.glass?.notifySettingsChanged?.();
+        await window.electron?.floatingWindow?.notifySettingsChanged?.();
       }
     } catch (e) {
       console.warn('Failed to save theme:', e);
@@ -103,7 +103,7 @@ const InterfaceSection = ({
     copy: { label: t('shortcuts.copy'), global: false, icon: '📄' },
     screenshot: { label: t('shortcuts.screenshot'), global: true, icon: '📷' },
     toggleWindow: { label: t('shortcuts.toggleWindow'), global: true, icon: '🪟' },
-    glassWindow: { label: t('shortcuts.glassWindow'), global: true, icon: '🔮' },
+    floatingWindow: { label: t('shortcuts.floatingWindow'), global: true, icon: '🔮' },
     selectionTranslate: { label: t('shortcuts.selectionTranslate'), global: true, icon: '✏️' },
   };
 
@@ -140,7 +140,7 @@ const InterfaceSection = ({
     updateSetting('shortcuts', null, defaultConfig.shortcuts);
     setSettings(prev => ({ ...prev, shortcuts: defaultConfig.shortcuts }));
     if (window.electron?.shortcuts?.update) {
-      ['screenshot', 'toggleWindow', 'glassWindow', 'selectionTranslate'].forEach(action => {
+      ['screenshot', 'toggleWindow', 'floatingWindow', 'selectionTranslate'].forEach(action => {
         window.electron.shortcuts.update(action, defaultConfig.shortcuts[action]);
       });
     }

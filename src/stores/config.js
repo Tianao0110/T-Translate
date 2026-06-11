@@ -1,4 +1,5 @@
-// Persistent user preferences: languages, engine priorities, theme, glass settings.
+// Persistent user preferences shared by all renderer windows
+// (localStorage key 't-translate-config').
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
@@ -16,7 +17,8 @@ const useConfigStore = create(
     (set, get) => ({
       sourceLanguage: LANGUAGE_CODES.AUTO,
       targetLanguage: LANGUAGE_CODES.ZH,
-      lockTargetLang: true,
+      // false = flip zh<->en when source equals target (floating window)
+      lockTargetLang: false,
 
       translationEngine: PROVIDER_IDS.LOCAL_LLM,
       providerPriority: [PROVIDER_IDS.LOCAL_LLM, PROVIDER_IDS.OPENAI, PROVIDER_IDS.DEEPL],
@@ -25,14 +27,8 @@ const useConfigStore = create(
       ocrPriority: [OCR_ENGINES.RAPID_OCR, OCR_ENGINES.LLM_VISION],
 
       theme: THEMES.LIGHT,
-      glassOpacity: 0.85,
+      floatingOpacity: 0.85,
       fontSize: DEFAULTS.FONT_SIZE,
-
-      glassWindow: {
-        autoPin: true,
-        rememberPosition: true,
-        smartDetect: true,
-      },
 
       setSourceLanguage: (lang) => set({ sourceLanguage: lang }),
       setTargetLanguage: (lang) => set({ targetLanguage: lang }),
@@ -45,22 +41,18 @@ const useConfigStore = create(
       setOcrPriority: (priority) => set({ ocrPriority: priority }),
 
       setTheme: (theme) => set({ theme }),
-      setGlassOpacity: (opacity) => set({ glassOpacity: opacity }),
-
-      updateGlassWindow: (updates) => set((state) => ({
-        glassWindow: { ...state.glassWindow, ...updates }
-      })),
+      setFloatingOpacity: (opacity) => set({ floatingOpacity: opacity }),
 
       reset: () => set({
         sourceLanguage: LANGUAGE_CODES.AUTO,
         targetLanguage: LANGUAGE_CODES.ZH,
-        lockTargetLang: true,
+        lockTargetLang: false,
         translationEngine: PROVIDER_IDS.LOCAL_LLM,
         providerPriority: [PROVIDER_IDS.LOCAL_LLM, PROVIDER_IDS.OPENAI, PROVIDER_IDS.DEEPL],
         ocrEngine: OCR_ENGINES.RAPID_OCR,
         ocrPriority: [OCR_ENGINES.RAPID_OCR, OCR_ENGINES.LLM_VISION],
         theme: THEMES.LIGHT,
-        glassOpacity: 0.85,
+        floatingOpacity: 0.85,
         fontSize: DEFAULTS.FONT_SIZE,
       }),
     }),
@@ -76,9 +68,8 @@ const useConfigStore = create(
         ocrEngine: state.ocrEngine,
         ocrPriority: state.ocrPriority,
         theme: state.theme,
-        glassOpacity: state.glassOpacity,
+        floatingOpacity: state.floatingOpacity,
         fontSize: state.fontSize,
-        glassWindow: state.glassWindow,
       }),
     }
   )

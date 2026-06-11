@@ -1,4 +1,4 @@
-// Privacy-mode definitions. Each mode pins feature flags and an
+﻿// Privacy-mode definitions. Each mode pins feature flags and an
 // optional allowlist of providers / OCR engines. Consumed app-wide.
 
 import { PRIVACY_MODES as PRIVACY_MODE_IDS, PROVIDER_IDS, OCR_ENGINES } from './constants.js';
@@ -17,7 +17,7 @@ export const PRIVACY_MODES = {
       analytics: true,
       autoSave: true,
       selectionTranslate: true,
-      glassWindow: true,
+      floatingWindow: true,
       documentTranslate: true,
       exportData: true,
       ocr: true,
@@ -39,7 +39,7 @@ export const PRIVACY_MODES = {
       analytics: false,
       autoSave: false,
       selectionTranslate: true,
-      glassWindow: true,
+      floatingWindow: true,
       documentTranslate: true,
       exportData: false,
       ocr: true,
@@ -61,7 +61,7 @@ export const PRIVACY_MODES = {
       analytics: false,
       autoSave: true,
       selectionTranslate: true,
-      glassWindow: true,
+      floatingWindow: true,
       documentTranslate: true,
       exportData: true,
       ocr: true,
@@ -83,7 +83,7 @@ export const PRIVACY_MODES = {
       analytics: false,
       autoSave: false,
       selectionTranslate: true,
-      glassWindow: true,
+      floatingWindow: true,
       documentTranslate: false,
       exportData: false,
       ocr: true,

@@ -1,4 +1,4 @@
-// Single OCR text block's translation overlay. Drag to move, double-click to
+﻿// Single OCR text block's translation overlay. Drag to move, double-click to
 // promote into an independent BrowserWindow (handled by parent's onFreeze).
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { X, Copy, Check, Loader2 } from 'lucide-react';
 import { CHILD_PANE_STATUS } from '../../stores/session.js';
 
-const ChildGlassPane = ({
+const ChildPane = ({
   pane,
   parentBounds,
   onPositionChange,
@@ -192,14 +192,14 @@ const ChildGlassPane = ({
   return (
     <div
       ref={paneRef}
-      className={`child-glass-pane ${statusClass} ${isFrozen ? 'frozen' : ''} ${isDragging ? 'dragging' : ''}`}
+      className={`floating-child-pane ${statusClass} ${isFrozen ? 'frozen' : ''} ${isDragging ? 'dragging' : ''}`}
       style={paneStyle}
       data-theme={theme}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onMouseDown={handleMouseDown}
       onDoubleClick={handleDoubleClick}
-      title={status === CHILD_PANE_STATUS.DONE && !isFrozen ? t('glass.doubleClickFreeze', '双击固定为独立窗口') : ''}
+      title={status === CHILD_PANE_STATUS.DONE && !isFrozen ? t('floatingWindow.doubleClickFreeze', '双击固定为独立窗口') : ''}
     >
       <div className="child-pane-content">
         {status === CHILD_PANE_STATUS.TRANSLATING ? (
@@ -240,4 +240,4 @@ const ChildGlassPane = ({
   );
 };
 
-export default ChildGlassPane;
+export default ChildPane;

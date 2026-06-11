@@ -1,4 +1,4 @@
-// System tray manager with locale-aware menu labels.
+﻿// System tray manager with locale-aware menu labels.
 
 const { Tray, Menu, nativeImage, app } = require('electron');
 const path = require('path');
@@ -15,7 +15,7 @@ let activeIcon = null;
 let deps = {
   getMainWindow: null,
   startScreenshot: null,
-  toggleGlassWindow: null,
+  toggleFloatingWindow: null,
   toggleSelectionTranslate: null,
   getSelectionEnabled: null,
 };
@@ -87,7 +87,7 @@ function createTray(ctx) {
     init({
       getMainWindow: ctx.getMainWindow,
       startScreenshot: ctx.managers?.startScreenshot,
-      toggleGlassWindow: ctx.managers?.toggleGlassWindow,
+      toggleFloatingWindow: ctx.managers?.toggleFloatingWindow,
       toggleSelectionTranslate: ctx.managers?.toggleSelectionTranslate,
       getSelectionEnabled: () => ctx.runtime?.selectionEnabled ?? false,
     });
@@ -202,13 +202,13 @@ function updateMenu() {
       },
     },
     {
-      label: t('glassWindow'),
+      label: t('floatingWindow'),
       click: () => {
-        logger.debug('Menu: glassWindow clicked');
-        if (deps.toggleGlassWindow) {
-          deps.toggleGlassWindow();
+        logger.debug('Menu: floatingWindow clicked');
+        if (deps.toggleFloatingWindow) {
+          deps.toggleFloatingWindow();
         } else {
-          logger.warn('toggleGlassWindow not available');
+          logger.warn('toggleFloatingWindow not available');
         }
       },
     },

@@ -3,18 +3,18 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
-const GlassWindowSection = ({
+const FloatingWindowSection = ({
   settings,
   updateSetting,
   handleSectionChange
 }) => {
   const { t } = useTranslation();
 
-  // Fallbacks mirror DEFAULT_SETTINGS.glassWindow.
+  // Fallbacks mirror DEFAULT_SETTINGS.floatingWindow.
   const gw = {
     defaultOpacity: 0.85,
     lockTargetLang: false,
-    ...(settings.glassWindow || {}),
+    ...(settings.floatingWindow || {}),
   };
 
   const getOcrEngineName = (engine) => {
@@ -28,44 +28,44 @@ const GlassWindowSection = ({
 
   return (
     <div className="setting-content">
-      <h3>{t('settings.glass.title')}</h3>
-      <p className="setting-description">{t('glass.description')}</p>
+      <h3>{t('settings.floatingWindow.title')}</h3>
+      <p className="setting-description">{t('floatingWindow.description')}</p>
       
       {/* 锁定目标语言 */}
       <div className="setting-group">
-        <label className="setting-label">{t('glass.lockTargetLang')}</label>
+        <label className="setting-label">{t('floatingWindow.lockTargetLang')}</label>
         <div className="toggle-wrapper">
           <button
             className={`toggle-button ${gw.lockTargetLang ? 'active' : ''}`}
-            onClick={() => updateSetting('glassWindow', 'lockTargetLang', !gw.lockTargetLang)}
+            onClick={() => updateSetting('floatingWindow', 'lockTargetLang', !gw.lockTargetLang)}
           >
             {gw.lockTargetLang ? t('common.on') : t('common.off')}
           </button>
           <span className="toggle-description">
-            {gw.lockTargetLang ? t('glass.lockTargetLangOnDesc') : t('glass.lockTargetLangOffDesc')}
+            {gw.lockTargetLang ? t('floatingWindow.lockTargetLangOnDesc') : t('floatingWindow.lockTargetLangOffDesc')}
           </span>
         </div>
-        <p className="setting-hint">{t('glass.lockTargetLangHint')}</p>
+        <p className="setting-hint">{t('floatingWindow.lockTargetLangHint')}</p>
       </div>
 
       {/* OCR 引擎 */}
       <div className="setting-group">
-        <label className="setting-label">{t('glass.ocrEngine')}</label>
+        <label className="setting-label">{t('floatingWindow.ocrEngine')}</label>
         <div className="setting-hint-inline">
-          {t('glass.useGlobalOcr', {engine: getOcrEngineName(settings.ocr.engine)})}
+          {t('floatingWindow.useGlobalOcr', {engine: getOcrEngineName(settings.ocr.engine)})}
           <button 
             className="link-button"
             onClick={() => handleSectionChange('ocr')}
             style={{marginLeft: '8px'}}
           >
-            {t('glass.goToSettings')} →
+            {t('floatingWindow.goToSettings')} →
           </button>
         </div>
       </div>
 
       {/* 默认透明度 */}
       <div className="setting-group">
-        <label className="setting-label">{t('glass.defaultOpacity')}</label>
+        <label className="setting-label">{t('floatingWindow.defaultOpacity')}</label>
         <div className="setting-row">
           <input
             type="range"
@@ -73,11 +73,11 @@ const GlassWindowSection = ({
             min="30"
             max="100"
             value={Math.round(gw.defaultOpacity * 100)}
-            onChange={(e) => updateSetting('glassWindow', 'defaultOpacity', parseInt(e.target.value) / 100)}
+            onChange={(e) => updateSetting('floatingWindow', 'defaultOpacity', parseInt(e.target.value) / 100)}
           />
           <span className="range-value">{Math.round(gw.defaultOpacity * 100)}%</span>
         </div>
-        <p className="setting-hint">{t('glass.opacityHint')}</p>
+        <p className="setting-hint">{t('floatingWindow.opacityHint')}</p>
       </div>
 
       {/* 快捷键 */}
@@ -86,28 +86,28 @@ const GlassWindowSection = ({
         <div className="shortcut-info">
           <div className="shortcut-item">
             <kbd>Ctrl+Alt+G</kbd>
-            <span>{t('glass.shortcut.toggle')}</span>
+            <span>{t('floatingWindow.shortcut.toggle')}</span>
           </div>
           <div className="shortcut-item">
             <kbd>Space</kbd>
-            <span>{t('glass.shortcut.capture')}</span>
+            <span>{t('floatingWindow.shortcut.capture')}</span>
           </div>
           <div className="shortcut-item">
             <kbd>Esc</kbd>
-            <span>{t('glass.shortcut.exit')}</span>
+            <span>{t('floatingWindow.shortcut.exit')}</span>
           </div>
         </div>
       </div>
 
       {/* 使用说明 */}
       <div className="setting-group">
-        <label className="setting-label">{t('glass.instructions')}</label>
+        <label className="setting-label">{t('floatingWindow.instructions')}</label>
         <div className="info-box">
-          <p><strong>{t('glass.normalMode')}：</strong>{t('glass.normalModeDesc')}</p>
+          <p><strong>{t('floatingWindow.normalMode')}：</strong>{t('floatingWindow.normalModeDesc')}</p>
         </div>
       </div>
     </div>
   );
 };
 
-export default GlassWindowSection;
+export default FloatingWindowSection;

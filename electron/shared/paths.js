@@ -1,4 +1,4 @@
-// Path config — single place to manage HTML / preload / resource paths across dev and prod.
+﻿// Path config — single place to manage HTML / preload / resource paths across dev and prod.
 //
 // Usage:
 //   const PATHS = require('./shared/paths');
@@ -21,7 +21,7 @@ const ELECTRON_DIR = path.join(__dirname, '..');
 const preloads = {
   main: path.join(ELECTRON_DIR, 'preloads/main.js'),
   selection: path.join(ELECTRON_DIR, 'preloads/selection.js'),
-  glass: path.join(ELECTRON_DIR, 'preloads/glass.js'),
+  floatingWindow: path.join(ELECTRON_DIR, 'preloads/floating-window.js'),
   childPane: path.join(ELECTRON_DIR, 'preloads/child-pane.js'),
   screenshot: path.join(ELECTRON_DIR, 'preloads/screenshot.js'),
 };
@@ -36,9 +36,9 @@ const pages = {
     url: `${DEV_SERVER}/selection.html`,
     file: path.join(BASE_DIR, 'build/selection.html'),
   },
-  glass: {
-    url: `${DEV_SERVER}/glass.html`,
-    file: path.join(BASE_DIR, 'build/glass.html'),
+  floatingWindow: {
+    url: `${DEV_SERVER}/floating-window.html`,
+    file: path.join(BASE_DIR, 'build/floating-window.html'),
   },
   screenshot: {
     // Screenshot page is plain HTML — not processed by Vite.
@@ -48,7 +48,7 @@ const pages = {
       : path.join(process.resourcesPath, 'resources/screenshot.html'),
   },
   childPane: {
-    // Child glass pane — standalone window (plain HTML + inline JS).
+    // Detached child pane — standalone window (plain HTML + inline JS).
     url: `${DEV_SERVER}/child-pane.html`,
     file: isDev
       ? path.join(BASE_DIR, 'public/child-pane.html')

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import translationService from '../../services/translation.js';
 import ttsManager, { TTS_STATUS } from '../../services/tts/index.js';
@@ -722,7 +722,7 @@ const SelectionTranslator = () => {
                       window.electron?.selection?.openOcrSettings?.();
                     }}
                   >
-                    {t('glass.goToOcrSettings')}
+                    {t('floatingWindow.goToOcrSettings')}
                   </button>
                 )}
               </>

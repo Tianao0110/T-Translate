@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+﻿import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Globe, Shield, Zap, Download, Upload, Moon, Sun,
@@ -33,7 +33,7 @@ import {
 import {
   OcrSection,
   InterfaceSection,
-  GlassWindowSection,
+  FloatingWindowSection,
   SelectionSection,
   PrivacySection,
   DocumentSection,
@@ -54,7 +54,7 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
     providers: t('settingsNav.providers'),
     translation: t('settingsNav.translation'),
     selection: t('settingsNav.selection'),
-    glassWindow: t('settingsNav.glassWindow'),
+    floatingWindow: t('settingsNav.floatingWindow'),
     document: t('settingsNav.document'),
     ocr: t('settingsNav.ocr'),
     tts: t('settingsNav.tts'),
@@ -349,8 +349,8 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
           await store.set('settings.document', settings.document);
         }
 
-        if (settings.glassWindow) {
-          await store.set('settings.glassWindow', settings.glassWindow);
+        if (settings.floatingWindow) {
+          await store.set('settings.floatingWindow', settings.floatingWindow);
         }
 
         if (settings.selection) {
@@ -412,8 +412,8 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
         }
       }
 
-      if (window.electron?.glass?.notifySettingsChanged) {
-        await window.electron.glass.notifySettingsChanged();
+      if (window.electron?.floatingWindow?.notifySettingsChanged) {
+        await window.electron.floatingWindow.notifySettingsChanged();
       }
 
       // The providers tab fires its own notification, so suppress here.
@@ -628,9 +628,9 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
             setAutoTranslateDelay={setAutoTranslateDelay}
           />
         );
-      case 'glassWindow':
+      case 'floatingWindow':
         return (
-          <GlassWindowSection
+          <FloatingWindowSection
             settings={settings}
             updateSetting={updateSetting}
             handleSectionChange={handleSectionChange}

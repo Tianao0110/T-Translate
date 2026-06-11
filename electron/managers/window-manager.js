@@ -1,4 +1,4 @@
-// Window manager: main, glass overlay, selection (with freeze-multi support),
+﻿// Window manager: main, glass overlay, selection (with freeze-multi support),
 // and screenshot windows. Deps injected via init() to avoid require cycles.
 
 const { BrowserWindow, shell } = require('electron');
@@ -141,33 +141,33 @@ function createMainWindow() {
 
 // ===== Glass overlay window =====
 
-function createGlassWindow() {
-  if (windows.glass) {
-    windows.glass.focus();
-    return windows.glass;
+function createFloatingWindow() {
+  if (windows.floatingWindow) {
+    windows.floatingWindow.focus();
+    return windows.floatingWindow;
   }
 
-  const savedBounds = store.get('glassBounds', {
+  const savedBounds = store.get('floatingWindowBounds', {
     width: 400,
     height: 200,
     x: undefined,
     y: undefined,
   });
 
-  const glassBounds = displayHelper.ensureBoundsOnDisplay(savedBounds, {
+  const floatingWindowBounds = displayHelper.ensureBoundsOnDisplay(savedBounds, {
     minVisiblePixels: 100,
     centerOnInvalid: true,
   });
 
-  if (glassBounds.adjusted) {
+  if (floatingWindowBounds.adjusted) {
     logger?.info?.('Glass window position adjusted to valid display');
   }
 
-  const glassWindow = new BrowserWindow({
-    width: glassBounds.width,
-    height: glassBounds.height,
-    x: glassBounds.x,
-    y: glassBounds.y,
+  const floatingWindow = new BrowserWindow({
+    width: floatingWindowBounds.width,
+    height: floatingWindowBounds.height,
+    x: floatingWindowBounds.x,
+    y: floatingWindowBounds.y,
     minWidth: 150,
     minHeight: 80,
     transparent: true,
@@ -180,7 +180,7 @@ function createGlassWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: PATHS.preloads.glass,
+      preload: PATHS.preloads.floatingWindow,
       backgroundThrottling: false, // glass refresh must run while unfocused
       webSecurity: false, // allow cross-origin (e.g. Google Translate)
     },
@@ -188,35 +188,35 @@ function createGlassWindow() {
 
   // WDA_EXCLUDEFROMCAPTURE so OCR doesn't re-read our own overlay
   if (process.platform === 'win32') {
-    glassWindow.webContents.on('did-finish-load', () => {
-      makeWindowInvisibleToCapture(glassWindow);
+    floatingWindow.webContents.on('did-finish-load', () => {
+      makeWindowInvisibleToCapture(floatingWindow);
     });
   }
 
   if (isDev) {
-    glassWindow.loadURL(PATHS.pages.glass.url);
+    floatingWindow.loadURL(PATHS.pages.floatingWindow.url);
   } else {
-    glassWindow.loadFile(PATHS.pages.glass.file);
+    floatingWindow.loadFile(PATHS.pages.floatingWindow.file);
   }
 
-  glassWindow.on('moved', () => {
-    if (glassWindow) {
-      store.set('glassBounds', glassWindow.getBounds());
+  floatingWindow.on('moved', () => {
+    if (floatingWindow) {
+      store.set('floatingWindowBounds', floatingWindow.getBounds());
     }
   });
 
-  glassWindow.on('resized', () => {
-    if (glassWindow) {
-      store.set('glassBounds', glassWindow.getBounds());
+  floatingWindow.on('resized', () => {
+    if (floatingWindow) {
+      store.set('floatingWindowBounds', floatingWindow.getBounds());
     }
   });
 
-  glassWindow.on('closed', () => {
-    windows.glass = null;
+  floatingWindow.on('closed', () => {
+    windows.floatingWindow = null;
     // Detached panes are alwaysOnTop orphans without their parent — reap them
     // on every close path (ESC, tray toggle, IPC), not just the X button.
     try {
-      require('../ipc/glass').closeAllChildPaneWindows();
+      require('../ipc/floating-window').closeAllChildPaneWindows();
     } catch (e) {
       logger.warn?.('Failed to close child panes with glass window:', e.message);
     }
@@ -225,34 +225,34 @@ function createGlassWindow() {
   // Electron on Windows can drop alwaysOnTop z-order when focus moves away.
   // Re-apply on blur — keep default 'floating' level (no second arg), do NOT
   // elevate to 'screen-saver' which would clobber the user's other pinned tools.
-  glassWindow.on('blur', () => {
-    if (glassWindow.isDestroyed()) return;
-    if (glassWindow.isAlwaysOnTop()) {
-      glassWindow.setAlwaysOnTop(false);
-      glassWindow.setAlwaysOnTop(true);
+  floatingWindow.on('blur', () => {
+    if (floatingWindow.isDestroyed()) return;
+    if (floatingWindow.isAlwaysOnTop()) {
+      floatingWindow.setAlwaysOnTop(false);
+      floatingWindow.setAlwaysOnTop(true);
     }
   });
 
-  // ESC and Space are handled in the renderer (GlassTranslator keydown), which
+  // ESC and Space are handled in the renderer (FloatingWindow keydown), which
   // knows the UI priority order (history panel > scattered panes > close) and
   // runs child-window cleanup. A main-process before-input-event shortcut here
   // would bypass all of that — deliberately absent.
 
-  windows.glass = glassWindow;
+  windows.floatingWindow = floatingWindow;
   logger.info?.('Glass window created');
-  return glassWindow;
+  return floatingWindow;
 }
 
-function toggleGlassWindow() {
-  if (windows.glass) {
-    if (windows.glass.isVisible()) {
-      windows.glass.close();
+function toggleFloatingWindow() {
+  if (windows.floatingWindow) {
+    if (windows.floatingWindow.isVisible()) {
+      windows.floatingWindow.close();
     } else {
-      windows.glass.show();
-      windows.glass.focus();
+      windows.floatingWindow.show();
+      windows.floatingWindow.focus();
     }
   } else {
-    createGlassWindow();
+    createFloatingWindow();
   }
 }
 
@@ -450,10 +450,10 @@ module.exports = {
   isPointInSelectionWindows,
   init,
   createMainWindow,
-  createGlassWindow,
+  createFloatingWindow,
   createSelectionWindow,
   createScreenshotWindow,
-  toggleGlassWindow,
+  toggleFloatingWindow,
   freezeSelectionWindow,
   closeFrozenSelectionWindow,
   getFrozenSelectionWindowsCount,

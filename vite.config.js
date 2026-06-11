@@ -1,4 +1,4 @@
-// vite.config.js
+﻿// vite.config.js
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
@@ -105,7 +105,7 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         input: {
           main: path.resolve(__dirname, 'public/index.html'),
-          glass: path.resolve(__dirname, 'public/glass.html'),
+          floatingWindow: path.resolve(__dirname, 'public/floating-window.html'),
           selection: path.resolve(__dirname, 'public/selection.html')
         },
         output: {

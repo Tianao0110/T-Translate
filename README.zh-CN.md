@@ -1,4 +1,4 @@
-# T-Translate
+﻿# T-Translate
 
 <p align="right">
   <a href="./README.md">English</a> | 简体中文
@@ -58,7 +58,7 @@
 透明悬浮窗实时翻译，支持拖拽、缩放、置顶，可创建多个独立子面板。空格键/左键 Toggle：有内容清空，无内容截图翻译。子窗口透明度独立于父窗口，始终清晰可读。
 
 <p align="center">
-  <img src="docs/screenshots/glass-window.png" width="600" alt="悬浮窗口">
+  <img src="docs/screenshots/floating-window.png" width="600" alt="悬浮窗口">
 </p>
 
 ### 文档翻译
