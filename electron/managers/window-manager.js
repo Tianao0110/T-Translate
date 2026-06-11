@@ -213,6 +213,13 @@ function createGlassWindow() {
 
   glassWindow.on('closed', () => {
     windows.glass = null;
+    // Detached panes are alwaysOnTop orphans without their parent — reap them
+    // on every close path (ESC, tray toggle, IPC), not just the X button.
+    try {
+      require('../ipc/glass').closeAllChildPaneWindows();
+    } catch (e) {
+      logger.warn?.('Failed to close child panes with glass window:', e.message);
+    }
   });
 
   // Electron on Windows can drop alwaysOnTop z-order when focus moves away.
@@ -226,13 +233,10 @@ function createGlassWindow() {
     }
   });
 
-  glassWindow.webContents.on('before-input-event', (event, input) => {
-    if (input.key === 'Escape') {
-      glassWindow.close();
-    } else if (input.key === ' ' && !input.control && !input.alt && !input.meta) {
-      glassWindow.webContents.send(CHANNELS.GLASS?.REFRESH || 'glass:refresh');
-    }
-  });
+  // ESC and Space are handled in the renderer (GlassTranslator keydown), which
+  // knows the UI priority order (history panel > scattered panes > close) and
+  // runs child-window cleanup. A main-process before-input-event shortcut here
+  // would bypass all of that — deliberately absent.
 
   windows.glass = glassWindow;
   logger.info?.('Glass window created');

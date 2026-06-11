@@ -147,20 +147,24 @@ const GlassTranslator = () => {
       }
 
       if (e.key === 'Escape') {
+        // Read live state — this handler is registered once on mount and a
+        // closure over render-scope state would be frozen at first render.
+        const s = useSessionStore.getState();
         // ESC priority: history panel > scattered panes > close window
         if (showHistoryPanelRef.current) {
           setShowHistoryPanel(false);
-        } else if (displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0) {
-          clearChildPanes();
+        } else if (s.displayMode === DISPLAY_MODE.SCATTERED && s.childPanes.length > 0) {
+          s.clearChildPanes();
         } else {
           handleClose();
         }
       } else if (e.code === 'Space') {
         e.preventDefault();
+        const s = useSessionStore.getState();
         // Space toggles between capture and clear depending on current state
-        if (translatedText || (displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0)) {
-          clearChildPanes();
-          clear();
+        if (s.translatedText || (s.displayMode === DISPLAY_MODE.SCATTERED && s.childPanes.length > 0)) {
+          s.clearChildPanes();
+          s.clear();
         } else {
           captureAndTranslate();
         }
@@ -206,9 +210,10 @@ const GlassTranslator = () => {
     };
 
     const handleContextMenu = (e) => {
-      if (displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0) {
+      const s = useSessionStore.getState();
+      if (s.displayMode === DISPLAY_MODE.SCATTERED && s.childPanes.length > 0) {
         e.preventDefault();
-        clearChildPanes();
+        s.clearChildPanes();
       }
     };
 
@@ -420,8 +425,16 @@ const GlassTranslator = () => {
     } else {
       logger.error('Failed to create child window:', result?.error);
       // Falling back to internal freeze keeps the pane usable even when
-      // BrowserWindow creation fails (e.g. low memory)
-      freezeChildPane(id);
+      // BrowserWindow creation fails (e.g. low memory). Frozen panes render in
+      // viewport space — pass the pane's viewport position, derived from the
+      // container offset when the drag handler didn't supply one.
+      const contentRect = contentRef.current?.getBoundingClientRect();
+      const fallbackViewportPos = viewportPos
+        ? { x: viewportPos.viewportX, y: viewportPos.viewportY }
+        : contentRect
+          ? { x: pane.bbox.x + contentRect.left, y: pane.bbox.y + contentRect.top }
+          : undefined;
+      freezeChildPane(id, fallbackViewportPos);
     }
   }, [childPanes, theme, removeChildPane, freezeChildPane]);
 

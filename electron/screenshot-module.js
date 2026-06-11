@@ -464,8 +464,10 @@ module.exports = {
       const imgHeight = targetMonitor.height;
       cropBounds.x = Math.min(cropBounds.x, imgWidth - 1);
       cropBounds.y = Math.min(cropBounds.y, imgHeight - 1);
-      cropBounds.width = Math.min(cropBounds.width, imgWidth - cropBounds.x);
-      cropBounds.height = Math.min(cropBounds.height, imgHeight - cropBounds.y);
+      // Floor at 1px: a window straddling displays can otherwise degenerate to
+      // a 0-size crop -> empty nativeImage -> opaque "截图失败"
+      cropBounds.width = Math.max(1, Math.min(cropBounds.width, imgWidth - cropBounds.x));
+      cropBounds.height = Math.max(1, Math.min(cropBounds.height, imgHeight - cropBounds.y));
 
       console.log('[Screenshot] Final crop bounds:', cropBounds, 'from image:', imgWidth, 'x', imgHeight);
 

@@ -21,6 +21,7 @@ const _t = (key, fallback) => {
 // Used to skip OCR/translate when the same image/text comes back from a refresh tick
 let lastImageHash = '';
 let lastText = '';
+let captureInFlight = false;
 
 async function getPrivacyMode() {
   try {
@@ -107,8 +108,16 @@ class TranslationPipeline {
   }
 
   async runFromCapture(captureOptions = {}) {
+    // Single-flight: a second capture while one is running would un-hide the
+    // glass window mid-screenshot (the IPC handler's opacity dance) and
+    // interleave session state.
+    if (captureInFlight) {
+      logger.debug('Capture already in flight, ignoring');
+      return { success: false, skipped: true };
+    }
+    captureInFlight = true;
+
     const session = useSessionStore.getState();
-    const config = useConfigStore.getState();
 
     try {
       // Frozen panes survive; transient ones are cleared each capture cycle
@@ -132,6 +141,8 @@ class TranslationPipeline {
       const errorMsg = getShortErrorMessage(error);
       session.setError(errorMsg);
       return { success: false, error: errorMsg };
+    } finally {
+      captureInFlight = false;
     }
   }
 

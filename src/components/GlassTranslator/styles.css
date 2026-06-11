@@ -40,29 +40,32 @@
 
 /* 字幕模式 - 完全透明 + 虚线边框 */
 /* ========== 顶部区域 ========== */
+/* Overlay, NOT in-flow: the content area is the capture origin and the
+   scattered panes' coordinate space — toolbar visibility must never move it. */
 .glass-top-area {
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 3px 6px;
-  min-height: 24px;  /* 缩小 30%: 32 → 24 */
+  min-height: 24px;
   -webkit-app-region: drag;
-  background: rgba(0, 0, 0, 0.06);  /* 背景加深，与识别区区分 */
+  background: rgba(0, 0, 0, 0.06);
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
   /* 默认隐藏，鼠标移入显示 */
   opacity: 0;
-  max-height: 0;
-  padding: 0;
-  overflow: hidden;
-  transition: all 0.2s ease;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
 }
 
 /* 鼠标移入悬浮窗口时显示顶部区域 */
 .glass-window.show-toolbar .glass-top-area {
   opacity: 1;
-  max-height: 24px;
-  padding: 3px 6px;
+  pointer-events: auto;
 }
 
 /* ========== 工具栏 ========== */

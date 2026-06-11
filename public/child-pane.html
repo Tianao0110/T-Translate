@@ -172,10 +172,11 @@
   </div>
   
   <script>
-    // 从 URL 参数获取数据
+    // 从 URL 参数获取数据。URLSearchParams.get 已完成百分号解码——再包一层
+    // decodeURIComponent 会让含 % 的译文（如 "50% off"）抛 URIError 杀死整个脚本
     const params = new URLSearchParams(window.location.search);
     const paneId = params.get('id');
-    const text = decodeURIComponent(params.get('text') || '');
+    const text = params.get('text') || '';
     const theme = params.get('theme') || 'light';
     
     // 设置主题

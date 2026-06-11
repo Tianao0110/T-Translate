@@ -4,6 +4,18 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electron', {
+  // Privacy mode must be visible here: the pipeline filters cloud providers by
+  // it, and screen captures are the most privacy-sensitive input in the app.
+  // Read-only — mode switching stays in the main window.
+  privacy: {
+    getMode: () => ipcRenderer.invoke('privacy:getMode'),
+  },
+
+  // Read-only settings access (pipeline reads the local-LLM endpoint at init).
+  store: {
+    get: (key) => ipcRenderer.invoke('store-get', key),
+  },
+
   glass: {
     getBounds: () => ipcRenderer.invoke('glass:get-bounds'),
 
