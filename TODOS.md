@@ -43,9 +43,11 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 
 ### 发布前人工步骤
 
+- [ ] 悬浮窗口人工回归：Ctrl+Alt+G 开窗 → 空格截图 → 再按空格清空 → ESC 关窗 → 设置页改透明度/锁定语言重启确认保留 → 双击窗格分离 → 含 % 译文窗格正常
+
 - [ ] `ocr-models` Release 首发：`npm run ocr:release` 产物已在 release-ocr-models/，按 OCR_MODELS.md 上传 7 个文件（**记得勾 pre-release**）。上传前应用内语言包列表会显示「无法获取清单」属预期
 - [ ] 人工回归：设置页语言包下载/更新徽章/卸载、截图翻译（中英日 + 装包后韩语）、划词 OCR 兜底、玻璃窗、Windows OCR 切换、隐私模式引擎过滤
-- [ ] 发版时版本号 `0.2.8-OCR` 改为 `0.2.9`：semver 规则 `0.2.8-OCR < 0.2.8`，electron-updater 不会向 0.2.8 用户推送 prerelease 版本号
+- [x] 版本号已改 0.2.9（合并 main 时完成，含 README 徽章）
 - [ ] 语言包 rec 模型目前 v4 代际；上游出 v5 多语言 ONNX 后按 OCR_MODELS.md「更新模型」流程换入（bump version 即可，无需发版）
 
 ## v0.3 candidates

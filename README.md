@@ -1,4 +1,4 @@
-﻿# T-Translate
+# T-Translate
 
 <p align="right">
   English | <a href="./README.zh-CN.md">简体中文</a>
@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.2.8-green" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.2.9-green" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="License">
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform">
 </p>
