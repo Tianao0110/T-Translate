@@ -21,7 +21,6 @@ import { PRIVACY_MODES } from '@config/defaults';
 
 dayjs.extend(relativeTime);
 dayjs.extend(isSameOrAfter);
-dayjs.locale('zh-cn');
 
 const HighlightText = memo(({ text, search }) => {
   if (!search || !text) return text;
@@ -145,6 +144,12 @@ HistoryCard.displayName = 'HistoryCard';
 
 const HistoryPanel = ({ showNotification }) => {
   const { t } = useTranslation();
+
+  // Month-group labels go through dayjs formats; a module-level zh-cn lock
+  // here used to leak Chinese month names into the English UI.
+  useEffect(() => {
+    dayjs.locale(i18n.language === 'zh' ? 'zh-cn' : 'en');
+  }, [i18n.language]);
 
   const notify = useCallback((msg, type) => {
     if (showNotification) showNotification(msg, type);
@@ -414,7 +419,7 @@ const HistoryPanel = ({ showNotification }) => {
 
   const handleExport = useCallback(async () => {
     try {
-      const data = exportHistory('json');
+      const data = exportHistory();
       const content = JSON.stringify(data, null, 2);
       const filename = `t-translate-history-${dayjs().format('YYYY-MM-DD')}.json`;
 
@@ -452,7 +457,11 @@ const HistoryPanel = ({ showNotification }) => {
     reader.onload = async () => {
       try {
         const result = await importHistory(file);
-        if (result?.success) notify(t('history.importedCount', { count: result.count || 0 }), 'success');
+        if (result?.success) {
+          notify(t('history.importedCount', { count: result.count || 0 }), 'success');
+        } else {
+          notify(t('history.importFailed', 'Import failed') + (result?.error ? `: ${result.error}` : ''), 'error');
+        }
       } catch {
         notify(t('history.importFailed', 'Import failed'), 'error');
       }
