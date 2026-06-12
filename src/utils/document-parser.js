@@ -517,7 +517,7 @@ export function splitCSVLine(line) {
 }
 
 export async function parseCSV(file, options = {}) {
-  const { maxCharsPerSegment = 800, filters = {} } = options;
+  const { filters = {} } = options;
 
   const text = await readAsText(file);
   const lines = text.split('\n');
@@ -696,8 +696,6 @@ function extractTextFromHTML(html) {
 }
 
 export async function parseDocument(file, options = {}) {
-  const { password } = options;
-
   const ext = file.name.split('.').pop().toLowerCase();
   const format = SUPPORTED_FORMATS[ext];
 
@@ -773,7 +771,7 @@ export async function parseDocument(file, options = {}) {
         break;
 
       default:
-        throw new Error('Unimplemented parser: ' + format.parser);
+        throw new Error(_t('docParser.unimplementedParser', 'Unimplemented parser') + ': ' + format.parser);
     }
 
     const headings = detectHeadings(segments);

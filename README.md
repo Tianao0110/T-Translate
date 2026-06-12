@@ -63,7 +63,7 @@ Transparent overlay window for live translation. Drag, resize, pin on top. Spawn
 
 ### Document translation
 
-Supports 9 formats: PDF, DOCX, EPUB, TXT, SRT, VTT, CSV, JSON, Markdown. Batch mode and glossary integration. Translation time varies by device and provider.
+Supports 9 formats: PDF, DOCX, EPUB, TXT, SRT, VTT, CSV, JSON, Markdown. Parallel translation, scanned-PDF OCR and glossary integration. Translation time varies by device and provider.
 
 <p align="center">
   <img src="docs/screenshots/document-translate.png" width="600" alt="Document translation">

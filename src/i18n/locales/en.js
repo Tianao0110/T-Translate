@@ -492,13 +492,10 @@ const en = {
       "纯文本": "Plain Text", "Markdown": "Markdown", "SRT 字幕": "SRT Subtitle", "WebVTT 字幕": "WebVTT Subtitle",
       "PDF 文档": "PDF Document", "Word 文档": "Word Document", "CSV 表格": "CSV Spreadsheet", "JSON 文件": "JSON File", "EPUB 电子书": "EPUB eBook"
     },
-    // Search & Replace
+    // Search
     search: {
       title: "Search",
       searchPlaceholder: "Search segments...",
-      replacePlaceholder: "Replace with...",
-      replaceAll: "Replace All",
-      replaceThis: "Replace",
       matches: "matches",
       prev: "Previous",
       next: "Next"
@@ -569,10 +566,8 @@ const en = {
       retryFailed: "Retry failed: {{error}}",
       exportSuccess: "Export successful",
       exportFailed: "Export failed: {{error}}",
-      printToPdf: "Please select \"Save as PDF\" in the print dialog",
       cacheCleared: "Translation memory cache cleared",
       scannedNoOcr: "This PDF is scanned (image-based). Please configure an OCR engine in Settings and try again.",
-      ocrUsed: "OCR recognized",
       fileTooLarge: "File too large, max 20MB supported",
       pdfHint: "PDF: text content only. Images and complex layouts may be lost."
     },
@@ -688,6 +683,8 @@ const en = {
     noTextRecognized: "(No text recognized)",
     noValidTextRecognized: "(No valid text recognized)"
   },
+  // Single block — a duplicate key here silently overrides the earlier one
+  // (the parser's epubNo* lookups were dead for several versions).
   docParser: {
     emptySegment: "Empty segment", tooShort: "Too short", numbersOnly: "Numbers only",
     codeBlock: "Code block", alreadyTargetLang: "Already in target language", containsKeyword: "Contains keyword",
@@ -696,6 +693,7 @@ const en = {
     epubNoOpf: "Invalid EPUB: OPF file not found",
     epubNoContent: "No translatable text found in EPUB",
     unsupportedFormat: "Unsupported file format",
+    unimplementedParser: "Unimplemented parser",
     passwordRequired: "File requires a password",
     readFailed: "File read failed"
   },
@@ -704,16 +702,6 @@ const en = {
     jsonParseFailed: "JSON parse failed",
     csvEmpty: "CSV file is empty or malformed",
     unknownFormat: "Unrecognized file format. Please use JSON, CSV, or TBX."
-  },
-  docParser: {
-    emptySegment: "Empty segment", tooShort: "Too short", numbersOnly: "Numbers only", codeBlock: "Code block",
-    alreadyTargetLang: "Already in target language", containsKeyword: "Contains keyword",
-    unsupportedFormat: "Unsupported file format", unimplementedParser: "Unimplemented parser",
-    passwordRequired: "File requires a password", readFailed: "File read failed",
-    invalidEpubContainer: "Invalid EPUB: missing container.xml",
-    invalidEpubRootfile: "Invalid EPUB: rootfile not found",
-    invalidEpubOpf: "Invalid EPUB: OPF file not found",
-    epubEmpty: "No translatable text found in EPUB"
   },
   tray: {
     showWindow: "Show Window",

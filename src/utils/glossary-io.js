@@ -73,11 +73,11 @@ export function exportToCSV(items) {
   });
 
   // BOM prefix so Excel opens the file as UTF-8 (otherwise CJK chars get mangled)
-  return '﻿' + header + '\n' + rows.join('\n');
+  return '\uFEFF' + header + '\n' + rows.join('\n');
 }
 
 export function importFromCSV(csvString) {
-  const content = csvString.replace(/^﻿/, '');
+  const content = csvString.replace(/^\uFEFF/, '');
 
   const lines = content.split(/\r?\n/).filter(line => line.trim());
   if (lines.length < 2) {
