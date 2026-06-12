@@ -35,6 +35,40 @@ describe('migrateOldSettings: floatingWindow unification', () => {
   });
 });
 
+describe('migrateOldSettings: document bucket reshape (0.2.9)', () => {
+  it('fills defaults when nothing was saved', () => {
+    const m = migrateOldSettings({});
+    expect(m.document).toEqual(DEFAULT_SETTINGS.document);
+  });
+
+  it('drops dead pre-0.2.9 keys', () => {
+    const m = migrateOldSettings({
+      document: { preserveFormatting: true, batchSize: 5, maxParagraphLength: 1000, outputFormat: 'same' },
+    });
+    expect(m.document.preserveFormatting).toBeUndefined();
+    expect(m.document.batchSize).toBeUndefined();
+    expect(m.document.maxParagraphLength).toBeUndefined();
+    expect(m.document.maxCharsPerSegment).toBe(800);
+  });
+
+  it('maps batchMaxSegments onto concurrency with clamping', () => {
+    expect(migrateOldSettings({ document: { batchMaxSegments: 4 } }).document.concurrency).toBe(4);
+    expect(migrateOldSettings({ document: { batchMaxSegments: 10 } }).document.concurrency).toBe(6);
+  });
+
+  it('explicit concurrency wins over legacy batchMaxSegments', () => {
+    const m = migrateOldSettings({ document: { concurrency: 3, batchMaxSegments: 5 } });
+    expect(m.document.concurrency).toBe(3);
+  });
+
+  it('partial filters deep-merge with defaults', () => {
+    const m = migrateOldSettings({ document: { filters: { skipShort: false } } });
+    expect(m.document.filters.skipShort).toBe(false);
+    expect(m.document.filters.skipNumbers).toBe(true);
+    expect(m.document.filters.minLength).toBe(10);
+  });
+});
+
 describe('migrateOldSettings: removed OCR engine id', () => {
   it('remaps paddle-ocr to rapid-ocr', () => {
     const m = migrateOldSettings({ ocr: { engine: 'paddle-ocr' } });

@@ -245,6 +245,10 @@ export function parseSRT(content) {
   const segments = [];
   const blocks = content.trim().split(/\n\s*\n/);
 
+  // ids are sequential, not the file's cue numbers — real-world SRT files
+  // restart or duplicate numbering, which would collide React keys and
+  // progress-restore mapping. The original cue number survives in `index`.
+  let id = 0;
   for (const block of blocks) {
     const lines = block.trim().split('\n');
     if (lines.length < 3) continue;
@@ -255,7 +259,7 @@ export function parseSRT(content) {
 
     if (!isNaN(index) && timecode.includes('-->')) {
       segments.push({
-        id: index - 1,
+        id: id++,
         index,
         timecode,
         original: text,
@@ -306,8 +310,29 @@ export function parseVTT(content) {
   return segments;
 }
 
+// Render a PDF page to canvas and feed it through the OCR chain.
+// Scale 2 keeps small print legible for local OCR without ballooning memory.
+// Returns null on failure so callers can distinguish "no text" from "failed".
+async function ocrPdfPage(page, ocrRecognize) {
+  try {
+    const viewport = page.getViewport({ scale: 2 });
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    const result = await ocrRecognize(canvas.toDataURL('image/png'));
+    return result?.success && result.text ? result.text : null;
+  } catch {
+    return null;
+  }
+}
+
+// Stray items (page number, watermark) still read as a scanned page;
+// real text pages clear this easily.
+const SCANNED_PAGE_MAX_CHARS = 20;
+
 export async function parsePDF(file, options = {}) {
-  const { password, maxCharsPerSegment = 800, filters = {} } = options;
+  const { password, maxCharsPerSegment = 800, filters = {}, ocrRecognize, onProgress } = options;
 
   const pdfjsLib = await import('pdfjs-dist');
 
@@ -336,8 +361,10 @@ export async function parsePDF(file, options = {}) {
 
   let allText = '';
   const pageTexts = [];
+  let usedOcr = false;
 
   for (let i = 1; i <= numPages; i++) {
+    onProgress?.({ page: i, total: numPages });
     const page = await pdf.getPage(i);
     const textContent = await page.getTextContent();
 
@@ -400,6 +427,16 @@ export async function parsePDF(file, options = {}) {
       }
     }
 
+    // Image-only page (scanned PDF) — render it and run the OCR chain.
+    if (pageText.trim().length < SCANNED_PAGE_MAX_CHARS && ocrRecognize) {
+      onProgress?.({ page: i, total: numPages, ocr: true });
+      const ocrText = await ocrPdfPage(page, ocrRecognize);
+      if (ocrText?.trim()) {
+        pageText = ocrText;
+        usedOcr = true;
+      }
+    }
+
     pageTexts.push(pageText.trim());
   }
 
@@ -410,11 +447,20 @@ export async function parsePDF(file, options = {}) {
     filters,
   });
 
-  return {
+  const result = {
     segments,
     pageCount: numPages,
     isPdf: true,
   };
+  if (usedOcr) {
+    result.usedOcr = true;
+  }
+  // Nothing extractable and OCR didn't save it — tell the user why the
+  // document came back empty instead of showing "0 segments".
+  if (segments.length === 0) {
+    result.warning = 'scanned_no_ocr';
+  }
+  return result;
 }
 
 export async function parseDOCX(file, options = {}) {
@@ -441,8 +487,37 @@ export async function parseDOCX(file, options = {}) {
   };
 }
 
+// Quote-aware single-line CSV field splitter (handles embedded commas and
+// doubled quotes). Multi-line quoted cells are out of scope — rows are
+// pre-split on newlines.
+export function splitCSVLine(line) {
+  const cells = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (line[i + 1] === '"') { current += '"'; i++; }
+        else inQuotes = false;
+      } else {
+        current += ch;
+      }
+    } else if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === ',') {
+      cells.push(current);
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  cells.push(current);
+  return cells;
+}
+
 export async function parseCSV(file, options = {}) {
-  const { maxCharsPerSegment = 800, filters = {} } = options;
+  const { filters = {} } = options;
 
   const text = await readAsText(file);
   const lines = text.split('\n');
@@ -456,8 +531,8 @@ export async function parseCSV(file, options = {}) {
     const line = lines[i].trim();
     if (!line) continue;
 
-    // Naive CSV parse — extracts text-bearing cells joined with " | ".
-    const cells = line.split(',').map(c => c.trim().replace(/^["']|["']$/g, ''));
+    // Extracts text-bearing cells joined with " | ".
+    const cells = splitCSVLine(line).map(c => c.trim());
     const textContent = cells.filter(c => c.length > 5 && !/^\d+$/.test(c)).join(' | ');
 
     if (textContent && textContent.length >= (filters.minLength || 5)) {
@@ -467,7 +542,6 @@ export async function parseCSV(file, options = {}) {
         translated: '',
         status: 'pending',
         tokens: estimateTokens(textContent),
-        row: i + 1,
       });
     }
   }
@@ -484,7 +558,7 @@ export async function parseJSON(file, options = {}) {
   const segments = [];
   let segmentId = 0;
 
-  function extractStrings(obj, path = '') {
+  function extractStrings(obj) {
     if (typeof obj === 'string' && obj.length >= (filters.minLength || 5)) {
       if (!/^(https?:\/\/|[\dT:Z-]+$|[a-f0-9-]{36}$)/i.test(obj)) {
         segments.push({
@@ -493,15 +567,12 @@ export async function parseJSON(file, options = {}) {
           translated: '',
           status: 'pending',
           tokens: estimateTokens(obj),
-          path,
         });
       }
     } else if (Array.isArray(obj)) {
-      obj.forEach((item, i) => extractStrings(item, `${path}[${i}]`));
+      obj.forEach(item => extractStrings(item));
     } else if (obj && typeof obj === 'object') {
-      Object.entries(obj).forEach(([key, value]) => {
-        extractStrings(value, path ? `${path}.${key}` : key);
-      });
+      Object.values(obj).forEach(value => extractStrings(value));
     }
   }
 
@@ -544,11 +615,15 @@ export async function parseEPUB(file, options = {}) {
   const spineIds = [...itemrefMatches].map(m => m[1]);
 
   const manifestMatch = opfContent.match(/<manifest[^>]*>([\s\S]*?)<\/manifest>/i);
-  const itemMatches = manifestMatch ? manifestMatch[1].matchAll(/<item[^>]+id="([^"]+)"[^>]+href="([^"]+)"[^>]*>/g) : [];
+  const itemTags = manifestMatch ? (manifestMatch[1].match(/<item\b[^>]*>/gi) || []) : [];
 
+  // Attribute order varies between EPUB generators — extract separately
+  // instead of assuming id comes before href.
   const manifest = {};
-  for (const match of itemMatches) {
-    manifest[match[1]] = match[2];
+  for (const tag of itemTags) {
+    const id = tag.match(/\bid="([^"]+)"/i)?.[1];
+    const href = tag.match(/\bhref="([^"]+)"/i)?.[1];
+    if (id && href) manifest[id] = href;
   }
 
   let allText = '';
@@ -603,8 +678,12 @@ function extractTextFromHTML(html) {
   text = text.replace(/&gt;/g, '>');
   text = text.replace(/&amp;/g, '&');
   text = text.replace(/&quot;/g, '"');
-  text = text.replace(/&#(\d+);/g, (_, code) => String.fromCharCode(code));
-  text = text.replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCharCode(parseInt(code, 16)));
+  // fromCodePoint, not fromCharCode — numeric entities can be astral (emoji).
+  const decodeCodePoint = (code) => {
+    try { return String.fromCodePoint(code); } catch { return ''; }
+  };
+  text = text.replace(/&#(\d+);/g, (_, code) => decodeCodePoint(Number(code)));
+  text = text.replace(/&#x([0-9a-f]+);/gi, (_, code) => decodeCodePoint(parseInt(code, 16)));
 
   text = text.replace(/[ \t]+/g, ' ');
   text = text.replace(/\n\s*\n/g, '\n\n');
@@ -613,13 +692,20 @@ function extractTextFromHTML(html) {
 }
 
 export async function parseDocument(file, options = {}) {
-  const { password } = options;
-
   const ext = file.name.split('.').pop().toLowerCase();
   const format = SUPPORTED_FORMATS[ext];
 
   if (!format) {
     throw new Error(_t('docParser.unsupportedFormat', 'Unsupported file format') + `: .${ext}`);
+  }
+
+  // Whole file goes through arrayBuffer; an unbounded PDF would freeze or
+  // OOM the renderer.
+  if (file.size > MAX_FILE_SIZE) {
+    return {
+      success: false,
+      error: _t('documentTranslator.notify.fileTooLarge', `File too large (max ${MAX_FILE_SIZE_LABEL})`),
+    };
   }
 
   try {
@@ -681,7 +767,7 @@ export async function parseDocument(file, options = {}) {
         break;
 
       default:
-        throw new Error('Unimplemented parser: ' + format.parser);
+        throw new Error(_t('docParser.unimplementedParser', 'Unimplemented parser') + ': ' + format.parser);
     }
 
     const headings = detectHeadings(segments);
@@ -721,13 +807,31 @@ export async function parseDocument(file, options = {}) {
   }
 }
 
-function readAsText(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => resolve(e.target.result);
-    reader.onerror = () => reject(new Error(_t('docParser.readFailed', 'Failed to read file')));
-    reader.readAsText(file);
-  });
+// FileReader.readAsText is UTF-8-only; legacy Chinese subtitles/novels are
+// frequently GBK, and some Windows tools emit UTF-16. Decode by evidence:
+// BOM first, then UTF-8 unless GBK produces strictly fewer replacement chars.
+async function readAsText(file) {
+  let buffer;
+  try {
+    buffer = await file.arrayBuffer();
+  } catch {
+    throw new Error(_t('docParser.readFailed', 'Failed to read file'));
+  }
+  const bytes = new Uint8Array(buffer);
+
+  if (bytes[0] === 0xff && bytes[1] === 0xfe) return new TextDecoder('utf-16le').decode(buffer);
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) return new TextDecoder('utf-16be').decode(buffer);
+
+  const utf8 = new TextDecoder('utf-8').decode(buffer);
+  const utf8Bad = (utf8.match(/�/g) || []).length;
+  if (utf8Bad === 0) return utf8;
+
+  try {
+    const gbk = new TextDecoder('gbk').decode(buffer);
+    const gbkBad = (gbk.match(/�/g) || []).length;
+    if (gbkBad < utf8Bad) return gbk;
+  } catch { /* decoder unavailable */ }
+  return utf8;
 }
 
 function calculateStats(segments) {
@@ -837,17 +941,31 @@ export function exportTranslatedOnly(segments, options = {}) {
     .join('\n\n');
 }
 
+// Timecodes are kept verbatim from the source file, so a VTT-loaded doc
+// exported as SRT (or vice versa) needs the millisecond separator converted —
+// players and <track> parsers reject the wrong one. SRT also requires a
+// 2-digit hour field, which short-form VTT times omit.
+export function toSRTTimecode(timecode) {
+  return timecode.replace(/(?:(\d{1,2}):)?(\d{2}):(\d{2})[.,](\d{3})/g, (_, h, m, s, ms) =>
+    `${(h || '0').padStart(2, '0')}:${m}:${s},${ms}`);
+}
+
+export function toVTTTimecode(timecode) {
+  return timecode.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
+}
+
 export function exportSRT(segments) {
+  // Renumbered sequentially — source cue numbers may restart or duplicate.
   return segments
     .filter(s => s.type === 'subtitle')
-    .map(s => `${s.index}\n${s.timecode}\n${s.translated || s.original}`)
+    .map((s, i) => `${i + 1}\n${toSRTTimecode(s.timecode)}\n${s.translated || s.original}`)
     .join('\n\n');
 }
 
 export function exportVTT(segments) {
   const body = segments
     .filter(s => s.type === 'subtitle')
-    .map(s => `${s.timecode}\n${s.translated || s.original}`)
+    .map(s => `${toVTTTimecode(s.timecode)}\n${s.translated || s.original}`)
     .join('\n\n');
 
   return `WEBVTT\n\n${body}`;
@@ -868,8 +986,9 @@ export function exportDOCX(segments, options = {}) {
   for (const segment of segments) {
     if (!includeSkipped && segment.status === 'skipped') continue;
 
-    const original = escapeHtml(segment.original || '');
-    const translated = escapeHtml(segment.translated || '');
+    // Multi-line text (subtitles) collapses in HTML without explicit breaks.
+    const original = escapeHtml(segment.original || '').replace(/\n/g, '<br>');
+    const translated = escapeHtml(segment.translated || '').replace(/\n/g, '<br>');
 
     if (style === 'bilingual') {
       content += `
@@ -951,20 +1070,20 @@ export function exportPDFHTML(segments, options = {}) {
   for (const segment of segments) {
     if (!includeSkipped && segment.status === 'skipped') continue;
 
-    const original = segment.original || '';
-    const translated = segment.translated || '';
+    const original = escapeHtml(segment.original || '').replace(/\n/g, '<br>');
+    const translated = escapeHtml(segment.translated || '').replace(/\n/g, '<br>');
 
     if (style === 'bilingual') {
       content += `
         <div class="segment">
-          <p class="original">${escapeHtml(original)}</p>
-          ${translated ? `<p class="translated">${escapeHtml(translated)}</p>` : ''}
+          <p class="original">${original}</p>
+          ${translated ? `<p class="translated">${translated}</p>` : ''}
         </div>
       `;
     } else if (style === 'translated-only') {
-      content += `<p class="text">${escapeHtml(translated || original)}</p>`;
+      content += `<p class="text">${translated || original}</p>`;
     } else {
-      content += `<p class="text">${escapeHtml(original)}</p>`;
+      content += `<p class="text">${original}</p>`;
     }
   }
 

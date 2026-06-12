@@ -77,13 +77,12 @@ const zh = {
   documentSettings: {
     title: "文档翻译设置", description: "配置文档翻译的分段策略、过滤规则和显示样式",
     segmentSettings: "分段设置", maxCharsPerSegment: "单段最大字符数", segmentHint: "过长的段落会按此限制自动分割",
-    batchTranslation: "批量翻译", batchMaxTokens: "每批最大 Tokens", batchMaxSegments: "每批最大段落数",
-    batchHint: "合并短段落可减少 API 调用次数",
+    parallelTranslation: "并发翻译", concurrency: "同时翻译段数",
+    concurrencyHint: "本地模型建议 1-2（GPU 串行，调高只会排队）；在线 API 可调高",
     smartFilter: "智能过滤", skipShort: "跳过过短段落", minLength: "最小字符数",
     skipNumbers: "跳过纯数字段落（如页码）", skipCode: "保留代码块不翻译", skipTargetLang: "跳过已是目标语言的段落",
     displayStyle: "默认显示样式",
     styleBelow: "上下对照 - 译文显示在原文下方", styleSideBySide: "左右对照 - 原文和译文并排显示",
-    styleSourceOnly: "仅原文 - 隐藏译文", styleTranslatedOnly: "仅译文 - 隐藏原文",
     supportedFormats: "支持的文件格式", formatHint: "支持加密 PDF · 自动识别章节大纲 · 翻译记忆复用"
   },
   shortcuts: {
@@ -492,13 +491,10 @@ const zh = {
       "纯文本": "纯文本", "Markdown": "Markdown", "SRT 字幕": "SRT 字幕", "WebVTT 字幕": "WebVTT 字幕",
       "PDF 文档": "PDF 文档", "Word 文档": "Word 文档", "CSV 表格": "CSV 表格", "JSON 文件": "JSON 文件", "EPUB 电子书": "EPUB 电子书"
     },
-    // Search & replace
+    // Search
     search: {
       title: "搜索",
       searchPlaceholder: "搜索段落内容...",
-      replacePlaceholder: "替换为...",
-      replaceAll: "全部替换",
-      replaceThis: "替换当前",
       matches: "个匹配",
       prev: "上一个",
       next: "下一个"
@@ -521,9 +517,7 @@ const zh = {
     // Display styles
     displayStyles: {
       below: "上下对照",
-      sideBySide: "左右对照",
-      sourceOnly: "仅原文",
-      translatedOnly: "仅译文"
+      sideBySide: "左右对照"
     },
     // Segment status
     status: {
@@ -546,7 +540,8 @@ const zh = {
       dropHere: "拖放文件到这里",
       orClick: "或点击选择文件",
       supported: "支持：{{formats}}",
-      parsing: "正在解析文件..."
+      parsing: "正在解析文件...",
+      ocrProgress: "OCR 识别第 {{page}}/{{total}} 页..."
     },
     // Password modal
     password: {
@@ -568,10 +563,8 @@ const zh = {
       retryFailed: "重试失败: {{error}}",
       exportSuccess: "导出成功",
       exportFailed: "导出失败: {{error}}",
-      printToPdf: "请在打印对话框中选择\"保存为 PDF\"",
       cacheCleared: "翻译记忆缓存已清除",
       scannedNoOcr: "该 PDF 为扫描件，无法提取文字。请在设置中配置 OCR 引擎后重试",
-      ocrUsed: "OCR 识别",
       fileTooLarge: "文件过大，最大支持 20MB",
       pdfHint: "PDF 仅提取文字内容，图片及复杂排版可能丢失，建议使用纯文本格式"
     },
@@ -584,7 +577,8 @@ const zh = {
       docFormat: "文档格式",
       bilingualWord: "双语 Word (.doc)",
       translatedOnlyWord: "仅译文 Word (.doc)",
-      exportPdf: "导出 PDF (打印)",
+      bilingualPdf: "双语 PDF (打印)",
+      translatedOnlyPdf: "仅译文 PDF (打印)",
       subtitleFormat: "字幕格式",
       srtSubtitle: "SRT 字幕",
       vttSubtitle: "VTT 字幕"
@@ -615,10 +609,9 @@ const zh = {
     },
     // Footer
     footer: {
-      auto: "自动",
-      batchMode: "批量",
-      batchModeOnHint: "批量模式：每次翻译 {{count}} 段，速度更快",
-      batchModeOffHint: "逐条模式：一段一段翻译，更稳定",
+      parallel: "并发",
+      parallelOnHint: "并发模式：同时翻译 {{count}} 段",
+      parallelOffHint: "顺序模式：逐段翻译，对本地模型最稳",
       glossary: "术语",
       glossaryEnabledHint: "术语表已启用",
       glossaryDisabledHint: "术语表已禁用",
@@ -688,6 +681,8 @@ const zh = {
     noTextRecognized: "（未识别到文字）",
     noValidTextRecognized: "（未识别到有效文字）"
   },
+  // Single block — a duplicate key here silently overrides the earlier one
+  // (the parser's epubNo* lookups were dead for several versions).
   docParser: {
     emptySegment: "空段落", tooShort: "过短", numbersOnly: "纯数字",
     codeBlock: "代码块", alreadyTargetLang: "已是目标语言", containsKeyword: "包含关键词",
@@ -696,6 +691,7 @@ const zh = {
     epubNoOpf: "无效的 EPUB 文件：找不到 OPF 文件",
     epubNoContent: "EPUB 文件中没有找到可翻译的文本内容",
     unsupportedFormat: "不支持的文件格式",
+    unimplementedParser: "未实现的解析器",
     passwordRequired: "文件需要密码",
     readFailed: "文件读取失败"
   },
@@ -704,16 +700,6 @@ const zh = {
     jsonParseFailed: "JSON 解析失败",
     csvEmpty: "CSV 文件为空或格式错误",
     unknownFormat: "无法识别文件格式，请使用 JSON、CSV 或 TBX 格式"
-  },
-  docParser: {
-    emptySegment: "空段落", tooShort: "过短", numbersOnly: "纯数字", codeBlock: "代码块",
-    alreadyTargetLang: "已是目标语言", containsKeyword: "包含关键词",
-    unsupportedFormat: "不支持的文件格式", unimplementedParser: "未实现的解析器",
-    passwordRequired: "文件需要密码", readFailed: "文件读取失败",
-    invalidEpubContainer: "无效的 EPUB 文件：缺少 container.xml",
-    invalidEpubRootfile: "无效的 EPUB 文件：找不到 rootfile",
-    invalidEpubOpf: "无效的 EPUB 文件：找不到 OPF 文件",
-    epubEmpty: "EPUB 文件中没有找到可翻译的文本内容"
   },
   tray: {
     showWindow: "显示窗口",

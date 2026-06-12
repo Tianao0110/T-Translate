@@ -77,13 +77,12 @@ const en = {
   documentSettings: {
     title: "Document Translation", description: "Configure segmentation, filter rules and display style",
     segmentSettings: "Segmentation", maxCharsPerSegment: "Max chars per segment", segmentHint: "Long paragraphs will be split automatically",
-    batchTranslation: "Batch Translation", batchMaxTokens: "Max tokens per batch", batchMaxSegments: "Max segments per batch",
-    batchHint: "Merging short paragraphs reduces API calls",
+    parallelTranslation: "Parallel Translation", concurrency: "Concurrent segments",
+    concurrencyHint: "Local models: keep at 1-2 (GPU serializes anyway); online APIs can go higher",
     smartFilter: "Smart Filter", skipShort: "Skip short paragraphs", minLength: "Min length",
     skipNumbers: "Skip number-only paragraphs (e.g. page numbers)", skipCode: "Keep code blocks untranslated", skipTargetLang: "Skip paragraphs already in target language",
     displayStyle: "Default Display Style",
     styleBelow: "Top-bottom - Translation below source", styleSideBySide: "Side by side - Source and translation side by side",
-    styleSourceOnly: "Source only - Hide translation", styleTranslatedOnly: "Translation only - Hide source",
     supportedFormats: "Supported Formats", formatHint: "Supports encrypted PDFs · Auto chapter detection · Translation memory"
   },
   shortcuts: {
@@ -492,13 +491,10 @@ const en = {
       "纯文本": "Plain Text", "Markdown": "Markdown", "SRT 字幕": "SRT Subtitle", "WebVTT 字幕": "WebVTT Subtitle",
       "PDF 文档": "PDF Document", "Word 文档": "Word Document", "CSV 表格": "CSV Spreadsheet", "JSON 文件": "JSON File", "EPUB 电子书": "EPUB eBook"
     },
-    // Search & Replace
+    // Search
     search: {
       title: "Search",
       searchPlaceholder: "Search segments...",
-      replacePlaceholder: "Replace with...",
-      replaceAll: "Replace All",
-      replaceThis: "Replace",
       matches: "matches",
       prev: "Previous",
       next: "Next"
@@ -521,9 +517,7 @@ const en = {
     // Display styles
     displayStyles: {
       below: "Top-bottom",
-      sideBySide: "Side by side",
-      sourceOnly: "Source only",
-      translatedOnly: "Translation only"
+      sideBySide: "Side by side"
     },
     // Segment status
     status: {
@@ -546,7 +540,8 @@ const en = {
       dropHere: "Drop file here",
       orClick: "or click to select",
       supported: "Supported: {{formats}}",
-      parsing: "Parsing file..."
+      parsing: "Parsing file...",
+      ocrProgress: "OCR on page {{page}}/{{total}}..."
     },
     // Password modal
     password: {
@@ -568,10 +563,8 @@ const en = {
       retryFailed: "Retry failed: {{error}}",
       exportSuccess: "Export successful",
       exportFailed: "Export failed: {{error}}",
-      printToPdf: "Please select \"Save as PDF\" in the print dialog",
       cacheCleared: "Translation memory cache cleared",
       scannedNoOcr: "This PDF is scanned (image-based). Please configure an OCR engine in Settings and try again.",
-      ocrUsed: "OCR recognized",
       fileTooLarge: "File too large, max 20MB supported",
       pdfHint: "PDF: text content only. Images and complex layouts may be lost."
     },
@@ -584,7 +577,8 @@ const en = {
       docFormat: "Document Format",
       bilingualWord: "Bilingual Word (.doc)",
       translatedOnlyWord: "Translation Only Word (.doc)",
-      exportPdf: "Export PDF (Print)",
+      bilingualPdf: "Bilingual PDF (Print)",
+      translatedOnlyPdf: "Translation Only PDF (Print)",
       subtitleFormat: "Subtitle Format",
       srtSubtitle: "SRT Subtitle",
       vttSubtitle: "VTT Subtitle"
@@ -615,10 +609,9 @@ const en = {
     },
     // Footer
     footer: {
-      auto: "Auto",
-      batchMode: "Batch",
-      batchModeOnHint: "Batch mode: translate {{count}} segments at once, faster",
-      batchModeOffHint: "Single mode: translate one by one, more stable",
+      parallel: "Parallel",
+      parallelOnHint: "Parallel mode: translate {{count}} segments concurrently",
+      parallelOffHint: "Sequential mode: one segment at a time, easiest on local models",
       glossary: "Glossary",
       glossaryEnabledHint: "Glossary enabled",
       glossaryDisabledHint: "Glossary disabled",
@@ -688,6 +681,8 @@ const en = {
     noTextRecognized: "(No text recognized)",
     noValidTextRecognized: "(No valid text recognized)"
   },
+  // Single block — a duplicate key here silently overrides the earlier one
+  // (the parser's epubNo* lookups were dead for several versions).
   docParser: {
     emptySegment: "Empty segment", tooShort: "Too short", numbersOnly: "Numbers only",
     codeBlock: "Code block", alreadyTargetLang: "Already in target language", containsKeyword: "Contains keyword",
@@ -696,6 +691,7 @@ const en = {
     epubNoOpf: "Invalid EPUB: OPF file not found",
     epubNoContent: "No translatable text found in EPUB",
     unsupportedFormat: "Unsupported file format",
+    unimplementedParser: "Unimplemented parser",
     passwordRequired: "File requires a password",
     readFailed: "File read failed"
   },
@@ -704,16 +700,6 @@ const en = {
     jsonParseFailed: "JSON parse failed",
     csvEmpty: "CSV file is empty or malformed",
     unknownFormat: "Unrecognized file format. Please use JSON, CSV, or TBX."
-  },
-  docParser: {
-    emptySegment: "Empty segment", tooShort: "Too short", numbersOnly: "Numbers only", codeBlock: "Code block",
-    alreadyTargetLang: "Already in target language", containsKeyword: "Contains keyword",
-    unsupportedFormat: "Unsupported file format", unimplementedParser: "Unimplemented parser",
-    passwordRequired: "File requires a password", readFailed: "File read failed",
-    invalidEpubContainer: "Invalid EPUB: missing container.xml",
-    invalidEpubRootfile: "Invalid EPUB: rootfile not found",
-    invalidEpubOpf: "Invalid EPUB: OPF file not found",
-    epubEmpty: "No translatable text found in EPUB"
   },
   tray: {
     showWindow: "Show Window",

@@ -37,6 +37,7 @@ const validChannels = {
     "get-platform",
     "show-save-dialog",
     "show-open-dialog",
+    "save-file",
     "read-clipboard-text",
     "read-clipboard-image",
     "store-get",
@@ -96,6 +97,7 @@ const electronAPI = {
   dialog: {
     showSaveDialog: (opts) => ipcRenderer.invoke("show-save-dialog", opts),
     showOpenDialog: (opts) => ipcRenderer.invoke("show-open-dialog", opts),
+    saveFile: (opts) => ipcRenderer.invoke("save-file", opts),
   },
   clipboard: {
     readText: () => ipcRenderer.invoke("read-clipboard-text"),

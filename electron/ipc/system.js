@@ -1,6 +1,7 @@
 // System-level IPC handlers — window control, dialogs, platform info, external links.
 
 const { ipcMain, dialog, shell } = require("electron");
+const fs = require("fs").promises;
 const { CHANNELS } = require("../shared/channels");
 const logger = require("../utils/logger")("IPC:System");
 const { t } = require("../shared/main-i18n");
@@ -156,6 +157,24 @@ function register(ctx) {
     } catch (error) {
       logger.error("Save dialog error:", error);
       return { canceled: true, error: error.message };
+    }
+  });
+
+  // Save dialog + write in one invoke — the renderer has no fs for
+  // arbitrary files, and a path returned from SAVE alone is useless to it.
+  ipcMain.handle(CHANNELS.DIALOG.SAVE_FILE, async (event, { defaultPath, filters, data, encoding } = {}) => {
+    const mainWindow = getMainWindow();
+    try {
+      const result = await dialog.showSaveDialog(mainWindow, { defaultPath, filters });
+      if (result.canceled || !result.filePath) {
+        return { success: false, canceled: true };
+      }
+      await fs.writeFile(result.filePath, data ?? "", encoding === "binary" ? "binary" : "utf8");
+      logger.debug("File saved:", result.filePath);
+      return { success: true, filePath: result.filePath };
+    } catch (error) {
+      logger.error("Save file error:", error);
+      return { success: false, error: error.message };
     }
   });
 

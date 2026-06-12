@@ -2,17 +2,15 @@ import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next';
 import {
   FileText, Upload, X, Play, Pause, RotateCcw, Download,
-  ChevronUp, ChevronDown, ChevronRight, Settings, AlertCircle, CheckCircle, Clock,
-  Loader, Eye, EyeOff, ArrowUp, Filter, FileDown, Trash2,
-  SkipForward, RefreshCw, Languages, Zap, Lock, Key,
-  List, Hash, DollarSign, Database, BookOpen, ChevronLeft,
-  Edit3, Check, Copy, Search
+  ChevronUp, ChevronDown, ChevronRight, AlertCircle, CheckCircle, Clock,
+  Loader, ArrowUp, FileDown,
+  SkipForward, RefreshCw, Zap, Lock, Key,
+  Database, BookOpen, BarChart3,
+  Edit3, Check, Copy, Search, Rows2, Columns2
 } from 'lucide-react';
 import createLogger from '../../utils/logger.js';
 import {
   parseDocument,
-  batchSegments,
-  estimateTokens,
   exportBilingual,
   exportTranslatedOnly,
   exportSRT,
@@ -24,7 +22,8 @@ import {
 import { ocrManager } from '../../providers/ocr/index.js';
 import translationService from '../../services/translation.js';
 import useTranslationStore from '../../stores/translation-store';
-import { LANGUAGES } from '../../config/constants.js';
+import { LANGUAGES, PRIVACY_MODES } from '../../config/constants.js';
+import { getPrivacyModeConfig } from '../../config/privacy-modes.js';
 import { LanguageSelector } from '../TranslationPanel/components.jsx';
 import './styles.css';
 
@@ -37,8 +36,42 @@ const STATUS = {
   SKIPPED: 'skipped',
 };
 
+// Settings are read at action time (mount/parse/translate) rather than
+// subscribed: the settings panel persists to electron-store, and a fresh
+// read per action stays in sync without a remount or IPC listener.
+const DOC_SETTINGS_DEFAULTS = {
+  maxCharsPerSegment: 800,
+  concurrency: 2,
+  displayStyle: 'below',
+  filters: { skipShort: true, minLength: 10, skipNumbers: true, skipCode: true, skipTargetLang: true },
+};
+
+async function readDocumentSettings() {
+  let saved = null;
+  try {
+    if (window.electron?.store) {
+      saved = await window.electron.store.get('settings.document');
+    } else {
+      saved = JSON.parse(localStorage.getItem('settings') || '{}')?.document;
+    }
+  } catch { /* fall back to defaults */ }
+
+  const clampInt = (value, min, max, fallback) =>
+    Number.isFinite(value) ? Math.min(Math.max(Math.round(value), min), max) : fallback;
+
+  return {
+    maxCharsPerSegment: clampInt(saved?.maxCharsPerSegment, 200, 2000, DOC_SETTINGS_DEFAULTS.maxCharsPerSegment),
+    concurrency: clampInt(saved?.concurrency, 1, 6, DOC_SETTINGS_DEFAULTS.concurrency),
+    displayStyle: ['below', 'side-by-side'].includes(saved?.displayStyle)
+      ? saved.displayStyle
+      : DOC_SETTINGS_DEFAULTS.displayStyle,
+    filters: { ...DOC_SETTINGS_DEFAULTS.filters, ...(saved?.filters || {}) },
+  };
+}
+
 // Progress persistence
 const PROGRESS_KEY = 'dt_progress_';
+const PROGRESS_TTL_MS = 7 * 86400000;
 
 function getFileFingerprint(file) {
   return `${file.name}_${file.size}_${file.lastModified}`;
@@ -58,9 +91,28 @@ function loadProgress(fp) {
     const raw = localStorage.getItem(PROGRESS_KEY + fp);
     if (!raw) return null;
     const data = JSON.parse(raw);
-    if (Date.now() - data.ts > 7 * 86400000) { localStorage.removeItem(PROGRESS_KEY + fp); return null; }
+    if (Date.now() - data.ts > PROGRESS_TTL_MS) { localStorage.removeItem(PROGRESS_KEY + fp); return null; }
     return data;
   } catch { return null; }
+}
+
+// loadProgress only ever cleans the key of a file the user re-opens;
+// abandoned files would pile up against the ~5MB localStorage quota until
+// saveProgress starts failing silently.
+function sweepExpiredProgress() {
+  try {
+    const now = Date.now();
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (!key?.startsWith(PROGRESS_KEY)) continue;
+      try {
+        const { ts } = JSON.parse(localStorage.getItem(key));
+        if (!ts || now - ts > PROGRESS_TTL_MS) localStorage.removeItem(key);
+      } catch {
+        localStorage.removeItem(key);
+      }
+    }
+  } catch { /* localStorage unavailable */ }
 }
 
 const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate, onEdit, onCopy, searchQuery, t }) => {
@@ -89,17 +141,17 @@ const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate,
   };
   const cancelEdit = () => { setIsEditing(false); setEditText(''); };
 
-  // Highlight search matches
+  // Highlight search matches. split() with a capture group puts matches at
+  // odd indices — testing parts against a /g regex would skip alternate
+  // matches via its persisting lastIndex.
   const highlightText = (text) => {
     if (!searchQuery || !text) return text;
     try {
-      const regex = new RegExp(`(${searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-      const parts = text.split(regex);
-      return parts.map((part, i) => regex.test(part) ? <mark key={i} className="search-highlight">{part}</mark> : part);
+      const escaped = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const parts = text.split(new RegExp(`(${escaped})`, 'gi'));
+      return parts.map((part, i) => i % 2 === 1 ? <mark key={i} className="search-highlight">{part}</mark> : part);
     } catch { return text; }
   };
-
-  const hasSearchMatch = searchQuery && segment.translated && segment.translated.toLowerCase().includes(searchQuery.toLowerCase());
 
   return (
     <div 
@@ -110,7 +162,7 @@ const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate,
       <div className="segment-header">
         <span className="segment-index">#{segment.id + 1}</span>
         {statusIcon[segment.status]}
-        {segment.edited && <span className="edited-badge" title={t('documentTranslator.segment.edited')}>✏️</span>}
+        {segment.edited && <span className="edited-badge" title={t('documentTranslator.segment.edited')}><Edit3 size={11} /></span>}
         {segment.status === STATUS.SKIPPED && segment.filterReason && (
           <span className="skip-reason">{segment.filterReason}</span>
         )}
@@ -141,14 +193,12 @@ const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate,
       </div>
 
       {/* source */}
-      {displayStyle !== 'translated-only' && (
-        <div className="segment-original">
-          {highlightText(segment.original)}
-        </div>
-      )}
+      <div className="segment-original">
+        {highlightText(segment.original)}
+      </div>
 
       {/* translation */}
-      {displayStyle !== 'source-only' && segment.status !== STATUS.SKIPPED && (
+      {segment.status !== STATUS.SKIPPED && (
         <div className={`segment-translated ${segment.status}`}>
           {segment.status === STATUS.TRANSLATING && (
             <span className="translating-hint">
@@ -251,14 +301,16 @@ const DocumentTranslator = ({
   const sourceLanguages = useMemo(() => LANGUAGES, []);
   
   const DISPLAY_STYLES = useMemo(() => [
-    { id: 'below', name: t('documentTranslator.displayStyles.below'), icon: '⬇️' },
-    { id: 'side-by-side', name: t('documentTranslator.displayStyles.sideBySide'), icon: '⬛' },
+    { id: 'below', name: t('documentTranslator.displayStyles.below'), icon: Rows2 },
+    { id: 'side-by-side', name: t('documentTranslator.displayStyles.sideBySide'), icon: Columns2 },
   ], [t]);
   
   // File state
   const [document, setDocument] = useState(null);
   const [segments, setSegments] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  // { page, total, ocr } during PDF parse — OCR pages are slow enough to need feedback.
+  const [parseProgress, setParseProgress] = useState(null);
   
   // Fingerprint used to key progress in localStorage.
   const fileFingerprint = useRef(null);
@@ -275,19 +327,28 @@ const DocumentTranslator = ({
   const pauseRef = useRef(false);
   const abortRef = useRef(false);
   
-  const [batchMode, setBatchMode] = useState(true);
-  const [batchSize, setBatchSize] = useState(10);
+  const [parallelMode, setParallelMode] = useState(true);
+  // Wired to settings.document.concurrency in loadDocumentSettings below.
+  const [concurrency, setConcurrency] = useState(2);
   const [useGlossary, setUseGlossary] = useState(true);
   
   const getGlossaryTerms = useTranslationStore(state => state.getGlossaryTerms);
   const translationMode = useTranslationStore(state => state.translationMode);
+
+  // The service defaults privacyMode to STANDARD, which would route
+  // offline/secure sessions to online providers and persist secure-mode
+  // results to the disk cache — so every translate call must carry these.
+  const buildTranslateOptions = () => ({
+    privacyMode: translationMode,
+    useCache: translationMode !== PRIVACY_MODES.SECURE,
+    glossaryTerms: useGlossary ? getGlossaryTerms() : [],
+  });
   
   const [startTime, setStartTime] = useState(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   
   // UI state
   const [displayStyle, setDisplayStyle] = useState('below');
-  const [showFilters, setShowFilters] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -309,22 +370,26 @@ const DocumentTranslator = ({
   const [pendingFile, setPendingFile] = useState(null);
   const [password, setPassword] = useState('');
   
-  // Filter settings
-  const [filters, setFilters] = useState({
-    skipShort: true,
-    minLength: 10,
-    skipNumbers: true,
-    skipCode: true,
-    skipTargetLang: true,
-    skipKeywords: [],
-  });
-  
+  // Seed concurrency + display style from settings once per mount; parse-time
+  // and translate-time values are re-read fresh in loadFile/startTranslation.
+  useEffect(() => {
+    let alive = true;
+    readDocumentSettings().then((ds) => {
+      if (!alive) return;
+      setConcurrency(ds.concurrency);
+      setDisplayStyle(ds.displayStyle);
+    });
+    return () => { alive = false; };
+  }, []);
+
+
   // Drop-zone refs
   const dropZoneRef = useRef(null);
   const fileInputRef = useRef(null);
   const [isDragOver, setIsDragOver] = useState(false);
   
-  // Segment list ref
+  // Root + segment list refs (root drives the hidden-tab visibility check)
+  const rootRef = useRef(null);
   const listRef = useRef(null);
   
   // Stats
@@ -341,7 +406,8 @@ const DocumentTranslator = ({
       .reduce((sum, s) => sum + (s.tokens || 0), 0);
     const cacheHits = segments.filter(s => s.fromCache).length;
     const edited = segments.filter(s => s.edited).length;
-    const progress = total > 0 ? Math.round((completed / (total - skipped)) * 100) : 0;
+    const translatable = total - skipped;
+    const progress = translatable > 0 ? Math.round((completed / translatable) * 100) : 0;
     
     return { 
       total, completed, failed, skipped, pending, translating,
@@ -377,18 +443,48 @@ const DocumentTranslator = ({
     setSearchMatchIndex(-1);
   }, [searchQuery]);
 
-  // Auto-save progress
-  useEffect(() => {
-    if (fileFingerprint.current && stats.completed > 0 && !isTranslating) {
-      saveProgress(fileFingerprint.current, segments, sourceLang, targetLang);
-    }
-  }, [stats.completed, isTranslating]);
+  // Latest segments for synchronous handlers (beforeunload).
+  const segmentsRef = useRef(segments);
+  useEffect(() => { segmentsRef.current = segments; }, [segments]);
 
-  // Ctrl+F / Ctrl+H
+  // Persist progress as it accumulates. Pre-0.2.9 this only fired after a
+  // run finished, so a crash or quit mid-translation lost the whole run
+  // (the L2 disk cache holds ~200 entries — no safety net for big docs).
+  // Throttled so fast providers don't stringify the list per completion.
+  const lastSaveRef = useRef(0);
+  useEffect(() => {
+    if (!fileFingerprint.current) return;
+    if (stats.completed === 0 && stats.edited === 0) return;
+    const now = Date.now();
+    if (isTranslating && now - lastSaveRef.current < 3000) return;
+    lastSaveRef.current = now;
+    saveProgress(fileFingerprint.current, segments, sourceLang, targetLang);
+  }, [stats.completed, stats.edited, isTranslating, segments, sourceLang, targetLang]);
+
+  // Crash/quit safety net — synchronous flush of whatever completed.
+  useEffect(() => {
+    const flush = () => {
+      if (fileFingerprint.current && segmentsRef.current.some(s => s.status === STATUS.COMPLETED)) {
+        saveProgress(fileFingerprint.current, segmentsRef.current, sourceLang, targetLang);
+      }
+    };
+    window.addEventListener('beforeunload', flush);
+    return () => window.removeEventListener('beforeunload', flush);
+  }, [sourceLang, targetLang]);
+
+  // One-time cleanup of expired progress blobs.
+  useEffect(() => { sweepExpiredProgress(); }, []);
+
+  // Ctrl+F toggles in-document search. The component stays mounted behind
+  // other tabs (display:none), so bail when hidden — otherwise this swallows
+  // the shortcut for the whole app.
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.ctrlKey && e.key === 'f' && document) { e.preventDefault(); setShowSearch(prev => !prev); }
-      if (e.ctrlKey && e.key === 'h' && document) { e.preventDefault(); setShowSearch(true); }
+      if (e.ctrlKey && e.key === 'f' && document) {
+        if (!rootRef.current?.offsetParent) return;
+        e.preventDefault();
+        setShowSearch(prev => !prev);
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -425,20 +521,26 @@ const DocumentTranslator = ({
     setIsLoading(true);
     
     try {
+      const docSettings = await readDocumentSettings();
       const result = await parseDocument(file, {
-        maxCharsPerSegment: 800,
+        maxCharsPerSegment: docSettings.maxCharsPerSegment,
         password: filePassword,
         filters: {
-          ...filters,
+          ...docSettings.filters,
           targetLang,
         },
         ocrRecognize: async (imageData) => {
           try {
-            return await ocrManager.recognize(imageData);
+            // Scanned-page OCR must respect the privacy mode's engine
+            // allowlist — the chain would otherwise reach online engines.
+            return await ocrManager.recognize(imageData, {
+              allowedEngines: getPrivacyModeConfig(translationMode).allowedOcrEngines || undefined,
+            });
           } catch {
             return { success: false, error: 'OCR unavailable' };
           }
         },
+        onProgress: setParseProgress,
       });
       
       logger.debug('parseDocument result:', result);
@@ -504,8 +606,9 @@ const DocumentTranslator = ({
       notify?.(error.message, 'error');
     } finally {
       setIsLoading(false);
+      setParseProgress(null);
     }
-  }, [filters, targetLang, notify, t]);
+  }, [sourceLang, targetLang, translationMode, notify, t]);
 
   // Submit password
   const handlePasswordSubmit = useCallback(async () => {
@@ -585,98 +688,38 @@ const DocumentTranslator = ({
       return;
     }
     
-    // Branch on translation mode
-    if (batchMode) {
-          await translateBatchMode(toTranslate);
-    } else {
-      await translateSingleMode(toTranslate);
-    }
-    
+    // Re-read so a settings change applies to the next run without remount.
+    const docSettings = await readDocumentSettings();
+    setConcurrency(docSettings.concurrency);
+    await translateWithPool(toTranslate, parallelMode ? docSettings.concurrency : 1);
+
     setIsTranslating(false);
     if (!abortRef.current) {
       notify?.(t('documentTranslator.notify.translationComplete'), 'success');
     }
   };
 
-  const translateBatchMode = async (toTranslate) => {
-    // Pick up glossary if enabled
-    const glossary = useGlossary ? getGlossaryTerms() : [];
-    if (glossary.length > 0) {
-      logger.debug(`Using glossary with ${glossary.length} terms`);
-    }
-    
-    // Process in batches
-    for (let i = 0; i < toTranslate.length; i += batchSize) {
-      if (abortRef.current) break;
-      
-      // Pause check
-      while (pauseRef.current) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        if (abortRef.current) break;
-      }
-      if (abortRef.current) break;
-      
-      const batch = toTranslate.slice(i, i + batchSize);
-      const batchIds = batch.map(s => s.id);
-      const batchTexts = batch.map(s => s.original);
-      
-      // Mark this batch as translating
-      setSegments(prev => prev.map(s => 
-        batchIds.includes(s.id) ? { ...s, status: STATUS.TRANSLATING } : s
-      ));
-      
-      try {
-        const result = await translationService.translateBatch(batchTexts, {
-          sourceLang,
-          targetLang,
-          glossary: glossary.length > 0 ? glossary : undefined,
-        });
-        
-        if (result.success && result.translations) {
-          // Apply results
-          setSegments(prev => prev.map(s => {
-            const batchIndex = batchIds.indexOf(s.id);
-            if (batchIndex >= 0) {
-              const translation = result.translations[batchIndex];
-              // Cache the translation
-              const cacheKey = `${s.original}|${sourceLang}|${targetLang}`;
-              translationCache.current.set(cacheKey, translation);
-              
-              return {
-                ...s,
-                status: STATUS.COMPLETED,
-                translated: translation,
-              };
-            }
-            return s;
-          }));
-        } else {
-          throw new Error(result.error || 'Batch translation failed');
+  // Worker pool over single-segment translation. Each segment gets its own
+  // success/error state, so a failed item can't masquerade as completed the
+  // way joined-batch responses could. Concurrency stays low by default:
+  // local LLMs serialize on the GPU, so more in-flight calls only add
+  // queueing (same calibration as pipeline.js scattered mode).
+  const translateWithPool = async (toTranslate, poolSize) => {
+    let cursor = 0;
+    const worker = async () => {
+      for (;;) {
+        while (pauseRef.current && !abortRef.current) {
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
-      } catch (error) {
-        // Batch failed — fall back to single-segment loop.
-        logger.warn('Batch translation failed, falling back to single mode:', error);
-        for (const segment of batch) {
-          if (abortRef.current) break;
-          await translateSingleSegment(segment);
-        }
+        if (abortRef.current) return;
+        const index = cursor++;
+        if (index >= toTranslate.length) return;
+        await translateSingleSegment(toTranslate[index]);
       }
-    }
-  };
-
-  const translateSingleMode = async (toTranslate) => {
-    for (const segment of toTranslate) {
-      if (abortRef.current) break;
-      
-      // Pause check
-      while (pauseRef.current) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        if (abortRef.current) break;
-      }
-      if (abortRef.current) break;
-      
-      await translateSingleSegment(segment);
-    }
+    };
+    await Promise.all(
+      Array.from({ length: Math.max(1, poolSize) }, () => worker())
+    );
   };
 
   const translateSingleSegment = async (segment) => {
@@ -688,23 +731,23 @@ const DocumentTranslator = ({
       const result = await translationService.translate(segment.original, {
         sourceLang,
         targetLang,
+        ...buildTranslateOptions(),
       });
-      
-      if (result.success) {
-        const translated = result.text || result.translatedText || '';
-          const cacheKey = `${segment.original}|${sourceLang}|${targetLang}`;
-        translationCache.current.set(cacheKey, translated);
-        
-        setSegments(prev => prev.map(s => 
-          s.id === segment.id ? { 
-            ...s, 
-            status: STATUS.COMPLETED, 
-            translated,
-          } : s
-        ));
-      } else {
-        throw new Error(result.error);
+
+      const translated = result.success ? (result.text || result.translatedText || '') : '';
+      if (!translated) {
+        throw new Error(result.error || 'Empty translation result');
       }
+      const cacheKey = `${segment.original}|${sourceLang}|${targetLang}`;
+      translationCache.current.set(cacheKey, translated);
+
+      setSegments(prev => prev.map(s =>
+        s.id === segment.id ? {
+          ...s,
+          status: STATUS.COMPLETED,
+          translated,
+        } : s
+      ));
     } catch (error) {
       setSegments(prev => prev.map(s => 
         s.id === segment.id ? { 
@@ -716,16 +759,27 @@ const DocumentTranslator = ({
     }
   };
 
-  // Pause / resume
+  // Pause / resume. The elapsed timer derives from startTime, so resuming
+  // shifts the epoch forward by the paused span — otherwise pause time
+  // counts as translation time.
+  const pausedAtRef = useRef(null);
   const togglePause = () => {
-    pauseRef.current = !pauseRef.current;
-    setIsPaused(pauseRef.current);
+    const next = !pauseRef.current;
+    pauseRef.current = next;
+    setIsPaused(next);
+    if (next) {
+      pausedAtRef.current = Date.now();
+    } else if (pausedAtRef.current) {
+      setStartTime(prev => prev + (Date.now() - pausedAtRef.current));
+      pausedAtRef.current = null;
+    }
   };
 
   // Stop translation
   const stopTranslation = () => {
     abortRef.current = true;
     pauseRef.current = false;
+    pausedAtRef.current = null;
     setIsPaused(false);
     setIsTranslating(false);
   };
@@ -743,13 +797,14 @@ const DocumentTranslator = ({
       const result = await translationService.translate(segment.original, {
         sourceLang,
         targetLang,
+        ...buildTranslateOptions(),
       });
-      
+
       if (result.success) {
-        setSegments(prev => prev.map(s => 
-          s.id === segmentId ? { 
-            ...s, 
-            status: STATUS.COMPLETED, 
+        setSegments(prev => prev.map(s =>
+          s.id === segmentId ? {
+            ...s,
+            status: STATUS.COMPLETED,
             translated: result.text || result.translatedText || '',
           } : s
         ));
@@ -785,7 +840,7 @@ const DocumentTranslator = ({
     translationCache.current.delete(cacheKey);
     setSegments(prev => prev.map(s => s.id === segmentId ? { ...s, status: STATUS.TRANSLATING, edited: false } : s));
     try {
-      const result = await translationService.translate(segment.original, { sourceLang, targetLang });
+      const result = await translationService.translate(segment.original, { sourceLang, targetLang, ...buildTranslateOptions() });
       if (result.success) {
         const translated = result.text || result.translatedText || '';
         translationCache.current.set(cacheKey, translated);
@@ -844,7 +899,6 @@ const DocumentTranslator = ({
     let filename = document?.filename?.replace(/\.[^.]+$/, '') || 'translated';
     let ext = 'txt';
     let filterName = 'Text';
-    let isBinary = false;
     
     try {
       switch (type) {
@@ -899,11 +953,20 @@ const DocumentTranslator = ({
           break;
         }
         case 'pdf':
-          content = exportPDFHTML(segments, { 
-            style: 'bilingual', 
+          content = exportPDFHTML(segments, {
+            style: 'bilingual',
             title: document?.filename || t('documentTranslator.defaultDocTitle')
           });
           filename += t('documentTranslator.fileSuffix.bilingual');
+          ext = 'html';
+          filterName = 'HTML (Print to PDF)';
+          break;
+        case 'pdf-translated':
+          content = exportPDFHTML(segments, {
+            style: 'translated-only',
+            title: document?.filename || t('documentTranslator.defaultDocTitle')
+          });
+          filename += t('documentTranslator.fileSuffix.translatedOnly');
           ext = 'html';
           filterName = 'HTML (Print to PDF)';
           break;
@@ -921,7 +984,7 @@ const DocumentTranslator = ({
             { name: 'All Files', extensions: ['*'] },
           ],
           data: content,
-          encoding: isBinary ? 'binary' : 'utf8',
+          encoding: 'utf8',
         });
         
         if (result.success) {
@@ -1021,7 +1084,7 @@ const DocumentTranslator = ({
     .join(', ');
 
   return (
-    <div className="document-translator">
+    <div className="document-translator" ref={rootRef}>
       {/* Header */}
       <div className="dt-header">
         <div className="dt-title">
@@ -1082,7 +1145,7 @@ const DocumentTranslator = ({
                     onClick={() => setDisplayStyle(style.id)}
                     title={style.name}
                   >
-                    {style.icon}
+                    <style.icon size={15} />
                   </button>
                 ))}
               </div>
@@ -1119,7 +1182,10 @@ const DocumentTranslator = ({
                       <FileText size={14} /> {t('documentTranslator.export.translatedOnlyWord')}
                     </button>
                     <button onClick={() => handleExport('pdf')}>
-                      <FileText size={14} /> {t('documentTranslator.export.exportPdf')}
+                      <FileText size={14} /> {t('documentTranslator.export.bilingualPdf')}
+                    </button>
+                    <button onClick={() => handleExport('pdf-translated')}>
+                      <FileText size={14} /> {t('documentTranslator.export.translatedOnlyPdf')}
                     </button>
                     
                     {segments[0]?.type === 'subtitle' && (
@@ -1185,11 +1251,17 @@ const DocumentTranslator = ({
             {isLoading ? (
               <div className="loading-state">
                 <Loader size={32} className="spinning" />
-                <p>{t('documentTranslator.upload.parsing')}</p>
+                <p>
+                  {parseProgress?.ocr
+                    ? t('documentTranslator.upload.ocrProgress', { page: parseProgress.page, total: parseProgress.total })
+                    : t('documentTranslator.upload.parsing')}
+                </p>
               </div>
             ) : (
               <>
-                <Upload size={48} />
+                <div className="dropzone-icon">
+                  <Upload size={32} />
+                </div>
                 <h3>{t('documentTranslator.upload.dropHere')}</h3>
                 <p>{t('documentTranslator.upload.orClick')}</p>
                 <p className="format-hint">{t('documentTranslator.upload.supported', { formats: supportedExtensions })}</p>
@@ -1257,7 +1329,8 @@ const DocumentTranslator = ({
                     <button
                       className="edited-count edited-locate-btn"
                       onClick={() => {
-                        const el = document.querySelector('.segment-item.edited');
+                        // `document` is shadowed by component state here
+                        const el = listRef.current?.querySelector('.segment-item.edited');
                         if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                       }}
                       title={t('documentTranslator.progress.editedHint')}
@@ -1333,7 +1406,7 @@ const DocumentTranslator = ({
                 <div className="stats-overlay" onClick={() => setShowStats(false)} />
                 <div className="stats-popup">
                   <div className="stats-popup-header">
-                    <span>📊 {t('documentTranslator.stats.title')}</span>
+                    <span className="stats-popup-title"><BarChart3 size={15} /> {t('documentTranslator.stats.title')}</span>
                     <button className="close-btn" onClick={() => setShowStats(false)}>
                       <X size={14} />
                     </button>
@@ -1414,16 +1487,16 @@ const DocumentTranslator = ({
       {document && (
         <div className="dt-footer">
           <div className="control-left">
-            {/* Batch mode toggle */}
-            <label className="batch-mode-toggle" title={batchMode ? t('documentTranslator.footer.batchModeOnHint', { count: batchSize }) : t('documentTranslator.footer.batchModeOffHint')}>
-              <input 
-                type="checkbox" 
-                checked={batchMode}
-                onChange={(e) => setBatchMode(e.target.checked)}
+            {/* Parallel mode toggle */}
+            <label className="batch-mode-toggle" title={parallelMode ? t('documentTranslator.footer.parallelOnHint', { count: concurrency }) : t('documentTranslator.footer.parallelOffHint')}>
+              <input
+                type="checkbox"
+                checked={parallelMode}
+                onChange={(e) => setParallelMode(e.target.checked)}
                 disabled={isTranslating}
               />
               <Zap size={14} />
-              <span>{t('documentTranslator.footer.batchMode')}</span>
+              <span>{t('documentTranslator.footer.parallel')}</span>
             </label>
             {/* Glossary toggle */}
             <label 

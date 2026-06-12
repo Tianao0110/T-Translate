@@ -14,6 +14,7 @@ const CHANNELS = {
     SAVE: 'show-save-dialog',
     OPEN: 'show-open-dialog',
     MESSAGE: 'show-message-box',
+    SAVE_FILE: 'save-file',   // dialog + write in one round trip
   },
   STORE: {
     GET: 'store-get',

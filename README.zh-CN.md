@@ -63,7 +63,7 @@
 
 ### 文档翻译
 
-支持 PDF、DOCX、EPUB、TXT、SRT、VTT、CSV、JSON 共 9 种格式。支持批量模式和术语库联动。等待时间因设备性能和翻译源而异。
+支持 PDF、DOCX、EPUB、TXT、Markdown、SRT、VTT、CSV、JSON 共 9 种格式。支持并发翻译、扫描件 OCR 和术语库联动。等待时间因设备性能和翻译源而异。
 
 <p align="center">
   <img src="docs/screenshots/document-translate.png" width="600" alt="文档翻译">
