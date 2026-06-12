@@ -68,6 +68,7 @@ async function readDocumentSettings() {
 
 // Progress persistence
 const PROGRESS_KEY = 'dt_progress_';
+const PROGRESS_TTL_MS = 7 * 86400000;
 
 function getFileFingerprint(file) {
   return `${file.name}_${file.size}_${file.lastModified}`;
@@ -87,9 +88,28 @@ function loadProgress(fp) {
     const raw = localStorage.getItem(PROGRESS_KEY + fp);
     if (!raw) return null;
     const data = JSON.parse(raw);
-    if (Date.now() - data.ts > 7 * 86400000) { localStorage.removeItem(PROGRESS_KEY + fp); return null; }
+    if (Date.now() - data.ts > PROGRESS_TTL_MS) { localStorage.removeItem(PROGRESS_KEY + fp); return null; }
     return data;
   } catch { return null; }
+}
+
+// loadProgress only ever cleans the key of a file the user re-opens;
+// abandoned files would pile up against the ~5MB localStorage quota until
+// saveProgress starts failing silently.
+function sweepExpiredProgress() {
+  try {
+    const now = Date.now();
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (!key?.startsWith(PROGRESS_KEY)) continue;
+      try {
+        const { ts } = JSON.parse(localStorage.getItem(key));
+        if (!ts || now - ts > PROGRESS_TTL_MS) localStorage.removeItem(key);
+      } catch {
+        localStorage.removeItem(key);
+      }
+    }
+  } catch { /* localStorage unavailable */ }
 }
 
 const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate, onEdit, onCopy, searchQuery, t }) => {
@@ -419,12 +439,37 @@ const DocumentTranslator = ({
     setSearchMatchIndex(-1);
   }, [searchQuery]);
 
-  // Auto-save progress
+  // Latest segments for synchronous handlers (beforeunload).
+  const segmentsRef = useRef(segments);
+  useEffect(() => { segmentsRef.current = segments; }, [segments]);
+
+  // Persist progress as it accumulates. Pre-0.2.9 this only fired after a
+  // run finished, so a crash or quit mid-translation lost the whole run
+  // (the L2 disk cache holds ~200 entries — no safety net for big docs).
+  // Throttled so fast providers don't stringify the list per completion.
+  const lastSaveRef = useRef(0);
   useEffect(() => {
-    if (fileFingerprint.current && stats.completed > 0 && !isTranslating) {
-      saveProgress(fileFingerprint.current, segments, sourceLang, targetLang);
-    }
-  }, [stats.completed, isTranslating]);
+    if (!fileFingerprint.current) return;
+    if (stats.completed === 0 && stats.edited === 0) return;
+    const now = Date.now();
+    if (isTranslating && now - lastSaveRef.current < 3000) return;
+    lastSaveRef.current = now;
+    saveProgress(fileFingerprint.current, segments, sourceLang, targetLang);
+  }, [stats.completed, stats.edited, isTranslating, segments, sourceLang, targetLang]);
+
+  // Crash/quit safety net — synchronous flush of whatever completed.
+  useEffect(() => {
+    const flush = () => {
+      if (fileFingerprint.current && segmentsRef.current.some(s => s.status === STATUS.COMPLETED)) {
+        saveProgress(fileFingerprint.current, segmentsRef.current, sourceLang, targetLang);
+      }
+    };
+    window.addEventListener('beforeunload', flush);
+    return () => window.removeEventListener('beforeunload', flush);
+  }, [sourceLang, targetLang]);
+
+  // One-time cleanup of expired progress blobs.
+  useEffect(() => { sweepExpiredProgress(); }, []);
 
   // Ctrl+F / Ctrl+H
   useEffect(() => {
