@@ -29,10 +29,6 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 
 弱引导 = 仅一件事：首次打开设置时在该链接旁出一次性气泡/高亮，告知"当前为简洁目录，可切换完整目录（划词/玻璃窗/OCR/隐私等）"。看过或点过即记 localStorage 标志，永不再现。zh/en 双语 i18n。**不做**欢迎页、分步向导、功能导览（完整版 onboarding 是 v0.3 候选）。预估 ≤60 行含样式。
 
-### 文档翻译并发（在线 provider 3-5x，独立小项）
-
-[translation.js](src/services/translation.js) `translateBatch` 逐条 await；DocumentTranslator 的 batch 只是 UI 分组。在线 API（OpenAI/DeepSeek/DeepL）可并发 3-5 路，本地 LLM 保持串行（GPU 排队无益）。presets 已有 `requiresNetwork` 字段，正好做并发度开关依据。
-
 ## v0.2.8-OCR scope
 
 主题：本地 OCR 升级（PP-OCRv5 + 语言包下载 + Windows OCR 兜底），分支 `v0.2.8-OCR`。维护手册见 [docs/OCR_MODELS.md](docs/OCR_MODELS.md)。
@@ -44,6 +40,8 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 ### 发布前人工步骤
 
 - [ ] 悬浮窗口人工回归：Ctrl+Alt+G 开窗 → 空格截图 → 再按空格清空 → ESC 关窗 → 设置页改透明度/锁定语言重启确认保留 → 双击窗格分离 → 含 % 译文窗格正常
+
+- [ ] 文档翻译人工回归（feat/document-translation，28 项修复）：拖入 TXT/PDF 翻译 → 翻译中直接关窗重开同文件确认恢复横幅 → 离线模式下确认不走在线源 → 扫描件 PDF 确认 OCR 逐页进度与结果 → 设置页改分段长度/并发数确认生效 → 术语库开关对照 → 导出 SRT/VTT/Word 各开一次 → GBK 编码字幕不乱码
 
 - [ ] `ocr-models` Release 首发：`npm run ocr:release` 产物已在 release-ocr-models/，按 OCR_MODELS.md 上传 7 个文件（**记得勾 pre-release**）。上传前应用内语言包列表会显示「无法获取清单」属预期
 - [ ] 人工回归：设置页语言包下载/更新徽章/卸载、截图翻译（中英日 + 装包后韩语）、划词 OCR 兜底、玻璃窗、Windows OCR 切换、隐私模式引擎过滤
@@ -90,10 +88,10 @@ Copilot 在 v0.2.4 PR 审查发现的既有问题。`translateText` 内部硬编
 ### Lint backlog cleanup
 
 v0.2.5 Phase T 装通 eslint 9 后跑 `npm run lint` 出 539 warnings + 21 pre-existing errors（已在 eslint.config.js per-file 降级兜底）。历史累积，需要逐个清：
-- `src/i18n/locales/{en,zh}.js`: 三对重复 key (selectStyle / notify / docParser) — 后定义静默覆盖前定义
+- `src/i18n/locales/{en,zh}.js`: 重复 key (selectStyle / notify) — 后定义静默覆盖前定义（docParser 对已在 0.2.9 文档翻译体检中合并）
 - `src/App.jsx`: 8 个 `react-hooks/rules-of-hooks` errors — hook 在 early return 后调
-- `src/components/DocumentTranslator/index.jsx`: 3 个 `navigateSearch` undefined
 - `src/utils/logger.js`: `??` 左侧 constant 是 dead code
+- eslint 未启用 `react/jsx-uses-vars`，JSX 引用的组件/图标全报 no-unused-vars 误报（0.2.9 审计时确认）
 
 清完后删 eslint.config.js 里的 per-file override，恢复全局严格。
 
