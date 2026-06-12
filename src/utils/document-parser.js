@@ -245,6 +245,10 @@ export function parseSRT(content) {
   const segments = [];
   const blocks = content.trim().split(/\n\s*\n/);
 
+  // ids are sequential, not the file's cue numbers — real-world SRT files
+  // restart or duplicate numbering, which would collide React keys and
+  // progress-restore mapping. The original cue number survives in `index`.
+  let id = 0;
   for (const block of blocks) {
     const lines = block.trim().split('\n');
     if (lines.length < 3) continue;
@@ -255,7 +259,7 @@ export function parseSRT(content) {
 
     if (!isNaN(index) && timecode.includes('-->')) {
       segments.push({
-        id: index - 1,
+        id: id++,
         index,
         timecode,
         original: text,
@@ -483,6 +487,35 @@ export async function parseDOCX(file, options = {}) {
   };
 }
 
+// Quote-aware single-line CSV field splitter (handles embedded commas and
+// doubled quotes). Multi-line quoted cells are out of scope — rows are
+// pre-split on newlines.
+export function splitCSVLine(line) {
+  const cells = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (line[i + 1] === '"') { current += '"'; i++; }
+        else inQuotes = false;
+      } else {
+        current += ch;
+      }
+    } else if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === ',') {
+      cells.push(current);
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  cells.push(current);
+  return cells;
+}
+
 export async function parseCSV(file, options = {}) {
   const { maxCharsPerSegment = 800, filters = {} } = options;
 
@@ -498,8 +531,8 @@ export async function parseCSV(file, options = {}) {
     const line = lines[i].trim();
     if (!line) continue;
 
-    // Naive CSV parse — extracts text-bearing cells joined with " | ".
-    const cells = line.split(',').map(c => c.trim().replace(/^["']|["']$/g, ''));
+    // Extracts text-bearing cells joined with " | ".
+    const cells = splitCSVLine(line).map(c => c.trim());
     const textContent = cells.filter(c => c.length > 5 && !/^\d+$/.test(c)).join(' | ');
 
     if (textContent && textContent.length >= (filters.minLength || 5)) {
@@ -586,11 +619,15 @@ export async function parseEPUB(file, options = {}) {
   const spineIds = [...itemrefMatches].map(m => m[1]);
 
   const manifestMatch = opfContent.match(/<manifest[^>]*>([\s\S]*?)<\/manifest>/i);
-  const itemMatches = manifestMatch ? manifestMatch[1].matchAll(/<item[^>]+id="([^"]+)"[^>]+href="([^"]+)"[^>]*>/g) : [];
+  const itemTags = manifestMatch ? (manifestMatch[1].match(/<item\b[^>]*>/gi) || []) : [];
 
+  // Attribute order varies between EPUB generators — extract separately
+  // instead of assuming id comes before href.
   const manifest = {};
-  for (const match of itemMatches) {
-    manifest[match[1]] = match[2];
+  for (const tag of itemTags) {
+    const id = tag.match(/\bid="([^"]+)"/i)?.[1];
+    const href = tag.match(/\bhref="([^"]+)"/i)?.[1];
+    if (id && href) manifest[id] = href;
   }
 
   let allText = '';
@@ -776,13 +813,31 @@ export async function parseDocument(file, options = {}) {
   }
 }
 
-function readAsText(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => resolve(e.target.result);
-    reader.onerror = () => reject(new Error(_t('docParser.readFailed', 'Failed to read file')));
-    reader.readAsText(file);
-  });
+// FileReader.readAsText is UTF-8-only; legacy Chinese subtitles/novels are
+// frequently GBK, and some Windows tools emit UTF-16. Decode by evidence:
+// BOM first, then UTF-8 unless GBK produces strictly fewer replacement chars.
+async function readAsText(file) {
+  let buffer;
+  try {
+    buffer = await file.arrayBuffer();
+  } catch {
+    throw new Error(_t('docParser.readFailed', 'Failed to read file'));
+  }
+  const bytes = new Uint8Array(buffer);
+
+  if (bytes[0] === 0xff && bytes[1] === 0xfe) return new TextDecoder('utf-16le').decode(buffer);
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) return new TextDecoder('utf-16be').decode(buffer);
+
+  const utf8 = new TextDecoder('utf-8').decode(buffer);
+  const utf8Bad = (utf8.match(/�/g) || []).length;
+  if (utf8Bad === 0) return utf8;
+
+  try {
+    const gbk = new TextDecoder('gbk').decode(buffer);
+    const gbkBad = (gbk.match(/�/g) || []).length;
+    if (gbkBad < utf8Bad) return gbk;
+  } catch { /* decoder unavailable */ }
+  return utf8;
 }
 
 function calculateStats(segments) {
@@ -906,9 +961,10 @@ export function toVTTTimecode(timecode) {
 }
 
 export function exportSRT(segments) {
+  // Renumbered sequentially — source cue numbers may restart or duplicate.
   return segments
     .filter(s => s.type === 'subtitle')
-    .map(s => `${s.index}\n${toSRTTimecode(s.timecode)}\n${s.translated || s.original}`)
+    .map((s, i) => `${i + 1}\n${toSRTTimecode(s.timecode)}\n${s.translated || s.original}`)
     .join('\n\n');
 }
 
