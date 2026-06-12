@@ -660,7 +660,7 @@ function stopSelectionHook() {
 }
 
 function isClickInOurWindows(x, y) {
-  const windowsToCheck = [windows.main, windows.glass];
+  const windowsToCheck = [windows.main, windows.floatingWindow];
   for (const win of windowsToCheck) {
     if (win && !win.isDestroyed() && win.isVisible()) {
       if (win.isMinimized() || !win.isFocused()) continue;
@@ -929,12 +929,12 @@ app.whenReady().then(() => {
           windows.main.setBounds(validBounds);
         }
       }
-      if (windows.glass && !windows.glass.isDestroyed()) {
-        const bounds = windows.glass.getBounds();
+      if (windows.floatingWindow && !windows.floatingWindow.isDestroyed()) {
+        const bounds = windows.floatingWindow.getBounds();
         const validBounds = displayHelper.ensureBoundsOnDisplay(bounds);
         if (validBounds.adjusted) {
-          logger.info('Glass window moved to valid display');
-          windows.glass.setBounds(validBounds);
+          logger.info('Floating window moved to valid display');
+          windows.floatingWindow.setBounds(validBounds);
         }
       }
     }
@@ -958,8 +958,8 @@ app.whenReady().then(() => {
     showSelectionWithText,
     showSelectionResult,
     hideSelectionLoading,
-    toggleGlassWindow: (...args) => windowManager.toggleGlassWindow(...args),
-    createGlassWindow: (...args) => windowManager.createGlassWindow(...args),
+    toggleFloatingWindow: (...args) => windowManager.toggleFloatingWindow(...args),
+    createFloatingWindow: (...args) => windowManager.createFloatingWindow(...args),
     toggleSelectionTranslate,
     toggleSubtitleCaptureWindow: (...args) => windowManager.toggleSubtitleCaptureWindow(...args),
   };

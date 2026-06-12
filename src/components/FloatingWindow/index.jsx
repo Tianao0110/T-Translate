@@ -1,4 +1,4 @@
-// Glass overlay translation window. Pure UI shell over the session store;
+// Floating translation overlay window. Pure UI shell over the session store;
 // all capture/OCR/translate logic lives in services/pipeline.js.
 // Supports scattered mode where each OCR block becomes its own child pane.
 
@@ -8,11 +8,11 @@ import { Camera, X, Loader2, AlertCircle, ChevronDown, GripHorizontal, History, 
 import useSessionStore, { STATUS, DISPLAY_MODE } from '../../stores/session.js';
 import useConfigStore from '../../stores/config.js';
 import pipeline from '../../services/pipeline.js';
-import ChildGlassPane from './ChildGlassPane.jsx';
+import ChildPane from './ChildPane.jsx';
 import createLogger from '../../utils/logger.js';
 import './styles.css';
 
-const logger = createLogger('Glass');
+const logger = createLogger('FloatingWindow');
 
 // Default OCR engine (llm-vision) needs a local vision model — new users without it
 // hit this path. Keyword match triggers a "Go to OCR Settings" button on the error.
@@ -21,7 +21,7 @@ function isOcrRelatedError(msg) {
   return typeof msg === 'string' && OCR_ERROR_KEYWORDS.test(msg);
 }
 
-const GlassTranslator = () => {
+const FloatingWindow = () => {
   const { t } = useTranslation();
 
   const {
@@ -42,11 +42,11 @@ const GlassTranslator = () => {
   } = useSessionStore();
 
   const {
-    glassOpacity,
+    floatingOpacity,
     targetLanguage,
     lockTargetLang,
     ocrEngine,
-    setGlassOpacity,
+    setFloatingOpacity,
     setTargetLanguage,
     setSourceLanguage,
     setLockTargetLang,
@@ -58,7 +58,7 @@ const GlassTranslator = () => {
   const [showHistoryPanel, setShowHistoryPanel] = useState(false);
   const [hasOverflow, setHasOverflow] = useState(false);
   const [theme, setTheme] = useState('light');
-  const [glassBounds, setGlassBounds] = useState(null);
+  const [floatingWindowBounds, setFloatingBounds] = useState(null);
   const [isPassThrough, setIsPassThrough] = useState(false);
   const [historyItems, setHistoryItems] = useState([]);
   const [toastMessage, setToastMessage] = useState(null);
@@ -75,7 +75,7 @@ const GlassTranslator = () => {
 
   const contentRef = useRef(null);
   const toolbarTimerRef = useRef(null);
-  const glassRef = useRef(null);
+  const rootRef = useRef(null);
   // Mirrors of state for closures inside event handlers (avoid stale-state bugs)
   const passThroughRef = useRef(false);
   const showHistoryPanelRef = useRef(false);
@@ -86,8 +86,8 @@ const GlassTranslator = () => {
   }, [showHistoryPanel]);
 
   useEffect(() => {
-    savedOpacityRef.current = glassOpacity;
-  }, [glassOpacity]);
+    savedOpacityRef.current = floatingOpacity;
+  }, [floatingOpacity]);
 
   useEffect(() => {
     pipeline.init();
@@ -126,7 +126,7 @@ const GlassTranslator = () => {
           width: rect.width,
           height: rect.height,
         };
-        setGlassBounds(newBounds);
+        setFloatingBounds(newBounds);
       }
     };
 
@@ -138,7 +138,7 @@ const GlassTranslator = () => {
       if (e.key === 'Alt' && !passThroughRef.current) {
         passThroughRef.current = true;
         try {
-          await window.electron?.glass?.setPassThrough?.(true);
+          await window.electron?.floatingWindow?.setPassThrough?.(true);
         } catch (err) {
           logger.error('Failed to enter pass-through mode:', err);
         }
@@ -147,20 +147,24 @@ const GlassTranslator = () => {
       }
 
       if (e.key === 'Escape') {
+        // Read live state — this handler is registered once on mount and a
+        // closure over render-scope state would be frozen at first render.
+        const s = useSessionStore.getState();
         // ESC priority: history panel > scattered panes > close window
         if (showHistoryPanelRef.current) {
           setShowHistoryPanel(false);
-        } else if (displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0) {
-          clearChildPanes();
+        } else if (s.displayMode === DISPLAY_MODE.SCATTERED && s.childPanes.length > 0) {
+          s.clearChildPanes();
         } else {
           handleClose();
         }
       } else if (e.code === 'Space') {
         e.preventDefault();
+        const s = useSessionStore.getState();
         // Space toggles between capture and clear depending on current state
-        if (translatedText || (displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0)) {
-          clearChildPanes();
-          clear();
+        if (s.translatedText || (s.displayMode === DISPLAY_MODE.SCATTERED && s.childPanes.length > 0)) {
+          s.clearChildPanes();
+          s.clear();
         } else {
           captureAndTranslate();
         }
@@ -170,7 +174,7 @@ const GlassTranslator = () => {
           setShowHistoryPanel(false);
         } else {
           try {
-            const history = await window.electron?.glass?.getHistory?.(20);
+            const history = await window.electron?.floatingWindow?.getHistory?.(20);
             setHistoryItems(history || []);
           } catch (err) {
             logger.error('Failed to load history:', err);
@@ -184,7 +188,7 @@ const GlassTranslator = () => {
       if (e.key === 'Alt' && passThroughRef.current) {
         passThroughRef.current = false;
         try {
-          await window.electron?.glass?.setPassThrough?.(false);
+          await window.electron?.floatingWindow?.setPassThrough?.(false);
         } catch (err) {
           logger.error('Failed to exit pass-through mode:', err);
         }
@@ -197,7 +201,7 @@ const GlassTranslator = () => {
       if (passThroughRef.current) {
         passThroughRef.current = false;
         try {
-          await window.electron?.glass?.setPassThrough?.(false);
+          await window.electron?.floatingWindow?.setPassThrough?.(false);
         } catch (err) {
           logger.error('Failed to exit pass-through mode on blur:', err);
         }
@@ -206,9 +210,10 @@ const GlassTranslator = () => {
     };
 
     const handleContextMenu = (e) => {
-      if (displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0) {
+      const s = useSessionStore.getState();
+      if (s.displayMode === DISPLAY_MODE.SCATTERED && s.childPanes.length > 0) {
         e.preventDefault();
-        clearChildPanes();
+        s.clearChildPanes();
       }
     };
 
@@ -223,8 +228,8 @@ const GlassTranslator = () => {
     window.addEventListener('passthrough-change', handlePassThroughChange);
 
     let unsubscribeSettings = null;
-    if (window.electron?.glass?.onSettingsChanged) {
-      unsubscribeSettings = window.electron.glass.onSettingsChanged((newSettings) => {
+    if (window.electron?.floatingWindow?.onSettingsChanged) {
+      unsubscribeSettings = window.electron.floatingWindow.onSettingsChanged((newSettings) => {
         loadSettings();
         const newTheme = newSettings?.interface?.theme;
         if (newTheme && ['light', 'dark', 'fresh'].includes(newTheme)) {
@@ -267,12 +272,12 @@ const GlassTranslator = () => {
 
   const loadSettings = async () => {
     try {
-      const settings = await window.electron?.glass?.getSettings?.();
+      const settings = await window.electron?.floatingWindow?.getSettings?.();
       if (settings) {
         logger.debug('Loaded settings from main:', settings);
 
         if (settings.opacity !== undefined) {
-          setGlassOpacity(settings.opacity);
+          setFloatingOpacity(settings.opacity);
         }
 
         if (settings.targetLanguage) {
@@ -288,8 +293,8 @@ const GlassTranslator = () => {
           setLockTargetLang(settings.lockTargetLang);
         }
 
-        if (settings.ocrEngine || settings.globalOcrEngine) {
-          setOcrEngine(settings.ocrEngine || settings.globalOcrEngine);
+        if (settings.ocrEngine) {
+          setOcrEngine(settings.ocrEngine);
         }
       }
     } catch (error) {
@@ -314,23 +319,29 @@ const GlassTranslator = () => {
   const handleClose = async () => {
     // Close detached child windows first so they don't outlive the parent
     try {
-      await window.electron?.glass?.closeAllChildWindows?.();
+      await window.electron?.floatingWindow?.closeAllChildWindows?.();
     } catch (e) {
       logger.error('Failed to close child windows:', e);
     }
 
-    window.electron?.glass?.close?.();
+    window.electron?.floatingWindow?.close?.();
   };
 
   const handleBarClick = () => {
     setShowOpacitySlider(prev => !prev);
   };
 
-  // Opacity is applied via CSS variable (--glass-opacity) so child panes stay opaque.
-  // BrowserWindow.setOpacity would dim children too.
+  // Opacity is applied via CSS variable (--floating-opacity) so child panes stay
+  // opaque; the IPC call persists it window-locally so it survives relaunch
+  // and settings-changed broadcasts.
   const handleOpacityChange = async (e) => {
     const newOpacity = parseFloat(e.target.value);
-    setGlassOpacity(newOpacity);
+    setFloatingOpacity(newOpacity);
+    try {
+      await window.electron?.floatingWindow?.setOpacity?.(newOpacity);
+    } catch (err) {
+      logger.debug('Failed to persist opacity:', err.message);
+    }
   };
 
   const scrollToBottom = () => {
@@ -339,14 +350,14 @@ const GlassTranslator = () => {
     }
   };
 
-  // Capture screen region that maps to this glass window's content area.
+  // Capture screen region that maps to this floating window's content area.
   // Defined as a callback because the keyboard handler closes over it.
   const captureAndTranslate = useCallback(async () => {
     try {
       if (!contentRef.current) return;
 
       const contentRect = contentRef.current.getBoundingClientRect();
-      const windowBounds = await window.electron?.glass?.getBounds?.();
+      const windowBounds = await window.electron?.floatingWindow?.getBounds?.();
       if (!windowBounds) return;
 
       // Window bounds are screen-absolute; contentRect is window-relative
@@ -372,7 +383,7 @@ const GlassTranslator = () => {
     if (
       e.target === e.currentTarget ||
       e.target.classList.contains('scattered-panes-container') ||
-      e.target.classList.contains('glass-message')
+      e.target.classList.contains('floating-message')
     ) {
       if (translatedText || (displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0)) {
         clearChildPanes();
@@ -393,7 +404,7 @@ const GlassTranslator = () => {
     const pane = childPanes.find(p => p.id === id);
     if (!pane) return;
 
-    const windowBounds = await window.electron?.glass?.getBounds?.();
+    const windowBounds = await window.electron?.floatingWindow?.getBounds?.();
     if (!windowBounds) {
       logger.error('Cannot get window bounds');
       return;
@@ -406,7 +417,7 @@ const GlassTranslator = () => {
     logger.debug('Creating child window at screen:', { screenX, screenY, viewportPos, windowBounds });
 
     // Main process sizes the window from the text length
-    const result = await window.electron?.glass?.createChildWindow?.({
+    const result = await window.electron?.floatingWindow?.createChildWindow?.({
       id: pane.id,
       text: pane.translatedText || pane.sourceText,
       x: screenX,
@@ -420,8 +431,16 @@ const GlassTranslator = () => {
     } else {
       logger.error('Failed to create child window:', result?.error);
       // Falling back to internal freeze keeps the pane usable even when
-      // BrowserWindow creation fails (e.g. low memory)
-      freezeChildPane(id);
+      // BrowserWindow creation fails (e.g. low memory). Frozen panes render in
+      // viewport space — pass the pane's viewport position, derived from the
+      // container offset when the drag handler didn't supply one.
+      const contentRect = contentRef.current?.getBoundingClientRect();
+      const fallbackViewportPos = viewportPos
+        ? { x: viewportPos.viewportX, y: viewportPos.viewportY }
+        : contentRect
+          ? { x: pane.bbox.x + contentRect.left, y: pane.bbox.y + contentRect.top }
+          : undefined;
+      freezeChildPane(id, fallbackViewportPos);
     }
   }, [childPanes, theme, removeChildPane, freezeChildPane]);
 
@@ -434,7 +453,7 @@ const GlassTranslator = () => {
     logger.debug('Enter pass-through mode');
 
     try {
-      await window.electron?.glass?.setPassThrough?.(true);
+      await window.electron?.floatingWindow?.setPassThrough?.(true);
     } catch (e) {
       logger.error('Failed to enter pass-through mode:', e);
     }
@@ -449,7 +468,7 @@ const GlassTranslator = () => {
     logger.debug('Exit pass-through mode');
 
     try {
-      await window.electron?.glass?.setPassThrough?.(false);
+      await window.electron?.floatingWindow?.setPassThrough?.(false);
     } catch (e) {
       logger.error('Failed to exit pass-through mode:', e);
     }
@@ -466,7 +485,7 @@ const GlassTranslator = () => {
 
   const loadHistory = useCallback(async () => {
     try {
-      const history = await window.electron?.glass?.getHistory?.(20);
+      const history = await window.electron?.floatingWindow?.getHistory?.(20);
       setHistoryItems(history || []);
     } catch (e) {
       logger.error('Failed to load history:', e);
@@ -487,14 +506,14 @@ const GlassTranslator = () => {
 
   return (
     <div
-      className={`glass-window ${showToolbar ? 'show-toolbar' : ''} ${isPassThrough ? 'pass-through' : ''} ${displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0 ? 'scattered-mode' : ''}`}
-      style={{ '--glass-opacity': glassOpacity }}
+      className={`floating-window ${showToolbar ? 'show-toolbar' : ''} ${isPassThrough ? 'pass-through' : ''} ${displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0 ? 'scattered-mode' : ''}`}
+      style={{ '--floating-opacity': floatingOpacity }}
       data-theme={theme}
       onMouseEnter={handleMouseEnterWindow}
       onMouseLeave={handleMouseLeaveWindow}
     >
-      <div className="glass-top-area">
-          <div className="glass-toolbar">
+      <div className="floating-top-area">
+          <div className="floating-toolbar">
             <button
               className="toolbar-btn"
               onClick={(e) => {
@@ -503,7 +522,7 @@ const GlassTranslator = () => {
                 captureAndTranslate();
               }}
               disabled={isLoading}
-              title={t('glass.captureSpace', '截图识别 (Space)')}
+              title={t('floatingWindow.captureSpace', '截图识别 (Space)')}
             >
               <Camera size={12} />
             </button>
@@ -515,7 +534,7 @@ const GlassTranslator = () => {
                 e.stopPropagation();
                 toggleHistoryPanel();
               }}
-              title={t('glass.historyCtrlH', '历史记录 (Ctrl+H)')}
+              title={t('floatingWindow.historyCtrlH', '历史记录 (Ctrl+H)')}
             >
               <History size={12} />
             </button>
@@ -523,16 +542,16 @@ const GlassTranslator = () => {
             <div
               className="toolbar-handle"
               onClick={handleBarClick}
-              title={t('glass.adjustOpacity', '点击调节透明度')}
+              title={t('floatingWindow.adjustOpacity', '点击调节透明度')}
             >
               <GripHorizontal size={14} />
             </div>
           </div>
 
         <button
-          className="glass-close-btn"
+          className="floating-close-btn"
           onClick={handleClose}
-          title={t('glass.closeEsc', '关闭 (Esc)')}
+          title={t('floatingWindow.closeEsc', '关闭 (Esc)')}
         >
           <X size={12} />
         </button>
@@ -540,22 +559,22 @@ const GlassTranslator = () => {
 
       {showOpacitySlider && (
         <div className="opacity-popup" onMouseLeave={() => setShowOpacitySlider(false)}>
-          <span className="opacity-label">{t('glass.opacity', '透明度')}</span>
+          <span className="opacity-label">{t('floatingWindow.opacity', '透明度')}</span>
           <input
             type="range"
             min="0.3"
             max="1"
             step="0.05"
-            value={glassOpacity}
+            value={floatingOpacity}
             onChange={handleOpacityChange}
           />
-          <span className="opacity-value">{Math.round(glassOpacity * 100)}%</span>
+          <span className="opacity-value">{Math.round(floatingOpacity * 100)}%</span>
         </div>
       )}
 
       {toastMessage && (
         <div
-          className={`glass-toast glass-toast-${toastMessage.type || 'info'}`}
+          className={`floating-toast floating-toast-${toastMessage.type || 'info'}`}
           onClick={() => setToastMessage(null)}
         >
           <span>{toastMessage.message}</span>
@@ -563,33 +582,33 @@ const GlassTranslator = () => {
       )}
 
       <div
-        className={`glass-content ${displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0 ? 'scattered-mode' : ''}`}
+        className={`floating-content ${displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0 ? 'scattered-mode' : ''}`}
         ref={contentRef}
         onClick={handleContentClick}
       >
         {status === STATUS.ERROR ? (
-          <div className="glass-message error">
+          <div className="floating-message error">
             <AlertCircle size={20} />
             <span>{error}</span>
             {isOcrRelatedError(error) && (
               <button
-                className="glass-action-btn"
+                className="floating-action-btn"
                 onClick={(e) => {
                   e.stopPropagation();
-                  window.electron?.glass?.openMainSettings?.('ocr');
+                  window.electron?.floatingWindow?.openMainSettings?.('ocr');
                 }}
               >
-                {t('glass.goToOcrSettings')}
+                {t('floatingWindow.goToOcrSettings')}
               </button>
             )}
           </div>
         ) : displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0 ? (
           <div className="scattered-panes-container">
             {childPanes.map((pane) => (
-              <ChildGlassPane
+              <ChildPane
                 key={pane.id}
                 pane={pane}
-                parentBounds={glassBounds}
+                parentBounds={floatingWindowBounds}
                 onPositionChange={handleChildPanePositionChange}
                 onFreeze={handleChildPaneFreeze}
                 onClose={null}
@@ -598,19 +617,19 @@ const GlassTranslator = () => {
             ))}
           </div>
         ) : isLoading ? (
-          <div className="glass-message loading">
+          <div className="floating-message loading">
             <Loader2 className="spin" size={24} />
             <span>
-              {status === STATUS.CAPTURING && t('glass.capturing', '截图中...')}
-              {status === STATUS.OCR_PROCESSING && t('glass.recognizing', '识别中...')}
-              {status === STATUS.TRANSLATING && t('glass.translating', '翻译中...')}
+              {status === STATUS.CAPTURING && t('floatingWindow.capturing', '截图中...')}
+              {status === STATUS.OCR_PROCESSING && t('floatingWindow.recognizing', '识别中...')}
+              {status === STATUS.TRANSLATING && t('floatingWindow.translating', '翻译中...')}
             </span>
           </div>
         ) : translatedText ? (
-          <div className="glass-result">{translatedText}</div>
+          <div className="floating-result">{translatedText}</div>
         ) : (
-          <div className="glass-message placeholder">
-            <span>{t('glass.captureHint', '点击 📷 或按 Space 截图识别')}</span>
+          <div className="floating-message placeholder">
+            <span>{t('floatingWindow.captureHint', '点击 📷 或按 Space 截图识别')}</span>
           </div>
         )}
       </div>
@@ -625,7 +644,7 @@ const GlassTranslator = () => {
       {frozenPanes.length > 0 && (
         <div className="frozen-panes-container">
           {frozenPanes.map((pane) => (
-            <ChildGlassPane
+            <ChildPane
               key={pane.id}
               pane={pane}
               parentBounds={null}
@@ -639,7 +658,7 @@ const GlassTranslator = () => {
       )}
 
       {showHistoryPanel && (
-        <div className="glass-history-panel">
+        <div className="floating-history-panel">
           <div className="history-header">
             <span className="history-title">
               <Clock size={14} />
@@ -681,11 +700,11 @@ const GlassTranslator = () => {
 
       {isPassThrough && (
         <div className="pass-through-indicator">
-          <span>{t('glass.passThroughMode')}</span>
+          <span>{t('floatingWindow.passThroughMode')}</span>
         </div>
       )}
     </div>
   );
 };
 
-export default GlassTranslator;
+export default FloatingWindow;

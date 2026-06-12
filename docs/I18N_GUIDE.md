@@ -1,4 +1,4 @@
-# T-Translate 多语言国际化 (i18n) 开发指南
+﻿# T-Translate 多语言国际化 (i18n) 开发指南
 
 ## 📋 目录
 
@@ -99,7 +99,7 @@ const zh = {
   providerSettings: { ... },        // 翻译源设置
   translationSettings: { ... },     // 翻译设置
   selectionSettings: { ... },       // 划词翻译
-  glassWindowSettings: { ... },     // 玻璃窗口
+  floatingWindowSettings: { ... },     // 悬浮窗口
   documentSettings: { ... },        // 文档翻译
   connectionSettings: { ... },      // LM Studio 连接
   
@@ -217,7 +217,7 @@ const newLanguage = {
   // ===== 设置导航 =====
   settingsNav: {
     searchPlaceholder: "", groupTranslation: "", groupSystem: "",
-    providers: "", translation: "", selection: "", glassWindow: "", document: "",
+    providers: "", translation: "", selection: "", floatingWindow: "", document: "",
     ocr: "", tts: "", interface: "", connection: "", privacy: "", about: "",
     export: "", import: "", reset: "", noMatch: "",
     unsavedChanges: "", saving: "", saveChanges: ""
@@ -541,7 +541,7 @@ console.log('Missing in ZH:', missingInZh);
 | `providerSettings` | 15+ | 翻译源设置 |
 | `translationSettings` | 30+ | 翻译设置 |
 | `selectionSettings` | 25+ | 划词翻译 |
-| `glassWindowSettings` | 25+ | 玻璃窗口 |
+| `floatingWindowSettings` | 25+ | 悬浮窗口 |
 | `documentSettings` | 20+ | 文档翻译 |
 | `connectionSettings` | 10+ | LM Studio 连接 |
 | `translation` | 40+ | 翻译面板 |

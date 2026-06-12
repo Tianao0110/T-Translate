@@ -1,10 +1,10 @@
 // Bridges Zustand store changes to electron-store so main-process windows
-// (selection translator, glass window) can read settings via the same
+// (selection translator, floating window) can read settings via the same
 // electron-store API without round-tripping JavaScript into a renderer.
 //
 // Synced fields:
 //   - settings.translation.sourceLanguage / targetLanguage (selection flow)
-//   - settings.interface.theme (glass + selection windows)
+//   - settings.interface.theme (floating + selection windows)
 //
 // Wire it up once from App.jsx via initStoreSync().
 
@@ -20,25 +20,25 @@ function debouncedSync(dotPath, value, delay = 100) {
       if (!window.electron?.store?.set) return;
       await window.electron.store.set(`settings.${dotPath}`, value);
       logger.debug(`Synced settings.${dotPath}`);
-      // Notify glass so it can reload target lang / theme without restart.
+      // Notify floating window so it can reload target lang / theme without restart.
       // Separate debounce to merge bursts (e.g. user toggles src+tgt back-to-back).
-      debouncedNotifyGlass();
+      debouncedNotifyFloatingWindow();
     } catch (e) {
       logger.debug(`Sync failed for ${dotPath}:`, e.message);
     }
   }, delay);
 }
 
-let _glassNotifyTimer = null;
-function debouncedNotifyGlass(delay = 50) {
-  clearTimeout(_glassNotifyTimer);
-  _glassNotifyTimer = setTimeout(async () => {
+let _fwNotifyTimer = null;
+function debouncedNotifyFloatingWindow(delay = 50) {
+  clearTimeout(_fwNotifyTimer);
+  _fwNotifyTimer = setTimeout(async () => {
     try {
-      if (!window.electron?.glass?.notifySettingsChanged) return;
-      await window.electron.glass.notifySettingsChanged();
-      logger.debug('Notified glass of settings change');
+      if (!window.electron?.floatingWindow?.notifySettingsChanged) return;
+      await window.electron.floatingWindow.notifySettingsChanged();
+      logger.debug('Notified floating window of settings change');
     } catch (e) {
-      logger.debug('Glass notify failed:', e.message);
+      logger.debug('Floating-window notify failed:', e.message);
     }
   }, delay);
 }

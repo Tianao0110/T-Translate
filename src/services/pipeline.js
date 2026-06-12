@@ -1,4 +1,4 @@
-// Glass-window translation pipeline: capture -> OCR -> (scattered or unified) -> translate.
+// Floating-window translation pipeline: capture -> OCR -> (scattered or unified) -> translate.
 // Owns dedupe-by-hash, target-language flip, and child-pane lifecycle.
 
 import { ocrManager } from '../providers/ocr/index.js';
@@ -21,6 +21,7 @@ const _t = (key, fallback) => {
 // Used to skip OCR/translate when the same image/text comes back from a refresh tick
 let lastImageHash = '';
 let lastText = '';
+let captureInFlight = false;
 
 async function getPrivacyMode() {
   try {
@@ -107,8 +108,16 @@ class TranslationPipeline {
   }
 
   async runFromCapture(captureOptions = {}) {
+    // Single-flight: a second capture while one is running would un-hide the
+    // floating window mid-screenshot (the IPC handler's opacity dance) and
+    // interleave session state.
+    if (captureInFlight) {
+      logger.debug('Capture already in flight, ignoring');
+      return { success: false, skipped: true };
+    }
+    captureInFlight = true;
+
     const session = useSessionStore.getState();
-    const config = useConfigStore.getState();
 
     try {
       // Frozen panes survive; transient ones are cleared each capture cycle
@@ -120,18 +129,23 @@ class TranslationPipeline {
 
       session.startCapture();
 
-      const captureResult = await window.electron?.glass?.captureRegion?.(captureOptions);
+      const captureResult = await window.electron?.floatingWindow?.captureRegion?.(captureOptions);
       if (!captureResult?.success) {
         throw new Error(captureResult?.error || _t('screenshot.failed', '截图失败'));
       }
 
-      return await this.runFromImage(captureResult.imageData, captureOptions);
+      return await this.runFromImage(captureResult.imageData, {
+        ...captureOptions,
+        scaleFactor: captureResult.scaleFactor,
+      });
 
     } catch (error) {
       logger.error('Capture error:', error);
       const errorMsg = getShortErrorMessage(error);
       session.setError(errorMsg);
       return { success: false, error: errorMsg };
+    } finally {
+      captureInFlight = false;
     }
   }
 
@@ -166,7 +180,7 @@ class TranslationPipeline {
         return { success: true, text: '' };
       }
 
-      // Glass overlay needs per-line positioning => prefer rawBlocks.
+      // Floating window needs per-line positioning => prefer rawBlocks.
       // Merged blocks are only used for the unified-mode single text body.
       const mergedBlocks = ocrResult.blocks || [];
       const rawBlocks = ocrResult.rawBlocks || mergedBlocks;
@@ -214,8 +228,10 @@ class TranslationPipeline {
     const config = useConfigStore.getState();
 
     try {
-      // OCR returns physical pixels; CSS needs logical pixels (divide by DPR)
-      const scaleFactor = window.devicePixelRatio || 1;
+      // OCR returns physical pixels of the captured display; CSS needs logical
+      // px. Prefer the capture-time scaleFactor — our own devicePixelRatio can
+      // belong to a different monitor in mixed-DPI setups.
+      const scaleFactor = captureOptions.scaleFactor || window.devicePixelRatio || 1;
       logger.debug(`ScaleFactor for coordinate conversion: ${scaleFactor}`);
 
       const validBlocks = blocks

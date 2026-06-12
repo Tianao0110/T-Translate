@@ -1,4 +1,4 @@
-// Global shortcut IPC: get/update/pause/resume + startup registration.
+﻿// Global shortcut IPC: get/update/pause/resume + startup registration.
 
 const { ipcMain, globalShortcut } = require('electron');
 const { CHANNELS } = require('../shared/channels');
@@ -8,7 +8,7 @@ const { t } = require('../shared/main-i18n');
 const DEFAULT_SHORTCUTS = {
   screenshot: 'Alt+Q',
   toggleWindow: 'CommandOrControl+Shift+W',
-  glassWindow: 'CommandOrControl+Alt+G',
+  floatingWindow: 'CommandOrControl+Alt+G',
   selectionTranslate: 'CommandOrControl+Shift+T',
 };
 
@@ -35,7 +35,7 @@ function register(ctx) {
         }
       }
     },
-    glassWindow: () => managers.toggleGlassWindow?.(),
+    floatingWindow: () => managers.toggleFloatingWindow?.(),
     selectionTranslate: () => managers.toggleSelectionTranslate?.(),
   });
 
@@ -173,7 +173,7 @@ function registerAllShortcuts(ctx) {
         }
       }
     },
-    glassWindow: () => managers.toggleGlassWindow?.(),
+    floatingWindow: () => managers.toggleFloatingWindow?.(),
     selectionTranslate: () => managers.toggleSelectionTranslate?.(),
   };
 

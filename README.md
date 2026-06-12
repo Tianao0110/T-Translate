@@ -1,4 +1,4 @@
-# T-Translate
+﻿# T-Translate
 
 <p align="right">
   English | <a href="./README.zh-CN.md">简体中文</a>
@@ -27,7 +27,7 @@
 | --- | --- |
 | **Selection translator** | System-wide. Select text in any app to translate. Up to 8 pinned windows |
 | **Screenshot OCR** | Capture screen regions. 6 OCR engines with automatic fallback |
-| **Glass overlay** | Transparent overlay. Space-bar to capture-and-translate. For complex layouts |
+| **Floating window** | Transparent overlay. Space-bar to capture-and-translate. For complex layouts |
 | **Document translation** | 9 formats: PDF / DOCX / EPUB / TXT / SRT / VTT / CSV / JSON / Markdown. Segment-by-segment, resumable |
 | **Glossary** | Auto-replace terms after translation, with undo support |
 | **TTS** | Built on Windows offline speech engine |
@@ -53,12 +53,12 @@ Capture a screen region for text recognition. When an OCR engine is unavailable,
   <img src="docs/screenshots/screenshot-ocr.png" width="600" alt="Screenshot OCR translation">
 </p>
 
-### Glass overlay
+### Floating window
 
 Transparent overlay window for live translation. Drag, resize, pin on top. Spawn independent child panes. Space-bar / left-click acts as a toggle: with content → clear, without content → screenshot-and-translate. Child window opacity is independent of the parent, always readable.
 
 <p align="center">
-  <img src="docs/screenshots/glass-window.png" width="600" alt="Glass overlay">
+  <img src="docs/screenshots/floating-window.png" width="600" alt="Floating window">
 </p>
 
 ### Document translation
@@ -116,7 +116,7 @@ npm run dist         # build installer (runs the fetch automatically)
 | --- | --- |
 | `Ctrl+Shift+T` | Show / hide main window |
 | `Ctrl+Shift+S` | Screenshot translate |
-| `Ctrl+Shift+G` | Open glass overlay |
+| `Ctrl+Shift+G` | Open floating window |
 | `Ctrl+Shift+D` | Toggle selection translator |
 | `Ctrl+Enter` | Run translation |
 

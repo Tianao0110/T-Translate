@@ -1,4 +1,4 @@
-// Global state — two layers.
+﻿// Global state — two layers.
 //   1. Persistent config (electron-store) — survives restarts.
 //   2. Runtime state — in-memory, reset on every launch.
 //
@@ -14,6 +14,25 @@ const Store = require('electron-store');
 
 const isDev = process.env.NODE_ENV === 'development' || !require('electron').app.isPackaged;
 
+// One-time store-key migration from the legacy "glass" naming (pre-0.2.9).
+// An old key present on disk means a pre-rename install — its value is the
+// user's real data, so it simply moves; idempotent because the old key is
+// deleted afterwards.
+function migrateGlassKeys(s) {
+  const renames = [
+    ['glassBounds', 'floatingWindowBounds'],
+    ['glassLocalSettings', 'floatingWindowLocal'],
+    ['settings.glassWindow', 'settings.floatingWindow'],
+    ['settings.shortcuts.glassWindow', 'settings.shortcuts.floatingWindow'],
+  ];
+  for (const [oldKey, newKey] of renames) {
+    if (s.has(oldKey)) {
+      s.set(newKey, s.get(oldKey));
+      s.delete(oldKey);
+    }
+  }
+}
+
 const store = new Store({
   defaults: {
     // Window geometry
@@ -22,9 +41,9 @@ const store = new Store({
     alwaysOnTop: false,
     startMinimized: false,
 
-    // Glass (floating overlay) window
-    glassBounds: { width: 400, height: 200 },
-    glassLocalSettings: {},
+    // Floating (screen-translation overlay) window
+    floatingWindowBounds: { width: 400, height: 200 },
+    floatingWindowLocal: {},
 
     // Selection translate — disabled by default on every launch (user opts in per session).
     selectionEnabled: false,
@@ -39,7 +58,7 @@ const store = new Store({
       interface: {},
       selection: {},
       screenshot: {},
-      glassWindow: {},
+      floatingWindow: {},
       providers: {},
       connection: {},
       tts: {
@@ -54,6 +73,8 @@ const store = new Store({
   },
 });
 
+migrateGlassKeys(store);
+
 // In-memory state — reset on every launch.
 const runtime = {
   isQuitting: false,
@@ -64,7 +85,7 @@ const runtime = {
   // Window refs — accessed through `windows` getter/setter below.
   _windows: {
     main: null,
-    glass: null,
+    floatingWindow: null,
     screenshot: null,
     selection: null,
   },
@@ -96,10 +117,10 @@ const windows = {
     if (isDev && win) console.log('[State] Main window set');
   },
 
-  get glass() { return runtime._windows.glass; },
-  set glass(win) {
-    runtime._windows.glass = win;
-    if (isDev && win) console.log('[State] Glass window set');
+  get floatingWindow() { return runtime._windows.floatingWindow; },
+  set floatingWindow(win) {
+    runtime._windows.floatingWindow = win;
+    if (isDev && win) console.log('[State] Floating window set');
   },
 
   get screenshot() { return runtime._windows.screenshot; },

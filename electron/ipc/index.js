@@ -1,4 +1,4 @@
-// IPC unified registry — dependency injection root.
+﻿// IPC unified registry — dependency injection root.
 // All IPC handlers register here; submodules never `require` the parent (avoids cycles).
 
 const logger = require('../utils/logger')('IPC');
@@ -8,7 +8,7 @@ const registerStoreIPC = require('./store');
 const registerShortcutsIPC = require('./shortcuts');
 const registerScreenshotIPC = require('./screenshot');
 const registerClipboardIPC = require('./clipboard');
-const registerGlassIPC = require('./glass');
+const registerFloatingWindowIPC = require('./floating-window');
 const registerSelectionIPC = require('./selection');
 const registerSecureStorageIPC = require('./secure-storage');
 const registerOcrIPC = require('./ocr');
@@ -25,7 +25,7 @@ const { registerThemeIPC } = require('./theme');
  * @param {Object} deps.runtime  Runtime state
  * @param {Object} deps.store    Persistent store
  * @param {Object} deps.app      Electron app instance
- * @param {Object} deps.managers Manager functions (startScreenshot, toggleGlassWindow, …)
+ * @param {Object} deps.managers Manager functions (startScreenshot, toggleFloatingWindow, …)
  */
 function initIPC(deps) {
   logger.info('Initializing IPC handlers...');
@@ -42,7 +42,7 @@ function initIPC(deps) {
   const context = {
     // Window getters (lazy — avoid capturing null at construction time)
     getMainWindow: () => deps.windows.main,
-    getGlassWindow: () => deps.windows.glass,
+    getFloatingWindow: () => deps.windows.floatingWindow,
     getScreenshotWindow: () => deps.windows.screenshot,
     getSelectionWindow: () => deps.windows.selection,
 
@@ -63,7 +63,7 @@ function initIPC(deps) {
   registerScreenshotIPC(context);
   registerClipboardIPC(context);
 
-  registerGlassIPC(context);
+  registerFloatingWindowIPC(context);
 
   registerSelectionIPC(context);
   registerSecureStorageIPC(context);

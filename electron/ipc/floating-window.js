@@ -1,14 +1,55 @@
-// Glass overlay window IPC: controls, settings, translate proxy, region capture,
-// child-pane sub-windows.
+// Floating-window IPC: window controls, settings merge, region capture, and detached child-pane windows.
 
 const { ipcMain, safeStorage } = require('electron');
 const { CHANNELS } = require('../shared/channels');
-const logger = require('../utils/logger')('IPC:Glass');
+const logger = require('../utils/logger')('IPC:FloatingWindow');
 const displayHelper = require('../utils/display-helper');
 const { t } = require('../shared/main-i18n');
 
+// Module scope (not per-register) so window-manager can close panes when the
+// floating window itself goes away — panes must never outlive their parent.
+const childPaneWindows = new Map();
+const MAX_CHILD_WINDOWS = 15;
+
+function removeOldestChildWindow() {
+  let oldest = null;
+  let oldestId = null;
+
+  for (const [id, data] of childPaneWindows) {
+    if (!oldest || data.createdAt < oldest.createdAt) {
+      oldest = data;
+      oldestId = id;
+    }
+  }
+
+  if (oldestId && oldest) {
+    try {
+      if (!oldest.window.isDestroyed()) {
+        oldest.window.close();
+      }
+    } catch (e) {}
+    childPaneWindows.delete(oldestId);
+    logger.debug('Removed oldest child window:', oldestId);
+  }
+}
+
+function closeAllChildPaneWindows() {
+  let count = 0;
+  for (const [, data] of childPaneWindows) {
+    try {
+      if (data.window && !data.window.isDestroyed()) {
+        data.window.close();
+        count++;
+      }
+    } catch (e) {}
+  }
+  childPaneWindows.clear();
+  if (count > 0) logger.debug('Closed all child pane windows:', count);
+  return count;
+}
+
 function register(ctx) {
-  const { getMainWindow, getGlassWindow, store, managers } = ctx;
+  const { getMainWindow, getFloatingWindow, store, managers } = ctx;
 
   let screenshotModule = null;
   const getScreenshotModule = () => {
@@ -20,72 +61,50 @@ function register(ctx) {
 
   // ===== Window controls =====
 
-  ipcMain.handle(CHANNELS.GLASS.OPEN, () => {
-    if (managers.createGlassWindow) {
-      managers.createGlassWindow();
+  ipcMain.handle(CHANNELS.FLOATING_WINDOW.OPEN, () => {
+    if (managers.createFloatingWindow) {
+      managers.createFloatingWindow();
       return true;
     }
-    logger.warn('createGlassWindow not available');
+    logger.warn('createFloatingWindow not available');
     return false;
   });
 
-  ipcMain.handle(CHANNELS.GLASS.CLOSE, () => {
-    const glassWindow = getGlassWindow();
-    if (glassWindow) {
-      glassWindow.close();
+  ipcMain.handle(CHANNELS.FLOATING_WINDOW.CLOSE, () => {
+    const floatingWindow = getFloatingWindow();
+    if (floatingWindow) {
+      floatingWindow.close();
       return true;
     }
     return false;
   });
 
-  ipcMain.handle(CHANNELS.GLASS.GET_BOUNDS, () => {
-    const glassWindow = getGlassWindow();
-    if (glassWindow) {
-      return glassWindow.getBounds();
+  ipcMain.handle(CHANNELS.FLOATING_WINDOW.GET_BOUNDS, () => {
+    const floatingWindow = getFloatingWindow();
+    if (floatingWindow) {
+      return floatingWindow.getBounds();
     }
     return null;
   });
 
-  ipcMain.handle(CHANNELS.GLASS.SET_ALWAYS_ON_TOP, (event, enabled) => {
-    const glassWindow = getGlassWindow();
-    if (glassWindow) {
-      glassWindow.setAlwaysOnTop(enabled);
-      return true;
-    }
-    return false;
-  });
-
   // Opacity is applied via CSS variable in the renderer (so child panes aren't
   // affected). We only persist the value for next launch.
-  ipcMain.handle(CHANNELS.GLASS.SET_OPACITY, (event, opacity) => {
-    const current = store.get('glassLocalSettings', {});
-    store.set('glassLocalSettings', { ...current, opacity });
+  ipcMain.handle(CHANNELS.FLOATING_WINDOW.SET_OPACITY, (event, opacity) => {
+    const current = store.get('floatingWindowLocal', {});
+    store.set('floatingWindowLocal', { ...current, opacity });
     return true;
   });
 
   // ===== Mouse pass-through =====
 
-  ipcMain.handle(CHANNELS.GLASS.SET_PASS_THROUGH, (event, enabled) => {
-    const glassWindow = getGlassWindow();
-    if (glassWindow && !glassWindow.isDestroyed()) {
+  ipcMain.handle(CHANNELS.FLOATING_WINDOW.SET_PASS_THROUGH, (event, enabled) => {
+    const floatingWindow = getFloatingWindow();
+    if (floatingWindow && !floatingWindow.isDestroyed()) {
       logger.debug('Setting pass-through mode:', enabled);
       if (enabled) {
-        glassWindow.setIgnoreMouseEvents(true, { forward: true });
+        floatingWindow.setIgnoreMouseEvents(true, { forward: true });
       } else {
-        glassWindow.setIgnoreMouseEvents(false);
-      }
-      return true;
-    }
-    return false;
-  });
-
-  ipcMain.handle(CHANNELS.GLASS.SET_IGNORE_MOUSE, (event, ignore) => {
-    const glassWindow = getGlassWindow();
-    if (glassWindow && !glassWindow.isDestroyed()) {
-      if (ignore) {
-        glassWindow.setIgnoreMouseEvents(true, { forward: true });
-      } else {
-        glassWindow.setIgnoreMouseEvents(false);
+        floatingWindow.setIgnoreMouseEvents(false);
       }
       return true;
     }
@@ -96,12 +115,12 @@ function register(ctx) {
 
   // Reads live language from main-window renderer store, falls back to persisted
   // defaults if the main window isn't around yet
-  ipcMain.handle(CHANNELS.GLASS.GET_SETTINGS, async () => {
+  ipcMain.handle(CHANNELS.FLOATING_WINDOW.GET_SETTINGS, async () => {
     const mainWindow = getMainWindow();
     const mainSettings = store.get('settings', {});
-    const glassConfig = mainSettings.glassWindow || {};
+    const fwConfig = mainSettings.floatingWindow || {};
     const ocrConfig = mainSettings.ocr || {};
-    const localSettings = store.get('glassLocalSettings', {});
+    const localSettings = store.get('floatingWindowLocal', {});
 
     let currentTargetLang = mainSettings.translation?.defaultTargetLang ?? 'zh';
     let currentSourceLang = mainSettings.translation?.defaultSourceLang ?? 'auto';
@@ -132,35 +151,24 @@ function register(ctx) {
       }
     }
 
+    // Fallbacks mirror DEFAULT_SETTINGS.floatingWindow in
+    // src/components/SettingsPanel/constants.js — keep both in sync.
     const merged = {
-      refreshInterval: glassConfig.refreshInterval ?? 3000,
-      smartDetect: glassConfig.smartDetect ?? true,
-      streamOutput: glassConfig.streamOutput ?? true,
-      ocrEngine: ocrConfig.engine ?? glassConfig.ocrEngine ?? 'llm-vision',
-      globalOcrEngine: ocrConfig.engine ?? 'llm-vision',
-      defaultOpacity: glassConfig.defaultOpacity ?? 0.85,
-      autoPin: glassConfig.autoPin ?? true,
-      lockTargetLang: glassConfig.lockTargetLang ?? true,
+      ocrEngine: ocrConfig.engine ?? 'llm-vision',
+      lockTargetLang: fwConfig.lockTargetLang ?? false,
       targetLanguage: currentTargetLang,
       sourceLanguage: currentSourceLang,
       theme: mainSettings.interface?.theme ?? 'light',
-      opacity: localSettings.opacity ?? glassConfig.defaultOpacity ?? 0.85,
-      isPinned: localSettings.isPinned ?? glassConfig.autoPin ?? true,
+      // window-local slider value wins over the settings-page default
+      opacity: localSettings.opacity ?? fwConfig.defaultOpacity ?? 0.85,
     };
 
     logger.debug('Get settings:', merged);
     return merged;
   });
 
-  ipcMain.handle(CHANNELS.GLASS.SAVE_SETTINGS, (event, settings) => {
-    const glassWindow = getGlassWindow();
-    const current = store.get('glassLocalSettings', {});
-    store.set('glassLocalSettings', { ...current, ...settings });
-    return true;
-  });
-
   // Decrypts the '***encrypted***' apiKey placeholder before returning
-  ipcMain.handle(CHANNELS.GLASS.GET_PROVIDER_CONFIGS, async () => {
+  ipcMain.handle(CHANNELS.FLOATING_WINDOW.GET_PROVIDER_CONFIGS, async () => {
     const mainSettings = store.get('settings', {});
     const providerSettings = mainSettings.providers || {};
 
@@ -196,11 +204,11 @@ function register(ctx) {
     };
   });
 
-  ipcMain.handle(CHANNELS.GLASS.NOTIFY_SETTINGS_CHANGED, () => {
-    const glassWindow = getGlassWindow();
-    if (glassWindow && !glassWindow.isDestroyed()) {
+  ipcMain.handle(CHANNELS.FLOATING_WINDOW.NOTIFY_SETTINGS_CHANGED, () => {
+    const floatingWindow = getFloatingWindow();
+    if (floatingWindow && !floatingWindow.isDestroyed()) {
       const settings = store.get('settings', {});
-      glassWindow.webContents.send(CHANNELS.GLASS.SETTINGS_CHANGED, settings);
+      floatingWindow.webContents.send(CHANNELS.FLOATING_WINDOW.SETTINGS_CHANGED, settings);
       return true;
     }
     return false;
@@ -208,7 +216,7 @@ function register(ctx) {
 
   // Show + focus main window, then send 'navigate' with 'settings:<section>' format
   // so MainWindow can switch tab AND jump to the right SettingsPanel section in one trip.
-  ipcMain.handle(CHANNELS.GLASS.OPEN_MAIN_SETTINGS, (event, section) => {
+  ipcMain.handle(CHANNELS.FLOATING_WINDOW.OPEN_MAIN_SETTINGS, (event, section) => {
     const mainWindow = getMainWindow();
     if (!mainWindow || mainWindow.isDestroyed()) {
       logger.warn('openMainSettings: main window not available');
@@ -223,76 +231,72 @@ function register(ctx) {
     return true;
   });
 
-  // ===== Translation =====
-
-  ipcMain.handle(CHANNELS.GLASS.TRANSLATE, async (event, text) => {
-    try {
-      const mainWindow = getMainWindow();
-      mainWindow?.webContents.send(CHANNELS.GLASS.TRANSLATE_REQUEST, text);
-      return { success: true };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  });
-
   // ===== Region capture =====
 
-  ipcMain.handle(CHANNELS.GLASS.CAPTURE_REGION, async (event, bounds) => {
-    const glassWindow = getGlassWindow();
+  ipcMain.handle(CHANNELS.FLOATING_WINDOW.CAPTURE_REGION, async (event, bounds) => {
+    const floatingWindow = getFloatingWindow();
 
     try {
-      if (!glassWindow || glassWindow.isDestroyed()) {
-        throw new Error(t('glass.windowNotFound', '玻璃窗口不存在'));
+      if (!floatingWindow || floatingWindow.isDestroyed()) {
+        throw new Error(t('floatingWindow.windowNotFound', '玻璃窗口不存在'));
       }
 
-      // Hide self before capture so we don't OCR our own translation overlay.
-      // WDA_EXCLUDEFROMCAPTURE is unreliable on some GPU/driver combos, so we
-      // still drop opacity as a fallback.
-      try {
-        glassWindow.setOpacity(0);
-        await new Promise(resolve => setTimeout(resolve, 80));
-      } catch (e) {
-        logger.warn('Failed to hide for capture:', e.message);
-      }
+      // Hide self AND detached child panes before capture so we don't OCR our
+      // own translation overlays. WDA_EXCLUDEFROMCAPTURE is unreliable on some
+      // GPU/driver combos, so we still drop opacity as a fallback.
+      const hideForCapture = (visible) => {
+        try {
+          floatingWindow.setOpacity(visible ? 1 : 0);
+        } catch (e) {
+          logger.warn('Failed to toggle overlay for capture:', e.message);
+        }
+        for (const [, data] of childPaneWindows) {
+          try {
+            if (data.window && !data.window.isDestroyed()) {
+              data.window.setOpacity(visible ? 1 : 0);
+            }
+          } catch (e) {}
+        }
+      };
+
+      hideForCapture(false);
+      await new Promise(resolve => setTimeout(resolve, 80));
 
       const screenshotMod = getScreenshotModule();
-      const screenshot = await screenshotMod.captureRegion(bounds);
-
+      let screenshot;
       try {
-        glassWindow.setOpacity(1);
-      } catch (e) {
-        logger.warn('Failed to restore after capture:', e.message);
+        screenshot = await screenshotMod.captureRegion(bounds);
+      } finally {
+        hideForCapture(true);
       }
 
       if (screenshot) {
-        return { success: true, imageData: screenshot };
+        // Renderer needs the CAPTURED display's scale to map OCR pixel coords
+        // back to CSS px — its own devicePixelRatio may belong to a different
+        // monitor in mixed-DPI setups.
+        const { screen } = require('electron');
+        const scaleFactor = screen.getDisplayMatching({
+          x: Math.round(bounds.x),
+          y: Math.round(bounds.y),
+          width: Math.max(1, Math.round(bounds.width)),
+          height: Math.max(1, Math.round(bounds.height)),
+        }).scaleFactor;
+        return { success: true, imageData: screenshot, scaleFactor };
       } else {
         throw new Error(t('screenshot.failed', '截图失败'));
       }
     } catch (error) {
       logger.error('Capture region error:', error);
-      if (glassWindow && !glassWindow.isDestroyed()) {
-        try { glassWindow.setOpacity(1); } catch {}
+      if (floatingWindow && !floatingWindow.isDestroyed()) {
+        try { floatingWindow.setOpacity(1); } catch {}
       }
       return { success: false, error: error.message };
     }
   });
 
-  // ===== Data sync (forward to main window) =====
+  // ===== Data sync =====
 
-  ipcMain.handle(CHANNELS.GLASS.ADD_TO_FAVORITES, (event, item) => {
-    const mainWindow = getMainWindow();
-    mainWindow?.webContents.send(CHANNELS.DATA.ADD_TO_FAVORITES, item);
-    return true;
-  });
-
-  ipcMain.handle(CHANNELS.GLASS.ADD_TO_HISTORY, (event, item) => {
-    const mainWindow = getMainWindow();
-    mainWindow?.webContents.send(CHANNELS.DATA.ADD_TO_HISTORY, item);
-    return true;
-  });
-
-  ipcMain.handle(CHANNELS.GLASS.GET_HISTORY, async (event, limit = 20) => {
+  ipcMain.handle(CHANNELS.FLOATING_WINDOW.GET_HISTORY, async (event, limit = 20) => {
     const mainWindow = getMainWindow();
     if (!mainWindow || mainWindow.isDestroyed()) {
       return [];
@@ -332,40 +336,9 @@ function register(ctx) {
     }
   });
 
-  ipcMain.handle(CHANNELS.GLASS.SYNC_TARGET_LANGUAGE, (event, langCode) => {
-    const mainWindow = getMainWindow();
-    mainWindow?.webContents.send(CHANNELS.DATA.SYNC_TARGET_LANGUAGE, langCode);
-    return true;
-  });
-
   // ===== Child pane standalone windows =====
 
-  const childPaneWindows = new Map();
-  const MAX_CHILD_WINDOWS = 15;
-
-  function removeOldestChildWindow() {
-    let oldest = null;
-    let oldestId = null;
-
-    for (const [id, data] of childPaneWindows) {
-      if (!oldest || data.createdAt < oldest.createdAt) {
-        oldest = data;
-        oldestId = id;
-      }
-    }
-
-    if (oldestId && oldest) {
-      try {
-        if (!oldest.window.isDestroyed()) {
-          oldest.window.close();
-        }
-      } catch (e) {}
-      childPaneWindows.delete(oldestId);
-      logger.debug('Removed oldest child window:', oldestId);
-    }
-  }
-
-  ipcMain.handle(CHANNELS.GLASS.CREATE_CHILD_WINDOW, async (event, options) => {
+  ipcMain.handle(CHANNELS.FLOATING_WINDOW.CREATE_CHILD_WINDOW, async (event, options) => {
     const { BrowserWindow } = require('electron');
     const path = require('path');
     const PATHS = require('../shared/paths');
@@ -445,19 +418,24 @@ function register(ctx) {
         childWindow.show();
       });
 
+      // Panes sit directly over the source text — without this the next
+      // capture would OCR the pane's own translation.
+      if (process.platform === 'win32') {
+        childWindow.webContents.once('did-finish-load', () => {
+          try {
+            const { makeWindowInvisibleToCapture } = require('../utils/native-helper');
+            makeWindowInvisibleToCapture(childWindow);
+          } catch (e) {
+            logger.warn('Failed to exclude child pane from capture:', e.message);
+          }
+        });
+      }
+
       childWindow.on('closed', () => {
         childPaneWindows.delete(id);
-        const glassWindow = getGlassWindow();
-        if (glassWindow && !glassWindow.isDestroyed()) {
-          glassWindow.webContents.send('child-pane:closed', id);
-        }
-      });
-
-      ipcMain.once(`child-pane:close:${id}`, () => {
-        if (childPaneWindows.has(id)) {
-          try {
-            childPaneWindows.get(id).window.close();
-          } catch (e) {}
+        const floatingWindow = getFloatingWindow();
+        if (floatingWindow && !floatingWindow.isDestroyed()) {
+          floatingWindow.webContents.send('child-pane:closed', id);
         }
       });
 
@@ -474,7 +452,7 @@ function register(ctx) {
     }
   });
 
-  ipcMain.handle(CHANNELS.GLASS.CLOSE_CHILD_WINDOW, (event, id) => {
+  ipcMain.handle(CHANNELS.FLOATING_WINDOW.CLOSE_CHILD_WINDOW, (event, id) => {
     if (childPaneWindows.has(id)) {
       try {
         const data = childPaneWindows.get(id);
@@ -490,41 +468,8 @@ function register(ctx) {
     return false;
   });
 
-  ipcMain.handle(CHANNELS.GLASS.UPDATE_CHILD_WINDOW, (event, id, data) => {
-    if (childPaneWindows.has(id)) {
-      const paneData = childPaneWindows.get(id);
-      if (paneData.window && !paneData.window.isDestroyed()) {
-        paneData.window.webContents.send('child-pane:update', data);
-        return true;
-      }
-    }
-    return false;
-  });
-
-  ipcMain.handle(CHANNELS.GLASS.MOVE_CHILD_WINDOW, (event, id, x, y) => {
-    if (childPaneWindows.has(id)) {
-      const paneData = childPaneWindows.get(id);
-      if (paneData.window && !paneData.window.isDestroyed()) {
-        paneData.window.setPosition(Math.round(x), Math.round(y));
-        return true;
-      }
-    }
-    return false;
-  });
-
-  ipcMain.handle(CHANNELS.GLASS.CLOSE_ALL_CHILD_WINDOWS, () => {
-    let count = 0;
-    for (const [id, data] of childPaneWindows) {
-      try {
-        if (data.window && !data.window.isDestroyed()) {
-          data.window.close();
-          count++;
-        }
-      } catch (e) {}
-    }
-    childPaneWindows.clear();
-    logger.debug('Closed all child pane windows:', count);
-    return count;
+  ipcMain.handle(CHANNELS.FLOATING_WINDOW.CLOSE_ALL_CHILD_WINDOWS, () => {
+    return closeAllChildPaneWindows();
   });
 
   ipcMain.on('child-pane:close', (event) => {
@@ -553,7 +498,8 @@ function register(ctx) {
     }
   });
 
-  logger.info('Glass IPC handlers registered');
+  logger.info('Floating-window IPC handlers registered');
 }
 
 module.exports = register;
+module.exports.closeAllChildPaneWindows = closeAllChildPaneWindows;

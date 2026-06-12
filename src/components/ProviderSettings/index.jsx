@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useImperativeHandle, forwardRef, useRef, useMemo } from 'react';
+﻿import React, { useState, useEffect, useCallback, useImperativeHandle, forwardRef, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ChevronDown, ChevronUp, Check, X, AlertCircle,
@@ -205,8 +205,8 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
         }
       });
 
-      if (window.electron?.glass?.notifySettingsChanged) {
-        await window.electron.glass.notifySettingsChanged();
+      if (window.electron?.floatingWindow?.notifySettingsChanged) {
+        await window.electron.floatingWindow.notifySettingsChanged();
       }
 
       notify?.(t('providerSettings.saved'), 'success');

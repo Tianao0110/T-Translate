@@ -1,4 +1,4 @@
-// IPC channel constants — kills magic strings.
+﻿// IPC channel constants — kills magic strings.
 
 const CHANNELS = {
   SYSTEM: {
@@ -57,34 +57,23 @@ const CHANNELS = {
     SCREEN_BOUNDS: 'screen-bounds',
     OCR_COMPLETE: 'screenshot:ocr-complete',       // OCR done — forward text to selection window for translation.
   },
-  GLASS: {
-    OPEN: 'glass:open',
-    CLOSE: 'glass:close',
-    GET_BOUNDS: 'glass:get-bounds',
-    TRANSLATE: 'glass:translate',
-    CAPTURE_REGION: 'glass:capture-region',
-    SET_PASS_THROUGH: 'glass:set-pass-through',
-    SET_IGNORE_MOUSE: 'glass:set-ignore-mouse',
-    SET_ALWAYS_ON_TOP: 'glass:set-always-on-top',
-    SET_OPACITY: 'glass:set-opacity',
-    GET_SETTINGS: 'glass:get-settings',
-    SAVE_SETTINGS: 'glass:save-settings',
-    GET_PROVIDER_CONFIGS: 'glass:get-provider-configs',
-    NOTIFY_SETTINGS_CHANGED: 'glass:notify-settings-changed',
-    OPEN_MAIN_SETTINGS: 'glass:open-main-settings',
-    ADD_TO_FAVORITES: 'glass:add-to-favorites',
-    ADD_TO_HISTORY: 'glass:add-to-history',
-    GET_HISTORY: 'glass:get-history',
-    SYNC_TARGET_LANGUAGE: 'glass:sync-target-language',
-    REFRESH: 'glass:refresh',
-    SETTINGS_CHANGED: 'glass:settings-changed',
-    TRANSLATE_REQUEST: 'glass:translate-request',
-    // Child glass-pane standalone windows
-    CREATE_CHILD_WINDOW: 'glass:create-child-window',
-    CLOSE_CHILD_WINDOW: 'glass:close-child-window',
-    UPDATE_CHILD_WINDOW: 'glass:update-child-window',
-    MOVE_CHILD_WINDOW: 'glass:move-child-window',
-    CLOSE_ALL_CHILD_WINDOWS: 'glass:close-all-child-windows',
+  FLOATING_WINDOW: {
+    OPEN: 'floating-window:open',
+    CLOSE: 'floating-window:close',
+    GET_BOUNDS: 'floating-window:get-bounds',
+    CAPTURE_REGION: 'floating-window:capture-region',
+    SET_PASS_THROUGH: 'floating-window:set-pass-through',
+    SET_OPACITY: 'floating-window:set-opacity',
+    GET_SETTINGS: 'floating-window:get-settings',
+    GET_PROVIDER_CONFIGS: 'floating-window:get-provider-configs',
+    NOTIFY_SETTINGS_CHANGED: 'floating-window:notify-settings-changed',
+    OPEN_MAIN_SETTINGS: 'floating-window:open-main-settings',
+    GET_HISTORY: 'floating-window:get-history',
+    SETTINGS_CHANGED: 'floating-window:settings-changed',
+    // Child pane standalone windows
+    CREATE_CHILD_WINDOW: 'floating-window:create-child-window',
+    CLOSE_CHILD_WINDOW: 'floating-window:close-child-window',
+    CLOSE_ALL_CHILD_WINDOWS: 'floating-window:close-all-child-windows',
   },
   SUBTITLE: {
     TOGGLE_CAPTURE_WINDOW: 'subtitle:toggle-capture-window',

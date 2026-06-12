@@ -23,7 +23,6 @@ const validChannels = {
     "add-to-favorites",
     "add-to-history",
     "sync-target-language",
-    "glass:translate-request",
     "screenshot-captured",
     "screenshot-captured-silent",
     "selection-state-changed",
@@ -47,12 +46,12 @@ const validChannels = {
     "store-has",
     "get-app-path",
     "capture-screen",
-    "glass:open",
-    "glass:notify-settings-changed",
+    "floating-window:open",
+    "floating-window:notify-settings-changed",
     "secure-storage:encrypt",
     "secure-storage:decrypt",
     "secure-storage:delete",
-    "secure-storage:is-available",
+    "secure-storage:isAvailable",
     "selection:toggle",
     "selection:get-enabled",
     "theme:get",
@@ -140,12 +139,12 @@ const electronAPI = {
     encrypt: (key, value) => ipcRenderer.invoke("secure-storage:encrypt", key, value),
     decrypt: (key, options) => ipcRenderer.invoke("secure-storage:decrypt", key, options),
     delete: (key) => ipcRenderer.invoke("secure-storage:delete", key),
-    isAvailable: () => ipcRenderer.invoke("secure-storage:is-available"),
+    isAvailable: () => ipcRenderer.invoke("secure-storage:isAvailable"),
     getAccessLog: () => ipcRenderer.invoke("secure-storage:getAccessLog"),
   },
-  glass: {
-    open: () => ipcRenderer.invoke("glass:open"),
-    notifySettingsChanged: () => ipcRenderer.invoke("glass:notify-settings-changed"),
+  floatingWindow: {
+    open: () => ipcRenderer.invoke("floating-window:open"),
+    notifySettingsChanged: () => ipcRenderer.invoke("floating-window:notify-settings-changed"),
   },
   selection: {
     toggle: () => ipcRenderer.invoke("selection:toggle"),
@@ -234,7 +233,7 @@ const electronAPI = {
       }
     },
   },
-  // Direct ipcRenderer for glass-window-style use cases.
+  // Direct ipcRenderer for floating-window-style use cases.
   ipcRenderer: {
     on: (channel, func) => {
       if (validChannels.receive.includes(channel)) {

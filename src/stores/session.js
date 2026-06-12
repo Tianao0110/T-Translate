@@ -1,4 +1,4 @@
-// Glass-window session store — runtime state only (not persisted).
+// Floating-window session store — runtime state only (not persisted).
 // Tracks translation status, child panes, recent history.
 
 import { create } from 'zustand';
@@ -133,7 +133,11 @@ const useSessionStore = create((set, get) => ({
     });
   },
 
-  freezeChildPane: (id) => {
+  // viewportPos {x,y} is required for correct placement: live panes hold
+  // container-relative coords while frozen panes render position:fixed
+  // (viewport space) — copying bbox unchanged would teleport the pane by the
+  // container's offset.
+  freezeChildPane: (id, viewportPos) => {
     const state = get();
     const pane = state.childPanes.find((p) => p.id === id);
 
@@ -145,9 +149,13 @@ const useSessionStore = create((set, get) => ({
       newFrozenPanes.shift();
     }
 
+    const frozenBbox = viewportPos
+      ? { ...pane.bbox, x: viewportPos.x, y: viewportPos.y }
+      : pane.bbox;
+
     set({
       childPanes: state.childPanes.filter((p) => p.id !== id),
-      frozenPanes: [...newFrozenPanes, { ...pane, isFrozen: true }],
+      frozenPanes: [...newFrozenPanes, { ...pane, bbox: frozenBbox, isFrozen: true }],
     });
   },
 
@@ -187,7 +195,7 @@ const useSessionStore = create((set, get) => ({
 
   clearHistory: () => set({ recentHistory: [] }),
 
-  // Used by pipeline / service layer to surface fallback notices to glass UI
+  // Used by pipeline / service layer to surface fallback notices to floating-window UI
   notification: null, // { message, type: 'info'|'warning'|'error'|'success' }
 
   setNotification: (notification) => set({ notification }),

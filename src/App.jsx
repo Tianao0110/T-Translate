@@ -11,7 +11,7 @@ import { THEMES } from '@config/defaults';
 
 const logger = createLogger('App');
 
-// Glass-window subprocess used to read these via executeJavaScript. We've
+// The floating window used to read these via executeJavaScript. We've
 // since switched to electron-store IPC, but the globals stay for any code
 // still reaching in through the DOM.
 if (typeof window !== 'undefined') {
@@ -68,7 +68,7 @@ function App() {
       }
 
       // localStorage 'storage' events fire on *other* tabs/windows — used to
-      // sync theme when the glass window changes it
+      // sync theme when the floating window changes it
       const handleStorageChange = (e) => {
         if (e.key === 'theme') {
           const newTheme = e.newValue || 'light';
@@ -111,10 +111,10 @@ function App() {
       };
     }, [setPendingScreenshot]);
 
-    // Glass window forwards user "add to favorites" through main -> this listener
+    // Floating window forwards user "add to favorites" through main -> this listener
     useEffect(() => {
       if (!window.electron?.ipcRenderer) {
-        logger.warn('IPC not available for glass favorites');
+        logger.warn('IPC not available for floating-window favorites');
         return;
       }
 
@@ -122,7 +122,7 @@ function App() {
         logger.debug('Received add-to-favorites:', item?.sourceText?.substring(0, 30));
         if (item && addToFavorites) {
           addToFavorites({
-            id: item.id || `glass-${Date.now()}`,
+            id: item.id || `floating-${Date.now()}`,
             sourceText: item.sourceText || '',
             translatedText: item.translatedText || '',
             sourceLanguage: item.sourceLanguage || 'auto',
@@ -131,7 +131,7 @@ function App() {
             tags: item.tags || [],
             folderId: item.folderId || null,
             isStyleReference: item.isStyleReference || false,
-            source: item.source || 'glass-translator'
+            source: item.source || 'floating-translator'
           });
         }
       };
@@ -143,7 +143,7 @@ function App() {
       };
     }, [addToFavorites]);
 
-    // Selection translate and glass window route history adds through this listener
+    // Selection translate and floating window route history adds through this listener
     useEffect(() => {
       if (!window.electron?.ipcRenderer) return;
 

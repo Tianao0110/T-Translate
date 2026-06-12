@@ -1,4 +1,4 @@
-// Single OCR text block's translation overlay. Drag to move, double-click to
+﻿// Single OCR text block's translation overlay. Drag to move, double-click to
 // promote into an independent BrowserWindow (handled by parent's onFreeze).
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { X, Copy, Check, Loader2 } from 'lucide-react';
 import { CHILD_PANE_STATUS } from '../../stores/session.js';
 
-const ChildGlassPane = ({
+const ChildPane = ({
   pane,
   parentBounds,
   onPositionChange,
@@ -79,8 +79,17 @@ const ChildGlassPane = ({
     const handleMouseMove = (e) => {
       if (!dragStateRef.current.isDragging) return;
 
-      const newX = e.clientX - dragStateRef.current.offsetX;
-      const newY = e.clientY - dragStateRef.current.offsetY;
+      let newX = e.clientX - dragStateRef.current.offsetX;
+      let newY = e.clientY - dragStateRef.current.offsetY;
+
+      // Web content can't render outside the BrowserWindow — clamp to the
+      // viewport so panes can't be "lost" past an edge. Double-click detach
+      // is the way to move a pane out of the window.
+      const rect = paneRef.current?.getBoundingClientRect();
+      const maxX = window.innerWidth - (rect?.width ?? 80);
+      const maxY = window.innerHeight - (rect?.height ?? 32);
+      newX = Math.min(Math.max(newX, 0), Math.max(maxX, 0));
+      newY = Math.min(Math.max(newY, 0), Math.max(maxY, 0));
 
       dragStateRef.current.currentX = newX;
       dragStateRef.current.currentY = newY;
@@ -183,14 +192,14 @@ const ChildGlassPane = ({
   return (
     <div
       ref={paneRef}
-      className={`child-glass-pane ${statusClass} ${isFrozen ? 'frozen' : ''} ${isDragging ? 'dragging' : ''}`}
+      className={`floating-child-pane ${statusClass} ${isFrozen ? 'frozen' : ''} ${isDragging ? 'dragging' : ''}`}
       style={paneStyle}
       data-theme={theme}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onMouseDown={handleMouseDown}
       onDoubleClick={handleDoubleClick}
-      title={status === CHILD_PANE_STATUS.DONE && !isFrozen ? t('glass.doubleClickFreeze', '双击固定为独立窗口') : ''}
+      title={status === CHILD_PANE_STATUS.DONE && !isFrozen ? t('floatingWindow.doubleClickFreeze', '双击固定为独立窗口') : ''}
     >
       <div className="child-pane-content">
         {status === CHILD_PANE_STATUS.TRANSLATING ? (
@@ -231,4 +240,4 @@ const ChildGlassPane = ({
   );
 };
 
-export default ChildGlassPane;
+export default ChildPane;

@@ -43,8 +43,8 @@ contextBridge.exposeInMainWorld("electron", {
       ipcRenderer.on("selection:show-direct", listener);
       return () => ipcRenderer.removeListener("selection:show-direct", listener);
     },
-    // Reuses glass:open-main-settings channel — handler doesn't care which window invoked it
-    openOcrSettings: () => ipcRenderer.invoke("glass:open-main-settings", "ocr"),
+    // Reuses floating-window:open-main-settings channel — handler doesn't care which window invoked it
+    openOcrSettings: () => ipcRenderer.invoke("floating-window:open-main-settings", "ocr"),
   },
 
   clipboard: {

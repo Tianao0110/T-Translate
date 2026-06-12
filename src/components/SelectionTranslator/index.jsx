@@ -507,7 +507,7 @@ const SelectionTranslator = () => {
     // Selected text already in the target language would round-trip through
     // the provider unchanged ("translation" = the source text). The card has
     // no language picker, so flip to the other primary language — same
-    // behavior as the glass window.
+    // behavior as the floating window.
     if (detectLanguage(text) === targetLang) {
       targetLang = targetLang === 'zh' ? 'en' : 'zh';
       logger.debug(`Source already in target language, flipping to ${targetLang}`);
@@ -722,7 +722,7 @@ const SelectionTranslator = () => {
                       window.electron?.selection?.openOcrSettings?.();
                     }}
                   >
-                    {t('glass.goToOcrSettings')}
+                    {t('floatingWindow.goToOcrSettings')}
                   </button>
                 )}
               </>

@@ -126,13 +126,13 @@ class TranslationService {
         logger.debug('Loaded from passed settings');
       }
 
-      // Glass overlay calls into main which returns already-decrypted configs
-      if (!providerConfigs && window.electron?.glass?.getProviderConfigs) {
-        const glassConfigs = await window.electron.glass.getProviderConfigs();
-        if (glassConfigs) {
-          providerList = glassConfigs.list;
-          providerConfigs = glassConfigs.configs;
-          logger.debug('Loaded configs from glass API');
+      // Floating window calls into main which returns already-decrypted configs
+      if (!providerConfigs && window.electron?.floatingWindow?.getProviderConfigs) {
+        const fwConfigs = await window.electron.floatingWindow.getProviderConfigs();
+        if (fwConfigs) {
+          providerList = fwConfigs.list;
+          providerConfigs = fwConfigs.configs;
+          logger.debug('Loaded configs from floating-window API');
         }
       }
 

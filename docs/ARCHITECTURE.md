@@ -1,11 +1,11 @@
-# T-Translate 架构文档
+﻿# T-Translate 架构文档
 
 ## 项目概述
 
 T-Translate 是一个基于 Electron + React + Vite 的离线翻译工具，支持：
 - 划词翻译（最多 8 个冻结窗口）
 - 截图 OCR 翻译
-- 玻璃窗口实时翻译
+- 悬浮窗口实时翻译
 - 文档翻译（PDF、DOCX、EPUB、TXT、SRT/VTT）
 - 多种翻译源（本地 LLM、OpenAI、DeepL、Gemini 等）
 
@@ -49,7 +49,7 @@ t-translate/
 │   │   ├── SettingsPanel/      # 设置面板 (含 sections/ 和 styles/)
 │   │   ├── HistoryPanel/       # 历史记录
 │   │   ├── FavoritesPanel/     # 收藏功能
-│   │   ├── GlassTranslator/    # 玻璃窗口
+│   │   ├── FloatingWindow/    # 悬浮窗口
 │   │   ├── SelectionTranslator/# 划词翻译
 │   │   ├── DocumentTranslator/ # 文档翻译
 │   │   ├── ProviderSettings/   # 翻译源设置
@@ -76,7 +76,7 @@ t-translate/
 │   │   ├── index.js            # 统一入口
 │   │   ├── translation.js      # 翻译服务（门面）
 │   │   ├── main-translation.js # 主窗口翻译
-│   │   ├── pipeline.js         # 玻璃窗口流水线
+│   │   ├── pipeline.js         # 悬浮窗口流水线
 │   │   ├── cache.js            # 翻译缓存
 │   │   └── tts/                # TTS 语音 (base, index, web-speech)
 │   │
@@ -104,7 +104,7 @@ t-translate/
 │   │   └── App.css             # 全局共享样式
 │   │
 │   ├── windows/                # 子窗口入口
-│   │   ├── glass-entry.jsx     # 玻璃窗口入口
+│   │   ├── floating-window-entry.jsx     # 悬浮窗口入口
 │   │   └── selection-entry.jsx # 划词翻译入口
 │   │
 │   └── workers/                # Web Workers
@@ -112,7 +112,7 @@ t-translate/
 ├── public/                     # 静态资源 + HTML 入口
 │   ├── index.html              # 主窗口
 │   ├── selection.html          # 划词翻译
-│   ├── glass.html              # 玻璃窗口
+│   ├── floating-window.html              # 悬浮窗口
 │   ├── child-pane.html         # 子面板
 │   ├── screenshot.html         # 截图选区
 │   ├── icon.png                # 应用图标
