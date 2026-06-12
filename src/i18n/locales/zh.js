@@ -83,7 +83,6 @@ const zh = {
     skipNumbers: "跳过纯数字段落（如页码）", skipCode: "保留代码块不翻译", skipTargetLang: "跳过已是目标语言的段落",
     displayStyle: "默认显示样式",
     styleBelow: "上下对照 - 译文显示在原文下方", styleSideBySide: "左右对照 - 原文和译文并排显示",
-    styleSourceOnly: "仅原文 - 隐藏译文", styleTranslatedOnly: "仅译文 - 隐藏原文",
     supportedFormats: "支持的文件格式", formatHint: "支持加密 PDF · 自动识别章节大纲 · 翻译记忆复用"
   },
   shortcuts: {
@@ -518,9 +517,7 @@ const zh = {
     // Display styles
     displayStyles: {
       below: "上下对照",
-      sideBySide: "左右对照",
-      sourceOnly: "仅原文",
-      translatedOnly: "仅译文"
+      sideBySide: "左右对照"
     },
     // Segment status
     status: {
@@ -580,7 +577,8 @@ const zh = {
       docFormat: "文档格式",
       bilingualWord: "双语 Word (.doc)",
       translatedOnlyWord: "仅译文 Word (.doc)",
-      exportPdf: "导出 PDF (打印)",
+      bilingualPdf: "双语 PDF (打印)",
+      translatedOnlyPdf: "仅译文 PDF (打印)",
       subtitleFormat: "字幕格式",
       srtSubtitle: "SRT 字幕",
       vttSubtitle: "VTT 字幕"

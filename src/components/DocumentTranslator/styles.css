@@ -173,6 +173,8 @@
   color: var(--text-primary);
   cursor: pointer;
   transition: background 0.15s;
+  /* Menu grows to fit; wrapped labels read broken */
+  white-space: nowrap;
 }
 
 .export-menu button:hover {
@@ -670,19 +672,6 @@
   background: transparent;
   border-left: none;
   color: var(--accent-primary);
-}
-
-/* Source-only / translated-only layouts */
-.segment-item.source-only .segment-translated,
-.segment-item.translated-only .segment-original {
-  display: none;
-}
-
-.segment-item.translated-only .segment-translated {
-  margin-top: 0;
-  background: transparent;
-  padding: 0;
-  border: none;
 }
 
 /* ==================== Scroll to top ==================== */

@@ -4,7 +4,7 @@ import {
   FileText, Upload, X, Play, Pause, RotateCcw, Download,
   ChevronUp, ChevronDown, ChevronRight, AlertCircle, CheckCircle, Clock,
   Loader, ArrowUp, FileDown,
-  SkipForward, RefreshCw, Languages, Zap, Lock, Key,
+  SkipForward, RefreshCw, Zap, Lock, Key,
   Database, BookOpen, BarChart3,
   Edit3, Check, Copy, Search, Rows2, Columns2
 } from 'lucide-react';
@@ -62,7 +62,9 @@ async function readDocumentSettings() {
   return {
     maxCharsPerSegment: clampInt(saved?.maxCharsPerSegment, 200, 2000, DOC_SETTINGS_DEFAULTS.maxCharsPerSegment),
     concurrency: clampInt(saved?.concurrency, 1, 6, DOC_SETTINGS_DEFAULTS.concurrency),
-    displayStyle: saved?.displayStyle || DOC_SETTINGS_DEFAULTS.displayStyle,
+    displayStyle: ['below', 'side-by-side'].includes(saved?.displayStyle)
+      ? saved.displayStyle
+      : DOC_SETTINGS_DEFAULTS.displayStyle,
     filters: { ...DOC_SETTINGS_DEFAULTS.filters, ...(saved?.filters || {}) },
   };
 }
@@ -191,14 +193,12 @@ const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate,
       </div>
 
       {/* source */}
-      {displayStyle !== 'translated-only' && (
-        <div className="segment-original">
-          {highlightText(segment.original)}
-        </div>
-      )}
+      <div className="segment-original">
+        {highlightText(segment.original)}
+      </div>
 
       {/* translation */}
-      {displayStyle !== 'source-only' && segment.status !== STATUS.SKIPPED && (
+      {segment.status !== STATUS.SKIPPED && (
         <div className={`segment-translated ${segment.status}`}>
           {segment.status === STATUS.TRANSLATING && (
             <span className="translating-hint">
@@ -303,8 +303,6 @@ const DocumentTranslator = ({
   const DISPLAY_STYLES = useMemo(() => [
     { id: 'below', name: t('documentTranslator.displayStyles.below'), icon: Rows2 },
     { id: 'side-by-side', name: t('documentTranslator.displayStyles.sideBySide'), icon: Columns2 },
-    { id: 'source-only', name: t('documentTranslator.displayStyles.sourceOnly'), icon: FileText },
-    { id: 'translated-only', name: t('documentTranslator.displayStyles.translatedOnly'), icon: Languages },
   ], [t]);
   
   // File state
@@ -955,11 +953,20 @@ const DocumentTranslator = ({
           break;
         }
         case 'pdf':
-          content = exportPDFHTML(segments, { 
-            style: 'bilingual', 
+          content = exportPDFHTML(segments, {
+            style: 'bilingual',
             title: document?.filename || t('documentTranslator.defaultDocTitle')
           });
           filename += t('documentTranslator.fileSuffix.bilingual');
+          ext = 'html';
+          filterName = 'HTML (Print to PDF)';
+          break;
+        case 'pdf-translated':
+          content = exportPDFHTML(segments, {
+            style: 'translated-only',
+            title: document?.filename || t('documentTranslator.defaultDocTitle')
+          });
+          filename += t('documentTranslator.fileSuffix.translatedOnly');
           ext = 'html';
           filterName = 'HTML (Print to PDF)';
           break;
@@ -1175,7 +1182,10 @@ const DocumentTranslator = ({
                       <FileText size={14} /> {t('documentTranslator.export.translatedOnlyWord')}
                     </button>
                     <button onClick={() => handleExport('pdf')}>
-                      <FileText size={14} /> {t('documentTranslator.export.exportPdf')}
+                      <FileText size={14} /> {t('documentTranslator.export.bilingualPdf')}
+                    </button>
+                    <button onClick={() => handleExport('pdf-translated')}>
+                      <FileText size={14} /> {t('documentTranslator.export.translatedOnlyPdf')}
                     </button>
                     
                     {segments[0]?.type === 'subtitle' && (

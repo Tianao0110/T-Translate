@@ -83,7 +83,6 @@ const en = {
     skipNumbers: "Skip number-only paragraphs (e.g. page numbers)", skipCode: "Keep code blocks untranslated", skipTargetLang: "Skip paragraphs already in target language",
     displayStyle: "Default Display Style",
     styleBelow: "Top-bottom - Translation below source", styleSideBySide: "Side by side - Source and translation side by side",
-    styleSourceOnly: "Source only - Hide translation", styleTranslatedOnly: "Translation only - Hide source",
     supportedFormats: "Supported Formats", formatHint: "Supports encrypted PDFs · Auto chapter detection · Translation memory"
   },
   shortcuts: {
@@ -518,9 +517,7 @@ const en = {
     // Display styles
     displayStyles: {
       below: "Top-bottom",
-      sideBySide: "Side by side",
-      sourceOnly: "Source only",
-      translatedOnly: "Translation only"
+      sideBySide: "Side by side"
     },
     // Segment status
     status: {
@@ -580,7 +577,8 @@ const en = {
       docFormat: "Document Format",
       bilingualWord: "Bilingual Word (.doc)",
       translatedOnlyWord: "Translation Only Word (.doc)",
-      exportPdf: "Export PDF (Print)",
+      bilingualPdf: "Bilingual PDF (Print)",
+      translatedOnlyPdf: "Translation Only PDF (Print)",
       subtitleFormat: "Subtitle Format",
       srtSubtitle: "SRT Subtitle",
       vttSubtitle: "VTT Subtitle"

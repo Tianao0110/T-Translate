@@ -111,10 +111,8 @@ const DocumentSection = ({
           value={settings.document?.displayStyle || 'below'}
           onChange={(e) => updateSetting('document', 'displayStyle', e.target.value)}
         >
-          <option value="below">⬇️ {t('documentSettings.styleBelow')}</option>
-          <option value="side-by-side">⬛ {t('documentSettings.styleSideBySide')}</option>
-          <option value="source-only">📄 {t('documentSettings.styleSourceOnly')}</option>
-          <option value="translated-only">🌐 {t('documentSettings.styleTranslatedOnly')}</option>
+          <option value="below">{t('documentSettings.styleBelow')}</option>
+          <option value="side-by-side">{t('documentSettings.styleSideBySide')}</option>
         </select>
       </div>
 
