@@ -1,9 +1,8 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Star, Search, Trash2, Copy, Edit3, Save, X, Plus,
-  Folder, FolderPlus, ChevronDown, ChevronRight,
-  Tag, Hash, MoreVertical, GripVertical,
+  Star, Search, Trash2, Copy, Edit3, X, Plus,
+  Folder, FolderPlus, Tag, Hash,
   Check, Palette, RotateCcw, Bookmark, Sparkles, RefreshCw, BookOpen,
   Download, Upload
 } from 'lucide-react';
@@ -12,6 +11,8 @@ import useTranslationStore from '../../stores/translation-store';
 import translationService from '../../services/translation.js';
 import { getAnalysisPrompts, parseJsonReply } from '../../utils/ai-prompts.js';
 import useVisibleHotkey from '../../hooks/use-visible-hotkey.js';
+import HighlightText from '../shared/HighlightText.jsx';
+import { useConfirm } from '../shared/ConfirmDialog.jsx';
 import {
   exportToJSON, exportToCSV, exportToTBX,
   autoImport, downloadFile
@@ -37,18 +38,6 @@ const FOLDER_COLORS = [
   '#6b7280',
 ];
 
-const HighlightText = ({ text, search }) => {
-  if (!search || !text) return text;
-
-  const parts = text.split(new RegExp(`(${search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'));
-
-  return parts.map((part, i) =>
-    part.toLowerCase() === search.toLowerCase() ? (
-      <mark key={i} className="search-highlight">{part}</mark>
-    ) : part
-  );
-};
-
 const DEFAULT_FOLDERS = [
   { id: 'work', name: '工作', color: '#3b82f6', order: 0 },
   { id: 'study', name: '学习', color: '#10b981', order: 1 },
@@ -57,18 +46,12 @@ const DEFAULT_FOLDERS = [
   { id: 'style_library', name: '风格库', color: '#8b5cf6', order: 4, isSystem: true, icon: 'palette' },
 ];
 
-const GlossaryRow = ({ item, onCopy, onDelete, onUpdateNote, onUpdateTags, notify }) => {
+const GlossaryRow = ({ item, onCopy, onDelete, onUpdateNote, notify }) => {
   const { t } = useTranslation();
   const [isEditing, setIsEditing] = useState(false);
   const [editNote, setEditNote] = useState(item.note || '');
-  const [editTags, setEditTags] = useState(item.tags?.join(', ') || '');
 
   const handleSave = () => {
-    const newTags = editTags
-      .split(/[,，]/)
-      .map(tag => tag.trim())
-      .filter(tag => tag.length > 0);
-    onUpdateTags(item.id, newTags);
     onUpdateNote(item.id, editNote);
     setIsEditing(false);
     notify?.(t('favorites.termUpdated'), 'success');
@@ -76,7 +59,6 @@ const GlossaryRow = ({ item, onCopy, onDelete, onUpdateNote, onUpdateTags, notif
 
   const handleCancel = () => {
     setEditNote(item.note || '');
-    setEditTags(item.tags?.join(', ') || '');
     setIsEditing(false);
   };
 
@@ -131,14 +113,11 @@ const FavoriteCard = ({
   folders,
   searchQuery,
   onCopy,
-  onEdit,
   onDelete,
   onMove,
   onUpdateTags,
   onUpdateNote,
   onUpdateStyleRef,
-  isSelected,
-  onSelect,
   notify
 }) => {
   const { t } = useTranslation();
@@ -149,6 +128,15 @@ const FavoriteCard = ({
   const [editStyleRef, setEditStyleRef] = useState(item.isStyleReference || false);
   const [showMoveMenu, setShowMoveMenu] = useState(false);
   const [isGeneratingTags, setIsGeneratingTags] = useState(false);
+
+  // Close the move menu on any outside click. The opening click is safe:
+  // the listener attaches after the render that opened it.
+  useEffect(() => {
+    if (!showMoveMenu) return;
+    const close = () => setShowMoveMenu(false);
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, [showMoveMenu]);
 
   const folder = folders.find(f => f.id === item.folderId);
 
@@ -232,7 +220,7 @@ const FavoriteCard = ({
   };
 
   return (
-    <div className={`favorite-card ${isSelected ? 'selected' : ''}`}>
+    <div className="favorite-card">
       <div className="card-header">
         <div className="card-header-left">
           <span className="card-lang">
@@ -458,6 +446,7 @@ const FavoritesPanel = ({ showNotification }) => {
 
   const rootRef = useRef(null);
   const searchRef = useRef(null);
+  const [confirm, confirmDialog] = useConfirm();
 
   // Ctrl+F focuses the panel search — guarded so the mounted-but-hidden
   // panel doesn't swallow the shortcut for the rest of the app.
@@ -486,37 +475,58 @@ const FavoritesPanel = ({ showNotification }) => {
     return favorites?.filter(item => item.folderId === 'glossary') || [];
   }, [favorites]);
 
-  const handleExportGlossary = (format) => {
+  const handleExportGlossary = async (format) => {
     if (glossaryItems.length === 0) {
       notify(t('favorites.glossaryEmpty'), 'warning');
       return;
     }
 
     const timestamp = dayjs().format('YYYYMMDD');
-    let content, filename, mimeType;
+    let content, filename, mimeType, ext;
 
     switch (format) {
       case 'json':
         content = exportToJSON(glossaryItems);
         filename = `glossary_${timestamp}.json`;
         mimeType = 'application/json';
+        ext = 'json';
         break;
       case 'csv':
         content = exportToCSV(glossaryItems);
         filename = `glossary_${timestamp}.csv`;
         mimeType = 'text/csv';
+        ext = 'csv';
         break;
       case 'tbx':
         content = exportToTBX(glossaryItems);
         filename = `glossary_${timestamp}.tbx`;
         mimeType = 'application/xml';
+        ext = 'tbx';
         break;
       default:
         return;
     }
 
-    downloadFile(content, filename, mimeType);
-    notify(t('favorites.exportedTerms', { count: glossaryItems.length, format: format.toUpperCase() }), 'success');
+    try {
+      const saveFile = window.electron?.dialog?.saveFile;
+      if (saveFile) {
+        const result = await saveFile({
+          defaultPath: filename,
+          filters: [
+            { name: format.toUpperCase(), extensions: [ext] },
+            { name: 'All Files', extensions: ['*'] },
+          ],
+          data: content,
+        });
+        if (result.canceled) { setShowExportMenu(false); return; }
+        if (!result.success) throw new Error(result.error);
+      } else {
+        downloadFile(content, filename, mimeType);
+      }
+      notify(t('favorites.exportedTerms', { count: glossaryItems.length, format: format.toUpperCase() }), 'success');
+    } catch (e) {
+      notify(t('favorites.importFailed') + ': ' + e.message, 'error');
+    }
     setShowExportMenu(false);
   };
 
@@ -654,8 +664,8 @@ const FavoritesPanel = ({ showNotification }) => {
     setEditingFolder(null);
   };
 
-  const handleDeleteFolder = (id) => {
-    if (!window.confirm(t('favorites.deleteFolderConfirm'))) return;
+  const handleDeleteFolder = async (id) => {
+    if (!(await confirm(t('favorites.deleteFolderConfirm')))) return;
 
     // Move items in this folder back to uncategorized before deletion.
     favorites?.forEach(item => {
@@ -697,12 +707,11 @@ const FavoritesPanel = ({ showNotification }) => {
     notify(isStyleReference ? t('favorites.movedToStyle') : t('favorites.movedFromStyle'), 'success');
   }, [updateFavoriteItem, notify]);
 
-  const handleDelete = useCallback((itemId) => {
-    if (window.confirm(t('favorites.deleteConfirm'))) {
-      removeFromFavorites(itemId);
-      notify(t('favorites.deleted'), 'success');
-    }
-  }, [removeFromFavorites, notify, t]);
+  const handleDelete = useCallback(async (itemId) => {
+    if (!(await confirm(t('favorites.deleteConfirm')))) return;
+    removeFromFavorites(itemId);
+    notify(t('favorites.deleted'), 'success');
+  }, [removeFromFavorites, notify, t, confirm]);
 
   return (
     <div className="favorites-panel" ref={rootRef}>
@@ -958,7 +967,6 @@ const FavoritesPanel = ({ showNotification }) => {
                       onCopy={handleCopy}
                       onDelete={handleDelete}
                       onUpdateNote={handleUpdateNote}
-                      onUpdateTags={handleUpdateTags}
                       notify={notify}
                     />
                   ))}
@@ -986,6 +994,8 @@ const FavoritesPanel = ({ showNotification }) => {
           )}
         </div>
       </div>
+
+      {confirmDialog}
     </div>
   );
 };

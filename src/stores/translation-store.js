@@ -539,10 +539,14 @@ const useTranslationStore = create(
             if (state.history.length > state.historyLimit) {
               state.history = state.history.slice(0, state.historyLimit);
             }
-            if (state.translationMode !== PRIVACY_MODES.SECURE) {
-              state.statistics.totalTranslations++;
-              state.statistics.totalCharacters += (historyItem.sourceText?.length || 0);
-            }
+            state.statistics.totalTranslations++;
+            state.statistics.totalCharacters += (historyItem.sourceText?.length || 0);
+            // Keep the status-bar "today" count honest for selection/floating
+            // window entries too (main-panel path recomputes it the same way).
+            const today = new Date().toDateString();
+            state.statistics.todayTranslations = state.history.filter(
+              (h) => new Date(h.timestamp).toDateString() === today
+            ).length;
           }
         }),
 

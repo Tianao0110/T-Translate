@@ -5,12 +5,14 @@ import {
   Clock, Search, Trash2, Copy, Star,
   Calendar, ChevronDown, ChevronRight, LayoutGrid,
   BarChart3, TrendingUp, X, Edit3, Download, Upload,
-  FileText, Hash, Type, Languages, Activity, RotateCcw,
+  Hash, Type, Languages, Activity, RotateCcw, Lock,
   Table, CheckSquare, Square, Trash, ArrowUpDown
 } from 'lucide-react';
 import useTranslationStore from '../../stores/translation-store';
 import { useDebounce } from '../../utils/performance';
 import useVisibleHotkey from '../../hooks/use-visible-hotkey.js';
+import HighlightText from '../shared/HighlightText.jsx';
+import { useConfirm } from '../shared/ConfirmDialog.jsx';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
@@ -21,22 +23,6 @@ import { PRIVACY_MODES } from '@config/defaults';
 
 dayjs.extend(relativeTime);
 dayjs.extend(isSameOrAfter);
-
-const HighlightText = memo(({ text, search }) => {
-  if (!search || !text) return text;
-  try {
-    const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const parts = text.split(new RegExp(`(${escapedSearch})`, 'gi'));
-    return parts.map((part, i) =>
-      part.toLowerCase() === search.toLowerCase() ? (
-        <mark key={i} className="search-highlight">{part}</mark>
-      ) : part
-    );
-  } catch {
-    return text;
-  }
-});
-HighlightText.displayName = 'HighlightText';
 
 const HistoryCard = memo(({
   item,
@@ -179,6 +165,7 @@ const HistoryPanel = ({ showNotification }) => {
   const rootRef = useRef(null);
   const searchRef = useRef(null);
   const contentRef = useRef(null);
+  const [confirm, confirmDialog] = useConfirm();
 
   // Ctrl+F focuses the panel search — guarded so the mounted-but-hidden
   // panel doesn't swallow the shortcut for the rest of the app.
@@ -391,15 +378,14 @@ const HistoryPanel = ({ showNotification }) => {
     }
   }, [selectedIds.size, filteredHistory]);
 
-  const deleteSelected = useCallback(() => {
+  const deleteSelected = useCallback(async () => {
     if (selectedIds.size === 0) return;
-    if (window.confirm(t('history.deleteSelectedConfirm', { count: selectedIds.size }))) {
-      selectedIds.forEach(id => removeFromHistory(id));
-      setSelectedIds(new Set());
-      setSelectMode(false);
-      notify(t('history.deletedCount', { count: selectedIds.size }), 'success');
-    }
-  }, [selectedIds, removeFromHistory, notify, t]);
+    if (!(await confirm(t('history.deleteSelectedConfirm', { count: selectedIds.size })))) return;
+    selectedIds.forEach(id => removeFromHistory(id));
+    setSelectedIds(new Set());
+    setSelectMode(false);
+    notify(t('history.deletedCount', { count: selectedIds.size }), 'success');
+  }, [selectedIds, removeFromHistory, notify, t, confirm]);
 
   const handleCopy = useCallback((text) => {
     navigator.clipboard.writeText(text);
@@ -485,12 +471,11 @@ const HistoryPanel = ({ showNotification }) => {
     setSearchInput(e.target.value);
   }, []);
 
-  const handleClearHistory = useCallback(() => {
-    if (window.confirm(t('history.clearAllConfirm', { count: history.length }))) {
-      clearHistory();
-      notify(t('history.cleared'), 'success');
-    }
-  }, [history.length, clearHistory, notify, t]);
+  const handleClearHistory = useCallback(async () => {
+    if (!(await confirm(t('history.clearAllConfirm', { count: history.length })))) return;
+    clearHistory();
+    notify(t('history.cleared'), 'success');
+  }, [history.length, clearHistory, notify, t, confirm]);
 
   const toggleSelectMode = useCallback(() => {
     setSelectMode(prev => !prev);
@@ -672,7 +657,7 @@ const HistoryPanel = ({ showNotification }) => {
     <div className="history-panel" ref={rootRef}>
       {isSecureMode && (
         <div className="secure-mode-banner">
-          <div className="secure-banner-icon">🔒</div>
+          <div className="secure-banner-icon"><Lock size={20} /></div>
           <div className="secure-banner-content">
             <h4>{t('history.secureMode.title')}</h4>
             <p>{t('history.secureMode.desc')}</p>
@@ -837,6 +822,8 @@ const HistoryPanel = ({ showNotification }) => {
           </div>
         </div>
       )}
+
+      {confirmDialog}
     </div>
   );
 };
