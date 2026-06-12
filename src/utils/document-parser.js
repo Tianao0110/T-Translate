@@ -542,7 +542,6 @@ export async function parseCSV(file, options = {}) {
         translated: '',
         status: 'pending',
         tokens: estimateTokens(textContent),
-        row: i + 1,
       });
     }
   }
@@ -559,7 +558,7 @@ export async function parseJSON(file, options = {}) {
   const segments = [];
   let segmentId = 0;
 
-  function extractStrings(obj, path = '') {
+  function extractStrings(obj) {
     if (typeof obj === 'string' && obj.length >= (filters.minLength || 5)) {
       if (!/^(https?:\/\/|[\dT:Z-]+$|[a-f0-9-]{36}$)/i.test(obj)) {
         segments.push({
@@ -568,15 +567,12 @@ export async function parseJSON(file, options = {}) {
           translated: '',
           status: 'pending',
           tokens: estimateTokens(obj),
-          path,
         });
       }
     } else if (Array.isArray(obj)) {
-      obj.forEach((item, i) => extractStrings(item, `${path}[${i}]`));
+      obj.forEach(item => extractStrings(item));
     } else if (obj && typeof obj === 'object') {
-      Object.entries(obj).forEach(([key, value]) => {
-        extractStrings(value, path ? `${path}.${key}` : key);
-      });
+      Object.values(obj).forEach(value => extractStrings(value));
     }
   }
 
