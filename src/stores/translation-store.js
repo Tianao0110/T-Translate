@@ -532,6 +532,14 @@ const useTranslationStore = create(
           state.history = state.history.filter((item) => item.id !== id);
         }),
 
+      // Backs the privacy-page auto-delete setting; invoked once at startup.
+      pruneHistoryOlderThan: (days) =>
+        set((state) => {
+          if (!days || days <= 0) return;
+          const cutoff = Date.now() - days * 86400000;
+          state.history = state.history.filter((h) => (h.timestamp || 0) >= cutoff);
+        }),
+
       restoreFromHistory: (id) =>
         set((state) => {
           const item = state.history.find((h) => h.id === id);

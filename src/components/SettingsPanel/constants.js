@@ -28,7 +28,6 @@ export const defaultConfig = {
     selectionTranslate: 'Ctrl+Shift+T',
   },
   dev: { debugMode: false },
-  storage: { cache: { maxSize: 100 }, history: { maxItems: 1000 } }
 };
 
 export const SHORTCUT_LABELS = {
@@ -134,10 +133,12 @@ export const DEFAULT_SETTINGS = {
 
   privacyMode: PRIVACY_MODE_IDS.STANDARD,
 
-  saveHistory: true,
-  maxHistory: defaultConfig.storage.history.maxItems,
-  cacheEnabled: true,
-  maxCache: defaultConfig.storage.cache.maxSize,
+  // saveHistory/maxHistory/cacheEnabled/maxCache were ghost keys: persisted
+  // for several versions but never consumed anywhere (history cap lives in
+  // translation-store.historyLimit, cache cap in services/cache.js).
+  privacy: {
+    autoDeleteDays: 0,
+  },
 
   ocr: {
     engine: defaultConfig.ocr.defaultEngine,
@@ -218,6 +219,10 @@ export const migrateOldSettings = (savedSettings) => {
       ...(savedSettings.translation || {}),
     },
     document: migrateDocumentSettings(savedSettings.document),
+    privacy: {
+      ...DEFAULT_SETTINGS.privacy,
+      ...(savedSettings.privacy || {}),
+    },
     floatingWindow: {
       ...DEFAULT_SETTINGS.floatingWindow,
       ...(savedSettings.floatingWindow || {}),

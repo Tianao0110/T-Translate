@@ -11,6 +11,7 @@ import { useShallow } from 'zustand/react/shallow';
 import useTranslationStore from '../../stores/translation-store';
 import translationService from '../../services/translation.js';
 import { getAnalysisPrompts, parseJsonReply } from '../../utils/ai-prompts.js';
+import useVisibleHotkey from '../../hooks/use-visible-hotkey.js';
 import {
   exportToJSON, exportToCSV, exportToTBX,
   autoImport, downloadFile
@@ -455,6 +456,20 @@ const FavoritesPanel = ({ showNotification }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState(null);
 
+  const rootRef = useRef(null);
+  const searchRef = useRef(null);
+
+  // Ctrl+F focuses the panel search — guarded so the mounted-but-hidden
+  // panel doesn't swallow the shortcut for the rest of the app.
+  useVisibleHotkey(
+    rootRef,
+    (e) => (e.ctrlKey || e.metaKey) && e.key === 'f',
+    (e) => {
+      e.preventDefault();
+      searchRef.current?.focus();
+    }
+  );
+
   // useShallow: favorites tab stays mounted behind other tabs — without a
   // selector every streaming flush would re-render it
   const {
@@ -690,7 +705,7 @@ const FavoritesPanel = ({ showNotification }) => {
   }, [removeFromFavorites, notify, t]);
 
   return (
-    <div className="favorites-panel">
+    <div className="favorites-panel" ref={rootRef}>
       <div className="favorites-sidebar">
         <div className="sidebar-header">
           <h3>{t('favorites.title')}</h3>
@@ -891,6 +906,7 @@ const FavoritesPanel = ({ showNotification }) => {
           <div className="toolbar-search">
             <Search size={16} />
             <input
+              ref={searchRef}
               type="text"
               placeholder={t('favorites.search')}
               value={searchQuery}

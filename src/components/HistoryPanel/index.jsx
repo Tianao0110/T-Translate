@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import useTranslationStore from '../../stores/translation-store';
 import { useDebounce } from '../../utils/performance';
+import useVisibleHotkey from '../../hooks/use-visible-hotkey.js';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
@@ -170,7 +171,20 @@ const HistoryPanel = ({ showNotification }) => {
   // refiltering on every keystroke.
   const debouncedSearch = useDebounce(searchInput, 300);
 
+  const rootRef = useRef(null);
+  const searchRef = useRef(null);
   const contentRef = useRef(null);
+
+  // Ctrl+F focuses the panel search — guarded so the mounted-but-hidden
+  // panel doesn't swallow the shortcut for the rest of the app.
+  useVisibleHotkey(
+    rootRef,
+    (e) => (e.ctrlKey || e.metaKey) && e.key === 'f',
+    (e) => {
+      e.preventDefault();
+      searchRef.current?.focus();
+    }
+  );
 
   const history = useTranslationStore(state => state.history);
   const favorites = useTranslationStore(state => state.favorites);
@@ -646,7 +660,7 @@ const HistoryPanel = ({ showNotification }) => {
   };
 
   return (
-    <div className="history-panel">
+    <div className="history-panel" ref={rootRef}>
       {isSecureMode && (
         <div className="secure-mode-banner">
           <div className="secure-banner-icon">🔒</div>
@@ -662,6 +676,7 @@ const HistoryPanel = ({ showNotification }) => {
           <div className="toolbar-search">
             <Search size={16} />
             <input
+              ref={searchRef}
               type="text"
               placeholder={t('history.search')}
               value={searchInput}

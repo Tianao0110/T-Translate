@@ -32,12 +32,6 @@ const MainWindow = () => {
   const [activeTab, setActiveTab] = useState('translate');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [notification, setNotification] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterOptions, setFilterOptions] = useState({
-    language: 'all',
-    dateRange: 'all',
-    favorites: false
-  });
 
   const [version, setVersion] = useState('');
 
@@ -51,10 +45,22 @@ const MainWindow = () => {
   const getStatistics = useTranslationStore((s) => s.getStatistics);
   const recognizeImage = useTranslationStore((s) => s.recognizeImage);
 
-  const searchInputRef = useRef(null);
-
   // Bridge from main-process screenshot capture down to TranslationPanel
   const [screenshotData, setScreenshotData] = useState(null);
+
+  // Auto-delete old history per privacy settings — the control predates
+  // 0.2.9 but never had an implementation behind it.
+  useEffect(() => {
+    (async () => {
+      try {
+        const privacy = await window.electron?.store?.get('settings.privacy');
+        const days = privacy?.autoDeleteDays;
+        if (days > 0) {
+          useTranslationStore.getState().pruneHistoryOlderThan(days);
+        }
+      } catch { /* browser mode: no electron store */ }
+    })();
+  }, []);
 
   useEffect(() => {
     if (getStatistics) getStatistics();
@@ -171,23 +177,16 @@ const MainWindow = () => {
         if (tabs[index]) setActiveTab(tabs[index]);
       }
 
-      // Ctrl/Cmd + F focuses search (only valid in history/favorites tabs)
-      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-        if (activeTab === 'history' || activeTab === 'favorites') {
-          e.preventDefault();
-          searchInputRef.current?.focus();
-        }
-      }
+      // Ctrl+F is handled inside each panel (visibility-guarded hotkey).
 
       if (e.key === 'Escape') {
         if (isFullscreen) setIsFullscreen(false);
-        if (searchQuery) setSearchQuery('');
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [activeTab, isFullscreen, searchQuery]);
+  }, [activeTab, isFullscreen]);
 
   const showNotification = useCallback((message, type = 'info', duration = 3000) => {
     setNotification({ message, type });
@@ -333,7 +332,7 @@ const MainWindow = () => {
         {mountedTabs.has('history') && (
           <div className="tab-panel" style={{ display: activeTab === 'history' ? 'flex' : 'none' }}>
             <Suspense fallback={<LazyLoadingFallback />}>
-              <HistoryPanel searchQuery={searchQuery} filterOptions={filterOptions} showNotification={showNotification} />
+              <HistoryPanel showNotification={showNotification} />
             </Suspense>
           </div>
         )}
@@ -341,7 +340,7 @@ const MainWindow = () => {
         {mountedTabs.has('favorites') && (
           <div className="tab-panel" style={{ display: activeTab === 'favorites' ? 'flex' : 'none' }}>
             <Suspense fallback={<LazyLoadingFallback />}>
-              <FavoritesPanel searchQuery={searchQuery} showNotification={showNotification} />
+              <FavoritesPanel showNotification={showNotification} />
             </Suspense>
           </div>
         )}
