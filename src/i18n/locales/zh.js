@@ -3,7 +3,6 @@ const zh = {
   nav: { translate: "翻译", history: "历史", favorites: "收藏", documents: "文档", settings: "设置" },
   status: { ready: "就绪", today: "今日", online: "在线", offline: "离线" },
   screenshot: { failed: "截图失败" },
-  notify: { unknownError: "未知错误", networkError: "网络错误" },
   settingsNav: {
     searchPlaceholder: "搜索设置...",
     groupTranslation: "翻译", groupSystem: "系统",
@@ -110,7 +109,7 @@ const zh = {
     noTextToSpeak: "没有可朗读的文本", speakFailed: "朗读失败",
     ocrRecognizing: "正在识别文字...", ocrSuccess: "识别成功 ({{engine}})", ocrFailed: "未能识别到文字",
     enterText: "请输入要翻译的内容", notConnected: "LM Studio 未连接，请检查连接或使用离线模式",
-    translateFirst: "请先进行翻译", selectStyle: "请选择一个参考风格",
+    translateFirst: "请先进行翻译", selectStylePrompt: "请选择一个参考风格",
     styleRewriteComplete: "风格改写完成", styleRewriteFailed: "风格改写失败",
     savedToStyle: "已收藏到风格库", saved: "已收藏",
     imageOcrRecognizing: "正在识别图片文字...", imageOcrSuccess: "文字识别成功",
@@ -370,11 +369,12 @@ const zh = {
     downloadInstall: "下载并安装",
     githubHint: "你也可以手动前往 GitHub 下载"
   },
-  notify: { 
-    success: "成功", error: "错误", warning: "警告", info: "提示", 
-    copySuccess: "已复制到剪贴板", copyFailed: "复制失败", 
-    saveSuccess: "保存成功", saveFailed: "保存失败", 
-    networkError: "网络错误", translateError: "翻译失败", ocrError: "识别失败", 
+  // Single block — a duplicate key would silently override the earlier one
+  notify: {
+    success: "成功", error: "错误", warning: "警告", info: "提示",
+    copySuccess: "已复制到剪贴板", copyFailed: "复制失败",
+    saveSuccess: "保存成功", saveFailed: "保存失败",
+    networkError: "网络错误", unknownError: "未知错误", translateError: "翻译失败", ocrError: "识别失败",
     shortcutRegistered: "快捷键已注册", shortcutConflict: "快捷键冲突"
   },
   guide: {

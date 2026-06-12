@@ -161,7 +161,6 @@ const HistoryPanel = ({ showNotification }) => {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [selectMode, setSelectMode] = useState(false);
   const [sortConfig, setSortConfig] = useState({ key: 'timestamp', direction: 'desc' });
-  const [focusIndex, setFocusIndex] = useState(-1);
   const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
@@ -478,37 +477,6 @@ const HistoryPanel = ({ showNotification }) => {
   const toggleStats = useCallback(() => {
     setShowStats(prev => !prev);
   }, []);
-
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (!contentRef.current) return;
-
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        setFocusIndex(prev => Math.min(prev + 1, filteredHistory.length - 1));
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setFocusIndex(prev => Math.max(prev - 1, 0));
-      } else if (e.key === 'Enter' && focusIndex >= 0) {
-        e.preventDefault();
-        const item = filteredHistory[focusIndex];
-        if (item) {
-          navigator.clipboard.writeText(item.translatedText);
-          notify(t('history.copied'), 'success');
-        }
-      } else if (e.key === ' ' && focusIndex >= 0 && selectMode) {
-        e.preventDefault();
-        const item = filteredHistory[focusIndex];
-        if (item) toggleSelect(item.id);
-      } else if (e.key === 'Escape') {
-        setSelectMode(false);
-        setSelectedIds(new Set());
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [focusIndex, filteredHistory, selectMode, notify, toggleSelect]);
 
   const renderStats = () => {
     if (!showStats) return null;

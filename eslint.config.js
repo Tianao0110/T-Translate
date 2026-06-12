@@ -120,17 +120,10 @@ export default [
   // ========== v0.2.5 Phase T 历史代码兜底 ==========
   // 以下文件有 pre-existing lint errors，留 v0.3 lint cleanup 单独处理
   // （详见 TODOS.md "v0.3 candidates > Lint backlog"）
-  {
-    files: ['src/i18n/locales/*.js'],
-    rules: { 'no-dupe-keys': 'warn' }, // en.js / zh.js 有 selectStyle / notify / docParser 重复 key
-  },
+  // no-dupe-keys 豁免已删（0.2.9 修净 docParser/notify/selectStyle 重复键后恢复 error 级防线）
   {
     files: ['src/App.jsx'],
     rules: { 'react-hooks/rules-of-hooks': 'warn' }, // 顶层 useTranslationStore + useEffect 在 early return 后调用
-  },
-  {
-    files: ['src/components/DocumentTranslator/index.jsx'],
-    rules: { 'no-undef': 'warn' }, // navigateSearch 引用未导入
   },
 
   // ========== 配置文件 / 脚本 ==========

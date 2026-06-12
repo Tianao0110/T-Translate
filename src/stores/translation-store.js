@@ -453,6 +453,17 @@ const useTranslationStore = create(
         return state.translationMode !== PRIVACY_MODES.SECURE;
       },
 
+      // Single source for the privacy fields every translationService call
+      // must carry — the service defaults privacyMode to STANDARD, which has
+      // twice shipped offline/secure-mode leaks from call sites forgetting it.
+      getPrivacyOptions: () => {
+        const mode = get().translationMode;
+        return {
+          privacyMode: mode,
+          useCache: mode !== PRIVACY_MODES.SECURE,
+        };
+      },
+
       getModeConfig: () => {
         const state = get();
         const configs = {
