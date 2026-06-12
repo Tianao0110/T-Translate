@@ -2,11 +2,11 @@ import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next';
 import {
   FileText, Upload, X, Play, Pause, RotateCcw, Download,
-  ChevronUp, ChevronDown, ChevronRight, Settings, AlertCircle, CheckCircle, Clock,
-  Loader, Eye, EyeOff, ArrowUp, Filter, FileDown, Trash2,
+  ChevronUp, ChevronDown, ChevronRight, AlertCircle, CheckCircle, Clock,
+  Loader, ArrowUp, FileDown,
   SkipForward, RefreshCw, Languages, Zap, Lock, Key,
-  List, Hash, DollarSign, Database, BookOpen, ChevronLeft,
-  Edit3, Check, Copy, Search
+  Database, BookOpen, BarChart3,
+  Edit3, Check, Copy, Search, Rows2, Columns2
 } from 'lucide-react';
 import createLogger from '../../utils/logger.js';
 import {
@@ -160,7 +160,7 @@ const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate,
       <div className="segment-header">
         <span className="segment-index">#{segment.id + 1}</span>
         {statusIcon[segment.status]}
-        {segment.edited && <span className="edited-badge" title={t('documentTranslator.segment.edited')}>✏️</span>}
+        {segment.edited && <span className="edited-badge" title={t('documentTranslator.segment.edited')}><Edit3 size={11} /></span>}
         {segment.status === STATUS.SKIPPED && segment.filterReason && (
           <span className="skip-reason">{segment.filterReason}</span>
         )}
@@ -301,10 +301,10 @@ const DocumentTranslator = ({
   const sourceLanguages = useMemo(() => LANGUAGES, []);
   
   const DISPLAY_STYLES = useMemo(() => [
-    { id: 'below', name: t('documentTranslator.displayStyles.below'), icon: '⬇️' },
-    { id: 'side-by-side', name: t('documentTranslator.displayStyles.sideBySide'), icon: '⬛' },
-    { id: 'source-only', name: t('documentTranslator.displayStyles.sourceOnly'), icon: '📄' },
-    { id: 'translated-only', name: t('documentTranslator.displayStyles.translatedOnly'), icon: '🌐' },
+    { id: 'below', name: t('documentTranslator.displayStyles.below'), icon: Rows2 },
+    { id: 'side-by-side', name: t('documentTranslator.displayStyles.sideBySide'), icon: Columns2 },
+    { id: 'source-only', name: t('documentTranslator.displayStyles.sourceOnly'), icon: FileText },
+    { id: 'translated-only', name: t('documentTranslator.displayStyles.translatedOnly'), icon: Languages },
   ], [t]);
   
   // File state
@@ -1138,7 +1138,7 @@ const DocumentTranslator = ({
                     onClick={() => setDisplayStyle(style.id)}
                     title={style.name}
                   >
-                    {style.icon}
+                    <style.icon size={15} />
                   </button>
                 ))}
               </div>
@@ -1249,7 +1249,9 @@ const DocumentTranslator = ({
               </div>
             ) : (
               <>
-                <Upload size={48} />
+                <div className="dropzone-icon">
+                  <Upload size={32} />
+                </div>
                 <h3>{t('documentTranslator.upload.dropHere')}</h3>
                 <p>{t('documentTranslator.upload.orClick')}</p>
                 <p className="format-hint">{t('documentTranslator.upload.supported', { formats: supportedExtensions })}</p>
@@ -1394,7 +1396,7 @@ const DocumentTranslator = ({
                 <div className="stats-overlay" onClick={() => setShowStats(false)} />
                 <div className="stats-popup">
                   <div className="stats-popup-header">
-                    <span>📊 {t('documentTranslator.stats.title')}</span>
+                    <span className="stats-popup-title"><BarChart3 size={15} /> {t('documentTranslator.stats.title')}</span>
                     <button className="close-btn" onClick={() => setShowStats(false)}>
                       <X size={14} />
                     </button>
