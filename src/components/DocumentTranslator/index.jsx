@@ -139,13 +139,15 @@ const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate,
   };
   const cancelEdit = () => { setIsEditing(false); setEditText(''); };
 
-  // Highlight search matches
+  // Highlight search matches. split() with a capture group puts matches at
+  // odd indices — testing parts against a /g regex would skip alternate
+  // matches via its persisting lastIndex.
   const highlightText = (text) => {
     if (!searchQuery || !text) return text;
     try {
-      const regex = new RegExp(`(${searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-      const parts = text.split(regex);
-      return parts.map((part, i) => regex.test(part) ? <mark key={i} className="search-highlight">{part}</mark> : part);
+      const escaped = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const parts = text.split(new RegExp(`(${escaped})`, 'gi'));
+      return parts.map((part, i) => i % 2 === 1 ? <mark key={i} className="search-highlight">{part}</mark> : part);
     } catch { return text; }
   };
 
@@ -388,7 +390,8 @@ const DocumentTranslator = ({
   const fileInputRef = useRef(null);
   const [isDragOver, setIsDragOver] = useState(false);
   
-  // Segment list ref
+  // Root + segment list refs (root drives the hidden-tab visibility check)
+  const rootRef = useRef(null);
   const listRef = useRef(null);
   
   // Stats
@@ -474,11 +477,16 @@ const DocumentTranslator = ({
   // One-time cleanup of expired progress blobs.
   useEffect(() => { sweepExpiredProgress(); }, []);
 
-  // Ctrl+F / Ctrl+H
+  // Ctrl+F toggles in-document search. The component stays mounted behind
+  // other tabs (display:none), so bail when hidden — otherwise this swallows
+  // the shortcut for the whole app.
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.ctrlKey && e.key === 'f' && document) { e.preventDefault(); setShowSearch(prev => !prev); }
-      if (e.ctrlKey && e.key === 'h' && document) { e.preventDefault(); setShowSearch(true); }
+      if (e.ctrlKey && e.key === 'f' && document) {
+        if (!rootRef.current?.offsetParent) return;
+        e.preventDefault();
+        setShowSearch(prev => !prev);
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -753,16 +761,27 @@ const DocumentTranslator = ({
     }
   };
 
-  // Pause / resume
+  // Pause / resume. The elapsed timer derives from startTime, so resuming
+  // shifts the epoch forward by the paused span — otherwise pause time
+  // counts as translation time.
+  const pausedAtRef = useRef(null);
   const togglePause = () => {
-    pauseRef.current = !pauseRef.current;
-    setIsPaused(pauseRef.current);
+    const next = !pauseRef.current;
+    pauseRef.current = next;
+    setIsPaused(next);
+    if (next) {
+      pausedAtRef.current = Date.now();
+    } else if (pausedAtRef.current) {
+      setStartTime(prev => prev + (Date.now() - pausedAtRef.current));
+      pausedAtRef.current = null;
+    }
   };
 
   // Stop translation
   const stopTranslation = () => {
     abortRef.current = true;
     pauseRef.current = false;
+    pausedAtRef.current = null;
     setIsPaused(false);
     setIsTranslating(false);
   };
@@ -1058,7 +1077,7 @@ const DocumentTranslator = ({
     .join(', ');
 
   return (
-    <div className="document-translator">
+    <div className="document-translator" ref={rootRef}>
       {/* Header */}
       <div className="dt-header">
         <div className="dt-title">
