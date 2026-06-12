@@ -882,7 +882,6 @@ const DocumentTranslator = ({
     let filename = document?.filename?.replace(/\.[^.]+$/, '') || 'translated';
     let ext = 'txt';
     let filterName = 'Text';
-    let isBinary = false;
     
     try {
       switch (type) {
@@ -959,7 +958,7 @@ const DocumentTranslator = ({
             { name: 'All Files', extensions: ['*'] },
           ],
           data: content,
-          encoding: isBinary ? 'binary' : 'utf8',
+          encoding: 'utf8',
         });
         
         if (result.success) {

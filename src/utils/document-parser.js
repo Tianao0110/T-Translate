@@ -645,8 +645,12 @@ function extractTextFromHTML(html) {
   text = text.replace(/&gt;/g, '>');
   text = text.replace(/&amp;/g, '&');
   text = text.replace(/&quot;/g, '"');
-  text = text.replace(/&#(\d+);/g, (_, code) => String.fromCharCode(code));
-  text = text.replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCharCode(parseInt(code, 16)));
+  // fromCodePoint, not fromCharCode — numeric entities can be astral (emoji).
+  const decodeCodePoint = (code) => {
+    try { return String.fromCodePoint(code); } catch { return ''; }
+  };
+  text = text.replace(/&#(\d+);/g, (_, code) => decodeCodePoint(Number(code)));
+  text = text.replace(/&#x([0-9a-f]+);/gi, (_, code) => decodeCodePoint(parseInt(code, 16)));
 
   text = text.replace(/[ \t]+/g, ' ');
   text = text.replace(/\n\s*\n/g, '\n\n');
@@ -888,17 +892,30 @@ export function exportTranslatedOnly(segments, options = {}) {
     .join('\n\n');
 }
 
+// Timecodes are kept verbatim from the source file, so a VTT-loaded doc
+// exported as SRT (or vice versa) needs the millisecond separator converted —
+// players and <track> parsers reject the wrong one. SRT also requires a
+// 2-digit hour field, which short-form VTT times omit.
+export function toSRTTimecode(timecode) {
+  return timecode.replace(/(?:(\d{1,2}):)?(\d{2}):(\d{2})[.,](\d{3})/g, (_, h, m, s, ms) =>
+    `${(h || '0').padStart(2, '0')}:${m}:${s},${ms}`);
+}
+
+export function toVTTTimecode(timecode) {
+  return timecode.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
+}
+
 export function exportSRT(segments) {
   return segments
     .filter(s => s.type === 'subtitle')
-    .map(s => `${s.index}\n${s.timecode}\n${s.translated || s.original}`)
+    .map(s => `${s.index}\n${toSRTTimecode(s.timecode)}\n${s.translated || s.original}`)
     .join('\n\n');
 }
 
 export function exportVTT(segments) {
   const body = segments
     .filter(s => s.type === 'subtitle')
-    .map(s => `${s.timecode}\n${s.translated || s.original}`)
+    .map(s => `${toVTTTimecode(s.timecode)}\n${s.translated || s.original}`)
     .join('\n\n');
 
   return `WEBVTT\n\n${body}`;
@@ -919,8 +936,9 @@ export function exportDOCX(segments, options = {}) {
   for (const segment of segments) {
     if (!includeSkipped && segment.status === 'skipped') continue;
 
-    const original = escapeHtml(segment.original || '');
-    const translated = escapeHtml(segment.translated || '');
+    // Multi-line text (subtitles) collapses in HTML without explicit breaks.
+    const original = escapeHtml(segment.original || '').replace(/\n/g, '<br>');
+    const translated = escapeHtml(segment.translated || '').replace(/\n/g, '<br>');
 
     if (style === 'bilingual') {
       content += `
@@ -1002,20 +1020,20 @@ export function exportPDFHTML(segments, options = {}) {
   for (const segment of segments) {
     if (!includeSkipped && segment.status === 'skipped') continue;
 
-    const original = segment.original || '';
-    const translated = segment.translated || '';
+    const original = escapeHtml(segment.original || '').replace(/\n/g, '<br>');
+    const translated = escapeHtml(segment.translated || '').replace(/\n/g, '<br>');
 
     if (style === 'bilingual') {
       content += `
         <div class="segment">
-          <p class="original">${escapeHtml(original)}</p>
-          ${translated ? `<p class="translated">${escapeHtml(translated)}</p>` : ''}
+          <p class="original">${original}</p>
+          ${translated ? `<p class="translated">${translated}</p>` : ''}
         </div>
       `;
     } else if (style === 'translated-only') {
-      content += `<p class="text">${escapeHtml(translated || original)}</p>`;
+      content += `<p class="text">${translated || original}</p>`;
     } else {
-      content += `<p class="text">${escapeHtml(original)}</p>`;
+      content += `<p class="text">${original}</p>`;
     }
   }
 
