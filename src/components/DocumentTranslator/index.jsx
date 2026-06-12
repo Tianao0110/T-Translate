@@ -11,8 +11,6 @@ import {
 import createLogger from '../../utils/logger.js';
 import {
   parseDocument,
-  batchSegments,
-  estimateTokens,
   exportBilingual,
   exportTranslatedOnly,
   exportSRT,
@@ -36,6 +34,37 @@ const STATUS = {
   ERROR: 'error',
   SKIPPED: 'skipped',
 };
+
+// Settings are read at action time (mount/parse/translate) rather than
+// subscribed: the settings panel persists to electron-store, and a fresh
+// read per action stays in sync without a remount or IPC listener.
+const DOC_SETTINGS_DEFAULTS = {
+  maxCharsPerSegment: 800,
+  concurrency: 2,
+  displayStyle: 'below',
+  filters: { skipShort: true, minLength: 10, skipNumbers: true, skipCode: true, skipTargetLang: true },
+};
+
+async function readDocumentSettings() {
+  let saved = null;
+  try {
+    if (window.electron?.store) {
+      saved = await window.electron.store.get('settings.document');
+    } else {
+      saved = JSON.parse(localStorage.getItem('settings') || '{}')?.document;
+    }
+  } catch { /* fall back to defaults */ }
+
+  const clampInt = (value, min, max, fallback) =>
+    Number.isFinite(value) ? Math.min(Math.max(Math.round(value), min), max) : fallback;
+
+  return {
+    maxCharsPerSegment: clampInt(saved?.maxCharsPerSegment, 200, 2000, DOC_SETTINGS_DEFAULTS.maxCharsPerSegment),
+    concurrency: clampInt(saved?.concurrency, 1, 6, DOC_SETTINGS_DEFAULTS.concurrency),
+    displayStyle: saved?.displayStyle || DOC_SETTINGS_DEFAULTS.displayStyle,
+    filters: { ...DOC_SETTINGS_DEFAULTS.filters, ...(saved?.filters || {}) },
+  };
+}
 
 // Progress persistence
 const PROGRESS_KEY = 'dt_progress_';
@@ -98,8 +127,6 @@ const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate,
       return parts.map((part, i) => regex.test(part) ? <mark key={i} className="search-highlight">{part}</mark> : part);
     } catch { return text; }
   };
-
-  const hasSearchMatch = searchQuery && segment.translated && segment.translated.toLowerCase().includes(searchQuery.toLowerCase());
 
   return (
     <div 
@@ -253,6 +280,8 @@ const DocumentTranslator = ({
   const DISPLAY_STYLES = useMemo(() => [
     { id: 'below', name: t('documentTranslator.displayStyles.below'), icon: '⬇️' },
     { id: 'side-by-side', name: t('documentTranslator.displayStyles.sideBySide'), icon: '⬛' },
+    { id: 'source-only', name: t('documentTranslator.displayStyles.sourceOnly'), icon: '📄' },
+    { id: 'translated-only', name: t('documentTranslator.displayStyles.translatedOnly'), icon: '🌐' },
   ], [t]);
   
   // File state
@@ -297,7 +326,6 @@ const DocumentTranslator = ({
   
   // UI state
   const [displayStyle, setDisplayStyle] = useState('below');
-  const [showFilters, setShowFilters] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -319,16 +347,19 @@ const DocumentTranslator = ({
   const [pendingFile, setPendingFile] = useState(null);
   const [password, setPassword] = useState('');
   
-  // Filter settings
-  const [filters, setFilters] = useState({
-    skipShort: true,
-    minLength: 10,
-    skipNumbers: true,
-    skipCode: true,
-    skipTargetLang: true,
-    skipKeywords: [],
-  });
-  
+  // Seed concurrency + display style from settings once per mount; parse-time
+  // and translate-time values are re-read fresh in loadFile/startTranslation.
+  useEffect(() => {
+    let alive = true;
+    readDocumentSettings().then((ds) => {
+      if (!alive) return;
+      setConcurrency(ds.concurrency);
+      setDisplayStyle(ds.displayStyle);
+    });
+    return () => { alive = false; };
+  }, []);
+
+
   // Drop-zone refs
   const dropZoneRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -436,11 +467,12 @@ const DocumentTranslator = ({
     setIsLoading(true);
     
     try {
+      const docSettings = await readDocumentSettings();
       const result = await parseDocument(file, {
-        maxCharsPerSegment: 800,
+        maxCharsPerSegment: docSettings.maxCharsPerSegment,
         password: filePassword,
         filters: {
-          ...filters,
+          ...docSettings.filters,
           targetLang,
         },
         ocrRecognize: async (imageData) => {
@@ -516,7 +548,7 @@ const DocumentTranslator = ({
     } finally {
       setIsLoading(false);
     }
-  }, [filters, targetLang, notify, t]);
+  }, [sourceLang, targetLang, notify, t]);
 
   // Submit password
   const handlePasswordSubmit = useCallback(async () => {
@@ -596,7 +628,10 @@ const DocumentTranslator = ({
       return;
     }
     
-    await translateWithPool(toTranslate, parallelMode ? concurrency : 1);
+    // Re-read so a settings change applies to the next run without remount.
+    const docSettings = await readDocumentSettings();
+    setConcurrency(docSettings.concurrency);
+    await translateWithPool(toTranslate, parallelMode ? docSettings.concurrency : 1);
 
     setIsTranslating(false);
     if (!abortRef.current) {

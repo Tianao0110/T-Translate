@@ -83,16 +83,21 @@ export const DEFAULT_SETTINGS = {
   contextMemory: false,
   termCorrection: true,
 
+  // Document translator. Single source of truth — DocumentTranslator reads
+  // this bucket at parse/translate time, so keys here must match what the
+  // component consumes (the pre-0.2.9 bucket drifted into three disjoint
+  // key sets and every control was dead).
   document: {
-    preserveFormatting: true,
-    translateHeaders: true,
-    translateFooters: false,
-    translateCaptions: true,
-    maxParagraphLength: 1000,
-    batchSize: 5,
-    retryOnError: true,
-    outputFormat: 'same',
-    showProgress: true,
+    maxCharsPerSegment: 800,
+    concurrency: 2,
+    displayStyle: 'below',
+    filters: {
+      skipShort: true,
+      minLength: 10,
+      skipNumbers: true,
+      skipCode: true,
+      skipTargetLang: true,
+    },
   },
 
   // Floating window. Single source of truth for its defaults —
@@ -160,6 +165,39 @@ export const DEFAULT_SETTINGS = {
 
 export const LANGUAGE_OPTIONS = getLanguageOptions(true);
 
+// 0.2.9 reshaped settings.document around the keys the translator actually
+// reads. Old keys (preserveFormatting/batchSize/maxParagraphLength/...) were
+// never consumed; batchMaxTokens belonged to a joined-batch design that was
+// never implemented. batchMaxSegments maps onto concurrency to keep the one
+// user intent that survives the redesign.
+const migrateDocumentSettings = (saved) => {
+  const migrated = {
+    ...DEFAULT_SETTINGS.document,
+    filters: { ...DEFAULT_SETTINGS.document.filters },
+  };
+  if (!saved || typeof saved !== 'object') return migrated;
+
+  if (typeof saved.maxCharsPerSegment === 'number') {
+    migrated.maxCharsPerSegment = saved.maxCharsPerSegment;
+  }
+  if (typeof saved.concurrency === 'number') {
+    migrated.concurrency = saved.concurrency;
+  } else if (typeof saved.batchMaxSegments === 'number') {
+    migrated.concurrency = Math.min(Math.max(saved.batchMaxSegments, 1), 6);
+  }
+  if (typeof saved.displayStyle === 'string') {
+    migrated.displayStyle = saved.displayStyle;
+  }
+  if (saved.filters && typeof saved.filters === 'object') {
+    for (const key of Object.keys(migrated.filters)) {
+      if (saved.filters[key] !== undefined) {
+        migrated.filters[key] = saved.filters[key];
+      }
+    }
+  }
+  return migrated;
+};
+
 // Merges saved settings into the current default shape and rewrites any old
 // flat-keyed fields (endpoint, providers, selectionXxx, glassXxx) into the
 // current nested object layout.
@@ -179,10 +217,7 @@ export const migrateOldSettings = (savedSettings) => {
       ...DEFAULT_SETTINGS.translation,
       ...(savedSettings.translation || {}),
     },
-    document: {
-      ...DEFAULT_SETTINGS.document,
-      ...(savedSettings.document || {}),
-    },
+    document: migrateDocumentSettings(savedSettings.document),
     floatingWindow: {
       ...DEFAULT_SETTINGS.floatingWindow,
       ...(savedSettings.floatingWindow || {}),

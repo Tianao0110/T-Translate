@@ -38,31 +38,19 @@ const DocumentSection = ({
       </div>
 
       <div className="setting-group">
-        <label className="setting-label">{t('documentSettings.batchTranslation')}</label>
+        <label className="setting-label">{t('documentSettings.parallelTranslation')}</label>
         <div className="setting-row">
-          <span>{t('documentSettings.batchMaxTokens')}</span>
+          <span>{t('documentSettings.concurrency')}</span>
           <input
             type="number"
             className="setting-input small"
-            value={settings.document?.batchMaxTokens || 2000}
-            onChange={(e) => updateSetting('document', 'batchMaxTokens', parseInt(e.target.value) || 2000)}
-            min="500"
-            max="4000"
-            step="500"
-          />
-        </div>
-        <div className="setting-row">
-          <span>{t('documentSettings.batchMaxSegments')}</span>
-          <input
-            type="number"
-            className="setting-input small"
-            value={settings.document?.batchMaxSegments || 5}
-            onChange={(e) => updateSetting('document', 'batchMaxSegments', parseInt(e.target.value) || 5)}
+            value={settings.document?.concurrency || 2}
+            onChange={(e) => updateSetting('document', 'concurrency', Math.min(Math.max(parseInt(e.target.value) || 2, 1), 6))}
             min="1"
-            max="10"
+            max="6"
           />
         </div>
-        <p className="setting-hint">{t('documentSettings.batchHint')}</p>
+        <p className="setting-hint">{t('documentSettings.concurrencyHint')}</p>
       </div>
 
       <div className="setting-group">

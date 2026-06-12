@@ -77,8 +77,8 @@ const zh = {
   documentSettings: {
     title: "文档翻译设置", description: "配置文档翻译的分段策略、过滤规则和显示样式",
     segmentSettings: "分段设置", maxCharsPerSegment: "单段最大字符数", segmentHint: "过长的段落会按此限制自动分割",
-    batchTranslation: "批量翻译", batchMaxTokens: "每批最大 Tokens", batchMaxSegments: "每批最大段落数",
-    batchHint: "合并短段落可减少 API 调用次数",
+    parallelTranslation: "并发翻译", concurrency: "同时翻译段数",
+    concurrencyHint: "本地模型建议 1-2（GPU 串行，调高只会排队）；在线 API 可调高",
     smartFilter: "智能过滤", skipShort: "跳过过短段落", minLength: "最小字符数",
     skipNumbers: "跳过纯数字段落（如页码）", skipCode: "保留代码块不翻译", skipTargetLang: "跳过已是目标语言的段落",
     displayStyle: "默认显示样式",
