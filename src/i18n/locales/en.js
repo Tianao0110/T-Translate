@@ -615,10 +615,9 @@ const en = {
     },
     // Footer
     footer: {
-      auto: "Auto",
-      batchMode: "Batch",
-      batchModeOnHint: "Batch mode: translate {{count}} segments at once, faster",
-      batchModeOffHint: "Single mode: translate one by one, more stable",
+      parallel: "Parallel",
+      parallelOnHint: "Parallel mode: translate {{count}} segments concurrently",
+      parallelOffHint: "Sequential mode: one segment at a time, easiest on local models",
       glossary: "Glossary",
       glossaryEnabledHint: "Glossary enabled",
       glossaryDisabledHint: "Glossary disabled",

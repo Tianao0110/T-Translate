@@ -275,8 +275,9 @@ const DocumentTranslator = ({
   const pauseRef = useRef(false);
   const abortRef = useRef(false);
   
-  const [batchMode, setBatchMode] = useState(true);
-  const [batchSize, setBatchSize] = useState(10);
+  const [parallelMode, setParallelMode] = useState(true);
+  // Wired to settings.document.concurrency in loadDocumentSettings below.
+  const [concurrency, setConcurrency] = useState(2);
   const [useGlossary, setUseGlossary] = useState(true);
   
   const getGlossaryTerms = useTranslationStore(state => state.getGlossaryTerms);
@@ -595,92 +596,35 @@ const DocumentTranslator = ({
       return;
     }
     
-    // Branch on translation mode
-    if (batchMode) {
-          await translateBatchMode(toTranslate);
-    } else {
-      await translateSingleMode(toTranslate);
-    }
-    
+    await translateWithPool(toTranslate, parallelMode ? concurrency : 1);
+
     setIsTranslating(false);
     if (!abortRef.current) {
       notify?.(t('documentTranslator.notify.translationComplete'), 'success');
     }
   };
 
-  const translateBatchMode = async (toTranslate) => {
-    // Process in batches
-    for (let i = 0; i < toTranslate.length; i += batchSize) {
-      if (abortRef.current) break;
-      
-      // Pause check
-      while (pauseRef.current) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        if (abortRef.current) break;
-      }
-      if (abortRef.current) break;
-      
-      const batch = toTranslate.slice(i, i + batchSize);
-      const batchIds = batch.map(s => s.id);
-      const batchTexts = batch.map(s => s.original);
-      
-      // Mark this batch as translating
-      setSegments(prev => prev.map(s => 
-        batchIds.includes(s.id) ? { ...s, status: STATUS.TRANSLATING } : s
-      ));
-      
-      try {
-        const result = await translationService.translateBatch(batchTexts, {
-          sourceLang,
-          targetLang,
-          ...buildTranslateOptions(),
-        });
-        
-        if (result.success && result.translations) {
-          // Apply results
-          setSegments(prev => prev.map(s => {
-            const batchIndex = batchIds.indexOf(s.id);
-            if (batchIndex >= 0) {
-              const translation = result.translations[batchIndex];
-              // Cache the translation
-              const cacheKey = `${s.original}|${sourceLang}|${targetLang}`;
-              translationCache.current.set(cacheKey, translation);
-              
-              return {
-                ...s,
-                status: STATUS.COMPLETED,
-                translated: translation,
-              };
-            }
-            return s;
-          }));
-        } else {
-          throw new Error(result.error || 'Batch translation failed');
+  // Worker pool over single-segment translation. Each segment gets its own
+  // success/error state, so a failed item can't masquerade as completed the
+  // way joined-batch responses could. Concurrency stays low by default:
+  // local LLMs serialize on the GPU, so more in-flight calls only add
+  // queueing (same calibration as pipeline.js scattered mode).
+  const translateWithPool = async (toTranslate, poolSize) => {
+    let cursor = 0;
+    const worker = async () => {
+      for (;;) {
+        while (pauseRef.current && !abortRef.current) {
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
-      } catch (error) {
-        // Batch failed — fall back to single-segment loop.
-        logger.warn('Batch translation failed, falling back to single mode:', error);
-        for (const segment of batch) {
-          if (abortRef.current) break;
-          await translateSingleSegment(segment);
-        }
+        if (abortRef.current) return;
+        const index = cursor++;
+        if (index >= toTranslate.length) return;
+        await translateSingleSegment(toTranslate[index]);
       }
-    }
-  };
-
-  const translateSingleMode = async (toTranslate) => {
-    for (const segment of toTranslate) {
-      if (abortRef.current) break;
-      
-      // Pause check
-      while (pauseRef.current) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        if (abortRef.current) break;
-      }
-      if (abortRef.current) break;
-      
-      await translateSingleSegment(segment);
-    }
+    };
+    await Promise.all(
+      Array.from({ length: Math.max(1, poolSize) }, () => worker())
+    );
   };
 
   const translateSingleSegment = async (segment) => {
@@ -695,21 +639,20 @@ const DocumentTranslator = ({
         ...buildTranslateOptions(),
       });
 
-      if (result.success) {
-        const translated = result.text || result.translatedText || '';
-        const cacheKey = `${segment.original}|${sourceLang}|${targetLang}`;
-        translationCache.current.set(cacheKey, translated);
-        
-        setSegments(prev => prev.map(s => 
-          s.id === segment.id ? { 
-            ...s, 
-            status: STATUS.COMPLETED, 
-            translated,
-          } : s
-        ));
-      } else {
-        throw new Error(result.error);
+      const translated = result.success ? (result.text || result.translatedText || '') : '';
+      if (!translated) {
+        throw new Error(result.error || 'Empty translation result');
       }
+      const cacheKey = `${segment.original}|${sourceLang}|${targetLang}`;
+      translationCache.current.set(cacheKey, translated);
+
+      setSegments(prev => prev.map(s =>
+        s.id === segment.id ? {
+          ...s,
+          status: STATUS.COMPLETED,
+          translated,
+        } : s
+      ));
     } catch (error) {
       setSegments(prev => prev.map(s => 
         s.id === segment.id ? { 
@@ -1421,16 +1364,16 @@ const DocumentTranslator = ({
       {document && (
         <div className="dt-footer">
           <div className="control-left">
-            {/* Batch mode toggle */}
-            <label className="batch-mode-toggle" title={batchMode ? t('documentTranslator.footer.batchModeOnHint', { count: batchSize }) : t('documentTranslator.footer.batchModeOffHint')}>
-              <input 
-                type="checkbox" 
-                checked={batchMode}
-                onChange={(e) => setBatchMode(e.target.checked)}
+            {/* Parallel mode toggle */}
+            <label className="batch-mode-toggle" title={parallelMode ? t('documentTranslator.footer.parallelOnHint', { count: concurrency }) : t('documentTranslator.footer.parallelOffHint')}>
+              <input
+                type="checkbox"
+                checked={parallelMode}
+                onChange={(e) => setParallelMode(e.target.checked)}
                 disabled={isTranslating}
               />
               <Zap size={14} />
-              <span>{t('documentTranslator.footer.batchMode')}</span>
+              <span>{t('documentTranslator.footer.parallel')}</span>
             </label>
             {/* Glossary toggle */}
             <label 

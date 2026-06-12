@@ -615,10 +615,9 @@ const zh = {
     },
     // Footer
     footer: {
-      auto: "自动",
-      batchMode: "批量",
-      batchModeOnHint: "批量模式：每次翻译 {{count}} 段，速度更快",
-      batchModeOffHint: "逐条模式：一段一段翻译，更稳定",
+      parallel: "并发",
+      parallelOnHint: "并发模式：同时翻译 {{count}} 段",
+      parallelOffHint: "顺序模式：逐段翻译，对本地模型最稳",
       glossary: "术语",
       glossaryEnabledHint: "术语表已启用",
       glossaryDisabledHint: "术语表已禁用",
