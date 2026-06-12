@@ -622,6 +622,15 @@ export async function parseDocument(file, options = {}) {
     throw new Error(_t('docParser.unsupportedFormat', 'Unsupported file format') + `: .${ext}`);
   }
 
+  // Whole file goes through arrayBuffer; an unbounded PDF would freeze or
+  // OOM the renderer.
+  if (file.size > MAX_FILE_SIZE) {
+    return {
+      success: false,
+      error: _t('documentTranslator.notify.fileTooLarge', `File too large (max ${MAX_FILE_SIZE_LABEL})`),
+    };
+  }
+
   try {
     let content;
     let segments;

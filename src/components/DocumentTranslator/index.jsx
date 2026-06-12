@@ -24,7 +24,7 @@ import {
 import { ocrManager } from '../../providers/ocr/index.js';
 import translationService from '../../services/translation.js';
 import useTranslationStore from '../../stores/translation-store';
-import { LANGUAGES } from '../../config/constants.js';
+import { LANGUAGES, PRIVACY_MODES } from '../../config/constants.js';
 import { LanguageSelector } from '../TranslationPanel/components.jsx';
 import './styles.css';
 
@@ -281,6 +281,15 @@ const DocumentTranslator = ({
   
   const getGlossaryTerms = useTranslationStore(state => state.getGlossaryTerms);
   const translationMode = useTranslationStore(state => state.translationMode);
+
+  // The service defaults privacyMode to STANDARD, which would route
+  // offline/secure sessions to online providers and persist secure-mode
+  // results to the disk cache — so every translate call must carry these.
+  const buildTranslateOptions = () => ({
+    privacyMode: translationMode,
+    useCache: translationMode !== PRIVACY_MODES.SECURE,
+    glossaryTerms: useGlossary ? getGlossaryTerms() : [],
+  });
   
   const [startTime, setStartTime] = useState(null);
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -341,7 +350,8 @@ const DocumentTranslator = ({
       .reduce((sum, s) => sum + (s.tokens || 0), 0);
     const cacheHits = segments.filter(s => s.fromCache).length;
     const edited = segments.filter(s => s.edited).length;
-    const progress = total > 0 ? Math.round((completed / (total - skipped)) * 100) : 0;
+    const translatable = total - skipped;
+    const progress = translatable > 0 ? Math.round((completed / translatable) * 100) : 0;
     
     return { 
       total, completed, failed, skipped, pending, translating,
@@ -599,12 +609,6 @@ const DocumentTranslator = ({
   };
 
   const translateBatchMode = async (toTranslate) => {
-    // Pick up glossary if enabled
-    const glossary = useGlossary ? getGlossaryTerms() : [];
-    if (glossary.length > 0) {
-      logger.debug(`Using glossary with ${glossary.length} terms`);
-    }
-    
     // Process in batches
     for (let i = 0; i < toTranslate.length; i += batchSize) {
       if (abortRef.current) break;
@@ -629,7 +633,7 @@ const DocumentTranslator = ({
         const result = await translationService.translateBatch(batchTexts, {
           sourceLang,
           targetLang,
-          glossary: glossary.length > 0 ? glossary : undefined,
+          ...buildTranslateOptions(),
         });
         
         if (result.success && result.translations) {
@@ -688,11 +692,12 @@ const DocumentTranslator = ({
       const result = await translationService.translate(segment.original, {
         sourceLang,
         targetLang,
+        ...buildTranslateOptions(),
       });
-      
+
       if (result.success) {
         const translated = result.text || result.translatedText || '';
-          const cacheKey = `${segment.original}|${sourceLang}|${targetLang}`;
+        const cacheKey = `${segment.original}|${sourceLang}|${targetLang}`;
         translationCache.current.set(cacheKey, translated);
         
         setSegments(prev => prev.map(s => 
@@ -743,13 +748,14 @@ const DocumentTranslator = ({
       const result = await translationService.translate(segment.original, {
         sourceLang,
         targetLang,
+        ...buildTranslateOptions(),
       });
-      
+
       if (result.success) {
-        setSegments(prev => prev.map(s => 
-          s.id === segmentId ? { 
-            ...s, 
-            status: STATUS.COMPLETED, 
+        setSegments(prev => prev.map(s =>
+          s.id === segmentId ? {
+            ...s,
+            status: STATUS.COMPLETED,
             translated: result.text || result.translatedText || '',
           } : s
         ));
@@ -785,7 +791,7 @@ const DocumentTranslator = ({
     translationCache.current.delete(cacheKey);
     setSegments(prev => prev.map(s => s.id === segmentId ? { ...s, status: STATUS.TRANSLATING, edited: false } : s));
     try {
-      const result = await translationService.translate(segment.original, { sourceLang, targetLang });
+      const result = await translationService.translate(segment.original, { sourceLang, targetLang, ...buildTranslateOptions() });
       if (result.success) {
         const translated = result.text || result.translatedText || '';
         translationCache.current.set(cacheKey, translated);
@@ -1257,7 +1263,8 @@ const DocumentTranslator = ({
                     <button
                       className="edited-count edited-locate-btn"
                       onClick={() => {
-                        const el = document.querySelector('.segment-item.edited');
+                        // `document` is shadowed by component state here
+                        const el = listRef.current?.querySelector('.segment-item.edited');
                         if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                       }}
                       title={t('documentTranslator.progress.editedHint')}
