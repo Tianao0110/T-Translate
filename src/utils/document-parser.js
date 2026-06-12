@@ -306,8 +306,29 @@ export function parseVTT(content) {
   return segments;
 }
 
+// Render a PDF page to canvas and feed it through the OCR chain.
+// Scale 2 keeps small print legible for local OCR without ballooning memory.
+// Returns null on failure so callers can distinguish "no text" from "failed".
+async function ocrPdfPage(page, ocrRecognize) {
+  try {
+    const viewport = page.getViewport({ scale: 2 });
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    const result = await ocrRecognize(canvas.toDataURL('image/png'));
+    return result?.success && result.text ? result.text : null;
+  } catch {
+    return null;
+  }
+}
+
+// Stray items (page number, watermark) still read as a scanned page;
+// real text pages clear this easily.
+const SCANNED_PAGE_MAX_CHARS = 20;
+
 export async function parsePDF(file, options = {}) {
-  const { password, maxCharsPerSegment = 800, filters = {} } = options;
+  const { password, maxCharsPerSegment = 800, filters = {}, ocrRecognize, onProgress } = options;
 
   const pdfjsLib = await import('pdfjs-dist');
 
@@ -336,8 +357,10 @@ export async function parsePDF(file, options = {}) {
 
   let allText = '';
   const pageTexts = [];
+  let usedOcr = false;
 
   for (let i = 1; i <= numPages; i++) {
+    onProgress?.({ page: i, total: numPages });
     const page = await pdf.getPage(i);
     const textContent = await page.getTextContent();
 
@@ -400,6 +423,16 @@ export async function parsePDF(file, options = {}) {
       }
     }
 
+    // Image-only page (scanned PDF) — render it and run the OCR chain.
+    if (pageText.trim().length < SCANNED_PAGE_MAX_CHARS && ocrRecognize) {
+      onProgress?.({ page: i, total: numPages, ocr: true });
+      const ocrText = await ocrPdfPage(page, ocrRecognize);
+      if (ocrText?.trim()) {
+        pageText = ocrText;
+        usedOcr = true;
+      }
+    }
+
     pageTexts.push(pageText.trim());
   }
 
@@ -410,11 +443,20 @@ export async function parsePDF(file, options = {}) {
     filters,
   });
 
-  return {
+  const result = {
     segments,
     pageCount: numPages,
     isPdf: true,
   };
+  if (usedOcr) {
+    result.usedOcr = true;
+  }
+  // Nothing extractable and OCR didn't save it — tell the user why the
+  // document came back empty instead of showing "0 segments".
+  if (segments.length === 0) {
+    result.warning = 'scanned_no_ocr';
+  }
+  return result;
 }
 
 export async function parseDOCX(file, options = {}) {

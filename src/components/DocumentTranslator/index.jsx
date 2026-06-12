@@ -23,6 +23,7 @@ import { ocrManager } from '../../providers/ocr/index.js';
 import translationService from '../../services/translation.js';
 import useTranslationStore from '../../stores/translation-store';
 import { LANGUAGES, PRIVACY_MODES } from '../../config/constants.js';
+import { getPrivacyModeConfig } from '../../config/privacy-modes.js';
 import { LanguageSelector } from '../TranslationPanel/components.jsx';
 import './styles.css';
 
@@ -308,6 +309,8 @@ const DocumentTranslator = ({
   const [document, setDocument] = useState(null);
   const [segments, setSegments] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  // { page, total, ocr } during PDF parse — OCR pages are slow enough to need feedback.
+  const [parseProgress, setParseProgress] = useState(null);
   
   // Fingerprint used to key progress in localStorage.
   const fileFingerprint = useRef(null);
@@ -522,11 +525,16 @@ const DocumentTranslator = ({
         },
         ocrRecognize: async (imageData) => {
           try {
-            return await ocrManager.recognize(imageData);
+            // Scanned-page OCR must respect the privacy mode's engine
+            // allowlist — the chain would otherwise reach online engines.
+            return await ocrManager.recognize(imageData, {
+              allowedEngines: getPrivacyModeConfig(translationMode).allowedOcrEngines || undefined,
+            });
           } catch {
             return { success: false, error: 'OCR unavailable' };
           }
         },
+        onProgress: setParseProgress,
       });
       
       logger.debug('parseDocument result:', result);
@@ -592,8 +600,9 @@ const DocumentTranslator = ({
       notify?.(error.message, 'error');
     } finally {
       setIsLoading(false);
+      setParseProgress(null);
     }
-  }, [sourceLang, targetLang, notify, t]);
+  }, [sourceLang, targetLang, translationMode, notify, t]);
 
   // Submit password
   const handlePasswordSubmit = useCallback(async () => {
@@ -1214,7 +1223,11 @@ const DocumentTranslator = ({
             {isLoading ? (
               <div className="loading-state">
                 <Loader size={32} className="spinning" />
-                <p>{t('documentTranslator.upload.parsing')}</p>
+                <p>
+                  {parseProgress?.ocr
+                    ? t('documentTranslator.upload.ocrProgress', { page: parseProgress.page, total: parseProgress.total })
+                    : t('documentTranslator.upload.parsing')}
+                </p>
               </div>
             ) : (
               <>

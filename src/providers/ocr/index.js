@@ -143,7 +143,16 @@ class OCREngineManager {
   }
 
   async recognize(input, options = {}) {
-    const { engine: preferredEngine } = options;
+    const { allowedEngines } = options;
+    let { engine: preferredEngine } = options;
+
+    // Privacy modes pass an engine allowlist (null/undefined = unrestricted).
+    // A disallowed preferred engine falls through to the filtered chain
+    // instead of failing outright.
+    if (preferredEngine && allowedEngines && !allowedEngines.includes(preferredEngine)) {
+      logger.debug(`Preferred engine ${preferredEngine} not allowed in current privacy mode`);
+      preferredEngine = null;
+    }
 
     if (preferredEngine === 'llm-vision' && this._visionLocked) {
       logger.info('LLM Vision locked due to repeated failures, using local OCR');
@@ -186,6 +195,7 @@ class OCREngineManager {
     // No engine specified — walk the priority list, skipping locked vision
     for (const id of this.priority) {
       if (id === 'llm-vision' && this._visionLocked) continue;
+      if (allowedEngines && !allowedEngines.includes(id)) continue;
 
       const instance = this.getOrCreate(id);
       if (!instance) continue;

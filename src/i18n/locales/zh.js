@@ -546,7 +546,8 @@ const zh = {
       dropHere: "拖放文件到这里",
       orClick: "或点击选择文件",
       supported: "支持：{{formats}}",
-      parsing: "正在解析文件..."
+      parsing: "正在解析文件...",
+      ocrProgress: "OCR 识别第 {{page}}/{{total}} 页..."
     },
     // Password modal
     password: {

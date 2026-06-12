@@ -546,7 +546,8 @@ const en = {
       dropHere: "Drop file here",
       orClick: "or click to select",
       supported: "Supported: {{formats}}",
-      parsing: "Parsing file..."
+      parsing: "Parsing file...",
+      ocrProgress: "OCR on page {{page}}/{{total}}..."
     },
     // Password modal
     password: {
