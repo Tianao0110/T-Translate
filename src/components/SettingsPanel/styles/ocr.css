@@ -558,6 +558,39 @@
   color: var(--text-secondary);
 }
 
+/* Folded-by-default pack list: same chevron language as .section-header */
+.ocr-pack-section > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.ocr-pack-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.pack-section-title::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-right: 2px solid var(--text-tertiary);
+  border-bottom: 2px solid var(--text-tertiary);
+  transform: rotate(-45deg);
+  transition: transform 0.2s;
+  margin-right: 8px;
+  vertical-align: 1px;
+}
+
+.ocr-pack-section[open] .pack-section-title::before {
+  transform: rotate(45deg);
+}
+
+.pack-count {
+  margin-left: 8px;
+  font-weight: 400;
+  color: var(--text-tertiary);
+}
+
 .ocr-pack-row {
   display: flex;
   align-items: center;

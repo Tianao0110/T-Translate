@@ -358,31 +358,39 @@ const OcrSection = ({
                   </div>
                 )}
 
-                {/* Language packs */}
-                <div className="ocr-pack-section">
-                  <div className="ocr-pack-section-header">
-                    <span className="pack-section-title">{t('ocr.packs.title')}</span>
+                {/* Language packs — installed once then rarely touched: folded by
+                    default. Manifest errors and the base pack stay outside the fold
+                    (a broken manifest / missing core model must be visible). */}
+                {manifestError && (
+                  <p className="pack-manifest-error">
+                    <AlertTriangle size={12} style={{marginRight: 4, verticalAlign: -2}} />
+                    {t('ocr.packs.manifestError')}
+                  </p>
+                )}
+
+                {basePack && (basePack.status === 'update-available' || !settings.ocr.rapidInstalled) &&
+                  renderPackRow({ ...basePack, id: 'base-v5' })}
+
+                <details className="ocr-pack-section">
+                  <summary className="ocr-pack-section-header">
+                    <span className="pack-section-title">
+                      {t('ocr.packs.title')}
+                      {langPacks.length > 0 && (
+                        <span className="pack-count">
+                          {langPacks.filter((p) => ['installed', 'update-available', 'orphaned'].includes(p.status)).length}/{langPacks.length}
+                        </span>
+                      )}
+                    </span>
                     <button
                       className="btn-small"
-                      onClick={() => loadPacks(true)}
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); loadPacks(true); }}
                       disabled={packsLoading}
                       title={t('ocr.packs.refresh')}
                     >
                       <RefreshCw size={12} className={packsLoading ? 'spinning' : ''} />
                       <span style={{marginLeft: 4}}>{t('ocr.packs.refresh')}</span>
                     </button>
-                  </div>
-
-                  {manifestError && (
-                    <p className="pack-manifest-error">
-                      <AlertTriangle size={12} style={{marginRight: 4, verticalAlign: -2}} />
-                      {t('ocr.packs.manifestError')}
-                    </p>
-                  )}
-
-                  {/* Base pack: only surfaces when re-downloadable (missing or update) */}
-                  {basePack && (basePack.status === 'update-available' || !settings.ocr.rapidInstalled) &&
-                    renderPackRow({ ...basePack, id: 'base-v5' })}
+                  </summary>
 
                   {langPacks.length > 0
                     ? langPacks.map(renderPackRow)
@@ -391,7 +399,7 @@ const OcrSection = ({
                           {packsLoading ? t('ocr.packs.loading') : t('ocr.packs.empty')}
                         </p>
                       )}
-                </div>
+                </details>
               </div>
               <div className="engine-actions">
                 {settings.ocr.rapidInstalled ? (
