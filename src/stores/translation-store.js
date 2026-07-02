@@ -429,12 +429,16 @@ const useTranslationStore = create(
 
       clearCurrent: () =>
         set((state) => {
+          // Null id makes an in-flight stream fail its identity check instead
+          // of resurrecting text into the cleared panel
+          state.currentTranslation.id = null;
           state.currentTranslation.sourceText = "";
           state.currentTranslation.translatedText = "";
           state.currentTranslation.status = "idle";
           state.currentTranslation.error = null;
           state.currentTranslation.versions = [];
           state.currentTranslation.currentVersionId = null;
+          state.currentTranslation.glossaryApplied = null;
         }),
 
       clearHistory: () =>

@@ -152,16 +152,10 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
             notify(t('translation.ocrSuccess', { engine: result.engine || engineToUse }), 'success');
           }
 
-          if (autoTranslate) {
-            // Floor at 300ms so the user sees the OCR result before translate kicks in
-            const delay = Math.max(autoTranslateDelay || 500, 300);
-            setTimeout(async () => {
-              const currentText = useTranslationStore.getState().currentTranslation.sourceText;
-              if (currentText?.trim()) {
-                await handleTranslate();
-              }
-            }, delay);
-          }
+          // No explicit auto-translate here: the OCR write to sourceText
+          // re-triggers the debounced auto-translate effect with a fresh
+          // closure (correct 'ocr' template + overlay notify); a deferred call
+          // from this render's stale handleTranslate would miss both.
         } else {
           notify(result.error || t('translation.ocrFailed'), 'warning');
         }
@@ -197,6 +191,12 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   }, [currentTranslation.sourceText, autoTranslate, autoTranslateDelay]);
 
   const handleTranslate = async (overrideTemplate = null) => {
+    // Closure-safe re-entrancy guard — Ctrl+Enter and template clicks are not
+    // disabled while a stream is running, and concurrent streams interleave.
+    if (useTranslationStore.getState().currentTranslation.status === TRANSLATION_STATUS.TRANSLATING) {
+      notify(t('translation.translating'), 'info');
+      return;
+    }
     if (!currentTranslation.sourceText.trim()) {
       notify(t('translation.enterText'), 'warning');
       return;
@@ -401,7 +401,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
               {tts.ttsEnabled && (
                 <button
                   className={`action-btn ${tts.ttsStatus === TTS_STATUS.SPEAKING && tts.ttsTarget === 'source' ? 'active' : ''}`}
-                  onClick={() => tts.speakText(currentTranslation.sourceText, 'source', currentTranslation.sourceLang)}
+                  onClick={() => tts.speakText(currentTranslation.sourceText, 'source', currentTranslation.sourceLanguage)}
                   disabled={!currentTranslation.sourceText || isOcrProcessing}
                   title={tts.ttsStatus === TTS_STATUS.SPEAKING && tts.ttsTarget === 'source' ? t('translation.stopSpeak') : t('translation.speakSource')}
                 >
@@ -489,7 +489,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
               {tts.ttsEnabled && (
                 <button
                   className={`action-btn ${tts.ttsStatus === TTS_STATUS.SPEAKING && tts.ttsTarget === 'target' ? 'active' : ''}`}
-                  onClick={() => tts.speakText(currentTranslation.translatedText, 'target', currentTranslation.targetLang)}
+                  onClick={() => tts.speakText(currentTranslation.translatedText, 'target', currentTranslation.targetLanguage)}
                   disabled={!currentTranslation.translatedText}
                   title={tts.ttsStatus === TTS_STATUS.SPEAKING && tts.ttsTarget === 'target' ? t('translation.stopSpeak', '停止朗读') : t('translation.speakTarget', '朗读译文')}
                 >
@@ -608,7 +608,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
         onStyleRefChange={saveModal.setSaveAsStyleRef}
         onAnalyze={saveModal.analyzeContent}
         onSave={saveModal.executeSave}
-        onClose={() => saveModal.setShowSaveModal(false)}
+        onClose={saveModal.closeSaveModal}
       />
     </div>
   );
@@ -621,17 +621,18 @@ const GlossaryNotice = ({ count, first, replacements, onUndo, t }) => {
   const [expanded, setExpanded] = useState(false);
   const [hovered, setHovered] = useState(false);
 
+  // The render slot is keyless and stays truthy across translations, so new
+  // replacements arrive on this same mounted instance — re-arm per batch.
   useEffect(() => {
-    const timer = setTimeout(() => setVisible(false), 5000);
-    return () => clearTimeout(timer);
-  }, []);
+    setVisible(true);
+    setExpanded(false);
+  }, [replacements]);
 
   useEffect(() => {
-    if (hovered) return;
-    if (!visible) return;
+    if (hovered || !visible) return;
     const timer = setTimeout(() => setVisible(false), 5000);
     return () => clearTimeout(timer);
-  }, [hovered, visible]);
+  }, [hovered, visible, replacements]);
 
   if (!visible) return null;
 

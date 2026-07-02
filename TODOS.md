@@ -89,11 +89,11 @@ Copilot 在 v0.2.4 PR 审查发现的既有问题。`translateText` 内部硬编
 
 v0.2.5 Phase T 装通 eslint 9 后跑 `npm run lint` 出 539 warnings + 21 pre-existing errors（已在 eslint.config.js per-file 降级兜底）。历史累积，需要逐个清：
 - `src/i18n/locales/{en,zh}.js`: 重复 key (selectStyle / notify) — 后定义静默覆盖前定义（docParser 对已在 0.2.9 文档翻译体检中合并）
-- `src/App.jsx`: 8 个 `react-hooks/rules-of-hooks` errors — hook 在 early return 后调
+- ~~`src/App.jsx`: 9 个 `react-hooks/rules-of-hooks`（实测 9 非 8）~~ 0.2.9 主面板体检已根修：拆掉包裹全部 hooks 的 try/catch（ErrorBoundary 在 main.jsx 已有），per-file 豁免同步删除
 - `src/utils/logger.js`: `??` 左侧 constant 是 dead code
-- eslint 未启用 `react/jsx-uses-vars`，JSX 引用的组件/图标全报 no-unused-vars 误报（0.2.9 审计时确认）
+- eslint 未启用 `react/jsx-uses-vars`，JSX 引用的组件/图标全报 no-unused-vars 误报（0.2.9 审计时确认，主面板体检批次⑤处理）
 
-清完后删 eslint.config.js 里的 per-file override，恢复全局严格。
+App.jsx 的 per-file override 已删（0.2.9）；其余清完后恢复全局严格。
 
 ### Provider 层存量硬编码中文字符串迁 i18n
 

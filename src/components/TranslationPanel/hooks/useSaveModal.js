@@ -1,6 +1,6 @@
 // Save-to-favorites modal: AI-generated tags/summary + persist action.
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import translationService from '../../../services/translation.js';
 import useTranslationStore from '../../../stores/translation-store';
 import { getAnalysisPrompts, parseJsonReply } from '../../../utils/ai-prompts.js';
@@ -17,7 +17,12 @@ export default function useSaveModal(currentTranslation, addToFavorites, notify,
   const [editableTags, setEditableTags] = useState('');
   const [editableSummary, setEditableSummary] = useState('');
 
+  // Generation counter: a slow LLM reply from a closed/superseded modal must
+  // not overwrite the fields of a newer analysis (and then get saved).
+  const analyzeReqRef = useRef(0);
+
   const analyzeContent = useCallback(async () => {
+    const reqId = ++analyzeReqRef.current;
     setIsAnalyzing(true);
 
     try {
@@ -31,6 +36,7 @@ export default function useSaveModal(currentTranslation, addToFavorites, notify,
         ],
         useTranslationStore.getState().getPrivacyOptions()
       );
+      if (reqId !== analyzeReqRef.current) return;
 
       if (result.success && result.content) {
         let parsed;
@@ -55,13 +61,14 @@ export default function useSaveModal(currentTranslation, addToFavorites, notify,
       }
     } catch (error) {
       logger.error('AI analysis:', error);
+      if (reqId !== analyzeReqRef.current) return;
       setAiSuggestions({ tags: [], summary: '', isStyleSuggested: false });
       setEditableTags('');
       setEditableSummary('');
     } finally {
-      setIsAnalyzing(false);
+      if (reqId === analyzeReqRef.current) setIsAnalyzing(false);
     }
-  }, [currentTranslation]);
+  }, [currentTranslation, t]);
 
   const openSaveModal = useCallback(() => {
     if (!currentTranslation.translatedText) {
@@ -77,6 +84,12 @@ export default function useSaveModal(currentTranslation, addToFavorites, notify,
     // Kick off analysis as soon as the modal opens so the user doesn't wait
     analyzeContent();
   }, [currentTranslation.translatedText, analyzeContent, notify, t]);
+
+  const closeSaveModal = useCallback(() => {
+    // Invalidate any in-flight analysis so it can't repopulate after close
+    analyzeReqRef.current++;
+    setShowSaveModal(false);
+  }, []);
 
   const executeSave = useCallback(() => {
     // Accept both ASCII and fullwidth Chinese commas as separators
@@ -103,12 +116,12 @@ export default function useSaveModal(currentTranslation, addToFavorites, notify,
       saveAsStyleRef ? t('translation.savedToStyle') : t('translation.saved'),
       'success'
     );
-    setShowSaveModal(false);
-  }, [editableTags, editableSummary, saveAsStyleRef, currentTranslation, addToFavorites, notify, t]);
+    closeSaveModal();
+  }, [editableTags, editableSummary, saveAsStyleRef, currentTranslation, addToFavorites, notify, t, closeSaveModal]);
 
   return {
     showSaveModal,
-    setShowSaveModal,
+    closeSaveModal,
     saveAsStyleRef,
     setSaveAsStyleRef,
     isAnalyzing,
