@@ -293,7 +293,10 @@ function createSelectionWindow() {
   selectionWindow._windowId = windowId;
   selectionWindow._isFrozen = false;
 
-  selectionWindow.setAlwaysOnTop(true, 'screen-saver');
+  // 'floating' (not 'screen-saver'): a frozen card can live for a long time, and
+  // screen-saver level would sit above the user's own pinned tools. Same rule as
+  // the floating-window overlay.
+  selectionWindow.setAlwaysOnTop(true, 'floating');
   selectionWindow.setIgnoreMouseEvents(false);
 
   if (isDev) {

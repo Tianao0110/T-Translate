@@ -92,18 +92,20 @@ function register(ctx) {
       const errorText = data.error || '';
       const isZh = targetLang.startsWith('zh');
 
+      // main-i18n t(key, params): the 2nd arg is interpolation params, not a
+      // fallback — these keys exist in main-i18n, so pass the key alone.
       let displayError;
       if (errorText.includes('vision') || errorText.includes('not support') || errorText.includes('不支持')) {
-        displayError = t('screenshot.visionNotSupported', '当前模型不支持图片识别，请加载视觉模型（如 Qwen-VL、LLaVA）');
+        displayError = t('screenshot.visionNotSupported');
       } else if (errorText.includes('timeout') || errorText.includes('超时')) {
-        displayError = t('screenshot.ocrTimeout', 'OCR 识别超时，请检查模型是否正常运行');
+        displayError = t('screenshot.ocrTimeout');
       } else {
-        displayError = t('screenshot.ocrFailed', 'OCR 识别失败') + '：' + errorText;
+        displayError = t('screenshot.ocrFailed') + '：' + errorText;
       }
 
       if (managers.showSelectionResult) {
         managers.showSelectionResult({
-          sourceText: t('screenshot.ocrError', 'OCR 错误'),
+          sourceText: t('screenshot.ocrError'),
           translatedText: displayError,
           isOcrError: true,  // SelectionTranslator shows "Go to OCR Settings" button when set
         });

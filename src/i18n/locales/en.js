@@ -280,7 +280,7 @@ const en = {
     charLimit: "Character Limit", minChars: "Min", maxChars: "Max", charLimitHint: "Content below min or above max characters won't trigger translation",
     instructions: "Instructions", workflow: "Workflow",
     step1: "Select text with mouse", step2: "Translate button appears nearby", step3: "Click button to translate", step4: "Result card shows after translation",
-    quickActions: "Quick Actions", action1: "Drag title bar to move", action2: "Resize from bottom-right corner", action3: "Click 'Source' to show comparison", action4: "Click 'Copy' or select text to copy", action5: "Press ESC or right-click to close",
+    quickActions: "Quick Actions", action1: "Drag title bar to move", action2: "Resize from bottom-right corner", action3: "Click 'Source' to show comparison", action4: "Click 'Copy' or select text to copy", action5: "Right-click or click ✕ to close",
     // Selection translator component strings
     translateFailed: "Translation failed",
     noText: "No text captured — try screenshot translation",
@@ -295,8 +295,7 @@ const en = {
     frozenHint: "Pinned - right-click to close",
     freezeLimitHint: "Pinned-window limit reached (max 8)",
     showSource: "Show source",
-    copyTarget: "Copy translation",
-    closeEsc: "Close (ESC)"
+    copyTarget: "Copy translation"
   },
   settings: {
     title: "Settings",

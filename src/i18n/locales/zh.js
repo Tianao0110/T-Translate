@@ -280,7 +280,7 @@ const zh = {
     charLimit: "字符数限制", minChars: "最小", maxChars: "最大", charLimitHint: "少于最小或超过最大字符数的选中内容不会触发翻译",
     instructions: "使用说明", workflow: "划词翻译流程",
     step1: "用鼠标选中需要翻译的文字", step2: "松开鼠标后，旁边出现翻译按钮", step3: "点击按钮开始翻译", step4: "翻译完成后显示结果卡片",
-    quickActions: "快捷操作", action1: "拖动标题栏移动窗口", action2: "右下角调整大小", action3: "点击「原文」显示原文对照", action4: "点击「复制」或直接选中文字复制", action5: "按 ESC 或右键关闭",
+    quickActions: "快捷操作", action1: "拖动标题栏移动窗口", action2: "右下角调整大小", action3: "点击「原文」显示原文对照", action4: "点击「复制」或直接选中文字复制", action5: "右键或点 ✕ 关闭",
     // Selection translator strings
     translateFailed: "翻译失败",
     noText: "未获取到文字，可尝试截图翻译",
@@ -295,8 +295,7 @@ const zh = {
     frozenHint: "已固定 - 右键点击关闭",
     freezeLimitHint: "固定窗口已达上限（最多 8 个）",
     showSource: "显示原文",
-    copyTarget: "复制译文",
-    closeEsc: "关闭 (ESC)"
+    copyTarget: "复制译文"
   },
   settings: {
     title: "设置",

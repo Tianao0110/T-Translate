@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Pin, Volume2, VolumeX, X } from 'lucide-react';
 import translationService from '../../services/translation.js';
 import ttsManager, { TTS_STATUS } from '../../services/tts/index.js';
 import createLogger from '../../utils/logger.js';
@@ -68,7 +69,7 @@ function validateSelectionText(text, settings, t) {
 }
 
 const SelectionTranslator = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [mode, setMode] = useState('idle');
   const [sourceText, setSourceText] = useState('');
   const [translatedText, setTranslatedText] = useState('');
@@ -119,6 +120,12 @@ const SelectionTranslator = () => {
   // flip). History metadata and TTS read this instead of the configured target,
   // which would otherwise mislabel/mis-voice flipped results.
   const lastResolvedLangsRef = useRef({ sourceLanguage: 'auto', targetLanguage: 'zh' });
+
+  // Keep the document language in sync with the UI language (the static HTML
+  // hardcoded a single lang; this popup is bilingual).
+  useEffect(() => {
+    if (i18n?.language) document.documentElement.lang = i18n.language;
+  }, [i18n?.language]);
 
   useEffect(() => {
     ttsManager.init().catch(e => {
@@ -396,20 +403,15 @@ const SelectionTranslator = () => {
       if (triggerReadyTimerRef.current) clearTimeout(triggerReadyTimerRef.current);
     });
 
-    const handleKey = (e) => {
-      if (e.code === 'Escape') {
-        setMode('idle');
-        window.electron?.selection?.hide?.();
-      }
-    };
-    window.addEventListener('keydown', handleKey);
+    // No keydown/ESC handler: the window is focusable:false (deliberate — it
+    // must never steal focus), so it can't receive keyboard events. Closing is
+    // via right-click, the ✕ button, click-outside, or auto-hide.
 
     return () => {
       if (removeShowListener) removeShowListener();
       if (removeShowResultListener) removeShowResultListener();
       if (removeShowDirectListener) removeShowDirectListener();
       if (removeHideListener) removeHideListener();
-      window.removeEventListener('keydown', handleKey);
       if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
       if (triggerReadyTimerRef.current) clearTimeout(triggerReadyTimerRef.current);
     };
@@ -811,7 +813,9 @@ const SelectionTranslator = () => {
         >
           <div className="sel-toolbar">
             {isFrozen && (
-              <span className="sel-frozen-badge" title={t('selection.frozenHint', '已固定 - 右键点击关闭')}>📌</span>
+              <span className="sel-frozen-badge" title={t('selection.frozenHint', '已固定 - 右键点击关闭')}>
+                <Pin size={11} />
+              </span>
             )}
             <button className={`sel-btn ${showSource ? 'active' : ''}`} onClick={toggleSource} title={t('selection.showSource', '显示原文')}>
               {t('translation.source', '原文')}
@@ -825,10 +829,12 @@ const SelectionTranslator = () => {
               disabled={!translatedText}
               title={ttsStatus === TTS_STATUS.SPEAKING ? t('translation.stopSpeak', '停止朗读') : t('translation.speak', '朗读')}
             >
-              {ttsStatus === TTS_STATUS.SPEAKING ? '🔇' : '🔊'}
+              {ttsStatus === TTS_STATUS.SPEAKING ? <VolumeX size={13} /> : <Volume2 size={13} />}
             </button>
             <div className="sel-spacer" />
-            <button className="sel-btn sel-btn-close" onClick={handleClose} title={t('selection.closeEsc', '关闭 (ESC)')}>✕</button>
+            <button className="sel-btn sel-btn-close" onClick={handleClose} title={t('selection.close', '关闭')}>
+              <X size={13} />
+            </button>
           </div>
 
           <div className="sel-content" ref={contentRef}>

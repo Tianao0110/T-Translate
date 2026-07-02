@@ -15,7 +15,7 @@ html, body, #root {
    🔧 关键修复：根元素完全透明
    ========================================== */
 .sel-root {
-  width: 100%; 
+  width: 100%;
   height: 100%;
   padding: 4px;
   box-sizing: border-box;
@@ -26,7 +26,15 @@ html, body, #root {
   display: flex;
   align-items: center;
   justify-content: center;
+  /* Accent follows the theme so the trigger dot isn't a fixed blue on every
+     theme (jarring on 'fresh'). Only 3 themes exist; this window loads no App.css
+     token sheet, so the accents are defined locally per data-theme. */
+  --sel-accent: #3b82f6;
+  --sel-accent-hi: #60a5fa;
 }
+
+.sel-root[data-theme="dark"]  { --sel-accent: #60a5fa; --sel-accent-hi: #3b82f6; }
+.sel-root[data-theme="fresh"] { --sel-accent: #8b5cf6; --sel-accent-hi: #f472b6; }
 
 /* ==========================================
    触发圆点 - 保留原样式
@@ -44,9 +52,9 @@ html, body, #root {
   align-items: center;
   justify-content: center;
   cursor: default;
-  background: linear-gradient(135deg, #60a5fa, #3b82f6);
+  background: linear-gradient(135deg, var(--sel-accent-hi), var(--sel-accent));
   border-radius: 50%;
-  box-shadow: 0 1px 3px rgba(59, 130, 246, 0.35);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--sel-accent) 35%, transparent);
   animation: triggerIn 0.15s ease-out;
   transition: transform 0.15s, opacity 0.15s, filter 0.15s;
   opacity: 0.9;
@@ -125,8 +133,8 @@ html, body, #root {
 .sel-spinner {
   width: 10px;
   height: 10px;
-  border: 1.5px solid rgba(102, 126, 234, 0.2);
-  border-top-color: #667eea;
+  border: 1.5px solid color-mix(in srgb, var(--sel-accent) 20%, transparent);
+  border-top-color: var(--sel-accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -219,10 +227,10 @@ html, body, #root {
 }
 
 .sel-btn.active {
-  background: #667eea;
+  background: var(--sel-accent);
   color: white;
-  border-color: #667eea;
-  box-shadow: 0 1px 3px rgba(102, 126, 234, 0.3);
+  border-color: var(--sel-accent);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--sel-accent) 30%, transparent);
 }
 
 .sel-btn.success {

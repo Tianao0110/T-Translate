@@ -1,8 +1,9 @@
 // Selection-translate settings section.
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
 import createLogger from '../../../utils/logger.js';
+import { useConfirm } from '../../shared/ConfirmDialog.jsx';
 
 const logger = createLogger('Settings:Selection');
 
@@ -12,7 +13,7 @@ const SelectionSection = ({
   notify
 }) => {
   const { t } = useTranslation();
-  const [showStickyWarning, setShowStickyWarning] = useState(false);
+  const [confirm, confirmDialog] = useConfirm();
 
   const handleToggleSelection = async () => {
     try {
@@ -28,9 +29,9 @@ const SelectionSection = ({
     }
   };
 
-  // First-time opt-in shows the warning modal (CapsLock-direct can fire on
-  // accidental key presses). After confirm, subsequent toggles are silent.
-  const handleToggleSticky = () => {
+  // First-time opt-in shows a warning (CapsLock-direct can fire on accidental
+  // key presses). After confirm, subsequent toggles are silent.
+  const handleToggleSticky = async () => {
     const current = !!settings.selection.stickyViaCapsLock;
     if (current) {
       updateSetting('selection', 'stickyViaCapsLock', false);
@@ -38,19 +39,16 @@ const SelectionSection = ({
     }
     if (settings.selection.stickyWarningShown) {
       updateSetting('selection', 'stickyViaCapsLock', true);
-    } else {
-      setShowStickyWarning(true);
+      return;
     }
-  };
-
-  const confirmStickyWarning = () => {
-    updateSetting('selection', 'stickyViaCapsLock', true);
-    updateSetting('selection', 'stickyWarningShown', true);
-    setShowStickyWarning(false);
-  };
-
-  const cancelStickyWarning = () => {
-    setShowStickyWarning(false);
+    const ok = await confirm(
+      `${t('selection.stickyWarningTitle')}\n\n${t('selection.stickyWarningBody')}`,
+      { danger: false }
+    );
+    if (ok) {
+      updateSetting('selection', 'stickyViaCapsLock', true);
+      updateSetting('selection', 'stickyWarningShown', true);
+    }
   };
 
   return (
@@ -234,28 +232,7 @@ const SelectionSection = ({
         </div>
       </div>
 
-      {showStickyWarning && (
-        <div className="update-modal-overlay" onClick={cancelStickyWarning}>
-          <div className="update-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="update-modal-header">
-              <h3>{t('selection.stickyWarningTitle')}</h3>
-            </div>
-            <div className="update-modal-body">
-              <p style={{ lineHeight: 1.6, margin: 0, whiteSpace: 'pre-line' }}>
-                {t('selection.stickyWarningBody')}
-              </p>
-            </div>
-            <div className="update-modal-footer">
-              <button className="btn-secondary" onClick={cancelStickyWarning}>
-                {t('common.cancel')}
-              </button>
-              <button className="btn-primary" onClick={confirmStickyWarning}>
-                {t('selection.stickyWarningConfirm')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {confirmDialog}
     </div>
   );
 };
