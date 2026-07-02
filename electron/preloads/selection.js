@@ -51,6 +51,12 @@ contextBridge.exposeInMainWorld("electron", {
     writeText: (text) => ipcRenderer.invoke("clipboard:write-text", text),
   },
 
+  // Privacy mode must be visible here: translate() filters providers and gates
+  // the disk cache by it (same contract as the floating window's preload).
+  privacy: {
+    getMode: () => ipcRenderer.invoke("privacy:getMode"),
+  },
+
   // Store access — translation service needs to read config.
   store: {
     get: (key) => ipcRenderer.invoke("store-get", key),

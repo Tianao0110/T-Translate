@@ -78,7 +78,6 @@ const SelectionTranslator = () => {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [translation, setTranslation] = useState(DEFAULT_TRANSLATION);
   const [triggerReady, setTriggerReady] = useState(false);
-  const [privacyMode, setPrivacyMode] = useState(PRIVACY_MODES.STANDARD);
   const [isFrozen, setIsFrozen] = useState(false);
   const [windowId, setWindowId] = useState(null);
   const [initialBounds, setInitialBounds] = useState(null);
@@ -124,20 +123,6 @@ const SelectionTranslator = () => {
       });
     }
   }, [translatedText, translation.targetLanguage, ttsStatus]);
-
-  useEffect(() => {
-    const getPrivacyMode = async () => {
-      try {
-        if (window.electron?.privacy?.getMode) {
-          const mode = await window.electron.privacy.getMode();
-          setPrivacyMode(mode);
-        }
-      } catch (e) {
-        logger.debug('Failed to get privacy mode:', e);
-      }
-    };
-    getPrivacyMode();
-  }, []);
 
   useEffect(() => {
     const removeShowListener = window.electron?.selection?.onShowTrigger?.((data) => {
@@ -513,11 +498,21 @@ const SelectionTranslator = () => {
       logger.debug(`Source already in target language, flipping to ${targetLang}`);
     }
 
+    // Fetched per call, not at mount: this window is persistent (hide, not
+    // close), so a cached mode would go stale when the user switches it.
+    let privacyMode = PRIVACY_MODES.STANDARD;
+    try {
+      privacyMode = (await window.electron?.privacy?.getMode?.()) || PRIVACY_MODES.STANDARD;
+    } catch (e) {
+      logger.debug('Failed to get privacy mode, assuming standard:', e);
+    }
+
     try {
       const result = await translationService.translate(text, {
         sourceLang: sourceLang,
         targetLang: targetLang,
         privacyMode: privacyMode,
+        useCache: privacyMode !== PRIVACY_MODES.SECURE,
       });
 
       if (!result.success) {
