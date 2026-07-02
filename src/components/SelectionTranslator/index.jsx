@@ -97,6 +97,17 @@ const SelectionTranslator = () => {
   // Phase B pass-through: when main grabbed text in Layer 3, payload carries it.
   // handleTriggerClick prefers this over a second GET_TEXT IPC roundtrip.
   const prefetchedTextRef = useRef(null);
+  // Bumped by resetSession on every new session. Async translate paths capture
+  // it and bail after their await if a newer session started, so a stale result
+  // never overwrites a fresh trigger.
+  const generationRef = useRef(0);
+  // Work area of the display the selection happened on (from the main payload).
+  // Placement clamps to THIS monitor's bounds+origin, not window.screen (which
+  // is only the current display and carries no global offset).
+  const screenBoundsRef = useRef(null);
+  // True while adjustWindowToContent is moving the window programmatically, so
+  // the drag-to-freeze poll doesn't mistake our own setBounds for a user drag.
+  const isAdjustingRef = useRef(false);
 
   useEffect(() => {
     ttsManager.init().catch(e => {
@@ -124,6 +135,20 @@ const SelectionTranslator = () => {
     }
   }, [translatedText, translation.targetLanguage, ttsStatus]);
 
+  // Central per-session reset. The window is reused (hidden, not closed), so
+  // every entry point must scrub the previous session or its state leaks across
+  // selections (stale OCR-error button, mouse position, in-flight translation,
+  // still-speaking TTS). Bumps the generation so pending async work self-cancels.
+  const resetSession = () => {
+    generationRef.current += 1;
+    ttsManager.stop();
+    if (autoHideTimerRef.current) { clearTimeout(autoHideTimerRef.current); autoHideTimerRef.current = null; }
+    if (triggerReadyTimerRef.current) { clearTimeout(triggerReadyTimerRef.current); triggerReadyTimerRef.current = null; }
+    setError('');
+    setCopied(false);
+    setIsOcrError(false);
+  };
+
   useEffect(() => {
     const removeShowListener = window.electron?.selection?.onShowTrigger?.((data) => {
       // Frozen windows are detached overlays; new triggers spawn fresh windows instead
@@ -132,11 +157,11 @@ const SelectionTranslator = () => {
         return;
       }
 
-      if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
-      if (triggerReadyTimerRef.current) clearTimeout(triggerReadyTimerRef.current);
+      resetSession();
 
       setMousePos({ x: data.mouseX, y: data.mouseY });
       setRect(data.rect);
+      screenBoundsRef.current = data.screenBounds || null;
 
       if (data.theme) setTheme(data.theme);
 
@@ -149,10 +174,8 @@ const SelectionTranslator = () => {
       setShowSource(newSettings.showSourceByDefault);
 
       setMode('trigger');
-      setError('');
       setSourceText('');
       setTranslatedText('');
-      setCopied(false);
       sizedRef.current = false;
       setIsFrozen(false);
       setInitialBounds(null);
@@ -178,8 +201,10 @@ const SelectionTranslator = () => {
     //   { text }                      -> received OCR text, run translation here
     //   { sourceText, translatedText }-> pre-translated, just display
     const removeShowResultListener = window.electron?.selection?.onShowResult?.(async (data) => {
-      if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
-      if (triggerReadyTimerRef.current) clearTimeout(triggerReadyTimerRef.current);
+      resetSession();
+      // Screenshot path has no cursor anchor — (0,0) routes adjustWindowToContent
+      // through the startDrag branch (keep the window where main positioned it).
+      setMousePos({ x: 0, y: 0 });
 
       if (data.theme) setTheme(data.theme);
 
@@ -190,8 +215,6 @@ const SelectionTranslator = () => {
         logger.debug('Showing loading state');
         setSourceText('');
         setTranslatedText('');
-        setError('');
-        setCopied(false);
         sizedRef.current = false;
         setIsFrozen(false);
         setInitialBounds(null);
@@ -201,13 +224,12 @@ const SelectionTranslator = () => {
 
       if (data.text && !data.translatedText) {
         logger.debug('Received OCR text, translating...');
+        const gen = generationRef.current;
         if (data.targetLanguage) {
           setTranslation(prev => ({ ...prev, targetLanguage: data.targetLanguage }));
         }
         setSourceText(data.text);
         setShowSource(newSettings.showSourceByDefault);
-        setError('');
-        setCopied(false);
         sizedRef.current = false;
         setIsFrozen(false);
         setInitialBounds(null);
@@ -218,6 +240,7 @@ const SelectionTranslator = () => {
           const overrideTargetLang = data.targetLanguage || data.translation?.targetLanguage || null;
           const overrideSourceLang = data.sourceLanguage || data.translation?.sourceLanguage || null;
           const translationResult = await translateTextRef.current(data.text, 0, overrideTargetLang, overrideSourceLang);
+          if (gen !== generationRef.current) return; // superseded by a newer session
           setTranslatedText(translationResult);
           setError('');
           setMode('overlay');
@@ -231,6 +254,7 @@ const SelectionTranslator = () => {
             });
           }
         } catch (err) {
+          if (gen !== generationRef.current) return;
           setError(err.message || t('selection.translateFailed', '翻译失败'));
           setTranslatedText('');
           setMode('overlay');
@@ -247,9 +271,7 @@ const SelectionTranslator = () => {
         setShowSource(true);
         setSourceText(data.sourceText);
         setTranslatedText(data.translatedText);
-        setError('');
-        setIsOcrError(data.isOcrError === true);
-        setCopied(false);
+        setIsOcrError(data.isOcrError === true); // override resetSession's clear
         setIsFrozen(false);
         // Don't reset sizedRef/initialBounds — caller already positioned us
         setMode('overlay');
@@ -268,8 +290,10 @@ const SelectionTranslator = () => {
     const removeShowDirectListener = window.electron?.selection?.onShowDirect?.(async (data) => {
       logger.debug('SHOW_DIRECT received', { textLength: data?.text?.length });
 
-      if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
-      if (triggerReadyTimerRef.current) clearTimeout(triggerReadyTimerRef.current);
+      resetSession();
+      // Direct path anchors at the selection point main captured (payload coords).
+      setMousePos({ x: data.mouseX || 0, y: data.mouseY || 0 });
+      screenBoundsRef.current = data.screenBounds || null;
 
       if (data.theme) setTheme(data.theme);
       const newSettings = { ...DEFAULT_SETTINGS, ...data.settings };
@@ -280,13 +304,12 @@ const SelectionTranslator = () => {
 
       setSourceText('');
       setTranslatedText('');
-      setError('');
-      setCopied(false);
       sizedRef.current = false;
       setIsFrozen(false);
       setInitialBounds(null);
       setMode('loading');
 
+      const gen = generationRef.current;
       try {
         const text = (data.text || '').trim();
         validateSelectionText(text, newSettings, t);
@@ -296,6 +319,7 @@ const SelectionTranslator = () => {
         const overrideTargetLang = newTranslation.targetLanguage || null;
         const overrideSourceLang = newTranslation.sourceLanguage || null;
         const translationResult = await translateTextRef.current(text, 0, overrideTargetLang, overrideSourceLang);
+        if (gen !== generationRef.current) return; // superseded by a newer session
         setTranslatedText(translationResult);
         setError('');
         setMode('overlay');
@@ -310,6 +334,7 @@ const SelectionTranslator = () => {
           });
         }
       } catch (err) {
+        if (gen !== generationRef.current) return;
         logger.error('SHOW_DIRECT failed:', err);
         setError(err.message || t('selection.translateFailed', '翻译失败'));
         setTranslatedText('');
@@ -322,6 +347,7 @@ const SelectionTranslator = () => {
         logger.debug('Frozen window ignoring hide event');
         return;
       }
+      ttsManager.stop();
       setMode('idle');
       if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
       if (triggerReadyTimerRef.current) clearTimeout(triggerReadyTimerRef.current);
@@ -354,6 +380,8 @@ const SelectionTranslator = () => {
 
     if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
 
+    // Snapshot the session so a new trigger arriving mid-fetch discards this result.
+    const gen = generationRef.current;
     setMode('loading');
 
     try {
@@ -365,6 +393,7 @@ const SelectionTranslator = () => {
         const result = await window.electron?.selection?.getText?.(rect);
         text = result?.text;
       }
+      if (gen !== generationRef.current) return; // superseded by a newer session
       if (!text) throw new Error(t('selection.noText', '未获取到文字'));
       text = text.trim();
 
@@ -372,6 +401,7 @@ const SelectionTranslator = () => {
 
       setSourceText(text);
       const translationResult = await translateText(text);
+      if (gen !== generationRef.current) return;
       setTranslatedText(translationResult);
       setError('');
       setMode('overlay');
@@ -385,6 +415,7 @@ const SelectionTranslator = () => {
         });
       }
     } catch (err) {
+      if (gen !== generationRef.current) return;
       setError(err.message || t('selection.translateFailed', '翻译失败'));
       setTranslatedText('');
       setMode('overlay');
@@ -401,12 +432,20 @@ const SelectionTranslator = () => {
     // still waiting on its reflow timeout.
     const myToken = ++positionTokenRef.current;
 
+    // Suppress the drag-to-freeze poll while we move the window ourselves.
+    isAdjustingRef.current = true;
+
     const maxWidth = 400, minWidth = 160;
     const maxHeight = 350, minHeight = 65;
     const toolbarHeight = 36;
 
-    const sw = window.screen?.availWidth || 1920;
-    const sh = window.screen?.availHeight || 1080;
+    // Clamp to the display the selection was on (origin-aware), not window.screen
+    // — which is only the current monitor and drops multi-display offsets.
+    const sb = screenBoundsRef.current;
+    const originX = sb ? sb.x : 0;
+    const originY = sb ? sb.y : 0;
+    const sw = sb ? sb.width : (window.screen?.availWidth || 1920);
+    const sh = sb ? sb.height : (window.screen?.availHeight || 1080);
 
     const hasValidMousePos = mousePos.x !== 0 || mousePos.y !== 0;
 
@@ -430,8 +469,8 @@ const SelectionTranslator = () => {
     let anchorX, topY;
     if (hasValidMousePos) {
       anchorX = mousePos.x - width / 2;
-      if (anchorX < 10) anchorX = 10;
-      if (anchorX + width > sw - 10) anchorX = sw - width - 10;
+      if (anchorX < originX + 10) anchorX = originX + 10;
+      if (anchorX + width > originX + sw - 10) anchorX = originX + sw - width - 10;
       anchorX = Math.round(anchorX);
       topY = Math.round(mousePos.y + 20);
     } else {
@@ -460,13 +499,19 @@ const SelectionTranslator = () => {
 
     // Final pass: identical X/width, refine Y only.
     let y = topY;
-    if (hasValidMousePos && y + height > sh - 10) y = mousePos.y - height - 10;
-    if (y < 10) y = 10;
+    if (hasValidMousePos && y + height > originY + sh - 10) y = mousePos.y - height - 10;
+    if (y < originY + 10) y = originY + 10;
 
     window.electron?.selection?.setBounds?.({
       x: anchorX, y: Math.round(y),
       width, height: Math.round(height)
     });
+
+    // Let the bounds settle, then re-enable drag detection with the new position
+    // as its baseline (see the drag poll's isAdjustingRef handling).
+    setTimeout(() => {
+      if (positionTokenRef.current === myToken) isAdjustingRef.current = false;
+    }, 150);
   };
 
   useEffect(() => {
@@ -569,6 +614,8 @@ const SelectionTranslator = () => {
   const handleClose = async (e) => {
     if (e) e.preventDefault();
 
+    ttsManager.stop();
+
     // Frozen windows are tracked by ID in main; use the dedicated close channel
     if (isFrozen && windowId) {
       logger.debug(`Closing frozen window ${windowId}`);
@@ -587,6 +634,7 @@ const SelectionTranslator = () => {
       logger.debug('Window is pinned, skip auto-hide');
       return;
     }
+    ttsManager.stop();
     setMode('idle');
     window.electron?.selection?.hide?.();
   };
@@ -615,6 +663,14 @@ const SelectionTranslator = () => {
       try {
         const currentBounds = await window.electron?.selection?.startDrag?.();
         if (!currentBounds) return;
+
+        // While adjustWindowToContent is moving the window, keep re-baselining so
+        // its programmatic setBounds never reads as a user drag (which would
+        // freeze a card the moment its content resized).
+        if (isAdjustingRef.current) {
+          lastCheckBounds = currentBounds;
+          return;
+        }
 
         if (!lastCheckBounds) {
           lastCheckBounds = currentBounds;

@@ -198,6 +198,10 @@ async function showSelectionTrigger(mouseX, mouseY, rect, prefetchedText = null)
       mouseX,
       mouseY,
       rect,
+      // Work area of the display the selection happened on, so the renderer
+      // clamps card placement to the RIGHT monitor (window.screen is only the
+      // current display and carries no global origin).
+      screenBounds: { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height },
       theme: interfaceSettings.theme || 'light',
       settings: {
         triggerTimeout: selectionSettings.triggerTimeout || 4000,
@@ -290,6 +294,11 @@ async function handleHotkeyDirectPath(x, y, rect) {
   const sendData = () => {
     win.webContents.send(CHANNELS.SELECTION.SHOW_DIRECT, {
       text: text.trim(),
+      // Anchor + display work area so the card lands at the selection point on
+      // the correct monitor (P1-6 / P1-8) rather than the last trigger's spot.
+      mouseX: x,
+      mouseY: y,
+      screenBounds: { x: displayBounds.x, y: displayBounds.y, width: displayBounds.width, height: displayBounds.height },
       theme: interfaceSettings.theme || 'light',
       settings: {
         triggerTimeout: selectionSettings.triggerTimeout || 4000,
