@@ -44,6 +44,11 @@ const CONFIG = {
   DOUBLE_CLICK_TIME: 400,     // Multi-click time window (ms)
   DOUBLE_CLICK_DISTANCE: 15,  // Multi-click distance threshold (px)
 
+  // Sticky-direct: minimum drag before the CapsLock path fires. A pure click
+  // (zero drag) must NOT trigger the direct Ctrl+C injection — in a terminal
+  // with no selection that Ctrl+C is a SIGINT that kills the running process.
+  STICKY_MIN_DISTANCE: 8,
+
   // Retreat (LIKELY → POSSIBLE rollback)
   GRACE_PERIOD: 120,          // No retreat checks during this window after entering LIKELY (ms)
   RETREAT_ANGLE: 60,          // Min direction-change angle counted as a retreat sample (deg)
@@ -227,6 +232,11 @@ class SelectionStateMachine {
       // Caller skips the trigger icon and goes straight to capture+translate.
       // Note: direct beats multi-click — both flags true still uses this branch.
       if (this.isHotkeyTriggered && hotkeyActive) {
+        // Require a real drag: a pure click must not inject Ctrl+C (SIGINT risk).
+        if (this.getTotalDistance() < CONFIG.STICKY_MIN_DISTANCE) {
+          logger.debug('Sticky direct: pure click, no drag — skip (no injection)');
+          return { shouldShow: false };
+        }
         logger.debug('Sticky direct path (skipIcon)');
         return {
           shouldShow: true,
@@ -414,6 +424,14 @@ class SelectionStateMachine {
   // Evaluate LIKELY → POSSIBLE retreat. RETREAT_COUNT consecutive samples with
   // sharp direction change (>RETREAT_ANGLE) rolls the state back.
   evaluateLikely(now) {
+    // Refresh the watchdog on every accepted sample so LIKELY_TIMEOUT means
+    // "2s without movement", not "2s since entering LIKELY" — otherwise a slow
+    // multi-line drag that takes >2s gets killed mid-selection. Hotkey path has
+    // no watchdog (see transitionTo), so leave it alone.
+    if (!this.isHotkeyTriggered) {
+      this.setTimeout(CONFIG.LIKELY_TIMEOUT);
+    }
+
     // No retreat checks during the grace period.
     if (now - this.likelyEnteredAt < CONFIG.GRACE_PERIOD) {
       return;

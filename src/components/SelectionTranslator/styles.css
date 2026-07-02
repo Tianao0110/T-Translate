@@ -68,6 +68,22 @@ html, body, #root {
   transform: scale(0.95);
 }
 
+/* Sticky-direct capture came back empty: red tint + a single shake so the user
+   sees it failed, while the icon stays clickable to retry. */
+.sel-trigger.failed {
+  background: linear-gradient(135deg, #f87171, #ef4444);
+  box-shadow: 0 1px 3px rgba(239, 68, 68, 0.4);
+  animation: triggerShake 0.4s ease;
+}
+
+@keyframes triggerShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-3px); }
+  40% { transform: translateX(3px); }
+  60% { transform: translateX(-2px); }
+  80% { transform: translateX(2px); }
+}
+
 .sel-trigger-text {
   color: white;
   font-size: 10px;

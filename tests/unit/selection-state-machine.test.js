@@ -95,12 +95,21 @@ describe('SelectionStateMachine', () => {
 
   // ===== onMouseUp three branches =====
 
-  it('onMouseUp: hotkeyActive=true + isHotkeyTriggered=true → skipIcon:true', () => {
-    sm.onMouseDown(100, 100, true);  // sticky → LIKELY
-    const result = sm.onMouseUp(100, 100, true);
+  it('onMouseUp: sticky + real drag (hotkey both ends) → skipIcon:true', async () => {
+    sm.onMouseDown(100, 100, true);   // sticky → LIKELY
+    await new Promise(r => setTimeout(r, 30));  // clear the sample throttle
+    sm.onMouseMove(120, 100);         // drag 20px > STICKY_MIN_DISTANCE
+    const result = sm.onMouseUp(120, 100, true);
     expect(result.shouldShow).toBe(true);
     expect(result.skipIcon).toBe(true);
     expect(result.rect).toBeDefined();
+  });
+
+  it('onMouseUp: sticky + pure click (no drag) → shouldShow:false, no Ctrl+C injection', () => {
+    sm.onMouseDown(100, 100, true);   // sticky → LIKELY
+    const result = sm.onMouseUp(100, 100, true);  // released at same spot
+    expect(result.shouldShow).toBe(false);
+    expect(result.skipIcon).toBeUndefined();
   });
 
   it('onMouseUp: CapsLock released mid-drag (hotkey=false) → normal flow, no skipIcon', () => {

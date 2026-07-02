@@ -28,6 +28,21 @@ function debugProbe(stage, data) {
   if (SELECTION_DEBUG) logger.info(`[probe:${stage}]`, JSON.stringify(data));
 }
 
+// Terminal window classes where a blind Ctrl+C is a SIGINT (kills the running
+// process). The sticky-direct path downgrades to the click-to-confirm trigger
+// icon for these instead of auto-injecting.
+const TERMINAL_CLASSES = [
+  'CASCADIA_HOSTING_WINDOW_CLASS', // Windows Terminal
+  'ConsoleWindowClass',            // conhost / cmd / classic console
+  'VirtualConsoleClass',           // some console hosts
+  'mintty',                        // Git Bash / MSYS2
+  'PuTTY',                         // PuTTY
+];
+function isTerminalClass(className) {
+  if (!className) return false;
+  return TERMINAL_CLASSES.some((c) => className.includes(c));
+}
+
 const { createMenu } = require('./managers/menu-manager');
 const { createTray, updateTrayMenu, destroyTray } = require('./managers/tray-manager');
 const windowManager = require('./managers/window-manager');
@@ -143,8 +158,8 @@ async function handleDelayedConfirm(x, y, rect) {
 // (Layer 3 path), pass it through. The renderer stores it in a ref and uses it
 // directly on icon click, skipping the second clipboard fetch (which is the root cause
 // of the "press but no content" issue in complex apps with focus-transfer behavior).
-async function showSelectionTrigger(mouseX, mouseY, rect, prefetchedText = null) {
-  logger.debug(`showSelectionTrigger called (prefetched=${prefetchedText ? prefetchedText.length + ' chars' : 'none'})`);
+async function showSelectionTrigger(mouseX, mouseY, rect, prefetchedText = null, options = {}) {
+  logger.debug(`showSelectionTrigger called (prefetched=${prefetchedText ? prefetchedText.length + ' chars' : 'none'}, failed=${!!options.failed})`);
 
   if (!runtime.selectionEnabled) return;
 
@@ -217,6 +232,9 @@ async function showSelectionTrigger(mouseX, mouseY, rect, prefetchedText = null)
       },
       // v0.2.5 Phase B pass-through — see function docstring.
       text: prefetchedText,
+      // Sticky-direct capture came back empty: render the icon in a failed
+      // state (red + shake); a click retries via GET_TEXT.
+      failed: !!options.failed,
     });
   };
 
@@ -245,9 +263,13 @@ async function handleHotkeyDirectPath(x, y, rect) {
     return;
   }
 
-  const text = await fetchSelectedText();
-  if (!text || !text.trim()) {
-    logger.debug('Hotkey: no text captured, silent fail (no window opened)');
+  // Terminal: never blind-inject Ctrl+C (a no-selection copy is a SIGINT that
+  // kills the running process). Downgrade to the trigger icon so the copy only
+  // happens if the user explicitly clicks it.
+  const { getForegroundClassName } = require('./utils/native-helper');
+  if (isTerminalClass(getForegroundClassName())) {
+    logger.debug('Sticky direct in terminal — downgrading to trigger icon');
+    showSelectionTrigger(x, y, rect);
     return;
   }
 
@@ -290,36 +312,50 @@ async function handleHotkeyDirectPath(x, y, rect) {
     height: winH,
   });
 
-  // SHOW_DIRECT must wait for webContents to be ready, otherwise the message is dropped.
-  const sendData = () => {
-    win.webContents.send(CHANNELS.SELECTION.SHOW_DIRECT, {
-      text: text.trim(),
-      // Anchor + display work area so the card lands at the selection point on
-      // the correct monitor (P1-6 / P1-8) rather than the last trigger's spot.
-      mouseX: x,
-      mouseY: y,
-      screenBounds: { x: displayBounds.x, y: displayBounds.y, width: displayBounds.width, height: displayBounds.height },
-      theme: interfaceSettings.theme || 'light',
-      settings: {
-        triggerTimeout: selectionSettings.triggerTimeout || 4000,
-        showSourceByDefault: selectionSettings.showSourceByDefault || false,
-        autoCloseOnCopy: selectionSettings.autoCloseOnCopy || false,
-        minChars: selectionSettings.minChars || 2,
-        maxChars: selectionSettings.maxChars || 500,
-        windowOpacity: selectionSettings.windowOpacity || 95,
-      },
-      translation: {
-        targetLanguage: currentTargetLang,
-        sourceLanguage: currentSourceLang,
-      },
-    });
-    win.show();
+  const payloadBase = {
+    // Anchor + display work area so the card lands at the selection point on the
+    // correct monitor (P1-6 / P1-8) rather than the last trigger's spot.
+    mouseX: x,
+    mouseY: y,
+    screenBounds: { x: displayBounds.x, y: displayBounds.y, width: displayBounds.width, height: displayBounds.height },
+    theme: interfaceSettings.theme || 'light',
+    settings: {
+      triggerTimeout: selectionSettings.triggerTimeout || 4000,
+      showSourceByDefault: selectionSettings.showSourceByDefault || false,
+      autoCloseOnCopy: selectionSettings.autoCloseOnCopy || false,
+      minChars: selectionSettings.minChars || 2,
+      maxChars: selectionSettings.maxChars || 500,
+      windowOpacity: selectionSettings.windowOpacity || 95,
+    },
+    translation: {
+      targetLanguage: currentTargetLang,
+      sourceLanguage: currentSourceLang,
+    },
   };
 
-  if (win.webContents.isLoading()) {
-    win.webContents.once('did-finish-load', sendData);
+  const whenReady = (fn) => {
+    if (win.isDestroyed()) return;
+    if (win.webContents.isLoading()) win.webContents.once('did-finish-load', fn);
+    else fn();
+  };
+
+  // Show a loading dot right away — capture takes ~0.8s and a silent gap felt broken.
+  whenReady(() => {
+    if (win.isDestroyed()) return;
+    win.webContents.send(CHANNELS.SELECTION.SHOW_DIRECT, { ...payloadBase, phase: 'capturing' });
+    win.show();
+  });
+
+  const text = await fetchSelectedText();
+  if (win.isDestroyed()) return;
+
+  if (text && text.trim()) {
+    whenReady(() => win.webContents.send(CHANNELS.SELECTION.SHOW_DIRECT, { ...payloadBase, phase: 'translate', text: text.trim() }));
   } else {
-    setTimeout(sendData, 50);
+    // Empty capture: don't fail silently. Flip to a clickable "failed" trigger
+    // (red + shake) so the user can retry via the icon, which re-runs GET_TEXT.
+    logger.debug('Hotkey: no text captured, showing failed trigger');
+    showSelectionTrigger(x, y, rect, null, { failed: true });
   }
 }
 
@@ -483,6 +519,13 @@ function startSelectionHook() {
       selectionStateMachine = new SelectionStateMachine();
     }
     selectionStateMachine.reset();
+
+    // uIOhook is a singleton EventEmitter and .stop() does NOT drop listeners.
+    // Clear ours before re-adding so toggling selection on/off can't accumulate
+    // duplicate handlers (which raced each other and broke double-click capture).
+    uIOhook.removeAllListeners('mousedown');
+    uIOhook.removeAllListeners('mousemove');
+    uIOhook.removeAllListeners('mouseup');
 
     // ----- mousedown -----
     uIOhook.on('mousedown', (e) => {
@@ -661,6 +704,11 @@ function stopSelectionHook() {
 
   if (runtime.selectionHook) {
     try {
+      // Drop our handlers too — .stop() only halts the native thread, listeners
+      // persist on the singleton and would double up on the next enable.
+      runtime.selectionHook.removeAllListeners('mousedown');
+      runtime.selectionHook.removeAllListeners('mousemove');
+      runtime.selectionHook.removeAllListeners('mouseup');
       runtime.selectionHook.stop();
       runtime.selectionHook = null;
       logger.info('Selection hook stopped');
@@ -671,7 +719,10 @@ function stopSelectionHook() {
 }
 
 function isClickInOurWindows(x, y) {
-  const windowsToCheck = [windows.main, windows.floatingWindow];
+  // Include the screenshot overlay: while it's up (fullscreen, focused), the
+  // user's rubber-band drag must not drive the selection FSM and inject Ctrl+C
+  // into our own capture surface.
+  const windowsToCheck = [windows.main, windows.floatingWindow, windows.screenshot];
   for (const win of windowsToCheck) {
     if (win && !win.isDestroyed() && win.isVisible()) {
       if (win.isMinimized() || !win.isFocused()) continue;

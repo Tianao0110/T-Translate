@@ -78,6 +78,7 @@ const SelectionTranslator = () => {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [translation, setTranslation] = useState(DEFAULT_TRANSLATION);
   const [triggerReady, setTriggerReady] = useState(false);
+  const [triggerFailed, setTriggerFailed] = useState(false);
   const [isFrozen, setIsFrozen] = useState(false);
   const [windowId, setWindowId] = useState(null);
   const [initialBounds, setInitialBounds] = useState(null);
@@ -148,6 +149,7 @@ const SelectionTranslator = () => {
     setError('');
     setCopied(false);
     setIsOcrError(false);
+    setTriggerFailed(false);
   };
 
   useEffect(() => {
@@ -175,6 +177,7 @@ const SelectionTranslator = () => {
       setShowSource(newSettings.showSourceByDefault);
 
       setMode('trigger');
+      setTriggerFailed(data.failed === true); // sticky-direct empty capture → red+shake
       setSourceText('');
       setTranslatedText('');
       sizedRef.current = false;
@@ -294,7 +297,12 @@ const SelectionTranslator = () => {
     // text directly. Skips the trigger-icon UX (loading -> overlay), but shares
     // settings/validation with the trigger-click path.
     const removeShowDirectListener = window.electron?.selection?.onShowDirect?.(async (data) => {
-      logger.debug('SHOW_DIRECT received', { textLength: data?.text?.length });
+      logger.debug('SHOW_DIRECT received', { phase: data?.phase, textLength: data?.text?.length });
+
+      if (frozenRef.current) {
+        logger.debug('Frozen window ignoring direct event');
+        return;
+      }
 
       resetSession();
       // Direct path anchors at the selection point main captured (payload coords).
@@ -314,6 +322,10 @@ const SelectionTranslator = () => {
       setIsFrozen(false);
       setInitialBounds(null);
       setMode('loading');
+
+      // 'capturing' phase: main is still grabbing the selection — just hold the
+      // loading dot and wait for the follow-up 'translate' message.
+      if (data.phase === 'capturing') return;
 
       const gen = generationRef.current;
       try {
@@ -728,7 +740,11 @@ const SelectionTranslator = () => {
   return (
     <div className="sel-root" data-theme={theme}>
       {mode === 'trigger' && (
-        <div className={`sel-trigger ${triggerReady ? 'ready' : ''}`} onClick={handleTriggerClick}>
+        <div
+          className={`sel-trigger ${triggerReady ? 'ready' : ''} ${triggerFailed ? 'failed' : ''}`}
+          onClick={handleTriggerClick}
+          title={triggerFailed ? t('selection.retryHint', '未取到文字，点击重试') : undefined}
+        >
           <span className="sel-trigger-text">T</span>
         </div>
       )}

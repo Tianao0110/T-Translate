@@ -283,7 +283,8 @@ const zh = {
     quickActions: "快捷操作", action1: "拖动标题栏移动窗口", action2: "右下角调整大小", action3: "点击「原文」显示原文对照", action4: "点击「复制」或直接选中文字复制", action5: "按 ESC 或右键关闭",
     // Selection translator strings
     translateFailed: "翻译失败",
-    noText: "未获取到文字",
+    noText: "未获取到文字，可尝试截图翻译",
+    retryHint: "未取到文字，点击重试",
     emptyContent: "选中内容为空",
     tooShort: "文字太短（最少 {{min}} 字符）",
     tooLong: "文字太长（最多 {{max}} 字符）",

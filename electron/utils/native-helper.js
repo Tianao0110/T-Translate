@@ -466,6 +466,19 @@ function getFocusedWindowInfo(api) {
   };
 }
 
+// Foreground/focused control class name, for policy checks (e.g. terminal
+// detection before injecting Ctrl+C). Returns '' when unavailable.
+function getForegroundClassName() {
+  if (process.platform !== 'win32') return '';
+  const api = initWin32API();
+  if (!api) return '';
+  try {
+    return getFocusedWindowInfo(api).className || '';
+  } catch (e) {
+    return '';
+  }
+}
+
 // EM_GETSEL: read [start, end) of the current selection in a standard Edit/RichEdit.
 // Uses SendMessageTimeoutW (SMTO_ABORTIFHUNG) so a frozen target window can't
 // block the main process — a hung/timed-out call returns success:false and the
@@ -514,6 +527,7 @@ module.exports = {
   // Three-layer selection probe (Layers 1+2, clipboard-free).
   // Layer 3 clipboard fallback lives in utils/clipboard-capture.js.
   hasTextSelection,
+  getForegroundClassName,
 
   // Capture-exclusion
   makeWindowInvisibleToCapture,

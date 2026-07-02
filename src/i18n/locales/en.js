@@ -283,7 +283,8 @@ const en = {
     quickActions: "Quick Actions", action1: "Drag title bar to move", action2: "Resize from bottom-right corner", action3: "Click 'Source' to show comparison", action4: "Click 'Copy' or select text to copy", action5: "Press ESC or right-click to close",
     // Selection translator component strings
     translateFailed: "Translation failed",
-    noText: "No text captured",
+    noText: "No text captured — try screenshot translation",
+    retryHint: "No text captured, click to retry",
     emptyContent: "Selection is empty",
     tooShort: "Text too short (minimum {{min}} characters)",
     tooLong: "Text too long (maximum {{max}} characters)",
