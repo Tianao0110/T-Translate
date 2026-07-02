@@ -548,9 +548,15 @@ function startSelectionHook() {
       const { x, y } = cursorPos;
 
       // P3-20 verification aid: uiohook event coords vs Electron DIP coords.
-      // On a scaled display (e.g. 1.75x) a physical-pixel uiohook would read
-      // ~scale× larger — this one-liner settles whether we can ever switch.
-      debugProbe('coords', { uiohook: { x: e.x, y: e.y }, electronDip: { x, y } });
+      // On a scaled display (e.g. 1.75x) a physical-pixel uiohook reads ~scale×
+      // larger. Verdict is precomputed so the log line answers directly.
+      if (SELECTION_DEBUG) {
+        const ratio = x > 100 ? (e.x / x) : null; // skip near-origin clicks (ratio unstable)
+        const verdict = ratio === null ? 'click further from screen corner and retry'
+          : Math.abs(ratio - 1) < 0.05 ? 'SAME coordinate space -> switching to event coords is SAFE'
+          : `uiohook is ~${ratio.toFixed(2)}x (physical pixels) -> DO NOT switch, keep getCursorScreenPoint`;
+        debugProbe('coords', { uiohook: { x: e.x, y: e.y }, electronDip: { x, y }, verdict });
+      }
 
       // Click inside any of our selection windows (including frozen ones) — treat
       // as a drag-on-overlay and skip the FSM entirely.
