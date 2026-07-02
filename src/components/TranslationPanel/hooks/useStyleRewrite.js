@@ -3,6 +3,7 @@
 
 import { useState, useCallback } from 'react';
 import translationService from '../../../services/translation.js';
+import useTranslationStore from '../../../stores/translation-store';
 import createLogger from '../../../utils/logger.js';
 import { getShortErrorMessage } from '../../../utils/error-handler.js';
 
@@ -27,7 +28,7 @@ export default function useStyleRewrite(currentTranslation, addStyleVersion, not
 
   const executeStyleRewrite = useCallback(async () => {
     if (!selectedStyle) {
-      notify(t('translation.selectStyle'), 'warning');
+      notify(t('translation.selectStylePrompt'), 'warning');
       return;
     }
 
@@ -58,10 +59,13 @@ export default function useStyleRewrite(currentTranslation, addStyleVersion, not
 
 改写后的译文：`;
 
-      const result = await translationService.chatCompletion([
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ]);
+      const result = await translationService.chatCompletion(
+        [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        useTranslationStore.getState().getPrivacyOptions()
+      );
 
       if (result.success && result.content) {
         let rewrittenText = result.content.trim();

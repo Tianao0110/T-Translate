@@ -3,7 +3,6 @@ const en = {
   nav: { translate: "Translate", history: "History", favorites: "Favorites", documents: "Documents", settings: "Settings" },
   status: { ready: "Ready", today: "Today", online: "Online", offline: "Offline" },
   screenshot: { failed: "Screenshot failed" },
-  notify: { unknownError: "Unknown error", networkError: "Network error" },
   settingsNav: {
     searchPlaceholder: "Search settings...",
     groupTranslation: "Translation", groupSystem: "System",
@@ -110,7 +109,7 @@ const en = {
     noTextToSpeak: "No text to speak", speakFailed: "Speech failed",
     ocrRecognizing: "Recognizing text...", ocrSuccess: "Recognition successful ({{engine}})", ocrFailed: "No text recognized",
     enterText: "Please enter text to translate", notConnected: "LM Studio not connected, check connection or use offline mode",
-    translateFirst: "Please translate first", selectStyle: "Please select a reference style",
+    translateFirst: "Please translate first", selectStylePrompt: "Please select a reference style",
     styleRewriteComplete: "Style rewrite complete", styleRewriteFailed: "Style rewrite failed",
     savedToStyle: "Saved to style library", saved: "Saved",
     imageOcrRecognizing: "Recognizing image text...", imageOcrSuccess: "Text recognition successful",
@@ -370,11 +369,12 @@ const en = {
     downloadInstall: "Download & Install",
     githubHint: "You can also download manually from GitHub"
   },
-  notify: { 
-    success: "Success", error: "Error", warning: "Warning", info: "Info", 
-    copySuccess: "Copied to clipboard", copyFailed: "Copy failed", 
-    saveSuccess: "Saved successfully", saveFailed: "Save failed", 
-    networkError: "Network error", translateError: "Translation failed", ocrError: "Recognition failed", 
+  // Single block — a duplicate key would silently override the earlier one
+  notify: {
+    success: "Success", error: "Error", warning: "Warning", info: "Info",
+    copySuccess: "Copied to clipboard", copyFailed: "Copy failed",
+    saveSuccess: "Saved successfully", saveFailed: "Save failed",
+    networkError: "Network error", unknownError: "Unknown error", translateError: "Translation failed", ocrError: "Recognition failed",
     shortcutRegistered: "Shortcut registered", shortcutConflict: "Shortcut conflict"
   },
   guide: {

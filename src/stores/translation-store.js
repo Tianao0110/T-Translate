@@ -64,6 +64,25 @@ function createThrottledJSONStorage(interval = PERSIST_WRITE_MS) {
   };
 }
 
+// Import paths must tolerate hand-edited JSON: missing ids get generated,
+// bad timestamps fall back to now, text-less entries are dropped.
+// Exported for tests.
+export function normalizeHistoryItem(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const sourceText = typeof raw.sourceText === 'string' ? raw.sourceText : '';
+  const translatedText = typeof raw.translatedText === 'string' ? raw.translatedText : '';
+  if (!sourceText && !translatedText) return null;
+  return {
+    id: typeof raw.id === 'string' && raw.id ? raw.id : uuidv4(),
+    sourceText,
+    translatedText,
+    sourceLanguage: typeof raw.sourceLanguage === 'string' ? raw.sourceLanguage : 'auto',
+    targetLanguage: typeof raw.targetLanguage === 'string' ? raw.targetLanguage : 'zh',
+    timestamp: Number.isFinite(raw.timestamp) ? raw.timestamp : Date.now(),
+    source: typeof raw.source === 'string' ? raw.source : 'import',
+  };
+}
+
 // Lazy-bound to avoid circular dep with main-translation service
 let _mainTranslation = null;
 const getMainTranslation = async () => {
@@ -453,6 +472,17 @@ const useTranslationStore = create(
         return state.translationMode !== PRIVACY_MODES.SECURE;
       },
 
+      // Single source for the privacy fields every translationService call
+      // must carry — the service defaults privacyMode to STANDARD, which has
+      // twice shipped offline/secure-mode leaks from call sites forgetting it.
+      getPrivacyOptions: () => {
+        const mode = get().translationMode;
+        return {
+          privacyMode: mode,
+          useCache: mode !== PRIVACY_MODES.SECURE,
+        };
+      },
+
       getModeConfig: () => {
         const state = get();
         const configs = {
@@ -509,16 +539,28 @@ const useTranslationStore = create(
             if (state.history.length > state.historyLimit) {
               state.history = state.history.slice(0, state.historyLimit);
             }
-            if (state.translationMode !== PRIVACY_MODES.SECURE) {
-              state.statistics.totalTranslations++;
-              state.statistics.totalCharacters += (historyItem.sourceText?.length || 0);
-            }
+            state.statistics.totalTranslations++;
+            state.statistics.totalCharacters += (historyItem.sourceText?.length || 0);
+            // Keep the status-bar "today" count honest for selection/floating
+            // window entries too (main-panel path recomputes it the same way).
+            const today = new Date().toDateString();
+            state.statistics.todayTranslations = state.history.filter(
+              (h) => new Date(h.timestamp).toDateString() === today
+            ).length;
           }
         }),
 
       removeFromHistory: (id) =>
         set((state) => {
           state.history = state.history.filter((item) => item.id !== id);
+        }),
+
+      // Backs the privacy-page auto-delete setting; invoked once at startup.
+      pruneHistoryOlderThan: (days) =>
+        set((state) => {
+          if (!days || days <= 0) return;
+          const cutoff = Date.now() - days * 86400000;
+          state.history = state.history.filter((h) => (h.timestamp || 0) >= cutoff);
         }),
 
       restoreFromHistory: (id) =>
@@ -575,26 +617,49 @@ const useTranslationStore = create(
         return false;
       },
 
-      exportHistory: (format = "json") => {
-        const data = get().history;
-        return data;
-      },
+      exportHistory: () => ({
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        items: get().history,
+      }),
 
       importHistory: async (file) => {
         try {
           const text = await file.text();
           const data = JSON.parse(text);
-          if (Array.isArray(data)) {
-            set((state) => {
-              const existingIds = new Set(state.history.map((h) => h.id));
-              const newItems = data.filter((item) => !existingIds.has(item.id));
-              state.history = [...newItems, ...state.history].slice(
-                0,
-                state.historyLimit
-              );
-            });
-            return { success: true, count: data.length };
+          // Accept the 0.2.9 wrapped form and the legacy bare array.
+          const rawItems = Array.isArray(data) ? data
+            : Array.isArray(data?.items) ? data.items
+            : null;
+          if (!rawItems) {
+            return { success: false, error: 'Unrecognized history format' };
           }
+
+          let added = 0;
+          set((state) => {
+            const existingIds = new Set(state.history.map((h) => h.id));
+            const seenContent = new Set(
+              state.history.map((h) => `${h.sourceText}|${h.translatedText}`)
+            );
+            const newItems = [];
+            for (const raw of rawItems) {
+              const item = normalizeHistoryItem(raw);
+              if (!item) continue;
+              const contentKey = `${item.sourceText}|${item.translatedText}`;
+              if (existingIds.has(item.id) || seenContent.has(contentKey)) continue;
+              existingIds.add(item.id);
+              seenContent.add(contentKey);
+              newItems.push(item);
+            }
+            added = newItems.length;
+            state.history = [...newItems, ...state.history].slice(
+              0,
+              state.historyLimit
+            );
+          });
+          // Real insert count — the old code reported the file's row count
+          // even when everything was a duplicate.
+          return { success: true, count: added };
         } catch (error) {
           return { success: false, error: error.message };
         }

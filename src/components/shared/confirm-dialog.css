@@ -1,0 +1,108 @@
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  z-index: 300;
+  animation: confirmFadeIn 0.15s ease;
+}
+
+.confirm-dialog {
+  width: 340px;
+  max-width: calc(100vw - 48px);
+  padding: 22px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 14px;
+  box-shadow: var(--shadow-lg);
+  animation: confirmSlideIn 0.2s ease;
+  text-align: center;
+}
+
+.confirm-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 12px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  color: var(--warning);
+}
+
+.confirm-icon.danger {
+  background: color-mix(in srgb, var(--error) 10%, transparent);
+  color: var(--error);
+}
+
+.confirm-message {
+  margin: 0 0 18px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.confirm-btn {
+  min-width: 88px;
+  padding: 8px 18px;
+  border: none;
+  border-radius: var(--radius-lg);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.confirm-btn:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent-primary) 50%, transparent);
+  outline-offset: 1px;
+}
+
+.confirm-btn.cancel {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-primary);
+}
+
+.confirm-btn.cancel:hover {
+  background: var(--bg-hover);
+}
+
+.confirm-btn.primary {
+  background: var(--accent-primary);
+  color: var(--text-inverse);
+}
+
+.confirm-btn.primary:hover {
+  background: var(--accent-hover);
+}
+
+.confirm-btn.danger {
+  background: var(--error);
+  color: #fff;
+}
+
+.confirm-btn.danger:hover {
+  background: color-mix(in srgb, var(--error) 85%, #000);
+}
+
+@keyframes confirmFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes confirmSlideIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}

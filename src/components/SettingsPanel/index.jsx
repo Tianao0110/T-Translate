@@ -388,10 +388,9 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
         await store.set('settings.contextMemory', settings.contextMemory);
         await store.set('settings.termCorrection', settings.termCorrection);
         await store.set('settings.privacyMode', settings.privacyMode);
-        await store.set('settings.saveHistory', settings.saveHistory);
-        await store.set('settings.maxHistory', settings.maxHistory);
-        await store.set('settings.cacheEnabled', settings.cacheEnabled);
-        await store.set('settings.maxCache', settings.maxCache);
+        if (settings.privacy) {
+          await store.set('settings.privacy', settings.privacy);
+        }
         await store.set('settings.theme', settings.theme);
         await store.set('settings.fontSize', settings.fontSize);
         await store.set('settings.debugMode', settings.debugMode);

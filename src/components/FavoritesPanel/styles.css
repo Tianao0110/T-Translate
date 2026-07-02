@@ -356,12 +356,12 @@
 }
 
 .btn-confirm {
-  background: var(--success, #10b981);
+  background: var(--success);
   color: white;
 }
 
 .btn-confirm:hover {
-  background: #059669;
+  background: color-mix(in srgb, var(--success) 85%, #000);
 }
 
 .btn-cancel-small {
@@ -1187,12 +1187,12 @@
 }
 
 .glossary-table .glossary-actions button.save {
-  color: var(--success-color, #10b981);
+  color: var(--success);
 }
 
 .glossary-table .glossary-actions button.save:hover {
-  background: rgba(16, 185, 129, 0.1);
-  border-color: var(--success-color, #10b981);
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+  border-color: var(--success);
 }
 
 .glossary-table .glossary-actions button.danger:hover {

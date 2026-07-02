@@ -24,6 +24,7 @@ import translationService from '../../services/translation.js';
 import useTranslationStore from '../../stores/translation-store';
 import { LANGUAGES, PRIVACY_MODES } from '../../config/constants.js';
 import { getPrivacyModeConfig } from '../../config/privacy-modes.js';
+import useVisibleHotkey from '../../hooks/use-visible-hotkey.js';
 import { LanguageSelector } from '../TranslationPanel/components.jsx';
 import './styles.css';
 
@@ -475,20 +476,17 @@ const DocumentTranslator = ({
   // One-time cleanup of expired progress blobs.
   useEffect(() => { sweepExpiredProgress(); }, []);
 
-  // Ctrl+F toggles in-document search. The component stays mounted behind
-  // other tabs (display:none), so bail when hidden — otherwise this swallows
-  // the shortcut for the whole app.
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.ctrlKey && e.key === 'f' && document) {
-        if (!rootRef.current?.offsetParent) return;
-        e.preventDefault();
-        setShowSearch(prev => !prev);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [document]);
+  // Ctrl+F toggles in-document search (visibility-guarded: the component
+  // stays mounted behind other tabs).
+  useVisibleHotkey(
+    rootRef,
+    (e) => (e.ctrlKey || e.metaKey) && e.key === 'f',
+    (e) => {
+      if (!document) return;
+      e.preventDefault();
+      setShowSearch(prev => !prev);
+    }
+  );
 
   // Format elapsed time
   const formatTime = (ms) => {

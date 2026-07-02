@@ -1,15 +1,18 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Star, Search, Trash2, Copy, Edit3, Save, X, Plus,
-  Folder, FolderPlus, ChevronDown, ChevronRight,
-  Tag, Hash, MoreVertical, GripVertical,
+  Star, Search, Trash2, Copy, Edit3, X, Plus,
+  Folder, FolderPlus, Tag, Hash,
   Check, Palette, RotateCcw, Bookmark, Sparkles, RefreshCw, BookOpen,
   Download, Upload
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import useTranslationStore from '../../stores/translation-store';
 import translationService from '../../services/translation.js';
+import { getAnalysisPrompts, parseJsonReply } from '../../utils/ai-prompts.js';
+import useVisibleHotkey from '../../hooks/use-visible-hotkey.js';
+import HighlightText from '../shared/HighlightText.jsx';
+import { useConfirm } from '../shared/ConfirmDialog.jsx';
 import {
   exportToJSON, exportToCSV, exportToTBX,
   autoImport, downloadFile
@@ -35,18 +38,6 @@ const FOLDER_COLORS = [
   '#6b7280',
 ];
 
-const HighlightText = ({ text, search }) => {
-  if (!search || !text) return text;
-
-  const parts = text.split(new RegExp(`(${search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'));
-
-  return parts.map((part, i) =>
-    part.toLowerCase() === search.toLowerCase() ? (
-      <mark key={i} className="search-highlight">{part}</mark>
-    ) : part
-  );
-};
-
 const DEFAULT_FOLDERS = [
   { id: 'work', name: '工作', color: '#3b82f6', order: 0 },
   { id: 'study', name: '学习', color: '#10b981', order: 1 },
@@ -55,18 +46,12 @@ const DEFAULT_FOLDERS = [
   { id: 'style_library', name: '风格库', color: '#8b5cf6', order: 4, isSystem: true, icon: 'palette' },
 ];
 
-const GlossaryRow = ({ item, onCopy, onDelete, onUpdateNote, onUpdateTags, notify }) => {
+const GlossaryRow = ({ item, onCopy, onDelete, onUpdateNote, notify }) => {
   const { t } = useTranslation();
   const [isEditing, setIsEditing] = useState(false);
   const [editNote, setEditNote] = useState(item.note || '');
-  const [editTags, setEditTags] = useState(item.tags?.join(', ') || '');
 
   const handleSave = () => {
-    const newTags = editTags
-      .split(/[,，]/)
-      .map(tag => tag.trim())
-      .filter(tag => tag.length > 0);
-    onUpdateTags(item.id, newTags);
     onUpdateNote(item.id, editNote);
     setIsEditing(false);
     notify?.(t('favorites.termUpdated'), 'success');
@@ -74,7 +59,6 @@ const GlossaryRow = ({ item, onCopy, onDelete, onUpdateNote, onUpdateTags, notif
 
   const handleCancel = () => {
     setEditNote(item.note || '');
-    setEditTags(item.tags?.join(', ') || '');
     setIsEditing(false);
   };
 
@@ -129,14 +113,11 @@ const FavoriteCard = ({
   folders,
   searchQuery,
   onCopy,
-  onEdit,
   onDelete,
   onMove,
   onUpdateTags,
   onUpdateNote,
   onUpdateStyleRef,
-  isSelected,
-  onSelect,
   notify
 }) => {
   const { t } = useTranslation();
@@ -147,6 +128,15 @@ const FavoriteCard = ({
   const [editStyleRef, setEditStyleRef] = useState(item.isStyleReference || false);
   const [showMoveMenu, setShowMoveMenu] = useState(false);
   const [isGeneratingTags, setIsGeneratingTags] = useState(false);
+
+  // Close the move menu on any outside click. The opening click is safe:
+  // the listener attaches after the render that opened it.
+  useEffect(() => {
+    if (!showMoveMenu) return;
+    const close = () => setShowMoveMenu(false);
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, [showMoveMenu]);
 
   const folder = folders.find(f => f.id === item.folderId);
 
@@ -168,46 +158,20 @@ const FavoriteCard = ({
     setIsGeneratingTags(true);
 
     try {
-      const systemPrompt = `你是一个智能标签和摘要生成助手。根据用户提供的原文和译文，生成合适的标签和摘要。
+      const { systemPrompt, userPrompt } = getAnalysisPrompts(item.sourceText, item.translatedText);
 
-请严格按照以下 JSON 格式返回，不要包含任何其他内容：
-{
-  "tags": ["标签1", "标签2", "标签3"],
-  "summary": "简短摘要（20字以内）",
-  "isStyleSuggested": true/false
-}
-
-标签规则：
-- 生成 3-5 个相关标签
-- 标签应该反映内容的主题、领域、风格等
-- 使用中文标签
-
-摘要规则：
-- 20字以内的简短描述
-- 概括内容的核心特点
-
-风格参考判断规则（isStyleSuggested）：
-- 如果文本具有独特的文学风格、修辞手法、或值得模仿的表达方式，返回 true
-- 如果只是普通的术语、短语、或日常表达，返回 false
-- 长度超过 30 字且有明显风格特点的文本更适合作为风格参考`;
-
-      const userPrompt = `原文：${item.sourceText}
-译文：${item.translatedText}
-
-请分析并返回 JSON 格式的标签、摘要和风格建议。`;
-
-      const result = await translationService.chatCompletion([
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ]);
+      const result = await translationService.chatCompletion(
+        [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        useTranslationStore.getState().getPrivacyOptions()
+      );
 
       if (result.success && result.content) {
         let parsed;
         try {
-          let content = result.content.trim();
-          content = content.replace(/^```json\s*/, '').replace(/```\s*$/, '');
-          content = content.replace(/^```\s*/, '').replace(/```\s*$/, '');
-          parsed = JSON.parse(content);
+          parsed = parseJsonReply(result.content);
         } catch (parseError) {
           logger.error('JSON parse error:', parseError);
           parsed = {
@@ -256,7 +220,7 @@ const FavoriteCard = ({
   };
 
   return (
-    <div className={`favorite-card ${isSelected ? 'selected' : ''}`}>
+    <div className="favorite-card">
       <div className="card-header">
         <div className="card-header-left">
           <span className="card-lang">
@@ -480,6 +444,21 @@ const FavoritesPanel = ({ showNotification }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState(null);
 
+  const rootRef = useRef(null);
+  const searchRef = useRef(null);
+  const [confirm, confirmDialog] = useConfirm();
+
+  // Ctrl+F focuses the panel search — guarded so the mounted-but-hidden
+  // panel doesn't swallow the shortcut for the rest of the app.
+  useVisibleHotkey(
+    rootRef,
+    (e) => (e.ctrlKey || e.metaKey) && e.key === 'f',
+    (e) => {
+      e.preventDefault();
+      searchRef.current?.focus();
+    }
+  );
+
   // useShallow: favorites tab stays mounted behind other tabs — without a
   // selector every streaming flush would re-render it
   const {
@@ -496,37 +475,58 @@ const FavoritesPanel = ({ showNotification }) => {
     return favorites?.filter(item => item.folderId === 'glossary') || [];
   }, [favorites]);
 
-  const handleExportGlossary = (format) => {
+  const handleExportGlossary = async (format) => {
     if (glossaryItems.length === 0) {
       notify(t('favorites.glossaryEmpty'), 'warning');
       return;
     }
 
     const timestamp = dayjs().format('YYYYMMDD');
-    let content, filename, mimeType;
+    let content, filename, mimeType, ext;
 
     switch (format) {
       case 'json':
         content = exportToJSON(glossaryItems);
         filename = `glossary_${timestamp}.json`;
         mimeType = 'application/json';
+        ext = 'json';
         break;
       case 'csv':
         content = exportToCSV(glossaryItems);
         filename = `glossary_${timestamp}.csv`;
         mimeType = 'text/csv';
+        ext = 'csv';
         break;
       case 'tbx':
         content = exportToTBX(glossaryItems);
         filename = `glossary_${timestamp}.tbx`;
         mimeType = 'application/xml';
+        ext = 'tbx';
         break;
       default:
         return;
     }
 
-    downloadFile(content, filename, mimeType);
-    notify(t('favorites.exportedTerms', { count: glossaryItems.length, format: format.toUpperCase() }), 'success');
+    try {
+      const saveFile = window.electron?.dialog?.saveFile;
+      if (saveFile) {
+        const result = await saveFile({
+          defaultPath: filename,
+          filters: [
+            { name: format.toUpperCase(), extensions: [ext] },
+            { name: 'All Files', extensions: ['*'] },
+          ],
+          data: content,
+        });
+        if (result.canceled) { setShowExportMenu(false); return; }
+        if (!result.success) throw new Error(result.error);
+      } else {
+        downloadFile(content, filename, mimeType);
+      }
+      notify(t('favorites.exportedTerms', { count: glossaryItems.length, format: format.toUpperCase() }), 'success');
+    } catch (e) {
+      notify(t('favorites.importFailed') + ': ' + e.message, 'error');
+    }
     setShowExportMenu(false);
   };
 
@@ -664,8 +664,8 @@ const FavoritesPanel = ({ showNotification }) => {
     setEditingFolder(null);
   };
 
-  const handleDeleteFolder = (id) => {
-    if (!window.confirm(t('favorites.deleteFolderConfirm'))) return;
+  const handleDeleteFolder = async (id) => {
+    if (!(await confirm(t('favorites.deleteFolderConfirm')))) return;
 
     // Move items in this folder back to uncategorized before deletion.
     favorites?.forEach(item => {
@@ -707,15 +707,14 @@ const FavoritesPanel = ({ showNotification }) => {
     notify(isStyleReference ? t('favorites.movedToStyle') : t('favorites.movedFromStyle'), 'success');
   }, [updateFavoriteItem, notify]);
 
-  const handleDelete = useCallback((itemId) => {
-    if (window.confirm(t('favorites.deleteConfirm'))) {
-      removeFromFavorites(itemId);
-      notify(t('favorites.deleted'), 'success');
-    }
-  }, [removeFromFavorites, notify, t]);
+  const handleDelete = useCallback(async (itemId) => {
+    if (!(await confirm(t('favorites.deleteConfirm')))) return;
+    removeFromFavorites(itemId);
+    notify(t('favorites.deleted'), 'success');
+  }, [removeFromFavorites, notify, t, confirm]);
 
   return (
-    <div className="favorites-panel">
+    <div className="favorites-panel" ref={rootRef}>
       <div className="favorites-sidebar">
         <div className="sidebar-header">
           <h3>{t('favorites.title')}</h3>
@@ -916,6 +915,7 @@ const FavoritesPanel = ({ showNotification }) => {
           <div className="toolbar-search">
             <Search size={16} />
             <input
+              ref={searchRef}
               type="text"
               placeholder={t('favorites.search')}
               value={searchQuery}
@@ -967,7 +967,6 @@ const FavoritesPanel = ({ showNotification }) => {
                       onCopy={handleCopy}
                       onDelete={handleDelete}
                       onUpdateNote={handleUpdateNote}
-                      onUpdateTags={handleUpdateTags}
                       notify={notify}
                     />
                   ))}
@@ -995,6 +994,8 @@ const FavoritesPanel = ({ showNotification }) => {
           )}
         </div>
       </div>
+
+      {confirmDialog}
     </div>
   );
 };
