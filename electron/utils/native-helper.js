@@ -50,8 +50,12 @@ function initWin32API() {
       GetWindowThreadProcessId: user32.func('uint32 GetWindowThreadProcessId(void*, uint32*)'),
       GetClassNameW: user32.func('int GetClassNameW(void*, uint16*, int)'),
       GetForegroundWindow: user32.func('void* GetForegroundWindow()'),
-      GetGUIThreadInfo: user32.func('int GetGUIThreadInfo(uint32, GUITHREADINFO*)'),
-      SendMessageW: user32.func('intptr SendMessageW(void*, uint32, uintptr*, uintptr*)'),
+      // _Inout_ so koffi copies the filled struct back to JS: cbSize goes in,
+      // the focus/caret handles come out. Without it the output was never
+      // marshaled back and focus/caret detection silently returned nothing.
+      GetGUIThreadInfo: user32.func('int GetGUIThreadInfo(uint32, _Inout_ GUITHREADINFO* info)'),
+      // Timeout variant so a hung target window can't block the main process.
+      SendMessageTimeoutW: user32.func('intptr SendMessageTimeoutW(void*, uint32, uintptr*, uintptr*, uint32, uint32, uintptr*)'),
 
       // Process info
       OpenProcess: kernel32.func('void* OpenProcess(uint32, int, uint32)'),
@@ -72,6 +76,9 @@ function initWin32API() {
       WDA_EXCLUDEFROMCAPTURE: 0x00000011,
       EM_GETSEL: 0x00B0,
       GUI_CARETBLINKING: 0x0001,
+      SMTO_ABORTIFHUNG: 0x0002,
+      SMTO_BLOCK: 0x0001,
+      EM_GETSEL_TIMEOUT_MS: 200,
 
       GUITHREADINFO,
     };
@@ -298,6 +305,15 @@ function hasTextSelection() {
 
     logger.debug(`Focus window: "${focusInfo.className}" (caret: ${focusInfo.hasCaret}, usedForeground: ${focusInfo.usedForeground})`);
 
+    // Focus now resolves to the real focused control (post _Inout_ fix), so
+    // the control-class lists are matched EXACTLY — a substring match would let
+    // e.g. 'OlkPeoplePickerEdit' hit the 'Edit' standard-control rule and route
+    // Outlook's picker through EM_GETSEL. Only the complex-app list stays fuzzy;
+    // it holds deliberate prefixes/substrings ('Chrome_WidgetWin_', 'Olk', 'WebView').
+    const cls = focusInfo.className;
+    const matchesExact = (list) => list.includes(cls);
+    const matchesFuzzy = (list) => list.some((c) => cls.includes(c));
+
     // Classes that definitely can't hold a text selection.
     const noTextClasses = [
       'Progman', 'WorkerW',             // Desktop
@@ -308,20 +324,22 @@ function hasTextSelection() {
       'ScrollBar',
     ];
 
-    if (noTextClasses.some(cls => focusInfo.className.includes(cls))) {
-      return { hasSelection: false, method: 'class_filter', reason: `non-text control: ${focusInfo.className}` };
+    if (matchesExact(noTextClasses)) {
+      return { hasSelection: false, method: 'class_filter', reason: `non-text control: ${cls}` };
     }
 
     // ----- Layer 2: standard edit controls (EM_GETSEL) -----
+    // NOTE: Word's '_WwG' is deliberately NOT here — EM_GETSEL returns 0/0 on it
+    // (not a real Edit control), which would short-circuit to "no selection". It
+    // lives only in complexAppClasses so Word routes to the clipboard fallback.
     const standardEditClasses = [
       'Edit',
       'RICHEDIT50W', 'RichEdit20W', 'RichEdit',
       'RichEditD2DPT',     // Win11 Notepad
       'TextBox',           // .NET TextBox
-      '_WwG',              // Word editor surface
     ];
 
-    if (standardEditClasses.some(cls => focusInfo.className.includes(cls))) {
+    if (matchesExact(standardEditClasses)) {
       const selResult = getEditControlSelection(api, focusInfo.hwndFocus);
       if (selResult.success) {
         const hasSelection = selResult.start !== selResult.end;
@@ -374,18 +392,18 @@ function hasTextSelection() {
       'Notepad',
     ];
 
-    const isComplexApp = complexAppClasses.some(cls => focusInfo.className.includes(cls));
+    const isComplexApp = matchesFuzzy(complexAppClasses);
 
     if (isComplexApp || focusInfo.hasCaret) {
       return {
         hasSelection: null,
         method: 'needs_clipboard',
-        reason: isComplexApp ? `complex app: ${focusInfo.className}` : 'has caret, unknown control',
+        reason: isComplexApp ? `complex app: ${cls}` : 'has caret, unknown control',
       };
     }
 
     // Unknown class with no caret — most likely no selection.
-    return { hasSelection: false, method: 'unknown_no_caret', reason: `unknown class without caret: ${focusInfo.className}` };
+    return { hasSelection: false, method: 'unknown_no_caret', reason: `unknown class without caret: ${cls}` };
 
   } catch (e) {
     logger.error('hasTextSelection error:', e);
@@ -449,13 +467,28 @@ function getFocusedWindowInfo(api) {
 }
 
 // EM_GETSEL: read [start, end) of the current selection in a standard Edit/RichEdit.
+// Uses SendMessageTimeoutW (SMTO_ABORTIFHUNG) so a frozen target window can't
+// block the main process — a hung/timed-out call returns success:false and the
+// caller falls through to the clipboard layer.
 function getEditControlSelection(api, hwnd) {
-  const { SendMessageW, EM_GETSEL } = api;
+  const {
+    SendMessageTimeoutW, EM_GETSEL,
+    SMTO_ABORTIFHUNG, SMTO_BLOCK, EM_GETSEL_TIMEOUT_MS,
+  } = api;
 
   try {
     const startBuffer = Buffer.alloc(8);
     const endBuffer = Buffer.alloc(8);
-    SendMessageW(hwnd, EM_GETSEL, startBuffer, endBuffer);
+    const resultBuffer = Buffer.alloc(8);
+
+    const ok = SendMessageTimeoutW(
+      hwnd, EM_GETSEL, startBuffer, endBuffer,
+      SMTO_ABORTIFHUNG | SMTO_BLOCK, EM_GETSEL_TIMEOUT_MS, resultBuffer
+    );
+    if (!ok) {
+      logger.debug('EM_GETSEL timed out or target hung');
+      return { success: false };
+    }
 
     const start = startBuffer.readUInt32LE(0);
     const end = endBuffer.readUInt32LE(0);

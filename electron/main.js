@@ -20,6 +20,14 @@ const { SelectionStateMachine, STATES } = require('./utils/selection-state-machi
 let selectionStateMachine = null;
 const logger = require('./utils/logger')('Main');
 
+// Opt-in probe diagnostics (set TT_SELECTION_DEBUG=1). Records which detection
+// layer resolved each gesture, by control class + method only — never text
+// content — so the app-matrix pass can see where a given app lands.
+const SELECTION_DEBUG = process.env.TT_SELECTION_DEBUG === '1';
+function debugProbe(stage, data) {
+  if (SELECTION_DEBUG) logger.info(`[probe:${stage}]`, JSON.stringify(data));
+}
+
 const { createMenu } = require('./managers/menu-manager');
 const { createTray, updateTrayMenu, destroyTray } = require('./managers/tray-manager');
 const windowManager = require('./managers/window-manager');
@@ -68,6 +76,7 @@ async function handleDelayedConfirm(x, y, rect) {
     // ----- Layer 1+2: clipboard-free probe -----
     const selectionCheck = hasTextSelection();
     logger.debug(`Selection check: ${selectionCheck.hasSelection} (${selectionCheck.method}: ${selectionCheck.reason})`);
+    debugProbe('delayed', selectionCheck);
 
     if (selectionCheck.hasSelection === true) {
       logger.debug('Delayed confirm: selection detected via Win32 API (layer 1-2)');
@@ -577,6 +586,7 @@ function startSelectionHook() {
           const { detectSelectionViaClipboard } = require('./utils/clipboard-capture');
           const selectionCheck = hasTextSelection();
           logger.debug(`Normal drag selection check: ${selectionCheck.hasSelection} (${selectionCheck.method}: ${selectionCheck.reason})`);
+          debugProbe('drag', selectionCheck);
 
           if (selectionCheck.hasSelection === true) {
             // Layer 1+2 confirmed selection.
