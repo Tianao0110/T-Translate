@@ -3,7 +3,7 @@
 // Floating window uses a separate stores/session.js + services/pipeline.js.
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, subscribeWithSelector } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 import { v4 as uuidv4 } from "uuid";
 
@@ -94,7 +94,10 @@ const getMainTranslation = async () => {
 };
 
 const useTranslationStore = create(
-  persist(
+  // subscribeWithSelector: sync-to-electron.js subscribes with (selector,
+  // listener, options) — without this middleware vanilla subscribe treats the
+  // selector as the listener and the whole sync layer silently no-ops.
+  subscribeWithSelector(persist(
     immer((set, get) => ({
       translationMode: PRIVACY_MODES.STANDARD,
       useStreamOutput: true,
@@ -251,13 +254,6 @@ const useTranslationStore = create(
           state.currentTranslation.translatedText = '';
           state.currentTranslation.status = TRANSLATION_STATUS.IDLE;
           state.currentTranslation.error = null;
-          // Mirror to electron-store so main can read it (selection translate, etc.)
-          try {
-            const src = source || state.currentTranslation.sourceLanguage;
-            const tgt = target || state.currentTranslation.targetLanguage;
-            window.electron?.store?.set('settings.translation.sourceLanguage', src);
-            window.electron?.store?.set('settings.translation.targetLanguage', tgt);
-          } catch {}
         }),
 
       setTargetLanguage: (target) =>
@@ -267,9 +263,6 @@ const useTranslationStore = create(
             target = DEFAULTS.TARGET_LANGUAGE;
           }
           if (target) state.currentTranslation.targetLanguage = target;
-          try {
-            window.electron?.store?.set('settings.translation.targetLanguage', target);
-          } catch {}
         }),
 
       swapLanguages: () =>
@@ -280,10 +273,6 @@ const useTranslationStore = create(
           state.currentTranslation.sourceLanguage =
             state.currentTranslation.targetLanguage;
           state.currentTranslation.targetLanguage = temp;
-          try {
-            window.electron?.store?.set('settings.translation.sourceLanguage', state.currentTranslation.sourceLanguage);
-            window.electron?.store?.set('settings.translation.targetLanguage', state.currentTranslation.targetLanguage);
-          } catch {}
 
           const tempText = state.currentTranslation.sourceText;
           state.currentTranslation.sourceText =
@@ -731,6 +720,9 @@ const useTranslationStore = create(
         favorites: state.favorites,
         statistics: state.statistics,
         translationMode: state.translationMode,
+        autoTranslate: state.autoTranslate,
+        useStreamOutput: state.useStreamOutput,
+        autoTranslateDelay: state.autoTranslateDelay,
         // Secure-mode stash must survive a quit-while-secure: without these,
         // the emptied history/statistics are what lands on disk and the real
         // data is unrecoverable after restart.
@@ -743,7 +735,7 @@ const useTranslationStore = create(
         ocrStatus: { engine: state.ocrStatus.engine },
       }),
     }
-  )
+  ))
 );
 
 export default useTranslationStore;

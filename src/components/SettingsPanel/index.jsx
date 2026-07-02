@@ -337,13 +337,9 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
           await store.set('settings.connection', settings.connection);
         }
 
-        if (settings.translation) {
-          // Skip providers/providerConfigs — owned by ProviderSettings.
-          const { providers, providerConfigs, ...translationRest } = settings.translation;
-          for (const [key, value] of Object.entries(translationRest)) {
-            await store.set(`settings.translation.${key}`, value);
-          }
-        }
+        // settings.translation is not written here: providers belong to
+        // ProviderSettings, language keys to the sync-to-electron store mirror.
+        // Writing a load-time snapshot back would clobber both.
 
         if (settings.document) {
           await store.set('settings.document', settings.document);
@@ -381,19 +377,9 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
           theme: currentTheme,
         });
 
-        await store.set('settings.sourceLanguage', settings.sourceLanguage);
-        await store.set('settings.targetLanguage', settings.targetLanguage);
-        await store.set('settings.autoTranslate', settings.autoTranslate);
-        await store.set('settings.streamOutput', settings.streamOutput);
-        await store.set('settings.contextMemory', settings.contextMemory);
-        await store.set('settings.termCorrection', settings.termCorrection);
-        await store.set('settings.privacyMode', settings.privacyMode);
         if (settings.privacy) {
           await store.set('settings.privacy', settings.privacy);
         }
-        await store.set('settings.theme', settings.theme);
-        await store.set('settings.fontSize', settings.fontSize);
-        await store.set('settings.debugMode', settings.debugMode);
       } else {
         localStorage.setItem('settings', JSON.stringify(settings));
       }

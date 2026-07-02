@@ -20,7 +20,7 @@ if (typeof window !== 'undefined') {
 }
 
 // One-time wiring of Zustand -> electron-store (subscribes for the lifetime of the app)
-initStoreSync(useTranslationStore, useConfigStore);
+initStoreSync(useTranslationStore);
 
 function App() {
   try {

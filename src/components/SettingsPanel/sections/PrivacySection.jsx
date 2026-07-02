@@ -19,7 +19,8 @@ const PrivacySection = ({
   notify
 }) => {
   const { t } = useTranslation();
-  const currentMode = useTranslationStore.getState().translationMode || PRIVACY_MODE_IDS.STANDARD;
+  // Reactive subscription — nothing else re-renders this section on mode change
+  const currentMode = useTranslationStore((s) => s.translationMode) || PRIVACY_MODE_IDS.STANDARD;
   const modeConfig = PRIVACY_MODES[currentMode];
 
   // PRIVACY_MODES stores icon names as strings (so the config file stays
@@ -88,10 +89,9 @@ const PrivacySection = ({
     refreshDataStats();
   }, [refreshDataStats]);
 
-  // Mode change must hit three places: settings store, translation-store
-  // (for the secure-mode history stash), and main process (for the offline gate)
+  // Mode change hits two places: translation-store (persisted; drives the
+  // secure-mode history stash) and main process (offline gate + key access).
   const handleModeChange = (mode) => {
-    updateSetting('privacy', 'mode', mode.id);
     useTranslationStore.getState().setTranslationMode(mode.id);
     window.electron?.privacy?.setMode?.(mode.id);
     notify(t('privacy.switchedTo', { mode: getModeName(mode.id) }), 'success');

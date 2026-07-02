@@ -145,14 +145,8 @@ async function showSelectionTrigger(mouseX, mouseY, rect, prefetchedText = null)
 
   runtime.lastSelectionRect = rect;
 
-  const currentTargetLang = translationSettings.targetLanguage
-    || translationSettings.defaultTargetLang
-    || settings.targetLanguage
-    || 'zh';
-  const currentSourceLang = translationSettings.sourceLanguage
-    || translationSettings.defaultSourceLang
-    || settings.sourceLanguage
-    || 'auto';
+  const currentTargetLang = translationSettings.targetLanguage || 'zh';
+  const currentSourceLang = translationSettings.sourceLanguage || 'auto';
   logger.debug(`Language from electron-store: ${currentSourceLang} -> ${currentTargetLang}`);
 
   const win = windowManager.createSelectionWindow();
@@ -247,14 +241,8 @@ async function handleHotkeyDirectPath(x, y, rect) {
   const selectionSettings = settings.selection || {};
   const interfaceSettings = settings.interface || {};
   const translationSettings = settings.translation || {};
-  const currentTargetLang = translationSettings.targetLanguage
-    || translationSettings.defaultTargetLang
-    || settings.targetLanguage
-    || 'zh';
-  const currentSourceLang = translationSettings.sourceLanguage
-    || translationSettings.defaultSourceLang
-    || settings.sourceLanguage
-    || 'auto';
+  const currentTargetLang = translationSettings.targetLanguage || 'zh';
+  const currentSourceLang = translationSettings.sourceLanguage || 'auto';
 
   runtime.lastSelectionRect = rect;
 
@@ -340,9 +328,7 @@ function showSelectionWithText(text) {
   const selectionSettings = settings.selection || {};
   const translationSettings = settings.translation || {};
 
-  const currentTargetLang = translationSettings.targetLanguage
-    || settings.targetLanguage
-    || 'zh';
+  const currentTargetLang = translationSettings.targetLanguage || 'zh';
 
   win.webContents.send(CHANNELS.SELECTION.SHOW_RESULT, {
     text: text,  // Mode 2: text only, renderer translates.

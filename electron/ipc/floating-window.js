@@ -122,8 +122,8 @@ function register(ctx) {
     const ocrConfig = mainSettings.ocr || {};
     const localSettings = store.get('floatingWindowLocal', {});
 
-    let currentTargetLang = mainSettings.translation?.defaultTargetLang ?? 'zh';
-    let currentSourceLang = mainSettings.translation?.defaultSourceLang ?? 'auto';
+    let currentTargetLang = mainSettings.translation?.targetLanguage ?? 'zh';
+    let currentSourceLang = mainSettings.translation?.sourceLanguage ?? 'auto';
 
     if (mainWindow && !mainWindow.isDestroyed()) {
       try {
