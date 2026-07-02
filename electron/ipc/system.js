@@ -204,48 +204,6 @@ function register(ctx) {
     }
   });
 
-  // ===== LLM endpoint health check =====
-
-  ipcMain.handle(CHANNELS.APP.HEALTH_CHECK, async () => {
-    try {
-      const settings = store.get("settings", {});
-      const endpoint =
-        settings.connection?.apiEndpoint || "http://localhost:1234/v1";
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-      const response = await fetch(`${endpoint}/models`, {
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (response.ok) {
-        const data = await response.json();
-        logger.debug("Health check passed, models:", data?.data?.length || 0);
-        return {
-          success: true,
-          models: data?.data || [],
-          message: t('system.connectionOk', '连接正常'),
-        };
-      } else {
-        return {
-          success: false,
-          models: [],
-          message: t('system.serverStatus', '服务器返回') + ` ${response.status}`,
-        };
-      }
-    } catch (error) {
-      logger.warn("Health check failed:", error.message);
-      return {
-        success: false,
-        models: [],
-        message: error.name === "AbortError" ? t('system.timeout', '连接超时') : t('system.cannotConnect', '无法连接服务'),
-      };
-    }
-  });
-
   // ===== Logs =====
 
   ipcMain.handle(CHANNELS.LOGS.OPEN_DIRECTORY, async () => {

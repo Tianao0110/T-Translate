@@ -1,9 +1,9 @@
 import createLogger from '../../utils/logger.js';
 const logger = createLogger('MainWindow');
-import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  FileText, Languages, Settings, History, Star,
+  Languages, Settings, History, Star,
   AlertCircle, CheckCircle, Info, X, FileUp, Loader2
 } from 'lucide-react';
 
@@ -42,7 +42,6 @@ const MainWindow = () => {
   const targetLanguage = useTranslationStore((s) => s.currentTranslation.targetLanguage);
   const todayTranslations = useTranslationStore((s) => s.statistics.todayTranslations);
   const ocrEngine = useTranslationStore((s) => s.ocrStatus.engine);
-  const getStatistics = useTranslationStore((s) => s.getStatistics);
   const recognizeImage = useTranslationStore((s) => s.recognizeImage);
 
   // Bridge from main-process screenshot capture down to TranslationPanel
@@ -61,10 +60,6 @@ const MainWindow = () => {
       } catch { /* browser mode: no electron store */ }
     })();
   }, []);
-
-  useEffect(() => {
-    if (getStatistics) getStatistics();
-  }, [getStatistics]);
 
   useEffect(() => {
     const fetchVersion = async () => {
@@ -188,9 +183,12 @@ const MainWindow = () => {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [activeTab, isFullscreen]);
 
+  const notifyTimerRef = useRef(null);
   const showNotification = useCallback((message, type = 'info', duration = 3000) => {
+    // A previous toast's timer must not cut a newer (possibly longer) one short
+    clearTimeout(notifyTimerRef.current);
     setNotification({ message, type });
-    setTimeout(() => setNotification(null), duration);
+    notifyTimerRef.current = setTimeout(() => setNotification(null), duration);
   }, []);
 
   // Startup may report shortcuts that another app already grabbed
@@ -261,7 +259,7 @@ const MainWindow = () => {
       <div className={`notification notification-${notification.type}`}>
         {icons[notification.type]}
         <span>{notification.message}</span>
-        <button className="notification-close" onClick={() => setNotification(null)}><X size={14} /></button>
+        <button className="notification-close" onClick={() => { clearTimeout(notifyTimerRef.current); setNotification(null); }}><X size={14} /></button>
       </div>
     );
   };

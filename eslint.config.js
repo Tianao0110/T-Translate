@@ -60,6 +60,7 @@ export default [
       'prefer-const': 'warn',
 
       // --- React ---
+      'react/jsx-uses-vars': 'error',    // JSX 引用即使用——没有它，组件/图标全报 no-unused-vars 误报
       'react/jsx-uses-react': 'off',     // React 17+ 不需要
       'react/react-in-jsx-scope': 'off', // React 17+ 不需要
       'react/prop-types': 'off',         // 不强制 PropTypes
@@ -115,15 +116,6 @@ export default [
         window: 'readonly',
       },
     },
-  },
-
-  // ========== v0.2.5 Phase T 历史代码兜底 ==========
-  // 以下文件有 pre-existing lint errors，留 v0.3 lint cleanup 单独处理
-  // （详见 TODOS.md "v0.3 candidates > Lint backlog"）
-  // no-dupe-keys 豁免已删（0.2.9 修净 docParser/notify/selectStyle 重复键后恢复 error 级防线）
-  {
-    files: ['src/App.jsx'],
-    rules: { 'react-hooks/rules-of-hooks': 'warn' }, // 顶层 useTranslationStore + useEffect 在 early return 后调用
   },
 
   // ========== 配置文件 / 脚本 ==========

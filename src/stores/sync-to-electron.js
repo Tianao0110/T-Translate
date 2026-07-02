@@ -2,9 +2,10 @@
 // (selection translator, floating window) can read settings via the same
 // electron-store API without round-tripping JavaScript into a renderer.
 //
-// Synced fields:
-//   - settings.translation.sourceLanguage / targetLanguage (selection flow)
-//   - settings.interface.theme (floating + selection windows)
+// Single sync point for settings.translation.sourceLanguage / targetLanguage —
+// covers setLanguages/swapLanguages/setTargetLanguage/restoreFromHistory alike.
+// The store must be created with subscribeWithSelector or the selector-style
+// subscribe below silently degrades to a no-op.
 //
 // Wire it up once from App.jsx via initStoreSync().
 
@@ -43,7 +44,7 @@ function debouncedNotifyFloatingWindow(delay = 50) {
   }, delay);
 }
 
-export function initStoreSync(translationStore, configStore) {
+export function initStoreSync(translationStore) {
   translationStore.subscribe(
     (state) => ({
       src: state.currentTranslation.sourceLanguage,
@@ -58,15 +59,6 @@ export function initStoreSync(translationStore, configStore) {
       }
     },
     { equalityFn: (a, b) => a.src === b.src && a.tgt === b.tgt }
-  );
-
-  configStore.subscribe(
-    (state) => state.theme,
-    (theme, prevTheme) => {
-      if (theme !== prevTheme) {
-        debouncedSync('interface.theme', theme);
-      }
-    }
   );
 
   logger.info('Store sync initialized');

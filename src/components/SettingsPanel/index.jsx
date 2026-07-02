@@ -1,32 +1,16 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Globe, Shield, Zap, Download, Upload, Moon, Sun,
-  Info, CheckCircle, Wifi, RefreshCw, AlertCircle,
-  Save, Trash2, Eye, EyeOff, Lock, GitBranch,
-  Code2, Palette, Layers, MousePointer, Server,
-  FileText, Filter
-} from 'lucide-react';
-import translationService from '../../services/translation.js';
+import { RefreshCw, Save } from 'lucide-react';
 import { ocrManager } from '../../providers/ocr/index.js';
+import { useConfirm } from '../shared/ConfirmDialog';
 import { useShallow } from 'zustand/react/shallow';
 import useTranslationStore from '../../stores/translation-store';
-import ProviderSettings from '../ProviderSettings';
 import createLogger from '../../utils/logger.js';
 import './styles.css';
 
 import {
-  defaultConfig,
-  PRIVACY_MODES,
-  PRIVACY_MODE_IDS,
-  getModeFeatures,
-  isFeatureEnabled,
-  isProviderAllowed,
-  SHORTCUT_LABELS,
-  GLOBAL_SHORTCUT_KEYS,
   NAV_ITEMS,
   DEFAULT_SETTINGS,
-  LANGUAGE_OPTIONS,
   migrateOldSettings
 } from './constants.js';
 
@@ -49,6 +33,9 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
   const { t } = useTranslation();
 
   const notify = showNotification || ((msg, type) => logger.debug(`[${type}] ${msg}`));
+  // One dialog instance at panel level, handed down to sections as a prop —
+  // five separate overlays would be pointless.
+  const [confirm, confirmDialog] = useConfirm();
 
   const navLabels = {
     providers: t('settingsNav.providers'),
@@ -96,10 +83,7 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
   const isInitializingRef = useRef(true);
 
   const [activeSection, setActiveSection] = useState('providers');
-  const [connectionStatus, setConnectionStatus] = useState('unknown');
-  const [isTesting, setIsTesting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [models, setModels] = useState([]);
   const [showApiKeys, setShowApiKeys] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
   const [collapsedGroups, setCollapsedGroups] = useState({});
@@ -337,13 +321,9 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
           await store.set('settings.connection', settings.connection);
         }
 
-        if (settings.translation) {
-          // Skip providers/providerConfigs — owned by ProviderSettings.
-          const { providers, providerConfigs, ...translationRest } = settings.translation;
-          for (const [key, value] of Object.entries(translationRest)) {
-            await store.set(`settings.translation.${key}`, value);
-          }
-        }
+        // settings.translation is not written here: providers belong to
+        // ProviderSettings, language keys to the sync-to-electron store mirror.
+        // Writing a load-time snapshot back would clobber both.
 
         if (settings.document) {
           await store.set('settings.document', settings.document);
@@ -363,7 +343,7 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
 
         if (settings.ocr) {
           // Strip runtime-only fields before persisting.
-          const { isWindows, paddleInstalled, rapidInstalled, ...ocrToSave } = settings.ocr;
+          const { isWindows: _w, paddleInstalled: _p, rapidInstalled: _r, ...ocrToSave } = settings.ocr;
           await store.set('settings.ocr', ocrToSave);
         }
 
@@ -381,19 +361,9 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
           theme: currentTheme,
         });
 
-        await store.set('settings.sourceLanguage', settings.sourceLanguage);
-        await store.set('settings.targetLanguage', settings.targetLanguage);
-        await store.set('settings.autoTranslate', settings.autoTranslate);
-        await store.set('settings.streamOutput', settings.streamOutput);
-        await store.set('settings.contextMemory', settings.contextMemory);
-        await store.set('settings.termCorrection', settings.termCorrection);
-        await store.set('settings.privacyMode', settings.privacyMode);
         if (settings.privacy) {
           await store.set('settings.privacy', settings.privacy);
         }
-        await store.set('settings.theme', settings.theme);
-        await store.set('settings.fontSize', settings.fontSize);
-        await store.set('settings.debugMode', settings.debugMode);
       } else {
         localStorage.setItem('settings', JSON.stringify(settings));
       }
@@ -404,7 +374,10 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
 
       if (settings.ocr) {
         try {
-          ocrManager.updateConfigs(settings.ocr);
+          ocrManager.updateConfigs({
+            ...settings.ocr,
+            llmEndpoint: settings.connection?.endpoint,
+          });
           logger.debug(' OCR configs updated');
         } catch (e) {
           logger.warn(' ocrManager update failed:', e);
@@ -429,32 +402,9 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
     }
   };
 
-  const testConnection = async () => {
-    setIsTesting(true);
-    setConnectionStatus('testing');
-
-    try {
-      const currentEndpoint = settings.connection.endpoint;
-
-      const result = await translationService.testConnection(currentEndpoint);
-      if (result.success) {
-        setConnectionStatus('connected');
-        setModels(result.models || []);
-        notify(t('connectionSettings.connectionSuccess', { count: result.models?.length || 0 }), 'success');
-      } else {
-        setConnectionStatus('disconnected');
-        notify(t('connectionSettings.connectionFailed') + ': ' + (result.error || result.message || t('notify.unknownError')), 'error');
-      }
-    } catch (error) {
-      setConnectionStatus('error');
-      notify(t('connectionSettings.connectionError') + ': ' + error.message, 'error');
-    } finally {
-      setIsTesting(false);
-    }
-  };
-
-  const resetSettings = (section = null) => {
-    if (!window.confirm(section ? t('settings.resetSectionConfirm', { section }) : t('settings.resetAllConfirm'))) return;
+  const resetSettings = async (section = null) => {
+    const ok = await confirm(section ? t('settings.resetSectionConfirm', { section }) : t('settings.resetAllConfirm'));
+    if (!ok) return;
 
     if (section) {
       if (DEFAULT_SETTINGS[section]) {
@@ -474,63 +424,6 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
       setSettings({ ...DEFAULT_SETTINGS });
       notify(t('settings.allReset'), 'success');
     }
-  };
-
-  const exportSettings = () => {
-    const exportData = {
-      _version: '1.0',
-      _exportedAt: new Date().toISOString(),
-      ...settings
-    };
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `t-translate-settings_${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    notify(t('settings.exported'), 'success');
-  };
-
-  const importSettings = (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const imported = JSON.parse(e.target.result);
-
-        const { _version, _exportedAt, ...settingsData } = imported;
-
-        const requiredSections = ['connection', 'translation', 'ocr', 'interface'];
-        const hasRequiredSections = requiredSections.some(s => settingsData[s]);
-
-        if (!hasRequiredSections) {
-          notify(t('settings.invalidFormat'), 'error');
-          return;
-        }
-
-        setSettings(prev => {
-          const merged = { ...prev };
-          Object.keys(settingsData).forEach(key => {
-            if (typeof settingsData[key] === 'object' && settingsData[key] !== null) {
-              merged[key] = { ...prev[key], ...settingsData[key] };
-            } else {
-              merged[key] = settingsData[key];
-            }
-          });
-          return merged;
-        });
-
-        notify(t('settings.importedPleasesSave'), 'success');
-      } catch (error) {
-        logger.error('Import settings error:', error);
-        notify(t('settings.invalidFile'), 'error');
-      }
-    };
-    reader.readAsText(file);
-    event.target.value = null;
   };
 
   // silent=true skips the dirty flag (used when child components emit
@@ -574,6 +467,7 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
               settings={settings}
               updateSetting={updateSetting}
               notify={notify}
+              confirm={confirm}
             />
           );
       case 'ocr':
@@ -582,6 +476,7 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
             settings={settings}
             updateSetting={updateSetting}
             notify={notify}
+            confirm={confirm}
             collapsedGroups={collapsedGroups}
             toggleGroup={toggleGroup}
             showApiKeys={showApiKeys}
@@ -619,6 +514,7 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
             settings={settings}
             updateSetting={updateSetting}
             notify={notify}
+            confirm={confirm}
             useStreamOutput={useStreamOutput}
             setUseStreamOutput={setUseStreamOutput}
             autoTranslate={autoTranslate}
@@ -726,6 +622,7 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
           </div>
         )}
       </div>
+      {confirmDialog}
     </div>
   );
 };

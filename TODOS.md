@@ -61,6 +61,14 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 - **PDF 阅读器矩阵重测** — Adobe 已确认不行；重测 Foxit / Edge 内置 / SumatraPDF，可用的写进 README 支持列表，全不可用则 debug 剪贴板路径（[native-helper.js](electron/utils/native-helper.js) `simulateCtrlC` + `checkSelectionViaClipboard`）
 - **验收**：应用矩阵清单（Chrome/Edge/VSCode/Word/Excel/Outlook/Acrobat/Foxit/IntelliJ/Windows Terminal/UWP 设置/记事本），逐项标注走哪一层、已知限制
 
+### PP-OCRv6 ONNX 实测（能否喂进 esearch-ocr）
+
+PP-OCRv6 已发布（2026-06-11，[官方介绍](https://www.paddleocr.ai/main/en/version3.x/algorithm/PP-OCRv6/PP-OCRv6.html)）：PPLCNetV4 骨干，tiny/small/medium 三档（1.5M-34.5M 参数），medium 对 v5_server 识别 +5.1%/检测 +4.6%，**单模型 50 语言**（简繁中/英/日 + 46 拉丁语系，靠词表扩 ~200 变音字符）。CTC 解码保留、官方有 ONNX 导出与浏览器部署文档。
+
+- **实验**：Paddle2ONNX 导出 v6 tiny/small 的 det/rec + 字典，直接喂 esearch-ocr（8.5.0 尚未官方跟进 v6）跑 temp/ 的 probe 8 场景；风险点 = rec 非对称 stride 的输入形状与字典格式是否匹配 esearch-ocr 加载假设
+- **成了的话**：走"模型热更新只改 Release"路径（改 `ocr-models` tag 资产 + manifest），**拉丁语言包可删**（被基础模型吸收）；韩/西里尔/天城/阿拉伯不在 50 语言内，四包保留
+- 顺带记录：百度 Unlimited-OCR（2026-06-22，MIT，3B MoE 长文档一次通读）只有 NVIDIA GPU 路径（transformers/vLLM/SGLang，无 GGUF/CPU），不适合替代本地引擎；但 vLLM 镜像是 OpenAI 兼容 API，有 N 卡的用户可把连接端点指向它、llm-vision 引擎零改动直连——可写 FAQ，等 Ollama/GGUF 生态跟进再考虑内置
+
 ### 翻译栈下沉主进程评估
 
 主窗口/划词/玻璃窗三个 renderer 各持一份 provider 实例 + L1 缓存 + failure count，互不共享；L2 经 localStorage 共享但写入互相覆盖。下沉主进程后：跨窗口缓存命中、密钥单点解密、隐私模式单点强制。改动大，与下条 provider 合并评估同档期权衡。
@@ -89,11 +97,11 @@ Copilot 在 v0.2.4 PR 审查发现的既有问题。`translateText` 内部硬编
 
 v0.2.5 Phase T 装通 eslint 9 后跑 `npm run lint` 出 539 warnings + 21 pre-existing errors（已在 eslint.config.js per-file 降级兜底）。历史累积，需要逐个清：
 - `src/i18n/locales/{en,zh}.js`: 重复 key (selectStyle / notify) — 后定义静默覆盖前定义（docParser 对已在 0.2.9 文档翻译体检中合并）
-- `src/App.jsx`: 8 个 `react-hooks/rules-of-hooks` errors — hook 在 early return 后调
+- ~~`src/App.jsx`: 9 个 `react-hooks/rules-of-hooks`（实测 9 非 8）~~ 0.2.9 主面板体检已根修：拆掉包裹全部 hooks 的 try/catch（ErrorBoundary 在 main.jsx 已有），per-file 豁免同步删除
 - `src/utils/logger.js`: `??` 左侧 constant 是 dead code
-- eslint 未启用 `react/jsx-uses-vars`，JSX 引用的组件/图标全报 no-unused-vars 误报（0.2.9 审计时确认）
+- eslint 未启用 `react/jsx-uses-vars`，JSX 引用的组件/图标全报 no-unused-vars 误报（0.2.9 审计时确认，主面板体检批次⑤处理）
 
-清完后删 eslint.config.js 里的 per-file override，恢复全局严格。
+App.jsx 的 per-file override 已删（0.2.9）；其余清完后恢复全局严格。
 
 ### Provider 层存量硬编码中文字符串迁 i18n
 

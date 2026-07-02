@@ -8,6 +8,7 @@ import { ocrManager } from '../providers/ocr/index.js';
 import useTranslationStore from '../stores/translation-store.js';
 
 import { PRIVACY_MODES, TRANSLATION_STATUS } from '@config/defaults';
+import { getPrivacyModeConfig } from '../config/privacy-modes.js';
 import createLogger from '../utils/logger.js';
 import i18n from '../i18n.js';
 const logger = createLogger('MainTranslation');
@@ -18,7 +19,7 @@ const _t = (key, fallback) => {
 
 class MainTranslationService {
   constructor() {
-    this._isTranslating = false;
+    this._ocrConfigsLoaded = false;
   }
 
   // Picks stream vs one-shot based on user preference in the store
@@ -50,6 +51,8 @@ class MainTranslationService {
       draft.currentTranslation.error = null;
       draft.currentTranslation.translatedText = '';
       draft.currentTranslation.id = translationId;
+      // Stale glossary notice (and its undo) must not linger over a new run
+      draft.currentTranslation.glossaryApplied = null;
     });
 
     try {
@@ -68,6 +71,8 @@ class MainTranslationService {
         // Per-chunk UI update for typewriter effect
         (fullText) => {
           useTranslationStore.setState((draft) => {
+            // Drop chunks from a superseded run (cleared or re-translated)
+            if (draft.currentTranslation.id !== translationId) return;
             draft.currentTranslation.translatedText = fullText;
           });
         }
@@ -77,6 +82,8 @@ class MainTranslationService {
 
       if (result.success) {
         useTranslationStore.setState((draft) => {
+          // Superseded run must not touch UI state or write history
+          if (draft.currentTranslation.id !== translationId) return;
           draft.currentTranslation.status = TRANSLATION_STATUS.SUCCESS;
           draft.currentTranslation.translatedText = result.text;
           draft.currentTranslation.metadata = {
@@ -128,6 +135,7 @@ class MainTranslationService {
     } catch (error) {
       logger.error('Stream translation error:', error);
       useTranslationStore.setState((draft) => {
+        if (draft.currentTranslation.id !== translationId) return;
         draft.currentTranslation.status = TRANSLATION_STATUS.ERROR;
         draft.currentTranslation.error = error.message;
       });
@@ -151,6 +159,7 @@ class MainTranslationService {
       draft.currentTranslation.status = TRANSLATION_STATUS.TRANSLATING;
       draft.currentTranslation.error = null;
       draft.currentTranslation.id = translationId;
+      draft.currentTranslation.glossaryApplied = null;
     });
 
     try {
@@ -169,6 +178,7 @@ class MainTranslationService {
 
       if (result.success) {
         useTranslationStore.setState((draft) => {
+          if (draft.currentTranslation.id !== translationId) return;
           draft.currentTranslation.translatedText = result.text;
           draft.currentTranslation.status = TRANSLATION_STATUS.SUCCESS;
           draft.currentTranslation.metadata = {
@@ -219,6 +229,7 @@ class MainTranslationService {
     } catch (error) {
       logger.error('Translation error:', error);
       useTranslationStore.setState((draft) => {
+        if (draft.currentTranslation.id !== translationId) return;
         draft.currentTranslation.status = TRANSLATION_STATUS.ERROR;
         draft.currentTranslation.error = error.message;
       });
@@ -294,11 +305,27 @@ class MainTranslationService {
     return results;
   }
 
+  // ocrManager starts with empty configs in this renderer — feed it the
+  // persisted OCR settings once before first use (SettingsPanel re-feeds on
+  // every save). Without this, online-engine API keys are lost on restart.
+  async _ensureOcrConfigs() {
+    if (this._ocrConfigsLoaded) return;
+    this._ocrConfigsLoaded = true;
+    try {
+      const settings = await window.electron?.store?.get?.('settings') || {};
+      ocrManager.updateConfigs({
+        ...(settings.ocr || {}),
+        llmEndpoint: settings.connection?.endpoint,
+      });
+    } catch { /* browser mode: engine defaults apply */ }
+  }
+
   async recognizeImage(image, options = {}) {
     if (!ocrManager) {
       return { success: false, error: 'OCR not initialized' };
     }
 
+    await this._ensureOcrConfigs();
     const state = useTranslationStore.getState();
 
     useTranslationStore.setState((draft) => {
@@ -310,6 +337,8 @@ class MainTranslationService {
       const result = await ocrManager.recognize(image, {
         engine: state.ocrStatus.engine,
         ...options,
+        // Last so no call site can widen the engine set beyond the privacy mode
+        allowedEngines: getPrivacyModeConfig(state.translationMode).allowedOcrEngines || undefined,
       });
 
       if (result.success) {

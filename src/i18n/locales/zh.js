@@ -213,8 +213,7 @@ const zh = {
     modes: {
       standard: "标准模式", standardDesc: "功能全开，自动保存历史记录",
       incognito: "无痕模式", incognitoDesc: "不保存任何记录，关闭窗口即清除",
-      offline: "离线模式", offlineDesc: "完全离线，不发送任何网络请求",
-      strict: "严格模式", strictDesc: "最高隐私保护，仅本地处理"
+      offline: "离线模式", offlineDesc: "完全离线，不发送任何网络请求"
     },
     clearHistoryConfirm: "确定要清除所有翻译历史吗？",
     historyCleared: "历史记录已清除",
@@ -333,7 +332,7 @@ const zh = {
     shortcuts: { title: "快捷键设置", desc: "自定义全局快捷键", showWindow: "显示/隐藏主窗口", screenshot: "截图翻译", floatingWindow: "悬浮窗口", selectionToggle: "开启/关闭划词翻译", recording: "按下快捷键...", conflict: "快捷键冲突", reset: "重置默认" },
     privacy: {
       title: "隐私设置", mode: "隐私模式", modeDesc: "控制数据存储和网络请求",
-      modes: { standard: "标准模式", standardDesc: "正常功能，记录历史", offline: "离线模式", offlineDesc: "仅使用本地翻译源", incognito: "无痕模式", incognitoDesc: "不记录历史和缓存", strict: "严格模式", strictDesc: "离线 + 无痕" },
+      modes: { standard: "标准模式", standardDesc: "正常功能，记录历史", offline: "离线模式", offlineDesc: "仅使用本地翻译源", incognito: "无痕模式", incognitoDesc: "不记录历史和缓存" },
       clearHistory: "清除历史记录", clearCache: "清除缓存", clearAll: "清除所有数据"
     },
     tts: { title: "语音设置", enable: "启用 TTS", enableDesc: "开启翻译结果语音朗读", voice: "语音", voiceDesc: "选择朗读语音", rate: "语速", rateDesc: "调整朗读速度", pitch: "音调", pitchDesc: "调整语音音调", volume: "音量", volumeDesc: "调整朗读音量", test: "测试", testText: "这是一段测试文本" },

@@ -26,7 +26,6 @@ const CHANNELS = {
   APP: {
     GET_VERSION: 'get-app-version',
     GET_PLATFORM: 'get-platform',
-    HEALTH_CHECK: 'api:health-check',
     CHECK_UPDATE: 'app:check-update',
     DOWNLOAD_UPDATE: 'app:download-update',
     INSTALL_UPDATE: 'app:install-update',
@@ -169,7 +168,9 @@ const MENU_ACTIONS = {
 const PRIVACY_MODES = {
   STANDARD: 'standard',
   OFFLINE: 'offline',
-  STRICT: 'strict',
+  // SECURE was missing here, so privacy:setMode('secure') failed validation
+  // and the main-process mode key silently kept its previous value.
+  SECURE: 'secure',
 };
 
 module.exports = { CHANNELS, MENU_ACTIONS, PRIVACY_MODES };

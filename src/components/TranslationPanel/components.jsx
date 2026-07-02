@@ -1,107 +1,12 @@
 // Memoized sub-components for TranslationPanel — split out to keep the main
 // component's re-render footprint small.
 
-import React, { memo, useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  X, Check, Lightbulb, ArrowRight, Palette, ChevronUp, ChevronDown,
+  X, Check, Palette,
   Sparkles, Loader2, Tag, FileEdit, Bot, RotateCcw
 } from 'lucide-react';
-
-export const TermSuggestionBar = memo(({
-  suggestions,
-  onApply,
-  onDismiss,
-  onAlwaysUse
-}) => {
-  const { t } = useTranslation();
-  if (!suggestions || suggestions.length === 0) return null;
-
-  return (
-    <div className="term-suggestions-bar">
-      <div className="term-suggestions-header">
-        <Lightbulb size={14} />
-        <span>{t('translation.termFound', '术语一致性提示')}</span>
-        <span className="badge">{suggestions.length}</span>
-      </div>
-      <div className="term-suggestions-list">
-        {suggestions.map(suggestion => (
-          <div key={suggestion.id} className="term-suggestion-item">
-            <div className="term-info">
-              <span className="term-original">"{suggestion.originalTerm}"</span>
-              <ArrowRight size={12} />
-              <span className="term-saved">"{suggestion.savedTranslation}"</span>
-              {suggestion.note && (
-                <span className="term-note">({suggestion.note})</span>
-              )}
-            </div>
-            <div className="term-actions">
-              <button
-                className="btn-apply"
-                onClick={() => onApply(suggestion)}
-                title={t('translation.applyTerm', '应用此术语')}
-              >
-                <Check size={12} /> {t('translation.apply', '应用')}
-              </button>
-              <button
-                className="btn-always"
-                onClick={() => onAlwaysUse(suggestion)}
-                title={t('translation.alwaysUseTerm', '始终使用此术语')}
-              >
-                {t('translation.always', '始终')}
-              </button>
-              <button
-                className="btn-dismiss"
-                onClick={() => onDismiss(suggestion, false)}
-                title={t('translation.ignoreTerm', '忽略（本次）')}
-              >
-                <X size={12} />
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-});
-TermSuggestionBar.displayName = 'TermSuggestionBar';
-
-export const VersionMenu = memo(({
-  versions,
-  currentVersionId,
-  onSwitch,
-  onClose,
-  getVersionName
-}) => {
-  if (!versions || versions.length === 0) return null;
-
-  return (
-    <div className="version-menu">
-      <div className="version-menu-header">
-        <span>译文版本</span>
-        <button onClick={onClose}><X size={14} /></button>
-      </div>
-      <div className="version-list">
-        {versions.map(version => (
-          <div
-            key={version.id}
-            className={`version-item ${version.id === currentVersionId ? 'active' : ''}`}
-            onClick={() => onSwitch(version.id)}
-          >
-            <div className="version-info">
-              <span className="version-name">{getVersionName(version)}</span>
-              <span className="version-time">
-                {new Date(version.createdAt).toLocaleTimeString()}
-              </span>
-            </div>
-            {version.id === currentVersionId && <Check size={14} />}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-});
-VersionMenu.displayName = 'VersionMenu';
 
 export const StyleModal = memo(({
   show,
@@ -341,32 +246,6 @@ export const SaveModal = memo(({
 });
 SaveModal.displayName = 'SaveModal';
 
-export const TemplateSelector = memo(({
-  templates,
-  selectedTemplate,
-  onSelect
-}) => {
-  return (
-    <div className="template-selector">
-      {templates.map(template => {
-        const Icon = template.icon;
-        return (
-          <button
-            key={template.id}
-            className={`template-btn ${selectedTemplate === template.id ? 'active' : ''}`}
-            onClick={() => onSelect(template.id)}
-            title={template.desc}
-          >
-            <Icon size={14} />
-            <span>{template.name}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
-});
-TemplateSelector.displayName = 'TemplateSelector';
-
 // Shared language selector across TranslationPanel, DocumentTranslator, etc.
 // size: 'default' for hero selectors, 'compact' for toolbar usage.
 export const LanguageSelector = memo(({
@@ -405,12 +284,3 @@ export const LanguageSelector = memo(({
   );
 });
 LanguageSelector.displayName = 'LanguageSelector';
-
-export default {
-  TermSuggestionBar,
-  VersionMenu,
-  StyleModal,
-  SaveModal,
-  TemplateSelector,
-  LanguageSelector
-};

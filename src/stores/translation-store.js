@@ -3,12 +3,11 @@
 // Floating window uses a separate stores/session.js + services/pipeline.js.
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, subscribeWithSelector } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 import { v4 as uuidv4 } from "uuid";
 
-import { PRIVACY_MODES, TRANSLATION_STATUS, LANGUAGE_CODES, DEFAULTS, PROVIDER_IDS, LANGUAGES } from "@config/defaults";
-import { getModeFeatures } from "@config/privacy-modes";
+import { PRIVACY_MODES, TRANSLATION_STATUS, LANGUAGE_CODES, DEFAULTS, LANGUAGES } from "@config/defaults";
 import createLogger from '../utils/logger.js';
 const logger = createLogger('TranslationStore');
 
@@ -94,7 +93,10 @@ const getMainTranslation = async () => {
 };
 
 const useTranslationStore = create(
-  persist(
+  // subscribeWithSelector: sync-to-electron.js subscribes with (selector,
+  // listener, options) — without this middleware vanilla subscribe treats the
+  // selector as the listener and the whole sync layer silently no-ops.
+  subscribeWithSelector(persist(
     immer((set, get) => ({
       translationMode: PRIVACY_MODES.STANDARD,
       useStreamOutput: true,
@@ -140,16 +142,10 @@ const useTranslationStore = create(
         fallbackNotice: null,
       },
 
-      pendingScreenshot: null,
-
       statistics: {
         totalTranslations: 0,
         totalCharacters: 0,
         todayTranslations: 0,
-        weekTranslations: 0,
-        mostUsedLanguagePair: null,
-        averageTranslationTime: 0,
-        lastUpdated: new Date().toISOString(),
       },
 
       clipboard: {
@@ -176,10 +172,6 @@ const useTranslationStore = create(
               totalTranslations: 0,
               totalCharacters: 0,
               todayTranslations: 0,
-              weekTranslations: 0,
-              mostUsedLanguagePair: null,
-              averageTranslationTime: 0,
-              lastUpdated: new Date().toISOString(),
             };
           }
 
@@ -194,19 +186,6 @@ const useTranslationStore = create(
             }
           }
         }),
-
-      isFeatureEnabled: (featureName) => {
-        const mode = get().translationMode;
-        const features = getModeFeatures(mode);
-        return features[featureName] !== false;
-      },
-
-      // Offline mode only permits local LLM + Ollama
-      isProviderAllowed: (providerId) => {
-        const mode = get().translationMode;
-        if (mode !== PRIVACY_MODES.OFFLINE) return true;
-        return providerId === PROVIDER_IDS.LOCAL_LLM || providerId === PROVIDER_IDS.OLLAMA;
-      },
 
       setUseStreamOutput: (value) =>
         set((state) => {
@@ -251,13 +230,6 @@ const useTranslationStore = create(
           state.currentTranslation.translatedText = '';
           state.currentTranslation.status = TRANSLATION_STATUS.IDLE;
           state.currentTranslation.error = null;
-          // Mirror to electron-store so main can read it (selection translate, etc.)
-          try {
-            const src = source || state.currentTranslation.sourceLanguage;
-            const tgt = target || state.currentTranslation.targetLanguage;
-            window.electron?.store?.set('settings.translation.sourceLanguage', src);
-            window.electron?.store?.set('settings.translation.targetLanguage', tgt);
-          } catch {}
         }),
 
       setTargetLanguage: (target) =>
@@ -267,9 +239,6 @@ const useTranslationStore = create(
             target = DEFAULTS.TARGET_LANGUAGE;
           }
           if (target) state.currentTranslation.targetLanguage = target;
-          try {
-            window.electron?.store?.set('settings.translation.targetLanguage', target);
-          } catch {}
         }),
 
       swapLanguages: () =>
@@ -280,10 +249,6 @@ const useTranslationStore = create(
           state.currentTranslation.sourceLanguage =
             state.currentTranslation.targetLanguage;
           state.currentTranslation.targetLanguage = temp;
-          try {
-            window.electron?.store?.set('settings.translation.sourceLanguage', state.currentTranslation.sourceLanguage);
-            window.electron?.store?.set('settings.translation.targetLanguage', state.currentTranslation.targetLanguage);
-          } catch {}
 
           const tempText = state.currentTranslation.sourceText;
           state.currentTranslation.sourceText =
@@ -316,16 +281,6 @@ const useTranslationStore = create(
       setOcrEngine: (engine) =>
         set((state) => {
           state.ocrStatus.engine = engine;
-        }),
-
-      setPendingScreenshot: (dataURL) =>
-        set((state) => {
-          state.pendingScreenshot = dataURL;
-        }),
-
-      clearPendingScreenshot: () =>
-        set((state) => {
-          state.pendingScreenshot = null;
         }),
 
       addToFavorites: (item = null, isStyleReference = false) =>
@@ -440,12 +395,16 @@ const useTranslationStore = create(
 
       clearCurrent: () =>
         set((state) => {
+          // Null id makes an in-flight stream fail its identity check instead
+          // of resurrecting text into the cleared panel
+          state.currentTranslation.id = null;
           state.currentTranslation.sourceText = "";
           state.currentTranslation.translatedText = "";
           state.currentTranslation.status = "idle";
           state.currentTranslation.error = null;
           state.currentTranslation.versions = [];
           state.currentTranslation.currentVersionId = null;
+          state.currentTranslation.glossaryApplied = null;
         }),
 
       clearHistory: () =>
@@ -457,21 +416,6 @@ const useTranslationStore = create(
 
       // ===== Privacy mode helpers =====
 
-      canSaveHistory: () => {
-        const state = get();
-        return state.translationMode !== PRIVACY_MODES.SECURE;
-      },
-
-      canUseOnlineApi: () => {
-        const state = get();
-        return state.translationMode !== PRIVACY_MODES.OFFLINE;
-      },
-
-      canUseCache: () => {
-        const state = get();
-        return state.translationMode !== PRIVACY_MODES.SECURE;
-      },
-
       // Single source for the privacy fields every translationService call
       // must carry — the service defaults privacyMode to STANDARD, which has
       // twice shipped offline/secure-mode leaks from call sites forgetting it.
@@ -481,33 +425,6 @@ const useTranslationStore = create(
           privacyMode: mode,
           useCache: mode !== PRIVACY_MODES.SECURE,
         };
-      },
-
-      getModeConfig: () => {
-        const state = get();
-        const configs = {
-          standard: {
-            saveHistory: true,
-            useCache: true,
-            onlineApi: true,
-            analytics: true,
-          },
-          secure: {
-            saveHistory: false,
-            useCache: false,
-            onlineApi: true,
-            analytics: false,
-          },
-          offline: {
-            saveHistory: true,
-            useCache: true,
-            onlineApi: false,
-            analytics: true,
-            allowedProviders: [PROVIDER_IDS.LOCAL_LLM, PROVIDER_IDS.OLLAMA],
-            allowedOcrEngines: ['llm-vision', 'rapid-ocr', 'windows-ocr'],
-          }
-        };
-        return configs[state.translationMode] || configs.standard;
       },
 
       // External callers (e.g. floating window) route through this, so privacy
@@ -674,15 +591,6 @@ const useTranslationStore = create(
         );
       },
 
-      getStatistics: () => {
-        const state = get();
-        // Bump lastUpdated so observers get a fresh value
-        set((state) => {
-          state.statistics.lastUpdated = new Date().toISOString();
-        });
-        return state.statistics;
-      },
-
       // Glossary terms live in the favorites pile under folderId === 'glossary'
       getGlossaryTerms: () => {
         const state = get();
@@ -694,15 +602,6 @@ const useTranslationStore = create(
           }))
           .filter(term => term.source && term.target);
       },
-
-      reset: () =>
-        set((state) => {
-          const { sourceLanguage, targetLanguage } = state.currentTranslation;
-          state.currentTranslation.sourceText = "";
-          state.currentTranslation.translatedText = "";
-          state.history = [];
-          state.favorites = [];
-        }),
     })),
     {
       name: "translation-store",
@@ -712,7 +611,10 @@ const useTranslationStore = create(
         return {
           ...currentState,
           ...persistedState,
-          translationMode: persistedState.translationMode || currentState.translationMode,
+          // 'strict' was removed in 0.2.9 — its core promise (no network) maps to offline
+          translationMode: persistedState.translationMode === 'strict'
+            ? PRIVACY_MODES.OFFLINE
+            : (persistedState.translationMode || currentState.translationMode),
           // Persist langs only — never restore in-flight translation text
           currentTranslation: {
             ...currentState.currentTranslation,
@@ -721,6 +623,11 @@ const useTranslationStore = create(
             sourceText: "",
             translatedText: "",
           },
+          // Partialize keeps only {engine}; restore the runtime fields' defaults
+          ocrStatus: {
+            ...currentState.ocrStatus,
+            ...(persistedState.ocrStatus || {}),
+          },
         };
       },
       partialize: (state) => ({
@@ -728,6 +635,14 @@ const useTranslationStore = create(
         favorites: state.favorites,
         statistics: state.statistics,
         translationMode: state.translationMode,
+        autoTranslate: state.autoTranslate,
+        useStreamOutput: state.useStreamOutput,
+        autoTranslateDelay: state.autoTranslateDelay,
+        // Secure-mode stash must survive a quit-while-secure: without these,
+        // the emptied history/statistics are what lands on disk and the real
+        // data is unrecoverable after restart.
+        _savedHistory: state._savedHistory,
+        _savedStatistics: state._savedStatistics,
         currentTranslation: {
           sourceLanguage: state.currentTranslation.sourceLanguage,
           targetLanguage: state.currentTranslation.targetLanguage,
@@ -735,7 +650,7 @@ const useTranslationStore = create(
         ocrStatus: { engine: state.ocrStatus.engine },
       }),
     }
-  )
+  ))
 );
 
 export default useTranslationStore;

@@ -531,17 +531,6 @@
     font-size: 14px;
   }
 
-  .privacy-panel {
-    padding: 12px;
-  }
-
-  .translation-modes {
-    flex-direction: column;
-  }
-
-  .mode-btn {
-    justify-content: flex-start;
-  }
 }
 /* ==================== Animations ==================== */
 .animate-spin {
@@ -553,52 +542,9 @@
   to { transform: rotate(360deg); }
 }
 
-.fade-in {
-  animation: fadeIn 0.3s ease;
-}
-
+/* keyframes only — .fade-in had no JSX consumers; dark-mode overrides live in dark.css */
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
-}
-
-.slide-in {
-  animation: slideIn 0.3s ease;
-}
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* ==================== Dark mode ==================== */
-[data-theme="dark"] .translation-box {
-  background: var(--bg-secondary);
-}
-
-[data-theme="dark"] .translation-textarea {
-  background: rgba(0, 0, 0, 0.2);
-}
-
-[data-theme="dark"] .translation-textarea:focus {
-  background: rgba(0, 0, 0, 0.3);
-}
-
-[data-theme="dark"] .privacy-panel {
-  background: var(--bg-secondary);
-}
-
-[data-theme="dark"] .translate-btn {
-  box-shadow: 0 4px 15px rgba(96, 165, 250, 0.2);
-}
-
-[data-theme="dark"] .translate-btn:hover:not(:disabled) {
-  box-shadow: 0 6px 20px rgba(96, 165, 250, 0.3);
 }
 

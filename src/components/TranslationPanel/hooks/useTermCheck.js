@@ -2,13 +2,13 @@
 // canonical translation when the LLM picked a different rendering.
 
 import { useState, useCallback } from 'react';
+import useTranslationStore from '../../../stores/translation-store';
 import createLogger from '../../../utils/logger.js';
 
 const logger = createLogger('useTermCheck');
 
 export default function useTermCheck(favorites, setTranslatedText, notify, t) {
   const [termSuggestions, setTermSuggestions] = useState([]);
-  const [dismissedTerms, setDismissedTerms] = useState(new Set());
 
   const checkTermConsistency = useCallback((sourceText, translatedText) => {
     if (!favorites || favorites.length === 0) return;
@@ -22,6 +22,8 @@ export default function useTermCheck(favorites, setTranslatedText, notify, t) {
 
     glossaryItems.forEach(fav => {
       if (!fav.sourceText || !fav.translatedText) return;
+      // '不再提示' persisted on the favorite itself (survives restart/export)
+      if (fav.termNoRemind) return;
 
       const favSourceLower = fav.sourceText.toLowerCase().trim();
       const favTranslatedLower = fav.translatedText.toLowerCase().trim();
@@ -42,9 +44,8 @@ export default function useTermCheck(favorites, setTranslatedText, notify, t) {
       }
     });
 
-    const filtered = suggestions.filter(s => !dismissedTerms.has(s.id));
-    setTermSuggestions(filtered);
-  }, [favorites, dismissedTerms]);
+    setTermSuggestions(suggestions);
+  }, [favorites]);
 
   // Three-tier substitution: exact match -> word-of-term match -> manual via clipboard
   const applyTermSuggestion = useCallback((suggestion, currentTranslatedText) => {
@@ -90,15 +91,15 @@ export default function useTermCheck(favorites, setTranslatedText, notify, t) {
     setTermSuggestions(prev => prev.filter(s => s.id !== suggestion.id));
   }, [setTranslatedText, notify, t]);
 
-  // permanent=true adds to the dismiss set; otherwise just hides for this translation
-  const dismissTermSuggestion = useCallback((suggestion, permanent = false) => {
+  // Hides the suggestion for this translation only — next translation re-checks
+  const dismissTermSuggestion = useCallback((suggestion) => {
     setTermSuggestions(prev => prev.filter(s => s.id !== suggestion.id));
-    if (permanent) {
-      setDismissedTerms(prev => new Set([...prev, suggestion.id]));
-    }
   }, []);
 
   const alwaysUseTerm = useCallback((suggestion) => {
+    // suggestion.id IS the glossary favorite's id — persist the choice on it
+    // so it survives restarts and rides along with favorites export/import
+    useTranslationStore.getState().updateFavoriteItem(suggestion.id, { termNoRemind: true });
     notify(
       t('translation.termSet') + `: "${suggestion.originalTerm}" → "${suggestion.savedTranslation}"`,
       'success'

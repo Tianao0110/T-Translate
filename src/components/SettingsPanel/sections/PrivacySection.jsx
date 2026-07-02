@@ -1,6 +1,6 @@
 // Privacy mode picker + data-management actions.
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Zap, Shield, Lock, CheckCircle, AlertCircle, Trash2 } from 'lucide-react';
 import useTranslationStore from '../../../stores/translation-store';
@@ -16,10 +16,12 @@ const formatBytes = (bytes) => {
 const PrivacySection = ({
   settings,
   updateSetting,
-  notify
+  notify,
+  confirm
 }) => {
   const { t } = useTranslation();
-  const currentMode = useTranslationStore.getState().translationMode || PRIVACY_MODE_IDS.STANDARD;
+  // Reactive subscription — nothing else re-renders this section on mode change
+  const currentMode = useTranslationStore((s) => s.translationMode) || PRIVACY_MODE_IDS.STANDARD;
   const modeConfig = PRIVACY_MODES[currentMode];
 
   // PRIVACY_MODES stores icon names as strings (so the config file stays
@@ -39,7 +41,6 @@ const PrivacySection = ({
       [PRIVACY_MODE_IDS.STANDARD]: 'privacy.modes.standard',
       [PRIVACY_MODE_IDS.OFFLINE]: 'privacy.modes.offline',
       [PRIVACY_MODE_IDS.SECURE]: 'privacy.modes.incognito',
-      [PRIVACY_MODE_IDS.STRICT]: 'privacy.modes.strict',
     };
     return t(modeKeys[modeId] || 'privacy.modes.standard');
   };
@@ -49,7 +50,6 @@ const PrivacySection = ({
       [PRIVACY_MODE_IDS.STANDARD]: 'privacy.modes.standardDesc',
       [PRIVACY_MODE_IDS.OFFLINE]: 'privacy.modes.offlineDesc',
       [PRIVACY_MODE_IDS.SECURE]: 'privacy.modes.incognitoDesc',
-      [PRIVACY_MODE_IDS.STRICT]: 'privacy.modes.strictDesc',
     };
     return t(descKeys[modeId] || 'privacy.modes.standardDesc');
   };
@@ -90,37 +90,33 @@ const PrivacySection = ({
     refreshDataStats();
   }, [refreshDataStats]);
 
-  // Mode change must hit three places: settings store, translation-store
-  // (for the secure-mode history stash), and main process (for the offline gate)
+  // Mode change hits two places: translation-store (persisted; drives the
+  // secure-mode history stash) and main process (offline gate + key access).
   const handleModeChange = (mode) => {
-    updateSetting('privacy', 'mode', mode.id);
     useTranslationStore.getState().setTranslationMode(mode.id);
     window.electron?.privacy?.setMode?.(mode.id);
     notify(t('privacy.switchedTo', { mode: getModeName(mode.id) }), 'success');
   };
 
-  const handleClearHistory = () => {
-    if (window.confirm(t('privacy.clearHistoryConfirm'))) {
-      useTranslationStore.getState().clearHistory?.();
-      notify(t('privacy.historyCleared'), 'success');
-      refreshDataStats();
-    }
+  const handleClearHistory = async () => {
+    if (!(await confirm(t('privacy.clearHistoryConfirm')))) return;
+    useTranslationStore.getState().clearHistory?.();
+    notify(t('privacy.historyCleared'), 'success');
+    refreshDataStats();
   };
 
-  const handleClearAllData = () => {
-    if (window.confirm(t('privacy.clearAllConfirm'))) {
-      localStorage.clear();
-      window.electron?.store?.clear?.();
-      window.location.reload();
-    }
+  const handleClearAllData = async () => {
+    if (!(await confirm(t('privacy.clearAllConfirm')))) return;
+    localStorage.clear();
+    window.electron?.store?.clear?.();
+    window.location.reload();
   };
 
-  const handleClearCache = () => {
-    if (window.confirm(t('translationSettings.clearCacheConfirm'))) {
-      translationService.clearCache();
-      notify(t('translationSettings.cacheCleared'), 'success');
-      refreshDataStats();
-    }
+  const handleClearCache = async () => {
+    if (!(await confirm(t('translationSettings.clearCacheConfirm')))) return;
+    translationService.clearCache();
+    notify(t('translationSettings.cacheCleared'), 'success');
+    refreshDataStats();
   };
 
   return (

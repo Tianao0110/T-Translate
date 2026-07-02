@@ -102,7 +102,9 @@ class OCREngineManager {
     return {
       'rapid-ocr': {},
       'windows-ocr': {},
-      'llm-vision': {}, // reuses the active translation provider
+      // Same OpenAI-compatible endpoint the local-LLM provider uses — the
+      // engine fetches it directly and never routes through translationService.
+      'llm-vision': settings.llmEndpoint ? { endpoint: settings.llmEndpoint } : {},
       'ocrspace': {
         apiKey: settings.ocrspaceKey || '',
         language: settings.recognitionLanguage || 'chs',

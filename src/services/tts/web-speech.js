@@ -167,6 +167,8 @@ export class WebSpeechEngine extends BaseTTSEngine {
         'zh': ['zh-CN', 'zh-TW', 'zh-HK', 'cmn', 'yue'],
         'zh-hans': ['zh-CN'],
         'zh-hant': ['zh-TW', 'zh-HK'],
+        // zh-TW is a picker option; fall back to any Chinese voice
+        'zh-tw': ['zh-TW', 'zh-HK', 'zh-CN'],
         'en': ['en-US', 'en-GB', 'en-AU', 'en-IN'],
         'ja': ['ja-JP', 'ja'],
         'ko': ['ko-KR', 'ko'],

@@ -69,28 +69,6 @@ export const PRIVACY_MODES = {
     allowedProviders: [PROVIDER_IDS.LOCAL_LLM, PROVIDER_IDS.OLLAMA],
     allowedOcrEngines: [OCR_ENGINES.LLM_VISION, OCR_ENGINES.WINDOWS_OCR, OCR_ENGINES.RAPID_OCR],
   },
-
-  [PRIVACY_MODE_IDS.STRICT]: {
-    id: PRIVACY_MODE_IDS.STRICT,
-    name: '严格模式',
-    icon: 'ShieldOff',
-    color: '#ef4444',
-    description: '最高隐私保护，仅本地处理',
-    features: {
-      saveHistory: false,
-      useCache: false,
-      onlineApi: false,
-      analytics: false,
-      autoSave: false,
-      selectionTranslate: true,
-      floatingWindow: true,
-      documentTranslate: false,
-      exportData: false,
-      ocr: true,
-    },
-    allowedProviders: [PROVIDER_IDS.LOCAL_LLM, PROVIDER_IDS.OLLAMA],
-    allowedOcrEngines: [OCR_ENGINES.LLM_VISION, OCR_ENGINES.WINDOWS_OCR],
-  },
 };
 
 export function getPrivacyModeConfig(mode) {

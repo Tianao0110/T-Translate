@@ -66,21 +66,13 @@ export const DEFAULT_SETTINGS = {
     model: '',
   },
 
+  // Live language keys are settings.translation.sourceLanguage/targetLanguage,
+  // mirrored from the zustand store by sync-to-electron.js — the settings page
+  // owns neither them nor providers (ProviderSettings does).
   translation: {
-    defaultSourceLang: defaultConfig.translation.sourceLanguage,
-    defaultTargetLang: defaultConfig.translation.targetLanguage,
     providers: [],
     providerConfigs: {},
-    subtitleProvider: null,
   },
-
-  // Flat top-level aliases preserved for backward compat with older code paths
-  sourceLanguage: defaultConfig.translation.sourceLanguage,
-  targetLanguage: defaultConfig.translation.targetLanguage,
-  autoTranslate: false,
-  streamOutput: true,
-  contextMemory: false,
-  termCorrection: true,
 
   // Document translator. Single source of truth — DocumentTranslator reads
   // this bucket at parse/translate time, so keys here must match what the
@@ -126,12 +118,7 @@ export const DEFAULT_SETTINGS = {
     stickyWarningShown: false,
   },
 
-  theme: defaultConfig.ui.theme,
-  fontSize: defaultConfig.ui.fontSize,
-
   shortcuts: { ...defaultConfig.shortcuts },
-
-  privacyMode: PRIVACY_MODE_IDS.STANDARD,
 
   // saveHistory/maxHistory/cacheEnabled/maxCache were ghost keys: persisted
   // for several versions but never consumed anywhere (history cap lives in
@@ -160,8 +147,6 @@ export const DEFAULT_SETTINGS = {
   screenshot: {
     outputMode: 'bubble', // 'bubble' | 'main'
   },
-
-  debugMode: defaultConfig.dev.debugMode,
 };
 
 export const LANGUAGE_OPTIONS = getLanguageOptions(true);
@@ -264,7 +249,6 @@ export const migrateOldSettings = (savedSettings) => {
       ...migrated.translation,
       providers: savedSettings.providers.list,
       providerConfigs: savedSettings.providers.configs,
-      subtitleProvider: savedSettings.providers.subtitleProvider,
     };
     delete migrated.providers;
   }
@@ -301,6 +285,11 @@ export const migrateOldSettings = (savedSettings) => {
   if (migrated.ocr?.engine === 'paddle-ocr') {
     migrated.ocr.engine = 'rapid-ocr';
   }
+
+  // Dead keys from the pre-0.2.9 privacy plumbing; privacy.mode would
+  // otherwise round-trip through the settings.privacy save forever.
+  delete migrated.privacyMode;
+  if (migrated.privacy) delete migrated.privacy.mode;
 
   return migrated;
 };

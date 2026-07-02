@@ -7,6 +7,11 @@ const logger = require('../utils/logger')('IPC:Privacy');
 function register(ctx) {
   const { store } = ctx;
 
+  // 'strict' was removed in 0.2.9 — its core promise (no network) maps to offline
+  if (store.get('privacyMode') === 'strict') {
+    store.set('privacyMode', 'offline');
+  }
+
   ipcMain.handle(CHANNELS.PRIVACY.SET_MODE, (event, mode) => {
     try {
       const validModes = Object.values(PRIVACY_MODES);
@@ -20,8 +25,6 @@ function register(ctx) {
       // Log mode-specific behavior so the user-visible effect is traceable.
       if (mode === PRIVACY_MODES.OFFLINE) {
         logger.info('Offline mode enabled - network features restricted');
-      } else if (mode === PRIVACY_MODES.STRICT) {
-        logger.info('Strict mode enabled - all telemetry disabled');
       }
 
       return { success: true, mode };

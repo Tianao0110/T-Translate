@@ -62,6 +62,58 @@ Style reference rules (isStyleSuggested):
   return { systemPrompt, userPrompt };
 }
 
+// Style-rewrite prompts (main panel Palette button). Bilingual for the same
+// reason as above: a Chinese instruction wrapper around non-Chinese text pulls
+// weak models into replying in Chinese.
+export function getStyleRewritePrompts(referenceText, targetText, strength) {
+  const lang = i18n.language || 'zh';
+  const isZh = lang.startsWith('zh');
+
+  const strengthDesc = isZh
+    ? (strength <= 30 ? '轻微调整，保持原意'
+      : strength <= 70 ? '中等程度模仿风格'
+      : '高度模仿，尽量贴近参考风格')
+    : (strength <= 30 ? 'Adjust lightly; keep close to the original wording'
+      : strength <= 70 ? 'Imitate the reference style to a moderate degree'
+      : 'Imitate the reference style as closely as possible');
+
+  const systemPrompt = isZh
+    ? '你是一个专业的翻译润色助手。你的任务是将译文改写成指定的风格，同时保持原文含义不变。只输出改写后的文本，不要任何解释或额外内容。'
+    : 'You are a professional translation-polishing assistant. Rewrite the given translation in the specified style while keeping its meaning unchanged. Output ONLY the rewritten text — no explanations, no extra content.';
+
+  const userPrompt = isZh
+    ? `请将以下译文改写成参考风格的语气和表达方式。
+
+参考风格示例：
+"${referenceText}"
+
+需要改写的译文：
+"${targetText}"
+
+改写要求：
+- ${strengthDesc}
+- 保持原文的核心意思不变
+- 模仿参考风格的语气、用词和句式
+
+改写后的译文：`
+    : `Rewrite the following translation to match the tone and expression of the reference style.
+
+Reference style example:
+"${referenceText}"
+
+Translation to rewrite:
+"${targetText}"
+
+Requirements:
+- ${strengthDesc}
+- Keep the core meaning unchanged
+- Imitate the reference's tone, word choice, and sentence patterns
+
+Rewritten translation:`;
+
+  return { systemPrompt, userPrompt };
+}
+
 // LLMs often wrap JSON in ``` fences despite being told not to. Throws on
 // unparseable replies — callers decide their own fallback.
 export function parseJsonReply(content) {

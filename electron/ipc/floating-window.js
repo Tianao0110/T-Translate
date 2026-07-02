@@ -2,6 +2,7 @@
 
 const { ipcMain, safeStorage } = require('electron');
 const { CHANNELS } = require('../shared/channels');
+const { isDecryptAllowed } = require('./secure-storage');
 const logger = require('../utils/logger')('IPC:FloatingWindow');
 const displayHelper = require('../utils/display-helper');
 const { t } = require('../shared/main-i18n');
@@ -122,8 +123,8 @@ function register(ctx) {
     const ocrConfig = mainSettings.ocr || {};
     const localSettings = store.get('floatingWindowLocal', {});
 
-    let currentTargetLang = mainSettings.translation?.defaultTargetLang ?? 'zh';
-    let currentSourceLang = mainSettings.translation?.defaultSourceLang ?? 'auto';
+    let currentTargetLang = mainSettings.translation?.targetLanguage ?? 'zh';
+    let currentSourceLang = mainSettings.translation?.sourceLanguage ?? 'auto';
 
     if (mainWindow && !mainWindow.isDestroyed()) {
       try {
@@ -167,41 +168,47 @@ function register(ctx) {
     return merged;
   });
 
-  // Decrypts the '***encrypted***' apiKey placeholder before returning
+  // Returns the provider list + configs with secure-storage fields decrypted.
+  // ProviderSettings (0.2.6+) writes settings.translation.providers and strips
+  // encrypted values from the persisted configs entirely, so walk the
+  // __encrypted_provider_* store keys instead of looking for placeholders.
   ipcMain.handle(CHANNELS.FLOATING_WINDOW.GET_PROVIDER_CONFIGS, async () => {
     const mainSettings = store.get('settings', {});
-    const providerSettings = mainSettings.providers || {};
+    const translation = mainSettings.translation || {};
+    const legacy = mainSettings.providers || {}; // pre-0.2.6 top-level bucket
+    const useNew = Array.isArray(translation.providers) && translation.providers.length > 0;
 
-    const configs = JSON.parse(JSON.stringify(providerSettings.configs || {}));
+    const list = useNew ? translation.providers : (legacy.list || []);
+    const configs = JSON.parse(JSON.stringify(
+      (useNew ? translation.providerConfigs : legacy.configs) || {}
+    ));
 
-    for (const providerId of Object.keys(configs)) {
-      const config = configs[providerId];
-      if (config?.apiKey === '***encrypted***') {
-        const encryptKey = `provider_${providerId}_apiKey`;
-        const stored = store.get(`__encrypted_${encryptKey}`);
-
-        if (stored) {
-          try {
-            if (safeStorage.isEncryptionAvailable()) {
-              const buffer = Buffer.from(stored, 'base64');
-              configs[providerId].apiKey = safeStorage.decryptString(buffer);
-            } else {
-              configs[providerId].apiKey = Buffer.from(stored, 'base64').toString('utf-8');
-            }
-          } catch (e) {
-            logger.error(`Failed to decrypt ${providerId} API key:`, e);
-            configs[providerId].apiKey = '';
-          }
-        } else {
-          configs[providerId].apiKey = '';
-        }
+    for (const storeKey of Object.keys(store.store)) {
+      const m = storeKey.match(/^__encrypted_(provider_([^_]+)_(.+))$/);
+      if (!m) continue;
+      const [, secureKey, providerId, field] = m;
+      // Same offline-mode gate the secure-storage IPC applies
+      if (!isDecryptAllowed(secureKey, store).allowed) continue;
+      try {
+        const buffer = Buffer.from(store.store[storeKey], 'base64');
+        configs[providerId] = configs[providerId] || {};
+        configs[providerId][field] = safeStorage.isEncryptionAvailable()
+          ? safeStorage.decryptString(buffer)
+          : buffer.toString('utf-8');
+      } catch (e) {
+        logger.error(`Failed to decrypt ${storeKey}:`, e);
       }
     }
 
-    return {
-      list: providerSettings.list || [],
-      configs,
-    };
+    // A surviving placeholder means its encrypted twin is gone — blank it so
+    // providers fail the key check instead of sending the literal placeholder.
+    for (const config of Object.values(configs)) {
+      for (const [key, value] of Object.entries(config)) {
+        if (value === '***encrypted***') config[key] = '';
+      }
+    }
+
+    return { list, configs };
   });
 
   ipcMain.handle(CHANNELS.FLOATING_WINDOW.NOTIFY_SETTINGS_CHANGED, () => {

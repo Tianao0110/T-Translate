@@ -4,6 +4,7 @@
 import { useState, useCallback } from 'react';
 import translationService from '../../../services/translation.js';
 import useTranslationStore from '../../../stores/translation-store';
+import { getStyleRewritePrompts } from '../../../utils/ai-prompts.js';
 import createLogger from '../../../utils/logger.js';
 import { getShortErrorMessage } from '../../../utils/error-handler.js';
 
@@ -36,28 +37,11 @@ export default function useStyleRewrite(currentTranslation, addStyleVersion, not
     setShowStyleModal(false);
 
     try {
-      const strengthDesc = styleStrength <= 30
-        ? '轻微调整，保持原意'
-        : styleStrength <= 70
-          ? '中等程度模仿风格'
-          : '高度模仿，尽量贴近参考风格';
-
-      const systemPrompt = `你是一个专业的翻译润色助手。你的任务是将译文改写成指定的风格，同时保持原文含义不变。只输出改写后的文本，不要任何解释或额外内容。`;
-
-      const userPrompt = `请将以下译文改写成参考风格的语气和表达方式。
-
-参考风格示例：
-"${selectedStyle.translatedText}"
-
-需要改写的译文：
-"${currentTranslation.translatedText}"
-
-改写要求：
-- ${strengthDesc}
-- 保持原文的核心意思不变
-- 模仿参考风格的语气、用词和句式
-
-改写后的译文：`;
+      const { systemPrompt, userPrompt } = getStyleRewritePrompts(
+        selectedStyle.translatedText,
+        currentTranslation.translatedText,
+        styleStrength
+      );
 
       const result = await translationService.chatCompletion(
         [
