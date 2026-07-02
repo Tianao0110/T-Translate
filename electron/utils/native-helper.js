@@ -38,6 +38,13 @@ function initWin32API() {
       rcCaret_bottom: 'int32',
     });
 
+    const RECT = koffi.struct('RECT', {
+      left: 'int32',
+      top: 'int32',
+      right: 'int32',
+      bottom: 'int32',
+    });
+
     win32API = {
       // Keyboard simulation
       keybd_event: user32.func('void keybd_event(uint8, uint8, uint32, uintptr)'),
@@ -50,8 +57,13 @@ function initWin32API() {
       GetWindowThreadProcessId: user32.func('uint32 GetWindowThreadProcessId(void*, uint32*)'),
       GetClassNameW: user32.func('int GetClassNameW(void*, uint16*, int)'),
       GetForegroundWindow: user32.func('void* GetForegroundWindow()'),
-      GetGUIThreadInfo: user32.func('int GetGUIThreadInfo(uint32, GUITHREADINFO*)'),
-      SendMessageW: user32.func('intptr SendMessageW(void*, uint32, uintptr*, uintptr*)'),
+      GetWindowRect: user32.func('int GetWindowRect(void*, _Out_ RECT* rect)'),
+      // _Inout_ so koffi copies the filled struct back to JS: cbSize goes in,
+      // the focus/caret handles come out. Without it the output was never
+      // marshaled back and focus/caret detection silently returned nothing.
+      GetGUIThreadInfo: user32.func('int GetGUIThreadInfo(uint32, _Inout_ GUITHREADINFO* info)'),
+      // Timeout variant so a hung target window can't block the main process.
+      SendMessageTimeoutW: user32.func('intptr SendMessageTimeoutW(void*, uint32, uintptr*, uintptr*, uint32, uint32, uintptr*)'),
 
       // Process info
       OpenProcess: kernel32.func('void* OpenProcess(uint32, int, uint32)'),
@@ -60,6 +72,8 @@ function initWin32API() {
 
       // Capture-affinity
       SetWindowDisplayAffinity: user32.func('SetWindowDisplayAffinity', 'bool', ['void*', 'uint']),
+
+      _koffi: koffi, // for koffi.address() pointer identity
 
       // Constants
       VK_CONTROL: 0x11,
@@ -72,6 +86,9 @@ function initWin32API() {
       WDA_EXCLUDEFROMCAPTURE: 0x00000011,
       EM_GETSEL: 0x00B0,
       GUI_CARETBLINKING: 0x0001,
+      SMTO_ABORTIFHUNG: 0x0002,
+      SMTO_BLOCK: 0x0001,
+      EM_GETSEL_TIMEOUT_MS: 200,
 
       GUITHREADINFO,
     };
@@ -129,23 +146,6 @@ function simulateCtrlC() {
   }
 }
 
-function simulateKeyPress(vkCode, scanCode = 0) {
-  if (process.platform !== 'win32') return false;
-
-  const api = initWin32API();
-  if (!api) return false;
-
-  try {
-    const { keybd_event, KEYEVENTF_KEYUP } = api;
-    keybd_event(vkCode, scanCode, 0, 0);
-    keybd_event(vkCode, scanCode, KEYEVENTF_KEYUP, 0);
-    return true;
-  } catch (e) {
-    logger.error('simulateKeyPress failed:', e);
-    return false;
-  }
-}
-
 // CapsLock LED state (the toggle), NOT the physical key-press.
 // GetKeyState low bit (0x0001) = toggle; high bit would be the physical press (not used here).
 // Fail-safe: returns false on non-Windows or API unavailable.
@@ -161,83 +161,6 @@ function isCapsLockOn() {
   } catch (e) {
     logger.error('isCapsLockOn failed:', e);
     return false;
-  }
-}
-
-// ===== Window detection =====
-
-// Returns info about the window under (x, y). Windows only.
-// Result: { className, childClassName, processName, isInputBox, isFileManager, isDesktop, isFileView }
-function getWindowInfoAtPoint(x, y) {
-  if (process.platform !== 'win32') return null;
-
-  const api = initWin32API();
-  if (!api) return null;
-
-  try {
-    const {
-      WindowFromPoint, GetAncestor, GetWindowThreadProcessId,
-      OpenProcess, CloseHandle, GetModuleBaseNameW, GetClassNameW,
-      GA_ROOT, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ,
-    } = api;
-
-    const point = { x: Math.round(x), y: Math.round(y) };
-    const childHwnd = WindowFromPoint(point);
-    if (!childHwnd) return null;
-
-    const childClassBuffer = Buffer.alloc(512);
-    GetClassNameW(childHwnd, childClassBuffer, 256);
-    const childClassName = childClassBuffer.toString('utf16le').replace(/\0/g, '');
-
-    // Top-level (root) HWND for app-level classification.
-    const rootHwnd = GetAncestor(childHwnd, GA_ROOT) || childHwnd;
-
-    const classNameBuffer = Buffer.alloc(512);
-    GetClassNameW(rootHwnd, classNameBuffer, 256);
-    const className = classNameBuffer.toString('utf16le').replace(/\0/g, '');
-
-    const pidBuffer = Buffer.alloc(4);
-    GetWindowThreadProcessId(rootHwnd, pidBuffer);
-    const pid = pidBuffer.readUInt32LE(0);
-
-    let processName = '';
-    const hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, 0, pid);
-    if (hProcess) {
-      const processNameBuffer = Buffer.alloc(512);
-      GetModuleBaseNameW(hProcess, null, processNameBuffer, 256);
-      processName = processNameBuffer.toString('utf16le').replace(/\0/g, '').toLowerCase();
-      CloseHandle(hProcess);
-    }
-
-    const inputBoxClasses = [
-      'Edit', 'RICHEDIT50W', 'RichEdit20W', 'RichEdit', 'TextBox', '_WwG',
-      'Chrome_RenderWidgetHostHWND', 'MozillaWindowClass', 'CASCADIA_HOSTING_WINDOW_CLASS',
-    ];
-
-    const fileManagerProcesses = [
-      'explorer.exe', 'totalcmd.exe', 'totalcmd64.exe',
-      'doublecmd.exe', 'xyplorer.exe', 'q-dir.exe', 'freecommander.exe',
-    ];
-
-    const desktopClasses = ['Progman', 'WorkerW'];
-
-    const fileViewClasses = [
-      'SHELLDLL_DefView', 'DirectUIHWND', 'SysListView32', 'SysTreeView32',
-      'CabinetWClass', 'ExploreWClass', 'TMyListBox', 'LCLListBox',
-    ];
-
-    return {
-      className,
-      childClassName,
-      processName,
-      isInputBox: inputBoxClasses.some(cls => childClassName.includes(cls)),
-      isFileManager: fileManagerProcesses.includes(processName),
-      isDesktop: desktopClasses.some(cls => className.includes(cls)),
-      isFileView: fileViewClasses.some(cls => className.includes(cls)),
-    };
-  } catch (e) {
-    logger.error('getWindowInfoAtPoint failed:', e);
-    return null;
   }
 }
 
@@ -269,15 +192,11 @@ function makeWindowInvisibleToCapture(electronWindow) {
 
 // ===== Three-layer selection detection =====
 
-// Debounce against repeated clipboard probes (e.g. double-click can fire two mouseups fast).
-let lastClipboardCheckTime = 0;
-const CLIPBOARD_CHECK_COOLDOWN = 100;
-
 /**
  * Three-layer selection probe.
  *   Layer 1: focus + control-class filter (cheap, zero side effects)
  *   Layer 2: standard Edit/RichEdit controls → EM_GETSEL (sync, clipboard-free)
- *   Layer 3: complex apps → clipboard fallback (separate function `checkSelectionViaClipboard`)
+ *   Layer 3: complex apps → clipboard fallback (utils/clipboard-capture.js)
  *
  * Returns { hasSelection: boolean|null, method: string, reason: string }.
  *   hasSelection === null means "Layer 1+2 can't decide, caller should run Layer 3".
@@ -302,6 +221,21 @@ function hasTextSelection() {
 
     logger.debug(`Focus window: "${focusInfo.className}" (caret: ${focusInfo.hasCaret}, usedForeground: ${focusInfo.usedForeground})`);
 
+    // Carried on every verdict so the TT_SELECTION_DEBUG probe shows whether
+    // GetGUIThreadInfo resolved the real focused control (focusResolved:true)
+    // or we fell back to the top-level foreground window — the direct health
+    // signal for the _Inout_ marshaling fix.
+    const diag = { focusResolved: !focusInfo.usedForeground, hasCaret: !!focusInfo.hasCaret };
+
+    // Focus now resolves to the real focused control (post _Inout_ fix), so
+    // the control-class lists are matched EXACTLY — a substring match would let
+    // e.g. 'OlkPeoplePickerEdit' hit the 'Edit' standard-control rule and route
+    // Outlook's picker through EM_GETSEL. Only the complex-app list stays fuzzy;
+    // it holds deliberate prefixes/substrings ('Chrome_WidgetWin_', 'Olk', 'WebView').
+    const cls = focusInfo.className;
+    const matchesExact = (list) => list.includes(cls);
+    const matchesFuzzy = (list) => list.some((c) => cls.includes(c));
+
     // Classes that definitely can't hold a text selection.
     const noTextClasses = [
       'Progman', 'WorkerW',             // Desktop
@@ -312,20 +246,22 @@ function hasTextSelection() {
       'ScrollBar',
     ];
 
-    if (noTextClasses.some(cls => focusInfo.className.includes(cls))) {
-      return { hasSelection: false, method: 'class_filter', reason: `non-text control: ${focusInfo.className}` };
+    if (matchesExact(noTextClasses)) {
+      return { hasSelection: false, method: 'class_filter', reason: `non-text control: ${cls}`, ...diag };
     }
 
     // ----- Layer 2: standard edit controls (EM_GETSEL) -----
+    // NOTE: Word's '_WwG' is deliberately NOT here — EM_GETSEL returns 0/0 on it
+    // (not a real Edit control), which would short-circuit to "no selection". It
+    // lives only in complexAppClasses so Word routes to the clipboard fallback.
     const standardEditClasses = [
       'Edit',
       'RICHEDIT50W', 'RichEdit20W', 'RichEdit',
       'RichEditD2DPT',     // Win11 Notepad
       'TextBox',           // .NET TextBox
-      '_WwG',              // Word editor surface
     ];
 
-    if (standardEditClasses.some(cls => focusInfo.className.includes(cls))) {
+    if (matchesExact(standardEditClasses)) {
       const selResult = getEditControlSelection(api, focusInfo.hwndFocus);
       if (selResult.success) {
         const hasSelection = selResult.start !== selResult.end;
@@ -333,6 +269,7 @@ function hasTextSelection() {
           hasSelection,
           method: 'em_getsel',
           reason: hasSelection ? `range ${selResult.start}-${selResult.end}` : 'empty selection',
+          ...diag,
         };
       }
       logger.debug('EM_GETSEL failed, falling back');
@@ -376,20 +313,30 @@ function hasTextSelection() {
 
       // Win11 Notepad top-level (child can be RichEditD2DPT)
       'Notepad',
+
+      // PDF readers — page views hold a selection without a Win32 caret, so
+      // they must be routed to the clipboard probe explicitly. (AVL_AVView
+      // confirmed via probe log; previously fell through to unknown_no_caret
+      // and the clipboard layer was never even attempted.)
+      'AVL_AVView',          // Adobe Acrobat / Reader page view
+      'AcrobatSDIWindow',    // Adobe top-level (focus-fallback safety)
+      'SUMATRA_PDF_FRAME',   // SumatraPDF
+      'Foxit',               // Foxit family (classFoxit… prefixes)
     ];
 
-    const isComplexApp = complexAppClasses.some(cls => focusInfo.className.includes(cls));
+    const isComplexApp = matchesFuzzy(complexAppClasses);
 
     if (isComplexApp || focusInfo.hasCaret) {
       return {
         hasSelection: null,
         method: 'needs_clipboard',
-        reason: isComplexApp ? `complex app: ${focusInfo.className}` : 'has caret, unknown control',
+        reason: isComplexApp ? `complex app: ${cls}` : 'has caret, unknown control',
+        ...diag,
       };
     }
 
     // Unknown class with no caret — most likely no selection.
-    return { hasSelection: false, method: 'unknown_no_caret', reason: `unknown class without caret: ${focusInfo.className}` };
+    return { hasSelection: false, method: 'unknown_no_caret', reason: `unknown class without caret: ${cls}`, ...diag };
 
   } catch (e) {
     logger.error('hasTextSelection error:', e);
@@ -452,14 +399,62 @@ function getFocusedWindowInfo(api) {
   };
 }
 
+// Identity + position snapshot of the foreground window. Taken at mousedown and
+// compared at mouseup: same window at a different position means the gesture was
+// a window drag (title bar), which must never fire the selection probe — the
+// probe's Ctrl+C would land in whatever the dragged app has focused (in a
+// terminal that's a SIGINT to the running process).
+function getForegroundWindowSnapshot() {
+  if (process.platform !== 'win32') return null;
+  const api = initWin32API();
+  if (!api) return null;
+  try {
+    const hwnd = api.GetForegroundWindow();
+    if (!hwnd) return null;
+    const rect = {};
+    if (!api.GetWindowRect(hwnd, rect)) return null;
+    return { id: api._koffi.address(hwnd).toString(), left: rect.left, top: rect.top };
+  } catch (e) {
+    return null;
+  }
+}
+
+// Foreground/focused control class name, for policy checks (e.g. terminal
+// detection before injecting Ctrl+C). Returns '' when unavailable.
+function getForegroundClassName() {
+  if (process.platform !== 'win32') return '';
+  const api = initWin32API();
+  if (!api) return '';
+  try {
+    return getFocusedWindowInfo(api).className || '';
+  } catch (e) {
+    return '';
+  }
+}
+
 // EM_GETSEL: read [start, end) of the current selection in a standard Edit/RichEdit.
+// Uses SendMessageTimeoutW (SMTO_ABORTIFHUNG) so a frozen target window can't
+// block the main process — a hung/timed-out call returns success:false and the
+// caller falls through to the clipboard layer.
 function getEditControlSelection(api, hwnd) {
-  const { SendMessageW, EM_GETSEL } = api;
+  const {
+    SendMessageTimeoutW, EM_GETSEL,
+    SMTO_ABORTIFHUNG, SMTO_BLOCK, EM_GETSEL_TIMEOUT_MS,
+  } = api;
 
   try {
     const startBuffer = Buffer.alloc(8);
     const endBuffer = Buffer.alloc(8);
-    SendMessageW(hwnd, EM_GETSEL, startBuffer, endBuffer);
+    const resultBuffer = Buffer.alloc(8);
+
+    const ok = SendMessageTimeoutW(
+      hwnd, EM_GETSEL, startBuffer, endBuffer,
+      SMTO_ABORTIFHUNG | SMTO_BLOCK, EM_GETSEL_TIMEOUT_MS, resultBuffer
+    );
+    if (!ok) {
+      logger.debug('EM_GETSEL timed out or target hung');
+      return { success: false };
+    }
 
     const start = startBuffer.readUInt32LE(0);
     const end = endBuffer.readUInt32LE(0);
@@ -471,116 +466,17 @@ function getEditControlSelection(api, hwnd) {
   }
 }
 
-/**
- * Layer 3: clipboard fallback. Called only when Layers 1+2 returned `null`.
- * Snapshot → Ctrl+C → wait → compare → restore. Detects selection by diff.
- *
- * @returns {Promise<{hasSelection: boolean|null, text: string}>}
- */
-async function checkSelectionViaClipboard(options = {}) {
-  if (process.platform !== 'win32') {
-    return { hasSelection: false, text: '' };
-  }
-
-  // Cooldown debounce.
-  const now = Date.now();
-  if (now - lastClipboardCheckTime < CLIPBOARD_CHECK_COOLDOWN) {
-    logger.debug('Clipboard check skipped (cooldown)');
-    return { hasSelection: null, text: '' };
-  }
-  lastClipboardCheckTime = now;
-
-  const { clipboard } = require('electron');
-
-  // Office and similar apps need longer wait + a retry — their clipboard pipeline is slow.
-  const isComplexApp = options.isComplexApp || false;
-  const waitTime = isComplexApp ? 200 : 50;
-  const maxRetries = isComplexApp ? 2 : 1;
-
-  try {
-    // Snapshot all formats so we can fully restore.
-    const snapshot = {
-      text: clipboard.readText(),
-      html: clipboard.readHTML(),
-      rtf: clipboard.readRTF(),
-    };
-
-    let currentText = snapshot.text;
-    let textChanged = false;
-
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      simulateCtrlC();
-
-      await new Promise(resolve => setTimeout(resolve, waitTime));
-
-      currentText = clipboard.readText();
-
-      textChanged = currentText !== snapshot.text;
-
-      if (textChanged) {
-        logger.debug(`Clipboard changed on attempt ${attempt + 1}`);
-        break;
-      }
-
-      if (attempt < maxRetries - 1) {
-        logger.debug(`Clipboard unchanged, retrying (attempt ${attempt + 1}/${maxRetries})`);
-      }
-    }
-
-    const hasNewContent = currentText && currentText.trim().length > 0;
-
-    // Always restore (even on miss) — caller shouldn't observe our probing.
-    if (snapshot.html) {
-      clipboard.write({ text: snapshot.text, html: snapshot.html, rtf: snapshot.rtf });
-    } else if (snapshot.text) {
-      clipboard.writeText(snapshot.text);
-    } else {
-      clipboard.clear();
-    }
-
-    // Decision:
-    //   unchanged → no selection (Ctrl+C copied nothing)
-    //   changed + non-empty → selection captured
-    //   changed but empty → rare edge, treat as no selection
-    if (!textChanged) {
-      logger.debug('Clipboard unchanged after all attempts, no selection');
-      return { hasSelection: false, text: '' };
-    }
-
-    if (hasNewContent) {
-      logger.debug(`Clipboard changed, has selection: "${currentText.substring(0, 20)}..."`);
-      return { hasSelection: true, text: currentText };
-    }
-
-    logger.debug('Clipboard changed but empty');
-    return { hasSelection: false, text: '' };
-
-  } catch (e) {
-    logger.error('checkSelectionViaClipboard error:', e);
-    return { hasSelection: null, text: '' };
-  }
-}
-
 module.exports = {
-  initWin32API,
-
   // Key simulation
   simulateCtrlC,
-  simulateKeyPress,
   isCapsLockOn,  // Sticky-direct mode reads the CapsLock toggle bit (synchronous).
 
-  // Window detection
-  getWindowInfoAtPoint,
-
-  // Three-layer selection probe
-  hasTextSelection,           // Layers 1+2 (clipboard-free)
-  checkSelectionViaClipboard, // Layer 3 (clipboard fallback)
+  // Three-layer selection probe (Layers 1+2, clipboard-free).
+  // Layer 3 clipboard fallback lives in utils/clipboard-capture.js.
+  hasTextSelection,
+  getForegroundClassName,
+  getForegroundWindowSnapshot,
 
   // Capture-exclusion
   makeWindowInvisibleToCapture,
-
-  isWin32APIAvailable: () => {
-    if (process.platform !== 'win32') return false;
-    return initWin32API() !== null;
-  },
 };

@@ -69,6 +69,18 @@ const ERROR_PATTERNS = [
     ],
   },
   {
+    // "No usable provider" is the single most common first-run failure. Without
+    // these it fell through to UNKNOWN ("操作失败：发生未知错误") — zero guidance.
+    type: ERROR_TYPES.PROVIDER,
+    patterns: [
+      /没有可用的翻译源/,
+      /所有翻译源均失败/,
+      /no\s+(usable\s+)?translation\s+provider/i,
+      /no\s+provider.*(available|configured)/i,
+      /all\s+.*providers?\s+failed/i,
+    ],
+  },
+  {
     type: ERROR_TYPES.CONFIG,
     patterns: [
       /endpoint/i,
@@ -170,11 +182,13 @@ function getProviderMessages() {
     },
     'openai': {
       api_key: _t('errors.p.openai.apiKey', 'OpenAI API Key 无效。请在设置中检查您的 API Key。'),
-      quota: _t('errors.p.openai.quota', 'OpenAI API 配额已用尽。请检查您的账户余额。'),
+      // Key must be the ERROR_TYPES value ('api_quota'), not 'quota' — otherwise
+      // formatError's providerMsgs[errorType] lookup never finds it.
+      api_quota: _t('errors.p.openai.quota', 'OpenAI API 配额已用尽。请检查您的账户余额。'),
     },
     'deepl': {
       api_key: _t('errors.p.deepl.apiKey', 'DeepL API Key 无效。请确认使用的是 API Key 而非账户密码。'),
-      quota: _t('errors.p.deepl.quota', 'DeepL 免费版配额已用尽。考虑升级或切换翻译源。'),
+      api_quota: _t('errors.p.deepl.quota', 'DeepL 免费版配额已用尽。考虑升级或切换翻译源。'),
     },
     'gemini': {
       api_key: _t('errors.p.gemini.apiKey', 'Gemini API Key 无效。请前往 Google AI Studio 获取有效的 Key。'),
@@ -247,7 +261,10 @@ export function getShortErrorMessage(error, options = {}) {
     return formatted.message;
   }
 
-  return `${formatted.title}：${formatted.message}`;
+  // Locale-appropriate separator — a hardcoded full-width '：' read as mixed
+  // punctuation on the English UI.
+  const sep = i18n.language?.startsWith('zh') ? '：' : ': ';
+  return `${formatted.title}${sep}${formatted.message}`;
 }
 
 export function isRetryable(errorType) {

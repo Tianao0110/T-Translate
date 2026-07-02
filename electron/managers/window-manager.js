@@ -293,7 +293,10 @@ function createSelectionWindow() {
   selectionWindow._windowId = windowId;
   selectionWindow._isFrozen = false;
 
-  selectionWindow.setAlwaysOnTop(true, 'screen-saver');
+  // 'floating' (not 'screen-saver'): a frozen card can live for a long time, and
+  // screen-saver level would sit above the user's own pinned tools. Same rule as
+  // the floating-window overlay.
+  selectionWindow.setAlwaysOnTop(true, 'floating');
   selectionWindow.setIgnoreMouseEvents(false);
 
   if (isDev) {
@@ -327,15 +330,12 @@ function freezeSelectionWindow() {
     return { success: false, error: 'Already frozen' };
   }
 
-  // Evict oldest frozen window when at capacity (Map preserves insertion order)
+  // At capacity: refuse rather than silently closing the oldest pinned card —
+  // that card holds content the user deliberately pinned. Caller surfaces a hint
+  // and leaves this card active (it gets replaced by the next selection as usual).
   if (frozenSelectionWindows.size >= MAX_FROZEN_WINDOWS) {
-    const oldestId = frozenSelectionWindows.keys().next().value;
-    const oldestWindow = frozenSelectionWindows.get(oldestId);
-    if (oldestWindow && !oldestWindow.isDestroyed()) {
-      oldestWindow.close();
-    }
-    frozenSelectionWindows.delete(oldestId);
-    logger.debug?.(`Closed oldest frozen window ${oldestId} due to limit`);
+    logger.debug?.(`Freeze refused: at limit (${MAX_FROZEN_WINDOWS})`);
+    return { success: false, error: 'limit', frozenCount: frozenSelectionWindows.size };
   }
 
   currentWindow._isFrozen = true;
@@ -360,20 +360,6 @@ function closeFrozenSelectionWindow(windowId) {
     return { success: true };
   }
   return { success: false, error: 'Window not found' };
-}
-
-function getFrozenSelectionWindowsCount() {
-  return frozenSelectionWindows.size;
-}
-
-function closeAllFrozenSelectionWindows() {
-  for (const [id, win] of frozenSelectionWindows) {
-    if (win && !win.isDestroyed()) {
-      win.close();
-    }
-  }
-  frozenSelectionWindows.clear();
-  logger.info?.('All frozen selection windows closed');
 }
 
 // ===== Screenshot window =====
@@ -456,6 +442,4 @@ module.exports = {
   toggleFloatingWindow,
   freezeSelectionWindow,
   closeFrozenSelectionWindow,
-  getFrozenSelectionWindowsCount,
-  closeAllFrozenSelectionWindows,
 };

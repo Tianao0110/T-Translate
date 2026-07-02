@@ -1,21 +1,17 @@
 // Selection translate IPC handlers
 
-const { ipcMain, clipboard, screen } = require('electron');
+const { ipcMain, BrowserWindow } = require('electron');
 const { CHANNELS } = require('../shared/channels');
 const logger = require('../utils/logger')('IPC:Selection');
-const { simulateCtrlC } = require('../utils/native-helper');
+const { captureSelectedText, hasFileFormat } = require('../utils/clipboard-capture');
+
+// Address the window that actually sent the IPC, not the active-slot window. A
+// frozen card is detached from windows.selection, so getSelectionWindow() would
+// misroute its own hide/resize/drag onto whatever card is currently active.
+const senderWindow = (event) => BrowserWindow.fromWebContents(event.sender);
 
 function register(ctx) {
-  const { getMainWindow, getSelectionWindow, runtime, store, managers } = ctx;
-
-  // Lazy-load screenshot module (heavy native deps)
-  let screenshotModule = null;
-  const getScreenshotModule = () => {
-    if (!screenshotModule) {
-      screenshotModule = require('../screenshot-module');
-    }
-    return screenshotModule;
-  };
+  const { getMainWindow, runtime, managers } = ctx;
 
   // Collapse 3+ consecutive blank lines into 2 (paragraph detection over-produces blanks)
   const cleanTextBlankLines = (text) => {
@@ -39,8 +35,8 @@ function register(ctx) {
 
   // ===== Window control =====
 
-  ipcMain.handle(CHANNELS.SELECTION.HIDE, () => {
-    const selectionWindow = getSelectionWindow();
+  ipcMain.handle(CHANNELS.SELECTION.HIDE, (event) => {
+    const selectionWindow = senderWindow(event);
     if (selectionWindow && !selectionWindow.isDestroyed()) {
       selectionWindow.hide();
       selectionWindow.webContents.send(CHANNELS.SELECTION.HIDE);
@@ -48,16 +44,8 @@ function register(ctx) {
     return true;
   });
 
-  ipcMain.handle(CHANNELS.SELECTION.SET_POSITION, (event, x, y) => {
-    const selectionWindow = getSelectionWindow();
-    if (selectionWindow && !selectionWindow.isDestroyed()) {
-      selectionWindow.setPosition(Math.round(x), Math.round(y));
-    }
-    return true;
-  });
-
   ipcMain.handle(CHANNELS.SELECTION.SET_BOUNDS, (event, bounds) => {
-    const selectionWindow = getSelectionWindow();
+    const selectionWindow = senderWindow(event);
     if (selectionWindow && !selectionWindow.isDestroyed()) {
       selectionWindow.setBounds({
         x: Math.round(bounds.x),
@@ -69,16 +57,8 @@ function register(ctx) {
     return true;
   });
 
-  ipcMain.handle(CHANNELS.SELECTION.RESIZE, (event, { width, height }) => {
-    const selectionWindow = getSelectionWindow();
-    if (selectionWindow && !selectionWindow.isDestroyed()) {
-      selectionWindow.setSize(Math.round(width), Math.round(height));
-    }
-    return true;
-  });
-
-  ipcMain.handle(CHANNELS.SELECTION.START_DRAG, () => {
-    const selectionWindow = getSelectionWindow();
+  ipcMain.handle(CHANNELS.SELECTION.START_DRAG, (event) => {
+    const selectionWindow = senderWindow(event);
     if (selectionWindow && !selectionWindow.isDestroyed()) {
       const bounds = selectionWindow.getBounds();
       return { x: bounds.x, y: bounds.y };
@@ -86,87 +66,34 @@ function register(ctx) {
     return null;
   });
 
-  // ===== Settings =====
-
-  // Shallow-merge defaults so v0.2.3 users upgrading still get new keys with default values
-  ipcMain.handle(CHANNELS.SELECTION.GET_SETTINGS, () => {
-    const settings = store.get('settings', {});
-    const defaults = {
-      triggerIcon: 'dot',
-      triggerSize: 24,
-      triggerColor: '#3b82f6',
-      customIconPath: '',
-      hoverDelay: 300,
-      triggerTimeout: 5000,
-      resultTimeout: 3000,
-      minChars: 2,
-      maxChars: 500,
-      stickyViaCapsLock: false,
-      stickyWarningShown: false,
-    };
-    return { ...defaults, ...(settings.selection || {}) };
-  });
-
   // ===== Text capture =====
 
   // Anti-misfire: clipboard may contain a file drop instead of selected text;
-  // distinguish via available formats so we don't translate file paths blindly.
-  ipcMain.handle(CHANNELS.SELECTION.GET_TEXT, async (event, rect) => {
-    const text = await fetchSelectedText();
+  // distinguish via the formats the copy produced (read fresh inside the
+  // capture, before restore) so we don't translate file paths blindly.
+  ipcMain.handle(CHANNELS.SELECTION.GET_TEXT, async () => {
+    const { text, formats, fileClipboard } = await captureSelectedText();
 
-    const formats = clipboard.availableFormats();
+    // Clipboard held files we refused to clobber — nothing to translate.
+    if (fileClipboard) return { text: null };
 
-    const isFileDrop = formats.some(f =>
-      f.includes('FileNameW') ||
-      f.includes('FileContents') ||
-      f.includes('CF_HDROP') ||
-      f === 'text/uri-list'
-    );
-
-    if (isFileDrop) {
+    if (hasFileFormat(formats)) {
       if (text && text.trim()) {
-        const looksLikePath = /^[A-Za-z]:\\|^\/|^\\\\|^file:\/\//.test(text.trim());
-
+        const trimmed = text.trim();
+        const looksLikePath = /^[A-Za-z]:\\|^\/|^\\\\|^file:\/\//.test(trimmed);
         if (looksLikePath) {
-          const filename = extractFilenameForTranslation(text.trim());
-          if (filename) {
-            return { text: filename, method: 'filename', original: text.trim() };
-          }
-        } else {
-          // File-format present but text payload is not a path — treat as text
-          return { text: cleanTextBlankLines(text.trim()), method: 'clipboard' };
+          // A file selection — translate just the filename if it's meaningful.
+          return { text: extractFilenameForTranslation(trimmed) || null };
         }
+        // File-format present but the text isn't a path — treat as text.
+        return { text: cleanTextBlankLines(trimmed) };
       }
-
-      // No text payload: user is dragging files
-      return { text: null, method: null, reason: 'file_drop' };
+      return { text: null }; // dragging files, no text
     }
 
-    if (text && text.trim()) {
-      return { text: cleanTextBlankLines(text.trim()), method: 'clipboard' };
-    }
+    if (text && text.trim()) return { text: cleanTextBlankLines(text.trim()) };
 
-    // Clipboard path failed — try OCR fallback on the captured rect
-    const ocrRect = rect || runtime.lastSelectionRect;
-
-    if (ocrRect && ocrRect.width > 8 && ocrRect.height > 4) {
-      try {
-        const ocrText = await getTextByOCR(ocrRect, getScreenshotModule(), {
-          language: store.get('settings.ocr.recognitionLanguage', 'auto'),
-          preprocess: {
-            enabled: store.get('settings.ocr.enablePreprocess', true),
-            scale: store.get('settings.ocr.scaleFactor', 2),
-          },
-        });
-        if (ocrText && ocrText.trim()) {
-          return { text: cleanTextBlankLines(ocrText.trim()), method: 'ocr' };
-        }
-      } catch (err) {
-        logger.error('OCR failed:', err);
-      }
-    }
-
-    return { text: null, method: null };
+    return { text: null };
   });
 
   // ===== Multi-window management =====
@@ -179,19 +106,6 @@ function register(ctx) {
   ipcMain.handle(CHANNELS.SELECTION.CLOSE_FROZEN, (event, windowId) => {
     const windowManager = require('../managers/window-manager');
     return windowManager.closeFrozenSelectionWindow(windowId);
-  });
-
-  ipcMain.handle(CHANNELS.SELECTION.GET_WINDOW_ID, (event) => {
-    const selectionWindow = getSelectionWindow();
-    if (selectionWindow && !selectionWindow.isDestroyed()) {
-      return selectionWindow._windowId || null;
-    }
-    return null;
-  });
-
-  ipcMain.handle(CHANNELS.SELECTION.FROZEN_WINDOWS_COUNT, () => {
-    const windowManager = require('../managers/window-manager');
-    return windowManager.getFrozenSelectionWindowsCount();
   });
 
   // ===== Data sync =====
@@ -207,99 +121,12 @@ function register(ctx) {
 
 // ===== Helpers =====
 
-// Serialization lock: a single Promise chain ensures only one fetchSelectedText is
-// in flight at a time. Without this, the 500ms delayed restore from the previous
-// call can interleave with the next call's backup-read, leaving the clipboard
-// polluted with whichever restore finishes last.
-let lastRestoreComplete = Promise.resolve();
-
-// Reliable selected-text capture via clear+poll. Clears the clipboard as a semaphore,
-// fires Ctrl+C, polls for up to 800ms, then restores the original clipboard contents.
+// Thin wrapper kept for the hotkey-direct caller (main.js). All the clipboard
+// mechanics (mutex, full-format restore, success cache) live in the shared
+// capture module so the mouseup probe and this fetch can't clobber each other.
 async function fetchSelectedText() {
-  // Append to the serialization chain: wait for the previous restore to finish.
-  const prevRestore = lastRestoreComplete;
-  let resolveMyRestore;
-  const myRestorePromise = new Promise(r => { resolveMyRestore = r; });
-  lastRestoreComplete = myRestorePromise;
-
-  // Don't block on a previously rejected restore.
-  await prevRestore.catch(() => {});
-
-  let backup = null;
-  let foundText = null;
-  try {
-    backup = clipboard.readText();
-
-    // Clear as semaphore — polling treats empty as "not yet copied".
-    clipboard.clear();
-
-    simulateCtrlC();
-
-    // Poll up to 800ms (16 × 50ms).
-    for (let i = 0; i < 16; i++) {
-      await new Promise(resolve => setTimeout(resolve, 50));
-      const text = clipboard.readText();
-      if (text && text.trim()) {
-        foundText = text.trim();
-        break;
-      }
-    }
-
-    return foundText;
-  } catch (err) {
-    logger.error('fetchSelectedText error:', err);
-    return null;
-  } finally {
-    // On success: delay restore by 500ms so the caller can synchronously
-    // read clipboard formats (e.g. detect file drop) before we overwrite it.
-    // On failure: restore immediately. Either branch MUST call resolveMyRestore,
-    // otherwise the chain locks up and the next fetch never starts.
-    if (foundText) {
-      setTimeout(() => {
-        try { if (backup !== null) clipboard.writeText(backup); } catch (e) { logger.warn('restore failed:', e.message); }
-        resolveMyRestore();
-      }, 500);
-    } else {
-      try { if (backup !== null) clipboard.writeText(backup); } catch (e) { logger.warn('restore failed:', e.message); }
-      resolveMyRestore();
-    }
-  }
-}
-
-// OCR fallback via the local PP-OCR engine.
-async function getTextByOCR(rect, screenshotModule, ocrOptions = {}) {
-  try {
-    // Reject sub-word regions: PaddleOCR produces garbage on tiny crops.
-    if (rect.width < 12 || rect.height < 6) {
-      return null;
-    }
-
-    const padding = 5;
-    const captureRect = {
-      x: rect.x - padding,
-      y: rect.y - padding,
-      width: rect.width + padding * 2,
-      height: rect.height + padding * 2,
-    };
-
-    const screenshot = await screenshotModule.captureRegion(captureRect);
-
-    if (!screenshot) {
-      return null;
-    }
-
-    const ocrEngine = require('../utils/ocr-engine');
-    const result = await ocrEngine.recognize(screenshot, ocrOptions);
-
-    if (result.success && result.text) {
-      return result.text;
-    }
-
-    return null;
-  } catch (err) {
-    logger.error('OCR error:', err);
-    return null;
-  }
+  const { text } = await captureSelectedText();
+  return text;
 }
 
 // Extract a translatable filename from a path string (strips dir, extension, separators).

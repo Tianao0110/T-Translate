@@ -3,9 +3,11 @@
 export function detectLanguage(text) {
   if (!text) return 'auto';
 
-  if (/[一-龥]/.test(text)) return 'zh';
+  // Kana before Han: Japanese mixes kana with kanji, so checking Han first
+  // misfiles Japanese as Chinese (which then wrongly flips ja→zh into ja→en).
   if (/[぀-ヿ]/.test(text)) return 'ja';
   if (/[가-힯]/.test(text)) return 'ko';
+  if (/[一-龥]/.test(text)) return 'zh';
   return 'en';
 }
 

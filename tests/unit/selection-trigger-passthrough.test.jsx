@@ -91,7 +91,6 @@ async function fireShowTrigger(data) {
   await act(async () => {
     triggerCb({
       mouseX: 100, mouseY: 100,
-      rect: { x: 100, y: 100, width: 50, height: 20 },
       theme: 'light',
       settings: { triggerTimeout: 4000, minChars: 2, maxChars: 500 },
       translation: { sourceLanguage: 'auto', targetLanguage: 'zh' },

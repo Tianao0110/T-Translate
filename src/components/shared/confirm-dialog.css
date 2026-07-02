@@ -45,6 +45,7 @@
   line-height: 1.6;
   color: var(--text-primary);
   word-break: break-word;
+  white-space: pre-line; /* honor \n paragraph breaks in multi-line messages */
 }
 
 .confirm-actions {

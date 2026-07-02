@@ -260,10 +260,10 @@ const zh = {
     goToOcrSettings: "前往 OCR 设置"
   },
   selection: {
-    freeze: "冻结", unfreeze: "解冻", close: "关闭", copy: "复制", more: "更多",
+    close: "关闭", more: "更多",
     description: "选中文字后显示翻译按钮，点击即可翻译",
-    enableSelection: "启用划词翻译", enabled: "划词翻译已开启", disabled: "划词翻译已关闭",
-    enabledDesc: "选中文字后显示翻译按钮", disabledDesc: "已禁用划词翻译", toggleFailed: "切换划词翻译失败",
+    enableSelection: "启用划词翻译", enabled: "划词翻译已开启",
+    enabledDesc: "选中文字后显示翻译按钮", disabledDesc: "已禁用划词翻译", toggleFailed: "切换划词翻译失败", enableFailed: "开启划词翻译失败，请查看日志",
     shortcutHint: "也可以使用快捷键 {{shortcut}} 快速切换",
     triggerTimeout: "按钮自动消失时间", seconds: "秒", triggerTimeoutHint: "划词后翻译按钮自动消失的时间",
     showSourceByDefault: "默认显示原文", showSourceOnDesc: "翻译结果默认显示原文对照", showSourceOffDesc: "只显示翻译结果",
@@ -280,10 +280,11 @@ const zh = {
     charLimit: "字符数限制", minChars: "最小", maxChars: "最大", charLimitHint: "少于最小或超过最大字符数的选中内容不会触发翻译",
     instructions: "使用说明", workflow: "划词翻译流程",
     step1: "用鼠标选中需要翻译的文字", step2: "松开鼠标后，旁边出现翻译按钮", step3: "点击按钮开始翻译", step4: "翻译完成后显示结果卡片",
-    quickActions: "快捷操作", action1: "拖动标题栏移动窗口", action2: "右下角调整大小", action3: "点击「原文」显示原文对照", action4: "点击「复制」或直接选中文字复制", action5: "按 ESC 或右键关闭",
+    quickActions: "快捷操作", action1: "拖动标题栏移动窗口", action2: "右下角调整大小", action3: "点击「原文」显示原文对照", action4: "点击「复制」或直接选中文字复制", action5: "右键或点 ✕ 关闭",
     // Selection translator strings
     translateFailed: "翻译失败",
-    noText: "未获取到文字",
+    noText: "未获取到文字，可尝试截图翻译",
+    retryHint: "未取到文字，点击重试",
     emptyContent: "选中内容为空",
     tooShort: "文字太短（最少 {{min}} 字符）",
     tooLong: "文字太长（最多 {{max}} 字符）",
@@ -292,9 +293,9 @@ const zh = {
     isFilePath: "选中内容是文件路径",
     emptyResult: "翻译结果为空",
     frozenHint: "已固定 - 右键点击关闭",
+    freezeLimitHint: "固定窗口已达上限（最多 8 个）",
     showSource: "显示原文",
-    copyTarget: "复制译文",
-    closeEsc: "关闭 (ESC)"
+    copyTarget: "复制译文"
   },
   settings: {
     title: "设置",

@@ -260,10 +260,10 @@ const en = {
     goToOcrSettings: "Go to OCR Settings"
   },
   selection: {
-    freeze: "Freeze", unfreeze: "Unfreeze", close: "Close", copy: "Copy", more: "More",
+    close: "Close", more: "More",
     description: "Show translate button after selecting text",
-    enableSelection: "Enable Selection Translation", enabled: "Selection translation enabled", disabled: "Selection translation disabled",
-    enabledDesc: "Show translate button after selecting text", disabledDesc: "Selection translation disabled", toggleFailed: "Failed to toggle selection translation",
+    enableSelection: "Enable Selection Translation", enabled: "Selection translation enabled",
+    enabledDesc: "Show translate button after selecting text", disabledDesc: "Selection translation disabled", toggleFailed: "Failed to toggle selection translation", enableFailed: "Failed to enable selection translation — check the logs",
     shortcutHint: "You can also use {{shortcut}} to toggle",
     triggerTimeout: "Button Auto-hide Time", seconds: "s", triggerTimeoutHint: "Time before translate button auto-hides",
     showSourceByDefault: "Show Source by Default", showSourceOnDesc: "Show source text comparison by default", showSourceOffDesc: "Only show translation",
@@ -280,10 +280,11 @@ const en = {
     charLimit: "Character Limit", minChars: "Min", maxChars: "Max", charLimitHint: "Content below min or above max characters won't trigger translation",
     instructions: "Instructions", workflow: "Workflow",
     step1: "Select text with mouse", step2: "Translate button appears nearby", step3: "Click button to translate", step4: "Result card shows after translation",
-    quickActions: "Quick Actions", action1: "Drag title bar to move", action2: "Resize from bottom-right corner", action3: "Click 'Source' to show comparison", action4: "Click 'Copy' or select text to copy", action5: "Press ESC or right-click to close",
+    quickActions: "Quick Actions", action1: "Drag title bar to move", action2: "Resize from bottom-right corner", action3: "Click 'Source' to show comparison", action4: "Click 'Copy' or select text to copy", action5: "Right-click or click ✕ to close",
     // Selection translator component strings
     translateFailed: "Translation failed",
-    noText: "No text captured",
+    noText: "No text captured — try screenshot translation",
+    retryHint: "No text captured, click to retry",
     emptyContent: "Selection is empty",
     tooShort: "Text too short (minimum {{min}} characters)",
     tooLong: "Text too long (maximum {{max}} characters)",
@@ -292,9 +293,9 @@ const en = {
     isFilePath: "Selection is a file path",
     emptyResult: "Translation result is empty",
     frozenHint: "Pinned - right-click to close",
+    freezeLimitHint: "Pinned-window limit reached (max 8)",
     showSource: "Show source",
-    copyTarget: "Copy translation",
-    closeEsc: "Close (ESC)"
+    copyTarget: "Copy translation"
   },
   settings: {
     title: "Settings",

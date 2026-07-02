@@ -96,14 +96,11 @@ const runtime = {
   screenshotFromHotkey: false,
   lastScreenshotBounds: null,
   screenshotSelectionWindow: null,
+  screenshotLoadingTimer: null,
 
   // Selection translate
-  lastSelectionRect: null,
   isDraggingOverlay: false,
   selectionHook: null,
-  mouseDownPos: null,
-  mouseDownTime: 0,
-  isNativeDragging: false,
 
   shortcutsRegistered: false,
 };
@@ -147,11 +144,7 @@ function resetRuntime() {
   runtime.screenshotData = null;
   runtime.wasMainWindowVisible = false;
   runtime.screenshotFromHotkey = false;
-  runtime.lastSelectionRect = null;
   runtime.isDraggingOverlay = false;
-  runtime.mouseDownPos = null;
-  runtime.mouseDownTime = 0;
-  runtime.isNativeDragging = false;
   windows.clearAll();
 }
 

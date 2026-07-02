@@ -88,11 +88,8 @@ const CHANNELS = {
     TOGGLE: 'selection:toggle',
     HIDE: 'selection:hide',
     GET_ENABLED: 'selection:get-enabled',
-    GET_SETTINGS: 'selection:get-settings',
     GET_TEXT: 'selection:get-text',
-    SET_POSITION: 'selection:set-position',
     SET_BOUNDS: 'selection:set-bounds',
-    RESIZE: 'selection:resize',
     START_DRAG: 'selection:start-drag',
     ADD_TO_HISTORY: 'selection:add-to-history',
     SHOW_TRIGGER: 'selection:show-trigger',
@@ -102,8 +99,6 @@ const CHANNELS = {
     // Multi-window support
     FREEZE: 'selection:freeze',
     CLOSE_FROZEN: 'selection:close-frozen',
-    GET_WINDOW_ID: 'selection:get-window-id',
-    FROZEN_WINDOWS_COUNT: 'selection:frozen-windows-count',
   },
   CLIPBOARD: {
     WRITE_TEXT: 'clipboard:write-text',
