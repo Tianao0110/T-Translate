@@ -362,20 +362,6 @@ function closeFrozenSelectionWindow(windowId) {
   return { success: false, error: 'Window not found' };
 }
 
-function getFrozenSelectionWindowsCount() {
-  return frozenSelectionWindows.size;
-}
-
-function closeAllFrozenSelectionWindows() {
-  for (const [id, win] of frozenSelectionWindows) {
-    if (win && !win.isDestroyed()) {
-      win.close();
-    }
-  }
-  frozenSelectionWindows.clear();
-  logger.info?.('All frozen selection windows closed');
-}
-
 // ===== Screenshot window =====
 
 function createScreenshotWindow(bounds) {
@@ -456,6 +442,4 @@ module.exports = {
   toggleFloatingWindow,
   freezeSelectionWindow,
   closeFrozenSelectionWindow,
-  getFrozenSelectionWindowsCount,
-  closeAllFrozenSelectionWindows,
 };

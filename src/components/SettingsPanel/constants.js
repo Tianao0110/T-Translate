@@ -100,13 +100,6 @@ export const DEFAULT_SETTINGS = {
 
   selection: {
     enabled: false,
-    showButton: true,
-    autoTranslate: false,
-    buttonPosition: 'cursor',
-    buttonDelay: 0,
-    minDistance: 10,
-    minDuration: 150,
-    maxDuration: 5000,
     triggerTimeout: 4000,
     showSourceByDefault: false,
     autoCloseOnCopy: false,
@@ -253,18 +246,12 @@ export const migrateOldSettings = (savedSettings) => {
     delete migrated.providers;
   }
 
-  // Pre-v0.2 flat selectionXxx -> selection nested object
+  // Pre-v0.2 flat selectionXxx -> selection nested object (only `enabled`
+  // survived; the other flat keys were dead and are no longer seeded).
   if (!savedSettings.selection || typeof savedSettings.selection !== 'object') {
     migrated.selection = {
       ...DEFAULT_SETTINGS.selection,
       enabled: savedSettings.selectionEnabled || false,
-      showButton: savedSettings.selectionShowButton ?? true,
-      autoTranslate: savedSettings.selectionAutoTranslate || false,
-      buttonPosition: savedSettings.selectionButtonPosition || 'cursor',
-      buttonDelay: savedSettings.selectionButtonDelay || 0,
-      minDistance: savedSettings.selectionMinDistance || 10,
-      minDuration: savedSettings.selectionMinDuration || 150,
-      maxDuration: savedSettings.selectionMaxDuration || 5000,
     };
   }
 

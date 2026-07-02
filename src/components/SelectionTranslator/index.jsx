@@ -8,21 +8,9 @@ import { getShortErrorMessage } from '../../utils/error-handler.js';
 import { detectLanguage } from '../../utils/text.js';
 import './styles.css';
 
-import { PRIVACY_MODES, THEMES, LANGUAGE_CODES, selectionDefaults } from '@config/defaults';
+import { PRIVACY_MODES, THEMES } from '@config/defaults';
 
 const logger = createLogger('Selection');
-
-const LANG_MAP = {
-  'zh': 'Simplified Chinese',
-  'en': 'English',
-  'ja': 'Japanese',
-  'ko': 'Korean',
-  'fr': 'French',
-  'de': 'German',
-  'es': 'Spanish',
-  'ru': 'Russian',
-  'auto': 'auto'
-};
 
 const DEFAULT_SETTINGS = {
   triggerTimeout: 4000,
@@ -76,7 +64,6 @@ const SelectionTranslator = () => {
   const [error, setError] = useState('');
   const [isOcrError, setIsOcrError] = useState(false);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-  const [rect, setRect] = useState(null);
   const [copied, setCopied] = useState(false);
   const [theme, setTheme] = useState(THEMES.LIGHT);
   const [showSource, setShowSource] = useState(false);
@@ -86,13 +73,11 @@ const SelectionTranslator = () => {
   const [triggerFailed, setTriggerFailed] = useState(false);
   const [isFrozen, setIsFrozen] = useState(false);
   const [windowId, setWindowId] = useState(null);
-  const [initialBounds, setInitialBounds] = useState(null);
   const [freezeHint, setFreezeHint] = useState(false);
   const [cardHovered, setCardHovered] = useState(false);
 
   const [ttsStatus, setTtsStatus] = useState(TTS_STATUS.IDLE);
 
-  const sizedRef = useRef(false);
   // Bumped on every adjustWindowToContent run; a later run supersedes an
   // in-flight one so overlapping passes can't fight over the final bounds.
   const positionTokenRef = useRef(0);
@@ -182,7 +167,6 @@ const SelectionTranslator = () => {
       resetSession();
 
       setMousePos({ x: data.mouseX, y: data.mouseY });
-      setRect(data.rect);
       screenBoundsRef.current = data.screenBounds || null;
 
       if (data.theme) setTheme(data.theme);
@@ -200,9 +184,7 @@ const SelectionTranslator = () => {
       setTriggerFailed(data.failed === true); // sticky-direct empty capture → red+shake
       setSourceText('');
       setTranslatedText('');
-      sizedRef.current = false;
       setIsFrozen(false);
-      setInitialBounds(null);
 
       // Phase B pass-through: take Layer-3 text if present.
       // Null out after assignment so a stale value can't leak into next cycle.
@@ -248,9 +230,7 @@ const SelectionTranslator = () => {
         setSourceText('');
         setTranslatedText('');
         setError(data.error);
-        sizedRef.current = false;
         setIsFrozen(false);
-        setInitialBounds(null);
         setMode('overlay');
         return;
       }
@@ -259,9 +239,7 @@ const SelectionTranslator = () => {
         logger.debug('Showing loading state');
         setSourceText('');
         setTranslatedText('');
-        sizedRef.current = false;
         setIsFrozen(false);
-        setInitialBounds(null);
         setMode('loading');
         return;
       }
@@ -274,9 +252,7 @@ const SelectionTranslator = () => {
         }
         setSourceText(data.text);
         setShowSource(newSettings.showSourceByDefault);
-        sizedRef.current = false;
         setIsFrozen(false);
-        setInitialBounds(null);
         setMode('loading');
 
         try {
@@ -319,7 +295,7 @@ const SelectionTranslator = () => {
         setTranslatedText(data.translatedText);
         setIsOcrError(data.isOcrError === true); // override resetSession's clear
         setIsFrozen(false);
-        // Don't reset sizedRef/initialBounds — caller already positioned us
+        // Caller already positioned us (screenshot bounds) — just show.
         setMode('overlay');
         // Auto-hide handled by the unified overlay effect (乙案), no per-path timer.
       }
@@ -351,9 +327,7 @@ const SelectionTranslator = () => {
 
       setSourceText('');
       setTranslatedText('');
-      sizedRef.current = false;
       setIsFrozen(false);
-      setInitialBounds(null);
       setMode('loading');
 
       // 'capturing' phase: main is still grabbing the selection — just hold the
@@ -438,7 +412,7 @@ const SelectionTranslator = () => {
       let text = prefetchedTextRef.current;
       prefetchedTextRef.current = null;
       if (!text) {
-        const result = await window.electron?.selection?.getText?.(rect);
+        const result = await window.electron?.selection?.getText?.();
         text = result?.text;
       }
       if (gen !== generationRef.current) return; // superseded by a newer session
@@ -750,7 +724,6 @@ const SelectionTranslator = () => {
 
         if (!lastCheckBounds) {
           lastCheckBounds = currentBounds;
-          setInitialBounds(currentBounds);
           return;
         }
 

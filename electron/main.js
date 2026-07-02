@@ -186,8 +186,6 @@ async function showSelectionTrigger(mouseX, mouseY, rect, prefetchedText = null,
   const interfaceSettings = settings.interface || {};
   const translationSettings = settings.translation || {};
 
-  runtime.lastSelectionRect = rect;
-
   const currentTargetLang = translationSettings.targetLanguage || 'zh';
   const currentSourceLang = translationSettings.sourceLanguage || 'auto';
   logger.debug(`Language from electron-store: ${currentSourceLang} -> ${currentTargetLang}`);
@@ -289,8 +287,6 @@ async function handleHotkeyDirectPath(x, y, rect) {
   const translationSettings = settings.translation || {};
   const currentTargetLang = translationSettings.targetLanguage || 'zh';
   const currentSourceLang = translationSettings.sourceLanguage || 'auto';
-
-  runtime.lastSelectionRect = rect;
 
   const win = windowManager.createSelectionWindow();
   if (!win || win.isDestroyed()) {

@@ -117,18 +117,6 @@ body {
   --shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.08);
 }
 
-/* ==================== 自定义主题色 ==================== */
-/* 通过 JS 设置 --custom-accent 变量来改变强调色 */
-/* 用法：document.documentElement.style.setProperty('--custom-accent', '#your-color') */
-:root {
-  --custom-accent: var(--accent-primary);
-}
-
-/* 当设置了自定义强调色时应用（添加 data-custom-accent 属性） */
-[data-custom-accent] {
-  --accent-primary: var(--custom-accent);
-}
-
 /* ==================== 全局样式 ==================== */
 * {
   margin: 0;

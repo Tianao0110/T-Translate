@@ -7,15 +7,12 @@ contextBridge.exposeInMainWorld("electron", {
     hide: () => ipcRenderer.invoke("selection:hide"),
     setBounds: (bounds) => ipcRenderer.invoke("selection:set-bounds", bounds),
     addToHistory: (item) => ipcRenderer.invoke("selection:add-to-history", item),
-    getText: (rect) => ipcRenderer.invoke("selection:get-text", rect),
-    resize: (size) => ipcRenderer.invoke("selection:resize", size),
+    getText: () => ipcRenderer.invoke("selection:get-text"),
     startDrag: () => ipcRenderer.invoke("selection:start-drag"),
 
     // Multi-window support
     freeze: () => ipcRenderer.invoke("selection:freeze"),
     closeFrozen: (windowId) => ipcRenderer.invoke("selection:close-frozen", windowId),
-    getWindowId: () => ipcRenderer.invoke("selection:get-window-id"),
-    getFrozenCount: () => ipcRenderer.invoke("selection:frozen-windows-count"),
 
     onShowTrigger: (callback) => {
       const listener = (event, data) => callback(data);
@@ -63,18 +60,9 @@ contextBridge.exposeInMainWorld("electron", {
     set: (key, value) => ipcRenderer.invoke("store-set", key, value),
   },
 
-  // secureStorage access — translation service reads encrypted API keys.
+  // secureStorage — translation service only DECRYPTS API keys here (encryption
+  // happens in the settings window; this window never writes keys).
   secureStorage: {
-    encrypt: (key, value) => ipcRenderer.invoke("secure-storage:encrypt", key, value),
     decrypt: (key) => ipcRenderer.invoke("secure-storage:decrypt", key),
-  },
-
-  theme: {
-    sync: () => ipcRenderer.invoke("theme:sync"),
-    onChanged: (callback) => {
-      const handler = (event, theme) => callback(theme);
-      ipcRenderer.on("theme:changed", handler);
-      return () => ipcRenderer.removeListener("theme:changed", handler);
-    },
   },
 });

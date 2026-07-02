@@ -13,16 +13,6 @@ export const THEMES = {
   FRESH: 'fresh',
 };
 
-export const PRESET_ACCENT_COLORS = [
-  { id: 'blue', name: '蓝色', color: '#3b82f6' },
-  { id: 'green', name: '绿色', color: '#10b981' },
-  { id: 'purple', name: '紫色', color: '#8b5cf6' },
-  { id: 'orange', name: '橙色', color: '#f97316' },
-  { id: 'pink', name: '粉色', color: '#ec4899' },
-  { id: 'cyan', name: '青色', color: '#06b6d4' },
-  { id: 'red', name: '红色', color: '#ef4444' },
-  { id: 'amber', name: '琥珀', color: '#f59e0b' },
-];
 
 export const OCR_ENGINES = {
   LLM_VISION: 'llm-vision',

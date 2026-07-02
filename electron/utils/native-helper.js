@@ -136,23 +136,6 @@ function simulateCtrlC() {
   }
 }
 
-function simulateKeyPress(vkCode, scanCode = 0) {
-  if (process.platform !== 'win32') return false;
-
-  const api = initWin32API();
-  if (!api) return false;
-
-  try {
-    const { keybd_event, KEYEVENTF_KEYUP } = api;
-    keybd_event(vkCode, scanCode, 0, 0);
-    keybd_event(vkCode, scanCode, KEYEVENTF_KEYUP, 0);
-    return true;
-  } catch (e) {
-    logger.error('simulateKeyPress failed:', e);
-    return false;
-  }
-}
-
 // CapsLock LED state (the toggle), NOT the physical key-press.
 // GetKeyState low bit (0x0001) = toggle; high bit would be the physical press (not used here).
 // Fail-safe: returns false on non-Windows or API unavailable.
@@ -168,83 +151,6 @@ function isCapsLockOn() {
   } catch (e) {
     logger.error('isCapsLockOn failed:', e);
     return false;
-  }
-}
-
-// ===== Window detection =====
-
-// Returns info about the window under (x, y). Windows only.
-// Result: { className, childClassName, processName, isInputBox, isFileManager, isDesktop, isFileView }
-function getWindowInfoAtPoint(x, y) {
-  if (process.platform !== 'win32') return null;
-
-  const api = initWin32API();
-  if (!api) return null;
-
-  try {
-    const {
-      WindowFromPoint, GetAncestor, GetWindowThreadProcessId,
-      OpenProcess, CloseHandle, GetModuleBaseNameW, GetClassNameW,
-      GA_ROOT, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ,
-    } = api;
-
-    const point = { x: Math.round(x), y: Math.round(y) };
-    const childHwnd = WindowFromPoint(point);
-    if (!childHwnd) return null;
-
-    const childClassBuffer = Buffer.alloc(512);
-    GetClassNameW(childHwnd, childClassBuffer, 256);
-    const childClassName = childClassBuffer.toString('utf16le').replace(/\0/g, '');
-
-    // Top-level (root) HWND for app-level classification.
-    const rootHwnd = GetAncestor(childHwnd, GA_ROOT) || childHwnd;
-
-    const classNameBuffer = Buffer.alloc(512);
-    GetClassNameW(rootHwnd, classNameBuffer, 256);
-    const className = classNameBuffer.toString('utf16le').replace(/\0/g, '');
-
-    const pidBuffer = Buffer.alloc(4);
-    GetWindowThreadProcessId(rootHwnd, pidBuffer);
-    const pid = pidBuffer.readUInt32LE(0);
-
-    let processName = '';
-    const hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, 0, pid);
-    if (hProcess) {
-      const processNameBuffer = Buffer.alloc(512);
-      GetModuleBaseNameW(hProcess, null, processNameBuffer, 256);
-      processName = processNameBuffer.toString('utf16le').replace(/\0/g, '').toLowerCase();
-      CloseHandle(hProcess);
-    }
-
-    const inputBoxClasses = [
-      'Edit', 'RICHEDIT50W', 'RichEdit20W', 'RichEdit', 'TextBox', '_WwG',
-      'Chrome_RenderWidgetHostHWND', 'MozillaWindowClass', 'CASCADIA_HOSTING_WINDOW_CLASS',
-    ];
-
-    const fileManagerProcesses = [
-      'explorer.exe', 'totalcmd.exe', 'totalcmd64.exe',
-      'doublecmd.exe', 'xyplorer.exe', 'q-dir.exe', 'freecommander.exe',
-    ];
-
-    const desktopClasses = ['Progman', 'WorkerW'];
-
-    const fileViewClasses = [
-      'SHELLDLL_DefView', 'DirectUIHWND', 'SysListView32', 'SysTreeView32',
-      'CabinetWClass', 'ExploreWClass', 'TMyListBox', 'LCLListBox',
-    ];
-
-    return {
-      className,
-      childClassName,
-      processName,
-      isInputBox: inputBoxClasses.some(cls => childClassName.includes(cls)),
-      isFileManager: fileManagerProcesses.includes(processName),
-      isDesktop: desktopClasses.some(cls => className.includes(cls)),
-      isFileView: fileViewClasses.some(cls => className.includes(cls)),
-    };
-  } catch (e) {
-    logger.error('getWindowInfoAtPoint failed:', e);
-    return null;
   }
 }
 
@@ -514,15 +420,9 @@ function getEditControlSelection(api, hwnd) {
 }
 
 module.exports = {
-  initWin32API,
-
   // Key simulation
   simulateCtrlC,
-  simulateKeyPress,
   isCapsLockOn,  // Sticky-direct mode reads the CapsLock toggle bit (synchronous).
-
-  // Window detection
-  getWindowInfoAtPoint,
 
   // Three-layer selection probe (Layers 1+2, clipboard-free).
   // Layer 3 clipboard fallback lives in utils/clipboard-capture.js.
@@ -531,9 +431,4 @@ module.exports = {
 
   // Capture-exclusion
   makeWindowInvisibleToCapture,
-
-  isWin32APIAvailable: () => {
-    if (process.platform !== 'win32') return false;
-    return initWin32API() !== null;
-  },
 };

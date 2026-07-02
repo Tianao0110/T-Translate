@@ -65,7 +65,6 @@ class SelectionStateMachine {
   constructor() {
     this.reset();
     this.clickHistory = [];
-    this.onStateChange = null;
     this.isMultiClickTriggered = false;
   }
 
@@ -125,10 +124,6 @@ class SelectionStateMachine {
       }
     } else if (newState === STATES.IDLE) {
       this.reset();
-    }
-
-    if (this.onStateChange) {
-      this.onStateChange(newState, oldState);
     }
   }
 
@@ -484,11 +479,6 @@ class SelectionStateMachine {
 
   getState() {
     return this.state;
-  }
-
-  getLastPosition() {
-    if (this.samples.length === 0) return this.startPos;
-    return this.samples[this.samples.length - 1];
   }
 }
 

@@ -11,16 +11,7 @@ const { captureSelectedText, hasFileFormat } = require('../utils/clipboard-captu
 const senderWindow = (event) => BrowserWindow.fromWebContents(event.sender);
 
 function register(ctx) {
-  const { getMainWindow, getSelectionWindow, runtime, store, managers } = ctx;
-
-  // Lazy-load screenshot module (heavy native deps)
-  let screenshotModule = null;
-  const getScreenshotModule = () => {
-    if (!screenshotModule) {
-      screenshotModule = require('../screenshot-module');
-    }
-    return screenshotModule;
-  };
+  const { getMainWindow, runtime, managers } = ctx;
 
   // Collapse 3+ consecutive blank lines into 2 (paragraph detection over-produces blanks)
   const cleanTextBlankLines = (text) => {
@@ -53,14 +44,6 @@ function register(ctx) {
     return true;
   });
 
-  ipcMain.handle(CHANNELS.SELECTION.SET_POSITION, (event, x, y) => {
-    const selectionWindow = getSelectionWindow();
-    if (selectionWindow && !selectionWindow.isDestroyed()) {
-      selectionWindow.setPosition(Math.round(x), Math.round(y));
-    }
-    return true;
-  });
-
   ipcMain.handle(CHANNELS.SELECTION.SET_BOUNDS, (event, bounds) => {
     const selectionWindow = senderWindow(event);
     if (selectionWindow && !selectionWindow.isDestroyed()) {
@@ -74,14 +57,6 @@ function register(ctx) {
     return true;
   });
 
-  ipcMain.handle(CHANNELS.SELECTION.RESIZE, (event, { width, height }) => {
-    const selectionWindow = getSelectionWindow();
-    if (selectionWindow && !selectionWindow.isDestroyed()) {
-      selectionWindow.setSize(Math.round(width), Math.round(height));
-    }
-    return true;
-  });
-
   ipcMain.handle(CHANNELS.SELECTION.START_DRAG, (event) => {
     const selectionWindow = senderWindow(event);
     if (selectionWindow && !selectionWindow.isDestroyed()) {
@@ -91,84 +66,34 @@ function register(ctx) {
     return null;
   });
 
-  // ===== Settings =====
-
-  // Shallow-merge defaults so v0.2.3 users upgrading still get new keys with default values
-  ipcMain.handle(CHANNELS.SELECTION.GET_SETTINGS, () => {
-    const settings = store.get('settings', {});
-    const defaults = {
-      triggerIcon: 'dot',
-      triggerSize: 24,
-      triggerColor: '#3b82f6',
-      customIconPath: '',
-      hoverDelay: 300,
-      triggerTimeout: 5000,
-      resultTimeout: 3000,
-      minChars: 2,
-      maxChars: 500,
-      stickyViaCapsLock: false,
-      stickyWarningShown: false,
-    };
-    return { ...defaults, ...(settings.selection || {}) };
-  });
-
   // ===== Text capture =====
 
   // Anti-misfire: clipboard may contain a file drop instead of selected text;
   // distinguish via the formats the copy produced (read fresh inside the
   // capture, before restore) so we don't translate file paths blindly.
-  ipcMain.handle(CHANNELS.SELECTION.GET_TEXT, async (event, rect) => {
+  ipcMain.handle(CHANNELS.SELECTION.GET_TEXT, async () => {
     const { text, formats, fileClipboard } = await captureSelectedText();
 
     // Clipboard held files we refused to clobber — nothing to translate.
-    if (fileClipboard) {
-      return { text: null, method: null, reason: 'file_drop' };
-    }
+    if (fileClipboard) return { text: null };
 
     if (hasFileFormat(formats)) {
       if (text && text.trim()) {
-        const looksLikePath = /^[A-Za-z]:\\|^\/|^\\\\|^file:\/\//.test(text.trim());
-
+        const trimmed = text.trim();
+        const looksLikePath = /^[A-Za-z]:\\|^\/|^\\\\|^file:\/\//.test(trimmed);
         if (looksLikePath) {
-          const filename = extractFilenameForTranslation(text.trim());
-          if (filename) {
-            return { text: filename, method: 'filename', original: text.trim() };
-          }
-        } else {
-          // File-format present but text payload is not a path — treat as text
-          return { text: cleanTextBlankLines(text.trim()), method: 'clipboard' };
+          // A file selection — translate just the filename if it's meaningful.
+          return { text: extractFilenameForTranslation(trimmed) || null };
         }
+        // File-format present but the text isn't a path — treat as text.
+        return { text: cleanTextBlankLines(trimmed) };
       }
-
-      // No text payload: user is dragging files
-      return { text: null, method: null, reason: 'file_drop' };
+      return { text: null }; // dragging files, no text
     }
 
-    if (text && text.trim()) {
-      return { text: cleanTextBlankLines(text.trim()), method: 'clipboard' };
-    }
+    if (text && text.trim()) return { text: cleanTextBlankLines(text.trim()) };
 
-    // Clipboard path failed — try OCR fallback on the captured rect
-    const ocrRect = rect || runtime.lastSelectionRect;
-
-    if (ocrRect && ocrRect.width > 8 && ocrRect.height > 4) {
-      try {
-        const ocrText = await getTextByOCR(ocrRect, getScreenshotModule(), {
-          language: store.get('settings.ocr.recognitionLanguage', 'auto'),
-          preprocess: {
-            enabled: store.get('settings.ocr.enablePreprocess', true),
-            scale: store.get('settings.ocr.scaleFactor', 2),
-          },
-        });
-        if (ocrText && ocrText.trim()) {
-          return { text: cleanTextBlankLines(ocrText.trim()), method: 'ocr' };
-        }
-      } catch (err) {
-        logger.error('OCR failed:', err);
-      }
-    }
-
-    return { text: null, method: null };
+    return { text: null };
   });
 
   // ===== Multi-window management =====
@@ -181,19 +106,6 @@ function register(ctx) {
   ipcMain.handle(CHANNELS.SELECTION.CLOSE_FROZEN, (event, windowId) => {
     const windowManager = require('../managers/window-manager');
     return windowManager.closeFrozenSelectionWindow(windowId);
-  });
-
-  ipcMain.handle(CHANNELS.SELECTION.GET_WINDOW_ID, (event) => {
-    const selectionWindow = getSelectionWindow();
-    if (selectionWindow && !selectionWindow.isDestroyed()) {
-      return selectionWindow._windowId || null;
-    }
-    return null;
-  });
-
-  ipcMain.handle(CHANNELS.SELECTION.FROZEN_WINDOWS_COUNT, () => {
-    const windowManager = require('../managers/window-manager');
-    return windowManager.getFrozenSelectionWindowsCount();
   });
 
   // ===== Data sync =====
@@ -215,42 +127,6 @@ function register(ctx) {
 async function fetchSelectedText() {
   const { text } = await captureSelectedText();
   return text;
-}
-
-// OCR fallback via the local PP-OCR engine.
-async function getTextByOCR(rect, screenshotModule, ocrOptions = {}) {
-  try {
-    // Reject sub-word regions: PaddleOCR produces garbage on tiny crops.
-    if (rect.width < 12 || rect.height < 6) {
-      return null;
-    }
-
-    const padding = 5;
-    const captureRect = {
-      x: rect.x - padding,
-      y: rect.y - padding,
-      width: rect.width + padding * 2,
-      height: rect.height + padding * 2,
-    };
-
-    const screenshot = await screenshotModule.captureRegion(captureRect);
-
-    if (!screenshot) {
-      return null;
-    }
-
-    const ocrEngine = require('../utils/ocr-engine');
-    const result = await ocrEngine.recognize(screenshot, ocrOptions);
-
-    if (result.success && result.text) {
-      return result.text;
-    }
-
-    return null;
-  } catch (err) {
-    logger.error('OCR error:', err);
-    return null;
-  }
 }
 
 // Extract a translatable filename from a path string (strips dir, extension, separators).

@@ -260,9 +260,9 @@ const en = {
     goToOcrSettings: "Go to OCR Settings"
   },
   selection: {
-    freeze: "Freeze", unfreeze: "Unfreeze", close: "Close", copy: "Copy", more: "More",
+    close: "Close", more: "More",
     description: "Show translate button after selecting text",
-    enableSelection: "Enable Selection Translation", enabled: "Selection translation enabled", disabled: "Selection translation disabled",
+    enableSelection: "Enable Selection Translation", enabled: "Selection translation enabled",
     enabledDesc: "Show translate button after selecting text", disabledDesc: "Selection translation disabled", toggleFailed: "Failed to toggle selection translation", enableFailed: "Failed to enable selection translation — check the logs",
     shortcutHint: "You can also use {{shortcut}} to toggle",
     triggerTimeout: "Button Auto-hide Time", seconds: "s", triggerTimeoutHint: "Time before translate button auto-hides",
