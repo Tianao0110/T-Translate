@@ -211,6 +211,12 @@ function hasTextSelection() {
 
     logger.debug(`Focus window: "${focusInfo.className}" (caret: ${focusInfo.hasCaret}, usedForeground: ${focusInfo.usedForeground})`);
 
+    // Carried on every verdict so the TT_SELECTION_DEBUG probe shows whether
+    // GetGUIThreadInfo resolved the real focused control (focusResolved:true)
+    // or we fell back to the top-level foreground window — the direct health
+    // signal for the _Inout_ marshaling fix.
+    const diag = { focusResolved: !focusInfo.usedForeground, hasCaret: !!focusInfo.hasCaret };
+
     // Focus now resolves to the real focused control (post _Inout_ fix), so
     // the control-class lists are matched EXACTLY — a substring match would let
     // e.g. 'OlkPeoplePickerEdit' hit the 'Edit' standard-control rule and route
@@ -231,7 +237,7 @@ function hasTextSelection() {
     ];
 
     if (matchesExact(noTextClasses)) {
-      return { hasSelection: false, method: 'class_filter', reason: `non-text control: ${cls}` };
+      return { hasSelection: false, method: 'class_filter', reason: `non-text control: ${cls}`, ...diag };
     }
 
     // ----- Layer 2: standard edit controls (EM_GETSEL) -----
@@ -253,6 +259,7 @@ function hasTextSelection() {
           hasSelection,
           method: 'em_getsel',
           reason: hasSelection ? `range ${selResult.start}-${selResult.end}` : 'empty selection',
+          ...diag,
         };
       }
       logger.debug('EM_GETSEL failed, falling back');
@@ -305,11 +312,12 @@ function hasTextSelection() {
         hasSelection: null,
         method: 'needs_clipboard',
         reason: isComplexApp ? `complex app: ${cls}` : 'has caret, unknown control',
+        ...diag,
       };
     }
 
     // Unknown class with no caret — most likely no selection.
-    return { hasSelection: false, method: 'unknown_no_caret', reason: `unknown class without caret: ${cls}` };
+    return { hasSelection: false, method: 'unknown_no_caret', reason: `unknown class without caret: ${cls}`, ...diag };
 
   } catch (e) {
     logger.error('hasTextSelection error:', e);
