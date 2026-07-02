@@ -1,9 +1,14 @@
 // Selection translate IPC handlers
 
-const { ipcMain } = require('electron');
+const { ipcMain, BrowserWindow } = require('electron');
 const { CHANNELS } = require('../shared/channels');
 const logger = require('../utils/logger')('IPC:Selection');
 const { captureSelectedText, hasFileFormat } = require('../utils/clipboard-capture');
+
+// Address the window that actually sent the IPC, not the active-slot window. A
+// frozen card is detached from windows.selection, so getSelectionWindow() would
+// misroute its own hide/resize/drag onto whatever card is currently active.
+const senderWindow = (event) => BrowserWindow.fromWebContents(event.sender);
 
 function register(ctx) {
   const { getMainWindow, getSelectionWindow, runtime, store, managers } = ctx;
@@ -39,8 +44,8 @@ function register(ctx) {
 
   // ===== Window control =====
 
-  ipcMain.handle(CHANNELS.SELECTION.HIDE, () => {
-    const selectionWindow = getSelectionWindow();
+  ipcMain.handle(CHANNELS.SELECTION.HIDE, (event) => {
+    const selectionWindow = senderWindow(event);
     if (selectionWindow && !selectionWindow.isDestroyed()) {
       selectionWindow.hide();
       selectionWindow.webContents.send(CHANNELS.SELECTION.HIDE);
@@ -57,7 +62,7 @@ function register(ctx) {
   });
 
   ipcMain.handle(CHANNELS.SELECTION.SET_BOUNDS, (event, bounds) => {
-    const selectionWindow = getSelectionWindow();
+    const selectionWindow = senderWindow(event);
     if (selectionWindow && !selectionWindow.isDestroyed()) {
       selectionWindow.setBounds({
         x: Math.round(bounds.x),
@@ -77,8 +82,8 @@ function register(ctx) {
     return true;
   });
 
-  ipcMain.handle(CHANNELS.SELECTION.START_DRAG, () => {
-    const selectionWindow = getSelectionWindow();
+  ipcMain.handle(CHANNELS.SELECTION.START_DRAG, (event) => {
+    const selectionWindow = senderWindow(event);
     if (selectionWindow && !selectionWindow.isDestroyed()) {
       const bounds = selectionWindow.getBounds();
       return { x: bounds.x, y: bounds.y };

@@ -81,6 +81,7 @@ const SelectionTranslator = () => {
   const [isFrozen, setIsFrozen] = useState(false);
   const [windowId, setWindowId] = useState(null);
   const [initialBounds, setInitialBounds] = useState(null);
+  const [freezeHint, setFreezeHint] = useState(false);
 
   const [ttsStatus, setTtsStatus] = useState(TTS_STATUS.IDLE);
 
@@ -201,6 +202,11 @@ const SelectionTranslator = () => {
     //   { text }                      -> received OCR text, run translation here
     //   { sourceText, translatedText }-> pre-translated, just display
     const removeShowResultListener = window.electron?.selection?.onShowResult?.(async (data) => {
+      // Frozen cards are detached overlays — a screenshot result must not overwrite one.
+      if (frozenRef.current) {
+        logger.debug('Frozen window ignoring result event');
+        return;
+      }
       resetSession();
       // Screenshot path has no cursor anchor — (0,0) routes adjustWindowToContent
       // through the startDrag branch (keep the window where main positioned it).
@@ -598,8 +604,15 @@ const SelectionTranslator = () => {
 
     if (settings.autoCloseOnCopy) {
       setTimeout(() => {
+        ttsManager.stop();
+        // Frozen cards live in the frozen pool — hide() would only conceal one,
+        // leaving an invisible click-catcher; close it out properly.
+        if (isFrozen && windowId) {
+          window.electron?.selection?.closeFrozen?.(windowId);
+        } else {
+          window.electron?.selection?.hide?.();
+        }
         setMode('idle');
-        window.electron?.selection?.hide?.();
       }, 300);
     } else {
       setTimeout(() => setCopied(false), 1200);
@@ -695,15 +708,13 @@ const SelectionTranslator = () => {
               clearTimeout(autoHideTimerRef.current);
               autoHideTimerRef.current = null;
             }
-
-            if (sourceText && translatedText) {
-              window.electron?.selection?.addToHistory?.({
-                source: sourceText,
-                result: translatedText,
-                timestamp: Date.now(),
-                from: 'selection-frozen',
-              });
-            }
+            // History was already recorded when this translation completed; the
+            // store dedups on (source, result), so re-adding here is pure noise.
+          } else if (result?.error === 'limit') {
+            // Pinned-window cap reached: card stays active, tell the user why it
+            // didn't detach instead of silently closing someone's pinned content.
+            setFreezeHint(true);
+            setTimeout(() => setFreezeHint(false), 2500);
           }
         }
       } catch (e) {}
@@ -780,7 +791,11 @@ const SelectionTranslator = () => {
             )}
           </div>
 
-
+          {freezeHint && (
+            <div className="sel-freeze-hint">
+              {t('selection.freezeLimitHint', '固定窗口已达上限（最多 8 个）')}
+            </div>
+          )}
         </div>
       )}
     </div>

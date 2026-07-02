@@ -292,6 +292,7 @@ const zh = {
     isFilePath: "选中内容是文件路径",
     emptyResult: "翻译结果为空",
     frozenHint: "已固定 - 右键点击关闭",
+    freezeLimitHint: "固定窗口已达上限（最多 8 个）",
     showSource: "显示原文",
     copyTarget: "复制译文",
     closeEsc: "关闭 (ESC)"

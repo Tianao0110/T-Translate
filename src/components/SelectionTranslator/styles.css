@@ -119,10 +119,11 @@ html, body, #root {
    卡片主体
    ========================================== */
 .sel-card {
-  width: 100%; 
+  width: 100%;
   height: 100%;
-  display: flex; 
+  display: flex;
   flex-direction: column;
+  position: relative; /* anchor for .sel-freeze-hint */
   border-radius: 12px;
   overflow: hidden;
   background: rgba(255, 255, 255, var(--sel-opacity, 0.95));
@@ -407,6 +408,23 @@ html, body, #root {
   font-size: 9px;
   margin-right: 2px;
   animation: freezeBounce 0.3s ease;
+}
+
+/* Transient freeze-limit hint — overlays the card bottom without replacing content */
+.sel-freeze-hint {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 3px 10px;
+  max-width: 90%;
+  background: rgba(15, 23, 42, 0.82);
+  color: #f1f5f9;
+  font-size: 11px;
+  border-radius: 6px;
+  text-align: center;
+  pointer-events: none;
+  animation: cardIn 0.2s ease-out;
 }
 
 @keyframes freezeBounce {

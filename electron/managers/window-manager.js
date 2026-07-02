@@ -327,15 +327,12 @@ function freezeSelectionWindow() {
     return { success: false, error: 'Already frozen' };
   }
 
-  // Evict oldest frozen window when at capacity (Map preserves insertion order)
+  // At capacity: refuse rather than silently closing the oldest pinned card —
+  // that card holds content the user deliberately pinned. Caller surfaces a hint
+  // and leaves this card active (it gets replaced by the next selection as usual).
   if (frozenSelectionWindows.size >= MAX_FROZEN_WINDOWS) {
-    const oldestId = frozenSelectionWindows.keys().next().value;
-    const oldestWindow = frozenSelectionWindows.get(oldestId);
-    if (oldestWindow && !oldestWindow.isDestroyed()) {
-      oldestWindow.close();
-    }
-    frozenSelectionWindows.delete(oldestId);
-    logger.debug?.(`Closed oldest frozen window ${oldestId} due to limit`);
+    logger.debug?.(`Freeze refused: at limit (${MAX_FROZEN_WINDOWS})`);
+    return { success: false, error: 'limit', frozenCount: frozenSelectionWindows.size };
   }
 
   currentWindow._isFrozen = true;

@@ -292,6 +292,7 @@ const en = {
     isFilePath: "Selection is a file path",
     emptyResult: "Translation result is empty",
     frozenHint: "Pinned - right-click to close",
+    freezeLimitHint: "Pinned-window limit reached (max 8)",
     showSource: "Show source",
     copyTarget: "Copy translation",
     closeEsc: "Close (ESC)"
