@@ -85,6 +85,23 @@ store.onDidChange('settings.selection', (value) => {
 // third mouseup) cancels the older one so only the final selection gets probed.
 let pendingConfirmCancel = null;
 
+// Foreground window snapshot taken at mousedown; compared at mouseup to detect
+// window-drag gestures (see getForegroundWindowSnapshot).
+let gestureWindowSnapshot = null;
+
+// True when the gesture moved the foreground window itself (title-bar drag,
+// double-click maximize): the user was manipulating a window, not selecting
+// text — probing would inject Ctrl+C into it (SIGINT in terminals).
+function isWindowDragGesture() {
+  if (!gestureWindowSnapshot) return false;
+  const { getForegroundWindowSnapshot } = require('./utils/native-helper');
+  const now = getForegroundWindowSnapshot();
+  if (!now || now.id !== gestureWindowSnapshot.id) return false;
+  const moved = Math.abs(now.left - gestureWindowSnapshot.left) > 10 ||
+                Math.abs(now.top - gestureWindowSnapshot.top) > 10;
+  return moved;
+}
+
 // Delayed-confirm path for double/triple click. The system needs time to react before
 // we can check if text actually got selected.
 async function handleDelayedConfirm(x, y) {
@@ -106,6 +123,15 @@ async function handleDelayedConfirm(x, y) {
 
     if (cancelled) {
       logger.debug('Delayed confirm cancelled by newer mouseup (likely triple-click)');
+      return;
+    }
+
+    // Double-click on a title bar maximizes the window — that resize lands
+    // after our mouseup, so re-check here (post-wait) before probing.
+    if (isWindowDragGesture()) {
+      logger.debug('Delayed confirm: window moved/resized (title-bar double-click) — skip probe');
+      debugProbe('delayed', { skipped: 'window-drag gesture' });
+      selectionStateMachine.reset();
       return;
     }
 
@@ -585,6 +611,9 @@ function startSelectionHook() {
       // this one selection, never leak into the next.
       require('./utils/clipboard-capture').invalidateCache();
 
+      // Window-drag detection baseline (compared at mouseup).
+      gestureWindowSnapshot = require('./utils/native-helper').getForegroundWindowSnapshot();
+
       // Sticky direct: setting on + CapsLock LED on → bypass trigger icon.
       const stickyActive = !!cachedSelectionSettings.stickyViaCapsLock && isCapsLockOn();
 
@@ -638,6 +667,16 @@ function startSelectionHook() {
         const result = selectionStateMachine.onMouseUp(x, y, stickyActive);
 
         if (result.shouldShow) {
+          // Title-bar drags kinematically look like fast selections. If the
+          // foreground window itself moved with the gesture, bail before any
+          // probe/injection (Ctrl+C into a dragged terminal is a SIGINT).
+          if (isWindowDragGesture()) {
+            logger.debug('Gesture moved the foreground window (title-bar drag) — skip probe');
+            debugProbe('drag', { skipped: 'window-drag gesture' });
+            selectionStateMachine.reset();
+            return;
+          }
+
           // Sticky direct: skip the icon, skip Layer 1+2 probe, go straight to capture + translate.
           if (result.skipIcon) {
             await handleHotkeyDirectPath(x, y);

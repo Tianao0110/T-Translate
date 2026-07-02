@@ -38,6 +38,13 @@ function initWin32API() {
       rcCaret_bottom: 'int32',
     });
 
+    const RECT = koffi.struct('RECT', {
+      left: 'int32',
+      top: 'int32',
+      right: 'int32',
+      bottom: 'int32',
+    });
+
     win32API = {
       // Keyboard simulation
       keybd_event: user32.func('void keybd_event(uint8, uint8, uint32, uintptr)'),
@@ -50,6 +57,7 @@ function initWin32API() {
       GetWindowThreadProcessId: user32.func('uint32 GetWindowThreadProcessId(void*, uint32*)'),
       GetClassNameW: user32.func('int GetClassNameW(void*, uint16*, int)'),
       GetForegroundWindow: user32.func('void* GetForegroundWindow()'),
+      GetWindowRect: user32.func('int GetWindowRect(void*, _Out_ RECT* rect)'),
       // _Inout_ so koffi copies the filled struct back to JS: cbSize goes in,
       // the focus/caret handles come out. Without it the output was never
       // marshaled back and focus/caret detection silently returned nothing.
@@ -64,6 +72,8 @@ function initWin32API() {
 
       // Capture-affinity
       SetWindowDisplayAffinity: user32.func('SetWindowDisplayAffinity', 'bool', ['void*', 'uint']),
+
+      _koffi: koffi, // for koffi.address() pointer identity
 
       // Constants
       VK_CONTROL: 0x11,
@@ -380,6 +390,26 @@ function getFocusedWindowInfo(api) {
   };
 }
 
+// Identity + position snapshot of the foreground window. Taken at mousedown and
+// compared at mouseup: same window at a different position means the gesture was
+// a window drag (title bar), which must never fire the selection probe — the
+// probe's Ctrl+C would land in whatever the dragged app has focused (in a
+// terminal that's a SIGINT to the running process).
+function getForegroundWindowSnapshot() {
+  if (process.platform !== 'win32') return null;
+  const api = initWin32API();
+  if (!api) return null;
+  try {
+    const hwnd = api.GetForegroundWindow();
+    if (!hwnd) return null;
+    const rect = {};
+    if (!api.GetWindowRect(hwnd, rect)) return null;
+    return { id: api._koffi.address(hwnd).toString(), left: rect.left, top: rect.top };
+  } catch (e) {
+    return null;
+  }
+}
+
 // Foreground/focused control class name, for policy checks (e.g. terminal
 // detection before injecting Ctrl+C). Returns '' when unavailable.
 function getForegroundClassName() {
@@ -436,6 +466,7 @@ module.exports = {
   // Layer 3 clipboard fallback lives in utils/clipboard-capture.js.
   hasTextSelection,
   getForegroundClassName,
+  getForegroundWindowSnapshot,
 
   // Capture-exclusion
   makeWindowInvisibleToCapture,

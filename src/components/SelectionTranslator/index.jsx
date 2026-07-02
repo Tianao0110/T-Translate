@@ -505,25 +505,27 @@ const SelectionTranslator = () => {
       topY = Math.round(cb?.y ?? 100);
     }
 
-    // Measure pass: lock width + tall height at the final X so content reflows.
-    await window.electron?.selection?.setBounds?.({
-      x: anchorX, y: topY, width, height: maxHeight
-    });
+    if (positionTokenRef.current !== myToken) return; // superseded during the await above
 
-    await new Promise(r => setTimeout(r, 20));
-    if (positionTokenRef.current !== myToken) return; // superseded by a newer run
-
-    // Temporarily allow content to size naturally so scrollHeight reflects real layout
+    // Measure at the target width WITHOUT resizing the window: force the content
+    // element's width, read its wrapped height synchronously, restore. The old
+    // approach resized the window to maxHeight as a "measure pass" and shrank it
+    // after — a visible balloon-then-shrink flash on every source toggle.
+    const origWidth = contentEl.style.width;
     const origFlex = contentEl.style.flex;
+    // border-box width the content will get inside the final window:
+    // window width minus root padding (4px × 2) and card border (1px × 2).
+    contentEl.style.width = `${width - 10}px`;
     contentEl.style.flex = '0 0 auto';
     void contentEl.offsetHeight;
-
     const contentHeight = contentEl.scrollHeight;
+    contentEl.style.width = origWidth;
     contentEl.style.flex = origFlex;
 
     const height = Math.min(Math.max(contentHeight + toolbarHeight + 16, minHeight), maxHeight);
 
-    // Final pass: identical X/width, refine Y only.
+    // Single visible resize: geometry fully known, refine Y (flip above cursor
+    // on bottom overflow) and apply once.
     let y = topY;
     if (hasValidMousePos && y + height > originY + sh - 10) y = mousePos.y - height - 10;
     if (y < originY + 10) y = originY + 10;
