@@ -547,10 +547,13 @@ const SelectionTranslator = () => {
     // empty translation. Gating on (translatedText || error) meant an empty
     // result skipped the resize and the window stayed at the 40px trigger size.
     // Frozen cards resize in place (keepPosition) instead of re-anchoring.
+    // isFrozen is read via ref, NOT a dependency: freezing happens mid-drag, and
+    // an adjust fired at that moment would setBounds into the OS move loop and
+    // kill the user's drag. Content didn't change on freeze — nothing to resize.
     if (mode === 'overlay') {
-      adjustWindowToContent(isFrozen);
+      adjustWindowToContent(frozenRef.current);
     }
-  }, [mode, translatedText, error, showSource, isFrozen]);
+  }, [mode, translatedText, error, showSource]);
 
   // Unified auto-hide for result cards (乙案): every overlay path hides after
   // triggerTimeout. Hovering the card pauses the countdown (effect early-returns

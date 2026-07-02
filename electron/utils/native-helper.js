@@ -313,6 +313,15 @@ function hasTextSelection() {
 
       // Win11 Notepad top-level (child can be RichEditD2DPT)
       'Notepad',
+
+      // PDF readers — page views hold a selection without a Win32 caret, so
+      // they must be routed to the clipboard probe explicitly. (AVL_AVView
+      // confirmed via probe log; previously fell through to unknown_no_caret
+      // and the clipboard layer was never even attempted.)
+      'AVL_AVView',          // Adobe Acrobat / Reader page view
+      'AcrobatSDIWindow',    // Adobe top-level (focus-fallback safety)
+      'SUMATRA_PDF_FRAME',   // SumatraPDF
+      'Foxit',               // Foxit family (classFoxit… prefixes)
     ];
 
     const isComplexApp = matchesFuzzy(complexAppClasses);
