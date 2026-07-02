@@ -26,6 +26,18 @@ const CACHE_TTL = 500;
 
 const FILE_FORMAT_HINTS = ['FileNameW', 'FileContents', 'CF_HDROP', 'text/uri-list'];
 
+// PDF viewers copy typographic ligature codepoints verbatim (ﬁ ﬂ ﬀ …) — fonts
+// without those glyphs render tofu and providers see garbage. Standard Unicode
+// ligatures expand losslessly; PUA codepoints (custom ligatures like "ti") are
+// unrecoverable at the text layer and left as-is.
+const LIGATURES = { 'ﬀ': 'ff', 'ﬁ': 'fi', 'ﬂ': 'fl', 'ﬃ': 'ffi', 'ﬄ': 'ffl', 'ﬅ': 'st', 'ﬆ': 'st' };
+
+function normalizeCapturedText(text) {
+  return text
+    .replace(/[ﬀ-ﬆ]/g, (ch) => LIGATURES[ch] || ch)
+    .replace(/\u00A0/g, ' '); // NBSP → plain space (common in PDF copies)
+}
+
 function hasFileFormat(formats) {
   return (formats || []).some((f) => FILE_FORMAT_HINTS.some((h) => f.includes(h)));
 }
@@ -127,8 +139,9 @@ async function runCapture({ isComplexApp = false } = {}) {
 
     restoreClipboard(snap);
 
-    const trimmed = text && text.trim() ? text.trim() : null;
+    let trimmed = text && text.trim() ? text.trim() : null;
     if (trimmed) {
+      trimmed = normalizeCapturedText(trimmed);
       lastText = trimmed;
       lastTextAt = Date.now();
     }
