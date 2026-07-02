@@ -52,14 +52,13 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 
 ### 划词检测完整性计划（v0.3 主题）
 
-目标：主流应用全覆盖 + 覆盖不到的场景优雅降级并给用户明确提示。"任何程序都能识别"技术上无法承诺（UIPI 隔离的提权窗口、DRM/反截屏应用、独占全屏游戏），按分层推进：
+> **大部分已在 0.2.9 划词专项（feat/selection）落地。** 承重墙（GetGUIThreadInfo `_Inout_`）修复后焦点/caret 检测首次工作，三层探测按设计运转。剩余为矩阵验收 + UIA 决策，待人工回归数据。目标不变：主流应用全覆盖 + 覆盖不到时优雅降级明确提示（UIPI 提权窗/DRM/独占全屏无解）。
 
-- **第 4 层探测：UI Automation TextPattern** — 不动剪贴板、不抢焦点；Chrome/Electron/UWP 大多支持。作为 Layer 2.5 插入现有三层之间
-- **Layer 1/2 文本捕获 root-fix** — `hasTextSelection` 只返回布尔不带 text，图标点击走二次 fetch。成功时主动调 Layer 3 fetch，text 全部在 mouseup 时捕获，零二次 fetch（~60-80 行）
-- **"按下没内容"文本缓存 root-fix** — v0.2.4 用 800ms 轮询缓解了症状；真因是焦点转移。缓存成功取到的 text + 时间戳到 `runtime.lastSelectionText`，<500ms 内复用。需校准失效策略
-- **权限对齐（UIPI）** — 提权目标窗口会静默吞掉合成 Ctrl+C。检测目标进程 elevation，提示"目标程序以管理员运行"而非无响应；评估 manifest `uiAccess` 的代价（需签名 + Program Files）
-- **PDF 阅读器矩阵重测** — Adobe 已确认不行；重测 Foxit / Edge 内置 / SumatraPDF，可用的写进 README 支持列表，全不可用则 debug 剪贴板路径（[native-helper.js](electron/utils/native-helper.js) `simulateCtrlC` + `checkSelectionViaClipboard`）
-- **验收**：应用矩阵清单（Chrome/Edge/VSCode/Word/Excel/Outlook/Acrobat/Foxit/IntelliJ/Windows Terminal/UWP 设置/记事本），逐项标注走哪一层、已知限制
+- ~~**Layer 1/2 文本捕获 root-fix**~~ ✅ 0.2.9：短时缓存合并同一次划词的探测+抓取，消灭二次 fetch（utils/clipboard-capture）
+- ~~**"按下没内容"文本缓存 root-fix**~~ ✅ 0.2.9：<500ms 成功缓存 + mousedown 失效
+- ~~**权限对齐（UIPI）终端盲注**~~ ✅ 0.2.9：终端类前台降级为点击确认，纯单击不注入；`uiAccess` 已拍板砍掉（签名+Program Files 负资产）
+- **第 4 层探测：UI Automation TextPattern**（待定，切片 C′ 决策）— 不动剪贴板、不抢焦点。**承重墙修复后可能已不需要**，据应用矩阵失败样本决定建/不建；TT_SELECTION_DEBUG 开关已就位辅助定位
+- **应用矩阵验收 + PDF 阅读器重测**（切片 C′，人工）— Chrome/Edge/VSCode/Word/Excel/Outlook/Acrobat/Foxit/IntelliJ/Windows Terminal/UWP/记事本 逐项标注走哪层+已知限制，写进 README；Foxit/Edge 内置/SumatraPDF 重测。UIPI 提权窗 elevation 检测提示可在此期补
 
 ### PP-OCRv6 ONNX 实测（能否喂进 esearch-ocr）
 
@@ -84,14 +83,6 @@ The v0.2.6 OCR error-to-guidance fix is the short version. Full version: first-l
 ### Incremental unit test coverage buildout
 
 `tests/unit/` 现有 4 个测试文件（selection-state-machine / selection-trigger-passthrough / translate-text-sourcelang / stream-throttle）。Principle: add tests when you touch a file, new features ship with tests, bug fixes ship with regression tests. Not chasing 100% coverage.
-
-### SelectionTranslator: `translation.sourceLanguage` is dead payload
-
-Copilot 在 v0.2.4 PR 审查发现的既有问题。`translateText` 内部硬编码 `sourceLang: 'auto'`（[SelectionTranslator/index.jsx:528](src/components/SelectionTranslator/index.jsx:528)）。三个调用点都只传 targetLanguage，sourceLanguage 字段一路传却从不读。二选一：
-- 打通：`translateText` 签名加 `overrideSourceLang`，三处调用传入
-- 删除：从 `DEFAULT_TRANSLATION` / IPC payload 移除 sourceLanguage
-
-先拍产品决策：UI 里"手动指定源语言"该不该真生效？
 
 ### Lint backlog cleanup
 
