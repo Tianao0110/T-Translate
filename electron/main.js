@@ -56,6 +56,9 @@ function buildSelectionSettingsPayload() {
     minChars: s.minChars || 2,
     maxChars: s.maxChars || 500,
     windowOpacity: s.windowOpacity || 95,
+    // UI language, so the persistent window refreshes its i18n on each show —
+    // language (unlike theme) has no cross-window broadcast.
+    language: store.get('settings.interface.language') || undefined,
   };
 }
 
@@ -504,23 +507,27 @@ function toggleSelectionTranslate() {
   runtime.selectionEnabled = !runtime.selectionEnabled;
   store.set('selectionEnabled', runtime.selectionEnabled);
 
-  updateTrayMenu();
-
+  let hookOk = true;
   if (!runtime.selectionEnabled) {
     hideSelectionWindow();
     stopSelectionHook();
   } else {
-    startSelectionHook();
+    hookOk = startSelectionHook() !== false; // may flip selectionEnabled back off on failure
   }
 
+  updateTrayMenu(); // after the hook attempt, so it reflects a failed enable
   windows.main?.webContents?.send(CHANNELS.SELECTION.STATE_CHANGED, runtime.selectionEnabled);
   logger.info('Selection translate:', runtime.selectionEnabled ? 'enabled' : 'disabled');
-  return runtime.selectionEnabled;
+
+  // Distinguish "user turned it off" from "enable failed" so the UI can show an
+  // error instead of a green "disabled" success toast.
+  return { enabled: runtime.selectionEnabled, error: hookOk ? null : 'hookFailed' };
 }
 
 // Wire the global mouse hook (uIOhook) and route mousedown/move/up into the FSM.
+// Returns true on success, false if the native hook failed to start.
 function startSelectionHook() {
-  if (runtime.selectionHook || !runtime.selectionEnabled) return;
+  if (runtime.selectionHook || !runtime.selectionEnabled) return true;
 
   try {
     const { uIOhook } = require('uiohook-napi');
@@ -698,11 +705,13 @@ function startSelectionHook() {
     uIOhook.start();
     runtime.selectionHook = uIOhook;
     logger.info('Selection hook started (state machine mode)');
+    return true;
   } catch (err) {
     logger.error('Failed to start selection hook:', err.message);
     runtime.selectionEnabled = false;
     store.set('selectionEnabled', false);
     updateTrayMenu();
+    return false;
   }
 }
 

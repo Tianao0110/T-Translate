@@ -263,7 +263,7 @@ const en = {
     freeze: "Freeze", unfreeze: "Unfreeze", close: "Close", copy: "Copy", more: "More",
     description: "Show translate button after selecting text",
     enableSelection: "Enable Selection Translation", enabled: "Selection translation enabled", disabled: "Selection translation disabled",
-    enabledDesc: "Show translate button after selecting text", disabledDesc: "Selection translation disabled", toggleFailed: "Failed to toggle selection translation",
+    enabledDesc: "Show translate button after selecting text", disabledDesc: "Selection translation disabled", toggleFailed: "Failed to toggle selection translation", enableFailed: "Failed to enable selection translation — check the logs",
     shortcutHint: "You can also use {{shortcut}} to toggle",
     triggerTimeout: "Button Auto-hide Time", seconds: "s", triggerTimeoutHint: "Time before translate button auto-hides",
     showSourceByDefault: "Show Source by Default", showSourceOnDesc: "Show source text comparison by default", showSourceOffDesc: "Only show translation",

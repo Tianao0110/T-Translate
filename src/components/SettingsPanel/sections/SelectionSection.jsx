@@ -17,11 +17,21 @@ const SelectionSection = ({
 
   const handleToggleSelection = async () => {
     try {
-      const newState = await window.electron?.selection?.toggle?.();
-      logger.debug('Selection toggle result:', newState);
-      if (typeof newState === 'boolean') {
-        updateSetting('selection', 'enabled', newState);
-        notify(newState ? t('selection.enabled') : t('selection.disabledDesc'), 'success');
+      const result = await window.electron?.selection?.toggle?.();
+      logger.debug('Selection toggle result:', result);
+      // result is { enabled, error } (legacy boolean tolerated).
+      const enabled = typeof result === 'object' ? result?.enabled : result;
+      const error = typeof result === 'object' ? result?.error : null;
+
+      if (error) {
+        // e.g. the native hook failed to start — surface it, don't claim success.
+        notify(t('selection.enableFailed'), 'error');
+        updateSetting('selection', 'enabled', false);
+        return;
+      }
+      if (typeof enabled === 'boolean') {
+        updateSetting('selection', 'enabled', enabled);
+        notify(enabled ? t('selection.enabled') : t('selection.disabledDesc'), 'success');
       }
     } catch (e) {
       logger.error('Selection toggle error:', e);

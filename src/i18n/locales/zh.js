@@ -263,7 +263,7 @@ const zh = {
     freeze: "冻结", unfreeze: "解冻", close: "关闭", copy: "复制", more: "更多",
     description: "选中文字后显示翻译按钮，点击即可翻译",
     enableSelection: "启用划词翻译", enabled: "划词翻译已开启", disabled: "划词翻译已关闭",
-    enabledDesc: "选中文字后显示翻译按钮", disabledDesc: "已禁用划词翻译", toggleFailed: "切换划词翻译失败",
+    enabledDesc: "选中文字后显示翻译按钮", disabledDesc: "已禁用划词翻译", toggleFailed: "切换划词翻译失败", enableFailed: "开启划词翻译失败，请查看日志",
     shortcutHint: "也可以使用快捷键 {{shortcut}} 快速切换",
     triggerTimeout: "按钮自动消失时间", seconds: "秒", triggerTimeoutHint: "划词后翻译按钮自动消失的时间",
     showSourceByDefault: "默认显示原文", showSourceOnDesc: "翻译结果默认显示原文对照", showSourceOffDesc: "只显示翻译结果",

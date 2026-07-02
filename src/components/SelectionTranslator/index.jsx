@@ -186,6 +186,7 @@ const SelectionTranslator = () => {
       screenBoundsRef.current = data.screenBounds || null;
 
       if (data.theme) setTheme(data.theme);
+      if (data.settings?.language && i18n?.language !== data.settings.language) i18n.changeLanguage(data.settings.language);
 
       const newSettings = { ...DEFAULT_SETTINGS, ...data.settings };
       setSettings(newSettings);
@@ -235,6 +236,7 @@ const SelectionTranslator = () => {
       setMousePos({ x: 0, y: 0 });
 
       if (data.theme) setTheme(data.theme);
+      if (data.settings?.language && i18n?.language !== data.settings.language) i18n.changeLanguage(data.settings.language);
 
       const newSettings = { ...DEFAULT_SETTINGS, ...data.settings };
       setSettings(newSettings);
@@ -340,6 +342,7 @@ const SelectionTranslator = () => {
       screenBoundsRef.current = data.screenBounds || null;
 
       if (data.theme) setTheme(data.theme);
+      if (data.settings?.language && i18n?.language !== data.settings.language) i18n.changeLanguage(data.settings.language);
       const newSettings = { ...DEFAULT_SETTINGS, ...data.settings };
       setSettings(newSettings);
       const newTranslation = { ...DEFAULT_TRANSLATION, ...data.translation };
