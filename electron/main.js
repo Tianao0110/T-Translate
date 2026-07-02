@@ -11,6 +11,7 @@ const path = require('path');
 
 const { store, runtime, windows, isDev } = require('./state');
 const { CHANNELS } = require('./shared/channels');
+const { t } = require('./shared/main-i18n');
 const { initIPC } = require('./ipc');
 const { registerAllShortcuts, unregisterAllShortcuts } = require('./ipc/shortcuts');
 const { makeWindowInvisibleToCapture, isCapsLockOn } = require('./utils/native-helper');
@@ -41,6 +42,21 @@ const TERMINAL_CLASSES = [
 function isTerminalClass(className) {
   if (!className) return false;
   return TERMINAL_CLASSES.some((c) => className.includes(c));
+}
+
+// Single source for the settings payload every selection-window path sends —
+// kills per-call-site drift (screenshot Modes 2/3 were missing showSourceByDefault
+// and triggerTimeout, and defaults disagreed across sites).
+function buildSelectionSettingsPayload() {
+  const s = store.get('settings.selection', {}) || {};
+  return {
+    triggerTimeout: s.triggerTimeout || 4000,
+    showSourceByDefault: s.showSourceByDefault || false,
+    autoCloseOnCopy: s.autoCloseOnCopy || false,
+    minChars: s.minChars || 2,
+    maxChars: s.maxChars || 500,
+    windowOpacity: s.windowOpacity || 95,
+  };
 }
 
 const { createMenu } = require('./managers/menu-manager');
@@ -164,7 +180,6 @@ async function showSelectionTrigger(mouseX, mouseY, rect, prefetchedText = null,
   if (!runtime.selectionEnabled) return;
 
   const settings = store.get('settings', {});
-  const selectionSettings = settings.selection || {};
   const interfaceSettings = settings.interface || {};
   const translationSettings = settings.translation || {};
 
@@ -218,14 +233,7 @@ async function showSelectionTrigger(mouseX, mouseY, rect, prefetchedText = null,
       // current display and carries no global origin).
       screenBounds: { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height },
       theme: interfaceSettings.theme || 'light',
-      settings: {
-        triggerTimeout: selectionSettings.triggerTimeout || 4000,
-        showSourceByDefault: selectionSettings.showSourceByDefault || false,
-        autoCloseOnCopy: selectionSettings.autoCloseOnCopy || false,
-        minChars: selectionSettings.minChars || 2,
-        maxChars: selectionSettings.maxChars || 500,
-        windowOpacity: selectionSettings.windowOpacity || 95,
-      },
+      settings: buildSelectionSettingsPayload(),
       translation: {
         targetLanguage: currentTargetLang,
         sourceLanguage: currentSourceLang,
@@ -274,7 +282,6 @@ async function handleHotkeyDirectPath(x, y, rect) {
   }
 
   const settings = store.get('settings', {});
-  const selectionSettings = settings.selection || {};
   const interfaceSettings = settings.interface || {};
   const translationSettings = settings.translation || {};
   const currentTargetLang = translationSettings.targetLanguage || 'zh';
@@ -319,14 +326,7 @@ async function handleHotkeyDirectPath(x, y, rect) {
     mouseY: y,
     screenBounds: { x: displayBounds.x, y: displayBounds.y, width: displayBounds.width, height: displayBounds.height },
     theme: interfaceSettings.theme || 'light',
-    settings: {
-      triggerTimeout: selectionSettings.triggerTimeout || 4000,
-      showSourceByDefault: selectionSettings.showSourceByDefault || false,
-      autoCloseOnCopy: selectionSettings.autoCloseOnCopy || false,
-      minChars: selectionSettings.minChars || 2,
-      maxChars: selectionSettings.maxChars || 500,
-      windowOpacity: selectionSettings.windowOpacity || 95,
-    },
+    settings: buildSelectionSettingsPayload(),
     translation: {
       targetLanguage: currentTargetLang,
       sourceLanguage: currentSourceLang,
@@ -369,6 +369,7 @@ function hideSelectionWindow() {
 // Send OCR'd text to the selection window — Mode 2 of SHOW_RESULT: the window receives
 // raw text and translates it itself (so the same translator + history flow gets reused).
 function showSelectionWithText(text) {
+  clearSelectionLoadingWatchdog(); // OCR resolved — cancel the timeout
   const win = runtime.screenshotSelectionWindow;
 
   if (!win || win.isDestroyed()) {
@@ -380,7 +381,6 @@ function showSelectionWithText(text) {
 
   const settings = store.get('settings', {});
   const interfaceSettings = settings.interface || {};
-  const selectionSettings = settings.selection || {};
   const translationSettings = settings.translation || {};
 
   const currentTargetLang = translationSettings.targetLanguage || 'zh';
@@ -389,16 +389,14 @@ function showSelectionWithText(text) {
     text: text,  // Mode 2: text only, renderer translates.
     targetLanguage: currentTargetLang,
     theme: interfaceSettings.theme || 'light',
-    settings: {
-      windowOpacity: selectionSettings.windowOpacity || 95,
-      autoCloseOnCopy: selectionSettings.autoCloseOnCopy || false,
-    },
+    settings: buildSelectionSettingsPayload(),
   });
 }
 
 // Show result directly (Mode 3): already-translated text. Used for OCR-failure paths
 // where the renderer should display content (or an error) without translating again.
 function showSelectionResult(data) {
+  clearSelectionLoadingWatchdog(); // OCR resolved (result or error) — cancel the timeout
   const win = runtime.screenshotSelectionWindow;
 
   if (!win || win.isDestroyed()) {
@@ -408,30 +406,35 @@ function showSelectionResult(data) {
 
   const settings = store.get('settings', {});
   const interfaceSettings = settings.interface || {};
-  const selectionSettings = settings.selection || {};
 
   win.webContents.send(CHANNELS.SELECTION.SHOW_RESULT, {
     sourceText: data.sourceText || '',
     translatedText: data.translatedText || '',
     isOcrError: data.isOcrError === true,
     theme: interfaceSettings.theme || 'light',
-    settings: {
-      windowOpacity: selectionSettings.windowOpacity || 95,
-      autoCloseOnCopy: selectionSettings.autoCloseOnCopy || false,
-    },
+    settings: buildSelectionSettingsPayload(),
   });
+}
+
+// Cancel the loading-window watchdog (OCR resolved, or we're tearing down).
+function clearSelectionLoadingWatchdog() {
+  if (runtime.screenshotLoadingTimer) {
+    clearTimeout(runtime.screenshotLoadingTimer);
+    runtime.screenshotLoadingTimer = null;
+  }
 }
 
 // Close the screenshot-OCR loading window. If errorMsg is provided, show it for 4s first.
 function hideSelectionLoading(errorMsg) {
+  clearSelectionLoadingWatchdog();
   const win = runtime.screenshotSelectionWindow;
 
   if (win && !win.isDestroyed()) {
     if (errorMsg) {
       win.webContents.send(CHANNELS.SELECTION.SHOW_RESULT, {
-        sourceText: '',
-        translatedText: '',
         error: errorMsg,
+        theme: (store.get('settings.interface.theme')) || 'light',
+        settings: buildSelectionSettingsPayload(),
       });
       setTimeout(() => {
         if (win && !win.isDestroyed()) win.close();
@@ -449,17 +452,24 @@ async function showSelectionLoading(bounds) {
 
   const settings = store.get('settings', {});
   const interfaceSettings = settings.interface || {};
-  const selectionSettings = settings.selection || {};
 
   const win = windowManager.createSelectionWindow();
   runtime.screenshotSelectionWindow = win;
+
+  // Watchdog: if OCR never reports back (renderer not ready, message dropped),
+  // don't leave a permanent, unclosable spinner — surface a timeout after 20s.
+  clearSelectionLoadingWatchdog();
+  runtime.screenshotLoadingTimer = setTimeout(() => {
+    logger.warn('Selection loading timed out with no OCR result');
+    hideSelectionLoading(t('selection.loadingTimeout'));
+  }, 20000);
 
   // Position at the bottom-right of the captured screenshot area.
   let posX = bounds.x + bounds.width + 10;
   let posY = bounds.y + bounds.height + 10;
 
   const display = screen.getDisplayNearestPoint({ x: posX, y: posY });
-  const screenBounds = display.bounds;
+  const screenBounds = display.workArea; // workArea (not bounds) so it clears the taskbar
   const winSize = 28;  // Square loading window, matches selection-trigger size.
 
   if (posX + winSize > screenBounds.x + screenBounds.width) {
@@ -479,7 +489,7 @@ async function showSelectionLoading(bounds) {
     win.webContents.send(CHANNELS.SELECTION.SHOW_RESULT, {
       isLoading: true,
       theme: interfaceSettings.theme || 'light',
-      settings: { windowOpacity: selectionSettings.windowOpacity || 95 },
+      settings: buildSelectionSettingsPayload(),
     });
   };
 

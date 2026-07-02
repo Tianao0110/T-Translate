@@ -96,6 +96,7 @@ const runtime = {
   screenshotFromHotkey: false,
   lastScreenshotBounds: null,
   screenshotSelectionWindow: null,
+  screenshotLoadingTimer: null,
 
   // Selection translate
   lastSelectionRect: null,

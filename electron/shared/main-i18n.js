@@ -53,6 +53,7 @@ const messages = {
     'screenshot.ocrError': 'OCR 错误',
     'screenshot.noImage': '没有预先截取的屏幕图像',
     'screenshot.noSource': '没有可用的截图源',
+    'selection.loadingTimeout': '识别超时，请重试',
     
     // menu
     'menu.file': '文件', 'menu.edit': '编辑', 'menu.view': '视图',
@@ -124,6 +125,7 @@ const messages = {
     'screenshot.ocrError': 'OCR Error',
     'screenshot.noImage': 'No pre-captured screen image',
     'screenshot.noSource': 'No screenshot source available',
+    'selection.loadingTimeout': 'Recognition timed out, please try again',
     
     // menu
     'menu.file': 'File', 'menu.edit': 'Edit', 'menu.view': 'View',

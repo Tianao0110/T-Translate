@@ -87,6 +87,7 @@ const SelectionTranslator = () => {
   const [windowId, setWindowId] = useState(null);
   const [initialBounds, setInitialBounds] = useState(null);
   const [freezeHint, setFreezeHint] = useState(false);
+  const [cardHovered, setCardHovered] = useState(false);
 
   const [ttsStatus, setTtsStatus] = useState(TTS_STATUS.IDLE);
 
@@ -231,6 +232,20 @@ const SelectionTranslator = () => {
       const newSettings = { ...DEFAULT_SETTINGS, ...data.settings };
       setSettings(newSettings);
 
+      // Error payload (e.g. loading watchdog timeout) — surface it instead of
+      // silently doing nothing (this branch previously had no receiver).
+      if (data.error) {
+        logger.debug('Showing result error:', data.error);
+        setSourceText('');
+        setTranslatedText('');
+        setError(data.error);
+        sizedRef.current = false;
+        setIsFrozen(false);
+        setInitialBounds(null);
+        setMode('overlay');
+        return;
+      }
+
       if (data.isLoading) {
         logger.debug('Showing loading state');
         setSourceText('');
@@ -297,12 +312,7 @@ const SelectionTranslator = () => {
         setIsFrozen(false);
         // Don't reset sizedRef/initialBounds — caller already positioned us
         setMode('overlay');
-
-        if (newSettings.triggerTimeout > 0) {
-          autoHideTimerRef.current = setTimeout(() => {
-            handleAutoHide();
-          }, newSettings.triggerTimeout);
-        }
+        // Auto-hide handled by the unified overlay effect (乙案), no per-path timer.
       }
     });
 
@@ -558,6 +568,17 @@ const SelectionTranslator = () => {
     }
   }, [mode, translatedText, error, showSource]);
 
+  // Unified auto-hide for result cards (乙案): every overlay path hides after
+  // triggerTimeout. Hovering the card pauses the countdown (effect early-returns
+  // while hovered, reschedules the full timeout on leave); frozen cards exempt.
+  useEffect(() => {
+    if (mode !== 'overlay' || isFrozen || cardHovered) return;
+    const timeout = settings.triggerTimeout || 4000;
+    if (timeout <= 0) return;
+    const timer = setTimeout(() => handleAutoHide(), timeout);
+    return () => clearTimeout(timer);
+  }, [mode, isFrozen, cardHovered, settings.triggerTimeout]);
+
   const translateText = async (text, retryCount = 0, overrideTargetLang = null, overrideSourceLang = null) => {
     if (!translationService.initialized) {
       logger.debug('Initializing translation service...');
@@ -613,8 +634,9 @@ const SelectionTranslator = () => {
 
       return result.text;
     } catch (err) {
-      // One automatic retry for transient network/fetch failures only
-      if (retryCount < 1 && (err.message.includes('fetch') || err.message.includes('network') || err.message.includes('连接'))) {
+      // One automatic retry for transient network failures only. Match common
+      // markers in both languages rather than a single '连接' substring.
+      if (retryCount < 1 && /fetch|network|timeout|ECONN|连接|超时|网络/i.test(err.message || '')) {
         logger.debug('Retrying translation...');
         await new Promise(r => setTimeout(r, 1000));
         // Forward override langs on retry — otherwise retry would silently fall back to state
@@ -783,6 +805,8 @@ const SelectionTranslator = () => {
         <div
           className={`sel-card ${copied ? 'copied' : ''} ${isFrozen ? 'frozen' : ''}`}
           onContextMenu={handleClose}
+          onMouseEnter={() => setCardHovered(true)}
+          onMouseLeave={() => setCardHovered(false)}
           style={{ '--sel-opacity': (settings.windowOpacity || 95) / 100 }}
         >
           <div className="sel-toolbar">
