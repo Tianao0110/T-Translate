@@ -126,10 +126,12 @@ class TranslationService {
         logger.debug('Loaded from passed settings');
       }
 
-      // Floating window calls into main which returns already-decrypted configs
+      // Floating window calls into main which returns already-decrypted configs.
+      // An empty answer must fall through — {} is truthy and used to truncate
+      // the chain here, leaving the floating window with zero providers.
       if (!providerConfigs && window.electron?.floatingWindow?.getProviderConfigs) {
         const fwConfigs = await window.electron.floatingWindow.getProviderConfigs();
-        if (fwConfigs) {
+        if (fwConfigs?.list?.length || Object.keys(fwConfigs?.configs || {}).length > 0) {
           providerList = fwConfigs.list;
           providerConfigs = fwConfigs.configs;
           logger.debug('Loaded configs from floating-window API');

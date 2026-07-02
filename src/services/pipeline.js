@@ -7,7 +7,7 @@ import useSessionStore, { DISPLAY_MODE, CHILD_PANE_STATUS } from '../stores/sess
 import useConfigStore from '../stores/config.js';
 import { calculateHash } from '../utils/image.js';
 import { detectLanguage, cleanTranslationOutput, shouldTranslateText } from '../utils/text.js';
-import { isProviderAllowed, isOcrEngineAllowed, PRIVACY_MODE_IDS } from '../config/privacy-modes.js';
+import { getPrivacyModeConfig, PRIVACY_MODE_IDS } from '../config/privacy-modes.js';
 import createLogger from '../utils/logger.js';
 import { getShortErrorMessage } from '../utils/error-handler.js';
 import i18n from '../i18n.js';
@@ -88,19 +88,21 @@ class TranslationPipeline {
 
     logger.debug('Initializing...');
 
-    let llmEndpoint = 'http://localhost:1234/v1';
+    // init takes the flat settings.ocr bucket (same contract as updateConfigs)
+    // — the old per-engine shape was silently discarded by _buildConfigs, so
+    // online-engine keys and the llm-vision endpoint never arrived here.
+    let ocrSettings = {};
+    let llmEndpoint;
     try {
       const settings = await window.electron?.store?.get?.('settings') || {};
-      llmEndpoint = settings.llm?.endpoint || llmEndpoint;
+      ocrSettings = settings.ocr || {};
+      llmEndpoint = settings.connection?.endpoint;
     } catch (e) {
-      logger.debug('Failed to get LLM endpoint from settings:', e);
+      logger.debug('Failed to read settings for OCR init:', e);
     }
 
     const config = useConfigStore.getState();
-    await ocrManager.init({
-      'rapid-ocr': {},
-      'llm-vision': { endpoint: llmEndpoint },
-    });
+    await ocrManager.init({ ...ocrSettings, llmEndpoint });
     ocrManager.setPriority(config.ocrPriority);
 
     this._initialized = true;
@@ -166,8 +168,12 @@ class TranslationPipeline {
 
       session.startOcr();
 
+      // Mode fetched before OCR, not at translate time — screen captures are
+      // the most privacy-sensitive input and must respect the engine allowlist.
+      const privacyMode = await getPrivacyMode();
       const ocrResult = await ocrManager.recognize(imageData, {
         engine: config.ocrEngine,
+        allowedEngines: getPrivacyModeConfig(privacyMode).allowedOcrEngines || undefined,
       });
 
       if (!ocrResult.success) {

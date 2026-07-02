@@ -295,11 +295,27 @@ class MainTranslationService {
     return results;
   }
 
+  // ocrManager starts with empty configs in this renderer — feed it the
+  // persisted OCR settings once before first use (SettingsPanel re-feeds on
+  // every save). Without this, online-engine API keys are lost on restart.
+  async _ensureOcrConfigs() {
+    if (this._ocrConfigsLoaded) return;
+    this._ocrConfigsLoaded = true;
+    try {
+      const settings = await window.electron?.store?.get?.('settings') || {};
+      ocrManager.updateConfigs({
+        ...(settings.ocr || {}),
+        llmEndpoint: settings.connection?.endpoint,
+      });
+    } catch { /* browser mode: engine defaults apply */ }
+  }
+
   async recognizeImage(image, options = {}) {
     if (!ocrManager) {
       return { success: false, error: 'OCR not initialized' };
     }
 
+    await this._ensureOcrConfigs();
     const state = useTranslationStore.getState();
 
     useTranslationStore.setState((draft) => {

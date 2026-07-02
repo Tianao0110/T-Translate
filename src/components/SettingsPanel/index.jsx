@@ -390,7 +390,10 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
 
       if (settings.ocr) {
         try {
-          ocrManager.updateConfigs(settings.ocr);
+          ocrManager.updateConfigs({
+            ...settings.ocr,
+            llmEndpoint: settings.connection?.endpoint,
+          });
           logger.debug(' OCR configs updated');
         } catch (e) {
           logger.warn(' ocrManager update failed:', e);

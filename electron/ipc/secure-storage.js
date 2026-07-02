@@ -185,3 +185,6 @@ function register(ctx) {
 }
 
 module.exports = register;
+// Shared with floating-window.js so its direct safeStorage reads respect the
+// same offline-mode gate instead of maintaining a second prefix list.
+module.exports.isDecryptAllowed = isDecryptAllowed;
