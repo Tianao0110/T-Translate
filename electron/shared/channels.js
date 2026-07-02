@@ -61,6 +61,8 @@ const CHANNELS = {
     OPEN: 'floating-window:open',
     CLOSE: 'floating-window:close',
     GET_BOUNDS: 'floating-window:get-bounds',
+    SET_POSITION: 'floating-window:set-position', // manual title-bar drag stream
+
     CAPTURE_REGION: 'floating-window:capture-region',
     SET_PASS_THROUGH: 'floating-window:set-pass-through',
     SET_OPACITY: 'floating-window:set-opacity',

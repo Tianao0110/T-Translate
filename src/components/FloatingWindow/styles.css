@@ -31,11 +31,11 @@
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   color: var(--floating-text);
-  /* none, NOT text: a text-selectable element in the drag-region ancestry breaks
-     -webkit-app-region dragging on Electron 42 — this killed title-bar dragging.
-     Text selection is granted specifically where there is text (result/message/panes). */
+  /* Text selection is granted specifically where there is text (result/message/
+     panes); the chrome itself must not be selectable while dragging. */
   user-select: none;
-  -webkit-app-region: drag;
+  /* No -webkit-app-region here: it is dead on this transparent frameless window
+     (E42) — title-bar dragging is implemented manually (handleTitleBarMouseDown). */
 }
 
 /* 字幕模式 - 完全透明 + 虚线边框 */
@@ -53,7 +53,7 @@
   justify-content: center;
   padding: 3px 6px;
   min-height: 24px;
-  -webkit-app-region: drag;
+  cursor: move; /* manual drag lives here (handleTitleBarMouseDown) */
   background: rgba(0, 0, 0, 0.06);
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
   /* 默认隐藏，鼠标移入显示 */

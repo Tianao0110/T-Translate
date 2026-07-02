@@ -19,6 +19,9 @@ contextBridge.exposeInMainWorld('electron', {
   floatingWindow: {
     getBounds: () => ipcRenderer.invoke('floating-window:get-bounds'),
 
+    // Manual title-bar drag: high-frequency fire-and-forget position stream.
+    moveTo: (x, y) => ipcRenderer.send('floating-window:set-position', x, y),
+
     captureRegion: (bounds) => ipcRenderer.invoke('floating-window:capture-region', bounds),
 
     setPassThrough: (enabled) => ipcRenderer.invoke('floating-window:set-pass-through', enabled),

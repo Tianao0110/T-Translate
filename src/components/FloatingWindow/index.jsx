@@ -334,6 +334,39 @@ const FloatingWindow = () => {
     setShowOpacitySlider(prev => !prev);
   };
 
+  // Manual title-bar drag. -webkit-app-region is dead on this transparent
+  // frameless window (E42, installed builds too), so track the pointer and
+  // stream window positions to main. Interactive islands (buttons, toolbar,
+  // opacity popup) are excluded so their clicks keep working.
+  const handleTitleBarMouseDown = (e) => {
+    if (e.button !== 0) return;
+    if (e.target.closest('button, .floating-toolbar, .opacity-popup')) return;
+    e.preventDefault();
+
+    // Grab offset inside the window; window.screenX/Y and e.screenX/Y share the
+    // same DIP coordinate space, matching BrowserWindow.setPosition.
+    const offsetX = e.screenX - window.screenX;
+    const offsetY = e.screenY - window.screenY;
+
+    let pending = null;
+    let raf = 0;
+    const onMove = (ev) => {
+      pending = { x: ev.screenX - offsetX, y: ev.screenY - offsetY };
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        if (pending) window.electron?.floatingWindow?.moveTo?.(pending.x, pending.y);
+      });
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      if (raf) cancelAnimationFrame(raf);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
   // Opacity is applied via CSS variable (--floating-opacity) so child panes stay
   // opaque; the IPC call persists it window-locally so it survives relaunch
   // and settings-changed broadcasts.
@@ -515,7 +548,7 @@ const FloatingWindow = () => {
       onMouseEnter={handleMouseEnterWindow}
       onMouseLeave={handleMouseLeaveWindow}
     >
-      <div className="floating-top-area">
+      <div className="floating-top-area" onMouseDown={handleTitleBarMouseDown}>
           <div className="floating-toolbar">
             <button
               className="toolbar-btn"

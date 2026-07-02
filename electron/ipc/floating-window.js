@@ -1,6 +1,6 @@
 // Floating-window IPC: window controls, settings merge, region capture, and detached child-pane windows.
 
-const { ipcMain, safeStorage } = require('electron');
+const { ipcMain, safeStorage, BrowserWindow } = require('electron');
 const { CHANNELS } = require('../shared/channels');
 const { isDecryptAllowed } = require('./secure-storage');
 const logger = require('../utils/logger')('IPC:FloatingWindow');
@@ -94,6 +94,19 @@ function register(ctx) {
     const current = store.get('floatingWindowLocal', {});
     store.set('floatingWindowLocal', { ...current, opacity });
     return true;
+  });
+
+  // ===== Manual window drag =====
+
+  // -webkit-app-region dragging is dead on this transparent frameless window
+  // (Electron 42; the installed 0.2.8 reproduces it too), so the renderer tracks
+  // the pointer itself and streams positions here. `on` (not handle): this fires
+  // at mousemove frequency, fire-and-forget. Addressed via event.sender.
+  ipcMain.on(CHANNELS.FLOATING_WINDOW.SET_POSITION, (event, x, y) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win && !win.isDestroyed() && Number.isFinite(x) && Number.isFinite(y)) {
+      win.setPosition(Math.round(x), Math.round(y));
+    }
   });
 
   // ===== Mouse pass-through =====
