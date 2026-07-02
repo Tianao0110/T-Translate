@@ -712,7 +712,10 @@ const useTranslationStore = create(
         return {
           ...currentState,
           ...persistedState,
-          translationMode: persistedState.translationMode || currentState.translationMode,
+          // 'strict' was removed in 0.2.9 — its core promise (no network) maps to offline
+          translationMode: persistedState.translationMode === 'strict'
+            ? PRIVACY_MODES.OFFLINE
+            : (persistedState.translationMode || currentState.translationMode),
           // Persist langs only — never restore in-flight translation text
           currentTranslation: {
             ...currentState.currentTranslation,
@@ -728,6 +731,11 @@ const useTranslationStore = create(
         favorites: state.favorites,
         statistics: state.statistics,
         translationMode: state.translationMode,
+        // Secure-mode stash must survive a quit-while-secure: without these,
+        // the emptied history/statistics are what lands on disk and the real
+        // data is unrecoverable after restart.
+        _savedHistory: state._savedHistory,
+        _savedStatistics: state._savedStatistics,
         currentTranslation: {
           sourceLanguage: state.currentTranslation.sourceLanguage,
           targetLanguage: state.currentTranslation.targetLanguage,

@@ -39,7 +39,6 @@ const PrivacySection = ({
       [PRIVACY_MODE_IDS.STANDARD]: 'privacy.modes.standard',
       [PRIVACY_MODE_IDS.OFFLINE]: 'privacy.modes.offline',
       [PRIVACY_MODE_IDS.SECURE]: 'privacy.modes.incognito',
-      [PRIVACY_MODE_IDS.STRICT]: 'privacy.modes.strict',
     };
     return t(modeKeys[modeId] || 'privacy.modes.standard');
   };
@@ -49,7 +48,6 @@ const PrivacySection = ({
       [PRIVACY_MODE_IDS.STANDARD]: 'privacy.modes.standardDesc',
       [PRIVACY_MODE_IDS.OFFLINE]: 'privacy.modes.offlineDesc',
       [PRIVACY_MODE_IDS.SECURE]: 'privacy.modes.incognitoDesc',
-      [PRIVACY_MODE_IDS.STRICT]: 'privacy.modes.strictDesc',
     };
     return t(descKeys[modeId] || 'privacy.modes.standardDesc');
   };

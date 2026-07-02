@@ -8,6 +8,7 @@ import { ocrManager } from '../providers/ocr/index.js';
 import useTranslationStore from '../stores/translation-store.js';
 
 import { PRIVACY_MODES, TRANSLATION_STATUS } from '@config/defaults';
+import { getPrivacyModeConfig } from '../config/privacy-modes.js';
 import createLogger from '../utils/logger.js';
 import i18n from '../i18n.js';
 const logger = createLogger('MainTranslation');
@@ -310,6 +311,8 @@ class MainTranslationService {
       const result = await ocrManager.recognize(image, {
         engine: state.ocrStatus.engine,
         ...options,
+        // Last so no call site can widen the engine set beyond the privacy mode
+        allowedEngines: getPrivacyModeConfig(state.translationMode).allowedOcrEngines || undefined,
       });
 
       if (result.success) {

@@ -213,8 +213,7 @@ const en = {
     modes: {
       standard: "Standard", standardDesc: "Full features, auto-save history",
       incognito: "Incognito", incognitoDesc: "No records saved, cleared on close",
-      offline: "Offline", offlineDesc: "Fully offline, no network requests",
-      strict: "Strict", strictDesc: "Maximum privacy, local processing only"
+      offline: "Offline", offlineDesc: "Fully offline, no network requests"
     },
     clearHistoryConfirm: "Are you sure to clear all translation history?",
     historyCleared: "History cleared",
@@ -333,7 +332,7 @@ const en = {
     shortcuts: { title: "Keyboard Shortcuts", desc: "Customize global shortcuts", showWindow: "Show/Hide Window", screenshot: "Screenshot Translate", floatingWindow: "Floating Window", selectionToggle: "Toggle Selection", recording: "Press shortcut...", conflict: "Shortcut conflict", reset: "Reset Default" },
     privacy: {
       title: "Privacy Settings", mode: "Privacy Mode", modeDesc: "Control data storage and network",
-      modes: { standard: "Standard", standardDesc: "Normal features, save history", offline: "Offline", offlineDesc: "Local translation only", incognito: "Incognito", incognitoDesc: "No history or cache", strict: "Strict", strictDesc: "Offline + Incognito" },
+      modes: { standard: "Standard", standardDesc: "Normal features, save history", offline: "Offline", offlineDesc: "Local translation only", incognito: "Incognito", incognitoDesc: "No history or cache" },
       clearHistory: "Clear History", clearCache: "Clear Cache", clearAll: "Clear All Data"
     },
     tts: { title: "Text-to-Speech", enable: "Enable TTS", enableDesc: "Enable voice reading", voice: "Voice", voiceDesc: "Select voice", rate: "Speed", rateDesc: "Adjust reading speed", pitch: "Pitch", pitchDesc: "Adjust voice pitch", volume: "Volume", volumeDesc: "Adjust volume", test: "Test", testText: "This is a test message" },

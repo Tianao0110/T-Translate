@@ -4,7 +4,6 @@
 export const PRIVACY_MODES = {
   STANDARD: 'standard',
   OFFLINE: 'offline',
-  STRICT: 'strict',
   SECURE: 'secure',
 };
 
