@@ -49,12 +49,16 @@ function validateSelectionText(text, settings, t) {
   if (text.length > settings.maxChars) {
     throw new Error(t('selection.tooLong', '文字太长（最多 {{max}} 字符）').replace('{{max}}', settings.maxChars));
   }
-  // Require at least one alphanumeric / CJK char so blank punctuation runs are skipped
-  if (!/[\w一-鿿぀-ヿ가-힯]/.test(text)) {
+  // Require at least one letter/number in ANY script (Cyrillic, Greek, Arabic,
+  // Thai, …), not just Latin+CJK — the old class rejected every supported
+  // non-Latin-non-CJK language outright.
+  if (!/[\p{L}\p{N}]/u.test(text)) {
     throw new Error(t('selection.noValidText', '选中内容无有效文字'));
   }
-  // 10+ repeats of the same char usually means OCR/encoding garbage
-  if (/(.)\1{10,}/.test(text)) {
+  // Very long single-char runs usually mean OCR/encoding garbage. Threshold kept
+  // high so legit emphatic repetition ("哈哈哈…") and divider lines ("====")
+  // aren't rejected.
+  if (/(.)\1{30,}/.test(text)) {
     throw new Error(t('selection.possibleGarbage', '选中内容可能是乱码'));
   }
   // Skip file paths: Windows drive/UNC, common POSIX absolute, file:// URL
@@ -110,6 +114,10 @@ const SelectionTranslator = () => {
   // True while adjustWindowToContent is moving the window programmatically, so
   // the drag-to-freeze poll doesn't mistake our own setBounds for a user drag.
   const isAdjustingRef = useRef(false);
+  // Actual languages the last translation resolved to (after the same-language
+  // flip). History metadata and TTS read this instead of the configured target,
+  // which would otherwise mislabel/mis-voice flipped results.
+  const lastResolvedLangsRef = useRef({ sourceLanguage: 'auto', targetLanguage: 'zh' });
 
   useEffect(() => {
     ttsManager.init().catch(e => {
@@ -131,7 +139,10 @@ const SelectionTranslator = () => {
     if (ttsStatus === TTS_STATUS.SPEAKING) {
       ttsManager.stop();
     } else {
-      ttsManager.speak(translatedText, { lang: translation.targetLanguage }).catch(e => {
+      // Speak in the language actually translated INTO (post-flip), not the
+      // configured target — otherwise a flipped ja→en result gets a zh voice.
+      const speakLang = lastResolvedLangsRef.current.targetLanguage || translation.targetLanguage;
+      ttsManager.speak(translatedText, { lang: speakLang }).catch(e => {
         logger.error('TTS error:', e);
       });
     }
@@ -258,6 +269,8 @@ const SelectionTranslator = () => {
             window.electron?.selection?.addToHistory?.({
               source: data.text,
               result: translationResult,
+              sourceLanguage: lastResolvedLangsRef.current.sourceLanguage,
+              targetLanguage: lastResolvedLangsRef.current.targetLanguage,
               timestamp: Date.now(),
               from: 'screenshot',
             });
@@ -347,6 +360,8 @@ const SelectionTranslator = () => {
           window.electron?.selection?.addToHistory?.({
             source: text,
             result: translationResult,
+            sourceLanguage: lastResolvedLangsRef.current.sourceLanguage,
+            targetLanguage: lastResolvedLangsRef.current.targetLanguage,
             timestamp: Date.now(),
             from: 'hotkey',
           });
@@ -428,6 +443,8 @@ const SelectionTranslator = () => {
         window.electron?.selection?.addToHistory?.({
           source: text,
           result: translationResult,
+          sourceLanguage: lastResolvedLangsRef.current.sourceLanguage,
+          targetLanguage: lastResolvedLangsRef.current.targetLanguage,
           timestamp: Date.now(),
           from: 'selection',
         });
@@ -556,10 +573,17 @@ const SelectionTranslator = () => {
     // the provider unchanged ("translation" = the source text). The card has
     // no language picker, so flip to the other primary language — same
     // behavior as the floating window.
-    if (detectLanguage(text) === targetLang) {
+    const detected = detectLanguage(text);
+    if (detected === targetLang) {
       targetLang = targetLang === 'zh' ? 'en' : 'zh';
       logger.debug(`Source already in target language, flipping to ${targetLang}`);
     }
+
+    // Record the languages actually used (post-flip) for history + TTS.
+    lastResolvedLangsRef.current = {
+      sourceLanguage: sourceLang !== 'auto' ? sourceLang : detected,
+      targetLanguage: targetLang,
+    };
 
     // Fetched per call, not at mount: this window is persistent (hide, not
     // close), so a cached mode would go stale when the user switches it.
