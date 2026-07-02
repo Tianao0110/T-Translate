@@ -2,12 +2,12 @@
 // (useTTS, useTermCheck, useStyleRewrite, useSaveModal) and presentational
 // pieces in components.jsx (StyleModal, SaveModal, etc.)
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Send, Camera, Image, FileText, Volume2, VolumeX, Copy,
-  RotateCcw, Sparkles, Loader2, Clock, Zap, Shield, Eye, EyeOff, Lock,
-  Lightbulb, Check, X, ArrowRight, Palette, ChevronUp, ChevronDown, AlertTriangle, BookOpen
+  RotateCcw, Sparkles, Loader2, Clock,
+  Lightbulb, Check, X, ArrowRight, Palette, ChevronUp, ChevronDown, BookOpen
 } from 'lucide-react';
 
 import { useShallow } from 'zustand/react/shallow';
@@ -202,17 +202,17 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
       return;
     }
 
+    // navigator.onLine is unreliable and local providers work without a
+    // network — warn and let the request itself decide.
     if (!isConnected && translationMode !== PRIVACY_MODES.OFFLINE) {
-      notify(t('translation.notConnected'), 'error');
+      notify(t('translation.notConnected'), 'warning');
     }
 
     // OCR'd text gets the 'ocr' template (different prompt — better for fragments)
     const effectiveTemplate = isOcrSource ? 'ocr' : (overrideTemplate || selectedTemplate);
 
-    const options = {
-      template: effectiveTemplate,
-      saveHistory: translationMode !== PRIVACY_MODES.SECURE,
-    };
+    // History gating lives in the service layer (mode-aware); no per-call flag
+    const options = { template: effectiveTemplate };
 
     const result = useStreamOutput
       ? await streamTranslate(options)
@@ -562,7 +562,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
           <div className="box-footer">
             {currentTranslation.translatedText && (
               <>
-                <span className="char-count">{(currentTranslation.translatedText || '').length} 字符</span>
+                <span className="char-count">{(currentTranslation.translatedText || '').length} {t('translation.characters')}</span>
                 {currentTranslation.metadata.duration && (
                   <span className="translation-time">
                     <Clock size={12} style={{ marginRight: 4 }} />

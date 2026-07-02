@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import TitleBar from './components/TitleBar';
 import MainWindow from './components/MainWindow';
 import useTranslationStore from './stores/translation-store';
-import useConfigStore from './stores/config';
 import { initStoreSync } from './stores/sync-to-electron.js';
 import createLogger from './utils/logger.js';
 import './styles/App.css';
@@ -11,12 +10,10 @@ import { THEMES } from '@config/defaults';
 
 const logger = createLogger('App');
 
-// The floating window used to read these via executeJavaScript. We've
-// since switched to electron-store IPC, but the globals stay for any code
-// still reaching in through the DOM.
+// Still load-bearing: floating-window.js GET_SETTINGS reads the live language
+// pair from this global via executeJavaScript when the main window is around.
 if (typeof window !== 'undefined') {
   window.__TRANSLATION_STORE__ = useTranslationStore;
-  window.__CONFIG_STORE__ = useConfigStore;
 }
 
 // One-time wiring of Zustand -> electron-store (subscribes for the lifetime of the app)
@@ -24,7 +21,6 @@ initStoreSync(useTranslationStore);
 
 function App() {
   const [theme, setTheme] = useState(THEMES.LIGHT);
-  const setPendingScreenshot = useTranslationStore((state) => state.setPendingScreenshot);
   const addToFavorites = useTranslationStore((state) => state.addToFavorites);
   const addToHistory = useTranslationStore((state) => state.addToHistory);
   const setTargetLanguage = useTranslationStore((state) => state.setTargetLanguage);
@@ -45,7 +41,7 @@ function App() {
         } else {
           savedTheme = localStorage.getItem('theme') || 'light';
         }
-      } catch (e) {
+      } catch {
         savedTheme = localStorage.getItem('theme') || 'light';
       }
 
@@ -92,23 +88,8 @@ function App() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!window.electron?.screenshot?.onCaptured) {
-      logger.warn('Screenshot API not available');
-      return;
-    }
-
-    const unsubscribe = window.electron.screenshot.onCaptured((dataURL) => {
-      logger.debug('Screenshot captured, length:', dataURL?.length || 0);
-      if (dataURL) {
-        setPendingScreenshot(dataURL);
-      }
-    });
-
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
-  }, [setPendingScreenshot]);
+  // Screenshot capture is handled by MainWindow's own onCaptured listener
+  // (screenshotData prop -> TranslationPanel) — no second subscription here.
 
   // Floating window forwards user "add to favorites" through main -> this listener
   useEffect(() => {

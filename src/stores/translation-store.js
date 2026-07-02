@@ -7,8 +7,7 @@ import { persist, subscribeWithSelector } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 import { v4 as uuidv4 } from "uuid";
 
-import { PRIVACY_MODES, TRANSLATION_STATUS, LANGUAGE_CODES, DEFAULTS, PROVIDER_IDS, LANGUAGES } from "@config/defaults";
-import { getModeFeatures } from "@config/privacy-modes";
+import { PRIVACY_MODES, TRANSLATION_STATUS, LANGUAGE_CODES, DEFAULTS, LANGUAGES } from "@config/defaults";
 import createLogger from '../utils/logger.js';
 const logger = createLogger('TranslationStore');
 
@@ -143,16 +142,10 @@ const useTranslationStore = create(
         fallbackNotice: null,
       },
 
-      pendingScreenshot: null,
-
       statistics: {
         totalTranslations: 0,
         totalCharacters: 0,
         todayTranslations: 0,
-        weekTranslations: 0,
-        mostUsedLanguagePair: null,
-        averageTranslationTime: 0,
-        lastUpdated: new Date().toISOString(),
       },
 
       clipboard: {
@@ -179,10 +172,6 @@ const useTranslationStore = create(
               totalTranslations: 0,
               totalCharacters: 0,
               todayTranslations: 0,
-              weekTranslations: 0,
-              mostUsedLanguagePair: null,
-              averageTranslationTime: 0,
-              lastUpdated: new Date().toISOString(),
             };
           }
 
@@ -197,19 +186,6 @@ const useTranslationStore = create(
             }
           }
         }),
-
-      isFeatureEnabled: (featureName) => {
-        const mode = get().translationMode;
-        const features = getModeFeatures(mode);
-        return features[featureName] !== false;
-      },
-
-      // Offline mode only permits local LLM + Ollama
-      isProviderAllowed: (providerId) => {
-        const mode = get().translationMode;
-        if (mode !== PRIVACY_MODES.OFFLINE) return true;
-        return providerId === PROVIDER_IDS.LOCAL_LLM || providerId === PROVIDER_IDS.OLLAMA;
-      },
 
       setUseStreamOutput: (value) =>
         set((state) => {
@@ -305,16 +281,6 @@ const useTranslationStore = create(
       setOcrEngine: (engine) =>
         set((state) => {
           state.ocrStatus.engine = engine;
-        }),
-
-      setPendingScreenshot: (dataURL) =>
-        set((state) => {
-          state.pendingScreenshot = dataURL;
-        }),
-
-      clearPendingScreenshot: () =>
-        set((state) => {
-          state.pendingScreenshot = null;
         }),
 
       addToFavorites: (item = null, isStyleReference = false) =>
@@ -450,21 +416,6 @@ const useTranslationStore = create(
 
       // ===== Privacy mode helpers =====
 
-      canSaveHistory: () => {
-        const state = get();
-        return state.translationMode !== PRIVACY_MODES.SECURE;
-      },
-
-      canUseOnlineApi: () => {
-        const state = get();
-        return state.translationMode !== PRIVACY_MODES.OFFLINE;
-      },
-
-      canUseCache: () => {
-        const state = get();
-        return state.translationMode !== PRIVACY_MODES.SECURE;
-      },
-
       // Single source for the privacy fields every translationService call
       // must carry — the service defaults privacyMode to STANDARD, which has
       // twice shipped offline/secure-mode leaks from call sites forgetting it.
@@ -474,33 +425,6 @@ const useTranslationStore = create(
           privacyMode: mode,
           useCache: mode !== PRIVACY_MODES.SECURE,
         };
-      },
-
-      getModeConfig: () => {
-        const state = get();
-        const configs = {
-          standard: {
-            saveHistory: true,
-            useCache: true,
-            onlineApi: true,
-            analytics: true,
-          },
-          secure: {
-            saveHistory: false,
-            useCache: false,
-            onlineApi: true,
-            analytics: false,
-          },
-          offline: {
-            saveHistory: true,
-            useCache: true,
-            onlineApi: false,
-            analytics: true,
-            allowedProviders: [PROVIDER_IDS.LOCAL_LLM, PROVIDER_IDS.OLLAMA],
-            allowedOcrEngines: ['llm-vision', 'rapid-ocr', 'windows-ocr'],
-          }
-        };
-        return configs[state.translationMode] || configs.standard;
       },
 
       // External callers (e.g. floating window) route through this, so privacy
@@ -667,15 +591,6 @@ const useTranslationStore = create(
         );
       },
 
-      getStatistics: () => {
-        const state = get();
-        // Bump lastUpdated so observers get a fresh value
-        set((state) => {
-          state.statistics.lastUpdated = new Date().toISOString();
-        });
-        return state.statistics;
-      },
-
       // Glossary terms live in the favorites pile under folderId === 'glossary'
       getGlossaryTerms: () => {
         const state = get();
@@ -687,15 +602,6 @@ const useTranslationStore = create(
           }))
           .filter(term => term.source && term.target);
       },
-
-      reset: () =>
-        set((state) => {
-          const { sourceLanguage, targetLanguage } = state.currentTranslation;
-          state.currentTranslation.sourceText = "";
-          state.currentTranslation.translatedText = "";
-          state.history = [];
-          state.favorites = [];
-        }),
     })),
     {
       name: "translation-store",
@@ -716,6 +622,11 @@ const useTranslationStore = create(
             targetLanguage: persistedState.currentTranslation?.targetLanguage || currentState.currentTranslation.targetLanguage,
             sourceText: "",
             translatedText: "",
+          },
+          // Partialize keeps only {engine}; restore the runtime fields' defaults
+          ocrStatus: {
+            ...currentState.ocrStatus,
+            ...(persistedState.ocrStatus || {}),
           },
         };
       },

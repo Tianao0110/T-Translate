@@ -9,6 +9,7 @@ const OcrSection = ({
   settings,
   updateSetting,
   notify,
+  confirm,
   collapsedGroups,
   toggleGroup,
   showApiKeys,
@@ -117,7 +118,7 @@ const OcrSection = ({
   }, [notify, t, updateSetting, checkEngineHealth, loadPacks]);
 
   const handleRemovePack = useCallback(async (packId) => {
-    if (!window.confirm(t('ocr.packs.removeConfirm'))) return;
+    if (!(await confirm(t('ocr.packs.removeConfirm')))) return;
     try {
       const result = await window.electron?.ocr?.removePack?.(packId);
       if (result?.success) {
@@ -129,7 +130,7 @@ const OcrSection = ({
     } catch (e) {
       notify(t('ocr.packs.removeFailed') + ': ' + e.message, 'error');
     }
-  }, [notify, t, loadPacks]);
+  }, [notify, t, loadPacks, confirm]);
 
   const toggleApiKeyVisibility = (key, e) => {
     e?.stopPropagation();

@@ -6,6 +6,7 @@ const TranslationSection = ({
   settings,
   updateSetting,
   notify,
+  confirm,
   autoTranslate,
   setAutoTranslate,
   autoTranslateDelay,
@@ -15,11 +16,10 @@ const TranslationSection = ({
 }) => {
   const { t } = useTranslation();
 
-  const handleClearCache = () => {
-    if (window.confirm(t('translationSettings.clearCacheConfirm'))) {
-      localStorage.removeItem('translation-cache');
-      notify(t('translationSettings.cacheCleared'), 'success');
-    }
+  const handleClearCache = async () => {
+    if (!(await confirm(t('translationSettings.clearCacheConfirm')))) return;
+    localStorage.removeItem('translation-cache');
+    notify(t('translationSettings.cacheCleared'), 'success');
   };
 
   return (

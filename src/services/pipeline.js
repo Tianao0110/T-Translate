@@ -109,6 +109,20 @@ class TranslationPipeline {
     logger.debug('Initialized');
   }
 
+  // Re-feed engine configs after a settings save — the floating window is
+  // persistent (hide, not close), so _initialized alone would pin stale keys.
+  async refreshOcrConfigs() {
+    try {
+      const settings = await window.electron?.store?.get?.('settings') || {};
+      ocrManager.updateConfigs({
+        ...(settings.ocr || {}),
+        llmEndpoint: settings.connection?.endpoint,
+      });
+    } catch (e) {
+      logger.debug('OCR config refresh failed:', e);
+    }
+  }
+
   async runFromCapture(captureOptions = {}) {
     // Single-flight: a second capture while one is running would un-hide the
     // floating window mid-screenshot (the IPC handler's opacity dance) and

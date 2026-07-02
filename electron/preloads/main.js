@@ -172,9 +172,6 @@ const electronAPI = {
     setMode: (mode) => ipcRenderer.invoke("privacy:setMode", mode),
     getMode: () => ipcRenderer.invoke("privacy:getMode"),
   },
-  api: {
-    healthCheck: () => ipcRenderer.invoke("api:health-check"),
-  },
   ocr: {
     // Local engines
     checkWindowsOCR: () => ipcRenderer.invoke("ocr:check-windows-ocr"),

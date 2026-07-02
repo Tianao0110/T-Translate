@@ -231,6 +231,9 @@ const FloatingWindow = () => {
     if (window.electron?.floatingWindow?.onSettingsChanged) {
       unsubscribeSettings = window.electron.floatingWindow.onSettingsChanged((newSettings) => {
         loadSettings();
+        // Persistent window: engine keys/endpoint changed in main settings
+        // must reach the already-initialized ocrManager too
+        pipeline.refreshOcrConfigs();
         const newTheme = newSettings?.interface?.theme;
         if (newTheme && ['light', 'dark', 'fresh'].includes(newTheme)) {
           setTheme(newTheme);

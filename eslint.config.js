@@ -60,6 +60,7 @@ export default [
       'prefer-const': 'warn',
 
       // --- React ---
+      'react/jsx-uses-vars': 'error',    // JSX 引用即使用——没有它，组件/图标全报 no-unused-vars 误报
       'react/jsx-uses-react': 'off',     // React 17+ 不需要
       'react/react-in-jsx-scope': 'off', // React 17+ 不需要
       'react/prop-types': 'off',         // 不强制 PropTypes
