@@ -269,15 +269,11 @@ function makeWindowInvisibleToCapture(electronWindow) {
 
 // ===== Three-layer selection detection =====
 
-// Debounce against repeated clipboard probes (e.g. double-click can fire two mouseups fast).
-let lastClipboardCheckTime = 0;
-const CLIPBOARD_CHECK_COOLDOWN = 100;
-
 /**
  * Three-layer selection probe.
  *   Layer 1: focus + control-class filter (cheap, zero side effects)
  *   Layer 2: standard Edit/RichEdit controls → EM_GETSEL (sync, clipboard-free)
- *   Layer 3: complex apps → clipboard fallback (separate function `checkSelectionViaClipboard`)
+ *   Layer 3: complex apps → clipboard fallback (utils/clipboard-capture.js)
  *
  * Returns { hasSelection: boolean|null, method: string, reason: string }.
  *   hasSelection === null means "Layer 1+2 can't decide, caller should run Layer 3".
@@ -471,96 +467,6 @@ function getEditControlSelection(api, hwnd) {
   }
 }
 
-/**
- * Layer 3: clipboard fallback. Called only when Layers 1+2 returned `null`.
- * Snapshot → Ctrl+C → wait → compare → restore. Detects selection by diff.
- *
- * @returns {Promise<{hasSelection: boolean|null, text: string}>}
- */
-async function checkSelectionViaClipboard(options = {}) {
-  if (process.platform !== 'win32') {
-    return { hasSelection: false, text: '' };
-  }
-
-  // Cooldown debounce.
-  const now = Date.now();
-  if (now - lastClipboardCheckTime < CLIPBOARD_CHECK_COOLDOWN) {
-    logger.debug('Clipboard check skipped (cooldown)');
-    return { hasSelection: null, text: '' };
-  }
-  lastClipboardCheckTime = now;
-
-  const { clipboard } = require('electron');
-
-  // Office and similar apps need longer wait + a retry — their clipboard pipeline is slow.
-  const isComplexApp = options.isComplexApp || false;
-  const waitTime = isComplexApp ? 200 : 50;
-  const maxRetries = isComplexApp ? 2 : 1;
-
-  try {
-    // Snapshot all formats so we can fully restore.
-    const snapshot = {
-      text: clipboard.readText(),
-      html: clipboard.readHTML(),
-      rtf: clipboard.readRTF(),
-    };
-
-    let currentText = snapshot.text;
-    let textChanged = false;
-
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      simulateCtrlC();
-
-      await new Promise(resolve => setTimeout(resolve, waitTime));
-
-      currentText = clipboard.readText();
-
-      textChanged = currentText !== snapshot.text;
-
-      if (textChanged) {
-        logger.debug(`Clipboard changed on attempt ${attempt + 1}`);
-        break;
-      }
-
-      if (attempt < maxRetries - 1) {
-        logger.debug(`Clipboard unchanged, retrying (attempt ${attempt + 1}/${maxRetries})`);
-      }
-    }
-
-    const hasNewContent = currentText && currentText.trim().length > 0;
-
-    // Always restore (even on miss) — caller shouldn't observe our probing.
-    if (snapshot.html) {
-      clipboard.write({ text: snapshot.text, html: snapshot.html, rtf: snapshot.rtf });
-    } else if (snapshot.text) {
-      clipboard.writeText(snapshot.text);
-    } else {
-      clipboard.clear();
-    }
-
-    // Decision:
-    //   unchanged → no selection (Ctrl+C copied nothing)
-    //   changed + non-empty → selection captured
-    //   changed but empty → rare edge, treat as no selection
-    if (!textChanged) {
-      logger.debug('Clipboard unchanged after all attempts, no selection');
-      return { hasSelection: false, text: '' };
-    }
-
-    if (hasNewContent) {
-      logger.debug(`Clipboard changed, has selection: "${currentText.substring(0, 20)}..."`);
-      return { hasSelection: true, text: currentText };
-    }
-
-    logger.debug('Clipboard changed but empty');
-    return { hasSelection: false, text: '' };
-
-  } catch (e) {
-    logger.error('checkSelectionViaClipboard error:', e);
-    return { hasSelection: null, text: '' };
-  }
-}
-
 module.exports = {
   initWin32API,
 
@@ -572,9 +478,9 @@ module.exports = {
   // Window detection
   getWindowInfoAtPoint,
 
-  // Three-layer selection probe
-  hasTextSelection,           // Layers 1+2 (clipboard-free)
-  checkSelectionViaClipboard, // Layer 3 (clipboard fallback)
+  // Three-layer selection probe (Layers 1+2, clipboard-free).
+  // Layer 3 clipboard fallback lives in utils/clipboard-capture.js.
+  hasTextSelection,
 
   // Capture-exclusion
   makeWindowInvisibleToCapture,

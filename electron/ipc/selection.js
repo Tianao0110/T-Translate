@@ -1,9 +1,9 @@
 // Selection translate IPC handlers
 
-const { ipcMain, clipboard, screen } = require('electron');
+const { ipcMain } = require('electron');
 const { CHANNELS } = require('../shared/channels');
 const logger = require('../utils/logger')('IPC:Selection');
-const { simulateCtrlC } = require('../utils/native-helper');
+const { captureSelectedText, hasFileFormat } = require('../utils/clipboard-capture');
 
 function register(ctx) {
   const { getMainWindow, getSelectionWindow, runtime, store, managers } = ctx;
@@ -110,20 +110,17 @@ function register(ctx) {
   // ===== Text capture =====
 
   // Anti-misfire: clipboard may contain a file drop instead of selected text;
-  // distinguish via available formats so we don't translate file paths blindly.
+  // distinguish via the formats the copy produced (read fresh inside the
+  // capture, before restore) so we don't translate file paths blindly.
   ipcMain.handle(CHANNELS.SELECTION.GET_TEXT, async (event, rect) => {
-    const text = await fetchSelectedText();
+    const { text, formats, fileClipboard } = await captureSelectedText();
 
-    const formats = clipboard.availableFormats();
+    // Clipboard held files we refused to clobber — nothing to translate.
+    if (fileClipboard) {
+      return { text: null, method: null, reason: 'file_drop' };
+    }
 
-    const isFileDrop = formats.some(f =>
-      f.includes('FileNameW') ||
-      f.includes('FileContents') ||
-      f.includes('CF_HDROP') ||
-      f === 'text/uri-list'
-    );
-
-    if (isFileDrop) {
+    if (hasFileFormat(formats)) {
       if (text && text.trim()) {
         const looksLikePath = /^[A-Za-z]:\\|^\/|^\\\\|^file:\/\//.test(text.trim());
 
@@ -207,63 +204,12 @@ function register(ctx) {
 
 // ===== Helpers =====
 
-// Serialization lock: a single Promise chain ensures only one fetchSelectedText is
-// in flight at a time. Without this, the 500ms delayed restore from the previous
-// call can interleave with the next call's backup-read, leaving the clipboard
-// polluted with whichever restore finishes last.
-let lastRestoreComplete = Promise.resolve();
-
-// Reliable selected-text capture via clear+poll. Clears the clipboard as a semaphore,
-// fires Ctrl+C, polls for up to 800ms, then restores the original clipboard contents.
+// Thin wrapper kept for the hotkey-direct caller (main.js). All the clipboard
+// mechanics (mutex, full-format restore, success cache) live in the shared
+// capture module so the mouseup probe and this fetch can't clobber each other.
 async function fetchSelectedText() {
-  // Append to the serialization chain: wait for the previous restore to finish.
-  const prevRestore = lastRestoreComplete;
-  let resolveMyRestore;
-  const myRestorePromise = new Promise(r => { resolveMyRestore = r; });
-  lastRestoreComplete = myRestorePromise;
-
-  // Don't block on a previously rejected restore.
-  await prevRestore.catch(() => {});
-
-  let backup = null;
-  let foundText = null;
-  try {
-    backup = clipboard.readText();
-
-    // Clear as semaphore — polling treats empty as "not yet copied".
-    clipboard.clear();
-
-    simulateCtrlC();
-
-    // Poll up to 800ms (16 × 50ms).
-    for (let i = 0; i < 16; i++) {
-      await new Promise(resolve => setTimeout(resolve, 50));
-      const text = clipboard.readText();
-      if (text && text.trim()) {
-        foundText = text.trim();
-        break;
-      }
-    }
-
-    return foundText;
-  } catch (err) {
-    logger.error('fetchSelectedText error:', err);
-    return null;
-  } finally {
-    // On success: delay restore by 500ms so the caller can synchronously
-    // read clipboard formats (e.g. detect file drop) before we overwrite it.
-    // On failure: restore immediately. Either branch MUST call resolveMyRestore,
-    // otherwise the chain locks up and the next fetch never starts.
-    if (foundText) {
-      setTimeout(() => {
-        try { if (backup !== null) clipboard.writeText(backup); } catch (e) { logger.warn('restore failed:', e.message); }
-        resolveMyRestore();
-      }, 500);
-    } else {
-      try { if (backup !== null) clipboard.writeText(backup); } catch (e) { logger.warn('restore failed:', e.message); }
-      resolveMyRestore();
-    }
-  }
+  const { text } = await captureSelectedText();
+  return text;
 }
 
 // OCR fallback via the local PP-OCR engine.

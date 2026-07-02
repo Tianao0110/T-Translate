@@ -53,7 +53,8 @@ async function handleDelayedConfirm(x, y, rect) {
   pendingConfirmCancel = myCancel;
 
   try {
-    const { hasTextSelection, checkSelectionViaClipboard } = require('./utils/native-helper');
+    const { hasTextSelection } = require('./utils/native-helper');
+    const { detectSelectionViaClipboard } = require('./utils/clipboard-capture');
 
     // Wait a beat — double-click selection is async on Windows. Office / Outlook
     // may need longer (toolbars pop up etc.).
@@ -95,7 +96,7 @@ async function handleDelayedConfirm(x, y, rect) {
                         reason.includes('Outlook Host');
     logger.debug(`Delayed confirm: layer 3 - clipboard fallback (office=${isOfficeApp})`);
 
-    const clipboardResult = await checkSelectionViaClipboard({ isComplexApp: isOfficeApp });
+    const clipboardResult = await detectSelectionViaClipboard({ isComplexApp: isOfficeApp });
 
     if (cancelled) {
       logger.debug('Delayed confirm cancelled mid-clipboard-fetch');
@@ -494,6 +495,10 @@ function startSelectionHook() {
         hideSelectionWindow();
       }
 
+      // Fresh gesture: drop any cached capture so it can only be reused within
+      // this one selection, never leak into the next.
+      require('./utils/clipboard-capture').invalidateCache();
+
       // Sticky direct: setting on + CapsLock LED on → bypass trigger icon.
       const stickyActive = !!cachedSelectionSettings.stickyViaCapsLock && isCapsLockOn();
 
@@ -568,7 +573,8 @@ function startSelectionHook() {
           }
 
           // Normal drag: run the three-layer selection probe.
-          const { hasTextSelection, checkSelectionViaClipboard } = require('./utils/native-helper');
+          const { hasTextSelection } = require('./utils/native-helper');
+          const { detectSelectionViaClipboard } = require('./utils/clipboard-capture');
           const selectionCheck = hasTextSelection();
           logger.debug(`Normal drag selection check: ${selectionCheck.hasSelection} (${selectionCheck.method}: ${selectionCheck.reason})`);
 
@@ -598,7 +604,7 @@ function startSelectionHook() {
                               dragReason.includes('OlkPeoplePickerEdit') ||
                               dragReason.includes('Outlook Host');
           logger.debug(`Normal drag: complex app, using clipboard fallback (office=${isOfficeApp})`);
-          const clipboardResult = await checkSelectionViaClipboard({ isComplexApp: isOfficeApp });
+          const clipboardResult = await detectSelectionViaClipboard({ isComplexApp: isOfficeApp });
 
           if (clipboardResult.hasSelection === true) {
             showSelectionTrigger(x, y, rect, clipboardResult.text);
