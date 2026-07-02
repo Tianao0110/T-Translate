@@ -24,7 +24,8 @@ const logger = require('./utils/logger')('Main');
 // Opt-in probe diagnostics (set TT_SELECTION_DEBUG=1). Records which detection
 // layer resolved each gesture, by control class + method only — never text
 // content — so the app-matrix pass can see where a given app lands.
-const SELECTION_DEBUG = process.env.TT_SELECTION_DEBUG === '1';
+// Tolerant parse: cmd's `set X=1 && …` includes the trailing space in the value.
+const SELECTION_DEBUG = /^(1|true)$/i.test((process.env.TT_SELECTION_DEBUG || '').trim());
 function debugProbe(stage, data) {
   if (SELECTION_DEBUG) logger.info(`[probe:${stage}]`, JSON.stringify(data));
 }

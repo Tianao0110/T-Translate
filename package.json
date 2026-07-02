@@ -6,6 +6,7 @@
   "main": "electron/main.js",
   "scripts": {
     "start": "concurrently --kill-others --kill-others-on-fail \"npm run react:start\" \"node scripts/wait-for-vite.js http://localhost:5173 && npm run electron:start\"",
+    "start:debug": "set TT_SELECTION_DEBUG=1&& npm start",
     "react:start": "vite",
     "electron:start": "electron .",
     "build": "node scripts/fetch-ocr-models.js && vite build && electron-builder",
