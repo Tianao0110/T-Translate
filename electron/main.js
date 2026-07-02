@@ -16,7 +16,7 @@ const { initIPC } = require('./ipc');
 const { registerAllShortcuts, unregisterAllShortcuts } = require('./ipc/shortcuts');
 const { makeWindowInvisibleToCapture, isCapsLockOn } = require('./utils/native-helper');
 const { fetchSelectedText } = require('./ipc/selection');
-const { SelectionStateMachine, STATES } = require('./utils/selection-state-machine');
+const { SelectionStateMachine, STATES, CONFIG: FSM_CONFIG } = require('./utils/selection-state-machine');
 
 let selectionStateMachine = null;
 const logger = require('./utils/logger')('Main');
@@ -80,15 +80,13 @@ store.onDidChange('settings.selection', (value) => {
   cachedSelectionSettings = value || {};
 });
 
-// Cancellation for in-flight delayed-confirm. Triple-click fires two mouseups
-// back-to-back; without this, both confirms race and the first one (still inside
-// its 80ms wait) grabs the partial double-click word selection instead of the
-// final paragraph one. Newer confirm cancels older.
+// Cancellation for in-flight delayed-confirm: a newer confirm (triple-click's
+// third mouseup) cancels the older one so only the final selection gets probed.
 let pendingConfirmCancel = null;
 
 // Delayed-confirm path for double/triple click. The system needs time to react before
 // we can check if text actually got selected.
-async function handleDelayedConfirm(x, y, rect) {
+async function handleDelayedConfirm(x, y) {
   if (pendingConfirmCancel) pendingConfirmCancel();
   let cancelled = false;
   const myCancel = () => { cancelled = true; };
@@ -98,9 +96,12 @@ async function handleDelayedConfirm(x, y, rect) {
     const { hasTextSelection } = require('./utils/native-helper');
     const { detectSelectionViaClipboard } = require('./utils/clipboard-capture');
 
-    // Wait a beat — double-click selection is async on Windows. Office / Outlook
-    // may need longer (toolbars pop up etc.).
-    await new Promise(resolve => setTimeout(resolve, 80));
+    // Wait out the FULL multi-click window before probing. Probing earlier (was
+    // 80ms) fired between the 2nd and 3rd click of a triple-click: the probe's
+    // synthetic Ctrl+C landed mid-sequence, broke the app's own triple-click
+    // expansion, and captured the double-click word instead of the paragraph.
+    // Any click that arrives within this window cancels us and re-schedules.
+    await new Promise(resolve => setTimeout(resolve, FSM_CONFIG.DOUBLE_CLICK_TIME));
 
     if (cancelled) {
       logger.debug('Delayed confirm cancelled by newer mouseup (likely triple-click)');
@@ -114,7 +115,7 @@ async function handleDelayedConfirm(x, y, rect) {
 
     if (selectionCheck.hasSelection === true) {
       logger.debug('Delayed confirm: selection detected via Win32 API (layer 1-2)');
-      showSelectionTrigger(x, y, rect);
+      showSelectionTrigger(x, y);
       selectionStateMachine.reset();
       return;
     }
@@ -148,7 +149,7 @@ async function handleDelayedConfirm(x, y, rect) {
 
     if (clipboardResult.hasSelection === true) {
       logger.debug(`Delayed confirm: text selected via clipboard "${clipboardResult.text.substring(0, 20)}..."`);
-      showSelectionTrigger(x, y, rect, clipboardResult.text);
+      showSelectionTrigger(x, y, clipboardResult.text);
     } else if (clipboardResult.hasSelection === null) {
       // Debounced or errored.
       logger.debug('Delayed confirm: clipboard check skipped or failed');
@@ -177,7 +178,7 @@ async function handleDelayedConfirm(x, y, rect) {
 // (Layer 3 path), pass it through. The renderer stores it in a ref and uses it
 // directly on icon click, skipping the second clipboard fetch (which is the root cause
 // of the "press but no content" issue in complex apps with focus-transfer behavior).
-async function showSelectionTrigger(mouseX, mouseY, rect, prefetchedText = null, options = {}) {
+async function showSelectionTrigger(mouseX, mouseY, prefetchedText = null, options = {}) {
   logger.debug(`showSelectionTrigger called (prefetched=${prefetchedText ? prefetchedText.length + ' chars' : 'none'}, failed=${!!options.failed})`);
 
   if (!runtime.selectionEnabled) return;
@@ -228,7 +229,6 @@ async function showSelectionTrigger(mouseX, mouseY, rect, prefetchedText = null,
     win.webContents.send(CHANNELS.SELECTION.SHOW_TRIGGER, {
       mouseX,
       mouseY,
-      rect,
       // Work area of the display the selection happened on, so the renderer
       // clamps card placement to the RIGHT monitor (window.screen is only the
       // current display and carries no global origin).
@@ -264,8 +264,8 @@ async function showSelectionTrigger(mouseX, mouseY, rect, prefetchedText = null,
  * payload shape intentionally mirrors SHOW_TRIGGER so the renderer's two paths stay
  * consistent.
  */
-async function handleHotkeyDirectPath(x, y, rect) {
-  logger.debug('handleHotkeyDirectPath called', { x, y, rect });
+async function handleHotkeyDirectPath(x, y) {
+  logger.debug('handleHotkeyDirectPath called', { x, y });
 
   if (!runtime.selectionEnabled) {
     logger.debug('Selection disabled, hotkey silent no-op');
@@ -278,7 +278,7 @@ async function handleHotkeyDirectPath(x, y, rect) {
   const { getForegroundClassName } = require('./utils/native-helper');
   if (isTerminalClass(getForegroundClassName())) {
     logger.debug('Sticky direct in terminal — downgrading to trigger icon');
-    showSelectionTrigger(x, y, rect);
+    showSelectionTrigger(x, y);
     return;
   }
 
@@ -354,7 +354,7 @@ async function handleHotkeyDirectPath(x, y, rect) {
     // Empty capture: don't fail silently. Flip to a clickable "failed" trigger
     // (red + shake) so the user can retry via the icon, which re-runs GET_TEXT.
     logger.debug('Hotkey: no text captured, showing failed trigger');
-    showSelectionTrigger(x, y, rect, null, { failed: true });
+    showSelectionTrigger(x, y, null, { failed: true });
   }
 }
 
@@ -547,6 +547,11 @@ function startSelectionHook() {
       const cursorPos = screen.getCursorScreenPoint();
       const { x, y } = cursorPos;
 
+      // P3-20 verification aid: uiohook event coords vs Electron DIP coords.
+      // On a scaled display (e.g. 1.75x) a physical-pixel uiohook would read
+      // ~scale× larger — this one-liner settles whether we can ever switch.
+      debugProbe('coords', { uiohook: { x: e.x, y: e.y }, electronDip: { x, y } });
+
       // Click inside any of our selection windows (including frozen ones) — treat
       // as a drag-on-overlay and skip the FSM entirely.
       if (windowManager.isPointInSelectionWindows(x, y)) {
@@ -626,23 +631,16 @@ function startSelectionHook() {
         const result = selectionStateMachine.onMouseUp(x, y, stickyActive);
 
         if (result.shouldShow) {
-          const rect = result.rect || {
-            x: x - 50,
-            y: y - 20,
-            width: 100,
-            height: 40,
-          };
-
           // Sticky direct: skip the icon, skip Layer 1+2 probe, go straight to capture + translate.
           if (result.skipIcon) {
-            await handleHotkeyDirectPath(x, y, rect);
+            await handleHotkeyDirectPath(x, y);
             selectionStateMachine.reset();
             return;
           }
 
           // Multi-click: needs delayed confirm (system selects text async after the click).
           if (result.needsDelayedConfirm) {
-            handleDelayedConfirm(x, y, rect);
+            handleDelayedConfirm(x, y);
             return;
           }
 
@@ -655,7 +653,7 @@ function startSelectionHook() {
 
           if (selectionCheck.hasSelection === true) {
             // Layer 1+2 confirmed selection.
-            showSelectionTrigger(x, y, rect);
+            showSelectionTrigger(x, y);
             selectionStateMachine.reset();
             return;
           }
@@ -682,7 +680,7 @@ function startSelectionHook() {
           const clipboardResult = await detectSelectionViaClipboard({ isComplexApp: isOfficeApp });
 
           if (clipboardResult.hasSelection === true) {
-            showSelectionTrigger(x, y, rect, clipboardResult.text);
+            showSelectionTrigger(x, y, clipboardResult.text);
           } else {
             logger.debug('Normal drag: clipboard check found no selection');
           }

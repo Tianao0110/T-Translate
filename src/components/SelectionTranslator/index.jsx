@@ -447,8 +447,10 @@ const SelectionTranslator = () => {
   };
 
   // Resize window to fit translated content, then reposition near mousePos.
-  // Screenshot path has mousePos=(0,0); in that case only the size is adjusted.
-  const adjustWindowToContent = async () => {
+  // keepPosition (frozen cards, screenshot path): resize in place at the current
+  // window position — a frozen card was deliberately dragged somewhere by the
+  // user, snapping it back to the selection anchor would undo that.
+  const adjustWindowToContent = async (keepPosition = false) => {
     const contentEl = contentRef.current;
     if (!contentEl) return;
 
@@ -471,7 +473,7 @@ const SelectionTranslator = () => {
     const sw = sb ? sb.width : (window.screen?.availWidth || 1920);
     const sh = sb ? sb.height : (window.screen?.availHeight || 1080);
 
-    const hasValidMousePos = mousePos.x !== 0 || mousePos.y !== 0;
+    const hasValidMousePos = !keepPosition && (mousePos.x !== 0 || mousePos.y !== 0);
 
     const text = contentEl.innerText || '';
     const hasNewlines = text.includes('\n');
@@ -542,10 +544,11 @@ const SelectionTranslator = () => {
     // Fit the window to the card whenever we're in overlay mode — even on an
     // empty translation. Gating on (translatedText || error) meant an empty
     // result skipped the resize and the window stayed at the 40px trigger size.
+    // Frozen cards resize in place (keepPosition) instead of re-anchoring.
     if (mode === 'overlay') {
-      adjustWindowToContent();
+      adjustWindowToContent(isFrozen);
     }
-  }, [mode, translatedText, error, showSource]);
+  }, [mode, translatedText, error, showSource, isFrozen]);
 
   // Unified auto-hide for result cards (乙案): every overlay path hides after
   // triggerTimeout. Hovering the card pauses the countdown (effect early-returns

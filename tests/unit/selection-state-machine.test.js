@@ -102,7 +102,6 @@ describe('SelectionStateMachine', () => {
     const result = sm.onMouseUp(120, 100, true);
     expect(result.shouldShow).toBe(true);
     expect(result.skipIcon).toBe(true);
-    expect(result.rect).toBeDefined();
   });
 
   it('onMouseUp: sticky + pure click (no drag) → shouldShow:false, no Ctrl+C injection', () => {

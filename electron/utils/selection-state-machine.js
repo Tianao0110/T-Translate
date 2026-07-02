@@ -233,26 +233,18 @@ class SelectionStateMachine {
           return { shouldShow: false };
         }
         logger.debug('Sticky direct path (skipIcon)');
-        return {
-          shouldShow: true,
-          rect: this.getSelectionRect(),
-          skipIcon: true,
-        };
+        return { shouldShow: true, skipIcon: true };
       }
 
       // Multi-click needs delayed confirm — system needs time to actually select.
       if (this.isMultiClickTriggered) {
         logger.debug('Multi-click needs delayed confirmation');
-        return {
-          shouldShow: true,
-          rect: this.getSelectionRect(),
-          needsDelayedConfirm: true,
-        };
+        return { shouldShow: true, needsDelayedConfirm: true };
       }
 
       // Normal return — also covers "CapsLock was on at mousedown but off at mouseup"
       // (user released sticky mid-drag). Falls back to ordinary trigger-icon flow.
-      return { shouldShow: true, rect: this.getSelectionRect() };
+      return { shouldShow: true };
     } else if (this.state === STATES.POSSIBLE) {
       this.transitionTo(STATES.IDLE);
       return { shouldShow: false };
@@ -461,20 +453,6 @@ class SelectionStateMachine {
       Math.pow(lastSample.x - this.startPos.x, 2) +
       Math.pow(lastSample.y - this.startPos.y, 2)
     );
-  }
-
-  getSelectionRect() {
-    if (!this.startPos || this.samples.length === 0) {
-      return null;
-    }
-
-    const lastSample = this.samples[this.samples.length - 1];
-    return {
-      x: Math.min(this.startPos.x, lastSample.x),
-      y: Math.min(this.startPos.y, lastSample.y),
-      width: Math.abs(lastSample.x - this.startPos.x),
-      height: Math.abs(lastSample.y - this.startPos.y),
-    };
   }
 
   getState() {
