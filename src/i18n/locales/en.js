@@ -7,7 +7,7 @@ const en = {
     searchPlaceholder: "Search settings...",
     groupTranslation: "Translation", groupSystem: "System",
     providers: "Providers", translation: "Translation", selection: "Selection", floatingWindow: "Floating Window", document: "Documents",
-    ocr: "OCR", tts: "Text to Speech", interface: "Appearance", connection: "LM Studio", privacy: "Privacy", about: "About",
+    ocr: "OCR", tts: "Text to Speech", interface: "Appearance", privacy: "Privacy", about: "About",
     export: "Export", import: "Import", reset: "Reset",
     simpleMode: "Simple", fullMode: "Full", switchToFull: "Full", switchToSimple: "Simple",
     modeHint: "You're viewing the simple catalog. Click Full below for all settings (selection, floating window, OCR, privacy...)",
@@ -63,8 +63,7 @@ const en = {
     'ollama': { endpoint: 'API Endpoint', model: 'Model Name', timeout: 'Timeout (ms)', model_placeholder: 'Leave empty to auto-detect (e.g. llama3, qwen2)' },
     'anthropic': { apiKey: 'API Key', model: 'Model', baseUrl: 'API Endpoint' },
     'microsoft-translator': { apiKey: 'API Key', region: 'Region' },
-    'baidu-translate': { appId: 'APP ID', secretKey: 'Secret Key' },
-    ocr: { language: 'Recognition Language', language_chs: 'Simplified Chinese', language_cht: 'Traditional Chinese', language_eng: 'English', language_jpn: 'Japanese', language_kor: 'Korean' }
+    'baidu-translate': { appId: 'APP ID', secretKey: 'Secret Key' }
   },
   translationSettings: {
     title: "Translation Settings", description: "Configure translation behavior and output",
@@ -201,11 +200,6 @@ const en = {
     tagsLabel: "Tags (comma separated)", tagsPlaceholder: "formal, academic, important...",
     noteLabel: "Note", notePlaceholder: "Add note..."
   },
-  connectionSettings: {
-    title: "LM Studio Connection", endpoint: "API Endpoint", timeout: "Timeout (ms)",
-    testing: "Testing...", testConnection: "Test Connection", availableModels: "Available Models",
-    connectionSuccess: "Connected! Found {{count}} models", connectionFailed: "Connection failed", connectionError: "Connection error"
-  },
   documents: { title: "Document Translation", upload: "Upload Document", dragDrop: "Drag & drop file here, or click to upload", supported: "Supports PDF, DOCX, EPUB, TXT", translating: "Translating...", download: "Download", preview: "Preview" },
   privacy: {
     modeDescription: "Choose a mode that fits your needs. Different features are available in different modes.",
@@ -306,13 +300,10 @@ const en = {
     exported: "Settings exported", invalidFormat: "Invalid settings file format", importedPleasesSave: "Settings imported, please save to apply", invalidFile: "Invalid settings file",
     resetSectionConfirm: "Reset \"{{section}}\" settings?", resetAllConfirm: "Reset all settings? This clears all custom configuration (saved API keys are kept; use \"Clear all data\" on the Privacy page for a full wipe).",
     sectionReset: "{{section}} settings reset", sectionNotFound: "Default settings for {{section}} not found", allReset: "All settings reset",
-    tabs: { general: "General", providers: "Providers", ocr: "OCR", shortcuts: "Shortcuts", privacy: "Privacy", tts: "TTS", glossary: "Glossary", about: "About" },
     general: {
       title: "General Settings", language: "Language", languageDesc: "Select interface language",
       theme: "Theme", themeDesc: "Select app appearance",
       themes: { default: "Default", fresh: "Fresh", dark: "Dark" },
-      startup: "Start on Boot", startupDesc: "Run automatically on system startup", minimize: "Minimize to Tray", minimizeDesc: "Minimize to system tray when closed",
-      defaultSource: "Default Source Language", defaultTarget: "Default Target Language",
       langSwitched: "Language changed"
     },
     startup: {
@@ -325,23 +316,14 @@ const en = {
       autoSelection: "Enable selection translate on startup",
       autoSelectionHint: "Automatically enable selection translate after auto-launch",
     },
-    providers: {
-      title: "Translation Providers", enable: "Enable", disable: "Disable", test: "Test Connection", testing: "Testing...", testSuccess: "Connection successful", testFailed: "Connection failed",
-      priority: "Priority", priorityDesc: "Drag to adjust provider priority", apiKey: "API Key", apiKeyPlaceholder: "Enter API Key", baseUrl: "API URL", model: "Model", getKey: "Get Key",
-      localLlm: { name: "Local LLM", desc: "Use local models, fully offline", endpoint: "API Endpoint", endpointPlaceholder: "http://localhost:1234/v1" },
-      openai: { name: "OpenAI", desc: "Translate with GPT models" }, deepl: { name: "DeepL", desc: "High quality translation" },
-      gemini: { name: "Gemini", desc: "Google AI translation" }, deepseek: { name: "DeepSeek", desc: "DeepSeek AI translation" }, google: { name: "Google Translate", desc: "Free Google translation" }
-    },
-    ocr: { title: "OCR Settings", engine: "OCR Engine", engineDesc: "Select text recognition engine", engines: { rapid: "RapidOCR (Local)", windows: "Windows OCR", llmVision: "LLM Vision" }, language: "Recognition Language", languageDesc: "Select language to recognize" },
-    shortcuts: { title: "Keyboard Shortcuts", desc: "Customize global shortcuts", showWindow: "Show/Hide Window", screenshot: "Screenshot Translate", floatingWindow: "Floating Window", selectionToggle: "Toggle Selection", recording: "Press shortcut...", conflict: "Shortcut conflict", reset: "Reset Default" },
+    ocr: { title: "OCR Settings" },
+    shortcuts: { title: "Keyboard Shortcuts" },
     privacy: {
-      title: "Privacy Settings", mode: "Privacy Mode", modeDesc: "Control data storage and network",
-      modes: { standard: "Standard", standardDesc: "Normal features, save history", offline: "Offline", offlineDesc: "Local translation only", incognito: "Incognito", incognitoDesc: "No history or cache" },
-      clearHistory: "Clear History", clearCache: "Clear Cache", clearAll: "Clear All Data"
+      title: "Privacy Settings",
+      clearHistory: "Clear History", clearAll: "Clear All Data"
     },
-    tts: { title: "Text-to-Speech", enable: "Enable TTS", enableDesc: "Enable voice reading", voice: "Voice", voiceDesc: "Select voice", rate: "Speed", rateDesc: "Adjust reading speed", pitch: "Pitch", pitchDesc: "Adjust voice pitch", volume: "Volume", volumeDesc: "Adjust volume", test: "Test", testText: "This is a test message" },
-    glossary: { title: "Glossary", desc: "Custom translation terms for consistent terminology", add: "Add Term", source: "Source", target: "Translation", empty: "No terms yet", import: "Import", export: "Export", delete: "Delete", save: "Save" },
-    about: { title: "About", version: "Version", checkUpdate: "Check for Updates", checking: "Checking...", upToDate: "You're up to date", newVersion: "New version available", download: "Download", later: "Later", releaseNotes: "Release Notes", publishedAt: "Published", github: "GitHub", feedback: "Feedback", license: "License", copyright: "© 2026 T-Translate" },
+    tts: { title: "Text-to-Speech" },
+    about: { checkUpdate: "Check for Updates", checking: "Checking...", upToDate: "You're up to date", newVersion: "New version available", download: "Download", later: "Later", releaseNotes: "Release Notes", publishedAt: "Published", copyright: "© 2026 T-Translate" },
     selection: { title: "Selection Translate" },
     floatingWindow: { title: "Floating Window" }
   },
@@ -477,7 +459,6 @@ const en = {
     rate: "Rate", rateHint: "Adjust speaking speed, 1.0 is normal",
     pitch: "Pitch", pitchHint: "Adjust voice pitch, 1.0 is normal",
     volume: "Volume", volumeHint: "Adjust volume level",
-    preview: "Preview", previewHint: "Play test audio with current settings",
     play: "Play Preview", stop: "Stop",
     testTextMixed: "This is a TTS test. 这是语音朗读测试。",
     testTextChinese: "Hello, this is a TTS test.",

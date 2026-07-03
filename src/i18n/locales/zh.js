@@ -7,7 +7,7 @@ const zh = {
     searchPlaceholder: "搜索设置...",
     groupTranslation: "翻译", groupSystem: "系统",
     providers: "翻译源", translation: "翻译设置", selection: "划词翻译", floatingWindow: "悬浮窗口", document: "文档翻译",
-    ocr: "OCR 识别", tts: "朗读设置", interface: "界面外观", connection: "LM Studio", privacy: "隐私模式", about: "关于",
+    ocr: "OCR 识别", tts: "朗读设置", interface: "界面外观", privacy: "隐私模式", about: "关于",
     export: "导出", import: "导入", reset: "重置",
     simpleMode: "简洁", fullMode: "完整", switchToFull: "完整", switchToSimple: "简洁",
     modeHint: "当前为简洁目录，点下方「完整」可查看全部设置（划词、悬浮窗、OCR、隐私等）",
@@ -63,8 +63,7 @@ const zh = {
     'ollama': { endpoint: 'API 地址', model: '模型名称', timeout: '超时时间 (ms)', model_placeholder: '留空自动检测（如 llama3, qwen2 等）' },
     'anthropic': { apiKey: 'API Key', model: '模型', baseUrl: 'API 地址' },
     'microsoft-translator': { apiKey: 'API Key', region: '区域' },
-    'baidu-translate': { appId: 'APP ID', secretKey: '密钥' },
-    ocr: { language: '识别语言', language_chs: '简体中文', language_cht: '繁体中文', language_eng: 'English', language_jpn: '日本語', language_kor: '한국어' }
+    'baidu-translate': { appId: 'APP ID', secretKey: '密钥' }
   },
   translationSettings: {
     title: "翻译设置", description: "配置翻译行为和输出方式",
@@ -201,11 +200,6 @@ const zh = {
     tagsLabel: "标签（逗号分隔）", tagsPlaceholder: "正式, 学术, 重要...",
     noteLabel: "笔记", notePlaceholder: "添加笔记..."
   },
-  connectionSettings: {
-    title: "LM Studio 连接设置", endpoint: "API 端点", timeout: "超时时间 (ms)",
-    testing: "测试中...", testConnection: "测试连接", availableModels: "可用模型",
-    connectionSuccess: "连接成功！检测到 {{count}} 个模型", connectionFailed: "连接失败", connectionError: "连接错误"
-  },
   documents: { title: "文档翻译", upload: "上传文档", dragDrop: "拖拽文件到这里，或点击上传", supported: "支持 PDF、DOCX、EPUB、TXT 格式", translating: "翻译中...", download: "下载译文", preview: "预览" },
   privacy: {
     modeDescription: "选择适合您需求的工作模式，不同模式下可用功能不同",
@@ -306,13 +300,10 @@ const zh = {
     exported: "设置已导出", invalidFormat: "设置文件格式不正确", importedPleasesSave: "设置已导入，请保存以生效", invalidFile: "无效的设置文件",
     resetSectionConfirm: "重置 \"{{section}}\" 的设置？", resetAllConfirm: "重置所有设置？这将清除所有自定义配置（已保存的 API 密钥会保留；如需彻底清除，请用隐私页的“清除所有数据”）。",
     sectionReset: "{{section}} 设置已重置", sectionNotFound: "未找到 {{section}} 的默认设置", allReset: "所有设置已重置",
-    tabs: { general: "通用", providers: "翻译源", ocr: "OCR", shortcuts: "快捷键", privacy: "隐私", tts: "语音", glossary: "术语表", about: "关于" },
     general: {
       title: "通用设置", language: "界面语言", languageDesc: "选择应用界面显示语言",
       theme: "主题", themeDesc: "选择应用外观主题",
       themes: { default: "默认", fresh: "清新", dark: "暗色" },
-      startup: "开机启动", startupDesc: "系统启动时自动运行", minimize: "最小化到托盘", minimizeDesc: "关闭窗口时最小化到系统托盘",
-      defaultSource: "默认源语言", defaultTarget: "默认目标语言",
       langSwitched: "界面语言已切换"
     },
     startup: {
@@ -325,23 +316,14 @@ const zh = {
       autoSelection: "启动后自动开启划词翻译",
       autoSelectionHint: "开机自启后自动开启划词翻译，选中文字即可翻译",
     },
-    providers: {
-      title: "翻译源设置", enable: "启用", disable: "禁用", test: "测试连接", testing: "测试中...", testSuccess: "连接成功", testFailed: "连接失败",
-      priority: "优先级", priorityDesc: "拖拽调整翻译源优先级", apiKey: "API Key", apiKeyPlaceholder: "请输入 API Key", baseUrl: "API 地址", model: "模型", getKey: "获取 Key",
-      localLlm: { name: "本地 LLM", desc: "使用本地大模型翻译，完全离线", endpoint: "API 端点", endpointPlaceholder: "http://localhost:1234/v1" },
-      openai: { name: "OpenAI", desc: "使用 GPT 模型翻译" }, deepl: { name: "DeepL", desc: "高质量翻译服务" },
-      gemini: { name: "Gemini", desc: "Google AI 翻译" }, deepseek: { name: "DeepSeek", desc: "国产大模型翻译" }, google: { name: "Google 翻译", desc: "Google 免费翻译服务" }
-    },
-    ocr: { title: "OCR 设置", engine: "OCR 引擎", engineDesc: "选择文字识别引擎", engines: { rapid: "RapidOCR（本地）", windows: "Windows OCR", llmVision: "LLM Vision" }, language: "识别语言", languageDesc: "选择要识别的语言" },
-    shortcuts: { title: "快捷键设置", desc: "自定义全局快捷键", showWindow: "显示/隐藏主窗口", screenshot: "截图翻译", floatingWindow: "悬浮窗口", selectionToggle: "开启/关闭划词翻译", recording: "按下快捷键...", conflict: "快捷键冲突", reset: "重置默认" },
+    ocr: { title: "OCR 设置" },
+    shortcuts: { title: "快捷键设置" },
     privacy: {
-      title: "隐私设置", mode: "隐私模式", modeDesc: "控制数据存储和网络请求",
-      modes: { standard: "标准模式", standardDesc: "正常功能，记录历史", offline: "离线模式", offlineDesc: "仅使用本地翻译源", incognito: "无痕模式", incognitoDesc: "不记录历史和缓存" },
-      clearHistory: "清除历史记录", clearCache: "清除缓存", clearAll: "清除所有数据"
+      title: "隐私设置",
+      clearHistory: "清除历史记录", clearAll: "清除所有数据"
     },
-    tts: { title: "语音设置", enable: "启用 TTS", enableDesc: "开启翻译结果语音朗读", voice: "语音", voiceDesc: "选择朗读语音", rate: "语速", rateDesc: "调整朗读速度", pitch: "音调", pitchDesc: "调整语音音调", volume: "音量", volumeDesc: "调整朗读音量", test: "测试", testText: "这是一段测试文本" },
-    glossary: { title: "术语表", desc: "自定义翻译术语，确保专业词汇翻译一致", add: "添加术语", source: "原文", target: "译文", empty: "暂无术语", import: "导入", export: "导出", delete: "删除", save: "保存" },
-    about: { title: "关于", version: "版本", checkUpdate: "检查更新", checking: "检查中...", upToDate: "已是最新版本", newVersion: "发现新版本", download: "前往下载", later: "稍后再说", releaseNotes: "更新内容", publishedAt: "发布时间", github: "GitHub", feedback: "反馈问题", license: "开源协议", copyright: "© 2026 T-Translate" },
+    tts: { title: "语音设置" },
+    about: { checkUpdate: "检查更新", checking: "检查中...", upToDate: "已是最新版本", newVersion: "发现新版本", download: "前往下载", later: "稍后再说", releaseNotes: "更新内容", publishedAt: "发布时间", copyright: "© 2026 T-Translate" },
     selection: { title: "划词翻译" },
     floatingWindow: { title: "悬浮窗口" }
   },
@@ -477,7 +459,6 @@ const zh = {
     rate: "语速", rateHint: "调整朗读速度，1.0 为正常语速",
     pitch: "音调", pitchHint: "调整声音音调，1.0 为正常音调",
     volume: "音量", volumeHint: "调整朗读音量大小",
-    preview: "试听效果", previewHint: "使用当前设置播放测试语音",
     play: "播放试听", stop: "停止播放",
     testTextMixed: "这是语音朗读测试。This is a TTS test.",
     testTextChinese: "你好，这是语音朗读功能测试。",
