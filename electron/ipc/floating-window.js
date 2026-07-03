@@ -102,9 +102,17 @@ function register(ctx) {
   // (Electron 42; the installed 0.2.8 reproduces it too), so the renderer tracks
   // the pointer itself and streams positions here. `on` (not handle): this fires
   // at mousemove frequency, fire-and-forget. Addressed via event.sender.
-  ipcMain.on(CHANNELS.FLOATING_WINDOW.SET_POSITION, (event, x, y) => {
+  //
+  // Size is passed in, captured ONCE at drag start: on fractional display
+  // scaling (e.g. 1.75x) a bare setPosition re-rounds the size每 call and the
+  // rounding error accumulates — the window visibly grows while dragging.
+  // A constant DIP size through setBounds rounds identically every frame.
+  ipcMain.on(CHANNELS.FLOATING_WINDOW.SET_POSITION, (event, x, y, width, height) => {
     const win = BrowserWindow.fromWebContents(event.sender);
-    if (win && !win.isDestroyed() && Number.isFinite(x) && Number.isFinite(y)) {
+    if (!win || win.isDestroyed() || !Number.isFinite(x) || !Number.isFinite(y)) return;
+    if (Number.isFinite(width) && Number.isFinite(height)) {
+      win.setBounds({ x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) });
+    } else {
       win.setPosition(Math.round(x), Math.round(y));
     }
   });

@@ -20,7 +20,9 @@ contextBridge.exposeInMainWorld('electron', {
     getBounds: () => ipcRenderer.invoke('floating-window:get-bounds'),
 
     // Manual title-bar drag: high-frequency fire-and-forget position stream.
-    moveTo: (x, y) => ipcRenderer.send('floating-window:set-position', x, y),
+    // width/height = drag-start size, held constant to defeat fractional-DPI
+    // rounding accumulation (window grew while dragging on 1.75x displays).
+    moveTo: (x, y, width, height) => ipcRenderer.send('floating-window:set-position', x, y, width, height),
 
     captureRegion: (bounds) => ipcRenderer.invoke('floating-window:capture-region', bounds),
 

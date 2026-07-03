@@ -344,9 +344,16 @@ const FloatingWindow = () => {
     e.preventDefault();
 
     // Grab offset inside the window; window.screenX/Y and e.screenX/Y share the
-    // same DIP coordinate space, matching BrowserWindow.setPosition.
+    // same DIP coordinate space, matching BrowserWindow.setBounds.
     const offsetX = e.screenX - window.screenX;
     const offsetY = e.screenY - window.screenY;
+
+    // Lock the size for the whole drag (fetched once): re-deriving it per frame
+    // accumulates fractional-DPI rounding and the window grows while dragging.
+    let dragSize = null;
+    window.electron?.floatingWindow?.getBounds?.().then((b) => {
+      if (b && Number.isFinite(b.width)) dragSize = { width: b.width, height: b.height };
+    }).catch(() => {});
 
     let pending = null;
     let raf = 0;
@@ -355,7 +362,11 @@ const FloatingWindow = () => {
       if (raf) return;
       raf = requestAnimationFrame(() => {
         raf = 0;
-        if (pending) window.electron?.floatingWindow?.moveTo?.(pending.x, pending.y);
+        // Hold moves until the locked size arrives (resolves within a frame or
+        // two) — a bare position update would re-round the size and drift it.
+        if (pending && dragSize) {
+          window.electron?.floatingWindow?.moveTo?.(pending.x, pending.y, dragSize.width, dragSize.height);
+        }
       });
     };
     const onUp = () => {

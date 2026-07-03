@@ -199,17 +199,22 @@ function createFloatingWindow() {
     floatingWindow.loadFile(PATHS.pages.floatingWindow.file);
   }
 
-  floatingWindow.on('moved', () => {
-    if (floatingWindow) {
-      store.set('floatingWindowBounds', floatingWindow.getBounds());
-    }
-  });
+  // Debounced persist: the manual title-bar drag streams setBounds per frame,
+  // and each one fires 'moved' — writing electron-store (synchronous disk IO)
+  // 60×/s would jank the drag. Trailing write after the movement settles.
+  let persistBoundsTimer = null;
+  const persistBounds = () => {
+    if (persistBoundsTimer) clearTimeout(persistBoundsTimer);
+    persistBoundsTimer = setTimeout(() => {
+      persistBoundsTimer = null;
+      if (floatingWindow && !floatingWindow.isDestroyed()) {
+        store.set('floatingWindowBounds', floatingWindow.getBounds());
+      }
+    }, 300);
+  };
 
-  floatingWindow.on('resized', () => {
-    if (floatingWindow) {
-      store.set('floatingWindowBounds', floatingWindow.getBounds());
-    }
-  });
+  floatingWindow.on('moved', persistBounds);
+  floatingWindow.on('resized', persistBounds);
 
   floatingWindow.on('closed', () => {
     windows.floatingWindow = null;
