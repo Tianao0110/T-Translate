@@ -13,7 +13,6 @@ const CHANNELS = {
   DIALOG: {
     SAVE: 'show-save-dialog',
     OPEN: 'show-open-dialog',
-    MESSAGE: 'show-message-box',
     SAVE_FILE: 'save-file',   // dialog + write in one round trip
   },
   STORE: {
@@ -21,7 +20,6 @@ const CHANNELS = {
     SET: 'store-set',
     DELETE: 'store-delete',
     CLEAR: 'store-clear',
-    HAS: 'store-has',
   },
   APP: {
     GET_VERSION: 'get-app-version',
@@ -35,14 +33,12 @@ const CHANNELS = {
   },
   LOGS: {
     OPEN_DIRECTORY: 'logs:open-directory',
-    GET_DIRECTORY: 'logs:get-directory',
   },
   PRIVACY: {
     SET_MODE: 'privacy:setMode',
     GET_MODE: 'privacy:getMode',
   },
   SHORTCUTS: {
-    GET: 'shortcuts:get',
     UPDATE: 'shortcuts:update',
     PAUSE: 'shortcuts:pause',
     RESUME: 'shortcuts:resume',
@@ -54,11 +50,9 @@ const CHANNELS = {
     CAPTURED: 'screenshot-captured',
     CAPTURED_SILENT: 'screenshot-captured-silent', // Silent mode — no main window pop.
     CONFIG: 'screenshot-config',
-    SCREEN_BOUNDS: 'screen-bounds',
     OCR_COMPLETE: 'screenshot:ocr-complete',       // OCR done — forward text to selection window for translation.
   },
   FLOATING_WINDOW: {
-    OPEN: 'floating-window:open',
     CLOSE: 'floating-window:close',
     GET_BOUNDS: 'floating-window:get-bounds',
     SET_POSITION: 'floating-window:set-position', // manual title-bar drag stream
@@ -131,7 +125,6 @@ const CHANNELS = {
     DECRYPT: 'secure-storage:decrypt',
     DELETE: 'secure-storage:delete',
     IS_AVAILABLE: 'secure-storage:isAvailable',
-    GET_ACCESS_LOG: 'secure-storage:getAccessLog',
   },
 };
 

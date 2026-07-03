@@ -204,17 +204,6 @@ function register(ctx) {
     }
   });
 
-  ipcMain.handle(CHANNELS.DIALOG.MESSAGE, async (event, options) => {
-    const mainWindow = getMainWindow();
-    try {
-      const result = await dialog.showMessageBox(mainWindow, options);
-      return result;
-    } catch (error) {
-      logger.error("Message dialog error:", error);
-      return { response: -1, error: error.message };
-    }
-  });
-
   // ===== Logs =====
 
   ipcMain.handle(CHANNELS.LOGS.OPEN_DIRECTORY, async () => {
@@ -234,11 +223,6 @@ function register(ctx) {
     }
 
     return { success: false, message: t('system.logDirFailed', '无法获取日志目录') };
-  });
-
-  ipcMain.handle(CHANNELS.LOGS.GET_DIRECTORY, () => {
-    const { getLogDirectory } = require('../utils/logger');
-    return getLogDirectory();
   });
 
   // On-disk footprint for the privacy page's data-management panel.

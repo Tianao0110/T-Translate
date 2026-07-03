@@ -61,15 +61,8 @@ function register(ctx) {
   };
 
   // ===== Window controls =====
-
-  ipcMain.handle(CHANNELS.FLOATING_WINDOW.OPEN, () => {
-    if (managers.createFloatingWindow) {
-      managers.createFloatingWindow();
-      return true;
-    }
-    logger.warn('createFloatingWindow not available');
-    return false;
-  });
+  // No OPEN handler: the floating window opens exclusively via the global
+  // shortcut (managers.toggleFloatingWindow).
 
   ipcMain.handle(CHANNELS.FLOATING_WINDOW.CLOSE, () => {
     const floatingWindow = getFloatingWindow();

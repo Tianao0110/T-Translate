@@ -262,18 +262,20 @@ const OcrSection = ({
           value={settings.ocr.recognitionLanguage || 'auto'}
           onChange={(e) => updateSetting('ocr', 'recognitionLanguage', e.target.value)}
         >
-          <option value="auto">🔄 {t('ocr.lang.auto')}</option>
-          <option value="zh-Hans">🇨🇳 {t('ocr.lang.zhHans')}</option>
-          <option value="zh-Hant">🇹🇼 {t('ocr.lang.zhHant')}</option>
-          <option value="en">🇺🇸 {t('ocr.lang.en')}</option>
-          <option value="ja">🇯🇵 {t('ocr.lang.ja')}</option>
-          <option value="ko">🇰🇷 {t('ocr.lang.ko')}</option>
-          <option value="fr">🇫🇷 {t('ocr.lang.fr')}</option>
-          <option value="de">🇩🇪 {t('ocr.lang.de')}</option>
-          <option value="es">🇪🇸 {t('ocr.lang.es')}</option>
-          <option value="ru">🇷🇺 {t('ocr.lang.ru')}</option>
-          <option value="hi">🇮🇳 {t('ocr.lang.hi')}</option>
-          <option value="ar">🇸🇦 {t('ocr.lang.ar')}</option>
+          {/* Native <option> can't render SVG, so no icons here (emoji flags
+              violated the lucide-only rule and rendered inconsistently). */}
+          <option value="auto">{t('ocr.lang.auto')}</option>
+          <option value="zh-Hans">{t('ocr.lang.zhHans')}</option>
+          <option value="zh-Hant">{t('ocr.lang.zhHant')}</option>
+          <option value="en">{t('ocr.lang.en')}</option>
+          <option value="ja">{t('ocr.lang.ja')}</option>
+          <option value="ko">{t('ocr.lang.ko')}</option>
+          <option value="fr">{t('ocr.lang.fr')}</option>
+          <option value="de">{t('ocr.lang.de')}</option>
+          <option value="es">{t('ocr.lang.es')}</option>
+          <option value="ru">{t('ocr.lang.ru')}</option>
+          <option value="hi">{t('ocr.lang.hi')}</option>
+          <option value="ar">{t('ocr.lang.ar')}</option>
         </select>
         <p className="setting-hint">{t('ocr.autoLangHint')}</p>
         <p className="setting-hint">{t('ocr.langPackHint')}</p>

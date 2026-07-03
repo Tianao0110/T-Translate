@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 
 import { PRIVACY_MODES, getModeFeatures, isFeatureEnabled, isProviderAllowed as isProviderAllowedByMode, PRIVACY_MODE_IDS } from '@config/privacy-modes';
-import { getLanguageOptions } from '@config/defaults';
+import { DEFAULT_TTS_CONFIG } from '../../services/tts/index.js';
 
 export const defaultConfig = {
   llm: { endpoint: 'http://localhost:1234/v1', timeout: 60000 },
@@ -125,21 +125,15 @@ export const DEFAULT_SETTINGS = {
     llmEndpoint: defaultConfig.llm.endpoint,
   },
 
-  tts: {
-    enabled: true,
-    engine: 'web-speech',
-    rate: 1.0,
-    pitch: 1.0,
-    volume: 0.8,
-    voiceId: '',
-  },
+  // Single source of truth for TTS defaults is services/tts/index.js
+  // (electron/state.js keeps a value-identical copy — main process can't
+  // import renderer ESM).
+  tts: { ...DEFAULT_TTS_CONFIG },
 
   screenshot: {
     outputMode: 'bubble', // 'bubble' | 'main'
   },
 };
-
-export const LANGUAGE_OPTIONS = getLanguageOptions(true);
 
 // 0.2.9 reshaped settings.document around the keys the translator actually
 // reads. Old keys (preserveFormatting/batchSize/maxParagraphLength/...) were
@@ -244,8 +238,10 @@ export const migrateOldSettings = (savedSettings) => {
       providers: savedSettings.providers.list,
       providerConfigs: savedSettings.providers.configs,
     };
-    delete migrated.providers;
   }
+  // Drop the bucket unconditionally — old installs also carry an empty {}
+  // seeded by a former electron-store default, kept alive by the spread above.
+  delete migrated.providers;
 
   // Pre-v0.2 flat selectionXxx -> selection nested object (only `enabled`
   // survived; the other flat keys were dead and are no longer seeded).

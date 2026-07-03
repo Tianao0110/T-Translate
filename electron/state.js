@@ -50,7 +50,9 @@ const store = new Store({
 
     privacyMode: 'standard',
 
-    // App-wide settings buckets.
+    // App-wide settings buckets. (No 'providers'/'connection' seeds: both
+    // buckets are retired — seeding them here re-created ghost keys on every
+    // fresh install that the renderer-side migration then carried forever.)
     settings: {
       shortcuts: {},
       translation: {},
@@ -59,8 +61,8 @@ const store = new Store({
       selection: {},
       screenshot: {},
       floatingWindow: {},
-      providers: {},
-      connection: {},
+      // Must stay value-identical to DEFAULT_TTS_CONFIG in
+      // src/services/tts/index.js (main process can't import that ESM module).
       tts: {
         enabled: true,
         engine: 'web-speech',

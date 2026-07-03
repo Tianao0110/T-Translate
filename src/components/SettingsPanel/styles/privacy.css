@@ -70,6 +70,9 @@
 }
 
 .mode-features-panel h4 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin: 0 0 12px 0;
   font-size: 14px;
   font-weight: 600;
@@ -102,12 +105,12 @@
 }
 
 .feature-icon {
-  font-size: 14px;
-  font-weight: bold;
+  display: inline-flex;
+  align-items: center;
 }
 
-.feature-item.enabled .feature-icon { color: #10b981; }
-.feature-item.disabled .feature-icon { color: #ef4444; }
+.feature-item.enabled .feature-icon { color: var(--success); }
+.feature-item.disabled .feature-icon { color: var(--error); }
 
 .feature-name {
   flex: 1;

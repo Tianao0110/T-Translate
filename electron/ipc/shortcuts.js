@@ -39,11 +39,6 @@ function register(ctx) {
     selectionTranslate: () => managers.toggleSelectionTranslate?.(),
   });
 
-  ipcMain.handle(CHANNELS.SHORTCUTS.GET, () => {
-    const settings = store.get('settings', {});
-    return settings.shortcuts || {};
-  });
-
   ipcMain.handle(CHANNELS.SHORTCUTS.UPDATE, (event, action, shortcut) => {
     try {
       const handlers = getShortcutHandlers();

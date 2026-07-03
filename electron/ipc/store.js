@@ -52,15 +52,6 @@ function register(ctx) {
     }
   });
 
-  ipcMain.handle(CHANNELS.STORE.HAS, async (event, key) => {
-    try {
-      return store.has(key);
-    } catch (error) {
-      logger.error('Has error:', key, error.message);
-      return false;
-    }
-  });
-
   logger.info('Store IPC handlers registered');
 }
 

@@ -65,31 +65,47 @@ class AnthropicProvider extends BaseProvider {
     return true;
   }
 
-  async translate(text, sourceLang = 'auto', targetLang = 'zh', options = {}) {
+  // Shared guard for translate/translateStream (they used to carry verbatim copies).
+  _checkInput(text) {
     if (!text?.trim()) {
       return { success: false, error: _t('providerError.emptyText', '文本为空') };
     }
     if (!this.config.apiKey) {
       return { success: false, error: _t('providerError.notConfigured', '未配置 API Key') };
     }
+    return null;
+  }
+
+  // Supports both legacy string and `{ content, mode }` from services/translation.js
+  _resolveSystemPrompt(options, targetLang) {
+    const promptOpt = options.systemPrompt;
+    return (promptOpt && typeof promptOpt === 'object' ? promptOpt.content : promptOpt) ||
+      `You are a professional translator. Translate the following text to ${LANGUAGE_CODES[targetLang]?.name || targetLang}. Output only the translation, nothing else.`;
+  }
+
+  _buildBody(text, systemPrompt, stream = false) {
+    return JSON.stringify({
+      model: this.config.model,
+      max_tokens: 4096,
+      ...(stream ? { stream: true } : {}),
+      system: systemPrompt,
+      messages: [
+        { role: 'user', content: text },
+      ],
+    });
+  }
+
+  async translate(text, sourceLang = 'auto', targetLang = 'zh', options = {}) {
+    const guard = this._checkInput(text);
+    if (guard) return guard;
 
     try {
-      // Support both legacy string and `{ content, mode }` from services/translation.js
-      const promptOpt = options.systemPrompt;
-      const systemPrompt = (promptOpt && typeof promptOpt === 'object' ? promptOpt.content : promptOpt) ||
-        `You are a professional translator. Translate the following text to ${LANGUAGE_CODES[targetLang]?.name || targetLang}. Output only the translation, nothing else.`;
+      const systemPrompt = this._resolveSystemPrompt(options, targetLang);
 
       const response = await fetch(`${this.config.baseUrl}/v1/messages`, {
         method: 'POST',
         headers: this._buildHeaders(),
-        body: JSON.stringify({
-          model: this.config.model,
-          max_tokens: 4096,
-          system: systemPrompt,
-          messages: [
-            { role: 'user', content: text },
-          ],
-        }),
+        body: this._buildBody(text, systemPrompt),
         signal: AbortSignal.timeout(this.config.timeout),
       });
 
@@ -128,18 +144,11 @@ class AnthropicProvider extends BaseProvider {
   }
 
   async translateStream(text, sourceLang, targetLang, onChunk, options = {}) {
-    if (!text?.trim()) {
-      return { success: false, error: _t('providerError.emptyText', '文本为空') };
-    }
-    if (!this.config.apiKey) {
-      return { success: false, error: _t('providerError.notConfigured', '未配置 API Key') };
-    }
+    const guard = this._checkInput(text);
+    if (guard) return guard;
 
     try {
-      // Support both legacy string and `{ content, mode }` from services/translation.js
-      const promptOpt = options.systemPrompt;
-      const systemPrompt = (promptOpt && typeof promptOpt === 'object' ? promptOpt.content : promptOpt) ||
-        `You are a professional translator. Translate the following text to ${LANGUAGE_CODES[targetLang]?.name || targetLang}. Output only the translation, nothing else.`;
+      const systemPrompt = this._resolveSystemPrompt(options, targetLang);
 
       // Idle watchdog, not a total-duration timeout: AbortSignal.timeout(30s)
       // would abort a long-but-healthy stream at 30s. Reset the timer on each
@@ -157,15 +166,7 @@ class AnthropicProvider extends BaseProvider {
         response = await fetch(`${this.config.baseUrl}/v1/messages`, {
           method: 'POST',
           headers: this._buildHeaders(),
-          body: JSON.stringify({
-            model: this.config.model,
-            max_tokens: 4096,
-            stream: true,
-            system: systemPrompt,
-            messages: [
-              { role: 'user', content: text },
-            ],
-          }),
+          body: this._buildBody(text, systemPrompt, true),
           signal: controller.signal,
         });
 

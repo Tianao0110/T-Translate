@@ -874,8 +874,6 @@ async function startScreenshot(fromHotkey = false) {
   const screenshotWindow = windowManager.createScreenshotWindow(totalBounds);
 
   screenshotWindow.webContents.on('did-finish-load', () => {
-    screenshotWindow.webContents.send(CHANNELS.SCREENSHOT.SCREEN_BOUNDS, { minX, minY, maxX, maxY });
-
     let showConfirmButtons = true;
     try {
       const settings = store.get('settings');

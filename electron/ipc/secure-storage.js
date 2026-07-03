@@ -172,17 +172,8 @@ function register(ctx) {
     return safeStorage.isEncryptionAvailable();
   });
 
-  // Redacts key suffixes (_apiKey/_secretKey -> _***) before returning
-  ipcMain.handle(CHANNELS.SECURE_STORAGE.GET_ACCESS_LOG, async () => {
-    return {
-      records: accessLog.records.slice(-50).map(r => ({
-        key: r.key.replace(/^provider_/, '').replace(/_apiKey$|_secretKey$/, '_***'),
-        timestamp: r.timestamp,
-        context: r.context,
-      })),
-      totalCount: accessLog.records.length,
-    };
-  });
+  // No access-log query channel: the audit trail (accessLog above) exists for
+  // the anomaly detector + security alerts, not for UI consumption.
 
   logger.info('SecureStorage IPC handlers registered (with audit & privacy guard)');
 }

@@ -5,18 +5,11 @@ const { contextBridge, ipcRenderer } = require("electron");
 const path = require("path");
 const fs = require("fs").promises;
 
-// Channel allow-lists — generic on/send/invoke are gated by these to prevent
-// renderer code from talking to arbitrary IPC channels.
+// Receive allow-list — the generic ipc.on / ipcRenderer.on bridges below are
+// gated by this so renderer code can't subscribe to arbitrary channels.
+// (send/invoke need no list: they are only reachable through the explicit
+// electronAPI methods, never generically.)
 const validChannels = {
-  send: [
-    "minimize-window",
-    "maximize-window",
-    "close-window",
-    "set-always-on-top",
-    "open-external",
-    "write-clipboard-text",
-    "menu-action",
-  ],
   receive: [
     "menu-action",
     "import-file",
@@ -29,35 +22,6 @@ const validChannels = {
     "shortcut-conflict",
     "navigate",
     "security-alert",
-  ],
-  invoke: [
-    "get-app-version",
-    "get-platform",
-    "show-save-dialog",
-    "show-open-dialog",
-    "save-file",
-    "read-clipboard-text",
-    "read-clipboard-image",
-    "store-get",
-    "store-set",
-    "store-delete",
-    "store-clear",
-    "store-has",
-    "get-app-path",
-    "capture-screen",
-    "floating-window:open",
-    "floating-window:notify-settings-changed",
-    "secure-storage:encrypt",
-    "secure-storage:decrypt",
-    "secure-storage:delete",
-    "secure-storage:isAvailable",
-    "selection:toggle",
-    "selection:get-enabled",
-    "theme:get",
-    "theme:set",
-    "theme:sync",
-    "logs:open-directory",
-    "logs:get-directory",
   ],
 };
 
@@ -126,7 +90,6 @@ const electronAPI = {
   },
   logs: {
     openDirectory: () => ipcRenderer.invoke("logs:open-directory"),
-    getDirectory: () => ipcRenderer.invoke("logs:get-directory"),
   },
   store: {
     get: (key) => ipcRenderer.invoke("store-get", key),
@@ -140,10 +103,8 @@ const electronAPI = {
     decrypt: (key, options) => ipcRenderer.invoke("secure-storage:decrypt", key, options),
     delete: (key) => ipcRenderer.invoke("secure-storage:delete", key),
     isAvailable: () => ipcRenderer.invoke("secure-storage:isAvailable"),
-    getAccessLog: () => ipcRenderer.invoke("secure-storage:getAccessLog"),
   },
   floatingWindow: {
-    open: () => ipcRenderer.invoke("floating-window:open"),
     notifySettingsChanged: () => ipcRenderer.invoke("floating-window:notify-settings-changed"),
   },
   selection: {
