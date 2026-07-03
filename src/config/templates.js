@@ -1,6 +1,7 @@
 // Translation templates. Each template is a system prompt sent to the LLM;
 // different templates yield different styles (natural / precise / formal /
-// OCR-correction / creative).
+// OCR-correction). The UI labels come from i18n (templates.*), so the name/
+// description/icon metadata that used to live here was unused and removed.
 
 export const LANGUAGE_NAMES = {
   'auto': 'the same language as the source',
@@ -21,17 +22,13 @@ export const LANGUAGE_NAMES = {
   'pa': 'Punjabi',
 };
 
-// Templates here = "tone" (natural / precise / formal / ocr / creative).
+// Templates here = "tone" (natural / precise / formal / ocr).
 // The "message structure" (system+user vs user-only) is decided by
 // services/translation.js based on the active model — translation-only small
 // models (Hunyuan MT etc.) get a simpler prompt and user-only mode,
 // regardless of which tone template is selected.
 export const TEMPLATES = {
   natural: {
-    id: 'natural',
-    name: '自然',
-    description: '日常对话、口语化表达',
-    icon: 'FileText',
     mode: 'system',
     systemPrompt: `You are a professional translator. Translate the following text into {targetLang}.
 
@@ -43,10 +40,6 @@ Requirements:
   },
 
   precise: {
-    id: 'precise',
-    name: '精确',
-    description: '技术文档、学术论文',
-    icon: 'Zap',
     mode: 'system',
     systemPrompt: `You are a professional technical translator. Translate the following text into {targetLang}.
 
@@ -59,10 +52,6 @@ Requirements:
   },
 
   formal: {
-    id: 'formal',
-    name: '正式',
-    description: '商务邮件、官方文档',
-    icon: 'Sparkles',
     mode: 'system',
     systemPrompt: `You are a professional business translator. Translate the following text into {targetLang}.
 
@@ -75,10 +64,6 @@ Requirements:
   },
 
   ocr: {
-    id: 'ocr',
-    name: 'OCR纠错',
-    description: 'OCR识别文本，自动纠正识别错误',
-    icon: 'Camera',
     mode: 'system',
     systemPrompt: `You are a professional translator with OCR post-processing expertise. The following text was extracted via OCR and may contain recognition errors.
 
@@ -93,34 +78,7 @@ Requirements:
 - Output ONLY the final translation, no explanations or intermediate steps
 - Do NOT translate content inside special markers like ⟦...⟧`,
   },
-
-  creative: {
-    id: 'creative',
-    name: '创意',
-    description: '文学作品、创意内容',
-    icon: 'Palette',
-    mode: 'system',
-    systemPrompt: `You are a literary translator. Translate the following text into {targetLang}.
-
-Requirements:
-- Preserve the artistic style, tone, and literary devices
-- Adapt cultural references appropriately
-- Maintain the emotional impact and aesthetic quality
-- Use creative expression while staying true to the original meaning
-- Output ONLY the translation, no explanations
-- Do NOT translate content inside special markers like ⟦...⟧`,
-  },
-
 };
-
-export function getTemplateList() {
-  return Object.values(TEMPLATES).map(t => ({
-    id: t.id,
-    name: t.name,
-    description: t.description,
-    icon: t.icon,
-  }));
-}
 
 // Returns { content, mode } — service layer expects this shape (see translation.js).
 export function getSystemPrompt(templateId, targetLang) {
@@ -133,14 +91,8 @@ export function getSystemPrompt(templateId, targetLang) {
   };
 }
 
-export function hasTemplate(templateId) {
-  return templateId in TEMPLATES;
-}
-
 export default {
   TEMPLATES,
   LANGUAGE_NAMES,
-  getTemplateList,
   getSystemPrompt,
-  hasTemplate,
 };

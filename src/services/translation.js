@@ -49,7 +49,6 @@ const _MT_TONE = {
   precise: 'precise and technically accurate',
   formal: 'formal and professional',
   ocr: 'natural and conversational',
-  creative: 'creative and literary',
 };
 function buildMTPrompt(toneTemplate, targetLang) {
   const langName = LANGUAGE_NAMES[targetLang] || targetLang;

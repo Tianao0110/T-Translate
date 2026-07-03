@@ -1,6 +1,6 @@
 // DeepL translation provider.
 
-import { BaseProvider, LANGUAGE_CODES, _t } from '../base.js';
+import { BaseProvider, _t } from '../base.js';
 import icon from './icon.svg';
 
 class DeepLProvider extends BaseProvider {
@@ -35,7 +35,6 @@ class DeepLProvider extends BaseProvider {
     super({
       apiKey: '',
       useFreeApi: true,
-      formality: 'default',
       ...config,
     });
   }
@@ -121,12 +120,6 @@ class DeepLProvider extends BaseProvider {
       // Omit source_lang for auto-detect
       if (sourceCode) {
         params.append('source_lang', sourceCode);
-      }
-
-      // Only some target languages accept the formality param; passing it
-      // unconditionally would 400 those
-      if (this.config.formality && this.config.formality !== 'default') {
-        params.append('formality', this.config.formality);
       }
 
       const response = await fetch(`${this.baseUrl}/translate`, {

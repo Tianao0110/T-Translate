@@ -21,9 +21,7 @@ initStoreSync(useTranslationStore);
 
 function App() {
   const [theme, setTheme] = useState(THEMES.LIGHT);
-  const addToFavorites = useTranslationStore((state) => state.addToFavorites);
   const addToHistory = useTranslationStore((state) => state.addToHistory);
-  const setTargetLanguage = useTranslationStore((state) => state.setTargetLanguage);
   const setOcrEngine = useTranslationStore((state) => state.setOcrEngine);
 
   useEffect(() => {
@@ -103,38 +101,6 @@ function App() {
   // Screenshot capture is handled by MainWindow's own onCaptured listener
   // (screenshotData prop -> TranslationPanel) — no second subscription here.
 
-  // Floating window forwards user "add to favorites" through main -> this listener
-  useEffect(() => {
-    if (!window.electron?.ipcRenderer) {
-      logger.warn('IPC not available for floating-window favorites');
-      return;
-    }
-
-    const handleAddToFavorites = (event, item) => {
-      logger.debug('Received add-to-favorites:', item?.sourceText?.substring(0, 30));
-      if (item && addToFavorites) {
-        addToFavorites({
-          id: item.id || `floating-${Date.now()}`,
-          sourceText: item.sourceText || '',
-          translatedText: item.translatedText || '',
-          sourceLanguage: item.sourceLanguage || 'auto',
-          targetLanguage: item.targetLanguage || 'zh',
-          timestamp: item.timestamp || Date.now(),
-          tags: item.tags || [],
-          folderId: item.folderId || null,
-          isStyleReference: item.isStyleReference || false,
-          source: item.source || 'floating-translator',
-        });
-      }
-    };
-
-    window.electron.ipcRenderer.on('add-to-favorites', handleAddToFavorites);
-
-    return () => {
-      window.electron.ipcRenderer.removeListener('add-to-favorites', handleAddToFavorites);
-    };
-  }, [addToFavorites]);
-
   // Selection translate and floating window route history adds through this listener
   useEffect(() => {
     if (!window.electron?.ipcRenderer) return;
@@ -160,23 +126,6 @@ function App() {
       window.electron.ipcRenderer.removeListener('add-to-history', handleAddToHistory);
     };
   }, [addToHistory]);
-
-  useEffect(() => {
-    if (!window.electron?.ipcRenderer) return;
-
-    const handleSyncLanguage = (event, langCode) => {
-      logger.debug('Sync target language:', langCode);
-      if (langCode && setTargetLanguage) {
-        setTargetLanguage(langCode);
-      }
-    };
-
-    window.electron.ipcRenderer.on('sync-target-language', handleSyncLanguage);
-
-    return () => {
-      window.electron.ipcRenderer.removeListener('sync-target-language', handleSyncLanguage);
-    };
-  }, [setTargetLanguage]);
 
   // Render-phase errors are ErrorBoundary's job (src/main.jsx wraps <App/>);
   // the old try/catch here broke hook ordering rules and, on a mount throw,

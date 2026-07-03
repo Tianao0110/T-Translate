@@ -29,20 +29,6 @@ export const defaultConfig = {
   dev: { debugMode: false },
 };
 
-export const SHORTCUT_LABELS = {
-  translate: '执行翻译',
-  swapLanguages: '切换语言',
-  clear: '清空内容',
-  paste: '粘贴文本',
-  copy: '复制结果',
-  screenshot: '📷 截图翻译',
-  toggleWindow: '🪟 显示/隐藏窗口',
-  floatingWindow: '🔮 悬浮窗口',
-  selectionTranslate: '✏️ 划词翻译开关',
-};
-
-export const GLOBAL_SHORTCUT_KEYS = ['screenshot', 'toggleWindow', 'floatingWindow', 'selectionTranslate'];
-
 // `basic: true` flags items shown in the simplified settings view.
 // `keywords` powers the in-settings search.
 export const NAV_ITEMS = [

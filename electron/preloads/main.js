@@ -20,9 +20,7 @@ const validChannels = {
   receive: [
     "menu-action",
     "import-file",
-    "add-to-favorites",
     "add-to-history",
-    "sync-target-language",
     "screenshot-captured",
     "screenshot-captured-silent",
     "selection-state-changed",
@@ -179,16 +177,8 @@ const electronAPI = {
       ipcRenderer.invoke("ocr:windows-ocr", imageData, options),
     recognizeWithPaddleOCR: (imageData, options) =>
       ipcRenderer.invoke("ocr:paddle-ocr", imageData, options),
-
-    // Online APIs
-    recognizeWithOCRSpace: (imageData, options) =>
-      ipcRenderer.invoke("ocr:ocrspace", imageData, options),
-    recognizeWithGoogleVision: (imageData, options) =>
-      ipcRenderer.invoke("ocr:google-vision", imageData, options),
-    recognizeWithAzureOCR: (imageData, options) =>
-      ipcRenderer.invoke("ocr:azure-ocr", imageData, options),
-    recognizeWithBaiduOCR: (imageData, options) =>
-      ipcRenderer.invoke("ocr:baidu-ocr", imageData, options),
+    // Online OCR engines run in the renderer (see src/providers/ocr/*), so no
+    // main-process recognizers are exposed here.
 
     // Engine management
     checkInstalled: () => ipcRenderer.invoke("ocr:check-installed"),

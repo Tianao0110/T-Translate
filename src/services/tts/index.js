@@ -70,13 +70,6 @@ class TTSManager {
     return this._config.enabled;
   }
 
-  getEngineList() {
-    return Object.entries(engines).map(([id, Engine]) => ({
-      id,
-      ...Engine.metadata,
-    }));
-  }
-
   async getEngine(engineId) {
     if (this._engines.has(engineId)) {
       return this._engines.get(engineId);
@@ -210,14 +203,6 @@ class TTSManager {
     };
 
     return this._currentEngine.speak(text, mergedOptions);
-  }
-
-  pause() {
-    this._currentEngine?.pause();
-  }
-
-  resume() {
-    this._currentEngine?.resume();
   }
 
   stop() {

@@ -96,7 +96,10 @@ class GeminiProvider extends BaseProvider {
       const promptOpt = options.systemPrompt;
       const promptStr = promptOpt && typeof promptOpt === 'object' ? promptOpt.content : promptOpt;
       if (promptStr) {
-        prompt = promptStr.replace('{targetLang}', this._getLanguageName(targetLang)) + `\n\n${text}`;
+        // systemPrompt arrives from translation.js already interpolated
+        // (getSystemPrompt / buildMTPrompt both resolve {targetLang}), so no
+        // further replace is needed — just append the source text.
+        prompt = `${promptStr}\n\n${text}`;
       } else {
         const sourceName = this._getLanguageName(sourceLang);
         const targetName = this._getLanguageName(targetLang);

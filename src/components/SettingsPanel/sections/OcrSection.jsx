@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Eye, EyeOff, AlertTriangle, RefreshCw, Download, Trash2 } from 'lucide-react';
+import { Eye, EyeOff, AlertTriangle, RefreshCw, Download, Trash2, Cpu, Sparkles, Globe } from 'lucide-react';
 import { ocrManager } from '../../../providers/ocr/index.js';
 
 const OcrSection = ({
@@ -322,7 +322,7 @@ const OcrSection = ({
       {/* Tier 1: local engines */}
       <details className="setting-section" open={!collapsedGroups['ocr-local']}>
         <summary className="section-header" onClick={(e) => { e.preventDefault(); toggleGroup('ocr-local'); }}>
-          <span className="section-title">🚀 {t('ocr.localEngines')}</span>
+          <span className="section-title"><Cpu size={15} /> {t('ocr.localEngines')}</span>
           <span className="section-hint">{t('ocr.localHint')}</span>
         </summary>
         <div className="section-content">
@@ -483,7 +483,7 @@ const OcrSection = ({
       {/* Tier 2: vision LLM */}
       <details className="setting-section" open={!collapsedGroups['ocr-vision']}>
         <summary className="section-header" onClick={(e) => { e.preventDefault(); toggleGroup('ocr-vision'); }}>
-          <span className="section-title">⚡ {t('ocr.visionModels')}</span>
+          <span className="section-title"><Sparkles size={15} /> {t('ocr.visionModels')}</span>
           <span className="section-hint">{t('ocr.visionHint')}</span>
         </summary>
         <div className="section-content">
@@ -523,7 +523,7 @@ const OcrSection = ({
       {/* Tier 3: online APIs */}
       <details className="setting-section" open={!collapsedGroups['ocr-online']}>
         <summary className="section-header" onClick={(e) => { e.preventDefault(); toggleGroup('ocr-online'); }}>
-          <span className="section-title">🌐 {t('ocr.onlineServices')}</span>
+          <span className="section-title"><Globe size={15} /> {t('ocr.onlineServices')}</span>
           <span className="section-hint">{t('ocr.onlineHint')}</span>
         </summary>
         <div className="section-content">

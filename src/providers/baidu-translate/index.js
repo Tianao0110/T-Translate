@@ -82,11 +82,6 @@ class BaiduTranslateProvider extends BaseProvider {
     return mapping[code] || code;
   }
 
-  async _md5(str) {
-    // SubtleCrypto omits MD5, so we drop to a manual implementation
-    return this._md5Manual(str);
-  }
-
   // Standard MD5 reference impl. Don't refactor — the algorithm is fixed and
   // any change breaks the request signature.
   _md5Manual(string) {
@@ -170,10 +165,10 @@ class BaiduTranslateProvider extends BaseProvider {
 
   async translate(text, sourceLang = 'auto', targetLang = 'zh') {
     if (!text?.trim()) {
-      return { success: false, error: '文本为空' };
+      return { success: false, error: _t('providerError.emptyText', '文本为空') };
     }
     if (!this.config.appId || !this.config.secretKey) {
-      return { success: false, error: '未配置 APP ID 或密钥' };
+      return { success: false, error: _t('providerError.notConfiguredBaidu', '未配置 APP ID 或密钥') };
     }
 
     try {
@@ -214,7 +209,7 @@ class BaiduTranslateProvider extends BaseProvider {
       );
 
       if (!response.ok) {
-        return { success: false, error: `HTTP ${response.status}` };
+        return { success: false, error: _t('providerError.httpError', `HTTP ${response.status}`, { status: response.status }) };
       }
 
       const data = await response.json();

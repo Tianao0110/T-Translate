@@ -120,10 +120,6 @@ const CHANNELS = {
     DOWNLOAD_PROGRESS: 'ocr:download-progress',
     WINDOWS_OCR: 'ocr:windows-ocr',
     PADDLE_OCR: 'ocr:paddle-ocr',
-    OCRSPACE: 'ocr:ocrspace',
-    GOOGLE_VISION: 'ocr:google-vision',
-    AZURE_OCR: 'ocr:azure-ocr',
-    BAIDU_OCR: 'ocr:baidu-ocr',
     HEALTH_CHECK: 'ocr:health-check',
   },
   MENU: {
@@ -131,9 +127,7 @@ const CHANNELS = {
     IMPORT_FILE: 'import-file',
   },
   DATA: {
-    ADD_TO_FAVORITES: 'add-to-favorites',
     ADD_TO_HISTORY: 'add-to-history',
-    SYNC_TARGET_LANGUAGE: 'sync-target-language',
   },
   THEME: {
     GET: 'theme:get',

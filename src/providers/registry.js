@@ -52,10 +52,6 @@ export function getProviderClass(id) {
   return providerClasses[id] || null;
 }
 
-export function hasProvider(id) {
-  return !!providerClasses[id];
-}
-
 export function getProviderMetadata(id) {
   const ProviderClass = providerClasses[id];
   if (!ProviderClass?.metadata) return null;
@@ -146,14 +142,6 @@ export function initConfigs(allConfigs, clearExisting = true) {
   logger.debug(`Initialized configs for: ${Object.keys(allConfigs).join(', ')}`);
 }
 
-export function exportConfigs() {
-  const result = {};
-  configs.forEach((config, id) => {
-    result[id] = config;
-  });
-  return result;
-}
-
 export function getAllProvidersStatus() {
   return getAllProviderMetadata().map(meta => {
     const instance = instances.get(meta.id);
@@ -168,23 +156,9 @@ export function getAllProvidersStatus() {
   });
 }
 
-// For plugin-style runtime additions
-export function registerProvider(id, ProviderClass) {
-  if (providerClasses[id]) {
-    logger.warn(`Provider ${id} already exists, overwriting...`);
-  }
-  providerClasses[id] = ProviderClass;
-}
-
-export function clearInstances() {
-  instances.clear();
-  logger.debug('Cleared all instances');
-}
-
 export default {
   getAllProviderIds,
   getProviderClass,
-  hasProvider,
   getProviderMetadata,
   getAllProviderMetadata,
 
@@ -196,12 +170,8 @@ export default {
   updateProviderConfig,
   getProviderConfig,
   initConfigs,
-  exportConfigs,
 
   getAllProvidersStatus,
-
-  registerProvider,
-  clearInstances,
 
   DEFAULT_PRIORITY,
 };

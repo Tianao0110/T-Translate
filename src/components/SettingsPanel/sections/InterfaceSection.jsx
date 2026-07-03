@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Sun, Moon, Leaf, RefreshCw, Globe, Power, MousePointer } from 'lucide-react';
+import { Sun, Moon, Leaf, RefreshCw, Globe, Power, MousePointer, Keyboard, Camera, AppWindow, Layers, Pencil } from 'lucide-react';
 import { defaultConfig } from '../constants.js';
 
 const LANGUAGES = [
@@ -100,10 +100,10 @@ const InterfaceSection = ({
   // through Electron's globalShortcut and needs pause/resume during editing so
   // the user's chord doesn't trigger the action.
   const shortcutConfig = {
-    screenshot: { label: t('shortcuts.screenshot'), global: true, icon: '📷' },
-    toggleWindow: { label: t('shortcuts.toggleWindow'), global: true, icon: '🪟' },
-    floatingWindow: { label: t('shortcuts.floatingWindow'), global: true, icon: '🔮' },
-    selectionTranslate: { label: t('shortcuts.selectionTranslate'), global: true, icon: '✏️' },
+    screenshot: { label: t('shortcuts.screenshot'), global: true, icon: Camera },
+    toggleWindow: { label: t('shortcuts.toggleWindow'), global: true, icon: AppWindow },
+    floatingWindow: { label: t('shortcuts.floatingWindow'), global: true, icon: Layers },
+    selectionTranslate: { label: t('shortcuts.selectionTranslate'), global: true, icon: Pencil },
   };
 
   const startEditing = async (action, config) => {
@@ -232,7 +232,7 @@ const InterfaceSection = ({
       </div>
 
       <div className="setting-group" style={{marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border-primary)'}}>
-        <label className="setting-label">⌨️ {t('settings.shortcuts.title')}</label>
+        <label className="setting-label"><Keyboard size={16} style={{marginRight: '6px', verticalAlign: 'middle'}} /> {t('settings.shortcuts.title')}</label>
         <p className="setting-hint" style={{marginBottom: '12px'}}>
           {t('shortcuts.hint')}
         </p>
@@ -245,8 +245,8 @@ const InterfaceSection = ({
             return (
               <div key={action} className={`shortcut-row ${config.global ? 'global' : ''}`}>
                 <span className="shortcut-action">
-                  <span className="shortcut-icon">{config.icon}</span>
-                  {config.global && <span className="global-badge">🌐</span>}
+                  <span className="shortcut-icon">{config.icon && <config.icon size={14} />}</span>
+                  {config.global && <span className="global-badge"><Globe size={12} /></span>}
                   {config.label}
                 </span>
                 {editingShortcut === action ? (

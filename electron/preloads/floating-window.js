@@ -65,20 +65,13 @@ contextBridge.exposeInMainWorld('electron', {
     },
   },
 
-  // Shared OCR API (also exposed in the main-window preload).
+  // Shared OCR API (also exposed in the main-window preload). Online engines
+  // run in the renderer, so only the local recognizers are bridged here.
   ocr: {
     recognizeWithPaddleOCR: (imageData, options) =>
       ipcRenderer.invoke('ocr:paddle-ocr', imageData, options),
     recognizeWithWindowsOCR: (imageData, options) =>
       ipcRenderer.invoke('ocr:windows-ocr', imageData, options),
-    recognizeWithOCRSpace: (imageData, options) =>
-      ipcRenderer.invoke('ocr:ocrspace', imageData, options),
-    recognizeWithGoogleVision: (imageData, options) =>
-      ipcRenderer.invoke('ocr:google-vision', imageData, options),
-    recognizeWithAzureOCR: (imageData, options) =>
-      ipcRenderer.invoke('ocr:azure-ocr', imageData, options),
-    recognizeWithBaiduOCR: (imageData, options) =>
-      ipcRenderer.invoke('ocr:baidu-ocr', imageData, options),
     checkInstalled: () => ipcRenderer.invoke('ocr:check-installed'),
   },
 
