@@ -44,7 +44,7 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 - [ ] 文档翻译人工回归（feat/document-translation，28 项修复）：拖入 TXT/PDF 翻译 → 翻译中直接关窗重开同文件确认恢复横幅 → 离线模式下确认不走在线源 → 扫描件 PDF 确认 OCR 逐页进度与结果 → 设置页改分段长度/并发数确认生效 → 术语库开关对照 → 导出 SRT/VTT/Word 各开一次 → GBK 编码字幕不乱码
 
 - [ ] `ocr-models` Release 首发：`npm run ocr:release` 产物已在 release-ocr-models/，按 OCR_MODELS.md 上传 7 个文件（**记得勾 pre-release**）。上传前应用内语言包列表会显示「无法获取清单」属预期
-- [ ] 人工回归：设置页语言包下载/更新徽章/卸载、截图翻译（中英日 + 装包后韩语）、划词 OCR 兜底、玻璃窗、Windows OCR 切换、隐私模式引擎过滤
+- [ ] 人工回归：设置页语言包下载/更新徽章/卸载、截图翻译（中英日 + 装包后韩语）、Windows OCR 切换、隐私模式引擎过滤（划词 OCR 兜底已在 0.2.9 划词专项删除，图片场景走截图翻译）
 - [x] 版本号已改 0.2.9（合并 main 时完成，含 README 徽章）
 - [ ] 语言包 rec 模型目前 v4 代际；上游出 v5 多语言 ONNX 后按 OCR_MODELS.md「更新模型」流程换入（bump version 即可，无需发版）
 
