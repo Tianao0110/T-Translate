@@ -1,7 +1,7 @@
 // Local OCR — PP-OCRv5 via esearch-ocr in the main process; renderer calls
 // through IPC. Engine id stays 'rapid-ocr' for stored-settings compatibility.
 
-import { BaseOCREngine } from './base.js';
+import { BaseOCREngine, _t } from './base.js';
 import createLogger from '../../utils/logger.js';
 const logger = createLogger('LocalOCR');
 
@@ -28,7 +28,7 @@ class RapidOCREngine extends BaseOCREngine {
   async recognize(input, options = {}) {
     try {
       if (!window.electron?.ocr?.recognizeWithPaddleOCR) {
-        return { success: false, error: 'RapidOCR API 不可用' };
+        return { success: false, error: _t('providerError.ocrApiUnavailable', 'OCR 服务不可用') };
       }
 
       const imageData = this.ensureBase64(input);
@@ -38,7 +38,7 @@ class RapidOCREngine extends BaseOCREngine {
       if (!result.success) {
         return {
           success: false,
-          error: result.error || 'OCR 识别失败',
+          error: result.error || _t('providerError.ocrRecognizeFailed', 'OCR 识别失败'),
           errorCode: result.errorCode,
         };
       }

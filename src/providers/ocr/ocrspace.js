@@ -1,6 +1,6 @@
 // OCR.space API engine — https://ocr.space/ocrapi
 
-import { BaseOCREngine } from './base.js';
+import { BaseOCREngine, _t } from './base.js';
 import createLogger from '../../utils/logger.js';
 const logger = createLogger('OCRSpace');
 
@@ -63,7 +63,7 @@ class OCRSpaceEngine extends BaseOCREngine {
     const { apiKey, language } = this.config;
 
     if (!apiKey) {
-      return { success: false, error: '请配置 OCR.space API Key' };
+      return { success: false, error: _t('providerError.ocrNotConfigured', '请配置该 OCR 引擎的密钥') };
     }
 
     try {
@@ -93,12 +93,12 @@ class OCRSpaceEngine extends BaseOCREngine {
       const data = await response.json();
 
       if (data.IsErroredOnProcessing) {
-        throw new Error(data.ErrorMessage?.[0] || 'OCR 处理失败');
+        throw new Error(data.ErrorMessage?.[0] || _t('providerError.ocrProcessFailed', 'OCR 处理失败'));
       }
 
       const parsedResults = data.ParsedResults || [];
       if (parsedResults.length === 0) {
-        return { success: false, error: '未识别到文字' };
+        return { success: false, error: _t('providerError.ocrNoText', '未识别到文字') };
       }
 
       const text = parsedResults.map(r => r.ParsedText).join('\n');

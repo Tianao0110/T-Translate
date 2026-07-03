@@ -1,6 +1,6 @@
 // Anthropic Messages API provider (not OpenAI-compatible).
 
-import { BaseProvider, LANGUAGE_CODES } from '../base.js';
+import { BaseProvider, LANGUAGE_CODES, _t } from '../base.js';
 import icon from './icon.svg';
 import createLogger from '../../utils/logger.js';
 
@@ -67,10 +67,10 @@ class AnthropicProvider extends BaseProvider {
 
   async translate(text, sourceLang = 'auto', targetLang = 'zh', options = {}) {
     if (!text?.trim()) {
-      return { success: false, error: '文本为空' };
+      return { success: false, error: _t('providerError.emptyText', '文本为空') };
     }
     if (!this.config.apiKey) {
-      return { success: false, error: '未配置 API Key' };
+      return { success: false, error: _t('providerError.notConfigured', '未配置 API Key') };
     }
 
     try {
@@ -105,13 +105,13 @@ class AnthropicProvider extends BaseProvider {
       const translatedText = data.content?.[0]?.text;
 
       if (!translatedText) {
-        return { success: false, error: '无翻译结果' };
+        return { success: false, error: _t('providerError.noResult', '无翻译结果') };
       }
 
       // max_tokens => the model was cut off mid-translation. Returning it as
       // success would cache and display a truncated translation as if complete.
       if (data.stop_reason === 'max_tokens') {
-        return { success: false, error: '翻译结果被截断（超出最大长度）' };
+        return { success: false, error: _t('providerError.truncated', '翻译结果被截断（超出最大长度）') };
       }
 
       return {
@@ -129,10 +129,10 @@ class AnthropicProvider extends BaseProvider {
 
   async translateStream(text, sourceLang, targetLang, onChunk, options = {}) {
     if (!text?.trim()) {
-      return { success: false, error: '文本为空' };
+      return { success: false, error: _t('providerError.emptyText', '文本为空') };
     }
     if (!this.config.apiKey) {
-      return { success: false, error: '未配置 API Key' };
+      return { success: false, error: _t('providerError.notConfigured', '未配置 API Key') };
     }
 
     try {
@@ -209,7 +209,7 @@ class AnthropicProvider extends BaseProvider {
         }
 
         if (stopReason === 'max_tokens') {
-          return { success: false, error: '翻译结果被截断（超出最大长度）' };
+          return { success: false, error: _t('providerError.truncated', '翻译结果被截断（超出最大长度）') };
         }
 
         return { success: true, text: fullText.trim() };
@@ -218,13 +218,13 @@ class AnthropicProvider extends BaseProvider {
       }
     } catch (error) {
       this._lastError = error;
-      return { success: false, error: error.message || '流式翻译失败' };
+      return { success: false, error: error.message || _t('providerError.streamFailed', '流式翻译失败') };
     }
   }
 
   async testConnection() {
     if (!this.config.apiKey) {
-      return { success: false, message: '未配置 API Key' };
+      return { success: false, message: _t('providerError.notConfigured', '未配置 API Key') };
     }
 
     try {
@@ -243,20 +243,20 @@ class AnthropicProvider extends BaseProvider {
       });
 
       if (response.status === 401) {
-        return { success: false, message: 'API Key 无效' };
+        return { success: false, message: _t('providerError.keyInvalid', 'API Key 无效') };
       }
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({}));
-        return { success: false, message: error.error?.message || `HTTP ${response.status}` };
+        return { success: false, message: error.error?.message || _t('providerError.httpError', `HTTP ${response.status}`, { status: response.status }) };
       }
 
       return {
         success: true,
-        message: `Claude 连接成功 (${this.config.model})`,
+        message: `${_t('providerError.connectSuccess', '连接成功')} (${this.config.model})`,
       };
     } catch (error) {
-      return { success: false, message: error.message || '连接失败' };
+      return { success: false, message: error.message || _t('providerError.connectFailed', '连接失败') };
     }
   }
 

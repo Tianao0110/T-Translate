@@ -1,5 +1,7 @@
 // Base class for all OCR engines.
 
+export { _t } from '../base.js';
+
 export class BaseOCREngine {
   constructor(config = {}) {
     this.config = config;

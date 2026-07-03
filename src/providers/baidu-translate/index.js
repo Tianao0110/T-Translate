@@ -2,7 +2,7 @@
 // Free tier: 50k chars/month standard, 1M chars/month advanced.
 // Reachable inside mainland China without a proxy.
 
-import { BaseProvider } from '../base.js';
+import { BaseProvider, _t } from '../base.js';
 import icon from './icon.svg';
 import createLogger from '../../utils/logger.js';
 
@@ -219,25 +219,12 @@ class BaiduTranslateProvider extends BaseProvider {
 
       const data = await response.json();
 
-      // Known error codes mapped to human-readable Chinese messages
+      // Baidu error codes → localized messages (providerError.baiduCode.*).
       if (data.error_code) {
-        const errorMessages = {
-          '52001': '请求超时',
-          '52002': '系统错误',
-          '52003': '未授权用户 (APP ID 无效)',
-          '54000': '必填参数为空',
-          '54001': '签名错误 (请检查密钥)',
-          '54003': '访问频率受限',
-          '54004': '账户余额不足',
-          '54005': '长 query 频率限制',
-          '58000': '客户端 IP 非法',
-          '58001': '语言方向不支持',
-          '58002': '服务已关闭',
-          '90107': '认证未通过或未生效',
-        };
+        const mapped = _t(`providerError.baiduCode.${data.error_code}`, '');
         return {
           success: false,
-          error: errorMessages[data.error_code] || `百度 API 错误: ${data.error_code} - ${data.error_msg}`,
+          error: mapped || `${_t('providerError.providerErrorStatus', `百度 错误: ${data.error_code}`, { provider: 'Baidu', status: data.error_code })} - ${data.error_msg}`,
         };
       }
 
@@ -245,7 +232,7 @@ class BaiduTranslateProvider extends BaseProvider {
       const translatedText = data.trans_result?.map(r => r.dst).join('\n');
 
       if (!translatedText) {
-        return { success: false, error: '无翻译结果' };
+        return { success: false, error: _t('providerError.noResult', '无翻译结果') };
       }
 
       return {
@@ -256,8 +243,8 @@ class BaiduTranslateProvider extends BaseProvider {
       };
     } catch (error) {
       logger.error('Translation error:', error);
-      if (error.name === 'AbortError') {
-        return { success: false, error: '请求超时' };
+      if (error.name === 'TimeoutError' || error.name === 'AbortError') {
+        return { success: false, error: _t('providerError.timeout', '请求超时') };
       }
       return { success: false, error: error.message };
     }
@@ -265,17 +252,17 @@ class BaiduTranslateProvider extends BaseProvider {
 
   async testConnection() {
     if (!this.config.appId || !this.config.secretKey) {
-      return { success: false, message: '未配置 APP ID 或密钥' };
+      return { success: false, message: _t('providerError.notConfiguredBaidu', '未配置 APP ID 或密钥') };
     }
 
     try {
       const result = await this.translate('test', 'en', 'zh');
       if (result.success) {
-        return { success: true, message: '百度翻译连接成功' };
+        return { success: true, message: _t('providerError.connectSuccess', '连接成功') };
       }
-      return { success: false, message: result.error || '测试失败' };
+      return { success: false, message: result.error || _t('providerError.translateFailed', '测试失败') };
     } catch (error) {
-      return { success: false, message: error.message || '连接失败' };
+      return { success: false, message: error.message || _t('providerError.connectFailed', '连接失败') };
     }
   }
 }

@@ -1,6 +1,6 @@
 // Baidu OCR — https://ai.baidu.com/tech/ocr
 
-import { BaseOCREngine } from './base.js';
+import { BaseOCREngine, _t } from './base.js';
 import createLogger from '../../utils/logger.js';
 const logger = createLogger('BaiduOCR');
 
@@ -79,7 +79,7 @@ class BaiduOCREngine extends BaseOCREngine {
     const { apiKey, secretKey } = this.config;
 
     if (!apiKey || !secretKey) {
-      return { success: false, error: '请配置百度 OCR API Key 和 Secret Key' };
+      return { success: false, error: _t('providerError.ocrNotConfigured', '请配置该 OCR 引擎的密钥') };
     }
 
     try {
@@ -116,7 +116,7 @@ class BaiduOCREngine extends BaseOCREngine {
 
       const wordsResult = data.words_result || [];
       if (wordsResult.length === 0) {
-        return { success: false, error: '未识别到文字' };
+        return { success: false, error: _t('providerError.ocrNoText', '未识别到文字') };
       }
 
       const text = wordsResult.map(item => item.words).join('\n');

@@ -69,7 +69,7 @@ class OpenAICompatibleProvider extends BaseProvider {
 
   async translate(text, sourceLang = 'auto', targetLang = 'zh', options = {}) {
     if (!text?.trim()) {
-      return { success: false, error: '文本为空' };
+      return { success: false, error: _t('providerError.emptyText', '文本为空') };
     }
 
     const keyCheck = this._checkApiKey();
@@ -84,16 +84,16 @@ class OpenAICompatibleProvider extends BaseProvider {
         return { success: true, text: response.content.trim() };
       }
 
-      return { success: false, error: response.error || '翻译失败' };
+      return { success: false, error: response.error || _t('providerError.translateFailed', '翻译失败') };
     } catch (error) {
       this._lastError = error;
-      return { success: false, error: error.message || '未知错误' };
+      return { success: false, error: error.message || _t('providerError.unknownError', '未知错误') };
     }
   }
 
   async translateStream(text, sourceLang, targetLang, onChunk, options = {}) {
     if (!text?.trim()) {
-      return { success: false, error: '文本为空' };
+      return { success: false, error: _t('providerError.emptyText', '文本为空') };
     }
 
     const keyCheck = this._checkApiKey();
@@ -121,7 +121,7 @@ class OpenAICompatibleProvider extends BaseProvider {
             : _t('providerError.waitTimeout', '等待模型响应超时，可在翻译源设置中调大超时时间'),
         };
       }
-      return { success: false, error: error.message || '流式翻译失败' };
+      return { success: false, error: error.message || _t('providerError.streamFailed', '流式翻译失败') };
     }
   }
 
@@ -137,13 +137,13 @@ class OpenAICompatibleProvider extends BaseProvider {
 
       const msg = this.hooks.testConnectionMessage
         ? this.hooks.testConnectionMessage(filtered.length)
-        : `连接成功，检测到 ${filtered.length} 个模型`;
+        : _t('providerError.connectSuccess', '连接成功');
 
       return { success: true, message: msg, models: filtered };
     } catch (error) {
-      if (error.status === 401) return { success: false, message: 'API Key 无效' };
-      if (error.status) return { success: false, message: `连接失败: ${error.status}` };
-      return { success: false, message: error.message || '连接失败' };
+      if (error.status === 401) return { success: false, message: _t('providerError.keyInvalid', 'API Key 无效') };
+      if (error.status) return { success: false, message: _t('providerError.connectFailedStatus', `连接失败: ${error.status}`, { status: error.status }) };
+      return { success: false, message: error.message || _t('providerError.connectFailed', '连接失败') };
     }
   }
 
@@ -233,7 +233,7 @@ class OpenAICompatibleProvider extends BaseProvider {
       const content = data.choices?.[0]?.message?.content;
 
       if (!content) {
-        return { success: false, error: '无响应内容' };
+        return { success: false, error: _t('providerError.noResponseContent', '无响应内容') };
       }
 
       return { success: true, content, usage: data.usage, model: data.model };
@@ -285,9 +285,11 @@ class OpenAICompatibleProvider extends BaseProvider {
    */
   _checkApiKey() {
     if (this.hooks.requireApiKey && !this.config.apiKey) {
+      // apiKeyErrorMessage hook may be a plain string or an i18n key.
+      const hookMsg = this.hooks.apiKeyErrorMessage;
       return {
         success: false,
-        error: this.hooks.apiKeyErrorMessage || '未配置 API Key',
+        error: hookMsg ? _t(hookMsg, hookMsg) : _t('providerError.notConfigured', '未配置 API Key'),
       };
     }
     return null;

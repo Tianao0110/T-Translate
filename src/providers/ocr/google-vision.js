@@ -1,6 +1,6 @@
 // Google Cloud Vision OCR — https://cloud.google.com/vision/docs/ocr
 
-import { BaseOCREngine } from './base.js';
+import { BaseOCREngine, _t } from './base.js';
 import createLogger from '../../utils/logger.js';
 const logger = createLogger('GoogleVision');
 
@@ -40,7 +40,7 @@ class GoogleVisionEngine extends BaseOCREngine {
     const { apiKey } = this.config;
 
     if (!apiKey) {
-      return { success: false, error: '请配置 Google Vision API Key' };
+      return { success: false, error: _t('providerError.ocrNotConfigured', '请配置该 OCR 引擎的密钥') };
     }
 
     try {
@@ -92,7 +92,7 @@ class GoogleVisionEngine extends BaseOCREngine {
 
       const textAnnotations = result?.textAnnotations;
       if (!textAnnotations || textAnnotations.length === 0) {
-        return { success: false, error: '未识别到文字' };
+        return { success: false, error: _t('providerError.ocrNoText', '未识别到文字') };
       }
 
       // textAnnotations[0] is the concatenated full text; [1..] are per-word boxes

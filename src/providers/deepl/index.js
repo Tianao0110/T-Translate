@@ -1,6 +1,6 @@
 // DeepL translation provider.
 
-import { BaseProvider, LANGUAGE_CODES } from '../base.js';
+import { BaseProvider, LANGUAGE_CODES, _t } from '../base.js';
 import icon from './icon.svg';
 
 class DeepLProvider extends BaseProvider {
@@ -91,11 +91,11 @@ class DeepLProvider extends BaseProvider {
 
   async translate(text, sourceLang = 'auto', targetLang = 'zh') {
     if (!text?.trim()) {
-      return { success: false, error: '文本为空' };
+      return { success: false, error: _t('providerError.emptyText', '文本为空') };
     }
 
     if (!this.config.apiKey) {
-      return { success: false, error: '未配置 API Key' };
+      return { success: false, error: _t('providerError.notConfigured', '未配置 API Key') };
     }
 
     // Reject languages DeepL doesn't support before spending a request. Flagged
@@ -103,13 +103,13 @@ class DeepLProvider extends BaseProvider {
     // failures and get DeepL benched for every other language this session.
     const targetCode = this._convertLangCode(targetLang, true);
     if (!targetCode) {
-      return { success: false, error: 'DeepL 不支持所选目标语言', skipFailureCount: true };
+      return { success: false, error: _t('providerError.unsupportedTargetLang', '所选目标语言不受支持'), skipFailureCount: true };
     }
     let sourceCode = null;
     if (sourceLang !== 'auto') {
       sourceCode = this._convertLangCode(sourceLang, false);
       if (!sourceCode) {
-        return { success: false, error: 'DeepL 不支持所选源语言', skipFailureCount: true };
+        return { success: false, error: _t('providerError.unsupportedSourceLang', '所选源语言不受支持'), skipFailureCount: true };
       }
     }
 
@@ -140,24 +140,24 @@ class DeepLProvider extends BaseProvider {
       });
 
       if (response.status === 403) {
-        return { success: false, error: 'API Key 无效或已过期' };
+        return { success: false, error: _t('providerError.keyInvalidExpired', 'API Key 无效或已过期') };
       }
 
       // DeepL-specific: 456 = quota exhausted (unique to their API)
       if (response.status === 456) {
-        return { success: false, error: '配额已用完' };
+        return { success: false, error: _t('providerError.quotaExhausted', '配额已用完') };
       }
 
       if (!response.ok) {
         const errorText = await response.text();
-        return { success: false, error: `DeepL 错误: ${response.status} - ${errorText}` };
+        return { success: false, error: _t('providerError.providerErrorStatus', `DeepL 错误: ${response.status}`, { provider: 'DeepL', status: response.status }) + ` - ${errorText}` };
       }
 
       const data = await response.json();
       const translatedText = data.translations?.[0]?.text;
 
       if (!translatedText) {
-        return { success: false, error: '翻译结果为空' };
+        return { success: false, error: _t('providerError.noResult', '翻译结果为空') };
       }
 
       return {
@@ -172,19 +172,19 @@ class DeepLProvider extends BaseProvider {
       // so the old AbortError check never matched and timeouts fell through
       // to the generic branch.
       if (error.name === 'TimeoutError' || error.name === 'AbortError') {
-        return { success: false, error: '请求超时' };
+        return { success: false, error: _t('providerError.timeout', '请求超时') };
       }
 
       return {
         success: false,
-        error: error.message || '未知错误',
+        error: error.message || _t('providerError.unknownError', '未知错误'),
       };
     }
   }
 
   async testConnection() {
     if (!this.config.apiKey) {
-      return { success: false, message: '未配置 API Key' };
+      return { success: false, message: _t('providerError.notConfigured', '未配置 API Key') };
     }
 
     try {
@@ -198,11 +198,11 @@ class DeepLProvider extends BaseProvider {
       });
 
       if (response.status === 403) {
-        return { success: false, message: 'API Key 无效' };
+        return { success: false, message: _t('providerError.keyInvalid', 'API Key 无效') };
       }
 
       if (!response.ok) {
-        return { success: false, message: `连接失败: ${response.status}` };
+        return { success: false, message: _t('providerError.connectFailedStatus', `连接失败: ${response.status}`, { status: response.status }) };
       }
 
       const data = await response.json();
@@ -212,13 +212,13 @@ class DeepLProvider extends BaseProvider {
 
       return {
         success: true,
-        message: `连接成功，剩余字符: ${remaining.toLocaleString()} / ${limit.toLocaleString()}`,
+        message: `${_t('providerError.connectSuccess', '连接成功')} (${remaining.toLocaleString()} / ${limit.toLocaleString()})`,
         usage: { used, limit, remaining },
       };
     } catch (error) {
       return {
         success: false,
-        message: error.message || '连接失败',
+        message: error.message || _t('providerError.connectFailed', '连接失败'),
       };
     }
   }
