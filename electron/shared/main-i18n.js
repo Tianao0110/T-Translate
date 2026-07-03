@@ -33,6 +33,7 @@ const messages = {
     
     // system
     'system.checkUpdateFailed': '检查更新失败',
+    'system.offlineUpdateBlocked': '离线模式下已禁用检查更新',
     'system.alreadyDownloading': '已在下载中',
     'system.downloadFailed': '下载失败',
     'system.installFailed': '安装失败',
@@ -105,6 +106,7 @@ const messages = {
     
     // system
     'system.checkUpdateFailed': 'Failed to check for updates',
+    'system.offlineUpdateBlocked': 'Update checks are disabled in offline mode',
     'system.alreadyDownloading': 'Already downloading',
     'system.downloadFailed': 'Download failed',
     'system.installFailed': 'Installation failed',

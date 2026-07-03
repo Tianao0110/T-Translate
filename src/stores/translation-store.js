@@ -412,6 +412,11 @@ const useTranslationStore = create(
           state.history = [];
           state.statistics.totalTranslations = 0;
           state.statistics.totalCharacters = 0;
+          state.statistics.todayTranslations = 0;
+          // The secure-mode stash must go too, or "cleared" history quietly
+          // resurrects when the user leaves secure mode.
+          state._savedHistory = null;
+          state._savedStatistics = null;
         }),
 
       // ===== Privacy mode helpers =====
@@ -541,6 +546,12 @@ const useTranslationStore = create(
       }),
 
       importHistory: async (file) => {
+        // Secure mode: current history is a stash-backed empty view — an
+        // import would be silently discarded by the stash restore on exit.
+        // The UI disables the button; this guard covers any other entry point.
+        if (get().translationMode === PRIVACY_MODES.SECURE) {
+          return { success: false, reason: 'secure-mode' };
+        }
         try {
           const text = await file.text();
           const data = JSON.parse(text);

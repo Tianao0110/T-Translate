@@ -76,6 +76,9 @@ const ONLINE_KEY_PREFIXES = [
   'provider_google-translate_',
   'provider_microsoft-translator_',
   'provider_baidu-translate_',
+  // All vaulted OCR keys belong to online engines (ocr-key-vault.js);
+  // offline mode's allowed engines are local-only and need no keys.
+  'ocr_',
 ];
 
 function isDecryptAllowed(key, store) {

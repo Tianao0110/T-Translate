@@ -22,6 +22,7 @@ const en = {
     testing: "Testing...", connected: "Connected", connectionFailed: "Connection failed", notTested: "Not tested",
     noConfig: "This provider requires no configuration, ready to use",
     saved: "Provider settings saved", saveFailed: "Save failed",
+    encryptFailed: "API key encryption failed (system encryption unavailable); save aborted",
     enabledSection: "Enabled", disabledSection: "Not Enabled",
     noEnabled: "No translation providers enabled",
     enable: "Enable",
@@ -162,6 +163,7 @@ const en = {
     copied: "Copied", restored: "Restored to editor", favorited: "Added to favorites", unfavorited: "Removed from favorites",
     exportSuccess: "Export successful", exportFailed: "Export failed", cleared: "Cleared",
     importedCount: "Imported {{count}} records", importFailed: "Import failed", noMatch: "No matching records found",
+    importDisabledSecure: "History import is unavailable in incognito mode",
     emptyHint: "Translations will be saved here automatically",
     deleteSelectedConfirm: "Delete {{count}} selected records?",
     deletedCount: "Deleted {{count}} records",
@@ -300,6 +302,7 @@ const en = {
   settings: {
     title: "Settings",
     saved: "Settings saved", saveFailed: "Failed to save settings",
+    ocrKeysEncryptFailed: "OCR API key encryption failed (system encryption unavailable); keys were not saved",
     exported: "Settings exported", invalidFormat: "Invalid settings file format", importedPleasesSave: "Settings imported, please save to apply", invalidFile: "Invalid settings file",
     resetSectionConfirm: "Reset \"{{section}}\" settings?", resetAllConfirm: "Reset all settings? This will clear all custom configurations.",
     sectionReset: "{{section}} settings reset", sectionNotFound: "Default settings for {{section}} not found", allReset: "All settings reset",
@@ -669,6 +672,7 @@ const en = {
   svc: {
     noProvider: "No translation providers available",
     allFailed: "All translation providers failed",
+    testBlockedByPrivacy: "This provider is disabled by the current privacy mode",
     batchFailed: "Batch translation failed entirely",
     noUserMsg: "No user message",
     translateFailed: "Translation failed",

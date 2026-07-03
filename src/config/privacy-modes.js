@@ -58,7 +58,9 @@ export const PRIVACY_MODES = {
       saveHistory: true,
       useCache: true,
       onlineApi: false,
-      analytics: false,
+      // Local usage counters do accumulate offline (history is on); claiming
+      // otherwise made the privacy matrix lie. Only secure mode gates them.
+      analytics: true,
       autoSave: true,
       selectionTranslate: true,
       floatingWindow: true,

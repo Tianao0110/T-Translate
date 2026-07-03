@@ -22,6 +22,7 @@ const zh = {
     testing: "测试中...", connected: "已连接", connectionFailed: "连接失败", notTested: "未测试",
     noConfig: "此翻译源无需额外配置，开箱即用",
     saved: "翻译源设置已保存", saveFailed: "保存失败",
+    encryptFailed: "密钥加密失败（系统加密不可用），已取消保存",
     enabledSection: "已启用", disabledSection: "未启用",
     noEnabled: "尚未启用任何翻译源",
     enable: "启用",
@@ -165,6 +166,7 @@ const zh = {
     copied: "已复制译文", restored: "已恢复到编辑区", favorited: "已收藏", unfavorited: "已取消收藏",
     exportSuccess: "导出成功", exportFailed: "导出失败", cleared: "已清空",
     importedCount: "导入 {{count}} 条", importFailed: "导入失败", noMatch: "没有找到匹配的记录",
+    importDisabledSecure: "无痕模式下不可导入历史记录",
     emptyHint: "翻译内容会自动保存在这里",
     secureMode: { title: "无痕模式已启用", desc: "当前模式下不会保存任何翻译历史记录。如需保存历史，请切换到标准模式。" },
     stats: { 
@@ -300,6 +302,7 @@ const zh = {
   settings: {
     title: "设置",
     saved: "设置已保存", saveFailed: "保存设置失败",
+    ocrKeysEncryptFailed: "OCR 密钥加密失败（系统加密不可用），密钥未保存",
     exported: "设置已导出", invalidFormat: "设置文件格式不正确", importedPleasesSave: "设置已导入，请保存以生效", invalidFile: "无效的设置文件",
     resetSectionConfirm: "重置 \"{{section}}\" 的设置？", resetAllConfirm: "重置所有设置？这将清除所有自定义配置。",
     sectionReset: "{{section}} 设置已重置", sectionNotFound: "未找到 {{section}} 的默认设置", allReset: "所有设置已重置",
@@ -669,6 +672,7 @@ const zh = {
   svc: {
     noProvider: "没有可用的翻译源",
     allFailed: "所有翻译源均失败",
+    testBlockedByPrivacy: "当前隐私模式已禁用该翻译源",
     batchFailed: "批量翻译全部失败",
     noUserMsg: "没有用户消息",
     translateFailed: "翻译失败",

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next';
 import { RefreshCw, Save } from 'lucide-react';
 import { ocrManager } from '../../providers/ocr/index.js';
+import { migrateLegacyOcrSecrets, decryptOcrSecrets, encryptOcrSecrets } from '../../utils/ocr-key-vault.js';
 import { useConfirm } from '../shared/ConfirmDialog';
 import { useShallow } from 'zustand/react/shallow';
 import useTranslationStore from '../../stores/translation-store';
@@ -206,6 +207,9 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
 
       let savedSettings = null;
       if (window.electron?.store) {
+        // Move any pre-vault plaintext OCR keys into safeStorage first so the
+        // bucket we read below is already sanitized.
+        await migrateLegacyOcrSecrets();
         savedSettings = await window.electron.store.get('settings');
       } else {
         const stored = localStorage.getItem('settings');
@@ -241,6 +245,10 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
           selection: { ...DEFAULT_SETTINGS.selection, enabled: runtimeState.selectionEnabled }
         };
       }
+
+      // Fill vaulted OCR keys into UI state so the inputs display them and
+      // the next save round-trips through encryptOcrSecrets.
+      finalSettings.ocr = await decryptOcrSecrets(finalSettings.ocr, 'settings-load');
 
       setSettings(finalSettings);
       setSettingsReady(true);
@@ -344,7 +352,13 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
         if (settings.ocr) {
           // Strip runtime-only fields before persisting.
           const { isWindows: _w, paddleInstalled: _p, rapidInstalled: _r, ...ocrToSave } = settings.ocr;
-          await store.set('settings.ocr', ocrToSave);
+          // API keys go to safeStorage, never into the plaintext bucket. On
+          // encrypt failure the key is dropped from disk (not saved) — say so.
+          const { sanitized, failed } = await encryptOcrSecrets(ocrToSave);
+          await store.set('settings.ocr', sanitized);
+          if (failed.length > 0) {
+            notify(t('settings.ocrKeysEncryptFailed'), 'error');
+          }
         }
 
         if (settings.tts) {

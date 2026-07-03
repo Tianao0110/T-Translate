@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { getAllProviderMetadata } from '../../providers/registry.js';
 import translationService from '../../services/translation.js';
+import useTranslationStore from '../../stores/translation-store';
 import './styles.css';
 import createLogger from '../../utils/logger.js';
 const logger = createLogger('ProviderSettings');
@@ -179,11 +180,22 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
 
         if (meta.configSchema) {
           for (const [key, field] of Object.entries(meta.configSchema)) {
-            if (field.encrypted && configsToSave[meta.id][key]) {
-              await secureStorage.set(`provider_${meta.id}_${key}`, configsToSave[meta.id][key]);
-              // Don't leave any value (not even a placeholder) in providerConfigs.
-              delete configsToSave[meta.id][key];
+            if (!field.encrypted) continue;
+            const value = configsToSave[meta.id][key];
+            if (value) {
+              // Abort on encrypt failure — a stripped-but-unstored key would
+              // vanish silently on next launch while this save reports success.
+              const res = await secureStorage.set(`provider_${meta.id}_${key}`, value);
+              if (res === false || res?.success === false) {
+                throw new Error(t('providerSettings.encryptFailed'));
+              }
+            } else {
+              // Cleared in UI: remove the vault entry too, otherwise the old
+              // key resurrects from secure storage on restart.
+              await window.electron?.secureStorage?.delete?.(`provider_${meta.id}_${key}`);
             }
+            // Don't leave any value (not even a placeholder) in providerConfigs.
+            delete configsToSave[meta.id][key];
           }
         }
       }
@@ -216,7 +228,7 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
     } finally {
       setIsSaving(false);
     }
-  }, [providers, providerConfigs, updateSettings, notify, allProvidersMeta]);
+  }, [providers, providerConfigs, updateSettings, notify, allProvidersMeta, t]);
 
   useImperativeHandle(ref, () => ({
     save: saveSettings
@@ -260,7 +272,10 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
 
     try {
       const config = providerConfigs[providerId];
-      const result = await translationService.testProviderWithConfig(providerId, config);
+      // Explicit test clicks still honor the privacy mode — offline promises
+      // "no network requests", full stop.
+      const { privacyMode } = useTranslationStore.getState().getPrivacyOptions();
+      const result = await translationService.testProviderWithConfig(providerId, config, privacyMode);
       setTestResults(prev => ({ ...prev, [providerId]: result }));
     } catch (error) {
       setTestResults(prev => ({

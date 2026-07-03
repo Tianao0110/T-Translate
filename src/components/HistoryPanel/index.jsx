@@ -445,6 +445,8 @@ const HistoryPanel = ({ showNotification }) => {
         const result = await importHistory(file);
         if (result?.success) {
           notify(t('history.importedCount', { count: result.count || 0 }), 'success');
+        } else if (result?.reason === 'secure-mode') {
+          notify(t('history.importDisabledSecure'), 'warning');
         } else {
           notify(t('history.importFailed', 'Import failed') + (result?.error ? `: ${result.error}` : ''), 'error');
         }
@@ -727,10 +729,18 @@ const HistoryPanel = ({ showNotification }) => {
           )}
 
           <button className="toolbar-btn" onClick={handleExport} title={t('history.export')}><Download size={16} /></button>
-          <label className="toolbar-btn" title={t('history.import')}>
-            <Upload size={16} />
-            <input type="file" accept=".json" onChange={handleImport} style={{ display: 'none' }} />
-          </label>
+          {translationMode === PRIVACY_MODES.SECURE ? (
+            // Import writes persistent history — contradicts secure mode, and
+            // the stash restore on exit would silently drop it anyway.
+            <span className="toolbar-btn disabled" title={t('history.importDisabledSecure')}>
+              <Upload size={16} />
+            </span>
+          ) : (
+            <label className="toolbar-btn" title={t('history.import')}>
+              <Upload size={16} />
+              <input type="file" accept=".json" onChange={handleImport} style={{ display: 'none' }} />
+            </label>
+          )}
 
           <div className="toolbar-divider" />
 

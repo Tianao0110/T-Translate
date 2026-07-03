@@ -9,6 +9,7 @@ import useTranslationStore from '../stores/translation-store.js';
 
 import { PRIVACY_MODES, TRANSLATION_STATUS } from '@config/defaults';
 import { getPrivacyModeConfig } from '../config/privacy-modes.js';
+import { decryptOcrSecrets } from '../utils/ocr-key-vault.js';
 import createLogger from '../utils/logger.js';
 import i18n from '../i18n.js';
 const logger = createLogger('MainTranslation');
@@ -314,7 +315,7 @@ class MainTranslationService {
     try {
       const settings = await window.electron?.store?.get?.('settings') || {};
       ocrManager.updateConfigs({
-        ...(settings.ocr || {}),
+        ...(await decryptOcrSecrets(settings.ocr || {})),
         llmEndpoint: settings.connection?.endpoint,
       });
     } catch { /* browser mode: engine defaults apply */ }

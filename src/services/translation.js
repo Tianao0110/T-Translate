@@ -446,7 +446,9 @@ class TranslationService {
   }
 
   getPriority() {
-    if (this._userPriority && this._userPriority.length > 0) {
+    // null = never configured -> defaults. [] = user explicitly disabled
+    // every provider -> respect that, don't silently call cloud providers.
+    if (this._userPriority) {
       return this._userPriority;
     }
     return DEFAULT_PRIORITY[this._mode] || DEFAULT_PRIORITY.normal;
@@ -877,8 +879,13 @@ class TranslationService {
     return provider.testConnection();
   }
 
-  // Used by settings UI to verify an unsaved config without committing it
-  async testProviderWithConfig(providerId, config) {
+  // Used by settings UI to verify an unsaved config without committing it.
+  // privacyMode must come from the caller — offline mode blocks tests against
+  // disallowed providers (even a probe request is network traffic).
+  async testProviderWithConfig(providerId, config, privacyMode = PRIVACY_MODE_IDS.STANDARD) {
+    if (!isProviderAllowed(providerId, privacyMode)) {
+      return { success: false, message: _t('svc.testBlockedByPrivacy', '当前隐私模式已禁用该翻译源') };
+    }
     try {
       const tempProvider = createProvider(providerId, config);
       if (!tempProvider) {

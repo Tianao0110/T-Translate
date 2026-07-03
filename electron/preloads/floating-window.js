@@ -91,7 +91,7 @@ contextBridge.exposeInMainWorld('electron', {
   // Encrypted storage for API keys etc.
   secureStorage: {
     encrypt: (key, value) => ipcRenderer.invoke('secure-storage:encrypt', key, value),
-    decrypt: (key) => ipcRenderer.invoke('secure-storage:decrypt', key),
+    decrypt: (key, options) => ipcRenderer.invoke('secure-storage:decrypt', key, options),
     delete: (key) => ipcRenderer.invoke('secure-storage:delete', key),
     isAvailable: () => ipcRenderer.invoke('secure-storage:isAvailable'),
   },

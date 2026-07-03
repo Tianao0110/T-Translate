@@ -87,6 +87,9 @@ const AboutSection = ({ notify, resetSettings }) => {
       if (!result.success) {
         setUpdateStage(UPDATE_STAGE.ERROR);
         setErrorMsg(result.error || t('about.updateFailed'));
+        // errorMsg only renders inside the update modal, which isn't open
+        // during the check stage — without a toast this failure is invisible.
+        notify(result.error || t('about.updateFailed'), 'error');
         return;
       }
 
@@ -107,6 +110,7 @@ const AboutSection = ({ notify, resetSettings }) => {
     } catch (e) {
       setUpdateStage(UPDATE_STAGE.ERROR);
       setErrorMsg(e.message || t('notify.networkError'));
+      notify(e.message || t('notify.networkError'), 'error');
     }
   }, [updateStage, notify, t]);
 
