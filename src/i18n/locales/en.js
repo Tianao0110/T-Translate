@@ -484,7 +484,8 @@ const en = {
     testFailed: "Preview failed", loadVoicesFailed: "Failed to load voices",
     langNames: { zh: "Chinese", en: "English", ja: "Japanese", ko: "Korean", fr: "French", de: "German", es: "Spanish", ru: "Russian", pt: "Portuguese", it: "Italian" },
     noVoicesInstalled: "No voice packs installed. Please install voices in system settings.",
-    noVoiceForLang: "No {{lang}} voice pack installed"
+    noVoiceForLang: "No {{lang}} voice pack installed",
+    installVoiceHint: "No voice packs detected. Install them in System Settings → Language → Speech."
   },
   // ===== DocumentTranslator keys =====
   documentTranslator: {

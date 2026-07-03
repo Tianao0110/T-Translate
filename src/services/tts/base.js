@@ -20,7 +20,9 @@ export class BaseTTSEngine {
     this.config = config;
     this._status = TTS_STATUS.IDLE;
     this._currentUtterance = null;
-    this._onStatusChange = null;
+    // Multi-listener: a single slot let whichever component subscribed last
+    // silently evict the others (main panel status died once Settings opened).
+    this._statusListeners = new Set();
     this._onProgress = null;
   }
 
@@ -28,8 +30,10 @@ export class BaseTTSEngine {
     return this._status;
   }
 
+  // Returns an unsubscribe function so callers can clean up on unmount.
   onStatusChange(callback) {
-    this._onStatusChange = callback;
+    this._statusListeners.add(callback);
+    return () => this._statusListeners.delete(callback);
   }
 
   onProgress(callback) {
@@ -38,8 +42,8 @@ export class BaseTTSEngine {
 
   _setStatus(status) {
     this._status = status;
-    if (this._onStatusChange) {
-      this._onStatusChange(status);
+    for (const cb of this._statusListeners) {
+      try { cb(status); } catch { /* one bad listener shouldn't break the rest */ }
     }
   }
 
@@ -69,7 +73,7 @@ export class BaseTTSEngine {
 
   dispose() {
     this.stop();
-    this._onStatusChange = null;
+    this._statusListeners.clear();
     this._onProgress = null;
   }
 }

@@ -484,7 +484,8 @@ const zh = {
     testFailed: "试听失败", loadVoicesFailed: "加载语音列表失败",
     langNames: { zh: "中文", en: "英语", ja: "日语", ko: "韩语", fr: "法语", de: "德语", es: "西班牙语", ru: "俄语", pt: "葡萄牙语", it: "意大利语" },
     noVoicesInstalled: "系统未安装任何语音包，请在系统设置中安装语音",
-    noVoiceForLang: "系统未安装{{lang}}语音包"
+    noVoiceForLang: "系统未安装{{lang}}语音包",
+    installVoiceHint: "未检测到语音包，请在系统设置 → 语言 → 语音中安装"
   },
   // ===== DocumentTranslator keys =====
   documentTranslator: {
