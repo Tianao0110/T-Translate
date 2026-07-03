@@ -102,17 +102,12 @@
 
 /* 全局快捷键样式 */
 .shortcut-row.global {
-  background: linear-gradient(135deg, var(--bg-secondary), rgba(59, 130, 246, 0.05));
-  border-color: rgba(59, 130, 246, 0.3);
+  background: linear-gradient(135deg, var(--bg-secondary), color-mix(in srgb, var(--accent-primary) 5%, transparent));
+  border-color: color-mix(in srgb, var(--accent-primary) 30%, transparent);
 }
 
 .shortcut-row.global:hover {
   border-color: var(--accent-primary);
-}
-
-.global-badge {
-  margin-right: 6px;
-  font-size: 12px;
 }
 
 .shortcut-action {
@@ -123,21 +118,14 @@
   color: var(--text-primary);
 }
 
+/* Holds a lucide svg (global reset makes svg block; flex re-centers it) */
 .shortcut-icon {
-  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 20px;
-  text-align: center;
-}
-
-/* ==================== 快捷键增强 ==================== */
-.shortcut-row.global {
-  background: rgba(59, 130, 246, 0.05);
-  border-color: rgba(59, 130, 246, 0.2);
-}
-
-.global-badge {
-  margin-right: 6px;
-  font-size: 12px;
+  color: var(--accent-primary);
+  opacity: 0.85;
 }
 /* src/components/SettingsPanel/styles.patch.css */
 /* 设置面板 UI 优化补丁 - 更现代的视觉设计 */
@@ -160,8 +148,8 @@
 }
 
 .shortcut-row.global {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), transparent);
-  border-color: rgba(59, 130, 246, 0.2);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent-primary) 5%, transparent), transparent);
+  border-color: color-mix(in srgb, var(--accent-primary) 20%, transparent);
 }
 
 .shortcut-key kbd {

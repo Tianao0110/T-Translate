@@ -245,8 +245,9 @@ const InterfaceSection = ({
             return (
               <div key={action} className={`shortcut-row ${config.global ? 'global' : ''}`}>
                 <span className="shortcut-action">
+                  {/* No per-row global badge: every configurable shortcut is
+                      system-wide now, so the hint says it once instead. */}
                   <span className="shortcut-icon">{config.icon && <config.icon size={14} />}</span>
-                  {config.global && <span className="global-badge"><Globe size={12} /></span>}
                   {config.label}
                 </span>
                 {editingShortcut === action ? (

@@ -268,7 +268,7 @@ const AboutSection = ({ notify, resetSettings }) => {
 
         {updateInfo?.downloadName && (
           <div className="download-info">
-            <Package size={14} style={{ verticalAlign: 'middle' }} /> {updateInfo.downloadName}
+            <Package size={14} /> {updateInfo.downloadName}
             {updateInfo.downloadSize > 0 && ` (${formatSize(updateInfo.downloadSize)})`}
           </div>
         )}
@@ -392,7 +392,7 @@ const AboutSection = ({ notify, resetSettings }) => {
       </div>
 
       <div className="about-footer">
-        <p>Made with <Heart size={13} style={{ verticalAlign: 'middle', fill: 'currentColor' }} /> for Tianao</p>
+        <p className="made-with">Made with <Heart size={13} style={{ fill: 'currentColor' }} /> for Tianao</p>
         <p className="copyright">{t('settings.about.copyright')}</p>
       </div>
 
