@@ -59,7 +59,7 @@ const en = {
     'deepl': { apiKey: 'API Key', useFreeApi: 'Use Free API (Key ending with :fx)' },
     'gemini': { apiKey: 'API Key', model: 'Model' },
     'deepseek': { apiKey: 'API Key', model: 'Model', endpoint: 'API Endpoint' },
-    'google-translate': { domain: 'Server', domain_com: 'google.com (International)', domain_cn: 'google.cn (China)', 'domain_com.hk': 'google.com.hk (Hong Kong)' },
+    'google-translate': { domain: 'Server', domain_com: 'google.com (International)', 'domain_com.hk': 'google.com.hk (Hong Kong)' },
     'ollama': { endpoint: 'API Endpoint', model: 'Model Name', timeout: 'Timeout (ms)', model_placeholder: 'Leave empty to auto-detect (e.g. llama3, qwen2)' },
     'anthropic': { apiKey: 'API Key', model: 'Model', baseUrl: 'API Endpoint' },
     'microsoft-translator': { apiKey: 'API Key', region: 'Region' },

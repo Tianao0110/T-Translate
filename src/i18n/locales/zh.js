@@ -59,7 +59,7 @@ const zh = {
     'deepl': { apiKey: 'API Key', useFreeApi: '使用免费 API（Key 以 :fx 结尾）' },
     'gemini': { apiKey: 'API Key', model: '模型' },
     'deepseek': { apiKey: 'API Key', model: '模型', endpoint: 'API 地址' },
-    'google-translate': { domain: '服务器', domain_com: 'google.com (国际)', domain_cn: 'google.cn (中国)', 'domain_com.hk': 'google.com.hk (香港)' },
+    'google-translate': { domain: '服务器', domain_com: 'google.com (国际)', 'domain_com.hk': 'google.com.hk (香港)' },
     'ollama': { endpoint: 'API 地址', model: '模型名称', timeout: '超时时间 (ms)', model_placeholder: '留空自动检测（如 llama3, qwen2 等）' },
     'anthropic': { apiKey: 'API Key', model: '模型', baseUrl: 'API 地址' },
     'microsoft-translator': { apiKey: 'API Key', region: '区域' },

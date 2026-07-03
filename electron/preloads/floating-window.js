@@ -75,16 +75,6 @@ contextBridge.exposeInMainWorld('electron', {
     checkInstalled: () => ipcRenderer.invoke('ocr:check-installed'),
   },
 
-  translate: {
-    translate: (text, options) => ipcRenderer.invoke('translate:translate', text, options),
-    streamTranslate: (text, options) => ipcRenderer.invoke('translate:stream', text, options),
-    onStreamChunk: (callback) => {
-      const handler = (event, data) => callback(data);
-      ipcRenderer.on('translate:stream-chunk', handler);
-      return () => ipcRenderer.removeListener('translate:stream-chunk', handler);
-    },
-  },
-
   // Encrypted storage for API keys etc.
   secureStorage: {
     encrypt: (key, value) => ipcRenderer.invoke('secure-storage:encrypt', key, value),

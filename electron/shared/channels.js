@@ -78,15 +78,6 @@ const CHANNELS = {
     CLOSE_CHILD_WINDOW: 'floating-window:close-child-window',
     CLOSE_ALL_CHILD_WINDOWS: 'floating-window:close-all-child-windows',
   },
-  SUBTITLE: {
-    TOGGLE_CAPTURE_WINDOW: 'subtitle:toggle-capture-window',
-    GET_CAPTURE_RECT: 'subtitle:get-capture-rect',
-    SET_CAPTURE_RECT: 'subtitle:set-capture-rect',
-    CLEAR_CAPTURE_RECT: 'subtitle:clear-capture-rect',
-    CAPTURE_REGION: 'subtitle:capture-region',
-    IS_CAPTURE_WINDOW_VISIBLE: 'subtitle:is-capture-window-visible',
-    CAPTURE_RECT_UPDATED: 'subtitle:capture-rect-updated',
-  },
   SELECTION: {
     TOGGLE: 'selection:toggle',
     HIDE: 'selection:hide',
