@@ -23,7 +23,7 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 主体已修（P0/P1/P2 全部 + 大部分 P3，见 gstack 目录审计文档修复状态）。剩下的纯技术债/装饰性清理，不影响功能，单独排期：
 
 - **渲染端死语言包键清扫**（审计 §104，~90 组×2）：settings.tabs/providers/glossary 整块、connectionSettings 整块、providerConfig.ocr、settings.privacy.mode/modes、settings.general.startup/minimize 等无消费者键。删前需逐块 grep 验证非引用（check:i18n 保证 zh/en 删齐）
-- **ProviderSettings/styles.css 令牌化**（§79，~140 行）：整文件硬编码 hex + 手工 [data-theme] 覆盖块迁 var(--*) 令牌 + color-mix；连带 45 个死 CSS 类（§99，需 CSS→JSX / JSX→CSS 双向扫描）
+- **SettingsPanel 死 CSS 类清扫**（§99，约 45 个候选）：CSS→JSX 单向扫描列出 ~55 候选（setting-card 族 / radio-* / stepper-* / mode-standard|offline|secure 等），但需逐个排除动态构造（`mode-${id}`）与 ::before content 用法后才能删，零功能收益、误删即掉样式，低优先。ProviderSettings/styles.css 令牌化已完成（三主题实拍验证）
 - **残余死 IPC 通道**（四端对照）：STORE.HAS、SECURE_STORAGE.GET_ACCESS_LOG、SHORTCUTS.GET、SCREENSHOT.SCREEN_BOUNDS、SYSTEM.DIALOG.MESSAGE/LOGS.GET_DIRECTORY、FLOATING_WINDOW.OPEN——handler/preload 齐全但无调用方
 - **anthropic 文件内去重**（D24b 剩余）：translate/translateStream ~40 行守卫+prompt 归一化+请求体逐字重复，可抽 `_buildBody`/`_resolvePrompt` 私有方法（纯重构无行为变化）
 - **DEFAULT_TTS_CONFIG 四处常量表收敛**（§84）：services/tts/index.js（活）/SettingsPanel/constants.js（活）/electron/state.js（活）三张活表 + config/defaults 已删；跨进程无法共享 import，至少加交叉注释锚定
