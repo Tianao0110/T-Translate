@@ -18,17 +18,11 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 - **在线 OCR 调用下沉** — 四家在线 OCR（OCR.space/Google Vision/Azure/百度）改经主进程发请求，密钥只留主进程、不再进任何渲染进程（本轮 D1 拍板选了渲染端加密小修，主进程化为终态方向；旧的四个主进程 handler 已腐化两代并在本轮删除，届时按现行引擎实现重写）
 - **硬前提** — 主进程目前是未打包裸 CJS（`"main": "electron/main.js"`），providers 层是 ESM + svg import + 渲染端 i18n/localStorage：下沉前必须先引入主进程打包链（如 vite-plugin-electron）并拆分 provider 的 metadata（UI 用）与运行时；流式需自建 chunk IPC 协议、用户级 abort 需请求 id→AbortController 映射。估 15-25 文件 / ±800-1200 行 / 3-5 工作日
 
-### 设置页 + Provider 专项审计残余（低风险清理，零功能影响）
+### 设置页 + Provider 专项审计残余（仅剩一项）
 
-主体已修（P0/P1/P2 全部 + 大部分 P3，见 gstack 目录审计文档修复状态）。剩下的纯技术债/装饰性清理，不影响功能，单独排期：
+审计残余已于 2026-07-03 三批清完（死通道/幽灵桶/config.js 字段/anthropic 去重/TTS 常量收敛/死语言包键 ~90 组/国旗与隐私页 emoji/ProviderSettings CSS 令牌化）。仅剩：
 
-- **渲染端死语言包键清扫**（审计 §104，~90 组×2）：settings.tabs/providers/glossary 整块、connectionSettings 整块、providerConfig.ocr、settings.privacy.mode/modes、settings.general.startup/minimize 等无消费者键。删前需逐块 grep 验证非引用（check:i18n 保证 zh/en 删齐）
-- **SettingsPanel 死 CSS 类清扫**（§99，约 45 个候选）：CSS→JSX 单向扫描列出 ~55 候选（setting-card 族 / radio-* / stepper-* / mode-standard|offline|secure 等），但需逐个排除动态构造（`mode-${id}`）与 ::before content 用法后才能删，零功能收益、误删即掉样式，低优先。ProviderSettings/styles.css 令牌化已完成（三主题实拍验证）
-- **残余死 IPC 通道**（四端对照）：STORE.HAS、SECURE_STORAGE.GET_ACCESS_LOG、SHORTCUTS.GET、SCREENSHOT.SCREEN_BOUNDS、SYSTEM.DIALOG.MESSAGE/LOGS.GET_DIRECTORY、FLOATING_WINDOW.OPEN——handler/preload 齐全但无调用方
-- **anthropic 文件内去重**（D24b 剩余）：translate/translateStream ~40 行守卫+prompt 归一化+请求体逐字重复，可抽 `_buildBody`/`_resolvePrompt` 私有方法（纯重构无行为变化）
-- **DEFAULT_TTS_CONFIG 四处常量表收敛**（§84）：services/tts/index.js（活）/SettingsPanel/constants.js（活）/electron/state.js（活）三张活表 + config/defaults 已删；跨进程无法共享 import，至少加交叉注释锚定
-- **electron/state.js settings.providers:{} 幽灵桶**（§73）：store defaults 给新装种的顶层空桶无消费者；config.js 幽灵字段（translationEngine/providerPriority/theme/fontSize）
-- OcrSection 语言下拉的国旗 emoji（🇨🇳 等）：lucide 无国旗图标，保留或改纯文字待定
+- **SettingsPanel 死 CSS 类清扫**（§99，~55 候选）：CSS→JSX 单向扫描候选含 setting-card 族 / radio-* / stepper-* / mode-standard|offline|secure 等，删前需逐个排除动态构造（`mode-${id}`）与 ::before content 用法，零功能收益、误删即掉样式——低优先
 
 ### 划词检测完整性（0.2.9 已基本落地，剩数据驱动项）
 
@@ -61,7 +55,5 @@ The v0.2.6 OCR error-to-guidance fix is the short version. Full version: first-l
 
 ### Lint backlog cleanup
 
-剩余项（App.jsx rules-of-hooks 与 jsx-uses-vars 已在 0.2.9 主面板轮根修）：
-- `src/i18n/locales/{en,zh}.js`: 重复 key（selectStyle / notify）— 后定义静默覆盖前定义
-- `src/utils/logger.js`: `??` 左侧 constant 是 dead code
-- 清完后恢复全局严格（移除 eslint.config.js 剩余 per-file 降级）
+仅剩一项（locales 重复 key 与 logger.js `??` 死代码已清，no-constant-binary-expression 已恢复 error 级）：
+- `no-case-declarations` 存量 5 处 case 内声明（全局仍 warn 级），清完后升 error

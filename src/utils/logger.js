@@ -7,17 +7,12 @@ const LOG_LEVELS = {
   ERROR: 3,
 };
 
-const isDev = import.meta.env?.DEV ??
-              process.env.NODE_ENV === 'development' ??
-              window.location.hostname === 'localhost';
+// Chained ?? was dead code: `NODE_ENV === '...'` is always a boolean, so the
+// third operand could never be reached. Vite always defines import.meta.env.
+const isDev = import.meta.env?.DEV ?? (process.env.NODE_ENV === 'development');
 
 // Dev: all levels. Prod: warn+ only.
 const currentLevel = isDev ? LOG_LEVELS.DEBUG : LOG_LEVELS.WARN;
-
-function getTimestamp() {
-  const now = new Date();
-  return now.toTimeString().slice(0, 8);
-}
 
 function createLogger(scope) {
   const prefix = `[${scope}]`;

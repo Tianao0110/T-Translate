@@ -76,8 +76,9 @@ export default [
       'no-async-promise-executor': 'warn',
 
       // --- 历史代码兜底（v0.2.5 Phase T，待 v0.3 单独清理）---
-      'no-case-declarations': 'warn',
-      'no-constant-binary-expression': 'warn',
+      'no-case-declarations': 'warn', // 剩 5 处存量 case 内声明
+      // 最后一处存量（logger.js 的 ?? 链）已修，恢复 error 防线
+      'no-constant-binary-expression': 'error',
     },
   },
 
