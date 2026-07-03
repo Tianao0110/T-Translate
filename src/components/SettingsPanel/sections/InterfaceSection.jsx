@@ -16,8 +16,7 @@ const InterfaceSection = ({
   setSettings,
   notify,
   editingShortcut,
-  setEditingShortcut,
-  saveSettings
+  setEditingShortcut
 }) => {
   const { t, i18n } = useTranslation();
 
@@ -53,15 +52,18 @@ const InterfaceSection = ({
     }
   };
 
+  // These three controls persist immediately via their own store/IPC writes,
+  // so the React-state update is silent — otherwise the panel would show
+  // "unsaved changes" (and block on beforeunload) for a change already saved.
   const toggleAutoSelection = (enabled) => {
-    updateSetting('startup', 'autoEnableSelection', enabled);
+    updateSetting('startup', 'autoEnableSelection', enabled, true);
     window.electron?.store?.set?.('settings.startup.autoEnableSelection', enabled);
   };
 
   // Write language using the dot-path API so we don't round-trip the whole settings object
   const switchLanguage = async (langCode) => {
     i18n.changeLanguage(langCode);
-    updateSetting('interface', 'language', langCode);
+    updateSetting('interface', 'language', langCode, true);
     try {
       await window.electron?.store?.set('settings.interface.language', langCode);
     } catch (e) {
@@ -76,7 +78,7 @@ const InterfaceSection = ({
   //   3. localStorage so a refresh/screenshot window picks it up
   //   4. theme IPC broadcast so child windows re-theme without a full settings reload
   const switchTheme = async (theme) => {
-    updateSetting('interface', 'theme', theme);
+    updateSetting('interface', 'theme', theme, true);
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
 
@@ -93,14 +95,11 @@ const InterfaceSection = ({
     }
   };
 
-  // `global: true` means the binding goes through Electron's globalShortcut
-  // and needs pause/resume during editing to avoid the user's chord triggering the action
+  // Only global (OS-level) shortcuts are configurable — the in-app keys were
+  // decorative (nothing read settings.shortcuts for them). global: true routes
+  // through Electron's globalShortcut and needs pause/resume during editing so
+  // the user's chord doesn't trigger the action.
   const shortcutConfig = {
-    translate: { label: t('shortcuts.translate'), global: false, icon: '⏎' },
-    swapLanguages: { label: t('shortcuts.swapLanguages'), global: false, icon: '🔄' },
-    clear: { label: t('shortcuts.clear'), global: false, icon: '🗑️' },
-    paste: { label: t('shortcuts.paste'), global: false, icon: '📋' },
-    copy: { label: t('shortcuts.copy'), global: false, icon: '📄' },
     screenshot: { label: t('shortcuts.screenshot'), global: true, icon: '📷' },
     toggleWindow: { label: t('shortcuts.toggleWindow'), global: true, icon: '🪟' },
     floatingWindow: { label: t('shortcuts.floatingWindow'), global: true, icon: '🔮' },
@@ -122,12 +121,15 @@ const InterfaceSection = ({
   };
 
   const finishEditing = async (action, config, newShortcut) => {
-    updateSetting('shortcuts', action, newShortcut);
     setEditingShortcut(null);
 
     if (config.global && window.electron?.shortcuts?.update) {
+      // Register with the OS first. The handler persists to store on success,
+      // so we only mirror into React state (silently — already saved) if it
+      // took; a rejected chord must not linger in state and get written later.
       const result = await window.electron.shortcuts.update(action, newShortcut);
       if (result?.success) {
+        updateSetting('shortcuts', action, newShortcut, true);
         notify(t('shortcuts.updated', { label: config.label, shortcut: newShortcut }), 'success');
       } else {
         notify(t('shortcuts.updateFailed', { error: result?.error || 'Unknown error' }), 'error');
@@ -137,10 +139,11 @@ const InterfaceSection = ({
   };
 
   const resetShortcuts = () => {
-    updateSetting('shortcuts', null, defaultConfig.shortcuts);
-    setSettings(prev => ({ ...prev, shortcuts: defaultConfig.shortcuts }));
+    // Each update() call re-registers and persists to store, so this reset
+    // takes effect immediately without going through the panel's save.
+    setSettings(prev => ({ ...prev, shortcuts: { ...defaultConfig.shortcuts } }));
     if (window.electron?.shortcuts?.update) {
-      ['screenshot', 'toggleWindow', 'floatingWindow', 'selectionTranslate'].forEach(action => {
+      Object.keys(defaultConfig.shortcuts).forEach(action => {
         window.electron.shortcuts.update(action, defaultConfig.shortcuts[action]);
       });
     }
@@ -207,19 +210,19 @@ const InterfaceSection = ({
         <label className="setting-label">{t('settings.general.theme')}</label>
         <div className="theme-selector">
           <button
-            className={`theme-option ${settings.interface.theme === 'light' ? 'active' : ''}`}
+            className={`theme-option ${settings.interface?.theme === 'light' ? 'active' : ''}`}
             onClick={() => switchTheme('light')}
           >
             <Sun size={16}/>{t('settings.general.themes.default')}
           </button>
           <button
-            className={`theme-option ${settings.interface.theme === 'dark' ? 'active' : ''}`}
+            className={`theme-option ${settings.interface?.theme === 'dark' ? 'active' : ''}`}
             onClick={() => switchTheme('dark')}
           >
             <Moon size={16}/>{t('settings.general.themes.dark')}
           </button>
           <button
-            className={`theme-option fresh ${settings.interface.theme === 'fresh' ? 'active' : ''}`}
+            className={`theme-option fresh ${settings.interface?.theme === 'fresh' ? 'active' : ''}`}
             onClick={() => switchTheme('fresh')}
           >
             <Leaf size={16}/>{t('settings.general.themes.fresh')}

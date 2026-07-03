@@ -153,7 +153,12 @@ const OcrSection = ({
     }
   };
 
-  const ApiKeyInput = ({ keyName, placeholder = 'API Key', value, showKey }) => (
+  // A render function, not an inline component: defining a component inside the
+  // render body gives it a new identity every keystroke, so React remounted the
+  // input and dropped focus. toggleKey is passed explicitly — the old
+  // keyName-derived key ('baiduApiKey' -> 'baiduApi') never matched the
+  // showApiKeys key ('baidu'), so that eye toggle did nothing.
+  const renderApiKeyInput = ({ keyName, toggleKey, placeholder = 'API Key', value, showKey }) => (
     <div className="api-key-input-wrapper">
       <input
         type={showKey ? "text" : "password"}
@@ -166,7 +171,7 @@ const OcrSection = ({
       <button
         type="button"
         className="api-key-toggle"
-        onClick={(e) => toggleApiKeyVisibility(keyName.replace('Key', '').replace('Secret', 'Secret'), e)}
+        onClick={(e) => toggleApiKeyVisibility(toggleKey, e)}
         title={showKey ? t('common.hide') : t('common.show')}
       >
         {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -521,7 +526,7 @@ const OcrSection = ({
                   <span className="engine-badge free">{t('ocr.free25k')}</span>
                 </div>
                 <p className="engine-desc">{t('ocr.ocrspaceDesc')}</p>
-                <ApiKeyInput keyName="ocrspaceKey" value={settings.ocr.ocrspaceKey} showKey={showApiKeys.ocrspace} />
+                {renderApiKeyInput({ keyName: 'ocrspaceKey', toggleKey: 'ocrspace', value: settings.ocr.ocrspaceKey, showKey: showApiKeys.ocrspace })}
               </div>
               <div className="engine-actions">
                 <button
@@ -540,7 +545,7 @@ const OcrSection = ({
                   <span className="engine-badge free">{t('ocr.free1k')}</span>
                 </div>
                 <p className="engine-desc">{t('ocr.googleVisionDesc')}</p>
-                <ApiKeyInput keyName="googleVisionKey" value={settings.ocr.googleVisionKey} showKey={showApiKeys.googleVision} />
+                {renderApiKeyInput({ keyName: 'googleVisionKey', toggleKey: 'googleVision', value: settings.ocr.googleVisionKey, showKey: showApiKeys.googleVision })}
               </div>
               <div className="engine-actions">
                 <button
@@ -559,7 +564,7 @@ const OcrSection = ({
                   <span className="engine-badge free">{t('ocr.free5k')}</span>
                 </div>
                 <p className="engine-desc">{t('ocr.azureDesc')}</p>
-                <ApiKeyInput keyName="azureKey" value={settings.ocr.azureKey} showKey={showApiKeys.azure} />
+                {renderApiKeyInput({ keyName: 'azureKey', toggleKey: 'azure', value: settings.ocr.azureKey, showKey: showApiKeys.azure })}
                 <div className="api-key-input-wrapper" style={{marginTop: '6px'}}>
                   <input type="text" className="setting-input compact" placeholder={t('ocr.azureEndpoint')}
                     value={settings.ocr.azureEndpoint || ''} onChange={(e) => updateSetting('ocr', 'azureEndpoint', e.target.value)} />
@@ -585,7 +590,7 @@ const OcrSection = ({
                   <span className="engine-badge free">{t('ocr.free1k')}</span>
                 </div>
                 <p className="engine-desc">{t('ocr.baiduDesc')}</p>
-                <ApiKeyInput keyName="baiduApiKey" value={settings.ocr.baiduApiKey} showKey={showApiKeys.baidu} />
+                {renderApiKeyInput({ keyName: 'baiduApiKey', toggleKey: 'baidu', value: settings.ocr.baiduApiKey, showKey: showApiKeys.baidu })}
                 <div className="api-key-input-wrapper" style={{marginTop: '6px'}}>
                   <input type={showApiKeys.baiduSecret ? "text" : "password"} className="setting-input compact" placeholder="Secret Key"
                     value={settings.ocr.baiduSecretKey || ''} onChange={(e) => updateSetting('ocr', 'baiduSecretKey', e.target.value)} />

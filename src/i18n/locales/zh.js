@@ -304,7 +304,7 @@ const zh = {
     saved: "设置已保存", saveFailed: "保存设置失败",
     ocrKeysEncryptFailed: "OCR 密钥加密失败（系统加密不可用），密钥未保存",
     exported: "设置已导出", invalidFormat: "设置文件格式不正确", importedPleasesSave: "设置已导入，请保存以生效", invalidFile: "无效的设置文件",
-    resetSectionConfirm: "重置 \"{{section}}\" 的设置？", resetAllConfirm: "重置所有设置？这将清除所有自定义配置。",
+    resetSectionConfirm: "重置 \"{{section}}\" 的设置？", resetAllConfirm: "重置所有设置？这将清除所有自定义配置（已保存的 API 密钥会保留；如需彻底清除，请用隐私页的“清除所有数据”）。",
     sectionReset: "{{section}} 设置已重置", sectionNotFound: "未找到 {{section}} 的默认设置", allReset: "所有设置已重置",
     tabs: { general: "通用", providers: "翻译源", ocr: "OCR", shortcuts: "快捷键", privacy: "隐私", tts: "语音", glossary: "术语表", about: "关于" },
     general: {

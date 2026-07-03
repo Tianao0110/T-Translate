@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback, useImperativeHandle, forwardRef, useRef, useMemo } from 'react';
+﻿import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ChevronDown, ChevronUp, Check, X, AlertCircle,
@@ -8,51 +8,19 @@ import {
 import { getAllProviderMetadata } from '../../providers/registry.js';
 import translationService from '../../services/translation.js';
 import useTranslationStore from '../../stores/translation-store';
+import { secureStorage } from './persist.js';
 import './styles.css';
 import createLogger from '../../utils/logger.js';
 const logger = createLogger('ProviderSettings');
 
-const secureStorage = {
-  async get(key, context) {
-    if (window.electron?.secureStorage) {
-      const value = await window.electron.secureStorage.decrypt(key, context ? { context } : undefined);
-      if (value) return value;
-
-      // One-shot migration: pull legacy plaintext from localStorage into
-      // safeStorage, then erase the plaintext. If migration fails we still
-      // wipe the legacy entry so plaintext never lingers.
-      const legacy = localStorage.getItem(`__secure_${key}`);
-      if (legacy) {
-        try {
-          const migrated = decodeURIComponent(atob(legacy));
-          await window.electron.secureStorage.encrypt(key, migrated);
-          localStorage.removeItem(`__secure_${key}`);
-          logger.info(`Migrated key from localStorage to safeStorage: ${key}`);
-          return migrated;
-        } catch { /* fall through */ }
-        localStorage.removeItem(`__secure_${key}`);
-      }
-      return null;
-    }
-    return null;
-  },
-  async set(key, value) {
-    if (window.electron?.secureStorage) {
-      return await window.electron.secureStorage.encrypt(key, value);
-    }
-    // Refuse to fall back to plaintext localStorage — secrets must stay encrypted.
-    logger.warn('secureStorage unavailable, refusing to store key:', key);
-    return false;
-  }
+// Status/type colors resolve to theme tokens (defined in ProviderSettings/styles.css).
+const TYPE_COLOR_VARS = {
+  'llm': 'var(--ps-type-llm)',
+  'api': 'var(--ps-type-api)',
+  'traditional': 'var(--ps-type-traditional)',
 };
 
-const TYPE_COLORS = {
-  'llm': '#8b5cf6',
-  'api': '#3b82f6',
-  'traditional': '#10b981',
-};
-
-const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, notify }, ref) => {
+const ProviderSettings = ({ settings, settingsReady, updateSettings, notify }) => {
   const { t } = useTranslation();
 
   // useMemo so getAllProviderMetadata() returns a stable reference and
@@ -67,7 +35,6 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
   const [showPasswords, setShowPasswords] = useState({});
   const [testingProvider, setTestingProvider] = useState(null);
   const [testResults, setTestResults] = useState({});
-  const [isSaving, setIsSaving] = useState(false);
   const initializedRef = useRef(false);
 
   const { enabledProviders, disabledProviders } = useMemo(() => {
@@ -152,7 +119,10 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
 
         if (meta.configSchema) {
           for (const [key, field] of Object.entries(meta.configSchema)) {
-            if (field.encrypted) {
+            // Only pull from the vault when the seed has no value — on a tab
+            // re-mount savedConfigs already carries the user's unsaved edit,
+            // and the old decrypt would clobber it with the on-disk key.
+            if (field.encrypted && !configs[meta.id][key]) {
               const decrypted = await secureStorage.get(`provider_${meta.id}_${key}`, 'settings-load');
               if (decrypted) {
                 configs[meta.id][key] = decrypted;
@@ -163,76 +133,18 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
       }
 
       setProviderConfigs(configs);
+      // Mirror the decrypted configs up to the parent so SettingsPanel's
+      // unified save has complete provider data even if the user never edits
+      // a field (silent: this is a load-time sync, not a user change).
+      updateSettings?.('translation', 'providerConfigs', configs, true);
       initializedRef.current = true;
     };
 
     initProviders();
+    // updateSettings intentionally omitted: it changes identity on every
+    // parent render and would re-run this decrypt loop pointlessly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settingsReady, settings?.translation?.providers, allProvidersMeta]);
-
-  const saveSettings = useCallback(async () => {
-    setIsSaving(true);
-
-    try {
-      const configsToSave = {};
-
-      for (const meta of allProvidersMeta) {
-        configsToSave[meta.id] = { ...providerConfigs[meta.id] };
-
-        if (meta.configSchema) {
-          for (const [key, field] of Object.entries(meta.configSchema)) {
-            if (!field.encrypted) continue;
-            const value = configsToSave[meta.id][key];
-            if (value) {
-              // Abort on encrypt failure — a stripped-but-unstored key would
-              // vanish silently on next launch while this save reports success.
-              const res = await secureStorage.set(`provider_${meta.id}_${key}`, value);
-              if (res === false || res?.success === false) {
-                throw new Error(t('providerSettings.encryptFailed'));
-              }
-            } else {
-              // Cleared in UI: remove the vault entry too, otherwise the old
-              // key resurrects from secure storage on restart.
-              await window.electron?.secureStorage?.delete?.(`provider_${meta.id}_${key}`);
-            }
-            // Don't leave any value (not even a placeholder) in providerConfigs.
-            delete configsToSave[meta.id][key];
-          }
-        }
-      }
-
-      updateSettings('translation', 'providers', providers, true);
-      updateSettings('translation', 'providerConfigs', configsToSave, true);
-
-      // Dot-path writes to avoid the read-modify-write race that bites
-      // when two updaters touch sibling fields concurrently.
-      if (window.electron?.store) {
-        await window.electron.store.set('settings.translation.providers', providers);
-        await window.electron.store.set('settings.translation.providerConfigs', configsToSave);
-      }
-
-      await translationService.reload({
-        providers: {
-          list: providers,
-          configs: providerConfigs,
-        }
-      });
-
-      if (window.electron?.floatingWindow?.notifySettingsChanged) {
-        await window.electron.floatingWindow.notifySettingsChanged();
-      }
-
-      notify?.(t('providerSettings.saved'), 'success');
-    } catch (error) {
-      logger.error('Save failed:', error);
-      notify?.(t('providerSettings.saveFailed') + ': ' + error.message, 'error');
-    } finally {
-      setIsSaving(false);
-    }
-  }, [providers, providerConfigs, updateSettings, notify, allProvidersMeta, t]);
-
-  useImperativeHandle(ref, () => ({
-    save: saveSettings
-  }), [saveSettings]);
 
   const toggleProvider = (providerId) => {
     const newProviders = providers.map(p =>
@@ -346,9 +258,9 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
 
   const getStatusColor = (providerId) => {
     const result = testResults[providerId];
-    if (result?.success) return '#10b981';
-    if (result?.success === false) return '#ef4444';
-    return '#9ca3af';
+    if (result?.success) return 'var(--success)';
+    if (result?.success === false) return 'var(--error)';
+    return 'var(--text-tertiary)';
   };
 
   const getStatusText = (providerId) => {
@@ -502,7 +414,7 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
               if (!meta) return null;
 
               const isExpanded = expandedProvider === provider.id;
-              const typeColor = TYPE_COLORS[meta.type] || TYPE_COLORS['api'];
+              const typeColor = TYPE_COLOR_VARS[meta.type] || TYPE_COLOR_VARS['api'];
               const typeLabel = t(`providerSettings.typeLabels.${meta.type}`) || meta.type;
               const rank = getEnabledRank(provider.id);
               const isDragOver = dragOverIndex === provider.originalIndex && draggedIndex !== provider.originalIndex;
@@ -525,7 +437,7 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
                     <div className="ps-priority">{rank}</div>
 
                     <div className="ps-icon">
-                      {meta.icon ? <img src={meta.icon} alt="" className="ps-icon-img" /> : <span style={{ display: 'inline-block', width: 20, height: 20, borderRadius: '50%', background: meta.color || '#888' }} />}
+                      {meta.icon ? <img src={meta.icon} alt="" className="ps-icon-img" /> : <span style={{ display: 'inline-block', width: 20, height: 20, borderRadius: '50%', background: meta.color || 'var(--text-tertiary)' }} />}
                     </div>
 
                     <div className="ps-info">
@@ -620,7 +532,7 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
                     onClick={() => setExpandedProvider(isExpanded ? null : provider.id)}
                   >
                     <div className="ps-mini-icon">
-                      {meta.icon ? <img src={meta.icon} alt="" className="ps-icon-img" /> : <span style={{ display: 'inline-block', width: 16, height: 16, borderRadius: '50%', background: meta.color || '#888' }} />}
+                      {meta.icon ? <img src={meta.icon} alt="" className="ps-icon-img" /> : <span style={{ display: 'inline-block', width: 16, height: 16, borderRadius: '50%', background: meta.color || 'var(--text-tertiary)' }} />}
                     </div>
                     <div className="ps-mini-info">
                       <div className="ps-mini-name">{t(`providerSettings.names.${provider.id}`, { defaultValue: meta.name })}</div>
@@ -666,8 +578,6 @@ const ProviderSettings = forwardRef(({ settings, settingsReady, updateSettings, 
       )}
     </div>
   );
-});
-
-ProviderSettings.displayName = 'ProviderSettings';
+};
 
 export default ProviderSettings;

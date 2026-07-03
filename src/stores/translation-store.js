@@ -419,6 +419,18 @@ const useTranslationStore = create(
           state._savedStatistics = null;
         }),
 
+      // Resets only the persisted preference fields (not history/favorites) to
+      // defaults. Used by Settings "reset all" so zustand-backed controls don't
+      // survive a reset that only cleared electron-store.
+      resetPreferences: () =>
+        set((state) => {
+          state.translationMode = PRIVACY_MODES.STANDARD;
+          state.useStreamOutput = true;
+          state.autoTranslate = false;
+          state.autoTranslateDelay = 500;
+          state.ocrStatus.engine = 'llm-vision';
+        }),
+
       // ===== Privacy mode helpers =====
 
       // Single source for the privacy fields every translationService call

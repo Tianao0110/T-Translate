@@ -14,20 +14,28 @@ import createLogger from '../utils/logger.js';
 const logger = createLogger('StoreSync');
 
 const _syncTimers = {};
+const _pendingWrites = {};
 function debouncedSync(dotPath, value, delay = 100) {
+  _pendingWrites[dotPath] = value;
   clearTimeout(_syncTimers[dotPath]);
-  _syncTimers[dotPath] = setTimeout(async () => {
-    try {
-      if (!window.electron?.store?.set) return;
-      await window.electron.store.set(`settings.${dotPath}`, value);
-      logger.debug(`Synced settings.${dotPath}`);
-      // Notify floating window so it can reload target lang / theme without restart.
-      // Separate debounce to merge bursts (e.g. user toggles src+tgt back-to-back).
-      debouncedNotifyFloatingWindow();
-    } catch (e) {
-      logger.debug(`Sync failed for ${dotPath}:`, e.message);
-    }
-  }, delay);
+  _syncTimers[dotPath] = setTimeout(() => flushSync(dotPath), delay);
+}
+
+async function flushSync(dotPath) {
+  clearTimeout(_syncTimers[dotPath]);
+  if (!(dotPath in _pendingWrites)) return;
+  const value = _pendingWrites[dotPath];
+  delete _pendingWrites[dotPath];
+  try {
+    if (!window.electron?.store?.set) return;
+    await window.electron.store.set(`settings.${dotPath}`, value);
+    logger.debug(`Synced settings.${dotPath}`);
+    // Notify floating window so it can reload target lang / theme without restart.
+    // Separate debounce to merge bursts (e.g. user toggles src+tgt back-to-back).
+    debouncedNotifyFloatingWindow();
+  } catch (e) {
+    logger.debug(`Sync failed for ${dotPath}:`, e.message);
+  }
 }
 
 let _fwNotifyTimer = null;
@@ -45,6 +53,13 @@ function debouncedNotifyFloatingWindow(delay = 50) {
 }
 
 export function initStoreSync(translationStore) {
+  // Startup reconcile: subscribe only fires on *change*, so a language edit
+  // whose debounced write was lost (quit within 100ms) would leave the mirror
+  // stale forever. Push the current values once so electron-store matches.
+  const initial = translationStore.getState().currentTranslation;
+  debouncedSync('translation.sourceLanguage', initial.sourceLanguage);
+  debouncedSync('translation.targetLanguage', initial.targetLanguage);
+
   translationStore.subscribe(
     (state) => ({
       src: state.currentTranslation.sourceLanguage,
@@ -60,6 +75,14 @@ export function initStoreSync(translationStore) {
     },
     { equalityFn: (a, b) => a.src === b.src && a.tgt === b.tgt }
   );
+
+  // Flush pending debounced writes before the page goes away, so a language
+  // switch immediately followed by quit/reload isn't dropped.
+  if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', () => {
+      Object.keys(_pendingWrites).forEach(flushSync);
+    });
+  }
 
   logger.info('Store sync initialized');
 }

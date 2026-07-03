@@ -2,10 +2,13 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next';
 import { RefreshCw, Save } from 'lucide-react';
 import { ocrManager } from '../../providers/ocr/index.js';
+import { getAllProviderMetadata } from '../../providers/registry.js';
+import { persistProviderData } from '../ProviderSettings/persist.js';
 import { migrateLegacyOcrSecrets, decryptOcrSecrets, encryptOcrSecrets } from '../../utils/ocr-key-vault.js';
 import { useConfirm } from '../shared/ConfirmDialog';
 import { useShallow } from 'zustand/react/shallow';
 import useTranslationStore from '../../stores/translation-store';
+import i18n from '../../i18n.js';
 import createLogger from '../../utils/logger.js';
 import './styles.css';
 
@@ -76,11 +79,15 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
     setAutoTranslateDelay: s.setAutoTranslateDelay,
   })));
 
-  const providerSettingsRef = useRef(null);
+  const allProvidersMeta = useMemo(() => getAllProviderMetadata(), []);
 
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [settingsReady, setSettingsReady] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  // Which buckets have unsaved edits. save() only writes dirty buckets so it
+  // never re-persists an untouched bucket from a stale in-memory snapshot —
+  // critical for the translation bucket, whose configs are decrypted lazily.
+  const dirtyBucketsRef = useRef(new Set());
   const isInitializingRef = useRef(true);
 
   const [activeSection, setActiveSection] = useState('providers');
@@ -105,17 +112,10 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
 
   const hasUnsavedChanges = isDirty;
 
-  useEffect(() => {
-    const handleBeforeUnload = (e) => {
-      if (hasUnsavedChanges) {
-        e.preventDefault();
-        e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
-        return e.returnValue;
-      }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [hasUnsavedChanges]);
+  // No beforeunload guard: Electron intercepts the window close as a hide and
+  // destroys on quit without dispatching beforeunload, so it never protected
+  // anything — and returning a string silently *cancelled* the menu Reload.
+  // The footer "unsaved changes" indicator is the honest signal instead.
 
   const handleSectionChange = useCallback((section) => {
     if (section !== activeSection) {
@@ -253,6 +253,7 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
       setSettings(finalSettings);
       setSettingsReady(true);
       setIsDirty(false);
+      dirtyBucketsRef.current = new Set();
 
       // Delay clearing the initializing flag — child components (notably
       // ProviderSettings) need ~100ms plus async decrypt before they're
@@ -312,26 +313,38 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
   const saveSettings = async () => {
     setIsSaving(true);
     try {
-      // ProviderSettings.save() is self-contained — let it run and bail.
-      if (activeSection === 'providers' && providerSettingsRef.current?.save) {
-        await providerSettingsRef.current.save();
-        setIsDirty(false);
-        setIsSaving(false);
-        return;
-      }
+      const dirty = dirtyBucketsRef.current;
 
       // Dot-path writes per-section so concurrent updaters touching
       // sibling fields don't clobber each other (read-modify-write race).
       if (window.electron?.store) {
         const store = window.electron.store;
 
+        // Provider data is persisted from the parent's mirror (ProviderSettings
+        // mirrors decrypted configs up on init), so a save from ANY tab keeps
+        // provider edits instead of the old activeSection-routed path that
+        // dropped them. Only when actually edited — an untouched translation
+        // bucket would otherwise strip keys it never received.
+        if (dirty.has('translation')) {
+          const { ok } = await persistProviderData({
+            providers: settings.translation?.providers || [],
+            providerConfigs: settings.translation?.providerConfigs || {},
+            allProvidersMeta,
+          });
+          if (!ok) {
+            // Keep the panel dirty so the user can retry after fixing encryption.
+            notify(t('providerSettings.encryptFailed'), 'error');
+            return;
+          }
+        }
+
         if (settings.connection) {
           await store.set('settings.connection', settings.connection);
         }
 
-        // settings.translation is not written here: providers belong to
-        // ProviderSettings, language keys to the sync-to-electron store mirror.
-        // Writing a load-time snapshot back would clobber both.
+        // settings.translation providers/configs are written above; language
+        // keys are owned by the sync-to-electron store mirror. Writing a
+        // load-time snapshot of the whole bucket here would clobber both.
 
         if (settings.document) {
           await store.set('settings.document', settings.document);
@@ -339,6 +352,12 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
 
         if (settings.floatingWindow) {
           await store.set('settings.floatingWindow', settings.floatingWindow);
+          // Saving the default opacity means the user is setting it explicitly,
+          // so drop the window-local override that would otherwise permanently
+          // shadow it (GET_SETTINGS prefers floatingWindowLocal.opacity).
+          if (dirty.has('floatingWindow')) {
+            await store.delete('floatingWindowLocal.opacity');
+          }
         }
 
         if (settings.selection) {
@@ -402,12 +421,10 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
         await window.electron.floatingWindow.notifySettingsChanged();
       }
 
-      // The providers tab fires its own notification, so suppress here.
-      if (activeSection !== 'providers') {
-        notify(t('settings.saved'), 'success');
-      }
+      notify(t('settings.saved'), 'success');
 
       setIsDirty(false);
+      dirtyBucketsRef.current = new Set();
     } catch (error) {
       logger.error('Failed to save settings:', error);
       notify(t('settings.saveFailed'), 'error');
@@ -431,11 +448,40 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
         notify(t('settings.sectionNotFound', { section }), 'error');
       }
     } else {
+      // Full reset must clear every side-band store, not just electron-store —
+      // theme, language, sidebar prefs, zustand preferences and OS auto-launch
+      // all live outside the 'settings' key and would otherwise survive.
       localStorage.removeItem('settings');
+      localStorage.removeItem('theme');
+      localStorage.removeItem('app-language');
+      localStorage.removeItem('settings-simple-mode');
+      localStorage.removeItem('settings-mode-hint-seen');
       if (window.electron?.store) {
         window.electron.store.delete('settings');
       }
-      setSettings({ ...DEFAULT_SETTINGS });
+
+      // zustand-persisted preference fields (share a store with history/
+      // favorites, so reset by field, don't wipe the key).
+      useTranslationStore.getState().resetPreferences?.();
+
+      // Reset the live theme + language the user is looking at right now.
+      document.documentElement.setAttribute('data-theme', 'light');
+      try {
+        await window.electron?.theme?.set?.('light');
+        await i18n.changeLanguage('zh');
+      } catch { /* best effort */ }
+
+      // Auto-launch is a settings control too (D13).
+      try { await window.electron?.app?.setAutoLaunch?.(false); } catch { /* ignore */ }
+
+      // API keys are deliberately kept (confirm dialog says so) — clearing them
+      // would force the user to re-obtain keys; "clear all data" on the privacy
+      // page is the escape hatch for a full wipe.
+
+      // Rebuild from a fresh load so runtime-derived state (OCR availability,
+      // selection toggle) is re-detected instead of a bare defaults snapshot
+      // that leaves the OCR panel and selection toggle showing stale values.
+      await loadSettings();
       notify(t('settings.allReset'), 'success');
     }
   };
@@ -451,6 +497,7 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
       }
     }));
     if (!silent && !isInitializingRef.current) {
+      dirtyBucketsRef.current.add(section);
       setIsDirty(true);
     }
   }, []);
@@ -460,7 +507,6 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
       case 'providers':
         return (
           <ProvidersSection
-            ref={providerSettingsRef}
             settings={settings}
             settingsReady={settingsReady}
             updateSetting={updateSetting}

@@ -304,7 +304,7 @@ const en = {
     saved: "Settings saved", saveFailed: "Failed to save settings",
     ocrKeysEncryptFailed: "OCR API key encryption failed (system encryption unavailable); keys were not saved",
     exported: "Settings exported", invalidFormat: "Invalid settings file format", importedPleasesSave: "Settings imported, please save to apply", invalidFile: "Invalid settings file",
-    resetSectionConfirm: "Reset \"{{section}}\" settings?", resetAllConfirm: "Reset all settings? This will clear all custom configurations.",
+    resetSectionConfirm: "Reset \"{{section}}\" settings?", resetAllConfirm: "Reset all settings? This clears all custom configuration (saved API keys are kept; use \"Clear all data\" on the Privacy page for a full wipe).",
     sectionReset: "{{section}} settings reset", sectionNotFound: "Default settings for {{section}} not found", allReset: "All settings reset",
     tabs: { general: "General", providers: "Providers", ocr: "OCR", shortcuts: "Shortcuts", privacy: "Privacy", tts: "TTS", glossary: "Glossary", about: "About" },
     general: {

@@ -16,12 +16,11 @@ export const defaultConfig = {
   ocr: { defaultEngine: 'llm-vision', windowsLanguage: 'zh-Hans' },
   ui: { theme: 'light', fontSize: 14 },
   logging: { level: 'info' },
+  // Only the global (OS-level) shortcuts are configurable. The in-app keys
+  // (translate/swap/clear/paste/copy) were editable in the UI but nothing read
+  // settings.shortcuts for them — they're hardcoded in the panels — so the
+  // rows were pure decoration and have been removed.
   shortcuts: {
-    translate: 'Ctrl+Enter',
-    swapLanguages: 'Ctrl+L',
-    clear: 'Ctrl+Shift+C',
-    paste: 'Ctrl+V',
-    copy: 'Ctrl+C',
     screenshot: 'Alt+Q',
     toggleWindow: 'Ctrl+Shift+W',
     floatingWindow: 'Ctrl+Alt+G',
@@ -64,6 +63,20 @@ export const DEFAULT_SETTINGS = {
     endpoint: defaultConfig.llm.endpoint,
     timeout: defaultConfig.llm.timeout,
     model: '',
+  },
+
+  // Theme/language. Previously only survived via electron-store's build-time
+  // defaults leaking through the top-level spread — a fresh install or a
+  // reset-all left this bucket undefined and InterfaceSection crashed reading
+  // .theme. Owned here now so the shape is always present.
+  interface: {
+    theme: defaultConfig.ui.theme,
+    language: '',
+  },
+
+  // Startup toggles (auto-enable selection after launch).
+  startup: {
+    autoEnableSelection: false,
   },
 
   // Live language keys are settings.translation.sourceLanguage/targetLanguage,
@@ -191,6 +204,14 @@ export const migrateOldSettings = (savedSettings) => {
     connection: {
       ...DEFAULT_SETTINGS.connection,
       ...(savedSettings.connection || {}),
+    },
+    interface: {
+      ...DEFAULT_SETTINGS.interface,
+      ...(savedSettings.interface || {}),
+    },
+    startup: {
+      ...DEFAULT_SETTINGS.startup,
+      ...(savedSettings.startup || {}),
     },
     translation: {
       ...DEFAULT_SETTINGS.translation,
