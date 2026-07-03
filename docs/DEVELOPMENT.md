@@ -934,8 +934,9 @@ console.log(`[${this.constructor.metadata.id}] Response:`, data);
 // 查看翻译服务状态
 console.log(await window.electron?.store?.get('settings'));
 
-// 查看安全存储
-console.log(localStorage.getItem('__secure_provider_my-provider_apiKey'));
+// API Key 经 Windows DPAPI 加密存于主进程（electron-store 顶层 __encrypted_* 键），
+// 不在 localStorage、也不落明文。渲染端只能经 IPC 解密读取：
+console.log(await window.electron?.secureStorage?.decrypt('provider_my-provider_apiKey'));
 ```
 
 ### 3. 网络请求调试

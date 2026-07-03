@@ -26,13 +26,13 @@
 | Feature | Description |
 | --- | --- |
 | **Selection translator** | System-wide. Select text in any app to translate. Up to 8 pinned windows |
-| **Screenshot OCR** | Capture screen regions. 6 OCR engines with automatic fallback |
+| **Screenshot OCR** | Capture screen regions. 7 OCR engines with automatic fallback |
 | **Floating window** | Transparent overlay. Space-bar to capture-and-translate. For complex layouts |
 | **Document translation** | 9 formats: PDF / DOCX / EPUB / TXT / SRT / VTT / CSV / JSON / Markdown. Segment-by-segment, resumable |
 | **Glossary** | Auto-replace terms after translation, with undo support |
 | **TTS** | Built on Windows offline speech engine |
 | **10 translation providers** | LM Studio, Ollama, OpenAI, Claude, Gemini, DeepSeek, DeepL, Google, Microsoft, Baidu |
-| **4 privacy modes** | Standard / Offline / Incognito / Strict. Offline mode blocks decryption of online API keys |
+| **3 privacy modes** | Standard / Incognito / Offline. Offline mode blocks decryption of online API keys |
 | **Auto-start** | Silent tray launch with optional auto-enable for selection translator |
 
 ---
@@ -71,7 +71,7 @@ Supports 9 formats: PDF, DOCX, EPUB, TXT, SRT, VTT, CSV, JSON, Markdown. Paralle
 
 ### Privacy modes
 
-Four levels of privacy control. In offline / strict modes, only local LLMs are used. Online API keys are blocked from decryption even if internal code attempts to access them.
+Three levels of privacy control. In offline mode, only local LLMs are used. Online API keys are blocked from decryption even if internal code attempts to access them.
 
 <p align="center">
   <img src="docs/screenshots/privacy-mode.png" width="600" alt="Privacy modes">
@@ -114,10 +114,10 @@ npm run dist         # build installer (runs the fetch automatically)
 
 | Shortcut | Action |
 | --- | --- |
-| `Ctrl+Shift+T` | Show / hide main window |
-| `Ctrl+Shift+S` | Screenshot translate |
-| `Ctrl+Shift+G` | Open floating window |
-| `Ctrl+Shift+D` | Toggle selection translator |
+| `Alt+Q` | Screenshot translate |
+| `Ctrl+Shift+W` | Show / hide main window |
+| `Ctrl+Alt+G` | Open floating window |
+| `Ctrl+Shift+T` | Toggle selection translator |
 | `Ctrl+Enter` | Run translation |
 
 *Shortcuts are customizable in Settings.*
@@ -131,7 +131,7 @@ Privacy is a core design principle:
 - **Local-first** — Local LLM is the top priority. Fully usable offline
 - **Encrypted at rest** — API keys encrypted via Windows DPAPI. No plaintext fallback
 - **Access audit** — Every decryption operation is logged. Abnormal frequency triggers alerts
-- **Privacy interlocks** — Offline / strict modes block decryption of online API keys
+- **Privacy interlocks** — Offline mode blocks decryption of online API keys
 - **Least privilege** — Each window has its own preload script exposing only the APIs it needs
 - **No axios** — Unaffected by recent npm supply chain attacks
 
@@ -167,12 +167,12 @@ t-translate/
 
 | Category | Technology |
 | --- | --- |
-| Framework | Electron 28 + React 18 |
-| Build | Vite 5 |
+| Framework | Electron 42 + React 18 |
+| Build | Vite 7 |
 | State | Zustand + Immer |
 | Styling | CSS Variables |
 | Secure storage | Electron safeStorage (Windows DPAPI) + access audit |
-| OCR | PP-OCRv5 local (downloadable language packs) / Windows OCR / LLM Vision / Google Vision / Azure / Baidu |
+| OCR | PP-OCRv5 local (downloadable language packs) / Windows OCR / LLM Vision / OCR.space / Google Vision / Azure / Baidu |
 | Local LLM | LM Studio / Ollama (OpenAI-compatible API) |
 | Online translation | OpenAI / Claude / Gemini / DeepSeek / DeepL / Google / Microsoft / Baidu |
 | Packaging | electron-builder |

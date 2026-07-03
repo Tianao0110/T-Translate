@@ -57,16 +57,13 @@ t-translate/
 │   │   └── ErrorBoundary/      # 错误边界
 │   │
 │   ├── providers/              # 翻译源 Provider（kebab-case 目录）
-│   │   ├── base.js             # BaseProvider 基类
-│   │   ├── openai-compatible.js# OpenAI 兼容 API 基类
+│   │   ├── base.js             # BaseProvider 基类 + 共享 _t
+│   │   ├── openai-compatible.js# OpenAI 兼容基类（local-llm/ollama/openai/deepseek 经 presets 动态生成）
+│   │   ├── openai-compatible/  # presets.js + 图标（四个 OpenAI 兼容源）
 │   │   ├── registry.js         # Provider 注册中心
-│   │   ├── local-llm/          # LM Studio (本地 LLM)
-│   │   ├── ollama/             # Ollama (本地 LLM)
-│   │   ├── openai/             # OpenAI API
 │   │   ├── anthropic/          # Anthropic Claude
 │   │   ├── deepl/              # DeepL
 │   │   ├── gemini/             # Gemini
-│   │   ├── deepseek/           # DeepSeek
 │   │   ├── google-translate/   # Google 翻译
 │   │   ├── microsoft-translator/ # Microsoft Translator
 │   │   ├── baidu-translate/    # 百度翻译
