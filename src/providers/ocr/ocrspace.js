@@ -49,6 +49,16 @@ class OCRSpaceEngine extends BaseOCREngine {
     return !!this.config.apiKey;
   }
 
+  // The OCR settings UI stores BCP-47-ish codes (zh-Hans, en, ...) but this
+  // API wants its own 3-letter codes. Map here; unknown/auto falls back to the
+  // OCREngine-2 auto behavior rather than sending an invalid language.
+  static LANG_MAP = {
+    'zh-Hans': 'chs', 'zh-Hant': 'cht', 'en': 'eng', 'ja': 'jpn', 'ko': 'kor',
+    'fr': 'fre', 'de': 'ger', 'es': 'spa', 'ru': 'rus', 'ar': 'ara',
+    // already-native codes pass through
+    'chs': 'chs', 'cht': 'cht', 'eng': 'eng', 'jpn': 'jpn', 'kor': 'kor',
+  };
+
   async recognize(input, options = {}) {
     const { apiKey, language } = this.config;
 
@@ -58,10 +68,12 @@ class OCRSpaceEngine extends BaseOCREngine {
 
     try {
       const base64Data = this.ensureBase64(input);
+      const rawLang = options.language || language;
+      const apiLang = OCRSpaceEngine.LANG_MAP[rawLang] || 'eng';
 
       const formData = new FormData();
       formData.append('apikey', apiKey);
-      formData.append('language', options.language || language);
+      formData.append('language', apiLang);
       formData.append('base64Image', base64Data);
       formData.append('isOverlayRequired', 'false');
       formData.append('detectOrientation', 'true');

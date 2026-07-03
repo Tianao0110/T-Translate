@@ -192,10 +192,23 @@ class BaiduTranslateProvider extends BaseProvider {
         sign,
       });
 
+      // Long text as a GET query string blows the URL length limit (and hits
+      // Baidu's long-query rate cap). Baidu accepts the same params as a POST
+      // body, so switch over once the text is large. Threshold mirrors the
+      // google provider's URL-length guard.
+      const usesPost = text.length > 1500;
       const response = await fetch(
-        `https://fanyi-api.baidu.com/api/trans/vip/translate?${params.toString()}`,
+        usesPost
+          ? 'https://fanyi-api.baidu.com/api/trans/vip/translate'
+          : `https://fanyi-api.baidu.com/api/trans/vip/translate?${params.toString()}`,
         {
-          method: 'GET',
+          method: usesPost ? 'POST' : 'GET',
+          ...(usesPost
+            ? {
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: params,
+              }
+            : {}),
           signal: AbortSignal.timeout(this.config.timeout),
         }
       );

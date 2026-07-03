@@ -8,6 +8,7 @@ import { Camera, X, Loader2, AlertCircle, ChevronDown, GripHorizontal, History, 
 import useSessionStore, { STATUS, DISPLAY_MODE } from '../../stores/session.js';
 import useConfigStore from '../../stores/config.js';
 import pipeline from '../../services/pipeline.js';
+import translationService from '../../services/translation.js';
 import ChildPane from './ChildPane.jsx';
 import createLogger from '../../utils/logger.js';
 import './styles.css';
@@ -232,8 +233,11 @@ const FloatingWindow = () => {
       unsubscribeSettings = window.electron.floatingWindow.onSettingsChanged((newSettings) => {
         loadSettings();
         // Persistent window: engine keys/endpoint changed in main settings
-        // must reach the already-initialized ocrManager too
+        // must reach the already-initialized ocrManager AND the translation
+        // stack — without reload it keeps using the provider keys/priority from
+        // its first translation until the whole app restarts.
         pipeline.refreshOcrConfigs();
+        translationService.reload();
         const newTheme = newSettings?.interface?.theme;
         if (newTheme && ['light', 'dark', 'fresh'].includes(newTheme)) {
           setTheme(newTheme);

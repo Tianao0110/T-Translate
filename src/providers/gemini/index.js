@@ -54,8 +54,10 @@ class GeminiProvider extends BaseProvider {
   }
 
   async testConnection() {
+    // Use `message` (not `error`) throughout — that's the key the settings
+    // status row reads; returning `error` here dropped the real reason.
     if (!this.config.apiKey) {
-      return { success: false, error: '请配置 API Key' };
+      return { success: false, message: '请配置 API Key' };
     }
 
     try {
@@ -71,11 +73,11 @@ class GeminiProvider extends BaseProvider {
       if (response.ok) {
         return { success: true, message: 'Gemini 连接成功' };
       } else {
-        const error = await response.json();
-        return { success: false, error: error.error?.message || `HTTP ${response.status}` };
+        const error = await response.json().catch(() => ({}));
+        return { success: false, message: error.error?.message || `HTTP ${response.status}` };
       }
     } catch (error) {
-      return { success: false, error: error.message };
+      return { success: false, message: error.message };
     }
   }
 

@@ -71,6 +71,7 @@ const CHANNELS = {
     NOTIFY_SETTINGS_CHANGED: 'floating-window:notify-settings-changed',
     OPEN_MAIN_SETTINGS: 'floating-window:open-main-settings',
     GET_HISTORY: 'floating-window:get-history',
+    ADD_TO_HISTORY: 'floating-window:add-to-history', // forward a translation into the main window's history
     SETTINGS_CHANGED: 'floating-window:settings-changed',
     // Child pane standalone windows
     CREATE_CHILD_WINDOW: 'floating-window:create-child-window',
@@ -97,6 +98,7 @@ const CHANNELS = {
     SHOW_TRIGGER: 'selection:show-trigger',
     SHOW_RESULT: 'selection:show-result',     // Direct result display (screenshot chain).
     SHOW_DIRECT: 'selection:show-direct',     // Sticky-direct path (skip trigger icon).
+    SETTINGS_CHANGED: 'selection:settings-changed', // Provider/settings save → reload translation stack.
     STATE_CHANGED: 'selection-state-changed',
     // Multi-window support
     FREEZE: 'selection:freeze',

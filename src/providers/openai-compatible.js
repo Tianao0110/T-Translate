@@ -294,9 +294,27 @@ class OpenAICompatibleProvider extends BaseProvider {
   }
 
   /**
+   * Providers like Ollama require an explicit model name and reject an omitted
+   * one. When the field is blank and the preset opts in, resolve the first
+   * available model once and cache it onto config so later calls skip the fetch.
+   */
+  async _ensureModel() {
+    if (this.config.model || !this.hooks.autoDetectModel) return;
+    try {
+      const models = await this._fetchModelsWithFallback();
+      const filtered = this.hooks.filterModels ? this.hooks.filterModels(models) : models;
+      if (filtered.length > 0) {
+        this.config.model = filtered[0];
+        logger.debug('Auto-detected model:', this.config.model);
+      }
+    } catch { /* leave blank; the request will surface a clear error */ }
+  }
+
+  /**
    * Chat completion (non-streaming)
    */
   async _chatCompletion(messages) {
+    await this._ensureModel();
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
 
@@ -340,6 +358,7 @@ class OpenAICompatibleProvider extends BaseProvider {
    * Chat completion (streaming)
    */
   async _chatCompletionStream(messages, onChunk) {
+    await this._ensureModel();
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
     let idleTimer = null;

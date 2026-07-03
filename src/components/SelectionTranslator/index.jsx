@@ -380,6 +380,13 @@ const SelectionTranslator = () => {
       if (triggerReadyTimerRef.current) clearTimeout(triggerReadyTimerRef.current);
     });
 
+    // Provider/settings saved in the main window: reload this persistent
+    // window's translation stack so it picks up new keys/priority without an
+    // app restart. reload() with no args re-reads store + secureStorage.
+    const removeSettingsListener = window.electron?.selection?.onSettingsChanged?.(() => {
+      translationService.reload();
+    });
+
     // No keydown/ESC handler: the window is focusable:false (deliberate — it
     // must never steal focus), so it can't receive keyboard events. Closing is
     // via right-click, the ✕ button, click-outside, or auto-hide.
@@ -389,6 +396,7 @@ const SelectionTranslator = () => {
       if (removeShowResultListener) removeShowResultListener();
       if (removeShowDirectListener) removeShowDirectListener();
       if (removeHideListener) removeHideListener();
+      if (removeSettingsListener) removeSettingsListener();
       if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
       if (triggerReadyTimerRef.current) clearTimeout(triggerReadyTimerRef.current);
     };

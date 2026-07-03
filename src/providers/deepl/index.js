@@ -79,9 +79,14 @@ class DeepLProvider extends BaseProvider {
       'it': 'IT',
       'nl': 'NL',
       'pl': 'PL',
+      'ar': 'AR',
+      'th': 'TH',
+      'vi': 'VI',
     };
 
-    return mapping[code] || code?.toUpperCase();
+    // Unmapped (e.g. Punjabi) returns null — the caller reports a friendly
+    // "unsupported language" instead of blindly upper-casing and 400-ing.
+    return mapping[code] ?? null;
   }
 
   async translate(text, sourceLang = 'auto', targetLang = 'zh') {
@@ -93,14 +98,29 @@ class DeepLProvider extends BaseProvider {
       return { success: false, error: '未配置 API Key' };
     }
 
+    // Reject languages DeepL doesn't support before spending a request. Flagged
+    // skipFailureCount so one unsupported pick (e.g. Punjabi) doesn't rack up
+    // failures and get DeepL benched for every other language this session.
+    const targetCode = this._convertLangCode(targetLang, true);
+    if (!targetCode) {
+      return { success: false, error: 'DeepL 不支持所选目标语言', skipFailureCount: true };
+    }
+    let sourceCode = null;
+    if (sourceLang !== 'auto') {
+      sourceCode = this._convertLangCode(sourceLang, false);
+      if (!sourceCode) {
+        return { success: false, error: 'DeepL 不支持所选源语言', skipFailureCount: true };
+      }
+    }
+
     try {
       const params = new URLSearchParams();
       params.append('text', text);
-      params.append('target_lang', this._convertLangCode(targetLang, true));
+      params.append('target_lang', targetCode);
 
       // Omit source_lang for auto-detect
-      if (sourceLang !== 'auto') {
-        params.append('source_lang', this._convertLangCode(sourceLang, false));
+      if (sourceCode) {
+        params.append('source_lang', sourceCode);
       }
 
       // Only some target languages accept the formality param; passing it
@@ -148,7 +168,10 @@ class DeepLProvider extends BaseProvider {
     } catch (error) {
       this._lastError = error;
 
-      if (error.name === 'AbortError') {
+      // AbortSignal.timeout() rejects with a TimeoutError (not AbortError),
+      // so the old AbortError check never matched and timeouts fell through
+      // to the generic branch.
+      if (error.name === 'TimeoutError' || error.name === 'AbortError') {
         return { success: false, error: '请求超时' };
       }
 

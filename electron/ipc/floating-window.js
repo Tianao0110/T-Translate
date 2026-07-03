@@ -50,7 +50,7 @@ function closeAllChildPaneWindows() {
 }
 
 function register(ctx) {
-  const { getMainWindow, getFloatingWindow, store, managers } = ctx;
+  const { getMainWindow, getFloatingWindow, getSelectionWindow, store, managers } = ctx;
 
   let screenshotModule = null;
   const getScreenshotModule = () => {
@@ -233,13 +233,32 @@ function register(ctx) {
   });
 
   ipcMain.handle(CHANNELS.FLOATING_WINDOW.NOTIFY_SETTINGS_CHANGED, () => {
+    const settings = store.get('settings', {});
+
     const floatingWindow = getFloatingWindow();
     if (floatingWindow && !floatingWindow.isDestroyed()) {
-      const settings = store.get('settings', {});
       floatingWindow.webContents.send(CHANNELS.FLOATING_WINDOW.SETTINGS_CHANGED, settings);
-      return true;
     }
-    return false;
+
+    // The selection window is a persistent (hide-not-close) renderer with its
+    // own translation stack, so a provider/settings change must reach it too —
+    // otherwise it keeps using the config snapshot from its first translation
+    // until the whole app restarts.
+    const selectionWindow = getSelectionWindow?.();
+    if (selectionWindow && !selectionWindow.isDestroyed()) {
+      selectionWindow.webContents.send(CHANNELS.SELECTION.SETTINGS_CHANGED);
+    }
+
+    return !!(floatingWindow && !floatingWindow.isDestroyed());
+  });
+
+  // Forward floating-window translations into the main window's history store,
+  // reusing the same DATA.ADD_TO_HISTORY channel the selection window uses. The
+  // store applies the secure-mode gate, so no privacy check is needed here.
+  ipcMain.handle(CHANNELS.FLOATING_WINDOW.ADD_TO_HISTORY, (event, item) => {
+    const mainWindow = getMainWindow();
+    mainWindow?.webContents.send(CHANNELS.DATA.ADD_TO_HISTORY, item);
+    return true;
   });
 
   // Show + focus main window, then send 'navigate' with 'settings:<section>' format

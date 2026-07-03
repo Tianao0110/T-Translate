@@ -448,6 +448,8 @@ const en = {
     },
     llmVisionDesc: "Handle artistic text, handwriting, blurry text, comic bubbles, etc.",
     llmVisionMeta: "Requires LM Studio + Vision model (e.g., Qwen-VL)",
+    llmEndpointPlaceholder: "http://localhost:1234/v1",
+    llmEndpointHint: "OpenAI-compatible endpoint of the vision model (Ollama default: http://localhost:11434/v1)",
     free25k: "Free 25000/month", free5k: "Free 5000/month", free1k: "Free 1000/month",
     ocrspaceDesc: "Highest free quota, supports 25+ languages",
     googleVisionDesc: "Best recognition, supports 200+ languages",

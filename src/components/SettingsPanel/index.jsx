@@ -338,10 +338,6 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
           }
         }
 
-        if (settings.connection) {
-          await store.set('settings.connection', settings.connection);
-        }
-
         // settings.translation providers/configs are written above; language
         // keys are owned by the sync-to-electron store mirror. Writing a
         // load-time snapshot of the whole bucket here would clobber both.
@@ -407,10 +403,8 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
 
       if (settings.ocr) {
         try {
-          ocrManager.updateConfigs({
-            ...settings.ocr,
-            llmEndpoint: settings.connection?.endpoint,
-          });
+          // settings.ocr.llmEndpoint feeds the LLM-Vision engine now.
+          ocrManager.updateConfigs({ ...settings.ocr });
           logger.debug(' OCR configs updated');
         } catch (e) {
           logger.warn(' ocrManager update failed:', e);

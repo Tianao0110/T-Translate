@@ -314,10 +314,8 @@ class MainTranslationService {
     this._ocrConfigsLoaded = true;
     try {
       const settings = await window.electron?.store?.get?.('settings') || {};
-      ocrManager.updateConfigs({
-        ...(await decryptOcrSecrets(settings.ocr || {})),
-        llmEndpoint: settings.connection?.endpoint,
-      });
+      // decrypted ocr bucket already carries llmEndpoint.
+      ocrManager.updateConfigs(await decryptOcrSecrets(settings.ocr || {}));
     } catch { /* browser mode: engine defaults apply */ }
   }
 

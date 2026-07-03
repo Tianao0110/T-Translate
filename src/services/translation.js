@@ -566,8 +566,13 @@ class TranslationService {
           };
         }
 
-        this._failureCount[id] = (this._failureCount[id] || 0) + 1;
-        logger.warn(`Provider ${id} failed (${this._failureCount[id]}/${this._skipThreshold})`);
+        // skipFailureCount: a deterministic "can't do this input" (e.g. DeepL
+        // asked for an unsupported language) — counting it would bench the
+        // provider for every other language too.
+        if (!result.skipFailureCount) {
+          this._failureCount[id] = (this._failureCount[id] || 0) + 1;
+          logger.warn(`Provider ${id} failed (${this._failureCount[id]}/${this._skipThreshold})`);
+        }
 
         if (!enableFallback) {
           return { success: false, error: result.error, provider: id };
@@ -653,10 +658,15 @@ class TranslationService {
       };
     }
 
+    const tried = [];
+    let lastError = null;
+
     for (const id of usableProviders) {
 
       const provider = getProvider(id);
       if (!provider) continue;
+
+      tried.push(id);
 
       try {
         logger.debug(`Trying stream provider: ${id}`);
@@ -717,6 +727,14 @@ class TranslationService {
               fromCache: false,
             };
           }
+          lastError = result.error;
+          if (!result.skipFailureCount) {
+            this._failureCount[id] = (this._failureCount[id] || 0) + 1;
+          }
+          if (!enableFallback) {
+            return { success: false, error: lastError || _t('svc.translateFailed', '翻译失败'), provider: id };
+          }
+          continue;
         } else {
           // Provider doesn't stream; do a single shot and emit it as one chunk
           const result = await provider.translate(processed, sourceLang, targetLang, {
@@ -754,15 +772,17 @@ class TranslationService {
               fromCache: false,
             };
           }
-        }
-
-        this._failureCount[id] = (this._failureCount[id] || 0) + 1;
-
-        if (!enableFallback) {
-          return { success: false, error: 'Translation failed', provider: id };
+          lastError = result.error;
+          if (!result.skipFailureCount) {
+            this._failureCount[id] = (this._failureCount[id] || 0) + 1;
+          }
+          if (!enableFallback) {
+            return { success: false, error: lastError || _t('svc.translateFailed', '翻译失败'), provider: id };
+          }
         }
 
       } catch (error) {
+        lastError = error.message;
         this._failureCount[id] = (this._failureCount[id] || 0) + 1;
         logger.error(`Stream provider ${id} error:`, error);
 
@@ -778,7 +798,14 @@ class TranslationService {
       return this.translateStream(text, options, onChunk);
     }
 
-    return { success: false, error: _t('svc.noProvider', '没有可用的翻译源') };
+    // Mirror translate(): if providers were actually tried, surface that (with
+    // the last real error) instead of the misleading "no providers available".
+    return {
+      success: false,
+      error: tried.length > 0
+        ? (lastError || _t('svc.allFailed', '所有翻译源均失败')) + ` (${tried.join(', ')})`
+        : _t('svc.noProvider', '没有可用的翻译源'),
+    };
   }
 
   // ===== Batch =====

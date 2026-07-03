@@ -670,7 +670,9 @@ const useTranslationStore = create(
           sourceLanguage: state.currentTranslation.sourceLanguage,
           targetLanguage: state.currentTranslation.targetLanguage,
         },
-        ocrStatus: { engine: state.ocrStatus.engine },
+        // ocrStatus.engine deliberately NOT persisted here — settings.ocr.engine
+        // (electron-store) is the single source of truth, seeded into the store
+        // at startup (App.jsx). Persisting it too caused the two to diverge.
       }),
     }
   ))

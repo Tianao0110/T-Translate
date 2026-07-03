@@ -21,9 +21,10 @@ class GoogleTranslateProvider extends BaseProvider {
         type: 'select',
         label: 'Server',
         default: 'com',
+        // translate.google.cn was retired in Oct 2022 — its translate_a
+        // endpoint 404s now, so that option only ever produced failures.
         options: [
           { value: 'com', label: 'google.com (International)' },
-          { value: 'cn', label: 'google.cn (China)' },
           { value: 'com.hk', label: 'google.com.hk (Hong Kong)' },
         ],
       },
@@ -36,6 +37,11 @@ class GoogleTranslateProvider extends BaseProvider {
       timeout: 15000,
       ...config,
     });
+
+    // Fold any persisted 'cn' (removed above) back to a working server.
+    if (this.config.domain === 'cn') {
+      this.config.domain = 'com';
+    }
 
     // TKK seed — the unofficial API derives tk from this. '0.0' works for most
     // request volumes; a real scraper would fetch it from translate.google.com

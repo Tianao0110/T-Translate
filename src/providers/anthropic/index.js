@@ -108,6 +108,12 @@ class AnthropicProvider extends BaseProvider {
         return { success: false, error: '无翻译结果' };
       }
 
+      // max_tokens => the model was cut off mid-translation. Returning it as
+      // success would cache and display a truncated translation as if complete.
+      if (data.stop_reason === 'max_tokens') {
+        return { success: false, error: '翻译结果被截断（超出最大长度）' };
+      }
+
       return {
         success: true,
         text: translatedText.trim(),
@@ -135,57 +141,81 @@ class AnthropicProvider extends BaseProvider {
       const systemPrompt = (promptOpt && typeof promptOpt === 'object' ? promptOpt.content : promptOpt) ||
         `You are a professional translator. Translate the following text to ${LANGUAGE_CODES[targetLang]?.name || targetLang}. Output only the translation, nothing else.`;
 
-      const response = await fetch(`${this.config.baseUrl}/v1/messages`, {
-        method: 'POST',
-        headers: this._buildHeaders(),
-        body: JSON.stringify({
-          model: this.config.model,
-          max_tokens: 4096,
-          stream: true,
-          system: systemPrompt,
-          messages: [
-            { role: 'user', content: text },
-          ],
-        }),
-        signal: AbortSignal.timeout(this.config.timeout),
-      });
+      // Idle watchdog, not a total-duration timeout: AbortSignal.timeout(30s)
+      // would abort a long-but-healthy stream at 30s. Reset the timer on each
+      // chunk so it only fires when the connection actually stalls.
+      const controller = new AbortController();
+      let idleTimer;
+      const resetIdle = () => {
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => controller.abort(), this.config.timeout);
+      };
+      resetIdle();
 
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
-        throw new Error(error.error?.message || `HTTP ${response.status}`);
-      }
+      let response;
+      try {
+        response = await fetch(`${this.config.baseUrl}/v1/messages`, {
+          method: 'POST',
+          headers: this._buildHeaders(),
+          body: JSON.stringify({
+            model: this.config.model,
+            max_tokens: 4096,
+            stream: true,
+            system: systemPrompt,
+            messages: [
+              { role: 'user', content: text },
+            ],
+          }),
+          signal: controller.signal,
+        });
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let fullText = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const data = line.slice(6);
-          if (data === '[DONE]') continue;
-
-          try {
-            const json = JSON.parse(data);
-
-            // Anthropic streams several event types; only content_block_delta carries token text
-            if (json.type === 'content_block_delta' && json.delta?.text) {
-              fullText += json.delta.text;
-              if (onChunk) onChunk(json.delta.text);
-            }
-          } catch {}
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}));
+          throw new Error(error.error?.message || `HTTP ${response.status}`);
         }
-      }
 
-      return { success: true, text: fullText.trim() };
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let fullText = '';
+        let stopReason = null;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          resetIdle();
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const data = line.slice(6);
+            if (data === '[DONE]') continue;
+
+            try {
+              const json = JSON.parse(data);
+
+              // Anthropic streams several event types; only content_block_delta carries token text
+              if (json.type === 'content_block_delta' && json.delta?.text) {
+                fullText += json.delta.text;
+                if (onChunk) onChunk(json.delta.text);
+              } else if (json.type === 'message_delta' && json.delta?.stop_reason) {
+                stopReason = json.delta.stop_reason;
+              }
+            } catch {}
+          }
+        }
+
+        if (stopReason === 'max_tokens') {
+          return { success: false, error: '翻译结果被截断（超出最大长度）' };
+        }
+
+        return { success: true, text: fullText.trim() };
+      } finally {
+        clearTimeout(idleTimer);
+      }
     } catch (error) {
       this._lastError = error;
       return { success: false, error: error.message || '流式翻译失败' };

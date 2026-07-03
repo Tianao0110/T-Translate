@@ -24,6 +24,7 @@ function App() {
   const addToFavorites = useTranslationStore((state) => state.addToFavorites);
   const addToHistory = useTranslationStore((state) => state.addToHistory);
   const setTargetLanguage = useTranslationStore((state) => state.setTargetLanguage);
+  const setOcrEngine = useTranslationStore((state) => state.setOcrEngine);
 
   useEffect(() => {
     // Theme source-of-truth precedence: settings store > localStorage. We
@@ -51,6 +52,17 @@ function App() {
     };
 
     initTheme();
+
+    // Seed the OCR engine from electron-store (the single source of truth).
+    // It's no longer persisted in the zustand key, so without this the main
+    // window would reset to the default engine every launch and diverge from
+    // what the floating window reads from settings.ocr.engine.
+    (async () => {
+      try {
+        const engine = await window.electron?.store?.get?.('settings.ocr.engine');
+        if (engine) setOcrEngine(engine);
+      } catch { /* browser mode: default engine applies */ }
+    })();
 
     let unsubscribeTheme = null;
     if (window.electron?.theme?.onChanged) {

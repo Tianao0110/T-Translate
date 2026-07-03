@@ -40,6 +40,13 @@ export const PRESETS = [
           required: false,
           placeholder: 'gpt-4o-mini',
         },
+        timeout: {
+          type: 'number',
+          label: 'Timeout (ms)',
+          default: 15000,
+          required: false,
+          placeholder: '15000',
+        },
       },
     },
     defaults: {
@@ -89,6 +96,13 @@ export const PRESETS = [
           default: 'https://api.deepseek.com/v1',
           required: false,
           placeholder: 'https://api.deepseek.com/v1',
+        },
+        timeout: {
+          type: 'number',
+          label: 'Timeout (ms)',
+          default: 30000,
+          required: false,
+          placeholder: '30000',
         },
       },
     },
@@ -152,6 +166,9 @@ export const PRESETS = [
       requireApiKey: false,
       // Ollama may return {models:[{name}]} via /api/tags when /v1/models is empty
       modelsFallbackEndpoint: '/api/tags',
+      // Ollama requires an explicit model (unlike LM Studio, which uses its
+      // loaded one). With the field left blank, auto-detect the first model.
+      autoDetectModel: true,
       testConnectionMessage: (count) => `Ollama 连接成功，检测到 ${count} 个模型`,
     },
   },

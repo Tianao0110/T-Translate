@@ -448,6 +448,8 @@ const zh = {
     },
     llmVisionDesc: "处理艺术字、手写体、模糊文字、漫画气泡等复杂场景",
     llmVisionMeta: "需要 LM Studio + 视觉模型（如 Qwen-VL）",
+    llmEndpointPlaceholder: "http://localhost:1234/v1",
+    llmEndpointHint: "视觉模型的 OpenAI 兼容接口地址（Ollama 默认 http://localhost:11434/v1）",
     free25k: "免费 25000次/月", free5k: "免费 5000次/月", free1k: "免费 1000次/月",
     ocrspaceDesc: "免费额度最高，支持 25+ 语言",
     googleVisionDesc: "识别效果最好，支持 200+ 语言",

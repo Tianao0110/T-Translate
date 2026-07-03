@@ -59,12 +59,6 @@ export const NAV_ITEMS = [
 ];
 
 export const DEFAULT_SETTINGS = {
-  connection: {
-    endpoint: defaultConfig.llm.endpoint,
-    timeout: defaultConfig.llm.timeout,
-    model: '',
-  },
-
   // Theme/language. Previously only survived via electron-store's build-time
   // defaults leaking through the top-level spread — a fresh install or a
   // reset-all left this bucket undefined and InterfaceSection crashed reading
@@ -139,6 +133,10 @@ export const DEFAULT_SETTINGS = {
     preprocess: true,
     autoDetect: true,
     confidence: 0.6,
+    // OpenAI-compatible endpoint for the LLM-Vision OCR engine. Was the
+    // orphaned settings.connection.endpoint bucket (no UI); now a real field
+    // in the OCR panel's LLM-Vision group.
+    llmEndpoint: defaultConfig.llm.endpoint,
   },
 
   tts: {
@@ -201,10 +199,6 @@ export const migrateOldSettings = (savedSettings) => {
   let migrated = {
     ...DEFAULT_SETTINGS,
     ...savedSettings,
-    connection: {
-      ...DEFAULT_SETTINGS.connection,
-      ...(savedSettings.connection || {}),
-    },
     interface: {
       ...DEFAULT_SETTINGS.interface,
       ...(savedSettings.interface || {}),
@@ -248,14 +242,14 @@ export const migrateOldSettings = (savedSettings) => {
     },
   };
 
-  // Pre-v0.2 flat endpoint -> connection object
-  if (savedSettings.endpoint && !savedSettings.connection) {
-    migrated.connection = {
-      endpoint: savedSettings.endpoint,
-      timeout: savedSettings.timeout || DEFAULT_SETTINGS.connection.timeout,
-      model: savedSettings.model || '',
-    };
+  // The old settings.connection bucket only ever fed the LLM-Vision OCR
+  // endpoint (its timeout/model were dead). Carry that one live value into
+  // ocr.llmEndpoint, preferring an explicit ocr.llmEndpoint if already set.
+  const legacyEndpoint = savedSettings.connection?.endpoint || savedSettings.endpoint;
+  if (legacyEndpoint && !savedSettings.ocr?.llmEndpoint) {
+    migrated.ocr = { ...migrated.ocr, llmEndpoint: legacyEndpoint };
   }
+  delete migrated.connection;
 
   // settings.providers (old) -> settings.translation.providers
   if (savedSettings.providers?.list && !savedSettings.translation?.providers) {
