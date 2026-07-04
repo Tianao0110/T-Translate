@@ -380,7 +380,7 @@ const zh = {
     recognitionLanguage: "识别语言",
     lang: { auto: "自动检测", zhHans: "简体中文", zhHant: "繁体中文", en: "英文", ja: "日文", ko: "韩文", fr: "法文", de: "德文", es: "西班牙文", ru: "俄文", hi: "印地文", ar: "阿拉伯文" },
     autoLangHint: "选择「自动检测」时，将根据翻译设置自动选择",
-    langPackHint: "中/繁/英/日内置；韩/法德西/俄/印地/阿拉伯需在下方安装对应语言包",
+    langPackHint: "中/繁/英/日及法德西等拉丁语系内置；韩/俄/印地/阿拉伯需在下方安装对应语言包",
     showConfirmButtons: "显示截图确认按钮", confirmButtonsHint: "启用后，选择区域后需点击确认或按 Enter 键",
     autoEnlarge: "自动放大小图片", enlargeHint: "小字体（<15px）识别率低，自动放大可提升准确率",
     scaleFactor: "放大倍数", recommended: "（推荐）",
@@ -388,9 +388,9 @@ const zh = {
     visionModels: "视觉大模型", visionHint: "深度识别，处理复杂场景",
     onlineServices: "在线 OCR 服务", onlineHint: "精准模式，需联网",
     onlineNote: "商业 API 训练数据最多，识别精度最高。隐私模式下自动禁用。",
-    installed: "已安装", needDownload: "需下载基础模型 ~21MB", builtin: "内置",
-    localOcrName: "本地 OCR（PP-OCRv5）",
-    rapidDesc: "内置简中/繁中/英/日识别，支持手写和竖排；更多语言可下载语言包",
+    installed: "已安装", needDownload: "需下载基础模型 ~25MB", builtin: "内置",
+    localOcrName: "本地 OCR（PP-OCRv6）",
+    rapidDesc: "内置简中/繁中/英/日及法德西等拉丁语系识别，支持手写和竖排；更多语言可下载语言包",
     engineBroken: "引擎异常", checking: "检查中", recheckHealth: "重新检查引擎状态",
     engineErrorTitle: "本地 OCR 引擎不可用", healthUnknownError: "未知错误",
     repairing: "正在修复...",
@@ -420,8 +420,10 @@ const zh = {
       redownloadBase: "重新下载基础模型",
       phase: { downloading: "下载中", verifying: "校验中", extracting: "解压中", done: "完成", error: "失败" },
       names: {
-        "base-v5": "基础模型（简中/繁中/英/日）",
+        "base-v6": "基础模型（简中/繁中/英/日/拉丁语系）",
         korean: "韩文",
+        // latin pack was absorbed into base-v6; key kept so a leftover
+        // installed copy still renders a proper name until uninstalled
         latin: "拉丁语系（法/德/西等）",
         cyrillic: "西里尔语系（俄文等）",
         devanagari: "天城文（印地文等）",

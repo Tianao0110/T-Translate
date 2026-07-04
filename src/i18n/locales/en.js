@@ -380,7 +380,7 @@ const en = {
     recognitionLanguage: "Recognition Language",
     lang: { auto: "Auto Detect", zhHans: "Simplified Chinese", zhHant: "Traditional Chinese", en: "English", ja: "Japanese", ko: "Korean", fr: "French", de: "German", es: "Spanish", ru: "Russian", hi: "Hindi", ar: "Arabic" },
     autoLangHint: "When set to Auto Detect, language will be selected based on translation settings",
-    langPackHint: "Chinese/English/Japanese are built in; Korean/Latin/Russian/Hindi/Arabic need the matching language pack below",
+    langPackHint: "Chinese/English/Japanese and Latin-script languages (French/German/Spanish...) are built in; Korean/Russian/Hindi/Arabic need the matching language pack below",
     showConfirmButtons: "Show Screenshot Confirm Buttons", confirmButtonsHint: "When enabled, you need to click confirm or press Enter after selecting area",
     autoEnlarge: "Auto Enlarge Small Images", enlargeHint: "Small fonts (<15px) have low recognition rate, auto enlarge can improve accuracy",
     scaleFactor: "Scale Factor", recommended: "(Recommended)",
@@ -388,9 +388,9 @@ const en = {
     visionModels: "Vision Models", visionHint: "Deep recognition for complex scenarios",
     onlineServices: "Online OCR Services", onlineHint: "Accurate mode, requires network",
     onlineNote: "Commercial APIs have the most training data and highest accuracy. Auto disabled in privacy mode.",
-    installed: "Installed", needDownload: "Base models needed ~21MB", builtin: "Built-in",
-    localOcrName: "Local OCR (PP-OCRv5)",
-    rapidDesc: "Simplified/Traditional Chinese, English and Japanese built in, with handwriting and vertical text; more languages via downloadable packs",
+    installed: "Installed", needDownload: "Base models needed ~25MB", builtin: "Built-in",
+    localOcrName: "Local OCR (PP-OCRv6)",
+    rapidDesc: "Simplified/Traditional Chinese, English, Japanese and Latin-script languages built in, with handwriting and vertical text; more languages via downloadable packs",
     engineBroken: "Engine Error", checking: "Checking", recheckHealth: "Re-check engine health",
     engineErrorTitle: "Local OCR engine unavailable", healthUnknownError: "Unknown error",
     repairing: "Repairing...",
@@ -420,8 +420,10 @@ const en = {
       redownloadBase: "Re-download base models",
       phase: { downloading: "downloading", verifying: "verifying", extracting: "extracting", done: "done", error: "failed" },
       names: {
-        "base-v5": "Base models (Chinese/English/Japanese)",
+        "base-v6": "Base models (Chinese/English/Japanese/Latin scripts)",
         korean: "Korean",
+        // latin pack was absorbed into base-v6; key kept so a leftover
+        // installed copy still renders a proper name until uninstalled
         latin: "Latin script (French/German/Spanish...)",
         cyrillic: "Cyrillic script (Russian...)",
         devanagari: "Devanagari script (Hindi...)",

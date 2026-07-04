@@ -361,7 +361,7 @@ const AboutSection = ({ notify, resetSettings }) => {
             <li>Electron + React 18</li>
             <li>Zustand State Management</li>
             <li>LM Studio / Ollama</li>
-            <li>PP-OCRv5 / LLM Vision</li>
+            <li>PP-OCRv6 / LLM Vision</li>
           </ul>
         </div>
       </div>

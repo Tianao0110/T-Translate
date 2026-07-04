@@ -172,7 +172,7 @@ t-translate/
 | State | Zustand + Immer |
 | Styling | CSS Variables |
 | Secure storage | Electron safeStorage (Windows DPAPI) + access audit |
-| OCR | PP-OCRv5 local (downloadable language packs) / Windows OCR / LLM Vision / OCR.space / Google Vision / Azure / Baidu |
+| OCR | PP-OCRv6 local (Chinese/English/Japanese/Latin scripts built in, downloadable language packs) / Windows OCR / LLM Vision / OCR.space / Google Vision / Azure / Baidu |
 | Local LLM | LM Studio / Ollama (OpenAI-compatible API) |
 | Online translation | OpenAI / Claude / Gemini / DeepSeek / DeepL / Google / Microsoft / Baidu |
 | Packaging | electron-builder |

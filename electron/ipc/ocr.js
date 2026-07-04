@@ -1,10 +1,11 @@
 // OCR IPC: engine detection, model-pack management, recognition handlers.
-// Local recognition runs on electron/utils/ocr-engine (PP-OCRv5 via
+// Local recognition runs on electron/utils/ocr-engine (PP-OCRv6 via
 // esearch-ocr); downloadable language packs live in ocr-pack-manager.
 
 const { ipcMain } = require('electron');
 
 const { CHANNELS } = require('../shared/channels');
+const { BASE_PACK_ID } = require('../shared/ocr-packs');
 const logger = require('../utils/logger')('IPC:OCR');
 const { t } = require('../shared/main-i18n');
 const ocrEngine = require('../utils/ocr-engine');
@@ -35,7 +36,7 @@ function register(ctx) {
   ipcMain.handle(CHANNELS.OCR.CHECK_INSTALLED, async () => {
     const status = {
       'llm-vision': true, // builtin
-      'rapid-ocr': ocrEngine.isPackInstalled('base-v5'),
+      'rapid-ocr': ocrEngine.isPackInstalled(BASE_PACK_ID),
       'windows-ocr': process.platform === 'win32',
     };
     logger.debug('Installed status:', status);

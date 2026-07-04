@@ -21,7 +21,7 @@ const FloatingWindowSection = ({
     const names = {
       'llm-vision': 'LLM Vision',
       'windows-ocr': 'Windows OCR',
-      'rapid-ocr': t('ocr.localOcrName', 'Local OCR (PP-OCRv5)'),
+      'rapid-ocr': t('ocr.localOcrName', 'Local OCR (PP-OCRv6)'),
     };
     return names[engine] || engine;
   };

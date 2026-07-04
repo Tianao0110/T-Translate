@@ -5,6 +5,11 @@ import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff, AlertTriangle, RefreshCw, Download, Trash2, Cpu, Sparkles, Globe } from 'lucide-react';
 import { ocrManager } from '../../../providers/ocr/index.js';
 
+// Must match electron/shared/ocr-packs.js BASE_PACK_ID (renderer cannot
+// import main-process modules; the manifest may list other generations' base
+// packs, so the id must be exact).
+const BASE_PACK_ID = 'base-v6';
+
 const OcrSection = ({
   settings,
   updateSetting,
@@ -101,7 +106,7 @@ const OcrSection = ({
       const result = await window.electron?.ocr?.downloadPack?.(packId);
       if (result?.success) {
         notify(t('ocr.packs.downloaded'), 'success');
-        if (packId === 'base-v5') {
+        if (packId === BASE_PACK_ID) {
           updateSetting('ocr', 'rapidInstalled', true);
           checkEngineHealth();
         }
@@ -330,7 +335,7 @@ const OcrSection = ({
         <div className="section-content">
           <div className="ocr-engines-list">
 
-            {/* Local PP-OCRv5 engine */}
+            {/* Local PP-OCRv6 engine */}
             <div className={`ocr-engine-item ${settings.ocr.engine === 'rapid-ocr' ? 'active' : ''} ${engineHealth === 'broken' ? 'engine-broken' : ''}`}>
               <div className="engine-info">
                 <div className="engine-header">
@@ -376,7 +381,7 @@ const OcrSection = ({
                 )}
 
                 {basePack && (basePack.status === 'update-available' || !settings.ocr.rapidInstalled) &&
-                  renderPackRow({ ...basePack, id: 'base-v5' })}
+                  renderPackRow(basePack)}
 
                 <details className="ocr-pack-section">
                   <summary className="ocr-pack-section-header">
@@ -415,9 +420,9 @@ const OcrSection = ({
                       <button
                         className="btn repair"
                         disabled={busyPackId !== null}
-                        onClick={() => handleDownloadPack('base-v5')}
+                        onClick={() => handleDownloadPack(BASE_PACK_ID)}
                       >
-                        {busyPackId === 'base-v5' ? (
+                        {busyPackId === BASE_PACK_ID ? (
                           <><RefreshCw size={13} className="spinning" /> {t('ocr.repairing')}</>
                         ) : (
                           <><Download size={13} /> {t('ocr.packs.redownloadBase')}</>
@@ -445,9 +450,9 @@ const OcrSection = ({
                   <button
                     className="btn download"
                     disabled={busyPackId !== null}
-                    onClick={() => handleDownloadPack('base-v5')}
+                    onClick={() => handleDownloadPack(BASE_PACK_ID)}
                   >
-                    {busyPackId === 'base-v5'
+                    {busyPackId === BASE_PACK_ID
                       ? <><RefreshCw size={13} className="spinning" /> {t('ocr.packs.downloadingShort')}</>
                       : t('ocr.download')}
                   </button>
