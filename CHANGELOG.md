@@ -2,9 +2,9 @@
 
 本文档记录 T-Translate 各版本变更。早于 v0.2.4 的历史请查 git log 与版本 tag。
 
-## 未发布 — 设置页 + Provider 管理专项（体检修复）
+## v0.3.0（待发布，人工回归通过后上线）— 设置页 + Provider 管理专项
 
-四维审计（README 验真 / 设置桶漂移 / 性能健壮性 / 交互死代码 + 隐私对照）后分七批修复，含 1 个 P0、11 个 P1 与大批 P2/P3。
+四维审计（README 验真 / 设置桶漂移 / 性能健壮性 / 交互死代码 + 隐私对照）后分七批修复，含 1 个 P0、11 个 P1 与大批 P2/P3；另含 emoji→lucide 排版回归修复与三批技术债清扫（死通道/幽灵桶/死语言包键/CSS 令牌化，净删 ~700 行）。
 
 ### 安全与隐私
 - **在线 OCR 密钥不再明文落盘**（P0）：OCR.space / Google Vision / Azure / 百度 OCR 的 API Key 此前以明文写入 electron-store 磁盘 JSON（`encrypted` 标志无人消费），现统一走 Windows DPAPI 加密存储，存量明文一次性迁移；离线模式解密门同步覆盖

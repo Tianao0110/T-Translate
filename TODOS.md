@@ -2,6 +2,14 @@
 
 Forward-looking work clipboard. Git history / GitHub release notes are the archive — these notes stay concise (1-3 lines each + file:line links). Stale-check on each release; delete shipped items.
 
+## ⏭ v0.3.0 发布（下一步，人工事项）
+
+设置页 + Provider 专项定版 0.3.0（package.json 已 bump，CHANGELOG 条目已就位）。流程：
+
+1. 人工回归 `feat/settings-provider`（重点：跨页保存不丢、重置所有设置、Provider 密钥存取与清空、悬浮窗/划词窗改配置即生效、TTS 开关即时显隐、三主题下翻译源页外观、OCR 密钥迁移后截图识别正常）
+2. 回归过 → `git merge --no-ff feat/settings-provider`（描述性 merge message）→ `git branch -d` 清分支 → push
+3. `npm run dist` → GitHub Release 传三件套（exe + blockmap + latest.yml）→ 删除 CHANGELOG 标题中的"待发布"字样并补日期 → TODOS 清扫本节
+
 ## 发布流程备忘（每版适用）
 
 - 打包：`npm run dist`，产物在 `release/`；GitHub Release **必传三件套** `T-Translate-Setup-x.x.x.exe` + `.exe.blockmap` + `latest.yml`（缺 latest.yml 用户端检查更新直接报错）
