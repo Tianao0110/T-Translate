@@ -36,12 +36,15 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 - README 应用支持列表 — 等日常使用积累（`npm run start:debug` 探针日志按应用记录走哪层），逐项标注已知限制
 - UIA TextPattern 第 4 层 — **默认不建**（承重墙修复后覆盖大幅改善）；仅当日志出现成片失败样本再评估
 
-### PP-OCRv6 ONNX 实测（能否喂进 esearch-ocr）
+### PP-OCRv6 换代（spike 已验证 ✅ 2026-07-03，待拍板排期）
 
-PP-OCRv6 已发布（2026-06-11，[官方介绍](https://www.paddleocr.ai/main/en/version3.x/algorithm/PP-OCRv6/PP-OCRv6.html)）：PPLCNetV4 骨干，tiny/small/medium 三档（1.5M-34.5M 参数），medium 对 v5_server 识别 +5.1%/检测 +4.6%，**单模型 50 语言**（简繁中/英/日 + 46 拉丁语系）。
+Spike 结论（复跑：`node temp/ocr-probe/probe-v6.js`，形状检查 `inspect-v6.js`，模型在 temp/ocr-probe/v6-\*）：**上游 eSearch-OCR 模型仓（release tag `4.0.0`）已有官方转换好的 v6 ONNX**（tiny/small/medium 三档），Paddle2ONNX 一步全免；**esearch-ocr 8.5.0 零改动直接加载推理**——rec 输入同为 `[N,3,48,W]`、字典同"行数+2"（blank+space）约定，原风险点全部排除。六场景（zh简/繁/en/ja/拉丁/ko）实测：
 
-- **实验**：Paddle2ONNX 导出 v6 tiny/small 的 det/rec + 字典，直接喂 esearch-ocr 跑 temp/ 的 probe 8 场景；风险点 = rec 非对称 stride 的输入形状与字典格式是否匹配 esearch-ocr 加载假设
-- **成了的话**：走"模型热更新只改 Release"路径，**拉丁语言包可删**（被基础模型吸收）；韩/西里尔/天城/阿拉伯四包保留
+- **v6-small（zip 24.8MB）可整包替换 base-v5**：zh简繁/en/ja 全对且置信度更高（0.998-0.999），**拉丁语系全对**（Grüße/Straße/niño/¿ 全中；v5 则 ß→B、ñ→n、¿→i），韩文空输出（同 v5 优雅降级）；速度 190-260ms vs v5 110-330ms（CJK 略慢、拉丁反超），截图场景无感
+- **v6-tiny（5.4MB）否决**：字典仅 6904 字**无假名**——日文乱码（二九(二方过世界，conf 0.722）、繁体劣化（測信式/翻澤）、韩文幻觉输出（conf 0.701 有害于回退判断）
+- 落地清单：① engine 空格启发式门控 [ocr-engine.js](../electron/utils/ocr-engine.js) `gen !== 'v5'` 改按代际白名单（v6 同样原生空格须关闭）② [ocr-model-sources.js](../scripts/ocr-model-sources.js) BASE_PACK 换 v6-small（files 名 ppocr6_small_det/rec.onnx + dic.txt）+ gen:'v6' + bump version ③ **拉丁包删除**：LANGUAGE_TO_PACK 的 fr/de/es 改映射 base，korean/cyrillic/devanagari/arabic 四包保留 v4 ④ 体积：安装包约 +7MB（25MB zip / 31MB 落盘 vs 现 18MB/21MB）
+- **⚠️ 发布顺序陷阱**：老客户端 engine 对 gen≠'v5' 会**开启**空格启发式——若先翻 ocr-models Release，老版本"重新下载基础包"会拿到 v6 且疯狂插空格。**必须先发含门控修复的应用版，再更新模型 Release 资产**
+- 合入时补测：竖排文本、真实截图小字（过全量 probe.js + 实拍），medium（95MB）不考虑
 - 顺带：百度 Unlimited-OCR 只有 NVIDIA GPU 路径，不适合内置；其 vLLM 镜像是 OpenAI 兼容 API，有 N 卡用户可把 llm-vision 端点指过去零改动直连——可写 FAQ
 
 ### 真 asar 热替换（仅评估，不承诺）
