@@ -41,10 +41,12 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 Spike 结论（复跑：`node temp/ocr-probe/probe-v6.js`，形状检查 `inspect-v6.js`，模型在 temp/ocr-probe/v6-\*）：**上游 eSearch-OCR 模型仓（release tag `4.0.0`）已有官方转换好的 v6 ONNX**（tiny/small/medium 三档），Paddle2ONNX 一步全免；**esearch-ocr 8.5.0 零改动直接加载推理**——rec 输入同为 `[N,3,48,W]`、字典同"行数+2"（blank+space）约定，原风险点全部排除。六场景（zh简/繁/en/ja/拉丁/ko）实测：
 
 - **v6-small（zip 24.8MB）可整包替换 base-v5**：zh简繁/en/ja 全对且置信度更高（0.998-0.999），**拉丁语系全对**（Grüße/Straße/niño/¿ 全中；v5 则 ß→B、ñ→n、¿→i），韩文空输出（同 v5 优雅降级）；速度 190-260ms vs v5 110-330ms（CJK 略慢、拉丁反超），截图场景无感
-- **v6-tiny（5.4MB）否决**：字典仅 6904 字**无假名**——日文乱码（二九(二方过世界，conf 0.722）、繁体劣化（測信式/翻澤）、韩文幻觉输出（conf 0.701 有害于回退判断）
+- **v6-tiny（5.4MB）否决**：字典仅 6904 字**无假名**——日文乱码（二九(二方过世界，conf 0.722）、繁体劣化（測信式/翻澤）、韩文幻觉输出（conf 0.701 有害于回退判断）。官方档位说明印证：tiny 49 语言**不含日语**
+- **v6-medium（zip 95MB / 落盘 139MB）已实测**：六场景输出与 small **一字不差**（conf 1.000 vs 0.998-0.999），速度 ~2× 慢（270-791ms）；其 +5.1% 优势在困难样本（模糊照片/艺术字/点阵/旋转），清晰截图显不出。官方定位 medium=server、small=mobile/desktop。**不做默认**；如做"质量优先"选项 → 可选下载"高精度包"：pack 体系 userData 覆盖 base 已支持（medium 文件落 base 目录 + gen:'v6' 即透明生效），只差设置页档位控件（走设置四件套），medium zip 直接挂 ocr-models Release
+- **档位事实（官方页已核）**：v6 全系仅 tiny/small/medium 三档（1.5M-34.5M 参数），medium 即顶配（对标并超越 v5_server，CPU 上 OpenVINO 比 v5_server 快 5.2×）；上游转换 ONNX 恰好也是这三档；v6 **无独立多语言模型**，韩/西里尔/天城/阿拉伯继续走 v4 包
 - 落地清单：① engine 空格启发式门控 [ocr-engine.js](../electron/utils/ocr-engine.js) `gen !== 'v5'` 改按代际白名单（v6 同样原生空格须关闭）② [ocr-model-sources.js](../scripts/ocr-model-sources.js) BASE_PACK 换 v6-small（files 名 ppocr6_small_det/rec.onnx + dic.txt）+ gen:'v6' + bump version ③ **拉丁包删除**：LANGUAGE_TO_PACK 的 fr/de/es 改映射 base，korean/cyrillic/devanagari/arabic 四包保留 v4 ④ 体积：安装包约 +7MB（25MB zip / 31MB 落盘 vs 现 18MB/21MB）
 - **⚠️ 发布顺序陷阱**：老客户端 engine 对 gen≠'v5' 会**开启**空格启发式——若先翻 ocr-models Release，老版本"重新下载基础包"会拿到 v6 且疯狂插空格。**必须先发含门控修复的应用版，再更新模型 Release 资产**
-- 合入时补测：竖排文本、真实截图小字（过全量 probe.js + 实拍），medium（95MB）不考虑
+- 合入时补测：竖排文本、真实截图小字（过全量 probe.js + 实拍）
 - 顺带：百度 Unlimited-OCR 只有 NVIDIA GPU 路径，不适合内置；其 vLLM 镜像是 OpenAI 兼容 API，有 N 卡用户可把 llm-vision 端点指过去零改动直连——可写 FAQ
 
 ### 真 asar 热替换（仅评估，不承诺）
