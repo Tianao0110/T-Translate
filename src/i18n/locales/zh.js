@@ -399,6 +399,14 @@ const zh = {
       desc: "Windows 内置 OCR，零下载开箱即用；识别质量一般，适合兜底",
       langs: "系统已装语言包：{{langs}}",
     },
+    tier: {
+      label: "模型档位",
+      standard: "标准（内置）",
+      high: "高精度（需下载 ~95MB）",
+      hint: "高精度档对模糊照片、艺术字、点阵字等困难样本更强；清晰截图两档结果相同，高精度速度约慢一半",
+      enabled: "已启用高精度模型",
+      disabled: "已切回标准模型",
+    },
     packs: {
       title: "语言包",
       refresh: "刷新",
@@ -421,6 +429,7 @@ const zh = {
       phase: { downloading: "下载中", verifying: "校验中", extracting: "解压中", done: "完成", error: "失败" },
       names: {
         "base-v6": "基础模型（简中/繁中/英/日/拉丁语系）",
+        "base-v6-hq": "高精度模型（PP-OCRv6 medium）",
         korean: "韩文",
         // latin pack was absorbed into base-v6; key kept so a leftover
         // installed copy still renders a proper name until uninstalled

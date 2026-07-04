@@ -106,6 +106,7 @@ const CHANNELS = {
     WINDOWS_OCR: 'ocr:windows-ocr',
     PADDLE_OCR: 'ocr:paddle-ocr',
     HEALTH_CHECK: 'ocr:health-check',
+    SET_MODEL_TIER: 'ocr:set-model-tier',
   },
   MENU: {
     ACTION: 'menu-action',

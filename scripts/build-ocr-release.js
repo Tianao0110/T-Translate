@@ -15,7 +15,7 @@
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const { BASE_PACK, LANG_PACKS, LEGACY_PACKS, RELEASE_BASE_URL } = require('./ocr-model-sources');
+const { BASE_PACK, HQ_PACK, LANG_PACKS, LEGACY_PACKS, RELEASE_BASE_URL } = require('./ocr-model-sources');
 
 const OUT_DIR = path.join(__dirname, '..', 'release-ocr-models');
 
@@ -50,7 +50,7 @@ async function main() {
   const packs = [];
   // Legacy entries first: pre-v6 clients pick their base pack via
   // find(type === 'base'), so base-v5 must precede base-v6 in the manifest.
-  for (const pack of [...LEGACY_PACKS, BASE_PACK, ...LANG_PACKS]) {
+  for (const pack of [...LEGACY_PACKS, BASE_PACK, HQ_PACK, ...LANG_PACKS]) {
     packs.push(await fetchPack(pack));
   }
 

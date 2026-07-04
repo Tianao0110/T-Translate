@@ -7,7 +7,7 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 设置页 + Provider 专项已合并 main（merge 4222c8c，分支已清，2026-07-03）。剩余：
 
 1. 人工回归收尾（重点：跨页保存不丢、重置所有设置、Provider 密钥存取与清空、悬浮窗/划词窗改配置即生效、TTS 开关即时显隐、三主题下翻译源页外观、OCR 密钥迁移后截图识别正常、**v6 基础模型截图识别中/英/日/法德西 + 语言包下载卸载**）；发现问题直接在 main 上小修
-2. **更新 `ocr-models` Release**：`npm run ocr:release` 重新生成 → 到 Release 页删除旧 manifest.json，上传新 manifest.json + ppocr_v6_small.zip（**其余旧资产全部保留**——老客户端靠 base-v5/latin 条目活着）。须在 0.3.0 发布前完成，否则新装用户"修复基础包"找不到 base-v6
+2. **更新 `ocr-models` Release**：`npm run ocr:release` 重新生成 → 到 Release 页删除旧 manifest.json，上传新 manifest.json + ppocr_v6_small.zip + ppocr_v6_medium.zip（**其余旧资产全部保留**——老客户端靠 base-v5/latin 条目活着）。须在 0.3.0 发布前完成，否则新装用户"修复基础包"找不到 base-v6、高精度档下载不到 medium
 3. `npm run dist` → GitHub Release 传三件套（exe + blockmap + latest.yml）→ 删除 CHANGELOG 标题中的"待发布"字样并补日期 → TODOS 清扫本节
 
 ## 发布流程备忘（每版适用）
@@ -37,13 +37,13 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 - README 应用支持列表 — 等日常使用积累（`npm run start:debug` 探针日志按应用记录走哪层），逐项标注已知限制
 - UIA TextPattern 第 4 层 — **默认不建**（承重墙修复后覆盖大幅改善）；仅当日志出现成片失败样本再评估
 
-### PP-OCRv6 后续候选（换代已随 v0.3.0 落地 ✅ 2026-07-04）
+### PP-OCRv6 后续候选（换代 + 高精度档均已随 v0.3.0 落地 ✅ 2026-07-04）
 
-基础包已换 v6-small（feat/ocr-v6：新 id base-v6 + 空格门控按代际 + 拉丁包退役 + manifest 新旧双轨服务老客户端），发布动作见上方 v0.3.0 节步骤 2。剩余候选：
+基础包已换 v6-small（feat/ocr-v6：新 id base-v6 + 空格门控按代际 + 拉丁包退役 + manifest 新旧双轨服务老客户端）；medium 高精度档已落地（feat/ocr-model-tier：模型档位控件 + base-v6-hq 可下载可切换 + 引擎按档位解析 base 目录）。发布动作见上方 v0.3.0 节步骤 2。剩余候选：
 
-- **medium"高精度包"可选下载**：实测六场景输出与 small 一字不差（其 +5.1% 优势在模糊照片/艺术字/点阵/旋转等困难样本），落盘 139MB、速度 ~2× 慢——不做默认。做法：medium 文件以 base-v6 id 落 userData 即透明生效（pack 体系 userData 覆盖 base 已支持），差一个设置页档位控件（走设置四件套）+ medium zip 挂 ocr-models Release。等用户对困难样本的真实需求再拍板
 - **doc_cls 旋转分类器**：整图旋转/倒置文本目前不纠正（OCR_MODELS.md 已知边界），上游有现成 doc_cls.onnx（6.5MB，release 8.1.0）；接入 esearch-ocr init 的 docCls 参数即可，适合并入下一轮 OCR 小批
-- 档位备忘：v6 全系仅 tiny/small/medium 三档（官方页 2026-07-03 已核），tiny 无假名不可用；v6 无独立多语言模型，韩/西里尔/天城/阿拉伯继续 v4 包；spike 数据与复跑脚本在 temp/ocr-probe/（probe-v6.js 四引擎对比 / inspect-v6.js 形状检查）
+- **模型更新主动提示**：模型更新目前靠用户进设置页看"可更新"徽章；可在启动/健康检查时比对 manifest，有新基础模型 toast 引导一键更新（已向用户提过，未拍板）
+- 档位备忘：v6 全系仅 tiny/small/medium 三档（官方页 2026-07-03 已核），tiny 无假名不可用；v6 无独立多语言模型，韩/西里尔/天城/阿拉伯继续 v4 包；spike 数据与复跑脚本在 temp/ocr-probe/（probe-v6.js 四引擎对比 / probe-tier.js 档位切换 / inspect-v6.js 形状检查）
 - 合入时补测：竖排文本、真实截图小字（过全量 probe.js + 实拍）
 - 顺带：百度 Unlimited-OCR 只有 NVIDIA GPU 路径，不适合内置；其 vLLM 镜像是 OpenAI 兼容 API，有 N 卡用户可把 llm-vision 端点指过去零改动直连——可写 FAQ
 

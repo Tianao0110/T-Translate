@@ -6,8 +6,12 @@ const path = require('path');
 const fs = require('fs');
 const { app } = require('electron');
 const PATHS = require('../shared/paths');
-const { BASE_PACK_ID, packIdForLanguage } = require('../shared/ocr-packs');
+const { BASE_PACK_ID, HQ_PACK_ID, packIdForLanguage } = require('../shared/ocr-packs');
 const logger = require('./logger')('OCR-Engine');
+
+// 'standard' = bundled small model; 'high' = downloaded medium variant.
+// Seeded from settings at IPC registration, updated via SET_MODEL_TIER.
+let _modelTier = 'standard';
 
 // Heavy natives (onnxruntime dll, skia) load lazily on first recognition,
 // not at app startup.
@@ -65,6 +69,25 @@ function isPackInstalled(packId) {
   return resolvePackDir(packId) !== null;
 }
 
+// High tier prefers the medium variant; silently falls back to the standard
+// base if the hq pack was removed from disk while the setting still says high.
+function resolveBaseDir() {
+  if (_modelTier === 'high') {
+    const hq = resolvePackDir(HQ_PACK_ID);
+    if (hq) return hq;
+  }
+  return resolvePackDir(BASE_PACK_ID);
+}
+
+function setModelTier(tier) {
+  const next = tier === 'high' ? 'high' : 'standard';
+  if (next === _modelTier) return;
+  _modelTier = next;
+  // Base det/rec underlie every cached session — rebuild them all.
+  _sessions.clear();
+  logger.info(`Model tier set to ${next}`);
+}
+
 // Scan userData packs (+ bundled base) for the settings UI.
 function listInstalledPacks() {
   const packs = new Map();
@@ -98,7 +121,7 @@ function listInstalledPacks() {
 async function createSession(packId) {
   const { esearch, ort } = ensureEnv();
 
-  const baseDir = resolvePackDir(BASE_PACK_ID);
+  const baseDir = resolveBaseDir();
   if (!baseDir) {
     const err = new Error('base models missing');
     err.code = 'BASE_MODELS_MISSING';
@@ -123,7 +146,7 @@ async function createSession(packId) {
   const recPath = path.join(recDir, recMeta.files.rec);
   const dict = fs.readFileSync(path.join(recDir, recMeta.files.dict), 'utf8');
 
-  logger.info(`Loading OCR session: pack=${packId} gen=${recMeta.gen}`);
+  logger.info(`Loading OCR session: pack=${packId} gen=${recMeta.gen} base=${base.id}`);
 
   return esearch.init({
     det: { input: detPath },
@@ -162,9 +185,10 @@ async function getSession(packId) {
 }
 
 // Pack manager calls this after uninstall/update so the next recognition
-// reloads from disk.
+// reloads from disk. Base packs supply the det model to every session, so
+// changing either of them invalidates the whole cache, not just their own key.
 function evictSessions(packId) {
-  if (packId) {
+  if (packId && packId !== BASE_PACK_ID && packId !== HQ_PACK_ID) {
     _sessions.delete(packId);
   } else {
     _sessions.clear();
@@ -288,12 +312,16 @@ async function recognize(imageInput, options = {}) {
 // Health probe: model files resolvable + sessions load (catches corrupt onnx
 // and broken native bindings without running a full recognition).
 async function healthCheck() {
-  if (!resolvePackDir(BASE_PACK_ID)) {
+  const baseDir = resolveBaseDir();
+  if (!baseDir) {
     return { healthy: false, error: 'BASE_MODELS_MISSING' };
   }
   try {
     await getSession(BASE_PACK_ID);
-    return { healthy: true };
+    // activeBase tells callers (and probes) which base variant actually
+    // loaded — the pack id, not the directory name (the bundled copy lives
+    // in a dir just called 'base').
+    return { healthy: true, activeBase: readPackMeta(baseDir).id };
   } catch (e) {
     return { healthy: false, error: e.code || 'LOAD_FAILED', detail: e.message };
   }
@@ -303,6 +331,7 @@ module.exports = {
   recognize,
   healthCheck,
   evictSessions,
+  setModelTier,
   isPackInstalled,
   listInstalledPacks,
   resolvePackDir,

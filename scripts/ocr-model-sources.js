@@ -25,6 +25,25 @@ const BASE_PACK = {
   },
 };
 
+// Optional high-accuracy base variant (PP-OCRv6 medium). Not bundled into the
+// installer, not a language pack: users opt in via the model-tier control in
+// OCR settings and the engine swaps it in for the base det/rec. Its type keeps
+// it out of the base row and the language-pack list in every client generation.
+const HQ_PACK = {
+  id: 'base-v6-hq',
+  type: 'base-variant',
+  gen: 'v6',
+  version: '1.0.0',
+  file: 'ppocr_v6_medium.zip',
+  url: `${UPSTREAM_BASE}/ppocr_v6_medium.zip`,
+  languages: ['zh-Hans', 'zh-Hant', 'en', 'ja', 'fr', 'de', 'es'],
+  files: {
+    det: 'ppocr6_medium_det.onnx',
+    rec: 'ppocr6_medium_rec.onnx',
+    dict: 'dic.txt',
+  },
+};
+
 // Kept in the release manifest for apps shipped before the v6 base swap:
 // their base-pack repair resolves 'base-v5', and their fr/de/es still map to
 // the latin pack. Never bump/change these — old clients' engine enables the
@@ -102,4 +121,4 @@ const LANG_PACKS = [
 // Where the app downloads packs from at runtime (the user-controlled release).
 const RELEASE_BASE_URL = 'https://github.com/Tianao0110/T-Translate/releases/download/ocr-models';
 
-module.exports = { UPSTREAM_BASE, BASE_PACK, LANG_PACKS, LEGACY_PACKS, RELEASE_BASE_URL };
+module.exports = { UPSTREAM_BASE, BASE_PACK, HQ_PACK, LANG_PACKS, LEGACY_PACKS, RELEASE_BASE_URL };

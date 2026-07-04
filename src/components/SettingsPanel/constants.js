@@ -119,6 +119,10 @@ export const DEFAULT_SETTINGS = {
     preprocess: true,
     autoDetect: true,
     confidence: 0.6,
+    // Local model tier: 'standard' = bundled small models, 'high' = the
+    // downloadable medium variant. Applies immediately (silent update +
+    // dot-path store write), like theme/language.
+    modelTier: 'standard',
     // OpenAI-compatible endpoint for the LLM-Vision OCR engine. Was the
     // orphaned settings.connection.endpoint bucket (no UI); now a real field
     // in the OCR panel's LLM-Vision group.
