@@ -44,6 +44,7 @@
 
 ### 内部
 - 死代码清扫约 500 行：主进程四个死在线 OCR handler、SUBTITLE 幽灵通道桶、多处死 IPC 监听与导出、creative 模板与死元数据、theme 'auto' 死分支等；About/OCR/快捷键面板 emoji 图标改 lucide
+- 深色主题下原生下拉弹层白底白字修复：全局 `select option` 令牌化，设置页/主面板全部下拉受益（三主题实测计算样式）
 
 ## v0.2.9 — 2026-07-02
 

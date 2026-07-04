@@ -34,6 +34,15 @@ input, button, textarea, select {
   font: inherit;
 }
 
+/* Native <select> popups paint their own chrome: on dark themes the options
+   sit on the OS-light popup background while inheriting theme-light text —
+   white on white until hovered. Chromium honors bg/color on <option>, so pin
+   both to theme tokens (resolves correctly for all three themes). */
+select option {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
 p, h1, h2, h3, h4, h5, h6 {
   overflow-wrap: break-word;
 }
