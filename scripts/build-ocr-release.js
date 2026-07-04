@@ -15,7 +15,7 @@
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const { BASE_PACK, LANG_PACKS, RELEASE_BASE_URL } = require('./ocr-model-sources');
+const { BASE_PACK, LANG_PACKS, LEGACY_PACKS, RELEASE_BASE_URL } = require('./ocr-model-sources');
 
 const OUT_DIR = path.join(__dirname, '..', 'release-ocr-models');
 
@@ -34,7 +34,9 @@ async function fetchPack(pack) {
     fs.writeFileSync(dest, buffer);
   }
 
-  const { url, ...entry } = pack;
+  // Manifest entries carry no url — clients join baseUrl + file instead.
+  const entry = { ...pack };
+  delete entry.url;
   return {
     ...entry,
     size: buffer.length,
@@ -46,7 +48,9 @@ async function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true });
 
   const packs = [];
-  for (const pack of [BASE_PACK, ...LANG_PACKS]) {
+  // Legacy entries first: pre-v6 clients pick their base pack via
+  // find(type === 'base'), so base-v5 must precede base-v6 in the manifest.
+  for (const pack of [...LEGACY_PACKS, BASE_PACK, ...LANG_PACKS]) {
     packs.push(await fetchPack(pack));
   }
 

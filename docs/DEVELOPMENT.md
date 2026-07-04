@@ -20,7 +20,7 @@ src/
 ├── providers/ocr/            # OCR 引擎
 │   ├── base.js               # OCR 引擎基类
 │   ├── index.js              # OCR 引擎注册表
-│   ├── rapid.js              # 本地 OCR 引擎（PP-OCRv5，主进程 esearch-ocr，见 docs/OCR_MODELS.md）
+│   ├── rapid.js              # 本地 OCR 引擎（PP-OCRv6，主进程 esearch-ocr，见 docs/OCR_MODELS.md）
 │   ├── windows.js            # Windows OCR 系统引擎（兜底）
 │   ├── llm-vision.js         # LLM Vision 引擎
 │   └── ...

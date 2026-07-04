@@ -172,7 +172,7 @@ t-translate/
 | 状态管理 | Zustand + Immer                                                         |
 | 样式     | CSS Variables                                                           |
 | 安全存储 | Electron safeStorage (Windows DPAPI) + 访问审计                         |
-| OCR      | PP-OCRv5 本地（语言包可下载）/ Windows OCR / LLM Vision / OCR.space / Google Vision / Azure / 百度 |
+| OCR      | PP-OCRv6 本地（简繁英日+拉丁语系内置，语言包可下载）/ Windows OCR / LLM Vision / OCR.space / Google Vision / Azure / 百度 |
 | 本地 LLM | LM Studio / Ollama（OpenAI 兼容 API）                                   |
 | 在线翻译 | OpenAI / Claude / Gemini / DeepSeek / DeepL / Google / Microsoft / 百度 |
 | 打包     | electron-builder                                                        |

@@ -6,8 +6,9 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 
 设置页 + Provider 专项已合并 main（merge 4222c8c，分支已清，2026-07-03）。剩余：
 
-1. 人工回归收尾（重点：跨页保存不丢、重置所有设置、Provider 密钥存取与清空、悬浮窗/划词窗改配置即生效、TTS 开关即时显隐、三主题下翻译源页外观、OCR 密钥迁移后截图识别正常）；发现问题直接在 main 上小修
-2. `npm run dist` → GitHub Release 传三件套（exe + blockmap + latest.yml）→ 删除 CHANGELOG 标题中的"待发布"字样并补日期 → TODOS 清扫本节
+1. 人工回归收尾（重点：跨页保存不丢、重置所有设置、Provider 密钥存取与清空、悬浮窗/划词窗改配置即生效、TTS 开关即时显隐、三主题下翻译源页外观、OCR 密钥迁移后截图识别正常、**v6 基础模型截图识别中/英/日/法德西 + 语言包下载卸载**）；发现问题直接在 main 上小修
+2. **更新 `ocr-models` Release**：`npm run ocr:release` 重新生成 → 到 Release 页删除旧 manifest.json，上传新 manifest.json + ppocr_v6_small.zip（**其余旧资产全部保留**——老客户端靠 base-v5/latin 条目活着）。须在 0.3.0 发布前完成，否则新装用户"修复基础包"找不到 base-v6
+3. `npm run dist` → GitHub Release 传三件套（exe + blockmap + latest.yml）→ 删除 CHANGELOG 标题中的"待发布"字样并补日期 → TODOS 清扫本节
 
 ## 发布流程备忘（每版适用）
 
@@ -36,16 +37,13 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 - README 应用支持列表 — 等日常使用积累（`npm run start:debug` 探针日志按应用记录走哪层），逐项标注已知限制
 - UIA TextPattern 第 4 层 — **默认不建**（承重墙修复后覆盖大幅改善）；仅当日志出现成片失败样本再评估
 
-### PP-OCRv6 换代（spike 已验证 ✅ 2026-07-03，待拍板排期）
+### PP-OCRv6 后续候选（换代已随 v0.3.0 落地 ✅ 2026-07-04）
 
-Spike 结论（复跑：`node temp/ocr-probe/probe-v6.js`，形状检查 `inspect-v6.js`，模型在 temp/ocr-probe/v6-\*）：**上游 eSearch-OCR 模型仓（release tag `4.0.0`）已有官方转换好的 v6 ONNX**（tiny/small/medium 三档），Paddle2ONNX 一步全免；**esearch-ocr 8.5.0 零改动直接加载推理**——rec 输入同为 `[N,3,48,W]`、字典同"行数+2"（blank+space）约定，原风险点全部排除。六场景（zh简/繁/en/ja/拉丁/ko）实测：
+基础包已换 v6-small（feat/ocr-v6：新 id base-v6 + 空格门控按代际 + 拉丁包退役 + manifest 新旧双轨服务老客户端），发布动作见上方 v0.3.0 节步骤 2。剩余候选：
 
-- **v6-small（zip 24.8MB）可整包替换 base-v5**：zh简繁/en/ja 全对且置信度更高（0.998-0.999），**拉丁语系全对**（Grüße/Straße/niño/¿ 全中；v5 则 ß→B、ñ→n、¿→i），韩文空输出（同 v5 优雅降级）；速度 190-260ms vs v5 110-330ms（CJK 略慢、拉丁反超），截图场景无感
-- **v6-tiny（5.4MB）否决**：字典仅 6904 字**无假名**——日文乱码（二九(二方过世界，conf 0.722）、繁体劣化（測信式/翻澤）、韩文幻觉输出（conf 0.701 有害于回退判断）。官方档位说明印证：tiny 49 语言**不含日语**
-- **v6-medium（zip 95MB / 落盘 139MB）已实测**：六场景输出与 small **一字不差**（conf 1.000 vs 0.998-0.999），速度 ~2× 慢（270-791ms）；其 +5.1% 优势在困难样本（模糊照片/艺术字/点阵/旋转），清晰截图显不出。官方定位 medium=server、small=mobile/desktop。**不做默认**；如做"质量优先"选项 → 可选下载"高精度包"：pack 体系 userData 覆盖 base 已支持（medium 文件落 base 目录 + gen:'v6' 即透明生效），只差设置页档位控件（走设置四件套），medium zip 直接挂 ocr-models Release
-- **档位事实（官方页已核）**：v6 全系仅 tiny/small/medium 三档（1.5M-34.5M 参数），medium 即顶配（对标并超越 v5_server，CPU 上 OpenVINO 比 v5_server 快 5.2×）；上游转换 ONNX 恰好也是这三档；v6 **无独立多语言模型**，韩/西里尔/天城/阿拉伯继续走 v4 包
-- 落地清单：① engine 空格启发式门控 [ocr-engine.js](../electron/utils/ocr-engine.js) `gen !== 'v5'` 改按代际白名单（v6 同样原生空格须关闭）② [ocr-model-sources.js](../scripts/ocr-model-sources.js) BASE_PACK 换 v6-small（files 名 ppocr6_small_det/rec.onnx + dic.txt）+ gen:'v6' + bump version ③ **拉丁包删除**：LANGUAGE_TO_PACK 的 fr/de/es 改映射 base，korean/cyrillic/devanagari/arabic 四包保留 v4 ④ 体积：安装包约 +7MB（25MB zip / 31MB 落盘 vs 现 18MB/21MB）
-- **⚠️ 发布顺序陷阱**：老客户端 engine 对 gen≠'v5' 会**开启**空格启发式——若先翻 ocr-models Release，老版本"重新下载基础包"会拿到 v6 且疯狂插空格。**必须先发含门控修复的应用版，再更新模型 Release 资产**
+- **medium"高精度包"可选下载**：实测六场景输出与 small 一字不差（其 +5.1% 优势在模糊照片/艺术字/点阵/旋转等困难样本），落盘 139MB、速度 ~2× 慢——不做默认。做法：medium 文件以 base-v6 id 落 userData 即透明生效（pack 体系 userData 覆盖 base 已支持），差一个设置页档位控件（走设置四件套）+ medium zip 挂 ocr-models Release。等用户对困难样本的真实需求再拍板
+- **doc_cls 旋转分类器**：整图旋转/倒置文本目前不纠正（OCR_MODELS.md 已知边界），上游有现成 doc_cls.onnx（6.5MB，release 8.1.0）；接入 esearch-ocr init 的 docCls 参数即可，适合并入下一轮 OCR 小批
+- 档位备忘：v6 全系仅 tiny/small/medium 三档（官方页 2026-07-03 已核），tiny 无假名不可用；v6 无独立多语言模型，韩/西里尔/天城/阿拉伯继续 v4 包；spike 数据与复跑脚本在 temp/ocr-probe/（probe-v6.js 四引擎对比 / inspect-v6.js 形状检查）
 - 合入时补测：竖排文本、真实截图小字（过全量 probe.js + 实拍）
 - 顺带：百度 Unlimited-OCR 只有 NVIDIA GPU 路径，不适合内置；其 vLLM 镜像是 OpenAI 兼容 API，有 N 卡用户可把 llm-vision 端点指过去零改动直连——可写 FAQ
 

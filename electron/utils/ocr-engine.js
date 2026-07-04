@@ -130,9 +130,9 @@ async function createSession(packId) {
     rec: {
       input: recPath,
       decodeDic: dict,
-      // v5 recognizes spaces natively; the lib's space heuristic is for v3/v4
-      // and over-inserts on v5 output.
-      optimize: { space: recMeta.gen !== 'v5' },
+      // The lib's space heuristic is for v3/v4 rec models; v5+ recognize
+      // spaces natively and the heuristic over-inserts.
+      optimize: { space: recMeta.gen === 'v3' || recMeta.gen === 'v4' },
     },
     ort,
   });

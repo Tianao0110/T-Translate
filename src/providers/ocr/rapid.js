@@ -1,4 +1,4 @@
-// Local OCR — PP-OCRv5 via esearch-ocr in the main process; renderer calls
+// Local OCR — PP-OCRv6 via esearch-ocr in the main process; renderer calls
 // through IPC. Engine id stays 'rapid-ocr' for stored-settings compatibility.
 
 import { BaseOCREngine, _t } from './base.js';
@@ -9,8 +9,8 @@ class RapidOCREngine extends BaseOCREngine {
 
   static metadata = {
     id: 'rapid-ocr',
-    name: 'Local OCR (PP-OCRv5)',
-    description: 'Local PP-OCRv5 engine with downloadable language packs',
+    name: 'Local OCR (PP-OCRv6)',
+    description: 'Local PP-OCRv6 engine with downloadable language packs',
     type: 'local',
     tier: 1,
     priority: 1,

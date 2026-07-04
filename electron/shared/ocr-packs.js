@@ -3,21 +3,23 @@
 // by a pack.json; the base pack ships with the app, language packs are
 // downloaded on demand from the GitHub `ocr-models` release.
 
-const BASE_PACK_ID = 'base-v5';
+const BASE_PACK_ID = 'base-v6';
 
-// The base recognizer (PP-OCRv5 mobile) natively covers zh-Hans/zh-Hant/en/ja.
-// Every other language maps to the pack whose recognition model unlocks it.
-// Detection is script-agnostic: all packs reuse the base det model.
+// The base recognizer (PP-OCRv6 small) natively covers zh-Hans/zh-Hant/en/ja
+// plus 46 Latin-script languages (fr/de/es exposed in the UI; the former
+// latin pack is absorbed). Every other language maps to the pack whose
+// recognition model unlocks it. Detection is script-agnostic: all packs
+// reuse the base det model.
 const LANGUAGE_TO_PACK = {
   'auto': BASE_PACK_ID,
   'zh-Hans': BASE_PACK_ID,
   'zh-Hant': BASE_PACK_ID,
   'en': BASE_PACK_ID,
   'ja': BASE_PACK_ID,
+  'fr': BASE_PACK_ID,
+  'de': BASE_PACK_ID,
+  'es': BASE_PACK_ID,
   'ko': 'korean',
-  'fr': 'latin',
-  'de': 'latin',
-  'es': 'latin',
   'ru': 'cyrillic',
   'hi': 'devanagari',
   'ar': 'arabic',
@@ -49,6 +51,13 @@ function computePackList(installedPacks, manifest) {
   const result = [];
 
   for (const mp of manifest?.packs || []) {
+    // The manifest also carries entries for other app generations (their base
+    // pack; packs absorbed into this build's base model). Skip what this
+    // build can't use — a still-installed absorbed pack falls through to the
+    // orphan branch below, staying visible and uninstallable.
+    if (mp.type === 'base' && mp.id !== BASE_PACK_ID) continue;
+    if (mp.type === 'lang' && !(mp.languages || []).some((l) => LANGUAGE_TO_PACK[l] === mp.id)) continue;
+
     const local = installed.get(mp.id);
     if (!local) {
       result.push({ ...mp, status: 'not-installed' });

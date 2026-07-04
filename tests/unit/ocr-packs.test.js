@@ -13,16 +13,14 @@ const {
 
 describe('packIdForLanguage', () => {
   it('maps built-in languages to the base pack', () => {
-    for (const lang of ['auto', 'zh-Hans', 'zh-Hant', 'en', 'ja']) {
+    // fr/de/es ride on the v6 base model (former latin pack absorbed)
+    for (const lang of ['auto', 'zh-Hans', 'zh-Hant', 'en', 'ja', 'fr', 'de', 'es']) {
       expect(packIdForLanguage(lang)).toBe(BASE_PACK_ID);
     }
   });
 
   it('maps pack languages to their pack', () => {
     expect(packIdForLanguage('ko')).toBe('korean');
-    expect(packIdForLanguage('fr')).toBe('latin');
-    expect(packIdForLanguage('de')).toBe('latin');
-    expect(packIdForLanguage('es')).toBe('latin');
     expect(packIdForLanguage('ru')).toBe('cyrillic');
     expect(packIdForLanguage('hi')).toBe('devanagari');
     expect(packIdForLanguage('ar')).toBe('arabic');
@@ -57,9 +55,9 @@ describe('compareVersions', () => {
 describe('computePackList', () => {
   const manifest = {
     packs: [
-      { id: 'base-v5', type: 'base', version: '1.0.0' },
-      { id: 'korean', type: 'lang', version: '1.0.0' },
-      { id: 'cyrillic', type: 'lang', version: '2.0.0' },
+      { id: BASE_PACK_ID, type: 'base', version: '1.0.0' },
+      { id: 'korean', type: 'lang', version: '1.0.0', languages: ['ko'] },
+      { id: 'cyrillic', type: 'lang', version: '2.0.0', languages: ['ru'] },
     ],
   };
 
@@ -108,5 +106,34 @@ describe('computePackList', () => {
     const cyr = list.find((p) => p.id === 'cyrillic');
     expect(cyr.version).toBe('2.0.0');
     expect(cyr.installedVersion).toBe('1.0.0');
+  });
+
+  // The shared manifest also serves older app generations: their base pack
+  // and packs absorbed into the current base model must not surface here.
+  it("skips other generations' base packs from the manifest", () => {
+    const list = computePackList([], {
+      packs: [
+        { id: 'base-v5', type: 'base', version: '1.0.0' },
+        { id: BASE_PACK_ID, type: 'base', version: '1.0.0' },
+      ],
+    });
+    expect(list.map((p) => p.id)).toEqual([BASE_PACK_ID]);
+  });
+
+  it('skips manifest lang packs whose languages were absorbed into base', () => {
+    const list = computePackList([], {
+      packs: [{ id: 'latin', type: 'lang', version: '1.0.0', languages: ['fr', 'de', 'es'] }],
+    });
+    expect(list).toEqual([]);
+  });
+
+  it('keeps an installed absorbed pack visible as orphaned (uninstallable)', () => {
+    const list = computePackList(
+      [{ id: 'latin', type: 'lang', version: '1.0.0' }],
+      { packs: [{ id: 'latin', type: 'lang', version: '1.0.0', languages: ['fr', 'de', 'es'] }] }
+    );
+    const latin = list.find((p) => p.id === 'latin');
+    expect(latin.status).toBe('orphaned');
+    expect(latin.installedVersion).toBe('1.0.0');
   });
 });

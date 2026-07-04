@@ -4,8 +4,8 @@
 
 | 路径 | 内容 | 何时使用 |
 | --- | --- | --- |
-| 安装包内置 | 基础包 base-v5（det + 简繁英日 rec + 字典，~21MB） | 随安装包分发，开箱即用 |
-| 应用内下载 | 语言包（韩/拉丁/西里尔/天城文/阿拉伯，各 ~8MB） | 用户在 设置 → OCR → 语言包 按需下载 |
+| 安装包内置 | 基础包 base-v6（det + 简繁英日及 46 拉丁语系 rec + 字典，下载 ~25MB / 落盘 ~31MB） | 随安装包分发，开箱即用 |
+| 应用内下载 | 语言包（韩/西里尔/天城文/阿拉伯，各 ~8MB；拉丁包已被 base-v6 吸收退役） | 用户在 设置 → OCR → 语言包 按需下载 |
 | 应用内修复 | 基础包重新下载到 userData | 内置模型损坏 / 缺失时 |
 
 ## 运行时目录
@@ -26,12 +26,14 @@ https://github.com/Tianao0110/T-Translate/releases/download/ocr-models/manifest.
 ### 首次发布（一次性）
 
 ```bash
-npm run ocr:release        # 生成 release-ocr-models/（6 个 zip + manifest.json）
+npm run ocr:release        # 生成 release-ocr-models/（7 个 zip + manifest.json）
 ```
 
 1. GitHub → Releases → Draft a new release，tag 填 `ocr-models`（不要带 v 前缀）
 2. **勾选 "Set as a pre-release"** —— 防止 electron-updater 把它当成应用最新版
-3. 上传 `release-ocr-models/` 里的全部 7 个文件，发布
+3. 上传 `release-ocr-models/` 里的全部 8 个文件，发布
+
+> **新旧双轨**：manifest 同时携带 `LEGACY_PACKS`（base-v5 + latin）服务 v6 换代前的老客户端——它们的基础包修复按 id `base-v5` 取包、法德西仍映射拉丁包，且其引擎对 gen≠'v5' 会开空格启发式，**绝不能收到 v6 模型**。旧资产（ppocr_v5_mobile.zip / latin.zip）永远保留在 Release 上，legacy 条目不 bump 版本。新客户端在 `computePackList` 里自动跳过异代 base 与被吸收的语言包。
 
 ### 日后更新模型（无需发应用新版）
 
@@ -52,7 +54,7 @@ npm run ocr:release        # 生成 release-ocr-models/（6 个 zip + manifest.j
   "packs": [{
     "id": "korean",            // 唯一 id，= 安装目录名
     "type": "lang",            // base | lang
-    "gen": "v4",               // 模型代际；v5 时引擎关闭空格启发式
+    "gen": "v4",               // 模型代际；引擎仅对 v3/v4 开空格启发式（v5+ 原生识别空格）
     "version": "1.0.0",        // 与本地 pack.json 比较以提示更新
     "file": "korean.zip",      // 资产文件名（与 baseUrl 拼接；也可用 url 字段覆写）
     "size": 8952561,           // 字节，用于进度估算
@@ -85,7 +87,8 @@ npx electron temp/ocr-probe/probe-ipc.js      # IPC 注册完整性 + 健康检�
 
 ## 已知边界
 
-- 语言包 rec 模型现为 PP-OCRv4 代际（上游 eSearch-OCR 尚未转换 v5 多语言模型）；v5 的 korean/latin/eslav ONNX 出现后按上述「更新模型」流程换入即可
+- 剩余四个语言包（韩/西里尔/天城/阿拉伯）rec 模型仍为 PP-OCRv4 代际——PP-OCRv6 是单模型 50 语言（简繁中/英/日 + 46 拉丁），**没有独立多语言模型**，这四种文字不在其覆盖内；上游出新代多语言 ONNX 后按「更新模型」流程换入
+- v6 基础模型三档中本项目用 small（官方定位 mobile/desktop）；medium（落盘 139MB，清晰截图输出与 small 一致、速度约 2 倍慢）可做未来"高精度包"可选下载，tiny 无假名不可用（见 TODOS）
 - **旁遮普语（Punjabi/古木基文 Gurmukhi）无法支持**：已核对 PP-OCRv5 全部 11 个多语言模型的语种表（2026-06），PaddleOCR 系没有 Gurmukhi 模型，做不成语言包。巴基斯坦写法（Shahmukhi，阿拉伯字母系）与 arabic 包覆盖的乌尔都文接近、可能部分可用但非官方支持；印度写法只能走在线引擎（Google Vision 支持 pa）或 LLM Vision。上游若新增 Gurmukhi 模型，按「新增语言包」流程接入
 - 引擎未接角度分类器（doc_cls）：整图旋转 / 倒置文本不纠正；v5 基础模型自带竖排识别，截图场景足够
 - Windows OCR 引擎走系统语言包（设置 → 时间和语言 → 语言 安装），与本仓库模型体系无关
