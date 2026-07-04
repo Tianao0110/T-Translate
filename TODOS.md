@@ -42,7 +42,6 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 基础包已换 v6-small（feat/ocr-v6：新 id base-v6 + 空格门控按代际 + 拉丁包退役 + manifest 新旧双轨服务老客户端）；medium 高精度档已落地（feat/ocr-model-tier：模型档位控件 + base-v6-hq 可下载可切换 + 引擎按档位解析 base 目录）。发布动作见上方 v0.3.0 节步骤 2。剩余候选：
 
 - **doc_cls 旋转分类器**：整图旋转/倒置文本目前不纠正（OCR_MODELS.md 已知边界），上游有现成 doc_cls.onnx（6.5MB，release 8.1.0）；接入 esearch-ocr init 的 docCls 参数即可，适合并入下一轮 OCR 小批
-- **模型更新主动提示**：模型更新目前靠用户进设置页看"可更新"徽章；可在启动/健康检查时比对 manifest，有新基础模型 toast 引导一键更新（已向用户提过，未拍板）
 - 档位备忘：v6 全系仅 tiny/small/medium 三档（官方页 2026-07-03 已核），tiny 无假名不可用；v6 无独立多语言模型，韩/西里尔/天城/阿拉伯继续 v4 包；spike 数据与复跑脚本在 temp/ocr-probe/（probe-v6.js 四引擎对比 / probe-tier.js 档位切换 / inspect-v6.js 形状检查）
 - 合入时补测：竖排文本、真实截图小字（过全量 probe.js + 实拍）
 - 顺带：百度 Unlimited-OCR 只有 NVIDIA GPU 路径，不适合内置；其 vLLM 镜像是 OpenAI 兼容 API，有 N 卡用户可把 llm-vision 端点指过去零改动直连——可写 FAQ

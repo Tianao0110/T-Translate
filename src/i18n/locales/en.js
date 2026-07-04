@@ -419,6 +419,8 @@ const en = {
       loading: "Loading pack list...",
       empty: "No language packs available",
       manifestError: "Could not fetch the pack list. Check your network and hit Refresh.",
+      updatesFound: "{{count}} model pack(s) have updates — see the list below",
+      upToDate: "All model packs are up to date",
       downloaded: "Language pack installed",
       downloadFailed: "Language pack download failed",
       downloadingShort: "Downloading...",
