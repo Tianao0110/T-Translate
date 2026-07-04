@@ -46,6 +46,16 @@ const OcrSection = ({
       if (res?.success) {
         setPacks(res.packs || []);
         setManifestError(res.manifestError || null);
+        // Passive update notice (user decision): feedback only on a manual
+        // refresh — no unsolicited prompts elsewhere in the app.
+        if (refresh && !res.manifestError) {
+          const updatable = (res.packs || []).filter((p) => p.status === 'update-available');
+          if (updatable.length > 0) {
+            notify(t('ocr.packs.updatesFound', { count: updatable.length }), 'info');
+          } else {
+            notify(t('ocr.packs.upToDate'), 'success');
+          }
+        }
       } else {
         setManifestError(res?.error || 'unknown');
       }
@@ -54,7 +64,7 @@ const OcrSection = ({
     } finally {
       setPacksLoading(false);
     }
-  }, []);
+  }, [notify, t]);
 
   const checkEngineHealth = useCallback(async () => {
     setEngineHealth('checking');

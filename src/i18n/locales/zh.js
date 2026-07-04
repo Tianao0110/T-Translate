@@ -419,6 +419,8 @@ const zh = {
       loading: "正在获取语言包清单...",
       empty: "暂无可用语言包",
       manifestError: "无法获取语言包清单，请检查网络后点击刷新",
+      updatesFound: "{{count}} 个模型包有可用更新，见下方列表",
+      upToDate: "模型包已全部为最新版本",
       downloaded: "语言包安装完成",
       downloadFailed: "语言包下载失败",
       downloadingShort: "下载中...",
