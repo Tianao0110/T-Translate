@@ -72,7 +72,10 @@ const logger = createLogger('Translation');
 const secureStorage = {
   async get(key) {
     if (window.electron?.secureStorage) {
-      return await window.electron.secureStorage.decrypt(key);
+      // Stack boot/reload sweeps every enabled provider's keys in all three
+      // windows — tagged so the main-process access audit logs but doesn't
+      // count them as a suspicious burst.
+      return await window.electron.secureStorage.decrypt(key, { context: 'stack-reload' });
     }
     // Browser-mode fallback: base64-wrapped (no real encryption)
     const encoded = localStorage.getItem(`__secure_${key}`);

@@ -8,11 +8,19 @@ const logger = require('../utils/logger')('IPC:SecureStorage');
 
 // ===== Access audit =====
 
+// App-internal bulk sweeps legitimately touch every stored key at once:
+// settings-page load, translation-stack boot/reload in each of the three
+// windows, OCR engine config loads. They stay in the audit trail but are
+// excluded from the burst alarm — it exists to flag access patterns the
+// app's own architecture can't produce. (Before this, boot + one settings
+// save crossed the threshold and fired a false "suspicious access" alert.)
+const BULK_CONTEXTS = new Set(['settings-load', 'stack-reload', 'ocr-config']);
+
 const accessLog = {
   records: [],
   maxRecords: 200,
 
-  alertThreshold: 15,      // >15 decrypts in window => suspicious
+  alertThreshold: 15,      // >15 non-bulk decrypts in window => suspicious
   alertWindowMs: 60000,
   lastAlertTime: 0,
   alertCooldownMs: 300000, // throttle alerts to 1 per 5 min
@@ -31,7 +39,9 @@ function logAccess(key, context = 'unknown') {
 function checkAnomaly() {
   const now = Date.now();
   const windowStart = now - accessLog.alertWindowMs;
-  const recent = accessLog.records.filter(r => r.timestamp > windowStart);
+  const recent = accessLog.records.filter(
+    r => r.timestamp > windowStart && !BULK_CONTEXTS.has(r.context)
+  );
 
   if (recent.length >= accessLog.alertThreshold) {
     const uniqueKeys = new Set(recent.map(r => r.key));
@@ -126,7 +136,8 @@ function register(ctx) {
     }
   });
 
-  // options.context: 'settings-load' suppresses anomaly alert during batch load
+  // options.context: recognized bulk contexts (BULK_CONTEXTS) are logged for
+  // the audit trail but never counted toward the burst alarm.
   ipcMain.handle(CHANNELS.SECURE_STORAGE.DECRYPT, async (event, key, options = {}) => {
     try {
       const privacyCheck = isDecryptAllowed(key, store);
@@ -136,8 +147,10 @@ function register(ctx) {
       }
 
       const context = options?.context || 'unknown';
+      // Bulk records can't create an anomaly (filtered in checkAnomaly), so
+      // isAnomaly here always reflects a genuine non-bulk burst.
       const anomaly = logAccess(key, context);
-      if (anomaly.isAnomaly && context !== 'settings-load') {
+      if (anomaly.isAnomaly) {
         sendSecurityAlert(anomaly);
       }
 
@@ -182,3 +195,13 @@ module.exports = register;
 // Shared with floating-window.js so its direct safeStorage reads respect the
 // same offline-mode gate instead of maintaining a second prefix list.
 module.exports.isDecryptAllowed = isDecryptAllowed;
+// Test-only surface (tests/unit/secure-audit.test.js): the burst heuristic
+// must stay false-positive-free for app-internal bulk sweeps.
+module.exports._audit = {
+  logAccess,
+  checkAnomaly,
+  reset() {
+    accessLog.records = [];
+    accessLog.lastAlertTime = 0;
+  },
+};
