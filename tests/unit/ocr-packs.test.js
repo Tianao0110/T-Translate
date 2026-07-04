@@ -127,6 +127,13 @@ describe('computePackList', () => {
     expect(list).toEqual([]);
   });
 
+  it('passes the high-accuracy base variant through (neither base nor lang)', () => {
+    const list = computePackList([], {
+      packs: [{ id: 'base-v6-hq', type: 'base-variant', version: '1.0.0', languages: ['fr'] }],
+    });
+    expect(list.find((p) => p.id === 'base-v6-hq')?.status).toBe('not-installed');
+  });
+
   it('keeps an installed absorbed pack visible as orphaned (uninstallable)', () => {
     const list = computePackList(
       [{ id: 'latin', type: 'lang', version: '1.0.0' }],

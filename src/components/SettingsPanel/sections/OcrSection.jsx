@@ -5,10 +5,11 @@ import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff, AlertTriangle, RefreshCw, Download, Trash2, Cpu, Sparkles, Globe } from 'lucide-react';
 import { ocrManager } from '../../../providers/ocr/index.js';
 
-// Must match electron/shared/ocr-packs.js BASE_PACK_ID (renderer cannot
-// import main-process modules; the manifest may list other generations' base
-// packs, so the id must be exact).
+// Must match electron/shared/ocr-packs.js BASE_PACK_ID / HQ_PACK_ID (renderer
+// cannot import main-process modules; the manifest may list other generations'
+// base packs, so the ids must be exact).
 const BASE_PACK_ID = 'base-v6';
+const HQ_PACK_ID = 'base-v6-hq';
 
 const OcrSection = ({
   settings,
@@ -122,11 +123,22 @@ const OcrSection = ({
     }
   }, [notify, t, updateSetting, checkEngineHealth, loadPacks]);
 
+  // Immediate-apply control (like theme/language): silent React update +
+  // dot-path persist + engine hot-swap via IPC.
+  const applyTier = useCallback(async (tier) => {
+    updateSetting('ocr', 'modelTier', tier, true);
+    window.electron?.store?.set?.('settings.ocr.modelTier', tier);
+    await window.electron?.ocr?.setModelTier?.(tier);
+  }, [updateSetting]);
+
   const handleRemovePack = useCallback(async (packId) => {
     if (!(await confirm(t('ocr.packs.removeConfirm')))) return;
     try {
       const result = await window.electron?.ocr?.removePack?.(packId);
       if (result?.success) {
+        // Removing the high-accuracy variant reverts the tier — the engine
+        // would silently fall back anyway, but the setting must not lie.
+        if (packId === HQ_PACK_ID) await applyTier('standard');
         notify(t('ocr.packs.removed'), 'success');
         await loadPacks(false);
       } else {
@@ -135,7 +147,7 @@ const OcrSection = ({
     } catch (e) {
       notify(t('ocr.packs.removeFailed') + ': ' + e.message, 'error');
     }
-  }, [notify, t, loadPacks, confirm]);
+  }, [notify, t, loadPacks, confirm, applyTier]);
 
   const toggleApiKeyVisibility = (key, e) => {
     e?.stopPropagation();
@@ -202,6 +214,35 @@ const OcrSection = ({
 
   const langPacks = packs.filter((p) => p.type === 'lang');
   const basePack = packs.find((p) => p.type === 'base');
+  const hqPack = packs.find((p) => p.id === HQ_PACK_ID);
+  const hqInstalled = !!hqPack && ['installed', 'update-available', 'orphaned'].includes(hqPack.status);
+  const modelTier = settings.ocr.modelTier || 'standard';
+
+  const handleTierChange = async (tier) => {
+    if (tier === modelTier) return;
+    if (tier === 'high' && !hqInstalled) {
+      // Not on disk yet: download first, enable only on success
+      setBusyPackId(HQ_PACK_ID);
+      try {
+        const result = await window.electron?.ocr?.downloadPack?.(HQ_PACK_ID);
+        if (result?.success) {
+          await applyTier('high');
+          notify(t('ocr.tier.enabled'), 'success');
+          await loadPacks(false);
+        } else {
+          notify(result?.error || t('ocr.packs.downloadFailed'), 'error');
+        }
+      } catch (e) {
+        notify(t('ocr.packs.downloadFailed') + ': ' + e.message, 'error');
+      } finally {
+        setBusyPackId(null);
+        setPackProgress(null);
+      }
+      return;
+    }
+    await applyTier(tier);
+    notify(tier === 'high' ? t('ocr.tier.enabled') : t('ocr.tier.disabled'), 'success');
+  };
 
   const renderPackRow = (pack) => {
     const busy = busyPackId === pack.id;
@@ -382,6 +423,24 @@ const OcrSection = ({
 
                 {basePack && (basePack.status === 'update-available' || !settings.ocr.rapidInstalled) &&
                   renderPackRow(basePack)}
+
+                {/* Model tier: bundled small vs downloadable medium. Selecting
+                    "high" without the pack on disk downloads it first. */}
+                <div className="setting-group" style={{ margin: '10px 0 4px' }}>
+                  <label className="setting-label">{t('ocr.tier.label')}</label>
+                  <select
+                    className="setting-select"
+                    style={{ maxWidth: 340 }}
+                    value={modelTier}
+                    onChange={(e) => handleTierChange(e.target.value)}
+                    disabled={busyPackId !== null}
+                  >
+                    <option value="standard">{t('ocr.tier.standard')}</option>
+                    <option value="high">{t('ocr.tier.high')}</option>
+                  </select>
+                  <p className="setting-hint">{t('ocr.tier.hint')}</p>
+                  {hqPack && (hqInstalled || busyPackId === HQ_PACK_ID) && renderPackRow(hqPack)}
+                </div>
 
                 <details className="ocr-pack-section">
                   <summary className="ocr-pack-section-header">

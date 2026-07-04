@@ -5,6 +5,12 @@
 
 const BASE_PACK_ID = 'base-v6';
 
+// Optional high-accuracy base variant (PP-OCRv6 medium). When installed and
+// the user has picked the high tier, the engine resolves base det/rec from
+// this pack instead of BASE_PACK_ID. type 'base-variant' keeps it out of both
+// the base row and the language-pack list in every client generation.
+const HQ_PACK_ID = 'base-v6-hq';
+
 // The base recognizer (PP-OCRv6 small) natively covers zh-Hans/zh-Hant/en/ja
 // plus 46 Latin-script languages (fr/de/es exposed in the UI; the former
 // latin pack is absorbed). Every other language maps to the pack whose
@@ -83,6 +89,7 @@ function computePackList(installedPacks, manifest) {
 
 module.exports = {
   BASE_PACK_ID,
+  HQ_PACK_ID,
   LANGUAGE_TO_PACK,
   packIdForLanguage,
   compareVersions,

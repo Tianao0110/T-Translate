@@ -4,7 +4,8 @@
 
 | 路径 | 内容 | 何时使用 |
 | --- | --- | --- |
-| 安装包内置 | 基础包 base-v6（det + 简繁英日及 46 拉丁语系 rec + 字典，下载 ~25MB / 落盘 ~31MB） | 随安装包分发，开箱即用 |
+| 安装包内置 | 基础包 base-v6（PP-OCRv6 small det + 简繁英日及 46 拉丁语系 rec + 字典，下载 ~25MB / 落盘 ~31MB） | 随安装包分发，开箱即用 |
+| 应用内下载 | 高精度包 base-v6-hq（PP-OCRv6 medium det + rec，下载 ~95MB / 落盘 ~139MB） | 设置 → OCR → 模型档位 选「高精度」，切换即时生效、切回不删包 |
 | 应用内下载 | 语言包（韩/西里尔/天城文/阿拉伯，各 ~8MB；拉丁包已被 base-v6 吸收退役） | 用户在 设置 → OCR → 语言包 按需下载 |
 | 应用内修复 | 基础包重新下载到 userData | 内置模型损坏 / 缺失时 |
 
@@ -26,12 +27,12 @@ https://github.com/Tianao0110/T-Translate/releases/download/ocr-models/manifest.
 ### 首次发布（一次性）
 
 ```bash
-npm run ocr:release        # 生成 release-ocr-models/（7 个 zip + manifest.json）
+npm run ocr:release        # 生成 release-ocr-models/（8 个 zip + manifest.json）
 ```
 
 1. GitHub → Releases → Draft a new release，tag 填 `ocr-models`（不要带 v 前缀）
 2. **勾选 "Set as a pre-release"** —— 防止 electron-updater 把它当成应用最新版
-3. 上传 `release-ocr-models/` 里的全部 8 个文件，发布
+3. 上传 `release-ocr-models/` 里的全部 9 个文件，发布
 
 > **新旧双轨**：manifest 同时携带 `LEGACY_PACKS`（base-v5 + latin）服务 v6 换代前的老客户端——它们的基础包修复按 id `base-v5` 取包、法德西仍映射拉丁包，且其引擎对 gen≠'v5' 会开空格启发式，**绝不能收到 v6 模型**。旧资产（ppocr_v5_mobile.zip / latin.zip）永远保留在 Release 上，legacy 条目不 bump 版本。新客户端在 `computePackList` 里自动跳过异代 base 与被吸收的语言包。
 
@@ -88,7 +89,7 @@ npx electron temp/ocr-probe/probe-ipc.js      # IPC 注册完整性 + 健康检�
 ## 已知边界
 
 - 剩余四个语言包（韩/西里尔/天城/阿拉伯）rec 模型仍为 PP-OCRv4 代际——PP-OCRv6 是单模型 50 语言（简繁中/英/日 + 46 拉丁），**没有独立多语言模型**，这四种文字不在其覆盖内；上游出新代多语言 ONNX 后按「更新模型」流程换入
-- v6 基础模型三档中本项目用 small（官方定位 mobile/desktop）；medium（落盘 139MB，清晰截图输出与 small 一致、速度约 2 倍慢）可做未来"高精度包"可选下载，tiny 无假名不可用（见 TODOS）
+- v6 基础模型三档：small 为内置默认（官方定位 mobile/desktop），medium 已作为可选「高精度包」提供（对模糊照片/艺术字/点阵字等困难样本更强；清晰截图输出与 small 一致、速度约 2 倍慢），tiny 无假名不可用。引擎解析顺序：档位为「高精度」且 base-v6-hq 在 userData → 用它，否则回落 base-v6（含 hq 被手动删除的静默回退）
 - **旁遮普语（Punjabi/古木基文 Gurmukhi）无法支持**：已核对 PP-OCRv5 全部 11 个多语言模型的语种表（2026-06），PaddleOCR 系没有 Gurmukhi 模型，做不成语言包。巴基斯坦写法（Shahmukhi，阿拉伯字母系）与 arabic 包覆盖的乌尔都文接近、可能部分可用但非官方支持；印度写法只能走在线引擎（Google Vision 支持 pa）或 LLM Vision。上游若新增 Gurmukhi 模型，按「新增语言包」流程接入
 - 引擎未接角度分类器（doc_cls）：整图旋转 / 倒置文本不纠正；v5 基础模型自带竖排识别，截图场景足够
 - Windows OCR 引擎走系统语言包（设置 → 时间和语言 → 语言 安装），与本仓库模型体系无关

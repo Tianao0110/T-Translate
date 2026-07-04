@@ -15,6 +15,15 @@ const windowsOcr = require('../utils/windows-ocr');
 function register(ctx) {
   const { getMainWindow, store } = ctx;
 
+  // Seed the engine's model tier from persisted settings; the renderer keeps
+  // it updated through SET_MODEL_TIER when the user switches.
+  ocrEngine.setModelTier(store.get('settings.ocr.modelTier', 'standard'));
+
+  ipcMain.handle(CHANNELS.OCR.SET_MODEL_TIER, (event, tier) => {
+    ocrEngine.setModelTier(tier);
+    return { success: true };
+  });
+
   // ===== Engine detection =====
 
   ipcMain.handle(CHANNELS.OCR.CHECK_WINDOWS_OCR, async () => {

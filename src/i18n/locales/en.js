@@ -399,6 +399,14 @@ const en = {
       desc: "Windows built-in OCR, zero download; moderate quality, good as a fallback",
       langs: "Installed system language packs: {{langs}}",
     },
+    tier: {
+      label: "Model tier",
+      standard: "Standard (bundled)",
+      high: "High accuracy (~95MB download)",
+      hint: "High accuracy is stronger on blurry photos, stylized and dot-matrix text; results on clean screenshots are identical and it runs at roughly half the speed",
+      enabled: "High-accuracy models enabled",
+      disabled: "Switched back to standard models",
+    },
     packs: {
       title: "Language Packs",
       refresh: "Refresh",
@@ -421,6 +429,7 @@ const en = {
       phase: { downloading: "downloading", verifying: "verifying", extracting: "extracting", done: "done", error: "failed" },
       names: {
         "base-v6": "Base models (Chinese/English/Japanese/Latin scripts)",
+        "base-v6-hq": "High-accuracy models (PP-OCRv6 medium)",
         korean: "Korean",
         // latin pack was absorbed into base-v6; key kept so a leftover
         // installed copy still renders a proper name until uninstalled

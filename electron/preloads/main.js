@@ -149,6 +149,7 @@ const electronAPI = {
     listPacks: (options) => ipcRenderer.invoke("ocr:packs-list", options),
     downloadPack: (packId) => ipcRenderer.invoke("ocr:packs-download", packId),
     removePack: (packId) => ipcRenderer.invoke("ocr:packs-remove", packId),
+    setModelTier: (tier) => ipcRenderer.invoke("ocr:set-model-tier", tier),
     onPackProgress: (callback) => {
       const handler = (event, data) => callback(data);
       ipcRenderer.on("ocr:download-progress", handler);
