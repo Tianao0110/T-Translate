@@ -28,7 +28,7 @@ const DocumentSection = ({
             type="number"
             className="setting-input small"
             value={settings.document?.maxCharsPerSegment || 800}
-            onChange={(e) => updateSetting('document', 'maxCharsPerSegment', parseInt(e.target.value) || 800)}
+            onChange={(e) => updateSetting('document', 'maxCharsPerSegment', Math.min(Math.max(parseInt(e.target.value) || 800, 200), 2000))}
             min="200"
             max="2000"
             step="100"
@@ -72,7 +72,7 @@ const DocumentSection = ({
               type="number"
               className="setting-input small"
               value={settings.document?.filters?.minLength || 10}
-              onChange={(e) => updateFilter('minLength', parseInt(e.target.value) || 10)}
+              onChange={(e) => updateFilter('minLength', Math.min(Math.max(parseInt(e.target.value) || 10, 1), 50))}
               min="1"
               max="50"
             />

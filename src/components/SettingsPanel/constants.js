@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 
 import { PRIVACY_MODES, getModeFeatures, isFeatureEnabled, isProviderAllowed as isProviderAllowedByMode, PRIVACY_MODE_IDS } from '@config/privacy-modes';
-import { getLanguageOptions } from '@config/defaults';
+import { DEFAULT_TTS_CONFIG } from '../../services/tts/index.js';
 
 export const defaultConfig = {
   llm: { endpoint: 'http://localhost:1234/v1', timeout: 60000 },
@@ -16,12 +16,11 @@ export const defaultConfig = {
   ocr: { defaultEngine: 'llm-vision', windowsLanguage: 'zh-Hans' },
   ui: { theme: 'light', fontSize: 14 },
   logging: { level: 'info' },
+  // Only the global (OS-level) shortcuts are configurable. The in-app keys
+  // (translate/swap/clear/paste/copy) were editable in the UI but nothing read
+  // settings.shortcuts for them — they're hardcoded in the panels — so the
+  // rows were pure decoration and have been removed.
   shortcuts: {
-    translate: 'Ctrl+Enter',
-    swapLanguages: 'Ctrl+L',
-    clear: 'Ctrl+Shift+C',
-    paste: 'Ctrl+V',
-    copy: 'Ctrl+C',
     screenshot: 'Alt+Q',
     toggleWindow: 'Ctrl+Shift+W',
     floatingWindow: 'Ctrl+Alt+G',
@@ -29,20 +28,6 @@ export const defaultConfig = {
   },
   dev: { debugMode: false },
 };
-
-export const SHORTCUT_LABELS = {
-  translate: '执行翻译',
-  swapLanguages: '切换语言',
-  clear: '清空内容',
-  paste: '粘贴文本',
-  copy: '复制结果',
-  screenshot: '📷 截图翻译',
-  toggleWindow: '🪟 显示/隐藏窗口',
-  floatingWindow: '🔮 悬浮窗口',
-  selectionTranslate: '✏️ 划词翻译开关',
-};
-
-export const GLOBAL_SHORTCUT_KEYS = ['screenshot', 'toggleWindow', 'floatingWindow', 'selectionTranslate'];
 
 // `basic: true` flags items shown in the simplified settings view.
 // `keywords` powers the in-settings search.
@@ -60,10 +45,18 @@ export const NAV_ITEMS = [
 ];
 
 export const DEFAULT_SETTINGS = {
-  connection: {
-    endpoint: defaultConfig.llm.endpoint,
-    timeout: defaultConfig.llm.timeout,
-    model: '',
+  // Theme/language. Previously only survived via electron-store's build-time
+  // defaults leaking through the top-level spread — a fresh install or a
+  // reset-all left this bucket undefined and InterfaceSection crashed reading
+  // .theme. Owned here now so the shape is always present.
+  interface: {
+    theme: defaultConfig.ui.theme,
+    language: '',
+  },
+
+  // Startup toggles (auto-enable selection after launch).
+  startup: {
+    autoEnableSelection: false,
   },
 
   // Live language keys are settings.translation.sourceLanguage/targetLanguage,
@@ -126,23 +119,21 @@ export const DEFAULT_SETTINGS = {
     preprocess: true,
     autoDetect: true,
     confidence: 0.6,
+    // OpenAI-compatible endpoint for the LLM-Vision OCR engine. Was the
+    // orphaned settings.connection.endpoint bucket (no UI); now a real field
+    // in the OCR panel's LLM-Vision group.
+    llmEndpoint: defaultConfig.llm.endpoint,
   },
 
-  tts: {
-    enabled: true,
-    engine: 'web-speech',
-    rate: 1.0,
-    pitch: 1.0,
-    volume: 0.8,
-    voiceId: '',
-  },
+  // Single source of truth for TTS defaults is services/tts/index.js
+  // (electron/state.js keeps a value-identical copy — main process can't
+  // import renderer ESM).
+  tts: { ...DEFAULT_TTS_CONFIG },
 
   screenshot: {
     outputMode: 'bubble', // 'bubble' | 'main'
   },
 };
-
-export const LANGUAGE_OPTIONS = getLanguageOptions(true);
 
 // 0.2.9 reshaped settings.document around the keys the translator actually
 // reads. Old keys (preserveFormatting/batchSize/maxParagraphLength/...) were
@@ -188,9 +179,13 @@ export const migrateOldSettings = (savedSettings) => {
   let migrated = {
     ...DEFAULT_SETTINGS,
     ...savedSettings,
-    connection: {
-      ...DEFAULT_SETTINGS.connection,
-      ...(savedSettings.connection || {}),
+    interface: {
+      ...DEFAULT_SETTINGS.interface,
+      ...(savedSettings.interface || {}),
+    },
+    startup: {
+      ...DEFAULT_SETTINGS.startup,
+      ...(savedSettings.startup || {}),
     },
     translation: {
       ...DEFAULT_SETTINGS.translation,
@@ -227,14 +222,14 @@ export const migrateOldSettings = (savedSettings) => {
     },
   };
 
-  // Pre-v0.2 flat endpoint -> connection object
-  if (savedSettings.endpoint && !savedSettings.connection) {
-    migrated.connection = {
-      endpoint: savedSettings.endpoint,
-      timeout: savedSettings.timeout || DEFAULT_SETTINGS.connection.timeout,
-      model: savedSettings.model || '',
-    };
+  // The old settings.connection bucket only ever fed the LLM-Vision OCR
+  // endpoint (its timeout/model were dead). Carry that one live value into
+  // ocr.llmEndpoint, preferring an explicit ocr.llmEndpoint if already set.
+  const legacyEndpoint = savedSettings.connection?.endpoint || savedSettings.endpoint;
+  if (legacyEndpoint && !savedSettings.ocr?.llmEndpoint) {
+    migrated.ocr = { ...migrated.ocr, llmEndpoint: legacyEndpoint };
   }
+  delete migrated.connection;
 
   // settings.providers (old) -> settings.translation.providers
   if (savedSettings.providers?.list && !savedSettings.translation?.providers) {
@@ -243,8 +238,10 @@ export const migrateOldSettings = (savedSettings) => {
       providers: savedSettings.providers.list,
       providerConfigs: savedSettings.providers.configs,
     };
-    delete migrated.providers;
   }
+  // Drop the bucket unconditionally — old installs also carry an empty {}
+  // seeded by a former electron-store default, kept alive by the spread above.
+  delete migrated.providers;
 
   // Pre-v0.2 flat selectionXxx -> selection nested object (only `enabled`
   // survived; the other flat keys were dead and are no longer seeded).

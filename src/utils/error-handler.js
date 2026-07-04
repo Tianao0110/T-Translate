@@ -31,7 +31,12 @@ const ERROR_PATTERNS = [
       /enotfound/i,
       /econnreset/i,
       /unable to connect/i,
+      // Migrated English provider strings (providerError.connectFailed / cannotConnectTryOther)
+      /cannot\s*connect/i,
+      /connection\s*failed/i,
+      /failed to connect/i,
       /无法连接/,
+      /连接失败/,
       /网络/,
     ],
   },
@@ -44,8 +49,14 @@ const ERROR_PATTERNS = [
       /401/,
       /api.*key.*invalid/i,
       /incorrect.*api.*key/i,
+      // Migrated English provider strings (providerError.notConfigured / keyInvalid*)
+      /not\s*configured/i,
+      /api\s*key\s*invalid/i,
+      /invalid\s*api\s*key/i,
       /请配置.*key/i,
       /未配置/,
+      /key\s*无效/i,
+      /无效或已过期/,
     ],
   },
   {
@@ -57,6 +68,8 @@ const ERROR_PATTERNS = [
       /429/,
       /exceeded/i,
       /limit.*reached/i,
+      /配额/,
+      /余额不足/,
     ],
   },
   {

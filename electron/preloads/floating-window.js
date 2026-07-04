@@ -40,6 +40,10 @@ contextBridge.exposeInMainWorld('electron', {
 
     getHistory: (limit) => ipcRenderer.invoke('floating-window:get-history', limit),
 
+    // Forward a completed translation into the main window's history store
+    // (which applies its own secure-mode gate).
+    addToHistory: (item) => ipcRenderer.invoke('floating-window:add-to-history', item),
+
     openMainSettings: (section) => ipcRenderer.invoke('floating-window:open-main-settings', section),
 
     onSettingsChanged: (callback) => {
@@ -61,37 +65,20 @@ contextBridge.exposeInMainWorld('electron', {
     },
   },
 
-  // Shared OCR API (also exposed in the main-window preload).
+  // Shared OCR API (also exposed in the main-window preload). Online engines
+  // run in the renderer, so only the local recognizers are bridged here.
   ocr: {
     recognizeWithPaddleOCR: (imageData, options) =>
       ipcRenderer.invoke('ocr:paddle-ocr', imageData, options),
     recognizeWithWindowsOCR: (imageData, options) =>
       ipcRenderer.invoke('ocr:windows-ocr', imageData, options),
-    recognizeWithOCRSpace: (imageData, options) =>
-      ipcRenderer.invoke('ocr:ocrspace', imageData, options),
-    recognizeWithGoogleVision: (imageData, options) =>
-      ipcRenderer.invoke('ocr:google-vision', imageData, options),
-    recognizeWithAzureOCR: (imageData, options) =>
-      ipcRenderer.invoke('ocr:azure-ocr', imageData, options),
-    recognizeWithBaiduOCR: (imageData, options) =>
-      ipcRenderer.invoke('ocr:baidu-ocr', imageData, options),
     checkInstalled: () => ipcRenderer.invoke('ocr:check-installed'),
-  },
-
-  translate: {
-    translate: (text, options) => ipcRenderer.invoke('translate:translate', text, options),
-    streamTranslate: (text, options) => ipcRenderer.invoke('translate:stream', text, options),
-    onStreamChunk: (callback) => {
-      const handler = (event, data) => callback(data);
-      ipcRenderer.on('translate:stream-chunk', handler);
-      return () => ipcRenderer.removeListener('translate:stream-chunk', handler);
-    },
   },
 
   // Encrypted storage for API keys etc.
   secureStorage: {
     encrypt: (key, value) => ipcRenderer.invoke('secure-storage:encrypt', key, value),
-    decrypt: (key) => ipcRenderer.invoke('secure-storage:decrypt', key),
+    decrypt: (key, options) => ipcRenderer.invoke('secure-storage:decrypt', key, options),
     delete: (key) => ipcRenderer.invoke('secure-storage:delete', key),
     isAvailable: () => ipcRenderer.invoke('secure-storage:isAvailable'),
   },

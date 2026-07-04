@@ -1,6 +1,6 @@
 // Anthropic Messages API provider (not OpenAI-compatible).
 
-import { BaseProvider, LANGUAGE_CODES } from '../base.js';
+import { BaseProvider, LANGUAGE_CODES, _t } from '../base.js';
 import icon from './icon.svg';
 import createLogger from '../../utils/logger.js';
 
@@ -65,31 +65,47 @@ class AnthropicProvider extends BaseProvider {
     return true;
   }
 
-  async translate(text, sourceLang = 'auto', targetLang = 'zh', options = {}) {
+  // Shared guard for translate/translateStream (they used to carry verbatim copies).
+  _checkInput(text) {
     if (!text?.trim()) {
-      return { success: false, error: '文本为空' };
+      return { success: false, error: _t('providerError.emptyText', '文本为空') };
     }
     if (!this.config.apiKey) {
-      return { success: false, error: '未配置 API Key' };
+      return { success: false, error: _t('providerError.notConfigured', '未配置 API Key') };
     }
+    return null;
+  }
+
+  // Supports both legacy string and `{ content, mode }` from services/translation.js
+  _resolveSystemPrompt(options, targetLang) {
+    const promptOpt = options.systemPrompt;
+    return (promptOpt && typeof promptOpt === 'object' ? promptOpt.content : promptOpt) ||
+      `You are a professional translator. Translate the following text to ${LANGUAGE_CODES[targetLang]?.name || targetLang}. Output only the translation, nothing else.`;
+  }
+
+  _buildBody(text, systemPrompt, stream = false) {
+    return JSON.stringify({
+      model: this.config.model,
+      max_tokens: 4096,
+      ...(stream ? { stream: true } : {}),
+      system: systemPrompt,
+      messages: [
+        { role: 'user', content: text },
+      ],
+    });
+  }
+
+  async translate(text, sourceLang = 'auto', targetLang = 'zh', options = {}) {
+    const guard = this._checkInput(text);
+    if (guard) return guard;
 
     try {
-      // Support both legacy string and `{ content, mode }` from services/translation.js
-      const promptOpt = options.systemPrompt;
-      const systemPrompt = (promptOpt && typeof promptOpt === 'object' ? promptOpt.content : promptOpt) ||
-        `You are a professional translator. Translate the following text to ${LANGUAGE_CODES[targetLang]?.name || targetLang}. Output only the translation, nothing else.`;
+      const systemPrompt = this._resolveSystemPrompt(options, targetLang);
 
       const response = await fetch(`${this.config.baseUrl}/v1/messages`, {
         method: 'POST',
         headers: this._buildHeaders(),
-        body: JSON.stringify({
-          model: this.config.model,
-          max_tokens: 4096,
-          system: systemPrompt,
-          messages: [
-            { role: 'user', content: text },
-          ],
-        }),
+        body: this._buildBody(text, systemPrompt),
         signal: AbortSignal.timeout(this.config.timeout),
       });
 
@@ -105,7 +121,13 @@ class AnthropicProvider extends BaseProvider {
       const translatedText = data.content?.[0]?.text;
 
       if (!translatedText) {
-        return { success: false, error: '无翻译结果' };
+        return { success: false, error: _t('providerError.noResult', '无翻译结果') };
+      }
+
+      // max_tokens => the model was cut off mid-translation. Returning it as
+      // success would cache and display a truncated translation as if complete.
+      if (data.stop_reason === 'max_tokens') {
+        return { success: false, error: _t('providerError.truncated', '翻译结果被截断（超出最大长度）') };
       }
 
       return {
@@ -122,79 +144,88 @@ class AnthropicProvider extends BaseProvider {
   }
 
   async translateStream(text, sourceLang, targetLang, onChunk, options = {}) {
-    if (!text?.trim()) {
-      return { success: false, error: '文本为空' };
-    }
-    if (!this.config.apiKey) {
-      return { success: false, error: '未配置 API Key' };
-    }
+    const guard = this._checkInput(text);
+    if (guard) return guard;
 
     try {
-      // Support both legacy string and `{ content, mode }` from services/translation.js
-      const promptOpt = options.systemPrompt;
-      const systemPrompt = (promptOpt && typeof promptOpt === 'object' ? promptOpt.content : promptOpt) ||
-        `You are a professional translator. Translate the following text to ${LANGUAGE_CODES[targetLang]?.name || targetLang}. Output only the translation, nothing else.`;
+      const systemPrompt = this._resolveSystemPrompt(options, targetLang);
 
-      const response = await fetch(`${this.config.baseUrl}/v1/messages`, {
-        method: 'POST',
-        headers: this._buildHeaders(),
-        body: JSON.stringify({
-          model: this.config.model,
-          max_tokens: 4096,
-          stream: true,
-          system: systemPrompt,
-          messages: [
-            { role: 'user', content: text },
-          ],
-        }),
-        signal: AbortSignal.timeout(this.config.timeout),
-      });
+      // Idle watchdog, not a total-duration timeout: AbortSignal.timeout(30s)
+      // would abort a long-but-healthy stream at 30s. Reset the timer on each
+      // chunk so it only fires when the connection actually stalls.
+      const controller = new AbortController();
+      let idleTimer;
+      const resetIdle = () => {
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => controller.abort(), this.config.timeout);
+      };
+      resetIdle();
 
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
-        throw new Error(error.error?.message || `HTTP ${response.status}`);
-      }
+      let response;
+      try {
+        response = await fetch(`${this.config.baseUrl}/v1/messages`, {
+          method: 'POST',
+          headers: this._buildHeaders(),
+          body: this._buildBody(text, systemPrompt, true),
+          signal: controller.signal,
+        });
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let fullText = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const data = line.slice(6);
-          if (data === '[DONE]') continue;
-
-          try {
-            const json = JSON.parse(data);
-
-            // Anthropic streams several event types; only content_block_delta carries token text
-            if (json.type === 'content_block_delta' && json.delta?.text) {
-              fullText += json.delta.text;
-              if (onChunk) onChunk(json.delta.text);
-            }
-          } catch {}
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}));
+          throw new Error(error.error?.message || `HTTP ${response.status}`);
         }
-      }
 
-      return { success: true, text: fullText.trim() };
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let fullText = '';
+        let stopReason = null;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          resetIdle();
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const data = line.slice(6);
+            if (data === '[DONE]') continue;
+
+            try {
+              const json = JSON.parse(data);
+
+              // Anthropic streams several event types; only content_block_delta carries token text
+              if (json.type === 'content_block_delta' && json.delta?.text) {
+                fullText += json.delta.text;
+                if (onChunk) onChunk(json.delta.text);
+              } else if (json.type === 'message_delta' && json.delta?.stop_reason) {
+                stopReason = json.delta.stop_reason;
+              }
+            } catch {}
+          }
+        }
+
+        if (stopReason === 'max_tokens') {
+          return { success: false, error: _t('providerError.truncated', '翻译结果被截断（超出最大长度）') };
+        }
+
+        return { success: true, text: fullText.trim() };
+      } finally {
+        clearTimeout(idleTimer);
+      }
     } catch (error) {
       this._lastError = error;
-      return { success: false, error: error.message || '流式翻译失败' };
+      return { success: false, error: error.message || _t('providerError.streamFailed', '流式翻译失败') };
     }
   }
 
   async testConnection() {
     if (!this.config.apiKey) {
-      return { success: false, message: '未配置 API Key' };
+      return { success: false, message: _t('providerError.notConfigured', '未配置 API Key') };
     }
 
     try {
@@ -213,20 +244,20 @@ class AnthropicProvider extends BaseProvider {
       });
 
       if (response.status === 401) {
-        return { success: false, message: 'API Key 无效' };
+        return { success: false, message: _t('providerError.keyInvalid', 'API Key 无效') };
       }
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({}));
-        return { success: false, message: error.error?.message || `HTTP ${response.status}` };
+        return { success: false, message: error.error?.message || _t('providerError.httpError', `HTTP ${response.status}`, { status: response.status }) };
       }
 
       return {
         success: true,
-        message: `Claude 连接成功 (${this.config.model})`,
+        message: `${_t('providerError.connectSuccess', '连接成功')} (${this.config.model})`,
       };
     } catch (error) {
-      return { success: false, message: error.message || '连接失败' };
+      return { success: false, message: error.message || _t('providerError.connectFailed', '连接失败') };
     }
   }
 

@@ -34,11 +34,34 @@ class TranslationCache {
 
   save() {
     try {
-      const obj = {};
+      // Three renderer windows share this one localStorage key. A plain
+      // overwrite means the last window to save drops every entry the others
+      // added since load. Merge against the current on-disk copy first
+      // (newer timestamp wins), then reflect the union back into our own map.
+      let merged = {};
+      try {
+        const existing = localStorage.getItem(this.storageKey);
+        if (existing) merged = JSON.parse(existing);
+      } catch { /* corrupt/other-window write; fall back to our own data */ }
+
       this.cache.forEach((value, key) => {
-        obj[key] = value;
+        const prev = merged[key];
+        if (!prev || (value.timestamp || 0) >= (prev.timestamp || 0)) {
+          merged[key] = value;
+        }
       });
-      localStorage.setItem(this.storageKey, JSON.stringify(obj));
+
+      let entries = Object.entries(merged);
+      if (entries.length > this.maxSize) {
+        entries.sort((a, b) => (b[1].timestamp || 0) - (a[1].timestamp || 0));
+        entries = entries.slice(0, this.maxSize);
+        merged = Object.fromEntries(entries);
+      }
+
+      // Keep our in-memory view consistent with the merged union so this
+      // window can also read entries the others contributed.
+      this.cache = new Map(entries);
+      localStorage.setItem(this.storageKey, JSON.stringify(merged));
     } catch (error) {
       logger.error('Failed to save cache:', error);
       // localStorage quota is ~5MB; on overflow drop half and retry once

@@ -7,6 +7,7 @@ import openaiIcon from './icons/openai.svg';
 import deepseekIcon from './icons/deepseek.svg';
 import ollamaIcon from './icons/ollama.svg';
 import localLlmIcon from './icons/local-llm.svg';
+import { _t } from '../base.js';
 
 export const PRESETS = [
   {
@@ -40,6 +41,13 @@ export const PRESETS = [
           required: false,
           placeholder: 'gpt-4o-mini',
         },
+        timeout: {
+          type: 'number',
+          label: 'Timeout (ms)',
+          default: 15000,
+          required: false,
+          placeholder: '15000',
+        },
       },
     },
     defaults: {
@@ -55,7 +63,7 @@ export const PRESETS = [
       // OpenAI configSchema uses 'baseUrl', base class uses 'endpoint' — keep them in sync
       fieldAdapter: (cfg) => (cfg.baseUrl ? { ...cfg, endpoint: cfg.baseUrl } : cfg),
       filterModels: (models) => models.filter(m => m.includes('gpt')),
-      testConnectionMessage: (count) => `连接成功，检测到 ${count} 个 GPT 模型`,
+      testConnectionMessage: (count) => _t('providerError.connectedModels', `连接成功，检测到 ${count} 个模型`, { count }),
     },
   },
   {
@@ -90,6 +98,13 @@ export const PRESETS = [
           required: false,
           placeholder: 'https://api.deepseek.com/v1',
         },
+        timeout: {
+          type: 'number',
+          label: 'Timeout (ms)',
+          default: 30000,
+          required: false,
+          placeholder: '30000',
+        },
       },
     },
     defaults: {
@@ -102,8 +117,8 @@ export const PRESETS = [
     requiresNetwork: true,
     hooks: {
       requireApiKey: true,
-      apiKeyErrorMessage: '请配置 DeepSeek API Key',
-      testConnectionMessage: () => 'DeepSeek 连接成功',
+      apiKeyErrorMessage: 'providerError.notConfigured',
+      testConnectionMessage: () => _t('providerError.connectSuccess', '连接成功'),
     },
   },
   {
@@ -152,7 +167,10 @@ export const PRESETS = [
       requireApiKey: false,
       // Ollama may return {models:[{name}]} via /api/tags when /v1/models is empty
       modelsFallbackEndpoint: '/api/tags',
-      testConnectionMessage: (count) => `Ollama 连接成功，检测到 ${count} 个模型`,
+      // Ollama requires an explicit model (unlike LM Studio, which uses its
+      // loaded one). With the field left blank, auto-detect the first model.
+      autoDetectModel: true,
+      testConnectionMessage: (count) => _t('providerError.connectedModels', `连接成功，检测到 ${count} 个模型`, { count }),
     },
   },
   {

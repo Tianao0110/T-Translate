@@ -1,7 +1,7 @@
 // Microsoft Translator (Azure Cognitive Services).
 // Free tier: 2M chars/month.
 
-import { BaseProvider } from '../base.js';
+import { BaseProvider, _t } from '../base.js';
 import icon from './icon.svg';
 import createLogger from '../../utils/logger.js';
 
@@ -82,10 +82,10 @@ class MicrosoftTranslatorProvider extends BaseProvider {
 
   async translate(text, sourceLang = 'auto', targetLang = 'zh') {
     if (!text?.trim()) {
-      return { success: false, error: '文本为空' };
+      return { success: false, error: _t('providerError.emptyText', '文本为空') };
     }
     if (!this.config.apiKey) {
-      return { success: false, error: '未配置 API Key' };
+      return { success: false, error: _t('providerError.notConfigured', '未配置 API Key') };
     }
 
     try {
@@ -121,14 +121,14 @@ class MicrosoftTranslatorProvider extends BaseProvider {
       );
 
       if (response.status === 401 || response.status === 403) {
-        return { success: false, error: 'API Key 无效或权限不足' };
+        return { success: false, error: _t('providerError.keyInvalid', 'API Key 无效') };
       }
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         return {
           success: false,
-          error: errorData.error?.message || `HTTP ${response.status}`,
+          error: errorData.error?.message || _t('providerError.httpError', `HTTP ${response.status}`, { status: response.status }),
         };
       }
 
@@ -136,7 +136,7 @@ class MicrosoftTranslatorProvider extends BaseProvider {
       const translatedText = data[0]?.translations?.[0]?.text;
 
       if (!translatedText) {
-        return { success: false, error: '无翻译结果' };
+        return { success: false, error: _t('providerError.noResult', '无翻译结果') };
       }
 
       return {
@@ -147,8 +147,8 @@ class MicrosoftTranslatorProvider extends BaseProvider {
       };
     } catch (error) {
       logger.error('Translation error:', error);
-      if (error.name === 'AbortError') {
-        return { success: false, error: '请求超时' };
+      if (error.name === 'TimeoutError' || error.name === 'AbortError') {
+        return { success: false, error: _t('providerError.timeout', '请求超时') };
       }
       return { success: false, error: error.message };
     }
@@ -156,17 +156,17 @@ class MicrosoftTranslatorProvider extends BaseProvider {
 
   async testConnection() {
     if (!this.config.apiKey) {
-      return { success: false, message: '未配置 API Key' };
+      return { success: false, message: _t('providerError.notConfigured', '未配置 API Key') };
     }
 
     try {
       const result = await this.translate('test', 'en', 'zh');
       if (result.success) {
-        return { success: true, message: 'Microsoft 翻译连接成功' };
+        return { success: true, message: _t('providerError.connectSuccess', '连接成功') };
       }
-      return { success: false, message: result.error || '测试失败' };
+      return { success: false, message: result.error || _t('providerError.translateFailed', '测试失败') };
     } catch (error) {
-      return { success: false, message: error.message || '连接失败' };
+      return { success: false, message: error.message || _t('providerError.connectFailed', '连接失败') };
     }
   }
 }

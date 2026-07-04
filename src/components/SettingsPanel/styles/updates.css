@@ -319,7 +319,12 @@
 /* ==================== 下载信息 ==================== */
 
 .download-info {
-  text-align: center;
+  /* Flex (not text-align): the leading lucide icon is block-level per the
+     global svg reset and would otherwise break onto its own line */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   font-size: 13px;
   color: var(--text-secondary, #6b7280);
   background: var(--bg-secondary, #f9fafb);

@@ -1,6 +1,6 @@
 // Google Gemini provider via Google AI Studio API.
 
-import { BaseProvider, LANGUAGE_CODES } from '../base.js';
+import { BaseProvider, LANGUAGE_CODES, _t } from '../base.js';
 import icon from './icon.svg';
 import createLogger from '../../utils/logger.js';
 const logger = createLogger('Gemini');
@@ -54,8 +54,10 @@ class GeminiProvider extends BaseProvider {
   }
 
   async testConnection() {
+    // Use `message` (not `error`) throughout — that's the key the settings
+    // status row reads; returning `error` here dropped the real reason.
     if (!this.config.apiKey) {
-      return { success: false, error: '请配置 API Key' };
+      return { success: false, message: _t('providerError.notConfigured', '未配置 API Key') };
     }
 
     try {
@@ -69,23 +71,23 @@ class GeminiProvider extends BaseProvider {
       );
 
       if (response.ok) {
-        return { success: true, message: 'Gemini 连接成功' };
+        return { success: true, message: _t('providerError.connectSuccess', '连接成功') };
       } else {
-        const error = await response.json();
-        return { success: false, error: error.error?.message || `HTTP ${response.status}` };
+        const error = await response.json().catch(() => ({}));
+        return { success: false, message: error.error?.message || _t('providerError.httpError', `HTTP ${response.status}`, { status: response.status }) };
       }
     } catch (error) {
-      return { success: false, error: error.message };
+      return { success: false, message: error.message };
     }
   }
 
   async translate(text, sourceLang = 'auto', targetLang = 'zh', options = {}) {
     if (!text?.trim()) {
-      return { success: false, error: '文本为空' };
+      return { success: false, error: _t('providerError.emptyText', '文本为空') };
     }
 
     if (!this.config.apiKey) {
-      return { success: false, error: '请配置 Gemini API Key' };
+      return { success: false, error: _t('providerError.notConfigured', '未配置 API Key') };
     }
 
     try {
@@ -94,7 +96,10 @@ class GeminiProvider extends BaseProvider {
       const promptOpt = options.systemPrompt;
       const promptStr = promptOpt && typeof promptOpt === 'object' ? promptOpt.content : promptOpt;
       if (promptStr) {
-        prompt = promptStr.replace('{targetLang}', this._getLanguageName(targetLang)) + `\n\n${text}`;
+        // systemPrompt arrives from translation.js already interpolated
+        // (getSystemPrompt / buildMTPrompt both resolve {targetLang}), so no
+        // further replace is needed — just append the source text.
+        prompt = `${promptStr}\n\n${text}`;
       } else {
         const sourceName = this._getLanguageName(sourceLang);
         const targetName = this._getLanguageName(targetLang);
@@ -131,8 +136,8 @@ class GeminiProvider extends BaseProvider {
       );
 
       if (!response.ok) {
-        const error = await response.json();
-        return { success: false, error: error.error?.message || `HTTP ${response.status}` };
+        const error = await response.json().catch(() => ({}));
+        return { success: false, error: error.error?.message || _t('providerError.httpError', `HTTP ${response.status}`, { status: response.status }) };
       }
 
       const data = await response.json();
@@ -142,9 +147,9 @@ class GeminiProvider extends BaseProvider {
       if (!translatedText) {
         // Distinguish safety-block from generic empty response
         if (data.promptFeedback?.blockReason) {
-          return { success: false, error: `内容被阻止: ${data.promptFeedback.blockReason}` };
+          return { success: false, error: `${_t('providerError.contentBlocked', '内容被安全策略拦截')}: ${data.promptFeedback.blockReason}` };
         }
-        return { success: false, error: '无翻译结果' };
+        return { success: false, error: _t('providerError.noResult', '无翻译结果') };
       }
 
       return {

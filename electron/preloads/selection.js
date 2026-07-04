@@ -40,6 +40,13 @@ contextBridge.exposeInMainWorld("electron", {
       ipcRenderer.on("selection:show-direct", listener);
       return () => ipcRenderer.removeListener("selection:show-direct", listener);
     },
+    // Provider/settings changed in the main window — this persistent window
+    // must reload its translation stack or it keeps using stale keys/priority.
+    onSettingsChanged: (callback) => {
+      const listener = () => callback();
+      ipcRenderer.on("selection:settings-changed", listener);
+      return () => ipcRenderer.removeListener("selection:settings-changed", listener);
+    },
     // Reuses floating-window:open-main-settings channel — handler doesn't care which window invoked it
     openOcrSettings: () => ipcRenderer.invoke("floating-window:open-main-settings", "ocr"),
   },

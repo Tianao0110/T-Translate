@@ -605,6 +605,14 @@
   color: var(--text-tertiary);
 }
 
+/* Inline heart icon (block-level per global svg reset) needs a centered flex row */
+.about-footer .made-with {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
 .about-footer .copyright {
   font-size: 11px;
   color: var(--text-tertiary);

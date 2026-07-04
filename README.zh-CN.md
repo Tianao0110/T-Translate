@@ -26,13 +26,13 @@
 | 功能                   | 说明                                                                                |
 | ---------------------- | ----------------------------------------------------------------------------------- |
 | **划词翻译**     | 系统级，任何应用中选中文字即翻译，支持 8 个冻结窗口                                 |
-| **截图 OCR**     | 截屏识别文字，6 个 OCR 引擎自动降级                                                 |
+| **截图 OCR**     | 截屏识别文字，7 个 OCR 引擎自动降级                                                 |
 | **悬浮窗口**     | 透明悬浮窗，空格截图翻译，复杂排版用                                                |
 | **文档翻译**     | PDF / DOCX / EPUB / TXT / SRT 等 9 种格式，逐段翻译，进度可恢复                     |
 | **术语库**       | 翻译后自动替换术语，支持撤销                                                        |
 | **TTS 朗读**     | 基于 Windows 离线语音引擎                                                           |
 | **10 个翻译源**  | LM Studio、Ollama、OpenAI、Claude、Gemini、DeepSeek、DeepL、Google、Microsoft、百度 |
-| **四档隐私模式** | 标准 / 离线 / 无痕 / 严格，离线模式下在线 API Key 禁止解密                          |
+| **三档隐私模式** | 标准 / 无痕 / 离线，离线模式下在线 API Key 禁止解密                                 |
 | **开机自启**     | 静默运行到托盘，可选自动开启划词翻译                                                |
 
 ---
@@ -71,7 +71,7 @@
 
 ### 隐私模式
 
-四档隐私控制，按需选择。离线/严格模式下仅使用本地 LLM，在线 API Key 禁止解密——即使程序内部被恶意代码调用也拿不到。
+三档隐私控制，按需选择。离线模式下仅使用本地 LLM，在线 API Key 禁止解密——即使程序内部被恶意代码调用也拿不到。
 
 <p align="center">
   <img src="docs/screenshots/privacy-mode.png" width="600" alt="隐私模式">
@@ -114,10 +114,10 @@ npm run dist         # 打包安装程序（自动含上一步）
 
 | 快捷键           | 功能              |
 | ---------------- | ----------------- |
-| `Ctrl+Shift+T` | 显示/隐藏主窗口   |
-| `Ctrl+Shift+S` | 截图翻译          |
-| `Ctrl+Shift+G` | 打开悬浮窗口      |
-| `Ctrl+Shift+D` | 开启/关闭划词翻译 |
+| `Alt+Q`        | 截图翻译          |
+| `Ctrl+Shift+W` | 显示/隐藏主窗口   |
+| `Ctrl+Alt+G`   | 打开悬浮窗口      |
+| `Ctrl+Shift+T` | 开启/关闭划词翻译 |
 | `Ctrl+Enter`   | 执行翻译          |
 
 *快捷键可在设置中自定义*
@@ -131,7 +131,7 @@ T-Translate 以隐私保护为核心设计理念：
 - **本地优先** — 本地 LLM 是第一优先级，完全离线可用
 - **加密存储** — API Key 使用 Windows DPAPI 加密，无明文回退
 - **访问审计** — 密钥解密操作全程记录，异常频率自动告警
-- **隐私联动** — 离线/严格模式下在线 API Key 禁止解密
+- **隐私联动** — 离线模式下在线 API Key 禁止解密
 - **最小权限** — 每种窗口独立 Preload，只暴露必要的 API
 - **无 axios** — 不受近期 npm 供应链攻击影响
 
@@ -167,12 +167,12 @@ t-translate/
 
 | 类别     | 技术                                                                    |
 | -------- | ----------------------------------------------------------------------- |
-| 框架     | Electron 28 + React 18                                                  |
-| 构建     | Vite 5                                                                  |
+| 框架     | Electron 42 + React 18                                                  |
+| 构建     | Vite 7                                                                  |
 | 状态管理 | Zustand + Immer                                                         |
 | 样式     | CSS Variables                                                           |
 | 安全存储 | Electron safeStorage (Windows DPAPI) + 访问审计                         |
-| OCR      | PP-OCRv5 本地（语言包可下载）/ Windows OCR / LLM Vision / Google Vision / Azure / 百度 |
+| OCR      | PP-OCRv5 本地（语言包可下载）/ Windows OCR / LLM Vision / OCR.space / Google Vision / Azure / 百度 |
 | 本地 LLM | LM Studio / Ollama（OpenAI 兼容 API）                                   |
 | 在线翻译 | OpenAI / Claude / Gemini / DeepSeek / DeepL / Google / Microsoft / 百度 |
 | 打包     | electron-builder                                                        |

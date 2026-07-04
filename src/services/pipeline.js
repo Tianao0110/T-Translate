@@ -8,6 +8,7 @@ import useConfigStore from '../stores/config.js';
 import { calculateHash } from '../utils/image.js';
 import { detectLanguage, cleanTranslationOutput, shouldTranslateText } from '../utils/text.js';
 import { getPrivacyModeConfig, PRIVACY_MODE_IDS } from '../config/privacy-modes.js';
+import { decryptOcrSecrets } from '../utils/ocr-key-vault.js';
 import createLogger from '../utils/logger.js';
 import { getShortErrorMessage } from '../utils/error-handler.js';
 import i18n from '../i18n.js';
@@ -32,6 +33,17 @@ async function getPrivacyMode() {
     logger.debug('Failed to get privacy mode from main:', e.message);
   }
   return PRIVACY_MODE_IDS.STANDARD;
+}
+
+// Forward a floating-window translation into the main window's history store.
+// The old session.addToHistory only wrote an in-memory list nothing read, so
+// floating-window translations never appeared in any history view.
+function addToMainHistory(item) {
+  try {
+    window.electron?.floatingWindow?.addToHistory?.({ source: 'floating', ...item });
+  } catch (e) {
+    logger.debug('History forward failed:', e.message);
+  }
 }
 
 // Heuristic: are the OCR blocks scattered (e.g. UI labels, code annotations)
@@ -92,17 +104,16 @@ class TranslationPipeline {
     // — the old per-engine shape was silently discarded by _buildConfigs, so
     // online-engine keys and the llm-vision endpoint never arrived here.
     let ocrSettings = {};
-    let llmEndpoint;
     try {
       const settings = await window.electron?.store?.get?.('settings') || {};
-      ocrSettings = settings.ocr || {};
-      llmEndpoint = settings.connection?.endpoint;
+      ocrSettings = await decryptOcrSecrets(settings.ocr || {});
     } catch (e) {
       logger.debug('Failed to read settings for OCR init:', e);
     }
 
     const config = useConfigStore.getState();
-    await ocrManager.init({ ...ocrSettings, llmEndpoint });
+    // ocrSettings.llmEndpoint feeds the LLM-Vision engine (see _buildConfigs).
+    await ocrManager.init({ ...ocrSettings, llmEndpoint: ocrSettings.llmEndpoint });
     ocrManager.setPriority(config.ocrPriority);
 
     this._initialized = true;
@@ -114,10 +125,8 @@ class TranslationPipeline {
   async refreshOcrConfigs() {
     try {
       const settings = await window.electron?.store?.get?.('settings') || {};
-      ocrManager.updateConfigs({
-        ...(settings.ocr || {}),
-        llmEndpoint: settings.connection?.endpoint,
-      });
+      // decrypted ocr bucket already carries llmEndpoint.
+      ocrManager.updateConfigs(await decryptOcrSecrets(settings.ocr || {}));
     } catch (e) {
       logger.debug('OCR config refresh failed:', e);
     }
@@ -291,6 +300,9 @@ class TranslationPipeline {
       session.setStatus('translating');
 
       const privacyMode = await getPrivacyMode();
+      // Secure mode must not leave screen-capture text in the L1 cache of
+      // this persistent window (L2 is already gated service-side).
+      const useCache = privacyMode !== PRIVACY_MODE_IDS.SECURE;
 
       // Cap concurrency: more than 2 concurrent LLM calls causes UI jank on
       // typical local setups (each call ties up the GPU briefly)
@@ -325,6 +337,7 @@ class TranslationPipeline {
             targetLang,
             mode: 'normal',
             privacyMode,
+            useCache,
           });
 
           if (result.success && result.text) {
@@ -364,11 +377,10 @@ class TranslationPipeline {
         .join('\n');
 
       if (allTranslated) {
-        currentState.addToHistory({
-          source: allSource,
-          translated: allTranslated,
-          mode: 'scattered',
-          blockCount: createdPanes.length,
+        addToMainHistory({
+          sourceText: allSource,
+          translatedText: allTranslated,
+          targetLanguage: config.targetLanguage,
         });
       }
 
@@ -409,6 +421,7 @@ class TranslationPipeline {
         targetLang,
         mode,
         privacyMode,
+        useCache: privacyMode !== PRIVACY_MODE_IDS.SECURE,
       });
 
       if (!result.success) {
@@ -421,12 +434,11 @@ class TranslationPipeline {
       if (cleaned) {
         session.setResult(cleaned, result.provider);
 
-        session.addToHistory({
-          source: text,
-          translated: cleaned,
-          sourceLang,
-          targetLang,
-          provider: result.provider,
+        addToMainHistory({
+          sourceText: text,
+          translatedText: cleaned,
+          sourceLanguage: sourceLang,
+          targetLanguage: targetLang,
         });
       }
 

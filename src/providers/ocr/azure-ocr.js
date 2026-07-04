@@ -1,6 +1,6 @@
 // Azure Computer Vision OCR (Read API v3.2). Asynchronous: submit, then poll.
 
-import { BaseOCREngine } from './base.js';
+import { BaseOCREngine, _t } from './base.js';
 import createLogger from '../../utils/logger.js';
 const logger = createLogger('AzureOCR');
 
@@ -48,7 +48,7 @@ class AzureOCREngine extends BaseOCREngine {
     const { apiKey, endpoint } = this.config;
 
     if (!apiKey || !endpoint) {
-      return { success: false, error: '请配置 Azure OCR API Key 和 Endpoint' };
+      return { success: false, error: _t('providerError.ocrNotConfigured', '请配置该 OCR 引擎的密钥') };
     }
 
     try {
@@ -76,7 +76,7 @@ class AzureOCREngine extends BaseOCREngine {
 
       const operationLocation = response.headers.get('Operation-Location');
       if (!operationLocation) {
-        throw new Error('未获取到操作位置');
+        throw new Error(_t('providerError.ocrProcessFailed', 'OCR 处理失败'));
       }
 
       // Phase 2: poll. Azure returns 'running' until done; 10s budget at 1s intervals.
@@ -91,7 +91,7 @@ class AzureOCREngine extends BaseOCREngine {
         });
 
         if (!resultResponse.ok) {
-          throw new Error(`获取结果失败: HTTP ${resultResponse.status}`);
+          throw new Error(_t('providerError.httpError', `HTTP ${resultResponse.status}`, { status: resultResponse.status }));
         }
 
         result = await resultResponse.json();
@@ -99,12 +99,12 @@ class AzureOCREngine extends BaseOCREngine {
         if (result.status === 'succeeded') {
           break;
         } else if (result.status === 'failed') {
-          throw new Error(result.error?.message || 'OCR 处理失败');
+          throw new Error(result.error?.message || _t('providerError.ocrProcessFailed', 'OCR 处理失败'));
         }
       }
 
       if (result.status !== 'succeeded') {
-        throw new Error('OCR 处理超时');
+        throw new Error(_t('providerError.ocrTimeout', 'OCR 处理超时'));
       }
 
       const readResults = result.analyzeResult?.readResults || [];
@@ -119,7 +119,7 @@ class AzureOCREngine extends BaseOCREngine {
       const text = lines.join('\n');
 
       if (!text) {
-        return { success: false, error: '未识别到文字' };
+        return { success: false, error: _t('providerError.ocrNoText', '未识别到文字') };
       }
 
       return {

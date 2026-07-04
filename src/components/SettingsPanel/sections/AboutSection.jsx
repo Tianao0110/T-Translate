@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { GitBranch, RefreshCw, FolderOpen, Download, X, Loader2, CheckCircle, AlertCircle, ExternalLink } from 'lucide-react';
+import { GitBranch, RefreshCw, FolderOpen, Download, X, Loader2, CheckCircle, AlertCircle, ExternalLink, Rocket, Cpu, Heart, PartyPopper, Package } from 'lucide-react';
 import appIcon from '/icon.png';
 
 const UPDATE_STAGE = {
@@ -87,6 +87,9 @@ const AboutSection = ({ notify, resetSettings }) => {
       if (!result.success) {
         setUpdateStage(UPDATE_STAGE.ERROR);
         setErrorMsg(result.error || t('about.updateFailed'));
+        // errorMsg only renders inside the update modal, which isn't open
+        // during the check stage — without a toast this failure is invisible.
+        notify(result.error || t('about.updateFailed'), 'error');
         return;
       }
 
@@ -102,11 +105,12 @@ const AboutSection = ({ notify, resetSettings }) => {
         setUpdateStage(UPDATE_STAGE.IDLE);
       } else {
         setUpdateStage(UPDATE_STAGE.IDLE);
-        notify(t('settings.about.upToDate') + ' ✓', 'success');
+        notify(t('settings.about.upToDate'), 'success');
       }
     } catch (e) {
       setUpdateStage(UPDATE_STAGE.ERROR);
       setErrorMsg(e.message || t('notify.networkError'));
+      notify(e.message || t('notify.networkError'), 'error');
     }
   }, [updateStage, notify, t]);
 
@@ -264,7 +268,7 @@ const AboutSection = ({ notify, resetSettings }) => {
 
         {updateInfo?.downloadName && (
           <div className="download-info">
-            📦 {updateInfo.downloadName}
+            <Package size={14} /> {updateInfo.downloadName}
             {updateInfo.downloadSize > 0 && ` (${formatSize(updateInfo.downloadSize)})`}
           </div>
         )}
@@ -343,7 +347,7 @@ const AboutSection = ({ notify, resetSettings }) => {
 
       <div className="info-cards">
         <div className="info-card">
-          <h4>🚀 {t('about.features')}</h4>
+          <h4><Rocket size={16} /> {t('about.features')}</h4>
           <ul>
             <li>{t('about.feature1')}</li>
             <li>{t('about.feature2')}</li>
@@ -352,12 +356,12 @@ const AboutSection = ({ notify, resetSettings }) => {
           </ul>
         </div>
         <div className="info-card">
-          <h4>⚙️ {t('about.techStack')}</h4>
+          <h4><Cpu size={16} /> {t('about.techStack')}</h4>
           <ul>
             <li>Electron + React 18</li>
             <li>Zustand State Management</li>
             <li>LM Studio / Ollama</li>
-            <li>RapidOCR / LLM Vision</li>
+            <li>PP-OCRv5 / LLM Vision</li>
           </ul>
         </div>
       </div>
@@ -388,7 +392,7 @@ const AboutSection = ({ notify, resetSettings }) => {
       </div>
 
       <div className="about-footer">
-        <p>Made with ❤️ for Tianao</p>
+        <p className="made-with">Made with <Heart size={13} style={{ fill: 'currentColor' }} /> for Tianao</p>
         <p className="copyright">{t('settings.about.copyright')}</p>
       </div>
 
@@ -396,10 +400,10 @@ const AboutSection = ({ notify, resetSettings }) => {
         <div className="update-modal-overlay" onClick={closeModal}>
           <div className="update-modal" onClick={e => e.stopPropagation()}>
             <div className="update-modal-header">
-              <h3>
-                {updateStage === UPDATE_STAGE.READY ? '✅ ' :
-                 updateStage === UPDATE_STAGE.ERROR ? '⚠️ ' :
-                 updateStage === UPDATE_STAGE.DOWNLOADING ? '⬇️ ' : '🎉 '}
+              <h3 style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                {updateStage === UPDATE_STAGE.READY ? <CheckCircle size={18} /> :
+                 updateStage === UPDATE_STAGE.ERROR ? <AlertCircle size={18} /> :
+                 updateStage === UPDATE_STAGE.DOWNLOADING ? <Download size={18} /> : <PartyPopper size={18} />}
                 {updateStage === UPDATE_STAGE.READY
                   ? t('about.downloadComplete')
                   : updateStage === UPDATE_STAGE.ERROR

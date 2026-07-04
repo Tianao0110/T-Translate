@@ -412,6 +412,23 @@ const useTranslationStore = create(
           state.history = [];
           state.statistics.totalTranslations = 0;
           state.statistics.totalCharacters = 0;
+          state.statistics.todayTranslations = 0;
+          // The secure-mode stash must go too, or "cleared" history quietly
+          // resurrects when the user leaves secure mode.
+          state._savedHistory = null;
+          state._savedStatistics = null;
+        }),
+
+      // Resets only the persisted preference fields (not history/favorites) to
+      // defaults. Used by Settings "reset all" so zustand-backed controls don't
+      // survive a reset that only cleared electron-store.
+      resetPreferences: () =>
+        set((state) => {
+          state.translationMode = PRIVACY_MODES.STANDARD;
+          state.useStreamOutput = true;
+          state.autoTranslate = false;
+          state.autoTranslateDelay = 500;
+          state.ocrStatus.engine = 'llm-vision';
         }),
 
       // ===== Privacy mode helpers =====
@@ -541,6 +558,12 @@ const useTranslationStore = create(
       }),
 
       importHistory: async (file) => {
+        // Secure mode: current history is a stash-backed empty view — an
+        // import would be silently discarded by the stash restore on exit.
+        // The UI disables the button; this guard covers any other entry point.
+        if (get().translationMode === PRIVACY_MODES.SECURE) {
+          return { success: false, reason: 'secure-mode' };
+        }
         try {
           const text = await file.text();
           const data = JSON.parse(text);
@@ -647,7 +670,9 @@ const useTranslationStore = create(
           sourceLanguage: state.currentTranslation.sourceLanguage,
           targetLanguage: state.currentTranslation.targetLanguage,
         },
-        ocrStatus: { engine: state.ocrStatus.engine },
+        // ocrStatus.engine deliberately NOT persisted here — settings.ocr.engine
+        // (electron-store) is the single source of truth, seeded into the store
+        // at startup (App.jsx). Persisting it too caused the two to diverge.
       }),
     }
   ))

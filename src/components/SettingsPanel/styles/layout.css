@@ -435,9 +435,20 @@
 }
 
 .section-title {
+  /* Flex so the leading lucide icon (block-level per the global svg reset)
+     sits inline with the title instead of pushing it to a second line */
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
+}
+
+.section-title svg {
+  color: var(--accent-primary);
+  opacity: 0.85;
+  flex-shrink: 0;
 }
 
 .section-hint {

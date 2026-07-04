@@ -19,14 +19,22 @@ export default function useTTS(notify, t) {
       logger.warn('TTS init failed:', e.message);
     });
 
-    ttsManager.onStatusChange((status) => {
+    const unsubStatus = ttsManager.onStatusChange((status) => {
       setTtsStatus(status);
       if (status === TTS_STATUS.IDLE || status === TTS_STATUS.ERROR) {
         setTtsTarget(null);
       }
     });
 
+    // Keep the panel's speak button in sync when TTS is toggled in settings,
+    // instead of freezing at the mount-time value until a restart.
+    const unsubConfig = ttsManager.onConfigChange((cfg) => {
+      setTtsEnabled(cfg.enabled);
+    });
+
     return () => {
+      unsubStatus();
+      unsubConfig();
       ttsManager.stop();
     };
   }, []);

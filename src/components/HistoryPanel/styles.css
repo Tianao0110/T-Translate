@@ -121,6 +121,8 @@
 .toolbar-btn.active { background: var(--accent-primary); border-color: var(--accent-primary); color: white; }
 .toolbar-btn.danger { border-color: var(--error); color: var(--error); }
 .toolbar-btn.danger:hover { background: var(--error); color: white; }
+.toolbar-btn.disabled { opacity: 0.45; cursor: not-allowed; }
+.toolbar-btn.disabled:hover { border-color: var(--border-primary); color: var(--text-primary); }
 
 .toolbar-select {
   padding: 8px 12px;

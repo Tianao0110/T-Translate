@@ -1,5 +1,19 @@
 // Base class for all translation providers.
 
+import i18n from '../i18n.js';
+
+// Shared translator for provider-layer user-visible strings. Providers run
+// outside React, so they read i18n's core instance directly; the fallback
+// keeps behavior identical when a key is missing.
+export const _t = (key, fallback, params) => {
+  try {
+    const r = i18n.t(key, params);
+    return r === key ? fallback : r;
+  } catch {
+    return fallback;
+  }
+};
+
 export class BaseProvider {
   constructor(config = {}) {
     this.config = config;

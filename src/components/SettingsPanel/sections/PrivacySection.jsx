@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Zap, Shield, Lock, CheckCircle, AlertCircle, Trash2 } from 'lucide-react';
+import { Zap, Shield, Lock, CheckCircle, AlertCircle, Trash2, ClipboardList, Database, Check, X } from 'lucide-react';
 import useTranslationStore from '../../../stores/translation-store';
 import translationService from '../../../services/translation.js';
 import { PRIVACY_MODES, PRIVACY_MODE_IDS } from '../constants.js';
@@ -159,25 +159,25 @@ const PrivacySection = ({
 
       {/* Feature matrix for the active mode */}
       <div className="mode-features-panel">
-        <h4>📋 {t('privacy.featuresTitle')}</h4>
+        <h4><ClipboardList size={15} /> {t('privacy.featuresTitle')}</h4>
         <div className="feature-list">
           <div className={`feature-item ${modeConfig?.features.saveHistory ? 'enabled' : 'disabled'}`}>
-            <span className="feature-icon">{modeConfig?.features.saveHistory ? '✓' : '✗'}</span>
+            <span className="feature-icon">{modeConfig?.features.saveHistory ? <Check size={13} /> : <X size={13} />}</span>
             <span className="feature-name">{t('privacy.features.history')}</span>
             <span className="feature-status">{modeConfig?.features.saveHistory ? t('privacy.save') : t('privacy.noSave')}</span>
           </div>
           <div className={`feature-item ${modeConfig?.features.useCache ? 'enabled' : 'disabled'}`}>
-            <span className="feature-icon">{modeConfig?.features.useCache ? '✓' : '✗'}</span>
+            <span className="feature-icon">{modeConfig?.features.useCache ? <Check size={13} /> : <X size={13} />}</span>
             <span className="feature-name">{t('privacy.features.cache')}</span>
             <span className="feature-status">{modeConfig?.features.useCache ? t('common.enable') : t('common.disable')}</span>
           </div>
           <div className={`feature-item ${modeConfig?.features.onlineApi ? 'enabled' : 'disabled'}`}>
-            <span className="feature-icon">{modeConfig?.features.onlineApi ? '✓' : '✗'}</span>
+            <span className="feature-icon">{modeConfig?.features.onlineApi ? <Check size={13} /> : <X size={13} />}</span>
             <span className="feature-name">{t('privacy.features.onlineApi')}</span>
             <span className="feature-status">{modeConfig?.features.onlineApi ? t('privacy.allow') : t('privacy.deny')}</span>
           </div>
           <div className={`feature-item ${modeConfig?.features.analytics ? 'enabled' : 'disabled'}`}>
-            <span className="feature-icon">{modeConfig?.features.analytics ? '✓' : '✗'}</span>
+            <span className="feature-icon">{modeConfig?.features.analytics ? <Check size={13} /> : <X size={13} />}</span>
             <span className="feature-name">{t('privacy.features.analytics')}</span>
             <span className="feature-status">{modeConfig?.features.analytics ? t('privacy.collect') : t('privacy.noCollect')}</span>
           </div>
@@ -200,7 +200,7 @@ const PrivacySection = ({
 
       {/* Data management */}
       <div className="setting-group" style={{marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border-primary)'}}>
-        <h4 style={{marginBottom: '16px', color: 'var(--text-primary)'}}>🗂️ {t('privacy.dataManagement')}</h4>
+        <h4 style={{display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', color: 'var(--text-primary)'}}><Database size={15} /> {t('privacy.dataManagement')}</h4>
 
         {dataStats && (
           <div style={{

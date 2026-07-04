@@ -1,23 +1,21 @@
-import React, { forwardRef } from 'react';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
 import ProviderSettings from '../../ProviderSettings';
 
-// forwardRef so callers can grab the inner ProviderSettings ref.
-const ProvidersSection = forwardRef(({
+const ProvidersSection = ({
   settings,
   settingsReady,
   updateSetting,
   notify
-}, ref) => {
+}) => {
   const { t } = useTranslation();
 
   return (
     <div className="setting-content">
       <h3>{t('providerSettings.title')}</h3>
       <p className="setting-description">{t('providerSettings.description')}</p>
-      
-      <ProviderSettings 
-        ref={ref}
+
+      <ProviderSettings
         settings={settings}
         settingsReady={settingsReady}
         updateSettings={updateSetting}
@@ -25,8 +23,6 @@ const ProvidersSection = forwardRef(({
       />
     </div>
   );
-});
-
-ProvidersSection.displayName = 'ProvidersSection';
+};
 
 export default ProvidersSection;

@@ -46,8 +46,6 @@ const useSessionStore = create((set, get) => ({
   childPanes: [],
   frozenPanes: [], // pinned panes the user dragged out (cap of 15)
 
-  recentHistory: [], // in-memory only, capped at 100
-
   setStatus: (status) => set({ status }),
 
   setSourceText: (text) => set({ sourceText: text }),
@@ -179,21 +177,6 @@ const useSessionStore = create((set, get) => ({
   clearAllPanes: () => {
     set({ childPanes: [], frozenPanes: [], displayMode: DISPLAY_MODE.UNIFIED });
   },
-
-  addToHistory: (item) => set((state) => {
-    const newHistory = [
-      {
-        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        timestamp: Date.now(),
-        ...item,
-      },
-      ...state.recentHistory,
-    ].slice(0, 100);
-
-    return { recentHistory: newHistory };
-  }),
-
-  clearHistory: () => set({ recentHistory: [] }),
 
   // Used by pipeline / service layer to surface fallback notices to floating-window UI
   notification: null, // { message, type: 'info'|'warning'|'error'|'success' }

@@ -1,6 +1,6 @@
 // Google Translate via the unofficial translate.google.com web API (no key needed).
 
-import { BaseProvider, LANGUAGE_CODES } from '../base.js';
+import { BaseProvider, LANGUAGE_CODES, _t } from '../base.js';
 import icon from './icon.svg';
 import createLogger from '../../utils/logger.js';
 const logger = createLogger('GoogleTranslate');
@@ -21,9 +21,10 @@ class GoogleTranslateProvider extends BaseProvider {
         type: 'select',
         label: 'Server',
         default: 'com',
+        // translate.google.cn was retired in Oct 2022 — its translate_a
+        // endpoint 404s now, so that option only ever produced failures.
         options: [
           { value: 'com', label: 'google.com (International)' },
-          { value: 'cn', label: 'google.cn (China)' },
           { value: 'com.hk', label: 'google.com.hk (Hong Kong)' },
         ],
       },
@@ -36,6 +37,11 @@ class GoogleTranslateProvider extends BaseProvider {
       timeout: 15000,
       ...config,
     });
+
+    // Fold any persisted 'cn' (removed above) back to a working server.
+    if (this.config.domain === 'cn') {
+      this.config.domain = 'com';
+    }
 
     // TKK seed — the unofficial API derives tk from this. '0.0' works for most
     // request volumes; a real scraper would fetch it from translate.google.com
@@ -56,24 +62,24 @@ class GoogleTranslateProvider extends BaseProvider {
       const result = await this.translate('test', 'en', 'zh');
 
       if (result.success) {
-        return { success: true, message: 'Google 翻译可用' };
+        return { success: true, message: _t('providerError.connectSuccess', '连接成功') };
       } else {
-        return { success: false, message: result.error || '翻译测试失败' };
+        return { success: false, message: result.error || _t('providerError.translateFailed', '翻译测试失败') };
       }
     } catch (error) {
       if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
         return {
           success: false,
-          message: `无法连接 (${this.config.domain})，请检查网络或尝试其他服务器`
+          message: _t('providerError.cannotConnectTryOther', '无法连接，请检查网络或尝试其他服务器'),
         };
       }
-      return { success: false, message: error.message || '连接失败' };
+      return { success: false, message: error.message || _t('providerError.connectFailed', '连接失败') };
     }
   }
 
   async translate(text, sourceLang = 'auto', targetLang = 'zh') {
     if (!text?.trim()) {
-      return { success: false, error: '文本为空' };
+      return { success: false, error: _t('providerError.emptyText', '文本为空') };
     }
 
     try {
@@ -128,7 +134,7 @@ class GoogleTranslateProvider extends BaseProvider {
       const translatedText = this._parseResponse(data);
 
       if (!translatedText) {
-        return { success: false, error: '无翻译结果' };
+        return { success: false, error: _t('providerError.noResult', '无翻译结果') };
       }
 
       // data[2] holds the auto-detected source language

@@ -86,7 +86,16 @@ function register(ctx) {
   let _downloadProgress = null;
   let _isDownloading = false;
 
+  // Offline mode promises "no network requests" — that includes the updater.
+  // Gated in main so all windows are covered by one check.
+  const updateBlockedOffline = () =>
+    store.get('privacyMode', 'standard') === 'offline'
+      ? { success: false, offline: true, error: t('system.offlineUpdateBlocked', '离线模式下已禁用检查更新') }
+      : null;
+
   ipcMain.handle(CHANNELS.APP.CHECK_UPDATE, async () => {
+    const blocked = updateBlockedOffline();
+    if (blocked) return blocked;
     try {
       return await autoUpdater.checkForUpdate();
     } catch (error) {
@@ -99,6 +108,8 @@ function register(ctx) {
   // Renderer still sends {downloadUrl, downloadName} - ignored, electron-updater
   // downloads whatever the preceding check resolved from the feed.
   ipcMain.handle(CHANNELS.APP.DOWNLOAD_UPDATE, async () => {
+    const blocked = updateBlockedOffline();
+    if (blocked) return blocked;
     if (_isDownloading) {
       return { success: false, error: t('system.alreadyDownloading', '已在下载中') };
     }
@@ -193,17 +204,6 @@ function register(ctx) {
     }
   });
 
-  ipcMain.handle(CHANNELS.DIALOG.MESSAGE, async (event, options) => {
-    const mainWindow = getMainWindow();
-    try {
-      const result = await dialog.showMessageBox(mainWindow, options);
-      return result;
-    } catch (error) {
-      logger.error("Message dialog error:", error);
-      return { response: -1, error: error.message };
-    }
-  });
-
   // ===== Logs =====
 
   ipcMain.handle(CHANNELS.LOGS.OPEN_DIRECTORY, async () => {
@@ -223,11 +223,6 @@ function register(ctx) {
     }
 
     return { success: false, message: t('system.logDirFailed', '无法获取日志目录') };
-  });
-
-  ipcMain.handle(CHANNELS.LOGS.GET_DIRECTORY, () => {
-    const { getLogDirectory } = require('../utils/logger');
-    return getLogDirectory();
   });
 
   // On-disk footprint for the privacy page's data-management panel.

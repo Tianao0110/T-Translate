@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Eye, EyeOff, AlertTriangle, RefreshCw, Download, Trash2 } from 'lucide-react';
+import { Eye, EyeOff, AlertTriangle, RefreshCw, Download, Trash2, Cpu, Sparkles, Globe } from 'lucide-react';
 import { ocrManager } from '../../../providers/ocr/index.js';
 
 const OcrSection = ({
@@ -153,7 +153,12 @@ const OcrSection = ({
     }
   };
 
-  const ApiKeyInput = ({ keyName, placeholder = 'API Key', value, showKey }) => (
+  // A render function, not an inline component: defining a component inside the
+  // render body gives it a new identity every keystroke, so React remounted the
+  // input and dropped focus. toggleKey is passed explicitly — the old
+  // keyName-derived key ('baiduApiKey' -> 'baiduApi') never matched the
+  // showApiKeys key ('baidu'), so that eye toggle did nothing.
+  const renderApiKeyInput = ({ keyName, toggleKey, placeholder = 'API Key', value, showKey }) => (
     <div className="api-key-input-wrapper">
       <input
         type={showKey ? "text" : "password"}
@@ -166,7 +171,7 @@ const OcrSection = ({
       <button
         type="button"
         className="api-key-toggle"
-        onClick={(e) => toggleApiKeyVisibility(keyName.replace('Key', '').replace('Secret', 'Secret'), e)}
+        onClick={(e) => toggleApiKeyVisibility(toggleKey, e)}
         title={showKey ? t('common.hide') : t('common.show')}
       >
         {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -257,18 +262,20 @@ const OcrSection = ({
           value={settings.ocr.recognitionLanguage || 'auto'}
           onChange={(e) => updateSetting('ocr', 'recognitionLanguage', e.target.value)}
         >
-          <option value="auto">🔄 {t('ocr.lang.auto')}</option>
-          <option value="zh-Hans">🇨🇳 {t('ocr.lang.zhHans')}</option>
-          <option value="zh-Hant">🇹🇼 {t('ocr.lang.zhHant')}</option>
-          <option value="en">🇺🇸 {t('ocr.lang.en')}</option>
-          <option value="ja">🇯🇵 {t('ocr.lang.ja')}</option>
-          <option value="ko">🇰🇷 {t('ocr.lang.ko')}</option>
-          <option value="fr">🇫🇷 {t('ocr.lang.fr')}</option>
-          <option value="de">🇩🇪 {t('ocr.lang.de')}</option>
-          <option value="es">🇪🇸 {t('ocr.lang.es')}</option>
-          <option value="ru">🇷🇺 {t('ocr.lang.ru')}</option>
-          <option value="hi">🇮🇳 {t('ocr.lang.hi')}</option>
-          <option value="ar">🇸🇦 {t('ocr.lang.ar')}</option>
+          {/* Native <option> can't render SVG, so no icons here (emoji flags
+              violated the lucide-only rule and rendered inconsistently). */}
+          <option value="auto">{t('ocr.lang.auto')}</option>
+          <option value="zh-Hans">{t('ocr.lang.zhHans')}</option>
+          <option value="zh-Hant">{t('ocr.lang.zhHant')}</option>
+          <option value="en">{t('ocr.lang.en')}</option>
+          <option value="ja">{t('ocr.lang.ja')}</option>
+          <option value="ko">{t('ocr.lang.ko')}</option>
+          <option value="fr">{t('ocr.lang.fr')}</option>
+          <option value="de">{t('ocr.lang.de')}</option>
+          <option value="es">{t('ocr.lang.es')}</option>
+          <option value="ru">{t('ocr.lang.ru')}</option>
+          <option value="hi">{t('ocr.lang.hi')}</option>
+          <option value="ar">{t('ocr.lang.ar')}</option>
         </select>
         <p className="setting-hint">{t('ocr.autoLangHint')}</p>
         <p className="setting-hint">{t('ocr.langPackHint')}</p>
@@ -317,7 +324,7 @@ const OcrSection = ({
       {/* Tier 1: local engines */}
       <details className="setting-section" open={!collapsedGroups['ocr-local']}>
         <summary className="section-header" onClick={(e) => { e.preventDefault(); toggleGroup('ocr-local'); }}>
-          <span className="section-title">🚀 {t('ocr.localEngines')}</span>
+          <span className="section-title"><Cpu size={15} /> {t('ocr.localEngines')}</span>
           <span className="section-hint">{t('ocr.localHint')}</span>
         </summary>
         <div className="section-content">
@@ -478,7 +485,7 @@ const OcrSection = ({
       {/* Tier 2: vision LLM */}
       <details className="setting-section" open={!collapsedGroups['ocr-vision']}>
         <summary className="section-header" onClick={(e) => { e.preventDefault(); toggleGroup('ocr-vision'); }}>
-          <span className="section-title">⚡ {t('ocr.visionModels')}</span>
+          <span className="section-title"><Sparkles size={15} /> {t('ocr.visionModels')}</span>
           <span className="section-hint">{t('ocr.visionHint')}</span>
         </summary>
         <div className="section-content">
@@ -491,6 +498,16 @@ const OcrSection = ({
                 </div>
                 <p className="engine-desc">{t('ocr.llmVisionDesc')}</p>
                 <p className="engine-meta">{t('ocr.llmVisionMeta')}</p>
+                <div className="api-key-input-wrapper" style={{marginTop: '6px'}}>
+                  <input
+                    type="text"
+                    className="setting-input compact"
+                    placeholder={t('ocr.llmEndpointPlaceholder')}
+                    value={settings.ocr.llmEndpoint || ''}
+                    onChange={(e) => updateSetting('ocr', 'llmEndpoint', e.target.value)}
+                  />
+                </div>
+                <p className="setting-hint">{t('ocr.llmEndpointHint')}</p>
               </div>
               <div className="engine-actions">
                 <button
@@ -508,7 +525,7 @@ const OcrSection = ({
       {/* Tier 3: online APIs */}
       <details className="setting-section" open={!collapsedGroups['ocr-online']}>
         <summary className="section-header" onClick={(e) => { e.preventDefault(); toggleGroup('ocr-online'); }}>
-          <span className="section-title">🌐 {t('ocr.onlineServices')}</span>
+          <span className="section-title"><Globe size={15} /> {t('ocr.onlineServices')}</span>
           <span className="section-hint">{t('ocr.onlineHint')}</span>
         </summary>
         <div className="section-content">
@@ -521,7 +538,7 @@ const OcrSection = ({
                   <span className="engine-badge free">{t('ocr.free25k')}</span>
                 </div>
                 <p className="engine-desc">{t('ocr.ocrspaceDesc')}</p>
-                <ApiKeyInput keyName="ocrspaceKey" value={settings.ocr.ocrspaceKey} showKey={showApiKeys.ocrspace} />
+                {renderApiKeyInput({ keyName: 'ocrspaceKey', toggleKey: 'ocrspace', value: settings.ocr.ocrspaceKey, showKey: showApiKeys.ocrspace })}
               </div>
               <div className="engine-actions">
                 <button
@@ -540,7 +557,7 @@ const OcrSection = ({
                   <span className="engine-badge free">{t('ocr.free1k')}</span>
                 </div>
                 <p className="engine-desc">{t('ocr.googleVisionDesc')}</p>
-                <ApiKeyInput keyName="googleVisionKey" value={settings.ocr.googleVisionKey} showKey={showApiKeys.googleVision} />
+                {renderApiKeyInput({ keyName: 'googleVisionKey', toggleKey: 'googleVision', value: settings.ocr.googleVisionKey, showKey: showApiKeys.googleVision })}
               </div>
               <div className="engine-actions">
                 <button
@@ -559,7 +576,7 @@ const OcrSection = ({
                   <span className="engine-badge free">{t('ocr.free5k')}</span>
                 </div>
                 <p className="engine-desc">{t('ocr.azureDesc')}</p>
-                <ApiKeyInput keyName="azureKey" value={settings.ocr.azureKey} showKey={showApiKeys.azure} />
+                {renderApiKeyInput({ keyName: 'azureKey', toggleKey: 'azure', value: settings.ocr.azureKey, showKey: showApiKeys.azure })}
                 <div className="api-key-input-wrapper" style={{marginTop: '6px'}}>
                   <input type="text" className="setting-input compact" placeholder={t('ocr.azureEndpoint')}
                     value={settings.ocr.azureEndpoint || ''} onChange={(e) => updateSetting('ocr', 'azureEndpoint', e.target.value)} />
@@ -585,7 +602,7 @@ const OcrSection = ({
                   <span className="engine-badge free">{t('ocr.free1k')}</span>
                 </div>
                 <p className="engine-desc">{t('ocr.baiduDesc')}</p>
-                <ApiKeyInput keyName="baiduApiKey" value={settings.ocr.baiduApiKey} showKey={showApiKeys.baidu} />
+                {renderApiKeyInput({ keyName: 'baiduApiKey', toggleKey: 'baidu', value: settings.ocr.baiduApiKey, showKey: showApiKeys.baidu })}
                 <div className="api-key-input-wrapper" style={{marginTop: '6px'}}>
                   <input type={showApiKeys.baiduSecret ? "text" : "password"} className="setting-input compact" placeholder="Secret Key"
                     value={settings.ocr.baiduSecretKey || ''} onChange={(e) => updateSetting('ocr', 'baiduSecretKey', e.target.value)} />

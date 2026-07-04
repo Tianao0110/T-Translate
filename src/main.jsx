@@ -73,30 +73,17 @@ const checkElectronAPI = () => {
   }
 };
 
+const THEMES = ['light', 'dark', 'fresh'];
+
 const initTheme = () => {
-  const savedTheme = localStorage.getItem('theme') || 'light';
-  document.documentElement.setAttribute('data-theme', savedTheme);
-
-  if (window.matchMedia) {
-    const darkModeQuery = window.matchMedia('(prefers-color-scheme: dark)');
-
-    // Only react to OS theme changes when user explicitly chose 'auto'
-    darkModeQuery.addEventListener('change', (e) => {
-      if (localStorage.getItem('theme') === 'auto') {
-        document.documentElement.setAttribute(
-          'data-theme',
-          e.matches ? 'dark' : 'light'
-        );
-      }
-    });
-
-    if (savedTheme === 'auto') {
-      document.documentElement.setAttribute(
-        'data-theme',
-        darkModeQuery.matches ? 'dark' : 'light'
-      );
-    }
-  }
+  // No 'auto'/follow-system branch: nothing ever writes theme='auto' (the UI
+  // has only light/dark/fresh), so it was dead. A stray/unknown value falls
+  // back to light rather than an unmatched data-theme.
+  const savedTheme = localStorage.getItem('theme');
+  document.documentElement.setAttribute(
+    'data-theme',
+    THEMES.includes(savedTheme) ? savedTheme : 'light'
+  );
 };
 
 const initApp = () => {

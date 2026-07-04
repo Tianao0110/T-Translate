@@ -106,14 +106,23 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
 
   useEffect(() => {
     loadVoices();
-    ttsManager.onStatusChange((status) => {
+    const unsub = ttsManager.onStatusChange((status) => {
       setTtsStatus(status);
       if (status === TTS_STATUS.IDLE) setIsTesting(false);
     });
+    // Return the slot on unmount (and stop any test playback), or the main
+    // panel's status callback stays evicted after visiting this page.
+    return () => {
+      unsub();
+      ttsManager.stop();
+    };
   }, [loadVoices]);
 
+  // ttsManager.updateConfig persists to the store immediately, so the React
+  // update is silent — otherwise the panel would flag "unsaved changes" for a
+  // change that's already saved.
   const updateTTSConfig = useCallback((key, value) => {
-    updateSetting('tts', key, value);
+    updateSetting('tts', key, value, true);
     ttsManager.updateConfig({ [key]: value });
   }, [updateSetting]);
 

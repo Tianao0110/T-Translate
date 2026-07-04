@@ -1,6 +1,6 @@
 // OCR.space API engine — https://ocr.space/ocrapi
 
-import { BaseOCREngine } from './base.js';
+import { BaseOCREngine, _t } from './base.js';
 import createLogger from '../../utils/logger.js';
 const logger = createLogger('OCRSpace');
 
@@ -49,19 +49,31 @@ class OCRSpaceEngine extends BaseOCREngine {
     return !!this.config.apiKey;
   }
 
+  // The OCR settings UI stores BCP-47-ish codes (zh-Hans, en, ...) but this
+  // API wants its own 3-letter codes. Map here; unknown/auto falls back to the
+  // OCREngine-2 auto behavior rather than sending an invalid language.
+  static LANG_MAP = {
+    'zh-Hans': 'chs', 'zh-Hant': 'cht', 'en': 'eng', 'ja': 'jpn', 'ko': 'kor',
+    'fr': 'fre', 'de': 'ger', 'es': 'spa', 'ru': 'rus', 'ar': 'ara',
+    // already-native codes pass through
+    'chs': 'chs', 'cht': 'cht', 'eng': 'eng', 'jpn': 'jpn', 'kor': 'kor',
+  };
+
   async recognize(input, options = {}) {
     const { apiKey, language } = this.config;
 
     if (!apiKey) {
-      return { success: false, error: '请配置 OCR.space API Key' };
+      return { success: false, error: _t('providerError.ocrNotConfigured', '请配置该 OCR 引擎的密钥') };
     }
 
     try {
       const base64Data = this.ensureBase64(input);
+      const rawLang = options.language || language;
+      const apiLang = OCRSpaceEngine.LANG_MAP[rawLang] || 'eng';
 
       const formData = new FormData();
       formData.append('apikey', apiKey);
-      formData.append('language', options.language || language);
+      formData.append('language', apiLang);
       formData.append('base64Image', base64Data);
       formData.append('isOverlayRequired', 'false');
       formData.append('detectOrientation', 'true');
@@ -81,12 +93,12 @@ class OCRSpaceEngine extends BaseOCREngine {
       const data = await response.json();
 
       if (data.IsErroredOnProcessing) {
-        throw new Error(data.ErrorMessage?.[0] || 'OCR 处理失败');
+        throw new Error(data.ErrorMessage?.[0] || _t('providerError.ocrProcessFailed', 'OCR 处理失败'));
       }
 
       const parsedResults = data.ParsedResults || [];
       if (parsedResults.length === 0) {
-        return { success: false, error: '未识别到文字' };
+        return { success: false, error: _t('providerError.ocrNoText', '未识别到文字') };
       }
 
       const text = parsedResults.map(r => r.ParsedText).join('\n');

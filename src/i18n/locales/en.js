@@ -7,7 +7,7 @@ const en = {
     searchPlaceholder: "Search settings...",
     groupTranslation: "Translation", groupSystem: "System",
     providers: "Providers", translation: "Translation", selection: "Selection", floatingWindow: "Floating Window", document: "Documents",
-    ocr: "OCR", tts: "Text to Speech", interface: "Appearance", connection: "LM Studio", privacy: "Privacy", about: "About",
+    ocr: "OCR", tts: "Text to Speech", interface: "Appearance", privacy: "Privacy", about: "About",
     export: "Export", import: "Import", reset: "Reset",
     simpleMode: "Simple", fullMode: "Full", switchToFull: "Full", switchToSimple: "Simple",
     modeHint: "You're viewing the simple catalog. Click Full below for all settings (selection, floating window, OCR, privacy...)",
@@ -22,6 +22,7 @@ const en = {
     testing: "Testing...", connected: "Connected", connectionFailed: "Connection failed", notTested: "Not tested",
     noConfig: "This provider requires no configuration, ready to use",
     saved: "Provider settings saved", saveFailed: "Save failed",
+    encryptFailed: "API key encryption failed (system encryption unavailable); save aborted",
     enabledSection: "Enabled", disabledSection: "Not Enabled",
     noEnabled: "No translation providers enabled",
     enable: "Enable",
@@ -54,16 +55,15 @@ const en = {
   },
   providerConfig: {
     'local-llm': { endpoint: 'API Endpoint', model: 'Model Name', timeout: 'Timeout (ms)', model_placeholder: 'Leave empty to auto-detect' },
-    'openai': { apiKey: 'API Key', endpoint: 'API Endpoint', model: 'Model Name' },
-    'deepl': { apiKey: 'API Key', freeApi: 'Use Free API (Key ending with :fx)' },
+    'openai': { apiKey: 'API Key', baseUrl: 'API Endpoint', model: 'Model Name' },
+    'deepl': { apiKey: 'API Key', useFreeApi: 'Use Free API (Key ending with :fx)' },
     'gemini': { apiKey: 'API Key', model: 'Model' },
     'deepseek': { apiKey: 'API Key', model: 'Model', endpoint: 'API Endpoint' },
-    'google-translate': { domain: 'Server', domain_com: 'google.com (International)', domain_cn: 'google.cn (China)', 'domain_com.hk': 'google.com.hk (Hong Kong)' },
+    'google-translate': { domain: 'Server', domain_com: 'google.com (International)', 'domain_com.hk': 'google.com.hk (Hong Kong)' },
     'ollama': { endpoint: 'API Endpoint', model: 'Model Name', timeout: 'Timeout (ms)', model_placeholder: 'Leave empty to auto-detect (e.g. llama3, qwen2)' },
     'anthropic': { apiKey: 'API Key', model: 'Model', baseUrl: 'API Endpoint' },
     'microsoft-translator': { apiKey: 'API Key', region: 'Region' },
-    'baidu-translate': { appId: 'APP ID', secretKey: 'Secret Key' },
-    ocr: { language: 'Recognition Language', language_chs: 'Simplified Chinese', language_cht: 'Traditional Chinese', language_eng: 'English', language_jpn: 'Japanese', language_kor: 'Korean' }
+    'baidu-translate': { appId: 'APP ID', secretKey: 'Secret Key' }
   },
   translationSettings: {
     title: "Translation Settings", description: "Configure translation behavior and output",
@@ -88,7 +88,7 @@ const en = {
     title: "Shortcuts",
     translate: "Translate", swapLanguages: "Swap Languages", clear: "Clear", paste: "Paste", copy: "Copy Result",
     screenshot: "Screenshot", toggleWindow: "Show/Hide Window", floatingWindow: "Floating Window", selectionTranslate: "Toggle Selection",
-    hint: "Click to edit shortcut, press Esc to cancel. 🌐 marks global shortcuts",
+    hint: "All shortcuts below are system-wide. Click to edit, press Esc to cancel",
     pressKey: "Press shortcut...", resetDefault: "Reset to Default",
     updated: "Shortcut updated: {{label}} → {{shortcut}}", updateFailed: "Shortcut update failed: {{error}}", reset: "Shortcuts reset to default",
     conflictNotice: "Shortcuts occupied by other apps: {{shortcuts}}. You can change them in Settings."
@@ -162,6 +162,7 @@ const en = {
     copied: "Copied", restored: "Restored to editor", favorited: "Added to favorites", unfavorited: "Removed from favorites",
     exportSuccess: "Export successful", exportFailed: "Export failed", cleared: "Cleared",
     importedCount: "Imported {{count}} records", importFailed: "Import failed", noMatch: "No matching records found",
+    importDisabledSecure: "History import is unavailable in incognito mode",
     emptyHint: "Translations will be saved here automatically",
     deleteSelectedConfirm: "Delete {{count}} selected records?",
     deletedCount: "Deleted {{count}} records",
@@ -198,11 +199,6 @@ const en = {
     importFailed: "Import failed",
     tagsLabel: "Tags (comma separated)", tagsPlaceholder: "formal, academic, important...",
     noteLabel: "Note", notePlaceholder: "Add note..."
-  },
-  connectionSettings: {
-    title: "LM Studio Connection", endpoint: "API Endpoint", timeout: "Timeout (ms)",
-    testing: "Testing...", testConnection: "Test Connection", availableModels: "Available Models",
-    connectionSuccess: "Connected! Found {{count}} models", connectionFailed: "Connection failed", connectionError: "Connection error"
   },
   documents: { title: "Document Translation", upload: "Upload Document", dragDrop: "Drag & drop file here, or click to upload", supported: "Supports PDF, DOCX, EPUB, TXT", translating: "Translating...", download: "Download", preview: "Preview" },
   privacy: {
@@ -300,16 +296,14 @@ const en = {
   settings: {
     title: "Settings",
     saved: "Settings saved", saveFailed: "Failed to save settings",
+    ocrKeysEncryptFailed: "OCR API key encryption failed (system encryption unavailable); keys were not saved",
     exported: "Settings exported", invalidFormat: "Invalid settings file format", importedPleasesSave: "Settings imported, please save to apply", invalidFile: "Invalid settings file",
-    resetSectionConfirm: "Reset \"{{section}}\" settings?", resetAllConfirm: "Reset all settings? This will clear all custom configurations.",
+    resetSectionConfirm: "Reset \"{{section}}\" settings?", resetAllConfirm: "Reset all settings? This clears all custom configuration (saved API keys are kept; use \"Clear all data\" on the Privacy page for a full wipe).",
     sectionReset: "{{section}} settings reset", sectionNotFound: "Default settings for {{section}} not found", allReset: "All settings reset",
-    tabs: { general: "General", providers: "Providers", ocr: "OCR", shortcuts: "Shortcuts", privacy: "Privacy", tts: "TTS", glossary: "Glossary", about: "About" },
     general: {
       title: "General Settings", language: "Language", languageDesc: "Select interface language",
       theme: "Theme", themeDesc: "Select app appearance",
       themes: { default: "Default", fresh: "Fresh", dark: "Dark" },
-      startup: "Start on Boot", startupDesc: "Run automatically on system startup", minimize: "Minimize to Tray", minimizeDesc: "Minimize to system tray when closed",
-      defaultSource: "Default Source Language", defaultTarget: "Default Target Language",
       langSwitched: "Language changed"
     },
     startup: {
@@ -322,23 +316,14 @@ const en = {
       autoSelection: "Enable selection translate on startup",
       autoSelectionHint: "Automatically enable selection translate after auto-launch",
     },
-    providers: {
-      title: "Translation Providers", enable: "Enable", disable: "Disable", test: "Test Connection", testing: "Testing...", testSuccess: "Connection successful", testFailed: "Connection failed",
-      priority: "Priority", priorityDesc: "Drag to adjust provider priority", apiKey: "API Key", apiKeyPlaceholder: "Enter API Key", baseUrl: "API URL", model: "Model", getKey: "Get Key",
-      localLlm: { name: "Local LLM", desc: "Use local models, fully offline", endpoint: "API Endpoint", endpointPlaceholder: "http://localhost:1234/v1" },
-      openai: { name: "OpenAI", desc: "Translate with GPT models" }, deepl: { name: "DeepL", desc: "High quality translation" },
-      gemini: { name: "Gemini", desc: "Google AI translation" }, deepseek: { name: "DeepSeek", desc: "DeepSeek AI translation" }, google: { name: "Google Translate", desc: "Free Google translation" }
-    },
-    ocr: { title: "OCR Settings", engine: "OCR Engine", engineDesc: "Select text recognition engine", engines: { rapid: "RapidOCR (Local)", windows: "Windows OCR", llmVision: "LLM Vision" }, language: "Recognition Language", languageDesc: "Select language to recognize" },
-    shortcuts: { title: "Keyboard Shortcuts", desc: "Customize global shortcuts", showWindow: "Show/Hide Window", screenshot: "Screenshot Translate", floatingWindow: "Floating Window", selectionToggle: "Toggle Selection", recording: "Press shortcut...", conflict: "Shortcut conflict", reset: "Reset Default" },
+    ocr: { title: "OCR Settings" },
+    shortcuts: { title: "Keyboard Shortcuts" },
     privacy: {
-      title: "Privacy Settings", mode: "Privacy Mode", modeDesc: "Control data storage and network",
-      modes: { standard: "Standard", standardDesc: "Normal features, save history", offline: "Offline", offlineDesc: "Local translation only", incognito: "Incognito", incognitoDesc: "No history or cache" },
-      clearHistory: "Clear History", clearCache: "Clear Cache", clearAll: "Clear All Data"
+      title: "Privacy Settings",
+      clearHistory: "Clear History", clearAll: "Clear All Data"
     },
-    tts: { title: "Text-to-Speech", enable: "Enable TTS", enableDesc: "Enable voice reading", voice: "Voice", voiceDesc: "Select voice", rate: "Speed", rateDesc: "Adjust reading speed", pitch: "Pitch", pitchDesc: "Adjust voice pitch", volume: "Volume", volumeDesc: "Adjust volume", test: "Test", testText: "This is a test message" },
-    glossary: { title: "Glossary", desc: "Custom translation terms for consistent terminology", add: "Add Term", source: "Source", target: "Translation", empty: "No terms yet", import: "Import", export: "Export", delete: "Delete", save: "Save" },
-    about: { title: "About", version: "Version", checkUpdate: "Check for Updates", checking: "Checking...", upToDate: "You're up to date", newVersion: "New version available", download: "Download", later: "Later", releaseNotes: "Release Notes", publishedAt: "Published", github: "GitHub", feedback: "Feedback", license: "License", copyright: "© 2026 T-Translate" },
+    tts: { title: "Text-to-Speech" },
+    about: { checkUpdate: "Check for Updates", checking: "Checking...", upToDate: "You're up to date", newVersion: "New version available", download: "Download", later: "Later", releaseNotes: "Release Notes", publishedAt: "Published", copyright: "© 2026 T-Translate" },
     selection: { title: "Selection Translate" },
     floatingWindow: { title: "Floating Window" }
   },
@@ -445,6 +430,8 @@ const en = {
     },
     llmVisionDesc: "Handle artistic text, handwriting, blurry text, comic bubbles, etc.",
     llmVisionMeta: "Requires LM Studio + Vision model (e.g., Qwen-VL)",
+    llmEndpointPlaceholder: "http://localhost:1234/v1",
+    llmEndpointHint: "OpenAI-compatible endpoint of the vision model (Ollama default: http://localhost:11434/v1)",
     free25k: "Free 25000/month", free5k: "Free 5000/month", free1k: "Free 1000/month",
     ocrspaceDesc: "Highest free quota, supports 25+ languages",
     googleVisionDesc: "Best recognition, supports 200+ languages",
@@ -472,14 +459,14 @@ const en = {
     rate: "Rate", rateHint: "Adjust speaking speed, 1.0 is normal",
     pitch: "Pitch", pitchHint: "Adjust voice pitch, 1.0 is normal",
     volume: "Volume", volumeHint: "Adjust volume level",
-    preview: "Preview", previewHint: "Play test audio with current settings",
     play: "Play Preview", stop: "Stop",
     testTextMixed: "This is a TTS test. 这是语音朗读测试。",
     testTextChinese: "Hello, this is a TTS test.",
     testFailed: "Preview failed", loadVoicesFailed: "Failed to load voices",
     langNames: { zh: "Chinese", en: "English", ja: "Japanese", ko: "Korean", fr: "French", de: "German", es: "Spanish", ru: "Russian", pt: "Portuguese", it: "Italian" },
     noVoicesInstalled: "No voice packs installed. Please install voices in system settings.",
-    noVoiceForLang: "No {{lang}} voice pack installed"
+    noVoiceForLang: "No {{lang}} voice pack installed",
+    installVoiceHint: "No voice packs detected. Install them in System Settings → Language → Speech."
   },
   // ===== DocumentTranslator keys =====
   documentTranslator: {
@@ -646,6 +633,52 @@ const en = {
     requestTimeout: "Request timeout — you can raise the timeout in provider settings",
     waitTimeout: "Model response timeout — you can raise the timeout in provider settings",
     streamStalled: "Generation stalled — no new output within the timeout",
+    // English strings keep the keywords error-handler's ERROR_PATTERNS match on
+    // (not configured / invalid / timeout / quota / connection failed).
+    emptyText: "Text is empty",
+    notConfigured: "API Key not configured",
+    notConfiguredBaidu: "App ID or secret key not configured",
+    keyInvalid: "Invalid API Key",
+    keyInvalidExpired: "API Key invalid or expired",
+    noResult: "No translation result",
+    noResponseContent: "No response content",
+    connectFailed: "Connection failed",
+    connectFailedStatus: "Connection failed: {{status}}",
+    connectSuccess: "Connected successfully",
+    connectedModels: "Connected, found {{count}} models",
+    streamFailed: "Streaming translation failed",
+    translateFailed: "Translation failed",
+    unknownError: "Unknown error",
+    timeout: "Request timeout",
+    truncated: "Translation was truncated (exceeded max length)",
+    quotaExhausted: "Quota exhausted",
+    apiError: "API error: {{status}}",
+    httpError: "HTTP {{status}}",
+    contentBlocked: "Content blocked by safety policy",
+    cannotConnectTryOther: "Cannot connect — check your network or try another server",
+    ocrNoText: "No text recognized",
+    ocrProcessFailed: "OCR processing failed",
+    ocrTimeout: "OCR processing timed out",
+    ocrRecognizeFailed: "OCR recognition failed",
+    ocrApiUnavailable: "OCR service unavailable",
+    ocrNotConfigured: "Please configure this OCR engine's credentials",
+    unsupportedTargetLang: "The selected target language is not supported",
+    unsupportedSourceLang: "The selected source language is not supported",
+    providerErrorStatus: "{{provider}} error: {{status}}",
+    baiduCode: {
+      '52001': "Request timeout",
+      '52002': "System error",
+      '52003': "Unauthorized user (invalid App ID)",
+      '54000': "Required parameter missing",
+      '54001': "Signature error (check your secret key)",
+      '54003': "Access rate limited",
+      '54004': "Insufficient account balance",
+      '54005': "Long-text request rate limited",
+      '58000': "Client IP not allowed",
+      '58001': "Translation language direction not supported",
+      '58002': "Service is currently disabled",
+      '90107': "Authentication failed or inactive",
+    },
   },
   errors: {
     network: { title: "Network Error", message: "Cannot connect to translation service", s1: "Check your network connection", s2: "If using local LLM, make sure LM Studio is running", s3: "Check if firewall is blocking the connection" },
@@ -669,6 +702,7 @@ const en = {
   svc: {
     noProvider: "No translation providers available",
     allFailed: "All translation providers failed",
+    testBlockedByPrivacy: "This provider is disabled by the current privacy mode",
     batchFailed: "Batch translation failed entirely",
     noUserMsg: "No user message",
     translateFailed: "Translation failed",

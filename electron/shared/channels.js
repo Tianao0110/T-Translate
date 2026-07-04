@@ -13,7 +13,6 @@ const CHANNELS = {
   DIALOG: {
     SAVE: 'show-save-dialog',
     OPEN: 'show-open-dialog',
-    MESSAGE: 'show-message-box',
     SAVE_FILE: 'save-file',   // dialog + write in one round trip
   },
   STORE: {
@@ -21,7 +20,6 @@ const CHANNELS = {
     SET: 'store-set',
     DELETE: 'store-delete',
     CLEAR: 'store-clear',
-    HAS: 'store-has',
   },
   APP: {
     GET_VERSION: 'get-app-version',
@@ -35,14 +33,12 @@ const CHANNELS = {
   },
   LOGS: {
     OPEN_DIRECTORY: 'logs:open-directory',
-    GET_DIRECTORY: 'logs:get-directory',
   },
   PRIVACY: {
     SET_MODE: 'privacy:setMode',
     GET_MODE: 'privacy:getMode',
   },
   SHORTCUTS: {
-    GET: 'shortcuts:get',
     UPDATE: 'shortcuts:update',
     PAUSE: 'shortcuts:pause',
     RESUME: 'shortcuts:resume',
@@ -54,11 +50,9 @@ const CHANNELS = {
     CAPTURED: 'screenshot-captured',
     CAPTURED_SILENT: 'screenshot-captured-silent', // Silent mode — no main window pop.
     CONFIG: 'screenshot-config',
-    SCREEN_BOUNDS: 'screen-bounds',
     OCR_COMPLETE: 'screenshot:ocr-complete',       // OCR done — forward text to selection window for translation.
   },
   FLOATING_WINDOW: {
-    OPEN: 'floating-window:open',
     CLOSE: 'floating-window:close',
     GET_BOUNDS: 'floating-window:get-bounds',
     SET_POSITION: 'floating-window:set-position', // manual title-bar drag stream
@@ -71,20 +65,12 @@ const CHANNELS = {
     NOTIFY_SETTINGS_CHANGED: 'floating-window:notify-settings-changed',
     OPEN_MAIN_SETTINGS: 'floating-window:open-main-settings',
     GET_HISTORY: 'floating-window:get-history',
+    ADD_TO_HISTORY: 'floating-window:add-to-history', // forward a translation into the main window's history
     SETTINGS_CHANGED: 'floating-window:settings-changed',
     // Child pane standalone windows
     CREATE_CHILD_WINDOW: 'floating-window:create-child-window',
     CLOSE_CHILD_WINDOW: 'floating-window:close-child-window',
     CLOSE_ALL_CHILD_WINDOWS: 'floating-window:close-all-child-windows',
-  },
-  SUBTITLE: {
-    TOGGLE_CAPTURE_WINDOW: 'subtitle:toggle-capture-window',
-    GET_CAPTURE_RECT: 'subtitle:get-capture-rect',
-    SET_CAPTURE_RECT: 'subtitle:set-capture-rect',
-    CLEAR_CAPTURE_RECT: 'subtitle:clear-capture-rect',
-    CAPTURE_REGION: 'subtitle:capture-region',
-    IS_CAPTURE_WINDOW_VISIBLE: 'subtitle:is-capture-window-visible',
-    CAPTURE_RECT_UPDATED: 'subtitle:capture-rect-updated',
   },
   SELECTION: {
     TOGGLE: 'selection:toggle',
@@ -97,6 +83,7 @@ const CHANNELS = {
     SHOW_TRIGGER: 'selection:show-trigger',
     SHOW_RESULT: 'selection:show-result',     // Direct result display (screenshot chain).
     SHOW_DIRECT: 'selection:show-direct',     // Sticky-direct path (skip trigger icon).
+    SETTINGS_CHANGED: 'selection:settings-changed', // Provider/settings save → reload translation stack.
     STATE_CHANGED: 'selection-state-changed',
     // Multi-window support
     FREEZE: 'selection:freeze',
@@ -118,10 +105,6 @@ const CHANNELS = {
     DOWNLOAD_PROGRESS: 'ocr:download-progress',
     WINDOWS_OCR: 'ocr:windows-ocr',
     PADDLE_OCR: 'ocr:paddle-ocr',
-    OCRSPACE: 'ocr:ocrspace',
-    GOOGLE_VISION: 'ocr:google-vision',
-    AZURE_OCR: 'ocr:azure-ocr',
-    BAIDU_OCR: 'ocr:baidu-ocr',
     HEALTH_CHECK: 'ocr:health-check',
   },
   MENU: {
@@ -129,9 +112,7 @@ const CHANNELS = {
     IMPORT_FILE: 'import-file',
   },
   DATA: {
-    ADD_TO_FAVORITES: 'add-to-favorites',
     ADD_TO_HISTORY: 'add-to-history',
-    SYNC_TARGET_LANGUAGE: 'sync-target-language',
   },
   THEME: {
     GET: 'theme:get',
@@ -144,7 +125,6 @@ const CHANNELS = {
     DECRYPT: 'secure-storage:decrypt',
     DELETE: 'secure-storage:delete',
     IS_AVAILABLE: 'secure-storage:isAvailable',
-    GET_ACCESS_LOG: 'secure-storage:getAccessLog',
   },
 };
 

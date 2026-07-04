@@ -7,7 +7,7 @@ const zh = {
     searchPlaceholder: "搜索设置...",
     groupTranslation: "翻译", groupSystem: "系统",
     providers: "翻译源", translation: "翻译设置", selection: "划词翻译", floatingWindow: "悬浮窗口", document: "文档翻译",
-    ocr: "OCR 识别", tts: "朗读设置", interface: "界面外观", connection: "LM Studio", privacy: "隐私模式", about: "关于",
+    ocr: "OCR 识别", tts: "朗读设置", interface: "界面外观", privacy: "隐私模式", about: "关于",
     export: "导出", import: "导入", reset: "重置",
     simpleMode: "简洁", fullMode: "完整", switchToFull: "完整", switchToSimple: "简洁",
     modeHint: "当前为简洁目录，点下方「完整」可查看全部设置（划词、悬浮窗、OCR、隐私等）",
@@ -22,6 +22,7 @@ const zh = {
     testing: "测试中...", connected: "已连接", connectionFailed: "连接失败", notTested: "未测试",
     noConfig: "此翻译源无需额外配置，开箱即用",
     saved: "翻译源设置已保存", saveFailed: "保存失败",
+    encryptFailed: "密钥加密失败（系统加密不可用），已取消保存",
     enabledSection: "已启用", disabledSection: "未启用",
     noEnabled: "尚未启用任何翻译源",
     enable: "启用",
@@ -54,16 +55,15 @@ const zh = {
   },
   providerConfig: {
     'local-llm': { endpoint: 'API 地址', model: '模型名称', timeout: '超时时间 (ms)', model_placeholder: '留空自动检测' },
-    'openai': { apiKey: 'API Key', endpoint: 'API 地址', model: '模型名称' },
-    'deepl': { apiKey: 'API Key', freeApi: '使用免费 API（Key 以 :fx 结尾）' },
+    'openai': { apiKey: 'API Key', baseUrl: 'API 地址', model: '模型名称' },
+    'deepl': { apiKey: 'API Key', useFreeApi: '使用免费 API（Key 以 :fx 结尾）' },
     'gemini': { apiKey: 'API Key', model: '模型' },
     'deepseek': { apiKey: 'API Key', model: '模型', endpoint: 'API 地址' },
-    'google-translate': { domain: '服务器', domain_com: 'google.com (国际)', domain_cn: 'google.cn (中国)', 'domain_com.hk': 'google.com.hk (香港)' },
+    'google-translate': { domain: '服务器', domain_com: 'google.com (国际)', 'domain_com.hk': 'google.com.hk (香港)' },
     'ollama': { endpoint: 'API 地址', model: '模型名称', timeout: '超时时间 (ms)', model_placeholder: '留空自动检测（如 llama3, qwen2 等）' },
     'anthropic': { apiKey: 'API Key', model: '模型', baseUrl: 'API 地址' },
     'microsoft-translator': { apiKey: 'API Key', region: '区域' },
-    'baidu-translate': { appId: 'APP ID', secretKey: '密钥' },
-    ocr: { language: '识别语言', language_chs: '简体中文', language_cht: '繁体中文', language_eng: 'English', language_jpn: '日本語', language_kor: '한국어' }
+    'baidu-translate': { appId: 'APP ID', secretKey: '密钥' }
   },
   translationSettings: {
     title: "翻译设置", description: "配置翻译行为和输出方式",
@@ -88,7 +88,7 @@ const zh = {
     title: "快捷键",
     translate: "执行翻译", swapLanguages: "切换语言", clear: "清空内容", paste: "粘贴文本", copy: "复制结果",
     screenshot: "截图翻译", toggleWindow: "显示/隐藏窗口", floatingWindow: "悬浮窗口", selectionTranslate: "划词翻译开关",
-    hint: "点击快捷键可进行修改，按 Esc 取消。带 🌐 标记的为全局快捷键",
+    hint: "以下均为系统全局快捷键。点击可修改，按 Esc 取消",
     pressKey: "按下快捷键...", resetDefault: "重置为默认",
     updated: "快捷键已更新: {{label}} → {{shortcut}}", updateFailed: "快捷键更新失败: {{error}}", reset: "快捷键已重置为默认值",
     conflictNotice: "快捷键被其他程序占用: {{shortcuts}}，可在设置中修改"
@@ -165,6 +165,7 @@ const zh = {
     copied: "已复制译文", restored: "已恢复到编辑区", favorited: "已收藏", unfavorited: "已取消收藏",
     exportSuccess: "导出成功", exportFailed: "导出失败", cleared: "已清空",
     importedCount: "导入 {{count}} 条", importFailed: "导入失败", noMatch: "没有找到匹配的记录",
+    importDisabledSecure: "无痕模式下不可导入历史记录",
     emptyHint: "翻译内容会自动保存在这里",
     secureMode: { title: "无痕模式已启用", desc: "当前模式下不会保存任何翻译历史记录。如需保存历史，请切换到标准模式。" },
     stats: { 
@@ -198,11 +199,6 @@ const zh = {
     importFailed: "导入失败",
     tagsLabel: "标签（逗号分隔）", tagsPlaceholder: "正式, 学术, 重要...",
     noteLabel: "笔记", notePlaceholder: "添加笔记..."
-  },
-  connectionSettings: {
-    title: "LM Studio 连接设置", endpoint: "API 端点", timeout: "超时时间 (ms)",
-    testing: "测试中...", testConnection: "测试连接", availableModels: "可用模型",
-    connectionSuccess: "连接成功！检测到 {{count}} 个模型", connectionFailed: "连接失败", connectionError: "连接错误"
   },
   documents: { title: "文档翻译", upload: "上传文档", dragDrop: "拖拽文件到这里，或点击上传", supported: "支持 PDF、DOCX、EPUB、TXT 格式", translating: "翻译中...", download: "下载译文", preview: "预览" },
   privacy: {
@@ -300,16 +296,14 @@ const zh = {
   settings: {
     title: "设置",
     saved: "设置已保存", saveFailed: "保存设置失败",
+    ocrKeysEncryptFailed: "OCR 密钥加密失败（系统加密不可用），密钥未保存",
     exported: "设置已导出", invalidFormat: "设置文件格式不正确", importedPleasesSave: "设置已导入，请保存以生效", invalidFile: "无效的设置文件",
-    resetSectionConfirm: "重置 \"{{section}}\" 的设置？", resetAllConfirm: "重置所有设置？这将清除所有自定义配置。",
+    resetSectionConfirm: "重置 \"{{section}}\" 的设置？", resetAllConfirm: "重置所有设置？这将清除所有自定义配置（已保存的 API 密钥会保留；如需彻底清除，请用隐私页的“清除所有数据”）。",
     sectionReset: "{{section}} 设置已重置", sectionNotFound: "未找到 {{section}} 的默认设置", allReset: "所有设置已重置",
-    tabs: { general: "通用", providers: "翻译源", ocr: "OCR", shortcuts: "快捷键", privacy: "隐私", tts: "语音", glossary: "术语表", about: "关于" },
     general: {
       title: "通用设置", language: "界面语言", languageDesc: "选择应用界面显示语言",
       theme: "主题", themeDesc: "选择应用外观主题",
       themes: { default: "默认", fresh: "清新", dark: "暗色" },
-      startup: "开机启动", startupDesc: "系统启动时自动运行", minimize: "最小化到托盘", minimizeDesc: "关闭窗口时最小化到系统托盘",
-      defaultSource: "默认源语言", defaultTarget: "默认目标语言",
       langSwitched: "界面语言已切换"
     },
     startup: {
@@ -322,23 +316,14 @@ const zh = {
       autoSelection: "启动后自动开启划词翻译",
       autoSelectionHint: "开机自启后自动开启划词翻译，选中文字即可翻译",
     },
-    providers: {
-      title: "翻译源设置", enable: "启用", disable: "禁用", test: "测试连接", testing: "测试中...", testSuccess: "连接成功", testFailed: "连接失败",
-      priority: "优先级", priorityDesc: "拖拽调整翻译源优先级", apiKey: "API Key", apiKeyPlaceholder: "请输入 API Key", baseUrl: "API 地址", model: "模型", getKey: "获取 Key",
-      localLlm: { name: "本地 LLM", desc: "使用本地大模型翻译，完全离线", endpoint: "API 端点", endpointPlaceholder: "http://localhost:1234/v1" },
-      openai: { name: "OpenAI", desc: "使用 GPT 模型翻译" }, deepl: { name: "DeepL", desc: "高质量翻译服务" },
-      gemini: { name: "Gemini", desc: "Google AI 翻译" }, deepseek: { name: "DeepSeek", desc: "国产大模型翻译" }, google: { name: "Google 翻译", desc: "Google 免费翻译服务" }
-    },
-    ocr: { title: "OCR 设置", engine: "OCR 引擎", engineDesc: "选择文字识别引擎", engines: { rapid: "RapidOCR（本地）", windows: "Windows OCR", llmVision: "LLM Vision" }, language: "识别语言", languageDesc: "选择要识别的语言" },
-    shortcuts: { title: "快捷键设置", desc: "自定义全局快捷键", showWindow: "显示/隐藏主窗口", screenshot: "截图翻译", floatingWindow: "悬浮窗口", selectionToggle: "开启/关闭划词翻译", recording: "按下快捷键...", conflict: "快捷键冲突", reset: "重置默认" },
+    ocr: { title: "OCR 设置" },
+    shortcuts: { title: "快捷键设置" },
     privacy: {
-      title: "隐私设置", mode: "隐私模式", modeDesc: "控制数据存储和网络请求",
-      modes: { standard: "标准模式", standardDesc: "正常功能，记录历史", offline: "离线模式", offlineDesc: "仅使用本地翻译源", incognito: "无痕模式", incognitoDesc: "不记录历史和缓存" },
-      clearHistory: "清除历史记录", clearCache: "清除缓存", clearAll: "清除所有数据"
+      title: "隐私设置",
+      clearHistory: "清除历史记录", clearAll: "清除所有数据"
     },
-    tts: { title: "语音设置", enable: "启用 TTS", enableDesc: "开启翻译结果语音朗读", voice: "语音", voiceDesc: "选择朗读语音", rate: "语速", rateDesc: "调整朗读速度", pitch: "音调", pitchDesc: "调整语音音调", volume: "音量", volumeDesc: "调整朗读音量", test: "测试", testText: "这是一段测试文本" },
-    glossary: { title: "术语表", desc: "自定义翻译术语，确保专业词汇翻译一致", add: "添加术语", source: "原文", target: "译文", empty: "暂无术语", import: "导入", export: "导出", delete: "删除", save: "保存" },
-    about: { title: "关于", version: "版本", checkUpdate: "检查更新", checking: "检查中...", upToDate: "已是最新版本", newVersion: "发现新版本", download: "前往下载", later: "稍后再说", releaseNotes: "更新内容", publishedAt: "发布时间", github: "GitHub", feedback: "反馈问题", license: "开源协议", copyright: "© 2026 T-Translate" },
+    tts: { title: "语音设置" },
+    about: { checkUpdate: "检查更新", checking: "检查中...", upToDate: "已是最新版本", newVersion: "发现新版本", download: "前往下载", later: "稍后再说", releaseNotes: "更新内容", publishedAt: "发布时间", copyright: "© 2026 T-Translate" },
     selection: { title: "划词翻译" },
     floatingWindow: { title: "悬浮窗口" }
   },
@@ -445,6 +430,8 @@ const zh = {
     },
     llmVisionDesc: "处理艺术字、手写体、模糊文字、漫画气泡等复杂场景",
     llmVisionMeta: "需要 LM Studio + 视觉模型（如 Qwen-VL）",
+    llmEndpointPlaceholder: "http://localhost:1234/v1",
+    llmEndpointHint: "视觉模型的 OpenAI 兼容接口地址（Ollama 默认 http://localhost:11434/v1）",
     free25k: "免费 25000次/月", free5k: "免费 5000次/月", free1k: "免费 1000次/月",
     ocrspaceDesc: "免费额度最高，支持 25+ 语言",
     googleVisionDesc: "识别效果最好，支持 200+ 语言",
@@ -472,14 +459,14 @@ const zh = {
     rate: "语速", rateHint: "调整朗读速度，1.0 为正常语速",
     pitch: "音调", pitchHint: "调整声音音调，1.0 为正常音调",
     volume: "音量", volumeHint: "调整朗读音量大小",
-    preview: "试听效果", previewHint: "使用当前设置播放测试语音",
     play: "播放试听", stop: "停止播放",
     testTextMixed: "这是语音朗读测试。This is a TTS test.",
     testTextChinese: "你好，这是语音朗读功能测试。",
     testFailed: "试听失败", loadVoicesFailed: "加载语音列表失败",
     langNames: { zh: "中文", en: "英语", ja: "日语", ko: "韩语", fr: "法语", de: "德语", es: "西班牙语", ru: "俄语", pt: "葡萄牙语", it: "意大利语" },
     noVoicesInstalled: "系统未安装任何语音包，请在系统设置中安装语音",
-    noVoiceForLang: "系统未安装{{lang}}语音包"
+    noVoiceForLang: "系统未安装{{lang}}语音包",
+    installVoiceHint: "未检测到语音包，请在系统设置 → 语言 → 语音中安装"
   },
   // ===== DocumentTranslator keys =====
   documentTranslator: {
@@ -646,6 +633,53 @@ const zh = {
     requestTimeout: "请求超时，可在翻译源设置中调大超时时间",
     waitTimeout: "等待模型响应超时，可在翻译源设置中调大超时时间",
     streamStalled: "生成中断：超过超时时间无新内容",
+    // Shared provider runtime messages (migrated from hardcoded Chinese).
+    // English strings must keep classifiable keywords so error-handler's
+    // ERROR_PATTERNS still routes them (see utils/error-handler.js).
+    emptyText: "文本为空",
+    notConfigured: "未配置 API Key",
+    notConfiguredBaidu: "未配置 APP ID 或密钥",
+    keyInvalid: "API Key 无效",
+    keyInvalidExpired: "API Key 无效或已过期",
+    noResult: "无翻译结果",
+    noResponseContent: "无响应内容",
+    connectFailed: "连接失败",
+    connectFailedStatus: "连接失败: {{status}}",
+    connectSuccess: "连接成功",
+    connectedModels: "连接成功，检测到 {{count}} 个模型",
+    streamFailed: "流式翻译失败",
+    translateFailed: "翻译失败",
+    unknownError: "未知错误",
+    timeout: "请求超时",
+    truncated: "翻译结果被截断（超出最大长度）",
+    quotaExhausted: "配额已用完",
+    apiError: "API 错误: {{status}}",
+    httpError: "HTTP {{status}}",
+    contentBlocked: "内容被安全策略拦截",
+    cannotConnectTryOther: "无法连接，请检查网络或尝试其他服务器",
+    ocrNoText: "未识别到文字",
+    ocrProcessFailed: "OCR 处理失败",
+    ocrTimeout: "OCR 处理超时",
+    ocrRecognizeFailed: "OCR 识别失败",
+    ocrApiUnavailable: "OCR 服务不可用",
+    ocrNotConfigured: "请配置该 OCR 引擎的密钥",
+    unsupportedTargetLang: "所选目标语言不受支持",
+    unsupportedSourceLang: "所选源语言不受支持",
+    providerErrorStatus: "{{provider}} 错误: {{status}}",
+    baiduCode: {
+      '52001': "请求超时",
+      '52002': "系统错误",
+      '52003': "未授权用户 (APP ID 无效)",
+      '54000': "必填参数为空",
+      '54001': "签名错误 (请检查密钥)",
+      '54003': "访问频率受限",
+      '54004': "账户余额不足",
+      '54005': "长文本请求频率受限",
+      '58000': "客户端 IP 非法",
+      '58001': "译文语言方向不支持",
+      '58002': "服务当前已关闭",
+      '90107': "认证未通过或未生效",
+    },
   },
   errors: {
     network: { title: "网络连接失败", message: "无法连接到翻译服务", s1: "检查网络连接是否正常", s2: "如果使用本地 LLM，请确保 LM Studio 正在运行", s3: "检查防火墙设置是否阻止了连接" },
@@ -669,6 +703,7 @@ const zh = {
   svc: {
     noProvider: "没有可用的翻译源",
     allFailed: "所有翻译源均失败",
+    testBlockedByPrivacy: "当前隐私模式已禁用该翻译源",
     batchFailed: "批量翻译全部失败",
     noUserMsg: "没有用户消息",
     translateFailed: "翻译失败",

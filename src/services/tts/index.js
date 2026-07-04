@@ -28,7 +28,11 @@ class TTSManager {
     this._currentEngine = null;
     this._currentEngineId = null;
     this._config = { ...DEFAULT_TTS_CONFIG };
-    this._onStatusChange = null;
+    // Fan-out sets so main panel + settings page can both observe without
+    // stealing each other's single callback slot.
+    this._statusListeners = new Set();
+    this._configListeners = new Set();
+    this._engineUnsub = null;
     this._initialized = false;
   }
 
@@ -66,13 +70,6 @@ class TTSManager {
     return this._config.enabled;
   }
 
-  getEngineList() {
-    return Object.entries(engines).map(([id, Engine]) => ({
-      id,
-      ...Engine.metadata,
-    }));
-  }
-
   async getEngine(engineId) {
     if (this._engines.has(engineId)) {
       return this._engines.get(engineId);
@@ -103,13 +100,20 @@ class TTSManager {
     if (this._currentEngine) {
       this._currentEngine.stop();
     }
+    if (this._engineUnsub) {
+      this._engineUnsub();
+      this._engineUnsub = null;
+    }
 
     this._currentEngine = await this.getEngine(engineId);
     this._currentEngineId = engineId;
 
-    if (this._onStatusChange) {
-      this._currentEngine.onStatusChange(this._onStatusChange);
-    }
+    // One internal forwarder from the engine to all manager-level listeners.
+    this._engineUnsub = this._currentEngine.onStatusChange((status) => {
+      for (const cb of this._statusListeners) {
+        try { cb(status); } catch { /* isolate listeners */ }
+      }
+    });
 
     return this._currentEngine;
   }
@@ -127,10 +131,47 @@ class TTSManager {
   }
 
   onStatusChange(callback) {
-    this._onStatusChange = callback;
-    if (this._currentEngine) {
-      this._currentEngine.onStatusChange(callback);
+    this._statusListeners.add(callback);
+    return () => this._statusListeners.delete(callback);
+  }
+
+  // Notifies subscribers when the config (enabled/rate/voice/...) changes, so
+  // e.g. the main panel's speak button appears/disappears the moment TTS is
+  // toggled in settings instead of only after a restart.
+  onConfigChange(callback) {
+    this._configListeners.add(callback);
+    return () => this._configListeners.delete(callback);
+  }
+
+  _emitConfigChange() {
+    for (const cb of this._configListeners) {
+      try { cb(this.config); } catch { /* isolate listeners */ }
     }
+  }
+
+  // Re-read persisted config before speaking. This window (especially the
+  // persistent selection window) may hold a stale snapshot from its first
+  // init; the store is the source of truth and a settings save writes it.
+  async _refreshConfig() {
+    try {
+      const stored = await window.electron?.store?.get('settings.tts');
+      if (!stored) return;
+      const before = JSON.stringify(this._config);
+      this._config = { ...DEFAULT_TTS_CONFIG, ...stored };
+      if (before === JSON.stringify(this._config)) return;
+
+      if (this._currentEngine) {
+        this._currentEngine.updateConfig({
+          defaultRate: this._config.rate,
+          defaultPitch: this._config.pitch,
+          defaultVolume: this._config.volume,
+        });
+      }
+      if (this._currentEngineId && this._config.engine !== this._currentEngineId) {
+        try { await this.setEngine(this._config.engine); } catch { /* keep old engine */ }
+      }
+      this._emitConfigChange();
+    } catch { /* keep current config */ }
   }
 
   async getVoices() {
@@ -141,6 +182,10 @@ class TTSManager {
   }
 
   async speak(text, options = {}) {
+    // Lazy refresh so a settings change (enabled toggle, rate, voice) takes
+    // effect on the next utterance without restarting this window.
+    await this._refreshConfig();
+
     if (!this._config.enabled) {
       return;
     }
@@ -158,14 +203,6 @@ class TTSManager {
     };
 
     return this._currentEngine.speak(text, mergedOptions);
-  }
-
-  pause() {
-    this._currentEngine?.pause();
-  }
-
-  resume() {
-    this._currentEngine?.resume();
   }
 
   stop() {
@@ -190,9 +227,15 @@ class TTSManager {
         logger.error('[TTS] Failed to save config:', e);
       }
     }
+
+    this._emitConfigChange();
   }
 
   dispose() {
+    if (this._engineUnsub) {
+      this._engineUnsub();
+      this._engineUnsub = null;
+    }
     for (const engine of this._engines.values()) {
       engine.dispose();
     }
