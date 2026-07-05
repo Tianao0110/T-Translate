@@ -143,7 +143,7 @@ const electronAPI = {
 
     // Engine management
     checkInstalled: () => ipcRenderer.invoke("ocr:check-installed"),
-    healthCheck: (engineId) => ipcRenderer.invoke("ocr:health-check", engineId),
+    healthCheck: (engineId, options) => ipcRenderer.invoke("ocr:health-check", engineId, options),
 
     // Model packs (download/refresh/uninstall in settings)
     listPacks: (options) => ipcRenderer.invoke("ocr:packs-list", options),

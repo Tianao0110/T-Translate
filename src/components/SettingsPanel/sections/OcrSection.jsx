@@ -66,11 +66,13 @@ const OcrSection = ({
     }
   }, [notify, t]);
 
-  const checkEngineHealth = useCallback(async () => {
+  // Light check (file presence) on page entry; deep (builds the ONNX session,
+  // ~0.5s of main-process stalls) only for explicit user action.
+  const checkEngineHealth = useCallback(async (deep = false) => {
     setEngineHealth('checking');
     setHealthError('');
     try {
-      const result = await window.electron?.ocr?.healthCheck?.('rapid-ocr');
+      const result = await window.electron?.ocr?.healthCheck?.('rapid-ocr', { deep: deep === true });
       if (result?.healthy) {
         setEngineHealth('healthy');
       } else {
@@ -119,7 +121,7 @@ const OcrSection = ({
         notify(t('ocr.packs.downloaded'), 'success');
         if (packId === BASE_PACK_ID) {
           updateSetting('ocr', 'rapidInstalled', true);
-          checkEngineHealth();
+          checkEngineHealth(true); // deep: validate the fresh download for real
         }
         await loadPacks(false);
       } else {
@@ -507,7 +509,7 @@ const OcrSection = ({
                     )}
                     <button
                       className="btn-small"
-                      onClick={checkEngineHealth}
+                      onClick={() => checkEngineHealth(true)}
                       disabled={engineHealth === 'checking'}
                       title={t('ocr.recheckHealth')}
                       style={{marginLeft: 6, padding: '4px 8px'}}
