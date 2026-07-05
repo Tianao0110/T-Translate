@@ -185,7 +185,7 @@ const shutdown = () => {
   console.log('');
   try {
     uIOhook.stop();
-  } catch (e) {
+  } catch {
     // ignore
   }
   app.quit();

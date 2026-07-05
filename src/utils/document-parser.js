@@ -711,7 +711,7 @@ export async function parseDocument(file, options = {}) {
   try {
     let content;
     let segments;
-    let extra = {};
+    const extra = {};
 
     switch (format.parser) {
       case 'text':
@@ -729,7 +729,7 @@ export async function parseDocument(file, options = {}) {
         segments = parseVTT(content);
         break;
 
-      case 'pdf':
+      case 'pdf': {
         const pdfResult = await parsePDF(file, options);
         segments = pdfResult.segments;
         extra.pageCount = pdfResult.pageCount;
@@ -740,31 +740,36 @@ export async function parseDocument(file, options = {}) {
           extra.warning = 'scanned_no_ocr';
         }
         break;
+      }
 
-      case 'docx':
+      case 'docx': {
         const docxResult = await parseDOCX(file, options);
         segments = docxResult.segments;
         if (docxResult.warnings?.length > 0) {
           extra.warnings = docxResult.warnings;
         }
         break;
+      }
 
-      case 'csv':
+      case 'csv': {
         const csvResult = await parseCSV(file, options);
         segments = csvResult.segments;
         break;
+      }
 
-      case 'json':
+      case 'json': {
         const jsonResult = await parseJSON(file, options);
         segments = jsonResult.segments;
         break;
+      }
 
-      case 'epub':
+      case 'epub': {
         const epubResult = await parseEPUB(file, options);
         segments = epubResult.segments;
         extra.title = epubResult.title;
         extra.chapterCount = epubResult.chapterCount;
         break;
+      }
 
       default:
         throw new Error(_t('docParser.unimplementedParser', 'Unimplemented parser') + ': ' + format.parser);

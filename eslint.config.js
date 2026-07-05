@@ -75,8 +75,8 @@ export default [
       'no-prototype-builtins': 'off',
       'no-async-promise-executor': 'warn',
 
-      // --- 历史代码兜底（v0.2.5 Phase T，待 v0.3 单独清理）---
-      'no-case-declarations': 'warn', // 剩 5 处存量 case 内声明
+      // 存量已清零（document-parser 的 5 处 case 声明已加块作用域），恢复 error 防线
+      'no-case-declarations': 'error',
       // 最后一处存量（logger.js 的 ?? 链）已修，恢复 error 防线
       'no-constant-binary-expression': 'error',
     },
