@@ -2,14 +2,6 @@
 
 Forward-looking work clipboard. Git history / GitHub release notes are the archive — these notes stay concise (1-3 lines each + file:line links). Stale-check on each release; delete shipped items.
 
-## ⏭ v0.3.0 发布（下一步，人工事项）
-
-设置页 + Provider 专项已合并 main（merge 4222c8c，分支已清，2026-07-03）。剩余：
-
-1. 人工回归收尾（重点：跨页保存不丢、重置所有设置、Provider 密钥存取与清空、悬浮窗/划词窗改配置即生效、TTS 开关即时显隐、三主题下翻译源页外观、OCR 密钥迁移后截图识别正常、**v6 基础模型截图识别中/英/日/法德西 + 语言包下载卸载**）；发现问题直接在 main 上小修
-2. **更新 `ocr-models` Release**：`npm run ocr:release` 重新生成 → 到 Release 页删除旧 manifest.json，上传新 manifest.json + ppocr_v6_small.zip + ppocr_v6_medium.zip（**其余旧资产全部保留**——老客户端靠 base-v5/latin 条目活着）。须在 0.3.0 发布前完成，否则新装用户"修复基础包"找不到 base-v6、高精度档下载不到 medium
-3. `npm run dist` → GitHub Release 传三件套（exe + blockmap + latest.yml）→ 删除 CHANGELOG 标题中的"待发布"字样并补日期 → TODOS 清扫本节
-
 ## 发布流程备忘（每版适用）
 
 - 打包：`npm run dist`，产物在 `release/`；GitHub Release **必传三件套** `T-Translate-Setup-x.x.x.exe` + `.exe.blockmap` + `latest.yml`（缺 latest.yml 用户端检查更新直接报错）
