@@ -173,6 +173,21 @@ const SelectionSection = ({
       </div>
 
       <div className="setting-group">
+        <label className="setting-label">{t('selection.rainbowWindow')}</label>
+        <div className="toggle-wrapper">
+          <button
+            className={`toggle-button ${settings.selection.rainbowWindow ? 'active' : ''}`}
+            onClick={() => updateSetting('selection', 'rainbowWindow', !settings.selection.rainbowWindow)}
+          >
+            {settings.selection.rainbowWindow ? t('common.on') : t('common.off')}
+          </button>
+          <span className="toggle-description">
+            {settings.selection.rainbowWindow ? t('selection.rainbowOnDesc') : t('selection.rainbowOffDesc')}
+          </span>
+        </div>
+      </div>
+
+      <div className="setting-group">
         <label className="setting-label">{t('selection.screenshotOutput')}</label>
         <div className="toggle-wrapper">
           <button
