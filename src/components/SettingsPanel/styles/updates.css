@@ -186,8 +186,8 @@
   padding: 10px 16px;
   border: none;
   border-radius: 8px;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  color: white;
+  background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-hover) 100%);
+  color: var(--text-on-accent);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -196,7 +196,7 @@
 
 .update-modal-footer .btn-primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--accent-primary) 40%, transparent);
 }
 
 /* 检查中按钮状态 */
@@ -227,7 +227,7 @@
 .progress-percent {
   font-size: 14px;
   font-weight: 600;
-  color: var(--accent-primary, #3b82f6);
+  color: var(--accent-primary, var(--accent-primary));
 }
 
 .progress-bar-track {
@@ -240,7 +240,7 @@
 
 .progress-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #3b82f6, #2563eb);
+  background: linear-gradient(90deg, var(--accent-primary), var(--accent-hover));
   border-radius: 4px;
   transition: width 0.3s ease;
   min-width: 2%;

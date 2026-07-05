@@ -16,7 +16,7 @@
 }
 
 [data-theme="dark"] .mode-card.selected {
-  background: rgba(59, 130, 246, 0.1);
+  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
 }
 
 [data-theme="dark"] .ocr-engine-item {

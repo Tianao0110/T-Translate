@@ -14,7 +14,7 @@
 
 .current-mode-banner.mode-standard {
   border-color: var(--accent-primary);
-  background: rgba(59, 130, 246, 0.08);
+  background: color-mix(in srgb, var(--accent-primary) 8%, transparent);
 }
 
 .current-mode-banner.mode-secure {

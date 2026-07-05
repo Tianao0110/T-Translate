@@ -29,7 +29,7 @@
 
 .tts-dropdown-trigger.open {
   border-color: var(--accent-primary);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 10%, transparent);
 }
 
 .tts-dropdown-trigger:disabled {
@@ -125,7 +125,7 @@
 }
 
 .tts-dropdown-item.selected:hover {
-  background: rgba(59, 130, 246, 0.08);
+  background: color-mix(in srgb, var(--accent-primary) 8%, transparent);
 }
 
 .tts-dropdown-voice-name {
@@ -227,13 +227,13 @@
 
 .tts-preview-btn.play {
   background: var(--accent-primary);
-  color: white;
+  color: var(--text-on-accent);
 }
 
 .tts-preview-btn.play:hover {
   background: var(--accent-hover);
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent-primary) 30%, transparent);
 }
 
 .tts-preview-btn.stop {
@@ -301,7 +301,7 @@
 }
 
 [data-theme="dark"] .tts-slider-value {
-  background: rgba(59, 130, 246, 0.15);
+  background: color-mix(in srgb, var(--accent-primary) 15%, transparent);
 }
 
 [data-theme="dark"] .tts-voice-count {

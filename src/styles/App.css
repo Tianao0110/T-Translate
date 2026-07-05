@@ -7,25 +7,29 @@
   /* 字体大小（用户可调整） */
   --base-font-size: 14px;
   
-  /* 浅色主题 */
-  --bg-primary: #ffffff;
-  --bg-secondary: #f5f5f5;
-  --bg-tertiary: #e8e8e8;
-  --bg-hover: #f0f0f0;
-  --bg-active: #e0e0e0;
-  
-  --text-primary: #1a1a1a;
-  --text-secondary: #666666;
-  --text-tertiary: #999999;
+  /* 浅色主题 · 石板蓝灰（2026-07 柔化：中性色注入冷石板色相、边框后退半档、
+     对比回收——纯灰=毛坯感的病根，见主题提案 v4） */
+  --bg-primary: #fbfcfd;
+  --bg-secondary: #f3f5f8;
+  --bg-tertiary: #e9edf2;
+  --bg-hover: #f0f3f7;
+  --bg-active: #e3e8ef;
+
+  --text-primary: #232936;
+  --text-secondary: #5a6474;
+  --text-tertiary: #8a93a6;
   --text-inverse: #ffffff;
-  
-  --border-primary: #d1d5db;
-  --border-secondary: #e5e7eb;
-  
+
+  --border-primary: #e0e5ec;
+  --border-secondary: #ebeff4;
+
   --accent-primary: #3b82f6;
   --accent-hover: #2563eb;
   --accent-active: #1d4ed8;
-  
+  /* Text placed ON accent-filled surfaces. Amber dark theme needs dark-on-gold,
+     so hardcoded `color: white` next to accent fills is a bug — use this. */
+  --text-on-accent: #ffffff;
+
   --success: #10b981;
   --warning: #f59e0b;
   --error: #ef4444;
@@ -36,9 +40,9 @@
   --ps-type-api: #3b82f6;
   --ps-type-traditional: #10b981;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.1);
+  --shadow-sm: 0 1px 2px rgba(35, 42, 61, 0.05);
+  --shadow-md: 0 4px 6px rgba(35, 42, 61, 0.08);
+  --shadow-lg: 0 10px 25px rgba(35, 42, 61, 0.10);
   
   --radius-sm: 4px;
   --radius-md: 6px;
@@ -61,61 +65,65 @@ body {
   font-size: var(--base-font-size);
 }
 
-/* 深色主题 */
+/* 深色主题 · 琥珀夜读（2026-07 护眼向：暖中性炭底座去蓝光、柔白降眩光、
+   琥珀强调色——金底上必须用深字，全仓 text-on-accent 已随迁） */
 [data-theme="dark"] {
-  --bg-primary: #1a1a1a;
-  --bg-secondary: #262626;
-  --bg-tertiary: #333333;
-  --bg-hover: #2a2a2a;
-  --bg-active: #3a3a3a;
-  
-  --text-primary: #f0f0f0;
-  --text-secondary: #a0a0a0;
-  --text-tertiary: #707070;
-  --text-inverse: #1a1a1a;
-  
-  --border-primary: #404040;
-  --border-secondary: #333333;
-  
-  --accent-primary: #60a5fa;
-  --accent-hover: #3b82f6;
-  --accent-active: #2563eb;
-  
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.4);
+  --bg-primary: #191817;
+  --bg-secondary: #211f1d;
+  --bg-tertiary: #2b2926;
+  --bg-hover: #242220;
+  --bg-active: #302d2a;
+
+  --text-primary: #e8e4dd;
+  --text-secondary: #a39d92;
+  --text-tertiary: #6f6a61;
+  --text-inverse: #191817;
+
+  --border-primary: #383530;
+  --border-secondary: #2b2825;
+
+  --accent-primary: #c9973f;
+  --accent-hover: #d6a854;
+  --accent-active: #b3822f;
+  --text-on-accent: #241c0e;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.45);
 }
 
-/* 🌿 青绿主题 - 清新自然 */
+/* 🌿 青绿主题 · 青碧水色（2026-07：底色从"泛青冷白"加饱和到湖水青碧，
+   文字换同族墨青——修的是"太白/太冷"，翡翠强调与渐变元素全部保留） */
 [data-theme="fresh"] {
-  /* 背景使用非常浅的青绿色 */
-  --bg-primary: #f5fafa;
-  --bg-secondary: #edf7f6;
-  --bg-tertiary: #e0f2f0;
-  --bg-hover: rgba(16, 185, 129, 0.08);
-  --bg-active: rgba(16, 185, 129, 0.15);
-  
-  /* 文字使用正常深色 */
-  --text-primary: #1f2937;
-  --text-secondary: #4b5563;
-  --text-tertiary: #9ca3af;
+  /* 背景：青碧水色（色相 ~170°，有真实色量而非泛白） */
+  --bg-primary: #ecf6f4;
+  --bg-secondary: #dfeeeb;
+  --bg-tertiary: #cfe5e0;
+  --bg-hover: rgba(13, 148, 136, 0.08);
+  --bg-active: rgba(13, 148, 136, 0.15);
+
+  /* 文字：墨青（与底同族，告别冷石板灰） */
+  --text-primary: #1e3431;
+  --text-secondary: #4a625d;
+  --text-tertiary: #7f938f;
   --text-inverse: #ffffff;
-  
-  /* 边框使用淡青绿色 */
-  --border-primary: rgba(16, 185, 129, 0.2);
-  --border-secondary: rgba(16, 185, 129, 0.12);
-  
-  /* 强调色使用青绿色 */
+
+  /* 边框：青碧 tint，米白底上比旧值加强半档 */
+  --border-primary: rgba(13, 148, 136, 0.25);
+  --border-secondary: rgba(13, 148, 136, 0.15);
+
+  /* 强调色：翡翠不动（fresh 的灵魂） */
   --accent-primary: #10b981;
   --accent-hover: #059669;
   --accent-active: #047857;
-  
+  --text-on-accent: #ffffff;
+
   /* 状态色 */
   --success: #22c55e;
   --warning: #f59e0b;
   --error: #ef4444;
   --info: #0ea5e9;
-  
+
   /* 柔和阴影 */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.06);
@@ -184,7 +192,7 @@ body {
   background: var(--accent-primary);
   border: none;
   border-radius: 0 12px 12px 0;
-  color: white;
+  color: var(--text-on-accent);
   cursor: pointer;
   z-index: 10;
   display: flex;
@@ -329,7 +337,7 @@ body {
 .language-select:focus {
   outline: none;
   border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-primary) 10%, transparent);
 }
 
 .switch-button {
@@ -598,7 +606,7 @@ body {
   font-size: 13px;
   font-weight: 500;
   color: var(--accent-primary);
-  background-color: rgba(59, 130, 246, 0.1);
+  background-color: color-mix(in srgb, var(--accent-primary) 10%, transparent);
   padding: 2px 8px;
   border-radius: var(--radius-sm);
 }
@@ -716,7 +724,7 @@ body {
 .setting-select:focus {
   outline: none;
   border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-primary) 10%, transparent);
 }
 
 .setting-button {
@@ -903,7 +911,7 @@ body {
 
 /* ==================== 选中文本样式 ==================== */
 ::selection {
-  background-color: rgba(59, 130, 246, 0.2);
+  background-color: color-mix(in srgb, var(--accent-primary) 20%, transparent);
   color: var(--text-primary);
 }
 

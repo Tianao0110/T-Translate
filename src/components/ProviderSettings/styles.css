@@ -266,7 +266,7 @@
 .ps-config-btn.active {
   background: var(--accent, var(--accent-primary));
   border-color: var(--accent, var(--accent-primary));
-  color: #fff; /* on the accent fill */
+  color: var(--text-on-accent); /* on the accent fill */
 }
 
 /* ========== 开关 ========== */

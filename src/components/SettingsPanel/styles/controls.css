@@ -29,7 +29,7 @@
   outline: none;
   border-color: var(--accent-primary);
   background: var(--bg-primary);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 10%, transparent);
 }
 
 .setting-input::placeholder {
@@ -230,13 +230,13 @@ input:checked + .switch-slider::before {
   background: var(--accent-primary);
   border-radius: 50%;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--accent-primary) 30%, transparent);
   transition: transform 0.15s, box-shadow 0.15s;
 }
 
 .setting-range::-webkit-slider-thumb:hover {
   transform: scale(1.1);
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.5);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent-primary) 50%, transparent);
 }
 
 .setting-range::-moz-range-thumb {
@@ -283,7 +283,7 @@ input:checked + .switch-slider::before {
 .toggle-button.active {
   background: var(--accent-primary);
   border-color: var(--accent-primary);
-  color: white;
+  color: var(--text-on-accent);
 }
 
 .toggle-description {
@@ -388,7 +388,7 @@ input:checked + .switch-slider::before {
   gap: 4px;
   padding: 4px 8px;
   background: var(--accent-primary);
-  color: white;
+  color: var(--text-on-accent);
   border-radius: 4px;
   font-size: 12px;
 }
@@ -535,7 +535,7 @@ input:checked + .switch-slider::before {
   outline: none;
   border-color: var(--accent-primary);
   background: var(--bg-primary);
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-primary) 10%, transparent);
 }
 
 .setting-input::placeholder {
@@ -569,7 +569,7 @@ input:checked + .switch-slider::before {
 }
 
 input:checked + .switch-slider {
-  background: linear-gradient(135deg, var(--accent-primary), #6366f1);
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-hover));
   border-color: transparent;
 }
 
@@ -583,7 +583,7 @@ input:checked + .switch-slider::before {
 }
 
 .setting-switch:hover input:checked + .switch-slider {
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 20%, transparent);
 }
 
 /* ==================== 复选框优化 ==================== */
@@ -602,7 +602,7 @@ input:checked + .switch-slider::before {
 
 .setting-toggle:hover {
   border-color: var(--accent-primary);
-  background: rgba(59, 130, 246, 0.03);
+  background: color-mix(in srgb, var(--accent-primary) 3%, transparent);
 }
 
 .setting-toggle input[type="checkbox"] {
@@ -620,7 +620,7 @@ input:checked + .switch-slider::before {
 }
 
 .setting-toggle input[type="checkbox"]:checked {
-  background: linear-gradient(135deg, var(--accent-primary), #6366f1);
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-hover));
   border-color: transparent;
 }
 
@@ -652,17 +652,17 @@ input:checked + .switch-slider::before {
   -webkit-appearance: none;
   width: 20px;
   height: 20px;
-  background: linear-gradient(135deg, var(--accent-primary), #6366f1);
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-hover));
   border-radius: 50%;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent-primary) 40%, transparent);
   transition: transform 0.15s, box-shadow 0.15s;
   border: 2px solid white;
 }
 
 .setting-range::-webkit-slider-thumb:hover {
   transform: scale(1.15);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.5);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--accent-primary) 50%, transparent);
 }
 
 .range-value {
@@ -671,7 +671,7 @@ input:checked + .switch-slider::before {
   font-size: 14px;
   font-weight: 700;
   color: var(--accent-primary);
-  background: rgba(59, 130, 246, 0.1);
+  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
   padding: 4px 10px;
   border-radius: 6px;
 }
@@ -682,20 +682,20 @@ input:checked + .switch-slider::before {
   align-items: center;
   gap: 8px;
   padding: 12px 24px;
-  background: linear-gradient(135deg, var(--accent-primary), #6366f1);
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-hover));
   border: none;
   border-radius: 10px;
-  color: white;
+  color: var(--text-on-accent);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--accent-primary) 30%, transparent);
 }
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--accent-primary) 40%, transparent);
 }
 
 .btn-primary:active {

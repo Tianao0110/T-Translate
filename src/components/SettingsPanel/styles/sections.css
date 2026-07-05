@@ -31,7 +31,7 @@
 
 .theme-option.active {
   border-color: var(--accent-primary);
-  background: rgba(59, 130, 246, 0.08);
+  background: color-mix(in srgb, var(--accent-primary) 8%, transparent);
   color: var(--accent-primary);
 }
 
@@ -65,7 +65,7 @@
 
 .language-option.active {
   border-color: var(--accent-primary);
-  background: rgba(59, 130, 246, 0.08);
+  background: color-mix(in srgb, var(--accent-primary) 8%, transparent);
   color: var(--accent-primary);
 }
 
@@ -97,7 +97,7 @@
 
 .mode-card.selected {
   border-color: var(--accent-primary);
-  background: rgba(59, 130, 246, 0.05);
+  background: color-mix(in srgb, var(--accent-primary) 5%, transparent);
 }
 
 .mode-icon {
@@ -178,7 +178,7 @@
   width: 20px;
   height: 20px;
   background: var(--accent-primary);
-  color: white;
+  color: var(--text-on-accent);
   border-radius: 50%;
   font-size: 11px;
   font-weight: 600;
@@ -210,7 +210,7 @@
 .format-tag {
   padding: 5px 12px;
   background: var(--accent-primary);
-  color: white;
+  color: var(--text-on-accent);
   border-radius: 16px;
   font-size: 12px;
   font-weight: 500;
@@ -316,7 +316,7 @@
   display: inline-block;
   padding: 4px 12px;
   background: var(--accent-primary);
-  color: white;
+  color: var(--text-on-accent);
   border-radius: 12px;
   font-size: 12px;
   font-weight: 500;
@@ -423,9 +423,9 @@
 
 .theme-option.active {
   border-color: var(--accent-primary);
-  background: rgba(59, 130, 246, 0.05);
+  background: color-mix(in srgb, var(--accent-primary) 5%, transparent);
   color: var(--accent-primary);
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-primary) 10%, transparent);
 }
 
 .theme-option svg {
@@ -493,8 +493,8 @@
 
 .mode-card.selected {
   border-color: var(--accent-primary);
-  background: rgba(59, 130, 246, 0.03);
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+  background: color-mix(in srgb, var(--accent-primary) 3%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-primary) 10%, transparent);
 }
 
 .mode-icon {
@@ -510,8 +510,8 @@
 }
 
 .mode-card.selected .mode-icon {
-  background: linear-gradient(135deg, var(--accent-primary), #6366f1);
-  color: white;
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-hover));
+  color: var(--text-on-accent);
 }
 
 .mode-check {
@@ -524,7 +524,7 @@
   align-items: center;
   justify-content: center;
   background: var(--accent-primary);
-  color: white;
+  color: var(--text-on-accent);
   border-radius: 50%;
 }
 
@@ -561,8 +561,8 @@
 
 .ocr-engine-item.active {
   border-color: var(--accent-primary);
-  background: rgba(59, 130, 246, 0.03);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  background: color-mix(in srgb, var(--accent-primary) 3%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 10%, transparent);
 }
 
 .engine-header {
@@ -593,8 +593,8 @@
 }
 
 .engine-badge.online {
-  background: rgba(59, 130, 246, 0.1);
-  color: #3b82f6;
+  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+  color: var(--accent-primary);
 }
 
 .engine-desc {
@@ -607,8 +607,8 @@
 /* ==================== 帮助框优化 ==================== */
 .help-box {
   padding: 18px 20px;
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(139, 92, 246, 0.03));
-  border: 1px solid rgba(59, 130, 246, 0.15);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent-primary) 5%, transparent), rgba(139, 92, 246, 0.03));
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 15%, transparent);
   border-radius: 12px;
   font-size: 13px;
   line-height: 1.7;
@@ -631,13 +631,13 @@
 .app-info .version-tag {
   display: inline-block;
   padding: 6px 16px;
-  background: linear-gradient(135deg, var(--accent-primary), #6366f1);
-  color: white;
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-hover));
+  color: var(--text-on-accent);
   border-radius: 20px;
   font-size: 13px;
   font-weight: 600;
   margin: 10px 0;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--accent-primary) 30%, transparent);
 }
 
 /* 特性卡片 */
