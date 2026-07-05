@@ -18,6 +18,11 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 - **在线 OCR 调用下沉** — 四家在线 OCR（OCR.space/Google Vision/Azure/百度）改经主进程发请求，密钥只留主进程、不再进任何渲染进程（本轮 D1 拍板选了渲染端加密小修，主进程化为终态方向；旧的四个主进程 handler 已腐化两代并在本轮删除，届时按现行引擎实现重写）
 - **硬前提** — 主进程目前是未打包裸 CJS（`"main": "electron/main.js"`），providers 层是 ESM + svg import + 渲染端 i18n/localStorage：下沉前必须先引入主进程打包链（如 vite-plugin-electron）并拆分 provider 的 metadata（UI 用）与运行时；流式需自建 chunk IPC 协议、用户级 abort 需请求 id→AbortController 映射。估 15-25 文件 / ±800-1200 行 / 3-5 工作日
 
+### 主题二期候选（一期已随 v0.3.1 落地 2026-07-04）
+
+- **浅色顶栏柔化**：浅色主题的亮蓝渐变顶栏保留了品牌感（用户未拍板动它）；如后续想统一，参照深色做法（表面色 + 强调只标活跃项），提案 artifact 05 节有示意
+- 备忘：主题决策全记录在 workflow-playbook 记忆（琥珀 C3/青碧 F2/彩虹签名 R1/渐变保留/米白豆沙弃案）；新增强调面文字必须用 `--text-on-accent`，独立窗口（悬浮/划词）不加载 App.css 令牌表、只能用局部变量
+
 ### 划词检测完整性（0.2.9 已基本落地，剩数据驱动项）
 
 - README 应用支持列表 — 等日常使用积累（`npm run start:debug` 探针日志按应用记录走哪层），逐项标注已知限制
