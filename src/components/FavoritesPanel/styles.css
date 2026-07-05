@@ -52,7 +52,7 @@
 .add-folder-btn:hover {
   background: var(--accent-primary);
   border-color: var(--accent-primary);
-  color: white;
+  color: var(--text-on-accent);
 }
 
 /* 新建文件夹表单 */
@@ -147,7 +147,7 @@
   background: var(--accent-primary);
   border: none;
   border-radius: 6px;
-  color: white;
+  color: var(--text-on-accent);
   font-size: 12px;
   cursor: pointer;
 }
@@ -189,7 +189,7 @@
 
 .folder-item.active {
   background: var(--accent-primary);
-  color: white;
+  color: var(--text-on-accent);
 }
 
 .folder-item.active .folder-name,
@@ -421,7 +421,7 @@
 .tag-item.active {
   background: var(--accent-primary);
   border-color: var(--accent-primary);
-  color: white;
+  color: var(--text-on-accent);
 }
 
 /* ==================== 右侧主内容区 ==================== */
@@ -457,7 +457,7 @@
 
 .toolbar-search:focus-within {
   border-color: var(--accent-primary);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 10%, transparent);
 }
 
 .toolbar-search svg {
@@ -510,7 +510,7 @@
   background: var(--accent-primary);
   border-radius: 12px;
   font-size: 12px;
-  color: white;
+  color: var(--text-on-accent);
 }
 
 .active-filter button {
@@ -580,7 +580,7 @@
 
 .favorite-card.selected {
   border-color: var(--accent-primary);
-  background: rgba(59, 130, 246, 0.05);
+  background: color-mix(in srgb, var(--accent-primary) 5%, transparent);
 }
 
 .card-header {
@@ -687,7 +687,7 @@
   align-items: flex-start;
   gap: 8px;
   padding: 10px 14px;
-  background: rgba(59, 130, 246, 0.05);
+  background: color-mix(in srgb, var(--accent-primary) 5%, transparent);
   border-top: 1px solid var(--border-primary);
   font-size: 12px;
   color: var(--text-secondary);
@@ -821,7 +821,7 @@
 .btn-save {
   background: var(--accent-primary);
   border: none;
-  color: white;
+  color: var(--text-on-accent);
 }
 
 .btn-save:hover {
@@ -915,7 +915,7 @@
 
 .move-menu button.active {
   background: var(--accent-primary);
-  color: white;
+  color: var(--text-on-accent);
 }
 
 .move-menu button.active svg {
@@ -1218,5 +1218,5 @@
 }
 
 .glossary-table .glossary-note-edit input:focus {
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-primary) 20%, transparent);
 }

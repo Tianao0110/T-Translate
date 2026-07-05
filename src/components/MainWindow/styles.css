@@ -248,7 +248,7 @@
 .search-input:focus {
   outline: none;
   border-color: var(--accent-primary);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 10%, transparent);
 }
 
 .search-clear {
@@ -271,7 +271,7 @@
 
 .search-clear:hover {
   background: var(--accent-primary);
-  color: white;
+  color: var(--text-on-accent);
   transform: translateY(-50%) scale(1.1);
 }
 
@@ -523,8 +523,8 @@
 .notification-info {
   border-color: var(--info);
   background: linear-gradient(135deg, 
-    rgba(59, 130, 246, 0.05) 0%, 
-    rgba(59, 130, 246, 0.02) 100%);
+    color-mix(in srgb, var(--accent-primary) 5%, transparent) 0%, 
+    color-mix(in srgb, var(--accent-primary) 2%, transparent) 100%);
 }
 
 .notification-info svg {
@@ -741,12 +741,51 @@
 }
 
 /* ==================== 深色模式调整 ==================== */
+/* 顶栏改暗表面：大面积亮色渐变与护眼向深色直接冲突（主题提案拍板）。
+   子元素为渐变底设计的白字/白膜一并换令牌。 */
 [data-theme="dark"] .main-toolbar {
-  background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-primary);
+  box-shadow: none;
+}
+
+[data-theme="dark"] .brand-title {
+  color: var(--text-primary);
+  text-shadow: none;
+}
+
+[data-theme="dark"] .brand-logo {
+  background: color-mix(in srgb, var(--accent-primary) 18%, transparent);
+  color: var(--accent-primary);
+}
+
+[data-theme="dark"] .tab-button {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .tab-button:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 [data-theme="dark"] .tab-button.active {
-  background: rgba(30, 30, 30, 0.95);
+  background: var(--accent-primary);
+  color: var(--text-on-accent);
+  box-shadow: none;
+}
+
+[data-theme="dark"] .tab-button.active svg {
+  color: var(--text-on-accent);
+}
+
+[data-theme="dark"] .quick-actions-trigger {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .quick-actions-trigger:hover {
+  background: var(--bg-active);
 }
 
 [data-theme="dark"] .notification {

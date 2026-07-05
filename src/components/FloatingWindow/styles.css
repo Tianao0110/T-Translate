@@ -7,6 +7,9 @@
   --floating-text: #333;
   --floating-text-muted: #666;
   --floating-accent: #3b82f6;
+  /* Amber dark accent needs dark-on-gold text; this window loads no App.css
+     tokens, so the on-accent color is declared locally per theme. */
+  --floating-on-accent: #ffffff;
   --floating-radius: 12px;
 }
 
@@ -115,7 +118,7 @@
 
 /* 已设置采集区的按钮高亮 */
 .toolbar-btn.has-capture {
-  background: rgba(59, 130, 246, 0.2);
+  background: color-mix(in srgb, var(--floating-accent) 20%, transparent);
   color: var(--floating-accent);
 }
 
@@ -349,11 +352,13 @@
 
 /* ========== 清新主题 ========== */
 [data-theme="fresh"] .floating-window {
-  --floating-bg: rgba(245, 250, 250, var(--floating-opacity, 0.9));
-  --floating-border: rgba(16, 185, 129, 0.25);
-  --floating-text: #1f2937;
-  --floating-text-muted: #059669;
+  /* 青碧水色（2026-07 F2）：底色带真实青量，文字换墨青 */
+  --floating-bg: rgba(236, 246, 244, var(--floating-opacity, 0.9));
+  --floating-border: rgba(13, 148, 136, 0.28);
+  --floating-text: #1e3431;
+  --floating-text-muted: #0f766e;
   --floating-accent: #10b981;
+  --floating-on-accent: #ffffff;
 }
 
 [data-theme="fresh"] .floating-window::before {
@@ -415,7 +420,7 @@
 }
 
 [data-theme="fresh"] .translation-text {
-  color: #1f2937;
+  color: #1e3431;
 }
 
 [data-theme="fresh"] .floating-content::-webkit-scrollbar-thumb {
@@ -426,74 +431,75 @@
   background: rgba(16, 185, 129, 0.5);
 }
 
-/* ========== 深色主题 ========== */
+/* ========== 深色主题 · 琥珀夜读（2026-07 C3：暖炭底 + 金上深字） ========== */
 [data-theme="dark"] .floating-window {
-  --floating-bg: rgba(30, 41, 59, var(--floating-opacity, 0.9));
-  --floating-border: rgba(255, 255, 255, 0.1);
-  --floating-text: #e2e8f0;
-  --floating-text-muted: #94a3b8;
-  --floating-accent: #60a5fa;
+  --floating-bg: rgba(33, 31, 29, var(--floating-opacity, 0.9));
+  --floating-border: rgba(232, 228, 221, 0.12);
+  --floating-text: #e8e4dd;
+  --floating-text-muted: #a39d92;
+  --floating-accent: #d6a854;
+  --floating-on-accent: #241c0e;
 }
 
 [data-theme="dark"] .floating-top-area {
-  background: rgba(15, 23, 42, 0.5);
+  background: rgba(25, 23, 21, 0.5);
 }
 
 [data-theme="dark"] .floating-content {
-  color: #e2e8f0;
+  color: #e8e4dd;
 }
 
 [data-theme="dark"] .toolbar-btn {
-  background: rgba(255, 255, 255, 0.1);
-  color: #e2e8f0;
+  background: rgba(232, 228, 221, 0.10);
+  color: #e8e4dd;
 }
 
 [data-theme="dark"] .toolbar-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(232, 228, 221, 0.18);
 }
 
 [data-theme="dark"] .toolbar-handle {
-  background: rgba(255, 255, 255, 0.1);
-  color: #94a3b8;
+  background: rgba(232, 228, 221, 0.10);
+  color: #a39d92;
 }
 
 [data-theme="dark"] .toolbar-handle:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(232, 228, 221, 0.18);
 }
 
 [data-theme="dark"] .toolbar-btn.active {
-  background: #3b82f6;
-  color: white;
+  background: var(--floating-accent);
+  color: var(--floating-on-accent);
 }
 
 [data-theme="dark"] .floating-status {
-  color: #94a3b8;
+  color: #a39d92;
 }
 
 [data-theme="dark"] .lang-tag {
-  background: rgba(96, 165, 250, 0.2);
-  color: #60a5fa;
+  background: color-mix(in srgb, var(--floating-accent) 20%, transparent);
+  color: var(--floating-accent);
 }
 
 [data-theme="dark"] .translation-text {
-  color: #f1f5f9;
+  color: #eae6df;
 }
 
 [data-theme="dark"] .floating-content::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(232, 228, 221, 0.18);
 }
 
 [data-theme="dark"] .floating-content::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(232, 228, 221, 0.28);
 }
 
 [data-theme="dark"] .scroll-hint {
-  background: rgba(255, 255, 255, 0.2);
-  color: #e2e8f0;
+  background: rgba(232, 228, 221, 0.18);
+  color: #e8e4dd;
 }
 
 [data-theme="dark"] .scroll-hint:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(232, 228, 221, 0.28);
 }
 
 /* ========== 子玻璃板样式 ========== */
@@ -563,11 +569,11 @@
 
 .floating-child-pane.frozen {
   border-color: var(--floating-accent);
-  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.25);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--floating-accent) 25%, transparent);
 }
 
 .floating-child-pane.translating {
-  border-color: rgba(59, 130, 246, 0.3);
+  border-color: color-mix(in srgb, var(--floating-accent) 30%, transparent);
 }
 
 .floating-child-pane.error {
@@ -607,7 +613,7 @@
 .child-pane-text {
   font-size: 13px;
   line-height: 1.5;
-  color: #1f2937;
+  color: #232936;
   word-break: break-word;
   white-space: pre-wrap;
   user-select: text;      /* re-granted here — the root is user-select:none for dragging */
@@ -682,38 +688,38 @@
 }
 
 [data-theme="dark"] .floating-child-pane.frozen {
-  border-color: #60a5fa;
-  box-shadow: 0 4px 16px rgba(96, 165, 250, 0.3);
+  border-color: var(--floating-accent);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--floating-accent) 30%, transparent);
 }
 
 [data-theme="dark"] .child-pane-handle {
   background: rgba(255, 255, 255, 0.03);
-  color: #64748b;
+  color: #8a8478;
 }
 
 [data-theme="dark"] .child-pane-handle:hover {
   background: rgba(255, 255, 255, 0.06);
-  color: #94a3b8;
+  color: #a39d92;
 }
 
 [data-theme="dark"] .child-pane-text {
-  color: #f1f5f9;
+  color: #eae6df;
 }
 
 [data-theme="dark"] .child-pane-btn {
   background: rgba(255, 255, 255, 0.05);
-  color: #94a3b8;
+  color: #a39d92;
 }
 
 [data-theme="dark"] .child-pane-btn:hover {
   background: rgba(255, 255, 255, 0.1);
-  color: #e2e8f0;
+  color: #e8e4dd;
 }
 
 /* ========== 子玻璃板彩虹主题 ========== */
 
 [data-theme="fresh"] .floating-child-pane {
-  background: rgba(245, 250, 250, 0.98);
+  background: rgba(236, 246, 244, 0.98);
   border-color: rgba(16, 185, 129, 0.2);
   box-shadow: 0 2px 12px rgba(16, 185, 129, 0.15);
 }
@@ -738,7 +744,7 @@
 }
 
 [data-theme="fresh"] .child-pane-text {
-  color: #1f2937;
+  color: #232936;
 }
 
 [data-theme="fresh"] .child-pane-btn:hover {
@@ -836,11 +842,11 @@
 }
 
 .history-item:hover {
-  background: rgba(59, 130, 246, 0.08);
+  background: color-mix(in srgb, var(--floating-accent) 8%, transparent);
 }
 
 .history-item:active {
-  background: rgba(59, 130, 246, 0.12);
+  background: color-mix(in srgb, var(--floating-accent) 12%, transparent);
 }
 
 .history-source {
@@ -854,7 +860,7 @@
 
 .history-translated {
   font-size: 13px;
-  color: #1f2937;
+  color: #232936;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -911,12 +917,12 @@
 .floating-window.pass-through .frozen-panes-container .floating-child-pane {
   opacity: 1 !important;
   /* 穿透模式下冻结的子玻璃板更醒目 */
-  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 4px 20px color-mix(in srgb, var(--floating-accent) 40%, transparent);
 }
 
 /* 工具栏按钮激活状态 */
 .toolbar-btn.active {
-  background: rgba(59, 130, 246, 0.15);
+  background: color-mix(in srgb, var(--floating-accent) 15%, transparent);
   color: var(--floating-accent);
 }
 
@@ -934,42 +940,42 @@
 }
 
 [data-theme="dark"] .history-title {
-  color: #e2e8f0;
+  color: #e8e4dd;
 }
 
 [data-theme="dark"] .history-close-btn {
-  color: #94a3b8;
+  color: #a39d92;
 }
 
 [data-theme="dark"] .history-close-btn:hover {
   background: rgba(255, 255, 255, 0.06);
-  color: #e2e8f0;
+  color: #e8e4dd;
 }
 
 [data-theme="dark"] .history-empty {
-  color: #64748b;
+  color: #8a8478;
 }
 
 [data-theme="dark"] .history-item:hover {
-  background: rgba(96, 165, 250, 0.1);
+  background: color-mix(in srgb, var(--floating-accent) 10%, transparent);
 }
 
 [data-theme="dark"] .history-source {
-  color: #94a3b8;
+  color: #a39d92;
 }
 
 [data-theme="dark"] .history-translated {
-  color: #f1f5f9;
+  color: #eae6df;
 }
 
 [data-theme="dark"] .history-meta {
-  color: #64748b;
+  color: #8a8478;
 }
 
 /* ========== 历史记录彩虹主题 ========== */
 
 [data-theme="fresh"] .floating-history-panel {
-  background: rgba(245, 250, 250, 0.98);
+  background: rgba(236, 246, 244, 0.98);
   border-color: rgba(16, 185, 129, 0.15);
   box-shadow: 0 4px 16px rgba(16, 185, 129, 0.15);
 }
@@ -992,7 +998,7 @@
 }
 
 [data-theme="fresh"] .history-translated {
-  color: #1f2937;
+  color: #232936;
 }
 
 /* ========== 浮动通知条（OCR 降级等） ========== */
@@ -1013,7 +1019,7 @@
 }
 
 .floating-toast-info {
-  background: rgba(59, 130, 246, 0.9);
+  background: color-mix(in srgb, var(--floating-accent) 90%, transparent);
   color: #fff;
 }
 

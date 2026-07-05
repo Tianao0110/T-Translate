@@ -84,8 +84,8 @@ class ErrorBoundary extends React.Component {
                 onClick={this.handleRetry}
                 style={{
                   padding: '4px 12px',
-                  backgroundColor: '#3b82f6',
-                  color: 'white',
+                  backgroundColor: 'var(--accent-primary, #3b82f6)',
+                  color: 'var(--text-on-accent, #ffffff)',
                   border: 'none',
                   borderRadius: '4px',
                   cursor: 'pointer',
@@ -167,8 +167,8 @@ class ErrorBoundary extends React.Component {
                 onClick={this.handleRetry}
                 style={{
                   padding: '10px 24px',
-                  backgroundColor: '#3b82f6',
-                  color: 'white',
+                  backgroundColor: 'var(--accent-primary, #3b82f6)',
+                  color: 'var(--text-on-accent, #ffffff)',
                   border: 'none',
                   borderRadius: '8px',
                   cursor: 'pointer',
@@ -176,8 +176,8 @@ class ErrorBoundary extends React.Component {
                   fontWeight: '500',
                   transition: 'background-color 0.2s',
                 }}
-                onMouseOver={(e) => e.target.style.backgroundColor = '#2563eb'}
-                onMouseOut={(e) => e.target.style.backgroundColor = '#3b82f6'}
+                onMouseOver={(e) => e.target.style.backgroundColor = 'var(--accent-hover, #2563eb)'}
+                onMouseOut={(e) => e.target.style.backgroundColor = 'var(--accent-primary, #3b82f6)'}
               >
                 {t('errorBoundary.retry', 'Retry')}
               </button>

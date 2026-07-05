@@ -66,11 +66,6 @@
     color: white;
   }
   
-  /* 深色模式适配 */
-  [data-theme="dark"] .titlebar {
-    background-color: #202020;
-    border-bottom-color: #333;
-  }
 /* Logo T 文字样式 */
 .window-icon-text {
   width: 20px;
@@ -80,13 +75,13 @@
   justify-content: center;
   font-size: 12px;
   font-weight: 700;
-  color: white;
-  background: linear-gradient(135deg, #60a5fa, #3b82f6);
+  color: var(--text-on-accent);
+  background: linear-gradient(135deg, var(--accent-hover), var(--accent-primary));
   border-radius: 5px;
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.15);
 }
 
-/* 青绿主题 Logo */
-[data-theme="rainbow"] .window-icon-text {
+/* 青绿主题 Logo（前身叫 rainbow——死选择器复活为 fresh） */
+[data-theme="fresh"] .window-icon-text {
   background: linear-gradient(135deg, #34d399, #10b981);
 }

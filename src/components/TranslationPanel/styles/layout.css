@@ -51,13 +51,13 @@
 
 .language-select:hover {
   border-color: var(--accent-primary);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 10%, transparent);
 }
 
 .language-select:focus {
   outline: none;
   border-color: var(--accent-primary);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 20%, transparent);
 }
 
 /* Compact variant for toolbar usage (e.g. DocumentTranslator) */
@@ -84,7 +84,7 @@
   background: var(--accent-primary);
   border: none;
   border-radius: 50%;
-  color: white;
+  color: var(--text-on-accent);
   cursor: pointer;
   transition: all 0.3s ease;
   position: relative;
@@ -94,7 +94,7 @@
 .swap-button:hover:not(:disabled) {
   transform: rotate(180deg);
   background: var(--accent-hover);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--accent-primary) 40%, transparent);
 }
 
 .swap-button:disabled {
@@ -150,7 +150,7 @@
 
 .template-btn.active {
   background: var(--accent-primary);
-  color: white;
+  color: var(--text-on-accent);
 }
 
 /* Auto-switched MT prompt indicator — explains why output style changed */
@@ -190,14 +190,14 @@
 
 .translation-box:hover {
   border-color: var(--accent-primary);
-  box-shadow: 0 0 20px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--accent-primary) 10%, transparent);
 }
 
 .source-box.drag-over {
   border-color: var(--accent-primary);
   background: linear-gradient(135deg, 
-    rgba(59, 130, 246, 0.05) 0%, 
-    rgba(59, 130, 246, 0.02) 100%);
+    color-mix(in srgb, var(--accent-primary) 5%, transparent) 0%, 
+    color-mix(in srgb, var(--accent-primary) 2%, transparent) 100%);
   animation: pulse-border 1s infinite;
 }
 
@@ -344,19 +344,19 @@
   background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-hover) 100%);
   border: none;
   border-radius: 12px;
-  color: white;
+  color: var(--text-on-accent);
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 4px 15px color-mix(in srgb, var(--accent-primary) 30%, transparent);
 }
 
 .translate-btn:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--accent-primary) 40%, transparent);
 }
 
 .translate-btn:active:not(:disabled) {

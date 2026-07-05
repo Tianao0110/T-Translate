@@ -57,8 +57,8 @@
 }
 
 .engine-badge.system {
-  background: rgba(59, 130, 246, 0.1);
-  color: #3b82f6;
+  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+  color: var(--accent-primary);
 }
 
 .engine-badge.download {
@@ -122,12 +122,12 @@
 
 .engine-actions .btn:hover {
   background: var(--accent-primary);
-  color: white;
+  color: var(--text-on-accent);
 }
 
 .engine-actions .btn.active {
   background: var(--accent-primary);
-  color: white;
+  color: var(--text-on-accent);
 }
 
 .engine-actions .btn.download {
@@ -211,8 +211,8 @@
 
 .ocr-engine-item.active {
   border-color: var(--accent-primary);
-  background: rgba(59, 130, 246, 0.03);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  background: color-mix(in srgb, var(--accent-primary) 3%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 10%, transparent);
 }
 
 .engine-header {
@@ -267,8 +267,8 @@
 .engine-badge.checking {
   display: inline-flex;
   align-items: center;
-  background: rgba(59, 130, 246, 0.1);
-  color: #3b82f6;
+  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+  color: var(--accent-primary);
 }
 
 .engine-error-box {

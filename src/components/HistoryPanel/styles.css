@@ -48,7 +48,7 @@
 
 .toolbar-search:focus-within {
   border-color: var(--accent-primary);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 10%, transparent);
 }
 
 .toolbar-search svg { color: var(--text-tertiary); flex-shrink: 0; }
@@ -100,7 +100,7 @@
 
 .view-toggle button:not(:last-child) { border-right: 1px solid var(--border-primary); }
 .view-toggle button:hover { background: var(--bg-hover); color: var(--text-primary); }
-.view-toggle button.active { background: var(--accent-primary); color: white; }
+.view-toggle button.active { background: var(--accent-primary); color: var(--text-on-accent); }
 
 /* 工具栏按钮 */
 .toolbar-btn {
@@ -118,7 +118,7 @@
 }
 
 .toolbar-btn:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
-.toolbar-btn.active { background: var(--accent-primary); border-color: var(--accent-primary); color: white; }
+.toolbar-btn.active { background: var(--accent-primary); border-color: var(--accent-primary); color: var(--text-on-accent); }
 .toolbar-btn.danger { border-color: var(--error); color: var(--error); }
 .toolbar-btn.danger:hover { background: var(--error); color: white; }
 .toolbar-btn.disabled { opacity: 0.45; cursor: not-allowed; }
@@ -311,7 +311,7 @@
 }
 
 .history-card:hover { border-color: var(--accent-primary); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); }
-.history-card.selected { border-color: var(--accent-primary); background: rgba(59, 130, 246, 0.05); }
+.history-card.selected { border-color: var(--accent-primary); background: color-mix(in srgb, var(--accent-primary) 5%, transparent); }
 
 .card-header {
   display: flex;
@@ -451,8 +451,8 @@
 .history-table th svg.active { opacity: 1; color: var(--accent-primary); }
 
 .history-table tbody tr:hover { background: var(--bg-hover); }
-.history-table tbody tr.focused { background: rgba(59, 130, 246, 0.05); }
-.history-table tbody tr.selected { background: rgba(59, 130, 246, 0.1); }
+.history-table tbody tr.focused { background: color-mix(in srgb, var(--accent-primary) 5%, transparent); }
+.history-table tbody tr.selected { background: color-mix(in srgb, var(--accent-primary) 10%, transparent); }
 .history-table tbody tr:last-child td { border-bottom: none; }
 
 /* 🔧 修复：表格列宽定义 */
@@ -583,7 +583,7 @@
   font-size: 14px;
   font-weight: 600;
   color: var(--accent-primary);
-  background: rgba(59, 130, 246, 0.1);
+  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
   padding: 4px 10px;
   border-radius: 6px;
 }
@@ -688,7 +688,7 @@
 .detail-btn.primary {
   background: var(--accent-primary);
   border-color: var(--accent-primary);
-  color: white;
+  color: var(--text-on-accent);
 }
 
 .detail-btn.primary:hover {

@@ -89,7 +89,7 @@
   background: var(--accent-primary);
   border: 2px solid var(--accent-primary);
   border-radius: 6px;
-  color: white;
+  color: var(--text-on-accent);
   font-size: 12px;
   font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
   text-align: center;
