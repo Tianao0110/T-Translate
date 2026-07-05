@@ -37,6 +37,15 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 - README 应用支持列表 — 等日常使用积累（`npm run start:debug` 探针日志按应用记录走哪层），逐项标注已知限制
 - UIA TextPattern 第 4 层 — **默认不建**（承重墙修复后覆盖大幅改善）；仅当日志出现成片失败样本再评估
 
+### OCR 设置页加载卡顿（用户实测反馈 2026-07-04，待排查）
+
+进入 设置 → OCR 有可感知卡顿。预埋线索（未验证，按嫌疑排序）：
+
+- **头号嫌疑**：OcrSection 挂载即自动健康检查（engine=rapid-ocr 且已装时），[ocr-engine.js](electron/utils/ocr-engine.js) 首次 `ensureEnv()` 会在**主进程同步 require** onnxruntime-node / @napi-rs/canvas 原生 DLL + 构建 ONNX 会话——主进程事件循环被阻塞，全窗口跟着顿；v6 模型更大（31MB vs 21MB）加重，高精度档（139MB）会更狠
+- 次要：挂载时 `loadPacks(false)` 首次无缓存 → 同步发起 GitHub manifest 网络请求（异步不阻塞但抢时机）；`checkWindowsOCR` WinRT 调用
+- 修法候选：① 健康检查改轻量版（文件存在性校验，不建会话），真会话留到首次识别 ② 原生模块预热挪到应用启动后空闲期 ③ 会话构建下沉 worker/utilityProcess（重构大，可并入翻译栈下沉专项一起做）
+- 排查手段：主进程 `console.time` 包 ensureEnv/createSession + 渲染端 Performance 面板看长任务归属
+
 ### PP-OCRv6 后续候选（换代 + 高精度档均已随 v0.3.0 落地 ✅ 2026-07-04）
 
 基础包已换 v6-small（feat/ocr-v6：新 id base-v6 + 空格门控按代际 + 拉丁包退役 + manifest 新旧双轨服务老客户端）；medium 高精度档已落地（feat/ocr-model-tier：模型档位控件 + base-v6-hq 可下载可切换 + 引擎按档位解析 base 目录）。发布动作见上方 v0.3.0 节步骤 2。剩余候选：
