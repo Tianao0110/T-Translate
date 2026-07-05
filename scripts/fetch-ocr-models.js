@@ -40,8 +40,10 @@ async function main() {
   }
 
   // Same shape the pack manager writes for downloaded packs
-  const { url, file, ...packMeta } = BASE_PACK;
-  fs.writeFileSync(marker, JSON.stringify({ ...packMeta, source: url }, null, 2));
+  const packMeta = { ...BASE_PACK };
+  delete packMeta.url;
+  delete packMeta.file;
+  fs.writeFileSync(marker, JSON.stringify({ ...packMeta, source: BASE_PACK.url }, null, 2));
   console.log(`Base pack ready at ${DEST}`);
 }
 

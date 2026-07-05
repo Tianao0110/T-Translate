@@ -291,45 +291,6 @@ input:checked + .switch-slider::before {
   color: var(--text-secondary);
 }
 
-/* ==================== 测试连接按钮 ==================== */
-.test-button {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 16px;
-  border: 1px solid var(--border-primary);
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s;
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
-.test-button:hover {
-  border-color: var(--accent-primary);
-  color: var(--accent-primary);
-}
-
-.test-button.connected {
-  background: rgba(16, 185, 129, 0.1);
-  color: var(--success);
-  border-color: var(--success);
-}
-
-.test-button.disconnected {
-  background: rgba(239, 68, 68, 0.1);
-  color: var(--error);
-  border-color: var(--error);
-}
-
-.test-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
 /* ==================== 输入框带标签 ==================== */
 .input-with-label {
   display: flex;
@@ -343,29 +304,6 @@ input:checked + .switch-slider::before {
   color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.3px;
-}
-
-/* ==================== 模型列表 ==================== */
-.models-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.model-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-primary);
-  border-radius: 6px;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.model-item svg {
-  color: var(--accent-primary);
 }
 
 /* ==================== API Key 输入 ==================== */
@@ -441,31 +379,9 @@ input:checked + .switch-slider::before {
   text-decoration: underline;
 }
 
-/* ==================== 分层提示 ==================== */
-.tier-hint {
-  font-size: 12px;
-  font-weight: normal;
-  color: var(--text-tertiary);
-  margin-left: 8px;
-}
-/* ==================== 标签输入框 ==================== */
-.tags-input {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 8px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-primary);
-  border-radius: 8px;
-  min-height: 40px;
-  cursor: text;
-}
-
-.tags-input:focus-within {
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
+/* .tag-item is NOT settings UI — SettingsPanel styles bundle globally and
+   FavoritesPanel's tag chips pick this rule up (kept when the dead tags-input
+   cluster around it was removed). */
 .tag-item {
   display: flex;
   align-items: center;
@@ -475,78 +391,6 @@ input:checked + .switch-slider::before {
   color: white;
   border-radius: 4px;
   font-size: 12px;
-}
-
-.tag-remove {
-  background: none;
-  border: none;
-  color: white;
-  cursor: pointer;
-  padding: 0;
-  width: 14px;
-  height: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0.7;
-}
-
-.tag-remove:hover {
-  opacity: 1;
-}
-
-.tags-input input {
-  flex: 1;
-  min-width: 100px;
-  border: none;
-  background: transparent;
-  color: var(--text-primary);
-  font-size: 13px;
-  outline: none;
-}
-
-/* ==================== 数值步进器 ==================== */
-.number-stepper {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  border: 1px solid var(--border-primary);
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.stepper-btn {
-  width: 32px;
-  height: 32px;
-  background: var(--bg-secondary);
-  border: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s;
-}
-
-.stepper-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-
-.stepper-btn:active {
-  background: var(--accent-primary);
-  color: white;
-}
-
-.stepper-value {
-  width: 50px;
-  text-align: center;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-primary);
-  border-left: 1px solid var(--border-primary);
-  border-right: 1px solid var(--border-primary);
-  padding: 6px 0;
 }
 
 /* ==================== 进度条 ==================== */
@@ -562,16 +406,6 @@ input:checked + .switch-slider::before {
   background: var(--accent-primary);
   border-radius: 3px;
   transition: width 0.3s ease;
-}
-
-.progress-with-label {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.progress-with-label .progress-bar {
-  flex: 1;
 }
 
 .progress-label {
@@ -623,13 +457,6 @@ input:checked + .switch-slider::before {
 
 .info-box strong {
   color: var(--text-primary);
-}
-
-/* ==================== 复选框组 ==================== */
-.checkbox-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
 }
 
 .checkbox-label {
@@ -847,41 +674,6 @@ input:checked + .switch-slider::before {
   background: rgba(59, 130, 246, 0.1);
   padding: 4px 10px;
   border-radius: 6px;
-}
-
-/* ==================== 按钮优化 ==================== */
-.test-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 20px;
-  border: 1.5px solid var(--border-primary);
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
-}
-
-.test-button:hover {
-  border-color: var(--accent-primary);
-  color: var(--accent-primary);
-  background: rgba(59, 130, 246, 0.05);
-  transform: translateY(-1px);
-}
-
-.test-button.connected {
-  background: rgba(16, 185, 129, 0.1);
-  color: #059669;
-  border-color: #10b981;
-}
-
-.test-button.disconnected {
-  background: rgba(239, 68, 68, 0.1);
-  color: #dc2626;
-  border-color: #ef4444;
 }
 
 /* 主要按钮 */

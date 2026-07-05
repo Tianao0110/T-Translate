@@ -148,6 +148,9 @@ async function createSession(packId) {
 
   logger.info(`Loading OCR session: pack=${packId} gen=${recMeta.gen} base=${base.id}`);
 
+  // No docCls here on purpose: tested 2026-07-04 and rejected — it fixes
+  // upside-down photos but misclassifies short-line CJK screenshots as
+  // vertical (Japanese garbled, Korean pack broken). See OCR_MODELS.md.
   return esearch.init({
     det: { input: detPath },
     rec: {
@@ -309,27 +312,49 @@ async function recognize(imageInput, options = {}) {
   }
 }
 
-// Health probe: model files resolvable + sessions load (catches corrupt onnx
-// and broken native bindings without running a full recognition).
-async function healthCheck() {
+// Health probe. The default (light) variant only verifies the model files
+// resolve and are non-empty — cheap enough for the settings page to call on
+// entry. deep additionally builds the ONNX session (catches corrupt models
+// and broken native bindings) but costs ~0.5s of main-process stalls, so
+// callers reserve it for explicit user action (re-check button, post-repair).
+async function healthCheck({ deep = false } = {}) {
   const baseDir = resolveBaseDir();
   if (!baseDir) {
     return { healthy: false, error: 'BASE_MODELS_MISSING' };
   }
   try {
-    await getSession(BASE_PACK_ID);
-    // activeBase tells callers (and probes) which base variant actually
-    // loaded — the pack id, not the directory name (the bundled copy lives
-    // in a dir just called 'base').
-    return { healthy: true, activeBase: readPackMeta(baseDir).id };
+    // activeBase is the pack id, not the directory name (the bundled copy
+    // lives in a dir just called 'base').
+    const meta = readPackMeta(baseDir);
+    for (const name of Object.values(meta.files || {})) {
+      const st = fs.statSync(path.join(baseDir, name));
+      if (!st.size) throw Object.assign(new Error(`${name} is empty`), { code: 'ENOENT' });
+    }
+    if (deep) await getSession(BASE_PACK_ID);
+    return { healthy: true, activeBase: meta.id };
   } catch (e) {
-    return { healthy: false, error: e.code || 'LOAD_FAILED', detail: e.message };
+    const error = e.code === 'ENOENT' ? 'BASE_MODELS_MISSING' : (e.code || 'LOAD_FAILED');
+    return { healthy: false, error, detail: e.message };
+  }
+}
+
+// Loads the heavy natives (~100ms of sync require, canvas being the bulk)
+// off the interactive path. Called at idle shortly after startup when the
+// local engine is selected; session build stays lazy — its cost lands during
+// recognition where the user is already waiting on a spinner.
+function prewarm() {
+  try {
+    ensureEnv();
+    logger.info('OCR natives prewarmed');
+  } catch (e) {
+    logger.warn('Prewarm failed:', e.message);
   }
 }
 
 module.exports = {
   recognize,
   healthCheck,
+  prewarm,
   evictSessions,
   setModelTier,
   isPackInstalled,

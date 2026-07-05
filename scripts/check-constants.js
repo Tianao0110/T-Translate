@@ -32,7 +32,7 @@ function extractConstant(content, name) {
         .replace(/,\s*}/g, '}');
 
       return objStr;
-    } catch (e) {
+    } catch {
       return match[1];
     }
   }
@@ -87,14 +87,14 @@ function main() {
 
   try {
     electronContent = fs.readFileSync(electronConstantsPath, 'utf-8');
-  } catch (e) {
+  } catch {
     console.error(`❌ Cannot read ${electronConstantsPath}`);
     process.exit(1);
   }
 
   try {
     srcContent = fs.readFileSync(srcConstantsPath, 'utf-8');
-  } catch (e) {
+  } catch {
     console.error(`❌ Cannot read ${srcConstantsPath}`);
     process.exit(1);
   }

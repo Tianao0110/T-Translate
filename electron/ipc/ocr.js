@@ -19,6 +19,13 @@ function register(ctx) {
   // it updated through SET_MODEL_TIER when the user switches.
   ocrEngine.setModelTier(store.get('settings.ocr.modelTier', 'standard'));
 
+  // Warm the heavy natives at idle so neither the settings page nor the
+  // first recognition pays the sync-require cost mid-interaction. Only when
+  // the local engine is actually selected — no point paying its RAM otherwise.
+  if (store.get('settings.ocr.engine') === 'rapid-ocr') {
+    setTimeout(() => ocrEngine.prewarm(), 5000);
+  }
+
   ipcMain.handle(CHANNELS.OCR.SET_MODEL_TIER, (event, tier) => {
     ocrEngine.setModelTier(tier);
     return { success: true };
@@ -52,13 +59,13 @@ function register(ctx) {
     return status;
   });
 
-  // Loads the base models into a session — catches missing/corrupt model
-  // files and broken onnxruntime bindings without running a recognition.
-  ipcMain.handle(CHANNELS.OCR.HEALTH_CHECK, async (event, engineId) => {
-    logger.info('Health check for engine:', engineId);
+  // Light by default (file presence only — cheap enough for page entry);
+  // options.deep also builds the session, reserved for explicit user action.
+  ipcMain.handle(CHANNELS.OCR.HEALTH_CHECK, async (event, engineId, options = {}) => {
+    logger.info('Health check for engine:', engineId, options?.deep ? '(deep)' : '');
 
     if (engineId === 'rapid-ocr') {
-      const result = await ocrEngine.healthCheck();
+      const result = await ocrEngine.healthCheck({ deep: !!options?.deep });
       if (result.healthy) {
         return { healthy: true, message: t('ocr.engineHealthy') };
       }

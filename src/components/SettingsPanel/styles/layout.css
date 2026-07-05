@@ -140,49 +140,6 @@
   text-decoration: underline;
 }
 
-.action-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 8px 12px;
-  border: 1px solid var(--border-secondary);
-  background: var(--bg-primary);
-  border-radius: 6px;
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.action-button:hover {
-  border-color: var(--accent-primary);
-  color: var(--accent-primary);
-  background: var(--bg-hover);
-}
-
-.action-button.primary {
-  background: var(--accent-primary);
-  border-color: var(--accent-primary);
-  color: white;
-}
-
-.action-button.primary:hover {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
-  color: white;
-}
-
-.action-button.danger {
-  background: transparent;
-}
-
-.action-button.danger:hover {
-  border-color: var(--error);
-  color: var(--error);
-}
-
 /* ==================== 右侧内容区 ==================== */
 .settings-content-wrapper {
   flex: 1;
@@ -236,12 +193,6 @@
   font-weight: 600;
   color: var(--text-primary);
   margin-bottom: 8px;
-}
-
-.label-hint {
-  font-size: 12px;
-  color: var(--text-tertiary);
-  font-weight: 400;
 }
 
 /* 设置提示 */
@@ -626,53 +577,6 @@
   line-height: 1.5;
 }
 
-/* ==================== 设置卡片 (新增) ==================== */
-.setting-card {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-primary);
-  border-radius: 14px;
-  padding: 20px 24px;
-  margin-bottom: 20px;
-  transition: all 0.2s ease;
-}
-
-.setting-card:hover {
-  border-color: var(--border-secondary);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
-}
-
-.setting-card-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border-primary);
-}
-
-.setting-card-icon {
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, var(--accent-primary), #6366f1);
-  border-radius: 10px;
-  color: white;
-}
-
-.setting-card-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.setting-card-desc {
-  font-size: 12px;
-  color: var(--text-tertiary);
-  margin-top: 2px;
-}
-
 /* ==================== 设置组优化 ==================== */
 .setting-group {
   margin-bottom: 24px;
@@ -700,15 +604,6 @@
 .setting-label svg {
   color: var(--accent-primary);
   opacity: 0.8;
-}
-
-.label-hint {
-  font-size: 12px;
-  color: var(--text-tertiary);
-  font-weight: 400;
-  background: var(--bg-tertiary);
-  padding: 2px 8px;
-  border-radius: 4px;
 }
 
 /* ==================== 滚动条美化 ==================== */

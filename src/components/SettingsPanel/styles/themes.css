@@ -48,14 +48,6 @@
   background: transparent;
 }
 
-[data-theme="dark"] .radio-option {
-  background: rgba(255, 255, 255, 0.03);
-}
-
-[data-theme="dark"] .tags-input {
-  background: rgba(255, 255, 255, 0.05);
-}
-
 /* ==================== 青绿主题选项按钮 ==================== */
 .theme-option.fresh {
   background: linear-gradient(135deg, #f0fdf9 0%, #e0f7f3 50%, #d1fae5 100%);
@@ -111,17 +103,6 @@
   -webkit-background-clip: text !important;
   -webkit-text-fill-color: transparent !important;
   background-clip: text !important;
-}
-
-/* 卡片 */
-[data-theme="fresh"] .setting-card {
-  border-color: rgba(16, 185, 129, 0.15) !important;
-  background: #fafffe !important;
-}
-
-[data-theme="fresh"] .setting-card:hover {
-  border-color: rgba(16, 185, 129, 0.25) !important;
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.08) !important;
 }
 
 /* 开关 - 青绿色 */
@@ -201,23 +182,10 @@
   background: linear-gradient(135deg, #10b981, #059669) !important;
 }
 
-/* 应用图标 - 青绿色 */
-[data-theme="fresh"] .app-info .app-icon {
-  background: linear-gradient(135deg, 
-    #6ee7b7, #34d399, #10b981, #059669
-  ) !important;
-}
-
 /* 帮助框 */
 [data-theme="fresh"] .help-box {
   background: rgba(236, 253, 245, 0.8) !important;
   border-color: rgba(16, 185, 129, 0.2) !important;
-}
-
-/* 测试按钮 */
-[data-theme="fresh"] .test-button:hover {
-  border-color: #34d399 !important;
-  color: #059669 !important;
 }
 
 /* 分割线 - 青绿渐变 */
@@ -279,23 +247,6 @@
     #6ee7b7 100%
   ) !important;
   border-top-color: rgba(16, 185, 129, 0.2) !important;
-}
-
-[data-theme="fresh"] .action-button {
-  background: rgba(255, 255, 255, 0.7) !important;
-  border-color: rgba(16, 185, 129, 0.2) !important;
-  color: #059669 !important;
-}
-
-[data-theme="fresh"] .action-button:hover {
-  background: rgba(255, 255, 255, 0.9) !important;
-  border-color: #10b981 !important;
-}
-
-[data-theme="fresh"] .action-button.danger:hover {
-  background: rgba(254, 226, 226, 0.9) !important;
-  border-color: #ef4444 !important;
-  color: #dc2626 !important;
 }
 
 /* 移除主题选项按钮顶部的装饰条（可能导致视觉问题） */

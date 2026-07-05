@@ -109,8 +109,8 @@ function main() {
 
   const missingInEn = [...zhKeySet].filter(k => !enKeySet.has(k));
   const missingInZh = [...enKeySet].filter(k => !zhKeySet.has(k));
-  const emptyInZh = Object.entries(zhKeys).filter(([k, v]) => v === '').map(([k]) => k);
-  const emptyInEn = Object.entries(enKeys).filter(([k, v]) => v === '').map(([k]) => k);
+  const emptyInZh = Object.entries(zhKeys).filter(([, v]) => v === '').map(([k]) => k);
+  const emptyInEn = Object.entries(enKeys).filter(([, v]) => v === '').map(([k]) => k);
 
   console.log(`  zh.js: ${zhKeySet.size} keys`);
   console.log(`  en.js: ${enKeySet.size} keys`);
