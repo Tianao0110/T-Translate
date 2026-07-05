@@ -26,15 +26,23 @@ html, body, #root {
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Accent follows the theme so the trigger dot isn't a fixed blue on every
-     theme (jarring on 'fresh'). Only 3 themes exist; this window loads no App.css
-     token sheet, so the accents are defined locally per data-theme. */
+  /* This window loads no App.css token sheet — everything themed is defined
+     locally per data-theme.
+     Rainbow signature (2026-07 R1): the pastel toolbar + pink-purple accents
+     were born as the old "rainbow" theme and survived under fresh; promoted
+     to the selection window's product signature ACROSS all themes (echoes
+     the rainbow-tree logo). Card floors stay per-theme; --sel-accent keeps a
+     per-theme functional hue (spinner etc.). */
+  --sel-rainbow-a: #f472b6;
+  --sel-rainbow-b: #8b5cf6;
+  --sel-rainbow-alpha: 0.3;   /* pastel band strength; dimmed on dark */
+  --sel-source-alpha: 0.2;
   --sel-accent: #3b82f6;
   --sel-accent-hi: #60a5fa;
 }
 
-.sel-root[data-theme="dark"]  { --sel-accent: #60a5fa; --sel-accent-hi: #3b82f6; }
-.sel-root[data-theme="fresh"] { --sel-accent: #8b5cf6; --sel-accent-hi: #f472b6; }
+.sel-root[data-theme="dark"]  { --sel-accent: #d6a854; --sel-accent-hi: #c9973f; --sel-rainbow-alpha: 0.22; --sel-source-alpha: 0.13; }
+.sel-root[data-theme="fresh"] { --sel-accent: #10b981; --sel-accent-hi: #34d399; }
 
 /* ==========================================
    触发圆点 - 保留原样式
@@ -52,9 +60,9 @@ html, body, #root {
   align-items: center;
   justify-content: center;
   cursor: default;
-  background: linear-gradient(135deg, var(--sel-accent-hi), var(--sel-accent));
+  background: linear-gradient(135deg, var(--sel-rainbow-a), var(--sel-rainbow-b));
   border-radius: 50%;
-  box-shadow: 0 1px 3px color-mix(in srgb, var(--sel-accent) 35%, transparent);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--sel-rainbow-b) 35%, transparent);
   animation: triggerIn 0.15s ease-out;
   transition: transform 0.15s, opacity 0.15s, filter 0.15s;
   opacity: 0.9;
@@ -120,13 +128,12 @@ html, body, #root {
 }
 
 [data-theme="dark"] .sel-loading {
-  background: rgba(30, 41, 59, 0.98);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(33, 31, 29, 0.98); /* warm charcoal, matches amber dark */
+  border-color: rgba(232, 228, 221, 0.12);
 }
 
-/* 彩虹主题加载 - 保留 */
 [data-theme="fresh"] .sel-loading {
-  background: rgba(255, 250, 245, 0.98);
+  background: rgba(246, 251, 250, 0.98);
   border-color: rgba(139, 92, 246, 0.15);
 }
 
@@ -160,51 +167,47 @@ html, body, #root {
   backdrop-filter: blur(12px);
 }
 
+/* Card floors follow each theme (rainbow rides on top of them) */
 [data-theme="dark"] .sel-card {
-  background: rgba(30, 41, 59, var(--sel-opacity, 0.95));
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(33, 31, 29, var(--sel-opacity, 0.95));
+  border: 1px solid rgba(232, 228, 221, 0.12);
   backdrop-filter: blur(12px);
 }
 
-/* 🌈 彩虹主题卡片 - 保留 */
 [data-theme="fresh"] .sel-card {
-  background: linear-gradient(135deg, 
-    rgba(255, 255, 255, var(--sel-opacity, 0.95)), 
-    rgba(240, 248, 255, var(--sel-opacity, 0.95)));
-  border: 1px solid rgba(59, 130, 246, 0.2);
+  background: linear-gradient(135deg,
+    rgba(246, 251, 250, var(--sel-opacity, 0.95)),
+    rgba(236, 246, 244, var(--sel-opacity, 0.95)));
+  border: 1px solid rgba(13, 148, 136, 0.28);
   backdrop-filter: blur(12px);
 }
 
 /* ==========================================
    工具栏缩小30%
    ========================================== */
+/* 🌈 八色粉彩工具条 —— 全主题签名（升级自旧六色，2026-07 拍板） */
 .sel-toolbar {
   display: flex;
   align-items: center;
   gap: 3px;
   padding: 4px 6px;
-  background: linear-gradient(to bottom, #f8fafc, #f1f5f9);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  background: linear-gradient(90deg,
+    rgba(255, 179, 193, var(--sel-rainbow-alpha)),
+    rgba(255, 209, 179, var(--sel-rainbow-alpha)),
+    rgba(255, 241, 168, var(--sel-rainbow-alpha)),
+    rgba(196, 247, 186, var(--sel-rainbow-alpha)),
+    rgba(168, 240, 222, var(--sel-rainbow-alpha)),
+    rgba(179, 222, 255, var(--sel-rainbow-alpha)),
+    rgba(208, 190, 255, var(--sel-rainbow-alpha)),
+    rgba(246, 186, 232, var(--sel-rainbow-alpha))
+  );
+  border-bottom: 1px solid rgba(139, 92, 246, 0.10);
   -webkit-app-region: drag;
   min-height: 24px;
 }
 
 [data-theme="dark"] .sel-toolbar {
-  background: linear-gradient(to bottom, #1e293b, #0f172a);
-  border-color: rgba(255, 255, 255, 0.06);
-}
-
-/* 🌈 彩虹主题工具栏 - 保留 */
-[data-theme="fresh"] .sel-toolbar {
-  background: linear-gradient(90deg, 
-    rgba(255, 182, 193, 0.3),
-    rgba(255, 218, 185, 0.3),
-    rgba(255, 255, 186, 0.3),
-    rgba(186, 255, 201, 0.3),
-    rgba(186, 225, 255, 0.3),
-    rgba(221, 186, 255, 0.3)
-  );
-  border-color: rgba(139, 92, 246, 0.1);
+  border-color: rgba(232, 228, 221, 0.08);
 }
 
 /* 按钮 */
@@ -226,11 +229,21 @@ html, body, #root {
   color: #334155;
 }
 
+[data-theme="dark"] .sel-btn {
+  color: #b5aea1;
+}
+
+[data-theme="dark"] .sel-btn:hover {
+  background: rgba(232, 228, 221, 0.10);
+  color: #e8e4dd;
+}
+
+/* Active pill wears the rainbow signature in every theme */
 .sel-btn.active {
-  background: var(--sel-accent);
+  background: linear-gradient(135deg, var(--sel-rainbow-a), var(--sel-rainbow-b));
   color: white;
-  border-color: var(--sel-accent);
-  box-shadow: 0 1px 3px color-mix(in srgb, var(--sel-accent) 30%, transparent);
+  border-color: transparent;
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--sel-rainbow-b) 30%, transparent);
 }
 
 .sel-btn.success {
@@ -238,12 +251,6 @@ html, body, #root {
   color: white;
   border-color: transparent;
   box-shadow: 0 1px 3px rgba(34, 197, 94, 0.3);
-}
-
-/* 🌈 彩虹主题按钮 - 保留 */
-[data-theme="fresh"] .sel-btn.active {
-  background: linear-gradient(135deg, #f472b6, #8b5cf6);
-  border-color: transparent;
 }
 
 /* 关闭按钮 */
@@ -286,40 +293,35 @@ html, body, #root {
 }
 
 [data-theme="dark"] .sel-content {
-  color: #e2e8f0;
+  color: #e8e4dd;
 }
 
 [data-theme="fresh"] .sel-content {
-  color: #4b5563;
+  color: #3c514c;
 }
 
-/* 原文显示 */
+/* 原文显示 —— 粉彩渐变随彩虹签名走全主题（强度随主题变量） */
 .sel-source {
   padding: 6px 8px;
   margin-bottom: 8px;
-  background: linear-gradient(to right, #f1f5f9, #f8fafc);
+  background: linear-gradient(to right,
+    rgba(255, 182, 193, var(--sel-source-alpha)),
+    rgba(186, 225, 255, var(--sel-source-alpha))
+  );
   border-radius: 6px;
   font-size: 12px;
   color: #64748b;
-  border-left: 3px solid #94a3b8;
+  border-left: 3px solid var(--sel-rainbow-a);
   white-space: pre-wrap;
   word-break: break-word;
 }
 
 [data-theme="dark"] .sel-source {
-  background: linear-gradient(to right, #334155, #1e293b);
-  color: #94a3b8;
-  border-color: #475569;
+  color: #b3ab9e;
 }
 
-/* 🌈 彩虹主题原文 - 保留 */
 [data-theme="fresh"] .sel-source {
-  background: linear-gradient(to right, 
-    rgba(255, 182, 193, 0.2),
-    rgba(186, 225, 255, 0.2)
-  );
-  border-color: #f472b6;
-  color: #6b7280;
+  color: #4f6560;
 }
 
 /* 译文 */
@@ -331,11 +333,11 @@ html, body, #root {
 }
 
 [data-theme="dark"] .sel-text {
-  color: #f1f5f9;
+  color: #eae6df;
 }
 
 [data-theme="fresh"] .sel-text {
-  color: #374151;
+  color: #2c423d;
 }
 
 /* ==========================================
@@ -369,7 +371,7 @@ html, body, #root {
 }
 
 [data-theme="dark"] .sel-card.frozen .sel-toolbar {
-  background: linear-gradient(to right, rgba(251, 191, 36, 0.15), #1e293b);
+  background: linear-gradient(to right, rgba(251, 191, 36, 0.16), rgba(33, 31, 29, 0));
 }
 
 [data-theme="fresh"] .sel-card.frozen .sel-toolbar {
