@@ -10,9 +10,11 @@ T-Translate 提供三种内置主题：
 
 | 主题 | ID | 说明 |
 |------|-----|------|
-| 经典 | `light` | 浅色主题，白色背景 |
-| 深色 | `dark` | 深色主题，深灰背景 |
-| 清新 | `fresh` | 青绿色主题，清新自然 |
+| 经典 | `light` | 石板蓝灰：冷石板色相的中性色 + 蓝色强调 |
+| 深色 | `dark` | 琥珀夜读（护眼向）：暖炭底座 + 琥珀强调（金底深字，见 `--text-on-accent`） |
+| 清新 | `fresh` | 青碧水色：湖水青碧底 + 翡翠强调，渐变元素为主题特征 |
+
+另：划词翻译窗口带一套跨主题的「彩虹签名」（八色粉彩工具条 + 紫粉触发点，呼应彩虹树 Logo）——各主题只改它的卡片底面，彩虹元素本体不随主题变。
 
 ---
 
@@ -33,16 +35,8 @@ T-Translate 提供三种内置主题：
 }
 ```
 
-### 方法 2：通过 JavaScript（运行时）
-
-```javascript
-// 设置自定义强调色
-document.documentElement.style.setProperty('--custom-accent', '#8b5cf6');
-document.documentElement.setAttribute('data-custom-accent', 'true');
-
-// 恢复默认
-document.documentElement.removeAttribute('data-custom-accent');
-```
+> 注意：修改强调色时同步检查 `--text-on-accent`（强调色上的文字色）——亮色强调（如琥珀金）需要深色文字，白字会不可读。
+>（旧的 `--custom-accent` 运行时 API 已随自定义强调色功能一并移除。）
 
 ---
 
@@ -209,6 +203,7 @@ if (newTheme && ['light', 'dark', 'fresh', 'sakura'].includes(newTheme)) {
 | `--accent-primary` | 强调色（按钮、链接） |
 | `--accent-hover` | 强调色悬停状态 |
 | `--accent-active` | 强调色激活状态 |
+| `--text-on-accent` | 强调色填充面上的文字色（亮色强调需深字） |
 
 ### 状态颜色
 
@@ -236,7 +231,10 @@ if (newTheme && ['light', 'dark', 'fresh', 'sakura'].includes(newTheme)) {
 | `--floating-text` | 悬浮窗口文字色 |
 | `--floating-text-muted` | 悬浮窗口次要文字色 |
 | `--floating-accent` | 悬浮窗口强调色 |
+| `--floating-on-accent` | 悬浮窗口强调色上的文字色 |
 | `--floating-opacity` | 玻璃透明度（0-1） |
+
+> 悬浮窗与划词窗是独立渲染入口，**不加载 App.css 的令牌表**——新主题必须在这两个文件里补各自的每主题变量块，且样式里只能引用它们的局部变量（引用 `--accent-*` 会静默失效）。
 
 ---
 
@@ -284,4 +282,4 @@ A: 使用更具体的选择器，如 `[data-theme="sakura"] .specific-component`
 
 ---
 
-**文档更新日期**: 2025-01-21
+**文档更新日期**: 2026-07-04
