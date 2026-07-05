@@ -99,6 +99,9 @@ export const DEFAULT_SETTINGS = {
     minChars: 2,
     maxChars: 500,
     windowOpacity: 95,
+    // Rainbow signature skin for the selection window across all themes;
+    // off = theme-matched skins (fresh ships its own aqua one).
+    rainbowWindow: false,
     // CapsLock-direct mode: bypass trigger UI when CapsLock is on
     stickyViaCapsLock: false,
     stickyWarningShown: false,

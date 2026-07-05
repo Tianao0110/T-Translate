@@ -19,6 +19,7 @@ const DEFAULT_SETTINGS = {
   minChars: 2,
   maxChars: 500,
   windowOpacity: 95,
+  rainbowWindow: false,
 };
 
 const DEFAULT_TRANSLATION = {
@@ -778,7 +779,7 @@ const SelectionTranslator = () => {
   if (mode === 'idle') return null;
 
   return (
-    <div className="sel-root" data-theme={theme}>
+    <div className={`sel-root${settings.rainbowWindow ? ' sel-rainbow' : ''}`} data-theme={theme}>
       {mode === 'trigger' && (
         <div
           className={`sel-trigger ${triggerReady ? 'ready' : ''} ${triggerFailed ? 'failed' : ''}`}

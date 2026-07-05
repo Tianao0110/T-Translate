@@ -57,6 +57,9 @@ function buildSelectionSettingsPayload() {
     minChars: s.minChars || 2,
     maxChars: s.maxChars || 500,
     windowOpacity: s.windowOpacity || 95,
+    // Rainbow signature skin takes over the selection window in every theme
+    // when on; off = each theme's own matched skin (fresh has an aqua one).
+    rainbowWindow: s.rainbowWindow || false,
     // UI language, so the persistent window refreshes its i18n on each show —
     // language (unlike theme) has no cross-window broadcast.
     language: store.get('settings.interface.language') || undefined,
