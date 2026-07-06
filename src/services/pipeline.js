@@ -97,9 +97,14 @@ class TranslationPipeline {
       // Frozen panes survive; transient ones are cleared each capture cycle
       session.clearChildPanes();
 
-      // Force re-OCR even if the image is byte-identical to last cycle
-      lastImageHash = '';
-      lastText = '';
+      // Manual captures force a re-OCR even on a byte-identical frame. Auto-
+      // refresh (keepDedup) leaves the dedupe keys intact so an unchanged
+      // caption/subtitle doesn't re-OCR + re-translate every tick — only a
+      // changed region does real work.
+      if (!captureOptions.keepDedup) {
+        lastImageHash = '';
+        lastText = '';
+      }
 
       session.startCapture();
 

@@ -62,6 +62,7 @@ const CHANNELS = {
     SET_OPACITY: 'floating-window:set-opacity',
     GET_SETTINGS: 'floating-window:get-settings',
     NOTIFY_SETTINGS_CHANGED: 'floating-window:notify-settings-changed',
+    TRIGGER_CAPTURE: 'floating-window:trigger-capture', // global-hotkey re-capture (no focus steal)
     OPEN_MAIN_SETTINGS: 'floating-window:open-main-settings',
     GET_HISTORY: 'floating-window:get-history',
     ADD_TO_HISTORY: 'floating-window:add-to-history', // forward a translation into the main window's history

@@ -1093,6 +1093,15 @@ app.whenReady().then(() => {
     hideSelectionLoading,
     toggleFloatingWindow: (...args) => windowManager.toggleFloatingWindow(...args),
     createFloatingWindow: (...args) => windowManager.createFloatingWindow(...args),
+    // Global-hotkey capture: only when the floating window is up. Sent as an
+    // event (not focus) so the target app stays foreground and keeps its
+    // content (Teams captions, subtitle overlays) visible for the capture.
+    triggerFloatingCapture: () => {
+      const fw = windows.floatingWindow;
+      if (fw && !fw.isDestroyed() && fw.isVisible()) {
+        fw.webContents.send(CHANNELS.FLOATING_WINDOW.TRIGGER_CAPTURE);
+      }
+    },
     toggleSelectionTranslate,
     toggleSubtitleCaptureWindow: (...args) => windowManager.toggleSubtitleCaptureWindow(...args),
   };

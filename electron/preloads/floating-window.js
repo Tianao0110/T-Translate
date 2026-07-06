@@ -61,6 +61,13 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.on('child-pane:closed', handler);
       return () => ipcRenderer.removeListener('child-pane:closed', handler);
     },
+
+    // Global-hotkey re-capture trigger (fires while another app holds focus).
+    onTriggerCapture: (callback) => {
+      const handler = () => callback();
+      ipcRenderer.on('floating-window:trigger-capture', handler);
+      return () => ipcRenderer.removeListener('floating-window:trigger-capture', handler);
+    },
   },
 
   // Shared OCR API (also exposed in the main-window preload). Online engines

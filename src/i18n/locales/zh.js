@@ -87,7 +87,7 @@ const zh = {
   shortcuts: {
     title: "快捷键",
     translate: "执行翻译", swapLanguages: "切换语言", clear: "清空内容", paste: "粘贴文本", copy: "复制结果",
-    screenshot: "截图翻译", toggleWindow: "显示/隐藏窗口", floatingWindow: "悬浮窗口", selectionTranslate: "划词翻译开关",
+    screenshot: "截图翻译", toggleWindow: "显示/隐藏窗口", floatingWindow: "悬浮窗口", selectionTranslate: "划词翻译开关", floatingCapture: "悬浮窗重新截译",
     hint: "以下均为系统全局快捷键。点击可修改，按 Esc 取消",
     pressKey: "按下快捷键...", resetDefault: "重置为默认",
     updated: "快捷键已更新: {{label}} → {{shortcut}}", updateFailed: "快捷键更新失败: {{error}}", reset: "快捷键已重置为默认值",
@@ -248,6 +248,7 @@ const zh = {
     firstUse: "首次使用字幕模式", firstUseDesc: "需要先框选视频原字幕区域",
     // Floating window strings
     captureSpace: "截图识别 (Space)", historyCtrlH: "历史记录 (Ctrl+H)",
+    autoRefresh: "自动刷新（盯住区域循环截译，目标不失焦）",
     adjustOpacity: "点击调节透明度", closeEsc: "关闭 (Esc)",
     capturing: "截图中...", recognizing: "识别中...", translating: "翻译中...",
     captureHint: "点击 📷 或按 Space 截图识别",

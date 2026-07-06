@@ -10,6 +10,10 @@ const DEFAULT_SHORTCUTS = {
   toggleWindow: 'CommandOrControl+Shift+W',
   floatingWindow: 'CommandOrControl+Alt+G',
   selectionTranslate: 'CommandOrControl+Shift+T',
+  // Re-capture the floating window's region WITHOUT it taking focus, so the
+  // target app (Teams captions, a browser) stays foreground and doesn't hide
+  // its content. No-op when the floating window is hidden.
+  floatingCapture: 'CommandOrControl+Alt+Space',
 };
 
 // Renderer uses Ctrl/Meta; Electron globalShortcut wants CommandOrControl/Command
@@ -37,6 +41,7 @@ function register(ctx) {
     },
     floatingWindow: () => managers.toggleFloatingWindow?.(),
     selectionTranslate: () => managers.toggleSelectionTranslate?.(),
+    floatingCapture: () => managers.triggerFloatingCapture?.(),
   });
 
   ipcMain.handle(CHANNELS.SHORTCUTS.UPDATE, (event, action, shortcut) => {
@@ -170,6 +175,7 @@ function registerAllShortcuts(ctx) {
     },
     floatingWindow: () => managers.toggleFloatingWindow?.(),
     selectionTranslate: () => managers.toggleSelectionTranslate?.(),
+    floatingCapture: () => managers.triggerFloatingCapture?.(),
   };
 
   for (const [action, defaultKey] of Object.entries(DEFAULT_SHORTCUTS)) {

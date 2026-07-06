@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Camera, X, Loader2, AlertCircle, ChevronDown, GripHorizontal, History, Clock } from 'lucide-react';
+import { Camera, X, Loader2, AlertCircle, ChevronDown, GripHorizontal, History, Clock, RefreshCw } from 'lucide-react';
 import useSessionStore, { STATUS, DISPLAY_MODE } from '../../stores/session.js';
 import useConfigStore from '../../stores/config.js';
 import pipeline from '../../services/pipeline.js';
@@ -394,7 +394,9 @@ const FloatingWindow = () => {
 
   // Capture screen region that maps to this floating window's content area.
   // Defined as a callback because the keyboard handler closes over it.
-  const captureAndTranslate = useCallback(async () => {
+  // keepDedup=true (auto-refresh) skips work on unchanged frames; manual
+  // captures (space/button/global hotkey) force a fresh translate.
+  const captureAndTranslate = useCallback(async ({ keepDedup = false } = {}) => {
     try {
       if (!contentRef.current) return;
 
@@ -408,17 +410,50 @@ const FloatingWindow = () => {
         y: Math.round(windowBounds.y + contentRect.top),
         width: Math.round(contentRect.width),
         height: Math.round(contentRect.height),
+        keepDedup,
       };
-
-      logger.debug('Capture rect:', captureRect);
-      logger.debug('Content rect:', contentRect);
-      logger.debug('Window bounds:', windowBounds);
 
       await pipeline.runFromCapture(captureRect);
     } catch (error) {
       logger.error('Capture failed:', error);
     }
   }, []);
+
+  // Auto-refresh: keep re-capturing the region on a timer so a live-updating
+  // area (Teams captions, video subtitles) stays translated hands-free. The
+  // timer path never touches focus, so the target app stays foreground and
+  // keeps showing its content. Paused while the window is hidden. Dedupe in
+  // the pipeline means an unchanged frame costs nothing.
+  const [autoRefresh, setAutoRefresh] = useState(() => {
+    try { return localStorage.getItem('floating-auto-refresh') === '1'; } catch { return false; }
+  });
+  const AUTO_REFRESH_MS = 1500;
+
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const id = setInterval(() => {
+      if (document.hidden) return; // window hidden — nothing to capture
+      captureAndTranslate({ keepDedup: true });
+    }, AUTO_REFRESH_MS);
+    return () => clearInterval(id);
+  }, [autoRefresh, captureAndTranslate]);
+
+  const toggleAutoRefresh = useCallback(() => {
+    setAutoRefresh((prev) => {
+      const next = !prev;
+      try { localStorage.setItem('floating-auto-refresh', next ? '1' : '0'); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
+
+  // Global-hotkey re-capture: fires while another app holds focus, so the
+  // target never loses foreground (the whole point vs the in-window Space key).
+  useEffect(() => {
+    const off = window.electron?.floatingWindow?.onTriggerCapture?.(() => {
+      captureAndTranslate({ keepDedup: false });
+    });
+    return () => { if (off) off(); };
+  }, [captureAndTranslate]);
 
   const handleContentClick = useCallback((e) => {
     // Only fire toggle on bare-container clicks, not on child panes/text
@@ -567,6 +602,18 @@ const FloatingWindow = () => {
               title={t('floatingWindow.captureSpace', '截图识别 (Space)')}
             >
               <Camera size={12} />
+            </button>
+
+            <button
+              className={`toolbar-btn ${autoRefresh ? 'active' : ''}`}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleAutoRefresh();
+              }}
+              title={t('floatingWindow.autoRefresh', '自动刷新（盯住区域循环截译，目标不失焦）')}
+            >
+              <RefreshCw size={12} />
             </button>
 
             <button
