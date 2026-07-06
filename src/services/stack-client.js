@@ -199,6 +199,28 @@ class StackClient {
   onChanged(callback) {
     return bridge()?.onChanged(callback);
   }
+
+  // ===== OCR (main-process engine chain; allowedEngines injected there) =====
+
+  get ocr() {
+    return {
+      recognize: async (imageData, options = {}) => {
+        const b = bridge();
+        if (!b?.ocrRecognize) return NO_BRIDGE;
+        try {
+          return await b.ocrRecognize(imageData, options);
+        } catch (e) {
+          logger.error('ocr recognize IPC failed:', e);
+          return { success: false, error: e.message };
+        }
+      },
+      resetVisionFallback: async () => {
+        const b = bridge();
+        if (!b?.ocrResetVision) return;
+        await b.ocrResetVision().catch(() => {});
+      },
+    };
+  }
 }
 
 const stackClient = new StackClient();

@@ -19,11 +19,9 @@ import {
   exportPDFHTML,
   SUPPORTED_FORMATS,
 } from '../../utils/document-parser.js';
-import { ocrManager } from '../../providers/ocr/index.js';
 import translationService from '../../services/stack-client.js';
 import useTranslationStore from '../../stores/translation-store';
 import { LANGUAGES, PRIVACY_MODES } from '../../config/constants.js';
-import { getPrivacyModeConfig } from '../../config/privacy-modes.js';
 import useVisibleHotkey from '../../hooks/use-visible-hotkey.js';
 import { LanguageSelector } from '../TranslationPanel/components.jsx';
 import './styles.css';
@@ -527,11 +525,9 @@ const DocumentTranslator = ({
         },
         ocrRecognize: async (imageData) => {
           try {
-            // Scanned-page OCR must respect the privacy mode's engine
-            // allowlist — the chain would otherwise reach online engines.
-            return await ocrManager.recognize(imageData, {
-              allowedEngines: getPrivacyModeConfig(translationMode).allowedOcrEngines || undefined,
-            });
+            // Scanned-page OCR runs in the main-process stack; the privacy
+            // mode's engine allowlist is injected there, not passed from here.
+            return await translationService.ocr.recognize(imageData);
           } catch {
             return { success: false, error: 'OCR unavailable' };
           }

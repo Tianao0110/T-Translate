@@ -7,12 +7,17 @@ const caps = {
   fetch: null,
   getLanguage: () => 'zh',
   loggerFactory: null,
+  // Local OCR recognizers (paddle/windows) — the engines already live in the
+  // main process (electron/utils/ocr-engine.js); the stack calls them directly
+  // instead of the renderer's old IPC bridge classes.
+  localOcr: null,
 };
 
 export function configureRuntime(next = {}) {
   if (next.fetch) caps.fetch = next.fetch;
   if (next.getLanguage) caps.getLanguage = next.getLanguage;
   if (next.loggerFactory) caps.loggerFactory = next.loggerFactory;
+  if (next.localOcr) caps.localOcr = next.localOcr;
 }
 
 export function rtFetch(...args) {
@@ -32,4 +37,8 @@ export function getLanguage() {
 
 export function getLoggerFactory() {
   return caps.loggerFactory;
+}
+
+export function getLocalOcr() {
+  return caps.localOcr;
 }

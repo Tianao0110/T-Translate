@@ -89,8 +89,6 @@ const FloatingWindow = () => {
   }, [floatingOpacity]);
 
   useEffect(() => {
-    pipeline.init();
-
     loadSettings();
 
     // Theme: prefer the IPC sync handshake, fall back to store, then localStorage
@@ -229,12 +227,9 @@ const FloatingWindow = () => {
     let unsubscribeSettings = null;
     if (window.electron?.floatingWindow?.onSettingsChanged) {
       unsubscribeSettings = window.electron.floatingWindow.onSettingsChanged((newSettings) => {
+        // Stack + OCR reloads are main-process-internal now — this channel
+        // only carries the window's UI settings (opacity/engine/theme/langs).
         loadSettings();
-        // Persistent window: engine keys/endpoint changed in main settings
-        // must reach the already-initialized ocrManager. (Translation-stack
-        // reload is main-process-internal now — this channel only carries the
-        // window's UI settings + OCR config sync.)
-        pipeline.refreshOcrConfigs();
         const newTheme = newSettings?.interface?.theme;
         if (newTheme && ['light', 'dark', 'fresh'].includes(newTheme)) {
           setTheme(newTheme);

@@ -8,6 +8,17 @@
 const { auditAccess } = require('./secure-audit');
 const logger = require('./logger')('SecureVault');
 
+// Flat settings.ocr field names of all secret values. Mirror of
+// OCR_SECRET_FIELDS in src/utils/ocr-key-vault.js (renderer encrypt side) —
+// the two lists must stay in sync.
+const OCR_SECRET_FIELDS = [
+  'ocrspaceKey',
+  'googleVisionKey',
+  'azureKey',
+  'baiduApiKey',
+  'baiduSecretKey',
+];
+
 // Online-service key prefixes: offline mode blocks their decryption so no
 // network credential is even readable while the app promises "no requests".
 const ONLINE_KEY_PREFIXES = [
@@ -118,7 +129,21 @@ function createSecureVault({ store, safeStorage } = {}) {
     return { list, configs };
   }
 
-  return { decrypt, bulkDecryptProviderConfigs };
+  // Flat settings.ocr bucket with vault secrets merged in — main-process port
+  // of utils/ocr-key-vault.js decryptOcrSecrets (the encrypt-and-strip side
+  // stays renderer-side in that file; keep OCR_SECRET_FIELDS in sync).
+  // An existing truthy bucket value wins (not-yet-migrated legacy plaintext).
+  function decryptOcrBucket(context = 'ocr-config') {
+    const merged = { ...(store.get('settings.ocr') || {}) };
+    for (const field of OCR_SECRET_FIELDS) {
+      if (merged[field]) continue;
+      const value = decrypt(`ocr_${field}`, context);
+      if (value) merged[field] = value;
+    }
+    return merged;
+  }
+
+  return { decrypt, bulkDecryptProviderConfigs, decryptOcrBucket };
 }
 
 module.exports = { createSecureVault, isDecryptAllowed, ONLINE_KEY_PREFIXES };

@@ -119,6 +119,9 @@ const electronAPI = {
     reload: () => ipcRenderer.invoke("stack:reload"),
     clearCache: (level) => ipcRenderer.invoke("stack:clear-cache", { level }),
     cacheStats: () => ipcRenderer.invoke("stack:cache-stats"),
+    ocrRecognize: (imageData, options) =>
+      ipcRenderer.invoke("stack:ocr-recognize", { imageData, options }),
+    ocrResetVision: () => ipcRenderer.invoke("stack:ocr-reset-vision"),
     onStreamChunk: (callback) => {
       const handler = (event, frame) => callback(frame);
       ipcRenderer.on("stack:stream-chunk", handler);

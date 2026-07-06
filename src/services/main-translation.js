@@ -8,12 +8,9 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import translationService from './stack-client.js';
-import { ocrManager } from '../providers/ocr/index.js';
 import useTranslationStore from '../stores/translation-store.js';
 
 import { PRIVACY_MODES, TRANSLATION_STATUS } from '@config/defaults';
-import { getPrivacyModeConfig } from '../config/privacy-modes.js';
-import { decryptOcrSecrets } from '../utils/ocr-key-vault.js';
 import createLogger from '../utils/logger.js';
 import i18n from '../i18n.js';
 const logger = createLogger('MainTranslation');
@@ -23,9 +20,6 @@ const _t = (key, fallback) => {
 };
 
 class MainTranslationService {
-  constructor() {
-    this._ocrConfigsLoaded = false;
-  }
 
   // Picks stream vs one-shot based on user preference in the store
   async execute(options = {}) {
@@ -302,25 +296,10 @@ class MainTranslationService {
     return results;
   }
 
-  // ocrManager starts with empty configs in this renderer — feed it the
-  // persisted OCR settings once before first use (SettingsPanel re-feeds on
-  // every save). Without this, online-engine API keys are lost on restart.
-  async _ensureOcrConfigs() {
-    if (this._ocrConfigsLoaded) return;
-    this._ocrConfigsLoaded = true;
-    try {
-      const settings = await window.electron?.store?.get?.('settings') || {};
-      // decrypted ocr bucket already carries llmEndpoint.
-      ocrManager.updateConfigs(await decryptOcrSecrets(settings.ocr || {}));
-    } catch { /* browser mode: engine defaults apply */ }
-  }
-
+  // OCR runs in the main-process stack: engine configs (with vault secrets)
+  // load there, and the privacy-mode engine allowlist is injected there — this
+  // side just forwards the image and the user's preferred engine.
   async recognizeImage(image, options = {}) {
-    if (!ocrManager) {
-      return { success: false, error: 'OCR not initialized' };
-    }
-
-    await this._ensureOcrConfigs();
     const state = useTranslationStore.getState();
 
     useTranslationStore.setState((draft) => {
@@ -329,11 +308,9 @@ class MainTranslationService {
     });
 
     try {
-      const result = await ocrManager.recognize(image, {
+      const result = await translationService.ocr.recognize(image, {
         engine: state.ocrStatus.engine,
         ...options,
-        // Last so no call site can widen the engine set beyond the privacy mode
-        allowedEngines: getPrivacyModeConfig(state.translationMode).allowedOcrEngines || undefined,
       });
 
       if (result.success) {
@@ -344,9 +321,10 @@ class MainTranslationService {
             draft.currentTranslation.sourceText = result.text;
           }
           // Surface LLM-Vision fallback so the user knows they're on a different engine.
-          // Two variants: hard-lock (repeated failures disabled it) vs soft (model doesn't support vision).
+          // Two variants: hard-lock (repeated failures disabled it) vs soft (model
+          // doesn't support vision). The lock flag rides on the result now.
           if (result.fallbackFrom === 'llm-vision') {
-            draft.ocrStatus.fallbackNotice = ocrManager.isVisionLocked()
+            draft.ocrStatus.fallbackNotice = result.visionLocked
               ? _t('ocr.visionLocked', 'LLM Vision has been disabled due to repeated failures. Switched to local OCR. Re-enable in Settings > OCR.')
               : _t('ocr.visionFallback', 'Current model does not support vision. Using local OCR instead.');
           }

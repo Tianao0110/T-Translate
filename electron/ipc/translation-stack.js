@@ -34,6 +34,7 @@ function register(ctx) {
   let stackLoadError = null;
   try {
     const { createTranslationStack } = require('../generated/translation-stack.cjs');
+    const localOcr = require('./ocr');
     stack = createTranslationStack({
       // Chromium network stack — system proxy and enterprise certs behave
       // exactly like the renderer fetch the providers were written against.
@@ -41,6 +42,12 @@ function register(ctx) {
       getLanguage: () => (store.get('settings.interface.language') === 'en' ? 'en' : 'zh'),
       loggerFactory: (scope) => makeLogger(`Stack:${scope}`),
       loadProviderConfigs: async () => vault.bulkDecryptProviderConfigs('stack-reload'),
+      loadOcrConfigs: async () => vault.decryptOcrBucket('ocr-config'),
+      localOcr: {
+        paddle: (imageData, options) => localOcr.recognizePaddle(store, imageData, options),
+        windows: (imageData, options) => localOcr.recognizeWindows(store, imageData, options),
+        isWindows: process.platform === 'win32',
+      },
       getCustomFilters: () => store.get('settings.translation.customFilters', []),
       cacheFilePath: path.join(app.getPath('userData'), 'Caches', 'translation-cache.json'),
     });
@@ -242,7 +249,7 @@ function register(ctx) {
   ipcMain.handle(CHANNELS.STACK.RELOAD, async () => {
     if (!stack) return unavailable();
     try {
-      await stack.service.reload();
+      await stack.reload();
       // Lightweight invalidation signal — windows re-pull what they display.
       for (const win of BrowserWindow.getAllWindows()) {
         if (!win.isDestroyed()) win.webContents.send(CHANNELS.STACK.CHANGED);
@@ -264,6 +271,34 @@ function register(ctx) {
   ipcMain.handle(CHANNELS.STACK.CACHE_STATS, () => {
     if (!stack) return null;
     return stack.service.getCacheStats();
+  });
+
+  // ===== OCR =====
+
+  ipcMain.handle(CHANNELS.STACK.OCR_RECOGNIZE, async (event, payload = {}) => {
+    if (!stack) return unavailable();
+    const { imageData, options = {} } = payload;
+    const mode = getPrivacyMode();
+    // The allowlist is injected HERE from the live mode — a renderer cannot
+    // widen the engine set (the old call sites passed it as a parameter and
+    // relied on convention). Screen captures are the most privacy-sensitive
+    // input in the app.
+    const { allowedEngines: _ae, ...rest } = options;
+    try {
+      return await stack.ocr.recognize(imageData, {
+        ...rest,
+        allowedEngines: stack.privacyModes.getPrivacyModeConfig(mode).allowedOcrEngines || undefined,
+      });
+    } catch (e) {
+      logger.error('ocr recognize failed:', e);
+      return { success: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle(CHANNELS.STACK.OCR_RESET_VISION, () => {
+    if (!stack) return { success: false };
+    stack.ocr.resetVisionFallback();
+    return { success: true };
   });
 
   logger.info('Translation-stack IPC handlers registered');

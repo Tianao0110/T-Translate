@@ -142,6 +142,8 @@ const CHANNELS = {
     CLEAR_CACHE: 'stack:clear-cache',
     CACHE_STATS: 'stack:cache-stats',
     CHANGED: 'stack:changed',                     // main → renderer: stack reloaded
+    OCR_RECOGNIZE: 'stack:ocr-recognize',         // allowedEngines injected main-side
+    OCR_RESET_VISION: 'stack:ocr-reset-vision',
   },
 };
 
