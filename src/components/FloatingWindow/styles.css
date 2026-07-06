@@ -220,6 +220,61 @@
   cursor: pointer;
 }
 
+/* Auto-refresh interval picker — same shell as the opacity popup */
+.refresh-popup {
+  position: absolute;
+  top: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  -webkit-app-region: no-drag;
+}
+
+.refresh-popup .opacity-label {
+  font-size: 12px;
+  color: var(--floating-text-muted);
+  white-space: nowrap;
+}
+
+.refresh-interval-btn {
+  min-width: 34px;
+  padding: 4px 8px;
+  font-size: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--floating-text-muted);
+  cursor: pointer;
+}
+
+.refresh-interval-btn:hover {
+  color: var(--floating-text);
+  border-color: var(--floating-accent);
+}
+
+.refresh-interval-btn.active {
+  background: var(--floating-accent);
+  border-color: var(--floating-accent);
+  color: var(--floating-on-accent, #fff);
+}
+
+/* Gentle rotation while auto-refresh runs — state cue, not a spinner */
+.spinning-slow {
+  animation: refresh-spin 3s linear infinite;
+}
+
+@keyframes refresh-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 .opacity-popup .opacity-value {
   font-size: 12px;
   color: var(--floating-text);

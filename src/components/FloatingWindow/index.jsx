@@ -315,6 +315,8 @@ const FloatingWindow = () => {
   };
 
   const handleClose = async () => {
+    setAutoRefresh(false);
+
     // Close detached child windows first so they don't outlive the parent
     try {
       await window.electron?.floatingWindow?.closeAllChildWindows?.();
@@ -335,8 +337,13 @@ const FloatingWindow = () => {
   // opacity popup) are excluded so their clicks keep working.
   const handleTitleBarMouseDown = (e) => {
     if (e.button !== 0) return;
-    if (e.target.closest('button, .floating-toolbar, .opacity-popup')) return;
+    if (e.target.closest('button, .floating-toolbar, .opacity-popup, .refresh-popup')) return;
     e.preventDefault();
+
+    // Dragging the window means the watched region is about to change —
+    // stop the auto-refresh loop (user re-arms it after repositioning).
+    setAutoRefresh(false);
+    setShowRefreshPicker(false);
 
     // Grab offset inside the window; window.screenX/Y and e.screenX/Y share the
     // same DIP coordinate space, matching BrowserWindow.setBounds.
@@ -398,6 +405,9 @@ const FloatingWindow = () => {
   // captures (space/button/global hotkey) force a fresh translate.
   const captureAndTranslate = useCallback(async ({ keepDedup = false } = {}) => {
     try {
+      // A manual capture (button/Space/global hotkey) takes over — stop the
+      // auto-refresh loop instead of fighting it.
+      if (!keepDedup) setAutoRefresh(false);
       if (!contentRef.current) return;
 
       const contentRect = contentRef.current.getBoundingClientRect();
@@ -419,31 +429,47 @@ const FloatingWindow = () => {
     }
   }, []);
 
-  // Auto-refresh: keep re-capturing the region on a timer so a live-updating
-  // area (Teams captions, video subtitles) stays translated hands-free. The
-  // timer path never touches focus, so the target app stays foreground and
-  // keeps showing its content. Paused while the window is hidden. Dedupe in
-  // the pipeline means an unchanged frame costs nothing.
-  const [autoRefresh, setAutoRefresh] = useState(() => {
-    try { return localStorage.getItem('floating-auto-refresh') === '1'; } catch { return false; }
+  // Auto-refresh: re-capture the region on a timer so a live-updating area
+  // (Teams captions, video subtitles) stays translated hands-free without the
+  // window ever taking focus. Flow per user spec: click the button → pick an
+  // interval → it starts; moving the window, a manual capture, or closing
+  // stops it (an explicit start each session, never auto-resumed). Silent
+  // dedupe in the pipeline means unchanged frames cost nothing and don't
+  // touch the UI. Intervals sized for OCR+LLM latency — 1.5s was faster than
+  // a full recognize+translate round trip.
+  const AUTO_REFRESH_INTERVALS = [2, 3, 5, 10];
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [showRefreshPicker, setShowRefreshPicker] = useState(false);
+  const [refreshInterval, setRefreshInterval] = useState(() => {
+    try {
+      const saved = parseInt(localStorage.getItem('floating-auto-refresh-interval'), 10);
+      return AUTO_REFRESH_INTERVALS.includes(saved) ? saved : 3;
+    } catch { return 3; }
   });
-  const AUTO_REFRESH_MS = 1500;
 
   useEffect(() => {
     if (!autoRefresh) return;
     const id = setInterval(() => {
       if (document.hidden) return; // window hidden — nothing to capture
       captureAndTranslate({ keepDedup: true });
-    }, AUTO_REFRESH_MS);
+    }, refreshInterval * 1000);
     return () => clearInterval(id);
-  }, [autoRefresh, captureAndTranslate]);
+  }, [autoRefresh, refreshInterval, captureAndTranslate]);
 
-  const toggleAutoRefresh = useCallback(() => {
-    setAutoRefresh((prev) => {
-      const next = !prev;
-      try { localStorage.setItem('floating-auto-refresh', next ? '1' : '0'); } catch { /* ignore */ }
-      return next;
-    });
+  // Button: running → stop; idle → open the interval picker.
+  const handleAutoRefreshClick = useCallback(() => {
+    if (autoRefresh) {
+      setAutoRefresh(false);
+    } else {
+      setShowRefreshPicker((prev) => !prev);
+    }
+  }, [autoRefresh]);
+
+  const startAutoRefresh = useCallback((seconds) => {
+    setRefreshInterval(seconds);
+    try { localStorage.setItem('floating-auto-refresh-interval', String(seconds)); } catch { /* ignore */ }
+    setShowRefreshPicker(false);
+    setAutoRefresh(true);
   }, []);
 
   // Global-hotkey re-capture: fires while another app holds focus, so the
@@ -609,11 +635,13 @@ const FloatingWindow = () => {
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                toggleAutoRefresh();
+                handleAutoRefreshClick();
               }}
-              title={t('floatingWindow.autoRefresh', '自动刷新（盯住区域循环截译，目标不失焦）')}
+              title={autoRefresh
+                ? t('floatingWindow.autoRefreshRunning', '自动刷新中（{{s}}s），点击停止', { s: refreshInterval })
+                : t('floatingWindow.autoRefresh', '自动刷新（盯住区域循环截译，目标不失焦）')}
             >
-              <RefreshCw size={12} />
+              <RefreshCw size={12} className={autoRefresh ? 'spinning-slow' : undefined} />
             </button>
 
             <button
@@ -658,6 +686,25 @@ const FloatingWindow = () => {
             onChange={handleOpacityChange}
           />
           <span className="opacity-value">{Math.round(floatingOpacity * 100)}%</span>
+        </div>
+      )}
+
+      {showRefreshPicker && (
+        <div className="refresh-popup" onMouseLeave={() => setShowRefreshPicker(false)}>
+          <span className="opacity-label">{t('floatingWindow.autoRefreshInterval', '刷新间隔')}</span>
+          {AUTO_REFRESH_INTERVALS.map((s) => (
+            <button
+              key={s}
+              className={`refresh-interval-btn ${s === refreshInterval ? 'active' : ''}`}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                startAutoRefresh(s);
+              }}
+            >
+              {s}s
+            </button>
+          ))}
         </div>
       )}
 

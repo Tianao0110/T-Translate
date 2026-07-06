@@ -249,6 +249,8 @@ const zh = {
     // Floating window strings
     captureSpace: "截图识别 (Space)", historyCtrlH: "历史记录 (Ctrl+H)",
     autoRefresh: "自动刷新（盯住区域循环截译，目标不失焦）",
+    autoRefreshRunning: "自动刷新中（{{s}}s），点击停止",
+    autoRefreshInterval: "刷新间隔",
     adjustOpacity: "点击调节透明度", closeEsc: "关闭 (Esc)",
     capturing: "截图中...", recognizing: "识别中...", translating: "翻译中...",
     captureHint: "点击 📷 或按 Space 截图识别",

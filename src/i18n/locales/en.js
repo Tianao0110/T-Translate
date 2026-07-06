@@ -249,6 +249,8 @@ const en = {
     // Floating window component strings
     captureSpace: "Screenshot (Space)", historyCtrlH: "History (Ctrl+H)",
     autoRefresh: "Auto-refresh (loop-capture a region, target keeps focus)",
+    autoRefreshRunning: "Auto-refreshing ({{s}}s), click to stop",
+    autoRefreshInterval: "Interval",
     adjustOpacity: "Adjust opacity", closeEsc: "Close (Esc)",
     capturing: "Capturing...", recognizing: "Recognizing...", translating: "Translating...",
     captureHint: "Click 📷 or press Space to capture",

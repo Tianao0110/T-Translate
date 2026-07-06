@@ -94,22 +94,26 @@ class TranslationPipeline {
     const session = useSessionStore.getState();
 
     try {
-      // Frozen panes survive; transient ones are cleared each capture cycle
-      session.clearChildPanes();
-
-      // Manual captures force a re-OCR even on a byte-identical frame. Auto-
-      // refresh (keepDedup) leaves the dedupe keys intact so an unchanged
-      // caption/subtitle doesn't re-OCR + re-translate every tick — only a
-      // changed region does real work.
+      // Auto-refresh ticks (keepDedup) run SILENTLY until content actually
+      // changes: no pane clearing, no "capturing" state, dedupe keys intact.
+      // The old behavior reset the UI every tick, which read as "it restarts
+      // recognition before the previous one finished". Manual captures keep
+      // the explicit feedback and force a re-OCR of identical frames.
       if (!captureOptions.keepDedup) {
+        // Frozen panes survive; transient ones are cleared each capture cycle
+        session.clearChildPanes();
         lastImageHash = '';
         lastText = '';
+        session.startCapture();
       }
-
-      session.startCapture();
 
       const captureResult = await window.electron?.floatingWindow?.captureRegion?.(captureOptions);
       if (!captureResult?.success) {
+        // A failed silent tick must not flash an error banner every interval.
+        if (captureOptions.keepDedup) {
+          logger.debug('Auto-refresh capture failed silently:', captureResult?.error);
+          return { success: false, skipped: true };
+        }
         throw new Error(captureResult?.error || _t('screenshot.failed', '截图失败'));
       }
 
@@ -142,6 +146,12 @@ class TranslationPipeline {
         return { success: true, skipped: true };
       }
       lastImageHash = imageKey;
+
+      // Silent tick just detected real change — NOW reset the transient panes
+      // (deferred from runFromCapture so unchanged ticks never touch the UI).
+      if (captureOptions.keepDedup) {
+        session.clearChildPanes();
+      }
 
       session.startOcr();
 
