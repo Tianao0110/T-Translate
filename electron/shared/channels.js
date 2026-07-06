@@ -127,6 +127,23 @@ const CHANNELS = {
     DELETE: 'secure-storage:delete',
     IS_AVAILABLE: 'secure-storage:isAvailable',
   },
+  // Main-process translation stack (facade in ipc/translation-stack.js).
+  // privacyMode/useCache never cross this boundary — the facade injects them.
+  STACK: {
+    TRANSLATE: 'stack:translate',
+    STREAM_START: 'stack:translate-stream-start',
+    STREAM_CHUNK: 'stack:stream-chunk',           // main → renderer push frames
+    ABORT: 'stack:abort',
+    CHAT: 'stack:chat',
+    TEST_PROVIDER: 'stack:test-provider',
+    TEST_PROVIDER_CONFIG: 'stack:test-provider-config',
+    PROVIDERS_STATUS: 'stack:providers-status',
+    CURRENT_PROVIDER: 'stack:current-provider',
+    RELOAD: 'stack:reload',
+    CLEAR_CACHE: 'stack:clear-cache',
+    CACHE_STATS: 'stack:cache-stats',
+    CHANGED: 'stack:changed',                     // main → renderer: stack reloaded
+  },
 };
 
 const MENU_ACTIONS = {

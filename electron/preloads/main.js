@@ -104,6 +104,32 @@ const electronAPI = {
     delete: (key) => ipcRenderer.invoke("secure-storage:delete", key),
     isAvailable: () => ipcRenderer.invoke("secure-storage:isAvailable"),
   },
+  // Main-process translation stack (services/stack-client.js is the consumer).
+  // No privacyMode/useCache here — the main-process facade injects them.
+  stack: {
+    translate: (payload) => ipcRenderer.invoke("stack:translate", payload),
+    streamStart: (payload) => ipcRenderer.invoke("stack:translate-stream-start", payload),
+    abort: (id) => ipcRenderer.invoke("stack:abort", { id }),
+    chat: (payload) => ipcRenderer.invoke("stack:chat", payload),
+    testProvider: (providerId) => ipcRenderer.invoke("stack:test-provider", { providerId }),
+    testProviderConfig: (providerId, config) =>
+      ipcRenderer.invoke("stack:test-provider-config", { providerId, config }),
+    providersStatus: () => ipcRenderer.invoke("stack:providers-status"),
+    currentProvider: () => ipcRenderer.invoke("stack:current-provider"),
+    reload: () => ipcRenderer.invoke("stack:reload"),
+    clearCache: (level) => ipcRenderer.invoke("stack:clear-cache", { level }),
+    cacheStats: () => ipcRenderer.invoke("stack:cache-stats"),
+    onStreamChunk: (callback) => {
+      const handler = (event, frame) => callback(frame);
+      ipcRenderer.on("stack:stream-chunk", handler);
+      return () => ipcRenderer.removeListener("stack:stream-chunk", handler);
+    },
+    onChanged: (callback) => {
+      const handler = () => callback();
+      ipcRenderer.on("stack:changed", handler);
+      return () => ipcRenderer.removeListener("stack:changed", handler);
+    },
+  },
   floatingWindow: {
     notifySettingsChanged: () => ipcRenderer.invoke("floating-window:notify-settings-changed"),
   },

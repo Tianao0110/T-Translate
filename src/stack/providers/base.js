@@ -103,4 +103,25 @@ export function getLanguageName(code) {
   return LANGUAGE_CODES[code]?.name || code;
 }
 
+// Fetch signal for providers with a fixed per-request timeout: combines the
+// caller's abort signal (facade requestId -> AbortController, P2-34) with the
+// provider's own timeout. Either firing cancels the HTTP request.
+export function combineSignal(external, timeoutMs) {
+  const timeout = AbortSignal.timeout(timeoutMs);
+  return external ? AbortSignal.any([external, timeout]) : timeout;
+}
+
+// For providers that manage their own AbortController (idle watchdogs):
+// propagate an external abort into it. The aborted-check matters — an abort
+// listener on an already-aborted signal never fires (fallback chain hands the
+// same signal to the NEXT provider after the first one died).
+export function linkAbort(external, controller) {
+  if (!external) return;
+  if (external.aborted) {
+    controller.abort();
+    return;
+  }
+  external.addEventListener('abort', () => controller.abort(), { once: true });
+}
+
 export default BaseProvider;

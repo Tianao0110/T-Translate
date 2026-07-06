@@ -11,6 +11,7 @@ const registerClipboardIPC = require('./clipboard');
 const registerFloatingWindowIPC = require('./floating-window');
 const registerSelectionIPC = require('./selection');
 const registerSecureStorageIPC = require('./secure-storage');
+const registerTranslationStackIPC = require('./translation-stack');
 const registerOcrIPC = require('./ocr');
 const registerPrivacyIPC = require('./privacy');
 const { registerThemeIPC } = require('./theme');
@@ -67,6 +68,9 @@ function initIPC(deps) {
 
   registerSelectionIPC(context);
   registerSecureStorageIPC(context);
+
+  // Before privacy: its handlers notify the stack on mode switches via this hook.
+  context.stackHooks = registerTranslationStackIPC(context) || {};
 
   registerOcrIPC(context);
   registerPrivacyIPC(context);

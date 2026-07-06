@@ -123,6 +123,33 @@ describe('stack TranslationService', () => {
     expect(l2.set).toHaveBeenCalled();
   });
 
+  it('external abort interrupts the in-flight provider fetch (P2-34)', async () => {
+    let firstSignal;
+    const fetchMock = vi.fn((url, opts) => new Promise((resolve, reject) => {
+      const fail = () => {
+        const e = new Error('aborted');
+        e.name = 'AbortError';
+        reject(e);
+      };
+      if (!firstSignal) firstSignal = opts.signal;
+      if (opts.signal.aborted) return fail();
+      opts.signal.addEventListener('abort', fail, { once: true });
+    }));
+    configureRuntime({ fetch: fetchMock });
+
+    const svc = makeService(makeFakeL2());
+    await svc.init(SETTINGS);
+
+    const ac = new AbortController();
+    const pending = svc.translate('slow text', { signal: ac.signal });
+    await new Promise(r => setTimeout(r, 20)); // let the first fetch start
+    ac.abort();
+
+    const result = await pending;
+    expect(result.success).toBe(false);
+    expect(firstSignal.aborted).toBe(true); // the HTTP request itself was cancelled
+  });
+
   it('testProviderWithConfig is blocked by offline mode before any network', async () => {
     const fetchMock = vi.fn();
     configureRuntime({ fetch: fetchMock });

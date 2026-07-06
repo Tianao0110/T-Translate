@@ -10,7 +10,7 @@
 //   - fieldAdapter                         → normalize config (e.g. baseUrl → endpoint)
 //   - testConnectionMessage                → custom success message
 
-import { BaseProvider, LANGUAGE_CODES } from './base.js';
+import { BaseProvider, LANGUAGE_CODES, combineSignal, linkAbort } from './base.js';
 import { _t } from '../i18n.js';
 import { rtFetch } from '../runtime.js';
 import createLogger from '../logger.js';
@@ -78,7 +78,7 @@ class OpenAICompatibleProvider extends BaseProvider {
     try {
       const messages = this._buildMessages(text, targetLang, options);
 
-      const response = await this._chatCompletion(messages);
+      const response = await this._chatCompletion(messages, options.signal);
 
       if (response.success && response.content) {
         return { success: true, text: response.content.trim() };
@@ -106,7 +106,7 @@ class OpenAICompatibleProvider extends BaseProvider {
       await this._chatCompletionStream(messages, (chunk) => {
         fullText += chunk;
         if (onChunk) onChunk(chunk);
-      });
+      }, options.signal);
 
       return { success: true, text: fullText.trim() };
     } catch (error) {
@@ -221,7 +221,7 @@ class OpenAICompatibleProvider extends BaseProvider {
           ...(options.max_tokens ? { max_tokens: options.max_tokens } : {}),
           stream: false,
         }),
-        signal: AbortSignal.timeout(this.config.timeout || 30000),
+        signal: combineSignal(options.signal, this.config.timeout || 30000),
       });
 
       if (!response.ok) {
@@ -315,10 +315,12 @@ class OpenAICompatibleProvider extends BaseProvider {
   /**
    * Chat completion (non-streaming)
    */
-  async _chatCompletion(messages) {
+  async _chatCompletion(messages, extSignal) {
     await this._ensureModel();
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
+    // External abort (facade requestId mapping, P2-34) cancels the same controller
+    linkAbort(extSignal, controller);
 
     try {
       const response = await rtFetch(`${this.config.endpoint}/chat/completions`, {
@@ -359,11 +361,13 @@ class OpenAICompatibleProvider extends BaseProvider {
   /**
    * Chat completion (streaming)
    */
-  async _chatCompletionStream(messages, onChunk) {
+  async _chatCompletionStream(messages, onChunk, extSignal) {
     await this._ensureModel();
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
     let idleTimer = null;
+    // External abort (facade requestId mapping, P2-34) cancels the same controller
+    linkAbort(extSignal, controller);
 
     try {
       const response = await rtFetch(`${this.config.endpoint}/chat/completions`, {

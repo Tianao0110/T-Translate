@@ -2,7 +2,7 @@
 // Stack port of src/providers/anthropic/index.js — metadata from the shared
 // table, network via rtFetch; logic byte-identical.
 
-import { BaseProvider, LANGUAGE_CODES, _t } from './base.js';
+import { BaseProvider, LANGUAGE_CODES, _t, combineSignal, linkAbort } from './base.js';
 import { PROVIDER_METADATA } from './metadata.js';
 import { rtFetch } from '../runtime.js';
 import createLogger from '../logger.js';
@@ -76,7 +76,7 @@ class AnthropicProvider extends BaseProvider {
         method: 'POST',
         headers: this._buildHeaders(),
         body: this._buildBody(text, systemPrompt),
-        signal: AbortSignal.timeout(this.config.timeout),
+        signal: combineSignal(options.signal, this.config.timeout),
       });
 
       if (!response.ok) {
@@ -130,6 +130,8 @@ class AnthropicProvider extends BaseProvider {
         idleTimer = setTimeout(() => controller.abort(), this.config.timeout);
       };
       resetIdle();
+      // External abort (facade requestId mapping, P2-34) cancels the same controller
+      linkAbort(options.signal, controller);
 
       let response;
       try {

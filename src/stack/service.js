@@ -397,6 +397,7 @@ export class TranslationService {
       privacyMode = PRIVACY_MODE_IDS.STANDARD,
       useCache = true,
       glossaryTerms = [],
+      signal = undefined,
     } = options;
 
     const { processed, protectedMap } = this._preProcess(text);
@@ -448,6 +449,7 @@ export class TranslationService {
         const result = await provider.translate(processed, sourceLang, targetLang, {
           systemPrompt,
           template,
+          signal,
         });
 
         if (result.success) {
@@ -532,6 +534,7 @@ export class TranslationService {
       privacyMode = PRIVACY_MODE_IDS.STANDARD,
       useCache = true,
       glossaryTerms = [],
+      signal = undefined,
     } = options;
 
     const { processed, protectedMap } = this._preProcess(text);
@@ -607,7 +610,7 @@ export class TranslationService {
                 fullText += chunk;
                 if (onChunk) throttle.schedule();
               },
-              { systemPrompt, template }
+              { systemPrompt, template, signal }
             );
           } finally {
             // A flush firing after the final result is applied downstream
@@ -654,6 +657,7 @@ export class TranslationService {
           const result = await provider.translate(processed, sourceLang, targetLang, {
             systemPrompt,
             template,
+            signal,
           });
 
           if (result.success) {

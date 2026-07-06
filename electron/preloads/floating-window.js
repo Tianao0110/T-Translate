@@ -83,6 +83,32 @@ contextBridge.exposeInMainWorld('electron', {
     isAvailable: () => ipcRenderer.invoke('secure-storage:isAvailable'),
   },
 
+  // Main-process translation stack (same bridge as the main-window preload).
+  stack: {
+    translate: (payload) => ipcRenderer.invoke('stack:translate', payload),
+    streamStart: (payload) => ipcRenderer.invoke('stack:translate-stream-start', payload),
+    abort: (id) => ipcRenderer.invoke('stack:abort', { id }),
+    chat: (payload) => ipcRenderer.invoke('stack:chat', payload),
+    testProvider: (providerId) => ipcRenderer.invoke('stack:test-provider', { providerId }),
+    testProviderConfig: (providerId, config) =>
+      ipcRenderer.invoke('stack:test-provider-config', { providerId, config }),
+    providersStatus: () => ipcRenderer.invoke('stack:providers-status'),
+    currentProvider: () => ipcRenderer.invoke('stack:current-provider'),
+    reload: () => ipcRenderer.invoke('stack:reload'),
+    clearCache: (level) => ipcRenderer.invoke('stack:clear-cache', { level }),
+    cacheStats: () => ipcRenderer.invoke('stack:cache-stats'),
+    onStreamChunk: (callback) => {
+      const handler = (event, frame) => callback(frame);
+      ipcRenderer.on('stack:stream-chunk', handler);
+      return () => ipcRenderer.removeListener('stack:stream-chunk', handler);
+    },
+    onChanged: (callback) => {
+      const handler = () => callback();
+      ipcRenderer.on('stack:changed', handler);
+      return () => ipcRenderer.removeListener('stack:changed', handler);
+    },
+  },
+
   clipboard: {
     writeText: (text) => ipcRenderer.invoke('clipboard:write-text', text),
     readText: () => ipcRenderer.invoke('clipboard:read-text'),

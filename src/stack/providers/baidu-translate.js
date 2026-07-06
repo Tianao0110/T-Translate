@@ -5,7 +5,7 @@
 // shared table, network via rtFetch; the MD5 reference impl is untouched (any
 // change breaks the request signature).
 
-import { BaseProvider, _t } from './base.js';
+import { BaseProvider, _t, combineSignal } from './base.js';
 import { PROVIDER_METADATA } from './metadata.js';
 import { rtFetch } from '../runtime.js';
 import createLogger from '../logger.js';
@@ -141,7 +141,7 @@ class BaiduTranslateProvider extends BaseProvider {
     return hex(md51(utf8));
   }
 
-  async translate(text, sourceLang = 'auto', targetLang = 'zh') {
+  async translate(text, sourceLang = 'auto', targetLang = 'zh', options = {}) {
     if (!text?.trim()) {
       return { success: false, error: _t('providerError.emptyText', '文本为空') };
     }
@@ -182,7 +182,7 @@ class BaiduTranslateProvider extends BaseProvider {
                 body: params,
               }
             : {}),
-          signal: AbortSignal.timeout(this.config.timeout),
+          signal: combineSignal(options.signal, this.config.timeout),
         }
       );
 

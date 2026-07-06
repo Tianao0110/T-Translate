@@ -2,7 +2,7 @@
 // Stack port of src/providers/gemini/index.js — metadata from the shared table,
 // network via rtFetch; logic byte-identical.
 
-import { BaseProvider, LANGUAGE_CODES, _t } from './base.js';
+import { BaseProvider, LANGUAGE_CODES, _t, combineSignal } from './base.js';
 import { PROVIDER_METADATA } from './metadata.js';
 import { rtFetch } from '../runtime.js';
 import createLogger from '../logger.js';
@@ -108,7 +108,7 @@ class GeminiProvider extends BaseProvider {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(requestBody),
-          signal: AbortSignal.timeout(this.config.timeout),
+          signal: combineSignal(options.signal, this.config.timeout),
         }
       );
 

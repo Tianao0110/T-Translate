@@ -2,7 +2,7 @@
 // Stack port of src/providers/deepl/index.js — metadata from the shared table,
 // network via rtFetch; logic byte-identical.
 
-import { BaseProvider, _t } from './base.js';
+import { BaseProvider, _t, combineSignal } from './base.js';
 import { PROVIDER_METADATA } from './metadata.js';
 import { rtFetch } from '../runtime.js';
 
@@ -67,7 +67,7 @@ class DeepLProvider extends BaseProvider {
     return mapping[code] ?? null;
   }
 
-  async translate(text, sourceLang = 'auto', targetLang = 'zh') {
+  async translate(text, sourceLang = 'auto', targetLang = 'zh', options = {}) {
     if (!text?.trim()) {
       return { success: false, error: _t('providerError.emptyText', '文本为空') };
     }
@@ -108,7 +108,7 @@ class DeepLProvider extends BaseProvider {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: params,
-        signal: AbortSignal.timeout(15000),
+        signal: combineSignal(options.signal, 15000),
       });
 
       if (response.status === 403) {

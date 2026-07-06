@@ -3,7 +3,7 @@
 // Stack port of src/providers/microsoft-translator/index.js — metadata from the
 // shared table, network via rtFetch; logic byte-identical.
 
-import { BaseProvider, _t } from './base.js';
+import { BaseProvider, _t, combineSignal } from './base.js';
 import { PROVIDER_METADATA } from './metadata.js';
 import { rtFetch } from '../runtime.js';
 import createLogger from '../logger.js';
@@ -57,7 +57,7 @@ class MicrosoftTranslatorProvider extends BaseProvider {
     return mapping[code] || code;
   }
 
-  async translate(text, sourceLang = 'auto', targetLang = 'zh') {
+  async translate(text, sourceLang = 'auto', targetLang = 'zh', options = {}) {
     if (!text?.trim()) {
       return { success: false, error: _t('providerError.emptyText', '文本为空') };
     }
@@ -93,7 +93,7 @@ class MicrosoftTranslatorProvider extends BaseProvider {
           headers,
           // Body is an array — Azure supports batch in one call
           body: JSON.stringify([{ Text: text }]),
-          signal: AbortSignal.timeout(this.config.timeout),
+          signal: combineSignal(options.signal, this.config.timeout),
         }
       );
 
