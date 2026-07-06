@@ -34,8 +34,8 @@
     "electron",
     "react"
   ],
-  "author": "",
-  "license": "MIT",
+  "author": "Edan Zeng (https://github.com/Tianao0110)",
+  "license": "SEE LICENSE IN LICENSE",
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@testing-library/dom": "^10.4.1",

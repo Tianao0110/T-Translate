@@ -1,0 +1,43 @@
+# NOTICE — 第三方组件协议清单 / Third-Party Components
+
+T-Translate 本体按仓库根目录 LICENSE（T-Translate 许可协议 1.0）授权。
+以下第三方开源组件按其各自原协议授权，不受本项目协议约束：
+
+T-Translate itself is licensed under the T-Translate License 1.0 (see
+LICENSE). The following third-party components remain under their own
+licenses:
+
+## 运行时依赖 / Runtime dependencies
+
+| Component            | License                      |
+| -------------------- | ---------------------------- |
+| @napi-rs/canvas      | MIT                          |
+| dayjs                | MIT                          |
+| electron-log         | MIT                          |
+| electron-store       | MIT                          |
+| electron-updater     | MIT                          |
+| esearch-ocr          | Apache-2.0                   |
+| i18next              | MIT                          |
+| immer                | MIT                          |
+| jszip                | MIT (of MIT OR GPL-3.0 dual) |
+| koffi                | MIT                          |
+| lucide-react         | ISC                          |
+| mammoth              | BSD-2-Clause                 |
+| node-screenshots     | Apache-2.0                   |
+| onnxruntime-node     | MIT                          |
+| pdfjs-dist           | Apache-2.0                   |
+| react / react-dom    | MIT                          |
+| react-i18next        | MIT                          |
+| uiohook-napi         | MIT                          |
+| uuid                 | MIT                          |
+| zustand              | MIT                          |
+
+## 框架与模型 / Framework & models
+
+| Component                          | License    |
+| ---------------------------------- | ---------- |
+| Electron                           | MIT        |
+| PP-OCR 系列模型（PaddleOCR 项目）  | Apache-2.0 |
+
+完整依赖树各包的协议以其 node_modules/<pkg>/LICENSE 为准。
+For the full dependency tree, each package's own LICENSE file governs.

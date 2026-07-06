@@ -15,7 +15,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-0.3.1-green" alt="Version">
-  <img src="https://img.shields.io/badge/license-MIT-blue" alt="License">
+  <img src="https://img.shields.io/badge/license-T--Translate%201.0-blue" alt="License">
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform">
 </p>
 
@@ -194,10 +194,16 @@ Issues and pull requests are welcome.
 
 ## License
 
-[MIT License](LICENSE)
+[T-Translate License 1.0](LICENSE) (source-available; the Chinese text prevails) — in three lines:
+
+- **Use and modify freely**: personal / team / commercial use, modification, and distribution are all free of charge
+- **Free forever**: the software and any modified version containing its code (including features added by modifiers) may not be monetized in any form — no selling, paid downloads, in-app purchases, pay-to-unlock, or paywalled sharing; for commercial sale, [contact the author](https://github.com/Tianao0110/T-Translate) for a separate license
+- **Keep attribution**: modified versions must be marked "modified from T-Translate" with a link to the original project, and may not be claimed as original work
+
+Monetized tutorials/reviews, paid deployment/consulting services, and voluntary donations (not gating features) are all fine. Third-party dependencies remain under their own licenses (see [NOTICE](NOTICE)). Versions up to v0.3.0 were released under MIT and remain unaffected.
 
 ---
 
 <p align="center">
-  Made with ❤️ by <a href="https://github.com/Tianao0110">Tianao</a>
+  Made with ❤️ by <a href="https://github.com/Tianao0110">Edan Zeng</a>
 </p>

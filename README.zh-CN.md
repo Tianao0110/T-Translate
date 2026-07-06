@@ -15,7 +15,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-0.3.1-green" alt="Version">
-  <img src="https://img.shields.io/badge/license-MIT-blue" alt="License">
+  <img src="https://img.shields.io/badge/license-T--Translate%201.0-blue" alt="License">
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform">
 </p>
 
@@ -194,10 +194,16 @@ t-translate/
 
 ## 许可证
 
-[MIT License](LICENSE)
+[T-Translate 许可协议 1.0](LICENSE)（源码开放，中文文本为准）——三句话版本：
+
+- **随便用、随便改**：个人 / 团队 / 商业环境使用、修改、分发全部免费
+- **永远免费**：本软件及任何包含其代码的修改版（含修改者新增的功能）不得以任何形式收费——禁止售卖、收费下载、内购、打赏解锁、收费分享；商业售卖请[联系作者](https://github.com/Tianao0110/T-Translate)洽谈授权
+- **保留署名**：修改版须标明"基于 T-Translate 修改"并附原项目地址，不得声称原创
+
+教程/评测内容变现、有偿部署等技术服务、不与功能挂钩的自愿捐赠均不受限制。第三方依赖按各自原协议授权（见 [NOTICE](NOTICE)）。v0.3.0 及更早版本按当时的 MIT 协议发布不受影响。
 
 ---
 
 <p align="center">
-  Made with ❤️ by <a href="https://github.com/Tianao0110">Tianao</a>
+  Made with ❤️ by <a href="https://github.com/Tianao0110">Edan Zeng</a>
 </p>

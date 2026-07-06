@@ -1,0 +1,124 @@
+T-Translate 许可协议 1.0 / T-Translate License 1.0
+
+版权所有 (c) 2026 Edan Zeng (github.com/Tianao0110)
+Copyright (c) 2026 Edan Zeng (github.com/Tianao0110)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+中文条款（本协议以中文文本为准）
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+第一条 授权范围
+在遵守本协议全部条款的前提下，任何个人、团队或商业组织均可免费、永久地：
+  1. 使用本软件（包括在商业环境中使用）；
+  2. 复制与分发本软件；
+  3. 修改本软件并分发修改版。
+
+第二条 署名与出处
+  1. 分发本软件或其修改版时，必须完整保留本协议文本与上述版权声明；
+  2. 修改版必须显著标明「基于 T-Translate 修改，非原版」，并附原项目地址
+     https://github.com/Tianao0110/T-Translate ；
+  3. 不得声称本软件或其修改版为原创作品，不得移除或篡改原作者署名。
+
+第三条 禁止售卖（核心条款）
+本软件以及任何包含本软件代码的修改版、衍生版，整体及其全部功能——包括
+修改者自行新增的功能——必须永久免费提供。禁止以任何直接或间接形式将其
+变为收费对象，包括但不限于：
+  1. 出售软件本体，或对下载、获取行为收费；
+  2. 内购、订阅、打赏解锁，或以任何名义付费解锁功能；
+  3. 通过收费网盘、收费教程、收费社群等捆绑方式变相收费提供软件；
+  4. 预装收费、更名换皮转售、以「优化版 / 增强版 / 专业版」等名义售卖。
+说明：新增功能同样受本条约束。若希望对基于本软件的创新收费，可依第九条
+洽谈商业授权，或将该创新实现为不包含本软件代码的独立软件（独立软件不受
+本协议约束）。
+
+第四条 允许的商业行为
+以下行为不受第三条限制：
+  1. 在商业环境中使用本软件（企业内部使用、处理商业内容等）；
+  2. 制作关于本软件的教程、评测、视频等内容并获得广告等收益，
+     前提是软件本体保持免费可得；
+  3. 提供与本软件相关的有偿技术服务（部署、维护、定制开发等人工服务费）；
+  4. 接受自愿捐赠，但捐赠不得与任何功能解锁挂钩。
+
+第五条 贡献
+向本项目提交的任何贡献（代码、文档、翻译等），视为贡献者同意该贡献按
+本协议授权。
+
+第六条 第三方组件
+本软件依赖的第三方开源组件按其各自原协议授权（清单见 NOTICE 文件），
+不受本协议约束。
+
+第七条 免责声明
+本软件按「现状」提供，不附带任何明示或默示的担保，包括但不限于对适销性、
+特定用途适用性及不侵权的担保。在任何情况下，作者均不对因使用或无法使用
+本软件而产生的任何索赔、损害或其他责任负责。使用者自行配置的第三方 API
+服务所产生的费用、数据传输与合规责任，由使用者自行承担。
+
+第八条 违约与终止
+违反本协议任何条款，本协议授予的一切权利即自动终止。
+
+第九条 商业授权
+如需超出本协议范围的授权（包括商业售卖），请通过原项目仓库
+https://github.com/Tianao0110/T-Translate 联系作者另行洽谈。
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+English Translation (for reference only; the Chinese text prevails)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Grant
+Subject to full compliance with this license, any individual, team, or
+commercial organization may, free of charge and perpetually: (a) use the
+Software, including in commercial environments; (b) copy and distribute
+the Software; (c) modify the Software and distribute modified versions.
+
+2. Attribution
+(a) This license text and the copyright notice above must be retained in
+all distributions; (b) modified versions must be prominently marked as
+"modified from T-Translate, not the original", with a link to
+https://github.com/Tianao0110/T-Translate ; (c) claiming the Software or
+a modified version as one's own original work, or removing/altering the
+author attribution, is prohibited.
+
+3. No Selling (core term)
+The Software, and any modified or derivative version containing any of
+its code, must remain free of charge as a whole — including features
+newly added by the modifier. Turning it into a paid offering, directly
+or indirectly, is prohibited, including but not limited to: selling the
+software or charging for downloads; in-app purchases, subscriptions, or
+pay-to-unlock features under any name; bundling it behind paid file
+hosting, paid tutorials, or paid communities; preinstall-for-a-fee or
+rebranded resale ("optimized/enhanced/pro" editions).
+Note: to charge for innovations built on this Software, seek a commercial
+license under Section 9, or implement the innovation as standalone
+software containing none of this Software's code.
+
+4. Permitted commercial activities
+Not restricted by Section 3: (a) using the Software in commercial
+environments; (b) monetized tutorials/reviews/videos about the Software,
+provided the Software itself remains freely available; (c) paid technical
+services (deployment, maintenance, custom development labor); (d)
+voluntary donations, provided no feature is gated behind them.
+
+5. Contributions
+Any contribution submitted to this project is deemed licensed under this
+license by its contributor.
+
+6. Third-party components
+Third-party open-source components remain under their own licenses (see
+NOTICE) and are not covered by this license.
+
+7. Disclaimer
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY ARISING FROM THE USE OF OR INABILITY TO USE THE SOFTWARE.
+Costs and compliance obligations of third-party API services configured
+by the user are the user's own responsibility.
+
+8. Termination
+Any violation of this license automatically terminates all rights
+granted herein.
+
+9. Commercial licensing
+For rights beyond this license (including commercial sale), contact the
+author via https://github.com/Tianao0110/T-Translate .
