@@ -8,14 +8,9 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 - OCR 模型热更新只改 `ocr-models` Release 资产（bump manifest version 即可，无需发版），维护手册见 [docs/OCR_MODELS.md](docs/OCR_MODELS.md)
 - 语言包 rec 模型目前 v4 代际；上游出 v5 多语言 ONNX 后按 OCR_MODELS.md「更新模型」流程换入
 
-## v0.3.1 发版清单（本次）
+## 下一版本候选
 
-1. 合并 `feat/main-process-stack`（用户执行，--no-ff；11 提交 = 下沉批0-4 + 三个修复批 + 悬浮窗零焦点截取两批；CHANGELOG v0.3.1 条目已在分支上）
-2. 发版前抽查（大部分回归已过：主窗/两窗/OCR 全链均用户实测通过）：三隐私模式各截译一次、悬浮窗自动刷新+全局键 Ctrl+Alt+Space 实景、如有代理环境补一次云 provider 冒烟（design doc §4.4 全矩阵备查）
-3. `npm run dist` → Release 三件套（exe + blockmap + latest.yml）；**本版未动 OCR 模型，无需 ocr:release**
-4. CHANGELOG 删"待发布"补日期
-
-### 下沉专项批5 · 旧栈清理净删（留下一版本；须 v0.3.1 稳定一个回归周期后）
+### 下沉专项批5 · 旧栈清理净删（须 v0.3.1 稳定一个回归周期后，2026-07-06 发布起算）
 
 批0-4 已随 v0.3.1 交付（三窗+OCR 已全走主进程栈，旧渲染端栈零消费者留位回滚保险）。批5 范围（design doc §4.1 + mainproc-migration-design 记忆有细节）：
 - 删旧栈：src/services/translation.js、cache.js、providers/* 运行时类（metadata 收敛为直接 import stack 共享表 + icons 集中）、providers/ocr/ 全目录、services/index.js 死桶
