@@ -1,14 +1,11 @@
 // Floating-window translation pipeline: capture -> OCR -> (scattered or unified) -> translate.
 // Owns dedupe-by-hash, target-language flip, and child-pane lifecycle.
 
-import { ocrManager } from '../providers/ocr/index.js';
-import translationService from './translation.js';
+import translationService from './stack-client.js';
 import useSessionStore, { DISPLAY_MODE, CHILD_PANE_STATUS } from '../stores/session.js';
 import useConfigStore from '../stores/config.js';
 import { calculateHash } from '../utils/image.js';
 import { detectLanguage, cleanTranslationOutput, shouldTranslateText } from '../utils/text.js';
-import { getPrivacyModeConfig, PRIVACY_MODE_IDS } from '../config/privacy-modes.js';
-import { decryptOcrSecrets } from '../utils/ocr-key-vault.js';
 import createLogger from '../utils/logger.js';
 import { getShortErrorMessage } from '../utils/error-handler.js';
 import i18n from '../i18n.js';
@@ -23,17 +20,6 @@ const _t = (key, fallback) => {
 let lastImageHash = '';
 let lastText = '';
 let captureInFlight = false;
-
-async function getPrivacyMode() {
-  try {
-    if (window.electron?.privacy?.getMode) {
-      return await window.electron.privacy.getMode();
-    }
-  } catch (e) {
-    logger.debug('Failed to get privacy mode from main:', e.message);
-  }
-  return PRIVACY_MODE_IDS.STANDARD;
-}
 
 // Forward a floating-window translation into the main window's history store.
 // The old session.addToHistory only wrote an in-memory list nothing read, so
@@ -91,46 +77,9 @@ function shouldUseScatteredMode(blocks) {
 }
 
 class TranslationPipeline {
-  constructor() {
-    this._initialized = false;
-  }
-
-  async init() {
-    if (this._initialized) return;
-
-    logger.debug('Initializing...');
-
-    // init takes the flat settings.ocr bucket (same contract as updateConfigs)
-    // — the old per-engine shape was silently discarded by _buildConfigs, so
-    // online-engine keys and the llm-vision endpoint never arrived here.
-    let ocrSettings = {};
-    try {
-      const settings = await window.electron?.store?.get?.('settings') || {};
-      ocrSettings = await decryptOcrSecrets(settings.ocr || {});
-    } catch (e) {
-      logger.debug('Failed to read settings for OCR init:', e);
-    }
-
-    const config = useConfigStore.getState();
-    // ocrSettings.llmEndpoint feeds the LLM-Vision engine (see _buildConfigs).
-    await ocrManager.init({ ...ocrSettings, llmEndpoint: ocrSettings.llmEndpoint });
-    ocrManager.setPriority(config.ocrPriority);
-
-    this._initialized = true;
-    logger.debug('Initialized');
-  }
-
-  // Re-feed engine configs after a settings save — the floating window is
-  // persistent (hide, not close), so _initialized alone would pin stale keys.
-  async refreshOcrConfigs() {
-    try {
-      const settings = await window.electron?.store?.get?.('settings') || {};
-      // decrypted ocr bucket already carries llmEndpoint.
-      ocrManager.updateConfigs(await decryptOcrSecrets(settings.ocr || {}));
-    } catch (e) {
-      logger.debug('OCR config refresh failed:', e);
-    }
-  }
+  // No init/refreshOcrConfigs anymore: OCR engines, their configs (with vault
+  // secrets), and settings-save reloads all live in the main-process stack —
+  // this persistent window can't pin stale keys by construction.
 
   async runFromCapture(captureOptions = {}) {
     // Single-flight: a second capture while one is running would un-hide the
@@ -145,17 +94,26 @@ class TranslationPipeline {
     const session = useSessionStore.getState();
 
     try {
-      // Frozen panes survive; transient ones are cleared each capture cycle
-      session.clearChildPanes();
-
-      // Force re-OCR even if the image is byte-identical to last cycle
-      lastImageHash = '';
-      lastText = '';
-
-      session.startCapture();
+      // Auto-refresh ticks (keepDedup) run SILENTLY until content actually
+      // changes: no pane clearing, no "capturing" state, dedupe keys intact.
+      // The old behavior reset the UI every tick, which read as "it restarts
+      // recognition before the previous one finished". Manual captures keep
+      // the explicit feedback and force a re-OCR of identical frames.
+      if (!captureOptions.keepDedup) {
+        // Frozen panes survive; transient ones are cleared each capture cycle
+        session.clearChildPanes();
+        lastImageHash = '';
+        lastText = '';
+        session.startCapture();
+      }
 
       const captureResult = await window.electron?.floatingWindow?.captureRegion?.(captureOptions);
       if (!captureResult?.success) {
+        // A failed silent tick must not flash an error banner every interval.
+        if (captureOptions.keepDedup) {
+          logger.debug('Auto-refresh capture failed silently:', captureResult?.error);
+          return { success: false, skipped: true };
+        }
         throw new Error(captureResult?.error || _t('screenshot.failed', '截图失败'));
       }
 
@@ -189,14 +147,20 @@ class TranslationPipeline {
       }
       lastImageHash = imageKey;
 
+      // Silent tick just detected real change — NOW reset the transient panes
+      // (deferred from runFromCapture so unchanged ticks never touch the UI).
+      if (captureOptions.keepDedup) {
+        session.clearChildPanes();
+      }
+
       session.startOcr();
 
-      // Mode fetched before OCR, not at translate time — screen captures are
-      // the most privacy-sensitive input and must respect the engine allowlist.
-      const privacyMode = await getPrivacyMode();
-      const ocrResult = await ocrManager.recognize(imageData, {
+      // Engine allowlist is injected by the main-process facade from the live
+      // privacy mode; priority is per-request now (a shared manager instance
+      // must not inherit this window's ordering globally).
+      const ocrResult = await translationService.ocr.recognize(imageData, {
         engine: config.ocrEngine,
-        allowedEngines: getPrivacyModeConfig(privacyMode).allowedOcrEngines || undefined,
+        priority: config.ocrPriority,
       });
 
       if (!ocrResult.success) {
@@ -299,11 +263,6 @@ class TranslationPipeline {
       const createdPanes = session.setChildPanes(validBlocks);
       session.setStatus('translating');
 
-      const privacyMode = await getPrivacyMode();
-      // Secure mode must not leave screen-capture text in the L1 cache of
-      // this persistent window (L2 is already gated service-side).
-      const useCache = privacyMode !== PRIVACY_MODE_IDS.SECURE;
-
       // Cap concurrency: more than 2 concurrent LLM calls causes UI jank on
       // typical local setups (each call ties up the GPU briefly)
       const CONCURRENCY_LIMIT = 2;
@@ -332,12 +291,13 @@ class TranslationPipeline {
             targetLang = targetLang === 'zh' ? 'en' : 'zh';
           }
 
+          // Privacy fields no longer travel from here — the main-process
+          // facade injects the live mode (SECURE keeps screen-capture text out
+          // of every cache layer at the single enforcement point).
           const result = await translationService.translate(text, {
             sourceLang,
             targetLang,
             mode: 'normal',
-            privacyMode,
-            useCache,
           });
 
           if (result.success && result.text) {
@@ -410,18 +370,10 @@ class TranslationPipeline {
 
       const mode = options.mode || 'normal';
 
-      const privacyMode = await getPrivacyMode();
-
-      if (privacyMode === PRIVACY_MODE_IDS.OFFLINE) {
-        logger.debug('Offline mode - using local-llm only');
-      }
-
       const result = await translationService.translate(text, {
         sourceLang,
         targetLang,
         mode,
-        privacyMode,
-        useCache: privacyMode !== PRIVACY_MODE_IDS.SECURE,
       });
 
       if (!result.success) {

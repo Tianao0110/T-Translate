@@ -2,46 +2,15 @@
 
 import { BaseProvider, LANGUAGE_CODES, _t } from '../base.js';
 import icon from './icon.svg';
+import { PROVIDER_METADATA } from '../../stack/providers/metadata.js';
 import createLogger from '../../utils/logger.js';
 
 const logger = createLogger('Anthropic');
 
 class AnthropicProvider extends BaseProvider {
 
-  static metadata = {
-    id: 'anthropic',
-    name: 'Anthropic Claude',
-    description: 'Claude AI, extremely high translation quality',
-    icon: icon,
-    color: '#d4a27f',
-    type: 'llm',
-    helpUrl: 'https://console.anthropic.com/settings/keys',
-
-    configSchema: {
-      apiKey: {
-        type: 'password',
-        label: 'API Key',
-        default: '',
-        required: true,
-        placeholder: 'sk-ant-...',
-        encrypted: true,
-      },
-      model: {
-        type: 'text',
-        label: 'Model',
-        default: 'claude-sonnet-4-20250514',
-        required: false,
-        placeholder: 'claude-sonnet-4-20250514',
-      },
-      baseUrl: {
-        type: 'text',
-        label: 'API Endpoint',
-        default: 'https://api.anthropic.com',
-        required: false,
-        placeholder: 'https://api.anthropic.com',
-      },
-    },
-  };
+  // Shared table (single source with the main-process stack) + renderer icon
+  static metadata = { ...PROVIDER_METADATA['anthropic'], icon };
 
   constructor(config = {}) {
     super({

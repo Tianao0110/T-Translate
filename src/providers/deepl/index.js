@@ -2,34 +2,12 @@
 
 import { BaseProvider, _t } from '../base.js';
 import icon from './icon.svg';
+import { PROVIDER_METADATA } from '../../stack/providers/metadata.js';
 
 class DeepLProvider extends BaseProvider {
 
-  static metadata = {
-    id: 'deepl',
-    name: 'DeepL',
-    description: 'Professional translation API, excellent quality',
-    icon: icon,
-    color: '#0f2b46',
-    type: 'api',
-    helpUrl: 'https://www.deepl.com/pro-api',
-
-    configSchema: {
-      apiKey: {
-        type: 'password',
-        label: 'API Key',
-        required: true,
-        placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx:fx',
-        encrypted: true,
-      },
-      useFreeApi: {
-        type: 'checkbox',
-        label: 'Use Free API (Key ending with :fx)',
-        default: true,
-        required: false,
-      },
-    },
-  };
+  // Shared table (single source with the main-process stack) + renderer icon
+  static metadata = { ...PROVIDER_METADATA['deepl'], icon };
 
   constructor(config = {}) {
     super({

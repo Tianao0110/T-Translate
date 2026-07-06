@@ -143,10 +143,20 @@ const MainWindow = () => {
 
         logger.debug('[Silent] OCR success, sending text to selection window');
 
+        // Engine degraded mid-capture (e.g. llm-vision → local): the notice
+        // must ride along — this chain never shows the main panel where the
+        // fallback banner normally lives.
+        const notice = ocrResult.fallbackFrom === 'llm-vision'
+          ? (ocrResult.visionLocked
+            ? t('ocr.visionLocked', 'LLM Vision 已因连续失败停用，本次已用本地 OCR。可在设置 > OCR 重新启用。')
+            : t('ocr.visionFallback', '当前模型不支持视觉，本次已用本地 OCR 识别。'))
+          : null;
+
         // Selection window will run its own translation pass on this text
         window.electron?.screenshot?.notifyOcrComplete?.({
           success: true,
           text: ocrResult.text,
+          notice,
         });
       } catch (error) {
         logger.error('[Silent] OCR error:', error);

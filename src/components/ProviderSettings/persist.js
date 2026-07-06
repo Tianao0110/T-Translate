@@ -3,7 +3,7 @@
 // triggered from any tab writes provider data completely instead of the old
 // activeSection-routed path that silently dropped it.
 
-import translationService from '../../services/translation.js';
+import stackClient from '../../services/stack-client.js';
 import createLogger from '../../utils/logger.js';
 
 const logger = createLogger('ProviderSettings');
@@ -87,15 +87,11 @@ export async function persistProviderData({ providers, providerConfigs, allProvi
     await window.electron.store.set('settings.translation.providerConfigs', sanitized);
   }
 
-  // reload uses the in-memory plaintext configs (this window's service needs
-  // usable keys); disk got the sanitized copy above.
-  await translationService.reload({
-    providers: { list: providers, configs: providerConfigs },
-  });
-
-  if (window.electron?.floatingWindow?.notifySettingsChanged) {
-    await window.electron.floatingWindow.notifySettingsChanged();
-  }
+  // Main-process stack re-reads store + vault itself — no plaintext configs
+  // travel back over IPC, and all three windows are served by the same reload
+  // (the old per-window broadcast survives only for UI-settings sync, which
+  // SettingsPanel's unified save and sync-to-electron still drive).
+  await stackClient.reload();
 
   return { ok: true, sanitizedConfigs: sanitized };
 }

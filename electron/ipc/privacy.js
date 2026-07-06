@@ -22,6 +22,10 @@ function register(ctx) {
       store.set('privacyMode', mode);
       logger.info('Mode changed to:', mode);
 
+      // SECURE pauses the stack's L2 cache persistence (flushes pending
+      // standard-mode writes first); other modes resume it.
+      ctx.stackHooks?.onPrivacyModeChanged?.(mode);
+
       // Log mode-specific behavior so the user-visible effect is traceable.
       if (mode === PRIVACY_MODES.OFFLINE) {
         logger.info('Offline mode enabled - network features restricted');

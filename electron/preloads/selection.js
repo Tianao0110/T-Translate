@@ -72,4 +72,27 @@ contextBridge.exposeInMainWorld("electron", {
   secureStorage: {
     decrypt: (key) => ipcRenderer.invoke("secure-storage:decrypt", key),
   },
+
+  // Main-process translation stack (same bridge as the main-window preload;
+  // this window only translates, so no test/management surface is exposed).
+  stack: {
+    translate: (payload) => ipcRenderer.invoke("stack:translate", payload),
+    streamStart: (payload) => ipcRenderer.invoke("stack:translate-stream-start", payload),
+    abort: (id) => ipcRenderer.invoke("stack:abort", { id }),
+    chat: (payload) => ipcRenderer.invoke("stack:chat", payload),
+    providersStatus: () => ipcRenderer.invoke("stack:providers-status"),
+    currentProvider: () => ipcRenderer.invoke("stack:current-provider"),
+    reload: () => ipcRenderer.invoke("stack:reload"),
+    cacheStats: () => ipcRenderer.invoke("stack:cache-stats"),
+    onStreamChunk: (callback) => {
+      const handler = (event, frame) => callback(frame);
+      ipcRenderer.on("stack:stream-chunk", handler);
+      return () => ipcRenderer.removeListener("stack:stream-chunk", handler);
+    },
+    onChanged: (callback) => {
+      const handler = () => callback();
+      ipcRenderer.on("stack:changed", handler);
+      return () => ipcRenderer.removeListener("stack:changed", handler);
+    },
+  },
 });

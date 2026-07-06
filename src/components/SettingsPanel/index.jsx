@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RefreshCw, Save } from 'lucide-react';
-import { ocrManager } from '../../providers/ocr/index.js';
+import stackClient from '../../services/stack-client.js';
 import { getAllProviderMetadata } from '../../providers/registry.js';
 import { persistProviderData } from '../ProviderSettings/persist.js';
 import { migrateLegacyOcrSecrets, decryptOcrSecrets, encryptOcrSecrets } from '../../utils/ocr-key-vault.js';
@@ -403,11 +403,14 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
 
       if (settings.ocr) {
         try {
-          // settings.ocr.llmEndpoint feeds the LLM-Vision engine now.
-          ocrManager.updateConfigs({ ...settings.ocr });
-          logger.debug(' OCR configs updated');
+          // OCR engine configs live in the main-process stack — one reload
+          // re-reads the saved bucket + vault there. (Translation-bucket saves
+          // already reload via persistProviderData; a second reload here when
+          // both buckets are dirty is idempotent and cheap.)
+          await stackClient.reload();
+          logger.debug(' OCR configs reloaded (main-process stack)');
         } catch (e) {
-          logger.warn(' ocrManager update failed:', e);
+          logger.warn(' stack reload failed:', e);
         }
       }
 

@@ -61,8 +61,8 @@ const CHANNELS = {
     SET_PASS_THROUGH: 'floating-window:set-pass-through',
     SET_OPACITY: 'floating-window:set-opacity',
     GET_SETTINGS: 'floating-window:get-settings',
-    GET_PROVIDER_CONFIGS: 'floating-window:get-provider-configs',
     NOTIFY_SETTINGS_CHANGED: 'floating-window:notify-settings-changed',
+    TRIGGER_CAPTURE: 'floating-window:trigger-capture', // global-hotkey re-capture (no focus steal)
     OPEN_MAIN_SETTINGS: 'floating-window:open-main-settings',
     GET_HISTORY: 'floating-window:get-history',
     ADD_TO_HISTORY: 'floating-window:add-to-history', // forward a translation into the main window's history
@@ -126,6 +126,25 @@ const CHANNELS = {
     DECRYPT: 'secure-storage:decrypt',
     DELETE: 'secure-storage:delete',
     IS_AVAILABLE: 'secure-storage:isAvailable',
+  },
+  // Main-process translation stack (facade in ipc/translation-stack.js).
+  // privacyMode/useCache never cross this boundary — the facade injects them.
+  STACK: {
+    TRANSLATE: 'stack:translate',
+    STREAM_START: 'stack:translate-stream-start',
+    STREAM_CHUNK: 'stack:stream-chunk',           // main → renderer push frames
+    ABORT: 'stack:abort',
+    CHAT: 'stack:chat',
+    TEST_PROVIDER: 'stack:test-provider',
+    TEST_PROVIDER_CONFIG: 'stack:test-provider-config',
+    PROVIDERS_STATUS: 'stack:providers-status',
+    CURRENT_PROVIDER: 'stack:current-provider',
+    RELOAD: 'stack:reload',
+    CLEAR_CACHE: 'stack:clear-cache',
+    CACHE_STATS: 'stack:cache-stats',
+    CHANGED: 'stack:changed',                     // main → renderer: stack reloaded
+    OCR_RECOGNIZE: 'stack:ocr-recognize',         // allowedEngines injected main-side
+    OCR_RESET_VISION: 'stack:ocr-reset-vision',
   },
 };
 

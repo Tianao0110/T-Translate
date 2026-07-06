@@ -1,0 +1,150 @@
+// Stack OCREngineManager: the behaviors that must survive the main-process
+// migration — privacy allowlist filtering, the LLM-Vision degrade/lock chain
+// (now global across windows, lock flag rides on results), and per-request
+// priority (a shared instance must not inherit one window's ordering).
+
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { OCREngineManager } from '../../src/stack/ocr/manager.js';
+import { configureRuntime } from '../../src/stack/runtime.js';
+
+const IMG = 'data:image/png;base64,AAAA';
+
+function visionUnsupportedResponse() {
+  return {
+    ok: false,
+    status: 400,
+    text: async () => 'this model does not support vision inputs',
+    json: async () => ({}),
+  };
+}
+
+let paddleMock;
+let windowsMock;
+
+beforeEach(() => {
+  paddleMock = vi.fn(async () => ({ success: true, text: 'local text', blocks: [], rawBlocks: [] }));
+  windowsMock = vi.fn(async () => ({ success: true, text: 'win text' }));
+  configureRuntime({
+    fetch: vi.fn(async () => visionUnsupportedResponse()),
+    getLanguage: () => 'zh',
+    localOcr: { paddle: paddleMock, windows: windowsMock, isWindows: true },
+  });
+});
+
+async function makeManager(settings = {}) {
+  const manager = new OCREngineManager({ loadConfigs: async () => settings });
+  await manager.init();
+  return manager;
+}
+
+describe('stack OCREngineManager', () => {
+  it('disallowed preferred engine falls through to the filtered local chain (no network)', async () => {
+    const fetchMock = vi.fn();
+    configureRuntime({ fetch: fetchMock });
+    const manager = await makeManager({ ocrspaceKey: 'k-123' });
+
+    const result = await manager.recognize(IMG, {
+      engine: 'ocrspace',
+      allowedEngines: ['llm-vision', 'windows-ocr', 'rapid-ocr'], // OFFLINE set
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.engine).toBe('rapid-ocr');
+    expect(paddleMock).toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('vision-unsupported degrades to local chain, then locks after 2 failures', async () => {
+    const fetchMock = vi.fn(async () => visionUnsupportedResponse());
+    configureRuntime({ fetch: fetchMock });
+    const manager = await makeManager();
+
+    const first = await manager.recognize(IMG, { engine: 'llm-vision' });
+    expect(first.success).toBe(true);
+    expect(first.fallbackFrom).toBe('llm-vision');
+    expect(first.visionLocked).toBe(false);
+    expect(manager.isVisionLocked()).toBe(false);
+
+    const second = await manager.recognize(IMG, { engine: 'llm-vision' });
+    expect(second.visionLocked).toBe(true);
+    expect(manager.isVisionLocked()).toBe(true);
+
+    // Locked: goes straight to the local chain without touching the endpoint
+    const callsBefore = fetchMock.mock.calls.length;
+    const third = await manager.recognize(IMG, { engine: 'llm-vision' });
+    expect(third.success).toBe(true);
+    expect(fetchMock.mock.calls.length).toBe(callsBefore);
+
+    manager.resetVisionFallback();
+    expect(manager.isVisionLocked()).toBe(false);
+  });
+
+  it('vision 200 "fake success" with a stripped image (low prompt_tokens) degrades', async () => {
+    // Text-only model given an image: server strips it, model answers from the
+    // instruction, returns 200 — but prompt_tokens betrays the missing image.
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{ message: { content: 'Sure, here is a translation of your request.' } }],
+        usage: { prompt_tokens: 105, completion_tokens: 12 },
+      }),
+      text: async () => '',
+    }));
+    configureRuntime({ fetch: fetchMock });
+    const manager = await makeManager();
+
+    const result = await manager.recognize(IMG, { engine: 'llm-vision' });
+    expect(result.success).toBe(true);
+    expect(result.engine).toBe('rapid-ocr'); // degraded, not the model's chatter
+    expect(result.fallbackFrom).toBe('llm-vision');
+  });
+
+  it('vision 200 with a real image (high prompt_tokens) is kept as-is', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{ message: { content: 'Hello world' } }],
+        usage: { prompt_tokens: 640, completion_tokens: 3 }, // image tokens present
+      }),
+      text: async () => '',
+    }));
+    configureRuntime({ fetch: fetchMock });
+    const manager = await makeManager();
+
+    const result = await manager.recognize(IMG, { engine: 'llm-vision' });
+    expect(result.success).toBe(true);
+    expect(result.engine).toBe('llm-vision');
+    expect(result.text).toBe('Hello world');
+  });
+
+  it('endpoint-level "no models loaded" also degrades to the local chain', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: false,
+      status: 400,
+      text: async () => '{"error":{"message":"No models loaded. Please load a model in the developer page"}}',
+      json: async () => ({}),
+    }));
+    configureRuntime({ fetch: fetchMock });
+    const manager = await makeManager();
+
+    const result = await manager.recognize(IMG, { engine: 'llm-vision' });
+    expect(result.success).toBe(true);
+    expect(result.engine).toBe('rapid-ocr');
+    expect(result.fallbackFrom).toBe('llm-vision');
+  });
+
+  it('per-request priority reorders the walk without mutating shared state', async () => {
+    const manager = await makeManager();
+
+    const result = await manager.recognize(IMG, { priority: ['windows-ocr'] });
+    expect(result.engine).toBe('windows-ocr');
+    expect(windowsMock).toHaveBeenCalled();
+    expect(paddleMock).not.toHaveBeenCalled();
+
+    // Next request without priority uses the default order again
+    const next = await manager.recognize(IMG, {});
+    expect(next.engine).toBe('rapid-ocr');
+  });
+});

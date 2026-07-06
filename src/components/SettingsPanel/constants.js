@@ -25,6 +25,7 @@ export const defaultConfig = {
     toggleWindow: 'Ctrl+Shift+W',
     floatingWindow: 'Ctrl+Alt+G',
     selectionTranslate: 'Ctrl+Shift+T',
+    floatingCapture: 'Ctrl+Alt+Space',
   },
   dev: { debugMode: false },
 };

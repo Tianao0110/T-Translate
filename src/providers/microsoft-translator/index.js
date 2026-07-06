@@ -3,39 +3,15 @@
 
 import { BaseProvider, _t } from '../base.js';
 import icon from './icon.svg';
+import { PROVIDER_METADATA } from '../../stack/providers/metadata.js';
 import createLogger from '../../utils/logger.js';
 
 const logger = createLogger('MicrosoftTranslator');
 
 class MicrosoftTranslatorProvider extends BaseProvider {
 
-  static metadata = {
-    id: 'microsoft-translator',
-    name: 'Microsoft Translator',
-    description: 'Microsoft Translator API, 2M chars/month free',
-    icon: icon,
-    color: '#0078d4',
-    type: 'api',
-    helpUrl: 'https://learn.microsoft.com/azure/cognitive-services/translator/',
-
-    configSchema: {
-      apiKey: {
-        type: 'password',
-        label: 'API Key',
-        default: '',
-        required: true,
-        placeholder: 'Azure Translator API Key',
-        encrypted: true,
-      },
-      region: {
-        type: 'text',
-        label: 'Region',
-        default: 'global',
-        required: false,
-        placeholder: 'global (or eastasia, westus2, etc.)',
-      },
-    },
-  };
+  // Shared table (single source with the main-process stack) + renderer icon
+  static metadata = { ...PROVIDER_METADATA['microsoft-translator'], icon };
 
   constructor(config = {}) {
     super({

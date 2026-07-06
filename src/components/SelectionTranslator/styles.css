@@ -388,6 +388,20 @@ html, body, #root {
 /* ==========================================
    错误状态
    ========================================== */
+/* Non-fatal degrade hint (e.g. vision engine fell back to local OCR).
+   Inherits card text color at reduced emphasis — no --accent-* here
+   (standalone-window token rule). */
+.sel-notice {
+  padding: 6px 8px;
+  margin-bottom: 6px;
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.4;
+  opacity: 0.85;
+  background: rgba(245, 158, 11, 0.12);
+  border-left: 3px solid rgba(245, 158, 11, 0.65);
+}
+
 .sel-error {
   padding: 10px;
   background: linear-gradient(to right, #fef2f2, #fff);

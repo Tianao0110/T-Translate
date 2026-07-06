@@ -130,41 +130,49 @@ function register(ctx) {
 }
 
 // ===== Per-engine recognizers =====
+// Bodies are shared with the translation-stack facade (ctx.localOcr): the
+// stack's local-bridge engines call these directly, the legacy IPC channels
+// keep serving any renderer path until the cleanup batch retires them.
+
+// Windows OCR — Windows.Media.Ocr via electron/utils/windows-ocr
+async function recognizeWindows(store, imageData, options = {}) {
+  const language =
+    options.language || store.get('settings.ocr.recognitionLanguage', 'auto');
+  const result = await windowsOcr.recognize(imageData, { language });
+
+  if (!result.success) {
+    logger.error('Windows OCR failed:', result.error);
+    if (process.platform !== 'win32') result.error = t('ocr.winOnlyWindows');
+  } else {
+    logger.debug('Windows OCR result length:', result.text.length);
+  }
+  return result;
+}
+
+// Local PP-OCR — language picks the model pack (missing pack falls back to base)
+async function recognizePaddle(store, imageData, options = {}) {
+  const language =
+    options.language || store.get('settings.ocr.recognitionLanguage', 'auto');
+  const preprocess = {
+    enabled: store.get('settings.ocr.enablePreprocess', true),
+    scale: store.get('settings.ocr.scaleFactor', 2),
+  };
+  const result = await ocrEngine.recognize(imageData, { ...options, language, preprocess });
+
+  if (!result.success && result.errorCode === 'BASE_MODELS_MISSING') {
+    result.error = t('ocr.baseModelsMissing');
+  }
+  return result;
+}
 
 function registerOCRRecognizers(ctx) {
   const { store } = ctx;
 
-  // Windows OCR — Windows.Media.Ocr via electron/utils/windows-ocr
-  ipcMain.handle(CHANNELS.OCR.WINDOWS_OCR, async (event, imageData, options = {}) => {
-    const language =
-      options.language || store.get('settings.ocr.recognitionLanguage', 'auto');
-    const result = await windowsOcr.recognize(imageData, { language });
+  ipcMain.handle(CHANNELS.OCR.WINDOWS_OCR, (event, imageData, options = {}) =>
+    recognizeWindows(store, imageData, options));
 
-    if (!result.success) {
-      logger.error('Windows OCR failed:', result.error);
-      if (process.platform !== 'win32') result.error = t('ocr.winOnlyWindows');
-    } else {
-      logger.debug('Windows OCR result length:', result.text.length);
-    }
-    return result;
-  });
-
-  // Local PP-OCR — language picks the model pack (missing pack falls back to base)
-  ipcMain.handle(CHANNELS.OCR.PADDLE_OCR, async (event, imageData, options = {}) => {
-    const language =
-      options.language || store.get('settings.ocr.recognitionLanguage', 'auto');
-    const preprocess = {
-      enabled: store.get('settings.ocr.enablePreprocess', true),
-      scale: store.get('settings.ocr.scaleFactor', 2),
-    };
-    const result = await ocrEngine.recognize(imageData, { ...options, language, preprocess });
-
-    if (!result.success && result.errorCode === 'BASE_MODELS_MISSING') {
-      result.error = t('ocr.baseModelsMissing');
-    }
-    return result;
-  });
-
+  ipcMain.handle(CHANNELS.OCR.PADDLE_OCR, (event, imageData, options = {}) =>
+    recognizePaddle(store, imageData, options));
 }
 
 // ===== Helpers =====
@@ -178,3 +186,5 @@ function sendPackProgress(mainWindow, packId, progress, phase) {
 }
 
 module.exports = register;
+module.exports.recognizeWindows = recognizeWindows;
+module.exports.recognizePaddle = recognizePaddle;

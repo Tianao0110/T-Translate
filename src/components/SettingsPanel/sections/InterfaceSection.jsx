@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Sun, Moon, Leaf, RefreshCw, Globe, Power, MousePointer, Keyboard, Camera, AppWindow, Layers, Pencil } from 'lucide-react';
+import { Sun, Moon, Leaf, RefreshCw, Globe, Power, MousePointer, Keyboard, Camera, AppWindow, Layers, Pencil, ScanLine } from 'lucide-react';
 import { defaultConfig } from '../constants.js';
 
 const LANGUAGES = [
@@ -104,6 +104,7 @@ const InterfaceSection = ({
     toggleWindow: { label: t('shortcuts.toggleWindow'), global: true, icon: AppWindow },
     floatingWindow: { label: t('shortcuts.floatingWindow'), global: true, icon: Layers },
     selectionTranslate: { label: t('shortcuts.selectionTranslate'), global: true, icon: Pencil },
+    floatingCapture: { label: t('shortcuts.floatingCapture'), global: true, icon: ScanLine },
   };
 
   const startEditing = async (action, config) => {

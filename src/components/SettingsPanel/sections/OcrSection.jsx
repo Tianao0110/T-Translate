@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff, AlertTriangle, RefreshCw, Download, Trash2, Cpu, Sparkles, Globe } from 'lucide-react';
-import { ocrManager } from '../../../providers/ocr/index.js';
+import stackClient from '../../../services/stack-client.js';
 
 // Must match electron/shared/ocr-packs.js BASE_PACK_ID / HQ_PACK_ID (renderer
 // cannot import main-process modules; the manifest may list other generations'
@@ -176,9 +176,10 @@ const OcrSection = ({
     if (setOcrEngine) setOcrEngine(engineId);
 
     // Manual re-select of llm-vision clears the auto-degrade lock so the user
-    // can re-enable it after fixing their model setup
+    // can re-enable it after fixing their model setup (lock lives in the
+    // main-process stack now — global across all three windows)
     if (engineId === 'llm-vision') {
-      ocrManager.resetVisionFallback();
+      stackClient.ocr.resetVisionFallback();
     }
   };
 

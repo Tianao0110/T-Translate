@@ -2,7 +2,7 @@
 // current translation to imitate its tone and register.
 
 import { useState, useCallback } from 'react';
-import translationService from '../../../services/translation.js';
+import translationService from '../../../services/stack-client.js';
 import useTranslationStore from '../../../stores/translation-store';
 import { getStyleRewritePrompts } from '../../../utils/ai-prompts.js';
 import createLogger from '../../../utils/logger.js';
@@ -43,13 +43,12 @@ export default function useStyleRewrite(currentTranslation, addStyleVersion, not
         styleStrength
       );
 
-      const result = await translationService.chatCompletion(
-        [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        useTranslationStore.getState().getPrivacyOptions()
-      );
+      // Privacy fields no longer travel from call sites — the main-process
+      // facade injects the live mode into every stack request.
+      const result = await translationService.chatCompletion([
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ]);
 
       if (result.success && result.content) {
         let rewrittenText = result.content.trim();

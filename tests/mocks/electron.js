@@ -53,6 +53,18 @@ export const Menu = {
 
 export const Tray = vi.fn();
 export const nativeImage = { createFromPath: vi.fn(() => ({})) };
+
+// Reversible pseudo-encryption so vault/secure-storage tests can assert
+// round-trips without DPAPI: enc:<plaintext> in a Buffer.
+export const safeStorage = {
+  isEncryptionAvailable: vi.fn(() => true),
+  encryptString: vi.fn((s) => Buffer.from(`enc:${s}`, 'utf8')),
+  decryptString: vi.fn((buf) => buf.toString('utf8').replace(/^enc:/, '')),
+};
+
+export const net = {
+  fetch: vi.fn(() => Promise.resolve({ ok: false, status: 503, json: async () => ({}), text: async () => '' })),
+};
 export const dialog = {
   showMessageBox: vi.fn(() => Promise.resolve({ response: 0 })),
   showErrorBox: vi.fn(),
@@ -63,4 +75,5 @@ export const globalShortcut = { register: vi.fn(), unregister: vi.fn(), unregist
 export default {
   BrowserWindow, app, screen, clipboard,
   ipcMain, ipcRenderer, Menu, Tray, nativeImage, dialog, shell, globalShortcut,
+  safeStorage, net,
 };

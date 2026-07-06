@@ -2,38 +2,14 @@
 
 import { BaseProvider, LANGUAGE_CODES, _t } from '../base.js';
 import icon from './icon.svg';
+import { PROVIDER_METADATA } from '../../stack/providers/metadata.js';
 import createLogger from '../../utils/logger.js';
 const logger = createLogger('Gemini');
 
 class GeminiProvider extends BaseProvider {
 
-  static metadata = {
-    id: 'gemini',
-    name: 'Google Gemini',
-    description: 'Google AI model, free tier available, high quality',
-    icon: icon,
-    color: '#4285f4',
-    type: 'llm',
-    helpUrl: 'https://aistudio.google.com/apikey',
-
-    configSchema: {
-      apiKey: {
-        type: 'password',
-        label: 'API Key',
-        default: '',
-        required: true,
-        placeholder: 'AIzaSy...',
-        encrypted: true,
-      },
-      model: {
-        type: 'text',
-        label: 'Model',
-        default: 'gemini-2.0-flash',
-        required: false,
-        placeholder: 'gemini-2.0-flash',
-      },
-    },
-  };
+  // Shared table (single source with the main-process stack) + renderer icon
+  static metadata = { ...PROVIDER_METADATA['gemini'], icon };
 
   constructor(config = {}) {
     super({

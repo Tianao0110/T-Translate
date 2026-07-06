@@ -4,11 +4,10 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Camera, X, Loader2, AlertCircle, ChevronDown, GripHorizontal, History, Clock } from 'lucide-react';
+import { Camera, X, Loader2, AlertCircle, ChevronDown, GripHorizontal, History, Clock, RefreshCw } from 'lucide-react';
 import useSessionStore, { STATUS, DISPLAY_MODE } from '../../stores/session.js';
 import useConfigStore from '../../stores/config.js';
 import pipeline from '../../services/pipeline.js';
-import translationService from '../../services/translation.js';
 import ChildPane from './ChildPane.jsx';
 import createLogger from '../../utils/logger.js';
 import './styles.css';
@@ -90,8 +89,6 @@ const FloatingWindow = () => {
   }, [floatingOpacity]);
 
   useEffect(() => {
-    pipeline.init();
-
     loadSettings();
 
     // Theme: prefer the IPC sync handshake, fall back to store, then localStorage
@@ -230,13 +227,9 @@ const FloatingWindow = () => {
     let unsubscribeSettings = null;
     if (window.electron?.floatingWindow?.onSettingsChanged) {
       unsubscribeSettings = window.electron.floatingWindow.onSettingsChanged((newSettings) => {
+        // Stack + OCR reloads are main-process-internal now — this channel
+        // only carries the window's UI settings (opacity/engine/theme/langs).
         loadSettings();
-        // Persistent window: engine keys/endpoint changed in main settings
-        // must reach the already-initialized ocrManager AND the translation
-        // stack — without reload it keeps using the provider keys/priority from
-        // its first translation until the whole app restarts.
-        pipeline.refreshOcrConfigs();
-        translationService.reload();
         const newTheme = newSettings?.interface?.theme;
         if (newTheme && ['light', 'dark', 'fresh'].includes(newTheme)) {
           setTheme(newTheme);
@@ -322,6 +315,8 @@ const FloatingWindow = () => {
   };
 
   const handleClose = async () => {
+    setAutoRefresh(false);
+
     // Close detached child windows first so they don't outlive the parent
     try {
       await window.electron?.floatingWindow?.closeAllChildWindows?.();
@@ -342,8 +337,13 @@ const FloatingWindow = () => {
   // opacity popup) are excluded so their clicks keep working.
   const handleTitleBarMouseDown = (e) => {
     if (e.button !== 0) return;
-    if (e.target.closest('button, .floating-toolbar, .opacity-popup')) return;
+    if (e.target.closest('button, .floating-toolbar, .opacity-popup, .refresh-popup')) return;
     e.preventDefault();
+
+    // Dragging the window means the watched region is about to change —
+    // stop the auto-refresh loop (user re-arms it after repositioning).
+    setAutoRefresh(false);
+    setShowRefreshPicker(false);
 
     // Grab offset inside the window; window.screenX/Y and e.screenX/Y share the
     // same DIP coordinate space, matching BrowserWindow.setBounds.
@@ -401,8 +401,13 @@ const FloatingWindow = () => {
 
   // Capture screen region that maps to this floating window's content area.
   // Defined as a callback because the keyboard handler closes over it.
-  const captureAndTranslate = useCallback(async () => {
+  // keepDedup=true (auto-refresh) skips work on unchanged frames; manual
+  // captures (space/button/global hotkey) force a fresh translate.
+  const captureAndTranslate = useCallback(async ({ keepDedup = false } = {}) => {
     try {
+      // A manual capture (button/Space/global hotkey) takes over — stop the
+      // auto-refresh loop instead of fighting it.
+      if (!keepDedup) setAutoRefresh(false);
       if (!contentRef.current) return;
 
       const contentRect = contentRef.current.getBoundingClientRect();
@@ -415,17 +420,66 @@ const FloatingWindow = () => {
         y: Math.round(windowBounds.y + contentRect.top),
         width: Math.round(contentRect.width),
         height: Math.round(contentRect.height),
+        keepDedup,
       };
-
-      logger.debug('Capture rect:', captureRect);
-      logger.debug('Content rect:', contentRect);
-      logger.debug('Window bounds:', windowBounds);
 
       await pipeline.runFromCapture(captureRect);
     } catch (error) {
       logger.error('Capture failed:', error);
     }
   }, []);
+
+  // Auto-refresh: re-capture the region on a timer so a live-updating area
+  // (Teams captions, video subtitles) stays translated hands-free without the
+  // window ever taking focus. Flow per user spec: click the button → pick an
+  // interval → it starts; moving the window, a manual capture, or closing
+  // stops it (an explicit start each session, never auto-resumed). Silent
+  // dedupe in the pipeline means unchanged frames cost nothing and don't
+  // touch the UI. Intervals sized for OCR+LLM latency — 1.5s was faster than
+  // a full recognize+translate round trip.
+  const AUTO_REFRESH_INTERVALS = [2, 3, 5, 10];
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [showRefreshPicker, setShowRefreshPicker] = useState(false);
+  const [refreshInterval, setRefreshInterval] = useState(() => {
+    try {
+      const saved = parseInt(localStorage.getItem('floating-auto-refresh-interval'), 10);
+      return AUTO_REFRESH_INTERVALS.includes(saved) ? saved : 3;
+    } catch { return 3; }
+  });
+
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const id = setInterval(() => {
+      if (document.hidden) return; // window hidden — nothing to capture
+      captureAndTranslate({ keepDedup: true });
+    }, refreshInterval * 1000);
+    return () => clearInterval(id);
+  }, [autoRefresh, refreshInterval, captureAndTranslate]);
+
+  // Button: running → stop; idle → open the interval picker.
+  const handleAutoRefreshClick = useCallback(() => {
+    if (autoRefresh) {
+      setAutoRefresh(false);
+    } else {
+      setShowRefreshPicker((prev) => !prev);
+    }
+  }, [autoRefresh]);
+
+  const startAutoRefresh = useCallback((seconds) => {
+    setRefreshInterval(seconds);
+    try { localStorage.setItem('floating-auto-refresh-interval', String(seconds)); } catch { /* ignore */ }
+    setShowRefreshPicker(false);
+    setAutoRefresh(true);
+  }, []);
+
+  // Global-hotkey re-capture: fires while another app holds focus, so the
+  // target never loses foreground (the whole point vs the in-window Space key).
+  useEffect(() => {
+    const off = window.electron?.floatingWindow?.onTriggerCapture?.(() => {
+      captureAndTranslate({ keepDedup: false });
+    });
+    return () => { if (off) off(); };
+  }, [captureAndTranslate]);
 
   const handleContentClick = useCallback((e) => {
     // Only fire toggle on bare-container clicks, not on child panes/text
@@ -577,6 +631,20 @@ const FloatingWindow = () => {
             </button>
 
             <button
+              className={`toolbar-btn ${autoRefresh ? 'active' : ''}`}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleAutoRefreshClick();
+              }}
+              title={autoRefresh
+                ? t('floatingWindow.autoRefreshRunning', '自动刷新中（{{s}}s），点击停止', { s: refreshInterval })
+                : t('floatingWindow.autoRefresh', '自动刷新（盯住区域循环截译，目标不失焦）')}
+            >
+              <RefreshCw size={12} className={autoRefresh ? 'spinning-slow' : undefined} />
+            </button>
+
+            <button
               className={`toolbar-btn ${showHistoryPanel ? 'active' : ''}`}
               onClick={(e) => {
                 e.preventDefault();
@@ -618,6 +686,25 @@ const FloatingWindow = () => {
             onChange={handleOpacityChange}
           />
           <span className="opacity-value">{Math.round(floatingOpacity * 100)}%</span>
+        </div>
+      )}
+
+      {showRefreshPicker && (
+        <div className="refresh-popup" onMouseLeave={() => setShowRefreshPicker(false)}>
+          <span className="opacity-label">{t('floatingWindow.autoRefreshInterval', '刷新间隔')}</span>
+          {AUTO_REFRESH_INTERVALS.map((s) => (
+            <button
+              key={s}
+              className={`refresh-interval-btn ${s === refreshInterval ? 'active' : ''}`}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                startAutoRefresh(s);
+              }}
+            >
+              {s}s
+            </button>
+          ))}
         </div>
       )}
 

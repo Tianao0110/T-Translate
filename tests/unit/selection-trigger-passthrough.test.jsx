@@ -10,7 +10,7 @@ import React from 'react';
 let triggerCb = null;
 
 // vi.mock must run before all imports — vitest hoists these.
-vi.mock('../../src/services/translation.js', () => ({
+vi.mock('../../src/services/stack-client.js', () => ({
   default: {
     initialized: true,
     init: vi.fn(() => Promise.resolve()),
@@ -117,7 +117,7 @@ describe('Phase B — text pass-through via SHOW_TRIGGER', () => {
     });
 
     // Key assertion: translate called with 'hello world', getText not called.
-    const translationService = (await import('../../src/services/translation.js')).default;
+    const translationService = (await import('../../src/services/stack-client.js')).default;
     await waitFor(() => {
       expect(translationService.translate).toHaveBeenCalled();
     });
@@ -138,7 +138,7 @@ describe('Phase B — text pass-through via SHOW_TRIGGER', () => {
     });
 
     expect(mockGetText).toHaveBeenCalledTimes(1);
-    const translationService = (await import('../../src/services/translation.js')).default;
+    const translationService = (await import('../../src/services/stack-client.js')).default;
     await waitFor(() => {
       expect(translationService.translate).toHaveBeenCalled();
     });
@@ -183,7 +183,7 @@ describe('Phase B — text pass-through via SHOW_TRIGGER', () => {
     });
 
     expect(mockGetText).toHaveBeenCalledTimes(1);
-    const translationService = (await import('../../src/services/translation.js')).default;
+    const translationService = (await import('../../src/services/stack-client.js')).default;
     await waitFor(() => {
       expect(translationService.translate.mock.calls.at(-1)[0]).toBe('second fetch');
     });
@@ -203,7 +203,7 @@ describe('Phase B — text pass-through via SHOW_TRIGGER', () => {
       await new Promise(r => setTimeout(r, 50));
     });
 
-    const translationService = (await import('../../src/services/translation.js')).default;
+    const translationService = (await import('../../src/services/stack-client.js')).default;
     await waitFor(() => {
       expect(translationService.translate).toHaveBeenCalled();
     });

@@ -1,8 +1,7 @@
 // Floating-window IPC: window controls, settings merge, region capture, and detached child-pane windows.
 
-const { ipcMain, safeStorage, BrowserWindow } = require('electron');
+const { ipcMain, BrowserWindow } = require('electron');
 const { CHANNELS } = require('../shared/channels');
-const { isDecryptAllowed } = require('./secure-storage');
 const logger = require('../utils/logger')('IPC:FloatingWindow');
 const displayHelper = require('../utils/display-helper');
 const { t } = require('../shared/main-i18n');
@@ -180,49 +179,6 @@ function register(ctx) {
 
     logger.debug('Get settings:', merged);
     return merged;
-  });
-
-  // Returns the provider list + configs with secure-storage fields decrypted.
-  // ProviderSettings (0.2.6+) writes settings.translation.providers and strips
-  // encrypted values from the persisted configs entirely, so walk the
-  // __encrypted_provider_* store keys instead of looking for placeholders.
-  ipcMain.handle(CHANNELS.FLOATING_WINDOW.GET_PROVIDER_CONFIGS, async () => {
-    const mainSettings = store.get('settings', {});
-    const translation = mainSettings.translation || {};
-    const legacy = mainSettings.providers || {}; // pre-0.2.6 top-level bucket
-    const useNew = Array.isArray(translation.providers) && translation.providers.length > 0;
-
-    const list = useNew ? translation.providers : (legacy.list || []);
-    const configs = JSON.parse(JSON.stringify(
-      (useNew ? translation.providerConfigs : legacy.configs) || {}
-    ));
-
-    for (const storeKey of Object.keys(store.store)) {
-      const m = storeKey.match(/^__encrypted_(provider_([^_]+)_(.+))$/);
-      if (!m) continue;
-      const [, secureKey, providerId, field] = m;
-      // Same offline-mode gate the secure-storage IPC applies
-      if (!isDecryptAllowed(secureKey, store).allowed) continue;
-      try {
-        const buffer = Buffer.from(store.store[storeKey], 'base64');
-        configs[providerId] = configs[providerId] || {};
-        configs[providerId][field] = safeStorage.isEncryptionAvailable()
-          ? safeStorage.decryptString(buffer)
-          : buffer.toString('utf-8');
-      } catch (e) {
-        logger.error(`Failed to decrypt ${storeKey}:`, e);
-      }
-    }
-
-    // A surviving placeholder means its encrypted twin is gone — blank it so
-    // providers fail the key check instead of sending the literal placeholder.
-    for (const config of Object.values(configs)) {
-      for (const [key, value] of Object.entries(config)) {
-        if (value === '***encrypted***') config[key] = '';
-      }
-    }
-
-    return { list, configs };
   });
 
   ipcMain.handle(CHANNELS.FLOATING_WINDOW.NOTIFY_SETTINGS_CHANGED, () => {

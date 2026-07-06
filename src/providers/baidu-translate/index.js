@@ -4,39 +4,15 @@
 
 import { BaseProvider, _t } from '../base.js';
 import icon from './icon.svg';
+import { PROVIDER_METADATA } from '../../stack/providers/metadata.js';
 import createLogger from '../../utils/logger.js';
 
 const logger = createLogger('BaiduTranslate');
 
 class BaiduTranslateProvider extends BaseProvider {
 
-  static metadata = {
-    id: 'baidu-translate',
-    name: 'Baidu Translate',
-    description: 'Baidu Translate API, direct access in China, free tier',
-    icon: icon,
-    color: '#3385ff',
-    type: 'api',
-    helpUrl: 'https://fanyi-api.baidu.com/',
-
-    configSchema: {
-      appId: {
-        type: 'text',
-        label: 'APP ID',
-        default: '',
-        required: true,
-        placeholder: 'Baidu Translate APP ID',
-      },
-      secretKey: {
-        type: 'password',
-        label: 'Secret Key',
-        default: '',
-        required: true,
-        placeholder: 'Baidu Translate Secret Key',
-        encrypted: true,
-      },
-    },
-  };
+  // Shared table (single source with the main-process stack) + renderer icon
+  static metadata = { ...PROVIDER_METADATA['baidu-translate'], icon };
 
   constructor(config = {}) {
     super({

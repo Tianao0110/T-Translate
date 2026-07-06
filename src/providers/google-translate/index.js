@@ -2,34 +2,14 @@
 
 import { BaseProvider, LANGUAGE_CODES, _t } from '../base.js';
 import icon from './icon.svg';
+import { PROVIDER_METADATA } from '../../stack/providers/metadata.js';
 import createLogger from '../../utils/logger.js';
 const logger = createLogger('GoogleTranslate');
 
 class GoogleTranslateProvider extends BaseProvider {
 
-  static metadata = {
-    id: 'google-translate',
-    name: 'Google Translate',
-    description: 'Free to use, many languages, fast',
-    icon: icon,
-    color: '#4285f4',
-    type: 'traditional',
-    helpUrl: 'https://translate.google.com',
-
-    configSchema: {
-      domain: {
-        type: 'select',
-        label: 'Server',
-        default: 'com',
-        // translate.google.cn was retired in Oct 2022 — its translate_a
-        // endpoint 404s now, so that option only ever produced failures.
-        options: [
-          { value: 'com', label: 'google.com (International)' },
-          { value: 'com.hk', label: 'google.com.hk (Hong Kong)' },
-        ],
-      },
-    },
-  };
+  // Shared table (single source with the main-process stack) + renderer icon
+  static metadata = { ...PROVIDER_METADATA['google-translate'], icon };
 
   constructor(config = {}) {
     super({

@@ -33,8 +33,6 @@ contextBridge.exposeInMainWorld('electron', {
     // Merged settings (main app + window-local)
     getSettings: () => ipcRenderer.invoke('floating-window:get-settings'),
 
-    getProviderConfigs: () => ipcRenderer.invoke('floating-window:get-provider-configs'),
-
     // Persists window-locally (survives relaunch and settings broadcasts)
     setOpacity: (opacity) => ipcRenderer.invoke('floating-window:set-opacity', opacity),
 
@@ -63,6 +61,13 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.on('child-pane:closed', handler);
       return () => ipcRenderer.removeListener('child-pane:closed', handler);
     },
+
+    // Global-hotkey re-capture trigger (fires while another app holds focus).
+    onTriggerCapture: (callback) => {
+      const handler = () => callback();
+      ipcRenderer.on('floating-window:trigger-capture', handler);
+      return () => ipcRenderer.removeListener('floating-window:trigger-capture', handler);
+    },
   },
 
   // Shared OCR API (also exposed in the main-window preload). Online engines
@@ -81,6 +86,35 @@ contextBridge.exposeInMainWorld('electron', {
     decrypt: (key, options) => ipcRenderer.invoke('secure-storage:decrypt', key, options),
     delete: (key) => ipcRenderer.invoke('secure-storage:delete', key),
     isAvailable: () => ipcRenderer.invoke('secure-storage:isAvailable'),
+  },
+
+  // Main-process translation stack (same bridge as the main-window preload).
+  stack: {
+    translate: (payload) => ipcRenderer.invoke('stack:translate', payload),
+    streamStart: (payload) => ipcRenderer.invoke('stack:translate-stream-start', payload),
+    abort: (id) => ipcRenderer.invoke('stack:abort', { id }),
+    chat: (payload) => ipcRenderer.invoke('stack:chat', payload),
+    testProvider: (providerId) => ipcRenderer.invoke('stack:test-provider', { providerId }),
+    testProviderConfig: (providerId, config) =>
+      ipcRenderer.invoke('stack:test-provider-config', { providerId, config }),
+    providersStatus: () => ipcRenderer.invoke('stack:providers-status'),
+    currentProvider: () => ipcRenderer.invoke('stack:current-provider'),
+    reload: () => ipcRenderer.invoke('stack:reload'),
+    clearCache: (level) => ipcRenderer.invoke('stack:clear-cache', { level }),
+    cacheStats: () => ipcRenderer.invoke('stack:cache-stats'),
+    ocrRecognize: (imageData, options) =>
+      ipcRenderer.invoke('stack:ocr-recognize', { imageData, options }),
+    ocrResetVision: () => ipcRenderer.invoke('stack:ocr-reset-vision'),
+    onStreamChunk: (callback) => {
+      const handler = (event, frame) => callback(frame);
+      ipcRenderer.on('stack:stream-chunk', handler);
+      return () => ipcRenderer.removeListener('stack:stream-chunk', handler);
+    },
+    onChanged: (callback) => {
+      const handler = () => callback();
+      ipcRenderer.on('stack:changed', handler);
+      return () => ipcRenderer.removeListener('stack:changed', handler);
+    },
   },
 
   clipboard: {

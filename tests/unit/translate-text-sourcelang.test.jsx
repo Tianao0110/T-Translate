@@ -13,7 +13,7 @@ let triggerCb = null;
 let directCb = null;
 let resultCb = null;
 
-vi.mock('../../src/services/translation.js', () => ({
+vi.mock('../../src/services/stack-client.js', () => ({
   default: {
     initialized: true,
     init: vi.fn(() => Promise.resolve()),
@@ -125,7 +125,7 @@ describe('Phase A — translateText sourceLanguage precedence', () => {
       await new Promise(r => setTimeout(r, 50));
     });
 
-    const translationService = (await import('../../src/services/translation.js')).default;
+    const translationService = (await import('../../src/services/stack-client.js')).default;
     await waitFor(() => {
       expect(translationService.translate).toHaveBeenCalled();
     });
@@ -143,7 +143,7 @@ describe('Phase A — translateText sourceLanguage precedence', () => {
       translation: { sourceLanguage: 'ja', targetLanguage: 'zh' },
     });
 
-    const translationService = (await import('../../src/services/translation.js')).default;
+    const translationService = (await import('../../src/services/stack-client.js')).default;
     await waitFor(() => {
       expect(translationService.translate).toHaveBeenCalled();
     });
@@ -160,7 +160,7 @@ describe('Phase A — translateText sourceLanguage precedence', () => {
       translation: { targetLanguage: 'zh' },  // no sourceLanguage
     });
 
-    const translationService = (await import('../../src/services/translation.js')).default;
+    const translationService = (await import('../../src/services/stack-client.js')).default;
     await waitFor(() => {
       expect(translationService.translate).toHaveBeenCalled();
     });
@@ -183,7 +183,7 @@ describe('Phase A — translateText sourceLanguage precedence', () => {
       await new Promise(r => setTimeout(r, 50));
     });
 
-    const translationService = (await import('../../src/services/translation.js')).default;
+    const translationService = (await import('../../src/services/stack-client.js')).default;
     await waitFor(() => {
       expect(translationService.translate).toHaveBeenCalled();
     });

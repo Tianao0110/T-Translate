@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pin, Volume2, VolumeX, X } from 'lucide-react';
-import translationService from '../../services/translation.js';
+import translationService from '../../services/stack-client.js';
 import ttsManager, { TTS_STATUS } from '../../services/tts/index.js';
 import createLogger from '../../utils/logger.js';
 import { getShortErrorMessage } from '../../utils/error-handler.js';
@@ -64,6 +64,9 @@ const SelectionTranslator = () => {
   const [translatedText, setTranslatedText] = useState('');
   const [error, setError] = useState('');
   const [isOcrError, setIsOcrError] = useState(false);
+  // Non-fatal hint riding on screenshot results (e.g. vision engine degraded
+  // to local OCR) — this chain has no other surface to tell the user.
+  const [notice, setNotice] = useState('');
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [copied, setCopied] = useState(false);
   const [theme, setTheme] = useState(THEMES.LIGHT);
@@ -154,8 +157,18 @@ const SelectionTranslator = () => {
     setError('');
     setCopied(false);
     setIsOcrError(false);
+    setNotice('');
     setTriggerFailed(false);
   };
+
+  // Degrade hint is transient — the vision lock means it only ever appears on
+  // the first two captures anyway, so a permanent banner just nags. Auto-clear
+  // 3s after it shows (a newer notice resets the timer).
+  useEffect(() => {
+    if (!notice) return;
+    const id = setTimeout(() => setNotice(''), 3000);
+    return () => clearTimeout(id);
+  }, [notice]);
 
   useEffect(() => {
     const removeShowListener = window.electron?.selection?.onShowTrigger?.((data) => {
@@ -217,6 +230,9 @@ const SelectionTranslator = () => {
       // Screenshot path has no cursor anchor — (0,0) routes adjustWindowToContent
       // through the startDrag branch (keep the window where main positioned it).
       setMousePos({ x: 0, y: 0 });
+      // Work area of the capture's display, so the grown card clamps on-screen
+      // even when the shot was taken hard against a screen edge.
+      if (data.screenBounds) screenBoundsRef.current = data.screenBounds;
 
       if (data.theme) setTheme(data.theme);
       if (data.settings?.language && i18n?.language !== data.settings.language) i18n.changeLanguage(data.settings.language);
@@ -251,6 +267,7 @@ const SelectionTranslator = () => {
         if (data.targetLanguage) {
           setTranslation(prev => ({ ...prev, targetLanguage: data.targetLanguage }));
         }
+        if (data.notice) setNotice(data.notice);
         setSourceText(data.text);
         setShowSource(newSettings.showSourceByDefault);
         setIsFrozen(false);
@@ -381,12 +398,10 @@ const SelectionTranslator = () => {
       if (triggerReadyTimerRef.current) clearTimeout(triggerReadyTimerRef.current);
     });
 
-    // Provider/settings saved in the main window: reload this persistent
-    // window's translation stack so it picks up new keys/priority without an
-    // app restart. reload() with no args re-reads store + secureStorage.
-    const removeSettingsListener = window.electron?.selection?.onSettingsChanged?.(() => {
-      translationService.reload();
-    });
+    // No settings-changed listener anymore: the translation stack lives in the
+    // main process and reloads itself on save — this persistent window picks
+    // up new keys/priority automatically. (The selection UI settings arrive
+    // with each show via the payload, so nothing else needs the broadcast.)
 
     // No keydown/ESC handler: the window is focusable:false (deliberate — it
     // must never steal focus), so it can't receive keyboard events. Closing is
@@ -397,7 +412,6 @@ const SelectionTranslator = () => {
       if (removeShowResultListener) removeShowResultListener();
       if (removeShowDirectListener) removeShowDirectListener();
       if (removeHideListener) removeHideListener();
-      if (removeSettingsListener) removeSettingsListener();
       if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
       if (triggerReadyTimerRef.current) clearTimeout(triggerReadyTimerRef.current);
     };
@@ -539,8 +553,19 @@ const SelectionTranslator = () => {
     if (hasValidMousePos && y + height > originY + sh - 10) y = mousePos.y - height - 10;
     if (y < originY + 10) y = originY + 10;
 
+    // Universal off-screen guard for the FINAL geometry. The cursor path clamps
+    // anchorX earlier, but the keepPosition/screenshot path anchors at the
+    // clamped 28×28 loading spot and then the card GROWS — without this the
+    // expansion overflows the work area at screen edges.
+    let finalX = anchorX;
+    if (finalX + width > originX + sw - 10) finalX = originX + sw - width - 10;
+    if (finalX < originX + 10) finalX = originX + 10;
+    let finalY = Math.round(y);
+    if (finalY + height > originY + sh - 10) finalY = originY + sh - height - 10;
+    if (finalY < originY + 10) finalY = originY + 10;
+
     window.electron?.selection?.setBounds?.({
-      x: anchorX, y: Math.round(y),
+      x: Math.round(finalX), y: finalY,
       width, height: Math.round(height)
     });
 
@@ -576,11 +601,6 @@ const SelectionTranslator = () => {
   }, [mode, isFrozen, cardHovered, settings.triggerTimeout]);
 
   const translateText = async (text, retryCount = 0, overrideTargetLang = null, overrideSourceLang = null) => {
-    if (!translationService.initialized) {
-      logger.debug('Initializing translation service...');
-      await translationService.init();
-    }
-
     // Override > state > default. Used by screenshot path which knows the lang
     // before the state hook update has propagated.
     let targetLang = overrideTargetLang || translation.targetLanguage || 'zh';
@@ -602,21 +622,13 @@ const SelectionTranslator = () => {
       targetLanguage: targetLang,
     };
 
-    // Fetched per call, not at mount: this window is persistent (hide, not
-    // close), so a cached mode would go stale when the user switches it.
-    let privacyMode = PRIVACY_MODES.STANDARD;
     try {
-      privacyMode = (await window.electron?.privacy?.getMode?.()) || PRIVACY_MODES.STANDARD;
-    } catch (e) {
-      logger.debug('Failed to get privacy mode, assuming standard:', e);
-    }
-
-    try {
+      // Privacy fields no longer travel from here — the main-process facade
+      // reads the live mode per request (this persistent window can never hold
+      // a stale mode again).
       const result = await translationService.translate(text, {
         sourceLang: sourceLang,
         targetLang: targetLang,
-        privacyMode: privacyMode,
-        useCache: privacyMode !== PRIVACY_MODES.SECURE,
       });
 
       if (!result.success) {
@@ -835,6 +847,9 @@ const SelectionTranslator = () => {
               <div className="sel-error">{error}</div>
             ) : (
               <>
+                {notice && (
+                  <div className="sel-notice">{notice}</div>
+                )}
                 {showSource && sourceText && (
                   <div className="sel-source">{sourceText}</div>
                 )}

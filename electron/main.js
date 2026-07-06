@@ -211,7 +211,10 @@ async function handleDelayedConfirm(x, y) {
 async function showSelectionTrigger(mouseX, mouseY, prefetchedText = null, options = {}) {
   logger.debug(`showSelectionTrigger called (prefetched=${prefetchedText ? prefetchedText.length + ' chars' : 'none'}, failed=${!!options.failed})`);
 
-  if (!runtime.selectionEnabled) return;
+  if (!runtime.selectionEnabled) {
+    logger.debug('showSelectionTrigger: selection translate disabled, no icon');
+    return;
+  }
 
   const settings = store.get('settings', {});
   const interfaceSettings = settings.interface || {};
@@ -397,7 +400,7 @@ function hideSelectionWindow() {
 
 // Send OCR'd text to the selection window — Mode 2 of SHOW_RESULT: the window receives
 // raw text and translates it itself (so the same translator + history flow gets reused).
-function showSelectionWithText(text) {
+function showSelectionWithText(text, notice) {
   clearSelectionLoadingWatchdog(); // OCR resolved — cancel the timeout
   const win = runtime.screenshotSelectionWindow;
 
@@ -414,10 +417,18 @@ function showSelectionWithText(text) {
 
   const currentTargetLang = translationSettings.targetLanguage || 'zh';
 
+  // Work area of the display the loading window sits on — the card expands from
+  // a clamped 28×28 spot near a screen edge, so the renderer needs these bounds
+  // to keep the grown card on-screen (the screenshot path has no cursor anchor).
+  const wb = win.getBounds();
+  const disp = screen.getDisplayNearestPoint({ x: wb.x, y: wb.y });
+
   win.webContents.send(CHANNELS.SELECTION.SHOW_RESULT, {
     text: text,  // Mode 2: text only, renderer translates.
+    notice: notice || undefined, // e.g. "vision model degraded to local OCR"
     targetLanguage: currentTargetLang,
     theme: interfaceSettings.theme || 'light',
+    screenBounds: { x: disp.workArea.x, y: disp.workArea.y, width: disp.workArea.width, height: disp.workArea.height },
     settings: buildSelectionSettingsPayload(),
   });
 }
@@ -1082,6 +1093,15 @@ app.whenReady().then(() => {
     hideSelectionLoading,
     toggleFloatingWindow: (...args) => windowManager.toggleFloatingWindow(...args),
     createFloatingWindow: (...args) => windowManager.createFloatingWindow(...args),
+    // Global-hotkey capture: only when the floating window is up. Sent as an
+    // event (not focus) so the target app stays foreground and keeps its
+    // content (Teams captions, subtitle overlays) visible for the capture.
+    triggerFloatingCapture: () => {
+      const fw = windows.floatingWindow;
+      if (fw && !fw.isDestroyed() && fw.isVisible()) {
+        fw.webContents.send(CHANNELS.FLOATING_WINDOW.TRIGGER_CAPTURE);
+      }
+    },
     toggleSelectionTranslate,
     toggleSubtitleCaptureWindow: (...args) => windowManager.toggleSubtitleCaptureWindow(...args),
   };

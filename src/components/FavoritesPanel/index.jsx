@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import useTranslationStore from '../../stores/translation-store';
-import translationService from '../../services/translation.js';
+import translationService from '../../services/stack-client.js';
 import { getAnalysisPrompts, parseJsonReply } from '../../utils/ai-prompts.js';
 import useVisibleHotkey from '../../hooks/use-visible-hotkey.js';
 import HighlightText from '../shared/HighlightText.jsx';
@@ -160,13 +160,12 @@ const FavoriteCard = ({
     try {
       const { systemPrompt, userPrompt } = getAnalysisPrompts(item.sourceText, item.translatedText);
 
-      const result = await translationService.chatCompletion(
-        [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        useTranslationStore.getState().getPrivacyOptions()
-      );
+      // Privacy fields no longer travel from call sites — the main-process
+      // facade injects the live mode into every stack request.
+      const result = await translationService.chatCompletion([
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ]);
 
       if (result.success && result.content) {
         let parsed;

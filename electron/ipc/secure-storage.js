@@ -1,116 +1,17 @@
 // Secure storage IPC: encrypts API keys via Electron safeStorage (DPAPI on Windows).
 // Layered defenses: access audit log, anomaly detection, privacy-mode gate.
 // No plaintext fallback — refuses to store if encryption is unavailable.
+//
+// The audit trail and the offline privacy gate live in shared modules
+// (utils/secure-audit.js, utils/secure-vault.js) since the main-process
+// translation stack decrypts in-process through the same code paths — an
+// IPC-local audit would be blind to the stack's traffic.
 
-const { ipcMain, safeStorage, BrowserWindow } = require('electron');
+const { ipcMain, safeStorage } = require('electron');
 const { CHANNELS } = require('../shared/channels');
+const audit = require('../utils/secure-audit');
+const { isDecryptAllowed } = require('../utils/secure-vault');
 const logger = require('../utils/logger')('IPC:SecureStorage');
-
-// ===== Access audit =====
-
-// App-internal bulk sweeps legitimately touch every stored key at once:
-// settings-page load, translation-stack boot/reload in each of the three
-// windows, OCR engine config loads. They stay in the audit trail but are
-// excluded from the burst alarm — it exists to flag access patterns the
-// app's own architecture can't produce. (Before this, boot + one settings
-// save crossed the threshold and fired a false "suspicious access" alert.)
-const BULK_CONTEXTS = new Set(['settings-load', 'stack-reload', 'ocr-config']);
-
-const accessLog = {
-  records: [],
-  maxRecords: 200,
-
-  alertThreshold: 15,      // >15 non-bulk decrypts in window => suspicious
-  alertWindowMs: 60000,
-  lastAlertTime: 0,
-  alertCooldownMs: 300000, // throttle alerts to 1 per 5 min
-};
-
-function logAccess(key, context = 'unknown') {
-  accessLog.records.push({ key, timestamp: Date.now(), context });
-
-  if (accessLog.records.length > accessLog.maxRecords) {
-    accessLog.records = accessLog.records.slice(-accessLog.maxRecords);
-  }
-
-  return checkAnomaly();
-}
-
-function checkAnomaly() {
-  const now = Date.now();
-  const windowStart = now - accessLog.alertWindowMs;
-  const recent = accessLog.records.filter(
-    r => r.timestamp > windowStart && !BULK_CONTEXTS.has(r.context)
-  );
-
-  if (recent.length >= accessLog.alertThreshold) {
-    const uniqueKeys = new Set(recent.map(r => r.key));
-    return {
-      isAnomaly: true,
-      count: recent.length,
-      uniqueKeys: uniqueKeys.size,
-      window: accessLog.alertWindowMs / 1000,
-    };
-  }
-
-  return { isAnomaly: false };
-}
-
-function sendSecurityAlert(anomaly) {
-  const now = Date.now();
-  if (now - accessLog.lastAlertTime < accessLog.alertCooldownMs) return;
-  accessLog.lastAlertTime = now;
-
-  logger.warn(`SECURITY ALERT: ${anomaly.count} decrypt ops in ${anomaly.window}s (${anomaly.uniqueKeys} unique keys)`);
-
-  for (const win of BrowserWindow.getAllWindows()) {
-    if (!win.isDestroyed()) {
-      win.webContents.send('security-alert', {
-        type: 'suspicious-key-access',
-        count: anomaly.count,
-        uniqueKeys: anomaly.uniqueKeys,
-        timestamp: now,
-      });
-    }
-  }
-}
-
-// ===== Privacy-mode gate =====
-
-const ONLINE_KEY_PREFIXES = [
-  'provider_openai_',
-  'provider_anthropic_',
-  'provider_deepl_',
-  'provider_gemini_',
-  'provider_deepseek_',
-  'provider_google-translate_',
-  'provider_microsoft-translator_',
-  'provider_baidu-translate_',
-  // All vaulted OCR keys belong to online engines (ocr-key-vault.js);
-  // offline mode's allowed engines are local-only and need no keys.
-  'ocr_',
-];
-
-function isDecryptAllowed(key, store) {
-  const privacyMode = store.get('privacyMode', 'standard');
-
-  if (privacyMode === 'standard' || privacyMode === 'secure') {
-    return { allowed: true };
-  }
-
-  // offline/strict: block online API keys to prevent network leakage
-  const isOnlineKey = ONLINE_KEY_PREFIXES.some(prefix => key.startsWith(prefix));
-  if (isOnlineKey) {
-    return {
-      allowed: false,
-      reason: `Privacy mode "${privacyMode}" blocks online API key decryption`,
-    };
-  }
-
-  return { allowed: true };
-}
-
-// ===== IPC handlers =====
 
 function register(ctx) {
   const { store } = ctx;
@@ -146,13 +47,7 @@ function register(ctx) {
         return null;
       }
 
-      const context = options?.context || 'unknown';
-      // Bulk records can't create an anomaly (filtered in checkAnomaly), so
-      // isAnomaly here always reflects a genuine non-bulk burst.
-      const anomaly = logAccess(key, context);
-      if (anomaly.isAnomaly) {
-        sendSecurityAlert(anomaly);
-      }
+      audit.auditAccess(key, options?.context || 'unknown');
 
       const stored = store.get(`__encrypted_${key}`);
       if (!stored) return null;
@@ -185,23 +80,21 @@ function register(ctx) {
     return safeStorage.isEncryptionAvailable();
   });
 
-  // No access-log query channel: the audit trail (accessLog above) exists for
-  // the anomaly detector + security alerts, not for UI consumption.
+  // No access-log query channel: the audit trail exists for the anomaly
+  // detector + security alerts, not for UI consumption.
 
   logger.info('SecureStorage IPC handlers registered (with audit & privacy guard)');
 }
 
 module.exports = register;
-// Shared with floating-window.js so its direct safeStorage reads respect the
-// same offline-mode gate instead of maintaining a second prefix list.
+// Re-exported for floating-window.js and any other main-side consumer so its
+// direct safeStorage reads respect the same offline-mode gate.
 module.exports.isDecryptAllowed = isDecryptAllowed;
 // Test-only surface (tests/unit/secure-audit.test.js): the burst heuristic
-// must stay false-positive-free for app-internal bulk sweeps.
+// must stay false-positive-free for app-internal bulk sweeps. Kept stable
+// across the extraction to utils/secure-audit.js.
 module.exports._audit = {
-  logAccess,
-  checkAnomaly,
-  reset() {
-    accessLog.records = [];
-    accessLog.lastAlertTime = 0;
-  },
+  logAccess: audit.logAccess,
+  checkAnomaly: audit.checkAnomaly,
+  reset: audit.reset,
 };

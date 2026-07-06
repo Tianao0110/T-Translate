@@ -8,15 +8,20 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 - OCR 模型热更新只改 `ocr-models` Release 资产（bump manifest version 即可，无需发版），维护手册见 [docs/OCR_MODELS.md](docs/OCR_MODELS.md)
 - 语言包 rec 模型目前 v4 代际；上游出 v5 多语言 ONNX 后按 OCR_MODELS.md「更新模型」流程换入
 
-## v0.3 candidates
+## v0.3.1 发版清单（本次）
 
-### 翻译栈 + 在线 OCR 下沉主进程（独立专项，需 design doc）
+1. 合并 `feat/main-process-stack`（用户执行，--no-ff；11 提交 = 下沉批0-4 + 三个修复批 + 悬浮窗零焦点截取两批；CHANGELOG v0.3.1 条目已在分支上）
+2. 发版前抽查（大部分回归已过：主窗/两窗/OCR 全链均用户实测通过）：三隐私模式各截译一次、悬浮窗自动刷新+全局键 Ctrl+Alt+Space 实景、如有代理环境补一次云 provider 冒烟（design doc §4.4 全矩阵备查）
+3. `npm run dist` → Release 三件套（exe + blockmap + latest.yml）；**本版未动 OCR 模型，无需 ocr:release**
+4. CHANGELOG 删"待发布"补日期
 
-2026-07-02 设置页专项评估结论：本轮只做小方案（配置变更广播 reload + cache 覆写修复 + OCR 密钥渲染端加密），下沉另立专项。届时一并迁移：
+### 下沉专项批5 · 旧栈清理净删（留下一版本；须 v0.3.1 稳定一个回归周期后）
 
-- **翻译 provider 栈下沉** — 三 renderer 各持实例/L1 缓存/failure count 互不共享，L2 localStorage 写入互覆。下沉后：跨窗口缓存命中、密钥单点解密、隐私模式单点强制
-- **在线 OCR 调用下沉** — 四家在线 OCR（OCR.space/Google Vision/Azure/百度）改经主进程发请求，密钥只留主进程、不再进任何渲染进程（本轮 D1 拍板选了渲染端加密小修，主进程化为终态方向；旧的四个主进程 handler 已腐化两代并在本轮删除，届时按现行引擎实现重写）
-- **硬前提** — 主进程目前是未打包裸 CJS（`"main": "electron/main.js"`），providers 层是 ESM + svg import + 渲染端 i18n/localStorage：下沉前必须先引入主进程打包链（如 vite-plugin-electron）并拆分 provider 的 metadata（UI 用）与运行时；流式需自建 chunk IPC 协议、用户级 abort 需请求 id→AbortController 映射。估 15-25 文件 / ±800-1200 行 / 3-5 工作日
+批0-4 已随 v0.3.1 交付（三窗+OCR 已全走主进程栈，旧渲染端栈零消费者留位回滚保险）。批5 范围（design doc §4.1 + mainproc-migration-design 记忆有细节）：
+- 删旧栈：src/services/translation.js、cache.js、providers/* 运行时类（metadata 收敛为直接 import stack 共享表 + icons 集中）、providers/ocr/ 全目录、services/index.js 死桶
+- localStorage 退役：'translation-cache' 键清理；customFilters 迁移 electron-store（D-1b，registerFilter/getFilters 死 API 不留）
+- 评估退役：ipc/ocr.js 旧识别通道（四端对照）、ocr-key-vault 解密侧（encrypt 侧保留）、preload 死暴露
+- docs/ARCHITECTURE.md 架构图更新 + 净删预期 ~-800 行；删除批回滚成本高，单独分批提交
 
 ### 主题二期候选（一期已随 v0.3.1 落地 2026-07-04）
 
@@ -41,9 +46,10 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 
 只覆盖纯 JS 改动；koffi/uiohook/node-screenshots/OCR 全在 asarUnpack，native 或 Electron 版本一变必须回全量；且热更新通道必须做包签名校验，否则是供应链攻击口。当前差分下载（v0.2.8 起）已覆盖大部分收益。
 
-### 流式翻译用户级 abort 传播（设置页审计 P2-34，本轮暂缓）
+### FAQ 候选（文档化即可）
 
-流式翻译无用户级取消：被取代的请求（流进行中清空/切语言解除门禁后）在后台跑完到 [DONE]，白耗 token/本地 GPU。修法需 translate/translateStream 增 `options.signal`，各 provider fetch 用 `AbortSignal.any([signal, timeoutController.signal])` 合并，[main-translation.js](src/services/main-translation.js) 持当前 run 的 AbortController、新 run 启动时 abort 上一个。横跨 ~10 个 provider fetch，属性能优化非正确性 bug，单独排期做全量回归。
+- **Teams 字幕截不到**：Teams「弹出字幕窗口」自带系统级反截屏（WDA 排除捕获，任何截图工具都黑），把字幕**固定在会议窗口内**即可正常被悬浮窗截取；配合悬浮窗自动刷新/全局键（v0.3.1）零焦点使用
+- 百度 Unlimited-OCR 的 vLLM 镜像是 OpenAI 兼容 API，有 N 卡用户可把 llm-vision 端点指过去零改动直连
 
 ### Full onboarding wizard
 
@@ -51,5 +57,5 @@ The v0.2.6 OCR error-to-guidance fix is the short version. Full version: first-l
 
 ### Incremental unit test coverage buildout
 
-`tests/unit/` 现有 8 个测试文件（selection 三件套 / stream-throttle / ocr-packs / 历史导入规范化等）。Principle: add tests when you touch a file, new features ship with tests, bug fixes ship with regression tests. Not chasing 100% coverage.
+`tests/unit/` 现有 15 个测试文件（selection 三件套 / stream-throttle / ocr-packs / 历史导入 / stack 五件套：service·cache·i18n·ocr·secure-vault / secure-audit / error-classification 等）。Principle: add tests when you touch a file, new features ship with tests, bug fixes ship with regression tests. Not chasing 100% coverage.
 

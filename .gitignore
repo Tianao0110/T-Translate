@@ -7,6 +7,8 @@ build/
 out/
 release*/
 *.asar
+# 主进程翻译栈 bundle（scripts/build-stack.js 生成）
+electron/generated/
 
 # Electron 打包
 dist-electron/
