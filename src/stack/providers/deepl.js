@@ -1,13 +1,14 @@
 // DeepL translation provider.
+// Stack port of src/providers/deepl/index.js — metadata from the shared table,
+// network via rtFetch; logic byte-identical.
 
-import { BaseProvider, _t } from '../base.js';
-import icon from './icon.svg';
-import { PROVIDER_METADATA } from '../../stack/providers/metadata.js';
+import { BaseProvider, _t } from './base.js';
+import { PROVIDER_METADATA } from './metadata.js';
+import { rtFetch } from '../runtime.js';
 
 class DeepLProvider extends BaseProvider {
 
-  // Shared table (single source with the main-process stack) + renderer icon
-  static metadata = { ...PROVIDER_METADATA['deepl'], icon };
+  static metadata = PROVIDER_METADATA['deepl'];
 
   constructor(config = {}) {
     super({
@@ -100,7 +101,7 @@ class DeepLProvider extends BaseProvider {
         params.append('source_lang', sourceCode);
       }
 
-      const response = await fetch(`${this.baseUrl}/translate`, {
+      const response = await rtFetch(`${this.baseUrl}/translate`, {
         method: 'POST',
         headers: {
           'Authorization': `DeepL-Auth-Key ${this.config.apiKey}`,
@@ -160,7 +161,7 @@ class DeepLProvider extends BaseProvider {
 
     try {
       // /usage is the cheapest endpoint and surfaces quota info as a bonus
-      const response = await fetch(`${this.baseUrl}/usage`, {
+      const response = await rtFetch(`${this.baseUrl}/usage`, {
         method: 'GET',
         headers: {
           'Authorization': `DeepL-Auth-Key ${this.config.apiKey}`,
@@ -198,7 +199,7 @@ class DeepLProvider extends BaseProvider {
     if (!this.config.apiKey) return null;
 
     try {
-      const response = await fetch(`${this.baseUrl}/usage`, {
+      const response = await rtFetch(`${this.baseUrl}/usage`, {
         method: 'GET',
         headers: {
           'Authorization': `DeepL-Auth-Key ${this.config.apiKey}`,
@@ -223,7 +224,7 @@ class DeepLProvider extends BaseProvider {
     if (!this.config.apiKey) return [];
 
     try {
-      const response = await fetch(`${this.baseUrl}/languages`, {
+      const response = await rtFetch(`${this.baseUrl}/languages`, {
         method: 'GET',
         headers: {
           'Authorization': `DeepL-Auth-Key ${this.config.apiKey}`,

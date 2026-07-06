@@ -1,17 +1,18 @@
 // Microsoft Translator (Azure Cognitive Services).
 // Free tier: 2M chars/month.
+// Stack port of src/providers/microsoft-translator/index.js — metadata from the
+// shared table, network via rtFetch; logic byte-identical.
 
-import { BaseProvider, _t } from '../base.js';
-import icon from './icon.svg';
-import { PROVIDER_METADATA } from '../../stack/providers/metadata.js';
-import createLogger from '../../utils/logger.js';
+import { BaseProvider, _t } from './base.js';
+import { PROVIDER_METADATA } from './metadata.js';
+import { rtFetch } from '../runtime.js';
+import createLogger from '../logger.js';
 
 const logger = createLogger('MicrosoftTranslator');
 
 class MicrosoftTranslatorProvider extends BaseProvider {
 
-  // Shared table (single source with the main-process stack) + renderer icon
-  static metadata = { ...PROVIDER_METADATA['microsoft-translator'], icon };
+  static metadata = PROVIDER_METADATA['microsoft-translator'];
 
   constructor(config = {}) {
     super({
@@ -85,7 +86,7 @@ class MicrosoftTranslatorProvider extends BaseProvider {
         headers['Ocp-Apim-Subscription-Region'] = this.config.region;
       }
 
-      const response = await fetch(
+      const response = await rtFetch(
         `https://api.cognitive.microsofttranslator.com/translate?${params.toString()}`,
         {
           method: 'POST',

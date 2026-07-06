@@ -1,15 +1,16 @@
 // Google Gemini provider via Google AI Studio API.
+// Stack port of src/providers/gemini/index.js — metadata from the shared table,
+// network via rtFetch; logic byte-identical.
 
-import { BaseProvider, LANGUAGE_CODES, _t } from '../base.js';
-import icon from './icon.svg';
-import { PROVIDER_METADATA } from '../../stack/providers/metadata.js';
-import createLogger from '../../utils/logger.js';
+import { BaseProvider, LANGUAGE_CODES, _t } from './base.js';
+import { PROVIDER_METADATA } from './metadata.js';
+import { rtFetch } from '../runtime.js';
+import createLogger from '../logger.js';
 const logger = createLogger('Gemini');
 
 class GeminiProvider extends BaseProvider {
 
-  // Shared table (single source with the main-process stack) + renderer icon
-  static metadata = { ...PROVIDER_METADATA['gemini'], icon };
+  static metadata = PROVIDER_METADATA['gemini'];
 
   constructor(config = {}) {
     super({
@@ -38,7 +39,7 @@ class GeminiProvider extends BaseProvider {
 
     try {
       // Model-info endpoint is the cheapest way to validate the key
-      const response = await fetch(
+      const response = await rtFetch(
         `https://generativelanguage.googleapis.com/v1/models/${this.config.model}?key=${this.config.apiKey}`,
         {
           method: 'GET',
@@ -68,11 +69,11 @@ class GeminiProvider extends BaseProvider {
 
     try {
       let prompt;
-      // Support both legacy string and `{ content, mode }` from services/translation.js
+      // Support both legacy string and `{ content, mode }` from the service layer
       const promptOpt = options.systemPrompt;
       const promptStr = promptOpt && typeof promptOpt === 'object' ? promptOpt.content : promptOpt;
       if (promptStr) {
-        // systemPrompt arrives from translation.js already interpolated
+        // systemPrompt arrives from the service already interpolated
         // (getSystemPrompt / buildMTPrompt both resolve {targetLang}), so no
         // further replace is needed — just append the source text.
         prompt = `${promptStr}\n\n${text}`;
@@ -101,7 +102,7 @@ class GeminiProvider extends BaseProvider {
         },
       };
 
-      const response = await fetch(
+      const response = await rtFetch(
         `https://generativelanguage.googleapis.com/v1/models/${this.config.model}:generateContent?key=${this.config.apiKey}`,
         {
           method: 'POST',

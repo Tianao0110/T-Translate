@@ -1100,8 +1100,11 @@ app.whenReady().then(() => {
   // for now — translation still runs renderer-side, so a missing/broken bundle
   // must not block startup; it just logs loudly for diagnosis.
   try {
+    const { net } = require('electron');
     const { createTranslationStack } = require('./generated/translation-stack.cjs');
-    const stack = createTranslationStack({ store });
+    // net.fetch, NOT Node's fetch: the stack must ride Chromium's network
+    // stack (system proxy, enterprise certs) like the renderer always did.
+    const stack = createTranslationStack({ fetch: net.fetch.bind(net) });
     logger.info(`Translation stack bundle loaded (ping=${stack.ping()})`);
   } catch (e) {
     logger.error('Translation stack bundle missing/broken — run `node scripts/build-stack.js`:', e.message);

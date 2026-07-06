@@ -1,16 +1,17 @@
 // Anthropic Messages API provider (not OpenAI-compatible).
+// Stack port of src/providers/anthropic/index.js — metadata from the shared
+// table, network via rtFetch; logic byte-identical.
 
-import { BaseProvider, LANGUAGE_CODES, _t } from '../base.js';
-import icon from './icon.svg';
-import { PROVIDER_METADATA } from '../../stack/providers/metadata.js';
-import createLogger from '../../utils/logger.js';
+import { BaseProvider, LANGUAGE_CODES, _t } from './base.js';
+import { PROVIDER_METADATA } from './metadata.js';
+import { rtFetch } from '../runtime.js';
+import createLogger from '../logger.js';
 
 const logger = createLogger('Anthropic');
 
 class AnthropicProvider extends BaseProvider {
 
-  // Shared table (single source with the main-process stack) + renderer icon
-  static metadata = { ...PROVIDER_METADATA['anthropic'], icon };
+  static metadata = PROVIDER_METADATA['anthropic'];
 
   constructor(config = {}) {
     super({
@@ -45,7 +46,7 @@ class AnthropicProvider extends BaseProvider {
     return null;
   }
 
-  // Supports both legacy string and `{ content, mode }` from services/translation.js
+  // Supports both legacy string and `{ content, mode }` from the service layer
   _resolveSystemPrompt(options, targetLang) {
     const promptOpt = options.systemPrompt;
     return (promptOpt && typeof promptOpt === 'object' ? promptOpt.content : promptOpt) ||
@@ -71,7 +72,7 @@ class AnthropicProvider extends BaseProvider {
     try {
       const systemPrompt = this._resolveSystemPrompt(options, targetLang);
 
-      const response = await fetch(`${this.config.baseUrl}/v1/messages`, {
+      const response = await rtFetch(`${this.config.baseUrl}/v1/messages`, {
         method: 'POST',
         headers: this._buildHeaders(),
         body: this._buildBody(text, systemPrompt),
@@ -132,7 +133,7 @@ class AnthropicProvider extends BaseProvider {
 
       let response;
       try {
-        response = await fetch(`${this.config.baseUrl}/v1/messages`, {
+        response = await rtFetch(`${this.config.baseUrl}/v1/messages`, {
           method: 'POST',
           headers: this._buildHeaders(),
           body: this._buildBody(text, systemPrompt, true),
@@ -199,7 +200,7 @@ class AnthropicProvider extends BaseProvider {
 
     try {
       // Minimum-cost ping: 10 tokens output for "Hi"
-      const response = await fetch(`${this.config.baseUrl}/v1/messages`, {
+      const response = await rtFetch(`${this.config.baseUrl}/v1/messages`, {
         method: 'POST',
         headers: this._buildHeaders(),
         body: JSON.stringify({
@@ -230,7 +231,8 @@ class AnthropicProvider extends BaseProvider {
     }
   }
 
-  // anthropic-dangerous-direct-browser-access lets us call from renderer (no CORS proxy)
+  // Header kept identical to the renderer implementation (the dangerous-direct
+  // flag is inert outside a browser context and keeps the request shape stable).
   _buildHeaders() {
     return {
       'Content-Type': 'application/json',

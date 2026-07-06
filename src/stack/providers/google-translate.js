@@ -1,15 +1,17 @@
 // Google Translate via the unofficial translate.google.com web API (no key needed).
+// Stack port of src/providers/google-translate/index.js — metadata from the
+// shared table, network via rtFetch; the tk bit-magic is untouched (it must
+// match Google's algorithm exactly or the API returns 403).
 
-import { BaseProvider, LANGUAGE_CODES, _t } from '../base.js';
-import icon from './icon.svg';
-import { PROVIDER_METADATA } from '../../stack/providers/metadata.js';
-import createLogger from '../../utils/logger.js';
+import { BaseProvider, _t } from './base.js';
+import { PROVIDER_METADATA } from './metadata.js';
+import { rtFetch } from '../runtime.js';
+import createLogger from '../logger.js';
 const logger = createLogger('GoogleTranslate');
 
 class GoogleTranslateProvider extends BaseProvider {
 
-  // Shared table (single source with the main-process stack) + renderer icon
-  static metadata = { ...PROVIDER_METADATA['google-translate'], icon };
+  static metadata = PROVIDER_METADATA['google-translate'];
 
   constructor(config = {}) {
     super({
@@ -18,7 +20,7 @@ class GoogleTranslateProvider extends BaseProvider {
       ...config,
     });
 
-    // Fold any persisted 'cn' (removed above) back to a working server.
+    // Fold any persisted 'cn' (removed from options) back to a working server.
     if (this.config.domain === 'cn') {
       this.config.domain = 'com';
     }
@@ -90,7 +92,7 @@ class GoogleTranslateProvider extends BaseProvider {
       if (usePost) {
         const paramsWithoutQ = new URLSearchParams(params);
         paramsWithoutQ.delete('q');
-        response = await fetch(`${baseUrl}/translate_a/single?${paramsWithoutQ.toString()}`, {
+        response = await rtFetch(`${baseUrl}/translate_a/single?${paramsWithoutQ.toString()}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -99,7 +101,7 @@ class GoogleTranslateProvider extends BaseProvider {
           signal: AbortSignal.timeout(this.config.timeout),
         });
       } else {
-        response = await fetch(`${baseUrl}/translate_a/single?${params.toString()}`, {
+        response = await rtFetch(`${baseUrl}/translate_a/single?${params.toString()}`, {
           method: 'GET',
           signal: AbortSignal.timeout(this.config.timeout),
         });

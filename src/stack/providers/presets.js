@@ -1,27 +1,13 @@
-// src/providers/openai-compatible/presets.js
-// Renderer-side presets: shared core (metadata / defaults / pure hooks live in
-// src/stack/providers/ — single source with the main-process stack) plus the
-// renderer-local pieces: svg icons and localized test messages via renderer _t.
-// To add a new OpenAI-compatible provider: extend presets-core.js + metadata.js,
-// then register its icon/message here.
+// Stack-side presets: shared core (metadata / defaults / pure hooks) plus the
+// stack-local localized messages. The renderer's presets file assembles the
+// same core with its own _t and svg icons — see presets-core.js for why the
+// split exists.
 
-import openaiIcon from './icons/openai.svg';
-import deepseekIcon from './icons/deepseek.svg';
-import ollamaIcon from './icons/ollama.svg';
-import localLlmIcon from './icons/local-llm.svg';
-import { PROVIDER_METADATA } from '../../stack/providers/metadata.js';
-import { PRESET_CORE } from '../../stack/providers/presets-core.js';
-import { _t } from '../base.js';
+import { PROVIDER_METADATA } from './metadata.js';
+import { PRESET_CORE } from './presets-core.js';
+import { _t } from '../i18n.js';
 
-const ICONS = {
-  'openai': openaiIcon,
-  'deepseek': deepseekIcon,
-  'ollama': ollamaIcon,
-  'local-llm': localLlmIcon,
-};
-
-// Localized per-preset success messages (the only env-coupled hook part —
-// the stack has its own copy over the same i18n keys).
+// Localized per-preset success messages (the only env-coupled hook part).
 const TEST_MESSAGES = {
   'openai': (count) => _t('providerError.connectedModels', `连接成功，检测到 ${count} 个模型`, { count }),
   'deepseek': () => _t('providerError.connectSuccess', '连接成功'),
@@ -30,7 +16,7 @@ const TEST_MESSAGES = {
 
 export const PRESETS = PRESET_CORE.map((core) => ({
   id: core.id,
-  metadata: { ...PROVIDER_METADATA[core.id], icon: ICONS[core.id] },
+  metadata: PROVIDER_METADATA[core.id],
   defaults: core.defaults,
   latencyLevel: core.latencyLevel,
   requiresNetwork: core.requiresNetwork,

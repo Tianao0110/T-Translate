@@ -1,18 +1,20 @@
 // Baidu Translate API (https://fanyi-api.baidu.com).
 // Free tier: 50k chars/month standard, 1M chars/month advanced.
 // Reachable inside mainland China without a proxy.
+// Stack port of src/providers/baidu-translate/index.js — metadata from the
+// shared table, network via rtFetch; the MD5 reference impl is untouched (any
+// change breaks the request signature).
 
-import { BaseProvider, _t } from '../base.js';
-import icon from './icon.svg';
-import { PROVIDER_METADATA } from '../../stack/providers/metadata.js';
-import createLogger from '../../utils/logger.js';
+import { BaseProvider, _t } from './base.js';
+import { PROVIDER_METADATA } from './metadata.js';
+import { rtFetch } from '../runtime.js';
+import createLogger from '../logger.js';
 
 const logger = createLogger('BaiduTranslate');
 
 class BaiduTranslateProvider extends BaseProvider {
 
-  // Shared table (single source with the main-process stack) + renderer icon
-  static metadata = { ...PROVIDER_METADATA['baidu-translate'], icon };
+  static metadata = PROVIDER_METADATA['baidu-translate'];
 
   constructor(config = {}) {
     super({
@@ -168,7 +170,7 @@ class BaiduTranslateProvider extends BaseProvider {
       // body, so switch over once the text is large. Threshold mirrors the
       // google provider's URL-length guard.
       const usesPost = text.length > 1500;
-      const response = await fetch(
+      const response = await rtFetch(
         usesPost
           ? 'https://fanyi-api.baidu.com/api/trans/vip/translate'
           : `https://fanyi-api.baidu.com/api/trans/vip/translate?${params.toString()}`,

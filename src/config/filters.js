@@ -3,8 +3,8 @@
 // restored after. Used to prevent code, URLs, emails etc. from being
 // rewritten by the LLM.
 
-import createLogger from '../utils/logger.js';
-const logger = createLogger('Filters');
+// No logger import here: this file is cross-imported by the main-process
+// stack bundle, and utils/logger.js carries a Vite-only import.meta.
 
 // Each filter: { name, pattern (RegExp, MUST be /g), description, enabled }.
 export const DEFAULT_FILTERS = [
@@ -102,7 +102,7 @@ export function createCustomFilter(name, patternStr, description = '') {
       isCustom: true,
     };
   } catch (error) {
-    logger.error('Invalid regex:', patternStr, error);
+    console.error('[Filters] Invalid regex:', patternStr, error);
     return null;
   }
 }
