@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Zap, Shield, Lock, CheckCircle, AlertCircle, Trash2, ClipboardList, Database, Check, X } from 'lucide-react';
 import useTranslationStore from '../../../stores/translation-store';
-import translationService from '../../../services/translation.js';
+import translationService from '../../../services/stack-client.js';
 import { PRIVACY_MODES, PRIVACY_MODE_IDS } from '../constants.js';
 
 const formatBytes = (bytes) => {
@@ -71,7 +71,7 @@ const PrivacySection = ({
 
     let cacheCount = 0;
     try {
-      cacheCount = translationService.getCacheStats()?.l2Stats?.total ?? 0;
+      cacheCount = (await translationService.getCacheStats())?.l2Stats?.total ?? 0;
     } catch { /* count stays 0 */ }
 
     const main = (await window.electron?.app?.getDataStats?.()) || {};
@@ -114,7 +114,7 @@ const PrivacySection = ({
 
   const handleClearCache = async () => {
     if (!(await confirm(t('translationSettings.clearCacheConfirm')))) return;
-    translationService.clearCache();
+    await translationService.clearCache();
     notify(t('translationSettings.cacheCleared'), 'success');
     refreshDataStats();
   };

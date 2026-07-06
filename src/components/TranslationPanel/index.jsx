@@ -12,7 +12,7 @@ import {
 
 import { useShallow } from 'zustand/react/shallow';
 import useTranslationStore from '../../stores/translation-store';
-import translationService from '../../services/translation.js';
+import translationService from '../../services/stack-client.js';
 import { TTS_STATUS } from '../../services/tts/index.js';
 import createLogger from '../../utils/logger.js';
 import { getShortErrorMessage } from '../../utils/error-handler.js';
@@ -119,8 +119,21 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   ];
 
   // Surface the auto-switch so users know why output style changed.
-  // Recomputed per render — cheap registry lookup, no subscription needed.
-  const isMTModel = !!detectTemplateFromModel(translationService.getCurrentProvider()?.model || '');
+  // The active model now lives in the main process — pull it once and refresh
+  // on stack:changed (settings save reloads the stack in any window).
+  const [activeModel, setActiveModel] = useState('');
+  useEffect(() => {
+    let alive = true;
+    const pull = () => {
+      translationService.getCurrentProvider()
+        .then((p) => { if (alive) setActiveModel(p?.model || ''); })
+        .catch(() => {});
+    };
+    pull();
+    const off = translationService.onChanged(pull);
+    return () => { alive = false; off?.(); };
+  }, []);
+  const isMTModel = !!detectTemplateFromModel(activeModel);
 
   // Triggered when MainWindow passes screenshot data in via props (capture flow)
   useEffect(() => {

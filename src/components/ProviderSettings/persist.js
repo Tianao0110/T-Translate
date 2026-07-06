@@ -3,7 +3,7 @@
 // triggered from any tab writes provider data completely instead of the old
 // activeSection-routed path that silently dropped it.
 
-import translationService from '../../services/translation.js';
+import stackClient from '../../services/stack-client.js';
 import createLogger from '../../utils/logger.js';
 
 const logger = createLogger('ProviderSettings');
@@ -87,12 +87,13 @@ export async function persistProviderData({ providers, providerConfigs, allProvi
     await window.electron.store.set('settings.translation.providerConfigs', sanitized);
   }
 
-  // reload uses the in-memory plaintext configs (this window's service needs
-  // usable keys); disk got the sanitized copy above.
-  await translationService.reload({
-    providers: { list: providers, configs: providerConfigs },
-  });
+  // Main-process stack re-reads store + vault itself — no plaintext configs
+  // travel back over IPC for the reload.
+  await stackClient.reload();
 
+  // Dual-notify transition (until the floating/selection windows switch to the
+  // stack too): the legacy broadcast still drives their old renderer-side
+  // reload AND their non-stack settings sync. Do not remove before batch 3.
   if (window.electron?.floatingWindow?.notifySettingsChanged) {
     await window.electron.floatingWindow.notifySettingsChanged();
   }

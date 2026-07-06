@@ -1,7 +1,7 @@
 // Save-to-favorites modal: AI-generated tags/summary + persist action.
 
 import { useState, useCallback, useRef } from 'react';
-import translationService from '../../../services/translation.js';
+import translationService from '../../../services/stack-client.js';
 import useTranslationStore from '../../../stores/translation-store';
 import { getAnalysisPrompts, parseJsonReply } from '../../../utils/ai-prompts.js';
 import createLogger from '../../../utils/logger.js';
@@ -29,13 +29,12 @@ export default function useSaveModal(currentTranslation, addToFavorites, notify,
       const { sourceText, translatedText } = currentTranslation;
       const { systemPrompt, userPrompt } = getAnalysisPrompts(sourceText, translatedText);
 
-      const result = await translationService.chatCompletion(
-        [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        useTranslationStore.getState().getPrivacyOptions()
-      );
+      // Privacy fields no longer travel from call sites — the main-process
+      // facade injects the live mode into every stack request.
+      const result = await translationService.chatCompletion([
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ]);
       if (reqId !== analyzeReqRef.current) return;
 
       if (result.success && result.content) {

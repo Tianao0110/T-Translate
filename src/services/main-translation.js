@@ -1,9 +1,13 @@
-// Main-window translation service. Wires UI store state to translationService
-// and ocrManager, drives status transitions, and writes history.
-// Call graph: TranslationPanel -> translation-store -> this -> translationService -> providers
+// Main-window translation service. Wires UI store state to the main-process
+// translation stack (via stack-client) and ocrManager, drives status
+// transitions, and writes history. privacyMode/useCache no longer travel from
+// here — the main-process facade injects them; history gating reads the mode
+// snapshot the facade attaches to each result (effectivePrivacyMode), so the
+// gate can never disagree with what the request actually ran under.
+// Call graph: TranslationPanel -> translation-store -> this -> stack IPC -> providers
 
 import { v4 as uuidv4 } from 'uuid';
-import translationService from './translation.js';
+import translationService from './stack-client.js';
 import { ocrManager } from '../providers/ocr/index.js';
 import useTranslationStore from '../stores/translation-store.js';
 
@@ -37,7 +41,6 @@ class MainTranslationService {
 
   async streamTranslate(options = {}) {
     const state = useTranslationStore.getState();
-    const mode = state.translationMode;
     const { sourceText, sourceLanguage, targetLanguage } = state.currentTranslation;
 
     if (!sourceText.trim()) {
@@ -65,8 +68,6 @@ class MainTranslationService {
           sourceLang: sourceLanguage,
           targetLang: targetLanguage,
           template: options.template || state.currentTranslation.metadata.template,
-          privacyMode: mode,
-          useCache: mode !== PRIVACY_MODES.SECURE,
           glossaryTerms,
         },
         // Per-chunk UI update for typewriter effect
@@ -114,7 +115,7 @@ class MainTranslationService {
           draft.currentTranslation.versions = [originalVersion];
           draft.currentTranslation.currentVersionId = 'v1';
 
-          if (mode !== PRIVACY_MODES.SECURE && result.text) {
+          if (result.effectivePrivacyMode !== PRIVACY_MODES.SECURE && result.text) {
             this._addToHistory(draft, {
               id: translationId,
               sourceText,
@@ -146,7 +147,6 @@ class MainTranslationService {
 
   async translate(options = {}) {
     const state = useTranslationStore.getState();
-    const mode = state.translationMode;
     const { sourceText, sourceLanguage, targetLanguage } = state.currentTranslation;
 
     if (!sourceText.trim()) {
@@ -170,8 +170,6 @@ class MainTranslationService {
         sourceLang: sourceLanguage,
         targetLang: targetLanguage,
         template: options.template || state.currentTranslation.metadata.template,
-        privacyMode: mode,
-        useCache: mode !== PRIVACY_MODES.SECURE,
         glossaryTerms,
       });
 
@@ -208,7 +206,7 @@ class MainTranslationService {
           draft.currentTranslation.versions = [originalVersion];
           draft.currentTranslation.currentVersionId = 'v1';
 
-          if (mode !== PRIVACY_MODES.SECURE) {
+          if (result.effectivePrivacyMode !== PRIVACY_MODES.SECURE) {
             this._addToHistory(draft, {
               id: translationId,
               sourceText,
@@ -268,8 +266,6 @@ class MainTranslationService {
           sourceLang: state.currentTranslation.sourceLanguage,
           targetLang: state.currentTranslation.targetLanguage,
           template: options.template,
-          privacyMode: state.translationMode,
-          useCache: state.translationMode !== PRIVACY_MODES.SECURE,
         });
 
         useTranslationStore.setState((draft) => {

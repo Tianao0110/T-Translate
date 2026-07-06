@@ -6,7 +6,7 @@ import {
   Zap, Globe, Plus, Settings, Power
 } from 'lucide-react';
 import { getAllProviderMetadata } from '../../providers/registry.js';
-import translationService from '../../services/translation.js';
+import translationService from '../../services/stack-client.js';
 import useTranslationStore from '../../stores/translation-store';
 import { secureStorage } from './persist.js';
 import './styles.css';
@@ -184,10 +184,10 @@ const ProviderSettings = ({ settings, settingsReady, updateSettings, notify }) =
 
     try {
       const config = providerConfigs[providerId];
-      // Explicit test clicks still honor the privacy mode — offline promises
-      // "no network requests", full stop.
-      const { privacyMode } = useTranslationStore.getState().getPrivacyOptions();
-      const result = await translationService.testProviderWithConfig(providerId, config, privacyMode);
+      // Offline still blocks explicit test clicks ("no network requests, full
+      // stop") — the gate now lives in the main-process facade, which applies
+      // the live mode; nothing to pass from here.
+      const result = await translationService.testProviderWithConfig(providerId, config);
       setTestResults(prev => ({ ...prev, [providerId]: result }));
     } catch (error) {
       setTestResults(prev => ({

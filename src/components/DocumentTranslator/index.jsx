@@ -20,7 +20,7 @@ import {
   SUPPORTED_FORMATS,
 } from '../../utils/document-parser.js';
 import { ocrManager } from '../../providers/ocr/index.js';
-import translationService from '../../services/translation.js';
+import translationService from '../../services/stack-client.js';
 import useTranslationStore from '../../stores/translation-store';
 import { LANGUAGES, PRIVACY_MODES } from '../../config/constants.js';
 import { getPrivacyModeConfig } from '../../config/privacy-modes.js';
@@ -336,12 +336,10 @@ const DocumentTranslator = ({
   const getGlossaryTerms = useTranslationStore(state => state.getGlossaryTerms);
   const translationMode = useTranslationStore(state => state.translationMode);
 
-  // The service defaults privacyMode to STANDARD, which would route
-  // offline/secure sessions to online providers and persist secure-mode
-  // results to the disk cache — so every translate call must carry these.
+  // privacyMode/useCache no longer travel from here — the main-process stack
+  // facade injects the live mode into every request (renderer values are
+  // discarded by design). translationMode stays for the OCR allowlist below.
   const buildTranslateOptions = () => ({
-    privacyMode: translationMode,
-    useCache: translationMode !== PRIVACY_MODES.SECURE,
     glossaryTerms: useGlossary ? getGlossaryTerms() : [],
   });
   
