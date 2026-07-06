@@ -64,6 +64,9 @@ const SelectionTranslator = () => {
   const [translatedText, setTranslatedText] = useState('');
   const [error, setError] = useState('');
   const [isOcrError, setIsOcrError] = useState(false);
+  // Non-fatal hint riding on screenshot results (e.g. vision engine degraded
+  // to local OCR) — this chain has no other surface to tell the user.
+  const [notice, setNotice] = useState('');
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [copied, setCopied] = useState(false);
   const [theme, setTheme] = useState(THEMES.LIGHT);
@@ -154,6 +157,7 @@ const SelectionTranslator = () => {
     setError('');
     setCopied(false);
     setIsOcrError(false);
+    setNotice('');
     setTriggerFailed(false);
   };
 
@@ -251,6 +255,7 @@ const SelectionTranslator = () => {
         if (data.targetLanguage) {
           setTranslation(prev => ({ ...prev, targetLanguage: data.targetLanguage }));
         }
+        if (data.notice) setNotice(data.notice);
         setSourceText(data.text);
         setShowSource(newSettings.showSourceByDefault);
         setIsFrozen(false);
@@ -819,6 +824,9 @@ const SelectionTranslator = () => {
               <div className="sel-error">{error}</div>
             ) : (
               <>
+                {notice && (
+                  <div className="sel-notice">{notice}</div>
+                )}
                 {showSource && sourceText && (
                   <div className="sel-source">{sourceText}</div>
                 )}

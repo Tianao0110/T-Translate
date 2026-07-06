@@ -18,6 +18,24 @@ function consoleLogger(scope) {
 }
 
 export default function createLogger(scope) {
-  const factory = getLoggerFactory();
-  return factory ? factory(scope) : consoleLogger(scope);
+  // Resolve the factory per call, not per createLogger: stack modules build
+  // their loggers at import time, BEFORE configureRuntime injects the real
+  // factory — eager binding silently pinned the whole OCR/translation pipeline
+  // to the console fallback and the on-disk log never saw it.
+  const fallback = consoleLogger(scope);
+  let real = null;
+  const resolve = () => {
+    if (!real) {
+      const factory = getLoggerFactory();
+      if (factory) real = factory(scope);
+    }
+    return real || fallback;
+  };
+  return {
+    debug: (...args) => resolve().debug(...args),
+    info: (...args) => resolve().info(...args),
+    warn: (...args) => resolve().warn(...args),
+    error: (...args) => resolve().error(...args),
+    success: (...args) => (resolve().success || resolve().info)(...args),
+  };
 }

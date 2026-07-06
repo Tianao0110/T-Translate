@@ -80,7 +80,7 @@ function register(ctx) {
     if (data.success && data.text) {
       logger.info('OCR complete, sending text to selection window for translation');
       if (managers.showSelectionWithText) {
-        managers.showSelectionWithText(data.text);
+        managers.showSelectionWithText(data.text, data.notice);
       } else {
         logger.warn('showSelectionWithText not available in managers');
       }

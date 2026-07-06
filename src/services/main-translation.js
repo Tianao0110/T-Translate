@@ -330,7 +330,13 @@ class MainTranslationService {
           }
         });
 
-        return { success: true, text: result.text, engine: result.engine, fallbackFrom: result.fallbackFrom };
+        return {
+          success: true,
+          text: result.text,
+          engine: result.engine,
+          fallbackFrom: result.fallbackFrom,
+          visionLocked: result.visionLocked,
+        };
       } else {
         throw new Error(result.error);
       }

@@ -397,7 +397,7 @@ function hideSelectionWindow() {
 
 // Send OCR'd text to the selection window — Mode 2 of SHOW_RESULT: the window receives
 // raw text and translates it itself (so the same translator + history flow gets reused).
-function showSelectionWithText(text) {
+function showSelectionWithText(text, notice) {
   clearSelectionLoadingWatchdog(); // OCR resolved — cancel the timeout
   const win = runtime.screenshotSelectionWindow;
 
@@ -416,6 +416,7 @@ function showSelectionWithText(text) {
 
   win.webContents.send(CHANNELS.SELECTION.SHOW_RESULT, {
     text: text,  // Mode 2: text only, renderer translates.
+    notice: notice || undefined, // e.g. "vision model degraded to local OCR"
     targetLanguage: currentTargetLang,
     theme: interfaceSettings.theme || 'light',
     settings: buildSelectionSettingsPayload(),

@@ -269,7 +269,17 @@ function createSelectionWindow() {
   if (windows.selection && !windows.selection.isDestroyed()) {
     const isFrozen = windows.selection._isFrozen;
     if (!isFrozen) {
-      return windows.selection;
+      // A persistent hide()-not-close window can outlive its renderer (crash,
+      // dev-server restart mid-session). Reusing it then means every trigger
+      // icon and result card goes to an invisible corpse — transparent +
+      // frameless + dead renderer paints nothing and raises nothing. Recreate.
+      if (windows.selection._rendererDead || windows.selection.webContents.isCrashed()) {
+        logger.warn?.(`Selection window ${windows.selection._windowId} renderer dead — recreating`);
+        try { windows.selection.destroy(); } catch { /* already gone */ }
+        windows.selection = null;
+      } else {
+        return windows.selection;
+      }
     }
   }
 
@@ -309,6 +319,17 @@ function createSelectionWindow() {
   } else {
     selectionWindow.loadFile(PATHS.pages.selection.file);
   }
+
+  // Renderer-death markers for the self-heal above. warn (not debug) so a
+  // field log shows exactly when and why the window went dark.
+  selectionWindow.webContents.on('render-process-gone', (event, details) => {
+    logger.warn?.(`Selection window ${windowId} renderer gone: ${details?.reason || 'unknown'}`);
+    selectionWindow._rendererDead = true;
+  });
+  selectionWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    logger.warn?.(`Selection window ${windowId} failed to load: ${errorCode} ${errorDescription}`);
+    selectionWindow._rendererDead = true;
+  });
 
   selectionWindow.on('closed', () => {
     if (selectionWindow._isFrozen) {

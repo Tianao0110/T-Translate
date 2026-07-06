@@ -79,6 +79,22 @@ describe('stack OCREngineManager', () => {
     expect(manager.isVisionLocked()).toBe(false);
   });
 
+  it('endpoint-level "no models loaded" also degrades to the local chain', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: false,
+      status: 400,
+      text: async () => '{"error":{"message":"No models loaded. Please load a model in the developer page"}}',
+      json: async () => ({}),
+    }));
+    configureRuntime({ fetch: fetchMock });
+    const manager = await makeManager();
+
+    const result = await manager.recognize(IMG, { engine: 'llm-vision' });
+    expect(result.success).toBe(true);
+    expect(result.engine).toBe('rapid-ocr');
+    expect(result.fallbackFrom).toBe('llm-vision');
+  });
+
   it('per-request priority reorders the walk without mutating shared state', async () => {
     const manager = await makeManager();
 

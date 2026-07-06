@@ -229,7 +229,9 @@ export class OCREngineManager {
   }
 
   // String-match against known "model doesn't speak images" failure modes
-  // from OpenAI-compatible servers, LM Studio, and timeout cases.
+  // from OpenAI-compatible servers, LM Studio, and timeout cases. Endpoint-level
+  // "nothing loaded" also degrades: hammering an empty server helps nobody and
+  // the local chain serves the capture instead.
   _isVisionUnsupportedError(errorMsg) {
     if (!errorMsg) return false;
     const lower = errorMsg.toLowerCase();
@@ -240,6 +242,8 @@ export class OCREngineManager {
            lower.includes('multimodal') ||
            lower.includes('image_url') ||
            lower.includes('content type') ||
+           lower.includes('no models loaded') ||
+           lower.includes('no model loaded') ||
            lower.includes('timeout') ||
            lower.includes('超时');
   }
