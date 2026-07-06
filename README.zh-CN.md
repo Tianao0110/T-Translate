@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.2.9-green" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.3.1-green" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="License">
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform">
 </p>
@@ -27,7 +27,7 @@
 | ---------------------- | ----------------------------------------------------------------------------------- |
 | **划词翻译**     | 系统级，任何应用中选中文字即翻译，支持 8 个冻结窗口                                 |
 | **截图 OCR**     | 截屏识别文字，7 个 OCR 引擎自动降级                                                 |
-| **悬浮窗口**     | 透明悬浮窗，空格截图翻译，复杂排版用                                                |
+| **悬浮窗口**     | 透明悬浮窗，空格截图翻译；自动刷新与全局快捷键零焦点截取，实时字幕/追番适用         |
 | **文档翻译**     | PDF / DOCX / EPUB / TXT / SRT 等 9 种格式，逐段翻译，进度可恢复                     |
 | **术语库**       | 翻译后自动替换术语，支持撤销                                                        |
 | **TTS 朗读**     | 基于 Windows 离线语音引擎                                                           |
@@ -56,6 +56,8 @@
 ### 悬浮窗口
 
 透明悬浮窗实时翻译，支持拖拽、缩放、置顶，可创建多个独立子面板。空格键/左键 Toggle：有内容清空，无内容截图翻译。子窗口透明度独立于父窗口，始终清晰可读。
+
+**零焦点截取**：自动刷新（工具栏选间隔 2/3/5/10 秒循环截译，内容不变零开销）与全局快捷键 `Ctrl+Alt+Space` 重截，全程不抢焦点——目标应用保持前台，实时字幕/视频字幕不会因失焦消失。（提示：Teams「弹出字幕窗口」自带系统级反截屏，把字幕固定在会议窗口内即可正常截取。）
 
 <p align="center">
   <img src="docs/screenshots/floating-window.png" width="600" alt="悬浮窗口">
@@ -118,6 +120,7 @@ npm run dist         # 打包安装程序（自动含上一步）
 | `Ctrl+Shift+W` | 显示/隐藏主窗口   |
 | `Ctrl+Alt+G`   | 打开悬浮窗口      |
 | `Ctrl+Shift+T` | 开启/关闭划词翻译 |
+| `Ctrl+Alt+Space` | 悬浮窗重新截译（不抢焦点） |
 | `Ctrl+Enter`   | 执行翻译          |
 
 *快捷键可在设置中自定义*
@@ -129,6 +132,7 @@ npm run dist         # 打包安装程序（自动含上一步）
 T-Translate 以隐私保护为核心设计理念：
 
 - **本地优先** — 本地 LLM 是第一优先级，完全离线可用
+- **主进程单点强制** — 翻译与在线 OCR 请求全部由主进程发出，渲染进程不含网络代码；隐私模式对每个请求在主进程强制（无痕不落缓存、离线走引擎白名单），任何窗口都无法绕过
 - **加密存储** — API Key 使用 Windows DPAPI 加密，无明文回退
 - **访问审计** — 密钥解密操作全程记录，异常频率自动告警
 - **隐私联动** — 离线模式下在线 API Key 禁止解密
@@ -149,10 +153,11 @@ t-translate/
 │   ├── managers/           # 窗口/托盘/菜单管理器
 │   └── utils/              # 原生工具（Win32 API、状态机）
 │
-├── src/                    # 渲染进程代码
+├── src/                    # 渲染进程代码 + 主进程翻译栈源码
+│   ├── stack/              # 翻译栈（运行在主进程：10 翻译源 + OCR 引擎链 + 缓存，esbuild 打包）
 │   ├── components/         # React 组件
-│   ├── providers/          # 翻译源 Provider（10 个）
-│   ├── services/           # 服务层（翻译、缓存、管线）
+│   ├── providers/          # Provider 元数据（设置页 UI 用）
+│   ├── services/           # 服务层（栈客户端、截图管线）
 │   ├── stores/             # Zustand 状态管理
 │   ├── config/             # 配置（隐私模式、模板、常量）
 │   └── i18n/               # 国际化（中英双语 1000+ key）
@@ -168,7 +173,7 @@ t-translate/
 | 类别     | 技术                                                                    |
 | -------- | ----------------------------------------------------------------------- |
 | 框架     | Electron 42 + React 18                                                  |
-| 构建     | Vite 7                                                                  |
+| 构建     | Vite 7（渲染端）+ esbuild（主进程翻译栈）                               |
 | 状态管理 | Zustand + Immer                                                         |
 | 样式     | CSS Variables                                                           |
 | 安全存储 | Electron safeStorage (Windows DPAPI) + 访问审计                         |

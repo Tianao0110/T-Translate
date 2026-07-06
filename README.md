@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.2.9-green" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.3.1-green" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="License">
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform">
 </p>
@@ -27,7 +27,7 @@
 | --- | --- |
 | **Selection translator** | System-wide. Select text in any app to translate. Up to 8 pinned windows |
 | **Screenshot OCR** | Capture screen regions. 7 OCR engines with automatic fallback |
-| **Floating window** | Transparent overlay. Space-bar to capture-and-translate. For complex layouts |
+| **Floating window** | Transparent overlay. Space-bar to capture-and-translate; auto-refresh & global-hotkey zero-focus capture for live captions / subtitles |
 | **Document translation** | 9 formats: PDF / DOCX / EPUB / TXT / SRT / VTT / CSV / JSON / Markdown. Segment-by-segment, resumable |
 | **Glossary** | Auto-replace terms after translation, with undo support |
 | **TTS** | Built on Windows offline speech engine |
@@ -56,6 +56,8 @@ Capture a screen region for text recognition. When an OCR engine is unavailable,
 ### Floating window
 
 Transparent overlay window for live translation. Drag, resize, pin on top. Spawn independent child panes. Space-bar / left-click acts as a toggle: with content → clear, without content → screenshot-and-translate. Child window opacity is independent of the parent, always readable.
+
+**Zero-focus capture**: auto-refresh (pick a 2/3/5/10s interval from the toolbar to loop-capture; unchanged frames cost nothing) and the `Ctrl+Alt+Space` global hotkey re-capture without ever taking focus — the target app stays foreground, so live captions/subtitles don't vanish on focus loss. (Tip: Teams' popped-out caption window has system-level capture protection; keep captions pinned inside the meeting window and they capture fine.)
 
 <p align="center">
   <img src="docs/screenshots/floating-window.png" width="600" alt="Floating window">
@@ -118,6 +120,7 @@ npm run dist         # build installer (runs the fetch automatically)
 | `Ctrl+Shift+W` | Show / hide main window |
 | `Ctrl+Alt+G` | Open floating window |
 | `Ctrl+Shift+T` | Toggle selection translator |
+| `Ctrl+Alt+Space` | Re-capture floating window (no focus steal) |
 | `Ctrl+Enter` | Run translation |
 
 *Shortcuts are customizable in Settings.*
@@ -129,6 +132,7 @@ npm run dist         # build installer (runs the fetch automatically)
 Privacy is a core design principle:
 
 - **Local-first** — Local LLM is the top priority. Fully usable offline
+- **Main-process enforcement** — All translation and online-OCR requests originate from the main process; renderer processes contain no network code. Privacy modes are enforced per request in the main process (incognito writes no caches, offline applies engine allowlists) — no window can bypass them
 - **Encrypted at rest** — API keys encrypted via Windows DPAPI. No plaintext fallback
 - **Access audit** — Every decryption operation is logged. Abnormal frequency triggers alerts
 - **Privacy interlocks** — Offline mode blocks decryption of online API keys
@@ -149,10 +153,11 @@ t-translate/
 │   ├── managers/           # Window / tray / menu managers
 │   └── utils/              # Native utilities (Win32 API, state machines)
 │
-├── src/                    # Renderer process
+├── src/                    # Renderer code + main-process translation stack sources
+│   ├── stack/              # Translation stack (runs in main: 10 providers + OCR chain + cache, bundled by esbuild)
 │   ├── components/         # React components
-│   ├── providers/          # Translation providers (10)
-│   ├── services/           # Service layer (translation, cache, pipeline)
+│   ├── providers/          # Provider metadata (settings UI)
+│   ├── services/           # Service layer (stack client, capture pipeline)
 │   ├── stores/             # Zustand state management
 │   ├── config/             # Config (privacy modes, templates, constants)
 │   └── i18n/               # i18n (zh / en, 1000+ keys each)
@@ -168,7 +173,7 @@ t-translate/
 | Category | Technology |
 | --- | --- |
 | Framework | Electron 42 + React 18 |
-| Build | Vite 7 |
+| Build | Vite 7 (renderer) + esbuild (main-process translation stack) |
 | State | Zustand + Immer |
 | Styling | CSS Variables |
 | Secure storage | Electron safeStorage (Windows DPAPI) + access audit |
