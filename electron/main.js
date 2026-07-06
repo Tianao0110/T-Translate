@@ -211,7 +211,10 @@ async function handleDelayedConfirm(x, y) {
 async function showSelectionTrigger(mouseX, mouseY, prefetchedText = null, options = {}) {
   logger.debug(`showSelectionTrigger called (prefetched=${prefetchedText ? prefetchedText.length + ' chars' : 'none'}, failed=${!!options.failed})`);
 
-  if (!runtime.selectionEnabled) return;
+  if (!runtime.selectionEnabled) {
+    logger.debug('showSelectionTrigger: selection translate disabled, no icon');
+    return;
+  }
 
   const settings = store.get('settings', {});
   const interfaceSettings = settings.interface || {};
@@ -414,11 +417,18 @@ function showSelectionWithText(text, notice) {
 
   const currentTargetLang = translationSettings.targetLanguage || 'zh';
 
+  // Work area of the display the loading window sits on — the card expands from
+  // a clamped 28×28 spot near a screen edge, so the renderer needs these bounds
+  // to keep the grown card on-screen (the screenshot path has no cursor anchor).
+  const wb = win.getBounds();
+  const disp = screen.getDisplayNearestPoint({ x: wb.x, y: wb.y });
+
   win.webContents.send(CHANNELS.SELECTION.SHOW_RESULT, {
     text: text,  // Mode 2: text only, renderer translates.
     notice: notice || undefined, // e.g. "vision model degraded to local OCR"
     targetLanguage: currentTargetLang,
     theme: interfaceSettings.theme || 'light',
+    screenBounds: { x: disp.workArea.x, y: disp.workArea.y, width: disp.workArea.width, height: disp.workArea.height },
     settings: buildSelectionSettingsPayload(),
   });
 }

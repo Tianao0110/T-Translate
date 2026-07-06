@@ -7,6 +7,17 @@ import { rtFetch } from '../runtime.js';
 import createLogger from '../logger.js';
 const logger = createLogger('LLMVision');
 
+// A vision request always carries the encoded image in the prompt, so its
+// prompt_tokens run into the hundreds+ regardless of how much TEXT the image
+// holds (image tokens scale with pixels, not characters — a few-word capture
+// is unaffected). A text-only server that silently drops the image and answers
+// from the instruction alone leaves prompt_tokens at just the ~100-token OCR
+// prompt. Below this floor + a 200 "success" = the image never reached a model
+// → degrade instead of surfacing the model's chatter as OCR output.
+// Only applied when the server reports usage; many don't, and then we can't
+// tell (documented edge). Compact-tokenizer vision models sit well above 150.
+const VISION_PROMPT_TOKEN_FLOOR = 150;
+
 class LLMVisionEngine extends BaseOCREngine {
 
   static metadata = {
@@ -87,6 +98,15 @@ class LLMVisionEngine extends BaseOCREngine {
 
       if (!text) {
         return { success: false, error: 'No text recognized / 未识别到文字' };
+      }
+
+      // Detect a stripped-image "fake success" (e.g. a translation model given
+      // an image): the error string matches _isVisionUnsupportedError, so the
+      // manager degrades to local OCR and counts it toward the vision lock.
+      const promptTokens = data.usage?.prompt_tokens;
+      if (typeof promptTokens === 'number' && promptTokens > 0 && promptTokens < VISION_PROMPT_TOKEN_FLOOR) {
+        logger.warn(`LLM Vision 200 but prompt_tokens=${promptTokens} < ${VISION_PROMPT_TOKEN_FLOOR}: image not processed, treating as vision-unsupported`);
+        return { success: false, error: 'Model does not support vision / 图片未被模型处理（当前模型可能不支持视觉）' };
       }
 
       const cleanedText = this.cleanLLMOutput(text);

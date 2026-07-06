@@ -79,6 +79,46 @@ describe('stack OCREngineManager', () => {
     expect(manager.isVisionLocked()).toBe(false);
   });
 
+  it('vision 200 "fake success" with a stripped image (low prompt_tokens) degrades', async () => {
+    // Text-only model given an image: server strips it, model answers from the
+    // instruction, returns 200 — but prompt_tokens betrays the missing image.
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{ message: { content: 'Sure, here is a translation of your request.' } }],
+        usage: { prompt_tokens: 105, completion_tokens: 12 },
+      }),
+      text: async () => '',
+    }));
+    configureRuntime({ fetch: fetchMock });
+    const manager = await makeManager();
+
+    const result = await manager.recognize(IMG, { engine: 'llm-vision' });
+    expect(result.success).toBe(true);
+    expect(result.engine).toBe('rapid-ocr'); // degraded, not the model's chatter
+    expect(result.fallbackFrom).toBe('llm-vision');
+  });
+
+  it('vision 200 with a real image (high prompt_tokens) is kept as-is', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{ message: { content: 'Hello world' } }],
+        usage: { prompt_tokens: 640, completion_tokens: 3 }, // image tokens present
+      }),
+      text: async () => '',
+    }));
+    configureRuntime({ fetch: fetchMock });
+    const manager = await makeManager();
+
+    const result = await manager.recognize(IMG, { engine: 'llm-vision' });
+    expect(result.success).toBe(true);
+    expect(result.engine).toBe('llm-vision');
+    expect(result.text).toBe('Hello world');
+  });
+
   it('endpoint-level "no models loaded" also degrades to the local chain', async () => {
     const fetchMock = vi.fn(async () => ({
       ok: false,

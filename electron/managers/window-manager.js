@@ -326,8 +326,16 @@ function createSelectionWindow() {
     logger.warn?.(`Selection window ${windowId} renderer gone: ${details?.reason || 'unknown'}`);
     selectionWindow._rendererDead = true;
   });
-  selectionWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
-    logger.warn?.(`Selection window ${windowId} failed to load: ${errorCode} ${errorDescription}`);
+  // ONLY a real main-frame load failure means a dead renderer. did-fail-load
+  // also fires for aborted loads (errorCode -3, e.g. a dev-server HMR reload)
+  // and subframes — the renderer is perfectly alive in those cases, and
+  // marking it dead made the next reuse needlessly destroy a healthy window
+  // (the regression behind "loaded a model → selection window went dark":
+  // heavier OCR keeps the window alive longer, so a spurious -3 was far more
+  // likely to land mid-session).
+  selectionWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    if (!isMainFrame || errorCode === -3) return;
+    logger.warn?.(`Selection window ${windowId} main-frame load failed: ${errorCode} ${errorDescription}`);
     selectionWindow._rendererDead = true;
   });
 

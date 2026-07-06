@@ -161,6 +161,15 @@ const SelectionTranslator = () => {
     setTriggerFailed(false);
   };
 
+  // Degrade hint is transient — the vision lock means it only ever appears on
+  // the first two captures anyway, so a permanent banner just nags. Auto-clear
+  // 3s after it shows (a newer notice resets the timer).
+  useEffect(() => {
+    if (!notice) return;
+    const id = setTimeout(() => setNotice(''), 3000);
+    return () => clearTimeout(id);
+  }, [notice]);
+
   useEffect(() => {
     const removeShowListener = window.electron?.selection?.onShowTrigger?.((data) => {
       // Frozen windows are detached overlays; new triggers spawn fresh windows instead
@@ -221,6 +230,9 @@ const SelectionTranslator = () => {
       // Screenshot path has no cursor anchor — (0,0) routes adjustWindowToContent
       // through the startDrag branch (keep the window where main positioned it).
       setMousePos({ x: 0, y: 0 });
+      // Work area of the capture's display, so the grown card clamps on-screen
+      // even when the shot was taken hard against a screen edge.
+      if (data.screenBounds) screenBoundsRef.current = data.screenBounds;
 
       if (data.theme) setTheme(data.theme);
       if (data.settings?.language && i18n?.language !== data.settings.language) i18n.changeLanguage(data.settings.language);
@@ -541,8 +553,19 @@ const SelectionTranslator = () => {
     if (hasValidMousePos && y + height > originY + sh - 10) y = mousePos.y - height - 10;
     if (y < originY + 10) y = originY + 10;
 
+    // Universal off-screen guard for the FINAL geometry. The cursor path clamps
+    // anchorX earlier, but the keepPosition/screenshot path anchors at the
+    // clamped 28×28 loading spot and then the card GROWS — without this the
+    // expansion overflows the work area at screen edges.
+    let finalX = anchorX;
+    if (finalX + width > originX + sw - 10) finalX = originX + sw - width - 10;
+    if (finalX < originX + 10) finalX = originX + 10;
+    let finalY = Math.round(y);
+    if (finalY + height > originY + sh - 10) finalY = originY + sh - height - 10;
+    if (finalY < originY + 10) finalY = originY + 10;
+
     window.electron?.selection?.setBounds?.({
-      x: anchorX, y: Math.round(y),
+      x: Math.round(finalX), y: finalY,
       width, height: Math.round(height)
     });
 
