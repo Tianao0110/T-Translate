@@ -33,8 +33,6 @@ contextBridge.exposeInMainWorld('electron', {
     // Merged settings (main app + window-local)
     getSettings: () => ipcRenderer.invoke('floating-window:get-settings'),
 
-    getProviderConfigs: () => ipcRenderer.invoke('floating-window:get-provider-configs'),
-
     // Persists window-locally (survives relaunch and settings broadcasts)
     setOpacity: (opacity) => ipcRenderer.invoke('floating-window:set-opacity', opacity),
 

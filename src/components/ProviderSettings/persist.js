@@ -88,15 +88,10 @@ export async function persistProviderData({ providers, providerConfigs, allProvi
   }
 
   // Main-process stack re-reads store + vault itself — no plaintext configs
-  // travel back over IPC for the reload.
+  // travel back over IPC, and all three windows are served by the same reload
+  // (the old per-window broadcast survives only for UI-settings sync, which
+  // SettingsPanel's unified save and sync-to-electron still drive).
   await stackClient.reload();
-
-  // Dual-notify transition (until the floating/selection windows switch to the
-  // stack too): the legacy broadcast still drives their old renderer-side
-  // reload AND their non-stack settings sync. Do not remove before batch 3.
-  if (window.electron?.floatingWindow?.notifySettingsChanged) {
-    await window.electron.floatingWindow.notifySettingsChanged();
-  }
 
   return { ok: true, sanitizedConfigs: sanitized };
 }

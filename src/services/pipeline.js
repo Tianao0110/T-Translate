@@ -2,7 +2,7 @@
 // Owns dedupe-by-hash, target-language flip, and child-pane lifecycle.
 
 import { ocrManager } from '../providers/ocr/index.js';
-import translationService from './translation.js';
+import translationService from './stack-client.js';
 import useSessionStore, { DISPLAY_MODE, CHILD_PANE_STATUS } from '../stores/session.js';
 import useConfigStore from '../stores/config.js';
 import { calculateHash } from '../utils/image.js';
@@ -299,11 +299,6 @@ class TranslationPipeline {
       const createdPanes = session.setChildPanes(validBlocks);
       session.setStatus('translating');
 
-      const privacyMode = await getPrivacyMode();
-      // Secure mode must not leave screen-capture text in the L1 cache of
-      // this persistent window (L2 is already gated service-side).
-      const useCache = privacyMode !== PRIVACY_MODE_IDS.SECURE;
-
       // Cap concurrency: more than 2 concurrent LLM calls causes UI jank on
       // typical local setups (each call ties up the GPU briefly)
       const CONCURRENCY_LIMIT = 2;
@@ -332,12 +327,13 @@ class TranslationPipeline {
             targetLang = targetLang === 'zh' ? 'en' : 'zh';
           }
 
+          // Privacy fields no longer travel from here — the main-process
+          // facade injects the live mode (SECURE keeps screen-capture text out
+          // of every cache layer at the single enforcement point).
           const result = await translationService.translate(text, {
             sourceLang,
             targetLang,
             mode: 'normal',
-            privacyMode,
-            useCache,
           });
 
           if (result.success && result.text) {
@@ -410,18 +406,10 @@ class TranslationPipeline {
 
       const mode = options.mode || 'normal';
 
-      const privacyMode = await getPrivacyMode();
-
-      if (privacyMode === PRIVACY_MODE_IDS.OFFLINE) {
-        logger.debug('Offline mode - using local-llm only');
-      }
-
       const result = await translationService.translate(text, {
         sourceLang,
         targetLang,
         mode,
-        privacyMode,
-        useCache: privacyMode !== PRIVACY_MODE_IDS.SECURE,
       });
 
       if (!result.success) {

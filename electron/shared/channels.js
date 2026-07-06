@@ -61,7 +61,6 @@ const CHANNELS = {
     SET_PASS_THROUGH: 'floating-window:set-pass-through',
     SET_OPACITY: 'floating-window:set-opacity',
     GET_SETTINGS: 'floating-window:get-settings',
-    GET_PROVIDER_CONFIGS: 'floating-window:get-provider-configs',
     NOTIFY_SETTINGS_CHANGED: 'floating-window:notify-settings-changed',
     OPEN_MAIN_SETTINGS: 'floating-window:open-main-settings',
     GET_HISTORY: 'floating-window:get-history',

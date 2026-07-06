@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pin, Volume2, VolumeX, X } from 'lucide-react';
-import translationService from '../../services/translation.js';
+import translationService from '../../services/stack-client.js';
 import ttsManager, { TTS_STATUS } from '../../services/tts/index.js';
 import createLogger from '../../utils/logger.js';
 import { getShortErrorMessage } from '../../utils/error-handler.js';
@@ -381,12 +381,10 @@ const SelectionTranslator = () => {
       if (triggerReadyTimerRef.current) clearTimeout(triggerReadyTimerRef.current);
     });
 
-    // Provider/settings saved in the main window: reload this persistent
-    // window's translation stack so it picks up new keys/priority without an
-    // app restart. reload() with no args re-reads store + secureStorage.
-    const removeSettingsListener = window.electron?.selection?.onSettingsChanged?.(() => {
-      translationService.reload();
-    });
+    // No settings-changed listener anymore: the translation stack lives in the
+    // main process and reloads itself on save — this persistent window picks
+    // up new keys/priority automatically. (The selection UI settings arrive
+    // with each show via the payload, so nothing else needs the broadcast.)
 
     // No keydown/ESC handler: the window is focusable:false (deliberate — it
     // must never steal focus), so it can't receive keyboard events. Closing is
@@ -397,7 +395,6 @@ const SelectionTranslator = () => {
       if (removeShowResultListener) removeShowResultListener();
       if (removeShowDirectListener) removeShowDirectListener();
       if (removeHideListener) removeHideListener();
-      if (removeSettingsListener) removeSettingsListener();
       if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
       if (triggerReadyTimerRef.current) clearTimeout(triggerReadyTimerRef.current);
     };
@@ -576,11 +573,6 @@ const SelectionTranslator = () => {
   }, [mode, isFrozen, cardHovered, settings.triggerTimeout]);
 
   const translateText = async (text, retryCount = 0, overrideTargetLang = null, overrideSourceLang = null) => {
-    if (!translationService.initialized) {
-      logger.debug('Initializing translation service...');
-      await translationService.init();
-    }
-
     // Override > state > default. Used by screenshot path which knows the lang
     // before the state hook update has propagated.
     let targetLang = overrideTargetLang || translation.targetLanguage || 'zh';
@@ -602,21 +594,13 @@ const SelectionTranslator = () => {
       targetLanguage: targetLang,
     };
 
-    // Fetched per call, not at mount: this window is persistent (hide, not
-    // close), so a cached mode would go stale when the user switches it.
-    let privacyMode = PRIVACY_MODES.STANDARD;
     try {
-      privacyMode = (await window.electron?.privacy?.getMode?.()) || PRIVACY_MODES.STANDARD;
-    } catch (e) {
-      logger.debug('Failed to get privacy mode, assuming standard:', e);
-    }
-
-    try {
+      // Privacy fields no longer travel from here — the main-process facade
+      // reads the live mode per request (this persistent window can never hold
+      // a stale mode again).
       const result = await translationService.translate(text, {
         sourceLang: sourceLang,
         targetLang: targetLang,
-        privacyMode: privacyMode,
-        useCache: privacyMode !== PRIVACY_MODES.SECURE,
       });
 
       if (!result.success) {

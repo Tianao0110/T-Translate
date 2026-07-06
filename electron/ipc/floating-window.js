@@ -2,7 +2,6 @@
 
 const { ipcMain, BrowserWindow } = require('electron');
 const { CHANNELS } = require('../shared/channels');
-const { createSecureVault } = require('../utils/secure-vault');
 const logger = require('../utils/logger')('IPC:FloatingWindow');
 const displayHelper = require('../utils/display-helper');
 const { t } = require('../shared/main-i18n');
@@ -180,13 +179,6 @@ function register(ctx) {
 
     logger.debug('Get settings:', merged);
     return merged;
-  });
-
-  // Returns the provider list + configs with secure-storage fields decrypted.
-  // Implementation moved to utils/secure-vault.js (shared with the main-process
-  // translation stack); this channel retires once all windows run on the stack.
-  ipcMain.handle(CHANNELS.FLOATING_WINDOW.GET_PROVIDER_CONFIGS, async () => {
-    return createSecureVault({ store }).bulkDecryptProviderConfigs('stack-reload');
   });
 
   ipcMain.handle(CHANNELS.FLOATING_WINDOW.NOTIFY_SETTINGS_CHANGED, () => {
