@@ -46,6 +46,12 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 
 只覆盖纯 JS 改动；koffi/uiohook/node-screenshots/OCR 全在 asarUnpack，native 或 Electron 版本一变必须回全量；且热更新通道必须做包签名校验，否则是供应链攻击口。当前差分下载（v0.2.8 起）已覆盖大部分收益。
 
+### 悬浮窗散点/整段判定加强 或 手动模式切换（2026-07-06 用户提出）
+
+散点子窗口判定是纯几何启发式（[pipeline.js:37](src/services/pipeline.js:37) shouldUseScatteredMode：列对齐+行距+水平散布三条件），误判时整段文字被炸成子窗格、或散落 UI 标签被并成一段。两个方向（可只做②）：
+- ① 启发式加强：字号一致性/多列检测/块数上限等补充信号
+- ② **工具栏手动三态开关（自动/散点/整段，持久化）**——判定不可能全对，手动兜底符合产品习惯，推荐先做这个；散点判定结果在结果区提示当前模式，切换后用上次截图立即重排（imageData 需暂存一份）
+
 ### FAQ 候选（文档化即可）
 
 - **Teams 字幕截不到**：Teams「弹出字幕窗口」自带系统级反截屏（WDA 排除捕获，任何截图工具都黑），把字幕**固定在会议窗口内**即可正常被悬浮窗截取；配合悬浮窗自动刷新/全局键（v0.3.1）零焦点使用
