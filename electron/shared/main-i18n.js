@@ -30,6 +30,7 @@ const messages = {
     // shortcuts
     'shortcuts.occupied': '快捷键已被占用',
     'shortcuts.resumeFailed': '快捷键恢复失败',
+    'shortcuts.needsModifier': '全局快捷键需包含 Ctrl、Alt 或 Win 键（F1-F24 可单独使用）',
     
     // system
     'system.checkUpdateFailed': '检查更新失败',
@@ -103,6 +104,7 @@ const messages = {
     // shortcuts
     'shortcuts.occupied': 'Shortcut is already in use',
     'shortcuts.resumeFailed': 'Failed to restore shortcut',
+    'shortcuts.needsModifier': 'Global shortcuts must include Ctrl, Alt or Win (F1-F24 may be used alone)',
     
     // system
     'system.checkUpdateFailed': 'Failed to check for updates',
