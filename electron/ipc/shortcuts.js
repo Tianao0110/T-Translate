@@ -2,6 +2,7 @@
 
 const { ipcMain, globalShortcut } = require('electron');
 const { CHANNELS } = require('../shared/channels');
+const { isAllowedGlobalShortcut } = require('../shared/shortcut-rules');
 const logger = require('../utils/logger')('IPC:Shortcuts');
 const { t } = require('../shared/main-i18n');
 
@@ -52,6 +53,11 @@ function register(ctx) {
       if (!handler) {
         logger.warn('Unknown action:', action);
         return { success: false, error: 'Unknown action' };
+      }
+
+      if (!isAllowedGlobalShortcut(shortcut)) {
+        logger.warn('Rejected weak shortcut:', action, shortcut);
+        return { success: false, error: t('shortcuts.needsModifier') };
       }
 
       const electronShortcut = toElectronFormat(shortcut);
@@ -179,7 +185,17 @@ function registerAllShortcuts(ctx) {
   };
 
   for (const [action, defaultKey] of Object.entries(DEFAULT_SHORTCUTS)) {
-    const shortcut = shortcuts[action] || defaultKey;
+    let shortcut = shortcuts[action] || defaultKey;
+
+    // Heal configs recorded before the modifier rule existed: a persisted bare
+    // key (e.g. Backspace) would otherwise hijack that key system-wide at
+    // every startup with zero feedback.
+    if (!isAllowedGlobalShortcut(shortcut)) {
+      logger.warn(`Sanitized weak shortcut: ${action} [${shortcut}] -> [${defaultKey}]`);
+      store.set(`settings.shortcuts.${action}`, defaultKey);
+      shortcut = defaultKey;
+    }
+
     const electronShortcut = toElectronFormat(shortcut);
     const handler = handlers[action];
 

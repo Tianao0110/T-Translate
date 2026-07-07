@@ -88,8 +88,9 @@ const zh = {
     title: "快捷键",
     translate: "执行翻译", swapLanguages: "切换语言", clear: "清空内容", paste: "粘贴文本", copy: "复制结果",
     screenshot: "截图翻译", toggleWindow: "显示/隐藏窗口", floatingWindow: "悬浮窗口", selectionTranslate: "划词翻译开关", floatingCapture: "悬浮窗重新截译",
-    hint: "以下均为系统全局快捷键。点击可修改，按 Esc 取消",
+    hint: "以下均为系统全局快捷键，须包含 Ctrl/Alt/Win（F1-F24 可单独使用）。点击可修改，按 Esc 取消",
     pressKey: "按下快捷键...", resetDefault: "重置为默认",
+    needsModifier: "全局快捷键需包含 Ctrl、Alt 或 Win 键（F1-F24 可单独使用）",
     updated: "快捷键已更新: {{label}} → {{shortcut}}", updateFailed: "快捷键更新失败: {{error}}", reset: "快捷键已重置为默认值",
     conflictNotice: "快捷键被其他程序占用: {{shortcuts}}，可在设置中修改"
   },

@@ -266,21 +266,29 @@ const InterfaceSection = ({
                         return;
                       }
 
+                      // Wait for the chord's final key before judging it.
+                      if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) {
+                        return;
+                      }
+
+                      // Without Ctrl/Alt/Win the binding would hijack the key
+                      // system-wide (a bare Backspace here disabled the user's
+                      // backspace everywhere). F1-F24 are safe to bind alone;
+                      // the main process enforces the same rule on update.
+                      const isFKey = /^F([1-9]|1[0-9]|2[0-4])$/.test(e.key);
+                      if (!e.ctrlKey && !e.altKey && !e.metaKey && !isFKey) {
+                        notify(t('shortcuts.needsModifier'), 'error');
+                        return;
+                      }
+
                       const keys = [];
                       if (e.ctrlKey) keys.push('Ctrl');
                       if (e.altKey) keys.push('Alt');
                       if (e.shiftKey) keys.push('Shift');
                       if (e.metaKey) keys.push('Meta');
+                      keys.push(e.key.length === 1 ? e.key.toUpperCase() : e.key);
 
-                      const key = e.key.length === 1 ? e.key.toUpperCase() : e.key;
-                      if (!['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) {
-                        keys.push(key);
-                      }
-
-                      // Require at least one non-modifier key before committing
-                      if (keys.length > 0 && !['Control', 'Alt', 'Shift', 'Meta'].includes(keys[keys.length - 1])) {
-                        finishEditing(action, config, keys.join('+'));
-                      }
+                      finishEditing(action, config, keys.join('+'));
                     }}
                     onBlur={() => cancelEditing(action, config)}
                     placeholder={t('shortcuts.pressKey')}

@@ -88,8 +88,9 @@ const en = {
     title: "Shortcuts",
     translate: "Translate", swapLanguages: "Swap Languages", clear: "Clear", paste: "Paste", copy: "Copy Result",
     screenshot: "Screenshot", toggleWindow: "Show/Hide Window", floatingWindow: "Floating Window", selectionTranslate: "Toggle Selection", floatingCapture: "Re-capture Floating Window",
-    hint: "All shortcuts below are system-wide. Click to edit, press Esc to cancel",
+    hint: "All shortcuts below are system-wide and must include Ctrl/Alt/Win (F1-F24 may be used alone). Click to edit, press Esc to cancel",
     pressKey: "Press shortcut...", resetDefault: "Reset to Default",
+    needsModifier: "Global shortcuts must include Ctrl, Alt or Win (F1-F24 may be used alone)",
     updated: "Shortcut updated: {{label}} → {{shortcut}}", updateFailed: "Shortcut update failed: {{error}}", reset: "Shortcuts reset to default",
     conflictNotice: "Shortcuts occupied by other apps: {{shortcuts}}. You can change them in Settings."
   },
