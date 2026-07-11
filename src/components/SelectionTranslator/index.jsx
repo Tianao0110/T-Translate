@@ -5,7 +5,7 @@ import translationService from '../../services/stack-client.js';
 import ttsManager, { TTS_STATUS } from '../../services/tts/index.js';
 import createLogger from '../../utils/logger.js';
 import { getShortErrorMessage } from '../../utils/error-handler.js';
-import { detectLanguage } from '../../utils/text.js';
+import { detectLanguage, resolveSameLanguageTarget } from '../../utils/text.js';
 import './styles.css';
 
 import { PRIVACY_MODES, THEMES } from '@config/defaults';
@@ -25,6 +25,7 @@ const DEFAULT_SETTINGS = {
 const DEFAULT_TRANSLATION = {
   targetLanguage: 'zh',
   sourceLanguage: 'auto',
+  sameLanguageBehavior: 'original',
 };
 
 // Shared validation between trigger-click and CapsLock-direct paths.
@@ -277,13 +278,14 @@ const SelectionTranslator = () => {
           // Pass langs explicitly — state update is async and won't be visible yet
           const overrideTargetLang = data.targetLanguage || data.translation?.targetLanguage || null;
           const overrideSourceLang = data.sourceLanguage || data.translation?.sourceLanguage || null;
-          const translationResult = await translateTextRef.current(data.text, 0, overrideTargetLang, overrideSourceLang);
+          const overrideBehavior = data.sameLanguageBehavior || data.translation?.sameLanguageBehavior || null;
+          const translationResult = await translateTextRef.current(data.text, 0, overrideTargetLang, overrideSourceLang, overrideBehavior);
           if (gen !== generationRef.current) return; // superseded by a newer session
           setTranslatedText(translationResult);
           setError('');
           setMode('overlay');
 
-          if (translationResult) {
+          if (translationResult && !lastResolvedLangsRef.current.passthrough) {
             window.electron?.selection?.addToHistory?.({
               source: data.text,
               result: translationResult,
@@ -361,14 +363,15 @@ const SelectionTranslator = () => {
 
         const overrideTargetLang = newTranslation.targetLanguage || null;
         const overrideSourceLang = newTranslation.sourceLanguage || null;
-        const translationResult = await translateTextRef.current(text, 0, overrideTargetLang, overrideSourceLang);
+        const overrideBehavior = newTranslation.sameLanguageBehavior || null;
+        const translationResult = await translateTextRef.current(text, 0, overrideTargetLang, overrideSourceLang, overrideBehavior);
         if (gen !== generationRef.current) return; // superseded by a newer session
         setTranslatedText(translationResult);
         setError('');
         setMode('overlay');
 
         // from: 'hotkey' distinguishes this path in history vs 'selection' / 'screenshot'
-        if (translationResult) {
+        if (translationResult && !lastResolvedLangsRef.current.passthrough) {
           window.electron?.selection?.addToHistory?.({
             source: text,
             result: translationResult,
@@ -451,7 +454,7 @@ const SelectionTranslator = () => {
       setError('');
       setMode('overlay');
 
-      if (translationResult) {
+      if (translationResult && !lastResolvedLangsRef.current.passthrough) {
         window.electron?.selection?.addToHistory?.({
           source: text,
           result: translationResult,
@@ -600,27 +603,33 @@ const SelectionTranslator = () => {
     return () => clearTimeout(timer);
   }, [mode, isFrozen, cardHovered, settings.triggerTimeout]);
 
-  const translateText = async (text, retryCount = 0, overrideTargetLang = null, overrideSourceLang = null) => {
+  const translateText = async (text, retryCount = 0, overrideTargetLang = null, overrideSourceLang = null, overrideBehavior = null) => {
     // Override > state > default. Used by screenshot path which knows the lang
     // before the state hook update has propagated.
-    let targetLang = overrideTargetLang || translation.targetLanguage || 'zh';
+    const requestedTarget = overrideTargetLang || translation.targetLanguage || 'zh';
     const sourceLang = overrideSourceLang || translation.sourceLanguage || 'auto';
+    const behavior = overrideBehavior || translation.sameLanguageBehavior || 'original';
 
-    // Selected text already in the target language would round-trip through
-    // the provider unchanged ("translation" = the source text). The card has
-    // no language picker, so flip to the other primary language — same
-    // behavior as the floating window.
+    // Text already in the target language: show the original or swap back to
+    // the configured source language, per settings.translation
+    // .sameLanguageBehavior (shared with the floating window — see
+    // resolveSameLanguageTarget).
     const detected = detectLanguage(text);
-    if (detected === targetLang) {
-      targetLang = targetLang === 'zh' ? 'en' : 'zh';
-      logger.debug(`Source already in target language, flipping to ${targetLang}`);
-    }
+    const resolved = resolveSameLanguageTarget(detected, requestedTarget, behavior, sourceLang);
+    const targetLang = resolved.targetLang;
 
-    // Record the languages actually used (post-flip) for history + TTS.
+    // Record the languages actually used (post-resolve) for history + TTS.
+    // passthrough also gates history: an untranslated echo is not a record.
     lastResolvedLangsRef.current = {
       sourceLanguage: sourceLang !== 'auto' ? sourceLang : detected,
       targetLanguage: targetLang,
+      passthrough: resolved.passthrough,
     };
+
+    if (resolved.passthrough) {
+      logger.debug('Source already in target language, showing original');
+      return text;
+    }
 
     try {
       // Privacy fields no longer travel from here — the main-process facade
@@ -648,7 +657,7 @@ const SelectionTranslator = () => {
         logger.debug('Retrying translation...');
         await new Promise(r => setTimeout(r, 1000));
         // Forward override langs on retry — otherwise retry would silently fall back to state
-        return translateText(text, retryCount + 1, overrideTargetLang, overrideSourceLang);
+        return translateText(text, retryCount + 1, overrideTargetLang, overrideSourceLang, overrideBehavior);
       }
 
       const errorMsg = getShortErrorMessage(err);

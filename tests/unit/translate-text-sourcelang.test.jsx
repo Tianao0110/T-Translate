@@ -192,3 +192,50 @@ describe('Phase A — translateText sourceLanguage precedence', () => {
     expect(options.sourceLang).toBe('auto');
   });
 });
+
+// 2026-07-10 user report: with target=en, selecting English text translated it
+// to Chinese (hardcoded zh<->en flip) instead of following the target language.
+describe('sameLanguageBehavior — text already in the target language', () => {
+  it("default ('original') shows the source untranslated, no provider call, no history", async () => {
+    const { container } = render(<SelectionTranslator />);
+
+    await fireShowTrigger({
+      text: 'someEnglishText',
+      translation: { sourceLanguage: 'auto', targetLanguage: 'en' },
+    });
+
+    const trigger = container.querySelector('.sel-trigger');
+    await act(async () => {
+      fireEvent.click(trigger);
+      await new Promise(r => setTimeout(r, 150));
+    });
+
+    const translationService = (await import('../../src/services/stack-client.js')).default;
+    expect(translationService.translate).not.toHaveBeenCalled();
+    expect(window.electron.selection.addToHistory).not.toHaveBeenCalled();
+    expect(container.textContent).toContain('someEnglishText');
+  });
+
+  it("'swap' keeps the legacy flip: en target + en text → translates to zh", async () => {
+    const { container } = render(<SelectionTranslator />);
+
+    await fireShowTrigger({
+      text: 'someEnglishText',
+      translation: { sourceLanguage: 'auto', targetLanguage: 'en', sameLanguageBehavior: 'swap' },
+    });
+
+    const trigger = container.querySelector('.sel-trigger');
+    await act(async () => {
+      fireEvent.click(trigger);
+      await new Promise(r => setTimeout(r, 50));
+    });
+
+    const translationService = (await import('../../src/services/stack-client.js')).default;
+    await waitFor(() => {
+      expect(translationService.translate).toHaveBeenCalled();
+    });
+
+    const options = translationService.translate.mock.calls[0][1];
+    expect(options.targetLang).toBe('zh');
+  });
+});

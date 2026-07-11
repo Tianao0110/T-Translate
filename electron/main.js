@@ -271,6 +271,7 @@ async function showSelectionTrigger(mouseX, mouseY, prefetchedText = null, optio
       translation: {
         targetLanguage: currentTargetLang,
         sourceLanguage: currentSourceLang,
+        sameLanguageBehavior: translationSettings.sameLanguageBehavior || 'original',
       },
       // v0.2.5 Phase B pass-through — see function docstring.
       text: prefetchedText,
@@ -362,6 +363,7 @@ async function handleHotkeyDirectPath(x, y) {
     translation: {
       targetLanguage: currentTargetLang,
       sourceLanguage: currentSourceLang,
+      sameLanguageBehavior: translationSettings.sameLanguageBehavior || 'original',
     },
   };
 
@@ -427,6 +429,7 @@ function showSelectionWithText(text, notice) {
     text: text,  // Mode 2: text only, renderer translates.
     notice: notice || undefined, // e.g. "vision model degraded to local OCR"
     targetLanguage: currentTargetLang,
+    sameLanguageBehavior: translationSettings.sameLanguageBehavior || 'original',
     theme: interfaceSettings.theme || 'light',
     screenBounds: { x: disp.workArea.x, y: disp.workArea.y, width: disp.workArea.width, height: disp.workArea.height },
     settings: buildSelectionSettingsPayload(),

@@ -44,11 +44,11 @@ const FloatingWindow = () => {
   const {
     floatingOpacity,
     targetLanguage,
-    lockTargetLang,
     ocrEngine,
     setFloatingOpacity,
     setTargetLanguage,
-    setLockTargetLang,
+    setSourceLanguage,
+    setSameLanguageBehavior,
     setOcrEngine,
   } = useConfigStore();
 
@@ -284,11 +284,14 @@ const FloatingWindow = () => {
           setTargetLanguage(settings.targetLanguage);
         }
 
-        // sourceLanguage is not mirrored: the pipeline always auto-detects
-        // per capture, so a stored value had no reader.
+        // The pipeline auto-detects the actual text language per capture; the
+        // configured source is mirrored only so 'swap' knows the other side.
+        if (settings.sourceLanguage) {
+          setSourceLanguage(settings.sourceLanguage);
+        }
 
-        if (settings.lockTargetLang !== undefined) {
-          setLockTargetLang(settings.lockTargetLang);
+        if (settings.sameLanguageBehavior) {
+          setSameLanguageBehavior(settings.sameLanguageBehavior);
         }
 
         if (settings.ocrEngine) {
