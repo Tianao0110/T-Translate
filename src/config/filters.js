@@ -90,35 +90,8 @@ export function getEnabledFilters(userFilters = []) {
   return Array.from(filterMap.values());
 }
 
-export function createCustomFilter(name, patternStr, description = '') {
-  try {
-    const pattern = new RegExp(patternStr, 'g');
-
-    return {
-      name: `custom_${name}`,
-      pattern,
-      description: description || `自定义: ${patternStr}`,
-      enabled: true,
-      isCustom: true,
-    };
-  } catch (error) {
-    console.error('[Filters] Invalid regex:', patternStr, error);
-    return null;
-  }
-}
-
-export function validateFilter(filter) {
-  if (!filter || typeof filter !== 'object') return false;
-  if (!filter.name || typeof filter.name !== 'string') return false;
-  if (!filter.pattern || !(filter.pattern instanceof RegExp)) return false;
-  if (!filter.pattern.global) return false;  // global flag required
-  return true;
-}
-
 export default {
   DEFAULT_FILTERS,
   USER_FILTERS_KEY,
   getEnabledFilters,
-  createCustomFilter,
-  validateFilter,
 };

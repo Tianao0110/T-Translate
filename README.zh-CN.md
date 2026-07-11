@@ -156,14 +156,14 @@ t-translate/
 ├── src/                    # 渲染进程代码 + 主进程翻译栈源码
 │   ├── stack/              # 翻译栈（运行在主进程：10 翻译源 + OCR 引擎链 + 缓存，esbuild 打包）
 │   ├── components/         # React 组件
-│   ├── providers/          # Provider 元数据（设置页 UI 用）
+│   ├── assets/             # 静态资源（翻译源图标）
 │   ├── services/           # 服务层（栈客户端、截图管线）
 │   ├── stores/             # Zustand 状态管理
 │   ├── config/             # 配置（隐私模式、模板、常量）
 │   └── i18n/               # 国际化（中英双语 1000+ key）
 │
 ├── public/                 # HTML 入口 + 静态资源
-├── resources/              # 应用资源（OCR 训练数据）
+├── resources/              # 应用资源（内置 OCR 基础模型）
 ├── scripts/                # 工具脚本
 └── docs/                   # 项目文档
 ```
@@ -182,7 +182,7 @@ t-translate/
 | 在线翻译 | OpenAI / Claude / Gemini / DeepSeek / DeepL / Google / Microsoft / 百度 |
 | 打包     | electron-builder                                                        |
 
-详细文档见 `docs/` 目录：[架构设计](docs/ARCHITECTURE.md) · [开发指南](docs/DEVELOPMENT.md) · [国际化](docs/I18N_GUIDE.md) · [主题定制](docs/THEME_CUSTOMIZATION.md)
+详细文档见 `docs/` 目录：[架构设计](docs/ARCHITECTURE.md) · [开发指南](docs/DEVELOPMENT.md) · [常见问题](docs/FAQ.md) · [OCR 模型](docs/OCR_MODELS.md) · [国际化](docs/I18N_GUIDE.md) · [主题定制](docs/THEME_CUSTOMIZATION.md)
 
 ---
 

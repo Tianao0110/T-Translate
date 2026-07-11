@@ -3,6 +3,7 @@ import TitleBar from './components/TitleBar';
 import MainWindow from './components/MainWindow';
 import useTranslationStore from './stores/translation-store';
 import { initStoreSync } from './stores/sync-to-electron.js';
+import { USER_FILTERS_KEY } from './config/filters.js';
 import createLogger from './utils/logger.js';
 import './styles/App.css';
 
@@ -18,6 +19,28 @@ if (typeof window !== 'undefined') {
 
 // One-time wiring of Zustand -> electron-store (subscribes for the lifetime of the app)
 initStoreSync(useTranslationStore);
+
+// Retire localStorage keys orphaned by the v0.3.1 stack migration. The L2
+// cache is droppable (rebuilt cold in the main process, D-2b); custom filter
+// defs move to electron-store where the stack reads them (D-1b). All windows
+// share one origin, so running this in the main window covers everything.
+(async function retireLegacyLocalStorage() {
+  try {
+    const rawFilters = localStorage.getItem(USER_FILTERS_KEY);
+    if (rawFilters) {
+      const defs = JSON.parse(rawFilters);
+      const existing = await window.electron?.store?.get?.('settings.translation.customFilters');
+      if (Array.isArray(defs) && defs.length > 0 && !(Array.isArray(existing) && existing.length > 0)) {
+        await window.electron?.store?.set?.('settings.translation.customFilters', defs);
+        logger.info(`Migrated ${defs.length} custom filters to electron-store`);
+      }
+      localStorage.removeItem(USER_FILTERS_KEY);
+    }
+    localStorage.removeItem('translation-cache');
+  } catch (e) {
+    logger.warn('Legacy localStorage retirement failed:', e.message);
+  }
+})();
 
 function App() {
   const [theme, setTheme] = useState(THEMES.LIGHT);

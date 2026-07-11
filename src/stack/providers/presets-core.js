@@ -1,8 +1,8 @@
 // Environment-free core of the OpenAI-compatible presets: defaults, latency
-// class, and the pure hook parts (flags, adapters, filters). Shared by the
-// stack presets (main process) and the renderer presets during the dual-track
-// migration window — the only per-environment piece left in each end is the
-// localized testConnectionMessage (it needs that end's _t).
+// class, and the pure hook parts (flags, adapters, filters). Kept separate
+// from presets.js so the table stays importable anywhere; adding a compatible
+// provider = add an entry here + metadata.js + a renderer icon (see
+// docs/DEVELOPMENT.md).
 
 export const PRESET_CORE = [
   {

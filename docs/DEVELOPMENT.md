@@ -1,947 +1,255 @@
 # T-Translate 开发者指南
 
-本文档介绍如何为 T-Translate 开发自定义翻译源（Provider）和 OCR 引擎。
+本文档介绍如何为 T-Translate 开发自定义翻译源（Provider）和 OCR 引擎，以及 UI/样式规范与调试方法。
+
+> **v0.3.1 起的关键事实**：翻译源与在线 OCR 引擎全部运行在**主进程翻译栈**（`src/stack/`，经 esbuild 打包为 `electron/generated/translation-stack.cjs`），渲染进程不再包含任何翻译/在线 OCR 网络代码。开发新翻译源 = 改 `src/stack/`，不是改渲染端。
 
 ---
 
-## 📁 项目结构
+## 📁 开发者视角的代码分布
 
 ```
-src/
-├── providers/                 # 翻译源
-│   ├── base.js               # 翻译源基类
-│   ├── registry.js           # 翻译源注册表
-│   ├── local-llm/            # 本地 LLM 翻译源
-│   │   ├── index.js
-│   │   └── icon.svg
-│   ├── openai/               # OpenAI 翻译源
-│   ├── google-translate/     # Google 翻译源
-│   └── ...
-├── providers/ocr/            # OCR 引擎
-│   ├── base.js               # OCR 引擎基类
-│   ├── index.js              # OCR 引擎注册表
-│   ├── rapid.js              # 本地 OCR 引擎（PP-OCRv6，主进程 esearch-ocr，见 docs/OCR_MODELS.md）
-│   ├── windows.js            # Windows OCR 系统引擎（兜底）
-│   ├── llm-vision.js         # LLM Vision 引擎
-│   └── ...
-├── services/                 # 服务层
-│   ├── translation.js        # 翻译服务（调度）
-│   └── ...
-├── components/               # UI 组件
-│   ├── ProviderSettings.jsx  # 翻译源设置界面
-│   ├── SettingsPanel.jsx     # 设置面板
-│   └── ...
-└── styles/                   # 样式文件
-    └── components/
-        └── ProviderSettings.css
+src/stack/                      # 主进程翻译栈（ESM 源码，esbuild 打包，运行时单实例）
+├── index.js                    # createStack 入口（ctx 依赖注入）
+├── service.js                  # 调度：provider 路由/降级/两级缓存/免译过滤器/隐私门控
+├── registry.js                 # 翻译源注册表 + DEFAULT_PRIORITY
+├── runtime.js                  # rtFetch（Electron net.fetch 封装，网络唯一出口）
+├── i18n.js                     # 栈内 _t（复用 src/i18n/locales 词表）
+├── providers/
+│   ├── base.js                 # BaseProvider + _t + combineSignal
+│   ├── metadata.js             # ★ 跨端共享元数据表（configSchema 驱动表单与密钥加密）
+│   ├── presets-core.js         # OpenAI 兼容预设（加兼容源只需在这加条目）
+│   ├── presets.js              # 预设 → Provider 类的包装
+│   └── <id>.js                 # 独立翻译源类（deepl/gemini/anthropic/...）
+└── ocr/
+    ├── base.js                 # BaseOCREngine + _t
+    ├── manager.js              # ★ OCR 引擎注册表 + 自动降级链 + vision 全局锁
+    ├── local-bridge.js         # 本地引擎桥（主进程内直调 ocr-engine/windows-ocr）
+    └── <id>.js                 # 在线引擎类（ocrspace/google-vision/azure/baidu/llm-vision）
+
+src/（渲染端，只管 UI）
+├── services/stack-client.js    # 栈的渲染端客户端（stack:* IPC，同名 API）
+├── config/provider-icons.js    # ★ 翻译源图标 + 显示顺序（渲染端专属，svg 不进栈 bundle）
+├── assets/provider-icons/      # 翻译源 svg 图标
+└── components/ProviderSettings # 按 metadata.configSchema 自动渲染配置表单
 ```
+
+### 栈内三条铁律（违反 = 必然出 bug）
+
+1. **网络请求只能走 `rtFetch`**（`../runtime.js`）——它是 Electron `net.fetch`，走 Chromium 网络栈和系统代理。直接用 Node `fetch` 会绕过代理，代理用户直接断网。
+2. **栈内禁止 import `electron`、`window`、`localStorage`**——栈被 esbuild 打包进主进程，环境依赖全部经 `createStack(ctx)` 注入。
+3. **用户可见文案走 `_t(key, 中文fallback)`**——栈有独立 i18n 实例，词表与渲染端同源（`src/i18n/locales`），新增 key 两端词表都要加并过 `npm run check:i18n`。
 
 ---
 
-## 🔌 自定义翻译源（Provider）
+## 🔌 新增翻译源（Provider）
 
-### 1. 基本结构
+### 路线 A：OpenAI 兼容 API（最常见，零类文件）
 
-每个翻译源是一个独立目录，包含：
+很多服务商（SiliconFlow、Moonshot、各类中转站…）都暴露 OpenAI 兼容接口。只需两步：
 
-```
-src/providers/my-provider/
-├── index.js      # 主文件（必需）
-└── icon.svg      # 图标（可选，推荐 24x24）
-```
-
-### 2. 创建翻译源类
-
-继承 `BaseProvider` 并实现必要方法：
+1. `src/stack/providers/presets-core.js` 的 `PRESET_CORE` 加一个条目：
 
 ```javascript
-// src/providers/my-provider/index.js
+{
+  id: 'my-service',
+  defaults: {
+    apiKey: '',
+    model: 'default-model',
+    endpoint: 'https://api.my-service.com/v1',
+    timeout: 15000,
+  },
+  latencyLevel: 'fast',        // 'fast' | 'medium' | 'slow'
+  requiresNetwork: true,
+  hooks: {
+    requireApiKey: true,       // 未配置 key 时直接短路报错
+    // 可选：filterModels、fieldAdapter 等，参考 openai 条目
+  },
+},
+```
 
-import { BaseProvider, LANGUAGE_CODES } from '../base.js';
-import icon from './icon.svg';
+2. `src/stack/providers/metadata.js` 加对应的元数据 + `configSchema`（见下文），
+   再按「渲染端登记」补图标即可。
 
-/**
- * 自定义翻译源示例
- */
+### 路线 B：独立协议的翻译源
+
+在 `src/stack/providers/my-provider.js` 创建类（参考 `deepl.js`，它是最小的独立源）：
+
+```javascript
+import { BaseProvider, _t, combineSignal } from './base.js';
+import { PROVIDER_METADATA } from './metadata.js';
+import { rtFetch } from '../runtime.js';
+
 class MyProvider extends BaseProvider {
-  
-  // ========== 静态元信息（必需）==========
-  static metadata = {
-    id: 'my-provider',           // 唯一标识符（kebab-case）
-    name: '我的翻译源',           // 显示名称
-    description: '这是一个示例翻译源', // 简短描述
-    icon: icon,                  // 图标（SVG 或图片路径）
-    color: '#3b82f6',            // 主题色（用于 UI 高亮）
-    type: 'llm',                 // 类型：'llm' | 'api' | 'traditional'
-    helpUrl: 'https://...',      // 帮助链接（获取 API Key 等）
-    
-    // 配置字段声明（用于自动生成设置界面）
-    configSchema: {
-      apiKey: {
-        type: 'password',        // 字段类型
-        label: 'API Key',        // 显示标签
-        required: true,          // 是否必填
-        placeholder: 'sk-...',   // 占位符
-        encrypted: true,         // 是否加密存储
-      },
-      baseUrl: {
-        type: 'text',
-        label: 'API 地址',
-        default: 'https://api.example.com/v1',
-        required: false,
-        placeholder: 'https://api.example.com/v1',
-      },
-      model: {
-        type: 'select',          // 下拉选择
-        label: '模型',
-        default: 'model-a',
-        options: [
-          { value: 'model-a', label: 'Model A' },
-          { value: 'model-b', label: 'Model B' },
-        ],
-      },
-      enableCache: {
-        type: 'checkbox',        // 复选框
-        label: '启用缓存',
-        default: true,
-      },
-    },
-  };
+  // 元数据不写在类里 —— 单源在 metadata.js（跨端共享）
+  static metadata = PROVIDER_METADATA['my-provider'];
 
-  // ========== 构造函数 ==========
   constructor(config = {}) {
-    super({
-      // 默认配置
-      apiKey: '',
-      baseUrl: 'https://api.example.com/v1',
-      model: 'model-a',
-      timeout: 15000,
-      ...config,  // 合并传入的配置
-    });
+    super({ apiKey: '', timeout: 15000, ...config });
   }
 
-  // ========== 属性（可选覆盖）==========
-  
-  /**
-   * 预估延迟等级
-   * 'fast' - <500ms（在线 API）
-   * 'medium' - 500ms-2s
-   * 'slow' - >2s（本地大模型）
-   */
-  get latencyLevel() {
-    return 'fast';
-  }
+  get latencyLevel() { return 'fast'; }      // 'fast' | 'medium' | 'slow'
+  get requiresNetwork() { return true; }     // 离线模式白名单依据，必须诚实
+  get supportsStreaming() { return false; }
 
-  /**
-   * 是否需要外网
-   */
-  get requiresNetwork() {
-    return true;
-  }
-
-  /**
-   * 是否支持流式输出
-   */
-  get supportsStreaming() {
-    return false;
-  }
-
-  // ========== 核心方法（必须实现）==========
-
-  /**
-   * 翻译文本
-   * @param {string} text - 要翻译的文本
-   * @param {string} sourceLang - 源语言代码（'auto' 表示自动检测）
-   * @param {string} targetLang - 目标语言代码
-   * @returns {Promise<{success: boolean, text?: string, error?: string}>}
-   */
-  async translate(text, sourceLang = 'auto', targetLang = 'zh') {
-    // 1. 参数验证
-    if (!text?.trim()) {
-      return { success: false, error: '文本为空' };
-    }
-
+  async translate(text, sourceLang = 'auto', targetLang = 'zh', options = {}) {
     if (!this.config.apiKey) {
-      return { success: false, error: '未配置 API Key' };
+      return { success: false, error: _t('providerError.notConfigured', '未配置 API Key') };
     }
-
     try {
-      // 2. 获取语言名称（用于 prompt）
-      const targetName = LANGUAGE_CODES[targetLang]?.name || targetLang;
-
-      // 3. 调用 API
-      const response = await fetch(`${this.config.baseUrl}/translate`, {
+      const response = await rtFetch(`${this.baseUrl}/translate`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.config.apiKey}`,
-        },
-        body: JSON.stringify({
-          text,
-          source: sourceLang,
-          target: targetLang,
-          model: this.config.model,
-        }),
-        signal: AbortSignal.timeout(this.config.timeout),
-      });
-
-      // 4. 处理错误响应
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        return { 
-          success: false, 
-          error: errorData.message || `HTTP ${response.status}` 
-        };
-      }
-
-      // 5. 解析响应
-      const data = await response.json();
-      const translatedText = data.translation || data.text;
-
-      if (!translatedText) {
-        return { success: false, error: '翻译结果为空' };
-      }
-
-      // 6. 返回成功结果
-      return {
-        success: true,
-        text: translatedText,
-        detectedLang: data.detected_language,  // 可选
-      };
-
-    } catch (error) {
-      // 7. 错误处理
-      this._lastError = error;
-      
-      if (error.name === 'AbortError') {
-        return { success: false, error: '请求超时' };
-      }
-      
-      return { success: false, error: error.message || '未知错误' };
-    }
-  }
-
-  // ========== 可选方法 ==========
-
-  /**
-   * 流式翻译（支持流式输出时实现）
-   * @param {string} text - 要翻译的文本
-   * @param {string} sourceLang - 源语言代码
-   * @param {string} targetLang - 目标语言代码
-   * @param {function} onChunk - 接收每个文本块的回调
-   * @returns {Promise<{success: boolean, text?: string, error?: string}>}
-   */
-  async translateStream(text, sourceLang, targetLang, onChunk) {
-    // 如果不支持流式，调用普通翻译
-    if (!this.supportsStreaming) {
-      const result = await this.translate(text, sourceLang, targetLang);
-      if (result.success && onChunk) {
-        onChunk(result.text);
-      }
-      return result;
-    }
-
-    // 流式实现示例
-    try {
-      const response = await fetch(`${this.config.baseUrl}/translate/stream`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.config.apiKey}`,
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.config.apiKey}` },
         body: JSON.stringify({ text, source: sourceLang, target: targetLang }),
+        // combineSignal 合并调用方 abort 信号与超时 —— 取消翻译真的会断请求
+        signal: combineSignal(options.signal, this.config.timeout),
       });
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let fullText = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value, { stream: true });
-        fullText += chunk;
-        
-        if (onChunk) {
-          onChunk(chunk);
-        }
-      }
-
-      return { success: true, text: fullText };
+      if (!response.ok) return { success: false, error: `HTTP ${response.status}` };
+      const data = await response.json();
+      return data.translation
+        ? { success: true, text: data.translation }
+        : { success: false, error: _t('providerError.emptyResult', '翻译结果为空') };
     } catch (error) {
       return { success: false, error: error.message };
     }
   }
 
-  /**
-   * 测试连接
-   * @returns {Promise<{success: boolean, message?: string}>}
-   */
-  async testConnection() {
-    if (!this.config.apiKey) {
-      return { success: false, message: '未配置 API Key' };
-    }
-
-    try {
-      // 方式 1: 调用专门的测试接口
-      const response = await fetch(`${this.config.baseUrl}/health`, {
-        headers: { 'Authorization': `Bearer ${this.config.apiKey}` },
-        signal: AbortSignal.timeout(10000),
-      });
-
-      if (!response.ok) {
-        return { success: false, message: `连接失败: ${response.status}` };
-      }
-
-      return { success: true, message: '连接成功' };
-
-    } catch (error) {
-      return { success: false, message: error.message || '连接失败' };
-    }
-  }
-
-  /**
-   * 获取可用模型列表（LLM 类型用）
-   * @returns {Promise<string[]>}
-   */
-  async getModels() {
-    try {
-      const response = await fetch(`${this.config.baseUrl}/models`, {
-        headers: { 'Authorization': `Bearer ${this.config.apiKey}` },
-      });
-      const data = await response.json();
-      return data.models || [];
-    } catch {
-      return [];
-    }
-  }
+  // 可选：translateStream(text, src, tgt, onChunk, options)、testConnection()、getModels()
 }
 
 export default MyProvider;
 ```
 
-### 3. 注册翻译源
+### 元数据表（两条路线都必做）
 
-在 `src/providers/registry.js` 中注册：
+`src/stack/providers/metadata.js` 加条目。**这张表是单源**：渲染端设置表单按 `configSchema` 自动生成，主进程按 `encrypted: true` 决定哪些字段进 DPAPI 加密仓——两端不会漂移。表内必须保持纯 JSON 可序列化（会原样过 IPC）。
 
 ```javascript
-// 1. 导入
-import MyProvider from './my-provider/index.js';
-
-// 2. 添加到 providerClasses
-const providerClasses = {
-  'local-llm': LocalLLMProvider,
-  'openai': OpenAIProvider,
-  // ... 其他
-  'my-provider': MyProvider,  // 添加这行
-};
-
-// 3. 添加到 DEFAULT_PRIORITY（可选）
-export const DEFAULT_PRIORITY = {
-  normal: ['local-llm', 'openai', 'my-provider', ...],
-};
+'my-provider': {
+  id: 'my-provider',
+  name: '我的翻译源',
+  description: '一句话描述',
+  color: '#3b82f6',            // 卡片强调色（品牌色，数据例外可写死）
+  type: 'llm',                 // 'llm' | 'api' | 'traditional'
+  helpUrl: 'https://...',      // "获取 API Key" 跳转
+  configSchema: {
+    apiKey: { type: 'password', label: 'API Key', required: true, encrypted: true, placeholder: 'sk-...' },
+    baseUrl: { type: 'text', label: 'API 地址', default: 'https://...', required: false },
+    model:  { type: 'text', label: '模型', default: '...', required: false },
+    timeout:{ type: 'number', label: '超时 (ms)', default: 15000, required: false },
+  },
+},
 ```
 
-### 4. 配置字段类型参考
+字段类型：`text` / `password`（配 `encrypted: true` 走 safeStorage）/ `select`（带 `options`）/ `checkbox` / `number`。
 
-| 类型 | 说明 | 配置示例 |
-|------|------|----------|
-| `text` | 普通文本输入 | `{ type: 'text', label: '地址', placeholder: 'https://...' }` |
-| `password` | 密码输入（可切换显示） | `{ type: 'password', label: 'API Key', encrypted: true }` |
-| `select` | 下拉选择 | `{ type: 'select', options: [{value, label}] }` |
-| `checkbox` | 复选框 | `{ type: 'checkbox', label: '启用', default: true }` |
-| `number` | 数字输入 | `{ type: 'number', min: 0, max: 100 }` |
+### 注册与渲染端登记
 
-### 5. 语言代码参考
+1. **栈注册**：`src/stack/registry.js` —— import 类 + 加进 `providerClasses` + `DEFAULT_PRIORITY.normal` 排个位置（路线 A 的预设自动注册，跳过 import）。
+2. **渲染端图标**：svg 放 `src/assets/provider-icons/my-provider.svg`，在 `src/config/provider-icons.js` 的 `PROVIDER_ICONS` 和 `ORDER` 各加一行（ORDER 决定设置页显示顺序）。
+3. **常量表**：`npm run check:constants` 会校验 PROVIDER_IDS 跨文件同步，报错就按提示补齐。
 
-使用 `LANGUAGE_CODES` 获取标准语言信息：
+### 验证
 
-```javascript
-import { LANGUAGE_CODES } from '../base.js';
-
-// LANGUAGE_CODES 结构
-{
-  'zh': { code: 'zh', name: '中文', nativeName: '中文' },
-  'en': { code: 'en', name: 'English', nativeName: 'English' },
-  'ja': { code: 'ja', name: '日语', nativeName: '日本語' },
-  // ...
-}
+```bash
+npm run stack:build   # 栈必须能打包
+npm test              # 单测
+npm start             # 实测：设置页出卡片、填 key、测试连接、翻译
 ```
 
 ---
 
-## 👁️ 自定义 OCR 引擎
+## 👁️ 新增 OCR 引擎
 
-### 1. 基本结构
+在线 OCR 引擎同样活在栈里：`src/stack/ocr/my-ocr.js`（参考 `ocrspace.js`，最小样板）：
 
 ```javascript
-// src/providers/ocr/my-ocr.js
+import { BaseOCREngine, _t } from './base.js';
+import { rtFetch } from '../runtime.js';
 
-import { BaseOCREngine } from './base.js';
-
-/**
- * 自定义 OCR 引擎示例
- */
 class MyOCREngine extends BaseOCREngine {
-  
-  // ========== 静态元信息（必需）==========
   static metadata = {
-    id: 'my-ocr',                // 唯一标识符
-    name: '我的 OCR',            // 显示名称
-    description: '自定义 OCR 引擎', // 描述
-    type: 'online',              // 'local' | 'online'
-    tier: 3,                     // 梯队：1=本地首选, 2=视觉模型, 3=在线API
-    priority: 40,                // 优先级数值（越小越优先）
-    isOnline: true,              // 是否需要联网
-    
-    // 配置字段
-    configSchema: {
-      apiKey: {
-        type: 'password',
-        label: 'API Key',
-        required: true,
-        placeholder: 'xxx...',
-        encrypted: true,
-      },
-      language: {
-        type: 'select',
-        label: '识别语言',
-        default: 'auto',
-        options: [
-          { value: 'auto', label: '自动检测' },
-          { value: 'zh', label: '中文' },
-          { value: 'en', label: 'English' },
-          { value: 'ja', label: '日本語' },
-        ],
-      },
-    },
-    
-    helpUrl: 'https://...',  // 帮助链接
+    id: 'my-ocr',
+    name: '我的 OCR',
+    description: '一句话描述',
+    type: 'online',            // OCR 元数据独立于翻译源表，直接写在类上
+    tier: 3,                   // 1=本地首选 2=视觉模型 3=在线 API
+    priority: 40,              // 降级链内排序（越小越优先）
+    isOnline: true,            // 离线模式白名单依据，必须诚实
+    configSchema: { apiKey: { type: 'password', label: 'API Key', required: true, encrypted: true } },
+    helpUrl: 'https://...',
   };
 
-  // ========== 构造函数 ==========
-  constructor(config = {}) {
-    super({
-      apiKey: '',
-      language: 'auto',
-      ...config,
-    });
-  }
+  constructor(config = {}) { super({ apiKey: '', ...config }); }
 
-  // ========== 核心方法 ==========
+  async isAvailable() { return !!this.config.apiKey; }
 
-  /**
-   * 检查引擎是否可用
-   * @returns {Promise<boolean>}
-   */
-  async isAvailable() {
-    // 检查必要配置是否存在
-    return !!this.config.apiKey;
-  }
-
-  /**
-   * 识别图片中的文字
-   * @param {string|Uint8Array} input - base64 图片或二进制数据
-   * @param {object} options - 识别选项
-   * @returns {Promise<{success: boolean, text?: string, error?: string}>}
-   */
   async recognize(input, options = {}) {
-    const { apiKey, language } = this.config;
-    
-    // 1. 验证配置
-    if (!apiKey) {
-      return { success: false, error: '请配置 API Key' };
-    }
-
-    try {
-      // 2. 确保输入是 base64 格式
-      const base64Data = this.ensureBase64(input);
-      
-      // 3. 移除 data URL 前缀（如果 API 不需要）
-      const pureBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
-
-      // 4. 调用 OCR API
-      const response = await fetch('https://api.my-ocr.com/recognize', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          image: pureBase64,
-          language: options.language || language,
-        }),
-      });
-
-      // 5. 处理错误
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP ${response.status}`);
-      }
-
-      // 6. 解析结果
-      const data = await response.json();
-      const text = data.text || data.result;
-
-      if (!text) {
-        return { success: false, error: '未识别到文字' };
-      }
-
-      // 7. 返回结果（使用 cleanText 清理文本）
-      return {
-        success: true,
-        text: this.cleanText(text),
-        engine: 'my-ocr',
-        confidence: data.confidence,  // 可选：置信度
-        language: data.language,      // 可选：检测到的语言
-      };
-
-    } catch (error) {
-      console.error('[MyOCR] Error:', error);
-      return { success: false, error: error.message };
-    }
+    const base64 = this.ensureBase64(input).replace(/^data:image\/\w+;base64,/, '');
+    const response = await rtFetch('https://api.my-ocr.com/recognize', { /* ... */ });
+    const data = await response.json();
+    return data.text
+      ? { success: true, text: this.cleanText(data.text), engine: 'my-ocr' }
+      : { success: false, error: _t('ocr.noText', '未识别到文字') };
   }
 }
 
 export default MyOCREngine;
 ```
 
-### 2. 注册 OCR 引擎
+登记三处：
 
-在 `src/providers/ocr/index.js` 中注册：
+1. `src/stack/ocr/manager.js` —— import + `engines` 表 + `DEFAULT_OCR_PRIORITY`（决定自动降级链位置）。
+2. `src/config/constants.js` 与 `electron/shared/constants.js` 的 `OCR_ENGINES` 常量表（`check:constants` 锁同步）。
+3. 设置页 UI：`src/components/SettingsPanel/sections/OcrSection.jsx` 加引擎卡片（参考现有在线引擎块；密钥输入走统一的 OCR 密钥仓，保存时自动 DPAPI 加密）。
 
-```javascript
-// 1. 导入
-import MyOCREngine from './my-ocr.js';
-
-// 2. 添加到 engines
-const engines = {
-  'rapid-ocr': RapidOCREngine,
-  'windows-ocr': WindowsOCREngine,
-  'llm-vision': LLMVisionEngine,
-  // ... 其他
-  'my-ocr': MyOCREngine,  // 添加这行
-};
-
-// 3. 添加到默认优先级（可选）
-export const DEFAULT_OCR_PRIORITY = [
-  'rapid-ocr',
-  'windows-ocr',
-  'llm-vision',
-  'my-ocr',  // 添加这行
-  // ...
-];
-```
-
-### 3. 添加 UI 配置
-
-在 `src/components/SettingsPanel.jsx` 的 OCR 设置部分添加：
-
-```jsx
-{/* 我的 OCR */}
-<div className={`ocr-engine-item ${settings.ocr.engine === 'my-ocr' ? 'active' : ''}`}>
-  <div className="engine-info">
-    <div className="engine-header">
-      <span className="engine-name">我的 OCR</span>
-      <span className="engine-badge">在线</span>
-    </div>
-    <p className="engine-desc">自定义 OCR 引擎描述</p>
-    <div className="api-key-input-wrapper">
-      <input 
-        type={showApiKeys.myOcr ? "text" : "password"}
-        className="setting-input compact"
-        placeholder="API Key"
-        value={settings.ocr.myOcrKey || ''}
-        onChange={(e) => updateSetting('ocr', 'myOcrKey', e.target.value)}
-      />
-      <button 
-        type="button"
-        className="api-key-toggle"
-        onClick={() => setShowApiKeys(prev => ({ ...prev, myOcr: !prev.myOcr }))}
-      >
-        {showApiKeys.myOcr ? <EyeOff size={14} /> : <Eye size={14} />}
-      </button>
-    </div>
-  </div>
-  <div className="engine-actions">
-    <button 
-      className={`btn ${settings.ocr.engine === 'my-ocr' ? 'active' : ''}`}
-      onClick={() => {
-        if (settings.ocr.myOcrKey) {
-          updateSetting('ocr', 'engine', 'my-ocr');
-        } else {
-          notify('请先配置 API Key', 'warning');
-        }
-      }}
-    >
-      {settings.ocr.engine === 'my-ocr' ? '✓ 使用中' : '使用'}
-    </button>
-  </div>
-</div>
-```
-
-### 4. BaseOCREngine 辅助方法
-
-| 方法 | 说明 |
-|------|------|
-| `this.ensureBase64(input)` | 确保输入转换为 base64 data URL |
-| `this.cleanText(text)` | 清理 OCR 输出（统一换行符、去除多余空格）|
-| `this.config` | 访问配置对象 |
+注意：非标准隐私模式下引擎走 `allowedEngines` 白名单（`src/stack/privacy-modes.js`），新在线引擎默认**不在**离线白名单——这是设计，不要绕。
 
 ---
 
-## 🎨 CSS 样式规范
+## 🎨 UI 与样式规范
 
-### 1. 命名规范
+样式令牌的完整说明在 [THEME_CUSTOMIZATION.md](THEME_CUSTOMIZATION.md)，开发时只需记住这几条硬规则：
 
-使用 BEM-like 命名或组件前缀：
-
-```css
-/* 组件前缀方式（推荐） */
-.ps-container { }      /* ProviderSettings 容器 */
-.ps-card { }           /* 卡片 */
-.ps-card-header { }    /* 卡片头部 */
-.ps-card.enabled { }   /* 状态修饰 */
-.ps-card.expanded { }
-
-/* 通用组件 */
-.setting-group { }
-.setting-label { }
-.setting-input { }
-.setting-select { }
-```
-
-### 2. CSS 变量
-
-项目使用的主要 CSS 变量：
-
-```css
-:root {
-  /* 颜色 */
-  --primary-color: #3b82f6;
-  --success-color: #10b981;
-  --warning-color: #f59e0b;
-  --error-color: #ef4444;
-  
-  /* 灰度 */
-  --gray-50: #f9fafb;
-  --gray-100: #f3f4f6;
-  --gray-200: #e5e7eb;
-  --gray-300: #d1d5db;
-  --gray-400: #9ca3af;
-  --gray-500: #6b7280;
-  --gray-600: #4b5563;
-  --gray-700: #374151;
-  --gray-800: #1f2937;
-  --gray-900: #111827;
-  
-  /* 间距 */
-  --spacing-xs: 4px;
-  --spacing-sm: 8px;
-  --spacing-md: 16px;
-  --spacing-lg: 24px;
-  --spacing-xl: 32px;
-  
-  /* 圆角 */
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-full: 9999px;
-  
-  /* 阴影 */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
-}
-```
-
-### 3. 常用组件样式模板
-
-#### 卡片组件
-
-```css
-.my-card {
-  background: #fff;
-  border: 1px solid var(--gray-200);
-  border-radius: var(--radius-lg);
-  padding: var(--spacing-md);
-  transition: all 0.2s ease;
-}
-
-.my-card:hover {
-  border-color: var(--gray-300);
-  box-shadow: var(--shadow-sm);
-}
-
-.my-card.active {
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-```
-
-#### 输入框
-
-```css
-.my-input {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--gray-200);
-  border-radius: var(--radius-md);
-  font-size: 14px;
-  background: #fff;
-  transition: all 0.15s;
-}
-
-.my-input:focus {
-  outline: none;
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.my-input::placeholder {
-  color: var(--gray-400);
-}
-```
-
-#### 按钮
-
-```css
-/* 主要按钮 */
-.btn-primary {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 20px;
-  border: none;
-  border-radius: var(--radius-md);
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  color: #fff;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-primary:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
-}
-
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-/* 次要按钮 */
-.btn-secondary {
-  padding: 8px 16px;
-  border: 1px solid var(--gray-200);
-  border-radius: var(--radius-md);
-  background: #fff;
-  color: var(--gray-700);
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.btn-secondary:hover {
-  background: var(--gray-50);
-  border-color: var(--gray-300);
-}
-```
-
-#### 开关
-
-```css
-.toggle-switch {
-  position: relative;
-  width: 44px;
-  height: 24px;
-  background: var(--gray-200);
-  border-radius: var(--radius-full);
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.toggle-switch.active {
-  background: var(--success-color);
-}
-
-.toggle-switch::after {
-  content: '';
-  position: absolute;
-  width: 20px;
-  height: 20px;
-  background: #fff;
-  border-radius: 50%;
-  top: 2px;
-  left: 2px;
-  transition: transform 0.2s;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
-}
-
-.toggle-switch.active::after {
-  transform: translateX(20px);
-}
-```
-
-#### 状态徽章
-
-```css
-.badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: var(--radius-sm);
-  font-size: 11px;
-  font-weight: 500;
-}
-
-.badge-success {
-  background: #ecfdf5;
-  color: #059669;
-}
-
-.badge-warning {
-  background: #fffbeb;
-  color: #d97706;
-}
-
-.badge-error {
-  background: #fef2f2;
-  color: #dc2626;
-}
-
-.badge-info {
-  background: #eff6ff;
-  color: #2563eb;
-}
-```
-
-### 4. 动画
-
-```css
-/* 旋转动画（加载中） */
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-.spinning {
-  animation: spin 1s linear infinite;
-}
-
-/* 淡入 */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.fade-in {
-  animation: fadeIn 0.2s ease;
-}
-
-/* 滑入 */
-@keyframes slideDown {
-  from { 
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to { 
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.slide-down {
-  animation: slideDown 0.2s ease;
-}
-```
-
-### 5. 响应式设计
-
-```css
-/* 移动端适配 */
-@media (max-width: 768px) {
-  .my-container {
-    padding: var(--spacing-sm);
-  }
-  
-  .my-card {
-    padding: var(--spacing-sm);
-  }
-  
-  .my-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* 小屏幕 */
-@media (max-width: 480px) {
-  .btn-group {
-    flex-direction: column;
-  }
-}
-```
-
----
-
-## 📝 最佳实践
-
-### 1. 翻译源开发
-
-- ✅ 总是处理空文本和未配置的情况
-- ✅ 使用 `AbortSignal.timeout()` 设置超时
-- ✅ 返回有意义的错误消息
-- ✅ 支持 `auto` 源语言检测
-- ✅ 加密存储敏感配置（设置 `encrypted: true`）
-- ❌ 不要在代码中硬编码 API Key
-- ❌ 不要忽略网络错误
-
-### 2. OCR 引擎开发
-
-- ✅ 使用 `ensureBase64()` 处理输入格式
-- ✅ 使用 `cleanText()` 清理输出
-- ✅ 实现 `isAvailable()` 检查可用性
-- ✅ 处理 "无文字" 的情况
-- ❌ 不要假设输入格式
-
-### 3. CSS 开发
-
-- ✅ 使用 CSS 变量保持一致性
-- ✅ 添加 hover/focus 状态
-- ✅ 考虑禁用状态样式
-- ✅ 使用 transition 添加过渡效果
-- ❌ 不要使用 `!important`（除非必要）
-- ❌ 不要使用内联样式
+- **颜色一律主题令牌**：`var(--accent-primary)`、`var(--bg-*)`、`var(--text-*)`；透明变体用 `color-mix(in srgb, var(--accent-primary) 12%, transparent)`。**禁止写死 rgba/hex 蓝色**——项目有 light/dark/fresh 三主题，写死=另外两个主题破相。（provider 品牌色 `metadata.color` 是唯一数据例外。）
+- **强调色底上的文字**用 `--text-on-accent`（深色主题是琥珀金底，白字不可读）。
+- **悬浮窗/划词窗不加载 App.css 令牌表**：这两个独立窗口只能用各自的局部变量（`--floating-*` / `--sel-*`），引用 `--accent-*` 会静默失效。
+- **图标一律 [lucide-react](https://lucide.dev/)**，不用 emoji。
+- **弹窗用 `shared/ConfirmDialog`**（`useConfirm()` Promise 式），禁止 `window.confirm`。
+- **常驻面板（display:none 挂载）的 window 级快捷键**必须走 `hooks/use-visible-hotkey`，否则隐藏页签也会响应按键。
+- 类名用组件前缀（`.ps-card`、`.setting-group`），不用内联样式堆布局。
 
 ---
 
 ## 🔧 调试技巧
 
-### 1. 翻译源调试
-
 ```javascript
-// 在 translate() 方法中添加日志
-console.log(`[${this.constructor.metadata.id}] Translating:`, { text, sourceLang, targetLang });
-console.log(`[${this.constructor.metadata.id}] Response:`, data);
+// 渲染端 DevTools（F12）里：
+
+// 看设置（密钥字段已剥离，密文在主进程 __encrypted_* 键，不落明文）
+await window.electron.store.get('settings')
+
+// 手动触发栈重载（设置保存后会自动 reload 并广播 stack:changed）
+await window.electron.stack.reload()
+
+// 栈缓存统计 / 清空
+await window.electron.stack.cacheStats()
+await window.electron.stack.clearCache('all')
 ```
 
-### 2. 控制台检查配置
+- **主进程/栈日志**：设置 → 关于 → 打开日志目录（`%APPDATA%/t-translate/logs/app-*.log`），翻译栈与 OCR 管线日志都在这。
+- **划词链路探针**：`npm run start:debug`（`TT_SELECTION_DEBUG=1`）输出选区检测各层判定。
+- **网络请求**：主进程栈的请求不经过渲染端 DevTools Network 面板，看日志或在 provider 里临时加 log。
 
-```javascript
-// 查看翻译服务状态
-console.log(await window.electron?.store?.get('settings'));
+## ✅ 提交前检查
 
-// API Key 经 Windows DPAPI 加密存于主进程（electron-store 顶层 __encrypted_* 键），
-// 不在 localStorage、也不落明文。渲染端只能经 IPC 解密读取：
-console.log(await window.electron?.secureStorage?.decrypt('provider_my-provider_apiKey'));
+```bash
+npx eslint . --quiet     # 0 error（全仓已归零，不许回退）
+npm test                 # vitest
+npm run stack:build      # 栈可打包
+npx vite build           # 渲染端可构建
+npm run check:all        # 常量表 + i18n + 硬编码中文
 ```
-
-### 3. 网络请求调试
-
-使用浏览器开发者工具的 Network 面板查看 API 请求和响应。
 
 ---
 
@@ -949,27 +257,27 @@ console.log(await window.electron?.secureStorage?.decrypt('provider_my-provider_
 
 | 文件 | 说明 |
 |------|------|
-| `src/providers/base.js` | 翻译源基类 |
-| `src/providers/registry.js` | 翻译源注册表 |
-| `src/providers/ocr/base.js` | OCR 引擎基类 |
-| `src/providers/ocr/index.js` | OCR 引擎注册表 |
-| `src/services/translation.js` | 翻译服务（调度逻辑） |
-| `src/components/ProviderSettings.jsx` | 翻译源设置 UI |
-| `src/components/SettingsPanel.jsx` | 设置面板 |
+| `src/stack/providers/metadata.js` | 翻译源元数据单源（configSchema 驱动表单+加密） |
+| `src/stack/registry.js` | 翻译源注册表 + 默认优先级 |
+| `src/stack/ocr/manager.js` | OCR 引擎注册表 + 降级链 |
+| `src/stack/runtime.js` | rtFetch（网络唯一出口） |
+| `src/config/provider-icons.js` | 渲染端图标 + 显示顺序 |
+| `src/services/stack-client.js` | 渲染端栈客户端 |
+| `electron/ipc/translation-stack.js` | 栈 IPC facade（隐私注入/abort/流帧） |
 | `docs/ARCHITECTURE.md` | 架构文档 |
 
 ---
 
 ## ❓ 常见问题
 
-### Q: 新增的翻译源不显示？
-A: 检查是否在 `registry.js` 中注册，并确保 `metadata` 定义正确。
+**Q: 新增的翻译源不显示？**
+A: 四处检查：stack/registry.js 注册、metadata.js 表项、provider-icons.js 的 ICONS+ORDER、`npm run stack:build` 是否重新打包（dev 启动会自动打包）。
 
-### Q: 配置保存后不生效？
-A: 确保调用了 `translationService.reload()` 刷新配置。
+**Q: 配置保存后不生效？**
+A: 设置页保存会自动触发栈 reload 并广播三窗，无需手动处理；自己写的调试路径可以调 `window.electron.stack.reload()`。
 
-### Q: API Key 显示为 `***encrypted***`？
-A: 这是正常的，加密字段会在加载时自动解密。
+**Q: API Key 在设置里显示为密文/空？**
+A: 正常。密钥经 Windows DPAPI 加密存主进程，设置页加载时经审计通道解密回填，明文永不落盘。
 
-### Q: 测试连接失败但翻译成功？
-A: 可能是测试接口和翻译接口不同，检查 `testConnection()` 实现。
+**Q: 翻译源在离线模式下不可用？**
+A: 设计如此：`requiresNetwork: true` 的源在 OFFLINE 模式被主进程强制排除，渲染端无法绕过。
