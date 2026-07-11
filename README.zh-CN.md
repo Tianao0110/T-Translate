@@ -76,7 +76,9 @@
 三档隐私控制，按需选择。离线模式下仅使用本地 LLM，在线 API Key 禁止解密——即使程序内部被恶意代码调用也拿不到。
 
 <p align="center">
-  <img src="docs/screenshots/privacy-mode.png" width="600" alt="隐私模式">
+    <img src="docs/screenshots/privacy-mode-standard.png" width="600" alt="隐私正常模式">
+  <img src="docs/screenshots/privacy-mode-Incognito.png" width="600" alt="无痕模式">
+  <img src="docs/screenshots/privacy-mode-offline.png" width="600" alt="离线模式">
 </p>
 
 ### 多翻译源
@@ -207,3 +209,4 @@ t-translate/
 <p align="center">
   Made with ❤️ by <a href="https://github.com/Tianao0110">Edan Zeng</a>
 </p>
+
