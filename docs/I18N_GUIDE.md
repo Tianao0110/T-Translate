@@ -20,32 +20,21 @@
 | react-i18next | ^14.x | React 集成 |
 | dayjs | ^1.x | 日期本地化 |
 
-### 架构设计
+### 架构设计：三层 i18n 体系（⚠️ 新增文案先确认落在哪层）
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    React Components                      │
-│                   useTranslation() hook                  │
-└────────────────────────┬────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────────┐
-│                    react-i18next                         │
-│                  <I18nextProvider>                       │
-└────────────────────────┬────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────────┐
-│                       i18next                            │
-│              语言检测 → 翻译查找 → 插值处理               │
-└────────────────────────┬────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────────┐
-│                   src/i18n.js                            │
-│              zh: {...}, en: {...}, ...                   │
-└─────────────────────────────────────────────────────────┘
-```
+项目有**三个独立的 i18n 实例**，词表归属不同，混淆会导致"key 加了却不生效"：
+
+| 层 | 实例 | 词表来源 | 取词方式 | 典型场景 |
+|----|------|---------|---------|---------|
+| 渲染进程（三窗 UI） | react-i18next（`src/i18n.js` 初始化） | `src/i18n/locales/zh.js` + `en.js` | `useTranslation()` 的 `t()` | 所有 React 组件文案 |
+| 主进程翻译栈 | 栈内独立 i18next（`src/stack/i18n.js`） | **复用同一份** `src/i18n/locales` 词表 | `_t(key, 中文fallback)` | provider/OCR 错误文案（跨 IPC 后两端逐字一致） |
+| 主进程原生 UI | `electron/shared/main-i18n.js` | **该文件内自带的 zh/en 双表** | `t(key, params)`（第二参是插值参数，**不是 fallback**） | 托盘/菜单/快捷键冲突提示/OCR 健康检查消息 |
+
+实践规则：
+- 渲染端组件文案 → 加 `locales/zh.js` + `en.js`（两份都加，`check:i18n` 锁同步）
+- 栈内（provider/OCR）文案 → 同样加 locales 两份，代码里用栈的 `_t`
+- 主进程托盘/菜单/IPC 返回给用户的错误串 → 加 `main-i18n.js` 的 **zh 和 en 两个块**
+- 错误分类器 `ERROR_PATTERNS`（`src/utils/error-handler.js`）匹配关键词必须**中英双语**各写一份（栈返回哪种语言取决于用户界面语言），`tests/unit/error-classification.test.js` 锁行为
 
 ---
 
@@ -53,23 +42,17 @@
 
 ```
 src/
-├── i18n.js                 # 核心配置 + 所有语言包
-├── main.jsx                # 应用入口，初始化 i18n
-│
-├── components/
-│   ├── MainWindow/
-│   │   └── index.jsx       # useTranslation() 使用示例
-│   ├── TranslationPanel/
-│   ├── HistoryPanel/
-│   ├── FavoritesPanel/
-│   └── SettingsPanel/
-│       ├── index.jsx
-│       └── sections/
-│           ├── InterfaceSection.jsx  # 语言切换 UI
-│           └── ...
-│
-└── stores/
-    └── translation-store.js  # 可选：语言偏好持久化
+├── i18n.js                     # 渲染端 i18next 初始化（resources 引 locales）
+├── i18n/locales/
+│   ├── zh.js                   # 中文词表（渲染端 + 栈共用）
+│   └── en.js                   # 英文词表（渲染端 + 栈共用）
+├── stack/i18n.js               # 栈内 i18n 实例（复用上面的词表，导出 _t）
+├── utils/ai-prompts.js         # AI 提示词双语模板（isZh 分支）
+└── components/SettingsPanel/sections/InterfaceSection.jsx  # 语言切换 UI
+
+electron/shared/main-i18n.js    # 主进程独立双语消息表（托盘/菜单/IPC 错误串）
+scripts/check-i18n.js           # zh/en key 同步检查（npm run check:i18n，提交前必过）
+scripts/check-hardcoded-chinese.js  # 硬编码中文扫描（npm run check:hardcoded）
 ```
 
 ---
@@ -152,36 +135,33 @@ t('history.deleteSelectedConfirm', { count: 5 })
 
 ## 添加新语言
 
-### 步骤 1: 在 i18n.js 中添加语言包
+### 步骤 1: 新建语言包文件并注册
 
 ```javascript
-// src/i18n.js
-
-// 1. 定义新语言包（以日语为例）
-const ja = {
-  app: { name: "T-Translate", version: "バージョン" },
-  nav: { translate: "翻訳", history: "履歴", favorites: "お気に入り", documents: "ドキュメント", settings: "設定" },
-  status: { ready: "準備完了", today: "今日", online: "オンライン", offline: "オフライン" },
-  // ... 复制 zh 或 en 的完整结构，逐一翻译
+// 1. 新建 src/i18n/locales/ja.js（复制 zh.js 的完整结构逐一翻译）
+export default {
+  app: { name: "T-Translate" },
+  nav: { translate: "翻訳", history: "履歴", /* ... */ },
+  // ... 与 zh.js 键结构完全一致
 };
 
-// 2. 添加到 i18n 初始化
-i18n.use(initReactI18next).init({
-  resources: {
-    zh: { translation: zh },
-    en: { translation: en },
-    ja: { translation: ja },  // 添加这行
-  },
-  // ...
-});
+// 2. src/i18n.js 的 resources 注册
+import ja from './i18n/locales/ja.js';
+resources: {
+  zh: { translation: zh },
+  en: { translation: en },
+  ja: { translation: ja },  // 添加这行
+},
 ```
+
+同步动作：`scripts/check-i18n.js` 需把新语言纳入比对；`electron/shared/main-i18n.js` 和 `src/utils/ai-prompts.js` 的语言分支也要补对应文案，否则托盘/提示词会回退中文。
 
 ### 步骤 2: 更新语言选择器
 
 ```jsx
 // src/components/SettingsPanel/sections/InterfaceSection.jsx
 
-const AVAILABLE_LANGUAGES = [
+const LANGUAGES = [
   { code: 'zh', name: '简体中文', nativeName: '简体中文' },
   { code: 'en', name: 'English', nativeName: 'English' },
   { code: 'ja', name: '日本語', nativeName: '日本語' },  // 添加这行
@@ -269,9 +249,11 @@ const MyComponent = () => {
 // 定义
 // deleteSelectedConfirm: "确定删除选中的 {{count}} 条记录？"
 
-// 使用
-<button onClick={() => {
-  if (window.confirm(t('history.deleteSelectedConfirm', { count: selectedIds.size }))) {
+// 使用（弹窗一律走 shared/ConfirmDialog 的 useConfirm，项目禁用 window.confirm）
+const confirm = useConfirm();
+
+<button onClick={async () => {
+  if (await confirm(t('history.deleteSelectedConfirm', { count: selectedIds.size }))) {
     // ...
   }
 }}>
@@ -321,13 +303,14 @@ import { useTranslation } from 'react-i18next';
 
 const LanguageSwitcher = () => {
   const { i18n } = useTranslation();
-  
-  const changeLanguage = (lang) => {
+
+  const changeLanguage = async (lang) => {
     i18n.changeLanguage(lang);
-    // 可选：持久化到 localStorage
-    localStorage.setItem('language', lang);
+    // 持久化到 electron-store（真实实现见 InterfaceSection.switchLanguage）——
+    // 主进程托盘/菜单和三个窗口都从这个键读语言
+    await window.electron?.store?.set('settings.interface.language', lang);
   };
-  
+
   return (
     <select value={i18n.language} onChange={(e) => changeLanguage(e.target.value)}>
       <option value="zh">中文</option>
@@ -499,61 +482,25 @@ export default withTranslation()(MyComponent);
 
 ### Q5: 如何验证翻译完整性？
 
+项目自带三道检查，改动文案后提交前必过：
+
 ```bash
-# 可以创建脚本检查所有语言包的键是否一致
-node scripts/check-i18n.js
-
-# check-i18n.js 示例
-const zh = require('../src/i18n').zh;
-const en = require('../src/i18n').en;
-
-function getKeys(obj, prefix = '') {
-  return Object.keys(obj).flatMap(key => {
-    const path = prefix ? `${prefix}.${key}` : key;
-    return typeof obj[key] === 'object' ? getKeys(obj[key], path) : path;
-  });
-}
-
-const zhKeys = getKeys(zh);
-const enKeys = getKeys(en);
-
-const missingInEn = zhKeys.filter(k => !enKeys.includes(k));
-const missingInZh = enKeys.filter(k => !zhKeys.includes(k));
-
-console.log('Missing in EN:', missingInEn);
-console.log('Missing in ZH:', missingInZh);
+npm run check:i18n         # zh/en 键结构同步比对（缺键/多键直接列出）
+npm run check:i18n:strict  # 严格模式（额外检查空值等）
+npm run check:hardcoded    # 扫描组件里硬编码的中文字符串
 ```
+
+`main-i18n.js` 的双表不在脚本覆盖范围内——新增键时人工保证 zh/en 两个块都加。
 
 ---
 
-## 翻译键完整清单
+## 翻译键清单
 
-当前项目包含约 **520+ 翻译键**，分布在以下命名空间：
+键的命名空间和数量以 `npm run check:i18n` 的实时输出为准（本文档不再维护手工计数表）。词表实体共三处：
 
-| 命名空间 | 键数量 | 说明 |
-|---------|:------:|------|
-| `app` | 2 | 应用名称、版本 |
-| `nav` | 5 | 导航栏标签 |
-| `status` | 4 | 状态栏 |
-| `screenshot` | 1 | 截图功能 |
-| `notify` | 2 | 通用通知 |
-| `settingsNav` | 20+ | 设置导航栏 |
-| `providerSettings` | 15+ | 翻译源设置 |
-| `translationSettings` | 30+ | 翻译设置 |
-| `selectionSettings` | 25+ | 划词翻译 |
-| `floatingWindowSettings` | 25+ | 悬浮窗口 |
-| `documentSettings` | 20+ | 文档翻译 |
-| `connectionSettings` | 10+ | LM Studio 连接 |
-| `translation` | 40+ | 翻译面板 |
-| `history` | 50+ | 历史记录 |
-| `favorites` | 45+ | 收藏夹 |
-| `languages` | 12 | 语言列表 |
-| `ocr` | 15+ | OCR 设置 |
-| `tts` | 15+ | 语音朗读 |
-| `privacy` | 25+ | 隐私模式 |
-| `about` | 15+ | 关于页面 |
-| `shortcuts` | 15+ | 快捷键 |
-| `settings` | 30+ | 通用设置 |
+1. `src/i18n/locales/zh.js` + `en.js` —— 渲染端与主进程栈共用的主词表
+2. `electron/shared/main-i18n.js` —— 主进程原生 UI 双语表（托盘/菜单/IPC 错误串）
+3. `src/utils/ai-prompts.js` —— AI 提示词双语模板（isZh 分支）
 
 ---
 
@@ -562,8 +509,9 @@ console.log('Missing in ZH:', missingInZh);
 | 版本 | 日期 | 变更 |
 |------|------|------|
 | v1.0 | 2026-01-22 | 初始国际化实现，支持中文/英文 |
+| v2.0 | 2026-07-10 | 补三层 i18n 体系（渲染端/栈/main-i18n）、locales 拆分文件现实、check 工具链；示例改用 ConfirmDialog 与 electron-store 持久化 |
 
 ---
 
-**文档维护者**: T-Translate 开发团队  
-**最后更新**: 2026-01-22
+**文档维护者**: T-Translate 开发团队
+**最后更新**: 2026-07-10

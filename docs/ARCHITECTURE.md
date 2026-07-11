@@ -24,8 +24,10 @@ t-translate/
 │
 ├── docs/                       # 项目文档
 │   ├── ARCHITECTURE.md         # 架构设计（本文件）
-│   ├── DEVELOPMENT.md          # 开发者指南
-│   ├── I18N_GUIDE.md           # 国际化指南
+│   ├── DEVELOPMENT.md          # 开发者指南（新增翻译源/OCR 引擎）
+│   ├── I18N_GUIDE.md           # 国际化指南（三层 i18n 体系）
+│   ├── OCR_MODELS.md           # OCR 模型维护手册
+│   ├── FAQ.md                  # 常见问题
 │   └── THEME_CUSTOMIZATION.md  # 主题定制
 │
 ├── electron/                   # 主进程代码
@@ -92,16 +94,15 @@ t-translate/
 │   │       ├── zh.js           # 中文
 │   │       └── en.js           # English
 │   │
+│   ├── hooks/                  # 共享 hooks（use-visible-hotkey 等）
 │   ├── utils/                  # 工具函数
 │   ├── styles/                 # 全局样式
 │   │   ├── index.css           # CSS Reset + 基础变量
 │   │   └── App.css             # 全局共享样式
 │   │
-│   ├── windows/                # 子窗口入口
-│   │   ├── floating-window-entry.jsx     # 悬浮窗口入口
-│   │   └── selection-entry.jsx # 划词翻译入口
-│   │
-│   └── workers/                # Web Workers
+│   └── windows/                # 子窗口入口
+│       ├── floating-window-entry.jsx     # 悬浮窗口入口
+│       └── selection-entry.jsx # 划词翻译入口
 │
 ├── public/                     # 静态资源 + HTML 入口
 │   ├── index.html              # 主窗口
@@ -114,15 +115,19 @@ t-translate/
 │   └── tray-icon.ico           # 托盘图标
 │
 ├── resources/                  # 应用资源
-│   └── ocr/                    # OCR 训练数据
+│   └── ocr/                    # 内置 OCR 基础模型（fetch-ocr-models 拉取，gitignore）
 │
 ├── scripts/                    # 工具脚本
+│   ├── build-stack.js          # esbuild 打包翻译栈（dev/build 自动执行）
+│   ├── fetch-ocr-models.js     # 拉取内置 OCR 基础模型
+│   ├── build-ocr-release.js    # 生成 ocr-models Release 资产（发模型用）
 │   ├── check-constants.js      # 常量同步检查
 │   ├── check-i18n.js           # i18n key 一致性检查
 │   └── check-hardcoded-chinese.js  # 硬编码中文扫描
 │
 └── tests/                      # 测试
     ├── setup.js                # 测试环境配置
+    ├── mocks/electron.js       # 主进程模块单测用 electron stub
     └── unit/                   # 单元测试
 ```
 
@@ -183,11 +188,13 @@ OCR 网络代码，离线与无痕语义由主进程按请求强制（结构性�
 ## 开发命令
 
 ```bash
-npm start               # 启动开发环境
+npm start                # 启动开发环境（先打包栈，再 vite + electron）
+npm run start:debug      # 同上 + 划词链路探针日志（TT_SELECTION_DEBUG=1）
+npm run stack:build      # 单独打包翻译栈（esbuild → electron/generated/）
 npm run build            # 构建生产版本
-npm run dist             # 打包安装程序
-npm run lint             # ESLint 检查
+npm run dist             # 打包安装程序（产物在 release/，发布传三件套 exe+blockmap+latest.yml）
+npm run lint             # ESLint 检查（全仓 0 error 是底线）
 npm run format           # Prettier 格式化
-npm test                 # 运行测试
-npm run check:constants  # 检查常量同步
+npm test                 # 运行测试（vitest）
+npm run check:all        # 常量同步 + i18n 键同步 + 硬编码中文，三连
 ```

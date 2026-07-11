@@ -32,7 +32,7 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 基础包已换 v6-small（feat/ocr-v6：新 id base-v6 + 空格门控按代际 + 拉丁包退役 + manifest 新旧双轨服务老客户端）；medium 高精度档已落地（feat/ocr-model-tier：模型档位控件 + base-v6-hq 可下载可切换 + 引擎按档位解析 base 目录）。发布动作见上方 v0.3.0 节步骤 2。剩余候选：
 
 - ~~doc_cls 旋转分类器~~ **已实测弃案（2026-07-04）**：倒置图可纠正，但日文横排截图被误判竖排、韩文包乱码——主场景回归不可接受，详见 OCR_MODELS.md 已知边界（含复现方法）。别再捡
-- 档位备忘：v6 全系仅 tiny/small/medium 三档（官方页 2026-07-03 已核），tiny 无假名不可用；v6 无独立多语言模型，韩/西里尔/天城/阿拉伯继续 v4 包；spike 数据与复跑脚本在 temp/ocr-probe/（probe-v6.js 四引擎对比 / probe-tier.js 档位切换 / inspect-v6.js 形状检查）
+- 档位备忘：v6 全系仅 tiny/small/medium 三档（官方页 2026-07-03 已核），tiny 无假名不可用；v6 无独立多语言模型，韩/西里尔/天城/阿拉伯继续 v4 包；spike 复跑脚本已随 2026-07-10 temp 清理退役（结论与复现方法保全在 docs/OCR_MODELS.md 已知边界节）
 - 合入时补测：竖排文本、真实截图小字（过全量 probe.js + 实拍）
 - 顺带：百度 Unlimited-OCR 只有 NVIDIA GPU 路径，不适合内置；其 vLLM 镜像是 OpenAI 兼容 API，有 N 卡用户可把 llm-vision 端点指过去零改动直连——可写 FAQ
 
@@ -45,11 +45,6 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 散点子窗口判定是纯几何启发式（[pipeline.js:37](src/services/pipeline.js:37) shouldUseScatteredMode：列对齐+行距+水平散布三条件），误判时整段文字被炸成子窗格、或散落 UI 标签被并成一段。两个方向（可只做②）：
 - ① 启发式加强：字号一致性/多列检测/块数上限等补充信号
 - ② **工具栏手动三态开关（自动/散点/整段，持久化）**——判定不可能全对，手动兜底符合产品习惯，推荐先做这个；散点判定结果在结果区提示当前模式，切换后用上次截图立即重排（imageData 需暂存一份）
-
-### FAQ 候选（文档化即可）
-
-- **Teams 字幕截不到**：Teams「弹出字幕窗口」自带系统级反截屏（WDA 排除捕获，任何截图工具都黑），把字幕**固定在会议窗口内**即可正常被悬浮窗截取；配合悬浮窗自动刷新/全局键（v0.3.1）零焦点使用
-- 百度 Unlimited-OCR 的 vLLM 镜像是 OpenAI 兼容 API，有 N 卡用户可把 llm-vision 端点指过去零改动直连
 
 ### Full onboarding wizard
 

@@ -76,13 +76,10 @@ clone 之后跑一次（`npm run build` / `npm run dist` 会自动执行）：
 npm run ocr:models      # 拉基础模型到 resources/ocr/base
 ```
 
-本地端到端回归 probe（gitignored，temp/ocr-probe/）：
-
-```bash
-npx electron temp/ocr-probe/probe.js          # 引擎识别：中/英/日 + 语言包安装与回退
-npx electron temp/ocr-probe/probe-packs.js    # 包管理：下载/校验拒绝/卸载零残留
-npx electron temp/ocr-probe/probe-ipc.js      # IPC 注册完整性 + 健康检查
-```
+端到端回归此前靠一组 gitignored 的 probe 脚本（temp/ocr-probe/，已随 2026-07-10
+临时目录清理退役，不在版本库内）。当前回归走发版人工清单；如需重新自动化，按原
+覆盖面重建三个 electron 脚本即可：①引擎识别（中/英/日样张 + 语言包安装与回退）
+②包管理（下载/sha256 校验拒绝/卸载零残留）③IPC 注册完整性 + 健康检查。
 
 测试清单 URL 可用环境变量覆写：`TT_OCR_MANIFEST_URL=file:///path/to/manifest.json`。
 
@@ -91,5 +88,5 @@ npx electron temp/ocr-probe/probe-ipc.js      # IPC 注册完整性 + 健康检�
 - 剩余四个语言包（韩/西里尔/天城/阿拉伯）rec 模型仍为 PP-OCRv4 代际——PP-OCRv6 是单模型 50 语言（简繁中/英/日 + 46 拉丁），**没有独立多语言模型**，这四种文字不在其覆盖内；上游出新代多语言 ONNX 后按「更新模型」流程换入
 - v6 基础模型三档：small 为内置默认（官方定位 mobile/desktop），medium 已作为可选「高精度包」提供（对模糊照片/艺术字/点阵字等困难样本更强；清晰截图输出与 small 一致、速度约 2 倍慢），tiny 无假名不可用。引擎解析顺序：档位为「高精度」且 base-v6-hq 在 userData → 用它，否则回落 base-v6（含 hq 被手动删除的静默回退）
 - **旁遮普语（Punjabi/古木基文 Gurmukhi）无法支持**：已核对 PP-OCRv5 全部 11 个多语言模型的语种表（2026-06），PaddleOCR 系没有 Gurmukhi 模型，做不成语言包。巴基斯坦写法（Shahmukhi，阿拉伯字母系）与 arabic 包覆盖的乌尔都文接近、可能部分可用但非官方支持；印度写法只能走在线引擎（Google Vision 支持 pa）或 LLM Vision。上游若新增 Gurmukhi 模型，按「新增语言包」流程接入
-- 引擎不接角度分类器（doc_cls）——**已实测弃案（2026-07-04）**：接入上游 doc_cls.onnx 后倒置整图确实能纠正，但短行 CJK 截图被误判方向（日文横排当竖排识别成乱码、韩文包输出损坏）——主场景回归换边缘场景收益，不划算。旋转照片/扫描件建议走 LLM Vision 或在线引擎；上游分类器若针对短文本改进可复评（复现：img-zh 旋转 180° + esearch.init 传 docCls 跑 probe）
+- 引擎不接角度分类器（doc_cls）——**已实测弃案（2026-07-04）**：接入上游 doc_cls.onnx 后倒置整图确实能纠正，但短行 CJK 截图被误判方向（日文横排当竖排识别成乱码、韩文包输出损坏）——主场景回归换边缘场景收益，不划算。旋转照片/扫描件建议走 LLM Vision 或在线引擎；上游分类器若针对短文本改进可复评（复现：中文样张旋转 180°，esearch.init 传 docCls 对比日文横排/韩文样张的识别输出）
 - Windows OCR 引擎走系统语言包（设置 → 时间和语言 → 语言 安装），与本仓库模型体系无关
