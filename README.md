@@ -156,14 +156,14 @@ t-translate/
 ├── src/                    # Renderer code + main-process translation stack sources
 │   ├── stack/              # Translation stack (runs in main: 10 providers + OCR chain + cache, bundled by esbuild)
 │   ├── components/         # React components
-│   ├── providers/          # Provider metadata (settings UI)
+│   ├── assets/             # Static assets (provider icons)
 │   ├── services/           # Service layer (stack client, capture pipeline)
 │   ├── stores/             # Zustand state management
 │   ├── config/             # Config (privacy modes, templates, constants)
 │   └── i18n/               # i18n (zh / en, 1000+ keys each)
 │
 ├── public/                 # HTML entry + static assets
-├── resources/              # App resources (OCR training data)
+├── resources/              # App resources (bundled OCR base models)
 ├── scripts/                # Utility scripts
 └── docs/                   # Project documentation
 ```
@@ -182,7 +182,7 @@ t-translate/
 | Online translation | OpenAI / Claude / Gemini / DeepSeek / DeepL / Google / Microsoft / Baidu |
 | Packaging | electron-builder |
 
-More docs under `docs/`: [Architecture](docs/ARCHITECTURE.md) · [Development guide](docs/DEVELOPMENT.md) · [i18n guide](docs/I18N_GUIDE.md) · [Theme customization](docs/THEME_CUSTOMIZATION.md)
+More docs under `docs/`: [Architecture](docs/ARCHITECTURE.md) · [Development guide](docs/DEVELOPMENT.md) · [FAQ](docs/FAQ.md) · [OCR models](docs/OCR_MODELS.md) · [i18n guide](docs/I18N_GUIDE.md) · [Theme customization](docs/THEME_CUSTOMIZATION.md)
 
 ---
 
