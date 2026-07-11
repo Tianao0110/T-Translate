@@ -32,11 +32,12 @@ t-translate/
 │   ├── main.js                 # 主进程入口
 │   ├── state.js                # 全局状态 (store, runtime, windows)
 │   ├── screenshot-module.js    # 截图核心逻辑
+│   ├── generated/              # esbuild 产物 translation-stack.cjs（gitignore，构建时生成）
 │   ├── preloads/               # Preload 脚本 (每个窗口一个)
 │   ├── shared/                 # 主/渲染进程共享常量
-│   ├── ipc/                    # IPC 处理器 (按功能拆分)
+│   ├── ipc/                    # IPC 处理器 (按功能拆分，translation-stack.js 为栈 facade)
 │   ├── managers/               # 窗口/托盘/菜单管理器
-│   └── utils/                  # 工具函数
+│   └── utils/                  # 工具函数（secure-vault/secure-audit/ocr-engine 等）
 │
 ├── src/                        # 渲染进程代码
 │   ├── main.jsx                # 应用入口
@@ -56,25 +57,17 @@ t-translate/
 │   │   ├── TitleBar/           # 标题栏
 │   │   └── ErrorBoundary/      # 错误边界
 │   │
-│   ├── providers/              # 翻译源 Provider（kebab-case 目录）
-│   │   ├── base.js             # BaseProvider 基类 + 共享 _t
-│   │   ├── openai-compatible.js# OpenAI 兼容基类（local-llm/ollama/openai/deepseek 经 presets 动态生成）
-│   │   ├── openai-compatible/  # presets.js + 图标（四个 OpenAI 兼容源）
+│   ├── stack/                  # 翻译+OCR 栈源码（ESM；esbuild 打包为主进程 CJS，运行时单实例）
+│   │   ├── index.js            # createStack 入口（ctx 依赖注入：net.fetch/store/密钥）
+│   │   ├── service.js          # 翻译服务（provider 路由/降级/两级缓存/免译过滤器/隐私门控单点）
 │   │   ├── registry.js         # Provider 注册中心
-│   │   ├── anthropic/          # Anthropic Claude
-│   │   ├── deepl/              # DeepL
-│   │   ├── gemini/             # Gemini
-│   │   ├── google-translate/   # Google 翻译
-│   │   ├── microsoft-translator/ # Microsoft Translator
-│   │   ├── baidu-translate/    # 百度翻译
-│   │   └── ocr/                # OCR 引擎 (base, rapid, llm-vision 等)
+│   │   ├── providers/          # 翻译源实现 + metadata.js（跨端共享的纯数据表）
+│   │   └── ocr/                # 在线 OCR 四引擎 + LLM Vision + 本地引擎 local-bridge
 │   │
-│   ├── services/               # 服务层
-│   │   ├── index.js            # 统一入口
-│   │   ├── translation.js      # 翻译服务（门面）
-│   │   ├── main-translation.js # 主窗口翻译
+│   ├── services/               # 渲染端服务层
+│   │   ├── stack-client.js     # 主进程栈的渲染端客户端（stack:* IPC，同名 API）
+│   │   ├── main-translation.js # 主窗口翻译编排
 │   │   ├── pipeline.js         # 悬浮窗口流水线
-│   │   ├── cache.js            # 翻译缓存
 │   │   └── tts/                # TTS 语音 (base, index, web-speech)
 │   │
 │   ├── stores/                 # Zustand 状态管理
@@ -83,12 +76,16 @@ t-translate/
 │   │   ├── session.js          # 会话状态
 │   │   └── sync-to-electron.js # 主进程同步
 │   │
+│   ├── assets/
+│   │   └── provider-icons/     # 翻译源 svg 图标（config/provider-icons.js 集中引入）
+│   │
 │   ├── config/                 # 前端配置
 │   │   ├── constants.js        # 常量定义
 │   │   ├── defaults.js         # 默认值
 │   │   ├── templates.js        # 翻译模板
 │   │   ├── privacy-modes.js    # 隐私模式
-│   │   └── filters.js          # 免译过滤器
+│   │   ├── provider-icons.js   # stack 共享表 + 图标合成的渲染端 provider 目录
+│   │   └── filters.js          # 免译过滤器（stack 与渲染端共用的纯数据）
 │   │
 │   ├── i18n/                   # 语言包
 │   │   └── locales/
@@ -134,7 +131,7 @@ t-translate/
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                         View Layer                              │
-│  components/* (React Components)                                │
+│  components/* (React Components，三渲染窗口)                     │
 └────────────────────────────────┬────────────────────────────────┘
                                  │
                                  ▼
@@ -145,24 +142,33 @@ t-translate/
                                  │
                                  ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                       Service Layer                             │
-│  translation.js, main-translation.js, pipeline.js, cache.js     │
+│                    Renderer Service Layer                       │
+│  stack-client.js（栈客户端）, main-translation.js, pipeline.js   │
+└────────────────────────────────┬────────────────────────────────┘
+                                 │ stack:* IPC
+                                 │ （流式批帧 / 请求 id→abort / 隐私模式主进程注入）
+                                 ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              Main-Process Translation Stack（单实例）            │
+│  electron/generated/translation-stack.cjs ←esbuild← src/stack/* │
+│  service（路由/降级/两级缓存/过滤器/隐私门控单点）                │
+│  registry → local-llm, ollama, openai, anthropic, deepl,        │
+│             gemini, deepseek, google-translate, microsoft, baidu │
+│  ocr/*（在线四引擎 + LLM Vision + 本地 local-bridge 直调）        │
+│  网络出口统一 net.fetch（Chromium 栈，随系统代理）；              │
+│  密钥解密仅在主进程（secure-vault + 审计）                        │
 └────────────────────────────────┬────────────────────────────────┘
                                  │
                                  ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                      Provider Layer                             │
-│  registry.js → local-llm, ollama, openai, anthropic, deepl,     │
-│                gemini, deepseek, google-translate, microsoft,    │
-│                baidu, ocr/*                                      │
-└────────────────────────────────┬────────────────────────────────┘
-                                 │ IPC
-                                 ▼
-┌─────────────────────────────────────────────────────────────────┐
 │                      Electron Main Process                      │
-│  main.js → ipc/* → managers/*                                   │
+│  main.js → ipc/*（translation-stack.js facade）→ managers/*     │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+三个渲染窗口（主窗/悬浮/划词）共享同一个主进程栈实例：缓存全局命中、
+翻译源故障计数全局生效、设置保存一次生效；渲染进程不含任何翻译/在线
+OCR 网络代码，离线与无痕语义由主进程按请求强制（结构性隐私保证）。
 
 ## 命名规范
 
