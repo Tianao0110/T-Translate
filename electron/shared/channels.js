@@ -103,8 +103,6 @@ const CHANNELS = {
     PACKS_DOWNLOAD: 'ocr:packs-download',
     PACKS_REMOVE: 'ocr:packs-remove',
     DOWNLOAD_PROGRESS: 'ocr:download-progress',
-    WINDOWS_OCR: 'ocr:windows-ocr',
-    PADDLE_OCR: 'ocr:paddle-ocr',
     HEALTH_CHECK: 'ocr:health-check',
     SET_MODEL_TIER: 'ocr:set-model-tier',
   },

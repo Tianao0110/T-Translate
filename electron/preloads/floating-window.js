@@ -70,16 +70,6 @@ contextBridge.exposeInMainWorld('electron', {
     },
   },
 
-  // Shared OCR API (also exposed in the main-window preload). Online engines
-  // run in the renderer, so only the local recognizers are bridged here.
-  ocr: {
-    recognizeWithPaddleOCR: (imageData, options) =>
-      ipcRenderer.invoke('ocr:paddle-ocr', imageData, options),
-    recognizeWithWindowsOCR: (imageData, options) =>
-      ipcRenderer.invoke('ocr:windows-ocr', imageData, options),
-    checkInstalled: () => ipcRenderer.invoke('ocr:check-installed'),
-  },
-
   // Encrypted storage for API keys etc.
   secureStorage: {
     encrypt: (key, value) => ipcRenderer.invoke('secure-storage:encrypt', key, value),

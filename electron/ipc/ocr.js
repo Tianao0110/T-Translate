@@ -124,15 +124,13 @@ function register(ctx) {
     }
   });
 
-  registerOCRRecognizers(ctx);
-
   logger.info('OCR IPC handlers registered');
 }
 
 // ===== Per-engine recognizers =====
-// Bodies are shared with the translation-stack facade (ctx.localOcr): the
-// stack's local-bridge engines call these directly, the legacy IPC channels
-// keep serving any renderer path until the cleanup batch retires them.
+// No IPC of their own since the v0.3.1 stack migration retired the legacy
+// ocr:paddle-ocr / ocr:windows-ocr channels — the translation-stack facade
+// (ctx.localOcr) calls these exports directly in the main process.
 
 // Windows OCR — Windows.Media.Ocr via electron/utils/windows-ocr
 async function recognizeWindows(store, imageData, options = {}) {
@@ -163,16 +161,6 @@ async function recognizePaddle(store, imageData, options = {}) {
     result.error = t('ocr.baseModelsMissing');
   }
   return result;
-}
-
-function registerOCRRecognizers(ctx) {
-  const { store } = ctx;
-
-  ipcMain.handle(CHANNELS.OCR.WINDOWS_OCR, (event, imageData, options = {}) =>
-    recognizeWindows(store, imageData, options));
-
-  ipcMain.handle(CHANNELS.OCR.PADDLE_OCR, (event, imageData, options = {}) =>
-    recognizePaddle(store, imageData, options));
 }
 
 // ===== Helpers =====

@@ -161,14 +161,9 @@ const electronAPI = {
     getMode: () => ipcRenderer.invoke("privacy:getMode"),
   },
   ocr: {
-    // Local engines
+    // Recognition itself goes through stack.ocrRecognize (main-process stack);
+    // only detection and pack management stay on the ocr:* channels.
     checkWindowsOCR: () => ipcRenderer.invoke("ocr:check-windows-ocr"),
-    recognizeWithWindowsOCR: (imageData, options) =>
-      ipcRenderer.invoke("ocr:windows-ocr", imageData, options),
-    recognizeWithPaddleOCR: (imageData, options) =>
-      ipcRenderer.invoke("ocr:paddle-ocr", imageData, options),
-    // Online OCR engines run in the renderer (see src/providers/ocr/*), so no
-    // main-process recognizers are exposed here.
 
     // Engine management
     checkInstalled: () => ipcRenderer.invoke("ocr:check-installed"),
