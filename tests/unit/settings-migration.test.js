@@ -8,7 +8,6 @@ describe('migrateOldSettings: floatingWindow unification', () => {
   it('fills floatingWindow defaults when nothing was saved', () => {
     const m = migrateOldSettings({});
     expect(m.floatingWindow).toEqual(DEFAULT_SETTINGS.floatingWindow);
-    expect(m.floatingWindow.lockTargetLang).toBe(false);
     expect(m.floatingWindow.defaultOpacity).toBe(0.85);
   });
 
@@ -21,17 +20,39 @@ describe('migrateOldSettings: floatingWindow unification', () => {
   it('existing floatingWindow values win over legacy glass values', () => {
     const m = migrateOldSettings({
       glass: { opacity: 0.7 },
-      floatingWindow: { defaultOpacity: 0.6, lockTargetLang: true },
+      floatingWindow: { defaultOpacity: 0.6 },
     });
     expect(m.floatingWindow.defaultOpacity).toBe(0.6);
-    expect(m.floatingWindow.lockTargetLang).toBe(true);
     expect(m.glass).toBeUndefined();
   });
+});
 
-  it('partial floatingWindow gets all newly-added defaults', () => {
+describe('migrateOldSettings: sameLanguageBehavior (lockTargetLang retirement)', () => {
+  it("fills the 'original' default when nothing was saved", () => {
+    const m = migrateOldSettings({});
+    expect(m.translation.sameLanguageBehavior).toBe('original');
+  });
+
+  it("legacy lockTargetLang=true maps to 'original' and the key is dropped", () => {
     const m = migrateOldSettings({ floatingWindow: { lockTargetLang: true } });
-    expect(m.floatingWindow.lockTargetLang).toBe(true);
+    expect(m.translation.sameLanguageBehavior).toBe('original');
+    expect(m.floatingWindow.lockTargetLang).toBeUndefined();
     expect(m.floatingWindow.defaultOpacity).toBe(0.85);
+  });
+
+  it("legacy lockTargetLang=false is dropped without forcing a value", () => {
+    const m = migrateOldSettings({ floatingWindow: { lockTargetLang: false } });
+    expect(m.translation.sameLanguageBehavior).toBe('original');
+    expect(m.floatingWindow.lockTargetLang).toBeUndefined();
+  });
+
+  it('an explicit saved behavior wins over the legacy key', () => {
+    const m = migrateOldSettings({
+      translation: { sameLanguageBehavior: 'swap' },
+      floatingWindow: { lockTargetLang: true },
+    });
+    expect(m.translation.sameLanguageBehavior).toBe('swap');
+    expect(m.floatingWindow.lockTargetLang).toBeUndefined();
   });
 });
 

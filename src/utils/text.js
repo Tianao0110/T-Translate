@@ -11,6 +11,22 @@ export function detectLanguage(text) {
   return 'en';
 }
 
+// What to do when the detected language already equals the target.
+// 'original' (default): show the source untranslated, no provider call.
+// 'swap': legacy zh<->en flip. Both behaviors were requested at different
+// times (flip 2026-06-10, passthrough 2026-07-10), so it's a setting now —
+// settings.translation.sameLanguageBehavior, shared by the selection window
+// and the floating window.
+export function resolveSameLanguageTarget(detected, targetLang, behavior = 'original') {
+  if (!targetLang || detected !== targetLang) {
+    return { targetLang, passthrough: false };
+  }
+  if (behavior === 'swap') {
+    return { targetLang: targetLang === 'zh' ? 'en' : 'zh', passthrough: false };
+  }
+  return { targetLang, passthrough: true };
+}
+
 export function cleanText(text) {
   if (!text) return '';
 
@@ -93,6 +109,7 @@ export function getLanguageName(code) {
 
 export default {
   detectLanguage,
+  resolveSameLanguageTarget,
   cleanText,
   cleanTranslationOutput,
   shouldTranslateText,

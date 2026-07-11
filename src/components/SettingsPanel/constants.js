@@ -66,6 +66,10 @@ export const DEFAULT_SETTINGS = {
   translation: {
     providers: [],
     providerConfigs: {},
+    // 'original' shows source text untranslated when it's already in the
+    // target language; 'swap' flips zh<->en (legacy). Consumed by the
+    // selection window and the floating-window pipeline.
+    sameLanguageBehavior: 'original',
   },
 
   // Document translator. Single source of truth — DocumentTranslator reads
@@ -89,7 +93,6 @@ export const DEFAULT_SETTINGS = {
   // electron/ipc/floating-window.js GET_SETTINGS fallbacks must stay in sync.
   floatingWindow: {
     defaultOpacity: 0.85,
-    lockTargetLang: false,
   },
 
   selection: {
@@ -250,6 +253,16 @@ export const migrateOldSettings = (savedSettings) => {
   // Drop the bucket unconditionally — old installs also carry an empty {}
   // seeded by a former electron-store default, kept alive by the spread above.
   delete migrated.providers;
+
+  // floatingWindow.lockTargetLang (retired 2026-07-10): ON meant "never flip
+  // zh<->en", which the unified behavior expresses as 'original'. OFF users
+  // get the new default ('original') rather than 'swap' — the flip is now
+  // opt-in via settings.translation.sameLanguageBehavior.
+  if (savedSettings.floatingWindow?.lockTargetLang === true
+      && !savedSettings.translation?.sameLanguageBehavior) {
+    migrated.translation.sameLanguageBehavior = 'original';
+  }
+  delete migrated.floatingWindow.lockTargetLang;
 
   // Pre-v0.2 flat selectionXxx -> selection nested object (only `enabled`
   // survived; the other flat keys were dead and are no longer seeded).

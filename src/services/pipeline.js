@@ -1,11 +1,11 @@
 // Floating-window translation pipeline: capture -> OCR -> (scattered or unified) -> translate.
-// Owns dedupe-by-hash, target-language flip, and child-pane lifecycle.
+// Owns dedupe-by-hash, same-language behavior, and child-pane lifecycle.
 
 import translationService from './stack-client.js';
 import useSessionStore, { DISPLAY_MODE, CHILD_PANE_STATUS } from '../stores/session.js';
 import useConfigStore from '../stores/config.js';
 import { calculateHash } from '../utils/image.js';
-import { detectLanguage, cleanTranslationOutput, shouldTranslateText } from '../utils/text.js';
+import { detectLanguage, resolveSameLanguageTarget, cleanTranslationOutput, shouldTranslateText } from '../utils/text.js';
 import createLogger from '../utils/logger.js';
 import { getShortErrorMessage } from '../utils/error-handler.js';
 import i18n from '../i18n.js';
@@ -284,11 +284,15 @@ class TranslationPipeline {
 
           const sourceLang = detectLanguage(text);
 
-          // If user hasn't pinned target lang and we detect same-as-source,
-          // flip to the other primary lang so something useful is shown
-          let targetLang = config.targetLanguage;
-          if (!config.lockTargetLang && sourceLang === targetLang) {
-            targetLang = targetLang === 'zh' ? 'en' : 'zh';
+          const { targetLang, passthrough } = resolveSameLanguageTarget(
+            sourceLang, config.targetLanguage, config.sameLanguageBehavior
+          );
+          if (passthrough) {
+            session.updateChildPane(paneId, {
+              status: CHILD_PANE_STATUS.DONE,
+              translatedText: text,
+            });
+            return;
           }
 
           // Privacy fields no longer travel from here — the main-process
@@ -363,9 +367,14 @@ class TranslationPipeline {
 
       const sourceLang = detectLanguage(text);
 
-      let targetLang = config.targetLanguage;
-      if (!config.lockTargetLang && sourceLang === targetLang) {
-        targetLang = targetLang === 'zh' ? 'en' : 'zh';
+      const { targetLang, passthrough } = resolveSameLanguageTarget(
+        sourceLang, config.targetLanguage, config.sameLanguageBehavior
+      );
+      if (passthrough) {
+        // Already in the target language: show the original, skip the provider
+        // and history (an untranslated echo is not a record).
+        session.setResult(text);
+        return { success: true, text, provider: null };
       }
 
       const mode = options.mode || 'normal';

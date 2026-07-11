@@ -169,7 +169,7 @@ function register(ctx) {
     // src/components/SettingsPanel/constants.js — keep both in sync.
     const merged = {
       ocrEngine: ocrConfig.engine ?? 'llm-vision',
-      lockTargetLang: fwConfig.lockTargetLang ?? false,
+      sameLanguageBehavior: mainSettings.translation?.sameLanguageBehavior ?? 'original',
       targetLanguage: currentTargetLang,
       sourceLanguage: currentSourceLang,
       theme: mainSettings.interface?.theme ?? 'light',
