@@ -18,7 +18,9 @@ const TranslationSection = ({
 
   const handleClearCache = async () => {
     if (!(await confirm(t('translationSettings.clearCacheConfirm')))) return;
-    localStorage.removeItem('translation-cache');
+    // Cache lives in the main-process stack since v0.3.1 (the old
+    // localStorage key is retired at boot by App.jsx).
+    await window.electron?.stack?.clearCache?.('all');
     notify(t('translationSettings.cacheCleared'), 'success');
   };
 
