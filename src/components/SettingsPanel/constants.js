@@ -115,7 +115,7 @@ export const DEFAULT_SETTINGS = {
 
   // saveHistory/maxHistory/cacheEnabled/maxCache were ghost keys: persisted
   // for several versions but never consumed anywhere (history cap lives in
-  // translation-store.historyLimit, cache cap in services/cache.js).
+  // translation-store.historyLimit, cache cap in the main-process stack).
   privacy: {
     autoDeleteDays: 0,
   },

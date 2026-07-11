@@ -5,7 +5,7 @@ import {
   RefreshCw, Eye, EyeOff, ExternalLink, GripVertical,
   Zap, Globe, Plus, Settings, Power
 } from 'lucide-react';
-import { getAllProviderMetadata } from '../../providers/registry.js';
+import { getAllProviderMetadata } from '../../config/provider-icons.js';
 import translationService from '../../services/stack-client.js';
 import useTranslationStore from '../../stores/translation-store';
 import { secureStorage } from './persist.js';

@@ -109,7 +109,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
 
   const languages = useMemo(() => getLanguageList(true), []);
 
-  // Tone templates. MT detection is handled in services/translation.js
+  // Tone templates. MT detection is handled in the main-process stack
   // — when a translation-only model is active, prompt structure auto-switches
   // (user-only message + simplified prompt) regardless of which tone is picked.
   const templates = [

@@ -23,10 +23,10 @@ export const LANGUAGE_NAMES = {
 };
 
 // Templates here = "tone" (natural / precise / formal / ocr).
-// The "message structure" (system+user vs user-only) is decided by
-// services/translation.js based on the active model — translation-only small
-// models (Hunyuan MT etc.) get a simpler prompt and user-only mode,
-// regardless of which tone template is selected.
+// The "message structure" (system+user vs user-only) is decided by the
+// main-process stack (stack/service.js) based on the active model —
+// translation-only small models (Hunyuan MT etc.) get a simpler prompt and
+// user-only mode, regardless of which tone template is selected.
 export const TEMPLATES = {
   natural: {
     mode: 'system',

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next';
 import { RefreshCw, Save } from 'lucide-react';
 import stackClient from '../../services/stack-client.js';
-import { getAllProviderMetadata } from '../../providers/registry.js';
+import { getAllProviderMetadata } from '../../config/provider-icons.js';
 import { persistProviderData } from '../ProviderSettings/persist.js';
 import { migrateLegacyOcrSecrets, decryptOcrSecrets, encryptOcrSecrets } from '../../utils/ocr-key-vault.js';
 import { useConfirm } from '../shared/ConfirmDialog';
