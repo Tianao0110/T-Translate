@@ -12,6 +12,9 @@ const useConfigStore = create(
   persist(
     (set) => ({
       targetLanguage: LANGUAGE_CODES.ZH,
+      // Configured source language, mirrored so 'swap' knows what to swap back
+      // to (the pipeline still auto-detects the actual text language).
+      sourceLanguage: 'auto',
       // Mirror of settings.translation.sameLanguageBehavior ('original'|'swap'),
       // synced from the main settings on load and on settings-changed.
       sameLanguageBehavior: 'original',
@@ -22,6 +25,7 @@ const useConfigStore = create(
       floatingOpacity: 0.85,
 
       setTargetLanguage: (lang) => set({ targetLanguage: lang }),
+      setSourceLanguage: (lang) => set({ sourceLanguage: lang }),
       setSameLanguageBehavior: (behavior) => set({ sameLanguageBehavior: behavior }),
       setOcrEngine: (engine) => set({ ocrEngine: engine }),
       setFloatingOpacity: (opacity) => set({ floatingOpacity: opacity }),
@@ -31,6 +35,7 @@ const useConfigStore = create(
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         targetLanguage: state.targetLanguage,
+        sourceLanguage: state.sourceLanguage,
         sameLanguageBehavior: state.sameLanguageBehavior,
         ocrEngine: state.ocrEngine,
         ocrPriority: state.ocrPriority,

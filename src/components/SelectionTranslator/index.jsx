@@ -610,11 +610,12 @@ const SelectionTranslator = () => {
     const sourceLang = overrideSourceLang || translation.sourceLanguage || 'auto';
     const behavior = overrideBehavior || translation.sameLanguageBehavior || 'original';
 
-    // Text already in the target language: show the original or flip zh<->en,
-    // per settings.translation.sameLanguageBehavior (shared with the floating
-    // window — see resolveSameLanguageTarget).
+    // Text already in the target language: show the original or swap back to
+    // the configured source language, per settings.translation
+    // .sameLanguageBehavior (shared with the floating window — see
+    // resolveSameLanguageTarget).
     const detected = detectLanguage(text);
-    const resolved = resolveSameLanguageTarget(detected, requestedTarget, behavior);
+    const resolved = resolveSameLanguageTarget(detected, requestedTarget, behavior, sourceLang);
     const targetLang = resolved.targetLang;
 
     // Record the languages actually used (post-resolve) for history + TTS.

@@ -285,7 +285,7 @@ class TranslationPipeline {
           const sourceLang = detectLanguage(text);
 
           const { targetLang, passthrough } = resolveSameLanguageTarget(
-            sourceLang, config.targetLanguage, config.sameLanguageBehavior
+            sourceLang, config.targetLanguage, config.sameLanguageBehavior, config.sourceLanguage
           );
           if (passthrough) {
             session.updateChildPane(paneId, {
@@ -368,7 +368,7 @@ class TranslationPipeline {
       const sourceLang = detectLanguage(text);
 
       const { targetLang, passthrough } = resolveSameLanguageTarget(
-        sourceLang, config.targetLanguage, config.sameLanguageBehavior
+        sourceLang, config.targetLanguage, config.sameLanguageBehavior, config.sourceLanguage
       );
       if (passthrough) {
         // Already in the target language: show the original, skip the provider

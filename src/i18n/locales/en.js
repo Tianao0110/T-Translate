@@ -70,8 +70,8 @@ const en = {
     autoTranslate: "Auto Translate", autoTranslateHint: "Start translation automatically after input stops",
     autoDelay: "Auto Translate Delay", autoDelayHint: "How long to wait after input stops",
     streamOutput: "Stream Output (Typewriter effect)", streamOutputHint: "Results will appear character by character",
-    sameLangTitle: "When Text Is Already in Target Language", sameLangOriginal: "Show Original", sameLangSwap: "Auto Swap (zh↔en)",
-    sameLangHint: "Applies to selection translate and the floating window: when selected or recognized text is already in the target language, show it as-is (no translation call), or translate to the other language",
+    sameLangTitle: "When Text Is Already in Target Language", sameLangOriginal: "Show Original", sameLangSwap: "Auto Swap (back to source)",
+    sameLangHint: "Applies to selection translate and the floating window: when selected or recognized text is already in the target language, show it as-is (no translation call), or translate back into your configured source language (zh↔en when source is \"Auto\")",
     sameLangSaved: "Applied",
     cache: "Translation Cache", cacheHint: "Cache translated content, return cached results for same text",
     clearCache: "Clear Cache", clearCacheConfirm: "Are you sure to clear translation cache?", cacheCleared: "Cache cleared"

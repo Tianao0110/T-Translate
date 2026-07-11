@@ -70,8 +70,8 @@ const zh = {
     autoTranslate: "自动翻译", autoTranslateHint: "输入停止后自动开始翻译",
     autoDelay: "自动翻译延迟", autoDelayHint: "停止输入后等待多久开始翻译",
     streamOutput: "流式输出（打字机效果）", streamOutputHint: "开启后翻译结果将逐字显示",
-    sameLangTitle: "内容已是目标语言时", sameLangOriginal: "显示原文", sameLangSwap: "自动互译（中↔英）",
-    sameLangHint: "作用于划词翻译和悬浮窗口：选中或识别的内容已经是目标语言时，直接显示原文（不调用翻译），或自动翻成另一种语言",
+    sameLangTitle: "内容已是目标语言时", sameLangOriginal: "显示原文", sameLangSwap: "自动互译（译回源语言）",
+    sameLangHint: "作用于划词翻译和悬浮窗口：选中或识别的内容已经是目标语言时，直接显示原文（不调用翻译），或反向翻成你设定的源语言（源语言为\"自动检测\"时按中↔英处理）",
     sameLangSaved: "已生效",
     cache: "翻译缓存", cacheHint: "缓存已翻译的内容，相同文本再次翻译时直接返回结果",
     clearCache: "清除缓存", clearCacheConfirm: "确定要清除翻译缓存吗？", cacheCleared: "缓存已清除"

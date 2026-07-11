@@ -20,13 +20,24 @@ describe('resolveSameLanguageTarget', () => {
     expect(resolveSameLanguageTarget('en', 'en', 'bogus').passthrough).toBe(true);
   });
 
-  it("'swap' keeps the legacy zh<->en flip", () => {
-    expect(resolveSameLanguageTarget('en', 'en', 'swap'))
+  it("'swap' translates back into the configured source language", () => {
+    // en->ja pair, selected text already ja -> swap back to en (NOT zh)
+    expect(resolveSameLanguageTarget('ja', 'ja', 'swap', 'en'))
+      .toEqual({ targetLang: 'en', passthrough: false });
+    expect(resolveSameLanguageTarget('en', 'en', 'swap', 'ja'))
+      .toEqual({ targetLang: 'ja', passthrough: false });
+  });
+
+  it("'swap' with source on auto falls back to the zh<->en heuristic", () => {
+    expect(resolveSameLanguageTarget('en', 'en', 'swap', 'auto'))
       .toEqual({ targetLang: 'zh', passthrough: false });
     expect(resolveSameLanguageTarget('zh', 'zh', 'swap'))
       .toEqual({ targetLang: 'en', passthrough: false });
-    // Non-zh/en targets fall back to zh — documented legacy quirk.
-    expect(resolveSameLanguageTarget('ja', 'ja', 'swap'))
+    // Non-zh/en target without a usable source falls back to zh.
+    expect(resolveSameLanguageTarget('ja', 'ja', 'swap', 'auto'))
+      .toEqual({ targetLang: 'zh', passthrough: false });
+    // source === target is not a usable other side either.
+    expect(resolveSameLanguageTarget('en', 'en', 'swap', 'en'))
       .toEqual({ targetLang: 'zh', passthrough: false });
   });
 

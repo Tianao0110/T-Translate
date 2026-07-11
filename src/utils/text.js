@@ -13,16 +13,22 @@ export function detectLanguage(text) {
 
 // What to do when the detected language already equals the target.
 // 'original' (default): show the source untranslated, no provider call.
-// 'swap': legacy zh<->en flip. Both behaviors were requested at different
-// times (flip 2026-06-10, passthrough 2026-07-10), so it's a setting now —
+// 'swap': translate back into the user's configured source language — NOT a
+// hardcoded zh<->en pair (that old heuristic misled non-zh/en users); with
+// source on "auto" there is no other side, so zh<->en stays as the fallback.
+// Both behaviors were requested at different times (flip 2026-06-10,
+// passthrough 2026-07-10), so it's a setting now —
 // settings.translation.sameLanguageBehavior, shared by the selection window
 // and the floating window.
-export function resolveSameLanguageTarget(detected, targetLang, behavior = 'original') {
+export function resolveSameLanguageTarget(detected, targetLang, behavior = 'original', sourceLang = 'auto') {
   if (!targetLang || detected !== targetLang) {
     return { targetLang, passthrough: false };
   }
   if (behavior === 'swap') {
-    return { targetLang: targetLang === 'zh' ? 'en' : 'zh', passthrough: false };
+    const swapTo = (sourceLang && sourceLang !== 'auto' && sourceLang !== targetLang)
+      ? sourceLang
+      : (targetLang === 'zh' ? 'en' : 'zh');
+    return { targetLang: swapTo, passthrough: false };
   }
   return { targetLang, passthrough: true };
 }
