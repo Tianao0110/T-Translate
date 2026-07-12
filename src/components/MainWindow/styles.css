@@ -876,36 +876,69 @@
 }
 
 /* ==================== 文档翻译按钮 ==================== */
-/* Theme-accent glass (拍板 D4: follow the theme, glass look): translucent
-   accent gradient + top inner highlight + light rim. !important outlives the
-   .tab-button/.active background rules this button also matches. */
+/* Liquid-glass pill (D4 二审, 参照 shuding/liquid-glass 与 rdev/
+   liquid-glass-react 的配方观感, 两者 MIT; 无代码拷贝, 数值自调).
+   Glass carries NO fill — the look is entirely the backdrop being lifted
+   (blur + contrast + brightness + saturate) inside a specular rim; the theme
+   shows THROUGH the glass and color lands only on the text. Refraction
+   (feDisplacementMap) deliberately not adopted: the backdrop here is a flat
+   toolbar wash with nothing to bend. !important outlives the .tab-button
+   background/color rules this button also matches. */
 .doc-translate-btn {
-  background: linear-gradient(135deg,
-    color-mix(in srgb, var(--accent-primary) 62%, transparent) 0%,
-    color-mix(in srgb, var(--accent-hover) 50%, transparent) 100%) !important;
-  color: var(--text-on-accent) !important;
-  border: 1px solid color-mix(in srgb, var(--accent-primary) 30%, rgba(255, 255, 255, 0.55));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
-  backdrop-filter: blur(10px) saturate(1.3);
+  background: none !important;
+  color: var(--accent-primary) !important;
+  border: none;
+  border-radius: 999px;
+  backdrop-filter: blur(6px) contrast(1.15) brightness(1.1) saturate(1.5);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.5),
+    inset 1.5px 1.5px 0.5px -1px rgba(255, 255, 255, 0.85),
+    inset -1px -1px 0.5px -1px rgba(255, 255, 255, 0.4),
+    inset 0 -12px 20px -14px rgba(30, 41, 59, 0.35),
+    0 4px 12px -5px rgba(30, 41, 59, 0.35);
+  transition:
+    transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.25s ease;
 }
 
 .doc-translate-btn:hover {
-  transform: translateY(-1px);
-  background: linear-gradient(135deg,
-    color-mix(in srgb, var(--accent-primary) 75%, transparent) 0%,
-    color-mix(in srgb, var(--accent-hover) 62%, transparent) 100%) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3),
-    0 2px 8px color-mix(in srgb, var(--accent-primary) 35%, transparent);
+  transform: translateY(-1px) scale(1.02);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.65),
+    inset 1.5px 1.5px 0.5px -1px rgba(255, 255, 255, 0.95),
+    inset -1px -1px 0.5px -1px rgba(255, 255, 255, 0.5),
+    inset 0 -12px 20px -14px rgba(30, 41, 59, 0.3),
+    0 6px 16px -5px color-mix(in srgb, var(--accent-primary) 45%, transparent);
 }
 
-/* Dark: denser fill — 62% translucent amber over the near-black bar would
-   starve the dark-on-gold text of contrast. */
+.doc-translate-btn:active {
+  transform: scale(0.97);
+}
+
+/* Documents view open: a light accent tint settles inside the glass */
+.doc-translate-btn.active {
+  background: color-mix(in srgb, var(--accent-primary) 14%, transparent) !important;
+}
+
+/* Dark: white speculars soften, backdrop lifts harder so the smoky pill
+   separates from the near-black bar; amber lands on the text. */
 [data-theme="dark"] .doc-translate-btn {
-  background: linear-gradient(135deg,
-    color-mix(in srgb, var(--accent-primary) 82%, transparent) 0%,
-    color-mix(in srgb, var(--accent-hover) 70%, transparent) 100%) !important;
-  border-color: color-mix(in srgb, var(--accent-primary) 45%, rgba(255, 255, 255, 0.25));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(6px) contrast(1.1) brightness(1.4) saturate(1.3);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.16),
+    inset 1.5px 1.5px 0.5px -1px rgba(255, 255, 255, 0.3),
+    inset -1px -1px 0.5px -1px rgba(255, 255, 255, 0.1),
+    inset 0 -12px 20px -14px rgba(0, 0, 0, 0.5),
+    0 4px 12px -5px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .doc-translate-btn:hover {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.24),
+    inset 1.5px 1.5px 0.5px -1px rgba(255, 255, 255, 0.4),
+    inset -1px -1px 0.5px -1px rgba(255, 255, 255, 0.14),
+    inset 0 -12px 20px -14px rgba(0, 0, 0, 0.45),
+    0 6px 16px -5px color-mix(in srgb, var(--accent-primary) 45%, transparent);
 }
 
 /* ==================== 文档翻译弹窗 ==================== */
