@@ -6,6 +6,7 @@ import {
   shouldUseScatteredMode,
   resolveDisplayMode,
   isWordPile,
+  isSparseCoverage,
   pickScatterBlocks,
 } from '../../src/services/display-mode.js';
 
@@ -99,6 +100,34 @@ describe('shouldUseScatteredMode', () => {
     expect(isWordPile(bubbleBlocks)).toBe(false);
     expect(shouldUseScatteredMode(bubbleBlocks)).toBe(true);
   });
+
+  it('a lone centered bubble in a large frame scatters via sparse coverage (manga)', () => {
+    const singleBubble = [
+      block(800, 300, 220, 24, 'A SKILL THAT'),
+      block(790, 330, 240, 24, 'RAPIDLY REPAIRS'),
+      block(810, 360, 180, 24, 'INJURIES?'),
+    ];
+    // Perfect centered column — without the frame it reads as unified…
+    expect(shouldUseScatteredMode(singleBubble, null)).toBe(false);
+    // …but covering <1% of a manga page it must overlay in place.
+    expect(shouldUseScatteredMode(singleBubble, { width: 2000, height: 1200 })).toBe(true);
+  });
+
+  it('a paragraph filling its capture frame stays unified despite the frame', () => {
+    expect(shouldUseScatteredMode(paragraphBlocks, { width: 430, height: 110 })).toBe(false);
+  });
+});
+
+describe('isSparseCoverage', () => {
+  it('is false without a frame or without blocks', () => {
+    expect(isSparseCoverage(paragraphBlocks, null)).toBe(false);
+    expect(isSparseCoverage([], { width: 100, height: 100 })).toBe(false);
+  });
+
+  it('separates islands-over-imagery from frame-filling text', () => {
+    expect(isSparseCoverage([block(800, 300, 200, 24)], { width: 2000, height: 1200 })).toBe(true);
+    expect(isSparseCoverage(paragraphBlocks, { width: 430, height: 110 })).toBe(false);
+  });
 });
 
 describe('isWordPile', () => {
@@ -122,12 +151,29 @@ describe('pickScatterBlocks', () => {
     block(240, 200, 175, 42, '本当にそうなのか？ わからないけど。'),
   ];
 
-  it('keeps raw blocks when the merge collapses a word pile into a blob', () => {
+  it('keeps raw blocks for word piles (per-word positioning is the point)', () => {
     expect(pickScatterBlocks(vocabBlocks, mergedIntoOne)).toBe(vocabBlocks);
   });
 
-  it('prefers merged paragraphs for bubble clusters (one pane per bubble)', () => {
-    expect(pickScatterBlocks(bubbleBlocks, mergedBubbles)).toBe(mergedBubbles);
+  it('accepts audited bubble merges (constituents aligned, similar width, tight)', () => {
+    expect(pickScatterBlocks(bubbleBlocks, mergedBubbles)).toEqual(mergedBubbles);
+  });
+
+  it('splits a merge that glued a list row to its neighbor badge/index back to raw lines', () => {
+    // "list row + badge + next row" glued into one box — widths differ wildly
+    const rowA = block(10, 10, 300, 20, '巴威已进入安徽');
+    const badge = block(320, 12, 40, 18, '热2');
+    const rowB = block(10, 38, 380, 20, '遭遇强降雨有关险情如何避险自救');
+    const glued = [block(10, 10, 420, 48, '巴威已进入安徽 热2 遭遇强降雨有关险情如何避险自救')];
+    expect(pickScatterBlocks([rowA, badge, rowB], glued)).toEqual([rowA, badge, rowB]);
+  });
+
+  it('never drops raw lines no merged box claimed', () => {
+    const orphan = block(500, 500, 120, 20, 'orphan');
+    const merged = [block(20, 10, 180, 42, 'それはちがうと思うよ 昨日のことだけどね')];
+    const out = pickScatterBlocks([bubbleBlocks[0], bubbleBlocks[1], orphan], merged);
+    expect(out).toContain(orphan);
+    expect(out).toContainEqual(merged[0]);
   });
 
   it('falls back to raw blocks when merged input is empty or unpositioned', () => {

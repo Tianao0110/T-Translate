@@ -4,10 +4,11 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Camera, X, Loader2, AlertCircle, ChevronDown, GripHorizontal, History, Clock, RefreshCw } from 'lucide-react';
+import { Camera, X, Loader2, AlertCircle, ChevronDown, GripHorizontal, History, Clock, RefreshCw, Ghost } from 'lucide-react';
 import useSessionStore, { STATUS, DISPLAY_MODE, CHILD_PANE_STATUS } from '../../stores/session.js';
 import useConfigStore from '../../stores/config.js';
 import pipeline from '../../services/pipeline.js';
+import { resolveOverlaps } from '../../services/pane-layout.js';
 import ChildPane from './ChildPane.jsx';
 import createLogger from '../../utils/logger.js';
 import './styles.css';
@@ -88,6 +89,13 @@ const FloatingWindow = () => {
   const passThroughRef = useRef(false);
   const showHistoryPanelRef = useRef(false);
   const savedOpacityRef = useRef(0.85);
+  // Sticky pass-through survives blur (unlike the momentary Alt hold);
+  // regionIgnoreRef tracks the current setIgnoreMouseEvents state so the
+  // mousemove-driven region toggle only IPCs on boundary crossings.
+  const [stickyPassThrough, setStickyPassThrough] = useState(false);
+  const stickyPassThroughRef = useRef(false);
+  const regionIgnoreRef = useRef(false);
+  const exitStickyRef = useRef(null);
 
   useEffect(() => {
     showHistoryPanelRef.current = showHistoryPanel;
@@ -156,8 +164,10 @@ const FloatingWindow = () => {
         // Read live state — this handler is registered once on mount and a
         // closure over render-scope state would be frozen at first render.
         const s = useSessionStore.getState();
-        // ESC priority: history panel > scattered panes > close window
-        if (showHistoryPanelRef.current) {
+        // ESC priority: sticky pass-through > history panel > scattered panes > close
+        if (stickyPassThroughRef.current) {
+          exitStickyRef.current?.();
+        } else if (showHistoryPanelRef.current) {
           setShowHistoryPanel(false);
         } else if (s.displayMode === DISPLAY_MODE.SCATTERED && s.childPanes.length > 0) {
           s.clearChildPanes();
@@ -190,8 +200,10 @@ const FloatingWindow = () => {
       }
     };
 
+    // Alt keyup / blur end only the MOMENTARY hold — sticky mode must survive
+    // both (losing focus on every click-through is its whole reason to exist).
     const handleKeyUp = async (e) => {
-      if (e.key === 'Alt' && passThroughRef.current) {
+      if (e.key === 'Alt' && passThroughRef.current && !stickyPassThroughRef.current) {
         passThroughRef.current = false;
         try {
           await window.electron?.floatingWindow?.setPassThrough?.(false);
@@ -202,9 +214,9 @@ const FloatingWindow = () => {
       }
     };
 
-    // Window blur also exits pass-through, otherwise alt-tab leaves it stuck on
+    // Window blur also exits the Alt hold, otherwise alt-tab leaves it stuck on
     const handleBlur = async () => {
-      if (passThroughRef.current) {
+      if (passThroughRef.current && !stickyPassThroughRef.current) {
         passThroughRef.current = false;
         try {
           await window.electron?.floatingWindow?.setPassThrough?.(false);
@@ -332,6 +344,8 @@ const FloatingWindow = () => {
     // 300ms delay catches the "mouse slipped off edge" case so the toolbar
     // doesn't flicker when the cursor briefly leaves and re-enters
     toolbarTimerRef.current = setTimeout(() => {
+      // Sticky pass-through keeps the top strip visible — it is the exit.
+      if (stickyPassThroughRef.current) return;
       setShowToolbar(false);
       setShowOpacitySlider(false);
     }, 300);
@@ -505,6 +519,9 @@ const FloatingWindow = () => {
   }, [captureAndTranslate]);
 
   const handleContentClick = useCallback((e) => {
+    // Any pass-through flavor: content clicks belong to the app below, never
+    // trigger a capture (the old accidental-recognition complaint).
+    if (passThroughRef.current) return;
     // Only fire toggle on bare-container clicks, not on child panes/text
     if (
       e.target === e.currentTarget ||
@@ -528,8 +545,9 @@ const FloatingWindow = () => {
   // bigger than the OCR line boxes they anchor to, so tightly stacked blocks
   // produce unreadable overlaps. Once a batch settles (no pane pending or
   // translating — sizes are locked then), measure the real rendered frames
-  // and greedily shift colliding panes downward. Runs once per batch so it
-  // never fights the user's own drags.
+  // and let the layout policy (pane-layout.js: significant collisions only,
+  // minimal bidirectional shift, capped drift) decide the moves. Runs once
+  // per batch so it never fights the user's own drags.
   const deoverlapKeyRef = useRef('');
   useEffect(() => {
     if (displayMode !== DISPLAY_MODE.SCATTERED || childPanes.length < 2) return;
@@ -541,7 +559,6 @@ const FloatingWindow = () => {
     if (deoverlapKeyRef.current === batchKey) return;
     deoverlapKeyRef.current = batchKey;
 
-    const GAP = 4;
     const rects = childPanes
       .map((p) => {
         const el = document.querySelector(`[data-pane-id="${p.id}"]`);
@@ -549,32 +566,10 @@ const FloatingWindow = () => {
         const r = el.getBoundingClientRect();
         return { id: p.id, x: p.bbox.x, y: p.bbox.y, w: r.width, h: r.height };
       })
-      .filter(Boolean)
-      .sort((a, b) => a.y - b.y || a.x - b.x);
+      .filter(Boolean);
 
-    const placed = [];
-    for (const r of rects) {
-      // Vertical-only shifts keep the horizontal anchor to the source text
-      let moved = true;
-      let guard = 0;
-      while (moved && guard++ < 20) {
-        moved = false;
-        for (const p of placed) {
-          const intersects = r.x < p.x + p.w && p.x < r.x + r.w && r.y < p.y + p.h && p.y < r.y + r.h;
-          if (intersects) {
-            r.y = p.y + p.h + GAP;
-            moved = true;
-          }
-        }
-      }
-      placed.push(r);
-    }
-
-    for (const r of placed) {
-      const pane = childPanes.find((p) => p.id === r.id);
-      if (pane && Math.abs(r.y - pane.bbox.y) > 1) {
-        updateChildPanePosition(r.id, { y: Math.round(r.y) });
-      }
+    for (const [id, y] of resolveOverlaps(rects)) {
+      updateChildPanePosition(id, { y });
     }
   }, [childPanes, displayMode, updateChildPanePosition]);
 
@@ -623,6 +618,69 @@ const FloatingWindow = () => {
       freezeChildPane(id, fallbackViewportPos);
     }
   }, [childPanes, theme, removeChildPane, freezeChildPane]);
+
+  // Sticky pass-through: content clicks fall through to the app below while
+  // the top strip stays clickable — the forwarded mousemove stream drives
+  // setIgnoreMouseEvents by cursor region. Unlike the Alt hold this needs no
+  // focus, so it survives the very click-through it exists for (manga flow:
+  // page the reader through the overlay, auto-refresh re-translates).
+  const enterStickyPassThrough = useCallback(async () => {
+    stickyPassThroughRef.current = true;
+    passThroughRef.current = true;
+    setStickyPassThrough(true);
+    setIsPassThrough(true);
+    setShowToolbar(true);
+    regionIgnoreRef.current = true;
+    try {
+      await window.electron?.floatingWindow?.setPassThrough?.(true);
+    } catch (e) {
+      logger.error('Failed to enter sticky pass-through:', e);
+    }
+  }, []);
+
+  const exitStickyPassThrough = useCallback(async () => {
+    stickyPassThroughRef.current = false;
+    passThroughRef.current = false;
+    setStickyPassThrough(false);
+    setIsPassThrough(false);
+    regionIgnoreRef.current = false;
+    try {
+      await window.electron?.floatingWindow?.setPassThrough?.(false);
+    } catch (e) {
+      logger.error('Failed to exit sticky pass-through:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    exitStickyRef.current = exitStickyPassThrough;
+  }, [exitStickyPassThrough]);
+
+  const toggleStickyPassThrough = useCallback(() => {
+    if (stickyPassThroughRef.current) {
+      exitStickyPassThrough();
+    } else {
+      enterStickyPassThrough();
+    }
+  }, [enterStickyPassThrough, exitStickyPassThrough]);
+
+  // Region toggle: over the top strip → accept mouse (toolbar clickable),
+  // below it → ignore (clicks pass through). Only IPC on boundary crossings.
+  useEffect(() => {
+    if (!stickyPassThrough) return;
+    const onMove = (e) => {
+      const topEl = document.querySelector('.floating-top-area');
+      const boundary = topEl ? topEl.getBoundingClientRect().bottom : 30;
+      const wantIgnore = e.clientY > boundary;
+      if (wantIgnore !== regionIgnoreRef.current) {
+        regionIgnoreRef.current = wantIgnore;
+        try {
+          window.electron?.floatingWindow?.setPassThrough?.(wantIgnore);
+        } catch { /* window may be closing */ }
+      }
+    };
+    window.addEventListener('mousemove', onMove);
+    return () => window.removeEventListener('mousemove', onMove);
+  }, [stickyPassThrough]);
 
   const enterPassThroughMode = useCallback(async () => {
     if (passThroughRef.current) return;
@@ -701,7 +759,7 @@ const FloatingWindow = () => {
 
   return (
     <div
-      className={`floating-window ${showToolbar ? 'show-toolbar' : ''} ${isPassThrough ? 'pass-through' : ''} ${displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0 ? 'scattered-mode' : ''}`}
+      className={`floating-window ${showToolbar ? 'show-toolbar' : ''} ${isPassThrough && !stickyPassThrough ? 'pass-through' : ''} ${stickyPassThrough ? 'pass-through-sticky' : ''} ${displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0 ? 'scattered-mode' : ''}`}
       style={{ '--floating-opacity': floatingOpacity }}
       data-theme={theme}
       onMouseEnter={handleMouseEnterWindow}
@@ -734,6 +792,20 @@ const FloatingWindow = () => {
                 : t('floatingWindow.autoRefresh', '自动刷新（盯住区域循环截译，目标不失焦）')}
             >
               <RefreshCw size={12} className={autoRefresh ? 'spinning-slow' : undefined} />
+            </button>
+
+            <button
+              className={`toolbar-btn ${stickyPassThrough ? 'active' : ''}`}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleStickyPassThrough();
+              }}
+              title={stickyPassThrough
+                ? t('floatingWindow.passThroughOn', '穿透中，点击退出（内容区点击直达下层应用）')
+                : t('floatingWindow.passThroughToggle', '鼠标穿透：内容区点击直达下层应用，顶栏保持可点')}
+            >
+              <Ghost size={12} />
             </button>
 
             <button
@@ -936,7 +1008,11 @@ const FloatingWindow = () => {
 
       {isPassThrough && (
         <div className="pass-through-indicator">
-          <span>{t('floatingWindow.passThroughMode')}</span>
+          <span>
+            {stickyPassThrough
+              ? t('floatingWindow.passThroughSticky', '穿透中 · 顶栏可点击退出 (Esc)')
+              : t('floatingWindow.passThroughMode')}
+          </span>
         </div>
       )}
     </div>

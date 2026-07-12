@@ -263,7 +263,10 @@ const en = {
     displayMode: "Display mode",
     modeAuto: "Auto", modeScattered: "Scattered", modeUnified: "Unified",
     modeFallbackHint: "Engine returned no text coordinates; shown as one block",
-    displayModeHint: "Auto = judge by content; Scattered = overlay each block in place (UI labels, words, manga); Unified = merge into one block (article paragraphs)"
+    displayModeHint: "Auto = judge by content; Scattered = overlay each block in place (UI labels, words, manga); Unified = merge into one block (article paragraphs)",
+    passThroughToggle: "Mouse pass-through: content clicks reach the app below; top bar stays clickable",
+    passThroughOn: "Pass-through on, click to exit (content clicks reach the app below)",
+    passThroughSticky: "Pass-through on · exit via top bar (Esc)"
   },
   selection: {
     close: "Close", more: "More",

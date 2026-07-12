@@ -146,7 +146,13 @@ class TranslationPipeline {
       // resolver (merged paragraphs per bubble, raw blocks for word piles).
       const mergedBlocks = ocrResult.blocks || [];
       const rawBlocks = ocrResult.rawBlocks || mergedBlocks;
-      const { useScattered, fellBack, blocks } = resolveDisplayMode(modePref, rawBlocks, mergedBlocks);
+      // Capture frame in the same physical-pixel space as the OCR boxes —
+      // the sparse-coverage rule (manga bubbles over imagery) needs it.
+      const sf = captureOptions.scaleFactor || 1;
+      const frame = captureOptions.width > 0 && captureOptions.height > 0
+        ? { width: captureOptions.width * sf, height: captureOptions.height * sf }
+        : null;
+      const { useScattered, fellBack, blocks } = resolveDisplayMode(modePref, rawBlocks, mergedBlocks, frame);
       session.setModeInfo({
         pref: modePref,
         effective: useScattered ? 'scattered' : 'unified',

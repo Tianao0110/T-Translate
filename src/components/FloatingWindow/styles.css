@@ -990,6 +990,12 @@
   background: rgba(255, 255, 255, 0.15) !important;  /* 背景更透明 */
 }
 
+/* Sticky pass-through keeps content fully readable (the user is reading
+   translations while clicking through) — only the border tints as the cue. */
+.floating-window.pass-through-sticky {
+  border-color: color-mix(in srgb, var(--floating-accent) 55%, transparent);
+}
+
 .floating-window.pass-through .floating-top-area {
   opacity: 0.3;
 }
