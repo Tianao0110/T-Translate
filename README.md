@@ -23,17 +23,17 @@
 
 ## Features
 
-| Feature | Description |
-| --- | --- |
-| **Selection translator** | System-wide. Select text in any app to translate. Up to 8 pinned windows |
-| **Screenshot OCR** | Capture screen regions. 7 OCR engines with automatic fallback |
-| **Floating window** | Transparent overlay. Space-bar to capture-and-translate; auto-refresh & global-hotkey zero-focus capture for live captions / subtitles |
-| **Document translation** | 9 formats: PDF / DOCX / EPUB / TXT / SRT / VTT / CSV / JSON / Markdown. Segment-by-segment, resumable |
-| **Glossary** | Auto-replace terms after translation, with undo support |
-| **TTS** | Built on Windows offline speech engine |
-| **10 translation providers** | LM Studio, Ollama, OpenAI, Claude, Gemini, DeepSeek, DeepL, Google, Microsoft, Baidu |
-| **3 privacy modes** | Standard / Incognito / Offline. Offline mode blocks decryption of online API keys |
-| **Auto-start** | Silent tray launch with optional auto-enable for selection translator |
+| Feature                            | Description                                                                                                                            |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **Selection translator**     | System-wide. Select text in any app to translate. Up to 8 pinned windows                                                               |
+| **Screenshot OCR**           | Capture screen regions. 7 OCR engines with automatic fallback                                                                          |
+| **Floating window**          | Transparent overlay. Space-bar to capture-and-translate; auto-refresh & global-hotkey zero-focus capture for live captions / subtitles |
+| **Document translation**     | 9 formats: PDF / DOCX / EPUB / TXT / SRT / VTT / CSV / JSON / Markdown. Segment-by-segment, resumable                                  |
+| **Glossary**                 | Auto-replace terms after translation, with undo support                                                                                |
+| **TTS**                      | Built on Windows offline speech engine                                                                                                 |
+| **10 translation providers** | LM Studio, Ollama, OpenAI, Claude, Gemini, DeepSeek, DeepL, Google, Microsoft, Baidu                                                   |
+| **3 privacy modes**          | Standard / Incognito / Offline. Offline mode blocks decryption of online API keys                                                      |
+| **Auto-start**               | Silent tray launch with optional auto-enable for selection translator                                                                  |
 
 ---
 
@@ -76,7 +76,9 @@ Supports 9 formats: PDF, DOCX, EPUB, TXT, SRT, VTT, CSV, JSON, Markdown. Paralle
 Three levels of privacy control. In offline mode, only local LLMs are used. Online API keys are blocked from decryption even if internal code attempts to access them.
 
 <p align="center">
-  <img src="docs/screenshots/privacy-mode.png" width="600" alt="Privacy modes">
+  <img src="docs/screenshots/privacy-mode-standard.png" width="600" alt="Privacy standard modes">
+  <img src="docs/screenshots/privacy-mode-Incognito.png" width="600" alt="Privacy incognito modes">
+  <img src="docs/screenshots/privacy-mode-offline.png" width="600" alt="Privacy offline modes">
 </p>
 
 ### Multi-provider
@@ -114,14 +116,14 @@ npm run dist         # build installer (runs the fetch automatically)
 
 ## Keyboard shortcuts
 
-| Shortcut | Action |
-| --- | --- |
-| `Alt+Q` | Screenshot translate |
-| `Ctrl+Shift+W` | Show / hide main window |
-| `Ctrl+Alt+G` | Open floating window |
-| `Ctrl+Shift+T` | Toggle selection translator |
+| Shortcut           | Action                                      |
+| ------------------ | ------------------------------------------- |
+| `Alt+Q`          | Screenshot translate                        |
+| `Ctrl+Shift+W`   | Show / hide main window                     |
+| `Ctrl+Alt+G`     | Open floating window                        |
+| `Ctrl+Shift+T`   | Toggle selection translator                 |
 | `Ctrl+Alt+Space` | Re-capture floating window (no focus steal) |
-| `Ctrl+Enter` | Run translation |
+| `Ctrl+Enter`     | Run translation                             |
 
 *Shortcuts are customizable in Settings.*
 
@@ -170,17 +172,17 @@ t-translate/
 
 ## 🏗️ Tech stack
 
-| Category | Technology |
-| --- | --- |
-| Framework | Electron 42 + React 18 |
-| Build | Vite 7 (renderer) + esbuild (main-process translation stack) |
-| State | Zustand + Immer |
-| Styling | CSS Variables |
-| Secure storage | Electron safeStorage (Windows DPAPI) + access audit |
-| OCR | PP-OCRv6 local (Chinese/English/Japanese/Latin scripts built in, downloadable language packs) / Windows OCR / LLM Vision / OCR.space / Google Vision / Azure / Baidu |
-| Local LLM | LM Studio / Ollama (OpenAI-compatible API) |
-| Online translation | OpenAI / Claude / Gemini / DeepSeek / DeepL / Google / Microsoft / Baidu |
-| Packaging | electron-builder |
+| Category           | Technology                                                                                                                                                           |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Framework          | Electron 42 + React 18                                                                                                                                               |
+| Build              | Vite 7 (renderer) + esbuild (main-process translation stack)                                                                                                         |
+| State              | Zustand + Immer                                                                                                                                                      |
+| Styling            | CSS Variables                                                                                                                                                        |
+| Secure storage     | Electron safeStorage (Windows DPAPI) + access audit                                                                                                                  |
+| OCR                | PP-OCRv6 local (Chinese/English/Japanese/Latin scripts built in, downloadable language packs) / Windows OCR / LLM Vision / OCR.space / Google Vision / Azure / Baidu |
+| Local LLM          | LM Studio / Ollama (OpenAI-compatible API)                                                                                                                           |
+| Online translation | OpenAI / Claude / Gemini / DeepSeek / DeepL / Google / Microsoft / Baidu                                                                                             |
+| Packaging          | electron-builder                                                                                                                                                     |
 
 More docs under `docs/`: [Architecture](docs/ARCHITECTURE.md) · [Development guide](docs/DEVELOPMENT.md) · [FAQ](docs/FAQ.md) · [OCR models](docs/OCR_MODELS.md) · [i18n guide](docs/I18N_GUIDE.md) · [Theme customization](docs/THEME_CUSTOMIZATION.md)
 
