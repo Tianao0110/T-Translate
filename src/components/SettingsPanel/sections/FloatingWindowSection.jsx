@@ -13,6 +13,7 @@ const FloatingWindowSection = ({
   // Fallbacks mirror DEFAULT_SETTINGS.floatingWindow.
   const gw = {
     defaultOpacity: 0.85,
+    displayMode: 'auto',
     ...(settings.floatingWindow || {}),
   };
 
@@ -45,6 +46,21 @@ const FloatingWindowSection = ({
         </div>
       </div>
 
+      {/* 显示模式 */}
+      <div className="setting-group">
+        <label className="setting-label">{t('floatingWindow.displayMode', '显示模式')}</label>
+        <select
+          className="setting-select"
+          value={gw.displayMode}
+          onChange={(e) => updateSetting('floatingWindow', 'displayMode', e.target.value)}
+        >
+          <option value="auto">{t('floatingWindow.modeAuto', '自动')}</option>
+          <option value="scattered">{t('floatingWindow.modeScattered', '散点')}</option>
+          <option value="unified">{t('floatingWindow.modeUnified', '整段')}</option>
+        </select>
+        <p className="setting-hint">{t('floatingWindow.displayModeHint', '自动＝按内容判断；散点＝每块文字原位贴译文（界面标签、单词、漫画）；整段＝合并为一段译文（文章段落）')}</p>
+      </div>
+
       {/* 默认透明度 */}
       <div className="setting-group">
         <label className="setting-label">{t('floatingWindow.defaultOpacity')}</label>
@@ -52,7 +68,7 @@ const FloatingWindowSection = ({
           <input
             type="range"
             className="setting-range"
-            min="30"
+            min="1"
             max="100"
             value={Math.round(gw.defaultOpacity * 100)}
             onChange={(e) => updateSetting('floatingWindow', 'defaultOpacity', parseInt(e.target.value) / 100)}

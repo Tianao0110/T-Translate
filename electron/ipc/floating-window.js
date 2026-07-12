@@ -175,6 +175,7 @@ function register(ctx) {
       theme: mainSettings.interface?.theme ?? 'light',
       // window-local slider value wins over the settings-page default
       opacity: localSettings.opacity ?? fwConfig.defaultOpacity ?? 0.85,
+      displayMode: fwConfig.displayMode ?? 'auto',
     };
 
     logger.debug('Get settings:', merged);

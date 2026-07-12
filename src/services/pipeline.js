@@ -142,11 +142,11 @@ class TranslationPipeline {
         return { success: true, text: '' };
       }
 
-      // Floating window needs per-line positioning => prefer rawBlocks.
-      // Merged blocks are only used for the unified-mode single text body.
+      // Judgment runs on raw per-line boxes; pane granularity comes from the
+      // resolver (merged paragraphs per bubble, raw blocks for word piles).
       const mergedBlocks = ocrResult.blocks || [];
       const rawBlocks = ocrResult.rawBlocks || mergedBlocks;
-      const { useScattered, fellBack } = resolveDisplayMode(modePref, rawBlocks);
+      const { useScattered, fellBack, blocks } = resolveDisplayMode(modePref, rawBlocks, mergedBlocks);
       session.setModeInfo({
         pref: modePref,
         effective: useScattered ? 'scattered' : 'unified',
@@ -154,14 +154,14 @@ class TranslationPipeline {
       });
 
       logger.debug(`Display mode: ${useScattered ? 'scattered' : 'unified'} (pref: ${modePref})`);
-      logger.debug(`Raw blocks: ${rawBlocks.length}, Merged blocks: ${mergedBlocks.length}`);
+      logger.debug(`Raw blocks: ${rawBlocks.length}, Merged blocks: ${mergedBlocks.length}, Pane blocks: ${blocks?.length ?? 0}`);
       if (rawBlocks.length > 0) {
         logger.debug('First raw block bbox:', rawBlocks[0]?.bbox);
         logger.debug('Capture options:', captureOptions);
       }
 
       if (useScattered) {
-        return await this.runScatteredMode(rawBlocks, captureOptions);
+        return await this.runScatteredMode(blocks, captureOptions);
       }
 
       const textKey = `${text}::${config.targetLanguage}::${modePref}`;

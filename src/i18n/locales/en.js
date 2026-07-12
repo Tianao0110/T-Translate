@@ -262,7 +262,8 @@ const en = {
     goToOcrSettings: "Go to OCR Settings",
     displayMode: "Display mode",
     modeAuto: "Auto", modeScattered: "Scattered", modeUnified: "Unified",
-    modeFallbackHint: "Engine returned no text coordinates; shown as one block"
+    modeFallbackHint: "Engine returned no text coordinates; shown as one block",
+    displayModeHint: "Auto = judge by content; Scattered = overlay each block in place (UI labels, words, manga); Unified = merge into one block (article paragraphs)"
   },
   selection: {
     close: "Close", more: "More",

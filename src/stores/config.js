@@ -25,9 +25,9 @@ const useConfigStore = create(
 
       floatingOpacity: 0.85,
 
-      // 'auto' | 'scattered' | 'unified' — manual override for the floating
-      // window's scattered-mode heuristic (window-local pref, not a settings
-      // bucket, same as floatingOpacity).
+      // Mirror of settings.floatingWindow.displayMode ('auto'|'scattered'|
+      // 'unified'), synced from the main settings on load and on
+      // settings-changed — the pipeline reads it per capture.
       floatingDisplayMode: 'auto',
 
       setTargetLanguage: (lang) => set({ targetLanguage: lang }),

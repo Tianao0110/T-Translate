@@ -4,8 +4,8 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Camera, X, Loader2, AlertCircle, ChevronDown, GripHorizontal, History, Clock, RefreshCw, LayoutGrid } from 'lucide-react';
-import useSessionStore, { STATUS, DISPLAY_MODE } from '../../stores/session.js';
+import { Camera, X, Loader2, AlertCircle, ChevronDown, GripHorizontal, History, Clock, RefreshCw } from 'lucide-react';
+import useSessionStore, { STATUS, DISPLAY_MODE, CHILD_PANE_STATUS } from '../../stores/session.js';
 import useConfigStore from '../../stores/config.js';
 import pipeline from '../../services/pipeline.js';
 import ChildPane from './ChildPane.jsx';
@@ -21,8 +21,7 @@ function isOcrRelatedError(msg) {
   return typeof msg === 'string' && OCR_ERROR_KEYWORDS.test(msg);
 }
 
-// Tri-state layout override: auto (heuristic) / scattered / unified
-const DISPLAY_MODE_PREFS = ['auto', 'scattered', 'unified'];
+// Labels for the layout badge (pref lives in settings > 悬浮窗口 > 显示模式)
 const MODE_LABEL_KEYS = {
   auto: ['floatingWindow.modeAuto', '自动'],
   scattered: ['floatingWindow.modeScattered', '散点'],
@@ -52,7 +51,6 @@ const FloatingWindow = () => {
 
   const {
     floatingOpacity,
-    floatingDisplayMode,
     targetLanguage,
     ocrEngine,
     setFloatingOpacity,
@@ -65,7 +63,6 @@ const FloatingWindow = () => {
 
   const [showToolbar, setShowToolbar] = useState(false);
   const [showOpacitySlider, setShowOpacitySlider] = useState(false);
-  const [showModePicker, setShowModePicker] = useState(false);
   const [showHistoryPanel, setShowHistoryPanel] = useState(false);
   const [hasOverflow, setHasOverflow] = useState(false);
   const [theme, setTheme] = useState('light');
@@ -309,6 +306,17 @@ const FloatingWindow = () => {
         if (settings.ocrEngine) {
           setOcrEngine(settings.ocrEngine);
         }
+
+        // Display-mode pref lives in the settings page. On change, re-layout
+        // the stashed capture immediately so the switch is visible without a
+        // fresh screenshot (no-ops when nothing was captured yet).
+        if (settings.displayMode) {
+          const prev = useConfigStore.getState().floatingDisplayMode;
+          if (settings.displayMode !== prev) {
+            setFloatingDisplayMode(settings.displayMode);
+            pipeline.rerunLastCapture();
+          }
+        }
       }
     } catch (error) {
       logger.error('Load settings failed:', error);
@@ -352,7 +360,7 @@ const FloatingWindow = () => {
   // opacity popup) are excluded so their clicks keep working.
   const handleTitleBarMouseDown = (e) => {
     if (e.button !== 0) return;
-    if (e.target.closest('button, .floating-toolbar, .opacity-popup, .refresh-popup, .mode-popup')) return;
+    if (e.target.closest('button, .floating-toolbar, .opacity-popup, .refresh-popup')) return;
     e.preventDefault();
 
     // Dragging the window means the watched region is about to change —
@@ -487,22 +495,6 @@ const FloatingWindow = () => {
     setAutoRefresh(true);
   }, []);
 
-  // Display-mode pick: persist the pref (config store) and immediately
-  // re-layout from the stashed capture — no re-capture round trip. The
-  // pipeline no-ops when nothing was captured yet.
-  const selectDisplayMode = useCallback((mode) => {
-    setFloatingDisplayMode(mode);
-    setShowModePicker(false);
-    pipeline.rerunLastCapture();
-  }, [setFloatingDisplayMode]);
-
-  const handleModePickerClick = useCallback(() => {
-    setShowModePicker((prev) => !prev);
-    // Popups share the same anchor spot — never show two at once
-    setShowOpacitySlider(false);
-    setShowRefreshPicker(false);
-  }, []);
-
   // Global-hotkey re-capture: fires while another app holds focus, so the
   // target never loses foreground (the whole point vs the in-window Space key).
   useEffect(() => {
@@ -531,6 +523,60 @@ const FloatingWindow = () => {
   const handleChildPanePositionChange = useCallback((id, position) => {
     updateChildPanePosition(id, position);
   }, [updateChildPanePosition]);
+
+  // De-overlap pass: pane frames (padding/min-width/translated text) are
+  // bigger than the OCR line boxes they anchor to, so tightly stacked blocks
+  // produce unreadable overlaps. Once a batch settles (no pane pending or
+  // translating — sizes are locked then), measure the real rendered frames
+  // and greedily shift colliding panes downward. Runs once per batch so it
+  // never fights the user's own drags.
+  const deoverlapKeyRef = useRef('');
+  useEffect(() => {
+    if (displayMode !== DISPLAY_MODE.SCATTERED || childPanes.length < 2) return;
+    const busy = childPanes.some(
+      (p) => p.status === CHILD_PANE_STATUS.PENDING || p.status === CHILD_PANE_STATUS.TRANSLATING
+    );
+    if (busy) return;
+    const batchKey = childPanes.map((p) => p.id).join('|');
+    if (deoverlapKeyRef.current === batchKey) return;
+    deoverlapKeyRef.current = batchKey;
+
+    const GAP = 4;
+    const rects = childPanes
+      .map((p) => {
+        const el = document.querySelector(`[data-pane-id="${p.id}"]`);
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return { id: p.id, x: p.bbox.x, y: p.bbox.y, w: r.width, h: r.height };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.y - b.y || a.x - b.x);
+
+    const placed = [];
+    for (const r of rects) {
+      // Vertical-only shifts keep the horizontal anchor to the source text
+      let moved = true;
+      let guard = 0;
+      while (moved && guard++ < 20) {
+        moved = false;
+        for (const p of placed) {
+          const intersects = r.x < p.x + p.w && p.x < r.x + r.w && r.y < p.y + p.h && p.y < r.y + r.h;
+          if (intersects) {
+            r.y = p.y + p.h + GAP;
+            moved = true;
+          }
+        }
+      }
+      placed.push(r);
+    }
+
+    for (const r of placed) {
+      const pane = childPanes.find((p) => p.id === r.id);
+      if (pane && Math.abs(r.y - pane.bbox.y) > 1) {
+        updateChildPanePosition(r.id, { y: Math.round(r.y) });
+      }
+    }
+  }, [childPanes, displayMode, updateChildPanePosition]);
 
   // Double-click detaches a scattered pane into its own OS-level window.
   // viewportPos comes from the child component's mouse handler.
@@ -638,8 +684,9 @@ const FloatingWindow = () => {
 
   const isLoading = [STATUS.CAPTURING, STATUS.OCR_PROCESSING, STATUS.TRANSLATING].includes(status);
 
-  // Result-area badge: what layout actually rendered. Auto shows its verdict
-  // ("自动 · 散点"); a forced mode that fell back shows the arrow ("散点 → 整段").
+  // Result-area badge, shown only where it carries information: auto mode
+  // (which way did the heuristic decide) and the forced-scattered fallback
+  // (engine gave no coordinates). A user-pinned mode needs no echo.
   const modeLabel = (m) => t(...(MODE_LABEL_KEYS[m] || MODE_LABEL_KEYS.auto));
   const modeChipText = !modeInfo
     ? ''
@@ -647,7 +694,7 @@ const FloatingWindow = () => {
       ? `${modeLabel('auto')} · ${modeLabel(modeInfo.effective)}`
       : modeInfo.fellBack
         ? `${modeLabel(modeInfo.pref)} → ${modeLabel(modeInfo.effective)}`
-        : modeLabel(modeInfo.effective);
+        : '';
   const modeChipTitle = modeInfo?.fellBack
     ? t('floatingWindow.modeFallbackHint', '引擎未返回文字坐标，已按整段显示')
     : undefined;
@@ -690,18 +737,6 @@ const FloatingWindow = () => {
             </button>
 
             <button
-              className={`toolbar-btn ${floatingDisplayMode !== 'auto' ? 'active' : ''}`}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                handleModePickerClick();
-              }}
-              title={`${t('floatingWindow.displayMode', '显示模式')}: ${t(...MODE_LABEL_KEYS[floatingDisplayMode] || MODE_LABEL_KEYS.auto)}`}
-            >
-              <LayoutGrid size={12} />
-            </button>
-
-            <button
               className={`toolbar-btn ${showHistoryPanel ? 'active' : ''}`}
               onClick={(e) => {
                 e.preventDefault();
@@ -736,9 +771,9 @@ const FloatingWindow = () => {
           <span className="opacity-label">{t('floatingWindow.opacity', '透明度')}</span>
           <input
             type="range"
-            min="0.3"
+            min="0.01"
             max="1"
-            step="0.05"
+            step="0.01"
             value={floatingOpacity}
             onChange={handleOpacityChange}
           />
@@ -760,25 +795,6 @@ const FloatingWindow = () => {
               }}
             >
               {s}s
-            </button>
-          ))}
-        </div>
-      )}
-
-      {showModePicker && (
-        <div className="mode-popup" onMouseLeave={() => setShowModePicker(false)}>
-          <span className="opacity-label">{t('floatingWindow.displayMode', '显示模式')}</span>
-          {DISPLAY_MODE_PREFS.map((m) => (
-            <button
-              key={m}
-              className={`refresh-interval-btn ${m === floatingDisplayMode ? 'active' : ''}`}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                selectDisplayMode(m);
-              }}
-            >
-              {t(...MODE_LABEL_KEYS[m])}
             </button>
           ))}
         </div>

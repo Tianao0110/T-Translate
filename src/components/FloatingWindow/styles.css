@@ -268,31 +268,6 @@
   color: var(--floating-on-accent, #fff);
 }
 
-/* Display-mode picker — same shell as the interval picker, on the theme-aware
-   surface token (the hardcoded white of its siblings breaks in dark). */
-.mode-popup {
-  position: absolute;
-  top: 48px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 14px;
-  background: var(--floating-surface);
-  border: 1px solid var(--floating-border);
-  border-radius: 10px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  z-index: 100;
-  -webkit-app-region: no-drag;
-}
-
-.mode-popup .opacity-label {
-  font-size: 12px;
-  color: var(--floating-text-muted);
-  white-space: nowrap;
-}
-
 /* Layout badge in the result area: which mode rendered this result.
    flex (not inline): the badge takes its own line above the result text. */
 .mode-indicator {

@@ -262,7 +262,8 @@ const zh = {
     goToOcrSettings: "前往 OCR 设置",
     displayMode: "显示模式",
     modeAuto: "自动", modeScattered: "散点", modeUnified: "整段",
-    modeFallbackHint: "引擎未返回文字坐标，已按整段显示"
+    modeFallbackHint: "引擎未返回文字坐标，已按整段显示",
+    displayModeHint: "自动＝按内容判断；散点＝每块文字原位贴译文（界面标签、单词、漫画）；整段＝合并为一段译文（文章段落）"
   },
   selection: {
     close: "关闭", more: "更多",
