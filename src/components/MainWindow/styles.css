@@ -799,6 +799,74 @@
 [data-theme="dark"] .shortcut-hints {
   background: var(--bg-secondary);
 }
+
+/* ==================== 浅色/清新 顶栏柔化（主题二期拍板） ==================== */
+/* Same motive as the dark precedent above: a saturated full-width gradient
+   made chrome the loudest surface on the page. Light gets a cool accent wash
+   (D1=C), fresh keeps a whisper of its gradient signature (D3=F3); active
+   tab stays a solid accent pill so the current location reads at a glance.
+   Titlebar stays as-is per explicit decision. */
+[data-theme="light"] .main-toolbar {
+  background: color-mix(in srgb, var(--accent-primary) 7%, var(--bg-secondary));
+  border-bottom: 1px solid color-mix(in srgb, var(--accent-primary) 18%, var(--border-primary));
+  box-shadow: none;
+}
+
+[data-theme="fresh"] .main-toolbar {
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--accent-primary) 20%, var(--bg-secondary)) 0%,
+    color-mix(in srgb, var(--accent-primary) 6%, var(--bg-secondary)) 100%);
+  border-bottom: 1px solid color-mix(in srgb, var(--accent-primary) 18%, var(--border-primary));
+  box-shadow: none;
+}
+
+[data-theme="light"] .brand-title,
+[data-theme="fresh"] .brand-title {
+  color: var(--text-primary);
+  text-shadow: none;
+}
+
+[data-theme="light"] .brand-logo,
+[data-theme="fresh"] .brand-logo {
+  background: color-mix(in srgb, var(--accent-primary) 18%, transparent);
+  color: var(--accent-primary);
+}
+
+[data-theme="light"] .tab-button,
+[data-theme="fresh"] .tab-button {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+[data-theme="light"] .tab-button:hover,
+[data-theme="fresh"] .tab-button:hover {
+  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .tab-button.active,
+[data-theme="fresh"] .tab-button.active {
+  background: var(--accent-primary);
+  color: var(--text-on-accent);
+  box-shadow: none;
+}
+
+[data-theme="light"] .tab-button.active svg,
+[data-theme="fresh"] .tab-button.active svg {
+  color: var(--text-on-accent);
+}
+
+[data-theme="light"] .quick-actions-trigger,
+[data-theme="fresh"] .quick-actions-trigger {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+[data-theme="light"] .quick-actions-trigger:hover,
+[data-theme="fresh"] .quick-actions-trigger:hover {
+  background: var(--bg-active);
+}
+
 /* ==================== 工具栏分隔线 ==================== */
 .toolbar-divider {
   width: 1px;
@@ -808,14 +876,36 @@
 }
 
 /* ==================== 文档翻译按钮 ==================== */
+/* Theme-accent glass (拍板 D4: follow the theme, glass look): translucent
+   accent gradient + top inner highlight + light rim. !important outlives the
+   .tab-button/.active background rules this button also matches. */
 .doc-translate-btn {
-  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%) !important;
-  color: #fff !important;
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--accent-primary) 62%, transparent) 0%,
+    color-mix(in srgb, var(--accent-hover) 50%, transparent) 100%) !important;
+  color: var(--text-on-accent) !important;
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 30%, rgba(255, 255, 255, 0.55));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(10px) saturate(1.3);
 }
 
 .doc-translate-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.4);
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--accent-primary) 75%, transparent) 0%,
+    color-mix(in srgb, var(--accent-hover) 62%, transparent) 100%) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 2px 8px color-mix(in srgb, var(--accent-primary) 35%, transparent);
+}
+
+/* Dark: denser fill — 62% translucent amber over the near-black bar would
+   starve the dark-on-gold text of contrast. */
+[data-theme="dark"] .doc-translate-btn {
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--accent-primary) 82%, transparent) 0%,
+    color-mix(in srgb, var(--accent-hover) 70%, transparent) 100%) !important;
+  border-color: color-mix(in srgb, var(--accent-primary) 45%, rgba(255, 255, 255, 0.25));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
 /* ==================== 文档翻译弹窗 ==================== */
