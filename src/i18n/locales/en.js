@@ -259,7 +259,10 @@ const en = {
     captureHint: "Click 📷 or press Space to capture",
     doubleClickFreeze: "Double-click to pin as independent window",
     passThroughMode: "Pass-through mode (release Alt to exit)",
-    goToOcrSettings: "Go to OCR Settings"
+    goToOcrSettings: "Go to OCR Settings",
+    displayMode: "Display mode",
+    modeAuto: "Auto", modeScattered: "Scattered", modeUnified: "Unified",
+    modeFallbackHint: "Engine returned no text coordinates; shown as one block"
   },
   selection: {
     close: "Close", more: "More",

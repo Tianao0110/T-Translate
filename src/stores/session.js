@@ -46,6 +46,11 @@ const useSessionStore = create((set, get) => ({
   childPanes: [],
   frozenPanes: [], // pinned panes the user dragged out (cap of 15)
 
+  // How the current result got its layout: { pref, effective, fellBack }.
+  // pref is the user's tri-state choice, effective what actually rendered
+  // (they differ when auto decides, or forced-scattered lacks coordinates).
+  modeInfo: null,
+
   setStatus: (status) => set({ status }),
 
   setSourceText: (text) => set({ sourceText: text }),
@@ -71,6 +76,7 @@ const useSessionStore = create((set, get) => ({
     translatedText: '',
     error: null,
     currentProvider: null,
+    modeInfo: null,
     metadata: {
       timestamp: null,
       duration: null,
@@ -80,6 +86,8 @@ const useSessionStore = create((set, get) => ({
   }),
 
   setDisplayMode: (mode) => set({ displayMode: mode }),
+
+  setModeInfo: (modeInfo) => set({ modeInfo }),
 
   // Returns the created panes so the caller can iterate without re-reading state
   setChildPanes: (blocks) => {

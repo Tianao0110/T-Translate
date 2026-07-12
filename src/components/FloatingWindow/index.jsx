@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Camera, X, Loader2, AlertCircle, ChevronDown, GripHorizontal, History, Clock, RefreshCw } from 'lucide-react';
+import { Camera, X, Loader2, AlertCircle, ChevronDown, GripHorizontal, History, Clock, RefreshCw, LayoutGrid } from 'lucide-react';
 import useSessionStore, { STATUS, DISPLAY_MODE } from '../../stores/session.js';
 import useConfigStore from '../../stores/config.js';
 import pipeline from '../../services/pipeline.js';
@@ -21,6 +21,14 @@ function isOcrRelatedError(msg) {
   return typeof msg === 'string' && OCR_ERROR_KEYWORDS.test(msg);
 }
 
+// Tri-state layout override: auto (heuristic) / scattered / unified
+const DISPLAY_MODE_PREFS = ['auto', 'scattered', 'unified'];
+const MODE_LABEL_KEYS = {
+  auto: ['floatingWindow.modeAuto', '自动'],
+  scattered: ['floatingWindow.modeScattered', '散点'],
+  unified: ['floatingWindow.modeUnified', '整段'],
+};
+
 const FloatingWindow = () => {
   const { t } = useTranslation();
 
@@ -31,6 +39,7 @@ const FloatingWindow = () => {
     displayMode,
     childPanes,
     frozenPanes,
+    modeInfo,
     notification,
     updateChildPanePosition,
     freezeChildPane,
@@ -43,9 +52,11 @@ const FloatingWindow = () => {
 
   const {
     floatingOpacity,
+    floatingDisplayMode,
     targetLanguage,
     ocrEngine,
     setFloatingOpacity,
+    setFloatingDisplayMode,
     setTargetLanguage,
     setSourceLanguage,
     setSameLanguageBehavior,
@@ -54,6 +65,7 @@ const FloatingWindow = () => {
 
   const [showToolbar, setShowToolbar] = useState(false);
   const [showOpacitySlider, setShowOpacitySlider] = useState(false);
+  const [showModePicker, setShowModePicker] = useState(false);
   const [showHistoryPanel, setShowHistoryPanel] = useState(false);
   const [hasOverflow, setHasOverflow] = useState(false);
   const [theme, setTheme] = useState('light');
@@ -340,7 +352,7 @@ const FloatingWindow = () => {
   // opacity popup) are excluded so their clicks keep working.
   const handleTitleBarMouseDown = (e) => {
     if (e.button !== 0) return;
-    if (e.target.closest('button, .floating-toolbar, .opacity-popup, .refresh-popup')) return;
+    if (e.target.closest('button, .floating-toolbar, .opacity-popup, .refresh-popup, .mode-popup')) return;
     e.preventDefault();
 
     // Dragging the window means the watched region is about to change —
@@ -473,6 +485,22 @@ const FloatingWindow = () => {
     try { localStorage.setItem('floating-auto-refresh-interval', String(seconds)); } catch { /* ignore */ }
     setShowRefreshPicker(false);
     setAutoRefresh(true);
+  }, []);
+
+  // Display-mode pick: persist the pref (config store) and immediately
+  // re-layout from the stashed capture — no re-capture round trip. The
+  // pipeline no-ops when nothing was captured yet.
+  const selectDisplayMode = useCallback((mode) => {
+    setFloatingDisplayMode(mode);
+    setShowModePicker(false);
+    pipeline.rerunLastCapture();
+  }, [setFloatingDisplayMode]);
+
+  const handleModePickerClick = useCallback(() => {
+    setShowModePicker((prev) => !prev);
+    // Popups share the same anchor spot — never show two at once
+    setShowOpacitySlider(false);
+    setShowRefreshPicker(false);
   }, []);
 
   // Global-hotkey re-capture: fires while another app holds focus, so the
@@ -610,6 +638,20 @@ const FloatingWindow = () => {
 
   const isLoading = [STATUS.CAPTURING, STATUS.OCR_PROCESSING, STATUS.TRANSLATING].includes(status);
 
+  // Result-area badge: what layout actually rendered. Auto shows its verdict
+  // ("自动 · 散点"); a forced mode that fell back shows the arrow ("散点 → 整段").
+  const modeLabel = (m) => t(...(MODE_LABEL_KEYS[m] || MODE_LABEL_KEYS.auto));
+  const modeChipText = !modeInfo
+    ? ''
+    : modeInfo.pref === 'auto'
+      ? `${modeLabel('auto')} · ${modeLabel(modeInfo.effective)}`
+      : modeInfo.fellBack
+        ? `${modeLabel(modeInfo.pref)} → ${modeLabel(modeInfo.effective)}`
+        : modeLabel(modeInfo.effective);
+  const modeChipTitle = modeInfo?.fellBack
+    ? t('floatingWindow.modeFallbackHint', '引擎未返回文字坐标，已按整段显示')
+    : undefined;
+
   return (
     <div
       className={`floating-window ${showToolbar ? 'show-toolbar' : ''} ${isPassThrough ? 'pass-through' : ''} ${displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0 ? 'scattered-mode' : ''}`}
@@ -645,6 +687,18 @@ const FloatingWindow = () => {
                 : t('floatingWindow.autoRefresh', '自动刷新（盯住区域循环截译，目标不失焦）')}
             >
               <RefreshCw size={12} className={autoRefresh ? 'spinning-slow' : undefined} />
+            </button>
+
+            <button
+              className={`toolbar-btn ${floatingDisplayMode !== 'auto' ? 'active' : ''}`}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleModePickerClick();
+              }}
+              title={`${t('floatingWindow.displayMode', '显示模式')}: ${t(...MODE_LABEL_KEYS[floatingDisplayMode] || MODE_LABEL_KEYS.auto)}`}
+            >
+              <LayoutGrid size={12} />
             </button>
 
             <button
@@ -711,6 +765,25 @@ const FloatingWindow = () => {
         </div>
       )}
 
+      {showModePicker && (
+        <div className="mode-popup" onMouseLeave={() => setShowModePicker(false)}>
+          <span className="opacity-label">{t('floatingWindow.displayMode', '显示模式')}</span>
+          {DISPLAY_MODE_PREFS.map((m) => (
+            <button
+              key={m}
+              className={`refresh-interval-btn ${m === floatingDisplayMode ? 'active' : ''}`}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                selectDisplayMode(m);
+              }}
+            >
+              {t(...MODE_LABEL_KEYS[m])}
+            </button>
+          ))}
+        </div>
+      )}
+
       {toastMessage && (
         <div
           className={`floating-toast floating-toast-${toastMessage.type || 'info'}`}
@@ -743,6 +816,9 @@ const FloatingWindow = () => {
           </div>
         ) : displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0 ? (
           <div className="scattered-panes-container">
+            {modeChipText && (
+              <div className="mode-indicator in-scattered" title={modeChipTitle}>{modeChipText}</div>
+            )}
             {childPanes.map((pane) => (
               <ChildPane
                 key={pane.id}
@@ -765,7 +841,12 @@ const FloatingWindow = () => {
             </span>
           </div>
         ) : translatedText ? (
-          <div className="floating-result">{translatedText}</div>
+          <div className="floating-result">
+            {modeChipText && (
+              <div className="mode-indicator" title={modeChipTitle}>{modeChipText}</div>
+            )}
+            {translatedText}
+          </div>
         ) : (
           <div className="floating-message placeholder">
             <span>{t('floatingWindow.captureHint', '点击 📷 或按 Space 截图识别')}</span>

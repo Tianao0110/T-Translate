@@ -259,7 +259,10 @@ const zh = {
     captureHint: "点击 📷 或按 Space 截图识别",
     doubleClickFreeze: "双击固定为独立窗口",
     passThroughMode: "穿透模式 (松开 Alt 退出)",
-    goToOcrSettings: "前往 OCR 设置"
+    goToOcrSettings: "前往 OCR 设置",
+    displayMode: "显示模式",
+    modeAuto: "自动", modeScattered: "散点", modeUnified: "整段",
+    modeFallbackHint: "引擎未返回文字坐标，已按整段显示"
   },
   selection: {
     close: "关闭", more: "更多",
