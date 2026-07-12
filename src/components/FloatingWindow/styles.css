@@ -729,11 +729,23 @@
 }
 
 /* 控制按钮 */
+/* Hover controls overlay the pane (absolute) — as a flex sibling they took
+   layout width and re-wrapped multi-line text under the cursor. */
 .child-pane-controls {
+  position: absolute;
+  top: 2px;
+  right: 2px;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 4px 4px 4px 0;
+  padding: 2px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+[data-theme="dark"] .child-pane-controls {
+  background: rgba(30, 41, 59, 0.95);
 }
 
 .child-pane-btn {

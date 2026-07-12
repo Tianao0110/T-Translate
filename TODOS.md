@@ -43,6 +43,14 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 - ① 启发式加强：字号一致性/多列检测/块数上限等补充信号
 - ② **工具栏手动三态开关（自动/散点/整段，持久化）**——判定不可能全对，手动兜底符合产品习惯，推荐先做这个；散点判定结果在结果区提示当前模式，切换后用上次截图立即重排（imageData 需暂存一份）
 
+### LLM 视觉 OCR 丢失位置信息（2026-07-12 用户提出，研究性质）
+
+llm-vision 引擎（API 交给本地视觉模型识别）只返回纯文本、无 bbox——悬浮窗散点模式被迫回退整段（徽标"散点→整段"），漫画/标签场景体验降级。候选方向（需实验验证）：
+
+- ① **结构化输出 prompt**：要求模型返回行级 JSON + 归一化坐标。Qwen2-VL 系原生支持 grounding（bbox 定位），但小参数本地模型坐标精度未知，且不同模型能力参差——需按模型分级启用
+- ② **混合管线**：本地 PP-OCR det 模型只出框（det 权重仅 ~9MB、无需 rec 语言包），裁切文本条喂 LLM 识别——框准、字准，代价是 N 个框 N 次调用（或拼图批量）
+- ③ **场景引导**：散点需求场景（悬浮窗）提示切换本地 OCR 引擎，llm-vision 保持整段专用——零研发成本的兜底文案方案
+
 ### Full onboarding wizard
 
 The v0.2.6 OCR error-to-guidance fix is the short version. Full version: first-launch welcome flow, guided OCR/LLM setup, feature tour. Needs design.
