@@ -10,12 +10,9 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 
 ## 下一版本候选
 
-### 主进程内存体检+瘦身（2026-07-10 用户实测立项）
+### ~~主进程内存体检+瘦身~~ 已搁置（2026-07-11 用户拍板：属过度优化，暂不做）
 
-用时主进程 ~700MB（标准档、各渲染窗仅 40-50MB；闲时可回落 ~200MB，弹性正常非泄漏）。大头=ONNX arena（推理后不归还）+图像链缓冲。先量化拆账单再动刀：
-- 首选杠杆：OCR 会话空闲驱逐（N 分钟无识别 evictSessions 释放 arena，[ocr-engine.js](electron/utils/ocr-engine.js) 已有驱逐机制缺空闲定时器；重建 ~0.5s 与 deep 检查同量级）
-- 次选：esearch.init ortOption 传 sessionOptions 做 arena 收缩实验（需实测速度代价）；图像链 buffer 滞留审计
-- 已复核不动：划词窗常驻保留（仅 40-50MB）；闲时 200MB 是 Electron 多窗地板
+实测形态健康：用时 ~700MB 是推理期弹性上探、闲时回落 ~200MB，非泄漏。复启条件=闲置基线持续爬升不回落、或用户侧真实反馈；届时量化数据与杠杆分析在协作记忆 memory-checkup-lead 里备着，别凭空重推
 
 ### 主题二期候选（一期已随 v0.3.1 落地 2026-07-04）
 
@@ -33,8 +30,8 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 
 - ~~doc_cls 旋转分类器~~ **已实测弃案（2026-07-04）**：倒置图可纠正，但日文横排截图被误判竖排、韩文包乱码——主场景回归不可接受，详见 OCR_MODELS.md 已知边界（含复现方法）。别再捡
 - 档位备忘：v6 全系仅 tiny/small/medium 三档（官方页 2026-07-03 已核），tiny 无假名不可用；v6 无独立多语言模型，韩/西里尔/天城/阿拉伯继续 v4 包；spike 复跑脚本已随 2026-07-10 temp 清理退役（结论与复现方法保全在 docs/OCR_MODELS.md 已知边界节）
-- 合入时补测：竖排文本、真实截图小字（过全量 probe.js + 实拍）
-- 顺带：百度 Unlimited-OCR 只有 NVIDIA GPU 路径，不适合内置；其 vLLM 镜像是 OpenAI 兼容 API，有 N 卡用户可把 llm-vision 端点指过去零改动直连——可写 FAQ
+- 合入时补测：竖排文本、真实截图小字（实拍回归）
+- ~~百度 Unlimited-OCR vLLM 直连提示~~ ✅ 已写入 docs/FAQ.md（2026-07-10）
 
 ### 真 asar 热替换（仅评估，不承诺）
 
