@@ -14,11 +14,6 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 
 实测形态健康：用时 ~700MB 是推理期弹性上探、闲时回落 ~200MB，非泄漏。复启条件=闲置基线持续爬升不回落、或用户侧真实反馈；届时量化数据与杠杆分析在协作记忆 memory-checkup-lead 里备着，别凭空重推
 
-### 主题二期候选（一期已随 v0.3.1 落地 2026-07-04）
-
-- **浅色顶栏柔化**：浅色主题的亮蓝渐变顶栏保留了品牌感（用户未拍板动它）；如后续想统一，参照深色做法（表面色 + 强调只标活跃项），提案 artifact 05 节有示意
-- 备忘：主题决策全记录在 workflow-playbook 记忆（琥珀 C3/青碧 F2/彩虹签名 R1/渐变保留/米白豆沙弃案）；新增强调面文字必须用 `--text-on-accent`，独立窗口（悬浮/划词）不加载 App.css 令牌表、只能用局部变量
-
 ### 划词检测完整性（0.2.9 已基本落地，剩数据驱动项）
 
 - README 应用支持列表 — 等日常使用积累（`npm run start:debug` 探针日志按应用记录走哪层），逐项标注已知限制
@@ -36,12 +31,6 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 ### 真 asar 热替换（仅评估，不承诺）
 
 只覆盖纯 JS 改动；koffi/uiohook/node-screenshots/OCR 全在 asarUnpack，native 或 Electron 版本一变必须回全量；且热更新通道必须做包签名校验，否则是供应链攻击口。当前差分下载（v0.2.8 起）已覆盖大部分收益。
-
-### 悬浮窗散点/整段判定加强 或 手动模式切换（2026-07-06 用户提出）
-
-散点子窗口判定是纯几何启发式（[pipeline.js:37](src/services/pipeline.js:37) shouldUseScatteredMode：列对齐+行距+水平散布三条件），误判时整段文字被炸成子窗格、或散落 UI 标签被并成一段。两个方向（可只做②）：
-- ① 启发式加强：字号一致性/多列检测/块数上限等补充信号
-- ② **工具栏手动三态开关（自动/散点/整段，持久化）**——判定不可能全对，手动兜底符合产品习惯，推荐先做这个；散点判定结果在结果区提示当前模式，切换后用上次截图立即重排（imageData 需暂存一份）
 
 ### LLM 视觉 OCR 丢失位置信息（2026-07-12 用户提出，研究性质）
 
