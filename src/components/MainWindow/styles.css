@@ -888,7 +888,9 @@
   background: none !important;
   color: var(--accent-primary) !important;
   border: none;
-  border-radius: 999px;
+  /* Same geometry as the sibling tabs — the pill radius made it read as a
+     different control family (用户二审反馈) */
+  border-radius: 8px;
   backdrop-filter: blur(6px) contrast(1.15) brightness(1.1) saturate(1.5);
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.5),
@@ -902,7 +904,7 @@
 }
 
 .doc-translate-btn:hover {
-  transform: translateY(-1px) scale(1.02);
+  transform: translateY(-1px);
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.65),
     inset 1.5px 1.5px 0.5px -1px rgba(255, 255, 255, 0.95),
@@ -913,11 +915,6 @@
 
 .doc-translate-btn:active {
   transform: scale(0.97);
-}
-
-/* Documents view open: a light accent tint settles inside the glass */
-.doc-translate-btn.active {
-  background: color-mix(in srgb, var(--accent-primary) 14%, transparent) !important;
 }
 
 /* Dark: white speculars soften, backdrop lifts harder so the smoky pill
@@ -939,6 +936,16 @@
     inset -1px -1px 0.5px -1px rgba(255, 255, 255, 0.14),
     inset 0 -12px 20px -14px rgba(0, 0, 0, 0.45),
     0 6px 16px -5px color-mix(in srgb, var(--accent-primary) 45%, transparent);
+}
+
+/* Documents view open: read exactly like every other active tab (solid
+   accent pill) — the glass is the RESTING look. Placed after the dark
+   overrides so source order settles the tie. */
+.doc-translate-btn.active {
+  background: var(--accent-primary) !important;
+  color: var(--text-on-accent) !important;
+  backdrop-filter: none;
+  box-shadow: none;
 }
 
 /* ==================== 文档翻译弹窗 ==================== */
