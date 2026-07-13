@@ -259,7 +259,14 @@ const zh = {
     captureHint: "点击 📷 或按 Space 截图识别",
     doubleClickFreeze: "双击固定为独立窗口",
     passThroughMode: "穿透模式 (松开 Alt 退出)",
-    goToOcrSettings: "前往 OCR 设置"
+    goToOcrSettings: "前往 OCR 设置",
+    displayMode: "显示模式",
+    modeAuto: "自动", modeScattered: "散点", modeUnified: "整段",
+    modeFallbackHint: "引擎未返回文字坐标，已按整段显示",
+    displayModeHint: "自动＝按内容判断；散点＝每块文字原位贴译文（界面标签、单词、漫画）；整段＝合并为一段译文（文章段落）",
+    passThroughToggle: "鼠标穿透：内容区点击直达下层应用，顶栏保持可点",
+    passThroughOn: "穿透中，点击退出（内容区点击直达下层应用）",
+    passThroughSticky: "穿透中 · 顶栏可点击退出 (Esc)"
   },
   selection: {
     close: "关闭", more: "更多",

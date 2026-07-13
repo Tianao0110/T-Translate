@@ -4,6 +4,7 @@
 import translationService from './stack-client.js';
 import useSessionStore, { DISPLAY_MODE, CHILD_PANE_STATUS } from '../stores/session.js';
 import useConfigStore from '../stores/config.js';
+import { resolveDisplayMode } from './display-mode.js';
 import { calculateHash } from '../utils/image.js';
 import { detectLanguage, resolveSameLanguageTarget, cleanTranslationOutput, shouldTranslateText } from '../utils/text.js';
 import createLogger from '../utils/logger.js';
@@ -20,6 +21,10 @@ const _t = (key, fallback) => {
 let lastImageHash = '';
 let lastText = '';
 let captureInFlight = false;
+// Last processed capture, kept so a display-mode toggle can re-layout
+// immediately without asking the user to re-capture. Dies with the renderer
+// (the floating window is destroyed on close, not hidden).
+let lastCapture = null;
 
 // Forward a floating-window translation into the main window's history store.
 // The old session.addToHistory only wrote an in-memory list nothing read, so
@@ -32,49 +37,8 @@ function addToMainHistory(item) {
   }
 }
 
-// Heuristic: are the OCR blocks scattered (e.g. UI labels, code annotations)
-// vs a single vertically-aligned paragraph? Scattered => overlay one bubble per block.
-function shouldUseScatteredMode(blocks) {
-  if (!blocks || blocks.length === 0) return false;
-  if (blocks.length === 1) return false;
-
-  const hasCoordinates = blocks.some(b => b.bbox && b.bbox.width > 0);
-  if (!hasCoordinates) return false;
-
-  const validBlocks = blocks.filter(b => b.bbox && b.bbox.height > 0);
-  if (validBlocks.length < 2) return false;
-
-  const avgHeight = validBlocks.reduce((sum, b) => sum + b.bbox.height, 0) / validBlocks.length;
-
-  const sorted = [...validBlocks].sort((a, b) => a.bbox.y - b.bbox.y);
-
-  let isVerticallyAligned = true;
-  let maxHorizontalOffset = 0;
-
-  for (let i = 1; i < sorted.length; i++) {
-    const prev = sorted[i - 1];
-    const curr = sorted[i];
-
-    const verticalGap = curr.bbox.y - (prev.bbox.y + prev.bbox.height);
-
-    const horizontalOffset = Math.abs(curr.bbox.x - prev.bbox.x);
-    maxHorizontalOffset = Math.max(maxHorizontalOffset, horizontalOffset);
-
-    // Gap > 2x line height OR significant overlap (-0.3 line height) breaks the column
-    if (verticalGap > avgHeight * 2 || verticalGap < -avgHeight * 0.3) {
-      isVerticallyAligned = false;
-      break;
-    }
-  }
-
-  // Horizontal scatter > 40% of avg block width means it's not a column
-  const avgWidth = validBlocks.reduce((sum, b) => sum + b.bbox.width, 0) / validBlocks.length;
-  if (maxHorizontalOffset > avgWidth * 0.4) {
-    isVerticallyAligned = false;
-  }
-
-  return !isVerticallyAligned;
-}
+// Scattered-vs-unified decision (heuristic + manual override) lives in
+// display-mode.js so it stays pure and unit-testable.
 
 class TranslationPipeline {
   // No init/refreshOcrConfigs anymore: OCR engines, their configs (with vault
@@ -137,12 +101,17 @@ class TranslationPipeline {
     const config = useConfigStore.getState();
 
     try {
-      // Dedupe key includes the target language: switching languages must
-      // retranslate even when the captured frame is byte-identical.
+      lastCapture = { imageData, options: { ...captureOptions } };
+
+      // Dedupe key includes target language AND display-mode pref: switching
+      // either must re-run even when the captured frame is byte-identical
+      // (same precedent as targetLanguage — a mode toggle would otherwise be
+      // swallowed as "content unchanged").
+      const modePref = config.floatingDisplayMode || 'auto';
       const hash = await calculateHash(imageData);
-      const imageKey = `${hash}::${config.targetLanguage}`;
+      const imageKey = `${hash}::${config.targetLanguage}::${modePref}`;
       if (imageKey === lastImageHash) {
-        logger.debug('Image and target language unchanged, skipping');
+        logger.debug('Image, target language and display mode unchanged, skipping');
         return { success: true, skipped: true };
       }
       lastImageHash = imageKey;
@@ -173,26 +142,37 @@ class TranslationPipeline {
         return { success: true, text: '' };
       }
 
-      // Floating window needs per-line positioning => prefer rawBlocks.
-      // Merged blocks are only used for the unified-mode single text body.
+      // Judgment runs on raw per-line boxes; pane granularity comes from the
+      // resolver (merged paragraphs per bubble, raw blocks for word piles).
       const mergedBlocks = ocrResult.blocks || [];
       const rawBlocks = ocrResult.rawBlocks || mergedBlocks;
-      const useScattered = shouldUseScatteredMode(rawBlocks);
+      // Capture frame in the same physical-pixel space as the OCR boxes —
+      // the sparse-coverage rule (manga bubbles over imagery) needs it.
+      const sf = captureOptions.scaleFactor || 1;
+      const frame = captureOptions.width > 0 && captureOptions.height > 0
+        ? { width: captureOptions.width * sf, height: captureOptions.height * sf }
+        : null;
+      const { useScattered, fellBack, blocks } = resolveDisplayMode(modePref, rawBlocks, mergedBlocks, frame);
+      session.setModeInfo({
+        pref: modePref,
+        effective: useScattered ? 'scattered' : 'unified',
+        fellBack,
+      });
 
-      logger.debug(`Display mode: ${useScattered ? 'scattered' : 'unified'}`);
-      logger.debug(`Raw blocks: ${rawBlocks.length}, Merged blocks: ${mergedBlocks.length}`);
+      logger.debug(`Display mode: ${useScattered ? 'scattered' : 'unified'} (pref: ${modePref})`);
+      logger.debug(`Raw blocks: ${rawBlocks.length}, Merged blocks: ${mergedBlocks.length}, Pane blocks: ${blocks?.length ?? 0}`);
       if (rawBlocks.length > 0) {
         logger.debug('First raw block bbox:', rawBlocks[0]?.bbox);
         logger.debug('Capture options:', captureOptions);
       }
 
-      if (useScattered && rawBlocks.length > 0) {
-        return await this.runScatteredMode(rawBlocks, captureOptions);
+      if (useScattered) {
+        return await this.runScatteredMode(blocks, captureOptions);
       }
 
-      const textKey = `${text}::${config.targetLanguage}`;
+      const textKey = `${text}::${config.targetLanguage}::${modePref}`;
       if (textKey === lastText) {
-        logger.debug('Text and target language unchanged, skipping');
+        logger.debug('Text, target language and display mode unchanged, skipping');
         return { success: true, skipped: true };
       }
       lastText = textKey;
@@ -413,9 +393,28 @@ class TranslationPipeline {
     }
   }
 
+  // Re-process the last capture (display-mode toggle re-layout). keepDedup
+  // reuses the silent-tick path: transient panes are only cleared once the
+  // dedupe key confirms a real change — which a mode switch guarantees.
+  async rerunLastCapture() {
+    if (!lastCapture || captureInFlight) {
+      return { success: false, skipped: true };
+    }
+    captureInFlight = true;
+    try {
+      return await this.runFromImage(lastCapture.imageData, {
+        ...lastCapture.options,
+        keepDedup: true,
+      });
+    } finally {
+      captureInFlight = false;
+    }
+  }
+
   resetCache() {
     lastImageHash = '';
     lastText = '';
+    lastCapture = null;
   }
 }
 

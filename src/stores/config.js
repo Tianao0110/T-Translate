@@ -1,7 +1,8 @@
 // Persistent user preferences shared by all renderer windows
 // (localStorage key 't-translate-config'). Only fields with real consumers
 // live here — the floating window + its pipeline read targetLanguage/
-// sameLanguageBehavior/ocrEngine/ocrPriority/floatingOpacity.
+// sameLanguageBehavior/ocrEngine/ocrPriority/floatingOpacity/
+// floatingDisplayMode.
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
@@ -24,11 +25,17 @@ const useConfigStore = create(
 
       floatingOpacity: 0.85,
 
+      // Mirror of settings.floatingWindow.displayMode ('auto'|'scattered'|
+      // 'unified'), synced from the main settings on load and on
+      // settings-changed — the pipeline reads it per capture.
+      floatingDisplayMode: 'auto',
+
       setTargetLanguage: (lang) => set({ targetLanguage: lang }),
       setSourceLanguage: (lang) => set({ sourceLanguage: lang }),
       setSameLanguageBehavior: (behavior) => set({ sameLanguageBehavior: behavior }),
       setOcrEngine: (engine) => set({ ocrEngine: engine }),
       setFloatingOpacity: (opacity) => set({ floatingOpacity: opacity }),
+      setFloatingDisplayMode: (mode) => set({ floatingDisplayMode: mode }),
     }),
     {
       name: 't-translate-config',
@@ -40,6 +47,7 @@ const useConfigStore = create(
         ocrEngine: state.ocrEngine,
         ocrPriority: state.ocrPriority,
         floatingOpacity: state.floatingOpacity,
+        floatingDisplayMode: state.floatingDisplayMode,
       }),
     }
   )

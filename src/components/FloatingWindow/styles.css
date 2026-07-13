@@ -11,6 +11,9 @@
      tokens, so the on-accent color is declared locally per theme. */
   --floating-on-accent: #ffffff;
   --floating-radius: 12px;
+  /* Near-opaque elevated surface (popups/badges) — unlike --floating-bg it
+     must not follow the user's window opacity. */
+  --floating-surface: rgba(255, 255, 255, 0.96);
 }
 
 /* ========== 主窗口 ========== */
@@ -265,6 +268,35 @@
   color: var(--floating-on-accent, #fff);
 }
 
+/* Layout badge in the result area: which mode rendered this result.
+   flex (not inline): the badge takes its own line above the result text. */
+.mode-indicator {
+  display: flex;
+  align-items: center;
+  width: fit-content;
+  margin-bottom: 6px;
+  padding: 1px 8px;
+  font-size: 10px;
+  line-height: 16px;
+  border-radius: 999px;
+  color: var(--floating-text-muted);
+  background: color-mix(in srgb, var(--floating-accent) 12%, transparent);
+  user-select: none;
+}
+
+/* Over scattered panes the badge floats in the corner on a solid chip —
+   arbitrary screen content sits behind, it needs its own surface to stay
+   legible */
+.mode-indicator.in-scattered {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  z-index: 5;
+  margin-bottom: 0;
+  background: var(--floating-surface);
+  border: 1px solid var(--floating-border);
+}
+
 /* Gentle rotation while auto-refresh runs — state cue, not a spinner */
 .spinning-slow {
   animation: refresh-spin 3s linear infinite;
@@ -414,6 +446,7 @@
   --floating-text-muted: #0f766e;
   --floating-accent: #10b981;
   --floating-on-accent: #ffffff;
+  --floating-surface: rgba(236, 246, 244, 0.97);
 }
 
 [data-theme="fresh"] .floating-window::before {
@@ -494,6 +527,7 @@
   --floating-text-muted: #a39d92;
   --floating-accent: #d6a854;
   --floating-on-accent: #241c0e;
+  --floating-surface: rgba(38, 36, 33, 0.97);
 }
 
 [data-theme="dark"] .floating-top-area {
@@ -695,11 +729,23 @@
 }
 
 /* 控制按钮 */
+/* Hover controls overlay the pane (absolute) — as a flex sibling they took
+   layout width and re-wrapped multi-line text under the cursor. */
 .child-pane-controls {
+  position: absolute;
+  top: 2px;
+  right: 2px;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 4px 4px 4px 0;
+  padding: 2px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+[data-theme="dark"] .child-pane-controls {
+  background: rgba(30, 41, 59, 0.95);
 }
 
 .child-pane-btn {
@@ -954,6 +1000,12 @@
 /* 不再设置整个窗口透明度，而是分别控制各部分 */
 .floating-window.pass-through {
   background: rgba(255, 255, 255, 0.15) !important;  /* 背景更透明 */
+}
+
+/* Sticky pass-through keeps content fully readable (the user is reading
+   translations while clicking through) — only the border tints as the cue. */
+.floating-window.pass-through-sticky {
+  border-color: color-mix(in srgb, var(--floating-accent) 55%, transparent);
 }
 
 .floating-window.pass-through .floating-top-area {

@@ -36,7 +36,7 @@ export const NAV_ITEMS = [
   { id: 'providers', icon: Server, group: 'translation', basic: true, keywords: ['provider', 'openai', 'deepl', 'gemini', 'deepseek', 'local', 'api', '翻译源', '本地'] },
   { id: 'translation', icon: Globe, group: 'translation', basic: true, keywords: ['language', 'source', 'target', 'auto', 'stream', '翻译', '语言', '流式'] },
   { id: 'selection', icon: MousePointer, group: 'translation', keywords: ['selection', 'mouse', 'trigger', 'button', '划词', '选中', '鼠标'] },
-  { id: 'floatingWindow', icon: Layers, group: 'translation', keywords: ['glass', 'floating', 'overlay', 'pin', '玻璃', '透明', '置顶'] },
+  { id: 'floatingWindow', icon: Layers, group: 'translation', keywords: ['glass', 'floating', 'overlay', 'pin', '玻璃', '透明', '置顶', '悬浮', '散点', '整段'] },
   { id: 'document', icon: FileText, group: 'translation', keywords: ['document', 'pdf', 'docx', 'epub', 'srt', 'subtitle', '文档', '字幕'] },
   { id: 'ocr', icon: Eye, group: 'system', keywords: ['ocr', 'recognize', 'screenshot', 'image', 'rapidocr', 'llm', '识别', '截图'] },
   { id: 'tts', icon: Volume2, group: 'system', keywords: ['tts', 'speech', 'voice', 'volume', 'rate', '朗读', '语音', '语速'] },
@@ -93,6 +93,9 @@ export const DEFAULT_SETTINGS = {
   // electron/ipc/floating-window.js GET_SETTINGS fallbacks must stay in sync.
   floatingWindow: {
     defaultOpacity: 0.85,
+    // 'auto' | 'scattered' | 'unified' — scattered-vs-unified layout for
+    // capture results ('auto' keeps the geometry heuristic)
+    displayMode: 'auto',
   },
 
   selection: {

@@ -175,7 +175,9 @@ const ChildPane = ({
       width: `${fixedSize.width}px`,
       height: `${fixedSize.height}px`,
     } : {
-      minWidth: '80px',
+      // Tight floor: word-pile panes anchor to word-sized boxes, and an
+      // inflated frame is what makes neighboring panes overlap
+      minWidth: '48px',
       maxWidth: isFrozen ? '400px' : 'calc(100% - 20px)',
     }),
     // Drag z must beat both frozen and regular; frozen beats regular when stacked
@@ -194,6 +196,7 @@ const ChildPane = ({
       ref={paneRef}
       className={`floating-child-pane ${statusClass} ${isFrozen ? 'frozen' : ''} ${isDragging ? 'dragging' : ''}`}
       style={paneStyle}
+      data-pane-id={id}
       data-theme={theme}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
