@@ -461,6 +461,8 @@ const zh = {
     llmVisionMeta: "需要 LM Studio + 视觉模型（如 Qwen-VL）",
     llmEndpointPlaceholder: "http://localhost:1234/v1",
     llmEndpointHint: "视觉模型的 OpenAI 兼容接口地址（Ollama 默认 http://localhost:11434/v1）",
+    llmModelPlaceholder: "模型名称（可选，如 qwen2-vl-7b）",
+    llmModelHint: "指定要用的视觉模型；LM Studio/Ollama 同时加载了多个模型时建议填写，避免选到不支持图片的模型。留空则用服务端当前加载的模型",
     free25k: "免费 25000次/月", free5k: "免费 5000次/月", free1k: "免费 1000次/月",
     ocrspaceDesc: "免费额度最高，支持 25+ 语言",
     googleVisionDesc: "识别效果最好，支持 200+ 语言",

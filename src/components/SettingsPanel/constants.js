@@ -137,6 +137,10 @@ export const DEFAULT_SETTINGS = {
     // orphaned settings.connection.endpoint bucket (no UI); now a real field
     // in the OCR panel's LLM-Vision group.
     llmEndpoint: defaultConfig.llm.endpoint,
+    // Optional explicit vision model. Blank = server's currently-loaded model;
+    // set it when LM Studio/Ollama holds several models so a non-vision one
+    // can't be picked (which silently drops the image → auto-degrade).
+    llmModel: '',
   },
 
   // Single source of truth for TTS defaults is services/tts/index.js

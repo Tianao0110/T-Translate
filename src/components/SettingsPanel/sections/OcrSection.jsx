@@ -585,6 +585,16 @@ const OcrSection = ({
                   />
                 </div>
                 <p className="setting-hint">{t('ocr.llmEndpointHint')}</p>
+                <div className="api-key-input-wrapper" style={{marginTop: '6px'}}>
+                  <input
+                    type="text"
+                    className="setting-input compact"
+                    placeholder={t('ocr.llmModelPlaceholder')}
+                    value={settings.ocr.llmModel || ''}
+                    onChange={(e) => updateSetting('ocr', 'llmModel', e.target.value)}
+                  />
+                </div>
+                <p className="setting-hint">{t('ocr.llmModelHint')}</p>
               </div>
               <div className="engine-actions">
                 <button

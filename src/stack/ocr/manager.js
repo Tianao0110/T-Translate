@@ -104,7 +104,14 @@ export class OCREngineManager {
       'windows-ocr': {},
       // Same OpenAI-compatible endpoint the local-LLM provider uses — the
       // engine fetches it directly and never routes through the service.
-      'llm-vision': settings.llmEndpoint ? { endpoint: settings.llmEndpoint } : {},
+      // model is independent of endpoint: users on LM Studio's default port
+      // (blank endpoint) still need to pin a vision model when multiple load.
+      'llm-vision': (settings.llmEndpoint || settings.llmModel)
+        ? {
+            ...(settings.llmEndpoint ? { endpoint: settings.llmEndpoint } : {}),
+            ...(settings.llmModel ? { model: settings.llmModel } : {}),
+          }
+        : {},
       'ocrspace': {
         apiKey: settings.ocrspaceKey || '',
         language: settings.recognitionLanguage || 'chs',
