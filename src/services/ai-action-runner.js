@@ -40,14 +40,26 @@ export function meetsLengthGate(text, gate) {
   return (gate.cjk > 0 && cjk >= gate.cjk) || (gate.latin > 0 && latin >= gate.latin);
 }
 
+// Which pipeline this action would run through right now, or null if neither
+// is possible. Path B (the vision model reads the capture) wins when it is
+// available: it sees the layout, so nothing is lost to OCR errors or to text
+// that a recognizer merged in the wrong order.
+export function resolveActionPath(action, ctx = {}) {
+  if (!action) return null;
+  const { capabilities = {}, hasImage = false } = ctx;
+  if (action.visionPrompts && hasImage && capabilities.vision) return 'vision';
+  if (capabilities[action.capability]) return 'text';
+  return null;
+}
+
 // Why an action is not offered, or null when it is. ctx:
-//   { surface, displayMode, text, capabilities: { text, vision } }
+//   { surface, displayMode, text, hasImage, capabilities: { text, vision } }
 export function checkActionAvailability(action, ctx = {}) {
   if (!action) return { available: false, reason: 'unknown' };
-  const { surface, displayMode, text = '', capabilities = {} } = ctx;
+  const { surface, displayMode, text = '' } = ctx;
   const trigger = action.trigger || {};
 
-  if (!capabilities[action.capability]) return { available: false, reason: 'capability' };
+  if (!resolveActionPath(action, ctx)) return { available: false, reason: 'capability' };
   if (surface && trigger.surfaces && !trigger.surfaces.includes(surface)) {
     return { available: false, reason: 'surface' };
   }
@@ -108,15 +120,15 @@ function resolveOutputLanguage(action, context, uiLang) {
 
 // A prompt wrapped in the wrong language pulls weak models into answering in
 // it, so each action carries both and we pick by UI language.
-function pickPrompts(action, uiLang) {
-  const prompts = action.prompts || {};
+function pickPrompts(action, uiLang, path) {
+  const prompts = (path === 'vision' ? action.visionPrompts : action.prompts) || {};
   return prompts[uiLang] || prompts[uiLang.split('-')[0]] || prompts.zh || prompts.en
     || Object.values(prompts)[0] || null;
 }
 
-export function buildActionMessages(action, context = {}, uiLang = 'zh') {
+export function buildActionMessages(action, context = {}, uiLang = 'zh', path = 'text') {
   const lang = uiLang.startsWith('zh') ? 'zh' : 'en';
-  const prompts = pickPrompts(action, lang);
+  const prompts = pickPrompts(action, lang, path);
   if (!prompts) return null;
 
   const vars = {
@@ -140,34 +152,76 @@ function unwrap(content) {
   return out.trim();
 }
 
+function normalizeReply(action, result, path) {
+  if (!result?.success) {
+    return { success: false, error: result?.error || _t('aiActions.failed', 'AI 动作失败') };
+  }
+  const content = unwrap(result.content || '');
+  if (!content) {
+    return { success: false, error: _t('aiActions.emptyResult', 'AI 未返回内容') };
+  }
+  return { success: true, actionId: action.id, content, path, provider: result.provider || null };
+}
+
 // requireChat keeps AI actions off the chatCompletion fallback that translates
 // the prompt when no provider implements chat() — a summary that is really a
 // translated instruction looks like a working feature.
-export async function runAiAction(action, context = {}) {
-  const messages = buildActionMessages(action, context, i18n.language || 'zh');
-  if (!messages) {
-    return { success: false, error: _t('aiActions.badConfig', '动作配置无效') };
+async function runTextPath(action, context) {
+  const messages = buildActionMessages(action, context, i18n.language || 'zh', 'text');
+  if (!messages) return { success: false, error: _t('aiActions.badConfig', '动作配置无效') };
+  const result = await translationService.chatCompletion(messages, { requireChat: true });
+  return normalizeReply(action, result, 'text');
+}
+
+async function runVisionPath(action, context) {
+  const messages = buildActionMessages(action, context, i18n.language || 'zh', 'vision');
+  if (!messages) return { success: false, error: _t('aiActions.badConfig', '动作配置无效') };
+  const result = await translationService.visionChat(messages, context.imageData);
+  const reply = normalizeReply(action, result, 'vision');
+  // The result window shows this; 'llm-vision' is an engine id, and the point
+  // for the user is which model actually looked at their screen.
+  if (reply.success) {
+    reply.provider = result.model ? `LLM Vision (${result.model})` : 'LLM Vision';
   }
+  return { ...reply, visionUnsupported: !!result?.visionUnsupported };
+}
+
+// Path B first when it applies, then degrade. A model that turns out not to see
+// images (or an endpoint that is down) must not cost the user the action: the
+// recognized text is already in hand, so path A finishes the job.
+export async function runAiAction(action, context = {}) {
+  const path = resolveActionPath(action, {
+    capabilities: context.capabilities || {},
+    hasImage: !!context.imageData,
+  }) || 'text';
 
   try {
-    const result = await translationService.chatCompletion(messages, { requireChat: true });
-    if (!result?.success) {
-      return { success: false, error: result?.error || _t('aiActions.failed', 'AI 动作失败') };
+    if (path === 'vision') {
+      const result = await runVisionPath(action, context);
+      if (result.success) return result;
+      if (!context.sourceText) return result;
+      logger.info(`Vision path failed (${result.error}); falling back to text`);
+      const fallback = await runTextPath(action, context);
+      return fallback.success ? { ...fallback, degradedFrom: 'vision' } : result;
     }
-    const content = unwrap(result.content || '');
-    if (!content) {
-      return { success: false, error: _t('aiActions.emptyResult', 'AI 未返回内容') };
-    }
-    return { success: true, actionId: action.id, content, provider: result.provider || null };
+    return await runTextPath(action, context);
   } catch (error) {
     logger.error(`Action ${action.id} failed:`, error);
     return { success: false, error: error.message };
   }
 }
 
-// Which action capabilities the current setup can actually run. Vision arrives
-// with path B; today an action that needs it is simply not offered.
+// What the current setup can actually run. Both probes answer under the live
+// privacy mode, so an offline user with a cloud-only setup gets false for both.
 export async function getActionCapabilities() {
-  const chat = await translationService.getChatCapability();
-  return { text: !!chat?.available, vision: false, providerName: chat?.providerName || null };
+  const [chat, vision] = await Promise.all([
+    translationService.getChatCapability(),
+    translationService.getVisionCapability(),
+  ]);
+  return {
+    text: !!chat?.available,
+    vision: !!vision?.available,
+    providerName: chat?.providerName || null,
+    visionLocal: !!vision?.local,
+  };
 }

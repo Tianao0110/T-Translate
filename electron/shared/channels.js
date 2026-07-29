@@ -144,6 +144,8 @@ const CHANNELS = {
     CHANGED: 'stack:changed',                     // main → renderer: stack reloaded
     OCR_RECOGNIZE: 'stack:ocr-recognize',         // allowedEngines injected main-side
     OCR_RESET_VISION: 'stack:ocr-reset-vision',
+    VISION_CHAT: 'stack:vision-chat',             // path B: prompt + capture to a vision model
+    VISION_CAPABILITY: 'stack:vision-capability', // may path B run under the live privacy mode?
   },
   // AI action result windows (ipc/ai-result.js). Owned by the window that asked
   // for them, so the spawning card takes them down when its session ends.

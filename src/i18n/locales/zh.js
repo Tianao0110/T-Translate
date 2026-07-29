@@ -480,6 +480,8 @@ const zh = {
     },
     visionFallback: "当前模型不支持视觉识别，已自动切换到本地 OCR",
     visionLocked: "LLM 视觉识别已因多次失败被禁用，已切换到本地 OCR。如需重新启用请前往 设置 > OCR",
+    visionBlockedByPrivacy: "当前隐私模式已禁用视觉模型",
+    visionNotLocal: "离线模式只允许本机视觉模型，截图不出本机",
     allEnginesFailed: "所有 OCR 引擎均失败"
   },
   tts: {
@@ -739,6 +741,7 @@ const zh = {
     emptyResult: "AI 未返回内容",
     resultTitle: "AI 结果",
     generatedBy: "由 {{provider}} 生成",
+    sendsCapture: "会把这张截图发给视觉模型",
     summarize: { name: "总结", desc: "读完整段内容，用目标语言给出要点" }
   },
   svc: {

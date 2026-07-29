@@ -18,6 +18,28 @@ const logger = createLogger('LLMVision');
 // tell (documented edge). Compact-tokenizer vision models sit well above 150.
 const VISION_PROMPT_TOKEN_FLOOR = 150;
 
+// Servers that cannot see images answer from the instruction alone. Both the
+// 400-body sniff and the token floor produce this same string because
+// ocrManager._isVisionUnsupportedError pattern-matches it to trigger fallback.
+const VISION_UNSUPPORTED = 'Model does not support vision / 当前模型不支持图片识别，请加载视觉模型 (Qwen-VL, LLaVA)';
+
+function isVisionRejection(status, errorText) {
+  const lower = errorText.toLowerCase();
+  return status === 400 && (
+    lower.includes('image') || lower.includes('vision') ||
+    lower.includes('multimodal') || lower.includes('content type') ||
+    lower.includes('does not support')
+  );
+}
+
+// A 200 whose prompt_tokens sit below the floor means the image was dropped on
+// the way in — the reply is the model talking about the instruction, not the
+// picture. Only decidable when the server reports usage.
+function imageWasDropped(usage) {
+  const promptTokens = usage?.prompt_tokens;
+  return typeof promptTokens === 'number' && promptTokens > 0 && promptTokens < VISION_PROMPT_TOKEN_FLOOR;
+}
+
 class LLMVisionEngine extends BaseOCREngine {
 
   static metadata = {
@@ -80,15 +102,10 @@ class LLMVisionEngine extends BaseOCREngine {
 
       if (!response.ok) {
         const errorText = await response.text();
-        const lower = errorText.toLowerCase();
         // ocrManager pattern-matches this error string to trigger auto-fallback
         // to local OCR. Keep the keywords in sync with _isVisionUnsupportedError there.
-        if (response.status === 400 && (
-          lower.includes('image') || lower.includes('vision') ||
-          lower.includes('multimodal') || lower.includes('content type') ||
-          lower.includes('does not support')
-        )) {
-          return { success: false, error: 'Model does not support vision / 当前模型不支持图片识别，请加载视觉模型 (Qwen-VL, LLaVA)' };
+        if (isVisionRejection(response.status, errorText)) {
+          return { success: false, error: VISION_UNSUPPORTED };
         }
         return { success: false, error: `API 错误: ${response.status} - ${errorText.slice(0, 200)}` };
       }
@@ -103,9 +120,8 @@ class LLMVisionEngine extends BaseOCREngine {
       // Detect a stripped-image "fake success" (e.g. a translation model given
       // an image): the error string matches _isVisionUnsupportedError, so the
       // manager degrades to local OCR and counts it toward the vision lock.
-      const promptTokens = data.usage?.prompt_tokens;
-      if (typeof promptTokens === 'number' && promptTokens > 0 && promptTokens < VISION_PROMPT_TOKEN_FLOOR) {
-        logger.warn(`LLM Vision 200 but prompt_tokens=${promptTokens} < ${VISION_PROMPT_TOKEN_FLOOR}: image not processed, treating as vision-unsupported`);
+      if (imageWasDropped(data.usage)) {
+        logger.warn(`LLM Vision 200 but prompt_tokens=${data.usage.prompt_tokens} < ${VISION_PROMPT_TOKEN_FLOOR}: image not processed, treating as vision-unsupported`);
         return { success: false, error: 'Model does not support vision / 图片未被模型处理（当前模型可能不支持视觉）' };
       }
 
@@ -121,6 +137,69 @@ class LLMVisionEngine extends BaseOCREngine {
       logger.error('Error:', error);
       if (error.name === 'AbortError' || error.name === 'TimeoutError') {
         return { success: false, error: 'OCR timeout - check if model supports vision / OCR 超时，请检查模型是否支持视觉' };
+      }
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Path B for AI actions: the model reads the capture directly instead of
+  // summarizing OCR output, so layout and interleaved graphics stay intact and
+  // no recognition errors compound. Same endpoint, model and image-dropped
+  // detection as recognize() — only the prompt differs, and it comes from the
+  // action config rather than this file.
+  async chat(messages, imageData, options = {}) {
+    const { timeout = 60000 } = options;
+    try {
+      const image = this.ensureBase64(imageData);
+      const system = messages.find(m => m.role === 'system');
+      const user = messages.find(m => m.role === 'user');
+      if (!user) return { success: false, error: 'No user message / 缺少提示词' };
+
+      const payload = [];
+      if (system?.content) payload.push({ role: 'system', content: system.content });
+      payload.push({
+        role: 'user',
+        content: [
+          { type: 'text', text: user.content },
+          { type: 'image_url', image_url: { url: image } },
+        ],
+      });
+
+      const response = await rtFetch(`${this.config.endpoint}/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: this.config.model || undefined,
+          messages: payload,
+          max_tokens: 2048,
+        }),
+        signal: AbortSignal.timeout(timeout),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        if (isVisionRejection(response.status, errorText)) {
+          return { success: false, error: VISION_UNSUPPORTED, visionUnsupported: true };
+        }
+        return { success: false, error: `API 错误: ${response.status} - ${errorText.slice(0, 200)}` };
+      }
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content;
+
+      if (imageWasDropped(data.usage)) {
+        logger.warn(`Vision chat 200 but prompt_tokens=${data.usage.prompt_tokens}: image not processed`);
+        return { success: false, error: VISION_UNSUPPORTED, visionUnsupported: true };
+      }
+      if (!content) {
+        return { success: false, error: 'Empty reply / 模型未返回内容' };
+      }
+
+      return { success: true, content, provider: 'llm-vision', model: this.config.model || '' };
+    } catch (error) {
+      logger.error('Vision chat error:', error);
+      if (error.name === 'AbortError' || error.name === 'TimeoutError') {
+        return { success: false, error: 'Vision timeout / 视觉模型响应超时' };
       }
       return { success: false, error: error.message };
     }

@@ -87,14 +87,22 @@ const FloatingWindow = () => {
   }, [notification, clearNotification]);
 
   // AI actions run on the recognized source text, not the translation — a
-  // summary of a summary compounds whatever the translator got wrong.
+  // summary of a summary compounds whatever the translator got wrong. When a
+  // vision model is configured they run on the capture itself instead.
   const ai = useAiActions('floating');
-  const aiActions = ai.availableActions({ displayMode, text: sourceText });
+  const captureImage = pipeline.getLastCaptureImage(sourceText);
+  const aiActions = ai.availableActions({ displayMode, text: sourceText, hasImage: !!captureImage });
 
   const runAction = useCallback(async (action) => {
     const result = await ai.run(
       action,
-      { sourceText, translatedText, sourceLanguage: 'auto', targetLanguage },
+      {
+        sourceText,
+        translatedText,
+        sourceLanguage: 'auto',
+        targetLanguage,
+        imageData: pipeline.getLastCaptureImage(sourceText),
+      },
       theme
     );
     if (!result.success) {
@@ -851,7 +859,9 @@ const FloatingWindow = () => {
                   runAction(action);
                 }}
                 disabled={ai.runningId === action.id}
-                title={resolveActionLabel(action, i18n.language)}
+                title={ai.pathFor(action, !!captureImage) === 'vision'
+                  ? `${resolveActionLabel(action, i18n.language)} · ${t('aiActions.sendsCapture', '会把这张截图发给视觉模型')}`
+                  : resolveActionLabel(action, i18n.language)}
               >
                 {ai.runningId === action.id
                   ? <Loader2 size={12} className="spin" />

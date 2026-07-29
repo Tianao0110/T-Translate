@@ -308,6 +308,39 @@ function register(ctx) {
     }
   });
 
+  // Path B carries a screen capture, so the same allowlist that guards OCR
+  // guards this — plus offline's extra rule that the endpoint must be local.
+  // Both are injected here; a renderer can only ask, never widen.
+  function visionGate(mode) {
+    return {
+      allowedEngines: stack.privacyModes.getPrivacyModeConfig(mode).allowedOcrEngines || undefined,
+      requireLocalVision: mode === 'offline',
+    };
+  }
+
+  ipcMain.handle(CHANNELS.STACK.VISION_CHAT, async (event, payload = {}) => {
+    if (!stack) return unavailable();
+    const { messages, imageData, options = {} } = payload;
+    const mode = getPrivacyMode();
+    const { allowedEngines: _ae, requireLocalVision: _rl, ...rest } = options;
+    try {
+      return await stack.ocr.visionChat(messages, imageData, { ...rest, ...visionGate(mode) });
+    } catch (e) {
+      logger.error('vision chat failed:', e);
+      return { success: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle(CHANNELS.STACK.VISION_CAPABILITY, () => {
+    if (!stack) return { available: false, reason: unavailable().error };
+    try {
+      return stack.ocr.getVisionCapability(visionGate(getPrivacyMode()));
+    } catch (e) {
+      logger.error('vision capability probe failed:', e);
+      return { available: false, reason: e.message };
+    }
+  });
+
   ipcMain.handle(CHANNELS.STACK.OCR_RESET_VISION, () => {
     if (!stack) return { success: false };
     stack.ocr.resetVisionFallback();

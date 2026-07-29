@@ -51,6 +51,21 @@ export function createOCREngine(id, config = {}) {
   return new EngineClass(config);
 }
 
+// Mirrors LLMVisionEngine's own default — the manager has to answer "is this
+// endpoint local?" before an instance exists.
+const DEFAULT_VISION_ENDPOINT = 'http://localhost:1234/v1';
+
+// Offline mode allows llm-vision only while it points at this machine. Host
+// names are matched exactly: a "localhost.evil.com" must not read as local.
+export function isLoopbackEndpoint(endpoint) {
+  try {
+    const host = new URL(endpoint).hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.endsWith('.localhost');
+  } catch {
+    return false;
+  }
+}
+
 // LLM Vision auto-degrade:
 // - If llm-vision fails with "vision unsupported" we transparently retry on
 //   rapid-ocr (the local fallback) and the result carries fallbackFrom.
@@ -233,6 +248,58 @@ export class OCREngineManager {
     } catch (error) {
       return { success: false, error: error.message };
     }
+  }
+
+  // Path B for AI actions: hand the capture straight to the vision model with
+  // the action's own prompt. Shares the engine, the config and the
+  // image-dropped detection with recognize(), and counts toward the same
+  // vision lock — a model that cannot see images fails both ways.
+  async visionChat(messages, imageData, options = {}) {
+    const capability = this.getVisionCapability(options);
+    if (!capability.available) {
+      return { success: false, error: capability.reason, visionUnsupported: true };
+    }
+
+    const instance = this.getOrCreate('llm-vision');
+    if (!instance) {
+      return { success: false, error: _t('ocr.allEnginesFailed', '所有 OCR 引擎均失败'), visionUnsupported: true };
+    }
+
+    const result = await instance.chat(messages, imageData, options);
+    if (result.success) {
+      this._visionFailCount = 0;
+      return result;
+    }
+    if (result.visionUnsupported || this._isVisionUnsupportedError(result.error)) {
+      this._incrementVisionFail();
+      result.visionUnsupported = true;
+    }
+    return result;
+  }
+
+  // Whether path B may run at all. Deliberately does NOT probe the network:
+  // reachability says nothing about whether a VISION model is loaded, that is
+  // only knowable from the reply, so the caller degrades on failure instead.
+  getVisionCapability(options = {}) {
+    const { allowedEngines, requireLocalVision = false } = options;
+
+    if (allowedEngines && !allowedEngines.includes('llm-vision')) {
+      return { available: false, reason: _t('ocr.visionBlockedByPrivacy', '当前隐私模式已禁用视觉模型') };
+    }
+    if (this._visionLocked) {
+      return { available: false, reason: _t('ocr.visionLocked', 'LLM 视觉识别已因多次失败被禁用') };
+    }
+
+    const endpoint = this.configs['llm-vision']?.endpoint || DEFAULT_VISION_ENDPOINT;
+    const local = isLoopbackEndpoint(endpoint);
+    // Offline mode's promise is that nothing leaves the machine, and a capture
+    // leaks far more than a line of text — a remote vision endpoint is refused
+    // rather than silently used.
+    if (requireLocalVision && !local) {
+      return { available: false, reason: _t('ocr.visionNotLocal', '离线模式只允许本机视觉模型') };
+    }
+
+    return { available: true, local, endpoint, model: this.configs['llm-vision']?.model || '' };
   }
 
   // String-match against known "model doesn't speak images" failure modes

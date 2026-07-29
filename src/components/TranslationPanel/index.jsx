@@ -109,10 +109,19 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
 
   // AI actions read the source side, so the entry follows the source box, not
   // whether a translation already exists.
+  const lastCaptureRef = useRef(null); // { dataURL, sourceText } of the last capture
   const ai = useAiActions('screenshot');
+
+  // The capture only stands in for the source box while the box still holds
+  // what that capture said; an edit or a paste retires it.
+  const captureImage = lastCaptureRef.current?.sourceText === currentTranslation.sourceText
+    ? lastCaptureRef.current.dataURL
+    : null;
+
   const aiActions = ai.availableActions({
     displayMode: 'unified',
     text: currentTranslation.sourceText,
+    hasImage: !!captureImage,
   });
 
   const runAiActionFromPanel = useCallback(async (action) => {
@@ -123,11 +132,12 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
         translatedText: currentTranslation.translatedText,
         sourceLanguage: currentTranslation.sourceLanguage,
         targetLanguage: currentTranslation.targetLanguage,
+        imageData: captureImage,
       },
       document.documentElement.getAttribute('data-theme') || 'light'
     );
     if (!result.success) notify(result.error, 'error');
-  }, [ai, currentTranslation, notify]);
+  }, [ai, currentTranslation, captureImage, notify]);
 
   const sourceTextareaRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -179,6 +189,10 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
 
         if (result.success && result.text) {
           setIsOcrSource(true);
+          // Kept past the OCR run so an AI action can read the capture itself
+          // instead of its recognized text. Paired with the text it produced —
+          // once the box holds anything else, the picture no longer describes it.
+          lastCaptureRef.current = { dataURL: screenshotData.dataURL, sourceText: result.text };
 
           // LLM Vision -> local OCR fallback gets surfaced; ocrStatus.fallbackNotice
           // is set by recognizeImage in main-translation.js
@@ -530,7 +544,9 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
                   className="action-btn"
                   onClick={() => runAiActionFromPanel(action)}
                   disabled={ai.runningId === action.id}
-                  title={resolveActionLabel(action, i18n.language)}
+                  title={ai.pathFor(action, !!captureImage) === 'vision'
+                    ? `${resolveActionLabel(action, i18n.language)} · ${t('aiActions.sendsCapture', '会把这张截图发给视觉模型')}`
+                    : resolveActionLabel(action, i18n.language)}
                 >
                   {ai.runningId === action.id
                     ? <Loader2 size={15} className="animate-spin" />

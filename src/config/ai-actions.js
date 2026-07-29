@@ -60,6 +60,19 @@ const SUMMARIZE = {
       user: 'Read the following content and summarize its key points in {{outputLanguage}}.\n\nContent:\n{{sourceText}}\n\nRequirements:\n- 3-5 bullet points, one per line\n- Keep key numbers, names, and terminology\n- Do not add anything the source does not state',
     },
   },
+  // Path B. Carrying these is what marks an action as runnable straight off the
+  // capture; the wording has to change because there is no {{sourceText}} to
+  // paste — the model is looking at the page, layout and all.
+  visionPrompts: {
+    zh: {
+      system: '你是一个阅读助手。用户会给你一张截图，请读懂图里的内容，然后用{{outputLanguage}}写总结。只输出总结正文，不要描述画面，不要说明你在做什么。',
+      user: '请读懂这张截图里的内容，并用{{outputLanguage}}总结要点。\n\n要求：\n- 3-5 条要点，每条一行\n- 保留关键的数字、名称和术语\n- 图里没有的不要补充推测',
+    },
+    en: {
+      system: 'You are a reading assistant. The user gives you a screenshot; read what it says, then write the summary in {{outputLanguage}}. Output only the summary — do not describe the image or explain what you are doing.',
+      user: 'Read this screenshot and summarize its key points in {{outputLanguage}}.\n\nRequirements:\n- 3-5 bullet points, one per line\n- Keep key numbers, names, and terminology\n- Do not add anything the image does not show',
+    },
+  },
 };
 
 export const BUILTIN_AI_ACTIONS = [SUMMARIZE];
@@ -105,6 +118,11 @@ export function normalizeActionConfig(raw) {
 
   const promptError = checkPrompts(raw.prompts);
   if (promptError) return { ok: false, error: promptError };
+
+  if (raw.visionPrompts != null) {
+    const visionError = checkPrompts(raw.visionPrompts);
+    if (visionError) return { ok: false, error: `visionPrompts: ${visionError}` };
+  }
 
   // Imported actions have no i18n keys of their own, so they must carry their
   // own display text.
@@ -163,6 +181,7 @@ export function normalizeActionConfig(raw) {
         minLength,
       },
       prompts: raw.prompts,
+      visionPrompts: raw.visionPrompts || null,
     },
   };
 }

@@ -10,6 +10,7 @@ import {
   renderTemplate,
   buildActionMessages,
   resolveActionLabel,
+  resolveActionPath,
 } from '../../src/services/ai-action-runner.js';
 import {
   BUILTIN_AI_ACTIONS,
@@ -122,6 +123,43 @@ describe('checkActionAvailability', () => {
   });
 });
 
+describe('resolveActionPath', () => {
+  const summarize = getAiAction('summarize');
+  const BOTH = { text: true, vision: true };
+
+  it('prefers the capture when a vision model can read it', () => {
+    expect(resolveActionPath(summarize, { capabilities: BOTH, hasImage: true })).toBe('vision');
+  });
+
+  it('uses text when there is no capture to look at', () => {
+    expect(resolveActionPath(summarize, { capabilities: BOTH, hasImage: false })).toBe('text');
+  });
+
+  it('uses text when no vision model is configured', () => {
+    expect(resolveActionPath(summarize, { capabilities: CAN_CHAT, hasImage: true })).toBe('text');
+  });
+
+  it('runs on vision alone — a vision-only setup still gets the action', () => {
+    const visionOnly = { text: false, vision: true };
+    expect(resolveActionPath(summarize, { capabilities: visionOnly, hasImage: true })).toBe('vision');
+    expect(checkActionAvailability(summarize, {
+      surface: 'floating', displayMode: 'unified', text: longCjk,
+      capabilities: visionOnly, hasImage: true,
+    }).available).toBe(true);
+  });
+
+  it('has no path when neither side is configured', () => {
+    expect(resolveActionPath(summarize, {
+      capabilities: { text: false, vision: false }, hasImage: true,
+    })).toBeNull();
+  });
+
+  it('ignores vision for an action that carries no image prompt', () => {
+    const textOnly = { ...summarize, visionPrompts: null };
+    expect(resolveActionPath(textOnly, { capabilities: BOTH, hasImage: true })).toBe('text');
+  });
+});
+
 describe('canStoreResult', () => {
   const summarize = getAiAction('summarize');
 
@@ -185,6 +223,18 @@ describe('buildActionMessages', () => {
   it('returns null when the action carries no prompts', () => {
     expect(buildActionMessages({ id: 'x', prompts: {} }, context, 'zh')).toBeNull();
   });
+
+  it('builds the image prompt from visionPrompts, with no source text pasted in', () => {
+    const messages = buildActionMessages(summarize, context, 'zh', 'vision');
+    expect(messages[1].content).not.toContain(context.sourceText);
+    expect(messages[1].content).toContain('截图');
+    expect(messages[0].content).toContain('中文'); // still answers in the target language
+  });
+
+  it('returns null for the image path when the action has no image prompt', () => {
+    const textOnly = { ...summarize, visionPrompts: null };
+    expect(buildActionMessages(textOnly, context, 'zh', 'vision')).toBeNull();
+  });
 });
 
 describe('resolveActionLabel', () => {
@@ -238,6 +288,22 @@ describe('normalizeActionConfig', () => {
     const { action } = normalizeActionConfig({ ...importable(), evalCode: 'rm -rf', builtin: true });
     expect(action.evalCode).toBeUndefined();
     expect(action.builtin).toBe(false);
+  });
+
+  it('accepts an optional image prompt and keeps it', () => {
+    const raw = { ...importable(), visionPrompts: { zh: { system: '看图。', user: '用{{outputLanguage}}答。' } } };
+    const { ok, action } = normalizeActionConfig(raw);
+    expect(ok).toBe(true);
+    expect(action.visionPrompts.zh.user).toContain('{{outputLanguage}}');
+  });
+
+  it('holds the image prompt to the same rules as the text one', () => {
+    const raw = { ...importable(), visionPrompts: { zh: { system: '看图。', user: '{{sorceText}}' } } };
+    expect(normalizeActionConfig(raw).error).toContain('visionPrompts');
+  });
+
+  it('leaves visionPrompts null when the config omits it', () => {
+    expect(normalizeActionConfig(importable()).action.visionPrompts).toBeNull();
   });
 
   it('rejects junk input', () => {

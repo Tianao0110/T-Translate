@@ -101,6 +101,9 @@ contextBridge.exposeInMainWorld('electron', {
     ocrRecognize: (imageData, options) =>
       ipcRenderer.invoke('stack:ocr-recognize', { imageData, options }),
     ocrResetVision: () => ipcRenderer.invoke('stack:ocr-reset-vision'),
+    visionChat: (messages, imageData, options) =>
+      ipcRenderer.invoke('stack:vision-chat', { messages, imageData, options }),
+    visionCapability: () => ipcRenderer.invoke('stack:vision-capability'),
     onStreamChunk: (callback) => {
       const handler = (event, frame) => callback(frame);
       ipcRenderer.on('stack:stream-chunk', handler);
