@@ -387,6 +387,68 @@ function freezeSelectionWindow() {
   };
 }
 
+// AI results reuse the selection card instead of a window of their own: same
+// preload, same page, same three themes, same grow-to-fit-content behavior.
+// Born pinned and detached — it is a standalone card the user closes, not the
+// active slot, so the next selection never overwrites it.
+function createAiResultWindow(anchorBounds) {
+  if (frozenSelectionWindows.size >= MAX_FROZEN_WINDOWS) {
+    logger.debug?.(`AI result card refused: pinned cards at limit (${MAX_FROZEN_WINDOWS})`);
+    return { success: false, error: 'limit' };
+  }
+
+  const windowId = ++selectionWindowIdCounter;
+  const bounds = displayHelper.ensureBoundsOnDisplay({
+    x: (anchorBounds?.x ?? 200) + (anchorBounds?.width ?? 0) + 12,
+    y: anchorBounds?.y ?? 200,
+    width: 450,
+    height: 200,
+  }, { minVisiblePixels: 80, centerOnInvalid: false });
+
+  const win = new BrowserWindow({
+    x: Math.round(bounds.x),
+    y: Math.round(bounds.y),
+    width: bounds.width,
+    height: bounds.height,
+    show: false,
+    frame: false,
+    transparent: true,
+    resizable: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    hasShadow: false,
+    focusable: false,
+    webPreferences: {
+      preload: PATHS.preloads.selection,
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+      webSecurity: false,
+    },
+  });
+
+  win._windowId = windowId;
+  win._isFrozen = true;
+  frozenSelectionWindows.set(windowId, win);
+
+  win.setAlwaysOnTop(true, 'floating');
+  win.setIgnoreMouseEvents(false);
+
+  if (isDev) {
+    win.loadURL(PATHS.pages.selection.url);
+  } else {
+    win.loadFile(PATHS.pages.selection.file);
+  }
+
+  win.on('closed', () => {
+    frozenSelectionWindows.delete(windowId);
+    logger.debug?.(`AI result card ${windowId} closed, pinned remaining: ${frozenSelectionWindows.size}`);
+  });
+
+  logger.info?.(`AI result card ${windowId} created, pinned total: ${frozenSelectionWindows.size}`);
+  return { success: true, windowId, window: win };
+}
+
 function closeFrozenSelectionWindow(windowId) {
   const frozenWindow = frozenSelectionWindows.get(windowId);
   if (frozenWindow && !frozenWindow.isDestroyed()) {
@@ -476,4 +538,5 @@ module.exports = {
   toggleFloatingWindow,
   freezeSelectionWindow,
   closeFrozenSelectionWindow,
+  createAiResultWindow,
 };

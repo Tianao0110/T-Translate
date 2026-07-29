@@ -60,17 +60,20 @@ export default function useAiActions(surface, attachResult) {
 
   // Resolves to the runner's result; the caller surfaces failures in whatever
   // notification channel its window owns.
-  const run = useCallback(async (action, context, theme) => {
+  const run = useCallback(async (action, context) => {
     setRunningId(action.id);
     try {
       const result = await runAiAction(action, { ...context, capabilities });
       if (result.success) {
-        await window.electron?.aiResult?.open?.({
+        // Shown in a pinned selection card next door — same look, same themes,
+        // same grow-to-fit as every other card in the app.
+        await window.electron?.aiResult?.show?.({
           actionId: action.id,
-          title: resolveActionLabel(action, i18n.language || 'zh'),
+          actionLabel: resolveActionLabel(action, i18n.language || 'zh'),
           content: result.content,
-          provider: result.provider || '',
-          theme: theme || 'light',
+          sourceText: context.sourceText || '',
+          sourceLanguage: context.sourceLanguage || 'auto',
+          targetLanguage: context.targetLanguage || 'zh',
         });
         // The store applies the secure-mode gate and decides which entry this
         // hangs on — nothing to hang it on means it stays a one-off.

@@ -12,6 +12,7 @@ import { resolveOverlaps } from '../../services/pane-layout.js';
 import ChildPane from './ChildPane.jsx';
 import AiActionIcon from '../shared/AiActionIcon.jsx';
 import useAiActions from '../../hooks/use-ai-actions.js';
+import { getUnderstandAction } from '@config/ai-actions';
 import { resolveActionLabel } from '../../services/ai-action-runner.js';
 import createLogger from '../../utils/logger.js';
 import './styles.css';
@@ -96,12 +97,15 @@ const FloatingWindow = () => {
   }, []);
   const ai = useAiActions('floating', attachAiResult);
   const captureImage = pipeline.getLastCaptureImage(sourceText);
+  // Whatever the mode runs on every capture is not also a button — the toolbar
+  // is for things the user chooses to do.
+  const autoRunId = understandMode ? getUnderstandAction()?.id : null;
   const aiActions = ai.availableActions({
     displayMode,
     text: sourceText,
     hasImage: !!captureImage,
     understandMode,
-  });
+  }).filter(action => action.id !== autoRunId);
 
   const runAction = useCallback(async (action) => {
     const result = await ai.run(
@@ -112,14 +116,13 @@ const FloatingWindow = () => {
         sourceLanguage: 'auto',
         targetLanguage,
         imageData: pipeline.getLastCaptureImage(sourceText),
-      },
-      theme
+      }
     );
     if (!result.success) {
       setToastMessage({ message: result.error, type: 'error' });
       setTimeout(() => setToastMessage(null), 5000);
     }
-  }, [ai, sourceText, translatedText, targetLanguage, theme]);
+  }, [ai, sourceText, translatedText, targetLanguage]);
 
   const contentRef = useRef(null);
   const toolbarTimerRef = useRef(null);
@@ -805,6 +808,24 @@ const FloatingWindow = () => {
       onMouseLeave={handleMouseLeaveWindow}
     >
       <div className="floating-top-area" onMouseDown={handleTitleBarMouseDown}>
+          {/* Mode switch, deliberately away from the action icons: it changes
+              what a capture produces, it is not one more thing to click. */}
+          {(ai.capabilities.text || ai.capabilities.vision) && (
+            <button
+              className={`floating-understand-btn ${understandMode ? 'active' : ''}`}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setUnderstandMode(!understandMode);
+              }}
+              title={understandMode
+                ? t('floatingWindow.understandModeOn', '理解模式已开：截图后直接讲解，点击关闭')
+                : t('floatingWindow.understandMode', '理解模式：截图后不翻译，直接讲解内容')}
+            >
+              <Brain size={12} />
+            </button>
+          )}
+
           <div className="floating-toolbar">
             <button
               className="toolbar-btn"
@@ -858,22 +879,6 @@ const FloatingWindow = () => {
             >
               <History size={12} />
             </button>
-
-            {ai.capabilities.text || ai.capabilities.vision ? (
-              <button
-                className={`toolbar-btn ${understandMode ? 'active' : ''}`}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setUnderstandMode(!understandMode);
-                }}
-                title={understandMode
-                  ? t('floatingWindow.understandModeOn', '理解模式已开，点击关闭')
-                  : t('floatingWindow.understandMode', '理解模式：对这块内容再做一层理解')}
-              >
-                <Brain size={12} />
-              </button>
-            ) : null}
 
             {aiActions.map((action) => (
               <button
@@ -1000,7 +1005,9 @@ const FloatingWindow = () => {
             <span>
               {status === STATUS.CAPTURING && t('floatingWindow.capturing', '截图中...')}
               {status === STATUS.OCR_PROCESSING && t('floatingWindow.recognizing', '识别中...')}
-              {status === STATUS.TRANSLATING && t('floatingWindow.translating', '翻译中...')}
+              {status === STATUS.TRANSLATING && (understandMode
+                ? t('floatingWindow.understanding', '理解中...')
+                : t('floatingWindow.translating', '翻译中...'))}
             </span>
           </div>
         ) : translatedText ? (

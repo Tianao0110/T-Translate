@@ -15,6 +15,7 @@ import {
 import {
   BUILTIN_AI_ACTIONS,
   getAiAction,
+  getUnderstandAction,
   normalizeActionConfig,
   AI_ACTION_SCHEMA_VERSION,
   LONG_FORM_GATE,
@@ -135,20 +136,20 @@ describe('understanding-mode gating', () => {
       .toBe(true);
   });
 
-  it('leaves summarize available either way — the toggle adds, it does not swap', () => {
+  it('swaps rather than stacks — with the toggle on there is no translation to summarize', () => {
     expect(checkActionAvailability(summarize, { ...base, text: longCjk, understandMode: false }).available).toBe(true);
-    expect(checkActionAvailability(summarize, { ...base, text: longCjk, understandMode: true }).available).toBe(true);
+    expect(checkActionAvailability(summarize, { ...base, text: longCjk, understandMode: true }).reason)
+      .toBe('understandMode');
+  });
+
+  it('leaves the surfaces that have no toggle on the reading side', () => {
+    expect(checkActionAvailability(summarize, { ...base, surface: 'selection', text: longCjk }).available)
+      .toBe(true);
   });
 
   it('explains short content too — turning the mode on IS the trigger', () => {
     expect(checkActionAvailability(explain, { ...base, text: '两行密集的公式', understandMode: true }).available)
       .toBe(true);
-  });
-
-  it('explains scattered captures as well, unlike summarize', () => {
-    const scattered = { ...base, displayMode: 'scattered', text: longCjk, understandMode: true };
-    expect(checkActionAvailability(explain, scattered).available).toBe(true);
-    expect(checkActionAvailability(summarize, scattered).reason).toBe('displayMode');
   });
 
   it('stays off the other surfaces — the toggle is the floating window’s', () => {
@@ -157,10 +158,23 @@ describe('understanding-mode gating', () => {
     }).reason).toBe('surface');
   });
 
-  it('carries an imported action’s understandOnly flag through the validator', () => {
-    const raw = { ...importable(), trigger: { surfaces: ['floating'], understandOnly: true } };
-    expect(normalizeActionConfig(raw).action.trigger.understandOnly).toBe(true);
-    expect(normalizeActionConfig(importable()).action.trigger.understandOnly).toBe(false);
+  it('carries an imported action’s side of the split through the validator', () => {
+    const raw = { ...importable(), trigger: { surfaces: ['floating'], mode: 'understand' } };
+    expect(normalizeActionConfig(raw).action.trigger.mode).toBe('understand');
+    // Unstated or bogus falls back to 'any' instead of silently picking a side
+    expect(normalizeActionConfig(importable()).action.trigger.mode).toBe('any');
+    const bogus = { ...importable(), trigger: { surfaces: ['floating'], mode: 'telepathy' } };
+    expect(normalizeActionConfig(bogus).action.trigger.mode).toBe('any');
+  });
+
+  it('lets an imported understanding action take the mode over from the built-in', () => {
+    const imported = normalizeActionConfig({
+      ...importable(),
+      trigger: { surfaces: ['floating'], mode: 'understand' },
+    }).action;
+
+    expect(getUnderstandAction().id).toBe('explain');
+    expect(getUnderstandAction([imported]).id).toBe('explain-steps');
   });
 });
 
@@ -364,11 +378,15 @@ describe('built-in catalog', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('ships explain behind the understanding toggle, on the floating window only', () => {
+  it('ships explain on the understanding side, on the floating window only', () => {
     const explain = getAiAction('explain');
-    expect(explain.trigger.understandOnly).toBe(true);
+    expect(explain.trigger.mode).toBe('understand');
     expect(explain.trigger.surfaces).toEqual(['floating']);
     expect(explain.trigger.minLength).toBeNull();
+  });
+
+  it('keeps summarize on the reading side', () => {
+    expect(getAiAction('summarize').trigger.mode).toBe('translate');
   });
 
   // The switch has to stay neutral: it is named for understanding, and the

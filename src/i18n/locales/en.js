@@ -268,8 +268,9 @@ const en = {
     passThroughToggle: "Mouse pass-through: content clicks reach the app below; top bar stays clickable",
     passThroughOn: "Pass-through on, click to exit (content clicks reach the app below)",
     passThroughSticky: "Pass-through on · exit via top bar (Esc)",
-    understandMode: "Understanding mode: take a closer look at this content",
-    understandModeOn: "Understanding mode on, click to turn off"
+    understandMode: "Understanding mode: explain the capture instead of translating it",
+    understandModeOn: "Understanding mode on — captures get explained; click to turn off",
+    understanding: "Understanding..."
   },
   selection: {
     close: "Close", more: "More",
@@ -739,6 +740,7 @@ const en = {
   // actions carry their own labels instead — they have no keys here.
   aiActions: {
     badConfig: "Invalid action config",
+    noUnderstandAction: "No understanding action available",
     failed: "AI action failed",
     emptyResult: "The model returned nothing",
     resultTitle: "AI Result",

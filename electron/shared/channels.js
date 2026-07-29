@@ -150,13 +150,10 @@ const CHANNELS = {
     VISION_CHAT: 'stack:vision-chat',             // path B: prompt + capture to a vision model
     VISION_CAPABILITY: 'stack:vision-capability', // may path B run under the live privacy mode?
   },
-  // AI action result windows (ipc/ai-result.js). Owned by the window that asked
-  // for them, so the spawning card takes them down when its session ends.
+  // AI action results (ipc/ai-result.js) — shown in a pinned selection card
+  // spawned beside the requesting window, closed by the user like any other.
   AI_RESULT: {
-    OPEN: 'ai-result:open',
-    PAYLOAD: 'ai-result:payload',                 // window pulls its own content
-    RESIZE: 'ai-result:resize',                   // window reports its fitted height
-    CLOSE: 'ai-result:close',
+    SHOW: 'ai-result:show',
   },
 };
 

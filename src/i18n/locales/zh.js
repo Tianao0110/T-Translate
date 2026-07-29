@@ -268,8 +268,9 @@ const zh = {
     passThroughToggle: "鼠标穿透：内容区点击直达下层应用，顶栏保持可点",
     passThroughOn: "穿透中，点击退出（内容区点击直达下层应用）",
     passThroughSticky: "穿透中 · 顶栏可点击退出 (Esc)",
-    understandMode: "理解模式：对这块内容再做一层理解",
-    understandModeOn: "理解模式已开，点击关闭"
+    understandMode: "理解模式：截图后不翻译，直接讲解内容",
+    understandModeOn: "理解模式已开：截图后直接讲解，点击关闭",
+    understanding: "理解中..."
   },
   selection: {
     close: "关闭", more: "更多",
@@ -740,6 +741,7 @@ const zh = {
   // actions carry their own labels instead — they have no keys here.
   aiActions: {
     badConfig: "动作配置无效",
+    noUnderstandAction: "没有可用的理解动作",
     failed: "AI 动作失败",
     emptyResult: "AI 未返回内容",
     resultTitle: "AI 结果",

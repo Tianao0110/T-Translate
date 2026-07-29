@@ -7,6 +7,8 @@ import useConfigStore from '../stores/config.js';
 import { resolveDisplayMode } from './display-mode.js';
 import { calculateHash } from '../utils/image.js';
 import { detectLanguage, resolveSameLanguageTarget, cleanTranslationOutput, shouldTranslateText } from '../utils/text.js';
+import { getUnderstandAction } from '@config/ai-actions';
+import { getActionCapabilities, runAiAction } from './ai-action-runner.js';
 import createLogger from '../utils/logger.js';
 import { getShortErrorMessage } from '../utils/error-handler.js';
 import i18n from '../i18n.js';
@@ -107,7 +109,11 @@ class TranslationPipeline {
       // either must re-run even when the captured frame is byte-identical
       // (same precedent as targetLanguage — a mode toggle would otherwise be
       // swallowed as "content unchanged").
-      const modePref = config.floatingDisplayMode || 'auto';
+      // Understanding is a whole-passage job by definition, so the toggle wins
+      // over the layout heuristic: auto would otherwise judge a dense capture
+      // "scattered" and leave the mode with a handful of disconnected bubbles
+      // and nothing to explain.
+      const modePref = config.understandMode ? 'unified' : (config.floatingDisplayMode || 'auto');
       const hash = await calculateHash(imageData);
       const imageKey = `${hash}::${config.targetLanguage}::${modePref}`;
       if (imageKey === lastImageHash) {
@@ -181,13 +187,20 @@ class TranslationPipeline {
       }
       lastText = textKey;
 
+      session.setSourceText(text);
+
+      // Understanding mode replaces the translation step rather than adding to
+      // it — the user asked to be told what this says, not to read it in
+      // another language.
+      if (config.understandMode) {
+        return await this.runUnderstand(text, imageData);
+      }
+
       // Skip translation entirely for content that's already in target lang or trivial
       if (!shouldTranslateText(text)) {
         session.setResult(text);
         return { success: true, text };
       }
-
-      session.setSourceText(text);
 
       return await this.runFromText(text);
 
@@ -197,6 +210,42 @@ class TranslationPipeline {
       session.setError(errorMsg);
       return { success: false, error: errorMsg };
     }
+  }
+
+  // Understanding mode's capture path: whatever 'understand' action is
+  // installed reads the capture (or its recognized text) and the result lands
+  // in the window body where the translation normally goes. Nothing is written
+  // to history — an AI result rides on a translation entry, and this path
+  // produces none.
+  async runUnderstand(text, imageData) {
+    const session = useSessionStore.getState();
+    const config = useConfigStore.getState();
+
+    const action = getUnderstandAction();
+    if (!action) {
+      const message = _t('aiActions.noUnderstandAction', '没有可用的理解动作');
+      session.setError(message);
+      return { success: false, error: message };
+    }
+
+    session.startTranslation();
+
+    const capabilities = await getActionCapabilities();
+    const result = await runAiAction(action, {
+      sourceText: text,
+      sourceLanguage: 'auto',
+      targetLanguage: config.targetLanguage,
+      imageData,
+      capabilities,
+    });
+
+    if (!result.success) {
+      session.setError(result.error);
+      return result;
+    }
+
+    session.setResult(result.content, result.provider || null);
+    return { success: true, text: result.content };
   }
 
   // Spawns one child pane per OCR block, positioned over the original text

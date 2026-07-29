@@ -106,8 +106,7 @@ export default defineConfig(({ mode }) => {
         input: {
           main: path.resolve(__dirname, 'public/index.html'),
           floatingWindow: path.resolve(__dirname, 'public/floating-window.html'),
-          selection: path.resolve(__dirname, 'public/selection.html'),
-          aiResult: path.resolve(__dirname, 'public/ai-result.html')
+          selection: path.resolve(__dirname, 'public/selection.html')
         },
         output: {
           entryFileNames: `static/js/[name].[hash].js`,
