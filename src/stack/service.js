@@ -761,13 +761,11 @@ export class TranslationService {
 
   // ===== Misc =====
 
-  // Generic chat completion for AI features (analysis, rewriting).
-  // Falls back to translating the user message if no provider has chat().
-  async chatCompletion(messages, options = {}) {
-    if (!this._initialized) {
-      await this.init();
-    }
-
+  // Which provider, if any, can run a real chat completion right now.
+  // Metadata `type: 'llm'` is NOT the answer — the anthropic and gemini
+  // providers are llm but implement translate() only, so callers that need
+  // chat must ask here rather than read the catalog.
+  getChatCapability(options = {}) {
     // Same provider routing as translate(): first usable one wins
     const { privacyMode = PRIVACY_MODE_IDS.STANDARD } = options;
     for (const id of this.getPriority()) {
@@ -775,8 +773,34 @@ export class TranslationService {
       if (!isProviderConfigured(id)) continue;
       const provider = getProvider(id);
       if (provider && typeof provider.chat === 'function') {
-        return provider.chat(messages, options);
+        return {
+          available: true,
+          providerId: id,
+          providerName: provider?.constructor?.metadata?.name || id,
+        };
       }
+    }
+    return { available: false, providerId: null, providerName: null };
+  }
+
+  // Generic chat completion for AI features (analysis, rewriting).
+  // Falls back to translating the user message if no provider has chat();
+  // options.requireChat opts out of that fallback for callers whose prompt
+  // would come back as a translated instruction rather than an answer.
+  async chatCompletion(messages, options = {}) {
+    if (!this._initialized) {
+      await this.init();
+    }
+
+    const capability = this.getChatCapability(options);
+    if (capability.available) {
+      return getProvider(capability.providerId).chat(messages, options);
+    }
+    if (options.requireChat) {
+      return {
+        success: false,
+        error: _t('svc.noChatProvider', '当前翻译源不支持 AI 对话功能，请配置一个大模型翻译源'),
+      };
     }
 
     const userMessage = messages.find(m => m.role === 'user');

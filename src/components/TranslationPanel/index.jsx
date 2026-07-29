@@ -22,13 +22,16 @@ import { PRIVACY_MODES, TRANSLATION_STATUS, getLanguageList } from '@config/defa
 import { detectTemplateFromModel } from '../../config/model-template-mapping.js';
 
 import { useTTS, useTermCheck, useStyleRewrite, useSaveModal } from './hooks';
+import useAiActions from '../../hooks/use-ai-actions.js';
+import { resolveActionLabel } from '../../services/ai-action-runner.js';
+import AiActionIcon from '../shared/AiActionIcon.jsx';
 
 import { StyleModal, SaveModal, LanguageSelector } from './components.jsx';
 
 const logger = createLogger('TranslationPanel');
 
 const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProcessed }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const notify = showNotification || ((msg, type) => logger.debug(`[Notify] ${type}: ${msg}`));
 
   const [dragOver, setDragOver] = useState(false);
@@ -76,6 +79,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     pasteFromClipboard,
     addStyleVersion,
     switchVersion,
+    attachAiResult,
   } = useTranslationStore(useShallow((s) => ({
     currentTranslation: s.currentTranslation,
     favorites: s.favorites,
@@ -97,12 +101,45 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     pasteFromClipboard: s.pasteFromClipboard,
     addStyleVersion: s.addStyleVersion,
     switchVersion: s.switchVersion,
+    attachAiResult: s.attachAiResult,
   })));
 
   const tts = useTTS(notify, t);
   const termCheck = useTermCheck(favorites, setTranslatedText, notify, t);
   const styleRewrite = useStyleRewrite(currentTranslation, addStyleVersion, notify, t);
   const saveModal = useSaveModal(currentTranslation, addToFavorites, notify, t);
+
+  // AI actions read the source side, so the entry follows the source box, not
+  // whether a translation already exists.
+  const lastCaptureRef = useRef(null); // { dataURL, sourceText } of the last capture
+  const ai = useAiActions('screenshot', attachAiResult);
+
+  // The capture only stands in for the source box while the box still holds
+  // what that capture said; an edit or a paste retires it.
+  const captureImage = lastCaptureRef.current?.sourceText === currentTranslation.sourceText
+    ? lastCaptureRef.current.dataURL
+    : null;
+
+  const aiActions = ai.availableActions({
+    displayMode: 'unified',
+    text: currentTranslation.sourceText,
+    hasImage: !!captureImage,
+  });
+
+  const runAiActionFromPanel = useCallback(async (action) => {
+    const result = await ai.run(
+      action,
+      {
+        sourceText: currentTranslation.sourceText,
+        translatedText: currentTranslation.translatedText,
+        sourceLanguage: currentTranslation.sourceLanguage,
+        targetLanguage: currentTranslation.targetLanguage,
+        imageData: captureImage,
+      },
+      document.documentElement.getAttribute('data-theme') || 'light'
+    );
+    if (!result.success) notify(result.error, 'error');
+  }, [ai, currentTranslation, captureImage, notify]);
 
   const sourceTextareaRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -154,6 +191,10 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
 
         if (result.success && result.text) {
           setIsOcrSource(true);
+          // Kept past the OCR run so an AI action can read the capture itself
+          // instead of its recognized text. Paired with the text it produced —
+          // once the box holds anything else, the picture no longer describes it.
+          lastCaptureRef.current = { dataURL: screenshotData.dataURL, sourceText: result.text };
 
           // LLM Vision -> local OCR fallback gets surfaced; ocrStatus.fallbackNotice
           // is set by recognizeImage in main-translation.js
@@ -499,6 +540,21 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
               <button className="action-btn" onClick={saveModal.openSaveModal} disabled={!currentTranslation.translatedText} title={t('translation.favorite', '收藏')}>
                 <Sparkles size={15} />
               </button>
+              {aiActions.map((action) => (
+                <button
+                  key={action.id}
+                  className="action-btn"
+                  onClick={() => runAiActionFromPanel(action)}
+                  disabled={ai.runningId === action.id}
+                  title={ai.pathFor(action, !!captureImage) === 'vision'
+                    ? `${resolveActionLabel(action, i18n.language)} · ${t('aiActions.sendsCapture', '会把这张截图发给视觉模型')}`
+                    : resolveActionLabel(action, i18n.language)}
+                >
+                  {ai.runningId === action.id
+                    ? <Loader2 size={15} className="animate-spin" />
+                    : <AiActionIcon name={action.icon} size={15} />}
+                </button>
+              ))}
               {tts.ttsEnabled && (
                 <button
                   className={`action-btn ${tts.ttsStatus === TTS_STATUS.SPEAKING && tts.ttsTarget === 'target' ? 'active' : ''}`}

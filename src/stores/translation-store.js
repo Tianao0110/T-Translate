@@ -66,12 +66,29 @@ function createThrottledJSONStorage(interval = PERSIST_WRITE_MS) {
 // Import paths must tolerate hand-edited JSON: missing ids get generated,
 // bad timestamps fall back to now, text-less entries are dropped.
 // Exported for tests.
+// Attached AI results survive an export/import round trip, but only in the
+// shape the app writes — a hand-edited file must not smuggle in other fields.
+function normalizeAiResults(raw) {
+  if (!Array.isArray(raw)) return null;
+  const results = raw
+    .filter((a) => a && typeof a.content === 'string' && a.content)
+    .map((a) => ({
+      id: typeof a.id === 'string' && a.id ? a.id : uuidv4(),
+      actionId: typeof a.actionId === 'string' ? a.actionId : '',
+      content: a.content,
+      provider: typeof a.provider === 'string' ? a.provider : '',
+      path: a.path === 'vision' ? 'vision' : 'text',
+      timestamp: Number.isFinite(a.timestamp) ? a.timestamp : Date.now(),
+    }));
+  return results.length ? results : null;
+}
+
 export function normalizeHistoryItem(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const sourceText = typeof raw.sourceText === 'string' ? raw.sourceText : '';
   const translatedText = typeof raw.translatedText === 'string' ? raw.translatedText : '';
   if (!sourceText && !translatedText) return null;
-  return {
+  const item = {
     id: typeof raw.id === 'string' && raw.id ? raw.id : uuidv4(),
     sourceText,
     translatedText,
@@ -80,6 +97,9 @@ export function normalizeHistoryItem(raw) {
     timestamp: Number.isFinite(raw.timestamp) ? raw.timestamp : Date.now(),
     source: typeof raw.source === 'string' ? raw.source : 'import',
   };
+  const ai = normalizeAiResults(raw.ai);
+  if (ai) item.ai = ai;
+  return item;
 }
 
 // Lazy-bound to avoid circular dep with main-translation service
@@ -482,6 +502,46 @@ const useTranslationStore = create(
               (h) => new Date(h.timestamp).toDateString() === today
             ).length;
           }
+        }),
+
+      // An AI result rides on the translation it was derived from — a summary
+      // is not its own history entry, it is something that translation "also
+      // has". Matched by source text because the three windows share no
+      // translation id; nothing to attach to means nothing is written (the
+      // result stays a one-off in its window).
+      attachAiResult: (payload = {}) =>
+        set((state) => {
+          if (state.translationMode === PRIVACY_MODES.SECURE) return;
+
+          const sourceText = payload.sourceText || '';
+          const content = payload.content || '';
+          if (!sourceText || !content) return;
+
+          const entry = state.history.find((h) => h.sourceText === sourceText);
+          if (!entry) return;
+
+          // One result per action, latest wins — same collapse rule as style
+          // versions, so re-running a summary replaces rather than piles up.
+          const kept = (entry.ai || []).filter((a) => a.actionId !== payload.actionId);
+          entry.ai = [
+            {
+              id: uuidv4(),
+              actionId: payload.actionId || '',
+              content,
+              provider: payload.provider || '',
+              path: payload.path === 'vision' ? 'vision' : 'text',
+              timestamp: Date.now(),
+            },
+            ...kept,
+          ];
+        }),
+
+      removeAiResult: (historyId, aiId) =>
+        set((state) => {
+          const entry = state.history.find((h) => h.id === historyId);
+          if (!entry?.ai) return;
+          entry.ai = entry.ai.filter((a) => a.id !== aiId);
+          if (entry.ai.length === 0) delete entry.ai;
         }),
 
       removeFromHistory: (id) =>

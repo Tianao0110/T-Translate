@@ -141,6 +141,10 @@ class TranslationPipeline {
         session.setResult(_t('svc.noTextRecognized', '（未识别到文字）'));
         return { success: true, text: '' };
       }
+      // Pair the capture with what it read, so a later text-only run can tell
+      // that the picture no longer describes the session (see
+      // getLastCaptureImage — path B must not read a stale frame).
+      if (lastCapture) lastCapture.sourceText = text;
 
       // Judgment runs on raw per-line boxes; pane granularity comes from the
       // resolver (merged paragraphs per bubble, raw blocks for word piles).
@@ -409,6 +413,15 @@ class TranslationPipeline {
     } finally {
       captureInFlight = false;
     }
+  }
+
+  // The capture behind whatever is on screen right now, or null once the
+  // session has moved on to text that did not come from it. AI actions take it
+  // for path B — reading the picture beats summarizing the OCR of the picture.
+  getLastCaptureImage(currentText) {
+    if (!lastCapture?.imageData || !lastCapture.sourceText) return null;
+    if (currentText != null && lastCapture.sourceText !== currentText) return null;
+    return lastCapture.imageData;
   }
 
   resetCache() {

@@ -30,12 +30,19 @@ const useConfigStore = create(
       // settings-changed — the pipeline reads it per capture.
       floatingDisplayMode: 'auto',
 
+      // Floating-window toggle for understanding-type AI actions. Neutral by
+      // construction: it decides nothing about behavior, it only lets the
+      // actions marked understandOnly appear — what those actions do is their
+      // prompt config, including any the user imports.
+      understandMode: false,
+
       setTargetLanguage: (lang) => set({ targetLanguage: lang }),
       setSourceLanguage: (lang) => set({ sourceLanguage: lang }),
       setSameLanguageBehavior: (behavior) => set({ sameLanguageBehavior: behavior }),
       setOcrEngine: (engine) => set({ ocrEngine: engine }),
       setFloatingOpacity: (opacity) => set({ floatingOpacity: opacity }),
       setFloatingDisplayMode: (mode) => set({ floatingDisplayMode: mode }),
+      setUnderstandMode: (on) => set({ understandMode: !!on }),
     }),
     {
       name: 't-translate-config',
@@ -48,6 +55,7 @@ const useConfigStore = create(
         ocrPriority: state.ocrPriority,
         floatingOpacity: state.floatingOpacity,
         floatingDisplayMode: state.floatingDisplayMode,
+        understandMode: state.understandMode,
       }),
     }
   )

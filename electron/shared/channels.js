@@ -66,6 +66,7 @@ const CHANNELS = {
     OPEN_MAIN_SETTINGS: 'floating-window:open-main-settings',
     GET_HISTORY: 'floating-window:get-history',
     ADD_TO_HISTORY: 'floating-window:add-to-history', // forward a translation into the main window's history
+    ATTACH_AI_RESULT: 'floating-window:attach-ai-result',
     SETTINGS_CHANGED: 'floating-window:settings-changed',
     // Child pane standalone windows
     CREATE_CHILD_WINDOW: 'floating-window:create-child-window',
@@ -80,6 +81,7 @@ const CHANNELS = {
     SET_BOUNDS: 'selection:set-bounds',
     START_DRAG: 'selection:start-drag',
     ADD_TO_HISTORY: 'selection:add-to-history',
+    ATTACH_AI_RESULT: 'selection:attach-ai-result',
     SHOW_TRIGGER: 'selection:show-trigger',
     SHOW_RESULT: 'selection:show-result',     // Direct result display (screenshot chain).
     SHOW_DIRECT: 'selection:show-direct',     // Sticky-direct path (skip trigger icon).
@@ -112,6 +114,7 @@ const CHANNELS = {
   },
   DATA: {
     ADD_TO_HISTORY: 'add-to-history',
+    ATTACH_AI_RESULT: 'attach-ai-result', // rides on an existing history entry, never its own
   },
   THEME: {
     GET: 'theme:get',
@@ -133,6 +136,7 @@ const CHANNELS = {
     STREAM_CHUNK: 'stack:stream-chunk',           // main → renderer push frames
     ABORT: 'stack:abort',
     CHAT: 'stack:chat',
+    CHAT_CAPABILITY: 'stack:chat-capability',     // can any allowed provider chat()?
     TEST_PROVIDER: 'stack:test-provider',
     TEST_PROVIDER_CONFIG: 'stack:test-provider-config',
     PROVIDERS_STATUS: 'stack:providers-status',
@@ -143,6 +147,16 @@ const CHANNELS = {
     CHANGED: 'stack:changed',                     // main → renderer: stack reloaded
     OCR_RECOGNIZE: 'stack:ocr-recognize',         // allowedEngines injected main-side
     OCR_RESET_VISION: 'stack:ocr-reset-vision',
+    VISION_CHAT: 'stack:vision-chat',             // path B: prompt + capture to a vision model
+    VISION_CAPABILITY: 'stack:vision-capability', // may path B run under the live privacy mode?
+  },
+  // AI action result windows (ipc/ai-result.js). Owned by the window that asked
+  // for them, so the spawning card takes them down when its session ends.
+  AI_RESULT: {
+    OPEN: 'ai-result:open',
+    PAYLOAD: 'ai-result:payload',                 // window pulls its own content
+    RESIZE: 'ai-result:resize',                   // window reports its fitted height
+    CLOSE: 'ai-result:close',
   },
 };
 

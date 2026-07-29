@@ -4,12 +4,15 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Camera, X, Loader2, AlertCircle, ChevronDown, GripHorizontal, History, Clock, RefreshCw, Ghost } from 'lucide-react';
+import { Camera, X, Loader2, AlertCircle, ChevronDown, GripHorizontal, History, Clock, RefreshCw, Ghost, Brain } from 'lucide-react';
 import useSessionStore, { STATUS, DISPLAY_MODE, CHILD_PANE_STATUS } from '../../stores/session.js';
 import useConfigStore from '../../stores/config.js';
 import pipeline from '../../services/pipeline.js';
 import { resolveOverlaps } from '../../services/pane-layout.js';
 import ChildPane from './ChildPane.jsx';
+import AiActionIcon from '../shared/AiActionIcon.jsx';
+import useAiActions from '../../hooks/use-ai-actions.js';
+import { resolveActionLabel } from '../../services/ai-action-runner.js';
 import createLogger from '../../utils/logger.js';
 import './styles.css';
 
@@ -30,10 +33,11 @@ const MODE_LABEL_KEYS = {
 };
 
 const FloatingWindow = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const {
     status,
+    sourceText,
     translatedText,
     error,
     displayMode,
@@ -54,6 +58,8 @@ const FloatingWindow = () => {
     floatingOpacity,
     targetLanguage,
     ocrEngine,
+    understandMode,
+    setUnderstandMode,
     setFloatingOpacity,
     setFloatingDisplayMode,
     setTargetLanguage,
@@ -81,6 +87,39 @@ const FloatingWindow = () => {
       return () => clearTimeout(timer);
     }
   }, [notification, clearNotification]);
+
+  // AI actions run on the recognized source text, not the translation — a
+  // summary of a summary compounds whatever the translator got wrong. When a
+  // vision model is configured they run on the capture itself instead.
+  const attachAiResult = useCallback((payload) => {
+    window.electron?.floatingWindow?.attachAiResult?.(payload);
+  }, []);
+  const ai = useAiActions('floating', attachAiResult);
+  const captureImage = pipeline.getLastCaptureImage(sourceText);
+  const aiActions = ai.availableActions({
+    displayMode,
+    text: sourceText,
+    hasImage: !!captureImage,
+    understandMode,
+  });
+
+  const runAction = useCallback(async (action) => {
+    const result = await ai.run(
+      action,
+      {
+        sourceText,
+        translatedText,
+        sourceLanguage: 'auto',
+        targetLanguage,
+        imageData: pipeline.getLastCaptureImage(sourceText),
+      },
+      theme
+    );
+    if (!result.success) {
+      setToastMessage({ message: result.error, type: 'error' });
+      setTimeout(() => setToastMessage(null), 5000);
+    }
+  }, [ai, sourceText, translatedText, targetLanguage, theme]);
 
   const contentRef = useRef(null);
   const toolbarTimerRef = useRef(null);
@@ -819,6 +858,42 @@ const FloatingWindow = () => {
             >
               <History size={12} />
             </button>
+
+            {ai.capabilities.text || ai.capabilities.vision ? (
+              <button
+                className={`toolbar-btn ${understandMode ? 'active' : ''}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setUnderstandMode(!understandMode);
+                }}
+                title={understandMode
+                  ? t('floatingWindow.understandModeOn', '理解模式已开，点击关闭')
+                  : t('floatingWindow.understandMode', '理解模式：对这块内容再做一层理解')}
+              >
+                <Brain size={12} />
+              </button>
+            ) : null}
+
+            {aiActions.map((action) => (
+              <button
+                key={action.id}
+                className="toolbar-btn"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  runAction(action);
+                }}
+                disabled={ai.runningId === action.id}
+                title={ai.pathFor(action, !!captureImage) === 'vision'
+                  ? `${resolveActionLabel(action, i18n.language)} · ${t('aiActions.sendsCapture', '会把这张截图发给视觉模型')}`
+                  : resolveActionLabel(action, i18n.language)}
+              >
+                {ai.runningId === action.id
+                  ? <Loader2 size={12} className="spin" />
+                  : <AiActionIcon name={action.icon} size={12} />}
+              </button>
+            ))}
 
             <div
               className="toolbar-handle"

@@ -41,6 +41,7 @@ contextBridge.exposeInMainWorld('electron', {
     // Forward a completed translation into the main window's history store
     // (which applies its own secure-mode gate).
     addToHistory: (item) => ipcRenderer.invoke('floating-window:add-to-history', item),
+    attachAiResult: (payload) => ipcRenderer.invoke('floating-window:attach-ai-result', payload),
 
     openMainSettings: (section) => ipcRenderer.invoke('floating-window:open-main-settings', section),
 
@@ -78,12 +79,18 @@ contextBridge.exposeInMainWorld('electron', {
     isAvailable: () => ipcRenderer.invoke('secure-storage:isAvailable'),
   },
 
+  // AI action results open in their own window, owned by this one.
+  aiResult: {
+    open: (payload) => ipcRenderer.invoke('ai-result:open', payload),
+  },
+
   // Main-process translation stack (same bridge as the main-window preload).
   stack: {
     translate: (payload) => ipcRenderer.invoke('stack:translate', payload),
     streamStart: (payload) => ipcRenderer.invoke('stack:translate-stream-start', payload),
     abort: (id) => ipcRenderer.invoke('stack:abort', { id }),
     chat: (payload) => ipcRenderer.invoke('stack:chat', payload),
+    chatCapability: () => ipcRenderer.invoke('stack:chat-capability'),
     testProvider: (providerId) => ipcRenderer.invoke('stack:test-provider', { providerId }),
     testProviderConfig: (providerId, config) =>
       ipcRenderer.invoke('stack:test-provider-config', { providerId, config }),
@@ -95,6 +102,9 @@ contextBridge.exposeInMainWorld('electron', {
     ocrRecognize: (imageData, options) =>
       ipcRenderer.invoke('stack:ocr-recognize', { imageData, options }),
     ocrResetVision: () => ipcRenderer.invoke('stack:ocr-reset-vision'),
+    visionChat: (messages, imageData, options) =>
+      ipcRenderer.invoke('stack:vision-chat', { messages, imageData, options }),
+    visionCapability: () => ipcRenderer.invoke('stack:vision-capability'),
     onStreamChunk: (callback) => {
       const handler = (event, frame) => callback(frame);
       ipcRenderer.on('stack:stream-chunk', handler);

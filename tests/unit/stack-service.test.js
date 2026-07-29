@@ -163,3 +163,70 @@ describe('stack TranslationService', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+// A provider that only translates answers a prompt with a translation OF that
+// prompt, which reads like a working AI feature. These lock the honest answer.
+describe('chat capability', () => {
+  const TRADITIONAL_ONLY = {
+    providers: {
+      list: [{ id: 'google-translate', enabled: true, priority: 1 }],
+      configs: { 'google-translate': {} },
+    },
+  };
+
+  it('reports the chat-capable provider when one is configured', async () => {
+    configureRuntime({ fetch: vi.fn() });
+    const svc = makeService(makeFakeL2());
+    await svc.init(SETTINGS);
+
+    expect(svc.getChatCapability()).toMatchObject({ available: true, providerId: 'openai' });
+  });
+
+  it('reports unavailable when only traditional sources are configured', async () => {
+    configureRuntime({ fetch: vi.fn() });
+    const svc = makeService(makeFakeL2());
+    await svc.init(TRADITIONAL_ONLY);
+
+    expect(svc.getChatCapability()).toMatchObject({ available: false, providerId: null });
+  });
+
+  it('reports unavailable in offline mode when the only LLM is a cloud one', async () => {
+    configureRuntime({ fetch: vi.fn() });
+    const svc = makeService(makeFakeL2());
+    await svc.init(SETTINGS);
+
+    expect(svc.getChatCapability({ privacyMode: 'offline' }).available).toBe(false);
+  });
+
+  it('requireChat refuses instead of translating the prompt', async () => {
+    const fetchMock = vi.fn();
+    configureRuntime({ fetch: fetchMock });
+    const svc = makeService(makeFakeL2());
+    await svc.init(TRADITIONAL_ONLY);
+
+    const result = await svc.chatCompletion(
+      [{ role: 'user', content: 'Summarize this article' }],
+      { requireChat: true }
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error.length).toBeGreaterThan(0);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('without requireChat the legacy translate fallback still runs', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => [[['翻译结果', 'Summarize this article']]],
+      text: async () => '',
+    }));
+    configureRuntime({ fetch: fetchMock });
+    const svc = makeService(makeFakeL2());
+    await svc.init(TRADITIONAL_ONLY);
+
+    await svc.chatCompletion([{ role: 'user', content: 'Summarize this article' }]);
+
+    expect(fetchMock).toHaveBeenCalled();
+  });
+});

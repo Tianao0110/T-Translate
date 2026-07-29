@@ -156,6 +156,7 @@ const zh = {
     filter: { all: "全部时间", today: "今天", week: "本周", month: "本月" },
     group: { date: "按日期", language: "按语言" },
     select: "选择", export: "导出", import: "导入",
+    hasAiResult: "附带 AI 结果，双击查看",
     deleteSelected: "删除 ({{count}})",
     deleteSelectedConfirm: "确定删除选中的 {{count}} 条记录？",
     deletedCount: "已删除 {{count}} 条",
@@ -266,7 +267,9 @@ const zh = {
     displayModeHint: "自动＝按内容判断；散点＝每块文字原位贴译文（界面标签、单词、漫画）；整段＝合并为一段译文（文章段落）",
     passThroughToggle: "鼠标穿透：内容区点击直达下层应用，顶栏保持可点",
     passThroughOn: "穿透中，点击退出（内容区点击直达下层应用）",
-    passThroughSticky: "穿透中 · 顶栏可点击退出 (Esc)"
+    passThroughSticky: "穿透中 · 顶栏可点击退出 (Esc)",
+    understandMode: "理解模式：对这块内容再做一层理解",
+    understandModeOn: "理解模式已开，点击关闭"
   },
   selection: {
     close: "关闭", more: "更多",
@@ -480,6 +483,8 @@ const zh = {
     },
     visionFallback: "当前模型不支持视觉识别，已自动切换到本地 OCR",
     visionLocked: "LLM 视觉识别已因多次失败被禁用，已切换到本地 OCR。如需重新启用请前往 设置 > OCR",
+    visionBlockedByPrivacy: "当前隐私模式已禁用视觉模型",
+    visionNotLocal: "离线模式只允许本机视觉模型，截图不出本机",
     allEnginesFailed: "所有 OCR 引擎均失败"
   },
   tts: {
@@ -731,12 +736,26 @@ const zh = {
       google: { network: "Google 翻译服务暂时无法访问。可能需要网络代理。" }
     }
   },
+  // Display text for the built-in AI actions (config/ai-actions.js). Imported
+  // actions carry their own labels instead — they have no keys here.
+  aiActions: {
+    badConfig: "动作配置无效",
+    failed: "AI 动作失败",
+    emptyResult: "AI 未返回内容",
+    resultTitle: "AI 结果",
+    generatedBy: "由 {{provider}} 生成",
+    sendsCapture: "会把这张截图发给视觉模型",
+    readFromCapture: "视觉模型读取截图生成",
+    summarize: { name: "总结", desc: "读完整段内容，用目标语言给出要点" },
+    explain: { name: "讲解", desc: "把这块内容讲清楚：整体在说什么，关键概念是什么" }
+  },
   svc: {
     noProvider: "没有可用的翻译源",
     allFailed: "所有翻译源均失败",
     testBlockedByPrivacy: "当前隐私模式已禁用该翻译源",
     batchFailed: "批量翻译全部失败",
     noUserMsg: "没有用户消息",
+    noChatProvider: "当前翻译源不支持 AI 对话功能，请配置一个大模型翻译源",
     translateFailed: "翻译失败",
     providerNotFound: "翻译源不存在",
     missingConfig: "缺少配置",

@@ -157,6 +157,20 @@ class StackClient {
     }
   }
 
+  // Whether a real chat completion is possible right now. Asked before an AI
+  // action is offered — a provider that only translates would answer a prompt
+  // with a translation of that prompt.
+  async getChatCapability() {
+    const b = bridge();
+    if (!b?.chatCapability) return { available: false, providerId: null, providerName: null };
+    try {
+      return await b.chatCapability();
+    } catch (e) {
+      logger.error('chat capability IPC failed:', e);
+      return { available: false, providerId: null, providerName: null };
+    }
+  }
+
   async testProvider(providerId) {
     const b = bridge();
     if (!b) return { success: false, message: NO_BRIDGE.error };
@@ -220,6 +234,32 @@ class StackClient {
         await b.ocrResetVision().catch(() => {});
       },
     };
+  }
+
+  // ===== Path B: the vision model reads the capture directly =====
+  // Only the windows that hold a capture expose these; elsewhere the bridge
+  // method is absent and path B simply never applies.
+
+  async visionChat(messages, imageData, options = {}) {
+    const b = bridge();
+    if (!b?.visionChat) return { success: false, error: NO_BRIDGE.error, visionUnsupported: true };
+    try {
+      return await b.visionChat(messages, imageData, options);
+    } catch (e) {
+      logger.error('vision chat IPC failed:', e);
+      return { success: false, error: e.message };
+    }
+  }
+
+  async getVisionCapability() {
+    const b = bridge();
+    if (!b?.visionCapability) return { available: false, reason: 'unavailable' };
+    try {
+      return await b.visionCapability();
+    } catch (e) {
+      logger.error('vision capability IPC failed:', e);
+      return { available: false, reason: e.message };
+    }
   }
 }
 

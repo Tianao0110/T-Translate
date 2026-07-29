@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld("electron", {
     hide: () => ipcRenderer.invoke("selection:hide"),
     setBounds: (bounds) => ipcRenderer.invoke("selection:set-bounds", bounds),
     addToHistory: (item) => ipcRenderer.invoke("selection:add-to-history", item),
+    attachAiResult: (payload) => ipcRenderer.invoke("selection:attach-ai-result", payload),
     getText: () => ipcRenderer.invoke("selection:get-text"),
     startDrag: () => ipcRenderer.invoke("selection:start-drag"),
 
@@ -73,6 +74,11 @@ contextBridge.exposeInMainWorld("electron", {
     decrypt: (key) => ipcRenderer.invoke("secure-storage:decrypt", key),
   },
 
+  // AI action results open in their own window, owned by this one.
+  aiResult: {
+    open: (payload) => ipcRenderer.invoke("ai-result:open", payload),
+  },
+
   // Main-process translation stack (same bridge as the main-window preload;
   // this window only translates, so no test/management surface is exposed).
   stack: {
@@ -80,6 +86,7 @@ contextBridge.exposeInMainWorld("electron", {
     streamStart: (payload) => ipcRenderer.invoke("stack:translate-stream-start", payload),
     abort: (id) => ipcRenderer.invoke("stack:abort", { id }),
     chat: (payload) => ipcRenderer.invoke("stack:chat", payload),
+    chatCapability: () => ipcRenderer.invoke("stack:chat-capability"),
     providersStatus: () => ipcRenderer.invoke("stack:providers-status"),
     currentProvider: () => ipcRenderer.invoke("stack:current-provider"),
     reload: () => ipcRenderer.invoke("stack:reload"),

@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pin, Volume2, VolumeX, X } from 'lucide-react';
+import { Pin, Volume2, VolumeX, X, Loader2 } from 'lucide-react';
 import translationService from '../../services/stack-client.js';
 import ttsManager, { TTS_STATUS } from '../../services/tts/index.js';
+import AiActionIcon from '../shared/AiActionIcon.jsx';
+import useAiActions from '../../hooks/use-ai-actions.js';
+import { resolveActionLabel } from '../../services/ai-action-runner.js';
 import createLogger from '../../utils/logger.js';
 import { getShortErrorMessage } from '../../utils/error-handler.js';
 import { detectLanguage, resolveSameLanguageTarget } from '../../utils/text.js';
@@ -699,6 +702,29 @@ const SelectionTranslator = () => {
     setShowSource(!showSource);
   };
 
+  // AI actions read the selected text, not the translation — understanding is
+  // done on the original side and answered in the target language in one step.
+  const attachAiResultFromCard = useCallback((payload) => {
+    window.electron?.selection?.attachAiResult?.(payload);
+  }, []);
+  const ai = useAiActions('selection', attachAiResultFromCard);
+  const aiActions = ai.availableActions({ displayMode: 'unified', text: sourceText });
+
+  const runAiActionFromCard = async (e, action) => {
+    e.stopPropagation();
+    const result = await ai.run(
+      action,
+      {
+        sourceText,
+        translatedText,
+        sourceLanguage: lastResolvedLangsRef.current.sourceLanguage,
+        targetLanguage: lastResolvedLangsRef.current.targetLanguage,
+      },
+      theme
+    );
+    if (!result.success) setNotice(result.error);
+  };
+
   const handleClose = async (e) => {
     if (e) e.preventDefault();
 
@@ -845,6 +871,19 @@ const SelectionTranslator = () => {
             >
               {ttsStatus === TTS_STATUS.SPEAKING ? <VolumeX size={13} /> : <Volume2 size={13} />}
             </button>
+            {aiActions.map((action) => (
+              <button
+                key={action.id}
+                className="sel-btn"
+                onClick={(e) => runAiActionFromCard(e, action)}
+                disabled={ai.runningId === action.id}
+                title={resolveActionLabel(action, i18n.language)}
+              >
+                {ai.runningId === action.id
+                  ? <Loader2 size={13} className="sel-spin" />
+                  : <AiActionIcon name={action.icon} size={13} />}
+              </button>
+            ))}
             <div className="sel-spacer" />
             <button className="sel-btn sel-btn-close" onClick={handleClose} title={t('selection.close', '关闭')}>
               <X size={13} />

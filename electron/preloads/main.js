@@ -14,6 +14,7 @@ const validChannels = {
     "menu-action",
     "import-file",
     "add-to-history",
+    "attach-ai-result",
     "screenshot-captured",
     "screenshot-captured-silent",
     "selection-state-changed",
@@ -104,6 +105,11 @@ const electronAPI = {
     delete: (key) => ipcRenderer.invoke("secure-storage:delete", key),
     isAvailable: () => ipcRenderer.invoke("secure-storage:isAvailable"),
   },
+  // AI action results open in their own window, owned by this one.
+  aiResult: {
+    open: (payload) => ipcRenderer.invoke("ai-result:open", payload),
+  },
+
   // Main-process translation stack (services/stack-client.js is the consumer).
   // No privacyMode/useCache here — the main-process facade injects them.
   stack: {
@@ -111,6 +117,7 @@ const electronAPI = {
     streamStart: (payload) => ipcRenderer.invoke("stack:translate-stream-start", payload),
     abort: (id) => ipcRenderer.invoke("stack:abort", { id }),
     chat: (payload) => ipcRenderer.invoke("stack:chat", payload),
+    chatCapability: () => ipcRenderer.invoke("stack:chat-capability"),
     testProvider: (providerId) => ipcRenderer.invoke("stack:test-provider", { providerId }),
     testProviderConfig: (providerId, config) =>
       ipcRenderer.invoke("stack:test-provider-config", { providerId, config }),
@@ -122,6 +129,9 @@ const electronAPI = {
     ocrRecognize: (imageData, options) =>
       ipcRenderer.invoke("stack:ocr-recognize", { imageData, options }),
     ocrResetVision: () => ipcRenderer.invoke("stack:ocr-reset-vision"),
+    visionChat: (messages, imageData, options) =>
+      ipcRenderer.invoke("stack:vision-chat", { messages, imageData, options }),
+    visionCapability: () => ipcRenderer.invoke("stack:vision-capability"),
     onStreamChunk: (callback) => {
       const handler = (event, frame) => callback(frame);
       ipcRenderer.on("stack:stream-chunk", handler);
