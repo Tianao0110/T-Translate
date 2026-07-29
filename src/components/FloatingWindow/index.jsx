@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Camera, X, Loader2, AlertCircle, ChevronDown, GripHorizontal, History, Clock, RefreshCw, Ghost } from 'lucide-react';
+import { Camera, X, Loader2, AlertCircle, ChevronDown, GripHorizontal, History, Clock, RefreshCw, Ghost, Brain } from 'lucide-react';
 import useSessionStore, { STATUS, DISPLAY_MODE, CHILD_PANE_STATUS } from '../../stores/session.js';
 import useConfigStore from '../../stores/config.js';
 import pipeline from '../../services/pipeline.js';
@@ -58,6 +58,8 @@ const FloatingWindow = () => {
     floatingOpacity,
     targetLanguage,
     ocrEngine,
+    understandMode,
+    setUnderstandMode,
     setFloatingOpacity,
     setFloatingDisplayMode,
     setTargetLanguage,
@@ -94,7 +96,12 @@ const FloatingWindow = () => {
   }, []);
   const ai = useAiActions('floating', attachAiResult);
   const captureImage = pipeline.getLastCaptureImage(sourceText);
-  const aiActions = ai.availableActions({ displayMode, text: sourceText, hasImage: !!captureImage });
+  const aiActions = ai.availableActions({
+    displayMode,
+    text: sourceText,
+    hasImage: !!captureImage,
+    understandMode,
+  });
 
   const runAction = useCallback(async (action) => {
     const result = await ai.run(
@@ -851,6 +858,22 @@ const FloatingWindow = () => {
             >
               <History size={12} />
             </button>
+
+            {ai.capabilities.text || ai.capabilities.vision ? (
+              <button
+                className={`toolbar-btn ${understandMode ? 'active' : ''}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setUnderstandMode(!understandMode);
+                }}
+                title={understandMode
+                  ? t('floatingWindow.understandModeOn', '理解模式已开，点击关闭')
+                  : t('floatingWindow.understandMode', '理解模式：对这块内容再做一层理解')}
+              >
+                <Brain size={12} />
+              </button>
+            ) : null}
 
             {aiActions.map((action) => (
               <button

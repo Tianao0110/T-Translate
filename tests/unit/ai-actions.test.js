@@ -123,6 +123,47 @@ describe('checkActionAvailability', () => {
   });
 });
 
+describe('understanding-mode gating', () => {
+  const explain = getAiAction('explain');
+  const summarize = getAiAction('summarize');
+  const base = { surface: 'floating', displayMode: 'unified', capabilities: CAN_CHAT };
+
+  it('hides understanding actions until the toggle is on', () => {
+    expect(checkActionAvailability(explain, { ...base, text: longCjk, understandMode: false }).reason)
+      .toBe('understandMode');
+    expect(checkActionAvailability(explain, { ...base, text: longCjk, understandMode: true }).available)
+      .toBe(true);
+  });
+
+  it('leaves summarize available either way — the toggle adds, it does not swap', () => {
+    expect(checkActionAvailability(summarize, { ...base, text: longCjk, understandMode: false }).available).toBe(true);
+    expect(checkActionAvailability(summarize, { ...base, text: longCjk, understandMode: true }).available).toBe(true);
+  });
+
+  it('explains short content too — turning the mode on IS the trigger', () => {
+    expect(checkActionAvailability(explain, { ...base, text: '两行密集的公式', understandMode: true }).available)
+      .toBe(true);
+  });
+
+  it('explains scattered captures as well, unlike summarize', () => {
+    const scattered = { ...base, displayMode: 'scattered', text: longCjk, understandMode: true };
+    expect(checkActionAvailability(explain, scattered).available).toBe(true);
+    expect(checkActionAvailability(summarize, scattered).reason).toBe('displayMode');
+  });
+
+  it('stays off the other surfaces — the toggle is the floating window’s', () => {
+    expect(checkActionAvailability(explain, {
+      ...base, surface: 'selection', text: longCjk, understandMode: true,
+    }).reason).toBe('surface');
+  });
+
+  it('carries an imported action’s understandOnly flag through the validator', () => {
+    const raw = { ...importable(), trigger: { surfaces: ['floating'], understandOnly: true } };
+    expect(normalizeActionConfig(raw).action.trigger.understandOnly).toBe(true);
+    expect(normalizeActionConfig(importable()).action.trigger.understandOnly).toBe(false);
+  });
+});
+
 describe('resolveActionPath', () => {
   const summarize = getAiAction('summarize');
   const BOTH = { text: true, vision: true };
@@ -321,6 +362,20 @@ describe('built-in catalog', () => {
   it('keeps every built-in id unique', () => {
     const ids = BUILTIN_AI_ACTIONS.map(a => a.id);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('ships explain behind the understanding toggle, on the floating window only', () => {
+    const explain = getAiAction('explain');
+    expect(explain.trigger.understandOnly).toBe(true);
+    expect(explain.trigger.surfaces).toEqual(['floating']);
+    expect(explain.trigger.minLength).toBeNull();
+  });
+
+  // The switch has to stay neutral: it is named for understanding, and the
+  // shipped configs must not describe anything narrower.
+  it('carries no problem-solving wording in any built-in', () => {
+    const text = JSON.stringify(BUILTIN_AI_ACTIONS);
+    expect(text).not.toMatch(/解题|答案|homework|solve the problem/i);
   });
 
   it('returns null for an unknown id', () => {

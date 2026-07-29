@@ -75,7 +75,52 @@ const SUMMARIZE = {
   },
 };
 
-export const BUILTIN_AI_ACTIONS = [SUMMARIZE];
+// Default action of the floating window's understanding toggle. The toggle
+// itself decides nothing — it only reveals actions marked understandOnly, and
+// what any of them does is its prompt config. That is what keeps the switch
+// neutral while still letting an imported config do something else entirely.
+const EXPLAIN = {
+  id: 'explain',
+  schemaVersion: AI_ACTION_SCHEMA_VERSION,
+  builtin: true,
+  icon: 'Lightbulb',
+  nameKey: 'aiActions.explain.name',
+  descKey: 'aiActions.explain.desc',
+  capability: 'text',
+  outputLanguage: 'target',
+  history: 'attach',
+  trigger: {
+    surfaces: ['floating'],
+    // No display-mode or length gate: the user turned the mode on, which is
+    // the trigger. Summaries need length to be worth anything; an explanation
+    // of two dense lines does not.
+    displayModes: null,
+    minLength: null,
+    understandOnly: true,
+  },
+  prompts: {
+    zh: {
+      system: '你是一个讲解助手。用户会给你一段内容，请基于原文理解它，然后用{{outputLanguage}}讲清楚它在说什么。只输出讲解正文，不要复述原文。',
+      user: '请讲解下面这段内容，用{{outputLanguage}}回答。\n\n内容：\n{{sourceText}}\n\n要求：\n- 先用一两句说清整体在讲什么\n- 再解释其中的关键概念、术语或符号\n- 原文没写的不要编造',
+    },
+    en: {
+      system: 'You are an explaining assistant. The user gives you a passage; understand it from the original text, then explain in {{outputLanguage}} what it is saying. Output only the explanation — do not restate the passage.',
+      user: 'Explain the following content in {{outputLanguage}}.\n\nContent:\n{{sourceText}}\n\nRequirements:\n- Start with one or two sentences on what it is about overall\n- Then explain the key concepts, terms, or symbols in it\n- Do not invent anything the source does not state',
+    },
+  },
+  visionPrompts: {
+    zh: {
+      system: '你是一个讲解助手。用户会给你一张截图，请读懂图里的内容，然后用{{outputLanguage}}讲清楚它在说什么。只输出讲解正文，不要描述画面。',
+      user: '请讲解这张截图里的内容，用{{outputLanguage}}回答。\n\n要求：\n- 先用一两句说清整体在讲什么\n- 再解释其中的关键概念、术语或符号\n- 图里没有的不要编造',
+    },
+    en: {
+      system: 'You are an explaining assistant. The user gives you a screenshot; read what it says, then explain in {{outputLanguage}} what it is about. Output only the explanation — do not describe the image.',
+      user: 'Explain what this screenshot says, in {{outputLanguage}}.\n\nRequirements:\n- Start with one or two sentences on what it is about overall\n- Then explain the key concepts, terms, or symbols in it\n- Do not invent anything the image does not show',
+    },
+  },
+};
+
+export const BUILTIN_AI_ACTIONS = [SUMMARIZE, EXPLAIN];
 
 export function getAiAction(id, extraActions = []) {
   return [...BUILTIN_AI_ACTIONS, ...extraActions].find(a => a.id === id) || null;
@@ -162,6 +207,9 @@ export function normalizeActionConfig(raw) {
       latin: Number(rawTrigger.minLength.latin) || 0,
     }
     : null;
+  // Imported actions that only make sense behind the understanding toggle say
+  // so here; nothing else about them changes.
+  const understandOnly = rawTrigger.understandOnly === true;
 
   return {
     ok: true,
@@ -179,6 +227,7 @@ export function normalizeActionConfig(raw) {
         surfaces,
         displayModes: displayModes && displayModes.length ? displayModes : null,
         minLength,
+        understandOnly,
       },
       prompts: raw.prompts,
       visionPrompts: raw.visionPrompts || null,

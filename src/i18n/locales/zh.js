@@ -267,7 +267,9 @@ const zh = {
     displayModeHint: "自动＝按内容判断；散点＝每块文字原位贴译文（界面标签、单词、漫画）；整段＝合并为一段译文（文章段落）",
     passThroughToggle: "鼠标穿透：内容区点击直达下层应用，顶栏保持可点",
     passThroughOn: "穿透中，点击退出（内容区点击直达下层应用）",
-    passThroughSticky: "穿透中 · 顶栏可点击退出 (Esc)"
+    passThroughSticky: "穿透中 · 顶栏可点击退出 (Esc)",
+    understandMode: "理解模式：对这块内容再做一层理解",
+    understandModeOn: "理解模式已开，点击关闭"
   },
   selection: {
     close: "关闭", more: "更多",
@@ -744,7 +746,8 @@ const zh = {
     generatedBy: "由 {{provider}} 生成",
     sendsCapture: "会把这张截图发给视觉模型",
     readFromCapture: "视觉模型读取截图生成",
-    summarize: { name: "总结", desc: "读完整段内容，用目标语言给出要点" }
+    summarize: { name: "总结", desc: "读完整段内容，用目标语言给出要点" },
+    explain: { name: "讲解", desc: "把这块内容讲清楚：整体在说什么，关键概念是什么" }
   },
   svc: {
     noProvider: "没有可用的翻译源",

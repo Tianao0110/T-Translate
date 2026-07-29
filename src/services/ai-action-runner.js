@@ -52,13 +52,17 @@ export function resolveActionPath(action, ctx = {}) {
 }
 
 // Why an action is not offered, or null when it is. ctx:
-//   { surface, displayMode, text, hasImage, capabilities: { text, vision } }
+//   { surface, displayMode, text, hasImage, understandMode,
+//     capabilities: { text, vision } }
 export function checkActionAvailability(action, ctx = {}) {
   if (!action) return { available: false, reason: 'unknown' };
-  const { surface, displayMode, text = '' } = ctx;
+  const { surface, displayMode, text = '', understandMode = false } = ctx;
   const trigger = action.trigger || {};
 
   if (!resolveActionPath(action, ctx)) return { available: false, reason: 'capability' };
+  if (trigger.understandOnly && !understandMode) {
+    return { available: false, reason: 'understandMode' };
+  }
   if (surface && trigger.surfaces && !trigger.surfaces.includes(surface)) {
     return { available: false, reason: 'surface' };
   }
