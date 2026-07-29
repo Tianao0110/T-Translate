@@ -884,7 +884,7 @@ const FloatingWindow = () => {
             {aiActions.map((action) => (
               <button
                 key={action.id}
-                className={`toolbar-btn ${ai.isExpanded(action) ? 'active' : ''}`}
+                className={`toolbar-btn ${aiResult?.actionId === action.id ? 'active' : ''}`}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();

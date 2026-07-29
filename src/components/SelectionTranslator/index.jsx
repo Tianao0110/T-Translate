@@ -697,11 +697,6 @@ const SelectionTranslator = () => {
     }
   };
 
-  const toggleSource = (e) => {
-    e.stopPropagation();
-    setShowSource(!showSource);
-  };
-
   // AI actions read the selected text, not the translation — understanding is
   // done on the original side and answered in the target language in one step.
   const attachAiResultFromCard = useCallback((payload) => {
@@ -711,8 +706,18 @@ const SelectionTranslator = () => {
   const aiActions = ai.availableActions({ displayMode: 'unified', text: sourceText });
   const aiResult = ai.expandedFor(sourceText);
 
+  // The source text and every AI result share one panel above the translation:
+  // opening either closes the other, so the card only ever grows by one block
+  // and there is exactly one place to look.
+  const toggleSource = (e) => {
+    e.stopPropagation();
+    ai.collapse();
+    setShowSource(!showSource || !!aiResult);
+  };
+
   const runAiActionFromCard = async (e, action) => {
     e.stopPropagation();
+    setShowSource(false);
     const result = await ai.toggle(
       action,
       {
@@ -857,7 +862,7 @@ const SelectionTranslator = () => {
                 <Pin size={11} />
               </span>
             )}
-            <button className={`sel-btn ${showSource ? 'active' : ''}`} onClick={toggleSource} title={t('selection.showSource', '显示原文')}>
+            <button className={`sel-btn ${showSource && !aiResult ? 'active' : ''}`} onClick={toggleSource} title={t('selection.showSource', '显示原文')}>
               {t('translation.source', '原文')}
             </button>
             <button className={`sel-btn ${copied ? 'success' : ''}`} onClick={handleCopy} title={t('selection.copyTarget', '复制译文')}>
@@ -874,7 +879,7 @@ const SelectionTranslator = () => {
             {aiActions.map((action) => (
               <button
                 key={action.id}
-                className={`sel-btn ${ai.isExpanded(action) ? 'active' : ''}`}
+                className={`sel-btn ${aiResult?.actionId === action.id ? 'active' : ''}`}
                 onClick={(e) => runAiActionFromCard(e, action)}
                 disabled={ai.runningId === action.id}
                 title={resolveActionLabel(action, i18n.language)}
@@ -898,19 +903,20 @@ const SelectionTranslator = () => {
                 {notice && (
                   <div className="sel-notice">{notice}</div>
                 )}
-                {showSource && sourceText && (
-                  <div className="sel-source">{sourceText}</div>
-                )}
-                <div className="sel-text">{translatedText}</div>
-                {/* Folds open below the translation, the same way the source
-                    does — so a result is never a card of its own that could be
-                    fed back into another action. */}
-                {aiResult && (
+                {/* One panel above the translation, shared by the source text
+                    and every AI result: opening either closes the other, so the
+                    card grows by at most one block and there is a single place
+                    to look. It also means a result is never a card of its own
+                    that could be fed back into another action. */}
+                {aiResult ? (
                   <div className="sel-ai">
                     <div className="sel-ai-label">{aiResult.label}</div>
                     <div className="sel-ai-text">{aiResult.content}</div>
                   </div>
-                )}
+                ) : showSource && sourceText ? (
+                  <div className="sel-source">{sourceText}</div>
+                ) : null}
+                <div className="sel-text">{translatedText}</div>
                 {isOcrError && (
                   <button
                     className="sel-action-btn"

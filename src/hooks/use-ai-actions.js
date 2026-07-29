@@ -70,7 +70,9 @@ export default function useAiActions(surface, attachResult) {
     return entry && entry.sourceText === sourceText ? entry : null;
   }, [expandedId, results]);
 
-  const isExpanded = useCallback((action) => expandedId === action.id, [expandedId]);
+  // For surfaces that share one slot between the source text and a result:
+  // whatever opens there closes whatever was there before.
+  const collapse = useCallback(() => setExpandedId(null), []);
 
   // First click runs the action, later clicks fold its result away and back —
   // same as the card's source toggle, and it means a result can never become
@@ -116,5 +118,5 @@ export default function useAiActions(surface, attachResult) {
     }
   }, [i18n.language, capabilities, attachResult, results, expandedId]);
 
-  return { capabilities, availableActions, pathFor, runningId, toggle, expandedFor, isExpanded };
+  return { capabilities, availableActions, pathFor, runningId, toggle, expandedFor, collapse };
 }

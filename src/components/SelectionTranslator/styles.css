@@ -583,10 +583,10 @@ html, body, #root {
   animation: spin 1s linear infinite;
 }
 
-/* Folded-open AI result. Sits under the translation, accent-tinted so it reads
-   as something derived from it rather than a second translation. */
+/* AI result in the shared panel above the translation — same slot and metrics
+   as .sel-source, accent-tinted so the two are never confused. */
 .sel-ai {
-  margin-top: 8px;
+  margin-bottom: 8px;
   padding: 6px 8px;
   border-radius: 6px;
   border-left: 3px solid var(--sel-accent);

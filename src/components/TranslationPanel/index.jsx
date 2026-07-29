@@ -544,7 +544,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
               {aiActions.map((action) => (
                 <button
                   key={action.id}
-                  className={`action-btn ${ai.isExpanded(action) ? 'active' : ''}`}
+                  className={`action-btn ${aiResult?.actionId === action.id ? 'active' : ''}`}
                   onClick={() => runAiActionFromPanel(action)}
                   disabled={ai.runningId === action.id}
                   title={ai.pathFor(action, !!captureImage) === 'vision'

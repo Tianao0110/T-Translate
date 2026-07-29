@@ -40,8 +40,17 @@ describe('AI action toggle', () => {
     await act(async () => { await result.current.toggle(summarize, context); });
 
     expect(runAiAction).toHaveBeenCalledTimes(1);
-    expect(result.current.expandedFor('a long passage')).toMatchObject({ content: 'three points' });
-    expect(result.current.isExpanded(summarize)).toBe(true);
+    expect(result.current.expandedFor('a long passage'))
+      .toMatchObject({ actionId: 'summarize', content: 'three points' });
+  });
+
+  it('collapses on demand, so the shared panel can hand the slot to the source text', async () => {
+    const { result } = renderHook(() => useAiActions('selection'));
+
+    await act(async () => { await result.current.toggle(summarize, context); });
+    act(() => { result.current.collapse(); });
+
+    expect(result.current.expandedFor('a long passage')).toBeNull();
   });
 
   it('folds away on the second click without asking the model again', async () => {
