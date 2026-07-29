@@ -731,12 +731,21 @@ const zh = {
       google: { network: "Google 翻译服务暂时无法访问。可能需要网络代理。" }
     }
   },
+  // Display text for the built-in AI actions (config/ai-actions.js). Imported
+  // actions carry their own labels instead — they have no keys here.
+  aiActions: {
+    badConfig: "动作配置无效",
+    failed: "AI 动作失败",
+    emptyResult: "AI 未返回内容",
+    summarize: { name: "总结", desc: "读完整段内容，用目标语言给出要点" }
+  },
   svc: {
     noProvider: "没有可用的翻译源",
     allFailed: "所有翻译源均失败",
     testBlockedByPrivacy: "当前隐私模式已禁用该翻译源",
     batchFailed: "批量翻译全部失败",
     noUserMsg: "没有用户消息",
+    noChatProvider: "当前翻译源不支持 AI 对话功能，请配置一个大模型翻译源",
     translateFailed: "翻译失败",
     providerNotFound: "翻译源不存在",
     missingConfig: "缺少配置",

@@ -84,6 +84,7 @@ contextBridge.exposeInMainWorld('electron', {
     streamStart: (payload) => ipcRenderer.invoke('stack:translate-stream-start', payload),
     abort: (id) => ipcRenderer.invoke('stack:abort', { id }),
     chat: (payload) => ipcRenderer.invoke('stack:chat', payload),
+    chatCapability: () => ipcRenderer.invoke('stack:chat-capability'),
     testProvider: (providerId) => ipcRenderer.invoke('stack:test-provider', { providerId }),
     testProviderConfig: (providerId, config) =>
       ipcRenderer.invoke('stack:test-provider-config', { providerId, config }),

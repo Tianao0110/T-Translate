@@ -133,6 +133,7 @@ const CHANNELS = {
     STREAM_CHUNK: 'stack:stream-chunk',           // main → renderer push frames
     ABORT: 'stack:abort',
     CHAT: 'stack:chat',
+    CHAT_CAPABILITY: 'stack:chat-capability',     // can any allowed provider chat()?
     TEST_PROVIDER: 'stack:test-provider',
     TEST_PROVIDER_CONFIG: 'stack:test-provider-config',
     PROVIDERS_STATUS: 'stack:providers-status',

@@ -730,12 +730,21 @@ const en = {
       google: { network: "Google Translate is temporarily unreachable. A network proxy may be needed." }
     }
   },
+  // Display text for the built-in AI actions (config/ai-actions.js). Imported
+  // actions carry their own labels instead — they have no keys here.
+  aiActions: {
+    badConfig: "Invalid action config",
+    failed: "AI action failed",
+    emptyResult: "The model returned nothing",
+    summarize: { name: "Summarize", desc: "Read the whole passage and give key points in the target language" }
+  },
   svc: {
     noProvider: "No translation providers available",
     allFailed: "All translation providers failed",
     testBlockedByPrivacy: "This provider is disabled by the current privacy mode",
     batchFailed: "Batch translation failed entirely",
     noUserMsg: "No user message",
+    noChatProvider: "The current provider cannot run AI chat — configure an LLM provider",
     translateFailed: "Translation failed",
     providerNotFound: "Translation provider not found",
     missingConfig: "Missing configuration",

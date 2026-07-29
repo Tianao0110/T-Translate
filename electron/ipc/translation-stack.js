@@ -207,6 +207,19 @@ function register(ctx) {
     }
   });
 
+  // Answered under the facade's privacy mode, like every other stack call: in
+  // offline mode a cloud LLM must not count as "AI available".
+  ipcMain.handle(CHANNELS.STACK.CHAT_CAPABILITY, async () => {
+    if (!stack) return { available: false, providerId: null, providerName: null };
+    try {
+      await stack.service.init();
+      return stack.service.getChatCapability({ privacyMode: getPrivacyMode() });
+    } catch (e) {
+      logger.error('chat capability probe failed:', e);
+      return { available: false, providerId: null, providerName: null };
+    }
+  });
+
   // ===== Connection tests (offline gate enforced HERE, not in the renderer) =====
 
   ipcMain.handle(CHANNELS.STACK.TEST_PROVIDER, async (event, payload = {}) => {
