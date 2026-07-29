@@ -82,8 +82,6 @@ const SelectionTranslator = () => {
   const [isFrozen, setIsFrozen] = useState(false);
   const [windowId, setWindowId] = useState(null);
   const [freezeHint, setFreezeHint] = useState(false);
-  // Non-empty when this card holds an AI action result rather than a translation
-  const [aiAction, setAiAction] = useState('');
   const [cardHovered, setCardHovered] = useState(false);
 
   const [ttsStatus, setTtsStatus] = useState(TTS_STATUS.IDLE);
@@ -165,7 +163,6 @@ const SelectionTranslator = () => {
     setIsOcrError(false);
     setNotice('');
     setTriggerFailed(false);
-    setAiAction('');
   };
 
   // Degrade hint is transient — the vision lock means it only ever appears on
@@ -316,17 +313,11 @@ const SelectionTranslator = () => {
           targetLanguage: data.targetLanguage || 'zh',
           sourceLanguage: data.sourceLanguage || 'auto',
         });
-        // An AI result is the point of its own card, so it opens showing the
-        // answer; the source text is one click away like anywhere else.
-        setShowSource(!data.aiAction);
-        setAiAction(data.aiAction || '');
+        setShowSource(true);
         setSourceText(data.sourceText);
         setTranslatedText(data.translatedText);
         setIsOcrError(data.isOcrError === true); // override resetSession's clear
-        // Born pinned (AI result cards): detached from the active slot, so no
-        // later trigger overwrites it and closing goes through the pinned pool.
-        setIsFrozen(data.frozen === true);
-        if (data.frozen && data.windowId) setWindowId(data.windowId);
+        setIsFrozen(false);
         // Caller already positioned us (screenshot bounds) — just show.
         setMode('overlay');
         // Auto-hide handled by the unified overlay effect (乙案), no per-path timer.
@@ -718,10 +709,11 @@ const SelectionTranslator = () => {
   }, []);
   const ai = useAiActions('selection', attachAiResultFromCard);
   const aiActions = ai.availableActions({ displayMode: 'unified', text: sourceText });
+  const aiResult = ai.expandedFor(sourceText);
 
   const runAiActionFromCard = async (e, action) => {
     e.stopPropagation();
-    const result = await ai.run(
+    const result = await ai.toggle(
       action,
       {
         sourceText,
@@ -865,7 +857,6 @@ const SelectionTranslator = () => {
                 <Pin size={11} />
               </span>
             )}
-            {aiAction && <span className="sel-ai-badge">{aiAction}</span>}
             <button className={`sel-btn ${showSource ? 'active' : ''}`} onClick={toggleSource} title={t('selection.showSource', '显示原文')}>
               {t('translation.source', '原文')}
             </button>
@@ -883,7 +874,7 @@ const SelectionTranslator = () => {
             {aiActions.map((action) => (
               <button
                 key={action.id}
-                className="sel-btn"
+                className={`sel-btn ${ai.isExpanded(action) ? 'active' : ''}`}
                 onClick={(e) => runAiActionFromCard(e, action)}
                 disabled={ai.runningId === action.id}
                 title={resolveActionLabel(action, i18n.language)}
@@ -911,6 +902,15 @@ const SelectionTranslator = () => {
                   <div className="sel-source">{sourceText}</div>
                 )}
                 <div className="sel-text">{translatedText}</div>
+                {/* Folds open below the translation, the same way the source
+                    does — so a result is never a card of its own that could be
+                    fed back into another action. */}
+                {aiResult && (
+                  <div className="sel-ai">
+                    <div className="sel-ai-label">{aiResult.label}</div>
+                    <div className="sel-ai-text">{aiResult.content}</div>
+                  </div>
+                )}
                 {isOcrError && (
                   <button
                     className="sel-action-btn"

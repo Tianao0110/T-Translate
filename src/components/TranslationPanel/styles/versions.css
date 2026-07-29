@@ -82,3 +82,28 @@
   background: rgba(139, 92, 246, 0.1);
 }
 
+
+/* Folded-open AI result under the translation box. Accent-tinted so it reads
+   as something derived from the translation, not a second one. */
+.panel-ai {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border-left: 3px solid var(--accent-primary);
+  background: color-mix(in srgb, var(--accent-primary) 6%, var(--bg-secondary));
+}
+
+.panel-ai-label {
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-primary);
+}
+
+.panel-ai-text {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}

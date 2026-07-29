@@ -157,6 +157,23 @@
   cursor: grabbing;
 }
 
+/* Folded-open AI result under the translation. Accent-tinted so it reads as
+   something derived from the text above, not a second translation. */
+.floating-ai {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border-left: 3px solid var(--floating-accent);
+  background: color-mix(in srgb, var(--floating-accent) 7%, transparent);
+}
+
+.floating-ai-label {
+  margin-bottom: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--floating-accent);
+}
+
 /* ========== 理解模式开关 ==========
    Mirrors the close button on the opposite corner: it is a mode switch, not
    one of the centred action icons. */

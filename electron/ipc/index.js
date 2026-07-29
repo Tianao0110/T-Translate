@@ -9,7 +9,6 @@ const registerShortcutsIPC = require('./shortcuts');
 const registerScreenshotIPC = require('./screenshot');
 const registerClipboardIPC = require('./clipboard');
 const registerFloatingWindowIPC = require('./floating-window');
-const registerAiResultIPC = require('./ai-result');
 const registerSelectionIPC = require('./selection');
 const registerSecureStorageIPC = require('./secure-storage');
 const registerTranslationStackIPC = require('./translation-stack');
@@ -70,7 +69,6 @@ function initIPC(deps) {
   registerClipboardIPC(context);
 
   registerFloatingWindowIPC(context);
-  registerAiResultIPC(context);
 
   registerSelectionIPC(context);
   registerSecureStorageIPC(context);

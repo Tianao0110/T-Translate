@@ -74,11 +74,6 @@ contextBridge.exposeInMainWorld("electron", {
     decrypt: (key) => ipcRenderer.invoke("secure-storage:decrypt", key),
   },
 
-  // AI action results appear in a pinned selection card beside this window.
-  aiResult: {
-    show: (payload) => ipcRenderer.invoke("ai-result:show", payload),
-  },
-
   // Main-process translation stack (same bridge as the main-window preload;
   // this window only translates, so no test/management surface is exposed).
   stack: {

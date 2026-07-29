@@ -126,8 +126,10 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     hasImage: !!captureImage,
   });
 
+  const aiResult = ai.expandedFor(currentTranslation.sourceText);
+
   const runAiActionFromPanel = useCallback(async (action) => {
-    const result = await ai.run(
+    const result = await ai.toggle(
       action,
       {
         sourceText: currentTranslation.sourceText,
@@ -542,7 +544,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
               {aiActions.map((action) => (
                 <button
                   key={action.id}
-                  className="action-btn"
+                  className={`action-btn ${ai.isExpanded(action) ? 'active' : ''}`}
                   onClick={() => runAiActionFromPanel(action)}
                   disabled={ai.runningId === action.id}
                   title={ai.pathFor(action, !!captureImage) === 'vision'
@@ -574,6 +576,15 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
             placeholder={t('translation.outputPlaceholder')}
             spellCheck={false}
           />
+
+          {/* Folds open under the translation it was made from; clicking the
+              action again puts it away. */}
+          {aiResult && (
+            <div className="panel-ai">
+              <div className="panel-ai-label">{aiResult.label}</div>
+              <div className="panel-ai-text">{aiResult.content}</div>
+            </div>
+          )}
 
           {currentTranslation.glossaryApplied && currentTranslation.glossaryApplied.replacements.length > 0 && (() => {
             const replacements = currentTranslation.glossaryApplied.replacements;

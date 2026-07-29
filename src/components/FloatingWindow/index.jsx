@@ -106,9 +106,10 @@ const FloatingWindow = () => {
     hasImage: !!captureImage,
     understandMode,
   }).filter(action => action.id !== autoRunId);
+  const aiResult = ai.expandedFor(sourceText);
 
   const runAction = useCallback(async (action) => {
-    const result = await ai.run(
+    const result = await ai.toggle(
       action,
       {
         sourceText,
@@ -883,7 +884,7 @@ const FloatingWindow = () => {
             {aiActions.map((action) => (
               <button
                 key={action.id}
-                className="toolbar-btn"
+                className={`toolbar-btn ${ai.isExpanded(action) ? 'active' : ''}`}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -1016,6 +1017,14 @@ const FloatingWindow = () => {
               <div className="mode-indicator" title={modeChipTitle}>{modeChipText}</div>
             )}
             {translatedText}
+            {/* Folds open under the translation rather than opening a window of
+                its own — a result is never something you can act on again. */}
+            {aiResult && (
+              <div className="floating-ai">
+                <div className="floating-ai-label">{aiResult.label}</div>
+                {aiResult.content}
+              </div>
+            )}
           </div>
         ) : (
           <div className="floating-message placeholder">

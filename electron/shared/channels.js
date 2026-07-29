@@ -150,11 +150,6 @@ const CHANNELS = {
     VISION_CHAT: 'stack:vision-chat',             // path B: prompt + capture to a vision model
     VISION_CAPABILITY: 'stack:vision-capability', // may path B run under the live privacy mode?
   },
-  // AI action results (ipc/ai-result.js) — shown in a pinned selection card
-  // spawned beside the requesting window, closed by the user like any other.
-  AI_RESULT: {
-    SHOW: 'ai-result:show',
-  },
 };
 
 const MENU_ACTIONS = {

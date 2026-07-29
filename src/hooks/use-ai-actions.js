@@ -1,7 +1,8 @@
 // Shared wiring for the data-driven AI actions: which ones this surface may
-// offer right now, and running one into its own result window. Generalizes the
-// style-rewrite flow (result -> popup -> chatCompletion) so a new action is a
-// config entry rather than another copy of this hook.
+// offer right now, running one, and holding its result so the surface can
+// expand it in place. Generalizes the style-rewrite flow (result -> chatCompletion
+// -> shown next to the translation) so a new action is a config entry rather
+// than another copy of this hook.
 
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -26,6 +27,10 @@ export default function useAiActions(surface, attachResult) {
   const { i18n } = useTranslation();
   const [capabilities, setCapabilities] = useState({ text: false, vision: false });
   const [runningId, setRunningId] = useState(null);
+  // One result per action, remembered with the text it was made from so a new
+  // translation can never show the previous passage's summary.
+  const [results, setResults] = useState({});
+  const [expandedId, setExpandedId] = useState(null);
 
   // Re-probed whenever the stack reloads: adding an LLM provider in settings
   // must light the entry up without restarting the window.
@@ -58,23 +63,41 @@ export default function useAiActions(surface, attachResult) {
     resolveActionPath(action, { capabilities, hasImage })
   ), [capabilities]);
 
-  // Resolves to the runner's result; the caller surfaces failures in whatever
-  // notification channel its window owns.
-  const run = useCallback(async (action, context) => {
+  // What the surface should render right now, or null. Returns nothing once the
+  // window has moved on to different text.
+  const expandedFor = useCallback((sourceText) => {
+    const entry = expandedId ? results[expandedId] : null;
+    return entry && entry.sourceText === sourceText ? entry : null;
+  }, [expandedId, results]);
+
+  const isExpanded = useCallback((action) => expandedId === action.id, [expandedId]);
+
+  // First click runs the action, later clicks fold its result away and back —
+  // same as the card's source toggle, and it means a result can never become
+  // the input of another run.
+  const toggle = useCallback(async (action, context) => {
+    const cached = results[action.id];
+    if (cached && cached.sourceText === context.sourceText) {
+      setExpandedId(expandedId === action.id ? null : action.id);
+      return { success: true, content: cached.content };
+    }
+
     setRunningId(action.id);
     try {
       const result = await runAiAction(action, { ...context, capabilities });
       if (result.success) {
-        // Shown in a pinned selection card next door — same look, same themes,
-        // same grow-to-fit as every other card in the app.
-        await window.electron?.aiResult?.show?.({
-          actionId: action.id,
-          actionLabel: resolveActionLabel(action, i18n.language || 'zh'),
-          content: result.content,
-          sourceText: context.sourceText || '',
-          sourceLanguage: context.sourceLanguage || 'auto',
-          targetLanguage: context.targetLanguage || 'zh',
-        });
+        setResults(prev => ({
+          ...prev,
+          [action.id]: {
+            actionId: action.id,
+            label: resolveActionLabel(action, i18n.language || 'zh'),
+            sourceText: context.sourceText,
+            content: result.content,
+            path: result.path,
+            provider: result.provider || '',
+          },
+        }));
+        setExpandedId(action.id);
         // The store applies the secure-mode gate and decides which entry this
         // hangs on — nothing to hang it on means it stays a one-off.
         if (isAttachableResult(action) && attachResult) {
@@ -91,7 +114,7 @@ export default function useAiActions(surface, attachResult) {
     } finally {
       setRunningId(null);
     }
-  }, [i18n.language, capabilities, attachResult]);
+  }, [i18n.language, capabilities, attachResult, results, expandedId]);
 
-  return { capabilities, availableActions, pathFor, runningId, run };
+  return { capabilities, availableActions, pathFor, runningId, toggle, expandedFor, isExpanded };
 }

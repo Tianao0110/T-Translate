@@ -105,11 +105,6 @@ const electronAPI = {
     delete: (key) => ipcRenderer.invoke("secure-storage:delete", key),
     isAvailable: () => ipcRenderer.invoke("secure-storage:isAvailable"),
   },
-  // AI action results appear in a pinned selection card beside this window.
-  aiResult: {
-    show: (payload) => ipcRenderer.invoke("ai-result:show", payload),
-  },
-
   // Main-process translation stack (services/stack-client.js is the consumer).
   // No privacyMode/useCache here — the main-process facade injects them.
   stack: {

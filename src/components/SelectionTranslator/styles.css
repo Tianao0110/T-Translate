@@ -583,17 +583,27 @@ html, body, #root {
   animation: spin 1s linear infinite;
 }
 
-/* Names the action a result card came from, so a pinned summary is not read
-   as a translation. */
-.sel-ai-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 6px;
-  height: 18px;
-  border-radius: 9px;
+/* Folded-open AI result. Sits under the translation, accent-tinted so it reads
+   as something derived from it rather than a second translation. */
+.sel-ai {
+  margin-top: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border-left: 3px solid var(--sel-accent);
+  background: color-mix(in srgb, var(--sel-accent) 7%, transparent);
+}
+
+.sel-ai-label {
+  margin-bottom: 4px;
   font-size: 11px;
-  font-weight: 500;
-  white-space: nowrap;
-  background: color-mix(in srgb, var(--sel-accent) 15%, transparent);
+  font-weight: 600;
   color: var(--sel-accent);
 }
+
+.sel-ai-text {
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
