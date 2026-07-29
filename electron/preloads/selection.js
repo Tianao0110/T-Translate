@@ -73,6 +73,11 @@ contextBridge.exposeInMainWorld("electron", {
     decrypt: (key) => ipcRenderer.invoke("secure-storage:decrypt", key),
   },
 
+  // AI action results open in their own window, owned by this one.
+  aiResult: {
+    open: (payload) => ipcRenderer.invoke("ai-result:open", payload),
+  },
+
   // Main-process translation stack (same bridge as the main-window preload;
   // this window only translates, so no test/management surface is exposed).
   stack: {

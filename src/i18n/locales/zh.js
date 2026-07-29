@@ -737,6 +737,8 @@ const zh = {
     badConfig: "动作配置无效",
     failed: "AI 动作失败",
     emptyResult: "AI 未返回内容",
+    resultTitle: "AI 结果",
+    generatedBy: "由 {{provider}} 生成",
     summarize: { name: "总结", desc: "读完整段内容，用目标语言给出要点" }
   },
   svc: {

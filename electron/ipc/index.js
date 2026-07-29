@@ -9,6 +9,7 @@ const registerShortcutsIPC = require('./shortcuts');
 const registerScreenshotIPC = require('./screenshot');
 const registerClipboardIPC = require('./clipboard');
 const registerFloatingWindowIPC = require('./floating-window');
+const registerAiResultIPC = require('./ai-result');
 const registerSelectionIPC = require('./selection');
 const registerSecureStorageIPC = require('./secure-storage');
 const registerTranslationStackIPC = require('./translation-stack');
@@ -50,6 +51,10 @@ function initIPC(deps) {
     runtime: deps.runtime,
     store: deps.store,
     app: deps.app,
+    // Platform modules are dependencies like any other here — submodules that
+    // take them from ctx stay loadable (and testable) outside a real Electron.
+    electron: require('electron'),
+    displayHelper: require('../utils/display-helper'),
     // Managers passed in (avoids circular dep on window-manager).
     managers: deps.managers || {},
   };
@@ -65,6 +70,7 @@ function initIPC(deps) {
   registerClipboardIPC(context);
 
   registerFloatingWindowIPC(context);
+  registerAiResultIPC(context);
 
   registerSelectionIPC(context);
   registerSecureStorageIPC(context);

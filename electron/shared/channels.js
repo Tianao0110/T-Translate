@@ -145,6 +145,13 @@ const CHANNELS = {
     OCR_RECOGNIZE: 'stack:ocr-recognize',         // allowedEngines injected main-side
     OCR_RESET_VISION: 'stack:ocr-reset-vision',
   },
+  // AI action result windows (ipc/ai-result.js). Owned by the window that asked
+  // for them, so the spawning card takes them down when its session ends.
+  AI_RESULT: {
+    OPEN: 'ai-result:open',
+    PAYLOAD: 'ai-result:payload',                 // window pulls its own content
+    CLOSE: 'ai-result:close',
+  },
 };
 
 const MENU_ACTIONS = {

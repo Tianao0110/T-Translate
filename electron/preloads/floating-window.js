@@ -78,6 +78,11 @@ contextBridge.exposeInMainWorld('electron', {
     isAvailable: () => ipcRenderer.invoke('secure-storage:isAvailable'),
   },
 
+  // AI action results open in their own window, owned by this one.
+  aiResult: {
+    open: (payload) => ipcRenderer.invoke('ai-result:open', payload),
+  },
+
   // Main-process translation stack (same bridge as the main-window preload).
   stack: {
     translate: (payload) => ipcRenderer.invoke('stack:translate', payload),

@@ -40,7 +40,10 @@ vi.mock('../../src/utils/error-handler.js', () => ({
 }));
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (_key, fallback) => fallback || _key }),
+  useTranslation: () => ({ t: (_key, fallback) => fallback || _key, i18n: { language: 'zh' } }),
+  // src/i18n.js now runs for real in this graph (ai-action-runner imports it)
+  // and hands this to i18next.use(); a stub keeps that bootstrap from throwing.
+  initReactI18next: { type: '3rdParty', init: () => {} },
 }));
 
 vi.mock('@config/defaults', () => ({
