@@ -32,6 +32,12 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 
 只覆盖纯 JS 改动；koffi/uiohook/node-screenshots/OCR 全在 asarUnpack，native 或 Electron 版本一变必须回全量；且热更新通道必须做包签名校验，否则是供应链攻击口。当前差分下载（v0.2.8 起）已覆盖大部分收益。
 
+### AI 动作框架收尾项（v0.3.3 已发布，剩数据驱动项）
+
+- **长段阈值仍是估值**：中文 150 字 / 英文 120 词写在 `src/config/ai-actions.js` `LONG_FORM_GATE`，设计阶段就说要拿真实技术文档实测再定。用一段时间后按"该出现却没出现 / 不该出现却出现"的实感调
+- **Anthropic / Gemini 不支持 AI 动作**：这两个 provider 只实现了 `translate()`、没有 `chat()`（`src/stack/providers/`），能力探测据此不显示入口。要支持就给它们各补一个 chat 实现（各自的原生 messages API），不是框架侧的事
+- **理解模式结果不进历史**：那条路没有翻译条目可挂（AI 结果是翻译的附属，无附主则不写）。若要回看，需要单独设计一个"理解记录"，或让理解模式也留一条主条目——属产品决策，未定
+
 ### LLM 视觉 OCR 丢失位置信息（2026-07-12 用户提出，研究性质）
 
 llm-vision 引擎（API 交给本地视觉模型识别）只返回纯文本、无 bbox——悬浮窗散点模式被迫回退整段（徽标"散点→整段"），漫画/标签场景体验降级。候选方向（需实验验证）：
