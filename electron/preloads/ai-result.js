@@ -6,6 +6,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electron', {
   aiResult: {
     getPayload: (id) => ipcRenderer.invoke('ai-result:payload', id),
+    // Fire-and-forget: the window sizes itself to the text it just laid out.
+    reportHeight: (id, height) => ipcRenderer.send('ai-result:resize', { id, height }),
     close: (id) => ipcRenderer.invoke('ai-result:close', id),
   },
 

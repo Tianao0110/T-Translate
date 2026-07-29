@@ -1,8 +1,9 @@
-// AI result windows: the ownership rules from the design's linkage table.
-// A result never outlives the card it came from; closing a result leaves that
-// card alone. Drives the real IPC handlers against a fake BrowserWindow.
+// AI result windows: the ownership rules from the design's linkage table (a
+// result never outlives the card it came from; closing a result leaves that
+// card alone) and the fit-to-content sizing. Drives the real IPC handlers
+// against a fake BrowserWindow.
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // shared/paths.js builds packaged paths from process.resourcesPath, which only
 // exists inside Electron.
@@ -17,16 +18,23 @@ class FakeResultWindow {
   constructor(options) {
     this.options = options;
     this.destroyed = false;
+    this.visible = false;
     this.closeCalls = 0;
+    this.bounds = { x: options.x, y: options.y, width: options.width, height: options.height };
     this._on = {};
     created.push(this);
   }
   isDestroyed() { return this.destroyed; }
+  isVisible() { return this.visible; }
+  show() { this.visible = true; }
+  getBounds() { return { ...this.bounds }; }
+  setBounds(next) { this.bounds = { ...this.bounds, ...next }; }
   setAlwaysOnTop() {}
   loadURL() {}
   loadFile() {}
   once(event, cb) { this._on[event] = cb; }
   on(event, cb) { this._on[event] = cb; }
+  emit(event) { this._on[event]?.(); }
   close() {
     this.closeCalls++;
     this.destroyed = true;
@@ -60,7 +68,10 @@ function open(ownerWindow, payload = {}) {
 // display enumeration are involved.
 const ctx = {
   electron: {
-    ipcMain: { handle: (channel, fn) => handlers.set(channel, fn) },
+    ipcMain: {
+      handle: (channel, fn) => handlers.set(channel, fn),
+      on: (channel, fn) => handlers.set(channel, fn),
+    },
     BrowserWindow: Object.assign(
       function (options) { return new FakeResultWindow(options); },
       { fromWebContents: (wc) => wc?.__ownerWindow || null }
@@ -154,5 +165,69 @@ describe('AI result window ownership', () => {
 
     expect(result.success).toBe(false);
     expect(created).toHaveLength(0);
+  });
+});
+
+describe('AI result window sizing', () => {
+  const report = (id, height) => handlers.get('ai-result:resize')({}, { id, height });
+
+  it('takes the height the renderer measured for its text', async () => {
+    const result = await open(makeOwner(1));
+
+    report(result.id, 268);
+
+    expect(created[0].getBounds().height).toBe(268);
+    expect(created[0].getBounds().width).toBe(420); // reading column stays fixed
+  });
+
+  it('does not shrink below a usable minimum', async () => {
+    const result = await open(makeOwner(1));
+
+    report(result.id, 20);
+
+    expect(created[0].getBounds().height).toBe(140);
+  });
+
+  it('caps the height and lets long content scroll instead', async () => {
+    const result = await open(makeOwner(1));
+
+    report(result.id, 4000);
+
+    expect(created[0].getBounds().height).toBe(720);
+  });
+
+  it('stays hidden until the height is settled, then shows', async () => {
+    const result = await open(makeOwner(1));
+    created[0].emit('ready-to-show');
+
+    expect(created[0].isVisible()).toBe(false);
+
+    report(result.id, 300);
+
+    expect(created[0].isVisible()).toBe(true);
+  });
+
+  it('shows anyway when the renderer never reports a height', async () => {
+    vi.useFakeTimers();
+    try {
+      await open(makeOwner(1));
+      created[0].emit('ready-to-show');
+
+      vi.advanceTimersByTime(1000);
+
+      expect(created[0].isVisible()).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('ignores a nonsense height', async () => {
+    const result = await open(makeOwner(1));
+    const before = created[0].getBounds().height;
+
+    report(result.id, 0);
+    report(result.id, undefined);
+
+    expect(created[0].getBounds().height).toBe(before);
   });
 });

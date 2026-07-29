@@ -150,6 +150,7 @@ const CHANNELS = {
   AI_RESULT: {
     OPEN: 'ai-result:open',
     PAYLOAD: 'ai-result:payload',                 // window pulls its own content
+    RESIZE: 'ai-result:resize',                   // window reports its fitted height
     CLOSE: 'ai-result:close',
   },
 };

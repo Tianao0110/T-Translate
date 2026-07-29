@@ -2,7 +2,7 @@
 // content is a snapshot taken when the action ran, so a later translation in
 // the card that spawned it never rewrites what the user is reading.
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Copy, Check, X } from 'lucide-react';
 import createLogger from '../../utils/logger.js';
@@ -15,6 +15,10 @@ const AiResultWindow = () => {
   const [payload, setPayload] = useState(null);
   const [theme, setTheme] = useState('light');
   const [copied, setCopied] = useState(false);
+
+  const rootRef = useRef(null);
+  const contentRef = useRef(null);
+  const bodyRef = useRef(null);
 
   const windowId = new URLSearchParams(window.location.search).get('id') || '';
 
@@ -43,6 +47,23 @@ const AiResultWindow = () => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
+  // The window sizes itself to the text once, after it has been laid out — a
+  // fixed box leaves a three-line summary swimming in empty space. Reported
+  // once only, so a window the user has resized by hand stays put.
+  useEffect(() => {
+    if (!payload) return undefined;
+    const frame = requestAnimationFrame(() => {
+      const root = rootRef.current;
+      const content = contentRef.current;
+      const body = bodyRef.current;
+      if (!root || !content || !body) return;
+      // Everything that is not the scrolling area: header, footer, borders.
+      const chrome = root.offsetHeight - content.offsetHeight;
+      window.electron?.aiResult?.reportHeight?.(windowId, chrome + body.offsetHeight);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [payload, windowId]);
+
   const handleClose = useCallback(() => {
     window.electron?.aiResult?.close?.(windowId);
   }, [windowId]);
@@ -63,7 +84,7 @@ const AiResultWindow = () => {
   }, [handleClose]);
 
   return (
-    <div className="ai-result-root" data-theme={theme}>
+    <div className="ai-result-root" data-theme={theme} ref={rootRef}>
       <div className="ai-result-header">
         <span className="ai-result-title">{payload?.title || t('aiActions.resultTitle', 'AI 结果')}</span>
         <div className="ai-result-actions">
@@ -81,10 +102,14 @@ const AiResultWindow = () => {
         </div>
       </div>
 
-      <div className="ai-result-content">
-        {payload?.content
-          ? <pre className="ai-result-text">{payload.content}</pre>
-          : <div className="ai-result-empty">{t('aiActions.emptyResult', 'AI 未返回内容')}</div>}
+      <div className="ai-result-content" ref={contentRef}>
+        {/* Padding lives on this inner box, not the scroll container, so its
+            height is exactly what the window needs to show everything. */}
+        <div className="ai-result-body" ref={bodyRef}>
+          {payload?.content
+            ? <pre className="ai-result-text">{payload.content}</pre>
+            : <div className="ai-result-empty">{t('aiActions.emptyResult', 'AI 未返回内容')}</div>}
+        </div>
       </div>
 
       {payload?.provider && (
