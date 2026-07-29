@@ -14,6 +14,12 @@
   /* Near-opaque elevated surface (popups/badges) — unlike --floating-bg it
      must not follow the user's window opacity. */
   --floating-surface: rgba(255, 255, 255, 0.96);
+  /* Solid halo behind result/message text. Matches this theme's --floating-bg
+     base color, so it's invisible at normal opacity but shows through as a
+     legibility rim once the background is dragged toward 1% (subtitle over
+     manga/desktop) — the text itself was never transparent, it just lost its
+     backing surface. */
+  --floating-text-halo: rgba(255, 255, 255, 0.9);
 }
 
 /* ========== 主窗口 ========== */
@@ -349,6 +355,9 @@
   color: var(--floating-text-muted);
   text-align: center;
   font-size: 14px;
+  /* Same low-opacity legibility rim as .floating-result (loading/placeholder/
+     error text sits on the transparent window too) */
+  text-shadow: 0 0 3px var(--floating-text-halo), 0 0 6px var(--floating-text-halo);
 }
 
 .floating-message.error {
@@ -397,6 +406,8 @@
   word-wrap: break-word;
   white-space: pre-wrap;  /* 保留换行符 */
   user-select: text;      /* re-granted here — the root is user-select:none for dragging */
+  /* Legibility rim for low window opacity — see --floating-text-halo */
+  text-shadow: 0 0 3px var(--floating-text-halo), 0 0 6px var(--floating-text-halo);
 }
 
 /* ========== 滚动提示 ========== */
@@ -447,6 +458,7 @@
   --floating-accent: #10b981;
   --floating-on-accent: #ffffff;
   --floating-surface: rgba(236, 246, 244, 0.97);
+  --floating-text-halo: rgba(236, 246, 244, 0.9);
 }
 
 [data-theme="fresh"] .floating-window::before {
@@ -528,6 +540,7 @@
   --floating-accent: #d6a854;
   --floating-on-accent: #241c0e;
   --floating-surface: rgba(38, 36, 33, 0.97);
+  --floating-text-halo: rgba(33, 31, 29, 0.9);
 }
 
 [data-theme="dark"] .floating-top-area {
