@@ -45,6 +45,7 @@ initStoreSync(useTranslationStore);
 function App() {
   const [theme, setTheme] = useState(THEMES.LIGHT);
   const addToHistory = useTranslationStore((state) => state.addToHistory);
+  const attachAiResult = useTranslationStore((state) => state.attachAiResult);
   const setOcrEngine = useTranslationStore((state) => state.setOcrEngine);
 
   useEffect(() => {
@@ -143,12 +144,20 @@ function App() {
       }
     };
 
+    // AI results from those windows ride on an existing entry rather than
+    // making one; the store owns the matching and the secure-mode gate.
+    const handleAttachAiResult = (event, payload) => {
+      if (payload) attachAiResult(payload);
+    };
+
     window.electron.ipcRenderer.on('add-to-history', handleAddToHistory);
+    window.electron.ipcRenderer.on('attach-ai-result', handleAttachAiResult);
 
     return () => {
       window.electron.ipcRenderer.removeListener('add-to-history', handleAddToHistory);
+      window.electron.ipcRenderer.removeListener('attach-ai-result', handleAttachAiResult);
     };
-  }, [addToHistory]);
+  }, [addToHistory, attachAiResult]);
 
   // Render-phase errors are ErrorBoundary's job (src/main.jsx wraps <App/>);
   // the old try/catch here broke hook ordering rules and, on a mount throw,

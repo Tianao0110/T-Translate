@@ -41,6 +41,7 @@ contextBridge.exposeInMainWorld('electron', {
     // Forward a completed translation into the main window's history store
     // (which applies its own secure-mode gate).
     addToHistory: (item) => ipcRenderer.invoke('floating-window:add-to-history', item),
+    attachAiResult: (payload) => ipcRenderer.invoke('floating-window:attach-ai-result', payload),
 
     openMainSettings: (section) => ipcRenderer.invoke('floating-window:open-main-settings', section),
 

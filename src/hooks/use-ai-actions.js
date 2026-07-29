@@ -9,6 +9,7 @@ import { BUILTIN_AI_ACTIONS } from '@config/ai-actions';
 import {
   checkActionAvailability,
   getActionCapabilities,
+  isAttachableResult,
   resolveActionLabel,
   resolveActionPath,
   runAiAction,
@@ -18,7 +19,10 @@ import createLogger from '../utils/logger.js';
 
 const logger = createLogger('useAiActions');
 
-export default function useAiActions(surface) {
+// attachResult: how this window records a result onto the translation it came
+// from. The main panel hands over the store action; the overlay windows hand
+// over their IPC bridge, since only the main window owns the history.
+export default function useAiActions(surface, attachResult) {
   const { i18n } = useTranslation();
   const [capabilities, setCapabilities] = useState({ text: false, vision: false });
   const [runningId, setRunningId] = useState(null);
@@ -68,12 +72,23 @@ export default function useAiActions(surface) {
           provider: result.provider || '',
           theme: theme || 'light',
         });
+        // The store applies the secure-mode gate and decides which entry this
+        // hangs on — nothing to hang it on means it stays a one-off.
+        if (isAttachableResult(action) && attachResult) {
+          attachResult({
+            sourceText: context.sourceText,
+            actionId: action.id,
+            content: result.content,
+            provider: result.provider || '',
+            path: result.path,
+          });
+        }
       }
       return result;
     } finally {
       setRunningId(null);
     }
-  }, [i18n.language, capabilities]);
+  }, [i18n.language, capabilities, attachResult]);
 
   return { capabilities, availableActions, pathFor, runningId, run };
 }

@@ -89,7 +89,10 @@ const FloatingWindow = () => {
   // AI actions run on the recognized source text, not the translation — a
   // summary of a summary compounds whatever the translator got wrong. When a
   // vision model is configured they run on the capture itself instead.
-  const ai = useAiActions('floating');
+  const attachAiResult = useCallback((payload) => {
+    window.electron?.floatingWindow?.attachAiResult?.(payload);
+  }, []);
+  const ai = useAiActions('floating', attachAiResult);
   const captureImage = pipeline.getLastCaptureImage(sourceText);
   const aiActions = ai.availableActions({ displayMode, text: sourceText, hasImage: !!captureImage });
 

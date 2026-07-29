@@ -6,9 +6,11 @@ import {
   Calendar, ChevronDown, ChevronRight, LayoutGrid,
   BarChart3, TrendingUp, X, Edit3, Download, Upload,
   Hash, Type, Languages, Activity, RotateCcw, Lock,
-  Table, CheckSquare, Square, Trash, ArrowUpDown
+  Table, CheckSquare, Square, Trash, ArrowUpDown, Sparkles, Image as ImageIcon
 } from 'lucide-react';
 import useTranslationStore from '../../stores/translation-store';
+import { getAiAction } from '@config/ai-actions';
+import { resolveActionLabel } from '../../services/ai-action-runner.js';
 import { useDebounce } from '../../utils/performance';
 import useVisibleHotkey from '../../hooks/use-visible-hotkey.js';
 import HighlightText from '../shared/HighlightText.jsx';
@@ -76,6 +78,11 @@ const HistoryCard = memo(({
       <div className="card-header">
         <span className="card-lang">{item.sourceLanguage || 'auto'} → {item.targetLanguage || 'zh'}</span>
         <div className="card-header-right">
+          {item.ai?.length > 0 && (
+            <span className="card-ai-badge" title={t('history.hasAiResult', '附带 AI 结果，双击查看')}>
+              <Sparkles size={12} />
+            </span>
+          )}
           <span className="card-time">{dayjs(item.timestamp).format('HH:mm')}</span>
           {showCheckbox && (
             <button className="card-checkbox" onClick={handleSelect}>
@@ -120,6 +127,8 @@ const HistoryCard = memo(({
     prevProps.item.id === nextProps.item.id &&
     prevProps.item.sourceText === nextProps.item.sourceText &&
     prevProps.item.translatedText === nextProps.item.translatedText &&
+    // The badge appears/disappears with attached AI results
+    (prevProps.item.ai?.length || 0) === (nextProps.item.ai?.length || 0) &&
     prevProps.isFavorite === nextProps.isFavorite &&
     prevProps.isSelected === nextProps.isSelected &&
     prevProps.showCheckbox === nextProps.showCheckbox &&
@@ -186,6 +195,7 @@ const HistoryPanel = ({ showNotification }) => {
   const addToFavorites = useTranslationStore(state => state.addToFavorites);
   const removeFromFavorites = useTranslationStore(state => state.removeFromFavorites);
   const removeFromHistory = useTranslationStore(state => state.removeFromHistory);
+  const removeAiResult = useTranslationStore(state => state.removeAiResult);
   const exportHistory = useTranslationStore(state => state.exportHistory);
   const importHistory = useTranslationStore(state => state.importHistory);
 
@@ -396,6 +406,14 @@ const HistoryPanel = ({ showNotification }) => {
     restoreFromHistory(id);
     notify(t('history.restored'), 'success');
   }, [restoreFromHistory, notify, t]);
+
+  // The open modal holds a snapshot of the entry, so it is refreshed here —
+  // otherwise the deleted result stays on screen until the modal is reopened.
+  const handleRemoveAiResult = useCallback((item, aiId) => {
+    removeAiResult(item.id, aiId);
+    const remaining = (item.ai || []).filter((a) => a.id !== aiId);
+    setDetailItem({ ...item, ai: remaining.length ? remaining : undefined });
+  }, [removeAiResult]);
 
   const handleFavorite = useCallback((item) => {
     const isFav = favoriteIds.has(item.id);
@@ -809,6 +827,27 @@ const HistoryPanel = ({ showNotification }) => {
                 <div className="detail-label">{t('translation.target')}</div>
                 <div className="detail-text translated">{detailItem.translatedText}</div>
               </div>
+              {/* Attached AI results, deletable on their own — the translation
+                  they hang on stays either way. */}
+              {detailItem.ai?.map((result) => (
+                <div className="detail-section" key={result.id}>
+                  <div className="detail-label ai">
+                    <Sparkles size={12} />
+                    {resolveActionLabel(getAiAction(result.actionId), i18n.language) || t('aiActions.resultTitle')}
+                    {result.path === 'vision' && (
+                      <ImageIcon size={11} className="detail-ai-path" title={t('aiActions.readFromCapture', '视觉模型读取截图生成')} />
+                    )}
+                    <button
+                      className="detail-ai-delete"
+                      onClick={() => handleRemoveAiResult(detailItem, result.id)}
+                      title={t('history.delete')}
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                  <div className="detail-text ai">{result.content}</div>
+                </div>
+              ))}
             </div>
 
             <div className="detail-modal-footer">

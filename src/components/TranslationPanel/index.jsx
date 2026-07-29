@@ -79,6 +79,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     pasteFromClipboard,
     addStyleVersion,
     switchVersion,
+    attachAiResult,
   } = useTranslationStore(useShallow((s) => ({
     currentTranslation: s.currentTranslation,
     favorites: s.favorites,
@@ -100,6 +101,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     pasteFromClipboard: s.pasteFromClipboard,
     addStyleVersion: s.addStyleVersion,
     switchVersion: s.switchVersion,
+    attachAiResult: s.attachAiResult,
   })));
 
   const tts = useTTS(notify, t);
@@ -110,7 +112,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   // AI actions read the source side, so the entry follows the source box, not
   // whether a translation already exists.
   const lastCaptureRef = useRef(null); // { dataURL, sourceText } of the last capture
-  const ai = useAiActions('screenshot');
+  const ai = useAiActions('screenshot', attachAiResult);
 
   // The capture only stands in for the source box while the box still holds
   // what that capture said; an edit or a paste retires it.

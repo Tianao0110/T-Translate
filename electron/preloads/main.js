@@ -14,6 +14,7 @@ const validChannels = {
     "menu-action",
     "import-file",
     "add-to-history",
+    "attach-ai-result",
     "screenshot-captured",
     "screenshot-captured-silent",
     "selection-state-changed",

@@ -657,6 +657,49 @@
   font-weight: 500;
 }
 
+/* Attached AI result — sits under the translation it belongs to, accent-tinted
+   so it reads as a derivative rather than a third equal column of text. */
+.detail-label.ai {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  text-transform: none;
+  color: var(--accent-primary);
+}
+
+.detail-ai-path {
+  color: var(--text-tertiary);
+}
+
+.detail-ai-delete {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+
+.detail-ai-delete:hover {
+  background: color-mix(in srgb, var(--error) 12%, transparent);
+  color: var(--error);
+}
+
+.detail-text.ai {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--accent-primary) 5%, var(--bg-secondary));
+  border-color: color-mix(in srgb, var(--accent-primary) 25%, transparent);
+}
+
+.card-ai-badge {
+  display: inline-flex;
+  align-items: center;
+  color: var(--accent-primary);
+}
+
 .detail-modal-footer {
   display: flex;
   flex-wrap: wrap;

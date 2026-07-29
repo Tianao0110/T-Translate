@@ -156,6 +156,7 @@ const zh = {
     filter: { all: "全部时间", today: "今天", week: "本周", month: "本月" },
     group: { date: "按日期", language: "按语言" },
     select: "选择", export: "导出", import: "导入",
+    hasAiResult: "附带 AI 结果，双击查看",
     deleteSelected: "删除 ({{count}})",
     deleteSelectedConfirm: "确定删除选中的 {{count}} 条记录？",
     deletedCount: "已删除 {{count}} 条",
@@ -742,6 +743,7 @@ const zh = {
     resultTitle: "AI 结果",
     generatedBy: "由 {{provider}} 生成",
     sendsCapture: "会把这张截图发给视觉模型",
+    readFromCapture: "视觉模型读取截图生成",
     summarize: { name: "总结", desc: "读完整段内容，用目标语言给出要点" }
   },
   svc: {

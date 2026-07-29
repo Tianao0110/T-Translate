@@ -7,7 +7,6 @@
 
 import translationService from './stack-client.js';
 import { AI_ACTION_VARS } from '@config/ai-actions';
-import { PRIVACY_MODES } from '@config/defaults';
 import { detectLanguage } from '../utils/text.js';
 import createLogger from '../utils/logger.js';
 import i18n from '../i18n.js';
@@ -73,11 +72,12 @@ export function checkActionAvailability(action, ctx = {}) {
 }
 
 // AI results are derivatives of the content they came from, so they follow the
-// same rule as history: secure mode keeps nothing. Actions marked history
-// 'none' stay out of the main history in every mode.
-export function canStoreResult(action, privacyMode) {
-  if (!action || action.history !== 'attach') return false;
-  return privacyMode !== PRIVACY_MODES.SECURE;
+// same rule as history. The secure-mode half lives in the store next to
+// addToHistory (one gate for both, and the child windows write through it);
+// this is the config half — an action marked 'none' is module-owned and stays
+// out of the main history in every mode.
+export function isAttachableResult(action) {
+  return !!action && action.history === 'attach';
 }
 
 export function resolveActionLabel(action, lang = 'zh') {

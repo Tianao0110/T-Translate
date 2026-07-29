@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld("electron", {
     hide: () => ipcRenderer.invoke("selection:hide"),
     setBounds: (bounds) => ipcRenderer.invoke("selection:set-bounds", bounds),
     addToHistory: (item) => ipcRenderer.invoke("selection:add-to-history", item),
+    attachAiResult: (payload) => ipcRenderer.invoke("selection:attach-ai-result", payload),
     getText: () => ipcRenderer.invoke("selection:get-text"),
     startDrag: () => ipcRenderer.invoke("selection:start-drag"),
 

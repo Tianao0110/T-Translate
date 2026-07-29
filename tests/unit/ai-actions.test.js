@@ -6,7 +6,7 @@ import {
   measureText,
   meetsLengthGate,
   checkActionAvailability,
-  canStoreResult,
+  isAttachableResult,
   renderTemplate,
   buildActionMessages,
   resolveActionLabel,
@@ -160,19 +160,17 @@ describe('resolveActionPath', () => {
   });
 });
 
-describe('canStoreResult', () => {
-  const summarize = getAiAction('summarize');
-
-  it('attaches a result in standard mode', () => {
-    expect(canStoreResult(summarize, 'standard')).toBe(true);
+describe('isAttachableResult', () => {
+  it('attaches the built-in summary to its translation', () => {
+    expect(isAttachableResult(getAiAction('summarize'))).toBe(true);
   });
 
-  it('keeps secure mode clean', () => {
-    expect(canStoreResult(summarize, 'secure')).toBe(false);
+  it('keeps module-owned actions out of the main history', () => {
+    expect(isAttachableResult(normalizeActionConfig(importable()).action)).toBe(false);
   });
 
-  it('never stores actions marked history none, even in standard mode', () => {
-    expect(canStoreResult(normalizeActionConfig(importable()).action, 'standard')).toBe(false);
+  it('says no for a missing action', () => {
+    expect(isAttachableResult(null)).toBe(false);
   });
 });
 

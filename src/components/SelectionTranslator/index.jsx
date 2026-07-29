@@ -704,7 +704,10 @@ const SelectionTranslator = () => {
 
   // AI actions read the selected text, not the translation — understanding is
   // done on the original side and answered in the target language in one step.
-  const ai = useAiActions('selection');
+  const attachAiResultFromCard = useCallback((payload) => {
+    window.electron?.selection?.attachAiResult?.(payload);
+  }, []);
+  const ai = useAiActions('selection', attachAiResultFromCard);
   const aiActions = ai.availableActions({ displayMode: 'unified', text: sourceText });
 
   const runAiActionFromCard = async (e, action) => {

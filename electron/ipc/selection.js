@@ -116,6 +116,14 @@ function register(ctx) {
     return true;
   });
 
+  // Same route for AI results, which attach to a history entry rather than
+  // creating one — the store decides whether there is anything to attach to.
+  ipcMain.handle(CHANNELS.SELECTION.ATTACH_AI_RESULT, (event, payload) => {
+    const mainWindow = getMainWindow();
+    mainWindow?.webContents.send(CHANNELS.DATA.ATTACH_AI_RESULT, payload);
+    return true;
+  });
+
   logger.info('Selection IPC handlers registered');
 }
 
