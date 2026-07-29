@@ -135,8 +135,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
         sourceLanguage: currentTranslation.sourceLanguage,
         targetLanguage: currentTranslation.targetLanguage,
         imageData: captureImage,
-      },
-      document.documentElement.getAttribute('data-theme') || 'light'
+      }
     );
     if (!result.success) notify(result.error, 'error');
   }, [ai, currentTranslation, captureImage, notify]);

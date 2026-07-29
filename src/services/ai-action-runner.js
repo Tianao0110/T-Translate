@@ -60,7 +60,10 @@ export function checkActionAvailability(action, ctx = {}) {
   const trigger = action.trigger || {};
 
   if (!resolveActionPath(action, ctx)) return { available: false, reason: 'capability' };
-  if (trigger.understandOnly && !understandMode) {
+  // Reading and understanding are two states of one window, not two stacked
+  // feature sets: each side offers only its own actions.
+  const mode = trigger.mode || 'any';
+  if (mode !== 'any' && mode !== (understandMode ? 'understand' : 'translate')) {
     return { available: false, reason: 'understandMode' };
   }
   if (surface && trigger.surfaces && !trigger.surfaces.includes(surface)) {

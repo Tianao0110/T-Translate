@@ -21,6 +21,12 @@ export const AI_ACTION_HISTORY_MODES = ['attach', 'none'];
 // Entry points an action may be offered on.
 export const AI_ACTION_SURFACES = ['selection', 'screenshot', 'floating'];
 
+// The "看 vs 懂" split as the floating window's toggle sees it: 'translate'
+// actions belong to reading (toggle off), 'understand' actions to the
+// understanding mode (toggle on), 'any' to both. Surfaces without the toggle
+// behave as if it were off.
+export const AI_ACTION_MODES = ['translate', 'understand', 'any'];
+
 // 'target'/'source' follow the translation's languages, 'ui' follows the app
 // language; anything else is taken as a literal language code.
 export const AI_ACTION_OUTPUT_LANGUAGES = ['target', 'source', 'ui'];
@@ -47,6 +53,9 @@ const SUMMARIZE = {
     // to summarize, so the entry stays hidden there.
     displayModes: ['unified'],
     minLength: LONG_FORM_GATE,
+    // Reading side only: with the understanding toggle on, the window is not
+    // translating any more, so there is nothing to summarize alongside.
+    mode: 'translate',
   },
   // The model reads the source side and answers in the output language in one
   // step — a summary of the translation would compound its errors.
@@ -75,10 +84,12 @@ const SUMMARIZE = {
   },
 };
 
-// Default action of the floating window's understanding toggle. The toggle
-// itself decides nothing — it only reveals actions marked understandOnly, and
-// what any of them does is its prompt config. That is what keeps the switch
-// neutral while still letting an imported config do something else entirely.
+// Default action of the floating window's understanding toggle: with the
+// toggle on, a capture is recognized and then run through this instead of
+// being translated. The toggle itself decides nothing — it picks whichever
+// 'understand' action is installed, and what that does is its prompt config.
+// That is what keeps the switch neutral while letting an imported config
+// replace the behavior entirely.
 const EXPLAIN = {
   id: 'explain',
   schemaVersion: AI_ACTION_SCHEMA_VERSION,
@@ -96,7 +107,7 @@ const EXPLAIN = {
     // of two dense lines does not.
     displayModes: null,
     minLength: null,
-    understandOnly: true,
+    mode: 'understand',
   },
   prompts: {
     zh: {
@@ -124,6 +135,13 @@ export const BUILTIN_AI_ACTIONS = [SUMMARIZE, EXPLAIN];
 
 export function getAiAction(id, extraActions = []) {
   return [...BUILTIN_AI_ACTIONS, ...extraActions].find(a => a.id === id) || null;
+}
+
+// What the understanding toggle runs on a capture. Imported actions win over
+// the built-in, which is how installing one swaps the mode's behavior without
+// touching the app.
+export function getUnderstandAction(extraActions = []) {
+  return [...extraActions, ...BUILTIN_AI_ACTIONS].find(a => a.trigger?.mode === 'understand') || null;
 }
 
 function templateVars(template) {
@@ -207,9 +225,8 @@ export function normalizeActionConfig(raw) {
       latin: Number(rawTrigger.minLength.latin) || 0,
     }
     : null;
-  // Imported actions that only make sense behind the understanding toggle say
-  // so here; nothing else about them changes.
-  const understandOnly = rawTrigger.understandOnly === true;
+  // Which side of the reading/understanding split this action lives on.
+  const mode = AI_ACTION_MODES.includes(rawTrigger.mode) ? rawTrigger.mode : 'any';
 
   return {
     ok: true,
@@ -227,7 +244,7 @@ export function normalizeActionConfig(raw) {
         surfaces,
         displayModes: displayModes && displayModes.length ? displayModes : null,
         minLength,
-        understandOnly,
+        mode,
       },
       prompts: raw.prompts,
       visionPrompts: raw.visionPrompts || null,
