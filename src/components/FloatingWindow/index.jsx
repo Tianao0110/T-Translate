@@ -99,7 +99,7 @@ const FloatingWindow = () => {
   const captureImage = pipeline.getLastCaptureImage(sourceText);
   // Whatever the mode runs on every capture is not also a button — the toolbar
   // is for things the user chooses to do.
-  const autoRunId = understandMode ? getUnderstandAction()?.id : null;
+  const autoRunId = understandMode ? getUnderstandAction(ai.imported)?.id : null;
   const aiActions = ai.availableActions({
     displayMode,
     text: sourceText,

@@ -28,7 +28,8 @@ import {
   TTSSection,
   AboutSection,
   ProvidersSection,
-  TranslationSection
+  TranslationSection,
+  AiActionsSection
 } from './sections/index.jsx';
 
 const logger = createLogger('Settings');
@@ -47,6 +48,7 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
     selection: t('settingsNav.selection'),
     floatingWindow: t('settingsNav.floatingWindow'),
     document: t('settingsNav.document'),
+    aiActions: t('settingsNav.aiActions'),
     ocr: t('settingsNav.ocr'),
     tts: t('settingsNav.tts'),
     interface: t('settingsNav.interface'),
@@ -356,6 +358,10 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
           }
         }
 
+        if (settings.aiActions) {
+          await store.set('settings.aiActions', settings.aiActions);
+        }
+
         if (settings.selection) {
           await store.set('settings.selection', settings.selection);
         }
@@ -594,6 +600,15 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
             settings={settings}
             updateSetting={updateSetting}
             notify={notify}
+          />
+        );
+      case 'aiActions':
+        return (
+          <AiActionsSection
+            settings={settings}
+            updateSetting={updateSetting}
+            notify={notify}
+            confirm={confirm}
           />
         );
       default: return null;

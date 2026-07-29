@@ -679,3 +679,85 @@
   line-height: 2;
 }
 
+
+/* ==================== AI 动作 ==================== */
+.ai-action-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.ai-action-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+}
+
+.ai-action-icon {
+  display: inline-flex;
+  color: var(--accent-primary);
+}
+
+.ai-action-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.ai-action-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.ai-action-lock {
+  color: var(--text-tertiary);
+}
+
+.ai-action-meta {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.ai-action-remove {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+
+.ai-action-remove:hover {
+  background: color-mix(in srgb, var(--error) 12%, transparent);
+  color: var(--error);
+}
+
+.ai-action-import {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.ai-action-import:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}

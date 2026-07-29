@@ -4,7 +4,7 @@ import {
   Globe, Shield, Zap, Moon, Sun,
   Info, Wifi, Eye, Lock, Volume2,
   Code2, Palette, Layers, MousePointer, Server,
-  FileText
+  FileText, Sparkles
 } from 'lucide-react';
 
 import { PRIVACY_MODES, getModeFeatures, isFeatureEnabled, isProviderAllowed as isProviderAllowedByMode, PRIVACY_MODE_IDS } from '@config/privacy-modes';
@@ -38,6 +38,7 @@ export const NAV_ITEMS = [
   { id: 'selection', icon: MousePointer, group: 'translation', keywords: ['selection', 'mouse', 'trigger', 'button', '划词', '选中', '鼠标'] },
   { id: 'floatingWindow', icon: Layers, group: 'translation', keywords: ['glass', 'floating', 'overlay', 'pin', '玻璃', '透明', '置顶', '悬浮', '散点', '整段'] },
   { id: 'document', icon: FileText, group: 'translation', keywords: ['document', 'pdf', 'docx', 'epub', 'srt', 'subtitle', '文档', '字幕'] },
+  { id: 'aiActions', icon: Sparkles, group: 'translation', keywords: ['ai', 'action', 'summarize', 'explain', 'import', 'prompt', 'AI', '动作', '总结', '讲解', '理解', '导入'] },
   { id: 'ocr', icon: Eye, group: 'system', keywords: ['ocr', 'recognize', 'screenshot', 'image', 'rapidocr', 'llm', '识别', '截图'] },
   { id: 'tts', icon: Volume2, group: 'system', keywords: ['tts', 'speech', 'voice', 'volume', 'rate', '朗读', '语音', '语速'] },
   { id: 'interface', icon: Palette, group: 'system', basic: true, keywords: ['theme', 'dark', 'light', 'font', 'appearance', '界面', '主题', '外观'] },
@@ -143,6 +144,13 @@ export const DEFAULT_SETTINGS = {
     llmModel: '',
   },
 
+  // User-imported AI action configs (config/ai-actions.js defines the shape).
+  // Data, not code: the app ships a framework plus two neutral built-ins, and
+  // anything beyond that is a file the user chose to import.
+  aiActions: {
+    imported: [],
+  },
+
   // Single source of truth for TTS defaults is services/tts/index.js
   // (electron/state.js keeps a value-identical copy — main process can't
   // import renderer ESM).
@@ -225,6 +233,10 @@ export const migrateOldSettings = (savedSettings) => {
     ocr: {
       ...DEFAULT_SETTINGS.ocr,
       ...(savedSettings.ocr || {}),
+    },
+    aiActions: {
+      ...DEFAULT_SETTINGS.aiActions,
+      ...(savedSettings.aiActions || {}),
     },
     tts: {
       ...DEFAULT_SETTINGS.tts,

@@ -7,6 +7,7 @@ const en = {
     searchPlaceholder: "Search settings...",
     groupTranslation: "Translation", groupSystem: "System",
     providers: "Providers", translation: "Translation", selection: "Selection", floatingWindow: "Floating Window", document: "Documents",
+    aiActions: "AI Actions",
     ocr: "OCR", tts: "Text to Speech", interface: "Appearance", privacy: "Privacy", about: "About",
     export: "Export", import: "Import", reset: "Reset",
     simpleMode: "Simple", fullMode: "Full", switchToFull: "Full", switchToSimple: "Simple",
@@ -345,7 +346,8 @@ const en = {
     tts: { title: "Text-to-Speech" },
     about: { checkUpdate: "Check for Updates", checking: "Checking...", upToDate: "You're up to date", newVersion: "New version available", download: "Download", later: "Later", releaseNotes: "Release Notes", publishedAt: "Published", copyright: "© 2026 T-Translate" },
     selection: { title: "Selection Translate" },
-    floatingWindow: { title: "Floating Window" }
+    floatingWindow: { title: "Floating Window" },
+    aiActions: { title: "AI Actions" }
   },
   about: {
     desc: "Smart Offline Translation Tool",
@@ -739,6 +741,18 @@ const en = {
   // Display text for the built-in AI actions (config/ai-actions.js). Imported
   // actions carry their own labels instead — they have no keys here.
   aiActions: {
+    surfaceSelection: "Selection", surfaceScreenshot: "Main panel", surfaceFloating: "Floating window",
+    inUnderstandMode: "in understanding mode",
+    description: "One more layer of understanding on what you are looking at. An action is a prompt config, not code — two ship with the app, the rest are imported.",
+    builtinTitle: "Built-in actions", builtinHint: "Built in; ships with the app",
+    importedTitle: "Imported actions", importedEmpty: "Nothing imported yet",
+    import: "Import a config file",
+    importTitle: "Import an AI action config",
+    importHint: "A JSON file holding one action or a list of them. A config that breaks the schema is refused with the reason, and prompts may only use known variables.",
+    importOk: "Imported {{count}} action(s); save to apply",
+    importRejected: "Config refused: {{error}}",
+    importUnreadable: "Could not read the file: {{error}}",
+    remove: "Remove", removeConfirm: "Remove “{{name}}”?",
     badConfig: "Invalid action config",
     noUnderstandAction: "No understanding action available",
     failed: "AI action failed",

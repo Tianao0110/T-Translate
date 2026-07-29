@@ -7,6 +7,7 @@ const zh = {
     searchPlaceholder: "搜索设置...",
     groupTranslation: "翻译", groupSystem: "系统",
     providers: "翻译源", translation: "翻译设置", selection: "划词翻译", floatingWindow: "悬浮窗口", document: "文档翻译",
+    aiActions: "AI 动作",
     ocr: "OCR 识别", tts: "朗读设置", interface: "界面外观", privacy: "隐私模式", about: "关于",
     export: "导出", import: "导入", reset: "重置",
     simpleMode: "简洁", fullMode: "完整", switchToFull: "完整", switchToSimple: "简洁",
@@ -345,7 +346,8 @@ const zh = {
     tts: { title: "语音设置" },
     about: { checkUpdate: "检查更新", checking: "检查中...", upToDate: "已是最新版本", newVersion: "发现新版本", download: "前往下载", later: "稍后再说", releaseNotes: "更新内容", publishedAt: "发布时间", copyright: "© 2026 T-Translate" },
     selection: { title: "划词翻译" },
-    floatingWindow: { title: "悬浮窗口" }
+    floatingWindow: { title: "悬浮窗口" },
+    aiActions: { title: "AI 动作" }
   },
   about: {
     desc: "智能离线翻译工具",
@@ -740,6 +742,18 @@ const zh = {
   // Display text for the built-in AI actions (config/ai-actions.js). Imported
   // actions carry their own labels instead — they have no keys here.
   aiActions: {
+    surfaceSelection: "划词", surfaceScreenshot: "主面板", surfaceFloating: "悬浮窗",
+    inUnderstandMode: "理解模式下",
+    description: "在看到的内容上再做一层理解。一个动作就是一份提示词配置，不是代码——内置两个，其余靠导入。",
+    builtinTitle: "内置动作", builtinHint: "内置动作，随程序发布",
+    importedTitle: "导入的动作", importedEmpty: "还没有导入任何动作",
+    import: "导入配置文件",
+    importTitle: "导入 AI 动作配置",
+    importHint: "JSON 文件，一个动作或一组动作。字段不合规会被拒绝并说明原因，提示词里只允许已知变量。",
+    importOk: "已导入 {{count}} 个动作，保存后生效",
+    importRejected: "配置不合规：{{error}}",
+    importUnreadable: "文件读不出来：{{error}}",
+    remove: "移除", removeConfirm: "确定移除「{{name}}」吗？",
     badConfig: "动作配置无效",
     noUnderstandAction: "没有可用的理解动作",
     failed: "AI 动作失败",

@@ -8,6 +8,7 @@ import { resolveDisplayMode } from './display-mode.js';
 import { calculateHash } from '../utils/image.js';
 import { detectLanguage, resolveSameLanguageTarget, cleanTranslationOutput, shouldTranslateText } from '../utils/text.js';
 import { getUnderstandAction } from '@config/ai-actions';
+import { ensureImportedActions } from './ai-action-store.js';
 import { getActionCapabilities, runAiAction } from './ai-action-runner.js';
 import createLogger from '../utils/logger.js';
 import { getShortErrorMessage } from '../utils/error-handler.js';
@@ -221,7 +222,8 @@ class TranslationPipeline {
     const session = useSessionStore.getState();
     const config = useConfigStore.getState();
 
-    const action = getUnderstandAction();
+    // An imported understanding action takes the mode over from the built-in.
+    const action = getUnderstandAction(await ensureImportedActions());
     if (!action) {
       const message = _t('aiActions.noUnderstandAction', '没有可用的理解动作');
       session.setError(message);

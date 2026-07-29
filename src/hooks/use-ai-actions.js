@@ -15,6 +15,7 @@ import {
   resolveActionPath,
   runAiAction,
 } from '../services/ai-action-runner.js';
+import { ensureImportedActions, refreshImportedActions } from '../services/ai-action-store.js';
 import translationService from '../services/stack-client.js';
 import createLogger from '../utils/logger.js';
 
@@ -31,16 +32,24 @@ export default function useAiActions(surface, attachResult) {
   // translation can never show the previous passage's summary.
   const [results, setResults] = useState({});
   const [expandedId, setExpandedId] = useState(null);
+  // User-imported action configs, alongside the built-ins.
+  const [imported, setImported] = useState([]);
 
-  // Re-probed whenever the stack reloads: adding an LLM provider in settings
-  // must light the entry up without restarting the window.
+  // Re-probed whenever the stack reloads: adding an LLM provider — or importing
+  // an action — in settings must light the entry up without restarting.
   useEffect(() => {
     let cancelled = false;
     const probe = () => {
       getActionCapabilities()
         .then((caps) => { if (!cancelled) setCapabilities(caps); })
         .catch((e) => logger.error('Capability probe failed:', e));
+      refreshImportedActions()
+        .then((actions) => { if (!cancelled) setImported(actions); })
+        .catch((e) => logger.error('Imported action load failed:', e));
     };
+    ensureImportedActions()
+      .then((actions) => { if (!cancelled) setImported(actions); })
+      .catch(() => {});
     probe();
     const off = translationService.onChanged?.(probe);
     return () => {
@@ -51,10 +60,10 @@ export default function useAiActions(surface, attachResult) {
 
   // ctx: { displayMode, text, hasImage }
   const availableActions = useCallback((ctx = {}) => (
-    BUILTIN_AI_ACTIONS.filter(
+    [...BUILTIN_AI_ACTIONS, ...imported].filter(
       action => checkActionAvailability(action, { ...ctx, surface, capabilities }).available
     )
-  ), [surface, capabilities]);
+  ), [surface, capabilities, imported]);
 
   // Which pipeline an action would use, so a surface can say up front that the
   // capture itself is about to be sent — an image gives away far more than the
@@ -118,5 +127,5 @@ export default function useAiActions(surface, attachResult) {
     }
   }, [i18n.language, capabilities, attachResult, results, expandedId]);
 
-  return { capabilities, availableActions, pathFor, runningId, toggle, expandedFor, collapse };
+  return { capabilities, imported, availableActions, pathFor, runningId, toggle, expandedFor, collapse };
 }
