@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import {
   ChevronDown, ChevronUp, Check, X, AlertCircle,
   RefreshCw, Eye, EyeOff, ExternalLink, GripVertical,
-  Zap, Globe, Plus, Settings, Power
+  Zap, Globe, Plus, Settings, Power, MessageSquareOff
 } from 'lucide-react';
 import { getAllProviderMetadata } from '../../config/provider-icons.js';
 import translationService from '../../services/stack-client.js';
@@ -446,6 +446,15 @@ const ProviderSettings = ({ settings, settingsReady, updateSettings, notify }) =
                         <span className="ps-tag" style={{ background: typeColor }}>
                           {typeLabel}
                         </span>
+                        {/* AI actions need a real chat call; a source that only
+                            translates would answer a prompt with a translation of
+                            that prompt, so its entries stay hidden. Say so here
+                            rather than leaving the user to wonder. */}
+                        {!meta.supportsChat && (
+                          <span className="ps-tag ps-tag-muted" title={t('providerSettings.noAiActionsHint')}>
+                            {t('providerSettings.noAiActions')}
+                          </span>
+                        )}
                       </div>
                       <div className="ps-desc">{t(`providerSettings.descriptions.${provider.id}`, { defaultValue: meta.description })}</div>
                     </div>
@@ -535,7 +544,16 @@ const ProviderSettings = ({ settings, settingsReady, updateSettings, notify }) =
                       {meta.icon ? <img src={meta.icon} alt="" className="ps-icon-img" /> : <span style={{ display: 'inline-block', width: 16, height: 16, borderRadius: '50%', background: meta.color || 'var(--text-tertiary)' }} />}
                     </div>
                     <div className="ps-mini-info">
-                      <div className="ps-mini-name">{t(`providerSettings.names.${provider.id}`, { defaultValue: meta.name })}</div>
+                      <div className="ps-mini-name">
+                        <span className="ps-mini-label">{t(`providerSettings.names.${provider.id}`, { defaultValue: meta.name })}</span>
+                        {!meta.supportsChat && (
+                          <MessageSquareOff
+                            size={12}
+                            className="ps-no-chat"
+                            title={`${t('providerSettings.noAiActions')} — ${t('providerSettings.noAiActionsHint')}`}
+                          />
+                        )}
+                      </div>
                       <div className="ps-mini-desc">{t(`providerSettings.descriptions.${provider.id}`, { defaultValue: meta.description })}</div>
                     </div>
                     <button

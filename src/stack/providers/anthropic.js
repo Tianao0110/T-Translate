@@ -233,6 +233,58 @@ class AnthropicProvider extends BaseProvider {
     }
   }
 
+  // ===== Generic chat (AI actions, style rewrite) =====
+  // The Messages API this provider already speaks IS a chat API — translate()
+  // just pins the array to a single user turn. Here the caller's turns go
+  // through as-is; the only shape difference from OpenAI is that the system
+  // prompt is a top-level field rather than a message.
+  async chat(messages, options = {}) {
+    if (!this.config.apiKey) {
+      return { success: false, error: _t('providerError.notConfigured', '未配置 API Key') };
+    }
+
+    const system = messages.filter(m => m.role === 'system').map(m => m.content).join('\n\n');
+    const turns = messages.filter(m => m.role !== 'system');
+    if (turns.length === 0) {
+      return { success: false, error: _t('svc.noUserMsg', '没有用户消息') };
+    }
+
+    try {
+      const response = await rtFetch(`${this.config.baseUrl}/v1/messages`, {
+        method: 'POST',
+        headers: this._buildHeaders(),
+        body: JSON.stringify({
+          model: this.config.model,
+          max_tokens: options.max_tokens ?? 2048,
+          ...(system ? { system } : {}),
+          messages: turns.map(m => ({ role: m.role, content: m.content })),
+        }),
+        signal: combineSignal(options.signal, this.config.timeout),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        return { success: false, error: error.error?.message || `HTTP ${response.status}` };
+      }
+
+      const data = await response.json();
+      const content = data.content?.[0]?.text;
+
+      if (!content) {
+        return { success: false, error: _t('providerError.noResponseContent', '无响应内容') };
+      }
+      // Same reason as translate(): a cut-off answer must not pass as a whole one.
+      if (data.stop_reason === 'max_tokens') {
+        return { success: false, error: _t('providerError.truncated', '翻译结果被截断（超出最大长度）') };
+      }
+
+      return { success: true, content: content.trim(), usage: data.usage, model: data.model };
+    } catch (error) {
+      logger.error('Chat error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
   // Header kept identical to the renderer implementation (the dangerous-direct
   // flag is inert outside a browser context and keeps the request shape stable).
   _buildHeaders() {

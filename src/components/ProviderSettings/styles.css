@@ -225,6 +225,13 @@
   letter-spacing: 0.3px;
 }
 
+/* Capability note, not a provider type — reads as a caveat, not a badge. */
+.ps-tag-muted {
+  background: transparent;
+  color: var(--text-tertiary);
+  border: 1px solid var(--border-primary);
+}
+
 .ps-desc {
   font-size: 12px;
   color: var(--text-tertiary);
@@ -559,9 +566,23 @@
 }
 
 .ps-mini-name {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
   font-size: 13px;
   font-weight: 500;
   color: var(--text-secondary);
+}
+
+/* Names still wrap the way they always did; only the marker is pinned so a
+   two-line name cannot squeeze it away. */
+.ps-mini-label {
+  min-width: 0;
+}
+
+.ps-no-chat {
+  flex: 0 0 auto;
+  color: var(--text-tertiary);
 }
 
 .ps-mini-desc {

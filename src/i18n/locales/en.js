@@ -29,6 +29,8 @@ const en = {
     enable: "Enable",
     getApiKey: "Get API Key",
     typeLabels: { llm: "AI Model", api: "Pro API", traditional: "Traditional" },
+    noAiActions: "No AI actions",
+    noAiActionsHint: "This source only translates — it cannot hold a conversation, so Summarize and understanding mode stay hidden while it is the active source. Use an LLM source (OpenAI / DeepSeek / Claude / Gemini / Ollama / LM Studio) for those.",
     names: {
       'local-llm': 'LM Studio (Local)',
       'openai': 'OpenAI',

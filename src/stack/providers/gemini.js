@@ -141,6 +141,80 @@ class GeminiProvider extends BaseProvider {
     }
   }
 
+  // ===== Generic chat (AI actions, style rewrite) =====
+  // generateContent is a chat endpoint; translate() just collapses everything
+  // into one part. The work here is the shape mapping: OpenAI-style
+  // {role, content} turns become contents[{role, parts}], 'assistant' is
+  // spelled 'model', and the system prompt is its own systemInstruction field
+  // instead of a message.
+  async chat(messages, options = {}) {
+    if (!this.config.apiKey) {
+      return { success: false, error: _t('providerError.notConfigured', '未配置 API Key') };
+    }
+
+    const system = messages.filter(m => m.role === 'system').map(m => m.content).join('\n\n');
+    const contents = messages
+      .filter(m => m.role !== 'system')
+      .map(m => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content }],
+      }));
+    if (contents.length === 0) {
+      return { success: false, error: _t('svc.noUserMsg', '没有用户消息') };
+    }
+
+    try {
+      const response = await rtFetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${this.config.model}:generateContent?key=${this.config.apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents,
+            ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
+            // Same reasoning as translate(): default thresholds block content
+            // that is perfectly legitimate to summarize or explain.
+            safetySettings: [
+              { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+              { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+              { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+              { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+            ],
+            generationConfig: {
+              temperature: options.temperature ?? 0.7,
+              maxOutputTokens: options.max_tokens ?? 2048,
+            },
+          }),
+          signal: combineSignal(options.signal, this.config.timeout),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        return { success: false, error: error.error?.message || _t('providerError.httpError', `HTTP ${response.status}`, { status: response.status }) };
+      }
+
+      const data = await response.json();
+      // Multi-part answers arrive split; joining keeps a long reply whole.
+      const content = (data.candidates?.[0]?.content?.parts || [])
+        .map(p => p.text || '')
+        .join('')
+        .trim();
+
+      if (!content) {
+        if (data.promptFeedback?.blockReason) {
+          return { success: false, error: `${_t('providerError.contentBlocked', '内容被安全策略拦截')}: ${data.promptFeedback.blockReason}` };
+        }
+        return { success: false, error: _t('providerError.noResponseContent', '无响应内容') };
+      }
+
+      return { success: true, content, model: this.config.model, usage: data.usageMetadata };
+    } catch (error) {
+      logger.error('Chat error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
   _getLanguageName(code) {
     const names = {
       'auto': 'auto-detected language',

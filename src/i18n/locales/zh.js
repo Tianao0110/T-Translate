@@ -29,6 +29,8 @@ const zh = {
     enable: "启用",
     getApiKey: "获取 API Key",
     typeLabels: { llm: "AI 大模型", api: "专业 API", traditional: "传统翻译" },
+    noAiActions: "无 AI 动作",
+    noAiActionsHint: "这个翻译源只会翻译、不能对话，所以它当值时「总结」和理解模式不会出现。需要用大模型源（OpenAI / DeepSeek / Claude / Gemini / Ollama / LM Studio）。",
     names: {
       'local-llm': 'LM Studio (本地)',
       'openai': 'OpenAI',

@@ -7,6 +7,10 @@
 //
 // Everything in this file must stay JSON-serializable (it crosses IPC as-is).
 
+// `supportsChat` is the AI-action gate: it must match whether the provider
+// class actually implements chat(). Traditional/API-only sources answer a
+// prompt with a translation OF that prompt, which reads like a working
+// feature — tests/unit/provider-chat.test.js keeps this column honest.
 export const PROVIDER_METADATA = {
   'openai': {
     id: 'openai',
@@ -14,6 +18,7 @@ export const PROVIDER_METADATA = {
     description: 'GPT models, high quality and fast',
     color: '#10a37f',
     type: 'llm',
+    supportsChat: true,
     helpUrl: 'https://platform.openai.com/api-keys',
     configSchema: {
       apiKey: {
@@ -53,6 +58,7 @@ export const PROVIDER_METADATA = {
     description: 'DeepSeek AI, affordable, excellent for Chinese',
     color: '#5b6ef8',
     type: 'llm',
+    supportsChat: true,
     helpUrl: 'https://platform.deepseek.com',
     configSchema: {
       apiKey: {
@@ -93,6 +99,7 @@ export const PROVIDER_METADATA = {
     description: 'Local LLM via Ollama, private and free',
     color: '#ffffff',
     type: 'llm',
+    supportsChat: true,
     helpUrl: 'https://ollama.com/',
     configSchema: {
       endpoint: {
@@ -125,6 +132,7 @@ export const PROVIDER_METADATA = {
     description: 'Local LLM translation, private and free',
     color: '#10b981',
     type: 'llm',
+    supportsChat: true,
     helpUrl: 'https://lmstudio.ai/',
     configSchema: {
       endpoint: {
@@ -157,6 +165,7 @@ export const PROVIDER_METADATA = {
     description: 'Claude AI, extremely high translation quality',
     color: '#d4a27f',
     type: 'llm',
+    supportsChat: true,
     helpUrl: 'https://console.anthropic.com/settings/keys',
     configSchema: {
       apiKey: {
@@ -190,6 +199,7 @@ export const PROVIDER_METADATA = {
     description: 'Professional translation API, excellent quality',
     color: '#0f2b46',
     type: 'api',
+    supportsChat: false,
     helpUrl: 'https://www.deepl.com/pro-api',
     configSchema: {
       apiKey: {
@@ -214,6 +224,7 @@ export const PROVIDER_METADATA = {
     description: 'Google AI model, free tier available, high quality',
     color: '#4285f4',
     type: 'llm',
+    supportsChat: true,
     helpUrl: 'https://aistudio.google.com/apikey',
     configSchema: {
       apiKey: {
@@ -240,6 +251,7 @@ export const PROVIDER_METADATA = {
     description: 'Free to use, many languages, fast',
     color: '#4285f4',
     type: 'traditional',
+    supportsChat: false,
     helpUrl: 'https://translate.google.com',
     configSchema: {
       domain: {
@@ -262,6 +274,7 @@ export const PROVIDER_METADATA = {
     description: 'Microsoft Translator API, 2M chars/month free',
     color: '#0078d4',
     type: 'api',
+    supportsChat: false,
     helpUrl: 'https://learn.microsoft.com/azure/cognitive-services/translator/',
     configSchema: {
       apiKey: {
@@ -288,6 +301,7 @@ export const PROVIDER_METADATA = {
     description: 'Baidu Translate API, direct access in China, free tier',
     color: '#3385ff',
     type: 'api',
+    supportsChat: false,
     helpUrl: 'https://fanyi-api.baidu.com/',
     configSchema: {
       appId: {
