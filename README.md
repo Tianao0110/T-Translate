@@ -29,6 +29,7 @@
 | **Screenshot OCR**           | Capture screen regions. 7 OCR engines with automatic fallback                                                                          |
 | **Floating window**          | Transparent overlay. Space-bar to capture-and-translate; auto-refresh & global-hotkey zero-focus capture for live captions / subtitles |
 | **Document translation**     | 9 formats: PDF / DOCX / EPUB / TXT / SRT / VTT / CSV / JSON / Markdown. Segment-by-segment, resumable                                  |
+| **AI actions**               | One-click summary of long passages; floating-window "understanding mode" explains a capture directly; custom actions can be imported (needs an LLM provider) |
 | **Glossary**                 | Auto-replace terms after translation, with undo support                                                                                |
 | **TTS**                      | Built on Windows offline speech engine                                                                                                 |
 | **10 translation providers** | LM Studio, Ollama, OpenAI, Claude, Gemini, DeepSeek, DeepL, Google, Microsoft, Baidu                                                   |
@@ -62,6 +63,14 @@ Transparent overlay window for live translation. Drag, resize, pin on top. Spawn
 <p align="center">
   <img src="docs/screenshots/floating-window.png" width="600" alt="Floating window">
 </p>
+
+### AI actions (Summarize / Understanding mode)
+
+A layer of understanding on top of translation. **Summarize** reads a long passage and hands back the key points — available in the selection card, the main panel, and the floating window, folding open in place. The **understanding mode** switch in the floating window's top-left corner stops translating captures and explains them instead — for the technical documents, formulas, and code that stay confusing even after translation.
+
+With a vision model loaded (Qwen-VL, LLaVA, and the like in LM Studio / Ollama), the model reads the screenshot itself instead of going through "recognize the text, then understand it", so layout and mixed text/graphics survive; it falls back to the text path automatically if the model cannot see images. Summaries are kept alongside the translation they came from in history, and can be deleted on their own.
+
+An action is a prompt config rather than code — custom ones can be imported from the "AI Actions" settings page. **An LLM provider is required** (LM Studio / Ollama / OpenAI / Claude / Gemini / DeepSeek); translate-only sources (DeepL / Google / Microsoft / Baidu) cannot run them and are marked as such in Settings.
 
 ### Document translation
 
@@ -161,7 +170,7 @@ t-translate/
 │   ├── assets/             # Static assets (provider icons)
 │   ├── services/           # Service layer (stack client, capture pipeline)
 │   ├── stores/             # Zustand state management
-│   ├── config/             # Config (privacy modes, templates, constants)
+│   ├── config/             # Config (privacy modes, templates, constants, AI action catalog)
 │   └── i18n/               # i18n (zh / en, 1000+ keys each)
 │
 ├── public/                 # HTML entry + static assets

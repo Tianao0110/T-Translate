@@ -159,6 +159,48 @@ npm start             # 实测：设置页出卡片、填 key、测试连接、�
 
 ---
 
+## ✨ 新增 AI 动作（总结 / 理解那一族）
+
+**动作是数据不是代码**——正常情况下你不写 JS，只加一份配置。
+
+内置动作加在 `src/config/ai-actions.js` 的 `BUILTIN_AI_ACTIONS`；用户侧的第三方
+动作走设置页「AI 动作 → 导入配置文件」，两者字段完全一致、过同一个闸门。
+
+```javascript
+{
+  id: 'explain-steps',              // 小写字母/数字/连字符，2-40 位
+  schemaVersion: 1,
+  icon: 'Lightbulb',                // lucide 名，见 shared/AiActionIcon.jsx 的映射
+  nameKey: 'aiActions.xxx.name',    // 内置用 i18n key；导入的用 labels: { zh, en }
+  capability: 'text',               // 'text' 需要能对话的源；'vision' 需要视觉模型
+  outputLanguage: 'target',         // target/source/ui 或语言码——模型用哪种语言回答
+  history: 'attach',                // 'attach' 挂到翻译条目下；'none' 不进主历史
+  trigger: {
+    surfaces: ['floating'],         // selection | screenshot | floating
+    displayModes: ['unified'],      // null = 不限；散点内容通常没有总结价值
+    minLength: { cjk: 150, latin: 120 },  // null = 不卡长度
+    mode: 'understand',             // translate=看的一侧 / understand=懂的一侧 / any
+  },
+  prompts:       { zh: { system, user }, en: { ... } },   // 路径 A：喂识别出的文本
+  visionPrompts: { zh: { system, user }, en: { ... } },   // 路径 B：喂截图本身（可省）
+}
+```
+
+要点：
+
+- **模板变量只有四个**：`{{sourceText}}` `{{translatedText}}` `{{sourceLanguage}}`
+  `{{outputLanguage}}`。写错的变量名会在导入时被拒收，不会被当字面量发给模型
+- **提示词必须双语**：中文包裹的指令会把弱模型带偏成中文回答（和 `utils/ai-prompts`
+  同一个理由）
+- **带了 `visionPrompts` 才算支持路径 B**。措辞得换——图里没有 `{{sourceText}}`
+  可以贴，模型是在看版面
+- **`mode: 'understand'` 的动作会接管悬浮窗的理解模式**，导入的优先于内置：装一份
+  就换掉默认的「讲解」，主程序不用改
+
+改完跑 `npm test`——`tests/unit/ai-actions.test.js` 覆盖触发判定与导入校验。
+
+---
+
 ## 👁️ 新增 OCR 引擎
 
 在线 OCR 引擎同样活在栈里：`src/stack/ocr/my-ocr.js`（参考 `ocrspace.js`，最小样板）：

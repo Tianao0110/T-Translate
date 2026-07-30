@@ -175,6 +175,33 @@ t-translate/
 翻译源故障计数全局生效、设置保存一次生效；渲染进程不含任何翻译/在线
 OCR 网络代码，离线与无痕语义由主进程按请求强制（结构性隐私保证）。
 
+### AI 动作框架（v0.3.3）
+
+「总结 / 理解」这类动作**是数据不是代码**：一个动作 = 一份提示词配置。加动作
+不用改逻辑，只加一条配置；用户导入的第三方配置走同一条路径。
+
+```
+config/ai-actions.js        动作目录：内置两条（summarize / explain）+ 字段契约
+                            + normalizeActionConfig（导入唯一闸门）
+services/ai-action-runner   纯逻辑：文本量度 / 触发判定 / 模板渲染 / 路径选择
+                            + runAiAction（唯一出口，调 stack-client）
+services/ai-action-store    导入配置的读取缓存，每次读都重新过一遍闸门
+hooks/use-ai-actions        三个窗口共用：能力探测、可用动作、结果折叠展开
+```
+
+三条容易被违反的约束：
+
+1. **能力看实现不看元数据**。`metadata.supportsChat` 只供 UI 显示；运行时一律走
+   `service.getChatCapability()`（与 `chatCompletion` 同一个 provider 循环），AI
+   路径带 `requireChat`——否则只会翻译的源会把提示词翻译一遍还回来，看着像功能
+   正常。`tests/unit/provider-chat.test.js` 拿真实类核对那一列，防止漂移
+2. **两条路径，失败降级**。有视觉模型且手里有截图 → 路径 B（模型直接读图）；否则
+   路径 A（文本）。路径 B 失败且有识别文本时自动回落 A——用户不该为模型看不见图
+   买单
+3. **隐私跟随翻译**。LLM 调用的门在主进程 facade（同 translate）；结果写历史的门
+   在 `translation-store.attachAiResult`（同 addToHistory，无痕不写）；路径 B 在
+   离线模式下还要求视觉端点必须在本机
+
 ## 命名规范
 
 | 类别 | 规范 | 示例 |
