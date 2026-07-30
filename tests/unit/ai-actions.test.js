@@ -337,6 +337,13 @@ describe('normalizeActionConfig', () => {
     expect(normalizeActionConfig({ ...importable(), history: 'everywhere' }).ok).toBe(false);
   });
 
+  it('rejects a malformed outputLanguage instead of sending it as a language name', () => {
+    expect(normalizeActionConfig({ ...importable(), outputLanguage: '目标语言' }).ok).toBe(false);
+    expect(normalizeActionConfig({ ...importable(), outputLanguage: '' }).action.outputLanguage).toBe('target');
+    expect(normalizeActionConfig({ ...importable(), outputLanguage: 'zh-TW' }).ok).toBe(true);
+    expect(normalizeActionConfig({ ...importable(), outputLanguage: 'ui' }).ok).toBe(true);
+  });
+
   it('drops fields outside the schema', () => {
     const { action } = normalizeActionConfig({ ...importable(), evalCode: 'rm -rf', builtin: true });
     expect(action.evalCode).toBeUndefined();

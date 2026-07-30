@@ -205,8 +205,11 @@ export function normalizeActionConfig(raw) {
   }
 
   const outputLanguage = raw.outputLanguage || 'target';
-  if (typeof outputLanguage !== 'string' || !outputLanguage.trim()) {
-    return { ok: false, error: 'outputLanguage must be a string' };
+  // Either one of the follow-the-translation keywords or a plain language
+  // code; a typo'd keyword would otherwise be taken as a literal language
+  // name and reach the model as one.
+  if (typeof outputLanguage !== 'string' || !/^[a-zA-Z][\w-]*$/.test(outputLanguage)) {
+    return { ok: false, error: `outputLanguage must be ${AI_ACTION_OUTPUT_LANGUAGES.join('/')} or a language code` };
   }
 
   const rawTrigger = raw.trigger && typeof raw.trigger === 'object' ? raw.trigger : {};

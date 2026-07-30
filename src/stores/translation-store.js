@@ -452,17 +452,11 @@ const useTranslationStore = create(
         }),
 
       // ===== Privacy mode helpers =====
-
-      // Single source for the privacy fields every translationService call
-      // must carry — the service defaults privacyMode to STANDARD, which has
-      // twice shipped offline/secure-mode leaks from call sites forgetting it.
-      getPrivacyOptions: () => {
-        const mode = get().translationMode;
-        return {
-          privacyMode: mode,
-          useCache: mode !== PRIVACY_MODES.SECURE,
-        };
-      },
+      // getPrivacyOptions() lived here until the v0.3.1 stack migration: call
+      // sites used to attach privacyMode/useCache themselves. The main-process
+      // facade now injects both per request, so the helper had no callers left
+      // and keeping it invited someone to "restore" a gate that is already
+      // enforced one layer down.
 
       // External callers (e.g. floating window) route through this, so privacy
       // gating happens here rather than at each call site.

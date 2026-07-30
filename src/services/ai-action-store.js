@@ -11,7 +11,7 @@ import createLogger from '../utils/logger.js';
 
 const logger = createLogger('AIActionStore');
 
-export const IMPORTED_ACTIONS_KEY = 'settings.aiActions.imported';
+const IMPORTED_ACTIONS_KEY = 'settings.aiActions.imported';
 
 let cache = [];
 let pending = null;
@@ -51,7 +51,3 @@ export function refreshImportedActions() {
   return pending;
 }
 
-// Synchronous view for code that already awaited one of the above.
-export function getImportedActions() {
-  return cache;
-}
