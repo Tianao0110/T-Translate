@@ -80,8 +80,13 @@ class OpenAICompatibleProvider extends BaseProvider {
 
       const response = await this._chatCompletion(messages, options.signal);
 
-      if (response.success && response.content) {
+      if (response.success && response.content?.trim()) {
         return { success: true, text: response.content.trim() };
+      }
+      // A reply of pure whitespace is not a translation. Reporting success
+      // here let an empty string travel on as the result and get cached.
+      if (response.success) {
+        return { success: false, error: _t('providerError.noResult', '无翻译结果') };
       }
 
       return { success: false, error: response.error || _t('providerError.translateFailed', '翻译失败') };
@@ -108,7 +113,12 @@ class OpenAICompatibleProvider extends BaseProvider {
         if (onChunk) onChunk(chunk);
       }, options.signal);
 
-      return { success: true, text: fullText.trim() };
+      const streamed = fullText.trim();
+      if (!streamed) {
+        // Stream ended without producing anything — same reasoning as translate().
+        return { success: false, error: _t('providerError.noResult', '无翻译结果') };
+      }
+      return { success: true, text: streamed };
     } catch (error) {
       this._lastError = error;
       if (error.name === 'AbortError') {

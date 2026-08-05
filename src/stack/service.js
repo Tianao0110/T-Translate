@@ -282,34 +282,60 @@ export class TranslationService {
     return `${targetLang}-${template}-${providerId}-${model}-${hash}`;
   }
 
+  // The one place a cached entry becomes text again. Entries have carried two
+  // shapes over time (L1 kept `text`, L2 kept `translated`), and a 0.3.x bug
+  // wrote whole objects into `translated` — so this returns a string or nothing
+  // at all. Handing a non-string upward killed the renderer once already
+  // (React #31), and those entries are still on disk.
+  _cachedText(entry) {
+    if (typeof entry === 'string') return entry || null;
+    if (!entry || typeof entry !== 'object') return null;
+    const text = typeof entry.translated === 'string' ? entry.translated
+      : typeof entry.text === 'string' ? entry.text
+        : null;
+    return text || null;
+  }
+
   _checkCache(key, options = {}) {
     const { useCache = true, privacyMode = PRIVACY_MODE_IDS.STANDARD } = options;
 
     if (!useCache) return null;
 
     if (this._l1Cache.has(key)) {
-      this._cacheStats.l1Hits++;
-      logger.debug('[Cache] L1 HIT (memory)');
-
-      // LRU bump: re-insert at the end
       const value = this._l1Cache.get(key);
-      this._l1Cache.delete(key);
-      this._l1Cache.set(key, value);
+      const text = this._cachedText(value);
+      if (text === null) {
+        // Corrupt or empty — drop it so the next translation replaces it.
+        this._l1Cache.delete(key);
+        logger.warn('[Cache] dropped an unusable L1 entry');
+      } else {
+        this._cacheStats.l1Hits++;
+        logger.debug('[Cache] L1 HIT (memory)');
 
-      return { value, source: 'l1' };
+        // LRU bump: re-insert at the end
+        this._l1Cache.delete(key);
+        this._l1Cache.set(key, value);
+
+        return { value, text, source: 'l1' };
+      }
     }
 
     // Secure mode skips the persistent cache entirely (no disk footprint)
     if (privacyMode !== PRIVACY_MODE_IDS.SECURE && this._l2) {
       const l2Result = this._l2.get(key);
       if (l2Result) {
-        this._cacheStats.l2Hits++;
-        logger.debug('[Cache] L2 HIT (disk)');
+        const text = this._cachedText(l2Result);
+        if (text === null) {
+          logger.warn('[Cache] dropped an unusable L2 entry');
+        } else {
+          this._cacheStats.l2Hits++;
+          logger.debug('[Cache] L2 HIT (disk)');
 
-        // Promote into L1 so subsequent hits avoid the L2 lookup
-        this._setL1Cache(key, l2Result);
+          // Promote into L1 so subsequent hits avoid the L2 lookup
+          this._setL1Cache(key, l2Result);
 
-        return { value: l2Result, source: 'l2' };
+          return { value: l2Result, text, source: 'l2' };
+        }
       }
     }
 
@@ -322,12 +348,21 @@ export class TranslationService {
 
     if (!useCache) return;
 
+    // Nothing to cache is not the same as caching nothing: an empty answer
+    // stored here would be served as the translation forever after. (It used to
+    // be worse — `result.text || result` put the whole wrapper object in
+    // `translated`, which the renderer then tried to render.)
+    if (typeof result?.text !== 'string' || !result.text) {
+      logger.debug('[Cache] skipped: empty translation');
+      return;
+    }
+
     this._setL1Cache(key, result);
 
     if (privacyMode !== PRIVACY_MODE_IDS.SECURE && this._l2) {
       const cacheEntry = {
         success: true,
-        translated: result.text || result,
+        translated: result.text,
         from: result.from,
         to: result.to,
         timestamp: Date.now(),
@@ -424,10 +459,9 @@ export class TranslationService {
     const cached = this._checkCache(cacheKey, { useCache, privacyMode });
 
     if (cached) {
-      const cachedText = cached.value?.translated || cached.value?.text || cached.value;
       return {
         success: true,
-        text: this._postProcess(cachedText, protectedMap),
+        text: this._postProcess(cached.text, protectedMap),
         fromCache: true,
         cacheSource: cached.source,
       };
@@ -558,8 +592,7 @@ export class TranslationService {
     const cached = this._checkCache(cacheKey, { useCache, privacyMode });
 
     if (cached) {
-      const cachedText = cached.value?.translated || cached.value?.text || cached.value;
-      const finalText = this._postProcess(cachedText, protectedMap);
+      const finalText = this._postProcess(cached.text, protectedMap);
 
       // Replay cached result as a single chunk so the caller's stream-handling code path runs
       if (onChunk) {
