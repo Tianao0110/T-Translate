@@ -37,9 +37,14 @@ const providerClasses = {
   'baidu-translate': BaiduTranslateProvider,
 };
 
-// Service layer reads this when no user-defined priority is set
+// Service layer reads this when no user-defined priority is set. Local models
+// lead, then the key-free cloud fallback — same shape as a fresh install's
+// enabled set (components/ProviderSettings/defaults.js), so the "never opened
+// settings" path and the "opened it once" path behave alike. The key-requiring
+// providers below are skipped instantly while unconfigured; they only matter
+// once the user has actually entered a key.
 export const DEFAULT_PRIORITY = {
-  normal: ['local-llm', 'ollama', 'openai', 'anthropic', 'gemini', 'deepseek', 'google-translate', 'microsoft-translator', 'baidu-translate', 'deepl'],
+  normal: ['local-llm', 'ollama', 'google-translate', 'openai', 'anthropic', 'gemini', 'deepseek', 'microsoft-translator', 'baidu-translate', 'deepl'],
 };
 
 const instances = new Map();
