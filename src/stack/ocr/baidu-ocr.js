@@ -2,6 +2,7 @@
 // Stack port of src/providers/ocr/baidu-ocr.js — network via rtFetch.
 
 import { BaseOCREngine, _t } from './base.js';
+import { makeBlocks } from './blocks.js';
 import { rtFetch } from '../runtime.js';
 import createLogger from '../logger.js';
 const logger = createLogger('BaiduOCR');
@@ -90,8 +91,11 @@ class BaiduOCREngine extends BaseOCREngine {
       // Baidu expects bare base64 form-encoded, not a data: URL
       const pureBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
 
-      // accurate_basic = high-accuracy general OCR (slower but more reliable than basicGeneral)
-      const apiUrl = `https://aip.baidubce.com/rest/2.0/ocr/v1/accurate_basic?access_token=${accessToken}`;
+      // accurate = high-accuracy general OCR *with* per-line position. The
+      // _basic suffix means "no coordinates" by design, which left the floating
+      // window's scattered mode with nothing to place. Same accuracy and the
+      // same free-quota tier, separate quota counter.
+      const apiUrl = `https://aip.baidubce.com/rest/2.0/ocr/v1/accurate?access_token=${accessToken}`;
 
       const formData = new URLSearchParams();
       formData.append('image', pureBase64);
@@ -123,9 +127,22 @@ class BaiduOCREngine extends BaseOCREngine {
 
       const text = wordsResult.map(item => item.words).join('\n');
 
+      // location is {left, top, width, height} in source-image pixels, one entry
+      // per recognized line.
+      const blocks = makeBlocks(wordsResult.map(item => ({
+        text: item.words,
+        bbox: item.location && {
+          x: item.location.left,
+          y: item.location.top,
+          width: item.location.width,
+          height: item.location.height,
+        },
+      })));
+
       return {
         success: true,
         text: this.cleanText(text),
+        ...(blocks.length && { blocks, rawBlocks: blocks }),
         engine: 'baidu-ocr',
         wordsCount: data.words_result_num,
       };

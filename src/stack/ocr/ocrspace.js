@@ -2,6 +2,7 @@
 // Stack port of src/providers/ocr/ocrspace.js — network via rtFetch.
 
 import { BaseOCREngine, _t } from './base.js';
+import { unionRects, makeBlocks } from './blocks.js';
 import { rtFetch } from '../runtime.js';
 import createLogger from '../logger.js';
 const logger = createLogger('OCRSpace');
@@ -77,7 +78,9 @@ class OCRSpaceEngine extends BaseOCREngine {
       formData.append('apikey', apiKey);
       formData.append('language', apiLang);
       formData.append('base64Image', base64Data);
-      formData.append('isOverlayRequired', 'false');
+      // Overlay carries the per-word boxes the floating window's scattered mode
+      // needs. It costs response size only — no extra API credits.
+      formData.append('isOverlayRequired', 'true');
       formData.append('detectOrientation', 'true');
       formData.append('scale', 'true');
       // Engine 2 has materially better accuracy on small/styled text than the default
@@ -108,13 +111,39 @@ class OCRSpaceEngine extends BaseOCREngine {
       return {
         success: true,
         text: this.cleanText(text),
+        ...this._overlayBlocks(parsedResults),
         engine: 'ocrspace',
-        confidence: parsedResults[0]?.TextOverlay?.Lines?.[0]?.MaxHeight || null,
       };
     } catch (error) {
       logger.error('Error:', error);
       return { success: false, error: error.message };
     }
+  }
+
+  // TextOverlay boxes words, not lines, so each line's box is the union of its
+  // words — word-level blocks would read as a "word pile" to the scattered-mode
+  // heuristic and force in-place panes on ordinary prose.
+  //
+  // Caveat: we also send scale=true (server-side upscale for small captures),
+  // and the overlay is reported in whatever space the server worked in. If that
+  // turns out not to be source-image pixels, the coordinates land outside the
+  // capture frame and resolveDisplayMode drops them — degrading to unified,
+  // which is exactly this engine's behavior before boxes existed.
+  _overlayBlocks(parsedResults) {
+    const lines = [];
+    for (const result of parsedResults) {
+      for (const line of result?.TextOverlay?.Lines || []) {
+        const rects = (line.Words || []).map(w => ({
+          x: w.Left, y: w.Top, width: w.Width, height: w.Height,
+        }));
+        lines.push({
+          text: line.LineText || (line.Words || []).map(w => w.WordText).join(' '),
+          bbox: unionRects(rects),
+        });
+      }
+    }
+    const blocks = makeBlocks(lines);
+    return blocks.length ? { blocks, rawBlocks: blocks } : {};
   }
 }
 

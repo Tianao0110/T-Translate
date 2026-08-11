@@ -71,16 +71,76 @@ try {
   if ($null -eq $ocrEngine) { $ocrEngine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages() }
   if ($null -eq $ocrEngine) { Write-Error 'no usable OCR language pack'; exit 1 }
   $result = Await ($ocrEngine.RecognizeAsync($bitmap)) ([Windows.Media.Ocr.OcrResult])
-  ($result.Lines | ForEach-Object { $_.Text }) -join [Environment]::NewLine
+  $lines = @($result.Lines | ForEach-Object {
+    $words = @($_.Words | ForEach-Object { @{ x = $_.BoundingRect.X; y = $_.BoundingRect.Y; w = $_.BoundingRect.Width; h = $_.BoundingRect.Height } })
+    @{ text = $_.Text; words = $words }
+  })
+  @{ lines = $lines } | ConvertTo-Json -Depth 5 -Compress
   $stream.Dispose()
 } catch { Write-Error $_.Exception.Message; exit 1 }
 `.trim();
 }
 
+// OcrLine carries no rect of its own — only its Words do, so a line's box is
+// their union. Line granularity matches the local engine's rawBlocks; word
+// boxes would read as a "word pile" to the floating window's layout heuristic.
+function unionWordRects(words) {
+  const valid = (words || []).filter(
+    w => [w?.x, w?.y, w?.w, w?.h].every(Number.isFinite) && w.w > 0 && w.h > 0
+  );
+  if (!valid.length) return null;
+
+  const x = Math.min(...valid.map(w => w.x));
+  const y = Math.min(...valid.map(w => w.y));
+  const right = Math.max(...valid.map(w => w.x + w.w));
+  const bottom = Math.max(...valid.map(w => w.y + w.h));
+  return { x, y, width: right - x, height: bottom - y };
+}
+
+/**
+ * Parse the PowerShell payload into text + positioned blocks.
+ *
+ * Falls back to treating the output as plain text when it isn't JSON: a host
+ * where ConvertTo-Json misbehaves then degrades to this driver's pre-0.3.4
+ * behavior (text, no coordinates) instead of failing recognition outright.
+ *
+ * @returns {{text: string, blocks: Array<{text, bbox, confidence, index}>}}
+ */
+function parseRecognizeOutput(stdout) {
+  const raw = (stdout || '').trim();
+  if (!raw) return { text: '', blocks: [] };
+
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    return { text: raw, blocks: [] };
+  }
+
+  // PS 5.1 collapses a one-element array to a bare object and may render an
+  // empty one as null.
+  const lines = Array.isArray(data?.lines) ? data.lines : data?.lines ? [data.lines] : [];
+
+  const texts = [];
+  const blocks = [];
+  for (const line of lines) {
+    const text = typeof line?.text === 'string' ? line.text : '';
+    if (!text.trim()) continue;
+    texts.push(text);
+
+    const bbox = unionWordRects(Array.isArray(line.words) ? line.words : line.words ? [line.words] : []);
+    if (bbox) {
+      blocks.push({ text: text.trim(), bbox, confidence: 0.9, index: blocks.length });
+    }
+  }
+
+  return { text: texts.join('\n'), blocks };
+}
+
 /**
  * @param {string} imageData - dataURL or bare base64 PNG
  * @param {{language?: string}} options - settings language code ('auto' ok)
- * @returns {Promise<{success, text?, confidence?, engine, error?}>}
+ * @returns {Promise<{success, text?, blocks?, rawBlocks?, confidence?, engine, error?}>}
  */
 async function recognize(imageData, options = {}) {
   if (process.platform !== 'win32') {
@@ -105,10 +165,16 @@ async function recognize(imageData, options = {}) {
     const winLang = WIN_LANG_MAP[options.language] || '';
     const { stdout } = await runPowerShell(buildRecognizeScript(tempFile, winLang));
 
-    const text = stripCjkSpaces(stdout.trim());
+    const parsed = parseRecognizeOutput(stdout);
+    const text = stripCjkSpaces(parsed.text);
+    // Boxes come straight from Windows in source-image pixels — this driver
+    // writes the capture to disk untouched, so no scale conversion applies.
+    const blocks = parsed.blocks.map(b => ({ ...b, text: stripCjkSpaces(b.text) }));
     return {
       success: true,
       text,
+      blocks,
+      rawBlocks: blocks,
       confidence: text ? 0.9 : 0,
       engine: 'windows-ocr',
     };
@@ -150,4 +216,4 @@ $null = [Windows.Media.Ocr.OcrEngine, Windows.Foundation, ContentType = WindowsR
   }
 }
 
-module.exports = { recognize, checkAvailability, stripCjkSpaces };
+module.exports = { recognize, checkAvailability, stripCjkSpaces, parseRecognizeOutput };

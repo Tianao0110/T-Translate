@@ -102,8 +102,9 @@ export class WindowsOCREngine extends BaseOCREngine {
         success: true,
         text: this.cleanText(result.text),
         raw: result.text,
-        blocks: [],
-        rawBlocks: [],
+        // Windows.Media.Ocr boxes every word; the driver unions them per line.
+        blocks: result.blocks || [],
+        rawBlocks: result.rawBlocks || result.blocks || [],
         engine: 'windows-ocr',
       };
     } catch (error) {
