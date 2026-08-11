@@ -56,6 +56,14 @@ function formatArgs(args) {
   });
 }
 
+// Local YYYY-MM-DD. Not toISOString(): that is UTC, so west-of-UTC machines
+// rolled the file over mid-evening and named it for the next day, while the
+// timestamps written inside stayed local.
+function localDateStamp(date = new Date()) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
 // Configure electron-log: per-day rotated files, 5MB cap, 7-day retention.
 function configureElectronLog() {
   if (!electronLog) return;
@@ -63,8 +71,7 @@ function configureElectronLog() {
   const logDir = path.join(app.getPath('userData'), 'logs');
 
   electronLog.transports.file.resolvePathFn = () => {
-    const date = new Date().toISOString().slice(0, 10);
-    return path.join(logDir, `app-${date}.log`);
+    return path.join(logDir, `app-${localDateStamp()}.log`);
   };
 
   electronLog.transports.file.level = 'info';
@@ -237,3 +244,4 @@ module.exports = createLogger;
 module.exports.LOG_LEVELS = LOG_LEVELS;
 module.exports.getLogDirectory = getLogDirectory;
 module.exports.filterSensitive = filterSensitive;
+module.exports.localDateStamp = localDateStamp;

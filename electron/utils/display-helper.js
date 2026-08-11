@@ -55,6 +55,27 @@ function getNearestDisplay(x, y) {
 }
 
 /**
+ * Normalize a persisted window position to `{ x, y }`.
+ *
+ * Builds up to v0.3.3 stored `BrowserWindow.getPosition()` verbatim — an [x, y]
+ * array — while the read side took `.x` / `.y` off it. That silently yielded
+ * undefined, so every launch fell through to "no position info" and recentred
+ * the window. Both shapes are accepted so existing installs keep their spot.
+ *
+ * @returns {{ x?: number, y?: number }} — empty when nothing usable was stored.
+ */
+function normalizeWindowPosition(stored) {
+  if (Array.isArray(stored)) {
+    const [x, y] = stored;
+    return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : {};
+  }
+  if (stored && Number.isFinite(stored.x) && Number.isFinite(stored.y)) {
+    return { x: stored.x, y: stored.y };
+  }
+  return {};
+}
+
+/**
  * Ensure window bounds land on a valid display. If invalid, either recenter on the
  * primary display or clamp to the nearest one.
  *
@@ -203,6 +224,7 @@ module.exports = {
   isPointOnAnyDisplay,
   isBoundsVisible,
   getNearestDisplay,
+  normalizeWindowPosition,
   ensureBoundsOnDisplay,
   constrainToScreen,
   getWindowPosition,

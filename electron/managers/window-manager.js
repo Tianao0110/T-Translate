@@ -39,13 +39,13 @@ function createMainWindow() {
   }
 
   const windowBounds = store.get('windowBounds');
-  const windowPosition = store.get('windowPosition');
+  const windowPosition = displayHelper.normalizeWindowPosition(store.get('windowPosition'));
 
   const savedBounds = {
     width: windowBounds.width,
     height: windowBounds.height,
-    x: windowPosition?.x,
-    y: windowPosition?.y,
+    x: windowPosition.x,
+    y: windowPosition.y,
   };
 
   // Guard against orphaned positions when a monitor is unplugged
@@ -105,7 +105,9 @@ function createMainWindow() {
 
   mainWindow.on('move', () => {
     if (!mainWindow.isMaximized()) {
-      store.set('windowPosition', mainWindow.getPosition());
+      // getPosition() returns [x, y]; the read side wants { x, y }.
+      const [x, y] = mainWindow.getPosition();
+      store.set('windowPosition', { x, y });
     }
   });
 
