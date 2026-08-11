@@ -62,7 +62,10 @@ const CONFIG = {
 // ===== State machine =====
 
 class SelectionStateMachine {
-  constructor() {
+  // Injectable clock: kinematic conditions divide distance by wall-clock time,
+  // so tests must control it — real sleeps stretch under load and flip verdicts.
+  constructor({ now = Date.now } = {}) {
+    this.now = now;
     this.reset();
     this.clickHistory = [];
     this.isMultiClickTriggered = false;
@@ -114,7 +117,7 @@ class SelectionStateMachine {
     if (newState === STATES.POSSIBLE) {
       this.setTimeout(CONFIG.POSSIBLE_TIMEOUT);
     } else if (newState === STATES.LIKELY) {
-      this.likelyEnteredAt = Date.now();
+      this.likelyEnteredAt = this.now();
       this.retreatCount = 0;
       // Sticky direct path needs no watchdog: the user is actively dragging and mouseup
       // resolves the state. The 2s LIKELY_TIMEOUT would falsely kill long slow selections
@@ -135,7 +138,7 @@ class SelectionStateMachine {
    * @param {boolean} hotkeyActive — sticky direct mode (CapsLock toggle) on at this moment
    */
   onMouseDown(x, y, hotkeyActive = false) {
-    const now = Date.now();
+    const now = this.now();
 
     const isMulti = this.isMultiClick(x, y, now);
 
@@ -169,7 +172,7 @@ class SelectionStateMachine {
   onMouseMove(x, y) {
     if (this.state === STATES.IDLE) return;
 
-    const now = Date.now();
+    const now = this.now();
 
     // Throttle by sample interval.
     if (now - this.lastSampleTime < CONFIG.SAMPLE_INTERVAL) {
@@ -211,7 +214,7 @@ class SelectionStateMachine {
    * @param {boolean} hotkeyActive — sticky direct mode on at this moment
    */
   onMouseUp(x, y, hotkeyActive = false) {
-    const now = Date.now();
+    const now = this.now();
 
     // Always stamp upTime (even on hotkey path) — otherwise the next double-click
     // after a sticky direct can be misclassified.
@@ -274,7 +277,7 @@ class SelectionStateMachine {
   // Non-mutating peek used during mousedown to decide whether to hide the existing
   // window (avoid flicker when a double-click is about to extend selection).
   peekMultiClick(x, y) {
-    const now = Date.now();
+    const now = this.now();
     if (this.clickHistory.length === 0) return false;
 
     const lastClick = this.clickHistory[this.clickHistory.length - 1];
