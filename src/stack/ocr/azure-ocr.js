@@ -3,6 +3,7 @@
 // a Node global since v16.
 
 import { BaseOCREngine, _t } from './base.js';
+import { rectFromPoints, makeBlocks } from './blocks.js';
 import { rtFetch } from '../runtime.js';
 import createLogger from '../logger.js';
 const logger = createLogger('AzureOCR');
@@ -115,19 +116,26 @@ class AzureOCREngine extends BaseOCREngine {
 
       for (const page of readResults) {
         for (const line of page.lines || []) {
-          lines.push(line.text);
+          // boundingBox is a flat 8-number quadrilateral in source-image pixels.
+          lines.push({ text: line.text, bbox: rectFromPoints(line.boundingBox) });
         }
       }
 
-      const text = lines.join('\n');
+      const text = lines.map(l => l.text).join('\n');
 
       if (!text) {
         return { success: false, error: _t('providerError.ocrNoText', '未识别到文字') };
       }
 
+      // Read returns per-line boxes already — no merged variant, so the pipeline
+      // gets one pane per line in scattered mode.
+      const blocks = makeBlocks(lines);
+
       return {
         success: true,
         text: this.cleanText(text),
+        blocks,
+        rawBlocks: blocks,
         engine: 'azure-ocr',
       };
     } catch (error) {

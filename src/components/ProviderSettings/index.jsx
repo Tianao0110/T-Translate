@@ -9,6 +9,7 @@ import { getAllProviderMetadata } from '../../config/provider-icons.js';
 import translationService from '../../services/stack-client.js';
 import useTranslationStore from '../../stores/translation-store';
 import { secureStorage } from './persist.js';
+import { buildDefaultProviderList } from './defaults.js';
 import './styles.css';
 import createLogger from '../../utils/logger.js';
 const logger = createLogger('ProviderSettings');
@@ -96,11 +97,7 @@ const ProviderSettings = ({ settings, settingsReady, updateSettings, notify }) =
           }
         }
       } else {
-        providerList = allProvidersMeta.map((meta, index) => ({
-          id: meta.id,
-          enabled: index === 0,
-          priority: index,
-        }));
+        providerList = buildDefaultProviderList(allProvidersMeta);
       }
 
       providerList.forEach((p, i) => p.priority = i);

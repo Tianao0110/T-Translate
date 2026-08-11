@@ -2,9 +2,19 @@
 // Stack port of src/providers/ocr/baidu-ocr.js — network via rtFetch.
 
 import { BaseOCREngine, _t } from './base.js';
+import { makeBlocks } from './blocks.js';
 import { rtFetch } from '../runtime.js';
 import createLogger from '../logger.js';
 const logger = createLogger('BaiduOCR');
+
+const POSITION_ENDPOINT = 'accurate';       // per-line location, separate activation + quota
+const FALLBACK_ENDPOINT = 'accurate_basic'; // text only, the endpoint used before v0.3.4
+
+// Baidu codes that all mean "this account cannot use `accurate` right now":
+// 6 = interface not activated, 17/19 = daily/total quota exhausted,
+// 18 = QPS limit. Each endpoint meters separately, so basic may still answer.
+// Token and image errors are deliberately absent — they fail both endpoints.
+const ENDPOINT_UNAVAILABLE_CODES = new Set([6, 17, 18, 19]);
 
 class BaiduOCREngine extends BaseOCREngine {
   static metadata = {
@@ -90,27 +100,17 @@ class BaiduOCREngine extends BaseOCREngine {
       // Baidu expects bare base64 form-encoded, not a data: URL
       const pureBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
 
-      // accurate_basic = high-accuracy general OCR (slower but more reliable than basicGeneral)
-      const apiUrl = `https://aip.baidubce.com/rest/2.0/ocr/v1/accurate_basic?access_token=${accessToken}`;
+      // accurate carries per-line position; accurate_basic (the _basic suffix
+      // literally means "no coordinates") does not. Same accuracy, but Baidu
+      // activates and meters them separately — so try the positioned one and
+      // drop to basic when this account can't use it, rather than failing the
+      // capture over a quota the user may not even know about.
+      let data = await this._callOcr(POSITION_ENDPOINT, accessToken, pureBase64);
 
-      const formData = new URLSearchParams();
-      formData.append('image', pureBase64);
-      formData.append('detect_direction', 'true');
-      formData.append('paragraph', 'true');
-
-      const response = await rtFetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: formData.toString(),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+      if (ENDPOINT_UNAVAILABLE_CODES.has(data.error_code)) {
+        logger.warn(`accurate unavailable (${data.error_code}: ${data.error_msg}), retrying without position`);
+        data = await this._callOcr(FALLBACK_ENDPOINT, accessToken, pureBase64);
       }
-
-      const data = await response.json();
 
       if (data.error_code) {
         throw new Error(data.error_msg || `错误码: ${data.error_code}`);
@@ -123,9 +123,22 @@ class BaiduOCREngine extends BaseOCREngine {
 
       const text = wordsResult.map(item => item.words).join('\n');
 
+      // location is {left, top, width, height} in source-image pixels, one entry
+      // per recognized line.
+      const blocks = makeBlocks(wordsResult.map(item => ({
+        text: item.words,
+        bbox: item.location && {
+          x: item.location.left,
+          y: item.location.top,
+          width: item.location.width,
+          height: item.location.height,
+        },
+      })));
+
       return {
         success: true,
         text: this.cleanText(text),
+        ...(blocks.length && { blocks, rawBlocks: blocks }),
         engine: 'baidu-ocr',
         wordsCount: data.words_result_num,
       };
@@ -133,6 +146,28 @@ class BaiduOCREngine extends BaseOCREngine {
       logger.error('Error:', error);
       return { success: false, error: error.message };
     }
+  }
+
+  async _callOcr(endpoint, accessToken, pureBase64) {
+    const formData = new URLSearchParams();
+    formData.append('image', pureBase64);
+    formData.append('detect_direction', 'true');
+    formData.append('paragraph', 'true');
+
+    const response = await rtFetch(
+      `https://aip.baidubce.com/rest/2.0/ocr/v1/${endpoint}?access_token=${accessToken}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formData.toString(),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    return response.json();
   }
 }
 

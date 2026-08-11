@@ -151,22 +151,54 @@ export function pickScatterBlocks(rawBlocks, mergedBlocks) {
   return result;
 }
 
+// Boxes must sit inside the frame they were read from. Engines report in their
+// own coordinate space, and a whole-set overshoot means that space isn't
+// source-image pixels — scattering on those numbers would paste translations
+// far from the text they belong to. Distrusting the set degrades to unified,
+// which is what these engines did before they reported boxes at all. The
+// tolerance absorbs edge-clipped boxes and rounding, not a 2× scale error.
+const FRAME_OVERSHOOT_TOLERANCE = 0.25;
+
+export function coordsFitFrame(blocks, frame) {
+  if (!frame || !(frame.width > 0) || !(frame.height > 0)) return true; // nothing to judge against
+  const valid = positioned(blocks);
+  if (!valid.length) return true;
+
+  const slackX = frame.width * FRAME_OVERSHOOT_TOLERANCE;
+  const slackY = frame.height * FRAME_OVERSHOOT_TOLERANCE;
+  return valid.every(b =>
+    b.bbox.x >= -slackX &&
+    b.bbox.y >= -slackY &&
+    b.bbox.x + b.bbox.width <= frame.width + slackX &&
+    b.bbox.y + b.bbox.height <= frame.height + slackY
+  );
+}
+
 // Manual pref ('scattered'|'unified') overrides the heuristic ('auto').
-// Forced scattered still needs positioned text blocks — engines that return
-// no box coordinates (e.g. LLM vision) fall back to unified instead of
-// rendering zero panes and dropping the text.
+// Scattered mode needs positioned text blocks either way — engines that return
+// no box coordinates (LLM vision) fall back to unified instead of rendering
+// zero panes and dropping the text. `fellBack` drives the badge's "engine gave
+// no coordinates" hint, and auto mode raises it too: silently landing on
+// unified reads as "the heuristic chose this", when the truth is it never got
+// to choose.
 export function resolveDisplayMode(pref, rawBlocks, mergedBlocks, frame = null) {
   if (pref === 'unified') return { useScattered: false, fellBack: false, blocks: null };
+
+  const trusted = coordsFitFrame(rawBlocks, frame);
+  const raw = trusted ? rawBlocks : [];
+  const merged = trusted ? mergedBlocks : [];
+  const hasPositioned = positioned(raw).some(b => b.text?.trim());
+
   if (pref === 'scattered') {
-    const hasPositioned = positioned(rawBlocks).some(b => b.text?.trim());
     return hasPositioned
-      ? { useScattered: true, fellBack: false, blocks: pickScatterBlocks(rawBlocks, mergedBlocks) }
+      ? { useScattered: true, fellBack: false, blocks: pickScatterBlocks(raw, merged) }
       : { useScattered: false, fellBack: true, blocks: null };
   }
-  const useScattered = shouldUseScatteredMode(rawBlocks, frame);
+
+  const useScattered = shouldUseScatteredMode(raw, frame);
   return {
     useScattered,
-    fellBack: false,
-    blocks: useScattered ? pickScatterBlocks(rawBlocks, mergedBlocks) : null,
+    fellBack: !useScattered && !hasPositioned,
+    blocks: useScattered ? pickScatterBlocks(raw, merged) : null,
   };
 }

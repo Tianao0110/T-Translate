@@ -2,6 +2,7 @@
 // Stack port of src/providers/ocr/google-vision.js — network via rtFetch.
 
 import { BaseOCREngine, _t } from './base.js';
+import { rectFromPoints, makeBlocks } from './blocks.js';
 import { rtFetch } from '../runtime.js';
 import createLogger from '../logger.js';
 const logger = createLogger('GoogleVision');
@@ -103,6 +104,7 @@ class GoogleVisionEngine extends BaseOCREngine {
       return {
         success: true,
         text: this.cleanText(fullText),
+        ...this._paragraphBlocks(result?.fullTextAnnotation),
         engine: 'google-vision',
         locale: textAnnotations[0]?.locale,
       };
@@ -111,6 +113,44 @@ class GoogleVisionEngine extends BaseOCREngine {
       return { success: false, error: error.message };
     }
   }
+
+  // Blocks come from fullTextAnnotation (returned alongside TEXT_DETECTION),
+  // not from textAnnotations[1..]: those are per-WORD, and word boxes are about
+  // as tall as they are wide, so the scattered-mode heuristic would read every
+  // paragraph of prose as a word pile. Paragraph boxes are the coarsest
+  // granularity Vision structures for us and need no line reassembly.
+  _paragraphBlocks(fullTextAnnotation) {
+    const items = [];
+    for (const page of fullTextAnnotation?.pages || []) {
+      for (const block of page.blocks || []) {
+        for (const paragraph of block.paragraphs || []) {
+          items.push({
+            text: paragraphText(paragraph),
+            bbox: rectFromPoints(paragraph.boundingBox?.vertices),
+            confidence: paragraph.confidence,
+          });
+        }
+      }
+    }
+    const blocks = makeBlocks(items);
+    return blocks.length ? { blocks, rawBlocks: blocks } : {};
+  }
+}
+
+// Vision gives paragraphs no text field — it has to be rebuilt from symbols,
+// with detectedBreak carrying the whitespace the symbols themselves omit.
+function paragraphText(paragraph) {
+  let out = '';
+  for (const word of paragraph?.words || []) {
+    for (const symbol of word.symbols || []) {
+      out += symbol.text || '';
+      const type = symbol.property?.detectedBreak?.type;
+      if (type === 'SPACE' || type === 'SURE_SPACE') out += ' ';
+      else if (type === 'EOL_SURE_SPACE' || type === 'LINE_BREAK') out += '\n';
+      else if (type === 'HYPHEN') out += '-';
+    }
+  }
+  return out.trim();
 }
 
 export default GoogleVisionEngine;
