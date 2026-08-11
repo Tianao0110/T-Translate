@@ -375,7 +375,7 @@ describe('engine response parsing', () => {
     expect(parseRecognizeOutput('plain text line')).toEqual({ text: 'plain text line', blocks: [] });
   });
 
-  it('Baidu: the basic endpoint is no longer used — it omits location by design', async () => {
+  it('Baidu: asks the positioned endpoint first', async () => {
     const fetch = routedFetch({
       '/oauth/2.0/token': { body: { access_token: 't', expires_in: 2592000 } },
       '/ocr/v1/accurate': { body: { words_result: [{ words: 'x', location: { left: 0, top: 0, width: 5, height: 5 } }] } },
@@ -387,5 +387,40 @@ describe('engine response parsing', () => {
     const ocrCall = fetch.mock.calls.find(([url]) => String(url).includes('/ocr/v1/'));
     expect(ocrCall[0]).toContain('/ocr/v1/accurate?');
     expect(ocrCall[0]).not.toContain('accurate_basic');
+  });
+
+  it('Baidu: an unactivated or exhausted `accurate` drops to basic, text intact', async () => {
+    // 6 = interface not activated. The user may only have turned on the
+    // no-position endpoint; losing scattered layout beats losing the capture.
+    let call = 0;
+    const fetch = vi.fn(async (url) => {
+      const body = String(url).includes('/oauth/')
+        ? { access_token: 't', expires_in: 2592000 }
+        : String(url).includes('accurate_basic')
+          ? { words_result: [{ words: '仍然有文字' }] }
+          : (call++, { error_code: 6, error_msg: 'No permission to access data' });
+      return { ok: true, status: 200, headers: { get: () => null }, json: async () => body, text: async () => '' };
+    });
+    configureRuntime({ fetch });
+
+    const result = await new BaiduOCREngine({ apiKey: 'k', secretKey: 's' }).recognize(IMG);
+
+    expect(result.success).toBe(true);
+    expect(result.text).toBe('仍然有文字');
+    expect(result.rawBlocks).toBeUndefined();  // no coordinates from basic
+    expect(fetch.mock.calls.some(([u]) => String(u).includes('accurate_basic'))).toBe(true);
+  });
+
+  it('Baidu: a genuine error still surfaces instead of silently retrying', async () => {
+    const fetch = routedFetch({
+      '/oauth/2.0/token': { body: { access_token: 't', expires_in: 2592000 } },
+      '/ocr/v1/accurate': { body: { error_code: 216201, error_msg: 'image format error' } },
+    });
+    configureRuntime({ fetch });
+
+    const result = await new BaiduOCREngine({ apiKey: 'k', secretKey: 's' }).recognize(IMG);
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('image format error');
+    expect(fetch.mock.calls.some(([u]) => String(u).includes('accurate_basic'))).toBe(false);
   });
 });
