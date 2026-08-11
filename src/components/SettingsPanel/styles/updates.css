@@ -255,7 +255,14 @@
 
 /* ==================== 下载完成 ==================== */
 
+/* Column-centered like .empty-state, not text-align alone: the reset makes
+   every svg display:block (styles/index.css), and a block box ignores the
+   parent's text-align — the icon sat against the left edge while the text
+   under it was centered. Same for the installing and error states below. */
 .update-ready {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   text-align: center;
   padding: 16px 0;
 }
@@ -281,6 +288,9 @@
 /* ==================== 安装中 ==================== */
 
 .update-installing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   text-align: center;
   padding: 24px 0;
   color: var(--text-secondary, #6b7280);
@@ -294,6 +304,9 @@
 /* ==================== 错误状态 ==================== */
 
 .update-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   text-align: center;
   padding: 16px 0;
 }
