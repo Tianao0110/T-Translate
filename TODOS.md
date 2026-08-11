@@ -39,13 +39,15 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 - **长段阈值仍是估值**：中文 150 字 / 英文 120 词写在 `src/config/ai-actions.js` `LONG_FORM_GATE`，设计阶段就说要拿真实技术文档实测再定。用一段时间后按"该出现却没出现 / 不该出现却出现"的实感调
 - **理解模式结果不进历史**：那条路没有翻译条目可挂（AI 结果是翻译的附属，无附主则不写）。若要回看，需要单独设计一个"理解记录"，或让理解模式也留一条主条目——属产品决策，未定
 
-### LLM 视觉 OCR 丢失位置信息（2026-07-12 用户提出，研究性质）
+### LLM 视觉 OCR 丢失位置信息（其余六个引擎已于 v0.3.4 补齐，只剩这一个）
 
-llm-vision 引擎（API 交给本地视觉模型识别）只返回纯文本、无 bbox——悬浮窗散点模式被迫回退整段（徽标"散点→整段"），漫画/标签场景体验降级。候选方向（需实验验证）：
+v0.3.4 给 Windows OCR / Azure / Google Vision / OCR.space / 百度 五个引擎补上了行级坐标（坐标契约与粒度铁律见 `src/stack/ocr/blocks.js` 注释）。**llm-vision 仍是唯一无坐标的引擎**——模型只被要求输出文字，散点模式下退回整段（现在两种模式都会给提示）。候选方向（需实验验证，需要机器上有 Qwen2-VL 类模型）：
 
-- ① **结构化输出 prompt**：要求模型返回行级 JSON + 归一化坐标。Qwen2-VL 系原生支持 grounding（bbox 定位），但小参数本地模型坐标精度未知，且不同模型能力参差——需按模型分级启用
+- ① **结构化输出 prompt**：要求模型返回行级 JSON + 归一化坐标。Qwen2-VL 系原生支持 grounding（bbox 定位），但小参数本地模型坐标精度未知，且不同模型能力参差——需按模型分级启用 + 坐标合法性校验（`display-mode.js` 的 `coordsFitFrame` 已经是现成的兜底闸门，越界整组丢弃）
 - ② **混合管线**：本地 PP-OCR det 模型只出框（det 权重仅 ~9MB、无需 rec 语言包），裁切文本条喂 LLM 识别——框准、字准，代价是 N 个框 N 次调用（或拼图批量）
 - ③ **场景引导**：散点需求场景（悬浮窗）提示切换本地 OCR 引擎，llm-vision 保持整段专用——零研发成本的兜底文案方案
+
+**四个在线引擎的坐标只有 fixture 验证**（按各家文档的响应形状建的，见 `tests/unit/ocr-blocks.test.js`），无密钥无法端到端实测；Windows OCR 与本地引擎是实测过的。哪天有密钥了，实拍一次散点排版确认坐标空间无误。
 
 ### ~~绿色便携化（数据不落 APPDATA）~~ 已评估，暂不做（2026-08-10 用户拍板）
 
@@ -56,9 +58,17 @@ llm-vision 引擎（API 交给本地视觉模型识别）只返回纯文本、�
 - ⚠️ **userData 之外还有一处残留**：[system.js:265](electron/ipc/system.js:265) 的开机自启走 `setLoginItemSettings` → 写 `HKCU\...\Run` 注册表。「卸载完全不留」要成立就必须处理它（便携版隐藏该开关或退出时清），否则是假承诺
 - 其余：便携版不能装进 Program Files（不可写）→ electron-builder 加 `portable`/`zip` target 与 NSIS 并存，前者自带 `PORTABLE_EXECUTABLE_DIR` 可当检测依据；老用户迁移提示；OCR 模型跟着搬（高精度包 139MB）需在文档说明
 
-### Full onboarding wizard
+### 首次启动弱引导（2026-08-11 设计已定稿，未实施）
 
-The v0.2.6 OCR error-to-guidance fix is the short version. Full version: first-launch welcome flow, guided OCR/LLM setup, feature tour. Needs design.
+用户拍板走**弱引导**而非多步向导："用户点击进哪里，哪里就会有相对应的小提示"。三块：
+
+- **主面板常驻提示条**：检测到当前翻译不了时常驻一条，按钮直达设置→翻译源，配好即消。判据不能看 `isConfigured()`——本地源无必填字段、永远报"已配置"；要按真实可达性判：云端源有 key 就算可用（**不探测**，每次启动发一次 API 调用会烧配额），本地源探 localhost 端点（免费、离线模式下也合法）。区分两类要读 `requiresNetwork`，它是 provider 类上的 getter 不在 metadata 里，应让 `getAllProvidersStatus()` 从实例读它带进 IPC 载荷，别往 metadata 抄一份（"能力看实现不看元数据"）
+- **首次启动轻弹窗**：走 ConfirmDialog 的样式语言，内容 = 功能速览 + 指明先配翻译源，不在弹窗里做配置。**`guide.*` 那组 i18n 是现成文案且全仓零消费者**（4 张功能卡 + 副标题 + "不再显示"），正好复活
+- **两处一次性小提示**：用户点名了**改写风格**与**收藏**，先只做这两处（一次性提示铺太多，第一次打开处处冒泡反而烦）
+
+状态存 electron-store 顶层 `onboarding: { welcomeSeen, hints: {...} }`，配一个"重新查看引导"复位入口放设置→关于（免得成幽灵键）。
+
+已确认**不做**：简略/全部设置切换早就实现了（`SettingsPanel/index.jsx` 的 `simpleMode`，默认简略，带一次性提示），用户看过后表示"已经够了，不用动"。
 
 ### Incremental unit test coverage buildout
 
