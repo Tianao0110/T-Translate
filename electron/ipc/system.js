@@ -3,7 +3,8 @@
 const { ipcMain, dialog, shell } = require("electron");
 const fs = require("fs").promises;
 const { CHANNELS } = require("../shared/channels");
-const logger = require("../utils/logger")("IPC:System");
+const createLogger = require("../utils/logger");
+const logger = createLogger("IPC:System");
 const { t } = require("../shared/main-i18n");
 
 function register(ctx) {
@@ -205,6 +206,24 @@ function register(ctx) {
   });
 
   // ===== Logs =====
+
+  // Renderer-side logging had no path to disk: src/utils/logger.js writes to
+  // console only, so React crashes, unhandled rejections and window.onerror
+  // left the log files completely blind to the whole renderer half of the app.
+  // One-way (`on`, not `handle`) — logging must never make the caller await.
+  const RENDERER_LEVELS = new Set(['error', 'warn', 'info']);
+  const MAX_RENDERER_MSG = 4000;
+
+  ipcMain.on(CHANNELS.LOGS.WRITE, (event, payload = {}) => {
+    const level = RENDERER_LEVELS.has(payload.level) ? payload.level : 'error';
+    const scope = String(payload.scope || 'Renderer').slice(0, 40);
+    // Already a string from the renderer side; cap it so a runaway loop cannot
+    // blow past the 5MB file cap in one write.
+    const text = String(payload.text || '').slice(0, MAX_RENDERER_MSG);
+    if (!text) return;
+
+    createLogger(`Renderer:${scope}`)[level](text);
+  });
 
   ipcMain.handle(CHANNELS.LOGS.OPEN_DIRECTORY, async () => {
     const { getLogDirectory } = require('../utils/logger');

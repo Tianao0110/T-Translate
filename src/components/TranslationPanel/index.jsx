@@ -18,7 +18,7 @@ import createLogger from '../../utils/logger.js';
 import { getShortErrorMessage } from '../../utils/error-handler.js';
 import './styles.css';
 
-import { PRIVACY_MODES, TRANSLATION_STATUS, getLanguageList } from '@config/defaults';
+import { PRIVACY_MODES, TRANSLATION_STATUS, LANGUAGES } from '@config/defaults';
 import { detectTemplateFromModel } from '../../config/model-template-mapping.js';
 
 import { useTTS, useTermCheck, useStyleRewrite, useSaveModal } from './hooks';
@@ -26,7 +26,9 @@ import useAiActions from '../../hooks/use-ai-actions.js';
 import { resolveActionLabel } from '../../services/ai-action-runner.js';
 import AiActionIcon from '../shared/AiActionIcon.jsx';
 
-import { StyleModal, SaveModal, LanguageSelector } from './components.jsx';
+import { StyleModal, SaveModal } from './components.jsx';
+import LanguagePicker from '../shared/LanguagePicker.jsx';
+import { mergeLanguages, customCodesOf } from '@config/custom-languages';
 
 const logger = createLogger('TranslationPanel');
 
@@ -61,6 +63,8 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   const {
     currentTranslation,
     favorites,
+    languagePicker,
+    customLanguages,
     useStreamOutput,
     autoTranslate,
     autoTranslateDelay,
@@ -69,6 +73,9 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     setSourceText,
     setTranslatedText,
     setLanguages,
+    recordLanguageUse,
+    recordLanguageBrowse,
+    addCustomLanguage,
     translate,
     streamTranslate,
     recognizeImage,
@@ -91,6 +98,11 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     setSourceText: s.setSourceText,
     setTranslatedText: s.setTranslatedText,
     setLanguages: s.setLanguages,
+    languagePicker: s.languagePicker,
+    customLanguages: s.customLanguages,
+    addCustomLanguage: s.addCustomLanguage,
+    recordLanguageUse: s.recordLanguageUse,
+    recordLanguageBrowse: s.recordLanguageBrowse,
     translate: s.translate,
     streamTranslate: s.streamTranslate,
     recognizeImage: s.recognizeImage,
@@ -145,7 +157,12 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   const sourceTextareaRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  const languages = useMemo(() => getLanguageList(true), []);
+  // The picker needs the whole entry (Chinese name, English name, endonym)
+  // to label chips and file them under the right letter.
+  // User-added languages sit alongside the built-ins; built-ins win a clash.
+  const languages = useMemo(() => mergeLanguages(LANGUAGES, customLanguages), [customLanguages]);
+  const targetLanguages = useMemo(() => languages.filter((l) => l.code !== 'auto'), [languages]);
+  const customCodes = useMemo(() => customCodesOf(customLanguages), [customLanguages]);
 
   // Tone templates. MT detection is handled in the main-process stack
   // — when a translation-only model is active, prompt structure auto-switches
@@ -382,10 +399,17 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
 
       <div className="language-selector-bar">
         <div className="language-select-group">
-          <LanguageSelector
-            value={currentTranslation.sourceLanguage || ''}
+          <LanguagePicker
+            value={currentTranslation.sourceLanguage || 'auto'}
             options={languages}
-            onChange={(code) => setLanguages(code, null)}
+            onChange={(code) => { setLanguages(code, null); recordLanguageUse(code); }}
+            recent={languagePicker.recent}
+            lastLetter={languagePicker.lastLetter}
+            letterLang={languagePicker.letterLang}
+            onBrowse={recordLanguageBrowse}
+            customCodes={customCodes}
+            existingCustom={customLanguages}
+            onAddCustom={addCustomLanguage}
           />
 
           <button
@@ -397,10 +421,17 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
             <RotateCcw size={16} />
           </button>
 
-          <LanguageSelector
+          <LanguagePicker
             value={currentTranslation.targetLanguage}
-            options={languages.filter(l => l.code !== 'auto')}
-            onChange={(code) => setLanguages(null, code)}
+            options={targetLanguages}
+            onChange={(code) => { setLanguages(null, code); recordLanguageUse(code); }}
+            recent={languagePicker.recent}
+            lastLetter={languagePicker.lastLetter}
+            letterLang={languagePicker.letterLang}
+            onBrowse={recordLanguageBrowse}
+            customCodes={customCodes}
+            existingCustom={customLanguages}
+            onAddCustom={addCustomLanguage}
           />
         </div>
 

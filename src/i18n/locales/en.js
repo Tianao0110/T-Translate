@@ -74,6 +74,12 @@ const en = {
     autoDelay: "Auto Translate Delay", autoDelayHint: "How long to wait after input stops",
     streamOutput: "Stream Output (Typewriter effect)", streamOutputHint: "Results will appear character by character",
     sameLangTitle: "When Text Is Already in Target Language", sameLangOriginal: "Show Original", sameLangSwap: "Auto Swap (back to source)",
+    customLangs: "Custom languages",
+    customLangsHint: "Added from the bottom of the language picker. These are outside Google Translate's range — whether they work depends on the model in use.",
+    customLangsEmpty: "No custom languages yet",
+    customLangPrompt: "sent as: {{name}}",
+    customLangRemoveConfirm: "Remove the custom language \"{{name}}\"?",
+    customLangRemoved: "Removed \"{{name}}\"",
     sameLangHint: "Applies to selection translate and the floating window: when selected or recognized text is already in the target language, show it as-is (no translation call), or translate back into your configured source language (zh↔en when source is \"Auto\")",
     sameLangSaved: "Applied",
     cache: "Translation Cache", cacheHint: "Cache translated content, return cached results for same text",
@@ -150,6 +156,14 @@ const en = {
     rewriteFailed: "Rewrite failed",
     versionOriginal: "Original", versionOriginalFull: "Original Translation",
     versionStyleRewrite: "Style Rewrite", versionUserEdit: "User Edit", versionUnknown: "Unknown"
+  },
+  languagePicker: {
+    customSection: "Custom", recent: "Recently used", addCustom: "Add a custom language",
+    addWarning: "This language is outside Google Translate's range. Whether it can be translated at all depends on whether your current model knows it — results may be inaccurate or plain wrong.",
+    addName: "Language name", addNamePlaceholder: "e.g. Tibetan",
+    addPromptName: "Name to send the model", addPromptPlaceholder: "Leave empty to reuse the name above",
+    addConfirm: "Understood, add it",
+    addError: { emptyName: "Enter a language name", duplicate: "That language is already added", tooLong: "Name is too long", tooMany: "Custom language limit reached" },
   },
   languages: { auto: "Auto Detect", zh: "Chinese", "zh-TW": "Traditional Chinese", en: "English", ja: "Japanese", ko: "Korean", fr: "French", de: "German", es: "Spanish", ru: "Russian", pt: "Portuguese", it: "Italian", ar: "Arabic", th: "Thai", vi: "Vietnamese", pa: "Punjabi" },
   history: { 

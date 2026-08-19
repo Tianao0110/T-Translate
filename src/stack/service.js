@@ -32,6 +32,7 @@ import {
 
 import { isProviderAllowed, PRIVACY_MODE_IDS } from './privacy-modes.js';
 import { getEnabledFilters } from '../config/filters.js';
+import { reorderForLanguage } from '../config/model-language-coverage.js';
 import { getSystemPrompt, LANGUAGE_NAMES } from '../config/templates.js';
 import { detectTemplateFromModel } from '../config/model-template-mapping.js';
 import { createStreamThrottle } from '../utils/stream-throttle.js';
@@ -451,6 +452,23 @@ export class TranslationService {
         firstModel = getProvider(id)?.config?.model || '';
       }
       usableProviders.push(id);
+    }
+
+    // A local model asked for a language it does not know answers confidently
+    // and wrongly, and "success" ends the chain — so Google, which does know
+    // that language, never gets a turn. Demote such providers before the first
+    // request rather than after a bad translation. No-op when nothing is known
+    // about the loaded model, which is the common case.
+    const ordered = reorderForLanguage(
+      usableProviders,
+      targetLang,
+      (id) => getProvider(id)?.config?.model || ''
+    );
+    if (ordered !== usableProviders) {
+      usableProviders.length = 0;
+      usableProviders.push(...ordered);
+      firstAvailableId = usableProviders[0] || '';
+      firstModel = getProvider(firstAvailableId)?.config?.model || '';
     }
 
     // Cache key bound to the first available provider + model so switching

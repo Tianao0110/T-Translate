@@ -4,6 +4,12 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electron', {
+  // One-way crash reporting to the on-disk log. Renderer logging was
+  // console-only, so nothing from this window ever survived a restart.
+  logs: {
+    write: (payload) => ipcRenderer.send('logs:write', payload),
+  },
+
   // Privacy mode must be visible here: the pipeline filters cloud providers by
   // it, and screen captures are the most privacy-sensitive input in the app.
   // Read-only — mode switching stays in the main window.

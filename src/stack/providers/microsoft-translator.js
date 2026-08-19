@@ -49,6 +49,8 @@ class MicrosoftTranslatorProvider extends BaseProvider {
       'ru': 'ru',
       'pt': 'pt',
       'it': 'it',
+      'nl': 'nl',
+      'pl': 'pl',
       'ar': 'ar',
       'th': 'th',
       'vi': 'vi',

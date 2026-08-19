@@ -23,7 +23,8 @@ import translationService from '../../services/stack-client.js';
 import useTranslationStore from '../../stores/translation-store';
 import { LANGUAGES, PRIVACY_MODES } from '../../config/constants.js';
 import useVisibleHotkey from '../../hooks/use-visible-hotkey.js';
-import { LanguageSelector } from '../TranslationPanel/components.jsx';
+import LanguagePicker from '../shared/LanguagePicker.jsx';
+import { mergeLanguages, customCodesOf } from '../../config/custom-languages.js';
 import './styles.css';
 
 // Segment status
@@ -295,9 +296,18 @@ const DocumentTranslator = ({
   const [sourceLang, setSourceLang] = useState(initialSourceLang);
   const [targetLang, setTargetLang] = useState(initialTargetLang);
   
+  const customLanguages = useTranslationStore(state => state.customLanguages);
+  const languagePicker = useTranslationStore(state => state.languagePicker);
+  const recordLanguageUse = useTranslationStore(state => state.recordLanguageUse);
+  const recordLanguageBrowse = useTranslationStore(state => state.recordLanguageBrowse);
+
   // Source allows auto; target does not.
-  const targetLanguages = useMemo(() => LANGUAGES.filter(l => l.code !== 'auto'), []);
-  const sourceLanguages = useMemo(() => LANGUAGES, []);
+  // Same catalogue as the main panel, custom entries included — a language the
+  // user added is a language they expect to see everywhere.
+  const allLanguages = useMemo(() => mergeLanguages(LANGUAGES, customLanguages), [customLanguages]);
+  const targetLanguages = useMemo(() => allLanguages.filter(l => l.code !== 'auto'), [allLanguages]);
+  const sourceLanguages = allLanguages;
+  const customCodes = useMemo(() => customCodesOf(customLanguages), [customLanguages]);
   
   const DISPLAY_STYLES = useMemo(() => [
     { id: 'below', name: t('documentTranslator.displayStyles.below'), icon: Rows2 },
@@ -1086,19 +1096,29 @@ const DocumentTranslator = ({
         
         {/* Language selectors */}
         <div className="dt-lang-selector">
-          <LanguageSelector
+          <LanguagePicker
             value={sourceLang}
             options={sourceLanguages}
             onChange={setSourceLang}
+            recent={languagePicker.recent}
+            lastLetter={languagePicker.lastLetter}
+            letterLang={languagePicker.letterLang}
+            onBrowse={recordLanguageBrowse}
+            customCodes={customCodes}
             size="compact"
             disabled={isTranslating}
             title={t('documentTranslator.sourceLang')}
           />
           <span className="dt-lang-arrow">→</span>
-          <LanguageSelector
+          <LanguagePicker
             value={targetLang}
             options={targetLanguages}
-            onChange={setTargetLang}
+            onChange={(code) => { setTargetLang(code); recordLanguageUse(code); }}
+            recent={languagePicker.recent}
+            lastLetter={languagePicker.lastLetter}
+            letterLang={languagePicker.letterLang}
+            onBrowse={recordLanguageBrowse}
+            customCodes={customCodes}
             size="compact"
             disabled={isTranslating}
             title={t('documentTranslator.targetLang')}

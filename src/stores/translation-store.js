@@ -9,9 +9,19 @@ import { v4 as uuidv4 } from "uuid";
 
 import { PRIVACY_MODES, TRANSLATION_STATUS, LANGUAGE_CODES, DEFAULTS, LANGUAGES } from "@config/defaults";
 import createLogger from '../utils/logger.js';
+import { sanitizeTextEntries, toStoredText } from './history-sanitize.js';
 const logger = createLogger('TranslationStore');
 
-const VALID_LANG_CODES = new Set(LANGUAGES.map(l => l.code));
+const BUILTIN_LANG_CODES = new Set(LANGUAGES.map(l => l.code));
+
+// The guard exists to reject junk (a stale code from an old profile, a typo
+// over IPC), not to gatekeep the catalogue — a user-added language is a valid
+// choice, and validating only against the built-ins silently threw every one
+// of them away at the moment of selection.
+function isKnownLanguage(state, code) {
+  return BUILTIN_LANG_CODES.has(code) ||
+    (state.customLanguages || []).some((l) => l.code === code);
+}
 
 // zustand persist re-serializes the partialized state — history alone can hold
 // 1000 entries — on EVERY setState: per keystroke and, while streaming, per
@@ -162,6 +172,9 @@ const useTranslationStore = create(
         fallbackNotice: null,
       },
 
+      languagePicker: { recent: [], lastLetter: null, letterLang: null },
+      customLanguages: [],
+
       statistics: {
         totalTranslations: 0,
         totalCharacters: 0,
@@ -236,11 +249,11 @@ const useTranslationStore = create(
 
       setLanguages: (source, target) =>
         set((state) => {
-          if (source && !VALID_LANG_CODES.has(source)) {
+          if (source && !isKnownLanguage(state, source)) {
             logger.warn(`Invalid source language code: ${source}, ignoring`);
             source = null;
           }
-          if (target && !VALID_LANG_CODES.has(target)) {
+          if (target && !isKnownLanguage(state, target)) {
             logger.warn(`Invalid target language code: ${target}, falling back to default`);
             target = DEFAULTS.TARGET_LANGUAGE;
           }
@@ -254,7 +267,7 @@ const useTranslationStore = create(
 
       setTargetLanguage: (target) =>
         set((state) => {
-          if (target && !VALID_LANG_CODES.has(target)) {
+          if (target && !isKnownLanguage(state, target)) {
             logger.warn(`Invalid target language code: ${target}, falling back to default`);
             target = DEFAULTS.TARGET_LANGUAGE;
           }
@@ -460,6 +473,35 @@ const useTranslationStore = create(
 
       // External callers (e.g. floating window) route through this, so privacy
       // gating happens here rather than at each call site.
+      // Language-picker memory. Recent codes drive the pinned section; the
+      // letter is where the user was last browsing, and it is only meaningful
+      // in the UI language it was recorded under (荷兰语 sits under H in
+      // Chinese and Dutch under D in English).
+      recordLanguageUse: (code) =>
+        set((state) => {
+          if (!code || code === 'auto') return;
+          const next = [code, ...state.languagePicker.recent.filter((c) => c !== code)];
+          state.languagePicker.recent = next.slice(0, 8);
+        }),
+
+      addCustomLanguage: (language) =>
+        set((state) => {
+          if (!language?.code) return;
+          if (state.customLanguages.some((l) => l.code === language.code)) return;
+          state.customLanguages.push(language);
+        }),
+
+      removeCustomLanguage: (code) =>
+        set((state) => {
+          state.customLanguages = state.customLanguages.filter((l) => l.code !== code);
+        }),
+
+      recordLanguageBrowse: (letter, uiLanguage) =>
+        set((state) => {
+          state.languagePicker.lastLetter = letter || null;
+          state.languagePicker.letterLang = uiLanguage || null;
+        }),
+
       addToHistory: (item) =>
         set((state) => {
           if (state.translationMode === PRIVACY_MODES.SECURE) {
@@ -468,8 +510,10 @@ const useTranslationStore = create(
 
           const historyItem = {
             id: item.id || uuidv4(),
-            sourceText: item.sourceText || '',
-            translatedText: item.translatedText || '',
+            // toStoredText, not `|| ''`: an object is truthy and would ride
+            // straight to disk, where it later kills the panel that renders it.
+            sourceText: toStoredText(item.sourceText),
+            translatedText: toStoredText(item.translatedText),
             sourceLanguage: item.sourceLanguage || 'auto',
             targetLanguage: item.targetLanguage || 'zh',
             timestamp: item.timestamp || Date.now(),
@@ -685,9 +729,38 @@ const useTranslationStore = create(
       // localStorage works in Electron and loads synchronously (no flash)
       storage: createThrottledJSONStorage(),
       merge: (persistedState, currentState) => {
+        // Rows written before v0.3.5 can hold a whole result object where the
+        // text belongs; rendering one throws and takes the panel down. Repair
+        // on the way in — the entries live in localStorage, so nothing else
+        // ever gets a chance to fix them.
+        const cleanHistory = sanitizeTextEntries(persistedState.history, 'drop');
+        const cleanSaved = sanitizeTextEntries(persistedState._savedHistory, 'drop');
+        const cleanFavorites = sanitizeTextEntries(persistedState.favorites, 'blank');
+        const damaged = cleanHistory.repaired + cleanHistory.dropped +
+          cleanSaved.repaired + cleanSaved.dropped +
+          cleanFavorites.repaired + cleanFavorites.dropped;
+        if (damaged > 0) {
+          logger.warn(
+            `Repaired persisted entries: history ${cleanHistory.repaired} fixed / ${cleanHistory.dropped} dropped, ` +
+            `favorites ${cleanFavorites.repaired} fixed, stash ${cleanSaved.repaired} fixed / ${cleanSaved.dropped} dropped`
+          );
+        }
+
         return {
           ...currentState,
           ...persistedState,
+          history: cleanHistory.entries,
+          customLanguages: Array.isArray(persistedState.customLanguages)
+            ? persistedState.customLanguages.filter((l) => l?.code && l?.name)
+            : [],
+          languagePicker: {
+            recent: [],
+            lastLetter: null,
+            letterLang: null,
+            ...(persistedState.languagePicker || {}),
+          },
+          favorites: cleanFavorites.entries,
+          _savedHistory: persistedState._savedHistory ? cleanSaved.entries : persistedState._savedHistory,
           // 'strict' was removed in 0.2.9 — its core promise (no network) maps to offline
           translationMode: persistedState.translationMode === 'strict'
             ? PRIVACY_MODES.OFFLINE
@@ -715,6 +788,8 @@ const useTranslationStore = create(
         autoTranslate: state.autoTranslate,
         useStreamOutput: state.useStreamOutput,
         autoTranslateDelay: state.autoTranslateDelay,
+        languagePicker: state.languagePicker,
+        customLanguages: state.customLanguages,
         // Secure-mode stash must survive a quit-while-secure: without these,
         // the emptied history/statistics are what lands on disk and the real
         // data is unrecoverable after restart.

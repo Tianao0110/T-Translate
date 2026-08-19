@@ -74,6 +74,12 @@ const zh = {
     autoDelay: "自动翻译延迟", autoDelayHint: "停止输入后等待多久开始翻译",
     streamOutput: "流式输出（打字机效果）", streamOutputHint: "开启后翻译结果将逐字显示",
     sameLangTitle: "内容已是目标语言时", sameLangOriginal: "显示原文", sameLangSwap: "自动互译（译回源语言）",
+    customLangs: "自定义语言",
+    customLangsHint: "从语言选择器底部添加。这些语言不在谷歌翻译的支持范围内，能否翻译取决于当前使用的大模型。",
+    customLangsEmpty: "还没有添加自定义语言",
+    customLangPrompt: "发给模型：{{name}}",
+    customLangRemoveConfirm: "确定删除自定义语言「{{name}}」？",
+    customLangRemoved: "已删除「{{name}}」",
     sameLangHint: "作用于划词翻译和悬浮窗口：选中或识别的内容已经是目标语言时，直接显示原文（不调用翻译），或反向翻成你设定的源语言（源语言为\"自动检测\"时按中↔英处理）",
     sameLangSaved: "已生效",
     cache: "翻译缓存", cacheHint: "缓存已翻译的内容，相同文本再次翻译时直接返回结果",
@@ -150,6 +156,14 @@ const zh = {
     rewriteFailed: "改写失败",
     versionOriginal: "原始", versionOriginalFull: "原始翻译",
     versionStyleRewrite: "风格改写", versionUserEdit: "用户编辑", versionUnknown: "未知"
+  },
+  languagePicker: {
+    customSection: "自定义", recent: "最近使用", addCustom: "添加自定义语言",
+    addWarning: "自定义语言不在谷歌翻译的支持范围内，能否翻译取决于你当前使用的大模型是否认识它。结果可能不准确或完全错误。",
+    addName: "语言名称", addNamePlaceholder: "如：藏语",
+    addPromptName: "发给模型的名字", addPromptPlaceholder: "留空则同上；模型只认 Tibetan 就填 Tibetan",
+    addConfirm: "我知道了，添加",
+    addError: { emptyName: "请填写语言名称", duplicate: "已经添加过同名的语言", tooLong: "名称太长", tooMany: "自定义语言数量已达上限" },
   },
   languages: { auto: "自动检测", zh: "中文", "zh-TW": "繁体中文", en: "English", ja: "日本語", ko: "한국어", fr: "Français", de: "Deutsch", es: "Español", ru: "Русский", pt: "Português", it: "Italiano", ar: "العربية", th: "ไทย", vi: "Tiếng Việt", pa: "ਪੰਜਾਬੀ" },
   history: { 

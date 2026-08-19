@@ -45,9 +45,22 @@ function filterSensitive(data) {
 
 function formatArgs(args) {
   return args.map(arg => {
+    // Errors first: message/stack/code are non-enumerable, so JSON.stringify
+    // renders every Error as "{}" — which is exactly what the log files were
+    // full of, and why they could not diagnose a single crash.
+    if (arg instanceof Error) {
+      const parts = [arg.stack || `${arg.name}: ${arg.message}`];
+      if (arg.code) parts.push(`code=${arg.code}`);
+      if (arg.cause) parts.push(`cause=${arg.cause.message || arg.cause}`);
+      return filterSensitive(parts.join(' | '));
+    }
     if (typeof arg === 'object' && arg !== null) {
       try {
-        return filterSensitive(JSON.stringify(arg, null, 2));
+        const json = JSON.stringify(arg, null, 2);
+        // Same blind spot one level down: an object whose own keys are all
+        // non-enumerable (or an empty one) says nothing. Fall back to the
+        // runtime's own description.
+        return filterSensitive(json === '{}' ? String(arg) : json);
       } catch {
         return String(arg);
       }

@@ -91,6 +91,9 @@ const electronAPI = {
   },
   logs: {
     openDirectory: () => ipcRenderer.invoke("logs:open-directory"),
+    // One-way: logging must never make the caller await, and a failed write
+    // must never surface as a rejected promise in the renderer.
+    write: (payload) => ipcRenderer.send("logs:write", payload),
   },
   store: {
     get: (key) => ipcRenderer.invoke("store-get", key),
