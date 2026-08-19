@@ -3,6 +3,12 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("electron", {
+  // One-way crash reporting to the on-disk log. Renderer logging was
+  // console-only, so nothing from this window ever survived a restart.
+  logs: {
+    write: (payload) => ipcRenderer.send('logs:write', payload),
+  },
+
   selection: {
     hide: () => ipcRenderer.invoke("selection:hide"),
     setBounds: (bounds) => ipcRenderer.invoke("selection:set-bounds", bounds),

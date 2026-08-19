@@ -28,8 +28,15 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    logger.error('React Error:', error.message);
-    logger.debug('Component Stack:', errorInfo?.componentStack);
+    // Pass the Error itself (the logger keeps its stack) and put the component
+    // stack at error level too — at debug it never reached the log file, which
+    // is why a crash on disk read as a bare message with nothing to locate it.
+    logger.error(
+      `React error in ${this.props.windowName || 'main'}:`,
+      error,
+      `
+component stack:${errorInfo?.componentStack || ' (none)'}`
+    );
     
     this.setState({
       error,

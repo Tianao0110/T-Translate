@@ -33,6 +33,9 @@ const CHANNELS = {
   },
   LOGS: {
     OPEN_DIRECTORY: 'logs:open-directory',
+    // Fire-and-forget: renderer crashes never reached the log files, so a
+    // React error or unhandled rejection left no trace on disk at all.
+    WRITE: 'logs:write',
   },
   PRIVACY: {
     SET_MODE: 'privacy:setMode',
