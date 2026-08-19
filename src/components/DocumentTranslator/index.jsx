@@ -25,6 +25,7 @@ import { LANGUAGES, PRIVACY_MODES } from '../../config/constants.js';
 import useVisibleHotkey from '../../hooks/use-visible-hotkey.js';
 import LanguagePicker from '../shared/LanguagePicker.jsx';
 import useAiActions from '../../hooks/use-ai-actions.js';
+import useSegmentNotes from '../../hooks/use-segment-notes.js';
 import { runAiAction } from '../../services/ai-action-runner.js';
 import { getAiAction } from '../../config/ai-actions.js';
 import { mergeLanguages, customCodesOf } from '../../config/custom-languages.js';
@@ -119,7 +120,7 @@ function sweepExpiredProgress() {
 }
 
 const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate, onEdit, onCopy, searchQuery, t,
-  onExplain, aiNote, aiRunning, canExplain }) => {
+  onExplain, aiNote, noteFolded, aiRunning, canExplain }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState('');
   const editRef = useRef(null);
@@ -198,7 +199,7 @@ const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate,
               whether the translation has arrived. */}
           {canExplain && segment.status !== STATUS.SKIPPED && (
             <button
-              className={`seg-btn ${aiNote ? 'has-note' : ''}`}
+              className={`seg-btn ${aiNote && !noteFolded ? 'has-note' : ''}`}
               onClick={() => onExplain(segment)}
               disabled={aiRunning}
               title={t('documentTranslator.segment.explain', '讲解这一段')}
@@ -213,17 +214,6 @@ const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate,
       <div className="segment-original">
         {highlightText(segment.original)}
       </div>
-
-      {/* An explanation stays with the paragraph it belongs to. */}
-      {aiNote && (
-        <div className="segment-ai-note">
-          <div className="segment-ai-label">
-            <Lightbulb size={11} />
-            {t('aiActions.explain.name')}
-          </div>
-          <div className="segment-ai-body">{aiNote}</div>
-        </div>
-      )}
 
       {/* translation */}
       {segment.status !== STATUS.SKIPPED && (
@@ -266,6 +256,18 @@ const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate,
           {segment.status === STATUS.PENDING && (
             <span className="pending-hint">{t('documentTranslator.status.pending')}</span>
           )}
+        </div>
+      )}
+
+      {/* Last, so opening it never pushes the source or the translation off
+          the spot the reader is looking at. */}
+      {aiNote && !noteFolded && (
+        <div className="segment-ai-note">
+          <div className="segment-ai-label">
+            <Lightbulb size={11} />
+            {t('aiActions.explain.name')}
+          </div>
+          <div className="segment-ai-body">{aiNote}</div>
         </div>
       )}
     </div>
@@ -348,14 +350,18 @@ const DocumentTranslator = ({
 
   // ===== AI actions on a document =====
   //
-  // The shared hook is built around one active passage: it keeps a single
-  // result per action and replaces it when the source text changes. A document
-  // needs many notes alive at once, so only the capability probe and the
-  // availability filter come from the hook — the notes are kept here, keyed by
-  // segment.
+  // The shared hook is built around one active passage, so only the capability
+  // probe and the availability filter come from it; the notes themselves live
+  // in use-segment-notes, which keeps many alive at once.
   const { capabilities, availableActions } = useAiActions('document', null);
-  const [aiNotes, setAiNotes] = useState({});
-  const [aiRunningId, setAiRunningId] = useState(null);
+  const noteError = useCallback(
+    (error) => notify(error || t('aiActions.failed'), 'error'),
+    [notify, t]
+  );
+  const {
+    notes: aiNotes, folded: foldedNotes, runningId: aiRunningId,
+    explain: explainSegment, reset: resetNotes,
+  } = useSegmentNotes({ capabilities, sourceLang, targetLang, onError: noteError });
   const [digest, setDigest] = useState(null);
   const [digestRunning, setDigestRunning] = useState(false);
 
@@ -367,28 +373,6 @@ const DocumentTranslator = ({
   );
   const canExplain = documentActions.some((a) => a.id === 'explain');
   const noteCount = Object.keys(aiNotes).length;
-
-  const explainSegment = useCallback(async (segment) => {
-    const action = getAiAction('explain');
-    if (!action || aiRunningId) return;
-    setAiRunningId(segment.id);
-    try {
-      const result = await runAiAction(action, {
-        sourceText: segment.original,
-        translatedText: segment.translated || '',
-        sourceLanguage: sourceLang,
-        targetLanguage: targetLang,
-        capabilities,
-      });
-      if (result.success) {
-        setAiNotes((prev) => ({ ...prev, [segment.id]: result.content }));
-      } else {
-        notify(result.error || t('aiActions.failed'), 'error');
-      }
-    } finally {
-      setAiRunningId(null);
-    }
-  }, [aiRunningId, sourceLang, targetLang, capabilities, notify, t]);
 
   const runDigest = useCallback(async () => {
     const action = getAiAction('digest');
@@ -659,6 +643,10 @@ const DocumentTranslator = ({
         });
         setSegments(result.segments);
         setOutline(result.outline || []);
+        // Notes are keyed by segment id and ids restart at 0, so a new
+        // document would inherit the previous one's explanations.
+        resetNotes();
+        setDigest(null);
         setShowPasswordModal(false);
         setPendingFile(null);
         setPassword('');
@@ -709,7 +697,7 @@ const DocumentTranslator = ({
       setIsLoading(false);
       setParseProgress(null);
     }
-  }, [sourceLang, targetLang, translationMode, notify, t]);
+  }, [sourceLang, targetLang, translationMode, resetNotes, notify, t]);
 
   // Submit password
   const handlePasswordSubmit = useCallback(async () => {
@@ -1120,6 +1108,8 @@ const DocumentTranslator = ({
     setDocument(null);
     setSegments([]);
     setOutline([]);
+    resetNotes();
+    setDigest(null);
     setStartTime(null);
     setElapsedTime(0);
     setPendingRestore(null);
@@ -1529,6 +1519,7 @@ const DocumentTranslator = ({
                     searchQuery={showSearch ? searchQuery : ''}
                     onExplain={explainSegment}
                     aiNote={aiNotes[segment.id]}
+                    noteFolded={!!foldedNotes[segment.id]}
                     aiRunning={aiRunningId === segment.id}
                     canExplain={canExplain}
                     t={t}

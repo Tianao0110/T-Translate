@@ -83,7 +83,7 @@ If the language you need is not there, add it from the bottom of the picker. A n
 
 Supports 9 formats: PDF, DOCX, EPUB, TXT, SRT, VTT, CSV, JSON, Markdown. Parallel translation, scanned-PDF OCR and glossary integration. Translation time varies by device and provider.
 
-With an LLM provider configured, each paragraph can be **explained** on request — it reads the source, so untranslated paragraphs work too — and the explanation folds open in place. After two of them the toolbar offers a consolidated note. That note covers only the paragraphs you opened, and says so: it is not a summary of the document.
+With an LLM provider configured, each paragraph can be **explained** on request — it reads the source, so untranslated paragraphs work too — and the explanation folds open under the translation, folding away on a second click. After two of them the toolbar offers a consolidated note. That note covers only the paragraphs you opened, and says so: it is not a summary of the document.
 
 <p align="center">
   <img src="docs/screenshots/document-translate.png" width="600" alt="Document translation">

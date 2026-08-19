@@ -1528,6 +1528,12 @@
   background: color-mix(in srgb, var(--accent-primary) 7%, transparent);
 }
 
+/* Two columns hold the source/translation pair; the note takes a row of its
+   own underneath instead of grabbing the translation's cell. */
+.segment-item.side-by-side .segment-ai-note {
+  grid-column: 1 / -1;
+}
+
 .segment-ai-label {
   display: flex;
   align-items: center;
