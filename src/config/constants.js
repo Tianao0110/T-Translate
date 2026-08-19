@@ -60,27 +60,10 @@ export const LANGUAGE_CODES = {
   VI: 'vi',
 };
 
-// Single source of truth for language picker options across UI
-export const LANGUAGES = [
-  { code: 'auto', name: '自动检测', nativeName: 'Auto Detect', flag: '🌐' },
-  { code: 'zh', name: '中文', nativeName: '中文', flag: '🇨🇳' },
-  { code: 'zh-TW', name: '繁体中文', nativeName: '繁體中文', flag: '🇨🇳' },
-  { code: 'en', name: '英语', nativeName: 'English', flag: '🇺🇸' },
-  { code: 'ja', name: '日语', nativeName: '日本語', flag: '🇯🇵' },
-  { code: 'ko', name: '韩语', nativeName: '한국어', flag: '🇰🇷' },
-  { code: 'fr', name: '法语', nativeName: 'Français', flag: '🇫🇷' },
-  { code: 'de', name: '德语', nativeName: 'Deutsch', flag: '🇩🇪' },
-  { code: 'es', name: '西班牙语', nativeName: 'Español', flag: '🇪🇸' },
-  { code: 'ru', name: '俄语', nativeName: 'Русский', flag: '🇷🇺' },
-  { code: 'pa', name: '旁遮普语', nativeName: 'ਪੰਜਾਬੀ', flag: 'PA' },
-  { code: 'pt', name: '葡萄牙语', nativeName: 'Português', flag: '🇵🇹' },
-  { code: 'it', name: '意大利语', nativeName: 'Italiano', flag: '🇮🇹' },
-  { code: 'nl', name: '荷兰语', nativeName: 'Nederlands', flag: '🇳🇱' },
-  { code: 'pl', name: '波兰语', nativeName: 'Polski', flag: '🇵🇱' },
-  { code: 'ar', name: '阿拉伯语', nativeName: 'العربية', flag: '🇸🇦' },
-  { code: 'th', name: '泰语', nativeName: 'ไทย', flag: '🇹🇭' },
-  { code: 'vi', name: '越南语', nativeName: 'Tiếng Việt', flag: '🇻🇳' },
-];
+// The catalogue lives in config/languages.js so the stack can import the same
+// table (service.js already imports config/filters.js). One table, no drift.
+import { LANGUAGES } from './languages.js';
+export { LANGUAGES };
 
 // {value, label} shape — for native <select> usage in settings panel
 export const getLanguageOptions = (includeAuto = true) => {
@@ -88,18 +71,19 @@ export const getLanguageOptions = (includeAuto = true) => {
     .filter(lang => includeAuto || lang.code !== 'auto')
     .map(lang => ({
       value: lang.code,
-      label: `${lang.flag} ${lang.name}`,
+      // Code as a compact label — flags were retired: most of the catalogue
+      // has none, and a language is not a country.
+      label: lang.code === 'auto' ? lang.name : `${lang.code.toUpperCase()} ${lang.name}`,
     }));
 };
 
-// {code, name, flag} shape — uses nativeName for translation panel display
+// {code, name} shape — uses nativeName for translation panel display
 export const getLanguageList = (includeAuto = true) => {
   return LANGUAGES
     .filter(lang => includeAuto || lang.code !== 'auto')
     .map(lang => ({
       code: lang.code,
       name: lang.nativeName,
-      flag: lang.flag,
     }));
 };
 

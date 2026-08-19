@@ -3,6 +3,7 @@
 // the renderer react-i18next instance).
 
 import { _t } from '../i18n.js';
+import { LANGUAGES } from '../../config/languages.js';
 
 export { _t };
 
@@ -78,28 +79,16 @@ export class BaseProvider {
   }
 }
 
-// Cross-provider language code reference. Each entry holds the display name
-// plus mappings for DeepL / Google (other providers map inline in their files).
-export const LANGUAGE_CODES = {
-  'auto': { name: '自动检测', deepl: null, google: 'auto' },
-  'zh': { name: '中文', deepl: 'ZH', google: 'zh-CN' },
-  'zh-TW': { name: '繁体中文', deepl: 'ZH', google: 'zh-TW' },
-  'en': { name: 'English', deepl: 'EN', google: 'en' },
-  'ja': { name: '日本語', deepl: 'JA', google: 'ja' },
-  'ko': { name: '한국어', deepl: 'KO', google: 'ko' },
-  'fr': { name: 'Français', deepl: 'FR', google: 'fr' },
-  'de': { name: 'Deutsch', deepl: 'DE', google: 'de' },
-  'es': { name: 'Español', deepl: 'ES', google: 'es' },
-  'ru': { name: 'Русский', deepl: 'RU', google: 'ru' },
-  'pt': { name: 'Português', deepl: 'PT', google: 'pt' },
-  'it': { name: 'Italiano', deepl: 'IT', google: 'it' },
-  'nl': { name: 'Nederlands', deepl: 'NL', google: 'nl' },
-  'pl': { name: 'Polski', deepl: 'PL', google: 'pl' },
-  'ar': { name: 'العربية', deepl: null, google: 'ar' },
-  'th': { name: 'ไทย', deepl: null, google: 'th' },
-  'vi': { name: 'Tiếng Việt', deepl: null, google: 'vi' },
-  'pa': { name: 'ਪੰਜਾਬੀ', deepl: null, google: 'pa' },
-};
+// Derived from the shared catalogue so a language can never exist in the
+// picker without a name here — the six LLM providers put this name straight
+// into the prompt (`Translate the following text to X`).
+//
+// English, not the endonym the old hand-written table used: the prompt around
+// it is English, and `Translate to Meiteilon` is something a model can act on
+// while the same request written in an unfamiliar script is not.
+export const LANGUAGE_CODES = Object.fromEntries(
+  LANGUAGES.map((lang) => [lang.code, { name: lang.en, nativeName: lang.nativeName }])
+);
 
 export function getLanguageName(code) {
   return LANGUAGE_CODES[code]?.name || code;
