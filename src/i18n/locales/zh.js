@@ -528,6 +528,8 @@ const zh = {
     title: "文档翻译",
     sourceLang: "源语言",
     targetLang: "目标语言",
+    digestHint: "把已讲解的段落整理成一份笔记",
+    digestScope: "基于已讲解的 {{count}} 段，不代表全文",
     newDocument: "清空",
     formats: {
       "纯文本": "纯文本", "Markdown": "Markdown", "SRT 字幕": "SRT 字幕", "WebVTT 字幕": "WebVTT 字幕",
@@ -543,6 +545,7 @@ const zh = {
     },
     // Segments
     segment: {
+      explain: "讲解这一段",
       edited: "译文已修改",
       retranslate: "重新翻译",
       edit: "编辑译文",

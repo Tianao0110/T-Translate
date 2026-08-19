@@ -19,7 +19,10 @@ export const AI_ACTION_CAPABILITIES = ['text', 'vision'];
 export const AI_ACTION_HISTORY_MODES = ['attach', 'none'];
 
 // Entry points an action may be offered on.
-export const AI_ACTION_SURFACES = ['selection', 'screenshot', 'floating'];
+// 'document' is a reading surface too: a paragraph of a translated manual can
+// be as opaque as a screenshot. Missing from this list, an imported action
+// aimed at documents would be rejected at import while the built-in worked.
+export const AI_ACTION_SURFACES = ['selection', 'screenshot', 'floating', 'document'];
 
 // The "看 vs 懂" split as the floating window's toggle sees it: 'translate'
 // actions belong to reading (toggle off), 'understand' actions to the
@@ -150,7 +153,7 @@ const DIGEST = {
   id: 'digest',
   schemaVersion: AI_ACTION_SCHEMA_VERSION,
   builtin: true,
-  icon: 'NotebookPen',
+  icon: 'ClipboardList',
   nameKey: 'aiActions.digest.name',
   descKey: 'aiActions.digest.desc',
   capability: 'text',

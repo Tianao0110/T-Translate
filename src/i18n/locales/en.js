@@ -528,6 +528,8 @@ const en = {
     title: "Document Translation",
     sourceLang: "Source Language",
     targetLang: "Target Language",
+    digestHint: "Organise the paragraphs you have explained into one note",
+    digestScope: "from the {{count}} paragraphs you explained — not the whole document",
     newDocument: "Clear",
     formats: {
       "纯文本": "Plain Text", "Markdown": "Markdown", "SRT 字幕": "SRT Subtitle", "WebVTT 字幕": "WebVTT Subtitle",
@@ -543,6 +545,7 @@ const en = {
     },
     // Segment
     segment: {
+      explain: "Explain this paragraph",
       edited: "Translation modified",
       retranslate: "Retranslate",
       edit: "Edit translation",

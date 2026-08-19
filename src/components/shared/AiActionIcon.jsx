@@ -3,9 +3,9 @@
 // An unknown name falls back rather than rendering nothing.
 
 import React from 'react';
-import { ScrollText, Sparkles, Lightbulb, BookOpen, Brain } from 'lucide-react';
+import { ScrollText, Sparkles, Lightbulb, BookOpen, Brain, ClipboardList } from 'lucide-react';
 
-const ICONS = { ScrollText, Sparkles, Lightbulb, BookOpen, Brain };
+const ICONS = { ScrollText, Sparkles, Lightbulb, BookOpen, Brain, ClipboardList };
 
 const AiActionIcon = ({ name, size = 14 }) => {
   const Icon = ICONS[name] || Sparkles;

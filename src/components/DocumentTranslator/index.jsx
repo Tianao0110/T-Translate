@@ -6,7 +6,7 @@ import {
   Loader, ArrowUp, FileDown,
   SkipForward, RefreshCw, Zap, Lock, Key,
   Database, BookOpen, BarChart3,
-  Edit3, Check, Copy, Search, Rows2, Columns2
+  Edit3, Check, Copy, Search, Rows2, Columns2, Lightbulb, ClipboardList
 } from 'lucide-react';
 import createLogger from '../../utils/logger.js';
 import {
@@ -24,6 +24,9 @@ import useTranslationStore from '../../stores/translation-store';
 import { LANGUAGES, PRIVACY_MODES } from '../../config/constants.js';
 import useVisibleHotkey from '../../hooks/use-visible-hotkey.js';
 import LanguagePicker from '../shared/LanguagePicker.jsx';
+import useAiActions from '../../hooks/use-ai-actions.js';
+import { runAiAction } from '../../services/ai-action-runner.js';
+import { getAiAction } from '../../config/ai-actions.js';
 import { mergeLanguages, customCodesOf } from '../../config/custom-languages.js';
 import './styles.css';
 
@@ -115,7 +118,8 @@ function sweepExpiredProgress() {
   } catch { /* localStorage unavailable */ }
 }
 
-const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate, onEdit, onCopy, searchQuery, t }) => {
+const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate, onEdit, onCopy, searchQuery, t,
+  onExplain, aiNote, aiRunning, canExplain }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState('');
   const editRef = useRef(null);
@@ -189,6 +193,19 @@ const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate,
 
             </>
           )}
+          {/* Outside the status branches on purpose: an explanation is built
+              from the source paragraph, so needing one has nothing to do with
+              whether the translation has arrived. */}
+          {canExplain && segment.status !== STATUS.SKIPPED && (
+            <button
+              className={`seg-btn ${aiNote ? 'has-note' : ''}`}
+              onClick={() => onExplain(segment)}
+              disabled={aiRunning}
+              title={t('documentTranslator.segment.explain', '讲解这一段')}
+            >
+              {aiRunning ? <Loader size={12} className="spinning" /> : <Lightbulb size={12} />}
+            </button>
+          )}
         </div>
       </div>
 
@@ -196,6 +213,17 @@ const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate,
       <div className="segment-original">
         {highlightText(segment.original)}
       </div>
+
+      {/* An explanation stays with the paragraph it belongs to. */}
+      {aiNote && (
+        <div className="segment-ai-note">
+          <div className="segment-ai-label">
+            <Lightbulb size={11} />
+            {t('aiActions.explain.name')}
+          </div>
+          <div className="segment-ai-body">{aiNote}</div>
+        </div>
+      )}
 
       {/* translation */}
       {segment.status !== STATUS.SKIPPED && (
@@ -317,6 +345,77 @@ const DocumentTranslator = ({
   // File state
   const [document, setDocument] = useState(null);
   const [segments, setSegments] = useState([]);
+
+  // ===== AI actions on a document =====
+  //
+  // The shared hook is built around one active passage: it keeps a single
+  // result per action and replaces it when the source text changes. A document
+  // needs many notes alive at once, so only the capability probe and the
+  // availability filter come from the hook — the notes are kept here, keyed by
+  // segment.
+  const { capabilities, availableActions } = useAiActions('document', null);
+  const [aiNotes, setAiNotes] = useState({});
+  const [aiRunningId, setAiRunningId] = useState(null);
+  const [digest, setDigest] = useState(null);
+  const [digestRunning, setDigestRunning] = useState(false);
+
+  // The document surface has no understanding switch — asking about a
+  // paragraph IS the request, so it opts in on the action's behalf.
+  const documentActions = useMemo(
+    () => availableActions({ understandMode: true, text: 'x' }),
+    [availableActions]
+  );
+  const canExplain = documentActions.some((a) => a.id === 'explain');
+  const noteCount = Object.keys(aiNotes).length;
+
+  const explainSegment = useCallback(async (segment) => {
+    const action = getAiAction('explain');
+    if (!action || aiRunningId) return;
+    setAiRunningId(segment.id);
+    try {
+      const result = await runAiAction(action, {
+        sourceText: segment.original,
+        translatedText: segment.translated || '',
+        sourceLanguage: sourceLang,
+        targetLanguage: targetLang,
+        capabilities,
+      });
+      if (result.success) {
+        setAiNotes((prev) => ({ ...prev, [segment.id]: result.content }));
+      } else {
+        notify(result.error || t('aiActions.failed'), 'error');
+      }
+    } finally {
+      setAiRunningId(null);
+    }
+  }, [aiRunningId, sourceLang, targetLang, capabilities, notify, t]);
+
+  const runDigest = useCallback(async () => {
+    const action = getAiAction('digest');
+    if (!action || digestRunning) return;
+    // Document order, not the order they were opened — a note reads as a walk
+    // through the document.
+    const ordered = segments
+      .filter((seg) => aiNotes[seg.id])
+      .map((seg, i) => `${i + 1}. ${aiNotes[seg.id]}`)
+      .join('\n\n');
+    if (!ordered) return;
+
+    setDigestRunning(true);
+    try {
+      const result = await runAiAction(action, {
+        sourceText: ordered,
+        sourceLanguage: sourceLang,
+        targetLanguage: targetLang,
+        capabilities,
+      });
+      if (result.success) setDigest(result.content);
+      else notify(result.error || t('aiActions.failed'), 'error');
+    } finally {
+      setDigestRunning(false);
+    }
+  }, [digestRunning, segments, aiNotes, sourceLang, targetLang, capabilities, notify, t]);
+
   const [isLoading, setIsLoading] = useState(false);
   // { page, total, ocr } during PDF parse — OCR pages are slow enough to need feedback.
   const [parseProgress, setParseProgress] = useState(null);
@@ -1139,6 +1238,20 @@ const DocumentTranslator = ({
                 <span>{t('documentTranslator.newDocument')}</span>
               </button>
               
+              {/* Consolidate the explanations collected so far. Two is where
+                  it starts being worth a round trip — one note IS the note. */}
+              {noteCount >= 2 && (
+                <button
+                  className="dt-btn"
+                  onClick={runDigest}
+                  disabled={digestRunning}
+                  title={t('documentTranslator.digestHint', '把已讲解的段落整理成一份笔记')}
+                >
+                  {digestRunning ? <Loader size={16} className="spinning" /> : <ClipboardList size={16} />}
+                  <span>{t('aiActions.digest.name')} ({noteCount})</span>
+                </button>
+              )}
+
               {/* Search toggle */}
               <button 
                 className={`dt-btn icon-only ${showSearch ? 'active' : ''}`}
@@ -1386,6 +1499,24 @@ const DocumentTranslator = ({
                 ref={listRef}
                 onScroll={handleScroll}
               >
+                {digest && (
+                  <div className="dt-digest">
+                    <div className="dt-digest-head">
+                      <ClipboardList size={13} />
+                      <span>{t('aiActions.digest.name')}</span>
+                      {/* Say plainly what this covers — it is a note on the
+                          paragraphs the reader opened, not on the document. */}
+                      <span className="dt-digest-scope">
+                        {t('documentTranslator.digestScope', { count: noteCount })}
+                      </span>
+                      <button className="dt-digest-close" onClick={() => setDigest(null)}>
+                        <X size={13} />
+                      </button>
+                    </div>
+                    <div className="dt-digest-body">{digest}</div>
+                  </div>
+                )}
+
                 {segments.map(segment => (
                   <SegmentItem
                     key={segment.id}
@@ -1396,7 +1527,10 @@ const DocumentTranslator = ({
                     onEdit={editSegment}
                     onCopy={copySegmentText}
                     searchQuery={showSearch ? searchQuery : ''}
-                    
+                    onExplain={explainSegment}
+                    aiNote={aiNotes[segment.id]}
+                    aiRunning={aiRunningId === segment.id}
+                    canExplain={canExplain}
                     t={t}
                   />
                 ))}
