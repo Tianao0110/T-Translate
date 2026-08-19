@@ -72,6 +72,23 @@ function main() {
     console.log(`  ❌ 目录里有重复的语言码: ${[...new Set(dupes)].join(', ')}`);
   }
 
+  // The Chinese letter index reads the pinyin initial off the name's first
+  // character. An unmapped character silently lands the language in the '#'
+  // group, where nobody will look for it.
+  const src = read('../src/config/languages.js');
+  const initials = block(src, /const PINYIN_INITIALS = \{/, '};') || '';
+  const mappedChars = new Set([...initials.matchAll(/(\S): '/g)].map((m) => m[1]));
+  const namesBlock = block(src, /export const LANGUAGES = \[/, '\n];') || '';
+  const unmapped = [...namesBlock.matchAll(/name: '([^']+)'/g)]
+    .map((m) => m[1])
+    .filter((n) => n !== '自动检测' && !mappedChars.has(n[0]));
+  if (unmapped.length) {
+    hasError = true;
+    console.log(`  ❌ 这些语言名的首字没有拼音映射，中文索引会漏: ${unmapped.join(', ')}`);
+  } else {
+    console.log(`  ✅ 拼音首字母索引 — ${mappedChars.size} 个字覆盖全部语言名`);
+  }
+
   const orphanEnum = enumCodes().filter((c) => !ref.has(c));
   if (orphanEnum.length) {
     hasError = true;

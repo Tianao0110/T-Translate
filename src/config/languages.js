@@ -163,3 +163,41 @@ export const LANGUAGE_BY_CODE = Object.fromEntries(LANGUAGES.map((l) => [l.code,
 export function getLanguageName(code) {
   return LANGUAGE_BY_CODE[code]?.name || code;
 }
+
+// Pinyin initial of every character that starts a Chinese language name.
+// The letter index follows the UI language — a Chinese reader looks for 荷兰语
+// under H, an English reader looks for Dutch under D — so the Chinese side
+// needs the reading, not the character.
+//
+// Keyed by character rather than by language: 100 characters cover all 134
+// names, and a new language usually starts with one already here.
+// `npm run check:languages` fails if a name starts with an unmapped character.
+const PINYIN_INITIALS = {
+  南: 'N', 阿: 'A', 亚: 'Y', 艾: 'A', 班: 'B', 巴: 'B', 白: 'B', 孟: 'M',
+  博: 'B', 波: 'B', 保: 'B', 加: 'J', 宿: 'S', 齐: 'Q', 中: 'Z', 繁: 'F',
+  科: 'K', 克: 'K', 捷: 'J', 丹: 'D', 迪: 'D', 多: 'D', 荷: 'H', 英: 'Y',
+  世: 'S', 爱: 'A', 埃: 'A', 菲: 'F', 芬: 'F', 法: 'F', 弗: 'F', 格: 'G',
+  德: 'D', 希: 'X', 瓜: 'G', 古: 'G', 海: 'H', 豪: 'H', 夏: 'X', 印: 'Y',
+  苗: 'M', 匈: 'X', 冰: 'B', 伊: 'Y', 意: 'Y', 日: 'R', 爪: 'Z', 卡: 'K',
+  哈: 'H', 高: 'G', 卢: 'L', 孔: 'K', 韩: 'H', 库: 'K', 索: 'S', 吉: 'J',
+  老: 'L', 拉: 'L', 林: 'L', 立: 'L', 马: 'M', 迈: 'M', 毛: 'M', 曼: 'M',
+  米: 'M', 蒙: 'M', 缅: 'M', 尼: 'N', 挪: 'N', 奥: 'A', 普: 'P', 葡: 'P',
+  旁: 'P', 罗: 'L', 俄: 'E', 萨: 'S', 梵: 'F', 苏: 'S', 北: 'B', 塞: 'S',
+  绍: 'S', 信: 'X', 僧: 'S', 斯: 'S', 西: 'X', 巽: 'X', 瑞: 'R', 塔: 'T',
+  泰: 'T', 鞑: 'D', 提: 'T', 聪: 'C', 土: 'T', 契: 'Q', 乌: 'W', 维: 'W',
+  越: 'Y', 威: 'W', 约: 'Y', 祖: 'Z',
+};
+
+export function pinyinInitial(chineseName) {
+  return PINYIN_INITIALS[chineseName?.[0]] || '#';
+}
+
+/**
+ * Which letter group a language belongs to, in the reader's own alphabet.
+ * Stored preferences keyed on this must be dropped when the UI language
+ * changes — the same language lands under a different letter.
+ */
+export function indexLetter(lang, uiLanguage = 'zh') {
+  if (!lang) return '#';
+  return uiLanguage === 'zh' ? pinyinInitial(lang.name) : (lang.en?.[0] || '#').toUpperCase();
+}
