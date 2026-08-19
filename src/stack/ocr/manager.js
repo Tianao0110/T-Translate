@@ -16,6 +16,7 @@ import OCRSpaceEngine from './ocrspace.js';
 import GoogleVisionEngine from './google-vision.js';
 import AzureOCREngine from './azure-ocr.js';
 import BaiduOCREngine from './baidu-ocr.js';
+import { isUsableResult } from './result-quality.js';
 import { _t } from '../i18n.js';
 import createLogger from '../logger.js';
 
@@ -210,6 +211,9 @@ export class OCREngineManager {
 
     // No engine specified — walk the priority list, skipping locked vision
     const order = priority || DEFAULT_OCR_PRIORITY;
+    // Best result that reported success but read as unusable. Held so a capture
+    // every engine struggles with still returns something.
+    let weakest = null;
     for (const id of order) {
       if (id === 'llm-vision' && this._visionLocked) continue;
       if (allowedEngines && !allowedEngines.includes(id)) continue;
@@ -223,7 +227,13 @@ export class OCREngineManager {
 
         const result = await instance.recognize(input, options);
         if (result.success) {
-          return result;
+          if (isUsableResult(result, id)) return result;
+          // An engine that cannot read this script does not report failure —
+          // it returns nothing, or nonsense. Keep walking so the engines
+          // behind it get their turn.
+          logger.debug(`Engine ${id} returned nothing usable, trying the next one`);
+          if (!weakest || (result.confidence || 0) > (weakest.confidence || 0)) weakest = result;
+          continue;
         }
 
         // Walk-the-priority path still counts toward the vision lock threshold
@@ -235,6 +245,7 @@ export class OCREngineManager {
       }
     }
 
+    if (weakest) return { ...weakest, lowQuality: true };
     return { success: false, error: _t('ocr.allEnginesFailed', 'All OCR engines failed') };
   }
 
@@ -341,17 +352,21 @@ export class OCREngineManager {
     return fallbackResult;
   }
 
-  // Walk rapid-ocr -> windows-ocr; first success wins. Last failure is
+  // Walk rapid-ocr -> windows-ocr; first usable result wins. Last failure is
   // returned so the caller still sees a meaningful error.
   async _recognizeWithLocalChain(input, options) {
     let lastResult = null;
+    let weakest = null;
     for (const engineId of this._localFallbackChain) {
       const instance = this.getOrCreate(engineId);
       if (!instance || !(await instance.isAvailable())) continue;
 
       lastResult = await this._recognizeWithEngine(engineId, input, options);
-      if (lastResult.success) return lastResult;
+      if (!lastResult.success) continue;
+      if (isUsableResult(lastResult, engineId)) return lastResult;
+      if (!weakest || (lastResult.confidence || 0) > (weakest.confidence || 0)) weakest = lastResult;
     }
+    if (weakest) return { ...weakest, lowQuality: true };
     return lastResult || { success: false, error: _t('ocr.allEnginesFailed', 'All OCR engines failed') };
   }
 
