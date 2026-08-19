@@ -28,6 +28,7 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 - ~~doc_cls 旋转分类器~~ **已实测弃案（2026-07-04）**：倒置图可纠正，但日文横排截图被误判竖排、韩文包乱码——主场景回归不可接受，详见 OCR_MODELS.md 已知边界（含复现方法）。别再捡
 - 档位备忘：v6 全系仅 tiny/small/medium 三档（官方页 2026-07-03 已核），tiny 无假名不可用；v6 无独立多语言模型，韩/西里尔/天城/阿拉伯继续 v4 包；spike 复跑脚本已随 2026-07-10 temp 清理退役（结论与复现方法保全在 docs/OCR_MODELS.md 已知边界节）
 - 合入时补测：竖排文本、真实截图小字（实拍回归）
+- **泰米尔 / 泰卢固 / 卡纳达三个语言包**（2026-08-19 提出，用户当时只取了语言扩容与降级门槛两项，这项未否决只是没做）：上游 eSearch-OCR 4.0.0 release 已有现成 `ta.zip` / `te.zip` / `ka.zip`（8.0 / 7.7 / 7.9 MB），是该上游仅剩的三个未打包模型。工作量=`scripts/ocr-model-sources.js` 加三条 + `src/config/ocr-languages.js` 与 `electron/shared/ocr-packs.js` 各加一组 + 三个 i18n 包名键 + `npm run ocr:release` 传资产（约 24MB 托管）。**照例先拿字典验**（判据见下方 DEVELOPMENT「OCR 支持一门新语言」），别信上游文档
 - ~~百度 Unlimited-OCR vLLM 直连提示~~ ✅ 已写入 docs/FAQ.md（2026-07-10）
 
 ### 真 asar 热替换（仅评估，不承诺）
@@ -69,8 +70,6 @@ v0.3.4 给 Windows OCR / Azure / Google Vision / OCR.space / 百度 五个引擎
 - **可以扩到 240+**：谷歌 2024 年又加了 110 种（含藏语、粤语等）。核对脚本 `scripts/verify-google-languages.mjs` 现成，跑一轮就知道哪些码可用；未做是因为那批低资源语言翻译质量参差，等有人提再说
 - **模型语言表只有五条**（Llama 3.x / Qwen 2-3 / NLLB / MADLAD / Opus-MT，见 `config/model-language-coverage.js`）。故意不求全——缺条目零代价，只在降级链排序上生效、绝不进 UI。Mistral、Gemma、Phi 跨版本语言覆盖差异太大，写进去准确度不如不写
 - **选择器没有搜索框**：设计上靠字母索引，134 种够用；真扩到 240+ 时要重新评估
-- **文档 AI 只做了样式实拍**：讲解入口需要一个能对话的翻译源才出现，headless 浏览器
-  会话没有 electron 桥、拿不到能力，完整链路要在装好本地模型的正式环境回归
 - ⚠️ **暂时性死区已犯两次**（DocumentTranslator 里 customLanguages 与 segments 各一次）：
   useCallback 的依赖数组在渲染期求值，声明顺序是硬要求，而 eslint 默认不管。量过开
   `no-use-before-define` 的代价——20 处命中且绝大多数是回调体内引用后定义的函数
