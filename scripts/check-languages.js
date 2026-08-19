@@ -43,6 +43,28 @@ const PROVIDERS = [
   { id: 'baidu', file: '../src/stack/providers/baidu-translate.js', fn: '_mapLanguageCode', unmapped: 'passthrough' },
 ];
 
+// The OCR language list exists twice on purpose: the engine resolves model
+// packs in the main process, the settings select renders in the renderer, and
+// the renderer cannot import main-process code. Equal, not subset — a code in
+// only one of them is either a language the UI offers and the engine
+// mis-routes, or one the engine knows and nobody can pick.
+function ocrPackMaps() {
+  const ui = block(read('../src/config/ocr-languages.js'), /export const OCR_LANGUAGE_GROUPS = \[/, '\n];');
+  const engine = block(read('../electron/shared/ocr-packs.js'), /const LANGUAGE_TO_PACK = \{/, '\n};');
+  if (!ui || !engine) return null;
+
+  const uiMap = { auto: 'base-v6' };
+  for (const g of ui.matchAll(/packId: '([^']+)',[\s\S]*?languages: \[([\s\S]*?)\]/g)) {
+    for (const c of g[2].matchAll(/'([^']+)'/g)) uiMap[c[1]] = g[1];
+  }
+
+  const engineMap = {};
+  for (const m of engine.matchAll(/'([^']+)':\s*(BASE_PACK_ID|'[^']+')/g)) {
+    engineMap[m[1]] = m[2] === 'BASE_PACK_ID' ? 'base-v6' : m[2].replace(/'/g, '');
+  }
+  return { uiMap, engineMap };
+}
+
 function providerCodes(meta) {
   const content = read(meta.file);
   // The DEFINITION, not the first call site — google-translate.js calls its
@@ -95,6 +117,32 @@ function main() {
     console.log(`  ❌ LANGUAGE_CODES 枚举引用了目录里没有的语言: ${orphanEnum.join(', ')}`);
   } else {
     console.log(`  ✅ LANGUAGE_CODES 枚举 — 均在目录内`);
+  }
+
+  const ocr = ocrPackMaps();
+  if (!ocr) {
+    hasError = true;
+    console.log('  ❌ 没读到 OCR 语言表（结构变了？）');
+  } else {
+    const { uiMap, engineMap } = ocr;
+    const mismatched = Object.keys(uiMap).filter((c) => uiMap[c] !== engineMap[c]);
+    const engineOnly = Object.keys(engineMap).filter((c) => !uiMap[c]);
+    // Names come from the shared catalogue; a code outside it renders as the
+    // raw code in the settings select.
+    const nameless = Object.keys(uiMap)
+      .filter((c) => !['auto', 'zh-Hans', 'zh-Hant'].includes(c) && !ref.has(c));
+
+    if (mismatched.length || engineOnly.length) {
+      hasError = true;
+      if (mismatched.length) console.log(`  ❌ OCR 语言表不同步 — 选择器与引擎对不上: ${mismatched.join(', ')}`);
+      if (engineOnly.length) console.log(`  ❌ OCR 语言表不同步 — 引擎认得但选择器没放出: ${engineOnly.join(', ')}`);
+    } else if (nameless.length) {
+      hasError = true;
+      console.log(`  ❌ OCR 可选语言不在共享目录里，名字会显示成语言码: ${nameless.join(', ')}`);
+    } else {
+      const packs = new Set(Object.values(uiMap)).size;
+      console.log(`  ✅ OCR 语言表 — ${Object.keys(uiMap).length - 1} 种，分属 ${packs} 个模型包，两端一致`);
+    }
   }
 
   console.log('');

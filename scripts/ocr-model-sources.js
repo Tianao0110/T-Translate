@@ -15,9 +15,16 @@ const BASE_PACK = {
   version: '1.0.0',
   file: 'ppocr_v6_small.zip',
   url: `${UPSTREAM_BASE}/ppocr_v6_small.zip`,
-  // v6-small is a single 50-language model (simp/trad Chinese, English,
-  // Japanese + 46 Latin-script languages); the UI exposes fr/de/es.
-  languages: ['zh-Hans', 'zh-Hant', 'en', 'ja', 'fr', 'de', 'es'],
+  // v6-small is a single 50-language model. The exposed subset is the one
+  // verified against its dictionary — see src/config/ocr-languages.js for why
+  // Vietnamese and Greek are absent despite the scripts looking covered.
+  languages: [
+    'zh-Hans', 'zh-Hant', 'en', 'ja',
+    'fr', 'de', 'es', 'it', 'pt', 'nl', 'sv', 'da', 'no', 'fi',
+    'pl', 'cs', 'sk', 'sl', 'hr', 'bs', 'ro', 'hu', 'tr', 'sq',
+    'lv', 'lt', 'et', 'is', 'ga', 'cy', 'mt', 'ca', 'gl', 'eu',
+    'af', 'az', 'id', 'ms', 'tl', 'sw', 'la',
+  ],
   files: {
     det: 'ppocr6_small_det.onnx',
     rec: 'ppocr6_small_rec.onnx',
@@ -93,7 +100,7 @@ const LANG_PACKS = [
     version: '1.0.0',
     file: 'cyrillic.zip',
     url: `${UPSTREAM_BASE}/cyrillic.zip`,
-    languages: ['ru'],
+    languages: ['ru', 'uk', 'be', 'bg', 'sr', 'mk'],
     files: { rec: 'cyrillic_rec.onnx', dict: 'cyrillic_dict.txt' },
   },
   {
@@ -103,7 +110,7 @@ const LANG_PACKS = [
     version: '1.0.0',
     file: 'devanagari.zip',
     url: `${UPSTREAM_BASE}/devanagari.zip`,
-    languages: ['hi'],
+    languages: ['hi', 'mr', 'ne', 'sa'],
     files: { rec: 'devanagari_rec.onnx', dict: 'devanagari_dict.txt' },
   },
   {
@@ -113,7 +120,7 @@ const LANG_PACKS = [
     version: '1.0.0',
     file: 'arabic.zip',
     url: `${UPSTREAM_BASE}/arabic.zip`,
-    languages: ['ar'],
+    languages: ['ar', 'fa', 'ur', 'ug'],
     files: { rec: 'arabic_rec.onnx', dict: 'arabic_dict.txt' },
   },
 ];

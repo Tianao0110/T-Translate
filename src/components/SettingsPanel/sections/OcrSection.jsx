@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff, AlertTriangle, RefreshCw, Download, Trash2, Cpu, Sparkles, Globe } from 'lucide-react';
 import stackClient from '../../../services/stack-client.js';
+import { OCR_LANGUAGE_GROUPS, ocrLanguageName } from '../../../config/ocr-languages.js';
 
 // Must match electron/shared/ocr-packs.js BASE_PACK_ID / HQ_PACK_ID (renderer
 // cannot import main-process modules; the manifest may list other generations'
@@ -22,7 +23,7 @@ const OcrSection = ({
   setShowApiKeys,
   setOcrEngine
 }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   // null = unchecked, 'checking', 'healthy', 'broken'
   const [engineHealth, setEngineHealth] = useState(null);
@@ -322,19 +323,21 @@ const OcrSection = ({
           onChange={(e) => updateSetting('ocr', 'recognitionLanguage', e.target.value)}
         >
           {/* Native <option> can't render SVG, so no icons here (emoji flags
-              violated the lucide-only rule and rendered inconsistently). */}
+              violated the lucide-only rule and rendered inconsistently).
+              Grouped by model pack so the download cost of a choice is visible
+              before making it, not after. */}
           <option value="auto">{t('ocr.lang.auto')}</option>
-          <option value="zh-Hans">{t('ocr.lang.zhHans')}</option>
-          <option value="zh-Hant">{t('ocr.lang.zhHant')}</option>
-          <option value="en">{t('ocr.lang.en')}</option>
-          <option value="ja">{t('ocr.lang.ja')}</option>
-          <option value="ko">{t('ocr.lang.ko')}</option>
-          <option value="fr">{t('ocr.lang.fr')}</option>
-          <option value="de">{t('ocr.lang.de')}</option>
-          <option value="es">{t('ocr.lang.es')}</option>
-          <option value="ru">{t('ocr.lang.ru')}</option>
-          <option value="hi">{t('ocr.lang.hi')}</option>
-          <option value="ar">{t('ocr.lang.ar')}</option>
+          {OCR_LANGUAGE_GROUPS.map((group) => (
+            <optgroup
+              key={group.packId}
+              label={t(`ocr.langGroup.${group.packId === BASE_PACK_ID ? 'builtin' : group.packId}`)}
+            >
+              {group.languages
+                .map((code) => ({ code, name: ocrLanguageName(code, i18n.language) }))
+                .sort((a, b) => a.name.localeCompare(b.name, i18n.language === 'en' ? 'en' : 'zh'))
+                .map(({ code, name }) => <option key={code} value={code}>{name}</option>)}
+            </optgroup>
+          ))}
         </select>
         <p className="setting-hint">{t('ocr.autoLangHint')}</p>
         <p className="setting-hint">{t('ocr.langPackHint')}</p>

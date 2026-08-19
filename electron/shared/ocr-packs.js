@@ -11,24 +11,32 @@ const BASE_PACK_ID = 'base-v6';
 // the base row and the language-pack list in every client generation.
 const HQ_PACK_ID = 'base-v6-hq';
 
-// The base recognizer (PP-OCRv6 small) natively covers zh-Hans/zh-Hant/en/ja
-// plus 46 Latin-script languages (fr/de/es exposed in the UI; the former
-// latin pack is absorbed). Every other language maps to the pack whose
-// recognition model unlocks it. Detection is script-agnostic: all packs
-// reuse the base det model.
+// Which languages each recognition model can actually read. Mirrors
+// OCR_LANGUAGE_GROUPS in src/config/ocr-languages.js, which documents how the
+// list was verified and why Vietnamese, Greek, Uzbek and Mongolian are absent
+// despite their scripts looking covered. The renderer cannot import this file,
+// so `npm run check:languages` fails if the two drift apart.
+// Detection is script-agnostic: every pack reuses the base det model.
 const LANGUAGE_TO_PACK = {
   'auto': BASE_PACK_ID,
-  'zh-Hans': BASE_PACK_ID,
-  'zh-Hant': BASE_PACK_ID,
-  'en': BASE_PACK_ID,
-  'ja': BASE_PACK_ID,
-  'fr': BASE_PACK_ID,
-  'de': BASE_PACK_ID,
-  'es': BASE_PACK_ID,
+  // Bundled base pack — PP-OCRv6 small reads CJK, kana and Latin script.
+  'zh-Hans': BASE_PACK_ID, 'zh-Hant': BASE_PACK_ID, 'en': BASE_PACK_ID, 'ja': BASE_PACK_ID,
+  'fr': BASE_PACK_ID, 'de': BASE_PACK_ID, 'es': BASE_PACK_ID, 'it': BASE_PACK_ID,
+  'pt': BASE_PACK_ID, 'nl': BASE_PACK_ID, 'sv': BASE_PACK_ID, 'da': BASE_PACK_ID,
+  'no': BASE_PACK_ID, 'fi': BASE_PACK_ID, 'pl': BASE_PACK_ID, 'cs': BASE_PACK_ID,
+  'sk': BASE_PACK_ID, 'sl': BASE_PACK_ID, 'hr': BASE_PACK_ID, 'bs': BASE_PACK_ID,
+  'ro': BASE_PACK_ID, 'hu': BASE_PACK_ID, 'tr': BASE_PACK_ID, 'sq': BASE_PACK_ID,
+  'lv': BASE_PACK_ID, 'lt': BASE_PACK_ID, 'et': BASE_PACK_ID, 'is': BASE_PACK_ID,
+  'ga': BASE_PACK_ID, 'cy': BASE_PACK_ID, 'mt': BASE_PACK_ID, 'ca': BASE_PACK_ID,
+  'gl': BASE_PACK_ID, 'eu': BASE_PACK_ID, 'af': BASE_PACK_ID, 'az': BASE_PACK_ID,
+  'id': BASE_PACK_ID, 'ms': BASE_PACK_ID, 'tl': BASE_PACK_ID, 'sw': BASE_PACK_ID,
+  'la': BASE_PACK_ID,
+  // Downloadable packs — one recognition model per script family.
   'ko': 'korean',
-  'ru': 'cyrillic',
-  'hi': 'devanagari',
-  'ar': 'arabic',
+  'ru': 'cyrillic', 'uk': 'cyrillic', 'be': 'cyrillic',
+  'bg': 'cyrillic', 'sr': 'cyrillic', 'mk': 'cyrillic',
+  'hi': 'devanagari', 'mr': 'devanagari', 'ne': 'devanagari', 'sa': 'devanagari',
+  'ar': 'arabic', 'fa': 'arabic', 'ur': 'arabic', 'ug': 'arabic',
 };
 
 function packIdForLanguage(language) {
