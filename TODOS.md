@@ -49,6 +49,14 @@ v0.3.4 给 Windows OCR / Azure / Google Vision / OCR.space / 百度 五个引擎
 
 **四个在线引擎的坐标只有 fixture 验证**（按各家文档的响应形状建的，见 `tests/unit/ocr-blocks.test.js`），无密钥无法端到端实测；Windows OCR 与本地引擎是实测过的。哪天有密钥了，实拍一次散点排版确认坐标空间无误。
 
+### 语言选择器的后续（主体已完成，未发布）
+
+134 种目录 + 新选择器 + 自定义语言已落地。剩余候选：
+
+- **可以扩到 240+**：谷歌 2024 年又加了 110 种（含藏语、粤语等）。核对脚本 `scripts/verify-google-languages.mjs` 现成，跑一轮就知道哪些码可用；未做是因为那批低资源语言翻译质量参差，等有人提再说
+- **模型语言表只有五条**（Llama 3.x / Qwen 2-3 / NLLB / MADLAD / Opus-MT，见 `config/model-language-coverage.js`）。故意不求全——缺条目零代价，只在降级链排序上生效、绝不进 UI。Mistral、Gemma、Phi 跨版本语言覆盖差异太大，写进去准确度不如不写
+- **选择器没有搜索框**：设计上靠字母索引，134 种够用；真扩到 240+ 时要重新评估
+
 ### ~~绿色便携化（数据不落 APPDATA）~~ 已评估，暂不做（2026-08-10 用户拍板）
 
 结论：可行、约 1-2 天、风险低，不影响现有安装版。评估结论存档如下，重启时不必重推。
@@ -72,5 +80,5 @@ v0.3.4 给 Windows OCR / Azure / Google Vision / OCR.space / 百度 五个引擎
 
 ### Incremental unit test coverage buildout
 
-`tests/unit/` 现有 15 个测试文件（selection 三件套 / stream-throttle / ocr-packs / 历史导入 / stack 五件套：service·cache·i18n·ocr·secure-vault / secure-audit / error-classification 等）。Principle: add tests when you touch a file, new features ship with tests, bug fixes ship with regression tests. Not chasing 100% coverage.
+`tests/unit/` 现有 34 个测试文件（selection / stack 五件套 / OCR 坐标 / 语言目录与选择器 / 历史中毒数据 / 渲染端日志转发 等）。Principle: add tests when you touch a file, new features ship with tests, bug fixes ship with regression tests. Not chasing 100% coverage.
 
