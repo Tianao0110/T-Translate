@@ -163,6 +163,8 @@ const useTranslationStore = create(
         fallbackNotice: null,
       },
 
+      languagePicker: { recent: [], lastLetter: null, letterLang: null },
+
       statistics: {
         totalTranslations: 0,
         totalCharacters: 0,
@@ -461,6 +463,23 @@ const useTranslationStore = create(
 
       // External callers (e.g. floating window) route through this, so privacy
       // gating happens here rather than at each call site.
+      // Language-picker memory. Recent codes drive the pinned section; the
+      // letter is where the user was last browsing, and it is only meaningful
+      // in the UI language it was recorded under (荷兰语 sits under H in
+      // Chinese and Dutch under D in English).
+      recordLanguageUse: (code) =>
+        set((state) => {
+          if (!code || code === 'auto') return;
+          const next = [code, ...state.languagePicker.recent.filter((c) => c !== code)];
+          state.languagePicker.recent = next.slice(0, 8);
+        }),
+
+      recordLanguageBrowse: (letter, uiLanguage) =>
+        set((state) => {
+          state.languagePicker.lastLetter = letter || null;
+          state.languagePicker.letterLang = uiLanguage || null;
+        }),
+
       addToHistory: (item) =>
         set((state) => {
           if (state.translationMode === PRIVACY_MODES.SECURE) {
@@ -709,6 +728,12 @@ const useTranslationStore = create(
           ...currentState,
           ...persistedState,
           history: cleanHistory.entries,
+          languagePicker: {
+            recent: [],
+            lastLetter: null,
+            letterLang: null,
+            ...(persistedState.languagePicker || {}),
+          },
           favorites: cleanFavorites.entries,
           _savedHistory: persistedState._savedHistory ? cleanSaved.entries : persistedState._savedHistory,
           // 'strict' was removed in 0.2.9 — its core promise (no network) maps to offline
@@ -738,6 +763,7 @@ const useTranslationStore = create(
         autoTranslate: state.autoTranslate,
         useStreamOutput: state.useStreamOutput,
         autoTranslateDelay: state.autoTranslateDelay,
+        languagePicker: state.languagePicker,
         // Secure-mode stash must survive a quit-while-secure: without these,
         // the emptied history/statistics are what lands on disk and the real
         // data is unrecoverable after restart.

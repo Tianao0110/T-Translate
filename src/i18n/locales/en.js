@@ -151,6 +151,7 @@ const en = {
     versionOriginal: "Original", versionOriginalFull: "Original Translation",
     versionStyleRewrite: "Style Rewrite", versionUserEdit: "User Edit", versionUnknown: "Unknown"
   },
+  languagePicker: { recent: "Recently used" },
   languages: { auto: "Auto Detect", zh: "Chinese", "zh-TW": "Traditional Chinese", en: "English", ja: "Japanese", ko: "Korean", fr: "French", de: "German", es: "Spanish", ru: "Russian", pt: "Portuguese", it: "Italian", ar: "Arabic", th: "Thai", vi: "Vietnamese", pa: "Punjabi" },
   history: { 
     title: "Translation History", search: "Search history...", empty: "No history yet", clearAll: "Clear", clearConfirm: "Are you sure to clear all history?", 
