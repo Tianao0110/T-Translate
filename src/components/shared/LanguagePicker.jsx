@@ -16,8 +16,9 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback, memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, Clock } from 'lucide-react';
+import { ChevronDown, Clock, Plus, AlertTriangle } from 'lucide-react';
 import { indexLetter } from '../../config/languages.js';
+import { normalizeCustomLanguage } from '../../config/custom-languages.js';
 import './language-picker.css';
 
 const displayName = (lang, uiLanguage) =>
@@ -32,6 +33,8 @@ const LanguagePicker = memo(({
   letterLang = null,
   onBrowse,
   customCodes = [],
+  onAddCustom,
+  existingCustom = [],
   disabled = false,
   size = 'default',
   title,
@@ -40,6 +43,9 @@ const LanguagePicker = memo(({
   const uiLanguage = i18n.language?.startsWith('zh') ? 'zh' : 'en';
 
   const [open, setOpen] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({ name: '', promptName: '' });
+  const [formError, setFormError] = useState('');
   const rootRef = useRef(null);
   const listRef = useRef(null);
   const groupRefs = useRef(new Map());
@@ -54,10 +60,20 @@ const LanguagePicker = memo(({
   // 'auto' is not a language and belongs in no letter group — it sits above
   // everything, in the picker that offers it.
   const autoOption = byCode.auto || null;
+
+  // User-added languages get their own pinned section rather than a letter
+  // group: their "letter" is the first character of a name the user typed,
+  // which put a stray 藏 on the end of an A-Z strip.
+  const customLangs = useMemo(
+    () => options.filter((l) => l.custom || custom.has(l.code)),
+    [options, custom]
+  );
+
   const groups = useMemo(() => {
     const map = new Map();
     for (const lang of options) {
       if (lang.code === 'auto') continue;
+      if (lang.custom || custom.has(lang.code)) continue;
       const letter = indexLetter(lang, uiLanguage);
       if (!map.has(letter)) map.set(letter, []);
       map.get(letter).push(lang);
@@ -65,7 +81,7 @@ const LanguagePicker = memo(({
     return [...map.entries()]
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([letter, items]) => ({ letter, items }));
-  }, [options, uiLanguage]);
+  }, [options, uiLanguage, custom]);
 
   const recentLangs = useMemo(
     () => recent.map((code) => byCode[code]).filter(Boolean).slice(0, 8),
@@ -100,6 +116,13 @@ const LanguagePicker = memo(({
       listRef.current.scrollTop = 0;
     }
   }, [open, lastLetter, letterLang, uiLanguage, scrollToLetter]);
+
+  useEffect(() => {
+    if (open) return;
+    setAdding(false);
+    setForm({ name: '', promptName: '' });
+    setFormError('');
+  }, [open]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -142,6 +165,19 @@ const LanguagePicker = memo(({
     e.currentTarget.releasePointerCapture?.(e.pointerId);
   };
 
+  const submitCustom = () => {
+    const result = normalizeCustomLanguage(form, existingCustom);
+    if (!result.ok) {
+      setFormError(result.reason);
+      return;
+    }
+    onAddCustom?.(result.language);
+    setAdding(false);
+    setForm({ name: '', promptName: '' });
+    onChange?.(result.language.code);
+    setOpen(false);
+  };
+
   const select = (code) => {
     onChange?.(code);
     setOpen(false);
@@ -166,7 +202,10 @@ const LanguagePicker = memo(({
         : undefined}
       onClick={() => select(lang.code)}
     >
-      <span className="lp-chip-code">{lang.code.toUpperCase()}</span>
+      {/* A custom language's code IS its prompt name, so it would render as a
+          whole word in the slot meant for a two-letter tag. The dashed frame
+          already says "custom"; the slot stays empty. */}
+      {!lang.custom && <span className="lp-chip-code">{lang.code.toUpperCase()}</span>}
       <span className="lp-chip-name">{displayName(lang, uiLanguage)}</span>
     </button>
   );
@@ -209,6 +248,61 @@ const LanguagePicker = memo(({
             ))}
           </div>
 
+          {adding && (
+            <div className="lp-add">
+              <div className="lp-add-warn">
+                <AlertTriangle size={13} />
+                <span>
+                  {t(
+                    'languagePicker.addWarning',
+                    '自定义语言不在谷歌翻译的支持范围内，能否翻译取决于你当前使用的大模型是否认识它。结果可能不准确或完全错误。'
+                  )}
+                </span>
+              </div>
+
+              <label className="lp-add-field">
+                <span>{t('languagePicker.addName', '语言名称')}</span>
+                <input
+                  autoFocus
+                  value={form.name}
+                  placeholder={t('languagePicker.addNamePlaceholder', '如：藏语')}
+                  onChange={(e) => { setForm((f) => ({ ...f, name: e.target.value })); setFormError(''); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') submitCustom(); }}
+                />
+              </label>
+
+              <label className="lp-add-field">
+                <span>{t('languagePicker.addPromptName', '发给模型的名字')}</span>
+                <input
+                  value={form.promptName}
+                  placeholder={t('languagePicker.addPromptPlaceholder', '留空则同上；模型只认 Tibetan 就填 Tibetan')}
+                  onChange={(e) => { setForm((f) => ({ ...f, promptName: e.target.value })); setFormError(''); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') submitCustom(); }}
+                />
+              </label>
+
+              {formError && (
+                <div className="lp-add-error">
+                  {t(`languagePicker.addError.${formError}`, {
+                    emptyName: '请填写语言名称',
+                    duplicate: '已经添加过同名的语言',
+                    tooLong: '名称太长',
+                    tooMany: '自定义语言数量已达上限',
+                  }[formError] || formError)}
+                </div>
+              )}
+
+              <div className="lp-add-actions">
+                <button type="button" className="lp-add-cancel" onClick={() => setAdding(false)}>
+                  {t('common.cancel', '取消')}
+                </button>
+                <button type="button" className="lp-add-confirm" onClick={submitCustom}>
+                  {t('languagePicker.addConfirm', '我知道了，添加')}
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="lp-list" ref={listRef}>
             {autoOption && (
               <div className="lp-section lp-section-auto">
@@ -226,6 +320,15 @@ const LanguagePicker = memo(({
               </div>
             )}
 
+            {customLangs.length > 0 && (
+              <div className="lp-section">
+                <div className="lp-section-title">
+                  {t('languagePicker.customSection', '自定义')}
+                </div>
+                <div className="lp-chips">{customLangs.map(renderChip)}</div>
+              </div>
+            )}
+
             {groups.map(({ letter, items }) => (
               <div
                 key={letter}
@@ -240,6 +343,13 @@ const LanguagePicker = memo(({
               </div>
             ))}
           </div>
+
+          {onAddCustom && !adding && (
+            <button type="button" className="lp-add-entry" onClick={() => setAdding(true)}>
+              <Plus size={12} />
+              {t('languagePicker.addCustom', '添加自定义语言')}
+            </button>
+          )}
         </div>
       )}
     </div>

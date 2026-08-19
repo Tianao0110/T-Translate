@@ -12,7 +12,16 @@ import createLogger from '../utils/logger.js';
 import { sanitizeTextEntries, toStoredText } from './history-sanitize.js';
 const logger = createLogger('TranslationStore');
 
-const VALID_LANG_CODES = new Set(LANGUAGES.map(l => l.code));
+const BUILTIN_LANG_CODES = new Set(LANGUAGES.map(l => l.code));
+
+// The guard exists to reject junk (a stale code from an old profile, a typo
+// over IPC), not to gatekeep the catalogue — a user-added language is a valid
+// choice, and validating only against the built-ins silently threw every one
+// of them away at the moment of selection.
+function isKnownLanguage(state, code) {
+  return BUILTIN_LANG_CODES.has(code) ||
+    (state.customLanguages || []).some((l) => l.code === code);
+}
 
 // zustand persist re-serializes the partialized state — history alone can hold
 // 1000 entries — on EVERY setState: per keystroke and, while streaming, per
@@ -164,6 +173,7 @@ const useTranslationStore = create(
       },
 
       languagePicker: { recent: [], lastLetter: null, letterLang: null },
+      customLanguages: [],
 
       statistics: {
         totalTranslations: 0,
@@ -239,11 +249,11 @@ const useTranslationStore = create(
 
       setLanguages: (source, target) =>
         set((state) => {
-          if (source && !VALID_LANG_CODES.has(source)) {
+          if (source && !isKnownLanguage(state, source)) {
             logger.warn(`Invalid source language code: ${source}, ignoring`);
             source = null;
           }
-          if (target && !VALID_LANG_CODES.has(target)) {
+          if (target && !isKnownLanguage(state, target)) {
             logger.warn(`Invalid target language code: ${target}, falling back to default`);
             target = DEFAULTS.TARGET_LANGUAGE;
           }
@@ -257,7 +267,7 @@ const useTranslationStore = create(
 
       setTargetLanguage: (target) =>
         set((state) => {
-          if (target && !VALID_LANG_CODES.has(target)) {
+          if (target && !isKnownLanguage(state, target)) {
             logger.warn(`Invalid target language code: ${target}, falling back to default`);
             target = DEFAULTS.TARGET_LANGUAGE;
           }
@@ -472,6 +482,18 @@ const useTranslationStore = create(
           if (!code || code === 'auto') return;
           const next = [code, ...state.languagePicker.recent.filter((c) => c !== code)];
           state.languagePicker.recent = next.slice(0, 8);
+        }),
+
+      addCustomLanguage: (language) =>
+        set((state) => {
+          if (!language?.code) return;
+          if (state.customLanguages.some((l) => l.code === language.code)) return;
+          state.customLanguages.push(language);
+        }),
+
+      removeCustomLanguage: (code) =>
+        set((state) => {
+          state.customLanguages = state.customLanguages.filter((l) => l.code !== code);
         }),
 
       recordLanguageBrowse: (letter, uiLanguage) =>
@@ -728,6 +750,9 @@ const useTranslationStore = create(
           ...currentState,
           ...persistedState,
           history: cleanHistory.entries,
+          customLanguages: Array.isArray(persistedState.customLanguages)
+            ? persistedState.customLanguages.filter((l) => l?.code && l?.name)
+            : [],
           languagePicker: {
             recent: [],
             lastLetter: null,
@@ -764,6 +789,7 @@ const useTranslationStore = create(
         useStreamOutput: state.useStreamOutput,
         autoTranslateDelay: state.autoTranslateDelay,
         languagePicker: state.languagePicker,
+        customLanguages: state.customLanguages,
         // Secure-mode stash must survive a quit-while-secure: without these,
         // the emptied history/statistics are what lands on disk and the real
         // data is unrecoverable after restart.

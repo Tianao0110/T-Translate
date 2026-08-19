@@ -151,7 +151,14 @@ const zh = {
     versionOriginal: "原始", versionOriginalFull: "原始翻译",
     versionStyleRewrite: "风格改写", versionUserEdit: "用户编辑", versionUnknown: "未知"
   },
-  languagePicker: { recent: "最近使用" },
+  languagePicker: {
+    customSection: "自定义", recent: "最近使用", addCustom: "添加自定义语言",
+    addWarning: "自定义语言不在谷歌翻译的支持范围内，能否翻译取决于你当前使用的大模型是否认识它。结果可能不准确或完全错误。",
+    addName: "语言名称", addNamePlaceholder: "如：藏语",
+    addPromptName: "发给模型的名字", addPromptPlaceholder: "留空则同上；模型只认 Tibetan 就填 Tibetan",
+    addConfirm: "我知道了，添加",
+    addError: { emptyName: "请填写语言名称", duplicate: "已经添加过同名的语言", tooLong: "名称太长", tooMany: "自定义语言数量已达上限" },
+  },
   languages: { auto: "自动检测", zh: "中文", "zh-TW": "繁体中文", en: "English", ja: "日本語", ko: "한국어", fr: "Français", de: "Deutsch", es: "Español", ru: "Русский", pt: "Português", it: "Italiano", ar: "العربية", th: "ไทย", vi: "Tiếng Việt", pa: "ਪੰਜਾਬੀ" },
   history: { 
     title: "翻译历史", search: "搜索历史...", empty: "暂无历史记录", clearAll: "清空", clearConfirm: "确定要清空所有历史记录吗？", 

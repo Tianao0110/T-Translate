@@ -198,3 +198,110 @@
   font-weight: 600;
   letter-spacing: 0.02em;
 }
+
+/* ===== Add a custom language ===== */
+
+/* Deliberately quiet: the built-in catalogue covers Google's whole set, so
+   almost nobody needs this. Discoverable at the moment of "it isn't here",
+   not competing with the list above it. */
+.lp-add-entry {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  padding: 7px;
+  border: none;
+  border-top: 1px solid var(--border-secondary);
+  background: var(--bg-secondary);
+  color: var(--text-tertiary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.lp-add-entry:hover {
+  color: var(--accent-primary);
+  background: var(--bg-hover);
+}
+
+.lp-add {
+  padding: 10px 12px 12px;
+  border-bottom: 1px solid var(--border-secondary);
+  background: var(--bg-secondary);
+}
+
+.lp-add-warn {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+  padding: 8px 9px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.lp-add-warn svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--warning);
+}
+
+.lp-add-field {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.lp-add-field span {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--text-secondary);
+  font-size: 11.5px;
+}
+
+.lp-add-field input {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 12.5px;
+}
+
+.lp-add-field input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+.lp-add-error {
+  margin-bottom: 8px;
+  color: var(--error);
+  font-size: 11.5px;
+}
+
+.lp-add-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.lp-add-actions button {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.lp-add-cancel {
+  border: 1px solid var(--border-primary);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+}
+
+.lp-add-confirm {
+  border: 1px solid var(--accent-primary);
+  background: var(--accent-primary);
+  color: var(--text-on-accent);
+}

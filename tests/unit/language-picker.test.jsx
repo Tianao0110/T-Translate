@@ -141,3 +141,117 @@ describe('selection and memory', () => {
     expect(chip.className).toContain('custom');
   });
 });
+
+describe('adding a custom language', () => {
+  const openWithAdd = (props = {}) => {
+    const onAddCustom = vi.fn();
+    const utils = open({ onAddCustom, ...props });
+    fireEvent.click(utils.container.querySelector('.lp-add-entry'));
+    return { ...utils, onAddCustom };
+  };
+
+  it('states the risk before the fields, not after', () => {
+    const { container } = openWithAdd();
+    const warn = container.querySelector('.lp-add-warn');
+    expect(warn.textContent).toContain('取决于');
+    // The warning must precede the inputs — an acknowledgement shown after the
+    // work is done is not an acknowledgement.
+    const form = container.querySelector('.lp-add');
+    expect([...form.children].indexOf(warn)).toBe(0);
+  });
+
+  it('sends the typed name to the model when no override is given', () => {
+    const { container, onAddCustom } = openWithAdd();
+    fireEvent.change(container.querySelectorAll('.lp-add-field input')[0], {
+      target: { value: '藏语' },
+    });
+    fireEvent.click(container.querySelector('.lp-add-confirm'));
+
+    expect(onAddCustom).toHaveBeenCalledWith(expect.objectContaining({
+      name: '藏语',
+      promptName: '藏语',
+      code: '藏语',   // the code IS what the prompt says
+      custom: true,
+    }));
+  });
+
+  it('lets the model be told something other than what the picker shows', () => {
+    // A local model may know Tibetan and not 藏语, or the reverse — only the
+    // person who loaded it knows which.
+    const { container, onAddCustom } = openWithAdd();
+    const [nameInput, promptInput] = container.querySelectorAll('.lp-add-field input');
+    fireEvent.change(nameInput, { target: { value: '藏语' } });
+    fireEvent.change(promptInput, { target: { value: 'Tibetan' } });
+    fireEvent.click(container.querySelector('.lp-add-confirm'));
+
+    expect(onAddCustom).toHaveBeenCalledWith(expect.objectContaining({
+      name: '藏语',
+      promptName: 'Tibetan',
+      code: 'Tibetan',
+    }));
+  });
+
+  it('selects the language it just added — that is why the user was here', () => {
+    const { container, onChange } = openWithAdd();
+    fireEvent.change(container.querySelectorAll('.lp-add-field input')[0], {
+      target: { value: '藏语' },
+    });
+    fireEvent.click(container.querySelector('.lp-add-confirm'));
+    expect(onChange).toHaveBeenCalledWith('藏语');
+  });
+
+  it('refuses an empty name and a duplicate, without calling back', () => {
+    const { container, onAddCustom } = openWithAdd({
+      existingCustom: [{ code: '藏语', name: '藏语' }],
+    });
+    fireEvent.click(container.querySelector('.lp-add-confirm'));
+    expect(container.querySelector('.lp-add-error')).toBeTruthy();
+
+    fireEvent.change(container.querySelectorAll('.lp-add-field input')[0], {
+      target: { value: '藏语' },
+    });
+    fireEvent.click(container.querySelector('.lp-add-confirm'));
+    expect(container.querySelector('.lp-add-error')).toBeTruthy();
+    expect(onAddCustom).not.toHaveBeenCalled();
+  });
+
+  it('offers no entry point when the caller cannot accept one', () => {
+    const { container } = open();
+    expect(container.querySelector('.lp-add-entry')).toBeNull();
+  });
+});
+
+describe('custom languages stay out of the alphabet', () => {
+  // Their "letter" is the first character of a name the user typed, which put
+  // a stray 藏 on the end of an otherwise A-Z strip.
+  const withCustom = () => open({
+    onAddCustom: vi.fn(),
+    options: [...pick('auto', 'zh', 'de'), { code: 'Tibetan', name: '藏语', en: '藏语', custom: true }],
+    customCodes: ['Tibetan'],
+  });
+
+  it('keeps the index strip free of user-typed characters', () => {
+    const { container } = withCustom();
+    const letters = [...container.querySelectorAll('.lp-index-letter')].map((e) => e.textContent);
+    expect(letters.every((l) => /^[A-Z]$/.test(l))).toBe(true);
+    expect(letters).not.toContain('藏');
+  });
+
+  it('gives them their own pinned section', () => {
+    const { container } = withCustom();
+    const titles = [...container.querySelectorAll('.lp-list > .lp-section')]
+      .map((s) => s.querySelector('.lp-section-title')?.textContent.trim());
+    expect(titles).toContain('自定义');
+
+    const customSection = [...container.querySelectorAll('.lp-list > .lp-section')]
+      .find((s) => s.querySelector('.lp-section-title')?.textContent.trim() === '自定义');
+    expect(customSection.querySelector('.lp-chip-name').textContent).toBe('藏语');
+  });
+
+  it('drops the code tag — a custom code is a whole prompt name', () => {
+    const { container } = withCustom();
+    const chip = [...container.querySelectorAll('.lp-chip.custom')][0];
+    expect(chip.querySelector('.lp-chip-code')).toBeNull();
+    expect(chip.textContent.trim()).toBe('藏语');
+  });
+});

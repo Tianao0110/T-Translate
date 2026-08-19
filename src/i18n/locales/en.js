@@ -151,7 +151,14 @@ const en = {
     versionOriginal: "Original", versionOriginalFull: "Original Translation",
     versionStyleRewrite: "Style Rewrite", versionUserEdit: "User Edit", versionUnknown: "Unknown"
   },
-  languagePicker: { recent: "Recently used" },
+  languagePicker: {
+    customSection: "Custom", recent: "Recently used", addCustom: "Add a custom language",
+    addWarning: "This language is outside Google Translate's range. Whether it can be translated at all depends on whether your current model knows it — results may be inaccurate or plain wrong.",
+    addName: "Language name", addNamePlaceholder: "e.g. Tibetan",
+    addPromptName: "Name to send the model", addPromptPlaceholder: "Leave empty to reuse the name above",
+    addConfirm: "Understood, add it",
+    addError: { emptyName: "Enter a language name", duplicate: "That language is already added", tooLong: "Name is too long", tooMany: "Custom language limit reached" },
+  },
   languages: { auto: "Auto Detect", zh: "Chinese", "zh-TW": "Traditional Chinese", en: "English", ja: "Japanese", ko: "Korean", fr: "French", de: "German", es: "Spanish", ru: "Russian", pt: "Portuguese", it: "Italian", ar: "Arabic", th: "Thai", vi: "Vietnamese", pa: "Punjabi" },
   history: { 
     title: "Translation History", search: "Search history...", empty: "No history yet", clearAll: "Clear", clearConfirm: "Are you sure to clear all history?", 

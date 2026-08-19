@@ -28,6 +28,7 @@ import AiActionIcon from '../shared/AiActionIcon.jsx';
 
 import { StyleModal, SaveModal } from './components.jsx';
 import LanguagePicker from '../shared/LanguagePicker.jsx';
+import { mergeLanguages, customCodesOf } from '@config/custom-languages';
 
 const logger = createLogger('TranslationPanel');
 
@@ -63,6 +64,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     currentTranslation,
     favorites,
     languagePicker,
+    customLanguages,
     useStreamOutput,
     autoTranslate,
     autoTranslateDelay,
@@ -73,6 +75,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     setLanguages,
     recordLanguageUse,
     recordLanguageBrowse,
+    addCustomLanguage,
     translate,
     streamTranslate,
     recognizeImage,
@@ -96,6 +99,8 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     setTranslatedText: s.setTranslatedText,
     setLanguages: s.setLanguages,
     languagePicker: s.languagePicker,
+    customLanguages: s.customLanguages,
+    addCustomLanguage: s.addCustomLanguage,
     recordLanguageUse: s.recordLanguageUse,
     recordLanguageBrowse: s.recordLanguageBrowse,
     translate: s.translate,
@@ -154,8 +159,10 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
 
   // The picker needs the whole entry (Chinese name, English name, endonym)
   // to label chips and file them under the right letter.
-  const languages = LANGUAGES;
-  const targetLanguages = useMemo(() => LANGUAGES.filter((l) => l.code !== 'auto'), []);
+  // User-added languages sit alongside the built-ins; built-ins win a clash.
+  const languages = useMemo(() => mergeLanguages(LANGUAGES, customLanguages), [customLanguages]);
+  const targetLanguages = useMemo(() => languages.filter((l) => l.code !== 'auto'), [languages]);
+  const customCodes = useMemo(() => customCodesOf(customLanguages), [customLanguages]);
 
   // Tone templates. MT detection is handled in the main-process stack
   // — when a translation-only model is active, prompt structure auto-switches
@@ -400,6 +407,9 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
             lastLetter={languagePicker.lastLetter}
             letterLang={languagePicker.letterLang}
             onBrowse={recordLanguageBrowse}
+            customCodes={customCodes}
+            existingCustom={customLanguages}
+            onAddCustom={addCustomLanguage}
           />
 
           <button
@@ -419,6 +429,9 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
             lastLetter={languagePicker.lastLetter}
             letterLang={languagePicker.letterLang}
             onBrowse={recordLanguageBrowse}
+            customCodes={customCodes}
+            existingCustom={customLanguages}
+            onAddCustom={addCustomLanguage}
           />
         </div>
 
