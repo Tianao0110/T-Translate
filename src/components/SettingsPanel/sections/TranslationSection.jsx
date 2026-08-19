@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Trash2 } from 'lucide-react';
+import { Trash2, X } from 'lucide-react';
+import useTranslationStore from '../../../stores/translation-store';
 
 const TranslationSection = ({
   settings,
@@ -15,6 +16,16 @@ const TranslationSection = ({
   setUseStreamOutput
 }) => {
   const { t } = useTranslation();
+  const customLanguages = useTranslationStore((s) => s.customLanguages);
+  const removeCustomLanguage = useTranslationStore((s) => s.removeCustomLanguage);
+
+  // Removal lives here rather than in the picker: it is rare and destructive,
+  // and the panel people open every day should not carry a delete control.
+  const handleRemoveLanguage = async (lang) => {
+    if (!(await confirm(t('translationSettings.customLangRemoveConfirm', { name: lang.name })))) return;
+    removeCustomLanguage(lang.code);
+    notify(t('translationSettings.customLangRemoved', { name: lang.name }), 'success');
+  };
 
   const handleClearCache = async () => {
     if (!(await confirm(t('translationSettings.clearCacheConfirm')))) return;
@@ -105,6 +116,42 @@ const TranslationSection = ({
           </button>
         </div>
         <p className="setting-hint">{t('translationSettings.sameLangHint')}</p>
+      </div>
+
+      <div className="setting-group" style={{marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border-primary)'}}>
+        <h4 style={{marginBottom: '12px', color: 'var(--text-secondary)'}}>
+          {t('translationSettings.customLangs')}
+        </h4>
+        <p className="setting-hint" style={{marginBottom: '12px'}}>
+          {t('translationSettings.customLangsHint')}
+        </p>
+        {customLanguages.length === 0 ? (
+          <p className="setting-hint" style={{opacity: 0.7}}>
+            {t('translationSettings.customLangsEmpty')}
+          </p>
+        ) : (
+          <div className="custom-lang-list">
+            {customLanguages.map((lang) => (
+              <div key={lang.code} className="custom-lang-item">
+                <span className="custom-lang-name">{lang.name}</span>
+                {/* The prompt name is the thing that actually decides whether a
+                    model understands the request, so it is worth showing. */}
+                {lang.promptName !== lang.name && (
+                  <span className="custom-lang-prompt">
+                    {t('translationSettings.customLangPrompt', { name: lang.promptName })}
+                  </span>
+                )}
+                <button
+                  className="custom-lang-remove"
+                  onClick={() => handleRemoveLanguage(lang)}
+                  title={t('common.delete')}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="setting-group" style={{marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border-primary)'}}>

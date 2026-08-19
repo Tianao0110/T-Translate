@@ -305,3 +305,11 @@
   background: var(--accent-primary);
   color: var(--text-on-accent);
 }
+
+/* Flipped when the trigger sits too close to the right edge — the panel is
+   several times wider than its trigger, so left-aligning it there hangs part
+   of the list off screen. */
+.lp-panel.align-right {
+  left: auto;
+  right: 0;
+}

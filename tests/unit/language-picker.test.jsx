@@ -255,3 +255,26 @@ describe('custom languages stay out of the alphabet', () => {
     expect(chip.textContent.trim()).toBe('藏语');
   });
 });
+
+describe('panel placement', () => {
+  // The panel is several times wider than its trigger, so one sitting near the
+  // right edge (the document translator header, or any narrow window) hangs
+  // part of the list off screen.
+  const openAt = (left, innerWidth) => {
+    vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(innerWidth);
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({
+      left, top: 0, right: left + 120, bottom: 30, width: 120, height: 30, x: left, y: 0,
+    });
+    return open();
+  };
+
+  it('stays left-aligned when there is room', () => {
+    const { container } = openAt(40, 1280);
+    expect(container.querySelector('.lp-panel').className).not.toContain('align-right');
+  });
+
+  it('flips to the right edge when it would overflow', () => {
+    const { container } = openAt(620, 820);
+    expect(container.querySelector('.lp-panel').className).toContain('align-right');
+  });
+});

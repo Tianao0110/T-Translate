@@ -43,6 +43,7 @@ const LanguagePicker = memo(({
   const uiLanguage = i18n.language?.startsWith('zh') ? 'zh' : 'en';
 
   const [open, setOpen] = useState(false);
+  const [alignRight, setAlignRight] = useState(false);
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ name: '', promptName: '' });
   const [formError, setFormError] = useState('');
@@ -104,6 +105,17 @@ const LanguagePicker = memo(({
       list.scrollTop = top;
     }
   }, []);
+
+  // The panel is far wider than its trigger, so a trigger sitting near the
+  // right edge (the document translator's header, or any narrow window) pushes
+  // it off screen. Measured on open rather than guessed from a breakpoint —
+  // what matters is this trigger's position, not the viewport size.
+  useEffect(() => {
+    if (!open || !rootRef.current) return;
+    const { left } = rootRef.current.getBoundingClientRect();
+    const PANEL_WIDTH = 452;
+    setAlignRight(left + PANEL_WIDTH > window.innerWidth - 8);
+  }, [open]);
 
   // Reopening returns to where the user was browsing — but a letter recorded
   // under a different UI language points at a group that no longer exists.
@@ -225,7 +237,7 @@ const LanguagePicker = memo(({
       </button>
 
       {open && (
-        <div className="lp-panel">
+        <div className={alignRight ? 'lp-panel align-right' : 'lp-panel'}>
           <div
             className="lp-index"
             onPointerDown={handleStripPointerDown}
