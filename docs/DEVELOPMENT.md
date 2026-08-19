@@ -218,6 +218,27 @@ npm start             # 实测：设置页出卡片、填 key、测试连接、�
 传统翻译源的映射按需补：Google/微软吃 ISO 码、未映射直传；百度那套是自定义码
 （jp/kor/fra/vie），漏了会发出它不认识的码；DeepL 未映射即报"不支持"，是刻意的。
 
+## 🔤 OCR 支持一门新语言
+
+先分清两件事：**翻译语言**（134 种，src/config/languages.js）和 **OCR 识别语言**
+（56 种，src/config/ocr-languages.js）。后者取决于模型字典里有没有那套字形，
+跟翻译能力无关。
+
+加一种之前**必须先验**，别照抄上游文档——它两个方向都错过：
+
+1. 拿到该语言的模型字典（内置包在 `resources/ocr/base/dic.txt`，语言包在
+   userData/ocr-models/<pack>/），检查这门语言的全部字形在不在
+2. 字形在 ≠ 能读。越南语字典里 ă â đ ê ô ơ ư 全有，但没有任何叠调符号，
+   实跑返回的文本会把声调全丢掉，置信度还是 0.985。**渲染一张样图跑一遍真
+   引擎**是唯一可靠的判据
+3. 通过了就同时改两处——src/config/ocr-languages.js 与
+   electron/shared/ocr-packs.js 的 LANGUAGE_TO_PACK（渲染进程不能 import 主
+   进程代码，所以必须两份），`npm run check:languages` 校验二者相等
+4. 语言名不用加 i18n 键，从 134 目录那张表取
+
+判定「读不出来」的门槛在 src/stack/ocr/result-quality.js，里面的数字全部是
+实测值，改动前先看那份注释。
+
 ## 👁️ 新增 OCR 引擎
 
 在线 OCR 引擎同样活在栈里：`src/stack/ocr/my-ocr.js`（参考 `ocrspace.js`，最小样板）：

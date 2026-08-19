@@ -87,6 +87,7 @@ t-translate/
 │   │   ├── templates.js        # 翻译模板
 │   │   ├── privacy-modes.js    # 隐私模式
 │   │   ├── languages.js       # 语言目录（134 种）+ 拼音索引，渲染端与栈共用
+│   │   ├── ocr-languages.js   # OCR 可识别语言（56 种）→ 模型包，与主进程那份互校
 │   │   ├── custom-languages.js # 用户自定义语言的校验与合并
 │   │   ├── model-language-coverage.js # 模型语言能力表（只影响降级链排序）
 │   │   ├── provider-icons.js   # stack 共享表 + 图标合成的渲染端 provider 目录

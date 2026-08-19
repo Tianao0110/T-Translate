@@ -26,7 +26,7 @@
 | Feature                            | Description                                                                                                                            |
 | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | **Selection translator**     | System-wide. Select text in any app to translate. Up to 8 pinned windows                                                               |
-| **Screenshot OCR**           | Capture screen regions. 7 OCR engines with automatic fallback                                                                          |
+| **Screenshot OCR**           | Capture screen regions. 56 recognition languages, 7 OCR engines with automatic fallback                                                |
 | **Floating window**          | Transparent overlay. Space-bar to capture-and-translate; auto-refresh & global-hotkey zero-focus capture for live captions / subtitles |
 | **Document translation**     | 9 formats: PDF / DOCX / EPUB / TXT / SRT / VTT / CSV / JSON / Markdown. Segment-by-segment, resumable                                  |
 | **134 languages**            | Everything Google Translate supports, in a picker with a letter index and a recently-used row; more can be added by hand                |
@@ -49,7 +49,7 @@ Select any text and a translation window pops up automatically. Up to 8 pinned w
 
 ### Screenshot OCR translation
 
-Capture a screen region for text recognition. When an OCR engine is unavailable, falls back to the next one transparently.
+Capture a screen region for text recognition. When an OCR engine is unavailable, falls back to the next one transparently. 56 recognition languages: Chinese, English, Japanese and 37 Latin-script languages are built in; Korean, Cyrillic, Devanagari and Arabic each need one language pack, and a pack covers every language written in that script. When the local engine cannot read a capture, the chain moves on to an engine that can.
 
 <p align="center">
   <img src="docs/screenshots/screenshot-ocr.png" width="600" alt="Screenshot OCR translation">
