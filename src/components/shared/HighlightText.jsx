@@ -5,7 +5,12 @@
 import { memo } from 'react';
 
 const HighlightText = memo(({ text, search }) => {
-  if (!search || !text) return text;
+  // Last line of defense: a non-string here (a stray result object from the
+  // 0.3.x empty-translation bug) would be handed to React as a child and throw
+  // #31, taking down the whole panel over one bad row. The store repairs those
+  // on rehydrate; this makes the render path survive whatever slips past.
+  if (typeof text !== 'string') return text == null ? null : String(text);
+  if (!search) return text;
   try {
     const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const parts = text.split(new RegExp(`(${escaped})`, 'gi'));

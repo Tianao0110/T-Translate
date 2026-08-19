@@ -9,6 +9,7 @@ import { v4 as uuidv4 } from "uuid";
 
 import { PRIVACY_MODES, TRANSLATION_STATUS, LANGUAGE_CODES, DEFAULTS, LANGUAGES } from "@config/defaults";
 import createLogger from '../utils/logger.js';
+import { sanitizeTextEntries, toStoredText } from './history-sanitize.js';
 const logger = createLogger('TranslationStore');
 
 const VALID_LANG_CODES = new Set(LANGUAGES.map(l => l.code));
@@ -468,8 +469,10 @@ const useTranslationStore = create(
 
           const historyItem = {
             id: item.id || uuidv4(),
-            sourceText: item.sourceText || '',
-            translatedText: item.translatedText || '',
+            // toStoredText, not `|| ''`: an object is truthy and would ride
+            // straight to disk, where it later kills the panel that renders it.
+            sourceText: toStoredText(item.sourceText),
+            translatedText: toStoredText(item.translatedText),
             sourceLanguage: item.sourceLanguage || 'auto',
             targetLanguage: item.targetLanguage || 'zh',
             timestamp: item.timestamp || Date.now(),
@@ -685,9 +688,29 @@ const useTranslationStore = create(
       // localStorage works in Electron and loads synchronously (no flash)
       storage: createThrottledJSONStorage(),
       merge: (persistedState, currentState) => {
+        // Rows written before v0.3.5 can hold a whole result object where the
+        // text belongs; rendering one throws and takes the panel down. Repair
+        // on the way in — the entries live in localStorage, so nothing else
+        // ever gets a chance to fix them.
+        const cleanHistory = sanitizeTextEntries(persistedState.history, 'drop');
+        const cleanSaved = sanitizeTextEntries(persistedState._savedHistory, 'drop');
+        const cleanFavorites = sanitizeTextEntries(persistedState.favorites, 'blank');
+        const damaged = cleanHistory.repaired + cleanHistory.dropped +
+          cleanSaved.repaired + cleanSaved.dropped +
+          cleanFavorites.repaired + cleanFavorites.dropped;
+        if (damaged > 0) {
+          logger.warn(
+            `Repaired persisted entries: history ${cleanHistory.repaired} fixed / ${cleanHistory.dropped} dropped, ` +
+            `favorites ${cleanFavorites.repaired} fixed, stash ${cleanSaved.repaired} fixed / ${cleanSaved.dropped} dropped`
+          );
+        }
+
         return {
           ...currentState,
           ...persistedState,
+          history: cleanHistory.entries,
+          favorites: cleanFavorites.entries,
+          _savedHistory: persistedState._savedHistory ? cleanSaved.entries : persistedState._savedHistory,
           // 'strict' was removed in 0.2.9 — its core promise (no network) maps to offline
           translationMode: persistedState.translationMode === 'strict'
             ? PRIVACY_MODES.OFFLINE
