@@ -385,11 +385,32 @@ describe('built-in catalog', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('ships explain on the understanding side, on the floating window only', () => {
+  it('ships explain on the understanding side, never on the reading side', () => {
     const explain = getAiAction('explain');
+    // The mode is what keeps the two sides apart — the floating window offers
+    // it only with the switch on, and a surface without a switch (the document
+    // reader) opts in by asking. Surfaces may grow; the mode may not.
     expect(explain.trigger.mode).toBe('understand');
-    expect(explain.trigger.surfaces).toEqual(['floating']);
+    expect(explain.trigger.surfaces).toContain('floating');
+    expect(explain.trigger.surfaces).toContain('document');
     expect(explain.trigger.minLength).toBeNull();
+  });
+
+  it('keeps the note digest out of history — documents have nothing to hang on', () => {
+    const digest = getAiAction('digest');
+    // Document translation keeps its own progress file and never writes to the
+    // history store, so an attachable result would have no parent entry.
+    expect(digest.history).toBe('none');
+    expect(digest.trigger.surfaces).toEqual(['document']);
+  });
+
+  it('does not claim the digest covers a whole document', () => {
+    // It only sees the paragraphs the reader opened. Calling that a summary of
+    // the document would be a lie, and the prompt has to say so to the model.
+    const digest = getAiAction('digest');
+    for (const lang of ['zh', 'en']) {
+      expect(digest.prompts[lang].user).toMatch(/一部分|only parts/);
+    }
   });
 
   it('keeps summarize on the reading side', () => {

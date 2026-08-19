@@ -778,6 +778,7 @@ const en = {
     sendsCapture: "sends this screenshot to the vision model",
     readFromCapture: "Read from the screenshot by a vision model",
     summarize: { name: "Summarize", desc: "Read the whole passage and give key points in the target language" },
+    digest: { name: "Consolidate notes", desc: "Organise the paragraphs you have explained into one note" },
     explain: { name: "Explain", desc: "Explain this content: what it is about and what the key concepts are" }
   },
   svc: {

@@ -779,6 +779,7 @@ const zh = {
     sendsCapture: "会把这张截图发给视觉模型",
     readFromCapture: "视觉模型读取截图生成",
     summarize: { name: "总结", desc: "读完整段内容，用目标语言给出要点" },
+    digest: { name: "整理笔记", desc: "把已讲解的段落整理成一份连贯笔记" },
     explain: { name: "讲解", desc: "把这块内容讲清楚：整体在说什么，关键概念是什么" }
   },
   svc: {

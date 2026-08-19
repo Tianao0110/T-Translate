@@ -101,7 +101,11 @@ const EXPLAIN = {
   outputLanguage: 'target',
   history: 'attach',
   trigger: {
-    surfaces: ['floating'],
+    // 'document' joins the floating window: a paragraph of a manual that is
+    // still opaque after translation is the same need the mode switch answers.
+    // The document surface has no switch — asking for a paragraph IS the
+    // request — so it passes understandMode itself.
+    surfaces: ['floating', 'document'],
     // No display-mode or length gate: the user turned the mode on, which is
     // the trigger. Summaries need length to be worth anything; an explanation
     // of two dense lines does not.
@@ -131,7 +135,48 @@ const EXPLAIN = {
   },
 };
 
-export const BUILTIN_AI_ACTIONS = [SUMMARIZE, EXPLAIN];
+// Collects the explanations the reader has already asked for into one note.
+//
+// Deliberately NOT a whole-document summary. It only sees the paragraphs the
+// user chose to open, so calling it that would be a lie — a 200-page manual
+// with three explained paragraphs would produce a "summary" of three hard
+// paragraphs. A true full-document summary needs a map-reduce pass over every
+// segment, which is a pipeline, not a prompt.
+//
+// What it is instead is cheap and honest: the map phase was already paid for
+// by the reader's own clicks, the input is a handful of notes rather than a
+// book, and it gets more complete the more of the document they work through.
+const DIGEST = {
+  id: 'digest',
+  schemaVersion: AI_ACTION_SCHEMA_VERSION,
+  builtin: true,
+  icon: 'NotebookPen',
+  nameKey: 'aiActions.digest.name',
+  descKey: 'aiActions.digest.desc',
+  capability: 'text',
+  outputLanguage: 'target',
+  // Documents keep their own progress file and never touch the history store,
+  // so there is no translation entry for this to hang on.
+  history: 'none',
+  trigger: {
+    surfaces: ['document'],
+    displayModes: null,
+    minLength: null,
+    mode: 'understand',
+  },
+  prompts: {
+    zh: {
+      system: '你在帮读者整理阅读笔记。用户会给你若干段讲解，请用{{outputLanguage}}把它们整理成一份连贯的笔记。只输出笔记正文。',
+      user: '下面是我在读一份文档时，对其中若干段落的讲解记录。请用{{outputLanguage}}把它们整理成一份连贯的阅读笔记。\n\n讲解记录：\n{{sourceText}}\n\n要求：\n- 按主题归拢，不要逐条复述\n- 指出这些段落之间的关联\n- 这些只是文档的一部分，不要假装概括了全文\n- 记录里没有的不要编造',
+    },
+    en: {
+      system: 'You are helping a reader consolidate their notes. The user gives you several explanations; organise them into one coherent note in {{outputLanguage}}. Output only the note.',
+      user: 'Below are explanations I collected while reading parts of a document. Organise them into one coherent reading note, in {{outputLanguage}}.\n\nExplanations:\n{{sourceText}}\n\nRequirements:\n- Group by theme rather than restating each one in turn\n- Point out how these parts relate to each other\n- These are only parts of the document — do not present this as covering the whole\n- Do not invent anything the notes do not contain',
+    },
+  },
+};
+
+export const BUILTIN_AI_ACTIONS = [SUMMARIZE, EXPLAIN, DIGEST];
 
 export function getAiAction(id, extraActions = []) {
   return [...BUILTIN_AI_ACTIONS, ...extraActions].find(a => a.id === id) || null;
