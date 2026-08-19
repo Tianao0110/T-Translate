@@ -86,6 +86,9 @@ t-translate/
 │   │   ├── defaults.js         # 默认值
 │   │   ├── templates.js        # 翻译模板
 │   │   ├── privacy-modes.js    # 隐私模式
+│   │   ├── languages.js       # 语言目录（134 种）+ 拼音索引，渲染端与栈共用
+│   │   ├── custom-languages.js # 用户自定义语言的校验与合并
+│   │   ├── model-language-coverage.js # 模型语言能力表（只影响降级链排序）
 │   │   ├── provider-icons.js   # stack 共享表 + 图标合成的渲染端 provider 目录
 │   │   └── filters.js          # 免译过滤器（stack 与渲染端共用的纯数据）
 │   │

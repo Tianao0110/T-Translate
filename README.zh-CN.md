@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.3.4-green" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.3.5-green" alt="Version">
   <img src="https://img.shields.io/badge/license-T--Translate%201.0-blue" alt="License">
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform">
 </p>
@@ -29,7 +29,8 @@
 | **截图 OCR**     | 截屏识别文字，7 个 OCR 引擎自动降级                                                 |
 | **悬浮窗口**     | 透明悬浮窗，空格截图翻译；自动刷新与全局快捷键零焦点截取，实时字幕/追番适用         |
 | **文档翻译**     | PDF / DOCX / EPUB / TXT / SRT 等 9 种格式，逐段翻译，进度可恢复                     |
-| **AI 动作**      | 长段内容一键总结；悬浮窗「理解模式」直接讲解截图内容；可导入自定义动作（需大模型源） |
+| **134 种语言**   | 覆盖谷歌翻译支持的全部语言，选择器带字母索引与常用区，可自行添加语言                 |
+| **AI 动作**      | 长段内容一键总结；悬浮窗「理解模式」与文档段落讲解；可导入自定义动作（需大模型源）   |
 | **术语库**       | 翻译后自动替换术语，支持撤销                                                        |
 | **TTS 朗读**     | 基于 Windows 离线语音引擎                                                           |
 | **10 个翻译源**  | LM Studio、Ollama、OpenAI、Claude、Gemini、DeepSeek、DeepL、Google、Microsoft、百度 |
@@ -72,9 +73,17 @@
 
 一个动作就是一份提示词配置而非代码，设置页「AI 动作」可导入自定义动作。**需要大模型翻译源**（LM Studio / Ollama / OpenAI / Claude / Gemini / DeepSeek）；只会翻译的源（DeepL / Google / Microsoft / 百度）用不了，设置页有标记。
 
+### 语言选择
+
+134 种语言，覆盖谷歌翻译支持的全部范围（每个语言码都向谷歌实测核对过）。选择器把常用语言钉在最上面，下面按字母分组，顶部索引条可点击跳转、也可按住滑动。索引跟随界面语言——中文界面按拼音（荷兰语在 H），英文界面按英文名（Dutch 在 D）。
+
+需要的语言不在列表里时，可在选择器底部自行添加：填一个名字即可，另可单独指定"发给模型的名字"（本地模型可能只认「藏语」不认 Tibetan）。这类语言不在谷歌翻译范围内，能否翻译取决于当前使用的大模型，添加前会明确说明。
+
 ### 文档翻译
 
 支持 PDF、DOCX、EPUB、TXT、Markdown、SRT、VTT、CSV、JSON 共 9 种格式。支持并发翻译、扫描件 OCR 和术语库联动。等待时间因设备性能和翻译源而异。
+
+配了大模型翻译源时，每个段落右上角可以让 AI **讲解这一段**（读的是原文，没翻译的段落也能用），结果就地展开。攒够两段后工具栏出现「整理笔记」，把已讲解的段落汇总成一份连贯笔记——它只覆盖你点开过的段落，面板上会写明这一点，不是全文摘要。
 
 <p align="center">
   <img src="docs/screenshots/document-translate.png" width="600" alt="文档翻译">

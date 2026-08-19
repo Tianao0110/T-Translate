@@ -176,7 +176,7 @@ npm start             # 实测：设置页出卡片、填 key、测试连接、�
   outputLanguage: 'target',         // target/source/ui 或语言码——模型用哪种语言回答
   history: 'attach',                // 'attach' 挂到翻译条目下；'none' 不进主历史
   trigger: {
-    surfaces: ['floating'],         // selection | screenshot | floating
+    surfaces: ['floating'],         // selection | screenshot | floating | document
     displayModes: ['unified'],      // null = 不限；散点内容通常没有总结价值
     minLength: { cjk: 150, latin: 120 },  // null = 不卡长度
     mode: 'understand',             // translate=看的一侧 / understand=懂的一侧 / any
@@ -200,6 +200,23 @@ npm start             # 实测：设置页出卡片、填 key、测试连接、�
 改完跑 `npm test`——`tests/unit/ai-actions.test.js` 覆盖触发判定与导入校验。
 
 ---
+
+## 🌐 新增语言
+
+语言目录是**一张共享表**：`src/config/languages.js`，渲染端（选择器）和主进程栈
+（提示词里的语言名）共用同一份。加一种语言：
+
+1. `LANGUAGES` 加一条 `{ code, name, nativeName, en }`
+2. 如果它的中文名首字不在 `PINYIN_INITIALS` 里，补一个字→拼音首字母的映射
+   （中文界面的字母索引靠它，缺了会静默落进 `#` 组）
+3. `npm run check:languages` —— 校验目录无重复码、具名枚举是子集、各 provider
+   映射不含目录外的语言
+4. `node scripts/verify-google-languages.mjs` —— 逐个向谷歌实际请求一次翻译，
+   报出被拒绝或原样返回的码。**别靠肉眼保证码是对的**：错的码不会抛错，只会
+   静默返回未翻译的原文。这个脚本不进 check:all（一种语言一次网络请求）
+
+传统翻译源的映射按需补：Google/微软吃 ISO 码、未映射直传；百度那套是自定义码
+（jp/kor/fra/vie），漏了会发出它不认识的码；DeepL 未映射即报"不支持"，是刻意的。
 
 ## 👁️ 新增 OCR 引擎
 

@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.3.4-green" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.3.5-green" alt="Version">
   <img src="https://img.shields.io/badge/license-T--Translate%201.0-blue" alt="License">
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform">
 </p>
@@ -29,7 +29,8 @@
 | **Screenshot OCR**           | Capture screen regions. 7 OCR engines with automatic fallback                                                                          |
 | **Floating window**          | Transparent overlay. Space-bar to capture-and-translate; auto-refresh & global-hotkey zero-focus capture for live captions / subtitles |
 | **Document translation**     | 9 formats: PDF / DOCX / EPUB / TXT / SRT / VTT / CSV / JSON / Markdown. Segment-by-segment, resumable                                  |
-| **AI actions**               | One-click summary of long passages; floating-window "understanding mode" explains a capture directly; custom actions can be imported (needs an LLM provider) |
+| **134 languages**            | Everything Google Translate supports, in a picker with a letter index and a recently-used row; more can be added by hand                |
+| **AI actions**               | One-click summary of long passages; "understanding mode" in the floating window and per-paragraph explanations in documents; custom actions can be imported (needs an LLM provider) |
 | **Glossary**                 | Auto-replace terms after translation, with undo support                                                                                |
 | **TTS**                      | Built on Windows offline speech engine                                                                                                 |
 | **10 translation providers** | LM Studio, Ollama, OpenAI, Claude, Gemini, DeepSeek, DeepL, Google, Microsoft, Baidu                                                   |
@@ -72,9 +73,17 @@ With a vision model loaded (Qwen-VL, LLaVA, and the like in LM Studio / Ollama),
 
 An action is a prompt config rather than code — custom ones can be imported from the "AI Actions" settings page. **An LLM provider is required** (LM Studio / Ollama / OpenAI / Claude / Gemini / DeepSeek); translate-only sources (DeepL / Google / Microsoft / Baidu) cannot run them and are marked as such in Settings.
 
+### Language selection
+
+134 languages — everything Google Translate supports, every code verified against Google itself. The picker pins recently used languages at the top, groups the rest by letter, and carries an index strip you can click or press-and-drag through. The index follows the interface language: 荷兰语 files under H for a Chinese reader, Dutch under D for an English one.
+
+If the language you need is not there, add it from the bottom of the picker. A name is all it takes, plus an optional separate "name to send the model" — a local model may know 藏语 and not Tibetan. Such languages are outside Google's range, so whether they translate depends on the model in use; the picker says so before you add one.
+
 ### Document translation
 
 Supports 9 formats: PDF, DOCX, EPUB, TXT, SRT, VTT, CSV, JSON, Markdown. Parallel translation, scanned-PDF OCR and glossary integration. Translation time varies by device and provider.
+
+With an LLM provider configured, each paragraph can be **explained** on request — it reads the source, so untranslated paragraphs work too — and the explanation folds open in place. After two of them the toolbar offers a consolidated note. That note covers only the paragraphs you opened, and says so: it is not a summary of the document.
 
 <p align="center">
   <img src="docs/screenshots/document-translate.png" width="600" alt="Document translation">
