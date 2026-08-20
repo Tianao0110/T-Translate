@@ -247,8 +247,12 @@ function register(ctx) {
       }
 
       // Hide self AND detached child panes before capture so we don't OCR our
-      // own translation overlays. WDA_EXCLUDEFROMCAPTURE is unreliable on some
-      // GPU/driver combos, so we still drop opacity as a fallback.
+      // own translation overlays. WDA_EXCLUDEFROMCAPTURE is applied too, but it
+      // is not guaranteed across GPU/driver combos, so opacity stays as the
+      // fallback that actually decides correctness here.
+      // (Until 2026-08-19 the affinity call never took effect at all — the HWND
+      // was being passed to koffi as a Buffer, so this fallback was the only
+      // thing working. See makeWindowInvisibleToCapture.)
       const hideForCapture = (visible) => {
         try {
           floatingWindow.setOpacity(visible ? 1 : 0);

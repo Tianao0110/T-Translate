@@ -174,7 +174,12 @@ function makeWindowInvisibleToCapture(electronWindow) {
   if (!api) return false;
 
   try {
-    const hwnd = electronWindow.getNativeWindowHandle();
+    // getNativeWindowHandle() returns a Buffer *containing* the HWND. Handing
+    // that Buffer to a koffi `void*` passes a pointer to the buffer's bytes,
+    // not the handle — Win32 then gets a bogus window and returns false every
+    // single time. Measured: IsWindow(buffer) false, IsWindow(decoded) true.
+    const handleBuffer = electronWindow.getNativeWindowHandle();
+    const hwnd = api._koffi.decode(handleBuffer, 'void*');
     const result = api.SetWindowDisplayAffinity(hwnd, api.WDA_EXCLUDEFROMCAPTURE);
 
     if (result) {

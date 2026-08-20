@@ -696,7 +696,11 @@ export async function parseDocument(file, options = {}) {
   const format = SUPPORTED_FORMATS[ext];
 
   if (!format) {
-    throw new Error(_t('docParser.unsupportedFormat', 'Unsupported file format') + `: .${ext}`);
+    // Tagged so callers can log it as the user mistake it is, rather than as a
+    // program error competing for attention in the log file.
+    const err = new Error(_t('docParser.unsupportedFormat', 'Unsupported file format') + `: .${ext}`);
+    err.code = 'UNSUPPORTED_FORMAT';
+    throw err;
   }
 
   // Whole file goes through arrayBuffer; an unbounded PDF would freeze or
@@ -793,7 +797,13 @@ export async function parseDocument(file, options = {}) {
     };
 
   } catch (error) {
-    logger.error('Error:', error);
+    // Say which file and which stage. A pdf.js rejection can carry no message
+    // at all — a bare "Error:" line leaves nothing to act on.
+    logger.error(
+      `Parse failed: ${file?.name || 'unknown file'} (${ext || 'no extension'}, `
+      + `${file?.size ?? '?'} bytes, name=${error?.name || 'Error'})`,
+      error
+    );
 
     if (error.message?.includes('password') ||
         error.name === 'PasswordException' ||

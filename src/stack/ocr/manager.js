@@ -238,7 +238,7 @@ export class OCREngineManager {
 
         // Walk-the-priority path still counts toward the vision lock threshold
         if (id === 'llm-vision' && this._isVisionUnsupportedError(result.error)) {
-          this._incrementVisionFail();
+          this._incrementVisionFail(result.error);
         }
       } catch (error) {
         logger.warn(`Engine ${id} failed:`, error.message);
@@ -282,7 +282,7 @@ export class OCREngineManager {
       return result;
     }
     if (result.visionUnsupported || this._isVisionUnsupportedError(result.error)) {
-      this._incrementVisionFail();
+      this._incrementVisionFail(result.error);
       result.visionUnsupported = true;
     }
     return result;
@@ -334,7 +334,7 @@ export class OCREngineManager {
   }
 
   async _handleVisionFallback(input, options, originalError) {
-    this._incrementVisionFail();
+    this._incrementVisionFail(originalError);
 
     logger.info(`LLM Vision failed (${this._visionFailCount}/${this._visionFailThreshold}), falling back to local chain`);
 
@@ -370,11 +370,20 @@ export class OCREngineManager {
     return lastResult || { success: false, error: _t('ocr.allEnginesFailed', 'All OCR engines failed') };
   }
 
-  _incrementVisionFail() {
+  // The reason travels with the count: locking turns the user's vision model
+  // off until they re-enable it in settings, and a log that only says "locked"
+  // leaves them with no way to find out what to fix.
+  _incrementVisionFail(reason) {
     this._visionFailCount++;
+    if (reason) this._visionLastError = String(reason);
     if (this._visionFailCount >= this._visionFailThreshold) {
       this._visionLocked = true;
-      logger.warn(`LLM Vision locked after ${this._visionFailCount} failures. User must re-enable in settings.`);
+      logger.warn(
+        `LLM Vision locked after ${this._visionFailCount} failures. `
+        + `User must re-enable in settings. Last error: ${this._visionLastError || 'unknown'}`
+      );
+    } else if (reason) {
+      logger.warn(`LLM Vision failure ${this._visionFailCount}/${this._visionFailThreshold}: ${reason}`);
     }
   }
 }

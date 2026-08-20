@@ -735,7 +735,11 @@ const DocumentTranslator = ({
         notify?.(result.error || t('documentTranslator.notify.parseFailed'), 'error');
       }
     } catch (error) {
-      logger.error('Error:', error);
+      if (error?.code === 'UNSUPPORTED_FORMAT') {
+        logger.warn(`Rejected ${file?.name}: ${error.message}`);
+      } else {
+        logger.error(`Load failed: ${file?.name || 'unknown file'}`, error);
+      }
       notify?.(error.message, 'error');
     } finally {
       setIsLoading(false);

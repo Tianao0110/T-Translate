@@ -26,6 +26,9 @@ function getUpdater() {
   // update still applies if the user quits without clicking install.
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
+  // We ship one NSIS installer and nothing else; leaving this false made
+  // electron-updater warn on every download. It becomes the default upstream.
+  autoUpdater.disableWebInstaller = true;
   autoUpdater.logger = logger;
 
   _updater = autoUpdater;
