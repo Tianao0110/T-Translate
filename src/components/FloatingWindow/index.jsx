@@ -106,7 +106,7 @@ const FloatingWindow = () => {
     hasImage: !!captureImage,
     understandMode,
   }).filter(action => action.id !== autoRunId);
-  const aiResult = ai.expandedFor(sourceText);
+  const aiResult = ai.expandedFor(sourceText, targetLanguage);
 
   const runAction = useCallback(async (action) => {
     const result = await ai.toggle(

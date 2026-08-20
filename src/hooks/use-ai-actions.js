@@ -73,10 +73,13 @@ export default function useAiActions(surface, attachResult) {
   ), [capabilities]);
 
   // What the surface should render right now, or null. Returns nothing once the
-  // window has moved on to different text.
-  const expandedFor = useCallback((sourceText) => {
+  // window has moved on to different text — or to a different reading language,
+  // since the answer was written in the one that was set at the time.
+  const expandedFor = useCallback((sourceText, targetLanguage) => {
     const entry = expandedId ? results[expandedId] : null;
-    return entry && entry.sourceText === sourceText ? entry : null;
+    if (!entry || entry.sourceText !== sourceText) return null;
+    if (targetLanguage !== undefined && entry.targetLanguage !== targetLanguage) return null;
+    return entry;
   }, [expandedId, results]);
 
   // For surfaces that share one slot between the source text and a result:
@@ -88,7 +91,11 @@ export default function useAiActions(surface, attachResult) {
   // the input of another run.
   const toggle = useCallback(async (action, context) => {
     const cached = results[action.id];
-    if (cached && cached.sourceText === context.sourceText) {
+    // Identity is the passage AND the language it was answered in. Keying on
+    // the text alone meant switching the target language kept handing back the
+    // old answer, so the summary stayed in the previous language forever.
+    if (cached && cached.sourceText === context.sourceText
+        && cached.targetLanguage === context.targetLanguage) {
       setExpandedId(expandedId === action.id ? null : action.id);
       return { success: true, content: cached.content };
     }
@@ -103,6 +110,7 @@ export default function useAiActions(surface, attachResult) {
             actionId: action.id,
             label: resolveActionLabel(action, i18n.language || 'zh'),
             sourceText: context.sourceText,
+            targetLanguage: context.targetLanguage,
             content: result.content,
             path: result.path,
             provider: result.provider || '',

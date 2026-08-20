@@ -138,7 +138,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     hasImage: !!captureImage,
   });
 
-  const aiResult = ai.expandedFor(currentTranslation.sourceText);
+  const aiResult = ai.expandedFor(currentTranslation.sourceText, currentTranslation.targetLanguage);
 
   const runAiActionFromPanel = useCallback(async (action) => {
     const result = await ai.toggle(

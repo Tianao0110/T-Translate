@@ -288,6 +288,32 @@ describe('buildActionMessages', () => {
     const textOnly = { ...summarize, visionPrompts: null };
     expect(buildActionMessages(textOnly, context, 'zh', 'vision')).toBeNull();
   });
+
+  // The language names used to come from the i18n `languages.*` bundle, which
+  // only ever held 16 entries. Every other target reached the model as a bare
+  // code — "写总结" in "it" — and models answered in English instead.
+  describe('naming the output language', () => {
+    const named = (targetLanguage, uiLang = 'zh') =>
+      buildActionMessages(summarize, { ...context, targetLanguage }, uiLang)[0].content;
+
+    it('names a language outside the old 16-entry table', () => {
+      expect(named('it')).toContain('意大利语');
+      expect(named('uk')).toContain('乌克兰语');
+      expect(named('it', 'en')).toContain('Italian');
+    });
+
+    it('never leaves a bare language code in the prompt', () => {
+      for (const code of ['it', 'uk', 'sw', 'ta', 'ne']) {
+        expect(named(code)).not.toMatch(new RegExp(`用\\s*${code}\\b`));
+      }
+    });
+
+    it('passes an unknown code through verbatim — a custom language IS its name', () => {
+      // config/custom-languages.js stores the model-facing name as the code.
+      expect(named('藏语')).toContain('藏语');
+      expect(named('Lojban')).toContain('Lojban');
+    });
+  });
 });
 
 describe('resolveActionLabel', () => {

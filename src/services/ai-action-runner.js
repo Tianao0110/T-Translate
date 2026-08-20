@@ -7,6 +7,7 @@
 
 import translationService from './stack-client.js';
 import { AI_ACTION_VARS } from '@config/ai-actions';
+import { LANGUAGES } from '@config/languages';
 import { detectLanguage } from '../utils/text.js';
 import createLogger from '../utils/logger.js';
 import i18n from '../i18n.js';
@@ -102,19 +103,25 @@ export function renderTemplate(template, vars = {}) {
 
 // Pinned to the prompt's language rather than i18n's current one, so a prompt
 // never mixes an English language name into its Chinese wrapper.
+const LANGUAGE_BY_CODE = new Map(LANGUAGES.map((l) => [l.code, l]));
+
+// The name the model is told to answer in. This reads the shared 134-language
+// catalogue, not i18n: the `languages.*` bundle only ever held 16 entries, so
+// every other target reached the prompt as a bare code ("write the summary in
+// it") and models answered in English instead.
+//
+// An unknown code is returned verbatim on purpose — a user-added language
+// stores the model-facing name AS its code (see config/custom-languages.js).
 function languageName(code, lang) {
-  try {
-    const r = i18n.t(`languages.${code}`, { lng: lang });
-    return r === `languages.${code}` ? code : r;
-  } catch {
-    return code;
-  }
+  const entry = LANGUAGE_BY_CODE.get(code);
+  if (!entry) return code;
+  return lang === 'en' ? entry.en : entry.name;
 }
 
 // Which language the model answers in. The model always reads the source side
 // (translating symbols/formulas first would damage the meaning), so this only
 // controls the output.
-function resolveOutputLanguage(action, context, uiLang) {
+export function resolveOutputLanguage(action, context, uiLang) {
   const spec = action.outputLanguage || 'target';
   if (spec === 'ui') return uiLang;
   if (spec === 'source') {

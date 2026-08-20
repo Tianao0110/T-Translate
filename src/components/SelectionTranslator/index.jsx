@@ -704,7 +704,8 @@ const SelectionTranslator = () => {
   }, []);
   const ai = useAiActions('selection', attachAiResultFromCard);
   const aiActions = ai.availableActions({ displayMode: 'unified', text: sourceText });
-  const aiResult = ai.expandedFor(sourceText);
+  const aiTargetLanguage = translation.targetLanguage || 'zh';
+  const aiResult = ai.expandedFor(sourceText, aiTargetLanguage);
 
   // The source text and every AI result share one panel above the translation:
   // opening either closes the other, so the card only ever grows by one block
@@ -724,7 +725,11 @@ const SelectionTranslator = () => {
         sourceText,
         translatedText,
         sourceLanguage: lastResolvedLangsRef.current.sourceLanguage,
-        targetLanguage: lastResolvedLangsRef.current.targetLanguage,
+        // The configured target, not the resolved one. lastResolvedLangs holds
+        // the post-same-language-swap value, which history and TTS want but a
+        // summary does not: selecting Chinese with "swap back" on flips that
+        // field to English, and the summary came back in English too.
+        targetLanguage: aiTargetLanguage,
       }
     );
     if (!result.success) setNotice(result.error);

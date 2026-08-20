@@ -44,6 +44,45 @@ describe('AI action toggle', () => {
       .toMatchObject({ actionId: 'summarize', content: 'three points' });
   });
 
+  // A summary is written IN a language, so the language is part of what
+  // identifies it. Keying on the passage alone meant that once a summary came
+  // back in the wrong language, switching the target kept handing back that
+  // same answer — the summary stayed wrong forever.
+  describe('the reading language is part of the result identity', () => {
+    it('re-runs when the target language changed', async () => {
+      const { result } = renderHook(() => useAiActions('selection'));
+
+      await act(async () => { await result.current.toggle(summarize, context); });
+      runAiAction.mockResolvedValue({ success: true, content: '三点要点', path: 'text' });
+      await act(async () => {
+        await result.current.toggle(summarize, { ...context, targetLanguage: 'ja' });
+      });
+
+      expect(runAiAction).toHaveBeenCalledTimes(2);
+      expect(result.current.expandedFor('a long passage', 'ja'))
+        .toMatchObject({ content: '三点要点' });
+    });
+
+    it('stops showing an answer written for the previous language', async () => {
+      const { result } = renderHook(() => useAiActions('selection'));
+
+      await act(async () => { await result.current.toggle(summarize, context); });
+
+      expect(result.current.expandedFor('a long passage', 'zh')).toBeTruthy();
+      expect(result.current.expandedFor('a long passage', 'ja')).toBeNull();
+    });
+
+    it('still folds on a repeat click when nothing changed', async () => {
+      const { result } = renderHook(() => useAiActions('selection'));
+
+      await act(async () => { await result.current.toggle(summarize, context); });
+      await act(async () => { await result.current.toggle(summarize, context); });
+
+      expect(runAiAction).toHaveBeenCalledTimes(1);
+      expect(result.current.expandedFor('a long passage', 'zh')).toBeNull();
+    });
+  });
+
   it('collapses on demand, so the shared panel can hand the slot to the source text', async () => {
     const { result } = renderHook(() => useAiActions('selection'));
 
