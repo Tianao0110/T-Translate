@@ -6,7 +6,7 @@ import {
   Loader, ArrowUp, FileDown,
   SkipForward, RefreshCw, Zap, Lock, Key,
   Database, BookOpen, BarChart3,
-  Edit3, Check, Copy, Search, Rows2, Columns2, Lightbulb, ClipboardList
+  Edit3, Check, Copy, Search, Rows2, Columns2, Lightbulb, ClipboardList, Sparkles
 } from 'lucide-react';
 import createLogger from '../../utils/logger.js';
 import {
@@ -24,6 +24,7 @@ import useTranslationStore from '../../stores/translation-store';
 import { LANGUAGES, PRIVACY_MODES } from '../../config/constants.js';
 import useVisibleHotkey from '../../hooks/use-visible-hotkey.js';
 import LanguagePicker from '../shared/LanguagePicker.jsx';
+import { useConfirm } from '../shared/ConfirmDialog.jsx';
 import useAiActions from '../../hooks/use-ai-actions.js';
 import useSegmentNotes from '../../hooks/use-segment-notes.js';
 import { runAiAction } from '../../services/ai-action-runner.js';
@@ -320,6 +321,7 @@ const DocumentTranslator = ({
   targetLang: initialTargetLang = 'zh',
 }) => {
   const { t } = useTranslation();
+  const [confirm, confirmDialog] = useConfirm();
   
   // Document-translator keeps its own language state, seeded from the
   // main UI but free to diverge.
@@ -359,11 +361,14 @@ const DocumentTranslator = ({
     [notify, t]
   );
   const {
-    notes: aiNotes, folded: foldedNotes, runningId: aiRunningId,
-    explain: explainSegment, reset: resetNotes,
+    notes: aiNotes, folded: foldedNotes, runningId: aiRunningId, batch: aiBatch,
+    explain: explainSegment, explainAll, stopBatch, reset: resetNotes,
   } = useSegmentNotes({ capabilities, sourceLang, targetLang, onError: noteError });
   const [digest, setDigest] = useState(null);
   const [digestRunning, setDigestRunning] = useState(false);
+  // True once the notes the digest was built from covered the whole document —
+  // the panel must not keep saying "only the paragraphs you opened" when it did.
+  const [digestWholeDoc, setDigestWholeDoc] = useState(false);
 
   // The document surface has no understanding switch — asking about a
   // paragraph IS the request, so it opts in on the action's behalf.
@@ -374,14 +379,24 @@ const DocumentTranslator = ({
   const canExplain = documentActions.some((a) => a.id === 'explain');
   const noteCount = Object.keys(aiNotes).length;
 
-  const runDigest = useCallback(async () => {
+  // Paragraphs an explanation could be built from. Skipped ones were filtered
+  // out of translation (page numbers, code blocks) and have nothing to explain.
+  const explainable = useMemo(
+    () => segments.filter((s) => s.status !== STATUS.SKIPPED && String(s.original || '').trim()),
+    [segments]
+  );
+
+  // notesOverride: the batch pass hands its own result in, because its notes
+  // have not reached this closure through state yet.
+  const runDigest = useCallback(async (wholeDoc = false, notesOverride = null) => {
     const action = getAiAction('digest');
     if (!action || digestRunning) return;
+    const source = notesOverride || aiNotes;
     // Document order, not the order they were opened — a note reads as a walk
     // through the document.
     const ordered = segments
-      .filter((seg) => aiNotes[seg.id])
-      .map((seg, i) => `${i + 1}. ${aiNotes[seg.id]}`)
+      .filter((seg) => source[seg.id])
+      .map((seg, i) => `${i + 1}. ${source[seg.id]}`)
       .join('\n\n');
     if (!ordered) return;
 
@@ -393,12 +408,41 @@ const DocumentTranslator = ({
         targetLanguage: targetLang,
         capabilities,
       });
-      if (result.success) setDigest(result.content);
-      else notify(result.error || t('aiActions.failed'), 'error');
+      if (result.success) {
+        setDigest(result.content);
+        setDigestWholeDoc(wholeDoc);
+      } else notify(result.error || t('aiActions.failed'), 'error');
     } finally {
       setDigestRunning(false);
     }
   }, [digestRunning, segments, aiNotes, sourceLang, targetLang, capabilities, notify, t]);
+
+  // One button for the whole thing: explain every paragraph, then summarize
+  // those explanations. The per-paragraph pass is what makes the summary
+  // affordable — the model never sees the full document at once.
+  const summarizeDocument = useCallback(async () => {
+    const todo = explainable.filter((s) => !aiNotes[s.id]).length;
+    if (todo > 0) {
+      const ok = await confirm(
+        t('documentTranslator.summarizeAllConfirm', { count: todo }),
+        { danger: false }
+      );
+      if (!ok) return;
+    }
+
+    const outcome = await explainAll(explainable, { concurrency });
+    if (!outcome) return;
+
+    const covered = explainable.filter((s) => outcome.notes[s.id]).length;
+    if (covered === 0) return;
+    if (covered < explainable.length) {
+      notify(t('documentTranslator.summarizeAllPartial', {
+        done: covered, total: explainable.length,
+      }), 'warning');
+    }
+
+    await runDigest(covered === explainable.length, outcome.notes);
+  }, [explainable, explainAll, concurrency, confirm, runDigest, notify, t]);
 
   const [isLoading, setIsLoading] = useState(false);
   // { page, total, ocr } during PDF parse — OCR pages are slow enough to need feedback.
@@ -1242,6 +1286,32 @@ const DocumentTranslator = ({
                 </button>
               )}
 
+              {/* One button for the whole document: explain every paragraph,
+                  then summarize those explanations. */}
+              {canExplain && explainable.length > 0 && (
+                aiBatch ? (
+                  <button
+                    className="dt-btn dt-batch-stop"
+                    onClick={stopBatch}
+                    title={t('documentTranslator.summarizeAllStop')}
+                  >
+                    <Loader size={16} className="spinning" />
+                    <span>{aiBatch.done}/{aiBatch.total}</span>
+                    <X size={14} />
+                  </button>
+                ) : (
+                  <button
+                    className="dt-btn"
+                    onClick={summarizeDocument}
+                    disabled={digestRunning}
+                    title={t('documentTranslator.summarizeAllHint')}
+                  >
+                    {digestRunning ? <Loader size={16} className="spinning" /> : <Sparkles size={16} />}
+                    <span>{t('documentTranslator.summarizeAll')}</span>
+                  </button>
+                )
+              )}
+
               {/* Search toggle */}
               <button 
                 className={`dt-btn icon-only ${showSearch ? 'active' : ''}`}
@@ -1497,7 +1567,9 @@ const DocumentTranslator = ({
                       {/* Say plainly what this covers — it is a note on the
                           paragraphs the reader opened, not on the document. */}
                       <span className="dt-digest-scope">
-                        {t('documentTranslator.digestScope', { count: noteCount })}
+                        {digestWholeDoc
+                          ? t('documentTranslator.digestScopeAll', { count: noteCount })
+                          : t('documentTranslator.digestScope', { count: noteCount })}
                       </span>
                       <button className="dt-digest-close" onClick={() => setDigest(null)}>
                         <X size={13} />
@@ -1739,6 +1811,8 @@ const DocumentTranslator = ({
           </div>
         </div>
       )}
+
+      {confirmDialog}
     </div>
   );
 };

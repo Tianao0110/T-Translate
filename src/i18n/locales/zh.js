@@ -537,6 +537,12 @@ const zh = {
     targetLang: "目标语言",
     digestHint: "把已讲解的段落整理成一份笔记",
     digestScope: "基于已讲解的 {{count}} 段，不代表全文",
+    digestScopeAll: "覆盖全文 {{count}} 个段落",
+    summarizeAll: "一键总结",
+    summarizeAllHint: "先逐段讲解全文，再汇总成总结",
+    summarizeAllConfirm: "将逐段讲解 {{count}} 个段落，再汇总成全文总结。\n\n这会向模型发起 {{count}} 次请求，长文档可能需要几分钟；在线 API 会按用量计费。过程中可以随时停止，已完成的讲解会保留。",
+    summarizeAllStop: "停止（已完成的讲解会保留）",
+    summarizeAllPartial: "有段落没讲解成功，总结只覆盖了 {{done}}/{{total}} 段",
     newDocument: "清空",
     formats: {
       "纯文本": "纯文本", "Markdown": "Markdown", "SRT 字幕": "SRT 字幕", "WebVTT 字幕": "WebVTT 字幕",

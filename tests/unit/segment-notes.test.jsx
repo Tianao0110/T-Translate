@@ -90,6 +90,124 @@ describe('document segment notes', () => {
     expect(result.current.runningId).toBeNull();
   });
 
+  describe('explainAll — the one-button pass over a document', () => {
+    const doc = [seg(0, 'first'), seg(1, 'second'), seg(2, 'third')];
+
+    it('explains every paragraph that has no note yet', async () => {
+      const { result } = renderHook(() => useSegmentNotes(options));
+
+      let outcome;
+      await act(async () => { outcome = await result.current.explainAll(doc); });
+
+      expect(runAiAction).toHaveBeenCalledTimes(3);
+      expect(outcome).toMatchObject({ done: 3, failed: 0, stopped: false });
+      expect(Object.keys(result.current.notes)).toHaveLength(3);
+    });
+
+    it('does not pay again for paragraphs already explained', async () => {
+      const { result } = renderHook(() => useSegmentNotes(options));
+
+      await act(async () => { await result.current.explain(doc[1]); });
+      runAiAction.mockClear();
+      await act(async () => { await result.current.explainAll(doc); });
+
+      expect(runAiAction).toHaveBeenCalledTimes(2);
+    });
+
+    it('skips paragraphs with no text', async () => {
+      const { result } = renderHook(() => useSegmentNotes(options));
+
+      let outcome;
+      await act(async () => {
+        outcome = await result.current.explainAll([seg(0, 'real'), seg(1, '   '), seg(2, '')]);
+      });
+
+      expect(runAiAction).toHaveBeenCalledTimes(1);
+      expect(outcome.skipped).toBe(2);
+    });
+
+    // The caller's next step is to summarize these notes, and React state has
+    // not reached its closure yet — so the batch hands them back directly.
+    it('returns the finished notes, not just the counts', async () => {
+      const { result } = renderHook(() => useSegmentNotes(options));
+
+      let outcome;
+      await act(async () => { outcome = await result.current.explainAll(doc); });
+
+      expect(outcome.notes[0]).toBe('这段在说自注意力');
+      expect(Object.keys(outcome.notes)).toHaveLength(3);
+    });
+
+    it('gives up once the provider has failed three times running', async () => {
+      runAiAction.mockResolvedValue({ success: false, error: '没有可用的大模型翻译源' });
+      const onError = vi.fn();
+      const { result } = renderHook(() => useSegmentNotes({ ...options, onError }));
+      const long = Array.from({ length: 40 }, (_, i) => seg(i, `p${i}`));
+
+      let outcome;
+      await act(async () => { outcome = await result.current.explainAll(long, { concurrency: 1 }); });
+
+      expect(runAiAction).toHaveBeenCalledTimes(3);
+      expect(outcome).toMatchObject({ done: 0, failed: 3, stopped: true });
+      // One report for the batch, not one per paragraph.
+      expect(onError).toHaveBeenCalledTimes(1);
+    });
+
+    it('reports progress while it runs and clears it after', async () => {
+      const seen = [];
+      let release;
+      runAiAction.mockImplementation(() => new Promise((r) => { release = r; }));
+      const { result } = renderHook(() => useSegmentNotes(options));
+
+      let pending;
+      act(() => { pending = result.current.explainAll(doc, { concurrency: 1 }); });
+      seen.push(result.current.batch);
+
+      await act(async () => {
+        for (let i = 0; i < 3; i++) {
+          release({ success: true, content: 'x' });
+          await Promise.resolve();
+          await Promise.resolve();
+        }
+        await pending;
+      });
+
+      expect(seen[0]).toEqual({ done: 0, total: 3 });
+      expect(result.current.batch).toBeNull();
+    });
+
+    it('stops on request and keeps what it already has', async () => {
+      const { result } = renderHook(() => useSegmentNotes(options));
+      const long = Array.from({ length: 20 }, (_, i) => seg(i, `p${i}`));
+
+      runAiAction.mockImplementation(async () => {
+        result.current.stopBatch();
+        return { success: true, content: 'note' };
+      });
+
+      let outcome;
+      await act(async () => { outcome = await result.current.explainAll(long, { concurrency: 1 }); });
+
+      expect(outcome.stopped).toBe(true);
+      expect(outcome.done).toBe(1);
+      expect(result.current.notes[0]).toBe('note');
+    });
+
+    it('refuses to start while a single explanation is in flight', async () => {
+      let release;
+      runAiAction.mockReturnValue(new Promise((r) => { release = r; }));
+      const { result } = renderHook(() => useSegmentNotes(options));
+
+      let single;
+      act(() => { single = result.current.explain(doc[0]); });
+      let outcome;
+      await act(async () => { outcome = await result.current.explainAll(doc); });
+
+      expect(outcome).toBeNull();
+      await act(async () => { release({ success: true, content: 'x' }); await single; });
+    });
+  });
+
   it('ignores a click while another paragraph is still running', async () => {
     let release;
     runAiAction.mockReturnValue(new Promise((r) => { release = r; }));

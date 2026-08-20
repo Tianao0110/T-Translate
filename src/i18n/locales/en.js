@@ -537,6 +537,12 @@ const en = {
     targetLang: "Target Language",
     digestHint: "Organise the paragraphs you have explained into one note",
     digestScope: "from the {{count}} paragraphs you explained — not the whole document",
+    digestScopeAll: "covering all {{count}} paragraphs of the document",
+    summarizeAll: "Summarize document",
+    summarizeAllHint: "Explain every paragraph, then summarize those explanations",
+    summarizeAllConfirm: "This will explain {{count}} paragraphs one by one, then summarize them into one document summary.\n\nThat is {{count}} requests to the model — minutes for a long document, and metered usage on a paid API. You can stop at any point; explanations already finished are kept.",
+    summarizeAllStop: "Stop (finished explanations are kept)",
+    summarizeAllPartial: "Some paragraphs could not be explained — the summary covers {{done}}/{{total}}",
     newDocument: "Clear",
     formats: {
       "纯文本": "Plain Text", "Markdown": "Markdown", "SRT 字幕": "SRT Subtitle", "WebVTT 字幕": "WebVTT Subtitle",
