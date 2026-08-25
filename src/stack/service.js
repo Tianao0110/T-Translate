@@ -16,6 +16,7 @@
 //
 // Call graph: renderer stack-client -> IPC facade -> this -> Providers
 
+import { applyGlossary } from './glossary.js';
 import { _t } from './i18n.js';
 import createLogger from './logger.js';
 
@@ -236,33 +237,15 @@ export class TranslationService {
     return result;
   }
 
-  // Glossary applied to the *translated* text — for cases where the LLM left
-  // a source term as-is. Longer terms first so "API" doesn't pre-empt "API Key".
+  // Kept as a thin method so call sites read the same; the logic is shared
+  // with the renderer, which re-applies the glossary to documents translated
+  // before a term existed.
   _applyGlossary(translatedText, glossaryTerms) {
-    if (!translatedText || !glossaryTerms || glossaryTerms.length === 0) {
-      return { text: translatedText, replacements: [] };
+    const result = applyGlossary(translatedText, glossaryTerms);
+    for (const r of result.replacements) {
+      logger.debug(`Glossary replaced: "${r.from}" → "${r.to}"`);
     }
-
-    let result = translatedText;
-    const replacements = [];
-
-    const sorted = [...glossaryTerms].sort((a, b) => b.source.length - a.source.length);
-
-    for (const term of sorted) {
-      if (!term.source || !term.target) continue;
-      if (term.source.length < 2) continue;
-
-      const sourceEscaped = term.source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const sourceRegex = new RegExp(sourceEscaped, 'gi');
-
-      if (sourceRegex.test(result)) {
-        result = result.replace(sourceRegex, term.target);
-        replacements.push({ from: term.source, to: term.target });
-        logger.debug(`Glossary replaced: "${term.source}" → "${term.target}"`);
-      }
-    }
-
-    return { text: result, replacements };
+    return result;
   }
 
   // ===== Two-level cache =====

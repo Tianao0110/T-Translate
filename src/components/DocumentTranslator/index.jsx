@@ -6,7 +6,7 @@ import {
   Loader, ArrowUp, FileDown,
   SkipForward, RefreshCw, Zap, Lock, Key,
   Database, BookOpen, BarChart3,
-  Edit3, Check, Copy, Search, Rows2, Columns2, Lightbulb, ClipboardList, Sparkles
+  Edit3, Check, Copy, Search, Rows2, Columns2, Lightbulb, ClipboardList, Sparkles, BookMarked
 } from 'lucide-react';
 import createLogger from '../../utils/logger.js';
 import {
@@ -25,6 +25,7 @@ import { LANGUAGES, PRIVACY_MODES } from '../../config/constants.js';
 import useVisibleHotkey from '../../hooks/use-visible-hotkey.js';
 import LanguagePicker from '../shared/LanguagePicker.jsx';
 import { useConfirm } from '../shared/ConfirmDialog.jsx';
+import { scanDocumentTerms } from '../../utils/term-consistency.js';
 import useAiActions from '../../hooks/use-ai-actions.js';
 import useSegmentNotes from '../../hooks/use-segment-notes.js';
 import { runAiAction } from '../../services/ai-action-runner.js';
@@ -350,6 +351,33 @@ const DocumentTranslator = ({
   const [document, setDocument] = useState(null);
   const [segments, setSegments] = useState([]);
 
+  const [isLoading, setIsLoading] = useState(false);
+  // { page, total, ocr } during PDF parse — OCR pages are slow enough to need feedback.
+  const [parseProgress, setParseProgress] = useState(null);
+  
+  // Fingerprint used to key progress in localStorage.
+  const fileFingerprint = useRef(null);
+  
+  // Outline navigation
+  const [outline, setOutline] = useState([]);
+  
+  // In-memory translation memory for this session.
+  const translationCache = useRef(new Map());
+  
+  // Translation lifecycle flags
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const pauseRef = useRef(false);
+  const abortRef = useRef(false);
+  
+  const [parallelMode, setParallelMode] = useState(true);
+  // Wired to settings.document.concurrency in loadDocumentSettings below.
+  const [concurrency, setConcurrency] = useState(2);
+  const [useGlossary, setUseGlossary] = useState(true);
+  
+  const getGlossaryTerms = useTranslationStore(state => state.getGlossaryTerms);
+  const translationMode = useTranslationStore(state => state.translationMode);
+
   // ===== AI actions on a document =====
   //
   // The shared hook is built around one active passage, so only the capability
@@ -369,6 +397,8 @@ const DocumentTranslator = ({
   // True once the notes the digest was built from covered the whole document —
   // the panel must not keep saying "only the paragraphs you opened" when it did.
   const [digestWholeDoc, setDigestWholeDoc] = useState(false);
+  // { fixable, review, checked, applied } from the glossary pass, or null.
+  const [termReport, setTermReport] = useState(null);
 
   // The document surface has no understanding switch — asking about a
   // paragraph IS the request, so it opts in on the action's behalf.
@@ -444,32 +474,35 @@ const DocumentTranslator = ({
     await runDigest(covered === explainable.length, outcome.notes);
   }, [explainable, explainAll, concurrency, confirm, runDigest, notify, t]);
 
-  const [isLoading, setIsLoading] = useState(false);
-  // { page, total, ocr } during PDF parse — OCR pages are slow enough to need feedback.
-  const [parseProgress, setParseProgress] = useState(null);
-  
-  // Fingerprint used to key progress in localStorage.
-  const fileFingerprint = useRef(null);
-  
-  // Outline navigation
-  const [outline, setOutline] = useState([]);
-  
-  // In-memory translation memory for this session.
-  const translationCache = useRef(new Map());
-  
-  // Translation lifecycle flags
-  const [isTranslating, setIsTranslating] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-  const pauseRef = useRef(false);
-  const abortRef = useRef(false);
-  
-  const [parallelMode, setParallelMode] = useState(true);
-  // Wired to settings.document.concurrency in loadDocumentSettings below.
-  const [concurrency, setConcurrency] = useState(2);
-  const [useGlossary, setUseGlossary] = useState(true);
-  
-  const getGlossaryTerms = useTranslationStore(state => state.getGlossaryTerms);
-  const translationMode = useTranslationStore(state => state.translationMode);
+  // ===== Glossary consistency =====
+  //
+  // The glossary is applied as each paragraph is translated, so a finished
+  // document drifts only when a term was added afterwards, when the switch was
+  // off, or when the model rendered a term as some other word. The first two
+  // are fixable here without asking anything; the third is reported, never
+  // guessed at. See utils/term-consistency.js.
+  const runTermCheck = useCallback(() => {
+    const report = scanDocumentTerms(segments, getGlossaryTerms());
+    setTermReport({ ...report, applied: false });
+    if (!report.fixable.length && !report.review.length) {
+      notify?.(t('documentTranslator.terms.allConsistent'), 'success');
+    }
+  }, [segments, getGlossaryTerms, notify, t]);
+
+  const applyTermFixes = useCallback(() => {
+    if (!termReport?.fixable.length) return;
+    const byId = new Map(termReport.fixable.map((f) => [f.segmentId, f.after]));
+    setSegments((prev) => prev.map((s) => (byId.has(s.id) ? { ...s, translated: byId.get(s.id) } : s)));
+    setTermReport((prev) => ({ ...prev, applied: true }));
+    notify?.(t('documentTranslator.terms.applied', { count: termReport.fixable.length }), 'success');
+  }, [termReport, notify, t]);
+
+  const undoTermFixes = useCallback(() => {
+    if (!termReport?.applied) return;
+    const byId = new Map(termReport.fixable.map((f) => [f.segmentId, f.before]));
+    setSegments((prev) => prev.map((s) => (byId.has(s.id) ? { ...s, translated: byId.get(s.id) } : s)));
+    setTermReport((prev) => ({ ...prev, applied: false }));
+  }, [termReport]);
 
   // privacyMode/useCache no longer travel from here — the main-process stack
   // facade injects the live mode into every request (renderer values are
