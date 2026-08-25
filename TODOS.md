@@ -80,10 +80,16 @@ v0.3.4 给 Windows OCR / Azure / Google Vision / OCR.space / 百度 五个引擎
 - **可以扩到 240+**：谷歌 2024 年又加了 110 种（含藏语、粤语等）。核对脚本 `scripts/verify-google-languages.mjs` 现成，跑一轮就知道哪些码可用；未做是因为那批低资源语言翻译质量参差，等有人提再说
 - **模型语言表只有五条**（Llama 3.x / Qwen 2-3 / NLLB / MADLAD / Opus-MT，见 `config/model-language-coverage.js`）。故意不求全——缺条目零代价，只在降级链排序上生效、绝不进 UI。Mistral、Gemma、Phi 跨版本语言覆盖差异太大，写进去准确度不如不写
 - **选择器没有搜索框**：设计上靠字母索引，134 种够用；真扩到 240+ 时要重新评估
-- ⚠️ **暂时性死区已犯两次**（DocumentTranslator 里 customLanguages 与 segments 各一次）：
-  useCallback 的依赖数组在渲染期求值，声明顺序是硬要求，而 eslint 默认不管。量过开
-  `no-use-before-define` 的代价——20 处命中且绝大多数是回调体内引用后定义的函数
-  （运行时无害），规则区分不了，改造收益不抵风险。**改大组件时人工留意这一条**
+- ⚠️ **暂时性死区已犯三次**，第三次（一键总结的 concurrency）**漏进了 main**。
+  "人工留意"这个缓解手段就此作废——留意的人是我，照样漏。现在的防线是
+  `tests/unit/document-translator-mount.test.jsx`：把组件挂载一次。已验证它对着
+  崩溃版本会红。**它只覆盖必然求值的那部分**（组件体顶层、依赖数组），条件分支里
+  的错误照样漏——所以其他大组件也该各加一个挂载冒烟测试，尤其 FloatingWindow、
+  SelectionTranslator、SettingsPanel
+- **`no-use-before-define` 现状**：开 `{variables:true, functions:false}` 还剩 20 处
+  命中，分布在 6 个组件 + 2 个工具文件，**全部是回调体内的调用期引用（运行时无害）**，
+  危险的渲染期引用已清零。要开成 error 得先把这 20 处重排，风险在于 FloatingWindow
+  那几处涉及 useState 声明位置。**没做，等哪次动那些文件时顺手**
 
 ### ~~绿色便携化（数据不落 APPDATA）~~ 已评估，暂不做（2026-08-10 用户拍板）
 

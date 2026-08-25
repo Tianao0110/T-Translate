@@ -8,6 +8,9 @@
 // term. Finding those needs alignment, which is what the document's term-drift
 // pass uses a model for.
 
+// Single-character terms match far too much to be worth replacing.
+export const MIN_TERM_LENGTH = 2;
+
 /**
  * @param {string} translatedText
  * @param {Array<{source: string, target: string}>} glossaryTerms
@@ -39,9 +42,6 @@ export function applyGlossary(translatedText, glossaryTerms) {
 
   return { text: result, replacements };
 }
-
-// Single-character terms match far too much to be worth replacing.
-export const MIN_TERM_LENGTH = 2;
 
 export function isUsableTerm(term) {
   return !!term?.source && !!term?.target && term.source.length >= MIN_TERM_LENGTH;
