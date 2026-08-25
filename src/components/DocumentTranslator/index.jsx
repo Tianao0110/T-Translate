@@ -376,6 +376,11 @@ const DocumentTranslator = ({
   const [useGlossary, setUseGlossary] = useState(true);
   
   const getGlossaryTerms = useTranslationStore(state => state.getGlossaryTerms);
+  // Scalar selector: only the count decides whether the check is offered, and
+  // returning the array itself would hand back a new one on every render.
+  const glossaryCount = useTranslationStore(
+    state => state.favorites.filter(f => f.folderId === 'glossary').length
+  );
   const translationMode = useTranslationStore(state => state.translationMode);
 
   // ===== AI actions on a document =====
@@ -1349,6 +1354,19 @@ const DocumentTranslator = ({
                 )
               )}
 
+              {/* Glossary consistency — no model involved, so it is offered
+                  whenever there are terms and something translated to check. */}
+              {glossaryCount > 0 && stats.completed > 0 && (
+                <button
+                  className="dt-btn"
+                  onClick={runTermCheck}
+                  title={t('documentTranslator.terms.hint')}
+                >
+                  <BookMarked size={16} />
+                  <span>{t('documentTranslator.terms.check')}</span>
+                </button>
+              )}
+
               {/* Search toggle */}
               <button 
                 className={`dt-btn icon-only ${showSearch ? 'active' : ''}`}
@@ -1613,6 +1631,66 @@ const DocumentTranslator = ({
                       </button>
                     </div>
                     <div className="dt-digest-body">{digest}</div>
+                  </div>
+                )}
+
+                {termReport && (termReport.fixable.length > 0 || termReport.review.length > 0) && (
+                  <div className="dt-digest dt-terms">
+                    <div className="dt-digest-head">
+                      <BookMarked size={13} />
+                      <span>{t('documentTranslator.terms.check')}</span>
+                      <span className="dt-digest-scope">
+                        {t('documentTranslator.terms.scanned', { count: termReport.checked })}
+                      </span>
+                      <button className="dt-digest-close" onClick={() => setTermReport(null)}>
+                        <X size={13} />
+                      </button>
+                    </div>
+                    <div className="dt-digest-body">
+                      {termReport.fixable.length > 0 && (
+                        <div className="dt-term-row">
+                          <span>
+                            {termReport.applied
+                              ? t('documentTranslator.terms.applied', { count: termReport.fixable.length })
+                              : t('documentTranslator.terms.fixable', { count: termReport.fixable.length })}
+                          </span>
+                          <button
+                            className="dt-term-action"
+                            onClick={termReport.applied ? undoTermFixes : applyTermFixes}
+                          >
+                            {termReport.applied
+                              ? t('documentTranslator.terms.undo')
+                              : t('documentTranslator.terms.apply')}
+                          </button>
+                        </div>
+                      )}
+
+                      {termReport.review.length > 0 && (
+                        <>
+                          {/* Deliberately not offered as a one-click fix: the
+                              paragraph rendered the term as *something*, and
+                              nothing says which words those were. */}
+                          <div className="dt-term-note">
+                            {t('documentTranslator.terms.reviewHint', { count: termReport.review.length })}
+                          </div>
+                          <ul className="dt-term-list">
+                            {termReport.review.map((item, i) => (
+                              <li key={`${item.segmentId}-${item.source}-${i}`}>
+                                <button
+                                  className="dt-term-jump"
+                                  onClick={() => scrollToSegment(item.segmentId)}
+                                >
+                                  #{item.segmentId + 1}
+                                </button>
+                                <span className="dt-term-pair">
+                                  {item.source} <span className="dt-term-arrow">→</span> {item.canonical}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </>
+                      )}
+                    </div>
                   </div>
                 )}
 

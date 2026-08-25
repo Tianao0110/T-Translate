@@ -543,6 +543,17 @@ const zh = {
     summarizeAllConfirm: "将逐段讲解 {{count}} 个段落，再汇总成全文总结。\n\n这会向模型发起 {{count}} 次请求，长文档可能需要几分钟；在线 API 会按用量计费。过程中可以随时停止，已完成的讲解会保留。",
     summarizeAllStop: "停止（已完成的讲解会保留）",
     summarizeAllPartial: "有段落没讲解成功，总结只覆盖了 {{done}}/{{total}} 段",
+    terms: {
+      check: "术语检查",
+      hint: "对照术语库检查全文用词是否一致，不调用模型",
+      scanned: "扫描了含术语的 {{count}} 段",
+      allConsistent: "全文用词与术语库一致",
+      fixable: "{{count}} 处术语没翻译，可直接替换",
+      apply: "替换",
+      applied: "已替换 {{count}} 处",
+      undo: "撤销",
+      reviewHint: "另有 {{count}} 处译成了别的词，需要你看一眼——原文里有这个术语，但译文里找不到规范译法，也没有可替换的原词",
+    },
     newDocument: "清空",
     formats: {
       "纯文本": "纯文本", "Markdown": "Markdown", "SRT 字幕": "SRT 字幕", "WebVTT 字幕": "WebVTT 字幕",

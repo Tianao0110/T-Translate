@@ -543,6 +543,17 @@ const en = {
     summarizeAllConfirm: "This will explain {{count}} paragraphs one by one, then summarize them into one document summary.\n\nThat is {{count}} requests to the model — minutes for a long document, and metered usage on a paid API. You can stop at any point; explanations already finished are kept.",
     summarizeAllStop: "Stop (finished explanations are kept)",
     summarizeAllPartial: "Some paragraphs could not be explained — the summary covers {{done}}/{{total}}",
+    terms: {
+      check: "Check terms",
+      hint: "Check the document against your glossary. No model involved",
+      scanned: "scanned {{count}} paragraphs containing terms",
+      allConsistent: "Every glossary term is used consistently",
+      fixable: "{{count}} left untranslated — these can be substituted directly",
+      apply: "Substitute",
+      applied: "{{count}} substituted",
+      undo: "Undo",
+      reviewHint: "{{count}} more were rendered as something else and need your eye — the term is in the source, its canonical rendering is not in the translation, and there is no source word left to substitute",
+    },
     newDocument: "Clear",
     formats: {
       "纯文本": "Plain Text", "Markdown": "Markdown", "SRT 字幕": "SRT Subtitle", "WebVTT 字幕": "WebVTT Subtitle",
