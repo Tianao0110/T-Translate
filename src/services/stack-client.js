@@ -197,6 +197,15 @@ class StackClient {
     return b.providersStatus();
   }
 
+  // Whether anything can translate right now. Without the bridge (dev browser
+  // session) the honest answer is "unknown", and an unknown must not be shown
+  // as a problem.
+  async getReadiness() {
+    const b = bridge();
+    if (!b?.readiness) return null;
+    return b.readiness();
+  }
+
   async getCacheStats() {
     const b = bridge();
     if (!b) return null;

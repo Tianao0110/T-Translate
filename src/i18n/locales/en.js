@@ -400,6 +400,12 @@ const en = {
     networkError: "Network error", unknownError: "Unknown error", translateError: "Translation failed", ocrError: "Recognition failed",
     shortcutRegistered: "Shortcut registered", shortcutConflict: "Shortcut conflict"
   },
+  setupNotice: {
+    noProvider: "No translation source is set up yet, so nothing can be translated",
+    localUnreachable: "The local model is not responding — check that LM Studio or Ollama is running",
+    setUp: "Set up",
+    checkProviders: "Open providers",
+  },
   guide: {
     subtitle: "Discover core features",
     dismiss: "Don't show again",

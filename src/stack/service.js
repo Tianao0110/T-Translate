@@ -948,6 +948,51 @@ export class TranslationService {
     return getAllProvidersStatus();
   }
 
+  /**
+   * Can this app translate anything right now?
+   *
+   * Deliberately built on the same three filters the real translate path uses
+   * (priority order, privacy allowlist, configured) — a readiness banner that
+   * disagreed with what happens on the Translate button would be worse than no
+   * banner.
+   *
+   * The two provider kinds need different evidence, and `isConfigured()` alone
+   * cannot tell them apart: a local provider has no required config fields, so
+   * it reports configured whether or not anything is listening.
+   *
+   *   cloud — a key is enough. NOT probed: a request on every launch spends the
+   *           user's quota to answer a question they did not ask.
+   *   local — probed, because that is the only way to know. Free, on loopback,
+   *           and allowed in offline mode.
+   *
+   * @returns {Promise<{ready: boolean, reason: string, candidates: number}>}
+   */
+  async getTranslationReadiness(privacyMode = PRIVACY_MODE_IDS.STANDARD) {
+    const candidates = this.getPriority().filter(
+      (id) => isProviderAllowed(id, privacyMode) && isProviderConfigured(id)
+    );
+    if (candidates.length === 0) {
+      return { ready: false, reason: 'no-provider', candidates: 0 };
+    }
+
+    const locals = [];
+    for (const id of candidates) {
+      if (getProvider(id)?.requiresNetwork === false) locals.push(id);
+      else return { ready: true, reason: 'cloud', candidates: candidates.length };
+    }
+
+    for (const id of locals) {
+      try {
+        const result = await getProvider(id)?.testConnection?.();
+        if (result?.success) return { ready: true, reason: 'local', candidates: candidates.length };
+      } catch {
+        // An unreachable endpoint is the answer, not an error.
+      }
+    }
+
+    return { ready: false, reason: 'local-unreachable', candidates: candidates.length };
+  }
+
   updateProviderConfig(providerId, config) {
     updateProviderConfig(providerId, config);
   }

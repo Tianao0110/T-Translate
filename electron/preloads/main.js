@@ -120,6 +120,7 @@ const electronAPI = {
     testProviderConfig: (providerId, config) =>
       ipcRenderer.invoke("stack:test-provider-config", { providerId, config }),
     providersStatus: () => ipcRenderer.invoke("stack:providers-status"),
+    readiness: () => ipcRenderer.invoke("stack:readiness"),
     currentProvider: () => ipcRenderer.invoke("stack:current-provider"),
     reload: () => ipcRenderer.invoke("stack:reload"),
     clearCache: (level) => ipcRenderer.invoke("stack:clear-cache", { level }),

@@ -143,6 +143,7 @@ const CHANNELS = {
     TEST_PROVIDER: 'stack:test-provider',
     TEST_PROVIDER_CONFIG: 'stack:test-provider-config',
     PROVIDERS_STATUS: 'stack:providers-status',
+    READINESS: 'stack:readiness',                 // can anything translate right now?
     CURRENT_PROVIDER: 'stack:current-provider',
     RELOAD: 'stack:reload',
     CLEAR_CACHE: 'stack:clear-cache',

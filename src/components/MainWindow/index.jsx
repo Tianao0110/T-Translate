@@ -11,6 +11,8 @@ import useTranslationStore from '../../stores/translation-store';
 import appIcon from '/icon.png';
 // TranslationPanel is the initial view — keep it eagerly imported to avoid first-paint stall
 import TranslationPanel from '../TranslationPanel';
+import SetupNotice from '../shared/SetupNotice.jsx';
+import useTranslationReadiness from '../../hooks/use-translation-readiness.js';
 const HistoryPanel = lazy(() => import('../HistoryPanel'));
 const SettingsPanel = lazy(() => import('../SettingsPanel'));
 const FavoritesPanel = lazy(() => import('../FavoritesPanel'));
@@ -30,6 +32,7 @@ const MainWindow = () => {
   const { t } = useTranslation();
 
   const [activeTab, setActiveTab] = useState('translate');
+  const { readiness } = useTranslationReadiness();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [notification, setNotification] = useState(null);
 
@@ -330,6 +333,12 @@ const MainWindow = () => {
 
       <div className="main-content">
         <div className="tab-panel" style={{ display: activeTab === 'translate' ? 'flex' : 'none' }}>
+          {/* Only on the panel a new user lands on — the same strip repeated
+              on every tab would read as an alarm rather than a nudge. */}
+          <SetupNotice
+            readiness={readiness}
+            onOpenSettings={() => { setActiveTab('settings'); setPendingSettingsSection('providers'); }}
+          />
           <TranslationPanel
             showNotification={showNotification}
             screenshotData={screenshotData}

@@ -400,6 +400,12 @@ const zh = {
     networkError: "网络错误", unknownError: "未知错误", translateError: "翻译失败", ocrError: "识别失败",
     shortcutRegistered: "快捷键已注册", shortcutConflict: "快捷键冲突"
   },
+  setupNotice: {
+    noProvider: "还没有可用的翻译源，现在还翻译不了",
+    localUnreachable: "本地模型没有响应，检查一下 LM Studio 或 Ollama 是否在运行",
+    setUp: "去设置",
+    checkProviders: "查看翻译源",
+  },
   guide: {
     subtitle: "快速了解核心功能",
     dismiss: "不再显示",

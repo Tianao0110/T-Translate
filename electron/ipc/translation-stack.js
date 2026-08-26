@@ -254,6 +254,12 @@ function register(ctx) {
     });
   });
 
+  ipcMain.handle(CHANNELS.STACK.READINESS, async () => {
+    if (!stack) return { ready: false, reason: 'no-provider', candidates: 0 };
+    // Privacy mode is read here, never accepted from a renderer.
+    return stack.service.getTranslationReadiness(getPrivacyMode());
+  });
+
   ipcMain.handle(CHANNELS.STACK.CURRENT_PROVIDER, () => {
     if (!stack) return null;
     return stack.service.getCurrentProvider();

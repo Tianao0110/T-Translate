@@ -1,0 +1,48 @@
+/* A standing condition, not an alarm: it sits in the flow above the panel and
+   uses the warning token at low strength. Loud styling here would shout at
+   every launch until the user configures something, which is the opposite of
+   the "weak guidance" this is meant to be. */
+.setup-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--warning) 25%, transparent);
+  background: color-mix(in srgb, var(--warning) 9%, transparent);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.setup-notice > svg {
+  flex-shrink: 0;
+  color: var(--warning);
+}
+
+.setup-notice-text {
+  flex: 1;
+  line-height: 1.5;
+}
+
+.setup-notice-action {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--warning) 45%, transparent);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.setup-notice-action:hover {
+  background: color-mix(in srgb, var(--warning) 16%, transparent);
+}
+
+.setup-notice-action:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--warning) 55%, transparent);
+  outline-offset: 1px;
+}
