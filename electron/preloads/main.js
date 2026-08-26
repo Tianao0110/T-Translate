@@ -47,6 +47,7 @@ const electronAPI = {
     minimize: () => ipcRenderer.send("minimize-window"),
     maximize: () => ipcRenderer.send("maximize-window"),
     close: () => ipcRenderer.send("close-window"),
+    show: () => ipcRenderer.send("show-window"),
     setAlwaysOnTop: (flag) => ipcRenderer.send("set-always-on-top", flag),
     isMaximized: () => ipcRenderer.invoke("is-maximized"),
     onMaximizeChange: (callback) => {

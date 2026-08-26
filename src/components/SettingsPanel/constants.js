@@ -54,6 +54,9 @@ export const DEFAULT_SETTINGS = {
   interface: {
     theme: defaultConfig.ui.theme,
     language: '',
+    // OS notification when a long task (document translation / one-click
+    // summary) finishes while the window is in the background.
+    systemNotifications: true,
   },
 
   // Startup toggles (auto-enable selection after launch).

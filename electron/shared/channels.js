@@ -5,6 +5,7 @@ const CHANNELS = {
     MINIMIZE: 'minimize-window',
     MAXIMIZE: 'maximize-window',
     CLOSE: 'close-window',
+    SHOW: 'show-window',
     SET_ALWAYS_ON_TOP: 'set-always-on-top',
     OPEN_EXTERNAL: 'open-external',
     GET_PLATFORM: 'get-platform',

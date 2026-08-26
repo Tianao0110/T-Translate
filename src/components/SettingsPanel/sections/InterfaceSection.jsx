@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Sun, Moon, Leaf, RefreshCw, Globe, Power, MousePointer, Keyboard, Camera, AppWindow, Layers, Pencil, ScanLine } from 'lucide-react';
+import { Sun, Moon, Leaf, RefreshCw, Globe, Power, MousePointer, Keyboard, Camera, AppWindow, Layers, Pencil, ScanLine, Bell } from 'lucide-react';
 import { defaultConfig } from '../constants.js';
 
 const LANGUAGES = [
@@ -186,6 +186,26 @@ const InterfaceSection = ({
         {autoLaunch && (
           <p className="setting-hint">{t('settings.startup.autoSelectionHint')}</p>
         )}
+      </div>
+
+      <div className="setting-group">
+        <label className="setting-label">
+          <Bell size={16} style={{marginRight: '6px', verticalAlign: 'middle'}} />
+          {t('settings.notifications.title')}
+        </label>
+
+        <label className="setting-toggle">
+          <input
+            type="checkbox"
+            checked={settings.interface?.systemNotifications ?? true}
+            onChange={(e) => {
+              updateSetting('interface', 'systemNotifications', e.target.checked, true);
+              window.electron?.store?.set?.('settings.interface.systemNotifications', e.target.checked);
+            }}
+          />
+          <span>{t('settings.notifications.system')}</span>
+        </label>
+        <p className="setting-hint">{t('settings.notifications.systemHint')}</p>
       </div>
 
       <div className="setting-group">

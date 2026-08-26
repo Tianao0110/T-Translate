@@ -356,6 +356,11 @@ const zh = {
       autoSelection: "启动后自动开启划词翻译",
       autoSelectionHint: "开机自启后自动开启划词翻译，选中文字即可翻译",
     },
+    notifications: {
+      title: "通知",
+      system: "长任务完成后发送系统通知",
+      systemHint: "窗口不在前台时，文档翻译或一键总结完成会从系统通知中心提醒，点击回到窗口",
+    },
     ocr: { title: "OCR 设置" },
     shortcuts: { title: "快捷键设置" },
     privacy: {
@@ -554,6 +559,12 @@ const zh = {
   // ===== DocumentTranslator keys =====
   documentTranslator: {
     title: "文档翻译",
+    sysNotify: {
+      translateDoneTitle: "文档翻译完成",
+      translateDoneBody: "《{{name}}》已翻译完成，点击查看",
+      summaryDoneTitle: "一键总结完成",
+      summaryDoneBody: "《{{name}}》的总结已生成，点击查看",
+    },
     sourceLang: "源语言",
     targetLang: "目标语言",
     digestHint: "把已讲解的段落整理成一份笔记",

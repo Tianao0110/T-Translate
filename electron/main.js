@@ -1057,6 +1057,13 @@ function processDesktopCapturerSelection(data, bounds) {
 app.whenReady().then(() => {
   logger.info('App ready, initializing...');
 
+  // Windows routes toast notifications by AppUserModelID; without it the
+  // renderer's HTML5 Notifications never reach the notification center in the
+  // packaged build. Must match build.appId in package.json.
+  if (process.platform === 'win32') {
+    app.setAppUserModelId('com.ttranslate.core');
+  }
+
   // Auto-launch mode: --startup flag means started by OS, run silent.
   const isStartup = process.argv.includes('--startup');
   if (isStartup) {

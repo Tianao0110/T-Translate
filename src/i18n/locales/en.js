@@ -356,6 +356,11 @@ const en = {
       autoSelection: "Enable selection translate on startup",
       autoSelectionHint: "Automatically enable selection translate after auto-launch",
     },
+    notifications: {
+      title: "Notifications",
+      system: "System notification when long tasks finish",
+      systemHint: "With the window in the background, finished document translations and one-click summaries post a system notification. Click it to return.",
+    },
     ocr: { title: "OCR Settings" },
     shortcuts: { title: "Keyboard Shortcuts" },
     privacy: {
@@ -554,6 +559,12 @@ const en = {
   // ===== DocumentTranslator keys =====
   documentTranslator: {
     title: "Document Translation",
+    sysNotify: {
+      translateDoneTitle: "Document translated",
+      translateDoneBody: "\"{{name}}\" is fully translated. Click to view.",
+      summaryDoneTitle: "Summary ready",
+      summaryDoneBody: "The summary of \"{{name}}\" is ready. Click to view.",
+    },
     sourceLang: "Source Language",
     targetLang: "Target Language",
     digestHint: "Organise the paragraphs you have explained into one note",

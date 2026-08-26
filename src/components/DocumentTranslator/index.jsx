@@ -26,6 +26,7 @@ import useVisibleHotkey from '../../hooks/use-visible-hotkey.js';
 import LanguagePicker from '../shared/LanguagePicker.jsx';
 import { useConfirm } from '../shared/ConfirmDialog.jsx';
 import { scanDocumentTerms, renderWithReplacements } from '../../utils/term-consistency.js';
+import { notifyTaskDone } from '../../utils/system-notify.js';
 import HighlightText from '../shared/HighlightText.jsx';
 import AiBadge from '../shared/AiBadge.jsx';
 import useAiActions from '../../hooks/use-ai-actions.js';
@@ -440,7 +441,7 @@ const DocumentTranslator = ({
   // have not reached this closure through state yet.
   const runDigest = useCallback(async (wholeDoc = false, notesOverride = null) => {
     const action = getAiAction('digest');
-    if (!action || digestRunning) return;
+    if (!action || digestRunning) return false;
     const source = notesOverride || aiNotes;
     // Document order, not the order they were opened — a note reads as a walk
     // through the document.
@@ -448,7 +449,7 @@ const DocumentTranslator = ({
       .filter((seg) => source[seg.id])
       .map((seg, i) => `${i + 1}. ${source[seg.id]}`)
       .join('\n\n');
-    if (!ordered) return;
+    if (!ordered) return false;
 
     setDigestRunning(true);
     try {
@@ -461,7 +462,10 @@ const DocumentTranslator = ({
       if (result.success) {
         setDigest(result.content);
         setDigestWholeDoc(wholeDoc);
-      } else notify(result.error || t('aiActions.failed'), 'error');
+        return true;
+      }
+      notify(result.error || t('aiActions.failed'), 'error');
+      return false;
     } finally {
       setDigestRunning(false);
     }
@@ -491,8 +495,14 @@ const DocumentTranslator = ({
       }), 'warning');
     }
 
-    await runDigest(covered === explainable.length, outcome.notes);
-  }, [explainable, explainAll, concurrency, confirm, runDigest, notify, t]);
+    const digestOk = await runDigest(covered === explainable.length, outcome.notes);
+    if (digestOk) {
+      notifyTaskDone(
+        t('documentTranslator.sysNotify.summaryDoneTitle'),
+        t('documentTranslator.sysNotify.summaryDoneBody', { name: document?.filename || '' })
+      );
+    }
+  }, [explainable, explainAll, concurrency, confirm, runDigest, notify, t, document]);
 
   // ===== Glossary consistency =====
   //
@@ -961,6 +971,10 @@ const DocumentTranslator = ({
     if (toTranslate.length === 0) {
       setIsTranslating(false);
       notify?.(t('documentTranslator.notify.translationCompleteFromCache'), 'success');
+      notifyTaskDone(
+        t('documentTranslator.sysNotify.translateDoneTitle'),
+        t('documentTranslator.sysNotify.translateDoneBody', { name: document?.filename || '' })
+      );
       return;
     }
     
@@ -972,6 +986,10 @@ const DocumentTranslator = ({
     setIsTranslating(false);
     if (!abortRef.current) {
       notify?.(t('documentTranslator.notify.translationComplete'), 'success');
+      notifyTaskDone(
+        t('documentTranslator.sysNotify.translateDoneTitle'),
+        t('documentTranslator.sysNotify.translateDoneBody', { name: document?.filename || '' })
+      );
     }
   };
 

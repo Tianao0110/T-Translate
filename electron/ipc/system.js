@@ -39,6 +39,18 @@ function register(ctx) {
     return mainWindow ? mainWindow.isMaximized() : false;
   });
 
+  // Bring the main window back — notification clicks land here, and the
+  // window may be hidden to tray (close-to-hide) or minimized.
+  ipcMain.on(CHANNELS.SYSTEM.SHOW, () => {
+    const mainWindow = getMainWindow();
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+      logger.debug("Window shown via IPC");
+    }
+  });
+
   ipcMain.on(CHANNELS.SYSTEM.CLOSE, () => {
     const mainWindow = getMainWindow();
     if (mainWindow) {
