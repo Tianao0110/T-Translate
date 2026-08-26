@@ -598,6 +598,7 @@ const en = {
     // Progress restore
     restore: {
       found: "Previous progress found ({{count}} translated)",
+      foundWithNotes: "Previous progress found ({{count}} translated, {{notes}} explanations)",
       restore: "Restore",
       dismiss: "Dismiss"
     },
@@ -643,6 +644,8 @@ const en = {
     notify: {
       fileLoaded: "File loaded: {{count}} segments",
       fileLoadedWithPages: "File loaded: {{count}} segments ({{pages}} pages)",
+      progressRestored: "Restored {{count}} translated segments",
+      progressRestoredNotes: "Restored {{count}} translated segments and {{notes}} explanations",
       parseFailed: "Failed to parse file",
       translationComplete: "Translation complete",
       translationCompleteFromCache: "Translation complete (all from cache)",

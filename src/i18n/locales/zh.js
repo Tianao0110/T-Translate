@@ -598,6 +598,7 @@ const zh = {
     // Progress restore
     restore: {
       found: "发现上次的翻译进度（{{count}} 条已译）",
+      foundWithNotes: "发现上次的进度（{{count}} 条已译、{{notes}} 段讲解）",
       restore: "恢复进度",
       dismiss: "忽略"
     },
@@ -643,6 +644,8 @@ const zh = {
     notify: {
       fileLoaded: "文件加载成功：{{count}} 个段落",
       fileLoadedWithPages: "文件加载成功：{{count}} 个段落 ({{pages}} 页)",
+      progressRestored: "已恢复 {{count}} 段翻译",
+      progressRestoredNotes: "已恢复 {{count}} 段翻译、{{notes}} 段讲解",
       parseFailed: "文件解析失败",
       translationComplete: "翻译完成",
       translationCompleteFromCache: "翻译完成（全部来自缓存）",
