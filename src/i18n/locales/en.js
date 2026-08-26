@@ -545,7 +545,7 @@ const en = {
     testTextMixed: "This is a TTS test. 这是语音朗读测试。",
     testTextChinese: "Hello, this is a TTS test.",
     testFailed: "Preview failed", loadVoicesFailed: "Failed to load voices",
-    langNames: { zh: "Chinese", en: "English", ja: "Japanese", ko: "Korean", fr: "French", de: "German", es: "Spanish", ru: "Russian", pt: "Portuguese", it: "Italian" },
+    langNames: { zh: "Chinese", en: "English", ja: "Japanese", ko: "Korean", fr: "French", de: "German", es: "Spanish", ru: "Russian", pt: "Portuguese", it: "Italian", pl: "Polish", cs: "Czech", tr: "Turkish", hu: "Hungarian", vi: "Vietnamese", da: "Danish", sv: "Swedish", no: "Norwegian", ar: "Arabic" },
     noVoicesInstalled: "No voice packs installed. Please install voices in system settings.",
     noVoiceForLang: "No {{lang}} voice pack installed",
     installVoiceHint: "No voice packs detected. Install them in System Settings → Language → Speech."

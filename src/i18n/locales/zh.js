@@ -545,7 +545,7 @@ const zh = {
     testTextMixed: "这是语音朗读测试。This is a TTS test.",
     testTextChinese: "你好，这是语音朗读功能测试。",
     testFailed: "试听失败", loadVoicesFailed: "加载语音列表失败",
-    langNames: { zh: "中文", en: "英语", ja: "日语", ko: "韩语", fr: "法语", de: "德语", es: "西班牙语", ru: "俄语", pt: "葡萄牙语", it: "意大利语" },
+    langNames: { zh: "中文", en: "英语", ja: "日语", ko: "韩语", fr: "法语", de: "德语", es: "西班牙语", ru: "俄语", pt: "葡萄牙语", it: "意大利语", pl: "波兰语", cs: "捷克语", tr: "土耳其语", hu: "匈牙利语", vi: "越南语", da: "丹麦语", sv: "瑞典语", no: "挪威语", ar: "阿拉伯语" },
     noVoicesInstalled: "系统未安装任何语音包，请在系统设置中安装语音",
     noVoiceForLang: "系统未安装{{lang}}语音包",
     installVoiceHint: "未检测到语音包，请在系统设置 → 语言 → 语音中安装"
