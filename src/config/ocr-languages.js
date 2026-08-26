@@ -46,6 +46,10 @@ export const OCR_LANGUAGE_GROUPS = [
   { packId: 'cyrillic', languages: ['ru', 'uk', 'be', 'bg', 'sr', 'mk'] },
   { packId: 'devanagari', languages: ['hi', 'mr', 'ne', 'sa'] },
   { packId: 'arabic', languages: ['ar', 'fa', 'ur', 'ug'] },
+  // One script each — these three share no alphabet with anything else.
+  { packId: 'tamil', languages: ['ta'] },
+  { packId: 'telugu', languages: ['te'] },
+  { packId: 'kannada', languages: ['kn'] },
 ];
 
 export const OCR_LANGUAGE_TO_PACK = Object.fromEntries([

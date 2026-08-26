@@ -37,6 +37,10 @@ const LANGUAGE_TO_PACK = {
   'bg': 'cyrillic', 'sr': 'cyrillic', 'mk': 'cyrillic',
   'hi': 'devanagari', 'mr': 'devanagari', 'ne': 'devanagari', 'sa': 'devanagari',
   'ar': 'arabic', 'fa': 'arabic', 'ur': 'arabic', 'ug': 'arabic',
+  // Upstream names the Kannada archive "ka", which is Georgian in ISO 639-1.
+  // The pack really is Kannada (its dictionary holds 72 Kannada glyphs and no
+  // Georgian at all), so the language code here is kn.
+  'ta': 'tamil', 'te': 'telugu', 'kn': 'kannada',
 };
 
 function packIdForLanguage(language) {

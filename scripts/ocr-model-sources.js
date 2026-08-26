@@ -114,6 +114,38 @@ const LANG_PACKS = [
     files: { rec: 'devanagari_rec.onnx', dict: 'devanagari_dict.txt' },
   },
   {
+    id: 'tamil',
+    type: 'lang',
+    gen: 'v4',
+    version: '1.0.0',
+    file: 'ta.zip',
+    url: `${UPSTREAM_BASE}/ta.zip`,
+    languages: ['ta'],
+    files: { rec: 'ta_rec.onnx', dict: 'ta_dict.txt' },
+  },
+  {
+    id: 'telugu',
+    type: 'lang',
+    gen: 'v4',
+    version: '1.0.0',
+    file: 'te.zip',
+    url: `${UPSTREAM_BASE}/te.zip`,
+    languages: ['te'],
+    files: { rec: 'te_rec.onnx', dict: 'te_dict.txt' },
+  },
+  {
+    // Upstream calls this one "ka" — Georgian's ISO code — but the model is
+    // Kannada. Verified against its dictionary, not its filename.
+    id: 'kannada',
+    type: 'lang',
+    gen: 'v4',
+    version: '1.0.0',
+    file: 'ka.zip',
+    url: `${UPSTREAM_BASE}/ka.zip`,
+    languages: ['kn'],
+    files: { rec: 'ka_rec.onnx', dict: 'ka_dict.txt' },
+  },
+  {
     id: 'arabic',
     type: 'lang',
     gen: 'v4',

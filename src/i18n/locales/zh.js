@@ -435,6 +435,9 @@ const zh = {
       cyrillic: "西里尔字母 — 需下载语言包",
       devanagari: "天城文 — 需下载语言包",
       arabic: "阿拉伯字母 — 需下载语言包",
+      tamil: "泰米尔文 — 需下载语言包",
+      telugu: "泰卢固文 — 需下载语言包",
+      kannada: "卡纳达文 — 需下载语言包",
     },
     autoLangHint: "选择「自动检测」时，将根据翻译设置自动选择",
     langPackHint: "中/繁/英/日与 37 种拉丁语系语言内置；韩文、西里尔、天城文、阿拉伯字母各需在下方安装一个语言包，一个包覆盖同一文字的多种语言",
@@ -490,6 +493,9 @@ const zh = {
         "base-v6": "基础模型（简中/繁中/英/日/拉丁语系）",
         "base-v6-hq": "高精度模型（PP-OCRv6 medium）",
         korean: "韩文",
+        tamil: "泰米尔文",
+        telugu: "泰卢固文",
+        kannada: "卡纳达文",
         // latin pack was absorbed into base-v6; key kept so a leftover
         // installed copy still renders a proper name until uninstalled
         latin: "拉丁语系（法/德/西等）",

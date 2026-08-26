@@ -28,7 +28,7 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 - ~~doc_cls 旋转分类器~~ **已实测弃案（2026-07-04）**：倒置图可纠正，但日文横排截图被误判竖排、韩文包乱码——主场景回归不可接受，详见 OCR_MODELS.md 已知边界（含复现方法）。别再捡
 - 档位备忘：v6 全系仅 tiny/small/medium 三档（官方页 2026-07-03 已核），tiny 无假名不可用；v6 无独立多语言模型，韩/西里尔/天城/阿拉伯继续 v4 包；spike 复跑脚本已随 2026-07-10 temp 清理退役（结论与复现方法保全在 docs/OCR_MODELS.md 已知边界节）
 - 合入时补测：竖排文本、真实截图小字（实拍回归）
-- **泰米尔 / 泰卢固 / 卡纳达三个语言包**（2026-08-19 提出，用户当时只取了语言扩容与降级门槛两项，这项未否决只是没做）：上游 eSearch-OCR 4.0.0 release 已有现成 `ta.zip` / `te.zip` / `ka.zip`（8.0 / 7.7 / 7.9 MB），是该上游仅剩的三个未打包模型。工作量=`scripts/ocr-model-sources.js` 加三条 + `src/config/ocr-languages.js` 与 `electron/shared/ocr-packs.js` 各加一组 + 三个 i18n 包名键 + `npm run ocr:release` 传资产（约 24MB 托管）。**照例先拿字典验**（判据见下方 DEVELOPMENT「OCR 支持一门新语言」），别信上游文档
+- ~~泰米尔 / 泰卢固 / 卡纳达三个语言包~~ ✅ **已加入（2026-08-19）**，识别语言 56→59。上游 `ka.zip` 名为格鲁吉亚语码实为卡纳达语，我们用 `kn`；实测质量低于同代其他包（74/71/71% 对天城文 87%），已写进 OCR_MODELS.md 已知边界。**待发布动作：`npm run ocr:release` 后把三个新 zip + manifest 传上 ocr-models Release**
 - ~~百度 Unlimited-OCR vLLM 直连提示~~ ✅ 已写入 docs/FAQ.md（2026-07-10）
 
 ### 真 asar 热替换（仅评估，不承诺）

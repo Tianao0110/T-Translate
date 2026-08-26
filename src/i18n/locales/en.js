@@ -435,6 +435,9 @@ const en = {
       cyrillic: "Cyrillic — needs language pack",
       devanagari: "Devanagari — needs language pack",
       arabic: "Arabic — needs language pack",
+      tamil: "Tamil — needs language pack",
+      telugu: "Telugu — needs language pack",
+      kannada: "Kannada — needs language pack",
     },
     autoLangHint: "When set to Auto Detect, language will be selected based on translation settings",
     langPackHint: "Chinese/English/Japanese and 37 Latin-script languages are built in. Korean, Cyrillic, Devanagari and Arabic each need one language pack from below — a single pack covers every language written in that script",
@@ -490,6 +493,9 @@ const en = {
         "base-v6": "Base models (Chinese/English/Japanese/Latin scripts)",
         "base-v6-hq": "High-accuracy models (PP-OCRv6 medium)",
         korean: "Korean",
+        tamil: "Tamil",
+        telugu: "Telugu",
+        kannada: "Kannada",
         // latin pack was absorbed into base-v6; key kept so a leftover
         // installed copy still renders a proper name until uninstalled
         latin: "Latin script (French/German/Spanish...)",
