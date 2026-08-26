@@ -61,6 +61,34 @@ describe('document segment notes', () => {
     expect(result.current.notes).toEqual({ 0: '这段在说自注意力', 1: '第二段' });
   });
 
+  it('seeds restored notes but never clobbers one the reader just made', async () => {
+    const { result } = renderHook(() => useSegmentNotes(options));
+
+    await act(async () => { await result.current.explain(seg(0, 'first')); });
+    act(() => { result.current.seed({ 0: '旧讲解', 2: '恢复的讲解' }); });
+
+    expect(result.current.notes[0]).toBe('这段在说自注意力');
+    expect(result.current.notes[2]).toBe('恢复的讲解');
+  });
+
+  it('drops non-string values while seeding (blob is hand-editable)', () => {
+    const { result } = renderHook(() => useSegmentNotes(options));
+
+    act(() => { result.current.seed({ 0: '好的', 1: { text: 'bad' }, 2: '', 3: 42 }); });
+
+    expect(result.current.notes).toEqual({ 0: '好的' });
+  });
+
+  it('ignores a seed with nothing usable', () => {
+    const { result } = renderHook(() => useSegmentNotes(options));
+
+    act(() => { result.current.seed(null); });
+    act(() => { result.current.seed('nope'); });
+    act(() => { result.current.seed({}); });
+
+    expect(result.current.notes).toEqual({});
+  });
+
   it('drops every note on reset, folded ones included', async () => {
     const { result } = renderHook(() => useSegmentNotes(options));
     const s = seg(0, 'first');

@@ -6,7 +6,7 @@ import {
   Loader, ArrowUp, FileDown,
   SkipForward, RefreshCw, Zap, Lock, Key,
   Database, BookOpen, BarChart3,
-  Edit3, Check, Copy, Search, Rows2, Columns2, Lightbulb, ClipboardList, Sparkles, BookMarked
+  Edit3, Check, Copy, Search, Rows2, Columns2, ClipboardList, Sparkles, BookMarked
 } from 'lucide-react';
 import createLogger from '../../utils/logger.js';
 import {
@@ -27,6 +27,7 @@ import LanguagePicker from '../shared/LanguagePicker.jsx';
 import { useConfirm } from '../shared/ConfirmDialog.jsx';
 import { scanDocumentTerms, renderWithReplacements } from '../../utils/term-consistency.js';
 import HighlightText from '../shared/HighlightText.jsx';
+import AiBadge from '../shared/AiBadge.jsx';
 import useAiActions from '../../hooks/use-ai-actions.js';
 import useSegmentNotes from '../../hooks/use-segment-notes.js';
 import { runAiAction } from '../../services/ai-action-runner.js';
@@ -84,11 +85,18 @@ function getFileFingerprint(file) {
   return `${file.name}_${file.size}_${file.lastModified}`;
 }
 
-function saveProgress(fp, segments, sLang, tLang) {
+function saveProgress(fp, segments, sLang, tLang, notes, digest, digestWhole) {
   try {
     const data = { ts: Date.now(), sLang, tLang,
       segs: segments.filter(s => s.status === STATUS.COMPLETED).map(s => ({ id: s.id, t: s.translated }))
     };
+    // Explanations ride the same blob: the per-paragraph pass behind them is
+    // paid model calls — losing it on close wastes real work.
+    if (notes && Object.keys(notes).length) data.notes = notes;
+    if (digest) {
+      data.digest = digest;
+      data.digestWhole = !!digestWhole;
+    }
     localStorage.setItem(PROGRESS_KEY + fp, JSON.stringify(data));
   } catch { /* localStorage full */ }
 }
@@ -195,7 +203,7 @@ const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate,
               disabled={aiRunning}
               title={t('documentTranslator.segment.explain', '讲解这一段')}
             >
-              {aiRunning ? <Loader size={12} className="spinning" /> : <Lightbulb size={12} />}
+              {aiRunning ? <Loader size={12} className="spinning" /> : <AiBadge size={12} />}
             </button>
           )}
         </div>
@@ -265,7 +273,7 @@ const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate,
       {aiNote && !noteFolded && (
         <div className="segment-ai-note">
           <div className="segment-ai-label">
-            <Lightbulb size={11} />
+            <AiBadge size={11} />
             {t('aiActions.explain.name')}
           </div>
           <div className="segment-ai-body">{aiNote}</div>
@@ -394,13 +402,21 @@ const DocumentTranslator = ({
   );
   const {
     notes: aiNotes, folded: foldedNotes, runningId: aiRunningId, batch: aiBatch,
-    explain: explainSegment, explainAll, stopBatch, reset: resetNotes,
+    explain: explainSegment, explainAll, stopBatch, seed: seedNotes, reset: resetNotes,
   } = useSegmentNotes({ capabilities, sourceLang, targetLang, onError: noteError });
   const [digest, setDigest] = useState(null);
   const [digestRunning, setDigestRunning] = useState(false);
   // True once the notes the digest was built from covered the whole document —
   // the panel must not keep saying "only the paragraphs you opened" when it did.
   const [digestWholeDoc, setDigestWholeDoc] = useState(false);
+  // Ref mirrors for the beforeunload flush, which must read the latest notes
+  // without re-registering its listener per note.
+  const aiNotesRef = useRef(aiNotes);
+  useEffect(() => { aiNotesRef.current = aiNotes; }, [aiNotes]);
+  const digestRef = useRef({ content: null, whole: false });
+  useEffect(() => {
+    digestRef.current = { content: digest, whole: digestWholeDoc };
+  }, [digest, digestWholeDoc]);
   // { fixable, review, checked, applied } from the glossary pass, or null.
   const [termReport, setTermReport] = useState(null);
 
@@ -680,25 +696,44 @@ const DocumentTranslator = ({
   // (the L2 disk cache holds ~200 entries — no safety net for big docs).
   // Throttled so fast providers don't stringify the list per completion.
   const lastSaveRef = useRef(0);
+  // True once this document session held output while in secure mode. The gate
+  // must outlive the mode: segment state still holds secure-era text after the
+  // user leaves secure, so one write then would flush it to disk anyway.
+  const secureTaintRef = useRef(false);
   useEffect(() => {
     if (!fileFingerprint.current) return;
-    if (stats.completed === 0 && stats.edited === 0) return;
+    const hasNotes = Object.keys(aiNotes).length > 0 || !!digest;
+    if (stats.completed === 0 && stats.edited === 0 && !hasNotes) return;
+    if (translationMode === PRIVACY_MODES.SECURE) {
+      secureTaintRef.current = true;
+      return;
+    }
+    if (secureTaintRef.current) return;
     const now = Date.now();
-    if (isTranslating && now - lastSaveRef.current < 3000) return;
+    // A batch explain drops notes as fast as translation drops segments —
+    // same throttle, or a long document stringifies the blob per note.
+    if ((isTranslating || aiBatch) && now - lastSaveRef.current < 3000) return;
     lastSaveRef.current = now;
-    saveProgress(fileFingerprint.current, segments, sourceLang, targetLang);
-  }, [stats.completed, stats.edited, isTranslating, segments, sourceLang, targetLang]);
+    saveProgress(fileFingerprint.current, segments, sourceLang, targetLang, aiNotes, digest, digestWholeDoc);
+  }, [stats.completed, stats.edited, isTranslating, segments, sourceLang, targetLang, aiNotes, digest, digestWholeDoc, aiBatch, translationMode]);
 
   // Crash/quit safety net — synchronous flush of whatever completed.
   useEffect(() => {
     const flush = () => {
-      if (fileFingerprint.current && segmentsRef.current.some(s => s.status === STATUS.COMPLETED)) {
-        saveProgress(fileFingerprint.current, segmentsRef.current, sourceLang, targetLang);
+      if (translationMode === PRIVACY_MODES.SECURE || secureTaintRef.current) return;
+      const hasWork = segmentsRef.current.some(s => s.status === STATUS.COMPLETED)
+        || Object.keys(aiNotesRef.current).length > 0
+        || !!digestRef.current.content;
+      if (fileFingerprint.current && hasWork) {
+        saveProgress(
+          fileFingerprint.current, segmentsRef.current, sourceLang, targetLang,
+          aiNotesRef.current, digestRef.current.content, digestRef.current.whole
+        );
       }
     };
     window.addEventListener('beforeunload', flush);
     return () => window.removeEventListener('beforeunload', flush);
-  }, [sourceLang, targetLang]);
+  }, [sourceLang, targetLang, translationMode]);
 
   // One-time cleanup of expired progress blobs.
   useEffect(() => { sweepExpiredProgress(); }, []);
@@ -785,6 +820,13 @@ const DocumentTranslator = ({
         // document would inherit the previous one's explanations.
         resetNotes();
         setDigest(null);
+        // A fresh parse lifts the secure-mode taint — but secure-era text also
+        // survives in the in-memory translation cache, and a cache hit would
+        // put it straight back into persistable state. Both go together.
+        if (secureTaintRef.current) {
+          translationCache.current.clear();
+          secureTaintRef.current = false;
+        }
         setShowPasswordModal(false);
         setPendingFile(null);
         setPassword('');
@@ -792,9 +834,12 @@ const DocumentTranslator = ({
         setStartTime(null);
         setElapsedTime(0);
         
-        // Check for resumable progress
+        // Check for resumable progress. A blob holding only explanations (the
+        // reader explained without translating) is still worth offering.
         const saved = loadProgress(fingerprint);
-        if (saved && saved.segs.length > 0 && saved.sLang === sourceLang && saved.tLang === targetLang) {
+        const savedNoteCount = saved?.notes ? Object.keys(saved.notes).length : 0;
+        if (saved && (saved.segs.length > 0 || savedNoteCount > 0 || saved.digest)
+            && saved.sLang === sourceLang && saved.tLang === targetLang) {
           setPendingRestore(saved);
         } else {
           setPendingRestore(null);
@@ -1113,9 +1158,22 @@ const DocumentTranslator = ({
       }
       return s;
     }));
+    // Notes and digest come back with the translations (seed keeps any note
+    // the reader already made in this session).
+    seedNotes(pendingRestore.notes);
+    if (typeof pendingRestore.digest === 'string' && pendingRestore.digest && !digest) {
+      setDigest(pendingRestore.digest);
+      setDigestWholeDoc(!!pendingRestore.digestWhole);
+    }
+    const noteCount = pendingRestore.notes ? Object.keys(pendingRestore.notes).length : 0;
     setPendingRestore(null);
-    notify?.(t('documentTranslator.notify.progressRestored', { count: restoredMap.size }), 'success');
-  }, [pendingRestore, sourceLang, targetLang, notify, t]);
+    notify?.(
+      noteCount > 0
+        ? t('documentTranslator.notify.progressRestoredNotes', { count: restoredMap.size, notes: noteCount })
+        : t('documentTranslator.notify.progressRestored', { count: restoredMap.size }),
+      'success'
+    );
+  }, [pendingRestore, sourceLang, targetLang, digest, seedNotes, notify, t]);
 
   // Dismiss the restore banner
   const dismissRestore = useCallback(() => {
@@ -1581,7 +1639,14 @@ const DocumentTranslator = ({
               <div className="dt-restore-banner">
                 <div className="restore-info">
                   <RefreshCw size={16} />
-                  <span>{t('documentTranslator.restore.found', { count: pendingRestore.segs.length })}</span>
+                  <span>
+                    {pendingRestore.notes && Object.keys(pendingRestore.notes).length > 0
+                      ? t('documentTranslator.restore.foundWithNotes', {
+                        count: pendingRestore.segs.length,
+                        notes: Object.keys(pendingRestore.notes).length,
+                      })
+                      : t('documentTranslator.restore.found', { count: pendingRestore.segs.length })}
+                  </span>
                 </div>
                 <div className="restore-actions">
                   <button className="restore-btn primary" onClick={restoreProgress}>{t('documentTranslator.restore.restore')}</button>

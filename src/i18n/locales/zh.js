@@ -174,6 +174,8 @@ const zh = {
     group: { date: "按日期", language: "按语言" },
     select: "选择", export: "导出", import: "导入",
     hasAiResult: "附带 AI 结果，双击查看",
+    understandEntry: "AI 理解结果",
+    copyExplain: "复制讲解",
     deleteSelected: "删除 ({{count}})",
     deleteSelectedConfirm: "确定删除选中的 {{count}} 条记录？",
     deletedCount: "已删除 {{count}} 条",
@@ -195,7 +197,7 @@ const zh = {
       totalChars: "总字符", avgLength: "平均长度", streak: "连续天数", languagePairs: "常用语言对" 
     },
     table: { time: "时间", language: "语言", source: "原文", target: "译文", actions: "操作" },
-    card: { clickHint: "点击切换原文/译文，双击查看详情", source: "原文", target: "译文" }
+    card: { clickHint: "点击切换原文/译文，双击查看详情", source: "原文", target: "译文", explain: "讲解" }
   },
   favorites: { 
     title: "收藏夹", search: "搜索收藏...", empty: "暂无收藏", noMatch: "没有找到匹配的收藏", 
@@ -596,6 +598,7 @@ const zh = {
     // Progress restore
     restore: {
       found: "发现上次的翻译进度（{{count}} 条已译）",
+      foundWithNotes: "发现上次的进度（{{count}} 条已译、{{notes}} 段讲解）",
       restore: "恢复进度",
       dismiss: "忽略"
     },
@@ -641,6 +644,8 @@ const zh = {
     notify: {
       fileLoaded: "文件加载成功：{{count}} 个段落",
       fileLoadedWithPages: "文件加载成功：{{count}} 个段落 ({{pages}} 页)",
+      progressRestored: "已恢复 {{count}} 段翻译",
+      progressRestoredNotes: "已恢复 {{count}} 段翻译、{{notes}} 段讲解",
       parseFailed: "文件解析失败",
       translationComplete: "翻译完成",
       translationCompleteFromCache: "翻译完成（全部来自缓存）",

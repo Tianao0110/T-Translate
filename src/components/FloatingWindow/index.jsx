@@ -11,6 +11,7 @@ import pipeline from '../../services/pipeline.js';
 import { resolveOverlaps } from '../../services/pane-layout.js';
 import ChildPane from './ChildPane.jsx';
 import AiActionIcon from '../shared/AiActionIcon.jsx';
+import AiBadge from '../shared/AiBadge.jsx';
 import useAiActions from '../../hooks/use-ai-actions.js';
 import { getUnderstandAction } from '@config/ai-actions';
 import { resolveActionLabel } from '../../services/ai-action-runner.js';
@@ -1083,6 +1084,7 @@ const FloatingWindow = () => {
                   <div className="history-source">{item.source?.slice(0, 50) || '...'}</div>
                   <div className="history-translated">{item.translated?.slice(0, 50) || '...'}</div>
                   <div className="history-meta">
+                    {item.kind === 'understand' && <AiBadge size={10} />}
                     {item.timestamp && new Date(item.timestamp).toLocaleString('zh-CN', {
                       month: 'numeric',
                       day: 'numeric',

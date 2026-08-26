@@ -146,11 +146,26 @@ export default function useSegmentNotes({ capabilities, sourceLang, targetLang, 
 
   const stopBatch = useCallback(() => { stopRef.current = true; }, []);
 
+  // Restore path: re-seat notes saved with the document's progress blob.
+  // Existing notes win — one the reader just made must not be clobbered by
+  // an old blob arriving late. Non-string values are dropped (the blob is
+  // hand-editable localStorage).
+  const seed = useCallback((map) => {
+    if (!map || typeof map !== 'object') return;
+    const clean = {};
+    for (const [id, content] of Object.entries(map)) {
+      if (typeof content === 'string' && content) clean[id] = content;
+    }
+    if (!Object.keys(clean).length) return;
+    notesRef.current = { ...clean, ...notesRef.current };
+    setNotes(notesRef.current);
+  }, []);
+
   const reset = useCallback(() => {
     notesRef.current = {};
     setNotes({});
     setFolded({});
   }, []);
 
-  return { notes, folded, runningId, batch, explain, explainAll, stopBatch, reset };
+  return { notes, folded, runningId, batch, explain, explainAll, stopBatch, seed, reset };
 }

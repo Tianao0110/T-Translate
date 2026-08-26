@@ -174,6 +174,8 @@ const en = {
     group: { date: "By Date", language: "By Language" },
     select: "Select", export: "Export", import: "Import",
     hasAiResult: "Has an AI result — double-click to view",
+    understandEntry: "AI understanding result",
+    copyExplain: "Copy explanation",
     deleteSelected: "Delete ({{count}})",
     searchResult: "Search \"{{keyword}}\" found {{count}} results",
     searchHint: "(↑↓ Navigate, Enter to copy)",
@@ -195,7 +197,7 @@ const en = {
       totalChars: "Total Characters", avgLength: "Average Length", streak: "Streak Days", languagePairs: "Language Pairs" 
     },
     table: { time: "Time", language: "Language", source: "Source", target: "Target", actions: "Actions" },
-    card: { clickHint: "Click to toggle source/target, double-click for details", source: "Source", target: "Target" }
+    card: { clickHint: "Click to toggle source/target, double-click for details", source: "Source", target: "Target", explain: "Explanation" }
   },
   favorites: { 
     title: "Favorites", search: "Search favorites...", empty: "No favorites yet", noMatch: "No matching favorites found", 
@@ -596,6 +598,7 @@ const en = {
     // Progress restore
     restore: {
       found: "Previous progress found ({{count}} translated)",
+      foundWithNotes: "Previous progress found ({{count}} translated, {{notes}} explanations)",
       restore: "Restore",
       dismiss: "Dismiss"
     },
@@ -641,6 +644,8 @@ const en = {
     notify: {
       fileLoaded: "File loaded: {{count}} segments",
       fileLoadedWithPages: "File loaded: {{count}} segments ({{pages}} pages)",
+      progressRestored: "Restored {{count}} translated segments",
+      progressRestoredNotes: "Restored {{count}} translated segments and {{notes}} explanations",
       parseFailed: "Failed to parse file",
       translationComplete: "Translation complete",
       translationCompleteFromCache: "Translation complete (all from cache)",

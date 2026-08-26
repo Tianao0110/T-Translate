@@ -329,6 +329,7 @@ function register(ctx) {
                 timestamp: item.timestamp,
                 sourceLang: item.sourceLanguage,
                 targetLang: item.targetLanguage,
+                kind: item.kind,
               }));
             }
             return [];

@@ -1059,6 +1059,11 @@
   margin-top: 4px;
 }
 
+.history-meta .ai-text-badge {
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
 /* ========== 穿透模式指示器 ========== */
 
 .pass-through-indicator {
