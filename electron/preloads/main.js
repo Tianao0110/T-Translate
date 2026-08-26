@@ -63,6 +63,16 @@ const electronAPI = {
     showOpenDialog: (opts) => ipcRenderer.invoke("show-open-dialog", opts),
     saveFile: (opts) => ipcRenderer.invoke("save-file", opts),
   },
+  document: {
+    // "Open with T-Translate": pull the pending context-menu file (one-shot),
+    // and get pinged when a running instance receives a new one.
+    takePendingOpen: () => ipcRenderer.invoke("document:take-pending-open"),
+    onOpenFileReady: (callback) => {
+      const handler = () => callback();
+      ipcRenderer.on("document:open-file-ready", handler);
+      return () => ipcRenderer.removeListener("document:open-file-ready", handler);
+    },
+  },
   clipboard: {
     readText: () => ipcRenderer.invoke("read-clipboard-text"),
     writeText: (text) => ipcRenderer.send("write-clipboard-text", text),

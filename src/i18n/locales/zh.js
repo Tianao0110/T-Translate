@@ -585,6 +585,10 @@ const zh = {
   // ===== DocumentTranslator keys =====
   documentTranslator: {
     title: "文档翻译",
+    openWith: {
+      tooLarge: "《{{name}}》太大，无法通过右键菜单打开（上限 100MB），请在文档翻译页内选择该文件",
+      readFailed: "《{{name}}》读取失败，文件可能已被移动或占用",
+    },
     sysNotify: {
       translateDoneTitle: "文档翻译完成",
       translateDoneBody: "《{{name}}》已翻译完成，点击查看",

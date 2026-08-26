@@ -585,6 +585,10 @@ const en = {
   // ===== DocumentTranslator keys =====
   documentTranslator: {
     title: "Document Translation",
+    openWith: {
+      tooLarge: "\"{{name}}\" is too large for the context menu (100MB limit). Open it from the document page instead.",
+      readFailed: "Failed to read \"{{name}}\" — the file may have been moved or is in use.",
+    },
     sysNotify: {
       translateDoneTitle: "Document translated",
       translateDoneBody: "\"{{name}}\" is fully translated. Click to view.",

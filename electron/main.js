@@ -23,6 +23,7 @@ let selectionStateMachine = null;
 const logger = require('./utils/logger')('Main');
 
 const { createCrashGuard, SAFE_MODE_THRESHOLD } = require('./utils/crash-guard');
+const { extractOpenableFile } = require('./utils/open-with');
 const crashGuard = createCrashGuard({ store, logger });
 
 // Main-window renderer crashed past the reload limit: reloading clearly can't
@@ -1358,12 +1359,30 @@ const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
   app.quit();
 } else {
-  app.on('second-instance', () => {
+  app.on('second-instance', (event, commandLine) => {
+    // Context-menu launch while already running: the losing instance forwards
+    // its argv here. Stash the file and ping the renderer to come pick it up.
+    const openFile = extractOpenableFile(commandLine);
+    if (openFile) {
+      runtime.pendingOpenFile = openFile;
+      logger.info('Open-with file from second instance:', openFile);
+    }
+
     if (windows.main) {
       if (windows.main.isMinimized()) windows.main.restore();
+      windows.main.show(); // may be hidden to tray — focus alone won't surface it
       windows.main.focus();
+      if (openFile) {
+        windows.main.webContents.send(CHANNELS.DOCUMENT.OPEN_FILE_READY);
+      }
     }
   });
+
+  // Cold start straight from the context menu: the file rides process.argv.
+  runtime.pendingOpenFile = extractOpenableFile(process.argv);
+  if (runtime.pendingOpenFile) {
+    logger.info('Open-with file from cold start:', runtime.pendingOpenFile);
+  }
 
   // Startup-crash probation — only in the instance that owns the lock (the
   // losing duplicate quits right away and must not touch the counters). Runs

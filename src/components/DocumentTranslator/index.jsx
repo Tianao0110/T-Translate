@@ -324,10 +324,12 @@ const OutlineItem = ({ item, onNavigate, level = 0 }) => {
 
 const logger = createLogger('DocTranslator');
 
-const DocumentTranslator = ({ 
+const DocumentTranslator = ({
   notify,
   sourceLang: initialSourceLang = 'auto',
   targetLang: initialTargetLang = 'zh',
+  externalFile = null,
+  onExternalFileConsumed,
 }) => {
   const { t } = useTranslation();
   const [confirm, confirmDialog] = useConfirm();
@@ -933,6 +935,20 @@ const DocumentTranslator = ({
     }
     e.target.value = null;
   }, [loadFile]);
+
+  // "Open with T-Translate" hand-off from MainWindow — loads exactly like a
+  // picked file (password prompts, scanned-page OCR and progress restore all
+  // ride the same path). Consumed-callback clears the parent slot so the same
+  // File object cannot re-trigger. Deliberately keyed on externalFile alone:
+  // loadFile's identity churns with settings and must not re-run the load.
+  const externalFileRef = useRef(null);
+  useEffect(() => {
+    if (!externalFile || externalFileRef.current === externalFile) return;
+    externalFileRef.current = externalFile;
+    loadFile(externalFile);
+    onExternalFileConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalFile]);
 
   // Start translation
   const startTranslation = async () => {

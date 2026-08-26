@@ -16,6 +16,13 @@ const CHANNELS = {
     OPEN: 'show-open-dialog',
     SAVE_FILE: 'save-file',   // dialog + write in one round trip
   },
+  DOCUMENT: {
+    // "Open with T-Translate" hand-off: renderer pulls the pending file (path
+    // is main-process-owned — no arbitrary-path read surface), main pushes a
+    // ready ping on second-instance.
+    TAKE_PENDING_OPEN: 'document:take-pending-open',
+    OPEN_FILE_READY: 'document:open-file-ready',
+  },
   STORE: {
     GET: 'store-get',
     SET: 'store-set',

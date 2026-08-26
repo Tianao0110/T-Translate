@@ -11,7 +11,7 @@
 // is what catches them, so this asks for nothing more than "it mounts".
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render } from '@testing-library/react';
+import { render, waitFor } from '@testing-library/react';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -59,5 +59,22 @@ describe('DocumentTranslator mounts', () => {
   it('offers the file input, which is the only way in', () => {
     const { container } = render(<DocumentTranslator notify={() => {}} />);
     expect(container.querySelector('input[type="file"]')).toBeTruthy();
+  });
+
+  it('consumes an externally handed file (context-menu open) exactly once', async () => {
+    const consumed = vi.fn();
+    const file = new File(['hello external world'], 'open-with.txt', { type: 'text/plain' });
+
+    const { rerender } = render(
+      <DocumentTranslator notify={() => {}} externalFile={file} onExternalFileConsumed={consumed} />
+    );
+
+    await waitFor(() => expect(consumed).toHaveBeenCalledTimes(1));
+
+    // Parent clears the slot; a re-render with the same object must not re-load.
+    rerender(
+      <DocumentTranslator notify={() => {}} externalFile={file} onExternalFileConsumed={consumed} />
+    );
+    expect(consumed).toHaveBeenCalledTimes(1);
   });
 });
