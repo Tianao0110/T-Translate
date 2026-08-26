@@ -8,8 +8,10 @@ const createLogger = require("../utils/logger");
 const logger = createLogger("IPC:System");
 const { t } = require("../shared/main-i18n");
 
-// Larger files stall the IPC hand-off and the parser alike; refuse early.
-const MAX_OPEN_WITH_BYTES = 100 * 1024 * 1024;
+// Must match MAX_FILE_SIZE in src/utils/document-parser.js: the parser refuses
+// anything larger anyway, so a higher cap here would only read the whole file
+// into memory and ship it over IPC for the renderer to reject.
+const MAX_OPEN_WITH_BYTES = 20 * 1024 * 1024;
 
 function register(ctx) {
   const { getMainWindow, store, app, runtime } = ctx;

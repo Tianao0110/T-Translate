@@ -586,7 +586,7 @@ const en = {
   documentTranslator: {
     title: "Document Translation",
     openWith: {
-      tooLarge: "\"{{name}}\" is too large for the context menu (100MB limit). Open it from the document page instead.",
+      tooLarge: "\"{{name}}\" is larger than 20MB — too large for document translation.",
       readFailed: "Failed to read \"{{name}}\" — the file may have been moved or is in use.",
     },
     sysNotify: {
