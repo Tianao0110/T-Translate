@@ -49,7 +49,7 @@ Select any text and a translation window pops up automatically. Up to 8 pinned w
 
 ### Screenshot OCR translation
 
-Capture a screen region for text recognition. When an OCR engine is unavailable, falls back to the next one transparently. 59 recognition languages: Chinese, English, Japanese and 37 Latin-script languages are built in; Korean, Cyrillic, Devanagari, Arabic, Tamil, Telugu and Kannada each need one language pack, and a pack covers every language written in that script. When the local engine cannot read a capture, the chain moves on to an engine that can.
+Capture a screen region for text recognition; when an engine is unavailable or cannot read the capture, the chain falls back to the next one. 59 recognition languages: Chinese, English, Japanese and 37 Latin-script languages built in; Korean, Cyrillic, Devanagari, Arabic, Tamil, Telugu and Kannada each need one language pack, covering every language in that script.
 
 <p align="center">
   <img src="docs/screenshots/screenshot-ocr.png" width="600" alt="Screenshot OCR translation">
