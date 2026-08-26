@@ -10,6 +10,37 @@
 }
 
 /* ==================== 工具栏 ==================== */
+/* Origin filter chips — rendered only when history holds >= 2 source groups */
+.source-chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 20px 12px;
+}
+
+.source-chip {
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid var(--border-primary);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.source-chip:hover {
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
+.source-chip.active {
+  background: color-mix(in srgb, var(--accent-primary) 12%, transparent);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
 .history-toolbar {
   display: flex;
   align-items: center;
@@ -311,6 +342,21 @@
 }
 
 .history-card:hover { border-color: var(--accent-primary); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); }
+
+/* Per-source card tint. Fixed hues (user-approved exception to the token-only
+   rule) mixed at a few percent into the theme card base, so every theme keeps
+   its own darkness and the tint stays a soft wash, never a loud fill.
+   'other' keeps the plain base. */
+.history-card.source-main { background: color-mix(in srgb, #3b82f6 6%, var(--bg-secondary)); }
+.history-card.source-selection { background: color-mix(in srgb, #8b5cf6 6%, var(--bg-secondary)); }
+.history-card.source-screenshot { background: color-mix(in srgb, #10b981 7%, var(--bg-secondary)); }
+.history-card.source-floating { background: color-mix(in srgb, #f97316 6%, var(--bg-secondary)); }
+
+/* Dark base swallows a 6% wash — one step up keeps the hue readable there. */
+[data-theme='dark'] .history-card.source-main { background: color-mix(in srgb, #3b82f6 11%, var(--bg-secondary)); }
+[data-theme='dark'] .history-card.source-selection { background: color-mix(in srgb, #8b5cf6 11%, var(--bg-secondary)); }
+[data-theme='dark'] .history-card.source-screenshot { background: color-mix(in srgb, #10b981 12%, var(--bg-secondary)); }
+[data-theme='dark'] .history-card.source-floating { background: color-mix(in srgb, #f97316 11%, var(--bg-secondary)); }
 .history-card.selected { border-color: var(--accent-primary); background: color-mix(in srgb, var(--accent-primary) 5%, transparent); }
 
 .card-header {

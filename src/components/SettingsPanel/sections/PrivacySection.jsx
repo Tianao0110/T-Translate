@@ -2,10 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Zap, Shield, Lock, CheckCircle, AlertCircle, Trash2, ClipboardList, Database, Check, X } from 'lucide-react';
+import { Zap, Shield, Lock, CheckCircle, AlertCircle, Trash2, ClipboardList, Database, Check, X, ArrowRightLeft, Download, Upload } from 'lucide-react';
 import useTranslationStore from '../../../stores/translation-store';
 import translationService from '../../../services/stack-client.js';
 import { PRIVACY_MODES, PRIVACY_MODE_IDS } from '../constants.js';
+import { buildMigrationPack, parseMigrationPack, stripSecrets, MAX_PACK_BYTES } from '../../../utils/migration-pack.js';
+import { validateImportedActions, refreshImportedActions } from '../../../services/ai-action-store.js';
+import { getAllProviderMetadata } from '../../../config/provider-icons.js';
 
 const formatBytes = (bytes) => {
   if (!bytes) return '0 KB';
@@ -17,7 +20,8 @@ const PrivacySection = ({
   settings,
   updateSetting,
   notify,
-  confirm
+  confirm,
+  reloadSettings
 }) => {
   const { t } = useTranslation();
   // Reactive subscription — nothing else re-renders this section on mode change
@@ -117,6 +121,158 @@ const PrivacySection = ({
     await translationService.clearCache();
     notify(t('translationSettings.cacheCleared'), 'success');
     refreshDataStats();
+  };
+
+  // ===== Migration pack =====
+
+  // Parsed pack + per-block checkboxes; non-null renders the confirm modal.
+  const [importState, setImportState] = useState(null);
+
+  const handleExportPack = async () => {
+    try {
+      if (!window.electron?.store || !window.electron?.dialog?.saveFile) {
+        notify(t('privacy.migration.needApp'), 'warning');
+        return;
+      }
+      // Read the PERSISTED settings, never this panel's in-memory copy — the
+      // panel decrypts OCR keys into its inputs, and those must not reach a
+      // shareable file. The stored bucket is already key-free.
+      const storedSettings = await window.electron.store.get('settings');
+      const { favorites, customLanguages } = useTranslationStore.getState();
+      const appVersion = (await window.electron?.app?.getVersion?.()) || '';
+      const pack = buildMigrationPack({
+        settings: storedSettings,
+        favorites,
+        customLanguages,
+        appVersion,
+        providersMeta: getAllProviderMetadata(),
+      });
+      const filename = `t-translate-migration-${new Date().toISOString().slice(0, 10)}.json`;
+      const result = await window.electron.dialog.saveFile({
+        defaultPath: filename,
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+        data: JSON.stringify(pack, null, 2),
+      });
+      if (result?.success) notify(t('privacy.migration.exported'), 'success');
+      else if (result && !result.canceled) {
+        notify(t('privacy.migration.exportFailed') + (result.error ? `: ${result.error}` : ''), 'error');
+      }
+    } catch (e) {
+      notify(t('privacy.migration.exportFailed') + ': ' + e.message, 'error');
+    }
+  };
+
+  const handleImportFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-picking the same file after a failed try
+    if (!file) return;
+    if (file.size > MAX_PACK_BYTES) {
+      notify(t('privacy.migration.tooLarge'), 'error');
+      return;
+    }
+    try {
+      const parsed = parseMigrationPack(await file.text());
+      if (!parsed.ok) {
+        notify(t(parsed.error === 'newer-version'
+          ? 'privacy.migration.newerVersion'
+          : 'privacy.migration.invalidFile'), 'error');
+        return;
+      }
+      const s = parsed.summary;
+      if (!s.settingsBuckets && !s.glossary && !s.favorites && !s.customLanguages) {
+        notify(t('privacy.migration.emptyPack'), 'warning');
+        return;
+      }
+      setImportState({
+        ...parsed,
+        checks: {
+          settings: s.settingsBuckets > 0,
+          glossary: s.glossary > 0,
+          favorites: s.favorites > 0,
+          customLanguages: s.customLanguages > 0,
+        },
+      });
+    } catch (err) {
+      notify(t('privacy.migration.invalidFile') + ': ' + err.message, 'error');
+    }
+  };
+
+  const toggleImportCheck = (key) =>
+    setImportState((prev) => prev && ({ ...prev, checks: { ...prev.checks, [key]: !prev.checks[key] } }));
+
+  const applyImport = async () => {
+    const { payload, checks } = importState;
+    const results = [];
+    try {
+      if (checks.settings && payload.settings) {
+        // Same defense as export: a hand-edited pack must not smuggle keys in.
+        const clean = stripSecrets(payload.settings, getAllProviderMetadata());
+        if (clean.aiActions) {
+          clean.aiActions.imported = validateImportedActions(clean.aiActions.imported);
+        }
+        if (window.electron?.store) {
+          // Per-bucket dot-path writes: buckets absent from the pack keep
+          // their local values instead of being wiped by a whole-key set.
+          for (const [bucket, value] of Object.entries(clean)) {
+            await window.electron.store.set(`settings.${bucket}`, value);
+          }
+        }
+        await refreshImportedActions();
+        results.push(t('privacy.migration.appliedSettings', { count: Object.keys(clean).length }));
+      }
+
+      const store = useTranslationStore.getState();
+      const seen = new Set((store.favorites || []).map((f) => `${f.sourceText} ${f.translatedText}`));
+      const addUnique = (entry) => {
+        const key = `${entry.sourceText} ${entry.translatedText}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        store.addToFavorites(entry);
+        return true;
+      };
+
+      if (checks.glossary) {
+        let added = 0;
+        payload.glossary.forEach((term, i) => {
+          if (addUnique({
+            id: `mig_${Date.now()}_g${i}`,
+            sourceText: term.source,
+            translatedText: term.target,
+            note: term.note,
+            tags: term.tags,
+            folderId: 'glossary',
+            timestamp: Date.now(),
+          })) added++;
+        });
+        results.push(t('privacy.migration.appliedGlossary', { count: added }));
+      }
+
+      if (checks.favorites) {
+        let added = 0;
+        payload.favorites.forEach((f, i) => {
+          if (addUnique({ ...f, id: `mig_${Date.now()}_f${i}`, timestamp: Date.now() })) added++;
+        });
+        results.push(t('privacy.migration.appliedFavorites', { count: added }));
+      }
+
+      if (checks.customLanguages) {
+        const before = useTranslationStore.getState().customLanguages.length;
+        payload.customLanguages.forEach((l) => store.addCustomLanguage(l));
+        const added = useTranslationStore.getState().customLanguages.length - before;
+        results.push(t('privacy.migration.appliedLanguages', { count: added }));
+      }
+
+      // Multi-window take-effect path (same as a settings save).
+      try { await window.electron?.floatingWindow?.notifySettingsChanged?.(); } catch { /* best effort */ }
+      try { await translationService.reload?.(); } catch { /* best effort */ }
+      await reloadSettings?.();
+      refreshDataStats();
+
+      setImportState(null);
+      notify(t('privacy.migration.importDone', { detail: results.join(' / ') }), 'success');
+    } catch (e) {
+      notify(t('privacy.migration.importFailed') + ': ' + e.message, 'error');
+    }
   };
 
   return (
@@ -243,6 +399,21 @@ const PrivacySection = ({
         </p>
       </div>
 
+      {/* Migration pack */}
+      <div className="setting-group" style={{marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border-primary)'}}>
+        <h4 style={{display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', color: 'var(--text-primary)'}}><ArrowRightLeft size={15} /> {t('privacy.migration.title')}</h4>
+        <p className="setting-hint" style={{marginBottom: '12px'}}>{t('privacy.migration.hint')}</p>
+        <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap'}}>
+          <button className="neutral-button" onClick={handleExportPack}>
+            <Download size={16} /> {t('privacy.migration.export')}
+          </button>
+          <label className="neutral-button">
+            <Upload size={16} /> {t('privacy.migration.import')}
+            <input type="file" accept=".json" onChange={handleImportFile} style={{display: 'none'}} />
+          </label>
+        </div>
+      </div>
+
       <div className="setting-group">
         <div className="danger-actions">
           <button className="danger-button" onClick={handleClearHistory}>
@@ -256,6 +427,63 @@ const PrivacySection = ({
           </button>
         </div>
       </div>
+
+      {importState && (
+        <div className="migration-modal-overlay" onClick={() => setImportState(null)}>
+          <div className="migration-modal" onClick={(e) => e.stopPropagation()}>
+            <h4><ArrowRightLeft size={15} /> {t('privacy.migration.importTitle')}</h4>
+            <div className="migration-meta">
+              {t('privacy.migration.packMeta', {
+                version: importState.meta.appVersion || '?',
+                date: importState.meta.exportedAt ? importState.meta.exportedAt.slice(0, 10) : '?',
+              })}
+            </div>
+            <div className="migration-rows">
+              {importState.summary.settingsBuckets > 0 && (
+                <label className="setting-toggle">
+                  <input type="checkbox" checked={importState.checks.settings} onChange={() => toggleImportCheck('settings')} />
+                  <span>
+                    {t('privacy.migration.blockSettings', { count: importState.summary.settingsBuckets })}
+                    {importState.summary.importedActions > 0
+                      ? t('privacy.migration.blockSettingsActions', { count: importState.summary.importedActions })
+                      : ''}
+                  </span>
+                </label>
+              )}
+              {importState.summary.glossary > 0 && (
+                <label className="setting-toggle">
+                  <input type="checkbox" checked={importState.checks.glossary} onChange={() => toggleImportCheck('glossary')} />
+                  <span>{t('privacy.migration.blockGlossary', { count: importState.summary.glossary })}</span>
+                </label>
+              )}
+              {importState.summary.favorites > 0 && (
+                <label className="setting-toggle">
+                  <input type="checkbox" checked={importState.checks.favorites} onChange={() => toggleImportCheck('favorites')} />
+                  <span>{t('privacy.migration.blockFavorites', { count: importState.summary.favorites })}</span>
+                </label>
+              )}
+              {importState.summary.customLanguages > 0 && (
+                <label className="setting-toggle">
+                  <input type="checkbox" checked={importState.checks.customLanguages} onChange={() => toggleImportCheck('customLanguages')} />
+                  <span>{t('privacy.migration.blockLanguages', { count: importState.summary.customLanguages })}</span>
+                </label>
+              )}
+            </div>
+            <div className="migration-actions">
+              <button className="neutral-button" onClick={() => setImportState(null)}>
+                <X size={16} /> {t('common.cancel')}
+              </button>
+              <button
+                className="neutral-button"
+                disabled={!Object.values(importState.checks).some(Boolean)}
+                onClick={applyImport}
+              >
+                <Check size={16} /> {t('privacy.migration.applyImport')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

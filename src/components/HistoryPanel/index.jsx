@@ -27,6 +27,24 @@ import { PRIVACY_MODES } from '@config/defaults';
 dayjs.extend(relativeTime);
 dayjs.extend(isSameOrAfter);
 
+// Origin filter groups. 'selection' and 'hotkey' are the same feature from the
+// user's chair (icon click vs CapsLock direct), so they filter as one. Rows
+// with no recognized source — legacy entries (normalized to 'import' on
+// reload), imports, unknowns — all land in 'other'.
+const SOURCE_GROUPS = {
+  main: ['main'],
+  selection: ['selection', 'hotkey'],
+  screenshot: ['screenshot'],
+  floating: ['floating'],
+};
+
+function sourceGroupOf(source) {
+  for (const [group, values] of Object.entries(SOURCE_GROUPS)) {
+    if (values.includes(source)) return group;
+  }
+  return 'other';
+}
+
 const HistoryCard = memo(({
   item,
   onCopy,
@@ -75,7 +93,7 @@ const HistoryCard = memo(({
   }, [onDoubleClick, item]);
 
   return (
-    <div className={`history-card ${isSelected ? 'selected' : ''}`} onDoubleClick={handleDoubleClick}>
+    <div className={`history-card source-${sourceGroupOf(item.source)} ${isSelected ? 'selected' : ''}`} onDoubleClick={handleDoubleClick}>
       <div className="card-header">
         <span className="card-lang">{item.sourceLanguage || 'auto'} → {item.targetLanguage || 'zh'}</span>
         <div className="card-header-right">
@@ -162,9 +180,9 @@ const HistoryPanel = ({ showNotification }) => {
   const LOAD_MORE_THRESHOLD = 100;
 
   const [viewMode, setViewMode] = useState('card');
-  const [groupBy, setGroupBy] = useState('date');
   const [showStats, setShowStats] = useState(false);
   const [dateRange, setDateRange] = useState('all');
+  const [sourceFilter, setSourceFilter] = useState('all');
   const [searchInput, setSearchInput] = useState('');
   const [expandedGroups, setExpandedGroups] = useState(new Set(['today', 'yesterday']));
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -265,6 +283,10 @@ const HistoryPanel = ({ showNotification }) => {
       );
     }
 
+    if (sourceFilter !== 'all') {
+      filtered = filtered.filter(item => sourceGroupOf(item.source) === sourceFilter);
+    }
+
     const now = dayjs();
     switch (dateRange) {
       case 'today': filtered = filtered.filter(item => dayjs(item.timestamp).isSameOrAfter(now.startOf('day'))); break;
@@ -285,7 +307,17 @@ const HistoryPanel = ({ showNotification }) => {
     });
 
     return filtered;
-  }, [history, debouncedSearch, dateRange, sortConfig]);
+  }, [history, debouncedSearch, dateRange, sourceFilter, sortConfig]);
+
+  // Which origin groups actually occur — the chip row only renders when there
+  // are at least two, so a long-time single-source history shows nothing new.
+  const presentSourceGroups = useMemo(() => {
+    const groups = new Set();
+    if (Array.isArray(history)) {
+      for (const item of history) groups.add(sourceGroupOf(item.source));
+    }
+    return groups;
+  }, [history]);
 
   const paginatedHistory = useMemo(() => {
     return filteredHistory.slice(0, displayCount);
@@ -321,7 +353,7 @@ const HistoryPanel = ({ showNotification }) => {
   // the top, not whatever offset they had scrolled to.
   useEffect(() => {
     setDisplayCount(PAGE_SIZE);
-  }, [debouncedSearch, dateRange]);
+  }, [debouncedSearch, dateRange, sourceFilter]);
 
   const groupedHistory = useMemo(() => {
     const groups = {};
@@ -329,16 +361,12 @@ const HistoryPanel = ({ showNotification }) => {
 
     for (const item of paginatedHistory) {
       let key;
-      if (groupBy === 'date') {
-        const d = dayjs(item.timestamp);
-        if (d.isSame(now, 'day')) key = 'today';
-        else if (d.isSame(now.subtract(1, 'day'), 'day')) key = 'yesterday';
-        else if (d.isSame(now, 'week')) key = 'thisWeek';
-        else if (d.isSame(now, 'month')) key = 'thisMonth';
-        else key = d.format('YYYY-MM');
-      } else {
-        key = `${item.sourceLanguage || 'auto'} → ${item.targetLanguage || 'zh'}`;
-      }
+      const d = dayjs(item.timestamp);
+      if (d.isSame(now, 'day')) key = 'today';
+      else if (d.isSame(now.subtract(1, 'day'), 'day')) key = 'yesterday';
+      else if (d.isSame(now, 'week')) key = 'thisWeek';
+      else if (d.isSame(now, 'month')) key = 'thisMonth';
+      else key = d.format('YYYY-MM');
       if (!groups[key]) groups[key] = [];
       groups[key].push(item);
     }
@@ -353,7 +381,7 @@ const HistoryPanel = ({ showNotification }) => {
         return b[0].localeCompare(a[0]);
       })
       .map(([key, items]) => ({ key, items, count: items.length }));
-  }, [paginatedHistory, groupBy]);
+  }, [paginatedHistory]);
 
   const getGroupTitle = useCallback((key) => {
     const dateGroupLabels = {
@@ -740,11 +768,6 @@ const HistoryPanel = ({ showNotification }) => {
             <option value="week">{t('history.filter.week')}</option>
             <option value="month">{t('history.filter.month')}</option>
           </select>
-
-          <select className="toolbar-select" value={groupBy} onChange={(e) => setGroupBy(e.target.value)}>
-            <option value="date">{t('history.group.date')}</option>
-            <option value="language">{t('history.group.language')}</option>
-          </select>
         </div>
 
         <div className="toolbar-right">
@@ -775,6 +798,22 @@ const HistoryPanel = ({ showNotification }) => {
           </button>
         </div>
       </div>
+
+      {presentSourceGroups.size >= 2 && (
+        <div className="source-chips">
+          {['all', 'main', 'selection', 'screenshot', 'floating', 'other']
+            .filter((key) => key === 'all' || presentSourceGroups.has(key))
+            .map((key) => (
+              <button
+                key={key}
+                className={`source-chip ${sourceFilter === key ? 'active' : ''}`}
+                onClick={() => setSourceFilter(key)}
+              >
+                {t(`history.sourceFilter.${key}`)}
+              </button>
+            ))}
+        </div>
+      )}
 
       {renderStats()}
 

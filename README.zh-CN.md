@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.3.6-green" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.3.7-green" alt="Version">
   <img src="https://img.shields.io/badge/license-T--Translate%201.0-blue" alt="License">
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform">
 </p>
@@ -28,13 +28,14 @@
 | **划词翻译**     | 系统级，任何应用中选中文字即翻译，支持 8 个冻结窗口                                 |
 | **截图 OCR**     | 截屏识别文字，59 种识别语言，7 个 OCR 引擎自动降级                                   |
 | **悬浮窗口**     | 透明悬浮窗，空格截图翻译；自动刷新与全局快捷键零焦点截取，实时字幕/追番适用         |
-| **文档翻译**     | PDF / DOCX / EPUB / TXT / SRT 等 9 种格式，逐段翻译，进度可恢复，带术语检查         |
+| **文档翻译**     | PDF / DOCX / EPUB / TXT / SRT 等 9 种格式，逐段翻译，进度可恢复，带术语检查；资源管理器右键直达 |
 | **134 种语言**   | 覆盖谷歌翻译支持的全部语言，选择器带字母索引与常用区，可自行添加语言                 |
 | **AI 动作**      | 长段内容一键总结；悬浮窗「理解模式」与文档段落讲解；可导入自定义动作（需大模型源）   |
 | **术语库**       | 翻译后自动替换术语，支持撤销                                                        |
 | **TTS 朗读**     | 基于 Windows 离线语音引擎                                                           |
 | **10 个翻译源**  | LM Studio、Ollama、OpenAI、Claude、Gemini、DeepSeek、DeepL、Google、Microsoft、百度 |
 | **三档隐私模式** | 标准 / 无痕 / 离线，离线模式下在线 API Key 禁止解密                                 |
+| **迁移包**       | 设置、术语库、收藏、自定义语言一键导出导入，换机不丢配置                            |
 | **开机自启**     | 静默运行到托盘，可选自动开启划词翻译                                                |
 
 ---
@@ -77,7 +78,7 @@
 
 ### 文档翻译
 
-支持 PDF、DOCX、EPUB、TXT、Markdown、SRT、VTT、CSV、JSON 共 9 种格式，支持并发翻译、扫描件 OCR 和术语库联动。
+支持 PDF、DOCX、EPUB、TXT、Markdown、SRT、VTT、CSV、JSON 共 9 种格式，支持并发翻译、扫描件 OCR 和术语库联动。PDF、DOCX、TXT 可在资源管理器右键「用 T-Translate 翻译」直接打开；翻译或一键总结完成时窗口不在前台，会发系统通知提醒。
 
 配了大模型源时，每段可让 AI **讲解这一段**，结果展开在译文下方；「整理笔记」把已讲解的段落汇总成一份连贯笔记，两者都随进度保存，重开文件可恢复。翻译完成后，**术语检查**找出漏翻的术语一键替换，可单独撤销。
 
@@ -88,6 +89,8 @@
 ### 隐私模式
 
 三档隐私控制，按需选择。离线模式下仅使用本地 LLM，在线 API Key 禁止解密——即使程序内部被恶意代码调用也拿不到。
+
+设置 → 隐私可导出**迁移包**（设置、术语库、收藏、自定义语言），换机导入即用；API 密钥不随包迁移，需在新机重新填写。
 
 <p align="center">
     <img src="docs/screenshots/privacy-mode-standard.png" width="600" alt="隐私正常模式">
@@ -105,7 +108,7 @@
 
 ### TTS 朗读
 
-翻译结果语音朗读，基于 Windows 离线语音引擎，可调节语速。语音列表根据系统已安装的离线语音包加载。
+翻译结果语音朗读，基于 Windows 离线语音引擎，可调节语速。语音列表根据系统已安装的离线语音包加载；朗读语言为自动时，按文字特征挑选对应语言的语音。
 
 <p align="center">
   <img src="docs/screenshots/tts.png" width="600" alt="TTS 朗读">

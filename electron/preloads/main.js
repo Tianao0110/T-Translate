@@ -47,6 +47,7 @@ const electronAPI = {
     minimize: () => ipcRenderer.send("minimize-window"),
     maximize: () => ipcRenderer.send("maximize-window"),
     close: () => ipcRenderer.send("close-window"),
+    show: () => ipcRenderer.send("show-window"),
     setAlwaysOnTop: (flag) => ipcRenderer.send("set-always-on-top", flag),
     isMaximized: () => ipcRenderer.invoke("is-maximized"),
     onMaximizeChange: (callback) => {
@@ -61,6 +62,16 @@ const electronAPI = {
     showSaveDialog: (opts) => ipcRenderer.invoke("show-save-dialog", opts),
     showOpenDialog: (opts) => ipcRenderer.invoke("show-open-dialog", opts),
     saveFile: (opts) => ipcRenderer.invoke("save-file", opts),
+  },
+  document: {
+    // "Open with T-Translate": pull the pending context-menu file (one-shot),
+    // and get pinged when a running instance receives a new one.
+    takePendingOpen: () => ipcRenderer.invoke("document:take-pending-open"),
+    onOpenFileReady: (callback) => {
+      const handler = () => callback();
+      ipcRenderer.on("document:open-file-ready", handler);
+      return () => ipcRenderer.removeListener("document:open-file-ready", handler);
+    },
   },
   clipboard: {
     readText: () => ipcRenderer.invoke("read-clipboard-text"),

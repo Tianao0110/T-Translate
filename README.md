@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.3.6-green" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.3.7-green" alt="Version">
   <img src="https://img.shields.io/badge/license-T--Translate%201.0-blue" alt="License">
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform">
 </p>
@@ -28,13 +28,14 @@
 | **Selection translator**     | System-wide. Select text in any app to translate. Up to 8 pinned windows                                                               |
 | **Screenshot OCR**           | Capture screen regions. 59 recognition languages, 7 OCR engines with automatic fallback                                                |
 | **Floating window**          | Transparent overlay. Space-bar to capture-and-translate; auto-refresh & global-hotkey zero-focus capture for live captions / subtitles |
-| **Document translation**     | 9 formats: PDF / DOCX / EPUB / TXT / SRT / VTT / CSV / JSON / Markdown. Segment-by-segment, resumable, with term check                  |
+| **Document translation**     | 9 formats: PDF / DOCX / EPUB / TXT / SRT / VTT / CSV / JSON / Markdown. Segment-by-segment, resumable, with term check; Explorer right-click entry |
 | **134 languages**            | Everything Google Translate supports, in a picker with a letter index and a recently-used row; more can be added by hand                |
 | **AI actions**               | One-click summary of long passages; "understanding mode" in the floating window and per-paragraph explanations in documents; custom actions can be imported (needs an LLM provider) |
 | **Glossary**                 | Auto-replace terms after translation, with undo support                                                                                |
 | **TTS**                      | Built on Windows offline speech engine                                                                                                 |
 | **10 translation providers** | LM Studio, Ollama, OpenAI, Claude, Gemini, DeepSeek, DeepL, Google, Microsoft, Baidu                                                   |
 | **3 privacy modes**          | Standard / Incognito / Offline. Offline mode blocks decryption of online API keys                                                      |
+| **Migration pack**           | One-file export/import of settings, glossary, favorites and custom languages                                                           |
 | **Auto-start**               | Silent tray launch with optional auto-enable for selection translator                                                                  |
 
 ---
@@ -77,7 +78,7 @@ Summaries attach to their translation in history; understanding results get entr
 
 ### Document translation
 
-Supports 9 formats: PDF, DOCX, EPUB, TXT, SRT, VTT, CSV, JSON, Markdown — with parallel translation, scanned-PDF OCR and glossary integration.
+Supports 9 formats: PDF, DOCX, EPUB, TXT, SRT, VTT, CSV, JSON, Markdown — with parallel translation, scanned-PDF OCR and glossary integration. PDF, DOCX and TXT open straight from the Explorer right-click menu ("Translate with T-Translate"). When translation or a one-click summary finishes with the window in the background, a system notification lets you know.
 
 With an LLM provider, each paragraph can be **explained** under its translation, and a **consolidated note** collects the explanations; both are saved with the progress and come back when you reopen the file. After translating, **term check** replaces glossary terms left untranslated, with per-spot undo.
 
@@ -88,6 +89,8 @@ With an LLM provider, each paragraph can be **explained** under its translation,
 ### Privacy modes
 
 Three levels of privacy control. In offline mode, only local LLMs are used. Online API keys are blocked from decryption even if internal code attempts to access them.
+
+Settings → Privacy can export a **migration pack** (settings, glossary, favorites, custom languages) to import on another machine. API keys never travel with the pack — re-enter them on the new machine.
 
 <p align="center">
   <img src="docs/screenshots/privacy-mode-standard.png" width="600" alt="Privacy standard modes">
@@ -105,7 +108,7 @@ Three levels of privacy control. In offline mode, only local LLMs are used. Onli
 
 ### TTS
 
-Speak translation results aloud using Windows' offline speech engine. Rate adjustable. Voice list reflects locally installed speech packs.
+Speak translation results aloud using Windows' offline speech engine. Rate adjustable. Voice list reflects locally installed speech packs; with language set to auto, the voice is picked from the script and diacritics of the text.
 
 <p align="center">
   <img src="docs/screenshots/tts.png" width="600" alt="TTS">

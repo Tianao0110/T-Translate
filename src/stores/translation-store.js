@@ -324,7 +324,10 @@ const useTranslationStore = create(
 
       addToFavorites: (item = null, isStyleReference = false) =>
         set((state) => {
-          const favoriteItem = item || {
+          // Spread order makes uuidv4 a fallback only: a caller-provided id
+          // wins. Without this, an id-less entry (the glossary import bug)
+          // could never be removed — removeFromFavorites filters by id.
+          const favoriteItem = item ? { id: uuidv4(), ...item } : {
             id: uuidv4(),
             sourceText: state.currentTranslation.sourceText,
             translatedText: state.currentTranslation.translatedText,
@@ -819,7 +822,11 @@ const useTranslationStore = create(
             letterLang: null,
             ...(persistedState.languagePicker || {}),
           },
-          favorites: cleanFavorites.entries,
+          // Backfill ids for rows persisted by the id-less glossary import —
+          // without one, per-row deletion can never match them.
+          favorites: cleanFavorites.entries.map((f) =>
+            f && !f.id ? { ...f, id: uuidv4() } : f
+          ),
           _savedHistory: persistedState._savedHistory ? cleanSaved.entries : persistedState._savedHistory,
           // 'strict' was removed in 0.2.9 — its core promise (no network) maps to offline
           translationMode: persistedState.translationMode === 'strict'

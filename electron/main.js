@@ -4,6 +4,7 @@
 const {
   app,
   BrowserWindow,
+  dialog,
   globalShortcut,
   screen,
 } = require('electron');
@@ -20,6 +21,21 @@ const { SelectionStateMachine, STATES, CONFIG: FSM_CONFIG } = require('./utils/s
 
 let selectionStateMachine = null;
 const logger = require('./utils/logger')('Main');
+
+const { createCrashGuard, SAFE_MODE_THRESHOLD } = require('./utils/crash-guard');
+const { extractOpenableFile } = require('./utils/open-with');
+const crashGuard = createCrashGuard({ store, logger });
+
+// Main-window renderer crashed past the reload limit: reloading clearly can't
+// save it, so relaunch the whole app straight into safe mode (counter is
+// pre-loaded to the threshold; one healthy safe-mode run resets it).
+function onMainRendererGiveUp() {
+  logger.error('Main window renderer kept crashing — relaunching into safe mode');
+  crashGuard.forceSafeModeNextLaunch();
+  try { stopSelectionHook(); } catch (e) { /* ignore */ }
+  app.relaunch();
+  app.exit(0);
+}
 
 // Opt-in probe diagnostics (set TT_SELECTION_DEBUG=1). Records which detection
 // layer resolved each gesture, by control class + method only — never text
@@ -1042,6 +1058,13 @@ function processDesktopCapturerSelection(data, bounds) {
 app.whenReady().then(() => {
   logger.info('App ready, initializing...');
 
+  // Windows routes toast notifications by AppUserModelID; without it the
+  // renderer's HTML5 Notifications never reach the notification center in the
+  // packaged build. Must match build.appId in package.json.
+  if (process.platform === 'win32') {
+    app.setAppUserModelId('com.ttranslate.core');
+  }
+
   // Auto-launch mode: --startup flag means started by OS, run silent.
   const isStartup = process.argv.includes('--startup');
   if (isStartup) {
@@ -1084,6 +1107,8 @@ app.whenReady().then(() => {
     logger,
     makeWindowInvisibleToCapture,
     CHANNELS,
+    crashGuard,
+    onMainRendererGiveUp,
   });
 
   // Use arrow-function wrappers so we don't capture windowManager methods at
@@ -1106,7 +1131,6 @@ app.whenReady().then(() => {
       }
     },
     toggleSelectionTranslate,
-    toggleSubtitleCaptureWindow: (...args) => windowManager.toggleSubtitleCaptureWindow(...args),
   };
 
   // IPC must be initialized BEFORE any window is created — otherwise renderer may
@@ -1143,6 +1167,20 @@ app.whenReady().then(() => {
     });
   }
 
+  // Safe-mode notice — native dialog so it works even if the renderer is the
+  // thing that keeps crashing. Silent auto-launch just logs.
+  if (runtime.safeMode && !isStartup && windows.main) {
+    windows.main.webContents.once('did-finish-load', () => {
+      dialog.showMessageBox(windows.main, {
+        type: 'warning',
+        title: t('safeMode.title'),
+        message: t('safeMode.title'),
+        detail: t('safeMode.body'),
+        buttons: [t('menu.ok')],
+      }).catch(() => {});
+    });
+  }
+
   // Selection translate is off by default — user opts in.
   runtime.selectionEnabled = false;
   store.set('selectionEnabled', false);
@@ -1160,16 +1198,26 @@ app.whenReady().then(() => {
 
   logger.success('App initialized');
 
+  // Surviving the stability window marks this launch healthy and resets the
+  // consecutive-startup-failure counter.
+  crashGuard.scheduleStableMark();
+
   // Pre-warm selection-translate modules in the background. Longer delay on
   // auto-launch so we don't impact OS boot performance.
   const preheatDelay = isStartup ? 8000 : 3000;
   setTimeout(() => {
-    preheatSelectionModules();
+    // Safe mode: native modules (uiohook/koffi) are prime startup-crash
+    // suspects — leave them untouched, and don't auto-enable selection.
+    if (runtime.safeMode) {
+      logger.warn('Safe mode: skipped module preheat and selection auto-enable');
+    } else {
+      preheatSelectionModules();
 
-    // Auto-launch + user opt-in: enable selection translate after preheat.
-    if (isStartup && store.get('settings.startup.autoEnableSelection')) {
-      logger.info('Auto-enabling selection translate after startup');
-      toggleSelectionTranslate();
+      // Auto-launch + user opt-in: enable selection translate after preheat.
+      if (isStartup && store.get('settings.startup.autoEnableSelection')) {
+        logger.info('Auto-enabling selection translate after startup');
+        toggleSelectionTranslate();
+      }
     }
 
     if (isStartup) {
@@ -1266,6 +1314,11 @@ app.on('activate', () => {
 app.on('before-quit', () => {
   runtime.isQuitting = true;
 
+  // A deliberate quit is a healthy launch, however short — clear the startup
+  // dirty flag so it never counts as a crash. No-op in the losing
+  // single-instance duplicate (its probation never started).
+  crashGuard.markStartupHealthy('clean-quit');
+
   stopSelectionHook();
 
   const allWindows = BrowserWindow.getAllWindows();
@@ -1306,10 +1359,39 @@ const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
   app.quit();
 } else {
-  app.on('second-instance', () => {
+  app.on('second-instance', (event, commandLine) => {
+    // Context-menu launch while already running: the losing instance forwards
+    // its argv here. Stash the file and ping the renderer to come pick it up.
+    const openFile = extractOpenableFile(commandLine);
+    if (openFile) {
+      runtime.pendingOpenFile = openFile;
+      logger.info('Open-with file from second instance:', openFile);
+    }
+
     if (windows.main) {
       if (windows.main.isMinimized()) windows.main.restore();
+      windows.main.show(); // may be hidden to tray — focus alone won't surface it
       windows.main.focus();
+      if (openFile) {
+        windows.main.webContents.send(CHANNELS.DOCUMENT.OPEN_FILE_READY);
+      }
     }
   });
+
+  // Cold start straight from the context menu: the file rides process.argv.
+  runtime.pendingOpenFile = extractOpenableFile(process.argv);
+  if (runtime.pendingOpenFile) {
+    logger.info('Open-with file from cold start:', runtime.pendingOpenFile);
+  }
+
+  // Startup-crash probation — only in the instance that owns the lock (the
+  // losing duplicate quits right away and must not touch the counters). Runs
+  // in the first synchronous tick, i.e. before app-ready, which is the only
+  // time disableHardwareAcceleration() still works.
+  const startupFailures = crashGuard.beginStartupProbation();
+  if (startupFailures >= SAFE_MODE_THRESHOLD) {
+    runtime.safeMode = true;
+    app.disableHardwareAcceleration();
+    logger.warn(`Safe mode: ${startupFailures} consecutive startup failures — hardware acceleration off, module preheat will be skipped`);
+  }
 }

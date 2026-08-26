@@ -293,6 +293,35 @@ const MainWindow = () => {
     });
   }, [activeTab]);
 
+  // "Open with T-Translate" (Explorer context menu): pull the pending file on
+  // mount (cold start) and on every main-process ping (an already-running
+  // instance received a second-instance forward). The listener lives here —
+  // not in DocumentTranslator — because that tab may not be mounted yet.
+  const [externalDocFile, setExternalDocFile] = useState(null);
+
+  useEffect(() => {
+    let disposed = false;
+
+    const pickup = async () => {
+      try {
+        const pending = await window.electron?.document?.takePendingOpen?.();
+        if (disposed || !pending) return;
+        if (pending.error) {
+          showNotification(t(pending.error === 'too-large'
+            ? 'documentTranslator.openWith.tooLarge'
+            : 'documentTranslator.openWith.readFailed', { name: pending.name || '' }), 'error');
+          return;
+        }
+        setExternalDocFile(new File([pending.data], pending.name));
+        setActiveTab('document');
+      } catch { /* browser mode: no bridge */ }
+    };
+
+    pickup();
+    const off = window.electron?.document?.onOpenFileReady?.(pickup);
+    return () => { disposed = true; off?.(); };
+  }, [showNotification, t]);
+
   const tabs = [
     { id: 'translate', label: t('nav.translate'), icon: Languages, shortcut: '1' },
     { id: 'history', label: t('nav.history'), icon: History, shortcut: '2' },
@@ -384,6 +413,8 @@ const MainWindow = () => {
                 notify={showNotification}
                 sourceLang={sourceLanguage}
                 targetLang={targetLanguage}
+                externalFile={externalDocFile}
+                onExternalFileConsumed={() => setExternalDocFile(null)}
               />
             </Suspense>
           </div>

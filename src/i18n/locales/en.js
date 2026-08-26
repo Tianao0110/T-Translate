@@ -171,7 +171,7 @@ const en = {
     delete: "Delete", restore: "Restore to Edit", today: "Today", yesterday: "Yesterday", thisWeek: "This Week", thisMonth: "This Month", earlier: "Earlier",
     view: { card: "Card", table: "Table" },
     filter: { all: "All Time", today: "Today", week: "This Week", month: "This Month" },
-    group: { date: "By Date", language: "By Language" },
+    sourceFilter: { all: "All Sources", main: "Main Window", selection: "Selection", screenshot: "Screenshot", floating: "Floating Window", other: "Other" },
     select: "Select", export: "Export", import: "Import",
     hasAiResult: "Has an AI result — double-click to view",
     understandEntry: "AI understanding result",
@@ -255,7 +255,34 @@ const en = {
     autoDeleteHistory: "Auto-delete history after",
     daysLater: "days",
     zeroMeansNever: "Set to 0 to never auto-delete",
-    incognitoDisabled: " (Disabled in incognito mode)"
+    incognitoDisabled: " (Disabled in incognito mode)",
+    migration: {
+      title: "Migration",
+      hint: "Pack settings, glossary, favorites and custom languages into one file to import on another computer. API keys and model files never enter the pack.",
+      export: "Export Migration Pack",
+      import: "Import Migration Pack",
+      needApp: "This feature requires the desktop app",
+      exported: "Migration pack exported",
+      exportFailed: "Export failed",
+      invalidFile: "Not a valid migration pack",
+      newerVersion: "This pack comes from a newer app version. Update the app first.",
+      tooLarge: "File too large to be a migration pack",
+      emptyPack: "Nothing importable in this pack",
+      importTitle: "Import Migration Pack",
+      packMeta: "From v{{version}}, exported {{date}}",
+      blockSettings: "Settings ({{count}} sections)",
+      blockSettingsActions: ", incl. {{count}} imported actions",
+      blockGlossary: "Glossary ({{count}} terms)",
+      blockFavorites: "Favorites ({{count}} items)",
+      blockLanguages: "Custom languages ({{count}})",
+      applyImport: "Import Selected",
+      importDone: "Import finished: {{detail}}",
+      importFailed: "Import failed",
+      appliedSettings: "{{count}} settings sections",
+      appliedGlossary: "{{count}} terms",
+      appliedFavorites: "{{count}} favorites",
+      appliedLanguages: "{{count}} languages"
+    }
   },
   floatingWindow: {
     title: "Floating Window", pin: "Pin", unpin: "Unpin", opacity: "Opacity", close: "Close", addPanel: "Add Panel", removePanel: "Remove Panel", clearAll: "Clear All",
@@ -354,6 +381,11 @@ const en = {
       autoLaunchFailed: "Failed to set auto-launch",
       autoSelection: "Enable selection translate on startup",
       autoSelectionHint: "Automatically enable selection translate after auto-launch",
+    },
+    notifications: {
+      title: "Notifications",
+      system: "System notification when long tasks finish",
+      systemHint: "With the window in the background, finished document translations and one-click summaries post a system notification. Click it to return.",
     },
     ocr: { title: "OCR Settings" },
     shortcuts: { title: "Keyboard Shortcuts" },
@@ -545,7 +577,7 @@ const en = {
     testTextMixed: "This is a TTS test. 这是语音朗读测试。",
     testTextChinese: "Hello, this is a TTS test.",
     testFailed: "Preview failed", loadVoicesFailed: "Failed to load voices",
-    langNames: { zh: "Chinese", en: "English", ja: "Japanese", ko: "Korean", fr: "French", de: "German", es: "Spanish", ru: "Russian", pt: "Portuguese", it: "Italian" },
+    langNames: { zh: "Chinese", en: "English", ja: "Japanese", ko: "Korean", fr: "French", de: "German", es: "Spanish", ru: "Russian", pt: "Portuguese", it: "Italian", pl: "Polish", cs: "Czech", tr: "Turkish", hu: "Hungarian", vi: "Vietnamese", da: "Danish", sv: "Swedish", no: "Norwegian", ar: "Arabic" },
     noVoicesInstalled: "No voice packs installed. Please install voices in system settings.",
     noVoiceForLang: "No {{lang}} voice pack installed",
     installVoiceHint: "No voice packs detected. Install them in System Settings → Language → Speech."
@@ -553,6 +585,16 @@ const en = {
   // ===== DocumentTranslator keys =====
   documentTranslator: {
     title: "Document Translation",
+    openWith: {
+      tooLarge: "\"{{name}}\" is larger than 20MB — too large for document translation.",
+      readFailed: "Failed to read \"{{name}}\" — the file may have been moved or is in use.",
+    },
+    sysNotify: {
+      translateDoneTitle: "Document translated",
+      translateDoneBody: "\"{{name}}\" is fully translated. Click to view.",
+      summaryDoneTitle: "Summary ready",
+      summaryDoneBody: "The summary of \"{{name}}\" is ready. Click to view.",
+    },
     sourceLang: "Source Language",
     targetLang: "Target Language",
     digestHint: "Organise the paragraphs you have explained into one note",
@@ -634,7 +676,8 @@ const en = {
     // Password modal
     password: {
       title: "File is encrypted",
-      desc: "File <strong>{{filename}}</strong> requires a password to open",
+      descBefore: "File ",
+      descAfter: " requires a password to open",
       placeholder: "Enter password",
       cancel: "Cancel",
       confirm: "Confirm",
@@ -857,6 +900,7 @@ const en = {
     epubNoRootfile: "Invalid EPUB: rootfile not found",
     epubNoOpf: "Invalid EPUB: OPF file not found",
     epubNoContent: "No translatable text found in EPUB",
+    tooLargeDecompressed: "File content is too large after decompression; parsing stopped",
     unsupportedFormat: "Unsupported file format",
     unimplementedParser: "Unimplemented parser",
     passwordRequired: "File requires a password",

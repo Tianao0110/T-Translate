@@ -12,6 +12,43 @@ const _t = (key, fallback) => {
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 const MAX_FILE_SIZE_LABEL = '20MB';
 
+// Clamp the PDF render scale so a page with an absurd MediaBox can't allocate a
+// giant canvas (width*height*4 bytes) — the longest side never exceeds this.
+export const MAX_PDF_CANVAS_EDGE = 5000;
+
+// The MAX_FILE_SIZE cap is on the COMPRESSED file. A zip container (EPUB/DOCX)
+// can inflate ~1000x, so a 20MB file can decompress to gigabytes and OOM the
+// renderer — a one-click DoS now that the context menu opens arbitrary files.
+// Cap the decompressed total too. Declared sizes come from the zip central
+// directory (cheap, no inflate) and can be forged, so the EPUB reader also
+// enforces a runtime accumulation cap as JSZip inflates (which verifies CRC).
+export const MAX_DECOMPRESSED_SIZE_BYTES = 300 * 1024 * 1024;
+
+// Render scale for a page, clamped so the longest side stays within the canvas
+// edge cap. Exported so the clamp is testable without a headless canvas.
+export function clampedPdfScale(pageWidth, pageHeight, desiredScale = 2) {
+  const longestEdge = Math.max(pageWidth, pageHeight) || 1;
+  return Math.min(desiredScale, MAX_PDF_CANVAS_EDGE / longestEdge);
+}
+
+// Sum the zip's declared uncompressed sizes (JSZip exposes them per entry
+// without inflating). Throws the shared over-limit error past the cap.
+// Exported for direct testing (a real zip-bomb fixture is impractical to ship).
+export function assertZipWithinDecompressedCap(zip) {
+  let total = 0;
+  for (const entry of Object.values(zip.files || {})) {
+    if (entry?.dir) continue;
+    const size = entry?._data?.uncompressedSize;
+    if (typeof size === 'number' && size > 0) {
+      total += size;
+      if (total > MAX_DECOMPRESSED_SIZE_BYTES) {
+        throw new Error(_t('docParser.tooLargeDecompressed',
+          'File content is too large after decompression'));
+      }
+    }
+  }
+}
+
 export const SUPPORTED_FORMATS = {
   txt: { name: '纯文本', mime: 'text/plain', parser: 'text' },
   md: { name: 'Markdown', mime: 'text/markdown', parser: 'text' },
@@ -315,7 +352,10 @@ export function parseVTT(content) {
 // Returns null on failure so callers can distinguish "no text" from "failed".
 async function ocrPdfPage(page, ocrRecognize) {
   try {
-    const viewport = page.getViewport({ scale: 2 });
+    // Clamp scale so a page with an absurd MediaBox can't allocate a giant
+    // canvas (width*height*4 bytes). Never scale UP past 2 — just cap the edge.
+    const base = page.getViewport({ scale: 1 });
+    const viewport = page.getViewport({ scale: clampedPdfScale(base.width, base.height) });
     const canvas = document.createElement('canvas');
     canvas.width = Math.ceil(viewport.width);
     canvas.height = Math.ceil(viewport.height);
@@ -469,6 +509,11 @@ export async function parseDOCX(file, options = {}) {
   const mammoth = await import('mammoth');
   const arrayBuffer = await file.arrayBuffer();
 
+  // mammoth exposes no inflate limit and additionally builds an in-memory DOM
+  // (a further amplifier), so pre-check the zip's declared sizes before it runs.
+  const JSZip = (await import('jszip')).default;
+  assertZipWithinDecompressedCap(await JSZip.loadAsync(arrayBuffer));
+
   const result = await mammoth.extractRawText({ arrayBuffer });
   const text = result.value;
 
@@ -588,6 +633,7 @@ export async function parseEPUB(file, options = {}) {
   const JSZip = (await import('jszip')).default;
   const arrayBuffer = await file.arrayBuffer();
   const zip = await JSZip.loadAsync(arrayBuffer);
+  assertZipWithinDecompressedCap(zip);
 
   const containerXml = await zip.file('META-INF/container.xml')?.async('text');
   if (!containerXml) {
@@ -643,6 +689,12 @@ export async function parseEPUB(file, options = {}) {
       const text = extractTextFromHTML(content);
       if (text.trim()) {
         allText += text + '\n\n';
+      }
+      // Runtime backstop: declared sizes are forgeable, but the concatenated
+      // text can't outgrow what JSZip actually inflated (CRC-checked).
+      if (allText.length > MAX_DECOMPRESSED_SIZE_BYTES) {
+        throw new Error(_t('docParser.tooLargeDecompressed',
+          'File content is too large after decompression'));
       }
     }
   }

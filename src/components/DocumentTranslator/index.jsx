@@ -26,6 +26,7 @@ import useVisibleHotkey from '../../hooks/use-visible-hotkey.js';
 import LanguagePicker from '../shared/LanguagePicker.jsx';
 import { useConfirm } from '../shared/ConfirmDialog.jsx';
 import { scanDocumentTerms, renderWithReplacements } from '../../utils/term-consistency.js';
+import { notifyTaskDone } from '../../utils/system-notify.js';
 import HighlightText from '../shared/HighlightText.jsx';
 import AiBadge from '../shared/AiBadge.jsx';
 import useAiActions from '../../hooks/use-ai-actions.js';
@@ -323,10 +324,12 @@ const OutlineItem = ({ item, onNavigate, level = 0 }) => {
 
 const logger = createLogger('DocTranslator');
 
-const DocumentTranslator = ({ 
+const DocumentTranslator = ({
   notify,
   sourceLang: initialSourceLang = 'auto',
   targetLang: initialTargetLang = 'zh',
+  externalFile = null,
+  onExternalFileConsumed,
 }) => {
   const { t } = useTranslation();
   const [confirm, confirmDialog] = useConfirm();
@@ -440,7 +443,7 @@ const DocumentTranslator = ({
   // have not reached this closure through state yet.
   const runDigest = useCallback(async (wholeDoc = false, notesOverride = null) => {
     const action = getAiAction('digest');
-    if (!action || digestRunning) return;
+    if (!action || digestRunning) return false;
     const source = notesOverride || aiNotes;
     // Document order, not the order they were opened — a note reads as a walk
     // through the document.
@@ -448,7 +451,7 @@ const DocumentTranslator = ({
       .filter((seg) => source[seg.id])
       .map((seg, i) => `${i + 1}. ${source[seg.id]}`)
       .join('\n\n');
-    if (!ordered) return;
+    if (!ordered) return false;
 
     setDigestRunning(true);
     try {
@@ -461,7 +464,10 @@ const DocumentTranslator = ({
       if (result.success) {
         setDigest(result.content);
         setDigestWholeDoc(wholeDoc);
-      } else notify(result.error || t('aiActions.failed'), 'error');
+        return true;
+      }
+      notify(result.error || t('aiActions.failed'), 'error');
+      return false;
     } finally {
       setDigestRunning(false);
     }
@@ -491,8 +497,14 @@ const DocumentTranslator = ({
       }), 'warning');
     }
 
-    await runDigest(covered === explainable.length, outcome.notes);
-  }, [explainable, explainAll, concurrency, confirm, runDigest, notify, t]);
+    const digestOk = await runDigest(covered === explainable.length, outcome.notes);
+    if (digestOk) {
+      notifyTaskDone(
+        t('documentTranslator.sysNotify.summaryDoneTitle'),
+        t('documentTranslator.sysNotify.summaryDoneBody', { name: document?.filename || '' })
+      );
+    }
+  }, [explainable, explainAll, concurrency, confirm, runDigest, notify, t, document]);
 
   // ===== Glossary consistency =====
   //
@@ -924,6 +936,20 @@ const DocumentTranslator = ({
     e.target.value = null;
   }, [loadFile]);
 
+  // "Open with T-Translate" hand-off from MainWindow — loads exactly like a
+  // picked file (password prompts, scanned-page OCR and progress restore all
+  // ride the same path). Consumed-callback clears the parent slot so the same
+  // File object cannot re-trigger. Deliberately keyed on externalFile alone:
+  // loadFile's identity churns with settings and must not re-run the load.
+  const externalFileRef = useRef(null);
+  useEffect(() => {
+    if (!externalFile || externalFileRef.current === externalFile) return;
+    externalFileRef.current = externalFile;
+    loadFile(externalFile);
+    onExternalFileConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalFile]);
+
   // Start translation
   const startTranslation = async () => {
     if (isTranslating) return;
@@ -961,6 +987,10 @@ const DocumentTranslator = ({
     if (toTranslate.length === 0) {
       setIsTranslating(false);
       notify?.(t('documentTranslator.notify.translationCompleteFromCache'), 'success');
+      notifyTaskDone(
+        t('documentTranslator.sysNotify.translateDoneTitle'),
+        t('documentTranslator.sysNotify.translateDoneBody', { name: document?.filename || '' })
+      );
       return;
     }
     
@@ -972,6 +1002,10 @@ const DocumentTranslator = ({
     setIsTranslating(false);
     if (!abortRef.current) {
       notify?.(t('documentTranslator.notify.translationComplete'), 'success');
+      notifyTaskDone(
+        t('documentTranslator.sysNotify.translateDoneTitle'),
+        t('documentTranslator.sysNotify.translateDoneBody', { name: document?.filename || '' })
+      );
     }
   };
 
@@ -1960,9 +1994,15 @@ const DocumentTranslator = ({
               <Lock size={24} />
               <h3>{t('documentTranslator.password.title')}</h3>
             </div>
-            <p className="password-modal-desc" dangerouslySetInnerHTML={{ 
-              __html: t('documentTranslator.password.desc', { filename: pendingFile?.name }) 
-            }} />
+            {/* Filename is attacker-controlled (Explorer right-click opens any
+                file, name and all). Render it as a React child — never through
+                dangerouslySetInnerHTML — so a name like `<img onerror=…>.pdf`
+                is escaped instead of executed. */}
+            <p className="password-modal-desc">
+              {t('documentTranslator.password.descBefore')}
+              <strong>{pendingFile?.name}</strong>
+              {t('documentTranslator.password.descAfter')}
+            </p>
             <div className="password-input-group">
               <Key size={18} />
               <input

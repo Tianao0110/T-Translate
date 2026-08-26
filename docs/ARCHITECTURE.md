@@ -207,6 +207,24 @@ hooks/use-ai-actions        三个窗口共用：能力探测、可用动作、�
    结果作为独立主条目走 addToHistory（kind `'understand'`，同一道无痕门，动作声明
    `history:'none'` 则不写）；路径 B 在离线模式下还要求视觉端点必须在本机
 
+### 稳定性与系统集成（v0.3.7）
+
+```
+electron/utils/crash-guard.js   崩溃自愈：渲染进程异常退出限次自动重载（3 分钟
+                                窗口内 3 次；clean-exit/killed 不触发）+ 启动哨兵
+                                （连续 3 次未撑过 60s 稳定窗口 → 安全模式：禁硬件
+                                加速、跳过原生模块预热）。依赖注入、零 electron
+                                require，直接可测
+src/utils/migration-pack.js     迁移包 build/parse 纯函数。导出读 electron-store
+                                存储态（设置页内存态含解密后的 OCR 密钥，绝不可
+                                导）；两端都过 stripSecrets + 结构白名单
+electron/utils/open-with.js     右键菜单 argv 解析（.pdf/.docx/.txt 白名单）。
+                                冷启动走 process.argv，热启动走 second-instance
+                                转发；路径只在主进程暂存，渲染端单一 invoke 取
+                                文件内容——无任意路径读取面。注册表项由
+                                installer/installer.nsh 安装写入、卸载对称清除
+```
+
 ## 命名规范
 
 | 类别 | 规范 | 示例 |

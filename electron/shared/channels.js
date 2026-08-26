@@ -5,6 +5,7 @@ const CHANNELS = {
     MINIMIZE: 'minimize-window',
     MAXIMIZE: 'maximize-window',
     CLOSE: 'close-window',
+    SHOW: 'show-window',
     SET_ALWAYS_ON_TOP: 'set-always-on-top',
     OPEN_EXTERNAL: 'open-external',
     GET_PLATFORM: 'get-platform',
@@ -14,6 +15,13 @@ const CHANNELS = {
     SAVE: 'show-save-dialog',
     OPEN: 'show-open-dialog',
     SAVE_FILE: 'save-file',   // dialog + write in one round trip
+  },
+  DOCUMENT: {
+    // "Open with T-Translate" hand-off: renderer pulls the pending file (path
+    // is main-process-owned — no arbitrary-path read surface), main pushes a
+    // ready ping on second-instance.
+    TAKE_PENDING_OPEN: 'document:take-pending-open',
+    OPEN_FILE_READY: 'document:open-file-ready',
   },
   STORE: {
     GET: 'store-get',

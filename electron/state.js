@@ -82,6 +82,14 @@ const runtime = {
   isQuitting: false,
   isAppReady: false,
 
+  // Set once before app-ready when crash-guard detects consecutive startup
+  // failures; a boot-time decision, deliberately untouched by resetRuntime.
+  safeMode: false,
+
+  // File path handed over by the Explorer context menu (cold-start argv or
+  // second-instance forward), consumed once by the renderer's take-pending IPC.
+  pendingOpenFile: null,
+
   selectionEnabled: false,  // Off by default each launch (mirror of store but cleared on start).
 
   // Window refs — accessed through `windows` getter/setter below.

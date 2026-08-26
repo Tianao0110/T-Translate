@@ -534,6 +534,7 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
               updateSetting={updateSetting}
               notify={notify}
               confirm={confirm}
+              reloadSettings={loadSettings}
             />
           );
       case 'ocr':

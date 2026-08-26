@@ -344,6 +344,7 @@ npm run check:all        # 常量表 + i18n + 硬编码中文
 | `src/config/provider-icons.js` | 渲染端图标 + 显示顺序 |
 | `src/services/stack-client.js` | 渲染端栈客户端 |
 | `electron/ipc/translation-stack.js` | 栈 IPC facade（隐私注入/abort/流帧） |
+| `electron/utils/open-with.js` + `installer/installer.nsh` | 右键菜单：扩展名白名单与注册表宏，**改扩展名两处必须同步**（nsh 为 UTF-8 BOM，别用会丢 BOM 的编辑器保存） |
 | `docs/ARCHITECTURE.md` | 架构文档 |
 
 ---

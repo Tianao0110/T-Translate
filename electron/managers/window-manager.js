@@ -5,6 +5,7 @@ const { BrowserWindow, shell } = require('electron');
 const path = require('path');
 const PATHS = require('../shared/paths');
 const displayHelper = require('../utils/display-helper');
+const { isInternalUrl, mayOpenExternally } = require('../utils/url-policy');
 
 let store = null;
 let runtime = null;
@@ -13,6 +14,8 @@ let isDev = false;
 let logger = null;
 let makeWindowInvisibleToCapture = null;
 let CHANNELS = null;
+let crashGuard = null;
+let onMainRendererGiveUp = null;
 
 const frozenSelectionWindows = new Map();
 let selectionWindowIdCounter = 0;
@@ -26,8 +29,36 @@ function init(deps) {
   logger = deps.logger || console;
   makeWindowInvisibleToCapture = deps.makeWindowInvisibleToCapture || (() => {});
   CHANNELS = deps.CHANNELS || {};
+  crashGuard = deps.crashGuard || null;
+  onMainRendererGiveUp = deps.onMainRendererGiveUp || null;
 
   logger.info?.('Window manager initialized') || console.log('Window manager initialized');
+}
+
+// Navigation + window.open hardening, applied to every window we create.
+//
+// Both are escalation paths rather than bugs on their own: our preload
+// exposes secureStorage.decrypt, so a renderer that gets navigated to an
+// attacker page would hand that page the API-key bridge; and an ungated
+// shell.openExternal turns any injected window.open into "ask Windows to
+// run this" (file:// to an exe, a UNC path, ms-msdt: and friends). The
+// http/https allow-list mirrors the one on the open-external IPC handler.
+
+function hardenWebContents(win, name) {
+  win.webContents.on('will-navigate', (event, url) => {
+    if (isInternalUrl(url, isDev)) return;
+    event.preventDefault();
+    logger.warn?.(`${name}: blocked navigation to external URL`);
+  });
+
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (mayOpenExternally(url)) {
+      shell.openExternal(url);
+    } else {
+      logger.warn?.(`${name}: blocked window.open to a non-http URL`);
+    }
+    return { action: 'deny' };
+  });
 }
 
 // ===== Main window =====
@@ -131,9 +162,14 @@ function createMainWindow() {
     windows.main = null;
   });
 
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
-    return { action: 'deny' };
+  hardenWebContents(mainWindow, 'Main window');
+
+  // Renderer self-heal: abnormal death reloads in place (bounded); past the
+  // limit the give-up handler relaunches the app into safe mode.
+  crashGuard?.attachRendererRecovery(mainWindow, {
+    name: 'Main window',
+    isQuitting: () => runtime.isQuitting,
+    onGiveUp: (details) => onMainRendererGiveUp?.(details),
   });
 
   windows.main = mainWindow;
@@ -245,6 +281,19 @@ function createFloatingWindow() {
   // runs child-window cleanup. A main-process before-input-event shortcut here
   // would bypass all of that — deliberately absent.
 
+  // Renderer self-heal: reload on abnormal death. An auxiliary window never
+  // escalates to app relaunch — if reloads can't save it, close it; the user
+  // recreates it from the tray with a fresh renderer.
+  crashGuard?.attachRendererRecovery(floatingWindow, {
+    name: 'Floating window',
+    isQuitting: () => runtime.isQuitting,
+    onGiveUp: () => {
+      try { floatingWindow.destroy(); } catch { /* already gone */ }
+    },
+  });
+
+  hardenWebContents(floatingWindow, 'Floating window');
+
   windows.floatingWindow = floatingWindow;
   logger.info?.('Floating window created');
   return floatingWindow;
@@ -351,6 +400,8 @@ function createSelectionWindow() {
     }
   });
 
+  hardenWebContents(selectionWindow, 'Selection window');
+
   windows.selection = selectionWindow;
   logger.debug?.(`Selection window ${windowId} created`);
   return selectionWindow;
@@ -438,6 +489,8 @@ function createScreenshotWindow(bounds) {
   screenshotWindow.on('closed', () => {
     windows.screenshot = null;
   });
+
+  hardenWebContents(screenshotWindow, 'Screenshot window');
 
   windows.screenshot = screenshotWindow;
   logger.info?.('Screenshot window created');

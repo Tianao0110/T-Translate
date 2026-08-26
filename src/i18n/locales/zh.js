@@ -171,7 +171,7 @@ const zh = {
     delete: "删除", restore: "恢复编辑", today: "今天", yesterday: "昨天", thisWeek: "本周", thisMonth: "本月", earlier: "更早",
     view: { card: "卡片", table: "表格" },
     filter: { all: "全部时间", today: "今天", week: "本周", month: "本月" },
-    group: { date: "按日期", language: "按语言" },
+    sourceFilter: { all: "全部来源", main: "主界面", selection: "划词", screenshot: "截图", floating: "悬浮窗", other: "其他" },
     select: "选择", export: "导出", import: "导入",
     hasAiResult: "附带 AI 结果，双击查看",
     understandEntry: "AI 理解结果",
@@ -255,7 +255,34 @@ const zh = {
     autoDeleteHistory: "自动删除历史记录",
     daysLater: "天后",
     zeroMeansNever: "设为 0 表示永不自动删除",
-    incognitoDisabled: "（无痕模式下此选项无效）"
+    incognitoDisabled: "（无痕模式下此选项无效）",
+    migration: {
+      title: "迁移",
+      hint: "把设置、术语库、收藏和自定义语言打包成一个文件，到另一台电脑导入。API 密钥和模型文件不会进入迁移包",
+      export: "导出迁移包",
+      import: "导入迁移包",
+      needApp: "此功能需要在应用内使用",
+      exported: "迁移包已导出",
+      exportFailed: "导出失败",
+      invalidFile: "不是有效的迁移包文件",
+      newerVersion: "迁移包来自更新版本的应用，请先升级再导入",
+      tooLarge: "文件过大，不像是迁移包",
+      emptyPack: "迁移包里没有可导入的内容",
+      importTitle: "导入迁移包",
+      packMeta: "来自 v{{version}}，导出于 {{date}}",
+      blockSettings: "设置（{{count}} 组）",
+      blockSettingsActions: "，含 {{count}} 个导入的动作",
+      blockGlossary: "术语库（{{count}} 条）",
+      blockFavorites: "收藏（{{count}} 条）",
+      blockLanguages: "自定义语言（{{count}} 个）",
+      applyImport: "导入所选",
+      importDone: "导入完成：{{detail}}",
+      importFailed: "导入失败",
+      appliedSettings: "设置 {{count}} 组",
+      appliedGlossary: "术语 {{count}} 条",
+      appliedFavorites: "收藏 {{count}} 条",
+      appliedLanguages: "语言 {{count}} 个"
+    }
   },
   floatingWindow: {
     title: "悬浮窗口", pin: "置顶", unpin: "取消置顶", opacity: "透明度", close: "关闭", addPanel: "添加子面板", removePanel: "移除子面板", clearAll: "清空全部",
@@ -354,6 +381,11 @@ const zh = {
       autoLaunchFailed: "设置自启动失败",
       autoSelection: "启动后自动开启划词翻译",
       autoSelectionHint: "开机自启后自动开启划词翻译，选中文字即可翻译",
+    },
+    notifications: {
+      title: "通知",
+      system: "长任务完成后发送系统通知",
+      systemHint: "窗口不在前台时，文档翻译或一键总结完成会从系统通知中心提醒，点击回到窗口",
     },
     ocr: { title: "OCR 设置" },
     shortcuts: { title: "快捷键设置" },
@@ -545,7 +577,7 @@ const zh = {
     testTextMixed: "这是语音朗读测试。This is a TTS test.",
     testTextChinese: "你好，这是语音朗读功能测试。",
     testFailed: "试听失败", loadVoicesFailed: "加载语音列表失败",
-    langNames: { zh: "中文", en: "英语", ja: "日语", ko: "韩语", fr: "法语", de: "德语", es: "西班牙语", ru: "俄语", pt: "葡萄牙语", it: "意大利语" },
+    langNames: { zh: "中文", en: "英语", ja: "日语", ko: "韩语", fr: "法语", de: "德语", es: "西班牙语", ru: "俄语", pt: "葡萄牙语", it: "意大利语", pl: "波兰语", cs: "捷克语", tr: "土耳其语", hu: "匈牙利语", vi: "越南语", da: "丹麦语", sv: "瑞典语", no: "挪威语", ar: "阿拉伯语" },
     noVoicesInstalled: "系统未安装任何语音包，请在系统设置中安装语音",
     noVoiceForLang: "系统未安装{{lang}}语音包",
     installVoiceHint: "未检测到语音包，请在系统设置 → 语言 → 语音中安装"
@@ -553,6 +585,16 @@ const zh = {
   // ===== DocumentTranslator keys =====
   documentTranslator: {
     title: "文档翻译",
+    openWith: {
+      tooLarge: "《{{name}}》超过 20MB，文档翻译无法处理这么大的文件",
+      readFailed: "《{{name}}》读取失败，文件可能已被移动或占用",
+    },
+    sysNotify: {
+      translateDoneTitle: "文档翻译完成",
+      translateDoneBody: "《{{name}}》已翻译完成，点击查看",
+      summaryDoneTitle: "一键总结完成",
+      summaryDoneBody: "《{{name}}》的总结已生成，点击查看",
+    },
     sourceLang: "源语言",
     targetLang: "目标语言",
     digestHint: "把已讲解的段落整理成一份笔记",
@@ -634,7 +676,8 @@ const zh = {
     // Password modal
     password: {
       title: "文件已加密",
-      desc: "文件 <strong>{{filename}}</strong> 需要密码才能打开",
+      descBefore: "文件 ",
+      descAfter: " 需要密码才能打开",
       placeholder: "请输入密码",
       cancel: "取消",
       confirm: "确定",
@@ -858,6 +901,7 @@ const zh = {
     epubNoRootfile: "无效的 EPUB 文件：找不到 rootfile",
     epubNoOpf: "无效的 EPUB 文件：找不到 OPF 文件",
     epubNoContent: "EPUB 文件中没有找到可翻译的文本内容",
+    tooLargeDecompressed: "文件解压后内容过大，可能是异常文件，已停止解析",
     unsupportedFormat: "不支持的文件格式",
     unimplementedParser: "未实现的解析器",
     passwordRequired: "文件需要密码",

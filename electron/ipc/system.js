@@ -2,13 +2,19 @@
 
 const { ipcMain, dialog, shell } = require("electron");
 const fs = require("fs").promises;
+const path = require("path");
 const { CHANNELS } = require("../shared/channels");
 const createLogger = require("../utils/logger");
 const logger = createLogger("IPC:System");
 const { t } = require("../shared/main-i18n");
 
+// Must match MAX_FILE_SIZE in src/utils/document-parser.js: the parser refuses
+// anything larger anyway, so a higher cap here would only read the whole file
+// into memory and ship it over IPC for the renderer to reject.
+const MAX_OPEN_WITH_BYTES = 20 * 1024 * 1024;
+
 function register(ctx) {
-  const { getMainWindow, store, app } = ctx;
+  const { getMainWindow, store, app, runtime } = ctx;
 
   // ===== Window control =====
 
@@ -37,6 +43,41 @@ function register(ctx) {
   ipcMain.handle("is-maximized", () => {
     const mainWindow = getMainWindow();
     return mainWindow ? mainWindow.isMaximized() : false;
+  });
+
+  // One-shot pickup of the context-menu file. The renderer never supplies a
+  // path — only the argv-parsed, main-process-owned pending path is ever read,
+  // so this opens no arbitrary-file surface.
+  ipcMain.handle(CHANNELS.DOCUMENT.TAKE_PENDING_OPEN, async () => {
+    const filePath = runtime.pendingOpenFile;
+    if (!filePath) return null;
+    runtime.pendingOpenFile = null;
+
+    try {
+      const stat = await fs.stat(filePath);
+      if (stat.size > MAX_OPEN_WITH_BYTES) {
+        logger.warn("Open-with file too large:", filePath, stat.size);
+        return { error: "too-large", name: path.basename(filePath) };
+      }
+      const data = await fs.readFile(filePath);
+      logger.info("Open-with file handed to renderer:", filePath);
+      return { name: path.basename(filePath), data };
+    } catch (err) {
+      logger.error("Open-with read failed:", filePath, err.message);
+      return { error: "read-failed", name: path.basename(filePath) };
+    }
+  });
+
+  // Bring the main window back — notification clicks land here, and the
+  // window may be hidden to tray (close-to-hide) or minimized.
+  ipcMain.on(CHANNELS.SYSTEM.SHOW, () => {
+    const mainWindow = getMainWindow();
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+      logger.debug("Window shown via IPC");
+    }
   });
 
   ipcMain.on(CHANNELS.SYSTEM.CLOSE, () => {

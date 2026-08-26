@@ -18,6 +18,9 @@ export default defineConfig({
       // 测试里任何 import/require 'electron' 都重定向到 mock stub，
       // 让主进程文件能在 jsdom 环境加载而不挂
       electron: path.resolve(__dirname, 'tests/mocks/electron.js'),
+      // Vite public 根资源导入（import x from '/icon.png'）在 vitest 下没有
+      // public 目录语义，会被当成 file:///icon.png 加载而炸；指回真实文件
+      '/icon.png': path.resolve(__dirname, 'public/icon.png'),
     },
   },
   test: {

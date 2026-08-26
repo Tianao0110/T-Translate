@@ -130,6 +130,35 @@ export class WebSpeechEngine extends BaseTTSEngine {
     if (/[가-힯]/.test(text)) return 'ko';
     if (/[Ѐ-ӿ]/.test(text)) return 'ru';
     if (/[؀-ۿ]/.test(text)) return 'ar';
+
+    // ---- Latin-script refinement ----
+    // Everything Latin used to fall through to 'en', so Spanish/French/German
+    // text was read by an English voice. Two tiers, checked in order.
+    //
+    // Tier 1 — (near-)exclusive marks, effectively owned by one language.
+    // The Turkish set deliberately has no /i flag: with it, dotless ı would
+    // case-fold onto plain I and every English sentence would match.
+    if (/[ßẞ]/.test(text)) return 'de';
+    if (/[ñ¿¡]/.test(text)) return 'es';
+    if (/[ãõ]/i.test(text)) return 'pt';
+    if (/[œ]/i.test(text)) return 'fr';
+    if (/[Ạ-ỹđ]/i.test(text)) return 'vi'; // tone-mark block + đ
+    if (/[ąęłńśźż]/i.test(text)) return 'pl';
+    if (/[řěů]/i.test(text)) return 'cs';
+    if (/[ğşıİ]/.test(text)) return 'tr';
+    if (/[őű]/i.test(text)) return 'hu';
+    if (/[øæ]/i.test(text)) return 'da'; // Danish/Norwegian share these; a da voice reads both acceptably
+    if (/å/i.test(text)) return /[äö]/i.test(text) ? 'sv' : 'no';
+
+    // Tier 2 — shared accents, best-frequency guess. Known trade-offs
+    // (Finnish ä/ö lands on de; a French phrase with no ç/circumflex can land
+    // on es) all still beat the old en-for-everything.
+    if (/[êîûëç]/i.test(text)) return 'fr'; // high-frequency French marks (être, ça, français)
+    if (/[ìò]/i.test(text)) return 'it';    // grave i/o is Italian-only among the majors
+    if (/[áéíóú]/i.test(text)) return 'es'; // acute vowels are pan-Iberian; es is the widest guess, pt/fr strong marks were checked above
+    if (/[äöü]/i.test(text)) return 'de';
+    if (/[àèù]/i.test(text)) return 'it';   // grave-only tail (città, è): French graves rarely appear without marks caught above
+
     return 'en';
   }
 
@@ -179,6 +208,10 @@ export class WebSpeechEngine extends BaseTTSEngine {
         'pt': ['pt-BR', 'pt-PT', 'pt'],
         'it': ['it-IT', 'it'],
         'ar': ['ar-SA', 'ar'],
+        // Norwegian voices ship as nb-NO/nn-NO — the 'no' prefix match above
+        // never finds them, so this entry is load-bearing (unlike pl/cs/tr/...
+        // whose region tags all start with the bare code).
+        'no': ['nb-NO', 'no-NO', 'nn-NO'],
       };
 
       const variants = langMap[langLower];

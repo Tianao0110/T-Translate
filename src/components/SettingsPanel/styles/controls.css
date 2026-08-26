@@ -415,6 +415,28 @@ input:checked + .switch-slider::before {
   text-align: right;
 }
 
+/* ==================== 中性操作按钮 ==================== */
+.neutral-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.neutral-button:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  background: color-mix(in srgb, var(--accent-primary) 8%, transparent);
+}
+
 /* ==================== 危险按钮 ==================== */
 .danger-button {
   display: inline-flex;
