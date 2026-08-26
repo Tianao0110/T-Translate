@@ -28,7 +28,7 @@
 | **Selection translator**     | System-wide. Select text in any app to translate. Up to 8 pinned windows                                                               |
 | **Screenshot OCR**           | Capture screen regions. 59 recognition languages, 7 OCR engines with automatic fallback                                                |
 | **Floating window**          | Transparent overlay. Space-bar to capture-and-translate; auto-refresh & global-hotkey zero-focus capture for live captions / subtitles |
-| **Document translation**     | 9 formats: PDF / DOCX / EPUB / TXT / SRT / VTT / CSV / JSON / Markdown. Segment-by-segment, resumable (explanations included); term check catches untranslated glossary terms |
+| **Document translation**     | 9 formats: PDF / DOCX / EPUB / TXT / SRT / VTT / CSV / JSON / Markdown. Segment-by-segment, resumable, with term check                  |
 | **134 languages**            | Everything Google Translate supports, in a picker with a letter index and a recently-used row; more can be added by hand                |
 | **AI actions**               | One-click summary of long passages; "understanding mode" in the floating window and per-paragraph explanations in documents; custom actions can be imported (needs an LLM provider) |
 | **Glossary**                 | Auto-replace terms after translation, with undo support                                                                                |
@@ -69,7 +69,7 @@ Transparent overlay window for live translation. Drag, resize, pin on top. Spawn
 
 A layer of understanding on top of translation. **Summarize** reads a long passage and hands back the key points — available in the selection card, the main panel, and the floating window, folding open in place. The **understanding mode** switch in the floating window's top-left corner stops translating captures and explains them instead — for the technical documents, formulas, and code that stay confusing even after translation.
 
-With a vision model loaded (Qwen-VL, LLaVA, and the like in LM Studio / Ollama), the model reads the screenshot itself instead of going through "recognize the text, then understand it", so layout and mixed text/graphics survive; it falls back to the text path automatically if the model cannot see images. Summaries are kept alongside the translation they came from in history, and can be deleted on their own; understanding-mode results are saved as entries of their own (source plus explanation, marked with an AI badge), and explaining the same passage again replaces the old entry.
+With a vision model loaded (Qwen-VL, LLaVA, and the like in LM Studio / Ollama), the model reads the screenshot itself instead of going through "recognize the text, then understand it", so layout and mixed text/graphics survive; it falls back to the text path automatically if the model cannot see images. Summaries are kept alongside the translation they came from in history, and can be deleted on their own; understanding-mode results get entries of their own, and re-explaining a passage replaces the old one.
 
 An action is a prompt config rather than code — custom ones can be imported from the "AI Actions" settings page. **An LLM provider is required** (LM Studio / Ollama / OpenAI / Claude / Gemini / DeepSeek); translate-only sources (DeepL / Google / Microsoft / Baidu) cannot run them and are marked as such in Settings.
 
@@ -83,9 +83,9 @@ If the language you need is not there, add it from the bottom of the picker. A n
 
 Supports 9 formats: PDF, DOCX, EPUB, TXT, SRT, VTT, CSV, JSON, Markdown. Parallel translation, scanned-PDF OCR and glossary integration. Translation time varies by device and provider.
 
-With an LLM provider configured, each paragraph can be **explained** on request — it reads the source, so untranslated paragraphs work too — and the explanation folds open under the translation, folding away on a second click. After two of them the toolbar offers a consolidated note. That note covers only the paragraphs you opened, and says so: it is not a summary of the document. Explanations and the note are saved with the translation progress — reopen the same file within 7 days and they come back.
+With an LLM provider configured, each paragraph can be **explained** on request — it reads the source, so untranslated paragraphs work too — and the explanation folds open under the translation, folding away on a second click. After two of them the toolbar offers a consolidated note. That note covers only the paragraphs you opened, and says so: it is not a summary of the document. Explanations are saved with the translation progress and come back when you reopen the file.
 
-After translating, the toolbar's **term check** finds glossary terms that are still untranslated in the output and replaces them in one confirmed pass; replacements are highlighted both ways in the paragraph, with per-spot undo. No model calls — plain text matching against the current target language's glossary.
+After translating, **term check** finds glossary terms left untranslated and replaces them in one pass; replacements are highlighted, with per-spot undo.
 
 <p align="center">
   <img src="docs/screenshots/document-translate.png" width="600" alt="Document translation">
