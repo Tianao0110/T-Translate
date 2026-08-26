@@ -901,6 +901,7 @@ const zh = {
     epubNoRootfile: "无效的 EPUB 文件：找不到 rootfile",
     epubNoOpf: "无效的 EPUB 文件：找不到 OPF 文件",
     epubNoContent: "EPUB 文件中没有找到可翻译的文本内容",
+    tooLargeDecompressed: "文件解压后内容过大，可能是异常文件，已停止解析",
     unsupportedFormat: "不支持的文件格式",
     unimplementedParser: "未实现的解析器",
     passwordRequired: "文件需要密码",

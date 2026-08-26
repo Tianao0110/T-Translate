@@ -900,6 +900,7 @@ const en = {
     epubNoRootfile: "Invalid EPUB: rootfile not found",
     epubNoOpf: "Invalid EPUB: OPF file not found",
     epubNoContent: "No translatable text found in EPUB",
+    tooLargeDecompressed: "File content is too large after decompression; parsing stopped",
     unsupportedFormat: "Unsupported file format",
     unimplementedParser: "Unimplemented parser",
     passwordRequired: "File requires a password",

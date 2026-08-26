@@ -15,6 +15,10 @@ import {
   exportVTT,
   detectHeadings,
   buildOutlineTree,
+  clampedPdfScale,
+  assertZipWithinDecompressedCap,
+  MAX_PDF_CANVAS_EDGE,
+  MAX_DECOMPRESSED_SIZE_BYTES,
 } from '../../src/utils/document-parser.js';
 
 describe('timecode conversion', () => {
@@ -158,5 +162,64 @@ describe('outline detection', () => {
     expect(tree).toHaveLength(2);
     expect(tree[0].children).toHaveLength(1);
     expect(tree[0].children[0].segmentId).toBe(1);
+  });
+});
+
+// DoS hardening — a malicious PDF/EPUB/DOCX opened one-click from the context
+// menu must not allocate an unbounded canvas or decompress past the cap.
+describe('PDF canvas scale clamp', () => {
+  it('keeps scale 2 for a normal page', () => {
+    expect(clampedPdfScale(612, 792)).toBe(2); // US Letter @72dpi
+  });
+
+  it('scales an oversized page down so the longest edge fits the cap', () => {
+    const scale = clampedPdfScale(200000, 100000);
+    expect(scale).toBeLessThan(2);
+    expect(200000 * scale).toBeLessThanOrEqual(MAX_PDF_CANVAS_EDGE);
+  });
+
+  it('never scales up a tiny page past the desired 2', () => {
+    expect(clampedPdfScale(10, 10)).toBe(2);
+  });
+
+  it('survives a degenerate zero-size page', () => {
+    expect(clampedPdfScale(0, 0)).toBe(2);
+  });
+});
+
+describe('zip decompressed-size cap', () => {
+  const zipOf = (sizes) => ({
+    files: Object.fromEntries(
+      sizes.map((s, i) => [`f${i}`, { dir: false, _data: { uncompressedSize: s } }])
+    ),
+  });
+
+  it('passes a normal document', () => {
+    expect(() => assertZipWithinDecompressedCap(zipOf([1_000_000, 2_000_000]))).not.toThrow();
+  });
+
+  it('throws when the declared total exceeds the cap (zip bomb)', () => {
+    const huge = MAX_DECOMPRESSED_SIZE_BYTES + 1;
+    expect(() => assertZipWithinDecompressedCap(zipOf([huge]))).toThrow();
+  });
+
+  it('sums entries — many mid-size files together trip the cap', () => {
+    const each = Math.ceil(MAX_DECOMPRESSED_SIZE_BYTES / 4);
+    expect(() => assertZipWithinDecompressedCap(zipOf([each, each, each, each, each]))).toThrow();
+  });
+
+  it('ignores directory entries and missing sizes', () => {
+    const zip = { files: {
+      d: { dir: true, _data: { uncompressedSize: 9e9 } },
+      a: { dir: false, _data: {} },
+      b: { dir: false },
+      c: { dir: false, _data: { uncompressedSize: 5 } },
+    } };
+    expect(() => assertZipWithinDecompressedCap(zip)).not.toThrow();
+  });
+
+  it('tolerates an empty or malformed zip object', () => {
+    expect(() => assertZipWithinDecompressedCap({})).not.toThrow();
+    expect(() => assertZipWithinDecompressedCap({ files: null })).not.toThrow();
   });
 });
