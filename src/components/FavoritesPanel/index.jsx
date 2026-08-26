@@ -553,11 +553,13 @@ const FavoritesPanel = ({ showNotification }) => {
 
         if (!exists) {
           addToFavorites({
+            id: term.id,
             sourceText: term.sourceText,
             translatedText: term.translatedText,
             note: term.note,
             tags: term.tags,
             folderId: 'glossary',
+            timestamp: Date.now(),
           });
           added++;
         }
