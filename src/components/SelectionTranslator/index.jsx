@@ -20,7 +20,7 @@ const DEFAULT_SETTINGS = {
   showSourceByDefault: false,
   autoCloseOnCopy: false,
   minChars: 2,
-  maxChars: 500,
+  maxChars: 2000,
   windowOpacity: 95,
   rainbowWindow: false,
 };

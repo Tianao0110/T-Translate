@@ -227,9 +227,9 @@ const SelectionSection = ({
               type="number"
               className="setting-input small"
               value={settings.selection.maxChars}
-              onChange={(e) => updateSetting('selection', 'maxChars', parseInt(e.target.value) || 500)}
+              onChange={(e) => updateSetting('selection', 'maxChars', parseInt(e.target.value) || 2000)}
               min="50"
-              max="2000"
+              max="5000"
             />
           </div>
         </div>

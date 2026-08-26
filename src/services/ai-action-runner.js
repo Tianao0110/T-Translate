@@ -73,7 +73,10 @@ export function checkActionAvailability(action, ctx = {}) {
   if (displayMode && trigger.displayModes && !trigger.displayModes.includes(displayMode)) {
     return { available: false, reason: 'displayMode' };
   }
-  if (!meetsLengthGate(text, trigger.minLength)) {
+  // The surface may carry the user's own long-form threshold; an action that
+  // declares no gate is unaffected either way.
+  const gate = trigger.minLength && ctx.longFormGate ? ctx.longFormGate : trigger.minLength;
+  if (!meetsLengthGate(text, gate)) {
     return { available: false, reason: 'tooShort' };
   }
   return { available: true, reason: null };

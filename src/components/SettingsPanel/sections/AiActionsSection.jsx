@@ -103,6 +103,22 @@ const AiActionsSection = ({ settings, updateSetting, notify, confirm }) => {
       </div>
 
       <div className="setting-group">
+        <label className="setting-label">{t('aiActions.longForm')}</label>
+        <input
+          type="number"
+          className="setting-input small"
+          value={settings.aiActions?.longFormChars ?? 150}
+          onChange={(e) => updateSetting(
+            'aiActions', 'longFormChars',
+            Math.min(2000, Math.max(10, parseInt(e.target.value) || 150))
+          )}
+          min="10"
+          max="2000"
+        />
+        <p className="setting-hint">{t('aiActions.longFormHint')}</p>
+      </div>
+
+      <div className="setting-group">
         <label className="setting-label">{t('aiActions.importedTitle', '导入的动作')}</label>
         {imported.length === 0 ? (
           <div className="setting-hint-inline">{t('aiActions.importedEmpty', '还没有导入任何动作')}</div>

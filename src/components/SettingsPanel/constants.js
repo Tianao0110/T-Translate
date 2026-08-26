@@ -105,7 +105,7 @@ export const DEFAULT_SETTINGS = {
     showSourceByDefault: false,
     autoCloseOnCopy: false,
     minChars: 2,
-    maxChars: 500,
+    maxChars: 2000,
     windowOpacity: 95,
     // Rainbow signature skin for the selection window across all themes;
     // off = theme-matched skins (fresh ships its own aqua one).
@@ -149,6 +149,11 @@ export const DEFAULT_SETTINGS = {
   // anything beyond that is a file the user chose to import.
   aiActions: {
     imported: [],
+    // When "Summarize" is offered. Shipped as an estimate and always meant to
+    // be tuned against real documents — now the user does the tuning.
+    // One number: the Latin-word bar derives from it, keeping the ratio the
+    // built-in default had (150 CJK characters ≈ 120 English words).
+    longFormChars: 150,
   },
 
   // Single source of truth for TTS defaults is services/tts/index.js

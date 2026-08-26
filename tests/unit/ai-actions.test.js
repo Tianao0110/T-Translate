@@ -19,6 +19,7 @@ import {
   normalizeActionConfig,
   AI_ACTION_SCHEMA_VERSION,
   LONG_FORM_GATE,
+  longFormGate,
 } from '../../src/config/ai-actions.js';
 
 const CAN_CHAT = { text: true, vision: false };
@@ -81,6 +82,56 @@ describe('meetsLengthGate', () => {
   it('rejects text short on both scales', () => {
     expect(meetsLengthGate('短句子', LONG_FORM_GATE)).toBe(false);
     expect(meetsLengthGate('a short caption', LONG_FORM_GATE)).toBe(false);
+  });
+});
+
+// The shipped 150/120 was always an estimate the design said to tune against
+// real documents. It is now a setting, so what needs pinning is that the two
+// scales keep a sensible relationship and that an override cannot silently
+// disable a gate.
+describe('longFormGate', () => {
+  it('derives the Latin bar from the CJK one at the built-in ratio', () => {
+    expect(longFormGate(150)).toEqual({ cjk: 150, latin: 120 });
+    expect(longFormGate(50)).toEqual({ cjk: 50, latin: 40 });
+  });
+
+  it('never lets the Latin bar round down to zero, which would gate nothing', () => {
+    expect(longFormGate(1)).toEqual({ cjk: 1, latin: 1 });
+  });
+
+  it('falls back to the built-in default for junk input', () => {
+    for (const bad of [0, -10, null, undefined, 'abc', NaN]) {
+      expect(longFormGate(bad)).toEqual(LONG_FORM_GATE);
+    }
+  });
+});
+
+describe('a user-set long-form threshold', () => {
+  const ctx = (text, longFormGate) => ({
+    surface: 'selection', displayMode: 'unified', text, longFormGate,
+    capabilities: { text: true, vision: false },
+  });
+  const summarize = getAiAction('summarize');
+  const short = '短句。'.repeat(10);   // 30 CJK characters
+
+  it('hides summarize on this passage at the built-in threshold', () => {
+    expect(checkActionAvailability(summarize, ctx(short)).available).toBe(false);
+  });
+
+  it('offers it once the user lowers the bar below the passage', () => {
+    expect(checkActionAvailability(summarize, ctx(short, longFormGate(20))).available).toBe(true);
+  });
+
+  it('hides it again when the user raises the bar', () => {
+    expect(checkActionAvailability(summarize, ctx(short, longFormGate(500))).available).toBe(false);
+  });
+
+  it('leaves an action that declares no gate alone', () => {
+    const explain = getAiAction('explain');
+    const result = checkActionAvailability(explain, {
+      ...ctx('x', longFormGate(500)), surface: 'floating', understandMode: true,
+    });
+    expect(result.available).toBe(true);
   });
 });
 

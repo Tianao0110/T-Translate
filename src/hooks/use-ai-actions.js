@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BUILTIN_AI_ACTIONS } from '@config/ai-actions';
+import { BUILTIN_AI_ACTIONS, longFormGate } from '@config/ai-actions';
 import {
   checkActionAvailability,
   getActionCapabilities,
@@ -20,6 +20,26 @@ import translationService from '../services/stack-client.js';
 import createLogger from '../utils/logger.js';
 
 const logger = createLogger('useAiActions');
+
+// Read at use time, not at mount: the settings panel lives in this same
+// renderer, and a threshold the user just changed should apply to the next
+// keystroke rather than the next launch. Cached on the raw string so the JSON
+// is parsed once per actual change, not once per render.
+let _settingsRaw = null;
+let _longFormCache;
+function userLongFormGate() {
+  try {
+    const raw = localStorage.getItem('settings');
+    if (raw !== _settingsRaw) {
+      _settingsRaw = raw;
+      const chars = JSON.parse(raw || '{}')?.aiActions?.longFormChars;
+      _longFormCache = chars ? longFormGate(chars) : undefined;
+    }
+    return _longFormCache;
+  } catch {
+    return undefined;
+  }
+}
 
 // attachResult: how this window records a result onto the translation it came
 // from. The main panel hands over the store action; the overlay windows hand
@@ -59,11 +79,14 @@ export default function useAiActions(surface, attachResult) {
   }, []);
 
   // ctx: { displayMode, text, hasImage }
-  const availableActions = useCallback((ctx = {}) => (
-    [...BUILTIN_AI_ACTIONS, ...imported].filter(
-      action => checkActionAvailability(action, { ...ctx, surface, capabilities }).available
-    )
-  ), [surface, capabilities, imported]);
+  const availableActions = useCallback((ctx = {}) => {
+    const gate = userLongFormGate();
+    return [...BUILTIN_AI_ACTIONS, ...imported].filter(
+      action => checkActionAvailability(
+        action, { longFormGate: gate, ...ctx, surface, capabilities }
+      ).available
+    );
+  }, [surface, capabilities, imported]);
 
   // Which pipeline an action would use, so a surface can say up front that the
   // capture itself is about to be sent — an image gives away far more than the

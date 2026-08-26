@@ -40,6 +40,15 @@ export const AI_ACTION_OUTPUT_LANGUAGES = ['target', 'source', 'ui'];
 // the design leaves the final values to measurement on real documents.
 export const LONG_FORM_GATE = { cjk: 150, latin: 120 };
 
+// The Latin bar tracks the CJK one at the ratio the built-in default carried
+// (150 characters ≈ 120 words), so the user tunes one number instead of two
+// that have to be kept in a sensible relationship with each other.
+export function longFormGate(cjkChars) {
+  const cjk = Number(cjkChars);
+  if (!Number.isFinite(cjk) || cjk <= 0) return LONG_FORM_GATE;
+  return { cjk, latin: Math.max(1, Math.round(cjk * 0.8)) };
+}
+
 const SUMMARIZE = {
   id: 'summarize',
   schemaVersion: AI_ACTION_SCHEMA_VERSION,
