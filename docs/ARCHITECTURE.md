@@ -203,8 +203,9 @@ hooks/use-ai-actions        三个窗口共用：能力探测、可用动作、�
    路径 A（文本）。路径 B 失败且有识别文本时自动回落 A——用户不该为模型看不见图
    买单
 3. **隐私跟随翻译**。LLM 调用的门在主进程 facade（同 translate）；结果写历史的门
-   在 `translation-store.attachAiResult`（同 addToHistory，无痕不写）；路径 B 在
-   离线模式下还要求视觉端点必须在本机
+   在 `translation-store.attachAiResult`（同 addToHistory，无痕不写）；理解模式的
+   结果作为独立主条目走 addToHistory（kind `'understand'`，同一道无痕门，动作声明
+   `history:'none'` 则不写）；路径 B 在离线模式下还要求视觉端点必须在本机
 
 ## 命名规范
 

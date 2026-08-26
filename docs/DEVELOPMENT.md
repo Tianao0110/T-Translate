@@ -170,7 +170,7 @@ npm start             # 实测：设置页出卡片、填 key、测试连接、�
 {
   id: 'explain-steps',              // 小写字母/数字/连字符，2-40 位
   schemaVersion: 1,
-  icon: 'Lightbulb',                // lucide 名，见 shared/AiActionIcon.jsx 的映射
+  icon: 'Lightbulb',                // lucide 名或 'ai'（文字 AI 徽章），见 shared/AiActionIcon.jsx 的映射
   nameKey: 'aiActions.xxx.name',    // 内置用 i18n key；导入的用 labels: { zh, en }
   capability: 'text',               // 'text' 需要能对话的源；'vision' 需要视觉模型
   outputLanguage: 'target',         // target/source/ui 或语言码——模型用哪种语言回答
