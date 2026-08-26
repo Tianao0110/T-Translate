@@ -28,7 +28,7 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 - ~~doc_cls 旋转分类器~~ **已实测弃案（2026-07-04）**：倒置图可纠正，但日文横排截图被误判竖排、韩文包乱码——主场景回归不可接受，详见 OCR_MODELS.md 已知边界（含复现方法）。别再捡
 - 档位备忘：v6 全系仅 tiny/small/medium 三档（官方页 2026-07-03 已核），tiny 无假名不可用；v6 无独立多语言模型，韩/西里尔/天城/阿拉伯继续 v4 包；spike 复跑脚本已随 2026-07-10 temp 清理退役（结论与复现方法保全在 docs/OCR_MODELS.md 已知边界节）
 - 合入时补测：竖排文本、真实截图小字（实拍回归）
-- ~~泰米尔 / 泰卢固 / 卡纳达三个语言包~~ ✅ **已加入（2026-08-19）**，识别语言 56→59。上游 `ka.zip` 名为格鲁吉亚语码实为卡纳达语，我们用 `kn`；实测质量低于同代其他包（74/71/71% 对天城文 87%），已写进 OCR_MODELS.md 已知边界。**待发布动作：`npm run ocr:release` 后把三个新 zip + manifest 传上 ocr-models Release**
+- ~~泰米尔 / 泰卢固 / 卡纳达三个语言包~~ ✅ **已加入（2026-08-19）**，识别语言 56→59。上游 `ka.zip` 名为格鲁吉亚语码实为卡纳达语，我们用 `kn`；实测质量低于同代其他包（74/71/71% 对天城文 87%），已写进 OCR_MODELS.md 已知边界。资产已上线（2026-08-25：3 zip + manifest 传上 ocr-models Release 共 12 资产，下载 sha256 复验通过；语言对用户可见要等下次发版）
 - ~~百度 Unlimited-OCR vLLM 直连提示~~ ✅ 已写入 docs/FAQ.md（2026-07-10）
 
 ### 真 asar 热替换（仅评估，不承诺）

@@ -43,7 +43,7 @@ npm run ocr:release        # 生成 release-ocr-models/（8 个 zip + manifest.j
 3. 到 `ocr-models` Release 页 **删除旧资产、上传新 zip + 新 manifest.json**（tag 不变）
 4. 用户端点「刷新」即看到「可更新」徽章，点更新完成升级；应用代码零改动
 
-新增语言包同理：在 `ocr-model-sources.js` 的 `LANG_PACKS` 加条目 + 在 `electron/shared/ocr-packs.js` 的 `LANGUAGE_TO_PACK` 加语言映射 + 设置页语言下拉、`ocr.packs.names.*` 文案补齐（这一步需要发版）。
+新增语言包同理：在 `ocr-model-sources.js` 的 `LANG_PACKS` 加条目 + 在 `electron/shared/ocr-packs.js` 的 `LANGUAGE_TO_PACK` 加语言映射 + 设置页语言下拉、`ocr.packs.names.*` 文案补齐（这一步需要发版）。资产可先于发版上线（2026-08-25 实证）：v0.3.x 客户端的 `computePackList` 会跳过无语言映射的包（隐形），v0.2.x 更老客户端按裸 id 列出但语言下拉不路由到它，无害。
 
 ## manifest.json 协议（schemaVersion 1）
 
