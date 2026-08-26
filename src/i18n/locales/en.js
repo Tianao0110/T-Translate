@@ -411,8 +411,6 @@ const en = {
     dismiss: "Don't show again",
     next: "Set up a translation source first — everything else builds on it.",
     start: "Get started",
-    reset: "Show the guide again",
-    resetDone: "Guide reset — it will show again next launch",
     hints: {
       styleRewrite: "Tone not right? Have it rewritten in a style you pick",
       favorite: "Save phrases you reuse — glossary entries are applied automatically",

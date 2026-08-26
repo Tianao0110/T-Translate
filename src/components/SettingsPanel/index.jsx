@@ -461,6 +461,9 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
       localStorage.removeItem('settings-mode-hint-seen');
       if (window.electron?.store) {
         window.electron.store.delete('settings');
+        // Onboarding flags are side-band state too: a reset that left them set
+        // would hand the user a "factory fresh" app that never greets them.
+        window.electron.store.delete('onboarding');
       }
 
       // zustand-persisted preference fields (share a store with history/

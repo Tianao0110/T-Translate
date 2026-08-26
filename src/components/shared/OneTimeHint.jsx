@@ -10,8 +10,9 @@ import './one-time-hint.css';
  * which trains the user to dismiss without reading — and then the two hints
  * that would have helped get dismissed too.
  *
- * Renders nothing once dismissed, and dismissal is permanent (reset lives in
- * Settings → About).
+ * Renders nothing once dismissed, and dismissal is permanent — the only way
+ * back is the full settings reset, which clears the onboarding flags with
+ * everything else.
  */
 export default function OneTimeHint({ id, text, seen, onDismiss, placement = 'bottom' }) {
   const { t } = useTranslation();
