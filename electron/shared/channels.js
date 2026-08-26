@@ -162,6 +162,18 @@ const CHANNELS = {
     VISION_CHAT: 'stack:vision-chat',             // path B: prompt + capture to a vision model
     VISION_CAPABILITY: 'stack:vision-capability', // may path B run under the live privacy mode?
   },
+  // Audio-transcription probe (hidden experimental build; entry appears only
+  // when ASR models are manually placed under userData/asr-models).
+  AUDIO_PROBE: {
+    GET_INFO: 'audio-probe:get-info',   // renderer → main: model/privacy/state snapshot
+    START: 'audio-probe:start',         // renderer → main: spawn ASR worker
+    STOP: 'audio-probe:stop',           // renderer → main: stop worker, keep window
+    PCM: 'audio-probe:pcm',             // renderer → main: Float32Array 16k mono chunk
+    EVENT: 'audio-probe:event',         // renderer → main: capture-side event for the probe log
+    STATUS: 'audio-probe:status',       // main → renderer: {state, detail}
+    SEGMENT: 'audio-probe:segment',     // main → renderer: recognized segment record
+    CLOSE: 'audio-probe:close',         // renderer → main: close the probe window
+  },
 };
 
 const MENU_ACTIONS = {

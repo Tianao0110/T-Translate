@@ -6,6 +6,7 @@ const trayLabels = {
     screenshot: '截图翻译',
     floatingWindow: '悬浮窗口',
     selectionTranslate: '划词翻译',
+    audioProbe: '听译探针',
     settings: '设置',
     quit: '退出'
   },
@@ -13,6 +14,7 @@ const trayLabels = {
     screenshot: 'Screenshot Translate',
     floatingWindow: 'Floating Window',
     selectionTranslate: 'Selection Translate',
+    audioProbe: 'Audio Probe',
     settings: 'Settings',
     quit: 'Quit'
   }

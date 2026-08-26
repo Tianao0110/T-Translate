@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>T-Translate Audio Probe</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    /* 独立窗口：不透明深色单一外观，不引用主程序令牌表（独立窗口令牌铁律） */
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      background: #16181d;
+      color: #d7dae0;
+      font-family: 'Segoe UI', 'Microsoft YaHei', -apple-system, sans-serif;
+      font-size: 13px;
+    }
+
+    .probe {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      border: 1px solid #3a3f4a;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    /* 拖拽条：铁律——drag 元素上不放 filter/backdrop-filter/transform
+       控件全部 no-drag 且不几何覆盖拖拽区 */
+    .probe-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      background: #1e2128;
+      -webkit-app-region: drag;
+      user-select: none;
+      flex: none;
+    }
+
+    .probe-title {
+      font-weight: 600;
+      color: #aab2c0;
+      white-space: nowrap;
+    }
+
+    .probe-status {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #7d8697;
+    }
+
+    .probe-status.warn { color: #d9a441; }
+    .probe-status.err { color: #d96c6c; }
+    .probe-status.live { color: #5fb878; }
+
+    .probe-controls {
+      display: flex;
+      gap: 6px;
+      -webkit-app-region: no-drag;
+      flex: none;
+    }
+
+    .probe-btn {
+      border: 1px solid #3a3f4a;
+      border-radius: 5px;
+      background: #262a33;
+      color: #d7dae0;
+      padding: 3px 12px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .probe-btn:hover { background: #303542; }
+    .probe-btn:disabled { opacity: 0.45; cursor: default; }
+    .probe-btn.primary { border-color: #4a6fa5; background: #2c3e5c; }
+    .probe-btn.primary:hover { background: #354a6e; }
+
+    .level-track {
+      height: 3px;
+      background: #232730;
+      flex: none;
+    }
+    .level-bar {
+      height: 100%;
+      width: 0%;
+      background: #5fb878;
+      transition: width 120ms linear;
+    }
+
+    .transcript {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 10px;
+      user-select: text;
+      cursor: text;
+    }
+    .transcript::-webkit-scrollbar { width: 8px; }
+    .transcript::-webkit-scrollbar-thumb { background: #333947; border-radius: 4px; }
+
+    .seg { margin-bottom: 6px; line-height: 1.45; word-break: break-word; }
+    .seg-meta {
+      color: #616a7b;
+      font-size: 11px;
+      margin-right: 6px;
+      user-select: none;
+    }
+    .seg-repeat { color: #d9a441; }
+    .placeholder { color: #565e6d; padding-top: 8px; text-align: center; }
+
+    .probe-footer {
+      flex: none;
+      padding: 4px 10px;
+      background: #1a1d24;
+      color: #616a7b;
+      font-size: 11px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      user-select: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="probe">
+    <div class="probe-header">
+      <span class="probe-title">听译探针</span>
+      <span class="probe-status" id="status">初始化…</span>
+      <div class="probe-controls">
+        <button class="probe-btn primary" id="toggleBtn" disabled>开始</button>
+        <button class="probe-btn" id="closeBtn">关闭</button>
+      </div>
+    </div>
+    <div class="level-track"><div class="level-bar" id="levelBar"></div></div>
+    <div class="transcript" id="transcript">
+      <div class="placeholder" id="placeholder">点击「开始」监听系统声音（音频不落盘，识别文本仅记录到本地探针日志）</div>
+    </div>
+    <div class="probe-footer" id="footer">—</div>
+  </div>
+
+  <script>
+    const els = {
+      status: document.getElementById('status'),
+      toggleBtn: document.getElementById('toggleBtn'),
+      closeBtn: document.getElementById('closeBtn'),
+      levelBar: document.getElementById('levelBar'),
+      transcript: document.getElementById('transcript'),
+      placeholder: document.getElementById('placeholder'),
+      footer: document.getElementById('footer'),
+    };
+
+    const STATUS_TEXT = {
+      idle: '就绪',
+      loading: '加载模型…',
+      listening: '监听中',
+      'hint-no-audio': '未检测到声音——检查系统音量是否静音',
+      'hint-no-speech': '有声音，但长时间未识别到清晰语音',
+      stopped: '已停止',
+      'no-model': '未找到 ASR 模型',
+      'secure-blocked': '隐私安全模式下探针不可用',
+      'engine-restarting': '识别引擎崩溃，自动重启中…',
+      'engine-dead': '识别引擎不可用（本次会话不再重试）',
+      'device-lost': '音频设备变更，重新连接中…',
+      'reacquire-failed': '重连失败——点击「开始」手动重试',
+      'capture-error': '捕获系统声音失败',
+    };
+    const STATUS_CLASS = {
+      listening: 'live',
+      'hint-no-audio': 'warn',
+      'hint-no-speech': 'warn',
+      'device-lost': 'warn',
+      'engine-restarting': 'warn',
+      'no-model': 'err',
+      'secure-blocked': 'err',
+      'engine-dead': 'err',
+      'reacquire-failed': 'err',
+      'capture-error': 'err',
+    };
+
+    const MAX_SEGMENTS = 100;
+    const TARGET_RATE = 16000;
+    const SEND_BATCH = 3200; // 200ms at 16k
+
+    let running = false;        // session requested by user
+    let capture = null;         // {stream, ctx, src, proc, mute, track}
+    let engineReady = false;
+    let reacquireAttempts = 0;
+    let errorLatch = false;     // a terminal error keeps its status text over the trailing 'stopped'
+
+    function setStatus(state) {
+      els.status.textContent = STATUS_TEXT[state] || state;
+      els.status.className = 'probe-status ' + (STATUS_CLASS[state] || '');
+    }
+
+    function setLevel(rms) {
+      // sqrt scale makes quiet speech visible on the bar
+      const pct = Math.min(100, Math.round(Math.sqrt(Math.min(1, rms * 12)) * 100));
+      els.levelBar.style.width = pct + '%';
+    }
+
+    function addSegment(rec) {
+      if (els.placeholder) {
+        els.placeholder.remove();
+        els.placeholder = null;
+      }
+      const div = document.createElement('div');
+      div.className = 'seg';
+      const meta = document.createElement('span');
+      meta.className = 'seg-meta' + (rec.repeated ? ' seg-repeat' : '');
+      const lang = (rec.lang || '').replace(/[<|>]/g, '');
+      meta.textContent = `[${lang || '?'} ${rec.segDurS}s${rec.repeated ? ' 重复' : ''}]`;
+      div.appendChild(meta);
+      div.appendChild(document.createTextNode(rec.text));
+      els.transcript.appendChild(div);
+      while (els.transcript.children.length > MAX_SEGMENTS) {
+        els.transcript.firstChild.remove();
+      }
+      els.transcript.scrollTop = els.transcript.scrollHeight;
+    }
+
+    function setFooter(rec) {
+      els.footer.textContent =
+        `RSS ${rec.rssMb}MB · CPU ${rec.cpuPct}% · 已听 ${Math.round(rec.audioInS)}s · ${rec.segments} 段`;
+    }
+
+    // ===== capture pipeline: loopback -> mono -> linear resample -> batches =====
+
+    async function startCapture() {
+      // 铁律：三项处理必须显式关——AEC 的参考信号就是本机播放，开着会把
+      // loopback 整条流当回声消掉（spike 实测全零）
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+      });
+      stream.getVideoTracks().forEach((t) => t.stop());
+      const track = stream.getAudioTracks()[0];
+      if (!track) {
+        stream.getTracks().forEach((t) => t.stop());
+        throw new Error('no audio track');
+      }
+
+      const ctx = new AudioContext();
+      await ctx.resume();
+      const src = ctx.createMediaStreamSource(stream);
+      const proc = ctx.createScriptProcessor(4096, 2, 1);
+      const mute = ctx.createGain();
+      mute.gain.value = 0;
+
+      const step = ctx.sampleRate / TARGET_RATE; // e.g. 3.0 at 48k, 2.75625 at 44.1k
+      let pos = 0;            // fractional read position within the incoming stream
+      let prevSample = 0;     // last sample of the previous callback (for interpolation)
+      let outBuf = new Float32Array(SEND_BATCH);
+      let outLen = 0;
+      let levelSkip = 0;
+
+      proc.onaudioprocess = (e) => {
+        const ch0 = e.inputBuffer.getChannelData(0);
+        const ch1 = e.inputBuffer.numberOfChannels > 1 ? e.inputBuffer.getChannelData(1) : ch0;
+        const n = ch0.length;
+
+        let sumSq = 0;
+        for (let i = 0; i < n; i++) {
+          const v = (ch0[i] + ch1[i]) * 0.5;
+          sumSq += v * v;
+        }
+        if ((levelSkip = (levelSkip + 1) % 4) === 0) {
+          setLevel(Math.sqrt(sumSq / n));
+        }
+
+        // linear-interp resample with carry across callbacks
+        while (pos < n) {
+          const i = Math.floor(pos);
+          const frac = pos - i;
+          const s0 = i === 0 ? prevSample : (ch0[i - 1] + ch1[i - 1]) * 0.5;
+          const s1 = (ch0[i] + ch1[i]) * 0.5;
+          outBuf[outLen++] = s0 + (s1 - s0) * frac;
+          if (outLen === SEND_BATCH) {
+            window.audioProbe.sendPcm(outBuf);
+            outBuf = new Float32Array(SEND_BATCH);
+            outLen = 0;
+          }
+          pos += step;
+        }
+        pos -= n;
+        prevSample = (ch0[n - 1] + ch1[n - 1]) * 0.5;
+      };
+
+      src.connect(proc);
+      proc.connect(mute);
+      mute.connect(ctx.destination);
+
+      track.addEventListener('ended', onDeviceLost);
+      capture = { stream, ctx, src, proc, mute, track };
+    }
+
+    function stopCapture() {
+      if (!capture) return;
+      const c = capture;
+      capture = null;
+      try { c.track.removeEventListener('ended', onDeviceLost); } catch (err) { /* gone */ }
+      try { c.proc.disconnect(); c.src.disconnect(); c.mute.disconnect(); } catch (err) { /* gone */ }
+      try { c.stream.getTracks().forEach((t) => t.stop()); } catch (err) { /* gone */ }
+      try { c.ctx.close(); } catch (err) { /* gone */ }
+      setLevel(0);
+    }
+
+    // 生态调研坑位：默认输出设备切换时 loopback 流随旧设备死掉，要自动重建。
+    // getDisplayMedia 无用户手势可能被拒——拒了就退回手动按钮。
+    async function onDeviceLost() {
+      if (!running) return;
+      window.audioProbe.sendEvent('device-lost');
+      setStatus('device-lost');
+      stopCapture();
+      reacquireAttempts += 1;
+      await new Promise((r) => setTimeout(r, 1200));
+      if (!running) return;
+      try {
+        await startCapture();
+        window.audioProbe.sendEvent('device-reacquired');
+        if (engineReady) setStatus('listening');
+      } catch (err) {
+        window.audioProbe.sendEvent('reacquire-failed', String(err));
+        if (reacquireAttempts < 3) {
+          onDeviceLost();
+        } else {
+          setStatus('reacquire-failed');
+          stopSession();
+        }
+      }
+    }
+
+    // ===== session control =====
+
+    async function startSession() {
+      running = true;
+      engineReady = false;
+      reacquireAttempts = 0;
+      errorLatch = false;
+      els.toggleBtn.textContent = '停止';
+      window.audioProbe.start(); // spawn ASR worker; capture starts on 'listening'
+    }
+
+    function stopSession() {
+      running = false;
+      engineReady = false;
+      stopCapture();
+      window.audioProbe.stop();
+      els.toggleBtn.textContent = '开始';
+    }
+
+    els.toggleBtn.addEventListener('click', () => {
+      if (running) {
+        stopSession();
+      } else {
+        startSession();
+      }
+    });
+
+    els.closeBtn.addEventListener('click', () => {
+      stopSession();
+      window.audioProbe.close();
+    });
+
+    window.audioProbe.onStatus(async (payload) => {
+      const { state, detail } = payload || {};
+      if (state === 'metrics') {
+        setFooter(detail);
+        return;
+      }
+      if (state === 'listening' && running && !capture) {
+        // engine up — begin feeding it
+        engineReady = true;
+        try {
+          await startCapture();
+          setStatus('listening');
+        } catch (err) {
+          window.audioProbe.logs.write({ level: 'error', message: `probe capture failed: ${err}` });
+          errorLatch = true;
+          setStatus('capture-error');
+          stopSession();
+        }
+        return;
+      }
+      if (state === 'listening') {
+        engineReady = true;
+      }
+      if (state === 'stopped' || state === 'engine-dead' || state === 'secure-blocked') {
+        if (running && state !== 'stopped') stopSession();
+        els.toggleBtn.textContent = '开始';
+        if (state === 'stopped') running = false;
+        if (state === 'stopped' && errorLatch) return; // keep the error text visible
+      }
+      setStatus(state);
+    });
+
+    window.audioProbe.onSegment(addSegment);
+
+    window.addEventListener('error', (e) => {
+      window.audioProbe.logs.write({ level: 'error', message: `audio-probe window error: ${e.message}` });
+    });
+    window.addEventListener('unhandledrejection', (e) => {
+      window.audioProbe.logs.write({ level: 'error', message: `audio-probe unhandled rejection: ${e.reason}` });
+    });
+
+    (async () => {
+      try {
+        const info = await window.audioProbe.getInfo();
+        if (!info.modelName) {
+          setStatus('no-model');
+          return;
+        }
+        if (info.secureBlocked) {
+          setStatus('secure-blocked');
+          return;
+        }
+        els.footer.textContent = info.modelName;
+        els.toggleBtn.disabled = false;
+        setStatus('idle');
+      } catch (err) {
+        setStatus('capture-error');
+        window.audioProbe.logs.write({ level: 'error', message: `probe init failed: ${err}` });
+      }
+    })();
+  </script>
+</body>
+</html>

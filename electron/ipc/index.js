@@ -14,6 +14,7 @@ const registerSecureStorageIPC = require('./secure-storage');
 const registerTranslationStackIPC = require('./translation-stack');
 const registerOcrIPC = require('./ocr');
 const registerPrivacyIPC = require('./privacy');
+const registerAudioProbeIPC = require('./audio-probe');
 const { registerThemeIPC } = require('./theme');
 
 /**
@@ -46,6 +47,7 @@ function initIPC(deps) {
     getFloatingWindow: () => deps.windows.floatingWindow,
     getScreenshotWindow: () => deps.windows.screenshot,
     getSelectionWindow: () => deps.windows.selection,
+    getAudioProbeWindow: () => deps.windows.audioProbe,
 
     runtime: deps.runtime,
     store: deps.store,
@@ -78,6 +80,7 @@ function initIPC(deps) {
 
   registerOcrIPC(context);
   registerPrivacyIPC(context);
+  registerAudioProbeIPC(context);
 
   registerThemeIPC({ store: deps.store, logger });
 

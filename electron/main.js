@@ -85,6 +85,7 @@ function buildSelectionSettingsPayload() {
 const { createMenu } = require('./managers/menu-manager');
 const { createTray, updateTrayMenu, destroyTray } = require('./managers/tray-manager');
 const windowManager = require('./managers/window-manager');
+const audioProbeManager = require('./managers/audio-probe-manager');
 
 const screenshotModule = require('./screenshot-module');
 
@@ -1111,6 +1112,12 @@ app.whenReady().then(() => {
     onMainRendererGiveUp,
   });
 
+  audioProbeManager.init({
+    store,
+    windows,
+    createWindow: () => windowManager.createAudioProbeWindow(),
+  });
+
   // Use arrow-function wrappers so we don't capture windowManager methods at
   // declaration time (which would freeze them to the initial — possibly null — state).
   const managers = {
@@ -1131,6 +1138,8 @@ app.whenReady().then(() => {
       }
     },
     toggleSelectionTranslate,
+    toggleAudioProbe: () => audioProbeManager.toggleWindow(),
+    isAudioProbeAvailable: () => audioProbeManager.isAvailable(),
   };
 
   // IPC must be initialized BEFORE any window is created — otherwise renderer may
