@@ -1123,7 +1123,6 @@ app.whenReady().then(() => {
       }
     },
     toggleSelectionTranslate,
-    toggleSubtitleCaptureWindow: (...args) => windowManager.toggleSubtitleCaptureWindow(...args),
   };
 
   // IPC must be initialized BEFORE any window is created — otherwise renderer may
