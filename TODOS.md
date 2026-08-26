@@ -12,11 +12,6 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 
 ## 下一版本候选
 
-### 已认可待立项（2026-08-25 集思广益，用户点头「可以」）
-
-- **配置与数据迁移包**：一键导出/导入 设置 + 术语库 + 收藏 + 自定义语言 + 导入的动作（历史可选）。API Key 按设计不迁移（DPAPI 跨机不可用，界面明说）
-- **右键菜单集成**：资源管理器右键 PDF/DOCX/TXT →「用 T-Translate 翻译」直达文档翻译。两个硬约束（用户点名）：①程序未启动时要能拉起并接住文件（单实例锁转发参数）②卸载时注册表项必须随 NSIS 卸载自动清除
-
 ### ~~主进程内存体检+瘦身~~ 已搁置（2026-07-11 用户拍板：属过度优化，暂不做）
 
 实测形态健康：用时 ~700MB 是推理期弹性上探、闲时回落 ~200MB，非泄漏。复启条件=闲置基线持续爬升不回落、或用户侧真实反馈；届时量化数据与杠杆分析在协作记忆 memory-checkup-lead 里备着，别凭空重推
@@ -73,8 +68,8 @@ v0.3.4 给 Windows OCR / Azure / Google Vision / OCR.space / 百度 五个引擎
   "人工留意"这个缓解手段就此作废——留意的人是我，照样漏。现在的防线是
   `tests/unit/document-translator-mount.test.jsx`：把组件挂载一次。已验证它对着
   崩溃版本会红。**它只覆盖必然求值的那部分**（组件体顶层、依赖数组），条件分支里
-  的错误照样漏——所以其他大组件也该各加一个挂载冒烟测试，尤其 FloatingWindow、
-  SelectionTranslator、SettingsPanel
+  的错误照样漏——FloatingWindow / SelectionTranslator /
+  SettingsPanel 三个挂载冒烟测试已随 v0.3.7 批 1 补齐
 - **`no-use-before-define` 现状**：开 `{variables:true, functions:false}` 还剩 20 处
   命中，分布在 6 个组件 + 2 个工具文件，**全部是回调体内的调用期引用（运行时无害）**，
   危险的渲染期引用已清零。要开成 error 得先把这 20 处重排，风险在于 FloatingWindow
@@ -117,5 +112,5 @@ v0.3.4 给 Windows OCR / Azure / Google Vision / OCR.space / 百度 五个引擎
 
 ### Incremental unit test coverage buildout
 
-`tests/unit/` 现有 43 个测试文件、530 用例（selection / stack 五件套 / OCR 坐标 / 语言目录与选择器 / 历史与理解条目 / 段落笔记 等）。Principle: add tests when you touch a file, new features ship with tests, bug fixes ship with regression tests. Not chasing 100% coverage.
+`tests/unit/` 现有 54 个测试文件、636 用例（selection / stack 五件套 / OCR 坐标 / 语言目录与选择器 / 历史与理解条目 / 段落笔记 等）。Principle: add tests when you touch a file, new features ship with tests, bug fixes ship with regression tests. Not chasing 100% coverage.
 
