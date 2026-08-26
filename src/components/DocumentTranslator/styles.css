@@ -1612,6 +1612,28 @@
   padding: 0 2px;
 }
 
+.dt-term-action.small {
+  margin-left: auto;
+  padding: 1px 9px;
+  font-size: 11.5px;
+}
+
+/* Substituted rows recede — the eye should land on what still needs doing. */
+.dt-term-list li.is-applied .dt-term-pair {
+  color: var(--text-tertiary);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--text-tertiary) 50%, transparent);
+}
+
+/* The substituted term inside the paragraph itself, so the change is visible
+   where it happened rather than only in the report. */
+mark.term-highlight {
+  padding: 0 2px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--accent-primary) 22%, transparent);
+  color: inherit;
+}
+
 /* Running batch: the button turns into its own progress + stop control, so the
    toolbar keeps its width instead of growing a separate bar. */
 .dt-btn.dt-batch-stop {

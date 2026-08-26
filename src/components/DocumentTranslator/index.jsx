@@ -26,6 +26,7 @@ import useVisibleHotkey from '../../hooks/use-visible-hotkey.js';
 import LanguagePicker from '../shared/LanguagePicker.jsx';
 import { useConfirm } from '../shared/ConfirmDialog.jsx';
 import { scanDocumentTerms } from '../../utils/term-consistency.js';
+import HighlightText from '../shared/HighlightText.jsx';
 import useAiActions from '../../hooks/use-ai-actions.js';
 import useSegmentNotes from '../../hooks/use-segment-notes.js';
 import { runAiAction } from '../../services/ai-action-runner.js';
@@ -121,7 +122,7 @@ function sweepExpiredProgress() {
   } catch { /* localStorage unavailable */ }
 }
 
-const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate, onEdit, onCopy, searchQuery, t,
+const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate, onEdit, onCopy, searchQuery, termHighlights, t,
   onExplain, aiNote, noteFolded, aiRunning, canExplain }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState('');
@@ -147,18 +148,6 @@ const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate,
     setIsEditing(false);
   };
   const cancelEdit = () => { setIsEditing(false); setEditText(''); };
-
-  // Highlight search matches. split() with a capture group puts matches at
-  // odd indices — testing parts against a /g regex would skip alternate
-  // matches via its persisting lastIndex.
-  const highlightText = (text) => {
-    if (!searchQuery || !text) return text;
-    try {
-      const escaped = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const parts = text.split(new RegExp(`(${escaped})`, 'gi'));
-      return parts.map((part, i) => i % 2 === 1 ? <mark key={i} className="search-highlight">{part}</mark> : part);
-    } catch { return text; }
-  };
 
   return (
     <div 
@@ -214,7 +203,7 @@ const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate,
 
       {/* source */}
       <div className="segment-original">
-        {highlightText(segment.original)}
+        <HighlightText text={segment.original} search={searchQuery} />
       </div>
 
       {/* translation */}
@@ -227,7 +216,11 @@ const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate,
           )}
           {segment.status === STATUS.COMPLETED && !isEditing && (
             <span onDoubleClick={startEdit} className="translated-text">
-              {highlightText(segment.translated)}
+              <HighlightText
+                text={segment.translated}
+                search={searchQuery}
+                terms={termHighlights}
+              />
             </span>
           )}
           {segment.status === STATUS.COMPLETED && isEditing && (
@@ -488,25 +481,58 @@ const DocumentTranslator = ({
   // guessed at. See utils/term-consistency.js.
   const runTermCheck = useCallback(() => {
     const report = scanDocumentTerms(segments, getGlossaryTerms());
-    setTermReport({ ...report, applied: false });
+    setTermReport({ ...report, applied: [] });
     if (!report.fixable.length && !report.review.length) {
       notify?.(t('documentTranslator.terms.allConsistent'), 'success');
     }
   }, [segments, getGlossaryTerms, notify, t]);
 
-  const applyTermFixes = useCallback(() => {
-    if (!termReport?.fixable.length) return;
-    const byId = new Map(termReport.fixable.map((f) => [f.segmentId, f.after]));
-    setSegments((prev) => prev.map((s) => (byId.has(s.id) ? { ...s, translated: byId.get(s.id) } : s)));
-    setTermReport((prev) => ({ ...prev, applied: true }));
-    notify?.(t('documentTranslator.terms.applied', { count: termReport.fixable.length }), 'success');
-  }, [termReport, notify, t]);
+  // Per paragraph, so one bad substitution can be rolled back without losing
+  // the other twenty. `before` is the exact text this report was built from —
+  // undo restores that, never a guess.
+  const setTermFixApplied = useCallback((segmentIds, apply) => {
+    setTermReport((prev) => {
+      if (!prev) return prev;
+      const ids = new Set(segmentIds);
+      const wanted = new Map(
+        prev.fixable.filter((f) => ids.has(f.segmentId)).map((f) => [f.segmentId, apply ? f.after : f.before])
+      );
+      if (!wanted.size) return prev;
 
-  const undoTermFixes = useCallback(() => {
-    if (!termReport?.applied) return;
-    const byId = new Map(termReport.fixable.map((f) => [f.segmentId, f.before]));
-    setSegments((prev) => prev.map((s) => (byId.has(s.id) ? { ...s, translated: byId.get(s.id) } : s)));
-    setTermReport((prev) => ({ ...prev, applied: false }));
+      setSegments((segs) => segs.map((s) => (
+        wanted.has(s.id) ? { ...s, translated: wanted.get(s.id) } : s
+      )));
+
+      const applied = new Set(prev.applied);
+      for (const id of ids) {
+        if (apply) applied.add(id);
+        else applied.delete(id);
+      }
+      return { ...prev, applied: [...applied] };
+    });
+  }, []);
+
+  const applyAllTermFixes = useCallback(() => {
+    if (!termReport?.fixable.length) return;
+    setTermFixApplied(termReport.fixable.map((f) => f.segmentId), true);
+    notify?.(t('documentTranslator.terms.applied', { count: termReport.fixable.length }), 'success');
+  }, [termReport, setTermFixApplied, notify, t]);
+
+  const undoAllTermFixes = useCallback(() => {
+    if (!termReport?.fixable.length) return;
+    setTermFixApplied(termReport.fixable.map((f) => f.segmentId), false);
+  }, [termReport, setTermFixApplied]);
+
+  // segmentId -> the canonical renderings substituted into it, so the segment
+  // list can mark what changed instead of leaving the reader to diff by eye.
+  const termHighlights = useMemo(() => {
+    if (!termReport?.applied?.length) return null;
+    const applied = new Set(termReport.applied);
+    const map = {};
+    for (const fix of termReport.fixable) {
+      if (applied.has(fix.segmentId)) map[fix.segmentId] = fix.replacements.map((r) => r.to);
+    }
+    return map;
   }, [termReport]);
 
   // privacyMode/useCache no longer travel from here — the main-process stack
@@ -1647,23 +1673,56 @@ const DocumentTranslator = ({
                       </button>
                     </div>
                     <div className="dt-digest-body">
-                      {termReport.fixable.length > 0 && (
-                        <div className="dt-term-row">
-                          <span>
-                            {termReport.applied
-                              ? t('documentTranslator.terms.applied', { count: termReport.fixable.length })
-                              : t('documentTranslator.terms.fixable', { count: termReport.fixable.length })}
-                          </span>
-                          <button
-                            className="dt-term-action"
-                            onClick={termReport.applied ? undoTermFixes : applyTermFixes}
-                          >
-                            {termReport.applied
-                              ? t('documentTranslator.terms.undo')
-                              : t('documentTranslator.terms.apply')}
-                          </button>
-                        </div>
-                      )}
+                      {termReport.fixable.length > 0 && (() => {
+                        const appliedIds = new Set(termReport.applied);
+                        const allApplied = termReport.fixable.every((f) => appliedIds.has(f.segmentId));
+                        return (
+                          <>
+                            <div className="dt-term-row">
+                              <span>{t('documentTranslator.terms.fixable', { count: termReport.fixable.length })}</span>
+                              <button
+                                className="dt-term-action"
+                                onClick={allApplied ? undoAllTermFixes : applyAllTermFixes}
+                              >
+                                {allApplied
+                                  ? t('documentTranslator.terms.undoAll')
+                                  : t('documentTranslator.terms.applyAll')}
+                              </button>
+                            </div>
+                            <ul className="dt-term-list">
+                              {termReport.fixable.map((fix) => {
+                                const on = appliedIds.has(fix.segmentId);
+                                return (
+                                  <li key={fix.segmentId} className={on ? 'is-applied' : ''}>
+                                    <button
+                                      className="dt-term-jump"
+                                      onClick={() => scrollToSegment(fix.segmentId)}
+                                    >
+                                      #{fix.segmentId + 1}
+                                    </button>
+                                    <span className="dt-term-pair">
+                                      {fix.replacements.map((r, i) => (
+                                        <span key={r.from}>
+                                          {i > 0 && '、'}
+                                          {r.from} <span className="dt-term-arrow">→</span> {r.to}
+                                        </span>
+                                      ))}
+                                    </span>
+                                    <button
+                                      className="dt-term-action small"
+                                      onClick={() => setTermFixApplied([fix.segmentId], !on)}
+                                    >
+                                      {on
+                                        ? t('documentTranslator.terms.undo')
+                                        : t('documentTranslator.terms.apply')}
+                                    </button>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          </>
+                        );
+                      })()}
 
                       {termReport.review.length > 0 && (
                         <>
@@ -1713,6 +1772,7 @@ const DocumentTranslator = ({
                     onCopy={copySegmentText}
                     searchQuery={showSearch ? searchQuery : ''}
                     onExplain={explainSegment}
+                    termHighlights={termHighlights?.[segment.id]}
                     aiNote={aiNotes[segment.id]}
                     noteFolded={!!foldedNotes[segment.id]}
                     aiRunning={aiRunningId === segment.id}

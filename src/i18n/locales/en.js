@@ -550,6 +550,8 @@ const en = {
       allConsistent: "Every glossary term is used consistently",
       fixable: "{{count}} left untranslated — these can be substituted directly",
       apply: "Substitute",
+      applyAll: "Substitute all",
+      undoAll: "Undo all",
       applied: "{{count}} substituted",
       undo: "Undo",
       reviewHint: "{{terms}} terms were rendered as something else across {{count}} paragraphs and need your eye — the term is in the source, its canonical rendering is not in the translation, and there is no source word left to substitute",

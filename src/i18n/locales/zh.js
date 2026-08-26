@@ -550,6 +550,8 @@ const zh = {
       allConsistent: "全文用词与术语库一致",
       fixable: "{{count}} 处术语没翻译，可直接替换",
       apply: "替换",
+      applyAll: "全部替换",
+      undoAll: "全部撤销",
       applied: "已替换 {{count}} 处",
       undo: "撤销",
       reviewHint: "另有 {{terms}} 个术语在 {{count}} 段里译成了别的词，需要你看一眼——原文里有这个术语，但译文里找不到规范译法，也没有可替换的原词",
