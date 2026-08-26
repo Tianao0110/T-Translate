@@ -104,17 +104,15 @@ v0.3.4 给 Windows OCR / Azure / Google Vision / OCR.space / 百度 五个引擎
 - ⚠️ **userData 之外还有一处残留**：[system.js:265](electron/ipc/system.js:265) 的开机自启走 `setLoginItemSettings` → 写 `HKCU\...\Run` 注册表。「卸载完全不留」要成立就必须处理它（便携版隐藏该开关或退出时清），否则是假承诺
 - 其余：便携版不能装进 Program Files（不可写）→ electron-builder 加 `portable`/`zip` target 与 NSIS 并存，前者自带 `PORTABLE_EXECUTABLE_DIR` 可当检测依据；老用户迁移提示；OCR 模型跟着搬（高精度包 139MB）需在文档说明
 
-### 首次启动弱引导（2026-08-11 设计已定稿，未实施）
+### ~~首次启动弱引导~~ ✅ 三块全部落地（2026-08-19）
 
-用户拍板走**弱引导**而非多步向导："用户点击进哪里，哪里就会有相对应的小提示"。三块：
+主面板常驻提示条（判据复用真实翻译路径的过滤器；云端源有 key 就算数不探测，
+本地源探端点）+ 首次启动功能速览弹窗（复活了零消费者的 `guide.*` 文案）+ 改写
+风格与收藏两处一次性提示。状态存 electron-store 顶层 `onboarding`。
 
-- **主面板常驻提示条**：检测到当前翻译不了时常驻一条，按钮直达设置→翻译源，配好即消。判据不能看 `isConfigured()`——本地源无必填字段、永远报"已配置"；要按真实可达性判：云端源有 key 就算可用（**不探测**，每次启动发一次 API 调用会烧配额），本地源探 localhost 端点（免费、离线模式下也合法）。区分两类要读 `requiresNetwork`，它是 provider 类上的 getter 不在 metadata 里，应让 `getAllProvidersStatus()` 从实例读它带进 IPC 载荷，别往 metadata 抄一份（"能力看实现不看元数据"）
-- **首次启动轻弹窗**：走 ConfirmDialog 的样式语言，内容 = 功能速览 + 指明先配翻译源，不在弹窗里做配置。**`guide.*` 那组 i18n 是现成文案且全仓零消费者**（4 张功能卡 + 副标题 + "不再显示"），正好复活
-- **两处一次性小提示**：用户点名了**改写风格**与**收藏**，先只做这两处（一次性提示铺太多，第一次打开处处冒泡反而烦）
-
-状态存 electron-store 顶层 `onboarding: { welcomeSeen, hints: {...} }`，配一个"重新查看引导"复位入口放设置→关于（免得成幽灵键）。
-
-已确认**不做**：简略/全部设置切换早就实现了（`SettingsPanel/index.jsx` 的 `simpleMode`，默认简略，带一次性提示），用户看过后表示"已经够了，不用动"。
+⚠️ **「重新查看引导」入口按用户要求删了**，改由全量重置一并清 `onboarding`——
+所以 `resetSettings` 里那份"要清的 side-band 存储"清单现在也管着它，以后再加
+这类标记记得跟上。
 
 ### Incremental unit test coverage buildout
 
