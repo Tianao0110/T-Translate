@@ -552,7 +552,7 @@ const en = {
       apply: "Substitute",
       applied: "{{count}} substituted",
       undo: "Undo",
-      reviewHint: "{{count}} more were rendered as something else and need your eye — the term is in the source, its canonical rendering is not in the translation, and there is no source word left to substitute",
+      reviewHint: "{{terms}} terms were rendered as something else across {{count}} paragraphs and need your eye — the term is in the source, its canonical rendering is not in the translation, and there is no source word left to substitute",
     },
     newDocument: "Clear",
     formats: {

@@ -1671,19 +1671,27 @@ const DocumentTranslator = ({
                               paragraph rendered the term as *something*, and
                               nothing says which words those were. */}
                           <div className="dt-term-note">
-                            {t('documentTranslator.terms.reviewHint', { count: termReport.review.length })}
+                            {t('documentTranslator.terms.reviewHint', {
+                              terms: termReport.review.length,
+                              count: termReport.review.reduce((n, r) => n + r.segmentIds.length, 0),
+                            })}
                           </div>
                           <ul className="dt-term-list">
-                            {termReport.review.map((item, i) => (
-                              <li key={`${item.segmentId}-${item.source}-${i}`}>
-                                <button
-                                  className="dt-term-jump"
-                                  onClick={() => scrollToSegment(item.segmentId)}
-                                >
-                                  #{item.segmentId + 1}
-                                </button>
+                            {termReport.review.map((item) => (
+                              <li key={`${item.source}-${item.canonical}`}>
                                 <span className="dt-term-pair">
                                   {item.source} <span className="dt-term-arrow">→</span> {item.canonical}
+                                </span>
+                                <span className="dt-term-jumps">
+                                  {item.segmentIds.map((id) => (
+                                    <button
+                                      key={id}
+                                      className="dt-term-jump"
+                                      onClick={() => scrollToSegment(id)}
+                                    >
+                                      #{id + 1}
+                                    </button>
+                                  ))}
                                 </span>
                               </li>
                             ))}

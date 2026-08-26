@@ -1577,8 +1577,17 @@
 .dt-term-list li {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 4px 8px;
   font-size: 13px;
+}
+
+/* One term per row, its paragraphs trailing behind it — a term that drifted 40
+   times must not push everything else off the panel. */
+.dt-term-jumps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 .dt-term-jump {

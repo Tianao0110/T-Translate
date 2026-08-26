@@ -552,7 +552,7 @@ const zh = {
       apply: "替换",
       applied: "已替换 {{count}} 处",
       undo: "撤销",
-      reviewHint: "另有 {{count}} 处译成了别的词，需要你看一眼——原文里有这个术语，但译文里找不到规范译法，也没有可替换的原词",
+      reviewHint: "另有 {{terms}} 个术语在 {{count}} 段里译成了别的词，需要你看一眼——原文里有这个术语，但译文里找不到规范译法，也没有可替换的原词",
     },
     newDocument: "清空",
     formats: {

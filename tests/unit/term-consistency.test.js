@@ -40,7 +40,7 @@ describe('scanDocumentTerms', () => {
     const { fixable, review } = scanDocumentTerms(segments, [TENSOR]);
 
     expect(fixable).toHaveLength(0);
-    expect(review).toEqual([{ segmentId: 0, source: 'tensor', canonical: '张量' }]);
+    expect(review).toEqual([{ source: 'tensor', canonical: '张量', segmentIds: [0] }]);
   });
 
   it('ignores paragraphs the term never appears in', () => {
@@ -87,7 +87,34 @@ describe('scanDocumentTerms', () => {
 
     expect(checked).toBe(3);
     expect(fixable.map((f) => f.segmentId)).toEqual([1]);
-    expect(review.map((r) => r.segmentId)).toEqual([2]);
+    expect(review).toEqual([{ source: 'tensor', canonical: '张量', segmentIds: [2] }]);
+  });
+
+  // A term that drifted in a long document drifted in many paragraphs. One row
+  // per occurrence buries the thing the reader needs — which term — under
+  // repetitions of it.
+  it('reports one row per term, carrying every paragraph it drifted in', () => {
+    const segments = [
+      seg(0, 'A tensor flows.', '一个张力流过。'),
+      seg(1, 'The tensor grows.', '这个张力变大。'),
+      seg(2, 'A gradient descends.', '一个坡度下降。'),
+    ];
+    const terms = [TENSOR, { source: 'gradient', target: '梯度' }];
+
+    const { review } = scanDocumentTerms(segments, terms);
+
+    expect(review).toHaveLength(2);
+    expect(review.find((r) => r.source === 'tensor').segmentIds).toEqual([0, 1]);
+    expect(review.find((r) => r.source === 'gradient').segmentIds).toEqual([2]);
+  });
+
+  it('keeps two terms apart even when they share a canonical rendering', () => {
+    const segments = [seg(0, 'tensor and tensors everywhere', '张力遍地')];
+    const terms = [TENSOR, { source: 'tensors', target: '张量' }];
+
+    const { review } = scanDocumentTerms(segments, terms);
+
+    expect(review.map((r) => r.source).sort()).toEqual(['tensor', 'tensors']);
   });
 
   it('skips paragraphs that were never translated', () => {
