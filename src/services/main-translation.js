@@ -119,6 +119,7 @@ class MainTranslationService {
               timestamp: Date.now(),
               duration,
               model: result.provider,
+              source: 'main',
             });
           }
         });
@@ -210,6 +211,7 @@ class MainTranslationService {
               timestamp: Date.now(),
               duration,
               model: result.provider,
+              source: 'main',
             });
           }
         });

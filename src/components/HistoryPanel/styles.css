@@ -10,6 +10,37 @@
 }
 
 /* ==================== 工具栏 ==================== */
+/* Origin filter chips — rendered only when history holds >= 2 source groups */
+.source-chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 20px 0;
+}
+
+.source-chip {
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid var(--border-primary);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.source-chip:hover {
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
+.source-chip.active {
+  background: color-mix(in srgb, var(--accent-primary) 12%, transparent);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
 .history-toolbar {
   display: flex;
   align-items: center;

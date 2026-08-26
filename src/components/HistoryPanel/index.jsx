@@ -27,6 +27,24 @@ import { PRIVACY_MODES } from '@config/defaults';
 dayjs.extend(relativeTime);
 dayjs.extend(isSameOrAfter);
 
+// Origin filter groups. 'selection' and 'hotkey' are the same feature from the
+// user's chair (icon click vs CapsLock direct), so they filter as one. Rows
+// with no recognized source — legacy entries (normalized to 'import' on
+// reload), imports, unknowns — all land in 'other'.
+const SOURCE_GROUPS = {
+  main: ['main'],
+  selection: ['selection', 'hotkey'],
+  screenshot: ['screenshot'],
+  floating: ['floating'],
+};
+
+function sourceGroupOf(source) {
+  for (const [group, values] of Object.entries(SOURCE_GROUPS)) {
+    if (values.includes(source)) return group;
+  }
+  return 'other';
+}
+
 const HistoryCard = memo(({
   item,
   onCopy,
@@ -165,6 +183,7 @@ const HistoryPanel = ({ showNotification }) => {
   const [groupBy, setGroupBy] = useState('date');
   const [showStats, setShowStats] = useState(false);
   const [dateRange, setDateRange] = useState('all');
+  const [sourceFilter, setSourceFilter] = useState('all');
   const [searchInput, setSearchInput] = useState('');
   const [expandedGroups, setExpandedGroups] = useState(new Set(['today', 'yesterday']));
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -265,6 +284,10 @@ const HistoryPanel = ({ showNotification }) => {
       );
     }
 
+    if (sourceFilter !== 'all') {
+      filtered = filtered.filter(item => sourceGroupOf(item.source) === sourceFilter);
+    }
+
     const now = dayjs();
     switch (dateRange) {
       case 'today': filtered = filtered.filter(item => dayjs(item.timestamp).isSameOrAfter(now.startOf('day'))); break;
@@ -285,7 +308,17 @@ const HistoryPanel = ({ showNotification }) => {
     });
 
     return filtered;
-  }, [history, debouncedSearch, dateRange, sortConfig]);
+  }, [history, debouncedSearch, dateRange, sourceFilter, sortConfig]);
+
+  // Which origin groups actually occur — the chip row only renders when there
+  // are at least two, so a long-time single-source history shows nothing new.
+  const presentSourceGroups = useMemo(() => {
+    const groups = new Set();
+    if (Array.isArray(history)) {
+      for (const item of history) groups.add(sourceGroupOf(item.source));
+    }
+    return groups;
+  }, [history]);
 
   const paginatedHistory = useMemo(() => {
     return filteredHistory.slice(0, displayCount);
@@ -321,7 +354,7 @@ const HistoryPanel = ({ showNotification }) => {
   // the top, not whatever offset they had scrolled to.
   useEffect(() => {
     setDisplayCount(PAGE_SIZE);
-  }, [debouncedSearch, dateRange]);
+  }, [debouncedSearch, dateRange, sourceFilter]);
 
   const groupedHistory = useMemo(() => {
     const groups = {};
@@ -775,6 +808,22 @@ const HistoryPanel = ({ showNotification }) => {
           </button>
         </div>
       </div>
+
+      {presentSourceGroups.size >= 2 && (
+        <div className="source-chips">
+          {['all', 'main', 'selection', 'screenshot', 'floating', 'other']
+            .filter((key) => key === 'all' || presentSourceGroups.has(key))
+            .map((key) => (
+              <button
+                key={key}
+                className={`source-chip ${sourceFilter === key ? 'active' : ''}`}
+                onClick={() => setSourceFilter(key)}
+              >
+                {t(`history.sourceFilter.${key}`)}
+              </button>
+            ))}
+        </div>
+      )}
 
       {renderStats()}
 
