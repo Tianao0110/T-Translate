@@ -82,6 +82,10 @@ const runtime = {
   isQuitting: false,
   isAppReady: false,
 
+  // Set once before app-ready when crash-guard detects consecutive startup
+  // failures; a boot-time decision, deliberately untouched by resetRuntime.
+  safeMode: false,
+
   selectionEnabled: false,  // Off by default each launch (mirror of store but cleared on start).
 
   // Window refs — accessed through `windows` getter/setter below.

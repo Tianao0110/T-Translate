@@ -13,6 +13,8 @@ let isDev = false;
 let logger = null;
 let makeWindowInvisibleToCapture = null;
 let CHANNELS = null;
+let crashGuard = null;
+let onMainRendererGiveUp = null;
 
 const frozenSelectionWindows = new Map();
 let selectionWindowIdCounter = 0;
@@ -26,6 +28,8 @@ function init(deps) {
   logger = deps.logger || console;
   makeWindowInvisibleToCapture = deps.makeWindowInvisibleToCapture || (() => {});
   CHANNELS = deps.CHANNELS || {};
+  crashGuard = deps.crashGuard || null;
+  onMainRendererGiveUp = deps.onMainRendererGiveUp || null;
 
   logger.info?.('Window manager initialized') || console.log('Window manager initialized');
 }
@@ -136,6 +140,14 @@ function createMainWindow() {
     return { action: 'deny' };
   });
 
+  // Renderer self-heal: abnormal death reloads in place (bounded); past the
+  // limit the give-up handler relaunches the app into safe mode.
+  crashGuard?.attachRendererRecovery(mainWindow, {
+    name: 'Main window',
+    isQuitting: () => runtime.isQuitting,
+    onGiveUp: (details) => onMainRendererGiveUp?.(details),
+  });
+
   windows.main = mainWindow;
   logger.info?.('Main window created');
   return mainWindow;
@@ -244,6 +256,17 @@ function createFloatingWindow() {
   // knows the UI priority order (history panel > scattered panes > close) and
   // runs child-window cleanup. A main-process before-input-event shortcut here
   // would bypass all of that — deliberately absent.
+
+  // Renderer self-heal: reload on abnormal death. An auxiliary window never
+  // escalates to app relaunch — if reloads can't save it, close it; the user
+  // recreates it from the tray with a fresh renderer.
+  crashGuard?.attachRendererRecovery(floatingWindow, {
+    name: 'Floating window',
+    isQuitting: () => runtime.isQuitting,
+    onGiveUp: () => {
+      try { floatingWindow.destroy(); } catch { /* already gone */ }
+    },
+  });
 
   windows.floatingWindow = floatingWindow;
   logger.info?.('Floating window created');

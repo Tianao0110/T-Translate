@@ -46,6 +46,10 @@ const messages = {
     
     // floating window
     'floatingWindow.notFound': '悬浮窗口不存在',
+
+    // crash guard
+    'safeMode.title': '安全模式',
+    'safeMode.body': '检测到连续多次启动异常，本次已进入安全模式（停用硬件加速与部分后台模块）。若本次运行正常，下次启动将自动恢复。',
     
     // screenshot
     'screenshot.failed': '截图失败',
@@ -120,6 +124,10 @@ const messages = {
     
     // floating window
     'floatingWindow.notFound': 'Floating window not found',
+
+    // crash guard
+    'safeMode.title': 'Safe Mode',
+    'safeMode.body': 'Several launches in a row failed, so this one runs in safe mode (hardware acceleration and some background modules are off). If this run stays healthy, the next launch returns to normal.',
     
     // screenshot
     'screenshot.failed': 'Screenshot failed',
