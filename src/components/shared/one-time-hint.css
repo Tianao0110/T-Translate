@@ -1,0 +1,59 @@
+/* Anchored by the caller (a positioned parent); this only draws the bubble and
+   its pointer. */
+.one-time-hint {
+  position: absolute;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 260px;
+  padding: 7px 9px 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 35%, transparent);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  box-shadow: var(--shadow-lg);
+  color: var(--text-primary);
+  font-size: 12.5px;
+  line-height: 1.5;
+  animation: hint-in 0.2s ease;
+}
+
+.one-time-hint > svg {
+  flex-shrink: 0;
+  color: var(--accent-primary);
+}
+
+.one-time-hint-text {
+  flex: 1;
+}
+
+.one-time-hint-dismiss {
+  display: flex;
+  flex-shrink: 0;
+  padding: 2px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+
+.one-time-hint-dismiss:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.one-time-hint.bottom {
+  top: calc(100% + 8px);
+  right: 0;
+}
+
+.one-time-hint.top {
+  bottom: calc(100% + 8px);
+  right: 0;
+}
+
+@keyframes hint-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}

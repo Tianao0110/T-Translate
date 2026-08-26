@@ -228,6 +228,13 @@
   gap: 4px;
 }
 
+/* Anchor for a one-time hint bubble. The wrapper exists only so the bubble can
+   point at its own button; it must not change the row's layout. */
+.action-with-hint {
+  position: relative;
+  display: inline-flex;
+}
+
 .action-btn {
   width: 32px;
   height: 32px;

@@ -409,6 +409,14 @@ const zh = {
   guide: {
     subtitle: "快速了解核心功能",
     dismiss: "不再显示",
+    next: "先去设置里配一个翻译源，其余功能都建立在它上面。",
+    start: "开始使用",
+    reset: "重新查看引导",
+    resetDone: "引导已重置，下次打开程序时会再次显示",
+    hints: {
+      styleRewrite: "译文语气不合适？可以让它按你给的风格重写一遍",
+      favorite: "常用的词句可以收藏，存进术语库后翻译会自动沿用你的译法",
+    },
     selection: { title: "划词翻译", desc: "选中任意文字，自动弹出翻译" },
     screenshot: { title: "截图翻译", desc: "框选屏幕区域，OCR 识别并翻译" },
     floatingWindow: { title: "悬浮窗口", desc: "透明窗口覆盖在原文上方，实时翻译" },

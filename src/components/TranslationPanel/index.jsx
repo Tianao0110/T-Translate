@@ -25,6 +25,8 @@ import { useTTS, useTermCheck, useStyleRewrite, useSaveModal } from './hooks';
 import useAiActions from '../../hooks/use-ai-actions.js';
 import { resolveActionLabel } from '../../services/ai-action-runner.js';
 import AiActionIcon from '../shared/AiActionIcon.jsx';
+import OneTimeHint from '../shared/OneTimeHint.jsx';
+import useOnboarding from '../../hooks/use-onboarding.js';
 
 import { StyleModal, SaveModal } from './components.jsx';
 import LanguagePicker from '../shared/LanguagePicker.jsx';
@@ -120,6 +122,14 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   const termCheck = useTermCheck(favorites, setTranslatedText, notify, t);
   const styleRewrite = useStyleRewrite(currentTranslation, addStyleVersion, notify, t);
   const saveModal = useSaveModal(currentTranslation, addToFavorites, notify, t);
+  const onboarding = useOnboarding();
+
+  // One at a time, and only once there is a translation to act on — both
+  // buttons are disabled without one, and a hint pointing at a dead control
+  // teaches the user to ignore hints.
+  const activeHint = !currentTranslation.translatedText
+    ? null
+    : ['styleRewrite', 'favorite'].find((id) => !onboarding.hintSeen(id)) || null;
 
   // AI actions read the source side, so the entry follows the source box, not
   // whether a translation already exists.
@@ -566,12 +576,30 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
               <button className="action-btn" onClick={() => copyToClipboard('translated') && notify(t('translation.copied'), 'success')} disabled={!currentTranslation.translatedText} title={t('translation.copy', '复制')}>
                 <Copy size={15} />
               </button>
-              <button className="action-btn style-btn" onClick={styleRewrite.openStyleModal} disabled={!currentTranslation.translatedText || styleRewrite.isRewriting} title={t('translation.styleRewrite', '风格改写')}>
-                {styleRewrite.isRewriting ? <Loader2 size={15} className="animate-spin" /> : <Palette size={15} />}
-              </button>
-              <button className="action-btn" onClick={saveModal.openSaveModal} disabled={!currentTranslation.translatedText} title={t('translation.favorite', '收藏')}>
-                <Sparkles size={15} />
-              </button>
+              <span className="action-with-hint">
+                <button className="action-btn style-btn" onClick={styleRewrite.openStyleModal} disabled={!currentTranslation.translatedText || styleRewrite.isRewriting} title={t('translation.styleRewrite', '风格改写')}>
+                  {styleRewrite.isRewriting ? <Loader2 size={15} className="animate-spin" /> : <Palette size={15} />}
+                </button>
+                {activeHint === 'styleRewrite' && (
+                  <OneTimeHint
+                    id="styleRewrite"
+                    text={t('guide.hints.styleRewrite')}
+                    onDismiss={onboarding.dismissHint}
+                  />
+                )}
+              </span>
+              <span className="action-with-hint">
+                <button className="action-btn" onClick={saveModal.openSaveModal} disabled={!currentTranslation.translatedText} title={t('translation.favorite', '收藏')}>
+                  <Sparkles size={15} />
+                </button>
+                {activeHint === 'favorite' && (
+                  <OneTimeHint
+                    id="favorite"
+                    text={t('guide.hints.favorite')}
+                    onDismiss={onboarding.dismissHint}
+                  />
+                )}
+              </span>
               {aiActions.map((action) => (
                 <button
                   key={action.id}

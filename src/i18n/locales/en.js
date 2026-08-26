@@ -409,6 +409,14 @@ const en = {
   guide: {
     subtitle: "Discover core features",
     dismiss: "Don't show again",
+    next: "Set up a translation source first — everything else builds on it.",
+    start: "Get started",
+    reset: "Show the guide again",
+    resetDone: "Guide reset — it will show again next launch",
+    hints: {
+      styleRewrite: "Tone not right? Have it rewritten in a style you pick",
+      favorite: "Save phrases you reuse — glossary entries are applied automatically",
+    },
     selection: { title: "Selection Translate", desc: "Select any text to translate instantly" },
     screenshot: { title: "Screenshot Translate", desc: "Capture a screen region for OCR and translation" },
     floatingWindow: { title: "Floating Window", desc: "Transparent overlay that translates text in real-time" },

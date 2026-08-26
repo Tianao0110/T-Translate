@@ -12,6 +12,8 @@ import appIcon from '/icon.png';
 // TranslationPanel is the initial view — keep it eagerly imported to avoid first-paint stall
 import TranslationPanel from '../TranslationPanel';
 import SetupNotice from '../shared/SetupNotice.jsx';
+import WelcomeDialog from '../shared/WelcomeDialog.jsx';
+import useOnboarding from '../../hooks/use-onboarding.js';
 import useTranslationReadiness from '../../hooks/use-translation-readiness.js';
 const HistoryPanel = lazy(() => import('../HistoryPanel'));
 const SettingsPanel = lazy(() => import('../SettingsPanel'));
@@ -33,6 +35,7 @@ const MainWindow = () => {
 
   const [activeTab, setActiveTab] = useState('translate');
   const { readiness } = useTranslationReadiness();
+  const onboarding = useOnboarding();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [notification, setNotification] = useState(null);
 
@@ -411,6 +414,10 @@ const MainWindow = () => {
       </div>
 
       {renderNotification()}
+
+      {onboarding.showWelcome && (
+        <WelcomeDialog onClose={onboarding.markWelcomeSeen} />
+      )}
     </div>
   );
 };

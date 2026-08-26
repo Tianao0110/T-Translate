@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { GitBranch, RefreshCw, FolderOpen, Download, X, Loader2, CheckCircle, AlertCircle, ExternalLink, Rocket, Cpu, Heart, PartyPopper, Package } from 'lucide-react';
+import { GitBranch, RefreshCw, FolderOpen, Download, X, Loader2, CheckCircle, AlertCircle, ExternalLink, Rocket, Cpu, Heart, PartyPopper, Package, Lightbulb } from 'lucide-react';
 import appIcon from '/icon.png';
+import useOnboarding from '../../../hooks/use-onboarding.js';
 
 const UPDATE_STAGE = {
   IDLE: 'idle',
@@ -15,6 +16,7 @@ const UPDATE_STAGE = {
 };
 
 const AboutSection = ({ notify, resetSettings }) => {
+  const onboarding = useOnboarding();
   const { t, i18n } = useTranslation();
   const [version, setVersion] = useState('');
   const [updateStage, setUpdateStage] = useState(UPDATE_STAGE.IDLE);
@@ -165,6 +167,11 @@ const AboutSection = ({ notify, resetSettings }) => {
     if (updateStage === UPDATE_STAGE.DOWNLOADING) return;
     setShowUpdateModal(false);
     if (updateStage === UPDATE_STAGE.ERROR) setUpdateStage(UPDATE_STAGE.IDLE);
+  };
+
+  const replayGuide = () => {
+    onboarding.reset();
+    notify?.(t('guide.resetDone'), 'success');
   };
 
   const openLogDirectory = async () => {
@@ -383,6 +390,11 @@ const AboutSection = ({ notify, resetSettings }) => {
         </button>
         <button className="link-button" onClick={openLogDirectory}>
           <FolderOpen size={16}/> {t('about.openLogs')}
+        </button>
+        {/* Without this the onboarding flags would be write-once ghost state —
+            set on first launch and unreachable forever after. */}
+        <button className="link-button" onClick={replayGuide}>
+          <Lightbulb size={16}/> {t('guide.reset')}
         </button>
         {resetSettings && (
           <button className="link-button danger" onClick={() => resetSettings()}>
