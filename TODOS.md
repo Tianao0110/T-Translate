@@ -28,17 +28,10 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 - ~~doc_cls 旋转分类器~~ **已实测弃案（2026-07-04）**：倒置图可纠正，但日文横排截图被误判竖排、韩文包乱码——主场景回归不可接受，详见 OCR_MODELS.md 已知边界（含复现方法）。别再捡
 - 档位备忘：v6 全系仅 tiny/small/medium 三档（官方页 2026-07-03 已核），tiny 无假名不可用；v6 无独立多语言模型，韩/西里尔/天城/阿拉伯继续 v4 包；spike 复跑脚本已随 2026-07-10 temp 清理退役（结论与复现方法保全在 docs/OCR_MODELS.md 已知边界节）
 - 合入时补测：竖排文本、真实截图小字（实拍回归）
-- ~~泰米尔 / 泰卢固 / 卡纳达三个语言包~~ ✅ **已加入（2026-08-19）**，识别语言 56→59。上游 `ka.zip` 名为格鲁吉亚语码实为卡纳达语，我们用 `kn`；实测质量低于同代其他包（74/71/71% 对天城文 87%），已写进 OCR_MODELS.md 已知边界。资产已上线（2026-08-25：3 zip + manifest 传上 ocr-models Release 共 12 资产，下载 sha256 复验通过；语言对用户可见要等下次发版）
-- ~~百度 Unlimited-OCR vLLM 直连提示~~ ✅ 已写入 docs/FAQ.md（2026-07-10）
 
 ### 真 asar 热替换（仅评估，不承诺）
 
 只覆盖纯 JS 改动；koffi/uiohook/node-screenshots/OCR 全在 asarUnpack，native 或 Electron 版本一变必须回全量；且热更新通道必须做包签名校验，否则是供应链攻击口。当前差分下载（v0.2.8 起）已覆盖大部分收益。
-
-### AI 动作框架收尾项（v0.3.3 已发布，剩数据驱动项）
-
-- ~~长段阈值仍是估值~~ ✅ **改成用户可配（2026-08-19）**：设置 → AI 动作 →「总结」出现的门槛，默认仍是 150。用户拿捏比我们实测更省事，也更准——门槛该多高本来就取决于他看什么内容。英文按词数换算（×0.8），只让用户调一个数
-- ~~理解模式结果不进历史~~ ✅ **已做成主条目（2026-08-25 用户拍板）**：kind:'understand' 进同一本历史账（同文替换/不计翻译统计/恢复只回原文），`history:'none'` 的导入动作仍不留痕
 
 ### LLM 视觉 OCR 丢失位置信息（其余六个引擎已于 v0.3.4 补齐，只剩这一个）
 
@@ -60,32 +53,9 @@ v0.3.4 给 Windows OCR / Azure / Google Vision / OCR.space / 百度 五个引擎
 
 **四个在线引擎的坐标只有 fixture 验证**（按各家文档的响应形状建的，见 `tests/unit/ocr-blocks.test.js`），无密钥无法端到端实测；Windows OCR 与本地引擎是实测过的。哪天有密钥了，实拍一次散点排版确认坐标空间无误。
 
-### ~~悬浮窗截图闪烁~~ 已关闭（2026-08-19 用户实测「暂时没有发现问题」）
+### ~~悬浮窗截图闪烁~~ 已关闭（2026-08-19），**降透明度兜底保留别动**
 
-反截屏句柄修好后本想去掉降透明度那层兜底以消除闪烁，但用户实机看不到闪烁，
-去掉兜底就成了纯风险没有收益（判错的代价是 OCR 到悬浮窗自己的译文）。**兜底
-保留，别再动这块**；哪天有人真的抱怨闪烁再说。
-
-### ~~跨段术语一致性~~ 已完成，但**范围被用户主动收窄**（2026-08-19）
-
-做出来的是：文档翻译工具栏「术语检查」→ 弹窗列出术语库里有、但译文仍是原文的
-词 → 全部替换 → 段落里原文词与替换词双向高亮，点高亮可看原词并单独撤销。
-零模型调用，纯字符串匹配。
-
-**两件事被明确否掉，别再提议：**
-
-- **「模型把术语译成了别的词」这类不报**。第一版做了，用户实测后要求整条删除，
-  理由是产品定位：「必须让用户先进一步理解大概内容，而不是那些专业级别的」。
-  这类结果既修不了（字符串里没有信息指明该改哪一段），又是专业译者的活，而且
-  模型在变好、这类问题会自己减少
-- **原计划的第二步「未知术语的模型对齐」（扫全文找跨段译法不一致的词）同理作废**。
-  它正是"专业级别"的那种功能，且每个候选词都要调模型——与用户「我注重效率，其次
-  是质量」的排序相反。要复活得用户明确重提
-
-顺带修掉的真 bug：术语库的语言不固定（store 的去重键本来就是
-`(sourceText, targetLanguage)`），而 `getGlossaryTerms()` 曾不分语言全部返回，
-译成法语时会把中文译法塞进去，且静默无报错。现在按目标语言取，没标语言的旧
-条目（导入文件不带语言）仍可用。
+用户实机无闪烁，去掉兜底是纯风险（判错代价 = OCR 到悬浮窗自己的译文）。有人真抱怨再议。
 
 ### 语言选择器的后续（主体已随 v0.3.5 发布）
 
@@ -140,17 +110,7 @@ v0.3.4 给 Windows OCR / Azure / Google Vision / OCR.space / 百度 五个引擎
 - ⚠️ **userData 之外还有一处残留**：[system.js:265](electron/ipc/system.js:265) 的开机自启走 `setLoginItemSettings` → 写 `HKCU\...\Run` 注册表。「卸载完全不留」要成立就必须处理它（便携版隐藏该开关或退出时清），否则是假承诺
 - 其余：便携版不能装进 Program Files（不可写）→ electron-builder 加 `portable`/`zip` target 与 NSIS 并存，前者自带 `PORTABLE_EXECUTABLE_DIR` 可当检测依据；老用户迁移提示；OCR 模型跟着搬（高精度包 139MB）需在文档说明
 
-### ~~首次启动弱引导~~ ✅ 三块全部落地（2026-08-19）
-
-主面板常驻提示条（判据复用真实翻译路径的过滤器；云端源有 key 就算数不探测，
-本地源探端点）+ 首次启动功能速览弹窗（复活了零消费者的 `guide.*` 文案）+ 改写
-风格与收藏两处一次性提示。状态存 electron-store 顶层 `onboarding`。
-
-⚠️ **「重新查看引导」入口按用户要求删了**，改由全量重置一并清 `onboarding`——
-所以 `resetSettings` 里那份"要清的 side-band 存储"清单现在也管着它，以后再加
-这类标记记得跟上。
-
 ### Incremental unit test coverage buildout
 
-`tests/unit/` 现有 34 个测试文件（selection / stack 五件套 / OCR 坐标 / 语言目录与选择器 / 历史中毒数据 / 渲染端日志转发 等）。Principle: add tests when you touch a file, new features ship with tests, bug fixes ship with regression tests. Not chasing 100% coverage.
+`tests/unit/` 现有 43 个测试文件、530 用例（selection / stack 五件套 / OCR 坐标 / 语言目录与选择器 / 历史与理解条目 / 段落笔记 等）。Principle: add tests when you touch a file, new features ship with tests, bug fixes ship with regression tests. Not chasing 100% coverage.
 
