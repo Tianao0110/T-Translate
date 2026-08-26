@@ -494,13 +494,13 @@ const DocumentTranslator = ({
   const [termPopover, setTermPopover] = useState(null);
 
   const runTermCheck = useCallback(() => {
-    const report = scanDocumentTerms(segments, getGlossaryTerms());
+    const report = scanDocumentTerms(segments, getGlossaryTerms(targetLang));
     if (!report.fixable.length) {
       notify?.(t('documentTranslator.terms.allConsistent'), 'success');
       return;
     }
     setTermModal(report);
-  }, [segments, getGlossaryTerms, notify, t]);
+  }, [segments, getGlossaryTerms, targetLang, notify, t]);
 
   const applyTermFixes = useCallback(() => {
     const fixes = termModal?.fixable || [];
@@ -569,7 +569,7 @@ const DocumentTranslator = ({
   // facade injects the live mode into every request (renderer values are
   // discarded by design). translationMode stays for the OCR allowlist below.
   const buildTranslateOptions = () => ({
-    glossaryTerms: useGlossary ? getGlossaryTerms() : [],
+    glossaryTerms: useGlossary ? getGlossaryTerms(targetLang) : [],
   });
   
   const [startTime, setStartTime] = useState(null);
@@ -1929,16 +1929,17 @@ const DocumentTranslator = ({
       {termModal && (
         <div className="password-modal-overlay" onClick={() => setTermModal(null)}>
           <div className="password-modal dt-term-modal" onClick={e => e.stopPropagation()}>
+            {/* The list IS the explanation — a reader who opened "check terms"
+                already knows what they asked for. */}
             <div className="password-modal-header">
               <BookMarked size={24} />
               <h3>{t('documentTranslator.terms.check')}</h3>
+              <span className="dt-term-modal-count">
+                {t('documentTranslator.terms.count', {
+                  count: termModal.fixable.reduce((n, f) => n + f.replacements.length, 0),
+                })}
+              </span>
             </div>
-            <p className="password-modal-desc">
-              {t('documentTranslator.terms.modalDesc', {
-                count: termModal.fixable.reduce((n, f) => n + f.replacements.length, 0),
-                paragraphs: termModal.fixable.length,
-              })}
-            </p>
             <ul className="dt-term-modal-list">
               {[...new Map(
                 termModal.fixable.flatMap((f) => f.replacements.map((r) => [`${r.from}|${r.to}`, r]))
@@ -1950,7 +1951,6 @@ const DocumentTranslator = ({
                 </li>
               ))}
             </ul>
-            <p className="dt-term-modal-hint">{t('documentTranslator.terms.modalHint')}</p>
             <div className="password-modal-actions">
               <button className="dt-btn" onClick={() => setTermModal(null)}>
                 {t('documentTranslator.password.cancel')}

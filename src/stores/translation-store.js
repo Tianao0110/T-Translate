@@ -712,16 +712,42 @@ const useTranslationStore = create(
         );
       },
 
-      // Glossary terms live in the favorites pile under folderId === 'glossary'
-      getGlossaryTerms: () => {
+      // Glossary terms live in the favorites pile under folderId === 'glossary'.
+      //
+      // A glossary is not one language pair. The same word can be saved with a
+      // Chinese rendering and a French one — addToFavorites de-dupes on
+      // (sourceText, targetLanguage) precisely so it can be — and handing all
+      // of them to a translation would substitute whichever happened to sort
+      // first, dropping Chinese into French output.
+      //
+      // So: entries for another target language are excluded, and when a word
+      // has both a match for this language and a language-less entry, the match
+      // wins. Language-less entries (imported files carry no language) stay
+      // usable, because dropping them would silently break every imported
+      // glossary.
+      getGlossaryTerms: (targetLanguage) => {
         const state = get();
-        return state.favorites
-          .filter(item => item.folderId === 'glossary')
-          .map(item => ({
-            source: item.sourceText,
-            target: item.translatedText,
-          }))
-          .filter(term => term.source && term.target);
+        const all = state.favorites.filter(
+          item => item.folderId === 'glossary' && item.sourceText && item.translatedText
+        );
+
+        const usable = targetLanguage
+          ? all.filter(item => !item.targetLanguage || item.targetLanguage === targetLanguage)
+          : all;
+
+        const bySource = new Map();
+        for (const item of usable) {
+          const key = item.sourceText.toLowerCase();
+          const held = bySource.get(key);
+          const isExactMatch = targetLanguage && item.targetLanguage === targetLanguage;
+          const heldIsExact = targetLanguage && held?.targetLanguage === targetLanguage;
+          if (!held || (isExactMatch && !heldIsExact)) bySource.set(key, item);
+        }
+
+        return [...bySource.values()].map(item => ({
+          source: item.sourceText,
+          target: item.translatedText,
+        }));
       },
     })),
     {

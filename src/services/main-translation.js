@@ -54,7 +54,7 @@ class MainTranslationService {
     });
 
     try {
-      const glossaryTerms = useTranslationStore.getState().getGlossaryTerms?.() || [];
+      const glossaryTerms = useTranslationStore.getState().getGlossaryTerms?.(targetLanguage) || [];
 
       const result = await translationService.translateStream(
         sourceText,
@@ -158,7 +158,7 @@ class MainTranslationService {
     });
 
     try {
-      const glossaryTerms = useTranslationStore.getState().getGlossaryTerms?.() || [];
+      const glossaryTerms = useTranslationStore.getState().getGlossaryTerms?.(targetLanguage) || [];
 
       const result = await translationService.translate(sourceText, {
         sourceLang: sourceLanguage,
