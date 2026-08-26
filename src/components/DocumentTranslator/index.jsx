@@ -696,21 +696,31 @@ const DocumentTranslator = ({
   // (the L2 disk cache holds ~200 entries — no safety net for big docs).
   // Throttled so fast providers don't stringify the list per completion.
   const lastSaveRef = useRef(0);
+  // True once this document session held output while in secure mode. The gate
+  // must outlive the mode: segment state still holds secure-era text after the
+  // user leaves secure, so one write then would flush it to disk anyway.
+  const secureTaintRef = useRef(false);
   useEffect(() => {
     if (!fileFingerprint.current) return;
     const hasNotes = Object.keys(aiNotes).length > 0 || !!digest;
     if (stats.completed === 0 && stats.edited === 0 && !hasNotes) return;
+    if (translationMode === PRIVACY_MODES.SECURE) {
+      secureTaintRef.current = true;
+      return;
+    }
+    if (secureTaintRef.current) return;
     const now = Date.now();
     // A batch explain drops notes as fast as translation drops segments —
     // same throttle, or a long document stringifies the blob per note.
     if ((isTranslating || aiBatch) && now - lastSaveRef.current < 3000) return;
     lastSaveRef.current = now;
     saveProgress(fileFingerprint.current, segments, sourceLang, targetLang, aiNotes, digest, digestWholeDoc);
-  }, [stats.completed, stats.edited, isTranslating, segments, sourceLang, targetLang, aiNotes, digest, digestWholeDoc, aiBatch]);
+  }, [stats.completed, stats.edited, isTranslating, segments, sourceLang, targetLang, aiNotes, digest, digestWholeDoc, aiBatch, translationMode]);
 
   // Crash/quit safety net — synchronous flush of whatever completed.
   useEffect(() => {
     const flush = () => {
+      if (translationMode === PRIVACY_MODES.SECURE || secureTaintRef.current) return;
       const hasWork = segmentsRef.current.some(s => s.status === STATUS.COMPLETED)
         || Object.keys(aiNotesRef.current).length > 0
         || !!digestRef.current.content;
@@ -723,7 +733,7 @@ const DocumentTranslator = ({
     };
     window.addEventListener('beforeunload', flush);
     return () => window.removeEventListener('beforeunload', flush);
-  }, [sourceLang, targetLang]);
+  }, [sourceLang, targetLang, translationMode]);
 
   // One-time cleanup of expired progress blobs.
   useEffect(() => { sweepExpiredProgress(); }, []);
@@ -810,6 +820,13 @@ const DocumentTranslator = ({
         // document would inherit the previous one's explanations.
         resetNotes();
         setDigest(null);
+        // A fresh parse lifts the secure-mode taint — but secure-era text also
+        // survives in the in-memory translation cache, and a cache hit would
+        // put it straight back into persistable state. Both go together.
+        if (secureTaintRef.current) {
+          translationCache.current.clear();
+          secureTaintRef.current = false;
+        }
         setShowPasswordModal(false);
         setPendingFile(null);
         setPassword('');
