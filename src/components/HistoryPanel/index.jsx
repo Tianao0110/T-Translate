@@ -180,7 +180,6 @@ const HistoryPanel = ({ showNotification }) => {
   const LOAD_MORE_THRESHOLD = 100;
 
   const [viewMode, setViewMode] = useState('card');
-  const [groupBy, setGroupBy] = useState('date');
   const [showStats, setShowStats] = useState(false);
   const [dateRange, setDateRange] = useState('all');
   const [sourceFilter, setSourceFilter] = useState('all');
@@ -362,24 +361,17 @@ const HistoryPanel = ({ showNotification }) => {
 
     for (const item of paginatedHistory) {
       let key;
-      if (groupBy === 'date') {
-        const d = dayjs(item.timestamp);
-        if (d.isSame(now, 'day')) key = 'today';
-        else if (d.isSame(now.subtract(1, 'day'), 'day')) key = 'yesterday';
-        else if (d.isSame(now, 'week')) key = 'thisWeek';
-        else if (d.isSame(now, 'month')) key = 'thisMonth';
-        else key = d.format('YYYY-MM');
-      } else {
-        // 'src:' prefix keeps these keys out of the date-label namespace.
-        key = `src:${sourceGroupOf(item.source)}`;
-      }
+      const d = dayjs(item.timestamp);
+      if (d.isSame(now, 'day')) key = 'today';
+      else if (d.isSame(now.subtract(1, 'day'), 'day')) key = 'yesterday';
+      else if (d.isSame(now, 'week')) key = 'thisWeek';
+      else if (d.isSame(now, 'month')) key = 'thisMonth';
+      else key = d.format('YYYY-MM');
       if (!groups[key]) groups[key] = [];
       groups[key].push(item);
     }
 
-    const order = groupBy === 'date'
-      ? ['today', 'yesterday', 'thisWeek', 'thisMonth']
-      : ['src:main', 'src:selection', 'src:screenshot', 'src:floating', 'src:other'];
+    const order = ['today', 'yesterday', 'thisWeek', 'thisMonth'];
     return Object.entries(groups)
       .sort((a, b) => {
         const ai = order.indexOf(a[0]), bi = order.indexOf(b[0]);
@@ -389,7 +381,7 @@ const HistoryPanel = ({ showNotification }) => {
         return b[0].localeCompare(a[0]);
       })
       .map(([key, items]) => ({ key, items, count: items.length }));
-  }, [paginatedHistory, groupBy]);
+  }, [paginatedHistory]);
 
   const getGroupTitle = useCallback((key) => {
     const dateGroupLabels = {
@@ -399,7 +391,6 @@ const HistoryPanel = ({ showNotification }) => {
       thisMonth: t('history.thisMonth'),
     };
     if (dateGroupLabels[key]) return dateGroupLabels[key];
-    if (key.startsWith('src:')) return t(`history.sourceFilter.${key.slice(4)}`);
     // YYYY-MM keys get localized: '2026年05月' for zh, 'May 2026' otherwise.
     if (/^\d{4}-\d{2}$/.test(key)) {
       const date = dayjs(key + '-01');
@@ -776,11 +767,6 @@ const HistoryPanel = ({ showNotification }) => {
             <option value="today">{t('history.filter.today')}</option>
             <option value="week">{t('history.filter.week')}</option>
             <option value="month">{t('history.filter.month')}</option>
-          </select>
-
-          <select className="toolbar-select" value={groupBy} onChange={(e) => setGroupBy(e.target.value)}>
-            <option value="date">{t('history.group.date')}</option>
-            <option value="source">{t('history.group.source')}</option>
           </select>
         </div>
 

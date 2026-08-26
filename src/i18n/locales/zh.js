@@ -172,7 +172,6 @@ const zh = {
     view: { card: "卡片", table: "表格" },
     filter: { all: "全部时间", today: "今天", week: "本周", month: "本月" },
     sourceFilter: { all: "全部来源", main: "主界面", selection: "划词", screenshot: "截图", floating: "悬浮窗", other: "其他" },
-    group: { date: "按日期", source: "按来源" },
     select: "选择", export: "导出", import: "导入",
     hasAiResult: "附带 AI 结果，双击查看",
     understandEntry: "AI 理解结果",

@@ -172,7 +172,6 @@ const en = {
     view: { card: "Card", table: "Table" },
     filter: { all: "All Time", today: "Today", week: "This Week", month: "This Month" },
     sourceFilter: { all: "All Sources", main: "Main Window", selection: "Selection", screenshot: "Screenshot", floating: "Floating Window", other: "Other" },
-    group: { date: "By Date", source: "By Source" },
     select: "Select", export: "Export", import: "Import",
     hasAiResult: "Has an AI result — double-click to view",
     understandEntry: "AI understanding result",
