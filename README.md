@@ -57,9 +57,9 @@ Capture a screen region for text recognition. When an OCR engine is unavailable,
 
 ### Floating window
 
-Transparent overlay window for live translation. Drag, resize, pin on top. Spawn independent child panes. Space-bar / left-click acts as a toggle: with content → clear, without content → screenshot-and-translate. Child window opacity is independent of the parent, always readable.
+Transparent overlay for live translation — drag, resize, pin on top, spawn independent child panes. Space / left-click toggles: with content, clear; without, capture and translate.
 
-**Zero-focus capture**: auto-refresh (pick a 2/3/5/10s interval from the toolbar to loop-capture; unchanged frames cost nothing) and the `Ctrl+Alt+Space` global hotkey re-capture without ever taking focus — the target app stays foreground, so live captions/subtitles don't vanish on focus loss. (Tip: Teams' popped-out caption window has system-level capture protection; keep captions pinned inside the meeting window and they capture fine.)
+**Zero-focus capture**: auto-refresh (2/3/5/10s intervals) and the `Ctrl+Alt+Space` hotkey re-capture without taking focus, so live captions don't vanish.
 
 <p align="center">
   <img src="docs/screenshots/floating-window.png" width="600" alt="Floating window">
@@ -77,11 +77,9 @@ Summaries attach to their translation in history; understanding results get entr
 
 ### Document translation
 
-Supports 9 formats: PDF, DOCX, EPUB, TXT, SRT, VTT, CSV, JSON, Markdown. Parallel translation, scanned-PDF OCR and glossary integration. Translation time varies by device and provider.
+Supports 9 formats: PDF, DOCX, EPUB, TXT, SRT, VTT, CSV, JSON, Markdown — with parallel translation, scanned-PDF OCR and glossary integration.
 
-With an LLM provider configured, each paragraph can be **explained** on request — it reads the source, so untranslated paragraphs work too — and the explanation folds open under the translation, folding away on a second click. After two of them the toolbar offers a consolidated note. That note covers only the paragraphs you opened, and says so: it is not a summary of the document. Explanations are saved with the translation progress and come back when you reopen the file.
-
-After translating, **term check** finds glossary terms left untranslated and replaces them in one pass; replacements are highlighted, with per-spot undo.
+With an LLM provider, each paragraph can be **explained** under its translation, and a **consolidated note** collects the explanations; both are saved with the progress and come back when you reopen the file. After translating, **term check** replaces glossary terms left untranslated, with per-spot undo.
 
 <p align="center">
   <img src="docs/screenshots/document-translate.png" width="600" alt="Document translation">
