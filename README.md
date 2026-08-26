@@ -67,17 +67,13 @@ Transparent overlay window for live translation. Drag, resize, pin on top. Spawn
 
 ### AI actions (Summarize / Understanding mode)
 
-A layer of understanding on top of translation. **Summarize** reads a long passage and hands back the key points — available in the selection card, the main panel, and the floating window, folding open in place. The **understanding mode** switch in the floating window's top-left corner stops translating captures and explains them instead — for the technical documents, formulas, and code that stay confusing even after translation.
+A layer of understanding on top of translation. **Summarize** turns a long passage into key points — selection card, main panel, and floating window. **Understanding mode** (floating window, top-left) explains captures instead of translating them. With a vision model loaded, the model reads the screenshot itself, falling back to the text path when it cannot.
 
-With a vision model loaded (Qwen-VL, LLaVA, and the like in LM Studio / Ollama), the model reads the screenshot itself instead of going through "recognize the text, then understand it", so layout and mixed text/graphics survive; it falls back to the text path automatically if the model cannot see images. Summaries are kept alongside the translation they came from in history, and can be deleted on their own; understanding-mode results get entries of their own, and re-explaining a passage replaces the old one.
-
-An action is a prompt config rather than code — custom ones can be imported from the "AI Actions" settings page. **An LLM provider is required** (LM Studio / Ollama / OpenAI / Claude / Gemini / DeepSeek); translate-only sources (DeepL / Google / Microsoft / Baidu) cannot run them and are marked as such in Settings.
+Summaries attach to their translation in history; understanding results get entries of their own. Custom actions can be imported in Settings. **An LLM provider is required** — translate-only sources are marked in Settings.
 
 ### Language selection
 
-134 languages — everything Google Translate supports, every code verified against Google itself. The picker pins recently used languages at the top, groups the rest by letter, and carries an index strip you can click or press-and-drag through. The index follows the interface language: 荷兰语 files under H for a Chinese reader, Dutch under D for an English one.
-
-If the language you need is not there, add it from the bottom of the picker. A name is all it takes, plus an optional separate "name to send the model" — a local model may know 藏语 and not Tibetan. Such languages are outside Google's range, so whether they translate depends on the model in use; the picker says so before you add one.
+134 languages — everything Google Translate supports. The picker pins recent languages on top, groups the rest by letter under a clickable index strip, and sorts by the interface language. Languages not in the list can be added at the bottom, with an optional separate name to send the model.
 
 ### Document translation
 
