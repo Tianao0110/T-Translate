@@ -93,7 +93,7 @@ const HistoryCard = memo(({
   }, [onDoubleClick, item]);
 
   return (
-    <div className={`history-card ${isSelected ? 'selected' : ''}`} onDoubleClick={handleDoubleClick}>
+    <div className={`history-card source-${sourceGroupOf(item.source)} ${isSelected ? 'selected' : ''}`} onDoubleClick={handleDoubleClick}>
       <div className="card-header">
         <span className="card-lang">{item.sourceLanguage || 'auto'} → {item.targetLanguage || 'zh'}</span>
         <div className="card-header-right">
@@ -370,13 +370,16 @@ const HistoryPanel = ({ showNotification }) => {
         else if (d.isSame(now, 'month')) key = 'thisMonth';
         else key = d.format('YYYY-MM');
       } else {
-        key = `${item.sourceLanguage || 'auto'} → ${item.targetLanguage || 'zh'}`;
+        // 'src:' prefix keeps these keys out of the date-label namespace.
+        key = `src:${sourceGroupOf(item.source)}`;
       }
       if (!groups[key]) groups[key] = [];
       groups[key].push(item);
     }
 
-    const order = ['today', 'yesterday', 'thisWeek', 'thisMonth'];
+    const order = groupBy === 'date'
+      ? ['today', 'yesterday', 'thisWeek', 'thisMonth']
+      : ['src:main', 'src:selection', 'src:screenshot', 'src:floating', 'src:other'];
     return Object.entries(groups)
       .sort((a, b) => {
         const ai = order.indexOf(a[0]), bi = order.indexOf(b[0]);
@@ -396,6 +399,7 @@ const HistoryPanel = ({ showNotification }) => {
       thisMonth: t('history.thisMonth'),
     };
     if (dateGroupLabels[key]) return dateGroupLabels[key];
+    if (key.startsWith('src:')) return t(`history.sourceFilter.${key.slice(4)}`);
     // YYYY-MM keys get localized: '2026年05月' for zh, 'May 2026' otherwise.
     if (/^\d{4}-\d{2}$/.test(key)) {
       const date = dayjs(key + '-01');
@@ -776,7 +780,7 @@ const HistoryPanel = ({ showNotification }) => {
 
           <select className="toolbar-select" value={groupBy} onChange={(e) => setGroupBy(e.target.value)}>
             <option value="date">{t('history.group.date')}</option>
-            <option value="language">{t('history.group.language')}</option>
+            <option value="source">{t('history.group.source')}</option>
           </select>
         </div>
 
