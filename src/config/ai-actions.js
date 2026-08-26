@@ -106,7 +106,7 @@ const EXPLAIN = {
   id: 'explain',
   schemaVersion: AI_ACTION_SCHEMA_VERSION,
   builtin: true,
-  icon: 'Lightbulb',
+  icon: 'ai',
   nameKey: 'aiActions.explain.name',
   descKey: 'aiActions.explain.desc',
   capability: 'text',

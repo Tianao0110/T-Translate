@@ -367,8 +367,10 @@ class MainTranslationService {
       draft.statistics.totalCharacters += item.sourceText?.length || 0;
 
       const today = new Date().toDateString();
+      // kind 'understand' rows are explanations, not translations — keep the
+      // counter honest (store-side addToHistory applies the same filter).
       const historyToday = draft.history.filter(
-        (h) => new Date(h.timestamp).toDateString() === today
+        (h) => h.kind !== 'understand' && new Date(h.timestamp).toDateString() === today
       );
       draft.statistics.todayTranslations = historyToday.length;
     }

@@ -215,9 +215,10 @@ class TranslationPipeline {
 
   // Understanding mode's capture path: whatever 'understand' action is
   // installed reads the capture (or its recognized text) and the result lands
-  // in the window body where the translation normally goes. Nothing is written
-  // to history — an AI result rides on a translation entry, and this path
-  // produces none.
+  // in the window body where the translation normally goes. Since the mode
+  // replaces translation, its result is the capture's primary output and is
+  // recorded as its own history entry (kind 'understand') rather than riding
+  // on a translation — unless the action opts out with history:'none'.
   async runUnderstand(text, imageData) {
     const session = useSessionStore.getState();
     const config = useConfigStore.getState();
@@ -247,6 +248,21 @@ class TranslationPipeline {
     }
 
     session.setResult(result.content, result.provider || null);
+
+    // Text only, never the capture image: persisting screenshots would be a
+    // new privacy surface. The store applies the secure-mode gate and the
+    // replace-on-re-explain rule.
+    if (action.history === 'attach') {
+      addToMainHistory({
+        kind: 'understand',
+        actionId: action.id,
+        sourceText: text,
+        translatedText: result.content,
+        sourceLanguage: detectLanguage(text),
+        targetLanguage: config.targetLanguage,
+      });
+    }
+
     return { success: true, text: result.content };
   }
 

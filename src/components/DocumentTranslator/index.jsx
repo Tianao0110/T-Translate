@@ -6,7 +6,7 @@ import {
   Loader, ArrowUp, FileDown,
   SkipForward, RefreshCw, Zap, Lock, Key,
   Database, BookOpen, BarChart3,
-  Edit3, Check, Copy, Search, Rows2, Columns2, Lightbulb, ClipboardList, Sparkles, BookMarked
+  Edit3, Check, Copy, Search, Rows2, Columns2, ClipboardList, Sparkles, BookMarked
 } from 'lucide-react';
 import createLogger from '../../utils/logger.js';
 import {
@@ -27,6 +27,7 @@ import LanguagePicker from '../shared/LanguagePicker.jsx';
 import { useConfirm } from '../shared/ConfirmDialog.jsx';
 import { scanDocumentTerms, renderWithReplacements } from '../../utils/term-consistency.js';
 import HighlightText from '../shared/HighlightText.jsx';
+import AiBadge from '../shared/AiBadge.jsx';
 import useAiActions from '../../hooks/use-ai-actions.js';
 import useSegmentNotes from '../../hooks/use-segment-notes.js';
 import { runAiAction } from '../../services/ai-action-runner.js';
@@ -195,7 +196,7 @@ const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate,
               disabled={aiRunning}
               title={t('documentTranslator.segment.explain', '讲解这一段')}
             >
-              {aiRunning ? <Loader size={12} className="spinning" /> : <Lightbulb size={12} />}
+              {aiRunning ? <Loader size={12} className="spinning" /> : <AiBadge size={12} />}
             </button>
           )}
         </div>
@@ -265,7 +266,7 @@ const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate,
       {aiNote && !noteFolded && (
         <div className="segment-ai-note">
           <div className="segment-ai-label">
-            <Lightbulb size={11} />
+            <AiBadge size={11} />
             {t('aiActions.explain.name')}
           </div>
           <div className="segment-ai-body">{aiNote}</div>

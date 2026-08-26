@@ -132,7 +132,7 @@ function App() {
     const handleAddToHistory = (event, item) => {
       logger.debug('Received add-to-history from:', item?.from || item?.source);
       if (item && addToHistory) {
-        addToHistory({
+        const entry = {
           id: item.id || `${item.from || 'unknown'}-${Date.now()}`,
           sourceText: item.sourceText || item.source || '',
           translatedText: item.translatedText || item.result || '',
@@ -140,7 +140,14 @@ function App() {
           targetLanguage: item.targetLanguage || 'en',
           timestamp: item.timestamp || Date.now(),
           source: item.from || item.source || 'unknown',
-        });
+        };
+        // Understanding results arrive as their own kind; dropping the marker
+        // here would silently re-file them as translations.
+        if (item.kind === 'understand') {
+          entry.kind = 'understand';
+          if (item.actionId) entry.actionId = item.actionId;
+        }
+        addToHistory(entry);
       }
     };
 

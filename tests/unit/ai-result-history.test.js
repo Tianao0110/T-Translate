@@ -126,6 +126,101 @@ describe('removeAiResult', () => {
   });
 });
 
+describe('understand entries (kind)', () => {
+  const EXPLAIN_ITEM = {
+    kind: 'understand',
+    actionId: 'explain',
+    sourceText: SOURCE,
+    translatedText: '这段话在讲什么的讲解。',
+    sourceLanguage: 'en',
+    targetLanguage: 'zh',
+    source: 'floating',
+  };
+
+  const freshStats = () => ({ totalTranslations: 0, totalCharacters: 0, todayTranslations: 0 });
+
+  beforeEach(() => {
+    useTranslationStore.setState({ history: [], translationMode: 'standard', statistics: freshStats() });
+  });
+
+  it('stores the kind and the action that produced it', () => {
+    useTranslationStore.getState().addToHistory(EXPLAIN_ITEM);
+
+    expect(current()).toHaveLength(1);
+    expect(current()[0]).toMatchObject({ kind: 'understand', actionId: 'explain' });
+  });
+
+  it('strips an unknown kind instead of storing it', () => {
+    useTranslationStore.getState().addToHistory({ ...EXPLAIN_ITEM, kind: 'telepathy' });
+
+    expect(current()[0].kind).toBeUndefined();
+    expect(current()[0].actionId).toBeUndefined();
+  });
+
+  it('re-explaining the same passage replaces the row instead of piling up', () => {
+    const store = useTranslationStore.getState();
+    store.addToHistory(EXPLAIN_ITEM);
+    store.addToHistory({ ...EXPLAIN_ITEM, translatedText: '更好的讲解。' });
+
+    expect(current()).toHaveLength(1);
+    expect(current()[0].translatedText).toBe('更好的讲解。');
+  });
+
+  it('keeps explanations per target language', () => {
+    const store = useTranslationStore.getState();
+    store.addToHistory(EXPLAIN_ITEM);
+    store.addToHistory({ ...EXPLAIN_ITEM, targetLanguage: 'fr', translatedText: 'Une explication.' });
+
+    expect(current()).toHaveLength(2);
+  });
+
+  it('never touches the translation row for the same passage', () => {
+    seedHistory();
+    useTranslationStore.getState().addToHistory(EXPLAIN_ITEM);
+
+    const kinds = current().map((h) => h.kind);
+    expect(current()).toHaveLength(2);
+    expect(kinds).toContain('understand');
+    expect(kinds).toContain(undefined);
+  });
+
+  it('stays out of the translation counters', () => {
+    useTranslationStore.getState().addToHistory(EXPLAIN_ITEM);
+
+    const stats = useTranslationStore.getState().statistics;
+    expect(stats.totalTranslations).toBe(0);
+    expect(stats.totalCharacters).toBe(0);
+    expect(stats.todayTranslations).toBe(0);
+  });
+
+  it('still counts translations landing after an explanation', () => {
+    useTranslationStore.getState().addToHistory(EXPLAIN_ITEM);
+    seedHistory();
+
+    const stats = useTranslationStore.getState().statistics;
+    expect(stats.totalTranslations).toBe(1);
+    expect(stats.todayTranslations).toBe(1);
+  });
+
+  it('writes nothing in secure mode', () => {
+    useTranslationStore.setState({ translationMode: 'secure' });
+    useTranslationStore.getState().addToHistory(EXPLAIN_ITEM);
+
+    expect(current()).toHaveLength(0);
+  });
+
+  it('restore refills the source but never the target box', () => {
+    useTranslationStore.getState().addToHistory(EXPLAIN_ITEM);
+    const entry = current()[0];
+
+    useTranslationStore.getState().restoreFromHistory(entry.id);
+
+    const cur = useTranslationStore.getState().currentTranslation;
+    expect(cur.sourceText).toBe(SOURCE);
+    expect(cur.translatedText).toBe('');
+  });
+});
+
 describe('normalizeHistoryItem with AI results', () => {
   it('keeps well-formed attached results through an import', () => {
     const item = normalizeHistoryItem({
@@ -153,5 +248,15 @@ describe('normalizeHistoryItem with AI results', () => {
   it('leaves the field off when the import carries nothing usable', () => {
     expect(normalizeHistoryItem({ sourceText: 'a', translatedText: 'b', ai: 'nope' }).ai).toBeUndefined();
     expect(normalizeHistoryItem({ sourceText: 'a', translatedText: 'b', ai: [] }).ai).toBeUndefined();
+  });
+
+  it('round-trips an understand entry and drops unknown kinds', () => {
+    const kept = normalizeHistoryItem({ sourceText: 'a', translatedText: 'b', kind: 'understand', actionId: 'explain' });
+    expect(kept).toMatchObject({ kind: 'understand', actionId: 'explain' });
+
+    const stripped = normalizeHistoryItem({ sourceText: 'a', translatedText: 'b', kind: 'telepathy', actionId: 'explain' });
+    expect(stripped.kind).toBeUndefined();
+    // actionId means nothing without the kind — a plain translation must not carry one.
+    expect(stripped.actionId).toBeUndefined();
   });
 });

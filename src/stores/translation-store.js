@@ -109,6 +109,12 @@ export function normalizeHistoryItem(raw) {
   };
   const ai = normalizeAiResults(raw.ai);
   if (ai) item.ai = ai;
+  // Understanding entries round-trip export/import; unknown kinds are dropped
+  // so a hand-edited file cannot smuggle in rows the panels don't render.
+  if (raw.kind === 'understand') {
+    item.kind = 'understand';
+    if (typeof raw.actionId === 'string' && raw.actionId) item.actionId = raw.actionId;
+  }
   return item;
 }
 
@@ -508,6 +514,11 @@ const useTranslationStore = create(
             return;
           }
 
+          // 'understand' is the only non-translation kind; anything else is
+          // stored as a plain translation row so a hand-crafted payload
+          // cannot invent kinds the panels don't render.
+          const kind = item.kind === 'understand' ? 'understand' : undefined;
+
           const historyItem = {
             id: item.id || uuidv4(),
             // toStoredText, not `|| ''`: an object is truthy and would ride
@@ -519,11 +530,26 @@ const useTranslationStore = create(
             timestamp: item.timestamp || Date.now(),
             source: item.source || 'unknown'
           };
+          if (kind) {
+            historyItem.kind = kind;
+            if (typeof item.actionId === 'string' && item.actionId) {
+              historyItem.actionId = item.actionId;
+            }
+            // Re-explaining the same passage replaces the old note (same rule
+            // as entry.ai: latest wins) instead of piling near-duplicate rows.
+            state.history = state.history.filter(
+              (h) => !(h.kind === 'understand' &&
+                       h.sourceText === historyItem.sourceText &&
+                       h.targetLanguage === historyItem.targetLanguage)
+            );
+          }
 
-          // De-dupe on (sourceText, translatedText) so retries don't double-log
+          // De-dupe on (sourceText, translatedText) so retries don't double-log;
+          // kind-scoped so a translation can never block an explanation.
           const exists = state.history.some(
             h => h.sourceText === historyItem.sourceText &&
-                 h.translatedText === historyItem.translatedText
+                 h.translatedText === historyItem.translatedText &&
+                 (h.kind === 'understand') === (kind === 'understand')
           );
 
           if (!exists) {
@@ -531,13 +557,18 @@ const useTranslationStore = create(
             if (state.history.length > state.historyLimit) {
               state.history = state.history.slice(0, state.historyLimit);
             }
-            state.statistics.totalTranslations++;
-            state.statistics.totalCharacters += (historyItem.sourceText?.length || 0);
+            // Understanding entries stay out of the translation counters —
+            // "翻译次数" counting explanations would be a lie.
+            if (!kind) {
+              state.statistics.totalTranslations++;
+              state.statistics.totalCharacters += (historyItem.sourceText?.length || 0);
+            }
             // Keep the status-bar "today" count honest for selection/floating
             // window entries too (main-panel path recomputes it the same way).
             const today = new Date().toDateString();
             state.statistics.todayTranslations = state.history.filter(
-              (h) => new Date(h.timestamp).toDateString() === today
+              (h) => h.kind !== 'understand' &&
+                     new Date(h.timestamp).toDateString() === today
             ).length;
           }
         }),
@@ -600,7 +631,10 @@ const useTranslationStore = create(
           const item = state.history.find((h) => h.id === id);
           if (item) {
             state.currentTranslation.sourceText = item.sourceText;
-            state.currentTranslation.translatedText = item.translatedText;
+            // An explanation is not a translation: restoring one refills the
+            // source only, so the target box never presents it as translated.
+            state.currentTranslation.translatedText =
+              item.kind === 'understand' ? '' : item.translatedText;
             state.currentTranslation.sourceLanguage = item.sourceLanguage;
             state.currentTranslation.targetLanguage = item.targetLanguage;
           }

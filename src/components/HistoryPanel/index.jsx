@@ -14,6 +14,7 @@ import { resolveActionLabel } from '../../services/ai-action-runner.js';
 import { useDebounce } from '../../utils/performance';
 import useVisibleHotkey from '../../hooks/use-visible-hotkey.js';
 import HighlightText from '../shared/HighlightText.jsx';
+import AiBadge from '../shared/AiBadge.jsx';
 import { useConfirm } from '../shared/ConfirmDialog.jsx';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -78,6 +79,11 @@ const HistoryCard = memo(({
       <div className="card-header">
         <span className="card-lang">{item.sourceLanguage || 'auto'} → {item.targetLanguage || 'zh'}</span>
         <div className="card-header-right">
+          {item.kind === 'understand' && (
+            <span className="card-ai-badge" title={t('history.understandEntry', 'AI 理解结果')}>
+              <AiBadge size={12} />
+            </span>
+          )}
           {item.ai?.length > 0 && (
             <span className="card-ai-badge" title={t('history.hasAiResult', '附带 AI 结果，双击查看')}>
               <Sparkles size={12} />
@@ -94,7 +100,9 @@ const HistoryCard = memo(({
 
       <div className="card-body" onClick={handleToggle} title={t('history.card.clickHint')}>
         <div className="card-text-label">
-          {showTranslated ? t('history.card.target') : t('history.card.source')}
+          {showTranslated
+            ? (item.kind === 'understand' ? t('history.card.explain', '讲解') : t('history.card.target'))
+            : t('history.card.source')}
           <RotateCcw size={12} className="switch-hint" />
         </div>
         <div className={`card-text ${showTranslated ? 'translated' : 'source'}`}>
@@ -106,7 +114,7 @@ const HistoryCard = memo(({
       </div>
 
       <div className="card-actions">
-        <button onClick={handleCopyClick} title={t('history.copyTarget')}>
+        <button onClick={handleCopyClick} title={item.kind === 'understand' ? t('history.copyExplain', '复制讲解') : t('history.copyTarget')}>
           <Copy size={14} />
         </button>
         <button onClick={handleRestoreClick} title={t('history.restore')}>
@@ -824,7 +832,15 @@ const HistoryPanel = ({ showNotification }) => {
                 <div className="detail-text source">{detailItem.sourceText}</div>
               </div>
               <div className="detail-section">
-                <div className="detail-label">{t('translation.target')}</div>
+                {detailItem.kind === 'understand' ? (
+                  <div className="detail-label ai">
+                    <AiBadge size={12} />
+                    {resolveActionLabel(getAiAction(detailItem.actionId), i18n.language)
+                      || t('history.card.explain', '讲解')}
+                  </div>
+                ) : (
+                  <div className="detail-label">{t('translation.target')}</div>
+                )}
                 <div className="detail-text translated">{detailItem.translatedText}</div>
               </div>
               {/* Attached AI results, deletable on their own — the translation
@@ -855,7 +871,7 @@ const HistoryPanel = ({ showNotification }) => {
                 <Copy size={14} /> {t('history.copySource')}
               </button>
               <button className="detail-btn" onClick={() => { handleCopy(detailItem.translatedText); }}>
-                <Copy size={14} /> {t('history.copyTarget')}
+                <Copy size={14} /> {detailItem.kind === 'understand' ? t('history.copyExplain', '复制讲解') : t('history.copyTarget')}
               </button>
               <button className="detail-btn primary" onClick={() => { handleRestore(detailItem.id); setDetailItem(null); }}>
                 <Edit3 size={14} /> {t('history.restore')}
