@@ -1512,6 +1512,17 @@
   margin-top: 18px;
 }
 
+.dt-btn.primary {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: var(--text-inverse);
+}
+
+.dt-btn.primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent-primary) 85%, black);
+  border-color: color-mix(in srgb, var(--accent-primary) 85%, black);
+}
+
 /* ===== AI notes on a document ===== */
 
 .seg-btn.has-note {
@@ -1528,19 +1539,15 @@
   background: color-mix(in srgb, var(--accent-primary) 7%, transparent);
 }
 
-/* ===== Glossary consistency report ===== */
+/* ===== Glossary consistency ===== */
 
-.dt-terms .dt-digest-body {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+.dt-term-pair {
+  font-size: 13px;
 }
 
-.dt-term-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 13px;
+.dt-term-arrow {
+  color: var(--text-tertiary);
+  padding: 0 2px;
 }
 
 .dt-term-action {
@@ -1557,65 +1564,60 @@
   background: color-mix(in srgb, var(--accent-primary) 18%, transparent);
 }
 
-/* Not styled as an action: these are for the reader to judge, and a button
-   here would imply a one-click fix that cannot exist. */
-.dt-term-note {
-  color: var(--text-secondary);
-  font-size: 12.5px;
-  line-height: 1.6;
+.dt-term-action.small {
+  padding: 1px 9px;
+  font-size: 11.5px;
 }
 
-.dt-term-list {
+.dt-term-modal-list {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.dt-term-list li {
-  display: flex;
-  align-items: baseline;
   flex-wrap: wrap;
-  gap: 4px 8px;
+  gap: 6px 14px;
+  margin: 0 0 12px;
+  padding: 12px;
+  list-style: none;
+  max-height: 180px;
+  overflow-y: auto;
+  border-radius: 8px;
+  background: var(--bg-tertiary);
   font-size: 13px;
 }
 
-/* One term per row, its paragraphs trailing behind it — a term that drifted 40
-   times must not push everything else off the panel. */
-.dt-term-jumps {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+.dt-term-modal-hint {
+  margin: 0 0 16px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  line-height: 1.6;
 }
 
-.dt-term-jump {
-  flex-shrink: 0;
-  padding: 1px 6px;
-  border: none;
-  border-radius: 4px;
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
-  font-size: 11.5px;
-  font-variant-numeric: tabular-nums;
+mark.term-highlight.is-clickable {
   cursor: pointer;
 }
 
-.dt-term-jump:hover {
-  color: var(--accent-primary);
-  background: color-mix(in srgb, var(--accent-primary) 14%, transparent);
+mark.term-highlight.is-clickable:hover {
+  background: color-mix(in srgb, var(--accent-primary) 34%, transparent);
 }
 
-.dt-term-arrow {
-  color: var(--text-tertiary);
-  padding: 0 2px;
+/* Full-viewport catcher so the next click anywhere dismisses the popover. */
+.dt-term-popover-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
 }
 
-.dt-term-action.small {
-  margin-left: auto;
-  padding: 1px 9px;
-  font-size: 11.5px;
+.dt-term-popover {
+  position: fixed;
+  z-index: 201;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  box-shadow: var(--shadow-lg);
+  font-size: 13px;
+  white-space: nowrap;
 }
 
 /* Substituted rows recede — the eye should land on what still needs doing. */

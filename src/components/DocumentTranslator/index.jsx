@@ -25,7 +25,7 @@ import { LANGUAGES, PRIVACY_MODES } from '../../config/constants.js';
 import useVisibleHotkey from '../../hooks/use-visible-hotkey.js';
 import LanguagePicker from '../shared/LanguagePicker.jsx';
 import { useConfirm } from '../shared/ConfirmDialog.jsx';
-import { scanDocumentTerms } from '../../utils/term-consistency.js';
+import { scanDocumentTerms, renderWithReplacements } from '../../utils/term-consistency.js';
 import HighlightText from '../shared/HighlightText.jsx';
 import useAiActions from '../../hooks/use-ai-actions.js';
 import useSegmentNotes from '../../hooks/use-segment-notes.js';
@@ -122,7 +122,7 @@ function sweepExpiredProgress() {
   } catch { /* localStorage unavailable */ }
 }
 
-const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate, onEdit, onCopy, searchQuery, termHighlights, t,
+const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate, onEdit, onCopy, searchQuery, termMarks, onTermClick, t,
   onExplain, aiNote, noteFolded, aiRunning, canExplain }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState('');
@@ -203,7 +203,12 @@ const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate,
 
       {/* source */}
       <div className="segment-original">
-        <HighlightText text={segment.original} search={searchQuery} />
+        <HighlightText
+          text={segment.original}
+          search={searchQuery}
+          terms={termMarks?.sources}
+          onTermClick={onTermClick}
+        />
       </div>
 
       {/* translation */}
@@ -219,7 +224,8 @@ const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate,
               <HighlightText
                 text={segment.translated}
                 search={searchQuery}
-                terms={termHighlights}
+                terms={termMarks?.targets}
+                onTermClick={onTermClick}
               />
             </span>
           )}
@@ -474,66 +480,90 @@ const DocumentTranslator = ({
 
   // ===== Glossary consistency =====
   //
-  // The glossary is applied as each paragraph is translated, so a finished
-  // document drifts only when a term was added afterwards, when the switch was
-  // off, or when the model rendered a term as some other word. The first two
-  // are fixable here without asking anything; the third is reported, never
-  // guessed at. See utils/term-consistency.js.
+  // Scope is one case only: a glossary term the model left in the source
+  // language. A term rendered as some other word is not reported at all — see
+  // utils/term-consistency.js for why that is a product decision, not an
+  // oversight.
+  //
+  // `fixes` survives the modal closing: the marks in the paragraphs are what
+  // the reader interacts with afterwards, and each one has to know its own
+  // before-text to undo.
+  const [termModal, setTermModal] = useState(null);
+  const [termFixes, setTermFixes] = useState([]);
+  const [undoneTerms, setUndoneTerms] = useState(() => new Set());
+  const [termPopover, setTermPopover] = useState(null);
+
   const runTermCheck = useCallback(() => {
     const report = scanDocumentTerms(segments, getGlossaryTerms());
-    setTermReport({ ...report, applied: [] });
-    if (!report.fixable.length && !report.review.length) {
+    if (!report.fixable.length) {
       notify?.(t('documentTranslator.terms.allConsistent'), 'success');
+      return;
     }
+    setTermModal(report);
   }, [segments, getGlossaryTerms, notify, t]);
 
-  // Per paragraph, so one bad substitution can be rolled back without losing
-  // the other twenty. `before` is the exact text this report was built from —
-  // undo restores that, never a guess.
-  const setTermFixApplied = useCallback((segmentIds, apply) => {
-    setTermReport((prev) => {
-      if (!prev) return prev;
-      const ids = new Set(segmentIds);
-      const wanted = new Map(
-        prev.fixable.filter((f) => ids.has(f.segmentId)).map((f) => [f.segmentId, apply ? f.after : f.before])
-      );
-      if (!wanted.size) return prev;
+  const applyTermFixes = useCallback(() => {
+    const fixes = termModal?.fixable || [];
+    if (!fixes.length) return;
+    const byId = new Map(fixes.map((f) => [f.segmentId, f]));
 
-      setSegments((segs) => segs.map((s) => (
-        wanted.has(s.id) ? { ...s, translated: wanted.get(s.id) } : s
-      )));
+    setSegments((prev) => prev.map((seg) => {
+      const fix = byId.get(seg.id);
+      return fix ? { ...seg, translated: renderWithReplacements(fix.before, fix.replacements, () => true) } : seg;
+    }));
+    setTermFixes(fixes);
+    setUndoneTerms(new Set());
+    setTermModal(null);
+    notify?.(t('documentTranslator.terms.applied', {
+      count: fixes.reduce((n, f) => n + f.replacements.length, 0),
+    }), 'success');
+  }, [termModal, notify, t]);
 
-      const applied = new Set(prev.applied);
-      for (const id of ids) {
-        if (apply) applied.add(id);
-        else applied.delete(id);
-      }
-      return { ...prev, applied: [...applied] };
-    });
-  }, []);
+  // Undo one substitution where it happened. The paragraph is rebuilt from its
+  // untouched text with the remaining terms re-applied, so a paragraph that had
+  // three of them keeps the other two exactly as they were.
+  const undoOneTerm = useCallback((segmentId, from) => {
+    const fix = termFixes.find((f) => f.segmentId === segmentId);
+    if (!fix) return;
+    const nextUndone = new Set(undoneTerms);
+    nextUndone.add(`${segmentId}|${from}`);
 
-  const applyAllTermFixes = useCallback(() => {
-    if (!termReport?.fixable.length) return;
-    setTermFixApplied(termReport.fixable.map((f) => f.segmentId), true);
-    notify?.(t('documentTranslator.terms.applied', { count: termReport.fixable.length }), 'success');
-  }, [termReport, setTermFixApplied, notify, t]);
+    setSegments((prev) => prev.map((seg) => (
+      seg.id === segmentId
+        ? { ...seg, translated: renderWithReplacements(fix.before, fix.replacements, (f) => !nextUndone.has(`${segmentId}|${f}`)) }
+        : seg
+    )));
+    setUndoneTerms(nextUndone);
+    setTermPopover(null);
+  }, [termFixes, undoneTerms]);
 
-  const undoAllTermFixes = useCallback(() => {
-    if (!termReport?.fixable.length) return;
-    setTermFixApplied(termReport.fixable.map((f) => f.segmentId), false);
-  }, [termReport, setTermFixApplied]);
-
-  // segmentId -> the canonical renderings substituted into it, so the segment
-  // list can mark what changed instead of leaving the reader to diff by eye.
-  const termHighlights = useMemo(() => {
-    if (!termReport?.applied?.length) return null;
-    const applied = new Set(termReport.applied);
+  // segmentId -> what to mark and what each mark stands for. Both sides are
+  // marked: the English in the source, the substituted Chinese in the
+  // translation, so the pair is visible as a pair.
+  const termMarks = useMemo(() => {
+    if (!termFixes.length) return null;
     const map = {};
-    for (const fix of termReport.fixable) {
-      if (applied.has(fix.segmentId)) map[fix.segmentId] = fix.replacements.map((r) => r.to);
+    for (const fix of termFixes) {
+      const active = fix.replacements.filter((r) => !undoneTerms.has(`${fix.segmentId}|${r.from}`));
+      if (!active.length) continue;
+      map[fix.segmentId] = {
+        sources: active.map((r) => r.from),
+        targets: active.map((r) => r.to),
+        pairs: active,
+      };
     }
     return map;
-  }, [termReport]);
+  }, [termFixes, undoneTerms]);
+
+  const openTermPopover = useCallback((segmentId, value, event) => {
+    const marks = termMarks?.[segmentId];
+    const pair = marks?.pairs.find(
+      (p) => p.from.toLowerCase() === value.toLowerCase() || p.to.toLowerCase() === value.toLowerCase()
+    );
+    if (!pair) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    setTermPopover({ segmentId, from: pair.from, to: pair.to, x: rect.left, y: rect.bottom + 6 });
+  }, [termMarks]);
 
   // privacyMode/useCache no longer travel from here — the main-process stack
   // facade injects the live mode into every request (renderer values are
@@ -1660,107 +1690,6 @@ const DocumentTranslator = ({
                   </div>
                 )}
 
-                {termReport && (termReport.fixable.length > 0 || termReport.review.length > 0) && (
-                  <div className="dt-digest dt-terms">
-                    <div className="dt-digest-head">
-                      <BookMarked size={13} />
-                      <span>{t('documentTranslator.terms.check')}</span>
-                      <span className="dt-digest-scope">
-                        {t('documentTranslator.terms.scanned', { count: termReport.checked })}
-                      </span>
-                      <button className="dt-digest-close" onClick={() => setTermReport(null)}>
-                        <X size={13} />
-                      </button>
-                    </div>
-                    <div className="dt-digest-body">
-                      {termReport.fixable.length > 0 && (() => {
-                        const appliedIds = new Set(termReport.applied);
-                        const allApplied = termReport.fixable.every((f) => appliedIds.has(f.segmentId));
-                        return (
-                          <>
-                            <div className="dt-term-row">
-                              <span>{t('documentTranslator.terms.fixable', { count: termReport.fixable.length })}</span>
-                              <button
-                                className="dt-term-action"
-                                onClick={allApplied ? undoAllTermFixes : applyAllTermFixes}
-                              >
-                                {allApplied
-                                  ? t('documentTranslator.terms.undoAll')
-                                  : t('documentTranslator.terms.applyAll')}
-                              </button>
-                            </div>
-                            <ul className="dt-term-list">
-                              {termReport.fixable.map((fix) => {
-                                const on = appliedIds.has(fix.segmentId);
-                                return (
-                                  <li key={fix.segmentId} className={on ? 'is-applied' : ''}>
-                                    <button
-                                      className="dt-term-jump"
-                                      onClick={() => scrollToSegment(fix.segmentId)}
-                                    >
-                                      #{fix.segmentId + 1}
-                                    </button>
-                                    <span className="dt-term-pair">
-                                      {fix.replacements.map((r, i) => (
-                                        <span key={r.from}>
-                                          {i > 0 && '、'}
-                                          {r.from} <span className="dt-term-arrow">→</span> {r.to}
-                                        </span>
-                                      ))}
-                                    </span>
-                                    <button
-                                      className="dt-term-action small"
-                                      onClick={() => setTermFixApplied([fix.segmentId], !on)}
-                                    >
-                                      {on
-                                        ? t('documentTranslator.terms.undo')
-                                        : t('documentTranslator.terms.apply')}
-                                    </button>
-                                  </li>
-                                );
-                              })}
-                            </ul>
-                          </>
-                        );
-                      })()}
-
-                      {termReport.review.length > 0 && (
-                        <>
-                          {/* Deliberately not offered as a one-click fix: the
-                              paragraph rendered the term as *something*, and
-                              nothing says which words those were. */}
-                          <div className="dt-term-note">
-                            {t('documentTranslator.terms.reviewHint', {
-                              terms: termReport.review.length,
-                              count: termReport.review.reduce((n, r) => n + r.segmentIds.length, 0),
-                            })}
-                          </div>
-                          <ul className="dt-term-list">
-                            {termReport.review.map((item) => (
-                              <li key={`${item.source}-${item.canonical}`}>
-                                <span className="dt-term-pair">
-                                  {item.source} <span className="dt-term-arrow">→</span> {item.canonical}
-                                </span>
-                                <span className="dt-term-jumps">
-                                  {item.segmentIds.map((id) => (
-                                    <button
-                                      key={id}
-                                      className="dt-term-jump"
-                                      onClick={() => scrollToSegment(id)}
-                                    >
-                                      #{id + 1}
-                                    </button>
-                                  ))}
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                )}
-
                 {segments.map(segment => (
                   <SegmentItem
                     key={segment.id}
@@ -1772,7 +1701,8 @@ const DocumentTranslator = ({
                     onCopy={copySegmentText}
                     searchQuery={showSearch ? searchQuery : ''}
                     onExplain={explainSegment}
-                    termHighlights={termHighlights?.[segment.id]}
+                    termMarks={termMarks?.[segment.id]}
+                    onTermClick={(value, e) => openTermPopover(segment.id, value, e)}
                     aiNote={aiNotes[segment.id]}
                     noteFolded={!!foldedNotes[segment.id]}
                     aiRunning={aiRunningId === segment.id}
@@ -1993,6 +1923,66 @@ const DocumentTranslator = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* What can be substituted, before anything is touched. */}
+      {termModal && (
+        <div className="password-modal-overlay" onClick={() => setTermModal(null)}>
+          <div className="password-modal dt-term-modal" onClick={e => e.stopPropagation()}>
+            <div className="password-modal-header">
+              <BookMarked size={24} />
+              <h3>{t('documentTranslator.terms.check')}</h3>
+            </div>
+            <p className="password-modal-desc">
+              {t('documentTranslator.terms.modalDesc', {
+                count: termModal.fixable.reduce((n, f) => n + f.replacements.length, 0),
+                paragraphs: termModal.fixable.length,
+              })}
+            </p>
+            <ul className="dt-term-modal-list">
+              {[...new Map(
+                termModal.fixable.flatMap((f) => f.replacements.map((r) => [`${r.from}|${r.to}`, r]))
+              ).values()].map((r) => (
+                <li key={`${r.from}|${r.to}`}>
+                  <span className="dt-term-pair">
+                    {r.from} <span className="dt-term-arrow">→</span> {r.to}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="dt-term-modal-hint">{t('documentTranslator.terms.modalHint')}</p>
+            <div className="password-modal-actions">
+              <button className="dt-btn" onClick={() => setTermModal(null)}>
+                {t('documentTranslator.password.cancel')}
+              </button>
+              <button className="dt-btn primary" onClick={applyTermFixes}>
+                {t('documentTranslator.terms.applyAll')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Anchored to the mark that was clicked: what the word was, and a way
+          back. Fixed positioning so a scrolled list cannot drag it away. */}
+      {termPopover && (
+        <>
+          <div className="dt-term-popover-scrim" onClick={() => setTermPopover(null)} />
+          <div
+            className="dt-term-popover"
+            style={{ left: termPopover.x, top: termPopover.y }}
+          >
+            <div className="dt-term-pair">
+              {termPopover.from} <span className="dt-term-arrow">→</span> {termPopover.to}
+            </div>
+            <button
+              className="dt-term-action small"
+              onClick={() => undoOneTerm(termPopover.segmentId, termPopover.from)}
+            >
+              {t('documentTranslator.terms.undoOne')}
+            </button>
+          </div>
+        </>
       )}
 
       {confirmDialog}

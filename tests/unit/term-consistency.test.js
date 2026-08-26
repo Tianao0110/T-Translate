@@ -1,144 +1,118 @@
-// The glossary is applied as each translation happens, so a finished document
-// only drifts two ways: it was translated before a term existed, or the model
-// rendered a term as something else. Only the first is fixable without asking
-// a model where the term went — these tests pin that boundary, because the
-// tempting mistake is to "fix" the second by guessing.
+// The scan reports exactly one thing: a glossary term the model left in the
+// source language. A term rendered as some other word is deliberately NOT
+// reported — it cannot be fixed mechanically, and this app is for reading
+// comprehension, not terminology proofreading. These tests pin that scope so
+// the second category does not creep back in as "helpful" noise.
 
 import { describe, it, expect } from 'vitest';
-import { scanDocumentTerms } from '../../src/utils/term-consistency.js';
+import { scanDocumentTerms, renderWithReplacements } from '../../src/utils/term-consistency.js';
 import { applyGlossary } from '../../src/stack/glossary.js';
 
 const seg = (id, original, translated) => ({ id, original, translated });
 const TENSOR = { source: 'tensor', target: '张量' };
+const GPU = { source: 'GPU', target: '图形处理器' };
 
 describe('scanDocumentTerms', () => {
-  it('fixes a term the model left in the source language', () => {
+  it('finds a term the model left in the source language', () => {
     const segments = [seg(0, 'A tensor flows through the graph.', '一个 tensor 流过计算图。')];
 
-    const { fixable, review } = scanDocumentTerms(segments, [TENSOR]);
+    const { fixable } = scanDocumentTerms(segments, [TENSOR]);
 
     expect(fixable).toHaveLength(1);
-    expect(fixable[0]).toMatchObject({ segmentId: 0, after: '一个 张量 流过计算图。' });
+    expect(fixable[0]).toMatchObject({ segmentId: 0, before: '一个 tensor 流过计算图。' });
     expect(fixable[0].replacements).toEqual([{ from: 'tensor', to: '张量' }]);
-    expect(review).toHaveLength(0);
   });
 
-  it('leaves a paragraph alone when the canonical rendering is already there', () => {
+  it('leaves a paragraph alone when the term was translated', () => {
     const segments = [seg(0, 'A tensor flows.', '一个张量流过。')];
 
-    const { fixable, review } = scanDocumentTerms(segments, [TENSOR]);
-
-    expect(fixable).toHaveLength(0);
-    expect(review).toHaveLength(0);
+    expect(scanDocumentTerms(segments, [TENSOR]).fixable).toHaveLength(0);
   });
 
-  it('reports — never rewrites — a term rendered as some other word', () => {
-    // "张力" is wrong, but nothing in the string says it was meant to be the
-    // term. Guessing a span here is how you corrupt a translation.
+  it('says nothing about a term rendered as some other word', () => {
+    // Product decision, not a gap: nothing in the string says which span was
+    // meant to be the term, and a "go look at this yourself" list is
+    // proofreading work this app does not do.
     const segments = [seg(0, 'A tensor flows.', '一个张力流过。')];
 
-    const { fixable, review } = scanDocumentTerms(segments, [TENSOR]);
-
-    expect(fixable).toHaveLength(0);
-    expect(review).toEqual([{ source: 'tensor', canonical: '张量', segmentIds: [0] }]);
+    expect(scanDocumentTerms(segments, [TENSOR]).fixable).toHaveLength(0);
   });
 
-  it('ignores paragraphs the term never appears in', () => {
-    const segments = [seg(0, 'Nothing relevant here.', '这里没有相关内容。')];
+  it('will not substitute a term that was never in this paragraph', () => {
+    // "GPU" survives into the translation of a paragraph whose source never
+    // used it — rewriting it would invent a term the source lacked.
+    const segments = [seg(0, 'A model runs somewhere.', '模型跑在某台 GPU 上。')];
 
-    const { fixable, review, checked } = scanDocumentTerms(segments, [TENSOR]);
-
-    expect(checked).toBe(0);
-    expect(fixable).toHaveLength(0);
-    expect(review).toHaveLength(0);
+    expect(scanDocumentTerms(segments, [GPU]).fixable).toHaveLength(0);
   });
 
-  it('does not flag a rendering that contains the canonical one', () => {
-    // "张量积" contains "张量" — it reads as honoured, and it may genuinely be a
-    // different term (tensor product). Catching this needs alignment, not a
-    // substring rule. Pinned so nobody "fixes" it into a false positive.
-    const segments = [seg(0, 'The tensor product is defined.', '张量积的定义如下。')];
+  it('collects several terms from one paragraph', () => {
+    const segments = [seg(0, 'The tensor lives on the GPU.', 'tensor 放在 GPU 上。')];
 
-    const { review } = scanDocumentTerms(segments, [TENSOR]);
-
-    expect(review).toHaveLength(0);
-  });
-
-  it('judges the review list against the text after replacement', () => {
-    // The term was left in English and gets replaced — it must not then be
-    // reported as missing.
-    const segments = [seg(0, 'A tensor flows.', '一个 tensor 流过。')];
-
-    const { fixable, review } = scanDocumentTerms(segments, [TENSOR]);
+    const { fixable } = scanDocumentTerms(segments, [TENSOR, GPU]);
 
     expect(fixable).toHaveLength(1);
-    expect(review).toHaveLength(0);
+    expect(fixable[0].replacements.map((r) => r.from).sort()).toEqual(['GPU', 'tensor']);
   });
 
-  it('walks a whole document and keeps the per-paragraph verdicts apart', () => {
+  it('counts the paragraphs it actually examined', () => {
     const segments = [
-      seg(0, 'A tensor flows.', '一个张量流过。'),          // fine
-      seg(1, 'Another tensor here.', '这里还有一个 tensor。'), // fixable
-      seg(2, 'The tensor is large.', '这个张力很大。'),        // review
-      seg(3, 'Unrelated sentence.', '无关的句子。'),           // untouched
+      seg(0, 'A tensor flows.', '一个 tensor 流过。'),
+      seg(1, 'The tensor is large.', '这个张量很大。'),
+      seg(2, 'Unrelated sentence.', '无关的句子。'),
     ];
 
-    const { fixable, review, checked } = scanDocumentTerms(segments, [TENSOR]);
+    const { fixable, checked } = scanDocumentTerms(segments, [TENSOR]);
 
-    expect(checked).toBe(3);
-    expect(fixable.map((f) => f.segmentId)).toEqual([1]);
-    expect(review).toEqual([{ source: 'tensor', canonical: '张量', segmentIds: [2] }]);
-  });
-
-  // A term that drifted in a long document drifted in many paragraphs. One row
-  // per occurrence buries the thing the reader needs — which term — under
-  // repetitions of it.
-  it('reports one row per term, carrying every paragraph it drifted in', () => {
-    const segments = [
-      seg(0, 'A tensor flows.', '一个张力流过。'),
-      seg(1, 'The tensor grows.', '这个张力变大。'),
-      seg(2, 'A gradient descends.', '一个坡度下降。'),
-    ];
-    const terms = [TENSOR, { source: 'gradient', target: '梯度' }];
-
-    const { review } = scanDocumentTerms(segments, terms);
-
-    expect(review).toHaveLength(2);
-    expect(review.find((r) => r.source === 'tensor').segmentIds).toEqual([0, 1]);
-    expect(review.find((r) => r.source === 'gradient').segmentIds).toEqual([2]);
-  });
-
-  it('keeps two terms apart even when they share a canonical rendering', () => {
-    const segments = [seg(0, 'tensor and tensors everywhere', '张力遍地')];
-    const terms = [TENSOR, { source: 'tensors', target: '张量' }];
-
-    const { review } = scanDocumentTerms(segments, terms);
-
-    expect(review.map((r) => r.source).sort()).toEqual(['tensor', 'tensors']);
+    expect(checked).toBe(2);
+    expect(fixable.map((f) => f.segmentId)).toEqual([0]);
   });
 
   it('skips paragraphs that were never translated', () => {
     const segments = [seg(0, 'A tensor flows.', ''), seg(1, 'A tensor flows.', null)];
 
-    const { fixable, review, checked } = scanDocumentTerms(segments, [TENSOR]);
-
-    expect(checked).toBe(0);
-    expect(fixable).toHaveLength(0);
-    expect(review).toHaveLength(0);
+    expect(scanDocumentTerms(segments, [TENSOR])).toEqual({ fixable: [], checked: 0 });
   });
 
   it('survives an empty or absent glossary', () => {
-    const segments = [seg(0, 'A tensor flows.', '一个张力流过。')];
+    const segments = [seg(0, 'A tensor flows.', '一个 tensor 流过。')];
 
-    expect(scanDocumentTerms(segments, [])).toEqual({ fixable: [], review: [], checked: 0 });
-    expect(scanDocumentTerms(segments, null)).toEqual({ fixable: [], review: [], checked: 0 });
-    expect(scanDocumentTerms(null, [TENSOR])).toEqual({ fixable: [], review: [], checked: 0 });
+    expect(scanDocumentTerms(segments, [])).toEqual({ fixable: [], checked: 0 });
+    expect(scanDocumentTerms(segments, null)).toEqual({ fixable: [], checked: 0 });
+    expect(scanDocumentTerms(null, [TENSOR])).toEqual({ fixable: [], checked: 0 });
   });
 
   it('drops single-character terms, which would match everything', () => {
-    const segments = [seg(0, 'a b c', 'x y z')];
+    const segments = [seg(0, 'a b c', 'a b c')];
 
-    expect(scanDocumentTerms(segments, [{ source: 'a', target: '甲' }]).review).toHaveLength(0);
+    expect(scanDocumentTerms(segments, [{ source: 'a', target: '甲' }]).fixable).toHaveLength(0);
+  });
+});
+
+describe('renderWithReplacements', () => {
+  const before = 'tensor 放在 GPU 上，另一个 tensor 也是。';
+  const replacements = [{ from: 'tensor', to: '张量' }, { from: 'GPU', to: '图形处理器' }];
+
+  it('applies every replacement when all are active', () => {
+    expect(renderWithReplacements(before, replacements, () => true))
+      .toBe('张量 放在 图形处理器 上，另一个 张量 也是。');
+  });
+
+  // The whole reason it rebuilds from `before`: undoing one term must not
+  // disturb the others, and must not leave a half-substituted paragraph.
+  it('undoing one term keeps the others exactly as they were', () => {
+    expect(renderWithReplacements(before, replacements, (from) => from !== 'GPU'))
+      .toBe('张量 放在 GPU 上，另一个 张量 也是。');
+  });
+
+  it('undoing every term returns the untouched original', () => {
+    expect(renderWithReplacements(before, replacements, () => false)).toBe(before);
+  });
+
+  it('re-activating a term restores it — the source text is never lost', () => {
+    expect(renderWithReplacements(before, replacements, () => false)).toBe(before);
+    expect(renderWithReplacements(before, replacements, () => true))
+      .toBe('张量 放在 图形处理器 上，另一个 张量 也是。');
   });
 });
 

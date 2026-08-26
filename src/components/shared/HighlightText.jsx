@@ -13,7 +13,7 @@ const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
  *   used by the document to show which glossary terms it just substituted
  * @param {string} [termClassName]
  */
-const HighlightText = memo(({ text, search, terms, termClassName = 'term-highlight' }) => {
+const HighlightText = memo(({ text, search, terms, termClassName = 'term-highlight', onTermClick }) => {
   // Last line of defense: a non-string here (a stray result object from the
   // 0.3.x empty-translation bug) would be handed to React as a child and throw
   // #31, taking down the whole panel over one bad row. The store repairs those
@@ -36,7 +36,21 @@ const HighlightText = memo(({ text, search, terms, termClassName = 'term-highlig
 
     return parts.map((part, i) => {
       const hit = sorted.find((n) => n.value.toLowerCase() === part.toLowerCase());
-      return hit ? <mark key={i} className={hit.className}>{part}</mark> : part;
+      if (!hit) return part;
+      // Only term marks are interactive; a search hit has nothing to say.
+      const clickable = onTermClick && hit.className === termClassName;
+      return (
+        <mark
+          key={i}
+          className={clickable ? `${hit.className} is-clickable` : hit.className}
+          onClick={clickable ? (e) => onTermClick(part, e) : undefined}
+          role={clickable ? 'button' : undefined}
+          tabIndex={clickable ? 0 : undefined}
+          onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onTermClick(part, e); } } : undefined}
+        >
+          {part}
+        </mark>
+      );
     });
   } catch {
     return text;

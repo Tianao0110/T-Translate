@@ -546,15 +546,12 @@ const zh = {
     terms: {
       check: "术语检查",
       hint: "对照术语库检查全文用词是否一致，不调用模型",
-      scanned: "扫描了含术语的 {{count}} 段",
       allConsistent: "全文用词与术语库一致",
-      fixable: "{{count}} 处术语没翻译，可直接替换",
-      apply: "替换",
       applyAll: "全部替换",
-      undoAll: "全部撤销",
+      modalDesc: "文档里有 {{count}} 处术语没有翻译，分布在 {{paragraphs}} 个段落。可以直接替换成术语库里的译法。",
+      modalHint: "替换后，原文里的词和译文里替换过的词都会高亮。点高亮可以看到原词，也可以单独撤销那一处。",
+      undoOne: "撤销这一处",
       applied: "已替换 {{count}} 处",
-      undo: "撤销",
-      reviewHint: "另有 {{terms}} 个术语在 {{count}} 段里译成了别的词，需要你看一眼——原文里有这个术语，但译文里找不到规范译法，也没有可替换的原词",
     },
     newDocument: "清空",
     formats: {

@@ -546,15 +546,12 @@ const en = {
     terms: {
       check: "Check terms",
       hint: "Check the document against your glossary. No model involved",
-      scanned: "scanned {{count}} paragraphs containing terms",
       allConsistent: "Every glossary term is used consistently",
-      fixable: "{{count}} left untranslated — these can be substituted directly",
-      apply: "Substitute",
       applyAll: "Substitute all",
-      undoAll: "Undo all",
+      modalDesc: "{{count}} glossary terms were left untranslated, across {{paragraphs}} paragraphs. They can be substituted with your glossary rendering.",
+      modalHint: "After substituting, both the source word and its replacement are highlighted. Click a highlight to see the original word, or to undo that one.",
+      undoOne: "Undo this one",
       applied: "{{count}} substituted",
-      undo: "Undo",
-      reviewHint: "{{terms}} terms were rendered as something else across {{count}} paragraphs and need your eye — the term is in the source, its canonical rendering is not in the translation, and there is no source word left to substitute",
     },
     newDocument: "Clear",
     formats: {
