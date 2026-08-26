@@ -1994,9 +1994,15 @@ const DocumentTranslator = ({
               <Lock size={24} />
               <h3>{t('documentTranslator.password.title')}</h3>
             </div>
-            <p className="password-modal-desc" dangerouslySetInnerHTML={{ 
-              __html: t('documentTranslator.password.desc', { filename: pendingFile?.name }) 
-            }} />
+            {/* Filename is attacker-controlled (Explorer right-click opens any
+                file, name and all). Render it as a React child — never through
+                dangerouslySetInnerHTML — so a name like `<img onerror=…>.pdf`
+                is escaped instead of executed. */}
+            <p className="password-modal-desc">
+              {t('documentTranslator.password.descBefore')}
+              <strong>{pendingFile?.name}</strong>
+              {t('documentTranslator.password.descAfter')}
+            </p>
             <div className="password-input-group">
               <Key size={18} />
               <input

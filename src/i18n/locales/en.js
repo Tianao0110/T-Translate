@@ -676,7 +676,8 @@ const en = {
     // Password modal
     password: {
       title: "File is encrypted",
-      desc: "File <strong>{{filename}}</strong> requires a password to open",
+      descBefore: "File ",
+      descAfter: " requires a password to open",
       placeholder: "Enter password",
       cancel: "Cancel",
       confirm: "Confirm",

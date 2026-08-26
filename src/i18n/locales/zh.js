@@ -676,7 +676,8 @@ const zh = {
     // Password modal
     password: {
       title: "文件已加密",
-      desc: "文件 <strong>{{filename}}</strong> 需要密码才能打开",
+      descBefore: "文件 ",
+      descAfter: " 需要密码才能打开",
       placeholder: "请输入密码",
       cancel: "取消",
       confirm: "确定",
