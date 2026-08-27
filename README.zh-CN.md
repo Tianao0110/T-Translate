@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.3.7-green" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.3.8-green" alt="Version">
   <img src="https://img.shields.io/badge/license-T--Translate%201.0-blue" alt="License">
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform">
 </p>
@@ -152,7 +152,7 @@ T-Translate 以隐私保护为核心设计理念：
 
 - **本地优先** — 本地 LLM 是第一优先级，完全离线可用
 - **主进程单点强制** — 翻译与在线 OCR 请求全部由主进程发出，渲染进程不含网络代码；隐私模式对每个请求在主进程强制（无痕不落缓存、离线走引擎白名单），任何窗口都无法绕过
-- **加密存储** — API Key 使用 Windows DPAPI 加密，无明文回退
+- **加密存储** — API Key 使用 Windows DPAPI 加密，无明文回退；翻译历史、收藏与统计同样整体加密落盘
 - **访问审计** — 密钥解密操作全程记录，异常频率自动告警
 - **隐私联动** — 离线模式下在线 API Key 禁止解密
 - **最小权限** — 每种窗口独立 Preload，只暴露必要的 API

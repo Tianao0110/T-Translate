@@ -37,9 +37,9 @@ t-translate/
 │   ├── generated/              # esbuild 产物 translation-stack.cjs（gitignore，构建时生成）
 │   ├── preloads/               # Preload 脚本 (每个窗口一个)
 │   ├── shared/                 # 主/渲染进程共享常量
-│   ├── ipc/                    # IPC 处理器 (按功能拆分，translation-stack.js 为栈 facade)
+│   ├── ipc/                    # IPC 处理器 (按功能拆分，translation-stack.js 为栈 facade，history-vault.js 为历史加密库)
 │   ├── managers/               # 窗口/托盘/菜单管理器
-│   └── utils/                  # 工具函数（secure-vault/secure-audit/ocr-engine 等）
+│   └── utils/                  # 工具函数（secure-vault/secure-audit/history-vault/ocr-engine 等）
 │
 ├── src/                        # 渲染进程代码
 │   ├── main.jsx                # 应用入口

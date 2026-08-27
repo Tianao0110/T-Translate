@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.3.7-green" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.3.8-green" alt="Version">
   <img src="https://img.shields.io/badge/license-T--Translate%201.0-blue" alt="License">
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform">
 </p>
@@ -152,7 +152,7 @@ Privacy is a core design principle:
 
 - **Local-first** — Local LLM is the top priority. Fully usable offline
 - **Main-process enforcement** — All translation and online-OCR requests originate from the main process; renderer processes contain no network code. Privacy modes are enforced per request in the main process (incognito writes no caches, offline applies engine allowlists) — no window can bypass them
-- **Encrypted at rest** — API keys encrypted via Windows DPAPI. No plaintext fallback
+- **Encrypted at rest** — API keys encrypted via Windows DPAPI. No plaintext fallback. Translation history, favorites and statistics are encrypted on disk the same way
 - **Access audit** — Every decryption operation is logged. Abnormal frequency triggers alerts
 - **Privacy interlocks** — Offline mode blocks decryption of online API keys
 - **Least privilege** — Each window has its own preload script exposing only the APIs it needs

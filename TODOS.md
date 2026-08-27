@@ -112,5 +112,5 @@ v0.3.4 给 Windows OCR / Azure / Google Vision / OCR.space / 百度 五个引擎
 
 ### Incremental unit test coverage buildout
 
-`tests/unit/` 现有 54 个测试文件、636 用例（selection / stack 五件套 / OCR 坐标 / 语言目录与选择器 / 历史与理解条目 / 段落笔记 等）。Principle: add tests when you touch a file, new features ship with tests, bug fixes ship with regression tests. Not chasing 100% coverage.
+`tests/unit/` 现有 58 个测试文件、670 用例（selection / stack 五件套 / OCR 坐标 / 语言目录与选择器 / 历史与理解条目 / 段落笔记 / 历史保险库与存储路由 等）。Principle: add tests when you touch a file, new features ship with tests, bug fixes ship with regression tests. Not chasing 100% coverage.
 
