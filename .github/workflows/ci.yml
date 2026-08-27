@@ -1,0 +1,24 @@
+# Machine-enforced floor: lint 0 error, tests green, check:all clean
+# (constants sync / language tables / i18n keys / hardcoded-Chinese baseline).
+# Lint+test only — packaging is manual and stays that way.
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  check:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      # lint/test never launch Electron itself; skip the ~120MB binary download
+      ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run check:all

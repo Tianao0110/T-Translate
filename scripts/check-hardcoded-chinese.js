@@ -4,17 +4,26 @@
 //
 // Usage: npm run check:hardcoded
 //        node scripts/check-hardcoded-chinese.js --strict
+//        node scripts/check-hardcoded-chinese.js --update-baseline
 //
 // Output buckets:
 //   🔴 ERROR   - user-visible UI text (label / error / message / placeholder ...)
 //   🟡 WARNING - probably needs i18n but worth a human look
 //   ⚪ SKIP    - safe (comments, logs, i18n source files, etc.)
+//
+// Baseline gate: historical high-priority findings are frozen in
+// hardcoded-chinese-baseline.json (keys are file::text, no line numbers, so
+// unrelated edits don't shift them). Anything beyond the baseline exits 1 —
+// new code must use i18n. Paid some debt down? --update-baseline ratchets
+// the file tighter. It never accepts new findings; fix those instead.
 
 const fs = require('fs');
 const path = require('path');
 
 const PROJECT_ROOT = path.join(__dirname, '..');
 const isStrict = process.argv.includes('--strict');
+const isUpdateBaseline = process.argv.includes('--update-baseline');
+const BASELINE_PATH = path.join(__dirname, 'hardcoded-chinese-baseline.json');
 
 const SCAN_DIRS = [
   'src/components',
@@ -166,6 +175,7 @@ function main() {
   }
 
   if (fileResults.length === 0) {
+    if (isUpdateBaseline) writeBaseline({});
     console.log('✅ No hardcoded Chinese strings found!\n');
     return;
   }
@@ -212,6 +222,54 @@ function main() {
   } else {
     console.log('✅ No high-priority issues. Low-priority items may be intentional.');
   }
+
+  // Forward slashes so the baseline is byte-identical on any OS.
+  const currentCounts = {};
+  for (const r of fileResults) {
+    for (const f of r.errors) {
+      const key = `${r.file.replace(/\\/g, '/')}::${f.chinese.join('|')}`;
+      currentCounts[key] = (currentCounts[key] || 0) + 1;
+    }
+  }
+
+  if (isUpdateBaseline) {
+    writeBaseline(currentCounts);
+    return;
+  }
+
+  let baseline = {};
+  try {
+    baseline = JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf-8'));
+  } catch {
+    console.log('⚠️  No baseline file — every high-priority finding counts as new.');
+    console.log('   Generate it with: node scripts/check-hardcoded-chinese.js --update-baseline\n');
+  }
+
+  const newViolations = [];
+  for (const [key, count] of Object.entries(currentCounts)) {
+    const allowed = baseline[key] || 0;
+    if (count > allowed) newViolations.push({ key, extra: count - allowed });
+  }
+
+  if (newViolations.length > 0) {
+    console.log('❌ NEW hardcoded Chinese (beyond baseline) — use i18n (src/i18n/locales + t()) instead:');
+    console.log('─'.repeat(60));
+    for (const v of newViolations) {
+      const sep = v.key.indexOf('::');
+      console.log(`  ${v.key.slice(0, sep)}: ${v.key.slice(sep + 2)}${v.extra > 1 ? ` (x${v.extra})` : ''}`);
+    }
+    console.log('');
+    process.exit(1);
+  }
+}
+
+function writeBaseline(counts) {
+  const sorted = Object.fromEntries(
+    Object.entries(counts).sort(([a], [b]) => a.localeCompare(b))
+  );
+  fs.writeFileSync(BASELINE_PATH, JSON.stringify(sorted, null, 2) + '\n');
+  const total = Object.values(sorted).reduce((a, b) => a + b, 0);
+  console.log(`📌 Baseline written: ${total} findings → ${path.relative(PROJECT_ROOT, BASELINE_PATH)}`);
 }
 
 main();
