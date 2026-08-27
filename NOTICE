@@ -27,6 +27,7 @@ licenses:
 | onnxruntime-node     | MIT                          |
 | pdfjs-dist           | Apache-2.0                   |
 | react / react-dom    | MIT                          |
+| sherpa-onnx-node     | Apache-2.0                   |
 | react-i18next        | MIT                          |
 | uiohook-napi         | MIT                          |
 | uuid                 | MIT                          |
