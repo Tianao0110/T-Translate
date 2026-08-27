@@ -66,10 +66,19 @@ const PrivacySection = ({
     const state = useTranslationStore.getState();
 
     let localStorageBytes = 0;
+    let docProgressCount = 0;
+    let docProgressBytes = 0;
     try {
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
-        localStorageBytes += k.length + (localStorage.getItem(k)?.length || 0);
+        const bytes = k.length + (localStorage.getItem(k)?.length || 0);
+        localStorageBytes += bytes;
+        // Document-translation resume blobs (dt_progress_<fingerprint>) carry
+        // translated text — itemized so they're visible, not buried in the total.
+        if (k.startsWith('dt_progress_')) {
+          docProgressCount++;
+          docProgressBytes += bytes;
+        }
       }
     } catch { /* size stays 0 */ }
 
@@ -79,12 +88,17 @@ const PrivacySection = ({
     } catch { /* count stays 0 */ }
 
     const main = (await window.electron?.app?.getDataStats?.()) || {};
+    const vault = (await window.electron?.historyVault?.status?.()) || null;
 
     setDataStats({
       historyCount: state.history.length,
       favoritesCount: state.favorites.length,
       cacheCount,
       localStorageBytes,
+      docProgressCount,
+      docProgressBytes,
+      vaultAvailable: !!vault?.available,
+      vaultFileSize: vault?.fileSize || 0,
       settingsFileSize: main.settingsFileSize || 0,
       logsDirSize: main.logsDirSize || 0,
     });
@@ -112,6 +126,8 @@ const PrivacySection = ({
   const handleClearAllData = async () => {
     if (!(await confirm(t('privacy.clearAllConfirm')))) return;
     localStorage.clear();
+    // The encrypted history vault lives outside localStorage — clear it too.
+    try { await window.electron?.historyVault?.clear?.(); } catch { /* best effort */ }
     window.electron?.store?.clear?.();
     window.location.reload();
   };
@@ -372,6 +388,10 @@ const PrivacySection = ({
             <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.history')}</span><br/>{dataStats.historyCount} {t('privacy.stats.items')}</div>
             <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.favorites')}</span><br/>{dataStats.favoritesCount} {t('privacy.stats.items')}</div>
             <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.cache')}</span><br/>{dataStats.cacheCount} {t('privacy.stats.items')}</div>
+            <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.historyStore')}</span><br/>{dataStats.vaultAvailable
+              ? `${formatBytes(dataStats.vaultFileSize)} · ${t('privacy.stats.encrypted')}`
+              : t('privacy.stats.plaintext')}</div>
+            <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.docProgress')}</span><br/>{dataStats.docProgressCount} {t('privacy.stats.items')} · {formatBytes(dataStats.docProgressBytes)}</div>
             <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.localData')}</span><br/>{formatBytes(dataStats.localStorageBytes)}</div>
             <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.settingsFile')}</span><br/>{formatBytes(dataStats.settingsFileSize)}</div>
             <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.logs')}</span><br/>{formatBytes(dataStats.logsDirSize)}</div>

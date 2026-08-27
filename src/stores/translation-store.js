@@ -32,13 +32,29 @@ function createThrottledJSONStorage(interval = PERSIST_WRITE_MS) {
   let timer = null;
   let pending = null; // [name, value]
 
+  // Encrypted vault (DPAPI file in userData, main process) carries the blob
+  // when the bridge exists and encryption is available; localStorage remains
+  // the fallback for vitest/headless runs and DPAPI-less machines. The flag is
+  // resolved in getItem — zustand always hydrates before the first setItem.
+  const vaultApi = typeof window !== 'undefined' ? window.electron?.historyVault : null;
+  let useVault = false;
+
   const write = () => {
     timer = null;
     if (!pending) return;
     const [name, value] = pending;
     pending = null;
     try {
-      localStorage.setItem(name, JSON.stringify(value));
+      const raw = JSON.stringify(value);
+      if (useVault) {
+        // Fire-and-forget: a failed write keeps data in memory and the next
+        // throttled write retries. Never fall back to plaintext on failure.
+        vaultApi.save(raw).then((r) => {
+          if (r && !r.success) logger.error('Vault write failed:', r.reason);
+        }).catch((e) => logger.error('Vault write failed:', e));
+      } else {
+        localStorage.setItem(name, raw);
+      }
     } catch (e) {
       logger.error('Persist write failed:', e);
     }
@@ -49,7 +65,42 @@ function createThrottledJSONStorage(interval = PERSIST_WRITE_MS) {
   }
 
   return {
-    getItem: (name) => {
+    getItem: async (name) => {
+      if (vaultApi) {
+        try {
+          const st = await vaultApi.status();
+          if (st?.available) {
+            useVault = true;
+            const fromVault = await vaultApi.load();
+            if (fromVault != null) {
+              try {
+                return JSON.parse(fromVault);
+              } catch {
+                return null; // quarantined upstream; start fresh
+              }
+            }
+            // One-time migration: plaintext leaves localStorage only after the
+            // encrypted copy is confirmed on disk.
+            const legacy = localStorage.getItem(name);
+            if (legacy) {
+              const saved = await vaultApi.save(legacy);
+              if (saved?.success) {
+                localStorage.removeItem(name);
+                logger.info('History migrated to encrypted vault');
+              }
+              try {
+                return JSON.parse(legacy);
+              } catch {
+                return null;
+              }
+            }
+            return null;
+          }
+        } catch (e) {
+          logger.error('Vault hydrate failed, using localStorage:', e);
+          useVault = false;
+        }
+      }
       const raw = localStorage.getItem(name);
       if (!raw) return null;
       try {
@@ -68,6 +119,9 @@ function createThrottledJSONStorage(interval = PERSIST_WRITE_MS) {
       if (timer !== null) clearTimeout(timer);
       timer = null;
       pending = null;
+      if (useVault) {
+        vaultApi.clear().catch(() => {});
+      }
       localStorage.removeItem(name);
     },
   };
@@ -789,7 +843,9 @@ const useTranslationStore = create(
     })),
     {
       name: "translation-store",
-      // localStorage works in Electron and loads synchronously (no flash)
+      // In Electron the blob lives DPAPI-encrypted in userData (history vault);
+      // hydration turns async (~10ms IPC) — outside Electron it stays sync
+      // localStorage, which is what the tests seed.
       storage: createThrottledJSONStorage(),
       merge: (persistedState, currentState) => {
         // Rows written before v0.3.5 can hold a whole result object where the
