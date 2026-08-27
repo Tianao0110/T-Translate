@@ -389,7 +389,7 @@ const PrivacySection = ({
             <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.favorites')}</span><br/>{dataStats.favoritesCount} {t('privacy.stats.items')}</div>
             <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.cache')}</span><br/>{dataStats.cacheCount} {t('privacy.stats.items')}</div>
             <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.historyStore')}</span><br/>{dataStats.vaultAvailable
-              ? `${formatBytes(dataStats.vaultFileSize)} · ${t('privacy.stats.encrypted')}`
+              ? formatBytes(dataStats.vaultFileSize)
               : t('privacy.stats.plaintext')}</div>
             <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.docProgress')}</span><br/>{dataStats.docProgressCount} {t('privacy.stats.items')} · {formatBytes(dataStats.docProgressBytes)}</div>
             <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.localData')}</span><br/>{formatBytes(dataStats.localStorageBytes)}</div>

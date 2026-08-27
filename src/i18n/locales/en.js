@@ -248,7 +248,6 @@ const en = {
       favorites: "Favorites",
       cache: "Translation cache",
       historyStore: "History storage",
-      encrypted: "encrypted",
       plaintext: "not encrypted",
       docProgress: "Document progress",
       localData: "UI data",

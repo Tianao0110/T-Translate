@@ -248,7 +248,6 @@ const zh = {
       favorites: "收藏",
       cache: "翻译缓存",
       historyStore: "历史存储",
-      encrypted: "已加密",
       plaintext: "未加密",
       docProgress: "文档进度",
       localData: "界面数据",

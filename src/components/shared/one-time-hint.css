@@ -6,6 +6,10 @@
   display: flex;
   align-items: center;
   gap: 7px;
+  /* Anchored inside a ~30px button wrapper: absolute shrink-to-fit sizes
+     against that containing block, collapsing text to one char per line.
+     max-content sizes by content first, then the cap applies. */
+  width: max-content;
   max-width: 260px;
   padding: 7px 9px 7px 10px;
   border: 1px solid color-mix(in srgb, var(--accent-primary) 35%, transparent);
