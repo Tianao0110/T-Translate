@@ -63,6 +63,12 @@ const electronAPI = {
     showOpenDialog: (opts) => ipcRenderer.invoke("show-open-dialog", opts),
     saveFile: (opts) => ipcRenderer.invoke("save-file", opts),
   },
+  historyVault: {
+    status: () => ipcRenderer.invoke("history-vault:status"),
+    load: () => ipcRenderer.invoke("history-vault:load"),
+    save: (jsonString) => ipcRenderer.invoke("history-vault:save", jsonString),
+    clear: () => ipcRenderer.invoke("history-vault:clear"),
+  },
   document: {
     // "Open with T-Translate": pull the pending context-menu file (one-shot),
     // and get pinged when a running instance receives a new one.

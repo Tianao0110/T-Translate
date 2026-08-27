@@ -139,6 +139,14 @@ const CHANNELS = {
     DELETE: 'secure-storage:delete',
     IS_AVAILABLE: 'secure-storage:isAvailable',
   },
+  // Encrypted-at-rest vault for the translation-store persist blob (history /
+  // favorites / statistics). Main window only; DPAPI via safeStorage.
+  HISTORY_VAULT: {
+    STATUS: 'history-vault:status',
+    LOAD: 'history-vault:load',
+    SAVE: 'history-vault:save',
+    CLEAR: 'history-vault:clear',
+  },
   // Main-process translation stack (facade in ipc/translation-stack.js).
   // privacyMode/useCache never cross this boundary — the facade injects them.
   STACK: {

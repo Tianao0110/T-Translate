@@ -41,4 +41,17 @@
   !insertmacro removeContextMenuFor ".pdf"
   !insertmacro removeContextMenuFor ".docx"
   !insertmacro removeContextMenuFor ".txt"
+
+  ; Optional user-data cleanup — settings, history vault, logs, models all live
+  ; under %APPDATA%\t-translate (Electron userData derives from package.json
+  ; "name"). Silent uninstalls (including any update-driven flow) never delete:
+  ; data loss must always be an explicit human choice.
+  IfSilent skipDataDelete
+  StrCpy $R8 "Also delete all user data (settings, history, downloaded models)?"
+  StrCmp $LANGUAGE 2052 0 +2
+    StrCpy $R8 "同时删除全部用户数据（设置、历史记录、已下载模型）？"
+  MessageBox MB_YESNO|MB_ICONQUESTION "$R8" IDNO skipDataDelete
+    RMDir /r "$APPDATA\t-translate"
+    RMDir /r "$LOCALAPPDATA\t-translate-updater"
+  skipDataDelete:
 !macroend

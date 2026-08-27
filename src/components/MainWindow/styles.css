@@ -324,6 +324,12 @@
   width: 100%;
 }
 
+/* The setup strip shares the panel with the translator — without this it
+   inherits flex:1 from the rule above and swallows half the window. */
+.tab-panel > .setup-notice {
+  flex: 0 0 auto;
+}
+
 /* 自定义滚动条 */
 .main-content::-webkit-scrollbar {
   width: 10px;

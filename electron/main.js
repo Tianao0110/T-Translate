@@ -10,6 +10,13 @@ const {
 } = require('electron');
 const path = require('path');
 
+// Dev/QA userData sandbox. MUST run before require('./state') — state.js
+// constructs electron-store at module top, freezing the path (the same
+// require-order trap the portable-mode evaluation pinned down).
+if (process.env.TT_USERDATA) {
+  app.setPath('userData', path.resolve(process.env.TT_USERDATA));
+}
+
 const { store, runtime, windows, isDev } = require('./state');
 const { CHANNELS } = require('./shared/channels');
 const { t } = require('./shared/main-i18n');
