@@ -25,6 +25,7 @@ let restartedOnce = false;
 let readyTimer = null;
 let killTimer = null;
 let privacyUnsub = null;
+let sessionLanguage = ''; // SenseVoice hint from the probe window ('' = auto)
 
 function init(d) {
   deps = d;
@@ -85,13 +86,14 @@ function toggleWindow() {
   restartedOnce = false;
 }
 
-function startSession() {
+function startSession(options = {}) {
   if (childState !== 'idle') {
     logger.warn(`start ignored in state ${childState}`);
     return;
   }
   // Each user-initiated session gets its own one-shot crash restart.
   restartedOnce = false;
+  sessionLanguage = typeof options.language === 'string' ? options.language : '';
   const models = locateAsrModels(modelsBaseDir());
   if (!models) {
     sendStatus('no-model');
@@ -138,8 +140,8 @@ function spawnWorker(models) {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const logPath = path.join(logsDir, `audio-probe-${stamp}.jsonl`);
 
-  child = utilityProcess.fork(path.join(__dirname, '../services/asr-probe/asr-worker.js'), [], {
-    serviceName: 't-translate-asr-probe',
+  child = utilityProcess.fork(path.join(__dirname, '../services/audio-engine/audio-worker.js'), [], {
+    serviceName: 't-translate-audio-engine',
     stdio: 'pipe',
   });
   child.stdout?.on('data', (d) => logger.debug(`worker: ${String(d).trim()}`));
@@ -148,6 +150,7 @@ function spawnWorker(models) {
   child.on('message', onWorkerMessage);
   child.on('exit', onWorkerExit);
 
+  // Covers the whole init → asr-start → model-load chain (loading dominates).
   readyTimer = setTimeout(() => {
     logger.error('worker ready timeout');
     killWorker();
@@ -156,9 +159,14 @@ function spawnWorker(models) {
 
   child.postMessage({
     type: 'init',
-    modelPath: models.modelPath,
-    tokensPath: models.tokensPath,
-    vadPath: models.vadPath,
+    models: {
+      asr: {
+        modelPath: models.modelPath,
+        tokensPath: models.tokensPath,
+        vadPath: models.vadPath,
+        language: sessionLanguage,
+      },
+    },
     logPath,
     meta: {
       appVersion: app.getVersion(),
@@ -167,12 +175,16 @@ function spawnWorker(models) {
       privacyMode: deps.store.get('privacyMode', PRIVACY_MODES.STANDARD),
     },
   });
+  child.postMessage({ type: 'asr-start', language: sessionLanguage });
 }
 
 function onWorkerMessage(msg) {
   if (!msg || !msg.type) return;
   switch (msg.type) {
     case 'ready':
+      // init acknowledged — nothing loaded yet; asr-ready is the real gate.
+      break;
+    case 'asr-ready':
       clearTimeout(readyTimer);
       childState = 'running';
       logger.info(`worker ready in ${msg.loadMs}ms`);
@@ -181,14 +193,26 @@ function onWorkerMessage(msg) {
     case 'segment':
       sendToWindow(CHANNELS.AUDIO_PROBE.SEGMENT, msg.rec);
       break;
+    case 'partial':
+      sendToWindow(CHANNELS.AUDIO_PROBE.PARTIAL, msg.text);
+      break;
     case 'hint':
       sendStatus(msg.kind ? `hint-${msg.kind}` : 'listening');
       break;
     case 'metrics':
       sendToWindow(CHANNELS.AUDIO_PROBE.STATUS, { state: 'metrics', detail: msg.rec });
       break;
-    case 'stopped':
-      // Worker exits itself right after; 'exit' handler finishes cleanup.
+    case 'asr-stopped':
+      // Session flushed; the probe has no reason to keep an idle engine warm
+      // (zero-idle-footprint rule) — take the process down. 'exit' handler
+      // finishes cleanup; the kill grace timer is already armed.
+      if (child) {
+        try {
+          child.postMessage({ type: 'shutdown' });
+        } catch {
+          killWorker();
+        }
+      }
       break;
     case 'fatal':
       logger.error(`worker fatal: ${msg.message}`);
@@ -250,7 +274,7 @@ function stopSession(reason) {
   logger.info(`stopping session (${reason})`);
   childState = 'stopping';
   try {
-    child.postMessage({ type: 'stop' });
+    child.postMessage({ type: 'asr-stop' });
   } catch {
     killWorker();
     return;

@@ -79,6 +79,16 @@
     .probe-btn.primary { border-color: #4a6fa5; background: #2c3e5c; }
     .probe-btn.primary:hover { background: #354a6e; }
 
+    .probe-select {
+      border: 1px solid #3a3f4a;
+      border-radius: 5px;
+      background: #262a33;
+      color: #d7dae0;
+      padding: 2px 6px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
     .level-track {
       height: 3px;
       background: #232730;
@@ -109,6 +119,8 @@
       user-select: none;
     }
     .seg-repeat { color: #d9a441; }
+    /* 开放段临时识别文本——收到定稿 segment 后被替换 */
+    .seg.partial { color: #7d8697; font-style: italic; }
     .placeholder { color: #565e6d; padding-top: 8px; text-align: center; }
 
     .probe-footer {
@@ -130,6 +142,14 @@
       <span class="probe-title">听译探针</span>
       <span class="probe-status" id="status">初始化…</span>
       <div class="probe-controls">
+        <select class="probe-select" id="langSel" title="识别语言（切换后自动重启识别引擎）">
+          <option value="">自动</option>
+          <option value="zh">中文</option>
+          <option value="en">英文</option>
+          <option value="ja">日文</option>
+          <option value="ko">韩文</option>
+          <option value="yue">粤语</option>
+        </select>
         <button class="probe-btn primary" id="toggleBtn" disabled>开始</button>
         <button class="probe-btn" id="closeBtn">关闭</button>
       </div>
@@ -146,11 +166,15 @@
       status: document.getElementById('status'),
       toggleBtn: document.getElementById('toggleBtn'),
       closeBtn: document.getElementById('closeBtn'),
+      langSel: document.getElementById('langSel'),
       levelBar: document.getElementById('levelBar'),
       transcript: document.getElementById('transcript'),
       placeholder: document.getElementById('placeholder'),
       footer: document.getElementById('footer'),
     };
+
+    // file:// 独立 origin，localStorage 只属于探针窗自己
+    try { els.langSel.value = localStorage.getItem('audioProbeLang') || ''; } catch (err) { /* storage off */ }
 
     const STATUS_TEXT = {
       idle: '就绪',
@@ -189,6 +213,8 @@
     let engineReady = false;
     let reacquireAttempts = 0;
     let errorLatch = false;     // a terminal error keeps its status text over the trailing 'stopped'
+    let pendingRestart = false; // language changed mid-session: worker restarts, capture stays
+    let partialEl = null;       // provisional (open-segment) line at the transcript tail
 
     function setStatus(state) {
       els.status.textContent = STATUS_TEXT[state] || state;
@@ -201,7 +227,27 @@
       els.levelBar.style.width = pct + '%';
     }
 
+    // 开放段临时文本：末行灰斜体；text 为空=段闭合，清行等定稿
+    function setPartial(text) {
+      if (!text) {
+        if (partialEl) { partialEl.remove(); partialEl = null; }
+        return;
+      }
+      if (els.placeholder) {
+        els.placeholder.remove();
+        els.placeholder = null;
+      }
+      if (!partialEl) {
+        partialEl = document.createElement('div');
+        partialEl.className = 'seg partial';
+        els.transcript.appendChild(partialEl);
+      }
+      partialEl.textContent = text;
+      els.transcript.scrollTop = els.transcript.scrollHeight;
+    }
+
     function addSegment(rec) {
+      setPartial(''); // final replaces the provisional line
       if (els.placeholder) {
         els.placeholder.remove();
         els.placeholder = null;
@@ -339,17 +385,32 @@
       engineReady = false;
       reacquireAttempts = 0;
       errorLatch = false;
+      pendingRestart = false;
       els.toggleBtn.textContent = '停止';
-      window.audioProbe.start(); // spawn ASR worker; capture starts on 'listening'
+      // spawn ASR worker; capture starts on 'listening'
+      window.audioProbe.start({ language: els.langSel.value });
     }
 
     function stopSession() {
       running = false;
       engineReady = false;
       stopCapture();
+      setPartial('');
       window.audioProbe.stop();
       els.toggleBtn.textContent = '开始';
     }
+
+    // 改语言=重启 worker（模型不变，载入约 1.2s）。捕获流不动：重启期间 PCM 会被
+    // 主进程丢弃，避免重新 getDisplayMedia 需要用户手势的问题。
+    els.langSel.addEventListener('change', () => {
+      try { localStorage.setItem('audioProbeLang', els.langSel.value); } catch (err) { /* storage off */ }
+      if (!running) return;
+      pendingRestart = true;
+      engineReady = false;
+      setPartial('');
+      setStatus('loading');
+      window.audioProbe.stop();
+    });
 
     els.toggleBtn.addEventListener('click', () => {
       if (running) {
@@ -387,6 +448,12 @@
       if (state === 'listening') {
         engineReady = true;
       }
+      if (state === 'stopped' && pendingRestart && running) {
+        // language-change restart: same session from the user's view
+        pendingRestart = false;
+        window.audioProbe.start({ language: els.langSel.value });
+        return; // status stays 'loading'
+      }
       if (state === 'stopped' || state === 'engine-dead' || state === 'secure-blocked') {
         if (running && state !== 'stopped') stopSession();
         els.toggleBtn.textContent = '开始';
@@ -397,6 +464,7 @@
     });
 
     window.audioProbe.onSegment(addSegment);
+    window.audioProbe.onPartial(setPartial);
 
     window.addEventListener('error', (e) => {
       window.audioProbe.logs.write({ level: 'error', message: `audio-probe window error: ${e.message}` });
