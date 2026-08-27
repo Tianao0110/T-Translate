@@ -175,7 +175,11 @@ function handlePcm(samples) {
 
 function drainVadQueue() {
   while (!vad.isEmpty()) {
-    const seg = vad.front();
+    // enableExternalBuffer=false is mandatory under Electron: the V8 memory
+    // cage rejects napi external ArrayBuffers ("External buffers are not
+    // allowed"), and it only triggers on the FIRST detected speech segment —
+    // silence-only runs never reach this call.
+    const seg = vad.front(false);
     vad.pop();
     enqueueDecode(seg);
   }

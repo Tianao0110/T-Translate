@@ -89,6 +89,8 @@ function startSession() {
     logger.warn(`start ignored in state ${childState}`);
     return;
   }
+  // Each user-initiated session gets its own one-shot crash restart.
+  restartedOnce = false;
   const models = locateAsrModels(modelsBaseDir());
   if (!models) {
     sendStatus('no-model');
