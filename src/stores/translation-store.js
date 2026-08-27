@@ -28,7 +28,8 @@ function isKnownLanguage(state, code) {
 // flush. Throttle the stringify+write; beforeunload covers the tail.
 const PERSIST_WRITE_MS = 1000;
 
-function createThrottledJSONStorage(interval = PERSIST_WRITE_MS) {
+// Exported for tests (vault/localStorage routing + migration).
+export function createThrottledJSONStorage(interval = PERSIST_WRITE_MS) {
   let timer = null;
   let pending = null; // [name, value]
 
