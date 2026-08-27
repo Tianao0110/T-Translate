@@ -46,12 +46,23 @@ const VAD_WINDOW = 512;
 // 1.0s: RTF 0.033 leaves headroom even with a force-split-capped open segment
 // re-decode sharing the chain with finals (was 1.5s; user verdict: sluggish).
 const PARTIAL_INTERVAL_MS = 1000;
-// Open segments longer than this are finalized by force. Continuous speech
-// (video narration) can run without a 0.35s gap for minutes, and sherpa's own
-// maxSpeechDuration is unreliable (21s/31s segments logged under a 12/18
-// cap) — without this the segment never closes, partial re-decodes grow
-// unboundedly, and no final ever reaches the screen.
-const FORCE_SPLIT_S = 12;
+// Layered forced segmentation, aligned with the pro-subtitle ceiling of ~7s
+// per cue (Netflix/BBC style) and sherpa's own endpointing philosophy (relax
+// the acceptable-pause threshold as the segment drags on):
+//   < SOFT s   only the VAD's 0.35s silence closes a segment (natural breaks)
+//   >= SOFT s  valley split: the moment the last VALLEY_WINDOWS windows all
+//              drop below an adaptive RMS floor (a breath, ~0.26s), finalize
+//              right there — the cut AND the VAD re-acknowledgment both land
+//              in silence, so nothing is lost
+//   >= HARD s  hard split (sung vocals over BGM may never yield a valley).
+//              Costs ~1-2 characters at the seam; the price of any output.
+// sherpa's own maxSpeechDuration stays a distrusted backstop (21s/31s
+// segments were logged under a 12/18 cap).
+const SOFT_SPLIT_FROM_S = 5;
+const HARD_SPLIT_S = 9;
+const VALLEY_WINDOWS = 8; // x 512 samples = 0.256s of sustained quiet
+const VALLEY_RATIO = 0.2; // valley = below 20% of the open segment's mean RMS
+const VALLEY_FLOOR = 1e-4; // absolute floor so near-digital-silence always counts
 
 const ASR_LANGUAGES = new Set(['zh', 'en', 'ja', 'ko', 'yue', '']);
 
@@ -79,6 +90,16 @@ let openChunks = [];
 let openLen = 0;
 let lastPartialLen = 0;
 let partialGen = 0; // bumped on close so a stale in-flight partial is dropped
+// Per-window RMS bookkeeping for valley splits.
+let openRmsSum = 0;
+let openWinCount = 0;
+let recentRms = []; // last VALLEY_WINDOWS window RMS values
+// Pre-roll: recent windows kept during silence. When detection flips on, the
+// VAD's ~0.15s acknowledgment has already swallowed the utterance head —
+// without this, every segment AFTER a forced split starts a character short
+// ("些技术" for "这些技术" in the breath harness).
+const PRE_ROLL_WINDOWS = 10; // ~0.32s
+let preRoll = [];
 
 const isRepeat = makeRepeatTracker();
 const watchdog = makeSignalWatchdog();
@@ -271,23 +292,61 @@ function handlePcm(samples) {
 // would pin the whole per-callback merge buffer.
 function trackOpenSegment(win) {
   if (vad.isDetected()) {
+    // Segment just opened: prepend the pre-roll so the mirrored audio has the
+    // utterance head the acknowledgment window swallowed. Mostly silence plus
+    // the first ~0.15s of speech; SenseVoice doesn't mind leading quiet.
+    if (openLen === 0 && preRoll.length) {
+      for (const p of preRoll) {
+        openChunks.push(p);
+        openLen += p.length;
+      }
+      preRoll = [];
+    }
     openChunks.push(new Float32Array(win));
     openLen += win.length;
-  } else if (openLen > 0) {
-    // Segment closed: the final decode is already queued via drainVadQueue.
-    openChunks = [];
-    openLen = 0;
-    lastPartialLen = 0;
-    partialGen += 1;
-    post({ type: 'partial', text: '' });
+
+    let sumSq = 0;
+    for (let i = 0; i < win.length; i++) sumSq += win[i] * win[i];
+    const rms = Math.sqrt(sumSq / win.length);
+    openRmsSum += rms;
+    openWinCount += 1;
+    recentRms.push(rms);
+    if (recentRms.length > VALLEY_WINDOWS) recentRms.shift();
+
+    // Valley split: a sustained dip while the segment is already long enough.
+    // Checked per window (32ms) so the ~0.3s breath is never missed.
+    if (openLen >= SOFT_SPLIT_FROM_S * SAMPLE_RATE && recentRms.length === VALLEY_WINDOWS) {
+      const floor = Math.max(VALLEY_FLOOR, (openRmsSum / openWinCount) * VALLEY_RATIO);
+      if (recentRms.every((r) => r < floor)) forceSplit('valley');
+    }
+  } else {
+    preRoll.push(new Float32Array(win));
+    if (preRoll.length > PRE_ROLL_WINDOWS) preRoll.shift();
+    if (openLen > 0) {
+      // Segment closed naturally: the final decode is already queued via
+      // drainVadQueue.
+      resetOpenSegment();
+      post({ type: 'partial', text: '' });
+    }
   }
 }
 
-// Force-close an overlong open segment: finalize the mirrored audio ourselves
-// and reset the VAD so it starts a fresh segment. The VAD has not closed, so
-// its queue is empty — nothing double-decodes. Cost: ~0.15s of speech lost to
-// re-acknowledgment after reset, vs finals never appearing at all.
-function forceSplit() {
+function resetOpenSegment() {
+  openChunks = [];
+  openLen = 0;
+  lastPartialLen = 0;
+  partialGen += 1; // stale in-flight partials get dropped
+  openRmsSum = 0;
+  openWinCount = 0;
+  recentRms = [];
+}
+
+// Force-close the open segment: finalize the mirrored audio ourselves and
+// reset the VAD so it starts a fresh one. The VAD has not closed, so its
+// queue is empty — nothing double-decodes. On a 'valley' split both the cut
+// and the VAD re-acknowledgment land inside the quiet dip (lossless); a
+// 'hard' split costs ~1-2 characters at the seam.
+function forceSplit(reason) {
   const buf = new Float32Array(openLen);
   let off = 0;
   for (const c of openChunks) {
@@ -295,16 +354,13 @@ function forceSplit() {
     off += c.length;
   }
   const startSample = Math.max(0, audioInSamples - openLen);
-  openChunks = [];
-  openLen = 0;
-  lastPartialLen = 0;
-  partialGen += 1; // stale in-flight partials get dropped
+  resetOpenSegment();
   try {
     vad.reset();
   } catch {
     // reset failure is survivable — the next natural close still works
   }
-  logLine(eventRecord('force-split', `${(buf.length / SAMPLE_RATE).toFixed(1)}s`));
+  logLine(eventRecord('force-split', `${reason} ${(buf.length / SAMPLE_RATE).toFixed(1)}s`));
   // Same shape as a VAD-closed segment; the final replaces the gray line
   // on screen exactly like a natural close.
   enqueueDecode({ samples: buf, start: startSample });
@@ -312,7 +368,7 @@ function forceSplit() {
 
 function maybeDecodePartial() {
   if (!sessionLive || !recognizer) return;
-  if (openLen >= FORCE_SPLIT_S * SAMPLE_RATE) return forceSplit();
+  if (openLen >= HARD_SPLIT_S * SAMPLE_RATE) return forceSplit('hard');
   if (openLen === 0 || openLen === lastPartialLen) return;
   lastPartialLen = openLen;
 
@@ -386,10 +442,7 @@ function handleAsrStop() {
   if (hintTimer) clearInterval(hintTimer);
   if (metricsTimer) clearInterval(metricsTimer);
   partialTimer = hintTimer = metricsTimer = null;
-  openChunks = [];
-  openLen = 0;
-  lastPartialLen = 0;
-  partialGen += 1;
+  resetOpenSegment();
   try {
     if (vad) {
       vad.flush();
