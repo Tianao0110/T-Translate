@@ -43,9 +43,15 @@ const {
 
 const SAMPLE_RATE = 16000;
 const VAD_WINDOW = 512;
-// 1.0s: RTF 0.033 leaves headroom even with an 18s open segment re-decode
-// sharing the chain with finals (was 1.5s; user verdict: still sluggish).
+// 1.0s: RTF 0.033 leaves headroom even with a force-split-capped open segment
+// re-decode sharing the chain with finals (was 1.5s; user verdict: sluggish).
 const PARTIAL_INTERVAL_MS = 1000;
+// Open segments longer than this are finalized by force. Continuous speech
+// (video narration) can run without a 0.35s gap for minutes, and sherpa's own
+// maxSpeechDuration is unreliable (21s/31s segments logged under a 12/18
+// cap) — without this the segment never closes, partial re-decodes grow
+// unboundedly, and no final ever reaches the screen.
+const FORCE_SPLIT_S = 12;
 
 const ASR_LANGUAGES = new Set(['zh', 'en', 'ja', 'ko', 'yue', '']);
 
@@ -159,9 +165,11 @@ function handleAsrStart(msg) {
             threshold: 0.5,
             // 0.15 (was 0.25): faster onset acknowledgment.
             minSpeechDuration: 0.15,
-            // Probe-log verdict (59 segments): gap p25 was 0.83s, so raising
-            // this would merge real pauses — it stays put.
-            minSilenceDuration: 0.5,
+            // 0.35 (was 0.5): video narration pauses often sit under 0.5s, so
+            // 0.5 never closed a segment there (user-visible: finals never
+            // appeared). The 0.83s gap-p25 from probe logs only argued against
+            // RAISING it. Force-split below covers truly pause-free speech.
+            minSilenceDuration: 0.35,
             // 12 hard-cut 27% of segments (p90 14.9s). 18 clears p90;
             // SenseVoice degrades past ~20s, so no higher.
             maxSpeechDuration: 18,
@@ -275,8 +283,36 @@ function trackOpenSegment(win) {
   }
 }
 
+// Force-close an overlong open segment: finalize the mirrored audio ourselves
+// and reset the VAD so it starts a fresh segment. The VAD has not closed, so
+// its queue is empty — nothing double-decodes. Cost: ~0.15s of speech lost to
+// re-acknowledgment after reset, vs finals never appearing at all.
+function forceSplit() {
+  const buf = new Float32Array(openLen);
+  let off = 0;
+  for (const c of openChunks) {
+    buf.set(c, off);
+    off += c.length;
+  }
+  const startSample = Math.max(0, audioInSamples - openLen);
+  openChunks = [];
+  openLen = 0;
+  lastPartialLen = 0;
+  partialGen += 1; // stale in-flight partials get dropped
+  try {
+    vad.reset();
+  } catch {
+    // reset failure is survivable — the next natural close still works
+  }
+  logLine(eventRecord('force-split', `${(buf.length / SAMPLE_RATE).toFixed(1)}s`));
+  // Same shape as a VAD-closed segment; the final replaces the gray line
+  // on screen exactly like a natural close.
+  enqueueDecode({ samples: buf, start: startSample });
+}
+
 function maybeDecodePartial() {
   if (!sessionLive || !recognizer) return;
+  if (openLen >= FORCE_SPLIT_S * SAMPLE_RATE) return forceSplit();
   if (openLen === 0 || openLen === lastPartialLen) return;
   lastPartialLen = openLen;
 
