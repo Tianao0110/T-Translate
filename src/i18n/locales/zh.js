@@ -571,6 +571,9 @@ const zh = {
   tts: {
     description: "配置文本朗读功能和语音参数",
     enableTTS: "启用文本朗读", enableHint: "在翻译面板显示朗读按钮",
+    engine: "语音引擎",
+    engineHint: "系统语音零下载即可用；神经语音音质更自然，需已安装语音包",
+    engineNames: { "web-speech": "系统语音", neural: "神经语音" },
     defaultVoice: "默认语音", autoSelect: "自动选择", refreshVoices: "刷新语音列表",
     voicesLoaded: "已加载 {{count}} 个可用语音", autoSelectHint: "自动根据文本语言选择合适的语音",
     rate: "语速", rateHint: "调整朗读速度，1.0 为正常语速",

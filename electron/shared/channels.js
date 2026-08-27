@@ -27,7 +27,6 @@ const CHANNELS = {
     GET: 'store-get',
     SET: 'store-set',
     DELETE: 'store-delete',
-    CLEAR: 'store-clear',
   },
   APP: {
     GET_VERSION: 'get-app-version',
@@ -174,12 +173,13 @@ const CHANNELS = {
   // when ASR models are manually placed under userData/asr-models).
   AUDIO_PROBE: {
     GET_INFO: 'audio-probe:get-info',   // renderer → main: model/privacy/state snapshot
-    START: 'audio-probe:start',         // renderer → main: spawn ASR worker
+    START: 'audio-probe:start',         // renderer → main: spawn ASR worker; payload {language}
     STOP: 'audio-probe:stop',           // renderer → main: stop worker, keep window
     PCM: 'audio-probe:pcm',             // renderer → main: Float32Array 16k mono chunk
     EVENT: 'audio-probe:event',         // renderer → main: capture-side event for the probe log
     STATUS: 'audio-probe:status',       // main → renderer: {state, detail}
-    SEGMENT: 'audio-probe:segment',     // main → renderer: recognized segment record
+    SEGMENT: 'audio-probe:segment',     // main → renderer: recognized (final) segment record
+    PARTIAL: 'audio-probe:partial',     // main → renderer: open-segment provisional text ('' clears)
     CLOSE: 'audio-probe:close',         // renderer → main: close the probe window
   },
 };

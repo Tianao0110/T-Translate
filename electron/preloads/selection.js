@@ -74,11 +74,8 @@ contextBridge.exposeInMainWorld("electron", {
     set: (key, value) => ipcRenderer.invoke("store-set", key, value),
   },
 
-  // secureStorage — translation service only DECRYPTS API keys here (encryption
-  // happens in the settings window; this window never writes keys).
-  secureStorage: {
-    decrypt: (key) => ipcRenderer.invoke("secure-storage:decrypt", key),
-  },
+  // No secureStorage here: translation moved into the main-process stack
+  // (v0.3.1), so this window has no reason to ever see a decrypted key.
 
   // Main-process translation stack (same bridge as the main-window preload;
   // this window only translates, so no test/management surface is exposed).

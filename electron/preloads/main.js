@@ -116,7 +116,6 @@ const electronAPI = {
     get: (key) => ipcRenderer.invoke("store-get", key),
     set: (key, val) => ipcRenderer.invoke("store-set", key, val),
     delete: (key) => ipcRenderer.invoke("store-delete", key),
-    clear: () => ipcRenderer.invoke("store-clear"),
   },
   // Encrypted storage for API keys etc.
   secureStorage: {

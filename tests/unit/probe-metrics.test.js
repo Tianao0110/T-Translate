@@ -8,7 +8,7 @@ import {
   eventRecord,
   metricsRecord,
   makeSignalWatchdog,
-} from '../../electron/services/asr-probe/probe-metrics.js';
+} from '../../electron/services/audio-engine/probe-metrics.js';
 
 describe('makeRepeatTracker', () => {
   it('marks consecutive identical text as repeated (record only)', () => {

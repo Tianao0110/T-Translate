@@ -7,7 +7,7 @@ const AP = CHANNELS.AUDIO_PROBE;
 
 contextBridge.exposeInMainWorld('audioProbe', {
   getInfo: () => ipcRenderer.invoke(AP.GET_INFO),
-  start: () => ipcRenderer.send(AP.START),
+  start: (opts) => ipcRenderer.send(AP.START, opts),
   stop: () => ipcRenderer.send(AP.STOP),
   close: () => ipcRenderer.send(AP.CLOSE),
   sendPcm: (samples) => ipcRenderer.send(AP.PCM, samples),
@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('audioProbe', {
 
   onStatus: (cb) => ipcRenderer.on(AP.STATUS, (event, payload) => cb(payload)),
   onSegment: (cb) => ipcRenderer.on(AP.SEGMENT, (event, rec) => cb(rec)),
+  onPartial: (cb) => ipcRenderer.on(AP.PARTIAL, (event, text) => cb(text)),
 
   // Same crash-visibility bridge as the child pane: renderer errors reach the
   // on-disk main log instead of dying with the window.

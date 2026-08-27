@@ -21,7 +21,7 @@ function toFloat32(samples) {
 function registerAudioProbeIPC(ctx) {
   ipcMain.handle(AP.GET_INFO, () => probeManager.getInfo());
 
-  ipcMain.on(AP.START, () => probeManager.startSession());
+  ipcMain.on(AP.START, (event, opts) => probeManager.startSession(opts || {}));
   ipcMain.on(AP.STOP, () => probeManager.stopSession('renderer'));
 
   ipcMain.on(AP.PCM, (event, samples) => {

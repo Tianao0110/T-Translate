@@ -151,14 +151,6 @@
         "to": "resources/audio-probe.html"
       }
     ],
-    "mac": {
-      "category": "public.app-category.productivity",
-      "icon": "public/icon.icns",
-      "target": [
-        "dmg",
-        "zip"
-      ]
-    },
     "win": {
       "icon": "public/icon.ico",
       "target": [
@@ -186,14 +178,6 @@
       ],
       "multiLanguageInstaller": true,
       "differentialPackage": true
-    },
-    "linux": {
-      "icon": "public/icon.png",
-      "target": [
-        "AppImage",
-        "deb"
-      ],
-      "category": "Utility"
     }
   }
 }

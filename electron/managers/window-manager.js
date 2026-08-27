@@ -101,7 +101,6 @@ function createMainWindow() {
       contextIsolation: true,
       sandbox: false,
       preload: PATHS.preloads.main,
-      webSecurity: false,
     },
     autoHideMenuBar: true,
     menuBarVisible: false,
@@ -220,7 +219,8 @@ function createFloatingWindow() {
       contextIsolation: true,
       preload: PATHS.preloads.floatingWindow,
       backgroundThrottling: false, // floating-window refresh must run while unfocused
-      webSecurity: false, // allow cross-origin (e.g. Google Translate)
+      // webSecurity stays default-on: renderers stopped talking to the network
+      // when translation/OCR moved into the main process (v0.3.1)
     },
   });
 
@@ -352,7 +352,6 @@ function createSelectionWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
-      webSecurity: false,
     },
   });
 
