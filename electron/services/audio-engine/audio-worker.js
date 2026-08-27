@@ -42,6 +42,7 @@ const {
 } = require('./probe-metrics');
 
 const SAMPLE_RATE = 16000;
+const VAD_WINDOW = 512;
 // 1.0s: RTF 0.033 leaves headroom even with an 18s open segment re-decode
 // sharing the chain with finals (was 1.5s; user verdict: still sluggish).
 const PARTIAL_INTERVAL_MS = 1000;
@@ -52,8 +53,6 @@ let sherpa = null;
 let asrPaths = null; // declared by init; loaded by asr-start
 let asrLanguage = '';
 let vad = null;
-let vadKind = 'silero'; // 'ten' when ten-vad.onnx is present — better sensitivity
-let vadWindow = 512; // feed-window samples: silero 512, ten-vad 256
 let recognizer = null;
 let logStream = null;
 let sessionLive = false;
@@ -148,27 +147,26 @@ function handleAsrStart(msg) {
   const t0 = Date.now();
   try {
     if (!vad) {
-      // Shared tuning. minSpeech 0.15 (was 0.25): faster onset acknowledgment.
-      // minSilence 0.5 stays put — probe-log gap p25 was 0.83s, raising it
-      // would merge real pauses. maxSpeech 18 (was 12): 12 hard-cut 27% of
-      // segments (p90 14.9s); SenseVoice degrades past ~20s, so no higher.
-      const tuning = {
-        threshold: 0.5,
-        minSpeechDuration: 0.15,
-        minSilenceDuration: 0.5,
-        maxSpeechDuration: 18,
-      };
-      // ten-vad when present: better sensitivity on quiet speech over
-      // background audio, 1/4 the compute of silero. Window is fixed per
-      // model: ten-vad 256, silero 512.
-      const useTen = !!asrPaths.tenVadPath;
-      vadKind = useTen ? 'ten' : 'silero';
-      vadWindow = useTen ? 256 : 512;
+      // silero ONLY. ten-vad was tried on 2026-08-27 and reverted the same
+      // day: sherpa's port drops the pitch feature, and on real music (the
+      // primary use case) it missed most sung vocals — 67s of a song yielded
+      // 3 fragment segments vs silero's continuous output. Don't re-add it
+      // from a clean-speech benchmark; it must beat silero on BGM logs first.
       vad = new sherpa.Vad(
         {
-          ...(useTen
-            ? { tenVad: { model: asrPaths.tenVadPath, ...tuning, windowSize: vadWindow } }
-            : { sileroVad: { model: asrPaths.vadPath, ...tuning, windowSize: vadWindow } }),
+          sileroVad: {
+            model: asrPaths.vadPath,
+            threshold: 0.5,
+            // 0.15 (was 0.25): faster onset acknowledgment.
+            minSpeechDuration: 0.15,
+            // Probe-log verdict (59 segments): gap p25 was 0.83s, so raising
+            // this would merge real pauses — it stays put.
+            minSilenceDuration: 0.5,
+            // 12 hard-cut 27% of segments (p90 14.9s). 18 clears p90;
+            // SenseVoice degrades past ~20s, so no higher.
+            maxSpeechDuration: 18,
+            windowSize: VAD_WINDOW,
+          },
           sampleRate: SAMPLE_RATE,
           numThreads: 1,
           debug: 0,
@@ -198,7 +196,7 @@ function handleAsrStart(msg) {
 
   const loadMs = Date.now() - t0;
   sessionLive = true;
-  logLine({ ts: Date.now(), type: 'asr_start', loadMs, language: asrLanguage || 'auto', vad: vadKind });
+  logLine({ ts: Date.now(), type: 'asr_start', loadMs, language: asrLanguage || 'auto' });
   watchdog.start(Date.now());
   lastCpu = process.cpuUsage();
   lastMetricsMs = Date.now();
@@ -248,10 +246,10 @@ function handlePcm(samples) {
 
   let offset = 0;
   try {
-    while (offset + vadWindow <= merged.length) {
-      const win = merged.subarray(offset, offset + vadWindow);
+    while (offset + VAD_WINDOW <= merged.length) {
+      const win = merged.subarray(offset, offset + VAD_WINDOW);
       vad.acceptWaveform(win);
-      offset += vadWindow;
+      offset += VAD_WINDOW;
       drainVadQueue();
       trackOpenSegment(win);
     }
