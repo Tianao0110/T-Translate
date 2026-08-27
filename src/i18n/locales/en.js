@@ -571,6 +571,9 @@ const en = {
   tts: {
     description: "Configure text-to-speech settings",
     enableTTS: "Enable Text-to-Speech", enableHint: "Show speak button in translation panel",
+    engine: "Speech Engine",
+    engineHint: "System voices work with zero downloads; neural voices sound more natural but need an installed voice pack",
+    engineNames: { "web-speech": "System Voices", neural: "Neural Voices" },
     defaultVoice: "Default Voice", autoSelect: "Auto Select", refreshVoices: "Refresh Voices",
     voicesLoaded: "{{count}} voices available", autoSelectHint: "Auto select voice based on text language",
     rate: "Rate", rateHint: "Adjust speaking speed, 1.0 is normal",

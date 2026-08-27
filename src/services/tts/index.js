@@ -2,16 +2,24 @@
 
 import { TTS_STATUS } from './base.js';
 import WebSpeechEngine from './web-speech.js';
+import NeuralTTSEngine from './neural.js';
 import createLogger from '../../utils/logger.js';
 const logger = createLogger('TTSManager');
 
 export { BaseTTSEngine, TTS_STATUS } from './base.js';
 export { WebSpeechEngine } from './web-speech.js';
+export { NeuralTTSEngine } from './neural.js';
 
 const engines = {
   'web-speech': WebSpeechEngine,
-  // Cloud engines (azure-tts, google-tts) slot in here when implemented
+  // Neural stays invisible until its bridge + a voice pack exist (v0.4.x) —
+  // isAvailable() false today, so nothing in the UI claims it prematurely.
+  'neural': NeuralTTSEngine,
 };
+
+// web-speech is the zero-download floor: always present, so a configured
+// engine that lost its voice pack degrades honestly instead of erroring.
+const FALLBACK_ENGINE_ID = 'web-speech';
 
 export const DEFAULT_TTS_CONFIG = {
   enabled: true,
@@ -52,7 +60,7 @@ class TTSManager {
 
     if (this._config.enabled) {
       try {
-        await this.setEngine(this._config.engine || 'web-speech');
+        await this._setEngineWithFallback(this._config.engine || FALLBACK_ENGINE_ID);
       } catch (e) {
         logger.error('[TTS] Failed to init engine:', e);
       }
@@ -118,6 +126,40 @@ class TTSManager {
     return this._currentEngine;
   }
 
+  // The configured engine may be unavailable (neural without its voice pack).
+  // Fall back to the floor engine WITHOUT touching _config.engine: the user's
+  // choice survives, and _refreshConfig retries it on every speak, so the
+  // engine comes back the moment its pack does.
+  async _setEngineWithFallback(engineId) {
+    try {
+      return await this.setEngine(engineId);
+    } catch (e) {
+      if (engineId !== FALLBACK_ENGINE_ID) {
+        logger.warn(`[TTS] Engine ${engineId} unavailable, falling back:`, e.message);
+        return this.setEngine(FALLBACK_ENGINE_ID);
+      }
+      throw e;
+    }
+  }
+
+  // Availability probe for the settings UI. Cached live instances answer for
+  // their id; others get a throwaway probe instance.
+  async listEngines() {
+    const out = [];
+    for (const [id, EngineClass] of Object.entries(engines)) {
+      let available = false;
+      try {
+        const probe = this._engines.get(id) || new EngineClass({});
+        available = await probe.isAvailable();
+        if (!this._engines.has(id)) probe.dispose();
+      } catch {
+        available = false;
+      }
+      out.push({ id, available });
+    }
+    return out;
+  }
+
   get currentEngine() {
     return this._currentEngine;
   }
@@ -176,7 +218,7 @@ class TTSManager {
 
   async getVoices() {
     if (!this._currentEngine) {
-      await this.setEngine(this._config.engine || 'web-speech');
+      await this._setEngineWithFallback(this._config.engine || FALLBACK_ENGINE_ID);
     }
     return this._currentEngine.getVoices();
   }
@@ -191,7 +233,7 @@ class TTSManager {
     }
 
     if (!this._currentEngine) {
-      await this.setEngine(this._config.engine || 'web-speech');
+      await this._setEngineWithFallback(this._config.engine || FALLBACK_ENGINE_ID);
     }
 
     const mergedOptions = {
@@ -218,6 +260,17 @@ class TTSManager {
         defaultPitch: this._config.pitch,
         defaultVolume: this._config.volume,
       });
+    }
+
+    // Engine switch applies immediately when one is already live (settings
+    // page test button); windows without a live engine keep lazy-switching
+    // via _refreshConfig on their next speak.
+    if (config.engine && this._currentEngine && config.engine !== this._currentEngineId) {
+      try {
+        await this._setEngineWithFallback(config.engine);
+      } catch (e) {
+        logger.error('[TTS] Engine switch failed:', e);
+      }
     }
 
     if (persist) {

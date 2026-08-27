@@ -84,6 +84,10 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
   const [isLoadingVoices, setIsLoadingVoices] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [ttsStatus, setTtsStatus] = useState(TTS_STATUS.IDLE);
+  // Engines whose isAvailable() answered true. The picker renders only when
+  // there is an actual choice (neural shows up once its voice pack exists) —
+  // a one-option dropdown would be noise and a claim we can't back.
+  const [availableEngines, setAvailableEngines] = useState([]);
 
   const ttsConfig = {
     ...DEFAULT_TTS_CONFIG,
@@ -106,6 +110,12 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
 
   useEffect(() => {
     loadVoices();
+    let cancelled = false;
+    ttsManager.listEngines()
+      .then((list) => {
+        if (!cancelled) setAvailableEngines(list.filter((e) => e.available).map((e) => e.id));
+      })
+      .catch(() => {});
     const unsub = ttsManager.onStatusChange((status) => {
       setTtsStatus(status);
       if (status === TTS_STATUS.IDLE) setIsTesting(false);
@@ -113,10 +123,19 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
     // Return the slot on unmount (and stop any test playback), or the main
     // panel's status callback stays evicted after visiting this page.
     return () => {
+      cancelled = true;
       unsub();
       ttsManager.stop();
     };
   }, [loadVoices]);
+
+  // Engine switch takes effect on the live manager at once (test button uses
+  // it immediately); the voice list is engine-specific, so reload it.
+  const handleEngineChange = useCallback(async (engineId) => {
+    updateSetting('tts', 'engine', engineId, true);
+    await ttsManager.updateConfig({ engine: engineId });
+    loadVoices();
+  }, [updateSetting, loadVoices]);
 
   // ttsManager.updateConfig persists to the store immediately, so the React
   // update is silent — otherwise the panel would flag "unsaved changes" for a
@@ -207,6 +226,24 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
 
       {ttsConfig.enabled && (
         <>
+          {availableEngines.length > 1 && (
+            <div className="setting-group">
+              <label className="setting-label">{t('tts.engine')}</label>
+              <div className="setting-row">
+                <select
+                  className="setting-select"
+                  value={availableEngines.includes(ttsConfig.engine) ? ttsConfig.engine : 'web-speech'}
+                  onChange={(e) => handleEngineChange(e.target.value)}
+                >
+                  {availableEngines.map((id) => (
+                    <option key={id} value={id}>{t(`tts.engineNames.${id}`)}</option>
+                  ))}
+                </select>
+              </div>
+              <p className="setting-hint">{t('tts.engineHint')}</p>
+            </div>
+          )}
+
           <div className="setting-group">
             <div className="tts-slider-header">
               <label className="setting-label">{t('tts.defaultVoice')}</label>
