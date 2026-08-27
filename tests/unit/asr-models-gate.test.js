@@ -68,7 +68,7 @@ describe('locateAsrModels', () => {
     expect(locateAsrModels('base', { fs, path: P })).toBeNull();
   });
 
-  it('finds a complete sense-voice model set', () => {
+  it('finds a complete sense-voice model set (no ten-vad -> tenVadPath null)', () => {
     const fs = makeFs({
       base: ['silero_vad.onnx', 'sherpa-onnx-sense-voice-int8-2024-07-17/'],
       'base/silero_vad.onnx': 'file',
@@ -79,8 +79,31 @@ describe('locateAsrModels', () => {
     expect(found).not.toBeNull();
     expect(found.modelName).toBe('sherpa-onnx-sense-voice-int8-2024-07-17');
     expect(found.vadPath).toBe('base/silero_vad.onnx');
+    expect(found.tenVadPath).toBeNull();
     expect(found.modelPath).toBe('base/sherpa-onnx-sense-voice-int8-2024-07-17/model.int8.onnx');
     expect(found.tokensPath).toBe('base/sherpa-onnx-sense-voice-int8-2024-07-17/tokens.txt');
+  });
+
+  it('reports ten-vad when present, as an optional upgrade path', () => {
+    const fs = makeFs({
+      base: ['silero_vad.onnx', 'ten-vad.onnx', 'sense-voice-x/'],
+      'base/silero_vad.onnx': 'file',
+      'base/ten-vad.onnx': 'file',
+      'base/sense-voice-x/model.int8.onnx': 'file',
+      'base/sense-voice-x/tokens.txt': 'file',
+    });
+    const found = locateAsrModels('base', { fs, path: P });
+    expect(found.tenVadPath).toBe('base/ten-vad.onnx');
+  });
+
+  it('ten-vad alone does not satisfy the gate — silero stays required', () => {
+    const fs = makeFs({
+      base: ['ten-vad.onnx', 'sense-voice-x/'],
+      'base/ten-vad.onnx': 'file',
+      'base/sense-voice-x/model.int8.onnx': 'file',
+      'base/sense-voice-x/tokens.txt': 'file',
+    });
+    expect(locateAsrModels('base', { fs, path: P })).toBeNull();
   });
 
   it('skips an incomplete candidate and picks the next complete one, sorted', () => {

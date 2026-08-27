@@ -164,6 +164,7 @@ function spawnWorker(models) {
         modelPath: models.modelPath,
         tokensPath: models.tokensPath,
         vadPath: models.vadPath,
+        tenVadPath: models.tenVadPath,
         language: sessionLanguage,
       },
     },
