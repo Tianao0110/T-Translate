@@ -73,6 +73,7 @@
     "onnxruntime-node": "^1.26.0",
     "pdfjs-dist": "^4.0.379",
     "react": "^18.2.0",
+    "sherpa-onnx-node": "^1.13.6",
     "react-dom": "^18.2.0",
     "react-i18next": "^14.0.1",
     "uiohook-napi": "^1.5.4",
@@ -96,7 +97,9 @@
       "node_modules/@napi-rs/**",
       "node_modules/koffi/**",
       "node_modules/uiohook-napi/**",
-      "node_modules/node-screenshots/**"
+      "node_modules/node-screenshots/**",
+      "node_modules/sherpa-onnx-node/**",
+      "node_modules/sherpa-onnx-win-x64/**"
     ],
     "files": [
       "electron/**/*",
@@ -142,6 +145,10 @@
       {
         "from": "public/child-pane.html",
         "to": "resources/child-pane.html"
+      },
+      {
+        "from": "public/audio-probe.html",
+        "to": "resources/audio-probe.html"
       }
     ],
     "mac": {

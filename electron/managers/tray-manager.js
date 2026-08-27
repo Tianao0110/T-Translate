@@ -89,6 +89,8 @@ function createTray(ctx) {
       startScreenshot: ctx.managers?.startScreenshot,
       toggleFloatingWindow: ctx.managers?.toggleFloatingWindow,
       toggleSelectionTranslate: ctx.managers?.toggleSelectionTranslate,
+      toggleAudioProbe: ctx.managers?.toggleAudioProbe,
+      isAudioProbeAvailable: ctx.managers?.isAudioProbeAvailable,
       getSelectionEnabled: () => ctx.runtime?.selectionEnabled ?? false,
     });
   }
@@ -189,7 +191,7 @@ function updateMenu() {
     tray.setImage(selectionEnabled ? activeIcon : baseIcon);
   }
 
-  const contextMenu = Menu.buildFromTemplate([
+  const template = [
     {
       label: t('screenshot'),
       click: () => {
@@ -225,6 +227,21 @@ function updateMenu() {
         }
       },
     },
+  ];
+
+  // Hidden probe: the entry exists only while ASR models are present on disk
+  // (manually placed — nothing in the app ever advertises or downloads them).
+  if (deps.isAudioProbeAvailable?.()) {
+    template.push({
+      label: t('audioProbe'),
+      click: () => {
+        logger.debug('Menu: audioProbe clicked');
+        deps.toggleAudioProbe?.();
+      },
+    });
+  }
+
+  template.push(
     { type: 'separator' },
     {
       label: t('settings'),
@@ -243,9 +260,10 @@ function updateMenu() {
         runtime.isQuitting = true;
         app.quit();
       },
-    },
-  ]);
+    }
+  );
 
+  const contextMenu = Menu.buildFromTemplate(template);
   tray.setContextMenu(contextMenu);
   tray.setToolTip(selectionEnabled ? `T-Translate (${t('selectionTranslate')} ✓)` : 'T-Translate');
   logger.debug('Tray menu updated');
