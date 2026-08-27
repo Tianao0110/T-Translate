@@ -27,7 +27,6 @@ const CHANNELS = {
     GET: 'store-get',
     SET: 'store-set',
     DELETE: 'store-delete',
-    CLEAR: 'store-clear',
   },
   APP: {
     GET_VERSION: 'get-app-version',

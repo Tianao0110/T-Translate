@@ -180,17 +180,13 @@ window.TTranslate = {
       }
     },
 
+    // Goes through the main-process stack — with webSecurity on, the renderer
+    // cannot (and should not) reach any endpoint directly.
     testLLMConnection: async () => {
       try {
-        const response = await fetch('http://localhost:1234/v1/models');
-        if (response.ok) {
-          const data = await response.json();
-          logger.info('LM Studio connected');
-          console.table(data.data?.map(m => ({ id: m.id })) || []);
-          return data;
-        } else {
-          logger.error('LM Studio connection failed:', response.status);
-        }
+        const result = await window.electron?.stack?.testProvider?.('local-llm');
+        logger.info('LM Studio:', result?.success ? 'connected' : (result?.message || 'unreachable'));
+        return result;
       } catch (error) {
         logger.error('LM Studio error:', error.message);
       }
