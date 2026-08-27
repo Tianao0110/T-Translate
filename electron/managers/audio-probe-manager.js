@@ -16,6 +16,7 @@ const logger = require('../utils/logger')('AudioProbe');
 
 const READY_TIMEOUT_MS = 30000;
 const STOP_GRACE_MS = 3000;
+const MAX_PROBE_LOGS = 20; // rolling cap — one file per session, oldest pruned first
 
 let deps = null; // { store, windows, createWindow }
 let child = null;
@@ -121,6 +122,18 @@ function spawnWorker(models) {
     fs.mkdirSync(logsDir, { recursive: true });
   } catch {
     // appendable dir already exists in every normal run
+  }
+  // Timestamp-named files sort chronologically — prune oldest beyond the cap.
+  try {
+    const old = fs
+      .readdirSync(logsDir)
+      .filter((f) => f.startsWith('audio-probe-') && f.endsWith('.jsonl'))
+      .sort();
+    while (old.length >= MAX_PROBE_LOGS) {
+      fs.unlinkSync(path.join(logsDir, old.shift()));
+    }
+  } catch {
+    // pruning is best-effort — a full disk of logs still beats a dead session
   }
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const logPath = path.join(logsDir, `audio-probe-${stamp}.jsonl`);
