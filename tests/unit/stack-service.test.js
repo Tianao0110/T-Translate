@@ -164,6 +164,105 @@ describe('stack TranslationService', () => {
   });
 });
 
+// The language reorder (model-language-coverage.js) once lived only inside
+// translate(); the default UI path is translateStream(), so it never ran where
+// it mattered. These pin the reorder to BOTH scheduler paths.
+describe('language-coverage reorder', () => {
+  // Local llama-3 first (documented languages do NOT include zh), Google behind it.
+  const LOCAL_FIRST = {
+    providers: {
+      list: [
+        { id: 'local-llm', enabled: true, priority: 1 },
+        { id: 'google-translate', enabled: true, priority: 2 },
+      ],
+      configs: {
+        'local-llm': { model: 'llama-3.1-8b-instruct' },
+        'google-translate': {},
+      },
+    },
+  };
+
+  // SSE stream shaped like LM Studio's /chat/completions output — the local
+  // model must be able to "succeed" for the test to prove it was demoted
+  // rather than merely failing over.
+  function okSseResponse(text) {
+    const payload =
+      `data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\n` +
+      'data: [DONE]\n\n';
+    const bytes = new TextEncoder().encode(payload);
+    let sent = false;
+    return {
+      ok: true,
+      status: 200,
+      body: {
+        getReader: () => ({
+          read: async () => (sent ? { done: true, value: undefined } : (sent = true, { done: false, value: bytes })),
+          cancel: async () => {},
+          releaseLock: () => {},
+        }),
+      },
+      json: async () => ({}),
+      text: async () => '',
+    };
+  }
+
+  function makeRoutedFetch() {
+    return vi.fn(async (url) => {
+      if (String(url).includes('localhost:1234')) {
+        return okSseResponse('自信的胡话');
+      }
+      // google-translate web API shape
+      return { ok: true, status: 200, json: async () => [[['你好', 'hello']]], text: async () => '' };
+    });
+  }
+
+  it('translateStream (default UI path) demotes a local model that does not cover the target language', async () => {
+    const fetchMock = makeRoutedFetch();
+    configureRuntime({ fetch: fetchMock });
+
+    const svc = makeService(makeFakeL2());
+    await svc.init(LOCAL_FIRST);
+
+    const chunks = [];
+    const result = await svc.translateStream('hello', { targetLang: 'zh' }, (c) => chunks.push(c));
+
+    expect(result.success).toBe(true);
+    expect(result.provider).toBe('google-translate');
+    expect(chunks.length).toBeGreaterThan(0);
+    const urls = fetchMock.mock.calls.map(c => String(c[0]));
+    expect(urls.some(u => u.includes('localhost:1234'))).toBe(false);
+  });
+
+  it('translate (non-streaming path) applies the same reorder', async () => {
+    const fetchMock = makeRoutedFetch();
+    configureRuntime({ fetch: fetchMock });
+
+    const svc = makeService(makeFakeL2());
+    await svc.init(LOCAL_FIRST);
+
+    const result = await svc.translate('hello', { targetLang: 'zh' });
+
+    expect(result.success).toBe(true);
+    expect(result.provider).toBe('google-translate');
+    const urls = fetchMock.mock.calls.map(c => String(c[0]));
+    expect(urls.some(u => u.includes('localhost:1234'))).toBe(false);
+  });
+
+  it('a covered target language leaves the local model first', async () => {
+    const fetchMock = makeRoutedFetch();
+    configureRuntime({ fetch: fetchMock });
+
+    const svc = makeService(makeFakeL2());
+    await svc.init(LOCAL_FIRST);
+
+    // en IS in llama-3's documented set — no demotion, local model answers
+    const result = await svc.translateStream('你好', { targetLang: 'en' }, () => {});
+
+    expect(result.success).toBe(true);
+    expect(result.provider).toBe('local-llm');
+  });
+});
+
 // A provider that only translates answers a prompt with a translation OF that
 // prompt, which reads like a working AI feature. These lock the honest answer.
 describe('chat capability', () => {

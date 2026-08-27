@@ -401,6 +401,68 @@ export class TranslationService {
     return DEFAULT_PRIORITY.normal;
   }
 
+  // ===== Scheduling helpers (shared by translate / translateStream) =====
+
+  // Filters the priority list to providers usable right now (privacy /
+  // configured / not failing), then demotes providers whose loaded model is
+  // documented not to cover the target language: a local model asked for a
+  // language it does not know answers confidently and wrongly, and "success"
+  // ends the chain — so Google, which does know that language, never gets a
+  // turn. No-op when nothing is known about the loaded model (the common case).
+  _selectProviders({ privacyMode, targetLang }) {
+    const usable = [];
+    for (const id of this.getPriority()) {
+      if (!isProviderAllowed(id, privacyMode)) continue;
+      if (!isProviderConfigured(id)) continue;
+      if (this._failureCount[id] >= this._skipThreshold) continue;
+      usable.push(id);
+    }
+
+    const usableProviders = reorderForLanguage(
+      usable,
+      targetLang,
+      (id) => getProvider(id)?.config?.model || ''
+    );
+    const firstAvailableId = usableProviders[0] || '';
+    const firstModel = firstAvailableId
+      ? (getProvider(firstAvailableId)?.config?.model || '')
+      : '';
+    return { usableProviders, firstAvailableId, firstModel };
+  }
+
+  // Success finalization shared by every scheduler exit: placeholder restore,
+  // glossary pass, cache write (raw provider output, so glossary changes don't
+  // need re-translation), result envelope. Was three copy-pasted blocks — and
+  // a fix that lands in one copy is how the language reorder above sat dead on
+  // the default streaming path for a whole release.
+  _finalize(rawText, providerId, ctx) {
+    const { protectedMap, glossaryTerms, cacheKey, useCache, privacyMode, sourceLang, targetLang } = ctx;
+
+    let finalText = this._postProcess(rawText, protectedMap);
+
+    let glossaryReplacements = [];
+    if (glossaryTerms.length > 0) {
+      const glossaryResult = this._applyGlossary(finalText, glossaryTerms);
+      finalText = glossaryResult.text;
+      glossaryReplacements = glossaryResult.replacements;
+    }
+
+    this._saveCache(cacheKey, {
+      text: rawText,
+      from: sourceLang,
+      to: targetLang
+    }, { useCache, privacyMode });
+
+    return {
+      success: true,
+      text: finalText,
+      originalText: glossaryReplacements.length > 0 ? this._postProcess(rawText, protectedMap) : null,
+      glossaryReplacements,
+      provider: providerId,
+      fromCache: false,
+    };
+  }
+
   // ===== translate() =====
 
   async translate(text, options = {}) {
@@ -421,38 +483,7 @@ export class TranslationService {
 
     const { processed, protectedMap } = this._preProcess(text);
 
-    // Filter to providers usable right now (privacy / configured / not failing)
-    const priority = this.getPriority();
-    let firstAvailableId = '';
-    let firstModel = '';
-    const usableProviders = [];
-    for (const id of priority) {
-      if (!isProviderAllowed(id, privacyMode)) continue;
-      if (!isProviderConfigured(id)) continue;
-      if (this._failureCount[id] >= this._skipThreshold) continue;
-      if (!firstAvailableId) {
-        firstAvailableId = id;
-        firstModel = getProvider(id)?.config?.model || '';
-      }
-      usableProviders.push(id);
-    }
-
-    // A local model asked for a language it does not know answers confidently
-    // and wrongly, and "success" ends the chain — so Google, which does know
-    // that language, never gets a turn. Demote such providers before the first
-    // request rather than after a bad translation. No-op when nothing is known
-    // about the loaded model, which is the common case.
-    const ordered = reorderForLanguage(
-      usableProviders,
-      targetLang,
-      (id) => getProvider(id)?.config?.model || ''
-    );
-    if (ordered !== usableProviders) {
-      usableProviders.length = 0;
-      usableProviders.push(...ordered);
-      firstAvailableId = usableProviders[0] || '';
-      firstModel = getProvider(firstAvailableId)?.config?.model || '';
-    }
+    const { usableProviders, firstAvailableId, firstModel } = this._selectProviders({ privacyMode, targetLang });
 
     // Cache key bound to the first available provider + model so switching
     // either invalidates the cache
@@ -468,6 +499,7 @@ export class TranslationService {
       };
     }
 
+    const finalizeCtx = { protectedMap, glossaryTerms, cacheKey, useCache, privacyMode, sourceLang, targetLang };
     const tried = [];
 
     for (const id of usableProviders) {
@@ -489,31 +521,7 @@ export class TranslationService {
 
         if (result.success) {
           this._failureCount[id] = 0;
-
-          let finalText = this._postProcess(result.text, protectedMap);
-
-          let glossaryReplacements = [];
-          if (glossaryTerms.length > 0) {
-            const glossaryResult = this._applyGlossary(finalText, glossaryTerms);
-            finalText = glossaryResult.text;
-            glossaryReplacements = glossaryResult.replacements;
-          }
-
-          // Cache the raw provider output so glossary changes don't need re-translation
-          this._saveCache(cacheKey, {
-            text: result.text,
-            from: sourceLang,
-            to: targetLang
-          }, { useCache, privacyMode });
-
-          return {
-            success: true,
-            text: finalText,
-            originalText: glossaryReplacements.length > 0 ? this._postProcess(result.text, protectedMap) : null,
-            glossaryReplacements,
-            provider: id,
-            fromCache: false,
-          };
+          return this._finalize(result.text, id, finalizeCtx);
         }
 
         // skipFailureCount: a deterministic "can't do this input" (e.g. DeepL
@@ -574,20 +582,7 @@ export class TranslationService {
 
     const { processed, protectedMap } = this._preProcess(text);
 
-    const priority = this.getPriority();
-    let firstAvailableId = '';
-    let firstModel = '';
-    const usableProviders = [];
-    for (const id of priority) {
-      if (!isProviderAllowed(id, privacyMode)) continue;
-      if (!isProviderConfigured(id)) continue;
-      if (this._failureCount[id] >= this._skipThreshold) continue;
-      if (!firstAvailableId) {
-        firstAvailableId = id;
-        firstModel = getProvider(id)?.config?.model || '';
-      }
-      usableProviders.push(id);
-    }
+    const { usableProviders, firstAvailableId, firstModel } = this._selectProviders({ privacyMode, targetLang });
 
     const cacheKey = this._getCacheKey(processed, { targetLang, template, providerId: firstAvailableId, model: firstModel });
     const cached = this._checkCache(cacheKey, { useCache, privacyMode });
@@ -607,6 +602,7 @@ export class TranslationService {
       };
     }
 
+    const finalizeCtx = { protectedMap, glossaryTerms, cacheKey, useCache, privacyMode, sourceLang, targetLang };
     const tried = [];
     let lastError = null;
 
@@ -654,29 +650,7 @@ export class TranslationService {
 
           if (result.success) {
             this._failureCount[id] = 0;
-
-            let finalText = this._postProcess(result.text || fullText, protectedMap);
-            let glossaryReplacements = [];
-            if (glossaryTerms.length > 0) {
-              const glossaryResult = this._applyGlossary(finalText, glossaryTerms);
-              finalText = glossaryResult.text;
-              glossaryReplacements = glossaryResult.replacements;
-            }
-
-            this._saveCache(cacheKey, {
-              text: result.text || fullText,
-              from: sourceLang,
-              to: targetLang
-            }, { useCache, privacyMode });
-
-            return {
-              success: true,
-              text: finalText,
-              originalText: glossaryReplacements.length > 0 ? this._postProcess(result.text || fullText, protectedMap) : null,
-              glossaryReplacements,
-              provider: id,
-              fromCache: false,
-            };
+            return this._finalize(result.text || fullText, id, finalizeCtx);
           }
           lastError = result.error;
           if (!result.skipFailureCount) {
@@ -697,32 +671,11 @@ export class TranslationService {
           if (result.success) {
             this._failureCount[id] = 0;
 
-            let finalText = this._postProcess(result.text, protectedMap);
-            let glossaryReplacements = [];
-            if (glossaryTerms.length > 0) {
-              const glossaryResult = this._applyGlossary(finalText, glossaryTerms);
-              finalText = glossaryResult.text;
-              glossaryReplacements = glossaryResult.replacements;
-            }
-
+            const finalized = this._finalize(result.text, id, finalizeCtx);
             if (onChunk) {
-              onChunk(finalText);
+              onChunk(finalized.text);
             }
-
-            this._saveCache(cacheKey, {
-              text: result.text,
-              from: sourceLang,
-              to: targetLang
-            }, { useCache, privacyMode });
-
-            return {
-              success: true,
-              text: finalText,
-              originalText: glossaryReplacements.length > 0 ? this._postProcess(result.text, protectedMap) : null,
-              glossaryReplacements,
-              provider: id,
-              fromCache: false,
-            };
+            return finalized;
           }
           lastError = result.error;
           if (!result.skipFailureCount) {
