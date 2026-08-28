@@ -218,7 +218,12 @@ const ListenSection = ({ notify, confirm }) => {
           ? <p className="setting-hint">{packsLoading ? t('listen.packs.loading') : t('listen.packs.empty')}</p>
           : packs.map(renderPackRow)}
 
-        <p className="setting-hint">{t('listen.packs.location', { dir: info?.modelsDir || '' })}</p>
+        {/* Where the models actually are, which is not always where the next
+            download will land: packs installed before v0.4.0 still sit in the
+            old userData folder and keep working from there. */}
+        <p className="setting-hint">
+          {t('listen.packs.location', { dir: info?.activeDir || info?.modelsDir || '' })}
+        </p>
       </div>
     </div>
   );

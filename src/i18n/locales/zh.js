@@ -599,12 +599,12 @@ const zh = {
     allEnginesFailed: "所有 OCR 引擎均失败"
   },
   listen: {
-    description: "听译在悬浮窗里实时转写并翻译系统声音。识别模型不随安装包分发，按需下载；音频只在内存里过一遍，永不落盘。",
+    description: "在悬浮窗里实时转写并翻译系统声音。模型按需下载，音频不落盘。",
     ready: "可用",
     notReady: "不可用",
-    notReadyHint: "尚未安装识别模型，装好后悬浮窗的听译按钮才能点",
-    draftOn: "已装草稿引擎：中英边说边出字，说完自动修正",
-    draftOff: "未装草稿引擎：整句说完才出字（日/韩/粤本来就走这条路）",
+    notReadyHint: "装好模型后，悬浮窗的听译按钮才能点",
+    draftOn: "中英边说边出字，说完自动修正",
+    draftOff: "整句说完才出字；装草稿引擎后中英可边说边出",
     packs: {
       title: "识别模型",
       refresh: "刷新",
@@ -630,8 +630,8 @@ const zh = {
         "asr-draft-zipformer-zh-en": "草稿引擎（中英）"
       },
       desc: {
-        "asr-base": "听译必需：负责成句定稿、标点与数字规整",
-        "asr-draft": "可选：中英说话时先出草稿，定稿后自动修正"
+        "asr-base": "必需。成句定稿，带标点",
+        "asr-draft": "可选。中英边说边出字"
       }
     }
   },

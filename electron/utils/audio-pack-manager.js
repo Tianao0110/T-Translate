@@ -1,12 +1,12 @@
-// Audio model pack manager: thin shell over model-pack-core, binding the
+﻿// Audio model pack manager: thin shell over model-pack-core, binding the
 // audio domain pieces (manifest URL, asr-models root, live-session eviction).
 // Download / verify / staging-swap / remove machinery lives in the core,
 // shared verbatim with the OCR pack manager.
 
-const path = require('path');
-const { app, net } = require('electron');
+const { net } = require('electron');
 const { computePackList } = require('../shared/audio-packs');
 const { listInstalledPacks } = require('./asr-models');
+const { modelDir, modelDirs } = require('./model-root');
 const engineManager = require('../managers/audio-engine-manager');
 const { createPackManager } = require('./model-pack-core');
 
@@ -15,14 +15,31 @@ const MANIFEST_URL =
   process.env.TT_AUDIO_MANIFEST_URL ||
   'https://github.com/Tianao0110/T-Translate/releases/download/audio-models/manifest.json';
 
+// Downloads land in the install dir's models folder (see model-root.js);
+// packsRoots() also covers the old userData location so a pack put there by an
+// earlier build stays listed, usable and removable.
 function packsRoot() {
-  return path.join(app.getPath('userData'), 'asr-models');
+  return modelDir('asr-models');
+}
+
+function packsRoots() {
+  return modelDirs('asr-models');
+}
+
+// Active root last so it wins on an id collision with a stale older copy.
+function listAllInstalled() {
+  const byId = new Map();
+  for (const root of packsRoots().reverse()) {
+    for (const pack of listInstalledPacks(root)) byId.set(pack.id, pack);
+  }
+  return [...byId.values()];
 }
 
 const manager = createPackManager({
   manifestUrl: MANIFEST_URL,
   packsRoot,
-  listInstalled: () => listInstalledPacks(packsRoot()),
+  resolvePackDir: (packId) => listAllInstalled().find((p) => p.id === packId)?.dir || null,
+  listInstalled: listAllInstalled,
   // The worker holds the .onnx files open; swapping a pack under a live
   // session would fail on Windows (or worse, half-swap). Stopping is the
   // honest move — a model change mid-session cannot be seamless anyway.
@@ -45,6 +62,7 @@ const manager = createPackManager({
 module.exports = {
   MANIFEST_URL,
   packsRoot,
+  packsRoots,
   fetchManifest: manager.fetchManifest,
   listPacks: manager.listPacks,
   downloadPack: manager.downloadPack,

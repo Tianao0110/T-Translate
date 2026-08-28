@@ -1,11 +1,11 @@
-// Local OCR engine: esearch-ocr (PaddleOCR ONNX) on onnxruntime-node.
+﻿// Local OCR engine: esearch-ocr (PaddleOCR ONNX) on onnxruntime-node.
 // Single owner of model-pack resolution, session cache, and result
 // normalization for both IPC handlers and main-process callers.
 
 const path = require('path');
 const fs = require('fs');
-const { app } = require('electron');
 const PATHS = require('../shared/paths');
+const { modelDir, modelDirs } = require('./model-root');
 const { BASE_PACK_ID, HQ_PACK_ID, packIdForLanguage } = require('../shared/ocr-packs');
 const logger = require('./logger')('OCR-Engine');
 
@@ -35,19 +35,29 @@ function ensureEnv() {
   return _env;
 }
 
+// Install target for new downloads (install dir when writable — see
+// model-root.js for why the packs no longer grow the system drive).
 function packsRoot() {
-  return path.join(app.getPath('userData'), 'ocr-models');
+  return modelDir('ocr-models');
+}
+
+// Every location packs may already sit in: the active root plus the old
+// userData one, so an existing install keeps reading what it downloaded.
+function packsRoots() {
+  return modelDirs('ocr-models');
 }
 
 function bundledBaseDir() {
   return path.join(PATHS.resources.ocrData, 'base');
 }
 
-// Downloaded copy in userData wins over the bundled one (that's how base
-// model updates/repairs land without touching Program Files).
+// A downloaded copy wins over the bundled one (that's how base model
+// updates/repairs land without touching the app's own resources).
 function resolvePackDir(packId) {
-  const userDir = path.join(packsRoot(), packId);
-  if (fs.existsSync(path.join(userDir, 'pack.json'))) return userDir;
+  for (const root of packsRoots()) {
+    const dir = path.join(root, packId);
+    if (fs.existsSync(path.join(dir, 'pack.json'))) return dir;
+  }
   if (packId === BASE_PACK_ID) {
     const bundled = bundledBaseDir();
     if (fs.existsSync(path.join(bundled, 'pack.json'))) return bundled;
@@ -88,7 +98,7 @@ function setModelTier(tier) {
   logger.info(`Model tier set to ${next}`);
 }
 
-// Scan userData packs (+ bundled base) for the settings UI.
+// Scan every pack root (+ bundled base) for the settings UI.
 function listInstalledPacks() {
   const packs = new Map();
 
@@ -101,8 +111,10 @@ function listInstalledPacks() {
     }
   }
 
-  const root = packsRoot();
-  if (fs.existsSync(root)) {
+  // Reverse order: the active root is scanned last so it overwrites a stale
+  // copy of the same pack id left behind in the old location.
+  for (const root of packsRoots().reverse()) {
+    if (!fs.existsSync(root)) continue;
     for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
       try {
@@ -361,5 +373,6 @@ module.exports = {
   listInstalledPacks,
   resolvePackDir,
   packsRoot,
+  packsRoots,
   bundledBaseDir,
 };

@@ -599,12 +599,12 @@ const en = {
     allEnginesFailed: "All OCR engines failed"
   },
   listen: {
-    description: "Listen mode captions and translates system audio live in the floating window. Models download on demand — they are not bundled. Audio passes through memory and never touches disk.",
+    description: "Captions and translates system audio live in the floating window. Models download on demand; audio never touches disk.",
     ready: "Ready",
     notReady: "Not ready",
-    notReadyHint: "No recognition model installed — the floating window's listen button stays greyed out until one is",
-    draftOn: "Draft engine installed: Chinese and English appear while you speak, then get corrected.",
-    draftOff: "No draft engine: text appears when a sentence ends (Japanese, Korean and Cantonese always work this way).",
+    notReadyHint: "Install a model to enable the floating window's listen button",
+    draftOn: "Chinese and English appear while you speak, then get corrected.",
+    draftOff: "Text appears when a sentence ends. The draft engine adds live text for Chinese and English.",
     packs: {
       title: "Recognition models",
       refresh: "Refresh",
@@ -630,8 +630,8 @@ const en = {
         "asr-draft-zipformer-zh-en": "Draft engine (zh/en)"
       },
       desc: {
-        "asr-base": "Required: turns speech into finished sentences with punctuation",
-        "asr-draft": "Optional: shows Chinese and English as you speak, corrected on the final pass"
+        "asr-base": "Required. Finished sentences with punctuation.",
+        "asr-draft": "Optional. Live text for Chinese and English."
       }
     }
   },

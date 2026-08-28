@@ -12,8 +12,8 @@
 ## 运行时目录
 
 - 内置基础包：`<resources>/resources/ocr/base/`（打包产物；开发时为 `resources/ocr/base/`，gitignored）
-- 下载的包：`%APPDATA%/t-translate/ocr-models/<packId>/`，每包一个目录 = 模型文件 + `pack.json`
-- 解析顺序：userData 副本 > 内置副本（基础包）；语言包只存在于 userData
+- 下载的包：`<安装目录>/models/ocr-models/<packId>/`，每包一个目录 = 模型文件 + `pack.json`。放安装目录是为了让模型跟着程序所在磁盘走，不再撑大系统盘；安装目录不可写（Program Files 无管理员）或开发模式下回退到 `%APPDATA%/t-translate/ocr-models/`
+- 解析顺序：安装目录副本 > userData 副本（v0.4.0 之前下载的包留在原地照常可用）> 内置副本（基础包）
 - 卸载语言包 = 整目录删除，不留任何文件
 
 ## GitHub `ocr-models` Release（语言包分发源）

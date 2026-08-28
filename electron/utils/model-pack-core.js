@@ -9,7 +9,10 @@
 //
 // createPackManager({
 //   manifestUrl,       resolved URL (env override happens in the shell)
-//   packsRoot,         () => absolute install root
+//   packsRoot,         () => absolute install root (where downloads land)
+//   resolvePackDir,    optional (packId) => installed dir | null — lets a
+//                      domain find packs outside packsRoot() (legacy roots)
+//                      so removal works there too; defaults to packsRoot/id
 //   listInstalled,     () => installed packs (merged into the UI list)
 //   evictSessions,     (packId) => void — release live file handles pre-swap
 //   computePackList,   (installed, manifest) => UI-ready pack list
@@ -41,6 +44,7 @@ function compareVersions(a, b) {
 function createPackManager({
   manifestUrl,
   packsRoot,
+  resolvePackDir = null,
   listInstalled,
   evictSessions,
   computePackList,
@@ -221,7 +225,10 @@ function createPackManager({
   // userData copy can go — the bundled copy under resources/ is part of the
   // app and removal just falls back to it.
   async function removePack(packId) {
-    const dir = path.join(packsRoot(), packId);
+    // A pack installed by an older build can live outside the current root;
+    // resolvePackDir lets the domain point at it so removal is not silently
+    // impossible for exactly the packs a user most wants to reclaim.
+    const dir = (resolvePackDir && resolvePackDir(packId)) || path.join(packsRoot(), packId);
 
     if (!fs.existsSync(dir)) {
       if (basePackId !== null && packId === basePackId) {

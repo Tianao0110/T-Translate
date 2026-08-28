@@ -1,4 +1,4 @@
-// Audio engine orchestration: owns the ASR utilityProcess and status relay.
+﻿// Audio engine orchestration: owns the ASR utilityProcess and status relay.
 // The session is HOSTED by the floating window's listen mode (the standalone
 // probe window is gone) — this manager no longer owns any window lifecycle.
 //
@@ -13,6 +13,7 @@ const fs = require('fs');
 const { app, utilityProcess } = require('electron');
 const { CHANNELS, PRIVACY_MODES } = require('../shared/channels');
 const { locateAsrModels } = require('../utils/asr-models');
+const { modelDir, modelDirs } = require('../utils/model-root');
 const logger = require('../utils/logger')('AudioEngine');
 
 const READY_TIMEOUT_MS = 30000;
@@ -34,12 +35,23 @@ function init(d) {
   deps = d;
 }
 
+// Where a download lands. Reads go through findModels(), which also looks at
+// the pre-v0.4.0 userData location (see model-root.js).
 function modelsBaseDir() {
-  return path.join(app.getPath('userData'), 'asr-models');
+  return modelDir('asr-models');
+}
+
+// First root that holds a complete model set wins.
+function findModels() {
+  for (const dir of modelDirs('asr-models')) {
+    const found = locateAsrModels(dir);
+    if (found) return found;
+  }
+  return null;
 }
 
 function isAvailable() {
-  return locateAsrModels(modelsBaseDir()) !== null;
+  return findModels() !== null;
 }
 
 function isSecure() {
@@ -62,11 +74,12 @@ function sendStatus(state, detail) {
 }
 
 function getInfo() {
-  const models = locateAsrModels(modelsBaseDir());
+  const models = findModels();
   return {
     modelName: models ? models.modelName : null,
     streamingPresent: !!models?.streaming,
-    modelsDir: modelsBaseDir(),
+    modelsDir: modelsBaseDir(),      // where a new download lands
+    activeDir: models?.baseDir || null, // where the live set actually sits
     secureBlocked: isSecure(),
     running: childState === 'running' || childState === 'starting',
   };
@@ -80,7 +93,7 @@ function startSession(options = {}) {
   // Each user-initiated session gets its own one-shot crash restart.
   restartedOnce = false;
   sessionLanguage = typeof options.language === 'string' ? options.language : '';
-  const models = locateAsrModels(modelsBaseDir());
+  const models = findModels();
   if (!models) {
     sendStatus('no-model');
     return;
@@ -231,7 +244,7 @@ function onWorkerExit(code) {
   if (!restartedOnce && hostWindow()) {
     restartedOnce = true;
     sendStatus('engine-restarting');
-    const models = locateAsrModels(modelsBaseDir());
+    const models = findModels();
     if (models && !isSecure()) {
       spawnWorker(models);
       return;
