@@ -92,7 +92,7 @@ function buildSelectionSettingsPayload() {
 const { createMenu } = require('./managers/menu-manager');
 const { createTray, updateTrayMenu, destroyTray } = require('./managers/tray-manager');
 const windowManager = require('./managers/window-manager');
-const audioProbeManager = require('./managers/audio-probe-manager');
+const audioEngineManager = require('./managers/audio-engine-manager');
 
 const screenshotModule = require('./screenshot-module');
 
@@ -1119,10 +1119,10 @@ app.whenReady().then(() => {
     onMainRendererGiveUp,
   });
 
-  audioProbeManager.init({
+  // Listen-translate engine: hosted by the floating window's listen mode.
+  audioEngineManager.init({
     store,
-    windows,
-    createWindow: () => windowManager.createAudioProbeWindow(),
+    getWindow: () => windows.floatingWindow,
   });
 
   // Use arrow-function wrappers so we don't capture windowManager methods at
@@ -1145,8 +1145,6 @@ app.whenReady().then(() => {
       }
     },
     toggleSelectionTranslate,
-    toggleAudioProbe: () => audioProbeManager.toggleWindow(),
-    isAudioProbeAvailable: () => audioProbeManager.isAvailable(),
   };
 
   // IPC must be initialized BEFORE any window is created — otherwise renderer may

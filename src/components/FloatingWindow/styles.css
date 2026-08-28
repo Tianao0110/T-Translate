@@ -1241,3 +1241,115 @@
     transform: translateY(0);
   }
 }
+
+/* ========== 听译模式（listen mode） ========== */
+
+.floating-mode-wrap {
+  position: relative;
+  -webkit-app-region: no-drag;
+  flex: none;
+}
+
+.mode-popup {
+  position: absolute;
+  top: 26px;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  min-width: 118px;
+  background: var(--floating-surface);
+  border: 1px solid var(--floating-border);
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+  z-index: 1002;
+  -webkit-app-region: no-drag;
+}
+
+.mode-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 8px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--floating-text);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.mode-item:hover {
+  background: color-mix(in srgb, var(--floating-accent) 12%, transparent);
+}
+
+.mode-item.active {
+  color: var(--floating-accent);
+  background: color-mix(in srgb, var(--floating-accent) 16%, transparent);
+}
+
+.listen-select {
+  border: 1px solid var(--floating-border);
+  border-radius: 5px;
+  background: var(--floating-surface);
+  color: var(--floating-text);
+  font-size: 11px;
+  padding: 1px 3px;
+  max-width: 74px;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.listen-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.listen-status {
+  flex: none;
+  font-size: 11px;
+  color: var(--floating-text-muted);
+  padding: 0 2px 6px;
+  user-select: none;
+}
+
+.listen-status.live { color: var(--floating-accent); }
+.listen-status.warn { color: #d9a441; }
+.listen-status.err { color: #d96c6c; }
+
+.listen-transcript {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  user-select: text;
+  cursor: text;
+}
+
+.listen-placeholder {
+  color: var(--floating-text-muted);
+  text-align: center;
+  padding-top: 18px;
+  font-size: 12px;
+}
+
+.listen-seg {
+  margin-bottom: 8px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.listen-seg-trans {
+  color: var(--floating-accent);
+  margin-top: 1px;
+}
+
+.listen-partial {
+  color: var(--floating-text-muted);
+  font-style: italic;
+  line-height: 1.5;
+  word-break: break-word;
+}

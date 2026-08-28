@@ -145,10 +145,6 @@
       {
         "from": "public/child-pane.html",
         "to": "resources/child-pane.html"
-      },
-      {
-        "from": "public/audio-probe.html",
-        "to": "resources/audio-probe.html"
       }
     ],
     "win": {
