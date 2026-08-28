@@ -40,5 +40,18 @@ licenses:
 | Electron                           | MIT        |
 | PP-OCR 系列模型（PaddleOCR 项目）  | Apache-2.0 |
 
+## 语音模型 / Speech models
+
+按需下载，不随安装包分发；协议原文随模型包一同分发（见包内 LICENSE-*.txt 与 PROVENANCE.txt），原文归档在 scripts/model-licenses/。
+Downloaded on demand, not bundled in the installer. Each pack ships its licence
+text and provenance next to the weights; the texts are archived under
+scripts/model-licenses/.
+
+| Model                                                  | License                                    |
+| ------------------------------------------------------ | ------------------------------------------ |
+| SenseVoiceSmall（阿里巴巴集团 / FunASR，sherpa-onnx 转换版） | FunASR Model Open Source License 1.1       |
+| silero-vad（Silero Team）                              | MIT                                        |
+| streaming zipformer zh-en（k2-fsa / icefall）          | Apache-2.0                                 |
+
 完整依赖树各包的协议以其 node_modules/<pkg>/LICENSE 为准。
 For the full dependency tree, each package's own LICENSE file governs.
