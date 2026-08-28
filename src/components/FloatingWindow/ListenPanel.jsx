@@ -32,8 +32,11 @@ const ListenPanel = ({ session }) => {
               : t('floatingWindow.listenIdle', '点击开始，实时转写并翻译系统声音（音频不落盘）')}
           </div>
         )}
-        {segments.map((seg) => (
-          <div key={seg.id} className="listen-seg">
+        {segments.map((seg, idx) => (
+          <div
+            key={seg.id}
+            className={`listen-seg ${idx === segments.length - 1 && !partial ? 'current' : 'old'}`}
+          >
             <div className="listen-seg-text">
               {splitSubtitleLines(seg.text).map((line, i) => (
                 <div key={i}>{line}</div>

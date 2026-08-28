@@ -451,9 +451,7 @@
   color: var(--floating-text-muted);
   text-align: center;
   font-size: 14px;
-  /* Same low-opacity legibility rim as .floating-result (loading/placeholder/
-     error text sits on the transparent window too) */
-  text-shadow: 0 0 3px var(--floating-text-halo), 0 0 6px var(--floating-text-halo);
+  /* No text-shadow — see .floating-result */
 }
 
 .floating-message.error {
@@ -502,8 +500,8 @@
   word-wrap: break-word;
   white-space: pre-wrap;  /* 保留换行符 */
   user-select: text;      /* re-granted here — the root is user-select:none for dragging */
-  /* Legibility rim for low window opacity — see --floating-text-halo */
-  text-shadow: 0 0 3px var(--floating-text-halo), 0 0 6px var(--floating-text-halo);
+  /* No text-shadow: every halo variant (glow, outline) reads as blur —
+     Latin glyphs especially. User verdict across three rounds: crisp > rim. */
 }
 
 /* ========== 滚动提示 ========== */
@@ -1290,12 +1288,16 @@
   padding-top: 8px;
 }
 
+/* Lyrics-style flow (user-picked): the line BEING recognized is the big bold
+   "now playing" line, the freshest final keeps normal weight, older lines
+   recede to gray and drift up as new ones land. Everything centered. */
 .listen-transcript {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   user-select: text;
   cursor: text;
+  text-align: center;
 }
 
 /* Self-hiding scrollbar: a slim track that is invisible until the transcript
@@ -1335,6 +1337,12 @@
 .listen-seg {
   margin-bottom: 10px;
   word-break: break-word;
+  animation: listen-in 0.25s ease;
+}
+
+@keyframes listen-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
 }
 
 .listen-seg-text {
@@ -1351,15 +1359,28 @@
   margin-top: 2px;
 }
 
-/* No italics: CJK has no true italic glyphs, so the browser shears them —
-   permanently blurry text. The draft line is distinguished by muted color
-   alone. And NO text-shadow anywhere in listen mode — both the glow and the
-   hard-outline variants were tried and read as blur (user verdict: the
-   untreated first version looked best). Don't re-add either. */
-.listen-partial {
-  font-size: 14px;
+/* History lines recede */
+.listen-seg.old .listen-seg-text {
+  font-size: 13px;
+  font-weight: 400;
   color: var(--floating-text-muted);
-  opacity: 0.9;
-  line-height: 1.55;
+}
+
+.listen-seg.old .listen-seg-trans {
+  font-size: 12px;
+  color: color-mix(in srgb, var(--floating-accent) 55%, var(--floating-text-muted));
+}
+
+/* No italics: CJK has no true italic glyphs, so the browser shears them —
+   permanently blurry text. And NO text-shadow anywhere in listen mode — both
+   the glow and the hard-outline variants were tried and read as blur (user
+   verdict: the untreated first version looked best). Don't re-add either.
+   The draft is the "now playing" lyric: biggest and boldest on screen. */
+.listen-partial {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--floating-text);
+  line-height: 1.5;
   word-break: break-word;
+  padding-bottom: 4px;
 }
