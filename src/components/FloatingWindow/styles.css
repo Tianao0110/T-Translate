@@ -1297,9 +1297,9 @@
   border-radius: 5px;
   background: var(--floating-surface);
   color: var(--floating-text);
-  font-size: 11px;
-  padding: 1px 3px;
-  max-width: 74px;
+  font-size: 12px;
+  padding: 1px 4px;
+  max-width: 84px;
   cursor: pointer;
   -webkit-app-region: no-drag;
 }
@@ -1339,19 +1339,28 @@
 }
 
 .listen-seg {
-  margin-bottom: 8px;
-  line-height: 1.5;
+  margin-bottom: 10px;
   word-break: break-word;
 }
 
+.listen-seg-text {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.55;
+  color: var(--floating-text);
+}
+
 .listen-seg-trans {
+  font-size: 13px;
+  line-height: 1.5;
   color: var(--floating-accent);
-  margin-top: 1px;
+  margin-top: 2px;
 }
 
 .listen-partial {
+  font-size: 14px;
   color: var(--floating-text-muted);
   font-style: italic;
-  line-height: 1.5;
+  line-height: 1.55;
   word-break: break-word;
 }

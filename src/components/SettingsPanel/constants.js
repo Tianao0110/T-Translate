@@ -100,6 +100,9 @@ export const DEFAULT_SETTINGS = {
     // 'auto' | 'scattered' | 'unified' — scattered-vs-unified layout for
     // capture results ('auto' keeps the geometry heuristic)
     displayMode: 'auto',
+    // Off = WDA_EXCLUDEFROMCAPTURE (OCR never re-reads our own overlay).
+    // On = the window shows up in screenshots/recordings (user opt-in).
+    captureVisible: false,
   },
 
   selection: {

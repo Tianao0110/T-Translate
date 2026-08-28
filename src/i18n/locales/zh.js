@@ -317,6 +317,8 @@ const zh = {
     understandMode: "讲解模式：截图后不翻译，直接讲解内容",
     understandModeOn: "讲解模式已开：截图后直接讲解，点击关闭",
     modePicker: "模式：截图翻译 / 讲解 / 听译",
+    captureVisible: "允许悬浮窗被截图和录屏",
+    captureVisibleHint: "默认关闭：悬浮窗对截图工具隐身，截图翻译不会识别到自己的译文。需要截图或录制悬浮窗（比如做演示）时再打开",
     modeTranslate: "截图翻译",
     modeUnderstand: "讲解",
     modeListen: "听译",

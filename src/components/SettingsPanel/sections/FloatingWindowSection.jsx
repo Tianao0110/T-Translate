@@ -14,6 +14,7 @@ const FloatingWindowSection = ({
   const gw = {
     defaultOpacity: 0.85,
     displayMode: 'auto',
+    captureVisible: false,
     ...(settings.floatingWindow || {}),
   };
 
@@ -76,6 +77,20 @@ const FloatingWindowSection = ({
           <span className="range-value">{Math.round(gw.defaultOpacity * 100)}%</span>
         </div>
         <p className="setting-hint">{t('floatingWindow.opacityHint')}</p>
+      </div>
+
+      {/* 允许被截图/录屏捕获 */}
+      <div className="setting-group">
+        <label className="setting-switch">
+          <input
+            type="checkbox"
+            checked={gw.captureVisible}
+            onChange={(e) => updateSetting('floatingWindow', 'captureVisible', e.target.checked)}
+          />
+          <span className="switch-slider"></span>
+          <span className="switch-label">{t('floatingWindow.captureVisible', '允许悬浮窗被截图和录屏')}</span>
+        </label>
+        <p className="setting-hint">{t('floatingWindow.captureVisibleHint', '默认关闭：悬浮窗对截图工具隐身，截图翻译不会识别到自己的译文。需要截图或录制悬浮窗（比如做演示）时再打开')}</p>
       </div>
 
       {/* 快捷键 */}

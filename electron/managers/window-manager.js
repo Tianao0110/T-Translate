@@ -224,10 +224,13 @@ function createFloatingWindow() {
     },
   });
 
-  // WDA_EXCLUDEFROMCAPTURE so OCR doesn't re-read our own overlay
+  // WDA_EXCLUDEFROMCAPTURE so OCR doesn't re-read our own overlay — unless
+  // the user opted in to being capturable (screenshots/recordings of the
+  // overlay itself; settings changes re-apply live via the notify handler).
   if (process.platform === 'win32') {
     floatingWindow.webContents.on('did-finish-load', () => {
-      makeWindowInvisibleToCapture(floatingWindow);
+      const captureVisible = !!store.get('settings.floatingWindow.captureVisible', false);
+      if (!captureVisible) makeWindowInvisibleToCapture(floatingWindow);
     });
   }
 

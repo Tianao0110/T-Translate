@@ -317,6 +317,8 @@ const en = {
     understandMode: "Explain mode: explain the capture instead of translating it",
     understandModeOn: "Explain mode on — captures get explained; click to turn off",
     modePicker: "Mode: capture translate / explain / listen",
+    captureVisible: "Allow the overlay in screenshots and recordings",
+    captureVisibleHint: "Off by default: the overlay is invisible to capture tools, so capture-translate never re-reads its own output. Turn on when you want to screenshot or record the overlay itself (e.g. for a demo)",
     modeTranslate: "Capture translate",
     modeUnderstand: "Explain",
     modeListen: "Listen",

@@ -100,6 +100,24 @@ const FloatingWindow = () => {
     return () => { alive = false; };
   }, [showModePicker]);
 
+  // Standard click-style dropdown: close on outside mousedown (a hover-out
+  // close kept collapsing mid-reach, and the stray click then landed on the
+  // content area and fired a capture). The just-closed flag swallows that
+  // same click so it can never reach handleContentClick.
+  const justClosedPickerRef = useRef(false);
+  useEffect(() => {
+    if (!showModePicker) return undefined;
+    const onDown = (e) => {
+      if (!e.target.closest?.('.floating-mode-wrap')) {
+        setShowModePicker(false);
+        justClosedPickerRef.current = true;
+        setTimeout(() => { justClosedPickerRef.current = false; }, 0);
+      }
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [showModePicker]);
+
   // Service-layer notifications (e.g. OCR engine fallback) bubble up via session store
   useEffect(() => {
     if (notification) {
@@ -583,6 +601,9 @@ const FloatingWindow = () => {
   }, [captureAndTranslate]);
 
   const handleContentClick = useCallback((e) => {
+    // The click that just dismissed the mode picker must never double as a
+    // capture trigger.
+    if (justClosedPickerRef.current) return;
     // Any pass-through flavor: content clicks belong to the app below, never
     // trigger a capture (the old accidental-recognition complaint).
     if (passThroughRef.current) return;
@@ -849,7 +870,7 @@ const FloatingWindow = () => {
                 <ChevronDown size={9} />
               </button>
               {showModePicker && (
-                <div className="mode-popup" onMouseLeave={() => setShowModePicker(false)}>
+                <div className="mode-popup">
                   <button
                     className={`mode-item ${!listenMode && !understandMode ? 'active' : ''}`}
                     onClick={() => { setListenMode(false); setUnderstandMode(false); setShowModePicker(false); }}
