@@ -95,4 +95,36 @@ describe('locateAsrModels', () => {
     const found = locateAsrModels('base', { fs, path: P });
     expect(found.modelName).toBe('sense-voice-b');
   });
+
+  it('reports the optional streaming draft model set when complete', () => {
+    const fs = makeFs({
+      base: ['silero_vad.onnx', 'sense-voice-x/', 'sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/'],
+      'base/silero_vad.onnx': 'file',
+      'base/sense-voice-x/model.int8.onnx': 'file',
+      'base/sense-voice-x/tokens.txt': 'file',
+      'base/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/encoder-epoch-99-avg-1.int8.onnx': 'file',
+      'base/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/decoder-epoch-99-avg-1.onnx': 'file',
+      'base/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/joiner-epoch-99-avg-1.int8.onnx': 'file',
+      'base/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/tokens.txt': 'file',
+    });
+    const found = locateAsrModels('base', { fs, path: P });
+    expect(found).not.toBeNull();
+    expect(found.streaming).not.toBeNull();
+    expect(found.streaming.encoder).toContain('encoder-epoch-99-avg-1.int8.onnx');
+    expect(found.streaming.dirName).toBe('sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20');
+  });
+
+  it('an incomplete streaming dir yields streaming: null without gating the probe', () => {
+    const fs = makeFs({
+      base: ['silero_vad.onnx', 'sense-voice-x/', 'streaming-zipformer-broken/'],
+      'base/silero_vad.onnx': 'file',
+      'base/sense-voice-x/model.int8.onnx': 'file',
+      'base/sense-voice-x/tokens.txt': 'file',
+      'base/streaming-zipformer-broken/encoder-epoch-99-avg-1.int8.onnx': 'file',
+      // decoder/joiner/tokens missing
+    });
+    const found = locateAsrModels('base', { fs, path: P });
+    expect(found).not.toBeNull();
+    expect(found.streaming).toBeNull();
+  });
 });

@@ -164,6 +164,8 @@ function spawnWorker(models) {
         modelPath: models.modelPath,
         tokensPath: models.tokensPath,
         vadPath: models.vadPath,
+        // optional two-pass draft engine (null when not manually placed)
+        streaming: models.streaming,
         language: sessionLanguage,
       },
     },
