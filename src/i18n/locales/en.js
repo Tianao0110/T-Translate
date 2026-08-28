@@ -603,7 +603,7 @@ const en = {
     digestHint: "Summarize the paragraphs you have explained into one piece",
     digestScope: "from the {{count}} paragraphs you explained — not the whole document",
     digestScopeAll: "covering all {{count}} paragraphs of the document",
-    summarizeAll: "Summarize document",
+    summarizeAll: "Summarize",
     summarizeAllHint: "Explain every paragraph, then summarize those explanations",
     summarizeAllConfirm: "This will explain {{count}} paragraphs one by one, then summarize them into one document summary.\n\nThat is {{count}} requests to the model — minutes for a long document, and metered usage on a paid API. You can stop at any point; explanations already finished are kept.",
     summarizeAllStop: "Stop (finished explanations are kept)",
@@ -874,7 +874,7 @@ const en = {
     sendsCapture: "sends this screenshot to the vision model",
     readFromCapture: "Read from the screenshot by a vision model",
     summarize: { name: "Summarize", desc: "Read the whole passage and give key points in the target language" },
-    digest: { name: "Summarize explained sections", desc: "Summarize the paragraphs you have explained into one coherent piece" },
+    digest: { name: "Summarize explained", desc: "Summarize the paragraphs you have explained into one coherent piece" },
     explain: { name: "Explain", desc: "Explain this content: what it is about and what the key concepts are" }
   },
   svc: {

@@ -153,23 +153,6 @@
   color: var(--text-on-accent);
 }
 
-/* Simple/full toggle at the tail of the template row — same look and mental
-   model as the settings sidebar's link (S-2 progressive disclosure) */
-.mode-text-link {
-  display: flex;
-  align-items: center;
-  padding: 0 6px;
-  color: var(--text-secondary, #64748b);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: color 0.15s;
-  user-select: none;
-}
-
-.mode-text-link:hover {
-  color: var(--accent-primary);
-}
 
 /* ==================== Translation areas ==================== */
 .translation-areas {

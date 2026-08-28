@@ -1,6 +1,7 @@
-// S-2 progressive disclosure on the main panel: simple mode hides the heavy
-// controls (tone templates, style rewrite, image import) and full mode keeps
-// today's everything. Also the first mount smoke test TranslationPanel gets.
+// TranslationPanel mount smoke (its first): render-time crashes, plus two
+// S-2 outcomes pinned — the MT badge is gone for good, and the tone templates
+// stay always-visible (a simple/full split was tried and reverted the same
+// day; this stops it from silently coming back half-wired).
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
@@ -41,30 +42,21 @@ function renderPanel() {
   return render(<TranslationPanel screenshotData={null} onScreenshotProcessed={() => {}} />);
 }
 
-describe('TranslationPanel progressive disclosure', () => {
-  it('full mode (stored) shows templates, style rewrite, and image import', () => {
-    localStorage.setItem('main-simple-mode', 'false');
+describe('TranslationPanel', () => {
+  it('mounts with the full toolbar: templates, style rewrite, textareas', () => {
     const { container } = renderPanel();
-    expect(container.querySelector('.template-btn')).toBeTruthy();
+    expect(container.querySelectorAll('.template-btn').length).toBe(3);
     expect(container.querySelector('.style-btn')).toBeTruthy();
-    expect(container.querySelectorAll('.box-actions .action-btn').length).toBeGreaterThan(0);
-    expect(container.querySelector('.mode-text-link')).toBeTruthy();
-  });
-
-  it('simple mode (stored) hides them but keeps translate/copy/favorite and the toggle', () => {
-    localStorage.setItem('main-simple-mode', 'true');
-    const { container } = renderPanel();
-    expect(container.querySelector('.template-btn')).toBeNull();
-    expect(container.querySelector('.style-btn')).toBeNull();
-    // the toggle back to full stays reachable
-    expect(container.querySelector('.mode-text-link')).toBeTruthy();
-    // core surfaces stay
     expect(container.querySelector('.translation-textarea')).toBeTruthy();
   });
 
-  it('the MT badge is gone in both modes (mechanism still runs main-process side)', () => {
-    localStorage.setItem('main-simple-mode', 'false');
+  it('the MT badge stays removed (mechanism lives main-process side)', () => {
     const { container } = renderPanel();
     expect(container.querySelector('.mt-mode-badge')).toBeNull();
+  });
+
+  it('no simple/full toggle exists on the main panel (reverted by user verdict)', () => {
+    const { container } = renderPanel();
+    expect(container.querySelector('.mode-text-link')).toBeNull();
   });
 });
