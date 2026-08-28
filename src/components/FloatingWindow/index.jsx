@@ -79,7 +79,6 @@ const FloatingWindow = () => {
   // session only — leaving listen restores whatever understand was. The mode
   // entry is gated on ASR models being present (zero-claim until then).
   const [listenMode, setListenMode] = useState(false);
-  const [showModePicker, setShowModePicker] = useState(false);
   const [listenAvailable, setListenAvailable] = useState(false);
   const [hasOverflow, setHasOverflow] = useState(false);
   const [theme, setTheme] = useState('light');
@@ -90,7 +89,7 @@ const FloatingWindow = () => {
 
   const listen = useListenSession({ active: listenMode });
 
-  // Mode-picker gate: listen appears only when ASR models are on disk and
+  // Mode-segment gate: listen appears only when ASR models are on disk and
   // privacy allows (same zero-claim rule the probe entry followed).
   useEffect(() => {
     let alive = true;
@@ -98,25 +97,8 @@ const FloatingWindow = () => {
       .then((info) => { if (alive) setListenAvailable(!!info?.modelName); })
       .catch(() => { if (alive) setListenAvailable(false); });
     return () => { alive = false; };
-  }, [showModePicker]);
+  }, [listenMode]);
 
-  // Standard click-style dropdown: close on outside mousedown (a hover-out
-  // close kept collapsing mid-reach, and the stray click then landed on the
-  // content area and fired a capture). The just-closed flag swallows that
-  // same click so it can never reach handleContentClick.
-  const justClosedPickerRef = useRef(false);
-  useEffect(() => {
-    if (!showModePicker) return undefined;
-    const onDown = (e) => {
-      if (!e.target.closest?.('.floating-mode-wrap')) {
-        setShowModePicker(false);
-        justClosedPickerRef.current = true;
-        setTimeout(() => { justClosedPickerRef.current = false; }, 0);
-      }
-    };
-    document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
-  }, [showModePicker]);
 
   // Service-layer notifications (e.g. OCR engine fallback) bubble up via session store
   useEffect(() => {
@@ -601,9 +583,6 @@ const FloatingWindow = () => {
   }, [captureAndTranslate]);
 
   const handleContentClick = useCallback((e) => {
-    // The click that just dismissed the mode picker must never double as a
-    // capture trigger.
-    if (justClosedPickerRef.current) return;
     // Any pass-through flavor: content clicks belong to the app below, never
     // trigger a capture (the old accidental-recognition complaint).
     if (passThroughRef.current) return;
@@ -851,54 +830,43 @@ const FloatingWindow = () => {
       onMouseLeave={handleMouseLeaveWindow}
     >
       <div className="floating-top-area" onMouseDown={handleTitleBarMouseDown}>
-          {/* Mode picker (design B), deliberately away from the action icons:
-              what a session produces is a MODE, not one more thing to click.
+          {/* Mode segments (design A, user-picked over the dropdown): three
+              always-visible icons, single-select — no popup to fumble.
               understand needs a chat/vision provider; listen needs ASR models
               on disk (zero-claim otherwise). */}
           {(ai.capabilities.text || ai.capabilities.vision || listenAvailable) && (
             <div className="floating-mode-wrap">
               <button
-                className={`floating-understand-btn ${listenMode || understandMode ? 'active' : ''}`}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setShowModePicker((v) => !v);
-                }}
-                title={t('floatingWindow.modePicker', '模式：截图翻译 / 讲解 / 听译')}
+                className={`mode-seg-btn ${!listenMode && !understandMode ? 'active' : ''}`}
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setListenMode(false); setUnderstandMode(false); }}
+                title={t('floatingWindow.modeTranslate', '截图翻译')}
               >
-                {listenMode ? <AudioLines size={12} /> : understandMode ? <Brain size={12} /> : <Camera size={12} />}
-                <ChevronDown size={9} />
+                <Camera size={12} />
               </button>
-              {showModePicker && (
-                <div className="mode-popup">
-                  <button
-                    className={`mode-item ${!listenMode && !understandMode ? 'active' : ''}`}
-                    onClick={() => { setListenMode(false); setUnderstandMode(false); setShowModePicker(false); }}
-                  >
-                    <Camera size={12} />
-                    <span>{t('floatingWindow.modeTranslate', '截图翻译')}</span>
-                  </button>
-                  {(ai.capabilities.text || ai.capabilities.vision) && (
-                    <button
-                      className={`mode-item ${!listenMode && understandMode ? 'active' : ''}`}
-                      onClick={() => { setListenMode(false); setUnderstandMode(true); setShowModePicker(false); }}
-                    >
-                      <Brain size={12} />
-                      <span>{t('floatingWindow.modeUnderstand', '讲解')}</span>
-                    </button>
-                  )}
-                  {listenAvailable && (
-                    <button
-                      className={`mode-item ${listenMode ? 'active' : ''}`}
-                      onClick={() => { setAutoRefresh(false); setListenMode(true); setShowModePicker(false); }}
-                    >
-                      <AudioLines size={12} />
-                      <span>{t('floatingWindow.modeListen', '听译')}</span>
-                    </button>
-                  )}
-                </div>
+              {(ai.capabilities.text || ai.capabilities.vision) && (
+                <button
+                  className={`mode-seg-btn ${!listenMode && understandMode ? 'active' : ''}`}
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setListenMode(false); setUnderstandMode(true); }}
+                  title={t('floatingWindow.modeUnderstand', '讲解')}
+                >
+                  <Brain size={12} />
+                </button>
+              )}
+              {listenAvailable && (
+                <button
+                  className={`mode-seg-btn ${listenMode ? 'active' : ''}`}
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAutoRefresh(false); setListenMode(true); }}
+                  title={t('floatingWindow.modeListen', '听译')}
+                >
+                  <AudioLines size={12} />
+                </button>
               )}
             </div>
+          )}
+          {listenMode && (
+            <span className="listen-topbar-status">
+              {t(`floatingWindow.listenStatus.${listen.sessionState}`, listen.sessionState)}
+            </span>
           )}
 
           <div className="floating-toolbar">

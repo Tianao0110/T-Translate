@@ -174,16 +174,25 @@
   color: var(--floating-accent);
 }
 
-/* ========== 模式选择器（原理解模式开关位） ==========
-   Mirrors the close button on the opposite corner: it is a mode switch, not
-   one of the centred action icons. The WRAP owns the absolute corner anchor;
-   the button itself flows inside it (it holds two icons now — a fixed 20px
-   absolute button here once collapsed the wrap and its invisible opacity:0
-   body swallowed toolbar clicks). */
-.floating-understand-btn {
-  height: 20px;
-  padding: 0 4px;
+/* ========== 模式分段（原理解模式开关位，design A） ==========
+   Mirrors the close button on the opposite corner: three always-visible
+   single-select segments — a mode changes what a session produces, it is not
+   one of the centred action icons. Rest state hides with the chrome; the
+   ACTIVE segment stays visible (the window must always say what mode it is
+   in), same rule the old toggle followed. */
+.floating-mode-wrap {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  z-index: 1001;
+  display: flex;
   gap: 2px;
+  -webkit-app-region: no-drag;
+}
+
+.mode-seg-btn {
+  width: 20px;
+  height: 20px;
   border: none;
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.6);
@@ -197,37 +206,52 @@
   -webkit-app-region: no-drag;
 }
 
-.floating-window.show-toolbar .floating-understand-btn {
+.floating-window.show-toolbar .mode-seg-btn {
   opacity: 1;
 }
 
-.floating-understand-btn:hover {
+.mode-seg-btn:hover {
   background: rgba(255, 255, 255, 0.9);
   transform: scale(1.05);
 }
 
-[data-theme="fresh"] .floating-understand-btn {
+[data-theme="fresh"] .mode-seg-btn {
   background: rgba(255, 255, 255, 0.7);
   color: #059669;
 }
 
-[data-theme="dark"] .floating-understand-btn {
+[data-theme="dark"] .mode-seg-btn {
   background: rgba(232, 228, 221, 0.10);
   color: #e8e4dd;
 }
 
-[data-theme="dark"] .floating-understand-btn:hover {
+[data-theme="dark"] .mode-seg-btn:hover {
   background: rgba(232, 228, 221, 0.18);
 }
 
 /* Last, so it outranks the per-theme resting rules above (same specificity,
-   source order decides). Stays visible while the mode is on: it changes what
-   every capture does, so it must not vanish with the rest of the chrome. */
-.floating-understand-btn.active,
-.floating-understand-btn.active:hover {
+   source order decides). */
+.mode-seg-btn.active,
+.mode-seg-btn.active:hover {
   opacity: 1;
   background: var(--floating-accent);
   color: var(--floating-on-accent);
+}
+
+/* Listen status lives in the otherwise-empty drag strip next to the segments
+   (the strip looked dead when the chrome faded). Part of the drag area on
+   purpose — it is not clickable. */
+.listen-topbar-status {
+  position: absolute;
+  top: 5px;
+  left: 74px;
+  font-size: 11px;
+  color: var(--floating-text-muted);
+  text-shadow: 0 0 3px var(--floating-text-halo);
+  user-select: none;
+  pointer-events: none;
+  z-index: 1000;
+  white-space: nowrap;
 }
 
 /* ========== 关闭按钮 ========== */
@@ -1244,54 +1268,6 @@
 
 /* ========== 听译模式（listen mode） ========== */
 
-.floating-mode-wrap {
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  z-index: 1001;
-  -webkit-app-region: no-drag;
-}
-
-.mode-popup {
-  position: absolute;
-  top: 24px;
-  left: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 4px;
-  min-width: 118px;
-  background: var(--floating-surface);
-  border: 1px solid var(--floating-border);
-  border-radius: 8px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
-  z-index: 1002;
-  -webkit-app-region: no-drag;
-}
-
-.mode-item {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 5px 8px;
-  border: none;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--floating-text);
-  font-size: 12px;
-  cursor: pointer;
-  text-align: left;
-}
-
-.mode-item:hover {
-  background: color-mix(in srgb, var(--floating-accent) 12%, transparent);
-}
-
-.mode-item.active {
-  color: var(--floating-accent);
-  background: color-mix(in srgb, var(--floating-accent) 16%, transparent);
-}
-
 .listen-select {
   border: 1px solid var(--floating-border);
   border-radius: 5px;
@@ -1309,19 +1285,10 @@
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  /* Clear the top strip: mode segments + status text live there full-time in
+     listen mode (unlike capture results, which only meet翻译 chrome on hover). */
+  padding-top: 22px;
 }
-
-.listen-status {
-  flex: none;
-  font-size: 11px;
-  color: var(--floating-text-muted);
-  padding: 0 2px 6px;
-  user-select: none;
-}
-
-.listen-status.live { color: var(--floating-accent); }
-.listen-status.warn { color: #d9a441; }
-.listen-status.err { color: #d96c6c; }
 
 .listen-transcript {
   flex: 1;
@@ -1348,6 +1315,10 @@
   font-weight: 500;
   line-height: 1.55;
   color: var(--floating-text);
+  /* Legibility rim at low window opacity — the text sits straight on the
+     desktop there (the translation only "looked clearer" because accent
+     colors carry their own saturation). */
+  text-shadow: 0 0 3px var(--floating-text-halo), 0 0 6px var(--floating-text-halo);
 }
 
 .listen-seg-trans {
@@ -1355,6 +1326,7 @@
   line-height: 1.5;
   color: var(--floating-accent);
   margin-top: 2px;
+  text-shadow: 0 0 3px var(--floating-text-halo);
 }
 
 .listen-partial {
@@ -1363,4 +1335,5 @@
   font-style: italic;
   line-height: 1.55;
   word-break: break-word;
+  text-shadow: 0 0 3px var(--floating-text-halo), 0 0 6px var(--floating-text-halo);
 }
