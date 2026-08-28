@@ -823,7 +823,7 @@ const FloatingWindow = () => {
 
   return (
     <div
-      className={`floating-window ${showToolbar ? 'show-toolbar' : ''} ${isPassThrough && !stickyPassThrough ? 'pass-through' : ''} ${stickyPassThrough ? 'pass-through-sticky' : ''} ${displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0 ? 'scattered-mode' : ''} ${floatingOpacity < 0.55 ? 'low-opacity' : ''}`}
+      className={`floating-window ${showToolbar ? 'show-toolbar' : ''} ${isPassThrough && !stickyPassThrough ? 'pass-through' : ''} ${stickyPassThrough ? 'pass-through-sticky' : ''} ${displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0 ? 'scattered-mode' : ''}`}
       style={{ '--floating-opacity': floatingOpacity }}
       data-theme={theme}
       onMouseEnter={handleMouseEnterWindow}

@@ -1284,9 +1284,10 @@
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  /* Clear the top strip: mode segments + status text live there full-time in
-     listen mode (unlike capture results, which only meet翻译 chrome on hover). */
-  padding-top: 22px;
+  /* Top clearance for the mode segments + status strip. The content area's
+     own 16px padding covers most of the 23px strip; this tops it up (22px
+     here once stacked into a fat blank band). */
+  padding-top: 8px;
 }
 
 .listen-transcript {
@@ -1295,6 +1296,33 @@
   overflow-y: auto;
   user-select: text;
   cursor: text;
+}
+
+/* Self-hiding scrollbar: a slim track that is invisible until the transcript
+   is hovered (the native bar sat there full-time and ugly). */
+.listen-transcript::-webkit-scrollbar {
+  width: 6px;
+}
+
+.listen-transcript::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.listen-transcript::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+}
+
+.listen-transcript:hover::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--floating-text-muted) 45%, transparent);
+}
+
+.listen-transcript::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--floating-text-muted) 70%, transparent);
+}
+
+.listen-transcript::-webkit-scrollbar-button {
+  display: none;
 }
 
 .listen-placeholder {
@@ -1325,31 +1353,13 @@
 
 /* No italics: CJK has no true italic glyphs, so the browser shears them —
    permanently blurry text. The draft line is distinguished by muted color
-   and weight alone. */
+   alone. And NO text-shadow anywhere in listen mode — both the glow and the
+   hard-outline variants were tried and read as blur (user verdict: the
+   untreated first version looked best). Don't re-add either. */
 .listen-partial {
   font-size: 14px;
   color: var(--floating-text-muted);
   opacity: 0.9;
   line-height: 1.55;
   word-break: break-word;
-}
-
-/* Legibility rim ONLY at low window opacity, where the glyphs sit straight
-   on the desktop. A subtitle-style 4-direction hard outline — the blur-glow
-   variant smeared the edges at normal opacity ("更加模糊了"). */
-.floating-window.low-opacity .listen-seg-text,
-.floating-window.low-opacity .listen-partial {
-  text-shadow:
-    -1px 0 var(--floating-text-halo),
-    1px 0 var(--floating-text-halo),
-    0 -1px var(--floating-text-halo),
-    0 1px var(--floating-text-halo);
-}
-
-.floating-window.low-opacity .listen-seg-trans {
-  text-shadow:
-    -1px 0 var(--floating-text-halo),
-    1px 0 var(--floating-text-halo),
-    0 -1px var(--floating-text-halo),
-    0 1px var(--floating-text-halo);
 }
