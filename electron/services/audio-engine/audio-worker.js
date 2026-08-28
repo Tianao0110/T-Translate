@@ -61,8 +61,19 @@ const PARTIAL_INTERVAL_MS = 1000;
 const SOFT_SPLIT_FROM_S = 5;
 const HARD_SPLIT_S = 9;
 const VALLEY_WINDOWS = 8; // x 512 samples = 0.256s of sustained quiet
-const VALLEY_RATIO = 0.2; // valley = below 20% of the open segment's mean RMS
+// 0.3 (was 0.2): real BGM raises the energy floor, so at 0.2 valleys almost
+// never fired on actual content (probe logs: 0/14 narration, 1/10 song) and
+// hard 9s dominated. A false valley in music lands in an instrumental gap —
+// which IS a sentence boundary — so widening is cheap.
+const VALLEY_RATIO = 0.3;
 const VALLEY_FLOOR = 1e-4; // absolute floor so near-digital-silence always counts
+// Text-quiescence split (stream-draft sessions only): sung vocals and voiced
+// pauses keep the ACOUSTIC floor high, but the draft engine stops emitting
+// characters the moment the sentence ends — a semantic pause detector the
+// two-pass architecture gives us for free (industry counterpart: endpoint
+// rules on trailing non-emission, and neural caption segmentation replacing
+// pause-based splits). 0.8s of no draft growth on a >=5s segment closes it.
+const TEXT_QUIESCENCE_MS = 800;
 
 const ASR_LANGUAGES = new Set(['zh', 'en', 'ja', 'ko', 'yue', '']);
 
@@ -84,6 +95,7 @@ let onlineStream = null;
 let partialEngine = 'pseudo'; // 'pseudo' | 'stream'
 let autoEngineDecided = false;
 let lastStreamText = '';
+let lastDraftGrowthAt = 0; // ms timestamp of the last draft-text change
 let logStream = null;
 let sessionLive = false;
 let shuttingDown = false;
@@ -359,6 +371,7 @@ function feedStream(win) {
       const text = (online.getResult(onlineStream).text || '').trim();
       if (text && text !== lastStreamText) {
         lastStreamText = text;
+        lastDraftGrowthAt = Date.now();
         post({ type: 'partial', text });
       }
     }
@@ -411,13 +424,21 @@ function trackOpenSegment(win) {
     recentRms.push(rms);
     if (recentRms.length > VALLEY_WINDOWS) recentRms.shift();
 
-    // Both splits checked per window (32ms): the valley so a ~0.3s breath is
-    // never missed, the hard cap so segments land at 9s sharp instead of
-    // 9-10s off the old 1s-timer check.
+    // All splits checked per window (32ms). Priority: hard cap, then the
+    // semantic (text-quiescence) signal, then the acoustic valley.
     if (openLen >= HARD_SPLIT_S * SAMPLE_RATE) return forceSplit('hard');
-    if (openLen >= SOFT_SPLIT_FROM_S * SAMPLE_RATE && recentRms.length === VALLEY_WINDOWS) {
-      const floor = Math.max(VALLEY_FLOOR, (openRmsSum / openWinCount) * VALLEY_RATIO);
-      if (recentRms.every((r) => r < floor)) forceSplit('valley');
+    if (openLen >= SOFT_SPLIT_FROM_S * SAMPLE_RATE) {
+      if (
+        partialEngine === 'stream' &&
+        lastStreamText &&
+        Date.now() - lastDraftGrowthAt >= TEXT_QUIESCENCE_MS
+      ) {
+        return forceSplit('quiet');
+      }
+      if (recentRms.length === VALLEY_WINDOWS) {
+        const floor = Math.max(VALLEY_FLOOR, (openRmsSum / openWinCount) * VALLEY_RATIO);
+        if (recentRms.every((r) => r < floor)) forceSplit('valley');
+      }
     }
   } else {
     preRoll.push(new Float32Array(win));

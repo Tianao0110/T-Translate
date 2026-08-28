@@ -274,7 +274,12 @@
       const lang = (rec.lang || '').replace(/[<|>]/g, '');
       meta.textContent = `[${lang || '?'} ${rec.segDurS}s${rec.repeated ? ' 重复' : ''}]`;
       div.appendChild(meta);
-      div.appendChild(document.createTextNode(rec.text));
+      // 句末标点拆行显示（字幕规范：眼睛读短行）；翻译仍按整段走保住上下文
+      const parts = rec.text.split(/(?<=[。！？!?])/).filter((s) => s.trim());
+      (parts.length ? parts : [rec.text]).forEach((part, idx) => {
+        if (idx > 0) div.appendChild(document.createElement('br'));
+        div.appendChild(document.createTextNode(part.trim()));
+      });
       els.transcript.appendChild(div);
       while (els.transcript.children.length > MAX_SEGMENTS) {
         els.transcript.firstChild.remove();
