@@ -121,6 +121,9 @@
     .seg-repeat { color: #d9a441; }
     /* 开放段临时识别文本——收到定稿 segment 后被替换 */
     .seg.partial { color: #7d8697; font-style: italic; }
+    /* 定稿句的译文行（只翻定稿，不翻灰字） */
+    .seg-trans { color: #7ec9ff; margin-top: 1px; }
+    .seg-trans.pending { color: #4a5160; }
     .placeholder { color: #565e6d; padding-top: 8px; text-align: center; }
 
     .probe-footer {
@@ -150,6 +153,13 @@
           <option value="ko">韩文</option>
           <option value="yue">粤语</option>
         </select>
+        <select class="probe-select" id="targetSel" title="翻译目标语（只翻定稿句；与原文同语种的句子自动跳过）">
+          <option value="">不翻译</option>
+          <option value="zh">译成中文</option>
+          <option value="en">译成英文</option>
+          <option value="ja">译成日文</option>
+          <option value="ko">译成韩文</option>
+        </select>
         <button class="probe-btn primary" id="toggleBtn" disabled>开始</button>
         <button class="probe-btn" id="closeBtn">关闭</button>
       </div>
@@ -167,6 +177,7 @@
       toggleBtn: document.getElementById('toggleBtn'),
       closeBtn: document.getElementById('closeBtn'),
       langSel: document.getElementById('langSel'),
+      targetSel: document.getElementById('targetSel'),
       levelBar: document.getElementById('levelBar'),
       transcript: document.getElementById('transcript'),
       placeholder: document.getElementById('placeholder'),
@@ -175,6 +186,10 @@
 
     // file:// 独立 origin，localStorage 只属于探针窗自己
     try { els.langSel.value = localStorage.getItem('audioProbeLang') || ''; } catch (err) { /* storage off */ }
+    try { els.targetSel.value = localStorage.getItem('audioProbeTargetLang') || ''; } catch (err) { /* storage off */ }
+    els.targetSel.addEventListener('change', () => {
+      try { localStorage.setItem('audioProbeTargetLang', els.targetSel.value); } catch (err) { /* storage off */ }
+    });
 
     const STATUS_TEXT = {
       idle: '就绪',
@@ -265,6 +280,33 @@
         els.transcript.firstChild.remove();
       }
       els.transcript.scrollTop = els.transcript.scrollHeight;
+      translateSegment(div, rec, lang);
+    }
+
+    // 只翻定稿句（灰字永不进翻译）。同语种跳过；失败不留占位——诚实降级为纯转写。
+    // 隐私模式由主进程按请求注入，这里不用也不能带。
+    async function translateSegment(div, rec, srcLang) {
+      const target = els.targetSel.value;
+      if (!target || srcLang === target) return;
+      const transDiv = document.createElement('div');
+      transDiv.className = 'seg-trans pending';
+      transDiv.textContent = '…';
+      div.appendChild(transDiv);
+      try {
+        const res = await window.audioProbe.translate({
+          text: rec.text,
+          options: { sourceLang: 'auto', targetLang: target },
+        });
+        if (res && res.success && res.text) {
+          transDiv.textContent = res.text;
+          transDiv.classList.remove('pending');
+          els.transcript.scrollTop = els.transcript.scrollHeight;
+        } else {
+          transDiv.remove();
+        }
+      } catch (err) {
+        transDiv.remove();
+      }
     }
 
     function setFooter(rec) {

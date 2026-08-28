@@ -17,6 +17,11 @@ contextBridge.exposeInMainWorld('audioProbe', {
   onSegment: (cb) => ipcRenderer.on(AP.SEGMENT, (event, rec) => cb(rec)),
   onPartial: (cb) => ipcRenderer.on(AP.PARTIAL, (event, text) => cb(text)),
 
+  // Sentence translation for finals — same main-process stack bridge as the
+  // selection window; the facade injects privacyMode/useCache per request, so
+  // offline/secure gating needs nothing extra here.
+  translate: (payload) => ipcRenderer.invoke('stack:translate', payload),
+
   // Same crash-visibility bridge as the child pane: renderer errors reach the
   // on-disk main log instead of dying with the window.
   logs: {
