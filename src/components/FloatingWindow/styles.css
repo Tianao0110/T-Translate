@@ -1286,6 +1286,22 @@
      own 16px padding covers most of the 23px strip; this tops it up (22px
      here once stacked into a fat blank band). */
   padding-top: 8px;
+
+  /* Subtitle palette. This window floats over arbitrary content at any
+     opacity, so emphasis must be carried by ALPHA (which always fades toward
+     whatever is behind) and never by swapping to a "dimmer" color token: at
+     1% opacity over a dark video the light themes' near-black body color is
+     the LEAST readable thing on screen — that is how the live line came out
+     washed out while the finished ones looked solid (user report 2026-08-28,
+     inverted here). Both bases are mid-tone and survive black or white. */
+  --listen-src: var(--floating-text-muted);
+  --listen-dst: var(--floating-accent);
+}
+
+/* The amber-dark theme's body color IS a light warm gray — over video it beats
+   the muted token, so that theme keeps it as the transcript color. */
+[data-theme="dark"] .listen-panel {
+  --listen-src: var(--floating-text);
 }
 
 /* Lyrics-style flow (user-picked): the line BEING recognized is the big bold
@@ -1338,6 +1354,8 @@
   margin-bottom: 10px;
   word-break: break-word;
   animation: listen-in 0.25s ease;
+  /* Demotion to .old is a fade, not a snap */
+  transition: opacity 0.25s ease;
 }
 
 @keyframes listen-in {
@@ -1349,37 +1367,41 @@
   font-size: 14px;
   font-weight: 500;
   line-height: 1.55;
-  color: var(--floating-text);
+  color: var(--listen-src);
 }
 
 .listen-seg-trans {
   font-size: 13px;
   line-height: 1.5;
-  color: var(--floating-accent);
+  color: var(--listen-dst);
   margin-top: 2px;
 }
 
-/* History lines recede */
+/* Finished lines are ghosts: same hues, faded and smaller, drifting up as new
+   ones land. Alpha only — a "dimmer" token cannot be trusted here (see the
+   palette note above). */
+.listen-seg.old {
+  opacity: 0.45;
+}
+
 .listen-seg.old .listen-seg-text {
   font-size: 13px;
   font-weight: 400;
-  color: var(--floating-text-muted);
 }
 
 .listen-seg.old .listen-seg-trans {
   font-size: 12px;
-  color: color-mix(in srgb, var(--floating-accent) 55%, var(--floating-text-muted));
 }
 
 /* No italics: CJK has no true italic glyphs, so the browser shears them —
    permanently blurry text. And NO text-shadow anywhere in listen mode — both
    the glow and the hard-outline variants were tried and read as blur (user
    verdict: the untreated first version looked best). Don't re-add either.
-   The draft is the "now playing" lyric: biggest and boldest on screen. */
+   The draft is the "now playing" lyric: biggest, boldest, full alpha. */
 .listen-partial {
   font-size: 17px;
   font-weight: 600;
-  color: var(--floating-text);
+  color: var(--listen-src);
   line-height: 1.5;
   word-break: break-word;
   padding-bottom: 4px;

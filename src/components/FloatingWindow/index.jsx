@@ -878,7 +878,7 @@ const FloatingWindow = () => {
                   disabled={!listen.available}
                   title={listen.running
                     ? t('floatingWindow.listenStop', '停止监听')
-                    : t('floatingWindow.listenStart', '开始监听系统声音')}
+                    : t('floatingWindow.listenStart', '开始监听系统声音（音频不落盘）')}
                 >
                   {listen.running ? <Square size={12} /> : <Play size={12} />}
                 </button>

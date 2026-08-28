@@ -322,7 +322,7 @@ const zh = {
     modeTranslate: "截图翻译",
     modeUnderstand: "讲解",
     modeListen: "听译",
-    listenStart: "开始监听系统声音",
+    listenStart: "开始监听系统声音（音频不落盘）",
     listenStop: "停止监听",
     listenLang: "识别语言（切换后自动重启识别引擎）",
     listenLangAuto: "自动",
@@ -330,7 +330,7 @@ const zh = {
     listenNoTranslate: "不翻译",
     listenExport: "导出字幕（SRT，含译文）",
     listenExported: "字幕已导出",
-    listenIdle: "点击开始，实时转写并翻译系统声音（音频不落盘）",
+    listenIdle: "点击开始，听译系统声音",
     listenWaiting: "正在监听系统声音…",
     listenStatus: {
       idle: "就绪",
