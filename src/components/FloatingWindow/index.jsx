@@ -821,8 +821,8 @@ const FloatingWindow = () => {
                 setUnderstandMode(!understandMode);
               }}
               title={understandMode
-                ? t('floatingWindow.understandModeOn', '理解模式已开：截图后直接讲解，点击关闭')
-                : t('floatingWindow.understandMode', '理解模式：截图后不翻译，直接讲解内容')}
+                ? t('floatingWindow.understandModeOn', '讲解模式已开：截图后直接讲解，点击关闭')
+                : t('floatingWindow.understandMode', '讲解模式：截图后不翻译，直接讲解内容')}
             >
               <Brain size={12} />
             </button>

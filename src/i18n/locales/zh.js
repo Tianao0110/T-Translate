@@ -30,7 +30,7 @@ const zh = {
     getApiKey: "获取 API Key",
     typeLabels: { llm: "AI 大模型", api: "专业 API", traditional: "传统翻译" },
     noAiActions: "无 AI 动作",
-    noAiActionsHint: "这个翻译源只会翻译、不能对话，所以它当值时「总结」和理解模式不会出现。需要用大模型源（OpenAI / DeepSeek / Claude / Gemini / Ollama / LM Studio）。",
+    noAiActionsHint: "这个翻译源只会翻译、不能对话，所以它当值时「总结」和讲解模式不会出现。需要用大模型源（OpenAI / DeepSeek / Claude / Gemini / Ollama / LM Studio）。",
     names: {
       'local-llm': 'LM Studio (本地)',
       'openai': 'OpenAI',
@@ -106,7 +106,6 @@ const zh = {
     updated: "快捷键已更新: {{label}} → {{shortcut}}", updateFailed: "快捷键更新失败: {{error}}", reset: "快捷键已重置为默认值",
     conflictNotice: "快捷键被其他程序占用: {{shortcuts}}，可在设置中修改"
   },
-  toolbar: { floatingWindow: "悬浮窗口", screenshot: "截图翻译", selection: "划词翻译", selectionOn: "划词已开启", selectionOff: "划词已关闭", privacy: "隐私模式", theme: "主题" },
   templates: { natural: "自然", naturalDesc: "日常/口语", precise: "精确", preciseDesc: "技术/学术", formal: "正式", formalDesc: "商务/官方" },
   translation: {
     sourceLang: "源语言", targetLang: "目标语言", auto: "自动检测",
@@ -114,8 +113,6 @@ const zh = {
     translate: "翻译", translating: "翻译中...", copy: "复制", copied: "已复制", clear: "清空",
     swap: "交换语言", speak: "朗读", stop: "停止", favorite: "收藏", favorited: "已收藏", characters: "字符",
     source: "原文", target: "译文", recognizing: "识别中...",
-    mtModeBadge: "MT 模式",
-    mtModeHint: "检测到翻译专用模型，已自动切换为直接翻译提示词（语气选择仍然生效）",
     screenshot: "截图识别", importImage: "导入图片", paste: "粘贴",
     speakSource: "朗读原文", speakTarget: "朗读译文", stopSpeak: "停止朗读",
     ocrProcessing: "正在识别图片中的文字...", dropFile: "释放文件以导入...",
@@ -174,7 +171,7 @@ const zh = {
     sourceFilter: { all: "全部来源", main: "主界面", selection: "划词", screenshot: "截图", floating: "悬浮窗", other: "其他" },
     select: "选择", export: "导出", import: "导入",
     hasAiResult: "附带 AI 结果，双击查看",
-    understandEntry: "AI 理解结果",
+    understandEntry: "AI 讲解",
     copyExplain: "复制讲解",
     deleteSelected: "删除 ({{count}})",
     deleteSelectedConfirm: "确定删除选中的 {{count}} 条记录？",
@@ -317,8 +314,8 @@ const zh = {
     passThroughToggle: "鼠标穿透：内容区点击直达下层应用，顶栏保持可点",
     passThroughOn: "穿透中，点击退出（内容区点击直达下层应用）",
     passThroughSticky: "穿透中 · 顶栏可点击退出 (Esc)",
-    understandMode: "理解模式：截图后不翻译，直接讲解内容",
-    understandModeOn: "理解模式已开：截图后直接讲解，点击关闭",
+    understandMode: "讲解模式：截图后不翻译，直接讲解内容",
+    understandModeOn: "讲解模式已开：截图后直接讲解，点击关闭",
     understanding: "理解中..."
   },
   selection: {
@@ -388,7 +385,7 @@ const zh = {
     notifications: {
       title: "通知",
       system: "长任务完成后发送系统通知",
-      systemHint: "窗口不在前台时，文档翻译或一键总结完成会从系统通知中心提醒，点击回到窗口",
+      systemHint: "窗口不在前台时，文档翻译或全文总结完成会从系统通知中心提醒，点击回到窗口",
     },
     ocr: { title: "OCR 设置" },
     shortcuts: { title: "快捷键设置" },
@@ -598,15 +595,15 @@ const zh = {
     sysNotify: {
       translateDoneTitle: "文档翻译完成",
       translateDoneBody: "《{{name}}》已翻译完成，点击查看",
-      summaryDoneTitle: "一键总结完成",
+      summaryDoneTitle: "全文总结完成",
       summaryDoneBody: "《{{name}}》的总结已生成，点击查看",
     },
     sourceLang: "源语言",
     targetLang: "目标语言",
-    digestHint: "把已讲解的段落整理成一份笔记",
+    digestHint: "把已讲解的段落汇总成一份总结",
     digestScope: "基于已讲解的 {{count}} 段，不代表全文",
     digestScopeAll: "覆盖全文 {{count}} 个段落",
-    summarizeAll: "一键总结",
+    summarizeAll: "总结全文",
     summarizeAllHint: "先逐段讲解全文，再汇总成总结",
     summarizeAllConfirm: "将逐段讲解 {{count}} 个段落，再汇总成全文总结。\n\n这会向模型发起 {{count}} 次请求，长文档可能需要几分钟；在线 API 会按用量计费。过程中可以随时停止，已完成的讲解会保留。",
     summarizeAllStop: "停止（已完成的讲解会保留）",
@@ -856,7 +853,7 @@ const zh = {
   // actions carry their own labels instead — they have no keys here.
   aiActions: {
     surfaceSelection: "划词", surfaceScreenshot: "主面板", surfaceFloating: "悬浮窗",
-    inUnderstandMode: "理解模式下",
+    inUnderstandMode: "讲解模式下",
     description: "在看到的内容上再做一层理解。一个动作就是一份提示词配置，不是代码——内置两个，其余靠导入。",
     builtinTitle: "内置动作",
     longForm: "「总结」出现的门槛",
@@ -878,7 +875,7 @@ const zh = {
     sendsCapture: "会把这张截图发给视觉模型",
     readFromCapture: "视觉模型读取截图生成",
     summarize: { name: "总结", desc: "读完整段内容，用目标语言给出要点" },
-    digest: { name: "整理笔记", desc: "把已讲解的段落整理成一份连贯笔记" },
+    digest: { name: "总结已讲解段落", desc: "把已讲解的段落汇总成一份连贯总结" },
     explain: { name: "讲解", desc: "把这块内容讲清楚：整体在说什么，关键概念是什么" }
   },
   svc: {

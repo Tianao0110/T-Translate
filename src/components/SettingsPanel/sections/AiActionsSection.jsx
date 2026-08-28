@@ -27,7 +27,7 @@ const AiActionsSection = ({ settings, updateSetting, notify, confirm }) => {
       .map((s) => t(...(SURFACE_KEYS[s] || [s, s])))
       .join(' / ');
     const mode = action.trigger?.mode === 'understand'
-      ? t('aiActions.inUnderstandMode', '理解模式下')
+      ? t('aiActions.inUnderstandMode', '讲解模式下')
       : '';
     return [surfaces, mode].filter(Boolean).join(' · ');
   };

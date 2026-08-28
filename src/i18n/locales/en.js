@@ -30,7 +30,7 @@ const en = {
     getApiKey: "Get API Key",
     typeLabels: { llm: "AI Model", api: "Pro API", traditional: "Traditional" },
     noAiActions: "No AI actions",
-    noAiActionsHint: "This source only translates — it cannot hold a conversation, so Summarize and understanding mode stay hidden while it is the active source. Use an LLM source (OpenAI / DeepSeek / Claude / Gemini / Ollama / LM Studio) for those.",
+    noAiActionsHint: "This source only translates — it cannot hold a conversation, so Summarize and Explain mode stay hidden while it is the active source. Use an LLM source (OpenAI / DeepSeek / Claude / Gemini / Ollama / LM Studio) for those.",
     names: {
       'local-llm': 'LM Studio (Local)',
       'openai': 'OpenAI',
@@ -106,7 +106,6 @@ const en = {
     updated: "Shortcut updated: {{label}} → {{shortcut}}", updateFailed: "Shortcut update failed: {{error}}", reset: "Shortcuts reset to default",
     conflictNotice: "Shortcuts occupied by other apps: {{shortcuts}}. You can change them in Settings."
   },
-  toolbar: { floatingWindow: "Floating Window", screenshot: "Screenshot", selection: "Selection", selectionOn: "Selection ON", selectionOff: "Selection OFF", privacy: "Privacy Mode", theme: "Theme" },
   templates: { natural: "Natural", naturalDesc: "Daily/Casual", precise: "Precise", preciseDesc: "Tech/Academic", formal: "Formal", formalDesc: "Business/Official" },
   translation: {
     sourceLang: "Source", targetLang: "Target", auto: "Auto Detect",
@@ -114,8 +113,6 @@ const en = {
     translate: "Translate", translating: "Translating...", copy: "Copy", copied: "Copied", clear: "Clear",
     swap: "Swap Languages", speak: "Speak", stop: "Stop", favorite: "Favorite", favorited: "Favorited", characters: "characters",
     source: "Source", target: "Target", recognizing: "Recognizing...",
-    mtModeBadge: "MT mode",
-    mtModeHint: "Translation-only model detected — using direct prompt (tone selection still applies)",
     screenshot: "Screenshot OCR", importImage: "Import Image", paste: "Paste",
     speakSource: "Speak Source", speakTarget: "Speak Target", stopSpeak: "Stop Speaking",
     ocrProcessing: "Recognizing text from image...", dropFile: "Drop file to import...",
@@ -174,7 +171,7 @@ const en = {
     sourceFilter: { all: "All Sources", main: "Main Window", selection: "Selection", screenshot: "Screenshot", floating: "Floating Window", other: "Other" },
     select: "Select", export: "Export", import: "Import",
     hasAiResult: "Has an AI result — double-click to view",
-    understandEntry: "AI understanding result",
+    understandEntry: "AI explanation",
     copyExplain: "Copy explanation",
     deleteSelected: "Delete ({{count}})",
     searchResult: "Search \"{{keyword}}\" found {{count}} results",
@@ -317,8 +314,8 @@ const en = {
     passThroughToggle: "Mouse pass-through: content clicks reach the app below; top bar stays clickable",
     passThroughOn: "Pass-through on, click to exit (content clicks reach the app below)",
     passThroughSticky: "Pass-through on · exit via top bar (Esc)",
-    understandMode: "Understanding mode: explain the capture instead of translating it",
-    understandModeOn: "Understanding mode on — captures get explained; click to turn off",
+    understandMode: "Explain mode: explain the capture instead of translating it",
+    understandModeOn: "Explain mode on — captures get explained; click to turn off",
     understanding: "Understanding..."
   },
   selection: {
@@ -388,7 +385,7 @@ const en = {
     notifications: {
       title: "Notifications",
       system: "System notification when long tasks finish",
-      systemHint: "With the window in the background, finished document translations and one-click summaries post a system notification. Click it to return.",
+      systemHint: "With the window in the background, finished document translations and document summaries post a system notification. Click it to return.",
     },
     ocr: { title: "OCR Settings" },
     shortcuts: { title: "Keyboard Shortcuts" },
@@ -603,7 +600,7 @@ const en = {
     },
     sourceLang: "Source Language",
     targetLang: "Target Language",
-    digestHint: "Organise the paragraphs you have explained into one note",
+    digestHint: "Summarize the paragraphs you have explained into one piece",
     digestScope: "from the {{count}} paragraphs you explained — not the whole document",
     digestScopeAll: "covering all {{count}} paragraphs of the document",
     summarizeAll: "Summarize document",
@@ -855,7 +852,7 @@ const en = {
   // actions carry their own labels instead — they have no keys here.
   aiActions: {
     surfaceSelection: "Selection", surfaceScreenshot: "Main panel", surfaceFloating: "Floating window",
-    inUnderstandMode: "in understanding mode",
+    inUnderstandMode: "in Explain mode",
     description: "One more layer of understanding on what you are looking at. An action is a prompt config, not code — two ship with the app, the rest are imported.",
     builtinTitle: "Built-in actions",
     longForm: "When Summarize appears",
@@ -877,7 +874,7 @@ const en = {
     sendsCapture: "sends this screenshot to the vision model",
     readFromCapture: "Read from the screenshot by a vision model",
     summarize: { name: "Summarize", desc: "Read the whole passage and give key points in the target language" },
-    digest: { name: "Consolidate notes", desc: "Organise the paragraphs you have explained into one note" },
+    digest: { name: "Summarize explained sections", desc: "Summarize the paragraphs you have explained into one coherent piece" },
     explain: { name: "Explain", desc: "Explain this content: what it is about and what the key concepts are" }
   },
   svc: {

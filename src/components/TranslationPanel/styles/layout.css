@@ -153,18 +153,22 @@
   color: var(--text-on-accent);
 }
 
-/* Auto-switched MT prompt indicator — explains why output style changed */
-.mt-mode-badge {
+/* Simple/full toggle at the tail of the template row — same look and mental
+   model as the settings sidebar's link (S-2 progressive disclosure) */
+.mode-text-link {
   display: flex;
   align-items: center;
-  padding: 0 10px;
-  border-radius: 6px;
-  background: rgba(16, 185, 129, 0.12);
-  color: var(--success, #10b981);
-  font-size: 11px;
+  padding: 0 6px;
+  color: var(--text-secondary, #64748b);
+  font-size: 12px;
   font-weight: 600;
-  white-space: nowrap;
-  cursor: help;
+  cursor: pointer;
+  transition: color 0.15s;
+  user-select: none;
+}
+
+.mode-text-link:hover {
+  color: var(--accent-primary);
 }
 
 /* ==================== Translation areas ==================== */

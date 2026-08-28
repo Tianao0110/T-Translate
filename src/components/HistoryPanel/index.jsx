@@ -98,7 +98,7 @@ const HistoryCard = memo(({
         <span className="card-lang">{item.sourceLanguage || 'auto'} → {item.targetLanguage || 'zh'}</span>
         <div className="card-header-right">
           {item.kind === 'understand' && (
-            <span className="card-ai-badge" title={t('history.understandEntry', 'AI 理解结果')}>
+            <span className="card-ai-badge" title={t('history.understandEntry', 'AI 讲解')}>
               <AiBadge size={12} />
             </span>
           )}

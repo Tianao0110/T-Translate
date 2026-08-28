@@ -19,7 +19,6 @@ import { getShortErrorMessage } from '../../utils/error-handler.js';
 import './styles.css';
 
 import { PRIVACY_MODES, TRANSLATION_STATUS, LANGUAGES } from '@config/defaults';
-import { detectTemplateFromModel } from '../../config/model-template-mapping.js';
 
 import { useTTS, useTermCheck, useStyleRewrite, useSaveModal } from './hooks';
 import useAiActions from '../../hooks/use-ai-actions.js';
@@ -183,22 +182,39 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     { id: 'formal', name: t('templates.formal'), desc: t('templates.formalDesc') },
   ];
 
-  // Surface the auto-switch so users know why output style changed.
-  // The active model now lives in the main process — pull it once and refresh
-  // on stack:changed (settings save reloads the stack in any window).
-  const [activeModel, setActiveModel] = useState('');
+  // Progressive disclosure (S-2), same regime as the settings page: simple
+  // hides the heavy controls (tone templates, style rewrite, image import),
+  // full is today's everything. Stored per machine; the default splits by
+  // user age — an upgrade must not remove a single control from an existing
+  // user, while a fresh install starts light.
+  const [simpleMode, setSimpleMode] = useState(() => {
+    try {
+      const stored = localStorage.getItem('main-simple-mode');
+      if (stored !== null) return stored === 'true';
+    } catch { /* storage off */ }
+    return false; // render full until the new/old verdict below lands
+  });
   useEffect(() => {
+    try {
+      if (localStorage.getItem('main-simple-mode') !== null) return;
+    } catch { /* storage off */ }
     let alive = true;
-    const pull = () => {
-      translationService.getCurrentProvider()
-        .then((p) => { if (alive) setActiveModel(p?.model || ''); })
-        .catch(() => {});
-    };
-    pull();
-    const off = translationService.onChanged(pull);
-    return () => { alive = false; off?.(); };
+    window.electron?.store?.get?.('onboarding')
+      .then((ob) => {
+        if (!alive) return;
+        const isNewUser = !ob?.welcomeSeen;
+        if (isNewUser) setSimpleMode(true);
+        try { localStorage.setItem('main-simple-mode', String(isNewUser)); } catch { /* storage off */ }
+      })
+      .catch(() => {});
+    return () => { alive = false; };
   }, []);
-  const isMTModel = !!detectTemplateFromModel(activeModel);
+  const toggleSimpleMode = () => {
+    setSimpleMode((prev) => {
+      try { localStorage.setItem('main-simple-mode', String(!prev)); } catch { /* storage off */ }
+      return !prev;
+    });
+  };
 
   // Triggered when MainWindow passes screenshot data in via props (capture flow)
   useEffect(() => {
@@ -446,7 +462,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
         </div>
 
         <div className="template-selector">
-          {templates.map(tmpl => (
+          {!simpleMode && templates.map(tmpl => (
             <button
               key={tmpl.id}
               className={`template-btn ${selectedTemplate === tmpl.id ? 'active' : ''}`}
@@ -456,11 +472,9 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
               {tmpl.name}
             </button>
           ))}
-          {isMTModel && (
-            <span className="mt-mode-badge" title={t('translation.mtModeHint')}>
-              {t('translation.mtModeBadge')}
-            </span>
-          )}
+          <span className="mode-text-link" onClick={toggleSimpleMode}>
+            {simpleMode ? t('settingsNav.fullMode', '完整') : t('settingsNav.simpleMode', '简洁')}
+          </span>
         </div>
       </div>
 
@@ -485,9 +499,11 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
               <button className="action-btn" onClick={() => window.electron?.screenshot?.capture()} disabled={isOcrProcessing} title={t('translation.screenshot')}>
                 <Camera size={15} />
               </button>
-              <button className="action-btn" onClick={() => fileInputRef.current?.click()} disabled={isOcrProcessing} title={t('translation.importImage')}>
-                <Image size={15} />
-              </button>
+              {!simpleMode && (
+                <button className="action-btn" onClick={() => fileInputRef.current?.click()} disabled={isOcrProcessing} title={t('translation.importImage')}>
+                  <Image size={15} />
+                </button>
+              )}
               <button className="action-btn" onClick={pasteFromClipboard} disabled={isOcrProcessing} title={t('translation.paste')}>
                 <FileText size={15} />
               </button>
@@ -576,18 +592,20 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
               <button className="action-btn" onClick={() => copyToClipboard('translated') && notify(t('translation.copied'), 'success')} disabled={!currentTranslation.translatedText} title={t('translation.copy', '复制')}>
                 <Copy size={15} />
               </button>
-              <span className="action-with-hint">
-                <button className="action-btn style-btn" onClick={styleRewrite.openStyleModal} disabled={!currentTranslation.translatedText || styleRewrite.isRewriting} title={t('translation.styleRewrite', '风格改写')}>
-                  {styleRewrite.isRewriting ? <Loader2 size={15} className="animate-spin" /> : <Palette size={15} />}
-                </button>
-                {activeHint === 'styleRewrite' && (
-                  <OneTimeHint
-                    id="styleRewrite"
-                    text={t('guide.hints.styleRewrite')}
-                    onDismiss={onboarding.dismissHint}
-                  />
-                )}
-              </span>
+              {!simpleMode && (
+                <span className="action-with-hint">
+                  <button className="action-btn style-btn" onClick={styleRewrite.openStyleModal} disabled={!currentTranslation.translatedText || styleRewrite.isRewriting} title={t('translation.styleRewrite', '风格改写')}>
+                    {styleRewrite.isRewriting ? <Loader2 size={15} className="animate-spin" /> : <Palette size={15} />}
+                  </button>
+                  {activeHint === 'styleRewrite' && (
+                    <OneTimeHint
+                      id="styleRewrite"
+                      text={t('guide.hints.styleRewrite')}
+                      onDismiss={onboarding.dismissHint}
+                    />
+                  )}
+                </span>
+              )}
               <span className="action-with-hint">
                 <button className="action-btn" onClick={saveModal.openSaveModal} disabled={!currentTranslation.translatedText} title={t('translation.favorite', '收藏')}>
                   <Sparkles size={15} />
