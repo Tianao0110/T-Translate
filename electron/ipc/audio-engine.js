@@ -3,8 +3,9 @@
 
 const { ipcMain, dialog } = require('electron');
 const fs = require('fs');
-const { CHANNELS } = require('../shared/channels');
+const { CHANNELS, PRIVACY_MODES } = require('../shared/channels');
 const engineManager = require('../managers/audio-engine-manager');
+const packManager = require('../utils/audio-pack-manager');
 const logger = require('../utils/logger')('IPC:AudioEngine');
 
 const AE = CHANNELS.AUDIO_ENGINE;
@@ -20,7 +21,15 @@ function toFloat32(samples) {
   return null;
 }
 
+function sendPackProgress(mainWindow, packId, progress, phase) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send(AE.DOWNLOAD_PROGRESS, { packId, progress, phase });
+  }
+}
+
 function registerAudioEngineIPC(ctx) {
+  const { getMainWindow, store } = ctx;
+
   ipcMain.handle(AE.GET_INFO, () => engineManager.getInfo());
 
   ipcMain.on(AE.START, (event, opts) => engineManager.startSession(opts || {}));
@@ -56,6 +65,46 @@ function registerAudioEngineIPC(ctx) {
     } catch (e) {
       logger.error('SRT export failed:', e.message);
       return { success: false, error: e.message };
+    }
+  });
+
+  // ===== Model packs =====
+  // The settings page is the only download entry point (the floating window's
+  // listen button stays disabled until a base pack lands).
+
+  ipcMain.handle(AE.PACKS_LIST, async (event, options = {}) => {
+    try {
+      return { success: true, ...(await packManager.listPacks(options)) };
+    } catch (error) {
+      logger.error('Pack list failed:', error);
+      return { success: false, error: error.message, errorCode: error.code };
+    }
+  });
+
+  ipcMain.handle(AE.PACKS_DOWNLOAD, async (event, packId) => {
+    // Offline mode promises the app never reaches the network — a model
+    // download is not an exception the user can click their way out of.
+    if (store.get('privacyMode', PRIVACY_MODES.STANDARD) === PRIVACY_MODES.OFFLINE) {
+      return { success: false, error: 'offline-mode', errorCode: 'OFFLINE_BLOCKED' };
+    }
+    const mainWindow = getMainWindow();
+    try {
+      return await packManager.downloadPack(packId, (progress, phase) => {
+        sendPackProgress(mainWindow, packId, progress, phase);
+      });
+    } catch (error) {
+      logger.error(`Pack download failed (${packId}):`, error);
+      sendPackProgress(mainWindow, packId, -1, 'error');
+      return { success: false, error: error.message, errorCode: error.code };
+    }
+  });
+
+  ipcMain.handle(AE.PACKS_REMOVE, async (event, packId) => {
+    try {
+      return await packManager.removePack(packId);
+    } catch (error) {
+      logger.error(`Pack remove failed (${packId}):`, error);
+      return { success: false, error: error.message, errorCode: error.code };
     }
   });
 }

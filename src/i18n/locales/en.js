@@ -8,7 +8,7 @@ const en = {
     groupTranslation: "Translation", groupSystem: "System",
     providers: "Providers", translation: "Translation", selection: "Selection", floatingWindow: "Floating Window", document: "Documents",
     aiActions: "AI Actions",
-    ocr: "OCR", tts: "Text to Speech", interface: "Appearance", privacy: "Privacy", about: "About",
+    ocr: "OCR", tts: "Text to Speech", listen: "Listen models", interface: "Appearance", privacy: "Privacy", about: "About",
     export: "Export", import: "Import", reset: "Reset",
     simpleMode: "Simple", fullMode: "Full", switchToFull: "Full", switchToSimple: "Simple",
     modeHint: "You're viewing the simple catalog. Click Full below for all settings (selection, floating window, OCR, privacy...)",
@@ -322,6 +322,7 @@ const en = {
     modeTranslate: "Capture translate",
     modeUnderstand: "Explain",
     modeListen: "Listen",
+    modeListenLocked: "Listen: download a recognition model in Settings > Listen models first",
     listenStart: "Start listening to system audio (audio never touches disk)",
     listenStop: "Stop listening",
     listenLang: "Recognition language (switching restarts the engine)",
@@ -425,6 +426,7 @@ const en = {
       clearHistory: "Clear History", clearAll: "Clear All Data"
     },
     tts: { title: "Text-to-Speech" },
+    listen: { title: "Listen models" },
     about: { checkUpdate: "Check for Updates", checking: "Checking...", upToDate: "You're up to date", newVersion: "New version available", download: "Download", later: "Later", releaseNotes: "Release Notes", publishedAt: "Published", copyright: "© 2026 T-Translate" },
     selection: { title: "Selection Translate" },
     floatingWindow: { title: "Floating Window" },
@@ -595,6 +597,43 @@ const en = {
     visionBlockedByPrivacy: "The current privacy mode disables vision models",
     visionNotLocal: "Offline mode allows only a vision model on this machine — the screenshot stays local",
     allEnginesFailed: "All OCR engines failed"
+  },
+  listen: {
+    description: "Listen mode captions and translates system audio live in the floating window. Models download on demand — they are not bundled. Audio passes through memory and never touches disk.",
+    ready: "Ready",
+    notReady: "Not ready",
+    notReadyHint: "No recognition model installed — the floating window's listen button stays greyed out until one is",
+    draftOn: "Draft engine installed: Chinese and English appear while you speak, then get corrected.",
+    draftOff: "No draft engine: text appears when a sentence ends (Japanese, Korean and Cantonese always work this way).",
+    packs: {
+      title: "Recognition models",
+      refresh: "Refresh",
+      download: "Download",
+      update: "Update",
+      uninstall: "Uninstall",
+      installed: "Installed",
+      notInstalled: "Not installed",
+      updateAvailable: "Update available",
+      loading: "Fetching the model list...",
+      empty: "No models available",
+      manifestError: "Could not fetch the model list. Check your network, then refresh",
+      downloaded: "Model installed",
+      downloadFailed: "Model download failed",
+      offlineBlocked: "Offline mode never uses the network. Switch privacy mode to download",
+      removed: "Model uninstalled",
+      removeFailed: "Uninstall failed",
+      removeConfirm: "Uninstall this model? Listen mode needs it downloaded again to work",
+      location: "Model folder: {{dir}}",
+      phase: { downloading: "Downloading", verifying: "Verifying", extracting: "Extracting", done: "Done", error: "Failed" },
+      names: {
+        "asr-base-sense-voice": "Base model (zh/en/ja/ko/yue)",
+        "asr-draft-zipformer-zh-en": "Draft engine (zh/en)"
+      },
+      desc: {
+        "asr-base": "Required: turns speech into finished sentences with punctuation",
+        "asr-draft": "Optional: shows Chinese and English as you speak, corrected on the final pass"
+      }
+    }
   },
   tts: {
     description: "Configure text-to-speech settings",

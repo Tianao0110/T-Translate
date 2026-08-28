@@ -89,15 +89,20 @@ const FloatingWindow = () => {
 
   const listen = useListenSession({ active: listenMode });
 
-  // Mode-segment gate: listen appears only when ASR models are on disk and
-  // privacy allows (same zero-claim rule the probe entry followed).
-  useEffect(() => {
-    let alive = true;
+  // Mode-segment gate: the listen button is always visible, but stays disabled
+  // until a recognition model is on disk. Downloading happens in settings
+  // (user's call) — refreshListen also runs on the settings-changed broadcast
+  // the settings page fires after a pack install, so a fresh download lights
+  // the button up without reopening this window.
+  const refreshListen = useCallback(() => {
     window.electron?.audioEngine?.getInfo?.()
-      .then((info) => { if (alive) setListenAvailable(!!info?.modelName); })
-      .catch(() => { if (alive) setListenAvailable(false); });
-    return () => { alive = false; };
-  }, [listenMode]);
+      .then((info) => setListenAvailable(!!info?.modelName))
+      .catch(() => setListenAvailable(false));
+  }, []);
+
+  useEffect(() => {
+    refreshListen();
+  }, [listenMode, refreshListen]);
 
 
   // Service-layer notifications (e.g. OCR engine fallback) bubble up via session store
@@ -315,6 +320,9 @@ const FloatingWindow = () => {
         // Stack + OCR reloads are main-process-internal now — this channel
         // only carries the window's UI settings (opacity/engine/theme/langs).
         loadSettings();
+        // A model pack may have just landed (settings page fires this after an
+        // install/uninstall) — re-ask instead of staying grey until reopen.
+        refreshListen();
         const newTheme = newSettings?.interface?.theme;
         if (newTheme && ['light', 'dark', 'fresh'].includes(newTheme)) {
           setTheme(newTheme);
@@ -832,9 +840,9 @@ const FloatingWindow = () => {
       <div className="floating-top-area" onMouseDown={handleTitleBarMouseDown}>
           {/* Mode segments (design A, user-picked over the dropdown): three
               always-visible icons, single-select — no popup to fumble.
-              understand needs a chat/vision provider; listen needs ASR models
-              on disk (zero-claim otherwise). */}
-          {(ai.capabilities.text || ai.capabilities.vision || listenAvailable) && (
+              understand needs a chat/vision provider; listen is always there
+              but greyed until its models are downloaded in settings. */}
+          {(
             <div className="floating-mode-wrap">
               <button
                 className={`mode-seg-btn ${!listenMode && !understandMode ? 'active' : ''}`}
@@ -852,15 +860,16 @@ const FloatingWindow = () => {
                   <Brain size={12} />
                 </button>
               )}
-              {listenAvailable && (
-                <button
-                  className={`mode-seg-btn ${listenMode ? 'active' : ''}`}
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAutoRefresh(false); setListenMode(true); }}
-                  title={t('floatingWindow.modeListen', '听译')}
-                >
-                  <AudioLines size={12} />
-                </button>
-              )}
+              <button
+                className={`mode-seg-btn ${listenMode ? 'active' : ''}`}
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAutoRefresh(false); setListenMode(true); }}
+                disabled={!listenAvailable}
+                title={listenAvailable
+                  ? t('floatingWindow.modeListen', '听译')
+                  : t('floatingWindow.modeListenLocked', '听译：先到设置页「听译模型」下载识别模型')}
+              >
+                <AudioLines size={12} />
+              </button>
             </div>
           )}
           {listenMode && (

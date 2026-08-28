@@ -24,6 +24,20 @@ const path = require('path');
 const nodeFs = require('fs');
 const crypto = require('crypto');
 
+// "1.2.10" vs "1.3.0" — numeric per-segment compare, missing segments = 0.
+// Lives here, not in a domain pack file: every pack registry (OCR, audio)
+// needs the same "is the manifest newer than what's installed" test.
+function compareVersions(a, b) {
+  const pa = String(a || '0').split('.').map((n) => parseInt(n, 10) || 0);
+  const pb = String(b || '0').split('.').map((n) => parseInt(n, 10) || 0);
+  const len = Math.max(pa.length, pb.length);
+  for (let i = 0; i < len; i++) {
+    const d = (pa[i] || 0) - (pb[i] || 0);
+    if (d !== 0) return d > 0 ? 1 : -1;
+  }
+  return 0;
+}
+
 function createPackManager({
   manifestUrl,
   packsRoot,
@@ -235,4 +249,4 @@ function createPackManager({
   };
 }
 
-module.exports = { createPackManager };
+module.exports = { createPackManager, compareVersions };

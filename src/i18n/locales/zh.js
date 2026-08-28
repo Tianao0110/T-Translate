@@ -8,7 +8,7 @@ const zh = {
     groupTranslation: "翻译", groupSystem: "系统",
     providers: "翻译源", translation: "翻译设置", selection: "划词翻译", floatingWindow: "悬浮窗口", document: "文档翻译",
     aiActions: "AI 动作",
-    ocr: "OCR 识别", tts: "朗读设置", interface: "界面外观", privacy: "隐私模式", about: "关于",
+    ocr: "OCR 识别", tts: "朗读设置", listen: "听译模型", interface: "界面外观", privacy: "隐私模式", about: "关于",
     export: "导出", import: "导入", reset: "重置",
     simpleMode: "简洁", fullMode: "完整", switchToFull: "完整", switchToSimple: "简洁",
     modeHint: "当前为简洁目录，点下方「完整」可查看全部设置（划词、悬浮窗、OCR、隐私等）",
@@ -322,6 +322,7 @@ const zh = {
     modeTranslate: "截图翻译",
     modeUnderstand: "讲解",
     modeListen: "听译",
+    modeListenLocked: "听译：先到设置页「听译模型」下载识别模型",
     listenStart: "开始监听系统声音（音频不落盘）",
     listenStop: "停止监听",
     listenLang: "识别语言（切换后自动重启识别引擎）",
@@ -425,6 +426,7 @@ const zh = {
       clearHistory: "清除历史记录", clearAll: "清除所有数据"
     },
     tts: { title: "语音设置" },
+    listen: { title: "听译模型" },
     about: { checkUpdate: "检查更新", checking: "检查中...", upToDate: "已是最新版本", newVersion: "发现新版本", download: "前往下载", later: "稍后再说", releaseNotes: "更新内容", publishedAt: "发布时间", copyright: "© 2026 T-Translate" },
     selection: { title: "划词翻译" },
     floatingWindow: { title: "悬浮窗口" },
@@ -595,6 +597,43 @@ const zh = {
     visionBlockedByPrivacy: "当前隐私模式已禁用视觉模型",
     visionNotLocal: "离线模式只允许本机视觉模型，截图不出本机",
     allEnginesFailed: "所有 OCR 引擎均失败"
+  },
+  listen: {
+    description: "听译在悬浮窗里实时转写并翻译系统声音。识别模型不随安装包分发，按需下载；音频只在内存里过一遍，永不落盘。",
+    ready: "可用",
+    notReady: "不可用",
+    notReadyHint: "尚未安装识别模型，装好后悬浮窗的听译按钮才能点",
+    draftOn: "已装草稿引擎：中英边说边出字，说完自动修正",
+    draftOff: "未装草稿引擎：整句说完才出字（日/韩/粤本来就走这条路）",
+    packs: {
+      title: "识别模型",
+      refresh: "刷新",
+      download: "下载",
+      update: "更新",
+      uninstall: "卸载",
+      installed: "已安装",
+      notInstalled: "未安装",
+      updateAvailable: "可更新",
+      loading: "正在获取模型清单...",
+      empty: "暂无可用模型",
+      manifestError: "无法获取模型清单，请检查网络后点击刷新",
+      downloaded: "模型安装完成",
+      downloadFailed: "模型下载失败",
+      offlineBlocked: "离线模式不联网，下载请先切换隐私模式",
+      removed: "模型已卸载",
+      removeFailed: "模型卸载失败",
+      removeConfirm: "确定卸载该模型？卸载后听译要重新下载才能用",
+      location: "模型目录：{{dir}}",
+      phase: { downloading: "下载中", verifying: "校验中", extracting: "解压中", done: "完成", error: "失败" },
+      names: {
+        "asr-base-sense-voice": "基础识别模型（中/英/日/韩/粤）",
+        "asr-draft-zipformer-zh-en": "草稿引擎（中英）"
+      },
+      desc: {
+        "asr-base": "听译必需：负责成句定稿、标点与数字规整",
+        "asr-draft": "可选：中英说话时先出草稿，定稿后自动修正"
+      }
+    }
   },
   tts: {
     description: "配置文本朗读功能和语音参数",

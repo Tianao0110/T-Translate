@@ -238,6 +238,18 @@
   color: var(--floating-on-accent);
 }
 
+/* Locked (listen with no model downloaded yet): greyed via colour, never via
+   opacity — opacity is already this toolbar's show/hide channel, so dimming
+   with it would make the button vanish instead of read as disabled. Placed
+   after the theme and .active rules so it always wins on equal specificity. */
+.mode-seg-btn:disabled,
+.mode-seg-btn:disabled:hover {
+  cursor: default;
+  transform: none;
+  background: color-mix(in srgb, var(--floating-text-muted) 12%, transparent);
+  color: color-mix(in srgb, var(--floating-text-muted) 45%, transparent);
+}
+
 /* Listen status lives in the otherwise-empty drag strip next to the segments
    (the strip looked dead when the chrome faded). Part of the drag area on
    purpose — it is not clickable. */

@@ -170,8 +170,9 @@ const CHANNELS = {
     VISION_CAPABILITY: 'stack:vision-capability', // may path B run under the live privacy mode?
   },
   // Listen-translate (audio engine). Hosted by the floating window's listen
-  // mode; the mode entry appears only when ASR models are manually placed
-  // under userData/asr-models (zero-claim until then).
+  // mode; the mode entry is always visible but disabled until an ASR base
+  // pack sits under userData/asr-models — packs install from settings, and
+  // hand-placed model folders still count.
   AUDIO_ENGINE: {
     GET_INFO: 'audio-engine:get-info',   // renderer → main: model/privacy/state snapshot
     START: 'audio-engine:start',         // renderer → main: spawn ASR worker; payload {language}
@@ -182,6 +183,11 @@ const CHANNELS = {
     SEGMENT: 'audio-engine:segment',     // main → renderer: recognized (final) segment record
     PARTIAL: 'audio-engine:partial',     // main → renderer: open-segment provisional text ('' clears)
     EXPORT_SRT: 'audio-engine:export-srt', // renderer → main: save dialog + write subtitle file
+    // Model packs (settings page owns the only download entry point)
+    PACKS_LIST: 'audio-engine:packs-list',
+    PACKS_DOWNLOAD: 'audio-engine:packs-download',
+    PACKS_REMOVE: 'audio-engine:packs-remove',
+    DOWNLOAD_PROGRESS: 'audio-engine:download-progress',
   },
 };
 
