@@ -247,7 +247,6 @@
   left: 74px;
   font-size: 11px;
   color: var(--floating-text-muted);
-  text-shadow: 0 0 3px var(--floating-text-halo);
   user-select: none;
   pointer-events: none;
   z-index: 1000;
@@ -1315,10 +1314,6 @@
   font-weight: 500;
   line-height: 1.55;
   color: var(--floating-text);
-  /* Legibility rim at low window opacity — the text sits straight on the
-     desktop there (the translation only "looked clearer" because accent
-     colors carry their own saturation). */
-  text-shadow: 0 0 3px var(--floating-text-halo), 0 0 6px var(--floating-text-halo);
 }
 
 .listen-seg-trans {
@@ -1326,14 +1321,35 @@
   line-height: 1.5;
   color: var(--floating-accent);
   margin-top: 2px;
-  text-shadow: 0 0 3px var(--floating-text-halo);
 }
 
+/* No italics: CJK has no true italic glyphs, so the browser shears them —
+   permanently blurry text. The draft line is distinguished by muted color
+   and weight alone. */
 .listen-partial {
   font-size: 14px;
   color: var(--floating-text-muted);
-  font-style: italic;
+  opacity: 0.9;
   line-height: 1.55;
   word-break: break-word;
-  text-shadow: 0 0 3px var(--floating-text-halo), 0 0 6px var(--floating-text-halo);
+}
+
+/* Legibility rim ONLY at low window opacity, where the glyphs sit straight
+   on the desktop. A subtitle-style 4-direction hard outline — the blur-glow
+   variant smeared the edges at normal opacity ("更加模糊了"). */
+.floating-window.low-opacity .listen-seg-text,
+.floating-window.low-opacity .listen-partial {
+  text-shadow:
+    -1px 0 var(--floating-text-halo),
+    1px 0 var(--floating-text-halo),
+    0 -1px var(--floating-text-halo),
+    0 1px var(--floating-text-halo);
+}
+
+.floating-window.low-opacity .listen-seg-trans {
+  text-shadow:
+    -1px 0 var(--floating-text-halo),
+    1px 0 var(--floating-text-halo),
+    0 -1px var(--floating-text-halo),
+    0 1px var(--floating-text-halo);
 }
