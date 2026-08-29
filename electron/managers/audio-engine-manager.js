@@ -213,6 +213,11 @@ function onWorkerMessage(msg) {
       // finishes cleanup; the kill grace timer is already armed.
       if (child) {
         try {
+          // unload first: drops the recognizer/VAD/draft refs inside the
+          // worker so the model files are released before exit rather than
+          // whenever the process happens to die. Matters for the pack swap
+          // right behind stopSessionAndWait.
+          child.postMessage({ type: 'unload', what: 'asr' });
           child.postMessage({ type: 'shutdown' });
         } catch {
           killWorker();
@@ -235,6 +240,7 @@ function onWorkerExit(code) {
   childState = 'idle';
   unsubscribePrivacy();
   logger.info(`worker exited (code ${code}, stopping=${wasStopping})`);
+  drainExitWaiters();
 
   if (wasStopping) {
     sendStatus('stopped');
@@ -267,6 +273,40 @@ function logRendererEvent(kind, detail) {
   } catch {
     // worker mid-death — event is best-effort
   }
+}
+
+// Callers that must not touch the model files until the worker is really gone
+// (pack install/removal) wait on these.
+let exitWaiters = [];
+
+function drainExitWaiters() {
+  const waiters = exitWaiters;
+  exitWaiters = [];
+  for (const done of waiters) done();
+}
+
+/**
+ * Stop and resolve only once the worker process has exited. A pack swap that
+ * starts while the worker still has the .onnx files open fails on Windows —
+ * and it would fail at the very end of a 150 MB download.
+ */
+function stopSessionAndWait(reason, timeoutMs = STOP_GRACE_MS + 2000) {
+  if (!child) {
+    stopSession(reason);
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      logger.warn('worker did not exit in time — killing before pack swap');
+      killWorker();
+      resolve();
+    }, timeoutMs);
+    exitWaiters.push(() => {
+      clearTimeout(timer);
+      resolve();
+    });
+    stopSession(reason);
+  });
 }
 
 function stopSession(reason) {
@@ -315,6 +355,7 @@ module.exports = {
   getInfo,
   startSession,
   stopSession,
+  stopSessionAndWait,
   feedPcm,
   logRendererEvent,
 };

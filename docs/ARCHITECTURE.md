@@ -225,6 +225,29 @@ electron/utils/open-with.js     右键菜单 argv 解析（.pdf/.docx/.txt 白�
                                 installer/installer.nsh 安装写入、卸载对称清除
 ```
 
+### 听译引擎与驻留口径（v0.4.0）
+
+```
+electron/managers/audio-engine-manager.js  ASR utilityProcess 的唯一持有者
+electron/services/audio-engine/audio-worker.js  两个模型都住在这个子进程里
+electron/utils/model-root.js               模型根目录解析（安装目录优先）
+electron/utils/audio-pack-manager.js       模型包下载/卸载（工厂第二实例）
+```
+
+**载卸时序**：模型只在会话内驻留，不做常驻缓存。
+
+| 时刻 | 发生什么 |
+|------|----------|
+| 点开始 | fork 子进程 → `init` 声明模型路径 → `asr-start` 才真正加载 |
+| 会话中 | 定稿引擎 SenseVoice + 可选草稿引擎 zipformer 同时在内存 |
+| 点停止 | `asr-stop` 冲刷 → 主进程发 `unload`（丢引擎引用、放开模型文件）→ `shutdown` → 进程退出 |
+| 关窗/切 SECURE | 同上，`once('closed')` 与隐私监听各自兜底 |
+| 换包 | `stopSessionAndWait` 等进程真正退出才动目录——Windows 上文件句柄没放开，换包会在 150MB 下载的最后一步失败 |
+
+**内存口径**（2026-08-27 实测，双模型 3 分钟 soak）：会话中子进程 RSS 665–676MB
+且平稳；会话结束进程退出，回到 0。只装基座包约省一半。主进程侧的 OCR 会话是另一
+套缓存（LRU 2 个，换包/换档位时清），与听译互不影响。
+
 ## 命名规范
 
 | 类别 | 规范 | 示例 |

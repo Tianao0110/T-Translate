@@ -1,4 +1,4 @@
-// Generic model-pack manager factory: download / verify / install / remove
+﻿// Generic model-pack manager factory: download / verify / install / remove
 // packs under a domain-owned root, driven by a manifest.json hosted as a
 // release asset. Extracted verbatim from the OCR pack manager so the audio
 // engine (ASR/TTS packs, v0.4.x) reuses the same battle-tested machinery —
@@ -14,7 +14,9 @@
 //                      domain find packs outside packsRoot() (legacy roots)
 //                      so removal works there too; defaults to packsRoot/id
 //   listInstalled,     () => installed packs (merged into the UI list)
-//   evictSessions,     (packId) => void — release live file handles pre-swap
+//   evictSessions,     (packId) => void | Promise — release live file handles
+//                      before the swap. Awaited: a domain whose engine lives in
+//                      another process must resolve only once it is really gone
 //   computePackList,   (installed, manifest) => UI-ready pack list
 //   packJsonFields,    (entry) => fields persisted to pack.json (+installedAt)
 //   basePackId,        optional — its removal falls back to the bundled copy
@@ -208,7 +210,7 @@ function createPackManager({
       );
 
       // Swap into place: evict the live session first so no file handles linger
-      evictSessions(packId);
+      await evictSessions(packId);
       fs.rmSync(finalDir, { recursive: true, force: true });
       fs.renameSync(stagingDir, finalDir);
     } catch (e) {
@@ -241,7 +243,7 @@ function createPackManager({
       throw err;
     }
 
-    evictSessions(packId);
+    await evictSessions(packId);
     fs.rmSync(dir, { recursive: true, force: true });
     logger.info(`Pack ${packId} removed`);
     return { success: true, packId };

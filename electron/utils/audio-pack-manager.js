@@ -43,7 +43,9 @@ const manager = createPackManager({
   // The worker holds the .onnx files open; swapping a pack under a live
   // session would fail on Windows (or worse, half-swap). Stopping is the
   // honest move — a model change mid-session cannot be seamless anyway.
-  evictSessions: () => engineManager.stopSession('pack-swap'),
+  // Awaited by the core: stopSession alone returns before the process is
+  // actually gone, and the swap would race its file handles.
+  evictSessions: () => engineManager.stopSessionAndWait('pack-swap'),
   computePackList,
   packJsonFields: (entry) => ({
     id: entry.id,
