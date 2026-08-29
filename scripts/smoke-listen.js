@@ -1,7 +1,10 @@
 // Listen-module smoke test: the whole chain with real weights, in a throwaway
 // sandbox, no network.
 //
-//   npx electron scripts/smoke-listen.js [--wav <file>] [--keep]
+//   npx electron scripts/smoke-listen.js [--wav <file>] [--keep] [--soak <minutes>]
+//
+// --soak replays the audio for N minutes in one session and reports the worker
+// RSS trend — the answer to "does hours of listening grow anything".
 //
 // Covers manifest fetch -> sha256 verify -> zip extract -> pack.json write ->
 // staging swap -> pack-based model discovery -> worker load -> VAD ->
@@ -169,8 +172,8 @@ async function main() {
   // One session: feed the audio in real time and time everything against the
   // audio clock. The feed is scheduled against a fixed start so sleep drift
   // does not get counted as engine latency.
-  async function runSession(label) {
-    const ev = { status: [], segments: [], partials: [] };
+  async function runSession(label, soakMinutes = 0) {
+    const ev = { status: [], segments: [], partials: [], rss: [] };
     const stamp = { partials: [], segments: [] };
     let t0 = 0;
     const fakeWin = {
@@ -179,8 +182,10 @@ async function main() {
       webContents: {
         send: (channel, payload) => {
           const now = Date.now();
-          if (channel.endsWith(':status')) ev.status.push(payload.state);
-          else if (channel.endsWith(':segment')) {
+          if (channel.endsWith(':status')) {
+            ev.status.push(payload.state);
+            if (payload.state === 'metrics' && payload.detail) ev.rss.push(payload.detail.rssMb);
+          } else if (channel.endsWith(':segment')) {
             ev.segments.push(payload);
             stamp.segments.push(now);
           } else if (channel.endsWith(':partial') && payload) {
@@ -199,19 +204,32 @@ async function main() {
 
     const CHUNK = 1600; // 100 ms
     t0 = Date.now();
-    let chunkIndex = 0;
-    for (let i = 0; i < pcm.length; i += CHUNK, chunkIndex++) {
-      const due = t0 + chunkIndex * 100;
-      const wait = due - Date.now();
+    // Pace by AUDIO FED, not by chunk count: the last slice of the buffer is a
+    // short one (7.52s is not a whole number of 100ms chunks), and giving it a
+    // full slot drifts the clock 80ms per lap — over a 12-minute soak that
+    // showed up as 7.7s of fake, linearly-growing "engine latency".
+    let fedSamples = 0;
+    const pace = async () => {
+      const wait = t0 + fedSamples / 16 - Date.now();
       if (wait > 0) await sleep(wait);
-      engineManager.feedPcm(pcm.slice(i, i + CHUNK));
-    }
+    };
+    // Soak: replay the same audio until the clock runs out. Nothing about the
+    // engine treats a loop differently — what is under test is whether hours
+    // of continuous use grow anything without bound.
+    const until = soakMinutes > 0 ? t0 + soakMinutes * 60000 : 0;
+    do {
+      for (let i = 0; i < pcm.length; i += CHUNK) {
+        await pace();
+        const chunk = pcm.slice(i, i + CHUNK);
+        engineManager.feedPcm(chunk);
+        fedSamples += chunk.length;
+      }
+    } while (until && Date.now() < until);
     const silence = new Float32Array(CHUNK);
-    for (let i = 0; i < 25; i++, chunkIndex++) {
-      const due = t0 + chunkIndex * 100;
-      const wait = due - Date.now();
-      if (wait > 0) await sleep(wait);
+    for (let i = 0; i < 25; i++) {
+      await pace();
       engineManager.feedPcm(silence);
+      fedSamples += CHUNK;
     }
 
     // Wall clock at which a given point on the audio timeline was fed.
@@ -227,7 +245,12 @@ async function main() {
     return { label, ev, loadMs, firstDraftMs, draftGaps, finalLatencies };
   }
 
-  const withDraft = await runSession('two-pass（装了草稿引擎）');
+  const soakArg = process.argv.indexOf('--soak');
+  const soakMinutes = soakArg !== -1 ? Number(process.argv[soakArg + 1]) || 10 : 0;
+  if (soakMinutes > 0) console.log(`soak: ${soakMinutes} 分钟连续会话
+`);
+
+  const withDraft = await runSession('two-pass（装了草稿引擎）', soakMinutes);
 
   step(
     'finals recognized',
@@ -277,7 +300,15 @@ async function main() {
           : '—'
       }`
     );
-    console.log(`  解码 RTF        ${r.ev.segments.map((s) => s.rtf ?? '?').join(' / ')}`);
+    console.log(`  解码 RTF        ${r.ev.segments.slice(0, 5).map((s) => s.rtf ?? '?').join(' / ')}`);
+    if (r.ev.rss.length > 1) {
+      const first = r.ev.rss[0];
+      const last = r.ev.rss[r.ev.rss.length - 1];
+      console.log(
+        `  worker RSS      起 ${first}MB → 终 ${last}MB（峰 ${Math.max(...r.ev.rss)}MB，` +
+          `${r.ev.rss.length} 次采样 / ${r.ev.segments.length} 段）`
+      );
+    }
     console.log('');
   }
 

@@ -6,8 +6,9 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 
 - **版本号五处一起改，缺一处就对不上**：`package.json` / `package-lock.json`（自述的两个 version 字段，手改 package.json 不会带上它——v0.3.0～v0.3.2 三版都漂着发出去了）/ `README.md` 徽章 / `README.zh-CN.md` 徽章 / `CHANGELOG.md` 把「未发布」**改标题**成 `## vX.Y.Z — 日期 — 主题`（别在它前面新插一节，那样两条旧记录会留在孤立的「未发布」里）。代码里没有硬编码版本，运行时读 `app.getVersion()`，不用管；docs 里的历史版本号是叙述，别改
 - **新功能发版前对齐文档**：README×2 功能表 + 功能段、docs/FAQ（用户会问什么）、docs/ARCHITECTURE + DEVELOPMENT（后来人怎么改）。v0.3.3 的 AI 动作就是发完才发现四份文档零提及
-- 打包：`npm run dist`，产物在 `release/`；GitHub Release **必传三件套** `T-Translate-Setup-x.x.x.exe` + `.exe.blockmap` + `latest.yml`（缺 latest.yml 用户端检查更新直接报错）
-- OCR 模型热更新只改 `ocr-models` Release 资产（bump manifest version 即可，无需发版），维护手册见 [docs/OCR_MODELS.md](docs/OCR_MODELS.md)
+- 打包：`npm run dist`，产物在 `release/`；GitHub Release **必传三件套** `T-Translate-Setup-x.x.x.exe` + `.exe.blockmap` + `latest.yml`（缺 latest.yml 用户端检查更新直接报错）。⚠️ 打包前**关掉 VS Code**：它锁着 `release/win-unpacked/resources/app.asar`，`npm run dist` 会以 `EBUSY` 失败；非要并行就换输出目录 `-c.directories.output=release-xxx`
+- 模型热更新不用发版，只改对应 Release 资产：OCR 走 `ocr-models` tag（手册 [docs/OCR_MODELS.md](docs/OCR_MODELS.md)），听译走 `audio-models` tag（`npm run audio:release` 生成资产）。**两个 tag 都必须勾 Pre-release**，否则 electron-updater 会把它们当最新版去找 latest.yml；同理**永远别开 allowPrerelease**
+- 听译改动发版前跑 `npm run smoke:listen`（整链 13 项断言 + 延迟数字），改了模型或分发链必跑
 - 语言包 rec 模型目前 v4 代际；上游出 v5 多语言 ONNX 后按 OCR_MODELS.md「更新模型」流程换入
 
 ## 下一版本候选
@@ -105,12 +106,18 @@ v0.3.4 给 Windows OCR / Azure / Google Vision / OCR.space / 百度 五个引擎
 
 结论：可行、约 1-2 天、风险低，不影响现有安装版。评估结论存档如下，重启时不必重推。
 
-- **全仓 userData 落点只有 5 处，且全部走 `app.getPath('userData')`，零硬编码路径**：electron-store 的 config.json、[logger.js:71](electron/utils/logger.js:71) 的 logs/、[ocr-engine.js:39](electron/utils/ocr-engine.js:39) 的 ocr-models/、[translation-stack.js:52](electron/ipc/translation-stack.js:52) 的 Caches/、Chromium 自带的 Local Storage/IndexedDB。**一句 `app.setPath('userData', …)` 全部跟着搬**
+- **全仓 userData 落点全部走 `app.getPath('userData')`，零硬编码路径**：electron-store 的 config.json、[logger.js:71](electron/utils/logger.js:71) 的 logs/、[translation-stack.js:52](electron/ipc/translation-stack.js:52) 的 Caches/、Chromium 自带的 Local Storage/IndexedDB。**一句 `app.setPath('userData', …)` 全部跟着搬**。模型不在此列了——v0.4.0 起 OCR 与听译模型都落安装目录的 `models/`（[model-root.js](electron/utils/model-root.js)），便携化时它们本来就跟着程序走
 - ⚠️ **唯一真陷阱是 require 顺序**：[main.js:12](electron/main.js:12) require `./state` 时 [state.js:36](electron/state.js:36) 顶层就 `new Store()` 了，setPath 必须更早（main.js 最顶或抽独立首个 require）。顺序错了不报错，只会静默写回老位置
 - ⚠️ **userData 之外还有一处残留**：[system.js:265](electron/ipc/system.js:265) 的开机自启走 `setLoginItemSettings` → 写 `HKCU\...\Run` 注册表。「卸载完全不留」要成立就必须处理它（便携版隐藏该开关或退出时清），否则是假承诺
-- 其余：便携版不能装进 Program Files（不可写）→ electron-builder 加 `portable`/`zip` target 与 NSIS 并存，前者自带 `PORTABLE_EXECUTABLE_DIR` 可当检测依据；老用户迁移提示；OCR 模型跟着搬（高精度包 139MB）需在文档说明
+- 其余：便携版不能装进 Program Files（不可写）→ electron-builder 加 `portable`/`zip` target 与 NSIS 并存，前者自带 `PORTABLE_EXECUTABLE_DIR` 可当检测依据；老用户迁移提示
+
+### 听译上线后的观察项（v0.4.0 交付，非阻塞）
+
+- **OCR 语言包下载没有离线闸门**：听译侧的下载在离线模式下会被 [audio-pack-manager.js](electron/utils/audio-pack-manager.js) 直接拒绝，OCR 侧 [ocr.js](electron/ipc/ocr.js) 的 `packs-download` 没有这道检查——离线模式承诺绝不触网，这里是缺口。照抄音频侧那段即可，闸门要放在 pack manager 而不是 IPC 处理器
+- **BGM 场景偶出过短碎段**：歌曲背景下 VAD 会把一两个字的碎片当成句子定稿（如「如。」），出屏且触发一次翻译。备选修法=过短定稿不出屏也不翻译。用户觉得烦再做
+- **无痕模式是否放开听译**：当初禁用是因为会话日志记录识别原文；v0.4.0 起日志默认只写指标不写文字，禁用的原始理由已经不成立。要放开就得先确认无痕模式下"完全不写日志"还是"只写指标可接受"
 
 ### Incremental unit test coverage buildout
 
-`tests/unit/` 现有 61 个测试文件、692 用例（selection / stack 五件套 / OCR 坐标 / 语言目录与选择器 / 历史与理解条目 / 段落笔记 / 历史保险库与存储路由 / store 白名单 / 模型包 core / TTS 引擎落回 等）。Principle: add tests when you touch a file, new features ship with tests, bug fixes ship with regression tests. Not chasing 100% coverage.
+`tests/unit/` 现有 64 个测试文件、713 用例（selection / stack 五件套 / OCR 坐标 / 语言目录与选择器 / 历史与理解条目 / 段落笔记 / 历史保险库与存储路由 / store 白名单 / 模型包 core 与换包时序 / 听译模型发现与包列表 / TTS 引擎落回 等）。Principle: add tests when you touch a file, new features ship with tests, bug fixes ship with regression tests. Not chasing 100% coverage.
 

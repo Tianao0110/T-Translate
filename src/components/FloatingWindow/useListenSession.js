@@ -17,7 +17,13 @@ const logger = createLogger('ListenSession');
 
 const TARGET_RATE = 16000;
 const SEND_BATCH = 3200; // 200ms at 16k
+// On-screen scrollback. Small on purpose: every kept segment is live DOM, and
+// nobody scrolls back an hour in a subtitle overlay.
 const MAX_SEGMENTS = 100;
+// Full transcript kept for SRT export, in a ref — no re-render, no DOM. A
+// 2-hour film is ~2000 lines (~400KB); the cap is a runaway backstop, not a
+// budget, and is announced when it bites rather than silently dropping lines.
+const MAX_TRANSCRIPT = 20000;
 
 let nextSegId = 1;
 
@@ -25,6 +31,10 @@ export default function useListenSession({ active }) {
   const [sessionState, setSessionState] = useState('idle');
   const [running, setRunning] = useState(false);
   const [segments, setSegments] = useState([]);
+  // Export reads this, not `segments`: the visible list is a 100-line window,
+  // and exporting a two-hour session used to hand back only its tail.
+  const transcriptRef = useRef([]);
+  const transcriptTruncatedRef = useRef(false);
   const [partial, setPartial] = useState('');
   const [available, setAvailable] = useState(false);
 
@@ -144,6 +154,8 @@ export default function useListenSession({ active }) {
     errorLatchRef.current = false;
     pendingRestartRef.current = false;
     setSegments([]);
+    transcriptRef.current = [];
+    transcriptTruncatedRef.current = false;
     setPartial('');
     window.electron?.audioEngine?.start?.({ language: langRef.current });
   }, []);
@@ -188,6 +200,20 @@ export default function useListenSession({ active }) {
 
   // ===== per-final translation (finals only — the contract) =====
 
+  // Writes the settled translation into the export transcript as well as the
+  // visible list. Scans from the tail: a translation lands seconds after its
+  // segment, so the match is the last entry in practice.
+  const settleTrans = useCallback((segId, trans) => {
+    const arr = transcriptRef.current;
+    for (let i = arr.length - 1; i >= 0; i--) {
+      if (arr[i].id === segId) {
+        arr[i].trans = trans;
+        break;
+      }
+    }
+    setSegments((prev) => prev.map((s) => (s.id === segId ? { ...s, trans } : s)));
+  }, []);
+
   const translateSegment = useCallback(async (segId, rec) => {
     const target = targetLangRef.current;
     if (!target) return;
@@ -197,14 +223,19 @@ export default function useListenSession({ active }) {
     try {
       const res = await window.electron?.stack?.translate?.({
         text: rec.text,
+        // Subtitle lines are one-shot: caching them evicts the user's real
+        // translation cache (200 entries, shared) and rewrites the cache file
+        // every couple of seconds for content nobody translates twice. This
+        // flag can only ever REDUCE caching — the privacy gate that turns it
+        // off in secure mode still lives in the main-process facade.
+        noCache: true,
         options: { sourceLang: 'auto', targetLang: target },
       });
-      const trans = res?.success && res.text ? res.text : null;
-      setSegments((prev) => prev.map((s) => (s.id === segId ? { ...s, trans } : s)));
+      settleTrans(segId, res?.success && res.text ? res.text : null);
     } catch {
-      setSegments((prev) => prev.map((s) => (s.id === segId ? { ...s, trans: null } : s)));
+      settleTrans(segId, null);
     }
-  }, []);
+  }, [settleTrans]);
 
   // ===== engine event wiring (only while listen mode is active) =====
 
@@ -253,8 +284,11 @@ export default function useListenSession({ active }) {
 
     const offSegment = bridge.onSegment((rec) => {
       const id = nextSegId++;
+      const seg = { id, startS: rec.segStartS, durS: rec.segDurS, lang: rec.lang, text: rec.text, repeated: rec.repeated, trans: null };
+      if (transcriptRef.current.length >= MAX_TRANSCRIPT) transcriptTruncatedRef.current = true;
+      else transcriptRef.current.push(seg);
       setSegments((prev) => {
-        const next = [...prev, { id, startS: rec.segStartS, durS: rec.segDurS, lang: rec.lang, text: rec.text, repeated: rec.repeated, trans: null }];
+        const next = [...prev, seg];
         return next.length > MAX_SEGMENTS ? next.slice(next.length - MAX_SEGMENTS) : next;
       });
       setPartial('');
@@ -286,8 +320,11 @@ export default function useListenSession({ active }) {
 
   // ===== SRT export =====
 
+  // Exports the whole session, not the visible window, and works mid-recording:
+  // it writes the finals collected so far. The in-flight draft line is not a
+  // final and never lands in the file.
   const exportSrt = useCallback(async () => {
-    const finals = segments.filter((s) => s.text);
+    const finals = transcriptRef.current.filter((s) => s.text);
     if (!finals.length) return { success: false, error: 'empty' };
     const pad = (n, w) => String(n).padStart(w, '0');
     const ts = (sec) => {
@@ -302,8 +339,9 @@ export default function useListenSession({ active }) {
       if (seg.trans && seg.trans !== 'pending') lines.push(seg.trans);
       return `${i + 1}\n${ts(seg.startS)} --> ${ts(seg.startS + seg.durS)}\n${lines.join('\n')}`;
     });
-    return window.electron?.audioEngine?.exportSrt?.(blocks.join('\n\n') + '\n');
-  }, [segments]);
+    const res = await window.electron?.audioEngine?.exportSrt?.(blocks.join('\n\n') + '\n');
+    return res?.success ? { ...res, truncated: transcriptTruncatedRef.current } : res;
+  }, []);
 
   return {
     sessionState,
