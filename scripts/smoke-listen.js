@@ -85,6 +85,22 @@ function readWavPcm(file, targetRate = 16000) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// First sample where speech actually starts, in seconds. Latency has to be
+// measured from the sound, not from the start of the file (SAPI opens with
+// ~100 ms of digital silence).
+function speechOnsetSeconds(pcm, rate = 16000, threshold = 0.02) {
+  for (let i = 0; i < pcm.length; i++) {
+    if (Math.abs(pcm[i]) > threshold) return i / rate;
+  }
+  return 0;
+}
+
+function median(xs) {
+  if (!xs.length) return null;
+  const s = [...xs].sort((a, b) => a - b);
+  return s[Math.floor(s.length / 2)];
+}
+
 async function main() {
   if (!fs.existsSync(`${RELEASE_DIR}/manifest.json`)) {
     console.error(`missing ${RELEASE_DIR}/manifest.json — run: npm run audio:release`);
@@ -147,46 +163,78 @@ async function main() {
     models ? `${path.basename(models.modelDir)} / draft=${models.streaming?.dirName}` : 'null'
   );
 
-  const events = { status: [], segments: [], partials: [] };
-  const fakeWin = {
-    isDestroyed: () => false,
-    once: () => {},
-    webContents: {
-      send: (channel, payload) => {
-        if (channel.endsWith(':status')) events.status.push(payload.state);
-        else if (channel.endsWith(':segment')) events.segments.push(payload);
-        else if (channel.endsWith(':partial')) events.partials.push(payload);
-      },
-    },
-  };
-  engineManager.init({ store, getWindow: () => fakeWin });
-
-  const loadStart = Date.now();
-  engineManager.startSession({ language: 'zh' });
-  for (let i = 0; i < 200 && !events.status.includes('listening'); i++) await sleep(100);
-  step('engine reaches listening', events.status.includes('listening'), `${Date.now() - loadStart}ms`);
-
-  // Real-time feed: a one-shot dump never exercises the partial timer.
   const pcm = readWavPcm(wav);
-  const CHUNK = 1600; // 100 ms
-  for (let i = 0; i < pcm.length; i += CHUNK) {
-    engineManager.feedPcm(pcm.slice(i, i + CHUNK));
-    await sleep(100);
+  const onsetS = speechOnsetSeconds(pcm);
+
+  // One session: feed the audio in real time and time everything against the
+  // audio clock. The feed is scheduled against a fixed start so sleep drift
+  // does not get counted as engine latency.
+  async function runSession(label) {
+    const ev = { status: [], segments: [], partials: [] };
+    const stamp = { partials: [], segments: [] };
+    let t0 = 0;
+    const fakeWin = {
+      isDestroyed: () => false,
+      once: () => {},
+      webContents: {
+        send: (channel, payload) => {
+          const now = Date.now();
+          if (channel.endsWith(':status')) ev.status.push(payload.state);
+          else if (channel.endsWith(':segment')) {
+            ev.segments.push(payload);
+            stamp.segments.push(now);
+          } else if (channel.endsWith(':partial') && payload) {
+            ev.partials.push(payload);
+            stamp.partials.push(now);
+          }
+        },
+      },
+    };
+    engineManager.init({ store, getWindow: () => fakeWin });
+
+    const loadStart = Date.now();
+    engineManager.startSession({ language: 'zh' });
+    for (let i = 0; i < 200 && !ev.status.includes('listening'); i++) await sleep(100);
+    const loadMs = Date.now() - loadStart;
+
+    const CHUNK = 1600; // 100 ms
+    t0 = Date.now();
+    let chunkIndex = 0;
+    for (let i = 0; i < pcm.length; i += CHUNK, chunkIndex++) {
+      const due = t0 + chunkIndex * 100;
+      const wait = due - Date.now();
+      if (wait > 0) await sleep(wait);
+      engineManager.feedPcm(pcm.slice(i, i + CHUNK));
+    }
+    const silence = new Float32Array(CHUNK);
+    for (let i = 0; i < 25; i++, chunkIndex++) {
+      const due = t0 + chunkIndex * 100;
+      const wait = due - Date.now();
+      if (wait > 0) await sleep(wait);
+      engineManager.feedPcm(silence);
+    }
+
+    // Wall clock at which a given point on the audio timeline was fed.
+    const audioClock = (seconds) => t0 + seconds * 1000;
+
+    const firstDraftMs = stamp.partials.length ? stamp.partials[0] - audioClock(onsetS) : null;
+    const draftGaps = stamp.partials.slice(1).map((t, i) => t - stamp.partials[i]);
+    const finalLatencies = ev.segments.map(
+      (s, i) => stamp.segments[i] - audioClock(s.segStartS + s.segDurS)
+    );
+
+    await engineManager.stopSessionAndWait('smoke');
+    return { label, ev, loadMs, firstDraftMs, draftGaps, finalLatencies };
   }
-  const silence = new Float32Array(CHUNK);
-  for (let i = 0; i < 25; i++) {
-    engineManager.feedPcm(silence);
-    await sleep(100);
-  }
+
+  const withDraft = await runSession('two-pass（装了草稿引擎）');
 
   step(
     'finals recognized',
-    events.segments.length > 0,
-    events.segments.map((s) => JSON.stringify(s.text)).join(' | ') || '(none)'
+    withDraft.ev.segments.length > 0,
+    withDraft.ev.segments.map((s) => JSON.stringify(s.text)).join(' | ') || '(none)'
   );
-  step('streaming drafts emitted', events.partials.length > 0, `${events.partials.length} partials`);
-
-  await engineManager.stopSessionAndWait('smoke');
+  step('streaming drafts emitted', withDraft.ev.partials.length > 0, `${withDraft.ev.partials.length} partials`);
   step('stopSessionAndWait returns after the worker is gone', !engineManager.getInfo().running);
 
   const logsDir = path.join(SANDBOX, 'logs');
@@ -204,6 +252,34 @@ async function main() {
 
   const models2 = locateAsrModels(packMgr.packsRoot());
   step('listen still works without the draft pack', !!models2 && models2.streaming === null);
+
+  // Same audio again with the draft engine gone: this is what a user who only
+  // installed the base pack actually sees.
+  const pseudo = await runSession('伪流式（只装基座包）');
+  step(
+    'pseudo-streaming still recognizes and still draws drafts',
+    pseudo.ev.segments.length > 0 && pseudo.ev.partials.length > 0,
+    `${pseudo.ev.segments.length} finals / ${pseudo.ev.partials.length} partials`
+  );
+
+  console.log('\n==== 延迟 ====');
+  console.log(`语音起点 ${onsetS.toFixed(2)}s，音频总长 ${(pcm.length / 16000).toFixed(2)}s\n`);
+  for (const r of [withDraft, pseudo]) {
+    const gaps = r.draftGaps;
+    console.log(`${r.label}`);
+    console.log(`  引擎加载        ${r.loadMs} ms`);
+    console.log(`  首字（草稿）    ${r.firstDraftMs === null ? '—' : r.firstDraftMs + ' ms'}`);
+    console.log(`  草稿刷新间隔    ${gaps.length ? `中位 ${median(gaps)} ms（${gaps.length} 次）` : '—'}`);
+    console.log(
+      `  定稿延迟        ${
+        r.finalLatencies.length
+          ? r.finalLatencies.map((m) => m + ' ms').join(' / ') + `  中位 ${median(r.finalLatencies)} ms`
+          : '—'
+      }`
+    );
+    console.log(`  解码 RTF        ${r.ev.segments.map((s) => s.rtf ?? '?').join(' / ')}`);
+    console.log('');
+  }
 
   const failed = results.filter((r) => !r.ok).length;
   console.log(`\n==== ${results.length - failed}/${results.length} passed ====`);
