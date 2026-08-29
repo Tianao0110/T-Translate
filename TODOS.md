@@ -111,6 +111,16 @@ v0.3.4 给 Windows OCR / Azure / Google Vision / OCR.space / 百度 五个引擎
 - ⚠️ **userData 之外还有一处残留**：[system.js:265](electron/ipc/system.js:265) 的开机自启走 `setLoginItemSettings` → 写 `HKCU\...\Run` 注册表。「卸载完全不留」要成立就必须处理它（便携版隐藏该开关或退出时清），否则是假承诺
 - 其余：便携版不能装进 Program Files（不可写）→ electron-builder 加 `portable`/`zip` target 与 NSIS 并存，前者自带 `PORTABLE_EXECUTABLE_DIR` 可当检测依据；老用户迁移提示
 
+### 指定程序的声音（v0.4.1 第一批，用户 2026-08-29 拍板要做，v0.4.0 发完再开工）
+
+现在抓的是全系统混音，别的程序一响就串进字幕。目标：只听选定的程序，或听全部但排除选定的程序。
+
+- **技术路径**：Windows Process Loopback（`ActivateAudioInterfaceAsync` + `AUDIOCLIENT_ACTIVATION_PARAMS`，`PROCESS_LOOPBACK` 含"只抓这棵进程树"和"抓全部但排除这棵进程树"两模式）。Electron 不暴露，要原生层——划词栈的 koffi 经验直接复用
+- ⚠️ **「网站」做不到，只能到「程序」**：浏览器所有标签页共用一个音频服务进程，系统层面就是一个 chrome.exe。UI 文案必须写「程序」不能写「网站」，否则是假承诺
+- ⚠️ **最低系统版本必须先核实**（Win10 某个较新 build 起才有这个 API），并准备降级路径：不支持就退回现在的全系统 loopback，且要在 UI 上说清楚
+- **附带红利**：排除模式顺手解决自家 TTS 回灌（神经 TTS 上线后不会把自己念的声音再识别一遍）
+- spike 第一步：拿到 API 可用性 + 进程枚举（只列真正在出声的会话，别把几十个进程堆给用户选）
+
 ### 听译上线后的观察项（v0.4.0 交付，非阻塞）
 
 - **OCR 语言包下载没有离线闸门**：听译侧的下载在离线模式下会被 [audio-pack-manager.js](electron/utils/audio-pack-manager.js) 直接拒绝，OCR 侧 [ocr.js](electron/ipc/ocr.js) 的 `packs-download` 没有这道检查——离线模式承诺绝不触网，这里是缺口。照抄音频侧那段即可，闸门要放在 pack manager 而不是 IPC 处理器
