@@ -319,6 +319,8 @@ await window.electron.stack.clearCache('all')
 
 - **主进程/栈日志**：设置 → 关于 → 打开日志目录（`%APPDATA%/t-translate/logs/app-*.log`），翻译栈与 OCR 管线日志都在这。
 - **划词链路探针**：`npm run start:debug`（`TT_SELECTION_DEBUG=1`）输出选区检测各层判定。
+- **听译整链冒烟**：`npm run smoke:listen`（先 `npm run audio:release` 备好本地包）。临时沙箱里把 GitHub 换成 `file://` 跑完下载→校验→安装→发现→识别→卸载，并打印首字/定稿延迟。换模型、动分发链、发版前各跑一次。
+- **听译会话日志**：`%APPDATA%/t-translate/logs/audio-probe-*.jsonl`，滚动 20 份，默认只有时长/耗时/VAD 指标。**识别出的文字默认不写**——要看文字加 `TT_LISTEN_LOG_TEXT=1` 再启动。
 - **网络请求**：主进程栈的请求不经过渲染端 DevTools Network 面板，看日志或在 provider 里临时加 log。
 
 ## ✅ 提交前检查

@@ -173,6 +173,10 @@ function spawnWorker(models) {
       },
     },
     logPath,
+    // Recognized text stays out of the on-disk log by default — the session
+    // log exists for tuning (segment lengths, gaps, RTF), and those are
+    // metrics, not words. Developers chasing a bad transcription opt in.
+    logText: process.env.TT_LISTEN_LOG_TEXT === '1',
     meta: {
       appVersion: app.getVersion(),
       electron: process.versions.electron,

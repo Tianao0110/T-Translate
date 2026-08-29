@@ -27,7 +27,6 @@ export const defaultConfig = {
     selectionTranslate: 'Ctrl+Shift+T',
     floatingCapture: 'Ctrl+Alt+Space',
   },
-  dev: { debugMode: false },
 };
 
 // `basic: true` flags items shown in the simplified settings view.

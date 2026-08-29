@@ -6,7 +6,7 @@
 //
 // Protocol (process.parentPort):
 //   in : {type:'init', models:{asr?:{modelPath,tokensPath,vadPath,language?}},
-//         logPath, meta}                 declare paths + open log; loads nothing
+//         logPath, logText, meta}        declare paths + open log; loads nothing
 //        {type:'asr-start', language?}   load ASR if needed, begin a session
 //        {type:'pcm', samples}           16 kHz mono Float32Array, [-1, 1]
 //        {type:'asr-stop'}               flush session, keep models warm
@@ -30,7 +30,9 @@
 // on the first real synthesis.
 //
 // Audio frames are transcribed and dropped — nothing here ever writes audio to
-// disk. The JSONL probe log (local only) carries text and timing metrics.
+// disk. The JSONL session log (local only) carries timing metrics; the
+// recognized WORDS stay out of it unless the host passes logText (env
+// TT_LISTEN_LOG_TEXT=1), so watching a video leaves no transcript behind.
 
 const fs = require('fs');
 const {
@@ -97,6 +99,9 @@ let autoEngineDecided = false;
 let lastStreamText = '';
 let lastDraftGrowthAt = 0; // ms timestamp of the last draft-text change
 let logStream = null;
+// Recognized text is kept OUT of the session log unless the host says otherwise
+// (TT_LISTEN_LOG_TEXT=1). Metrics alone answer every tuning question.
+let logText = false;
 let sessionLive = false;
 let shuttingDown = false;
 
@@ -173,7 +178,8 @@ function handleInit(msg) {
 
   asrPaths = msg.models?.asr || null;
   asrLanguage = normalizeLanguage(asrPaths?.language);
-  logLine({ ts: Date.now(), type: 'session_start', ...(msg.meta || {}) });
+  logText = msg.logText === true;
+  logLine({ ts: Date.now(), type: 'session_start', logText, ...(msg.meta || {}) });
   post({ type: 'ready' });
 }
 
@@ -556,7 +562,13 @@ async function decodeSegment(seg) {
     text,
     repeated: isRepeat(text),
   });
-  logLine(rec);
+  // The record goes two ways and they are not the same trust level: the
+  // renderer needs the text to draw a subtitle, the on-disk log does not need
+  // it at all. Tuning (segment length, gaps, RTF, repeats) reads the metrics;
+  // only a developer chasing a wrong transcription needs the words, and that
+  // is what TT_LISTEN_LOG_TEXT is for. Default: nothing the user heard is
+  // written to disk.
+  logLine(logText ? rec : { ...rec, text: undefined });
   post({ type: 'segment', rec });
 
   // Auto-language sessions: the first final's language tag decides the draft
