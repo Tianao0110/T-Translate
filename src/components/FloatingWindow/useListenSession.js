@@ -35,6 +35,8 @@ export default function useListenSession({ active }) {
   // and exporting a two-hour session used to hand back only its tail.
   const transcriptRef = useRef([]);
   const transcriptTruncatedRef = useRef(false);
+  // 0..1 capture level, updated straight from the audio callback (see below).
+  const levelRef = useRef(0);
   const [partial, setPartial] = useState('');
   const [available, setAvailable] = useState(false);
 
@@ -79,6 +81,7 @@ export default function useListenSession({ active }) {
   // ===== capture pipeline (probe-page port) =====
 
   const stopCapture = useCallback(() => {
+    levelRef.current = 0; // meter must not freeze at the last loud frame
     const c = captureRef.current;
     if (!c) return;
     captureRef.current = null;
@@ -117,6 +120,18 @@ export default function useListenSession({ active }) {
       const ch0 = e.inputBuffer.getChannelData(0);
       const ch1 = e.inputBuffer.numberOfChannels > 1 ? e.inputBuffer.getChannelData(1) : ch0;
       const n = ch0.length;
+
+      // Capture level, straight off the buffer we already have (~85ms per
+      // callback at 48k/4096 — the fastest honest feedback in the whole
+      // feature; text cannot beat it). Written to a ref, never to state: the
+      // meter paints itself from a rAF loop so twelve updates a second do not
+      // re-render the transcript. sqrt curve calibrated against real speech
+      // (per-window RMS median 0.028, p95 0.165) so normal talking sits around
+      // half the bar instead of hugging the floor.
+      let acc = 0;
+      for (let i = 0; i < n; i++) acc += ch0[i] * ch0[i];
+      const rms = Math.sqrt(acc / n);
+      levelRef.current = Math.min(1, Math.sqrt(rms) * 2.2);
       // linear-interp resample with carry across callbacks
       while (pos < n) {
         const i = Math.floor(pos);
@@ -356,5 +371,6 @@ export default function useListenSession({ active }) {
     toggle,
     stop,
     exportSrt,
+    levelRef,
   };
 }

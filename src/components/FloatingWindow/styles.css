@@ -252,17 +252,43 @@
 
 /* Listen status lives in the otherwise-empty drag strip next to the segments
    (the strip looked dead when the chrome faded). Part of the drag area on
-   purpose — it is not clickable. */
+   purpose — it is not clickable. Flex row so the level meter can follow the
+   text: the label's width changes with the language, so anything positioned
+   at a fixed offset would collide in one locale and float in the other. */
 .listen-topbar-status {
   position: absolute;
   top: 5px;
   left: 74px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 11px;
   color: var(--floating-text-muted);
   user-select: none;
   pointer-events: none;
   z-index: 1000;
   white-space: nowrap;
+}
+
+/* Capture level, riding along inside the status row. Deliberately tiny: it
+   answers "is sound arriving" and nothing else, and it must not compete with
+   the subtitles. */
+.listen-level {
+  flex: none;
+  width: 34px;
+  height: 3px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--floating-text-muted) 22%, transparent);
+  overflow: hidden;
+}
+
+.listen-level-bar {
+  width: 100%;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--floating-accent);
+  transform-origin: left center;
+  transform: scaleX(0);
 }
 
 /* ========== 关闭按钮 ========== */

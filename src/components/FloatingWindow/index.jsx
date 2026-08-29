@@ -15,6 +15,7 @@ import AiBadge from '../shared/AiBadge.jsx';
 import useAiActions from '../../hooks/use-ai-actions.js';
 import useListenSession from './useListenSession.js';
 import ListenPanel from './ListenPanel.jsx';
+import ListenLevel from './ListenLevel.jsx';
 import { getUnderstandAction } from '@config/ai-actions';
 import { resolveActionLabel } from '../../services/ai-action-runner.js';
 import createLogger from '../../utils/logger.js';
@@ -875,6 +876,9 @@ const FloatingWindow = () => {
           {listenMode && (
             <span className="listen-topbar-status">
               {t(`floatingWindow.listenStatus.${listen.sessionState}`, listen.sessionState)}
+              {/* Fastest feedback the feature has: moves at the audio
+                  callback's rate, long before any text can appear. */}
+              <ListenLevel levelRef={listen.levelRef} active={listen.running} />
             </span>
           )}
 
