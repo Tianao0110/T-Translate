@@ -1,9 +1,9 @@
-// IPC for the listen-translate mode (hosted by the floating window). Thin:
+﻿// IPC for the listen-translate mode (hosted by the floating window). Thin:
 // session handlers delegate to audio-engine-manager, which owns the worker.
 
 const { ipcMain, dialog } = require('electron');
 const fs = require('fs');
-const { CHANNELS, PRIVACY_MODES } = require('../shared/channels');
+const { CHANNELS } = require('../shared/channels');
 const engineManager = require('../managers/audio-engine-manager');
 const packManager = require('../utils/audio-pack-manager');
 const logger = require('../utils/logger')('IPC:AudioEngine');
@@ -28,7 +28,7 @@ function sendPackProgress(mainWindow, packId, progress, phase) {
 }
 
 function registerAudioEngineIPC(ctx) {
-  const { getMainWindow, store } = ctx;
+  const { getMainWindow } = ctx;
 
   ipcMain.handle(AE.GET_INFO, () => engineManager.getInfo());
 
@@ -81,12 +81,10 @@ function registerAudioEngineIPC(ctx) {
     }
   });
 
+  // The offline gate is NOT here: audio-pack-manager.downloadPack owns it, so
+  // it holds for every caller instead of only this channel. The OFFLINE_BLOCKED
+  // code arrives through the catch below like any other refusal.
   ipcMain.handle(AE.PACKS_DOWNLOAD, async (event, packId) => {
-    // Offline mode promises the app never reaches the network — a model
-    // download is not an exception the user can click their way out of.
-    if (store.get('privacyMode', PRIVACY_MODES.STANDARD) === PRIVACY_MODES.OFFLINE) {
-      return { success: false, error: 'offline-mode', errorCode: 'OFFLINE_BLOCKED' };
-    }
     const mainWindow = getMainWindow();
     try {
       return await packManager.downloadPack(packId, (progress, phase) => {

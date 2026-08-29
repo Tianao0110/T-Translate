@@ -14,6 +14,8 @@
     "dist": "node scripts/fetch-ocr-models.js && node scripts/build-stack.js && vite build && electron-builder --publish=never",
     "ocr:models": "node scripts/fetch-ocr-models.js",
     "ocr:release": "node scripts/build-ocr-release.js",
+    "audio:release": "node scripts/build-audio-release.js",
+    "smoke:listen": "electron scripts/smoke-listen.js",
     "lint": "eslint src/ electron/",
     "lint:fix": "eslint src/ electron/ --fix",
     "format": "prettier --write \"src/**/*.{js,jsx,css}\" \"electron/**/*.js\"",
