@@ -479,3 +479,19 @@
   margin: 4px 0 6px;
 }
 
+/* ===== Listen models (shares the pack rows above; own header + status) ===== */
+
+.listen-packs-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* The model id can be long — wrap instead of stretching the row. */
+.listen-status-text {
+  font-size: 12.5px;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+

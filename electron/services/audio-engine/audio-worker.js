@@ -6,7 +6,7 @@
 //
 // Protocol (process.parentPort):
 //   in : {type:'init', models:{asr?:{modelPath,tokensPath,vadPath,language?}},
-//         logPath, meta}                 declare paths + open log; loads nothing
+//         logPath, logText, meta}        declare paths + open log; loads nothing
 //        {type:'asr-start', language?}   load ASR if needed, begin a session
 //        {type:'pcm', samples}           16 kHz mono Float32Array, [-1, 1]
 //        {type:'asr-stop'}               flush session, keep models warm
@@ -30,7 +30,9 @@
 // on the first real synthesis.
 //
 // Audio frames are transcribed and dropped — nothing here ever writes audio to
-// disk. The JSONL probe log (local only) carries text and timing metrics.
+// disk. The JSONL session log (local only) carries timing metrics; the
+// recognized WORDS stay out of it unless the host passes logText (env
+// TT_LISTEN_LOG_TEXT=1), so watching a video leaves no transcript behind.
 
 const fs = require('fs');
 const {
@@ -61,8 +63,19 @@ const PARTIAL_INTERVAL_MS = 1000;
 const SOFT_SPLIT_FROM_S = 5;
 const HARD_SPLIT_S = 9;
 const VALLEY_WINDOWS = 8; // x 512 samples = 0.256s of sustained quiet
-const VALLEY_RATIO = 0.2; // valley = below 20% of the open segment's mean RMS
+// 0.3 (was 0.2): real BGM raises the energy floor, so at 0.2 valleys almost
+// never fired on actual content (probe logs: 0/14 narration, 1/10 song) and
+// hard 9s dominated. A false valley in music lands in an instrumental gap —
+// which IS a sentence boundary — so widening is cheap.
+const VALLEY_RATIO = 0.3;
 const VALLEY_FLOOR = 1e-4; // absolute floor so near-digital-silence always counts
+// Text-quiescence split (stream-draft sessions only): sung vocals and voiced
+// pauses keep the ACOUSTIC floor high, but the draft engine stops emitting
+// characters the moment the sentence ends — a semantic pause detector the
+// two-pass architecture gives us for free (industry counterpart: endpoint
+// rules on trailing non-emission, and neural caption segmentation replacing
+// pause-based splits). 0.8s of no draft growth on a >=5s segment closes it.
+const TEXT_QUIESCENCE_MS = 800;
 
 const ASR_LANGUAGES = new Set(['zh', 'en', 'ja', 'ko', 'yue', '']);
 
@@ -71,7 +84,24 @@ let asrPaths = null; // declared by init; loaded by asr-start
 let asrLanguage = '';
 let vad = null;
 let recognizer = null;
+// Two-pass draft engine (optional): a streaming zipformer emits word-by-word
+// drafts while SenseVoice keeps owning finals (spike report: first token
+// ~0.86s, 13ms/chunk, zero hallucination over 23s). Per-session choice:
+//   zh/en chosen            -> 'stream'
+//   ja/ko/yue chosen        -> 'pseudo' (model has no such languages)
+//   auto                    -> start 'pseudo', first final's lang tag decides
+// Missing model / load failure -> 'pseudo' silently (drafts are a bonus, the
+// final chain never depends on them).
+let online = null;
+let onlineStream = null;
+let partialEngine = 'pseudo'; // 'pseudo' | 'stream'
+let autoEngineDecided = false;
+let lastStreamText = '';
+let lastDraftGrowthAt = 0; // ms timestamp of the last draft-text change
 let logStream = null;
+// Recognized text is kept OUT of the session log unless the host says otherwise
+// (TT_LISTEN_LOG_TEXT=1). Metrics alone answer every tuning question.
+let logText = false;
 let sessionLive = false;
 let shuttingDown = false;
 
@@ -148,7 +178,8 @@ function handleInit(msg) {
 
   asrPaths = msg.models?.asr || null;
   asrLanguage = normalizeLanguage(asrPaths?.language);
-  logLine({ ts: Date.now(), type: 'session_start', ...(msg.meta || {}) });
+  logText = msg.logText === true;
+  logLine({ ts: Date.now(), type: 'session_start', logText, ...(msg.meta || {}) });
   post({ type: 'ready' });
 }
 
@@ -223,9 +254,49 @@ function handleAsrStart(msg) {
     return fatal(`model load failed: ${err.message}`);
   }
 
+  // Draft engine, loaded only when it can possibly serve this session (zh/en
+  // or auto). Its failure is never fatal — worst case drafts stay pseudo.
+  const canStream = asrLanguage === 'zh' || asrLanguage === 'en' || asrLanguage === '';
+  if (canStream && asrPaths.streaming && !online) {
+    try {
+      online = new sherpa.OnlineRecognizer({
+        featConfig: { sampleRate: SAMPLE_RATE, featureDim: 80 },
+        modelConfig: {
+          transducer: {
+            encoder: asrPaths.streaming.encoder,
+            decoder: asrPaths.streaming.decoder,
+            joiner: asrPaths.streaming.joiner,
+          },
+          tokens: asrPaths.streaming.tokens,
+          numThreads: 2,
+          provider: 'cpu',
+          debug: 0,
+        },
+        decodingMethod: 'greedy_search',
+        enableEndpoint: 0, // segmentation stays with the VAD + layered splits
+      });
+      onlineStream = online.createStream();
+    } catch (err) {
+      logLine(eventRecord('stream-load-failed', err.message));
+      online = null;
+      onlineStream = null;
+    }
+  }
+  partialEngine =
+    online && (asrLanguage === 'zh' || asrLanguage === 'en') ? 'stream' : 'pseudo';
+  autoEngineDecided = asrLanguage !== ''; // auto keeps the decision open
+  lastStreamText = '';
+
   const loadMs = Date.now() - t0;
   sessionLive = true;
-  logLine({ ts: Date.now(), type: 'asr_start', loadMs, language: asrLanguage || 'auto' });
+  logLine({
+    ts: Date.now(),
+    type: 'asr_start',
+    loadMs,
+    language: asrLanguage || 'auto',
+    partialEngine,
+    streamingPresent: !!asrPaths.streaming,
+  });
   watchdog.start(Date.now());
   lastCpu = process.cpuUsage();
   lastMetricsMs = Date.now();
@@ -290,6 +361,49 @@ function handlePcm(samples) {
 
 // Mirror the open segment window-by-window. Copies, not views — a subarray
 // would pin the whole per-callback merge buffer.
+// Streaming draft pass: feed a window, decode whatever is ready (13ms per
+// 200ms of audio, measured), emit on text change. A draft-engine failure
+// downgrades to pseudo for the rest of the session — never fatal.
+function feedStream(win) {
+  if (partialEngine !== 'stream' || !online) return;
+  try {
+    onlineStream.acceptWaveform({ samples: win, sampleRate: SAMPLE_RATE });
+    let steps = 0;
+    while (online.isReady(onlineStream)) {
+      online.decode(onlineStream);
+      steps += 1;
+    }
+    if (steps > 0) {
+      const text = (online.getResult(onlineStream).text || '').trim();
+      if (text && text !== lastStreamText) {
+        lastStreamText = text;
+        lastDraftGrowthAt = Date.now();
+        post({ type: 'partial', text });
+      }
+    }
+  } catch (err) {
+    logLine(eventRecord('stream-draft-failed', String(err.message)));
+    partialEngine = 'pseudo';
+    online = null;
+    onlineStream = null;
+  }
+}
+
+// The draft lane resets at segment boundaries (natural close and forced
+// splits): the boundary moment is silence, so nothing in-flight is lost —
+// resetting on final landing instead would drop the next segment's head,
+// which streams in while the final still decodes.
+function resetStreamDraft() {
+  lastStreamText = '';
+  if (online && onlineStream) {
+    try {
+      online.reset(onlineStream);
+    } catch {
+      // survivable — the next natural reset still applies
+    }
+  }
+}
+
 function trackOpenSegment(win) {
   if (vad.isDetected()) {
     // Segment just opened: prepend the pre-roll so the mirrored audio has the
@@ -299,11 +413,14 @@ function trackOpenSegment(win) {
       for (const p of preRoll) {
         openChunks.push(p);
         openLen += p.length;
+        feedStream(p);
       }
       preRoll = [];
     }
-    openChunks.push(new Float32Array(win));
-    openLen += win.length;
+    const copy = new Float32Array(win);
+    openChunks.push(copy);
+    openLen += copy.length;
+    feedStream(copy);
 
     let sumSq = 0;
     for (let i = 0; i < win.length; i++) sumSq += win[i] * win[i];
@@ -313,11 +430,21 @@ function trackOpenSegment(win) {
     recentRms.push(rms);
     if (recentRms.length > VALLEY_WINDOWS) recentRms.shift();
 
-    // Valley split: a sustained dip while the segment is already long enough.
-    // Checked per window (32ms) so the ~0.3s breath is never missed.
-    if (openLen >= SOFT_SPLIT_FROM_S * SAMPLE_RATE && recentRms.length === VALLEY_WINDOWS) {
-      const floor = Math.max(VALLEY_FLOOR, (openRmsSum / openWinCount) * VALLEY_RATIO);
-      if (recentRms.every((r) => r < floor)) forceSplit('valley');
+    // All splits checked per window (32ms). Priority: hard cap, then the
+    // semantic (text-quiescence) signal, then the acoustic valley.
+    if (openLen >= HARD_SPLIT_S * SAMPLE_RATE) return forceSplit('hard');
+    if (openLen >= SOFT_SPLIT_FROM_S * SAMPLE_RATE) {
+      if (
+        partialEngine === 'stream' &&
+        lastStreamText &&
+        Date.now() - lastDraftGrowthAt >= TEXT_QUIESCENCE_MS
+      ) {
+        return forceSplit('quiet');
+      }
+      if (recentRms.length === VALLEY_WINDOWS) {
+        const floor = Math.max(VALLEY_FLOOR, (openRmsSum / openWinCount) * VALLEY_RATIO);
+        if (recentRms.every((r) => r < floor)) forceSplit('valley');
+      }
     }
   } else {
     preRoll.push(new Float32Array(win));
@@ -326,6 +453,7 @@ function trackOpenSegment(win) {
       // Segment closed naturally: the final decode is already queued via
       // drainVadQueue.
       resetOpenSegment();
+      resetStreamDraft();
       post({ type: 'partial', text: '' });
     }
   }
@@ -355,6 +483,7 @@ function forceSplit(reason) {
   }
   const startSample = Math.max(0, audioInSamples - openLen);
   resetOpenSegment();
+  resetStreamDraft();
   try {
     vad.reset();
   } catch {
@@ -368,7 +497,9 @@ function forceSplit(reason) {
 
 function maybeDecodePartial() {
   if (!sessionLive || !recognizer) return;
-  if (openLen >= HARD_SPLIT_S * SAMPLE_RATE) return forceSplit('hard');
+  // Streaming drafts come word-by-word from feedStream; the pseudo re-decode
+  // below only serves sessions the draft engine cannot (ja/ko/yue, no model).
+  if (partialEngine === 'stream') return;
   if (openLen === 0 || openLen === lastPartialLen) return;
   lastPartialLen = openLen;
 
@@ -431,8 +562,31 @@ async function decodeSegment(seg) {
     text,
     repeated: isRepeat(text),
   });
-  logLine(rec);
+  // The record goes two ways and they are not the same trust level: the
+  // renderer needs the text to draw a subtitle, the on-disk log does not need
+  // it at all. Tuning (segment length, gaps, RTF, repeats) reads the metrics;
+  // only a developer chasing a wrong transcription needs the words, and that
+  // is what TT_LISTEN_LOG_TEXT is for. Default: nothing the user heard is
+  // written to disk.
+  logLine(logText ? rec : { ...rec, text: undefined });
   post({ type: 'segment', rec });
+
+  // Auto-language sessions: the first final's language tag decides the draft
+  // engine once and for all. zh/en -> switch to streaming drafts (catching up
+  // on the audio already mirrored); anything else -> free the draft engine.
+  if (!autoEngineDecided && online) {
+    autoEngineDecided = true;
+    const lang = result.lang || '';
+    if (lang === '<|zh|>' || lang === '<|en|>') {
+      partialEngine = 'stream';
+      logLine(eventRecord('partial-engine', `stream (auto ${lang})`));
+      for (const c of openChunks) feedStream(c);
+    } else {
+      online = null;
+      onlineStream = null;
+      logLine(eventRecord('partial-engine', `pseudo (auto ${lang})`));
+    }
+  }
 }
 
 function handleAsrStop() {
@@ -467,6 +621,8 @@ function handleUnload(what) {
   if (what === 'asr' && !sessionLive) {
     vad = null;
     recognizer = null;
+    online = null;
+    onlineStream = null;
     logLine(eventRecord('unload', 'asr'));
   }
   // 'tts' becomes meaningful in v0.4.x

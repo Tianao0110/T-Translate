@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Camera, X, Loader2, AlertCircle, ChevronDown, GripHorizontal, History, Clock, RefreshCw, Ghost, Brain } from 'lucide-react';
+import { Camera, X, Loader2, AlertCircle, ChevronDown, GripHorizontal, History, Clock, RefreshCw, Ghost, Brain, AudioLines, Play, Square, Download } from 'lucide-react';
 import useSessionStore, { STATUS, DISPLAY_MODE, CHILD_PANE_STATUS } from '../../stores/session.js';
 import useConfigStore from '../../stores/config.js';
 import pipeline from '../../services/pipeline.js';
@@ -13,6 +13,9 @@ import ChildPane from './ChildPane.jsx';
 import AiActionIcon from '../shared/AiActionIcon.jsx';
 import AiBadge from '../shared/AiBadge.jsx';
 import useAiActions from '../../hooks/use-ai-actions.js';
+import useListenSession from './useListenSession.js';
+import ListenPanel from './ListenPanel.jsx';
+import ListenLevel from './ListenLevel.jsx';
 import { getUnderstandAction } from '@config/ai-actions';
 import { resolveActionLabel } from '../../services/ai-action-runner.js';
 import createLogger from '../../utils/logger.js';
@@ -73,12 +76,35 @@ const FloatingWindow = () => {
   const [showToolbar, setShowToolbar] = useState(false);
   const [showOpacitySlider, setShowOpacitySlider] = useState(false);
   const [showHistoryPanel, setShowHistoryPanel] = useState(false);
+  // Listen mode overlays the persisted understand toggle for this window
+  // session only — leaving listen restores whatever understand was. The mode
+  // entry is gated on ASR models being present (zero-claim until then).
+  const [listenMode, setListenMode] = useState(false);
+  const [listenAvailable, setListenAvailable] = useState(false);
   const [hasOverflow, setHasOverflow] = useState(false);
   const [theme, setTheme] = useState('light');
   const [floatingWindowBounds, setFloatingBounds] = useState(null);
   const [isPassThrough, setIsPassThrough] = useState(false);
   const [historyItems, setHistoryItems] = useState([]);
   const [toastMessage, setToastMessage] = useState(null);
+
+  const listen = useListenSession({ active: listenMode });
+
+  // Mode-segment gate: the listen button is always visible, but stays disabled
+  // until a recognition model is on disk. Downloading happens in settings
+  // (user's call) — refreshListen also runs on the settings-changed broadcast
+  // the settings page fires after a pack install, so a fresh download lights
+  // the button up without reopening this window.
+  const refreshListen = useCallback(() => {
+    window.electron?.audioEngine?.getInfo?.()
+      .then((info) => setListenAvailable(!!info?.modelName))
+      .catch(() => setListenAvailable(false));
+  }, []);
+
+  useEffect(() => {
+    refreshListen();
+  }, [listenMode, refreshListen]);
+
 
   // Service-layer notifications (e.g. OCR engine fallback) bubble up via session store
   useEffect(() => {
@@ -295,6 +321,9 @@ const FloatingWindow = () => {
         // Stack + OCR reloads are main-process-internal now — this channel
         // only carries the window's UI settings (opacity/engine/theme/langs).
         loadSettings();
+        // A model pack may have just landed (settings page fires this after an
+        // install/uninstall) — re-ask instead of staying grey until reopen.
+        refreshListen();
         const newTheme = newSettings?.interface?.theme;
         if (newTheme && ['light', 'dark', 'fresh'].includes(newTheme)) {
           setTheme(newTheme);
@@ -810,25 +839,105 @@ const FloatingWindow = () => {
       onMouseLeave={handleMouseLeaveWindow}
     >
       <div className="floating-top-area" onMouseDown={handleTitleBarMouseDown}>
-          {/* Mode switch, deliberately away from the action icons: it changes
-              what a capture produces, it is not one more thing to click. */}
-          {(ai.capabilities.text || ai.capabilities.vision) && (
-            <button
-              className={`floating-understand-btn ${understandMode ? 'active' : ''}`}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setUnderstandMode(!understandMode);
-              }}
-              title={understandMode
-                ? t('floatingWindow.understandModeOn', '理解模式已开：截图后直接讲解，点击关闭')
-                : t('floatingWindow.understandMode', '理解模式：截图后不翻译，直接讲解内容')}
-            >
-              <Brain size={12} />
-            </button>
+          {/* Mode segments (design A, user-picked over the dropdown): three
+              always-visible icons, single-select — no popup to fumble.
+              understand needs a chat/vision provider; listen is always there
+              but greyed until its models are downloaded in settings. */}
+          {(
+            <div className="floating-mode-wrap">
+              <button
+                className={`mode-seg-btn ${!listenMode && !understandMode ? 'active' : ''}`}
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setListenMode(false); setUnderstandMode(false); }}
+                title={t('floatingWindow.modeTranslate', '截图翻译')}
+              >
+                <Camera size={12} />
+              </button>
+              {(ai.capabilities.text || ai.capabilities.vision) && (
+                <button
+                  className={`mode-seg-btn ${!listenMode && understandMode ? 'active' : ''}`}
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setListenMode(false); setUnderstandMode(true); }}
+                  title={t('floatingWindow.modeUnderstand', '讲解')}
+                >
+                  <Brain size={12} />
+                </button>
+              )}
+              <button
+                className={`mode-seg-btn ${listenMode ? 'active' : ''}`}
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAutoRefresh(false); setListenMode(true); }}
+                disabled={!listenAvailable}
+                title={listenAvailable
+                  ? t('floatingWindow.modeListen', '听译')
+                  : t('floatingWindow.modeListenLocked', '听译：先到设置页「听译模型」下载识别模型')}
+              >
+                <AudioLines size={12} />
+              </button>
+            </div>
+          )}
+          {listenMode && (
+            <span className="listen-topbar-status">
+              {t(`floatingWindow.listenStatus.${listen.sessionState}`, listen.sessionState)}
+              {/* Fastest feedback the feature has: moves at the audio
+                  callback's rate, long before any text can appear. */}
+              <ListenLevel levelRef={listen.levelRef} active={listen.running} />
+            </span>
           )}
 
           <div className="floating-toolbar">
+            {listenMode ? (
+              <>
+                <button
+                  className={`toolbar-btn ${listen.running ? 'active' : ''}`}
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); listen.toggle(); }}
+                  disabled={!listen.available}
+                  title={listen.running
+                    ? t('floatingWindow.listenStop', '停止监听')
+                    : t('floatingWindow.listenStart', '开始监听系统声音（音频不落盘）')}
+                >
+                  {listen.running ? <Square size={12} /> : <Play size={12} />}
+                </button>
+                <select
+                  className="listen-select"
+                  value={listen.lang}
+                  onChange={(e) => listen.setLang(e.target.value)}
+                  title={t('floatingWindow.listenLang', '识别语言（切换后自动重启识别引擎）')}
+                >
+                  <option value="">{t('floatingWindow.listenLangAuto', '自动')}</option>
+                  <option value="zh">中文</option>
+                  <option value="en">EN</option>
+                  <option value="ja">日</option>
+                  <option value="ko">한</option>
+                  <option value="yue">粤</option>
+                </select>
+                <select
+                  className="listen-select"
+                  value={listen.targetLang}
+                  onChange={(e) => listen.setTargetLang(e.target.value)}
+                  title={t('floatingWindow.listenTarget', '翻译目标语（只翻定稿句，同语种自动跳过）')}
+                >
+                  <option value="">{t('floatingWindow.listenNoTranslate', '不翻译')}</option>
+                  <option value="zh">→中文</option>
+                  <option value="en">→EN</option>
+                  <option value="ja">→日</option>
+                  <option value="ko">→한</option>
+                </select>
+                <button
+                  className="toolbar-btn"
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const r = await listen.exportSrt();
+                    if (r?.success) {
+                      setToastMessage({ type: 'success', message: t('floatingWindow.listenExported', '字幕已导出') });
+                    }
+                  }}
+                  disabled={!listen.segments.length}
+                  title={t('floatingWindow.listenExport', '导出字幕（SRT，含译文）')}
+                >
+                  <Download size={12} />
+                </button>
+              </>
+            ) : (
+            <>
             <button
               className="toolbar-btn"
               onClick={(e) => {
@@ -901,6 +1010,8 @@ const FloatingWindow = () => {
                   : <AiActionIcon name={action.icon} size={12} />}
               </button>
             ))}
+            </>
+            )}
 
             <div
               className="toolbar-handle"
@@ -968,7 +1079,9 @@ const FloatingWindow = () => {
         ref={contentRef}
         onClick={handleContentClick}
       >
-        {status === STATUS.ERROR ? (
+        {listenMode ? (
+          <ListenPanel session={listen} />
+        ) : status === STATUS.ERROR ? (
           <div className="floating-message error">
             <AlertCircle size={20} />
             <span>{error}</span>

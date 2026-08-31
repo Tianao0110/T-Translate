@@ -169,18 +169,25 @@ const CHANNELS = {
     VISION_CHAT: 'stack:vision-chat',             // path B: prompt + capture to a vision model
     VISION_CAPABILITY: 'stack:vision-capability', // may path B run under the live privacy mode?
   },
-  // Audio-transcription probe (hidden experimental build; entry appears only
-  // when ASR models are manually placed under userData/asr-models).
-  AUDIO_PROBE: {
-    GET_INFO: 'audio-probe:get-info',   // renderer → main: model/privacy/state snapshot
-    START: 'audio-probe:start',         // renderer → main: spawn ASR worker; payload {language}
-    STOP: 'audio-probe:stop',           // renderer → main: stop worker, keep window
-    PCM: 'audio-probe:pcm',             // renderer → main: Float32Array 16k mono chunk
-    EVENT: 'audio-probe:event',         // renderer → main: capture-side event for the probe log
-    STATUS: 'audio-probe:status',       // main → renderer: {state, detail}
-    SEGMENT: 'audio-probe:segment',     // main → renderer: recognized (final) segment record
-    PARTIAL: 'audio-probe:partial',     // main → renderer: open-segment provisional text ('' clears)
-    CLOSE: 'audio-probe:close',         // renderer → main: close the probe window
+  // Listen-translate (audio engine). Hosted by the floating window's listen
+  // mode; the mode entry is always visible but disabled until an ASR base
+  // pack sits under userData/asr-models — packs install from settings, and
+  // hand-placed model folders still count.
+  AUDIO_ENGINE: {
+    GET_INFO: 'audio-engine:get-info',   // renderer → main: model/privacy/state snapshot
+    START: 'audio-engine:start',         // renderer → main: spawn ASR worker; payload {language}
+    STOP: 'audio-engine:stop',           // renderer → main: stop worker
+    PCM: 'audio-engine:pcm',             // renderer → main: Float32Array 16k mono chunk
+    EVENT: 'audio-engine:event',         // renderer → main: capture-side event for the session log
+    STATUS: 'audio-engine:status',       // main → renderer: {state, detail}
+    SEGMENT: 'audio-engine:segment',     // main → renderer: recognized (final) segment record
+    PARTIAL: 'audio-engine:partial',     // main → renderer: open-segment provisional text ('' clears)
+    EXPORT_SRT: 'audio-engine:export-srt', // renderer → main: save dialog + write subtitle file
+    // Model packs (settings page owns the only download entry point)
+    PACKS_LIST: 'audio-engine:packs-list',
+    PACKS_DOWNLOAD: 'audio-engine:packs-download',
+    PACKS_REMOVE: 'audio-engine:packs-remove',
+    DOWNLOAD_PROGRESS: 'audio-engine:download-progress',
   },
 };
 

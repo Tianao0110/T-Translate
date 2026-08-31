@@ -84,6 +84,7 @@ function initWin32API() {
       PROCESS_QUERY_INFORMATION: 0x0400,
       PROCESS_VM_READ: 0x0010,
       WDA_EXCLUDEFROMCAPTURE: 0x00000011,
+      WDA_NONE: 0x00000000,
       EM_GETSEL: 0x00B0,
       GUI_CARETBLINKING: 0x0001,
       SMTO_ABORTIFHUNG: 0x0002,
@@ -191,6 +192,26 @@ function makeWindowInvisibleToCapture(electronWindow) {
     }
   } catch (e) {
     logger.error('makeWindowInvisibleToCapture failed:', e);
+    return false;
+  }
+}
+
+// Undo the exclusion (WDA_NONE) — the user's "let me screenshot the overlay"
+// setting. Same HWND-decode dance as above.
+function makeWindowVisibleToCapture(electronWindow) {
+  if (process.platform !== 'win32') return false;
+
+  const api = initWin32API();
+  if (!api) return false;
+
+  try {
+    const handleBuffer = electronWindow.getNativeWindowHandle();
+    const hwnd = api._koffi.decode(handleBuffer, 'void*');
+    const result = api.SetWindowDisplayAffinity(hwnd, api.WDA_NONE);
+    if (!result) logger.warn('SetWindowDisplayAffinity(WDA_NONE) returned false');
+    return !!result;
+  } catch (e) {
+    logger.error('makeWindowVisibleToCapture failed:', e);
     return false;
   }
 }
@@ -484,4 +505,5 @@ module.exports = {
 
   // Capture-exclusion
   makeWindowInvisibleToCapture,
+  makeWindowVisibleToCapture,
 };

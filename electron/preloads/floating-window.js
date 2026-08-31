@@ -77,6 +77,34 @@ contextBridge.exposeInMainWorld('electron', {
     },
   },
 
+  // Listen-translate: loopback capture happens in THIS window (getDisplayMedia
+  // resolves via the session handler in the main process); PCM streams to the
+  // audio-engine worker, finals/partials stream back. Translation of finals
+  // reuses stack.translate below (privacy injected main-process side).
+  audioEngine: {
+    getInfo: () => ipcRenderer.invoke('audio-engine:get-info'),
+    start: (opts) => ipcRenderer.send('audio-engine:start', opts),
+    stop: () => ipcRenderer.send('audio-engine:stop'),
+    sendPcm: (samples) => ipcRenderer.send('audio-engine:pcm', samples),
+    sendEvent: (kind, detail) => ipcRenderer.send('audio-engine:event', { kind, detail }),
+    exportSrt: (content) => ipcRenderer.invoke('audio-engine:export-srt', { content }),
+    onStatus: (cb) => {
+      const handler = (event, payload) => cb(payload);
+      ipcRenderer.on('audio-engine:status', handler);
+      return () => ipcRenderer.removeListener('audio-engine:status', handler);
+    },
+    onSegment: (cb) => {
+      const handler = (event, rec) => cb(rec);
+      ipcRenderer.on('audio-engine:segment', handler);
+      return () => ipcRenderer.removeListener('audio-engine:segment', handler);
+    },
+    onPartial: (cb) => {
+      const handler = (event, text) => cb(text);
+      ipcRenderer.on('audio-engine:partial', handler);
+      return () => ipcRenderer.removeListener('audio-engine:partial', handler);
+    },
+  },
+
   // Encrypted storage for API keys etc.
   secureStorage: {
     encrypt: (key, value) => ipcRenderer.invoke('secure-storage:encrypt', key, value),

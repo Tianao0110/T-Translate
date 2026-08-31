@@ -188,6 +188,18 @@ function register(ctx) {
     const floatingWindow = getFloatingWindow();
     if (floatingWindow && !floatingWindow.isDestroyed()) {
       floatingWindow.webContents.send(CHANNELS.FLOATING_WINDOW.SETTINGS_CHANGED, settings);
+
+      // Capture-visibility applies live: WDA_EXCLUDEFROMCAPTURE keeps OCR from
+      // re-reading our own overlay, but the user can opt in to being
+      // capturable (to screenshot/record the overlay itself).
+      if (process.platform === 'win32') {
+        const helper = require('../utils/native-helper');
+        if (settings.floatingWindow?.captureVisible) {
+          helper.makeWindowVisibleToCapture(floatingWindow);
+        } else {
+          helper.makeWindowInvisibleToCapture(floatingWindow);
+        }
+      }
     }
 
     // The selection window is a persistent (hide-not-close) renderer with its

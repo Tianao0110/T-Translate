@@ -3,6 +3,10 @@
 // by a pack.json; the base pack ships with the app, language packs are
 // downloaded on demand from the GitHub `ocr-models` release.
 
+// Version compare lives in the generic pack machinery — the audio registry
+// needs the identical "manifest newer than installed?" test.
+const { compareVersions } = require('../utils/model-pack-core');
+
 const BASE_PACK_ID = 'base-v6';
 
 // Optional high-accuracy base variant (PP-OCRv6 medium). When installed and
@@ -45,18 +49,6 @@ const LANGUAGE_TO_PACK = {
 
 function packIdForLanguage(language) {
   return LANGUAGE_TO_PACK[language] || BASE_PACK_ID;
-}
-
-// "1.2.10" vs "1.3.0" — numeric per-segment compare, missing segments = 0.
-function compareVersions(a, b) {
-  const pa = String(a || '0').split('.').map((n) => parseInt(n, 10) || 0);
-  const pb = String(b || '0').split('.').map((n) => parseInt(n, 10) || 0);
-  const len = Math.max(pa.length, pb.length);
-  for (let i = 0; i < len; i++) {
-    const d = (pa[i] || 0) - (pb[i] || 0);
-    if (d !== 0) return d > 0 ? 1 : -1;
-  }
-  return 0;
 }
 
 // Merge what's installed with what the manifest offers into one UI-ready list.

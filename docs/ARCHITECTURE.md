@@ -6,6 +6,7 @@ T-Translate 是一个基于 Electron + React + Vite 的离线翻译工具，支�
 - 划词翻译（最多 8 个冻结窗口）
 - 截图 OCR 翻译
 - 悬浮窗口实时翻译
+- 听译（本机实时转写系统声音 + 逐句翻译，模型按需下载）
 - 文档翻译（PDF、DOCX、EPUB、TXT、SRT/VTT）
 - 多种翻译源（本地 LLM、OpenAI、DeepL、Gemini 等）
 
@@ -38,8 +39,11 @@ t-translate/
 │   ├── preloads/               # Preload 脚本 (每个窗口一个)
 │   ├── shared/                 # 主/渲染进程共享常量
 │   ├── ipc/                    # IPC 处理器 (按功能拆分，translation-stack.js 为栈 facade，history-vault.js 为历史加密库)
-│   ├── managers/               # 窗口/托盘/菜单管理器
-│   └── utils/                  # 工具函数（secure-vault/secure-audit/history-vault/ocr-engine 等）
+│   ├── managers/               # 窗口/托盘/菜单管理器 + audio-engine-manager（听译 ASR 子进程）
+│   ├── services/audio-engine/  # 听译 worker（utilityProcess 内跑 VAD+ASR，见「听译引擎与驻留口径」）
+│   └── utils/                  # 工具函数（secure-vault/secure-audit/history-vault/ocr-engine/
+│                               #   model-root=模型根目录解析 / model-pack-core=模型包下载安装工厂 +
+│                               #   ocr-pack-manager、audio-pack-manager 两个实例）
 │
 ├── src/                        # 渲染进程代码
 │   ├── main.jsx                # 应用入口
@@ -125,6 +129,10 @@ t-translate/
 │   ├── build-stack.js          # esbuild 打包翻译栈（dev/build 自动执行）
 │   ├── fetch-ocr-models.js     # 拉取内置 OCR 基础模型
 │   ├── build-ocr-release.js    # 生成 ocr-models Release 资产（发模型用）
+│   ├── audio-model-sources.js  # 听译模型包来源与角色映射（换模型改这里）
+│   ├── build-audio-release.js  # 生成 audio-models Release 资产
+│   ├── model-licenses/         # 模型协议原文（随包分发，见 NOTICE）
+│   ├── smoke-listen.js         # 听译整链冒烟 + 延迟测量（npm run smoke:listen）
 │   ├── check-constants.js      # 常量同步检查
 │   ├── check-i18n.js           # i18n key 一致性检查
 │   └── check-hardcoded-chinese.js  # 硬编码中文扫描
@@ -224,6 +232,44 @@ electron/utils/open-with.js     右键菜单 argv 解析（.pdf/.docx/.txt 白�
                                 文件内容——无任意路径读取面。注册表项由
                                 installer/installer.nsh 安装写入、卸载对称清除
 ```
+
+### 听译引擎与驻留口径（v0.4.0）
+
+```
+electron/managers/audio-engine-manager.js  ASR utilityProcess 的唯一持有者
+electron/services/audio-engine/audio-worker.js  两个模型都住在这个子进程里
+electron/utils/model-root.js               模型根目录解析（安装目录优先）
+electron/utils/audio-pack-manager.js       模型包下载/卸载（工厂第二实例）
+```
+
+**载卸时序**：模型只在会话内驻留，不做常驻缓存。
+
+| 时刻 | 发生什么 |
+|------|----------|
+| 点开始 | fork 子进程 → `init` 声明模型路径 → `asr-start` 才真正加载 |
+| 会话中 | 定稿引擎 SenseVoice + 可选草稿引擎 zipformer 同时在内存 |
+| 点停止 | `asr-stop` 冲刷 → 主进程发 `unload`（丢引擎引用、放开模型文件）→ `shutdown` → 进程退出 |
+| 关窗/切 SECURE | 同上，`once('closed')` 与隐私监听各自兜底 |
+| 换包 | `stopSessionAndWait` 等进程真正退出才动目录——Windows 上文件句柄没放开，换包会在 150MB 下载的最后一步失败 |
+
+**内存口径**（2026-08-27 双模型 3 分钟 soak / 2026-08-29 smoke 复测）：会话中子进程 RSS 596–676MB
+且平稳；会话结束进程退出，回到 0。只装基座包约省一半。主进程侧的 OCR 会话是另一
+套缓存（LRU 2 个，换包/换档位时清），与听译互不影响。
+
+**延迟口径**（`npm run smoke:listen` 实测，两次跑差 <20ms）：
+
+| 指标 | 装草稿引擎 | 只装基座包 |
+|------|-----------|-----------|
+| 引擎加载 | 2.2 s | 1.2–1.4 s |
+| 首字（草稿出第一个字） | 0.56–0.57 s | 0.80–0.83 s |
+| 草稿刷新间隔 | 0.31 s | 1.03 s（伪流式节流值） |
+| 定稿（说完到出定稿） | 0.37 s | 0.37 s |
+| 解码 RTF | 0.033–0.044 | 同 |
+
+口径说明：计时从 `feedPcm` 到事件送达，**不含采集与渲染**——渲染端
+`createScriptProcessor(4096)` 在 48kHz 下再压 ~85ms，加 IPC 与绘制，用户眼里约
+再多 0.1s。定稿延迟的主要成分是 VAD 尾静音（`minSilence` 0.35s）而不是算力，
+所以调它才是调定稿快慢。样本是合成语音，真实带 BGM 的场景 VAD 闭合更晚。
 
 ## 命名规范
 

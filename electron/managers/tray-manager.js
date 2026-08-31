@@ -89,8 +89,6 @@ function createTray(ctx) {
       startScreenshot: ctx.managers?.startScreenshot,
       toggleFloatingWindow: ctx.managers?.toggleFloatingWindow,
       toggleSelectionTranslate: ctx.managers?.toggleSelectionTranslate,
-      toggleAudioProbe: ctx.managers?.toggleAudioProbe,
-      isAudioProbeAvailable: ctx.managers?.isAudioProbeAvailable,
       getSelectionEnabled: () => ctx.runtime?.selectionEnabled ?? false,
     });
   }
@@ -228,18 +226,6 @@ function updateMenu() {
       },
     },
   ];
-
-  // Hidden probe: the entry exists only while ASR models are present on disk
-  // (manually placed — nothing in the app ever advertises or downloads them).
-  if (deps.isAudioProbeAvailable?.()) {
-    template.push({
-      label: t('audioProbe'),
-      click: () => {
-        logger.debug('Menu: audioProbe clicked');
-        deps.toggleAudioProbe?.();
-      },
-    });
-  }
 
   template.push(
     { type: 'separator' },

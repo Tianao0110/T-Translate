@@ -26,6 +26,7 @@ import {
   PrivacySection,
   DocumentSection,
   TTSSection,
+  ListenSection,
   AboutSection,
   ProvidersSection,
   TranslationSection,
@@ -51,6 +52,7 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
     aiActions: t('settingsNav.aiActions'),
     ocr: t('settingsNav.ocr'),
     tts: t('settingsNav.tts'),
+    listen: t('settingsNav.listen'),
     interface: t('settingsNav.interface'),
     privacy: t('settingsNav.privacy'),
     about: t('settingsNav.about'),
@@ -557,6 +559,13 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
             settings={settings}
             updateSetting={updateSetting}
             notify={notify}
+          />
+        );
+      case 'listen':
+        return (
+          <ListenSection
+            notify={notify}
+            confirm={confirm}
           />
         );
       case 'interface':

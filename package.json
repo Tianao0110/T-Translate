@@ -1,7 +1,7 @@
 {
   "name": "t-translate",
   "private": true,
-  "version": "0.3.8",
+  "version": "0.4.0",
   "description": "Professional offline translation tool with AI support",
   "main": "electron/main.js",
   "scripts": {
@@ -14,6 +14,8 @@
     "dist": "node scripts/fetch-ocr-models.js && node scripts/build-stack.js && vite build && electron-builder --publish=never",
     "ocr:models": "node scripts/fetch-ocr-models.js",
     "ocr:release": "node scripts/build-ocr-release.js",
+    "audio:release": "node scripts/build-audio-release.js",
+    "smoke:listen": "electron scripts/smoke-listen.js",
     "lint": "eslint src/ electron/",
     "lint:fix": "eslint src/ electron/ --fix",
     "format": "prettier --write \"src/**/*.{js,jsx,css}\" \"electron/**/*.js\"",
@@ -145,10 +147,6 @@
       {
         "from": "public/child-pane.html",
         "to": "resources/child-pane.html"
-      },
-      {
-        "from": "public/audio-probe.html",
-        "to": "resources/audio-probe.html"
       }
     ],
     "win": {

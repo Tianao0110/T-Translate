@@ -1,4 +1,4 @@
-// Generic model-pack manager factory: download / verify / install / remove
+﻿// Generic model-pack manager factory: download / verify / install / remove
 // packs under a domain-owned root, driven by a manifest.json hosted as a
 // release asset. Extracted verbatim from the OCR pack manager so the audio
 // engine (ASR/TTS packs, v0.4.x) reuses the same battle-tested machinery —
@@ -9,9 +9,14 @@
 //
 // createPackManager({
 //   manifestUrl,       resolved URL (env override happens in the shell)
-//   packsRoot,         () => absolute install root
+//   packsRoot,         () => absolute install root (where downloads land)
+//   resolvePackDir,    optional (packId) => installed dir | null — lets a
+//                      domain find packs outside packsRoot() (legacy roots)
+//                      so removal works there too; defaults to packsRoot/id
 //   listInstalled,     () => installed packs (merged into the UI list)
-//   evictSessions,     (packId) => void — release live file handles pre-swap
+//   evictSessions,     (packId) => void | Promise — release live file handles
+//                      before the swap. Awaited: a domain whose engine lives in
+//                      another process must resolve only once it is really gone
 //   computePackList,   (installed, manifest) => UI-ready pack list
 //   packJsonFields,    (entry) => fields persisted to pack.json (+installedAt)
 //   basePackId,        optional — its removal falls back to the bundled copy
@@ -24,9 +29,24 @@ const path = require('path');
 const nodeFs = require('fs');
 const crypto = require('crypto');
 
+// "1.2.10" vs "1.3.0" — numeric per-segment compare, missing segments = 0.
+// Lives here, not in a domain pack file: every pack registry (OCR, audio)
+// needs the same "is the manifest newer than what's installed" test.
+function compareVersions(a, b) {
+  const pa = String(a || '0').split('.').map((n) => parseInt(n, 10) || 0);
+  const pb = String(b || '0').split('.').map((n) => parseInt(n, 10) || 0);
+  const len = Math.max(pa.length, pb.length);
+  for (let i = 0; i < len; i++) {
+    const d = (pa[i] || 0) - (pb[i] || 0);
+    if (d !== 0) return d > 0 ? 1 : -1;
+  }
+  return 0;
+}
+
 function createPackManager({
   manifestUrl,
   packsRoot,
+  resolvePackDir = null,
   listInstalled,
   evictSessions,
   computePackList,
@@ -190,7 +210,7 @@ function createPackManager({
       );
 
       // Swap into place: evict the live session first so no file handles linger
-      evictSessions(packId);
+      await evictSessions(packId);
       fs.rmSync(finalDir, { recursive: true, force: true });
       fs.renameSync(stagingDir, finalDir);
     } catch (e) {
@@ -207,7 +227,10 @@ function createPackManager({
   // userData copy can go — the bundled copy under resources/ is part of the
   // app and removal just falls back to it.
   async function removePack(packId) {
-    const dir = path.join(packsRoot(), packId);
+    // A pack installed by an older build can live outside the current root;
+    // resolvePackDir lets the domain point at it so removal is not silently
+    // impossible for exactly the packs a user most wants to reclaim.
+    const dir = (resolvePackDir && resolvePackDir(packId)) || path.join(packsRoot(), packId);
 
     if (!fs.existsSync(dir)) {
       if (basePackId !== null && packId === basePackId) {
@@ -220,7 +243,7 @@ function createPackManager({
       throw err;
     }
 
-    evictSessions(packId);
+    await evictSessions(packId);
     fs.rmSync(dir, { recursive: true, force: true });
     logger.info(`Pack ${packId} removed`);
     return { success: true, packId };
@@ -235,4 +258,4 @@ function createPackManager({
   };
 }
 
-module.exports = { createPackManager };
+module.exports = { createPackManager, compareVersions };

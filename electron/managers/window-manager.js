@@ -224,11 +224,43 @@ function createFloatingWindow() {
     },
   });
 
-  // WDA_EXCLUDEFROMCAPTURE so OCR doesn't re-read our own overlay
+  // WDA_EXCLUDEFROMCAPTURE so OCR doesn't re-read our own overlay — unless
+  // the user opted in to being capturable (screenshots/recordings of the
+  // overlay itself; settings changes re-apply live via the notify handler).
   if (process.platform === 'win32') {
     floatingWindow.webContents.on('did-finish-load', () => {
-      makeWindowInvisibleToCapture(floatingWindow);
+      const captureVisible = !!store.get('settings.floatingWindow.captureVisible', false);
+      if (!captureVisible) makeWindowInvisibleToCapture(floatingWindow);
     });
+  }
+
+  // System-audio loopback for listen mode: getDisplayMedia in this window
+  // resolves through this handler. audio:'loopback' taps the default render
+  // device (post-volume, post-mute — a muted system yields silence by
+  // design); the renderer stops the mandatory video track immediately
+  // (spike-verified: audio keeps flowing). Registered once per session —
+  // the handler is session-global, and nothing else calls getDisplayMedia.
+  const fwSession = floatingWindow.webContents.session;
+  if (!fwSession._listenDisplayMediaHandler) {
+    fwSession._listenDisplayMediaHandler = true;
+    fwSession.setDisplayMediaRequestHandler(
+      (request, callback) => {
+        desktopCapturer
+          .getSources({ types: ['screen'] })
+          .then((sources) => {
+            callback({ video: sources[0], audio: 'loopback' });
+          })
+          .catch((err) => {
+            logger.warn?.(`Listen display-media handler failed: ${err.message}`);
+            try {
+              callback(null);
+            } catch {
+              /* request already gone */
+            }
+          });
+      },
+      { useSystemPicker: false }
+    );
   }
 
   if (isDev) {
@@ -520,87 +552,6 @@ function isPointInSelectionWindows(x, y) {
   return false;
 }
 
-// ===== Audio probe window =====
-
-// Hidden experimental probe: opaque frameless strip (no transparency — dodges
-// the whole transparent-window pitfall family), floating level like the other
-// overlays, destroy-on-close so the ASR worker never idles in the background.
-function createAudioProbeWindow() {
-  if (windows.audioProbe && !windows.audioProbe.isDestroyed()) {
-    windows.audioProbe.focus();
-    return windows.audioProbe;
-  }
-
-  const probeWindow = new BrowserWindow({
-    width: 640,
-    height: 240,
-    minWidth: 380,
-    minHeight: 150,
-    show: true,
-    frame: false,
-    transparent: false,
-    backgroundColor: '#16181d',
-    resizable: true,
-    alwaysOnTop: true,
-    skipTaskbar: true,
-    webPreferences: {
-      preload: PATHS.preloads.audioProbe,
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: false,
-    },
-  });
-
-  probeWindow.setAlwaysOnTop(true, 'floating');
-
-  // System-audio loopback: getDisplayMedia in the probe page resolves through
-  // this handler. audio:'loopback' taps the default render device (post-volume,
-  // post-mute — a muted system yields silence by design); the page stops the
-  // mandatory video track immediately (spike-verified: audio keeps flowing).
-  // Registered once per session — the handler is session-global, and nothing
-  // else in the app calls getDisplayMedia.
-  const probeSession = probeWindow.webContents.session;
-  if (!probeSession._audioProbeDisplayMediaHandler) {
-    probeSession._audioProbeDisplayMediaHandler = true;
-    probeSession.setDisplayMediaRequestHandler(
-      (request, callback) => {
-        desktopCapturer
-          .getSources({ types: ['screen'] })
-          .then((sources) => {
-            callback({ video: sources[0], audio: 'loopback' });
-          })
-          .catch((err) => {
-            logger.warn?.(`Audio probe display-media handler failed: ${err.message}`);
-            try {
-              callback(null);
-            } catch {
-              /* request already gone */
-            }
-          });
-      },
-      { useSystemPicker: false }
-    );
-  }
-
-  if (isDev) {
-    probeWindow.loadURL(PATHS.pages.audioProbe.url);
-  } else {
-    probeWindow.loadFile(PATHS.pages.audioProbe.file);
-  }
-
-  probeWindow.on('closed', () => {
-    if (windows.audioProbe === probeWindow) {
-      windows.audioProbe = null;
-    }
-  });
-
-  hardenWebContents(probeWindow, 'Audio probe window');
-
-  windows.audioProbe = probeWindow;
-  logger.debug?.('Audio probe window created');
-  return probeWindow;
-}
-
 module.exports = {
   isPointInSelectionWindows,
   init,
@@ -608,7 +559,6 @@ module.exports = {
   createFloatingWindow,
   createSelectionWindow,
   createScreenshotWindow,
-  createAudioProbeWindow,
   toggleFloatingWindow,
   freezeSelectionWindow,
   closeFrozenSelectionWindow,

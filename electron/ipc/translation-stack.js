@@ -75,12 +75,16 @@ function register(ctx) {
   }
 
   // The renderer's opinion about privacyMode/useCache/signal is dropped here.
-  function sanitizeOptions(options = {}, mode, signal) {
+  // `noCache` (payload level, not options) is the one exception and it is safe
+  // by construction: it can only turn caching further OFF, never on, so the
+  // secure-mode gate below still decides the ceiling. Listen mode sets it —
+  // subtitle lines are one-shot and would otherwise evict the shared cache.
+  function sanitizeOptions(options = {}, mode, signal, noCache = false) {
     const { privacyMode: _pm, useCache: _uc, signal: _sig, ...rest } = options;
     return {
       ...rest,
       privacyMode: mode,
-      useCache: mode !== 'secure',
+      useCache: mode !== 'secure' && !noCache,
       signal,
     };
   }
@@ -128,12 +132,15 @@ function register(ctx) {
 
   ipcMain.handle(CHANNELS.STACK.TRANSLATE, async (event, payload = {}) => {
     if (!stack) return unavailable();
-    const { requestId, text, options } = payload;
+    const { requestId, text, options, noCache } = payload;
     const mode = getPrivacyMode();
     const id = requestId || `rq_${crypto.randomUUID()}`;
     const controller = track(id, event.sender);
     try {
-      const result = await stack.service.translate(text, sanitizeOptions(options, mode, controller.signal));
+      const result = await stack.service.translate(
+        text,
+        sanitizeOptions(options, mode, controller.signal, noCache === true)
+      );
       return { ...result, effectivePrivacyMode: mode };
     } catch (e) {
       logger.error('translate failed:', e);

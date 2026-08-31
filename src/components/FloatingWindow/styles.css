@@ -174,13 +174,23 @@
   color: var(--floating-accent);
 }
 
-/* ========== 理解模式开关 ==========
-   Mirrors the close button on the opposite corner: it is a mode switch, not
-   one of the centred action icons. */
-.floating-understand-btn {
+/* ========== 模式分段（原理解模式开关位，design A） ==========
+   Mirrors the close button on the opposite corner: three always-visible
+   single-select segments — a mode changes what a session produces, it is not
+   one of the centred action icons. Rest state hides with the chrome; the
+   ACTIVE segment stays visible (the window must always say what mode it is
+   in), same rule the old toggle followed. */
+.floating-mode-wrap {
   position: absolute;
   top: 3px;
   left: 3px;
+  z-index: 1001;
+  display: flex;
+  gap: 2px;
+  -webkit-app-region: no-drag;
+}
+
+.mode-seg-btn {
   width: 20px;
   height: 20px;
   border: none;
@@ -194,40 +204,91 @@
   opacity: 0;
   transition: all 0.2s ease;
   -webkit-app-region: no-drag;
-  z-index: 1001;
 }
 
-.floating-window.show-toolbar .floating-understand-btn {
+.floating-window.show-toolbar .mode-seg-btn {
   opacity: 1;
 }
 
-.floating-understand-btn:hover {
+.mode-seg-btn:hover {
   background: rgba(255, 255, 255, 0.9);
   transform: scale(1.05);
 }
 
-[data-theme="fresh"] .floating-understand-btn {
+[data-theme="fresh"] .mode-seg-btn {
   background: rgba(255, 255, 255, 0.7);
   color: #059669;
 }
 
-[data-theme="dark"] .floating-understand-btn {
+[data-theme="dark"] .mode-seg-btn {
   background: rgba(232, 228, 221, 0.10);
   color: #e8e4dd;
 }
 
-[data-theme="dark"] .floating-understand-btn:hover {
+[data-theme="dark"] .mode-seg-btn:hover {
   background: rgba(232, 228, 221, 0.18);
 }
 
 /* Last, so it outranks the per-theme resting rules above (same specificity,
-   source order decides). Stays visible while the mode is on: it changes what
-   every capture does, so it must not vanish with the rest of the chrome. */
-.floating-understand-btn.active,
-.floating-understand-btn.active:hover {
+   source order decides). */
+.mode-seg-btn.active,
+.mode-seg-btn.active:hover {
   opacity: 1;
   background: var(--floating-accent);
   color: var(--floating-on-accent);
+}
+
+/* Locked (listen with no model downloaded yet): greyed via colour, never via
+   opacity — opacity is already this toolbar's show/hide channel, so dimming
+   with it would make the button vanish instead of read as disabled. Placed
+   after the theme and .active rules so it always wins on equal specificity. */
+.mode-seg-btn:disabled,
+.mode-seg-btn:disabled:hover {
+  cursor: default;
+  transform: none;
+  background: color-mix(in srgb, var(--floating-text-muted) 12%, transparent);
+  color: color-mix(in srgb, var(--floating-text-muted) 45%, transparent);
+}
+
+/* Listen status lives in the otherwise-empty drag strip next to the segments
+   (the strip looked dead when the chrome faded). Part of the drag area on
+   purpose — it is not clickable. Flex row so the level meter can follow the
+   text: the label's width changes with the language, so anything positioned
+   at a fixed offset would collide in one locale and float in the other. */
+.listen-topbar-status {
+  position: absolute;
+  top: 5px;
+  left: 74px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--floating-text-muted);
+  user-select: none;
+  pointer-events: none;
+  z-index: 1000;
+  white-space: nowrap;
+}
+
+/* Capture level, riding along inside the status row. Deliberately tiny: it
+   answers "is sound arriving" and nothing else, and it must not compete with
+   the subtitles. */
+.listen-level {
+  flex: none;
+  width: 34px;
+  height: 3px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--floating-text-muted) 22%, transparent);
+  overflow: hidden;
+}
+
+.listen-level-bar {
+  width: 100%;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--floating-accent);
+  transform-origin: left center;
+  transform: scaleX(0);
 }
 
 /* ========== 关闭按钮 ========== */
@@ -428,9 +489,7 @@
   color: var(--floating-text-muted);
   text-align: center;
   font-size: 14px;
-  /* Same low-opacity legibility rim as .floating-result (loading/placeholder/
-     error text sits on the transparent window too) */
-  text-shadow: 0 0 3px var(--floating-text-halo), 0 0 6px var(--floating-text-halo);
+  /* No text-shadow — see .floating-result */
 }
 
 .floating-message.error {
@@ -479,8 +538,8 @@
   word-wrap: break-word;
   white-space: pre-wrap;  /* 保留换行符 */
   user-select: text;      /* re-granted here — the root is user-select:none for dragging */
-  /* Legibility rim for low window opacity — see --floating-text-halo */
-  text-shadow: 0 0 3px var(--floating-text-halo), 0 0 6px var(--floating-text-halo);
+  /* No text-shadow: every halo variant (glow, outline) reads as blur —
+     Latin glyphs especially. User verdict across three rounds: crisp > rim. */
 }
 
 /* ========== 滚动提示 ========== */
@@ -1240,4 +1299,148 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* ========== 听译模式（listen mode） ========== */
+
+.listen-select {
+  border: 1px solid var(--floating-border);
+  border-radius: 5px;
+  background: var(--floating-surface);
+  color: var(--floating-text);
+  font-size: 12px;
+  padding: 1px 4px;
+  max-width: 84px;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.listen-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  /* Top clearance for the mode segments + status strip. The content area's
+     own 16px padding covers most of the 23px strip; this tops it up (22px
+     here once stacked into a fat blank band). */
+  padding-top: 8px;
+
+  /* Subtitle palette. This window floats over arbitrary content at any
+     opacity, so emphasis must be carried by ALPHA (which always fades toward
+     whatever is behind) and never by swapping to a "dimmer" color token: at
+     1% opacity over a dark video the light themes' near-black body color is
+     the LEAST readable thing on screen — that is how the live line came out
+     washed out while the finished ones looked solid (user report 2026-08-28,
+     inverted here). Both bases are mid-tone and survive black or white. */
+  --listen-src: var(--floating-text-muted);
+  --listen-dst: var(--floating-accent);
+}
+
+/* The amber-dark theme's body color IS a light warm gray — over video it beats
+   the muted token, so that theme keeps it as the transcript color. */
+[data-theme="dark"] .listen-panel {
+  --listen-src: var(--floating-text);
+}
+
+/* Lyrics-style flow (user-picked): the line BEING recognized is the big bold
+   "now playing" line, the freshest final keeps normal weight, older lines
+   recede to gray and drift up as new ones land. Everything centered. */
+.listen-transcript {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  user-select: text;
+  cursor: text;
+  text-align: center;
+}
+
+/* Self-hiding scrollbar: a slim track that is invisible until the transcript
+   is hovered (the native bar sat there full-time and ugly). */
+.listen-transcript::-webkit-scrollbar {
+  width: 6px;
+}
+
+.listen-transcript::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.listen-transcript::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+}
+
+.listen-transcript:hover::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--floating-text-muted) 45%, transparent);
+}
+
+.listen-transcript::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--floating-text-muted) 70%, transparent);
+}
+
+.listen-transcript::-webkit-scrollbar-button {
+  display: none;
+}
+
+.listen-placeholder {
+  color: var(--floating-text-muted);
+  text-align: center;
+  padding-top: 18px;
+  font-size: 12px;
+}
+
+.listen-seg {
+  margin-bottom: 10px;
+  word-break: break-word;
+  animation: listen-in 0.25s ease;
+  /* Demotion to .old is a fade, not a snap */
+  transition: opacity 0.25s ease;
+}
+
+@keyframes listen-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+.listen-seg-text {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.55;
+  color: var(--listen-src);
+}
+
+.listen-seg-trans {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--listen-dst);
+  margin-top: 2px;
+}
+
+/* Finished lines are ghosts: same hues, faded and smaller, drifting up as new
+   ones land. Alpha only — a "dimmer" token cannot be trusted here (see the
+   palette note above). */
+.listen-seg.old {
+  opacity: 0.45;
+}
+
+.listen-seg.old .listen-seg-text {
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.listen-seg.old .listen-seg-trans {
+  font-size: 12px;
+}
+
+/* No italics: CJK has no true italic glyphs, so the browser shears them —
+   permanently blurry text. And NO text-shadow anywhere in listen mode — both
+   the glow and the hard-outline variants were tried and read as blur (user
+   verdict: the untreated first version looked best). Don't re-add either.
+   The draft is the "now playing" lyric: biggest, boldest, full alpha. */
+.listen-partial {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--listen-src);
+  line-height: 1.5;
+  word-break: break-word;
+  padding-bottom: 4px;
 }

@@ -1,89 +1,88 @@
-// Audio-transcription probe orchestration: owns the probe window lifecycle,
-// the ASR utilityProcess, and status relay between them.
+﻿// Audio engine orchestration: owns the ASR utilityProcess and status relay.
+// The session is HOSTED by the floating window's listen mode (the standalone
+// probe window is gone) — this manager no longer owns any window lifecycle.
 //
-// Iron rules honored here: the probe window is destroy-on-close (never a
-// hidden resident like the selection window), the worker dies with the window
-// (zero idle footprint), SECURE privacy mode refuses to start (the probe log
-// records recognized text on disk), and a crashed engine restarts exactly once
-// per window before giving up.
+// Iron rules honored here: the worker dies with the session (zero idle
+// footprint; a closing host window force-stops via a once-listener armed at
+// session start), SECURE privacy mode refuses to start (the session log
+// records recognized text on disk), and a crashed engine restarts exactly
+// once per session before giving up.
 
 const path = require('path');
 const fs = require('fs');
 const { app, utilityProcess } = require('electron');
 const { CHANNELS, PRIVACY_MODES } = require('../shared/channels');
 const { locateAsrModels } = require('../utils/asr-models');
-const logger = require('../utils/logger')('AudioProbe');
+const { modelDir, modelDirs } = require('../utils/model-root');
+const logger = require('../utils/logger')('AudioEngine');
 
 const READY_TIMEOUT_MS = 30000;
 const STOP_GRACE_MS = 3000;
-const MAX_PROBE_LOGS = 20; // rolling cap — one file per session, oldest pruned first
+// Rolling cap — one file per session, oldest pruned first. Filename prefix
+// stays 'audio-probe-' so the accumulated tuning logs keep sorting together.
+const MAX_PROBE_LOGS = 20;
 
-let deps = null; // { store, windows, createWindow }
+let deps = null; // { store, getWindow }
 let child = null;
 let childState = 'idle'; // idle | starting | running | stopping
 let restartedOnce = false;
 let readyTimer = null;
 let killTimer = null;
 let privacyUnsub = null;
-let sessionLanguage = ''; // SenseVoice hint from the probe window ('' = auto)
+let sessionLanguage = ''; // SenseVoice hint from the host window ('' = auto)
 
 function init(d) {
   deps = d;
 }
 
+// Where a download lands. Reads go through findModels(), which also looks at
+// the pre-v0.4.0 userData location (see model-root.js).
 function modelsBaseDir() {
-  return path.join(app.getPath('userData'), 'asr-models');
+  return modelDir('asr-models');
+}
+
+// First root that holds a complete model set wins.
+function findModels() {
+  for (const dir of modelDirs('asr-models')) {
+    const found = locateAsrModels(dir);
+    if (found) return found;
+  }
+  return null;
 }
 
 function isAvailable() {
-  return locateAsrModels(modelsBaseDir()) !== null;
+  return findModels() !== null;
 }
 
 function isSecure() {
   return deps.store.get('privacyMode', PRIVACY_MODES.STANDARD) === PRIVACY_MODES.SECURE;
 }
 
-function probeWindow() {
-  const win = deps.windows.audioProbe;
+function hostWindow() {
+  const win = deps.getWindow?.();
   return win && !win.isDestroyed() ? win : null;
 }
 
 function sendToWindow(channel, payload) {
-  const win = probeWindow();
+  const win = hostWindow();
   if (win) win.webContents.send(channel, payload);
 }
 
 function sendStatus(state, detail) {
   logger.debug(`status: ${state}${detail ? ` (${detail})` : ''}`);
-  sendToWindow(CHANNELS.AUDIO_PROBE.STATUS, { state, detail });
+  sendToWindow(CHANNELS.AUDIO_ENGINE.STATUS, { state, detail });
 }
 
 function getInfo() {
-  const models = locateAsrModels(modelsBaseDir());
+  const models = findModels();
   return {
     modelName: models ? models.modelName : null,
-    modelsDir: modelsBaseDir(),
+    streamingPresent: !!models?.streaming,
+    modelsDir: modelsBaseDir(),      // where a new download lands
+    activeDir: models?.baseDir || null, // where the live set actually sits
     secureBlocked: isSecure(),
     running: childState === 'running' || childState === 'starting',
   };
-}
-
-function toggleWindow() {
-  const win = probeWindow();
-  if (win) {
-    win.close(); // 'closed' handler tears the session down
-    return;
-  }
-  if (!isAvailable()) {
-    logger.warn('toggle ignored: no ASR models present');
-    return;
-  }
-  deps.windows.audioProbe = deps.createWindow();
-  deps.windows.audioProbe.on('closed', () => {
-    deps.windows.audioProbe = null;
-    stopSession('window-closed');
-  });
-  restartedOnce = false;
 }
 
 function startSession(options = {}) {
@@ -94,7 +93,7 @@ function startSession(options = {}) {
   // Each user-initiated session gets its own one-shot crash restart.
   restartedOnce = false;
   sessionLanguage = typeof options.language === 'string' ? options.language : '';
-  const models = locateAsrModels(modelsBaseDir());
+  const models = findModels();
   if (!models) {
     sendStatus('no-model');
     return;
@@ -103,6 +102,10 @@ function startSession(options = {}) {
     sendStatus('secure-blocked');
     return;
   }
+  // Zero-idle-footprint backstop: a closing host window must never leave the
+  // engine humming. once() self-detaches; a stale listener firing after a
+  // normal stop hits the idle guard in stopSession and is a no-op.
+  hostWindow()?.once('closed', () => stopSession('window-closed'));
   spawnWorker(models);
 
   // A mid-session switch to SECURE stops the probe (its log carries text).
@@ -164,10 +167,16 @@ function spawnWorker(models) {
         modelPath: models.modelPath,
         tokensPath: models.tokensPath,
         vadPath: models.vadPath,
+        // optional two-pass draft engine (null when not manually placed)
+        streaming: models.streaming,
         language: sessionLanguage,
       },
     },
     logPath,
+    // Recognized text stays out of the on-disk log by default — the session
+    // log exists for tuning (segment lengths, gaps, RTF), and those are
+    // metrics, not words. Developers chasing a bad transcription opt in.
+    logText: process.env.TT_LISTEN_LOG_TEXT === '1',
     meta: {
       appVersion: app.getVersion(),
       electron: process.versions.electron,
@@ -191,16 +200,16 @@ function onWorkerMessage(msg) {
       sendStatus('listening');
       break;
     case 'segment':
-      sendToWindow(CHANNELS.AUDIO_PROBE.SEGMENT, msg.rec);
+      sendToWindow(CHANNELS.AUDIO_ENGINE.SEGMENT, msg.rec);
       break;
     case 'partial':
-      sendToWindow(CHANNELS.AUDIO_PROBE.PARTIAL, msg.text);
+      sendToWindow(CHANNELS.AUDIO_ENGINE.PARTIAL, msg.text);
       break;
     case 'hint':
       sendStatus(msg.kind ? `hint-${msg.kind}` : 'listening');
       break;
     case 'metrics':
-      sendToWindow(CHANNELS.AUDIO_PROBE.STATUS, { state: 'metrics', detail: msg.rec });
+      sendToWindow(CHANNELS.AUDIO_ENGINE.STATUS, { state: 'metrics', detail: msg.rec });
       break;
     case 'asr-stopped':
       // Session flushed; the probe has no reason to keep an idle engine warm
@@ -208,6 +217,11 @@ function onWorkerMessage(msg) {
       // finishes cleanup; the kill grace timer is already armed.
       if (child) {
         try {
+          // unload first: drops the recognizer/VAD/draft refs inside the
+          // worker so the model files are released before exit rather than
+          // whenever the process happens to die. Matters for the pack swap
+          // right behind stopSessionAndWait.
+          child.postMessage({ type: 'unload', what: 'asr' });
           child.postMessage({ type: 'shutdown' });
         } catch {
           killWorker();
@@ -230,16 +244,17 @@ function onWorkerExit(code) {
   childState = 'idle';
   unsubscribePrivacy();
   logger.info(`worker exited (code ${code}, stopping=${wasStopping})`);
+  drainExitWaiters();
 
   if (wasStopping) {
     sendStatus('stopped');
     return;
   }
   // Unexpected death mid-session: one automatic restart, then give up.
-  if (!restartedOnce && probeWindow()) {
+  if (!restartedOnce && hostWindow()) {
     restartedOnce = true;
     sendStatus('engine-restarting');
-    const models = locateAsrModels(modelsBaseDir());
+    const models = findModels();
     if (models && !isSecure()) {
       spawnWorker(models);
       return;
@@ -262,6 +277,40 @@ function logRendererEvent(kind, detail) {
   } catch {
     // worker mid-death — event is best-effort
   }
+}
+
+// Callers that must not touch the model files until the worker is really gone
+// (pack install/removal) wait on these.
+let exitWaiters = [];
+
+function drainExitWaiters() {
+  const waiters = exitWaiters;
+  exitWaiters = [];
+  for (const done of waiters) done();
+}
+
+/**
+ * Stop and resolve only once the worker process has exited. A pack swap that
+ * starts while the worker still has the .onnx files open fails on Windows —
+ * and it would fail at the very end of a 150 MB download.
+ */
+function stopSessionAndWait(reason, timeoutMs = STOP_GRACE_MS + 2000) {
+  if (!child) {
+    stopSession(reason);
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      logger.warn('worker did not exit in time — killing before pack swap');
+      killWorker();
+      resolve();
+    }, timeoutMs);
+    exitWaiters.push(() => {
+      clearTimeout(timer);
+      resolve();
+    });
+    stopSession(reason);
+  });
 }
 
 function stopSession(reason) {
@@ -308,9 +357,9 @@ module.exports = {
   init,
   isAvailable,
   getInfo,
-  toggleWindow,
   startSession,
   stopSession,
+  stopSessionAndWait,
   feedPcm,
   logRendererEvent,
 };

@@ -193,4 +193,64 @@ describe('model-pack-core', () => {
     await expect(manager.removePack('base')).rejects.toMatchObject({ code: 'BUILTIN_PACK' });
     await expect(manager.removePack('ghost')).rejects.toMatchObject({ code: 'PACK_NOT_INSTALLED' });
   });
+
+  // The audio engine runs in another process: stopping it returns long before
+  // the process is gone, and swapping the folder under its open .onnx files
+  // fails on Windows at the very end of a 150 MB download.
+  it('waits for an async evictSessions before touching the pack dir', async () => {
+    const zipBuf = await makeZip({ 'model.bin': 'DATA' });
+    let evicted = false;
+    let evictedAtSwap = null;
+    const evictSessions = vi.fn(
+      () => new Promise((resolve) => setTimeout(() => { evicted = true; resolve(); }, 20))
+    );
+    const { manager } = makeManager({
+      manifest: {
+        schemaVersion: 1,
+        packs: [{ id: 'pack-a', version: '1', url: 'https://packs.example/a.zip', sha256: sha256(zipBuf) }],
+      },
+      files: { 'https://packs.example/a.zip': zipBuf },
+      hooks: { evictSessions },
+    });
+
+    const realRename = fs.renameSync;
+    const spy = vi.spyOn(fs, 'renameSync').mockImplementation((...args) => {
+      evictedAtSwap ??= evicted;
+      return realRename(...args);
+    });
+
+    await manager.downloadPack('pack-a');
+    spy.mockRestore();
+
+    expect(evictSessions).toHaveBeenCalledWith('pack-a');
+    expect(evictedAtSwap).toBe(true);
+  });
+
+  it('removePack also waits for an async evictSessions', async () => {
+    const dir = path.join(root, 'pack-a');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'pack.json'), '{"id":"pack-a"}');
+
+    let evicted = false;
+    let evictedAtDelete = null;
+    const { manager } = makeManager({
+      manifest: { schemaVersion: 1, packs: [] },
+      hooks: {
+        evictSessions: () =>
+          new Promise((resolve) => setTimeout(() => { evicted = true; resolve(); }, 20)),
+      },
+    });
+
+    const realRm = fs.rmSync;
+    const spy = vi.spyOn(fs, 'rmSync').mockImplementation((...args) => {
+      if (String(args[0]).endsWith('pack-a')) evictedAtDelete ??= evicted;
+      return realRm(...args);
+    });
+
+    await manager.removePack('pack-a');
+    spy.mockRestore();
+
+    expect(evictedAtDelete).toBe(true);
+    expect(fs.existsSync(dir)).toBe(false);
+  });
 });

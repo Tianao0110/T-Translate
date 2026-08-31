@@ -19,7 +19,6 @@ import { getShortErrorMessage } from '../../utils/error-handler.js';
 import './styles.css';
 
 import { PRIVACY_MODES, TRANSLATION_STATUS, LANGUAGES } from '@config/defaults';
-import { detectTemplateFromModel } from '../../config/model-template-mapping.js';
 
 import { useTTS, useTermCheck, useStyleRewrite, useSaveModal } from './hooks';
 import useAiActions from '../../hooks/use-ai-actions.js';
@@ -183,22 +182,9 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     { id: 'formal', name: t('templates.formal'), desc: t('templates.formalDesc') },
   ];
 
-  // Surface the auto-switch so users know why output style changed.
-  // The active model now lives in the main process — pull it once and refresh
-  // on stack:changed (settings save reloads the stack in any window).
-  const [activeModel, setActiveModel] = useState('');
-  useEffect(() => {
-    let alive = true;
-    const pull = () => {
-      translationService.getCurrentProvider()
-        .then((p) => { if (alive) setActiveModel(p?.model || ''); })
-        .catch(() => {});
-    };
-    pull();
-    const off = translationService.onChanged(pull);
-    return () => { alive = false; off?.(); };
-  }, []);
-  const isMTModel = !!detectTemplateFromModel(activeModel);
+  // S-2 postscript: a simple/full split was tried here and reverted the same
+  // day — hiding two icons did not justify a mode toggle, and the tone
+  // templates earn their spot (user verdict). The MT badge removal stayed.
 
   // Triggered when MainWindow passes screenshot data in via props (capture flow)
   useEffect(() => {
@@ -456,11 +442,6 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
               {tmpl.name}
             </button>
           ))}
-          {isMTModel && (
-            <span className="mt-mode-badge" title={t('translation.mtModeHint')}>
-              {t('translation.mtModeBadge')}
-            </span>
-          )}
         </div>
       </div>
 

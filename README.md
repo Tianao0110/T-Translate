@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.3.8-green" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.4.0-green" alt="Version">
   <img src="https://img.shields.io/badge/license-T--Translate%201.0-blue" alt="License">
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform">
 </p>
@@ -28,9 +28,10 @@
 | **Selection translator**     | System-wide. Select text in any app to translate. Up to 8 pinned windows                                                               |
 | **Screenshot OCR**           | Capture screen regions. 59 recognition languages, 7 OCR engines with automatic fallback                                                |
 | **Floating window**          | Transparent overlay. Space-bar to capture-and-translate; auto-refresh & global-hotkey zero-focus capture for live captions / subtitles |
+| **Listen mode**              | Live captions for whatever is playing, translated sentence by sentence. Chinese / English / Japanese / Korean / Cantonese, recognized on-device, audio never touches disk; exports SRT |
 | **Document translation**     | 9 formats: PDF / DOCX / EPUB / TXT / SRT / VTT / CSV / JSON / Markdown. Segment-by-segment, resumable, with term check; Explorer right-click entry |
 | **134 languages**            | Everything Google Translate supports, in a picker with a letter index and a recently-used row; more can be added by hand                |
-| **AI actions**               | One-click summary of long passages; "understanding mode" in the floating window and per-paragraph explanations in documents; custom actions can be imported (needs an LLM provider) |
+| **AI actions**               | Summaries of long passages; "Explain mode" in the floating window and per-paragraph explanations in documents; custom actions can be imported (needs an LLM provider) |
 | **Glossary**                 | Auto-replace terms after translation, with undo support                                                                                |
 | **TTS**                      | Built on Windows offline speech engine                                                                                                 |
 | **10 translation providers** | LM Studio, Ollama, OpenAI, Claude, Gemini, DeepSeek, DeepL, Google, Microsoft, Baidu                                                   |
@@ -66,9 +67,21 @@ Transparent overlay for live translation — drag, resize, pin on top, spawn ind
   <img src="docs/screenshots/floating-window.png" width="600" alt="Floating window">
 </p>
 
-### AI actions (Summarize / Understanding mode)
+### Listen mode
 
-A layer of understanding on top of translation. **Summarize** turns a long passage into key points — selection card, main panel, and floating window. **Understanding mode** (floating window, top-left) explains captures instead of translating them. With a vision model loaded, the model reads the screenshot itself, falling back to the text path when it cannot.
+The waveform icon in the floating window's toolbar, then press ▶: it transcribes whatever your computer is playing and translates it sentence by sentence. For videos with no subtitles, meetings, or streams in a language you're learning.
+
+Recognition runs on your machine. **Audio passes through memory and is never written to disk**, and it is never uploaded. Translation goes through whichever provider you configured — pick a local model and nothing leaves the machine at all.
+
+Chinese, English, Japanese, Korean and Cantonese, picked manually or detected from the first sentence. With the optional draft engine installed, Chinese and English appear while you speak (first characters in under a second) and are corrected when the sentence ends; without it, text appears once the sentence is done.
+
+Subtitles export to SRT (source and translation on separate lines). Listen mode is unavailable in Incognito mode.
+
+**Models are downloaded on demand**: Settings → Listen models. Base model 153 MB (required), draft engine 168 MB (optional). A running session uses about 600-700 MB of memory, released when you stop.
+
+### AI features (Explain / Summarize)
+
+A layer of understanding on top of translation, built on exactly two concepts: **Explain helps you get this passage, Summarize helps you get through a long one.** Summarize turns a long passage into key points — selection card, main panel, and floating window. **Explain mode** (floating window, top-left) explains captures instead of translating them. With a vision model loaded, the model reads the screenshot itself, falling back to the text path when it cannot.
 
 Summaries attach to their translation in history; understanding results get entries of their own. Custom actions can be imported in Settings. **An LLM provider is required** — translate-only sources are marked in Settings.
 
@@ -78,7 +91,7 @@ Summaries attach to their translation in history; understanding results get entr
 
 ### Document translation
 
-Supports 9 formats: PDF, DOCX, EPUB, TXT, SRT, VTT, CSV, JSON, Markdown — with parallel translation, scanned-PDF OCR and glossary integration. PDF, DOCX and TXT open straight from the Explorer right-click menu ("Translate with T-Translate"). When translation or a one-click summary finishes with the window in the background, a system notification lets you know.
+Supports 9 formats: PDF, DOCX, EPUB, TXT, SRT, VTT, CSV, JSON, Markdown — with parallel translation, scanned-PDF OCR and glossary integration. PDF, DOCX and TXT open straight from the Explorer right-click menu ("Translate with T-Translate"). When translation or a document summary finishes with the window in the background, a system notification lets you know.
 
 With an LLM provider, each paragraph can be **explained** under its translation, and a **consolidated note** collects the explanations; both are saved with the progress and come back when you reopen the file. After translating, **term check** replaces glossary terms left untranslated, with per-spot undo.
 

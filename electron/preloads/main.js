@@ -205,6 +205,22 @@ const electronAPI = {
       return () => ipcRenderer.removeListener("ocr:download-progress", handler);
     },
   },
+  // Listen-mode model packs. Pack management only: capture and session
+  // control belong to the floating window's preload, not this one.
+  audioPacks: {
+    // Read-only status (which model is live, is the draft engine present):
+    // hand-placed model folders have no pack.json, so the pack list alone
+    // cannot answer "is listen mode usable right now".
+    getInfo: () => ipcRenderer.invoke("audio-engine:get-info"),
+    listPacks: (options) => ipcRenderer.invoke("audio-engine:packs-list", options),
+    downloadPack: (packId) => ipcRenderer.invoke("audio-engine:packs-download", packId),
+    removePack: (packId) => ipcRenderer.invoke("audio-engine:packs-remove", packId),
+    onPackProgress: (callback) => {
+      const handler = (event, data) => callback(data);
+      ipcRenderer.on("audio-engine:download-progress", handler);
+      return () => ipcRenderer.removeListener("audio-engine:download-progress", handler);
+    },
+  },
   screenshot: {
     capture: () => ipcRenderer.invoke("capture-screen"),
     onCaptured: (callback) => {
