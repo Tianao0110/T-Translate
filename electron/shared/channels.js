@@ -175,11 +175,14 @@ const CHANNELS = {
   // hand-placed model folders still count.
   AUDIO_ENGINE: {
     GET_INFO: 'audio-engine:get-info',   // renderer → main: model/privacy/state snapshot
-    START: 'audio-engine:start',         // renderer → main: spawn ASR worker; payload {language}
+    START: 'audio-engine:start',         // renderer → main: spawn ASR worker; payload {language, source}
     STOP: 'audio-engine:stop',           // renderer → main: stop worker
-    PCM: 'audio-engine:pcm',             // renderer → main: Float32Array 16k mono chunk
-    EVENT: 'audio-engine:event',         // renderer → main: capture-side event for the session log
+    SOURCES: 'audio-engine:sources',     // renderer → main: audio sources + capability probe
     STATUS: 'audio-engine:status',       // main → renderer: {state, detail}
+    LEVEL: 'audio-engine:level',         // main → renderer: 0..1 capture level, ~12/s
+    // v0.4.1 moved capture into the worker's native WASAPI layer, so the
+    // renderer no longer produces PCM at all: the pcm/event channels it used
+    // to push through are gone rather than left dangling.
     SEGMENT: 'audio-engine:segment',     // main → renderer: recognized (final) segment record
     PARTIAL: 'audio-engine:partial',     // main → renderer: open-segment provisional text ('' clears)
     EXPORT_SRT: 'audio-engine:export-srt', // renderer → main: save dialog + write subtitle file

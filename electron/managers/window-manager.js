@@ -1,7 +1,7 @@
 // Window manager: main, floating window, selection (with freeze-multi support),
 // and screenshot windows. Deps injected via init() to avoid require cycles.
 
-const { BrowserWindow, shell, desktopCapturer } = require('electron');
+const { BrowserWindow, shell } = require('electron');
 const path = require('path');
 const PATHS = require('../shared/paths');
 const displayHelper = require('../utils/display-helper');
@@ -234,34 +234,11 @@ function createFloatingWindow() {
     });
   }
 
-  // System-audio loopback for listen mode: getDisplayMedia in this window
-  // resolves through this handler. audio:'loopback' taps the default render
-  // device (post-volume, post-mute — a muted system yields silence by
-  // design); the renderer stops the mandatory video track immediately
-  // (spike-verified: audio keeps flowing). Registered once per session —
-  // the handler is session-global, and nothing else calls getDisplayMedia.
-  const fwSession = floatingWindow.webContents.session;
-  if (!fwSession._listenDisplayMediaHandler) {
-    fwSession._listenDisplayMediaHandler = true;
-    fwSession.setDisplayMediaRequestHandler(
-      (request, callback) => {
-        desktopCapturer
-          .getSources({ types: ['screen'] })
-          .then((sources) => {
-            callback({ video: sources[0], audio: 'loopback' });
-          })
-          .catch((err) => {
-            logger.warn?.(`Listen display-media handler failed: ${err.message}`);
-            try {
-              callback(null);
-            } catch {
-              /* request already gone */
-            }
-          });
-      },
-      { useSystemPicker: false }
-    );
-  }
+  // No setDisplayMediaRequestHandler here any more: listen mode captured
+  // system audio through getDisplayMedia until v0.4.1, which meant asking for
+  // a screen source (and a video track we stopped immediately) just to reach
+  // the speakers. Capture is now native WASAPI inside the audio worker, so the
+  // app never requests screen capture for audio at all.
 
   if (isDev) {
     floatingWindow.loadURL(PATHS.pages.floatingWindow.url);

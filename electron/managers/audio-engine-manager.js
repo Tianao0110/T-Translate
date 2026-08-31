@@ -33,6 +33,10 @@ let readyTimer = null;
 let killTimer = null;
 let privacyUnsub = null;
 let sessionLanguage = ''; // SenseVoice hint from the host window ('' = auto)
+// Which sound the session listens to: whole system (default), one program's
+// process tree, or everything except it. Native capture lives in the worker
+// (v0.4.1); the renderer no longer touches audio at all.
+let sessionSource = { mode: 'system', pid: 0 };
 
 function init(d) {
   deps = d;
@@ -96,6 +100,7 @@ function startSession(options = {}) {
   // Each user-initiated session gets its own one-shot crash restart.
   restartedOnce = false;
   sessionLanguage = typeof options.language === 'string' ? options.language : '';
+  sessionSource = normalizeSource(options.source);
   const models = findModels();
   if (!models) {
     sendStatus('no-model');
@@ -119,6 +124,17 @@ function startSession(options = {}) {
       sendStatus('secure-blocked');
     }
   });
+}
+
+// Renderer-supplied, so it is narrowed to the three shapes the worker accepts
+// rather than forwarded as-is.
+// 'off' opens no audio client at all: the caller feeds PCM itself, which is
+// how the smoke harness replays a wav through the real chain.
+function normalizeSource(source) {
+  const mode = source && ['system', 'include', 'exclude', 'off'].includes(source.mode) ? source.mode : 'system';
+  const pid = Number.isInteger(source?.pid) && source.pid > 0 ? source.pid : 0;
+  if (mode === 'off') return { mode: 'off', pid: 0 };
+  return mode === 'system' || !pid ? { mode: 'system', pid: 0 } : { mode, pid };
 }
 
 function spawnWorker(models) {
@@ -202,7 +218,28 @@ function onWorkerMessage(msg) {
       childState = 'running';
       engineEverReady = true;
       logger.info(`worker ready in ${msg.loadMs}ms`);
+      // Capture starts only now: an audio client opened while the models were
+      // still loading would just fill a buffer nobody reads.
+      if (sessionSource.mode === 'off') sendStatus('listening');
+      else child?.postMessage({ type: 'capture-start', ...sessionSource });
+      break;
+    case 'capture-started':
+      logger.info(`capture started (${msg.mode})`);
       sendStatus('listening');
+      break;
+    case 'capture-error':
+      logger.error(`capture failed: ${msg.message}`);
+      sendStatus('capture-error', msg.message);
+      stopSession('capture-error');
+      break;
+    case 'capture-event':
+      // device-lost / device-reacquired / reacquire-failed — the native layer
+      // rebuilds the stream itself; this only mirrors it into the UI.
+      if (msg.kind === 'device-reacquired') sendStatus('listening');
+      else if (msg.kind === 'device-lost' || msg.kind === 'reacquire-failed') sendStatus(msg.kind);
+      break;
+    case 'level':
+      sendToWindow(CHANNELS.AUDIO_ENGINE.LEVEL, msg.value);
       break;
     case 'segment':
       sendToWindow(CHANNELS.AUDIO_ENGINE.SEGMENT, msg.rec);
@@ -279,20 +316,12 @@ function onWorkerExit(code) {
   sendStatus('engine-dead');
 }
 
+// Inject PCM the host already has (the smoke harness replaying a wav through
+// the real chain). Normal sessions never call this — the worker's own native
+// capture feeds the VAD directly, and no renderer channel reaches either one.
 function feedPcm(samples) {
   if (childState !== 'running' || !child) return;
   child.postMessage({ type: 'pcm', samples });
-}
-
-// Capture-side events (device switches, reacquire outcomes) go into the same
-// probe log the worker owns.
-function logRendererEvent(kind, detail) {
-  if (!child) return;
-  try {
-    child.postMessage({ type: 'event', kind, detail });
-  } catch {
-    // worker mid-death — event is best-effort
-  }
 }
 
 // Callers that must not touch the model files until the worker is really gone
@@ -377,5 +406,4 @@ module.exports = {
   stopSession,
   stopSessionAndWait,
   feedPcm,
-  logRendererEvent,
 };

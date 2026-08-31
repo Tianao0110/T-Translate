@@ -4,22 +4,34 @@
 // sherpa/onnxruntime copy, and "no TTS while transcribing" is a product rule,
 // so there is no concurrency to arbitrate.
 //
+// Capture lives here too since v0.4.1: the native WASAPI layer
+// (utils/win-audio-capture) hands 16 kHz mono float32 straight to the VAD, so
+// audio never crosses a process boundary before it is recognized — no renderer
+// round trip, no resampler, and no screen-capture request.
+//
 // Protocol (process.parentPort):
 //   in : {type:'init', models:{asr?:{modelPath,tokensPath,vadPath,language?}},
 //         logPath, logText, meta}        declare paths + open log; loads nothing
 //        {type:'asr-start', language?}   load ASR if needed, begin a session
-//        {type:'pcm', samples}           16 kHz mono Float32Array, [-1, 1]
+//        {type:'capture-start', mode, pid}  'system' | 'include' | 'exclude'
+//        {type:'capture-stop'}           release the audio client
+//        {type:'pcm', samples}           inject 16 kHz mono float32 instead of
+//                                        capturing (smoke harness replaying a
+//                                        wav). Main-process only — no renderer
+//                                        channel reaches this since v0.4.1
 //        {type:'asr-stop'}               flush session, keep models warm
 //        {type:'unload', what}           'asr'|'tts' — idle-eviction hook for
 //                                        the future resident scheduler
 //        {type:'shutdown'}               graceful process exit
-//        {type:'event', kind, detail}    capture-side event for the log
 //        {type:'tts-generate'|'tts-cancel'}  reserved (v0.4.x) — see below
 //   out: {type:'ready'}                  init done (nothing loaded yet)
 //        {type:'asr-ready', loadMs}      ASR loaded + session live
 //        {type:'partial', text}          open-segment provisional text; ''
 //                                        clears it (segment closed)
 //        {type:'segment', rec} | {type:'hint', kind} | {type:'metrics', rec}
+//        {type:'capture-started', mode} | {type:'capture-error', message}
+//        {type:'capture-event', kind, detail}  device lost / reacquired
+//        {type:'level', value}            0..1-ish capture RMS, ~12/s
 //        {type:'asr-stopped'} | {type:'fatal', message}
 //
 // TTS slot (NOT implemented here — v0.4.x): tts-generate {id, text, sid,
@@ -130,6 +142,12 @@ let recentRms = []; // last VALLEY_WINDOWS window RMS values
 // ("些技术" for "这些技术" in the breath harness).
 const PRE_ROLL_WINDOWS = 10; // ~0.32s
 let preRoll = [];
+
+// Native capture handle (utils/win-audio-capture). Null whenever no audio is
+// being pulled — the zero-idle rule applies to the audio client too.
+let capture = null;
+let lastLevelPostAt = 0;
+const LEVEL_INTERVAL_MS = 80;
 
 const isRepeat = makeRepeatTracker();
 const watchdog = makeSignalWatchdog();
@@ -330,6 +348,58 @@ function emitMetrics() {
   });
   logLine(rec);
   post({ type: 'metrics', rec });
+}
+
+// ===== capture =====
+
+async function handleCaptureStart(msg) {
+  stopCapture();
+  try {
+    // Required lazily: a machine without the native layer must still be able
+    // to load models and report a clean capture error, not fail at import.
+    const winAudio = require('../../utils/win-audio-capture');
+    capture = await winAudio.startCapture({
+      mode: msg.mode || 'system',
+      pid: msg.pid || 0,
+      onPcm: (pcm) => {
+        emitLevel(pcm);
+        handlePcm(pcm);
+      },
+      onEvent: (kind, detail) => {
+        logLine(eventRecord(kind, detail));
+        post({ type: 'capture-event', kind, detail });
+      },
+    });
+    logLine(eventRecord('capture-start', capture.mode + (msg.pid ? ` pid=${msg.pid}` : '')));
+    post({ type: 'capture-started', mode: capture.mode });
+  } catch (err) {
+    capture = null;
+    logLine(eventRecord('capture-failed', String(err.message)));
+    post({ type: 'capture-error', message: String(err.message) });
+  }
+}
+
+function stopCapture() {
+  if (!capture) return;
+  try {
+    capture.stop();
+  } catch {
+    // already torn down
+  }
+  capture = null;
+  post({ type: 'level', value: 0 }); // the meter must not freeze on the last loud frame
+}
+
+// Same curve the renderer used to compute from its own audio callback, kept
+// identical so the meter behaves exactly as before the capture moved here.
+function emitLevel(samples) {
+  const now = Date.now();
+  if (now - lastLevelPostAt < LEVEL_INTERVAL_MS) return;
+  lastLevelPostAt = now;
+  let sumSq = 0;
+  for (let i = 0; i < samples.length; i++) sumSq += samples[i] * samples[i];
+  const rms = Math.sqrt(sumSq / (samples.length || 1));
+  post({ type: 'level', value: Math.min(1, Math.sqrt(rms) * 2.2) });
 }
 
 function handlePcm(samples) {
@@ -591,6 +661,8 @@ async function decodeSegment(seg) {
 
 function handleAsrStop() {
   if (!sessionLive) return;
+  // Capture first: no new audio may arrive while the VAD is flushing.
+  stopCapture();
   sessionLive = false;
   if (partialTimer) clearInterval(partialTimer);
   if (hintTimer) clearInterval(hintTimer);
@@ -635,6 +707,7 @@ function handleShutdown() {
 }
 
 function teardown(done) {
+  stopCapture();
   if (partialTimer) clearInterval(partialTimer);
   if (hintTimer) clearInterval(hintTimer);
   if (metricsTimer) clearInterval(metricsTimer);
@@ -653,11 +726,12 @@ process.parentPort.on('message', (e) => {
   switch (msg.type) {
     case 'init': return handleInit(msg);
     case 'asr-start': return handleAsrStart(msg);
+    case 'capture-start': return handleCaptureStart(msg);
     case 'pcm': return handlePcm(msg.samples);
+    case 'capture-stop': return stopCapture();
     case 'asr-stop': return handleAsrStop();
     case 'unload': return handleUnload(msg.what);
     case 'shutdown': return handleShutdown();
-    case 'event': return logLine(eventRecord(msg.kind, msg.detail));
     case 'tts-generate':
       // Protocol slot only — engine lands in v0.4.x.
       return post({ type: 'tts-error', id: msg.id, message: 'tts-not-implemented' });

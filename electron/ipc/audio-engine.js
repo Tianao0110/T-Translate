@@ -5,33 +5,16 @@ const { ipcMain, dialog } = require('electron');
 const fs = require('fs');
 const { CHANNELS } = require('../shared/channels');
 const engineManager = require('../managers/audio-engine-manager');
+const winAudio = require('../utils/win-audio-capture');
 const packManager = require('../utils/audio-pack-manager');
 const logger = require('../utils/logger')('IPC:AudioEngine');
 
 const AE = CHANNELS.AUDIO_ENGINE;
 
-// Every payload below is renderer-supplied, and the threat model for this app
-// is a compromised renderer, not a mistyped call. These are the sizes past
-// which a payload is not a subtitle session any more:
-//   PCM     the capture pipeline sends 3200 samples (200ms at 16k); 10s of
-//           audio in one message is already two orders of magnitude past that
-//   event   capture-side markers ('device-lost'), a line in the session log
-//   SRT     20000 lines x a generous line — the transcript cap the export
-//           itself enforces (useListenSession MAX_TRANSCRIPT)
-const MAX_PCM_SAMPLES = 16000 * 10;
-const MAX_EVENT_DETAIL = 2000;
+// The SRT body is renderer-supplied, and the threat model for this app is a
+// compromised renderer, not a mistyped call. 16MB is far past the export's own
+// ceiling (20000 transcript lines, useListenSession MAX_TRANSCRIPT).
 const MAX_SRT_BYTES = 16 * 1024 * 1024;
-
-// Structured clone should deliver a Float32Array; coerce the byte-ish shapes
-// some transports fall back to so the worker only ever sees Float32Array.
-function toFloat32(samples) {
-  if (samples instanceof Float32Array) return samples;
-  if (ArrayBuffer.isView(samples)) {
-    return new Float32Array(samples.buffer, samples.byteOffset, samples.byteLength / 4);
-  }
-  if (samples instanceof ArrayBuffer) return new Float32Array(samples);
-  return null;
-}
 
 function sendPackProgress(mainWindow, packId, progress, phase) {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -47,21 +30,14 @@ function registerAudioEngineIPC(ctx) {
   ipcMain.on(AE.START, (event, opts) => engineManager.startSession(opts || {}));
   ipcMain.on(AE.STOP, () => engineManager.stopSession('renderer'));
 
-  ipcMain.on(AE.PCM, (event, samples) => {
-    const f32 = toFloat32(samples);
-    // An oversized chunk is dropped rather than truncated: a legitimate
-    // capture never sends one, and half a buffer is worse than no buffer.
-    if (f32 && f32.length && f32.length <= MAX_PCM_SAMPLES) engineManager.feedPcm(f32);
-    else if (f32 && f32.length > MAX_PCM_SAMPLES) logger.warn(`PCM chunk dropped (${f32.length} samples)`);
-  });
-
-  ipcMain.on(AE.EVENT, (event, payload) => {
-    if (payload && typeof payload.kind === 'string') {
-      const detail = typeof payload.detail === 'string'
-        ? payload.detail.slice(0, MAX_EVENT_DETAIL)
-        : payload.detail;
-      engineManager.logRendererEvent(payload.kind.slice(0, 64), detail);
-    }
+  // Audio sources for the "which program" picker, plus what this machine can
+  // actually do. Sampling the peak meters takes a moment, hence invoke.
+  ipcMain.handle(AE.SOURCES, async () => {
+    const caps = winAudio.getCapabilities();
+    return {
+      ...caps,
+      sessions: caps.processLoopback ? await winAudio.listAudioSessions() : [],
+    };
   });
 
   // Subtitle export: the renderer assembles the SRT text (it owns the finals

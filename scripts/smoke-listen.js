@@ -177,6 +177,33 @@ async function main() {
     `download=${offlineCodes[0]}, manifest=${offlineCodes[1]}, list=${offlineList.manifestError}`
   );
 
+  // Native capture (v0.4.1). Assertable on a silent machine: a process- or
+  // system-loopback client keeps delivering a steady 16 kHz stream whether or
+  // not anything is playing, so the frame count alone proves koffi loaded, the
+  // client activated, the format was accepted, the pump runs and stop() stops
+  // it. Signal itself is not assertable without making noise.
+  const winAudio = require('../electron/utils/win-audio-capture');
+  const caps = winAudio.getCapabilities();
+  step(
+    'native capture capability probe',
+    caps.supported,
+    `build=${caps.build}, processLoopback=${caps.processLoopback}${caps.reason ? ` (${caps.reason})` : ''}`
+  );
+  if (caps.supported) {
+    let captured = 0;
+    const handle = await winAudio.startCapture({ mode: 'system', onPcm: (pcm) => { captured += pcm.length; } });
+    await new Promise((r) => setTimeout(r, 1500));
+    const duringStop = captured;
+    handle.stop();
+    await new Promise((r) => setTimeout(r, 300));
+    const seconds = duringStop / 16000;
+    step(
+      'native capture delivers a steady 16k mono stream and stops clean',
+      seconds > 1.2 && seconds < 1.9 && captured === duringStop,
+      `${seconds.toFixed(2)}s of audio in 1.5s, ${captured - duringStop} samples after stop`
+    );
+  }
+
   for (const id of ['asr-base-sense-voice', 'asr-draft-zipformer-zh-en']) {
     const phases = new Set();
     const t0 = Date.now();
@@ -226,7 +253,9 @@ async function main() {
     engineManager.init({ store, getWindow: () => fakeWin });
 
     const loadStart = Date.now();
-    engineManager.startSession({ language: 'zh' });
+    // source 'off': no audio client is opened, this harness feeds the wav in
+    // itself. Every other session captures natively inside the worker.
+    engineManager.startSession({ language: 'zh', source: { mode: 'off' } });
     for (let i = 0; i < 200 && !ev.status.includes('listening'); i++) await sleep(100);
     const loadMs = Date.now() - loadStart;
 

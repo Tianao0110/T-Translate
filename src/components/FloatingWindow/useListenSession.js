@@ -1,22 +1,20 @@
-// Listen-translate session hook: the audio-probe page's capture pipeline and
-// session state machine, ported into the floating window's listen mode.
+// Listen-translate session state machine for the floating window.
 //
-// Owns: loopback capture (getDisplayMedia resolved by the main-process session
-// handler), 48k→16k resample, PCM streaming to the audio-engine worker,
-// finals/partial state, per-final translation via the main-process stack
+// Capture is NOT here any more (v0.4.1): the native WASAPI layer inside the
+// audio worker pulls 16 kHz mono float32 straight into the VAD, which removed
+// this file's getDisplayMedia call, its 48k→16k resampler, its PCM streaming,
+// and the device-loss retry loop (the audio client reports an invalidated
+// device explicitly, so the worker rebuilds it and just says so).
+//
+// What is left: session control, finals/partial state, the capture level fed
+// from the worker, per-final translation through the main-process stack
 // (privacy injected there), and SRT export assembly.
-//
-// Iron rule carried over: echo cancellation / noise suppression / auto gain
-// MUST stay off — AEC's reference signal IS the machine's own playback, so it
-// would cancel the entire loopback stream (spike-verified all-zeros).
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import createLogger from '../../utils/logger.js';
 
 const logger = createLogger('ListenSession');
 
-const TARGET_RATE = 16000;
-const SEND_BATCH = 3200; // 200ms at 16k
 // On-screen scrollback. Small on purpose: every kept segment is live DOM, and
 // nobody scrolls back an hour in a subtitle overlay.
 const MAX_SEGMENTS = 100;
@@ -47,22 +45,25 @@ export default function useListenSession({ active }) {
     try { return localStorage.getItem('listenTargetLang') || ''; } catch { return ''; }
   });
 
-  const captureRef = useRef(null); // {stream, ctx, src, proc, mute, track}
   const runningRef = useRef(false);
   const engineReadyRef = useRef(false);
-  const reacquireRef = useRef(0);
   const errorLatchRef = useRef(false);
   const pendingRestartRef = useRef(false);
   const langRef = useRef(lang);
   const targetLangRef = useRef(targetLang);
+  // {mode:'system'|'include'|'exclude', pid, name} — which sound to listen to.
+  // Deliberately NOT persisted: a pid is only meaningful while that program is
+  // running, and silently listening to whatever inherited the number next
+  // launch would be worse than starting from "whole system" every time.
+  const [source, setSourceState] = useState({ mode: 'system', pid: 0, name: '' });
+  const sourceRef = useRef(source);
 
   const setLang = useCallback((value) => {
     setLangState(value);
     langRef.current = value;
     try { localStorage.setItem('listenLang', value); } catch { /* storage off */ }
-    // Language switch mid-session restarts the worker; capture keeps running
-    // (PCM is dropped main-process side while the engine reloads), dodging a
-    // second getDisplayMedia user-gesture requirement.
+    // Language switch mid-session restarts the worker (the language is baked
+    // into the recognizer config); capture restarts with it.
     if (runningRef.current) {
       pendingRestartRef.current = true;
       engineReadyRef.current = false;
@@ -78,86 +79,30 @@ export default function useListenSession({ active }) {
     try { localStorage.setItem('listenTargetLang', value); } catch { /* storage off */ }
   }, []);
 
-  // ===== capture pipeline (probe-page port) =====
-
-  const stopCapture = useCallback(() => {
-    levelRef.current = 0; // meter must not freeze at the last loud frame
-    const c = captureRef.current;
-    if (!c) return;
-    captureRef.current = null;
-    try { c.track.removeEventListener('ended', c.onEnded); } catch { /* gone */ }
-    try { c.proc.disconnect(); c.src.disconnect(); c.mute.disconnect(); } catch { /* gone */ }
-    try { c.stream.getTracks().forEach((t) => t.stop()); } catch { /* gone */ }
-    try { c.ctx.close(); } catch { /* gone */ }
-  }, []);
-
-  const startCapture = useCallback(async (onDeviceLost) => {
-    const stream = await navigator.mediaDevices.getDisplayMedia({
-      video: true,
-      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-    });
-    stream.getVideoTracks().forEach((t) => t.stop());
-    const track = stream.getAudioTracks()[0];
-    if (!track) {
-      stream.getTracks().forEach((t) => t.stop());
-      throw new Error('no audio track');
-    }
-
-    const ctx = new AudioContext();
-    await ctx.resume();
-    const src = ctx.createMediaStreamSource(stream);
-    const proc = ctx.createScriptProcessor(4096, 2, 1);
-    const mute = ctx.createGain();
-    mute.gain.value = 0;
-
-    const step = ctx.sampleRate / TARGET_RATE;
-    let pos = 0;
-    let prevSample = 0;
-    let outBuf = new Float32Array(SEND_BATCH);
-    let outLen = 0;
-
-    proc.onaudioprocess = (e) => {
-      const ch0 = e.inputBuffer.getChannelData(0);
-      const ch1 = e.inputBuffer.numberOfChannels > 1 ? e.inputBuffer.getChannelData(1) : ch0;
-      const n = ch0.length;
-
-      // Capture level, straight off the buffer we already have (~85ms per
-      // callback at 48k/4096 — the fastest honest feedback in the whole
-      // feature; text cannot beat it). Written to a ref, never to state: the
-      // meter paints itself from a rAF loop so twelve updates a second do not
-      // re-render the transcript. sqrt curve calibrated against real speech
-      // (per-window RMS median 0.028, p95 0.165) so normal talking sits around
-      // half the bar instead of hugging the floor.
-      let acc = 0;
-      for (let i = 0; i < n; i++) acc += ch0[i] * ch0[i];
-      const rms = Math.sqrt(acc / n);
-      levelRef.current = Math.min(1, Math.sqrt(rms) * 2.2);
-      // linear-interp resample with carry across callbacks
-      while (pos < n) {
-        const i = Math.floor(pos);
-        const frac = pos - i;
-        const s0 = i === 0 ? prevSample : (ch0[i - 1] + ch1[i - 1]) * 0.5;
-        const s1 = (ch0[i] + ch1[i]) * 0.5;
-        outBuf[outLen++] = s0 + (s1 - s0) * frac;
-        if (outLen === SEND_BATCH) {
-          window.electron?.audioEngine?.sendPcm?.(outBuf);
-          outBuf = new Float32Array(SEND_BATCH);
-          outLen = 0;
-        }
-        pos += step;
-      }
-      pos -= n;
-      prevSample = (ch0[n - 1] + ch1[n - 1]) * 0.5;
+  // Switching source mid-session restarts the worker's capture in place; the
+  // engine and its models stay loaded.
+  const setSource = useCallback((next) => {
+    const value = {
+      mode: ['system', 'include', 'exclude'].includes(next?.mode) ? next.mode : 'system',
+      pid: Number.isInteger(next?.pid) && next.pid > 0 ? next.pid : 0,
+      name: typeof next?.name === 'string' ? next.name : '',
     };
-
-    src.connect(proc);
-    proc.connect(mute);
-    mute.connect(ctx.destination);
-
-    const onEnded = () => onDeviceLost();
-    track.addEventListener('ended', onEnded);
-    captureRef.current = { stream, ctx, src, proc, mute, track, onEnded };
+    if (value.mode !== 'system' && !value.pid) return;
+    setSourceState(value);
+    sourceRef.current = value;
+    if (runningRef.current) {
+      pendingRestartRef.current = true;
+      engineReadyRef.current = false;
+      setPartial('');
+      setSessionState('loading');
+      window.electron?.audioEngine?.stop?.();
+    }
   }, []);
+
+  const listSources = useCallback(() => (
+    window.electron?.audioEngine?.listSources?.() ??
+      Promise.resolve({ supported: false, processLoopback: false, sessions: [] })
+  ), []);
 
   // ===== session control =====
 
@@ -165,48 +110,26 @@ export default function useListenSession({ active }) {
     runningRef.current = true;
     setRunning(true);
     engineReadyRef.current = false;
-    reacquireRef.current = 0;
     errorLatchRef.current = false;
     pendingRestartRef.current = false;
     setSegments([]);
     transcriptRef.current = [];
     transcriptTruncatedRef.current = false;
     setPartial('');
-    window.electron?.audioEngine?.start?.({ language: langRef.current });
+    window.electron?.audioEngine?.start?.({
+      language: langRef.current,
+      source: sourceRef.current,
+    });
   }, []);
 
   const stop = useCallback(() => {
     runningRef.current = false;
     setRunning(false);
     engineReadyRef.current = false;
-    stopCapture();
+    levelRef.current = 0; // the meter must not freeze on the last loud frame
     setPartial('');
     window.electron?.audioEngine?.stop?.();
-  }, [stopCapture]);
-
-  // Default output device switches kill the loopback stream — rebuild it.
-  const onDeviceLost = useCallback(async () => {
-    if (!runningRef.current) return;
-    window.electron?.audioEngine?.sendEvent?.('device-lost');
-    setSessionState('device-lost');
-    stopCapture();
-    reacquireRef.current += 1;
-    await new Promise((r) => setTimeout(r, 1200));
-    if (!runningRef.current) return;
-    try {
-      await startCapture(onDeviceLost);
-      window.electron?.audioEngine?.sendEvent?.('device-reacquired');
-      if (engineReadyRef.current) setSessionState('listening');
-    } catch (err) {
-      window.electron?.audioEngine?.sendEvent?.('reacquire-failed', String(err));
-      if (reacquireRef.current < 3) {
-        onDeviceLost();
-      } else {
-        setSessionState('reacquire-failed');
-        stop();
-      }
-    }
-  }, [startCapture, stopCapture, stop]);
+  }, []);
 
   const toggle = useCallback(() => {
     if (runningRef.current) stop();
@@ -264,29 +187,26 @@ export default function useListenSession({ active }) {
       if (info?.secureBlocked) setSessionState('secure-blocked');
     }).catch(() => setAvailable(false));
 
-    const offStatus = bridge.onStatus(async (payload) => {
-      const { state } = payload || {};
+    const offStatus = bridge.onStatus((payload) => {
+      const { state, detail } = payload || {};
       if (state === 'metrics') return;
-      if (state === 'listening' && runningRef.current && !captureRef.current) {
-        engineReadyRef.current = true;
-        try {
-          await startCapture(onDeviceLost);
-          setSessionState('listening');
-        } catch (err) {
-          window.electron?.logs?.write?.({ level: 'error', message: `listen capture failed: ${err}` });
-          errorLatchRef.current = true;
-          setSessionState('capture-error');
-          stop();
-        }
-        return;
-      }
       if (state === 'listening') engineReadyRef.current = true;
+      // The worker owns capture now, so a failure to open the audio client
+      // arrives as a status instead of a rejected promise here.
+      if (state === 'capture-error') {
+        window.electron?.logs?.write?.({ level: 'error', message: `listen capture failed: ${detail || ''}` });
+        errorLatchRef.current = true;
+      }
       if (state === 'stopped' && pendingRestartRef.current && runningRef.current) {
         pendingRestartRef.current = false;
-        window.electron?.audioEngine?.start?.({ language: langRef.current });
+        window.electron?.audioEngine?.start?.({
+          language: langRef.current,
+          source: sourceRef.current,
+        });
         return; // status stays 'loading'
       }
-      if (state === 'stopped' || state === 'engine-dead' || state === 'secure-blocked') {
+      if (state === 'stopped' || state === 'engine-dead' || state === 'model-load-failed'
+          || state === 'secure-blocked' || state === 'capture-error') {
         if (runningRef.current && state !== 'stopped') stop();
         if (state === 'stopped') {
           runningRef.current = false;
@@ -311,13 +231,19 @@ export default function useListenSession({ active }) {
     });
 
     const offPartial = bridge.onPartial((text) => setPartial(text || ''));
+    // Level arrives from the worker at ~12/s and lands in a ref: the meter
+    // paints itself from a rAF loop, so this never re-renders the transcript.
+    const offLevel = bridge.onLevel?.((value) => {
+      levelRef.current = typeof value === 'number' ? value : 0;
+    });
 
     return () => {
       offStatus?.();
       offSegment?.();
       offPartial?.();
+      offLevel?.();
     };
-  }, [active, startCapture, stopCapture, onDeviceLost, stop, translateSegment]);
+  }, [active, stop, translateSegment]);
 
   // Leaving listen mode (or unmounting the window) force-stops the session —
   // the engine must never hum without its host UI (zero-idle rule). The
@@ -368,6 +294,9 @@ export default function useListenSession({ active }) {
     setLang,
     targetLang,
     setTargetLang,
+    source,
+    setSource,
+    listSources,
     toggle,
     stop,
     exportSrt,
