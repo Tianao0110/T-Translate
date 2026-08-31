@@ -57,6 +57,8 @@ export default function useListenSession({ active }) {
   // launch would be worse than starting from "whole system" every time.
   const [source, setSourceState] = useState({ mode: 'system', pid: 0, name: '' });
   const sourceRef = useRef(source);
+  // What this machine can do + which programs are currently making sound.
+  const [sources, setSources] = useState({ supported: false, processLoopback: false, sessions: [] });
 
   const setLang = useCallback((value) => {
     setLangState(value);
@@ -82,11 +84,13 @@ export default function useListenSession({ active }) {
   // Switching source mid-session restarts the worker's capture in place; the
   // engine and its models stay loaded.
   const setSource = useCallback((next) => {
-    const value = {
-      mode: ['system', 'include', 'exclude'].includes(next?.mode) ? next.mode : 'system',
-      pid: Number.isInteger(next?.pid) && next.pid > 0 ? next.pid : 0,
-      name: typeof next?.name === 'string' ? next.name : '',
-    };
+    const mode = ['system', 'include', 'exclude'].includes(next?.mode) ? next.mode : 'system';
+    const pid = Number.isInteger(next?.pid) && next.pid > 0 ? next.pid : 0;
+    // A pid carried under 'system' is a contradiction waiting to be read by
+    // the next person: whole-system capture targets no process at all.
+    const value = mode === 'system'
+      ? { mode: 'system', pid: 0, name: '' }
+      : { mode, pid, name: typeof next?.name === 'string' ? next.name : '' };
     if (value.mode !== 'system' && !value.pid) return;
     setSourceState(value);
     sourceRef.current = value;
@@ -99,10 +103,14 @@ export default function useListenSession({ active }) {
     }
   }, []);
 
-  const listSources = useCallback(() => (
-    window.electron?.audioEngine?.listSources?.() ??
-      Promise.resolve({ supported: false, processLoopback: false, sessions: [] })
-  ), []);
+  const refreshSources = useCallback(async () => {
+    try {
+      const res = await window.electron?.audioEngine?.listSources?.();
+      if (res) setSources(res);
+    } catch {
+      // probe failure just leaves the previous list in place
+    }
+  }, []);
 
   // ===== session control =====
 
@@ -245,6 +253,16 @@ export default function useListenSession({ active }) {
     };
   }, [active, stop, translateSegment]);
 
+  // The picker can only list programs that already opened an audio stream, so
+  // the list is kept fresh while the user is choosing and left alone once the
+  // session runs (nothing in it can change what is already being captured).
+  useEffect(() => {
+    if (!active || running) return undefined;
+    refreshSources();
+    const timer = setInterval(refreshSources, 4000);
+    return () => clearInterval(timer);
+  }, [active, running, refreshSources]);
+
   // Leaving listen mode (or unmounting the window) force-stops the session —
   // the engine must never hum without its host UI (zero-idle rule). The
   // main-process once('closed') listener backstops a hard window close.
@@ -296,7 +314,8 @@ export default function useListenSession({ active }) {
     setTargetLang,
     source,
     setSource,
-    listSources,
+    sources,
+    refreshSources,
     toggle,
     stop,
     exportSrt,

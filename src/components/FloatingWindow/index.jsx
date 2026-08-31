@@ -896,6 +896,45 @@ const FloatingWindow = () => {
                   {listen.running ? <Square size={12} /> : <Play size={12} />}
                 </button>
                 <select
+                  className="listen-select listen-source-select"
+                  value={listen.source.mode === 'system' ? 'system' : `${listen.source.mode}:${listen.source.pid}`}
+                  onChange={(e) => {
+                    const [mode, pid] = e.target.value.split(':');
+                    const found = listen.sources.sessions.find((x) => String(x.pid) === pid);
+                    listen.setSource({ mode, pid: Number(pid) || 0, name: found?.name || '' });
+                  }}
+                  title={listen.sources.processLoopback
+                    ? t('floatingWindow.listenSourceHint', '声音来源：只听某个程序，或听全部但排除它')
+                    : t('floatingWindow.listenSourceUnsupported', '指定程序需要 Windows 11；本机只能监听全部声音')}
+                >
+                  <option value="system">{t('floatingWindow.listenSourceAll', '全部声音')}</option>
+                  {listen.sources.processLoopback && listen.sources.sessions.length > 0 && (
+                    <>
+                      <optgroup label={t('floatingWindow.listenSourceOnly', '只听这个程序')}>
+                        {listen.sources.sessions.map((x) => (
+                          // U+25B6 marks "making sound right now". A native
+                          // option cannot hold a lucide icon, and this is a
+                          // geometric symbol (text presentation by default),
+                          // not an emoji.
+                          <option key={`i${x.pid}`} value={`include:${x.pid}`}>
+                            {x.audible ? `▶ ${x.name}` : x.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                      <optgroup label={t('floatingWindow.listenSourceExcept', '除了这个程序')}>
+                        {listen.sources.sessions.map((x) => (
+                          // Prefixed because a closed select shows only the
+                          // chosen line: "chrome.exe" alone cannot say whether
+                          // it is the one being heard or the one being skipped.
+                          <option key={`e${x.pid}`} value={`exclude:${x.pid}`}>
+                            {`${t('floatingWindow.listenSourceExceptShort', '除')} ${x.name}`}
+                          </option>
+                        ))}
+                      </optgroup>
+                    </>
+                  )}
+                </select>
+                <select
                   className="listen-select"
                   value={listen.lang}
                   onChange={(e) => listen.setLang(e.target.value)}

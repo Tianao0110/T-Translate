@@ -1315,6 +1315,14 @@
   -webkit-app-region: no-drag;
 }
 
+/* The source select carries program names, not two-character language codes,
+   so it gets more room than its siblings (measured: the whole listen toolbar
+   is 286px inside a 400px window even at this width). */
+.listen-source-select {
+  max-width: 110px;
+  text-overflow: ellipsis;
+}
+
 .listen-panel {
   display: flex;
   flex-direction: column;
