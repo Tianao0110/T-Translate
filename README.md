@@ -28,7 +28,7 @@
 | **Selection translator**     | System-wide. Select text in any app to translate. Up to 8 pinned windows                                                               |
 | **Screenshot OCR**           | Capture screen regions. 59 recognition languages, 7 OCR engines with automatic fallback                                                |
 | **Floating window**          | Transparent overlay. Space-bar to capture-and-translate; auto-refresh & global-hotkey zero-focus capture for live captions / subtitles |
-| **Listen mode**              | Live captions for whatever is playing, translated sentence by sentence. Chinese / English / Japanese / Korean / Cantonese, recognized on-device, audio never touches disk; exports SRT |
+| **Listen mode**              | Live captions for whatever is playing, translated sentence by sentence. Chinese / English / Japanese / Korean / Cantonese, recognized on-device, audio never touches disk; can listen to a single program; exports SRT |
 | **Document translation**     | 9 formats: PDF / DOCX / EPUB / TXT / SRT / VTT / CSV / JSON / Markdown. Segment-by-segment, resumable, with term check; Explorer right-click entry |
 | **134 languages**            | Everything Google Translate supports, in a picker with a letter index and a recently-used row; more can be added by hand                |
 | **AI actions**               | Summaries of long passages; "Explain mode" in the floating window and per-paragraph explanations in documents; custom actions can be imported (needs an LLM provider) |
@@ -74,6 +74,8 @@ The waveform icon in the floating window's toolbar, then press ▶: it transcrib
 Recognition runs on your machine. **Audio passes through memory and is never written to disk**, and it is never uploaded. Translation goes through whichever provider you configured — pick a local model and nothing leaves the machine at all.
 
 Chinese, English, Japanese, Korean and Cantonese, picked manually or detected from the first sentence. With the optional draft engine installed, Chinese and English appear while you speak (first characters in under a second) and are corrected when the sentence ends; without it, text appears once the sentence is done.
+
+**Sound source**: listens to everything by default. On Windows 11 you can instead listen to one program, or to everything except one. The list shows only programs that have already played something, because a process that never opened an audio stream does not exist as far as Windows is concerned. Every browser tab shares one audio process, so the granularity stops at "program" — per-site is not possible. Windows 10 can only listen to all sound.
 
 Subtitles export to SRT (source and translation on separate lines). Listen mode is unavailable in Incognito mode.
 

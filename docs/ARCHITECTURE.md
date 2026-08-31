@@ -233,14 +233,27 @@ electron/utils/open-with.js     右键菜单 argv 解析（.pdf/.docx/.txt 白�
                                 installer/installer.nsh 安装写入、卸载对称清除
 ```
 
-### 听译引擎与驻留口径（v0.4.0）
+### 听译引擎与驻留口径（v0.4.0，捕获层 v0.4.1 换代）
 
 ```
 electron/managers/audio-engine-manager.js  ASR utilityProcess 的唯一持有者
-electron/services/audio-engine/audio-worker.js  两个模型都住在这个子进程里
+electron/services/audio-engine/audio-worker.js  两个模型 + 音频捕获都在这个子进程里
+electron/utils/win-audio-capture.js        WASAPI 捕获（koffi，v0.4.1）
 electron/utils/model-root.js               模型根目录解析（安装目录优先）
 electron/utils/audio-pack-manager.js       模型包下载/卸载（工厂第二实例）
 ```
+
+**音频从哪来（v0.4.1 起）**：`win-audio-capture` 用 koffi 直接调 WASAPI，两条激活路径同一
+个出口格式（16kHz 单声道 float32，直接喂 VAD，全链路不再有重采样）：
+
+| 来源 | 激活方式 | 系统要求 | 取到的是 |
+|------|----------|----------|----------|
+| 全部声音 | 端点环回 + `AUTOCONVERTPCM` | 全部 Windows | 系统音量之后的混音（静音即无声，与用户听到的一致） |
+| 只听某程序 / 排除某程序 | `ActivateAudioInterfaceAsync` + `PROCESS_LOOPBACK` | Win10 build 20348+（实际=Win11） | 该进程树的渲染流，在端点音量之前（系统静音也照抓；但该程序在音量合成器里被单独静音则取不到） |
+
+捕获跑在 worker 里，音频进 VAD 之前不跨进程；渲染端只收文字和一个电平数。设备切换由
+`AUDCLNT_E_DEVICE_INVALIDATED` 明确报出并自行重建（最多三次）。**v0.4.1 之前**这一层是渲染
+进程的 `getDisplayMedia`（因此要请求一条随即停掉的视频轨）+ JS 重采样，两者都已删除。
 
 **载卸时序**：模型只在会话内驻留，不做常驻缓存。
 
@@ -266,10 +279,17 @@ electron/utils/audio-pack-manager.js       模型包下载/卸载（工厂第二
 | 定稿（说完到出定稿） | 0.37 s | 0.37 s |
 | 解码 RTF | 0.033–0.044 | 同 |
 
-口径说明：计时从 `feedPcm` 到事件送达，**不含采集与渲染**——渲染端
-`createScriptProcessor(4096)` 在 48kHz 下再压 ~85ms，加 IPC 与绘制，用户眼里约
-再多 0.1s。定稿延迟的主要成分是 VAD 尾静音（`minSilence` 0.35s）而不是算力，
-所以调它才是调定稿快慢。样本是合成语音，真实带 BGM 的场景 VAD 闭合更晚。
+口径说明：计时从音频进入 worker 到事件送达。**v0.4.1 起采集也在 worker 内**，
+所以此前要另计的渲染端 `createScriptProcessor(4096)` 那 ~85ms 已经不存在，用户
+眼里只再多 IPC 与绘制。定稿延迟的主要成分是 VAD 尾静音（`minSilence` 0.35s）
+而不是算力，所以调它才是调定稿快慢。样本是合成语音，真实带 BGM 的场景 VAD 闭合更晚。
+
+**模型文件的信任边界**（v0.4.1 定，用户拍板）：包下载有 sha256 校验；**用户手动放进
+`asr-models/` 的文件按本机信任处理，不做校验**——能往目录里放文件的人同样能直接运行任意
+程序，校验挡不住有意的本地攻击者，只挡得住意外。我们保证的是**坏文件不会拖垮主程序**：
+识别引擎在独立 utilityProcess 里，一个不是 ONNX 的文件会让它原生崩溃（`0xE06D7363`，
+JS 的 try/catch 接不到），主进程无恙，且载入期崩溃不再重试（重试必然同样崩），
+界面直接报「模型加载失败——文件可能不完整或不是识别模型」。
 
 ## 命名规范
 

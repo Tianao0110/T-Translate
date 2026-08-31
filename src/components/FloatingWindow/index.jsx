@@ -904,13 +904,13 @@ const FloatingWindow = () => {
                     listen.setSource({ mode, pid: Number(pid) || 0, name: found?.name || '' });
                   }}
                   title={listen.sources.processLoopback
-                    ? t('floatingWindow.listenSourceHint', '声音来源：只听某个程序，或听全部但排除它')
-                    : t('floatingWindow.listenSourceUnsupported', '指定程序需要 Windows 11；本机只能监听全部声音')}
+                    ? t('floatingWindow.listenSourceHint')
+                    : t('floatingWindow.listenSourceUnsupported')}
                 >
-                  <option value="system">{t('floatingWindow.listenSourceAll', '全部声音')}</option>
+                  <option value="system">{t('floatingWindow.listenSourceAll')}</option>
                   {listen.sources.processLoopback && listen.sources.sessions.length > 0 && (
                     <>
-                      <optgroup label={t('floatingWindow.listenSourceOnly', '只听这个程序')}>
+                      <optgroup label={t('floatingWindow.listenSourceOnly')}>
                         {listen.sources.sessions.map((x) => (
                           // U+25B6 marks "making sound right now". A native
                           // option cannot hold a lucide icon, and this is a
@@ -921,13 +921,13 @@ const FloatingWindow = () => {
                           </option>
                         ))}
                       </optgroup>
-                      <optgroup label={t('floatingWindow.listenSourceExcept', '除了这个程序')}>
+                      <optgroup label={t('floatingWindow.listenSourceExcept')}>
                         {listen.sources.sessions.map((x) => (
                           // Prefixed because a closed select shows only the
                           // chosen line: "chrome.exe" alone cannot say whether
                           // it is the one being heard or the one being skipped.
                           <option key={`e${x.pid}`} value={`exclude:${x.pid}`}>
-                            {`${t('floatingWindow.listenSourceExceptShort', '除')} ${x.name}`}
+                            {`${t('floatingWindow.listenSourceExceptShort')} ${x.name}`}
                           </option>
                         ))}
                       </optgroup>

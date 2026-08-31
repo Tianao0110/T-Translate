@@ -320,6 +320,7 @@ await window.electron.stack.clearCache('all')
 - **主进程/栈日志**：设置 → 关于 → 打开日志目录（`%APPDATA%/t-translate/logs/app-*.log`），翻译栈与 OCR 管线日志都在这。
 - **划词链路探针**：`npm run start:debug`（`TT_SELECTION_DEBUG=1`）输出选区检测各层判定。
 - **听译整链冒烟**：`npm run smoke:listen`（先 `npm run audio:release` 备好本地包）。临时沙箱里把 GitHub 换成 `file://` 跑完下载→校验→安装→发现→识别→卸载，并打印首字/定稿延迟。换模型、动分发链、发版前各跑一次。
+- **听译捕获层**：`electron/utils/win-audio-capture.js` 用 koffi 直调 WASAPI，跑在音频 worker 里。改它之后 `npm run smoke:listen` 会真开一次音频客户端断言流是否稳定送达（静音机器上也能跑）；要验真实声音得让机器出声，参考 gstack `v041-process-loopback-spike` 里的做法。三个 koffi 坑记在文件头：`koffi.address()` 不认 Buffer（结构体内存一律 `koffi.alloc`）、`void*` 参数不吃 Buffer、`koffi.proto` 的类型名是全局注册表（放模块作用域，否则第二次调用报 Duplicate type name）。
 - **听译会话日志**：`%APPDATA%/t-translate/logs/audio-probe-*.jsonl`，滚动 20 份，默认只有时长/耗时/VAD 指标。**识别出的文字默认不写**——要看文字加 `TT_LISTEN_LOG_TEXT=1` 再启动。
 - **网络请求**：主进程栈的请求不经过渲染端 DevTools Network 面板，看日志或在 provider 里临时加 log。
 

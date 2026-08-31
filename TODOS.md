@@ -111,12 +111,12 @@ v0.3.4 给 Windows OCR / Azure / Google Vision / OCR.space / 百度 五个引擎
 - ⚠️ **userData 之外还有一处残留**：[system.js:265](electron/ipc/system.js:265) 的开机自启走 `setLoginItemSettings` → 写 `HKCU\...\Run` 注册表。「卸载完全不留」要成立就必须处理它（便携版隐藏该开关或退出时清），否则是假承诺
 - 其余：便携版不能装进 Program Files（不可写）→ electron-builder 加 `portable`/`zip` target 与 NSIS 并存，前者自带 `PORTABLE_EXECUTABLE_DIR` 可当检测依据；老用户迁移提示
 
-### 听译安全审查（v0.4.1，从 v0.4.x 提前——用户 2026-08-29 拍板；立项时定的"转正即失效"欠账）
+### ~~听译安全审查~~ 已交付（v0.4.1）
 
-四个面，发版前只覆盖了一半（日志默认不记原文 + v0.3.9 安全三条），剩两个面没专门过：
+报告在 gstack `v041-listen-security-audit-2026-08-30.md`。挖到并修掉一个 P0（模型包卸载的目录穿越，两域共享代码）+ IPC 面三处上限。**手放模型的信任口径已拍板=本机信任**（用户 2026-08-30）：不做校验，写进 ARCHITECTURE；保证的是坏文件不拖垮主程序（已成立），并且载入期崩溃不再白重试。剩下的：
 
-- **用户手放模型 = 未校验二进制进原生代码**：pack 下载有 sha256，手放目录没有任何校验就喂给 sherpa/onnxruntime。至少要定口径：信任边界写清（本机用户放的文件=本机信任）还是加轻校验
-- **audio-engine IPC 面**：audio-engine:* 通道逐条过（渲染端能塞什么、PCM 通道能不能被滥用、export-srt 的内容边界）；音频捕获权限叙事顺带核对文档宣称
+- **P3 不修，记着**：`ipcMain` 不校验 sender，被攻破的主窗口渲染进程能拉起 ASR worker（约 600MB）。拿不到转写内容（只发给悬浮窗），纯资源消耗。全 App 通道都是这个形态，要做就整体做一批
+- 文档宣称三条已核（音频不落盘 / 非麦克风成立；「不截屏」那条随 v0.4.1 变成结构事实并已写进 FAQ）
 
 ### 数据归位：UserData → 程序目录（用户 2026-08-29 定为长期方向；**排期=听译完善之后**——先走完 v0.4.1 听译三件与 TTS 批，再开第一步。铁律不等排期，即刻生效）
 
@@ -141,23 +141,21 @@ v0.3.4 给 Windows OCR / Azure / Google Vision / OCR.space / 百度 五个引擎
 - **userData 回退要有感**：安装目录不可写而回退 UserData 时，设置页明示"当前存储在用户目录（安装目录不可写）"，别静默——否则用户以为归位了实际没有
 - 顺带核对：卸载询问文案说"删除全部用户数据"时，安装目录 models 随程序目录走、不在该清单内，两边文案别互相矛盾
 
-### 指定程序的声音（v0.4.1 第一批，用户 2026-08-29 拍板要做，v0.4.0 发完再开工）
+### ~~指定程序的声音~~ 已交付（v0.4.1）
 
-现在抓的是全系统混音，别的程序一响就串进字幕。目标：只听选定的程序，或听全部但排除选定的程序。
+原生 WASAPI 层落在 [win-audio-capture.js](electron/utils/win-audio-capture.js)（koffi，不编译原生插件）；spike 报告在 gstack `v041-process-loopback-spike-2026-08-30.md`。全系统捕获也一并换到这条路，渲染端的 getDisplayMedia + 重采样已删除。剩下的活口：
 
-- **技术路径**：Windows Process Loopback（`ActivateAudioInterfaceAsync` + `AUDIOCLIENT_ACTIVATION_PARAMS`，`PROCESS_LOOPBACK` 含"只抓这棵进程树"和"抓全部但排除这棵进程树"两模式）。Electron 不暴露，要原生层——划词栈的 koffi 经验直接复用
-- ⚠️ **「网站」做不到，只能到「程序」**：浏览器所有标签页共用一个音频服务进程，系统层面就是一个 chrome.exe。UI 文案必须写「程序」不能写「网站」，否则是假承诺
-- ⚠️ **最低系统版本必须先核实**（Win10 某个较新 build 起才有这个 API），并准备降级路径：不支持就退回现在的全系统 loopback，且要在 UI 上说清楚
-- **附带红利**：排除模式顺手解决自家 TTS 回灌（神经 TTS 上线后不会把自己念的声音再识别一遍）
-- spike 第一步：拿到 API 可用性 + 进程枚举（只列真正在出声的会话，别把几十个进程堆给用户选）
+- **只在这台机器上验过**（Win11 25H2 / build 26200）。Win10 与 Win11 早期 build 的实机表现未知；发版前的人工检查里过一遍「全部声音」这条路
+- **泵用的是 20ms 轮询 + 2s 客户端缓冲**，没用 koffi 的 async 等待。长跑（数小时）下的漂移未测——smoke 只跑 1.5s
+- **排除自家 TTS 尚未接线**：机制已具备（exclude 模式实测归零），但今天的规则仍是「听译模式下不朗读」。放开它属 TTS 批的事，届时把自家进程树默认排除
+- 目标进程中途退出、中途开始播放的行为未测
 
 ### 听译上线后的观察项（v0.4.0 交付，非阻塞）
 
-- **OCR 语言包下载没有离线闸门**：听译侧的下载在离线模式下会被 [audio-pack-manager.js](electron/utils/audio-pack-manager.js) 直接拒绝，OCR 侧 [ocr.js](electron/ipc/ocr.js) 的 `packs-download` 没有这道检查——离线模式承诺绝不触网，这里是缺口。照抄音频侧那段即可，闸门要放在 pack manager 而不是 IPC 处理器
 - **BGM 场景偶出过短碎段**：歌曲背景下 VAD 会把一两个字的碎片当成句子定稿（如「如。」），出屏且触发一次翻译。备选修法=过短定稿不出屏也不翻译。用户觉得烦再做
 - **无痕模式是否放开听译**：当初禁用是因为会话日志记录识别原文；v0.4.0 起日志默认只写指标不写文字，禁用的原始理由已经不成立。要放开就得先确认无痕模式下"完全不写日志"还是"只写指标可接受"
 
 ### Incremental unit test coverage buildout
 
-`tests/unit/` 现有 64 个测试文件、713 用例（selection / stack 五件套 / OCR 坐标 / 语言目录与选择器 / 历史与理解条目 / 段落笔记 / 历史保险库与存储路由 / store 白名单 / 模型包 core 与换包时序 / 听译模型发现与包列表 / TTS 引擎落回 等）。Principle: add tests when you touch a file, new features ship with tests, bug fixes ship with regression tests. Not chasing 100% coverage.
+`tests/unit/` 现有 65 个测试文件、728 用例（selection / stack 五件套 / OCR 坐标 / 语言目录与选择器 / 历史与理解条目 / 段落笔记 / 历史保险库与存储路由 / store 白名单 / 模型包 core 与换包时序 / 听译模型发现与包列表 / 听译声音来源 / TTS 引擎落回 等）。Principle: add tests when you touch a file, new features ship with tests, bug fixes ship with regression tests. Not chasing 100% coverage.
 
