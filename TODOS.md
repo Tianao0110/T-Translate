@@ -118,7 +118,7 @@ v0.3.4 给 Windows OCR / Azure / Google Vision / OCR.space / 百度 五个引擎
 - **用户手放模型 = 未校验二进制进原生代码**：pack 下载有 sha256，手放目录没有任何校验就喂给 sherpa/onnxruntime。至少要定口径：信任边界写清（本机用户放的文件=本机信任）还是加轻校验
 - **audio-engine IPC 面**：audio-engine:* 通道逐条过（渲染端能塞什么、PCM 通道能不能被滥用、export-srt 的内容边界）；音频捕获权限叙事顺带核对文档宣称
 
-### 数据归位：UserData → 程序目录（用户 2026-08-29 定为长期方向："从这个版本开始一点一点移回程序本体文件夹"）
+### 数据归位：UserData → 程序目录（用户 2026-08-29 定为长期方向；**排期=听译完善之后**——先走完 v0.4.1 听译三件与 TTS 批，再开第一步。铁律不等排期，即刻生效）
 
 **即刻生效的开发铁律**：新功能落盘一律走程序目录优先的 data-root（model-root.js 模式：安装目录可写用之，否则回退 userData），**不再新增裸 `app.getPath('userData')` 落点**。审计固定动作加一条：grep 新增 userData 引用。
 
