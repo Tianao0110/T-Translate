@@ -40,8 +40,12 @@ function eventRecord(kind, detail) {
   return rec;
 }
 
-function metricsRecord({ rssMb, cpuPct, audioInS, segments }) {
-  return {
+// rmsAvg/rmsMax are the difference between "the stream went quiet" and "the
+// VAD ignored perfectly audible audio". Without them a stall in the log is
+// unexplainable: the no-audio watchdog only proves the signal was not exactly
+// zero (its floor is 1e-5, far below anything audible).
+function metricsRecord({ rssMb, cpuPct, audioInS, segments, rmsAvg, rmsMax, speechS }) {
+  const rec = {
     ts: Date.now(),
     type: 'metrics',
     rssMb: Math.round(rssMb),
@@ -49,12 +53,22 @@ function metricsRecord({ rssMb, cpuPct, audioInS, segments }) {
     audioInS: round2(audioInS),
     segments,
   };
+  if (rmsAvg !== undefined) rec.rmsAvg = round3(rmsAvg);
+  if (rmsMax !== undefined) rec.rmsMax = round3(rmsMax);
+  // Seconds the VAD reported speech during this window — separates "nothing
+  // was said" from "speech was detected but never got finalized".
+  if (speechS !== undefined) rec.speechS = round2(speechS);
+  return rec;
 }
 
 // Watches incoming audio energy and recognition output, and decides which
 // hint ('no-audio' when the stream is silent, 'no-speech' when there is sound
 // but nothing ever gets recognized) should fire. Time is injected for tests.
-function makeSignalWatchdog({ silenceRms = 1e-5, noAudioAfterMs = 5000, noSpeechAfterMs = 30000 } = {}) {
+// noSpeechAfterMs 12s (was 30s): probe logs showed a real 21s stretch where
+// audio kept arriving and the VAD produced nothing, and at 30s the user got no
+// word about it at all — the screen just stopped. 12s is past any normal
+// sentence gap (segments are force-split at 9s) so it does not fire mid-speech.
+function makeSignalWatchdog({ silenceRms = 1e-5, noAudioAfterMs = 5000, noSpeechAfterMs = 12000 } = {}) {
   let lastLoudMs = null;
   let lastSegmentMs = null;
   let startedMs = null;

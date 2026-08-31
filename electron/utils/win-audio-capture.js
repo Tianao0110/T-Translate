@@ -302,6 +302,10 @@ const AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM = 0x80000000;
 const AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY = 0x08000000;
 const AUDCLNT_E_DEVICE_INVALIDATED = 0x88890004;
 const AUDCLNT_BUFFERFLAGS_SILENT = 0x2;
+// Set when the device dropped samples between two packets — i.e. our pump did
+// not drain the 2s client buffer in time. Counted rather than ignored: it is
+// the difference between "the audio stopped" and "we stopped listening".
+const AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY = 0x1;
 
 const SAMPLE_RATE = 16000;
 const BUFFER_DURATION_HNS = 20000000n; // 2s of slack; the pump polls every 20ms
@@ -445,6 +449,9 @@ async function startCapture({ mode = 'system', pid = 0, onPcm, onEvent = () => {
   let timer = null;
   let stopped = false;
   let reacquires = 0;
+  let silentPackets = 0;
+  let discontinuities = 0;
+  let framesDelivered = 0;
 
   const teardown = () => {
     if (timer) clearInterval(timer);
@@ -514,8 +521,11 @@ async function startCapture({ mode = 'system', pid = 0, onPcm, onEvent = () => {
       if (hr !== 0) return onDeviceError(hr);
 
       const frames = outFrames[0];
+      if (outFlags[0] & AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY) discontinuities += 1;
       if (frames > 0) {
+        framesDelivered += frames;
         if (outFlags[0] & AUDCLNT_BUFFERFLAGS_SILENT) {
+          silentPackets += 1;
           // Silent packets carry no valid data pointer; the timeline still has
           // to advance or the VAD would see a jump-cut instead of a pause.
           onPcm(new Float32Array(frames));
@@ -564,6 +574,12 @@ async function startCapture({ mode = 'system', pid = 0, onPcm, onEvent = () => {
 
   return {
     mode,
+    // Read by the worker's metrics line: silent packets mean the source went
+    // quiet at the OS level (not our doing), discontinuities mean the pump
+    // fell behind. Both are invisible in the PCM itself.
+    stats() {
+      return { silentPackets, discontinuities, framesDelivered };
+    },
     stop() {
       stopped = true;
       teardown();

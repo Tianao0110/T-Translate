@@ -121,6 +121,13 @@ let shuttingDown = false;
 let pending = new Float32Array(0);
 let audioInSamples = 0;
 let segmentCount = 0;
+// Samples actually handed to the VAD, and the value that counter had at the
+// last vad.reset(). Sherpa's own segment.start restarts at zero on every
+// reset, and forced splits reset constantly — so raw VAD starts jump BACKWARDS
+// mid-session and the exported SRT timeline goes with them (probe logs showed
+// 17.10 -> 22.18 -> 0.23). Both segment sources are rebased onto this clock.
+let vadFedSamples = 0;
+let vadBaseSamples = 0;
 
 // Open-segment accumulator for provisional decoding. VAD only hands over
 // CLOSED segments; while isDetected() is true we mirror the audio ourselves,
@@ -148,6 +155,14 @@ let preRoll = [];
 let capture = null;
 let lastLevelPostAt = 0;
 const LEVEL_INTERVAL_MS = 80;
+
+// Level + speech-time accumulators, reset each metrics window. These exist
+// because a session log without them cannot answer the only question a stall
+// raises: was the audio quiet, or was the VAD deaf to audible audio?
+let rmsSum = 0;
+let rmsCount = 0;
+let rmsMax = 0;
+let speechWindows = 0;
 
 const isRepeat = makeRepeatTracker();
 const watchdog = makeSignalWatchdog();
@@ -306,6 +321,14 @@ function handleAsrStart(msg) {
   lastStreamText = '';
 
   const loadMs = Date.now() - t0;
+  // Session-scoped counters. The manager forks a fresh worker per session
+  // today, but the resident scheduler will not — a second session must not
+  // inherit the first one's clock.
+  audioInSamples = 0;
+  vadFedSamples = 0;
+  vadBaseSamples = 0;
+  segmentCount = 0;
+  rmsSum = rmsCount = rmsMax = speechWindows = 0;
   sessionLive = true;
   logLine({
     ts: Date.now(),
@@ -329,7 +352,13 @@ function checkHint() {
   const hint = watchdog.hint(Date.now());
   if (hint !== lastHint) {
     lastHint = hint;
-    if (hint) logLine(eventRecord(hint));
+    // The level goes in the log line: 'no-speech' at rmsMax 0.15 means the VAD
+    // was deaf to audible audio, the same hint at rmsMax 0.0005 means the
+    // stream really was quiet. Without this the two are indistinguishable
+    // afterwards, which is exactly where a stall investigation stalls.
+    if (hint) {
+      logLine(eventRecord(hint, `rmsAvg=${(rmsCount ? rmsSum / rmsCount : 0).toFixed(4)} rmsMax=${rmsMax.toFixed(4)}`));
+    }
     post({ type: 'hint', kind: hint });
   }
 }
@@ -345,7 +374,22 @@ function emitMetrics() {
     cpuPct: wallMs > 0 ? ((cpu.user + cpu.system) / 1000 / wallMs) * 100 : 0,
     audioInS: audioInSamples / SAMPLE_RATE,
     segments: segmentCount,
+    rmsAvg: rmsCount ? rmsSum / rmsCount : 0,
+    rmsMax,
+    speechS: (speechWindows * VAD_WINDOW) / SAMPLE_RATE,
   });
+  // Capture health, when capture is ours: silent packets mean the OS handed us
+  // digital silence (the source stopped), discontinuities mean the pump fell
+  // behind. Both look identical in the PCM.
+  const capStats = capture?.stats?.();
+  if (capStats) {
+    rec.capSilent = capStats.silentPackets;
+    rec.capGaps = capStats.discontinuities;
+  }
+  rmsSum = 0;
+  rmsCount = 0;
+  rmsMax = 0;
+  speechWindows = 0;
   logLine(rec);
   post({ type: 'metrics', rec });
 }
@@ -408,7 +452,11 @@ function handlePcm(samples) {
 
   let sumSq = 0;
   for (let i = 0; i < samples.length; i++) sumSq += samples[i] * samples[i];
-  watchdog.onChunk(Math.sqrt(sumSq / (samples.length || 1)), Date.now());
+  const chunkRms = Math.sqrt(sumSq / (samples.length || 1));
+  rmsSum += chunkRms;
+  rmsCount += 1;
+  if (chunkRms > rmsMax) rmsMax = chunkRms;
+  watchdog.onChunk(chunkRms, Date.now());
 
   const merged = new Float32Array(pending.length + samples.length);
   merged.set(pending, 0);
@@ -419,6 +467,7 @@ function handlePcm(samples) {
     while (offset + VAD_WINDOW <= merged.length) {
       const win = merged.subarray(offset, offset + VAD_WINDOW);
       vad.acceptWaveform(win);
+      vadFedSamples += VAD_WINDOW;
       offset += VAD_WINDOW;
       drainVadQueue();
       trackOpenSegment(win);
@@ -476,6 +525,7 @@ function resetStreamDraft() {
 
 function trackOpenSegment(win) {
   if (vad.isDetected()) {
+    speechWindows += 1;
     // Segment just opened: prepend the pre-roll so the mirrored audio has the
     // utterance head the acknowledgment window swallowed. Mostly silence plus
     // the first ~0.15s of speech; SenseVoice doesn't mind leading quiet.
@@ -551,11 +601,12 @@ function forceSplit(reason) {
     buf.set(c, off);
     off += c.length;
   }
-  const startSample = Math.max(0, audioInSamples - openLen);
+  const startSample = Math.max(0, vadFedSamples - openLen);
   resetOpenSegment();
   resetStreamDraft();
   try {
     vad.reset();
+    vadBaseSamples = vadFedSamples; // sherpa's segment clock restarts here
   } catch {
     // reset failure is survivable — the next natural close still works
   }
@@ -602,7 +653,8 @@ function drainVadQueue() {
     // silence-only runs never reach this call.
     const seg = vad.front(false);
     vad.pop();
-    enqueueDecode(seg);
+    // Rebased: seg.start is relative to the last reset, not to the session.
+    enqueueDecode({ samples: seg.samples, start: vadBaseSamples + seg.start });
   }
 }
 

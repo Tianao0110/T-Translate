@@ -309,6 +309,18 @@ async function main() {
 
   const withDraft = await runSession('two-pass（装了草稿引擎）', soakMinutes);
 
+  // Segment starts must only move forward. They did not: forced splits call
+  // vad.reset(), sherpa's own segment clock restarts at zero with it, and every
+  // naturally-closed segment after a split reported a start from the new
+  // origin — so a long session's SRT timeline walked backwards.
+  const starts = withDraft.ev.segments.map((x) => x.segStartS);
+  const backwards = starts.filter((v, i) => i > 0 && v < starts[i - 1]);
+  step(
+    'segment timeline only moves forward',
+    backwards.length === 0,
+    starts.map((v) => v.toFixed(2)).join(' → ')
+  );
+
   step(
     'finals recognized',
     withDraft.ev.segments.length > 0,

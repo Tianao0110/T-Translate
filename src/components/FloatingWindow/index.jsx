@@ -912,31 +912,19 @@ const FloatingWindow = () => {
                     : t('floatingWindow.listenSourceUnsupported')}
                 >
                   <option value="system">{t('floatingWindow.listenSourceAll')}</option>
-                  {listen.sources.processLoopback && listen.sources.sessions.length > 0 && (
-                    <>
-                      <optgroup label={t('floatingWindow.listenSourceOnly')}>
-                        {listen.sources.sessions.map((x) => (
-                          // U+25B6 marks "making sound right now". A native
-                          // option cannot hold a lucide icon, and this is a
-                          // geometric symbol (text presentation by default),
-                          // not an emoji.
-                          <option key={`i${x.pid}`} value={`include:${x.pid}`}>
-                            {x.audible ? `▶ ${x.name}` : x.name}
-                          </option>
-                        ))}
-                      </optgroup>
-                      <optgroup label={t('floatingWindow.listenSourceExcept')}>
-                        {listen.sources.sessions.map((x) => (
-                          // Prefixed because a closed select shows only the
-                          // chosen line: "chrome.exe" alone cannot say whether
-                          // it is the one being heard or the one being skipped.
-                          <option key={`e${x.pid}`} value={`exclude:${x.pid}`}>
-                            {`${t('floatingWindow.listenSourceExceptShort')} ${x.name}`}
-                          </option>
-                        ))}
-                      </optgroup>
-                    </>
-                  )}
+                  {/* Flat list, no "everything except X" group: the user's
+                      call — picking what to listen to is the need; excluding
+                      one program is not. The exclude mode stays in the capture
+                      layer for the TTS batch (it is how we will stop
+                      transcribing our own speech), just unexposed here. */}
+                  {listen.sources.processLoopback && listen.sources.sessions.map((x) => (
+                    // U+25B6 marks "making sound right now". A native option
+                    // cannot hold a lucide icon, and this is a geometric
+                    // symbol (text presentation by default), not an emoji.
+                    <option key={x.pid} value={`include:${x.pid}`}>
+                      {x.audible ? `▶ ${x.name}` : x.name}
+                    </option>
+                  ))}
                 </select>
                 <select
                   className="listen-select"
