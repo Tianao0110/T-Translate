@@ -291,6 +291,43 @@
   transform: scaleX(0);
 }
 
+/* Listen mode lays the top bar out as a real row.
+   Everywhere else the three pieces (mode segments / status / toolbar) are each
+   absolutely placed — mode-wrap pinned left, status at a fixed left: 74px, the
+   toolbar centred — which only holds while the toolbar stays narrow. Listen
+   mode's toolbar carries three selects, so its left edge reached back under the
+   status strip and the level meter ended up behind the source dropdown.
+   Putting these three in flow makes overlap impossible instead of unlikely. */
+.floating-window.listen-mode .floating-top-area {
+  justify-content: flex-start;
+  gap: 6px;
+  padding-right: 26px; /* the close button stays absolute at right: 3px */
+}
+
+.floating-window.listen-mode .floating-mode-wrap,
+.floating-window.listen-mode .listen-topbar-status,
+.floating-window.listen-mode .floating-toolbar {
+  position: static;
+  transform: none;
+}
+
+/* The toolbar keeps its natural width; the status strip is what gives way. */
+.floating-window.listen-mode .floating-toolbar {
+  flex: none;
+}
+
+.floating-window.listen-mode .listen-topbar-status {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.listen-status-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
 /* ========== 关闭按钮 ========== */
 .floating-close-btn {
   position: absolute;

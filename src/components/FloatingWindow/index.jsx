@@ -832,7 +832,7 @@ const FloatingWindow = () => {
 
   return (
     <div
-      className={`floating-window ${showToolbar ? 'show-toolbar' : ''} ${isPassThrough && !stickyPassThrough ? 'pass-through' : ''} ${stickyPassThrough ? 'pass-through-sticky' : ''} ${displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0 ? 'scattered-mode' : ''}`}
+      className={`floating-window ${showToolbar ? 'show-toolbar' : ''} ${listenMode ? 'listen-mode' : ''} ${isPassThrough && !stickyPassThrough ? 'pass-through' : ''} ${stickyPassThrough ? 'pass-through-sticky' : ''} ${displayMode === DISPLAY_MODE.SCATTERED && childPanes.length > 0 ? 'scattered-mode' : ''}`}
       style={{ '--floating-opacity': floatingOpacity }}
       data-theme={theme}
       onMouseEnter={handleMouseEnterWindow}
@@ -875,7 +875,11 @@ const FloatingWindow = () => {
           )}
           {listenMode && (
             <span className="listen-topbar-status">
-              {t(`floatingWindow.listenStatus.${listen.sessionState}`, listen.sessionState)}
+              {/* Own element so a narrow window truncates the WORDS and never
+                  the meter next to them. */}
+              <span className="listen-status-text">
+                {t(`floatingWindow.listenStatus.${listen.sessionState}`, listen.sessionState)}
+              </span>
               {/* Fastest feedback the feature has: moves at the audio
                   callback's rate, long before any text can appear. */}
               <ListenLevel levelRef={listen.levelRef} active={listen.running} />
