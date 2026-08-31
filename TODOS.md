@@ -102,9 +102,9 @@ v0.3.4 给 Windows OCR / Azure / Google Vision / OCR.space / 百度 五个引擎
 **价值定位别记错**：谷歌翻译已内置、免费、零下载，多数语种上比 1.8B 强。内置
 模型的价值是离线 + 隐私 + 开箱即用，不是翻得更好。
 
-### ~~绿色便携化（数据不落 APPDATA）~~ 已评估，暂不做（2026-08-10 用户拍板）
+### ~~绿色便携化（数据不落 APPDATA）~~ 已复活：2026-08-29 用户定「数据归位」方向后，此项即其终态（见上方数据归位节的第三步）；下面的评估结论直接用
 
-结论：可行、约 1-2 天、风险低，不影响现有安装版。评估结论存档如下，重启时不必重推。
+结论：可行、约 1-2 天、风险低，不影响现有安装版。
 
 - **全仓 userData 落点全部走 `app.getPath('userData')`，零硬编码路径**：electron-store 的 config.json、[logger.js:71](electron/utils/logger.js:71) 的 logs/、[translation-stack.js:52](electron/ipc/translation-stack.js:52) 的 Caches/、Chromium 自带的 Local Storage/IndexedDB。**一句 `app.setPath('userData', …)` 全部跟着搬**。模型不在此列了——v0.4.0 起 OCR 与听译模型都落安装目录的 `models/`（[model-root.js](electron/utils/model-root.js)），便携化时它们本来就跟着程序走
 - ⚠️ **唯一真陷阱是 require 顺序**：[main.js:12](electron/main.js:12) require `./state` 时 [state.js:36](electron/state.js:36) 顶层就 `new Store()` 了，setPath 必须更早（main.js 最顶或抽独立首个 require）。顺序错了不报错，只会静默写回老位置
@@ -118,7 +118,22 @@ v0.3.4 给 Windows OCR / Azure / Google Vision / OCR.space / 百度 五个引擎
 - **用户手放模型 = 未校验二进制进原生代码**：pack 下载有 sha256，手放目录没有任何校验就喂给 sherpa/onnxruntime。至少要定口径：信任边界写清（本机用户放的文件=本机信任）还是加轻校验
 - **audio-engine IPC 面**：audio-engine:* 通道逐条过（渲染端能塞什么、PCM 通道能不能被滥用、export-srt 的内容边界）；音频捕获权限叙事顺带核对文档宣称
 
-### 模型归位收尾（v0.4.x——用户 2026-08-29 指令"不能默认在 UserData，跟随软件本体文件夹"）
+### 数据归位：UserData → 程序目录（用户 2026-08-29 定为长期方向："从这个版本开始一点一点移回程序本体文件夹"）
+
+**即刻生效的开发铁律**：新功能落盘一律走程序目录优先的 data-root（model-root.js 模式：安装目录可写用之，否则回退 userData），**不再新增裸 `app.getPath('userData')` 落点**。审计固定动作加一条：grep 新增 userData 引用。
+
+**终态=一步切换而非逐项搬**：Chromium 自管存储（localStorage/IndexedDB，zustand 持久化在里面）不能单独指路径，逐项搬永远剩这一块。终点是启动最早期 `app.setPath('userData', 安装目录\data)` 整体迁移——即 2026-08-10 搁置的便携化方案，评估仍有效（require 顺序陷阱=state.js 顶层 new Store 之前必须 setPath / 开机自启注册表残留 / Program Files 不可写回退），本指令将其复活为正式方向。
+
+**两个产品契约碰撞，实施批拍板**：①自动更新清安装目录——models 的 NSIS stash/restore 护栏要扩成盖住整个 data 目录 ②卸载语义反转：现承诺"卸载默认保留数据"，数据进安装目录后卸载=默认全删；绿色语义 or 卸载器也 stash，二选一
+
+**分步节奏（每步独立可 ship）**：
+
+- v0.4.x 第一步=模型归位收尾（本体已在安装目录，补存量）：
+  - 老 userData 模型一键搬迁：设置页检测旧根有模型→提示+「移到程序目录」按钮，带进度跨盘复制+删，OCR/听译共用；搬完 activeDir 即显新位置
+  - userData 回退要有感：安装目录不可写时设置页明示"当前存储在用户目录（安装目录不可写）"，不许静默
+  - 卸载询问文案与安装目录 models 归属核对，两边别矛盾
+- 第二步=轻量单文件（翻译缓存/会话日志/文档进度）改走 data-root，双根读兼容存量
+- 第三步=整体切换（便携化终态）：config+保险库+Chromium 存储随 setPath 一次迁移，含一次性存量搬运与上述两契约拍板
 
 新下载的默认位置 v0.4.0 已改（安装目录\models，[model-root.js](electron/utils/model-root.js)）；欠的是存量与边界：
 
