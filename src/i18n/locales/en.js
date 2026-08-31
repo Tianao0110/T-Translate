@@ -344,6 +344,7 @@ const en = {
       "secure-blocked": "Listen mode is unavailable in secure privacy mode",
       "engine-restarting": "Recognition engine crashed — restarting…",
       "engine-dead": "Recognition engine unavailable (no more retries this session)",
+      "model-load-failed": "Model failed to load - the file may be incomplete or not a recognition model",
       "device-lost": "Audio device changed — reconnecting…",
       "reacquire-failed": "Reconnect failed — please start again",
       "capture-error": "Failed to capture system audio",

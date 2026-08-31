@@ -26,6 +26,9 @@ let deps = null; // { store, getWindow }
 let child = null;
 let childState = 'idle'; // idle | starting | running | stopping
 let restartedOnce = false;
+// Did THIS spawn ever reach asr-ready? A worker that dies before it does died
+// loading the models, and loading them again will die the same way.
+let engineEverReady = false;
 let readyTimer = null;
 let killTimer = null;
 let privacyUnsub = null;
@@ -120,6 +123,7 @@ function startSession(options = {}) {
 
 function spawnWorker(models) {
   childState = 'starting';
+  engineEverReady = false;
   sendStatus('loading');
 
   const logsDir = path.join(app.getPath('userData'), 'logs');
@@ -196,6 +200,7 @@ function onWorkerMessage(msg) {
     case 'asr-ready':
       clearTimeout(readyTimer);
       childState = 'running';
+      engineEverReady = true;
       logger.info(`worker ready in ${msg.loadMs}ms`);
       sendStatus('listening');
       break;
@@ -248,6 +253,17 @@ function onWorkerExit(code) {
 
   if (wasStopping) {
     sendStatus('stopped');
+    return;
+  }
+  // Died before ever going ready = the models did not load. A hand-placed file
+  // that is not really an ONNX model takes the worker down through a native
+  // exception (exit 0xE06D7363) rather than the JS try/catch around the load,
+  // so there is no 'fatal' message to go on — the state is the signal. Loading
+  // the same file again would crash identically, so the one-shot restart is
+  // reserved for engines that were actually running.
+  if (!engineEverReady) {
+    logger.error('worker died during model load — not retrying');
+    sendStatus('model-load-failed');
     return;
   }
   // Unexpected death mid-session: one automatic restart, then give up.

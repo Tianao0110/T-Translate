@@ -126,6 +126,7 @@ async function main() {
   const wav = wavArg !== -1 ? process.argv[wavArg + 1] : synthesizeWav(path.join(SANDBOX, 'speech.wav'));
 
   const packMgr = require('../electron/utils/audio-pack-manager');
+  const { createPackManager } = require('../electron/utils/model-pack-core');
   const engineManager = require('../electron/managers/audio-engine-manager');
   const { locateAsrModels } = require('../electron/utils/asr-models');
   const { store } = require('../electron/state');
@@ -139,15 +140,42 @@ async function main() {
     before.packs.map((p) => `${p.id}:${p.status}`).join(', ')
   );
 
+  // The offline gate refuses NETWORK access, and this whole harness runs on
+  // file:// URLs (a local read is not the network), so the refusal has to be
+  // checked against the URL shape a real user gets: a second manager, same
+  // gate, https manifest. Both of its network paths must refuse before any
+  // fetch happens — the injected fetch throws if it is ever reached.
   store.set('privacyMode', 'offline');
-  let offlineErr = null;
-  try {
-    await packMgr.downloadPack('asr-base-sense-voice');
-  } catch (e) {
-    offlineErr = e.code;
+  const netMgr = createPackManager({
+    manifestUrl: 'https://github.com/Tianao0110/T-Translate/releases/download/audio-models/manifest.json',
+    packsRoot: packMgr.packsRoot,
+    listInstalled: () => [],
+    evictSessions: () => {},
+    computePackList: (installed) => installed,
+    packJsonFields: (e) => e,
+    offlineGate: () => store.get('privacyMode') === 'offline',
+    logLabel: 'Smoke-Offline',
+    deps: {
+      fetch: () => { throw new Error('offline gate leaked: fetch was called'); },
+      logger: { info() {}, warn() {}, error() {}, debug() {} },
+    },
+  });
+  const offlineCodes = [];
+  for (const call of [() => netMgr.downloadPack('asr-base-sense-voice'), () => netMgr.fetchManifest(true)]) {
+    try {
+      await call();
+      offlineCodes.push('NOT-BLOCKED');
+    } catch (e) {
+      offlineCodes.push(e.code || e.message);
+    }
   }
+  const offlineList = await netMgr.listPacks({ refresh: true });
   store.set('privacyMode', 'standard');
-  step('offline mode refuses to download', offlineErr === 'OFFLINE_BLOCKED', `errorCode=${offlineErr}`);
+  step(
+    'offline mode refuses download and manifest fetch',
+    offlineCodes.every((c) => c === 'OFFLINE_BLOCKED') && offlineList.manifestError === 'OFFLINE_BLOCKED',
+    `download=${offlineCodes[0]}, manifest=${offlineCodes[1]}, list=${offlineList.manifestError}`
+  );
 
   for (const id of ['asr-base-sense-voice', 'asr-draft-zipformer-zh-en']) {
     const phases = new Set();

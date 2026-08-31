@@ -13,6 +13,10 @@
 //   resolvePackDir,    optional (packId) => installed dir | null — lets a
 //                      domain find packs outside packsRoot() (legacy roots)
 //                      so removal works there too; defaults to packsRoot/id
+//   allowedRoots,      optional () => string[] — every root a pack may live
+//                      under. removePack refuses to delete anything outside
+//                      them, so a resolvePackDir bug cannot turn into a
+//                      recursive delete of an arbitrary folder
 //   listInstalled,     () => installed packs (merged into the UI list)
 //   evictSessions,     (packId) => void | Promise — release live file handles
 //                      before the swap. Awaited: a domain whose engine lives in
@@ -35,6 +39,24 @@ const path = require('path');
 const nodeFs = require('fs');
 const crypto = require('crypto');
 
+// A pack id becomes a directory name (`<packsRoot>/<id>` and the matching
+// `.staging-<id>`), so it is the one caller-supplied value here that turns into
+// a filesystem path. Renderer-reachable through both packs-remove channels,
+// and removal is a recursive delete — an id like '../../Documents' escaped the
+// packs root and wiped whatever it landed on (proven, then fixed, in v0.4.1).
+// Manifest ids run through the same check: the manifest is a downloaded file,
+// so a tampered one must not be able to write outside the root either.
+const SAFE_PACK_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+function assertSafePackId(packId) {
+  if (typeof packId !== 'string' || !SAFE_PACK_ID.test(packId) || packId.includes('..')) {
+    const err = new Error(`invalid pack id: ${packId}`);
+    err.code = 'INVALID_PACK_ID';
+    throw err;
+  }
+  return packId;
+}
+
 // "1.2.10" vs "1.3.0" — numeric per-segment compare, missing segments = 0.
 // Lives here, not in a domain pack file: every pack registry (OCR, audio)
 // needs the same "is the manifest newer than what's installed" test.
@@ -53,6 +75,7 @@ function createPackManager({
   manifestUrl,
   packsRoot,
   resolvePackDir = null,
+  allowedRoots = null,
   listInstalled,
   evictSessions,
   computePackList,
@@ -159,6 +182,7 @@ function createPackManager({
    * phase in 'downloading' | 'verifying' | 'extracting' | 'done'.
    */
   async function downloadPack(packId, onProgress = () => {}) {
+    assertSafePackId(packId);
     const manifest = await fetchManifest(false);
     const entry = (manifest.packs || []).find((p) => p.id === packId);
     if (!entry) {
@@ -249,11 +273,30 @@ function createPackManager({
   // Remove a pack folder entirely (no residue). For the base pack only the
   // userData copy can go — the bundled copy under resources/ is part of the
   // app and removal just falls back to it.
+  // The delete below is recursive and forced, so the directory it is handed
+  // must provably sit under a root this domain owns — never the root itself.
+  function assertInsideAllowedRoot(dir) {
+    const roots = (allowedRoots ? allowedRoots() : [packsRoot()]).filter(Boolean);
+    const target = path.resolve(dir);
+    const contained = roots.some((root) => {
+      const rel = path.relative(path.resolve(root), target);
+      return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
+    });
+    if (!contained) {
+      logger.error(`Refusing to remove a pack dir outside the packs roots: ${target}`);
+      const err = new Error('pack dir outside the packs roots');
+      err.code = 'PACK_DIR_OUTSIDE_ROOT';
+      throw err;
+    }
+  }
+
   async function removePack(packId) {
+    assertSafePackId(packId);
     // A pack installed by an older build can live outside the current root;
     // resolvePackDir lets the domain point at it so removal is not silently
     // impossible for exactly the packs a user most wants to reclaim.
     const dir = (resolvePackDir && resolvePackDir(packId)) || path.join(packsRoot(), packId);
+    assertInsideAllowedRoot(dir);
 
     if (!fs.existsSync(dir)) {
       if (basePackId !== null && packId === basePackId) {

@@ -27,6 +27,7 @@ const manager = createPackManager({
     const dir = ocrEngine.resolvePackDir(packId);
     return dir && dir !== ocrEngine.bundledBaseDir() ? dir : null;
   },
+  allowedRoots: () => ocrEngine.packsRoots(),
   listInstalled: () => ocrEngine.listInstalledPacks(),
   evictSessions: (packId) => ocrEngine.evictSessions(packId),
   computePackList,

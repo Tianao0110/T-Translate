@@ -41,6 +41,9 @@ const manager = createPackManager({
   manifestUrl: MANIFEST_URL,
   packsRoot,
   resolvePackDir: (packId) => listAllInstalled().find((p) => p.id === packId)?.dir || null,
+  // Both roots are legitimate homes for a pack (install dir now, userData for
+  // anything a pre-v0.4.0 build downloaded); nothing outside them is removable.
+  allowedRoots: packsRoots,
   listInstalled: listAllInstalled,
   // The worker holds the .onnx files open; swapping a pack under a live
   // session would fail on Windows (or worse, half-swap). Stopping is the

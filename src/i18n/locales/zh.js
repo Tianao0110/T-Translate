@@ -344,6 +344,7 @@ const zh = {
       "secure-blocked": "隐私安全模式下听译不可用",
       "engine-restarting": "识别引擎崩溃，自动重启中…",
       "engine-dead": "识别引擎不可用（本次会话不再重试）",
+      "model-load-failed": "模型加载失败——文件可能不完整或不是识别模型",
       "device-lost": "音频设备变更，重新连接中…",
       "reacquire-failed": "重连失败——请重新开始",
       "capture-error": "捕获系统声音失败",

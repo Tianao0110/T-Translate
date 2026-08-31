@@ -324,4 +324,84 @@ describe('model-pack-core', () => {
     });
     await expect(manager.fetchManifest()).resolves.toMatchObject({ schemaVersion: 1 });
   });
+
+  // A pack id is the one caller-supplied value that becomes a filesystem path,
+  // and removal is a recursive delete. Reachable from the renderer through
+  // ocr:packs-remove / audio-engine:packs-remove.
+  it('removePack refuses a traversing pack id instead of deleting outside the root', async () => {
+    const victim = path.join(root, 'PRECIOUS');
+    const packs = path.join(root, 'models', 'asr-models');
+    fs.mkdirSync(packs, { recursive: true });
+    fs.mkdirSync(victim, { recursive: true });
+    fs.writeFileSync(path.join(victim, 'user-data.txt'), 'do not delete');
+
+    const manager = createPackManager({
+      manifestUrl: MANIFEST_URL,
+      packsRoot: () => packs,
+      resolvePackDir: () => null,
+      listInstalled: () => [],
+      evictSessions: vi.fn(),
+      computePackList: () => [],
+      packJsonFields: (e) => e,
+      deps: { fetch: vi.fn(), logger: silentLogger },
+    });
+
+    for (const bad of ['../../PRECIOUS', '..', 'a/../../PRECIOUS', 'C:\Windows', 'sub/dir', '']) {
+      await expect(manager.removePack(bad)).rejects.toMatchObject({ code: 'INVALID_PACK_ID' });
+    }
+    expect(fs.existsSync(path.join(victim, 'user-data.txt'))).toBe(true);
+  });
+
+  it('downloadPack refuses a traversing pack id before any network call', async () => {
+    const { manager, fetchMock } = makeManager({ manifest: { schemaVersion: 1, packs: [] } });
+    await expect(manager.downloadPack('../../evil')).rejects.toMatchObject({ code: 'INVALID_PACK_ID' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('removePack refuses a dir a domain resolved outside the allowed roots', async () => {
+    const packs = path.join(root, 'packs');
+    const outside = path.join(root, 'outside');
+    fs.mkdirSync(packs, { recursive: true });
+    fs.mkdirSync(outside, { recursive: true });
+    fs.writeFileSync(path.join(outside, 'keep.txt'), 'keep');
+
+    const manager = createPackManager({
+      manifestUrl: MANIFEST_URL,
+      packsRoot: () => packs,
+      resolvePackDir: () => outside, // a domain bug, not a caller trick
+      allowedRoots: () => [packs],
+      listInstalled: () => [],
+      evictSessions: vi.fn(),
+      computePackList: () => [],
+      packJsonFields: (e) => e,
+      deps: { fetch: vi.fn(), logger: silentLogger },
+    });
+
+    await expect(manager.removePack('pack-a')).rejects.toMatchObject({ code: 'PACK_DIR_OUTSIDE_ROOT' });
+    expect(fs.existsSync(path.join(outside, 'keep.txt'))).toBe(true);
+  });
+
+  it('removePack still deletes a pack sitting in a secondary allowed root', async () => {
+    const current = path.join(root, 'install', 'asr-models');
+    const legacy = path.join(root, 'userData', 'asr-models');
+    const pack = path.join(legacy, 'pack-a');
+    fs.mkdirSync(current, { recursive: true });
+    fs.mkdirSync(pack, { recursive: true });
+    fs.writeFileSync(path.join(pack, 'pack.json'), '{"id":"pack-a"}');
+
+    const manager = createPackManager({
+      manifestUrl: MANIFEST_URL,
+      packsRoot: () => current,
+      resolvePackDir: () => pack,
+      allowedRoots: () => [current, legacy],
+      listInstalled: () => [],
+      evictSessions: vi.fn(),
+      computePackList: () => [],
+      packJsonFields: (e) => e,
+      deps: { fetch: vi.fn(), logger: silentLogger },
+    });
+
+    await expect(manager.removePack('pack-a')).resolves.toMatchObject({ success: true });
+    expect(fs.existsSync(pack)).toBe(false);
+  });
 });

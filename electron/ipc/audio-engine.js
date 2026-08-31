@@ -10,6 +10,18 @@ const logger = require('../utils/logger')('IPC:AudioEngine');
 
 const AE = CHANNELS.AUDIO_ENGINE;
 
+// Every payload below is renderer-supplied, and the threat model for this app
+// is a compromised renderer, not a mistyped call. These are the sizes past
+// which a payload is not a subtitle session any more:
+//   PCM     the capture pipeline sends 3200 samples (200ms at 16k); 10s of
+//           audio in one message is already two orders of magnitude past that
+//   event   capture-side markers ('device-lost'), a line in the session log
+//   SRT     20000 lines x a generous line — the transcript cap the export
+//           itself enforces (useListenSession MAX_TRANSCRIPT)
+const MAX_PCM_SAMPLES = 16000 * 10;
+const MAX_EVENT_DETAIL = 2000;
+const MAX_SRT_BYTES = 16 * 1024 * 1024;
+
 // Structured clone should deliver a Float32Array; coerce the byte-ish shapes
 // some transports fall back to so the worker only ever sees Float32Array.
 function toFloat32(samples) {
@@ -37,12 +49,18 @@ function registerAudioEngineIPC(ctx) {
 
   ipcMain.on(AE.PCM, (event, samples) => {
     const f32 = toFloat32(samples);
-    if (f32) engineManager.feedPcm(f32);
+    // An oversized chunk is dropped rather than truncated: a legitimate
+    // capture never sends one, and half a buffer is worse than no buffer.
+    if (f32 && f32.length && f32.length <= MAX_PCM_SAMPLES) engineManager.feedPcm(f32);
+    else if (f32 && f32.length > MAX_PCM_SAMPLES) logger.warn(`PCM chunk dropped (${f32.length} samples)`);
   });
 
   ipcMain.on(AE.EVENT, (event, payload) => {
     if (payload && typeof payload.kind === 'string') {
-      engineManager.logRendererEvent(payload.kind, payload.detail);
+      const detail = typeof payload.detail === 'string'
+        ? payload.detail.slice(0, MAX_EVENT_DETAIL)
+        : payload.detail;
+      engineManager.logRendererEvent(payload.kind.slice(0, 64), detail);
     }
   });
 
@@ -52,6 +70,10 @@ function registerAudioEngineIPC(ctx) {
   ipcMain.handle(AE.EXPORT_SRT, async (event, payload) => {
     const content = typeof payload?.content === 'string' ? payload.content : '';
     if (!content) return { success: false, error: 'empty' };
+    if (Buffer.byteLength(content, 'utf8') > MAX_SRT_BYTES) {
+      logger.warn('SRT export refused: content over the size cap');
+      return { success: false, error: 'too-large' };
+    }
     try {
       const win = ctx.windows?.floatingWindow;
       const stamp = new Date().toISOString().slice(0, 10);
