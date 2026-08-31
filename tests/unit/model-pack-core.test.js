@@ -7,6 +7,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import crypto from 'crypto';
+import { pathToFileURL } from 'url';
 import JSZip from 'jszip';
 import { createPackManager } from '../../electron/utils/model-pack-core.js';
 
@@ -43,7 +44,7 @@ async function makeZip(entries) {
   return zip.generateAsync({ type: 'nodebuffer', compression: 'STORE' });
 }
 
-function makeManager({ manifest, files = {}, hooks = {} } = {}) {
+function makeManager({ manifest, files = {}, hooks = {}, offline = false } = {}) {
   const fetchMock = vi.fn(async (url) => {
     if (url === MANIFEST_URL) return bufferResponse(Buffer.from(JSON.stringify(manifest)));
     if (files[url]) return bufferResponse(files[url]);
@@ -58,6 +59,7 @@ function makeManager({ manifest, files = {}, hooks = {} } = {}) {
     computePackList: (installed, m) => ({ installed, manifestPacks: m?.packs || null }),
     packJsonFields: (entry) => ({ id: entry.id, version: entry.version }),
     basePackId: 'base',
+    offlineGate: () => offline,
     logLabel: 'Test-Packs',
     deps: { fetch: fetchMock, logger: silentLogger },
   });
@@ -252,5 +254,74 @@ describe('model-pack-core', () => {
 
     expect(evictedAtDelete).toBe(true);
     expect(fs.existsSync(dir)).toBe(false);
+  });
+
+  // Offline mode's one absolute promise is "never touches the network". The
+  // gate lives in the core so it holds for every domain and both network
+  // paths — the OCR side shipped without one until v0.4.1.
+  it('offline mode refuses the manifest fetch without hitting the network', async () => {
+    const { manager, fetchMock } = makeManager({ manifest: { schemaVersion: 1, packs: [] }, offline: true });
+    await expect(manager.fetchManifest()).rejects.toMatchObject({ code: 'OFFLINE_BLOCKED' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('offline mode still lists installed packs, reporting the refusal as manifestError', async () => {
+    const { manager, fetchMock } = makeManager({
+      manifest: { schemaVersion: 1, packs: [] },
+      hooks: { listInstalled: () => [{ id: 'pack-a' }] },
+      offline: true,
+    });
+    const res = await manager.listPacks();
+    expect(res.manifestError).toBe('OFFLINE_BLOCKED');
+    expect(res.packs.installed).toEqual([{ id: 'pack-a' }]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('offline mode refuses a download even when the manifest is already cached', async () => {
+    const zipBuf = await makeZip({ 'model.bin': 'DATA' });
+    let offline = false;
+    const fetchMock = vi.fn(async (url) => {
+      if (url === MANIFEST_URL) {
+        return bufferResponse(Buffer.from(JSON.stringify({
+          schemaVersion: 1,
+          packs: [{ id: 'pack-a', version: '1', url: 'https://packs.example/a.zip', sha256: sha256(zipBuf) }],
+        })));
+      }
+      return bufferResponse(zipBuf);
+    });
+    const manager = createPackManager({
+      manifestUrl: MANIFEST_URL,
+      packsRoot: () => root,
+      listInstalled: () => [],
+      evictSessions: vi.fn(),
+      computePackList: (installed) => ({ installed }),
+      packJsonFields: (entry) => ({ id: entry.id }),
+      offlineGate: () => offline,
+      logLabel: 'Test-Packs',
+      deps: { fetch: fetchMock, logger: silentLogger },
+    });
+
+    await manager.fetchManifest(); // warm the cache while still online
+    offline = true;
+    await expect(manager.downloadPack('pack-a')).rejects.toMatchObject({ code: 'OFFLINE_BLOCKED' });
+    expect(fetchMock).toHaveBeenCalledTimes(1); // manifest only, no pack body
+    expect(fs.readdirSync(root)).toEqual([]);
+  });
+
+  it('offline mode does not block a file:// manifest (a local read is not the network)', async () => {
+    const local = path.join(root, 'manifest.json');
+    fs.writeFileSync(local, JSON.stringify({ schemaVersion: 1, packs: [{ id: 'pack-a' }] }));
+    const manager = createPackManager({
+      manifestUrl: pathToFileURL(local).href,
+      packsRoot: () => root,
+      listInstalled: () => [],
+      evictSessions: vi.fn(),
+      computePackList: (installed, m) => ({ installed, manifestPacks: m?.packs || null }),
+      packJsonFields: (entry) => ({ id: entry.id }),
+      offlineGate: () => true,
+      logLabel: 'Test-Packs',
+      deps: { fetch: vi.fn(), logger: silentLogger },
+    });
+    await expect(manager.fetchManifest()).resolves.toMatchObject({ schemaVersion: 1 });
   });
 });

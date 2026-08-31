@@ -210,7 +210,9 @@ const ListenSection = ({ notify, confirm }) => {
         {manifestError && (
           <p className="pack-manifest-error">
             <AlertTriangle size={13} />
-            {t('listen.packs.manifestError')}
+            {manifestError === 'OFFLINE_BLOCKED'
+              ? t('listen.packs.manifestOffline')
+              : t('listen.packs.manifestError')}
           </p>
         )}
 

@@ -125,6 +125,8 @@ const OcrSection = ({
           checkEngineHealth(true); // deep: validate the fresh download for real
         }
         await loadPacks(false);
+      } else if (result?.errorCode === 'OFFLINE_BLOCKED') {
+        notify(t('ocr.packs.offlineBlocked'), 'warning');
       } else {
         notify(result?.error || t('ocr.packs.downloadFailed'), 'error');
       }
@@ -243,6 +245,8 @@ const OcrSection = ({
           await applyTier('high');
           notify(t('ocr.tier.enabled'), 'success');
           await loadPacks(false);
+        } else if (result?.errorCode === 'OFFLINE_BLOCKED') {
+          notify(t('ocr.packs.offlineBlocked'), 'warning');
         } else {
           notify(result?.error || t('ocr.packs.downloadFailed'), 'error');
         }
@@ -433,7 +437,9 @@ const OcrSection = ({
                 {manifestError && (
                   <p className="pack-manifest-error">
                     <AlertTriangle size={12} style={{marginRight: 4, verticalAlign: -2}} />
-                    {t('ocr.packs.manifestError')}
+                    {manifestError === 'OFFLINE_BLOCKED'
+                      ? t('ocr.packs.manifestOffline')
+                      : t('ocr.packs.manifestError')}
                   </p>
                 )}
 

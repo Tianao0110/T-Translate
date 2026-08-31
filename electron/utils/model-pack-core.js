@@ -21,6 +21,12 @@
 //   packJsonFields,    (entry) => fields persisted to pack.json (+installedAt)
 //   basePackId,        optional — its removal falls back to the bundled copy
 //   supportedSchema,   manifest schema ceiling (default 1)
+//   offlineGate,       () => boolean — true refuses every NETWORK access with
+//                      OFFLINE_BLOCKED. Injected (not read from the store here)
+//                      to keep this file electron-free; lives at this layer so
+//                      the refusal is structural for both domains and both
+//                      network paths, instead of a check each IPC handler has
+//                      to remember
 //   logLabel,          logger channel name
 //   deps: { fetch, fs, logger }   injection points for tests
 // })
@@ -53,6 +59,7 @@ function createPackManager({
   packJsonFields,
   basePackId = null,
   supportedSchema = 1,
+  offlineGate = () => false,
   logLabel = 'ModelPacks',
   deps = {},
 }) {
@@ -67,7 +74,19 @@ function createPackManager({
 
   let _manifestCache = null;
 
+  // Every network read in this file goes through here. file:// is a local
+  // read (the env-override test path), not a network access, so it is not
+  // gated — offline mode is about leaving the machine.
+  function assertOnlineAllowed(url) {
+    if (url.startsWith('file://')) return;
+    if (!offlineGate()) return;
+    const err = new Error('offline-mode');
+    err.code = 'OFFLINE_BLOCKED';
+    throw err;
+  }
+
   async function readUrl(url) {
+    assertOnlineAllowed(url);
     if (url.startsWith('file://')) {
       return fs.promises.readFile(new URL(url));
     }
@@ -149,6 +168,10 @@ function createPackManager({
     }
 
     const url = entry.url || `${manifest.baseUrl}/${entry.file}`;
+    // Re-checked here rather than trusted from fetchManifest above: a manifest
+    // cached before the user switched to offline mode would otherwise let the
+    // much larger pack download through.
+    assertOnlineAllowed(url);
     logger.info(`Downloading pack ${packId} from ${url}`);
     onProgress(0, 'downloading');
 

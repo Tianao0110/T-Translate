@@ -4,7 +4,9 @@
 // audio-engine pack managers (v0.4.x) with zero OCR behavior change.
 
 const { net } = require('electron');
+const { store } = require('../state');
 const { BASE_PACK_ID, computePackList } = require('../shared/ocr-packs');
+const { isOfflineMode } = require('./privacy-gate');
 const ocrEngine = require('./ocr-engine');
 const { createPackManager } = require('./model-pack-core');
 
@@ -38,6 +40,10 @@ const manager = createPackManager({
     size: entry.size,
   }),
   basePackId: BASE_PACK_ID,
+  // Same offline gate the audio packs carry. This side never had one: offline
+  // mode could still fetch the manifest and download a language pack, which
+  // contradicts the mode's one absolute promise.
+  offlineGate: () => isOfflineMode(store),
   logLabel: 'OCR-Packs',
   deps: { fetch: (...args) => net.fetch(...args) },
 });

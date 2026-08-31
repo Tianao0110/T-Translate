@@ -7,6 +7,7 @@ const { CHANNELS } = require("../shared/channels");
 const createLogger = require("../utils/logger");
 const logger = createLogger("IPC:System");
 const { t } = require("../shared/main-i18n");
+const { isOfflineMode } = require("../utils/privacy-gate");
 
 // Must match MAX_FILE_SIZE in src/utils/document-parser.js: the parser refuses
 // anything larger anyway, so a higher cap here would only read the whole file
@@ -131,7 +132,7 @@ function register(ctx) {
   // Offline mode promises "no network requests" — that includes the updater.
   // Gated in main so all windows are covered by one check.
   const updateBlockedOffline = () =>
-    store.get('privacyMode', 'standard') === 'offline'
+    isOfflineMode(store)
       ? { success: false, offline: true, error: t('system.offlineUpdateBlocked', '离线模式下已禁用检查更新') }
       : null;
 

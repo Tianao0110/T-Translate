@@ -5,7 +5,7 @@
 
 const { net } = require('electron');
 const { store } = require('../state');
-const { PRIVACY_MODES } = require('../shared/channels');
+const { isOfflineMode } = require('./privacy-gate');
 const { computePackList } = require('../shared/audio-packs');
 const { listInstalledPacks } = require('./asr-models');
 const { modelDir, modelDirs } = require('./model-root');
@@ -59,23 +59,15 @@ const manager = createPackManager({
     size: entry.size,
   }),
   basePackId: null, // nothing is bundled: every pack is fully removable
+  // Offline mode promises the app never reaches the network, and a model
+  // download is not an exception the user can click their way out of. The gate
+  // is injected into the core rather than wrapped around downloadPack here, so
+  // it also covers the manifest fetch behind listPacks — opening the settings
+  // page used to hit GitHub in offline mode.
+  offlineGate: () => isOfflineMode(store),
   logLabel: 'Audio-Packs',
   deps: { fetch: (...args) => net.fetch(...args) },
 });
-
-// Offline mode promises the app never reaches the network, and a model
-// download is not an exception the user can click their way out of. The gate
-// lives HERE rather than in the IPC handler so it is a structural fact for
-// every caller — the same reason the translation stack's privacy gates were
-// pushed down out of the call sites.
-async function downloadPack(packId, onProgress) {
-  if (store.get('privacyMode', PRIVACY_MODES.STANDARD) === PRIVACY_MODES.OFFLINE) {
-    const err = new Error('offline-mode');
-    err.code = 'OFFLINE_BLOCKED';
-    throw err;
-  }
-  return manager.downloadPack(packId, onProgress);
-}
 
 module.exports = {
   MANIFEST_URL,
@@ -83,6 +75,6 @@ module.exports = {
   packsRoots,
   fetchManifest: manager.fetchManifest,
   listPacks: manager.listPacks,
-  downloadPack,
+  downloadPack: manager.downloadPack,
   removePack: manager.removePack,
 };
