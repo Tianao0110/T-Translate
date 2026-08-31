@@ -70,9 +70,14 @@ export default defineConfig(({ mode }) => {
         }
       },
 
+      // No explicit hmr.port: it was pinned to 5174 regardless of the server
+      // port, so ANY second vite instance (a screenshot run on --port 5199,
+      // say) stole 5174 from the real dev server. The failure was silent and
+      // looked like an app bug — the floating window is frameless+transparent,
+      // so a page that never loads reads as "the window disappeared".
+      // HMR shares the server port, which is vite's own default.
       hmr: {
-        overlay: true,
-        port: 5174
+        overlay: true
       },
 
       watch: {
