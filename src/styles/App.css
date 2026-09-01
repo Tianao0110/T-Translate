@@ -415,6 +415,9 @@ body {
 }
 
 .box-header {
+  /* Query container for the one-time hint bubble that hangs off the buttons
+     in here: its width is the panel's, which is what the bubble must fit in. */
+  container-type: inline-size;
   display: flex;
   align-items: center;
   justify-content: space-between;

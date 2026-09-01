@@ -1,5 +1,13 @@
-/* Anchored by the caller (a positioned parent); this only draws the bubble and
-   its pointer. */
+/* Anchored by the caller (a positioned parent); this draws the bubble and its
+   pointer.
+
+   The bubble hangs below a 32px icon button and is right-aligned to it, so it
+   grows LEFTWARD into the panel — and .translation-box clips (overflow:hidden,
+   it owns the rounded corners). At a 364px panel a 260px bubble stuck out 22px
+   past the panel edge and the box sliced its left side off, lightbulb first:
+   the user saw a bubble jammed against the border with no icon, which reads as
+   "misplaced" rather than "clipped". The cap below is measured against the
+   panel itself so it fits at any window size. */
 .one-time-hint {
   position: absolute;
   z-index: 60;
@@ -10,7 +18,10 @@
      against that containing block, collapsing text to one char per line.
      max-content sizes by content first, then the cap applies. */
   width: max-content;
-  max-width: 260px;
+  /* 100cqw is the panel width (.box-header is the query container). 116px is
+     the room the button row and the panel padding take on the right, plus a
+     margin so the bubble never touches the panel edge. */
+  max-width: min(260px, calc(100cqw - 116px));
   padding: 7px 9px 7px 10px;
   border: 1px solid color-mix(in srgb, var(--accent-primary) 35%, transparent);
   border-radius: 8px;
@@ -55,6 +66,33 @@
 .one-time-hint.top {
   bottom: calc(100% + 8px);
   right: 0;
+}
+
+/* The pointer. Without it the bubble is a box parked in the panel: it is
+   right-aligned to a button in the MIDDLE of the icon row, so nothing says
+   which icon it means. 12px + half of 8px = the centre of the 32px button the
+   bubble hangs from, whichever button that is. */
+.one-time-hint::before {
+  content: '';
+  position: absolute;
+  right: 12px;
+  width: 8px;
+  height: 8px;
+  background: var(--bg-primary);
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 35%, transparent);
+  transform: rotate(45deg);
+}
+
+.one-time-hint.bottom::before {
+  top: -5px;
+  border-right: none;
+  border-bottom: none;
+}
+
+.one-time-hint.top::before {
+  bottom: -5px;
+  border-left: none;
+  border-top: none;
 }
 
 @keyframes hint-in {
