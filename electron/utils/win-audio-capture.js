@@ -17,9 +17,11 @@
 //            Taps BEFORE the endpoint volume: a muted system still records.
 //            Two modes: capture that process tree, or capture everything else.
 //
-// Both deliver 16 kHz mono float32 straight into the ASR pipeline. The process
-// path accepts it natively; the system path needs AUTOCONVERTPCM because a
-// shared-mode capture otherwise only takes the endpoint's mix format.
+// Both deliver 16 kHz mono float32 to the ASR pipeline. The system path lets
+// the engine convert (AUTOCONVERTPCM — a shared-mode capture otherwise only
+// takes the endpoint's mix format, and that conversion measured fine). The
+// process path takes the engine's native 48 kHz stereo and decimates here:
+// its own 16 kHz conversion cost the VAD 14% of a song's lines (see below).
 //
 // Spike numbers behind the choices (2026-08-30, gstack v041-process-loopback-spike):
 // activation 4ms, tone captured at rms 0.039 vs an expected 0.040, EXCLUDE mode
@@ -314,21 +316,30 @@ const AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY = 0x1;
 
 const SAMPLE_RATE = 16000;
 const BUFFER_DURATION_HNS = 20000000n; // 2s of slack; the pump polls every 20ms
-const ACTIVATION_TIMEOUT_MS = 10000;
+// 3s (was 10s): a healthy activation completes in ~4ms, and a user who sees
+// nothing for ten seconds presses stop before the failure is ever reported.
+const ACTIVATION_TIMEOUT_MS = 3000;
 
-// 16 kHz mono float32 — exactly what the ASR worker consumes, so nothing in
-// this file ever resamples.
-function waveFormat16kMono() {
+// WAVEFORMATEX for IEEE float: 16 kHz mono for the system path, the engine's
+// native 48 kHz stereo for the process path (decimated in win-audio-resample).
+function waveFormat(rate, channels) {
   const wf = mem(18);
   poke.u16(wf, 0, 3); // WAVE_FORMAT_IEEE_FLOAT
-  poke.u16(wf, 2, 1);
-  poke.u32(wf, 4, SAMPLE_RATE);
-  poke.u32(wf, 8, SAMPLE_RATE * 4);
-  poke.u16(wf, 12, 4);
+  poke.u16(wf, 2, channels);
+  poke.u32(wf, 4, rate);
+  poke.u32(wf, 8, rate * 4 * channels);
+  poke.u16(wf, 12, 4 * channels);
   poke.u16(wf, 14, 32);
   poke.u16(wf, 16, 0);
   return wf;
 }
+
+// Process loopback is asked for the engine's native 48 kHz stereo and
+// decimated here (win-audio-resample). Its built-in conversion to 16 kHz mono
+// was measurably worse for the VAD: same song, same player, silero at 0.5
+// opened on 86% of the lyric lines vs 100% through our own FIR (2026-09-02).
+const NATIVE_RATE = 48000;
+const NATIVE_CHANNELS = 2;
 
 // The completion handler ActivateAudioInterfaceAsync requires: a COM object
 // implemented as a table of koffi callbacks. Every piece stays referenced for
@@ -480,6 +491,13 @@ async function startCapture({ mode = 'system', pid = 0, onPcm, onEvent = () => {
   let clipGuard = null;
   let pollsSinceVolume = 0;
   const VOLUME_POLLS = 25; // re-read the slider every ~500ms at the 20ms pump
+  const nativeSrc = mode !== 'system';
+  const bytesPerFrame = nativeSrc ? 4 * NATIVE_CHANNELS : 4;
+  let decimator = null;
+  // Process loopback keeps delivering zero-filled packets after the target
+  // exits — no flag, no HRESULT (measured) — so liveness is checked directly.
+  let pollsSinceLiveness = 0;
+  const LIVENESS_POLLS = 50; // ~1s
 
   const teardown = () => {
     if (timer) clearInterval(timer);
@@ -529,11 +547,16 @@ async function startCapture({ mode = 'system', pid = 0, onPcm, onEvent = () => {
     // AUTOCONVERTPCM does — measured identical to converting it ourselves.
     let flags = AUDCLNT_STREAMFLAGS_LOOPBACK | AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
     if (mode === 'system') flags |= AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY;
+    const format = nativeSrc ? waveFormat(NATIVE_RATE, NATIVE_CHANNELS) : waveFormat(SAMPLE_RATE, 1);
     check(
       vcall(client, 3, 'long Initialize(void*, int, uint32, int64_t, int64_t, void*, void*)',
-        0, flags, BUFFER_DURATION_HNS, 0n, waveFormat16kMono(), null),
+        0, flags, BUFFER_DURATION_HNS, 0n, format, null),
       'IAudioClient::Initialize'
     );
+    if (nativeSrc) {
+      const { makeDownmixDecimator } = require('./win-audio-resample');
+      decimator = makeDownmixDecimator({ channels: NATIVE_CHANNELS, factor: NATIVE_RATE / SAMPLE_RATE });
+    }
 
     hEvent = init().CreateEventW(null, 0, 0, null);
     check(vcall(client, 13, 'long SetEventHandle(void*, void*)', hEvent), 'SetEventHandle');
@@ -558,6 +581,15 @@ async function startCapture({ mode = 'system', pid = 0, onPcm, onEvent = () => {
     if (volume && ++pollsSinceVolume >= VOLUME_POLLS) {
       pollsSinceVolume = 0;
       refreshGain();
+    }
+    if (nativeSrc && ++pollsSinceLiveness >= LIVENESS_POLLS) {
+      pollsSinceLiveness = 0;
+      if (!processName(pid)) {
+        stopped = true;
+        teardown();
+        onEvent('source-gone', String(pid));
+        return;
+      }
     }
     for (;;) {
       const outNext = [0];
@@ -585,10 +617,11 @@ async function startCapture({ mode = 'system', pid = 0, onPcm, onEvent = () => {
           silentPackets += 1;
           // Silent packets carry no valid data pointer; the timeline still has
           // to advance or the VAD would see a jump-cut instead of a pause.
-          onPcm(new Float32Array(frames));
+          onPcm(decimator ? decimator.process(new Float32Array(frames * NATIVE_CHANNELS)) : new Float32Array(frames));
         } else if (outData[0]) {
-          const bytes = new Uint8Array(koffi.decode(outData[0], 'uint8_t', frames * 4));
-          const pcm = new Float32Array(bytes.buffer, 0, frames);
+          const bytes = new Uint8Array(koffi.decode(outData[0], 'uint8_t', frames * bytesPerFrame));
+          let pcm = new Float32Array(bytes.buffer, 0, frames * (bytesPerFrame / 4));
+          if (decimator) pcm = decimator.process(pcm);
           if (gain !== 1) {
             applyGain(pcm, gain);
             if (!clipGuard) clipGuard = makeClipGuard();

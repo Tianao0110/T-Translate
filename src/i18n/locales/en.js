@@ -339,7 +339,9 @@ const en = {
     listenStatus: {
       idle: "Ready",
       loading: "Loading model…",
+      connecting: "Connecting audio…",
       listening: "Listening",
+      "source-gone": "That program exited — back to all sound",
       "hint-no-audio": "No sound detected — is the system muted?",
       "hint-no-speech": "Sound present, but no clear speech recognized for a while",
       stopped: "Stopped",

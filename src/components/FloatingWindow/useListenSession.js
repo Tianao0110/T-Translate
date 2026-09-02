@@ -12,6 +12,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import createLogger from '../../utils/logger.js';
+import { normalizeDraftCase } from '../../utils/listen-text.js';
 
 const logger = createLogger('ListenSession');
 
@@ -49,6 +50,10 @@ export default function useListenSession({ active }) {
   const engineReadyRef = useRef(false);
   const errorLatchRef = useRef(false);
   const pendingRestartRef = useRef(false);
+  // 'source-gone' is followed within milliseconds by 'listening' (the worker
+  // re-opens whole-system capture in place); hold the notice up long enough
+  // to be read.
+  const sourceGoneUntilRef = useRef(0);
   const langRef = useRef(lang);
   const targetLangRef = useRef(targetLang);
   // {mode:'system'|'include'|'exclude', pid, name} — which sound to listen to.
@@ -199,6 +204,15 @@ export default function useListenSession({ active }) {
       const { state, detail } = payload || {};
       if (state === 'metrics') return;
       if (state === 'listening') engineReadyRef.current = true;
+      if (state === 'source-gone') {
+        // The manager already fell back to whole-system capture; mirror it in
+        // the picker without the restart a user-driven switch triggers.
+        const value = { mode: 'system', pid: 0, name: '' };
+        setSourceState(value);
+        sourceRef.current = value;
+        sourceGoneUntilRef.current = Date.now() + 5000;
+      }
+      if (state === 'listening' && Date.now() < sourceGoneUntilRef.current) return;
       // The worker owns capture now, so a failure to open the audio client
       // arrives as a status instead of a rejected promise here.
       if (state === 'capture-error') {
@@ -238,7 +252,7 @@ export default function useListenSession({ active }) {
       translateSegment(id, rec);
     });
 
-    const offPartial = bridge.onPartial((text) => setPartial(text || ''));
+    const offPartial = bridge.onPartial((text) => setPartial(normalizeDraftCase(text || '')));
     // Level arrives from the worker at ~12/s and lands in a ref: the meter
     // paints itself from a rAF loop, so this never re-renders the transcript.
     const offLevel = bridge.onLevel?.((value) => {

@@ -78,6 +78,7 @@ function metricsRecord({ rssMb, cpuPct, audioInS, segments, rmsAvg, rmsMax, spee
 function makeVadThresholdPolicy({ speech = 0.5, music = 0.3, window = 3 } = {}) {
   const recent = [];
   let current = speech;
+  let held = false;
   return {
     current() {
       return current;
@@ -85,7 +86,7 @@ function makeVadThresholdPolicy({ speech = 0.5, music = 0.3, window = 3 } = {}) 
     onFinal(event) {
       recent.push(event === '<|BGM|>' ? 'music' : 'speech');
       if (recent.length > window) recent.shift();
-      if (recent.length < window) return null;
+      if (held || recent.length < window) return null;
       const musicCount = recent.filter((x) => x === 'music').length;
       let next = current;
       if (current === speech && musicCount >= 2) next = music;
@@ -94,7 +95,28 @@ function makeVadThresholdPolicy({ speech = 0.5, music = 0.3, window = 3 } = {}) 
       current = next;
       return next;
     },
+    // The watchdog saw loud audio with no finals for a long stretch: whatever
+    // the content is, 0.5 is not opening on it. Drop to the relaxed threshold
+    // and stay there for the rest of the session — a policy that climbed back
+    // on the next three speech finals would just go deaf again 12s later.
+    hold() {
+      held = true;
+      if (current === music) return null;
+      current = music;
+      return music;
+    },
   };
+}
+
+// A final that is not worth a subtitle line: over music the VAD closes on
+// breaths and yields one- or two-character fragments ("如。") that flash on
+// screen and burn a translation call. Speech finals are never filtered.
+function isNegligibleFinal(text) {
+  const bare = (text || '').replace(/[\s\p{P}]/gu, '');
+  if (!bare) return true;
+  const cjk = (bare.match(/[぀-ヿ㐀-鿿가-힯]/g) || []).length;
+  if (cjk > 0) return bare.length <= 2;
+  return bare.length <= 3; // Latin: a single short word or less
 }
 
 // Watches incoming audio energy and recognition output, and decides which
@@ -148,4 +170,5 @@ module.exports = {
   metricsRecord,
   makeSignalWatchdog,
   makeVadThresholdPolicy,
+  isNegligibleFinal,
 };

@@ -339,7 +339,9 @@ const zh = {
     listenStatus: {
       idle: "就绪",
       loading: "加载模型…",
+      connecting: "正在连接音频…",
       listening: "监听中",
+      "source-gone": "所选程序已退出，已切回全部声音",
       "hint-no-audio": "未检测到声音——检查系统音量是否静音",
       "hint-no-speech": "有声音，但长时间未识别到清晰语音",
       stopped: "已停止",

@@ -54,6 +54,7 @@ const {
   metricsRecord,
   makeSignalWatchdog,
   makeVadThresholdPolicy,
+  isNegligibleFinal,
 } = require('./probe-metrics');
 
 const SAMPLE_RATE = 16000;
@@ -107,6 +108,16 @@ let vadThreshold = VAD_THRESHOLD_SPEECH;
 let vadPolicy = makeVadThresholdPolicy({ speech: VAD_THRESHOLD_SPEECH, music: VAD_THRESHOLD_MUSIC });
 let vadRebuildTo = null; // pending threshold change, applied at a segment boundary
 let recognizer = null;
+// Auto-language sessions pin the recognizer to the first language that wins
+// three finals in a row. SenseVoice's per-segment detection drifts on mixed or
+// musical audio (a Chinese song drew ja/yue/en tags on 5 of 31 finals), and a
+// segment decoded under the wrong language is garbage, not "less accurate".
+// The pin rebuilds the recognizer once, between segments, inside the decode
+// chain so no in-flight final sees a half-built model.
+const LANG_PIN_STREAK = 3;
+let pinnedLanguage = '';
+let langStreak = { lang: '', count: 0 };
+let pendingPinLang = null;
 // Two-pass draft engine (optional): a streaming zipformer emits word-by-word
 // drafts while SenseVoice keeps owning finals (spike report: first token
 // ~0.86s, 13ms/chunk, zero hallucination over 23s). Per-session choice:
@@ -254,22 +265,12 @@ function handleAsrStart(msg) {
       vadThreshold = VAD_THRESHOLD_SPEECH;
       vad = createVad(vadThreshold);
     }
-    if (!recognizer) {
-      recognizer = new sherpa.OfflineRecognizer({
-        featConfig: { sampleRate: SAMPLE_RATE, featureDim: 80 },
-        modelConfig: {
-          senseVoice: {
-            model: asrPaths.modelPath,
-            language: asrLanguage,
-            useInverseTextNormalization: 1,
-          },
-          tokens: asrPaths.tokensPath,
-          numThreads: 2,
-          provider: 'cpu',
-          debug: 0,
-        },
-      });
-    }
+    // A pin from the previous session must not leak into this one.
+    if (pinnedLanguage && recognizer) recognizer = null;
+    pinnedLanguage = '';
+    langStreak = { lang: '', count: 0 };
+    pendingPinLang = null;
+    if (!recognizer) recognizer = createRecognizer(asrLanguage);
   } catch (err) {
     return fatal(`model load failed: ${err.message}`);
   }
@@ -368,6 +369,58 @@ function createVad(threshold) {
   );
 }
 
+function createRecognizer(language) {
+  return new sherpa.OfflineRecognizer({
+    featConfig: { sampleRate: SAMPLE_RATE, featureDim: 80 },
+    modelConfig: {
+      senseVoice: {
+        model: asrPaths.modelPath,
+        language,
+        useInverseTextNormalization: 1,
+      },
+      tokens: asrPaths.tokensPath,
+      numThreads: 2,
+      provider: 'cpu',
+      debug: 0,
+    },
+  });
+}
+
+// '<|zh|>' -> 'zh' for the languages the recognizer can be pinned to.
+function tagToLanguage(tag) {
+  const m = /^<\|([a-z]+)\|>$/.exec(tag || '');
+  return m && m[1] && ASR_LANGUAGES.has(m[1]) ? m[1] : '';
+}
+
+function applyLanguagePin() {
+  const lang = pendingPinLang;
+  pendingPinLang = null;
+  pinnedLanguage = lang;
+  decodeChain = decodeChain
+    .then(() => {
+      recognizer = null; // release before loading the replacement (~230MB)
+      recognizer = createRecognizer(lang);
+      logLine(eventRecord('lang-pinned', lang));
+      // The pin also settles the draft engine when the first final could not.
+      if (!autoEngineDecided && online) {
+        autoEngineDecided = true;
+        if (lang === 'zh' || lang === 'en') {
+          partialEngine = 'stream';
+          logLine(eventRecord('partial-engine', `stream (pinned ${lang})`));
+        } else {
+          online = null;
+          onlineStream = null;
+          logLine(eventRecord('partial-engine', `pseudo (pinned ${lang})`));
+        }
+      }
+    })
+    .catch((err) => {
+      logLine(eventRecord('lang-pin-failed', String(err.message)));
+      pinnedLanguage = '';
+      if (!recognizer) recognizer = createRecognizer(asrLanguage);
+    });
+}
+
 // Only between segments: a fresh silero starts in its non-speech state, so
 // swapping it mid-utterance would drop the rest of that utterance.
 function applyVadThreshold() {
@@ -395,6 +448,16 @@ function checkHint() {
       logLine(eventRecord(hint, `rmsAvg=${(rmsCount ? rmsSum / rmsCount : 0).toFixed(4)} rmsMax=${rmsMax.toFixed(4)}`));
     }
     post({ type: 'hint', kind: hint });
+    // Loud audio and no final for 12s: whatever this is, 0.5 is not opening
+    // on it (36s of audible English through one player did exactly that).
+    // Relax for the rest of the session instead of just saying so.
+    if (hint === 'no-speech' && vadThreshold === VAD_THRESHOLD_SPEECH) {
+      const next = vadPolicy.hold();
+      if (next !== null) {
+        vadRebuildTo = next;
+        logLine(eventRecord('vad-relax', `no-speech at ${vadThreshold}`));
+      }
+    }
   }
 }
 
@@ -435,6 +498,7 @@ function emitMetrics() {
 
 async function handleCaptureStart(msg) {
   stopCapture();
+  logLine(eventRecord('capture-activating', msg.mode || 'system'));
   try {
     // Required lazily: a machine without the native layer must still be able
     // to load models and report a clean capture error, not fail at import.
@@ -495,7 +559,10 @@ function handlePcm(samples) {
   if (chunkRms > rmsMax) rmsMax = chunkRms;
   watchdog.onChunk(chunkRms, Date.now());
 
-  if (vadRebuildTo !== null && openLen === 0 && !vad.isDetected() && vad.isEmpty()) applyVadThreshold();
+  if (openLen === 0 && !vad.isDetected() && vad.isEmpty()) {
+    if (vadRebuildTo !== null) applyVadThreshold();
+    if (pendingPinLang) applyLanguagePin();
+  }
 
   const merged = new Float32Array(pending.length + samples.length);
   merged.set(pending, 0);
@@ -712,8 +779,22 @@ async function decodeSegment(seg) {
   const decodeMs = Date.now() - t0;
   const text = (result.text || '').trim();
   if (!text) return;
+  if (result.event === '<|BGM|>' && isNegligibleFinal(text)) {
+    // A breath-sized fragment over music: activity for the watchdog, but
+    // never a subtitle line or a translation call.
+    watchdog.onSegment(Date.now());
+    logLine(eventRecord('dropped-short', `${text.length} chars`));
+    return;
+  }
   segmentCount += 1;
   watchdog.onSegment(Date.now());
+  if (asrLanguage === '' && !pinnedLanguage && !pendingPinLang) {
+    const lang = tagToLanguage(result.lang);
+    if (lang) {
+      langStreak = langStreak.lang === lang ? { lang, count: langStreak.count + 1 } : { lang, count: 1 };
+      if (langStreak.count >= LANG_PIN_STREAK) pendingPinLang = lang;
+    }
+  }
   const rec = segmentRecord({
     segStartS: seg.start / SAMPLE_RATE,
     segDurS: seg.samples.length / SAMPLE_RATE,
@@ -735,20 +816,18 @@ async function decodeSegment(seg) {
   const nextThreshold = vadPolicy.onFinal(result.event);
   if (nextThreshold !== null) vadRebuildTo = nextThreshold;
 
-  // Auto-language sessions: the first final's language tag decides the draft
-  // engine once and for all. zh/en -> switch to streaming drafts (catching up
-  // on the audio already mirrored); anything else -> free the draft engine.
+  // Auto-language sessions: the first zh/en final switches the drafts to the
+  // streaming engine (catching up on the audio already mirrored). A first
+  // final tagged anything else is NOT trusted to free the draft engine — on a
+  // song intro that tag is noise (yue/ja over an instrumental) — the language
+  // pin below makes that call once three finals agree.
   if (!autoEngineDecided && online) {
-    autoEngineDecided = true;
     const lang = result.lang || '';
     if (lang === '<|zh|>' || lang === '<|en|>') {
+      autoEngineDecided = true;
       partialEngine = 'stream';
       logLine(eventRecord('partial-engine', `stream (auto ${lang})`));
       for (const c of openChunks) feedStream(c);
-    } else {
-      online = null;
-      onlineStream = null;
-      logLine(eventRecord('partial-engine', `pseudo (auto ${lang})`));
     }
   }
 }
@@ -788,6 +867,7 @@ function handleUnload(what) {
     vad = null;
     vadThreshold = VAD_THRESHOLD_SPEECH;
     recognizer = null;
+    pinnedLanguage = '';
     online = null;
     onlineStream = null;
     logLine(eventRecord('unload', 'asr'));

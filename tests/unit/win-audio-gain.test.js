@@ -9,13 +9,13 @@ describe('compensationGain', () => {
   it('inverts the endpoint attenuation in dB, minus the safety margin', () => {
     // 8% on the Windows slider measured -38.08 dB on the user's machine.
     expect(compensationGain(-38.08, { marginDb: 0 })).toBeCloseTo(80.2, 0);
-    expect(compensationGain(-38.08)).toBeCloseTo(56.7, 0);
+    expect(compensationGain(-38.08)).toBeCloseTo(40.2, 0);
     expect(compensationGain(-6.02, { marginDb: 0 })).toBeCloseTo(2, 2);
   });
 
   it('is unity at or near full volume and for garbage input', () => {
     expect(compensationGain(0)).toBe(1);
-    expect(compensationGain(-2)).toBe(1); // inside the margin
+    expect(compensationGain(-5)).toBe(1); // inside the margin
     expect(compensationGain(3)).toBe(1);
     expect(compensationGain(NaN)).toBe(1);
     expect(compensationGain(undefined)).toBe(1);

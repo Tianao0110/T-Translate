@@ -221,7 +221,10 @@ function onWorkerMessage(msg) {
       // Capture starts only now: an audio client opened while the models were
       // still loading would just fill a buffer nobody reads.
       if (sessionSource.mode === 'off') sendStatus('listening');
-      else child?.postMessage({ type: 'capture-start', ...sessionSource });
+      else {
+        sendStatus('connecting');
+        child?.postMessage({ type: 'capture-start', ...sessionSource });
+      }
       break;
     case 'capture-started':
       logger.info(`capture started (${msg.mode})`);
@@ -237,6 +240,13 @@ function onWorkerMessage(msg) {
       // rebuilds the stream itself; this only mirrors it into the UI.
       if (msg.kind === 'device-reacquired') sendStatus('listening');
       else if (msg.kind === 'device-lost' || msg.kind === 'reacquire-failed') sendStatus(msg.kind);
+      else if (msg.kind === 'source-gone') {
+        // The chosen program exited. Fall back to whole-system capture in
+        // place so the session keeps running; the renderer resets its picker.
+        sessionSource = { mode: 'system', pid: 0 };
+        sendStatus('source-gone', msg.detail);
+        child?.postMessage({ type: 'capture-start', ...sessionSource });
+      }
       break;
     case 'level':
       sendToWindow(CHANNELS.AUDIO_ENGINE.LEVEL, msg.value);

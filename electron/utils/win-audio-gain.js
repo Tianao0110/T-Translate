@@ -8,11 +8,13 @@
 // volume, which is why "just this program" worked and "all sound" did not.
 
 // Capped so a slider parked at -60 dB does not turn the noise floor into a
-// signal. The margin keeps the restored level a little under the original:
-// the engine measured ~1.5 dB less attenuation than the endpoint reported, and
-// a brick-walled master restored 1.5 dB too hot would clip.
+// signal. The margin keeps the restored level under the original: the engine
+// measured ~1.5 dB less attenuation than the endpoint reported, some players
+// run ~2 dB hot, and a brick-walled master restored that much too hot would
+// clip. 6 dB under is still far above anything the VAD needs (0.19 rms of a
+// song scored the same lyric coverage as 0.31).
 const DEFAULT_CAP_DB = 40;
-const DEFAULT_MARGIN_DB = 3;
+const DEFAULT_MARGIN_DB = 6;
 
 function compensationGain(db, { capDb = DEFAULT_CAP_DB, marginDb = DEFAULT_MARGIN_DB } = {}) {
   if (!Number.isFinite(db) || db >= -marginDb) return 1;
@@ -25,7 +27,7 @@ function compensationGain(db, { capDb = DEFAULT_CAP_DB, marginDb = DEFAULT_MARGI
 // support flags do not say which case you are in (a Realtek codec reports
 // hardware volume and still attenuates in software), so the guard watches
 // the outcome: sustained clipping under gain means the assumption is wrong.
-function makeClipGuard({ windowSamples = 32000, maxRatio = 0.005, clipLevel = 0.999 } = {}) {
+function makeClipGuard({ windowSamples = 32000, maxRatio = 0.01, clipLevel = 0.999 } = {}) {
   let seen = 0;
   let clipped = 0;
   let tripped = false;

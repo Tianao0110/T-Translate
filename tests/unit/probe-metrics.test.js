@@ -9,6 +9,7 @@ import {
   metricsRecord,
   makeSignalWatchdog,
   makeVadThresholdPolicy,
+  isNegligibleFinal,
 } from '../../electron/services/audio-engine/probe-metrics.js';
 
 describe('makeRepeatTracker', () => {
@@ -148,5 +149,36 @@ describe('metricsRecord extras', () => {
     const bare = metricsRecord({ rssMb: 1, cpuPct: 0, audioInS: 0, segments: 0, endpointDb: null });
     expect(bare.vadThreshold).toBeUndefined();
     expect(bare.endpointDb).toBeUndefined();
+  });
+});
+
+describe('makeVadThresholdPolicy.hold', () => {
+  it('drops to the music threshold at once and stays there whatever the finals say', () => {
+    const p = makeVadThresholdPolicy();
+    expect(p.hold()).toBe(0.3);
+    expect(p.current()).toBe(0.3);
+    ['<|Speech|>', '<|Speech|>', '<|Speech|>', '<|Speech|>'].forEach((e) => expect(p.onFinal(e)).toBeNull());
+    expect(p.current()).toBe(0.3);
+  });
+
+  it('is a no-op when already relaxed', () => {
+    const p = makeVadThresholdPolicy();
+    ['<|BGM|>', '<|BGM|>', '<|BGM|>'].forEach((e) => p.onFinal(e));
+    expect(p.hold()).toBeNull();
+  });
+});
+
+describe('isNegligibleFinal', () => {
+  it('drops one- or two-character CJK fragments and tiny Latin scraps', () => {
+    expect(isNegligibleFinal('如。')).toBe(true);
+    expect(isNegligibleFinal('嗯嗯')).toBe(true);
+    expect(isNegligibleFinal('Oh.')).toBe(true);
+    expect(isNegligibleFinal('')).toBe(true);
+  });
+
+  it('keeps anything that could be a line', () => {
+    expect(isNegligibleFinal('我往前')).toBe(false);
+    expect(isNegligibleFinal('You know')).toBe(false);
+    expect(isNegligibleFinal('Yeah!')).toBe(false);
   });
 });
