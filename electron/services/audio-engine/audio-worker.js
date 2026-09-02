@@ -55,6 +55,7 @@ const {
   makeSignalWatchdog,
   makeVadThresholdPolicy,
   isNegligibleFinal,
+  makeAgc,
 } = require('./probe-metrics');
 
 const SAMPLE_RATE = 16000;
@@ -168,9 +169,15 @@ let recentRms = []; // last VALLEY_WINDOWS window RMS values
 // Pre-roll: recent windows kept during silence. When detection flips on, the
 // VAD's ~0.15s acknowledgment has already swallowed the utterance head —
 // without this, every segment AFTER a forced split starts a character short
-// ("些技术" for "这些技术" in the breath harness).
-const PRE_ROLL_WINDOWS = 10; // ~0.32s
+// ("些技术" for "这些技术" in the breath harness). 0.6s (was 0.32s): on read
+// speech the VAD opens late by up to ~1.5s on soft onsets, and the longer
+// head was part of the English pipeline going 14.7% -> 10.6% WER.
+const PRE_ROLL_WINDOWS = 19; // ~0.6s
 let preRoll = [];
+// Level normalization ahead of the VAD (see makeAgc). Applied to the windows
+// the VAD and the mirrored segments see; the level meter and the rms metrics
+// keep reading the raw signal, so a quiet source still looks quiet in the log.
+const agc = makeAgc();
 
 // Native capture handle (utils/win-audio-capture). Null whenever no audio is
 // being pulled — the zero-idle rule applies to the audio client too.
@@ -319,6 +326,7 @@ function handleAsrStart(msg) {
   rmsSum = rmsCount = rmsMax = speechWindows = 0;
   vadPolicy = makeVadThresholdPolicy({ speech: VAD_THRESHOLD_SPEECH, music: VAD_THRESHOLD_MUSIC });
   vadRebuildTo = null;
+  agc.reset();
   sessionLive = true;
   logLine({
     ts: Date.now(),
@@ -351,11 +359,12 @@ function createVad(threshold) {
         threshold,
         // 0.15 (was 0.25): faster onset acknowledgment.
         minSpeechDuration: 0.15,
-        // 0.35 (was 0.5): video narration pauses often sit under 0.5s, so
-        // 0.5 never closed a segment there (user-visible: finals never
-        // appeared). The 0.83s gap-p25 from probe logs only argued against
-        // RAISING it. Force-split below covers truly pause-free speech.
-        minSilenceDuration: 0.35,
+        // 0.5 (was 0.35, before that 0.5): 0.35 chopped read sentences at
+        // every comma into context-free fragments — FLEURS English pipeline
+        // WER 14.7% at 0.35 vs 10.6% at 0.5 (0.6 no better), for +0.15s on
+        // each final. The layered force-split below still bounds pause-free
+        // speech, so the old "finals never appeared" failure cannot return.
+        minSilenceDuration: 0.5,
         // 12 hard-cut 27% of segments (p90 14.9s). 18 clears p90;
         // SenseVoice degrades past ~20s, so no higher.
         maxSpeechDuration: 18,
@@ -481,6 +490,7 @@ function emitMetrics() {
     speechS: (speechWindows * VAD_WINDOW) / SAMPLE_RATE,
     vadThreshold,
     endpointDb: capStats?.endpointDb,
+    agcGain: agc.gain(),
   });
   if (capStats) {
     rec.capSilent = capStats.silentPackets;
@@ -571,7 +581,7 @@ function handlePcm(samples) {
   let offset = 0;
   try {
     while (offset + VAD_WINDOW <= merged.length) {
-      const win = merged.subarray(offset, offset + VAD_WINDOW);
+      const win = agc.process(merged.subarray(offset, offset + VAD_WINDOW));
       vad.acceptWaveform(win);
       vadFedSamples += VAD_WINDOW;
       offset += VAD_WINDOW;

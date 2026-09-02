@@ -10,6 +10,7 @@ import {
   makeSignalWatchdog,
   makeVadThresholdPolicy,
   isNegligibleFinal,
+  makeAgc,
 } from '../../electron/services/audio-engine/probe-metrics.js';
 
 describe('makeRepeatTracker', () => {
@@ -192,5 +193,47 @@ describe('makeSignalWatchdog.onSpeech', () => {
     expect(wd.hint(13000)).toBeNull();
     wd.onChunk(0.1, 25000);
     expect(wd.hint(25000)).toBe('no-speech'); // nothing opened or landed for 12.5s
+  });
+});
+
+describe('makeAgc', () => {
+  const sine = (amp, n = 512) => Float32Array.from({ length: n }, (_, i) => amp * Math.sin((2 * Math.PI * 440 * i) / 16000));
+  const rms = (a) => Math.sqrt(a.reduce((s, v) => s + v * v, 0) / a.length);
+
+  it('lifts a quiet source toward the target and reports the gain', () => {
+    const agc = makeAgc();
+    let out;
+    for (let i = 0; i < 20; i++) out = agc.process(sine(0.004)); // rms ~0.0028
+    expect(agc.gain()).toBeGreaterThan(10);
+    expect(rms(out)).toBeGreaterThan(0.03);
+  });
+
+  it('leaves a healthy or loud source alone (boost only)', () => {
+    const agc = makeAgc();
+    const loud = sine(0.5);
+    const before = rms(loud);
+    for (let i = 0; i < 5; i++) agc.process(sine(0.5));
+    expect(agc.gain()).toBe(1);
+    expect(rms(agc.process(loud))).toBeCloseTo(before, 6);
+  });
+
+  it('never exceeds the cap, and digital silence does not move the envelope', () => {
+    const agc = makeAgc({ capDb: 30 });
+    const g0 = agc.gain();
+    for (let i = 0; i < 50; i++) agc.process(sine(0.0001)); // below the gate
+    expect(agc.gain()).toBe(g0);
+    for (let i = 0; i < 50; i++) agc.process(sine(0.001));
+    expect(agc.gain()).toBeLessThanOrEqual(Math.pow(10, 30 / 20) + 1e-6);
+    expect(agc.gain()).toBeGreaterThan(20);
+  });
+
+  it('reset returns to the quiet-start gain', () => {
+    const agc = makeAgc();
+    const g0 = agc.gain();
+    expect(g0).toBeCloseTo(10, 6); // target 0.05 over an envelope opened at 10x the gate
+    for (let i = 0; i < 20; i++) agc.process(sine(0.002));
+    expect(agc.gain()).toBeGreaterThan(g0);
+    agc.reset();
+    expect(agc.gain()).toBe(g0);
   });
 });

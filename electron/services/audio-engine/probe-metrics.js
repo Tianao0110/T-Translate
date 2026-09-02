@@ -44,7 +44,7 @@ function eventRecord(kind, detail) {
 // VAD ignored perfectly audible audio". Without them a stall in the log is
 // unexplainable: the no-audio watchdog only proves the signal was not exactly
 // zero (its floor is 1e-5, far below anything audible).
-function metricsRecord({ rssMb, cpuPct, audioInS, segments, rmsAvg, rmsMax, speechS, vadThreshold, endpointDb }) {
+function metricsRecord({ rssMb, cpuPct, audioInS, segments, rmsAvg, rmsMax, speechS, vadThreshold, endpointDb, agcGain }) {
   const rec = {
     ts: Date.now(),
     type: 'metrics',
@@ -63,7 +63,56 @@ function metricsRecord({ rssMb, cpuPct, audioInS, segments, rmsAvg, rmsMax, spee
   // "the user listens quietly", the same rmsAvg with 0 dB says "the source is".
   if (vadThreshold !== undefined) rec.vadThreshold = vadThreshold;
   if (endpointDb !== undefined && endpointDb !== null) rec.endpointDb = round2(endpointDb);
+  // How much the AGC is currently lifting the source: 1 = a healthy level,
+  // 30 = a whisper-quiet source at the cap.
+  if (agcGain !== undefined) rec.agcGain = round2(agcGain);
   return rec;
+}
+
+// Automatic gain in front of the VAD. silero is level-sensitive in a way the
+// recognizer is not (fbank normalizes, the VAD does not): FLEURS recordings at
+// rms 0.003 never opened a segment at threshold 0.5 while SenseVoice
+// transcribed the same files fine, and with this stage in front the English
+// pipeline WER went 22.9% -> 14.7% (gstack v042-accuracy-baseline). A slow
+// envelope follower on 32ms windows: fast attack so an onset is never
+// over-amplified, slow release so a pause does not pump the noise floor, a
+// gate that leaves digital silence alone, and a cap on how far a quiet source
+// is lifted. Boost only — loud sources are left exactly as they were, which is
+// the regime every earlier measurement was made in.
+function makeAgc({ target = 0.05, capDb = 30, gate = 0.0005, attack = 0.5, release = 0.02 } = {}) {
+  const cap = Math.pow(10, capDb / 20);
+  // Start assuming a quiet source: the envelope opens ten times above the
+  // gate, so a quiet first sentence is lifted at once instead of after the
+  // ~5s the slow release would need, while a loud first window still only
+  // ever sees the attack (which lands the envelope above target in one step).
+  const initial = gate * 10;
+  const initialGain = Math.min(cap, Math.max(1, target / initial));
+  let env = initial;
+  let gain = initialGain;
+  return {
+    // Scales `win` in place and returns it.
+    process(win) {
+      let s = 0;
+      for (let i = 0; i < win.length; i++) s += win[i] * win[i];
+      const rms = Math.sqrt(s / (win.length || 1));
+      if (rms > gate) env += (rms - env) * (rms > env ? attack : release);
+      gain = Math.min(cap, Math.max(1, target / Math.max(env, 1e-6)));
+      if (gain !== 1) {
+        for (let i = 0; i < win.length; i++) {
+          const v = win[i] * gain;
+          win[i] = v > 1 ? 1 : v < -1 ? -1 : v;
+        }
+      }
+      return win;
+    },
+    gain() {
+      return gain;
+    },
+    reset() {
+      env = initial;
+      gain = initialGain;
+    },
+  };
 }
 
 // VAD threshold by content. silero's 0.5 is right for speech, but sung vocals
@@ -177,4 +226,5 @@ module.exports = {
   makeSignalWatchdog,
   makeVadThresholdPolicy,
   isNegligibleFinal,
+  makeAgc,
 };
