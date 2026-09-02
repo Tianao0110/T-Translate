@@ -75,7 +75,7 @@ Recognition runs on your machine. **Audio passes through memory and is never wri
 
 Chinese, English, Japanese, Korean and Cantonese, picked manually or detected from the first sentence. With the optional draft engine installed, Chinese and English appear while you speak (first characters in under a second) and are corrected when the sentence ends; without it, text appears once the sentence is done.
 
-**Sound source**: listens to everything by default. On Windows 11 you can instead listen to one program, or to everything except one. The list shows only programs that have already played something, because a process that never opened an audio stream does not exist as far as Windows is concerned. Every browser tab shares one audio process, so the granularity stops at "program" — per-site is not possible. Windows 10 can only listen to all sound.
+**Sound source**: listens to everything by default. On Windows 11 you can instead listen to one program. The list shows only programs that have already played something, because a process that never opened an audio stream does not exist as far as Windows is concerned. Every browser tab shares one audio process, so the granularity stops at "program" — per-site is not possible. Windows 10 can only listen to all sound.
 
 Subtitles export to SRT (source and translation on separate lines). Listen mode is unavailable in Incognito mode.
 
