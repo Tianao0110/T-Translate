@@ -128,28 +128,34 @@ function isNegligibleFinal(text) {
 // sentence gap (segments are force-split at 9s) so it does not fire mid-speech.
 function makeSignalWatchdog({ silenceRms = 1e-5, noAudioAfterMs = 5000, noSpeechAfterMs = 12000 } = {}) {
   let lastLoudMs = null;
-  let lastSegmentMs = null;
+  let lastActivityMs = null; // a final landed, or the VAD had a segment open
   let startedMs = null;
 
   return {
     start(nowMs) {
       startedMs = nowMs;
       lastLoudMs = null;
-      lastSegmentMs = null;
+      lastActivityMs = null;
     },
     onChunk(rms, nowMs) {
       if (rms > silenceRms) lastLoudMs = nowMs;
     },
     onSegment(nowMs) {
-      lastSegmentMs = nowMs;
+      lastActivityMs = nowMs;
+    },
+    // The VAD currently has speech open. Counts as activity: a 12s sentence
+    // that has not closed yet is not "sound but no speech" (that false alarm
+    // relaxed the VAD on the first utterance of a clean-speech benchmark).
+    onSpeech(nowMs) {
+      lastActivityMs = nowMs;
     },
     // Returns 'no-audio' | 'no-speech' | null.
     hint(nowMs) {
       if (startedMs === null) return null;
       const sinceLoud = lastLoudMs === null ? nowMs - startedMs : nowMs - lastLoudMs;
       if (sinceLoud >= noAudioAfterMs) return 'no-audio';
-      const sinceSegment = lastSegmentMs === null ? nowMs - startedMs : nowMs - lastSegmentMs;
-      if (lastLoudMs !== null && sinceSegment >= noSpeechAfterMs) return 'no-speech';
+      const sinceActivity = lastActivityMs === null ? nowMs - startedMs : nowMs - lastActivityMs;
+      if (lastLoudMs !== null && sinceActivity >= noSpeechAfterMs) return 'no-speech';
       return null;
     },
   };

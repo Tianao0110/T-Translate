@@ -182,3 +182,15 @@ describe('isNegligibleFinal', () => {
     expect(isNegligibleFinal('Yeah!')).toBe(false);
   });
 });
+
+describe('makeSignalWatchdog.onSpeech', () => {
+  it('an open VAD segment counts as activity, so a long first sentence is not "no speech"', () => {
+    const wd = makeSignalWatchdog({ silenceRms: 1e-5, noAudioAfterMs: 5000, noSpeechAfterMs: 12000 });
+    wd.start(0);
+    wd.onChunk(0.1, 13000);
+    wd.onSpeech(12500); // VAD has been open, no final yet
+    expect(wd.hint(13000)).toBeNull();
+    wd.onChunk(0.1, 25000);
+    expect(wd.hint(25000)).toBe('no-speech'); // nothing opened or landed for 12.5s
+  });
+});

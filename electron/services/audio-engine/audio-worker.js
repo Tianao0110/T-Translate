@@ -632,6 +632,7 @@ function resetStreamDraft() {
 function trackOpenSegment(win) {
   if (vad.isDetected()) {
     speechWindows += 1;
+    watchdog.onSpeech(Date.now());
     // Segment just opened: prepend the pre-roll so the mirrored audio has the
     // utterance head the acknowledgment window swallowed. Mostly silence plus
     // the first ~0.15s of speech; SenseVoice doesn't mind leading quiet.
