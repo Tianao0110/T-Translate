@@ -72,7 +72,12 @@ class StackClient {
     }
   }
 
-  async translateStream(text, options = {}, onChunk) {
+  // `supersede` (default on): a new stream from this window aborts the
+  // previous one — right for a translation panel that only ever shows one
+  // result. Listen subtitles are many independent lines in flight at once, so
+  // they pass `supersede: false` and never touch the active-stream slot.
+  // `noCache` mirrors the unary path's payload-level flag.
+  async translateStream(text, options = {}, onChunk, { supersede = true, noCache = false } = {}) {
     const b = bridge();
     if (!b) {
       if (onChunk) onChunk(NO_BRIDGE.error);
@@ -80,17 +85,16 @@ class StackClient {
     }
     ensureChunkListener();
 
-    // Supersede semantics: a new stream from this window aborts the previous
-    // one — orchestration layers already drop stale frames by translation id;
-    // this upgrade kills the upstream HTTP too (P2-34).
-    if (this._activeStreamId) {
+    // Supersede semantics: orchestration layers already drop stale frames by
+    // translation id; this upgrade kills the upstream HTTP too (P2-34).
+    if (supersede && this._activeStreamId) {
       const stale = this._activeStreamId;
       this._activeStreamId = null;
       chunkHandlers.delete(stale);
       b.abort(stale).catch(() => {});
     }
 
-    const payload = { text, options: stripPrivacy(options) };
+    const payload = { text, options: stripPrivacy(options), ...(noCache ? { noCache: true } : {}) };
 
     return new Promise((resolve) => {
       let sid = null;
@@ -124,7 +128,7 @@ class StackClient {
             return;
           }
           sid = res.streamId;
-          this._activeStreamId = sid;
+          if (supersede) this._activeStreamId = sid;
           chunkHandlers.set(sid, handle);
           const buffered = pendingFrames.get(sid);
           if (buffered) {

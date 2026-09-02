@@ -11,8 +11,11 @@
 // (privacy injected there), and SRT export assembly.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import i18n from 'i18next';
 import createLogger from '../../utils/logger.js';
+import stackClient from '../../services/stack-client.js';
 import { normalizeDraftCase } from '../../utils/listen-text.js';
+import { buildListenSystemPrompt } from '../../utils/listen-prompt.js';
 
 const logger = createLogger('ListenSession');
 
@@ -171,17 +174,34 @@ export default function useListenSession({ active }) {
     const srcLang = (rec.lang || '').replace(/[<|>]/g, '');
     if (srcLang === target) return;
     setSegments((prev) => prev.map((s) => (s.id === segId ? { ...s, trans: 'pending' } : s)));
+    // The two finals before this one, as context for the LLM prompt (MT
+    // engines ignore the system prompt and translate the bare line).
+    const arr = transcriptRef.current;
+    let idx = arr.length - 1;
+    while (idx >= 0 && arr[idx].id !== segId) idx--;
+    const context = idx > 0 ? arr.slice(Math.max(0, idx - 2), idx).map((s) => s.text) : [];
+    const systemPrompt = buildListenSystemPrompt({ targetLang: target, context, uiLang: i18n.language });
+    // Chunks carry the full text so far; paint them at most ~10 times a second
+    // so a fast model does not turn every token into a React commit.
+    let lastPaint = 0;
+    const paint = (text) => {
+      const now = Date.now();
+      if (now - lastPaint < 100) return;
+      lastPaint = now;
+      setSegments((prev) => prev.map((s) => (s.id === segId ? { ...s, trans: text } : s)));
+    };
     try {
-      const res = await window.electron?.stack?.translate?.({
-        text: rec.text,
-        // Subtitle lines are one-shot: caching them evicts the user's real
-        // translation cache (200 entries, shared) and rewrites the cache file
-        // every couple of seconds for content nobody translates twice. This
-        // flag can only ever REDUCE caching — the privacy gate that turns it
-        // off in secure mode still lives in the main-process facade.
-        noCache: true,
-        options: { sourceLang: 'auto', targetLang: target },
-      });
+      const res = await stackClient.translateStream(
+        rec.text,
+        { sourceLang: 'auto', targetLang: target, systemPrompt },
+        (full) => { if (full) paint(full); },
+        // supersede off: lines translate concurrently and never abort each
+        // other. noCache: subtitle lines are one-shot — caching them evicts
+        // the user's real translation cache (200 entries, shared) and rewrites
+        // the cache file every couple of seconds. The flag can only ever
+        // REDUCE caching; the secure-mode gate lives in the main-process facade.
+        { supersede: false, noCache: true }
+      );
       settleTrans(segId, res?.success && res.text ? res.text : null);
     } catch {
       settleTrans(segId, null);

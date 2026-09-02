@@ -152,7 +152,9 @@ function register(ctx) {
 
   ipcMain.handle(CHANNELS.STACK.STREAM_START, (event, payload = {}) => {
     if (!stack) return unavailable();
-    const { text, options } = payload;
+    // `noCache` has the same payload-level contract as on the unary path: it
+    // can only ever reduce caching (listen subtitles stream through here).
+    const { text, options, noCache } = payload;
     const mode = getPrivacyMode();
     const streamId = `st_${crypto.randomUUID()}`;
     const controller = track(streamId, event.sender);
@@ -171,7 +173,7 @@ function register(ctx) {
       try {
         const result = await stack.service.translateStream(
           text,
-          sanitizeOptions(options, mode, controller.signal),
+          sanitizeOptions(options, mode, controller.signal, noCache === true),
           (fullText) => send({ streamId, seq: seq++, kind: 'chunk', text: fullText })
         );
         if (result.success) {
