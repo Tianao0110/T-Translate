@@ -76,3 +76,6 @@ CHANGELOG-v0.2.3.md
 TODOS.md
 TEMPcheck.log
 .gstack/
+
+# Local agent instructions, not part of the shipped source
+/CLAUDE.md
