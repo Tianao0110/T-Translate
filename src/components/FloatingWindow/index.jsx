@@ -930,7 +930,7 @@ const FloatingWindow = () => {
                   className="listen-select"
                   value={listen.lang}
                   onChange={(e) => listen.setLang(e.target.value)}
-                  title={t('floatingWindow.listenLang', '识别语言（切换后自动重启识别引擎）')}
+                  title={t('floatingWindow.listenLang', '识别语言')}
                 >
                   <option value="">{t('floatingWindow.listenLangAuto', '自动')}</option>
                   <option value="zh">中文</option>
@@ -943,7 +943,7 @@ const FloatingWindow = () => {
                   className="listen-select"
                   value={listen.targetLang}
                   onChange={(e) => listen.setTargetLang(e.target.value)}
-                  title={t('floatingWindow.listenTarget', '翻译目标语（只翻定稿句，同语种自动跳过）')}
+                  title={t('floatingWindow.listenTarget', '翻译目标')}
                 >
                   <option value="">{t('floatingWindow.listenNoTranslate', '不翻译')}</option>
                   <option value="zh">→中文</option>

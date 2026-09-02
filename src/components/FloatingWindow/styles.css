@@ -328,6 +328,24 @@
   min-width: 0;
 }
 
+/* Narrow (portrait) window: under ~480px the 286px toolbar no longer fits
+   beside the mode segments and the level meter, and used to shove the close
+   button out of the window. It drops to a row of its own; the panel's top
+   clearance grows with it. */
+@media (max-width: 479px) {
+  .floating-window.listen-mode .floating-top-area {
+    flex-wrap: wrap;
+    row-gap: 3px;
+  }
+  .floating-window.listen-mode .floating-toolbar {
+    flex: 0 0 100%;
+    justify-content: center;
+  }
+  .floating-window.listen-mode .listen-panel {
+    padding-top: 36px;
+  }
+}
+
 /* ========== 关闭按钮 ========== */
 .floating-close-btn {
   position: absolute;
