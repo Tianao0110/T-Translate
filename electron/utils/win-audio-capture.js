@@ -6,8 +6,11 @@
 //
 //   system   IMMDevice::Activate(IAudioClient) on the default render endpoint
 //            + AUDCLNT_STREAMFLAGS_LOOPBACK. Every Windows version. Taps AFTER
-//            the endpoint volume, so a muted system yields silence — that is
-//            the behavior listen mode always had.
+//            the endpoint volume: a muted system yields silence, and a quiet
+//            one used to yield a whisper (8% on the slider is -38 dB and the
+//            VAD went deaf). The pump reads IAudioEndpointVolume and undoes
+//            that attenuation (win-audio-gain), so what the ASR hears no
+//            longer depends on how loud the user listens. Mute stays silence.
 //   process  ActivateAudioInterfaceAsync(VAD\Process_Loopback) with
 //            AUDIOCLIENT_ACTIVATION_PARAMS. Windows 10 build 20348+, which in
 //            practice means Windows 11 (consumer Win10 stops at 19045).
@@ -25,6 +28,7 @@
 
 const os = require('os');
 const logger = require('./logger')('WinAudio');
+const { compensationGain, makeClipGuard, applyGain } = require('./win-audio-gain');
 
 // ===== koffi + COM plumbing =====
 
@@ -91,6 +95,7 @@ const IID = {
   IAudioMeterInformation: guid('C02216F6-8C67-4B5B-9D00-D008E73E0064'),
   IAudioClient: guid('1CB9AD4C-DBFA-4C32-B178-C2F568A703B2'),
   IAudioCaptureClient: guid('C8ADBD64-E71E-48A0-A4DE-185C395CD317'),
+  IAudioEndpointVolume: guid('5CDF2C82-841E-4546-9722-0CF74078229A'),
   IActivateAudioInterfaceCompletionHandler: guid('41D949AB-9862-444A-80F6-C261334DA5EB'),
   IAgileObject: guid('94EA2B94-E9CC-49E0-C0FF-EE64CA8F5B90'),
   IUnknown: guid('00000000-0000-0000-C000-000000000046'),
@@ -409,6 +414,9 @@ function activateProcessLoopback(pid, exclude) {
   });
 }
 
+// Returns the loopback client plus the endpoint's volume control. The volume
+// interface is best effort: without it capture still works, only at whatever
+// level the user happens to listen at (the pre-v0.4.1 behavior).
 function activateSystemLoopback() {
   const device = defaultRenderDevice();
   try {
@@ -418,7 +426,17 @@ function activateSystemLoopback() {
         IID.IAudioClient, 23, null, out),
       'Activate(IAudioClient)'
     );
-    return out[0];
+    let volume = null;
+    try {
+      const outVol = [null];
+      const hr = vcall(device, 3, 'long Activate(void*, const uint8_t*, uint32, void*, _Out_ void**)',
+        IID.IAudioEndpointVolume, 23, null, outVol);
+      if (hr === 0) volume = outVol[0];
+      else logger.warn(`endpoint volume unavailable: 0x${(hr >>> 0).toString(16)}`);
+    } catch (e) {
+      logger.warn(`endpoint volume unavailable: ${e.message}`);
+    }
+    return { client: out[0], volume };
   } finally {
     release(device);
   }
@@ -452,6 +470,16 @@ async function startCapture({ mode = 'system', pid = 0, onPcm, onEvent = () => {
   let silentPackets = 0;
   let discontinuities = 0;
   let framesDelivered = 0;
+  // System path only: the endpoint volume control, the inverse gain derived
+  // from it, and the guard that switches compensation off for devices that
+  // apply their volume in hardware (their loopback was never attenuated).
+  let volume = null;
+  let gain = 1;
+  let endpointDb = null;
+  let compensation = mode === 'system' ? 'on' : 'n/a'; // 'on' | 'off' | 'n/a'
+  let clipGuard = null;
+  let pollsSinceVolume = 0;
+  const VOLUME_POLLS = 25; // re-read the slider every ~500ms at the 20ms pump
 
   const teardown = () => {
     if (timer) clearInterval(timer);
@@ -465,12 +493,35 @@ async function startCapture({ mode = 'system', pid = 0, onPcm, onEvent = () => {
     }
     release(capture);
     release(client);
+    release(volume);
     if (hEvent) init().CloseHandle(hEvent);
-    capture = client = hEvent = null;
+    capture = client = hEvent = volume = null;
+  };
+
+  // GetMasterVolumeLevel is the attenuation the engine applies (dB over the
+  // device's own range); the 0..1 scalar is only the slider position and is
+  // not linear in amplitude (8% read -38 dB, not -22).
+  const refreshGain = () => {
+    if (!volume) return;
+    try {
+      const outDb = [0];
+      if (vcall(volume, 8, 'long GetMasterVolumeLevel(void*, _Out_ float*)', outDb) !== 0) return;
+      endpointDb = outDb[0];
+      gain = compensation === 'on' ? compensationGain(endpointDb) : 1;
+    } catch (e) {
+      logger.warn(`endpoint volume read failed: ${e.message}`);
+      release(volume);
+      volume = null;
+      gain = 1;
+    }
   };
 
   const open = async () => {
-    client = mode === 'system' ? activateSystemLoopback() : await activateProcessLoopback(pid, mode === 'exclude');
+    if (mode === 'system') {
+      ({ client, volume } = activateSystemLoopback());
+    } else {
+      client = await activateProcessLoopback(pid, mode === 'exclude');
+    }
 
     // Process loopback takes 16k mono directly (it has no mix format at all —
     // GetMixFormat returns E_NOTIMPL). The endpoint client only accepts its
@@ -493,6 +544,8 @@ async function startCapture({ mode = 'system', pid = 0, onPcm, onEvent = () => {
     );
     capture = outCapture[0];
     check(vcall(client, 10, 'long Start(void*)'), 'IAudioClient::Start');
+    refreshGain();
+    pollsSinceVolume = 0;
   };
 
   // Polled rather than blocked on the event handle: this runs on the ASR
@@ -502,6 +555,10 @@ async function startCapture({ mode = 'system', pid = 0, onPcm, onEvent = () => {
   const drain = () => {
     if (stopped || !capture) return;
     const { koffi } = init();
+    if (volume && ++pollsSinceVolume >= VOLUME_POLLS) {
+      pollsSinceVolume = 0;
+      refreshGain();
+    }
     for (;;) {
       const outNext = [0];
       const hrNext = vcall(capture, 5, 'long GetNextPacketSize(void*, _Out_ uint32*)', outNext);
@@ -531,7 +588,20 @@ async function startCapture({ mode = 'system', pid = 0, onPcm, onEvent = () => {
           onPcm(new Float32Array(frames));
         } else if (outData[0]) {
           const bytes = new Uint8Array(koffi.decode(outData[0], 'uint8_t', frames * 4));
-          onPcm(new Float32Array(bytes.buffer, 0, frames));
+          const pcm = new Float32Array(bytes.buffer, 0, frames);
+          if (gain !== 1) {
+            applyGain(pcm, gain);
+            if (!clipGuard) clipGuard = makeClipGuard();
+            if (clipGuard.check(pcm)) {
+              // Sustained clipping under gain: this device applies its volume
+              // in hardware, the loopback signal was never attenuated, and the
+              // inverse is pure distortion. Off for the rest of this capture.
+              compensation = 'off';
+              gain = 1;
+              onEvent('volume-compensation-off', `clipping at ${endpointDb === null ? '?' : endpointDb.toFixed(1)} dB`);
+            }
+          }
+          onPcm(pcm);
         }
       }
       vcall(capture, 4, 'long ReleaseBuffer(void*, uint32)', frames);
@@ -570,15 +640,20 @@ async function startCapture({ mode = 'system', pid = 0, onPcm, onEvent = () => {
 
   await open();
   timer = setInterval(drain, pollMs);
-  logger.info(`capture started (mode=${mode}${pid ? `, pid=${pid}` : ''})`);
+  logger.info(
+    `capture started (mode=${mode}${pid ? `, pid=${pid}` : ''}` +
+      `${endpointDb === null ? '' : `, endpoint ${endpointDb.toFixed(1)} dB, gain x${gain.toFixed(1)}`})`
+  );
 
   return {
     mode,
     // Read by the worker's metrics line: silent packets mean the source went
     // quiet at the OS level (not our doing), discontinuities mean the pump
-    // fell behind. Both are invisible in the PCM itself.
+    // fell behind. Both are invisible in the PCM itself. endpointDb says how
+    // far down the user's volume slider was — the number that explained a
+    // "deaf" session once.
     stats() {
-      return { silentPackets, discontinuities, framesDelivered };
+      return { silentPackets, discontinuities, framesDelivered, endpointDb, gain, compensation };
     },
     stop() {
       stopped = true;

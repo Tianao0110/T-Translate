@@ -53,6 +53,7 @@ const {
   eventRecord,
   metricsRecord,
   makeSignalWatchdog,
+  makeVadThresholdPolicy,
 } = require('./probe-metrics');
 
 const SAMPLE_RATE = 16000;
@@ -88,6 +89,13 @@ const VALLEY_FLOOR = 1e-4; // absolute floor so near-digital-silence always coun
 // rules on trailing non-emission, and neural caption segmentation replacing
 // pause-based splits). 0.8s of no draft growth on a >=5s segment closes it.
 const TEXT_QUIESCENCE_MS = 800;
+// silero threshold by content: 0.5 for speech, 0.3 once the finals say the
+// audio is music (sung vocals over a beat hover under 0.5 and whole lyric
+// lines never open — 86% of lines at 0.5 vs 100% at 0.3 on a real song
+// through process loopback, speech unaffected). The policy lives in
+// probe-metrics; the swap happens only between segments.
+const VAD_THRESHOLD_SPEECH = 0.5;
+const VAD_THRESHOLD_MUSIC = 0.3;
 
 const ASR_LANGUAGES = new Set(['zh', 'en', 'ja', 'ko', 'yue', '']);
 
@@ -95,6 +103,9 @@ let sherpa = null;
 let asrPaths = null; // declared by init; loaded by asr-start
 let asrLanguage = '';
 let vad = null;
+let vadThreshold = VAD_THRESHOLD_SPEECH;
+let vadPolicy = makeVadThresholdPolicy({ speech: VAD_THRESHOLD_SPEECH, music: VAD_THRESHOLD_MUSIC });
+let vadRebuildTo = null; // pending threshold change, applied at a segment boundary
 let recognizer = null;
 // Two-pass draft engine (optional): a streaming zipformer emits word-by-word
 // drafts while SenseVoice keeps owning finals (spike report: first token
@@ -237,35 +248,11 @@ function handleAsrStart(msg) {
 
   const t0 = Date.now();
   try {
+    // A resident worker must not carry a music-tuned VAD into the next session.
+    if (vad && vadThreshold !== VAD_THRESHOLD_SPEECH) vad = null;
     if (!vad) {
-      // silero ONLY. ten-vad was tried on 2026-08-27 and reverted the same
-      // day: sherpa's port drops the pitch feature, and on real music (the
-      // primary use case) it missed most sung vocals — 67s of a song yielded
-      // 3 fragment segments vs silero's continuous output. Don't re-add it
-      // from a clean-speech benchmark; it must beat silero on BGM logs first.
-      vad = new sherpa.Vad(
-        {
-          sileroVad: {
-            model: asrPaths.vadPath,
-            threshold: 0.5,
-            // 0.15 (was 0.25): faster onset acknowledgment.
-            minSpeechDuration: 0.15,
-            // 0.35 (was 0.5): video narration pauses often sit under 0.5s, so
-            // 0.5 never closed a segment there (user-visible: finals never
-            // appeared). The 0.83s gap-p25 from probe logs only argued against
-            // RAISING it. Force-split below covers truly pause-free speech.
-            minSilenceDuration: 0.35,
-            // 12 hard-cut 27% of segments (p90 14.9s). 18 clears p90;
-            // SenseVoice degrades past ~20s, so no higher.
-            maxSpeechDuration: 18,
-            windowSize: VAD_WINDOW,
-          },
-          sampleRate: SAMPLE_RATE,
-          numThreads: 1,
-          debug: 0,
-        },
-        120
-      );
+      vadThreshold = VAD_THRESHOLD_SPEECH;
+      vad = createVad(vadThreshold);
     }
     if (!recognizer) {
       recognizer = new sherpa.OfflineRecognizer({
@@ -329,6 +316,8 @@ function handleAsrStart(msg) {
   vadBaseSamples = 0;
   segmentCount = 0;
   rmsSum = rmsCount = rmsMax = speechWindows = 0;
+  vadPolicy = makeVadThresholdPolicy({ speech: VAD_THRESHOLD_SPEECH, music: VAD_THRESHOLD_MUSIC });
+  vadRebuildTo = null;
   sessionLive = true;
   logLine({
     ts: Date.now(),
@@ -346,6 +335,52 @@ function handleAsrStart(msg) {
   metricsTimer = setInterval(emitMetrics, 30000);
   partialTimer = setInterval(maybeDecodePartial, PARTIAL_INTERVAL_MS);
   post({ type: 'asr-ready', loadMs });
+}
+
+// silero ONLY. ten-vad was tried on 2026-08-27 and reverted the same day:
+// sherpa's port drops the pitch feature, and on real music (the primary use
+// case) it missed most sung vocals — 67s of a song yielded 3 fragment segments
+// vs silero's continuous output. Don't re-add it from a clean-speech
+// benchmark; it must beat silero on BGM logs first.
+function createVad(threshold) {
+  return new sherpa.Vad(
+    {
+      sileroVad: {
+        model: asrPaths.vadPath,
+        threshold,
+        // 0.15 (was 0.25): faster onset acknowledgment.
+        minSpeechDuration: 0.15,
+        // 0.35 (was 0.5): video narration pauses often sit under 0.5s, so
+        // 0.5 never closed a segment there (user-visible: finals never
+        // appeared). The 0.83s gap-p25 from probe logs only argued against
+        // RAISING it. Force-split below covers truly pause-free speech.
+        minSilenceDuration: 0.35,
+        // 12 hard-cut 27% of segments (p90 14.9s). 18 clears p90;
+        // SenseVoice degrades past ~20s, so no higher.
+        maxSpeechDuration: 18,
+        windowSize: VAD_WINDOW,
+      },
+      sampleRate: SAMPLE_RATE,
+      numThreads: 1,
+      debug: 0,
+    },
+    120
+  );
+}
+
+// Only between segments: a fresh silero starts in its non-speech state, so
+// swapping it mid-utterance would drop the rest of that utterance.
+function applyVadThreshold() {
+  const next = vadRebuildTo;
+  vadRebuildTo = null;
+  try {
+    vad = createVad(next);
+    vadThreshold = next;
+    vadBaseSamples = vadFedSamples; // new instance, new segment clock
+    logLine(eventRecord('vad-threshold', String(next)));
+  } catch (err) {
+    logLine(eventRecord('vad-threshold-failed', String(err.message)));
+  }
 }
 
 function checkHint() {
@@ -369,6 +404,10 @@ function emitMetrics() {
   const wallMs = now - lastMetricsMs;
   lastCpu = process.cpuUsage();
   lastMetricsMs = now;
+  // Capture health, when capture is ours: silent packets mean the OS handed us
+  // digital silence (the source stopped), discontinuities mean the pump fell
+  // behind. Both look identical in the PCM.
+  const capStats = capture?.stats?.();
   const rec = metricsRecord({
     rssMb: process.memoryUsage().rss / 1024 / 1024,
     cpuPct: wallMs > 0 ? ((cpu.user + cpu.system) / 1000 / wallMs) * 100 : 0,
@@ -377,11 +416,9 @@ function emitMetrics() {
     rmsAvg: rmsCount ? rmsSum / rmsCount : 0,
     rmsMax,
     speechS: (speechWindows * VAD_WINDOW) / SAMPLE_RATE,
+    vadThreshold,
+    endpointDb: capStats?.endpointDb,
   });
-  // Capture health, when capture is ours: silent packets mean the OS handed us
-  // digital silence (the source stopped), discontinuities mean the pump fell
-  // behind. Both look identical in the PCM.
-  const capStats = capture?.stats?.();
   if (capStats) {
     rec.capSilent = capStats.silentPackets;
     rec.capGaps = capStats.discontinuities;
@@ -457,6 +494,8 @@ function handlePcm(samples) {
   rmsCount += 1;
   if (chunkRms > rmsMax) rmsMax = chunkRms;
   watchdog.onChunk(chunkRms, Date.now());
+
+  if (vadRebuildTo !== null && openLen === 0 && !vad.isDetected() && vad.isEmpty()) applyVadThreshold();
 
   const merged = new Float32Array(pending.length + samples.length);
   merged.set(pending, 0);
@@ -693,6 +732,9 @@ async function decodeSegment(seg) {
   logLine(logText ? rec : { ...rec, text: undefined });
   post({ type: 'segment', rec });
 
+  const nextThreshold = vadPolicy.onFinal(result.event);
+  if (nextThreshold !== null) vadRebuildTo = nextThreshold;
+
   // Auto-language sessions: the first final's language tag decides the draft
   // engine once and for all. zh/en -> switch to streaming drafts (catching up
   // on the audio already mirrored); anything else -> free the draft engine.
@@ -744,6 +786,7 @@ function handleAsrStop() {
 function handleUnload(what) {
   if (what === 'asr' && !sessionLive) {
     vad = null;
+    vadThreshold = VAD_THRESHOLD_SPEECH;
     recognizer = null;
     online = null;
     onlineStream = null;

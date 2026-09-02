@@ -44,7 +44,7 @@ function eventRecord(kind, detail) {
 // VAD ignored perfectly audible audio". Without them a stall in the log is
 // unexplainable: the no-audio watchdog only proves the signal was not exactly
 // zero (its floor is 1e-5, far below anything audible).
-function metricsRecord({ rssMb, cpuPct, audioInS, segments, rmsAvg, rmsMax, speechS }) {
+function metricsRecord({ rssMb, cpuPct, audioInS, segments, rmsAvg, rmsMax, speechS, vadThreshold, endpointDb }) {
   const rec = {
     ts: Date.now(),
     type: 'metrics',
@@ -58,7 +58,43 @@ function metricsRecord({ rssMb, cpuPct, audioInS, segments, rmsAvg, rmsMax, spee
   // Seconds the VAD reported speech during this window — separates "nothing
   // was said" from "speech was detected but never got finalized".
   if (speechS !== undefined) rec.speechS = round2(speechS);
+  // Which VAD regime was active, and how far the system volume was turned
+  // down (system loopback only): a quiet rmsAvg next to endpointDb -38 says
+  // "the user listens quietly", the same rmsAvg with 0 dB says "the source is".
+  if (vadThreshold !== undefined) rec.vadThreshold = vadThreshold;
+  if (endpointDb !== undefined && endpointDb !== null) rec.endpointDb = round2(endpointDb);
   return rec;
+}
+
+// VAD threshold by content. silero's 0.5 is right for speech, but sung vocals
+// over a beat hover under it and whole lyric lines never open a segment:
+// measured on a real song through process loopback, 86% of lyric lines at
+// 0.5 and 100% at 0.3, with speech material unaffected (gstack
+// v041-listen-music-diagnosis). SenseVoice tags every final with an audio
+// event, so the content itself says which regime we are in. onFinal() returns
+// the threshold to move to, or null to stay; the worker applies it only
+// between segments. Two of the last three finals tagged BGM is enough to go
+// down; it takes three speech finals in a row to come back up.
+function makeVadThresholdPolicy({ speech = 0.5, music = 0.3, window = 3 } = {}) {
+  const recent = [];
+  let current = speech;
+  return {
+    current() {
+      return current;
+    },
+    onFinal(event) {
+      recent.push(event === '<|BGM|>' ? 'music' : 'speech');
+      if (recent.length > window) recent.shift();
+      if (recent.length < window) return null;
+      const musicCount = recent.filter((x) => x === 'music').length;
+      let next = current;
+      if (current === speech && musicCount >= 2) next = music;
+      else if (current === music && musicCount === 0) next = speech;
+      if (next === current) return null;
+      current = next;
+      return next;
+    },
+  };
 }
 
 // Watches incoming audio energy and recognition output, and decides which
@@ -111,4 +147,5 @@ module.exports = {
   eventRecord,
   metricsRecord,
   makeSignalWatchdog,
+  makeVadThresholdPolicy,
 };

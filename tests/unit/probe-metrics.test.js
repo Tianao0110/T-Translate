@@ -8,6 +8,7 @@ import {
   eventRecord,
   metricsRecord,
   makeSignalWatchdog,
+  makeVadThresholdPolicy,
 } from '../../electron/services/audio-engine/probe-metrics.js';
 
 describe('makeRepeatTracker', () => {
@@ -109,5 +110,43 @@ describe('makeSignalWatchdog', () => {
     expect(wd.hint(31000)).toBeNull(); // only 16s since last segment
     wd.onChunk(0.01, 45500);
     expect(wd.hint(46000)).toBe('no-speech'); // 31s since last segment
+  });
+});
+
+describe('makeVadThresholdPolicy', () => {
+  it('drops to the music threshold once BGM dominates the last three finals', () => {
+    const p = makeVadThresholdPolicy();
+    expect(p.onFinal('<|Speech|>')).toBeNull();
+    expect(p.onFinal('<|BGM|>')).toBeNull(); // window not full yet
+    expect(p.onFinal('<|BGM|>')).toBe(0.3);
+    expect(p.current()).toBe(0.3);
+    expect(p.onFinal('<|BGM|>')).toBeNull(); // already there
+  });
+
+  it('returns to the speech threshold only after three speech finals in a row', () => {
+    const p = makeVadThresholdPolicy();
+    ['<|BGM|>', '<|BGM|>', '<|BGM|>'].forEach((e) => p.onFinal(e));
+    expect(p.onFinal('<|Speech|>')).toBeNull();
+    expect(p.onFinal('<|Speech|>')).toBeNull(); // one BGM still in the window
+    expect(p.onFinal('<|Speech|>')).toBe(0.5);
+  });
+
+  it('treats missing or other event tags as speech', () => {
+    const p = makeVadThresholdPolicy();
+    expect(p.onFinal(undefined)).toBeNull();
+    expect(p.onFinal('<|Applause|>')).toBeNull();
+    expect(p.onFinal('<|BGM|>')).toBeNull();
+    expect(p.current()).toBe(0.5);
+  });
+});
+
+describe('metricsRecord extras', () => {
+  it('carries the VAD threshold and endpoint volume when given', () => {
+    const rec = metricsRecord({ rssMb: 1, cpuPct: 0, audioInS: 0, segments: 0, vadThreshold: 0.3, endpointDb: -38.079 });
+    expect(rec.vadThreshold).toBe(0.3);
+    expect(rec.endpointDb).toBe(-38.08);
+    const bare = metricsRecord({ rssMb: 1, cpuPct: 0, audioInS: 0, segments: 0, endpointDb: null });
+    expect(bare.vadThreshold).toBeUndefined();
+    expect(bare.endpointDb).toBeUndefined();
   });
 });

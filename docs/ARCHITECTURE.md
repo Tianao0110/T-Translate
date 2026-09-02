@@ -248,7 +248,7 @@ electron/utils/audio-pack-manager.js       模型包下载/卸载（工厂第二
 
 | 来源 | 激活方式 | 系统要求 | 取到的是 |
 |------|----------|----------|----------|
-| 全部声音 | 端点环回 + `AUTOCONVERTPCM` | 全部 Windows | 系统音量之后的混音（静音即无声，与用户听到的一致） |
+| 全部声音 | 端点环回 + `AUTOCONVERTPCM` | 全部 Windows | 系统音量之后的混音，按端点音量（`IAudioEndpointVolume` 报的 dB）反向补偿回原始电平——用户开多小声都不影响识别（8% 音量是 -38 dB，补偿前 VAD 基本失聪）；静音仍是无声。硬件音量的设备靠削波守卫识别后停用补偿 |
 | 只听某程序 / 排除某程序 | `ActivateAudioInterfaceAsync` + `PROCESS_LOOPBACK` | Win10 build 20348+（实际=Win11） | 该进程树的渲染流，在端点音量之前（系统静音也照抓；但该程序在音量合成器里被单独静音则取不到） |
 
 捕获跑在 worker 里，音频进 VAD 之前不跨进程；渲染端只收文字和一个电平数。设备切换由
