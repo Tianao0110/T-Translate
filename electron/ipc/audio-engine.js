@@ -52,7 +52,12 @@ function registerAudioEngineIPC(ctx) {
     }
     try {
       const win = ctx.windows?.floatingWindow;
-      const stamp = new Date().toISOString().slice(0, 10);
+      // Local date + time: two exports on the same day used to propose the
+      // same name and the second one overwrote the first. (The old ISO date
+      // was UTC, too — an evening export was filed under tomorrow.)
+      const d = new Date();
+      const pad = (n) => String(n).padStart(2, '0');
+      const stamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
       const result = await dialog.showSaveDialog(win && !win.isDestroyed() ? win : null, {
         defaultPath: `listen-${stamp}.srt`,
         filters: [{ name: 'SubRip Subtitles', extensions: ['srt'] }],
