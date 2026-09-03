@@ -4,9 +4,10 @@
 //
 // Iron rules honored here: the worker dies with the listen session (zero idle
 // footprint; a closing host window force-stops via a once-listener armed at
-// session start), SECURE privacy mode refuses to start a session (its log
-// records recognized text on disk), and a crashed engine restarts exactly
-// once per session before giving up.
+// session start), SECURE privacy mode runs the session without any session
+// log (audio never touched disk anyway; the metrics log is the one file the
+// mode still refuses), and a crashed engine restarts exactly once per
+// session before giving up.
 //
 // TTS (v0.4.2) is the one relaxation of zero-idle: a spoken line needs the
 // worker even with no session running, and a voice pack takes 1.3-2.2s to
@@ -112,7 +113,8 @@ function getInfo() {
     streamingPresent: !!models?.streaming,
     modelsDir: modelsBaseDir(),      // where a new download lands
     activeDir: models?.baseDir || null, // where the live set actually sits
-    secureBlocked: isSecure(),
+    // Kept for the renderer's shape; secure mode no longer blocks sessions.
+    secureBlocked: false,
     running: childState === 'running' || childState === 'starting',
   };
 }
@@ -131,10 +133,6 @@ function startSession(options = {}) {
     sendStatus('no-model');
     return;
   }
-  if (isSecure()) {
-    sendStatus('secure-blocked');
-    return;
-  }
   // Zero-idle-footprint backstop: a closing host window must never leave the
   // engine humming. once() self-detaches; a stale listener firing after a
   // normal stop hits the idle guard in stopSession and is a no-op.
@@ -144,12 +142,16 @@ function startSession(options = {}) {
   if (child) discardWorker('listen-start');
   spawnWorker(models);
 
-  // A mid-session switch to SECURE stops the probe (its log carries text).
+  // A mid-session switch to SECURE keeps the session but closes its log:
+  // from here on nothing about it reaches disk.
   privacyUnsub = deps.store.onDidChange('privacyMode', (mode) => {
-    if (mode === PRIVACY_MODES.SECURE) {
-      logger.info('privacy switched to secure — stopping probe');
-      stopSession('privacy');
-      sendStatus('secure-blocked');
+    if (mode === PRIVACY_MODES.SECURE && child) {
+      logger.info('privacy switched to secure — closing the session log');
+      try {
+        child.postMessage({ type: 'log-close' });
+      } catch {
+        // process gone
+      }
     }
   });
 }
@@ -232,11 +234,12 @@ function spawnWorker(models) {
           }
         : null,
     },
-    logPath: models ? sessionLogPath() : null,
+    // Secure mode writes no session log at all — not even metrics.
+    logPath: models && !isSecure() ? sessionLogPath() : null,
     // Recognized text stays out of the on-disk log by default — the session
     // log exists for tuning (segment lengths, gaps, RTF), and those are
     // metrics, not words. Developers chasing a bad transcription opt in.
-    logText: process.env.TT_LISTEN_LOG_TEXT === '1',
+    logText: !isSecure() && process.env.TT_LISTEN_LOG_TEXT === '1',
     meta: {
       appVersion: app.getVersion(),
       electron: process.versions.electron,
@@ -406,7 +409,7 @@ function onWorkerExit(code) {
     restartedOnce = true;
     sendStatus('engine-restarting');
     const models = findModels();
-    if (models && !isSecure()) {
+    if (models) {
       spawnWorker(models);
       return;
     }

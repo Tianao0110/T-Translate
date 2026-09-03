@@ -77,7 +77,7 @@ Chinese, English, Japanese, Korean and Cantonese, picked manually or detected fr
 
 **Sound source**: listens to everything by default. On Windows 11 you can instead listen to one program. The list shows only programs that have already played something, because a process that never opened an audio stream does not exist as far as Windows is concerned. Every browser tab shares one audio process, so the granularity stops at "program" — per-site is not possible. Windows 10 can only listen to all sound.
 
-Subtitles export to SRT (source and translation on separate lines). Listen mode is unavailable in Incognito mode.
+Subtitles export to SRT (source and translation on separate lines). In Incognito mode listen works without writing its session log.
 
 **Models are downloaded on demand**: Settings → Audio → Listen. Base model 153 MB (required), draft engine 168 MB (optional). A running session uses about 600-700 MB of memory, released when you stop.
 

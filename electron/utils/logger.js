@@ -77,6 +77,21 @@ function localDateStamp(date = new Date()) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+// Secure (incognito) mode keeps only errors on disk: routine info/warn lines
+// describe what the user was doing, and the mode promises no such trail.
+// Console output is unaffected. Renderer lines arriving over logs:write go
+// through the same transport, so they are covered too.
+const NORMAL_FILE_LEVEL = 'info';
+const SECURE_FILE_LEVEL = 'error';
+let secureFileLogging = false;
+
+function setSecureFileLogging(on) {
+  secureFileLogging = Boolean(on);
+  if (electronLog) {
+    electronLog.transports.file.level = secureFileLogging ? SECURE_FILE_LEVEL : NORMAL_FILE_LEVEL;
+  }
+}
+
 // Configure electron-log: per-day rotated files, 5MB cap, 7-day retention.
 function configureElectronLog() {
   if (!electronLog) return;
@@ -87,7 +102,7 @@ function configureElectronLog() {
     return path.join(logDir, `app-${localDateStamp()}.log`);
   };
 
-  electronLog.transports.file.level = 'info';
+  electronLog.transports.file.level = secureFileLogging ? SECURE_FILE_LEVEL : NORMAL_FILE_LEVEL;
   electronLog.transports.file.maxSize = 5 * 1024 * 1024;
 
   electronLog.transports.console.level = process.env.NODE_ENV === 'development' ? 'debug' : 'warn';
@@ -256,5 +271,6 @@ function createLogger(scope) {
 module.exports = createLogger;
 module.exports.LOG_LEVELS = LOG_LEVELS;
 module.exports.getLogDirectory = getLogDirectory;
+module.exports.setSecureFileLogging = setSecureFileLogging;
 module.exports.filterSensitive = filterSensitive;
 module.exports.localDateStamp = localDateStamp;

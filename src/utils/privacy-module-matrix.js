@@ -11,10 +11,10 @@ export const PRIVACY_MODE_ORDER = ['standard', 'secure', 'offline'];
 // on = works as usual, part = works with restrictions, off = unavailable
 export const MODULE_STATE = {
   translators: { standard: 'on', secure: 'on', offline: 'part' },
-  ocr: { standard: 'on', secure: 'on', offline: 'part' },
-  // Incognito keeps listen mode disabled until every module honours "no
-  // logs at all" under it (user's call 2026-09-03).
-  listen: { standard: 'on', secure: 'off', offline: 'on' },
+  // Incognito: Windows OCR is out because it needs the capture as a temp file.
+  ocr: { standard: 'on', secure: 'part', offline: 'part' },
+  // Incognito: the session runs, the metrics log is simply not written.
+  listen: { standard: 'on', secure: 'part', offline: 'on' },
   speak: { standard: 'on', secure: 'on', offline: 'part' },
   downloads: { standard: 'on', secure: 'on', offline: 'off' },
   history: { standard: 'on', secure: 'off', offline: 'on' },

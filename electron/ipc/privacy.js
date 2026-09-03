@@ -2,6 +2,7 @@
 
 const { ipcMain } = require('electron');
 const { CHANNELS, PRIVACY_MODES } = require('../shared/channels');
+const { setSecureFileLogging } = require('../utils/logger');
 const logger = require('../utils/logger')('IPC:Privacy');
 
 function register(ctx) {
@@ -12,6 +13,10 @@ function register(ctx) {
     store.set('privacyMode', 'offline');
   }
 
+  // Secure mode persists across restarts, so the log gate is applied at
+  // boot as well as on every switch (before the switch is logged).
+  setSecureFileLogging(store.get('privacyMode') === PRIVACY_MODES.SECURE);
+
   ipcMain.handle(CHANNELS.PRIVACY.SET_MODE, (event, mode) => {
     try {
       const validModes = Object.values(PRIVACY_MODES);
@@ -20,6 +25,7 @@ function register(ctx) {
       }
 
       store.set('privacyMode', mode);
+      setSecureFileLogging(mode === PRIVACY_MODES.SECURE);
       logger.info('Mode changed to:', mode);
 
       // SECURE pauses the stack's L2 cache persistence (flushes pending

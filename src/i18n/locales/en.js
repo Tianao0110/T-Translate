@@ -242,8 +242,8 @@ const en = {
     detailTitle: "Modes side by side",
     modules: {
       translators: { name: "Translation providers", standard: "Local LLM and online providers", secure: "All available", offline: "Local LLM only, online providers disabled", offlineShort: "local LLM only" },
-      ocr: { name: "OCR", standard: "Local + online engines", secure: "Same as standard", offline: "Local engines only", offlineShort: "local engines only" },
-      listen: { name: "Listen", standard: "Available; the session log keeps metrics, never text", secure: "Unavailable", secureShort: "not yet", offline: "Available, models are local" },
+      ocr: { name: "OCR", standard: "Local + online engines", secure: "No Windows OCR (it needs the capture as a temp file)", secureShort: "no Windows OCR", offline: "Local engines only", offlineShort: "local engines only" },
+      listen: { name: "Listen", standard: "Available; the session log keeps metrics, never text", secure: "Available; no session log", secureShort: "no session log", offline: "Available, models are local" },
       speak: { name: "Read aloud", standard: "System / neural / external server", secure: "Same as standard", offline: "System / neural; external server disabled", offlineShort: "no external server" },
       downloads: { name: "Model and voice pack downloads", standard: "Available", secure: "Available", offline: "No network; installed packs only", offlineShort: "no network" },
       history: { name: "History · favorites · cache", standard: "Saved", secure: "Nothing written; cleared on close", secureShort: "nothing written", offline: "Saved" },

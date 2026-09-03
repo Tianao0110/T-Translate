@@ -21,7 +21,8 @@ describe('privacy module matrix', () => {
     expect(moduleState('updates', 'offline')).toBe('off');
     expect(moduleState('speak', 'offline')).toBe('part'); // external server blocked
     expect(moduleState('history', 'secure')).toBe('off');
-    expect(moduleState('listen', 'secure')).toBe('off'); // stays disabled until the incognito audit
+    expect(moduleState('listen', 'secure')).toBe('part'); // runs, writes no session log
+    expect(moduleState('ocr', 'secure')).toBe('part'); // Windows OCR needs a temp file
     expect(moduleState('listen', 'offline')).toBe('on'); // models are local
   });
 

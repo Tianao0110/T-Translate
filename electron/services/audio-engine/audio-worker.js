@@ -24,6 +24,8 @@
 //        {type:'asr-stop'}               flush session, keep models warm
 //        {type:'unload', what}           'asr'|'tts' — release that engine's
 //                                        model files (idle eviction, pack swap)
+//        {type:'log-close'}              stop the session log (secure mode
+//                                        entered mid-session); session goes on
 //        {type:'shutdown'}               graceful process exit
 //        {type:'tts-load', pack}         load a voice pack (see TTS below)
 //        {type:'tts-generate', id, text, sid, speed, pack?}
@@ -1190,6 +1192,19 @@ function handleTtsGate(msg) {
   if (on) post({ type: 'level', value: 0 });
 }
 
+// Secure mode entered mid-session: the log stops here, the session goes on.
+function handleLogClose() {
+  if (!logStream) return;
+  const s = logStream;
+  logStream = null;
+  logText = false;
+  try {
+    s.end();
+  } catch {
+    // already closed
+  }
+}
+
 function handleShutdown() {
   if (shuttingDown) return;
   shuttingDown = true;
@@ -1221,6 +1236,7 @@ process.parentPort.on('message', (e) => {
     case 'capture-stop': return stopCapture();
     case 'asr-stop': return handleAsrStop();
     case 'unload': return handleUnload(msg.what);
+    case 'log-close': return handleLogClose();
     case 'shutdown': return handleShutdown();
     case 'tts-load': return handleTtsLoad(msg);
     case 'tts-generate': return handleTtsGenerate(msg);

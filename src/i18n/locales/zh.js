@@ -242,8 +242,8 @@ const zh = {
     detailTitle: "三种模式对比",
     modules: {
       translators: { name: "翻译源", standard: "本地 LLM 与在线源都可用", secure: "都可用", offline: "只用本地 LLM，在线源禁用", offlineShort: "仅本地 LLM" },
-      ocr: { name: "OCR", standard: "本地引擎 + 在线引擎", secure: "同标准", offline: "只用本地引擎", offlineShort: "仅本地引擎" },
-      listen: { name: "听译", standard: "可用；会话日志只记指标不记文字", secure: "不可用", secureShort: "暂不开放", offline: "可用，模型全在本机" },
+      ocr: { name: "OCR", standard: "本地引擎 + 在线引擎", secure: "不用 Windows OCR（它要把截图写成临时文件）", secureShort: "无 Windows OCR", offline: "只用本地引擎", offlineShort: "仅本地引擎" },
+      listen: { name: "听译", standard: "可用；会话日志只记指标不记文字", secure: "可用；不写会话日志", secureShort: "不写会话日志", offline: "可用，模型全在本机" },
       speak: { name: "朗读", standard: "系统语音 / 神经语音 / 外接服务", secure: "同标准", offline: "系统语音 / 神经语音；外接服务禁用", offlineShort: "外接服务禁用" },
       downloads: { name: "模型与语音包下载", standard: "可用", secure: "可用", offline: "不联网，只列已安装", offlineShort: "不联网" },
       history: { name: "历史 · 收藏 · 缓存", standard: "保存", secure: "不写盘，关闭即清", secureShort: "不写盘", offline: "保存" },

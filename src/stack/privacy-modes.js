@@ -47,7 +47,9 @@ export const PRIVACY_MODES = {
       ocr: true,
     },
     allowedProviders: null,
-    allowedOcrEngines: null,
+    // Windows OCR hands the capture to PowerShell as a temp file; incognito
+    // promises nothing touches disk, so it sits this mode out.
+    allowedOcrEngines: Object.values(OCR_ENGINES).filter((id) => id !== OCR_ENGINES.WINDOWS_OCR),
   },
 
   [PRIVACY_MODE_IDS.OFFLINE]: {
