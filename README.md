@@ -108,9 +108,7 @@ Three levels of privacy control. In offline mode, only local LLMs are used. Onli
 Settings → Privacy can export a **migration pack** (settings, glossary, favorites, custom languages) to import on another machine. API keys never travel with the pack — re-enter them on the new machine.
 
 <p align="center">
-  <img src="docs/screenshots/privacy-mode-standard.png" width="600" alt="Privacy standard modes">
-  <img src="docs/screenshots/privacy-mode-Incognito.png" width="600" alt="Privacy incognito modes">
-  <img src="docs/screenshots/privacy-mode-offline.png" width="600" alt="Privacy offline modes">
+  <img src="docs/screenshots/privacy-mode.png" width="600" alt="Privacy modes">
 </p>
 
 ### Multi-provider

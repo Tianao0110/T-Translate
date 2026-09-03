@@ -108,9 +108,7 @@
 设置 → 隐私可导出**迁移包**（设置、术语库、收藏、自定义语言），换机导入即用；API 密钥不随包迁移，需在新机重新填写。
 
 <p align="center">
-    <img src="docs/screenshots/privacy-mode-standard.png" width="600" alt="隐私正常模式">
-  <img src="docs/screenshots/privacy-mode-Incognito.png" width="600" alt="无痕模式">
-  <img src="docs/screenshots/privacy-mode-offline.png" width="600" alt="离线模式">
+  <img src="docs/screenshots/privacy-mode.png" width="600" alt="隐私模式">
 </p>
 
 ### 多翻译源
