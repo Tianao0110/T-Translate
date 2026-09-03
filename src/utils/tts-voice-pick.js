@@ -35,10 +35,11 @@ function supports(voice, lang) {
 }
 
 /**
- * voiceByLang: the user's per-language choice ({ zh: 'pack:sid', en: ... }),
- * treated as the default for that language — a mixed sentence still goes to
- * the preferMixed pack when one is installed. voiceId is the legacy single
- * choice and wins outright as long as its pack can read the language.
+ * voiceByLang: the user's per-language choice ({ zh: 'pack:sid', en: ... }).
+ * A chosen voice is final for its language — a mixed sentence goes to the
+ * preferMixed pack only when nothing was chosen for the detected language.
+ * voiceId is the legacy single choice and wins outright as long as its pack
+ * can read the language.
  * @returns the voice to use, or null when no installed pack covers the text
  *   (the caller falls back to system voices for that utterance).
  */
@@ -53,15 +54,15 @@ export function pickVoice(voices, { voiceByLang = {}, voiceId = '', lang = '', t
     if (chosen && supports(chosen, want)) return chosen;
   }
 
-  if (isMixedText(text)) {
-    const mixed = voices.filter((v) => v.preferMixed);
-    if (mixed.length) return mixed.find((v) => v.featured) || mixed[0];
-  }
-
   const pinnedId = want && voiceByLang ? voiceByLang[want] : '';
   if (pinnedId) {
     const pinned = voices.find((v) => v.id === pinnedId);
     if (pinned) return pinned;
+  }
+
+  if (isMixedText(text)) {
+    const mixed = voices.filter((v) => v.preferMixed);
+    if (mixed.length) return mixed.find((v) => v.featured) || mixed[0];
   }
 
   // Native voices first; a pack whose single speaker covers both languages

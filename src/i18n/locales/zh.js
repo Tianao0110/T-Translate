@@ -667,7 +667,8 @@ const zh = {
     showFeaturedVoices: "只看常用音色",
     voiceFor: "{{lang}}音色",
     autoVoice: "自动（常用音色）",
-    voiceByLangHint: "按文本语言用对应音色；中英夹杂在装了 MeloTTS 时用它",
+    voiceByLangHint: "按文本语言用对应音色；没指定的语言自动选，中英夹杂时优先 MeloTTS",
+    pitchUnsupported: "神经语音不支持调音调，只对系统语音生效",
     testTextEnglish: "This is a text-to-speech test, recorded on the 15th of September 2026.",
     neural: {
       female: "女声", male: "男声",

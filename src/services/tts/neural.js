@@ -104,7 +104,7 @@ export class NeuralTTSEngine extends BaseTTSEngine {
     const clean = (text || '').trim();
     if (!clean) return;
 
-    this.stop();
+    this._cancelActive();
     const voices = this._voices || (await this.getVoices());
     if (!voices.length) throw new Error('NO_VOICES');
     // voiceId is the system-voice choice (a SpeechSynthesis voice name, or a
@@ -232,7 +232,10 @@ export class NeuralTTSEngine extends BaseTTSEngine {
     this._setStatus(TTS_STATUS.SPEAKING);
   }
 
-  stop() {
+  // Drops whatever is in flight without touching the public status. A new
+  // speak() supersedes silently — the panel's play/stop toggle keys off
+  // SPEAKING staying set — and only stop() announces IDLE.
+  _cancelActive() {
     if (this._activeRequestId) {
       // Stops synthesis mid-text worker-side; whatever is queued is dropped.
       this._bridge()?.ttsCancel?.({ id: this._activeRequestId });
@@ -243,6 +246,10 @@ export class NeuralTTSEngine extends BaseTTSEngine {
       this._playback = null;
     }
     this._teardownAudio();
+  }
+
+  stop() {
+    this._cancelActive();
     this._setStatus(TTS_STATUS.IDLE);
   }
 

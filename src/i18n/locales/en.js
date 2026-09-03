@@ -667,7 +667,8 @@ const en = {
     showFeaturedVoices: "Featured voices only",
     voiceFor: "{{lang}} voice",
     autoVoice: "Auto (featured)",
-    voiceByLangHint: "Each language uses its own voice; mixed zh/en uses MeloTTS when installed",
+    voiceByLangHint: "Each language uses its chosen voice; unchosen languages auto-pick, mixed zh/en prefers MeloTTS",
+    pitchUnsupported: "Neural voices have no pitch control; this only affects system voices",
     testTextEnglish: "This is a text-to-speech test, recorded on the 15th of September 2026.",
     neural: {
       female: "female", male: "male",

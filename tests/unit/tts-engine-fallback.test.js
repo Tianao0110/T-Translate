@@ -104,6 +104,72 @@ describe('TTSManager with a live neural engine', () => {
   });
 });
 
+// Enough of WebAudio for the scheduling code: buffers, sources, gain, clock.
+class FakeAudioContext {
+  constructor() {
+    this.sampleRate = 48000;
+    this.currentTime = 0;
+    this.state = 'running';
+    this.destination = {};
+  }
+  createGain() { return { gain: { value: 1 }, connect() {} }; }
+  createBuffer(ch, len, rate) { return { duration: len / rate, copyToChannel() {} }; }
+  createBufferSource() { return { connect() {}, start() {}, stop() {}, onended: null }; }
+  close() { return Promise.resolve(); }
+  suspend() { return Promise.resolve(); }
+  resume() { return Promise.resolve(); }
+}
+
+function neuralBridge(voices) {
+  const bridge = {
+    ttsStatus: vi.fn(async () => ({ available: true })),
+    ttsVoices: vi.fn(async () => voices),
+    ttsGenerate: vi.fn(async () => ({ success: true })),
+    ttsCancel: vi.fn(),
+    onTtsChunk: vi.fn(() => () => {}),
+  };
+  window.electron = { audioEngine: bridge, store: { get: vi.fn(async () => null), set: vi.fn(async () => {}) } };
+  window.AudioContext = FakeAudioContext;
+  return bridge;
+}
+const zhVoiceFull = { id: 'tts-kokoro-zh-en:3', packId: 'tts-kokoro-zh-en', sid: 3, lang: 'zh', gender: 'f', n: 1, featured: true, preferMixed: false, languages: ['zh', 'en'], engine: 'kokoro' };
+
+describe('neural engine playback control', () => {
+  afterEach(() => {
+    delete window.AudioContext;
+  });
+
+  it('speak announces SPEAKING without an IDLE first, and stop() ends it (the panel toggle)', async () => {
+    const bridge = neuralBridge([zhVoiceFull]);
+    const engine = new NeuralTTSEngine({});
+    const seen = [];
+    engine.onStatusChange((s) => seen.push(s));
+    const speaking = engine.speak('你好', { lang: 'zh' });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(seen).toEqual(['speaking']);
+    expect(bridge.ttsGenerate).toHaveBeenCalledTimes(1);
+    engine.stop();
+    await speaking;
+    expect(seen).toEqual(['speaking', 'idle']);
+    expect(bridge.ttsCancel).toHaveBeenCalledWith({ id: bridge.ttsGenerate.mock.calls[0][0].id });
+  });
+
+  it('the manager passes rate and volume through to the worker request and the gain', async () => {
+    const bridge = neuralBridge([zhVoiceFull]);
+    await ttsManager.init({ enabled: true, engine: 'neural', rate: 1.5, volume: 0.6 });
+    expect(ttsManager.currentEngineId).toBe('neural');
+    const speaking = ttsManager.speak('你好', { lang: 'zh' });
+    await new Promise((r) => setTimeout(r, 0));
+    const req = bridge.ttsGenerate.mock.calls[0][0];
+    expect(req.speed).toBe(1.5);
+    expect(req.packId).toBe('tts-kokoro-zh-en');
+    expect(req.sid).toBe(3);
+    expect(ttsManager.currentEngine._gain.gain.value).toBe(0.6);
+    ttsManager.stop();
+    await speaking;
+  });
+});
+
 describe('TTSManager per-utterance fallback', () => {
   it('hands an uncovered language to web-speech and keeps the neural engine configured', async () => {
     window.electron = {

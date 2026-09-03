@@ -409,11 +409,13 @@ const TTSSection = ({ settings, updateSetting, notify, confirm }) => {
                 <label className="setting-label">{t('tts.pitch')}</label>
                 <span className="tts-slider-value">{ttsConfig.pitch.toFixed(1)}</span>
               </div>
+              {/* sherpa voices have no pitch input; the slider stays for system voices */}
               <input type="range" className="setting-range" min="0.5" max="2" step="0.1"
                 value={ttsConfig.pitch}
+                disabled={isNeural}
                 onChange={(e) => updateTTSConfig('pitch', parseFloat(e.target.value))}
               />
-              <p className="setting-hint">{t('tts.pitchHint')}</p>
+              <p className="setting-hint">{isNeural ? t('tts.pitchUnsupported') : t('tts.pitchHint')}</p>
             </div>
 
             <div className="setting-group tts-slider-item">
