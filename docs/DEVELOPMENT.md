@@ -324,7 +324,7 @@ await window.electron.stack.clearCache('all')
 - **离线模式冒烟**：`npm run smoke:offline`。真实 store 置离线，`net.fetch` / 全局 `fetch` / `http(s).request` 全部换成一碰就报错的绊线，逐个调 OCR / 听译 / 语音三个包管理器与它们的 IPC 处理器、再调检查更新与下载更新，断言每条都以 `OFFLINE_BLOCKED` 拒绝且绊线一次都没碰到。改闸门、加下载入口、发版前各跑一次。
 
 - **听译捕获层**：`electron/utils/win-audio-capture.js` 用 koffi 直调 WASAPI，跑在音频 worker 里。改它之后 `npm run smoke:listen` 会真开一次音频客户端断言流是否稳定送达（smoke 自己从隐藏窗口放一个近乎无声的振荡器：WASAPI 环回只在端点上有渲染流时才送包，机器完全静默时一包都没有，2026-09-02 实测）；要验真实声音得让机器出声，参考 gstack `v041-process-loopback-spike` 里的做法。三个 koffi 坑记在文件头：`koffi.address()` 不认 Buffer（结构体内存一律 `koffi.alloc`）、`void*` 参数不吃 Buffer、`koffi.proto` 的类型名是全局注册表（放模块作用域，否则第二次调用报 Duplicate type name）。
-- **听译会话日志**：`%APPDATA%/t-translate/logs/audio-probe-*.jsonl`，滚动 20 份，默认只有时长/耗时/VAD 指标。**识别出的文字默认不写**——要看文字加 `TT_LISTEN_LOG_TEXT=1` 再启动。
+- **听译会话日志**：`%APPDATA%/t-translate/logs/audio-probe-*.jsonl`，滚动 3 份（够解释最近一次故障即可），默认只有时长/耗时/VAD 指标。**识别出的文字默认不写**——要看文字加 `TT_LISTEN_LOG_TEXT=1` 再启动。
 - **网络请求**：主进程栈的请求不经过渲染端 DevTools Network 面板，看日志或在 provider 里临时加 log。
 
 ## ✅ 提交前检查

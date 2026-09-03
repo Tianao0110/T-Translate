@@ -31,7 +31,9 @@ const TTS_IDLE_MS = 60000;
 const TTS_UNLOAD_WAIT_MS = 5000;
 // Rolling cap — one file per session, oldest pruned first. Filename prefix
 // stays 'audio-probe-' so the accumulated tuning logs keep sorting together.
-const MAX_PROBE_LOGS = 20;
+// Three is enough: the log holds metrics and errors, never content, and its
+// only job is to explain the most recent failure (user's call 2026-09-03).
+const MAX_PROBE_LOGS = 3;
 
 let deps = null; // { store, getWindow }
 let child = null;
