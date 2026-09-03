@@ -92,11 +92,15 @@ const TTSSection = ({ settings, updateSetting, notify, confirm }) => {
   // Neural packs carry a hundred speakers; the picker opens on the featured
   // few and unfolds the rest on request.
   const [showAllVoices, setShowAllVoices] = useState(false);
+  // Which per-language preview button is playing ('' = the main one).
+  const [testingLang, setTestingLang] = useState('');
 
   const ttsConfig = {
     ...DEFAULT_TTS_CONFIG,
     ...(settings?.tts || {}),
   };
+  const voiceByLang = ttsConfig.voiceByLang || {};
+  const isNeural = ttsConfig.engine === 'neural' && availableEngines.includes('neural');
 
   const loadVoices = useCallback(async () => {
     setIsLoadingVoices(true);
@@ -176,20 +180,29 @@ const TTSSection = ({ settings, updateSetting, notify, confirm }) => {
     return { text: t('tts.testFailed') + ': ' + e.message, type: 'error' };
   };
 
-  const handleTest = async () => {
+  // lang = 'zh' | 'en' previews that language's own voice; '' is the main
+  // button (mixed text once a specific voice or the neural engine is chosen).
+  const handleTest = async (lang = '') => {
     // Same button toggles play and stop
     if (isTesting || ttsStatus === TTS_STATUS.SPEAKING) {
       ttsManager.stop();
       setIsTesting(false);
+      setTestingLang('');
       return;
     }
     setIsTesting(true);
+    setTestingLang(lang);
     try {
-      // Pick test text by whether a specific voice was selected (mixed-lang for any voice, zh-only for auto)
-      const testText = ttsConfig.voiceId ? t('tts.testTextMixed') : t('tts.testTextChinese');
+      const testText = lang === 'en'
+        ? t('tts.testTextEnglish')
+        : lang === 'zh' || (!isNeural && !ttsConfig.voiceId)
+          ? t('tts.testTextChinese')
+          : t('tts.testTextMixed');
       await ttsManager.speak(testText, {
-        lang: 'zh',
-        voiceId: ttsConfig.voiceId,
+        lang: lang || 'zh',
+        // Neural voices are chosen per language, not through the single id.
+        voiceId: isNeural ? '' : ttsConfig.voiceId,
+        voiceByLang,
         rate: ttsConfig.rate,
         pitch: ttsConfig.pitch,
         volume: ttsConfig.volume,
@@ -200,14 +213,24 @@ const TTSSection = ({ settings, updateSetting, notify, confirm }) => {
       notify?.(text, type);
     } finally {
       setIsTesting(false);
+      setTestingLang('');
     }
   };
 
   const hasHiddenVoices = voices.some((v) => v.featured === false);
-  const visibleVoices = useMemo(
-    () => (showAllVoices || !hasHiddenVoices ? voices : voices.filter((v) => v.featured !== false || v.id === ttsConfig.voiceId)),
-    [voices, showAllVoices, hasHiddenVoices, ttsConfig.voiceId]
-  );
+  const visibleVoices = useMemo(() => {
+    if (showAllVoices || !hasHiddenVoices) return voices;
+    const chosen = new Set([ttsConfig.voiceId, ...Object.values(voiceByLang)]);
+    return voices.filter((v) => v.featured !== false || chosen.has(v.id));
+  }, [voices, showAllVoices, hasHiddenVoices, ttsConfig.voiceId, voiceByLang]);
+
+  // Per-language rows (neural): voices native to the language, or, for a pack
+  // with one speaker covering both (MeloTTS), the ones that can read it.
+  const voicesFor = useCallback((lang) => {
+    const native = visibleVoices.filter((v) => v.lang === lang);
+    if (native.length) return native;
+    return visibleVoices.filter((v) => Array.isArray(v.languages) && v.languages.includes(lang));
+  }, [visibleVoices]);
 
   const groupedVoices = useMemo(() => {
     return visibleVoices.reduce((groups, voice) => {
@@ -291,16 +314,49 @@ const TTSSection = ({ settings, updateSetting, notify, confirm }) => {
               </span>
             </div>
 
+            {isNeural
+              ? ['zh', 'en'].map((lang) => {
+                const langVoices = voicesFor(lang);
+                return (
+                  <div className="setting-row" key={lang}>
+                    <label className="setting-label" style={{ minWidth: 72 }}>
+                      {t('tts.voiceFor', { lang: t(`tts.langNames.${lang}`) })}
+                    </label>
+                    <VoiceDropdown
+                      value={voiceByLang[lang] || ''}
+                      onChange={(id) => updateTTSConfig('voiceByLang', { ...voiceByLang, [lang]: id })}
+                      groupedVoices={{ [t(`tts.langNames.${lang}`)]: langVoices }}
+                      noVoices={langVoices.length === 0}
+                      isLoading={isLoadingVoices}
+                      autoLabel={t('tts.autoVoice')}
+                      emptyLabel="—"
+                    />
+                    <button
+                      className="setting-btn-icon"
+                      onClick={() => handleTest(lang)}
+                      disabled={langVoices.length === 0}
+                      title={isTesting && testingLang === lang ? t('tts.stop') : t('tts.play')}
+                    >
+                      {isTesting && testingLang === lang ? <Square size={14} /> : <Play size={14} />}
+                    </button>
+                  </div>
+                );
+              })
+              : (
+                <div className="setting-row">
+                  <VoiceDropdown
+                    value={ttsConfig.voiceId || ''}
+                    onChange={(id) => updateTTSConfig('voiceId', id)}
+                    groupedVoices={groupedVoices}
+                    noVoices={noVoices}
+                    isLoading={isLoadingVoices}
+                    autoLabel={t('tts.autoSelect')}
+                    emptyLabel="—"
+                  />
+                </div>
+              )}
+
             <div className="setting-row">
-              <VoiceDropdown
-                value={ttsConfig.voiceId || ''}
-                onChange={(id) => updateTTSConfig('voiceId', id)}
-                groupedVoices={groupedVoices}
-                noVoices={noVoices}
-                isLoading={isLoadingVoices}
-                autoLabel={t('tts.autoSelect')}
-                emptyLabel="—"
-              />
               <button
                 className="setting-btn-icon"
                 onClick={loadVoices}
@@ -331,7 +387,7 @@ const TTSSection = ({ settings, updateSetting, notify, confirm }) => {
             )}
 
             {!noVoices && !isLoadingVoices && (
-              <p className="setting-hint">{t('tts.autoSelectHint')}</p>
+              <p className="setting-hint">{isNeural ? t('tts.voiceByLangHint') : t('tts.autoSelectHint')}</p>
             )}
           </div>
 
@@ -376,7 +432,7 @@ const TTSSection = ({ settings, updateSetting, notify, confirm }) => {
           <div className="tts-preview">
             <button
               className={`tts-preview-btn ${isTesting ? 'stop' : 'play'}`}
-              onClick={handleTest}
+              onClick={() => handleTest('')}
               disabled={noVoices}
             >
               {isTesting ? <><Square size={14} />{t('tts.stop')}</> : <><Play size={14} />{t('tts.play')}</>}

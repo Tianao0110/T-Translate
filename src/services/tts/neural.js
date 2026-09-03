@@ -107,7 +107,12 @@ export class NeuralTTSEngine extends BaseTTSEngine {
     this.stop();
     const voices = this._voices || (await this.getVoices());
     if (!voices.length) throw new Error('NO_VOICES');
-    const voice = pickVoice(voices, { voiceId: options.voiceId, lang: options.lang, text: clean });
+    const voice = pickVoice(voices, {
+      voiceByLang: options.voiceByLang,
+      voiceId: options.voiceId,
+      lang: options.lang,
+      text: clean,
+    });
     if (!voice) {
       throw new Error(`NO_VOICE_FOR_LANG:${normalizeLang(options.lang) || detectTextLang(clean) || 'en'}`);
     }

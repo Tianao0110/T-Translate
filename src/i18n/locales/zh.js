@@ -665,6 +665,10 @@ const zh = {
     installVoiceHint: "未检测到语音包，请在系统设置 → 语言 → 语音中安装",
     showAllVoices: "全部音色（{{count}}）",
     showFeaturedVoices: "只看常用音色",
+    voiceFor: "{{lang}}音色",
+    autoVoice: "自动（常用音色）",
+    voiceByLangHint: "按文本语言用对应音色；中英夹杂在装了 MeloTTS 时用它",
+    testTextEnglish: "This is a text-to-speech test, recorded on the 15th of September 2026.",
     neural: {
       female: "女声", male: "男声",
       voiceName: "{{lang}}{{gender}} {{n}}",

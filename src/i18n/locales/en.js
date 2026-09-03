@@ -665,6 +665,10 @@ const en = {
     installVoiceHint: "No voice packs detected. Install them in System Settings → Language → Speech.",
     showAllVoices: "All voices ({{count}})",
     showFeaturedVoices: "Featured voices only",
+    voiceFor: "{{lang}} voice",
+    autoVoice: "Auto (featured)",
+    voiceByLangHint: "Each language uses its own voice; mixed zh/en uses MeloTTS when installed",
+    testTextEnglish: "This is a text-to-speech test, recorded on the 15th of September 2026.",
     neural: {
       female: "female", male: "male",
       voiceName: "{{lang}} {{gender}} {{n}}",

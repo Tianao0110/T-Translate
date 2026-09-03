@@ -35,10 +35,14 @@ function supports(voice, lang) {
 }
 
 /**
+ * voiceByLang: the user's per-language choice ({ zh: 'pack:sid', en: ... }),
+ * treated as the default for that language — a mixed sentence still goes to
+ * the preferMixed pack when one is installed. voiceId is the legacy single
+ * choice and wins outright as long as its pack can read the language.
  * @returns the voice to use, or null when no installed pack covers the text
  *   (the caller falls back to system voices for that utterance).
  */
-export function pickVoice(voices, { voiceId = '', lang = '', text = '' } = {}) {
+export function pickVoice(voices, { voiceByLang = {}, voiceId = '', lang = '', text = '' } = {}) {
   if (!Array.isArray(voices) || voices.length === 0) return null;
   const want = normalizeLang(lang) || detectTextLang(text);
 
@@ -54,7 +58,16 @@ export function pickVoice(voices, { voiceId = '', lang = '', text = '' } = {}) {
     if (mixed.length) return mixed.find((v) => v.featured) || mixed[0];
   }
 
-  const candidates = want ? voices.filter((v) => v.lang === want) : voices;
+  const pinnedId = want && voiceByLang ? voiceByLang[want] : '';
+  if (pinnedId) {
+    const pinned = voices.find((v) => v.id === pinnedId);
+    if (pinned) return pinned;
+  }
+
+  // Native voices first; a pack whose single speaker covers both languages
+  // (MeloTTS is 'zh' but reads 'en') still counts before giving up.
+  let candidates = want ? voices.filter((v) => v.lang === want) : voices;
+  if (!candidates.length && want) candidates = voices.filter((v) => supports(v, want));
   if (!candidates.length) return null;
   return candidates.find((v) => v.featured) || candidates[0];
 }

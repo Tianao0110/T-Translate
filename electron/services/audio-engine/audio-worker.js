@@ -70,6 +70,7 @@ const {
   makeAgc,
   pickCutWindow,
 } = require('./probe-metrics');
+const { hasCjk, verbalizeEnglishNumbers } = require('./tts-text-en');
 
 const SAMPLE_RATE = 16000;
 const VAD_WINDOW = 512;
@@ -1107,6 +1108,10 @@ function handleTtsGenerate(msg) {
   const sid = Number.isInteger(msg.sid) && msg.sid >= 0 ? msg.sid : 0;
   const speed = Number.isFinite(msg.speed) && msg.speed > 0 ? Math.min(3, Math.max(0.3, msg.speed)) : 1;
 
+  // The packs' Chinese rule FSTs would read English digits in Chinese;
+  // English text gets its numbers spelled out first (tts-text-en).
+  const spoken = hasCjk(text) ? text : verbalizeEnglishNumbers(text);
+
   ttsChain = ttsChain
     .then(async () => {
       if (ttsCancelled.delete(id)) return post({ type: 'tts-done', id, cancelled: true });
@@ -1117,7 +1122,7 @@ function handleTtsGenerate(msg) {
       let sampleRate = engine.sampleRate;
       let cancelled = false;
       await engine.generateAsync({
-        text,
+        text: spoken,
         sid: Math.min(sid, Math.max(0, engine.numSpeakers - 1)),
         speed,
         enableExternalBuffer: false,

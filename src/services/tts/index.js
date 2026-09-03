@@ -28,7 +28,8 @@ export const DEFAULT_TTS_CONFIG = {
   rate: 1.0,
   pitch: 1.0,
   volume: 0.8,
-  voiceId: '', // empty = auto-pick by language
+  voiceId: '', // empty = auto-pick by language (system voices)
+  voiceByLang: {}, // neural voices: { zh: 'pack:sid', en: 'pack:sid' }, missing = featured voice
 };
 
 class TTSManager {
@@ -243,6 +244,7 @@ class TTSManager {
       pitch: this._config.pitch,
       volume: this._config.volume,
       voiceId: this._config.voiceId,
+      voiceByLang: this._config.voiceByLang,
       ...options,
     };
 

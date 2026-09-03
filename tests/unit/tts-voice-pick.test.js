@@ -79,6 +79,29 @@ describe('pickVoice', () => {
     expect(pickVoice(both, { voiceId: 'tts-kokoro-zh-en:3', lang: 'zh', text: '我们用 Kokoro 做 TTS' }).sid).toBe(3);
   });
 
+  it('per-language choices apply to their own language only', () => {
+    const byLang = { zh: 'tts-kokoro-zh-en:58', en: 'tts-kokoro-zh-en:1' };
+    expect(pickVoice(kokoroOnly, { voiceByLang: byLang, lang: 'zh', text: '你好' }).sid).toBe(58);
+    expect(pickVoice(kokoroOnly, { voiceByLang: byLang, lang: 'en', text: 'hello' }).sid).toBe(1);
+    // auto language still resolves from the text
+    expect(pickVoice(kokoroOnly, { voiceByLang: byLang, text: 'hello there' }).sid).toBe(1);
+  });
+
+  it('a per-language choice whose voice is gone falls back to the featured voice', () => {
+    expect(pickVoice(kokoroOnly, { voiceByLang: { en: 'tts-kokoro-zh-en:99' }, lang: 'en', text: 'hi' }).sid).toBe(0);
+  });
+
+  it('mixed text still prefers the mixed pack over per-language choices', () => {
+    const byLang = { zh: 'tts-kokoro-zh-en:58' };
+    expect(pickVoice(both, { voiceByLang: byLang, lang: 'zh', text: '我们用 Kokoro 做 TTS' }).packId).toBe('tts-melo-zh-en');
+    // without the mixed pack, the Chinese choice reads it
+    expect(pickVoice(kokoroOnly, { voiceByLang: byLang, lang: 'zh', text: '我们用 Kokoro 做 TTS' }).sid).toBe(58);
+  });
+
+  it('a single-speaker pack that covers the language is used when no native voice exists', () => {
+    expect(pickVoice([melo], { lang: 'en', text: 'hello' }).packId).toBe('tts-melo-zh-en');
+  });
+
   it('returns null when no pack covers the language (caller falls back to system voices)', () => {
     expect(pickVoice(both, { lang: 'ja', text: 'こんにちは' })).toBeNull();
     expect(pickVoice([], { lang: 'zh', text: '你好' })).toBeNull();
