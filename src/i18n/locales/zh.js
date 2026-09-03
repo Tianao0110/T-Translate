@@ -666,7 +666,9 @@ const zh = {
       voicePlaceholder: "alloy",
       test: "测试并试听",
       testing: "测试中...",
-      testOk: "连通：{{ms}} 毫秒返回 {{kb}} KB 音频"
+      testOk: "连通：{{ms}} 毫秒返回 {{kb}} KB 音频",
+      notTested: "未测试",
+      testFailedShort: "连接失败"
     },
     defaultVoice: "默认语音", autoSelect: "自动选择", refreshVoices: "刷新语音列表",
     voicesLoaded: "已加载 {{count}} 个可用语音", autoSelectHint: "自动根据文本语言选择合适的语音",

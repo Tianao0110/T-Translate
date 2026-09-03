@@ -666,7 +666,9 @@ const en = {
       voicePlaceholder: "alloy",
       test: "Test and listen",
       testing: "Testing...",
-      testOk: "Connected: {{kb}} KB of audio in {{ms}} ms"
+      testOk: "Connected: {{kb}} KB of audio in {{ms}} ms",
+      notTested: "Not tested",
+      testFailedShort: "Connection failed"
     },
     defaultVoice: "Default Voice", autoSelect: "Auto Select", refreshVoices: "Refresh Voices",
     voicesLoaded: "{{count}} voices available", autoSelectHint: "Auto select voice based on text language",

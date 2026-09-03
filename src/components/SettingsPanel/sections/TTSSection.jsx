@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Play, Square, RefreshCw, AlertTriangle, ChevronDown, Check } from 'lucide-react';
+import { Play, Square, RefreshCw, AlertTriangle, ChevronDown, Check, Zap } from 'lucide-react';
 import ttsManager, { DEFAULT_TTS_CONFIG, TTS_STATUS } from '../../../services/tts/index.js';
 import stackClient from '../../../services/stack-client.js';
 import PackList from './PackList.jsx';
@@ -109,6 +109,8 @@ const TTSSection = ({ settings, updateSetting, notify, confirm }) => {
   // Typed but not yet vaulted; cleared once encrypted.
   const [draftKey, setDraftKey] = useState('');
   const [endpointTesting, setEndpointTesting] = useState(false);
+  // Last test outcome for the status row: null | { success, ms, kb, error }
+  const [endpointTest, setEndpointTest] = useState(null);
 
   const loadVoices = useCallback(async () => {
     setIsLoadingVoices(true);
@@ -226,10 +228,12 @@ const TTSSection = ({ settings, updateSetting, notify, confirm }) => {
         sampleText: t('tts.testTextMixed'),
       });
       if (!res?.success) {
-        notify?.(res?.code === 'OFFLINE_BLOCKED' ? t('ttsEndpoint.offline') : (res?.error || t('tts.testFailed')), 'error');
+        const error = res?.code === 'OFFLINE_BLOCKED' ? t('ttsEndpoint.offline') : (res?.error || t('tts.testFailed'));
+        setEndpointTest({ success: false, error });
+        notify?.(error, 'error');
         return;
       }
-      notify?.(t('tts.endpoint.testOk', { ms: res.ms, kb: (res.bytes / 1024).toFixed(0) }), 'success');
+      setEndpointTest({ success: true, ms: res.ms, kb: (res.bytes / 1024).toFixed(0) });
       const ctx = new AudioContext();
       const buffer = await ctx.decodeAudioData(res.audio);
       const source = ctx.createBufferSource();
@@ -241,11 +245,21 @@ const TTSSection = ({ settings, updateSetting, notify, confirm }) => {
       source.onended = () => ctx.close().catch(() => {});
       source.start();
     } catch (e) {
+      setEndpointTest({ success: false, error: e.message });
       notify?.(t('tts.testFailed') + ': ' + e.message, 'error');
     } finally {
       setEndpointTesting(false);
     }
   }, [endpointCfg.baseUrl, endpointCfg.model, endpointCfg.voice, draftKey, ttsConfig.volume, notify, t]);
+
+  const endpointStatusText = endpointTest === null
+    ? t('tts.endpoint.notTested')
+    : endpointTest.success
+      ? t('tts.endpoint.testOk', { ms: endpointTest.ms, kb: endpointTest.kb })
+      : `${t('tts.endpoint.testFailedShort')}: ${endpointTest.error}`;
+  const endpointStatusColor = endpointTest === null
+    ? 'var(--text-tertiary)'
+    : endpointTest.success ? 'var(--success)' : 'var(--error)';
 
   // Maps thrown error strings (from web-speech.speak()) to localized UI messages.
   // NO_VOICES = OS has no speech voices installed at all; NO_VOICE_FOR_LANG = none match the target lang.
@@ -386,63 +400,78 @@ const TTSSection = ({ settings, updateSetting, notify, confirm }) => {
             </PackList>
           )}
 
-          {/* External OpenAI-compatible server. Fields persist like any tts
-              setting; the key goes to the vault via saveEndpointKey. */}
+          {/* External OpenAI-compatible server, laid out like a translation
+              provider card (ProviderSettings ps-* classes, user's call
+              2026-09-02): labeled full-width fields and a test row with a
+              status dot. Fields persist like any tts setting; the key goes to
+              the vault via saveEndpointKey. */}
           {window.electron?.stack?.ttsSpeak && (
             <div className="setting-group">
               <label className="setting-label">{t('tts.endpoint.title')}</label>
-              <div className="setting-row">
-                <input
-                  type="text"
-                  className="setting-input compact"
-                  placeholder={t('tts.endpoint.baseUrlPlaceholder')}
-                  title={t('tts.endpoint.baseUrl')}
-                  value={endpointCfg.baseUrl}
-                  onChange={(e) => updateEndpoint({ baseUrl: e.target.value })}
-                />
-              </div>
-              <div className="setting-row">
-                <input
-                  type="password"
-                  className="setting-input compact"
-                  placeholder={endpointCfg.hasKey ? t('tts.endpoint.keySaved') : t('tts.endpoint.apiKeyPlaceholder')}
-                  title={t('tts.endpoint.apiKey')}
-                  value={draftKey}
-                  onChange={(e) => setDraftKey(e.target.value)}
-                  onBlur={saveEndpointKey}
-                  autoComplete="off"
-                />
-                {endpointCfg.hasKey && (
-                  <button className="btn-small" onClick={clearEndpointKey} title={t('tts.endpoint.clearKey')}>
-                    {t('tts.endpoint.clearKey')}
+              <div className="ps-config-form">
+                <div className="ps-field">
+                  <label className="ps-label">{t('tts.endpoint.baseUrl')}<span className="ps-required">*</span></label>
+                  <input
+                    type="text"
+                    className="ps-input"
+                    placeholder={t('tts.endpoint.baseUrlPlaceholder')}
+                    value={endpointCfg.baseUrl}
+                    onChange={(e) => updateEndpoint({ baseUrl: e.target.value })}
+                  />
+                </div>
+                <div className="ps-field">
+                  <label className="ps-label">{t('tts.endpoint.apiKey')}</label>
+                  <div className="ps-input-group">
+                    <input
+                      type="password"
+                      className="ps-input"
+                      placeholder={endpointCfg.hasKey ? t('tts.endpoint.keySaved') : t('tts.endpoint.apiKeyPlaceholder')}
+                      value={draftKey}
+                      onChange={(e) => setDraftKey(e.target.value)}
+                      onBlur={saveEndpointKey}
+                      autoComplete="off"
+                    />
+                    {endpointCfg.hasKey && (
+                      <button type="button" className="ps-input-btn" onClick={clearEndpointKey} title={t('tts.endpoint.clearKey')}>
+                        {t('tts.endpoint.clearKey')}
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="ps-field">
+                  <label className="ps-label">{t('tts.endpoint.model')}</label>
+                  <input
+                    type="text"
+                    className="ps-input"
+                    placeholder={t('tts.endpoint.modelPlaceholder')}
+                    value={endpointCfg.model}
+                    onChange={(e) => updateEndpoint({ model: e.target.value })}
+                  />
+                </div>
+                <div className="ps-field">
+                  <label className="ps-label">{t('tts.endpoint.voice')}</label>
+                  <input
+                    type="text"
+                    className="ps-input"
+                    placeholder={t('tts.endpoint.voicePlaceholder')}
+                    value={endpointCfg.voice}
+                    onChange={(e) => updateEndpoint({ voice: e.target.value })}
+                  />
+                </div>
+                <div className="ps-test-row">
+                  <button
+                    className={`ps-test-btn ${endpointTest?.success ? 'success' : endpointTest?.success === false ? 'error' : ''}`}
+                    onClick={testEndpoint}
+                    disabled={endpointTesting || !endpointCfg.baseUrl.trim()}
+                  >
+                    {endpointTesting ? <RefreshCw size={14} className="spinning" /> : <Zap size={14} />}
+                    <span>{endpointTesting ? t('tts.endpoint.testing') : t('tts.endpoint.test')}</span>
                   </button>
-                )}
-              </div>
-              <div className="setting-row">
-                <input
-                  type="text"
-                  className="setting-input compact"
-                  placeholder={t('tts.endpoint.modelPlaceholder')}
-                  title={t('tts.endpoint.model')}
-                  value={endpointCfg.model}
-                  onChange={(e) => updateEndpoint({ model: e.target.value })}
-                />
-                <input
-                  type="text"
-                  className="setting-input compact"
-                  placeholder={t('tts.endpoint.voicePlaceholder')}
-                  title={t('tts.endpoint.voice')}
-                  value={endpointCfg.voice}
-                  onChange={(e) => updateEndpoint({ voice: e.target.value })}
-                />
-                <button
-                  className="btn-small"
-                  onClick={testEndpoint}
-                  disabled={endpointTesting || !endpointCfg.baseUrl.trim()}
-                >
-                  {endpointTesting ? <RefreshCw size={12} className="spinning" /> : <Play size={12} />}
-                  <span style={{ marginLeft: 4 }}>{endpointTesting ? t('tts.endpoint.testing') : t('tts.endpoint.test')}</span>
-                </button>
+                  <div className="ps-status">
+                    <span className="ps-status-dot" style={{ background: endpointStatusColor }}></span>
+                    <span>{endpointStatusText}</span>
+                  </div>
+                </div>
               </div>
               <p className="setting-hint">{t('tts.endpoint.hint')}</p>
             </div>
