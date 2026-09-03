@@ -344,6 +344,16 @@ int8 版本是负优化（x86 上比 fp32 慢 4 倍且不随线程数涨），�
 **实测**（`npm run smoke:listen` TTS 段，Ryzen 9 7945HX）：kokoro 英文首块 0.64s、2.6s 音频合成 0.64s；
 kokoro 中文换包含载入首块 1.5s；MeloTTS 冷启动（含进程与包载入）首块 2.6s。
 
+**外接语音服务（第三个引擎，`src/stack/tts/endpoint.js`）**：只做 OpenAI 兼容 `POST {baseUrl}/v1/audio/speech`
+（model / input / voice / speed / response_format=wav），本地 IndexTTS、GPT-SoVITS、CosyVoice、kokoro-fastapi 的
+服务端和 OpenAI 都吃这一个协议。请求模块放在翻译栈里，与翻译源同一条铁律：`rtFetch`（= `net.fetch`，系统代理）、
+不抛异常、错误文案走 `_t`。三个通道 `stack:tts-capability / tts-speak / tts-test` 在 `translation-stack.js` 里
+按请求读隐私模式——**离线模式一律拒绝**（`OFFLINE_BLOCKED`），密钥前缀 `tts_endpoint_` 同时在密钥库的离线
+封锁名单上，所以离线时连解密都不发生。`tts-speak` 进 in-flight 表，渲染端停止即 `stack:abort` 中断 HTTP。
+渲染端 `src/services/tts/endpoint.js` 整段拿到字节后 `decodeAudioData` 播放（首版不分块）；服务不可达 / 非音频
+应答 / 离线都抛 `ENDPOINT_*`，`TTSManager` 逐句回落系统语音。设置页只有地址 / 密钥 / 模型 / 音色四个字段和
+一个「测试并试听」（用一句真合成当连通性检查，没有标准的探活路由）；密钥失焦即入库，settings 里只记 `hasKey`。
+
 ## 命名规范
 
 | 类别 | 规范 | 示例 |

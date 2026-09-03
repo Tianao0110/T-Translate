@@ -3,12 +3,14 @@
 import { TTS_STATUS } from './base.js';
 import WebSpeechEngine from './web-speech.js';
 import NeuralTTSEngine from './neural.js';
+import EndpointTTSEngine from './endpoint.js';
 import createLogger from '../../utils/logger.js';
 const logger = createLogger('TTSManager');
 
 export { BaseTTSEngine, TTS_STATUS } from './base.js';
 export { WebSpeechEngine } from './web-speech.js';
 export { NeuralTTSEngine } from './neural.js';
+export { EndpointTTSEngine } from './endpoint.js';
 
 const engines = {
   'web-speech': WebSpeechEngine,
@@ -16,6 +18,9 @@ const engines = {
   // installed (isAvailable); the settings page hides the engine picker
   // otherwise, so nothing in the UI claims it prematurely.
   'neural': NeuralTTSEngine,
+  // External OpenAI-compatible server: offered while an address is set and
+  // the privacy mode is not offline (main-side capability probe).
+  'endpoint': EndpointTTSEngine,
 };
 
 // web-speech is the zero-download floor: always present, so a configured
@@ -30,6 +35,9 @@ export const DEFAULT_TTS_CONFIG = {
   volume: 0.8,
   voiceId: '', // empty = auto-pick by language (system voices)
   voiceByLang: {}, // neural voices: { zh: 'pack:sid', en: 'pack:sid' }, missing = featured voice
+  // External server (OpenAI-compatible). The key lives in the vault under
+  // tts_endpoint_apiKey; hasKey only records that one was saved.
+  endpoint: { baseUrl: '', model: '', voice: '', hasKey: false },
 };
 
 class TTSManager {
@@ -256,7 +264,12 @@ class TTSManager {
       // of failing it. The configured engine stays; the next utterance in a
       // covered language goes neural again.
       const msg = e?.message || '';
-      const coverable = msg.startsWith('NO_VOICE_FOR_LANG:') || msg === 'NO_VOICES' || msg === 'NEURAL_UNAVAILABLE';
+      const coverable =
+        msg.startsWith('NO_VOICE_FOR_LANG:') ||
+        msg === 'NO_VOICES' ||
+        msg === 'NEURAL_UNAVAILABLE' ||
+        // server down / offline mode / bad reply: the sentence still gets read
+        msg.startsWith('ENDPOINT_');
       if (!coverable || this._currentEngineId === FALLBACK_ENGINE_ID) throw e;
       logger.warn(`[TTS] ${this._currentEngineId} cannot read this text (${msg}); falling back to system voices`);
       return this._speakWithFallback(text, { ...mergedOptions, voiceId: '' });

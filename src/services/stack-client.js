@@ -274,6 +274,48 @@ class StackClient {
       return { available: false, reason: e.message };
     }
   }
+
+  // ===== External TTS endpoint (services/tts/endpoint.js is the consumer) =====
+
+  // Cancels one tracked request by id (the facade aborts its HTTP call).
+  abortRequest(requestId) {
+    const b = bridge();
+    if (!b?.abort || !requestId) return;
+    b.abort(requestId).catch(() => {});
+  }
+
+  async getTtsCapability() {
+    const b = bridge();
+    if (!b?.ttsCapability) return { available: false, reason: 'unavailable' };
+    try {
+      return await b.ttsCapability();
+    } catch (e) {
+      logger.error('tts capability IPC failed:', e);
+      return { available: false, reason: e.message };
+    }
+  }
+
+  async ttsSpeak(payload) {
+    const b = bridge();
+    if (!b?.ttsSpeak) return { success: false, error: NO_BRIDGE.error };
+    try {
+      return await b.ttsSpeak(payload);
+    } catch (e) {
+      logger.error('tts speak IPC failed:', e);
+      return { success: false, error: e.message };
+    }
+  }
+
+  async ttsTest(config) {
+    const b = bridge();
+    if (!b?.ttsTest) return { success: false, error: NO_BRIDGE.error };
+    try {
+      return await b.ttsTest(config);
+    } catch (e) {
+      logger.error('tts test IPC failed:', e);
+      return { success: false, error: e.message };
+    }
+  }
 }
 
 const stackClient = new StackClient();

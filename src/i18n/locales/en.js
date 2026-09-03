@@ -649,7 +649,25 @@ const en = {
     enableTTS: "Enable Text-to-Speech", enableHint: "Show speak button in translation panel",
     engine: "Speech Engine",
     engineHint: "System voices work with zero downloads; neural voices sound more natural but need an installed voice pack",
-    engineNames: { "web-speech": "System Voices", neural: "Neural Voices" },
+    engineNames: { "web-speech": "System Voices", neural: "Neural Voices", endpoint: "External Server" },
+    endpoint: {
+      title: "External speech server",
+      hint: "Any OpenAI-compatible /v1/audio/speech server: a local IndexTTS, GPT-SoVITS, CosyVoice or kokoro-fastapi, or OpenAI itself. Set an address and \"External Server\" appears under Speech Engine; unavailable in offline mode",
+      baseUrl: "Server address",
+      baseUrlPlaceholder: "http://localhost:8880",
+      apiKey: "API key",
+      apiKeyPlaceholder: "Leave empty if none",
+      keySaved: "Key saved",
+      clearKey: "Clear key",
+      keySaveFailed: "Could not save the key: system encryption unavailable",
+      model: "Model",
+      modelPlaceholder: "tts-1",
+      voice: "Voice",
+      voicePlaceholder: "alloy",
+      test: "Test and listen",
+      testing: "Testing...",
+      testOk: "Connected: {{kb}} KB of audio in {{ms}} ms"
+    },
     defaultVoice: "Default Voice", autoSelect: "Auto Select", refreshVoices: "Refresh Voices",
     voicesLoaded: "{{count}} voices available", autoSelectHint: "Auto select voice based on text language",
     rate: "Rate", rateHint: "Adjust speaking speed, 1.0 is normal",
@@ -898,6 +916,16 @@ const en = {
   // ===== Tray menu keys =====
   titleBar: {
     minimize: "Minimize", maximize: "Maximize", restore: "Restore", close: "Close"
+  },
+  ttsEndpoint: {
+    notConfigured: "No server address set",
+    cancelled: "Cancelled",
+    timeout: "The speech server did not respond in time",
+    unreachable: "Cannot reach the speech server: {{message}}",
+    unauthorized: "The speech server rejected the key (HTTP {{status}})",
+    httpError: "The speech server returned HTTP {{status}}: {{detail}}",
+    notAudio: "The speech server returned no audio: {{detail}}",
+    offline: "Offline mode never uses the network; the external speech server is unavailable"
   },
   providerError: {
     requestTimeout: "Request timeout — you can raise the timeout in provider settings",

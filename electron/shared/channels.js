@@ -168,6 +168,11 @@ const CHANNELS = {
     OCR_RESET_VISION: 'stack:ocr-reset-vision',
     VISION_CHAT: 'stack:vision-chat',             // path B: prompt + capture to a vision model
     VISION_CAPABILITY: 'stack:vision-capability', // may path B run under the live privacy mode?
+    // External TTS endpoint (OpenAI-compatible /v1/audio/speech), v0.4.2.
+    // Offline mode refuses all three main-side; the key stays in the vault.
+    TTS_CAPABILITY: 'stack:tts-capability',       // configured + allowed under the live privacy mode?
+    TTS_SPEAK: 'stack:tts-speak',                 // {requestId, text, voice, speed} → {success, audio}
+    TTS_TEST: 'stack:tts-test',                   // settings page: synthesize a sample with a draft config
   },
   // Listen-translate (audio engine). Hosted by the floating window's listen
   // mode; the mode entry is always visible but disabled until an ASR base

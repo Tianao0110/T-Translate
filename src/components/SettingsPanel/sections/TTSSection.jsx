@@ -5,6 +5,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useTranslation } from 'react-i18next';
 import { Play, Square, RefreshCw, AlertTriangle, ChevronDown, Check } from 'lucide-react';
 import ttsManager, { DEFAULT_TTS_CONFIG, TTS_STATUS } from '../../../services/tts/index.js';
+import stackClient from '../../../services/stack-client.js';
 import PackList from './PackList.jsx';
 import createLogger from '../../../utils/logger.js';
 const logger = createLogger('TTSSection');
@@ -101,6 +102,13 @@ const TTSSection = ({ settings, updateSetting, notify, confirm }) => {
   };
   const voiceByLang = ttsConfig.voiceByLang || {};
   const isNeural = ttsConfig.engine === 'neural' && availableEngines.includes('neural');
+  const isEndpoint = ttsConfig.engine === 'endpoint' && availableEngines.includes('endpoint');
+  // sherpa voices and the OpenAI speech route have no pitch input.
+  const noPitch = isNeural || isEndpoint;
+  const endpointCfg = { ...DEFAULT_TTS_CONFIG.endpoint, ...(ttsConfig.endpoint || {}) };
+  // Typed but not yet vaulted; cleared once encrypted.
+  const [draftKey, setDraftKey] = useState('');
+  const [endpointTesting, setEndpointTesting] = useState(false);
 
   const loadVoices = useCallback(async () => {
     setIsLoadingVoices(true);
@@ -164,6 +172,80 @@ const TTSSection = ({ settings, updateSetting, notify, confirm }) => {
     updateSetting('tts', key, value, true);
     ttsManager.updateConfig({ [key]: value });
   }, [updateSetting]);
+
+  // Plain endpoint fields persist like any tts setting; the address decides
+  // whether the engine is offered, so the engine list follows.
+  const updateEndpoint = useCallback(async (patch) => {
+    const next = { ...endpointCfg, ...patch };
+    updateSetting('tts', 'endpoint', next, true);
+    await ttsManager.updateConfig({ endpoint: next });
+    if ('baseUrl' in patch) loadEngines();
+  }, [endpointCfg, updateSetting, loadEngines]);
+
+  // The key goes straight to the DPAPI vault (tts_endpoint_ prefix: offline
+  // mode blocks its decryption) and is never written into settings.
+  const saveEndpointKey = useCallback(async () => {
+    const value = draftKey.trim();
+    if (!value) return;
+    const ss = window.electron?.secureStorage;
+    let ok = false;
+    try {
+      const res = await ss?.encrypt?.('tts_endpoint_apiKey', value);
+      ok = !!res && res.success !== false;
+    } catch {
+      ok = false;
+    }
+    if (!ok) {
+      notify?.(t('tts.endpoint.keySaveFailed'), 'error');
+      return;
+    }
+    setDraftKey('');
+    updateEndpoint({ hasKey: true });
+  }, [draftKey, notify, t, updateEndpoint]);
+
+  const clearEndpointKey = useCallback(async () => {
+    try {
+      await window.electron?.secureStorage?.delete?.('tts_endpoint_apiKey');
+    } catch {
+      // nothing to clear
+    }
+    setDraftKey('');
+    updateEndpoint({ hasKey: false });
+  }, [updateEndpoint]);
+
+  // One real synthesis is the only honest connectivity test; the sample is
+  // played so the user hears the server's actual voice.
+  const testEndpoint = useCallback(async () => {
+    setEndpointTesting(true);
+    try {
+      const res = await stackClient.ttsTest({
+        baseUrl: endpointCfg.baseUrl,
+        model: endpointCfg.model,
+        voice: endpointCfg.voice,
+        ...(draftKey.trim() ? { apiKey: draftKey.trim() } : {}),
+        sampleText: t('tts.testTextMixed'),
+      });
+      if (!res?.success) {
+        notify?.(res?.code === 'OFFLINE_BLOCKED' ? t('ttsEndpoint.offline') : (res?.error || t('tts.testFailed')), 'error');
+        return;
+      }
+      notify?.(t('tts.endpoint.testOk', { ms: res.ms, kb: (res.bytes / 1024).toFixed(0) }), 'success');
+      const ctx = new AudioContext();
+      const buffer = await ctx.decodeAudioData(res.audio);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      const gain = ctx.createGain();
+      gain.gain.value = ttsConfig.volume;
+      source.connect(gain);
+      gain.connect(ctx.destination);
+      source.onended = () => ctx.close().catch(() => {});
+      source.start();
+    } catch (e) {
+      notify?.(t('tts.testFailed') + ': ' + e.message, 'error');
+    } finally {
+      setEndpointTesting(false);
+    }
+  }, [endpointCfg.baseUrl, endpointCfg.model, endpointCfg.voice, draftKey, ttsConfig.volume, notify, t]);
 
   // Maps thrown error strings (from web-speech.speak()) to localized UI messages.
   // NO_VOICES = OS has no speech voices installed at all; NO_VOICE_FOR_LANG = none match the target lang.
@@ -304,6 +386,69 @@ const TTSSection = ({ settings, updateSetting, notify, confirm }) => {
             </PackList>
           )}
 
+          {/* External OpenAI-compatible server. Fields persist like any tts
+              setting; the key goes to the vault via saveEndpointKey. */}
+          {window.electron?.stack?.ttsSpeak && (
+            <div className="setting-group">
+              <label className="setting-label">{t('tts.endpoint.title')}</label>
+              <div className="setting-row">
+                <input
+                  type="text"
+                  className="setting-input compact"
+                  placeholder={t('tts.endpoint.baseUrlPlaceholder')}
+                  title={t('tts.endpoint.baseUrl')}
+                  value={endpointCfg.baseUrl}
+                  onChange={(e) => updateEndpoint({ baseUrl: e.target.value })}
+                />
+              </div>
+              <div className="setting-row">
+                <input
+                  type="password"
+                  className="setting-input compact"
+                  placeholder={endpointCfg.hasKey ? t('tts.endpoint.keySaved') : t('tts.endpoint.apiKeyPlaceholder')}
+                  title={t('tts.endpoint.apiKey')}
+                  value={draftKey}
+                  onChange={(e) => setDraftKey(e.target.value)}
+                  onBlur={saveEndpointKey}
+                  autoComplete="off"
+                />
+                {endpointCfg.hasKey && (
+                  <button className="btn-small" onClick={clearEndpointKey} title={t('tts.endpoint.clearKey')}>
+                    {t('tts.endpoint.clearKey')}
+                  </button>
+                )}
+              </div>
+              <div className="setting-row">
+                <input
+                  type="text"
+                  className="setting-input compact"
+                  placeholder={t('tts.endpoint.modelPlaceholder')}
+                  title={t('tts.endpoint.model')}
+                  value={endpointCfg.model}
+                  onChange={(e) => updateEndpoint({ model: e.target.value })}
+                />
+                <input
+                  type="text"
+                  className="setting-input compact"
+                  placeholder={t('tts.endpoint.voicePlaceholder')}
+                  title={t('tts.endpoint.voice')}
+                  value={endpointCfg.voice}
+                  onChange={(e) => updateEndpoint({ voice: e.target.value })}
+                />
+                <button
+                  className="btn-small"
+                  onClick={testEndpoint}
+                  disabled={endpointTesting || !endpointCfg.baseUrl.trim()}
+                >
+                  {endpointTesting ? <RefreshCw size={12} className="spinning" /> : <Play size={12} />}
+                  <span style={{ marginLeft: 4 }}>{endpointTesting ? t('tts.endpoint.testing') : t('tts.endpoint.test')}</span>
+                </button>
+              </div>
+              <p className="setting-hint">{t('tts.endpoint.hint')}</p>
+            </div>
+          )}
+
+          {!isEndpoint && (
           <div className="setting-group">
             <div className="tts-slider-header">
               <label className="setting-label">{t('tts.defaultVoice')}</label>
@@ -390,6 +535,7 @@ const TTSSection = ({ settings, updateSetting, notify, confirm }) => {
               <p className="setting-hint">{isNeural ? t('tts.voiceByLangHint') : t('tts.autoSelectHint')}</p>
             )}
           </div>
+          )}
 
           <div className="tts-slider-group">
             <div className="setting-group tts-slider-item">
@@ -412,10 +558,10 @@ const TTSSection = ({ settings, updateSetting, notify, confirm }) => {
               {/* sherpa voices have no pitch input; the slider stays for system voices */}
               <input type="range" className="setting-range" min="0.5" max="2" step="0.1"
                 value={ttsConfig.pitch}
-                disabled={isNeural}
+                disabled={noPitch}
                 onChange={(e) => updateTTSConfig('pitch', parseFloat(e.target.value))}
               />
-              <p className="setting-hint">{isNeural ? t('tts.pitchUnsupported') : t('tts.pitchHint')}</p>
+              <p className="setting-hint">{noPitch ? t('tts.pitchUnsupported') : t('tts.pitchHint')}</p>
             </div>
 
             <div className="setting-group tts-slider-item">
@@ -435,11 +581,11 @@ const TTSSection = ({ settings, updateSetting, notify, confirm }) => {
             <button
               className={`tts-preview-btn ${isTesting ? 'stop' : 'play'}`}
               onClick={() => handleTest('')}
-              disabled={noVoices}
+              disabled={noVoices && !isEndpoint}
             >
               {isTesting ? <><Square size={14} />{t('tts.stop')}</> : <><Play size={14} />{t('tts.play')}</>}
             </button>
-            {noVoices && <span className="tts-preview-status">{t('tts.noVoicesInstalled')}</span>}
+            {noVoices && !isEndpoint && <span className="tts-preview-status">{t('tts.noVoicesInstalled')}</span>}
           </div>
         </>
       )}

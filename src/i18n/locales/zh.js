@@ -649,7 +649,25 @@ const zh = {
     enableTTS: "启用文本朗读", enableHint: "在翻译面板显示朗读按钮",
     engine: "语音引擎",
     engineHint: "系统语音零下载即可用；神经语音音质更自然，需已安装语音包",
-    engineNames: { "web-speech": "系统语音", neural: "神经语音" },
+    engineNames: { "web-speech": "系统语音", neural: "神经语音", endpoint: "外接服务" },
+    endpoint: {
+      title: "外接语音服务",
+      hint: "任何 OpenAI 兼容的 /v1/audio/speech 服务：本地跑的 IndexTTS、GPT-SoVITS、CosyVoice、kokoro-fastapi，或 OpenAI 本身。填了地址后语音引擎里出现「外接服务」；离线模式下不可用",
+      baseUrl: "服务地址",
+      baseUrlPlaceholder: "http://localhost:8880",
+      apiKey: "密钥",
+      apiKeyPlaceholder: "没有就留空",
+      keySaved: "已保存密钥",
+      clearKey: "清除密钥",
+      keySaveFailed: "密钥保存失败：系统加密不可用",
+      model: "模型",
+      modelPlaceholder: "tts-1",
+      voice: "音色",
+      voicePlaceholder: "alloy",
+      test: "测试并试听",
+      testing: "测试中...",
+      testOk: "连通：{{ms}} 毫秒返回 {{kb}} KB 音频"
+    },
     defaultVoice: "默认语音", autoSelect: "自动选择", refreshVoices: "刷新语音列表",
     voicesLoaded: "已加载 {{count}} 个可用语音", autoSelectHint: "自动根据文本语言选择合适的语音",
     rate: "语速", rateHint: "调整朗读速度，1.0 为正常语速",
@@ -898,6 +916,16 @@ const zh = {
   // ===== Tray menu keys =====
   titleBar: {
     minimize: "最小化", maximize: "最大化", restore: "还原", close: "关闭"
+  },
+  ttsEndpoint: {
+    notConfigured: "未填写服务地址",
+    cancelled: "已取消",
+    timeout: "语音服务响应超时",
+    unreachable: "连不上语音服务：{{message}}",
+    unauthorized: "语音服务拒绝了密钥（HTTP {{status}}）",
+    httpError: "语音服务返回 HTTP {{status}}：{{detail}}",
+    notAudio: "语音服务没有返回音频：{{detail}}",
+    offline: "离线模式不联网，外接语音服务不可用"
   },
   providerError: {
     requestTimeout: "请求超时，可在翻译源设置中调大超时时间",

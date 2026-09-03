@@ -33,6 +33,9 @@ const ONLINE_KEY_PREFIXES = [
   // All vaulted OCR keys belong to online engines (ocr-key-vault.js);
   // offline mode's allowed engines are local-only and need no keys.
   'ocr_',
+  // External TTS endpoint (OpenAI-compatible /v1/audio/speech): a network
+  // service by definition, even when it runs on localhost.
+  'tts_endpoint_',
 ];
 
 function isDecryptAllowed(key, store) {

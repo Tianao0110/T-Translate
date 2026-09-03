@@ -151,6 +151,9 @@ contextBridge.exposeInMainWorld('electron', {
     visionChat: (messages, imageData, options) =>
       ipcRenderer.invoke('stack:vision-chat', { messages, imageData, options }),
     visionCapability: () => ipcRenderer.invoke('stack:vision-capability'),
+    // External TTS endpoint (services/tts/endpoint.js)
+    ttsCapability: () => ipcRenderer.invoke('stack:tts-capability'),
+    ttsSpeak: (payload) => ipcRenderer.invoke('stack:tts-speak', payload),
     onStreamChunk: (callback) => {
       const handler = (event, frame) => callback(frame);
       ipcRenderer.on('stack:stream-chunk', handler);

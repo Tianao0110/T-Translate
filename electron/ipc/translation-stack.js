@@ -50,6 +50,17 @@ function register(ctx) {
       },
       getCustomFilters: () => store.get('settings.translation.customFilters', []),
       cacheFilePath: path.join(app.getPath('userData'), 'Caches', 'translation-cache.json'),
+      // External TTS endpoint: plain fields from settings, the key from the
+      // vault (null under offline mode — the prefix is on the blocked list).
+      loadTtsEndpointConfig: async () => {
+        const cfg = store.get('settings.tts.endpoint', {}) || {};
+        return {
+          baseUrl: cfg.baseUrl,
+          model: cfg.model,
+          voice: cfg.voice,
+          apiKey: await vault.decrypt('tts_endpoint_apiKey', 'tts-endpoint'),
+        };
+      },
     });
   } catch (e) {
     stackLoadError = e;
@@ -360,6 +371,66 @@ function register(ctx) {
     if (!stack) return { success: false };
     stack.ocr.resetVisionFallback();
     return { success: true };
+  });
+
+  // ===== External TTS endpoint =====
+  // A network service by definition (even on localhost), so offline mode
+  // refuses all three here — the renderer engine reports itself unavailable
+  // and the manager stays on system voices.
+  const MAX_TTS_INPUT = 4096;
+  const str = (v) => (typeof v === 'string' ? v : '');
+
+  function ttsOffline() {
+    return { success: false, available: false, error: 'offline-mode', reason: 'offline-mode', code: 'OFFLINE_BLOCKED' };
+  }
+
+  ipcMain.handle(CHANNELS.STACK.TTS_CAPABILITY, async () => {
+    if (!stack) return { available: false, reason: unavailable().error };
+    if (getPrivacyMode() === 'offline') return ttsOffline();
+    try {
+      return await stack.tts.getCapability();
+    } catch (e) {
+      logger.error('tts capability probe failed:', e);
+      return { available: false, reason: e.message };
+    }
+  });
+
+  ipcMain.handle(CHANNELS.STACK.TTS_SPEAK, async (event, payload = {}) => {
+    if (!stack) return unavailable();
+    if (getPrivacyMode() === 'offline') return ttsOffline();
+    const id = str(payload.requestId) || crypto.randomUUID();
+    const controller = track(id, event.sender);
+    try {
+      // The ArrayBuffer crosses IPC as-is (structured clone).
+      return await stack.tts.speak({
+        text: str(payload.text).slice(0, MAX_TTS_INPUT),
+        voice: str(payload.voice),
+        speed: Number.isFinite(payload.speed) ? payload.speed : 1,
+        signal: controller.signal,
+      });
+    } catch (e) {
+      logger.error('tts speak failed:', e);
+      return { success: false, error: e.message };
+    } finally {
+      inflight.delete(id);
+    }
+  });
+
+  // Settings page: a draft config (fields not yet saved, key optional) is
+  // exercised end-to-end; the sample audio comes back for the page to play.
+  ipcMain.handle(CHANNELS.STACK.TTS_TEST, async (event, payload = {}) => {
+    if (!stack) return unavailable();
+    if (getPrivacyMode() === 'offline') return ttsOffline();
+    const cfg = payload.config || {};
+    const draft = { baseUrl: str(cfg.baseUrl), model: str(cfg.model), voice: str(cfg.voice) };
+    if (str(cfg.apiKey)) draft.apiKey = cfg.apiKey;
+    if (str(cfg.sampleText)) draft.sampleText = cfg.sampleText.slice(0, 200);
+    try {
+      return await stack.tts.test(draft);
+    } catch (e) {
+      logger.error('tts test failed:', e);
+      return { success: false, error: e.message };
+    }
   });
 
   logger.info('Translation-stack IPC handlers registered');

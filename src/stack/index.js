@@ -17,11 +17,15 @@
 //   getCustomFilters    () => persisted custom filter defs (electron-store).
 //   cacheFilePath       L2 cache JSON location (userData/Caches/...). Optional —
 //                       omitted = memory-only cache (tests).
+//   loadTtsEndpointConfig async () => { baseUrl, model, voice, apiKey } for the
+//                       external TTS endpoint (apiKey decrypted main-side, null
+//                       when the vault refuses). Optional — omitted = not configured.
 
 import { configureRuntime } from './runtime.js';
 import { TranslationService } from './service.js';
 import { StackTranslationCache } from './cache.js';
 import { OCREngineManager } from './ocr/manager.js';
+import { TtsEndpointClient } from './tts/endpoint.js';
 import { PROVIDER_METADATA } from './providers/metadata.js';
 import * as privacyModes from './privacy-modes.js';
 
@@ -44,11 +48,13 @@ export function createTranslationStack(ctx = {}) {
     cache,
   });
   const ocr = new OCREngineManager({ loadConfigs: ctx.loadOcrConfigs });
+  const tts = new TtsEndpointClient({ loadConfig: ctx.loadTtsEndpointConfig });
 
   return {
     service,
     cache,
     ocr,
+    tts,
     metadata: PROVIDER_METADATA,
     privacyModes,
     // Load the L2 snapshot then warm provider + OCR configs. Idempotent.

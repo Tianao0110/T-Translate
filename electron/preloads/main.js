@@ -147,6 +147,11 @@ const electronAPI = {
     visionChat: (messages, imageData, options) =>
       ipcRenderer.invoke("stack:vision-chat", { messages, imageData, options }),
     visionCapability: () => ipcRenderer.invoke("stack:vision-capability"),
+    // External TTS endpoint (services/tts/endpoint.js). Audio comes back as
+    // bytes; playback stays in the renderer, the request never leaves main.
+    ttsCapability: () => ipcRenderer.invoke("stack:tts-capability"),
+    ttsSpeak: (payload) => ipcRenderer.invoke("stack:tts-speak", payload),
+    ttsTest: (config) => ipcRenderer.invoke("stack:tts-test", { config }),
     onStreamChunk: (callback) => {
       const handler = (event, frame) => callback(frame);
       ipcRenderer.on("stack:stream-chunk", handler);

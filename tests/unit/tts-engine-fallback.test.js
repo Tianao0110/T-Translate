@@ -170,6 +170,41 @@ describe('neural engine playback control', () => {
   });
 });
 
+describe('external endpoint engine', () => {
+  it('is unavailable without the stack bridge or without a configured server', async () => {
+    const { EndpointTTSEngine } = await import('../../src/services/tts/index.js');
+    const engine = new EndpointTTSEngine({});
+    expect(await engine.isAvailable()).toBe(false);
+    window.electron = { stack: { ttsSpeak: vi.fn(), ttsCapability: vi.fn(async () => ({ available: false, reason: 'offline-mode', code: 'OFFLINE_BLOCKED' })), abort: vi.fn(async () => {}) } };
+    expect(await engine.isAvailable()).toBe(false);
+    window.electron.stack.ttsCapability = vi.fn(async () => ({ available: true, baseUrl: 'http://localhost:8880/v1' }));
+    expect(await engine.isAvailable()).toBe(true);
+  });
+
+  it('a failed server reply is an ENDPOINT_ error the manager can cover with system voices', async () => {
+    const { EndpointTTSEngine } = await import('../../src/services/tts/index.js');
+    window.electron = {
+      stack: {
+        ttsSpeak: vi.fn(async () => ({ success: false, error: 'ECONNREFUSED' })),
+        ttsCapability: vi.fn(async () => ({ available: true })),
+        abort: vi.fn(async () => {}),
+      },
+      store: { get: vi.fn(async () => null), set: vi.fn(async () => {}) },
+    };
+    window.AudioContext = FakeAudioContext;
+    const engine = new EndpointTTSEngine({});
+    await expect(engine.speak('hello', { lang: 'en' })).rejects.toThrow('ENDPOINT_FAILED:ECONNREFUSED');
+
+    await ttsManager.init({ enabled: true, engine: 'endpoint' });
+    expect(ttsManager.currentEngineId).toBe('endpoint');
+    const spy = vi.spyOn(ttsManager, '_speakWithFallback').mockResolvedValue(undefined);
+    await ttsManager.speak('hello', { lang: 'en' });
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+    delete window.AudioContext;
+  });
+});
+
 describe('TTSManager per-utterance fallback', () => {
   it('hands an uncovered language to web-speech and keeps the neural engine configured', async () => {
     window.electron = {
