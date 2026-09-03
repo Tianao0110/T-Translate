@@ -10,6 +10,7 @@ import translationService from '../../services/stack-client.js';
 import useTranslationStore from '../../stores/translation-store';
 import { secureStorage } from './persist.js';
 import { buildDefaultProviderList } from './defaults.js';
+import { Seg } from '../SettingsPanel/sections/shared.jsx';
 import './styles.css';
 import createLogger from '../../utils/logger.js';
 const logger = createLogger('ProviderSettings');
@@ -344,15 +345,16 @@ const ProviderSettings = ({ settings, settingsReady, updateSettings, notify }) =
                 <span>{getFieldLabel(providerId, key, field.label)}</span>
               </label>
             ) : field.type === 'select' ? (
-              <select
+              // Every schema select today has a handful of options, so the
+              // segmented control fits; a long list would need a picker.
+              <Seg
                 value={config[key] || field.default || ''}
-                onChange={(e) => updateConfig(providerId, key, e.target.value)}
-                className="ps-select"
-              >
-                {field.options?.map(opt => (
-                  <option key={opt.value} value={opt.value}>{getOptionLabel(providerId, key, opt.value, opt.label)}</option>
-                ))}
-              </select>
+                onChange={(v) => updateConfig(providerId, key, v)}
+                options={(field.options || []).map((opt) => ({
+                  value: opt.value,
+                  label: getOptionLabel(providerId, key, opt.value, opt.label),
+                }))}
+              />
             ) : (
               <input
                 type={field.type || 'text'}

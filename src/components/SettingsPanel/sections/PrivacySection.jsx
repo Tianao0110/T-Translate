@@ -380,8 +380,8 @@ const PrivacySection = ({
       </div>
 
       {/* Data management */}
-      <div className="setting-group" style={{marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border-primary)'}}>
-        <h4 style={{display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', color: 'var(--text-primary)'}}><Database size={15} /> {t('privacy.dataManagement')}</h4>
+      <div className="setting-group">
+        <label className="setting-label"><Database size={15} /> {t('privacy.dataManagement')}</label>
 
         {dataStats && (
           <div style={{
@@ -429,9 +429,8 @@ const PrivacySection = ({
       </div>
 
       {/* Migration pack */}
-      <div className="setting-group" style={{marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border-primary)'}}>
-        <h4 style={{display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', color: 'var(--text-primary)'}}><ArrowRightLeft size={15} /> {t('privacy.migration.title')}</h4>
-        <p className="setting-hint" style={{marginBottom: '12px'}}>{t('privacy.migration.hint')}</p>
+      <div className="setting-group">
+        <label className="setting-label"><ArrowRightLeft size={15} /> {t('privacy.migration.title')}</label>
         <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap'}}>
           <button className="neutral-button" onClick={handleExportPack}>
             <Download size={16} /> {t('privacy.migration.export')}

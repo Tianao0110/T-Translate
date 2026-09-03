@@ -13,7 +13,6 @@ const ProvidersSection = ({
   return (
     <div className="setting-content">
       <h3>{t('providerSettings.title')}</h3>
-      <p className="setting-description">{t('providerSettings.description')}</p>
 
       <ProviderSettings
         settings={settings}
