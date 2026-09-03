@@ -672,7 +672,7 @@ const zh = {
     },
     packs: {
       title: "语音包",
-      hint: "装了语音包后，语音引擎里就能选神经语音；系统语音不用下载，随时可用",
+      hint: "装包后语音引擎里可选神经语音",
       refresh: "刷新",
       download: "下载",
       update: "更新",
@@ -692,12 +692,12 @@ const zh = {
       removeConfirm: "确定卸载该语音包？卸载后朗读回落到系统语音",
       phase: { downloading: "下载中", verifying: "校验中", extracting: "解压中", done: "完成", error: "失败" },
       names: {
-        "tts-kokoro-zh-en": "Kokoro 多音色（中/英）",
-        "tts-melo-zh-en": "MeloTTS 中英混说"
+        "tts-kokoro-zh-en": "Kokoro（中/英）",
+        "tts-melo-zh-en": "MeloTTS（中英混说）"
       },
       desc: {
-        "tts-kokoro-zh-en": "音质最好。中文 100 个音色、英文 3 个女声；中英夹杂时英文带口音",
-        "tts-melo-zh-en": "单一女声，中英夹杂的句子读得最顺；装了它，混合句自动用它"
+        "tts-kokoro-zh-en": "中文 100 个音色，英文 3 个女声",
+        "tts-melo-zh-en": "单一女声，中英夹杂最自然"
       }
     }
   },

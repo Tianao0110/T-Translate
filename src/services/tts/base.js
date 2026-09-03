@@ -40,6 +40,13 @@ export class BaseTTSEngine {
     this._onProgress = callback;
   }
 
+  // TTSManager pushes rate/pitch/volume changes here; engines read them on
+  // the next speak. No engine defined this, so the first settings change with
+  // a live engine threw "updateConfig is not a function".
+  updateConfig(config = {}) {
+    this.config = { ...this.config, ...config };
+  }
+
   _setStatus(status) {
     this._status = status;
     for (const cb of this._statusListeners) {

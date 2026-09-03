@@ -672,7 +672,7 @@ const en = {
     },
     packs: {
       title: "Voice packs",
-      hint: "With a voice pack installed, Neural Voices appears under Speech Engine. System voices need no download.",
+      hint: "Install a pack to unlock Neural Voices.",
       refresh: "Refresh",
       download: "Download",
       update: "Update",
@@ -692,12 +692,12 @@ const en = {
       removeConfirm: "Uninstall this voice pack? Speech falls back to system voices",
       phase: { downloading: "Downloading", verifying: "Verifying", extracting: "Extracting", done: "Done", error: "Failed" },
       names: {
-        "tts-kokoro-zh-en": "Kokoro multi-voice (zh/en)",
-        "tts-melo-zh-en": "MeloTTS mixed zh/en"
+        "tts-kokoro-zh-en": "Kokoro (zh/en)",
+        "tts-melo-zh-en": "MeloTTS (mixed zh/en)"
       },
       desc: {
-        "tts-kokoro-zh-en": "Best quality. 100 Chinese voices, 3 English female voices; English inside Chinese text sounds accented",
-        "tts-melo-zh-en": "One female voice that reads mixed Chinese/English most naturally; mixed sentences use it automatically once installed"
+        "tts-kokoro-zh-en": "100 Chinese voices, 3 English female voices",
+        "tts-melo-zh-en": "One female voice, best for mixed zh/en"
       }
     }
   },

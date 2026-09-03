@@ -83,6 +83,27 @@ describe('neural TTS engine shell', () => {
   });
 });
 
+describe('TTSManager with a live neural engine', () => {
+  // Picking a voice on the settings page calls updateConfig with the engine
+  // live; the engine must accept it (it used to throw "not a function").
+  it('updateConfig reaches the engine without throwing', async () => {
+    window.electron = {
+      audioEngine: {
+        ttsStatus: vi.fn(async () => ({ available: true })),
+        ttsVoices: vi.fn(async () => [zhVoice]),
+        ttsGenerate: vi.fn(async () => ({ success: true })),
+        ttsCancel: vi.fn(),
+        onTtsChunk: vi.fn(() => () => {}),
+      },
+      store: { get: vi.fn(async () => null), set: vi.fn(async () => {}) },
+    };
+    await ttsManager.init({ enabled: true, engine: 'neural' });
+    expect(ttsManager.currentEngineId).toBe('neural');
+    await expect(ttsManager.updateConfig({ voiceId: 'tts-kokoro-zh-en:3', rate: 1.2 })).resolves.toBeUndefined();
+    expect(ttsManager.currentEngine.config.defaultRate).toBe(1.2);
+  });
+});
+
 describe('TTSManager per-utterance fallback', () => {
   it('hands an uncovered language to web-speech and keeps the neural engine configured', async () => {
     window.electron = {
