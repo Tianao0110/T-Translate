@@ -11,6 +11,7 @@
 //     vault secrets merged main-side)
 
 import { RapidOCREngine, WindowsOCREngine } from './local-bridge.js';
+import { isLoopbackUrl } from '../loopback.js';
 import LLMVisionEngine from './llm-vision.js';
 import OCRSpaceEngine from './ocrspace.js';
 import GoogleVisionEngine from './google-vision.js';
@@ -58,14 +59,7 @@ const DEFAULT_VISION_ENDPOINT = 'http://localhost:1234/v1';
 
 // Offline mode allows llm-vision only while it points at this machine. Host
 // names are matched exactly: a "localhost.evil.com" must not read as local.
-export function isLoopbackEndpoint(endpoint) {
-  try {
-    const host = new URL(endpoint).hostname.toLowerCase().replace(/^\[|\]$/g, '');
-    return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.endsWith('.localhost');
-  } catch {
-    return false;
-  }
-}
+export const isLoopbackEndpoint = isLoopbackUrl;
 
 // LLM Vision auto-degrade:
 // - If llm-vision fails with "vision unsupported" we transparently retry on

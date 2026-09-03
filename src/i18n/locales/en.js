@@ -492,6 +492,7 @@ const en = {
   setupNotice: {
     noProvider: "No translation source is set up yet, so nothing can be translated",
     localUnreachable: "The local model is not responding — check that LM Studio or Ollama is running",
+    offlineRemote: "In offline mode the provider must point at this machine; the address set now is another one",
     setUp: "Set up",
     checkProviders: "Open providers",
   },
@@ -1090,6 +1091,7 @@ const en = {
     noProvider: "No translation providers available",
     allFailed: "All translation providers failed",
     testBlockedByPrivacy: "This provider is disabled by the current privacy mode",
+    offlineRemoteEndpoint: "Offline mode only allows providers on this machine",
     batchFailed: "Batch translation failed entirely",
     noUserMsg: "No user message",
     noChatProvider: "The current provider cannot run AI chat — configure an LLM provider",

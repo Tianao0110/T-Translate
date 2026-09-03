@@ -244,11 +244,9 @@ function register(ctx) {
 
   ipcMain.handle(CHANNELS.STACK.TEST_PROVIDER, async (event, payload = {}) => {
     if (!stack) return { success: false, message: unavailable().error };
-    const mode = getPrivacyMode();
-    if (!stack.privacyModes.isProviderAllowed(payload.providerId, mode)) {
-      return { success: false, message: '当前隐私模式已禁用该翻译源' };
-    }
-    return stack.service.testProvider(payload.providerId);
+    // testProvider applies the privacy gate itself (allowlist plus, offline,
+    // the local-endpoint rule); the mode is the facade's, never the renderer's.
+    return stack.service.testProvider(payload.providerId, getPrivacyMode());
   });
 
   ipcMain.handle(CHANNELS.STACK.TEST_PROVIDER_CONFIG, async (event, payload = {}) => {

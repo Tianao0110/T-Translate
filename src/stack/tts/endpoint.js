@@ -9,6 +9,7 @@
 // mode blocks the tts_endpoint_ prefix outright).
 
 import { _t } from '../providers/base.js';
+import { isLoopbackUrl } from '../loopback.js';
 import { rtFetch } from '../runtime.js';
 
 const REQUEST_TIMEOUT_MS = 60000;
@@ -23,14 +24,7 @@ function normalizeBaseUrl(raw) {
   return url.endsWith('/v1') ? url : `${url}/v1`;
 }
 
-export function isLoopbackUrl(url) {
-  try {
-    const host = new URL(url).hostname.toLowerCase();
-    return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]';
-  } catch {
-    return false;
-  }
-}
+export { isLoopbackUrl };
 
 export class TtsEndpointClient {
   constructor({ loadConfig } = {}) {

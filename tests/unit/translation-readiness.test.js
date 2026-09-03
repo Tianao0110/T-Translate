@@ -137,3 +137,60 @@ describe('getTranslationReadiness', () => {
     expect(state.providers['local-llm'].testConnection).not.toHaveBeenCalled();
   });
 });
+
+// Offline mode promises no network traffic. A local provider whose endpoint
+// was pointed at another machine is network traffic, so the gate treats it as
+// unusable — and says so, because the fix (edit the address) differs from
+// "add a provider".
+describe('offline mode: local providers must point at this machine', () => {
+  const localAt = (endpoint, reachable = true) => ({
+    requiresNetwork: false,
+    isConfigured: () => true,
+    config: { endpoint },
+    testConnection: vi.fn().mockResolvedValue({ success: reachable }),
+  });
+
+  beforeEach(() => {
+    state.allowed = (id) => id === 'local-llm' || id === 'ollama';
+  });
+
+  it('refuses a LAN endpoint and names the reason', async () => {
+    state.priority = ['ollama'];
+    state.providers = { ollama: localAt('http://192.168.1.20:11434/v1') };
+
+    expect(await service().getTranslationReadiness('offline')).toMatchObject({
+      ready: false, reason: 'offline-remote-endpoint', candidates: 0,
+    });
+    expect(state.providers.ollama.testConnection).not.toHaveBeenCalled();
+  });
+
+  it('accepts localhost, 127.0.0.1 and an empty (default) endpoint', async () => {
+    state.priority = ['local-llm', 'ollama'];
+    state.providers = {
+      'local-llm': localAt('http://127.0.0.1:1234/v1'),
+      ollama: localAt(''),
+    };
+
+    expect(await service().getTranslationReadiness('offline')).toMatchObject({ ready: true, reason: 'local' });
+  });
+
+  it('only applies offline — the same LAN endpoint is fine in standard mode', async () => {
+    state.priority = ['ollama'];
+    state.providers = { ollama: localAt('http://192.168.1.20:11434/v1') };
+
+    expect(await service().getTranslationReadiness('standard')).toMatchObject({ ready: true, reason: 'local' });
+  });
+
+  it('keeps the remote provider out of the translate chain offline', () => {
+    state.priority = ['ollama', 'local-llm'];
+    state.providers = {
+      ollama: localAt('http://10.0.0.5:11434/v1'),
+      'local-llm': localAt('http://localhost:1234/v1'),
+    };
+    const s = service();
+
+    expect(s.providerGate('ollama', 'offline')).toBe('offline-remote-endpoint');
+    expect(s.providerGate('local-llm', 'offline')).toBeNull();
+    expect(s.providerGate('ollama', 'standard')).toBeNull();
+  });
+});

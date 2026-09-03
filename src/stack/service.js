@@ -32,11 +32,19 @@ import {
 } from './registry.js';
 
 import { isProviderAllowed, PRIVACY_MODE_IDS } from './privacy-modes.js';
+import { isLoopbackUrl } from './loopback.js';
 import { getEnabledFilters } from '../config/filters.js';
 import { reorderForLanguage } from '../config/model-language-coverage.js';
 import { getSystemPrompt, LANGUAGE_NAMES } from '../config/templates.js';
 import { detectTemplateFromModel } from '../config/model-template-mapping.js';
 import { createStreamThrottle } from '../utils/stream-throttle.js';
+
+// An empty endpoint means the preset default, and every local preset
+// defaults to localhost — so only an explicit address can be off-machine.
+function endpointIsLocal(config) {
+  const url = config?.endpoint || config?.baseUrl || '';
+  return !url || isLoopbackUrl(url);
+}
 
 const logger = createLogger('StackTranslation');
 
@@ -403,6 +411,19 @@ export class TranslationService {
 
   // ===== Scheduling helpers (shared by translate / translateStream) =====
 
+  // One answer to "may this provider run right now": the privacy allowlist,
+  // its configuration, and — offline only — that a local provider really
+  // points at this machine. Offline mode promises no network traffic, and a
+  // LAN Ollama is network traffic. Returns null when usable, else the reason.
+  providerGate(id, privacyMode) {
+    if (!isProviderAllowed(id, privacyMode)) return 'privacy';
+    if (!isProviderConfigured(id)) return 'unconfigured';
+    if (privacyMode === PRIVACY_MODE_IDS.OFFLINE && !endpointIsLocal(getProvider(id)?.config)) {
+      return 'offline-remote-endpoint';
+    }
+    return null;
+  }
+
   // Filters the priority list to providers usable right now (privacy /
   // configured / not failing), then demotes providers whose loaded model is
   // documented not to cover the target language: a local model asked for a
@@ -412,8 +433,7 @@ export class TranslationService {
   _selectProviders({ privacyMode, targetLang }) {
     const usable = [];
     for (const id of this.getPriority()) {
-      if (!isProviderAllowed(id, privacyMode)) continue;
-      if (!isProviderConfigured(id)) continue;
+      if (this.providerGate(id, privacyMode)) continue;
       if (this._failureCount[id] >= this._skipThreshold) continue;
       usable.push(id);
     }
@@ -756,8 +776,7 @@ export class TranslationService {
     // Same provider routing as translate(): first usable one wins
     const { privacyMode = PRIVACY_MODE_IDS.STANDARD } = options;
     for (const id of this.getPriority()) {
-      if (!isProviderAllowed(id, privacyMode)) continue;
-      if (!isProviderConfigured(id)) continue;
+      if (this.providerGate(id, privacyMode)) continue;
       const provider = getProvider(id);
       if (provider && typeof provider.chat === 'function') {
         return {
@@ -821,10 +840,18 @@ export class TranslationService {
     return { success: false, error: result.error || _t('svc.translateFailed', '翻译失败') };
   }
 
-  async testProvider(providerId) {
+  async testProvider(providerId, privacyMode = PRIVACY_MODE_IDS.STANDARD) {
     const provider = getProvider(providerId);
     if (!provider) {
       return { success: false, message: _t('svc.providerNotFound', '翻译源不存在') };
+    }
+    // Even a probe is network traffic, so the same gate as translate() applies.
+    const gate = this.providerGate(providerId, privacyMode);
+    if (gate === 'privacy') {
+      return { success: false, message: _t('svc.testBlockedByPrivacy', '当前隐私模式已禁用该翻译源') };
+    }
+    if (gate === 'offline-remote-endpoint') {
+      return { success: false, message: _t('svc.offlineRemoteEndpoint', '离线模式只允许本机地址的翻译源') };
     }
 
     if (!provider.isConfigured()) {
@@ -842,6 +869,9 @@ export class TranslationService {
   async testProviderWithConfig(providerId, config, privacyMode = PRIVACY_MODE_IDS.STANDARD) {
     if (!isProviderAllowed(providerId, privacyMode)) {
       return { success: false, message: _t('svc.testBlockedByPrivacy', '当前隐私模式已禁用该翻译源') };
+    }
+    if (privacyMode === PRIVACY_MODE_IDS.OFFLINE && !endpointIsLocal(config)) {
+      return { success: false, message: _t('svc.offlineRemoteEndpoint', '离线模式只允许本机地址的翻译源') };
     }
     try {
       const tempProvider = createProvider(providerId, config);
@@ -921,11 +951,12 @@ export class TranslationService {
    * @returns {Promise<{ready: boolean, reason: string, candidates: number}>}
    */
   async getTranslationReadiness(privacyMode = PRIVACY_MODE_IDS.STANDARD) {
-    const candidates = this.getPriority().filter(
-      (id) => isProviderAllowed(id, privacyMode) && isProviderConfigured(id)
-    );
+    const gates = this.getPriority().map((id) => [id, this.providerGate(id, privacyMode)]);
+    const candidates = gates.filter(([, gate]) => !gate).map(([id]) => id);
     if (candidates.length === 0) {
-      return { ready: false, reason: 'no-provider', candidates: 0 };
+      // A local provider pointed off-machine is a different fix than "add one".
+      const remote = gates.some(([, gate]) => gate === 'offline-remote-endpoint');
+      return { ready: false, reason: remote ? 'offline-remote-endpoint' : 'no-provider', candidates: 0 };
     }
 
     const locals = [];

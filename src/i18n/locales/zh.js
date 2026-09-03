@@ -492,6 +492,7 @@ const zh = {
   setupNotice: {
     noProvider: "还没有可用的翻译源，现在还翻译不了",
     localUnreachable: "本地模型没有响应，检查一下 LM Studio 或 Ollama 是否在运行",
+    offlineRemote: "离线模式下翻译源必须指向本机地址，现在填的是别的机器",
     setUp: "去设置",
     checkProviders: "查看翻译源",
   },
@@ -1091,6 +1092,7 @@ const zh = {
     noProvider: "没有可用的翻译源",
     allFailed: "所有翻译源均失败",
     testBlockedByPrivacy: "当前隐私模式已禁用该翻译源",
+    offlineRemoteEndpoint: "离线模式只允许本机地址的翻译源",
     batchFailed: "批量翻译全部失败",
     noUserMsg: "没有用户消息",
     noChatProvider: "当前翻译源不支持 AI 对话功能，请配置一个大模型翻译源",
