@@ -5,11 +5,10 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { createRequire } from 'module';
-
-const require = createRequire(import.meta.url);
-const { dataRoot, dataDir, carryOver } = require('../../electron/utils/data-root.js');
-const { storageState } = require('../../electron/utils/model-root.js');
+// ESM imports so vitest's electron alias applies; createRequire would load
+// the real electron package, whose require() export is a path string.
+import { dataRoot, dataDir, carryOver } from '../../electron/utils/data-root.js';
+import { storageState } from '../../electron/utils/model-root.js';
 
 describe('data-root', () => {
   it('falls back to userData when not packaged', () => {
