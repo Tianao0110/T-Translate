@@ -15,6 +15,7 @@
 
 const { ipcMain, app, net, BrowserWindow } = require('electron');
 const path = require('path');
+const { dataDir, carryOver } = require('../utils/data-root');
 const crypto = require('crypto');
 const { CHANNELS } = require('../shared/channels');
 const { createSecureVault } = require('../utils/secure-vault');
@@ -49,7 +50,13 @@ function register(ctx) {
         isWindows: process.platform === 'win32',
       },
       getCustomFilters: () => store.get('settings.translation.customFilters', []),
-      cacheFilePath: path.join(app.getPath('userData'), 'Caches', 'translation-cache.json'),
+      // v0.4.6 moved the cache under data-root; the userData copy is carried
+      // over once so the first launch after the move keeps its hits.
+      cacheFilePath: (() => {
+        const target = path.join(dataDir('cache'), 'translation-cache.json');
+        carryOver(path.join(app.getPath('userData'), 'Caches', 'translation-cache.json'), target);
+        return target;
+      })(),
       // External TTS endpoint: plain fields from settings, the key from the
       // vault (null under offline mode — the prefix is on the blocked list).
       loadTtsEndpointConfig: async () => {

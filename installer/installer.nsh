@@ -42,6 +42,12 @@
     RMDir /r "$INSTDIR\models"
     Rename "$INSTDIR\..\t-translate-models" "$INSTDIR\models"
   noStashedModels:
+
+  ; Same for the data folder (translation cache, session logs — v0.4.6).
+  IfFileExists "$INSTDIR\..\t-translate-data\*.*" 0 noStashedData
+    RMDir /r "$INSTDIR\data"
+    Rename "$INSTDIR\..\t-translate-data" "$INSTDIR\data"
+  noStashedData:
 !macroend
 
 !macro customUnInstall
@@ -60,6 +66,10 @@
       RMDir /r "$INSTDIR\..\t-translate-models"
       Rename "$INSTDIR\models" "$INSTDIR\..\t-translate-models"
     noModelsToStash:
+    IfFileExists "$INSTDIR\data\*.*" 0 noDataToStash
+      RMDir /r "$INSTDIR\..\t-translate-data"
+      Rename "$INSTDIR\data" "$INSTDIR\..\t-translate-data"
+    noDataToStash:
   ${endif}
 
   ; Optional user-data cleanup — settings, history vault and logs live under

@@ -80,4 +80,4 @@ function storageState() {
   return { root, legacyRoot, fallback: app.isPackaged && root === legacyRoot };
 }
 
-module.exports = { modelsRoot, modelRoots, modelDir, modelDirs, storageState };
+module.exports = { modelsRoot, modelRoots, modelDir, modelDirs, storageState, isWritable };

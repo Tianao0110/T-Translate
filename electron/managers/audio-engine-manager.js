@@ -23,6 +23,7 @@ const { CHANNELS, PRIVACY_MODES } = require('../shared/channels');
 const { locateAsrModels } = require('../utils/asr-models');
 const { listVoicePacks } = require('../utils/tts-models');
 const { modelDir, modelDirs } = require('../utils/model-root');
+const { dataDir } = require('../utils/data-root');
 const logger = require('../utils/logger')('AudioEngine');
 
 const READY_TIMEOUT_MS = 30000;
@@ -170,7 +171,7 @@ function normalizeSource(source) {
 }
 
 function sessionLogPath() {
-  const logsDir = path.join(app.getPath('userData'), 'logs');
+  const logsDir = dataDir('logs');
   try {
     fs.mkdirSync(logsDir, { recursive: true });
   } catch {

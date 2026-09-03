@@ -254,6 +254,8 @@ electron/managers/audio-engine-manager.js  音频 utilityProcess 的唯一持有
 electron/services/audio-engine/audio-worker.js  识别模型、音频捕获、语音合成都在这个子进程里
 electron/utils/win-audio-capture.js        WASAPI 捕获（koffi，v0.4.1）
 electron/utils/model-root.js               模型根目录解析（安装目录优先）
+electron/utils/data-root.js                轻量数据根目录（安装目录 data 优先；翻译缓存、听译会话日志）
+electron/utils/model-migrate.js            老用户目录模型搬迁（复制、校验、再删）
 electron/utils/audio-pack-manager.js       识别模型包下载/卸载（工厂第二实例，asr-models）
 electron/utils/tts-pack-manager.js         语音包下载/卸载（工厂第三实例，tts-models，v0.4.2）
 electron/utils/tts-models.js               已装语音包发现：pack.json 的 files 解析成绝对路径

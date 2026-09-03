@@ -341,7 +341,7 @@ async function main() {
   step('streaming drafts emitted', withDraft.ev.partials.length > 0, `${withDraft.ev.partials.length} partials`);
   step('stopSessionAndWait returns after the worker is gone', !engineManager.getInfo().running);
 
-  const logsDir = path.join(SANDBOX, 'logs');
+  const logsDir = require('../electron/utils/data-root').dataDir('logs');
   const logFile = fs.existsSync(logsDir)
     ? fs.readdirSync(logsDir).filter((f) => f.endsWith('.jsonl')).sort().pop()
     : null;
