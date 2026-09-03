@@ -133,6 +133,7 @@ t-translate/
 │   ├── build-audio-release.js  # 生成 audio-models Release 资产
 │   ├── model-licenses/         # 模型协议原文（随包分发，见 NOTICE）
 │   ├── smoke-listen.js         # 听译整链冒烟 + 延迟测量（npm run smoke:listen）
+│   ├── smoke-offline.js        # 离线模式所有下载入口拒绝断言（npm run smoke:offline）
 │   ├── check-constants.js      # 常量同步检查
 │   ├── check-i18n.js           # i18n key 一致性检查
 │   └── check-hardcoded-chinese.js  # 硬编码中文扫描
