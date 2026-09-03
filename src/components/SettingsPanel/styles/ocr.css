@@ -495,3 +495,18 @@
   word-break: break-word;
 }
 
+
+/* Model tier row inside the local engine card */
+.ocr-tier {
+  margin-top: 10px;
+}
+
+.ocr-tier .setting-label {
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+/* Engine cards drop their descriptions; the config form is the body. */
+.ocr-engine-item .ps-config-form {
+  margin-top: 8px;
+}

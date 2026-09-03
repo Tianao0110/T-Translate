@@ -12,7 +12,10 @@ import { Download, RefreshCw, Trash2, AlertTriangle } from 'lucide-react';
 import createLogger from '../../../utils/logger.js';
 const logger = createLogger('PackList');
 
-const PackList = ({ bridge, prefix, notify, confirm, onChanged, children }) => {
+// `filter` narrows the rows shown (the OCR page lists only language packs
+// here; its base and high-accuracy packs have their own controls) while
+// `onPacks` hands the caller the full list so those controls can read status.
+const PackList = ({ bridge, prefix, notify, confirm, onChanged, onPacks, filter, children }) => {
   const { t } = useTranslation();
   const [packs, setPacks] = useState([]);
   const [manifestError, setManifestError] = useState(null);
@@ -21,6 +24,8 @@ const PackList = ({ bridge, prefix, notify, confirm, onChanged, children }) => {
   const [packProgress, setPackProgress] = useState(null); // { packId, progress, phase }
   const packsRef = useRef([]);
   packsRef.current = packs;
+  const onPacksRef = useRef(onPacks);
+  onPacksRef.current = onPacks;
 
   const loadPacks = useCallback(async (refresh = false) => {
     if (!bridge?.listPacks) return;
@@ -30,6 +35,7 @@ const PackList = ({ bridge, prefix, notify, confirm, onChanged, children }) => {
       if (res?.success) {
         setPacks(res.packs || []);
         setManifestError(res.manifestError || null);
+        onPacksRef.current?.(res.packs || [], res.manifestError || null);
       } else {
         setManifestError(res?.error || 'unknown');
       }
@@ -157,6 +163,8 @@ const PackList = ({ bridge, prefix, notify, confirm, onChanged, children }) => {
     );
   };
 
+  const shown = filter ? packs.filter(filter) : packs;
+
   return (
     <div className="setting-group">
       {/* .ocr-pack-section-header is the flex row only; .pack-section-title
@@ -184,9 +192,9 @@ const PackList = ({ bridge, prefix, notify, confirm, onChanged, children }) => {
         </p>
       )}
 
-      {packs.length === 0
+      {shown.length === 0
         ? <p className="setting-hint">{packsLoading ? t(`${prefix}.loading`) : t(`${prefix}.empty`)}</p>
-        : packs.map(renderPackRow)}
+        : shown.map(renderPackRow)}
 
       {children}
     </div>

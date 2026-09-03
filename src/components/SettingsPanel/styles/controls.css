@@ -868,3 +868,8 @@ input:checked + .switch-slider::before {
 .setting-input.small {
   padding: 7px 10px;
 }
+
+/* Segments used as page tabs sit above the content they switch. */
+.seg.tabs {
+  margin-bottom: 14px;
+}
