@@ -72,4 +72,12 @@ function modelDirs(name) {
   return modelRoots().map((root) => path.join(root, name));
 }
 
-module.exports = { modelsRoot, modelRoots, modelDir, modelDirs };
+// For the settings page: where packs go, whether that is the userData
+// fallback (an unwritable install dir), and where an older build left them.
+function storageState() {
+  const root = modelsRoot();
+  const legacyRoot = userDataDir();
+  return { root, legacyRoot, fallback: app.isPackaged && root === legacyRoot };
+}
+
+module.exports = { modelsRoot, modelRoots, modelDir, modelDirs, storageState };

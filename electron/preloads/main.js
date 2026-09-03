@@ -210,6 +210,16 @@ const electronAPI = {
       return () => ipcRenderer.removeListener("ocr:download-progress", handler);
     },
   },
+  // Model storage: where packs live, and the one-time move out of userData.
+  models: {
+    storageInfo: () => ipcRenderer.invoke("models:storage-info"),
+    migrate: () => ipcRenderer.invoke("models:migrate"),
+    onMigrateProgress: (callback) => {
+      const handler = (event, data) => callback(data);
+      ipcRenderer.on("models:migrate-progress", handler);
+      return () => ipcRenderer.removeListener("models:migrate-progress", handler);
+    },
+  },
   // Listen-mode model packs. Pack management only: capture and session
   // control belong to the floating window's preload, not this one.
   audioPacks: {

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { GitBranch, RefreshCw, FolderOpen, Download, X, Loader2, CheckCircle, AlertCircle, ExternalLink, Rocket, Cpu, Heart, PartyPopper, Package } from 'lucide-react';
+import { GitBranch, RefreshCw, FolderOpen, Download, X, Loader2, CheckCircle, AlertCircle, ExternalLink, Rocket, Cpu, Heart, PartyPopper, Package, HardDrive } from 'lucide-react';
 import appIcon from '/icon.png';
 
 const UPDATE_STAGE = {
@@ -24,6 +24,39 @@ const AboutSection = ({ notify, resetSettings }) => {
   const [downloadedPath, setDownloadedPath] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
   const cleanupRef = useRef(null);
+
+  // Model storage: active root, fallback state, and what an older build
+  // left in userData. Refreshed after a move so the card reflects it.
+  const [storage, setStorage] = useState(null);
+  const [migrate, setMigrate] = useState({ state: 'idle', progress: null, error: '' });
+
+  const loadStorage = useCallback(async () => {
+    try {
+      const info = await window.electron?.models?.storageInfo?.();
+      if (info) setStorage(info);
+    } catch {
+      // no bridge (older preload) — the card simply stays hidden
+    }
+  }, []);
+
+  useEffect(() => {
+    loadStorage();
+    const off = window.electron?.models?.onMigrateProgress?.((p) => {
+      setMigrate((m) => ({ ...m, progress: p }));
+    });
+    return () => off?.();
+  }, [loadStorage]);
+
+  const moveModels = async () => {
+    setMigrate({ state: 'running', progress: null, error: '' });
+    const result = await window.electron?.models?.migrate?.();
+    if (result?.success) {
+      setMigrate({ state: 'done', progress: null, error: '' });
+    } else {
+      setMigrate({ state: 'failed', progress: null, error: result?.error || '' });
+    }
+    loadStorage();
+  };
 
   useEffect(() => {
     const fetchVersion = async () => {
@@ -365,6 +398,45 @@ const AboutSection = ({ notify, resetSettings }) => {
           </ul>
         </div>
       </div>
+
+      {storage && (
+        <div className="info-card storage-card">
+          <h4><HardDrive size={16} /> {t('about.storage.title')}</h4>
+          <div className="storage-row">
+            <span className="storage-label">{t('about.storage.modelsDir')}</span>
+            <span className={`engine-badge ${storage.fallback ? 'unavailable' : 'installed'}`}>
+              {storage.fallback ? t('about.storage.inUserDir') : t('about.storage.inProgramDir')}
+            </span>
+            <span className="storage-path" title={storage.root}>{storage.root}</span>
+          </div>
+          {storage.legacyPacks > 0 && !storage.fallback && (
+            <div className="storage-row">
+              <span className="storage-legacy">
+                {t('about.storage.legacyFound', { count: storage.legacyPacks, size: formatSize(storage.legacyBytes) })}
+              </span>
+              <button
+                className="btn-small download"
+                disabled={migrate.state === 'running'}
+                onClick={moveModels}
+              >
+                {migrate.state === 'running'
+                  ? <><RefreshCw size={12} className="spinning" /> {t('about.storage.moving')}</>
+                  : t('about.storage.moveButton')}
+              </button>
+            </div>
+          )}
+          {migrate.state === 'running' && migrate.progress && (
+            <div className="engine-download-progress">
+              <div className="download-progress-bar">
+                <div className="download-progress-fill" style={{ width: `${migrate.progress.total ? Math.max(2, Math.round(migrate.progress.done / migrate.progress.total * 100)) : 2}%` }} />
+              </div>
+              <span className="download-progress-text">{migrate.progress.pack}</span>
+            </div>
+          )}
+          {migrate.state === 'done' && <p className="storage-note">{t('about.storage.moved')}</p>}
+          {migrate.state === 'failed' && <p className="storage-note error">{t('about.storage.moveFailed', { error: migrate.error })}</p>}
+        </div>
+      )}
 
       <div className="about-actions">
         <button className="link-button" onClick={openGitHub}>

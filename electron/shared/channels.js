@@ -118,6 +118,11 @@ const CHANNELS = {
     HEALTH_CHECK: 'ocr:health-check',
     SET_MODEL_TIER: 'ocr:set-model-tier',
   },
+  MODELS: {
+    STORAGE_INFO: 'models:storage-info',
+    MIGRATE: 'models:migrate',
+    MIGRATE_PROGRESS: 'models:migrate-progress',
+  },
   MENU: {
     ACTION: 'menu-action',
     IMPORT_FILE: 'import-file',

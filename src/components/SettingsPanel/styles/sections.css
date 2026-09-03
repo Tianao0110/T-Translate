@@ -761,3 +761,55 @@
   border-color: var(--accent-primary);
   color: var(--accent-primary);
 }
+
+/* ==================== 关于页：存储卡 ==================== */
+.storage-card {
+  margin: 0 0 24px 0;
+}
+
+.storage-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.storage-row + .storage-row {
+  margin-top: 10px;
+}
+
+.storage-label {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.storage-path {
+  font-family: Consolas, "Courier New", monospace;
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+}
+
+.storage-legacy {
+  flex: 1;
+  min-width: 0;
+}
+
+.storage-card .engine-download-progress {
+  margin-top: 10px;
+}
+
+.storage-note {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.storage-note.error {
+  color: var(--error);
+}
