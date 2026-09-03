@@ -33,7 +33,7 @@
 | **134 languages**            | Everything Google Translate supports, in a picker with a letter index and a recently-used row; more can be added by hand                |
 | **AI actions**               | Summaries of long passages; "Explain mode" in the floating window and per-paragraph explanations in documents; custom actions can be imported (needs an LLM provider) |
 | **Glossary**                 | Auto-replace terms after translation, with undo support                                                                                |
-| **TTS**                      | Built on Windows offline speech engine                                                                                                 |
+| **Read aloud**               | System voices, neural voice packs, or an external server; listen-mode subtitles can be spoken line by line                          |
 | **10 translation providers** | LM Studio, Ollama, OpenAI, Claude, Gemini, DeepSeek, DeepL, Google, Microsoft, Baidu                                                   |
 | **3 privacy modes**          | Standard / Incognito / Offline. Offline mode blocks decryption of online API keys                                                      |
 | **Migration pack**           | One-file export/import of settings, glossary, favorites and custom languages                                                           |
@@ -121,9 +121,9 @@ Settings → Privacy can export a **migration pack** (settings, glossary, favori
   <img src="docs/screenshots/providers.png" width="600" alt="Multi-provider">
 </p>
 
-### TTS
+### Read aloud
 
-Speak translation results aloud using Windows' offline speech engine. Rate adjustable. Voice list reflects locally installed speech packs; with language set to auto, the voice is picked from the script and diacritics of the text.
+Translations can be read aloud with one of three engines: system voices (Windows offline speech, nothing to install), neural voices (kokoro / MeloTTS packs synthesised on your machine, 104 voices, one can be pinned per language), or an external server (any OpenAI-compatible /v1/audio/speech endpoint, never used in offline mode). Subtitle lines in listen mode can be spoken one at a time, and audio capture pauses while speaking. Rate and volume are adjustable; voice packs download under Settings → Audio → Read.
 
 <p align="center">
   <img src="docs/screenshots/tts.png" width="600" alt="TTS">
