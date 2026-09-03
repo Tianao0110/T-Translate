@@ -238,6 +238,12 @@ const agc = makeAgc();
 let capture = null;
 let lastLevelPostAt = 0;
 const LEVEL_INTERVAL_MS = 80;
+// A loopback client gets no packets at all while nothing renders on the
+// endpoint (measured 2026-09-02), so a paused video would leave the meter
+// frozen on its last frame unless someone zeroes it.
+let lastPcmAt = 0;
+let levelZeroed = true;
+const LEVEL_IDLE_MS = 1000;
 
 // Level + speech-time accumulators, reset each metrics window. These exist
 // because a session log without them cannot answer the only question a stall
@@ -505,6 +511,10 @@ function applyVadThreshold() {
 }
 
 function checkHint() {
+  if (capture && !levelZeroed && Date.now() - lastPcmAt > LEVEL_IDLE_MS) {
+    levelZeroed = true;
+    post({ type: 'level', value: 0 });
+  }
   const hint = watchdog.hint(Date.now());
   if (hint !== lastHint) {
     lastHint = hint;
@@ -608,6 +618,8 @@ function stopCapture() {
 // identical so the meter behaves exactly as before the capture moved here.
 function emitLevel(samples) {
   const now = Date.now();
+  lastPcmAt = now;
+  levelZeroed = false;
   if (now - lastLevelPostAt < LEVEL_INTERVAL_MS) return;
   lastLevelPostAt = now;
   let sumSq = 0;

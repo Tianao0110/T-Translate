@@ -21,7 +21,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const { execFileSync } = require('child_process');
-const { app } = require('electron');
+const { app, BrowserWindow } = require('electron');
 
 const REPO = path.resolve(__dirname, '..').replace(/\\/g, '/');
 const RELEASE_DIR = `${REPO}/release-audio-models`;
@@ -177,11 +177,13 @@ async function main() {
     `download=${offlineCodes[0]}, manifest=${offlineCodes[1]}, list=${offlineList.manifestError}`
   );
 
-  // Native capture (v0.4.1). Assertable on a silent machine: a process- or
-  // system-loopback client keeps delivering a steady 16 kHz stream whether or
-  // not anything is playing, so the frame count alone proves koffi loaded, the
-  // client activated, the format was accepted, the pump runs and stop() stops
-  // it. Signal itself is not assertable without making noise.
+  // Native capture (v0.4.1). A loopback client only receives packets while
+  // some render stream is active on the endpoint — a fully silent machine
+  // delivers nothing at all (0.00s measured 2026-09-02; earlier green runs had
+  // a browser or the app playing). So the check renders its own near-silent
+  // tone from a hidden window for the duration: the frame count then proves
+  // koffi loaded, the client activated, the format was accepted, the pump runs
+  // and stop() stops it. Signal itself is not assertable without making noise.
   const winAudio = require('../electron/utils/win-audio-capture');
   const caps = winAudio.getCapabilities();
   step(
@@ -190,12 +192,22 @@ async function main() {
     `build=${caps.build}, processLoopback=${caps.processLoopback}${caps.reason ? ` (${caps.reason})` : ''}`
   );
   if (caps.supported) {
+    // Destroying the only window would otherwise quit the app (Electron's
+    // default window-all-closed handling) halfway through the smoke.
+    app.on('window-all-closed', () => {});
+    const keepAlive = new BrowserWindow({ show: false, webPreferences: { backgroundThrottling: false } });
+    await keepAlive.loadURL(
+      'data:text/html,<script>const c=new AudioContext();const o=c.createOscillator();const g=c.createGain();' +
+        'g.gain.value=0.0005;o.connect(g);g.connect(c.destination);o.start();</script>'
+    );
+    await new Promise((r) => setTimeout(r, 300));
     let captured = 0;
     const handle = await winAudio.startCapture({ mode: 'system', onPcm: (pcm) => { captured += pcm.length; } });
     await new Promise((r) => setTimeout(r, 1500));
     const duringStop = captured;
     handle.stop();
     await new Promise((r) => setTimeout(r, 300));
+    keepAlive.destroy();
     const seconds = duringStop / 16000;
     step(
       'native capture delivers a steady 16k mono stream and stops clean',
@@ -523,8 +535,16 @@ async function main() {
     console.log('\n--- session log ---');
     console.log(logText.trim());
   }
-  if (failed === 0 && !KEEP) fs.rmSync(SANDBOX, { recursive: true, force: true });
-  else console.log(`\nsandbox kept: ${SANDBOX}`);
+  if (failed === 0 && !KEEP) {
+    // The keep-alive window leaves Chromium session files open under the
+    // sandbox userData until the process exits; the next run's rmSync at
+    // startup gets them. Not a test failure.
+    try {
+      fs.rmSync(SANDBOX, { recursive: true, force: true });
+    } catch (e) {
+      console.log(`\nsandbox cleanup deferred to next run (${e.code || e.message})`);
+    }
+  } else console.log(`\nsandbox kept: ${SANDBOX}`);
   app.exit(failed === 0 ? 0 : 1);
 }
 
