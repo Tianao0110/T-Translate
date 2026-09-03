@@ -327,3 +327,47 @@
 .pm-table td {
   vertical-align: middle;
 }
+
+/* Head row: the 详细 button stays a one-line pill on the right edge of the
+   content column; the pill grid and the comparison table center their data
+   columns (user's call 2026-09-03). */
+.pm-head .btn-small {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  width: auto;
+}
+
+.pm-table {
+  table-layout: fixed;
+}
+
+.pm-table th:first-child,
+.pm-table td.mod {
+  width: 34%;
+}
+
+.pm-table th:not(:first-child),
+.pm-table td:not(.mod) {
+  text-align: center;
+}
+
+.pm-table td:not(.mod) .pm-cell {
+  align-items: center;
+}
+
+/* .btn-small carries no surface of its own here; give the 详细 button the
+   same bordered look as the pack-list buttons. */
+.pm-head .btn-small {
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+}
+
+.pm-head .btn-small:hover {
+  color: var(--text-primary);
+  border-color: var(--accent-primary);
+}
