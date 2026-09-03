@@ -510,3 +510,14 @@
 .ocr-engine-item .ps-config-form {
   margin-top: 8px;
 }
+
+/* The high-accuracy download progress sits under its segment, not beside it. */
+.ocr-tier {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.ocr-tier .engine-download-progress {
+  margin-top: 8px;
+}

@@ -7,7 +7,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Play, Square, RefreshCw, Zap } from 'lucide-react';
+import { Play, Square, RefreshCw, Zap, Cpu, Sparkles, Globe } from 'lucide-react';
 import ttsManager, { DEFAULT_TTS_CONFIG, TTS_STATUS } from '../../../services/tts/index.js';
 import stackClient from '../../../services/stack-client.js';
 import VoicePicker from './VoicePicker.jsx';
@@ -15,6 +15,12 @@ import createLogger from '../../../utils/logger.js';
 const logger = createLogger('TTSSection');
 
 const ENGINE_ORDER = ['web-speech', 'neural', 'endpoint'];
+// Same three icons as the OCR engine tabs: local / model / online.
+const ENGINE_ICONS = {
+  'web-speech': <Cpu size={14} />,
+  neural: <Sparkles size={14} />,
+  endpoint: <Globe size={14} />,
+};
 
 function hostOf(url) {
   try {
@@ -321,6 +327,7 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
                   disabled={engineDisabled(id)}
                   onClick={() => handleEngineChange(id)}
                 >
+                  {ENGINE_ICONS[id]}
                   {t(`tts.engineNames.${id}`)}
                   {engineSub(id) && <span className="n">{engineSub(id)}</span>}
                 </button>

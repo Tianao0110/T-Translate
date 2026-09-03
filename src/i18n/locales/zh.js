@@ -602,7 +602,7 @@ const zh = {
     llmModelPlaceholder: "模型名称（可选，如 qwen2-vl-7b）",
     llmEndpoint: "接口地址",
     llmModel: "模型",
-    engineTitle: "识别引擎",
+    engineTitle: "引擎",
     llmModelHint: "指定要用的视觉模型；LM Studio/Ollama 同时加载了多个模型时建议填写，避免选到不支持图片的模型。留空则用服务端当前加载的模型",
     free25k: "免费 25000次/月", free5k: "免费 5000次/月", free1k: "免费 1000次/月",
     ocrspaceDesc: "免费额度最高，支持 25+ 语言",
@@ -681,7 +681,7 @@ const zh = {
       metaPacks: "已装 {{count}} 个语音包", metaNoPacks: "没有语音包",
       metaEndpoint: "外接服务已配置", metaNoEndpoint: "外接服务未配置"
     },
-    engine: { label: "语音引擎", packs: "{{count}} 包", noPacks: "未装包", endpointUnset: "未配置" },
+    engine: { label: "引擎", packs: "{{count}} 包", noPacks: "未装包", endpointUnset: "未配置" },
     now: {
       label: "当前朗读", local: "本机", api: "API", auto: "自动", preview: "试听",
       neuralSub: "{{zh}} / {{en}}；读不了的语言这一句回落系统语音",

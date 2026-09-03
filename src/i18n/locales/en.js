@@ -681,7 +681,7 @@ const en = {
       metaPacks: "{{count}} voice packs installed", metaNoPacks: "No voice packs",
       metaEndpoint: "External server configured", metaNoEndpoint: "No external server"
     },
-    engine: { label: "Speech engine", packs: "{{count}} packs", noPacks: "no packs", endpointUnset: "not set" },
+    engine: { label: "Engine", packs: "{{count}} packs", noPacks: "no packs", endpointUnset: "not set" },
     now: {
       label: "Speaking with", local: "Local", api: "API", auto: "auto", preview: "Preview",
       neuralSub: "{{zh}} / {{en}}; a language the pack cannot read falls back to system voices for that line",
