@@ -69,27 +69,13 @@ Transparent overlay for live translation — drag, resize, pin on top, spawn ind
 
 ### Listen mode
 
-The waveform icon in the floating window's toolbar, then press ▶: it transcribes whatever your computer is playing and translates it sentence by sentence. For videos with no subtitles, meetings, or streams in a language you're learning.
+The waveform icon in the floating window's toolbar, then ▶: it transcribes whatever your computer is playing and translates it sentence by sentence. Recognition runs on your machine; audio passes through memory and is never written to disk or uploaded.
 
-Recognition runs on your machine. **Audio passes through memory and is never written to disk**, and it is never uploaded. Translation goes through whichever provider you configured — pick a local model and nothing leaves the machine at all.
+Chinese, English, Japanese, Korean and Cantonese, chosen or detected. With the optional draft engine, Chinese and English appear as they are spoken. Listens to everything by default, or to a single program on Windows 11. Subtitles export to SRT. Models download under Settings → Audio → Listen (base 153 MB, draft engine 168 MB optional).
 
-Chinese, English, Japanese, Korean and Cantonese, picked manually or detected from the first sentence. With the optional draft engine installed, Chinese and English appear while you speak (first characters in under a second) and are corrected when the sentence ends; without it, text appears once the sentence is done.
-
-**Sound source**: listens to everything by default. On Windows 11 you can instead listen to one program. The list shows only programs that have already played something, because a process that never opened an audio stream does not exist as far as Windows is concerned. Every browser tab shares one audio process, so the granularity stops at "program" — per-site is not possible. Windows 10 can only listen to all sound.
-
-Subtitles export to SRT (source and translation on separate lines). In Incognito mode listen works without writing its session log.
-
-**Models are downloaded on demand**: Settings → Audio → Listen. Base model 153 MB (required), draft engine 168 MB (optional). A running session uses about 600-700 MB of memory, released when you stop.
-
-### AI features (Explain / Summarize)
-
-A layer of understanding on top of translation, built on exactly two concepts: **Explain helps you get this passage, Summarize helps you get through a long one.** Summarize turns a long passage into key points — selection card, main panel, and floating window. **Explain mode** (floating window, top-left) explains captures instead of translating them. With a vision model loaded, the model reads the screenshot itself, falling back to the text path when it cannot.
-
-Summaries attach to their translation in history; understanding results get entries of their own. Custom actions can be imported in Settings. **An LLM provider is required** — translate-only sources are marked in Settings.
-
-### Language selection
-
-134 languages — everything Google Translate supports. The picker pins recent languages on top, groups the rest by letter under a clickable index strip, and sorts by the interface language. Languages not in the list can be added at the bottom, with an optional separate name to send the model.
+<p align="center">
+  <img src="docs/screenshots/Listen.png" width="600" alt="Listen mode">
+</p>
 
 ### Document translation
 
