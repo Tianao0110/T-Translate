@@ -236,6 +236,16 @@ const en = {
     historyCleared: "History cleared",
     clearAllConfirm: "Are you sure to clear all local data? This will reset all settings.",
     features: { history: "History", cache: "Translation Cache", onlineApi: "Online Translation API", analytics: "Local Usage Stats" },
+    modeShort: { standard: "Standard", secure: "Incognito", offline: "Offline" },
+    modules: {
+      translators: { name: "Translation providers", standard: "Local LLM and online providers", secure: "All available", offline: "Local LLM only, online providers disabled" },
+      ocr: { name: "OCR", standard: "Local + online engines", secure: "Same as standard", offline: "Local engines only" },
+      listen: { name: "Listen", standard: "Available; the session log keeps metrics, never text", secure: "Unavailable", offline: "Available, models are local" },
+      speak: { name: "Read aloud", standard: "System / neural / external server", secure: "Same as standard", offline: "System / neural; external server disabled" },
+      downloads: { name: "Model and voice pack downloads", standard: "Available", secure: "Available", offline: "No network; installed packs only" },
+      history: { name: "History · favorites · cache", standard: "Saved", secure: "Nothing written; cleared on close", offline: "Saved" },
+      updates: { name: "Update check", standard: "Available", secure: "Available", offline: "No network" }
+    },
     save: "Save", noSave: "No Save", allow: "Allow", deny: "Deny", collect: "Recorded locally", noCollect: "Not recorded",
     offlineWarning: "In offline mode, only local LLM translation is available. Online sources (OpenAI, DeepL, etc.) are disabled.",
     incognitoWarning: "Incognito mode is on: Translation history is paused. Previous history will be restored when you exit.",

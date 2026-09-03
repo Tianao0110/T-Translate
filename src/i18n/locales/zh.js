@@ -236,6 +236,16 @@ const zh = {
     historyCleared: "历史记录已清除",
     clearAllConfirm: "确定要清除所有本地数据吗？这将重置所有设置。",
     features: { history: "历史记录", cache: "翻译缓存", onlineApi: "在线翻译API", analytics: "本地使用统计" },
+    modeShort: { standard: "标准", secure: "无痕", offline: "离线" },
+    modules: {
+      translators: { name: "翻译源", standard: "本地 LLM 与在线源都可用", secure: "都可用", offline: "只用本地 LLM，在线源禁用" },
+      ocr: { name: "OCR", standard: "本地引擎 + 在线引擎", secure: "同标准", offline: "只用本地引擎" },
+      listen: { name: "听译", standard: "可用；会话日志只记指标不记文字", secure: "不可用", offline: "可用，模型全在本机" },
+      speak: { name: "朗读", standard: "系统语音 / 神经语音 / 外接服务", secure: "同标准", offline: "系统语音 / 神经语音；外接服务禁用" },
+      downloads: { name: "模型与语音包下载", standard: "可用", secure: "可用", offline: "不联网，只列已安装" },
+      history: { name: "历史 · 收藏 · 缓存", standard: "保存", secure: "不写盘，关闭即清", offline: "保存" },
+      updates: { name: "检查更新", standard: "可用", secure: "可用", offline: "不联网" }
+    },
     save: "保存", noSave: "不保存", allow: "允许", deny: "禁止", collect: "记录在本机", noCollect: "不记录",
     offlineWarning: "离线模式下仅可使用本地 LLM 翻译，在线翻译源（OpenAI、DeepL等）将被禁用",
     incognitoWarning: "无痕模式已开启：翻译记录暂停保存，退出后恢复之前的历史",

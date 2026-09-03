@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Zap, Shield, Lock, CheckCircle, AlertCircle, Trash2, ClipboardList, Database, Check, X, ArrowRightLeft, Download, Upload } from 'lucide-react';
+import { Zap, Shield, Lock, Trash2, ClipboardList, Database, Check, X, Minus, ArrowRightLeft, Download, Upload } from 'lucide-react';
 import useTranslationStore from '../../../stores/translation-store';
 import translationService from '../../../services/stack-client.js';
 import { PRIVACY_MODES, PRIVACY_MODE_IDS } from '../constants.js';
+import { PRIVACY_MODULES, PRIVACY_MODE_ORDER, moduleState } from '../../../utils/privacy-module-matrix.js';
 import { buildMigrationPack, parseMigrationPack, stripSecrets, MAX_PACK_BYTES } from '../../../utils/migration-pack.js';
 import { validateImportedActions, refreshImportedActions } from '../../../services/ai-action-store.js';
 import { getAllProviderMetadata } from '../../../config/provider-icons.js';
@@ -49,14 +50,11 @@ const PrivacySection = ({
     return t(modeKeys[modeId] || 'privacy.modes.standard');
   };
 
-  const getModeDesc = (modeId) => {
-    const descKeys = {
-      [PRIVACY_MODE_IDS.STANDARD]: 'privacy.modes.standardDesc',
-      [PRIVACY_MODE_IDS.OFFLINE]: 'privacy.modes.offlineDesc',
-      [PRIVACY_MODE_IDS.SECURE]: 'privacy.modes.incognitoDesc',
-    };
-    return t(descKeys[modeId] || 'privacy.modes.standardDesc');
-  };
+  // Matrix columns use the config ids ('secure'), the seg shows the user-facing
+  // names ('无痕'). Same order everywhere.
+  const modeIds = PRIVACY_MODE_ORDER;
+  const stateIcon = (state) => (state === 'on' ? <Check size={13} /> : state === 'part' ? <Minus size={13} /> : <X size={13} />);
+  const stateClass = (state) => (state === 'on' ? 'enabled' : state === 'part' ? 'partial' : 'disabled');
 
   // Storage footprint for the data-management panel. Counts come from the
   // store, sizes from localStorage scan + a main-process stat call.
@@ -294,81 +292,67 @@ const PrivacySection = ({
   return (
     <div className="setting-content">
       <h3>{t('settings.privacy.title')}</h3>
-      <p className="setting-description">{t('privacy.modeDescription')}</p>
-      
-      {/* Current mode banner */}
-      <div className={`current-mode-banner mode-${currentMode}`}>
-        <div className="mode-banner-icon">
-          {getModeIcon(modeConfig?.icon, 20)}
-        </div>
-        <div className="mode-banner-info">
-          <span className="mode-banner-label">{t('privacy.currentMode')}</span>
-          <span className="mode-banner-name">{getModeName(currentMode)}</span>
-        </div>
-      </div>
-      
-      {/* Mode selection cards */}
-      <div className="mode-selection-grid">
-        {Object.values(PRIVACY_MODES).map((mode) => {
-          const isSelected = currentMode === mode.id;
-          
+
+      {/* Mode picker: the house segmented style; the selected segment IS the
+          current mode, so no separate banner. */}
+      <div className="seg">
+        {modeIds.map((id) => {
+          const mode = PRIVACY_MODES[id];
+          if (!mode) return null;
           return (
-            <div 
-              key={mode.id}
-              className={`mode-card ${isSelected ? 'selected' : ''}`}
+            <button
+              key={id}
+              type="button"
+              className={currentMode === id ? 'on' : ''}
               onClick={() => handleModeChange(mode)}
             >
-              <div className="mode-icon">{getModeIcon(mode.icon)}</div>
-              <div className="mode-info">
-                <h4>{getModeName(mode.id)}</h4>
-                <p>{getModeDesc(mode.id)}</p>
-              </div>
-              {isSelected && <div className="mode-check"><CheckCircle size={18} /></div>}
-            </div>
+              {getModeIcon(mode.icon, 13)}
+              {getModeName(id)}
+            </button>
           );
         })}
       </div>
 
-      {/* Feature matrix for the active mode */}
+      {/* What this mode means per module: state colour + one short line each */}
       <div className="mode-features-panel">
         <h4><ClipboardList size={15} /> {t('privacy.featuresTitle')}</h4>
         <div className="feature-list">
-          <div className={`feature-item ${modeConfig?.features.saveHistory ? 'enabled' : 'disabled'}`}>
-            <span className="feature-icon">{modeConfig?.features.saveHistory ? <Check size={13} /> : <X size={13} />}</span>
-            <span className="feature-name">{t('privacy.features.history')}</span>
-            <span className="feature-status">{modeConfig?.features.saveHistory ? t('privacy.save') : t('privacy.noSave')}</span>
-          </div>
-          <div className={`feature-item ${modeConfig?.features.useCache ? 'enabled' : 'disabled'}`}>
-            <span className="feature-icon">{modeConfig?.features.useCache ? <Check size={13} /> : <X size={13} />}</span>
-            <span className="feature-name">{t('privacy.features.cache')}</span>
-            <span className="feature-status">{modeConfig?.features.useCache ? t('common.enable') : t('common.disable')}</span>
-          </div>
-          <div className={`feature-item ${modeConfig?.features.onlineApi ? 'enabled' : 'disabled'}`}>
-            <span className="feature-icon">{modeConfig?.features.onlineApi ? <Check size={13} /> : <X size={13} />}</span>
-            <span className="feature-name">{t('privacy.features.onlineApi')}</span>
-            <span className="feature-status">{modeConfig?.features.onlineApi ? t('privacy.allow') : t('privacy.deny')}</span>
-          </div>
-          <div className={`feature-item ${modeConfig?.features.analytics ? 'enabled' : 'disabled'}`}>
-            <span className="feature-icon">{modeConfig?.features.analytics ? <Check size={13} /> : <X size={13} />}</span>
-            <span className="feature-name">{t('privacy.features.analytics')}</span>
-            <span className="feature-status">{modeConfig?.features.analytics ? t('privacy.collect') : t('privacy.noCollect')}</span>
-          </div>
+          {PRIVACY_MODULES.map((m) => {
+            const state = moduleState(m, currentMode);
+            return (
+              <div key={m} className={`feature-item ${stateClass(state)}`}>
+                <span className="feature-icon">{stateIcon(state)}</span>
+                <span className="feature-name">{t(`privacy.modules.${m}.name`)}</span>
+                <span className="feature-status">{t(`privacy.modules.${m}.${currentMode}`)}</span>
+              </div>
+            );
+          })}
         </div>
-        
-        {currentMode === PRIVACY_MODE_IDS.OFFLINE && (
-          <div className="mode-warning">
-            <AlertCircle size={16} />
-            <span>{t('privacy.offlineWarning')}</span>
-          </div>
-        )}
-        
-        {currentMode === PRIVACY_MODE_IDS.SECURE && (
-          <div className="mode-warning secure">
-            <Shield size={16} />
-            <span>{t('privacy.incognitoWarning')}</span>
-          </div>
-        )}
       </div>
+
+      {/* Read-only overview of all three modes; the current column is tinted */}
+      <table className="pm-table">
+        <thead>
+          <tr>
+            <th></th>
+            {modeIds.map((id) => (
+              <th key={id} className={currentMode === id ? 'cur' : ''}>{t(`privacy.modeShort.${id}`)}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {PRIVACY_MODULES.map((m) => (
+            <tr key={m}>
+              <td className="mod">{t(`privacy.modules.${m}.name`)}</td>
+              {modeIds.map((id) => (
+                <td key={id} className={`${moduleState(m, id)} ${currentMode === id ? 'cur' : ''}`}>
+                  {t(`privacy.modules.${m}.${id}`)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
       {/* Data management */}
       <div className="setting-group" style={{marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border-primary)'}}>

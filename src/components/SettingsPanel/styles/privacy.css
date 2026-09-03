@@ -214,3 +214,50 @@
   gap: 8px;
 }
 
+
+/* ==================== 按模块的功能说明（v0.4.2） ==================== */
+/* A third state next to enabled/disabled: works with restrictions. */
+.feature-item.partial {
+  border-left: 3px solid var(--warning);
+}
+
+.feature-item.partial .feature-icon {
+  color: var(--warning);
+}
+
+/* Read-only three-mode overview under the per-mode list. */
+.pm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  margin-top: 14px;
+}
+
+.pm-table th,
+.pm-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-primary);
+  text-align: left;
+  vertical-align: top;
+}
+
+.pm-table th {
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.pm-table td.mod {
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.pm-table td.on { color: var(--text-primary); }
+.pm-table td.part { color: var(--warning); }
+.pm-table td.off { color: var(--error); }
+
+.pm-table th.cur,
+.pm-table td.cur {
+  background: color-mix(in srgb, var(--accent-primary) 6%, transparent);
+}
