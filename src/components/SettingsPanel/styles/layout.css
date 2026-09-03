@@ -726,4 +726,9 @@
     grid-column: auto;
     margin: 0;
   }
+
+  /* Long lists (shortcut editor, engine tables) take the whole row. */
+  .settings-panel .setting-content > .setting-group.wide {
+    grid-column: 1 / -1;
+  }
 }

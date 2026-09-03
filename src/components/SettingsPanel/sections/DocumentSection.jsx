@@ -24,7 +24,7 @@ const DocumentSection = ({
 
       <div className="setting-group">
         <label className="setting-label">{t('documentSettings.segmentSettings')}</label>
-        <div className="setting-row">
+        <div className="field-grid">
           <span>{t('documentSettings.maxCharsPerSegment')}</span>
           <input
             type="number"
@@ -35,8 +35,6 @@ const DocumentSection = ({
             max="2000"
             step="100"
           />
-        </div>
-        <div className="setting-row">
           <span>{t('documentSettings.concurrency')}</span>
           <input
             type="number"

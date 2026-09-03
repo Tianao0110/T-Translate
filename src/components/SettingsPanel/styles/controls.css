@@ -834,3 +834,37 @@ input:checked + .switch-slider::before {
 .setting-group .setting-switch + .setting-switch {
   margin-top: 10px;
 }
+
+/* A segmented control never overflows its card; long option sets wrap. */
+.seg {
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+
+/* A lone slider: its head doubles as the card title, and the track stays short. */
+.sliders.solo {
+  max-width: 420px;
+  margin-top: 0;
+}
+
+.sliders.solo .sl-head {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Label / input pairs with the inputs lined up in one column. */
+.field-grid {
+  display: grid;
+  grid-template-columns: max-content 96px;
+  column-gap: 12px;
+  row-gap: 10px;
+  align-items: center;
+}
+
+.field-grid .setting-input.small {
+  width: 100%;
+}
+
+.setting-input.small {
+  padding: 7px 10px;
+}

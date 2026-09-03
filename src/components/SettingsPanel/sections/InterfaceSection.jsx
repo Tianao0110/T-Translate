@@ -220,7 +220,7 @@ const InterfaceSection = ({
         />
       </div>
 
-      <div className="setting-group">
+      <div className="setting-group wide">
         <label className="setting-label">
           <Keyboard size={16} />
           {t('settings.shortcuts.title')}

@@ -93,7 +93,7 @@ const zh = {
     smartFilter: "智能过滤", skipShort: "跳过过短段落", minLength: "最小字符数",
     skipNumbers: "跳过纯数字段落（如页码）", skipCode: "保留代码块不翻译", skipTargetLang: "跳过已是目标语言的段落",
     displayStyle: "默认显示样式",
-    styleBelow: "上下对照 - 译文显示在原文下方", styleSideBySide: "左右对照 - 原文和译文并排显示",
+    styleBelow: "上下对照", styleSideBySide: "左右对照",
     supportedFormats: "支持的文件格式", formatHint: "支持加密 PDF · 自动识别章节大纲 · 翻译记忆复用"
   },
   shortcuts: {

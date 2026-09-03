@@ -93,7 +93,7 @@ const en = {
     smartFilter: "Smart Filter", skipShort: "Skip short paragraphs", minLength: "Min length",
     skipNumbers: "Skip number-only paragraphs (e.g. page numbers)", skipCode: "Keep code blocks untranslated", skipTargetLang: "Skip paragraphs already in target language",
     displayStyle: "Default Display Style",
-    styleBelow: "Top-bottom - Translation below source", styleSideBySide: "Side by side - Source and translation side by side",
+    styleBelow: "Top-bottom", styleSideBySide: "Side by side",
     supportedFormats: "Supported Formats", formatHint: "Supports encrypted PDFs · Auto chapter detection · Translation memory"
   },
   shortcuts: {

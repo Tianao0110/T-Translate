@@ -62,8 +62,7 @@ const FloatingWindowSection = ({
       </div>
 
       <div className="setting-group">
-        <label className="setting-label">{t('floatingWindow.defaultOpacity')}</label>
-        <div className="sliders">
+        <div className="sliders solo">
           <Slider
             label={t('floatingWindow.defaultOpacity')}
             display={`${opacityPct}%`}
