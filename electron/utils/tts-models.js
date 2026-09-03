@@ -17,8 +17,9 @@ const ENGINES = new Set(['kokoro', 'vits']);
 
 // Fallback pace correction for packs installed before the manifest carried
 // speedScale (see audio-model-sources.js). Measured on the same 22-character
-// sentence: kokoro 5.09s, MeloTTS 4.18s at speed 1.0.
-const DEFAULT_SPEED_SCALE = { vits: { zh: 0.8, en: 1 } };
+// sentence: kokoro 5.09s, MeloTTS 4.18s at speed 1.0; 0.9 is the user's pick
+// by ear (2026-09-02).
+const DEFAULT_SPEED_SCALE = { vits: { zh: 0.9, en: 1 } };
 
 function exists(fs, p) {
   try {

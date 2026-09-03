@@ -69,7 +69,7 @@ describe('listVoicePacks', () => {
 
   it('speedScale comes from pack.json, else the engine default (MeloTTS Chinese runs fast)', () => {
     writePack('tts-melo-zh-en', { engine: 'vits', files: { model: 'model.onnx', tokens: 'tokens.txt' }, voiceGroups: [] }, ['model.onnx', 'tokens.txt']);
-    expect(listVoicePacks([root])[0].speedScale).toEqual({ zh: 0.8, en: 1 });
+    expect(listVoicePacks([root])[0].speedScale).toEqual({ zh: 0.9, en: 1 });
     writePack('tts-melo-zh-en', { engine: 'vits', files: { model: 'model.onnx', tokens: 'tokens.txt' }, voiceGroups: [], speedScale: 0.9 }, ['model.onnx', 'tokens.txt']);
     expect(listVoicePacks([root])[0].speedScale).toBe(0.9);
   });
