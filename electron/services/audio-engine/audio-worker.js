@@ -56,6 +56,7 @@ const {
   makeVadThresholdPolicy,
   isNegligibleFinal,
   makeAgc,
+  pickCutWindow,
 } = require('./probe-metrics');
 
 const SAMPLE_RATE = 16000;
@@ -174,6 +175,35 @@ let recentRms = []; // last VALLEY_WINDOWS window RMS values
 // head was part of the English pipeline going 14.7% -> 10.6% WER.
 const PRE_ROLL_WINDOWS = 19; // ~0.6s
 let preRoll = [];
+// Per-chunk RMS of the open segment (every chunk is one VAD window), so a
+// hard cut can land in the quietest recent window instead of at 9.0s sharp.
+let openChunkRms = [];
+// Carry-over after a forced cut: the audio from the cut point up to the VAD's
+// next acknowledgment. It is the head of the next sentence — before this it
+// was lost (every segment after a hard cut opened a letter or two short:
+// "ut your", "rote about") — so it is carried explicitly, and prefixed to the
+// next final without overlap using global sample positions.
+let carry = null; // { chunks: Float32Array[], len, startSample }
+let carryForDecode = null; // { samples: Float32Array, startSample }
+const CUT_LOOKBACK_WINDOWS = 47; // ~1.5s in which to find the quietest window
+const CUT_MIN_TAIL_WINDOWS = 8; // ~0.26s always kept for the next segment's head
+const CARRY_MAX_S = 3; // a carry nobody re-acknowledges is finalized on its own
+
+function rmsOf(arr) {
+  let sumSq = 0;
+  for (let i = 0; i < arr.length; i++) sumSq += arr[i] * arr[i];
+  return Math.sqrt(sumSq / (arr.length || 1));
+}
+
+function concatChunks(chunks, len) {
+  const out = new Float32Array(len);
+  let off = 0;
+  for (const c of chunks) {
+    out.set(c, off);
+    off += c.length;
+  }
+  return out;
+}
 // Level normalization ahead of the VAD (see makeAgc). Applied to the windows
 // the VAD and the mirrored segments see; the level meter and the rms metrics
 // keep reading the raw signal, so a quiet source still looks quiet in the log.
@@ -327,6 +357,9 @@ function handleAsrStart(msg) {
   vadPolicy = makeVadThresholdPolicy({ speech: VAD_THRESHOLD_SPEECH, music: VAD_THRESHOLD_MUSIC });
   vadRebuildTo = null;
   agc.reset();
+  carry = null;
+  carryForDecode = null;
+  preRoll = [];
   sessionLive = true;
   logLine({
     ts: Date.now(),
@@ -643,25 +676,40 @@ function trackOpenSegment(win) {
   if (vad.isDetected()) {
     speechWindows += 1;
     watchdog.onSpeech(Date.now());
-    // Segment just opened: prepend the pre-roll so the mirrored audio has the
-    // utterance head the acknowledgment window swallowed. Mostly silence plus
-    // the first ~0.15s of speech; SenseVoice doesn't mind leading quiet.
-    if (openLen === 0 && preRoll.length) {
-      for (const p of preRoll) {
-        openChunks.push(p);
-        openLen += p.length;
-        feedStream(p);
+    if (openLen === 0) {
+      if (carry) {
+        // A forced cut just happened and the speech went on: the carried
+        // audio is this segment's head. The pre-roll would only duplicate it.
+        for (const c of carry.chunks) {
+          openChunks.push(c);
+          openChunkRms.push(rmsOf(c));
+          openLen += c.length;
+          feedStream(c);
+        }
+        carryForDecode = { samples: concatChunks(carry.chunks, carry.len), startSample: carry.startSample };
+        carry = null;
+        preRoll = [];
+      } else if (preRoll.length) {
+        // Segment just opened: prepend the pre-roll so the mirrored audio has
+        // the utterance head the acknowledgment window swallowed. Mostly
+        // silence plus the first ~0.15s of speech; SenseVoice doesn't mind
+        // leading quiet.
+        for (const p of preRoll) {
+          openChunks.push(p);
+          openChunkRms.push(rmsOf(p));
+          openLen += p.length;
+          feedStream(p);
+        }
+        preRoll = [];
       }
-      preRoll = [];
     }
     const copy = new Float32Array(win);
+    const rms = rmsOf(copy);
     openChunks.push(copy);
+    openChunkRms.push(rms);
     openLen += copy.length;
     feedStream(copy);
 
-    let sumSq = 0;
-    for (let i = 0; i < win.length; i++) sumSq += win[i] * win[i];
-    const rms = Math.sqrt(sumSq / win.length);
     openRmsSum += rms;
     openWinCount += 1;
     recentRms.push(rms);
@@ -683,6 +731,12 @@ function trackOpenSegment(win) {
         if (recentRms.every((r) => r < floor)) forceSplit('valley');
       }
     }
+  } else if (carry) {
+    // Between a forced cut and the VAD's re-acknowledgment: still the same
+    // stretch of speech, so it belongs with the carried head, not the pre-roll.
+    carry.chunks.push(new Float32Array(win));
+    carry.len += win.length;
+    if (carry.len >= CARRY_MAX_S * SAMPLE_RATE) flushCarry('carry-timeout');
   } else {
     preRoll.push(new Float32Array(win));
     if (preRoll.length > PRE_ROLL_WINDOWS) preRoll.shift();
@@ -704,20 +758,36 @@ function resetOpenSegment() {
   openRmsSum = 0;
   openWinCount = 0;
   recentRms = [];
+  openChunkRms = [];
+}
+
+// The speech ended at (or right after) a forced cut and the VAD never
+// re-acknowledged: whatever was carried is the tail of that sentence and
+// gets its own final rather than waiting forever for a segment to join.
+function flushCarry(reason) {
+  if (!carry) return;
+  const { chunks, len, startSample } = carry;
+  carry = null;
+  logLine(eventRecord('carry-flush', `${reason} ${(len / SAMPLE_RATE).toFixed(2)}s`));
+  enqueueDecode({ samples: concatChunks(chunks, len), start: startSample });
 }
 
 // Force-close the open segment: finalize the mirrored audio ourselves and
 // reset the VAD so it starts a fresh one. The VAD has not closed, so its
-// queue is empty — nothing double-decodes. On a 'valley' split both the cut
-// and the VAD re-acknowledgment land inside the quiet dip (lossless); a
-// 'hard' split costs ~1-2 characters at the seam.
+// queue is empty — nothing double-decodes. 'valley' and 'quiet' cuts are
+// already at a pause and cut at the end. A 'hard' cut lands in the quietest
+// window of the last ~1.5s (between words far more often than 9.0s sharp),
+// and everything after that window is carried into the next segment.
 function forceSplit(reason) {
-  const buf = new Float32Array(openLen);
-  let off = 0;
-  for (const c of openChunks) {
-    buf.set(c, off);
-    off += c.length;
+  let cutAfter = openChunks.length - 1;
+  if (reason === 'hard') {
+    const k = pickCutWindow(openChunkRms, { lookback: CUT_LOOKBACK_WINDOWS, minTail: CUT_MIN_TAIL_WINDOWS });
+    if (k >= 0) cutAfter = k;
   }
+  const head = openChunks.slice(0, cutAfter + 1);
+  const tail = openChunks.slice(cutAfter + 1);
+  const tailLen = tail.reduce((a, c) => a + c.length, 0);
+  const buf = concatChunks(head, openLen - tailLen);
   const startSample = Math.max(0, vadFedSamples - openLen);
   resetOpenSegment();
   resetStreamDraft();
@@ -727,7 +797,9 @@ function forceSplit(reason) {
   } catch {
     // reset failure is survivable — the next natural close still works
   }
-  logLine(eventRecord('force-split', `${reason} ${(buf.length / SAMPLE_RATE).toFixed(1)}s`));
+  carry = tailLen ? { chunks: tail, len: tailLen, startSample: vadFedSamples - tailLen } : null;
+  carryForDecode = null;
+  logLine(eventRecord('force-split', `${reason} ${(buf.length / SAMPLE_RATE).toFixed(1)}s` + (tailLen ? ` carry ${(tailLen / SAMPLE_RATE).toFixed(2)}s` : '')));
   // Same shape as a VAD-closed segment; the final replaces the gray line
   // on screen exactly like a natural close.
   enqueueDecode({ samples: buf, start: startSample });
@@ -771,7 +843,22 @@ function drainVadQueue() {
     const seg = vad.front(false);
     vad.pop();
     // Rebased: seg.start is relative to the last reset, not to the session.
-    enqueueDecode({ samples: seg.samples, start: vadBaseSamples + seg.start });
+    let samples = seg.samples;
+    let start = vadBaseSamples + seg.start;
+    if (carryForDecode) {
+      // Prefix the carried head, minus whatever the VAD's own segment already
+      // covers (its start can sit a few windows before the acknowledgment).
+      const prefixLen = Math.min(carryForDecode.samples.length, Math.max(0, start - carryForDecode.startSample));
+      if (prefixLen > 0) {
+        const joined = new Float32Array(prefixLen + samples.length);
+        joined.set(carryForDecode.samples.subarray(0, prefixLen), 0);
+        joined.set(samples, prefixLen);
+        samples = joined;
+        start -= prefixLen;
+      }
+      carryForDecode = null;
+    }
+    enqueueDecode({ samples, start });
   }
 }
 
@@ -853,6 +940,7 @@ function handleAsrStop() {
   if (metricsTimer) clearInterval(metricsTimer);
   partialTimer = hintTimer = metricsTimer = null;
   resetOpenSegment();
+  flushCarry('stop');
   try {
     if (vad) {
       vad.flush();

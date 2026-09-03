@@ -157,6 +157,23 @@ function makeVadThresholdPolicy({ speech = 0.5, music = 0.3, window = 3 } = {}) 
   };
 }
 
+// Where to put a forced cut: the quietest window inside the lookback tail of
+// the open segment (a between-words dip), never the fixed 9.0s point. The
+// last `minTail` windows are off limits so the carried-over head of the next
+// segment is never shorter than the VAD needs to re-acknowledge it. Returns
+// the index of the window to cut AFTER, or -1 when there is too little to
+// choose from (caller cuts at the end as before).
+function pickCutWindow(rmsList, { lookback = 47, minTail = 8 } = {}) {
+  const n = rmsList.length;
+  if (n <= minTail + 1) return -1;
+  const from = Math.max(0, n - lookback);
+  const to = n - 1 - minTail; // inclusive
+  if (to < from) return -1;
+  let best = from;
+  for (let i = from + 1; i <= to; i++) if (rmsList[i] < rmsList[best]) best = i;
+  return best;
+}
+
 // A final that is not worth a subtitle line: over music the VAD closes on
 // breaths and yields one- or two-character fragments ("如。") that flash on
 // screen and burn a translation call. Speech finals are never filtered.
@@ -227,4 +244,5 @@ module.exports = {
   makeVadThresholdPolicy,
   isNegligibleFinal,
   makeAgc,
+  pickCutWindow,
 };

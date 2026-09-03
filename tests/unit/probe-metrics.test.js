@@ -11,6 +11,7 @@ import {
   makeVadThresholdPolicy,
   isNegligibleFinal,
   makeAgc,
+  pickCutWindow,
 } from '../../electron/services/audio-engine/probe-metrics.js';
 
 describe('makeRepeatTracker', () => {
@@ -235,5 +236,24 @@ describe('makeAgc', () => {
     expect(agc.gain()).toBeGreaterThan(g0);
     agc.reset();
     expect(agc.gain()).toBe(g0);
+  });
+});
+
+describe('pickCutWindow', () => {
+  it('picks the quietest window inside the lookback, leaving the minimum tail', () => {
+    const rms = new Array(60).fill(0.2);
+    rms[40] = 0.01; // a between-words dip
+    expect(pickCutWindow(rms, { lookback: 30, minTail: 8 })).toBe(40);
+  });
+
+  it('never cuts inside the protected tail even if that is the quietest spot', () => {
+    const rms = new Array(60).fill(0.2);
+    rms[57] = 0.001;
+    rms[45] = 0.05;
+    expect(pickCutWindow(rms, { lookback: 30, minTail: 8 })).toBe(45);
+  });
+
+  it('gives up on a segment too short to choose from', () => {
+    expect(pickCutWindow([0.1, 0.2, 0.05], { lookback: 30, minTail: 8 })).toBe(-1);
   });
 });
