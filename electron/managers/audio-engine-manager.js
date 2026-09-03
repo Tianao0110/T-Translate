@@ -662,7 +662,7 @@ async function ttsGenerate({ id, text, packId, sid, speed }, sender) {
       text,
       sid,
       speed,
-      pack: { id: pack.id, engine: pack.engine, paths: pack.paths },
+      pack: { id: pack.id, engine: pack.engine, paths: pack.paths, speedScale: pack.speedScale },
     });
   } catch (e) {
     ttsRequests.delete(id);

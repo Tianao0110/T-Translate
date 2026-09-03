@@ -70,7 +70,7 @@ const {
   makeAgc,
   pickCutWindow,
 } = require('./probe-metrics');
-const { hasCjk, verbalizeEnglishNumbers } = require('./tts-text-en');
+const { hasCjk, verbalizeEnglishNumbers, scaleSpeed } = require('./tts-text-en');
 
 const SAMPLE_RATE = 16000;
 const VAD_WINDOW = 512;
@@ -1106,7 +1106,7 @@ function handleTtsGenerate(msg) {
   const text = typeof msg.text === 'string' ? msg.text.trim() : '';
   if (!id || !text) return post({ type: 'tts-error', id, message: 'tts-empty' });
   const sid = Number.isInteger(msg.sid) && msg.sid >= 0 ? msg.sid : 0;
-  const speed = Number.isFinite(msg.speed) && msg.speed > 0 ? Math.min(3, Math.max(0.3, msg.speed)) : 1;
+  const speed = scaleSpeed(msg.speed, msg.pack?.speedScale, text);
 
   // The packs' Chinese rule FSTs would read English digits in Chinese;
   // English text gets its numbers spelled out first (tts-text-en).

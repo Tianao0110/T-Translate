@@ -53,6 +53,7 @@ const manager = createPackManager({
     voiceGroups: entry.voiceGroups,
     featured: entry.featured,
     preferMixed: entry.preferMixed === true,
+    ...(entry.speedScale !== undefined ? { speedScale: entry.speedScale } : {}),
     size: entry.size,
   }),
   basePackId: null,

@@ -64,6 +64,14 @@ describe('listVoicePacks', () => {
     expect(p.paths.ruleFsts).toEqual([path.join(dir, 'date-zh.fst')]);
     expect(p.voiceGroups).toEqual(kokoroMeta.voiceGroups);
     expect(p.featured).toEqual([0]);
+    expect(p.speedScale).toBe(1); // kokoro has no correction
+  });
+
+  it('speedScale comes from pack.json, else the engine default (MeloTTS Chinese runs fast)', () => {
+    writePack('tts-melo-zh-en', { engine: 'vits', files: { model: 'model.onnx', tokens: 'tokens.txt' }, voiceGroups: [] }, ['model.onnx', 'tokens.txt']);
+    expect(listVoicePacks([root])[0].speedScale).toEqual({ zh: 0.8, en: 1 });
+    writePack('tts-melo-zh-en', { engine: 'vits', files: { model: 'model.onnx', tokens: 'tokens.txt' }, voiceGroups: [], speedScale: 0.9 }, ['model.onnx', 'tokens.txt']);
+    expect(listVoicePacks([root])[0].speedScale).toBe(0.9);
   });
 
   it('skips a pack with a missing file instead of handing the worker a broken config', () => {

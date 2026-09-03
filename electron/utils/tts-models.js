@@ -15,6 +15,11 @@ const { listInstalledPacks } = require('./asr-models');
 
 const ENGINES = new Set(['kokoro', 'vits']);
 
+// Fallback pace correction for packs installed before the manifest carried
+// speedScale (see audio-model-sources.js). Measured on the same 22-character
+// sentence: kokoro 5.09s, MeloTTS 4.18s at speed 1.0.
+const DEFAULT_SPEED_SCALE = { vits: { zh: 0.8, en: 1 } };
+
 function exists(fs, p) {
   try {
     fs.statSync(p);
@@ -69,6 +74,7 @@ function listVoicePacks(roots, { fs = nodeFs, path = nodePath } = {}) {
         voiceGroups: Array.isArray(pack.voiceGroups) ? pack.voiceGroups : [],
         featured: Array.isArray(pack.featured) ? pack.featured : [],
         preferMixed: pack.preferMixed === true,
+        speedScale: pack.speedScale ?? DEFAULT_SPEED_SCALE[pack.engine] ?? 1,
         dir: pack.dir,
         paths,
       });

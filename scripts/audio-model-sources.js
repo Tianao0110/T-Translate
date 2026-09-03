@@ -170,6 +170,9 @@ const TTS_MELO_PACK = {
   voiceGroups: [{ from: 0, to: 0, lang: 'zh', gender: 'f' }],
   featured: [0],
   preferMixed: true,
+  // Its Chinese runs ~20% faster than kokoro at the same speed value (22
+  // characters: 4.18s vs 5.09s); English is already at a normal pace.
+  speedScale: { zh: 0.8, en: 1 },
   sources: [
     { dir: MELO_DIR, file: 'model.onnx' },
     { dir: MELO_DIR, file: 'tokens.txt' },

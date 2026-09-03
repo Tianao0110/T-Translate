@@ -3,7 +3,22 @@
 // reach the engine with its numbers already spelled out.
 
 import { describe, it, expect } from 'vitest';
-import { verbalizeEnglishNumbers, hasCjk, integerWords, ordinalWords, yearWords } from '../../electron/services/audio-engine/tts-text-en.js';
+import { verbalizeEnglishNumbers, hasCjk, integerWords, ordinalWords, yearWords, scaleSpeed } from '../../electron/services/audio-engine/tts-text-en.js';
+
+describe('scaleSpeed', () => {
+  it('rebases the slider by the pack scale, per language when given a map', () => {
+    expect(scaleSpeed(1, undefined, '你好')).toBe(1);
+    expect(scaleSpeed(1, 0.8, '你好')).toBeCloseTo(0.8);
+    expect(scaleSpeed(1.5, { zh: 0.8, en: 1 }, '你好')).toBeCloseTo(1.2);
+    expect(scaleSpeed(1.5, { zh: 0.8, en: 1 }, 'hello')).toBeCloseTo(1.5);
+  });
+
+  it('clamps to the engine range and ignores nonsense', () => {
+    expect(scaleSpeed(3, 2, 'x')).toBe(3);
+    expect(scaleSpeed(0.1, 1, 'x')).toBe(0.3);
+    expect(scaleSpeed(NaN, { zh: 'fast' }, '你好')).toBe(1);
+  });
+});
 
 describe('integerWords / ordinalWords / yearWords', () => {
   it('spells integers', () => {

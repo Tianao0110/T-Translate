@@ -146,4 +146,19 @@ function verbalizeEnglishNumbers(text) {
   return out;
 }
 
-module.exports = { hasCjk, verbalizeEnglishNumbers, integerWords, ordinalWords, yearWords };
+// Packs do not share a natural pace: MeloTTS reads Chinese ~20% faster than
+// kokoro at the same speed value. speedScale (per pack, a number or
+// {zh, en}) rebases the user's slider so 1.0 sounds alike across packs.
+function scaleSpeed(speed, speedScale, text) {
+  const base = Number.isFinite(speed) && speed > 0 ? speed : 1;
+  let scale = 1;
+  if (typeof speedScale === 'number') scale = speedScale;
+  else if (speedScale && typeof speedScale === 'object') {
+    const v = hasCjk(text) ? speedScale.zh : speedScale.en;
+    if (Number.isFinite(v)) scale = v;
+  }
+  if (!Number.isFinite(scale) || scale <= 0) scale = 1;
+  return Math.min(3, Math.max(0.3, base * scale));
+}
+
+module.exports = { hasCjk, verbalizeEnglishNumbers, integerWords, ordinalWords, yearWords, scaleSpeed };

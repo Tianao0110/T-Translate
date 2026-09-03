@@ -186,6 +186,7 @@ async function buildPack(pack, srcRoot) {
     ...(pack.voiceGroups ? { voiceGroups: pack.voiceGroups } : {}),
     ...(pack.featured ? { featured: pack.featured } : {}),
     ...(pack.preferMixed !== undefined ? { preferMixed: pack.preferMixed } : {}),
+    ...(pack.speedScale !== undefined ? { speedScale: pack.speedScale } : {}),
     license: pack.license,
     upstream: pack.upstream,
     size: buffer.length,
