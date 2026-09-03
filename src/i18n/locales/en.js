@@ -662,7 +662,44 @@ const en = {
     langNames: { zh: "Chinese", en: "English", ja: "Japanese", ko: "Korean", fr: "French", de: "German", es: "Spanish", ru: "Russian", pt: "Portuguese", it: "Italian", pl: "Polish", cs: "Czech", tr: "Turkish", hu: "Hungarian", vi: "Vietnamese", da: "Danish", sv: "Swedish", no: "Norwegian", ar: "Arabic" },
     noVoicesInstalled: "No voice packs installed. Please install voices in system settings.",
     noVoiceForLang: "No {{lang}} voice pack installed",
-    installVoiceHint: "No voice packs detected. Install them in System Settings → Language → Speech."
+    installVoiceHint: "No voice packs detected. Install them in System Settings → Language → Speech.",
+    showAllVoices: "All voices ({{count}})",
+    showFeaturedVoices: "Featured voices only",
+    neural: {
+      female: "female", male: "male",
+      voiceName: "{{lang}} {{gender}} {{n}}",
+      engineTag: { kokoro: "Kokoro", vits: "MeloTTS" }
+    },
+    packs: {
+      title: "Voice packs",
+      hint: "With a voice pack installed, Neural Voices appears under Speech Engine. System voices need no download.",
+      refresh: "Refresh",
+      download: "Download",
+      update: "Update",
+      uninstall: "Uninstall",
+      installed: "Installed",
+      notInstalled: "Not installed",
+      updateAvailable: "Update available",
+      loading: "Fetching the voice pack list...",
+      empty: "No voice packs available",
+      manifestError: "Could not fetch the voice pack list. Check your network, then refresh",
+      manifestOffline: "Offline mode never uses the network. Only installed voice packs are listed.",
+      downloaded: "Voice pack installed",
+      downloadFailed: "Voice pack download failed",
+      offlineBlocked: "Offline mode never uses the network. Switch privacy mode to download",
+      removed: "Voice pack uninstalled",
+      removeFailed: "Uninstall failed",
+      removeConfirm: "Uninstall this voice pack? Speech falls back to system voices",
+      phase: { downloading: "Downloading", verifying: "Verifying", extracting: "Extracting", done: "Done", error: "Failed" },
+      names: {
+        "tts-kokoro-zh-en": "Kokoro multi-voice (zh/en)",
+        "tts-melo-zh-en": "MeloTTS mixed zh/en"
+      },
+      desc: {
+        "tts-kokoro-zh-en": "Best quality. 100 Chinese voices, 3 English female voices; English inside Chinese text sounds accented",
+        "tts-melo-zh-en": "One female voice that reads mixed Chinese/English most naturally; mixed sentences use it automatically once installed"
+      }
+    }
   },
   // ===== DocumentTranslator keys =====
   documentTranslator: {

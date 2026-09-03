@@ -221,6 +221,32 @@ const electronAPI = {
       return () => ipcRenderer.removeListener("audio-engine:download-progress", handler);
     },
   },
+  // Neural voice packs (tts-models). Same progress channel as audioPacks —
+  // the payload's packId tells the two lists apart.
+  ttsPacks: {
+    listPacks: (options) => ipcRenderer.invoke("audio-engine:tts-packs-list", options),
+    downloadPack: (packId) => ipcRenderer.invoke("audio-engine:tts-packs-download", packId),
+    removePack: (packId) => ipcRenderer.invoke("audio-engine:tts-packs-remove", packId),
+    onPackProgress: (callback) => {
+      const handler = (event, data) => callback(data);
+      ipcRenderer.on("audio-engine:download-progress", handler);
+      return () => ipcRenderer.removeListener("audio-engine:download-progress", handler);
+    },
+  },
+  // Neural TTS — the only audio-engine surface this window gets. Synthesis
+  // runs in the audio worker; PCM streams back one sentence at a time and
+  // plays through WebAudio here (services/tts/neural.js).
+  audioEngine: {
+    ttsStatus: () => ipcRenderer.invoke("audio-engine:tts-status"),
+    ttsVoices: () => ipcRenderer.invoke("audio-engine:tts-voices"),
+    ttsGenerate: (req) => ipcRenderer.invoke("audio-engine:tts-generate", req),
+    ttsCancel: (req) => ipcRenderer.send("audio-engine:tts-cancel", req),
+    onTtsChunk: (callback) => {
+      const handler = (event, data) => callback(data);
+      ipcRenderer.on("audio-engine:tts-chunk", handler);
+      return () => ipcRenderer.removeListener("audio-engine:tts-chunk", handler);
+    },
+  },
   screenshot: {
     capture: () => ipcRenderer.invoke("capture-screen"),
     onCaptured: (callback) => {

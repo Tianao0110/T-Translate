@@ -662,7 +662,44 @@ const zh = {
     langNames: { zh: "中文", en: "英语", ja: "日语", ko: "韩语", fr: "法语", de: "德语", es: "西班牙语", ru: "俄语", pt: "葡萄牙语", it: "意大利语", pl: "波兰语", cs: "捷克语", tr: "土耳其语", hu: "匈牙利语", vi: "越南语", da: "丹麦语", sv: "瑞典语", no: "挪威语", ar: "阿拉伯语" },
     noVoicesInstalled: "系统未安装任何语音包，请在系统设置中安装语音",
     noVoiceForLang: "系统未安装{{lang}}语音包",
-    installVoiceHint: "未检测到语音包，请在系统设置 → 语言 → 语音中安装"
+    installVoiceHint: "未检测到语音包，请在系统设置 → 语言 → 语音中安装",
+    showAllVoices: "全部音色（{{count}}）",
+    showFeaturedVoices: "只看常用音色",
+    neural: {
+      female: "女声", male: "男声",
+      voiceName: "{{lang}}{{gender}} {{n}}",
+      engineTag: { kokoro: "Kokoro", vits: "MeloTTS" }
+    },
+    packs: {
+      title: "语音包",
+      hint: "装了语音包后，语音引擎里就能选神经语音；系统语音不用下载，随时可用",
+      refresh: "刷新",
+      download: "下载",
+      update: "更新",
+      uninstall: "卸载",
+      installed: "已安装",
+      notInstalled: "未安装",
+      updateAvailable: "可更新",
+      loading: "正在获取语音包清单...",
+      empty: "暂无可用语音包",
+      manifestError: "无法获取语音包清单，请检查网络后点击刷新",
+      manifestOffline: "离线模式不联网，当前只列出已安装的语音包",
+      downloaded: "语音包安装完成",
+      downloadFailed: "语音包下载失败",
+      offlineBlocked: "离线模式不联网，下载请先切换隐私模式",
+      removed: "语音包已卸载",
+      removeFailed: "语音包卸载失败",
+      removeConfirm: "确定卸载该语音包？卸载后朗读回落到系统语音",
+      phase: { downloading: "下载中", verifying: "校验中", extracting: "解压中", done: "完成", error: "失败" },
+      names: {
+        "tts-kokoro-zh-en": "Kokoro 多音色（中/英）",
+        "tts-melo-zh-en": "MeloTTS 中英混说"
+      },
+      desc: {
+        "tts-kokoro-zh-en": "音质最好。中文 100 个音色、英文 3 个女声；中英夹杂时英文带口音",
+        "tts-melo-zh-en": "单一女声，中英夹杂的句子读得最顺；装了它，混合句自动用它"
+      }
+    }
   },
   // ===== DocumentTranslator keys =====
   documentTranslator: {

@@ -5,6 +5,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useTranslation } from 'react-i18next';
 import { Play, Square, RefreshCw, AlertTriangle, ChevronDown, Check } from 'lucide-react';
 import ttsManager, { DEFAULT_TTS_CONFIG, TTS_STATUS } from '../../../services/tts/index.js';
+import PackList from './PackList.jsx';
 import createLogger from '../../../utils/logger.js';
 const logger = createLogger('TTSSection');
 
@@ -78,7 +79,7 @@ const VoiceDropdown = ({ value, onChange, groupedVoices, noVoices, isLoading, au
   );
 };
 
-const TTSSection = ({ settings, updateSetting, notify }) => {
+const TTSSection = ({ settings, updateSetting, notify, confirm }) => {
   const { t } = useTranslation();
   const [voices, setVoices] = useState([]);
   const [isLoadingVoices, setIsLoadingVoices] = useState(false);
@@ -88,6 +89,9 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
   // there is an actual choice (neural shows up once its voice pack exists) —
   // a one-option dropdown would be noise and a claim we can't back.
   const [availableEngines, setAvailableEngines] = useState([]);
+  // Neural packs carry a hundred speakers; the picker opens on the featured
+  // few and unfolds the rest on request.
+  const [showAllVoices, setShowAllVoices] = useState(false);
 
   const ttsConfig = {
     ...DEFAULT_TTS_CONFIG,
@@ -107,6 +111,18 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
       setIsLoadingVoices(false);
     }
   }, [notify, t]);
+
+  const loadEngines = useCallback(() => {
+    return ttsManager.listEngines()
+      .then((list) => setAvailableEngines(list.filter((e) => e.available).map((e) => e.id)))
+      .catch(() => {});
+  }, []);
+
+  // A voice pack landed or left: the engine list and the voice list change.
+  const handlePacksChanged = useCallback(async () => {
+    await loadEngines();
+    await loadVoices();
+  }, [loadEngines, loadVoices]);
 
   useEffect(() => {
     loadVoices();
@@ -187,8 +203,14 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
     }
   };
 
+  const hasHiddenVoices = voices.some((v) => v.featured === false);
+  const visibleVoices = useMemo(
+    () => (showAllVoices || !hasHiddenVoices ? voices : voices.filter((v) => v.featured !== false || v.id === ttsConfig.voiceId)),
+    [voices, showAllVoices, hasHiddenVoices, ttsConfig.voiceId]
+  );
+
   const groupedVoices = useMemo(() => {
-    return voices.reduce((groups, voice) => {
+    return visibleVoices.reduce((groups, voice) => {
       const langCode = voice.lang.split('-')[0];
       const langNames = {
         'zh': t('tts.langNames.zh'), 'en': t('tts.langNames.en'),
@@ -202,7 +224,7 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
       groups[groupName].push(voice);
       return groups;
     }, {});
-  }, [voices, t]);
+  }, [visibleVoices, t]);
 
   const noVoices = !isLoadingVoices && voices.length === 0;
 
@@ -244,6 +266,21 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
             </div>
           )}
 
+          {/* Voice packs download here (the only entry point), same list
+              component as the listen page. System voices stay the
+              zero-download floor whether or not a pack is installed. */}
+          {window.electron?.ttsPacks && (
+            <PackList
+              bridge={window.electron.ttsPacks}
+              prefix="tts.packs"
+              notify={notify}
+              confirm={confirm}
+              onChanged={handlePacksChanged}
+            >
+              <p className="setting-hint">{t('tts.packs.hint')}</p>
+            </PackList>
+          )}
+
           <div className="setting-group">
             <div className="tts-slider-header">
               <label className="setting-label">{t('tts.defaultVoice')}</label>
@@ -272,6 +309,15 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
               >
                 <RefreshCw size={14} className={isLoadingVoices ? 'spinning' : ''} />
               </button>
+              {hasHiddenVoices && (
+                <button
+                  className="btn-small"
+                  onClick={() => setShowAllVoices((v) => !v)}
+                  disabled={isLoadingVoices}
+                >
+                  {showAllVoices ? t('tts.showFeaturedVoices') : t('tts.showAllVoices', { count: voices.length })}
+                </button>
+              )}
             </div>
 
             {noVoices && (

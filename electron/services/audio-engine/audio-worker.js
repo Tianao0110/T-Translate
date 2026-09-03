@@ -1,8 +1,8 @@
-// Audio engine worker — ASR now, TTS protocol slot for v0.4.x. Runs inside an
-// Electron utilityProcess so a native/model crash never takes the main process
-// down. One process for both capabilities on purpose: they share a single
-// sherpa/onnxruntime copy, and "no TTS while transcribing" is a product rule,
-// so there is no concurrency to arbitrate.
+// Audio engine worker — ASR and neural TTS. Runs inside an Electron
+// utilityProcess so a native/model crash never takes the main process down.
+// One process for both capabilities on purpose: they share a single
+// sherpa/onnxruntime copy. Synthesis runs on the addon's own thread, so a
+// listen session and a spoken subtitle line only compete for CPU.
 //
 // Capture lives here too since v0.4.1: the native WASAPI layer
 // (utils/win-audio-capture) hands 16 kHz mono float32 straight to the VAD, so
@@ -11,7 +11,9 @@
 //
 // Protocol (process.parentPort):
 //   in : {type:'init', models:{asr?:{modelPath,tokensPath,vadPath,language?}},
-//         logPath, logText, meta}        declare paths + open log; loads nothing
+//         logPath?, logText, meta}       declare paths + open log; loads
+//                                        nothing. No logPath = no log file (a
+//                                        TTS-only process has no session)
 //        {type:'asr-start', language?}   load ASR if needed, begin a session
 //        {type:'capture-start', mode, pid}  'system' | 'include' | 'exclude'
 //        {type:'capture-stop'}           release the audio client
@@ -20,10 +22,12 @@
 //                                        wav). Main-process only — no renderer
 //                                        channel reaches this since v0.4.1
 //        {type:'asr-stop'}               flush session, keep models warm
-//        {type:'unload', what}           'asr'|'tts' — idle-eviction hook for
-//                                        the future resident scheduler
+//        {type:'unload', what}           'asr'|'tts' — release that engine's
+//                                        model files (idle eviction, pack swap)
 //        {type:'shutdown'}               graceful process exit
-//        {type:'tts-generate'|'tts-cancel'}  reserved (v0.4.x) — see below
+//        {type:'tts-load', pack}         load a voice pack (see TTS below)
+//        {type:'tts-generate', id, text, sid, speed, pack?}
+//        {type:'tts-cancel', id}
 //   out: {type:'ready'}                  init done (nothing loaded yet)
 //        {type:'asr-ready', loadMs}      ASR loaded + session live
 //        {type:'partial', text}          open-segment provisional text; ''
@@ -33,13 +37,21 @@
 //        {type:'capture-event', kind, detail}  device lost / reacquired
 //        {type:'level', value}            0..1-ish capture RMS, ~12/s
 //        {type:'asr-stopped'} | {type:'fatal', message}
+//        {type:'tts-ready', packId, loadMs, numSpeakers, sampleRate}
+//        {type:'tts-chunk', id, samples, sampleRate, progress}  one sentence
+//                                        of audio at a time — the renderer
+//                                        starts playing at the first chunk
+//        {type:'tts-done', id, cancelled, audioS, genMs}
+//        {type:'tts-error', id?, packId?, message} | {type:'tts-unloaded'}
 //
-// TTS slot (NOT implemented here — v0.4.x): tts-generate {id, text, sid,
-// speed} → tts-result {id, samples, sampleRate} | tts-error {id, message};
-// tts-cancel {id} = drop the result (sherpa generate cannot be interrupted).
-// ⚠ When implementing: TtsRequest.enableExternalBuffer MUST be false — same
-// Electron V8-cage landmine as Vad.front(false) below, and it only explodes
-// on the first real synthesis.
+// TTS: `pack` is {id, engine:'kokoro'|'vits', paths:{model, tokens, voices?,
+// dataDir?, dictDir?, lexicon[], ruleFsts[]}} resolved by the host from an
+// installed pack.json (utils/tts-models). One pack loaded at a time; a
+// generate naming another pack swaps it first. Synthesis is serialized, and a
+// cancel makes the progress callback return 0, which stops sherpa mid-text.
+// ⚠ TtsRequest.enableExternalBuffer MUST be false — same Electron V8-cage
+// landmine as Vad.front(false) below, and it only explodes on the first real
+// synthesis.
 //
 // Audio frames are transcribed and dropped — nothing here ever writes audio to
 // disk. The JSONL session log (local only) carries timing metrics; the
@@ -140,6 +152,17 @@ let logStream = null;
 let logText = false;
 let sessionLive = false;
 let shuttingDown = false;
+
+// ===== TTS =====
+// 4 threads: kokoro fp32 measured RTF 0.23-0.28 at 4 on a desktop CPU, and
+// the ASR side runs on 2, so both fit a 6-core box without starving capture.
+const TTS_THREADS = 4;
+const TTS_ENGINES = new Set(['kokoro', 'vits']);
+let tts = null;
+let ttsPackId = '';
+let ttsLoading = null; // Promise<OfflineTts> while createAsync runs
+let ttsChain = Promise.resolve(); // one synthesis at a time
+const ttsCancelled = new Set();
 
 // Rolling input buffer feeding fixed-size VAD windows.
 let pending = new Float32Array(0);
@@ -262,10 +285,12 @@ function handleInit(msg) {
   } catch (err) {
     return fatal(`sherpa-onnx-node load failed: ${err.message}`);
   }
-  try {
-    logStream = fs.createWriteStream(msg.logPath, { flags: 'a' });
-  } catch (err) {
-    return fatal(`log open failed: ${err.message}`);
+  if (msg.logPath) {
+    try {
+      logStream = fs.createWriteStream(msg.logPath, { flags: 'a' });
+    } catch (err) {
+      return fatal(`log open failed: ${err.message}`);
+    }
   }
 
   asrPaths = msg.models?.asr || null;
@@ -971,13 +996,166 @@ function handleUnload(what) {
     onlineStream = null;
     logLine(eventRecord('unload', 'asr'));
   }
-  // 'tts' becomes meaningful in v0.4.x
+  if (what === 'tts') unloadTts();
+}
+
+// Dropping the last reference is what releases the .onnx handles; queued up
+// behind any running synthesis so a pack swap never pulls files from under
+// the addon thread. The ack lets the host wait for exactly that moment.
+function unloadTts() {
+  ttsChain = ttsChain.then(async () => {
+    if (ttsLoading) {
+      try {
+        await ttsLoading;
+      } catch {
+        // load already failed — nothing to release
+      }
+    }
+    tts = null;
+    ttsPackId = '';
+    ttsLoading = null;
+    logLine(eventRecord('unload', 'tts'));
+    post({ type: 'tts-unloaded' });
+  });
+}
+
+function ttsConfigFor(pack) {
+  const p = pack.paths || {};
+  const list = (v) => (Array.isArray(v) ? v : v ? [v] : []);
+  const common = { numThreads: TTS_THREADS, provider: 'cpu', debug: 0 };
+  let model;
+  if (pack.engine === 'kokoro') {
+    model = {
+      kokoro: {
+        model: p.model,
+        voices: p.voices,
+        tokens: p.tokens,
+        dataDir: p.dataDir || '',
+        dictDir: p.dictDir || '',
+        lexicon: list(p.lexicon).join(','),
+      },
+      ...common,
+    };
+  } else {
+    model = {
+      vits: {
+        model: p.model,
+        tokens: p.tokens,
+        lexicon: list(p.lexicon).join(','),
+        dictDir: p.dictDir || '',
+        ...(p.dataDir ? { dataDir: p.dataDir } : {}),
+      },
+      ...common,
+    };
+  }
+  // One sentence per batch is what makes the progress callback stream: the
+  // first chunk is the first sentence, not the whole paragraph.
+  return { model, ruleFsts: list(p.ruleFsts).join(','), maxNumSentences: 1 };
+}
+
+// Resolves to the loaded engine for `pack`, swapping out a different one.
+function ensureTts(pack) {
+  if (!pack || !TTS_ENGINES.has(pack.engine) || !pack.paths?.model) {
+    return Promise.reject(new Error('tts-bad-pack'));
+  }
+  if (tts && ttsPackId === pack.id) return Promise.resolve(tts);
+  if (ttsLoading && ttsPackId === pack.id) return ttsLoading;
+  if (!sherpa) return Promise.reject(new Error('tts-not-initialized'));
+
+  tts = null;
+  ttsPackId = pack.id;
+  const t0 = Date.now();
+  ttsLoading = sherpa.OfflineTts.createAsync(ttsConfigFor(pack)).then(
+    (engine) => {
+      // A newer load superseded this one while it ran: let it go.
+      if (ttsPackId !== pack.id) return engine;
+      tts = engine;
+      ttsLoading = null;
+      const loadMs = Date.now() - t0;
+      logLine(eventRecord('tts-load', `${pack.id} ${loadMs}ms`));
+      post({
+        type: 'tts-ready',
+        packId: pack.id,
+        loadMs,
+        numSpeakers: engine.numSpeakers,
+        sampleRate: engine.sampleRate,
+      });
+      return engine;
+    },
+    (err) => {
+      if (ttsPackId === pack.id) {
+        ttsPackId = '';
+        ttsLoading = null;
+      }
+      post({ type: 'tts-error', packId: pack.id, message: `load failed: ${err.message}` });
+      throw err;
+    }
+  );
+  return ttsLoading;
+}
+
+function handleTtsLoad(msg) {
+  ensureTts(msg.pack).catch(() => {
+    // reported through tts-error above
+  });
+}
+
+function handleTtsGenerate(msg) {
+  const id = String(msg.id || '');
+  const text = typeof msg.text === 'string' ? msg.text.trim() : '';
+  if (!id || !text) return post({ type: 'tts-error', id, message: 'tts-empty' });
+  const sid = Number.isInteger(msg.sid) && msg.sid >= 0 ? msg.sid : 0;
+  const speed = Number.isFinite(msg.speed) && msg.speed > 0 ? Math.min(3, Math.max(0.3, msg.speed)) : 1;
+
+  ttsChain = ttsChain
+    .then(async () => {
+      if (ttsCancelled.delete(id)) return post({ type: 'tts-done', id, cancelled: true });
+      const engine = msg.pack ? await ensureTts(msg.pack) : tts;
+      if (!engine) throw new Error('tts-not-loaded');
+      const t0 = Date.now();
+      let samplesOut = 0;
+      let sampleRate = engine.sampleRate;
+      let cancelled = false;
+      await engine.generateAsync({
+        text,
+        sid: Math.min(sid, Math.max(0, engine.numSpeakers - 1)),
+        speed,
+        enableExternalBuffer: false,
+        onProgress: (info) => {
+          if (ttsCancelled.has(id)) {
+            cancelled = true;
+            return 0;
+          }
+          const samples = info.samples;
+          if (samples && samples.length) {
+            samplesOut += samples.length;
+            if (info.sampleRate) sampleRate = info.sampleRate;
+            post({ type: 'tts-chunk', id, samples, sampleRate, progress: info.progress });
+          }
+          return 1;
+        },
+      });
+      ttsCancelled.delete(id);
+      const genMs = Date.now() - t0;
+      const audioS = samplesOut / (sampleRate || 1);
+      logLine(eventRecord('tts', `${ttsPackId} sid ${sid} ${audioS.toFixed(2)}s in ${genMs}ms${cancelled ? ' (cancelled)' : ''}`));
+      post({ type: 'tts-done', id, cancelled, audioS, genMs });
+    })
+    .catch((err) => {
+      ttsCancelled.delete(id);
+      post({ type: 'tts-error', id, message: String(err && err.message ? err.message : err) });
+    });
+}
+
+function handleTtsCancel(msg) {
+  const id = String(msg.id || '');
+  if (id) ttsCancelled.add(id);
 }
 
 function handleShutdown() {
   if (shuttingDown) return;
   shuttingDown = true;
-  decodeChain.then(() => teardown(() => process.exit(0)));
+  Promise.all([decodeChain, ttsChain.catch(() => {})]).then(() => teardown(() => process.exit(0)));
 }
 
 function teardown(done) {
@@ -1006,10 +1184,9 @@ process.parentPort.on('message', (e) => {
     case 'asr-stop': return handleAsrStop();
     case 'unload': return handleUnload(msg.what);
     case 'shutdown': return handleShutdown();
-    case 'tts-generate':
-      // Protocol slot only — engine lands in v0.4.x.
-      return post({ type: 'tts-error', id: msg.id, message: 'tts-not-implemented' });
-    case 'tts-cancel': return;
+    case 'tts-load': return handleTtsLoad(msg);
+    case 'tts-generate': return handleTtsGenerate(msg);
+    case 'tts-cancel': return handleTtsCancel(msg);
     default: return;
   }
 });

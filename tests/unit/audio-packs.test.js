@@ -3,7 +3,7 @@
 // filtering (audio has no bundled base to keep compatible).
 
 import { describe, it, expect } from 'vitest';
-import { computePackList } from '../../electron/shared/audio-packs.js';
+import { computePackList, ASR_TYPES, TTS_TYPES, TTS_VOICE_TYPE } from '../../electron/shared/audio-packs.js';
 
 const manifest = {
   packs: [
@@ -43,7 +43,20 @@ describe('computePackList', () => {
   });
 
   it('skips manifest entries this build does not understand', () => {
-    const future = { packs: [...manifest.packs, { id: 'tts-voice-x', type: 'tts-voice', version: '1.0.0' }] };
-    expect(computePackList([], future).map((p) => p.id)).not.toContain('tts-voice-x');
+    const future = { packs: [...manifest.packs, { id: 'future-x', type: 'llm-engine', version: '1.0.0' }] };
+    expect(computePackList([], future).map((p) => p.id)).not.toContain('future-x');
+  });
+
+  // One manifest, two managers: each lists only its own types, so a voice
+  // pack never appears under the ASR list and the ASR packs never under TTS.
+  it('a types filter keeps each domain to its own manifest entries', () => {
+    const shared = { packs: [...manifest.packs, { id: 'tts-kokoro-zh-en', type: TTS_VOICE_TYPE, version: '1.0.0' }] };
+    expect(computePackList([], shared, ASR_TYPES).map((p) => p.id)).toEqual([
+      'asr-base-sense-voice',
+      'asr-draft-zipformer-zh-en',
+    ]);
+    expect(computePackList([], shared, TTS_TYPES).map((p) => p.id)).toEqual(['tts-kokoro-zh-en']);
+    // default = everything this build knows, voice packs included
+    expect(computePackList([], shared)).toHaveLength(3);
   });
 });

@@ -236,11 +236,14 @@ electron/utils/open-with.js     右键菜单 argv 解析（.pdf/.docx/.txt 白�
 ### 听译引擎与驻留口径（v0.4.0，捕获层 v0.4.1 换代）
 
 ```
-electron/managers/audio-engine-manager.js  ASR utilityProcess 的唯一持有者
-electron/services/audio-engine/audio-worker.js  两个模型 + 音频捕获都在这个子进程里
+electron/managers/audio-engine-manager.js  音频 utilityProcess 的唯一持有者（ASR 会话 + 神经 TTS）
+electron/services/audio-engine/audio-worker.js  识别模型、音频捕获、语音合成都在这个子进程里
 electron/utils/win-audio-capture.js        WASAPI 捕获（koffi，v0.4.1）
 electron/utils/model-root.js               模型根目录解析（安装目录优先）
-electron/utils/audio-pack-manager.js       模型包下载/卸载（工厂第二实例）
+electron/utils/audio-pack-manager.js       识别模型包下载/卸载（工厂第二实例，asr-models）
+electron/utils/tts-pack-manager.js         语音包下载/卸载（工厂第三实例，tts-models，v0.4.2）
+electron/utils/tts-models.js               已装语音包发现：pack.json 的 files 解析成绝对路径
+src/services/tts/neural.js                 渲染端神经语音引擎：分块播放、音色挑选、按句回落
 ```
 
 **音频从哪来（v0.4.1 起）**：`win-audio-capture` 用 koffi 直接调 WASAPI，两条激活路径同一
@@ -305,6 +308,41 @@ electron/utils/audio-pack-manager.js       模型包下载/卸载（工厂第二
 识别引擎在独立 utilityProcess 里，一个不是 ONNX 的文件会让它原生崩溃（`0xE06D7363`，
 JS 的 try/catch 接不到），主进程无恙，且载入期崩溃不再重试（重试必然同样崩），
 界面直接报「模型加载失败——文件可能不完整或不是识别模型」。
+
+### 神经语音（v0.4.2）
+
+同一个 worker、同一份 `audio-models` 清单，多出一种包类型 `tts-voice` 与一个根目录 `tts-models`。
+两个管理器各列各的类型（`computePackList(…, types)`），并用 `packFilter` 在核心层拒绝跨域的包 id——
+把语音包 id 递给识别模型通道会得到 `PACK_UNKNOWN`，而不是把语音包装进 `asr-models`。
+语音包带整棵目录（kokoro 的 `espeak-ng-data/`、jieba 的 `dict/`），`model-pack-core.extractZipTo`
+因此从「压平到文件名」改为保留相对路径，zip-slip 守卫改成显式检查（绝对路径、盘符、`..`
+一律拒绝并中止安装；JSZip 载入时自己也会消解 `..`）。
+
+| 包 | 引擎 | 体积 | 音色 | 采样率 | 用途 |
+|----|------|------|------|--------|------|
+| `tts-kokoro-zh-en` | kokoro（fp32） | 341MB | 0-1 美音女、2 英音女、3-57 中文女、58-102 中文男 | 24k | 主档；英文靠包内 espeak-ng-data 音素化（GPL-3 数据，NOTICE 已列） |
+| `tts-melo-zh-en` | vits（MeloTTS，fp32） | 157MB | 1 个女声 | 44.1k | 中英夹杂句子；`preferMixed` 让渲染端自动选它 |
+
+int8 版本是负优化（x86 上比 fp32 慢 4 倍且不随线程数涨），所以两个包都是 fp32。
+
+**worker 协议**：`tts-generate {id, text, sid, speed, pack}` → 若干 `tts-chunk {id, samples, sampleRate}`
+→ `tts-done {id, cancelled}`。`maxNumSentences: 1` 让 sherpa 的进度回调按句出块，渲染端收到第一句就
+开始播（`neural.js` 在一个 AudioContext 上顺序排队各块）。`tts-cancel` 让回调返回 0，sherpa 会在句间
+真正停下；`unload tts` 排在合成链之后放引用并回 `tts-unloaded`。`enableExternalBuffer` 恒为 false
+（Electron V8 内存笼）。合成跑在 addon 自己的线程上（4 线程），与识别只争 CPU。
+
+**驻留口径（零闲置铁律的唯一放宽）**：没有听译会话时朗读会起一个 TTS-only 进程（无识别模型、
+无会话日志）；最后一次朗读后闲置 60s 卸载退出，悬浮窗在屏上时续期。听译会话里加载的语音随会话
+生灭；会话结束时若语音仍热则进程转为 TTS-only 留下。开始听译时若已有 TTS-only 进程，直接换成
+会话进程（下次朗读重载语音，1.3-2.2s）。换/卸语音包走 `unloadTtsAndWait`：TTS-only 进程直接退出，
+会话内只卸语音并等 ack。
+
+**渲染端选音色**（`src/utils/tts-voice-pick.js`，纯函数）：用户指定的音色优先（其包读不了该语言时
+才放弃）；自动模式按目标语言/文本文字系统选常用音色；中英夹杂且装了 `preferMixed` 包时改用它；
+没有包覆盖的语言（日文等）抛 `NO_VOICE_FOR_LANG`，`TTSManager` 把这一句交给系统语音而不改引擎设置。
+
+**实测**（`npm run smoke:listen` TTS 段，Ryzen 9 7945HX）：kokoro 英文首块 0.64s、2.6s 音频合成 0.64s；
+kokoro 中文换包含载入首块 1.5s；MeloTTS 冷启动（含进程与包载入）首块 2.6s。
 
 ## 命名规范
 

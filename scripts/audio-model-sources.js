@@ -84,8 +84,110 @@ const ASR_DRAFT_PACK = {
   upstream: [`${UPSTREAM_BASE}/${ZIPFORMER_DIR}.tar.bz2`],
 };
 
+// ===== Neural voice packs (v0.4.2) =====
+// Same release, same manifest, different root (tts-models) and different
+// manager. Unlike the ASR packs these carry whole directories: sherpa opens
+// espeak-ng-data/ and dict/ by path, so `tree` sources are zipped with their
+// relative paths intact and extracted the same way.
+//
+// int8 is a pessimization here: measured 4x slower than fp32 on x86 with no
+// gain from more threads (onnxruntime dequantization overhead), so both packs
+// ship the fp32 weights despite the size.
+
+const TTS_UPSTREAM_BASE = 'https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models';
+
+const KOKORO_DIR = 'kokoro-multi-lang-v1_1';
+const MELO_DIR = 'vits-melo-tts-zh_en';
+
+// Kokoro v1.1-zh, 103 speakers: 0-1 US English female, 2 British English
+// female, 3-57 Chinese female, 58-102 Chinese male. No English male voice
+// exists in this generation. English goes through espeak-ng phonemization
+// (GPL-3 data, shipped in the pack), Chinese through the jieba dict + lexicon.
+const TTS_KOKORO_PACK = {
+  id: 'tts-kokoro-zh-en',
+  type: 'tts-voice',
+  version: '1.0.0',
+  model: KOKORO_DIR,
+  file: 'tts-kokoro-zh-en.zip',
+  languages: ['zh', 'en'],
+  engine: 'kokoro',
+  sampleRate: 24000,
+  files: {
+    model: 'model.onnx',
+    voices: 'voices.bin',
+    tokens: 'tokens.txt',
+    dataDir: 'espeak-ng-data',
+    dictDir: 'dict',
+    lexicon: ['lexicon-us-en.txt', 'lexicon-zh.txt'],
+    ruleFsts: ['date-zh.fst', 'number-zh.fst', 'phone-zh.fst'],
+  },
+  voiceGroups: [
+    { from: 0, to: 1, lang: 'en', gender: 'f' },
+    { from: 2, to: 2, lang: 'en', gender: 'f' },
+    { from: 3, to: 57, lang: 'zh', gender: 'f' },
+    { from: 58, to: 102, lang: 'zh', gender: 'm' },
+  ],
+  // Shown unfolded in the picker; the rest sit behind "all voices".
+  featured: [0, 1, 2, 3, 4, 5, 58, 59, 60],
+  preferMixed: false,
+  sources: [
+    { dir: KOKORO_DIR, file: 'model.onnx' },
+    { dir: KOKORO_DIR, file: 'voices.bin' },
+    { dir: KOKORO_DIR, file: 'tokens.txt' },
+    { dir: KOKORO_DIR, file: 'lexicon-us-en.txt' },
+    { dir: KOKORO_DIR, file: 'lexicon-zh.txt' },
+    { dir: KOKORO_DIR, file: 'date-zh.fst' },
+    { dir: KOKORO_DIR, file: 'number-zh.fst' },
+    { dir: KOKORO_DIR, file: 'phone-zh.fst' },
+    { dir: KOKORO_DIR, tree: 'espeak-ng-data' },
+    { dir: KOKORO_DIR, tree: 'dict' },
+  ],
+  licenses: ['LICENSE-kokoro.txt', 'LICENSE-espeak-ng.txt'],
+  license:
+    'Apache-2.0 (Kokoro-82M v1.1-zh, hexgrad; sherpa-onnx export) + GPL-3.0 (espeak-ng-data phoneme data, espeak-ng project)',
+  upstream: [`${TTS_UPSTREAM_BASE}/${KOKORO_DIR}.tar.bz2`],
+};
+
+// MeloTTS zh_en: one female speaker trained on mixed Chinese/English, so a
+// sentence that switches language mid-way reads naturally — the pack the
+// renderer prefers for mixed text when it is installed. No espeak-ng needed.
+const TTS_MELO_PACK = {
+  id: 'tts-melo-zh-en',
+  type: 'tts-voice',
+  version: '1.0.0',
+  model: MELO_DIR,
+  file: 'tts-melo-zh-en.zip',
+  languages: ['zh', 'en'],
+  engine: 'vits',
+  sampleRate: 44100,
+  files: {
+    model: 'model.onnx',
+    tokens: 'tokens.txt',
+    lexicon: ['lexicon.txt'],
+    dictDir: 'dict',
+    ruleFsts: ['date.fst', 'number.fst', 'phone.fst', 'new_heteronym.fst'],
+  },
+  voiceGroups: [{ from: 0, to: 0, lang: 'zh', gender: 'f' }],
+  featured: [0],
+  preferMixed: true,
+  sources: [
+    { dir: MELO_DIR, file: 'model.onnx' },
+    { dir: MELO_DIR, file: 'tokens.txt' },
+    { dir: MELO_DIR, file: 'lexicon.txt' },
+    { dir: MELO_DIR, file: 'date.fst' },
+    { dir: MELO_DIR, file: 'number.fst' },
+    { dir: MELO_DIR, file: 'phone.fst' },
+    { dir: MELO_DIR, file: 'new_heteronym.fst' },
+    { dir: MELO_DIR, tree: 'dict' },
+  ],
+  licenses: ['LICENSE-melo-tts.txt'],
+  license: 'MIT (MeloTTS, MyShell.ai; sherpa-onnx export)',
+  upstream: [`${TTS_UPSTREAM_BASE}/${MELO_DIR}.tar.bz2`],
+};
+
 module.exports = {
   UPSTREAM_BASE,
+  TTS_UPSTREAM_BASE,
   RELEASE_BASE_URL,
-  PACKS: [ASR_BASE_PACK, ASR_DRAFT_PACK],
+  PACKS: [ASR_BASE_PACK, ASR_DRAFT_PACK, TTS_KOKORO_PACK, TTS_MELO_PACK],
 };

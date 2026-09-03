@@ -109,6 +109,17 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.on('audio-engine:level', handler);
       return () => ipcRenderer.removeListener('audio-engine:level', handler);
     },
+    // Neural TTS (services/tts/neural.js): same worker, audio streamed back
+    // one sentence at a time and played through WebAudio in this window.
+    ttsStatus: () => ipcRenderer.invoke('audio-engine:tts-status'),
+    ttsVoices: () => ipcRenderer.invoke('audio-engine:tts-voices'),
+    ttsGenerate: (req) => ipcRenderer.invoke('audio-engine:tts-generate', req),
+    ttsCancel: (req) => ipcRenderer.send('audio-engine:tts-cancel', req),
+    onTtsChunk: (cb) => {
+      const handler = (event, data) => cb(data);
+      ipcRenderer.on('audio-engine:tts-chunk', handler);
+      return () => ipcRenderer.removeListener('audio-engine:tts-chunk', handler);
+    },
   },
 
   // Encrypted storage for API keys etc.

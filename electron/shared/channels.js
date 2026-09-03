@@ -190,7 +190,17 @@ const CHANNELS = {
     PACKS_LIST: 'audio-engine:packs-list',
     PACKS_DOWNLOAD: 'audio-engine:packs-download',
     PACKS_REMOVE: 'audio-engine:packs-remove',
-    DOWNLOAD_PROGRESS: 'audio-engine:download-progress',
+    DOWNLOAD_PROGRESS: 'audio-engine:download-progress', // shared by ASR and voice packs (payload carries packId)
+    // Neural TTS (v0.4.2): voice packs live under tts-models and synthesis
+    // runs in the same worker. Audio streams back one sentence at a time.
+    TTS_STATUS: 'audio-engine:tts-status',     // renderer → main: {available, packs, loaded}
+    TTS_VOICES: 'audio-engine:tts-voices',     // renderer → main: installed voices (packId:sid)
+    TTS_GENERATE: 'audio-engine:tts-generate', // renderer → main: {id, text, packId, sid, speed}
+    TTS_CANCEL: 'audio-engine:tts-cancel',     // renderer → main: {id}
+    TTS_CHUNK: 'audio-engine:tts-chunk',       // main → requesting window: {id, samples, sampleRate} | {id, done} | {id, error}
+    TTS_PACKS_LIST: 'audio-engine:tts-packs-list',
+    TTS_PACKS_DOWNLOAD: 'audio-engine:tts-packs-download',
+    TTS_PACKS_REMOVE: 'audio-engine:tts-packs-remove',
   },
 };
 

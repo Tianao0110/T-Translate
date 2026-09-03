@@ -6,7 +6,7 @@
 const { net } = require('electron');
 const { store } = require('../state');
 const { isOfflineMode } = require('./privacy-gate');
-const { computePackList } = require('../shared/audio-packs');
+const { computePackList, ASR_TYPES } = require('../shared/audio-packs');
 const { listInstalledPacks } = require('./asr-models');
 const { modelDir, modelDirs } = require('./model-root');
 const engineManager = require('../managers/audio-engine-manager');
@@ -51,7 +51,9 @@ const manager = createPackManager({
   // Awaited by the core: stopSession alone returns before the process is
   // actually gone, and the swap would race its file handles.
   evictSessions: () => engineManager.stopSessionAndWait('pack-swap'),
-  computePackList,
+  // Voice packs share this manifest but belong to tts-pack-manager.
+  computePackList: (installed, manifest) => computePackList(installed, manifest, ASR_TYPES),
+  packFilter: (entry) => ASR_TYPES.includes(entry.type),
   packJsonFields: (entry) => ({
     id: entry.id,
     version: entry.version,

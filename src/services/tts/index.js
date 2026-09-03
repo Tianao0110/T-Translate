@@ -12,8 +12,9 @@ export { NeuralTTSEngine } from './neural.js';
 
 const engines = {
   'web-speech': WebSpeechEngine,
-  // Neural stays invisible until its bridge + a voice pack exist (v0.4.x) —
-  // isAvailable() false today, so nothing in the UI claims it prematurely.
+  // Neural is offered only while its bridge exists and a voice pack is
+  // installed (isAvailable); the settings page hides the engine picker
+  // otherwise, so nothing in the UI claims it prematurely.
   'neural': NeuralTTSEngine,
 };
 
@@ -41,6 +42,7 @@ class TTSManager {
     this._statusListeners = new Set();
     this._configListeners = new Set();
     this._engineUnsub = null;
+    this._fallbackEngine = null; // web-speech while it covers one utterance
     this._initialized = false;
   }
 
@@ -244,11 +246,42 @@ class TTSManager {
       ...options,
     };
 
-    return this._currentEngine.speak(text, mergedOptions);
+    try {
+      return await this._currentEngine.speak(text, mergedOptions);
+    } catch (e) {
+      // Per-utterance fallback: a neural pack that cannot read this language
+      // (or lost its files) hands the sentence to the system voices instead
+      // of failing it. The configured engine stays; the next utterance in a
+      // covered language goes neural again.
+      const msg = e?.message || '';
+      const coverable = msg.startsWith('NO_VOICE_FOR_LANG:') || msg === 'NO_VOICES' || msg === 'NEURAL_UNAVAILABLE';
+      if (!coverable || this._currentEngineId === FALLBACK_ENGINE_ID) throw e;
+      logger.warn(`[TTS] ${this._currentEngineId} cannot read this text (${msg}); falling back to system voices`);
+      return this._speakWithFallback(text, { ...mergedOptions, voiceId: '' });
+    }
+  }
+
+  async _speakWithFallback(text, options) {
+    const fallback = await this.getEngine(FALLBACK_ENGINE_ID);
+    // Forward its status for the duration of the utterance so the speak
+    // button tracks the voice that is actually talking.
+    const unsub = fallback.onStatusChange((status) => {
+      for (const cb of this._statusListeners) {
+        try { cb(status); } catch { /* isolate listeners */ }
+      }
+    });
+    this._fallbackEngine = fallback;
+    try {
+      return await fallback.speak(text, options);
+    } finally {
+      unsub();
+      this._fallbackEngine = null;
+    }
   }
 
   stop() {
     this._currentEngine?.stop();
+    this._fallbackEngine?.stop();
   }
 
   async updateConfig(config, persist = true) {

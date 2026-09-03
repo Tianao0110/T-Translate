@@ -124,11 +124,13 @@ describe('model-pack-core', () => {
     expect(fs.readdirSync(root)).toEqual([]); // staging cleaned, nothing installed
   });
 
-  it('zip-slip paths are flattened to basenames inside the pack dir', async () => {
+  // Voice packs ship whole directories (espeak-ng-data/, dict/) that sherpa
+  // opens by path, so nested entries must land nested, not flattened.
+  it('nested zip entries keep their relative path inside the pack dir', async () => {
     const zipBuf = await makeZip({
       'model.bin': 'DATA',
-      '../../evil.txt': 'ESCAPED',
       'nested/dir/inner.bin': 'INNER',
+      'dict/pos_dict/prob.utf8': 'P',
     });
     const { manager } = makeManager({
       manifest: {
@@ -140,10 +142,69 @@ describe('model-pack-core', () => {
     await manager.downloadPack('pack-a');
 
     const packDir = path.join(root, 'pack-a');
-    const names = fs.readdirSync(packDir).sort();
-    expect(names).toEqual(['evil.txt', 'inner.bin', 'model.bin', 'pack.json']);
-    // nothing escaped the packs root
+    expect(fs.readdirSync(packDir).sort()).toEqual(['dict', 'model.bin', 'nested', 'pack.json']);
+    expect(fs.readFileSync(path.join(packDir, 'nested', 'dir', 'inner.bin'), 'utf8')).toBe('INNER');
+    expect(fs.readFileSync(path.join(packDir, 'dict', 'pos_dict', 'prob.utf8'), 'utf8')).toBe('P');
+  });
+
+  // With paths preserved, the zip-slip guard is an explicit refusal: a
+  // tampered archive aborts the install and leaves nothing behind. (JSZip
+  // itself resolves '..' segments on load, so the names that reach the guard
+  // raw are absolute and drive-relative ones.)
+  it('an absolute zip entry aborts the install with no residue', async () => {
+    for (const evil of ['/abs/evil.txt', 'C:/evil.txt']) {
+      const zipBuf = await makeZip({ 'model.bin': 'DATA', [evil]: 'ESCAPED' });
+      const { manager } = makeManager({
+        manifest: {
+          schemaVersion: 1,
+          packs: [{ id: 'pack-a', version: '3', url: 'https://packs.example/a.zip', sha256: sha256(zipBuf) }],
+        },
+        files: { 'https://packs.example/a.zip': zipBuf },
+      });
+      await expect(manager.downloadPack('pack-a')).rejects.toMatchObject({ code: 'ZIP_UNSAFE_ENTRY' });
+      expect(fs.readdirSync(root)).toEqual([]);
+    }
+  });
+
+  it('a traversing zip entry never lands outside the packs root', async () => {
+    const zipBuf = await makeZip({ 'model.bin': 'DATA', '../../evil.txt': 'ESCAPED', 'a/../../evil2.txt': 'X' });
+    const { manager } = makeManager({
+      manifest: {
+        schemaVersion: 1,
+        packs: [{ id: 'pack-a', version: '3', url: 'https://packs.example/a.zip', sha256: sha256(zipBuf) }],
+      },
+      files: { 'https://packs.example/a.zip': zipBuf },
+    });
+    await manager.downloadPack('pack-a').catch(() => {});
     expect(fs.existsSync(path.join(root, '..', 'evil.txt'))).toBe(false);
+    expect(fs.existsSync(path.join(root, '..', 'evil2.txt'))).toBe(false);
+    expect(fs.existsSync(path.join(root, 'evil.txt'))).toBe(false);
+  });
+
+  it('packFilter turns a foreign-domain pack id into PACK_UNKNOWN before any download', async () => {
+    const zipBuf = await makeZip({ 'model.bin': 'DATA' });
+    const fetchMock = vi.fn(async (url) => {
+      if (url === MANIFEST_URL) {
+        return bufferResponse(Buffer.from(JSON.stringify({
+          schemaVersion: 1,
+          packs: [{ id: 'voice-a', type: 'tts-voice', version: '1', url: 'https://packs.example/v.zip', sha256: sha256(zipBuf) }],
+        })));
+      }
+      return bufferResponse(zipBuf);
+    });
+    const manager = createPackManager({
+      manifestUrl: MANIFEST_URL,
+      packsRoot: () => root,
+      listInstalled: () => [],
+      evictSessions: vi.fn(),
+      computePackList: (installed) => ({ installed }),
+      packJsonFields: (entry) => ({ id: entry.id }),
+      packFilter: (entry) => entry.type === 'asr-base',
+      deps: { fetch: fetchMock, logger: silentLogger },
+    });
+    await expect(manager.downloadPack('voice-a')).rejects.toMatchObject({ code: 'PACK_UNKNOWN' });
+    expect(fetchMock).toHaveBeenCalledTimes(1); // manifest only
+    expect(fs.readdirSync(root)).toEqual([]);
   });
 
   it('happy path: installs, writes pack.json, evicts sessions, reports phased progress', async () => {

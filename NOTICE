@@ -52,6 +52,9 @@ scripts/model-licenses/.
 | SenseVoiceSmall（阿里巴巴集团 / FunASR，sherpa-onnx 转换版） | FunASR Model Open Source License 1.1       |
 | silero-vad（Silero Team）                              | MIT                                        |
 | streaming zipformer zh-en（k2-fsa / icefall）          | Apache-2.0                                 |
+| Kokoro-82M v1.1-zh（hexgrad，sherpa-onnx 转换版）      | Apache-2.0                                 |
+| espeak-ng-data（espeak-ng 项目；随 Kokoro 语音包分发的音素数据） | GPL-3.0                                    |
+| MeloTTS zh_en（MyShell.ai，sherpa-onnx 转换版）        | MIT                                        |
 
 完整依赖树各包的协议以其 node_modules/<pkg>/LICENSE 为准。
 For the full dependency tree, each package's own LICENSE file governs.

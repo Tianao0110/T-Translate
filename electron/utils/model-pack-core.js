@@ -23,6 +23,8 @@
 //                      another process must resolve only once it is really gone
 //   computePackList,   (installed, manifest) => UI-ready pack list
 //   packJsonFields,    (entry) => fields persisted to pack.json (+installedAt)
+//   packFilter,        optional (entry) => boolean — manifest entries this
+//                      domain may install; others answer PACK_UNKNOWN
 //   basePackId,        optional — its removal falls back to the bundled copy
 //   supportedSchema,   manifest schema ceiling (default 1)
 //   offlineGate,       () => boolean — true refuses every NETWORK access with
@@ -80,6 +82,7 @@ function createPackManager({
   evictSessions,
   computePackList,
   packJsonFields,
+  packFilter = null,
   basePackId = null,
   supportedSchema = 1,
   offlineGate = () => false,
@@ -164,16 +167,39 @@ function createPackManager({
     return crypto.createHash('sha256').update(buf).digest('hex');
   }
 
+  // Entries keep their relative path: TTS voice packs carry whole trees
+  // (espeak-ng-data/, dict/) that sherpa opens by directory. Flattening to the
+  // basename used to be the zip-slip guard, so the check is explicit now: no
+  // absolute or drive-relative names, no '..' segment, and the resolved target
+  // must land inside destDir. A tampered archive aborts the install instead of
+  // being quietly rearranged.
+  function safeEntryPath(destDir, name) {
+    const segments = String(name).split(/[\\/]+/).filter((s) => s !== '' && s !== '.');
+    const unsafe =
+      segments.length === 0 ||
+      segments.includes('..') ||
+      path.isAbsolute(name) ||
+      /^[A-Za-z]:/.test(name);
+    const base = path.resolve(destDir);
+    const target = unsafe ? null : path.resolve(base, ...segments);
+    const rel = target ? path.relative(base, target) : '..';
+    if (rel === '' || rel.startsWith('..') || path.isAbsolute(rel)) {
+      const err = new Error(`unsafe zip entry: ${name}`);
+      err.code = 'ZIP_UNSAFE_ENTRY';
+      throw err;
+    }
+    return target;
+  }
+
   async function extractZipTo(zipBuffer, destDir) {
     const JSZip = require('jszip');
     const zip = await JSZip.loadAsync(zipBuffer);
     fs.mkdirSync(destDir, { recursive: true });
     for (const [name, entry] of Object.entries(zip.files)) {
       if (entry.dir) continue;
-      // Flatten: pack folders are a single level, basename guards against
-      // zip-slip paths from a tampered archive.
-      const fileName = path.basename(name);
-      fs.writeFileSync(path.join(destDir, fileName), await entry.async('nodebuffer'));
+      const target = safeEntryPath(destDir, name);
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, await entry.async('nodebuffer'));
     }
   }
 
@@ -185,7 +211,10 @@ function createPackManager({
     assertSafePackId(packId);
     const manifest = await fetchManifest(false);
     const entry = (manifest.packs || []).find((p) => p.id === packId);
-    if (!entry) {
+    // packFilter keeps a domain to its own pack types: the ASR and TTS
+    // managers share one manifest, and an id handed to the wrong channel
+    // would otherwise install a voice pack under asr-models.
+    if (!entry || (packFilter && !packFilter(entry))) {
       const err = new Error(`pack not in manifest: ${packId}`);
       err.code = 'PACK_UNKNOWN';
       throw err;

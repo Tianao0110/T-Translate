@@ -354,6 +354,142 @@ async function main() {
     `${pseudo.ev.segments.length} finals / ${pseudo.ev.partials.length} partials`
   );
 
+  // ===== Neural TTS (v0.4.2) =====
+  // Same manifest, own manager and root; the worker comes up TTS-only (no
+  // listen session), streams one sentence at a time, swaps packs on demand,
+  // stops mid-text on cancel, and releases the pack before a swap/removal.
+  const ttsPackMgr = require('../electron/utils/tts-pack-manager');
+  const { listVoicePacks } = require('../electron/utils/tts-models');
+
+  const ttsList = await ttsPackMgr.listPacks({ refresh: false });
+  step(
+    'voice packs listed by their own manager, none under the ASR list',
+    ttsList.packs.length === 2 &&
+      ttsList.packs.every((p) => p.type === 'tts-voice' && p.status === 'not-installed') &&
+      after.packs.every((p) => p.type !== 'tts-voice'),
+    ttsList.packs.map((p) => `${p.id}:${p.status}`).join(', ')
+  );
+
+  const crossDomain = await packMgr.downloadPack('tts-melo-zh-en').then(() => 'INSTALLED', (e) => e.code);
+  step('ASR manager refuses a voice pack id', crossDomain === 'PACK_UNKNOWN', crossDomain);
+
+  for (const id of ['tts-melo-zh-en', 'tts-kokoro-zh-en']) {
+    const phases = new Set();
+    const t0 = Date.now();
+    const res = await ttsPackMgr.downloadPack(id, (_p, phase) => phases.add(phase));
+    step(`install ${id}`, res.success === true, `${Date.now() - t0}ms, ${[...phases].join('→')}`);
+  }
+
+  const voicePacks = listVoicePacks([ttsPackMgr.packsRoot()]);
+  const kokoroPack = voicePacks.find((p) => p.id === 'tts-kokoro-zh-en');
+  step(
+    'voice pack.json resolves models and the extracted data trees',
+    voicePacks.length === 2 &&
+      voicePacks.every((p) => fs.existsSync(p.paths.model) && fs.existsSync(p.paths.tokens)) &&
+      !!kokoroPack &&
+      fs.existsSync(path.join(kokoroPack.paths.dataDir, 'phontab')) &&
+      fs.existsSync(path.join(kokoroPack.paths.dictDir, 'jieba.dict.utf8')),
+    voicePacks.map((p) => `${p.id} (${p.engine}, ${p.voiceGroups.length} groups)`).join(', ')
+  );
+
+  engineManager.init({ store, getWindow: () => null });
+  const voices = engineManager.getTtsVoices();
+  step(
+    'voice list: 103 kokoro speakers + 1 MeloTTS, featured subset flagged',
+    voices.length === 104 &&
+      voices.filter((v) => v.featured).length === 10 &&
+      voices.filter((v) => v.packId === 'tts-kokoro-zh-en' && v.lang === 'zh' && v.gender === 'm').length === 45,
+    `${voices.length} voices, ${voices.filter((v) => v.featured).length} featured`
+  );
+
+  let ttsSeq = 0;
+  async function speak(packId, sid, text, { cancelAfterChunks = 0 } = {}) {
+    const id = `smoke-${++ttsSeq}`;
+    const out = { chunks: 0, samples: 0, sampleRate: 0, firstChunkMs: null, totalMs: 0, error: null, cancelled: false };
+    const t0 = Date.now();
+    const done = new Promise((resolve) => {
+      out.resolve = resolve;
+    });
+    const sender = {
+      isDestroyed: () => false,
+      send: (channel, payload) => {
+        if (!channel.endsWith(':tts-chunk') || payload.id !== id) return;
+        if (payload.error) {
+          out.error = payload.error;
+          out.resolve();
+        } else if (payload.done) {
+          out.cancelled = payload.cancelled;
+          out.totalMs = Date.now() - t0;
+          out.resolve();
+        } else {
+          out.chunks += 1;
+          out.samples += payload.samples.length;
+          out.sampleRate = payload.sampleRate;
+          if (out.firstChunkMs === null) out.firstChunkMs = Date.now() - t0;
+          if (cancelAfterChunks && out.chunks >= cancelAfterChunks) engineManager.ttsCancel(id);
+        }
+      },
+    };
+    const res = await engineManager.ttsGenerate({ id, text, packId, sid, speed: 1 }, sender);
+    if (!res.success) {
+      out.error = res.error;
+      return out;
+    }
+    await Promise.race([done, sleep(60000)]);
+    out.audioS = out.sampleRate ? out.samples / out.sampleRate : 0;
+    return out;
+  }
+
+  const melo = await speak('tts-melo-zh-en', 0, '这是语音朗读测试。This is a TTS test. 一共三句话。');
+  step(
+    'TTS-only worker: MeloTTS reads mixed zh/en, streamed per sentence',
+    !melo.error && melo.chunks >= 2 && melo.audioS > 2 && melo.sampleRate === 44100,
+    melo.error || `${melo.chunks} chunks, ${melo.audioS.toFixed(2)}s @${melo.sampleRate}, first chunk ${melo.firstChunkMs}ms, total ${melo.totalMs}ms`
+  );
+
+  const kokoroZh = await speak('tts-kokoro-zh-en', 3, '你好，这是语音朗读功能测试。');
+  step(
+    'pack swap inside the worker: kokoro Chinese voice',
+    !kokoroZh.error && kokoroZh.chunks >= 1 && kokoroZh.audioS > 1 && kokoroZh.sampleRate === 24000,
+    kokoroZh.error || `${kokoroZh.chunks} chunks, ${kokoroZh.audioS.toFixed(2)}s, first chunk ${kokoroZh.firstChunkMs}ms`
+  );
+
+  const kokoroEn = await speak('tts-kokoro-zh-en', 0, 'The quick brown fox jumps over the lazy dog.');
+  step(
+    'kokoro English voice (espeak-ng data in the pack)',
+    !kokoroEn.error && kokoroEn.audioS > 1,
+    kokoroEn.error || `${kokoroEn.audioS.toFixed(2)}s, first chunk ${kokoroEn.firstChunkMs}ms`
+  );
+
+  const longText = Array.from({ length: 12 }, (_, i) => `这是第${i + 1}句，用来测试取消。`).join('');
+  const cancelled = await speak('tts-kokoro-zh-en', 3, longText, { cancelAfterChunks: 2 });
+  step(
+    'cancel stops synthesis mid-text',
+    cancelled.cancelled === true && cancelled.chunks < 8,
+    `${cancelled.chunks} chunks before stop, cancelled=${cancelled.cancelled}`
+  );
+
+  step('worker stays TTS-only (no listen session reported running)', !engineManager.getInfo().running);
+  step('loaded voice reported', engineManager.getTtsStatus().loaded === 'tts-kokoro-zh-en');
+
+  const rmVoice = await ttsPackMgr.removePack('tts-kokoro-zh-en');
+  step(
+    'voice pack removal evicts the loaded voice and leaves no residue',
+    rmVoice.success === true &&
+      !fs.existsSync(path.join(ttsPackMgr.packsRoot(), 'tts-kokoro-zh-en')) &&
+      engineManager.getTtsStatus().loaded === '',
+    `loaded=${JSON.stringify(engineManager.getTtsStatus().loaded)}`
+  );
+
+  const meloAgain = await speak('tts-melo-zh-en', 0, '卸载之后另一个语音包还能用。');
+  step('the other voice pack still speaks after the removal', !meloAgain.error && meloAgain.audioS > 1, meloAgain.error || `${meloAgain.audioS.toFixed(2)}s`);
+  await engineManager.unloadTtsAndWait('smoke-end');
+
+  console.log('\n==== TTS ====');
+  console.log(`  MeloTTS 混说    首块 ${melo.firstChunkMs} ms，${melo.audioS.toFixed(2)}s 音频合成 ${melo.totalMs} ms（RTF ${(melo.totalMs / 1000 / (melo.audioS || 1)).toFixed(2)}）`);
+  console.log(`  kokoro 中文     首块 ${kokoroZh.firstChunkMs} ms（含换包载入），${kokoroZh.audioS.toFixed(2)}s 音频合成 ${kokoroZh.totalMs} ms`);
+  console.log(`  kokoro 英文     首块 ${kokoroEn.firstChunkMs} ms，${kokoroEn.audioS.toFixed(2)}s 音频合成 ${kokoroEn.totalMs} ms`);
+
   console.log('\n==== 延迟 ====');
   console.log(`语音起点 ${onsetS.toFixed(2)}s，音频总长 ${(pcm.length / 16000).toFixed(2)}s\n`);
   for (const r of [withDraft, pseudo]) {
