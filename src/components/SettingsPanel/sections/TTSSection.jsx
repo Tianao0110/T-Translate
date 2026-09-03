@@ -251,48 +251,38 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
     return voices.filter((v) => Array.isArray(v.languages) && v.languages.includes(lang));
   }, [voices]);
 
-  const voiceName = (id) => voices.find((v) => v.id === id)?.name || t('audio.now.auto');
-
   const endpointStatusText = endpointTest === null
     ? t('audio.now.untested')
     : endpointTest.success
       ? t('audio.now.lastTest', { ms: endpointTest.ms })
       : t('audio.now.lastFail', { error: endpointTest.error });
 
-  // The status line: what speaks right now and why.
+  // The status line: what speaks right now. Only a mismatch gets a note
+  // (the chosen engine cannot speak, so system voices do).
   const nowLine = useMemo(() => {
     if (chosen === 'endpoint') {
       if (isEndpoint) {
         return {
           warn: endpointTest?.success === false,
           value: `${t('audio.now.api')} · ${hostOf(endpointCfg.baseUrl)}`,
-          sub: t('audio.now.endpointSub', {
-            model: endpointCfg.model || 'tts-1',
-            voice: endpointCfg.voice || 'alloy',
-            test: endpointStatusText,
-          }),
+          note: endpointStatusText,
         };
       }
       return {
         warn: true,
-        value: t('tts.engineNames.endpoint'),
-        sub: endpointCap?.code === 'OFFLINE_BLOCKED' ? t('audio.now.endpointBlocked') : t('ttsEndpoint.notConfigured'),
+        value: `${t('audio.now.local')} · ${t('tts.engineNames.web-speech')}`,
+        note: endpointCap?.code === 'OFFLINE_BLOCKED' ? t('ttsEndpoint.offline') : t('ttsEndpoint.notConfigured'),
       };
     }
     if (isNeural) {
-      return {
-        warn: false,
-        value: `${t('audio.now.local')} · ${t('tts.engineNames.neural')}`,
-        sub: t('audio.now.neuralSub', { zh: voiceName(voiceByLang.zh), en: voiceName(voiceByLang.en) }),
-      };
+      return { warn: false, value: `${t('audio.now.local')} · ${t('tts.engineNames.neural')}`, note: '' };
     }
     return {
       warn: chosen === 'neural',
       value: `${t('audio.now.local')} · ${t('tts.engineNames.web-speech')}`,
-      sub: t('audio.now.webSub'),
+      note: chosen === 'neural' ? t('audio.engine.noPacks') : '',
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chosen, isEndpoint, isNeural, endpointTest, endpointCfg.baseUrl, endpointCfg.model, endpointCfg.voice, endpointCap, voices, voiceByLang.zh, voiceByLang.en, t]);
+  }, [chosen, isEndpoint, isNeural, endpointTest, endpointCfg.baseUrl, endpointCap, endpointStatusText, t]);
 
   const engineSub = (id) => {
     if (id === 'neural') return packCount ? t('audio.engine.packs', { count: packCount }) : t('audio.engine.noPacks');
@@ -315,7 +305,6 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
           />
           <span className="switch-slider"></span>
           <span className="switch-label">{t('tts.enableTTS')}</span>
-          <span className="setting-hint" style={{ margin: '0 0 0 10px' }}>{t('tts.enableHint')}</span>
         </label>
       </div>
 
@@ -337,19 +326,13 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
                 </button>
               ))}
             </div>
+            {/* One line, no prose: the dot and the value say local vs API;
+                a warning dot means the choice is not what actually speaks. */}
             <div className="tts-now">
               <span className={`dot ${nowLine.warn ? 'warn' : ''}`}></span>
               <span className="k">{t('audio.now.label')}</span>
               <span className="v">{nowLine.value}</span>
-              <span className="sub">{nowLine.sub}</span>
-              <button
-                className="btn-small"
-                onClick={() => handleTest('')}
-                disabled={!isEndpoint && voices.length === 0 && !isLoadingVoices}
-              >
-                {playing('') ? <Square size={12} /> : <Play size={12} />}
-                <span style={{ marginLeft: 4 }}>{playing('') ? t('tts.stop') : t('audio.now.preview')}</span>
-              </button>
+              {nowLine.note && <span className="sub">{nowLine.note}</span>}
             </div>
           </div>
 
@@ -421,7 +404,6 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
                   </div>
                 </div>
               </div>
-              <p className="setting-hint">{t('tts.endpoint.hint')}</p>
             </div>
           )}
 
@@ -457,7 +439,6 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
                   </React.Fragment>
                 ))}
               </div>
-              <p className="setting-hint">{t('audio.voices.neuralHint')}</p>
             </div>
           )}
 
@@ -491,7 +472,6 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
                   {playing('') ? <Square size={13} /> : <Play size={13} />}
                 </button>
               </div>
-              <p className="setting-hint">{voices.length ? t('audio.voices.webHint') : t('tts.installVoiceHint')}</p>
             </div>
           )}
 
@@ -521,7 +501,6 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
                 />
               </div>
             </div>
-            <p className="setting-hint">{t('audio.sliders.pitchHint')}</p>
           </div>
         </>
       )}

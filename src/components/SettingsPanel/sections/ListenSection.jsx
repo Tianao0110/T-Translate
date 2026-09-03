@@ -41,8 +41,10 @@ const ListenSection = ({ notify, confirm, embedded = false }) => {
   return (
     <div className={embedded ? '' : 'setting-content'}>
       {!embedded && <h3>{t('settings.listen.title')}</h3>}
-      <p className="setting-description">{t('listen.description')}</p>
+      {!embedded && <p className="setting-description">{t('listen.description')}</p>}
 
+      {/* Embedded: the sub-page header already carries the ready badge. */}
+      {!embedded && (
       <div className="setting-group">
         <div className="pack-header">
           <span className={`engine-badge ${ready ? 'installed' : 'unavailable'}`}>
@@ -56,6 +58,7 @@ const ListenSection = ({ notify, confirm, embedded = false }) => {
           {ready && info.streamingPresent ? t('listen.draftOn') : t('listen.draftOff')}
         </p>
       </div>
+      )}
 
       <PackList
         bridge={window.electron?.audioPacks}

@@ -76,7 +76,6 @@ const AudioSection = ({ settings, updateSetting, notify, confirm, initialView })
   const renderHome = () => (
     <div className="setting-content">
       <h3>{t('settingsNav.audio')}</h3>
-      <p className="setting-description">{t('audio.description')}</p>
       <div className="audio-home">
         <button type="button" className={`audio-card ${listenReady ? '' : 'warn'}`} onClick={() => setView('listen')}>
           <ChevronRight size={18} className="audio-card-chev" />
@@ -137,7 +136,6 @@ const AudioSection = ({ settings, updateSetting, notify, confirm, initialView })
             <span className={`engine-badge ${listenReady ? 'installed' : 'unavailable'}`}>
               {listenReady ? t('audio.listen.ready') : t('audio.listen.notReady')}
             </span>
-            {listenReady && <span className="audio-subhead-note">{listenInfo.modelName}</span>}
           </>
         )}
         <ListenSection embedded notify={notify} confirm={confirm} />
@@ -167,9 +165,7 @@ const AudioSection = ({ settings, updateSetting, notify, confirm, initialView })
               notify={notify}
               confirm={confirm}
               onChanged={loadSummary}
-            >
-              <p className="setting-hint">{t('tts.packs.hint')}</p>
-            </PackList>
+            />
           )}
       </div>
     );
