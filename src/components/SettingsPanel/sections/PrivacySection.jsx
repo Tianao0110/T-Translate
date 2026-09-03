@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Zap, Shield, Lock, Trash2, ClipboardList, Database, Check, X, Minus, ArrowRightLeft, Download, Upload } from 'lucide-react';
+import { Zap, Shield, Lock, Trash2, ClipboardList, Database, Check, X, Minus, ArrowRightLeft, Download, Upload, Table2, ChevronLeft } from 'lucide-react';
 import useTranslationStore from '../../../stores/translation-store';
 import translationService from '../../../services/stack-client.js';
 import { PRIVACY_MODES, PRIVACY_MODE_IDS } from '../constants.js';
@@ -53,8 +53,23 @@ const PrivacySection = ({
   // Matrix columns use the config ids ('secure'), the seg shows the user-facing
   // names ('无痕'). Same order everywhere.
   const modeIds = PRIVACY_MODE_ORDER;
-  const stateIcon = (state) => (state === 'on' ? <Check size={13} /> : state === 'part' ? <Minus size={13} /> : <X size={13} />);
-  const stateClass = (state) => (state === 'on' ? 'enabled' : state === 'part' ? 'partial' : 'disabled');
+  const stateIcon = (state) => (state === 'on' ? <Check size={12} /> : state === 'part' ? <Minus size={12} /> : <X size={12} />);
+  // 'main' = mode picker + this mode's module list; 'detail' = the read-only
+  // three-mode comparison behind the 详细 button.
+  const [view, setView] = useState('main');
+
+  // A cell is a pill (icon + one word) with a short reason under it when the
+  // module is restricted; the full sentence lives in the tooltip only.
+  const statePill = (m, mode) => {
+    const state = moduleState(m, mode);
+    const short = state === 'on' ? '' : t(`privacy.modules.${m}.${mode}Short`, { defaultValue: '' });
+    return (
+      <span className="pm-cell" title={t(`privacy.modules.${m}.${mode}`)}>
+        <span className={`pm-pill ${state}`}>{stateIcon(state)}{t(`privacy.stateWord.${state}`)}</span>
+        {short && <span className="pm-sub">{short}</span>}
+      </span>
+    );
+  };
 
   // Storage footprint for the data-management panel. Counts come from the
   // store, sizes from localStorage scan + a main-process stat call.
@@ -289,9 +304,47 @@ const PrivacySection = ({
     }
   };
 
+  if (view === 'detail') {
+    return (
+      <div className="setting-content">
+        <div className="audio-subhead">
+          <button type="button" className="audio-back" onClick={() => setView('main')}>
+            <ChevronLeft size={14} />{t('settings.privacy.title')}
+          </button>
+          <h3>{t('privacy.detailTitle')}</h3>
+        </div>
+        <table className="pm-table">
+          <thead>
+            <tr>
+              <th></th>
+              {modeIds.map((id) => (
+                <th key={id} className={currentMode === id ? 'cur' : ''}>{t(`privacy.modeShort.${id}`)}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {PRIVACY_MODULES.map((m) => (
+              <tr key={m}>
+                <td className="mod">{t(`privacy.modules.${m}.name`)}</td>
+                {modeIds.map((id) => (
+                  <td key={id} className={currentMode === id ? 'cur' : ''}>{statePill(m, id)}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
   return (
     <div className="setting-content">
-      <h3>{t('settings.privacy.title')}</h3>
+      <div className="pm-head">
+        <h3>{t('settings.privacy.title')}</h3>
+        <button type="button" className="btn-small" onClick={() => setView('detail')}>
+          <Table2 size={12} /><span style={{ marginLeft: 4 }}>{t('privacy.detail')}</span>
+        </button>
+      </div>
 
       {/* Mode picker: the house segmented style; the selected segment IS the
           current mode, so no separate banner. */}
@@ -313,46 +366,18 @@ const PrivacySection = ({
         })}
       </div>
 
-      {/* What this mode means per module: state colour + one short line each */}
+      {/* What this mode means per module: name + state pill (+ short reason) */}
       <div className="mode-features-panel">
         <h4><ClipboardList size={15} /> {t('privacy.featuresTitle')}</h4>
         <div className="feature-list">
-          {PRIVACY_MODULES.map((m) => {
-            const state = moduleState(m, currentMode);
-            return (
-              <div key={m} className={`feature-item ${stateClass(state)}`}>
-                <span className="feature-icon">{stateIcon(state)}</span>
-                <span className="feature-name">{t(`privacy.modules.${m}.name`)}</span>
-                <span className="feature-status">{t(`privacy.modules.${m}.${currentMode}`)}</span>
-              </div>
-            );
-          })}
+          {PRIVACY_MODULES.map((m) => (
+            <div key={m} className="feature-item pm-row">
+              <span className="feature-name">{t(`privacy.modules.${m}.name`)}</span>
+              {statePill(m, currentMode)}
+            </div>
+          ))}
         </div>
       </div>
-
-      {/* Read-only overview of all three modes; the current column is tinted */}
-      <table className="pm-table">
-        <thead>
-          <tr>
-            <th></th>
-            {modeIds.map((id) => (
-              <th key={id} className={currentMode === id ? 'cur' : ''}>{t(`privacy.modeShort.${id}`)}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {PRIVACY_MODULES.map((m) => (
-            <tr key={m}>
-              <td className="mod">{t(`privacy.modules.${m}.name`)}</td>
-              {modeIds.map((id) => (
-                <td key={id} className={`${moduleState(m, id)} ${currentMode === id ? 'cur' : ''}`}>
-                  {t(`privacy.modules.${m}.${id}`)}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
 
       {/* Data management */}
       <div className="setting-group" style={{marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border-primary)'}}>

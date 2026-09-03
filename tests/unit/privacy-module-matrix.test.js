@@ -25,12 +25,15 @@ describe('privacy module matrix', () => {
     expect(moduleState('listen', 'offline')).toBe('on'); // models are local
   });
 
-  it('both locales carry a name and a per-mode line for every module', () => {
+  it('both locales carry a name, a per-mode line, and a short reason for every restricted cell', () => {
     for (const locale of [zh, en]) {
       for (const m of PRIVACY_MODULES) {
         const entry = locale.privacy.modules[m];
         expect(typeof entry.name).toBe('string');
-        for (const mode of PRIVACY_MODE_ORDER) expect(typeof entry[mode]).toBe('string');
+        for (const mode of PRIVACY_MODE_ORDER) {
+          expect(typeof entry[mode]).toBe('string');
+          if (moduleState(m, mode) !== 'on') expect(typeof entry[`${mode}Short`]).toBe('string');
+        }
       }
     }
   });

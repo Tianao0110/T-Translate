@@ -261,3 +261,69 @@
 .pm-table td.cur {
   background: color-mix(in srgb, var(--accent-primary) 6%, transparent);
 }
+
+/* Head row: title + the 详细 button that opens the comparison view. */
+.pm-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pm-head h3 {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.pm-head + .seg {
+  margin-top: 16px;
+}
+
+/* State pills: icon + one word; a short reason below when restricted. */
+.pm-row {
+  border-left: none;
+  opacity: 1;
+  justify-content: space-between;
+}
+
+.pm-cell {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+
+.pm-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px 2px 7px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pm-pill.on {
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+  color: var(--success);
+}
+
+.pm-pill.part {
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+  color: var(--warning);
+}
+
+.pm-pill.off {
+  background: color-mix(in srgb, var(--error) 12%, transparent);
+  color: var(--error);
+}
+
+.pm-sub {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.pm-table td {
+  vertical-align: middle;
+}
