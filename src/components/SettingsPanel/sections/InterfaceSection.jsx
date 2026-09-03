@@ -1,9 +1,10 @@
-﻿// Interface settings: startup, language, theme, keyboard shortcuts.
+// Interface settings: startup, language, theme, keyboard shortcuts.
 
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Sun, Moon, Leaf, RefreshCw, Globe, Power, MousePointer, Keyboard, Camera, AppWindow, Layers, Pencil, ScanLine, Bell } from 'lucide-react';
+import { Sun, Moon, Leaf, RefreshCw, Globe, Power, Keyboard, Camera, AppWindow, Layers, Pencil, ScanLine, Bell } from 'lucide-react';
 import { defaultConfig } from '../constants.js';
+import { Seg, Switch } from './shared';
 
 const LANGUAGES = [
   { code: 'zh', name: '简体中文', nativeName: '简体中文' },
@@ -58,6 +59,11 @@ const InterfaceSection = ({
   const toggleAutoSelection = (enabled) => {
     updateSetting('startup', 'autoEnableSelection', enabled, true);
     window.electron?.store?.set?.('settings.startup.autoEnableSelection', enabled);
+  };
+
+  const toggleSystemNotifications = (enabled) => {
+    updateSetting('interface', 'systemNotifications', enabled, true);
+    window.electron?.store?.set?.('settings.interface.systemNotifications', enabled);
   };
 
   // Write language using the dot-path API so we don't round-trip the whole settings object
@@ -151,112 +157,74 @@ const InterfaceSection = ({
     notify(t('shortcuts.reset'), 'success');
   };
 
+  const themeOptions = [
+    { value: 'light', icon: <Sun size={14} />, label: t('settings.general.themes.default') },
+    { value: 'dark', icon: <Moon size={14} />, label: t('settings.general.themes.dark') },
+    { value: 'fresh', icon: <Leaf size={14} />, label: t('settings.general.themes.fresh') },
+  ];
+
   return (
     <div className="setting-content">
       <h3>{t('settings.general.title')}</h3>
-      <p className="setting-description">{t('settings.general.themeDesc')}</p>
 
       <div className="setting-group">
         <label className="setting-label">
-          <Power size={16} style={{marginRight: '6px', verticalAlign: 'middle'}} />
+          <Power size={16} />
           {t('settings.startup.title')}
         </label>
-
-        <label className="setting-toggle">
-          <input
-            type="checkbox"
-            checked={autoLaunch}
-            disabled={autoLaunchLoading}
-            onChange={(e) => toggleAutoLaunch(e.target.checked)}
+        <Switch
+          checked={autoLaunch}
+          disabled={autoLaunchLoading}
+          onChange={toggleAutoLaunch}
+          label={t('settings.startup.autoLaunch')}
+        />
+        {autoLaunch && (
+          <Switch
+            checked={settings.startup?.autoEnableSelection ?? false}
+            onChange={toggleAutoSelection}
+            label={t('settings.startup.autoSelection')}
           />
-          <span>{t('settings.startup.autoLaunch')}</span>
-        </label>
-        <p className="setting-hint">{t('settings.startup.autoLaunchHint')}</p>
-
-        {autoLaunch && (
-          <label className="setting-toggle" style={{marginTop: '8px'}}>
-            <input
-              type="checkbox"
-              checked={settings.startup?.autoEnableSelection ?? false}
-              onChange={(e) => toggleAutoSelection(e.target.checked)}
-            />
-            <span>{t('settings.startup.autoSelection')}</span>
-          </label>
-        )}
-        {autoLaunch && (
-          <p className="setting-hint">{t('settings.startup.autoSelectionHint')}</p>
         )}
       </div>
 
       <div className="setting-group">
         <label className="setting-label">
-          <Bell size={16} style={{marginRight: '6px', verticalAlign: 'middle'}} />
+          <Bell size={16} />
           {t('settings.notifications.title')}
         </label>
-
-        <label className="setting-toggle">
-          <input
-            type="checkbox"
-            checked={settings.interface?.systemNotifications ?? true}
-            onChange={(e) => {
-              updateSetting('interface', 'systemNotifications', e.target.checked, true);
-              window.electron?.store?.set?.('settings.interface.systemNotifications', e.target.checked);
-            }}
-          />
-          <span>{t('settings.notifications.system')}</span>
-        </label>
-        <p className="setting-hint">{t('settings.notifications.systemHint')}</p>
+        <Switch
+          checked={settings.interface?.systemNotifications ?? true}
+          onChange={toggleSystemNotifications}
+          label={t('settings.notifications.system')}
+        />
       </div>
 
       <div className="setting-group">
         <label className="setting-label">
-          <Globe size={16} style={{marginRight: '6px', verticalAlign: 'middle'}} />
+          <Globe size={16} />
           {t('settings.general.language')}
         </label>
-        <div className="language-selector">
-          {LANGUAGES.map(lang => (
-            <button
-              key={lang.code}
-              className={`language-option ${i18n.language === lang.code ? 'active' : ''}`}
-              onClick={() => switchLanguage(lang.code)}
-            >
-              {lang.nativeName}
-            </button>
-          ))}
-        </div>
-        <p className="setting-hint">{t('settings.general.languageDesc')}</p>
+        <Seg
+          value={i18n.language}
+          onChange={switchLanguage}
+          options={LANGUAGES.map((lang) => ({ value: lang.code, label: lang.nativeName }))}
+        />
       </div>
 
       <div className="setting-group">
         <label className="setting-label">{t('settings.general.theme')}</label>
-        <div className="theme-selector">
-          <button
-            className={`theme-option ${settings.interface?.theme === 'light' ? 'active' : ''}`}
-            onClick={() => switchTheme('light')}
-          >
-            <Sun size={16}/>{t('settings.general.themes.default')}
-          </button>
-          <button
-            className={`theme-option ${settings.interface?.theme === 'dark' ? 'active' : ''}`}
-            onClick={() => switchTheme('dark')}
-          >
-            <Moon size={16}/>{t('settings.general.themes.dark')}
-          </button>
-          <button
-            className={`theme-option fresh ${settings.interface?.theme === 'fresh' ? 'active' : ''}`}
-            onClick={() => switchTheme('fresh')}
-          >
-            <Leaf size={16}/>{t('settings.general.themes.fresh')}
-          </button>
-        </div>
-        <p className="setting-hint">{t('settings.general.themeDesc')}</p>
+        <Seg
+          value={settings.interface?.theme || 'light'}
+          onChange={switchTheme}
+          options={themeOptions}
+        />
       </div>
 
-      <div className="setting-group" style={{marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border-primary)'}}>
-        <label className="setting-label"><Keyboard size={16} style={{marginRight: '6px', verticalAlign: 'middle'}} /> {t('settings.shortcuts.title')}</label>
-        <p className="setting-hint" style={{marginBottom: '12px'}}>
-          {t('shortcuts.hint')}
-        </p>
+      <div className="setting-group">
+        <label className="setting-label">
+          <Keyboard size={16} />
+          {t('settings.shortcuts.title')}
+        </label>
 
         <div className="shortcut-editor">
           {Object.entries({ ...defaultConfig.shortcuts, ...settings.shortcuts }).map(([action, shortcut]) => {

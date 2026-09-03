@@ -477,7 +477,7 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
 
           <div className="setting-group">
             <label className="setting-label">{t('audio.sliders.label')}</label>
-            <div className="tts-sliders">
+            <div className="sliders">
               <div className="sl">
                 <div className="sl-head"><span>{t('tts.rate')}</span><span className="tts-slider-value">{ttsConfig.rate.toFixed(1)}x</span></div>
                 <input type="range" className="setting-range" min="0.5" max="2" step="0.1"

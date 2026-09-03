@@ -116,54 +116,6 @@
   color: var(--text-secondary);
 }
 
-/* ==================== 分段开关（所有"选择"的统一样式） ==================== */
-.seg {
-  display: inline-flex;
-  gap: 2px;
-  padding: 3px;
-  border-radius: 9px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-primary);
-}
-
-.seg button {
-  padding: 6px 14px;
-  border-radius: 7px;
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 12.5px;
-  font-family: inherit;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-}
-
-.seg button.on {
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  font-weight: 600;
-  box-shadow: 0 1px 3px color-mix(in srgb, var(--text-primary) 12%, transparent);
-}
-
-.seg button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.seg button .n {
-  font-size: 11px;
-  color: var(--text-tertiary);
-  font-weight: 400;
-}
-
-.seg.small button {
-  padding: 4px 10px;
-  font-size: 12px;
-}
-
 .audio-tabs {
   margin-bottom: 18px;
 }
@@ -246,41 +198,6 @@
 .tts-voices .setting-btn-icon {
   width: 30px;
   height: 30px;
-}
-
-/* ==================== 朗读页：并排滑块 ==================== */
-.tts-sliders {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  margin-top: 8px;
-}
-
-.tts-sliders .sl {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.tts-sliders .sl-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 12.5px;
-  color: var(--text-primary);
-}
-
-.tts-sliders .sl-head .tts-slider-value {
-  font-size: 11px;
-}
-
-.tts-sliders .sl.off {
-  opacity: 0.5;
-}
-
-.tts-sliders .sl.off .tts-slider-value {
-  background: transparent;
-  color: var(--text-tertiary);
 }
 
 /* ==================== 音色选择面板 ==================== */

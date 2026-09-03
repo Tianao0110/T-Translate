@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { Seg, Switch, Slider } from './shared';
 
 const FloatingWindowSection = ({
   settings,
@@ -27,17 +28,17 @@ const FloatingWindowSection = ({
     return names[engine] || engine;
   };
 
+  const opacityPct = Math.round(gw.defaultOpacity * 100);
+
   return (
     <div className="setting-content">
       <h3>{t('settings.floatingWindow.title')}</h3>
-      <p className="setting-description">{t('floatingWindow.description')}</p>
-      
-      {/* OCR 引擎 */}
+
       <div className="setting-group">
         <label className="setting-label">{t('floatingWindow.ocrEngine')}</label>
         <div className="setting-hint-inline">
           {t('floatingWindow.useGlobalOcr', {engine: getOcrEngineName(settings.ocr.engine)})}
-          <button 
+          <button
             className="link-button"
             onClick={() => handleSectionChange('ocr')}
             style={{marginLeft: '8px'}}
@@ -47,53 +48,41 @@ const FloatingWindowSection = ({
         </div>
       </div>
 
-      {/* 显示模式 */}
       <div className="setting-group">
-        <label className="setting-label">{t('floatingWindow.displayMode', '显示模式')}</label>
-        <select
-          className="setting-select"
+        <label className="setting-label">{t('floatingWindow.displayMode')}</label>
+        <Seg
           value={gw.displayMode}
-          onChange={(e) => updateSetting('floatingWindow', 'displayMode', e.target.value)}
-        >
-          <option value="auto">{t('floatingWindow.modeAuto', '自动')}</option>
-          <option value="scattered">{t('floatingWindow.modeScattered', '散点')}</option>
-          <option value="unified">{t('floatingWindow.modeUnified', '整段')}</option>
-        </select>
-        <p className="setting-hint">{t('floatingWindow.displayModeHint', '自动＝按内容判断；散点＝每块文字原位贴译文（界面标签、单词、漫画）；整段＝合并为一段译文（文章段落）')}</p>
+          onChange={(v) => updateSetting('floatingWindow', 'displayMode', v)}
+          options={[
+            { value: 'auto', label: t('floatingWindow.modeAuto') },
+            { value: 'scattered', label: t('floatingWindow.modeScattered') },
+            { value: 'unified', label: t('floatingWindow.modeUnified') },
+          ]}
+        />
       </div>
 
-      {/* 默认透明度 */}
       <div className="setting-group">
         <label className="setting-label">{t('floatingWindow.defaultOpacity')}</label>
-        <div className="setting-row">
-          <input
-            type="range"
-            className="setting-range"
-            min="1"
-            max="100"
-            value={Math.round(gw.defaultOpacity * 100)}
-            onChange={(e) => updateSetting('floatingWindow', 'defaultOpacity', parseInt(e.target.value) / 100)}
+        <div className="sliders">
+          <Slider
+            label={t('floatingWindow.defaultOpacity')}
+            display={`${opacityPct}%`}
+            min={1}
+            max={100}
+            value={opacityPct}
+            onChange={(v) => updateSetting('floatingWindow', 'defaultOpacity', Math.round(v) / 100)}
           />
-          <span className="range-value">{Math.round(gw.defaultOpacity * 100)}%</span>
         </div>
-        <p className="setting-hint">{t('floatingWindow.opacityHint')}</p>
       </div>
 
-      {/* 允许被截图/录屏捕获 */}
       <div className="setting-group">
-        <label className="setting-switch">
-          <input
-            type="checkbox"
-            checked={gw.captureVisible}
-            onChange={(e) => updateSetting('floatingWindow', 'captureVisible', e.target.checked)}
-          />
-          <span className="switch-slider"></span>
-          <span className="switch-label">{t('floatingWindow.captureVisible', '允许悬浮窗被截图和录屏')}</span>
-        </label>
-        <p className="setting-hint">{t('floatingWindow.captureVisibleHint', '默认关闭：悬浮窗对截图工具隐身，截图翻译不会识别到自己的译文。需要截图或录制悬浮窗（比如做演示）时再打开')}</p>
+        <Switch
+          checked={gw.captureVisible}
+          onChange={(on) => updateSetting('floatingWindow', 'captureVisible', on)}
+          label={t('floatingWindow.captureVisible')}
+        />
       </div>
 
-      {/* 快捷键 */}
       <div className="setting-group">
         <label className="setting-label">{t('shortcuts.title')}</label>
         <div className="shortcut-info">
@@ -109,14 +98,6 @@ const FloatingWindowSection = ({
             <kbd>Esc</kbd>
             <span>{t('floatingWindow.shortcut.exit')}</span>
           </div>
-        </div>
-      </div>
-
-      {/* 使用说明 */}
-      <div className="setting-group">
-        <label className="setting-label">{t('floatingWindow.instructions')}</label>
-        <div className="info-box">
-          <p><strong>{t('floatingWindow.normalMode')}：</strong>{t('floatingWindow.normalModeDesc')}</p>
         </div>
       </div>
     </div>
