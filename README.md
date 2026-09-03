@@ -79,7 +79,7 @@ Chinese, English, Japanese, Korean and Cantonese, picked manually or detected fr
 
 Subtitles export to SRT (source and translation on separate lines). Listen mode is unavailable in Incognito mode.
 
-**Models are downloaded on demand**: Settings → Listen models. Base model 153 MB (required), draft engine 168 MB (optional). A running session uses about 600-700 MB of memory, released when you stop.
+**Models are downloaded on demand**: Settings → Audio → Listen. Base model 153 MB (required), draft engine 168 MB (optional). A running session uses about 600-700 MB of memory, released when you stop.
 
 ### AI features (Explain / Summarize)
 

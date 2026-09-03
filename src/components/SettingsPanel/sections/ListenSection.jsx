@@ -10,7 +10,8 @@ import PackList from './PackList.jsx';
 import createLogger from '../../../utils/logger.js';
 const logger = createLogger('ListenSection');
 
-const ListenSection = ({ notify, confirm }) => {
+// embedded: rendered inside the 「音频」 sub-page, which owns the heading.
+const ListenSection = ({ notify, confirm, embedded = false }) => {
   const { t } = useTranslation();
 
   const [info, setInfo] = useState(null); // { modelName, streamingPresent, modelsDir, ... }
@@ -38,8 +39,8 @@ const ListenSection = ({ notify, confirm }) => {
   const ready = !!info?.modelName;
 
   return (
-    <div className="setting-content">
-      <h3>{t('settings.listen.title')}</h3>
+    <div className={embedded ? '' : 'setting-content'}>
+      {!embedded && <h3>{t('settings.listen.title')}</h3>}
       <p className="setting-description">{t('listen.description')}</p>
 
       <div className="setting-group">

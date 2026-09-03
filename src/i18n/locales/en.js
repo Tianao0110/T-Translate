@@ -8,7 +8,7 @@ const en = {
     groupTranslation: "Translation", groupSystem: "System",
     providers: "Providers", translation: "Translation", selection: "Selection", floatingWindow: "Floating Window", document: "Documents",
     aiActions: "AI Actions",
-    ocr: "OCR", tts: "Text to Speech", listen: "Listen models", interface: "Appearance", privacy: "Privacy", about: "About",
+    ocr: "OCR", tts: "Text to Speech", listen: "Listen models", audio: "Audio", interface: "Appearance", privacy: "Privacy", about: "About",
     export: "Export", import: "Import", reset: "Reset",
     simpleMode: "Simple", fullMode: "Full", switchToFull: "Full", switchToSimple: "Simple",
     modeHint: "You're viewing the simple catalog. Click Full below for all settings (selection, floating window, OCR, privacy...)",
@@ -322,7 +322,7 @@ const en = {
     modeTranslate: "Capture translate",
     modeUnderstand: "Explain",
     modeListen: "Listen",
-    modeListenLocked: "Listen: download a recognition model in Settings > Listen models first",
+    modeListenLocked: "Listen: download a recognition model in Settings > Audio > Listen first",
     listenStart: "Start listening to system audio (audio never touches disk)",
     listenStop: "Stop listening",
     listenLang: "Recognition language",
@@ -646,6 +646,45 @@ const en = {
         "asr-draft": "Optional. Live text for Chinese and English."
       }
     }
+  },
+  audio: {
+    description: "Listen is recognition, Speak is read-aloud; open a card for its settings",
+    back: "Audio",
+    cards: { listen: "Listen", speak: "Speak" },
+    tabs: { read: "Read aloud", packs: "Voice packs" },
+    listen: {
+      ready: "Ready", notReady: "Not installed",
+      readyDraft: "Base model + draft engine, live text for Chinese and English",
+      readyBase: "Base model, text after each sentence",
+      notReadyLine: "Download a recognition model to enable listen mode",
+      meta: "{{count}} recognition models installed · {{mb}} MB",
+      metaNone: "Base model 153 MB · optional draft engine 168 MB"
+    },
+    speak: {
+      lineWeb: "System voice picked by language",
+      metaPacks: "{{count}} voice packs installed", metaNoPacks: "No voice packs",
+      metaEndpoint: "External server configured", metaNoEndpoint: "No external server"
+    },
+    engine: { label: "Speech engine", packs: "{{count}} packs", noPacks: "no packs", endpointUnset: "not set" },
+    now: {
+      label: "Speaking with", local: "Local", api: "API", auto: "auto", preview: "Preview",
+      neuralSub: "{{zh}} / {{en}}; a language the pack cannot read falls back to system voices for that line",
+      endpointSub: "model {{model}} · voice {{voice}} · {{test}}; falls back to system voices when unreachable",
+      endpointBlocked: "Offline mode never uses the network; the external server is unavailable and system voices speak instead",
+      webSub: "Windows voices, picked by the text language",
+      untested: "not tested", lastTest: "last test {{ms}} ms", lastFail: "last failure: {{error}}"
+    },
+    voices: {
+      label: "Voice", count: "{{count}}", systemCount: "{{count}} system voices",
+      zh: "Chinese", en: "English", default: "Default", auto: "Auto (by text language)",
+      neuralHint: "Unchosen languages auto-pick; mixed zh/en prefers MeloTTS",
+      webHint: "System voices are picked by text language; you can also pin one"
+    },
+    picker: {
+      search: "Search voices…", all: "All", female: "Female", male: "Male", featured: "Featured", other: "Other",
+      preview: "Preview this voice", foot: "Applies on click · ▶ previews a voice", noMatch: "No matching voice"
+    },
+    sliders: { label: "Rate · Pitch · Volume", pitchUnsupported: "n/a", pitchHint: "Pitch only applies to system voices" }
   },
   tts: {
     description: "Configure text-to-speech settings",

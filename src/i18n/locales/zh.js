@@ -8,7 +8,7 @@ const zh = {
     groupTranslation: "翻译", groupSystem: "系统",
     providers: "翻译源", translation: "翻译设置", selection: "划词翻译", floatingWindow: "悬浮窗口", document: "文档翻译",
     aiActions: "AI 动作",
-    ocr: "OCR 识别", tts: "朗读设置", listen: "听译模型", interface: "界面外观", privacy: "隐私模式", about: "关于",
+    ocr: "OCR 识别", tts: "朗读设置", listen: "听译模型", audio: "音频", interface: "界面外观", privacy: "隐私模式", about: "关于",
     export: "导出", import: "导入", reset: "重置",
     simpleMode: "简洁", fullMode: "完整", switchToFull: "完整", switchToSimple: "简洁",
     modeHint: "当前为简洁目录，点下方「完整」可查看全部设置（划词、悬浮窗、OCR、隐私等）",
@@ -322,7 +322,7 @@ const zh = {
     modeTranslate: "截图翻译",
     modeUnderstand: "讲解",
     modeListen: "听译",
-    modeListenLocked: "听译：先到设置页「听译模型」下载识别模型",
+    modeListenLocked: "听译：先到设置页「音频 → 听」下载识别模型",
     listenStart: "开始监听系统声音（音频不落盘）",
     listenStop: "停止监听",
     listenLang: "识别语言",
@@ -646,6 +646,45 @@ const zh = {
         "asr-draft": "可选。中英边说边出字"
       }
     }
+  },
+  audio: {
+    description: "听是识别，读是朗读；点卡进入各自的设置",
+    back: "音频",
+    cards: { listen: "听", speak: "读" },
+    tabs: { read: "朗读", packs: "语音包" },
+    listen: {
+      ready: "已就绪", notReady: "未安装",
+      readyDraft: "基础模型 + 草稿引擎，中英边说边出字",
+      readyBase: "基础模型，整句说完出字",
+      notReadyLine: "下载识别模型后悬浮窗才能听译",
+      meta: "已装 {{count}} 个识别模型 · {{mb}} MB",
+      metaNone: "基础模型 153 MB · 可选草稿引擎 168 MB"
+    },
+    speak: {
+      lineWeb: "自动按语言选系统语音",
+      metaPacks: "已装 {{count}} 个语音包", metaNoPacks: "没有语音包",
+      metaEndpoint: "外接服务已配置", metaNoEndpoint: "外接服务未配置"
+    },
+    engine: { label: "语音引擎", packs: "{{count}} 包", noPacks: "未装包", endpointUnset: "未配置" },
+    now: {
+      label: "当前朗读", local: "本机", api: "API", auto: "自动", preview: "试听",
+      neuralSub: "{{zh}} / {{en}}；读不了的语言这一句回落系统语音",
+      endpointSub: "模型 {{model}} · 音色 {{voice}} · {{test}}；连不上时这一句回落系统语音",
+      endpointBlocked: "离线模式不联网，外接服务不可用；朗读回落系统语音",
+      webSub: "Windows 自带语音，按文本语言自动选",
+      untested: "未测试", lastTest: "上次测试 {{ms}} ms", lastFail: "上次失败：{{error}}"
+    },
+    voices: {
+      label: "音色", count: "{{count}} 个", systemCount: "系统 {{count}} 个",
+      zh: "中文", en: "英语", default: "默认", auto: "自动（按文本语言）",
+      neuralHint: "没指定的语言自动选，中英夹杂时优先 MeloTTS",
+      webHint: "系统语音按文本语言自动挑；也可以指定一个固定音色"
+    },
+    picker: {
+      search: "搜索音色…", all: "全部", female: "女声", male: "男声", featured: "常用", other: "其他",
+      preview: "试听这一枚", foot: "选中即生效 · ▶ 试听这一枚", noMatch: "没有匹配的音色"
+    },
+    sliders: { label: "语速 · 音调 · 音量", pitchUnsupported: "不支持", pitchHint: "音调只对系统语音生效" }
   },
   tts: {
     description: "配置文本朗读功能和语音参数",

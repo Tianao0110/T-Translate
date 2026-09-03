@@ -25,8 +25,7 @@ import {
   SelectionSection,
   PrivacySection,
   DocumentSection,
-  TTSSection,
-  ListenSection,
+  AudioSection,
   AboutSection,
   ProvidersSection,
   TranslationSection,
@@ -51,8 +50,7 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
     document: t('settingsNav.document'),
     aiActions: t('settingsNav.aiActions'),
     ocr: t('settingsNav.ocr'),
-    tts: t('settingsNav.tts'),
-    listen: t('settingsNav.listen'),
+    audio: t('settingsNav.audio'),
     interface: t('settingsNav.interface'),
     privacy: t('settingsNav.privacy'),
     about: t('settingsNav.about'),
@@ -121,12 +119,24 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
   // anything — and returning a string silently *cancelled* the menu Reload.
   // The footer "unsaved changes" indicator is the honest signal instead.
 
+  // 「音频」 opens on its two cards, except when reached through a search that
+  // named one side: 听译/识别 words land on 听, 朗读/语音 words on 读.
+  const [audioHint, setAudioHint] = useState(null);
+  const audioViewFromQuery = (q) => {
+    const s = (q || '').toLowerCase();
+    if (!s) return null;
+    if (/听译|识别|字幕|listen|asr|caption|subtitle|sensevoice/.test(s)) return 'listen';
+    if (/朗读|语音|语速|音色|tts|speech|voice|rate|volume/.test(s)) return 'speak';
+    return null;
+  };
+
   const handleSectionChange = useCallback((section) => {
     if (section !== activeSection) {
+      setAudioHint(section === 'audio' ? audioViewFromQuery(searchQuery) : null);
       setActiveSection(section);
       setSearchQuery('');
     }
-  }, [activeSection]);
+  }, [activeSection, searchQuery]);
 
   // External section jump (e.g. floating window "Go to OCR Settings" button)
   useEffect(() => {
@@ -553,20 +563,14 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
             setOcrEngine={setOcrEngine}
           />
         );
-      case 'tts':
+      case 'audio':
         return (
-          <TTSSection
+          <AudioSection
             settings={settings}
             updateSetting={updateSetting}
             notify={notify}
             confirm={confirm}
-          />
-        );
-      case 'listen':
-        return (
-          <ListenSection
-            notify={notify}
-            confirm={confirm}
+            initialView={audioHint}
           />
         );
       case 'interface':

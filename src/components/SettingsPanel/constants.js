@@ -2,7 +2,7 @@
 
 import {
   Globe, Shield, Zap, Moon, Sun,
-  Info, Wifi, Eye, Lock, Volume2,
+  Info, Wifi, Eye, Lock,
   Code2, Palette, Layers, MousePointer, Server,
   FileText, Sparkles, AudioLines
 } from 'lucide-react';
@@ -39,8 +39,9 @@ export const NAV_ITEMS = [
   { id: 'document', icon: FileText, group: 'translation', keywords: ['document', 'pdf', 'docx', 'epub', 'srt', 'subtitle', '文档', '字幕'] },
   { id: 'aiActions', icon: Sparkles, group: 'translation', keywords: ['ai', 'action', 'summarize', 'explain', 'import', 'prompt', 'AI', '动作', '总结', '讲解', '理解', '导入'] },
   { id: 'ocr', icon: Eye, group: 'system', keywords: ['ocr', 'recognize', 'screenshot', 'image', 'rapidocr', 'llm', '识别', '截图'] },
-  { id: 'tts', icon: Volume2, group: 'system', keywords: ['tts', 'speech', 'voice', 'volume', 'rate', '朗读', '语音', '语速'] },
-  { id: 'listen', icon: AudioLines, group: 'system', keywords: ['listen', 'asr', 'subtitle', 'caption', 'audio', 'model', 'sensevoice', '听译', '字幕', '识别', '模型', '语音识别'] },
+  // 听 (recognition models) and 读 (read-aloud) live under one entry; the
+  // keyword halves still route a search to the right sub-page (index.jsx).
+  { id: 'audio', icon: AudioLines, group: 'system', keywords: ['audio', 'tts', 'speech', 'voice', 'volume', 'rate', '朗读', '语音', '语速', '音色', 'listen', 'asr', 'subtitle', 'caption', 'model', 'sensevoice', '听译', '字幕', '识别', '模型', '语音识别', '音频'] },
   { id: 'interface', icon: Palette, group: 'system', basic: true, keywords: ['theme', 'dark', 'light', 'font', 'appearance', '界面', '主题', '外观'] },
   { id: 'privacy', icon: Shield, group: 'system', keywords: ['privacy', 'security', 'mode', 'history', '隐私', '安全', '记录'] },
   { id: 'about', icon: Info, group: 'system', basic: true, keywords: ['about', 'version', 'info', '关于', '版本'] },

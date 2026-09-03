@@ -1,123 +1,63 @@
-// TTS settings section. Replaces the native <select> with a custom dropdown
-// because Electron's native select stutters when the option list is long.
+// 「读 · 朗读」 tab (rendered inside AudioSection). Compact layout per the
+// batch-4 design: enable switch, engine segmented control, one "speaking
+// with" status line that says local vs API and carries the preview button,
+// the engine's own block underneath (per-language voices for neural, a
+// default voice for system voices, the server form for the endpoint), and
+// the three sliders in one row.
 
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Play, Square, RefreshCw, AlertTriangle, ChevronDown, Check, Zap } from 'lucide-react';
+import { Play, Square, RefreshCw, Zap } from 'lucide-react';
 import ttsManager, { DEFAULT_TTS_CONFIG, TTS_STATUS } from '../../../services/tts/index.js';
 import stackClient from '../../../services/stack-client.js';
-import PackList from './PackList.jsx';
+import VoicePicker from './VoicePicker.jsx';
 import createLogger from '../../../utils/logger.js';
 const logger = createLogger('TTSSection');
 
-const VoiceDropdown = ({ value, onChange, groupedVoices, noVoices, isLoading, autoLabel, emptyLabel }) => {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+const ENGINE_ORDER = ['web-speech', 'neural', 'endpoint'];
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
+function hostOf(url) {
+  try {
+    const u = new URL(String(url || '').trim());
+    return u.host || u.hostname;
+  } catch {
+    return String(url || '').trim();
+  }
+}
 
-  const selectedName = useMemo(() => {
-    if (!value) return noVoices ? emptyLabel : autoLabel;
-    for (const voices of Object.values(groupedVoices)) {
-      const found = voices.find(v => v.id === value);
-      if (found) return found.name;
-    }
-    return autoLabel;
-  }, [value, groupedVoices, noVoices, autoLabel, emptyLabel]);
-
-  const handleSelect = (id) => {
-    onChange(id);
-    setOpen(false);
-  };
-
-  return (
-    <div className="tts-dropdown" ref={ref}>
-      <button
-        className={`tts-dropdown-trigger ${open ? 'open' : ''}`}
-        onClick={() => !isLoading && !noVoices && setOpen(!open)}
-        disabled={isLoading || noVoices}
-        type="button"
-      >
-        <span className="tts-dropdown-text">{selectedName}</span>
-        <ChevronDown size={14} className={`tts-dropdown-arrow ${open ? 'rotated' : ''}`} />
-      </button>
-
-      {open && (
-        <div className="tts-dropdown-menu">
-          <div
-            className={`tts-dropdown-item ${!value ? 'selected' : ''}`}
-            onClick={() => handleSelect('')}
-          >
-            <span>{autoLabel}</span>
-            {!value && <Check size={12} />}
-          </div>
-
-          {Object.entries(groupedVoices).map(([lang, voices]) => (
-            <div key={lang}>
-              <div className="tts-dropdown-group">{lang}</div>
-              {voices.map(voice => (
-                <div
-                  key={voice.id}
-                  className={`tts-dropdown-item ${value === voice.id ? 'selected' : ''}`}
-                  onClick={() => handleSelect(voice.id)}
-                >
-                  <span className="tts-dropdown-voice-name">{voice.name}</span>
-                  {value === voice.id && <Check size={12} />}
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
-const TTSSection = ({ settings, updateSetting, notify, confirm }) => {
+const TTSSection = ({ settings, updateSetting, notify }) => {
   const { t } = useTranslation();
   const [voices, setVoices] = useState([]);
   const [isLoadingVoices, setIsLoadingVoices] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
-  const [ttsStatus, setTtsStatus] = useState(TTS_STATUS.IDLE);
-  // Engines whose isAvailable() answered true. The picker renders only when
-  // there is an actual choice (neural shows up once its voice pack exists) —
-  // a one-option dropdown would be noise and a claim we can't back.
-  const [availableEngines, setAvailableEngines] = useState([]);
-  // Neural packs carry a hundred speakers; the picker opens on the featured
-  // few and unfolds the rest on request.
-  const [showAllVoices, setShowAllVoices] = useState(false);
-  // Which per-language preview button is playing ('' = the main one).
   const [testingLang, setTestingLang] = useState('');
-
-  const ttsConfig = {
-    ...DEFAULT_TTS_CONFIG,
-    ...(settings?.tts || {}),
-  };
-  const voiceByLang = ttsConfig.voiceByLang || {};
-  const isNeural = ttsConfig.engine === 'neural' && availableEngines.includes('neural');
-  const isEndpoint = ttsConfig.engine === 'endpoint' && availableEngines.includes('endpoint');
-  // sherpa voices and the OpenAI speech route have no pitch input.
-  const noPitch = isNeural || isEndpoint;
-  const endpointCfg = { ...DEFAULT_TTS_CONFIG.endpoint, ...(ttsConfig.endpoint || {}) };
+  const [ttsStatus, setTtsStatus] = useState(TTS_STATUS.IDLE);
+  const [availableEngines, setAvailableEngines] = useState(['web-speech']);
+  const [packCount, setPackCount] = useState(0);
+  const [endpointCap, setEndpointCap] = useState(null);
   // Typed but not yet vaulted; cleared once encrypted.
   const [draftKey, setDraftKey] = useState('');
   const [endpointTesting, setEndpointTesting] = useState(false);
   // Last test outcome for the status row: null | { success, ms, kb, error }
   const [endpointTest, setEndpointTest] = useState(null);
 
+  const ttsConfig = { ...DEFAULT_TTS_CONFIG, ...(settings?.tts || {}) };
+  const voiceByLang = ttsConfig.voiceByLang || {};
+  const endpointCfg = { ...DEFAULT_TTS_CONFIG.endpoint, ...(ttsConfig.endpoint || {}) };
+  const hasEndpointBridge = !!window.electron?.stack?.ttsSpeak;
+  const chosen = ttsConfig.engine || 'web-speech';
+  // What actually speaks: the choice when its engine is usable, else system voices.
+  const effective = availableEngines.includes(chosen) ? chosen : 'web-speech';
+  const isNeural = effective === 'neural';
+  const isEndpoint = effective === 'endpoint';
+  // sherpa voices and the OpenAI speech route have no pitch input.
+  const noPitch = isNeural || isEndpoint;
+
   const loadVoices = useCallback(async () => {
     setIsLoadingVoices(true);
     try {
       await ttsManager.init();
-      const voiceList = await ttsManager.getVoices();
-      setVoices(voiceList);
+      setVoices(await ttsManager.getVoices());
     } catch (e) {
       logger.error('Failed to load voices:', e);
       notify?.(t('tts.loadVoicesFailed'), 'error');
@@ -126,46 +66,47 @@ const TTSSection = ({ settings, updateSetting, notify, confirm }) => {
     }
   }, [notify, t]);
 
-  const loadEngines = useCallback(() => {
-    return ttsManager.listEngines()
-      .then((list) => setAvailableEngines(list.filter((e) => e.available).map((e) => e.id)))
-      .catch(() => {});
-  }, []);
-
-  // A voice pack landed or left: the engine list and the voice list change.
-  const handlePacksChanged = useCallback(async () => {
-    await loadEngines();
-    await loadVoices();
-  }, [loadEngines, loadVoices]);
+  const loadEngines = useCallback(async () => {
+    try {
+      const [list, status, cap] = await Promise.all([
+        ttsManager.listEngines(),
+        window.electron?.audioEngine?.ttsStatus?.(),
+        hasEndpointBridge ? stackClient.getTtsCapability() : null,
+      ]);
+      setAvailableEngines(list.filter((e) => e.available).map((e) => e.id));
+      setPackCount(status?.packs?.length || 0);
+      setEndpointCap(cap);
+    } catch (e) {
+      logger.debug('engine probe failed:', e.message);
+    }
+  }, [hasEndpointBridge]);
 
   useEffect(() => {
     loadVoices();
-    let cancelled = false;
-    ttsManager.listEngines()
-      .then((list) => {
-        if (!cancelled) setAvailableEngines(list.filter((e) => e.available).map((e) => e.id));
-      })
-      .catch(() => {});
+    loadEngines();
     const unsub = ttsManager.onStatusChange((status) => {
       setTtsStatus(status);
-      if (status === TTS_STATUS.IDLE) setIsTesting(false);
+      if (status === TTS_STATUS.IDLE) {
+        setIsTesting(false);
+        setTestingLang('');
+      }
     });
     // Return the slot on unmount (and stop any test playback), or the main
     // panel's status callback stays evicted after visiting this page.
     return () => {
-      cancelled = true;
       unsub();
       ttsManager.stop();
     };
-  }, [loadVoices]);
+  }, [loadVoices, loadEngines]);
 
-  // Engine switch takes effect on the live manager at once (test button uses
-  // it immediately); the voice list is engine-specific, so reload it.
+  // Engine switch takes effect on the live manager at once (preview uses it
+  // immediately); the voice list is engine-specific, so reload it.
   const handleEngineChange = useCallback(async (engineId) => {
     updateSetting('tts', 'engine', engineId, true);
     await ttsManager.updateConfig({ engine: engineId });
+    await loadEngines();
     loadVoices();
-  }, [updateSetting, loadVoices]);
+  }, [updateSetting, loadEngines, loadVoices]);
 
   // ttsManager.updateConfig persists to the store immediately, so the React
   // update is silent — otherwise the panel would flag "unsaved changes" for a
@@ -252,22 +193,10 @@ const TTSSection = ({ settings, updateSetting, notify, confirm }) => {
     }
   }, [endpointCfg.baseUrl, endpointCfg.model, endpointCfg.voice, draftKey, ttsConfig.volume, notify, t]);
 
-  const endpointStatusText = endpointTest === null
-    ? t('tts.endpoint.notTested')
-    : endpointTest.success
-      ? t('tts.endpoint.testOk', { ms: endpointTest.ms, kb: endpointTest.kb })
-      : `${t('tts.endpoint.testFailedShort')}: ${endpointTest.error}`;
-  const endpointStatusColor = endpointTest === null
-    ? 'var(--text-tertiary)'
-    : endpointTest.success ? 'var(--success)' : 'var(--error)';
-
-  // Maps thrown error strings (from web-speech.speak()) to localized UI messages.
-  // NO_VOICES = OS has no speech voices installed at all; NO_VOICE_FOR_LANG = none match the target lang.
+  // Maps thrown error strings to localized UI messages.
   const getTTSErrorMessage = (e) => {
     const msg = e.message || '';
-    if (msg === 'NO_VOICES') {
-      return { text: t('tts.noVoicesInstalled'), type: 'warning' };
-    }
+    if (msg === 'NO_VOICES') return { text: t('tts.noVoicesInstalled'), type: 'warning' };
     if (msg.startsWith('NO_VOICE_FOR_LANG:')) {
       const langCode = msg.split(':')[1];
       const langName = t(`tts.langNames.${langCode}`, { defaultValue: langCode });
@@ -276,25 +205,25 @@ const TTSSection = ({ settings, updateSetting, notify, confirm }) => {
     return { text: t('tts.testFailed') + ': ' + e.message, type: 'error' };
   };
 
-  // lang = 'zh' | 'en' previews that language's own voice; '' is the main
-  // button (mixed text once a specific voice or the neural engine is chosen).
-  const handleTest = async (lang = '') => {
-    // Same button toggles play and stop
+  const testTextFor = (lang) => {
+    if (lang === 'en') return t('tts.testTextEnglish');
+    if (lang === 'zh') return t('tts.testTextChinese');
+    return isNeural || isEndpoint || ttsConfig.voiceId ? t('tts.testTextMixed') : t('tts.testTextChinese');
+  };
+
+  // lang = 'zh' | 'en' previews that language's own voice; '' is the status
+  // row's preview. overrides lets a picker chip play before it is chosen.
+  const handleTest = async (lang = '', overrides = {}) => {
     if (isTesting || ttsStatus === TTS_STATUS.SPEAKING) {
       ttsManager.stop();
       setIsTesting(false);
       setTestingLang('');
-      return;
+      if (!overrides.voiceId && !overrides.voiceByLang) return;
     }
     setIsTesting(true);
     setTestingLang(lang);
     try {
-      const testText = lang === 'en'
-        ? t('tts.testTextEnglish')
-        : lang === 'zh' || (!isNeural && !ttsConfig.voiceId)
-          ? t('tts.testTextChinese')
-          : t('tts.testTextMixed');
-      await ttsManager.speak(testText, {
+      await ttsManager.speak(testTextFor(lang), {
         lang: lang || 'zh',
         // Neural voices are chosen per language, not through the single id.
         voiceId: isNeural ? '' : ttsConfig.voiceId,
@@ -302,6 +231,7 @@ const TTSSection = ({ settings, updateSetting, notify, confirm }) => {
         rate: ttsConfig.rate,
         pitch: ttsConfig.pitch,
         volume: ttsConfig.volume,
+        ...overrides,
       });
     } catch (e) {
       logger.error('TTS test failed:', e);
@@ -313,45 +243,69 @@ const TTSSection = ({ settings, updateSetting, notify, confirm }) => {
     }
   };
 
-  const hasHiddenVoices = voices.some((v) => v.featured === false);
-  const visibleVoices = useMemo(() => {
-    if (showAllVoices || !hasHiddenVoices) return voices;
-    const chosen = new Set([ttsConfig.voiceId, ...Object.values(voiceByLang)]);
-    return voices.filter((v) => v.featured !== false || chosen.has(v.id));
-  }, [voices, showAllVoices, hasHiddenVoices, ttsConfig.voiceId, voiceByLang]);
-
   // Per-language rows (neural): voices native to the language, or, for a pack
   // with one speaker covering both (MeloTTS), the ones that can read it.
   const voicesFor = useCallback((lang) => {
-    const native = visibleVoices.filter((v) => v.lang === lang);
+    const native = voices.filter((v) => v.lang === lang);
     if (native.length) return native;
-    return visibleVoices.filter((v) => Array.isArray(v.languages) && v.languages.includes(lang));
-  }, [visibleVoices]);
+    return voices.filter((v) => Array.isArray(v.languages) && v.languages.includes(lang));
+  }, [voices]);
 
-  const groupedVoices = useMemo(() => {
-    return visibleVoices.reduce((groups, voice) => {
-      const langCode = voice.lang.split('-')[0];
-      const langNames = {
-        'zh': t('tts.langNames.zh'), 'en': t('tts.langNames.en'),
-        'ja': t('tts.langNames.ja'), 'ko': t('tts.langNames.ko'),
-        'fr': t('tts.langNames.fr'), 'de': t('tts.langNames.de'),
-        'es': t('tts.langNames.es'), 'ru': t('tts.langNames.ru'),
-        'pt': t('tts.langNames.pt'), 'it': t('tts.langNames.it'),
+  const voiceName = (id) => voices.find((v) => v.id === id)?.name || t('audio.now.auto');
+
+  const endpointStatusText = endpointTest === null
+    ? t('audio.now.untested')
+    : endpointTest.success
+      ? t('audio.now.lastTest', { ms: endpointTest.ms })
+      : t('audio.now.lastFail', { error: endpointTest.error });
+
+  // The status line: what speaks right now and why.
+  const nowLine = useMemo(() => {
+    if (chosen === 'endpoint') {
+      if (isEndpoint) {
+        return {
+          warn: endpointTest?.success === false,
+          value: `${t('audio.now.api')} · ${hostOf(endpointCfg.baseUrl)}`,
+          sub: t('audio.now.endpointSub', {
+            model: endpointCfg.model || 'tts-1',
+            voice: endpointCfg.voice || 'alloy',
+            test: endpointStatusText,
+          }),
+        };
+      }
+      return {
+        warn: true,
+        value: t('tts.engineNames.endpoint'),
+        sub: endpointCap?.code === 'OFFLINE_BLOCKED' ? t('audio.now.endpointBlocked') : t('ttsEndpoint.notConfigured'),
       };
-      const groupName = langNames[langCode] || voice.lang;
-      if (!groups[groupName]) groups[groupName] = [];
-      groups[groupName].push(voice);
-      return groups;
-    }, {});
-  }, [visibleVoices, t]);
+    }
+    if (isNeural) {
+      return {
+        warn: false,
+        value: `${t('audio.now.local')} · ${t('tts.engineNames.neural')}`,
+        sub: t('audio.now.neuralSub', { zh: voiceName(voiceByLang.zh), en: voiceName(voiceByLang.en) }),
+      };
+    }
+    return {
+      warn: chosen === 'neural',
+      value: `${t('audio.now.local')} · ${t('tts.engineNames.web-speech')}`,
+      sub: t('audio.now.webSub'),
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chosen, isEndpoint, isNeural, endpointTest, endpointCfg.baseUrl, endpointCfg.model, endpointCfg.voice, endpointCap, voices, voiceByLang.zh, voiceByLang.en, t]);
 
-  const noVoices = !isLoadingVoices && voices.length === 0;
+  const engineSub = (id) => {
+    if (id === 'neural') return packCount ? t('audio.engine.packs', { count: packCount }) : t('audio.engine.noPacks');
+    if (id === 'endpoint') return endpointCfg.baseUrl.trim() ? hostOf(endpointCfg.baseUrl) : t('audio.engine.endpointUnset');
+    return '';
+  };
+  const engineDisabled = (id) => (id === 'neural' ? !availableEngines.includes('neural') : false);
+  const engines = ENGINE_ORDER.filter((id) => id !== 'endpoint' || hasEndpointBridge);
+
+  const playing = (lang) => isTesting && testingLang === lang;
 
   return (
-    <div className="setting-content">
-      <h3>{t('settings.tts.title')}</h3>
-      <p className="setting-description">{t('tts.description')}</p>
-
+    <div>
       <div className="setting-group">
         <label className="setting-switch">
           <input
@@ -361,53 +315,47 @@ const TTSSection = ({ settings, updateSetting, notify, confirm }) => {
           />
           <span className="switch-slider"></span>
           <span className="switch-label">{t('tts.enableTTS')}</span>
+          <span className="setting-hint" style={{ margin: '0 0 0 10px' }}>{t('tts.enableHint')}</span>
         </label>
-        <p className="setting-hint">{t('tts.enableHint')}</p>
       </div>
 
       {ttsConfig.enabled && (
         <>
-          {availableEngines.length > 1 && (
-            <div className="setting-group">
-              <label className="setting-label">{t('tts.engine')}</label>
-              <div className="setting-row">
-                <select
-                  className="setting-select"
-                  value={availableEngines.includes(ttsConfig.engine) ? ttsConfig.engine : 'web-speech'}
-                  onChange={(e) => handleEngineChange(e.target.value)}
+          <div className="setting-group">
+            <label className="setting-label">{t('audio.engine.label')}</label>
+            <div className="seg">
+              {engines.map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={chosen === id ? 'on' : ''}
+                  disabled={engineDisabled(id)}
+                  onClick={() => handleEngineChange(id)}
                 >
-                  {availableEngines.map((id) => (
-                    <option key={id} value={id}>{t(`tts.engineNames.${id}`)}</option>
-                  ))}
-                </select>
-              </div>
-              <p className="setting-hint">{t('tts.engineHint')}</p>
+                  {t(`tts.engineNames.${id}`)}
+                  {engineSub(id) && <span className="n">{engineSub(id)}</span>}
+                </button>
+              ))}
             </div>
-          )}
+            <div className="tts-now">
+              <span className={`dot ${nowLine.warn ? 'warn' : ''}`}></span>
+              <span className="k">{t('audio.now.label')}</span>
+              <span className="v">{nowLine.value}</span>
+              <span className="sub">{nowLine.sub}</span>
+              <button
+                className="btn-small"
+                onClick={() => handleTest('')}
+                disabled={!isEndpoint && voices.length === 0 && !isLoadingVoices}
+              >
+                {playing('') ? <Square size={12} /> : <Play size={12} />}
+                <span style={{ marginLeft: 4 }}>{playing('') ? t('tts.stop') : t('audio.now.preview')}</span>
+              </button>
+            </div>
+          </div>
 
-          {/* Voice packs download here (the only entry point), same list
-              component as the listen page. System voices stay the
-              zero-download floor whether or not a pack is installed. */}
-          {window.electron?.ttsPacks && (
-            <PackList
-              bridge={window.electron.ttsPacks}
-              prefix="tts.packs"
-              notify={notify}
-              confirm={confirm}
-              onChanged={handlePacksChanged}
-            >
-              <p className="setting-hint">{t('tts.packs.hint')}</p>
-            </PackList>
-          )}
-
-          {/* External OpenAI-compatible server, laid out like a translation
-              provider card (ProviderSettings ps-* classes, user's call
-              2026-09-02): labeled full-width fields and a test row with a
-              status dot. Fields persist like any tts setting; the key goes to
-              the vault via saveEndpointKey. */}
-          {window.electron?.stack?.ttsSpeak && (
+          {/* engine-specific block */}
+          {chosen === 'endpoint' && (
             <div className="setting-group">
-              <label className="setting-label">{t('tts.endpoint.title')}</label>
               <div className="ps-config-form">
                 <div className="ps-field">
                   <label className="ps-label">{t('tts.endpoint.baseUrl')}<span className="ps-required">*</span></label>
@@ -468,8 +416,8 @@ const TTSSection = ({ settings, updateSetting, notify, confirm }) => {
                     <span>{endpointTesting ? t('tts.endpoint.testing') : t('tts.endpoint.test')}</span>
                   </button>
                   <div className="ps-status">
-                    <span className="ps-status-dot" style={{ background: endpointStatusColor }}></span>
-                    <span>{endpointStatusText}</span>
+                    <span className="ps-status-dot" style={{ background: endpointTest === null ? 'var(--text-tertiary)' : endpointTest.success ? 'var(--success)' : 'var(--error)' }}></span>
+                    <span>{endpointTest === null ? t('tts.endpoint.notTested') : endpointTest.success ? t('tts.endpoint.testOk', { ms: endpointTest.ms, kb: endpointTest.kb }) : `${t('tts.endpoint.testFailedShort')}: ${endpointTest.error}`}</span>
                   </div>
                 </div>
               </div>
@@ -477,144 +425,103 @@ const TTSSection = ({ settings, updateSetting, notify, confirm }) => {
             </div>
           )}
 
-          {!isEndpoint && (
-          <div className="setting-group">
-            <div className="tts-slider-header">
-              <label className="setting-label">{t('tts.defaultVoice')}</label>
-              <span className={`tts-voice-count ${noVoices ? 'empty' : ''}`}>
-                {isLoadingVoices ? '...' : voices.length > 0
-                  ? t('tts.voicesLoaded', { count: voices.length })
-                  : t('tts.noVoicesInstalled')}
-              </span>
-            </div>
-
-            {isNeural
-              ? ['zh', 'en'].map((lang) => {
-                const langVoices = voicesFor(lang);
-                return (
-                  <div className="setting-row" key={lang}>
-                    <label className="setting-label" style={{ minWidth: 72 }}>
-                      {t('tts.voiceFor', { lang: t(`tts.langNames.${lang}`) })}
-                    </label>
-                    <VoiceDropdown
+          {chosen !== 'endpoint' && isNeural && (
+            <div className="setting-group">
+              <div className="tts-voices-head">
+                <label className="setting-label">{t('audio.voices.label')}</label>
+                <span className="tts-voice-count">{t('audio.voices.count', { count: voices.length })}</span>
+                <button className="setting-btn-icon" style={{ width: 26, height: 26 }} onClick={loadVoices} disabled={isLoadingVoices} title={t('tts.refreshVoices')}>
+                  <RefreshCw size={13} className={isLoadingVoices ? 'spinning' : ''} />
+                </button>
+              </div>
+              <div className="tts-voices">
+                {['zh', 'en'].map((lang) => (
+                  <React.Fragment key={lang}>
+                    <span className="lbl">{t(`audio.voices.${lang}`)}</span>
+                    <VoicePicker
+                      mode="neural"
+                      voices={voicesFor(lang)}
                       value={voiceByLang[lang] || ''}
+                      placeholder={t('audio.now.auto')}
                       onChange={(id) => updateTTSConfig('voiceByLang', { ...voiceByLang, [lang]: id })}
-                      groupedVoices={{ [t(`tts.langNames.${lang}`)]: langVoices }}
-                      noVoices={langVoices.length === 0}
-                      isLoading={isLoadingVoices}
-                      autoLabel={t('tts.autoVoice')}
-                      emptyLabel="—"
+                      onPreview={(v) => handleTest(lang, { voiceByLang: { ...voiceByLang, [lang]: v.id } })}
                     />
                     <button
                       className="setting-btn-icon"
                       onClick={() => handleTest(lang)}
-                      disabled={langVoices.length === 0}
-                      title={isTesting && testingLang === lang ? t('tts.stop') : t('tts.play')}
+                      disabled={voicesFor(lang).length === 0}
+                      title={playing(lang) ? t('tts.stop') : t('tts.play')}
                     >
-                      {isTesting && testingLang === lang ? <Square size={14} /> : <Play size={14} />}
+                      {playing(lang) ? <Square size={13} /> : <Play size={13} />}
                     </button>
-                  </div>
-                );
-              })
-              : (
-                <div className="setting-row">
-                  <VoiceDropdown
-                    value={ttsConfig.voiceId || ''}
-                    onChange={(id) => updateTTSConfig('voiceId', id)}
-                    groupedVoices={groupedVoices}
-                    noVoices={noVoices}
-                    isLoading={isLoadingVoices}
-                    autoLabel={t('tts.autoSelect')}
-                    emptyLabel="—"
-                  />
-                </div>
-              )}
-
-            <div className="setting-row">
-              <button
-                className="setting-btn-icon"
-                onClick={loadVoices}
-                disabled={isLoadingVoices}
-                title={t('tts.refreshVoices')}
-              >
-                <RefreshCw size={14} className={isLoadingVoices ? 'spinning' : ''} />
-              </button>
-              {hasHiddenVoices && (
-                <button
-                  className="btn-small"
-                  onClick={() => setShowAllVoices((v) => !v)}
-                  disabled={isLoadingVoices}
-                >
-                  {showAllVoices ? t('tts.showFeaturedVoices') : t('tts.showAllVoices', { count: voices.length })}
-                </button>
-              )}
-            </div>
-
-            {noVoices && (
-              <div className="tts-voice-warning">
-                <AlertTriangle size={14} className="tts-voice-warning-icon" />
-                <div className="tts-voice-warning-text">
-                  <div className="tts-voice-warning-title">{t('tts.noVoicesInstalled')}</div>
-                  <div className="tts-voice-warning-hint">{t('tts.installVoiceHint')}</div>
-                </div>
+                  </React.Fragment>
+                ))}
               </div>
-            )}
-
-            {!noVoices && !isLoadingVoices && (
-              <p className="setting-hint">{isNeural ? t('tts.voiceByLangHint') : t('tts.autoSelectHint')}</p>
-            )}
-          </div>
+              <p className="setting-hint">{t('audio.voices.neuralHint')}</p>
+            </div>
           )}
 
-          <div className="tts-slider-group">
-            <div className="setting-group tts-slider-item">
-              <div className="tts-slider-header">
-                <label className="setting-label">{t('tts.rate')}</label>
-                <span className="tts-slider-value">{ttsConfig.rate.toFixed(1)}x</span>
+          {chosen !== 'endpoint' && !isNeural && (
+            <div className="setting-group">
+              <div className="tts-voices-head">
+                <label className="setting-label">{t('audio.voices.label')}</label>
+                <span className={`tts-voice-count ${voices.length ? '' : 'empty'}`}>
+                  {voices.length ? t('audio.voices.systemCount', { count: voices.length }) : t('tts.noVoicesInstalled')}
+                </span>
+                <button className="setting-btn-icon" style={{ width: 26, height: 26 }} onClick={loadVoices} disabled={isLoadingVoices} title={t('tts.refreshVoices')}>
+                  <RefreshCw size={13} className={isLoadingVoices ? 'spinning' : ''} />
+                </button>
               </div>
-              <input type="range" className="setting-range" min="0.5" max="2" step="0.1"
-                value={ttsConfig.rate}
-                onChange={(e) => updateTTSConfig('rate', parseFloat(e.target.value))}
-              />
-              <p className="setting-hint">{t('tts.rateHint')}</p>
-            </div>
-
-            <div className="setting-group tts-slider-item">
-              <div className="tts-slider-header">
-                <label className="setting-label">{t('tts.pitch')}</label>
-                <span className="tts-slider-value">{ttsConfig.pitch.toFixed(1)}</span>
+              <div className="tts-voices">
+                <span className="lbl">{t('audio.voices.default')}</span>
+                <VoicePicker
+                  mode="system"
+                  voices={voices}
+                  value={ttsConfig.voiceId || ''}
+                  autoLabel={t('audio.voices.auto')}
+                  onChange={(id) => updateTTSConfig('voiceId', id)}
+                  onPreview={(v) => handleTest('', { voiceId: v.id, lang: (v.lang || 'zh').split('-')[0] })}
+                />
+                <button
+                  className="setting-btn-icon"
+                  onClick={() => handleTest('')}
+                  disabled={voices.length === 0}
+                  title={playing('') ? t('tts.stop') : t('tts.play')}
+                >
+                  {playing('') ? <Square size={13} /> : <Play size={13} />}
+                </button>
               </div>
-              {/* sherpa voices have no pitch input; the slider stays for system voices */}
-              <input type="range" className="setting-range" min="0.5" max="2" step="0.1"
-                value={ttsConfig.pitch}
-                disabled={noPitch}
-                onChange={(e) => updateTTSConfig('pitch', parseFloat(e.target.value))}
-              />
-              <p className="setting-hint">{noPitch ? t('tts.pitchUnsupported') : t('tts.pitchHint')}</p>
+              <p className="setting-hint">{voices.length ? t('audio.voices.webHint') : t('tts.installVoiceHint')}</p>
             </div>
+          )}
 
-            <div className="setting-group tts-slider-item">
-              <div className="tts-slider-header">
-                <label className="setting-label">{t('tts.volume')}</label>
-                <span className="tts-slider-value">{Math.round(ttsConfig.volume * 100)}%</span>
+          <div className="setting-group">
+            <label className="setting-label">{t('audio.sliders.label')}</label>
+            <div className="tts-sliders">
+              <div className="sl">
+                <div className="sl-head"><span>{t('tts.rate')}</span><span className="tts-slider-value">{ttsConfig.rate.toFixed(1)}x</span></div>
+                <input type="range" className="setting-range" min="0.5" max="2" step="0.1"
+                  value={ttsConfig.rate}
+                  onChange={(e) => updateTTSConfig('rate', parseFloat(e.target.value))}
+                />
               </div>
-              <input type="range" className="setting-range" min="0" max="1" step="0.1"
-                value={ttsConfig.volume}
-                onChange={(e) => updateTTSConfig('volume', parseFloat(e.target.value))}
-              />
-              <p className="setting-hint">{t('tts.volumeHint')}</p>
+              <div className={`sl ${noPitch ? 'off' : ''}`}>
+                <div className="sl-head"><span>{t('tts.pitch')}</span><span className="tts-slider-value">{noPitch ? t('audio.sliders.pitchUnsupported') : ttsConfig.pitch.toFixed(1)}</span></div>
+                <input type="range" className="setting-range" min="0.5" max="2" step="0.1"
+                  value={ttsConfig.pitch}
+                  disabled={noPitch}
+                  onChange={(e) => updateTTSConfig('pitch', parseFloat(e.target.value))}
+                />
+              </div>
+              <div className="sl">
+                <div className="sl-head"><span>{t('tts.volume')}</span><span className="tts-slider-value">{Math.round(ttsConfig.volume * 100)}%</span></div>
+                <input type="range" className="setting-range" min="0" max="1" step="0.1"
+                  value={ttsConfig.volume}
+                  onChange={(e) => updateTTSConfig('volume', parseFloat(e.target.value))}
+                />
+              </div>
             </div>
-          </div>
-
-          <div className="tts-preview">
-            <button
-              className={`tts-preview-btn ${isTesting ? 'stop' : 'play'}`}
-              onClick={() => handleTest('')}
-              disabled={noVoices && !isEndpoint}
-            >
-              {isTesting ? <><Square size={14} />{t('tts.stop')}</> : <><Play size={14} />{t('tts.play')}</>}
-            </button>
-            {noVoices && !isEndpoint && <span className="tts-preview-status">{t('tts.noVoicesInstalled')}</span>}
+            <p className="setting-hint">{t('audio.sliders.pitchHint')}</p>
           </div>
         </>
       )}

@@ -104,7 +104,7 @@ const ListenPanel = ({ session }) => {
               <button
                 type="button"
                 className={`listen-seg-speak${speaking ? ' playing' : ''}`}
-                title={speaking ? t('floatingWindow.listenSpeakStop', '停止朗读') : t('floatingWindow.listenSpeakLine', '朗读这行')}
+                title={speaking ? t('floatingWindow.listenSpeakStop') : t('floatingWindow.listenSpeakLine')}
                 onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); speakRow(seg); }}
               >
