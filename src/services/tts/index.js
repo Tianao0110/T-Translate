@@ -52,6 +52,7 @@ class TTSManager {
     this._configListeners = new Set();
     this._engineUnsub = null;
     this._fallbackEngine = null; // web-speech while it covers one utterance
+    this._gateOn = false; // what this window last told the mute gate
     this._initialized = false;
   }
 
@@ -128,13 +129,23 @@ class TTSManager {
     this._currentEngineId = engineId;
 
     // One internal forwarder from the engine to all manager-level listeners.
-    this._engineUnsub = this._currentEngine.onStatusChange((status) => {
-      for (const cb of this._statusListeners) {
-        try { cb(status); } catch { /* isolate listeners */ }
-      }
-    });
+    this._engineUnsub = this._currentEngine.onStatusChange((status) => this._forwardStatus(status));
 
     return this._currentEngine;
+  }
+
+  // Every status change also drives the listen-mode mute gate: while this
+  // window is speaking (any engine, system voices included) the audio worker
+  // drops captured sound, so the app's own voice never lands in the subtitles.
+  _forwardStatus(status) {
+    const playing = status === TTS_STATUS.SPEAKING || status === TTS_STATUS.PAUSED;
+    if (playing !== this._gateOn) {
+      this._gateOn = playing;
+      try { window.electron?.audioEngine?.setTtsPlaying?.(playing); } catch { /* bridge absent */ }
+    }
+    for (const cb of this._statusListeners) {
+      try { cb(status); } catch { /* isolate listeners */ }
+    }
   }
 
   // The configured engine may be unavailable (neural without its voice pack).
@@ -280,11 +291,7 @@ class TTSManager {
     const fallback = await this.getEngine(FALLBACK_ENGINE_ID);
     // Forward its status for the duration of the utterance so the speak
     // button tracks the voice that is actually talking.
-    const unsub = fallback.onStatusChange((status) => {
-      for (const cb of this._statusListeners) {
-        try { cb(status); } catch { /* isolate listeners */ }
-      }
-    });
+    const unsub = fallback.onStatusChange((status) => this._forwardStatus(status));
     this._fallbackEngine = fallback;
     try {
       return await fallback.speak(text, options);

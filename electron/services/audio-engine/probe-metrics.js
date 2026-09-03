@@ -227,6 +227,26 @@ function makeSignalWatchdog({ silenceRms = 1e-5, noAudioAfterMs = 5000, noSpeech
   };
 }
 
+// Mute gate for the app's own TTS playback: blocked while on, and for tailMs
+// after off so the loopback path's latency (the last syllables still in the
+// device buffer) does not leak into the VAD.
+function makeTtsGate({ tailMs = 300 } = {}) {
+  let on = false;
+  let offAt = -Infinity;
+  return {
+    set(next, nowMs) {
+      if (on && !next) offAt = nowMs;
+      on = !!next;
+    },
+    blocked(nowMs) {
+      return on || nowMs - offAt < tailMs;
+    },
+    isOn() {
+      return on;
+    },
+  };
+}
+
 function round2(n) {
   return Math.round(n * 100) / 100;
 }
@@ -245,4 +265,5 @@ module.exports = {
   isNegligibleFinal,
   makeAgc,
   pickCutWindow,
+  makeTtsGate,
 };

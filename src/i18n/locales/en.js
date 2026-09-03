@@ -336,6 +336,9 @@ const en = {
     listenExported: "Subtitles exported",
     listenIdle: "Click start to caption system audio",
     listenWaiting: "Listening to system audio…",
+    listenGate: "Speaking · capture paused",
+    listenSpeakLine: "Read this line",
+    listenSpeakStop: "Stop reading",
     listenStatus: {
       idle: "Ready",
       loading: "Loading model…",

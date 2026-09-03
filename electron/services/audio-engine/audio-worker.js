@@ -28,6 +28,8 @@
 //        {type:'tts-load', pack}         load a voice pack (see TTS below)
 //        {type:'tts-generate', id, text, sid, speed, pack?}
 //        {type:'tts-cancel', id}
+//        {type:'tts-gate', on}           a window is playing TTS: drop captured
+//                                        audio until off (+300ms tail)
 //   out: {type:'ready'}                  init done (nothing loaded yet)
 //        {type:'asr-ready', loadMs}      ASR loaded + session live
 //        {type:'partial', text}          open-segment provisional text; ''
@@ -69,6 +71,7 @@ const {
   isNegligibleFinal,
   makeAgc,
   pickCutWindow,
+  makeTtsGate,
 } = require('./probe-metrics');
 const { hasCjk, verbalizeEnglishNumbers, scaleSpeed } = require('./tts-text-en');
 
@@ -164,6 +167,12 @@ let ttsPackId = '';
 let ttsLoading = null; // Promise<OfflineTts> while createAsync runs
 let ttsChain = Promise.resolve(); // one synthesis at a time
 const ttsCancelled = new Set();
+// Mute gate: while a window plays TTS (any engine) the captured audio is
+// dropped here, plus a tail for the loopback path's latency, so the app's own
+// voice never reaches the VAD. Works on every Windows build, unlike process
+// exclusion, and needs no audio client restart.
+const TTS_GATE_TAIL_MS = 300;
+const ttsGate = makeTtsGate({ tailMs: TTS_GATE_TAIL_MS });
 
 // Rolling input buffer feeding fixed-size VAD windows.
 let pending = new Float32Array(0);
@@ -630,6 +639,11 @@ function emitLevel(samples) {
 
 function handlePcm(samples) {
   if (!vad || !sessionLive) return;
+  if (ttsGate.blocked(Date.now())) {
+    // Dropped on the floor: not into the VAD, not into the level meter (which
+    // the UI greys out for the gate), not into the open segment.
+    return;
+  }
   audioInSamples += samples.length;
 
   let sumSq = 0;
@@ -1169,6 +1183,13 @@ function handleTtsCancel(msg) {
   if (id) ttsCancelled.add(id);
 }
 
+function handleTtsGate(msg) {
+  const on = msg.on === true;
+  ttsGate.set(on, Date.now());
+  logLine(eventRecord('tts-gate', on ? 'on' : 'off'));
+  if (on) post({ type: 'level', value: 0 });
+}
+
 function handleShutdown() {
   if (shuttingDown) return;
   shuttingDown = true;
@@ -1204,6 +1225,7 @@ process.parentPort.on('message', (e) => {
     case 'tts-load': return handleTtsLoad(msg);
     case 'tts-generate': return handleTtsGenerate(msg);
     case 'tts-cancel': return handleTtsCancel(msg);
+    case 'tts-gate': return handleTtsGate(msg);
     default: return;
   }
 });

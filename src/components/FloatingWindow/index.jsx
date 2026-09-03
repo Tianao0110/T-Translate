@@ -877,12 +877,14 @@ const FloatingWindow = () => {
             <span className="listen-topbar-status">
               {/* Own element so a narrow window truncates the WORDS and never
                   the meter next to them. */}
-              <span className="listen-status-text">
-                {t(`floatingWindow.listenStatus.${listen.sessionState}`, listen.sessionState)}
+              <span className={`listen-status-text ${listen.ttsGated && listen.running ? 'gated' : ''}`}>
+                {listen.ttsGated && listen.running
+                  ? t('floatingWindow.listenGate', '朗读中 · 暂停收音')
+                  : t(`floatingWindow.listenStatus.${listen.sessionState}`, listen.sessionState)}
               </span>
               {/* Fastest feedback the feature has: moves at the audio
                   callback's rate, long before any text can appear. */}
-              <ListenLevel levelRef={listen.levelRef} active={listen.running} />
+              <ListenLevel levelRef={listen.levelRef} active={listen.running} gated={listen.ttsGated} />
             </span>
           )}
 

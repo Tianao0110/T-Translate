@@ -251,6 +251,8 @@ const electronAPI = {
       ipcRenderer.on("audio-engine:tts-chunk", handler);
       return () => ipcRenderer.removeListener("audio-engine:tts-chunk", handler);
     },
+    // Any engine's playback (system voices included) mutes listen-mode capture.
+    setTtsPlaying: (on) => ipcRenderer.send("audio-engine:tts-playing", { on: !!on }),
   },
   screenshot: {
     capture: () => ipcRenderer.invoke("capture-screen"),

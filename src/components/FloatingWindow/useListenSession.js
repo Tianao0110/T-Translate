@@ -39,6 +39,7 @@ export default function useListenSession({ active }) {
   const transcriptTruncatedRef = useRef(false);
   // 0..1 capture level, updated straight from the audio callback (see below).
   const levelRef = useRef(0);
+  const [ttsGated, setTtsGated] = useState(false);
   const [partial, setPartial] = useState('');
   const [available, setAvailable] = useState(false);
 
@@ -278,12 +279,19 @@ export default function useListenSession({ active }) {
     const offLevel = bridge.onLevel?.((value) => {
       levelRef.current = typeof value === 'number' ? value : 0;
     });
+    // Mute gate mirror: while any window plays TTS the worker drops capture;
+    // the status strip says so and the meter rests at zero.
+    const offGate = bridge.onTtsGate?.((on) => {
+      setTtsGated(on);
+      if (on) levelRef.current = 0;
+    });
 
     return () => {
       offStatus?.();
       offSegment?.();
       offPartial?.();
       offLevel?.();
+      offGate?.();
     };
   }, [active, stop, translateSegment]);
 
@@ -354,5 +362,6 @@ export default function useListenSession({ active }) {
     stop,
     exportSrt,
     levelRef,
+    ttsGated,
   };
 }

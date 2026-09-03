@@ -336,6 +336,9 @@ const zh = {
     listenExported: "字幕已导出",
     listenIdle: "点击开始，听译系统声音",
     listenWaiting: "正在监听系统声音…",
+    listenGate: "朗读中 · 暂停收音",
+    listenSpeakLine: "朗读这行",
+    listenSpeakStop: "停止朗读",
     listenStatus: {
       idle: "就绪",
       loading: "加载模型…",

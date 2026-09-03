@@ -1507,3 +1507,59 @@
   word-break: break-word;
   padding-bottom: 4px;
 }
+
+/* Mute gate (v0.4.2): the app's own TTS is playing and capture is dropped in
+   the worker. The words say so in the accent tone; the meter dims rather than
+   disappearing, so a flat bar reads as "muted", not "no sound arriving". */
+.listen-status-text.gated {
+  color: var(--floating-accent);
+}
+
+.listen-level.gated {
+  opacity: 0.35;
+}
+
+/* Read-aloud button on subtitle rows (v0.4.2). Hidden until the row is
+   hovered so the transcript stays as clean as before; the playing row keeps
+   its button visible as a stop control and underlines the line being read.
+   Rows get side padding so the centered text never runs under the button. */
+.listen-seg {
+  position: relative;
+  padding: 0 30px;
+}
+
+.listen-seg-speak {
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--floating-text) 10%, transparent);
+  color: var(--floating-text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.listen-seg:hover .listen-seg-speak,
+.listen-seg-speak.playing {
+  opacity: 1;
+}
+
+.listen-seg-speak.playing {
+  background: var(--floating-accent);
+  color: var(--floating-on-accent);
+}
+
+.listen-seg.speaking .listen-seg-trans,
+.listen-seg.speaking.no-trans .listen-seg-text {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--floating-accent) 45%, transparent);
+  text-underline-offset: 3px;
+}

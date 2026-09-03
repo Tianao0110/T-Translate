@@ -16,7 +16,7 @@ import React, { useEffect, useRef } from 'react';
 // meter rather than a strobe.
 const DECAY = 0.82;
 
-const ListenLevel = ({ levelRef, active }) => {
+const ListenLevel = ({ levelRef, active, gated = false }) => {
   const barRef = useRef(null);
 
   useEffect(() => {
@@ -39,8 +39,10 @@ const ListenLevel = ({ levelRef, active }) => {
   }, [active, levelRef]);
 
   if (!active) return null;
+  // gated: the app's own TTS is playing and capture is being dropped — the
+  // meter dims so a flat bar reads as "muted", not "no sound".
   return (
-    <div className="listen-level" aria-hidden="true">
+    <div className={`listen-level ${gated ? 'gated' : ''}`} aria-hidden="true">
       <div className="listen-level-bar" ref={barRef} />
     </div>
   );

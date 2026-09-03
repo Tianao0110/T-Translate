@@ -58,6 +58,10 @@ let ttsUnloadWaiters = [];
 let spawnWaiters = []; // TTS callers waiting for a fresh process to say 'ready'
 // stopSessionAndWait needs the process gone (pack swap); TTS must not keep it.
 let exitRequested = false;
+// Mute gate: webContents ids currently playing TTS (any engine, any window).
+// The gate is on while the set is non-empty; the worker drops captured audio
+// for that span (+ a short tail) so the app never transcribes its own voice.
+const ttsPlayingSenders = new Set();
 
 function init(d) {
   deps = d;
@@ -256,6 +260,8 @@ function onWorkerMessage(msg) {
       childState = 'running';
       engineEverReady = true;
       logger.info(`worker ready in ${msg.loadMs}ms`);
+      // A session started mid-utterance inherits the gate.
+      if (ttsPlayingSenders.size > 0) child?.postMessage({ type: 'tts-gate', on: true });
       // Capture starts only now: an audio client opened while the models were
       // still loading would just fill a buffer nobody reads.
       if (sessionSource.mode === 'off') sendStatus('listening');
@@ -680,6 +686,26 @@ function ttsCancel(id) {
   }
 }
 
+// Mute gate, keyed by the reporting webContents so windows do not unmute
+// each other. A destroyed window drops out via the on/off pairing its
+// engine emits; a crashed one is cleaned up when it reports again or never.
+function setTtsPlaying(senderId, on) {
+  const before = ttsPlayingSenders.size > 0;
+  if (on) ttsPlayingSenders.add(senderId);
+  else ttsPlayingSenders.delete(senderId);
+  const after = ttsPlayingSenders.size > 0;
+  if (before === after) return;
+  logger.debug(`tts gate ${after ? 'on' : 'off'}`);
+  if (child && childState === 'running') {
+    try {
+      child.postMessage({ type: 'tts-gate', on: after });
+    } catch {
+      // process gone
+    }
+  }
+  sendToWindow(CHANNELS.AUDIO_ENGINE.TTS_GATE, { on: after });
+}
+
 function armTtsIdle() {
   clearTimeout(ttsIdleTimer);
   if (!child || !ttsLoadedPack || ttsRequests.size > 0) return;
@@ -756,5 +782,6 @@ module.exports = {
   getTtsVoices,
   ttsGenerate,
   ttsCancel,
+  setTtsPlaying,
   unloadTtsAndWait,
 };

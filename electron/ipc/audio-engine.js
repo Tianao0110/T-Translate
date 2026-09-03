@@ -155,6 +155,12 @@ function registerAudioEngineIPC(ctx) {
     if (id) engineManager.ttsCancel(id);
   });
 
+  // Each window reports its own playback; the manager ORs them, so one
+  // window stopping never unmutes while another is still talking.
+  ipcMain.on(AE.TTS_PLAYING, (event, payload) => {
+    engineManager.setTtsPlaying(event.sender.id, !!payload?.on);
+  });
+
   // Voice packs: same manifest and progress channel as the ASR packs, own
   // root and manager (tts-models; eviction unloads the voice, not the session).
   ipcMain.handle(AE.TTS_PACKS_LIST, async (event, options = {}) => {

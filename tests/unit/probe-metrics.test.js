@@ -12,7 +12,31 @@ import {
   isNegligibleFinal,
   makeAgc,
   pickCutWindow,
+  makeTtsGate,
 } from '../../electron/services/audio-engine/probe-metrics.js';
+
+describe('makeTtsGate', () => {
+  it('blocks while on and for the tail after off, then reopens', () => {
+    const gate = makeTtsGate({ tailMs: 300 });
+    expect(gate.blocked(1000)).toBe(false);
+    gate.set(true, 1000);
+    expect(gate.blocked(1000)).toBe(true);
+    expect(gate.blocked(5000)).toBe(true); // no timeout while a window is still playing
+    gate.set(false, 5000);
+    expect(gate.blocked(5100)).toBe(true); // tail: last syllables still in the loopback buffer
+    expect(gate.blocked(5299)).toBe(true);
+    expect(gate.blocked(5300)).toBe(false);
+    expect(gate.isOn()).toBe(false);
+  });
+
+  it('a repeated off does not restart the tail', () => {
+    const gate = makeTtsGate({ tailMs: 300 });
+    gate.set(true, 0);
+    gate.set(false, 100);
+    gate.set(false, 1000);
+    expect(gate.blocked(1050)).toBe(false);
+  });
+});
 
 describe('makeRepeatTracker', () => {
   it('marks consecutive identical text as repeated (record only)', () => {

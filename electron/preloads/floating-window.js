@@ -120,6 +120,14 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.on('audio-engine:tts-chunk', handler);
       return () => ipcRenderer.removeListener('audio-engine:tts-chunk', handler);
     },
+    // Mute gate: playback from any window pauses capture; the gate state
+    // comes back so the listen UI can say so.
+    setTtsPlaying: (on) => ipcRenderer.send('audio-engine:tts-playing', { on: !!on }),
+    onTtsGate: (cb) => {
+      const handler = (event, payload) => cb(!!payload?.on);
+      ipcRenderer.on('audio-engine:tts-gate', handler);
+      return () => ipcRenderer.removeListener('audio-engine:tts-gate', handler);
+    },
   },
 
   // Encrypted storage for API keys etc.

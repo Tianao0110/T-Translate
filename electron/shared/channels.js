@@ -206,6 +206,10 @@ const CHANNELS = {
     TTS_PACKS_LIST: 'audio-engine:tts-packs-list',
     TTS_PACKS_DOWNLOAD: 'audio-engine:tts-packs-download',
     TTS_PACKS_REMOVE: 'audio-engine:tts-packs-remove',
+    // Mute gate: while any window plays TTS the worker drops captured audio so
+    // the app's own voice is never transcribed back into the subtitles.
+    TTS_PLAYING: 'audio-engine:tts-playing',   // renderer → main: {on}
+    TTS_GATE: 'audio-engine:tts-gate',         // main → floating window: {on} (mirrors the gate for the UI)
   },
 };
 
