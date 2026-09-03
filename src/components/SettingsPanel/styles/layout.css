@@ -669,3 +669,61 @@
 .mode-text-link:hover {
   color: var(--accent-primary);
 }
+
+/* ==================== 宽 / 紧两档排版 ==================== */
+/* The content column is a container; classic pages (top-level setting groups)
+   become cards that flow into two columns once the column is wide enough.
+   Pages built from their own blocks (audio, privacy, about) keep a single
+   full-width flow: every direct child spans the grid unless it is a group. */
+.settings-content-wrapper {
+  container-type: inline-size;
+  container-name: settings;
+}
+
+/* App.css caps every group at 600px; inside the settings panel the column decides. */
+.settings-panel .setting-group {
+  max-width: none;
+}
+
+.settings-panel .setting-content > .setting-group {
+  margin: 0 0 16px 0;
+  padding: 18px 20px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 12px;
+}
+
+.settings-panel .setting-content > .setting-group:last-child {
+  margin-bottom: 0;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border-primary);
+}
+
+@container settings (min-width: 1040px) {
+  .setting-content {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 20px;
+    row-gap: 16px;
+    align-content: start;
+    align-items: start;
+    padding: 28px 40px;
+  }
+
+  .setting-content > * {
+    grid-column: 1 / -1;
+  }
+
+  .setting-content > h3 {
+    margin-bottom: 0;
+  }
+
+  .setting-content > .setting-description {
+    margin: -8px 0 8px 0;
+  }
+
+  .settings-panel .setting-content > .setting-group {
+    grid-column: auto;
+    margin: 0;
+  }
+}
