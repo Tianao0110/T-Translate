@@ -1,7 +1,7 @@
 {
   "name": "t-translate",
   "private": true,
-  "version": "0.4.6",
+  "version": "0.4.7",
   "description": "Professional offline translation tool with AI support",
   "main": "electron/main.js",
   "scripts": {
