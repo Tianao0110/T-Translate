@@ -140,16 +140,14 @@ function cleanOldLogs(logDir, keepDays) {
   }
 }
 
-// Initialize the log dir; if app isn't ready yet, defer to whenReady.
-// app is optional-chained so the module stays loadable outside a real
-// Electron main process (vitest requires it through the electron mock).
+// Initialize the log dir as soon as the module loads: app.getPath already
+// works before ready, and waiting for ready left every line logged during
+// startup in electron-log's default main.log. app is optional-chained so
+// the module stays loadable outside a real Electron main process (vitest
+// requires it through the electron mock).
 let logDirectory = null;
-if (electronLog && app?.isReady?.()) {
+if (electronLog && typeof app?.getPath === 'function') {
   logDirectory = configureElectronLog();
-} else if (electronLog && app?.whenReady) {
-  app.whenReady().then(() => {
-    logDirectory = configureElectronLog();
-  });
 }
 
 function getLogDirectory() {

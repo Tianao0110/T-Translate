@@ -11,6 +11,7 @@
 //   renderer with executeJavaScript.
 
 const Store = require('electron-store');
+const { pruneRetiredSettings } = require('./utils/store-cleanup');
 
 const isDev = process.env.NODE_ENV === 'development' || !require('electron').app.isPackaged;
 
@@ -76,6 +77,7 @@ const store = new Store({
 });
 
 migrateGlassKeys(store);
+pruneRetiredSettings(store);
 
 // In-memory state — reset on every launch.
 const runtime = {

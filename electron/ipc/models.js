@@ -19,12 +19,14 @@ const ocrEngine = require('../utils/ocr-engine');
 let busy = false;
 
 // The old %APPDATA% folder is offered for cleanup only when userData really
-// moved away from it and it still exists.
+// moved away from it and it still holds something. Electron recreates the
+// default userData directory on every launch, empty — that shell is not
+// old data and must not bring the button back.
 function legacyDataRoot() {
   const legacy = legacyUserData();
   if (!isRelocated() || !legacy) return null;
   try {
-    return fs.statSync(legacy).isDirectory() ? legacy : null;
+    return fs.readdirSync(legacy).length > 0 ? legacy : null;
   } catch {
     return null;
   }
