@@ -31,8 +31,13 @@ const CHROMIUM_ENTRIES = [
 
 // What a relocated install carries over from the old userData. Logs stay
 // behind; Session Storage is gone once the window closes anyway.
+//
+// `Local State` is not optional: on Windows safeStorage encrypts with a
+// random key kept in that file (the "v10" prefix), and DPAPI only wraps the
+// key. Without it the history vault and every stored API key decrypt to
+// garbage in the new folder.
 const CARRIED_FILES = ['config.json', 'translation-data.enc'];
-const CARRIED_BROWSER_DIRS = ['Local Storage', 'IndexedDB'];
+const CARRIED_BROWSER_ENTRIES = ['Local State', 'Local Storage', 'IndexedDB'];
 const LEGACY_CACHE = path.join('Caches', 'translation-cache.json');
 const CACHE_FILE = path.join('cache', 'translation-cache.json');
 
@@ -113,7 +118,7 @@ function removeIfEmpty(dir) {
 function carryOverLegacy(p, notes) {
   for (const f of CARRIED_FILES) copyIfMissing(path.join(p.legacyUserData, f), path.join(p.userData, f), notes);
   copyIfMissing(path.join(p.legacyUserData, LEGACY_CACHE), path.join(p.userData, CACHE_FILE), notes);
-  for (const d of CARRIED_BROWSER_DIRS) copyIfMissing(path.join(p.legacyUserData, d), path.join(p.browser, d), notes);
+  for (const d of CARRIED_BROWSER_ENTRIES) copyIfMissing(path.join(p.legacyUserData, d), path.join(p.browser, d), notes);
 }
 
 // userData stays where it was: pull Chromium's folders into browser\ (a

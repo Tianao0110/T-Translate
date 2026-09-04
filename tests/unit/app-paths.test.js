@@ -79,6 +79,7 @@ describe('applyAppPaths — relocated install', () => {
     write(path.join(legacy, 'translation-data.enc'), 'vault');
     write(path.join(legacy, 'Caches', 'translation-cache.json'), '{"hits":1}');
     write(path.join(legacy, 'Local Storage', 'leveldb', '000001.log'), 'ls');
+    write(path.join(legacy, 'Local State'), '{"os_crypt":{"encrypted_key":"k"}}');
     write(path.join(legacy, 'Session Storage', '000001.log'), 'ss');
     write(path.join(legacy, 'logs', 'app-2026-09-01.log'), 'log');
 
@@ -97,6 +98,8 @@ describe('applyAppPaths — relocated install', () => {
     expect(fs.readFileSync(path.join(data, 'translation-data.enc'), 'utf8')).toBe('vault');
     expect(fs.readFileSync(path.join(data, 'cache', 'translation-cache.json'), 'utf8')).toBe('{"hits":1}');
     expect(fs.readFileSync(path.join(data, 'browser', 'Local Storage', 'leveldb', '000001.log'), 'utf8')).toBe('ls');
+    // The safeStorage key lives here — without it the carried vault is unreadable.
+    expect(fs.readFileSync(path.join(data, 'browser', 'Local State'), 'utf8')).toContain('encrypted_key');
     expect(fs.existsSync(path.join(data, 'browser', 'Session Storage'))).toBe(false);
     expect(fs.existsSync(path.join(data, 'logs'))).toBe(false);
     // The old folder is untouched — the user clears it from the About page.
