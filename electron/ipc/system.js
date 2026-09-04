@@ -337,6 +337,21 @@ function register(ctx) {
     }
   });
 
+  // The uninstaller removes the Run entry. After a keep-data reinstall the
+  // stored preference still says on, so put the entry back — but only when
+  // it is missing: rewriting an existing one would also flip the Task
+  // Manager "disabled" flag the user may have set.
+  if (app.isPackaged && store.get('settings.startup.autoLaunch') === true) {
+    try {
+      if (!app.getLoginItemSettings({ args: ['--startup'] }).openAtLogin) {
+        app.setLoginItemSettings({ openAtLogin: true, args: ['--startup'] });
+        logger.info('Auto launch entry restored');
+      }
+    } catch (e) {
+      logger.warn('Auto launch restore failed:', e.message);
+    }
+  }
+
   ipcMain.handle(CHANNELS.APP.GET_AUTO_LAUNCH, () => {
     try {
       // Prefer store (reliable in dev), fall back to system API.

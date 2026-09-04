@@ -108,7 +108,7 @@ v0.3.4 给 Windows OCR / Azure / Google Vision / OCR.space / 百度 五个引擎
 
 - **全仓 userData 落点全部走 `app.getPath('userData')`，零硬编码路径**：electron-store 的 config.json、[logger.js:71](electron/utils/logger.js:71) 的 logs/、[translation-stack.js:52](electron/ipc/translation-stack.js:52) 的 Caches/、Chromium 自带的 Local Storage/IndexedDB。**一句 `app.setPath('userData', …)` 全部跟着搬**。模型不在此列了——v0.4.0 起 OCR 与听译模型都落安装目录的 `models/`（[model-root.js](electron/utils/model-root.js)），便携化时它们本来就跟着程序走
 - ⚠️ **唯一真陷阱是 require 顺序**：[main.js:12](electron/main.js:12) require `./state` 时 [state.js:36](electron/state.js:36) 顶层就 `new Store()` 了，setPath 必须更早（main.js 最顶或抽独立首个 require）。顺序错了不报错，只会静默写回老位置
-- ⚠️ **userData 之外还有一处残留**：[system.js:265](electron/ipc/system.js:265) 的开机自启走 `setLoginItemSettings` → 写 `HKCU\...\Run` 注册表。「卸载完全不留」要成立就必须处理它（便携版隐藏该开关或退出时清），否则是假承诺
+- ~~⚠️ **userData 之外还有一处残留**：开机自启走 `setLoginItemSettings` → 写 `HKCU\...\Run` 注册表~~ v0.4.7 已清：真卸载时 `installer.nsh` 删该值（值名 `electron.app.T-Translate`），启动时按存储偏好补回缺失项
 - 其余：便携版不能装进 Program Files（不可写）→ electron-builder 加 `portable`/`zip` target 与 NSIS 并存，前者自带 `PORTABLE_EXECUTABLE_DIR` 可当检测依据；老用户迁移提示
 
 ### ~~听译安全审查~~ 已交付（v0.4.1）
@@ -128,7 +128,7 @@ v0.3.4 给 Windows OCR / Azure / Google Vision / OCR.space / 百度 五个引擎
 
 **分步节奏（每步独立可 ship）**：
 
-**进度（2026-09-03，v0.4.7）**：三步全部落地。第三步=[app-paths.js](electron/utils/app-paths.js) 在 `require('./state')` 之前 `setPath('userData', 安装目录\data)` + `sessionData → data\browser`（实测 Chromium 全部文件含 DIPS/GPUCache 都跟着 sessionData 走，顶层干净）；首启从 `%APPDATA%\t-translate` 复制 config/保险库/缓存/Local Storage，旧目录保留，关于页「清理旧数据」按钮删（旧目录还有模型包时拒绝）；不可写/开发态原地整理（Chromium 条目 rename 进 browser）。契约②拍板=卸载询问保留，保留则挪到安装目录旁 `T-Translate-data\{data,models}`，重装认回；更新暂存合用同一目录（旧名 `t-translate-models`/`t-translate-data` 仍认，因大小写不敏感与新目录同名，只在新目录清空后再看）。**仍欠**：开机自启的 `HKCU\...\Run` 项卸载不清；保留后换目录重装认不回。
+**进度（2026-09-03，v0.4.7）**：三步全部落地。第三步=[app-paths.js](electron/utils/app-paths.js) 在 `require('./state')` 之前 `setPath('userData', 安装目录\data)` + `sessionData → data\browser`（实测 Chromium 全部文件含 DIPS/GPUCache 都跟着 sessionData 走，顶层干净）；首启从 `%APPDATA%\t-translate` 复制 config/保险库/缓存/Local Storage，旧目录保留，关于页「清理旧数据」按钮删（旧目录还有模型包时拒绝）；不可写/开发态原地整理（Chromium 条目 rename 进 browser）。契约②拍板=卸载询问保留，保留则挪到安装目录旁 `T-Translate-data\{data,models}`，重装认回；更新暂存合用同一目录（旧名 `t-translate-models`/`t-translate-data` 仍认，因大小写不敏感与新目录同名，只在新目录清空后再看）。开机自启注册表项（`HKCU\...\Run` 的 `electron.app.T-Translate`）真卸载时清掉，程序启动按存储偏好补回缺失项（只补缺失，不碰任务管理器的禁用标记）。**仍欠**：保留后换目录重装认不回。
 
 - v0.4.x 第一步=模型归位收尾（本体已在安装目录，补存量）：
   - 老 userData 模型一键搬迁：设置页检测旧根有模型→提示+「移到程序目录」按钮，带进度跨盘复制+删，OCR/听译共用；搬完 activeDir 即显新位置

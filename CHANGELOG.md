@@ -13,6 +13,7 @@
 - `config.json` 一次性清掉早期版本留下的 17 个无人读取的键（`settings.providers`、`settings.connection`、`settings.glass` 与 14 个平铺键）
 - 启动最早期的几行日志不再落到 electron-log 默认的 `main.log`，统一进 `app-日期.log`
 - **卸载改问「是否保留数据」**：保留则把 `data` 与 `models` 挪到安装目录旁的 `T-Translate-data`，重装自动认回；不保留才连旧的 `%APPDATA%` 目录一起删。静默卸载一律保留；更新沿用同一个暂存目录
+- **卸载清掉开机自启的注册表项**（`HKCU\...\Run` 下的 `electron.app.T-Translate`），不论是否保留数据；保留数据重装后，程序按原设置自动把它写回来
 
 ### 划词
 

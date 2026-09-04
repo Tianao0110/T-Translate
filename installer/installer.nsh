@@ -86,6 +86,13 @@
   ${if} ${isUpdated}
     !insertmacro parkUserFolders
   ${else}
+    ; The start-with-Windows entry the app writes through setLoginItemSettings
+    ; (value name = Electron's AppUserModelId, pointing at $INSTDIR). It goes
+    ; with the program whether or not the data is kept; the app rewrites it
+    ; from the stored preference on the next start after a reinstall.
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "electron.app.T-Translate"
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run" "electron.app.T-Translate"
+
     IfSilent keepData
     StrCpy $R8 "Keep your data (settings, history, downloaded models) for a future reinstall?"
     StrCmp $LANGUAGE 2052 0 +2
