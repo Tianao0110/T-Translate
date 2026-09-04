@@ -11,6 +11,7 @@
 const { clipboard } = require('electron');
 const { simulateCtrlC } = require('./native-helper');
 const logger = require('./logger')('ClipboardCapture');
+const { normalizeCapturedText } = require('./captured-text');
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -25,18 +26,6 @@ let lastTextAt = 0;
 const CACHE_TTL = 500;
 
 const FILE_FORMAT_HINTS = ['FileNameW', 'FileContents', 'CF_HDROP', 'text/uri-list'];
-
-// PDF viewers copy typographic ligature codepoints verbatim (ﬁ ﬂ ﬀ …) — fonts
-// without those glyphs render tofu and providers see garbage. Standard Unicode
-// ligatures expand losslessly; PUA codepoints (custom ligatures like "ti") are
-// unrecoverable at the text layer and left as-is.
-const LIGATURES = { 'ﬀ': 'ff', 'ﬁ': 'fi', 'ﬂ': 'fl', 'ﬃ': 'ffi', 'ﬄ': 'ffl', 'ﬅ': 'st', 'ﬆ': 'st' };
-
-function normalizeCapturedText(text) {
-  return text
-    .replace(/[ﬀ-ﬆ]/g, (ch) => LIGATURES[ch] || ch)
-    .replace(/\u00A0/g, ' '); // NBSP → plain space (common in PDF copies)
-}
 
 function hasFileFormat(formats) {
   return (formats || []).some((f) => FILE_FORMAT_HINTS.some((h) => f.includes(h)));
