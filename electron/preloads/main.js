@@ -210,11 +210,13 @@ const electronAPI = {
       return () => ipcRenderer.removeListener("ocr:download-progress", handler);
     },
   },
-  // Model storage: where packs live, and the one-time move out of userData.
+  // Storage: where data and packs live, the one-time move of packs out of
+  // the old userData, and clearing that old folder once it is empty.
   models: {
     storageInfo: () => ipcRenderer.invoke("models:storage-info"),
     migrate: () => ipcRenderer.invoke("models:migrate"),
-    openFolder: () => ipcRenderer.invoke("models:open-folder"),
+    openFolder: (which) => ipcRenderer.invoke("models:open-folder", which),
+    cleanLegacy: () => ipcRenderer.invoke("models:clean-legacy"),
     onMigrateProgress: (callback) => {
       const handler = (event, data) => callback(data);
       ipcRenderer.on("models:migrate-progress", handler);

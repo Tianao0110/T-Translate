@@ -12,8 +12,8 @@
 // downloads land in the active root.
 
 const path = require('path');
-const fs = require('fs');
 const { app } = require('electron');
+const { isWritable, legacyUserData } = require('./app-paths');
 const logger = require('./logger')('ModelRoot');
 
 let _cached = null;
@@ -26,16 +26,10 @@ function userDataDir() {
   return app.getPath('userData');
 }
 
-function isWritable(dir) {
-  try {
-    fs.mkdirSync(dir, { recursive: true });
-    const probe = path.join(dir, '.write-probe');
-    fs.writeFileSync(probe, '');
-    fs.unlinkSync(probe);
-    return true;
-  } catch {
-    return false;
-  }
+// The pre-v0.4.0 location: %APPDATA%\t-translate. Since v0.4.7 userData may
+// itself have moved into the install dir, so ask app-paths where it was.
+function legacyModelsRoot() {
+  return legacyUserData() || userDataDir();
 }
 
 // Active root — where downloads are installed. Probed once per process.
@@ -58,7 +52,7 @@ function modelsRoot() {
 // unpackaged run (or a read-only install dir) yields a single entry.
 function modelRoots() {
   const primary = modelsRoot();
-  const legacy = userDataDir();
+  const legacy = legacyModelsRoot();
   return primary === legacy ? [primary] : [primary, legacy];
 }
 
@@ -76,8 +70,8 @@ function modelDirs(name) {
 // fallback (an unwritable install dir), and where an older build left them.
 function storageState() {
   const root = modelsRoot();
-  const legacyRoot = userDataDir();
-  return { root, legacyRoot, fallback: app.isPackaged && root === legacyRoot };
+  const legacyRoot = legacyModelsRoot();
+  return { root, legacyRoot, fallback: app.isPackaged && root === userDataDir() };
 }
 
-module.exports = { modelsRoot, modelRoots, modelDir, modelDirs, storageState, isWritable };
+module.exports = { modelsRoot, modelRoots, modelDir, modelDirs, storageState };

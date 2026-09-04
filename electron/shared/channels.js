@@ -123,6 +123,7 @@ const CHANNELS = {
     MIGRATE: 'models:migrate',
     MIGRATE_PROGRESS: 'models:migrate-progress',
     OPEN_FOLDER: 'models:open-folder',
+    CLEAN_LEGACY: 'models:clean-legacy',
   },
   MENU: {
     ACTION: 'menu-action',

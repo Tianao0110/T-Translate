@@ -36,18 +36,39 @@
   !insertmacro writeContextMenuFor ".docx"
   !insertmacro writeContextMenuFor ".txt"
 
-  ; Put back the models folder that an update's silent uninstall stashed next
-  ; to the install dir (see customUnInstall for why).
-  IfFileExists "$INSTDIR\..\t-translate-models\*.*" 0 noStashedModels
+  ; Bring back what customUnInstall parked beside the install dir — during an
+  ; update, or when the user chose to keep their data on uninstall.
+  IfFileExists "$INSTDIR\..\T-Translate-data\models\*.*" 0 +3
+    RMDir /r "$INSTDIR\models"
+    Rename "$INSTDIR\..\T-Translate-data\models" "$INSTDIR\models"
+  IfFileExists "$INSTDIR\..\T-Translate-data\data\*.*" 0 +3
+    RMDir /r "$INSTDIR\data"
+    Rename "$INSTDIR\..\T-Translate-data\data" "$INSTDIR\data"
+  RMDir "$INSTDIR\..\T-Translate-data"
+
+  ; Pre-v0.4.7 uninstallers stashed under these two names. The data one is
+  ; the same folder as above on a case-insensitive disk, so it is only
+  ; looked at after that folder has been emptied.
+  IfFileExists "$INSTDIR\..\t-translate-models\*.*" 0 +3
     RMDir /r "$INSTDIR\models"
     Rename "$INSTDIR\..\t-translate-models" "$INSTDIR\models"
-  noStashedModels:
-
-  ; Same for the data folder (translation cache, session logs — v0.4.6).
-  IfFileExists "$INSTDIR\..\t-translate-data\*.*" 0 noStashedData
+  IfFileExists "$INSTDIR\..\t-translate-data\*.*" 0 +3
     RMDir /r "$INSTDIR\data"
     Rename "$INSTDIR\..\t-translate-data" "$INSTDIR\data"
-  noStashedData:
+!macroend
+
+; Park the two user folders beside the install dir so electron-builder's
+; closing `RMDir /r $INSTDIR` does not take them; customInstall of the next
+; version (or a later reinstall) moves them back.
+!macro parkUserFolders
+  IfFileExists "$INSTDIR\models\*.*" 0 +4
+    CreateDirectory "$INSTDIR\..\T-Translate-data"
+    RMDir /r "$INSTDIR\..\T-Translate-data\models"
+    Rename "$INSTDIR\models" "$INSTDIR\..\T-Translate-data\models"
+  IfFileExists "$INSTDIR\data\*.*" 0 +4
+    CreateDirectory "$INSTDIR\..\T-Translate-data"
+    RMDir /r "$INSTDIR\..\T-Translate-data\data"
+    Rename "$INSTDIR\data" "$INSTDIR\..\T-Translate-data\data"
 !macroend
 
 !macro customUnInstall
@@ -55,33 +76,26 @@
   !insertmacro removeContextMenuFor ".docx"
   !insertmacro removeContextMenuFor ".txt"
 
-  ; Downloaded models live in $INSTDIR\models (v0.4.0 moved them off the system
-  ; drive — a program installed on D: keeps its 300 MB packs there). But
-  ; electron-builder's uninstaller ends with `RMDir /r $INSTDIR`, and it runs
-  ; that during UPDATES too, so stash the folder beside the install dir first;
-  ; customInstall moves it back. A real uninstall skips the stash on purpose:
-  ; the models are part of the program folder and go with it.
+  ; Since v0.4.7 everything the user owns sits in the install dir: settings,
+  ; history and cache in $INSTDIR\data, downloaded packs in $INSTDIR\models.
+  ; electron-builder's uninstaller ends with `RMDir /r $INSTDIR` and runs
+  ; that during UPDATES too, so an update always parks both folders beside
+  ; the install dir. A real uninstall asks; keeping is the default, and a
+  ; silent uninstall keeps as well — data loss must be an explicit choice.
+  ; Declining also clears the pre-v0.4.7 %APPDATA% folder and the updater cache.
   ${if} ${isUpdated}
-    IfFileExists "$INSTDIR\models\*.*" 0 noModelsToStash
-      RMDir /r "$INSTDIR\..\t-translate-models"
-      Rename "$INSTDIR\models" "$INSTDIR\..\t-translate-models"
-    noModelsToStash:
-    IfFileExists "$INSTDIR\data\*.*" 0 noDataToStash
-      RMDir /r "$INSTDIR\..\t-translate-data"
-      Rename "$INSTDIR\data" "$INSTDIR\..\t-translate-data"
-    noDataToStash:
+    !insertmacro parkUserFolders
+  ${else}
+    IfSilent keepData
+    StrCpy $R8 "Keep your data (settings, history, downloaded models) for a future reinstall?"
+    StrCmp $LANGUAGE 2052 0 +2
+      StrCpy $R8 "保留数据（设置、历史记录、已下载的模型）以便日后重装？"
+    MessageBox MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON1 "$R8" IDYES keepData
+      RMDir /r "$APPDATA\t-translate"
+      RMDir /r "$LOCALAPPDATA\t-translate-updater"
+      Goto dataDone
+    keepData:
+      !insertmacro parkUserFolders
+    dataDone:
   ${endif}
-
-  ; Optional user-data cleanup — settings, history vault and logs live under
-  ; %APPDATA%\t-translate (Electron userData derives from package.json "name").
-  ; Silent uninstalls (including any update-driven flow) never delete: data
-  ; loss must always be an explicit human choice.
-  IfSilent skipDataDelete
-  StrCpy $R8 "Also delete all user data (settings, history, cache)?"
-  StrCmp $LANGUAGE 2052 0 +2
-    StrCpy $R8 "同时删除全部用户数据（设置、历史记录、缓存）？"
-  MessageBox MB_YESNO|MB_ICONQUESTION "$R8" IDNO skipDataDelete
-    RMDir /r "$APPDATA\t-translate"
-    RMDir /r "$LOCALAPPDATA\t-translate-updater"
-  skipDataDelete:
 !macroend

@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { GitBranch, RefreshCw, FolderOpen, Download, X, Loader2, CheckCircle, AlertCircle, ExternalLink, Rocket, Cpu, Heart, PartyPopper, Package, HardDrive } from 'lucide-react';
+import { GitBranch, RefreshCw, FolderOpen, Download, X, Loader2, CheckCircle, AlertCircle, ExternalLink, Rocket, Cpu, Heart, PartyPopper, Package, HardDrive, Trash2 } from 'lucide-react';
+import { useConfirm } from '../../shared/ConfirmDialog.jsx';
 import appIcon from '/icon.png';
 
 const UPDATE_STAGE = {
@@ -29,6 +30,8 @@ const AboutSection = ({ notify, resetSettings }) => {
   // left in userData. Refreshed after a move so the card reflects it.
   const [storage, setStorage] = useState(null);
   const [migrate, setMigrate] = useState({ state: 'idle', progress: null, error: '' });
+  const [clean, setClean] = useState({ state: 'idle', error: '' });
+  const [confirm, confirmDialog] = useConfirm();
 
   const loadStorage = useCallback(async () => {
     try {
@@ -55,6 +58,18 @@ const AboutSection = ({ notify, resetSettings }) => {
     } else {
       setMigrate({ state: 'failed', progress: null, error: result?.error || '' });
     }
+    loadStorage();
+  };
+
+  // Packs still in the old folder come first: the clear button only shows
+  // once they are moved, so 700 MB of models never go with a single click.
+  const showMovePacks = Boolean(storage && storage.legacyPacks > 0 && !storage.fallback);
+
+  const cleanLegacy = async () => {
+    if (!(await confirm(t('about.storage.cleanConfirm', { path: storage.legacyDataRoot })))) return;
+    setClean({ state: 'running', error: '' });
+    const result = await window.electron?.models?.cleanLegacy?.();
+    setClean(result?.success ? { state: 'done', error: '' } : { state: 'failed', error: result?.error || '' });
     loadStorage();
   };
 
@@ -403,30 +418,57 @@ const AboutSection = ({ notify, resetSettings }) => {
         <div className="info-card storage-card">
           <h4><HardDrive size={16} /> {t('about.storage.title')}</h4>
           <div className="storage-grid">
+            <span className="storage-label">{t('about.storage.dataDir')}</span>
+            <span className="storage-value">
+              <span className={`engine-badge ${storage.dataFallback ? 'unavailable' : 'installed'}`}>
+                {storage.dataFallback ? t('about.storage.inUserDir') : t('about.storage.inProgramDir')}
+              </span>
+              <span className="storage-path" title={storage.dataRoot}>{storage.dataRoot}</span>
+              <button className="link-button" onClick={() => window.electron?.models?.openFolder?.('data')}>
+                <FolderOpen size={14} /> {t('about.storage.openFolder')}
+              </button>
+            </span>
             <span className="storage-label">{t('about.storage.modelsDir')}</span>
             <span className="storage-value">
               <span className={`engine-badge ${storage.fallback ? 'unavailable' : 'installed'}`}>
                 {storage.fallback ? t('about.storage.inUserDir') : t('about.storage.inProgramDir')}
               </span>
               <span className="storage-path" title={storage.root}>{storage.root}</span>
-              <button className="link-button" onClick={() => window.electron?.models?.openFolder?.()}>
+              <button className="link-button" onClick={() => window.electron?.models?.openFolder?.('models')}>
                 <FolderOpen size={14} /> {t('about.storage.openFolder')}
               </button>
             </span>
-            {storage.legacyPacks > 0 && !storage.fallback && (
+            {(showMovePacks || storage.legacyDataRoot) && (
               <>
                 <span className="storage-label">{t('about.storage.legacyLabel')}</span>
                 <span className="storage-value">
-                  <span>{t('about.storage.legacyFound', { count: storage.legacyPacks, size: formatSize(storage.legacyBytes) })}</span>
-                  <button
-                    className="link-button"
-                    disabled={migrate.state === 'running'}
-                    onClick={moveModels}
-                  >
-                    {migrate.state === 'running'
-                      ? <><RefreshCw size={14} className="spinning" /> {t('about.storage.moving')}</>
-                      : <><HardDrive size={14} /> {t('about.storage.moveButton')}</>}
-                  </button>
+                  {showMovePacks ? (
+                    <>
+                      <span>{t('about.storage.legacyFound', { count: storage.legacyPacks, size: formatSize(storage.legacyBytes) })}</span>
+                      <button
+                        className="link-button"
+                        disabled={migrate.state === 'running'}
+                        onClick={moveModels}
+                      >
+                        {migrate.state === 'running'
+                          ? <><RefreshCw size={14} className="spinning" /> {t('about.storage.moving')}</>
+                          : <><HardDrive size={14} /> {t('about.storage.moveButton')}</>}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="storage-path" title={storage.legacyDataRoot}>{storage.legacyDataRoot}</span>
+                      <button
+                        className="link-button"
+                        disabled={clean.state === 'running'}
+                        onClick={cleanLegacy}
+                      >
+                        {clean.state === 'running'
+                          ? <><RefreshCw size={14} className="spinning" /> {t('about.storage.cleaning')}</>
+                          : <><Trash2 size={14} /> {t('about.storage.cleanButton')}</>}
+                      </button>
+                    </>
+                  )}
                 </span>
               </>
             )}
@@ -441,8 +483,11 @@ const AboutSection = ({ notify, resetSettings }) => {
           )}
           {migrate.state === 'done' && <p className="storage-note">{t('about.storage.moved')}</p>}
           {migrate.state === 'failed' && <p className="storage-note error">{t('about.storage.moveFailed', { error: migrate.error })}</p>}
+          {clean.state === 'done' && <p className="storage-note">{t('about.storage.cleaned')}</p>}
+          {clean.state === 'failed' && <p className="storage-note error">{t('about.storage.cleanFailed', { error: clean.error })}</p>}
         </div>
       )}
+      {confirmDialog}
       <div className="about-actions">
         <button className="link-button" onClick={openGitHub}>
           <GitBranch size={16}/> GitHub

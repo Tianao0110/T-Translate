@@ -10,12 +10,12 @@ const {
 } = require('electron');
 const path = require('path');
 
-// Dev/QA userData sandbox. MUST run before require('./state') — state.js
-// constructs electron-store at module top, freezing the path (the same
-// require-order trap the portable-mode evaluation pinned down).
-if (process.env.TT_USERDATA) {
-  app.setPath('userData', path.resolve(process.env.TT_USERDATA));
-}
+// Where everything on disk goes. MUST run before require('./state') —
+// state.js constructs electron-store at module top, freezing the path (the
+// same require-order trap the portable-mode evaluation pinned down).
+// TT_USERDATA is the dev/QA sandbox override.
+const { applyAppPaths } = require('./utils/app-paths');
+const appPaths = applyAppPaths(app, { override: process.env.TT_USERDATA });
 
 const { store, runtime, windows, isDev } = require('./state');
 const { CHANNELS } = require('./shared/channels');
@@ -28,6 +28,8 @@ const { SelectionStateMachine, STATES, CONFIG: FSM_CONFIG } = require('./utils/s
 
 let selectionStateMachine = null;
 const logger = require('./utils/logger')('Main');
+logger.info(`userData: ${appPaths.userData}${appPaths.relocated ? ` (was ${appPaths.legacyUserData})` : ''}`);
+for (const note of appPaths.notes) logger.info(`[app-paths] ${note}`);
 
 const { createCrashGuard, SAFE_MODE_THRESHOLD } = require('./utils/crash-guard');
 const { extractOpenableFile } = require('./utils/open-with');

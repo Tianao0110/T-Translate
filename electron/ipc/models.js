@@ -1,42 +1,72 @@
-// Model storage IPC: where packs live, and the one-time move of packs an older
-// build left in userData. Engines hold model files open, so a move first
-// stops the listen session, releases the voice and drops OCR sessions.
+// Storage IPC: where app data and model packs live, the one-time move of
+// packs an older build left in userData, and clearing that old userData
+// folder once a relocated install has carried everything over. Engines hold
+// model files open, so both the move and the clear first stop the listen
+// session, release the voice and drop OCR sessions.
 
-const { ipcMain, shell } = require('electron');
+const fs = require('fs');
+const path = require('path');
+const { ipcMain, shell, app } = require('electron');
 const { CHANNELS } = require('../shared/channels');
 const logger = require('../utils/logger')('IPC:Models');
 const modelRoot = require('../utils/model-root');
 const { scanLegacy, migrateLegacy } = require('../utils/model-migrate');
+const { legacyUserData, isRelocated } = require('../utils/app-paths');
+const { dataRoot } = require('../utils/data-root');
 const audioEngine = require('../managers/audio-engine-manager');
 const ocrEngine = require('../utils/ocr-engine');
 
-let migrating = false;
+let busy = false;
+
+// The old %APPDATA% folder is offered for cleanup only when userData really
+// moved away from it and it still exists.
+function legacyDataRoot() {
+  const legacy = legacyUserData();
+  if (!isRelocated() || !legacy) return null;
+  try {
+    return fs.statSync(legacy).isDirectory() ? legacy : null;
+  } catch {
+    return null;
+  }
+}
+
+function isInside(parent, child) {
+  const rel = path.relative(parent, child);
+  return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+}
+
+async function releaseModelFiles(reason) {
+  await audioEngine.stopSessionAndWait(reason);
+  await audioEngine.unloadTtsAndWait(reason);
+  ocrEngine.evictSessions();
+}
 
 function register() {
   ipcMain.handle(CHANNELS.MODELS.STORAGE_INFO, async () => {
     const state = modelRoot.storageState();
     const legacy = scanLegacy({ legacyRoot: state.legacyRoot, activeRoot: state.root });
     return {
+      dataRoot: dataRoot(),
+      dataFallback: app.isPackaged && !isRelocated(),
       root: state.root,
       fallback: state.fallback,
       legacyRoot: state.legacyRoot,
       legacyPacks: legacy.packs.length,
       legacyBytes: legacy.bytes,
-      migrating,
+      legacyDataRoot: legacyDataRoot(),
+      busy,
     };
   });
 
   ipcMain.handle(CHANNELS.MODELS.MIGRATE, async (event) => {
-    if (migrating) return { success: false, error: 'busy' };
+    if (busy) return { success: false, error: 'busy' };
     const state = modelRoot.storageState();
     if (state.fallback || state.legacyRoot === state.root) {
       return { success: false, error: 'no-target' };
     }
-    migrating = true;
+    busy = true;
     try {
-      await audioEngine.stopSessionAndWait('migrate');
-      await audioEngine.unloadTtsAndWait('migrate');
-      ocrEngine.evictSessions();
+      await releaseModelFiles('migrate');
       const result = await migrateLegacy({
         legacyRoot: state.legacyRoot,
         activeRoot: state.root,
@@ -50,13 +80,41 @@ function register() {
       logger.error('model migration failed:', e);
       return { success: false, error: e.message };
     } finally {
-      migrating = false;
+      busy = false;
     }
   });
 
-  ipcMain.handle(CHANNELS.MODELS.OPEN_FOLDER, async () => {
-    const { root } = modelRoot.storageState();
-    const error = await shell.openPath(root);
+  // Deletes the pre-v0.4.7 userData folder. Refused while it still holds
+  // model packs (move them first — 700 MB is not something to drop by
+  // accident) and, belt and braces, if it is the live folder or a parent.
+  ipcMain.handle(CHANNELS.MODELS.CLEAN_LEGACY, async () => {
+    if (busy) return { success: false, error: 'busy' };
+    const legacy = legacyDataRoot();
+    if (!legacy) return { success: false, error: 'no-legacy' };
+    if (isInside(legacy, dataRoot()) || isInside(legacy, modelRoot.modelsRoot())) {
+      return { success: false, error: 'live' };
+    }
+    const state = modelRoot.storageState();
+    if (scanLegacy({ legacyRoot: legacy, activeRoot: state.root }).packs.length > 0) {
+      return { success: false, error: 'packs' };
+    }
+    busy = true;
+    try {
+      await releaseModelFiles('clean-legacy');
+      await fs.promises.rm(legacy, { recursive: true, force: true });
+      logger.info(`old user data folder removed: ${legacy}`);
+      return { success: true };
+    } catch (e) {
+      logger.error('old user data cleanup failed:', e);
+      return { success: false, error: e.message };
+    } finally {
+      busy = false;
+    }
+  });
+
+  ipcMain.handle(CHANNELS.MODELS.OPEN_FOLDER, async (_event, which) => {
+    const target = which === 'data' ? dataRoot() : modelRoot.storageState().root;
+    const error = await shell.openPath(target);
     return error ? { success: false, error } : { success: true };
   });
 
