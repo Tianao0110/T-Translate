@@ -128,7 +128,7 @@ v0.3.4 给 Windows OCR / Azure / Google Vision / OCR.space / 百度 五个引擎
 
 **分步节奏（每步独立可 ship）**：
 
-**进度（2026-09-03，v0.4.6）**：第一步、第二步已落地——模型一键搬迁 + 回退明示（设置 → 关于「存储」卡）；翻译缓存与听译会话日志改走 `data-root`（安装目录 `data`，旧缓存首启带过来一次）；更新 stash 护栏已扩到 `data`（契约①按扩围落地）。文档进度是 Chromium 存储，随第三步。**剩第三步**（整体 setPath 切换 + 契约②卸载语义）。
+**进度（2026-09-03，v0.4.7）**：三步全部落地。第三步=[app-paths.js](electron/utils/app-paths.js) 在 `require('./state')` 之前 `setPath('userData', 安装目录\data)` + `sessionData → data\browser`（实测 Chromium 全部文件含 DIPS/GPUCache 都跟着 sessionData 走，顶层干净）；首启从 `%APPDATA%\t-translate` 复制 config/保险库/缓存/Local Storage，旧目录保留，关于页「清理旧数据」按钮删（旧目录还有模型包时拒绝）；不可写/开发态原地整理（Chromium 条目 rename 进 browser）。契约②拍板=卸载询问保留，保留则挪到安装目录旁 `T-Translate-data\{data,models}`，重装认回；更新暂存合用同一目录（旧名 `t-translate-models`/`t-translate-data` 仍认，因大小写不敏感与新目录同名，只在新目录清空后再看）。**仍欠**：开机自启的 `HKCU\...\Run` 项卸载不清；保留后换目录重装认不回。
 
 - v0.4.x 第一步=模型归位收尾（本体已在安装目录，补存量）：
   - 老 userData 模型一键搬迁：设置页检测旧根有模型→提示+「移到程序目录」按钮，带进度跨盘复制+删，OCR/听译共用；搬完 activeDir 即显新位置

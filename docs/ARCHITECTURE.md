@@ -253,8 +253,9 @@ electron/utils/open-with.js     右键菜单 argv 解析（.pdf/.docx/.txt 白�
 electron/managers/audio-engine-manager.js  音频 utilityProcess 的唯一持有者（ASR 会话 + 神经 TTS）
 electron/services/audio-engine/audio-worker.js  识别模型、音频捕获、语音合成都在这个子进程里
 electron/utils/win-audio-capture.js        WASAPI 捕获（koffi，v0.4.1）
+electron/utils/app-paths.js                启动最早期定 userData（安装目录 data，不可写则留用户目录）、Chromium 存储收进 browser、一次性搬迁（v0.4.7）
 electron/utils/model-root.js               模型根目录解析（安装目录优先）
-electron/utils/data-root.js                轻量数据根目录（安装目录 data 优先；翻译缓存、听译会话日志）
+electron/utils/data-root.js                数据根目录 = userData（翻译缓存、日志等非模型文件）
 electron/utils/model-migrate.js            老用户目录模型搬迁（复制、校验、再删）
 electron/utils/audio-pack-manager.js       识别模型包下载/卸载（工厂第二实例，asr-models）
 electron/utils/tts-pack-manager.js         语音包下载/卸载（工厂第三实例，tts-models，v0.4.2）

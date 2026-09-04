@@ -7,13 +7,13 @@
 | 安装包内置 | 基础包 base-v6（PP-OCRv6 small det + 简繁英日及 46 拉丁语系 rec + 字典，下载 ~25MB / 落盘 ~31MB） | 随安装包分发，开箱即用 |
 | 应用内下载 | 高精度包 base-v6-hq（PP-OCRv6 medium det + rec，下载 ~95MB / 落盘 ~139MB） | 设置 → OCR → 模型档位 选「高精度」，切换即时生效、切回不删包 |
 | 应用内下载 | 语言包（韩/西里尔/天城文/阿拉伯，各 ~8MB；拉丁包已被 base-v6 吸收退役） | 用户在 设置 → OCR → 语言包 按需下载 |
-| 应用内修复 | 基础包重新下载到 userData | 内置模型损坏 / 缺失时 |
+| 应用内修复 | 基础包重新下载到模型目录 | 内置模型损坏 / 缺失时 |
 
 ## 运行时目录
 
 - 内置基础包：`<resources>/resources/ocr/base/`（打包产物；开发时为 `resources/ocr/base/`，gitignored）
 - 下载的包：`<安装目录>/models/ocr-models/<packId>/`，每包一个目录 = 模型文件 + `pack.json`。放安装目录是为了让模型跟着程序所在磁盘走，不再撑大系统盘；安装目录不可写（Program Files 无管理员）或开发模式下回退到 `%APPDATA%/t-translate/ocr-models/`
-- 解析顺序：安装目录副本 > userData 副本（v0.4.0 之前下载的包留在原地照常可用）> 内置副本（基础包）
+- 解析顺序：安装目录副本 > 旧用户目录副本（`%APPDATA%\t-translate`，v0.4.0 之前下载的包留在原地照常可用）> 内置副本（基础包）
 - 卸载语言包 = 整目录删除，不留任何文件
 
 ## GitHub `ocr-models` Release（语言包分发源）
