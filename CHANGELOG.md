@@ -8,6 +8,10 @@
 
 - **全部数据归位到程序目录**：设置、历史记录、翻译缓存、日志统一放在安装目录的 `data`，Chromium 自管的存储收进 `data\browser`；模型仍在 `models`。首次启动自动把旧的 `%APPDATA%\t-translate` 里的设置、历史和缓存带过来，旧目录原样保留，设置 → 关于「存储」卡新增「数据目录」一行和「清理旧数据」按钮（旧目录还有模型包时先出「移到程序目录」）
 - 安装目录不可写时数据仍在用户目录，同样把 Chromium 存储收进 `browser` 子目录，v0.4.6 临时的 `data` 子目录取消
+- 搬迁同时带上 Chromium 的 `Local State`：Windows 上 `safeStorage` 的密钥存在这个文件里，缺了它历史保险库和已存密钥在新目录全解不开
+- Electron 每次启动都会重建一个空的 `%APPDATA%\t-translate`，空目录不再被当作待清理的旧数据
+- `config.json` 一次性清掉早期版本留下的 17 个无人读取的键（`settings.providers`、`settings.connection`、`settings.glass` 与 14 个平铺键）
+- 启动最早期的几行日志不再落到 electron-log 默认的 `main.log`，统一进 `app-日期.log`
 - **卸载改问「是否保留数据」**：保留则把 `data` 与 `models` 挪到安装目录旁的 `T-Translate-data`，重装自动认回；不保留才连旧的 `%APPDATA%` 目录一起删。静默卸载一律保留；更新沿用同一个暂存目录
 
 ### 划词
