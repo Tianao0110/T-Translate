@@ -26,10 +26,12 @@ afterEach(() => {
 });
 
 describe('dataRoot', () => {
-  it('falls back to userData when not packaged', () => {
+  it('falls back to a data folder inside userData when not packaged', () => {
     const { dataRoot, dataDir } = createDataRoot({ app: fakeApp(base, false), logger: quiet });
-    expect(dataRoot()).toBe(path.join(base, 'userData'));
-    expect(dataDir('logs')).toBe(path.join(base, 'userData', 'logs'));
+    // Not bare userData: Chromium keeps its own Cache/ there, and on a
+    // case-insensitive disk our cache/ would land inside it.
+    expect(dataRoot()).toBe(path.join(base, 'userData', 'data'));
+    expect(dataDir('logs')).toBe(path.join(base, 'userData', 'data', 'logs'));
   });
 
   it('uses a data folder beside the executable when packaged and writable', () => {

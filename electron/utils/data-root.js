@@ -2,7 +2,9 @@
 // and listen session logs today, everything else when the userData move
 // completes. Same rule as model-root: a `data` folder inside the install
 // directory when it is writable, userData otherwise (a Program Files install
-// without admin rights, or a dev run). Probed once per process.
+// without admin rights, or a dev run). The fallback is userData/data rather
+// than userData itself: Chromium keeps its own Cache/ folder there, and on
+// a case-insensitive disk our cache/ would land inside it. Probed once.
 //
 // A factory plus a default instance: under vitest a CJS require('electron')
 // reaches the real package (the alias only covers ESM imports), so the test
@@ -29,7 +31,7 @@ function createDataRoot({ app, fs = nodeFs, logger = require('./logger')('DataRo
       }
       logger.warn(`Install dir not writable, data stays in userData: ${dir}`);
     }
-    _cached = userDataDir();
+    _cached = path.join(userDataDir(), 'data');
     return _cached;
   }
 

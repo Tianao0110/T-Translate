@@ -177,6 +177,18 @@ function sessionLogPath() {
   } catch {
     // appendable dir already exists in every normal run
   }
+  // v0.4.6 moved these under data-root; the ones an older build left in
+  // userData/logs are never pruned by the cap below, so clear them here.
+  const legacyDir = path.join(app.getPath('userData'), 'logs');
+  if (legacyDir !== logsDir) {
+    try {
+      for (const f of fs.readdirSync(legacyDir)) {
+        if (f.startsWith('audio-probe-') && f.endsWith('.jsonl')) fs.unlinkSync(path.join(legacyDir, f));
+      }
+    } catch {
+      // nothing there
+    }
+  }
   // Timestamp-named files sort chronologically — prune oldest beyond the cap.
   try {
     const old = fs

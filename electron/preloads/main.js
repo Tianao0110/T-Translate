@@ -214,6 +214,7 @@ const electronAPI = {
   models: {
     storageInfo: () => ipcRenderer.invoke("models:storage-info"),
     migrate: () => ipcRenderer.invoke("models:migrate"),
+    openFolder: () => ipcRenderer.invoke("models:open-folder"),
     onMigrateProgress: (callback) => {
       const handler = (event, data) => callback(data);
       ipcRenderer.on("models:migrate-progress", handler);

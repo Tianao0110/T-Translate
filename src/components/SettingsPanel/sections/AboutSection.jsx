@@ -402,29 +402,35 @@ const AboutSection = ({ notify, resetSettings }) => {
       {storage && (
         <div className="info-card storage-card">
           <h4><HardDrive size={16} /> {t('about.storage.title')}</h4>
-          <div className="storage-row">
+          <div className="storage-grid">
             <span className="storage-label">{t('about.storage.modelsDir')}</span>
-            <span className={`engine-badge ${storage.fallback ? 'unavailable' : 'installed'}`}>
-              {storage.fallback ? t('about.storage.inUserDir') : t('about.storage.inProgramDir')}
-            </span>
-            <span className="storage-path" title={storage.root}>{storage.root}</span>
-          </div>
-          {storage.legacyPacks > 0 && !storage.fallback && (
-            <div className="storage-row">
-              <span className="storage-legacy">
-                {t('about.storage.legacyFound', { count: storage.legacyPacks, size: formatSize(storage.legacyBytes) })}
+            <span className="storage-value">
+              <span className={`engine-badge ${storage.fallback ? 'unavailable' : 'installed'}`}>
+                {storage.fallback ? t('about.storage.inUserDir') : t('about.storage.inProgramDir')}
               </span>
-              <button
-                className="btn-small download"
-                disabled={migrate.state === 'running'}
-                onClick={moveModels}
-              >
-                {migrate.state === 'running'
-                  ? <><RefreshCw size={12} className="spinning" /> {t('about.storage.moving')}</>
-                  : t('about.storage.moveButton')}
+              <span className="storage-path" title={storage.root}>{storage.root}</span>
+              <button className="link-button" onClick={() => window.electron?.models?.openFolder?.()}>
+                <FolderOpen size={14} /> {t('about.storage.openFolder')}
               </button>
-            </div>
-          )}
+            </span>
+            {storage.legacyPacks > 0 && !storage.fallback && (
+              <>
+                <span className="storage-label">{t('about.storage.legacyLabel')}</span>
+                <span className="storage-value">
+                  <span>{t('about.storage.legacyFound', { count: storage.legacyPacks, size: formatSize(storage.legacyBytes) })}</span>
+                  <button
+                    className="link-button"
+                    disabled={migrate.state === 'running'}
+                    onClick={moveModels}
+                  >
+                    {migrate.state === 'running'
+                      ? <><RefreshCw size={14} className="spinning" /> {t('about.storage.moving')}</>
+                      : <><HardDrive size={14} /> {t('about.storage.moveButton')}</>}
+                  </button>
+                </span>
+              </>
+            )}
+          </div>
           {migrate.state === 'running' && migrate.progress && (
             <div className="engine-download-progress">
               <div className="download-progress-bar">
@@ -437,7 +443,6 @@ const AboutSection = ({ notify, resetSettings }) => {
           {migrate.state === 'failed' && <p className="storage-note error">{t('about.storage.moveFailed', { error: migrate.error })}</p>}
         </div>
       )}
-
       <div className="about-actions">
         <button className="link-button" onClick={openGitHub}>
           <GitBranch size={16}/> GitHub

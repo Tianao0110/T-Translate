@@ -2,7 +2,7 @@
 // build left in userData. Engines hold model files open, so a move first
 // stops the listen session, releases the voice and drops OCR sessions.
 
-const { ipcMain } = require('electron');
+const { ipcMain, shell } = require('electron');
 const { CHANNELS } = require('../shared/channels');
 const logger = require('../utils/logger')('IPC:Models');
 const modelRoot = require('../utils/model-root');
@@ -52,6 +52,12 @@ function register() {
     } finally {
       migrating = false;
     }
+  });
+
+  ipcMain.handle(CHANNELS.MODELS.OPEN_FOLDER, async () => {
+    const { root } = modelRoot.storageState();
+    const error = await shell.openPath(root);
+    return error ? { success: false, error } : { success: true };
   });
 
   logger.info('Models IPC handlers registered');

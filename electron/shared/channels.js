@@ -122,6 +122,7 @@ const CHANNELS = {
     STORAGE_INFO: 'models:storage-info',
     MIGRATE: 'models:migrate',
     MIGRATE_PROGRESS: 'models:migrate-progress',
+    OPEN_FOLDER: 'models:open-folder',
   },
   MENU: {
     ACTION: 'menu-action',

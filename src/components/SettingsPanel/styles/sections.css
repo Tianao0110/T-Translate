@@ -765,24 +765,28 @@
 /* ==================== 关于页：存储卡 ==================== */
 .storage-card {
   margin: 0 0 24px 0;
+  text-align: left;
 }
 
-.storage-row {
-  display: flex;
+.storage-grid {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 12px 16px;
   align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
   font-size: 12px;
   color: var(--text-secondary);
-}
-
-.storage-row + .storage-row {
-  margin-top: 10px;
 }
 
 .storage-label {
   color: var(--text-primary);
   font-weight: 600;
+}
+
+.storage-value {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
 }
 
 .storage-path {
@@ -795,13 +799,31 @@
   flex: 1;
 }
 
-.storage-legacy {
+.storage-value > span:first-child + span:not(.storage-path) {
   flex: 1;
   min-width: 0;
 }
 
+.storage-card .link-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.storage-card .link-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .storage-card .engine-download-progress {
-  margin-top: 10px;
+  margin-top: 12px;
 }
 
 .storage-note {
