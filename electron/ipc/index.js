@@ -17,6 +17,7 @@ const registerOcrIPC = require('./ocr');
 const registerPrivacyIPC = require('./privacy');
 const registerAudioEngineIPC = require('./audio-engine');
 const registerModelsIPC = require('./models');
+const registerGpuIPC = require('./gpu');
 const { registerThemeIPC } = require('./theme');
 
 /**
@@ -84,6 +85,7 @@ function initIPC(deps) {
   registerPrivacyIPC(context);
   registerAudioEngineIPC(context);
   registerModelsIPC(context);
+  registerGpuIPC(context);
 
   registerThemeIPC({ store: deps.store, logger });
 

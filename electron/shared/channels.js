@@ -125,6 +125,12 @@ const CHANNELS = {
     OPEN_FOLDER: 'models:open-folder',
     CLEAN_LEGACY: 'models:clean-legacy',
   },
+  // GPU acceleration switch (v0.4.9): one setting, main process applies it
+  // to every engine that can take it (local OCR for now).
+  GPU: {
+    STATUS: 'gpu:status',
+    SET_ENABLED: 'gpu:set-enabled',
+  },
   MENU: {
     ACTION: 'menu-action',
     IMPORT_FILE: 'import-file',

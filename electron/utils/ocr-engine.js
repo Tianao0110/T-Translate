@@ -233,10 +233,17 @@ async function hostStatus() {
   return host().health({ packId: BASE_PACK_ID, models: resolveModels(BASE_PACK_ID) });
 }
 
+// 'dml' | 'cpu'. Takes effect on the next session build; a running host
+// drops its cached sessions so the switch is live without a restart.
+function setProvider(provider) {
+  host().setProvider(provider);
+}
+
 module.exports = {
   recognize,
   healthCheck,
   hostStatus,
+  setProvider,
   prewarm,
   evictSessions,
   setModelTier,

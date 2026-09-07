@@ -223,6 +223,12 @@ const electronAPI = {
       return () => ipcRenderer.removeListener("models:migrate-progress", handler);
     },
   },
+  // GPU acceleration: one switch, the main process decides which engines
+  // take it and self-tests before it sticks.
+  gpu: {
+    status: () => ipcRenderer.invoke("gpu:status"),
+    setEnabled: (enabled) => ipcRenderer.invoke("gpu:set-enabled", enabled),
+  },
   // Listen-mode model packs. Pack management only: capture and session
   // control belong to the floating window's preload, not this one.
   audioPacks: {

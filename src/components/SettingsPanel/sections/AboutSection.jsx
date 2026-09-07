@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { GitBranch, RefreshCw, FolderOpen, Download, X, Loader2, CheckCircle, AlertCircle, ExternalLink, Rocket, Cpu, Heart, PartyPopper, Package, HardDrive, Trash2 } from 'lucide-react';
+import { GitBranch, RefreshCw, FolderOpen, Download, X, Loader2, CheckCircle, AlertCircle, ExternalLink, Rocket, Cpu, Heart, PartyPopper, Package, HardDrive, Trash2, Zap } from 'lucide-react';
 import { useConfirm } from '../../shared/ConfirmDialog.jsx';
+import { Switch } from './shared.jsx';
 import appIcon from '/icon.png';
 
 const UPDATE_STAGE = {
@@ -71,6 +72,43 @@ const AboutSection = ({ notify, resetSettings }) => {
     const result = await window.electron?.models?.cleanLegacy?.();
     setClean(result?.success ? { state: 'done', error: '' } : { state: 'failed', error: result?.error || '' });
     loadStorage();
+  };
+
+  // GPU acceleration (v0.4.9): one switch; enabling runs a self-test in the
+  // OCR host and only sticks when the GPU actually built the session. The
+  // host swaps providers live, so nothing here asks for a restart.
+  const [gpu, setGpu] = useState(null); // { enabled, engines, supported, last }
+  const [gpuBusy, setGpuBusy] = useState(false);
+  const loadGpu = useCallback(async () => {
+    try {
+      const info = await window.electron?.gpu?.status?.();
+      if (info) setGpu(info);
+    } catch {
+      // no bridge (older preload) — the card stays hidden
+    }
+  }, []);
+  useEffect(() => {
+    loadGpu();
+  }, [loadGpu]);
+
+  const toggleGpu = async (next) => {
+    if (gpuBusy) return;
+    if (next && !(await confirm(t('about.gpu.confirm')))) return;
+    setGpuBusy(true);
+    try {
+      const result = await window.electron?.gpu?.setEnabled?.(next);
+      if (result?.success) notify(t(next ? 'about.gpu.enabled' : 'about.gpu.disabled'), 'success');
+      else notify(t('about.gpu.failed', { reason: result?.error || '' }), 'warning');
+    } finally {
+      setGpuBusy(false);
+      loadGpu();
+    }
+  };
+
+  const gpuStatusText = () => {
+    if (!gpu) return '';
+    if (gpu.enabled) return gpu.last?.provider === 'dml' ? t('about.gpu.statusGpu') : t('about.gpu.statusPending');
+    return t('about.gpu.statusCpu');
   };
 
   useEffect(() => {
@@ -485,6 +523,23 @@ const AboutSection = ({ notify, resetSettings }) => {
           {migrate.state === 'failed' && <p className="storage-note error">{t('about.storage.moveFailed', { error: migrate.error })}</p>}
           {clean.state === 'done' && <p className="storage-note">{t('about.storage.cleaned')}</p>}
           {clean.state === 'failed' && <p className="storage-note error">{t('about.storage.cleanFailed', { error: clean.error })}</p>}
+        </div>
+      )}
+      {gpu?.supported && (
+        <div className="info-card storage-card">
+          <h4><Zap size={16} /> {t('about.gpu.title')}</h4>
+          <div className="storage-grid">
+            <span className="storage-label">{t('about.gpu.switchLabel')}</span>
+            <span className="storage-value">
+              <Switch checked={!!gpu.enabled} onChange={toggleGpu} disabled={gpuBusy} label="" />
+              <span className={`engine-badge ${gpu.enabled && gpu.last?.provider === 'dml' ? 'installed' : ''}`}>
+                {gpuBusy ? t('about.gpu.testing') : gpuStatusText()}
+              </span>
+            </span>
+            <span className="storage-label">{t('about.gpu.enginesLabel')}</span>
+            <span className="storage-value"><span>{t('about.gpu.engines')}</span></span>
+          </div>
+          {gpu.last?.fallback && <p className="storage-note error">{t('about.gpu.fallback', { reason: gpu.last.fallback })}</p>}
         </div>
       )}
       {confirmDialog}
