@@ -21,6 +21,11 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 - **本地翻译模型选型（v0.5.0 输入）**：腾讯 **Hy-MT2-1.8B**（2026-05-21）协议已改 **Apache-2.0**（LICENSE.txt 逐条核过，无地域/月活/商用限制），官方 GGUF，33 语含中英日韩粤印，WMT25 超微软与豆包 API，8K 上下文，支持术语/SRT/JSON 提示——下面"内置本地翻译模型"一节的"许可证硬门槛"已不成立，剩"实测速度"一个门槛。与 v0.5.0"单一通用模型"的拍板冲突，开工前重议：翻译专才 + 通才双模型，还是只用通才。轻量替补 NiuTrans LMT-60 0.6B/1.7B（Qwen3 底座，Apache-2.0，中英中心）
 - 不选：TranslateGemma（Gemma 协议、4B 起）
 
+### v0.4.9：引擎进 GPU（用户 2026-09-07 拍板；查证事实在 gstack v048-engine-landscape 与记忆 audio-translate-leads「GPU 路线事实」）
+
+**产品形态（用户定）**：设置里**一个**「用显卡加速」选项；打开时**明确列出哪些引擎会进 GPU**（Kokoro 朗读 / Qwen3-ASR 高精度档 / PP-OCR 高精度包；SenseVoice int8 与流式草稿留 CPU），确认后**重启程序**生效；关闭同样重启——除非该引擎能热切换（子进程重建即可的引擎不必重启，实现时逐引擎核实）。
+**技术路线**：后端只走 **DirectML**（一个后端通吃 N/A/I，CUDA 不分发）。①OCR：onnxruntime-node 自带 DirectML.dll，`executionProviders:['dml']`，但 OCR 现在跑主进程，上 GPU 前先搬进子进程（= v0.5.0 进程宿主提前）②听译/朗读：sherpa 官方无 DirectML 预编译，自己 cmake 编带 DirectML 的 `sherpa-onnx-c-api.dll` 替换 npm 包里的（同版本 C API，spike 验 ABI）③首次自检：固定样本比 CPU 快才生效，失败或更慢记住并回退 CPU ④设置页显示当前后端 ⑤smoke 补 GPU 路径断言。稳定性口径：GPU ≠ 更稳，价值是算力挪出 CPU；驱动崩溃靠 utilityProcess 隔离兜。
+
 ### ~~主进程内存体检+瘦身~~ 已搁置（2026-07-11 用户拍板：属过度优化，暂不做）
 
 实测形态健康：用时 ~700MB 是推理期弹性上探、闲时回落 ~200MB，非泄漏。复启条件=闲置基线持续爬升不回落、或用户侧真实反馈；届时量化数据与杠杆分析在协作记忆 memory-checkup-lead 里备着，别凭空重推
