@@ -29,7 +29,8 @@
     "check:hardcoded": "node scripts/check-hardcoded-chinese.js",
     "check:languages": "node scripts/check-languages.js",
     "check:i18n:strict": "node scripts/check-i18n.js --strict",
-    "check:all": "npm run check:constants && npm run check:languages && npm run check:i18n && npm run check:hardcoded"
+    "check:all": "npm run check:constants && npm run check:languages && npm run check:i18n && npm run check:hardcoded",
+    "smoke:ocr": "electron scripts/smoke-ocr.js"
   },
   "keywords": [
     "translation",

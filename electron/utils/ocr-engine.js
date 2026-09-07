@@ -1,39 +1,23 @@
-﻿// Local OCR engine: esearch-ocr (PaddleOCR ONNX) on onnxruntime-node.
-// Single owner of model-pack resolution, session cache, and result
-// normalization for both IPC handlers and main-process callers.
+// Local OCR engine facade. Pack resolution (roots, pack.json, tier) lives
+// here in the main process because it owns the install directories; the
+// PP-OCR runtime itself (esearch-ocr + onnxruntime-node + skia canvas) runs
+// in the OCR host utilityProcess (services/ocr-host) since v0.4.9, so a
+// native fault there — or a GPU driver fault once DirectML is on — cannot
+// take the app down. Every export keeps its pre-v0.4.9 shape.
 
 const path = require('path');
 const fs = require('fs');
 const PATHS = require('../shared/paths');
 const { modelDir, modelDirs } = require('./model-root');
 const { BASE_PACK_ID, HQ_PACK_ID, packIdForLanguage } = require('../shared/ocr-packs');
+const hostManager = require('../managers/ocr-host-manager');
 const logger = require('./logger')('OCR-Engine');
 
 // 'standard' = bundled small model; 'high' = downloaded medium variant.
 // Seeded from settings at IPC registration, updated via SET_MODEL_TIER.
 let _modelTier = 'standard';
 
-// Heavy natives (onnxruntime dll, skia) load lazily on first recognition,
-// not at app startup.
-let _env = null;
-
-// packId -> Promise<ocr instance>. Promise (not instance) so concurrent
-// callers share one in-flight init instead of double-loading models.
-const _sessions = new Map();
-const MAX_SESSIONS = 2;
-
-function ensureEnv() {
-  if (_env) return _env;
-  const esearch = require('esearch-ocr');
-  const ort = require('onnxruntime-node');
-  const canvasKit = require('@napi-rs/canvas');
-  esearch.setOCREnv({
-    canvas: (w, h) => canvasKit.createCanvas(w, h),
-    imageData: (data, w, h) => new canvasKit.ImageData(data, w, h),
-  });
-  _env = { esearch, ort, canvasKit };
-  return _env;
-}
+const host = () => hostManager.get();
 
 // Install target for new downloads (install dir when writable — see
 // model-root.js for why the packs no longer grow the system drive).
@@ -94,7 +78,7 @@ function setModelTier(tier) {
   if (next === _modelTier) return;
   _modelTier = next;
   // Base det/rec underlie every cached session — rebuild them all.
-  _sessions.clear();
+  host().evict();
   logger.info(`Model tier set to ${next}`);
 }
 
@@ -130,143 +114,39 @@ function listInstalledPacks() {
   return [...packs.values()];
 }
 
-async function createSession(packId) {
-  const { esearch, ort } = ensureEnv();
-
+// The model files a session for `packId` needs, under the current tier.
+// Throws with the same codes the old in-process loader used.
+function resolveModels(packId) {
   const baseDir = resolveBaseDir();
   if (!baseDir) {
-    const err = new Error('base models missing');
-    err.code = 'BASE_MODELS_MISSING';
-    throw err;
+    throw Object.assign(new Error('base models missing'), { code: 'BASE_MODELS_MISSING' });
   }
   const base = readPackMeta(baseDir);
-
   let recDir = baseDir;
   let recMeta = base;
   if (packId !== BASE_PACK_ID) {
     const dir = resolvePackDir(packId);
     if (!dir) {
-      const err = new Error(`pack not installed: ${packId}`);
-      err.code = 'PACK_NOT_INSTALLED';
-      throw err;
+      throw Object.assign(new Error(`pack not installed: ${packId}`), { code: 'PACK_NOT_INSTALLED' });
     }
     recDir = dir;
     recMeta = readPackMeta(dir);
   }
-
-  const detPath = path.join(baseDir, base.files.det);
-  const recPath = path.join(recDir, recMeta.files.rec);
-  const dict = fs.readFileSync(path.join(recDir, recMeta.files.dict), 'utf8');
-
-  logger.info(`Loading OCR session: pack=${packId} gen=${recMeta.gen} base=${base.id}`);
-
-  // No docCls here on purpose: tested 2026-07-04 and rejected — it fixes
-  // upside-down photos but misclassifies short-line CJK screenshots as
-  // vertical (Japanese garbled, Korean pack broken). See OCR_MODELS.md.
-  return esearch.init({
-    det: { input: detPath },
-    rec: {
-      input: recPath,
-      decodeDic: dict,
-      // The lib's space heuristic is for v3/v4 rec models; v5+ recognize
-      // spaces natively and the heuristic over-inserts.
-      optimize: { space: recMeta.gen === 'v3' || recMeta.gen === 'v4' },
-    },
-    ort,
-  });
-}
-
-async function getSession(packId) {
-  if (_sessions.has(packId)) {
-    // LRU bump: re-insert as newest
-    const p = _sessions.get(packId);
-    _sessions.delete(packId);
-    _sessions.set(packId, p);
-    return p;
-  }
-
-  while (_sessions.size >= MAX_SESSIONS) {
-    const oldest = _sessions.keys().next().value;
-    _sessions.delete(oldest);
-    logger.info(`Evicted OCR session: ${oldest}`);
-  }
-
-  const promise = createSession(packId).catch((e) => {
-    _sessions.delete(packId); // failed init must not poison the cache
-    throw e;
-  });
-  _sessions.set(packId, promise);
-  return promise;
+  return {
+    det: path.join(baseDir, base.files.det),
+    rec: path.join(recDir, recMeta.files.rec),
+    dict: path.join(recDir, recMeta.files.dict),
+    gen: recMeta.gen,
+    baseId: base.id,
+  };
 }
 
 // Pack manager calls this after uninstall/update so the next recognition
 // reloads from disk. Base packs supply the det model to every session, so
 // changing either of them invalidates the whole cache, not just their own key.
 function evictSessions(packId) {
-  if (packId && packId !== BASE_PACK_ID && packId !== HQ_PACK_ID) {
-    _sessions.delete(packId);
-  } else {
-    _sessions.clear();
-  }
-}
-
-function stripDataUrl(s) {
-  return s.startsWith('data:image') ? s.split(',')[1] : s;
-}
-
-// Small captures (selection strips, tiny screenshot regions) carry small
-// glyphs that hurt recognition; upscaling before detection recovers them.
-// Larger images skip it — cost outweighs gain.
-const PREPROCESS_MAX_DIM = 1200;
-
-async function decodeToImageData(imageInput, preprocess = {}) {
-  const { canvasKit } = ensureEnv();
-  const buf = Buffer.isBuffer(imageInput)
-    ? imageInput
-    : Buffer.from(stripDataUrl(String(imageInput)), 'base64');
-  const img = await canvasKit.loadImage(buf);
-
-  let scale = 1;
-  if (
-    preprocess.enabled &&
-    preprocess.scale > 1 &&
-    Math.max(img.width, img.height) < PREPROCESS_MAX_DIM
-  ) {
-    scale = preprocess.scale;
-  }
-
-  const w = Math.round(img.width * scale);
-  const h = Math.round(img.height * scale);
-  const canvas = canvasKit.createCanvas(w, h);
-  const ctx = canvas.getContext('2d');
-  if (scale !== 1) {
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-  }
-  ctx.drawImage(img, 0, 0, w, h);
-  return { imageData: ctx.getImageData(0, 0, w, h), scale };
-}
-
-// esearch box: [↖,↗,↘,↙] points -> axis-aligned rect. `scale` undoes
-// preprocessing upscale so callers always see source-image pixel coords.
-function boxToBBox(box, scale = 1) {
-  if (!Array.isArray(box) || box.length < 4) return null;
-  const xs = box.map((p) => (p[0] || 0) / scale);
-  const ys = box.map((p) => (p[1] || 0) / scale);
-  const x = Math.min(...xs);
-  const y = Math.min(...ys);
-  return { x, y, width: Math.max(...xs) - x, height: Math.max(...ys) - y };
-}
-
-function toBlocks(lines, scale = 1) {
-  return (lines || [])
-    .filter((l) => l.text && l.text.trim())
-    .map((l, index) => ({
-      text: l.text,
-      confidence: typeof l.mean === 'number' ? l.mean : 0.9,
-      bbox: boxToBBox(l.box, scale),
-      index,
-    }));
+  if (packId && packId !== BASE_PACK_ID && packId !== HQ_PACK_ID) host().evict(packId);
+  else host().evict();
 }
 
 /**
@@ -291,24 +171,16 @@ async function recognize(imageInput, options = {}) {
   }
 
   try {
-    const session = await getSession(packId);
-    const { imageData, scale } = await decodeToImageData(imageInput, options.preprocess);
-    const out = await session.ocr(imageData);
-
-    // Per-paragraph (layout-aware merge by the lib) and per-line variants.
-    const blocks = toBlocks(out.parragraphs, scale);
-    const rawBlocks = toBlocks(out.src, scale);
-    const text = blocks.map((b) => b.text).join('\n').trim();
-    const confidence = blocks.length
-      ? blocks.reduce((s, b) => s + b.confidence, 0) / blocks.length
-      : 0;
-
+    const models = resolveModels(packId);
+    const out = await host().recognize({
+      packId,
+      models,
+      image: Buffer.isBuffer(imageInput) ? imageInput : String(imageInput),
+      preprocess: options.preprocess || {},
+    });
     return {
       success: true,
-      text,
-      blocks,
-      rawBlocks,
-      confidence,
+      ...out,
       engine: 'rapid-ocr',
       pack: packId,
       ...(packFallback && { packFallback: true, requestedLanguage: language }),
@@ -326,9 +198,8 @@ async function recognize(imageInput, options = {}) {
 
 // Health probe. The default (light) variant only verifies the model files
 // resolve and are non-empty — cheap enough for the settings page to call on
-// entry. deep additionally builds the ONNX session (catches corrupt models
-// and broken native bindings) but costs ~0.5s of main-process stalls, so
-// callers reserve it for explicit user action (re-check button, post-repair).
+// entry. deep additionally builds the session in the host (catches corrupt
+// models and broken native bindings), reserved for explicit user action.
 async function healthCheck({ deep = false } = {}) {
   const baseDir = resolveBaseDir();
   if (!baseDir) {
@@ -342,7 +213,7 @@ async function healthCheck({ deep = false } = {}) {
       const st = fs.statSync(path.join(baseDir, name));
       if (!st.size) throw Object.assign(new Error(`${name} is empty`), { code: 'ENOENT' });
     }
-    if (deep) await getSession(BASE_PACK_ID);
+    if (deep) await host().health({ packId: BASE_PACK_ID, models: resolveModels(BASE_PACK_ID) });
     return { healthy: true, activeBase: meta.id };
   } catch (e) {
     const error = e.code === 'ENOENT' ? 'BASE_MODELS_MISSING' : (e.code || 'LOAD_FAILED');
@@ -350,22 +221,22 @@ async function healthCheck({ deep = false } = {}) {
   }
 }
 
-// Loads the heavy natives (~100ms of sync require, canvas being the bulk)
-// off the interactive path. Called at idle shortly after startup when the
-// local engine is selected; session build stays lazy — its cost lands during
-// recognition where the user is already waiting on a spinner.
+// Spawns the host ahead of the first recognition so its native load does
+// not land on the interactive path. Session build stays lazy.
 function prewarm() {
-  try {
-    ensureEnv();
-    logger.info('OCR natives prewarmed');
-  } catch (e) {
-    logger.warn('Prewarm failed:', e.message);
-  }
+  host().prewarm();
+}
+
+// Which backend the host is actually running the base model on, and why
+// it fell back if it did — what the GPU switch in settings reports.
+async function hostStatus() {
+  return host().health({ packId: BASE_PACK_ID, models: resolveModels(BASE_PACK_ID) });
 }
 
 module.exports = {
   recognize,
   healthCheck,
+  hostStatus,
   prewarm,
   evictSessions,
   setModelTier,
