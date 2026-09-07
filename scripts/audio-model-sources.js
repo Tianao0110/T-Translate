@@ -84,6 +84,48 @@ const ASR_DRAFT_PACK = {
   upstream: [`${UPSTREAM_BASE}/${ZIPFORMER_DIR}.tar.bz2`],
 };
 
+// Optional pack: the high-accuracy final-pass engine (v0.4.8). Qwen3-ASR
+// 0.6B is an LLM-style decoder: far more robust than SenseVoice on music,
+// rap and noise (measured 7.8% vs 95.6% CER on a song with BGM) and covers
+// 31 languages, at ~1 GB resident and RTF ~0.2 on CPU. It replaces
+// SenseVoice for finals only when the user picks the tier; the VAD still
+// comes from the base pack, so this one never stands alone.
+//
+// Same-name-different-source note: the ONNX export is a third-party one
+// (Wasser1462's script, weights on ModelScope), repackaged by sherpa-onnx.
+// The 2026-09-07 spike verified it end to end; treat any newer export the
+// same way before swapping it in.
+const QWEN3_ASR_DIR = 'sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25';
+
+const ASR_HQ_PACK = {
+  id: 'asr-hq-qwen3-0.6b',
+  type: 'asr-hq',
+  version: '1.0.0',
+  model: QWEN3_ASR_DIR,
+  file: 'asr-hq-qwen3-0.6b.zip',
+  engine: 'qwen3-asr',
+  languages: [
+    'zh', 'en', 'yue', 'ja', 'ko', 'hi', 'ar', 'de', 'fr', 'es', 'pt', 'id', 'it', 'ru', 'th', 'vi',
+    'tr', 'ms', 'nl', 'sv', 'da', 'fi', 'pl', 'cs', 'fil', 'fa', 'el', 'hu', 'mk', 'ro',
+  ],
+  files: {
+    convFrontend: 'conv_frontend.onnx',
+    encoder: 'encoder.int8.onnx',
+    decoder: 'decoder.int8.onnx',
+    // A directory: sherpa opens vocab.json / merges.txt by path inside it.
+    tokenizer: 'tokenizer',
+  },
+  sources: [
+    { dir: QWEN3_ASR_DIR, file: 'conv_frontend.onnx' },
+    { dir: QWEN3_ASR_DIR, file: 'encoder.int8.onnx' },
+    { dir: QWEN3_ASR_DIR, file: 'decoder.int8.onnx' },
+    { dir: QWEN3_ASR_DIR, tree: 'tokenizer' },
+  ],
+  licenses: ['LICENSE-qwen3-asr.txt'],
+  license: 'Apache-2.0 (Qwen3-ASR-0.6B, Qwen team / Alibaba Cloud; ONNX export by Wasser1462 via sherpa-onnx)',
+  upstream: [`${UPSTREAM_BASE}/${QWEN3_ASR_DIR}.tar.bz2`],
+};
+
 // ===== Neural voice packs (v0.4.2) =====
 // Same release, same manifest, different root (tts-models) and different
 // manager. Unlike the ASR packs these carry whole directories: sherpa opens
@@ -193,5 +235,5 @@ module.exports = {
   UPSTREAM_BASE,
   TTS_UPSTREAM_BASE,
   RELEASE_BASE_URL,
-  PACKS: [ASR_BASE_PACK, ASR_DRAFT_PACK, TTS_KOKORO_PACK, TTS_MELO_PACK],
+  PACKS: [ASR_BASE_PACK, ASR_DRAFT_PACK, ASR_HQ_PACK, TTS_KOKORO_PACK, TTS_MELO_PACK],
 };

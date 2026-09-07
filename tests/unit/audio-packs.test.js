@@ -60,3 +60,12 @@ describe('computePackList', () => {
     expect(computePackList([], shared)).toHaveLength(3);
   });
 });
+
+describe('pack types', () => {
+  it('lists the high-accuracy engine under the ASR domain, never under TTS', () => {
+    expect(ASR_TYPES).toContain('asr-hq');
+    expect(TTS_TYPES).not.toContain('asr-hq');
+    const list = computePackList([], { packs: [{ id: 'asr-hq-qwen3-0.6b', type: 'asr-hq', version: '1.0.0' }] }, ASR_TYPES);
+    expect(list.map((p) => p.status)).toEqual(['not-installed']);
+  });
+});

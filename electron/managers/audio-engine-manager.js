@@ -114,6 +114,7 @@ function getInfo() {
   return {
     modelName: models ? models.modelName : null,
     streamingPresent: !!models?.streaming,
+    hqPresent: !!models?.hq,
     modelsDir: modelsBaseDir(),      // where a new download lands
     activeDir: models?.baseDir || null, // where the live set actually sits
     // Kept for the renderer's shape; secure mode no longer blocks sessions.
@@ -233,6 +234,11 @@ function spawnWorker(models) {
             vadPath: models.vadPath,
             // optional two-pass draft engine (null when not manually placed)
             streaming: models.streaming,
+            // optional high-accuracy final engine (v0.4.8); used only when
+            // the tier says so AND the pack is on disk — a missing pack
+            // silently means the base engine, never a dead session
+            hq: models.hq,
+            useHq: !!models.hq && deps.store.get('settings.listen.tier') === 'high',
             language: sessionLanguage,
           }
         : null,

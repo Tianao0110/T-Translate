@@ -290,12 +290,14 @@ src/services/tts/neural.js                 渲染端神经语音引擎：分块�
 一两个字的碎定稿不上屏也不翻译（`isNegligibleFinal`）。这些都在会话日志里留事件
 （`vad-threshold` / `vad-relax` / `lang-pinned` / `dropped-short`），metrics 行带当前阈值与端点音量 dB。
 
+**高精度定稿档（v0.4.8，`asr-hq` 包 = Qwen3-ASR 0.6B int8）**：`settings.listen.tier` 为 `high` 且包在场时，管理器在 `init` 里带上 `useHq`，worker 的 `createRecognizer` 换成 `qwen3Asr` 配置，SenseVoice 不再加载（换载不共存，常驻约 1 GB，RTF ~0.2）。VAD 仍来自基座包，所以高精度包永远不单独成立。Qwen3 的结果**没有语言与 BGM 标签**：语言钉住和音乐档 VAD 自适应在这个档位下自然不触发；自动语言会话装了草稿引擎就直接信草稿（`partialEngine = 'stream'`），没装草稿引擎则只出定稿（`'none'`）——1 GB 的模型不做伪流式重解码。单段仍受 9 s 硬切封顶：整段几十秒一次解码会退化。
+
 **载卸时序**：模型只在会话内驻留，不做常驻缓存。
 
 | 时刻 | 发生什么 |
 |------|----------|
 | 点开始 | fork 子进程 → `init` 声明模型路径 → `asr-start` 才真正加载 |
-| 会话中 | 定稿引擎 SenseVoice + 可选草稿引擎 zipformer 同时在内存 |
+| 会话中 | 定稿引擎 SenseVoice（或高精度档 Qwen3-ASR，二选一换载）+ 可选草稿引擎 zipformer 同时在内存 |
 | 点停止 | `asr-stop` 冲刷 → 主进程发 `unload`（丢引擎引用、放开模型文件）→ `shutdown` → 进程退出 |
 | 关窗/切 SECURE | 同上，`once('closed')` 与隐私监听各自兜底 |
 | 换包 | `stopSessionAndWait` 等进程真正退出才动目录——Windows 上文件句柄没放开，换包会在 150MB 下载的最后一步失败 |

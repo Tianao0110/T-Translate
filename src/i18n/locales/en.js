@@ -652,6 +652,14 @@ const en = {
     notReadyHint: "Install a model to enable the floating window's listen button",
     draftOn: "Chinese and English appear while you speak, then get corrected.",
     draftOff: "Text appears when a sentence ends. The draft engine adds live text for Chinese and English.",
+    tier: {
+      label: "Final pass",
+      standard: "Standard",
+      high: "High accuracy",
+      hint: "High accuracy: better with music or noise, 30 languages; 806 MB download, about 1 GB of RAM, finals 1–2 s later, 16 GB RAM recommended",
+      enabled: "Switched to high-accuracy finals; applies from the next listen session",
+      disabled: "Back to standard finals",
+    },
     packs: {
       title: "Recognition models",
       refresh: "Refresh",
@@ -675,11 +683,13 @@ const en = {
       phase: { downloading: "Downloading", verifying: "Verifying", extracting: "Extracting", done: "Done", error: "Failed" },
       names: {
         "asr-base-sense-voice": "Base model (zh/en/ja/ko/yue)",
-        "asr-draft-zipformer-zh-en": "Draft engine (zh/en)"
+        "asr-draft-zipformer-zh-en": "Draft engine (zh/en)",
+        "asr-hq-qwen3-0.6b": "High-accuracy final engine (Qwen3-ASR, 30 languages)"
       },
       desc: {
         "asr-base": "Required. Finished sentences with punctuation.",
-        "asr-draft": "Optional. Live text for Chinese and English."
+        "asr-draft": "Optional. Live text for Chinese and English.",
+        "asr-hq": "Optional. Better with music or noise; about 1 GB of RAM."
       }
     }
   },

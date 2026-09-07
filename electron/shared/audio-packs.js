@@ -14,12 +14,16 @@ const { compareVersions } = require('../utils/model-pack-core');
 const ASR_BASE_TYPE = 'asr-base';
 // Two-pass draft engine. Optional: absent means pseudo-streaming drafts.
 const ASR_DRAFT_TYPE = 'asr-draft';
+// High-accuracy final-pass engine (v0.4.8). Optional: replaces the base
+// engine for finals when the user picks the tier; the base pack's VAD still
+// gates it, so it never stands alone.
+const ASR_HQ_TYPE = 'asr-hq';
 // Neural voice pack (sherpa-onnx TTS model + its G2P data). Any number.
 const TTS_VOICE_TYPE = 'tts-voice';
 
 // One manifest serves both domains; each pack manager lists only its own
 // types so a voice pack never shows up under "识别模型" and vice versa.
-const ASR_TYPES = [ASR_BASE_TYPE, ASR_DRAFT_TYPE];
+const ASR_TYPES = [ASR_BASE_TYPE, ASR_DRAFT_TYPE, ASR_HQ_TYPE];
 const TTS_TYPES = [TTS_VOICE_TYPE];
 
 // Types this build knows how to install. A manifest written for a newer app
@@ -64,6 +68,7 @@ function computePackList(installedPacks, manifest, types = KNOWN_TYPES) {
 module.exports = {
   ASR_BASE_TYPE,
   ASR_DRAFT_TYPE,
+  ASR_HQ_TYPE,
   TTS_VOICE_TYPE,
   ASR_TYPES,
   TTS_TYPES,

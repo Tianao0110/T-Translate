@@ -652,6 +652,14 @@ const zh = {
     notReadyHint: "装好模型后，悬浮窗的听译按钮才能点",
     draftOn: "中英边说边出字，说完自动修正",
     draftOff: "整句说完才出字；装草稿引擎后中英可边说边出",
+    tier: {
+      label: "定稿档位",
+      standard: "标准",
+      high: "高精度",
+      hint: "高精度：带音乐或噪声时更准，30 种语言；下载 806 MB，占内存约 1 GB，定稿晚 1–2 秒，推荐 16 GB 内存",
+      enabled: "已切到高精度定稿，下次开始听译生效",
+      disabled: "已切回标准定稿",
+    },
     packs: {
       title: "识别模型",
       refresh: "刷新",
@@ -675,11 +683,13 @@ const zh = {
       phase: { downloading: "下载中", verifying: "校验中", extracting: "解压中", done: "完成", error: "失败" },
       names: {
         "asr-base-sense-voice": "基础识别模型（中/英/日/韩/粤）",
-        "asr-draft-zipformer-zh-en": "草稿引擎（中英）"
+        "asr-draft-zipformer-zh-en": "草稿引擎（中英）",
+        "asr-hq-qwen3-0.6b": "高精度定稿引擎（Qwen3-ASR，30 种语言）"
       },
       desc: {
         "asr-base": "必需。成句定稿，带标点",
-        "asr-draft": "可选。中英边说边出字"
+        "asr-draft": "可选。中英边说边出字",
+        "asr-hq": "可选。带音乐或噪声时更准；占内存约 1 GB"
       }
     }
   },

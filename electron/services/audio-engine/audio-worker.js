@@ -128,6 +128,10 @@ let vadThreshold = VAD_THRESHOLD_SPEECH;
 let vadPolicy = makeVadThresholdPolicy({ speech: VAD_THRESHOLD_SPEECH, music: VAD_THRESHOLD_MUSIC });
 let vadRebuildTo = null; // pending threshold change, applied at a segment boundary
 let recognizer = null;
+// High-accuracy tier (Qwen3-ASR), decided by the manager per session. Its
+// results carry no language or BGM tags, so the language pin and the music
+// VAD policy below simply never fire under it.
+const hqActive = () => !!(asrPaths && asrPaths.useHq && asrPaths.hq);
 // Auto-language sessions pin the recognizer to the first language that wins
 // three finals in a row. SenseVoice's per-segment detection drifts on mixed or
 // musical audio (a Chinese song drew ja/yue/en tags on 5 of 31 finals), and a
@@ -386,6 +390,13 @@ function handleAsrStart(msg) {
   partialEngine =
     online && (asrLanguage === 'zh' || asrLanguage === 'en') ? 'stream' : 'pseudo';
   autoEngineDecided = asrLanguage !== ''; // auto keeps the decision open
+  if (hqActive()) {
+    // Qwen3 finals carry no language tag, so the auto decision on the first
+    // final can never happen: trust the draft engine outright when it is
+    // loaded, and never re-decode drafts with a 1 GB model — finals only.
+    partialEngine = online ? 'stream' : 'none';
+    autoEngineDecided = true;
+  }
   lastStreamText = '';
 
   const loadMs = Date.now() - t0;
@@ -409,6 +420,7 @@ function handleAsrStart(msg) {
     type: 'asr_start',
     loadMs,
     language: asrLanguage || 'auto',
+    engine: hqActive() ? 'qwen3-asr' : 'sense-voice',
     partialEngine,
     streamingPresent: !!asrPaths.streaming,
   });
@@ -455,6 +467,32 @@ function createVad(threshold) {
 }
 
 function createRecognizer(language) {
+  if (hqActive()) {
+    const hq = asrPaths.hq;
+    return new sherpa.OfflineRecognizer({
+      featConfig: { sampleRate: SAMPLE_RATE, featureDim: 80 },
+      modelConfig: {
+        qwen3Asr: {
+          convFrontend: hq.convFrontend,
+          encoder: hq.encoder,
+          decoder: hq.decoder,
+          tokenizer: hq.tokenizerDir,
+          // Finals are ≤9s (hard split), so 512 new tokens is generous. Past
+          // its context the model degrades to garbage — another reason the
+          // VAD gate is never bypassed for this engine.
+          maxNewTokens: 512,
+          maxTotalLen: 1024,
+          temperature: 0,
+          topP: 1,
+          seed: 0,
+          hotwords: '',
+        },
+        numThreads: 2,
+        provider: 'cpu',
+        debug: 0,
+      },
+    });
+  }
   return new sherpa.OfflineRecognizer({
     featConfig: { sampleRate: SAMPLE_RATE, featureDim: 80 },
     modelConfig: {
@@ -705,7 +743,7 @@ function feedStream(win) {
     }
   } catch (err) {
     logLine(eventRecord('stream-draft-failed', String(err.message)));
-    partialEngine = 'pseudo';
+    partialEngine = hqActive() ? 'none' : 'pseudo';
     online = null;
     onlineStream = null;
   }
@@ -863,7 +901,8 @@ function maybeDecodePartial() {
   if (!sessionLive || !recognizer) return;
   // Streaming drafts come word-by-word from feedStream; the pseudo re-decode
   // below only serves sessions the draft engine cannot (ja/ko/yue, no model).
-  if (partialEngine === 'stream') return;
+  // 'none' = high-accuracy tier without a draft engine: finals only.
+  if (partialEngine !== 'pseudo') return;
   if (openLen === 0 || openLen === lastPartialLen) return;
   lastPartialLen = openLen;
 

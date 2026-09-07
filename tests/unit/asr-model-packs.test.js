@@ -161,3 +161,60 @@ describe('listInstalledPacks', () => {
     expect(listInstalledPacks(null)).toEqual([]);
   });
 });
+
+// v0.4.8: the optional high-accuracy final engine resolves from its own pack
+// type; its tokenizer is a directory, so vocab.json inside it is the probe.
+describe('locateAsrModels — high-accuracy pack', () => {
+  const hqPackJson = JSON.stringify({
+    id: 'asr-hq-qwen3-0.6b',
+    type: 'asr-hq',
+    version: '1.0.0',
+    model: 'sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25',
+    engine: 'qwen3-asr',
+    files: { convFrontend: 'conv_frontend.onnx', encoder: 'encoder.int8.onnx', decoder: 'decoder.int8.onnx', tokenizer: 'tokenizer' },
+  });
+  const baseTree = {
+    base: ['asr-base-sense-voice/', 'asr-hq-qwen3-0.6b/'],
+    'base/asr-base-sense-voice/pack.json': basePackJson,
+    'base/asr-base-sense-voice/model.int8.onnx': 'file',
+    'base/asr-base-sense-voice/tokens.txt': 'file',
+    'base/asr-base-sense-voice/silero_vad.onnx': 'file',
+    'base/asr-hq-qwen3-0.6b/pack.json': hqPackJson,
+    'base/asr-hq-qwen3-0.6b/conv_frontend.onnx': 'file',
+    'base/asr-hq-qwen3-0.6b/encoder.int8.onnx': 'file',
+    'base/asr-hq-qwen3-0.6b/decoder.int8.onnx': 'file',
+  };
+
+  it('resolves the engine files and tokenizer dir when complete', () => {
+    const fs = makeFs({ ...baseTree, 'base/asr-hq-qwen3-0.6b/tokenizer/vocab.json': 'file' });
+    const found = locateAsrModels('base', { fs, path: P });
+    expect(found.hq).toEqual({
+      convFrontend: 'base/asr-hq-qwen3-0.6b/conv_frontend.onnx',
+      encoder: 'base/asr-hq-qwen3-0.6b/encoder.int8.onnx',
+      decoder: 'base/asr-hq-qwen3-0.6b/decoder.int8.onnx',
+      tokenizerDir: 'base/asr-hq-qwen3-0.6b/tokenizer',
+      engine: 'qwen3-asr',
+      modelName: 'sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25',
+      dirName: 'asr-hq-qwen3-0.6b',
+    });
+  });
+
+  it('yields hq: null when the tokenizer is missing, without gating listen mode', () => {
+    const fs = makeFs(baseTree);
+    const found = locateAsrModels('base', { fs, path: P });
+    expect(found).not.toBeNull();
+    expect(found.hq).toBeNull();
+  });
+
+  it('never resolves hq without a base pack (the VAD lives there)', () => {
+    const fs = makeFs({
+      base: ['asr-hq-qwen3-0.6b/'],
+      'base/asr-hq-qwen3-0.6b/pack.json': hqPackJson,
+      'base/asr-hq-qwen3-0.6b/conv_frontend.onnx': 'file',
+      'base/asr-hq-qwen3-0.6b/encoder.int8.onnx': 'file',
+      'base/asr-hq-qwen3-0.6b/decoder.int8.onnx': 'file',
+      'base/asr-hq-qwen3-0.6b/tokenizer/vocab.json': 'file',
+    });
+    expect(locateAsrModels('base', { fs, path: P })).toBeNull();
+  });
+});

@@ -71,7 +71,7 @@ Transparent overlay for live translation — drag, resize, pin on top, spawn ind
 
 The waveform icon in the floating window's toolbar, then ▶: it transcribes whatever your computer is playing and translates it sentence by sentence. Recognition runs on your machine; audio passes through memory and is never written to disk or uploaded.
 
-Chinese, English, Japanese, Korean and Cantonese, chosen or detected. With the optional draft engine, Chinese and English appear as they are spoken. Listens to everything by default, or to a single program on Windows 11. Subtitles export to SRT. Models download under Settings → Audio → Listen (base 153 MB, draft engine 168 MB optional).
+Chinese, English, Japanese, Korean and Cantonese, chosen or detected. With the optional draft engine, Chinese and English appear as they are spoken. Listens to everything by default, or to a single program on Windows 11. Subtitles export to SRT. Models download under Settings → Audio → Listen (base 153 MB, draft engine 168 MB optional, high-accuracy final pass 806 MB optional — better with music or noise).
 
 <p align="center">
   <img src="docs/screenshots/Listen.png" width="600" alt="Listen mode">

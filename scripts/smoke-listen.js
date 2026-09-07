@@ -135,8 +135,8 @@ async function main() {
 
   const before = await packMgr.listPacks({ refresh: true });
   step(
-    'manifest reads, both packs listed as not-installed',
-    !before.manifestError && before.packs.length === 2 && before.packs.every((p) => p.status === 'not-installed'),
+    'manifest reads, all packs listed as not-installed',
+    !before.manifestError && before.packs.length >= 2 && before.packs.every((p) => p.status === 'not-installed'),
     before.packs.map((p) => `${p.id}:${p.status}`).join(', ')
   );
 
@@ -224,7 +224,10 @@ async function main() {
   }
 
   const after = await packMgr.listPacks({ refresh: false });
-  step('both packs report installed', after.packs.every((p) => p.status === 'installed'));
+  step(
+    'base + draft packs report installed',
+    after.packs.filter((p) => p.type !== 'asr-hq').every((p) => p.status === 'installed')
+  );
 
   const models = locateAsrModels(packMgr.packsRoot());
   step(
@@ -347,6 +350,39 @@ async function main() {
     : null;
   const logText = logFile ? fs.readFileSync(path.join(logsDir, logFile), 'utf8') : '';
   step('unload reached the worker (hook is wired)', /"unload"/.test(logText), logFile || '(no log)');
+
+  // ===== High-accuracy tier (v0.4.8) =====
+  // Only when the ~900 MB pack zip was built locally: it is optional, so a
+  // release dir without it is not a failure. Same wav, same harness — the
+  // engine swap must be invisible to everything above the worker.
+  const hqEntry = manifest.packs.find((p) => p.type === 'asr-hq');
+  if (hqEntry && fs.existsSync(path.join(RELEASE_DIR, hqEntry.file))) {
+    const tHq = Date.now();
+    const hqRes = await packMgr.downloadPack(hqEntry.id, () => {});
+    step(`install ${hqEntry.id}`, hqRes.success === true, `${Date.now() - tHq}ms`);
+    const modelsHq = locateAsrModels(packMgr.packsRoot());
+    step('pack.json resolves the high-accuracy engine', !!modelsHq?.hq, modelsHq?.hq?.dirName || 'null');
+    store.set('settings.listen.tier', 'high');
+    const hqRun = await runSession('高精度定稿（Qwen3-ASR）');
+    store.set('settings.listen.tier', 'standard');
+    step(
+      'high-accuracy tier recognizes finals',
+      hqRun.ev.segments.length > 0,
+      hqRun.ev.segments.map((s) => JSON.stringify(s.text)).join(' | ') || '(none)'
+    );
+    step(
+      'high-accuracy tier keeps streaming drafts',
+      hqRun.ev.partials.length > 0,
+      `${hqRun.ev.partials.length} partials, load ${hqRun.loadMs}ms`
+    );
+    const rmHq = await packMgr.removePack(hqEntry.id);
+    step(
+      'high-accuracy pack removal leaves no residue',
+      rmHq.success === true && !fs.existsSync(path.join(packMgr.packsRoot(), hqEntry.id))
+    );
+  } else {
+    console.log('  (high-accuracy pack not built locally — tier steps skipped)\n');
+  }
 
   const rm = await packMgr.removePack('asr-draft-zipformer-zh-en');
   step(
