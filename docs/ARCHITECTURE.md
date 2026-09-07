@@ -251,6 +251,9 @@ electron/utils/open-with.js     右键菜单 argv 解析（.pdf/.docx/.txt 白�
 
 ```
 electron/managers/audio-engine-manager.js  音频 utilityProcess 的唯一持有者（ASR 会话 + 神经 TTS）
+electron/managers/ocr-host-manager.js      OCR utilityProcess 的持有者：按需拉起、请求配对、崩溃重生、连崩退避（v0.4.9）
+electron/services/ocr-host/ocr-host.js     本地 OCR 运行时（esearch-ocr + onnxruntime-node + skia）跑在这个子进程；provider cpu/dml，DML 首会话热身、失败回退 CPU
+electron/ipc/gpu.js                        「显卡加速」开关：settings.gpu.enabled，开启即在 OCR host 自检，失败保持 CPU 并回传原因
 electron/services/audio-engine/audio-worker.js  识别模型、音频捕获、语音合成都在这个子进程里
 electron/utils/win-audio-capture.js        WASAPI 捕获（koffi，v0.4.1）
 electron/utils/app-paths.js                启动最早期定 userData（安装目录 data，不可写则留用户目录）、Chromium 存储收进 browser、一次性搬迁（v0.4.7）
@@ -303,8 +306,8 @@ src/services/tts/neural.js                 渲染端神经语音引擎：分块�
 | 换包 | `stopSessionAndWait` 等进程真正退出才动目录——Windows 上文件句柄没放开，换包会在 150MB 下载的最后一步失败 |
 
 **内存口径**（2026-08-27 双模型 3 分钟 soak / 2026-08-29 smoke 复测）：会话中子进程 RSS 596–676MB
-且平稳；会话结束进程退出，回到 0。只装基座包约省一半。主进程侧的 OCR 会话是另一
-套缓存（LRU 2 个，换包/换档位时清），与听译互不影响。
+且平稳；会话结束进程退出，回到 0。只装基座包约省一半。OCR host 子进程里的会话是另一
+套缓存（LRU 2 个，换包/换档位/切显卡时清），与听译互不影响；v0.4.9 起它不再占主进程内存。
 
 **延迟口径**（`npm run smoke:listen` 实测，两次跑差 <20ms）：
 
