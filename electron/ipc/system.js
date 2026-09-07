@@ -8,6 +8,7 @@ const createLogger = require("../utils/logger");
 const logger = createLogger("IPC:System");
 const { t } = require("../shared/main-i18n");
 const { isOfflineMode } = require("../utils/privacy-gate");
+const { syncLoginItem } = require("../utils/login-item");
 
 // Must match MAX_FILE_SIZE in src/utils/document-parser.js: the parser refuses
 // anything larger anyway, so a higher cap here would only read the whole file
@@ -337,20 +338,14 @@ function register(ctx) {
     }
   });
 
-  // The uninstaller removes the Run entry. After a keep-data reinstall the
-  // stored preference still says on, so put the entry back — but only when
-  // it is missing: rewriting an existing one would also flip the Task
-  // Manager "disabled" flag the user may have set.
-  if (app.isPackaged && store.get('settings.startup.autoLaunch') === true) {
-    try {
-      if (!app.getLoginItemSettings({ args: ['--startup'] }).openAtLogin) {
-        app.setLoginItemSettings({ openAtLogin: true, args: ['--startup'] });
-        logger.info('Auto launch entry restored');
-      }
-    } catch (e) {
-      logger.warn('Auto launch restore failed:', e.message);
-    }
-  }
+  // Retire the pre-v0.3.7 Run entry name once, and keep the current-name
+  // entry in line with the stored preference (see utils/login-item.js).
+  syncLoginItem({ app, store })
+    .then((r) => {
+      if (r.legacyRemoved) logger.info('Legacy auto launch entry retired');
+      if (r.entryWritten) logger.info('Auto launch entry restored');
+    })
+    .catch((e) => logger.warn('Auto launch sync failed:', e.message));
 
   ipcMain.handle(CHANNELS.APP.GET_AUTO_LAUNCH, () => {
     try {

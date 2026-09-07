@@ -87,9 +87,12 @@
     !insertmacro parkUserFolders
   ${else}
     ; The start-with-Windows entry the app writes through setLoginItemSettings
-    ; (value name = Electron's AppUserModelId, pointing at $INSTDIR). It goes
-    ; with the program whether or not the data is kept; the app rewrites it
-    ; from the stored preference on the next start after a reinstall.
+    ; (value name = the AppUserModelId, pointing at $INSTDIR). Builds before
+    ; v0.3.7 wrote it under Electron's default name, so both are removed. It
+    ; goes with the program whether or not the data is kept; the app rewrites
+    ; it from the stored preference on the next start after a reinstall.
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "com.ttranslate.core"
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run" "com.ttranslate.core"
     DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "electron.app.T-Translate"
     DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run" "electron.app.T-Translate"
 
