@@ -2,7 +2,7 @@
 // here in the main process because it owns the install directories; the
 // PP-OCR runtime itself (esearch-ocr + onnxruntime-node + skia canvas) runs
 // in the OCR host utilityProcess (services/ocr-host) since v0.4.9, so a
-// native fault there — or a GPU driver fault once DirectML is on — cannot
+// native fault there — or a GPU driver fault once WebGPU is on — cannot
 // take the app down. Every export keeps its pre-v0.4.9 shape.
 
 const path = require('path');
@@ -233,7 +233,7 @@ async function hostStatus() {
   return host().health({ packId: BASE_PACK_ID, models: resolveModels(BASE_PACK_ID) });
 }
 
-// 'dml' | 'cpu'. Takes effect on the next session build; a running host
+// 'webgpu' | 'cpu'. Takes effect on the next session build; a running host
 // drops its cached sessions so the switch is live without a restart.
 function setProvider(provider) {
   host().setProvider(provider);

@@ -1,11 +1,11 @@
 // Local OCR smoke: renders a known line of text to PNG, recognizes it through
-// the OCR host utilityProcess (CPU, then DirectML when --gpu is given), and
+// the OCR host utilityProcess (CPU, then WebGPU when --gpu is given), and
 // checks the host survives a kill. Runs against the bundled base pack, so
 // `npm run ocr:models` must have been done. Nothing of the user's is
 // touched: userData is a sandbox.
 //
 //   npm run smoke:ocr            CPU path only
-//   npm run smoke:ocr -- --gpu   also the DirectML path (needs a DX12 GPU)
+//   npm run smoke:ocr -- --gpu   also the WebGPU path (needs a DX12 GPU)
 /* eslint-disable no-console */
 
 const path = require('path');
@@ -110,14 +110,14 @@ async function main() {
   step('deep health check builds a session in the host', deep.healthy === true, deep.error || deep.activeBase);
 
   if (gpu) {
-    hostManager.setProvider('dml');
-    const dml = await pass('dml');
+    hostManager.setProvider('webgpu');
+    const gpuRun = await pass('webgpu');
     const gpuHealth = await ocrEngine.hostStatus().catch((e) => ({ ok: false, error: e.message }));
-    step('host reports the DirectML provider without fallback', gpuHealth.ok && gpuHealth.provider === 'dml' && !gpuHealth.fallback, JSON.stringify(gpuHealth));
-    step('DirectML beats CPU on a screen-sized capture', dml.bigMs < cpu.bigMs, `cpu ${cpu.bigMs}ms vs dml ${dml.bigMs}ms`);
+    step('host reports the WebGPU provider without fallback', gpuHealth.ok && gpuHealth.provider === 'webgpu' && !gpuHealth.fallback, JSON.stringify(gpuHealth));
+    step('WebGPU beats CPU on a screen-sized capture', gpuRun.bigMs < cpu.bigMs, `cpu ${cpu.bigMs}ms vs webgpu ${gpuRun.bigMs}ms`);
     hostManager.setProvider('cpu');
   } else {
-    console.log('  (DirectML path skipped — pass --gpu to test it)');
+    console.log('  (WebGPU path skipped — pass --gpu to test it)');
   }
 
   hostManager.shutdown();

@@ -159,7 +159,7 @@ function createOcrHostManager({ fork, logger, workerPath, readyTimeoutMs = READY
       if (child) child.postMessage({ type: 'evict', packId });
     },
     setProvider(next) {
-      provider = next === 'dml' ? 'dml' : 'cpu';
+      provider = next === 'webgpu' ? 'webgpu' : 'cpu';
       if (child) child.postMessage({ type: 'set-provider', provider });
     },
     provider: () => provider,

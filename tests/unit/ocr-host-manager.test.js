@@ -106,11 +106,11 @@ describe('ocr-host-manager', () => {
   it('forwards provider and eviction to a running host, and shutdown ends it', async () => {
     const { m, children } = manager(readyThenEcho);
     await m.recognize({ packId: 'base' });
-    m.setProvider('dml');
+    m.setProvider('webgpu');
     m.evict('ko');
     const types = children[0].sent.map((s) => s.type);
     expect(types).toEqual(['init', 'recognize', 'set-provider', 'evict']);
-    expect(children[0].sent[2]).toEqual({ type: 'set-provider', provider: 'dml' });
+    expect(children[0].sent[2]).toEqual({ type: 'set-provider', provider: 'webgpu' });
     m.shutdown();
     expect(m.running()).toBe(false);
     expect(children[0].sent.at(-1)).toEqual({ type: 'shutdown' });

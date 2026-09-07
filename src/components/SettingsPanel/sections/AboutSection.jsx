@@ -107,7 +107,7 @@ const AboutSection = ({ notify, resetSettings }) => {
 
   const gpuStatusText = () => {
     if (!gpu) return '';
-    if (gpu.enabled) return gpu.last?.provider === 'dml' ? t('about.gpu.statusGpu') : t('about.gpu.statusPending');
+    if (gpu.enabled) return gpu.last?.provider === 'webgpu' ? t('about.gpu.statusGpu') : t('about.gpu.statusPending');
     return t('about.gpu.statusCpu');
   };
 
@@ -532,7 +532,7 @@ const AboutSection = ({ notify, resetSettings }) => {
             <span className="storage-label">{t('about.gpu.switchLabel')}</span>
             <span className="storage-value">
               <Switch checked={!!gpu.enabled} onChange={toggleGpu} disabled={gpuBusy} label="" />
-              <span className={`engine-badge ${gpu.enabled && gpu.last?.provider === 'dml' ? 'installed' : ''}`}>
+              <span className={`engine-badge ${gpu.enabled && gpu.last?.provider === 'webgpu' ? 'installed' : ''}`}>
                 {gpuBusy ? t('about.gpu.testing') : gpuStatusText()}
               </span>
             </span>

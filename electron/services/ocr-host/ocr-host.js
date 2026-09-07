@@ -2,7 +2,7 @@
 // canvas) in its own utilityProcess. The main process resolves packs and
 // model paths (it owns the install roots); this side only loads models,
 // decodes images and recognizes. A native crash here — an ONNX Runtime
-// bug, a GPU driver fault once DirectML is on — takes this process, not
+// bug, a GPU driver fault once WebGPU is on — takes this process, not
 // the app; the manager rejects in-flight requests and respawns on demand.
 //
 // Kept apart from the audio worker on purpose: both bundle an
@@ -10,7 +10,7 @@
 // two DLLs of the same name.
 //
 // Protocol (main -> host):
-//   {type:'init', provider:'cpu'|'dml'}
+//   {type:'init', provider:'cpu'|'webgpu'}
 //   {type:'recognize', id, packId, models:{det, rec, dict, gen}, image, preprocess}
 //   {type:'health', id, packId, models}      build the session, report ok
 //   {type:'evict', packId?}                  drop one or every cached session
@@ -46,11 +46,11 @@ function ensureEnv() {
   return env;
 }
 
-// DirectML refuses memory patterns and parallel execution — both must be
-// off or session creation fails outright.
+// WebGPU EP (Dawn on D3D12): onnxruntime-node ships it with dxcompiler /
+// dxil next to onnxruntime.dll, so nothing is installed or downloaded.
 function ortOption() {
-  if (provider !== 'dml') return undefined;
-  return { executionProviders: ['dml'], enableMemPattern: false, executionMode: 'sequential' };
+  if (provider !== 'webgpu') return undefined;
+  return { executionProviders: ['webgpu'] };
 }
 
 function sessionKey(packId) {
@@ -78,9 +78,9 @@ async function buildSession(models, opt) {
   });
 }
 
-// DirectML compiles the graph on the first run (0.3–1.2 s measured); a
-// blank frame absorbs that here instead of on the user's first capture.
-// Later input sizes cost only tens of milliseconds.
+// WebGPU compiles its shader pipelines on the first run (0.5–1.1 s
+// measured); a blank frame absorbs that here instead of on the user's first
+// capture. Later input sizes cost only tens of milliseconds.
 async function warmUp(session) {
   const { canvasKit } = ensureEnv();
   const canvas = canvasKit.createCanvas(480, 320);
@@ -95,15 +95,15 @@ async function warmUp(session) {
 let providerFallback = null;
 
 async function createSession(models) {
-  if (provider !== 'dml') return buildSession(models, undefined);
+  if (provider !== 'webgpu') return buildSession(models, undefined);
   try {
     const session = await buildSession(models, ortOption());
     await warmUp(session);
     return session;
   } catch (e) {
     // A GPU that cannot build or run the session is a CPU machine from here
-    // on: the failure is remembered, every later session skips DirectML.
-    log('warn', `DirectML failed (${e.message}) — this host falls back to CPU`);
+    // on: the failure is remembered, every later session skips WebGPU.
+    log('warn', `WebGPU failed (${e.message}) — this host falls back to CPU`);
     providerFallback = e.message;
     provider = 'cpu';
     return buildSession(models, undefined);
@@ -209,11 +209,11 @@ async function recognize(msg) {
 async function handle(msg) {
   switch (msg.type) {
     case 'init':
-      provider = msg.provider === 'dml' ? 'dml' : 'cpu';
+      provider = msg.provider === 'webgpu' ? 'webgpu' : 'cpu';
       port.postMessage({ type: 'ready' });
       return;
     case 'set-provider': {
-      const next = msg.provider === 'dml' ? 'dml' : 'cpu';
+      const next = msg.provider === 'webgpu' ? 'webgpu' : 'cpu';
       // An explicit switch is a fresh attempt: forget an earlier fallback.
       providerFallback = null;
       if (next !== provider) {

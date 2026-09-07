@@ -487,7 +487,7 @@ const zh = {
       switchLabel: "用显卡加速",
       enginesLabel: "进显卡的引擎",
       engines: "本地 OCR 识别（PP-OCR 检测与识别）；听译与朗读仍在 CPU",
-      statusGpu: "当前：显卡（DirectML）",
+      statusGpu: "当前：显卡（WebGPU）",
       statusPending: "当前：下次识别时启用",
       statusCpu: "当前：CPU",
       testing: "正在自检",

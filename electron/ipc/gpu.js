@@ -1,13 +1,14 @@
 // GPU acceleration switch. One persisted flag (settings.gpu.enabled), applied
 // by the main process to every engine that can take it — today that is the
-// local OCR host (PP-OCR on DirectML). Enabling is a self-test, not a hope:
-// the host builds the base session on the GPU and warms it up; if that fails
-// the switch stays off and the reason is returned. The host swaps providers
-// live (sessions are rebuilt on the next recognition), so no restart.
+// local OCR host (PP-OCR on the WebGPU execution provider). Enabling is a
+// self-test, not a hope: the host builds the base session on the GPU and
+// warms it up; if that fails the switch stays off and the reason is
+// returned. The host swaps providers live (sessions are rebuilt on the next
+// recognition), so no restart.
 //
-// Listen and read-aloud stay on the CPU on purpose: their models are int8
-// (DirectML disables quantized ops) and Kokoro's ConvTranspose is rejected
-// by DirectML outright — measured 2026-09-07, see gstack v049-gpu-research.
+// Listen stays on the CPU on purpose: its models are int8, and quantized
+// graphs run 3–6x SLOWER on WebGPU than on the CPU (measured 2026-09-07,
+// see gstack v049-gpu-research).
 
 const { ipcMain } = require('electron');
 const { CHANNELS } = require('../shared/channels');
@@ -24,7 +25,7 @@ function register(ctx) {
   // without spawning the host just to ask.
   let last = null; // { provider, fallback, at }
 
-  ocrEngine.setProvider(store.get(KEY, false) === true ? 'dml' : 'cpu');
+  ocrEngine.setProvider(store.get(KEY, false) === true ? 'webgpu' : 'cpu');
 
   ipcMain.handle(CHANNELS.GPU.STATUS, async () => ({
     enabled: store.get(KEY, false) === true,
@@ -41,15 +42,15 @@ function register(ctx) {
       logger.info('GPU acceleration off');
       return { success: true, enabled: false };
     }
-    ocrEngine.setProvider('dml');
+    ocrEngine.setProvider('webgpu');
     try {
       const status = await ocrEngine.hostStatus();
-      if (status.provider !== 'dml' || status.fallback) {
-        throw new Error(status.fallback || 'DirectML unavailable');
+      if (status.provider !== 'webgpu' || status.fallback) {
+        throw new Error(status.fallback || 'WebGPU unavailable');
       }
       store.set(KEY, true);
-      last = { provider: 'dml', fallback: null, at: Date.now() };
-      logger.info('GPU acceleration on (DirectML)');
+      last = { provider: 'webgpu', fallback: null, at: Date.now() };
+      logger.info('GPU acceleration on (WebGPU)');
       return { success: true, enabled: true };
     } catch (e) {
       // Whatever went wrong, the machine runs on the CPU from here.

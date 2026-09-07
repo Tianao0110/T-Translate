@@ -487,7 +487,7 @@ const en = {
       switchLabel: "Use the GPU",
       enginesLabel: "Engines on the GPU",
       engines: "Local OCR (PP-OCR detection and recognition); listen and read-aloud stay on the CPU",
-      statusGpu: "Now: GPU (DirectML)",
+      statusGpu: "Now: GPU (WebGPU)",
       statusPending: "Now: enabled from the next recognition",
       statusCpu: "Now: CPU",
       testing: "Self-testing",
