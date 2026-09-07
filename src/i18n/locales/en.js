@@ -656,7 +656,7 @@ const en = {
       label: "Final pass",
       standard: "Standard",
       high: "High accuracy",
-      hint: "High accuracy: better with music or noise, 30 languages; 806 MB download, about 1 GB of RAM, finals 1–2 s later, 16 GB RAM recommended",
+      hint: "High accuracy: better with music or noise, 30 languages; 806 MB download, 1–1.6 GB of RAM, finals 1–2 s later, 16 GB RAM recommended",
       enabled: "Switched to high-accuracy finals; applies from the next listen session",
       disabled: "Back to standard finals",
     },
@@ -689,7 +689,7 @@ const en = {
       desc: {
         "asr-base": "Required. Finished sentences with punctuation.",
         "asr-draft": "Optional. Live text for Chinese and English.",
-        "asr-hq": "Optional. Better with music or noise; about 1 GB of RAM."
+        "asr-hq": "Optional. Better with music or noise; 1–1.6 GB of RAM."
       }
     }
   },
