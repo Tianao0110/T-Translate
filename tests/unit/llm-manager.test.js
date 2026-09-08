@@ -166,6 +166,23 @@ describe('llm manager', () => {
     expect(manager.trialReport('S.gguf')).toMatchObject({ requests: 1, probes: 1 });
   });
 
+  it('a folder file chosen in settings is used while the door is open, the whitelist otherwise', async () => {
+    const store = fakeStore({ 'settings.llm.allowUnlistedModels': true, 'settings.llm.pack': 'unlisted:Hy-MT-9B.gguf' });
+    const door = () => store.get('settings.llm.allowUnlistedModels', false) === true;
+    const { adapter } = boot({ store, packs: fakePacks({ unlisted: ['Hy-MT-9B.gguf'], door }) });
+    await manager.rescan();
+    expect(manager.selected()).toEqual({ id: 'unlisted:Hy-MT-9B.gguf', file: 'Hy-MT-9B.gguf', role: 'mt', name: 'Hy-MT-9B', status: 'ready', trial: true });
+    const g = await manager.generate({ user: 'U' });
+    await g.promise;
+    expect(g.trial).toBe(true);
+    expect(adapter.load.mock.calls[0][0]).toBe('C:/models/llm-models/Hy-MT-9B.gguf');
+    store.set('settings.llm.allowUnlistedModels', false);
+    expect(manager.selected()).toMatchObject({ id: 'qwen3-1.7b', role: 'general', trial: false });
+    const g2 = await manager.generate({ user: 'U' });
+    await g2.promise;
+    expect(adapter.load.mock.calls[1][0]).toBe('C:/models/llm-models/Q.gguf');
+  });
+
   it('forwards llm engine events into the trial log and forgets the model on exit', async () => {
     const store = fakeStore({ 'settings.llm.allowUnlistedModels': true });
     const { bus, adapter } = boot({ store, packs: fakePacks({ unlisted: ['S.gguf'], door: () => true }) });

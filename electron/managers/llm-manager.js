@@ -16,8 +16,13 @@ const { createLlmPolicy } = require('../policy/engine-policy');
 const IDLE_UNLOAD_MS = 5 * 60 * 1000;
 const KEY_ALLOW_UNLISTED = 'settings.llm.allowUnlistedModels';
 const KEY_TRIAL_TEXT = 'settings.llm.trialLogText';
-// Which whitelisted pack the built-in provider uses (settings page choice).
+// Which pack the built-in provider uses (settings page choice): a whitelist
+// id, or `unlisted:<file>` for a folder file behind the developer door.
 const KEY_PACK = 'settings.llm.pack';
+const UNLISTED_PREFIX = 'unlisted:';
+// The same family test the stack's template mapping uses for translation-only
+// models, so an unlisted Hy-MT file gets the short prompt and no AI actions.
+const MT_NAME = /\b(hy|hunyuan)[\s\-_]?mt/i;
 const TRIAL_EVENT_KINDS = new Set(['model-loaded', 'model-load-failed', 'request-failed', 'stall', 'health', 'exit']);
 
 let deps = null;
@@ -48,14 +53,27 @@ function selectedPack() {
   return chosen || defaultPack();
 }
 
+// A folder file chosen through the developer door, if the door is open and
+// the file is still there; null otherwise (the whitelist choice applies).
+function selectedUnlisted() {
+  const raw = String(deps.store.get(KEY_PACK, '') || '');
+  if (!raw.startsWith(UNLISTED_PREFIX) || !allowUnlisted()) return null;
+  const file = path.basename(raw.slice(UNLISTED_PREFIX.length));
+  const row = deps.packs.status()?.unlisted.find((u) => u.file === file);
+  if (!row) return null;
+  return { id: raw, file, role: MT_NAME.test(file) ? 'mt' : 'general', name: file.replace(/\.gguf$/i, ''), status: 'ready', trial: true };
+}
+
 // The pack the built-in provider will use, with its install state — what
 // the stack's prompt shaping and testConnection read.
 function selected() {
   if (!deps) return null;
+  const unlisted = selectedUnlisted();
+  if (unlisted) return unlisted;
   const pack = selectedPack();
   if (!pack) return null;
   const row = deps.packs.status()?.packs.find((p) => p.id === pack.id);
-  return { id: pack.id, role: pack.role, name: pack.name, status: row ? row.status : 'unknown' };
+  return { id: pack.id, role: pack.role, name: pack.name, status: row ? row.status : 'unknown', trial: false };
 }
 
 function clearIdle() {
@@ -118,6 +136,12 @@ async function resolveTarget({ packId = null, file = null } = {}) {
     const u = deps.packs.resolveUnlisted(file);
     if (!u) throw fail('LLM_MODEL_NOT_ALLOWED', `${path.basename(String(file))} is not in the model folder`);
     return u;
+  }
+  // No explicit choice: a folder file picked through the developer door wins.
+  if (!packId) {
+    const u = selectedUnlisted();
+    const r = u ? deps.packs.resolveUnlisted(u.file) : null;
+    if (r) return r;
   }
   // An explicit pack, else the settings choice, else the default pack —
   // whichever of those is actually installed.
@@ -273,4 +297,5 @@ module.exports = {
   KEY_ALLOW_UNLISTED,
   KEY_TRIAL_TEXT,
   KEY_PACK,
+  UNLISTED_PREFIX,
 };

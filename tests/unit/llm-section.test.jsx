@@ -95,6 +95,18 @@ describe('LlmSection', () => {
     expect(window.electron.shell.openExternal).toHaveBeenCalledWith('https://hf/y');
   });
 
+  it('with the door open, folder files join the model choice and show an unverified card', async () => {
+    const { container, findByText, updateSetting, llm } = mount({ settings: { llm: { pack: 'unlisted:Stranger.gguf', allowUnlistedModels: true } } });
+    await findByText('llm.engineNameWith:Stranger');
+    expect(container.querySelectorAll('.seg button')).toHaveLength(3);
+    expect(container.textContent).toContain('llm.unverified');
+    expect(container.textContent).toContain('llm.roleUnlistedHint');
+    expect(container.textContent).not.toContain('llm.howTo');
+    fireEvent.click(container.querySelectorAll('.seg button')[0]);
+    expect(updateSetting).toHaveBeenCalledWith('llm', 'pack', 'qwen3-1.7b', true);
+    expect(llm.rescan).not.toHaveBeenCalled();
+  });
+
   it('lists unlisted files even with the door closed, without actions', async () => {
     const { container, findByText } = mount();
     await findByText('Stranger.gguf');

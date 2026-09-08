@@ -39,9 +39,20 @@ const LlmSection = ({ settings, updateSetting, notify }) => {
 
   const llm = settings.llm || {};
   const packs = status?.packs?.packs || [];
-  const selectedId = packs.some((p) => p.id === llm.pack) ? llm.pack : packs[0]?.id;
-  const selected = packs.find((p) => p.id === selectedId) || null;
   const unlisted = status?.packs?.unlisted || [];
+  const doorOpen = !!llm.allowUnlistedModels;
+  const stem = (file) => file.replace(/\.gguf$/i, '');
+  // Whitelist packs, plus — with the door open — every other file in the
+  // folder, selectable as `unlisted:<file>`.
+  const options = [
+    ...packs.map((p) => ({ value: p.id, label: t('llm.packLabel', { name: p.name, role: p.role === 'mt' ? t('llm.roleMt') : t('llm.roleGeneral') }), name: p.name })),
+    ...(doorOpen ? unlisted.map((u) => ({ value: `unlisted:${u.file}`, label: t('llm.packLabelUnlisted', { name: stem(u.file) }), name: stem(u.file) })) : []),
+  ];
+  const selectedId = options.some((o) => o.value === llm.pack) ? llm.pack : options[0]?.value;
+  const selectedPack = packs.find((p) => p.id === selectedId) || null;
+  const selectedFile = !selectedPack && selectedId ? unlisted.find((u) => `unlisted:${u.file}` === selectedId) : null;
+  const selected = selectedPack
+    || (selectedFile ? { id: selectedId, name: stem(selectedFile.file), file: selectedFile.file, size: selectedFile.size, status: 'unverified', license: null, source: null, unlisted: true } : null);
 
   const persist = (key, value) => {
     updateSetting('llm', key, value, true);
@@ -51,8 +62,8 @@ const LlmSection = ({ settings, updateSetting, notify }) => {
   const choosePack = (id) => {
     if (id === selectedId) return;
     persist('pack', id);
-    const p = packs.find((x) => x.id === id);
-    notify(t('llm.packChanged', { name: p ? p.name : id }), 'success');
+    const o = options.find((x) => x.value === id);
+    notify(t('llm.packChanged', { name: o ? o.name : id }), 'success');
   };
 
   const run = async (key, fn) => {
@@ -92,6 +103,7 @@ const LlmSection = ({ settings, updateSetting, notify }) => {
       );
     }
     if (row.status === 'ready') return <span className="engine-badge installed">{t('llm.installed')}</span>;
+    if (row.status === 'unverified') return <span className="engine-badge">{t('llm.unverified')}</span>;
     if (row.status === 'mismatch') {
       return (
         <span className="engine-badge error">
@@ -108,16 +120,18 @@ const LlmSection = ({ settings, updateSetting, notify }) => {
       <h3>{t('settings.llm.title')}</h3>
       <p className="setting-description">{t('llm.description')}</p>
 
-      {packs.length > 0 && (
+      {options.length > 0 && (
         <div className="setting-group">
           <label className="setting-label">{t('llm.modelLabel')}</label>
           <Seg
             size="small"
             value={selectedId}
             onChange={choosePack}
-            options={packs.map((p) => ({ value: p.id, label: t('llm.packLabel', { name: p.name, role: p.role === 'mt' ? t('llm.roleMt') : t('llm.roleGeneral') }) }))}
+            options={options.map(({ value, label }) => ({ value, label }))}
           />
-          <p className="setting-hint">{selected?.role === 'mt' ? t('llm.roleMtHint') : t('llm.roleGeneralHint')}</p>
+          <p className="setting-hint">
+            {selected?.unlisted ? t('llm.roleUnlistedHint') : selected?.role === 'mt' ? t('llm.roleMtHint') : t('llm.roleGeneralHint')}
+          </p>
         </div>
       )}
 
@@ -125,13 +139,13 @@ const LlmSection = ({ settings, updateSetting, notify }) => {
         <div className="setting-group">
           <label className="setting-label">{t('llm.fileLabel')}</label>
           <div className="ocr-engines-list">
-            <div className={`ocr-engine-item ${selected.status === 'ready' ? 'active' : ''}`.trim()}>
+            <div className={`ocr-engine-item ${selected.status === 'ready' || selected.status === 'unverified' ? 'active' : ''}`.trim()}>
               <div className="engine-info">
                 <div className="engine-header">
                   <span className="engine-name">{t('llm.engineNameWith', { name: selected.name })}</span>
                   {badge(selected)}
                 </div>
-                <p className="engine-meta">{t('llm.fileLine', { file: selected.file, size: formatSize(selected.size), license: selected.license?.name || '' })}</p>
+                <p className="engine-meta">{t('llm.fileLine', { file: selected.file, size: formatSize(selected.size), license: selected.license?.name || t('llm.unverified') })}</p>
                 {status?.dir && <p className="engine-meta">{status.dir}</p>}
                 {selected.status === 'mismatch' && (
                   <div className="engine-error-box">
@@ -142,7 +156,7 @@ const LlmSection = ({ settings, updateSetting, notify }) => {
                     </div>
                   </div>
                 )}
-                {selected.status !== 'ready' && (
+                {selected.status !== 'ready' && selected.source && (
                   <>
                     <p className="engine-meta">{t('llm.howTo')}</p>
                     <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 6 }}>
@@ -184,9 +198,19 @@ const LlmSection = ({ settings, updateSetting, notify }) => {
       <div className="setting-group">
         <label className="setting-label">{t('llm.dev.title')}</label>
         <Switch
-          checked={!!llm.allowUnlistedModels}
-          onChange={(on) => {
+          checked={doorOpen}
+          onChange={async (on) => {
             persist('allowUnlistedModels', on);
+            // Files dropped in since the last scan show up the moment the
+            // door opens.
+            if (on) {
+              try {
+                const s = await bridge?.rescan?.();
+                if (s) setStatus(s);
+              } catch {
+                // the next load picks it up
+              }
+            }
             load();
           }}
           label={t('llm.dev.allow')}
@@ -226,7 +250,7 @@ const LlmSection = ({ settings, updateSetting, notify }) => {
                           </p>
                         )}
                       </div>
-                      {llm.allowUnlistedModels && (
+                      {doorOpen && (
                         <div className="engine-actions">
                           <button className="btn-small" onClick={() => probe(u.file)} disabled={busy !== null}>
                             {busy === `probe:${u.file}` ? <><RefreshCw size={12} className="spinning" /> {t('llm.dev.probing')}</> : t('llm.dev.probe')}
@@ -241,7 +265,7 @@ const LlmSection = ({ settings, updateSetting, notify }) => {
                 })}
               </div>
             )}
-            {llm.allowUnlistedModels && (
+            {doorOpen && (
               <div style={{ marginTop: 12 }}>
                 <Switch
                   checked={!!llm.trialLogText}

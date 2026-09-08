@@ -1,12 +1,14 @@
-// The local model's runtime block: backend, residency, speed, and the
-// self-test / unload buttons. Lives inside the built-in provider's card on
-// the providers page; self-contained so the card needs nothing but notify.
+// The local model's runtime block inside the built-in provider's card on
+// the providers page: backend, residency, speed, and the self-test /
+// unload buttons, laid out with the card's own form classes so it sits
+// like any other provider's fields. Self-contained: needs only notify.
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RefreshCw, Cpu, Zap } from 'lucide-react';
 
 const SLOW_TOK_PER_SEC = 8;
+const valueStyle = { fontSize: 13, color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: 6 };
 
 const LlmRuntimeCard = ({ notify }) => {
   const { t } = useTranslation();
@@ -64,30 +66,29 @@ const LlmRuntimeCard = ({ notify }) => {
   };
 
   return (
-    <div className="setting-group" style={{ marginBottom: 0 }}>
-      <div className="ocr-pack-section-header">
-        <h4 className="listen-packs-title">{t('llm.run.title')}</h4>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn-small" onClick={selfTest} disabled={busy !== null || !installed}>
-            {busy === 'test' ? <><RefreshCw size={12} className="spinning" /> {t('llm.run.testing')}</> : t('llm.run.selfTest')}
-          </button>
-          <button className="btn-small uninstall" onClick={unload} disabled={busy !== null || !status.resident}>
-            {t('llm.run.unload')}
-          </button>
-        </div>
+    <div className="ps-config-form">
+      <div className="ps-field">
+        <label className="ps-label">{t('llm.run.backend')}</label>
+        <span style={valueStyle}>{status.provider === 'gpu' ? <Zap size={13} /> : <Cpu size={13} />}{backendText()}</span>
       </div>
-      <div className="info-card storage-card">
-        <div className="storage-grid">
-          <span className="storage-label">{t('llm.run.backend')}</span>
-          <span className="storage-value">{status.provider === 'gpu' ? <Zap size={12} /> : <Cpu size={12} />} {backendText()}</span>
-          <span className="storage-label">{t('llm.run.state')}</span>
-          <span className="storage-value">{status.resident ? t('llm.run.loaded', { file: status.resident.file }) : t('llm.run.idle')}</span>
-          <span className="storage-label">{t('llm.run.speed')}</span>
-          <span className="storage-value">
-            {speed === null ? t('llm.run.speedUnknown') : t('llm.run.speedValue', { n: speed })}
-            {speed !== null && speed < SLOW_TOK_PER_SEC && <span className="engine-badge unavailable" style={{ marginLeft: 6 }}>{t('llm.run.slowHint')}</span>}
-          </span>
-        </div>
+      <div className="ps-field">
+        <label className="ps-label">{t('llm.run.state')}</label>
+        <span style={valueStyle}>{status.resident ? t('llm.run.loaded', { file: status.resident.file }) : t('llm.run.idle')}</span>
+      </div>
+      <div className="ps-field">
+        <label className="ps-label">{t('llm.run.speed')}</label>
+        <span style={valueStyle}>
+          {speed === null ? t('llm.run.speedUnknown') : t('llm.run.speedValue', { n: speed })}
+          {speed !== null && speed < SLOW_TOK_PER_SEC && <span className="engine-badge unavailable">{t('llm.run.slowHint')}</span>}
+        </span>
+      </div>
+      <div className="ps-field" style={{ flexDirection: 'row', gap: 8 }}>
+        <button className="btn-small" onClick={selfTest} disabled={busy !== null || !installed}>
+          {busy === 'test' ? <><RefreshCw size={12} className="spinning" /> {t('llm.run.testing')}</> : t('llm.run.selfTest')}
+        </button>
+        <button className="btn-small uninstall" onClick={unload} disabled={busy !== null || !status.resident}>
+          {t('llm.run.unload')}
+        </button>
       </div>
     </div>
   );

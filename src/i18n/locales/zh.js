@@ -572,6 +572,9 @@ const zh = {
     engineName: "本地模型",
     engineNameWith: "本地模型（{{name}}）",
     packLabel: "{{name}}（{{role}}）",
+    packLabelUnlisted: "{{name}}（未验证）",
+    unverified: "未验证",
+    roleUnlistedHint: "未列入白名单的模型：能载入不等于每个功能都好用，请自行判断；它的请求另写试用日志。名字里带 MT 的按「仅翻译」处理",
     installed: "已安装",
     notInstalled: "未安装",
     mismatch: "文件不符",
@@ -615,7 +618,7 @@ const zh = {
     dev: {
       title: "自定义模型（开发者）",
       allow: "允许试用文件夹里未列入白名单的模型",
-      allowHint: "打开后文件夹里的其他 GGUF 可以探针、可以在「翻译源」里被选用；它们另写试用日志，只保留两个月",
+      allowHint: "打开后文件夹里的其他 GGUF 会出现在上面「模型」里可选，也可以在这里探针；它们另写试用日志，只保留两个月。放入新文件后点模型文件卡上的刷新",
       none: "文件夹里没有未列入的模型",
       probe: "探针",
       probing: "探针中…",

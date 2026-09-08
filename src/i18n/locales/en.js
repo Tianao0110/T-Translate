@@ -572,6 +572,9 @@ const en = {
     engineName: "Local model",
     engineNameWith: "Local model ({{name}})",
     packLabel: "{{name}} ({{role}})",
+    packLabelUnlisted: "{{name}} (unverified)",
+    unverified: "Unverified",
+    roleUnlistedHint: "A model outside the whitelist: loading is not a promise that every feature works, judge for yourself; its requests go to a trial log. Names containing MT are treated as translation-only",
     installed: "Installed",
     notInstalled: "Not installed",
     mismatch: "File mismatch",
@@ -615,7 +618,7 @@ const en = {
     dev: {
       title: "Custom models (developer)",
       allow: "Allow models outside the whitelist from the folder",
-      allowHint: "When on, other GGUF files in the folder can be probed and picked under Providers; they get their own trial log, kept for two months",
+      allowHint: "When on, other GGUF files in the folder appear under Model above and can be probed here; they get their own trial log, kept for two months. After adding a file, hit refresh on the model file card",
       none: "No unlisted models in the folder",
       probe: "Probe",
       probing: "Probing…",

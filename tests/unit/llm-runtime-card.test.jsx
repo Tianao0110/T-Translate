@@ -47,7 +47,7 @@ afterEach(() => {
 describe('LlmRuntimeCard', () => {
   it('shows backend, residency and speed', async () => {
     const { container, findByText } = mount();
-    await findByText('llm.run.title');
+    await findByText('llm.run.backend');
     expect(container.textContent).toContain('llm.run.gpu:Vulkan0');
     expect(container.textContent).toContain('llm.run.loaded:Qwen3-1.7B-Q8_0.gguf');
     expect(container.textContent).toContain('llm.run.speedValue:210');
@@ -56,7 +56,7 @@ describe('LlmRuntimeCard', () => {
 
   it('flags a slow CPU run and disables unload when nothing is resident', async () => {
     const { container, findByText } = mount({ ...STATUS, provider: 'cpu', resident: null, lastHealth: { ok: true, tokPerSec: 5 } });
-    await findByText('llm.run.title');
+    await findByText('llm.run.backend');
     expect(container.textContent).toContain('llm.run.cpu');
     expect(container.textContent).toContain('llm.run.idle');
     expect(container.textContent).toContain('llm.run.slowHint');
@@ -66,7 +66,7 @@ describe('LlmRuntimeCard', () => {
 
   it('runs the self-test and reports the number, unloads on request', async () => {
     const { container, findByText, notify, llm } = mount();
-    await findByText('llm.run.title');
+    await findByText('llm.run.backend');
     fireEvent.click(Array.from(container.querySelectorAll('button')).find((b) => b.textContent === 'llm.run.selfTest'));
     await waitFor(() => expect(llm.selfTest).toHaveBeenCalled());
     await waitFor(() => expect(notify).toHaveBeenCalledWith('llm.run.testOk:200', 'success'));
