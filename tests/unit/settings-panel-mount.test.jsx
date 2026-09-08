@@ -58,4 +58,11 @@ describe('SettingsPanel mounts', () => {
     );
     expect(container.querySelector('.settings-panel')).toBeTruthy();
   });
+
+  it('mounts the built-in model section', () => {
+    const { container } = render(
+      <SettingsPanel showNotification={() => {}} initialSection="llm" onSectionConsumed={() => {}} />
+    );
+    expect(container.querySelector('.settings-panel')).toBeTruthy();
+  });
 });

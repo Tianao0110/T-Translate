@@ -40,6 +40,15 @@ function register(ctx) {
     return { success: true, unloaded };
   });
 
+  ipcMain.handle(CHANNELS.LLM.SELF_TEST, async () => {
+    try {
+      const r = await llmManager.selfTest();
+      return { success: true, ...r };
+    } catch (e) {
+      return { success: false, error: e.message, code: e.code || null };
+    }
+  });
+
   ipcMain.handle(CHANNELS.LLM.PROBE, async (_event, file) => {
     try {
       const report = await llmManager.probe(String(file || ''));

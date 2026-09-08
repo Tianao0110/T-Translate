@@ -20,6 +20,7 @@ import {
 
 import {
   OcrSection,
+  LlmSection,
   InterfaceSection,
   FloatingWindowSection,
   SelectionSection,
@@ -49,6 +50,7 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
     floatingWindow: t('settingsNav.floatingWindow'),
     document: t('settingsNav.document'),
     aiActions: t('settingsNav.aiActions'),
+    llm: t('settingsNav.llm'),
     ocr: t('settingsNav.ocr'),
     audio: t('settingsNav.audio'),
     interface: t('settingsNav.interface'),
@@ -549,6 +551,14 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
               reloadSettings={loadSettings}
             />
           );
+      case 'llm':
+        return (
+          <LlmSection
+            settings={settings}
+            updateSetting={updateSetting}
+            notify={notify}
+          />
+        );
       case 'ocr':
         return (
           <OcrSection

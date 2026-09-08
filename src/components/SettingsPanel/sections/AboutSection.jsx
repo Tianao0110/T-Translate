@@ -91,6 +91,36 @@ const AboutSection = ({ notify, resetSettings }) => {
     loadGpu();
   }, [loadGpu]);
 
+  // T-Engine snapshot: one line per engine — is the host up, which backend,
+  // what the last self-test said. Refreshed on engine events.
+  const [engines, setEngines] = useState(null);
+  const loadEngines = useCallback(async () => {
+    try {
+      const s = await window.electron?.tengine?.status?.();
+      if (s?.engines) setEngines(s.engines);
+    } catch {
+      // older preload — the card stays hidden
+    }
+  }, []);
+  useEffect(() => {
+    loadEngines();
+    return window.electron?.tengine?.onEvent?.(() => loadEngines());
+  }, [loadEngines]);
+
+  const engineLine = (e) => {
+    const parts = [];
+    const host = e.host || null;
+    if (host?.backoffUntil) parts.push(t('about.tengine.backoff'));
+    else parts.push(host?.running ? (host.ready ? t('about.tengine.ready') : t('about.tengine.running')) : t('about.tengine.idle'));
+    if (e.lastHealth) {
+      parts.push(e.lastHealth.ok
+        ? `${t('about.tengine.healthOk')}${e.lastHealth.tokPerSec ? ` · ${t('about.tengine.speed', { n: e.lastHealth.tokPerSec })}` : ''}`
+        : t('about.tengine.healthFail', { reason: e.lastHealth.fallback || e.lastHealth.code || '' }));
+    }
+    if (host?.crashesInWindow) parts.push(t('about.tengine.crashes', { n: host.crashesInWindow }));
+    return parts.join(' · ');
+  };
+
   const toggleGpu = async (next) => {
     if (gpuBusy) return;
     if (next && !(await confirm(t('about.gpu.confirm')))) return;
@@ -553,6 +583,19 @@ const AboutSection = ({ notify, resetSettings }) => {
                 </React.Fragment>
               );
             })}
+          </div>
+        </div>
+      )}
+      {engines && engines.length > 0 && (
+        <div className="info-card storage-card">
+          <h4><Cpu size={16} /> {t('about.tengine.title')}</h4>
+          <div className="storage-grid">
+            {engines.map((e) => (
+              <React.Fragment key={e.id}>
+                <span className="storage-label">{t(`about.gpu.engineNames.${e.id}`)}</span>
+                <span className="storage-value">{engineLine(e)}</span>
+              </React.Fragment>
+            ))}
           </div>
         </div>
       )}

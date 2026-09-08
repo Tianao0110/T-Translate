@@ -229,6 +229,26 @@ const electronAPI = {
     status: () => ipcRenderer.invoke("gpu:status"),
     setEnabled: (enabled) => ipcRenderer.invoke("gpu:set-enabled", enabled),
   },
+  // Built-in model: the model folder's state and the developer door. Text
+  // never crosses here — translation goes through the stack bridge.
+  llm: {
+    status: () => ipcRenderer.invoke("llm:status"),
+    rescan: () => ipcRenderer.invoke("llm:rescan"),
+    openDir: () => ipcRenderer.invoke("llm:open-dir"),
+    unload: () => ipcRenderer.invoke("llm:unload"),
+    selfTest: () => ipcRenderer.invoke("llm:self-test"),
+    probe: (file) => ipcRenderer.invoke("llm:probe", file),
+    trialReport: (file) => ipcRenderer.invoke("llm:trial-report", file),
+  },
+  // T-Engine: engine status snapshot + lifecycle events (numbers only).
+  tengine: {
+    status: () => ipcRenderer.invoke("tengine:status"),
+    onEvent: (callback) => {
+      const handler = (event, data) => callback(data);
+      ipcRenderer.on("tengine:event", handler);
+      return () => ipcRenderer.removeListener("tengine:event", handler);
+    },
+  },
   // Listen-mode model packs. Pack management only: capture and session
   // control belong to the floating window's preload, not this one.
   audioPacks: {

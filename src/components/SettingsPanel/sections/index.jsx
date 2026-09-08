@@ -1,4 +1,5 @@
 ﻿export { default as OcrSection } from './OcrSection.jsx';
+export { default as LlmSection } from './LlmSection.jsx';
 export { default as InterfaceSection } from './InterfaceSection.jsx';
 export { default as FloatingWindowSection } from './FloatingWindowSection.jsx';
 export { default as SelectionSection } from './SelectionSection.jsx';

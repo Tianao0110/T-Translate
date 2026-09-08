@@ -142,6 +142,7 @@ const CHANNELS = {
     RESCAN: 'llm:rescan',             // renderer → main: rescan the folder, returns status
     OPEN_DIR: 'llm:open-dir',         // renderer → main: open the model folder in Explorer
     UNLOAD: 'llm:unload',             // renderer → main: drop the resident model
+    SELF_TEST: 'llm:self-test',       // renderer → main: load the selected pack on the current backend, time a short generation
     PROBE: 'llm:probe',               // renderer → main: (file) five-step probe of an unlisted file (developer door)
     TRIAL_REPORT: 'llm:trial-report', // renderer → main: (file) trial-log summary
   },

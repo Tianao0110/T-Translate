@@ -144,11 +144,11 @@ describe('llm manager', () => {
   });
 
   it('the developer door gates unlisted files, probes them and logs the trial', async () => {
-    const store = fakeStore({ 'settings.tengine.allowUnlistedModels': false });
-    const door = () => store.get('settings.tengine.allowUnlistedModels', false) === true;
+    const store = fakeStore({ 'settings.llm.allowUnlistedModels': false });
+    const door = () => store.get('settings.llm.allowUnlistedModels', false) === true;
     const { adapter } = boot({ store, packs: fakePacks({ unlisted: ['S.gguf'], door }) });
     await expect(manager.generate({ file: 'S.gguf', user: 'U' })).rejects.toMatchObject({ code: 'LLM_MODEL_NOT_ALLOWED' });
-    store.set('settings.tengine.allowUnlistedModels', true);
+    store.set('settings.llm.allowUnlistedModels', true);
     const g = await manager.generate({ file: 'S.gguf', user: 'U' });
     await g.promise;
     expect(g.trial).toBe(true);
@@ -167,7 +167,7 @@ describe('llm manager', () => {
   });
 
   it('forwards llm engine events into the trial log and forgets the model on exit', async () => {
-    const store = fakeStore({ 'settings.tengine.allowUnlistedModels': true });
+    const store = fakeStore({ 'settings.llm.allowUnlistedModels': true });
     const { bus, adapter } = boot({ store, packs: fakePacks({ unlisted: ['S.gguf'], door: () => true }) });
     await manager.ensureLoaded({ file: 'S.gguf' });
     bus.emit({ engine: 'llm', host: 'llm', kind: 'stall', at: 1, phase: 'stream' });

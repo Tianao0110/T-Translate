@@ -13,8 +13,8 @@ const { createLlmPackManager } = require('./llm-pack-manager');
 const { createTrialLog, pruneTrialLogs, summarizeTrialLogs } = require('../tengine/trial-log');
 
 const IDLE_UNLOAD_MS = 5 * 60 * 1000;
-const KEY_ALLOW_UNLISTED = 'settings.tengine.allowUnlistedModels';
-const KEY_TRIAL_TEXT = 'settings.tengine.trialLogText';
+const KEY_ALLOW_UNLISTED = 'settings.llm.allowUnlistedModels';
+const KEY_TRIAL_TEXT = 'settings.llm.trialLogText';
 // Which whitelisted pack the built-in provider uses (settings page choice).
 const KEY_PACK = 'settings.llm.pack';
 const TRIAL_EVENT_KINDS = new Set(['model-loaded', 'model-load-failed', 'request-failed', 'stall', 'health', 'exit']);

@@ -4,7 +4,7 @@ import {
   Globe, Shield, Zap, Moon, Sun,
   Info, Wifi, Eye, Lock,
   Code2, Palette, Layers, MousePointer, Server,
-  FileText, Sparkles, AudioLines
+  FileText, Sparkles, AudioLines, Cpu
 } from 'lucide-react';
 
 import { PRIVACY_MODES, getModeFeatures, isFeatureEnabled, isProviderAllowed as isProviderAllowedByMode, PRIVACY_MODE_IDS } from '@config/privacy-modes';
@@ -38,6 +38,7 @@ export const NAV_ITEMS = [
   { id: 'floatingWindow', icon: Layers, group: 'translation', keywords: ['glass', 'floating', 'overlay', 'pin', '玻璃', '透明', '置顶', '悬浮', '散点', '整段'] },
   { id: 'document', icon: FileText, group: 'translation', keywords: ['document', 'pdf', 'docx', 'epub', 'srt', 'subtitle', '文档', '字幕'] },
   { id: 'aiActions', icon: Sparkles, group: 'translation', keywords: ['ai', 'action', 'summarize', 'explain', 'import', 'prompt', 'AI', '动作', '总结', '讲解', '理解', '导入'] },
+  { id: 'llm', icon: Cpu, group: 'system', keywords: ['llm', 'model', 'built-in', 'local', 'gguf', 'qwen', 'tengine', '内置', '模型', '本地', '大模型'] },
   { id: 'ocr', icon: Eye, group: 'system', keywords: ['ocr', 'recognize', 'screenshot', 'image', 'rapidocr', 'llm', '识别', '截图'] },
   // 听 (recognition models) and 读 (read-aloud) live under one entry; the
   // keyword halves still route a search to the right sub-page (index.jsx).
@@ -129,6 +130,15 @@ export const DEFAULT_SETTINGS = {
   // translation-store.historyLimit, cache cap in the main-process stack).
   privacy: {
     autoDeleteDays: 0,
+  },
+
+  // Built-in model (T-Engine). `pack` is the whitelisted pack id the
+  // translation source runs; the developer switches open the model folder
+  // to files outside the whitelist and let their trial log carry text.
+  llm: {
+    pack: 'qwen3-1.7b',
+    allowUnlistedModels: false,
+    trialLogText: false,
   },
 
   ocr: {
@@ -245,6 +255,10 @@ export const migrateOldSettings = (savedSettings) => {
     ocr: {
       ...DEFAULT_SETTINGS.ocr,
       ...(savedSettings.ocr || {}),
+    },
+    llm: {
+      ...DEFAULT_SETTINGS.llm,
+      ...(savedSettings.llm || {}),
     },
     aiActions: {
       ...DEFAULT_SETTINGS.aiActions,
