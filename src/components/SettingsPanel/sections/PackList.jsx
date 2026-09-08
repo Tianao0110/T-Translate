@@ -8,7 +8,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Download, RefreshCw, Trash2, AlertTriangle } from 'lucide-react';
+import { Download, RefreshCw, Trash2, AlertTriangle, ExternalLink } from 'lucide-react';
 import createLogger from '../../../utils/logger.js';
 const logger = createLogger('PackList');
 
@@ -124,6 +124,24 @@ const PackList = ({ bridge, prefix, notify, confirm, onChanged, onPacks, filter,
             {sizeMB && <span className="engine-size">{sizeMB} MB</span>}
           </div>
           {desc && <p className="setting-hint">{desc}</p>}
+          {/* Link-only packs (over 400 MB are never re-hosted): the upstream
+              link and the folder the extracted archive goes into. */}
+          {pack.manual && !installed && (
+            <div className="sub-setting" style={{ marginTop: 6 }}>
+              <p className="setting-hint">{t(`${prefix}.manualHint`)}</p>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 4 }}>
+                <button className="link-button" onClick={() => window.electron?.shell?.openExternal?.(pack.manual.url)}>
+                  <ExternalLink size={14} /> {t(`${prefix}.manualLink`)}
+                </button>
+                {pack.manual.mirror && (
+                  <button className="link-button" onClick={() => window.electron?.shell?.openExternal?.(pack.manual.mirror)}>
+                    <ExternalLink size={14} /> {t(`${prefix}.manualMirror`)}
+                  </button>
+                )}
+              </div>
+              {pack.targetDir && <p className="setting-hint">{t(`${prefix}.manualDir`, { dir: pack.targetDir })}</p>}
+            </div>
+          )}
           {progress && (
             <div className="engine-download-progress" style={{ marginTop: 6 }}>
               <div className="download-progress-bar">
@@ -136,7 +154,17 @@ const PackList = ({ bridge, prefix, notify, confirm, onChanged, onPacks, filter,
           )}
         </div>
         <div className="pack-actions">
-          {(pack.status === 'not-installed' || pack.status === 'update-available') && (
+          {pack.manual && !installed && (
+            <button
+              className="btn-small"
+              disabled={busyPackId !== null || packsLoading}
+              onClick={() => loadPacks(true)}
+              title={t(`${prefix}.manualRecheck`)}
+            >
+              <RefreshCw size={12} className={packsLoading ? 'spinning' : ''} /> {t(`${prefix}.manualRecheck`)}
+            </button>
+          )}
+          {pack.file && (pack.status === 'not-installed' || pack.status === 'update-available') && (
             <button
               className="btn-small download"
               disabled={busyPackId !== null}

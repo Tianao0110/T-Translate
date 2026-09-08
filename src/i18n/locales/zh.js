@@ -785,6 +785,11 @@ const zh = {
       removeFailed: "模型卸载失败",
       removeConfirm: "确定卸载该模型？卸载后听译要重新下载才能用",
       location: "模型目录：{{dir}}",
+      manualHint: "这个包太大，不经我们的服务器分发：点官方链接下载，解压后把整个文件夹放进下面的目录，再点「已放好，重新检测」",
+      manualLink: "官方下载",
+      manualMirror: "镜像",
+      manualDir: "放到：{{dir}}",
+      manualRecheck: "已放好，重新检测",
       phase: { downloading: "下载中", verifying: "校验中", extracting: "解压中", done: "完成", error: "失败" },
       names: {
         "asr-base-sense-voice": "基础识别模型（中/英/日/韩/粤）",
@@ -891,6 +896,11 @@ const zh = {
     packs: {
       title: "语音包",
       hint: "装包后语音引擎里可选神经语音",
+      manualHint: "这个包太大，不经我们的服务器分发：点官方链接下载，解压后把整个文件夹放进下面的目录，再点「已放好，重新检测」",
+      manualLink: "官方下载",
+      manualMirror: "镜像",
+      manualDir: "放到：{{dir}}",
+      manualRecheck: "已放好，重新检测",
       refresh: "刷新",
       download: "下载",
       update: "更新",

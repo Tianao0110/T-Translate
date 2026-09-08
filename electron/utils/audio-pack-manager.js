@@ -3,6 +3,7 @@
 // Download / verify / staging-swap / remove machinery lives in the core,
 // shared verbatim with the OCR pack manager.
 
+const path = require('path');
 const { net } = require('electron');
 const { store } = require('../state');
 const { isOfflineMode } = require('./privacy-gate');
@@ -51,8 +52,12 @@ const manager = createPackManager({
   // Awaited by the core: stopSession alone returns before the process is
   // actually gone, and the swap would race its file handles.
   evictSessions: () => engineManager.stopSessionAndWait('pack-swap'),
-  // Voice packs share this manifest but belong to tts-pack-manager.
-  computePackList: (installed, manifest) => computePackList(installed, manifest, ASR_TYPES),
+  // Voice packs share this manifest but belong to tts-pack-manager. A
+  // link-only pack that is not installed yet also gets the folder the user
+  // must drop it into, absolute, for the settings page.
+  computePackList: (installed, manifest) =>
+    computePackList(installed, manifest, ASR_TYPES).map((p) =>
+      (p.manual && typeof p.manual === 'object' && !p.dir ? { ...p, targetDir: path.join(packsRoot(), p.manual.dir) } : p)),
   packFilter: (entry) => ASR_TYPES.includes(entry.type),
   packJsonFields: (entry) => ({
     id: entry.id,

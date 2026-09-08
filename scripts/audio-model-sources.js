@@ -124,6 +124,12 @@ const ASR_HQ_PACK = {
   licenses: ['LICENSE-qwen3-asr.txt'],
   license: 'Apache-2.0 (Qwen3-ASR-0.6B, Qwen team / Alibaba Cloud; ONNX export by Wasser1462 via sherpa-onnx)',
   upstream: [`${UPSTREAM_BASE}/${QWEN3_ASR_DIR}.tar.bz2`],
+  // Also reachable by hand: the upstream tarball extracted into
+  // asr-models/<QWEN3_ASR_DIR> resolves without pack.json. The app ships the
+  // same entry in electron/shared/audio-packs.js (MANUAL_PACKS) — a unit test
+  // keeps the two in step. A pack over 400 MB from here on carries `manual`
+  // and no `file`: link only, never uploaded.
+  manual: { dir: QWEN3_ASR_DIR, url: `${UPSTREAM_BASE}/${QWEN3_ASR_DIR}.tar.bz2`, archive: 'tar.bz2' },
 };
 
 // ===== Neural voice packs (v0.4.2) =====

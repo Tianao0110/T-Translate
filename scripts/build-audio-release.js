@@ -121,7 +121,29 @@ function provenanceText(pack, fileHashes) {
   return lines.join('\n');
 }
 
+// A link-only pack has no zip: the manifest entry carries the layout and the
+// upstream link, and the app resolves the hand-placed folder itself.
+function manualEntry(pack) {
+  return {
+    id: pack.id,
+    type: pack.type,
+    version: pack.version,
+    model: pack.model,
+    languages: pack.languages,
+    files: pack.files,
+    ...(pack.engine ? { engine: pack.engine } : {}),
+    license: pack.license,
+    upstream: pack.upstream,
+    manual: pack.manual,
+    size: 0,
+  };
+}
+
 async function buildPack(pack, srcRoot) {
+  if (!pack.file && pack.manual) {
+    console.log(`  ${pack.id}: link-only (${pack.manual.url}), no zip`);
+    return manualEntry(pack);
+  }
   const zip = new JSZip();
   const fileHashes = {};
   let rawBytes = 0;
@@ -187,6 +209,7 @@ async function buildPack(pack, srcRoot) {
     ...(pack.featured ? { featured: pack.featured } : {}),
     ...(pack.preferMixed !== undefined ? { preferMixed: pack.preferMixed } : {}),
     ...(pack.speedScale !== undefined ? { speedScale: pack.speedScale } : {}),
+    ...(pack.manual ? { manual: pack.manual } : {}),
     license: pack.license,
     upstream: pack.upstream,
     size: buffer.length,

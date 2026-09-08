@@ -29,7 +29,7 @@
 
 const nodeFs = require('fs');
 const nodePath = require('path');
-const { ASR_BASE_TYPE, ASR_DRAFT_TYPE, ASR_HQ_TYPE } = require('../shared/audio-packs');
+const { ASR_BASE_TYPE, ASR_DRAFT_TYPE, ASR_HQ_TYPE, MANUAL_PACKS } = require('../shared/audio-packs');
 
 const VAD_FILE = 'silero_vad.onnx';
 const MODEL_FILE = 'model.int8.onnx';
@@ -50,6 +50,34 @@ function isFile(fs, p) {
   } catch {
     return false;
   }
+}
+
+function isDir(fs, p) {
+  try {
+    return fs.statSync(p).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+// Hand-placed upstream folders for the link-only packs (shared/audio-packs
+// MANUAL_PACKS): no pack.json, the folder name and file list are the
+// contract. A pack.json install of the same id wins.
+function manualPacks(baseDir, entries, taken, fs, path) {
+  const dirs = new Set(entries.filter((e) => e.isDirectory()).map((e) => e.name));
+  const out = [];
+  for (const m of MANUAL_PACKS) {
+    if (taken.has(m.id) || !dirs.has(m.manual.dir)) continue;
+    const dir = path.join(baseDir, m.manual.dir);
+    const complete = Object.values(m.files).every((name) => {
+      const p = path.join(dir, name);
+      return isFile(fs, p) || isDir(fs, p);
+    });
+    if (!complete) continue;
+    const { manual, ...meta } = m;
+    out.push({ ...meta, dir, dirName: manual.dir, manual: true });
+  }
+  return out;
 }
 
 function readDirEntries(baseDir, fs) {
@@ -83,6 +111,7 @@ function listInstalledPacks(baseDir, { fs = nodeFs, path = nodePath } = {}) {
       // unreadable pack.json — a half-written folder, not a pack
     }
   }
+  packs.push(...manualPacks(baseDir, entries, new Set(packs.map((p) => p.id)), fs, path));
   return packs;
 }
 

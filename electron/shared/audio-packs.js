@@ -30,6 +30,42 @@ const TTS_TYPES = [TTS_VOICE_TYPE];
 // lists types we must skip rather than offer.
 const KNOWN_TYPES = [...ASR_TYPES, ...TTS_TYPES];
 
+// Packs too big to re-host (the rule since v0.4.10: over 400 MB is a link,
+// not an upload). The user fetches the upstream archive and drops its folder
+// into <models>/asr-models; the layout below is what the locator trusts,
+// pack.json or not ("hand-placed = trusted locally"). Shipped with the app
+// so the folder resolves offline, and merged into the manifest entry of the
+// same id so the settings page can show the link and the target folder.
+// scripts/audio-model-sources.js carries the same entry for the release
+// build; tests/unit/audio-packs.test.js keeps the two in step.
+const QWEN3_ASR_DIR = 'sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25';
+const MANUAL_PACKS = [
+  {
+    id: 'asr-hq-qwen3-0.6b',
+    type: ASR_HQ_TYPE,
+    version: '1.0.0',
+    model: QWEN3_ASR_DIR,
+    engine: 'qwen3-asr',
+    languages: [
+      'zh', 'en', 'yue', 'ja', 'ko', 'hi', 'ar', 'de', 'fr', 'es', 'pt', 'id', 'it', 'ru', 'th', 'vi',
+      'tr', 'ms', 'nl', 'sv', 'da', 'fi', 'pl', 'cs', 'fil', 'fa', 'el', 'hu', 'mk', 'ro',
+    ],
+    files: {
+      convFrontend: 'conv_frontend.onnx',
+      encoder: 'encoder.int8.onnx',
+      decoder: 'decoder.int8.onnx',
+      tokenizer: 'tokenizer',
+    },
+    manual: {
+      dir: QWEN3_ASR_DIR,
+      url: `https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/${QWEN3_ASR_DIR}.tar.bz2`,
+      archive: 'tar.bz2',
+    },
+  },
+];
+
+const manualPackById = (id) => MANUAL_PACKS.find((m) => m.id === id) || null;
+
 // Merge what's installed with what the manifest offers into one UI-ready list.
 // installedPacks: [{ id, version, type, ... }] from the disk scan
 // manifest: { packs: [...] } or null (offline / unreachable)
@@ -40,8 +76,12 @@ function computePackList(installedPacks, manifest, types = KNOWN_TYPES) {
   const installed = new Map((installedPacks || []).map((p) => [p.id, p]));
   const result = [];
 
-  for (const mp of manifest?.packs || []) {
-    if (!types.includes(mp.type)) continue;
+  for (const entry of manifest?.packs || []) {
+    if (!types.includes(entry.type)) continue;
+    // A link-only pack: the manifest may or may not carry the link; the
+    // catalog shipped with the app always does.
+    const manual = entry.manual || manualPackById(entry.id)?.manual || null;
+    const mp = manual ? { ...entry, manual } : entry;
 
     const local = installed.get(mp.id);
     if (!local) {
@@ -73,5 +113,7 @@ module.exports = {
   ASR_TYPES,
   TTS_TYPES,
   KNOWN_TYPES,
+  MANUAL_PACKS,
+  manualPackById,
   computePackList,
 };

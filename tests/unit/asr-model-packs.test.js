@@ -24,7 +24,8 @@ function makeFs(tree) {
       }));
     },
     statSync(p) {
-      if (typeof tree[p] === 'string') return { isFile: () => true };
+      if (typeof tree[p] === 'string') return { isFile: () => true, isDirectory: () => false };
+      if (Array.isArray(tree[p])) return { isFile: () => false, isDirectory: () => true };
       const err = new Error('ENOENT');
       err.code = 'ENOENT';
       throw err;
@@ -216,5 +217,55 @@ describe('locateAsrModels — high-accuracy pack', () => {
       'base/asr-hq-qwen3-0.6b/tokenizer/vocab.json': 'file',
     });
     expect(locateAsrModels('base', { fs, path: P })).toBeNull();
+  });
+});
+
+// Link-only packs (shared/audio-packs MANUAL_PACKS): the upstream folder
+// dropped in by hand resolves without pack.json; a half folder does not; a
+// pack.json install of the same id wins.
+const HQ_DIR = 'sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25';
+function hqManualTree(dir = `base/${HQ_DIR}`) {
+  return {
+    [`${dir}/conv_frontend.onnx`]: 'file',
+    [`${dir}/encoder.int8.onnx`]: 'file',
+    [`${dir}/decoder.int8.onnx`]: 'file',
+    [`${dir}/tokenizer`]: ['vocab.json'],
+    [`${dir}/tokenizer/vocab.json`]: 'file',
+  };
+}
+
+describe('hand-placed link-only packs', () => {
+  it('lists the upstream folder as the high-accuracy pack and resolves it', () => {
+    const fs = makeFs({ base: ['asr-base-sense-voice/', `${HQ_DIR}/`], ...basePackTree(), ...hqManualTree() });
+    const packs = listInstalledPacks('base', { fs, path: P });
+    expect(packs.find((p) => p.id === 'asr-hq-qwen3-0.6b')).toMatchObject({ type: 'asr-hq', manual: true, dirName: HQ_DIR, dir: `base/${HQ_DIR}` });
+    const located = locateAsrModels('base', { fs, path: P });
+    expect(located.hq).toMatchObject({ engine: 'qwen3-asr', tokenizerDir: `base/${HQ_DIR}/tokenizer`, dirName: HQ_DIR });
+  });
+
+  it('a folder missing a file is not a pack', () => {
+    const tree = { base: ['asr-base-sense-voice/', `${HQ_DIR}/`], ...basePackTree(), ...hqManualTree() };
+    delete tree[`base/${HQ_DIR}/decoder.int8.onnx`];
+    const fs = makeFs(tree);
+    expect(listInstalledPacks('base', { fs, path: P }).map((p) => p.id)).toEqual(['asr-base-sense-voice']);
+    expect(locateAsrModels('base', { fs, path: P }).hq).toBeNull();
+  });
+
+  it('a pack.json install of the same id wins over the hand-placed folder', () => {
+    const packJson = JSON.stringify({ id: 'asr-hq-qwen3-0.6b', type: 'asr-hq', version: '1.1.0', engine: 'qwen3-asr', files: { convFrontend: 'a.onnx', encoder: 'b.onnx', decoder: 'c.onnx', tokenizer: 'tok' } });
+    const fs = makeFs({
+      base: ['asr-base-sense-voice/', 'asr-hq-qwen3-0.6b/', `${HQ_DIR}/`],
+      ...basePackTree(),
+      ...hqManualTree(),
+      'base/asr-hq-qwen3-0.6b/pack.json': packJson,
+      'base/asr-hq-qwen3-0.6b/a.onnx': 'file',
+      'base/asr-hq-qwen3-0.6b/b.onnx': 'file',
+      'base/asr-hq-qwen3-0.6b/c.onnx': 'file',
+      'base/asr-hq-qwen3-0.6b/tok/vocab.json': 'file',
+    });
+    const hq = listInstalledPacks('base', { fs, path: P }).filter((p) => p.id === 'asr-hq-qwen3-0.6b');
+    expect(hq).toHaveLength(1);
+    expect(hq[0]).toMatchObject({ version: '1.1.0', dirName: 'asr-hq-qwen3-0.6b' });
+    expect(hq[0].manual).toBeUndefined();
   });
 });

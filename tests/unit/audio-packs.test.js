@@ -69,3 +69,36 @@ describe('pack types', () => {
     expect(list.map((p) => p.status)).toEqual(['not-installed']);
   });
 });
+
+import { createRequire } from 'module';
+import { MANUAL_PACKS, manualPackById } from '../../electron/shared/audio-packs.js';
+
+const require = createRequire(import.meta.url);
+
+describe('link-only packs', () => {
+  it('merges the hand-placed link into the manifest entry of the same id', () => {
+    const list = computePackList([], { packs: [{ id: 'asr-hq-qwen3-0.6b', type: 'asr-hq', version: '1.0.0', file: 'x.zip' }] }, ASR_TYPES);
+    expect(list[0].manual).toMatchObject({ dir: 'sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25' });
+    expect(list[0].manual.url).toMatch(/^https:\/\/github\.com\/k2-fsa\/sherpa-onnx\//);
+    expect(list[0].file).toBe('x.zip');
+  });
+
+  it('a manifest that carries its own link keeps it', () => {
+    const own = { dir: 'd', url: 'https://elsewhere/x.tar.bz2' };
+    const list = computePackList([], { packs: [{ id: 'asr-hq-qwen3-0.6b', type: 'asr-hq', version: '1.0.0', manual: own }] }, ASR_TYPES);
+    expect(list[0].manual).toEqual(own);
+  });
+
+  it('every catalog entry mirrors the release source definition', () => {
+    const { PACKS } = require('../../scripts/audio-model-sources.js');
+    for (const m of MANUAL_PACKS) {
+      const src = PACKS.find((p) => p.id === m.id);
+      expect(src, m.id).toBeTruthy();
+      expect(m).toMatchObject({ type: src.type, version: src.version, model: src.model, files: src.files, languages: src.languages, engine: src.engine });
+      expect(m.manual).toEqual(src.manual);
+      expect(m.manual.dir).toBe(m.model);
+      expect(manualPackById(m.id)).toBe(m);
+    }
+    expect(manualPackById('nope')).toBeNull();
+  });
+});

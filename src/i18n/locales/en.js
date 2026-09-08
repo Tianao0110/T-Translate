@@ -785,6 +785,11 @@ const en = {
       removeFailed: "Uninstall failed",
       removeConfirm: "Uninstall this model? Listen mode needs it downloaded again to work",
       location: "Model folder: {{dir}}",
+      manualHint: "Too big to re-host: download from the official link, extract, put the whole folder into the directory below, then click “Placed, check again”",
+      manualLink: "Official download",
+      manualMirror: "Mirror",
+      manualDir: "Put it in: {{dir}}",
+      manualRecheck: "Placed, check again",
       phase: { downloading: "Downloading", verifying: "Verifying", extracting: "Extracting", done: "Done", error: "Failed" },
       names: {
         "asr-base-sense-voice": "Base model (zh/en/ja/ko/yue)",
@@ -891,6 +896,11 @@ const en = {
     packs: {
       title: "Voice packs",
       hint: "Install a pack to unlock Neural Voices.",
+      manualHint: "Too big to re-host: download from the official link, extract, put the whole folder into the directory below, then click “Placed, check again”",
+      manualLink: "Official download",
+      manualMirror: "Mirror",
+      manualDir: "Put it in: {{dir}}",
+      manualRecheck: "Placed, check again",
       refresh: "Refresh",
       download: "Download",
       update: "Update",
