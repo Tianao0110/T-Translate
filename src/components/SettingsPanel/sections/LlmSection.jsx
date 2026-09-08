@@ -121,7 +121,7 @@ const LlmSection = ({ settings, updateSetting, notify }) => {
       <p className="setting-description">{t('llm.description')}</p>
 
       {options.length > 0 && (
-        <div className="setting-group">
+        <div className="setting-group wide">
           <label className="setting-label">{t('llm.modelLabel')}</label>
           <Seg
             size="small"
@@ -136,7 +136,7 @@ const LlmSection = ({ settings, updateSetting, notify }) => {
       )}
 
       {selected && (
-        <div className="setting-group">
+        <div className="setting-group wide">
           <label className="setting-label">{t('llm.fileLabel')}</label>
           <div className="ocr-engines-list">
             <div className={`ocr-engine-item ${selected.status === 'ready' || selected.status === 'unverified' ? 'active' : ''}`.trim()}>
@@ -195,7 +195,7 @@ const LlmSection = ({ settings, updateSetting, notify }) => {
       {/* Files outside the whitelist (last year's model included) are always
           listed so the user can see what sits in the folder; probing and
           using them needs the switch. */}
-      <div className="setting-group">
+      <div className="setting-group wide">
         <label className="setting-label">{t('llm.dev.title')}</label>
         <Switch
           checked={doorOpen}
