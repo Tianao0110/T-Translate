@@ -33,6 +33,7 @@
     "check:all": "npm run check:constants && npm run check:languages && npm run check:i18n && npm run check:hardcoded",
     "smoke:ocr": "electron scripts/smoke-ocr.js",
     "smoke:llm": "node scripts/smoke-llm.js",
+    "smoke:llm-host": "electron scripts/smoke-llm-host.js",
     "postinstall": "node scripts/overlay-sherpa-runtime.js",
     "runtime:overlay": "node scripts/overlay-sherpa-runtime.js"
   },

@@ -108,6 +108,17 @@ function get() {
       onEvent: (evt) => tengine.emit(evt),
     }),
   );
+  const { createLlmEngine } = require('./engines/llm');
+  const { resources } = require('../shared/paths');
+  tengine.register(
+    createLlmEngine({
+      fork,
+      logger: createLogger('LLM-Host'),
+      workerPath: path.join(__dirname, '../services/llm-host/llm-host.js'),
+      runtimeDir: resources.llamaRuntime,
+      onEvent: (evt) => tengine.emit(evt),
+    }),
+  );
   _default = tengine;
   return tengine;
 }

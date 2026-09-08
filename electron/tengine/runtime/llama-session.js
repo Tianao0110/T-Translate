@@ -508,7 +508,9 @@ function openSession(binding, {
     }
     emit(stripper.push(decoder.end()));
     emit(stripper.flush());
-    if (stop !== 'cancel' && stop !== 'error') last = decoded;
+    // llama rolls an aborted batch back, so after a cancel the context still
+    // holds exactly the tokens that decoded; only a real error loses it.
+    if (stop !== 'error') last = decoded;
     const totalMs = now() - t0;
     return {
       ...base,

@@ -10,10 +10,13 @@
 //     {type:'load-model', reqId, file, options}  -> {type:'progress', reqId, value}* then {type:'model', reqId, ok, info|error}
 //     {type:'generate', reqId, system?, user?, prompt?, maxTokens?, sampler?}
 //                                                -> {type:'token', reqId, text}* then {type:'done', reqId, ok, result|error}
-//     {type:'unload-model'}                      -> {type:'unloaded'}
+//     {type:'unload-model', reqId}               -> {type:'unloaded', reqId}
 //     {type:'probe', reqId, file, options}       -> {type:'probed', reqId, report}
-//     {type:'metrics'}                           -> {type:'metrics', rss, ctxUsed, devices}
-//     {type:'shutdown'}
+//     {type:'health', reqId, file, options}      -> {type:'health', reqId, ok, value|error}
+//                                                   (loads the file unless it is the loaded one on the same
+//                                                    provider, then times a short fixed generation)
+//     {type:'metrics', reqId}                    -> {type:'metrics', reqId, rss, model, devices}
+//     {type:'shutdown'}                          -> {type:'shutdown-ack'}
 // out {type:'log', level, message} at any time
 
 const fs = require('fs');
@@ -29,7 +32,10 @@ const log = (level, message) => post({ type: 'log', level, message });
 const errInfo = (e) => ({ message: e.message, code: e.code || 'LLM_FAILED' });
 
 let binding = null;
-let current = null; // { session, file }
+let current = null; // { session, file, provider }
+// Long enough to time: the answer runs to the token limit.
+const HEALTH_PROMPT = 'List the numbers from one to thirty as English words, separated by commas.';
+const HEALTH_TOKENS = 24;
 
 function runtimeInfo() {
   return {
@@ -62,16 +68,46 @@ function loadModel(msg) {
     abortFlag,
     onProgress: (value) => post({ type: 'progress', reqId: msg.reqId, value }),
   });
-  current = { session: s, file: msg.file };
+  current = { session: s, file: msg.file, provider: (msg.options || {}).provider || 'cpu' };
+  return modelInfo();
+}
+
+function modelInfo() {
+  const s = current.session;
   return {
     ...s.info(),
-    file: msg.file,
+    file: current.file,
     provider: s.provider,
     device: s.device,
     fallback: s.fallback,
     loadMs: s.loadMs,
     ctxMs: s.ctxMs,
     threads: s.threads,
+  };
+}
+
+// The self-test behind the GPU switch and the pre-install check: the model
+// on the requested provider, plus a short fixed generation for the numbers.
+function health(msg) {
+  requireRuntime();
+  const provider = (msg.options || {}).provider || 'cpu';
+  const fresh = !current || current.file !== msg.file || current.provider !== provider;
+  const info = fresh ? loadModel(msg) : modelInfo();
+  if (abortFlag) Atomics.store(abortFlag, 0, 0);
+  const prompt = current.session.buildPrompt({ user: HEALTH_PROMPT });
+  // The first GPU generation pays for pipeline setup; time the second.
+  current.session.generate({ prompt, maxTokens: 2 });
+  const r = current.session.generate({ prompt, maxTokens: HEALTH_TOKENS });
+  return {
+    ok: r.genTokens > 0 && r.stop !== 'error',
+    provider: info.provider,
+    device: info.device,
+    fallback: info.fallback,
+    loadMs: fresh ? info.loadMs : 0,
+    firstMs: r.firstMs,
+    tokPerSec: r.tokPerSec,
+    genTokens: r.genTokens,
+    stop: r.stop,
   };
 }
 
@@ -184,13 +220,20 @@ function handle(msg) {
       return;
     case 'unload-model':
       unloadModel();
-      post({ type: 'unloaded' });
+      post({ type: 'unloaded', reqId: msg.reqId });
       return;
     case 'probe':
       post({ type: 'probed', reqId: msg.reqId, report: probe(msg) });
       return;
+    case 'health':
+      try {
+        post({ type: 'health', reqId: msg.reqId, ok: true, value: health(msg) });
+      } catch (e) {
+        post({ type: 'health', reqId: msg.reqId, ok: false, error: errInfo(e) });
+      }
+      return;
     case 'metrics':
-      post({ type: 'metrics', ...metrics() });
+      post({ type: 'metrics', reqId: msg.reqId, ...metrics() });
       return;
     case 'shutdown':
       unloadModel();
