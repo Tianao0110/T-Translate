@@ -251,6 +251,7 @@ electron/utils/open-with.js     右键菜单 argv 解析（.pdf/.docx/.txt 白�
 
 ```
 electron/managers/audio-engine-manager.js  听译会话与神经 TTS 的会话语义（来源 / 语言 / 档位 / 字幕事件转发 / 一次性重启策略）；进程本身归 T-Engine 的音频适配器（v0.5.0）
+electron/managers/listen-translator.js     听译的翻译、逐句记录与会话结束时的字幕文件（v0.5.0 从悬浮窗搬入）：定稿编号、带上文的系统提示（utils/listen-prompt.js）、流式译文经 audio-engine:translation 推给窗口、结束时等在途翻译 3 s 再落盘
 electron/tengine/engines/audio.js          音频宿主适配器：进程生命周期、模型载入计时、退出分类（model-load / session / idle）、provider 与 sherpa 的 stderr 回退标记、朗读自检；manager 订阅它转发的 worker 消息
 electron/tengine/                          T-Engine 引擎层（v0.5.0 第 1 步）：host-manager.js 通用宿主框架（按需拉起、请求配对、崩溃重生、连崩退避、事件流、状态快照）、registry.js 引擎表、engines/ocr.js OCR 引擎适配器（持有 OCR 宿主，provider / health / status）、index.js 门面（status() 快照 + on() 事件流）；手册见 docs/T-ENGINE.md
 electron/ipc/tengine.js                    tengine:status 快照与 tengine:event 转发；宿主生命周期事件在这里进 app 日志

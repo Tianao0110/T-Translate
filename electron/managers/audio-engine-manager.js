@@ -29,6 +29,8 @@ const { locateAsrModels } = require('../utils/asr-models');
 const { listVoicePacks } = require('../utils/tts-models');
 const { modelDir, modelDirs } = require('../utils/model-root');
 const { dataDir } = require('../utils/data-root');
+const { createListenAutosave } = require('../utils/listen-autosave');
+const { createListenTranslator } = require('./listen-translator');
 const tengine = require('../tengine');
 const logger = require('../utils/logger')('AudioEngine');
 
@@ -69,6 +71,11 @@ let exitRequested = false;
 // The gate is on while the set is non-empty; the worker drops captured audio
 // for that span (+ a short tail) so the app never transcribes its own voice.
 const ttsPlayingSenders = new Set();
+// Translation + transcript of the running session (listen-translator.js);
+// the stack call is wired in by the IPC layer once the stack exists.
+let translator = null;
+let translateStreamHook = null;
+let autosaveStore = null;
 
 function adapter() {
   return (audio ||= tengine.get().get('audio'));
@@ -85,6 +92,43 @@ function init(d) {
   unsubEvents = tengine.get().on(onEngineEvent);
   // The GPU switch persists in the store; the worker reads it at spawn.
   a.setProvider(d.store?.get?.('settings.gpu.enabled') === true ? 'webgpu' : 'cpu');
+  autosaveStore = createListenAutosave({ dir: dataDir('listen') });
+  translator = createListenTranslator({
+    translateStream: (...args) => translateStreamHook(...args),
+    enabled: () => !!translateStreamHook,
+    uiLang: () => (deps.store.get('settings.interface.language') === 'en' ? 'en' : 'zh'),
+    // Secure mode writes nothing; the user's switch is honoured here, one
+    // layer below the window.
+    autosave: async (content, sourceName) => {
+      if (isSecure()) return null;
+      if (deps.store.get('settings.listen.autosave', true) === false) return null;
+      const filePath = autosaveStore.save(content, sourceName);
+      logger.info(`subtitles saved: ${filePath}`);
+      return filePath;
+    },
+    emit: (kind, payload) => sendToWindow(kind === 'translation' ? CHANNELS.AUDIO_ENGINE.TRANSLATION : CHANNELS.AUDIO_ENGINE.AUTOSAVED, payload),
+    logger,
+  });
+}
+
+// The IPC layer owns the translation stack; it hands the main-process
+// stream call in once both exist.
+function configureTranslation({ translateStream } = {}) {
+  translateStreamHook = typeof translateStream === 'function' ? translateStream : null;
+}
+
+function setTargetLang(lang) {
+  translator?.setTarget(lang);
+}
+
+function listenDir() {
+  return autosaveStore ? autosaveStore.dir : dataDir('listen');
+}
+
+// The session's transcript is filed when the session ends, however it
+// ends; the translator ignores a second call.
+function endTranscript(reason) {
+  translator?.endSession(reason).catch((e) => logger.warn(`transcript end failed: ${e.message}`));
 }
 
 // Where a download lands. Reads go through findModels(), which also looks at
@@ -160,6 +204,7 @@ function startSession(options = {}) {
   // A TTS-only process was declared without ASR paths or a session log; a
   // session gets a fresh one and the voice reloads on the next utterance.
   if (adapter().running()) discardWorker('listen-start');
+  translator?.beginSession({ targetLang: options.targetLang, sourceName: options.source?.name });
   spawnWorker(models);
 
   // A mid-session switch to SECURE keeps the session but closes its log:
@@ -318,7 +363,9 @@ function onWorkerMessage(msg) {
       sendToWindow(CHANNELS.AUDIO_ENGINE.LEVEL, msg.value);
       break;
     case 'segment':
-      sendToWindow(CHANNELS.AUDIO_ENGINE.SEGMENT, msg.rec);
+      // The translator numbers the final and translates it; the window gets
+      // the record with its id, the translation follows on its own channel.
+      sendToWindow(CHANNELS.AUDIO_ENGINE.SEGMENT, translator ? translator.onSegment(msg.rec) : msg.rec);
       break;
     case 'partial':
       sendToWindow(CHANNELS.AUDIO_ENGINE.PARTIAL, msg.text);
@@ -336,6 +383,7 @@ function onWorkerMessage(msg) {
       // now rather than whenever the process happens to die — the pack swap
       // behind stopSessionAndWait depends on that.
       clearTimeout(killTimer);
+      endTranscript('stopped');
       if (adapter().running()) {
         try {
           adapter().post({ type: 'unload', what: 'asr' });
@@ -406,6 +454,7 @@ function onWorkerExit({ code, everReady }) {
   // No session was running in it: nothing to report on the status channel.
   if (wasTtsOnly) return;
 
+  endTranscript(wasStopping ? 'stopped' : 'engine-exited');
   if (wasStopping) {
     sendStatus('stopped');
     return;
@@ -818,6 +867,9 @@ async function ttsSelfTest() {
 
 module.exports = {
   init,
+  configureTranslation,
+  setTargetLang,
+  listenDir,
   isAvailable,
   getInfo,
   startSession,

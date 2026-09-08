@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { buildListenSystemPrompt } from '../../src/utils/listen-prompt.js';
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
+const { buildListenSystemPrompt } = require('../../electron/utils/listen-prompt.js');
 
 describe('buildListenSystemPrompt', () => {
   it('names the target language in the UI language and keeps the context out of the user turn', () => {

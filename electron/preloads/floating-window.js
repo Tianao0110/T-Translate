@@ -88,10 +88,21 @@ contextBridge.exposeInMainWorld('electron', {
     // Which programs are making sound, and whether this Windows build can
     // capture a single one of them.
     listSources: () => ipcRenderer.invoke('audio-engine:sources'),
-    // Subtitles are filed automatically when a session ends or restarts; the
-    // window only ever asks to open the folder they land in.
-    autosaveSrt: (content, sourceName) => ipcRenderer.invoke('audio-engine:autosave-srt', { content, sourceName }),
+    // Translation of each final happens in the main process; the window
+    // only names the target and paints what comes back. Subtitles are filed
+    // there too when the session ends; the window only opens the folder.
+    setTarget: (lang) => ipcRenderer.send('audio-engine:set-target', lang),
     openListenDir: () => ipcRenderer.invoke('audio-engine:open-listen-dir'),
+    onTranslation: (cb) => {
+      const handler = (event, payload) => cb(payload);
+      ipcRenderer.on('audio-engine:translation', handler);
+      return () => ipcRenderer.removeListener('audio-engine:translation', handler);
+    },
+    onAutosaved: (cb) => {
+      const handler = (event, payload) => cb(payload);
+      ipcRenderer.on('audio-engine:autosaved', handler);
+      return () => ipcRenderer.removeListener('audio-engine:autosaved', handler);
+    },
     onStatus: (cb) => {
       const handler = (event, payload) => cb(payload);
       ipcRenderer.on('audio-engine:status', handler);

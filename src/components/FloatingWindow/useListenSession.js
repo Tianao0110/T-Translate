@@ -11,21 +11,14 @@
 // (privacy injected there), and SRT export assembly.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import i18n from 'i18next';
 import createLogger from '../../utils/logger.js';
-import stackClient from '../../services/stack-client.js';
 import { normalizeDraftCase } from '../../utils/listen-text.js';
-import { buildListenSystemPrompt } from '../../utils/listen-prompt.js';
 
 const logger = createLogger('ListenSession');
 
 // On-screen scrollback. Small on purpose: every kept segment is live DOM, and
 // nobody scrolls back an hour in a subtitle overlay.
 const MAX_SEGMENTS = 100;
-// Full transcript kept for SRT export, in a ref — no re-render, no DOM. A
-// 2-hour film is ~2000 lines (~400KB); the cap is a runaway backstop, not a
-// budget, and is announced when it bites rather than silently dropping lines.
-const MAX_TRANSCRIPT = 20000;
 
 // Source-list cadence. The picker can only show programs that already opened
 // an audio stream, so it is refreshed in a burst right after a session starts
@@ -37,35 +30,13 @@ const SOURCES_EVERY_MS = 8000;
 const SOURCES_IDLE_EVERY_MS = 4000;
 const SOURCES_STOP_AFTER_MS = 180000;
 
-let nextSegId = 1;
-
-// SRT text for the finals collected so far; the in-flight draft is not a
-// final and never lands in a file.
-function buildSrt(finals) {
-  const pad = (n, w) => String(n).padStart(w, '0');
-  const ts = (sec) => {
-    const ms = Math.max(0, Math.round(sec * 1000));
-    const h = Math.floor(ms / 3600000);
-    const m = Math.floor((ms % 3600000) / 60000);
-    const s = Math.floor((ms % 60000) / 1000);
-    return `${pad(h, 2)}:${pad(m, 2)}:${pad(s, 2)},${pad(ms % 1000, 3)}`;
-  };
-  const blocks = finals.map((seg, i) => {
-    const lines = [seg.text];
-    if (seg.trans && seg.trans !== 'pending') lines.push(seg.trans);
-    return `${i + 1}\n${ts(seg.startS)} --> ${ts(seg.startS + seg.durS)}\n${lines.join('\n')}`;
-  });
-  return blocks.join('\n\n') + '\n';
-}
-
+// Translation, the session transcript and the subtitle file are the main
+// process's (managers/listen-translator.js): this hook shows a 100-line
+// window of finals with whatever translation has arrived for each.
 export default function useListenSession({ active, onAutosaved }) {
   const [sessionState, setSessionState] = useState('idle');
   const [running, setRunning] = useState(false);
   const [segments, setSegments] = useState([]);
-  // Export reads this, not `segments`: the visible list is a 100-line window,
-  // and exporting a two-hour session used to hand back only its tail.
-  const transcriptRef = useRef([]);
-  const transcriptTruncatedRef = useRef(false);
   // 0..1 capture level, updated straight from the audio callback (see below).
   const levelRef = useRef(0);
   const [ttsGated, setTtsGated] = useState(false);
@@ -101,7 +72,6 @@ export default function useListenSession({ active, onAutosaved }) {
   // switch, a hover); the refresh schedule stops SOURCES_STOP_AFTER_MS later.
   const sourcesActivityRef = useRef(0);
   const [sourcesTick, setSourcesTick] = useState(0);
-  const autosavedRef = useRef(false);
   const onAutosavedRef = useRef(onAutosaved);
   onAutosavedRef.current = onAutosaved;
 
@@ -110,45 +80,22 @@ export default function useListenSession({ active, onAutosaved }) {
     setSourcesTick((n) => n + 1);
   }, []);
 
-  // One file per session, written the moment it ends or restarts (stop, a
-  // source or language switch, the window closing) so an interruption never
-  // costs the transcript. Secure mode and the user's switch are enforced in
-  // the main process; here they just mean "nothing to announce".
-  const autosave = useCallback(async () => {
-    if (autosavedRef.current) return;
-    const finals = transcriptRef.current.filter((s) => s.text);
-    if (!finals.length) return;
-    autosavedRef.current = true;
-    const content = buildSrt(finals);
-    try {
-      const res = await window.electron?.audioEngine?.autosaveSrt?.(content, sourceRef.current.name || '');
-      if (res?.success) onAutosavedRef.current?.(res);
-      else if (res && res.error !== 'secure' && res.error !== 'disabled') logger.warn('subtitle autosave failed:', res.error);
-    } catch (e) {
-      logger.warn('subtitle autosave failed:', e.message);
-    }
-  }, []);
-
-  const resetTranscript = useCallback(() => {
+  const resetView = useCallback(() => {
     setSegments([]);
-    transcriptRef.current = [];
-    transcriptTruncatedRef.current = false;
-    autosavedRef.current = false;
     setPartial('');
   }, []);
 
-  // Mid-session switch: the worker restarts with the new config. The finals
-  // so far are filed and the transcript starts over, exactly as stop + start
-  // would — the new worker's clock starts at zero, so old and new lines
-  // could not share a timeline anyway.
+  // Mid-session switch: the worker restarts with the new config. The main
+  // process files the finals so far and the view starts over, exactly as
+  // stop + start would — the new worker's clock starts at zero, so old and
+  // new lines could not share a timeline anyway.
   const restartSession = useCallback(() => {
-    autosave();
-    resetTranscript();
+    resetView();
     pendingRestartRef.current = true;
     engineReadyRef.current = false;
     setSessionState('loading');
     window.electron?.audioEngine?.stop?.();
-  }, [autosave, resetTranscript]);
+  }, [resetView]);
 
   const setLang = useCallback((value) => {
     setLangState(value);
@@ -164,6 +111,9 @@ export default function useListenSession({ active, onAutosaved }) {
     setTargetLangState(value);
     targetLangRef.current = value;
     try { localStorage.setItem('listenTargetLang', value); } catch { /* storage off */ }
+    // Applies to the next finals of a running session; the translator
+    // lives in the main process.
+    window.electron?.audioEngine?.setTarget?.(value);
   }, []);
 
   // Switching source mid-session restarts the worker's capture in place; the
@@ -177,13 +127,11 @@ export default function useListenSession({ active, onAutosaved }) {
       ? { mode: 'system', pid: 0, name: '' }
       : { mode, pid, name: typeof next?.name === 'string' ? next.name : '' };
     if (value.mode !== 'system' && !value.pid) return;
-    // File the old source's lines under its own name before the ref moves on.
-    if (runningRef.current) autosave();
     setSourceState(value);
     sourceRef.current = value;
     bumpSourcesActivity();
     if (runningRef.current) restartSession();
-  }, [autosave, bumpSourcesActivity, restartSession]);
+  }, [bumpSourcesActivity, restartSession]);
 
   const refreshSources = useCallback(async () => {
     try {
@@ -202,84 +150,28 @@ export default function useListenSession({ active, onAutosaved }) {
     engineReadyRef.current = false;
     errorLatchRef.current = false;
     pendingRestartRef.current = false;
-    resetTranscript();
+    resetView();
     sourcesActivityRef.current = Date.now();
     window.electron?.audioEngine?.start?.({
       language: langRef.current,
+      targetLang: targetLangRef.current,
       source: sourceRef.current,
     });
-  }, [resetTranscript]);
+  }, [resetView]);
 
   const stop = useCallback(() => {
-    autosave();
     runningRef.current = false;
     setRunning(false);
     engineReadyRef.current = false;
     levelRef.current = 0; // the meter must not freeze on the last loud frame
     setPartial('');
     window.electron?.audioEngine?.stop?.();
-  }, [autosave]);
+  }, []);
 
   const toggle = useCallback(() => {
     if (runningRef.current) stop();
     else start();
   }, [start, stop]);
-
-  // ===== per-final translation (finals only — the contract) =====
-
-  // Writes the settled translation into the export transcript as well as the
-  // visible list. Scans from the tail: a translation lands seconds after its
-  // segment, so the match is the last entry in practice.
-  const settleTrans = useCallback((segId, trans) => {
-    const arr = transcriptRef.current;
-    for (let i = arr.length - 1; i >= 0; i--) {
-      if (arr[i].id === segId) {
-        arr[i].trans = trans;
-        break;
-      }
-    }
-    setSegments((prev) => prev.map((s) => (s.id === segId ? { ...s, trans } : s)));
-  }, []);
-
-  const translateSegment = useCallback(async (segId, rec) => {
-    const target = targetLangRef.current;
-    if (!target) return;
-    const srcLang = (rec.lang || '').replace(/[<|>]/g, '');
-    if (srcLang === target) return;
-    setSegments((prev) => prev.map((s) => (s.id === segId ? { ...s, trans: 'pending' } : s)));
-    // The two finals before this one, as context for the LLM prompt (MT
-    // engines ignore the system prompt and translate the bare line).
-    const arr = transcriptRef.current;
-    let idx = arr.length - 1;
-    while (idx >= 0 && arr[idx].id !== segId) idx--;
-    const context = idx > 0 ? arr.slice(Math.max(0, idx - 2), idx).map((s) => s.text) : [];
-    const systemPrompt = buildListenSystemPrompt({ targetLang: target, context, uiLang: i18n.language });
-    // Chunks carry the full text so far; paint them at most ~10 times a second
-    // so a fast model does not turn every token into a React commit.
-    let lastPaint = 0;
-    const paint = (text) => {
-      const now = Date.now();
-      if (now - lastPaint < 100) return;
-      lastPaint = now;
-      setSegments((prev) => prev.map((s) => (s.id === segId ? { ...s, trans: text } : s)));
-    };
-    try {
-      const res = await stackClient.translateStream(
-        rec.text,
-        { sourceLang: 'auto', targetLang: target, systemPrompt },
-        (full) => { if (full) paint(full); },
-        // supersede off: lines translate concurrently and never abort each
-        // other. noCache: subtitle lines are one-shot — caching them evicts
-        // the user's real translation cache (200 entries, shared) and rewrites
-        // the cache file every couple of seconds. The flag can only ever
-        // REDUCE caching; the secure-mode gate lives in the main-process facade.
-        { supersede: false, noCache: true }
-      );
-      settleTrans(segId, res?.success && res.text ? res.text : null);
-    } catch {
-      settleTrans(segId, null);
-    }
-  }, [settleTrans]);
 
   // ===== engine event wiring (only while listen mode is active) =====
 
@@ -316,6 +208,7 @@ export default function useListenSession({ active, onAutosaved }) {
         pendingRestartRef.current = false;
         window.electron?.audioEngine?.start?.({
           language: langRef.current,
+          targetLang: targetLangRef.current,
           source: sourceRef.current,
         });
         return; // status stays 'loading'
@@ -332,18 +225,21 @@ export default function useListenSession({ active, onAutosaved }) {
       setSessionState(state);
     });
 
+    // Finals arrive numbered by the main process; their translations follow
+    // on the translation channel keyed by that id ('pending', then the text
+    // so far, then the settled text or null).
     const offSegment = bridge.onSegment((rec) => {
-      const id = nextSegId++;
-      const seg = { id, startS: rec.segStartS, durS: rec.segDurS, lang: rec.lang, text: rec.text, repeated: rec.repeated, trans: null };
-      if (transcriptRef.current.length >= MAX_TRANSCRIPT) transcriptTruncatedRef.current = true;
-      else transcriptRef.current.push(seg);
+      const seg = { id: rec.id, startS: rec.segStartS, durS: rec.segDurS, lang: rec.lang, text: rec.text, repeated: rec.repeated, trans: null };
       setSegments((prev) => {
         const next = [...prev, seg];
         return next.length > MAX_SEGMENTS ? next.slice(next.length - MAX_SEGMENTS) : next;
       });
       setPartial('');
-      translateSegment(id, rec);
     });
+    const offTranslation = bridge.onTranslation?.(({ id, text }) => {
+      setSegments((prev) => prev.map((s) => (s.id === id ? { ...s, trans: text } : s)));
+    });
+    const offAutosaved = bridge.onAutosaved?.((result) => onAutosavedRef.current?.(result));
 
     const offPartial = bridge.onPartial((text) => setPartial(normalizeDraftCase(text || '')));
     // Level arrives from the worker at ~12/s and lands in a ref: the meter
@@ -361,11 +257,13 @@ export default function useListenSession({ active, onAutosaved }) {
     return () => {
       offStatus?.();
       offSegment?.();
+      offTranslation?.();
+      offAutosaved?.();
       offPartial?.();
       offLevel?.();
       offGate?.();
     };
-  }, [active, stop, translateSegment]);
+  }, [active, stop]);
 
   // A program that starts playing after the session began must still be
   // pickable (switching mid-session is supported), hence the running-state

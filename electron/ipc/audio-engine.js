@@ -3,10 +3,7 @@
 
 const { ipcMain, shell } = require('electron');
 const fs = require('fs');
-const { CHANNELS, PRIVACY_MODES } = require('../shared/channels');
-const { store } = require('../state');
-const { dataDir } = require('../utils/data-root');
-const { createListenAutosave } = require('../utils/listen-autosave');
+const { CHANNELS } = require('../shared/channels');
 const engineManager = require('../managers/audio-engine-manager');
 const winAudio = require('../utils/win-audio-capture');
 const packManager = require('../utils/audio-pack-manager');
@@ -15,10 +12,6 @@ const logger = require('../utils/logger')('IPC:AudioEngine');
 
 const AE = CHANNELS.AUDIO_ENGINE;
 
-// The SRT body is renderer-supplied, and the threat model for this app is a
-// compromised renderer, not a mistyped call. 16MB is far past the export's own
-// ceiling (20000 transcript lines, useListenSession MAX_TRANSCRIPT).
-const MAX_SRT_BYTES = 16 * 1024 * 1024;
 // One utterance. The translation panel's longest text is a few paragraphs;
 // anything past this is not a read-aloud request.
 const MAX_TTS_CHARS = 5000;
@@ -65,40 +58,18 @@ function registerAudioEngineIPC(ctx) {
     };
   });
 
-  // Subtitle auto-save: the renderer assembles the SRT text (it owns the
-  // finals and their timestamps) and sends it when a session ends or
-  // restarts; this side files it under <data>\listen with no dialog. Secure
-  // mode writes nothing and the user's switch is honoured here, one layer
-  // below the window that asks. The content is the user's own transcript —
-  // same trust level as clipboard.
-  const autosave = createListenAutosave({ dir: dataDir('listen') });
-  ipcMain.handle(AE.AUTOSAVE_SRT, async (event, payload) => {
-    const content = typeof payload?.content === 'string' ? payload.content : '';
-    if (!content) return { success: false, error: 'empty' };
-    if (Buffer.byteLength(content, 'utf8') > MAX_SRT_BYTES) {
-      logger.warn('subtitle autosave refused: content over the size cap');
-      return { success: false, error: 'too-large' };
-    }
-    if (store.get('privacyMode', PRIVACY_MODES.STANDARD) === PRIVACY_MODES.SECURE) {
-      return { success: false, error: 'secure' };
-    }
-    if (store.get('settings.listen.autosave', true) === false) return { success: false, error: 'disabled' };
-    try {
-      const sourceName = typeof payload?.sourceName === 'string' ? payload.sourceName : '';
-      const filePath = autosave.save(content, sourceName);
-      logger.info(`subtitles saved: ${filePath}`);
-      return { success: true, filePath };
-    } catch (e) {
-      logger.error('subtitle autosave failed:', e.message);
-      return { success: false, error: e.message };
-    }
-  });
+  // Translation of each final and the subtitle file at session end live in
+  // the main process (managers/listen-translator.js); the window names the
+  // target and opens the folder.
+  engineManager.configureTranslation({ translateStream: ctx.stackHooks?.translateStream || null });
+  ipcMain.on(AE.SET_TARGET, (event, lang) => engineManager.setTargetLang(typeof lang === 'string' ? lang : ''));
 
   ipcMain.handle(AE.OPEN_LISTEN_DIR, async () => {
+    const dir = engineManager.listenDir();
     try {
-      fs.mkdirSync(autosave.dir, { recursive: true });
-      const err = await shell.openPath(autosave.dir);
-      return err ? { success: false, error: err } : { success: true, dir: autosave.dir };
+      fs.mkdirSync(dir, { recursive: true });
+      const err = await shell.openPath(dir);
+      return err ? { success: false, error: err } : { success: true, dir };
     } catch (e) {
       return { success: false, error: e.message };
     }

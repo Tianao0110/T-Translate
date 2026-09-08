@@ -440,6 +440,35 @@ function register(ctx) {
     onPrivacyModeChanged(mode) {
       stack?.cache.setPersistEnabled(mode !== 'secure');
     },
+    // Main-process callers (the listen translator) go through the same
+    // sanitizer as the renderer: privacy mode from the store, cache only
+    // ever reduced, abort tracked like any other request.
+    async translateStream(text, options, onChunk, { noCache = false, signal = null } = {}) {
+      if (!stack) return unavailable();
+      const mode = getPrivacyMode();
+      const id = `st_${crypto.randomUUID()}`;
+      const controller = new AbortController();
+      inflight.set(id, { controller, senderId: 'main', startedAt: Date.now() });
+      const onAbort = () => controller.abort();
+      if (signal) {
+        if (signal.aborted) controller.abort();
+        else signal.addEventListener('abort', onAbort, { once: true });
+      }
+      try {
+        const result = await stack.service.translateStream(
+          text,
+          sanitizeOptions(options, mode, controller.signal, noCache === true),
+          (fullText) => onChunk?.(fullText)
+        );
+        return { ...result, effectivePrivacyMode: mode };
+      } catch (e) {
+        logger.error('translateStream (main) failed:', e);
+        return { success: false, error: e.message, effectivePrivacyMode: mode };
+      } finally {
+        inflight.delete(id);
+        signal?.removeEventListener?.('abort', onAbort);
+      }
+    },
   };
 }
 

@@ -26,6 +26,8 @@ T-Engine 只做三件事：**装载运行时、监控引擎、报告事实**。
 | 各包管理器 | 包在不在、下载 | 不动（数据层） | 不动 |
 | 渲染端 `listen.available` 等状态 | 从多处拼出"能不能用" | 改为读 `tengine:status` 一份快照 | 只显示 |
 
+第 2 步（2026-09-08）已做：听译的翻译、逐句记录、结束时的字幕文件搬进主进程 `managers/listen-translator.js`，悬浮窗只发目标语言、只画结果；这是"跳步骤"里唯一值得做的一条。
+
 移交后主程序与 T-Engine 之间只有两条线：`tengine:status`（快照，随时可拉）和 `tengine:event`（信号流）；主程序里放策略表的实现（`electron/policy/engine-policy.js`），按第七节的表把信号变成动作。
 
 ## 二、结构

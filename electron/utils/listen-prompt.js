@@ -5,6 +5,9 @@
 // user message stays the single line, so small models do not translate the
 // context along with it. Only LLM providers read `systemPrompt`; MT engines
 // (Google, DeepL, …) ignore it and behave as before.
+//
+// Main-process module since v0.5.0: the listen translator lives next to the
+// translation stack, not in the floating window.
 
 const TARGET_NAMES = {
   zh: { zh: '中文', en: 'Chinese' },
@@ -32,10 +35,10 @@ function trimContext(context) {
  * @param {object} p
  * @param {string} p.targetLang   'zh' | 'en' | 'ja' | 'ko'
  * @param {string[]} [p.context]  earlier finals, oldest first
- * @param {string} [p.uiLang]     i18n language of the UI ('zh-CN', 'en', …)
+ * @param {string} [p.uiLang]     UI language ('zh' | 'en', or a locale tag)
  * @returns {{ content: string, mode: 'system' }}
  */
-export function buildListenSystemPrompt({ targetLang, context = [], uiLang = 'zh' }) {
+function buildListenSystemPrompt({ targetLang, context = [], uiLang = 'zh' }) {
   const isZh = String(uiLang || '').toLowerCase().startsWith('zh');
   const name = (TARGET_NAMES[targetLang] || {})[isZh ? 'zh' : 'en'] || targetLang;
   const lines = trimContext(context);
@@ -53,3 +56,5 @@ export function buildListenSystemPrompt({ targetLang, context = [], uiLang = 'zh
       ];
   return { content: content.filter(Boolean).join('\n\n'), mode: 'system' };
 }
+
+module.exports = { buildListenSystemPrompt };

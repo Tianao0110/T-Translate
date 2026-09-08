@@ -208,8 +208,10 @@ const CHANNELS = {
     // to push through are gone rather than left dangling.
     SEGMENT: 'audio-engine:segment',     // main → renderer: recognized (final) segment record
     PARTIAL: 'audio-engine:partial',     // main → renderer: open-segment provisional text ('' clears)
-    AUTOSAVE_SRT: 'audio-engine:autosave-srt',     // renderer → main: file the session's subtitles under <data>\listen (no dialog)
-    OPEN_LISTEN_DIR: 'audio-engine:open-listen-dir', // renderer → main: open that folder in Explorer
+    SET_TARGET: 'audio-engine:set-target',   // renderer → main: translation target for the running session ('' = none)
+    TRANSLATION: 'audio-engine:translation', // main → renderer: {id, text, done} per final ('pending' first, then the text so far, then done)
+    AUTOSAVED: 'audio-engine:autosaved',     // main → renderer: {filePath, lines, reason} once the session's subtitles are filed
+    OPEN_LISTEN_DIR: 'audio-engine:open-listen-dir', // renderer → main: open the subtitle folder in Explorer
     // Model packs (settings page owns the only download entry point)
     PACKS_LIST: 'audio-engine:packs-list',
     PACKS_DOWNLOAD: 'audio-engine:packs-download',
