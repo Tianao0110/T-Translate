@@ -76,6 +76,7 @@ const {
   makeTtsGate,
 } = require('./probe-metrics');
 const { hasCjk, verbalizeEnglishNumbers, scaleSpeed } = require('./tts-text-en');
+const { parseAsrResultJson, stripAsrFrame } = require('./asr-result');
 
 const SAMPLE_RATE = 16000;
 const VAD_WINDOW = 512;
@@ -121,6 +122,7 @@ const VAD_THRESHOLD_MUSIC = 0.3;
 const ASR_LANGUAGES = new Set(['zh', 'en', 'ja', 'ko', 'yue', '']);
 
 let sherpa = null;
+let sherpaAddon = null;
 let asrPaths = null; // declared by init; loaded by asr-start
 let asrLanguage = '';
 let vad = null;
@@ -309,6 +311,7 @@ function fatal(message) {
 function handleInit(msg) {
   try {
     sherpa = require('sherpa-onnx-node');
+    sherpaAddon = require('sherpa-onnx-node/addon.js');
   } catch (err) {
     return fatal(`sherpa-onnx-node load failed: ${err.message}`);
   }
@@ -924,7 +927,7 @@ function maybeDecodePartial() {
       if (!recognizer || !sessionLive) return;
       const stream = recognizer.createStream();
       stream.acceptWaveform({ samples: buf, sampleRate: SAMPLE_RATE });
-      const result = await recognizer.decodeAsync(stream);
+      const result = await decodeOffline(stream);
       // Segment closed while we were decoding — the '' clear already went out.
       if (gen !== partialGen) return;
       const text = (result.text || '').trim();
@@ -967,12 +970,29 @@ function enqueueDecode(seg) {
     .catch((err) => fatal(`decode failed: ${err.message}`));
 }
 
+// The wrapper's decodeAsync JSON.parses the result itself and throws on an
+// unescaped control character; by then the decode has finished, so the raw
+// result is re-read from the stream and parsed leniently instead of letting
+// one hallucinated "\n" take the whole host down.
+async function decodeOffline(stream) {
+  let result;
+  try {
+    result = await recognizer.decodeAsync(stream);
+  } catch (err) {
+    if (!(err instanceof SyntaxError)) throw err;
+    logLine(eventRecord('result-unescaped', err.message));
+    result = parseAsrResultJson(sherpaAddon.getOfflineStreamResultAsJson(stream.handle));
+  }
+  result.text = stripAsrFrame(result.text);
+  return result;
+}
+
 async function decodeSegment(seg) {
   if (!recognizer) return;
   const stream = recognizer.createStream();
   stream.acceptWaveform({ samples: seg.samples, sampleRate: SAMPLE_RATE });
   const t0 = Date.now();
-  const result = await recognizer.decodeAsync(stream);
+  const result = await decodeOffline(stream);
   const decodeMs = Date.now() - t0;
   const text = (result.text || '').trim();
   if (!text) return;

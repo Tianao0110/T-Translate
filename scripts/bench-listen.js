@@ -327,6 +327,10 @@ async function main() {
     at: new Date().toISOString(),
     engine: TIER === 'high' ? models.hq?.dirName : path.basename(models.modelDir),
     loadMs,
+    // Anything beyond starting > listening > stopped means the host died and
+    // came back mid-run; its clock restarts, so later finals land on the
+    // wrong sentences and their latency is meaningless.
+    statusTrail: ev.status,
     ...agg,
     events,
     finalLatencyMedianMs: Math.round(median(latencies) || 0),
@@ -339,7 +343,7 @@ async function main() {
   const outFile = path.join(outDir, `${LANG}-${TIER}${NORMALIZE ? '-norm' : ''}-${result.at.replace(/[:.]/g, '-')}.json`);
   fs.writeFileSync(outFile, JSON.stringify(result, null, 2));
 
-  console.log(`\nengine ${result.engine}, load ${loadMs} ms`);
+  console.log(`\nengine ${result.engine}, load ${loadMs} ms, status ${ev.status.join(' > ')}`);
   console.log(`coverage ${agg.covered}/${agg.sentences}, finals ${agg.finals} (${JSON.stringify(events)}), split sentences ${agg.split}`);
   console.log(`CER ${(agg.cer * 100).toFixed(2)}%${agg.wer !== null ? `, WER ${(agg.wer * 100).toFixed(2)}%` : ''}  (hyp ${agg.hypChars} vs ref ${agg.refChars} chars, median ${(agg.cerMedian * 100).toFixed(1)}%, p90 ${(agg.cerP90 * 100).toFixed(1)}%, >50%: ${agg.worst})`);
   console.log(`final latency median ${result.finalLatencyMedianMs} ms, p90 ${result.finalLatencyP90Ms} ms`);
