@@ -26,9 +26,9 @@
 | Feature                            | Description                                                                                                                            |
 | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | **Selection translator**     | System-wide. Select text in any app to translate. Up to 8 pinned windows                                                               |
-| **Screenshot OCR**           | Capture screen regions. 59 recognition languages, 7 OCR engines with automatic fallback                                                |
+| **Screenshot OCR**           | Capture screen regions. 59 recognition languages, 7 OCR engines with automatic fallback; local OCR and the neural voice can run on the GPU |
 | **Floating window**          | Transparent overlay. Space-bar to capture-and-translate; auto-refresh & global-hotkey zero-focus capture for live captions / subtitles |
-| **Listen mode**              | Live captions for whatever is playing, translated sentence by sentence. Chinese / English / Japanese / Korean / Cantonese, recognized on-device, audio never touches disk; can listen to a single program; exports SRT |
+| **Listen mode**              | Live captions for whatever is playing, translated sentence by sentence. Chinese / English / Japanese / Korean / Cantonese, recognized on-device, audio never touches disk; can listen to a single program; subtitles auto-save as SRT |
 | **Document translation**     | 9 formats: PDF / DOCX / EPUB / TXT / SRT / VTT / CSV / JSON / Markdown. Segment-by-segment, resumable, with term check; Explorer right-click entry |
 | **134 languages**            | Everything Google Translate supports, in a picker with a letter index and a recently-used row; more can be added by hand                |
 | **AI actions**               | Summaries of long passages; "Explain mode" in the floating window and per-paragraph explanations in documents; custom actions can be imported (needs an LLM provider) |
@@ -71,7 +71,7 @@ Transparent overlay for live translation — drag, resize, pin on top, spawn ind
 
 The waveform icon in the floating window's toolbar, then ▶: it transcribes whatever your computer is playing and translates it sentence by sentence. Recognition runs on your machine; audio passes through memory and is never written to disk or uploaded.
 
-Chinese, English, Japanese, Korean and Cantonese, chosen or detected. With the optional draft engine, Chinese and English appear as they are spoken. Listens to everything by default, or to a single program on Windows 11. Subtitles export to SRT. Models download under Settings → Audio → Listen (base 153 MB, draft engine 168 MB optional, high-accuracy final pass 806 MB optional — better with music or noise).
+Chinese, English, Japanese, Korean and Cantonese, chosen or detected. With the optional draft engine, Chinese and English appear as they are spoken. Listens to everything by default, or to a single program on Windows 11. Subtitles auto-save as SRT (with translations) when you stop or switch. Models download under Settings → Audio → Listen (base 153 MB, draft engine 168 MB optional, high-accuracy final pass 806 MB optional — better with music or noise).
 
 <p align="center">
   <img src="docs/screenshots/Listen.png" width="600" alt="Listen mode">
