@@ -275,7 +275,7 @@ electron/tengine/metrics-log.js            事件流落盘 data\logs\tengine-<�
 electron/tengine/trial-log.js              未列入模型的试用日志（每模型每月一份，两个月清理）与试用报告汇总
 electron/ipc/llm.js                        llm:* 通道：状态、重扫、开文件夹、卸载、自检、探针、试用报告
 src/stack/providers/tengine.js             翻译源「内置模型」：经 runtime.localLlm 钩子到 llm-manager；仅翻译包时 canChat 为 false，AI 动作改走下一个源
-src/components/SettingsPanel/sections/LlmSection.jsx  设置 → 内置模型：安装状态与下载链接、模型选择、后端 / 驻留 / 速度、自检与卸载、开发者门
+src/components/SettingsPanel/sections/LlmSection.jsx  设置 → 本地模型：安装状态与下载链接、模型选择、后端 / 驻留 / 速度、自检与卸载、开发者门
 scripts/fetch-llama-runtime.js             按清单下载官方 llama.cpp Vulkan 包并校验（打包前跑；--pin 年度换版）
 native/sherpa-onnx-webgpu/                 带 webgpu provider 的 sherpa-onnx DLL + 补丁 + 构建配方；scripts/overlay-sherpa-runtime.js 在 postinstall / 打包前覆盖进 npm 包
 electron/services/audio-engine/audio-worker.js  识别模型、音频捕获、语音合成都在这个子进程里

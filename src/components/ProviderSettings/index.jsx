@@ -39,6 +39,34 @@ const ProviderSettings = ({ settings, settingsReady, updateSettings, notify }) =
   const [testResults, setTestResults] = useState({});
   const initializedRef = useRef(false);
 
+  // The built-in model's card carries the model's own name once a
+  // whitelisted file is installed and the source is on; otherwise the
+  // generic name. Read from the main process, refreshed on engine events.
+  const [builtinModel, setBuiltinModel] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      try {
+        const s = await window.electron?.llm?.status?.();
+        if (alive) setBuiltinModel(s?.selected || null);
+      } catch {
+        // no bridge in this window
+      }
+    };
+    load();
+    const off = window.electron?.tengine?.onEvent?.((evt) => {
+      if (evt?.engine === 'llm') load();
+    });
+    return () => {
+      alive = false;
+      off?.();
+    };
+  }, []);
+  const providerName = (provider, meta) => {
+    if (provider.id === 'tengine' && provider.enabled && builtinModel?.status === 'ready' && builtinModel.name) return builtinModel.name;
+    return t(`providerSettings.names.${provider.id}`, { defaultValue: meta.name });
+  };
+
   const { enabledProviders, disabledProviders } = useMemo(() => {
     const enabled = [];
     const disabled = [];
@@ -441,7 +469,7 @@ const ProviderSettings = ({ settings, settingsReady, updateSettings, notify }) =
 
                     <div className="ps-info">
                       <div className="ps-title">
-                        <span className="ps-name">{t(`providerSettings.names.${provider.id}`, { defaultValue: meta.name })}</span>
+                        <span className="ps-name">{providerName(provider, meta)}</span>
                         <span className="ps-tag" style={{ background: typeColor }}>
                           {typeLabel}
                         </span>
@@ -544,7 +572,7 @@ const ProviderSettings = ({ settings, settingsReady, updateSettings, notify }) =
                     </div>
                     <div className="ps-mini-info">
                       <div className="ps-mini-name">
-                        <span className="ps-mini-label">{t(`providerSettings.names.${provider.id}`, { defaultValue: meta.name })}</span>
+                        <span className="ps-mini-label">{providerName(provider, meta)}</span>
                         {!meta.supportsChat && (
                           <MessageSquareOff
                             size={12}
