@@ -69,10 +69,9 @@ describe('LlmSection', () => {
     const { container, findByText } = mount();
     await findByText('llm.engineNameWith:Qwen3-1.7B');
     expect(container.querySelector('.engine-badge.installed')).toBeTruthy();
-    expect(container.textContent).toContain('llm.run.gpu:Vulkan0');
-    expect(container.textContent).toContain('llm.run.loaded:Qwen3-1.7B-Q8_0.gguf');
-    expect(container.textContent).toContain('llm.run.speedValue:210');
     expect(container.textContent).toContain('D:/models/llm-models');
+    // The runtime block lives on the providers page now.
+    expect(container.textContent).not.toContain('llm.run.title');
     // Both packs are offered; the missing one is still selectable.
     expect(container.querySelectorAll('.seg button')).toHaveLength(2);
   });
@@ -96,12 +95,10 @@ describe('LlmSection', () => {
     expect(window.electron.shell.openExternal).toHaveBeenCalledWith('https://hf/y');
   });
 
-  it('runs the self-test and reports the number', async () => {
-    const { container, findByText, notify, llm } = mount();
-    await findByText('llm.engineNameWith:Qwen3-1.7B');
-    fireEvent.click(Array.from(container.querySelectorAll('button')).find((b) => b.textContent === 'llm.run.selfTest'));
-    await waitFor(() => expect(llm.selfTest).toHaveBeenCalled());
-    await waitFor(() => expect(notify).toHaveBeenCalledWith('llm.run.testOk:200', 'success'));
+  it('lists unlisted files even with the door closed, without actions', async () => {
+    const { container, findByText } = mount();
+    await findByText('Stranger.gguf');
+    expect(Array.from(container.querySelectorAll('button')).some((b) => b.textContent === 'llm.dev.probe')).toBe(false);
   });
 
   it('the developer door lists unlisted files with probe and report', async () => {

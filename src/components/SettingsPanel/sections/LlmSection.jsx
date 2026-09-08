@@ -1,16 +1,16 @@
 // Local model settings, laid out like the OCR page: a group per concern
-// (which model, the model file card, the runtime, the annual update note,
-// the developer door), all built from the panel's existing pieces — the
-// engine card, the section header with actions, the info-card grid.
+// (which model, the model file card, the developer door), all built from
+// the panel's existing pieces. The runtime block (backend / residency /
+// speed, self-test, unload) lives in the provider's card on the providers
+// page (LlmRuntimeCard).
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AlertTriangle, RefreshCw, ExternalLink, Cpu, Zap } from 'lucide-react';
+import { AlertTriangle, RefreshCw, ExternalLink } from 'lucide-react';
 import { Seg, Switch } from './shared';
 
 const GB = 1024 * 1024 * 1024;
 const formatSize = (bytes) => (bytes >= GB ? `${(bytes / GB).toFixed(1)} GB` : `${Math.round(bytes / 1048576)} MB`);
-const SLOW_TOK_PER_SEC = 8;
 
 const LlmSection = ({ settings, updateSetting, notify }) => {
   const { t } = useTranslation();
@@ -42,7 +42,6 @@ const LlmSection = ({ settings, updateSetting, notify }) => {
   const selectedId = packs.some((p) => p.id === llm.pack) ? llm.pack : packs[0]?.id;
   const selected = packs.find((p) => p.id === selectedId) || null;
   const unlisted = status?.packs?.unlisted || [];
-  const speed = status?.lastHealth?.tokPerSec ?? status?.lastRequest?.tokPerSec ?? null;
 
   const persist = (key, value) => {
     updateSetting('llm', key, value, true);
@@ -70,18 +69,6 @@ const LlmSection = ({ settings, updateSetting, notify }) => {
     const s = await bridge?.rescan?.();
     if (s) setStatus(s);
     notify(t('llm.scanned'), 'success');
-  });
-
-  const selfTest = () => run('test', async () => {
-    const r = await bridge?.selfTest?.();
-    if (r?.pending) notify(t('llm.run.testPending'), 'warning');
-    else if (r?.success && r.ok) notify(t('llm.run.testOk', { n: r.tokPerSec ?? '?' }), 'success');
-    else notify(t('llm.run.testFail', { reason: r?.fallback || r?.error || '' }), 'warning');
-  });
-
-  const unload = () => run('unload', async () => {
-    await bridge?.unload?.();
-    notify(t('llm.run.unloaded'), 'success');
   });
 
   const probe = (file) => run(`probe:${file}`, async () => {
@@ -114,12 +101,6 @@ const LlmSection = ({ settings, updateSetting, notify }) => {
       );
     }
     return <span className="engine-badge download">{t('llm.notInstalled')}</span>;
-  };
-
-  const backendText = () => {
-    if (status?.resident?.provider === 'gpu') return t('llm.run.gpu', { device: status.resident.device || 'GPU' });
-    if (status?.provider === 'gpu' && !status?.resident) return t('llm.run.gpu', { device: 'Vulkan' });
-    return t('llm.run.cpu');
   };
 
   return (
@@ -194,35 +175,6 @@ const LlmSection = ({ settings, updateSetting, notify }) => {
             </div>
           </div>
           <p className="setting-hint">{t('llm.enabledHint')}</p>
-        </div>
-      )}
-
-      {status?.ready && (
-        <div className="setting-group">
-          <div className="ocr-pack-section-header">
-            <h4 className="listen-packs-title">{t('llm.run.title')}</h4>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn-small" onClick={selfTest} disabled={busy !== null || selected?.status !== 'ready'}>
-                {busy === 'test' ? <><RefreshCw size={12} className="spinning" /> {t('llm.run.testing')}</> : t('llm.run.selfTest')}
-              </button>
-              <button className="btn-small uninstall" onClick={unload} disabled={busy !== null || !status?.resident}>
-                {t('llm.run.unload')}
-              </button>
-            </div>
-          </div>
-          <div className="info-card storage-card">
-            <div className="storage-grid">
-              <span className="storage-label">{t('llm.run.backend')}</span>
-              <span className="storage-value">{status?.provider === 'gpu' ? <Zap size={12} /> : <Cpu size={12} />} {backendText()}</span>
-              <span className="storage-label">{t('llm.run.state')}</span>
-              <span className="storage-value">{status?.resident ? t('llm.run.loaded', { file: status.resident.file }) : t('llm.run.idle')}</span>
-              <span className="storage-label">{t('llm.run.speed')}</span>
-              <span className="storage-value">
-                {speed === null ? t('llm.run.speedUnknown') : t('llm.run.speedValue', { n: speed })}
-                {speed !== null && speed < SLOW_TOK_PER_SEC && <span className="engine-badge unavailable" style={{ marginLeft: 6 }}>{t('llm.run.slowHint')}</span>}
-              </span>
-            </div>
-          </div>
         </div>
       )}
 

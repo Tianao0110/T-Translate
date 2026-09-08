@@ -11,6 +11,7 @@ import useTranslationStore from '../../stores/translation-store';
 import { secureStorage } from './persist.js';
 import { buildDefaultProviderList } from './defaults.js';
 import { Seg } from '../SettingsPanel/sections/shared.jsx';
+import LlmRuntimeCard from '../SettingsPanel/sections/LlmRuntimeCard.jsx';
 import './styles.css';
 import createLogger from '../../utils/logger.js';
 const logger = createLogger('ProviderSettings');
@@ -322,6 +323,12 @@ const ProviderSettings = ({ settings, settingsReady, updateSettings, notify }) =
   const renderConfigForm = (providerId) => {
     const meta = allProvidersMeta.find(m => m.id === providerId);
     const config = providerConfigs[providerId] || {};
+
+    // The built-in model has no fields; its card shows the runtime instead
+    // (backend, residency, speed, self-test, unload).
+    if (providerId === 'tengine') {
+      return <LlmRuntimeCard notify={notify} />;
+    }
 
     if (!meta?.configSchema || Object.keys(meta.configSchema).length === 0) {
       return (
