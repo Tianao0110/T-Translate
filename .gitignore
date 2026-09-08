@@ -91,3 +91,6 @@ tests/*
 
 # 开发运行时的模型根目录（model-root.js：未打包时放这里，不再塞 userData）
 /models/
+
+# 听译基准数据（FLEURS 下载与拼接结果，scripts/bench-listen.js 生成）
+/bench-data/
