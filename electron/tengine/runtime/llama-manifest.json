@@ -1,0 +1,117 @@
+{
+  "build": "b10853",
+  "pinnedAt": "2026-09-08",
+  "zip": {
+    "name": "llama-b10853-bin-win-vulkan-x64.zip",
+    "url": "https://github.com/ggml-org/llama.cpp/releases/download/b10853/llama-b10853-bin-win-vulkan-x64.zip",
+    "size": 35710570,
+    "sha256": "e4c1a9d47a79e9352ec0d9085840bed1ac5ebea0ef134f263be2cc90434a60ed"
+  },
+  "files": [
+    {
+      "name": "ggml-base.dll",
+      "size": 795648,
+      "sha256": "ac5172f1a4f490c49b14ac010df5ffba6ca52c33eeb1f006ad3b4f9d51f144dc"
+    },
+    {
+      "name": "ggml-cpu-alderlake.dll",
+      "size": 1230336,
+      "sha256": "04a2f477a28f2f52a321d5b380cdc2f3b5b09ce57a430c611f0ff088eb9da3e5"
+    },
+    {
+      "name": "ggml-cpu-cannonlake.dll",
+      "size": 1448448,
+      "sha256": "48c6a4882b76d6cd63114a62270f2dc555126dd0c8c18deabbd20faa19e637ba"
+    },
+    {
+      "name": "ggml-cpu-cascadelake.dll",
+      "size": 1434112,
+      "sha256": "2d93524969441a1e12179701217f8d2cf988ce90546fd425001f310f10d4d1ff"
+    },
+    {
+      "name": "ggml-cpu-cooperlake.dll",
+      "size": 1434624,
+      "sha256": "93bc7f1fb0afa11f58d8e7baba0528184d90a2d25e0e743453796c18b14eefe3"
+    },
+    {
+      "name": "ggml-cpu-haswell.dll",
+      "size": 1235968,
+      "sha256": "4246a91358c2716c3d6d30995a3328323de03ea9d8b9347c544cd978cee82725"
+    },
+    {
+      "name": "ggml-cpu-icelake.dll",
+      "size": 1440768,
+      "sha256": "e91cb7ec4497e1cb34726ea5161c51d85537445edd0e81b5a7a4cb21aa664530"
+    },
+    {
+      "name": "ggml-cpu-ivybridge.dll",
+      "size": 1127424,
+      "sha256": "a7850ba203d598e9b36c51ab9d6750911e733e1b270bfbc10eadd36506b31340"
+    },
+    {
+      "name": "ggml-cpu-piledriver.dll",
+      "size": 1131520,
+      "sha256": "95c61557264916a8685d94b591e90e11346f09726d5d026ce45523c7b495d107"
+    },
+    {
+      "name": "ggml-cpu-sandybridge.dll",
+      "size": 1107968,
+      "sha256": "5a13687a0c6e4a0e156993a624ae782d6cd6f628c990931499ca96ac8eef61f8"
+    },
+    {
+      "name": "ggml-cpu-sapphirerapids.dll",
+      "size": 1711616,
+      "sha256": "9d6e7e797ef612099ff7e9f6456760c08bea9c66647b1fcf234e3c1e066e454f"
+    },
+    {
+      "name": "ggml-cpu-skylakex.dll",
+      "size": 1441792,
+      "sha256": "e9ca1c5e78d3742caadf9c97bd8bafd292b64c5b1241236aa4f2e574f7c7f73f"
+    },
+    {
+      "name": "ggml-cpu-sse42.dll",
+      "size": 932352,
+      "sha256": "6621eb122ccfc08585136b991e65831c365883dcd26f03a0d9a49e4bc4ca3e3f"
+    },
+    {
+      "name": "ggml-cpu-x64.dll",
+      "size": 924160,
+      "sha256": "b6d7f6d3fcf468b9630e3cfabc8eb196d48d1e54238f9a3b7f2d47bea146a238"
+    },
+    {
+      "name": "ggml-cpu-zen4.dll",
+      "size": 1441280,
+      "sha256": "99f903ff8e3eb2cf0f0e15aea9a2aa42cd2c1bf0320452b911cdc5fff63163b2"
+    },
+    {
+      "name": "ggml-vulkan.dll",
+      "size": 57203200,
+      "sha256": "e166f38a7d9087f86fcf086b6e24ef242314b18d25c9c6fd106279c06393a364"
+    },
+    {
+      "name": "ggml.dll",
+      "size": 79872,
+      "sha256": "3f49aefcb7caf9d277b8fcc868e3eac86ec597bf191c918d0e377d40b440ea47"
+    },
+    {
+      "name": "libomp.dll",
+      "size": 768000,
+      "sha256": "a12116ba72d1d6820407cf30be23da04ce79d6bb8a71a5ee71759c5a1faa6f1c"
+    },
+    {
+      "name": "LICENSE-LLVM-OpenMP",
+      "size": 19741,
+      "sha256": "fdad1758a9e1f9d5a81e18879b3406772115edc92c24bfa36b70c654f325e8e4"
+    },
+    {
+      "name": "llama.dll",
+      "size": 3152896,
+      "sha256": "c90fe11872e78170674f59c4091cba370f6a67ef3cfc459a2e44af7ce55e5bd8"
+    },
+    {
+      "name": "mtmd.dll",
+      "size": 1771008,
+      "sha256": "621f5b6ccaa952f09117613e0df0c335425acb0539abe173d32d7b2bbfb2e1af"
+    }
+  ]
+}

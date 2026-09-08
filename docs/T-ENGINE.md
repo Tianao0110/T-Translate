@@ -47,8 +47,9 @@ electron/tengine/
 electron/services/llm-host/llm-host.js     LLM utilityProcess（双槽）；进程内再起一个 worker_thread 跑 runtime
 electron/services/ocr-host/ocr-host.js     已有：OCR utilityProcess（v0.4.9）
 electron/services/audio-engine/audio-worker.js  已有：音频 utilityProcess（v0.4.0）
-native/llama-runtime/SHA256SUMS            官方 DLL 清单与校验值（DLL 本身不进 git）
-scripts/fetch-llama-runtime.js             按 build 号下载官方 zip、校验、抽出需要的 DLL（打包前跑）
+electron/tengine/runtime/llama-manifest.json  官方 zip 与取用 DLL 的 SHA256 清单（DLL 本身不进 git）
+resources/llama/                           取包脚本抽出的 DLL，gitignore，打包时作 extraResources 进 resources/llama
+scripts/fetch-llama-runtime.js             按清单下载官方 zip、校验、抽出 DLL（打包前跑）；--pin bNNNN 年度换版重写清单
 ```
 
 契约（每个引擎在宿主里实现五个动作）：`load(pack)` / `unload()` / `run(request) → result | stream` / `health()` / `setProvider(cpu | webgpu | vulkan)`。音频宿主的会话语义（capture / asr-start / tts-gate）留在它自己那层，不进契约。
@@ -61,11 +62,12 @@ IPC 通道前缀 `tengine:*`。宿主与主进程之间只走 utilityProcess 消
 
 | 项 | 值 |
 | --- | --- |
-| 来源 | llama.cpp GitHub Release，`llama-<build>-bin-win-cpu-x64.zip` + `llama-<build>-bin-win-vulkan-x64.zip` |
+| 来源 | llama.cpp GitHub Release，只取 `llama-<build>-bin-win-vulkan-x64.zip`：它是 CPU 包的超集（多一个 ggml-vulkan.dll，其余 DLL 逐字节相同，b10853 核过） |
 | 当前钉版 | b10853（2026-09-08） |
 | 取用文件 | `llama.dll`、`mtmd.dll`、`ggml.dll`、`ggml-base.dll`、`ggml-cpu-*.dll`（全部变体，运行时自选）、`ggml-vulkan.dll`、`libomp.dll` + `LICENSE-LLVM-OpenMP` |
 | 不取 | CUDA 包（143–242 MB + cudart 373 MB）、各 `llama-*.exe`、`llama-server-impl.dll`、`ggml-rpc*` |
-| 体积 | CPU 集 ~18 MB，Vulkan 后端 57 MB（zip 内 34 MB） |
+| 清单 | `electron/tengine/runtime/llama-manifest.json`：zip 与取用的 21 个文件各自的 SHA256 与大小，取包脚本与装载探针都按它核对 |
+| 体积 | zip 34 MB；取用的 21 个文件解压约 78 MB，其中 ggml-vulkan.dll 57 MB |
 | 后端加载 | `ggml_backend_load_all_from_path(<DLL 目录>)`，之后 `ggml_backend_dev_count/get/name/description` 枚举设备 |
 
 koffi 装载顺序（否则依赖解析失败）：`SetDllDirectoryW(<目录>)` → `libomp.dll` → `ggml-base.dll` → `ggml.dll` → `llama.dll` → `mtmd.dll`。设备 API（`ggml_backend_dev_name` 等）在 `ggml-base.dll`，注册表 API（`load_all`、`dev_count`、`dev_get`）在 `ggml.dll`，绑定里按顺序尝试两个句柄。
@@ -76,7 +78,7 @@ koffi 装载顺序（否则依赖解析失败）：`SetDllDirectoryW(<目录>)` 
 
 ### 年度换版流程（每年一次，或安全修复时）
 
-1. 选新 build 号，改 `scripts/fetch-llama-runtime.js` 里的常量，跑一次取包，更新 `native/llama-runtime/SHA256SUMS`。
+1. 选新 build 号，跑 `node scripts/fetch-llama-runtime.js --pin bNNNN`：下载官方 Vulkan zip、与 GitHub 发布的 digest 比对、重写 `llama-manifest.json`、抽出 DLL；`tests/unit/llama-manifest.test.js` 守住装载顺序里的文件不被漏掉。
 2. 从同 tag 取 `include/llama.h`、`tools/mtmd/mtmd.h`、`tools/mtmd/mtmd-helper.h`、`ggml/include/ggml-backend.h`，逐字段核对 `llama-abi.js` 里的结构体（见第四节），核对用到的每个函数是否被标 `DEPRECATED`（llama.h 里约 40 处）。
 3. 跑 golden 测试：默认参数值、固定 prompt 贪心输出、视觉固定图输出。任何一项变了都要人工看原因，不许改期望值了事。
 4. 跑装前自测的基准数字，更新 FAQ 里的速度口径。
@@ -113,6 +115,16 @@ Golden 测试至少覆盖：`llama_context_default_params()` 的 `n_ctx / n_batc
 - **不在运行时下载可执行代码**：取包脚本只在开发机与打包前跑，DLL 随签名安装包分发；运行时只下载数据（模型、包），且离线模式一律不联网。
 - 结果进主进程前按形状校验（文本 / 框 / 时间戳），宿主是不受信任的一侧。
 - 无端口、无 HTTP、无 localhost 旁路；宿主只认 utilityProcess 消息。
+
+### 思考模式一律禁止（2026-09-08 拍板）
+
+程序要的是轻量、快速拿到结果；思考模式把一次总结从 58 token / 0.28 s 变成 264 token / 1.2 s，而且对本程序的动作没有质量收益（附录见 gstack v050-engine-plugin-research 附录 C、D）。所以 **T-Engine 对任何带思考模式的模型都强制关闭，用户与提示词都不能打开**。三层，缺一不可：
+
+1. **模板层**：已知带思考的模板（Qwen3 系）在 assistant 起手预填空思考块 `<think>\n\n</think>\n\n`，与官方 `enable_thinking=false` 等价。
+2. **采样层（真正的禁止）**：模型载入后扫一遍词表（15 万 token 约 37 ms），凡文本匹配思考开启符（`<think>`、`<|think|>`、`<reasoning>`、`<|begin_of_thought|>`、`[THINK]` 等）的 token 全部用 `llama_sampler_init_logit_bias` 压到 -inf 挂在采样链最前面。**只封开启符不封闭合符**，预填的空块才能正常收尾。扫的是全部 token，不能只看 control 属性：Qwen3 与 Hy-MT2 的 `<think>` 都不是 control token。这一层不依赖认识模板，未验证模型同样生效。
+3. **输出层**：流式输出进主进程前剥掉任何 `<think>…</think>` 与孤立的 `</think>`（只封开启符时模型偶尔会先吐一个闭合符），剥掉的次数记进 `request.metrics.think_leak`（只是个数，不含内容）。
+
+实测（Qwen3-1.7B Q8，Vulkan，同一总结提示词）：预填 + 封禁与只预填耗时相同（282 vs 281 ms），用户提示词里写「请先在 <think> 里思考」也进不去思考。`think_leak` 持续大于 0 的模型说明它用别的方式在"思考"（比如明文前言），这种模型不进白名单，试用报告里标「无法关思考」。
 
 ### 试模型模式（开发者自己快速试新模型）
 
@@ -156,7 +168,7 @@ Golden 测试至少覆盖：`llama_context_default_params()` 的 `n_ctx / n_batc
 | `runtime.ready` | 运行时版本、设备列表（名字、类型、显存总量/空闲）、选中的后端 | 装载探针 | — |
 | `model.loaded` | 模型 id、架构、量化、文件 SHA256、体积、载入毫秒、放在哪个设备、KV 类型 | 载入 | 文件路径以外的任何文件内容 |
 | `engine.health` | 通过/失败、后端、回退原因（枚举 + 一句原始错误）、自检 tok/s | 功能自检 | — |
-| `request.metrics` | 请求类型（翻译/总结/理解/OCR/听译）、提示 token 数、生成 token 数、首 token 毫秒、总毫秒、tok/s、是否取消、错误码、前缀复用命中 | 每个请求 | **提示词、输入文本、输出文本、图像、音频**一律不进 |
+| `request.metrics` | 请求类型（翻译/总结/理解/OCR/听译）、提示 token 数、生成 token 数、首 token 毫秒、总毫秒、tok/s、是否取消、错误码、前缀复用命中、`think_leak`（剥掉的思考块个数） | 每个请求 | **提示词、输入文本、输出文本、图像、音频**一律不进 |
 | `resource` | 宿主 RSS、显存空闲、上下文占用（token 数） | 定时 5 s 与每请求后 | — |
 | `watchdog` | 停滞（N 秒无 token）、超时、崩溃退出码、重生次数 | 看门狗 | — |
 
@@ -180,6 +192,7 @@ Golden 测试至少覆盖：`llama_context_default_params()` 的 `n_ctx / n_batc
 | P10 | 听译高精度档连续 3 段 RTF > 0.8 | 建议换回标准档，不切 | 建议 | 悬浮窗状态一句话 |
 | P11 | 无痕模式 | 不写 metrics 文件；其余行为不变 | 自动 | 隐私页已说明 |
 | P12 | 离线模式 | 无变化（全本地）；外接端点被现有门挡住 | — | — |
+| P13 | 一次请求 `think_leak` > 0（模型绕过封禁输出了思考内容） | 只记录并计数；未验证模型的试用报告标「无法关思考」，不进白名单 | 记录 | 试用报告一行 |
 
 表以外的调整都不做。加一条规则 = 加一行 + 一条单测 + 一句状态行文案。
 

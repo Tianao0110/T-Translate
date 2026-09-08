@@ -124,6 +124,7 @@ git clone https://github.com/Tianao0110/T-Translate.git
 cd T-Translate
 npm install
 npm run ocr:models   # fetch local OCR base models (one-time, ~19MB)
+npm run llama:runtime   # fetch the pinned llama.cpp runtime DLLs (one-time, ~34MB)
 npm start            # dev mode
 npm run dist         # build installer (runs the fetch automatically)
 ```

@@ -124,6 +124,7 @@ git clone https://github.com/Tianao0110/T-Translate.git
 cd T-Translate
 npm install
 npm run ocr:models   # 拉取本地 OCR 基础模型（一次性，~19MB）
+npm run llama:runtime   # 拉取钉版 llama.cpp 运行时 DLL（一次性，~34MB）
 npm start            # 开发模式
 npm run dist         # 打包安装程序（自动含上一步）
 ```

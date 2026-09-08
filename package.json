@@ -10,9 +10,10 @@
     "react:start": "vite",
     "electron:start": "electron .",
     "stack:build": "node scripts/build-stack.js",
-    "build": "node scripts/fetch-ocr-models.js && node scripts/build-stack.js && vite build && electron-builder",
-    "dist": "node scripts/overlay-sherpa-runtime.js && node scripts/fetch-ocr-models.js && node scripts/build-stack.js && vite build && electron-builder --publish=never",
+    "build": "node scripts/fetch-ocr-models.js && node scripts/fetch-llama-runtime.js && node scripts/build-stack.js && vite build && electron-builder",
+    "dist": "node scripts/overlay-sherpa-runtime.js && node scripts/fetch-ocr-models.js && node scripts/fetch-llama-runtime.js && node scripts/build-stack.js && vite build && electron-builder --publish=never",
     "ocr:models": "node scripts/fetch-ocr-models.js",
+    "llama:runtime": "node scripts/fetch-llama-runtime.js",
     "ocr:release": "node scripts/build-ocr-release.js",
     "audio:release": "node scripts/build-audio-release.js",
     "smoke:listen": "electron scripts/smoke-listen.js",
@@ -132,6 +133,13 @@
       {
         "from": "resources/ocr",
         "to": "resources/ocr",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "resources/llama",
+        "to": "resources/llama",
         "filter": [
           "**/*"
         ]

@@ -56,5 +56,25 @@ scripts/model-licenses/.
 | espeak-ng-data（espeak-ng 项目；随 Kokoro 语音包分发的音素数据） | GPL-3.0                                    |
 | MeloTTS zh_en（MyShell.ai，sherpa-onnx 转换版）        | MIT                                        |
 
+## 内置推理运行时 / Inference runtime
+
+DLL 由 scripts/fetch-llama-runtime.js 按 electron/tengine/runtime/llama-manifest.json 的哈希清单从 llama.cpp 官方 Release 取得，随安装包分发，不入 git。
+The DLLs are fetched from the official llama.cpp release against a hash manifest and ship with the installer; they are not in git.
+
+| Component                                      | License                        |
+| ---------------------------------------------- | ------------------------------ |
+| llama.cpp（ggml-org；llama / ggml / mtmd DLL） | MIT                            |
+| LLVM OpenMP 运行时（libomp.dll）               | Apache-2.0 WITH LLVM-exception |
+
+## 语言模型 / Language models
+
+不随安装包分发、不经我们的服务器：程序给出官方下载链接，用户自行下载后放入模型文件夹，程序只加载哈希在白名单（electron/shared/llm-packs.js）里的文件。
+Not bundled and not re-hosted: the app links to the official download, the user places the file in the models folder, and only files whose hash is on the whitelist are loaded.
+
+| Model                                              | License    |
+| -------------------------------------------------- | ---------- |
+| Qwen3-1.7B（阿里巴巴 Qwen 团队，官方 GGUF Q8_0）   | Apache-2.0 |
+| Hy-MT2-1.8B（腾讯混元，官方 GGUF Q8_0）            | Apache-2.0 |
+
 完整依赖树各包的协议以其 node_modules/<pkg>/LICENSE 为准。
 For the full dependency tree, each package's own LICENSE file governs.

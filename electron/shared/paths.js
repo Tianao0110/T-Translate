@@ -67,6 +67,10 @@ const resources = {
   ocrData: isDev
     ? path.join(BASE_DIR, 'resources/ocr')
     : path.join(process.resourcesPath, 'resources/ocr'),
+  // llama.cpp DLLs (scripts/fetch-llama-runtime.js); loaded by T-Engine's LLM host.
+  llamaRuntime: isDev
+    ? path.join(BASE_DIR, 'resources/llama')
+    : path.join(process.resourcesPath, 'resources/llama'),
 };
 
 // Load a page, picking dev URL vs prod file based on environment.

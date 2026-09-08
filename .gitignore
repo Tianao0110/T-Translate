@@ -79,3 +79,12 @@ TODOS.md
 
 # Local agent instructions, not part of the shipped source
 /CLAUDE.md
+
+# 内置 LLM 运行时 DLL（scripts/fetch-llama-runtime.js 按清单拉取，不入库）
+resources/llama/
+
+# 本地测试素材与模型（听译样本、试模型用的 GGUF），只留在开发机
+tests/*
+!tests/unit/
+!tests/mocks/
+!tests/setup.js
