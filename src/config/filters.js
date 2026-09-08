@@ -64,7 +64,10 @@ export const DEFAULT_FILTERS = [
   },
   {
     name: 'version_number',
-    pattern: /v?\d+\.\d+(?:\.\d+)?(?:-[\w.]+)?/g,
+    // A `v` prefix, or three segments: a bare "0.3" is a decimal, not a
+    // version. Turning "0.3 seconds" into a placeholder made a small local
+    // model treat it as an OCR error and rewrite it.
+    pattern: /\bv\d+\.\d+(?:\.\d+)*(?:-[\w.]+)?\b|\b\d+\.\d+\.\d+(?:\.\d+)*(?:-[\w.]+)?\b/g,
     description: '版本号 (v1.2.3)',
     enabled: true,
   },

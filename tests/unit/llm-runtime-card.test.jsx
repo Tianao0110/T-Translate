@@ -75,6 +75,13 @@ describe('LlmRuntimeCard', () => {
     await waitFor(() => expect(notify).toHaveBeenCalledWith('llm.run.unloaded', 'success'));
   });
 
+  it('surfaces the policy advice', async () => {
+    const { container, findByText } = mount({ ...STATUS, policy: { advice: ['perf-drop', 'unhealthy'], lastTokPerSec: 40, baselineTokPerSec: 100 } });
+    await findByText('llm.run.backend');
+    expect(container.textContent).toContain('llm.run.perfDrop:40,100');
+    expect(container.querySelector('.engine-badge.error').textContent).toBe('llm.run.unhealthy');
+  });
+
   it('renders nothing when the manager is not ready or there is no bridge', async () => {
     const { container } = mount({ ready: false });
     await new Promise((r) => setTimeout(r, 5));

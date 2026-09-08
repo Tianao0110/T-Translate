@@ -614,6 +614,9 @@ const en = {
       testPending: "No model file yet, nothing to test",
       unload: "Unload",
       unloaded: "Unloaded",
+      policy: "Note",
+      perfDrop: "Performance drop: {{n}} tok/s lately, {{base}} tok/s at self-test; check whether another program is using the GPU or CPU",
+      unhealthy: "Stalled repeatedly; other providers are used for this session. Unload, then use it again to reload and recover",
     },
     dev: {
       title: "Custom models (developer)",

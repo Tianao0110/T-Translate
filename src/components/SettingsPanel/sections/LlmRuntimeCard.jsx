@@ -58,6 +58,7 @@ const LlmRuntimeCard = ({ notify }) => {
 
   const speed = status.lastHealth?.tokPerSec ?? status.lastRequest?.tokPerSec ?? null;
   const installed = status.selected?.status === 'ready';
+  const advice = status.policy?.advice || [];
   const backendText = () => {
     if (status.resident?.provider === 'gpu') return t('llm.run.gpu', { device: status.resident.device || 'GPU' });
     if (status.provider === 'gpu' && !status.resident) return t('llm.run.gpu', { device: 'Vulkan' });
@@ -76,6 +77,18 @@ const LlmRuntimeCard = ({ notify }) => {
           {speed === null ? t('llm.run.speedUnknown') : t('llm.run.speedValue', { n: speed })}
           {speed !== null && speed < SLOW_TOK_PER_SEC && <span className="engine-badge unavailable" style={{ marginLeft: 6 }}>{t('llm.run.slowHint')}</span>}
         </span>
+        {advice.includes('perf-drop') && (
+          <>
+            <span className="storage-label">{t('llm.run.policy')}</span>
+            <span className="storage-value">{t('llm.run.perfDrop', { n: status.policy.lastTokPerSec ?? '?', base: status.policy.baselineTokPerSec ?? '?' })}</span>
+          </>
+        )}
+        {advice.includes('unhealthy') && (
+          <>
+            <span className="storage-label">{t('llm.run.policy')}</span>
+            <span className="storage-value"><span className="engine-badge error">{t('llm.run.unhealthy')}</span></span>
+          </>
+        )}
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
         <button className="ps-test-btn" onClick={selfTest} disabled={busy !== null || !installed}>

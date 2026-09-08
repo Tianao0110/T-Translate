@@ -614,6 +614,9 @@ const zh = {
       testPending: "还没放模型文件，无法自检",
       unload: "卸载",
       unloaded: "已卸载",
+      policy: "提示",
+      perfDrop: "性能下降：最近 {{n}} tok/s，自检时 {{base}} tok/s；看看是不是有别的程序在占显卡或 CPU",
+      unhealthy: "连续停滞，本次会话已改用其他翻译源；点「卸载」后再用会重新载入并恢复",
     },
     dev: {
       title: "自定义模型（开发者）",
