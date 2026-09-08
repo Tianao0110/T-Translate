@@ -85,12 +85,32 @@ describe('listen source selection', () => {
     expect(result.current.sources.sessions[0]).toMatchObject({ pid: 4242, audible: true });
   });
 
-  it('stops polling for programs once the session runs', async () => {
+  // A program that starts playing after the session began must still show
+  // up: a burst of refreshes right after start, a slow heartbeat after, a
+  // full stop once the window has been left alone, and a hover wakes it.
+  it('keeps polling after the session starts: burst, then slowly, then not at all', async () => {
     const { result } = await mounted();
     await waitFor(() => expect(audioEngine.listSources).toHaveBeenCalled());
-    const before = audioEngine.listSources.mock.calls.length;
-    act(() => result.current.toggle());
-    await new Promise((r) => setTimeout(r, 50));
-    expect(audioEngine.listSources.mock.calls.length).toBe(before);
+    vi.useFakeTimers();
+    try {
+      const calls = () => audioEngine.listSources.mock.calls.length;
+      act(() => result.current.toggle());
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      const afterStart = calls();
+      await act(async () => { await vi.advanceTimersByTimeAsync(2600); });
+      expect(calls()).toBeGreaterThan(afterStart);
+      const afterBurst = calls();
+      await act(async () => { await vi.advanceTimersByTimeAsync(8100); });
+      expect(calls()).toBeGreaterThan(afterBurst);
+      await act(async () => { await vi.advanceTimersByTimeAsync(180000); });
+      const idle = calls();
+      await act(async () => { await vi.advanceTimersByTimeAsync(30000); });
+      expect(calls()).toBe(idle);
+      act(() => result.current.bumpSourcesActivity());
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(calls()).toBeGreaterThan(idle);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

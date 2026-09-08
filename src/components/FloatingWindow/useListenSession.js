@@ -27,9 +27,38 @@ const MAX_SEGMENTS = 100;
 // budget, and is announced when it bites rather than silently dropping lines.
 const MAX_TRANSCRIPT = 20000;
 
+// Source-list cadence. The picker can only show programs that already opened
+// an audio stream, so it is refreshed in a burst right after a session starts
+// (pressing play usually comes next), then slowly, and not at all once the
+// window has been left alone — a hover on the toolbar wakes it up again.
+const SOURCES_BURST_MS = 10000;
+const SOURCES_BURST_EVERY_MS = 2500;
+const SOURCES_EVERY_MS = 8000;
+const SOURCES_IDLE_EVERY_MS = 4000;
+const SOURCES_STOP_AFTER_MS = 180000;
+
 let nextSegId = 1;
 
-export default function useListenSession({ active }) {
+// SRT text for the finals collected so far; the in-flight draft is not a
+// final and never lands in a file.
+function buildSrt(finals) {
+  const pad = (n, w) => String(n).padStart(w, '0');
+  const ts = (sec) => {
+    const ms = Math.max(0, Math.round(sec * 1000));
+    const h = Math.floor(ms / 3600000);
+    const m = Math.floor((ms % 3600000) / 60000);
+    const s = Math.floor((ms % 60000) / 1000);
+    return `${pad(h, 2)}:${pad(m, 2)}:${pad(s, 2)},${pad(ms % 1000, 3)}`;
+  };
+  const blocks = finals.map((seg, i) => {
+    const lines = [seg.text];
+    if (seg.trans && seg.trans !== 'pending') lines.push(seg.trans);
+    return `${i + 1}\n${ts(seg.startS)} --> ${ts(seg.startS + seg.durS)}\n${lines.join('\n')}`;
+  });
+  return blocks.join('\n\n') + '\n';
+}
+
+export default function useListenSession({ active, onAutosaved }) {
   const [sessionState, setSessionState] = useState('idle');
   const [running, setRunning] = useState(false);
   const [segments, setSegments] = useState([]);
@@ -68,6 +97,58 @@ export default function useListenSession({ active }) {
   const sourceRef = useRef(source);
   // What this machine can do + which programs are currently making sound.
   const [sources, setSources] = useState({ supported: false, processLoopback: false, sessions: [] });
+  // Last moment the user "touched" the picker's world (session start, a
+  // switch, a hover); the refresh schedule stops SOURCES_STOP_AFTER_MS later.
+  const sourcesActivityRef = useRef(0);
+  const [sourcesTick, setSourcesTick] = useState(0);
+  const autosavedRef = useRef(false);
+  const onAutosavedRef = useRef(onAutosaved);
+  onAutosavedRef.current = onAutosaved;
+
+  const bumpSourcesActivity = useCallback(() => {
+    sourcesActivityRef.current = Date.now();
+    setSourcesTick((n) => n + 1);
+  }, []);
+
+  // One file per session, written the moment it ends or restarts (stop, a
+  // source or language switch, the window closing) so an interruption never
+  // costs the transcript. Secure mode and the user's switch are enforced in
+  // the main process; here they just mean "nothing to announce".
+  const autosave = useCallback(async () => {
+    if (autosavedRef.current) return;
+    const finals = transcriptRef.current.filter((s) => s.text);
+    if (!finals.length) return;
+    autosavedRef.current = true;
+    const content = buildSrt(finals);
+    try {
+      const res = await window.electron?.audioEngine?.autosaveSrt?.(content, sourceRef.current.name || '');
+      if (res?.success) onAutosavedRef.current?.(res);
+      else if (res && res.error !== 'secure' && res.error !== 'disabled') logger.warn('subtitle autosave failed:', res.error);
+    } catch (e) {
+      logger.warn('subtitle autosave failed:', e.message);
+    }
+  }, []);
+
+  const resetTranscript = useCallback(() => {
+    setSegments([]);
+    transcriptRef.current = [];
+    transcriptTruncatedRef.current = false;
+    autosavedRef.current = false;
+    setPartial('');
+  }, []);
+
+  // Mid-session switch: the worker restarts with the new config. The finals
+  // so far are filed and the transcript starts over, exactly as stop + start
+  // would — the new worker's clock starts at zero, so old and new lines
+  // could not share a timeline anyway.
+  const restartSession = useCallback(() => {
+    autosave();
+    resetTranscript();
+    pendingRestartRef.current = true;
+    engineReadyRef.current = false;
+    setSessionState('loading');
+    window.electron?.audioEngine?.stop?.();
+  }, [autosave, resetTranscript]);
 
   const setLang = useCallback((value) => {
     setLangState(value);
@@ -75,14 +156,9 @@ export default function useListenSession({ active }) {
     try { localStorage.setItem('listenLang', value); } catch { /* storage off */ }
     // Language switch mid-session restarts the worker (the language is baked
     // into the recognizer config); capture restarts with it.
-    if (runningRef.current) {
-      pendingRestartRef.current = true;
-      engineReadyRef.current = false;
-      setPartial('');
-      setSessionState('loading');
-      window.electron?.audioEngine?.stop?.();
-    }
-  }, []);
+    bumpSourcesActivity();
+    if (runningRef.current) restartSession();
+  }, [bumpSourcesActivity, restartSession]);
 
   const setTargetLang = useCallback((value) => {
     setTargetLangState(value);
@@ -101,16 +177,13 @@ export default function useListenSession({ active }) {
       ? { mode: 'system', pid: 0, name: '' }
       : { mode, pid, name: typeof next?.name === 'string' ? next.name : '' };
     if (value.mode !== 'system' && !value.pid) return;
+    // File the old source's lines under its own name before the ref moves on.
+    if (runningRef.current) autosave();
     setSourceState(value);
     sourceRef.current = value;
-    if (runningRef.current) {
-      pendingRestartRef.current = true;
-      engineReadyRef.current = false;
-      setPartial('');
-      setSessionState('loading');
-      window.electron?.audioEngine?.stop?.();
-    }
-  }, []);
+    bumpSourcesActivity();
+    if (runningRef.current) restartSession();
+  }, [autosave, bumpSourcesActivity, restartSession]);
 
   const refreshSources = useCallback(async () => {
     try {
@@ -129,24 +202,23 @@ export default function useListenSession({ active }) {
     engineReadyRef.current = false;
     errorLatchRef.current = false;
     pendingRestartRef.current = false;
-    setSegments([]);
-    transcriptRef.current = [];
-    transcriptTruncatedRef.current = false;
-    setPartial('');
+    resetTranscript();
+    sourcesActivityRef.current = Date.now();
     window.electron?.audioEngine?.start?.({
       language: langRef.current,
       source: sourceRef.current,
     });
-  }, []);
+  }, [resetTranscript]);
 
   const stop = useCallback(() => {
+    autosave();
     runningRef.current = false;
     setRunning(false);
     engineReadyRef.current = false;
     levelRef.current = 0; // the meter must not freeze on the last loud frame
     setPartial('');
     window.electron?.audioEngine?.stop?.();
-  }, []);
+  }, [autosave]);
 
   const toggle = useCallback(() => {
     if (runningRef.current) stop();
@@ -295,15 +367,33 @@ export default function useListenSession({ active }) {
     };
   }, [active, stop, translateSegment]);
 
-  // The picker can only list programs that already opened an audio stream, so
-  // the list is kept fresh while the user is choosing and left alone once the
-  // session runs (nothing in it can change what is already being captured).
+  // A program that starts playing after the session began must still be
+  // pickable (switching mid-session is supported), hence the running-state
+  // schedule; see the SOURCES_* constants for the cadence.
   useEffect(() => {
-    if (!active || running) return undefined;
-    refreshSources();
-    const timer = setInterval(refreshSources, 4000);
-    return () => clearInterval(timer);
-  }, [active, running, refreshSources]);
+    if (!active) return undefined;
+    const startedAt = Date.now();
+    sourcesActivityRef.current = Math.max(sourcesActivityRef.current, startedAt);
+    let timer = null;
+    let cancelled = false;
+    const schedule = () => {
+      if (cancelled || Date.now() - sourcesActivityRef.current >= SOURCES_STOP_AFTER_MS) return;
+      const delay = !running
+        ? SOURCES_IDLE_EVERY_MS
+        : Date.now() - startedAt < SOURCES_BURST_MS
+          ? SOURCES_BURST_EVERY_MS
+          : SOURCES_EVERY_MS;
+      timer = setTimeout(async () => {
+        await refreshSources();
+        schedule();
+      }, delay);
+    };
+    refreshSources().then(schedule);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [active, running, sourcesTick, refreshSources]);
 
   // Leaving listen mode (or unmounting the window) force-stops the session —
   // the engine must never hum without its host UI (zero-idle rule). The
@@ -317,31 +407,6 @@ export default function useListenSession({ active }) {
   useEffect(() => () => {
     if (runningRef.current) stop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // ===== SRT export =====
-
-  // Exports the whole session, not the visible window, and works mid-recording:
-  // it writes the finals collected so far. The in-flight draft line is not a
-  // final and never lands in the file.
-  const exportSrt = useCallback(async () => {
-    const finals = transcriptRef.current.filter((s) => s.text);
-    if (!finals.length) return { success: false, error: 'empty' };
-    const pad = (n, w) => String(n).padStart(w, '0');
-    const ts = (sec) => {
-      const ms = Math.max(0, Math.round(sec * 1000));
-      const h = Math.floor(ms / 3600000);
-      const m = Math.floor((ms % 3600000) / 60000);
-      const s = Math.floor((ms % 60000) / 1000);
-      return `${pad(h, 2)}:${pad(m, 2)}:${pad(s, 2)},${pad(ms % 1000, 3)}`;
-    };
-    const blocks = finals.map((seg, i) => {
-      const lines = [seg.text];
-      if (seg.trans && seg.trans !== 'pending') lines.push(seg.trans);
-      return `${i + 1}\n${ts(seg.startS)} --> ${ts(seg.startS + seg.durS)}\n${lines.join('\n')}`;
-    });
-    const res = await window.electron?.audioEngine?.exportSrt?.(blocks.join('\n\n') + '\n');
-    return res?.success ? { ...res, truncated: transcriptTruncatedRef.current } : res;
   }, []);
 
   return {
@@ -360,7 +425,7 @@ export default function useListenSession({ active }) {
     refreshSources,
     toggle,
     stop,
-    exportSrt,
+    bumpSourcesActivity,
     levelRef,
     ttsGated,
   };

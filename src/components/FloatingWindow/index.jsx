@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Camera, X, Loader2, AlertCircle, ChevronDown, GripHorizontal, History, Clock, RefreshCw, Ghost, Brain, AudioLines, Play, Square, Download } from 'lucide-react';
+import { Camera, X, Loader2, AlertCircle, ChevronDown, GripHorizontal, History, Clock, RefreshCw, Ghost, Brain, AudioLines, Play, Square, FolderOpen } from 'lucide-react';
 import useSessionStore, { STATUS, DISPLAY_MODE, CHILD_PANE_STATUS } from '../../stores/session.js';
 import useConfigStore from '../../stores/config.js';
 import pipeline from '../../services/pipeline.js';
@@ -88,7 +88,10 @@ const FloatingWindow = () => {
   const [historyItems, setHistoryItems] = useState([]);
   const [toastMessage, setToastMessage] = useState(null);
 
-  const listen = useListenSession({ active: listenMode });
+  const listen = useListenSession({
+    active: listenMode,
+    onAutosaved: () => setToastMessage({ type: 'success', message: t('floatingWindow.listenAutosaved') }),
+  });
 
   // Mode-segment gate: the listen button is always visible, but stays disabled
   // until a recognition model is on disk. Downloading happens in settings
@@ -888,7 +891,7 @@ const FloatingWindow = () => {
             </span>
           )}
 
-          <div className="floating-toolbar">
+          <div className="floating-toolbar" onMouseEnter={listenMode ? listen.bumpSourcesActivity : undefined}>
             {listenMode ? (
               <>
                 <button
@@ -914,6 +917,15 @@ const FloatingWindow = () => {
                     : t('floatingWindow.listenSourceUnsupported')}
                 >
                   <option value="system">{t('floatingWindow.listenSourceAll')}</option>
+                  {/* The chosen program stays listed even when a refresh no
+                      longer sees it (paused, between tracks): a select whose
+                      value matches no option shows blank. */}
+                  {listen.sources.processLoopback && listen.source.mode !== 'system'
+                    && !listen.sources.sessions.some((x) => x.pid === listen.source.pid) && (
+                    <option value={`${listen.source.mode}:${listen.source.pid}`}>
+                      {listen.source.name || listen.source.pid}
+                    </option>
+                  )}
                   {/* Flat list, no "everything except X" group: the user's
                       call — picking what to listen to is the need; excluding
                       one program is not. The exclude mode stays in the capture
@@ -955,18 +967,14 @@ const FloatingWindow = () => {
                 </select>
                 <button
                   className="toolbar-btn"
-                  onClick={async (e) => {
+                  onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    const r = await listen.exportSrt();
-                    if (r?.success) {
-                      setToastMessage({ type: 'success', message: t('floatingWindow.listenExported', '字幕已导出') });
-                    }
+                    window.electron?.audioEngine?.openListenDir?.();
                   }}
-                  disabled={!listen.segments.length}
-                  title={t('floatingWindow.listenExport', '导出字幕（SRT，含译文）')}
+                  title={t('floatingWindow.listenOpenDir')}
                 >
-                  <Download size={12} />
+                  <FolderOpen size={12} />
                 </button>
               </>
             ) : (

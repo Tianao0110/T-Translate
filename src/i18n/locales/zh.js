@@ -243,7 +243,7 @@ const zh = {
     modules: {
       translators: { name: "翻译源", standard: "本地 LLM 与在线源都可用", secure: "都可用", offline: "只用本地 LLM，在线源禁用", offlineShort: "仅本地 LLM" },
       ocr: { name: "OCR", standard: "本地引擎 + 在线引擎", secure: "不用 Windows OCR（它要把截图写成临时文件）", secureShort: "无 Windows OCR", offline: "只用本地引擎", offlineShort: "仅本地引擎" },
-      listen: { name: "听译", standard: "可用；会话日志只记指标不记文字", secure: "可用；不写会话日志", secureShort: "不写会话日志", offline: "可用，模型全在本机" },
+      listen: { name: "听译", standard: "可用；字幕自动保存到程序目录，会话日志只记指标不记文字", secure: "可用；不写会话日志，字幕不自动保存", secureShort: "不写日志与字幕", offline: "可用，模型全在本机，字幕自动保存" },
       speak: { name: "朗读", standard: "系统语音 / 神经语音 / 外接服务", secure: "同标准", offline: "系统语音 / 神经语音；外接服务禁用", offlineShort: "外接服务禁用" },
       downloads: { name: "模型与语音包下载", standard: "可用", secure: "可用", offline: "不联网，只列已安装", offlineShort: "不联网" },
       history: { name: "历史 · 收藏 · 缓存", standard: "保存", secure: "不写盘，关闭即清", secureShort: "不写盘", offline: "保存" },
@@ -342,11 +342,11 @@ const zh = {
     listenLangAuto: "自动",
     listenTarget: "翻译目标",
     listenNoTranslate: "不翻译",
-    listenExport: "导出字幕（SRT，含译文）",
+    listenOpenDir: "打开字幕文件夹（停止或切换时自动保存）",
     listenSourceAll: "全部声音",
     listenSourceHint: "声音来源",
     listenSourceUnsupported: "声音来源（指定程序需要 Windows 11）",
-    listenExported: "字幕已导出",
+    listenAutosaved: "字幕已自动保存",
     listenIdle: "点击开始，听译系统声音",
     listenWaiting: "正在监听系统声音…",
     listenGate: "朗读中 · 暂停收音",
@@ -677,6 +677,10 @@ const zh = {
       hint: "高精度：带音乐或噪声时更准，30 种语言；下载 806 MB，占内存 1–1.6 GB，定稿晚 1–2 秒，推荐 16 GB 内存",
       enabled: "已切到高精度定稿，下次开始听译生效",
       disabled: "已切回标准定稿",
+    },
+    autosave: {
+      label: "停止或切换时自动保存字幕",
+      hint: "存到程序目录 data\\listen，按程序名加时间命名，只留最近 20 个；无痕模式不保存",
     },
     packs: {
       title: "识别模型",

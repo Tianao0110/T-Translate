@@ -1,9 +1,12 @@
 ﻿// IPC for the listen-translate mode (hosted by the floating window). Thin:
 // session handlers delegate to audio-engine-manager, which owns the worker.
 
-const { ipcMain, dialog } = require('electron');
+const { ipcMain, shell } = require('electron');
 const fs = require('fs');
-const { CHANNELS } = require('../shared/channels');
+const { CHANNELS, PRIVACY_MODES } = require('../shared/channels');
+const { store } = require('../state');
+const { dataDir } = require('../utils/data-root');
+const { createListenAutosave } = require('../utils/listen-autosave');
 const engineManager = require('../managers/audio-engine-manager');
 const winAudio = require('../utils/win-audio-capture');
 const packManager = require('../utils/audio-pack-manager');
@@ -62,33 +65,41 @@ function registerAudioEngineIPC(ctx) {
     };
   });
 
-  // Subtitle export: the renderer assembles the SRT text (it owns the finals
-  // and their timestamps); this side only does the save dialog + write. The
-  // content is the user's own transcript — same trust level as clipboard.
-  ipcMain.handle(AE.EXPORT_SRT, async (event, payload) => {
+  // Subtitle auto-save: the renderer assembles the SRT text (it owns the
+  // finals and their timestamps) and sends it when a session ends or
+  // restarts; this side files it under <data>\listen with no dialog. Secure
+  // mode writes nothing and the user's switch is honoured here, one layer
+  // below the window that asks. The content is the user's own transcript —
+  // same trust level as clipboard.
+  const autosave = createListenAutosave({ dir: dataDir('listen') });
+  ipcMain.handle(AE.AUTOSAVE_SRT, async (event, payload) => {
     const content = typeof payload?.content === 'string' ? payload.content : '';
     if (!content) return { success: false, error: 'empty' };
     if (Buffer.byteLength(content, 'utf8') > MAX_SRT_BYTES) {
-      logger.warn('SRT export refused: content over the size cap');
+      logger.warn('subtitle autosave refused: content over the size cap');
       return { success: false, error: 'too-large' };
     }
+    if (store.get('privacyMode', PRIVACY_MODES.STANDARD) === PRIVACY_MODES.SECURE) {
+      return { success: false, error: 'secure' };
+    }
+    if (store.get('settings.listen.autosave', true) === false) return { success: false, error: 'disabled' };
     try {
-      const win = ctx.windows?.floatingWindow;
-      // Local date + time: two exports on the same day used to propose the
-      // same name and the second one overwrote the first. (The old ISO date
-      // was UTC, too — an evening export was filed under tomorrow.)
-      const d = new Date();
-      const pad = (n) => String(n).padStart(2, '0');
-      const stamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
-      const result = await dialog.showSaveDialog(win && !win.isDestroyed() ? win : null, {
-        defaultPath: `listen-${stamp}.srt`,
-        filters: [{ name: 'SubRip Subtitles', extensions: ['srt'] }],
-      });
-      if (result.canceled || !result.filePath) return { success: false, canceled: true };
-      fs.writeFileSync(result.filePath, content, 'utf8');
-      return { success: true, filePath: result.filePath };
+      const sourceName = typeof payload?.sourceName === 'string' ? payload.sourceName : '';
+      const filePath = autosave.save(content, sourceName);
+      logger.info(`subtitles saved: ${filePath}`);
+      return { success: true, filePath };
     } catch (e) {
-      logger.error('SRT export failed:', e.message);
+      logger.error('subtitle autosave failed:', e.message);
+      return { success: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle(AE.OPEN_LISTEN_DIR, async () => {
+    try {
+      fs.mkdirSync(autosave.dir, { recursive: true });
+      const err = await shell.openPath(autosave.dir);
+      return err ? { success: false, error: err } : { success: true, dir: autosave.dir };
+    } catch (e) {
       return { success: false, error: e.message };
     }
   });

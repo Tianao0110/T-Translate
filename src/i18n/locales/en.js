@@ -243,7 +243,7 @@ const en = {
     modules: {
       translators: { name: "Translation providers", standard: "Local LLM and online providers", secure: "All available", offline: "Local LLM only, online providers disabled", offlineShort: "local LLM only" },
       ocr: { name: "OCR", standard: "Local + online engines", secure: "No Windows OCR (it needs the capture as a temp file)", secureShort: "no Windows OCR", offline: "Local engines only", offlineShort: "local engines only" },
-      listen: { name: "Listen", standard: "Available; the session log keeps metrics, never text", secure: "Available; no session log", secureShort: "no session log", offline: "Available, models are local" },
+      listen: { name: "Listen", standard: "Available; subtitles auto-save to the app folder, the session log keeps metrics, never text", secure: "Available; no session log, no subtitle auto-save", secureShort: "no log, no subtitle file", offline: "Available, models are local, subtitles auto-save" },
       speak: { name: "Read aloud", standard: "System / neural / external server", secure: "Same as standard", offline: "System / neural; external server disabled", offlineShort: "no external server" },
       downloads: { name: "Model and voice pack downloads", standard: "Available", secure: "Available", offline: "No network; installed packs only", offlineShort: "no network" },
       history: { name: "History · favorites · cache", standard: "Saved", secure: "Nothing written; cleared on close", secureShort: "nothing written", offline: "Saved" },
@@ -342,11 +342,11 @@ const en = {
     listenLangAuto: "Auto",
     listenTarget: "Translate to",
     listenNoTranslate: "Off",
-    listenExport: "Export subtitles (SRT, with translations)",
+    listenOpenDir: "Open the subtitle folder (auto-saved on stop or switch)",
     listenSourceAll: "All sound",
     listenSourceHint: "Sound source",
     listenSourceUnsupported: "Sound source (per-program needs Windows 11)",
-    listenExported: "Subtitles exported",
+    listenAutosaved: "Subtitles auto-saved",
     listenIdle: "Click start to caption system audio",
     listenWaiting: "Listening to system audio…",
     listenGate: "Speaking · capture paused",
@@ -677,6 +677,10 @@ const en = {
       hint: "High accuracy: better with music or noise, 30 languages; 806 MB download, 1–1.6 GB of RAM, finals 1–2 s later, 16 GB RAM recommended",
       enabled: "Switched to high-accuracy finals; applies from the next listen session",
       disabled: "Back to standard finals",
+    },
+    autosave: {
+      label: "Auto-save subtitles on stop or switch",
+      hint: "Saved under data\\listen in the app folder, named by program and time, newest 20 kept; nothing is saved in incognito mode",
     },
     packs: {
       title: "Recognition models",

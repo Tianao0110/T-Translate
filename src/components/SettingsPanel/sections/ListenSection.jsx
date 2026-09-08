@@ -7,7 +7,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import PackList from './PackList.jsx';
-import { Seg } from './shared.jsx';
+import { Seg, Switch } from './shared.jsx';
 import createLogger from '../../../utils/logger.js';
 const logger = createLogger('ListenSection');
 
@@ -24,6 +24,7 @@ const ListenSection = ({ notify, confirm, embedded = false }) => {
   const [info, setInfo] = useState(null); // { modelName, streamingPresent, hqPresent, modelsDir, ... }
   const [tier, setTier] = useState('standard');
   const [tierBusy, setTierBusy] = useState(false);
+  const [autosave, setAutosave] = useState(true);
   const [hqInstalled, setHqInstalled] = useState(false);
   const [listKey, setListKey] = useState(0); // remounts PackList after a download it did not start
 
@@ -41,7 +42,15 @@ const ListenSection = ({ notify, confirm, embedded = false }) => {
     window.electron?.store?.get?.('settings.listen.tier')
       .then((v) => setTier(v === 'high' ? 'high' : 'standard'))
       .catch(() => {});
+    window.electron?.store?.get?.('settings.listen.autosave')
+      .then((v) => setAutosave(v !== false))
+      .catch(() => {});
   }, [loadInfo]);
+
+  const handleAutosaveChange = async (next) => {
+    setAutosave(next);
+    await window.electron?.store?.set?.('settings.listen.autosave', next);
+  };
 
   // The floating window caches "is listen available" — tell it to re-ask, or a
   // freshly downloaded model leaves the button grey until the window reopens.
@@ -132,6 +141,11 @@ const ListenSection = ({ notify, confirm, embedded = false }) => {
           ]}
         />
         <p className="setting-hint">{t('listen.tier.hint')}</p>
+      </div>
+
+      <div className="setting-group">
+        <Switch checked={autosave} onChange={handleAutosaveChange} label={t('listen.autosave.label')} />
+        <p className="setting-hint">{t('listen.autosave.hint')}</p>
       </div>
 
       <PackList

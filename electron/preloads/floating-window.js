@@ -88,7 +88,10 @@ contextBridge.exposeInMainWorld('electron', {
     // Which programs are making sound, and whether this Windows build can
     // capture a single one of them.
     listSources: () => ipcRenderer.invoke('audio-engine:sources'),
-    exportSrt: (content) => ipcRenderer.invoke('audio-engine:export-srt', { content }),
+    // Subtitles are filed automatically when a session ends or restarts; the
+    // window only ever asks to open the folder they land in.
+    autosaveSrt: (content, sourceName) => ipcRenderer.invoke('audio-engine:autosave-srt', { content, sourceName }),
+    openListenDir: () => ipcRenderer.invoke('audio-engine:open-listen-dir'),
     onStatus: (cb) => {
       const handler = (event, payload) => cb(payload);
       ipcRenderer.on('audio-engine:status', handler);
