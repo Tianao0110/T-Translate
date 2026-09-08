@@ -568,7 +568,7 @@ const en = {
   },
   common: { confirm: "Confirm", cancel: "Cancel", save: "Save", delete: "Delete", edit: "Edit", close: "Close", open: "Open", enable: "Enable", disable: "Disable", loading: "Loading...", noData: "No data", retry: "Retry", reset: "Reset", search: "Search", filter: "Filter", all: "All", none: "None", yes: "Yes", no: "No", show: "Show", hide: "Hide", on: "On", off: "Off" },
   llm: {
-    description: "The app's own model",
+    description: "The app's own model. Models are updated once a year; older ones stay listed under Custom models until you delete them",
     engineName: "Local model",
     engineNameWith: "Local model ({{name}})",
     packLabel: "{{name}} ({{role}})",
@@ -584,10 +584,6 @@ const en = {
     fileLabel: "Model file",
     openFolder: "Open folder",
     rescan: "Rescan",
-    annual: {
-      title: "Annual update",
-      text: "The local model is updated once a year with the annual release: the pinned llama.cpp runtime and the whitelisted models are replaced and re-timed. After such a release, older files show as “File mismatch” or are no longer listed; download the new file from the links on this page into the same folder and delete the old one.",
-    },
     scanned: "Rescanned",
     modelLabel: "Model",
     roleGeneral: "General",

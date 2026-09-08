@@ -568,7 +568,7 @@ const zh = {
   },
   common: { confirm: "确定", cancel: "取消", save: "保存", delete: "删除", edit: "编辑", close: "关闭", open: "打开", enable: "启用", disable: "禁用", loading: "加载中...", noData: "暂无数据", retry: "重试", reset: "重置", search: "搜索", filter: "筛选", all: "全部", none: "无", yes: "是", no: "否", show: "显示", hide: "隐藏", on: "开启", off: "关闭" },
   llm: {
-    description: "程序自带的模型",
+    description: "程序自带的模型。模型以年度进行更新，旧的模型可在自定义模型里看到，直到你删除",
     engineName: "本地模型",
     engineNameWith: "本地模型（{{name}}）",
     packLabel: "{{name}}（{{role}}）",
@@ -584,10 +584,6 @@ const zh = {
     fileLabel: "模型文件",
     openFolder: "打开文件夹",
     rescan: "重新扫描",
-    annual: {
-      title: "年度更新",
-      text: "本地模型每年随年度版本更新一次：更换钉定的 llama.cpp 运行时与白名单里的模型，并重新测速。新版本发布后，旧模型文件会显示「文件不符」或不再列出，按本页链接下载新文件放进同一个文件夹即可，旧文件可以删掉。",
-    },
     scanned: "已重新扫描",
     modelLabel: "模型",
     roleGeneral: "通用",

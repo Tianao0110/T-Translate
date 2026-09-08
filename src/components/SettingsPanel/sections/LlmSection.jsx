@@ -226,11 +226,9 @@ const LlmSection = ({ settings, updateSetting, notify }) => {
         </div>
       )}
 
-      <div className="setting-group">
-        <label className="setting-label">{t('llm.annual.title')}</label>
-        <p className="setting-hint">{t('llm.annual.text')}</p>
-      </div>
-
+      {/* Files outside the whitelist (last year's model included) are always
+          listed so the user can see what sits in the folder; probing and
+          using them needs the switch. */}
       <div className="setting-group">
         <label className="setting-label">{t('llm.dev.title')}</label>
         <Switch
@@ -242,7 +240,7 @@ const LlmSection = ({ settings, updateSetting, notify }) => {
           label={t('llm.dev.allow')}
         />
         <p className="setting-hint">{t('llm.dev.allowHint')}</p>
-        {llm.allowUnlistedModels && (
+        {status?.ready && (
           <div className="sub-setting" style={{ marginTop: 10 }}>
             {unlisted.length === 0 && <p className="setting-hint">{t('llm.dev.none')}</p>}
             {unlisted.length > 0 && (
@@ -276,27 +274,31 @@ const LlmSection = ({ settings, updateSetting, notify }) => {
                           </p>
                         )}
                       </div>
-                      <div className="engine-actions">
-                        <button className="btn-small" onClick={() => probe(u.file)} disabled={busy !== null}>
-                          {busy === `probe:${u.file}` ? <><RefreshCw size={12} className="spinning" /> {t('llm.dev.probing')}</> : t('llm.dev.probe')}
-                        </button>
-                        <button className="link-button" onClick={() => report(u.file)} disabled={busy !== null} style={{ marginLeft: 10 }}>
-                          {t('llm.dev.report')}
-                        </button>
-                      </div>
+                      {llm.allowUnlistedModels && (
+                        <div className="engine-actions">
+                          <button className="btn-small" onClick={() => probe(u.file)} disabled={busy !== null}>
+                            {busy === `probe:${u.file}` ? <><RefreshCw size={12} className="spinning" /> {t('llm.dev.probing')}</> : t('llm.dev.probe')}
+                          </button>
+                          <button className="link-button" onClick={() => report(u.file)} disabled={busy !== null} style={{ marginLeft: 10 }}>
+                            {t('llm.dev.report')}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
               </div>
             )}
-            <div style={{ marginTop: 12 }}>
-              <Switch
-                checked={!!llm.trialLogText}
-                onChange={(on) => persist('trialLogText', on)}
-                label={t('llm.dev.logText')}
-              />
-              <p className="setting-hint">{t('llm.dev.logTextHint')}</p>
-            </div>
+            {llm.allowUnlistedModels && (
+              <div style={{ marginTop: 12 }}>
+                <Switch
+                  checked={!!llm.trialLogText}
+                  onChange={(on) => persist('trialLogText', on)}
+                  label={t('llm.dev.logText')}
+                />
+                <p className="setting-hint">{t('llm.dev.logTextHint')}</p>
+              </div>
+            )}
           </div>
         )}
       </div>
