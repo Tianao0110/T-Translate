@@ -31,6 +31,16 @@ describe('tengine facade', () => {
     expect(s.engines.find((e) => e.id === 'tts')).toMatchObject({ provider: 'cpu', lastHealth: null, host: null });
   });
 
+  it('serves every engine id an adapter lists', () => {
+    const t = createTengine();
+    const audio = { ...fakeEngine('audio'), engines: ['tts', 'asr'] };
+    t.register(audio);
+    expect(t.get('tts')).toBe(audio);
+    expect(t.get('asr')).toBe(audio);
+    t.setProvider('tts', 'webgpu');
+    expect(t.status().engines.find((e) => e.id === 'asr').provider).toBe('webgpu');
+  });
+
   it('delegates provider, health and shutdown to the engine', async () => {
     const t = createTengine();
     const e = t.register(fakeEngine('ocr'));

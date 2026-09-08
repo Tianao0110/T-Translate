@@ -20,6 +20,7 @@ function fakeChild(script) {
     if (reply) setImmediate(() => child.emit('message', reply));
   };
   child.kill = () => setImmediate(() => child.emit('exit', 0));
+  child.stderr = new EventEmitter();
   return child;
 }
 
@@ -79,10 +80,59 @@ describe('tengine host-manager', () => {
 
   it('post() is a no-op before spawn and delivers afterwards', async () => {
     const { h, children } = host((msg) => (msg.type === 'init' ? { type: 'ready' } : null));
-    h.post({ type: 'ping' });
+    expect(h.post({ type: 'ping' })).toBe(false);
     expect(children).toHaveLength(0);
     await h.prewarm();
-    h.post({ type: 'ping' });
+    expect(h.post({ type: 'ping' })).toBe(true);
     expect(children[0].sent.map((s) => s.type)).toEqual(['init', 'ping']);
+  });
+
+  it('hands event-stream messages (ready included) to onMessage and merges spawn opts into init', async () => {
+    const seen = [];
+    const { h, children } = host((msg) => (msg.type === 'init' ? { type: 'ready' } : null), {
+      onMessage: (m) => seen.push(m.type),
+      initPayload: (opts) => ({ session: opts.session }),
+    });
+    await h.spawn({ session: 'abc' });
+    children[0].emit('message', { type: 'segment', rec: {} });
+    children[0].emit('message', { type: 'log', level: 'info', message: 'x' });
+    expect(children[0].sent[0]).toEqual({ type: 'init', session: 'abc' });
+    expect(seen).toEqual(['ready', 'segment']);
+  });
+
+  it('with crashBackoff off, repeated crashes never block a respawn', async () => {
+    let t = 0;
+    const { h, fork } = host((msg, child) => {
+      if (msg.type === 'init') setImmediate(() => child.emit('exit', 9));
+      return null;
+    }, { crashBackoff: false, now: () => t, readyTimeoutMs: 50 });
+    for (let i = 0; i < 4; i++) {
+      await expect(h.spawn()).rejects.toMatchObject({ code: DEFAULT_CODES.crashed });
+    }
+    expect(fork).toHaveBeenCalledTimes(4);
+    expect(h.status().backoffUntil).toBe(0);
+  });
+
+  it('expectExit marks the next exit as expected; discard skips exit bookkeeping', async () => {
+    const { h, children, events } = host((msg) => (msg.type === 'init' ? { type: 'ready' } : null));
+    await h.spawn();
+    h.expectExit();
+    children[0].emit('exit', 0);
+    expect(events.at(-1)).toMatchObject({ kind: 'exit', expected: true, code: 0 });
+    expect(h.status().crashesInWindow).toBe(0);
+    await h.spawn();
+    const second = children[1];
+    h.discard('replaced');
+    second.emit('exit', 0);
+    expect(events.filter((e) => e.kind === 'exit')).toHaveLength(1);
+    expect(events.at(-1)).toMatchObject({ kind: 'discard', reason: 'replaced' });
+  });
+
+  it('feeds stderr lines to onStderr', async () => {
+    const lines = [];
+    const { h, children } = host((msg) => (msg.type === 'init' ? { type: 'ready' } : null), { onStderr: (l) => lines.push(l) });
+    await h.spawn();
+    children[0].stderr.emit('data', Buffer.from('  something on stderr \n'));
+    expect(lines).toEqual(['something on stderr']);
   });
 });

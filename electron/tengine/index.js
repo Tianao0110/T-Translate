@@ -24,9 +24,12 @@ function createTengine({ logger } = {}) {
     }
   }
 
+  // An adapter serves its own id plus every engine id it lists in
+  // `engines` (the audio host carries both the voice and the recognizer).
   function register(engine) {
     if (!engine?.id) throw new Error('engine needs an id');
     engines.set(engine.id, engine);
+    for (const id of engine.engines || []) engines.set(id, engine);
     return engine;
   }
 
@@ -53,9 +56,11 @@ function createTengine({ logger } = {}) {
     status() {
       return {
         provider: PROVIDER,
+        // An adapter serving several engines answers for each of them; the
+        // row keeps its own id.
         engines: ENGINES.map((row) => {
           const live = engines.get(row.id);
-          return { ...row, ...(live ? live.status() : { provider: 'cpu', lastHealth: null, host: null }) };
+          return { ...row, ...(live ? live.status() : { provider: 'cpu', lastHealth: null, host: null }), id: row.id };
         }),
       };
     },
@@ -78,21 +83,29 @@ function createTengine({ logger } = {}) {
 let _default = null;
 
 // The program's instance: real utilityProcess hosts, created on first use.
-// Engines that live in the audio worker join here when that manager moves
-// onto the host framework; until then only the OCR engine is registered.
 function get() {
   if (_default) return _default;
   const { utilityProcess } = require('electron');
   const createLogger = require('../utils/logger');
   const logger = createLogger('T-Engine');
   const tengine = createTengine({ logger });
+  const fork = (file, args, opts) => utilityProcess.fork(file, args, opts);
   const { createOcrEngine } = require('./engines/ocr');
+  const { createAudioEngine } = require('./engines/audio');
   tengine.register(
     createOcrEngine({
-      fork: (file, args, opts) => utilityProcess.fork(file, args, opts),
+      fork,
       logger: createLogger('OCR-Host'),
       workerPath: path.join(__dirname, '../services/ocr-host/ocr-host.js'),
       onEvent: (evt) => tengine.emit({ engine: 'ocr', ...evt }),
+    }),
+  );
+  tengine.register(
+    createAudioEngine({
+      fork,
+      logger: createLogger('AudioEngine'),
+      workerPath: path.join(__dirname, '../services/audio-engine/audio-worker.js'),
+      onEvent: (evt) => tengine.emit(evt),
     }),
   );
   _default = tengine;

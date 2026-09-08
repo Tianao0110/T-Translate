@@ -25,8 +25,7 @@ const { PROVIDER: GPU_PROVIDER, ENGINES: GPU_ENGINES } = tengine;
 const KEY = 'settings.gpu.enabled';
 
 // How each GPU-capable engine is driven. Keyed by the table's ids so the
-// table stays plain data. OCR goes through T-Engine; the voice engine joins
-// it when the audio manager moves onto the host framework.
+// table stays plain data.
 const DRIVERS = {
   ocr: {
     setProvider: (p) => tengine.get().setProvider('ocr', p),
@@ -38,7 +37,9 @@ const DRIVERS = {
     },
   },
   tts: {
-    setProvider: (p) => audioEngine.setTtsProvider(p),
+    setProvider: (p) => tengine.get().setProvider('tts', p),
+    // The manager picks the voice pack and brings the process up; the load,
+    // the wait and the fallback verdict are the audio adapter's.
     selfTest: async () => {
       const s = await audioEngine.ttsSelfTest();
       return { ok: s.ok, provider: s.provider, fallback: s.fallback || s.error || null };

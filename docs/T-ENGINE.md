@@ -18,9 +18,9 @@ T-Engine 只做三件事：**装载运行时、监控引擎、报告事实**。
 
 | 现在在哪 | 做什么 | 移到 T-Engine 的哪一层 | 主程序留下什么 |
 | --- | --- | --- | --- |
-| `ipc/gpu.js` DRIVERS | 逐引擎自检（OCR host 建会话、朗读载入+热身）、回退原因 | `registry` + 各引擎适配器的 `health()` / `setProvider()` | 开关的确认框、状态卡的渲染、存 `settings.gpu.enabled` |
-| `managers/ocr-host-manager.js` | 拉起、就绪、请求配对、崩溃重生、连崩退避 | `host-manager.js`（通用框架） | 无（整个换底） |
-| `managers/audio-engine-manager.js` | 就绪超时、一次性崩溃重启、TTS 闲置卸载、stderr 抓回退标记、TTS 自检 | `host-manager.js` + 音频引擎适配器 | 会话语义：来源、语言、档位、字幕事件转发 |
+| `ipc/gpu.js` DRIVERS | 逐引擎自检（OCR host 建会话、朗读载入+热身）、回退原因 | `registry` + 各引擎适配器的 `health()` / `setProvider()`（已做：OCR 与朗读都经 `tengine.setProvider`，自检由适配器执行） | 开关的确认框、状态卡的渲染、存 `settings.gpu.enabled`、朗读自检选哪个语音包 |
+| `managers/ocr-host-manager.js` | 拉起、就绪、请求配对、崩溃重生、连崩退避 | `host-manager.js`（通用框架）（已做，文件删除） | 无（整个换底） |
+| `managers/audio-engine-manager.js` | 就绪超时、一次性崩溃重启、TTS 闲置卸载、stderr 抓回退标记、TTS 自检 | `host-manager.js` + `engines/audio.js`（已做：进程、模型载入计时、退出分类 model-load / session / idle、provider 与 stderr 回退标记、自检载入等待）；一次性重启与 TTS 闲置卸载是会话策略，留 manager | 会话语义：来源、语言、档位、字幕事件转发、重启一次、闲置 60 s |
 | `ipc/ocr.js` HEALTH_CHECK | 深度健康检查 | `health()` | IPC 转发 |
 | `audio-worker.js` 看门狗（有声无字、停滞） | 产生信号 | 不动（信号在 worker 里产生），分类归 T-Engine | 策略表 P5/P6/P10 |
 | 各包管理器 | 包在不在、下载 | 不动（数据层） | 不动 |

@@ -1,6 +1,11 @@
-// Audio engine orchestration: owns the audio utilityProcess (ASR + neural
-// TTS) and the status relay. The listen session is HOSTED by the floating
-// window's listen mode — this manager owns no window lifecycle.
+// Audio engine orchestration: the listen session and the neural voice on
+// top of T-Engine's audio host (tengine/engines/audio.js), plus the status
+// relay. The listen session is HOSTED by the floating window's listen mode —
+// this manager owns no window lifecycle. Process ownership, the model-load
+// timer, exit classification, the provider and the voice self-test are the
+// adapter's (v0.5.0); what stays here is session semantics: which source,
+// which language, which tier, what the window is told, and the one-shot
+// restart policy that keys on the adapter's verdict.
 //
 // Iron rules honored here: the worker dies with the listen session (zero idle
 // footprint; a closing host window force-stops via a once-listener armed at
@@ -18,16 +23,17 @@
 
 const path = require('path');
 const fs = require('fs');
-const { app, utilityProcess } = require('electron');
+const { app } = require('electron');
 const { CHANNELS, PRIVACY_MODES } = require('../shared/channels');
 const { locateAsrModels } = require('../utils/asr-models');
 const { listVoicePacks } = require('../utils/tts-models');
 const { modelDir, modelDirs } = require('../utils/model-root');
 const { dataDir } = require('../utils/data-root');
+const tengine = require('../tengine');
 const logger = require('../utils/logger')('AudioEngine');
 
-const READY_TIMEOUT_MS = 30000;
 const STOP_GRACE_MS = 3000;
+const TTS_SPAWN_TIMEOUT_MS = 30000;
 const TTS_IDLE_MS = 60000;
 const TTS_UNLOAD_WAIT_MS = 5000;
 // Rolling cap — one file per session, oldest pruned first. Filename prefix
@@ -37,13 +43,11 @@ const TTS_UNLOAD_WAIT_MS = 5000;
 const MAX_PROBE_LOGS = 3;
 
 let deps = null; // { store, getWindow }
-let child = null;
+let audio = null; // T-Engine's audio host adapter
+let unsubMessages = null;
+let unsubEvents = null;
 let childState = 'idle'; // ASR session: idle | starting | running | stopping
 let restartedOnce = false;
-// Did THIS spawn ever reach asr-ready? A worker that dies before it does died
-// loading the models, and loading them again will die the same way.
-let engineEverReady = false;
-let readyTimer = null;
 let killTimer = null;
 let privacyUnsub = null;
 let sessionLanguage = ''; // SenseVoice hint from the host window ('' = auto)
@@ -55,14 +59,6 @@ let sessionSource = { mode: 'system', pid: 0 };
 // TTS state. ttsOnly: the process exists for TTS alone (no session ever
 // started in it, or the session ended and TTS kept it alive).
 let ttsOnly = false;
-let ttsLoadedPack = '';
-// GPU acceleration for the neural voice (v0.4.9): 'cpu' | 'webgpu'. sherpa
-// reports a failed provider only on stderr ("... Fallback to cpu"), so the
-// note is scraped from there and cleared on every provider change.
-let ttsProvider = 'cpu';
-let ttsProviderNote = null;
-// packId -> { resolve, reject } for whoever awaits a tts-ready (self-test).
-const ttsLoadWaiters = new Map();
 let ttsRequests = new Map(); // id -> { sender }
 let ttsIdleTimer = null;
 let ttsUnloadWaiters = [];
@@ -74,10 +70,21 @@ let exitRequested = false;
 // for that span (+ a short tail) so the app never transcribes its own voice.
 const ttsPlayingSenders = new Set();
 
+function adapter() {
+  return (audio ||= tengine.get().get('audio'));
+}
+
 function init(d) {
   deps = d;
+  const a = adapter();
+  // init runs once per program, but the smoke harness re-inits with other
+  // deps; never stack subscriptions.
+  if (unsubMessages) unsubMessages();
+  if (unsubEvents) unsubEvents();
+  unsubMessages = a.subscribe(onWorkerMessage);
+  unsubEvents = tengine.get().on(onEngineEvent);
   // The GPU switch persists in the store; the worker reads it at spawn.
-  ttsProvider = d.store?.get?.('settings.gpu.enabled') === true ? 'webgpu' : 'cpu';
+  a.setProvider(d.store?.get?.('settings.gpu.enabled') === true ? 'webgpu' : 'cpu');
 }
 
 // Where a download lands. Reads go through findModels(), which also looks at
@@ -152,16 +159,16 @@ function startSession(options = {}) {
   hostWindow()?.once('closed', () => stopSession('window-closed'));
   // A TTS-only process was declared without ASR paths or a session log; a
   // session gets a fresh one and the voice reloads on the next utterance.
-  if (child) discardWorker('listen-start');
+  if (adapter().running()) discardWorker('listen-start');
   spawnWorker(models);
 
   // A mid-session switch to SECURE keeps the session but closes its log:
   // from here on nothing about it reaches disk.
   privacyUnsub = deps.store.onDidChange('privacyMode', (mode) => {
-    if (mode === PRIVACY_MODES.SECURE && child) {
+    if (mode === PRIVACY_MODES.SECURE && adapter().running()) {
       logger.info('privacy switched to secure — closing the session log');
       try {
-        child.postMessage({ type: 'log-close' });
+        adapter().post({ type: 'log-close' });
       } catch {
         // process gone
       }
@@ -203,43 +210,10 @@ function sessionLogPath() {
   return path.join(logsDir, `audio-probe-${stamp}.jsonl`);
 }
 
-// models = null spawns a TTS-only process: no ASR paths, no session log, no
-// ready timeout, and the ASR state machine stays idle.
-function spawnWorker(models) {
-  ttsOnly = !models;
-  exitRequested = false;
-  if (models) {
-    childState = 'starting';
-    engineEverReady = false;
-    sendStatus('loading');
-  }
-
-  child = utilityProcess.fork(path.join(__dirname, '../services/audio-engine/audio-worker.js'), [], {
-    serviceName: 't-translate-audio-engine',
-    stdio: 'pipe',
-  });
-  child.stdout?.on('data', (d) => logger.debug(`worker: ${String(d).trim()}`));
-  child.stderr?.on('data', (d) => {
-    const line = String(d).trim();
-    // sherpa's only word on a provider it could not enable.
-    if (/webgpu/i.test(line) && /fallback to cpu/i.test(line)) ttsProviderNote = line;
-    logger.warn(`worker: ${line}`);
-  });
-
-  child.on('message', onWorkerMessage);
-  child.on('exit', onWorkerExit);
-
-  if (models) {
-    // Covers the whole init → asr-start → model-load chain (loading dominates).
-    readyTimer = setTimeout(() => {
-      logger.error('worker ready timeout');
-      killWorker();
-      sendStatus('engine-dead', 'ready-timeout');
-    }, READY_TIMEOUT_MS);
-  }
-
-  child.postMessage({
-    type: 'init',
+// What the worker is told at init. models = null describes a TTS-only
+// process: no ASR paths, no session log. The GPU flag is the adapter's.
+function initPayload(models) {
+  return {
     models: {
       asr: models
         ? {
@@ -257,8 +231,6 @@ function spawnWorker(models) {
           }
         : null,
     },
-    // Neural voice on the GPU (WebGPU) when the switch is on; ASR stays CPU.
-    gpu: ttsProvider === 'webgpu',
     // Secure mode writes no session log at all — not even metrics.
     logPath: models && !isSecure() ? sessionLogPath() : null,
     // Recognized text stays out of the on-disk log by default — the session
@@ -271,8 +243,32 @@ function spawnWorker(models) {
       model: models ? models.modelName : 'tts-only',
       privacyMode: deps.store.get('privacyMode', PRIVACY_MODES.STANDARD),
     },
-  });
-  if (models) child.postMessage({ type: 'asr-start', language: sessionLanguage });
+  };
+}
+
+// models = null spawns a TTS-only process: no ASR paths, no session log, no
+// model-load timer, and the ASR state machine stays idle.
+function spawnWorker(models) {
+  ttsOnly = !models;
+  exitRequested = false;
+  if (models) {
+    childState = 'starting';
+    sendStatus('loading');
+  }
+  adapter()
+    .spawn({ init: initPayload(models) })
+    .catch((e) => logger.error(`worker spawn failed: ${e.message}`));
+  // Covers init → asr-start → model load; the adapter's timer turns a
+  // silent load into an engine-dead verdict (see onEngineEvent).
+  if (models) adapter().startAsr(sessionLanguage);
+}
+
+// Engine-level verdicts from T-Engine: the process went away, or the model
+// load timed out. Session policy (restart once, or give up) lives here.
+function onEngineEvent(evt) {
+  if (evt.engine !== 'audio') return;
+  if (evt.kind === 'exit') onWorkerExit(evt);
+  else if (evt.kind === 'timeout' && evt.phase === 'model-load') sendStatus('engine-dead', 'ready-timeout');
 }
 
 function onWorkerMessage(msg) {
@@ -281,21 +277,19 @@ function onWorkerMessage(msg) {
     case 'ready':
       // init acknowledged — nothing loaded yet; asr-ready is the real gate.
       // TTS callers only need the process to be talking.
-      drainSpawnWaiters(child);
+      drainSpawnWaiters(true);
       break;
     case 'asr-ready':
-      clearTimeout(readyTimer);
       childState = 'running';
-      engineEverReady = true;
       logger.info(`worker ready in ${msg.loadMs}ms`);
       // A session started mid-utterance inherits the gate.
-      if (ttsPlayingSenders.size > 0) child?.postMessage({ type: 'tts-gate', on: true });
+      if (ttsPlayingSenders.size > 0) adapter().post({ type: 'tts-gate', on: true });
       // Capture starts only now: an audio client opened while the models were
       // still loading would just fill a buffer nobody reads.
       if (sessionSource.mode === 'off') sendStatus('listening');
       else {
         sendStatus('connecting');
-        child?.postMessage({ type: 'capture-start', ...sessionSource });
+        adapter().post({ type: 'capture-start', ...sessionSource });
       }
       break;
     case 'capture-started':
@@ -317,7 +311,7 @@ function onWorkerMessage(msg) {
         // place so the session keeps running; the renderer resets its picker.
         sessionSource = { mode: 'system', pid: 0 };
         sendStatus('source-gone', msg.detail);
-        child?.postMessage({ type: 'capture-start', ...sessionSource });
+        adapter().post({ type: 'capture-start', ...sessionSource });
       }
       break;
     case 'level':
@@ -342,9 +336,9 @@ function onWorkerMessage(msg) {
       // now rather than whenever the process happens to die — the pack swap
       // behind stopSessionAndWait depends on that.
       clearTimeout(killTimer);
-      if (child) {
+      if (adapter().running()) {
         try {
-          child.postMessage({ type: 'unload', what: 'asr' });
+          adapter().post({ type: 'unload', what: 'asr' });
           if (keepForTts()) {
             childState = 'idle';
             ttsOnly = true;
@@ -353,20 +347,17 @@ function onWorkerMessage(msg) {
             armTtsIdle();
             break;
           }
-          child.postMessage({ type: 'shutdown' });
+          adapter().expectExit();
+          adapter().post({ type: 'shutdown' });
         } catch {
           killWorker();
         }
       }
       break;
     case 'tts-ready':
-      ttsLoadedPack = msg.packId;
-      logger.info(`voice ${msg.packId} loaded in ${msg.loadMs}ms (${msg.numSpeakers} speakers, ${msg.sampleRate} Hz, ${ttsProvider})`);
-      ttsLoadWaiters.get(msg.packId)?.resolve();
-      ttsLoadWaiters.delete(msg.packId);
+      logger.info(`voice ${msg.packId} loaded in ${msg.loadMs}ms (${msg.numSpeakers} speakers, ${msg.sampleRate} Hz, ${adapter().provider()})`);
       break;
     case 'tts-unloaded':
-      ttsLoadedPack = '';
       drainTtsUnloadWaiters();
       break;
     case 'tts-chunk':
@@ -384,12 +375,8 @@ function onWorkerMessage(msg) {
         ttsRequests.delete(msg.id);
         armTtsIdle();
       } else {
-        // A load failure (no request id): whoever awaits that pack hears it.
-        const waiter = msg.packId && ttsLoadWaiters.get(msg.packId);
-        if (waiter) {
-          ttsLoadWaiters.delete(msg.packId);
-          waiter.reject(new Error(msg.message || 'tts-load-failed'));
-        }
+        // A load failure (no request id): the adapter already told whoever
+        // awaited that pack.
         logger.error(`voice ${msg.packId || '?'} load failed: ${msg.message}`);
       }
       break;
@@ -401,20 +388,17 @@ function onWorkerMessage(msg) {
   }
 }
 
-function onWorkerExit(code) {
-  clearTimeout(readyTimer);
+function onWorkerExit({ code, everReady }) {
   clearTimeout(killTimer);
   clearTimeout(ttsIdleTimer);
   const wasStopping = childState === 'stopping';
   const wasTtsOnly = ttsOnly;
-  child = null;
   childState = 'idle';
   ttsOnly = false;
   exitRequested = false;
-  ttsLoadedPack = '';
   failTtsRequests('engine-exited');
   drainTtsUnloadWaiters();
-  drainSpawnWaiters(null);
+  drainSpawnWaiters(false);
   unsubscribePrivacy();
   logger.info(`worker exited (code ${code}, stopping=${wasStopping}, ttsOnly=${wasTtsOnly})`);
   drainExitWaiters();
@@ -429,10 +413,10 @@ function onWorkerExit(code) {
   // Died before ever going ready = the models did not load. A hand-placed file
   // that is not really an ONNX model takes the worker down through a native
   // exception (exit 0xE06D7363) rather than the JS try/catch around the load,
-  // so there is no 'fatal' message to go on — the state is the signal. Loading
-  // the same file again would crash identically, so the one-shot restart is
-  // reserved for engines that were actually running.
-  if (!engineEverReady) {
+  // so there is no 'fatal' message to go on — the adapter's verdict is the
+  // signal. Loading the same file again would crash identically, so the
+  // one-shot restart is reserved for engines that were actually running.
+  if (!everReady) {
     logger.error('worker died during model load — not retrying');
     sendStatus('model-load-failed');
     return;
@@ -454,8 +438,8 @@ function onWorkerExit(code) {
 // the real chain). Normal sessions never call this — the worker's own native
 // capture feeds the VAD directly, and no renderer channel reaches either one.
 function feedPcm(samples) {
-  if (childState !== 'running' || !child) return;
-  child.postMessage({ type: 'pcm', samples });
+  if (childState !== 'running' || !adapter().running()) return;
+  adapter().post({ type: 'pcm', samples });
 }
 
 // Callers that must not touch the model files until the worker is really gone
@@ -474,7 +458,7 @@ function drainExitWaiters() {
  * and it would fail at the very end of a 150 MB download.
  */
 function stopSessionAndWait(reason, timeoutMs = STOP_GRACE_MS + 2000) {
-  if (!child) {
+  if (!adapter().running()) {
     stopSession(reason);
     return Promise.resolve();
   }
@@ -500,7 +484,7 @@ function stopSessionAndWait(reason, timeoutMs = STOP_GRACE_MS + 2000) {
 
 function stopSession(reason) {
   unsubscribePrivacy();
-  if (!child) {
+  if (!adapter().running()) {
     childState = 'idle';
     return;
   }
@@ -509,7 +493,8 @@ function stopSession(reason) {
   logger.info(`stopping session (${reason})`);
   childState = 'stopping';
   try {
-    child.postMessage({ type: 'asr-stop' });
+    adapter().stopAsr();
+    adapter().post({ type: 'asr-stop' });
   } catch {
     killWorker();
     return;
@@ -521,10 +506,11 @@ function stopSession(reason) {
 }
 
 function shutdownWorker() {
-  if (!child) return;
+  if (!adapter().running()) return;
   try {
-    child.postMessage({ type: 'unload', what: 'tts' });
-    child.postMessage({ type: 'shutdown' });
+    adapter().post({ type: 'unload', what: 'tts' });
+    adapter().expectExit();
+    adapter().post({ type: 'shutdown' });
   } catch {
     killWorker();
     return;
@@ -536,37 +522,21 @@ function shutdownWorker() {
 }
 
 function killWorker() {
-  clearTimeout(readyTimer);
   clearTimeout(killTimer);
-  if (child) {
-    try {
-      child.kill();
-    } catch {
-      // already gone
-    }
-  }
+  adapter().kill();
 }
 
 // Drop a process without going through onWorkerExit's session bookkeeping:
 // used when a listen session replaces a TTS-only process.
 function discardWorker(reason) {
-  const old = child;
-  if (!old) return;
+  if (!adapter().running()) return;
   logger.info(`discarding tts-only worker (${reason})`);
-  old.removeListener('message', onWorkerMessage);
-  old.removeListener('exit', onWorkerExit);
   clearTimeout(ttsIdleTimer);
-  child = null;
   ttsOnly = false;
-  ttsLoadedPack = '';
   failTtsRequests('engine-replaced');
   drainTtsUnloadWaiters();
-  drainSpawnWaiters(null);
-  try {
-    old.kill();
-  } catch {
-    // already gone
-  }
+  drainSpawnWaiters(false);
+  adapter().discard(reason);
 }
 
 function unsubscribePrivacy() {
@@ -579,7 +549,7 @@ function unsubscribePrivacy() {
 // ===== TTS =====
 
 function keepForTts() {
-  return !exitRequested && (!!ttsLoadedPack || ttsRequests.size > 0);
+  return !exitRequested && (!!adapter().ttsLoadedPack() || ttsRequests.size > 0);
 }
 
 function voicePacks() {
@@ -605,10 +575,10 @@ function getTtsStatus() {
   return {
     available: packs.length > 0,
     packs: packs.map(packSummary),
-    loaded: ttsLoadedPack,
+    loaded: adapter().ttsLoadedPack(),
     packsDir: modelDir('tts-models'),
-    provider: ttsProvider,
-    providerNote: ttsProviderNote,
+    provider: adapter().provider(),
+    providerNote: adapter().providerNote(),
   };
 }
 
@@ -645,22 +615,22 @@ function getTtsVoices() {
 }
 
 function ensureTtsWorker() {
-  if (child) return Promise.resolve(child);
+  if (adapter().running()) return Promise.resolve(true);
   spawnWorker(null);
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('tts-worker-timeout')), READY_TIMEOUT_MS);
-    spawnWaiters.push((proc) => {
+    const timer = setTimeout(() => reject(new Error('tts-worker-timeout')), TTS_SPAWN_TIMEOUT_MS);
+    spawnWaiters.push((ok) => {
       clearTimeout(timer);
-      if (proc) resolve(proc);
+      if (ok) resolve(true);
       else reject(new Error('tts-worker-died'));
     });
   });
 }
 
-function drainSpawnWaiters(proc) {
+function drainSpawnWaiters(ok) {
   const waiters = spawnWaiters;
   spawnWaiters = [];
-  for (const done of waiters) done(proc);
+  for (const done of waiters) done(ok);
 }
 
 function sendTts(id, payload) {
@@ -692,15 +662,14 @@ async function ttsGenerate({ id, text, packId, sid, speed }, sender) {
 
   clearTimeout(ttsIdleTimer);
   ttsRequests.set(id, { sender });
-  let worker;
   try {
-    worker = await ensureTtsWorker();
+    await ensureTtsWorker();
   } catch (e) {
     ttsRequests.delete(id);
     return { success: false, error: e.message };
   }
   try {
-    worker.postMessage({
+    adapter().post({
       type: 'tts-generate',
       id,
       text,
@@ -729,9 +698,9 @@ function ttsPackPayload(pack) {
 }
 
 function ttsCancel(id) {
-  if (!child || !ttsRequests.has(id)) return;
+  if (!adapter().running() || !ttsRequests.has(id)) return;
   try {
-    child.postMessage({ type: 'tts-cancel', id });
+    adapter().post({ type: 'tts-cancel', id });
   } catch {
     // process gone — exit handler fails the request
   }
@@ -747,9 +716,9 @@ function setTtsPlaying(senderId, on) {
   const after = ttsPlayingSenders.size > 0;
   if (before === after) return;
   logger.debug(`tts gate ${after ? 'on' : 'off'}`);
-  if (child && childState === 'running') {
+  if (adapter().running() && childState === 'running') {
     try {
-      child.postMessage({ type: 'tts-gate', on: after });
+      adapter().post({ type: 'tts-gate', on: after });
     } catch {
       // process gone
     }
@@ -759,13 +728,13 @@ function setTtsPlaying(senderId, on) {
 
 function armTtsIdle() {
   clearTimeout(ttsIdleTimer);
-  if (!child || !ttsLoadedPack || ttsRequests.size > 0) return;
+  if (!adapter().running() || !adapter().ttsLoadedPack() || ttsRequests.size > 0) return;
   ttsIdleTimer = setTimeout(onTtsIdle, TTS_IDLE_MS);
 }
 
 function onTtsIdle() {
   ttsIdleTimer = null;
-  if (!child || ttsRequests.size > 0) return;
+  if (!adapter().running() || ttsRequests.size > 0) return;
   // Inside a listen session the voice rides along until the session ends.
   if (childState !== 'idle') return;
   // Floating window on screen = the user is likely to ask for another line.
@@ -784,7 +753,7 @@ function onTtsIdle() {
  * is unloaded and the worker's ack is awaited.
  */
 function unloadTtsAndWait(packId) {
-  if (!child || (!ttsLoadedPack && ttsRequests.size === 0)) return Promise.resolve();
+  if (!adapter().running() || (!adapter().ttsLoadedPack() && ttsRequests.size === 0)) return Promise.resolve();
   logger.info(`releasing voice before pack swap (${packId})`);
   clearTimeout(ttsIdleTimer);
   if (childState === 'idle') {
@@ -808,7 +777,7 @@ function unloadTtsAndWait(packId) {
       resolve();
     });
     try {
-      child.postMessage({ type: 'unload', what: 'tts' });
+      adapter().post({ type: 'unload', what: 'tts' });
     } catch {
       drainTtsUnloadWaiters();
     }
@@ -824,62 +793,27 @@ function drainTtsUnloadWaiters() {
 // 'cpu' | 'webgpu'. A loaded voice is dropped by the worker and rebuilt on
 // the new backend at the next request — no restart, no session interruption.
 function setTtsProvider(provider) {
-  const next = provider === 'webgpu' ? 'webgpu' : 'cpu';
-  ttsProviderNote = null;
-  if (next === ttsProvider) return;
-  ttsProvider = next;
-  if (child) {
-    try {
-      child.postMessage({ type: 'tts-set-provider', provider: next });
-    } catch {
-      // process gone — the next spawn reads ttsProvider
-    }
-  }
+  adapter().setProvider(provider);
 }
 
 // Loads a voice on the current provider (with its warm-up) and reports what
 // actually happened: the GPU switch turns on only when this comes back
 // without a fallback note. Prefers Kokoro, the voice the GPU pays off for.
+// The process comes up TTS-only if nothing is running; the adapter does the
+// load, the wait and the fallback verdict.
 async function ttsSelfTest() {
   const packs = voicePacks();
-  if (!packs.length) return { ok: false, provider: ttsProvider, fallback: null, error: 'no-pack' };
+  if (!packs.length) return { ok: false, provider: adapter().provider(), fallback: null, error: 'no-pack' };
   const pack = packs.find((p) => p.engine === 'kokoro') || packs[0];
   clearTimeout(ttsIdleTimer);
-  ttsProviderNote = null;
-  const worker = await ensureTtsWorker();
-  // No unload here: the worker already dropped the voice when the provider
-  // changed, and a resident one on this provider just answers tts-ready
-  // again. unloadTtsAndWait on a TTS-only worker means process exit, which
-  // would leave the tts-load below talking to a dead handle.
-  const t0 = Date.now();
-  const ready = new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      ttsLoadWaiters.delete(pack.id);
-      reject(new Error('tts-load-timeout'));
-    }, 60000);
-    ttsLoadWaiters.set(pack.id, {
-      resolve: () => { clearTimeout(timer); resolve(); },
-      reject: (err) => { clearTimeout(timer); reject(err); },
-    });
-  });
-  worker.postMessage({ type: 'tts-load', pack: ttsPackPayload(pack) });
   try {
-    await ready;
-    // The fallback note travels on stderr, a different pipe from the IPC
-    // reply: give it a moment to land before reading it.
-    await new Promise((r) => setTimeout(r, 150));
+    await ensureTtsWorker();
+    return await adapter().health({ pack: ttsPackPayload(pack) });
   } catch (e) {
-    return { ok: false, provider: ttsProvider, fallback: ttsProviderNote, error: e.message, packId: pack.id };
+    return { ok: false, provider: adapter().provider(), fallback: adapter().providerNote(), error: e.message, packId: pack.id };
   } finally {
     armTtsIdle();
   }
-  return {
-    ok: !ttsProviderNote,
-    provider: ttsProviderNote ? 'cpu' : ttsProvider,
-    fallback: ttsProviderNote,
-    loadMs: Date.now() - t0,
-    packId: pack.id,
-  };
 }
 
 module.exports = {
