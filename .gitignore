@@ -88,3 +88,6 @@ tests/*
 !tests/unit/
 !tests/mocks/
 !tests/setup.js
+
+# 开发运行时的模型根目录（model-root.js：未打包时放这里，不再塞 userData）
+/models/

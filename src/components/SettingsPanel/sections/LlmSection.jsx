@@ -155,13 +155,13 @@ const LlmSection = ({ settings, updateSetting, notify }) => {
       {selected.status !== 'ready' && (
         <div className="sub-setting" style={{ marginTop: 8 }}>
           <p className="engine-meta">{t('llm.howTo')}</p>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
-            <button className="btn-small" onClick={() => window.electron?.shell?.openExternal?.(selected.source?.url)}>
-              <ExternalLink size={12} /> {t('llm.linkOfficial')}
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 6 }}>
+            <button className="link-button" onClick={() => window.electron?.shell?.openExternal?.(selected.source?.url)}>
+              <ExternalLink size={14} /> {t('llm.linkOfficial')}
             </button>
             {selected.source?.mirror && (
-              <button className="btn-small" onClick={() => window.electron?.shell?.openExternal?.(selected.source.mirror)}>
-                <ExternalLink size={12} /> {t('llm.linkMirror')}
+              <button className="link-button" onClick={() => window.electron?.shell?.openExternal?.(selected.source.mirror)}>
+                <ExternalLink size={14} /> {t('llm.linkMirror')}
               </button>
             )}
           </div>
@@ -195,7 +195,7 @@ const LlmSection = ({ settings, updateSetting, notify }) => {
           <button className="btn-small" onClick={selfTest} disabled={busy !== null || selected.status !== 'ready'}>
             {busy === 'test' ? <><RefreshCw size={12} className="spinning" /> {t('llm.run.testing')}</> : t('llm.run.selfTest')}
           </button>
-          <button className="btn-small" onClick={unload} disabled={busy !== null || !status?.resident}>
+          <button className="btn-small uninstall" onClick={unload} disabled={busy !== null || !status?.resident}>
             {t('llm.run.unload')}
           </button>
         </div>
@@ -218,7 +218,7 @@ const LlmSection = ({ settings, updateSetting, notify }) => {
             {body}
           </div>
           <div className="engine-actions">
-            <button className="btn-small" onClick={() => bridge?.openDir?.()} title={t('llm.openFolder')}>
+            <button className="btn" onClick={() => bridge?.openDir?.()} title={t('llm.openFolder')}>
               <FolderOpen size={13} /> {t('llm.openFolder')}
             </button>
             <button
@@ -282,7 +282,7 @@ const LlmSection = ({ settings, updateSetting, notify }) => {
                     <button className="btn-small" onClick={() => probe(u.file)} disabled={busy !== null}>
                       {busy === `probe:${u.file}` ? <><RefreshCw size={12} className="spinning" /> {t('llm.dev.probing')}</> : t('llm.dev.probe')}
                     </button>
-                    <button className="btn-small" onClick={() => report(u.file)} disabled={busy !== null} style={{ marginLeft: 6 }}>
+                    <button className="link-button" onClick={() => report(u.file)} disabled={busy !== null} style={{ marginLeft: 10 }}>
                       {t('llm.dev.report')}
                     </button>
                   </div>

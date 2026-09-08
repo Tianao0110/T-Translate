@@ -32,6 +32,7 @@ const zh = {
     noAiActions: "无 AI 动作",
     noAiActionsHint: "这个翻译源只会翻译、不能对话，所以它当值时「总结」和讲解模式不会出现。需要用大模型源（OpenAI / DeepSeek / Claude / Gemini / Ollama / LM Studio）。",
     names: {
+      'tengine': '内置翻译',
       'local-llm': 'LM Studio (本地)',
       'openai': 'OpenAI',
       'deepl': 'DeepL',
@@ -44,6 +45,7 @@ const zh = {
       'baidu-translate': '百度翻译'
     },
     descriptions: {
+      'tengine': '程序自带的本地模型，不用装 LM Studio，不开端口，离线可用',
       'local-llm': '使用本地大模型翻译，隐私安全、免费',
       'openai': '使用 GPT 模型翻译，质量高、速度快',
       'deepl': '专业翻译 API，翻译质量极高',

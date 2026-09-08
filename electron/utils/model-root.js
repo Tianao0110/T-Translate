@@ -3,9 +3,10 @@
 // Default is a `models` folder inside the install directory, not userData: the
 // packs are hundreds of megabytes, and a user who installed the app on D:/F:
 // expects that bulk to sit there too, not to grow %APPDATA% on the system
-// drive forever. Falls back to userData when the install dir cannot be written
-// (a Program Files install without admin) and in dev, where the "install dir"
-// is node_modules/electron.
+// drive forever. In dev the "install dir" is node_modules/electron, so the
+// repo's own `models/` folder (gitignored) stands in for it. userData is only
+// the fallback when that folder cannot be written (a Program Files install
+// without admin).
 //
 // Reads look in BOTH roots: models downloaded by an earlier build (or dropped
 // in by hand, or written by a dev run) keep working where they are. Only new
@@ -22,6 +23,10 @@ function installModelsDir() {
   return path.join(path.dirname(app.getPath('exe')), 'models');
 }
 
+function devModelsDir() {
+  return path.join(__dirname, '..', '..', 'models');
+}
+
 function userDataDir() {
   return app.getPath('userData');
 }
@@ -35,15 +40,13 @@ function legacyModelsRoot() {
 // Active root — where downloads are installed. Probed once per process.
 function modelsRoot() {
   if (_cached) return _cached;
-  if (app.isPackaged) {
-    const dir = installModelsDir();
-    if (isWritable(dir)) {
-      _cached = dir;
-      logger.info(`Models root: ${dir}`);
-      return _cached;
-    }
-    logger.warn(`Install dir not writable, models stay in userData: ${dir}`);
+  const dir = app.isPackaged ? installModelsDir() : devModelsDir();
+  if (isWritable(dir)) {
+    _cached = dir;
+    logger.info(`Models root: ${dir}`);
+    return _cached;
   }
+  logger.warn(`Models dir not writable, models stay in userData: ${dir}`);
   _cached = userDataDir();
   return _cached;
 }

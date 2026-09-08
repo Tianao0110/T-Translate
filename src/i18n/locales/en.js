@@ -32,6 +32,7 @@ const en = {
     noAiActions: "No AI actions",
     noAiActionsHint: "This source only translates — it cannot hold a conversation, so Summarize and Explain mode stay hidden while it is the active source. Use an LLM source (OpenAI / DeepSeek / Claude / Gemini / Ollama / LM Studio) for those.",
     names: {
+      'tengine': 'Built-in',
       'local-llm': 'LM Studio (Local)',
       'openai': 'OpenAI',
       'deepl': 'DeepL',
@@ -44,6 +45,7 @@ const en = {
       'baidu-translate': 'Baidu Translate'
     },
     descriptions: {
+      'tengine': "The app's own local model: no LM Studio, no port, works offline",
       'local-llm': 'Local LLM translation, private and free',
       'openai': 'GPT models, high quality and fast',
       'deepl': 'Professional translation API, excellent quality',

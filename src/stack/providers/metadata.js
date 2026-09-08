@@ -111,7 +111,9 @@ export const PROVIDER_METADATA = {
     id: 'ollama',
     name: 'Ollama (Local)',
     description: 'Local LLM via Ollama, private and free',
-    color: '#ffffff',
+    // The card paints its order number and active gear with this colour;
+    // Ollama's white brand vanished on the light theme.
+    color: '#71717a',
     type: 'llm',
     supportsChat: true,
     helpUrl: 'https://ollama.com/',
