@@ -39,9 +39,15 @@ const arg = (name, def = null) => {
 const LANG = arg('--lang', 'zh');
 const TIER = arg('--tier', 'standard');
 // One sandbox per run so two languages can bench side by side.
-const SANDBOX = path.join(os.tmpdir(), `tt-listen-bench-${LANG}-${TIER}`);
+const SANDBOX = path.join(os.tmpdir(), `tt-listen-bench-${LANG}-${TIER}${process.argv.includes('--normalize') ? '-norm' : ''}`);
 const N = Number(arg('--n', 40));
 const GAP_S = Number(arg('--gap', 0.8));
+// --normalize scales every clip to a common rms (0.05, the AGC's own target)
+// before joining: FLEURS readings sit anywhere between -22 and -65 dB, and
+// the difference between this run and the raw one is what the level jumps
+// alone cost the chain.
+const NORMALIZE = process.argv.includes('--normalize');
+const TARGET_RMS = 0.05;
 const LEAD_S = 1.0;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -103,8 +109,22 @@ function pickSentences(lang, n) {
   return out;
 }
 
+function normalizeClip(clip) {
+  let sum = 0;
+  let peak = 0;
+  for (const v of clip) {
+    sum += v * v;
+    if (Math.abs(v) > peak) peak = Math.abs(v);
+  }
+  const rms = Math.sqrt(sum / clip.length) || 1;
+  const gain = Math.min(TARGET_RMS / rms, peak ? 0.9 / peak : 1);
+  const out = new Float32Array(clip.length);
+  for (let i = 0; i < clip.length; i++) out[i] = clip[i] * gain;
+  return out;
+}
+
 function buildTrack(sentences) {
-  const clips = sentences.map((s) => readFleursWav(s.wav));
+  const clips = sentences.map((s) => (NORMALIZE ? normalizeClip(readFleursWav(s.wav)) : readFleursWav(s.wav)));
   const total = Math.round(LEAD_S * RATE) + clips.reduce((n, c) => n + c.length + Math.round(GAP_S * RATE), 0);
   const pcm = new Float32Array(total);
   const timeline = [];
@@ -164,7 +184,21 @@ function score(lang, timeline, finals) {
     const refChars = lang === 'zh' ? [...ref] : [...ref.replace(/ /g, '')];
     const hypChars = lang === 'zh' ? [...hyp] : [...hyp.replace(/ /g, '')];
     const cerEdits = editDistance(refChars, hypChars);
-    const row = { id: s.id, ref, hyp, finals: buckets[i].length, covered: buckets[i].length > 0, refLen: refChars.length, cerEdits, cer: refChars.length ? cerEdits / refChars.length : 0 };
+    const row = {
+      id: s.id,
+      start: Math.round(s.start * 100) / 100,
+      end: Math.round(s.end * 100) / 100,
+      ref,
+      hyp,
+      finals: buckets[i].length,
+      // The finals themselves, with their times, so a miss can be told from a
+      // merge with the neighbour or a late VAD open.
+      segments: buckets[i].map((f) => ({ start: Math.round(f.segStartS * 100) / 100, end: Math.round((f.segStartS + f.segDurS) * 100) / 100, text: f.text })),
+      covered: buckets[i].length > 0,
+      refLen: refChars.length,
+      cerEdits,
+      cer: refChars.length ? cerEdits / refChars.length : 0,
+    };
     if (lang === 'en') {
       const rw = ref.split(' ').filter(Boolean);
       const hw = hyp.split(' ').filter(Boolean);
@@ -287,6 +321,7 @@ async function main() {
   const result = {
     lang: LANG,
     tier: TIER,
+    normalized: NORMALIZE,
     n: N,
     gapS: GAP_S,
     at: new Date().toISOString(),
@@ -297,10 +332,11 @@ async function main() {
     finalLatencyMedianMs: Math.round(median(latencies) || 0),
     finalLatencyP90Ms: Math.round(percentile(latencies, 0.9) || 0),
     rows,
+    allFinals: finals.map((f) => ({ start: Math.round(f.segStartS * 100) / 100, end: Math.round((f.segStartS + f.segDurS) * 100) / 100, text: f.text })),
   };
   const outDir = path.join(DATA_DIR, 'results');
   fs.mkdirSync(outDir, { recursive: true });
-  const outFile = path.join(outDir, `${LANG}-${TIER}-${result.at.replace(/[:.]/g, '-')}.json`);
+  const outFile = path.join(outDir, `${LANG}-${TIER}${NORMALIZE ? '-norm' : ''}-${result.at.replace(/[:.]/g, '-')}.json`);
   fs.writeFileSync(outFile, JSON.stringify(result, null, 2));
 
   console.log(`\nengine ${result.engine}, load ${loadMs} ms`);
