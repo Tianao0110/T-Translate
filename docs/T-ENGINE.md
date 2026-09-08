@@ -86,7 +86,8 @@ koffi 装载顺序（否则依赖解析失败）：`SetDllDirectoryW(<目录>)` 
 
 ## 四、ABI 转录规则（写 llama-abi.js 时照做）
 
-- 结构体从头文件**逐字段抄**，顺序不能动；C `enum` 一律 `int32`；`bool` 是 1 字节，koffi 自己算对齐，但结构体尾部的指针和 `size_t` 不能漏（`llama_context_params` 末尾的 `samplers` / `n_samplers` 漏掉就是按值传参错位）。
+- 结构体从头文件**逐字段抄**，顺序不能动；C `enum` 一律 `int32`；`bool` 是 1 字节，koffi 自己算对齐，但结构体尾部的指针和 `size_t` 不能漏。真实教训：spike 绑定漏了 b10853 `llama_context_params` 最末的 `ctx_other`，每次 `llama_context_default_params()` 都往缓冲区外多写 8 字节，spike 全程没报错。所以 `llama-abi.js` 同时记 `SIZES`（`koffi.sizeof` 对表，单测常跑）和 `GOLDEN`（默认值指纹，有 DLL 时跑）：字段错位先在这两处露馅。
+- 符号归属也在 `llama-abi.js` 里按 DLL 分组（设备访问与 gguf 在 ggml-base，注册表在 ggml，其余在 llama）；绑定时先按声明的 DLL 找、找不到再翻别的，单测断言每个符号确实在声明的那份里，换版后搬了家会被点名。
 - 按值返回的结构体（`*_default_params()`）用 koffi 直接接收成 JS 对象，改字段后原样传回；不要自己拼默认值。
 - 需要保持地址稳定的缓冲区（token 数组给 `llama_batch_get_one`，之后 `llama_decode` 还会读）用 `koffi.alloc` 分配、`koffi.encode/decode` 读写；不要传 TypedArray，它可能被拷贝成临时内存。
 - 输出缓冲区（`llama_token_to_piece` 的 `buf`）声明 `_Out_ uint8 *`，传 Buffer。
@@ -99,13 +100,13 @@ koffi 装载顺序（否则依赖解析失败）：`SetDllDirectoryW(<目录>)` 
 - 双显卡机器要把 `llama_model_params.devices` 显式指到独显：本机默认选择恰好是 Vulkan0 = 4090（核显一字节没占），但不能指望别的机器也这样；指定后 llama 日志里 `VulkanN model buffer size` 能对上，作为自检断言。
 - 退出码：Git Bash 报的 127 是 msys 误报（PowerShell 读同一进程为 0），判断宿主崩溃以 utilityProcess 的 `exit` 事件 code 为准；0xC0000005 是访问违规，0xC0000409 是 fast-fail。
 
-Golden 测试至少覆盖：`llama_context_default_params()` 的 `n_ctx / n_batch / flash_attn_type` 等值、`llama_version()` 与钉版一致、固定 prompt 贪心输出前 N 个 token、视觉固定图前 N 个 token。
+Golden 测试至少覆盖：三个 `*_default_params()` 的全部字段值（`tests/unit/llama-abi.test.js` 已做）、`llama_version()` 与 GOLDEN 里的库版本串一致（它只报库版本如 `0.4.0-dev`，不是 build 号——build 由清单哈希保证）、固定 prompt 贪心输出前 N 个 token、视觉固定图前 N 个 token（后两项随模型白名单在 `scripts/smoke-llm.js` 里跑）。
 
 ## 五、健康与安全
 
 三级检查，缺一不可：
 
-1. **装载探针**（每次宿主起来）：DLL 全在且 SHA 与清单一致；`llama_version()` 等于钉版；ABI golden（默认参数值）通过。任何一项不过 → 该运行时标「不可用」并给出原因，功能链回落到下一档（OCR 回本地 v6 / 云；翻译回在线源），不弹崩溃。
+1. **装载探针**（每次宿主起来）：DLL 全在且 SHA 与清单一致（`verifyRuntime`，约 150 ms）；结构体大小对表；`llama_version()` 等于 GOLDEN 的库版本串。任何一项不过 → 该运行时标「不可用」并给出原因，功能链回落到下一档（OCR 回本地 v6 / 云；翻译回在线源），不弹崩溃。
 2. **功能自检**（后端切换、模型首次载入、装前自测）：固定输入 → 期望输出；顺带出速度数字。自检失败 → 记住并回落（显卡 → CPU → 禁用），与现有「显卡加速」开关同一张表。
 3. **运行看门狗**（每个请求）：超时、token 停滞（N 秒没有新 token）、RSS / 显存上限、崩溃计数与退避（连崩一分钟内不再拉起）。宿主死了只废在途请求，下一次请求重生。
 
@@ -124,7 +125,7 @@ Golden 测试至少覆盖：`llama_context_default_params()` 的 `n_ctx / n_batc
 2. **采样层（真正的禁止）**：模型载入后扫一遍词表（15 万 token 约 37 ms），凡文本匹配思考开启符（`<think>`、`<|think|>`、`<reasoning>`、`<|begin_of_thought|>`、`[THINK]` 等）的 token 全部用 `llama_sampler_init_logit_bias` 压到 -inf 挂在采样链最前面。**只封开启符不封闭合符**，预填的空块才能正常收尾。扫的是全部 token，不能只看 control 属性：Qwen3 与 Hy-MT2 的 `<think>` 都不是 control token。这一层不依赖认识模板，未验证模型同样生效。
 3. **输出层**：流式输出进主进程前剥掉任何 `<think>…</think>` 与孤立的 `</think>`（只封开启符时模型偶尔会先吐一个闭合符），剥掉的次数记进 `request.metrics.think_leak`（只是个数，不含内容）。
 
-实测（Qwen3-1.7B Q8，Vulkan，同一总结提示词）：预填 + 封禁与只预填耗时相同（282 vs 281 ms），用户提示词里写「请先在 <think> 里思考」也进不去思考。`think_leak` 持续大于 0 的模型说明它用别的方式在"思考"（比如明文前言），这种模型不进白名单，试用报告里标「无法关思考」。
+实现都在 `runtime/llama-session.js`：`findThinkTokens`（词表扫描）、`buildChain`（logit bias 挂链首）、`createThinkStripper`（流式剥离与计数）、`renderChatml`（按词表里找到的开启 / 闭合符预填空块）。实测（Qwen3-1.7B Q8，Vulkan，同一总结提示词）：预填 + 封禁与只预填耗时相同（282 vs 281 ms），用户提示词里写「请先在 <think> 里思考」也进不去思考。`think_leak` 持续大于 0 的模型说明它用别的方式在"思考"（比如明文前言），这种模型不进白名单，试用报告里标「无法关思考」。
 
 ### 试模型模式（开发者自己快速试新模型）
 
