@@ -8,13 +8,15 @@
 
 const path = require('path');
 const { PRIVACY_MODES } = require('../shared/channels');
-const { LLM_MODELS_DIR } = require('../shared/llm-packs');
+const { LLM_MODELS_DIR, packById, defaultPack } = require('../shared/llm-packs');
 const { createLlmPackManager } = require('./llm-pack-manager');
 const { createTrialLog, pruneTrialLogs, summarizeTrialLogs } = require('../tengine/trial-log');
 
 const IDLE_UNLOAD_MS = 5 * 60 * 1000;
 const KEY_ALLOW_UNLISTED = 'settings.tengine.allowUnlistedModels';
 const KEY_TRIAL_TEXT = 'settings.tengine.trialLogText';
+// Which whitelisted pack the built-in provider uses (settings page choice).
+const KEY_PACK = 'settings.llm.pack';
 const TRIAL_EVENT_KINDS = new Set(['model-loaded', 'model-load-failed', 'request-failed', 'stall', 'health', 'exit']);
 
 let deps = null;
@@ -36,6 +38,21 @@ function allowUnlisted() {
 
 function trialText() {
   return deps.store.get(KEY_TRIAL_TEXT, false) === true;
+}
+
+function selectedPack() {
+  const chosen = packById(deps.store.get(KEY_PACK, '') || '');
+  return chosen || defaultPack();
+}
+
+// The pack the built-in provider will use, with its install state — what
+// the stack's prompt shaping and testConnection read.
+function selected() {
+  if (!deps) return null;
+  const pack = selectedPack();
+  if (!pack) return null;
+  const row = deps.packs.status()?.packs.find((p) => p.id === pack.id);
+  return { id: pack.id, role: pack.role, name: pack.name, status: row ? row.status : 'unknown' };
 }
 
 function clearIdle() {
@@ -87,6 +104,7 @@ function init(d) {
 }
 
 async function resolveTarget({ packId = null, file = null } = {}) {
+  if (!deps) throw fail('LLM_NOT_READY', 'model manager not initialised');
   if (!deps.packs.status()) await deps.packs.scan();
   if (file) {
     if (!allowUnlisted()) throw fail('LLM_MODEL_NOT_ALLOWED', 'unlisted models are off');
@@ -94,8 +112,11 @@ async function resolveTarget({ packId = null, file = null } = {}) {
     if (!u) throw fail('LLM_MODEL_NOT_ALLOWED', `${path.basename(String(file))} is not in the model folder`);
     return u;
   }
-  const r = packId ? deps.packs.resolvePack(packId) : deps.packs.resolveDefault();
-  if (!r) throw fail('LLM_MODEL_MISSING', packId ? `${packId} is not installed` : 'no model installed');
+  // An explicit pack, else the settings choice, else the default pack —
+  // whichever of those is actually installed.
+  const wanted = packId || selectedPack()?.id || null;
+  const r = (wanted && deps.packs.resolvePack(wanted)) || (!packId && deps.packs.resolveDefault()) || null;
+  if (!r) throw fail('LLM_MODEL_MISSING', wanted ? `${wanted} is not installed` : 'no model installed');
   return r;
 }
 
@@ -194,10 +215,13 @@ function trialReport(fileName) {
 }
 
 function status() {
+  if (!deps) return { ready: false };
   const loaded = deps.adapter.loaded();
   return {
+    ready: true,
     dir: deps.packs.dir(),
     packs: deps.packs.status(),
+    selected: selected(),
     scanning: deps.packs.scanning(),
     allowUnlisted: allowUnlisted(),
     trialLogText: trialText(),
@@ -229,10 +253,12 @@ module.exports = {
   selfTest,
   trialReport,
   status,
+  selected,
   rescan: () => deps.packs.scan(),
   dir: () => deps.packs.dir(),
   reset,
   IDLE_UNLOAD_MS,
   KEY_ALLOW_UNLISTED,
   KEY_TRIAL_TEXT,
+  KEY_PACK,
 };

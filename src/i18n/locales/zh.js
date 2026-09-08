@@ -1044,6 +1044,13 @@ const zh = {
     requestTimeout: "请求超时，可在翻译源设置中调大超时时间",
     waitTimeout: "等待模型响应超时，可在翻译源设置中调大超时时间",
     streamStalled: "生成中断：超过超时时间无新内容",
+    tengineNotReady: "内置模型引擎未就绪",
+    tengineNoModel: "未安装内置模型文件，请到设置 → 内置模型 里放入模型",
+    tengineHostDown: "内置模型引擎暂不可用",
+    tengineUnhealthy: "内置模型连续停滞，本次会话已改用其他翻译源",
+    tengineCancelled: "已取消",
+    tengineFailed: "内置模型生成失败",
+    tengineNoChat: "当前内置模型只做翻译，AI 动作请改用通用模型",
     // Shared provider runtime messages (migrated from hardcoded Chinese).
     // English strings must keep classifiable keywords so error-handler's
     // ERROR_PATTERNS still routes them (see utils/error-handler.js).

@@ -121,6 +121,7 @@ export const DEFAULTS = {
 };
 
 export const PROVIDER_IDS = {
+  TENGINE: 'tengine',
   LOCAL_LLM: 'local-llm',
   OPENAI: 'openai',
   DEEPL: 'deepl',

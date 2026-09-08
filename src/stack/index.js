@@ -14,6 +14,9 @@
 //                       secrets merged (same ownership rule).
 //   localOcr            { paddle, windows, isWindows } — main-process local
 //                       OCR recognizers (electron/utils/ocr-engine et al).
+//   localLlm            { generate, status, selected } — the built-in model
+//                       (electron/managers/llm-manager). Optional — omitted =
+//                       the built-in provider reports itself as not ready.
 //   getCustomFilters    () => persisted custom filter defs (electron-store).
 //   cacheFilePath       L2 cache JSON location (userData/Caches/...). Optional —
 //                       omitted = memory-only cache (tests).
@@ -39,6 +42,7 @@ export function createTranslationStack(ctx = {}) {
     getLanguage: ctx.getLanguage,
     loggerFactory: ctx.loggerFactory,
     localOcr: ctx.localOcr,
+    localLlm: ctx.localLlm || null,
   });
 
   const cache = new StackTranslationCache({ filePath: ctx.cacheFilePath || null });

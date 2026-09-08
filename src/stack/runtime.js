@@ -11,6 +11,9 @@ const caps = {
   // main process (electron/utils/ocr-engine.js); the stack calls them directly
   // instead of the renderer's old IPC bridge classes.
   localOcr: null,
+  // The built-in model (T-Engine's LLM host, electron/managers/llm-manager):
+  // { generate(request, onToken) -> { promise, cancel }, status(), selected() }.
+  localLlm: null,
 };
 
 export function configureRuntime(next = {}) {
@@ -18,6 +21,7 @@ export function configureRuntime(next = {}) {
   if (next.getLanguage) caps.getLanguage = next.getLanguage;
   if (next.loggerFactory) caps.loggerFactory = next.loggerFactory;
   if (next.localOcr) caps.localOcr = next.localOcr;
+  if (next.localLlm !== undefined) caps.localLlm = next.localLlm;
 }
 
 export function rtFetch(...args) {
@@ -41,4 +45,8 @@ export function getLoggerFactory() {
 
 export function getLocalOcr() {
   return caps.localOcr;
+}
+
+export function getLocalLlm() {
+  return caps.localLlm;
 }

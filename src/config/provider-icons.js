@@ -5,6 +5,7 @@
 
 import { PROVIDER_METADATA } from '../stack/providers/metadata.js';
 
+import tengine from '../assets/provider-icons/tengine.svg';
 import openai from '../assets/provider-icons/openai.svg';
 import deepseek from '../assets/provider-icons/deepseek.svg';
 import ollama from '../assets/provider-icons/ollama.svg';
@@ -17,6 +18,7 @@ import microsoftTranslator from '../assets/provider-icons/microsoft-translator.s
 import baiduTranslate from '../assets/provider-icons/baidu-translate.svg';
 
 export const PROVIDER_ICONS = {
+  'tengine': tengine,
   'openai': openai,
   'deepseek': deepseek,
   'ollama': ollama,
@@ -32,6 +34,7 @@ export const PROVIDER_ICONS = {
 // Display order preserved from the retired renderer registry (presets first,
 // then standalone providers) so the settings list doesn't reshuffle.
 const ORDER = [
+  'tengine',
   'openai', 'deepseek', 'ollama', 'local-llm',
   'deepl', 'gemini', 'google-translate', 'anthropic',
   'microsoft-translator', 'baidu-translate',

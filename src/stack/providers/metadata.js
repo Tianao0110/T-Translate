@@ -12,6 +12,20 @@
 // prompt with a translation OF that prompt, which reads like a working
 // feature — tests/unit/provider-chat.test.js keeps this column honest.
 export const PROVIDER_METADATA = {
+  // The built-in model: runs inside the app (T-Engine), no endpoint, no key.
+  // Nothing to configure here — the model file and backend live in the
+  // settings page's own section.
+  'tengine': {
+    id: 'tengine',
+    name: 'Built-in model (T-Engine)',
+    description: 'Runs on this machine inside the app: no server, no key, works offline',
+    color: '#0f766e',
+    type: 'llm',
+    supportsChat: true,
+    helpUrl: 'https://github.com/Tianao0110/T-Translate/blob/main/docs/FAQ.md',
+    configSchema: {},
+  },
+
   'openai': {
     id: 'openai',
     name: 'OpenAI',

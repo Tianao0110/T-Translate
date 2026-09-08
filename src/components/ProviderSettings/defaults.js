@@ -13,7 +13,10 @@
 // attempt fails instantly (connection refused, not a timeout) and Google
 // Translate — free, no key — answers. "Local first" stays true and the app
 // still works the moment it is installed.
-export const DEFAULT_ENABLED_PROVIDERS = ['local-llm', 'ollama', 'google-translate'];
+// The built-in model leads: with its file in the model folder it answers
+// without any setup, and without the file it fails instantly (no model) so
+// the chain moves on at no cost.
+export const DEFAULT_ENABLED_PROVIDERS = ['tengine', 'local-llm', 'ollama', 'google-translate'];
 
 export function buildDefaultProviderList(allProvidersMeta) {
   const known = (allProvidersMeta || []).map(m => m.id).filter(Boolean);

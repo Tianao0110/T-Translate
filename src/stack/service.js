@@ -38,6 +38,7 @@ import { reorderForLanguage } from '../config/model-language-coverage.js';
 import { getSystemPrompt, LANGUAGE_NAMES } from '../config/templates.js';
 import { detectTemplateFromModel } from '../config/model-template-mapping.js';
 import { createStreamThrottle } from '../utils/stream-throttle.js';
+import { getLocalLlm } from './runtime.js';
 
 // An empty endpoint means the preset default, and every local preset
 // defaults to localhost — so only an explicit address can be off-machine.
@@ -78,7 +79,27 @@ function buildMTPrompt(toneTemplate, targetLang) {
   };
 }
 
+// The built-in model: the pack decides the prompt shape. A translation-only
+// pack gets the short user-only prompt; the general 1.7B model gets the
+// shared template plus one closing line naming the output language — it
+// follows two-step templates (OCR: fix, then translate) to the first step
+// and stops without it. Cloud sources never see that line.
+function isBuiltinProvider(provider) {
+  return provider?.constructor?.metadata?.id === 'tengine';
+}
+
+function withOutputLanguage(prompt, targetLang) {
+  const langName = LANGUAGE_NAMES[targetLang] || targetLang;
+  return { ...prompt, content: `${prompt.content}\n- Output language: ${langName}. Never answer in any other language.` };
+}
+
 function resolveSystemPrompt(provider, template, targetLang) {
+  if (isBuiltinProvider(provider)) {
+    const selected = getLocalLlm()?.selected?.();
+    return selected?.role === 'mt'
+      ? buildMTPrompt(template, targetLang)
+      : withOutputLanguage(getSystemPrompt(template, targetLang), targetLang);
+  }
   return isMTActiveModel(provider.config?.model)
     ? buildMTPrompt(template, targetLang)
     : getSystemPrompt(template, targetLang);
@@ -779,6 +800,9 @@ export class TranslationService {
       if (this.providerGate(id, privacyMode)) continue;
       const provider = getProvider(id);
       if (provider && typeof provider.chat === 'function') {
+        // A provider may know it cannot chat right now (the built-in model
+        // running a translation-only pack); the chain moves on.
+        if (typeof provider.canChat === 'function' && !provider.canChat()) continue;
         return {
           available: true,
           providerId: id,

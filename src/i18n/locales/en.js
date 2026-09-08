@@ -1044,6 +1044,13 @@ const en = {
     requestTimeout: "Request timeout — you can raise the timeout in provider settings",
     waitTimeout: "Model response timeout — you can raise the timeout in provider settings",
     streamStalled: "Generation stalled — no new output within the timeout",
+    tengineNotReady: "Built-in model engine is not ready",
+    tengineNoModel: "Built-in model file not installed — add it under Settings → Built-in model",
+    tengineHostDown: "Built-in model engine is unavailable right now",
+    tengineUnhealthy: "Built-in model stalled repeatedly; another provider is used for this session",
+    tengineCancelled: "Cancelled",
+    tengineFailed: "Built-in model failed to generate",
+    tengineNoChat: "The selected built-in model only translates; pick the general model for AI actions",
     // English strings keep the keywords error-handler's ERROR_PATTERNS match on
     // (not configured / invalid / timeout / quota / connection failed).
     emptyText: "Text is empty",

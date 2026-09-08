@@ -19,6 +19,7 @@ const { dataDir } = require('../utils/data-root');
 const crypto = require('crypto');
 const { CHANNELS } = require('../shared/channels');
 const { createSecureVault } = require('../utils/secure-vault');
+const llmManager = require('../managers/llm-manager');
 const makeLogger = require('../utils/logger');
 const logger = makeLogger('IPC:Stack');
 
@@ -50,6 +51,14 @@ function register(ctx) {
         isWindows: process.platform === 'win32',
       },
       getCustomFilters: () => store.get('settings.translation.customFilters', []),
+      // The built-in model: the stack's 'tengine' provider reaches T-Engine's
+      // LLM host through the model manager, which owns file choice, residency
+      // and the trial log. Text goes through untouched; numbers come back.
+      localLlm: {
+        generate: (request, onToken) => llmManager.generate(request, onToken),
+        status: () => llmManager.status(),
+        selected: () => llmManager.selected(),
+      },
       cacheFilePath: path.join(dataDir('cache'), 'translation-cache.json'),
       // External TTS endpoint: plain fields from settings, the key from the
       // vault (null under offline mode — the prefix is on the blocked list).

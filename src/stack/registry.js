@@ -10,6 +10,7 @@ import GoogleTranslateProvider from './providers/google-translate.js';
 import AnthropicProvider from './providers/anthropic.js';
 import MicrosoftTranslatorProvider from './providers/microsoft-translator.js';
 import BaiduTranslateProvider from './providers/baidu-translate.js';
+import TengineProvider from './providers/tengine.js';
 import createLogger from './logger.js';
 
 const logger = createLogger('Registry');
@@ -29,6 +30,7 @@ const presetClasses = Object.fromEntries(
 
 const providerClasses = {
   ...presetClasses,
+  'tengine': TengineProvider,
   'deepl': DeepLProvider,
   'gemini': GeminiProvider,
   'google-translate': GoogleTranslateProvider,
@@ -44,7 +46,7 @@ const providerClasses = {
 // providers below are skipped instantly while unconfigured; they only matter
 // once the user has actually entered a key.
 export const DEFAULT_PRIORITY = {
-  normal: ['local-llm', 'ollama', 'google-translate', 'openai', 'anthropic', 'gemini', 'deepseek', 'microsoft-translator', 'baidu-translate', 'deepl'],
+  normal: ['tengine', 'local-llm', 'ollama', 'google-translate', 'openai', 'anthropic', 'gemini', 'deepseek', 'microsoft-translator', 'baidu-translate', 'deepl'],
 };
 
 const instances = new Map();
