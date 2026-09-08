@@ -1,5 +1,5 @@
 // GPU acceleration switch. One persisted flag (settings.gpu.enabled) that
-// the main process applies to every engine in shared/gpu-engines.js that can
+// the main process applies to every engine in tengine/registry.js that can
 // take the GPU — local OCR (onnxruntime-node) and the neural voice
 // (sherpa-onnx) today — all on the one WebGPU execution provider.
 //
@@ -16,19 +16,23 @@
 
 const { ipcMain } = require('electron');
 const { CHANNELS } = require('../shared/channels');
-const { GPU_PROVIDER, GPU_ENGINES } = require('../shared/gpu-engines');
+const tengine = require('../tengine');
 const logger = require('../utils/logger')('IPC:GPU');
 const ocrEngine = require('../utils/ocr-engine');
 const audioEngine = require('../managers/audio-engine-manager');
 
+const { PROVIDER: GPU_PROVIDER, ENGINES: GPU_ENGINES } = tengine;
 const KEY = 'settings.gpu.enabled';
 
 // How each GPU-capable engine is driven. Keyed by the table's ids so the
-// table stays plain data.
+// table stays plain data. OCR goes through T-Engine; the voice engine joins
+// it when the audio manager moves onto the host framework.
 const DRIVERS = {
   ocr: {
-    setProvider: (p) => ocrEngine.setProvider(p),
+    setProvider: (p) => tengine.get().setProvider('ocr', p),
     selfTest: async () => {
+      // ocr-engine resolves the base pack's model paths; the health call
+      // itself is the engine adapter's.
       const s = await ocrEngine.hostStatus();
       return { ok: s.ok && s.provider === GPU_PROVIDER && !s.fallback, provider: s.provider, fallback: s.fallback || null };
     },

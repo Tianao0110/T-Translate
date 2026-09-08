@@ -53,7 +53,7 @@ async function main() {
   app.setPath('userData', SANDBOX);
 
   const ocrEngine = require('../electron/utils/ocr-engine');
-  const hostManager = require('../electron/managers/ocr-host-manager').get();
+  const hostManager = require('../electron/tengine').get().get('ocr');
   const gpu = process.argv.includes('--gpu');
 
   const light = await ocrEngine.healthCheck();

@@ -131,6 +131,11 @@ const CHANNELS = {
     STATUS: 'gpu:status',
     SET_ENABLED: 'gpu:set-enabled',
   },
+  // T-Engine (electron/tengine): engine layer status snapshot + event stream.
+  TENGINE: {
+    STATUS: 'tengine:status',   // renderer → main: {provider, engines[{id, host, runtime, gpu, provider, lastHealth, host:{running,…}}]}
+    EVENT: 'tengine:event',     // main → renderer: {engine, host, kind, at, …} per host lifecycle event
+  },
   MENU: {
     ACTION: 'menu-action',
     IMPORT_FILE: 'import-file',

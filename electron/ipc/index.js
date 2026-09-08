@@ -18,6 +18,7 @@ const registerPrivacyIPC = require('./privacy');
 const registerAudioEngineIPC = require('./audio-engine');
 const registerModelsIPC = require('./models');
 const registerGpuIPC = require('./gpu');
+const registerTengineIPC = require('./tengine');
 const { registerThemeIPC } = require('./theme');
 
 /**
@@ -85,6 +86,8 @@ function initIPC(deps) {
   registerPrivacyIPC(context);
   registerAudioEngineIPC(context);
   registerModelsIPC(context);
+  // Before gpu: the GPU switch drives engines through T-Engine.
+  registerTengineIPC(context);
   registerGpuIPC(context);
 
   registerThemeIPC({ store: deps.store, logger });

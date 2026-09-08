@@ -1358,8 +1358,8 @@ app.on('will-quit', () => {
   // was skipped (race during force-close), make sure the native hook is stopped.
   try { stopSelectionHook(); } catch (e) { /* ignore */ }
 
-  // The OCR host is a utilityProcess Electron does not reap by itself.
-  try { require('./managers/ocr-host-manager').get().shutdown(); } catch (e) { /* ignore */ }
+  // Engine hosts are utilityProcesses Electron does not reap by itself.
+  try { require('./tengine').get().shutdownAll(); } catch (e) { /* ignore */ }
 
   destroyTray();
 

@@ -10,14 +10,16 @@ const fs = require('fs');
 const PATHS = require('../shared/paths');
 const { modelDir, modelDirs } = require('./model-root');
 const { BASE_PACK_ID, HQ_PACK_ID, packIdForLanguage } = require('../shared/ocr-packs');
-const hostManager = require('../managers/ocr-host-manager');
+const tengine = require('../tengine');
 const logger = require('./logger')('OCR-Engine');
 
 // 'standard' = bundled small model; 'high' = downloaded medium variant.
 // Seeded from settings at IPC registration, updated via SET_MODEL_TIER.
 let _modelTier = 'standard';
 
-const host = () => hostManager.get();
+// The OCR engine adapter in T-Engine owns the host process; this side only
+// resolves packs and model paths.
+const host = () => tengine.get().get('ocr');
 
 // Install target for new downloads (install dir when writable — see
 // model-root.js for why the packs no longer grow the system drive).
