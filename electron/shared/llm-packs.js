@@ -65,6 +65,16 @@ const LLM_PACKS = [
   },
 ];
 
+// Role of a file outside the whitelist, from its name alone: only the
+// Hunyuan MT family (hy-mt2-7b, hunyuan-mt-1.8b ...) is translation-only —
+// the same family test the stack's template mapping uses for LM Studio
+// models. Everything else is a general model; "MT" elsewhere in a name
+// (Qwen…-M-TI) means nothing.
+const MT_NAME_PATTERN = /\b(hy|hunyuan)[\s\-_]?mt/i;
+function roleForFileName(name) {
+  return MT_NAME_PATTERN.test(String(name || '')) ? LLM_ROLE_MT : LLM_ROLE_GENERAL;
+}
+
 function packById(id) {
   return LLM_PACKS.find((p) => p.id === id) || null;
 }
@@ -95,6 +105,7 @@ module.exports = {
   LLM_MODELS_DIR,
   LLM_PINNED,
   LLM_PACKS,
+  roleForFileName,
   packById,
   packByHash,
   packForFile,

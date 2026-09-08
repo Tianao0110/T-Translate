@@ -9,7 +9,7 @@
 const nodeFs = require('fs');
 const nodePath = require('path');
 const crypto = require('crypto');
-const { LLM_PACKS, packForFile, packByHash, defaultPack } = require('../shared/llm-packs');
+const { LLM_PACKS, packForFile, packByHash, defaultPack, roleForFileName } = require('../shared/llm-packs');
 
 const CACHE_FILE = '.tt-hashes.json';
 
@@ -80,7 +80,7 @@ function createLlmPackManager({ dir, packs = LLM_PACKS, allowUnlisted = () => fa
       } catch {
         continue;
       }
-      const entry = { file: name, path: path.join(dir, name), size: st.size, mtimeMs: st.mtimeMs };
+      const entry = { file: name, path: path.join(dir, name), size: st.size, mtimeMs: st.mtimeMs, role: roleForFileName(name) };
       const candidate = packs.find((p) => p.file === name && p.size === st.size) || packForFile(name, st.size);
       if (!candidate || !packs.includes(candidate)) {
         unlisted.push(entry);

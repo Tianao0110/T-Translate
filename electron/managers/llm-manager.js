@@ -8,7 +8,7 @@
 
 const path = require('path');
 const { PRIVACY_MODES } = require('../shared/channels');
-const { LLM_MODELS_DIR, packById, defaultPack } = require('../shared/llm-packs');
+const { LLM_MODELS_DIR, packById, defaultPack, roleForFileName } = require('../shared/llm-packs');
 const { createLlmPackManager } = require('./llm-pack-manager');
 const { createTrialLog, pruneTrialLogs, summarizeTrialLogs } = require('../tengine/trial-log');
 const { createLlmPolicy } = require('../policy/engine-policy');
@@ -20,9 +20,6 @@ const KEY_TRIAL_TEXT = 'settings.llm.trialLogText';
 // id, or `unlisted:<file>` for a folder file behind the developer door.
 const KEY_PACK = 'settings.llm.pack';
 const UNLISTED_PREFIX = 'unlisted:';
-// The same family test the stack's template mapping uses for translation-only
-// models, so an unlisted Hy-MT file gets the short prompt and no AI actions.
-const MT_NAME = /\b(hy|hunyuan)[\s\-_]?mt/i;
 const TRIAL_EVENT_KINDS = new Set(['model-loaded', 'model-load-failed', 'request-failed', 'stall', 'health', 'exit']);
 
 let deps = null;
@@ -61,7 +58,7 @@ function selectedUnlisted() {
   const file = path.basename(raw.slice(UNLISTED_PREFIX.length));
   const row = deps.packs.status()?.unlisted.find((u) => u.file === file);
   if (!row) return null;
-  return { id: raw, file, role: MT_NAME.test(file) ? 'mt' : 'general', name: file.replace(/\.gguf$/i, ''), status: 'ready', trial: true };
+  return { id: raw, file, role: row.role || roleForFileName(file), name: file.replace(/\.gguf$/i, ''), status: 'ready', trial: true };
 }
 
 // The pack the built-in provider will use, with its install state — what

@@ -56,6 +56,14 @@ describe('llm packs whitelist', () => {
     expect(packs.packForFile('other.gguf', q.size)).toBeNull();
   });
 
+  it('names a file outside the whitelist as translation-only for the Hunyuan MT family alone', () => {
+    expect(packs.roleForFileName('Hy-MT2-7B-Q4_K_M.gguf')).toBe(packs.LLM_ROLE_MT);
+    expect(packs.roleForFileName('hunyuan-mt-1.8b.gguf')).toBe(packs.LLM_ROLE_MT);
+    expect(packs.roleForFileName('Qwen3.8-27B-Uncensored-YMQ-M-TI.gguf')).toBe(packs.LLM_ROLE_GENERAL);
+    expect(packs.roleForFileName('gemma-3-mt-tuned.gguf')).toBe(packs.LLM_ROLE_GENERAL);
+    expect(packs.roleForFileName('')).toBe(packs.LLM_ROLE_GENERAL);
+  });
+
   it('keeps the translation-only model out of the general role', () => {
     const mt = packs.packsForRole(packs.LLM_ROLE_MT);
     expect(mt.map((p) => p.id)).toEqual(['hy-mt2-1.8b']);

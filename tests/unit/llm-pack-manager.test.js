@@ -68,8 +68,9 @@ describe('llm pack manager', () => {
     fs.writeFileSync(path.join(dir, 'notes.txt'), 'x');
     let door = false;
     const m = manager({ allowUnlisted: () => door });
+    fs.writeFileSync(path.join(dir, 'hy-mt2-7b.gguf'), Buffer.alloc(41, 2));
     const s = await m.scan();
-    expect(s.unlisted.map((u) => u.file)).toEqual(['Stranger-Q4.gguf']);
+    expect(s.unlisted.map((u) => [u.file, u.role]).sort()).toEqual([['Stranger-Q4.gguf', 'general'], ['hy-mt2-7b.gguf', 'mt']]);
     expect(s.allowUnlisted).toBe(false);
     expect(m.resolveUnlisted('Stranger-Q4.gguf')).toBeNull();
     door = true;

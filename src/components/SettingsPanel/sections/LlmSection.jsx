@@ -46,13 +46,13 @@ const LlmSection = ({ settings, updateSetting, notify }) => {
   // folder, selectable as `unlisted:<file>`.
   const options = [
     ...packs.map((p) => ({ value: p.id, label: t('llm.packLabel', { name: p.name, role: p.role === 'mt' ? t('llm.roleMt') : t('llm.roleGeneral') }), name: p.name })),
-    ...(doorOpen ? unlisted.map((u) => ({ value: `unlisted:${u.file}`, label: t('llm.packLabelUnlisted', { name: stem(u.file) }), name: stem(u.file) })) : []),
+    ...(doorOpen ? unlisted.map((u) => ({ value: `unlisted:${u.file}`, label: t('llm.packLabelUnlisted', { name: stem(u.file), role: u.role === 'mt' ? t('llm.roleMt') : t('llm.roleGeneral') }), name: stem(u.file) })) : []),
   ];
   const selectedId = options.some((o) => o.value === llm.pack) ? llm.pack : options[0]?.value;
   const selectedPack = packs.find((p) => p.id === selectedId) || null;
   const selectedFile = !selectedPack && selectedId ? unlisted.find((u) => `unlisted:${u.file}` === selectedId) : null;
   const selected = selectedPack
-    || (selectedFile ? { id: selectedId, name: stem(selectedFile.file), file: selectedFile.file, size: selectedFile.size, status: 'unverified', license: null, source: null, unlisted: true } : null);
+    || (selectedFile ? { id: selectedId, name: stem(selectedFile.file), file: selectedFile.file, size: selectedFile.size, role: selectedFile.role || 'general', status: 'unverified', license: null, source: null, unlisted: true } : null);
 
   const persist = (key, value) => {
     updateSetting('llm', key, value, true);
