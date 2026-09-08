@@ -212,10 +212,12 @@ function updateMenu() {
         }
       },
     },
+    // A plain item on purpose: a checkbox makes Windows reserve a check
+    // column for every row, which is the only thing that made the menu look
+    // loose. The tray icon and its tooltip already show whether selection
+    // translation is on.
     {
       label: t('selectionTranslate'),
-      type: 'checkbox',
-      checked: selectionEnabled,
       click: () => {
         logger.debug('Menu: selectionTranslate clicked');
         if (deps.toggleSelectionTranslate) {
