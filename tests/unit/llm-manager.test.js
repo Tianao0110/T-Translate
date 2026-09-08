@@ -182,6 +182,20 @@ describe('llm manager', () => {
     expect(again.reloaded).toBe(true);
   });
 
+  it('P6: three stalls make generate step aside until the host restarts', async () => {
+    const { bus, adapter } = boot();
+    await manager.ensureLoaded();
+    for (let i = 0; i < 3; i++) bus.emit({ engine: 'llm', host: 'llm', kind: 'request', at: i, stop: 'stall', genTokens: 0 });
+    expect(manager.status().policy).toMatchObject({ unhealthy: true, consecutiveStalls: 3 });
+    await expect(manager.generate({ user: 'U' })).rejects.toMatchObject({ code: 'LLM_UNHEALTHY' });
+    expect(adapter.generate).not.toHaveBeenCalled();
+    adapter.crash();
+    bus.emit({ engine: 'llm', host: 'llm', kind: 'exit', at: 9, code: 1, expected: false });
+    const g = await manager.generate({ user: 'U' });
+    await g.promise;
+    expect(adapter.generate).toHaveBeenCalledTimes(1);
+  });
+
   it('self-test: pending without a model, a timed health check with one', async () => {
     boot({ packs: fakePacks({ ready: false }) });
     expect(await manager.selfTest()).toEqual({ ok: true, provider: 'cpu', fallback: null, pending: true });

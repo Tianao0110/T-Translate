@@ -203,6 +203,8 @@ Golden 测试至少覆盖：三个 `*_default_params()` 的全部字段值（`te
 
 表以外的调整都不做。加一条规则 = 加一行 + 一条单测 + 一句状态行文案。
 
+落码位置（2026-09-08）：内置模型这一列的 P4 / P5 / P6 / P9 / P13 在 `electron/policy/engine-policy.js`（纯函数，`observe(event)` 进、动作出，`tests/unit/engine-policy.test.js` 逐条守着），`managers/llm-manager.js` 喂事件并执行——P6 让 `generate()` 抛 `LLM_UNHEALTHY`，栈里的内置源据此让位给下一个源，宿主重启或换模型后自动恢复；P8 闲置卸载在 manager 本身；P1 / P2 / P3 / P7 在适配器与宿主框架；P10 / P11 / P12 在听译 manager 与 metrics-log。
+
 ## 八、排障
 
 | 症状 | 多半是 | 处理 |

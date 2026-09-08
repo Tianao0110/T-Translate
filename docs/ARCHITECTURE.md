@@ -258,7 +258,25 @@ electron/ipc/tengine.js                    tengine:status 快照与 tengine:even
 electron/services/ocr-host/ocr-host.js     本地 OCR 运行时（ppocr/ + onnxruntime-node + skia）跑在这个子进程；provider cpu/webgpu，首会话热身、失败回退 CPU
 electron/services/ocr-host/ppocr/          PP-OCR 流水线（检测 / 识别 / 版面），fork 自 esearch-ocr（Apache-2.0）：前后处理全部 typed array，输出与上游逐行一致（v0.4.10）
 electron/utils/listen-autosave.js          听译字幕自动保存：data\listen 下按「程序名-时间.srt」落盘、只留最近 20 个；无痕与开关的门在 ipc/audio-engine.js（v0.4.10）
-electron/ipc/gpu.js                        「显卡加速」开关：settings.gpu.enabled，开启时逐引擎自检（OCR 走 T-Engine，朗读暂仍走音频 manager），失败的引擎各自留 CPU 并回传原因；引擎表在 tengine/registry.js
+electron/ipc/gpu.js                        「显卡加速」开关：settings.gpu.enabled，开启时逐引擎自检（OCR、朗读、内置模型都经 T-Engine 适配器），失败的引擎各自留 CPU 并回传原因；引擎表在 tengine/registry.js
+```
+
+### 内置模型（v0.5.0 第 3 步；手册 docs/T-ENGINE.md）
+
+```
+electron/shared/llm-packs.js               模型白名单：文件名、大小、SHA256、协议、官方与镜像链接、模板族、角色（general = 翻译 + AI 动作，mt = 仅翻译）；哈希是安全边界
+electron/tengine/runtime/                  llama.cpp 运行时：llama-abi.js（钉版 b10853 的结构体 / 原型 / 默认值指纹）、llama-binding.js（koffi 装载与清单校验）、llama-session.js（模型与上下文、解码循环、思考模式三层禁止、KV 前缀复用、取消、循环检测）、worker.js（跑 FFI 的 worker_thread 协议）、llama-manifest.json（DLL 清单）
+electron/services/llm-host/llm-host.js     LLM utilityProcess：一次喂 worker 一个请求、共享取消标志、停滞看门狗；崩溃只带走本进程
+electron/tengine/engines/llm.js            LLM 适配器：load / unload / generate（流式）/ probe / health / metrics / setProvider / status，事件只带数字
+electron/managers/llm-manager.js           主进程决策：选文件（白名单或开发者门）、驻留与 5 分钟闲置卸载、显卡自检、策略表（policy/engine-policy.js）、试用日志
+electron/managers/llm-pack-manager.js      模型文件夹（<models>/llm-models）扫描：同名同大小才哈希，哈希对上才可用，其余列为未列入
+electron/policy/engine-policy.js           策略表落码：P4 慢建议、P5/P6 连续停滞标不健康、P9 性能下降记录、P13 思考泄漏计数
+electron/tengine/metrics-log.js            事件流落盘 data\logs\tengine-<日期>.jsonl（留 3 份，无痕不写，永不含文本）
+electron/tengine/trial-log.js              未列入模型的试用日志（每模型每月一份，两个月清理）与试用报告汇总
+electron/ipc/llm.js                        llm:* 通道：状态、重扫、开文件夹、卸载、自检、探针、试用报告
+src/stack/providers/tengine.js             翻译源「内置模型」：经 runtime.localLlm 钩子到 llm-manager；仅翻译包时 canChat 为 false，AI 动作改走下一个源
+src/components/SettingsPanel/sections/LlmSection.jsx  设置 → 内置模型：安装状态与下载链接、模型选择、后端 / 驻留 / 速度、自检与卸载、开发者门
+scripts/fetch-llama-runtime.js             按清单下载官方 llama.cpp Vulkan 包并校验（打包前跑；--pin 年度换版）
 native/sherpa-onnx-webgpu/                 带 webgpu provider 的 sherpa-onnx DLL + 补丁 + 构建配方；scripts/overlay-sherpa-runtime.js 在 postinstall / 打包前覆盖进 npm 包
 electron/services/audio-engine/audio-worker.js  识别模型、音频捕获、语音合成都在这个子进程里
 electron/utils/win-audio-capture.js        WASAPI 捕获（koffi，v0.4.1）

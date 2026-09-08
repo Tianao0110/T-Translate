@@ -11,6 +11,7 @@ const { PRIVACY_MODES } = require('../shared/channels');
 const { LLM_MODELS_DIR, packById, defaultPack } = require('../shared/llm-packs');
 const { createLlmPackManager } = require('./llm-pack-manager');
 const { createTrialLog, pruneTrialLogs, summarizeTrialLogs } = require('../tengine/trial-log');
+const { createLlmPolicy } = require('../policy/engine-policy');
 
 const IDLE_UNLOAD_MS = 5 * 60 * 1000;
 const KEY_ALLOW_UNLISTED = 'settings.llm.allowUnlistedModels';
@@ -25,6 +26,8 @@ let trial = null; // trial log of the resident unlisted model
 let idleTimer = null;
 let inflight = 0;
 let unsubscribe = null;
+// The policy table: streaks and advice from the engine's numbers.
+let policy = createLlmPolicy();
 
 const fail = (code, message) => Object.assign(new Error(message), { code });
 
@@ -74,6 +77,10 @@ function armIdle() {
 
 function onEngineEvent(evt) {
   if (evt.engine !== 'llm') return;
+  for (const a of policy.observe(evt)) {
+    if (a.rule === 'P6') deps.logger?.warn?.(`built-in model marked unhealthy after ${a.consecutive} stalls; other sources take over this session`);
+    else if (a.rule === 'P4' || a.rule === 'P9') deps.logger?.info?.(`built-in model ${a.advice}: ${a.tokPerSec} tok/s`);
+  }
   if (evt.kind === 'ready') pruneTrialLogs({ dir: deps.logsDir, now: deps.now });
   if (evt.kind === 'exit') {
     resident = null;
@@ -151,6 +158,9 @@ async function ensureLoaded(sel = {}, { onProgress = null } = {}) {
 // Streams visible text to onToken; resolves with the engine's result. The
 // trial log gets the request's numbers (and text only with the switch).
 async function generate({ packId = null, file = null, kind = 'generate', system = '', user = '', prompt, maxTokens = 256, sampler = {} } = {}, onToken = null) {
+  // P6: after repeated stalls this session steps aside until the host is
+  // restarted or a model is loaded afresh (both reset the policy).
+  if (policy.state().unhealthy) throw fail('LLM_UNHEALTHY', 'built-in model stalled repeatedly this session');
   const { target } = await ensureLoaded({ packId, file });
   inflight++;
   clearIdle();
@@ -231,6 +241,7 @@ function status() {
     runtime: deps.adapter.runtime(),
     lastHealth: deps.adapter.status().lastHealth,
     lastRequest: deps.adapter.status().lastRequest,
+    policy: policy.state(),
   };
 }
 
@@ -242,6 +253,7 @@ function reset() {
   resident = null;
   trial = null;
   inflight = 0;
+  policy = createLlmPolicy();
 }
 
 module.exports = {

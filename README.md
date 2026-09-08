@@ -29,6 +29,7 @@
 | **Screenshot OCR**           | Capture screen regions. 59 recognition languages, 7 OCR engines with automatic fallback; local OCR and the neural voice can run on the GPU |
 | **Floating window**          | Transparent overlay. Space-bar to capture-and-translate; auto-refresh & global-hotkey zero-focus capture for live captions / subtitles |
 | **Listen mode**              | Live captions for whatever is playing, translated sentence by sentence. Chinese / English / Japanese / Korean / Cantonese, recognized on-device, audio never touches disk; can listen to a single program; subtitles auto-save as SRT |
+| **Built-in model**           | The app's own local LLM (Qwen3-1.7B): drop the model file into a folder and it translates and summarizes — no LM Studio, no port, works offline, GPU optional |
 | **Document translation**     | 9 formats: PDF / DOCX / EPUB / TXT / SRT / VTT / CSV / JSON / Markdown. Segment-by-segment, resumable, with term check; Explorer right-click entry |
 | **134 languages**            | Everything Google Translate supports, in a picker with a letter index and a recently-used row; more can be added by hand                |
 | **AI actions**               | Summaries of long passages; "Explain mode" in the floating window and per-paragraph explanations in documents; custom actions can be imported (needs an LLM provider) |
