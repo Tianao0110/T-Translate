@@ -16,7 +16,7 @@ licenses:
 | electron-log         | MIT                          |
 | electron-store       | MIT                          |
 | electron-updater     | MIT                          |
-| esearch-ocr          | Apache-2.0                   |
+| esearch-ocr（源码 fork 于 electron/services/ocr-host/ppocr，非 npm 依赖） | Apache-2.0 |
 | i18next              | MIT                          |
 | immer                | MIT                          |
 | jszip                | MIT (of MIT OR GPL-3.0 dual) |

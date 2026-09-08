@@ -1,6 +1,6 @@
 # OCR 模型与语言包维护手册
 
-本地 OCR 自 v0.2.8-OCR 起基于 [esearch-ocr](https://github.com/xushengfeng/eSearch-OCR)（Apache-2.0）+ onnxruntime-node 运行 PaddleOCR 系列 ONNX 模型。模型不进 git 仓库、不进 npm 包，按三条路径分发：
+本地 OCR 自 v0.2.8-OCR 起基于 [esearch-ocr](https://github.com/xushengfeng/eSearch-OCR)（Apache-2.0）+ onnxruntime-node 运行 PaddleOCR 系列 ONNX 模型；自 v0.4.10 起流水线 fork 进 `electron/services/ocr-host/ppocr/`（前后处理改 typed array，识别输出与上游逐行一致），不再依赖该 npm 包。模型不进 git 仓库、不进 npm 包，按三条路径分发：
 
 | 路径 | 内容 | 何时使用 |
 | --- | --- | --- |

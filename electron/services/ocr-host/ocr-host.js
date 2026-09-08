@@ -1,13 +1,13 @@
-// OCR host: the PP-OCR runtime (esearch-ocr + onnxruntime-node + skia
-// canvas) in its own utilityProcess. The main process resolves packs and
+// OCR host: the PP-OCR runtime (./ppocr + onnxruntime-node + skia canvas)
+// in its own utilityProcess. The main process resolves packs and
 // model paths (it owns the install roots); this side only loads models,
 // decodes images and recognizes. A native crash here — an ONNX Runtime
 // bug, a GPU driver fault once WebGPU is on — takes this process, not
 // the app; the manager rejects in-flight requests and respawns on demand.
 //
 // Kept apart from the audio worker on purpose: both bundle an
-// onnxruntime.dll (1.26 here, 1.27 in sherpa) and one process cannot load
-// two DLLs of the same name.
+// onnxruntime.dll of their own and one process cannot load two DLLs of
+// the same name.
 //
 // Protocol (main -> host):
 //   {type:'init', provider:'cpu'|'webgpu'}
@@ -35,14 +35,10 @@ const MAX_SESSIONS = 2;
 // Heavy natives load lazily on the first request, not at fork.
 function ensureEnv() {
   if (env) return env;
-  const esearch = require('esearch-ocr');
+  const { createOcr } = require('./ppocr');
   const ort = require('onnxruntime-node');
   const canvasKit = require('@napi-rs/canvas');
-  esearch.setOCREnv({
-    canvas: (w, h) => canvasKit.createCanvas(w, h),
-    imageData: (data, w, h) => new canvasKit.ImageData(data, w, h),
-  });
-  env = { esearch, ort, canvasKit };
+  env = { createOcr, ort, canvasKit };
   return env;
 }
 
@@ -58,23 +54,19 @@ function sessionKey(packId) {
 }
 
 async function buildSession(models, opt) {
-  const { esearch, ort } = ensureEnv();
-  const dict = fs.readFileSync(models.dict, 'utf8');
-  // No docCls on purpose: it misclassifies short-line CJK screenshots as
-  // vertical (see OCR_MODELS.md).
-  // ortOption is a top-level init option in esearch-ocr (one set of session
-  // options for det and rec alike); a per-model key is silently ignored.
-  return esearch.init({
-    det: { input: models.det },
-    rec: {
-      input: models.rec,
-      decodeDic: dict,
-      // The lib's space heuristic is for v3/v4 rec models; v5+ recognize
-      // spaces natively and the heuristic over-inserts.
-      optimize: { space: models.gen === 'v3' || models.gen === 'v4' },
-    },
+  const { createOcr, ort, canvasKit } = ensureEnv();
+  // No document-direction classifier on purpose: it misclassifies
+  // short-line CJK screenshots as vertical (see OCR_MODELS.md).
+  return createOcr({
     ort,
-    ...(opt ? { ortOption: opt } : {}),
+    ortOption: opt,
+    canvasKit,
+    det: models.det,
+    rec: models.rec,
+    dict: fs.readFileSync(models.dict, 'utf8'),
+    // The space heuristic is for v3/v4 rec models; v5+ recognize spaces
+    // natively and the heuristic over-inserts.
+    spaceHeuristic: models.gen === 'v3' || models.gen === 'v4',
   });
 }
 

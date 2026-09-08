@@ -1,6 +1,6 @@
 // OCR IPC: engine detection, model-pack management, recognition handlers.
-// Local recognition runs on electron/utils/ocr-engine (PP-OCRv6 via
-// esearch-ocr); downloadable language packs live in ocr-pack-manager.
+// Local recognition runs on electron/utils/ocr-engine (PP-OCRv6 in the
+// ocr-host process); downloadable language packs live in ocr-pack-manager.
 
 const { ipcMain } = require('electron');
 

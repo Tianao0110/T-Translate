@@ -1,6 +1,6 @@
 // Local OCR engine facade. Pack resolution (roots, pack.json, tier) lives
 // here in the main process because it owns the install directories; the
-// PP-OCR runtime itself (esearch-ocr + onnxruntime-node + skia canvas) runs
+// PP-OCR runtime itself (the ppocr pipeline + onnxruntime-node + skia) runs
 // in the OCR host utilityProcess (services/ocr-host) since v0.4.9, so a
 // native fault there — or a GPU driver fault once WebGPU is on — cannot
 // take the app down. Every export keeps its pre-v0.4.9 shape.

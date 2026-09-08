@@ -252,7 +252,8 @@ electron/utils/open-with.js     右键菜单 argv 解析（.pdf/.docx/.txt 白�
 ```
 electron/managers/audio-engine-manager.js  音频 utilityProcess 的唯一持有者（ASR 会话 + 神经 TTS）
 electron/managers/ocr-host-manager.js      OCR utilityProcess 的持有者：按需拉起、请求配对、崩溃重生、连崩退避（v0.4.9）
-electron/services/ocr-host/ocr-host.js     本地 OCR 运行时（esearch-ocr + onnxruntime-node + skia）跑在这个子进程；provider cpu/webgpu，首会话热身、失败回退 CPU
+electron/services/ocr-host/ocr-host.js     本地 OCR 运行时（ppocr/ + onnxruntime-node + skia）跑在这个子进程；provider cpu/webgpu，首会话热身、失败回退 CPU
+electron/services/ocr-host/ppocr/          PP-OCR 流水线（检测 / 识别 / 版面），fork 自 esearch-ocr（Apache-2.0）：前后处理全部 typed array，输出与上游逐行一致（v0.4.10）
 electron/shared/gpu-engines.js             显卡加速的引擎表：谁能进 GPU、跑在哪个运行时、不能的原因——开关、确认框、状态行、自检都读它
 electron/ipc/gpu.js                        「显卡加速」开关：settings.gpu.enabled，开启时逐引擎自检（OCR host / 音频 worker），失败的引擎各自留 CPU 并回传原因
 native/sherpa-onnx-webgpu/                 带 webgpu provider 的 sherpa-onnx DLL + 补丁 + 构建配方；scripts/overlay-sherpa-runtime.js 在 postinstall / 打包前覆盖进 npm 包
