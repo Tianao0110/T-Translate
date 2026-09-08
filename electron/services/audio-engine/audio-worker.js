@@ -168,6 +168,11 @@ let shuttingDown = false;
 // the ASR side runs on 2, so both fit a 6-core box without starving capture.
 const TTS_THREADS = 4;
 const TTS_ENGINES = new Set(['kokoro', 'vits']);
+// 'cpu' | 'webgpu' — set by init and tts-set-provider. On the GPU the
+// runtime does the parallelism; extra CPU threads only contend (1 thread).
+let ttsProvider = 'cpu';
+// Bumped on every engine load; a queued unload from before the bump is void.
+let ttsGen = 0;
 let tts = null;
 let ttsPackId = '';
 let ttsLoading = null; // Promise<OfflineTts> while createAsync runs
@@ -317,6 +322,7 @@ function handleInit(msg) {
 
   asrPaths = msg.models?.asr || null;
   asrLanguage = normalizeLanguage(asrPaths?.language);
+  ttsProvider = msg.gpu === true ? 'webgpu' : 'cpu';
   logText = msg.logText === true;
   logLine({ ts: Date.now(), type: 'session_start', logText, ...(msg.meta || {}) });
   post({ type: 'ready' });
@@ -1071,6 +1077,9 @@ function handleUnload(what) {
 // behind any running synthesis so a pack swap never pulls files from under
 // the addon thread. The ack lets the host wait for exactly that moment.
 function unloadTts() {
+  // A load that starts while this release waits behind a running synthesis
+  // supersedes it: the state then belongs to the new engine.
+  const gen = ttsGen;
   ttsChain = ttsChain.then(async () => {
     if (ttsLoading) {
       try {
@@ -1079,6 +1088,7 @@ function unloadTts() {
         // load already failed — nothing to release
       }
     }
+    if (ttsGen !== gen) return;
     tts = null;
     ttsPackId = '';
     ttsLoading = null;
@@ -1090,7 +1100,11 @@ function unloadTts() {
 function ttsConfigFor(pack) {
   const p = pack.paths || {};
   const list = (v) => (Array.isArray(v) ? v : v ? [v] : []);
-  const common = { numThreads: TTS_THREADS, provider: 'cpu', debug: 0 };
+  const common = {
+    numThreads: ttsProvider === 'webgpu' ? 1 : TTS_THREADS,
+    provider: ttsProvider,
+    debug: 0,
+  };
   let model;
   if (pack.engine === 'kokoro') {
     model = {
@@ -1130,6 +1144,7 @@ function ensureTts(pack) {
   if (ttsLoading && ttsPackId === pack.id) return ttsLoading;
   if (!sherpa) return Promise.reject(new Error('tts-not-initialized'));
 
+  ttsGen += 1;
   tts = null;
   ttsPackId = pack.id;
   const t0 = Date.now();
@@ -1137,6 +1152,20 @@ function ensureTts(pack) {
     (engine) => {
       // A newer load superseded this one while it ran: let it go.
       if (ttsPackId !== pack.id) return engine;
+      // WebGPU compiles its pipelines on the first synthesis of each
+      // language (2.8 s for Chinese measured); take that hit here, once,
+      // instead of on the user's first sentence. Failures are not fatal:
+      // sherpa already fell back to the CPU inside the session if it had to.
+      if (ttsProvider === 'webgpu') {
+        for (const w of Array.isArray(pack.warmup) ? pack.warmup : []) {
+          try {
+            engine.generate({ text: w.text, sid: w.sid, speed: 1, enableExternalBuffer: false });
+          } catch (err) {
+            logLine(eventRecord('tts-warmup-failed', String(err.message)));
+            break;
+          }
+        }
+      }
       tts = engine;
       ttsLoading = null;
       const loadMs = Date.now() - t0;
@@ -1163,9 +1192,29 @@ function ensureTts(pack) {
 }
 
 function handleTtsLoad(msg) {
+  // Already resident: say so again, so a caller waiting on tts-ready (the
+  // GPU self-test) is not left hanging on a load that never happens.
+  if (tts && msg.pack && ttsPackId === msg.pack.id) {
+    post({ type: 'tts-ready', packId: msg.pack.id, loadMs: 0, numSpeakers: tts.numSpeakers, sampleRate: tts.sampleRate });
+    return;
+  }
   ensureTts(msg.pack).catch(() => {
     // reported through tts-error above
   });
+}
+
+// The provider is baked into the engine config: a loaded voice is dropped
+// and the next load (or tts-load) rebuilds it on the new backend.
+function handleTtsSetProvider(msg) {
+  const next = msg.provider === 'webgpu' ? 'webgpu' : 'cpu';
+  if (next === ttsProvider) return;
+  ttsProvider = next;
+  logLine(eventRecord('tts-provider', next));
+  // Forget the pack id now: the release itself queues behind any running
+  // synthesis, but a tts-load arriving in between must not match the old
+  // engine and hand back the wrong backend.
+  ttsPackId = '';
+  if (tts || ttsLoading) unloadTts();
 }
 
 function handleTtsGenerate(msg) {
@@ -1278,6 +1327,7 @@ process.parentPort.on('message', (e) => {
     case 'log-close': return handleLogClose();
     case 'shutdown': return handleShutdown();
     case 'tts-load': return handleTtsLoad(msg);
+    case 'tts-set-provider': return handleTtsSetProvider(msg);
     case 'tts-generate': return handleTtsGenerate(msg);
     case 'tts-cancel': return handleTtsCancel(msg);
     case 'tts-gate': return handleTtsGate(msg);

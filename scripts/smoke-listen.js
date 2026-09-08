@@ -509,6 +509,29 @@ async function main() {
     kokoroEn.error || `${kokoroEn.audioS.toFixed(2)}s, first chunk ${kokoroEn.firstChunkMs}ms`
   );
 
+  // ===== Neural voice on the GPU (v0.4.9) =====
+  // Needs the WebGPU runtime overlay (scripts/overlay-sherpa-runtime.js);
+  // without it sherpa reports the fallback on stderr and the self-test
+  // says so rather than pretending.
+  engineManager.setTtsProvider('webgpu');
+  const gpuTest = await engineManager.ttsSelfTest();
+  const gpuOn = gpuTest.ok && gpuTest.provider === 'webgpu';
+  step(
+    'kokoro loads on WebGPU (self-test with warm-up)',
+    gpuOn,
+    gpuTest.fallback || gpuTest.error || `load + warm-up ${gpuTest.loadMs}ms`
+  );
+  if (gpuOn) {
+    const kokoroGpu = await speak('tts-kokoro-zh-en', 3, '你好，这是语音朗读功能测试。');
+    step(
+      'kokoro on WebGPU: first chunk faster than on the CPU',
+      !kokoroGpu.error && kokoroGpu.firstChunkMs < kokoroZh.firstChunkMs,
+      kokoroGpu.error || `cpu ${kokoroZh.firstChunkMs}ms vs webgpu ${kokoroGpu.firstChunkMs}ms`
+    );
+  }
+  engineManager.setTtsProvider('cpu');
+  await engineManager.unloadTtsAndWait('gpu-off');
+
   const longText = Array.from({ length: 12 }, (_, i) => `这是第${i + 1}句，用来测试取消。`).join('');
   const cancelled = await speak('tts-kokoro-zh-en', 3, longText, { cancelAfterChunks: 2 });
   step(

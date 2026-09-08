@@ -97,18 +97,26 @@ const AboutSection = ({ notify, resetSettings }) => {
     setGpuBusy(true);
     try {
       const result = await window.electron?.gpu?.setEnabled?.(next);
-      if (result?.success) notify(t(next ? 'about.gpu.enabled' : 'about.gpu.disabled'), 'success');
-      else notify(t('about.gpu.failed', { reason: result?.error || '' }), 'warning');
+      if (result?.success) {
+        notify(t(next ? 'about.gpu.enabled' : 'about.gpu.disabled'), 'success');
+      } else {
+        const reason = (result?.engines || []).map((e) => e.state?.fallback).find(Boolean) || '';
+        notify(t('about.gpu.failed', { reason }), 'warning');
+      }
     } finally {
       setGpuBusy(false);
       loadGpu();
     }
   };
 
-  const gpuStatusText = () => {
-    if (!gpu) return '';
-    if (gpu.enabled) return gpu.last?.provider === 'webgpu' ? t('about.gpu.statusGpu') : t('about.gpu.statusPending');
-    return t('about.gpu.statusCpu');
+  // One line per engine, straight from the main-process table: what it runs
+  // on right now, or why it never takes the GPU.
+  const engineState = (e) => {
+    if (!e.gpu) return { cls: '', text: t('about.gpu.state.cpuOnly', { reason: t(`about.gpu.reasons.${e.reason}`) }) };
+    if (e.state?.provider === 'webgpu') return { cls: 'installed', text: t('about.gpu.state.gpu') };
+    if (e.state?.fallback) return { cls: 'unavailable', text: t('about.gpu.state.fallback', { reason: e.state.fallback }) };
+    if (e.state?.pending) return { cls: '', text: t('about.gpu.state.pending') };
+    return { cls: '', text: t('about.gpu.state.cpu') };
   };
 
   useEffect(() => {
@@ -532,14 +540,20 @@ const AboutSection = ({ notify, resetSettings }) => {
             <span className="storage-label">{t('about.gpu.switchLabel')}</span>
             <span className="storage-value">
               <Switch checked={!!gpu.enabled} onChange={toggleGpu} disabled={gpuBusy} label="" />
-              <span className={`engine-badge ${gpu.enabled && gpu.last?.provider === 'webgpu' ? 'installed' : ''}`}>
-                {gpuBusy ? t('about.gpu.testing') : gpuStatusText()}
-              </span>
+              {gpuBusy && <span className="engine-badge">{t('about.gpu.testing')}</span>}
             </span>
-            <span className="storage-label">{t('about.gpu.enginesLabel')}</span>
-            <span className="storage-value"><span>{t('about.gpu.engines')}</span></span>
+            {(gpu.engines || []).map((e) => {
+              const s = engineState(e);
+              return (
+                <React.Fragment key={e.id}>
+                  <span className="storage-label">{t(`about.gpu.engineNames.${e.id}`)}</span>
+                  <span className="storage-value">
+                    <span className={`engine-badge ${s.cls}`}>{s.text}</span>
+                  </span>
+                </React.Fragment>
+              );
+            })}
           </div>
-          {gpu.last?.fallback && <p className="storage-note error">{t('about.gpu.fallback', { reason: gpu.last.fallback })}</p>}
         </div>
       )}
       {confirmDialog}

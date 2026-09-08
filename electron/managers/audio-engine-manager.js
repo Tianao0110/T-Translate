@@ -56,6 +56,13 @@ let sessionSource = { mode: 'system', pid: 0 };
 // started in it, or the session ended and TTS kept it alive).
 let ttsOnly = false;
 let ttsLoadedPack = '';
+// GPU acceleration for the neural voice (v0.4.9): 'cpu' | 'webgpu'. sherpa
+// reports a failed provider only on stderr ("... Fallback to cpu"), so the
+// note is scraped from there and cleared on every provider change.
+let ttsProvider = 'cpu';
+let ttsProviderNote = null;
+// packId -> { resolve, reject } for whoever awaits a tts-ready (self-test).
+const ttsLoadWaiters = new Map();
 let ttsRequests = new Map(); // id -> { sender }
 let ttsIdleTimer = null;
 let ttsUnloadWaiters = [];
@@ -69,6 +76,8 @@ const ttsPlayingSenders = new Set();
 
 function init(d) {
   deps = d;
+  // The GPU switch persists in the store; the worker reads it at spawn.
+  ttsProvider = d.store?.get?.('settings.gpu.enabled') === true ? 'webgpu' : 'cpu';
 }
 
 // Where a download lands. Reads go through findModels(), which also looks at
@@ -210,7 +219,12 @@ function spawnWorker(models) {
     stdio: 'pipe',
   });
   child.stdout?.on('data', (d) => logger.debug(`worker: ${String(d).trim()}`));
-  child.stderr?.on('data', (d) => logger.warn(`worker: ${String(d).trim()}`));
+  child.stderr?.on('data', (d) => {
+    const line = String(d).trim();
+    // sherpa's only word on a provider it could not enable.
+    if (/webgpu/i.test(line) && /fallback to cpu/i.test(line)) ttsProviderNote = line;
+    logger.warn(`worker: ${line}`);
+  });
 
   child.on('message', onWorkerMessage);
   child.on('exit', onWorkerExit);
@@ -243,6 +257,8 @@ function spawnWorker(models) {
           }
         : null,
     },
+    // Neural voice on the GPU (WebGPU) when the switch is on; ASR stays CPU.
+    gpu: ttsProvider === 'webgpu',
     // Secure mode writes no session log at all — not even metrics.
     logPath: models && !isSecure() ? sessionLogPath() : null,
     // Recognized text stays out of the on-disk log by default — the session
@@ -345,7 +361,9 @@ function onWorkerMessage(msg) {
       break;
     case 'tts-ready':
       ttsLoadedPack = msg.packId;
-      logger.info(`voice ${msg.packId} loaded in ${msg.loadMs}ms (${msg.numSpeakers} speakers, ${msg.sampleRate} Hz)`);
+      logger.info(`voice ${msg.packId} loaded in ${msg.loadMs}ms (${msg.numSpeakers} speakers, ${msg.sampleRate} Hz, ${ttsProvider})`);
+      ttsLoadWaiters.get(msg.packId)?.resolve();
+      ttsLoadWaiters.delete(msg.packId);
       break;
     case 'tts-unloaded':
       ttsLoadedPack = '';
@@ -366,6 +384,12 @@ function onWorkerMessage(msg) {
         ttsRequests.delete(msg.id);
         armTtsIdle();
       } else {
+        // A load failure (no request id): whoever awaits that pack hears it.
+        const waiter = msg.packId && ttsLoadWaiters.get(msg.packId);
+        if (waiter) {
+          ttsLoadWaiters.delete(msg.packId);
+          waiter.reject(new Error(msg.message || 'tts-load-failed'));
+        }
         logger.error(`voice ${msg.packId || '?'} load failed: ${msg.message}`);
       }
       break;
@@ -583,6 +607,8 @@ function getTtsStatus() {
     packs: packs.map(packSummary),
     loaded: ttsLoadedPack,
     packsDir: modelDir('tts-models'),
+    provider: ttsProvider,
+    providerNote: ttsProviderNote,
   };
 }
 
@@ -680,13 +706,26 @@ async function ttsGenerate({ id, text, packId, sid, speed }, sender) {
       text,
       sid,
       speed,
-      pack: { id: pack.id, engine: pack.engine, paths: pack.paths, speedScale: pack.speedScale },
+      pack: ttsPackPayload(pack),
     });
   } catch (e) {
     ttsRequests.delete(id);
     return { success: false, error: e.message };
   }
   return { success: true };
+}
+
+// What the worker needs to load a voice, plus one short warm-up line per
+// language so a GPU-built engine compiles its pipelines before the first
+// real sentence.
+function ttsPackPayload(pack) {
+  const warmup = [];
+  for (const lang of pack.languages || []) {
+    const group = (pack.voiceGroups || []).find((g) => g.lang === lang);
+    const text = lang === 'zh' ? '好。' : 'Hi.';
+    warmup.push({ sid: group && Number.isInteger(group.from) ? group.from : 0, text });
+  }
+  return { id: pack.id, engine: pack.engine, paths: pack.paths, speedScale: pack.speedScale, warmup };
 }
 
 function ttsCancel(id) {
@@ -782,6 +821,67 @@ function drainTtsUnloadWaiters() {
   for (const done of waiters) done();
 }
 
+// 'cpu' | 'webgpu'. A loaded voice is dropped by the worker and rebuilt on
+// the new backend at the next request — no restart, no session interruption.
+function setTtsProvider(provider) {
+  const next = provider === 'webgpu' ? 'webgpu' : 'cpu';
+  ttsProviderNote = null;
+  if (next === ttsProvider) return;
+  ttsProvider = next;
+  if (child) {
+    try {
+      child.postMessage({ type: 'tts-set-provider', provider: next });
+    } catch {
+      // process gone — the next spawn reads ttsProvider
+    }
+  }
+}
+
+// Loads a voice on the current provider (with its warm-up) and reports what
+// actually happened: the GPU switch turns on only when this comes back
+// without a fallback note. Prefers Kokoro, the voice the GPU pays off for.
+async function ttsSelfTest() {
+  const packs = voicePacks();
+  if (!packs.length) return { ok: false, provider: ttsProvider, fallback: null, error: 'no-pack' };
+  const pack = packs.find((p) => p.engine === 'kokoro') || packs[0];
+  clearTimeout(ttsIdleTimer);
+  ttsProviderNote = null;
+  const worker = await ensureTtsWorker();
+  // No unload here: the worker already dropped the voice when the provider
+  // changed, and a resident one on this provider just answers tts-ready
+  // again. unloadTtsAndWait on a TTS-only worker means process exit, which
+  // would leave the tts-load below talking to a dead handle.
+  const t0 = Date.now();
+  const ready = new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      ttsLoadWaiters.delete(pack.id);
+      reject(new Error('tts-load-timeout'));
+    }, 60000);
+    ttsLoadWaiters.set(pack.id, {
+      resolve: () => { clearTimeout(timer); resolve(); },
+      reject: (err) => { clearTimeout(timer); reject(err); },
+    });
+  });
+  worker.postMessage({ type: 'tts-load', pack: ttsPackPayload(pack) });
+  try {
+    await ready;
+    // The fallback note travels on stderr, a different pipe from the IPC
+    // reply: give it a moment to land before reading it.
+    await new Promise((r) => setTimeout(r, 150));
+  } catch (e) {
+    return { ok: false, provider: ttsProvider, fallback: ttsProviderNote, error: e.message, packId: pack.id };
+  } finally {
+    armTtsIdle();
+  }
+  return {
+    ok: !ttsProviderNote,
+    provider: ttsProviderNote ? 'cpu' : ttsProvider,
+    fallback: ttsProviderNote,
+    loadMs: Date.now() - t0,
+    packId: pack.id,
+  };
+}
+
 module.exports = {
   init,
   isAvailable,
@@ -795,5 +895,7 @@ module.exports = {
   ttsGenerate,
   ttsCancel,
   setTtsPlaying,
+  setTtsProvider,
+  ttsSelfTest,
   unloadTtsAndWait,
 };

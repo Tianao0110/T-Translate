@@ -11,7 +11,7 @@
     "electron:start": "electron .",
     "stack:build": "node scripts/build-stack.js",
     "build": "node scripts/fetch-ocr-models.js && node scripts/build-stack.js && vite build && electron-builder",
-    "dist": "node scripts/fetch-ocr-models.js && node scripts/build-stack.js && vite build && electron-builder --publish=never",
+    "dist": "node scripts/overlay-sherpa-runtime.js && node scripts/fetch-ocr-models.js && node scripts/build-stack.js && vite build && electron-builder --publish=never",
     "ocr:models": "node scripts/fetch-ocr-models.js",
     "ocr:release": "node scripts/build-ocr-release.js",
     "audio:release": "node scripts/build-audio-release.js",
@@ -30,7 +30,9 @@
     "check:languages": "node scripts/check-languages.js",
     "check:i18n:strict": "node scripts/check-i18n.js --strict",
     "check:all": "npm run check:constants && npm run check:languages && npm run check:i18n && npm run check:hardcoded",
-    "smoke:ocr": "electron scripts/smoke-ocr.js"
+    "smoke:ocr": "electron scripts/smoke-ocr.js",
+    "postinstall": "node scripts/overlay-sherpa-runtime.js",
+    "runtime:overlay": "node scripts/overlay-sherpa-runtime.js"
   },
   "keywords": [
     "translation",
@@ -74,12 +76,12 @@
     "lucide-react": "^0.303.0",
     "mammoth": "^1.8.0",
     "node-screenshots": "^0.2.1",
-    "onnxruntime-node": "^1.26.0",
+    "onnxruntime-node": "1.26.0",
     "pdfjs-dist": "^4.0.379",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-i18next": "^14.0.1",
-    "sherpa-onnx-node": "^1.13.7",
+    "sherpa-onnx-node": "1.13.7",
     "uiohook-napi": "^1.5.4",
     "uuid": "^13.0.0",
     "zustand": "^4.4.7"

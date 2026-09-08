@@ -1,65 +1,115 @@
-// GPU acceleration switch. One persisted flag (settings.gpu.enabled), applied
-// by the main process to every engine that can take it — today that is the
-// local OCR host (PP-OCR on the WebGPU execution provider). Enabling is a
-// self-test, not a hope: the host builds the base session on the GPU and
-// warms it up; if that fails the switch stays off and the reason is
-// returned. The host swaps providers live (sessions are rebuilt on the next
-// recognition), so no restart.
+// GPU acceleration switch. One persisted flag (settings.gpu.enabled) that
+// the main process applies to every engine in shared/gpu-engines.js that can
+// take the GPU — local OCR (onnxruntime-node) and the neural voice
+// (sherpa-onnx) today — all on the one WebGPU execution provider.
 //
-// Listen stays on the CPU on purpose: its models are int8, and quantized
-// graphs run 3–6x SLOWER on WebGPU than on the CPU (measured 2026-09-07,
-// see gstack v049-gpu-research).
+// Enabling is a self-test, not a hope: each engine loads its model on the
+// GPU in its own utilityProcess and warms up; an engine that cannot goes
+// back to the CPU on its own and says why. The switch sticks when at least
+// one engine made it, and the settings page shows each engine's real
+// backend. Providers swap live (sessions rebuilt on the next request), so
+// nothing here restarts the app.
+//
+// Listen stays on the CPU by table: its models are int8, and quantized
+// graphs run 3–6x slower on WebGPU (measured 2026-09-07, see gstack
+// v049-gpu-research).
 
 const { ipcMain } = require('electron');
 const { CHANNELS } = require('../shared/channels');
+const { GPU_PROVIDER, GPU_ENGINES } = require('../shared/gpu-engines');
 const logger = require('../utils/logger')('IPC:GPU');
 const ocrEngine = require('../utils/ocr-engine');
+const audioEngine = require('../managers/audio-engine-manager');
 
 const KEY = 'settings.gpu.enabled';
-// Engine ids the renderer lists as "these run on the GPU".
-const GPU_ENGINES = ['ocr'];
+
+// How each GPU-capable engine is driven. Keyed by the table's ids so the
+// table stays plain data.
+const DRIVERS = {
+  ocr: {
+    setProvider: (p) => ocrEngine.setProvider(p),
+    selfTest: async () => {
+      const s = await ocrEngine.hostStatus();
+      return { ok: s.ok && s.provider === GPU_PROVIDER && !s.fallback, provider: s.provider, fallback: s.fallback || null };
+    },
+  },
+  tts: {
+    setProvider: (p) => audioEngine.setTtsProvider(p),
+    selfTest: async () => {
+      const s = await audioEngine.ttsSelfTest();
+      return { ok: s.ok, provider: s.provider, fallback: s.fallback || s.error || null };
+    },
+  },
+};
 
 function register(ctx) {
   const { store } = ctx;
-  // Last self-test outcome, so the settings page can show the live backend
-  // without spawning the host just to ask.
-  let last = null; // { provider, fallback, at }
+  // Last self-test per engine, so the page shows the live backend without
+  // spawning anything just to ask.
+  const last = {}; // id -> { ok, provider, fallback, at }
 
-  ocrEngine.setProvider(store.get(KEY, false) === true ? 'webgpu' : 'cpu');
+  const enabled = () => store.get(KEY, false) === true;
 
-  ipcMain.handle(CHANNELS.GPU.STATUS, async () => ({
-    enabled: store.get(KEY, false) === true,
-    engines: GPU_ENGINES,
-    supported: process.platform === 'win32',
-    last,
-  }));
+  function applyProvider(provider) {
+    for (const engine of GPU_ENGINES) {
+      if (engine.gpu && DRIVERS[engine.id]) DRIVERS[engine.id].setProvider(provider);
+    }
+  }
 
-  ipcMain.handle(CHANNELS.GPU.SET_ENABLED, async (_event, enabled) => {
-    if (!enabled) {
+  applyProvider(enabled() ? GPU_PROVIDER : 'cpu');
+
+  function snapshot() {
+    return {
+      enabled: enabled(),
+      supported: process.platform === 'win32',
+      provider: GPU_PROVIDER,
+      engines: GPU_ENGINES.map((e) => ({
+        id: e.id,
+        gpu: e.gpu,
+        reason: e.reason || null,
+        // Live state: a self-test result when there is one, else what the
+        // switch implies. Engines that never take the GPU are always cpu.
+        state: e.gpu ? (last[e.id] || { provider: enabled() ? GPU_PROVIDER : 'cpu', fallback: null, pending: enabled() }) : { provider: 'cpu' },
+      })),
+    };
+  }
+
+  ipcMain.handle(CHANNELS.GPU.STATUS, async () => snapshot());
+
+  ipcMain.handle(CHANNELS.GPU.SET_ENABLED, async (_event, on) => {
+    if (!on) {
       store.set(KEY, false);
-      ocrEngine.setProvider('cpu');
-      last = { provider: 'cpu', fallback: null, at: Date.now() };
+      applyProvider('cpu');
+      for (const e of GPU_ENGINES) if (e.gpu) last[e.id] = { ok: true, provider: 'cpu', fallback: null, at: Date.now() };
       logger.info('GPU acceleration off');
-      return { success: true, enabled: false };
+      return { success: true, ...snapshot() };
     }
-    ocrEngine.setProvider('webgpu');
-    try {
-      const status = await ocrEngine.hostStatus();
-      if (status.provider !== 'webgpu' || status.fallback) {
-        throw new Error(status.fallback || 'WebGPU unavailable');
+
+    applyProvider(GPU_PROVIDER);
+    const capable = GPU_ENGINES.filter((e) => e.gpu && DRIVERS[e.id]);
+    const results = await Promise.all(
+      capable.map(async (e) => {
+        try {
+          const r = await DRIVERS[e.id].selfTest();
+          return { id: e.id, ...r };
+        } catch (err) {
+          return { id: e.id, ok: false, provider: 'cpu', fallback: err.message };
+        }
+      }),
+    );
+    let any = false;
+    for (const r of results) {
+      last[r.id] = { ...r, at: Date.now() };
+      if (r.ok) any = true;
+      else {
+        // That engine runs on the CPU from here; the others are unaffected.
+        DRIVERS[r.id].setProvider('cpu');
+        logger.warn(`GPU self-test failed for ${r.id}, staying on CPU: ${r.fallback}`);
       }
-      store.set(KEY, true);
-      last = { provider: 'webgpu', fallback: null, at: Date.now() };
-      logger.info('GPU acceleration on (WebGPU)');
-      return { success: true, enabled: true };
-    } catch (e) {
-      // Whatever went wrong, the machine runs on the CPU from here.
-      ocrEngine.setProvider('cpu');
-      store.set(KEY, false);
-      last = { provider: 'cpu', fallback: e.message, at: Date.now() };
-      logger.warn(`GPU self-test failed, staying on CPU: ${e.message}`);
-      return { success: false, enabled: false, error: e.message };
     }
+    store.set(KEY, any);
+    logger.info(any ? `GPU acceleration on (${results.filter((r) => r.ok).map((r) => r.id).join(', ')})` : 'GPU acceleration unavailable on every engine');
+    return { success: any, ...snapshot() };
   });
 
   logger.info('GPU IPC handlers registered');
