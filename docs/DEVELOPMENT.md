@@ -287,6 +287,17 @@ export default MyOCREngine;
 
 ---
 
+## 🧠 内置模型与 T-Engine
+
+内置本地模型（翻译源 `tengine`）不走上面两条路线：它是 T-Engine 引擎层的一个宿主，全部细节在 [T-ENGINE.md](T-ENGINE.md)。改它之前只需记住：
+
+- **白名单在 `electron/shared/llm-packs.js`**，一个模型 = 文件名 + 大小 + 哈希 + 角色（`general` / `mt`）。加模型就是加一行，再跑 `npm run smoke:llm-stack -- --model <gguf>` 过一遍
+- **运行时钉版**：`npm run llama:runtime` 按 `llama-manifest.json` 下载并逐文件校验官方 llama.cpp DLL；换版走 T-ENGINE.md 第九节的检查单，ABI 结构体改动必须同步 `llama-abi.js` 的 SIZES / GOLDEN 单测
+- **开发者门**：`settings.llm.allowUnlistedModels` 或环境变量 `TT_TENGINE_DEV=1` 才能加载文件夹里的非白名单 GGUF；试用报告在 `logs/tengine-trial-*.jsonl`
+- **思考模式一律禁止**（logit 禁 token + 模板 + 流过滤三层），新模型接入时先确认它的 think token id
+
+---
+
 ## 🎨 UI 与样式规范
 
 样式令牌的完整说明在 [THEME_CUSTOMIZATION.md](THEME_CUSTOMIZATION.md)，开发时只需记住这几条硬规则：

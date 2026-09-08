@@ -13,6 +13,17 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 
 ## 下一版本候选
 
+### v0.5.1：内置模型的视觉（mtmd）路径（用户 2026-09-08 拍板：不进 v0.5.0，单独一版）
+
+- 双槽第二槽：mtmd.dll 的 ABI 转录（结构体 / 函数表 / 指纹单测同 llama-abi.js 的做法）、图片 → 视觉 token → 解码的会话路径、视觉模型包进白名单（候选 PaddleOCR-VL 官方 GGUF，须随包带 jinja 模板）、注册成 tier 2 的 OCR 引擎；spike 数字与 mtmd 用法在 gstack v050-engine-plugin-research（scratchpad/spike-llama/）
+- 顺带：Q6_K 掐表对比（可选）
+
+### v0.5.2：文档整体精简 + 程序内「使用说明」（用户 2026-09-08 拍板；落法与 8 章骨架在 gstack v052-manual-outline-2026-09-08）
+
+- 说明书源 `docs/MANUAL.zh.md` / `MANUAL.en.md` 随包分发，设置页新增「使用说明」入口离线可看，模型链接集中写进说明书（大包链接自取，小包保留一键下载）
+- **写法铁律**：分批写，每批写前核实界面（要截图），不确定就问，做完一批等用户指令再开下一批；先中文后英文
+- 文档精简：README 两份砍到概览 / 功能表 / 安装 / 链接；FAQ 只留排错；ARCHITECTURE 与 DEVELOPMENT 补 T-Engine 砍陈旧；其余四份逐份查过时；之后发版备忘加「每版过一遍说明书」
+
 ### 翻译源相关——全部等 v0.5.0 之后再开（用户 2026-09-07 拍板；调研全文 gstack v048-engine-landscape-2026-09-07）
 
 - **DeepL 文案**：2026-07 起 DeepL 停售 API Free / API Pro，新 Developer 计划是一次性 100 万字符不续（老 API Free key 仍可用）。程序里 DeepL 的"免费"引导措辞要改
@@ -23,11 +34,11 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 
 ### 听译逻辑复查（用户 2026-09-08 点名：整个引擎迁移完成后做一次）
 
-- T-Engine 迁移全部完成后，对听译这条链（VAD 两档与自动动作、硬切与接缝、AGC、看门狗、两档识别、主进程翻译与上文窗口、字幕自动保存）做一次"是否需要升级 / 调优 / 更新"的评估：用 FLEURS 基准与《可不可以》样本重跑一遍数字，对照 gstack v042-accuracy-baseline 与 v048 两份记录，列出该动与不该动的项再拍板；不在迁移过程中顺手改
+- ✅ 2026-09-08 已跑（报告 gstack v050-listen-review-2026-09-08；harness 入库 scripts/bench-listen.js，数据 bench-data/）：正常电平 en WER 8.99% / zh CER 5.27%（去参考伪差）覆盖 40/40，结论「链不用动」；顺手抓到并修掉一个真崩溃（Qwen3-ASR 吐换行符 → sherpa-onnx JSON 不转义 → 宿主 fatal 重启，`asr-result.js`）；待拍板三个小项：段尾填充词幻觉（裁段尾静音）、AGC 边界只记不改、高精度档数字 ITN。原任务：用 FLEURS 基准与《可不可以》样本重跑一遍数字，对照 gstack v042-accuracy-baseline 与 v048 两份记录，列出该动与不该动的项再拍板；不在迁移过程中顺手改
 
 ### 大包分发改成「链接 + 手放」（用户 2026-09-07 拍板：超过 400MB 的包不再上传 Release）
 
-- 首例 = 高精度听译包 845MB（v0.4.10 这次仍上传了，规矩从下一个大包起）。程序侧要做：manifest 条目加 `manual`（上游链接 + 目标目录），设置页对这类包显示链接、目录与「已放好，重新检测」代替下载按钮；`electron/utils/asr-models.js` 的定位逻辑要能直接吃上游原始目录（不依赖安装时写的 pack.json），口径沿用"手放模型 = 本机信任"
+- ✅ 2026-09-08 程序侧已做（MANUAL_PACKS 目录 + 定位器认手放文件夹 + 设置页链接 / 目录 / 重新检测 + build 脚本支持无 zip 的 manual 条目）。原计划：manifest 条目加 `manual`（上游链接 + 目标目录），设置页对这类包显示链接、目录与「已放好，重新检测」代替下载按钮；`electron/utils/asr-models.js` 的定位逻辑要能直接吃上游原始目录（不依赖安装时写的 pack.json），口径沿用"手放模型 = 本机信任"
 - FAQ / README 写清链接与目录，一条一行
 
 ### 引擎进 GPU 的后续（v0.4.10 已发 OCR + 朗读；spike 结论在 gstack v049-gpu-research「v0.4.10 调优三连」）
@@ -184,3 +195,8 @@ v0.3.4 给 Windows OCR / Azure / Google Vision / OCR.space / 百度 五个引擎
 
 `tests/unit/` 现有 65 个测试文件、728 用例（selection / stack 五件套 / OCR 坐标 / 语言目录与选择器 / 历史与理解条目 / 段落笔记 / 历史保险库与存储路由 / store 白名单 / 模型包 core 与换包时序 / 听译模型发现与包列表 / 听译声音来源 / TTS 引擎落回 等）。Principle: add tests when you touch a file, new features ship with tests, bug fixes ship with regression tests. Not chasing 100% coverage.
 
+
+### 过滤器把小数当版本号（2026-09-08 内置模型联调时发现，影响所有翻译源，只是小模型更敏感）
+- `src/config/filters.js` 的 `version_number` 正则 `/v?\d+\.\d+.../` 会把 "0.3 seconds" 里的 0.3 换成 `⟦version_number_0⟧`；云端大模型照抄占位符没事，Qwen3-1.7B 在 OCR 模板（"修 l/1/I 混淆"那条指令）下会把这个占位符当成识别错误改掉，还原后变成 "1/1/I"。第二句（版本 ⟦version_number_0⟧ + ⟦url_0⟧）小模型能照抄，只在"小数 + OCR 模板"这一交叉点出问题
+- 候选修法：版本号正则要求 `v` 前缀或三段（x.y.z），或者排除后面紧跟单位词（seconds/ms/%）的小数；改了要跑 tests/unit 里过滤器与 service 的用例，并复跑 `npm run smoke:llm-stack`
+- 已试过给内置模型多加一句「⟦…⟧ 原样照抄」，反而让它整句输出英文——不走提示词路线
