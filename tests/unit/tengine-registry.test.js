@@ -27,9 +27,14 @@ describe('tengine registry', () => {
     for (const e of ENGINES.filter((x) => !x.gpu)) expect(typeof e.reason).toBe('string');
   });
 
-  it('lists OCR and the neural voice as GPU-capable, listen as CPU-only', () => {
-    expect(gpuCapableIds().sort()).toEqual(['ocr', 'tts']);
+  it('lists OCR, the neural voice and the built-in model as GPU-capable, listen as CPU-only', () => {
+    expect(gpuCapableIds().sort()).toEqual(['llm', 'ocr', 'tts']);
     expect(engineById('asr').gpu).toBe(false);
     expect(engineById('nope')).toBeNull();
+  });
+
+  it('names the backend where it is not the shared onnxruntime provider', () => {
+    expect(engineById('llm')).toMatchObject({ host: 'llm', runtime: 'llama.cpp', backend: 'vulkan' });
+    for (const e of ENGINES.filter((x) => x.gpu && x.id !== 'llm')) expect(e.backend).toBeUndefined();
   });
 });

@@ -113,7 +113,7 @@ const AboutSection = ({ notify, resetSettings }) => {
   // on right now, or why it never takes the GPU.
   const engineState = (e) => {
     if (!e.gpu) return { cls: '', text: t('about.gpu.state.cpuOnly', { reason: t(`about.gpu.reasons.${e.reason}`) }) };
-    if (e.state?.provider === 'webgpu') return { cls: 'installed', text: t('about.gpu.state.gpu') };
+    if (e.state?.provider === 'webgpu') return { cls: 'installed', text: t(e.backend === 'vulkan' ? 'about.gpu.state.gpuVulkan' : 'about.gpu.state.gpu') };
     if (e.state?.fallback) return { cls: 'unavailable', text: t('about.gpu.state.fallback', { reason: e.state.fallback }) };
     if (e.state?.pending) return { cls: '', text: t('about.gpu.state.pending') };
     return { cls: '', text: t('about.gpu.state.cpu') };

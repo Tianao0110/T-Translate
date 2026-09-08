@@ -44,6 +44,17 @@ const ENGINES = [
     // SenseVoice / zipformer / Qwen3-ASR are int8: 3–6x slower on WebGPU.
     reason: 'int8',
   },
+  {
+    id: 'llm',
+    host: 'llm',
+    // Runtime: the pinned llama.cpp DLLs (electron/tengine/runtime) inside
+    // the LLM host utilityProcess. Its GPU path is Vulkan, not WebGPU.
+    runtime: 'llama.cpp',
+    gpu: true,
+    backend: 'vulkan',
+    // Qwen3-1.7B Q8_0 on an RTX 4090 Laptop: 22 tok/s CPU → 210 tok/s.
+    note: 'qwen3',
+  },
 ];
 
 const gpuCapableIds = () => ENGINES.filter((e) => e.gpu).map((e) => e.id);

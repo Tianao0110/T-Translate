@@ -136,6 +136,15 @@ const CHANNELS = {
     STATUS: 'tengine:status',   // renderer → main: {provider, engines[{id, host, runtime, gpu, provider, lastHealth, host:{running,…}}]}
     EVENT: 'tengine:event',     // main → renderer: {engine, host, kind, at, …} per host lifecycle event
   },
+  // Built-in model (v0.5.0): the model folder and the developer door. No text crosses here.
+  LLM: {
+    STATUS: 'llm:status',             // renderer → main: {dir, packs, resident, provider, runtime, …}
+    RESCAN: 'llm:rescan',             // renderer → main: rescan the folder, returns status
+    OPEN_DIR: 'llm:open-dir',         // renderer → main: open the model folder in Explorer
+    UNLOAD: 'llm:unload',             // renderer → main: drop the resident model
+    PROBE: 'llm:probe',               // renderer → main: (file) five-step probe of an unlisted file (developer door)
+    TRIAL_REPORT: 'llm:trial-report', // renderer → main: (file) trial-log summary
+  },
   MENU: {
     ACTION: 'menu-action',
     IMPORT_FILE: 'import-file',

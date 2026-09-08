@@ -20,6 +20,7 @@ const tengine = require('../tengine');
 const logger = require('../utils/logger')('IPC:GPU');
 const ocrEngine = require('../utils/ocr-engine');
 const audioEngine = require('../managers/audio-engine-manager');
+const llmManager = require('../managers/llm-manager');
 
 const { PROVIDER: GPU_PROVIDER, ENGINES: GPU_ENGINES } = tengine;
 const KEY = 'settings.gpu.enabled';
@@ -44,6 +45,12 @@ const DRIVERS = {
       const s = await audioEngine.ttsSelfTest();
       return { ok: s.ok, provider: s.provider, fallback: s.fallback || s.error || null };
     },
+  },
+  llm: {
+    setProvider: (p) => tengine.get().setProvider('llm', p),
+    // The manager picks the default pack and loads it on the GPU for a
+    // timed generation; with no model installed it reports pending.
+    selfTest: () => llmManager.selfTest(),
   },
 };
 
@@ -71,6 +78,7 @@ function register(ctx) {
       engines: GPU_ENGINES.map((e) => ({
         id: e.id,
         gpu: e.gpu,
+        backend: e.backend || GPU_PROVIDER,
         reason: e.reason || null,
         // Live state: a self-test result when there is one, else what the
         // switch implies. Engines that never take the GPU are always cpu.

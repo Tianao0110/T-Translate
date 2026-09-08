@@ -44,7 +44,13 @@ electron/tengine/
     mtmd.js            图像/音频 → chunks → eval
     worker.js          runtime 所在的 worker_thread：所有 FFI 调用在这条线程上同步进行；
                        宿主主线程只做 IPC、取消标志、看门狗
-electron/services/llm-host/llm-host.js     LLM utilityProcess（双槽）；进程内再起一个 worker_thread 跑 runtime
+  engines/llm.js       LLM 适配器：load / unload / generate（流式，reqId 路由）/ probe / health / metrics / setProvider / status
+  metrics-log.js       事件流落盘：data\logs\tengine-<日期>.jsonl，留 3 份，无痕不写，内容键一律剥掉
+  trial-log.js         试用日志：data\logs\tengine-trial-<模型>-<月>.jsonl，两个月清理，文本只在开关后写；summarize 出试用报告
+electron/services/llm-host/llm-host.js     LLM utilityProcess：进程内一条 worker_thread 跑 runtime，主线程转发、排队、持取消标志、跑停滞看门狗
+electron/managers/llm-manager.js           主进程侧决策：选文件（白名单 / 开发者门）、驻留与 5 分钟闲置卸载（P8）、显卡开关自检、试用日志
+electron/managers/llm-pack-manager.js      模型文件夹扫描：同名同大小才哈希（缓存 size+mtime），哈希对上才 ready，其余列为未列入
+electron/ipc/llm.js                        llm:* 通道：状态、重扫、开文件夹、卸载、探针、试用报告；不过文本
 electron/services/ocr-host/ocr-host.js     已有：OCR utilityProcess（v0.4.9）
 electron/services/audio-engine/audio-worker.js  已有：音频 utilityProcess（v0.4.0）
 electron/tengine/runtime/llama-manifest.json  官方 zip 与取用 DLL 的 SHA256 清单（DLL 本身不进 git）
