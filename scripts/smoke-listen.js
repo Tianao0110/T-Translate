@@ -114,6 +114,7 @@ async function main() {
   fs.rmSync(SANDBOX, { recursive: true, force: true });
   fs.mkdirSync(SANDBOX, { recursive: true });
   app.setPath('userData', SANDBOX);
+  process.env.TT_MODELS_ROOT = path.join(SANDBOX, 'models');
 
   // Local manifest: same file, baseUrl pointed at the local zips.
   const manifest = JSON.parse(fs.readFileSync(`${RELEASE_DIR}/manifest.json`, 'utf8'));

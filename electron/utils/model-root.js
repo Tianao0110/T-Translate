@@ -40,7 +40,9 @@ function legacyModelsRoot() {
 // Active root — where downloads are installed. Probed once per process.
 function modelsRoot() {
   if (_cached) return _cached;
-  const dir = app.isPackaged ? installModelsDir() : devModelsDir();
+  // Harnesses (smoke / bench scripts) sandbox everything under a temp
+  // folder; the dev models folder must not collect their packs.
+  const dir = process.env.TT_MODELS_ROOT || (app.isPackaged ? installModelsDir() : devModelsDir());
   if (isWritable(dir)) {
     _cached = dir;
     logger.info(`Models root: ${dir}`);

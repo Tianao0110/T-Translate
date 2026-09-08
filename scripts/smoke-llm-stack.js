@@ -62,6 +62,7 @@ async function main() {
   const modelsDir = path.join(SANDBOX, 'llm-models');
   fs.mkdirSync(modelsDir, { recursive: true });
   app.setPath('userData', SANDBOX);
+  process.env.TT_MODELS_ROOT = path.join(SANDBOX, 'models');
   const placed = place(modelsDir, MODEL);
   const placedMt = MT && fs.existsSync(MT) ? place(modelsDir, MT) : null;
   console.log(`model folder ${modelsDir}: ${placed.pack ? placed.pack.id : 'unlisted'}${placedMt ? ` + ${placedMt.pack ? placedMt.pack.id : 'unlisted'}` : ''}`);

@@ -213,6 +213,8 @@ async function main() {
   fs.rmSync(SANDBOX, { recursive: true, force: true });
   fs.mkdirSync(SANDBOX, { recursive: true });
   app.setPath('userData', SANDBOX);
+  // Packs go to the sandbox too, not the dev models folder (model-root.js).
+  process.env.TT_MODELS_ROOT = path.join(SANDBOX, 'models');
   const manifest = JSON.parse(fs.readFileSync(`${RELEASE_DIR}/manifest.json`, 'utf8'));
   manifest.baseUrl = `file:///${RELEASE_DIR}`;
   const manifestPath = path.join(SANDBOX, 'local-manifest.json');
