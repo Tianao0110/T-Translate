@@ -26,7 +26,9 @@ electron/tengine/
     llama-binding.js   koffi 装载：DLL 目录、依赖顺序、后端目录、设备枚举
     llama-session.js   模型/上下文生命周期、解码循环、采样链、取消、前缀复用、token 流
     mtmd.js            图像/音频 → chunks → eval
-electron/services/llm-host/llm-host.js     LLM utilityProcess（双槽）
+    worker.js          runtime 所在的 worker_thread：所有 FFI 调用在这条线程上同步进行；
+                       宿主主线程只做 IPC、取消标志、看门狗
+electron/services/llm-host/llm-host.js     LLM utilityProcess（双槽）；进程内再起一个 worker_thread 跑 runtime
 electron/services/ocr-host/ocr-host.js     已有：OCR utilityProcess（v0.4.9）
 electron/services/audio-engine/audio-worker.js  已有：音频 utilityProcess（v0.4.0）
 native/llama-runtime/SHA256SUMS            官方 DLL 清单与校验值（DLL 本身不进 git）
@@ -71,10 +73,13 @@ koffi 装载顺序（否则依赖解析失败）：`SetDllDirectoryW(<目录>)` 
 - 需要保持地址稳定的缓冲区（token 数组给 `llama_batch_get_one`，之后 `llama_decode` 还会读）用 `koffi.alloc` 分配、`koffi.encode/decode` 读写；不要传 TypedArray，它可能被拷贝成临时内存。
 - 输出缓冲区（`llama_token_to_piece` 的 `buf`）声明 `_Out_ uint8 *`，传 Buffer。
 - 字符串出参（`const char *` 返回）koffi 自动转 JS 字符串；结构体里的 `const char *` 字段同理。
-- 耗时调用用 `.async`（`llama_decode`、`mtmd_helper_eval_chunks`、模型加载），事件循环留给 IPC 与取消；同一上下文的调用串行，不并发。
-- 回调（进度、abort）只在 `.async` 调用期间使用；解码循环在 JS 里，取消靠循环里查标志，一个 token 内响应，不依赖 abort 回调（头文件注明它只对 CPU 生效）。
-- 线程数按**物理核**给，超线程反而慢（7945HX：8 线程 22.5 tok/s，16 线程 19.4）。
-- 双显卡机器要把 `llama_model_params.devices` 显式指到独显，否则 ggml 会把层分到核显上（本机 Vulkan0 = 4090、Vulkan1 = 610M）。
+- **所有 FFI 调用都在 runtime 的 worker_thread 上同步进行**，宿主主线程只做 IPC。不要用 `.async`：koffi 只允许在 V8 线程上回调，`.async` 期间从工作线程回到 JS 的任何回调（进度、日志、abort）实测直接 0xC0000005（koffi 2.15.0）。同步调用在专用线程上不会卡住宿主，实验里主线程全程照常跳 tick。
+- 回调三种都在同步调用里用：进度（`progress_callback`，0.6B 载入回调 311 次）、日志（`llama_log_set`，一次载入约 1000 行，进 metrics 不进用户日志）、abort。**取消 = abort 回调读 SharedArrayBuffer 里的标志**（主线程 `Atomics.store`，worker 里 `Atomics.load`），778 token 的提示词解码在标志置位后约 100 ms 内返回 rc=2，CPU 与 Vulkan 都生效（头文件说只对 CPU 生效，实测 Vulkan 也会在调度点轮询）。生成阶段每个 token 之间再查一次标志。
+- `koffi.encode` 只有 `(ptr, type, value)` 和 `(ptr, koffi.array(type, n), arr)` 两种形式；**没有 `(ptr, offset, type, value)`**，那样写会把内存写坏（设备数组的段错误就是它）。指针数组以 `null` 结尾用数组形式一次写入。
+- token 缓冲区每个会话预分配一份重复使用，不要每次请求 `koffi.alloc`（200 次请求 RSS 涨 9 MB，疑似来源）。
+- 线程数按**物理核**给，且取 2 的幂：7945HX 上 1.7B 生成 4 线程 23.7 tok/s 最快，8 线程 21.3，16 线程 19.4；提示词处理 4 / 8 / 16 线程都在 190 tok/s，6 和 12 线程掉到 40 多（非 2 的幂调度失衡）。最终数字由装前自测在 {4, 8} 里掐表选，不写死。
+- 双显卡机器要把 `llama_model_params.devices` 显式指到独显：本机默认选择恰好是 Vulkan0 = 4090（核显一字节没占），但不能指望别的机器也这样；指定后 llama 日志里 `VulkanN model buffer size` 能对上，作为自检断言。
+- 退出码：Git Bash 报的 127 是 msys 误报（PowerShell 读同一进程为 0），判断宿主崩溃以 utilityProcess 的 `exit` 事件 code 为准；0xC0000005 是访问违规，0xC0000409 是 fast-fail。
 
 Golden 测试至少覆盖：`llama_context_default_params()` 的 `n_ctx / n_batch / flash_attn_type` 等值、`llama_version()` 与钉版一致、固定 prompt 贪心输出前 N 个 token、视觉固定图前 N 个 token。
 
@@ -93,26 +98,66 @@ Golden 测试至少覆盖：`llama_context_default_params()` 的 `n_ctx / n_batc
 - 结果进主进程前按形状校验（文本 / 框 / 时间戳），宿主是不受信任的一侧。
 - 无端口、无 HTTP、无 localhost 旁路；宿主只认 utilityProcess 消息。
 
+### 试模型模式（开发者自己快速试新模型）
+
+白名单挡的是"程序替用户自动装的东西"，不是开发者手里的文件。留一扇明确的门：
+
+- 开关：`settings.tengine.allowUnlistedModels`（关于页开发者区，默认关；或环境变量 `TT_TENGINE_DEV=1`）。打开后模型目录里任何 GGUF 都能出现在候选列表，带「未验证」标记。
+- 探针流程（每个未验证模型第一次选中时跑，全在宿主里，坏文件只会让宿主报错不会崩主进程）：
+  1. `gguf_init_from_file(no_alloc)` 读元数据：架构、名字、量化、上下文长度、张量数——27 ms，坏头直接拒（垃圾文件、截断文件实测都是干净的 null 返回 + 一行日志）。
+  2. `vocab_only` 载入：架构是否被当前 llama.cpp 认识、词表能否解析（mmproj 当文本模型选会在这一步被拒）。
+  3. 预算检查：文件大小 + 估算 KV 对比空闲内存 / 显存（`ggml_backend_dev_memory`），不够就不装。
+  4. 完整载入 + 8 token 生成 + 掐表，出 tok/s 与首 token 延迟。
+  5. 任一步失败 → 该文件标「不可用」并记原因；通过 → 标「未验证，可用」。
+- 未验证模型永远不成为默认，不进档位预设宏，不做自动切换；只在用户明确选中时使用。
+- 无痕 / 离线模式不受影响：本地文件，不联网，不写文本。
+
 ## 六、轻量化口径
 
-- 安装包增量：CPU 运行时 ~18 MB + Vulkan 57 MB（zip 内约 50 MB）。要不要把 Vulkan 后端做成首次开显卡加速时下载的可选件，是产品决定，不是技术限制；决定了就只改取包与清单。
+- 安装包增量：CPU 运行时 ~18 MB + Vulkan 57 MB（zip 内约 50 MB），两者都随安装包走（2026-09-07 拍板：不为几十 MB 做可选下载）。
 - 内存：模型 mmap 载入，闲置卸载（音频宿主已有 60 s 口径），一个运行时家族一个进程；双槽全热 ≤ 4 GB。
 - 启动：宿主按需拉起，DLL 按需装载；主进程零原生依赖增量（koffi 已在）。
 - 首次编译：Vulkan / WebGPU 首次推理都要编着色器（文本 1.5 s、视觉 7 s 量级），放在装前自测与自检里热身，不让用户的第一句吃它。
+- 前缀复用（系统提示 + 上文共享 KV，`llama_memory_seq_rm` 只丢尾巴）：CPU 上 1.7B 带 407 token 系统提示的请求从 458 ms 降到 258 ms，0.6B 从 112 降到 83；显卡上 9 ms 对 6 ms，可忽略。值得做，但只在 CPU 档有感。
+- 长跑：Vulkan 200 次生成 RSS 846 → 855 MB，卸载后回到 198 MB（基线 162）；5 次装卸循环稳定在 199–200 MB；CPU 50 次生成 RSS 全程 1071 MB 不动。没有泄漏迹象，那 9 MB 待用预分配缓冲区复核。
 
 ## 七、监控信号与策略表
 
-宿主上报的信号（结构化，进 metrics 日志，不含用户文本）：
+### T-Engine 收集什么
 
-| 信号 | 来源 | 主程序拿它做什么 |
-| --- | --- | --- |
-| `runtime.ready { version, devices[] }` | 装载探针 | 决定可用后端，填「显卡加速」状态行 |
-| `engine.health { ok, provider, fallback, loadMs }` | 功能自检 | 开关是否生效、回退原因文案 |
-| `request.metrics { promptTokens, genTokens, ms, tokPerSec }` | 每个请求 | 装前自测数字、档位建议（慢于阈值提示换档） |
-| `resource { rssMb, vramFreeMb }` | 定时 | 触发闲置卸载、拒绝超预算的加载 |
-| `stall / timeout / crash { reason }` | 看门狗 | 重生、退避、连崩后禁用并提示 |
+原则：**只收数字与枚举，不收内容**。下面这张表就是全部；不在表里的不许加，加要先过隐私说明表（`src/utils/privacy-module-matrix.js` 与隐私页文案）。
 
-策略写成表，不写成散落的 if：档位（保底 / 内置 / 外接）× 信号 → 动作。改策略只改表，改引擎只改宿主。
+| 信号 | 字段 | 来源 | 明确不含 |
+| --- | --- | --- | --- |
+| `runtime.ready` | 运行时版本、设备列表（名字、类型、显存总量/空闲）、选中的后端 | 装载探针 | — |
+| `model.loaded` | 模型 id、架构、量化、文件 SHA256、体积、载入毫秒、放在哪个设备、KV 类型 | 载入 | 文件路径以外的任何文件内容 |
+| `engine.health` | 通过/失败、后端、回退原因（枚举 + 一句原始错误）、自检 tok/s | 功能自检 | — |
+| `request.metrics` | 请求类型（翻译/总结/理解/OCR/听译）、提示 token 数、生成 token 数、首 token 毫秒、总毫秒、tok/s、是否取消、错误码、前缀复用命中 | 每个请求 | **提示词、输入文本、输出文本、图像、音频**一律不进 |
+| `resource` | 宿主 RSS、显存空闲、上下文占用（token 数） | 定时 5 s 与每请求后 | — |
+| `watchdog` | 停滞（N 秒无 token）、超时、崩溃退出码、重生次数 | 看门狗 | — |
+
+落盘规则与隐私模式对齐：标准 / 离线模式写 `data\logs\tengine-<日期>.jsonl`（metrics 一行一条，与听译会话日志同一口径，保留最近 3 份）；**无痕模式不写盘**，只留内存里最近 200 条给状态页看；文本永远不落盘（听译会话日志的 `logText` 那种调试开关这里不提供）。用户可见的汇总只有三处：关于页的引擎状态卡、设置里的装前自测数字、FAQ 的「为什么慢」。
+
+### 主程序按什么调整
+
+规矩：**自动动作只在用户选定的档位之内**（后端回退、重生、卸载），**跨档位的变化只建议不执行**，所有自动动作都在状态行留一句话，不静默。用户手动设置永远压过自动值。
+
+| 编号 | 信号 | 动作 | 谁执行 | 用户看到 |
+| --- | --- | --- | --- | --- |
+| P1 | 显卡自检失败 / 建会话失败 | 该引擎回 CPU 并记住，直到用户再切开关 | 自动 | 状态行「已回到 CPU：原因」（已有） |
+| P2 | 装载探针失败（DLL / SHA / 版本） | 运行时标不可用，功能链回落下一档 | 自动 | 状态行 + 一次提示 |
+| P3 | 空闲内存 < 模型体积 + 1 GB，或显存不够 | 拒绝载入，不尝试 | 自动 | 提示「内存不够，换标准档或关掉其他程序」 |
+| P4 | 自检 tok/s 低于档位门槛（内置档：生成 < 8 tok/s） | 只建议换档，不切 | 建议 | 装前自测结果页一句话 |
+| P5 | 一次请求停滞 15 s 无 token | 取消该请求，计数 | 自动 | 该次结果显示失败原因 |
+| P6 | 同一引擎连续 3 次停滞或超时 | 本会话标不健康，功能链回落 | 自动 | 状态行「引擎异常，已改用 X」 |
+| P7 | 宿主崩溃 | 重生一次；60 s 内再崩则本会话禁用 | 自动 | 第二次时提示 |
+| P8 | 闲置：LLM 5 分钟、朗读 60 秒无请求 | 卸载模型 / 退出 TTS-only 进程 | 自动 | 无（下次请求多等载入时间） |
+| P9 | 连续 3 个请求 tok/s 低于自检基线一半 | 只记录并显示「性能下降」 | 记录 | 状态行 |
+| P10 | 听译高精度档连续 3 段 RTF > 0.8 | 建议换回标准档，不切 | 建议 | 悬浮窗状态一句话 |
+| P11 | 无痕模式 | 不写 metrics 文件；其余行为不变 | 自动 | 隐私页已说明 |
+| P12 | 离线模式 | 无变化（全本地）；外接端点被现有门挡住 | — | — |
+
+表以外的调整都不做。加一条规则 = 加一行 + 一条单测 + 一句状态行文案。
 
 ## 八、排障
 
@@ -126,6 +171,8 @@ Golden 测试至少覆盖：`llama_context_default_params()` 的 `n_ctx / n_batc
 | 双卡机器速度只有一半 | 层被分到核显 | `devices` 指到独显 |
 | 16 线程比 8 线程慢 | 超线程 | 线程数按物理核 |
 | 宿主反复重生 | 模型或 DLL 与白名单不符、显存不够 | 看装载探针原因；连崩退避后提示用户 |
+| 0xC0000005 且发生在载入或解码期间 | 在 `.async` 调用里用了 JS 回调 | 改成 worker_thread 上的同步调用（第四节） |
+| 设备数组 / token 数组写完就崩 | 用了不存在的 `koffi.encode(ptr, offset, …)` 形式 | 改用 `koffi.array` 一次写入 |
 
 ## 九、换版检查单（复制到 PR 里逐项勾）
 
