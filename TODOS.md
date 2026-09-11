@@ -24,22 +24,18 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 - **写法铁律**：分批写，每批写前核实界面（要截图），不确定就问，做完一批等用户指令再开下一批；先中文后英文
 - 文档精简：README 两份砍到概览 / 功能表 / 安装 / 链接；FAQ 只留排错；ARCHITECTURE 与 DEVELOPMENT 补 T-Engine 砍陈旧；其余四份逐份查过时；之后发版备忘加「每版过一遍说明书」
 
-### 翻译源相关——全部等 v0.5.0 之后再开（用户 2026-09-07 拍板；调研全文 gstack v048-engine-landscape-2026-09-07）
+### 翻译源相关（v0.5.0 已出，可以开了；调研全文 gstack v048-engine-landscape-2026-09-07）
 
 - **DeepL 文案**：2026-07 起 DeepL 停售 API Free / API Pro，新 Developer 计划是一次性 100 万字符不续（老 API Free key 仍可用）。程序里 DeepL 的"免费"引导措辞要改
 - **免费 LLM 预设**：智谱 GLM-4-Flash 永久免费、OpenAI 兼容、无 token 上限只限并发——走 Route A，在 presets-core.js 加一条预设即可，零新代码
 - **国内翻译源候选**：腾讯机器翻译 500 万字/月、火山翻译 200 万字/月 + 100 页文档（程序目前只接了百度 100 万字/月）。Route B 各半天，等有人要再做
-- **本地翻译模型选型（v0.5.0 输入）**：腾讯 **Hy-MT2-1.8B**（2026-05-21）协议已改 **Apache-2.0**（LICENSE.txt 逐条核过，无地域/月活/商用限制），官方 GGUF，33 语含中英日韩粤印，WMT25 超微软与豆包 API，8K 上下文，支持术语/SRT/JSON 提示——下面"内置本地翻译模型"一节的"许可证硬门槛"已不成立，剩"实测速度"一个门槛。与 v0.5.0"单一通用模型"的拍板冲突，开工前重议：翻译专才 + 通才双模型，还是只用通才。轻量替补 NiuTrans LMT-60 0.6B/1.7B（Qwen3 底座，Apache-2.0，中英中心）
+- 本地翻译模型选型已随 v0.5.0 落定：Qwen3-1.7B 默认通才 + Hy-MT2-1.8B 仅翻译进白名单；轻量替补候选 NiuTrans LMT-60 0.6B/1.7B（Qwen3 底座，Apache-2.0，中英中心）留作年度换版时比对
 - 不选：TranslateGemma（Gemma 协议、4B 起）
 
-### 听译逻辑复查（用户 2026-09-08 点名：整个引擎迁移完成后做一次）
+### 听译小项（2026-09-08 复查结论「链不用动」，用户定只记不改；数字与诊断在 gstack v050-listen-review-2026-09-08）
 
-- ✅ 2026-09-08 已跑（报告 gstack v050-listen-review-2026-09-08；harness 入库 scripts/bench-listen.js，数据 bench-data/）：正常电平 en WER 8.99% / zh CER 5.27%（去参考伪差）覆盖 40/40，结论「链不用动」；顺手抓到并修掉一个真崩溃（Qwen3-ASR 吐换行符 → sherpa-onnx JSON 不转义 → 宿主 fatal 重启，`asr-result.js`）；待拍板三个小项：段尾填充词幻觉（裁段尾静音）、AGC 边界只记不改、高精度档数字 ITN。原任务：用 FLEURS 基准与《可不可以》样本重跑一遍数字，对照 gstack v042-accuracy-baseline 与 v048 两份记录，列出该动与不该动的项再拍板；不在迁移过程中顺手改
-
-### 大包分发改成「链接 + 手放」（用户 2026-09-07 拍板：超过 400MB 的包不再上传 Release）
-
-- ✅ 2026-09-08 程序侧已做（MANUAL_PACKS 目录 + 定位器认手放文件夹 + 设置页链接 / 目录 / 重新检测 + build 脚本支持无 zip 的 manual 条目）。原计划：manifest 条目加 `manual`（上游链接 + 目标目录），设置页对这类包显示链接、目录与「已放好，重新检测」代替下载按钮；`electron/utils/asr-models.js` 的定位逻辑要能直接吃上游原始目录（不依赖安装时写的 pack.json），口径沿用"手放模型 = 本机信任"
-- FAQ / README 写清链接与目录，一条一行
+- 段尾填充词幻觉：英文标准档极低电平时定稿末尾偶尔多出 yeah / okay，修法是定稿前裁掉段尾静音；AGC 两个边界（+30 dB 封顶救不了峰值 0.005 的句、40 dB 台阶处慢包络让间隔底噪过门槛）只在 FLEURS 这类极端材料出现；高精度档把数字念成英文单词，可加轻量数词转数字。有真实反馈再动
+- 改听译链必跑 `scripts/bench-listen.js` zh / en 标准档各一次 + `--normalize`，高精度档单跑；结果 JSON 先看 `statusTrail` 有没有中途重启
 
 ### 引擎进 GPU 的后续（v0.4.10 已发 OCR + 朗读；spike 结论在 gstack v049-gpu-research「v0.4.10 调优三连」）
 
@@ -196,7 +192,3 @@ v0.3.4 给 Windows OCR / Azure / Google Vision / OCR.space / 百度 五个引擎
 `tests/unit/` 现有 65 个测试文件、728 用例（selection / stack 五件套 / OCR 坐标 / 语言目录与选择器 / 历史与理解条目 / 段落笔记 / 历史保险库与存储路由 / store 白名单 / 模型包 core 与换包时序 / 听译模型发现与包列表 / 听译声音来源 / TTS 引擎落回 等）。Principle: add tests when you touch a file, new features ship with tests, bug fixes ship with regression tests. Not chasing 100% coverage.
 
 
-### 过滤器把小数当版本号（2026-09-08 内置模型联调时发现，影响所有翻译源，只是小模型更敏感）
-- `src/config/filters.js` 的 `version_number` 正则 `/v?\d+\.\d+.../` 会把 "0.3 seconds" 里的 0.3 换成 `⟦version_number_0⟧`；云端大模型照抄占位符没事，Qwen3-1.7B 在 OCR 模板（"修 l/1/I 混淆"那条指令）下会把这个占位符当成识别错误改掉，还原后变成 "1/1/I"。第二句（版本 ⟦version_number_0⟧ + ⟦url_0⟧）小模型能照抄，只在"小数 + OCR 模板"这一交叉点出问题
-- 候选修法：版本号正则要求 `v` 前缀或三段（x.y.z），或者排除后面紧跟单位词（seconds/ms/%）的小数；改了要跑 tests/unit 里过滤器与 service 的用例，并复跑 `npm run smoke:llm-stack`
-- 已试过给内置模型多加一句「⟦…⟧ 原样照抄」，反而让它整句输出英文——不走提示词路线
