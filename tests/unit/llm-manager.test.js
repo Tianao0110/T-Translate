@@ -239,13 +239,13 @@ describe('the vision slot', () => {
     const { adapter } = boot({ packs: fakePacks({ vision: true }), visionAdapter });
     const r = await manager.recognize({ image: Buffer.from('png') });
     expect((await r.promise).text).toBe('你好');
-    expect(visionAdapter.load).toHaveBeenCalledWith('C:/models/llm-models/V.gguf', { nCtx: 4096, nBatch: 2048, template: 'auto', mmproj: 'C:/models/llm-models/V-mmproj.gguf', visionFamily: 'paddleocr', visionMaxPixels: 0 });
+    expect(visionAdapter.load).toHaveBeenCalledWith('C:/models/llm-models/V.gguf', { nCtx: 4096, nBatch: 2048, template: 'auto', mmproj: 'C:/models/llm-models/V-mmproj.gguf', visionFamily: 'paddleocr' });
     expect(visionAdapter.generate).toHaveBeenCalledWith(expect.objectContaining({ kind: 'ocr', task: 'Spotting' }));
     expect(visionAdapter.generate.mock.calls[0][0].image).toEqual(Buffer.from('png'));
     expect(adapter.load).not.toHaveBeenCalled();
     await (await manager.recognize({ image: Buffer.from('png') })).promise;
     expect(visionAdapter.load).toHaveBeenCalledTimes(1);
-    expect(manager.status().vision).toMatchObject({ available: true, usable: true, pack: { id: 'paddleocr-vl-1.6', status: 'ready' }, resident: { file: 'V.gguf' }, maxPixels: 0, inflight: 0 });
+    expect(manager.status().vision).toMatchObject({ available: true, usable: true, pack: { id: 'paddleocr-vl-1.6', status: 'ready' }, resident: { file: 'V.gguf' }, inflight: 0 });
   });
 
   it('never runs on the CPU: refuses before loading and reports unusable', async () => {
@@ -253,7 +253,7 @@ describe('the vision slot', () => {
     boot({ packs: fakePacks({ vision: true }), visionAdapter });
     await expect(manager.recognize({ image: Buffer.from('a') })).rejects.toMatchObject({ code: 'LLM_VISION_NEEDS_GPU' });
     expect(visionAdapter.load).not.toHaveBeenCalled();
-    expect(manager.status().vision).toMatchObject({ usable: false, provider: 'cpu', maxPixels: manager.CPU_MAX_PIXELS });
+    expect(manager.status().vision).toMatchObject({ usable: false, provider: 'cpu' });
     visionAdapter.setProvider('gpu');
     await (await manager.recognize({ image: Buffer.from('a') })).promise;
     expect(visionAdapter.load).toHaveBeenCalledTimes(1);
@@ -277,7 +277,7 @@ describe('the vision slot', () => {
     boot({ packs: fakePacks({ vision: true }), visionAdapter });
     visionAdapter.setProvider('gpu');
     const r = await manager.visionSelfTest();
-    expect(visionAdapter.health).toHaveBeenCalledWith({ file: 'C:/models/llm-models/V.gguf', options: expect.objectContaining({ mmproj: 'C:/models/llm-models/V-mmproj.gguf', visionMaxPixels: 0 }) });
+    expect(visionAdapter.health).toHaveBeenCalledWith({ file: 'C:/models/llm-models/V.gguf', options: expect.objectContaining({ mmproj: 'C:/models/llm-models/V-mmproj.gguf', visionFamily: 'paddleocr' }) });
     expect(r).toMatchObject({ ok: true, provider: 'webgpu', fallback: null, tokPerSec: 33 });
     expect(manager.status().vision.resident.file).toBe('V.gguf');
   });

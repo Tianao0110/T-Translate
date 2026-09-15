@@ -79,7 +79,7 @@ function loadModel(msg) {
   let vision = null;
   if (options.mmproj) {
     try {
-      vision = mtmd.attachVision(binding, s, { mmproj: options.mmproj, provider: s.provider, family: options.visionFamily || null, abortFlag, maxPixels: options.visionMaxPixels || 0 });
+      vision = mtmd.attachVision(binding, s, { mmproj: options.mmproj, provider: s.provider, family: options.visionFamily || null, abortFlag });
     } catch (e) {
       s.close();
       throw e;

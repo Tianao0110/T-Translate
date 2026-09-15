@@ -684,7 +684,7 @@ const zh = {
       openFolder: "打开模型文件夹",
       rescan: "重新检测",
       needsGpu: "只在显卡加速打开时可用（设置 → 关于 → 显卡加速）",
-      smartHint: "启用后由引擎层分配：简单截图直接走本地 OCR，大图、多栏、表格、字号混杂或本地 OCR 没把握的才交给视觉模型",
+      smartHint: "启用后由程序按截图分配：简单的直接走本地 OCR，大图、多栏、表格、字号混杂或本地 OCR 没把握的才交给视觉模型",
       part: { model: "主模型", mmproj: "图像编码器" },
       state: { ready: "已就绪", missing: "未放入", mismatch: "校验不符" },
       fallbackNotice: "内置视觉模型当前不可用（显卡加速未开或模型文件不在），已改用本地 OCR",

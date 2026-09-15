@@ -684,7 +684,7 @@ const en = {
       openFolder: "Open model folder",
       rescan: "Re-detect",
       needsGpu: "Available only while GPU acceleration is on (Settings → About → GPU acceleration)",
-      smartHint: "Once enabled the engine layer decides: simple captures go straight to Local OCR; only large captures, columns, tables, mixed font sizes or reads Local OCR is unsure of go to the vision model",
+      smartHint: "Once enabled the app decides per capture: simple ones go straight to Local OCR; only large captures, columns, tables, mixed font sizes or reads Local OCR is unsure of go to the vision model",
       part: { model: "Model", mmproj: "Image encoder" },
       state: { ready: "Ready", missing: "Not present", mismatch: "Hash mismatch" },
       fallbackNotice: "The built-in vision model is not available right now (GPU acceleration off or model files missing); Local OCR handled it",

@@ -14,6 +14,8 @@ T-Engine 只做三件事：**装载运行时、监控引擎、报告事实**。
 
 信号与策略的分工，用一句话记：**T-Engine 说"我现在这样"，主程序说"那就这么办"**。
 
+一个容易走偏的例子（2026-09-14 用户纠正）：内置视觉模型什么时候接活——简单截图走 PP-OCR、大图 / 多栏 / 表格才升级、显卡关着就不用——全是**程序本体**的判断，落在 `src/stack/ocr/vision-routing.js` 与 `managers/llm-manager.js`；T-Engine 的视觉槽只负责「给它一张图，读出来」，运行时里不放尺寸上限、不放路由规则。
+
 反过来也成立：**引擎状态的检测、自检、看门狗、崩溃计数这些"专业的事"全部归 T-Engine**，主程序里不再自己判断引擎好不好，只读 T-Engine 回的数据。现有代码里散在各处的检测逻辑按下表移交（2026-09-08 拍板）：
 
 | 现在在哪 | 做什么 | 移到 T-Engine 的哪一层 | 主程序留下什么 |
@@ -49,7 +51,7 @@ electron/tengine/
   metrics-log.js       事件流落盘：data\logs\tengine-<日期>.jsonl，留 3 份，无痕不写，内容键一律剥掉
   trial-log.js         试用日志：data\logs\tengine-trial-<模型>-<月>.jsonl，两个月清理，文本只在开关后写；summarize 出试用报告
 electron/services/llm-host/llm-host.js     LLM utilityProcess：进程内一条 worker_thread 跑 runtime，主线程转发、排队、持取消标志、跑停滞看门狗
-electron/managers/llm-manager.js           主进程侧决策：选文件（白名单 / 开发者门）、驻留与 5 分钟闲置卸载（P8）、显卡开关自检、试用日志；视觉槽（recognize / unloadVision / visionSelfTest）有自己的驻留、闲置计时与策略实例，CPU 后端按 CPU_MAX_PIXELS 限图
+electron/managers/llm-manager.js           主进程侧决策：选文件（白名单 / 开发者门）、驻留与 5 分钟闲置卸载（P8）、显卡开关自检、试用日志；视觉槽（recognize / unloadVision / visionSelfTest）有自己的驻留、闲置计时与策略实例；只在显卡上接活（`usable`），这是主程序的决定
 electron/managers/llm-pack-manager.js      模型文件夹扫描：同名同大小才哈希（缓存 size+mtime），哈希对上才 ready，其余列为未列入；双文件包（模型 + mmproj）逐文件核对，全对才 ready，缺一个 partial、错一个 mismatch
 electron/ipc/llm.js                        llm:* 通道：状态、重扫、开文件夹、卸载、探针、试用报告；不过文本
 src/stack/ocr/tengine-vision.js            OCR 引擎「内置视觉模型」：经 runtime.localLlm.recognize 到视觉槽，一律 Spotting，行框按 blocks.js 契约给像素坐标；默认顺序第 3 位；只在视觉槽在显卡上时可用（visionStatus().usable）

@@ -78,10 +78,9 @@ function parseSpotting(output, width, height) {
 
 // Loads the mmproj next to an open text session. warmup runs the encoder
 // once on a dummy image, which is where a GPU pays its shader compile.
-// maxPixels (0 = none) refuses larger images before the encoder runs: on a
-// CPU the encoder costs about a second per 0.1 MP, so the caller caps it
-// and lets the OCR chain fall through to the next engine.
-function attachVision(binding, session, { mmproj, provider = 'cpu', family = null, abortFlag = null, maxPixels = 0 } = {}) {
+// Whether an image should come here at all (backend, size, layout) is the
+// program's decision, made before the request; this reads what it is given.
+function attachVision(binding, session, { mmproj, provider = 'cpu', family = null, abortFlag = null } = {}) {
   const { koffi, f } = binding;
   const h = session.handles();
   const params = f.mtmdParamsDefault();
@@ -114,10 +113,6 @@ function attachVision(binding, session, { mmproj, provider = 'cpu', family = nul
     if (!wrap.bitmap) throw fail('LLM_BAD_IMAGE', 'the image could not be decoded');
     const width = f.mtmdBitmapNx(wrap.bitmap);
     const height = f.mtmdBitmapNy(wrap.bitmap);
-    if (maxPixels > 0 && width * height > maxPixels) {
-      f.mtmdBitmapFree(wrap.bitmap);
-      throw fail('LLM_IMAGE_TOO_LARGE', `${width}x${height} exceeds ${maxPixels} pixels on this backend`);
-    }
     const chunks = f.mtmdChunksInit();
     try {
       const prompt = renderVisionPrompt(visionFamily, marker, task);

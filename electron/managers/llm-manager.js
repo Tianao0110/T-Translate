@@ -25,11 +25,6 @@ const KEY_TRIAL_TEXT = 'settings.llm.trialLogText';
 const KEY_PACK = 'settings.llm.pack';
 const UNLISTED_PREFIX = 'unlisted:';
 const TRIAL_EVENT_KINDS = new Set(['model-loaded', 'model-load-failed', 'request-failed', 'stall', 'health', 'exit']);
-// On the CPU the image encoder costs about a second per 0.1 MP (measured
-// 2026-09-14); above this the OCR chain does better with the next engine.
-// The GPU takes any size.
-const CPU_MAX_PIXELS = 300000;
-
 let deps = null;
 let resident = null; // { path, provider } as requested at load time
 let trial = null; // trial log of the resident unlisted model
@@ -236,7 +231,6 @@ function visionLoadOptions(target) {
     template: 'auto',
     mmproj: target.mmproj,
     visionFamily: pack ? pack.visionFamily || null : null,
-    visionMaxPixels: deps.visionAdapter.provider() === 'gpu' ? 0 : CPU_MAX_PIXELS,
   };
 }
 
@@ -310,7 +304,6 @@ function visionStatus() {
     provider: a.provider(),
     // What the OCR chain and the settings card go by: pack ready and GPU on.
     usable: !!(row && row.status === 'ready' && a.provider() === 'gpu'),
-    maxPixels: a.provider() === 'gpu' ? 0 : CPU_MAX_PIXELS,
     resident: loaded ? { file: path.basename(loaded.file), provider: loaded.provider, device: loaded.device ? loaded.device.name : null, fallback: loaded.fallback } : null,
     inflight: visionInflight,
     lastHealth: a.status().lastHealth,
@@ -443,7 +436,6 @@ module.exports = {
   dir: () => deps.packs.dir(),
   reset,
   IDLE_UNLOAD_MS,
-  CPU_MAX_PIXELS,
   KEY_ALLOW_UNLISTED,
   KEY_TRIAL_TEXT,
   KEY_PACK,
