@@ -10,7 +10,7 @@ import path from 'path';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
-const appPaths = require('../../electron/utils/app-paths.js');
+const appPaths = require('../../electron/platform/app-paths.js');
 const { applyAppPaths, resolveAppPaths, legacyUserData, isRelocated } = appPaths;
 
 let base;

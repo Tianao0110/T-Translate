@@ -4,11 +4,11 @@ const { ipcMain, dialog, shell } = require("electron");
 const fs = require("fs").promises;
 const path = require("path");
 const { CHANNELS } = require("../shared/channels");
-const createLogger = require("../utils/logger");
+const createLogger = require("../platform/logger");
 const logger = createLogger("IPC:System");
 const { t } = require("../shared/main-i18n");
-const { isOfflineMode } = require("../utils/privacy-gate");
-const { syncLoginItem } = require("../utils/login-item");
+const { isOfflineMode } = require("../security/privacy-gate");
+const { syncLoginItem } = require("../platform/login-item");
 
 // Must match MAX_FILE_SIZE in src/utils/document-parser.js: the parser refuses
 // anything larger anyway, so a higher cap here would only read the whole file
@@ -124,7 +124,7 @@ function register(ctx) {
 
   // ===== Auto update =====
 
-  const autoUpdater = require('../utils/auto-updater');
+  const autoUpdater = require('../platform/auto-updater');
 
   // IPC doesn't stream — track download state here and poll/push via separate channel.
   let _downloadProgress = null;
@@ -269,7 +269,7 @@ function register(ctx) {
   });
 
   ipcMain.handle(CHANNELS.LOGS.OPEN_DIRECTORY, async () => {
-    const { getLogDirectory } = require('../utils/logger');
+    const { getLogDirectory } = require('../platform/logger');
     const logDir = getLogDirectory();
 
     if (logDir) {
@@ -302,7 +302,7 @@ function register(ctx) {
     }
 
     try {
-      const { getLogDirectory } = require('../utils/logger');
+      const { getLogDirectory } = require('../platform/logger');
       const logDir = getLogDirectory();
       if (logDir && fs.existsSync(logDir)) {
         for (const file of fs.readdirSync(logDir)) {
@@ -339,7 +339,7 @@ function register(ctx) {
   });
 
   // Retire the pre-v0.3.7 Run entry name once, and keep the current-name
-  // entry in line with the stored preference (see utils/login-item.js).
+  // entry in line with the stored preference (see platform/login-item.js).
   syncLoginItem({ app, store })
     .then((r) => {
       if (r.legacyRemoved) logger.info('Legacy auto launch entry retired');

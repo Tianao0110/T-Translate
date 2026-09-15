@@ -5,10 +5,10 @@
 
 const { ipcMain } = require('electron');
 const { CHANNELS, PRIVACY_MODES } = require('../shared/channels');
-const { dataDir } = require('../utils/data-root');
+const { dataDir } = require('../platform/data-root');
 const tengine = require('../tengine');
 const { createMetricsLog } = require('../tengine/metrics-log');
-const logger = require('../utils/logger')('IPC:TEngine');
+const logger = require('../platform/logger')('IPC:TEngine');
 
 function register(ctx) {
   const engine = tengine.get();

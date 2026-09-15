@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
-const { pruneRetiredSettings, RETIRED_SETTINGS_KEYS } = require('../../electron/utils/store-cleanup.js');
+const { pruneRetiredSettings, RETIRED_SETTINGS_KEYS } = require('../../electron/platform/store-cleanup.js');
 
 function fakeStore(entries) {
   const map = new Map(Object.entries(entries));

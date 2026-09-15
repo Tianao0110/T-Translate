@@ -6,7 +6,7 @@
 const path = require('path');
 const { net } = require('electron');
 const { store } = require('../state');
-const { isOfflineMode } = require('../utils/privacy-gate');
+const { isOfflineMode } = require('../security/privacy-gate');
 const { computePackList, ASR_TYPES } = require('../shared/audio-packs');
 const { listInstalledPacks } = require('./asr-models');
 const { modelDir, modelDirs } = require('../packs/model-root');

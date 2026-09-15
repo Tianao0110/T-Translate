@@ -28,11 +28,11 @@ const { CHANNELS, PRIVACY_MODES } = require('../shared/channels');
 const { locateAsrModels } = require('./asr-models');
 const { listVoicePacks } = require('../tts/tts-models');
 const { modelDir, modelDirs } = require('../packs/model-root');
-const { dataDir } = require('../utils/data-root');
+const { dataDir } = require('../platform/data-root');
 const { createListenAutosave } = require('./listen-autosave');
 const { createListenTranslator } = require('./listen-translator');
 const tengine = require('../tengine');
-const logger = require('../utils/logger')('AudioEngine');
+const logger = require('../platform/logger')('AudioEngine');
 
 const STOP_GRACE_MS = 3000;
 const TTS_SPAWN_TIMEOUT_MS = 30000;

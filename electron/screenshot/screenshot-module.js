@@ -354,6 +354,7 @@ module.exports = {
   setScreenshotWindow,
   captureWithNodeScreenshots,
   captureWithDesktopCapturer,
+  cropFromDesktopCapturer,
   processSelection,
   isNodeScreenshotsAvailable,
 

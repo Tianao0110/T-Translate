@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { safeStorage } from '../mocks/electron.js';
 
-const { createSecureVault } = await import('../../electron/utils/secure-vault.js');
+const { createSecureVault } = await import('../../electron/security/secure-vault.js');
 const { _audit } = await import('../../electron/ipc/secure-storage.js');
 
 const b64enc = (plain) => Buffer.from(`enc:${plain}`, 'utf8').toString('base64');

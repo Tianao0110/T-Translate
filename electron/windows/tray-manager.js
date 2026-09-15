@@ -4,7 +4,7 @@ const { Tray, Menu, nativeImage, app } = require('electron');
 const path = require('path');
 const { store, runtime } = require('../state');
 const PATHS = require('../shared/paths');
-const logger = require('../utils/logger')('Tray');
+const logger = require('../platform/logger')('Tray');
 const { t, setLanguage, getLanguage } = require('../shared/tray-labels');
 
 let tray = null;

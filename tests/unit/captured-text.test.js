@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
-const { normalizeCapturedText } = require('../../electron/utils/captured-text.js');
+const { normalizeCapturedText } = require('../../electron/selection/captured-text.js');
 
 describe('normalizeCapturedText', () => {
   it('turns Windows line endings into plain newlines', () => {

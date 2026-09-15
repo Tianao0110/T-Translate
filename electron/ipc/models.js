@@ -8,11 +8,11 @@ const fs = require('fs');
 const path = require('path');
 const { ipcMain, shell, app } = require('electron');
 const { CHANNELS } = require('../shared/channels');
-const logger = require('../utils/logger')('IPC:Models');
+const logger = require('../platform/logger')('IPC:Models');
 const modelRoot = require('../packs/model-root');
 const { scanLegacy, migrateLegacy } = require('../packs/model-migrate');
-const { legacyUserData, isRelocated } = require('../utils/app-paths');
-const { dataRoot } = require('../utils/data-root');
+const { legacyUserData, isRelocated } = require('../platform/app-paths');
+const { dataRoot } = require('../platform/data-root');
 const audioEngine = require('../listen/audio-engine-manager');
 const ocrEngine = require('../ocr/ocr-engine');
 

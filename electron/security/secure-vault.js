@@ -6,7 +6,7 @@
 // the audit trail (bulk context, so no false alarms).
 
 const { auditAccess } = require('./secure-audit');
-const logger = require('./logger')('SecureVault');
+const logger = require('../platform/logger')('SecureVault');
 
 // Flat settings.ocr field names of all secret values. Mirror of
 // OCR_SECRET_FIELDS in src/utils/ocr-key-vault.js (renderer encrypt side) —

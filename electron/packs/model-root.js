@@ -14,8 +14,8 @@
 
 const path = require('path');
 const { app } = require('electron');
-const { isWritable, legacyUserData } = require('../utils/app-paths');
-const logger = require('../utils/logger')('ModelRoot');
+const { isWritable, legacyUserData } = require('../platform/app-paths');
+const logger = require('../platform/logger')('ModelRoot');
 
 let _cached = null;
 

@@ -17,7 +17,7 @@
 const { ipcMain } = require('electron');
 const { CHANNELS } = require('../shared/channels');
 const tengine = require('../tengine');
-const logger = require('../utils/logger')('IPC:GPU');
+const logger = require('../platform/logger')('IPC:GPU');
 const ocrEngine = require('../ocr/ocr-engine');
 const audioEngine = require('../listen/audio-engine-manager');
 const llmManager = require('../llm/llm-manager');

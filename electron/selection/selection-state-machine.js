@@ -1,6 +1,6 @@
 // Selection state machine — kinematic detection of intentional text-selection gestures.
 
-const logger = require('./logger')('SelectionSM');
+const logger = require('../platform/logger')('SelectionSM');
 
 // ===== Constants =====
 

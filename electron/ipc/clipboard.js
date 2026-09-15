@@ -2,7 +2,7 @@
 
 const { ipcMain, clipboard } = require('electron');
 const { CHANNELS } = require('../shared/channels');
-const logger = require('../utils/logger')('IPC:Clipboard');
+const logger = require('../platform/logger')('IPC:Clipboard');
 
 function register(ctx) {
   // ===== Text =====

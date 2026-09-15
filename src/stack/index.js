@@ -7,7 +7,7 @@
 //   fetch               REQUIRED. electron net.fetch — Node's global fetch
 //                       bypasses the system proxy / enterprise certs (design R1).
 //   getLanguage         () => 'zh' | 'en', for provider error messages.
-//   loggerFactory       (scope) => logger, e.g. electron/utils/logger.js.
+//   loggerFactory       (scope) => logger, e.g. electron/platform/logger.js.
 //   loadProviderConfigs async () => ({ list, configs }) with decrypted configs
 //                       (main process owns decryption via secureVault).
 //   loadOcrConfigs      async () => flat settings.ocr bucket with vault

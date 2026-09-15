@@ -6,11 +6,11 @@
 const { ipcMain, shell } = require('electron');
 const { CHANNELS } = require('../shared/channels');
 const { LLM_MODELS_DIR } = require('../shared/llm-packs');
-const { dataDir } = require('../utils/data-root');
+const { dataDir } = require('../platform/data-root');
 const { modelDir } = require('../packs/model-root');
 const tengine = require('../tengine');
 const llmManager = require('../llm/llm-manager');
-const logger = require('../utils/logger')('IPC:LLM');
+const logger = require('../platform/logger')('IPC:LLM');
 
 function register(ctx) {
   const engine = tengine.get();

@@ -2,8 +2,8 @@
 
 const { ipcMain } = require('electron');
 const { CHANNELS, PRIVACY_MODES } = require('../shared/channels');
-const { setSecureFileLogging } = require('../utils/logger');
-const logger = require('../utils/logger')('IPC:Privacy');
+const { setSecureFileLogging } = require('../platform/logger');
+const logger = require('../platform/logger')('IPC:Privacy');
 
 function register(ctx) {
   const { store } = ctx;

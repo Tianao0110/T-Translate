@@ -14,7 +14,7 @@ T-Engine 只做三件事：**装载运行时、监控引擎、报告事实**。
 
 信号与策略的分工，用一句话记：**T-Engine 说"我现在这样"，主程序说"那就这么办"**。
 
-一个容易走偏的例子（2026-09-14 用户纠正）：内置视觉模型什么时候接活——简单截图走 PP-OCR、大图 / 多栏 / 表格才升级、显卡关着就不用——全是**程序本体**的判断，落在 `src/stack/ocr/vision-routing.js` 与 `managers/llm-manager.js`；T-Engine 的视觉槽只负责「给它一张图，读出来」，运行时里不放尺寸上限、不放路由规则。
+一个容易走偏的例子（2026-09-14 用户纠正）：内置视觉模型什么时候接活——简单截图走 PP-OCR、大图 / 多栏 / 表格才升级、显卡关着就不用——全是**程序本体**的判断，落在 `src/stack/ocr/vision-routing.js` 与 `llm/llm-manager.js`；T-Engine 的视觉槽只负责「给它一张图，读出来」，运行时里不放尺寸上限、不放路由规则。
 
 反过来也成立：**引擎状态的检测、自检、看门狗、崩溃计数这些"专业的事"全部归 T-Engine**，主程序里不再自己判断引擎好不好，只读 T-Engine 回的数据。现有代码里散在各处的检测逻辑按下表移交（2026-09-08 拍板）：
 
@@ -22,13 +22,13 @@ T-Engine 只做三件事：**装载运行时、监控引擎、报告事实**。
 | --- | --- | --- | --- |
 | `ipc/gpu.js` DRIVERS | 逐引擎自检（OCR host 建会话、朗读载入+热身）、回退原因 | `registry` + 各引擎适配器的 `health()` / `setProvider()`（已做：OCR 与朗读都经 `tengine.setProvider`，自检由适配器执行） | 开关的确认框、状态卡的渲染、存 `settings.gpu.enabled`、朗读自检选哪个语音包 |
 | `managers/ocr-host-manager.js` | 拉起、就绪、请求配对、崩溃重生、连崩退避 | `host-manager.js`（通用框架）（已做，文件删除） | 无（整个换底） |
-| `managers/audio-engine-manager.js` | 就绪超时、一次性崩溃重启、TTS 闲置卸载、stderr 抓回退标记、TTS 自检 | `host-manager.js` + `engines/audio.js`（已做：进程、模型载入计时、退出分类 model-load / session / idle、provider 与 stderr 回退标记、自检载入等待）；一次性重启与 TTS 闲置卸载是会话策略，留 manager | 会话语义：来源、语言、档位、字幕事件转发、重启一次、闲置 60 s |
+| `listen/audio-engine-manager.js` | 就绪超时、一次性崩溃重启、TTS 闲置卸载、stderr 抓回退标记、TTS 自检 | `host-manager.js` + `engines/audio.js`（已做：进程、模型载入计时、退出分类 model-load / session / idle、provider 与 stderr 回退标记、自检载入等待）；一次性重启与 TTS 闲置卸载是会话策略，留 manager | 会话语义：来源、语言、档位、字幕事件转发、重启一次、闲置 60 s |
 | `ipc/ocr.js` HEALTH_CHECK | 深度健康检查 | `health()` | IPC 转发 |
 | `audio-worker.js` 看门狗（有声无字、停滞） | 产生信号 | 不动（信号在 worker 里产生），分类归 T-Engine | 策略表 P5/P6/P10 |
 | 各包管理器 | 包在不在、下载 | 不动（数据层） | 不动 |
 | 渲染端 `listen.available` 等状态 | 从多处拼出"能不能用" | 改为读 `tengine:status` 一份快照 | 只显示 |
 
-第 2 步（2026-09-08）已做：听译的翻译、逐句记录、结束时的字幕文件搬进主进程 `managers/listen-translator.js`，悬浮窗只发目标语言、只画结果；这是"跳步骤"里唯一值得做的一条。
+第 2 步（2026-09-08）已做：听译的翻译、逐句记录、结束时的字幕文件搬进主进程 `listen/listen-translator.js`，悬浮窗只发目标语言、只画结果；这是"跳步骤"里唯一值得做的一条。
 
 移交后主程序与 T-Engine 之间只有两条线：`tengine:status`（快照，随时可拉）和 `tengine:event`（信号流）；主程序里放策略表的实现（`electron/policy/engine-policy.js`），按第七节的表把信号变成动作。
 
@@ -210,7 +210,7 @@ Golden 测试至少覆盖：三个 `*_default_params()` 与 `mtmd_context_params
 
 表以外的调整都不做。加一条规则 = 加一行 + 一条单测 + 一句状态行文案。
 
-落码位置（2026-09-08）：内置模型这一列的 P4 / P5 / P6 / P9 / P13 在 `electron/policy/engine-policy.js`（纯函数，`observe(event)` 进、动作出，`tests/unit/engine-policy.test.js` 逐条守着），`managers/llm-manager.js` 喂事件并执行——P6 让 `generate()` 抛 `LLM_UNHEALTHY`，栈里的内置源据此让位给下一个源，宿主重启或换模型后自动恢复；P8 闲置卸载在 manager 本身；P1 / P2 / P3 / P7 在适配器与宿主框架；P10 / P11 / P12 在听译 manager 与 metrics-log。
+落码位置（2026-09-08）：内置模型这一列的 P4 / P5 / P6 / P9 / P13 在 `electron/policy/engine-policy.js`（纯函数，`observe(event)` 进、动作出，`tests/unit/engine-policy.test.js` 逐条守着），`llm/llm-manager.js` 喂事件并执行——P6 让 `generate()` 抛 `LLM_UNHEALTHY`，栈里的内置源据此让位给下一个源，宿主重启或换模型后自动恢复；P8 闲置卸载在 manager 本身；P1 / P2 / P3 / P7 在适配器与宿主框架；P10 / P11 / P12 在听译 manager 与 metrics-log。
 
 ## 八、排障
 

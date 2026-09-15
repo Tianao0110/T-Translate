@@ -9,8 +9,8 @@
 //     the text instead of firing a second redundant Ctrl+C.
 
 const { clipboard } = require('electron');
-const { simulateCtrlC } = require('./native-helper');
-const logger = require('./logger')('ClipboardCapture');
+const { simulateCtrlC } = require('../platform/native-helper');
+const logger = require('../platform/logger')('ClipboardCapture');
 const { normalizeCapturedText } = require('./captured-text');
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

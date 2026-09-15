@@ -1,4 +1,4 @@
-// Renderer-side scoped logger. Mirrors the API of electron/utils/logger.js.
+// Renderer-side scoped logger. Mirrors the API of electron/platform/logger.js.
 
 const LOG_LEVELS = {
   DEBUG: 0,

@@ -32,18 +32,25 @@ t-translate/
 │   └── THEME_CUSTOMIZATION.md  # 主题定制
 │
 ├── electron/                   # 主进程代码
-│   ├── main.js                 # 主进程入口
+│   ├── main.js                 # 主进程入口（只做生命周期与接线）
 │   ├── state.js                # 全局状态 (store, runtime, windows)
-│   ├── screenshot-module.js    # 截图核心逻辑
 │   ├── generated/              # esbuild 产物 translation-stack.cjs（gitignore，构建时生成）
 │   ├── preloads/               # Preload 脚本 (每个窗口一个)
-│   ├── shared/                 # 主/渲染进程共享常量
-│   ├── ipc/                    # IPC 处理器 (按功能拆分，translation-stack.js 为栈 facade，history-vault.js 为历史加密库)
-│   ├── managers/               # 窗口/托盘/菜单管理器 + audio-engine-manager（听译 ASR 子进程）
-│   ├── services/audio-engine/  # 听译 worker（utilityProcess 内跑 VAD+ASR，见「听译引擎与驻留口径」）
-│   └── utils/                  # 工具函数（secure-vault/secure-audit/history-vault/ocr-engine/
-│                               #   model-root=模型根目录解析 / model-pack-core=模型包下载安装工厂 +
-│                               #   ocr-pack-manager、audio-pack-manager 两个实例）
+│   ├── shared/                 # 主/渲染进程共享常量与模型包目录
+│   ├── ipc/                    # IPC 处理器 (按功能拆分，translation-stack.js 为栈 facade)
+│   ├── windows/                # 窗口 / 菜单 / 托盘管理器
+│   ├── selection/              # 划词翻译：controller（鼠标钩子、三层探测、图标/直达两条路）、手势状态机、剪贴板抓取
+│   ├── screenshot/             # 截图 OCR：flow（截屏→框选→裁剪→交接）、screenshot-module（多屏截取与裁剪）
+│   ├── listen/                 # 听译：audio-engine-manager（ASR 子进程会话）、listen-translator、自动保存、模型表、音频包、WASAPI 抓音
+│   ├── tts/                    # 朗读：音色表与语音包
+│   ├── ocr/                    # 本地 OCR：ocr-engine、Windows OCR、OCR 模型包
+│   ├── llm/                    # 内置模型：llm-manager（文本槽 + 视觉槽）、模型包扫描
+│   ├── packs/                  # 模型包公共层：model-pack-core（下载安装工厂）、model-root、旧目录迁移
+│   ├── security/               # secure-vault / secure-audit / history-vault / privacy-gate / url-policy
+│   ├── platform/               # 数据目录、日志、崩溃守卫、开机自启、右键打开、更新器、Win32 与多屏辅助
+│   ├── policy/                 # engine-policy：内置模型健康 / 驻留策略的纯函数
+│   ├── tengine/                # T-Engine：引擎适配层与 llama.cpp 运行时绑定（见 T-ENGINE.md）
+│   └── services/               # 各引擎的 utilityProcess 宿主（audio-engine / ocr-host / llm-host）
 │
 ├── src/                        # 渲染进程代码
 │   ├── main.jsx                # 应用入口
@@ -180,7 +187,7 @@ t-translate/
                                  ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                      Electron Main Process                      │
-│  main.js → ipc/*（translation-stack.js facade）→ managers/*     │
+│  main.js → ipc/*（translation-stack.js facade）→ 各功能目录     │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -232,7 +239,7 @@ hooks/use-ai-actions        三个窗口共用：能力探测、可用动作、�
 ### 稳定性与系统集成（v0.3.7）
 
 ```
-electron/utils/crash-guard.js   崩溃自愈：渲染进程异常退出限次自动重载（3 分钟
+electron/platform/crash-guard.js   崩溃自愈：渲染进程异常退出限次自动重载（3 分钟
                                 窗口内 3 次；clean-exit/killed 不触发）+ 启动哨兵
                                 （连续 3 次未撑过 60s 稳定窗口 → 安全模式：禁硬件
                                 加速、跳过原生模块预热）。依赖注入、零 electron
@@ -240,7 +247,7 @@ electron/utils/crash-guard.js   崩溃自愈：渲染进程异常退出限次自
 src/utils/migration-pack.js     迁移包 build/parse 纯函数。导出读 electron-store
                                 存储态（设置页内存态含解密后的 OCR 密钥，绝不可
                                 导）；两端都过 stripSecrets + 结构白名单
-electron/utils/open-with.js     右键菜单 argv 解析（.pdf/.docx/.txt 白名单）。
+electron/platform/open-with.js     右键菜单 argv 解析（.pdf/.docx/.txt 白名单）。
                                 冷启动走 process.argv，热启动走 second-instance
                                 转发；路径只在主进程暂存，渲染端单一 invoke 取
                                 文件内容——无任意路径读取面。注册表项由
@@ -251,7 +258,7 @@ electron/utils/open-with.js     右键菜单 argv 解析（.pdf/.docx/.txt 白�
 
 ```
 electron/listen/audio-engine-manager.js  听译会话与神经 TTS 的会话语义（来源 / 语言 / 档位 / 字幕事件转发 / 一次性重启策略）；进程本身归 T-Engine 的音频适配器（v0.5.0）
-electron/listen/listen-translator.js     听译的翻译、逐句记录与会话结束时的字幕文件（v0.5.0 从悬浮窗搬入）：定稿编号、带上文的系统提示（utils/listen-prompt.js）、流式译文经 audio-engine:translation 推给窗口、结束时等在途翻译 3 s 再落盘
+electron/listen/listen-translator.js     听译的翻译、逐句记录与会话结束时的字幕文件（v0.5.0 从悬浮窗搬入）：定稿编号、带上文的系统提示（listen/listen-prompt.js）、流式译文经 audio-engine:translation 推给窗口、结束时等在途翻译 3 s 再落盘
 electron/tengine/engines/audio.js          音频宿主适配器：进程生命周期、模型载入计时、退出分类（model-load / session / idle）、provider 与 sherpa 的 stderr 回退标记、朗读自检；manager 订阅它转发的 worker 消息
 electron/tengine/                          T-Engine 引擎层（v0.5.0 第 1 步）：host-manager.js 通用宿主框架（按需拉起、请求配对、崩溃重生、连崩退避、事件流、状态快照）、registry.js 引擎表、engines/ocr.js OCR 引擎适配器（持有 OCR 宿主，provider / health / status）、index.js 门面（status() 快照 + on() 事件流）；手册见 docs/T-ENGINE.md
 electron/ipc/tengine.js                    tengine:status 快照与 tengine:event 转发；宿主生命周期事件在这里进 app 日志
@@ -282,9 +289,9 @@ scripts/fetch-llama-runtime.js             按清单下载官方 llama.cpp Vulka
 native/sherpa-onnx-webgpu/                 带 webgpu provider 的 sherpa-onnx DLL + 补丁 + 构建配方；scripts/overlay-sherpa-runtime.js 在 postinstall / 打包前覆盖进 npm 包
 electron/services/audio-engine/audio-worker.js  识别模型、音频捕获、语音合成都在这个子进程里
 electron/listen/win-audio-capture.js        WASAPI 捕获（koffi，v0.4.1）
-electron/utils/app-paths.js                启动最早期定 userData（安装目录 data，不可写则留用户目录）、Chromium 存储收进 browser、一次性搬迁（v0.4.7）
+electron/platform/app-paths.js                启动最早期定 userData（安装目录 data，不可写则留用户目录）、Chromium 存储收进 browser、一次性搬迁（v0.4.7）
 electron/packs/model-root.js               模型根目录解析（安装目录优先）
-electron/utils/data-root.js                数据根目录 = userData（翻译缓存、日志等非模型文件）
+electron/platform/data-root.js                数据根目录 = userData（翻译缓存、日志等非模型文件）
 electron/packs/model-migrate.js            老用户目录模型搬迁（复制、校验、再删）
 electron/listen/audio-pack-manager.js       识别模型包下载/卸载（工厂第二实例，asr-models）
 electron/tts/tts-pack-manager.js         语音包下载/卸载（工厂第三实例，tts-models，v0.4.2）

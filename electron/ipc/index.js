@@ -1,7 +1,7 @@
 ﻿// IPC unified registry — dependency injection root.
 // All IPC handlers register here; submodules never `require` the parent (avoids cycles).
 
-const logger = require('../utils/logger')('IPC');
+const logger = require('../platform/logger')('IPC');
 
 const registerSystemIPC = require('./system');
 const registerStoreIPC = require('./store');
@@ -59,7 +59,7 @@ function initIPC(deps) {
     // Platform modules are dependencies like any other here — submodules that
     // take them from ctx stay loadable (and testable) outside a real Electron.
     electron: require('electron'),
-    displayHelper: require('../utils/display-helper'),
+    displayHelper: require('../platform/display-helper'),
     // Managers passed in (avoids circular dep on window-manager).
     managers: deps.managers || {},
   };

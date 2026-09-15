@@ -9,7 +9,7 @@ import {
   STARTUP_STABLE_MS,
   RENDERER_CRASH_WINDOW_MS,
   MAX_RENDERER_RELOADS,
-} from '../../electron/utils/crash-guard.js';
+} from '../../electron/platform/crash-guard.js';
 
 function makeStore(seed = {}) {
   const data = new Map(Object.entries(seed));

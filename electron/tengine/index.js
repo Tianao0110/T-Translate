@@ -86,7 +86,7 @@ let _default = null;
 function get() {
   if (_default) return _default;
   const { utilityProcess } = require('electron');
-  const createLogger = require('../utils/logger');
+  const createLogger = require('../platform/logger');
   const logger = createLogger('T-Engine');
   const tengine = createTengine({ logger });
   const fork = (file, args, opts) => utilityProcess.fork(file, args, opts);

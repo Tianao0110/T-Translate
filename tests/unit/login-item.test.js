@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
-const { syncLoginItem, LEGACY_RUN_NAME, RUN_KEY, APPROVED_KEY } = require('../../electron/utils/login-item.js');
+const { syncLoginItem, LEGACY_RUN_NAME, RUN_KEY, APPROVED_KEY } = require('../../electron/platform/login-item.js');
 
 function fakeReg({ legacyPresent }) {
   const calls = [];

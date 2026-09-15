@@ -4,8 +4,8 @@
 const { BrowserWindow, shell } = require('electron');
 const path = require('path');
 const PATHS = require('../shared/paths');
-const displayHelper = require('../utils/display-helper');
-const { isInternalUrl, mayOpenExternally } = require('../utils/url-policy');
+const displayHelper = require('../platform/display-helper');
+const { isInternalUrl, mayOpenExternally } = require('../security/url-policy');
 
 let store = null;
 let runtime = null;

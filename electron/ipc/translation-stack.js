@@ -15,12 +15,12 @@
 
 const { ipcMain, net, BrowserWindow } = require('electron');
 const path = require('path');
-const { dataDir } = require('../utils/data-root');
+const { dataDir } = require('../platform/data-root');
 const crypto = require('crypto');
 const { CHANNELS } = require('../shared/channels');
-const { createSecureVault } = require('../utils/secure-vault');
+const { createSecureVault } = require('../security/secure-vault');
 const llmManager = require('../llm/llm-manager');
-const makeLogger = require('../utils/logger');
+const makeLogger = require('../platform/logger');
 const logger = makeLogger('IPC:Stack');
 
 // In-flight requests (one-shot and streams alike). Swept so an entry can never

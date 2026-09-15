@@ -3,7 +3,7 @@
 const { ipcMain, globalShortcut } = require('electron');
 const { CHANNELS } = require('../shared/channels');
 const { isAllowedGlobalShortcut } = require('../shared/shortcut-rules');
-const logger = require('../utils/logger')('IPC:Shortcuts');
+const logger = require('../platform/logger')('IPC:Shortcuts');
 const { t } = require('../shared/main-i18n');
 
 const DEFAULT_SHORTCUTS = {

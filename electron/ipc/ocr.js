@@ -6,7 +6,7 @@ const { ipcMain } = require('electron');
 
 const { CHANNELS } = require('../shared/channels');
 const { BASE_PACK_ID } = require('../shared/ocr-packs');
-const logger = require('../utils/logger')('IPC:OCR');
+const logger = require('../platform/logger')('IPC:OCR');
 const { t } = require('../shared/main-i18n');
 const ocrEngine = require('../ocr/ocr-engine');
 const packManager = require('../ocr/ocr-pack-manager');

@@ -8,8 +8,8 @@
 // normalizeWindowPosition is pure, which is the half that carried the bug.
 
 import { describe, it, expect } from 'vitest';
-import displayHelper from '../../electron/utils/display-helper.js';
-import createLogger from '../../electron/utils/logger.js';
+import displayHelper from '../../electron/platform/display-helper.js';
+import createLogger from '../../electron/platform/logger.js';
 
 const { normalizeWindowPosition } = displayHelper;
 const { localDateStamp } = createLogger;

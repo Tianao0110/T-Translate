@@ -8,7 +8,7 @@ const engineManager = require('../listen/audio-engine-manager');
 const winAudio = require('../listen/win-audio-capture');
 const packManager = require('../listen/audio-pack-manager');
 const ttsPackManager = require('../tts/tts-pack-manager');
-const logger = require('../utils/logger')('IPC:AudioEngine');
+const logger = require('../platform/logger')('IPC:AudioEngine');
 
 const AE = CHANNELS.AUDIO_ENGINE;
 

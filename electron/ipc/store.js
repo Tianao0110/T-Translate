@@ -8,7 +8,7 @@
 const { ipcMain } = require('electron');
 const { CHANNELS } = require('../shared/channels');
 const { isReadableKey, isWritableKey, isDeletableKey } = require('./store-allowlist');
-const logger = require('../utils/logger')('IPC:Store');
+const logger = require('../platform/logger')('IPC:Store');
 
 function register(ctx) {
   const { store } = ctx;

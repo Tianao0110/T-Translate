@@ -5,7 +5,7 @@
 // consumer.
 
 const { BrowserWindow } = require('electron');
-const logger = require('./logger')('SecureAudit');
+const logger = require('../platform/logger')('SecureAudit');
 
 // App-internal bulk sweeps legitimately touch every stored key at once:
 // settings-page load, translation-stack boot/reload, OCR engine config loads.

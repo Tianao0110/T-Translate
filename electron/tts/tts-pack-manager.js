@@ -4,7 +4,7 @@
 
 const { net } = require('electron');
 const { store } = require('../state');
-const { isOfflineMode } = require('../utils/privacy-gate');
+const { isOfflineMode } = require('../security/privacy-gate');
 const { computePackList, TTS_TYPES } = require('../shared/audio-packs');
 const { listInstalledPacks } = require('../listen/asr-models');
 const { modelDir, modelDirs } = require('../packs/model-root');

@@ -222,7 +222,7 @@ function makeWindowVisibleToCapture(electronWindow) {
  * Three-layer selection probe.
  *   Layer 1: focus + control-class filter (cheap, zero side effects)
  *   Layer 2: standard Edit/RichEdit controls → EM_GETSEL (sync, clipboard-free)
- *   Layer 3: complex apps → clipboard fallback (utils/clipboard-capture.js)
+ *   Layer 3: complex apps → clipboard fallback (selection/clipboard-capture.js)
  *
  * Returns { hasSelection: boolean|null, method: string, reason: string }.
  *   hasSelection === null means "Layer 1+2 can't decide, caller should run Layer 3".
@@ -498,7 +498,7 @@ module.exports = {
   isCapsLockOn,  // Sticky-direct mode reads the CapsLock toggle bit (synchronous).
 
   // Three-layer selection probe (Layers 1+2, clipboard-free).
-  // Layer 3 clipboard fallback lives in utils/clipboard-capture.js.
+  // Layer 3 clipboard fallback lives in selection/clipboard-capture.js.
   hasTextSelection,
   getForegroundClassName,
   getForegroundWindowSnapshot,

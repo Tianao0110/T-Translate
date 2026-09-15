@@ -2,8 +2,8 @@
 
 const { ipcMain, BrowserWindow } = require('electron');
 const { CHANNELS } = require('../shared/channels');
-const logger = require('../utils/logger')('IPC:FloatingWindow');
-const displayHelper = require('../utils/display-helper');
+const logger = require('../platform/logger')('IPC:FloatingWindow');
+const displayHelper = require('../platform/display-helper');
 const { t } = require('../shared/main-i18n');
 
 // Module scope (not per-register) so window-manager can close panes when the
@@ -54,7 +54,7 @@ function register(ctx) {
   let screenshotModule = null;
   const getScreenshotModule = () => {
     if (!screenshotModule) {
-      screenshotModule = require('../screenshot-module');
+      screenshotModule = require('../screenshot/screenshot-module');
     }
     return screenshotModule;
   };
@@ -193,7 +193,7 @@ function register(ctx) {
       // re-reading our own overlay, but the user can opt in to being
       // capturable (to screenshot/record the overlay itself).
       if (process.platform === 'win32') {
-        const helper = require('../utils/native-helper');
+        const helper = require('../platform/native-helper');
         if (settings.floatingWindow?.captureVisible) {
           helper.makeWindowVisibleToCapture(floatingWindow);
         } else {
@@ -445,7 +445,7 @@ function register(ctx) {
       if (process.platform === 'win32') {
         childWindow.webContents.once('did-finish-load', () => {
           try {
-            const { makeWindowInvisibleToCapture } = require('../utils/native-helper');
+            const { makeWindowInvisibleToCapture } = require('../platform/native-helper');
             makeWindowInvisibleToCapture(childWindow);
           } catch (e) {
             logger.warn('Failed to exclude child pane from capture:', e.message);

@@ -3,7 +3,7 @@
 // page inherits our preload (and its secureStorage.decrypt bridge)".
 
 import { describe, it, expect } from 'vitest';
-import { isInternalUrl, mayOpenExternally } from '../../electron/utils/url-policy.js';
+import { isInternalUrl, mayOpenExternally } from '../../electron/security/url-policy.js';
 
 describe('isInternalUrl — what may be navigated to', () => {
   it('allows our own packaged pages', () => {

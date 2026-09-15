@@ -91,7 +91,7 @@ async function main() {
   const store = fakeStore({ privacyMode: 'standard' });
   const tengine = require('../electron/tengine').get();
   const llmManager = require('../electron/llm/llm-manager');
-  const makeLogger = require('../electron/utils/logger');
+  const makeLogger = require('../electron/platform/logger');
   llmManager.init({ store, tengine, adapter: tengine.get('llm'), visionAdapter: tengine.get('llm-vision'), logsDir: path.join(SANDBOX, 'logs'), modelsDir, logger: makeLogger('LLM') });
   tengine.get('llm').setProvider(GPU ? 'gpu' : 'cpu');
   tengine.get('llm-vision').setProvider('cpu');

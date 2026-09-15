@@ -82,7 +82,7 @@ async function main() {
   }
 
   // ---- IPC level ----
-  const autoUpdater = require('../electron/utils/auto-updater');
+  const autoUpdater = require('../electron/platform/auto-updater');
   autoUpdater.checkForUpdate = trip('auto-updater.checkForUpdate');
   autoUpdater.downloadUpdate = trip('auto-updater.downloadUpdate');
 

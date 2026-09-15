@@ -2,8 +2,8 @@
 
 const { ipcMain, BrowserWindow } = require('electron');
 const { CHANNELS } = require('../shared/channels');
-const logger = require('../utils/logger')('IPC:Selection');
-const { captureSelectedText, hasFileFormat } = require('../utils/clipboard-capture');
+const logger = require('../platform/logger')('IPC:Selection');
+const { captureSelectedText, hasFileFormat } = require('../selection/clipboard-capture');
 
 // Address the window that actually sent the IPC, not the active-slot window. A
 // frozen card is detached from windows.selection, so getSelectionWindow() would
@@ -99,12 +99,12 @@ function register(ctx) {
   // ===== Multi-window management =====
 
   ipcMain.handle(CHANNELS.SELECTION.FREEZE, () => {
-    const windowManager = require('../managers/window-manager');
+    const windowManager = require('../windows/window-manager');
     return windowManager.freezeSelectionWindow();
   });
 
   ipcMain.handle(CHANNELS.SELECTION.CLOSE_FROZEN, (event, windowId) => {
-    const windowManager = require('../managers/window-manager');
+    const windowManager = require('../windows/window-manager');
     return windowManager.closeFrozenSelectionWindow(windowId);
   });
 

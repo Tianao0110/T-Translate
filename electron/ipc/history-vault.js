@@ -6,8 +6,8 @@
 const { ipcMain, safeStorage } = require('electron');
 const path = require('path');
 const { CHANNELS } = require('../shared/channels');
-const { createHistoryVault } = require('../utils/history-vault');
-const logger = require('../utils/logger')('HistoryVault');
+const { createHistoryVault } = require('../security/history-vault');
+const logger = require('../platform/logger')('HistoryVault');
 
 const HV = CHANNELS.HISTORY_VAULT;
 const VAULT_FILE = 'translation-data.enc';

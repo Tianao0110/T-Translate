@@ -3,15 +3,15 @@
 // No plaintext fallback — refuses to store if encryption is unavailable.
 //
 // The audit trail and the offline privacy gate live in shared modules
-// (utils/secure-audit.js, utils/secure-vault.js) since the main-process
+// (security/secure-audit.js, security/secure-vault.js) since the main-process
 // translation stack decrypts in-process through the same code paths — an
 // IPC-local audit would be blind to the stack's traffic.
 
 const { ipcMain, safeStorage } = require('electron');
 const { CHANNELS } = require('../shared/channels');
-const audit = require('../utils/secure-audit');
-const { isDecryptAllowed } = require('../utils/secure-vault');
-const logger = require('../utils/logger')('IPC:SecureStorage');
+const audit = require('../security/secure-audit');
+const { isDecryptAllowed } = require('../security/secure-vault');
+const logger = require('../platform/logger')('IPC:SecureStorage');
 
 function register(ctx) {
   const { store } = ctx;
@@ -92,7 +92,7 @@ module.exports = register;
 module.exports.isDecryptAllowed = isDecryptAllowed;
 // Test-only surface (tests/unit/secure-audit.test.js): the burst heuristic
 // must stay false-positive-free for app-internal bulk sweeps. Kept stable
-// across the extraction to utils/secure-audit.js.
+// across the extraction to security/secure-audit.js.
 module.exports._audit = {
   logAccess: audit.logAccess,
   checkAnomaly: audit.checkAnomaly,

@@ -81,7 +81,7 @@ async function main() {
   const store = fakeStore({ privacyMode: 'standard' });
   const tengine = require('../electron/tengine').get();
   const llmManager = require('../electron/llm/llm-manager');
-  const makeLogger = require('../electron/utils/logger');
+  const makeLogger = require('../electron/platform/logger');
   llmManager.init({ store, tengine, adapter: tengine.get('llm'), logsDir: path.join(SANDBOX, 'logs'), modelsDir, logger: makeLogger('LLM') });
   tengine.get('llm').setProvider(GPU ? 'gpu' : 'cpu');
   const t0 = Date.now();

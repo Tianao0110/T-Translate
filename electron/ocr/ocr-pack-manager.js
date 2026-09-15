@@ -6,7 +6,7 @@
 const { net } = require('electron');
 const { store } = require('../state');
 const { BASE_PACK_ID, computePackList } = require('../shared/ocr-packs');
-const { isOfflineMode } = require('../utils/privacy-gate');
+const { isOfflineMode } = require('../security/privacy-gate');
 const ocrEngine = require('./ocr-engine');
 const { createPackManager } = require('../packs/model-pack-core');
 

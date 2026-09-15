@@ -3,7 +3,7 @@
 
 const { ipcMain, globalShortcut } = require('electron');
 const { CHANNELS } = require('../shared/channels');
-const logger = require('../utils/logger')('IPC:Screenshot');
+const logger = require('../platform/logger')('IPC:Screenshot');
 const { t } = require('../shared/main-i18n');
 
 function register(ctx) {
@@ -12,7 +12,7 @@ function register(ctx) {
   let screenshotModule = null;
   const getScreenshotModule = () => {
     if (!screenshotModule) {
-      screenshotModule = require('../screenshot-module');
+      screenshotModule = require('../screenshot/screenshot-module');
     }
     return screenshotModule;
   };

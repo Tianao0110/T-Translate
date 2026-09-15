@@ -11,7 +11,7 @@
 //   renderer with executeJavaScript.
 
 const Store = require('electron-store');
-const { pruneRetiredSettings } = require('./utils/store-cleanup');
+const { pruneRetiredSettings } = require('./platform/store-cleanup');
 
 const isDev = process.env.NODE_ENV === 'development' || !require('electron').app.isPackaged;
 

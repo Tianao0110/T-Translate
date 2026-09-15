@@ -2,7 +2,7 @@
 // blob. DI fs/safeStorage so the vault runs outside Electron.
 
 import { describe, it, expect } from 'vitest';
-import { createHistoryVault } from '../../electron/utils/history-vault.js';
+import { createHistoryVault } from '../../electron/security/history-vault.js';
 
 const PATH_SHIM = { basename: (p) => p.split(/[\\/]/).pop() };
 

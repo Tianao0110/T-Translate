@@ -10,11 +10,11 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // FSM uses require('./logger')('SelectionSM'); logger in turn pulls in
 // `electron`. Stub the logger so neither dependency loads under Node.
-vi.mock('../../electron/utils/logger.js', () => ({
+vi.mock('../../electron/platform/logger.js', () => ({
   default: () => ({ debug: () => {}, info: () => {}, warn: () => {}, error: () => {} }),
 }));
 
-const smModule = await import('../../electron/utils/selection-state-machine.js');
+const smModule = await import('../../electron/selection/selection-state-machine.js');
 const { SelectionStateMachine, STATES, CONFIG } = smModule.default;
 
 describe('SelectionStateMachine', () => {

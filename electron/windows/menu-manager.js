@@ -3,7 +3,7 @@
 
 const { Menu, dialog, shell, app } = require('electron');
 const { CHANNELS, MENU_ACTIONS } = require('../shared/channels');
-const logger = require('../utils/logger')('MenuManager');
+const logger = require('../platform/logger')('MenuManager');
 const { t } = require('../shared/main-i18n');
 
 function createMenu(ctx) {

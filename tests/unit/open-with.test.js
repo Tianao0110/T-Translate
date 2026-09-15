@@ -2,7 +2,7 @@
 // skipped, existence checked, first hit wins.
 
 import { describe, it, expect } from 'vitest';
-import { extractOpenableFile } from '../../electron/utils/open-with.js';
+import { extractOpenableFile } from '../../electron/platform/open-with.js';
 
 const existsAll = () => true;
 
