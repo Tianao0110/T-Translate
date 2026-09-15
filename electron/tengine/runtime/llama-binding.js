@@ -168,6 +168,7 @@ function loadRuntime(dir, { koffi = require('koffi'), verify = true } = {}) {
       if (passing) fn(level, text);
     });
     f.logSet(cb, null);
+    f.mtmdHelperLogSet(cb, null);
   }
 
   return {

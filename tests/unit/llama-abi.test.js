@@ -41,11 +41,19 @@ describe('llama ABI transcription', () => {
     expect(modelFields[0]).toBe('devices');
     expect(modelFields[modelFields.length - 1]).toBe('load_mtp');
     expect(Object.keys(ABI.STRUCTS.llama_batch)).toEqual(['n_tokens', 'token', 'embd', 'pos', 'n_seq_id', 'seq_id', 'logits']);
+    // mtmd_context_params ends in the progress callback pair, like the model params.
+    const mtmdFields = Object.keys(ABI.STRUCTS.mtmd_context_params);
+    expect(mtmdFields[0]).toBe('use_gpu');
+    expect(mtmdFields[mtmdFields.length - 1]).toBe('progress_callback_user_data');
+    expect(Object.keys(ABI.STRUCTS.mtmd_input_text)).toEqual(['text', 'text_len', 'add_special', 'parse_special']);
+    expect(Object.keys(ABI.STRUCTS.mtmd_helper_bitmap_wrapper)).toEqual(['bitmap', 'video_ctx']);
   });
 
-  it('golden fingerprint covers every field of both param structs', () => {
+  it('golden fingerprint covers every field of the param structs', () => {
     expect(Object.keys(ABI.GOLDEN.modelParams)).toEqual(Object.keys(ABI.STRUCTS.llama_model_params));
     expect(Object.keys(ABI.GOLDEN.contextParams)).toEqual(Object.keys(ABI.STRUCTS.llama_context_params));
+    expect(Object.keys(ABI.GOLDEN.mtmdParams)).toEqual(Object.keys(ABI.STRUCTS.mtmd_context_params));
+    expect(Object.keys(ABI.GOLDEN.mtmdHelperOpt.video_params)).toEqual(Object.keys(ABI.STRUCTS.mtmd_helper_video_init_params));
   });
 
   it('verifyRuntime reports what is missing or altered', () => {
@@ -62,6 +70,10 @@ describe('llama ABI transcription', () => {
     expect(plain(rt.f.modelDefault())).toEqual(ABI.GOLDEN.modelParams);
     expect(plain(rt.f.ctxDefault())).toEqual(ABI.GOLDEN.contextParams);
     expect(plain(rt.f.chainDefault())).toEqual(ABI.GOLDEN.chainParams);
+    expect(plain(rt.f.mtmdParamsDefault())).toEqual(ABI.GOLDEN.mtmdParams);
+    const opt = rt.f.mtmdHelperOptDefault();
+    expect(plain(opt.video_params)).toEqual(ABI.GOLDEN.mtmdHelperOpt.video_params);
+    expect(rt.f.mtmdDefaultMarker()).toBe(ABI.GOLDEN.mtmdMarker);
     // Symbols live where the ABI says they do.
     for (const [lib, protos] of Object.entries(ABI.FUNCS)) {
       for (const key of Object.keys(protos)) expect(rt.homes[key], key).toBe(lib);

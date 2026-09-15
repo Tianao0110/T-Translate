@@ -1,7 +1,7 @@
 // llama.cpp b10853 ABI as T-Engine uses it: struct layouts, function
 // prototypes, enums and the default-parameter fingerprint, transcribed from
-// the pinned headers (include/llama.h, ggml.h, ggml-backend.h, gguf.h at tag
-// b10853). The annual re-pin re-checks this file field by field against the
+// the pinned headers (include/llama.h, ggml.h, ggml-backend.h, gguf.h,
+// tools/mtmd/mtmd.h and mtmd-helper.h at tag b10853). The annual re-pin re-checks this file field by field against the
 // new headers (docs/T-ENGINE.md §4); tests/unit/llama-abi.test.js holds the
 // struct sizes (always) and the fingerprint the pinned DLLs must reproduce
 // (when they are fetched).
@@ -89,6 +89,42 @@ const STRUCTS = {
   llama_logit_bias: { token: 'int32', bias: 'float' },
   llama_chat_message: { role: 'const char *', content: 'const char *' },
   gguf_init_params: { no_alloc: 'bool', ctx: 'void *' },
+  // mtmd.h / mtmd-helper.h, the vision side (runtime/mtmd.js).
+  mtmd_context_params: {
+    use_gpu: 'bool',
+    device: 'void *',
+    print_timings: 'bool',
+    n_threads: 'int32',
+    image_marker: 'const char *',
+    media_marker: 'const char *',
+    flash_attn_type: 'int32',
+    warmup: 'bool',
+    image_min_tokens: 'int32',
+    image_max_tokens: 'int32',
+    cb_eval: 'void *',
+    cb_eval_user_data: 'void *',
+    batch_max_tokens: 'int32',
+    progress_callback: 'void *',
+    progress_callback_user_data: 'void *',
+  },
+  mtmd_input_text: {
+    text: 'const char *',
+    text_len: 'size_t',
+    add_special: 'bool',
+    parse_special: 'bool',
+  },
+  mtmd_helper_video_init_params: {
+    fps_target: 'float',
+    ffmpeg_bin_dir: 'const char *',
+    timestamp_interval_ms: 'int64',
+  },
+  mtmd_helper_init_opt: {
+    video_params: 'mtmd_helper_video_init_params',
+  },
+  mtmd_helper_bitmap_wrapper: {
+    bitmap: 'void *',
+    video_ctx: 'void *',
+  },
 };
 
 // koffi.sizeof of the layouts above on x64. A transcription that drifts
@@ -101,6 +137,11 @@ const SIZES = {
   llama_logit_bias: 8,
   llama_chat_message: 16,
   gguf_init_params: 16,
+  mtmd_context_params: 96,
+  mtmd_input_text: 24,
+  mtmd_helper_video_init_params: 24,
+  mtmd_helper_init_opt: 24,
+  mtmd_helper_bitmap_wrapper: 16,
 };
 
 const CALLBACKS = {
@@ -188,6 +229,31 @@ const FUNCS = {
     sample: 'int32 llama_sampler_sample(void *smpl, void *ctx, int32 idx)',
     samplerFree: 'void llama_sampler_free(void *s)',
   },
+  mtmd: {
+    // Routes mtmd's own logger (and the helper's) through the same callback
+    // as llama's; otherwise every image prints its prompt to stderr.
+    mtmdHelperLogSet: 'void mtmd_helper_log_set(void *cb, void *user)',
+    mtmdDefaultMarker: 'const char *mtmd_default_marker()',
+    mtmdParamsDefault: 'mtmd_context_params mtmd_context_params_default()',
+    mtmdInit: 'void *mtmd_init_from_file(const char *mmproj, void *model, mtmd_context_params params)',
+    mtmdFree: 'void mtmd_free(void *ctx)',
+    mtmdSupportVision: 'bool mtmd_support_vision(void *ctx)',
+    mtmdUseMrope: 'bool mtmd_decode_use_mrope(void *ctx)',
+    mtmdHelperOptDefault: 'mtmd_helper_init_opt mtmd_helper_init_opt_default()',
+    mtmdBitmapFromBuf: 'mtmd_helper_bitmap_wrapper mtmd_helper_bitmap_init_from_buf(void *ctx, const uint8 *buf, size_t len, bool placeholder, mtmd_helper_init_opt opt)',
+    mtmdBitmapNx: 'uint32 mtmd_bitmap_get_nx(void *bitmap)',
+    mtmdBitmapNy: 'uint32 mtmd_bitmap_get_ny(void *bitmap)',
+    mtmdBitmapFree: 'void mtmd_bitmap_free(void *bitmap)',
+    mtmdChunksInit: 'void *mtmd_input_chunks_init()',
+    mtmdChunksSize: 'size_t mtmd_input_chunks_size(void *chunks)',
+    mtmdChunksGet: 'void *mtmd_input_chunks_get(void *chunks, size_t i)',
+    mtmdChunksFree: 'void mtmd_input_chunks_free(void *chunks)',
+    mtmdChunkType: 'int32 mtmd_input_chunk_get_type(void *chunk)',
+    mtmdChunkNTokens: 'size_t mtmd_input_chunk_get_n_tokens(void *chunk)',
+    mtmdTokenize: 'int32 mtmd_tokenize(void *ctx, void *out, const mtmd_input_text *text, void **bitmaps, size_t n)',
+    mtmdNPos: 'int32 mtmd_helper_get_n_pos(void *chunks)',
+    mtmdEvalChunks: 'int32 mtmd_helper_eval_chunks(void *ctx, void *lctx, void *chunks, int32 nPast, int32 seq, int32 nBatch, bool logitsLast, _Out_ int32 *newNPast)',
+  },
 };
 
 const ENUMS = {
@@ -199,6 +265,8 @@ const ENUMS = {
   GGUF_TYPE: { UINT8: 0, INT8: 1, UINT16: 2, INT16: 3, UINT32: 4, INT32: 5, FLOAT32: 6, BOOL: 7, STRING: 8, ARRAY: 9, UINT64: 10, INT64: 11, FLOAT64: 12 },
   // llama_decode return values (negative = fatal)
   DECODE: { OK: 0, NO_KV_SLOT: 1, ABORTED: 2 },
+  // mtmd_input_chunk_type
+  MTMD_CHUNK: { TEXT: 0, IMAGE: 1, AUDIO: 2 },
   LLAMA_DEFAULT_SEED: 0xffffffff,
 };
 
@@ -222,6 +290,13 @@ const GOLDEN = {
     samplers: null, n_samplers: 0, ctx_other: null,
   },
   chainParams: { no_perf: true },
+  mtmdParams: {
+    use_gpu: true, device: null, print_timings: true, n_threads: 4, image_marker: null, media_marker: '<__media__>',
+    flash_attn_type: -1, warmup: true, image_min_tokens: -1, image_max_tokens: -1, cb_eval: null, cb_eval_user_data: null,
+    batch_max_tokens: 1024, progress_callback: null, progress_callback_user_data: null,
+  },
+  mtmdHelperOpt: { video_params: { fps_target: 4, ffmpeg_bin_dir: null, timestamp_interval_ms: 5000 } },
+  mtmdMarker: '<__media__>',
 };
 
 module.exports = { BUILD, STRUCTS, SIZES, CALLBACKS, FUNCS, ENUMS, GOLDEN };

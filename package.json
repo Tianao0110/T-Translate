@@ -35,6 +35,7 @@
     "smoke:llm": "node scripts/smoke-llm.js",
     "smoke:llm-host": "electron scripts/smoke-llm-host.js",
     "smoke:llm-stack": "electron scripts/smoke-llm-stack.js",
+    "smoke:llm-vision": "node scripts/smoke-llm-vision.js",
     "postinstall": "node scripts/overlay-sherpa-runtime.js",
     "runtime:overlay": "node scripts/overlay-sherpa-runtime.js"
   },

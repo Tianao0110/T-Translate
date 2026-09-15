@@ -41,7 +41,8 @@ electron/tengine/
     llama-abi.js       钉版本的结构体与函数原型——年度换版唯一要核对的文件，配 golden 测试
     llama-binding.js   koffi 装载：DLL 目录、依赖顺序、后端目录、设备枚举
     llama-session.js   模型/上下文生命周期、解码循环、采样链、取消、前缀复用、token 流
-    mtmd.js            图像/音频 → chunks → eval
+    mtmd.js            视觉：图片字节 → mtmd 解码与编码 → 预填进同一个会话 → 会话的采样循环；Spotting 输出解析成行文字 + 像素框
+    assets/vision-health.png  视觉自检与 golden 用的固定图（「T-Translate OK 确认」）
     worker.js          runtime 所在的 worker_thread：所有 FFI 调用在这条线程上同步进行；
                        宿主主线程只做 IPC、取消标志、看门狗
   engines/llm.js       LLM 适配器：load / unload / generate（流式，reqId 路由）/ probe / health / metrics / setProvider / status
@@ -106,7 +107,9 @@ koffi 装载顺序（否则依赖解析失败）：`SetDllDirectoryW(<目录>)` 
 - 双显卡机器要把 `llama_model_params.devices` 显式指到独显：本机默认选择恰好是 Vulkan0 = 4090（核显一字节没占），但不能指望别的机器也这样；指定后 llama 日志里 `VulkanN model buffer size` 能对上，作为自检断言。
 - 退出码：Git Bash 报的 127 是 msys 误报（PowerShell 读同一进程为 0），判断宿主崩溃以 utilityProcess 的 `exit` 事件 code 为准；0xC0000005 是访问违规，0xC0000409 是 fast-fail。
 
-Golden 测试至少覆盖：三个 `*_default_params()` 的全部字段值（`tests/unit/llama-abi.test.js` 已做）、`llama_version()` 与 GOLDEN 里的库版本串一致（它只报库版本如 `0.4.0-dev`，不是 build 号——build 由清单哈希保证）、固定 prompt 贪心输出前 N 个 token、视觉固定图前 N 个 token（后两项随模型白名单在 `scripts/smoke-llm.js` 里跑）。
+Golden 测试至少覆盖：三个 `*_default_params()` 与 `mtmd_context_params_default()` / `mtmd_helper_init_opt_default()` 的全部字段值（`tests/unit/llama-abi.test.js` 已做）、`llama_version()` 与 GOLDEN 里的库版本串一致（它只报库版本如 `0.4.0-dev`，不是 build 号——build 由清单哈希保证）、固定 prompt 贪心输出前 N 个 token（`scripts/smoke-llm.js`）、视觉固定图 `runtime/assets/vision-health.png` 的 Spotting 结果（`scripts/smoke-llm-vision.js`：读到 OK 那一行且带框、两次输出逐字相同）。
+
+视觉路径的补充规则（v0.5.1）：mtmd 的结构体（`mtmd_context_params` 96 字节、`mtmd_input_text` 24、`mtmd_helper_init_opt` 24、`mtmd_helper_bitmap_wrapper` 16）与函数表同样放在 `llama-abi.js`，符号归属 `mtmd`；`mtmd_helper_log_set` 与 `llama_log_set` 挂同一个回调，否则 mtmd 会把每张图的提示词打到 stderr。图片字节经 `mtmd_helper_bitmap_init_from_buf` 直接喂（PNG / JPEG 由它解码），`mtmd_helper_eval_chunks` 一次完成编码与预填，之后接会话的 `generateContinue`；预填后不保留前缀（图像不是 token 列表）。mmproj 的 `warmup` 留开：它在载入时跑一次哑图，显卡首次的着色器编译（约 20 s）就落在载入而不是用户的第一张图。PaddleOCR-VL 的提示词是 `<|begin_of_sentence|>User: <__media__><任务>:\nAssistant:\n`，任务一律 `Spotting`（`OCR:` 对多栏整屏会漏栏）；mmproj 元数据把输入限在 1 MP，整屏会被缩放。
 
 ## 五、健康与安全
 

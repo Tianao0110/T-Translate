@@ -460,11 +460,27 @@ function openSession(binding, {
       throw fail('LLM_DECODE_FAILED', `llama_decode returned ${rc} on the prompt`);
     }
 
+    return runLoop({ base, decoded: promptTokens.slice(), limit, t0, promptMs, sampler, banThink, onToken, trackPrefix: true });
+  }
+
+  // Continues from a context somebody else filled (mtmd.js after
+  // mtmd_helper_eval_chunks): nPast positions are in, logits are ready.
+  function generateContinue({ nPast, promptMs = 0, t0 = now(), maxTokens = 256, onToken = null, sampler = {}, banThink = true } = {}) {
+    if (closed) throw fail('LLM_SESSION_CLOSED', 'session closed');
+    if (nPast + MIN_GENERATION_ROOM > nCtx) throw fail('LLM_PROMPT_TOO_LONG', `${nPast} prompt positions, context ${nCtx}`);
+    const limit = Math.min(maxTokens, nCtx - nPast);
+    const base = { promptTokens: nPast, reusedTokens: 0, promptMs: Math.round(promptMs), genTokens: 0, firstMs: null, text: '', thinkLeak: 0 };
+    return runLoop({ base, decoded: [], limit, t0, promptMs, sampler, banThink, onToken, trackPrefix: false });
+  }
+
+  // The sampling half: the context holds the prompt with logits for its last
+  // position. trackPrefix keeps the decoded tokens for KV reuse; an image
+  // prefill is not a token list, so nothing is kept after one.
+  function runLoop({ base, decoded, limit, t0, promptMs, sampler, banThink, onToken, trackPrefix }) {
     const chain = buildChain(sampler, banThink ? think.openers.map((t) => t.id) : []);
     const decoder = new StringDecoder('utf8');
     const stripper = createThinkStripper({ openers: think.openers.map((t) => t.text), closers: think.closers.map((t) => t.text) });
     const loop = createLoopDetector();
-    const decoded = promptTokens.slice();
     const piece = Buffer.alloc(256);
     let text = '';
     let firstMs = null;
@@ -510,7 +526,7 @@ function openSession(binding, {
     emit(stripper.flush());
     // llama rolls an aborted batch back, so after a cancel the context still
     // holds exactly the tokens that decoded; only a real error loses it.
-    if (stop !== 'error') last = decoded;
+    last = trackPrefix && stop !== 'error' ? decoded : null;
     const totalMs = now() - t0;
     return {
       ...base,
@@ -552,6 +568,9 @@ function openSession(binding, {
     tokenize,
     buildPrompt,
     generate,
+    generateContinue,
+    // Raw handles for mtmd.js, which prefills this context with an image.
+    handles: () => ({ model, ctx, mem, vocab, nVocab, nCtx, nBatch, threads: nThreads, deviceHandle: picked.device ? picked.device.handle : null }),
     ctxUsed: () => f.memSeqPosMax(mem, 0) + 1,
     clear() {
       f.memClear(mem, true);

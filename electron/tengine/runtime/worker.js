@@ -8,7 +8,9 @@
 //
 // in  {type:'load-runtime', dir}                 -> {type:'runtime', ok, info|error}
 //     {type:'load-model', reqId, file, options}  -> {type:'progress', reqId, value}* then {type:'model', reqId, ok, info|error}
+//                                                   (options.mmproj attaches the vision encoder; info.vision says so)
 //     {type:'generate', reqId, system?, user?, prompt?, maxTokens?, sampler?}
+//     {type:'generate', reqId, image, task?, maxTokens?, sampler?}   image: PNG/JPEG bytes, never logged
 //                                                -> {type:'token', reqId, text}* then {type:'done', reqId, ok, result|error}
 //     {type:'unload-model', reqId}               -> {type:'unloaded', reqId}
 //     {type:'probe', reqId, file, options}       -> {type:'probed', reqId, report}
@@ -20,9 +22,11 @@
 // out {type:'log', level, message} at any time
 
 const fs = require('fs');
+const path = require('path');
 const { parentPort, workerData } = require('worker_threads');
 const { loadRuntime } = require('./llama-binding');
 const session = require('./llama-session');
+const mtmd = require('./mtmd');
 const ABI = require('./llama-abi');
 
 const abortFlag = workerData && workerData.abortFlag ? new Int32Array(workerData.abortFlag) : null;
@@ -32,10 +36,12 @@ const log = (level, message) => post({ type: 'log', level, message });
 const errInfo = (e) => ({ message: e.message, code: e.code || 'LLM_FAILED' });
 
 let binding = null;
-let current = null; // { session, file, provider }
+let current = null; // { session, vision, file, provider }
 // Long enough to time: the answer runs to the token limit.
 const HEALTH_PROMPT = 'List the numbers from one to thirty as English words, separated by commas.';
 const HEALTH_TOKENS = 24;
+// The fixed image behind the vision self-test and the golden check.
+const HEALTH_IMAGE = path.join(__dirname, 'assets', 'vision-health.png');
 
 function runtimeInfo() {
   return {
@@ -54,6 +60,7 @@ function requireRuntime() {
 
 function unloadModel() {
   if (!current) return;
+  if (current.vision) current.vision.close();
   current.session.close();
   current = null;
 }
@@ -62,18 +69,29 @@ function loadModel(msg) {
   requireRuntime();
   unloadModel();
   if (abortFlag) Atomics.store(abortFlag, 0, 0);
+  const options = msg.options || {};
   const s = session.openSession(binding, {
-    ...(msg.options || {}),
+    ...options,
     file: msg.file,
     abortFlag,
     onProgress: (value) => post({ type: 'progress', reqId: msg.reqId, value }),
   });
-  current = { session: s, file: msg.file, provider: (msg.options || {}).provider || 'cpu' };
+  let vision = null;
+  if (options.mmproj) {
+    try {
+      vision = mtmd.attachVision(binding, s, { mmproj: options.mmproj, provider: s.provider, family: options.visionFamily || null, abortFlag });
+    } catch (e) {
+      s.close();
+      throw e;
+    }
+  }
+  current = { session: s, vision, file: msg.file, mmproj: options.mmproj || null, provider: options.provider || 'cpu' };
   return modelInfo();
 }
 
 function modelInfo() {
   const s = current.session;
+  const v = current.vision;
   return {
     ...s.info(),
     file: current.file,
@@ -83,7 +101,15 @@ function modelInfo() {
     loadMs: s.loadMs,
     ctxMs: s.ctxMs,
     threads: s.threads,
+    vision: v ? { mmproj: current.mmproj, loadMs: v.loadMs, family: v.family, mrope: v.mrope } : null,
   };
+}
+
+// A structured-clone Uint8Array as a Buffer view, no copy.
+function asBuffer(image) {
+  if (Buffer.isBuffer(image)) return image;
+  if (image instanceof Uint8Array) return Buffer.from(image.buffer, image.byteOffset, image.byteLength);
+  throw Object.assign(new Error('image must be bytes'), { code: 'LLM_BAD_IMAGE' });
 }
 
 // The self-test behind the GPU switch and the pre-install check: the model
@@ -91,9 +117,30 @@ function modelInfo() {
 function health(msg) {
   requireRuntime();
   const provider = (msg.options || {}).provider || 'cpu';
-  const fresh = !current || current.file !== msg.file || current.provider !== provider;
+  const mmproj = (msg.options || {}).mmproj || null;
+  const fresh = !current || current.file !== msg.file || current.provider !== provider || current.mmproj !== mmproj;
   const info = fresh ? loadModel(msg) : modelInfo();
   if (abortFlag) Atomics.store(abortFlag, 0, 0);
+  if (current.vision) {
+    // Same shape as the text self-test: the fixed image twice, time the second.
+    const image = fs.readFileSync(HEALTH_IMAGE);
+    current.vision.generate({ image, maxTokens: 4 });
+    const r = current.vision.generate({ image });
+    return {
+      ok: r.genTokens > 0 && r.stop !== 'error' && r.lines.length > 0,
+      provider: info.provider,
+      device: info.device,
+      fallback: info.fallback,
+      loadMs: fresh ? info.loadMs + info.vision.loadMs : 0,
+      firstMs: r.firstMs,
+      promptMs: r.promptMs,
+      imageTokens: r.imageTokens,
+      tokPerSec: r.tokPerSec,
+      genTokens: r.genTokens,
+      lines: r.lines.length,
+      stop: r.stop,
+    };
+  }
   const prompt = current.session.buildPrompt({ user: HEALTH_PROMPT });
   // The first GPU generation pays for pipeline setup; time the second.
   current.session.generate({ prompt, maxTokens: 2 });
@@ -114,6 +161,16 @@ function health(msg) {
 function generate(msg) {
   if (!current) throw Object.assign(new Error('no model loaded'), { code: 'LLM_NO_MODEL' });
   if (abortFlag) Atomics.store(abortFlag, 0, 0);
+  if (msg.image !== undefined) {
+    if (!current.vision) throw Object.assign(new Error('the loaded model has no vision encoder'), { code: 'LLM_VISION_UNSUPPORTED' });
+    return current.vision.generate({
+      image: asBuffer(msg.image),
+      task: msg.task || 'Spotting',
+      maxTokens: msg.maxTokens || null,
+      sampler: msg.sampler || {},
+      onToken: (text) => post({ type: 'token', reqId: msg.reqId, text }),
+    });
+  }
   const prompt = msg.prompt !== undefined ? msg.prompt : current.session.buildPrompt({ system: msg.system || '', user: msg.user || '' });
   return current.session.generate({
     prompt,
