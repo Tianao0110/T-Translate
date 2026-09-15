@@ -9,7 +9,7 @@ import { configureRuntime } from '../../src/stack/runtime.js';
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 1, 2, 3, 4]);
 const DATA_URL = `data:image/png;base64,${PNG.toString('base64')}`;
 
-function fakeLlm({ ready = true, result = null, reject = null } = {}) {
+function fakeLlm({ ready = true, gpu = true, result = null, reject = null } = {}) {
   const recognize = vi.fn(async (req) => ({
     reqId: 'g1',
     cancel: vi.fn(),
@@ -17,7 +17,7 @@ function fakeLlm({ ready = true, result = null, reject = null } = {}) {
   }));
   return {
     recognize,
-    visionStatus: () => ({ available: true, pack: ready ? { id: 'paddleocr-vl-1.6', status: 'ready' } : { id: 'paddleocr-vl-1.6', status: 'partial' }, provider: 'cpu' }),
+    visionStatus: () => ({ available: true, usable: ready && gpu, pack: ready ? { id: 'paddleocr-vl-1.6', status: 'ready' } : { id: 'paddleocr-vl-1.6', status: 'partial' }, provider: gpu ? 'gpu' : 'cpu' }),
     generate: vi.fn(),
     status: () => ({}),
     selected: () => null,
@@ -45,10 +45,12 @@ describe('linesToBlocks', () => {
 });
 
 describe('TengineVisionEngine', () => {
-  it('is available only with the hook and a ready pack', async () => {
+  it('is available only with the hook, a ready pack and the GPU', async () => {
     const e = new TengineVisionEngine();
     expect(await e.isAvailable()).toBe(false);
     configureRuntime({ localLlm: fakeLlm({ ready: false }) });
+    expect(await e.isAvailable()).toBe(false);
+    configureRuntime({ localLlm: fakeLlm({ gpu: false }) });
     expect(await e.isAvailable()).toBe(false);
     configureRuntime({ localLlm: fakeLlm() });
     expect(await e.isAvailable()).toBe(true);

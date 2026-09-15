@@ -100,20 +100,26 @@ async function main() {
   const row = scan.packs.find((p) => p.role === 'vision');
   step('two-file pack verified by both hashes', row && row.status === 'ready', row ? `${row.id}: ${row.files.map((f) => `${f.part}=${f.status}`).join(' ')}` : 'no vision row');
 
+  // GPU only: on the CPU the manager refuses before a byte of the pack is
+  // read, and the settings card reads unusable.
+  let onCpu = null;
+  try {
+    await (await llmManager.recognize({ image: fs.readFileSync(HEALTH_IMAGE) })).promise;
+  } catch (e) {
+    onCpu = e;
+  }
+  step('on the CPU the vision slot refuses before loading', onCpu && onCpu.code === 'LLM_VISION_NEEDS_GPU' && !llmManager.status().vision.resident && llmManager.status().vision.usable === false, onCpu ? onCpu.message : 'accepted');
+
+  tengine.get('llm-vision').setProvider('gpu');
   const image = fs.readFileSync(HEALTH_IMAGE);
   const t0 = Date.now();
   const r1 = await (await llmManager.recognize({ image })).promise;
-  step('recognize on the CPU host reads the fixed image with a box', r1.lines.some((l) => l.text.includes('OK') && l.box), `${Date.now() - t0} ms incl. load: ${JSON.stringify(r1.lines)}`);
+  step('recognize on the GPU host reads the fixed image with a box', r1.lines.some((l) => l.text.includes('OK') && l.box), `${Date.now() - t0} ms incl. load and warm-up: ${JSON.stringify(r1.lines)}`);
   const v1 = llmManager.status().vision;
-  step('status shows the vision slot resident on its own host', v1.available && v1.resident && v1.resident.file === path.basename(MODEL) && v1.provider === 'cpu', `${v1.resident?.file} on ${v1.resident?.provider}, cap ${v1.maxPixels}`);
-
-  let tooLarge = null;
-  try {
-    await (await llmManager.recognize({ image: bigBmp(800, 600) })).promise;
-  } catch (e) {
-    tooLarge = e;
-  }
-  step('an image over the CPU cap is refused before encoding', tooLarge && tooLarge.code === 'LLM_IMAGE_TOO_LARGE', tooLarge ? tooLarge.message : 'accepted');
+  step('status shows the vision slot resident on its own host', v1.available && v1.usable && v1.resident && v1.resident.file === path.basename(MODEL) && v1.provider === 'gpu', `${v1.resident?.file} on ${v1.resident?.provider}`);
+  const t2 = Date.now();
+  const r2 = await (await llmManager.recognize({ image: bigBmp(1200, 900), maxTokens: 8 })).promise;
+  step('a large image goes through on the GPU', r2.stop === 'eog' || r2.stop === 'limit', `${r2.imageTokens} image tok, ${Date.now() - t2} ms (first time at this size)`);
 
   const status = tengine.status();
   const hosts = status.engines.filter((e) => e.id === 'llm' || e.id === 'llm-vision').map((e) => `${e.id}:${e.host?.running ? 'running' : 'idle'}`);
@@ -126,28 +132,27 @@ async function main() {
     step('both models resident at once', !!llmManager.status().resident && !!llmManager.status().vision.resident);
   }
 
-  if (GPU) {
-    tengine.get('llm-vision').setProvider('gpu');
-    const t1 = Date.now();
-    const st = await llmManager.visionSelfTest();
-    step('GPU self-test reloads the vision pack on Vulkan without a cap', st.ok && st.provider === 'webgpu', `${Date.now() - t1} ms, prefill ${st.promptMs} ms, ${st.tokPerSec} tok/s`);
-    const r2 = await (await llmManager.recognize({ image: bigBmp(800, 600), maxTokens: 8 })).promise;
-    step('the GPU takes the large image', r2.stop === 'eog' || r2.stop === 'limit', `${r2.imageTokens} image tok, ${r2.totalMs} ms`);
-  }
+  const t1 = Date.now();
+  const st = await llmManager.visionSelfTest();
+  step('GPU self-test on the resident pack', st.ok && st.provider === 'webgpu', `${Date.now() - t1} ms, prefill ${st.promptMs} ms, ${st.tokPerSec} tok/s`);
 
-  // Through the stack: the OCR manager's built-in vision engine, a capture
-  // as the data URL the windows send, line boxes back; and the degrade to
-  // the classic local engine when the vision host refuses.
-  tengine.get('llm-vision').setProvider('cpu');
+  // Through the stack with the engine selected: PP-OCR (stubbed) reads
+  // first and keeps a simple capture; a capture it cannot read escalates
+  // to the vision model; with the GPU off the classic engines serve it
+  // and the result carries the notice.
   const { createTranslationStack } = require('../electron/generated/translation-stack.cjs');
-  const paddleStub = async () => ({ success: true, text: 'stub', blocks: [], rawBlocks: [] });
+  const line = { text: 'stub line', confidence: 0.98, bbox: { x: 10, y: 10, width: 200, height: 20 } };
+  let paddleMode = 'simple';
+  const paddleStub = async () => (paddleMode === 'simple'
+    ? { success: true, text: 'stub line', confidence: 0.98, blocks: [line], rawBlocks: [line] }
+    : { success: false, error: 'stub cannot read this', errorCode: 'BASE_MODELS_MISSING' });
   const stack = createTranslationStack({
     fetch: async () => { throw new Error('no network in this smoke'); },
     getLanguage: () => 'zh',
     loggerFactory: (scope) => makeLogger(`Stack:${scope}`),
     loadProviderConfigs: async () => ({ list: [], configs: {} }),
     loadOcrConfigs: async () => ({}),
-    localOcr: { paddle: paddleStub, windows: paddleStub, isWindows: true },
+    localOcr: { paddle: paddleStub, windows: async () => ({ success: false, error: 'no windows ocr in this smoke' }), isWindows: true },
     getCustomFilters: () => [],
     localLlm: {
       generate: (request, onToken) => llmManager.generate(request, onToken),
@@ -160,10 +165,15 @@ async function main() {
   await stack.init();
   const dataUrl = `data:image/png;base64,${image.toString('base64')}`;
   const o1 = await stack.ocr.recognize(dataUrl, { engine: 'tengine-vision', allowedEngines: ['tengine-vision', 'rapid-ocr', 'windows-ocr'] });
-  step('stack OCR engine returns text with line boxes', o1.success && o1.engine === 'tengine-vision' && o1.blocks.length > 0 && o1.blocks[0].bbox.width > 0, `${o1.text} ${JSON.stringify(o1.blocks[0]?.bbox)}`);
-  const big = bigBmp(800, 600);
-  const o2 = await stack.ocr.recognize(`data:image/bmp;base64,${big.toString('base64')}`, { engine: 'tengine-vision' });
-  step('a refused capture degrades to the classic local engine with a notice', o2.success && o2.engine === 'rapid-ocr' && o2.fallbackFrom === 'tengine-vision', o2.fallbackReason || o2.error);
+  step('smart routing keeps a simple capture on PP-OCR', o1.success && o1.engine === 'rapid-ocr' && o1.routed?.reason === 'simple', JSON.stringify(o1.routed));
+  paddleMode = 'fail';
+  const o2 = await stack.ocr.recognize(dataUrl, { engine: 'tengine-vision' });
+  step('smart routing escalates what PP-OCR cannot read to the vision model, with line boxes', o2.success && o2.engine === 'tengine-vision' && o2.routed?.reason === 'unreadable' && o2.blocks.length > 0 && o2.blocks[0].bbox.width > 0, `${o2.text} ${JSON.stringify(o2.blocks[0]?.bbox)}`);
+  paddleMode = 'simple';
+  tengine.get('llm-vision').setProvider('cpu');
+  const o3 = await stack.ocr.recognize(dataUrl, { engine: 'tengine-vision' });
+  step('with the GPU off the classic engine serves it and the result says so', o3.success && o3.engine === 'rapid-ocr' && o3.fallbackFrom === 'tengine-vision' && o3.fallbackReason === 'unavailable', JSON.stringify({ engine: o3.engine, fallbackFrom: o3.fallbackFrom }));
+  tengine.get('llm-vision').setProvider('gpu');
 
   step('manual unload clears both slots', (await llmManager.unloadVision('smoke')) === true && llmManager.status().vision.resident === null);
   await llmManager.unload('smoke');

@@ -409,6 +409,8 @@ const OcrSection = ({
 
   const visionPack = llmStatus?.packs?.packs?.find((p) => p.role === 'vision') || null;
   const visionReady = visionPack?.status === 'ready';
+  // Pack ready and the vision host on the GPU: the engine never runs on the CPU.
+  const visionUsable = !!llmStatus?.vision?.usable;
   const visionBadge = visionReady
     ? <span className="engine-badge installed">{t('ocr.installed')}</span>
     : visionPack?.status === 'mismatch'
@@ -449,14 +451,15 @@ const OcrSection = ({
           </div>
         </>
       )}
-      {visionReady && llmStatus?.vision?.provider !== 'gpu' && (
-        <p className="setting-hint">{t('ocr.tengineVision.cpuHint')}</p>
+      {visionReady && !visionUsable && (
+        <p className="setting-hint">{t('ocr.tengineVision.needsGpu')}</p>
       )}
+      {visionUsable && <p className="setting-hint">{t('ocr.tengineVision.smartHint')}</p>}
     </>
   );
   const visionActions = (
     <>
-      {selectButton('tengine-vision', visionReady, () => notify(t('ocr.tengineVision.notReady'), 'warning'))}
+      {selectButton('tengine-vision', visionUsable, () => notify(t(visionReady ? 'ocr.tengineVision.needsGpu' : 'ocr.tengineVision.notReady'), 'warning'))}
       <button
         className="btn-small"
         onClick={() => window.electron?.llm?.openDir?.()}

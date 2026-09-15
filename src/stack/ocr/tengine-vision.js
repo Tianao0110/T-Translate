@@ -14,7 +14,7 @@ const logger = createLogger('TEngineVision');
 
 // data: URL, bare base64 or bytes -> the encoded image bytes mtmd decodes.
 export function imageBytes(input) {
-  if (input instanceof Uint8Array) return input;
+  if (ArrayBuffer.isView(input)) return new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
   if (input instanceof ArrayBuffer) return new Uint8Array(input);
   if (typeof input !== 'string') return null;
   const comma = input.startsWith('data:') ? input.indexOf(',') : -1;
@@ -47,13 +47,13 @@ class TengineVisionEngine extends BaseOCREngine {
     isOnline: false,
   };
 
-  // Usable once the two-file pack passed its hashes; the size cap on the
-  // CPU is decided per image by the host, not here.
+  // Usable once the two-file pack passed its hashes and the vision host is
+  // on the GPU (2026-09-14 decision: never on the CPU).
   async isAvailable() {
     const llm = getLocalLlm();
     if (!llm?.recognize || !llm.visionStatus) return false;
     const v = llm.visionStatus();
-    return !!(v && v.available && v.pack && v.pack.status === 'ready');
+    return !!(v && v.available && v.usable);
   }
 
   async recognize(input, options = {}) {

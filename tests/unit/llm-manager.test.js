@@ -233,33 +233,37 @@ describe('llm manager', () => {
 });
 
 describe('the vision slot', () => {
-  it('loads the vision pack with its mmproj on the vision host, capped on the CPU, without touching the text slot', async () => {
+  it('loads the vision pack with its mmproj on the vision host (GPU), without touching the text slot', async () => {
     const visionAdapter = fakeAdapter();
+    visionAdapter.setProvider('gpu');
     const { adapter } = boot({ packs: fakePacks({ vision: true }), visionAdapter });
     const r = await manager.recognize({ image: Buffer.from('png') });
     expect((await r.promise).text).toBe('你好');
-    expect(visionAdapter.load).toHaveBeenCalledWith('C:/models/llm-models/V.gguf', { nCtx: 4096, nBatch: 2048, template: 'auto', mmproj: 'C:/models/llm-models/V-mmproj.gguf', visionFamily: 'paddleocr', visionMaxPixels: manager.CPU_MAX_PIXELS });
+    expect(visionAdapter.load).toHaveBeenCalledWith('C:/models/llm-models/V.gguf', { nCtx: 4096, nBatch: 2048, template: 'auto', mmproj: 'C:/models/llm-models/V-mmproj.gguf', visionFamily: 'paddleocr', visionMaxPixels: 0 });
     expect(visionAdapter.generate).toHaveBeenCalledWith(expect.objectContaining({ kind: 'ocr', task: 'Spotting' }));
     expect(visionAdapter.generate.mock.calls[0][0].image).toEqual(Buffer.from('png'));
     expect(adapter.load).not.toHaveBeenCalled();
     await (await manager.recognize({ image: Buffer.from('png') })).promise;
     expect(visionAdapter.load).toHaveBeenCalledTimes(1);
-    expect(manager.status().vision).toMatchObject({ available: true, pack: { id: 'paddleocr-vl-1.6', status: 'ready' }, resident: { file: 'V.gguf' }, maxPixels: manager.CPU_MAX_PIXELS, inflight: 0 });
+    expect(manager.status().vision).toMatchObject({ available: true, usable: true, pack: { id: 'paddleocr-vl-1.6', status: 'ready' }, resident: { file: 'V.gguf' }, maxPixels: 0, inflight: 0 });
   });
 
-  it('lifts the size cap on the GPU and reloads when the provider changes', async () => {
+  it('never runs on the CPU: refuses before loading and reports unusable', async () => {
     const visionAdapter = fakeAdapter();
     boot({ packs: fakePacks({ vision: true }), visionAdapter });
-    await (await manager.recognize({ image: Buffer.from('a') })).promise;
+    await expect(manager.recognize({ image: Buffer.from('a') })).rejects.toMatchObject({ code: 'LLM_VISION_NEEDS_GPU' });
+    expect(visionAdapter.load).not.toHaveBeenCalled();
+    expect(manager.status().vision).toMatchObject({ usable: false, provider: 'cpu', maxPixels: manager.CPU_MAX_PIXELS });
     visionAdapter.setProvider('gpu');
     await (await manager.recognize({ image: Buffer.from('a') })).promise;
-    expect(visionAdapter.load).toHaveBeenCalledTimes(2);
-    expect(visionAdapter.load.mock.calls[1][1].visionMaxPixels).toBe(0);
-    expect(manager.status().vision.maxPixels).toBe(0);
+    expect(visionAdapter.load).toHaveBeenCalledTimes(1);
+    expect(manager.status().vision.usable).toBe(true);
   });
 
   it('refuses without a vision pack or a vision host, and tells the GPU switch it is pending', async () => {
-    boot({ packs: fakePacks({ vision: false }), visionAdapter: fakeAdapter() });
+    const off = fakeAdapter();
+    off.setProvider('gpu');
+    boot({ packs: fakePacks({ vision: false }), visionAdapter: off });
     await expect(manager.recognize({ image: Buffer.from('a') })).rejects.toMatchObject({ code: 'LLM_VISION_MISSING' });
     expect(await manager.visionSelfTest()).toEqual({ ok: true, provider: 'cpu', fallback: null, pending: true });
     manager.reset();
@@ -281,6 +285,7 @@ describe('the vision slot', () => {
   it('idles the vision model out on its own timer, alongside the text model', async () => {
     vi.useFakeTimers();
     const visionAdapter = fakeAdapter();
+    visionAdapter.setProvider('gpu');
     const { adapter } = boot({ packs: fakePacks({ vision: true }), visionAdapter, timers: { set: setTimeout, clear: clearTimeout } });
     await (await manager.generate({ user: 'U' })).promise;
     await (await manager.recognize({ image: Buffer.from('a') })).promise;
@@ -293,6 +298,7 @@ describe('the vision slot', () => {
 
   it('drops the vision residency when its host exits, leaving the text slot alone', async () => {
     const visionAdapter = fakeAdapter();
+    visionAdapter.setProvider('gpu');
     const { adapter, bus } = boot({ packs: fakePacks({ vision: true }), visionAdapter });
     await (await manager.generate({ user: 'U' })).promise;
     await (await manager.recognize({ image: Buffer.from('a') })).promise;

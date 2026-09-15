@@ -14,6 +14,7 @@ import { RapidOCREngine, WindowsOCREngine } from './local-bridge.js';
 import { isLoopbackUrl } from '../loopback.js';
 import LLMVisionEngine from './llm-vision.js';
 import TengineVisionEngine from './tengine-vision.js';
+import { decideEscalation, imageSize } from './vision-routing.js';
 import OCRSpaceEngine from './ocrspace.js';
 import GoogleVisionEngine from './google-vision.js';
 import AzureOCREngine from './azure-ocr.js';
@@ -176,6 +177,10 @@ export class OCREngineManager {
       return this._recognizeWithLocalChain(input, options);
     }
 
+    if (preferredEngine === 'tengine-vision') {
+      return this._recognizeSmart(input, options);
+    }
+
     if (preferredEngine) {
       const result = await this._recognizeWithEngine(preferredEngine, input, options);
 
@@ -183,19 +188,6 @@ export class OCREngineManager {
         if (this._isVisionUnsupportedError(result.error)) {
           return this._handleVisionFallback(input, options, result.error);
         }
-      }
-
-      // The built-in vision model refuses what it cannot serve (not
-      // installed, the CPU size cap, a stalled host): the classic local
-      // engines take the capture and the result says who stepped in.
-      if (!result.success && preferredEngine === 'tengine-vision') {
-        const fallback = await this._recognizeWithLocalChain(input, options, ['rapid-ocr', 'windows-ocr']);
-        if (fallback.success) {
-          fallback.fallbackFrom = 'tengine-vision';
-          fallback.fallbackReason = result.error;
-          return fallback;
-        }
-        return result;
       }
 
       // Local models missing/corrupt -> degrade to Windows OCR instead of
@@ -363,6 +355,43 @@ export class OCREngineManager {
     }
 
     return fallbackResult;
+  }
+
+  // The built-in vision model as the selected engine means smart routing
+  // (user rule 2026-09-14): PP-OCR reads every capture first and keeps the
+  // simple ones; a large capture, a complex layout or an unsure read goes
+  // on to the vision model. `routed` on the result says which way it went,
+  // in enums only.
+  async _recognizeSmart(input, options) {
+    const vision = this.getOrCreate('tengine-vision');
+    const visionOk = !!vision && (await vision.isAvailable());
+    const pp = await this._recognizeWithEngine('rapid-ocr', input, options);
+    const ppUsable = pp.success && isUsableResult(pp, 'rapid-ocr');
+
+    if (!visionOk) {
+      // Selected but not usable right now (GPU off, pack gone): the classic
+      // engines serve the capture and the result says so.
+      const r = ppUsable ? pp : await this._recognizeWithLocalChain(input, options, ['windows-ocr']);
+      if (r.success) {
+        r.fallbackFrom = 'tengine-vision';
+        r.fallbackReason = 'unavailable';
+      }
+      return r;
+    }
+
+    const decision = decideEscalation(pp, imageSize(input));
+    if (!decision) {
+      return { ...pp, routed: { engine: 'tengine-vision', to: 'rapid-ocr', reason: 'simple' } };
+    }
+    logger.info(`vision escalation: ${decision.reason}`);
+    const v = await this._recognizeWithEngine('tengine-vision', input, options);
+    if (v.success && isUsableResult(v, 'tengine-vision')) {
+      return { ...v, routed: { engine: 'tengine-vision', to: 'tengine-vision', reason: decision.reason } };
+    }
+    logger.warn(`vision model could not serve the capture (${v.error || 'unusable'}), PP-OCR's read stands`);
+    if (ppUsable) return { ...pp, routed: { engine: 'tengine-vision', to: 'rapid-ocr', reason: decision.reason, visionFailed: true } };
+    const last = await this._recognizeWithLocalChain(input, options, ['windows-ocr']);
+    return last.success ? last : (pp.success ? pp : v);
   }
 
   // Walk the local chain; first usable result wins. Last failure is

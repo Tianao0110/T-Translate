@@ -683,10 +683,11 @@ const zh = {
       mirrorEncoder: "图像编码器（镜像）",
       openFolder: "打开模型文件夹",
       rescan: "重新检测",
-      cpuHint: "当前在 CPU 上运行：只处理约 0.3 百万像素以内的截图，更大的自动交给本地 OCR；开启显卡加速后不限大小",
+      needsGpu: "只在显卡加速打开时可用（设置 → 关于 → 显卡加速）",
+      smartHint: "启用后由引擎层分配：简单截图直接走本地 OCR，大图、多栏、表格、字号混杂或本地 OCR 没把握的才交给视觉模型",
       part: { model: "主模型", mmproj: "图像编码器" },
       state: { ready: "已就绪", missing: "未放入", mismatch: "校验不符" },
-      fallbackNotice: "内置视觉模型这次没接（未安装、截图过大或引擎异常），已改用本地 OCR",
+      fallbackNotice: "内置视觉模型当前不可用（显卡加速未开或模型文件不在），已改用本地 OCR",
     },
     tier: {
       label: "模型档位",

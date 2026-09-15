@@ -258,6 +258,11 @@ async function ensureVisionLoaded() {
 // nowhere else; nothing about them is logged.
 async function recognize({ image, task = 'Spotting', maxTokens = null } = {}) {
   if (visionPolicy.state().unhealthy) throw fail('LLM_UNHEALTHY', 'built-in vision model stalled repeatedly this session');
+  // GPU only (2026-09-14 decision): on the CPU the encoder takes seconds
+  // and a screen-scaled capture blows the size cap anyway, so the engine
+  // steps aside before a 1.7 GB pack is even loaded.
+  if (!deps.visionAdapter) throw fail('LLM_VISION_UNAVAILABLE', 'vision engine not wired');
+  if (deps.visionAdapter.provider() !== 'gpu') throw fail('LLM_VISION_NEEDS_GPU', 'the built-in vision model runs only with GPU acceleration on');
   await ensureVisionLoaded();
   visionInflight++;
   clearVisionIdle();
@@ -303,6 +308,8 @@ function visionStatus() {
     available: true,
     pack: row ? { id: row.id, name: row.name, status: row.status, files: row.files || [] } : null,
     provider: a.provider(),
+    // What the OCR chain and the settings card go by: pack ready and GPU on.
+    usable: !!(row && row.status === 'ready' && a.provider() === 'gpu'),
     maxPixels: a.provider() === 'gpu' ? 0 : CPU_MAX_PIXELS,
     resident: loaded ? { file: path.basename(loaded.file), provider: loaded.provider, device: loaded.device ? loaded.device.name : null, fallback: loaded.fallback } : null,
     inflight: visionInflight,
