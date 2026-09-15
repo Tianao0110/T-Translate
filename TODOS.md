@@ -13,9 +13,10 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 
 ## 下一版本候选
 
-### v0.5.1：内置模型的视觉（mtmd）路径（用户 2026-09-08 拍板：不进 v0.5.0，单独一版）
+### v0.5.1：内置视觉模型（分支 feat/v0.5.1，方案与进度 gstack v051-vision-plan-2026-09-14）
 
-- 双槽第二槽：mtmd.dll 的 ABI 转录（结构体 / 函数表 / 指纹单测同 llama-abi.js 的做法）、图片 → 视觉 token → 解码的会话路径、视觉模型包进白名单（候选 PaddleOCR-VL 官方 GGUF，须随包带 jinja 模板）、注册成 tier 2 的 OCR 引擎；spike 数字与 mtmd 用法在 gstack v050-engine-plugin-research（scratchpad/spike-llama/）
+- ✅ 第 0–3 步已落（mtmd 运行时、双宿主管理层、栈引擎 + 设置卡、GPU-only + 智能分配）；第 4 步验证与文档进行中
+- **分配阈值待真实反馈调**：`src/stack/ocr/vision-routing.js` 的 ROUTING（大图 1.2 MP、密集 30 行、表格 3 行 × 3 块、多栏各 4 行、字号差 2.5 倍、置信度 0.75 / 三成行低于 0.6）是 2026-09-14 拍脑袋定的；结果里的 `routed.reason` 就是对数用的，用户觉得「该走视觉没走 / 不该走走了」时按它调
 - 顺带：Q6_K 掐表对比（可选）
 
 ### v0.5.2：文档整体精简 + 程序内「使用说明」（用户 2026-09-08 拍板；落法与 8 章骨架在 gstack v052-manual-outline-2026-09-08）

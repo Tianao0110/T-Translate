@@ -264,17 +264,19 @@ electron/ipc/gpu.js                        「显卡加速」开关：settings.g
 ### 内置模型（v0.5.0 第 3 步；手册 docs/T-ENGINE.md）
 
 ```
-electron/shared/llm-packs.js               模型白名单：文件名、大小、SHA256、协议、官方与镜像链接、模板族、角色（general = 翻译 + AI 动作，mt = 仅翻译）；哈希是安全边界
-electron/tengine/runtime/                  llama.cpp 运行时：llama-abi.js（钉版 b10853 的结构体 / 原型 / 默认值指纹）、llama-binding.js（koffi 装载与清单校验）、llama-session.js（模型与上下文、解码循环、思考模式三层禁止、KV 前缀复用、取消、循环检测）、worker.js（跑 FFI 的 worker_thread 协议）、llama-manifest.json（DLL 清单）
-electron/services/llm-host/llm-host.js     LLM utilityProcess：一次喂 worker 一个请求、共享取消标志、停滞看门狗；崩溃只带走本进程
-electron/tengine/engines/llm.js            LLM 适配器：load / unload / generate（流式）/ probe / health / metrics / setProvider / status，事件只带数字
-electron/managers/llm-manager.js           主进程决策：选文件（白名单或开发者门）、驻留与 5 分钟闲置卸载、显卡自检、策略表（policy/engine-policy.js）、试用日志
-electron/managers/llm-pack-manager.js      模型文件夹（<models>/llm-models）扫描：同名同大小才哈希，哈希对上才可用，其余列为未列入
+electron/shared/llm-packs.js               模型白名单：文件名、大小、SHA256、协议、官方与镜像链接、模板族、角色（general = 翻译 + AI 动作，mt = 仅翻译，vision = 视觉 OCR，两个文件各自钉哈希）；哈希是安全边界
+electron/tengine/runtime/                  llama.cpp 运行时：llama-abi.js（钉版 b10853 的结构体 / 原型 / 默认值指纹，含 mtmd）、llama-binding.js（koffi 装载与清单校验）、llama-session.js（模型与上下文、解码循环、思考模式三层禁止、KV 前缀复用、取消、循环检测）、mtmd.js（图片 → mtmd 解码与编码 → 预填进会话 → 同一条采样循环；Spotting 输出解析成行文字 + 像素框）、worker.js（跑 FFI 的 worker_thread 协议）、llama-manifest.json（DLL 清单）
+electron/services/llm-host/llm-host.js     LLM utilityProcess：一次喂 worker 一个请求、共享取消标志、停滞看门狗；崩溃只带走本进程。文本槽 `llm` 与视觉槽 `llm-vision` 各起一个（v0.5.1）
+electron/tengine/engines/llm.js            LLM 适配器：load / unload / generate（流式）/ probe / health / metrics / setProvider / status，事件只带数字；`id` 参数区分文本槽与视觉槽
+electron/managers/llm-manager.js           主进程决策：选文件（白名单或开发者门）、驻留与 5 分钟闲置卸载、显卡自检、策略表（policy/engine-policy.js）、试用日志；视觉槽 recognize / unloadVision / visionSelfTest，只在显卡加速打开时可用
+electron/managers/llm-pack-manager.js      模型文件夹（<models>/llm-models）扫描：同名同大小才哈希，哈希对上才可用，其余列为未列入；双文件包逐文件核对（ready / partial / mismatch）
 electron/policy/engine-policy.js           策略表落码：P4 慢建议、P5/P6 连续停滞标不健康、P9 性能下降记录、P13 思考泄漏计数
 electron/tengine/metrics-log.js            事件流落盘 data\logs\tengine-<日期>.jsonl（留 3 份，无痕不写，永不含文本）
 electron/tengine/trial-log.js              未列入模型的试用日志（每模型每月一份，两个月清理）与试用报告汇总
 electron/ipc/llm.js                        llm:* 通道：状态、重扫、开文件夹、卸载、自检、探针、试用报告
 src/stack/providers/tengine.js             翻译源「内置模型」：经 runtime.localLlm 钩子到 llm-manager；仅翻译包时 canChat 为 false，AI 动作改走下一个源
+src/stack/ocr/tengine-vision.js            OCR 引擎「内置视觉模型」（v0.5.1）：经 runtime.localLlm.recognize 到视觉槽，一律 Spotting，行框按 blocks.js 契约给像素坐标；默认顺序第 3 位
+src/stack/ocr/vision-routing.js            选中内置视觉模型时的分配规则：先跑 PP-OCR，按其行框与置信度判 unreadable / large / dense / low-confidence / table / columns / mixed-sizes 才升级到视觉模型，结果带 routed 枚举
 src/components/SettingsPanel/sections/LlmSection.jsx  设置 → 本地模型：安装状态与下载链接、模型选择、后端 / 驻留 / 速度、自检与卸载、开发者门
 scripts/fetch-llama-runtime.js             按清单下载官方 llama.cpp Vulkan 包并校验（打包前跑；--pin 年度换版）
 native/sherpa-onnx-webgpu/                 带 webgpu provider 的 sherpa-onnx DLL + 补丁 + 构建配方；scripts/overlay-sherpa-runtime.js 在 postinstall / 打包前覆盖进 npm 包

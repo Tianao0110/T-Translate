@@ -26,7 +26,7 @@
 | Feature                            | Description                                                                                                                            |
 | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | **Selection translator**     | System-wide. Select text in any app to translate. Up to 8 pinned windows                                                               |
-| **Screenshot OCR**           | Capture screen regions. 59 recognition languages, 7 OCR engines with automatic fallback; local OCR and the neural voice can run on the GPU |
+| **Screenshot OCR**           | Capture screen regions. 59 recognition languages, 8 OCR engines with automatic fallback; the app's own vision model (PaddleOCR-VL) takes over large captures and complex layouts with GPU acceleration on |
 | **Floating window**          | Transparent overlay. Space-bar to capture-and-translate; auto-refresh & global-hotkey zero-focus capture for live captions / subtitles |
 | **Listen mode**              | Live captions for whatever is playing, translated sentence by sentence. Chinese / English / Japanese / Korean / Cantonese, recognized on-device, audio never touches disk; can listen to a single program; subtitles auto-save as SRT |
 | **Local model**              | The app's own local LLM (Qwen3-1.7B): drop the model file into a folder and it translates and summarizes — no LM Studio, no port, works offline, GPU optional |
