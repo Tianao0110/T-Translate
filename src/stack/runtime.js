@@ -12,7 +12,8 @@ const caps = {
   // instead of the renderer's old IPC bridge classes.
   localOcr: null,
   // The built-in model (T-Engine's LLM host, electron/managers/llm-manager):
-  // { generate(request, onToken) -> { promise, cancel }, status(), selected() }.
+  // { generate(request, onToken) -> { promise, cancel }, status(), selected(),
+  //   recognize({ image, task }) -> { promise, cancel }, visionStatus() }.
   localLlm: null,
 };
 

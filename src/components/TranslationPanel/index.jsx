@@ -212,10 +212,10 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
 
           // LLM Vision -> local OCR fallback gets surfaced; ocrStatus.fallbackNotice
           // is set by recognizeImage in main-translation.js
-          if (result.fallbackFrom === 'llm-vision') {
+          if (result.fallbackFrom === 'llm-vision' || result.fallbackFrom === 'tengine-vision') {
             const store = useTranslationStore.getState();
             const notice = store.ocrStatus?.fallbackNotice;
-            notify(notice || t('ocr.visionFallback'), 'warning');
+            notify(notice || t(result.fallbackFrom === 'tengine-vision' ? 'ocr.tengineVision.fallbackNotice' : 'ocr.visionFallback'), 'warning');
           } else {
             notify(t('translation.ocrSuccess', { engine: result.engine || engineToUse }), 'success');
           }

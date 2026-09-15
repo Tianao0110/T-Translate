@@ -58,6 +58,10 @@ function register(ctx) {
         generate: (request, onToken) => llmManager.generate(request, onToken),
         status: () => llmManager.status(),
         selected: () => llmManager.selected(),
+        // The vision slot for the built-in OCR engine: image bytes in, lines
+        // with boxes out; the bytes never touch a log.
+        recognize: (request) => llmManager.recognize(request),
+        visionStatus: () => llmManager.visionStatus(),
       },
       cacheFilePath: path.join(dataDir('cache'), 'translation-cache.json'),
       // External TTS endpoint: plain fields from settings, the key from the

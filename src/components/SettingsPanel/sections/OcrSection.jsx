@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Eye, EyeOff, AlertTriangle, RefreshCw, Download, Cpu, Sparkles, Globe } from 'lucide-react';
+import { Eye, EyeOff, AlertTriangle, RefreshCw, Download, Cpu, Sparkles, Globe, ExternalLink, FolderOpen } from 'lucide-react';
 import stackClient from '../../../services/stack-client.js';
 import { OCR_LANGUAGE_GROUPS, ocrLanguageName } from '../../../config/ocr-languages.js';
 import LanguagePicker from '../../shared/LanguagePicker.jsx';
@@ -18,6 +18,7 @@ const HQ_PACK_ID = 'base-v6-hq';
 const ENGINE_TAB = {
   'rapid-ocr': 'local',
   'windows-ocr': 'local',
+  'tengine-vision': 'vision',
   'llm-vision': 'vision',
   'ocrspace': 'online',
   'google-vision': 'online',
@@ -52,6 +53,34 @@ const OcrSection = ({
   const [winOcrLangs, setWinOcrLangs] = useState(null);
 
   const [tab, setTab] = useState(ENGINE_TAB[settings.ocr.engine] || 'local');
+
+  // The built-in vision model: install state of its two files and which
+  // backend it runs on, from the model manager (same bridge as the local
+  // model page).
+  const [llmStatus, setLlmStatus] = useState(null);
+  const [visionBusy, setVisionBusy] = useState(false);
+  const loadLlmStatus = useCallback(async () => {
+    try {
+      const s = await window.electron?.llm?.status?.();
+      if (s) setLlmStatus(s);
+    } catch {
+      // the card reads as not installed until the next visit
+    }
+  }, []);
+  useEffect(() => {
+    loadLlmStatus();
+  }, [loadLlmStatus]);
+  const rescanVision = async () => {
+    setVisionBusy(true);
+    try {
+      const s = await window.electron?.llm?.rescan?.();
+      if (s) setLlmStatus(s);
+    } catch {
+      // the next load picks it up
+    } finally {
+      setVisionBusy(false);
+    }
+  };
 
   const refreshPacks = useCallback(async () => {
     if (!window.electron?.ocr?.listPacks) return;
@@ -410,8 +439,85 @@ const OcrSection = ({
     </>
   );
 
+  const visionPack = llmStatus?.packs?.packs?.find((p) => p.role === 'vision') || null;
+  const visionReady = visionPack?.status === 'ready';
+  const visionBadge = visionReady
+    ? <span className="engine-badge installed">{t('ocr.installed')}</span>
+    : visionPack?.status === 'mismatch'
+      ? <span className="engine-badge error"><AlertTriangle size={11} style={{ marginRight: 3 }} />{t('ocr.tengineVision.mismatch')}</span>
+      : visionPack?.status === 'partial'
+        ? <span className="engine-badge download">{t('ocr.tengineVision.partial')}</span>
+        : <span className="engine-badge download">{t('ocr.tengineVision.notInstalled')}</span>;
+  const openLink = (url) => url && window.electron?.shell?.openExternal?.(url);
+  const visionBody = (
+    <>
+      <p className="engine-meta">{t('ocr.tengineVision.desc')}</p>
+      {(visionPack?.files || []).map((f) => (
+        <p className="engine-meta" key={f.part}>
+          {t(`ocr.tengineVision.part.${f.part}`)}: {f.file} · {t(`ocr.tengineVision.state.${f.status}`)}
+        </p>
+      ))}
+      {llmStatus?.dir && <p className="engine-meta">{llmStatus.dir}</p>}
+      {visionPack && !visionReady && visionPack.source && (
+        <>
+          <p className="engine-meta">{t('ocr.tengineVision.howTo')}</p>
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 6 }}>
+            <button className="link-button" onClick={() => openLink(visionPack.source.url)}>
+              <ExternalLink size={14} /> {t('ocr.tengineVision.linkModel')}
+            </button>
+            <button className="link-button" onClick={() => openLink(visionPack.source.mmproj?.url)}>
+              <ExternalLink size={14} /> {t('ocr.tengineVision.linkEncoder')}
+            </button>
+            {visionPack.source.mirror && (
+              <button className="link-button" onClick={() => openLink(visionPack.source.mirror)}>
+                <ExternalLink size={14} /> {t('ocr.tengineVision.mirrorModel')}
+              </button>
+            )}
+            {visionPack.source.mmproj?.mirror && (
+              <button className="link-button" onClick={() => openLink(visionPack.source.mmproj.mirror)}>
+                <ExternalLink size={14} /> {t('ocr.tengineVision.mirrorEncoder')}
+              </button>
+            )}
+          </div>
+        </>
+      )}
+      {visionReady && llmStatus?.vision?.provider !== 'gpu' && (
+        <p className="setting-hint">{t('ocr.tengineVision.cpuHint')}</p>
+      )}
+    </>
+  );
+  const visionActions = (
+    <>
+      {selectButton('tengine-vision', visionReady, () => notify(t('ocr.tengineVision.notReady'), 'warning'))}
+      <button
+        className="btn-small"
+        onClick={() => window.electron?.llm?.openDir?.()}
+        title={t('ocr.tengineVision.openFolder')}
+        style={{ marginLeft: 6, padding: '4px 8px' }}
+      >
+        <FolderOpen size={12} />
+      </button>
+      <button
+        className="btn-small"
+        onClick={rescanVision}
+        disabled={visionBusy}
+        title={t('ocr.tengineVision.rescan')}
+        style={{ marginLeft: 6, padding: '4px 8px' }}
+      >
+        <RefreshCw size={12} className={visionBusy ? 'spinning' : ''} />
+      </button>
+    </>
+  );
+
   const visionTab = (
     <div className="ocr-engines-list">
+      {engineCard({
+        id: 'tengine-vision',
+        name: t('ocr.tengineVision.name'),
+        badge: visionBadge,
+        body: visionBody,
+        actions: visionActions,
+      })}
       {engineCard({
         id: 'llm-vision',
         name: 'LLM Vision',

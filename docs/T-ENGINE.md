@@ -52,6 +52,7 @@ electron/services/llm-host/llm-host.js     LLM utilityProcess：进程内一条 
 electron/managers/llm-manager.js           主进程侧决策：选文件（白名单 / 开发者门）、驻留与 5 分钟闲置卸载（P8）、显卡开关自检、试用日志；视觉槽（recognize / unloadVision / visionSelfTest）有自己的驻留、闲置计时与策略实例，CPU 后端按 CPU_MAX_PIXELS 限图
 electron/managers/llm-pack-manager.js      模型文件夹扫描：同名同大小才哈希（缓存 size+mtime），哈希对上才 ready，其余列为未列入；双文件包（模型 + mmproj）逐文件核对，全对才 ready，缺一个 partial、错一个 mismatch
 electron/ipc/llm.js                        llm:* 通道：状态、重扫、开文件夹、卸载、探针、试用报告；不过文本
+src/stack/ocr/tengine-vision.js            OCR 引擎「内置视觉模型」：经 runtime.localLlm.recognize 到视觉槽，一律 Spotting，行框按 blocks.js 契约给像素坐标；默认顺序第 3 位，被首选而拒接时自动走本地 OCR 并标 fallbackFrom
 electron/services/ocr-host/ocr-host.js     已有：OCR utilityProcess（v0.4.9）
 electron/services/audio-engine/audio-worker.js  已有：音频 utilityProcess（v0.4.0）
 electron/tengine/runtime/llama-manifest.json  官方 zip 与取用 DLL 的 SHA256 清单（DLL 本身不进 git）

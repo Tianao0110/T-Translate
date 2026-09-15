@@ -124,6 +124,36 @@ async function main() {
     step('the GPU takes the large image', r2.stop === 'eog' || r2.stop === 'limit', `${r2.imageTokens} image tok, ${r2.totalMs} ms`);
   }
 
+  // Through the stack: the OCR manager's built-in vision engine, a capture
+  // as the data URL the windows send, line boxes back; and the degrade to
+  // the classic local engine when the vision host refuses.
+  tengine.get('llm-vision').setProvider('cpu');
+  const { createTranslationStack } = require('../electron/generated/translation-stack.cjs');
+  const paddleStub = async () => ({ success: true, text: 'stub', blocks: [], rawBlocks: [] });
+  const stack = createTranslationStack({
+    fetch: async () => { throw new Error('no network in this smoke'); },
+    getLanguage: () => 'zh',
+    loggerFactory: (scope) => makeLogger(`Stack:${scope}`),
+    loadProviderConfigs: async () => ({ list: [], configs: {} }),
+    loadOcrConfigs: async () => ({}),
+    localOcr: { paddle: paddleStub, windows: paddleStub, isWindows: true },
+    getCustomFilters: () => [],
+    localLlm: {
+      generate: (request, onToken) => llmManager.generate(request, onToken),
+      status: () => llmManager.status(),
+      selected: () => llmManager.selected(),
+      recognize: (request) => llmManager.recognize(request),
+      visionStatus: () => llmManager.visionStatus(),
+    },
+  });
+  await stack.init();
+  const dataUrl = `data:image/png;base64,${image.toString('base64')}`;
+  const o1 = await stack.ocr.recognize(dataUrl, { engine: 'tengine-vision', allowedEngines: ['tengine-vision', 'rapid-ocr', 'windows-ocr'] });
+  step('stack OCR engine returns text with line boxes', o1.success && o1.engine === 'tengine-vision' && o1.blocks.length > 0 && o1.blocks[0].bbox.width > 0, `${o1.text} ${JSON.stringify(o1.blocks[0]?.bbox)}`);
+  const big = bigBmp(800, 600);
+  const o2 = await stack.ocr.recognize(`data:image/bmp;base64,${big.toString('base64')}`, { engine: 'tengine-vision' });
+  step('a refused capture degrades to the classic local engine with a notice', o2.success && o2.engine === 'rapid-ocr' && o2.fallbackFrom === 'tengine-vision', o2.fallbackReason || o2.error);
+
   step('manual unload clears both slots', (await llmManager.unloadVision('smoke')) === true && llmManager.status().vision.resident === null);
   await llmManager.unload('smoke');
   tengine.shutdownAll();

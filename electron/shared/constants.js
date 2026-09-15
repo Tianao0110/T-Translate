@@ -17,6 +17,7 @@ const THEMES = {
 
 const OCR_ENGINES = {
   LLM_VISION: 'llm-vision',
+  TENGINE_VISION: 'tengine-vision',
   RAPID_OCR: 'rapid-ocr',
   PADDLE_OCR: 'paddle-ocr',
   WINDOWS_OCR: 'windows-ocr',

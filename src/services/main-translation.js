@@ -329,6 +329,8 @@ class MainTranslationService {
             draft.ocrStatus.fallbackNotice = result.visionLocked
               ? _t('ocr.visionLocked', 'LLM Vision has been disabled due to repeated failures. Switched to local OCR. Re-enable in Settings > OCR.')
               : _t('ocr.visionFallback', 'Current model does not support vision. Using local OCR instead.');
+          } else if (result.fallbackFrom === 'tengine-vision') {
+            draft.ocrStatus.fallbackNotice = _t('ocr.tengineVision.fallbackNotice', 'The built-in vision model passed on this capture; Local OCR handled it');
           }
         });
 

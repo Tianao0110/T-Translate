@@ -156,7 +156,9 @@ const MainWindow = () => {
           ? (ocrResult.visionLocked
             ? t('ocr.visionLocked', 'LLM Vision 已因连续失败停用，本次已用本地 OCR。可在设置 > OCR 重新启用。')
             : t('ocr.visionFallback', '当前模型不支持视觉，本次已用本地 OCR 识别。'))
-          : null;
+          : ocrResult.fallbackFrom === 'tengine-vision'
+            ? t('ocr.tengineVision.fallbackNotice')
+            : null;
 
         // Selection window will run its own translation pass on this text
         window.electron?.screenshot?.notifyOcrComplete?.({

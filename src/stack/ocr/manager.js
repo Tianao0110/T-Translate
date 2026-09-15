@@ -13,6 +13,7 @@
 import { RapidOCREngine, WindowsOCREngine } from './local-bridge.js';
 import { isLoopbackUrl } from '../loopback.js';
 import LLMVisionEngine from './llm-vision.js';
+import TengineVisionEngine from './tengine-vision.js';
 import OCRSpaceEngine from './ocrspace.js';
 import GoogleVisionEngine from './google-vision.js';
 import AzureOCREngine from './azure-ocr.js';
@@ -26,6 +27,7 @@ const logger = createLogger('OCRManager');
 const engines = {
   'rapid-ocr': RapidOCREngine,
   'windows-ocr': WindowsOCREngine,
+  'tengine-vision': TengineVisionEngine,
   'llm-vision': LLMVisionEngine,
   'ocrspace': OCRSpaceEngine,
   'google-vision': GoogleVisionEngine,
@@ -34,10 +36,12 @@ const engines = {
 };
 
 // Local engines first (no network, no quota), then online APIs by general
-// quality/availability
+// quality/availability. The built-in vision model sits behind the two
+// classic local engines until it beats PP-OCR on the OCR gates.
 export const DEFAULT_OCR_PRIORITY = [
   'rapid-ocr',
   'windows-ocr',
+  'tengine-vision',
   'llm-vision',
   'ocrspace',
   'google-vision',
@@ -83,8 +87,9 @@ export class OCREngineManager {
     this._visionFailThreshold = 2;
     this._visionLocked = false;
     // Walked in order when llm-vision degrades or local models are missing:
-    // PP-OCR first, Windows OCR as the zero-download bedrock.
-    this._localFallbackChain = ['rapid-ocr', 'windows-ocr'];
+    // PP-OCR first, Windows OCR as the zero-download bedrock, the built-in
+    // vision model last (it may be uninstalled or capped on the CPU).
+    this._localFallbackChain = ['rapid-ocr', 'windows-ocr', 'tengine-vision'];
   }
 
   async init() {
@@ -112,6 +117,7 @@ export class OCREngineManager {
     return {
       'rapid-ocr': {},
       'windows-ocr': {},
+      'tengine-vision': {},
       // Same OpenAI-compatible endpoint the local-LLM provider uses — the
       // engine fetches it directly and never routes through the service.
       // model is independent of endpoint: users on LM Studio's default port
@@ -177,6 +183,19 @@ export class OCREngineManager {
         if (this._isVisionUnsupportedError(result.error)) {
           return this._handleVisionFallback(input, options, result.error);
         }
+      }
+
+      // The built-in vision model refuses what it cannot serve (not
+      // installed, the CPU size cap, a stalled host): the classic local
+      // engines take the capture and the result says who stepped in.
+      if (!result.success && preferredEngine === 'tengine-vision') {
+        const fallback = await this._recognizeWithLocalChain(input, options, ['rapid-ocr', 'windows-ocr']);
+        if (fallback.success) {
+          fallback.fallbackFrom = 'tengine-vision';
+          fallback.fallbackReason = result.error;
+          return fallback;
+        }
+        return result;
       }
 
       // Local models missing/corrupt -> degrade to Windows OCR instead of
@@ -346,12 +365,12 @@ export class OCREngineManager {
     return fallbackResult;
   }
 
-  // Walk rapid-ocr -> windows-ocr; first usable result wins. Last failure is
+  // Walk the local chain; first usable result wins. Last failure is
   // returned so the caller still sees a meaningful error.
-  async _recognizeWithLocalChain(input, options) {
+  async _recognizeWithLocalChain(input, options, chain = this._localFallbackChain) {
     let lastResult = null;
     let weakest = null;
-    for (const engineId of this._localFallbackChain) {
+    for (const engineId of chain) {
       const instance = this.getOrCreate(engineId);
       if (!instance || !(await instance.isAvailable())) continue;
 
