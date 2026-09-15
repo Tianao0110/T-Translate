@@ -351,6 +351,13 @@ async function main() {
   console.log('\nworst 5:');
   for (const r of worst) console.log(`  [${(r.cer * 100).toFixed(0)}%] ref: ${r.ref}\n         hyp: ${r.hyp || '(none)'}`);
   console.log(`\nsaved ${outFile}`);
+  // The sandbox holds a copy of every pack it installed (up to 1.4 GB for
+  // the high-accuracy tier); the results are what matters.
+  try {
+    fs.rmSync(SANDBOX, { recursive: true, force: true });
+  } catch (e) {
+    console.log(`sandbox kept (${e.message}): ${SANDBOX}`);
+  }
   app.exit(0);
 }
 

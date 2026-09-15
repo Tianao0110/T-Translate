@@ -18,7 +18,7 @@ const HQ_PACK_ID = 'base-v6-hq';
 const ENGINE_TAB = {
   'rapid-ocr': 'local',
   'windows-ocr': 'local',
-  'tengine-vision': 'vision',
+  'tengine-vision': 'local',
   'llm-vision': 'vision',
   'ocrspace': 'online',
   'google-vision': 'online',
@@ -407,38 +407,6 @@ const OcrSection = ({
     </>
   );
 
-  const localTab = (
-    <>
-      <div className="ocr-engines-list">
-        {engineCard({
-          id: 'rapid-ocr',
-          name: t('ocr.localOcrName'),
-          badge: localBadge,
-          body: localBody,
-          actions: localActions,
-          className: engineHealth === 'broken' ? 'engine-broken' : '',
-        })}
-        {settings.ocr.isWindows && engineCard({
-          id: 'windows-ocr',
-          name: 'Windows OCR',
-          badge: <span className="engine-badge system">{t('ocr.windowsOcr.badge')}</span>,
-          meta: winOcrLangs && winOcrLangs.length > 0
-            ? t('ocr.windowsOcr.langs', { langs: winOcrLangs.join(', ') })
-            : null,
-          actions: selectButton('windows-ocr'),
-        })}
-      </div>
-      <PackList
-        bridge={window.electron?.ocr}
-        prefix="ocr.packs"
-        notify={notify}
-        confirm={confirm}
-        filter={(p) => p.type === 'lang'}
-        onPacks={(list) => setPacks(list)}
-      />
-    </>
-  );
-
   const visionPack = llmStatus?.packs?.packs?.find((p) => p.role === 'vision') || null;
   const visionReady = visionPack?.status === 'ready';
   const visionBadge = visionReady
@@ -509,15 +477,47 @@ const OcrSection = ({
     </>
   );
 
+  const localTab = (
+    <>
+      <div className="ocr-engines-list">
+        {engineCard({
+          id: 'rapid-ocr',
+          name: t('ocr.localOcrName'),
+          badge: localBadge,
+          body: localBody,
+          actions: localActions,
+          className: engineHealth === 'broken' ? 'engine-broken' : '',
+        })}
+        {settings.ocr.isWindows && engineCard({
+          id: 'windows-ocr',
+          name: 'Windows OCR',
+          badge: <span className="engine-badge system">{t('ocr.windowsOcr.badge')}</span>,
+          meta: winOcrLangs && winOcrLangs.length > 0
+            ? t('ocr.windowsOcr.langs', { langs: winOcrLangs.join(', ') })
+            : null,
+          actions: selectButton('windows-ocr'),
+        })}
+        {engineCard({
+          id: 'tengine-vision',
+          name: t('ocr.tengineVision.name'),
+          badge: visionBadge,
+          body: visionBody,
+          actions: visionActions,
+        })}
+      </div>
+      <PackList
+        bridge={window.electron?.ocr}
+        prefix="ocr.packs"
+        notify={notify}
+        confirm={confirm}
+        filter={(p) => p.type === 'lang'}
+        onPacks={(list) => setPacks(list)}
+      />
+    </>
+  );
+
   const visionTab = (
     <div className="ocr-engines-list">
-      {engineCard({
-        id: 'tengine-vision',
-        name: t('ocr.tengineVision.name'),
-        badge: visionBadge,
-        body: visionBody,
-        actions: visionActions,
-      })}
       {engineCard({
         id: 'llm-vision',
         name: 'LLM Vision',

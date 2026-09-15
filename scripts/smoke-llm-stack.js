@@ -36,9 +36,20 @@ function place(dir, src) {
   try {
     fs.linkSync(src, dst);
   } catch {
+    // Hard links cannot cross volumes (the sandbox is on the system drive):
+    // this is a real copy of a 2 GB file, removed again at exit.
+    console.log(`copying ${path.basename(src)} into the sandbox (${Math.round(size / 1048576)} MB, no hard link across drives)`);
     fs.copyFileSync(src, dst);
   }
   return { pack, dst };
+}
+
+function cleanupSandbox() {
+  try {
+    fs.rmSync(SANDBOX, { recursive: true, force: true });
+  } catch (e) {
+    console.log(`sandbox kept (${e.message}): ${SANDBOX}`);
+  }
 }
 
 function fakeStore(seed = {}) {
@@ -142,6 +153,7 @@ async function main() {
   await llmManager.unload('smoke');
   tengine.shutdownAll();
   await new Promise((r) => setTimeout(r, 300));
+  cleanupSandbox();
   console.log(failures ? `\n${failures} check(s) failed` : '\nall checks passed');
   app.exit(failures ? 1 : 0);
 }
