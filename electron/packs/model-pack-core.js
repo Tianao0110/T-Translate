@@ -93,7 +93,7 @@ function createPackManager({
   const fs = deps.fs || nodeFs;
   // Lazy: logger.js pulls in electron at module scope, which unit tests must
   // never reach — they inject deps.logger instead.
-  const logger = deps.logger || require('./logger')(logLabel);
+  const logger = deps.logger || require('../utils/logger')(logLabel);
   if (typeof fetchImpl !== 'function') {
     throw new Error('createPackManager requires deps.fetch (inject net.fetch)');
   }

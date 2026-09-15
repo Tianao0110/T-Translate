@@ -35,7 +35,7 @@ const ASR_BASE_PACK = {
   file: 'asr-base-sense-voice.zip',
   languages: ['zh', 'en', 'ja', 'ko', 'yue'],
   // Role -> installed filename. This map supersedes the hardcoded filenames in
-  // electron/utils/asr-models.js: swapping a model edits the map, not the code.
+  // electron/listen/asr-models.js: swapping a model edits the map, not the code.
   files: {
     model: 'model.int8.onnx',
     tokens: 'tokens.txt',

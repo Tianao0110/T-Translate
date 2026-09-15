@@ -250,14 +250,14 @@ electron/utils/open-with.js     右键菜单 argv 解析（.pdf/.docx/.txt 白�
 ### 听译引擎与驻留口径（v0.4.0，捕获层 v0.4.1 换代）
 
 ```
-electron/managers/audio-engine-manager.js  听译会话与神经 TTS 的会话语义（来源 / 语言 / 档位 / 字幕事件转发 / 一次性重启策略）；进程本身归 T-Engine 的音频适配器（v0.5.0）
-electron/managers/listen-translator.js     听译的翻译、逐句记录与会话结束时的字幕文件（v0.5.0 从悬浮窗搬入）：定稿编号、带上文的系统提示（utils/listen-prompt.js）、流式译文经 audio-engine:translation 推给窗口、结束时等在途翻译 3 s 再落盘
+electron/listen/audio-engine-manager.js  听译会话与神经 TTS 的会话语义（来源 / 语言 / 档位 / 字幕事件转发 / 一次性重启策略）；进程本身归 T-Engine 的音频适配器（v0.5.0）
+electron/listen/listen-translator.js     听译的翻译、逐句记录与会话结束时的字幕文件（v0.5.0 从悬浮窗搬入）：定稿编号、带上文的系统提示（utils/listen-prompt.js）、流式译文经 audio-engine:translation 推给窗口、结束时等在途翻译 3 s 再落盘
 electron/tengine/engines/audio.js          音频宿主适配器：进程生命周期、模型载入计时、退出分类（model-load / session / idle）、provider 与 sherpa 的 stderr 回退标记、朗读自检；manager 订阅它转发的 worker 消息
 electron/tengine/                          T-Engine 引擎层（v0.5.0 第 1 步）：host-manager.js 通用宿主框架（按需拉起、请求配对、崩溃重生、连崩退避、事件流、状态快照）、registry.js 引擎表、engines/ocr.js OCR 引擎适配器（持有 OCR 宿主，provider / health / status）、index.js 门面（status() 快照 + on() 事件流）；手册见 docs/T-ENGINE.md
 electron/ipc/tengine.js                    tengine:status 快照与 tengine:event 转发；宿主生命周期事件在这里进 app 日志
 electron/services/ocr-host/ocr-host.js     本地 OCR 运行时（ppocr/ + onnxruntime-node + skia）跑在这个子进程；provider cpu/webgpu，首会话热身、失败回退 CPU
 electron/services/ocr-host/ppocr/          PP-OCR 流水线（检测 / 识别 / 版面），fork 自 esearch-ocr（Apache-2.0）：前后处理全部 typed array，输出与上游逐行一致（v0.4.10）
-electron/utils/listen-autosave.js          听译字幕自动保存：data\listen 下按「程序名-时间.srt」落盘、只留最近 20 个；无痕与开关的门在 ipc/audio-engine.js（v0.4.10）
+electron/listen/listen-autosave.js          听译字幕自动保存：data\listen 下按「程序名-时间.srt」落盘、只留最近 20 个；无痕与开关的门在 ipc/audio-engine.js（v0.4.10）
 electron/ipc/gpu.js                        「显卡加速」开关：settings.gpu.enabled，开启时逐引擎自检（OCR、朗读、内置模型都经 T-Engine 适配器），失败的引擎各自留 CPU 并回传原因；引擎表在 tengine/registry.js
 ```
 
@@ -268,8 +268,8 @@ electron/shared/llm-packs.js               模型白名单：文件名、大小�
 electron/tengine/runtime/                  llama.cpp 运行时：llama-abi.js（钉版 b10853 的结构体 / 原型 / 默认值指纹，含 mtmd）、llama-binding.js（koffi 装载与清单校验）、llama-session.js（模型与上下文、解码循环、思考模式三层禁止、KV 前缀复用、取消、循环检测）、mtmd.js（图片 → mtmd 解码与编码 → 预填进会话 → 同一条采样循环；Spotting 输出解析成行文字 + 像素框）、worker.js（跑 FFI 的 worker_thread 协议）、llama-manifest.json（DLL 清单）
 electron/services/llm-host/llm-host.js     LLM utilityProcess：一次喂 worker 一个请求、共享取消标志、停滞看门狗；崩溃只带走本进程。文本槽 `llm` 与视觉槽 `llm-vision` 各起一个（v0.5.1）
 electron/tengine/engines/llm.js            LLM 适配器：load / unload / generate（流式）/ probe / health / metrics / setProvider / status，事件只带数字；`id` 参数区分文本槽与视觉槽
-electron/managers/llm-manager.js           主进程决策：选文件（白名单或开发者门）、驻留与 5 分钟闲置卸载、显卡自检、策略表（policy/engine-policy.js）、试用日志；视觉槽 recognize / unloadVision / visionSelfTest，只在显卡加速打开时可用
-electron/managers/llm-pack-manager.js      模型文件夹（<models>/llm-models）扫描：同名同大小才哈希，哈希对上才可用，其余列为未列入；双文件包逐文件核对（ready / partial / mismatch）
+electron/llm/llm-manager.js           主进程决策：选文件（白名单或开发者门）、驻留与 5 分钟闲置卸载、显卡自检、策略表（policy/engine-policy.js）、试用日志；视觉槽 recognize / unloadVision / visionSelfTest，只在显卡加速打开时可用
+electron/llm/llm-pack-manager.js      模型文件夹（<models>/llm-models）扫描：同名同大小才哈希，哈希对上才可用，其余列为未列入；双文件包逐文件核对（ready / partial / mismatch）
 electron/policy/engine-policy.js           策略表落码：P4 慢建议、P5/P6 连续停滞标不健康、P9 性能下降记录、P13 思考泄漏计数
 electron/tengine/metrics-log.js            事件流落盘 data\logs\tengine-<日期>.jsonl（留 3 份，无痕不写，永不含文本）
 electron/tengine/trial-log.js              未列入模型的试用日志（每模型每月一份，两个月清理）与试用报告汇总
@@ -281,14 +281,14 @@ src/components/SettingsPanel/sections/LlmSection.jsx  设置 → 本地模型：
 scripts/fetch-llama-runtime.js             按清单下载官方 llama.cpp Vulkan 包并校验（打包前跑；--pin 年度换版）
 native/sherpa-onnx-webgpu/                 带 webgpu provider 的 sherpa-onnx DLL + 补丁 + 构建配方；scripts/overlay-sherpa-runtime.js 在 postinstall / 打包前覆盖进 npm 包
 electron/services/audio-engine/audio-worker.js  识别模型、音频捕获、语音合成都在这个子进程里
-electron/utils/win-audio-capture.js        WASAPI 捕获（koffi，v0.4.1）
+electron/listen/win-audio-capture.js        WASAPI 捕获（koffi，v0.4.1）
 electron/utils/app-paths.js                启动最早期定 userData（安装目录 data，不可写则留用户目录）、Chromium 存储收进 browser、一次性搬迁（v0.4.7）
-electron/utils/model-root.js               模型根目录解析（安装目录优先）
+electron/packs/model-root.js               模型根目录解析（安装目录优先）
 electron/utils/data-root.js                数据根目录 = userData（翻译缓存、日志等非模型文件）
-electron/utils/model-migrate.js            老用户目录模型搬迁（复制、校验、再删）
-electron/utils/audio-pack-manager.js       识别模型包下载/卸载（工厂第二实例，asr-models）
-electron/utils/tts-pack-manager.js         语音包下载/卸载（工厂第三实例，tts-models，v0.4.2）
-electron/utils/tts-models.js               已装语音包发现：pack.json 的 files 解析成绝对路径
+electron/packs/model-migrate.js            老用户目录模型搬迁（复制、校验、再删）
+electron/listen/audio-pack-manager.js       识别模型包下载/卸载（工厂第二实例，asr-models）
+electron/tts/tts-pack-manager.js         语音包下载/卸载（工厂第三实例，tts-models，v0.4.2）
+electron/tts/tts-models.js               已装语音包发现：pack.json 的 files 解析成绝对路径
 src/services/tts/neural.js                 渲染端神经语音引擎：分块播放、音色挑选、按句回落
 ```
 

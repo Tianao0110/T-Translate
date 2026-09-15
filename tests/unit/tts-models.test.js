@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { listVoicePacks } from '../../electron/utils/tts-models.js';
+import { listVoicePacks } from '../../electron/tts/tts-models.js';
 
 let root;
 

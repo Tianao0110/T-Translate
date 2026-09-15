@@ -126,10 +126,10 @@ async function main() {
   const wavArg = process.argv.indexOf('--wav');
   const wav = wavArg !== -1 ? process.argv[wavArg + 1] : synthesizeWav(path.join(SANDBOX, 'speech.wav'));
 
-  const packMgr = require('../electron/utils/audio-pack-manager');
-  const { createPackManager } = require('../electron/utils/model-pack-core');
-  const engineManager = require('../electron/managers/audio-engine-manager');
-  const { locateAsrModels } = require('../electron/utils/asr-models');
+  const packMgr = require('../electron/listen/audio-pack-manager');
+  const { createPackManager } = require('../electron/packs/model-pack-core');
+  const engineManager = require('../electron/listen/audio-engine-manager');
+  const { locateAsrModels } = require('../electron/listen/asr-models');
   const { store } = require('../electron/state');
 
   console.log(`sandbox: ${SANDBOX}\npacks root: ${packMgr.packsRoot()}\n`);
@@ -185,7 +185,7 @@ async function main() {
   // tone from a hidden window for the duration: the frame count then proves
   // koffi loaded, the client activated, the format was accepted, the pump runs
   // and stop() stops it. Signal itself is not assertable without making noise.
-  const winAudio = require('../electron/utils/win-audio-capture');
+  const winAudio = require('../electron/listen/win-audio-capture');
   const caps = winAudio.getCapabilities();
   step(
     'native capture capability probe',
@@ -407,8 +407,8 @@ async function main() {
   // Same manifest, own manager and root; the worker comes up TTS-only (no
   // listen session), streams one sentence at a time, swaps packs on demand,
   // stops mid-text on cancel, and releases the pack before a swap/removal.
-  const ttsPackMgr = require('../electron/utils/tts-pack-manager');
-  const { listVoicePacks } = require('../electron/utils/tts-models');
+  const ttsPackMgr = require('../electron/tts/tts-pack-manager');
+  const { listVoicePacks } = require('../electron/tts/tts-models');
 
   const ttsList = await ttsPackMgr.listPacks({ refresh: false });
   step(

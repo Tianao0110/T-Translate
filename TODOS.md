@@ -137,7 +137,7 @@ v0.3.4 给 Windows OCR / Azure / Google Vision / OCR.space / 百度 五个引擎
 
 结论：可行、约 1-2 天、风险低，不影响现有安装版。
 
-- **全仓 userData 落点全部走 `app.getPath('userData')`，零硬编码路径**：electron-store 的 config.json、[logger.js:71](electron/utils/logger.js:71) 的 logs/、[translation-stack.js:52](electron/ipc/translation-stack.js:52) 的 Caches/、Chromium 自带的 Local Storage/IndexedDB。**一句 `app.setPath('userData', …)` 全部跟着搬**。模型不在此列了——v0.4.0 起 OCR 与听译模型都落安装目录的 `models/`（[model-root.js](electron/utils/model-root.js)），便携化时它们本来就跟着程序走
+- **全仓 userData 落点全部走 `app.getPath('userData')`，零硬编码路径**：electron-store 的 config.json、[logger.js:71](electron/utils/logger.js:71) 的 logs/、[translation-stack.js:52](electron/ipc/translation-stack.js:52) 的 Caches/、Chromium 自带的 Local Storage/IndexedDB。**一句 `app.setPath('userData', …)` 全部跟着搬**。模型不在此列了——v0.4.0 起 OCR 与听译模型都落安装目录的 `models/`（[model-root.js](electron/packs/model-root.js)），便携化时它们本来就跟着程序走
 - ⚠️ **唯一真陷阱是 require 顺序**：[main.js:12](electron/main.js:12) require `./state` 时 [state.js:36](electron/state.js:36) 顶层就 `new Store()` 了，setPath 必须更早（main.js 最顶或抽独立首个 require）。顺序错了不报错，只会静默写回老位置
 - ~~⚠️ **userData 之外还有一处残留**：开机自启走 `setLoginItemSettings` → 写 `HKCU\...\Run` 注册表~~ v0.4.7 已清：真卸载时 `installer.nsh` 删该值（值名 `electron.app.T-Translate`），启动时按存储偏好补回缺失项
 - 其余：便携版不能装进 Program Files（不可写）→ electron-builder 加 `portable`/`zip` target 与 NSIS 并存，前者自带 `PORTABLE_EXECUTABLE_DIR` 可当检测依据；老用户迁移提示
@@ -168,7 +168,7 @@ v0.3.4 给 Windows OCR / Azure / Google Vision / OCR.space / 百度 五个引擎
 - 第二步=轻量单文件（翻译缓存/会话日志/文档进度）改走 data-root，双根读兼容存量
 - 第三步=整体切换（便携化终态）：config+保险库+Chromium 存储随 setPath 一次迁移，含一次性存量搬运与上述两契约拍板
 
-新下载的默认位置 v0.4.0 已改（安装目录\models，[model-root.js](electron/utils/model-root.js)）；欠的是存量与边界：
+新下载的默认位置 v0.4.0 已改（安装目录\models，[model-root.js](electron/packs/model-root.js)）；欠的是存量与边界：
 
 - **老用户 userData 里的既有模型不会自动归位**（当时拍板不写迁移代码）——补「移到程序目录」入口：设置页检测到旧根有模型时出一行提示+按钮，带进度跨盘复制+删，OCR/听译共用；搬完 activeDir 即显新位置
 - **userData 回退要有感**：安装目录不可写而回退 UserData 时，设置页明示"当前存储在用户目录（安装目录不可写）"，别静默——否则用户以为归位了实际没有
@@ -176,7 +176,7 @@ v0.3.4 给 Windows OCR / Azure / Google Vision / OCR.space / 百度 五个引擎
 
 ### ~~指定程序的声音~~ 已交付（v0.4.1）
 
-原生 WASAPI 层落在 [win-audio-capture.js](electron/utils/win-audio-capture.js)（koffi，不编译原生插件）；spike 报告在 gstack `v041-process-loopback-spike-2026-08-30.md`。全系统捕获也一并换到这条路，渲染端的 getDisplayMedia + 重采样已删除。剩下的活口：
+原生 WASAPI 层落在 [win-audio-capture.js](electron/listen/win-audio-capture.js)（koffi，不编译原生插件）；spike 报告在 gstack `v041-process-loopback-spike-2026-08-30.md`。全系统捕获也一并换到这条路，渲染端的 getDisplayMedia + 重采样已删除。剩下的活口：
 
 - **只在这台机器上验过**（Win11 25H2 / build 26200）。Win10 与 Win11 早期 build 的实机表现未知；发版前的人工检查里过一遍「全部声音」这条路
 - **泵用的是 20ms 轮询 + 2s 客户端缓冲**，没用 koffi 的 async 等待。长跑（数小时）下的漂移未测——smoke 只跑 1.5s

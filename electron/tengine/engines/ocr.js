@@ -1,6 +1,6 @@
 // The local OCR engine as T-Engine sees it: owns the OCR host process and
 // answers in the contract's terms (provider, health, status). Pack
-// resolution stays in utils/ocr-engine.js, which owns the install roots
+// resolution stays in ocr/ocr-engine.js, which owns the install roots
 // and hands fully resolved model paths in.
 //
 // Error codes keep their pre-T-Engine names: callers switch on them.

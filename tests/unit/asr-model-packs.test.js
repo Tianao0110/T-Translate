@@ -4,7 +4,7 @@
 // working for everyone who set the probe up before downloads existed.
 
 import { describe, it, expect } from 'vitest';
-import { locateAsrModels, listInstalledPacks } from '../../electron/utils/asr-models.js';
+import { locateAsrModels, listInstalledPacks } from '../../electron/listen/asr-models.js';
 
 const P = { join: (...parts) => parts.join('/') };
 

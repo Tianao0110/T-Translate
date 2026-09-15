@@ -19,7 +19,7 @@ const { dataDir } = require('../utils/data-root');
 const crypto = require('crypto');
 const { CHANNELS } = require('../shared/channels');
 const { createSecureVault } = require('../utils/secure-vault');
-const llmManager = require('../managers/llm-manager');
+const llmManager = require('../llm/llm-manager');
 const makeLogger = require('../utils/logger');
 const logger = makeLogger('IPC:Stack');
 

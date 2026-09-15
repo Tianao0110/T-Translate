@@ -10,7 +10,7 @@ import os from 'os';
 import path from 'path';
 
 const require = createRequire(import.meta.url);
-const manager = require('../../electron/managers/llm-manager.js');
+const manager = require('../../electron/llm/llm-manager.js');
 
 const PACK = { id: 'qwen3-1.7b', role: 'general', default: true, file: 'Q.gguf', ctx: 4096, template: 'qwen3' };
 

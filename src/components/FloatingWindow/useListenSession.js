@@ -31,7 +31,7 @@ const SOURCES_IDLE_EVERY_MS = 4000;
 const SOURCES_STOP_AFTER_MS = 180000;
 
 // Translation, the session transcript and the subtitle file are the main
-// process's (managers/listen-translator.js): this hook shows a 100-line
+// process's (listen/listen-translator.js): this hook shows a 100-line
 // window of finals with whatever translation has arrived for each.
 export default function useListenSession({ active, onAutosaved }) {
   const [sessionState, setSessionState] = useState('idle');

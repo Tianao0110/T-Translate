@@ -5,7 +5,7 @@
 
 // Version compare lives in the generic pack machinery — the audio registry
 // needs the identical "manifest newer than installed?" test.
-const { compareVersions } = require('../utils/model-pack-core');
+const { compareVersions } = require('../packs/model-pack-core');
 
 const BASE_PACK_ID = 'base-v6';
 

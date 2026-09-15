@@ -7,9 +7,9 @@ const { ipcMain, shell } = require('electron');
 const { CHANNELS } = require('../shared/channels');
 const { LLM_MODELS_DIR } = require('../shared/llm-packs');
 const { dataDir } = require('../utils/data-root');
-const { modelDir } = require('../utils/model-root');
+const { modelDir } = require('../packs/model-root');
 const tengine = require('../tengine');
-const llmManager = require('../managers/llm-manager');
+const llmManager = require('../llm/llm-manager');
 const logger = require('../utils/logger')('IPC:LLM');
 
 function register(ctx) {

@@ -51,8 +51,8 @@ electron/tengine/
   metrics-log.js       事件流落盘：data\logs\tengine-<日期>.jsonl，留 3 份，无痕不写，内容键一律剥掉
   trial-log.js         试用日志：data\logs\tengine-trial-<模型>-<月>.jsonl，两个月清理，文本只在开关后写；summarize 出试用报告
 electron/services/llm-host/llm-host.js     LLM utilityProcess：进程内一条 worker_thread 跑 runtime，主线程转发、排队、持取消标志、跑停滞看门狗
-electron/managers/llm-manager.js           主进程侧决策：选文件（白名单 / 开发者门）、驻留与 5 分钟闲置卸载（P8）、显卡开关自检、试用日志；视觉槽（recognize / unloadVision / visionSelfTest）有自己的驻留、闲置计时与策略实例；只在显卡上接活（`usable`），这是主程序的决定
-electron/managers/llm-pack-manager.js      模型文件夹扫描：同名同大小才哈希（缓存 size+mtime），哈希对上才 ready，其余列为未列入；双文件包（模型 + mmproj）逐文件核对，全对才 ready，缺一个 partial、错一个 mismatch
+electron/llm/llm-manager.js           主进程侧决策：选文件（白名单 / 开发者门）、驻留与 5 分钟闲置卸载（P8）、显卡开关自检、试用日志；视觉槽（recognize / unloadVision / visionSelfTest）有自己的驻留、闲置计时与策略实例；只在显卡上接活（`usable`），这是主程序的决定
+electron/llm/llm-pack-manager.js      模型文件夹扫描：同名同大小才哈希（缓存 size+mtime），哈希对上才 ready，其余列为未列入；双文件包（模型 + mmproj）逐文件核对，全对才 ready，缺一个 partial、错一个 mismatch
 electron/ipc/llm.js                        llm:* 通道：状态、重扫、开文件夹、卸载、探针、试用报告；不过文本
 src/stack/ocr/tengine-vision.js            OCR 引擎「内置视觉模型」：经 runtime.localLlm.recognize 到视觉槽，一律 Spotting，行框按 blocks.js 契约给像素坐标；默认顺序第 3 位；只在视觉槽在显卡上时可用（visionStatus().usable）
 src/stack/ocr/vision-routing.js            选中内置视觉模型时的分配规则（2026-09-14 用户定）：先跑 PP-OCR，按其行框与置信度判 unreadable / large / dense / low-confidence / table / columns / mixed-sizes 才升级到视觉模型；结果带 routed 枚举，阈值在 ROUTING

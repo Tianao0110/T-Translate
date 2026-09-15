@@ -15,7 +15,7 @@ import AzureOCREngine from '../../src/stack/ocr/azure-ocr.js';
 import GoogleVisionEngine from '../../src/stack/ocr/google-vision.js';
 import OCRSpaceEngine from '../../src/stack/ocr/ocrspace.js';
 import BaiduOCREngine from '../../src/stack/ocr/baidu-ocr.js';
-import windowsOcr from '../../electron/utils/windows-ocr.js';
+import windowsOcr from '../../electron/ocr/windows-ocr.js';
 
 const { parseRecognizeOutput } = windowsOcr;
 

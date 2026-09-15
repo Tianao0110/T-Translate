@@ -8,7 +8,7 @@ import path from 'path';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
-const { scanLegacy, migrateLegacy } = require('../../electron/utils/model-migrate.js');
+const { scanLegacy, migrateLegacy } = require('../../electron/packs/model-migrate.js');
 
 let base;
 const legacy = () => path.join(base, 'legacy');

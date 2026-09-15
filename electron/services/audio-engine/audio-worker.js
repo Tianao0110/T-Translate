@@ -5,7 +5,7 @@
 // listen session and a spoken subtitle line only compete for CPU.
 //
 // Capture lives here too since v0.4.1: the native WASAPI layer
-// (utils/win-audio-capture) hands 16 kHz mono float32 straight to the VAD, so
+// (listen/win-audio-capture) hands 16 kHz mono float32 straight to the VAD, so
 // audio never crosses a process boundary before it is recognized — no renderer
 // round trip, no resampler, and no screen-capture request.
 //
@@ -50,7 +50,7 @@
 //
 // TTS: `pack` is {id, engine:'kokoro'|'vits', paths:{model, tokens, voices?,
 // dataDir?, dictDir?, lexicon[], ruleFsts[]}} resolved by the host from an
-// installed pack.json (utils/tts-models). One pack loaded at a time; a
+// installed pack.json (tts/tts-models). One pack loaded at a time; a
 // generate naming another pack swaps it first. Synthesis is serialized, and a
 // cancel makes the progress callback return 0, which stops sherpa mid-text.
 // ⚠ TtsRequest.enableExternalBuffer MUST be false — same Electron V8-cage
@@ -255,7 +255,7 @@ function concatChunks(chunks, len) {
 // keep reading the raw signal, so a quiet source still looks quiet in the log.
 const agc = makeAgc();
 
-// Native capture handle (utils/win-audio-capture). Null whenever no audio is
+// Native capture handle (listen/win-audio-capture). Null whenever no audio is
 // being pulled — the zero-idle rule applies to the audio client too.
 let capture = null;
 let lastLevelPostAt = 0;
@@ -639,7 +639,7 @@ async function handleCaptureStart(msg) {
   try {
     // Required lazily: a machine without the native layer must still be able
     // to load models and report a clean capture error, not fail at import.
-    const winAudio = require('../../utils/win-audio-capture');
+    const winAudio = require('../../listen/win-audio-capture');
     capture = await winAudio.startCapture({
       mode: msg.mode || 'system',
       pid: msg.pid || 0,

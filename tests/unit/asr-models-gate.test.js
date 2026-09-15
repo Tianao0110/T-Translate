@@ -2,7 +2,7 @@
 // SenseVoice + VAD model set is manually placed under asr-models.
 
 import { describe, it, expect } from 'vitest';
-import { locateAsrModels } from '../../electron/utils/asr-models.js';
+import { locateAsrModels } from '../../electron/listen/asr-models.js';
 
 const P = { join: (...parts) => parts.join('/') };
 

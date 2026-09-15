@@ -8,7 +8,7 @@
 // a `files` map of role -> filename, which is what frees the engine from
 // hardcoding sherpa's filenames.
 
-const { compareVersions } = require('../utils/model-pack-core');
+const { compareVersions } = require('../packs/model-pack-core');
 
 // Final-pass engine (+ the VAD that gates it). Listen mode needs exactly one.
 const ASR_BASE_TYPE = 'asr-base';

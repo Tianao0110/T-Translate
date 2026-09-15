@@ -6,12 +6,12 @@
 const path = require('path');
 const { net } = require('electron');
 const { store } = require('../state');
-const { isOfflineMode } = require('./privacy-gate');
+const { isOfflineMode } = require('../utils/privacy-gate');
 const { computePackList, ASR_TYPES } = require('../shared/audio-packs');
 const { listInstalledPacks } = require('./asr-models');
-const { modelDir, modelDirs } = require('./model-root');
-const engineManager = require('../managers/audio-engine-manager');
-const { createPackManager } = require('./model-pack-core');
+const { modelDir, modelDirs } = require('../packs/model-root');
+const engineManager = require('./audio-engine-manager');
+const { createPackManager } = require('../packs/model-pack-core');
 
 // env override makes local testing possible (file:// or http://localhost)
 const MANIFEST_URL =

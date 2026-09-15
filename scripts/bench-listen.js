@@ -255,9 +255,9 @@ async function main() {
   fs.writeFileSync(manifestPath, JSON.stringify(manifest));
   process.env.TT_AUDIO_MANIFEST_URL = `file:///${manifestPath.replace(/\\/g, '/')}`;
 
-  const packMgr = require('../electron/utils/audio-pack-manager');
-  const engineManager = require('../electron/managers/audio-engine-manager');
-  const { locateAsrModels } = require('../electron/utils/asr-models');
+  const packMgr = require('../electron/listen/audio-pack-manager');
+  const engineManager = require('../electron/listen/audio-engine-manager');
+  const { locateAsrModels } = require('../electron/listen/asr-models');
   const { store } = require('../electron/state');
 
   const wanted = ['asr-base-sense-voice', 'asr-draft-zipformer-zh-en', ...(TIER === 'high' ? ['asr-hq-qwen3-0.6b'] : [])];

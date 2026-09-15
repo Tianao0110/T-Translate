@@ -9,12 +9,12 @@ const path = require('path');
 const { ipcMain, shell, app } = require('electron');
 const { CHANNELS } = require('../shared/channels');
 const logger = require('../utils/logger')('IPC:Models');
-const modelRoot = require('../utils/model-root');
-const { scanLegacy, migrateLegacy } = require('../utils/model-migrate');
+const modelRoot = require('../packs/model-root');
+const { scanLegacy, migrateLegacy } = require('../packs/model-migrate');
 const { legacyUserData, isRelocated } = require('../utils/app-paths');
 const { dataRoot } = require('../utils/data-root');
-const audioEngine = require('../managers/audio-engine-manager');
-const ocrEngine = require('../utils/ocr-engine');
+const audioEngine = require('../listen/audio-engine-manager');
+const ocrEngine = require('../ocr/ocr-engine');
 
 let busy = false;
 

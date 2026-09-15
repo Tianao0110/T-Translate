@@ -1,7 +1,7 @@
 // 48 kHz stereo → 16 kHz mono FIR decimator for the process-loopback path.
 
 import { describe, it, expect } from 'vitest';
-import { makeDownmixDecimator } from '../../electron/utils/win-audio-resample.js';
+import { makeDownmixDecimator } from '../../electron/listen/win-audio-resample.js';
 
 function stereoSine(freq, seconds, rate = 48000, amp = 0.5) {
   const n = Math.floor(seconds * rate);

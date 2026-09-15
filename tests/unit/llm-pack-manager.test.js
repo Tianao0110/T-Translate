@@ -11,7 +11,7 @@ import path from 'path';
 import crypto from 'crypto';
 
 const require = createRequire(import.meta.url);
-const { createLlmPackManager, CACHE_FILE } = require('../../electron/managers/llm-pack-manager.js');
+const { createLlmPackManager, CACHE_FILE } = require('../../electron/llm/llm-pack-manager.js');
 
 const GOOD = Buffer.from('GGUF-tiny-model-bytes-0123456789');
 const EYES = Buffer.from('GGUF-tiny-vision-model-bytes-9876');

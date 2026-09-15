@@ -3,7 +3,7 @@
 // hardware.
 
 import { describe, it, expect } from 'vitest';
-import { compensationGain, makeClipGuard, applyGain } from '../../electron/utils/win-audio-gain.js';
+import { compensationGain, makeClipGuard, applyGain } from '../../electron/listen/win-audio-gain.js';
 
 describe('compensationGain', () => {
   it('inverts the endpoint attenuation in dB, minus the safety margin', () => {

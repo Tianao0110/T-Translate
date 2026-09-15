@@ -1,5 +1,5 @@
 // OCR IPC: engine detection, model-pack management, recognition handlers.
-// Local recognition runs on electron/utils/ocr-engine (PP-OCRv6 in the
+// Local recognition runs on electron/ocr/ocr-engine (PP-OCRv6 in the
 // ocr-host process); downloadable language packs live in ocr-pack-manager.
 
 const { ipcMain } = require('electron');
@@ -8,9 +8,9 @@ const { CHANNELS } = require('../shared/channels');
 const { BASE_PACK_ID } = require('../shared/ocr-packs');
 const logger = require('../utils/logger')('IPC:OCR');
 const { t } = require('../shared/main-i18n');
-const ocrEngine = require('../utils/ocr-engine');
-const packManager = require('../utils/ocr-pack-manager');
-const windowsOcr = require('../utils/windows-ocr');
+const ocrEngine = require('../ocr/ocr-engine');
+const packManager = require('../ocr/ocr-pack-manager');
+const windowsOcr = require('../ocr/windows-ocr');
 
 function register(ctx) {
   const { getMainWindow, store } = ctx;
@@ -132,7 +132,7 @@ function register(ctx) {
 // ocr:paddle-ocr / ocr:windows-ocr channels — the translation-stack facade
 // (ctx.localOcr) calls these exports directly in the main process.
 
-// Windows OCR — Windows.Media.Ocr via electron/utils/windows-ocr
+// Windows OCR — Windows.Media.Ocr via electron/ocr/windows-ocr
 async function recognizeWindows(store, imageData, options = {}) {
   const language =
     options.language || store.get('settings.ocr.recognitionLanguage', 'auto');

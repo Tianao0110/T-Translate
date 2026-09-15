@@ -4,10 +4,10 @@
 const { ipcMain, shell } = require('electron');
 const fs = require('fs');
 const { CHANNELS } = require('../shared/channels');
-const engineManager = require('../managers/audio-engine-manager');
-const winAudio = require('../utils/win-audio-capture');
-const packManager = require('../utils/audio-pack-manager');
-const ttsPackManager = require('../utils/tts-pack-manager');
+const engineManager = require('../listen/audio-engine-manager');
+const winAudio = require('../listen/win-audio-capture');
+const packManager = require('../listen/audio-pack-manager');
+const ttsPackManager = require('../tts/tts-pack-manager');
 const logger = require('../utils/logger')('IPC:AudioEngine');
 
 const AE = CHANNELS.AUDIO_ENGINE;
@@ -59,7 +59,7 @@ function registerAudioEngineIPC(ctx) {
   });
 
   // Translation of each final and the subtitle file at session end live in
-  // the main process (managers/listen-translator.js); the window names the
+  // the main process (listen/listen-translator.js); the window names the
   // target and opens the folder.
   engineManager.configureTranslation({ translateStream: ctx.stackHooks?.translateStream || null });
   ipcMain.on(AE.SET_TARGET, (event, lang) => engineManager.setTargetLang(typeof lang === 'string' ? lang : ''));

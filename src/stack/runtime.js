@@ -8,10 +8,10 @@ const caps = {
   getLanguage: () => 'zh',
   loggerFactory: null,
   // Local OCR recognizers (paddle/windows) — the engines already live in the
-  // main process (electron/utils/ocr-engine.js); the stack calls them directly
+  // main process (electron/ocr/ocr-engine.js); the stack calls them directly
   // instead of the renderer's old IPC bridge classes.
   localOcr: null,
-  // The built-in model (T-Engine's LLM host, electron/managers/llm-manager):
+  // The built-in model (T-Engine's LLM host, electron/llm/llm-manager):
   // { generate(request, onToken) -> { promise, cancel }, status(), selected(),
   //   recognize({ image, task }) -> { promise, cancel }, visionStatus() }.
   localLlm: null,

@@ -8,10 +8,10 @@
 const path = require('path');
 const fs = require('fs');
 const PATHS = require('../shared/paths');
-const { modelDir, modelDirs } = require('./model-root');
+const { modelDir, modelDirs } = require('../packs/model-root');
 const { BASE_PACK_ID, HQ_PACK_ID, packIdForLanguage } = require('../shared/ocr-packs');
 const tengine = require('../tengine');
-const logger = require('./logger')('OCR-Engine');
+const logger = require('../utils/logger')('OCR-Engine');
 
 // 'standard' = bundled small model; 'high' = downloaded medium variant.
 // Seeded from settings at IPC registration, updated via SET_MODEL_TIER.

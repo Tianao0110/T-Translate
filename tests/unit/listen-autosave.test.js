@@ -8,7 +8,7 @@ import os from 'os';
 import path from 'path';
 
 const require = createRequire(import.meta.url);
-const { createListenAutosave, safeName } = require('../../electron/utils/listen-autosave.js');
+const { createListenAutosave, safeName } = require('../../electron/listen/listen-autosave.js');
 
 describe('listen autosave', () => {
   let dir;

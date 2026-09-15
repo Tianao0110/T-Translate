@@ -6,9 +6,9 @@
 const { net } = require('electron');
 const { store } = require('../state');
 const { BASE_PACK_ID, computePackList } = require('../shared/ocr-packs');
-const { isOfflineMode } = require('./privacy-gate');
+const { isOfflineMode } = require('../utils/privacy-gate');
 const ocrEngine = require('./ocr-engine');
-const { createPackManager } = require('./model-pack-core');
+const { createPackManager } = require('../packs/model-pack-core');
 
 // env override makes local testing possible (file:// or http://localhost)
 const MANIFEST_URL =

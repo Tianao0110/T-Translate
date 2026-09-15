@@ -7,7 +7,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
-const { createListenTranslator, buildSrt } = require('../../electron/managers/listen-translator.js');
+const { createListenTranslator, buildSrt } = require('../../electron/listen/listen-translator.js');
 
 const quiet = { info() {}, warn() {}, error() {}, debug() {} };
 const rec = (text, lang = 'zh', start = 0) => ({ segStartS: start, segDurS: 2, lang: `<|${lang}|>`, text });

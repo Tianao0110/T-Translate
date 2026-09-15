@@ -53,7 +53,7 @@ async function main() {
   app.setPath('userData', SANDBOX);
   process.env.TT_MODELS_ROOT = path.join(SANDBOX, 'models');
 
-  const ocrEngine = require('../electron/utils/ocr-engine');
+  const ocrEngine = require('../electron/ocr/ocr-engine');
   const hostManager = require('../electron/tengine').get().get('ocr');
   const gpu = process.argv.includes('--gpu');
 

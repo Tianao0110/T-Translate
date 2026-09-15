@@ -29,7 +29,7 @@
 // working with the system muted (0.03874 vs 0.03877 unmuted).
 
 const os = require('os');
-const logger = require('./logger')('WinAudio');
+const logger = require('../utils/logger')('WinAudio');
 const { compensationGain, makeClipGuard, applyGain } = require('./win-audio-gain');
 
 // ===== koffi + COM plumbing =====

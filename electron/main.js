@@ -94,7 +94,7 @@ function buildSelectionSettingsPayload() {
 const { createMenu } = require('./managers/menu-manager');
 const { createTray, updateTrayMenu, destroyTray } = require('./managers/tray-manager');
 const windowManager = require('./managers/window-manager');
-const audioEngineManager = require('./managers/audio-engine-manager');
+const audioEngineManager = require('./listen/audio-engine-manager');
 
 const screenshotModule = require('./screenshot-module');
 

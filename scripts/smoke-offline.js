@@ -68,9 +68,9 @@ async function main() {
   const { CHANNELS } = require('../electron/shared/channels');
   const AE = CHANNELS.AUDIO_ENGINE;
   const managers = {
-    'ocr-pack-manager': require('../electron/utils/ocr-pack-manager'),
-    'audio-pack-manager': require('../electron/utils/audio-pack-manager'),
-    'tts-pack-manager': require('../electron/utils/tts-pack-manager'),
+    'ocr-pack-manager': require('../electron/ocr/ocr-pack-manager'),
+    'audio-pack-manager': require('../electron/listen/audio-pack-manager'),
+    'tts-pack-manager': require('../electron/tts/tts-pack-manager'),
   };
 
   // ---- manager level ----

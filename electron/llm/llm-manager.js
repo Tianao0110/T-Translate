@@ -152,7 +152,7 @@ function init(d) {
     ...d,
   };
   if (!deps.packs) {
-    const { modelDir } = require('../utils/model-root');
+    const { modelDir } = require('../packs/model-root');
     deps.packs = createLlmPackManager({ dir: deps.modelsDir || modelDir(LLM_MODELS_DIR), allowUnlisted, logger: deps.logger, now: deps.now });
   }
   if (unsubscribe) unsubscribe();

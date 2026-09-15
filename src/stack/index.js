@@ -13,9 +13,9 @@
 //   loadOcrConfigs      async () => flat settings.ocr bucket with vault
 //                       secrets merged (same ownership rule).
 //   localOcr            { paddle, windows, isWindows } — main-process local
-//                       OCR recognizers (electron/utils/ocr-engine et al).
+//                       OCR recognizers (electron/ocr/ocr-engine et al).
 //   localLlm            { generate, status, selected } — the built-in model
-//                       (electron/managers/llm-manager). Optional — omitted =
+//                       (electron/llm/llm-manager). Optional — omitted =
 //                       the built-in provider reports itself as not ready.
 //   getCustomFilters    () => persisted custom filter defs (electron-store).
 //   cacheFilePath       L2 cache JSON location (userData/Caches/...). Optional —

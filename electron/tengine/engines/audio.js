@@ -5,7 +5,7 @@
 // restart decision needs, the provider and sherpa's stderr-only fallback
 // note, and the voice self-test. Session semantics (which source, which
 // language, what the floating window is told) stay in
-// managers/audio-engine-manager.js, which subscribes to the messages here.
+// listen/audio-engine-manager.js, which subscribes to the messages here.
 //
 // Protocol: services/audio-engine/audio-worker.js header.
 

@@ -9,7 +9,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { pathToFileURL } from 'url';
 import JSZip from 'jszip';
-import { createPackManager } from '../../electron/utils/model-pack-core.js';
+import { createPackManager } from '../../electron/packs/model-pack-core.js';
 
 const MANIFEST_URL = 'https://packs.example/manifest.json';
 

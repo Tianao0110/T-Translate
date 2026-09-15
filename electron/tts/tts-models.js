@@ -11,7 +11,7 @@
 const nodeFs = require('fs');
 const nodePath = require('path');
 const { TTS_VOICE_TYPE } = require('../shared/audio-packs');
-const { listInstalledPacks } = require('./asr-models');
+const { listInstalledPacks } = require('../listen/asr-models');
 
 const ENGINES = new Set(['kokoro', 'vits']);
 

@@ -8,7 +8,7 @@
 //
 // Factory: the smoke and the unit test hand in a fake translateStream.
 
-const { buildListenSystemPrompt } = require('../utils/listen-prompt');
+const { buildListenSystemPrompt } = require('./listen-prompt');
 
 // Full transcript kept for the subtitle file. A 2-hour film is ~2000
 // lines (~400KB); the cap is a runaway backstop, not a budget.

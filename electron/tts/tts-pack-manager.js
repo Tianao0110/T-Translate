@@ -4,13 +4,13 @@
 
 const { net } = require('electron');
 const { store } = require('../state');
-const { isOfflineMode } = require('./privacy-gate');
+const { isOfflineMode } = require('../utils/privacy-gate');
 const { computePackList, TTS_TYPES } = require('../shared/audio-packs');
-const { listInstalledPacks } = require('./asr-models');
-const { modelDir, modelDirs } = require('./model-root');
-const engineManager = require('../managers/audio-engine-manager');
-const { createPackManager } = require('./model-pack-core');
-const { MANIFEST_URL } = require('./audio-pack-manager');
+const { listInstalledPacks } = require('../listen/asr-models');
+const { modelDir, modelDirs } = require('../packs/model-root');
+const engineManager = require('../listen/audio-engine-manager');
+const { createPackManager } = require('../packs/model-pack-core');
+const { MANIFEST_URL } = require('../listen/audio-pack-manager');
 
 function packsRoot() {
   return modelDir('tts-models');
