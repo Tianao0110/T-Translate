@@ -14,11 +14,14 @@ const require = createRequire(import.meta.url);
 const { createLlmPackManager, CACHE_FILE } = require('../../electron/managers/llm-pack-manager.js');
 
 const GOOD = Buffer.from('GGUF-tiny-model-bytes-0123456789');
+const EYES = Buffer.from('GGUF-tiny-vision-model-bytes-9876');
+const PROJ = Buffer.from('GGUF-tiny-mmproj-bytes-abcdef');
 const sha = (b) => crypto.createHash('sha256').update(b).digest('hex');
 
 const PACKS = [
   { id: 'tiny', role: 'general', default: true, name: 'Tiny', vendor: 'test', file: 'Tiny-Q8_0.gguf', size: GOOD.length, sha256: sha(GOOD), ctx: 512, template: 'qwen3', license: { name: 'Apache-2.0', url: 'https://x' }, source: { url: 'https://x/Tiny-Q8_0.gguf' }, minRamGb: 1 },
   { id: 'other', role: 'mt', default: false, name: 'Other', vendor: 'test', file: 'Other.gguf', size: 99, sha256: '0'.repeat(64), ctx: 512, template: 'hunyuan', license: { name: 'Apache-2.0', url: 'https://x' }, source: { url: 'https://x/Other.gguf' }, minRamGb: 1 },
+  { id: 'eyes', role: 'vision', default: false, name: 'Eyes', vendor: 'test', file: 'Eyes.gguf', size: EYES.length, sha256: sha(EYES), mmproj: { file: 'Eyes-mmproj.gguf', size: PROJ.length, sha256: sha(PROJ) }, ctx: 512, template: 'auto', visionFamily: 'paddleocr', license: { name: 'Apache-2.0', url: 'https://x' }, source: { url: 'https://x/Eyes.gguf' }, minRamGb: 1 },
 ];
 
 let dir;
@@ -37,9 +40,10 @@ describe('llm pack manager', () => {
     const m = createLlmPackManager({ dir: folder, packs: PACKS });
     const s = await m.scan();
     expect(fs.existsSync(folder)).toBe(true);
-    expect(s.packs.map((p) => [p.id, p.status])).toEqual([['tiny', 'missing'], ['other', 'missing']]);
+    expect(s.packs.map((p) => [p.id, p.status])).toEqual([['tiny', 'missing'], ['other', 'missing'], ['eyes', 'missing']]);
     expect(s.unlisted).toEqual([]);
     expect(m.resolveDefault()).toBeNull();
+    expect(m.resolveVision()).toBeNull();
   });
 
   it('marks the pinned bytes ready and caches the hash', async () => {
@@ -96,5 +100,38 @@ describe('llm pack manager', () => {
     expect(m.scanning()).toBe(true);
     await a;
     expect(m.scanning()).toBe(false);
+  });
+
+  it('a two-file pack is ready only when both files match, and resolves with its mmproj', async () => {
+    fs.writeFileSync(path.join(dir, 'Eyes.gguf'), EYES);
+    fs.writeFileSync(path.join(dir, 'Eyes-mmproj.gguf'), PROJ);
+    const m = manager();
+    const s = await m.scan();
+    const row = s.packs.find((p) => p.id === 'eyes');
+    expect(row.status).toBe('ready');
+    expect(row.files.map((f) => [f.part, f.status])).toEqual([['model', 'ready'], ['mmproj', 'ready']]);
+    expect(row.mmprojPath).toBe(path.join(dir, 'Eyes-mmproj.gguf'));
+    expect(m.resolveVision()).toEqual({ pack: PACKS[2], path: path.join(dir, 'Eyes.gguf'), mmproj: path.join(dir, 'Eyes-mmproj.gguf'), trial: false });
+    expect(s.unlisted).toEqual([]);
+    // Single-file packs carry no mmproj key at all.
+    expect(m.resolvePack('tiny')).toBeNull();
+  });
+
+  it('a two-file pack with only the model is partial, with a wrong mmproj a mismatch', async () => {
+    fs.writeFileSync(path.join(dir, 'Eyes.gguf'), EYES);
+    const m = manager();
+    let row = (await m.scan()).packs.find((p) => p.id === 'eyes');
+    expect(row.status).toBe('partial');
+    expect(row.files.map((f) => f.status)).toEqual(['ready', 'missing']);
+    expect(m.resolveVision()).toBeNull();
+
+    const bad = Buffer.from(PROJ);
+    bad[2] = 0x21;
+    fs.writeFileSync(path.join(dir, 'Eyes-mmproj.gguf'), bad);
+    row = (await m.scan()).packs.find((p) => p.id === 'eyes');
+    expect(row.status).toBe('mismatch');
+    expect(row.files.map((f) => f.status)).toEqual(['ready', 'mismatch']);
+    expect(m.resolveVision()).toBeNull();
+    expect(m.resolvePack('eyes')).toBeNull();
   });
 });

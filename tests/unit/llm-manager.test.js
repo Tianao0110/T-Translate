@@ -57,18 +57,23 @@ function fakeAdapter() {
   return a;
 }
 
-function fakePacks({ ready = true, unlisted = [], door = () => false, dir = 'C:/models/llm-models' } = {}) {
+const VPACK = { id: 'paddleocr-vl-1.6', role: 'vision', default: false, name: 'Eyes', file: 'V.gguf', ctx: 4096, template: 'auto', visionFamily: 'paddleocr' };
+
+function fakePacks({ ready = true, unlisted = [], door = () => false, dir = 'C:/models/llm-models', vision = false } = {}) {
   let last = null;
+  const visionRow = { ...VPACK, status: vision ? 'ready' : 'missing', path: vision ? `${dir}/V.gguf` : null, mmprojPath: vision ? `${dir}/V-mmproj.gguf` : null, files: [] };
+  const visionTarget = () => (vision ? { pack: VPACK, path: `${dir}/V.gguf`, mmproj: `${dir}/V-mmproj.gguf`, trial: false } : null);
   return {
     dir: () => dir,
     scan: vi.fn(async () => {
-      last = { dir, packs: [{ ...PACK, status: ready ? 'ready' : 'missing', path: ready ? `${dir}/Q.gguf` : null }], unlisted: unlisted.map((f) => ({ file: f, path: `${dir}/${f}` })), allowUnlisted: door() };
+      last = { dir, packs: [{ ...PACK, status: ready ? 'ready' : 'missing', path: ready ? `${dir}/Q.gguf` : null }, visionRow], unlisted: unlisted.map((f) => ({ file: f, path: `${dir}/${f}` })), allowUnlisted: door() };
       return last;
     }),
     scanning: () => false,
     status: () => last,
-    resolvePack: (id) => (id === PACK.id && ready ? { pack: PACK, path: `${dir}/Q.gguf`, trial: false } : null),
+    resolvePack: (id) => (id === PACK.id && ready ? { pack: PACK, path: `${dir}/Q.gguf`, trial: false } : id === VPACK.id ? visionTarget() : null),
     resolveDefault: () => (ready ? { pack: PACK, path: `${dir}/Q.gguf`, trial: false } : null),
+    resolveVision: visionTarget,
     resolveUnlisted: (name) => (door() && unlisted.includes(name) ? { pack: null, path: `${dir}/${name}`, trial: true } : null),
   };
 }
@@ -93,9 +98,9 @@ afterEach(() => {
   fs.rmSync(logsDir, { recursive: true, force: true });
 });
 
-function boot({ adapter = fakeAdapter(), packs = fakePacks(), store = fakeStore(), bus = tengineBus(), timers } = {}) {
-  manager.init({ store, tengine: bus, adapter, packs, logsDir, logger: null, ...(timers ? { timers } : {}) });
-  return { adapter, packs, store, bus };
+function boot({ adapter = fakeAdapter(), packs = fakePacks(), store = fakeStore(), bus = tengineBus(), timers, visionAdapter = null } = {}) {
+  manager.init({ store, tengine: bus, adapter, visionAdapter, packs, logsDir, logger: null, ...(timers ? { timers } : {}) });
+  return { adapter, packs, store, bus, visionAdapter };
 }
 
 describe('llm manager', () => {
@@ -224,5 +229,79 @@ describe('llm manager', () => {
     expect(r).toEqual({ ok: true, provider: 'webgpu', fallback: null, tokPerSec: 33 });
     const kept = await manager.ensureLoaded();
     expect(kept.reloaded).toBe(false);
+  });
+});
+
+describe('the vision slot', () => {
+  it('loads the vision pack with its mmproj on the vision host, capped on the CPU, without touching the text slot', async () => {
+    const visionAdapter = fakeAdapter();
+    const { adapter } = boot({ packs: fakePacks({ vision: true }), visionAdapter });
+    const r = await manager.recognize({ image: Buffer.from('png') });
+    expect((await r.promise).text).toBe('你好');
+    expect(visionAdapter.load).toHaveBeenCalledWith('C:/models/llm-models/V.gguf', { nCtx: 4096, nBatch: 2048, template: 'auto', mmproj: 'C:/models/llm-models/V-mmproj.gguf', visionFamily: 'paddleocr', visionMaxPixels: manager.CPU_MAX_PIXELS });
+    expect(visionAdapter.generate).toHaveBeenCalledWith(expect.objectContaining({ kind: 'ocr', task: 'Spotting' }));
+    expect(visionAdapter.generate.mock.calls[0][0].image).toEqual(Buffer.from('png'));
+    expect(adapter.load).not.toHaveBeenCalled();
+    await (await manager.recognize({ image: Buffer.from('png') })).promise;
+    expect(visionAdapter.load).toHaveBeenCalledTimes(1);
+    expect(manager.status().vision).toMatchObject({ available: true, pack: { id: 'paddleocr-vl-1.6', status: 'ready' }, resident: { file: 'V.gguf' }, maxPixels: manager.CPU_MAX_PIXELS, inflight: 0 });
+  });
+
+  it('lifts the size cap on the GPU and reloads when the provider changes', async () => {
+    const visionAdapter = fakeAdapter();
+    boot({ packs: fakePacks({ vision: true }), visionAdapter });
+    await (await manager.recognize({ image: Buffer.from('a') })).promise;
+    visionAdapter.setProvider('gpu');
+    await (await manager.recognize({ image: Buffer.from('a') })).promise;
+    expect(visionAdapter.load).toHaveBeenCalledTimes(2);
+    expect(visionAdapter.load.mock.calls[1][1].visionMaxPixels).toBe(0);
+    expect(manager.status().vision.maxPixels).toBe(0);
+  });
+
+  it('refuses without a vision pack or a vision host, and tells the GPU switch it is pending', async () => {
+    boot({ packs: fakePacks({ vision: false }), visionAdapter: fakeAdapter() });
+    await expect(manager.recognize({ image: Buffer.from('a') })).rejects.toMatchObject({ code: 'LLM_VISION_MISSING' });
+    expect(await manager.visionSelfTest()).toEqual({ ok: true, provider: 'cpu', fallback: null, pending: true });
+    manager.reset();
+    boot({ packs: fakePacks({ vision: true }) });
+    await expect(manager.recognize({ image: Buffer.from('a') })).rejects.toMatchObject({ code: 'LLM_VISION_UNAVAILABLE' });
+    expect(manager.status().vision).toEqual({ available: false });
+  });
+
+  it('runs the GPU self-test on the vision pack and keeps it resident', async () => {
+    const visionAdapter = fakeAdapter();
+    boot({ packs: fakePacks({ vision: true }), visionAdapter });
+    visionAdapter.setProvider('gpu');
+    const r = await manager.visionSelfTest();
+    expect(visionAdapter.health).toHaveBeenCalledWith({ file: 'C:/models/llm-models/V.gguf', options: expect.objectContaining({ mmproj: 'C:/models/llm-models/V-mmproj.gguf', visionMaxPixels: 0 }) });
+    expect(r).toMatchObject({ ok: true, provider: 'webgpu', fallback: null, tokPerSec: 33 });
+    expect(manager.status().vision.resident.file).toBe('V.gguf');
+  });
+
+  it('idles the vision model out on its own timer, alongside the text model', async () => {
+    vi.useFakeTimers();
+    const visionAdapter = fakeAdapter();
+    const { adapter } = boot({ packs: fakePacks({ vision: true }), visionAdapter, timers: { set: setTimeout, clear: clearTimeout } });
+    await (await manager.generate({ user: 'U' })).promise;
+    await (await manager.recognize({ image: Buffer.from('a') })).promise;
+    expect(adapter.loaded()).toBeTruthy();
+    expect(visionAdapter.loaded()).toBeTruthy();
+    await vi.advanceTimersByTimeAsync(manager.IDLE_UNLOAD_MS + 1000);
+    expect(visionAdapter.unload).toHaveBeenCalledTimes(1);
+    expect(adapter.unload).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops the vision residency when its host exits, leaving the text slot alone', async () => {
+    const visionAdapter = fakeAdapter();
+    const { adapter, bus } = boot({ packs: fakePacks({ vision: true }), visionAdapter });
+    await (await manager.generate({ user: 'U' })).promise;
+    await (await manager.recognize({ image: Buffer.from('a') })).promise;
+    visionAdapter.crash();
+    bus.emit({ engine: 'llm-vision', host: 'llm-vision', kind: 'exit', at: 1, code: 3221225477 });
+    await (await manager.recognize({ image: Buffer.from('a') })).promise;
+    expect(visionAdapter.load).toHaveBeenCalledTimes(2);
+    expect(adapter.load).toHaveBeenCalledTimes(1);
+    expect(await manager.unloadVision('manual')).toBe(true);
+    expect(adapter.loaded()).toBeTruthy();
   });
 });

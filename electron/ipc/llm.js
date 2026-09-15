@@ -18,6 +18,7 @@ function register(ctx) {
     store: ctx.store,
     tengine: engine,
     adapter: engine.get('llm'),
+    visionAdapter: engine.has('llm-vision') ? engine.get('llm-vision') : null,
     logsDir: dataDir('logs'),
     modelsDir: modelDir(LLM_MODELS_DIR),
     logger,
@@ -37,7 +38,8 @@ function register(ctx) {
 
   ipcMain.handle(CHANNELS.LLM.UNLOAD, async () => {
     const unloaded = await llmManager.unload('manual');
-    return { success: true, unloaded };
+    const visionUnloaded = await llmManager.unloadVision('manual');
+    return { success: true, unloaded: unloaded || visionUnloaded };
   });
 
   ipcMain.handle(CHANNELS.LLM.SELF_TEST, async () => {

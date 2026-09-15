@@ -19,7 +19,9 @@ const DEFAULT_THRESHOLDS = {
 
 const STALL_CODES = new Set(['LLM_TIMEOUT']);
 
-function createLlmPolicy({ thresholds = {} } = {}) {
+// engine: which adapter's events this instance watches ('llm' for the text
+// slot, 'llm-vision' for the vision slot); the rest are ignored.
+function createLlmPolicy({ thresholds = {}, engine = 'llm' } = {}) {
   const T = { ...DEFAULT_THRESHOLDS, ...thresholds };
   const state = {
     unhealthy: false,
@@ -43,7 +45,7 @@ function createLlmPolicy({ thresholds = {} } = {}) {
   // Returns the actions this event triggered: [{ rule, action, ...detail }].
   function observe(evt) {
     const actions = [];
-    if (!evt || evt.engine !== 'llm') return actions;
+    if (!evt || evt.engine !== engine) return actions;
     switch (evt.kind) {
       case 'health':
         if (evt.ok && typeof evt.tokPerSec === 'number') {

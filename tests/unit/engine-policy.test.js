@@ -75,4 +75,12 @@ describe('llm engine policy', () => {
     p.reset();
     expect(p.state()).toMatchObject({ unhealthy: false, stalls: 0, thinkLeaks: 0, baselineTokPerSec: null });
   });
+
+  it('watches only its own engine, so the vision slot keeps separate streaks', () => {
+    const vision = createLlmPolicy({ engine: 'llm-vision', thresholds: { stallLimit: 1 } });
+    expect(vision.observe(ev('request', { stop: 'stall' }))).toEqual([]);
+    expect(vision.observe({ ...ev('request', { stop: 'stall' }), engine: 'llm-vision' }).map((a) => a.rule)).toEqual(['P5', 'P6']);
+    expect(vision.state().unhealthy).toBe(true);
+    expect(createLlmPolicy().observe({ ...ev('request', { stop: 'stall' }), engine: 'llm-vision' })).toEqual([]);
+  });
 });

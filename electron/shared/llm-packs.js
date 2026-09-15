@@ -11,7 +11,10 @@
 const LLM_ROLE_GENERAL = 'general';
 // Translation only: short user-only prompt, no AI actions.
 const LLM_ROLE_MT = 'mt';
-const LLM_ROLES = [LLM_ROLE_GENERAL, LLM_ROLE_MT];
+// Reads images (the built-in vision OCR engine): a model file plus its
+// mmproj, both pinned, loaded in their own host next to the text model.
+const LLM_ROLE_VISION = 'vision';
+const LLM_ROLES = [LLM_ROLE_GENERAL, LLM_ROLE_MT, LLM_ROLE_VISION];
 
 // Folder under the models root, scanned by the LLM pack manager.
 const LLM_MODELS_DIR = 'llm-models';
@@ -63,7 +66,48 @@ const LLM_PACKS = [
       mirror: 'https://hf-mirror.com/tencent/Hy-MT2-1.8B-GGUF/resolve/main/Hy-MT2-1.8B-Q8_0.gguf',
     },
   },
+  {
+    id: 'paddleocr-vl-1.6',
+    role: LLM_ROLE_VISION,
+    default: false,
+    name: 'PaddleOCR-VL-1.6',
+    vendor: 'Baidu PaddlePaddle',
+    file: 'PaddleOCR-VL-1.6-GGUF.gguf',
+    size: 935769056,
+    sha256: 'f3ae46ec885050acf4b3d31944431e1fd90d50664fb09126af4a3c050ba14ee8',
+    // The image encoder; both files must match before the pack is ready.
+    mmproj: {
+      file: 'PaddleOCR-VL-1.6-GGUF-mmproj.gguf',
+      size: 881770560,
+      sha256: '204d757d7610d9b3faab10d506d69e5b244e32bf765e2bab2d0167e65e0a058a',
+    },
+    arch: 'paddleocr',
+    template: 'auto',
+    // Prompt family for runtime/mtmd.js.
+    visionFamily: 'paddleocr',
+    hasThinking: false,
+    ctx: 4096,
+    minRamGb: 4,
+    license: { name: 'Apache-2.0', url: 'https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.6-GGUF/blob/main/README.md' },
+    source: {
+      repo: 'PaddlePaddle/PaddleOCR-VL-1.6-GGUF',
+      url: 'https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.6-GGUF/resolve/main/PaddleOCR-VL-1.6-GGUF.gguf',
+      mirror: 'https://hf-mirror.com/PaddlePaddle/PaddleOCR-VL-1.6-GGUF/resolve/main/PaddleOCR-VL-1.6-GGUF.gguf',
+      mmproj: {
+        url: 'https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.6-GGUF/resolve/main/PaddleOCR-VL-1.6-GGUF-mmproj.gguf',
+        mirror: 'https://hf-mirror.com/PaddlePaddle/PaddleOCR-VL-1.6-GGUF/resolve/main/PaddleOCR-VL-1.6-GGUF-mmproj.gguf',
+      },
+    },
+  },
 ];
+
+// The files a pack consists of: the model, plus the mmproj for a vision
+// pack. Every part carries its own size and hash.
+function packFiles(pack) {
+  const parts = [{ part: 'model', file: pack.file, size: pack.size, sha256: pack.sha256 }];
+  if (pack.mmproj) parts.push({ part: 'mmproj', file: pack.mmproj.file, size: pack.mmproj.size, sha256: pack.mmproj.sha256 });
+  return parts;
+}
 
 // Role of a file outside the whitelist, from its name alone: only the
 // Hunyuan MT family (hy-mt2-7b, hunyuan-mt-1.8b ...) is translation-only —
@@ -85,9 +129,10 @@ function packByHash(sha256) {
 }
 
 // Cheap pre-check by file name and exact size, so the scanner only hashes
-// 2 GB when the file could be a whitelisted one. The hash still decides.
+// 2 GB when the file could be a whitelisted one (or its mmproj). The hash
+// still decides.
 function packForFile(name, size) {
-  return LLM_PACKS.find((p) => p.file === name && p.size === size) || null;
+  return LLM_PACKS.find((p) => packFiles(p).some((f) => f.file === name && f.size === size)) || null;
 }
 
 function defaultPack() {
@@ -98,9 +143,15 @@ function packsForRole(role) {
   return LLM_PACKS.filter((p) => p.role === role);
 }
 
+// The one vision pack of this year's pin.
+function visionPack() {
+  return LLM_PACKS.find((p) => p.role === LLM_ROLE_VISION) || null;
+}
+
 module.exports = {
   LLM_ROLE_GENERAL,
   LLM_ROLE_MT,
+  LLM_ROLE_VISION,
   LLM_ROLES,
   LLM_MODELS_DIR,
   LLM_PINNED,
@@ -109,6 +160,8 @@ module.exports = {
   packById,
   packByHash,
   packForFile,
+  packFiles,
   defaultPack,
   packsForRole,
+  visionPack,
 };

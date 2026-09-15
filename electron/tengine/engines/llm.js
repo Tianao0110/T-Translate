@@ -26,7 +26,11 @@ function toProvider(value) {
   return value === 'cpu' || !value ? 'cpu' : 'gpu';
 }
 
+// One instance per slot: the text model ('llm') and the vision model
+// ('llm-vision') each get their own host process, so the two can stay
+// resident together and a fault in one leaves the other alone.
 function createLlmEngine({
+  id = 'llm',
   fork,
   logger,
   workerPath,
@@ -46,11 +50,11 @@ function createLlmEngine({
   let seq = 0;
   const streams = new Map(); // reqId -> { onToken, onProgress, lastProgressAt }
 
-  const emit = (kind, detail = {}) => onEvent({ engine: 'llm', host: 'llm', kind, at: now(), ...detail });
+  const emit = (kind, detail = {}) => onEvent({ engine: id, host: id, kind, at: now(), ...detail });
 
   const host = createHostManager({
-    name: 'llm',
-    serviceName: 't-translate-llm',
+    name: id,
+    serviceName: `t-translate-${id}`,
     workerPath,
     fork,
     logger,
@@ -85,7 +89,7 @@ function createLlmEngine({
         loaded = null;
         streams.clear();
       }
-      onEvent({ engine: 'llm', ...evt });
+      onEvent({ engine: id, ...evt });
     },
     ...(readyTimeoutMs ? { readyTimeoutMs } : {}),
     ...(requestTimeoutMs ? { requestTimeoutMs } : {}),
@@ -208,7 +212,7 @@ function createLlmEngine({
   }
 
   return {
-    id: 'llm',
+    id,
     host,
     load,
     unload,
@@ -232,7 +236,7 @@ function createLlmEngine({
     },
     running: () => host.running(),
     status: () => ({
-      id: 'llm',
+      id,
       provider,
       loaded: loaded ? { file: loaded.file, provider: loaded.provider, device: loaded.device ? loaded.device.name : null, fallback: loaded.fallback, loadMs: loaded.loadMs } : null,
       runtime: runtime ? { build: runtime.build, version: runtime.version, gpuOffload: runtime.gpuOffload, devices: (runtime.devices || []).map((d) => ({ name: d.name, typeName: d.typeName, description: d.description, memory: d.memory })) } : null,

@@ -69,4 +69,28 @@ describe('llm packs whitelist', () => {
     expect(mt.map((p) => p.id)).toEqual(['hy-mt2-1.8b']);
     expect(packs.packsForRole(packs.LLM_ROLE_GENERAL).every((p) => p.id !== 'hy-mt2-1.8b')).toBe(true);
   });
+
+  it('pins the vision pack as two files, each with its own size, hash and link', () => {
+    const v = packs.visionPack();
+    expect(v.id).toBe('paddleocr-vl-1.6');
+    expect(v.role).toBe(packs.LLM_ROLE_VISION);
+    expect(v.default).toBe(false);
+    expect(v.visionFamily).toBe('paddleocr');
+    expect(v.mmproj.file).toMatch(/mmproj.*\.gguf$/);
+    expect(v.mmproj.size).toBeGreaterThan(0);
+    expect(v.mmproj.sha256).toMatch(HEX64);
+    expect(v.mmproj.sha256).not.toBe(v.sha256);
+    expect(v.source.mmproj.url.endsWith(`/${v.mmproj.file}`)).toBe(true);
+    expect(v.source.mmproj.mirror).toMatch(/^https:\/\/.+\.gguf$/);
+    expect(packs.packFiles(v).map((f) => f.part)).toEqual(['model', 'mmproj']);
+    expect(packs.packFiles(packs.defaultPack()).map((f) => f.part)).toEqual(['model']);
+  });
+
+  it('recognises the mmproj by name and size but never the model by the mmproj hash', () => {
+    const v = packs.visionPack();
+    expect(packs.packForFile(v.mmproj.file, v.mmproj.size)).toBe(v);
+    expect(packs.packForFile(v.mmproj.file, v.mmproj.size + 1)).toBeNull();
+    expect(packs.packByHash(v.mmproj.sha256)).toBeNull();
+    expect(packs.packsForRole(packs.LLM_ROLE_GENERAL).every((p) => p.id !== v.id)).toBe(true);
+  });
 });

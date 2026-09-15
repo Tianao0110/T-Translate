@@ -9,7 +9,7 @@
 const nodeFs = require('fs');
 const nodePath = require('path');
 const crypto = require('crypto');
-const { LLM_PACKS, packForFile, packByHash, defaultPack, roleForFileName } = require('../shared/llm-packs');
+const { LLM_PACKS, LLM_ROLE_VISION, packFiles, defaultPack, roleForFileName } = require('../shared/llm-packs');
 
 const CACHE_FILE = '.tt-hashes.json';
 
@@ -71,7 +71,15 @@ function createLlmPackManager({ dir, packs = LLM_PACKS, allowUnlisted = () => fa
     } catch (e) {
       logger?.warn?.(`model folder unreadable: ${e.message}`);
     }
-    const found = new Map(); // pack id -> row
+    // Which whitelisted part a folder file could be, by name and exact size.
+    const expectedPart = (name, size) => {
+      for (const p of packs) {
+        const part = packFiles(p).find((f) => f.file === name && f.size === size);
+        if (part) return { pack: p, part };
+      }
+      return null;
+    };
+    const found = new Map(); // `${pack id}:${part}` -> { status, path, sha256 }
     const unlisted = [];
     for (const name of names) {
       let st;
@@ -81,8 +89,8 @@ function createLlmPackManager({ dir, packs = LLM_PACKS, allowUnlisted = () => fa
         continue;
       }
       const entry = { file: name, path: path.join(dir, name), size: st.size, mtimeMs: st.mtimeMs, role: roleForFileName(name) };
-      const candidate = packs.find((p) => p.file === name && p.size === st.size) || packForFile(name, st.size);
-      if (!candidate || !packs.includes(candidate)) {
+      const expected = expectedPart(name, st.size);
+      if (!expected) {
         unlisted.push(entry);
         continue;
       }
@@ -96,17 +104,21 @@ function createLlmPackManager({ dir, packs = LLM_PACKS, allowUnlisted = () => fa
         continue;
       }
       if (cache[name] !== before) cacheDirty = true;
-      const pack = packs.find((p) => p.sha256 === sha) || packByHash(sha);
-      if (pack && pack.id === candidate.id) {
-        found.set(pack.id, { ...entry, packId: pack.id, status: 'ready', sha256: sha });
-      } else {
-        // Right name and size, different bytes: refuse, and say so.
-        found.set(candidate.id, { ...entry, packId: candidate.id, status: 'mismatch', sha256: sha });
-      }
+      // Right name and size, different bytes: refuse, and say so.
+      found.set(`${expected.pack.id}:${expected.part.part}`, { status: sha === expected.part.sha256 ? 'ready' : 'mismatch', path: entry.path, sha256: sha });
     }
     if (cacheDirty) writeCache(cache);
     const rows = packs.map((p) => {
-      const f = found.get(p.id);
+      const files = packFiles(p).map((part) => {
+        const f = found.get(`${p.id}:${part.part}`);
+        return { part: part.part, file: part.file, size: part.size, status: f ? f.status : 'missing', path: f ? f.path : null };
+      });
+      const states = files.map((f) => f.status);
+      // A pack is ready only when every part is; one wrong part refuses
+      // the whole pack, one absent part leaves it partial.
+      const status = states.every((s) => s === 'ready') ? 'ready' : states.includes('mismatch') ? 'mismatch' : states.includes('ready') ? 'partial' : 'missing';
+      const model = files.find((f) => f.part === 'model');
+      const mmproj = files.find((f) => f.part === 'mmproj') || null;
       return {
         id: p.id,
         role: p.role,
@@ -118,8 +130,10 @@ function createLlmPackManager({ dir, packs = LLM_PACKS, allowUnlisted = () => fa
         license: p.license,
         source: p.source,
         minRamGb: p.minRamGb,
-        status: f ? f.status : 'missing',
-        path: f ? f.path : null,
+        files,
+        status,
+        path: model.path,
+        mmprojPath: mmproj ? mmproj.path : null,
       };
     });
     last = { dir, scannedAt: now(), packs: rows, unlisted, allowUnlisted: !!allowUnlisted() };
@@ -140,12 +154,19 @@ function createLlmPackManager({ dir, packs = LLM_PACKS, allowUnlisted = () => fa
     const row = last.packs.find((p) => p.id === packId);
     if (!row || row.status !== 'ready') return null;
     const pack = packs.find((p) => p.id === packId);
-    return { pack, path: row.path, trial: false };
+    return { pack, path: row.path, ...(row.mmprojPath ? { mmproj: row.mmprojPath } : {}), trial: false };
   }
 
   function resolveDefault() {
     const d = packs.find((p) => p.default) || defaultPack();
     return d ? resolvePack(d.id) : null;
+  }
+
+  // The installed vision pack, if any (this year's pin has one).
+  function resolveVision() {
+    if (!last) return null;
+    const row = last.packs.find((p) => p.role === LLM_ROLE_VISION && p.status === 'ready');
+    return row ? resolvePack(row.id) : null;
   }
 
   // A file outside the whitelist, by bare name, only while the developer
@@ -165,6 +186,7 @@ function createLlmPackManager({ dir, packs = LLM_PACKS, allowUnlisted = () => fa
     status: () => last,
     resolvePack,
     resolveDefault,
+    resolveVision,
     resolveUnlisted,
   };
 }

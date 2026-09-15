@@ -504,7 +504,7 @@ const en = {
       enabled: "GPU acceleration on",
       disabled: "GPU acceleration off",
       failed: "No engine could use the GPU, staying on the CPU: {{reason}}",
-      engineNames: { ocr: "Local OCR", tts: "Neural read-aloud", asr: "Listen recognition", llm: "Local model" },
+      engineNames: { ocr: "Local OCR", tts: "Neural read-aloud", asr: "Listen recognition", llm: "Local model", "llm-vision": "Built-in vision model" },
       reasons: { int8: "int8 quantized models run 3–6x slower on the GPU" },
       state: {
         gpu: "GPU (WebGPU)",

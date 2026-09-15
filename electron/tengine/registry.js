@@ -55,6 +55,17 @@ const ENGINES = [
     // Qwen3-1.7B Q8_0 on an RTX 4090 Laptop: 22 tok/s CPU → 210 tok/s.
     note: 'qwen3',
   },
+  {
+    id: 'llm-vision',
+    host: 'llm-vision',
+    // The same llama.cpp runtime in its own host process, with mtmd for the
+    // image encoder; resident next to the text model, not instead of it.
+    runtime: 'llama.cpp',
+    gpu: true,
+    backend: 'vulkan',
+    // PaddleOCR-VL-1.6: a floating-window block 2.1 s CPU → 0.12 s on Vulkan.
+    note: 'paddleocr-vl',
+  },
 ];
 
 const gpuCapableIds = () => ENGINES.filter((e) => e.gpu).map((e) => e.id);

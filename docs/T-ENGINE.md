@@ -9,7 +9,7 @@ T-Engine 是程序自己的引擎接入层：把本地 OCR、听译、朗读、�
 T-Engine 只做三件事：**装载运行时、监控引擎、报告事实**。
 
 - 它不改产品行为。用哪个引擎、什么时候降档、翻译走哪条链，由主进程的策略层决定（`electron/ipc/*` 与 managers 之上那层），T-Engine 只给信号和建议。原因：隐私门和产品行为按架构规则住在主进程（见 ARCHITECTURE.md「隐私分层」），一个会自己改流程的引擎层没法测、没法解释。
-- 它不装在主进程里。每个运行时家族一个 utilityProcess：音频（sherpa-onnx）、OCR（onnxruntime-node）、LLM（llama.cpp）。三个原因：崩溃隔离、同名 DLL 互斥（一个进程装不下两份 onnxruntime.dll）、内存按进程记账（双槽 4 GB 封顶）。
+- 它不装在主进程里。每个运行时家族一个 utilityProcess：音频（sherpa-onnx）、OCR（onnxruntime-node）、LLM（llama.cpp）。三个原因：崩溃隔离、同名 DLL 互斥（一个进程装不下两份 onnxruntime.dll）、内存按进程记账（双槽 4 GB 封顶）。LLM 家族是例外中的例外：文本槽（`llm`）与视觉槽（`llm-vision`）各一个宿主进程，同一套 DLL 装两次——两个模型并存驻留、互不等待，一个出错不连累另一个，代价是运行时多占一份（约 80 MB）。
 - 它不编译原生代码。绑定层是 koffi（FFI）直接调官方发布的 DLL；C++ addon 只在"KV 缓存留显卡的自写解码循环"这类需求出现时才考虑，目前没有。
 
 信号与策略的分工，用一句话记：**T-Engine 说"我现在这样"，主程序说"那就这么办"**。
@@ -49,8 +49,8 @@ electron/tengine/
   metrics-log.js       事件流落盘：data\logs\tengine-<日期>.jsonl，留 3 份，无痕不写，内容键一律剥掉
   trial-log.js         试用日志：data\logs\tengine-trial-<模型>-<月>.jsonl，两个月清理，文本只在开关后写；summarize 出试用报告
 electron/services/llm-host/llm-host.js     LLM utilityProcess：进程内一条 worker_thread 跑 runtime，主线程转发、排队、持取消标志、跑停滞看门狗
-electron/managers/llm-manager.js           主进程侧决策：选文件（白名单 / 开发者门）、驻留与 5 分钟闲置卸载（P8）、显卡开关自检、试用日志
-electron/managers/llm-pack-manager.js      模型文件夹扫描：同名同大小才哈希（缓存 size+mtime），哈希对上才 ready，其余列为未列入
+electron/managers/llm-manager.js           主进程侧决策：选文件（白名单 / 开发者门）、驻留与 5 分钟闲置卸载（P8）、显卡开关自检、试用日志；视觉槽（recognize / unloadVision / visionSelfTest）有自己的驻留、闲置计时与策略实例，CPU 后端按 CPU_MAX_PIXELS 限图
+electron/managers/llm-pack-manager.js      模型文件夹扫描：同名同大小才哈希（缓存 size+mtime），哈希对上才 ready，其余列为未列入；双文件包（模型 + mmproj）逐文件核对，全对才 ready，缺一个 partial、错一个 mismatch
 electron/ipc/llm.js                        llm:* 通道：状态、重扫、开文件夹、卸载、探针、试用报告；不过文本
 electron/services/ocr-host/ocr-host.js     已有：OCR utilityProcess（v0.4.9）
 electron/services/audio-engine/audio-worker.js  已有：音频 utilityProcess（v0.4.0）

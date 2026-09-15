@@ -213,4 +213,14 @@ describe('tengine llm engine', () => {
     expect(child().sent.some((m) => m.type === 'unload-model')).toBe(true);
     expect(await e.metrics()).toEqual({ rss: 100 });
   });
+
+  it('an id names the slot: host, events and status all carry it', async () => {
+    const { e, events } = engine(stockHost, { id: 'llm-vision' });
+    expect(e.id).toBe('llm-vision');
+    await e.load('C:/m/v.gguf', { mmproj: 'C:/m/v-mmproj.gguf' });
+    expect(events.length).toBeGreaterThan(0);
+    expect(events.every((ev) => ev.engine === 'llm-vision' && ev.host === 'llm-vision')).toBe(true);
+    expect(e.status().id).toBe('llm-vision');
+    expect(e.host.status().name).toBe('llm-vision');
+  });
 });

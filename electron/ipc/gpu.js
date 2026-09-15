@@ -52,6 +52,11 @@ const DRIVERS = {
     // timed generation; with no model installed it reports pending.
     selfTest: () => llmManager.selfTest(),
   },
+  'llm-vision': {
+    setProvider: (p) => tengine.get().setProvider('llm-vision', p),
+    // Same shape for the vision pack: the fixed image on the GPU, timed.
+    selfTest: () => llmManager.visionSelfTest(),
+  },
 };
 
 function register(ctx) {

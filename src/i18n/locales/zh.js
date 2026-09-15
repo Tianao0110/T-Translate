@@ -504,7 +504,7 @@ const zh = {
       enabled: "显卡加速已开启",
       disabled: "显卡加速已关闭",
       failed: "所有引擎都没能进显卡，保持 CPU：{{reason}}",
-      engineNames: { ocr: "本地 OCR", tts: "神经语音朗读", asr: "听译识别", llm: "本地模型" },
+      engineNames: { ocr: "本地 OCR", tts: "神经语音朗读", asr: "听译识别", llm: "本地模型", "llm-vision": "内置视觉模型" },
       reasons: { int8: "int8 量化模型，显卡上反而慢 3 到 6 倍" },
       state: {
         gpu: "显卡（WebGPU）",
