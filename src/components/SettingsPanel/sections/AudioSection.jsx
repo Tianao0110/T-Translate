@@ -4,7 +4,7 @@
 // the sidebar starts on the cards; a settings search that matched listen or
 // speech keywords lands on the matching sub-page directly (initialView).
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AudioLines, Volume2, ChevronLeft, ChevronRight } from 'lucide-react';
 import ttsManager, { DEFAULT_TTS_CONFIG } from '../../../tts/index.js';

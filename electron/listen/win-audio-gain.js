@@ -62,4 +62,4 @@ function applyGain(samples, gain) {
   return samples;
 }
 
-module.exports = { compensationGain, makeClipGuard, applyGain, DEFAULT_CAP_DB, DEFAULT_MARGIN_DB };
+module.exports = { compensationGain, makeClipGuard, applyGain, };

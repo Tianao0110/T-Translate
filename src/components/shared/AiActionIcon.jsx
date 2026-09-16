@@ -3,7 +3,6 @@
 // 'ai' renders the literal AI text chip instead of a lucide glyph; an unknown
 // name falls back rather than rendering nothing.
 
-import React from 'react';
 import { ScrollText, Sparkles, Lightbulb, BookOpen, Brain, ClipboardList } from 'lucide-react';
 import AiBadge from './AiBadge.jsx';
 

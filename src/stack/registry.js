@@ -52,20 +52,6 @@ export const DEFAULT_PRIORITY = {
 const instances = new Map();
 const configs = new Map();
 
-export function getAllProviderIds() {
-  return Object.keys(providerClasses);
-}
-
-export function getProviderClass(id) {
-  return providerClasses[id] || null;
-}
-
-export function getProviderMetadata(id) {
-  const ProviderClass = providerClasses[id];
-  if (!ProviderClass?.metadata) return null;
-  return { id, ...ProviderClass.metadata };
-}
-
 export function getAllProviderMetadata() {
   return Object.entries(providerClasses).map(([id, ProviderClass]) => ({
     id,
@@ -130,10 +116,6 @@ export function updateProviderConfig(id, config) {
   }
 
   logger.debug(`Updated config for ${id}`);
-}
-
-export function getProviderConfig(id) {
-  return configs.get(id) || {};
 }
 
 // Clears instance cache by default — config changes during init require fresh instances

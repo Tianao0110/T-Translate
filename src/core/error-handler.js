@@ -229,7 +229,7 @@ export function detectErrorType(error) {
   return ERROR_TYPES.UNKNOWN;
 }
 
-export function formatError(error, options = {}) {
+function formatError(error, options = {}) {
   const { provider, context } = options;
   const errorMessage = typeof error === 'string' ? error : (error?.message || String(error));
   const errorType = detectErrorType(errorMessage);
@@ -280,7 +280,7 @@ export function getShortErrorMessage(error, options = {}) {
   return `${formatted.title}${sep}${formatted.message}`;
 }
 
-export function isRetryable(errorType) {
+function isRetryable(errorType) {
   return [
     ERROR_TYPES.NETWORK,
     ERROR_TYPES.TIMEOUT,
@@ -288,14 +288,14 @@ export function isRetryable(errorType) {
   ].includes(errorType);
 }
 
-export function requiresUserAction(errorType) {
+function requiresUserAction(errorType) {
   return [
     ERROR_TYPES.API_KEY,
     ERROR_TYPES.CONFIG,
   ].includes(errorType);
 }
 
-export function getSuggestedAction(formattedError) {
+function getSuggestedAction(formattedError) {
   if (!formattedError) return null;
 
   if (formattedError.action) {

@@ -12,7 +12,6 @@ import {
 
 import { useShallow } from 'zustand/react/shallow';
 import useTranslationStore from '../../stores/translation-store';
-import translationService from '../../translation/stack-client.js';
 import { TTS_STATUS } from '../../tts/index.js';
 import createLogger from '../../core/logger.js';
 import { getShortErrorMessage } from '../../core/error-handler.js';

@@ -296,6 +296,4 @@ function showAboutDialog(mainWindow) {
 
 module.exports = {
   createMenu,
-  showUpdateDialog,
-  showAboutDialog,
 };

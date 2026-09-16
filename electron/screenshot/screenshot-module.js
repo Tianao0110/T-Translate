@@ -2,8 +2,7 @@
 // Prefers node-screenshots (native, per-monitor) and falls back to
 // desktopCapturer (Electron built-in, single stitched thumbnail).
 
-const { screen, desktopCapturer, BrowserWindow, nativeImage } = require('electron');
-const path = require('path');
+const { screen, desktopCapturer, nativeImage } = require('electron');
 
 let nodeScreenshots = null;
 try {
@@ -14,7 +13,6 @@ try {
 }
 
 let screenshotData = null;
-let screenshotWindow = null;
 
 function getScreenshotData() {
   return screenshotData;
@@ -26,14 +24,6 @@ function setScreenshotData(data) {
 
 function clearScreenshotData() {
   screenshotData = null;
-}
-
-function getScreenshotWindow() {
-  return screenshotWindow;
-}
-
-function setScreenshotWindow(win) {
-  screenshotWindow = win;
 }
 
 async function captureWithNodeScreenshots(displays, totalBounds) {
@@ -350,8 +340,6 @@ module.exports = {
   getScreenshotData,
   setScreenshotData,
   clearScreenshotData,
-  getScreenshotWindow,
-  setScreenshotWindow,
   captureWithNodeScreenshots,
   captureWithDesktopCapturer,
   cropFromDesktopCapturer,

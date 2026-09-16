@@ -1,4 +1,3 @@
-import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Filter } from 'lucide-react';
 import { Seg, Switch } from './shared';

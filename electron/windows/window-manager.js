@@ -2,7 +2,6 @@
 // and screenshot windows. Deps injected via init() to avoid require cycles.
 
 const { BrowserWindow, shell } = require('electron');
-const path = require('path');
 const PATHS = require('../shared/paths');
 const displayHelper = require('../platform/display-helper');
 const { isInternalUrl, mayOpenExternally } = require('../security/url-policy');
@@ -13,7 +12,6 @@ let windows = null;
 let isDev = false;
 let logger = null;
 let makeWindowInvisibleToCapture = null;
-let CHANNELS = null;
 let crashGuard = null;
 let onMainRendererGiveUp = null;
 
@@ -28,7 +26,6 @@ function init(deps) {
   isDev = deps.isDev;
   logger = deps.logger || console;
   makeWindowInvisibleToCapture = deps.makeWindowInvisibleToCapture || (() => {});
-  CHANNELS = deps.CHANNELS || {};
   crashGuard = deps.crashGuard || null;
   onMainRendererGiveUp = deps.onMainRendererGiveUp || null;
 

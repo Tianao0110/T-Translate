@@ -132,4 +132,4 @@ async function migrateLegacy({
   return { moved, removed, bytes: done };
 }
 
-module.exports = { FAMILIES, scanLegacy, migrateLegacy };
+module.exports = { scanLegacy, migrateLegacy };

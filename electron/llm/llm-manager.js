@@ -436,8 +436,4 @@ module.exports = {
   dir: () => deps.packs.dir(),
   reset,
   IDLE_UNLOAD_MS,
-  KEY_ALLOW_UNLISTED,
-  KEY_TRIAL_TEXT,
-  KEY_PACK,
-  UNLISTED_PREFIX,
 };

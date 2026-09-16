@@ -192,4 +192,4 @@ function loadRuntime(dir, { koffi = require('koffi'), verify = true } = {}) {
   };
 }
 
-module.exports = { verifyRuntime, loadRuntime, defineStructs, LOAD_ORDER };
+module.exports = { verifyRuntime, loadRuntime, defineStructs, };

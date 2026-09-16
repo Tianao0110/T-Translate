@@ -27,7 +27,7 @@ export function initGlobalErrorHandler() {
   logger.debug('Global error handler initialized');
 }
 
-export async function safeExecute(fn, fallback = null) {
+async function safeExecute(fn, fallback = null) {
   try {
     const result = fn();
     if (result instanceof Promise) {
@@ -40,7 +40,7 @@ export async function safeExecute(fn, fallback = null) {
   }
 }
 
-export function createSafeHandler(handler, name = 'handler') {
+function createSafeHandler(handler, name = 'handler') {
   return async (...args) => {
     try {
       const result = handler(...args);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Minus, Maximize2, Minimize2, X } from 'lucide-react';
 import './styles.css';

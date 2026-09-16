@@ -216,4 +216,4 @@ $null = [Windows.Media.Ocr.OcrEngine, Windows.Foundation, ContentType = WindowsR
   }
 }
 
-module.exports = { recognize, checkAvailability, stripCjkSpaces, parseRecognizeOutput };
+module.exports = { recognize, checkAvailability, parseRecognizeOutput };

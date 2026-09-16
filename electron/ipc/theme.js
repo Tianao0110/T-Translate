@@ -69,17 +69,6 @@ function broadcastThemeChange(theme, logger) {
   });
 }
 
-function getCurrentTheme() {
-  return currentTheme;
-}
-
-function setCurrentTheme(theme) {
-  currentTheme = theme;
-}
-
 module.exports = {
   registerThemeIPC,
-  broadcastThemeChange,
-  getCurrentTheme,
-  setCurrentTheme,
 };

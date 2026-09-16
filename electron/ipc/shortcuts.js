@@ -227,4 +227,3 @@ function unregisterAllShortcuts() {
 module.exports = register;
 module.exports.registerAllShortcuts = registerAllShortcuts;
 module.exports.unregisterAllShortcuts = unregisterAllShortcuts;
-module.exports.DEFAULT_SHORTCUTS = DEFAULT_SHORTCUTS;

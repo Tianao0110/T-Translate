@@ -54,4 +54,4 @@ async function syncLoginItem({ app, store, exec = execFile, platform = process.p
   return result;
 }
 
-module.exports = { syncLoginItem, LEGACY_RUN_NAME, STARTUP_ARGS, RUN_KEY, APPROVED_KEY };
+module.exports = { syncLoginItem, LEGACY_RUN_NAME, RUN_KEY, APPROVED_KEY };

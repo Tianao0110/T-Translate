@@ -76,4 +76,4 @@ function createListenAutosave({ dir, maxFiles = MAX_FILES, now = () => new Date(
   return { dir, save, prune, listFiles };
 }
 
-module.exports = { createListenAutosave, safeName, MAX_FILES };
+module.exports = { createListenAutosave, safeName, };

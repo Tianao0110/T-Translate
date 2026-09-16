@@ -170,4 +170,4 @@ function summarizeTrialLogs({ dir, modelFile, fs = nodeFs, path = nodePath } = {
   return s;
 }
 
-module.exports = { createTrialLog, pruneTrialLogs, summarizeTrialLogs, trialFileName, safeStem, MAX_AGE_DAYS };
+module.exports = { createTrialLog, pruneTrialLogs, summarizeTrialLogs, trialFileName, };

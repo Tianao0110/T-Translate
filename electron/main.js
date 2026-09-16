@@ -103,7 +103,6 @@ app.whenReady().then(() => {
     isDev,
     logger,
     makeWindowInvisibleToCapture,
-    CHANNELS,
     crashGuard,
     onMainRendererGiveUp,
   });

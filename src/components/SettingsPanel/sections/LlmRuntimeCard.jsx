@@ -3,7 +3,7 @@
 // grid the About page uses, plus self-test / unload in the card's own
 // button style. Self-contained: needs only notify.
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RefreshCw, Cpu, Zap, Power } from 'lucide-react';
 

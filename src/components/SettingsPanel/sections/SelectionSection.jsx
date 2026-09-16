@@ -1,6 +1,5 @@
 // Selection-translate settings section.
 
-import React from 'react';
 import { useTranslation } from 'react-i18next';
 import createLogger from '../../../core/logger.js';
 import { useConfirm } from '../../shared/ConfirmDialog.jsx';

@@ -6,7 +6,7 @@
 // Row markup reuses the OCR pack classes (styles/ocr.css) — same rows, same
 // badges, same progress bar.
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Download, RefreshCw, Trash2, AlertTriangle, ExternalLink } from 'lucide-react';
 import createLogger from '../../../core/logger.js';

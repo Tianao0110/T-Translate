@@ -1,6 +1,6 @@
 // OCR settings: language, capture options, and per-engine config (local / vision / online).
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff, AlertTriangle, RefreshCw, Download, Cpu, Sparkles, Globe, ExternalLink, FolderOpen } from 'lucide-react';
 import stackClient from '../../../translation/stack-client.js';

@@ -85,4 +85,4 @@ function cropQuad(srcCanvas, points) {
   return ctx.getImageData(0, 0, out.width, out.height);
 }
 
-module.exports = { setCanvasKit, newCanvas, newImageData, data2canvas, resizeImg, rotateImg, cropQuad };
+module.exports = { setCanvasKit, data2canvas, resizeImg, rotateImg, cropQuad };

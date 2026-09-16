@@ -1,7 +1,7 @@
 ﻿// Single OCR text block's translation overlay. Drag to move, double-click to
 // promote into an independent BrowserWindow (handled by parent's onFreeze).
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, Copy, Check, Loader2 } from 'lucide-react';
 import { CHILD_PANE_STATUS } from '../../stores/session.js';

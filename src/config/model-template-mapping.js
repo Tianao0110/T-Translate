@@ -14,7 +14,7 @@
 // (e.g. `/\bhy[\s\-_]?mt/i` catches Hy-MT2, Hy-MT3, HyMT4, etc.). Avoid
 // version-specific patterns like `/hy-mt2/i` that go stale on the next release.
 
-export const MODEL_TEMPLATE_RULES = [
+const MODEL_TEMPLATE_RULES = [
   {
     template: 'mt-direct',
     label: 'Tencent Hunyuan MT family',

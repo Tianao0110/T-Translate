@@ -27,7 +27,7 @@ export const LANGUAGE_NAMES = {
 // main-process stack (stack/service.js) based on the active model —
 // translation-only small models (Hunyuan MT etc.) get a simpler prompt and
 // user-only mode, regardless of which tone template is selected.
-export const TEMPLATES = {
+const TEMPLATES = {
   natural: {
     mode: 'system',
     systemPrompt: `You are a professional translator. Translate the following text into {targetLang}.

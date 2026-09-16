@@ -50,7 +50,7 @@ export const DEFAULT_OCR_PRIORITY = [
   'baidu-ocr',
 ];
 
-export function createOCREngine(id, config = {}) {
+function createOCREngine(id, config = {}) {
   const EngineClass = engines[id];
   if (!EngineClass) {
     return null;

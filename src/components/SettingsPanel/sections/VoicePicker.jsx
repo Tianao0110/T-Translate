@@ -4,7 +4,7 @@
 // applies immediately. Neural voices group by gender with a featured row on
 // top; system voices group by language with "auto" as the first choice.
 
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, Play } from 'lucide-react';
 

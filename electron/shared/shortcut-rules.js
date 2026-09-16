@@ -28,4 +28,4 @@ function isAllowedGlobalShortcut(shortcut) {
   return parts.some((p) => STRONG_MODIFIERS.includes(p)) || F_KEY_RE.test(keys[0]);
 }
 
-module.exports = { isAllowedGlobalShortcut, F_KEY_RE };
+module.exports = { isAllowedGlobalShortcut, };

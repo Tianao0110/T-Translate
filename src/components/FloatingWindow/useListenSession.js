@@ -11,10 +11,7 @@
 // (privacy injected there), and SRT export assembly.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import createLogger from '../../core/logger.js';
 import { normalizeDraftCase } from '../../listen/listen-text.js';
-
-const logger = createLogger('ListenSession');
 
 // On-screen scrollback. Small on purpose: every kept segment is live DOM, and
 // nobody scrolls back an hour in a subtitle overlay.

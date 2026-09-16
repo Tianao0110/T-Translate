@@ -11,28 +11,28 @@ export const AI_ACTION_SCHEMA_VERSION = 1;
 export const AI_ACTION_VARS = ['sourceText', 'translatedText', 'sourceLanguage', 'outputLanguage'];
 
 // 'text' = any chat-capable LLM; 'vision' = needs a vision model (path B).
-export const AI_ACTION_CAPABILITIES = ['text', 'vision'];
+const AI_ACTION_CAPABILITIES = ['text', 'vision'];
 
 // Where the result may live. 'attach' = rides on the translation entry it was
 // derived from; 'none' = never touches the main history (module-owned actions
 // keep their own record, if any). Secure mode drops both.
-export const AI_ACTION_HISTORY_MODES = ['attach', 'none'];
+const AI_ACTION_HISTORY_MODES = ['attach', 'none'];
 
 // Entry points an action may be offered on.
 // 'document' is a reading surface too: a paragraph of a translated manual can
 // be as opaque as a screenshot. Missing from this list, an imported action
 // aimed at documents would be rejected at import while the built-in worked.
-export const AI_ACTION_SURFACES = ['selection', 'screenshot', 'floating', 'document'];
+const AI_ACTION_SURFACES = ['selection', 'screenshot', 'floating', 'document'];
 
 // The "看 vs 懂" split as the floating window's toggle sees it: 'translate'
 // actions belong to reading (toggle off), 'understand' actions to the
 // understanding mode (toggle on), 'any' to both. Surfaces without the toggle
 // behave as if it were off.
-export const AI_ACTION_MODES = ['translate', 'understand', 'any'];
+const AI_ACTION_MODES = ['translate', 'understand', 'any'];
 
 // 'target'/'source' follow the translation's languages, 'ui' follows the app
 // language; anything else is taken as a literal language code.
-export const AI_ACTION_OUTPUT_LANGUAGES = ['target', 'source', 'ui'];
+const AI_ACTION_OUTPUT_LANGUAGES = ['target', 'source', 'ui'];
 
 // Long-form gate for summary-shaped actions. CJK characters and Latin words are
 // counted separately because 150 Chinese characters and 150 English words are

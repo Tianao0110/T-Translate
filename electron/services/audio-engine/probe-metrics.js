@@ -256,7 +256,6 @@ function round3(n) {
 
 module.exports = {
   makeRepeatTracker,
-  normalizeForRepeat,
   segmentRecord,
   eventRecord,
   metricsRecord,

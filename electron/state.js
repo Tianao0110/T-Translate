@@ -149,24 +149,9 @@ const windows = {
   },
 };
 
-// Reset helper — primarily for tests / edge recovery.
-function resetRuntime() {
-  runtime.isQuitting = false;
-  runtime.selectionEnabled = false;
-  runtime.screenshotData = null;
-  runtime.wasMainWindowVisible = false;
-  runtime.screenshotFromHotkey = false;
-  runtime.isDraggingOverlay = false;
-  windows.clearAll();
-}
-
 // Legacy aliases — kept for backwards compatibility with older call sites.
 function getMainWindow() {
   return windows.main;
-}
-
-function setMainWindow(win) {
-  windows.main = win;
 }
 
 module.exports = {
@@ -174,7 +159,5 @@ module.exports = {
   runtime,
   windows,
   isDev,
-  resetRuntime,
   getMainWindow,
-  setMainWindow,
 };

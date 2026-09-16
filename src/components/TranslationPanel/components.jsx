@@ -248,7 +248,7 @@ SaveModal.displayName = 'SaveModal';
 
 // Shared language selector across TranslationPanel, DocumentTranslator, etc.
 // size: 'default' for hero selectors, 'compact' for toolbar usage.
-export const LanguageSelector = memo(({
+const LanguageSelector = memo(({
   value,
   options,
   onChange,

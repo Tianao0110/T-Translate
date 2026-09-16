@@ -88,7 +88,6 @@ class TranslationPipeline {
         ...captureOptions,
         scaleFactor: captureResult.scaleFactor,
       });
-
     } catch (error) {
       logger.error('Capture error:', error);
       const errorMsg = getShortErrorMessage(error);
@@ -204,7 +203,6 @@ class TranslationPipeline {
       }
 
       return await this.runFromText(text);
-
     } catch (error) {
       logger.error('Image processing error:', error);
       const errorMsg = getShortErrorMessage(error, { context: 'ocr' });
@@ -400,7 +398,6 @@ class TranslationPipeline {
       }
 
       return { success: true, mode: 'scattered', blockCount: createdPanes.length };
-
     } catch (error) {
       logger.error('Scattered mode error:', error);
       const errorMsg = getShortErrorMessage(error);
@@ -455,7 +452,6 @@ class TranslationPipeline {
       }
 
       return { success: true, text: cleaned, provider: result.provider };
-
     } catch (error) {
       logger.error('Translation error:', error);
       const errorMsg = getShortErrorMessage(error, { context: 'translation' });
@@ -501,4 +497,4 @@ class TranslationPipeline {
 const pipeline = new TranslationPipeline();
 
 export default pipeline;
-export { TranslationPipeline, calculateHash, detectLanguage, cleanTranslationOutput, shouldTranslateText };
+export { calculateHash, detectLanguage, cleanTranslationOutput, shouldTranslateText };

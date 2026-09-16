@@ -241,8 +241,4 @@ function locateAsrModels(baseDir, { fs = nodeFs, path = nodePath } = {}) {
 module.exports = {
   locateAsrModels,
   listInstalledPacks,
-  VAD_FILE,
-  MODEL_FILE,
-  TOKENS_FILE,
-  STREAMING_FILES,
 };

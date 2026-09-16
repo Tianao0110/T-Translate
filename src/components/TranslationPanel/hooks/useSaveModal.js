@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useRef } from 'react';
 import translationService from '../../../translation/stack-client.js';
-import useTranslationStore from '../../../stores/translation-store';
 import { getAnalysisPrompts, parseJsonReply } from '../../../ai/ai-prompts.js';
 import createLogger from '../../../core/logger.js';
 

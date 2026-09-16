@@ -100,13 +100,6 @@ function initIPC(deps) {
   return context;
 }
 
-// Placeholder for hot-reload / test cleanup. Electron doesn't expose a "remove all
-// handlers" API, so real cleanup needs per-handler tracking — TODO if we ever need it.
-function cleanupIPC() {
-  logger.info('IPC cleanup requested (manual cleanup may be needed)');
-}
-
 module.exports = {
   initIPC,
-  cleanupIPC,
 };

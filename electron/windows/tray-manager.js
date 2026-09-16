@@ -1,7 +1,6 @@
 ﻿// System tray manager with locale-aware menu labels.
 
 const { Tray, Menu, nativeImage, app } = require('electron');
-const path = require('path');
 const { store, runtime } = require('../state');
 const PATHS = require('../shared/paths');
 const logger = require('../platform/logger')('Tray');
@@ -265,33 +264,10 @@ function destroyTray() {
   }
 }
 
-function getTray() {
-  return tray;
-}
-
-function setToolTip(text) {
-  if (tray) {
-    tray.setToolTip(text);
-  }
-}
-
-function setIcon(iconPath) {
-  if (tray) {
-    const icon = nativeImage
-      .createFromPath(iconPath)
-      .resize({ width: 32, height: 32 });
-    tray.setImage(icon);
-  }
-}
-
 module.exports = {
   init,
   createTray,
-  updateMenu,
-  updateTrayMenu: updateMenu, // alias kept for existing main.js import
+  updateTrayMenu: updateMenu,
   updateLanguage,
   destroyTray,
-  getTray,
-  setToolTip,
-  setIcon,
 };

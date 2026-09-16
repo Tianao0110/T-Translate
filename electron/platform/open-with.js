@@ -28,4 +28,4 @@ function extractOpenableFile(argv, exists = fs.existsSync) {
   return null;
 }
 
-module.exports = { extractOpenableFile, OPENABLE_EXTENSIONS };
+module.exports = { extractOpenableFile, };

@@ -20,7 +20,6 @@ const _t = (key, fallback) => {
 };
 
 class MainTranslationService {
-
   // Picks stream vs one-shot based on user preference in the store
   async execute(options = {}) {
     const state = useTranslationStore.getState();
@@ -128,7 +127,6 @@ class MainTranslationService {
       } else {
         throw new Error(result.error || _t('svc.translateFailed', '翻译失败'));
       }
-
     } catch (error) {
       logger.error('Stream translation error:', error);
       useTranslationStore.setState((draft) => {
@@ -220,7 +218,6 @@ class MainTranslationService {
       } else {
         throw new Error(result.error || _t('svc.translateFailed', '翻译失败'));
       }
-
     } catch (error) {
       logger.error('Translation error:', error);
       useTranslationStore.setState((draft) => {
@@ -273,7 +270,6 @@ class MainTranslationService {
         });
 
         results.push({ success: true, text: result.text });
-
       } catch (error) {
         useTranslationStore.setState((draft) => {
           const queueItem = draft.queue.find((q) => q.id === item.id);
@@ -392,4 +388,3 @@ class MainTranslationService {
 const mainTranslation = new MainTranslationService();
 
 export default mainTranslation;
-export { MainTranslationService };

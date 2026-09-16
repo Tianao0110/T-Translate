@@ -17,7 +17,7 @@ import anthropic from '../assets/provider-icons/anthropic.svg';
 import microsoftTranslator from '../assets/provider-icons/microsoft-translator.svg';
 import baiduTranslate from '../assets/provider-icons/baidu-translate.svg';
 
-export const PROVIDER_ICONS = {
+const PROVIDER_ICONS = {
   'tengine': tengine,
   'openai': openai,
   'deepseek': deepseek,

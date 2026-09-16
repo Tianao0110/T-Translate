@@ -31,7 +31,7 @@
 // MAINTENANCE: incomplete on purpose. Add a family only when its published
 // coverage is clear and stable; a missing entry costs nothing.
 
-export const MODEL_LANGUAGE_RULES = [
+const MODEL_LANGUAGE_RULES = [
   {
     label: 'Meta Llama 3.x',
     // Meta documents exactly eight for 3.1 / 3.2 / 3.3.

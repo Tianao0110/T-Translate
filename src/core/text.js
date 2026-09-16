@@ -78,7 +78,7 @@ export function shouldTranslateText(text) {
 }
 
 // Jaccard similarity on character sets, scaled to 0-100
-export function textSimilarity(text1, text2) {
+function textSimilarity(text1, text2) {
   if (!text1 || !text2) return 0;
   if (text1 === text2) return 100;
 

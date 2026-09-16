@@ -9,7 +9,7 @@
 // pass uses a model for.
 
 // Single-character terms match far too much to be worth replacing.
-export const MIN_TERM_LENGTH = 2;
+const MIN_TERM_LENGTH = 2;
 
 /**
  * @param {string} translatedText
@@ -54,7 +54,3 @@ export function termAppliesTo(term, sourceText) {
   return isUsableTerm(term) && lower(sourceText).includes(lower(term.source));
 }
 
-/** Is the canonical rendering present in the translation? */
-export function termHonoured(term, translatedText) {
-  return lower(translatedText).includes(lower(term.target));
-}

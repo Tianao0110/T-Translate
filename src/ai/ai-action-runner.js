@@ -124,7 +124,7 @@ function languageName(code, lang) {
 // Which language the model answers in. The model always reads the source side
 // (translating symbols/formulas first would damage the meaning), so this only
 // controls the output.
-export function resolveOutputLanguage(action, context, uiLang) {
+function resolveOutputLanguage(action, context, uiLang) {
   const spec = action.outputLanguage || 'target';
   if (spec === 'ui') return uiLang;
   if (spec === 'source') {

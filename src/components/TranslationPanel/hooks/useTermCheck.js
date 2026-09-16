@@ -3,9 +3,6 @@
 
 import { useState, useCallback } from 'react';
 import useTranslationStore from '../../../stores/translation-store';
-import createLogger from '../../../core/logger.js';
-
-const logger = createLogger('useTermCheck');
 
 export default function useTermCheck(favorites, setTranslatedText, notify, t) {
   const [termSuggestions, setTermSuggestions] = useState([]);

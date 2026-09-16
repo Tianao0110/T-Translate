@@ -149,4 +149,4 @@ function createSecureVault({ store, safeStorage } = {}) {
   return { decrypt, bulkDecryptProviderConfigs, decryptOcrBucket };
 }
 
-module.exports = { createSecureVault, isDecryptAllowed, ONLINE_KEY_PREFIXES };
+module.exports = { createSecureVault, isDecryptAllowed, };

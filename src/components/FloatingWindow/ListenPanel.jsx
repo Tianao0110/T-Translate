@@ -9,7 +9,7 @@
 // the configured TTS engine. Playback from any window mutes capture in the
 // worker (the gate), so the spoken line never comes back as a subtitle.
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Volume2, Square } from 'lucide-react';
 import ttsManager, { TTS_STATUS } from '../../tts/index.js';

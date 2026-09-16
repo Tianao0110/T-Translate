@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pin, Volume2, VolumeX, X, Loader2 } from 'lucide-react';
 import translationService from '../../translation/stack-client.js';
@@ -11,7 +11,7 @@ import { getShortErrorMessage } from '../../core/error-handler.js';
 import { detectLanguage, resolveSameLanguageTarget } from '../../core/text.js';
 import './styles.css';
 
-import { PRIVACY_MODES, THEMES } from '../../config/constants.js';
+import { THEMES } from '../../config/constants.js';
 
 const logger = createLogger('Selection');
 

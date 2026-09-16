@@ -4,7 +4,7 @@
 // place instead of two windows. The list itself is PackList, shared with the
 // voice packs on the TTS page.
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import PackList from './PackList.jsx';
 import { Seg, Switch } from './shared.jsx';

@@ -38,4 +38,4 @@ function mayOpenExternally(url) {
   }
 }
 
-module.exports = { isInternalUrl, mayOpenExternally, EXTERNAL_OPEN_PROTOCOLS };
+module.exports = { isInternalUrl, mayOpenExternally, };

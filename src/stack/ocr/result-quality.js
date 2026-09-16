@@ -77,4 +77,3 @@ export function isUsableResult(result, engineId) {
   return true;
 }
 
-export const QUALITY_THRESHOLDS = { MIN_CONFIDENCE, MIN_DENSITY };

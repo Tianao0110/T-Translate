@@ -112,7 +112,6 @@ module.exports = {
   TTS_VOICE_TYPE,
   ASR_TYPES,
   TTS_TYPES,
-  KNOWN_TYPES,
   MANUAL_PACKS,
   manualPackById,
   computePackList,

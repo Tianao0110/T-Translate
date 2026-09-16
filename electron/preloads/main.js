@@ -2,7 +2,6 @@
 // main.js MUST set `sandbox: false` for fs access (preload runs in renderer process).
 
 const { contextBridge, ipcRenderer } = require("electron");
-const path = require("path");
 const fs = require("fs").promises;
 
 // Receive allow-list — the generic ipc.on / ipcRenderer.on bridges below are

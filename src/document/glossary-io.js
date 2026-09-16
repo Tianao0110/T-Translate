@@ -24,7 +24,7 @@ export function exportToJSON(items) {
 
 // Accepts both our wrapper shape ({terms: []}) and a bare array. Also tolerates
 // Chinese field names (原文/译文/备注) for exports from other tools.
-export function importFromJSON(jsonString) {
+function importFromJSON(jsonString) {
   try {
     const data = JSON.parse(jsonString);
 
@@ -76,7 +76,7 @@ export function exportToCSV(items) {
   return '\uFEFF' + header + '\n' + rows.join('\n');
 }
 
-export function importFromCSV(csvString) {
+function importFromCSV(csvString) {
   const content = csvString.replace(/^\uFEFF/, '');
 
   const lines = content.split(/\r?\n/).filter(line => line.trim());
@@ -185,7 +185,7 @@ ${termEntries}
 
 // Regex-based parser (no DOMParser, so this runs in Node tests too).
 // Assumes first langSet is source, second is target.
-export function importFromTBX(tbxString) {
+function importFromTBX(tbxString) {
   const terms = [];
 
   const termEntryRegex = /<termEntry[^>]*>([\s\S]*?)<\/termEntry>/gi;

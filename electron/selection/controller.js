@@ -836,12 +836,10 @@ function preheatSelectionModules() {
 
 module.exports = {
   toggleSelectionTranslate,
-  startSelectionHook,
   stopSelectionHook,
   showSelectionWithText,
   showSelectionResult,
   showSelectionLoading,
   hideSelectionLoading,
-  hideSelectionWindow,
   preheatSelectionModules,
 };

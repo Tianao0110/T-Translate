@@ -1,9 +1,7 @@
 ﻿// Shared constants for SettingsPanel: defaults, nav, settings shape, migrations.
 
 import {
-  Globe, Shield, Zap, Moon, Sun,
-  Info, Wifi, Eye, Lock,
-  Code2, Palette, Layers, MousePointer, Server,
+  Globe, Shield, Info, Eye, Palette, Layers, MousePointer, Server,
   FileText, Sparkles, AudioLines, Cpu
 } from 'lucide-react';
 

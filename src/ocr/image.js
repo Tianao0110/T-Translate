@@ -33,7 +33,7 @@ export async function calculateHash(imageData) {
   }
 }
 
-export function compareHash(hash1, hash2, threshold = 5) {
+function compareHash(hash1, hash2, threshold = 5) {
   if (!hash1 || !hash2) return false;
   if (hash1 === hash2) return true;
 
@@ -61,7 +61,7 @@ export function ensureBase64(input) {
   return input;
 }
 
-export function base64ToBytes(base64) {
+function base64ToBytes(base64) {
   const data = base64.split(',')[1] || base64;
   const binary = atob(data);
   const bytes = new Uint8Array(binary.length);
@@ -72,7 +72,7 @@ export function base64ToBytes(base64) {
 }
 
 // Base64 inflates raw bytes by 4/3; return approximate KB
-export function estimateBase64Size(base64) {
+function estimateBase64Size(base64) {
   if (!base64) return 0;
   const data = base64.split(',')[1] || base64;
   return Math.round((data.length * 3) / 4 / 1024);

@@ -1,6 +1,6 @@
 // Interface settings: startup, language, theme, keyboard shortcuts.
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Sun, Moon, Leaf, RefreshCw, Globe, Power, Keyboard, Camera, AppWindow, Layers, Pencil, ScanLine, Bell } from 'lucide-react';
 import { defaultConfig } from '../constants.js';

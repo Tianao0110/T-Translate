@@ -321,4 +321,3 @@ class StackClient {
 const stackClient = new StackClient();
 
 export default stackClient;
-export { StackClient };

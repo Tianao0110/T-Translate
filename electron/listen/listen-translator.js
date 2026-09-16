@@ -161,4 +161,4 @@ function createListenTranslator({ translateStream = null, enabled = () => !!tran
   };
 }
 
-module.exports = { createListenTranslator, buildSrt, MAX_TRANSCRIPT };
+module.exports = { createListenTranslator, buildSrt, };

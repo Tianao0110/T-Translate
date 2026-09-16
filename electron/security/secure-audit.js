@@ -91,7 +91,6 @@ module.exports = {
   BULK_CONTEXTS,
   logAccess,
   checkAnomaly,
-  sendSecurityAlert,
   auditAccess,
   reset,
 };

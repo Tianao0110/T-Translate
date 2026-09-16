@@ -701,5 +701,4 @@ module.exports = {
   listAudioSessions,
   startCapture,
   SAMPLE_RATE,
-  PROCESS_LOOPBACK_MIN_BUILD,
 };

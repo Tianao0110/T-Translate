@@ -7,7 +7,7 @@
 // stack bundle, and core/logger.js carries a Vite-only import.meta.
 
 // Each filter: { name, pattern (RegExp, MUST be /g), description, enabled }.
-export const DEFAULT_FILTERS = [
+const DEFAULT_FILTERS = [
   {
     name: 'code_block',
     pattern: /```[\s\S]*?```/g,

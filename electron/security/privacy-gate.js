@@ -15,12 +15,4 @@ function isOfflineMode(store) {
   return s.get('privacyMode', PRIVACY_MODES.STANDARD) === PRIVACY_MODES.OFFLINE;
 }
 
-// The refusal every network-touching feature returns, so the renderer can
-// tell "offline mode blocked this" apart from "the network failed".
-function offlineBlockedError() {
-  const err = new Error('offline-mode');
-  err.code = 'OFFLINE_BLOCKED';
-  return err;
-}
-
-module.exports = { isOfflineMode, offlineBlockedError };
+module.exports = { isOfflineMode, };

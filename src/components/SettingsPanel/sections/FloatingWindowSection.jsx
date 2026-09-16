@@ -1,6 +1,5 @@
 // Floating-window settings section.
 
-import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Seg, Switch, Slider } from './shared';
 

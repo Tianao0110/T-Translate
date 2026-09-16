@@ -270,5 +270,4 @@ module.exports = createLogger;
 module.exports.LOG_LEVELS = LOG_LEVELS;
 module.exports.getLogDirectory = getLogDirectory;
 module.exports.setSecureFileLogging = setSecureFileLogging;
-module.exports.filterSensitive = filterSensitive;
 module.exports.localDateStamp = localDateStamp;

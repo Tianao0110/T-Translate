@@ -3,7 +3,6 @@
 
 import { useState, useCallback } from 'react';
 import translationService from '../../../translation/stack-client.js';
-import useTranslationStore from '../../../stores/translation-store';
 import { getStyleRewritePrompts } from '../../../ai/ai-prompts.js';
 import createLogger from '../../../core/logger.js';
 import { getShortErrorMessage } from '../../../core/error-handler.js';

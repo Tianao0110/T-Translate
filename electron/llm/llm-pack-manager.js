@@ -191,4 +191,4 @@ function createLlmPackManager({ dir, packs = LLM_PACKS, allowUnlisted = () => fa
   };
 }
 
-module.exports = { createLlmPackManager, hashFile, CACHE_FILE };
+module.exports = { createLlmPackManager, CACHE_FILE };

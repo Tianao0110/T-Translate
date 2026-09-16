@@ -10,7 +10,7 @@
 // Paints itself from a rAF loop reading a ref, so twelve updates a second
 // never re-render the transcript above it.
 
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 
 // Falls faster than it rises would look jumpy; falling slowly reads as a
 // meter rather than a strobe.

@@ -19,9 +19,6 @@ const LLM_ROLES = [LLM_ROLE_GENERAL, LLM_ROLE_MT, LLM_ROLE_VISION];
 // Folder under the models root, scanned by the LLM pack manager.
 const LLM_MODELS_DIR = 'llm-models';
 
-// Date of the last annual pin (models + llama.cpp build together).
-const LLM_PINNED = '2026-09-08';
-
 const LLM_PACKS = [
   {
     id: 'qwen3-1.7b',
@@ -154,7 +151,6 @@ module.exports = {
   LLM_ROLE_VISION,
   LLM_ROLES,
   LLM_MODELS_DIR,
-  LLM_PINNED,
   LLM_PACKS,
   roleForFileName,
   packById,

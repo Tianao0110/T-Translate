@@ -52,11 +52,6 @@ export const OCR_LANGUAGE_GROUPS = [
   { packId: 'kannada', languages: ['kn'] },
 ];
 
-export const OCR_LANGUAGE_TO_PACK = Object.fromEntries([
-  ['auto', 'base-v6'],
-  ...OCR_LANGUAGE_GROUPS.flatMap((g) => g.languages.map((code) => [code, g.packId])),
-]);
-
 // The OCR setting distinguishes the two Chinese scripts; the shared catalogue
 // is about translation, where the distinction is region.
 const CATALOGUE_ALIAS = { 'zh-Hans': 'zh', 'zh-Hant': 'zh-TW' };

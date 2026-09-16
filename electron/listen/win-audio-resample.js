@@ -70,4 +70,4 @@ function makeDownmixDecimator({ channels = 2, factor = 3, taps = 63 } = {}) {
   };
 }
 
-module.exports = { makeDownmixDecimator, designLowpass };
+module.exports = { makeDownmixDecimator, };

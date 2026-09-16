@@ -126,7 +126,7 @@ export function buildOutlineTree(headings) {
 }
 
 // Token estimate: CJK ≈ 2 tokens/char, Latin ≈ 0.35 tokens/char (~4 chars/word, 1.3 tokens/word).
-export function estimateTokens(text) {
+function estimateTokens(text) {
   if (!text) return 0;
   const chineseChars = (text.match(/[\u4e00-\u9fff]/g) || []).length;
   const otherChars = text.length - chineseChars;
@@ -371,7 +371,7 @@ async function ocrPdfPage(page, ocrRecognize) {
 // real text pages clear this easily.
 const SCANNED_PAGE_MAX_CHARS = 20;
 
-export async function parsePDF(file, options = {}) {
+async function parsePDF(file, options = {}) {
   const { password, maxCharsPerSegment = 800, filters = {}, ocrRecognize, onProgress } = options;
 
   const pdfjsLib = await import('pdfjs-dist');
@@ -503,7 +503,7 @@ export async function parsePDF(file, options = {}) {
   return result;
 }
 
-export async function parseDOCX(file, options = {}) {
+async function parseDOCX(file, options = {}) {
   const { maxCharsPerSegment = 800, filters = {} } = options;
 
   const mammoth = await import('mammoth');
@@ -561,7 +561,7 @@ export function splitCSVLine(line) {
   return cells;
 }
 
-export async function parseCSV(file, options = {}) {
+async function parseCSV(file, options = {}) {
   const { filters = {} } = options;
 
   const text = await readAsText(file);
@@ -595,7 +595,7 @@ export async function parseCSV(file, options = {}) {
 }
 
 // Extracts string leaves from arbitrary JSON, skipping URLs/dates/UUIDs.
-export async function parseJSON(file, options = {}) {
+async function parseJSON(file, options = {}) {
   const { filters = {} } = options;
 
   const text = await readAsText(file);
@@ -627,7 +627,7 @@ export async function parseJSON(file, options = {}) {
 }
 
 // EPUB is a ZIP of (X)HTML — we follow container.xml → OPF → spine.
-export async function parseEPUB(file, options = {}) {
+async function parseEPUB(file, options = {}) {
   const { maxCharsPerSegment = 800, filters = {} } = options;
 
   const JSZip = (await import('jszip')).default;
@@ -847,7 +847,6 @@ export async function parseDocument(file, options = {}) {
       headings,
       ...extra,
     };
-
   } catch (error) {
     // Say which file and which stage. A pdf.js rejection can carry no message
     // at all — a bare "Error:" line leaves nothing to act on.
@@ -918,7 +917,7 @@ function calculateStats(segments) {
   };
 }
 
-export function batchSegments(segments, options = {}) {
+function batchSegments(segments, options = {}) {
   const {
     maxTokensPerBatch = 2000,
     maxSegmentsPerBatch = 5,

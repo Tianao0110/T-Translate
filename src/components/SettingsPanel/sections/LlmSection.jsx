@@ -4,7 +4,7 @@
 // speed, self-test, unload) lives in the provider's card on the providers
 // page (LlmRuntimeCard).
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AlertTriangle, RefreshCw, ExternalLink } from 'lucide-react';
 import { Seg, Switch } from './shared';

@@ -37,14 +37,8 @@ function t(key) {
   return trayLabels[currentLang]?.[key] || trayLabels.zh[key] || key;
 }
 
-function getLabels() {
-  return trayLabels[currentLang] || trayLabels.zh;
-}
-
 module.exports = {
-  trayLabels,
   setLanguage,
   getLanguage,
   t,
-  getLabels
 };

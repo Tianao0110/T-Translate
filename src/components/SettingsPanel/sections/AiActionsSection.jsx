@@ -3,7 +3,6 @@
 // code — an action is data (display name, where it appears, which prompt), and
 // the import gate is config/ai-actions.js normalizeActionConfig.
 
-import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Upload, Trash2, Lock } from 'lucide-react';
 

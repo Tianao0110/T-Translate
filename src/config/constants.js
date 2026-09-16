@@ -13,7 +13,6 @@ export const THEMES = {
   FRESH: 'fresh',
 };
 
-
 export const OCR_ENGINES = {
   LLM_VISION: 'llm-vision',
   TENGINE_VISION: 'tengine-vision',
@@ -65,32 +64,6 @@ export const LANGUAGE_CODES = {
 // table (service.js already imports config/filters.js). One table, no drift.
 import { LANGUAGES } from './languages.js';
 export { LANGUAGES };
-
-// {value, label} shape — for native <select> usage in settings panel
-export const getLanguageOptions = (includeAuto = true) => {
-  return LANGUAGES
-    .filter(lang => includeAuto || lang.code !== 'auto')
-    .map(lang => ({
-      value: lang.code,
-      // Code as a compact label — flags were retired: most of the catalogue
-      // has none, and a language is not a country.
-      label: lang.code === 'auto' ? lang.name : `${lang.code.toUpperCase()} ${lang.name}`,
-    }));
-};
-
-// {code, name} shape — uses nativeName for translation panel display
-export const getLanguageList = (includeAuto = true) => {
-  return LANGUAGES
-    .filter(lang => includeAuto || lang.code !== 'auto')
-    .map(lang => ({
-      code: lang.code,
-      name: lang.nativeName,
-    }));
-};
-
-export const getLanguageByCode = (code) => {
-  return LANGUAGES.find(lang => lang.code === code);
-};
 
 export const DEFAULTS = {
   LLM_ENDPOINT: 'http://localhost:1234/v1',

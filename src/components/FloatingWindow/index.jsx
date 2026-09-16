@@ -2,7 +2,7 @@
 // all capture/OCR/translate logic lives in floating/pipeline.js.
 // Supports scattered mode where each OCR block becomes its own child pane.
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Camera, X, Loader2, AlertCircle, ChevronDown, GripHorizontal, History, Clock, RefreshCw, Ghost, Brain, AudioLines, Play, Square, FolderOpen } from 'lucide-react';
 import useSessionStore, { STATUS, DISPLAY_MODE, CHILD_PANE_STATUS } from '../../stores/session.js';
@@ -107,7 +107,6 @@ const FloatingWindow = () => {
   useEffect(() => {
     refreshListen();
   }, [listenMode, refreshListen]);
-
 
   // Service-layer notifications (e.g. OCR engine fallback) bubble up via session store
   useEffect(() => {

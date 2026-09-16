@@ -182,6 +182,4 @@ module.exports = {
   legacyUserData,
   isRelocated,
   isWritable,
-  CHROMIUM_ENTRIES,
-  CARRIED_FILES,
 };

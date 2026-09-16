@@ -21,4 +21,4 @@ function normalizeCapturedText(text) {
     .replace(/\n{3,}/g, '\n\n'); // stacked blank lines → one paragraph gap
 }
 
-module.exports = { normalizeCapturedText, LIGATURES };
+module.exports = { normalizeCapturedText, };

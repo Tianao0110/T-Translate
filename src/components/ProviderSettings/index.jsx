@@ -1,20 +1,16 @@
-﻿import React, { useState, useEffect, useRef, useMemo } from 'react';
+﻿import { useState, useEffect, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  ChevronDown, ChevronUp, Check, X, AlertCircle,
   RefreshCw, Eye, EyeOff, ExternalLink, GripVertical,
   Zap, Globe, Plus, Settings, Power, MessageSquareOff
 } from 'lucide-react';
 import { getAllProviderMetadata } from '../../config/provider-icons.js';
 import translationService from '../../translation/stack-client.js';
-import useTranslationStore from '../../stores/translation-store';
 import { secureStorage } from './persist.js';
 import { buildDefaultProviderList } from './defaults.js';
 import { Seg } from '../SettingsPanel/sections/shared.jsx';
 import LlmRuntimeCard from '../SettingsPanel/sections/LlmRuntimeCard.jsx';
 import './styles.css';
-import createLogger from '../../core/logger.js';
-const logger = createLogger('ProviderSettings');
 
 // Status/type colors resolve to theme tokens (defined in ProviderSettings/styles.css).
 const TYPE_COLOR_VARS = {

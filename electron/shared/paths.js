@@ -73,36 +73,9 @@ const resources = {
     : path.join(process.resourcesPath, 'resources/llama'),
 };
 
-// Load a page, picking dev URL vs prod file based on environment.
-function loadPage(window, pageName, devMode = isDev) {
-  const page = pages[pageName];
-  if (!page) {
-    throw new Error(`Unknown page: ${pageName}`);
-  }
-
-  if (devMode && pageName !== 'screenshot') {
-    window.loadURL(page.url);
-  } else {
-    window.loadFile(page.file);
-  }
-}
-
-function getPreload(name) {
-  const preload = preloads[name];
-  if (!preload) {
-    throw new Error(`Unknown preload: ${name}`);
-  }
-  return preload;
-}
-
 module.exports = {
   preloads,
   pages,
   resources,
-  loadPage,
-  getPreload,
   isDev,
-  DEV_SERVER,
-  BASE_DIR,
-  ELECTRON_DIR,
 };

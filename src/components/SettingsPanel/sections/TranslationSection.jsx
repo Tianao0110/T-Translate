@@ -1,4 +1,3 @@
-import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Trash2, X } from 'lucide-react';
 import useTranslationStore from '../../../stores/translation-store';

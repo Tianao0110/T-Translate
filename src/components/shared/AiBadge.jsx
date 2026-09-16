@@ -1,7 +1,3 @@
-// Literal "AI" chip standing in for a lucide icon wherever AI output needs
-// marking. Draws with currentColor only: the floating/selection windows never
-// load App.css tokens, so a theme variable here would silently fail.
-import React from 'react';
 import './ai-badge.css';
 
 const AiBadge = ({ size = 14 }) => (

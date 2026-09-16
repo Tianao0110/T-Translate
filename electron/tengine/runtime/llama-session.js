@@ -591,7 +591,6 @@ module.exports = {
   vocabOnlyLoad,
   estimateKvBytes,
   pickDevice,
-  defaultThreads,
   findThinkTokens,
   createThinkStripper,
   createLoopDetector,
@@ -599,7 +598,4 @@ module.exports = {
   detectFamily,
   renderChatml,
   renderHunyuan,
-  FTYPE_NAMES,
-  THINK_OPENER,
-  THINK_CLOSER,
 };

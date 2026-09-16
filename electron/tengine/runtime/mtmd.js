@@ -160,4 +160,4 @@ function attachVision(binding, session, { mmproj, provider = 'cpu', family = nul
   };
 }
 
-module.exports = { attachVision, renderVisionPrompt, parseSpotting, VISION_FAMILIES };
+module.exports = { attachVision, renderVisionPrompt, parseSpotting, };
