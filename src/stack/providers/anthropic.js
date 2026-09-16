@@ -125,7 +125,7 @@ class AnthropicProvider extends BaseProvider {
         idleTimer = setTimeout(() => controller.abort(), this.config.timeout);
       };
       resetIdle();
-      // External abort (facade requestId mapping, P2-34) cancels the same controller
+      // The facade's abort signal cancels the same controller.
       linkAbort(options.signal, controller);
 
       let response;

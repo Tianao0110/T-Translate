@@ -31,7 +31,16 @@ t-translate/
 │   ├── FAQ.md                  # 常见问题
 │   ├── THEME_CUSTOMIZATION.md  # 主题定制
 │   ├── T-ENGINE.md             # 引擎接入层维护手册
-│   └── design/                 # 各功能的设计说明：代码只留指针，为什么与踩坑记在这里（listen.md …）
+│   └── design/                 # 各功能的设计说明：代码只留指针，为什么与踩坑记在这里
+│       ├── main-process.md     #   主进程平台层（窗口、托盘、崩溃守卫、路径、更新）
+│       ├── selection.md        #   划词翻译（手势、三层探测、剪贴板、窗口几何）
+│       ├── listen.md           #   听译与朗读（worker、VAD、TTS 门、包）
+│       ├── ocr.md              #   本地 OCR（门面、宿主、PP-OCR 流水线、Windows OCR）
+│       ├── model-packs.md      #   模型根目录、通用包管理器、搬迁
+│       ├── ipc.md              #   IPC 层、预加载、共享表
+│       ├── stack.md            #   翻译栈（服务层、缓存、翻译源、OCR 链、语音端点）
+│       ├── renderer.md         #   渲染端（各窗口、store、文档翻译、AI 动作、设置页、配置表）
+│       └── tooling.md          #   scripts/（门禁、构建发布、取包、冒烟与基准）
 │
 ├── electron/                   # 主进程代码
 │   ├── main.js                 # 主进程入口（只做生命周期与接线）

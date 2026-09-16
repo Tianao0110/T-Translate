@@ -296,7 +296,7 @@ class OpenAICompatibleProvider extends BaseProvider {
     await this._ensureModel();
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
-    // External abort (facade requestId mapping, P2-34) cancels the same controller
+    // The facade's abort signal cancels the same controller.
     linkAbort(extSignal, controller);
 
     try {
@@ -342,7 +342,7 @@ class OpenAICompatibleProvider extends BaseProvider {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
     let idleTimer = null;
-    // External abort (facade requestId mapping, P2-34) cancels the same controller
+    // The facade's abort signal cancels the same controller.
     linkAbort(extSignal, controller);
 
     try {
