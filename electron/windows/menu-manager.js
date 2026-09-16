@@ -1,299 +1,114 @@
-// Application menu (File / Edit / View / Translate / Settings / Help); items
-// send MENU_ACTIONS to the main window.
+// Application menu. The main window is frameless with the menu bar hidden, so
+// this exists for its accelerators (Ctrl+Q, F11, zoom, Ctrl+,) and the Help
+// entries, which open pages of the in-app settings through 'navigate'.
 
-const { Menu, dialog, shell, app } = require('electron');
-const { CHANNELS, MENU_ACTIONS } = require('../shared/channels');
+const { Menu, app } = require('electron');
 const logger = require('../platform/logger')('MenuManager');
 const { t } = require('../shared/main-i18n');
 
+// Shows the main window and asks it for `target` ('settings' | 'settings:<section>').
+function openInMain(getMainWindow, target) {
+  const win = getMainWindow();
+  if (!win || win.isDestroyed()) return;
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+  win.webContents.send('navigate', target);
+}
+
 function createMenu(ctx) {
-  const { getMainWindow, runtime, store, managers } = ctx;
+  const { getMainWindow, runtime, store, isDev } = ctx;
 
-  const template = [
-    createFileMenu(ctx),
-    createEditMenu(),
-    createViewMenu(ctx),
-    createTranslateMenu(ctx),
-    createSettingsMenu(ctx),
-    createHelpMenu(ctx),
-  ];
+  const fileMenu = {
+    label: t('menu.file'),
+    submenu: [
+      {
+        label: t('menu.quit'),
+        accelerator: 'CmdOrCtrl+Q',
+        click: () => {
+          runtime.isQuitting = true;
+          app.quit();
+        },
+      },
+    ],
+  };
 
-  if (process.platform === 'darwin') {
-    template.unshift(createMacAppMenu(ctx));
-  }
+  const editMenu = {
+    label: t('menu.edit'),
+    submenu: [
+      { label: t('menu.undo'), accelerator: 'CmdOrCtrl+Z', role: 'undo' },
+      { label: t('menu.redo'), accelerator: 'Shift+CmdOrCtrl+Z', role: 'redo' },
+      { type: 'separator' },
+      { label: t('menu.cut'), accelerator: 'CmdOrCtrl+X', role: 'cut' },
+      { label: t('menu.copy'), accelerator: 'CmdOrCtrl+C', role: 'copy' },
+      { label: t('menu.paste'), accelerator: 'CmdOrCtrl+V', role: 'paste' },
+      { label: t('menu.selectAll'), accelerator: 'CmdOrCtrl+A', role: 'selectAll' },
+    ],
+  };
 
-  const menu = Menu.buildFromTemplate(template);
+  const devItems = isDev
+    ? [
+        { label: t('menu.reload'), accelerator: 'CmdOrCtrl+R', click: () => getMainWindow()?.reload() },
+        { label: t('menu.devTools'), accelerator: 'F12', click: () => getMainWindow()?.webContents.toggleDevTools() },
+        { type: 'separator' },
+      ]
+    : [];
+
+  const zoomBy = (delta) => {
+    const win = getMainWindow();
+    if (win) win.webContents.setZoomLevel(win.webContents.getZoomLevel() + delta);
+  };
+
+  const viewMenu = {
+    label: t('menu.view'),
+    submenu: [
+      ...devItems,
+      { label: t('menu.actualSize'), accelerator: 'CmdOrCtrl+0', click: () => getMainWindow()?.webContents.setZoomLevel(0) },
+      { label: t('menu.zoomIn'), accelerator: 'CmdOrCtrl+Plus', click: () => zoomBy(1) },
+      { label: t('menu.zoomOut'), accelerator: 'CmdOrCtrl+-', click: () => zoomBy(-1) },
+      { type: 'separator' },
+      {
+        label: t('menu.fullscreen'),
+        accelerator: 'F11',
+        click: () => {
+          const win = getMainWindow();
+          if (win) win.setFullScreen(!win.isFullScreen());
+        },
+      },
+      {
+        label: t('menu.alwaysOnTop'),
+        type: 'checkbox',
+        checked: store.get('alwaysOnTop', false),
+        click: (item) => {
+          const win = getMainWindow();
+          if (win) win.setAlwaysOnTop(item.checked);
+          store.set('alwaysOnTop', item.checked);
+        },
+      },
+    ],
+  };
+
+  const settingsMenu = {
+    label: t('menu.settings'),
+    submenu: [
+      { label: t('menu.preferences'), accelerator: 'CmdOrCtrl+,', click: () => openInMain(getMainWindow, 'settings') },
+    ],
+  };
+
+  const helpMenu = {
+    label: t('menu.help'),
+    submenu: [
+      { label: t('menu.userGuide'), click: () => openInMain(getMainWindow, 'settings:manual') },
+      { type: 'separator' },
+      { label: t('menu.checkUpdate'), click: () => openInMain(getMainWindow, 'settings:about') },
+      { label: t('menu.about'), click: () => openInMain(getMainWindow, 'settings:about') },
+    ],
+  };
+
+  const menu = Menu.buildFromTemplate([fileMenu, editMenu, viewMenu, settingsMenu, helpMenu]);
   Menu.setApplicationMenu(menu);
-
   logger.info('Application menu created');
   return menu;
 }
 
-function createMacAppMenu(ctx) {
-  const { getMainWindow, runtime } = ctx;
-
-  return {
-    label: app.getName(),
-    submenu: [
-      { label: t('menu.about', '关于') + ' ' + app.getName(), role: 'about' },
-      { type: 'separator' },
-      {
-        label: t('menu.preferences', '偏好设置'),
-        accelerator: 'Cmd+,',
-        click: () => getMainWindow()?.webContents.send(CHANNELS.MENU.ACTION, MENU_ACTIONS.OPEN_SETTINGS),
-      },
-      { type: 'separator' },
-      { label: t('menu.hide', '隐藏') + ' ' + app.getName(), accelerator: 'Cmd+H', role: 'hide' },
-      { label: t('menu.hideOthers', '隐藏其他'), accelerator: 'Cmd+Shift+H', role: 'hideothers' },
-      { label: t('menu.showAll', '显示全部'), role: 'unhide' },
-      { type: 'separator' },
-      {
-        label: t('menu.quit', '退出'),
-        accelerator: 'Cmd+Q',
-        click: () => {
-          runtime.isQuitting = true;
-          app.quit();
-        },
-      },
-    ],
-  };
-}
-
-function createFileMenu(ctx) {
-  const { getMainWindow, runtime } = ctx;
-
-  return {
-    label: t('menu.file', '文件'),
-    submenu: [
-      {
-        label: t('menu.newTranslation', '新建翻译'),
-        accelerator: 'CmdOrCtrl+N',
-        click: () => getMainWindow()?.webContents.send(CHANNELS.MENU.ACTION, MENU_ACTIONS.NEW_TRANSLATION),
-      },
-      {
-        label: t('menu.importText', '导入文本'),
-        accelerator: 'CmdOrCtrl+O',
-        click: async () => {
-          const mainWindow = getMainWindow();
-          if (!mainWindow) return;
-
-          const result = await dialog.showOpenDialog(mainWindow, {
-            properties: ['openFile'],
-            filters: [
-              { name: t('menu.textFiles', '文本文件'), extensions: ['txt', 'md', 'doc', 'docx', 'pdf'] },
-              { name: t('menu.allFiles', '所有文件'), extensions: ['*'] },
-            ],
-          });
-
-          if (!result.canceled && result.filePaths[0]) {
-            mainWindow.webContents.send(CHANNELS.MENU.IMPORT_FILE, result.filePaths[0]);
-          }
-        },
-      },
-      {
-        label: t('menu.exportTranslation', '导出翻译'),
-        accelerator: 'CmdOrCtrl+S',
-        click: () => getMainWindow()?.webContents.send(CHANNELS.MENU.ACTION, MENU_ACTIONS.EXPORT_TRANSLATION),
-      },
-      { type: 'separator' },
-      {
-        label: t('menu.quit', '退出'),
-        accelerator: process.platform === 'darwin' ? 'Cmd+Q' : 'Ctrl+Q',
-        click: () => {
-          runtime.isQuitting = true;
-          app.quit();
-        },
-      },
-    ],
-  };
-}
-
-function createEditMenu() {
-  return {
-    label: t('menu.edit', '编辑'),
-    submenu: [
-      { label: t('menu.undo', '撤销'), accelerator: 'CmdOrCtrl+Z', role: 'undo' },
-      { label: t('menu.redo', '重做'), accelerator: 'Shift+CmdOrCtrl+Z', role: 'redo' },
-      { type: 'separator' },
-      { label: t('menu.cut', '剪切'), accelerator: 'CmdOrCtrl+X', role: 'cut' },
-      { label: t('menu.copy', '复制'), accelerator: 'CmdOrCtrl+C', role: 'copy' },
-      { label: t('menu.paste', '粘贴'), accelerator: 'CmdOrCtrl+V', role: 'paste' },
-      { label: t('menu.selectAll', '全选'), accelerator: 'CmdOrCtrl+A', role: 'selectAll' },
-    ],
-  };
-}
-
-function createViewMenu(ctx) {
-  const { getMainWindow, store } = ctx;
-
-  return {
-    label: t('menu.view', '视图'),
-    submenu: [
-      {
-        label: t('menu.reload', '重新加载'),
-        accelerator: 'CmdOrCtrl+R',
-        click: () => getMainWindow()?.reload(),
-      },
-      {
-        label: t('menu.devTools', '开发者工具'),
-        accelerator: 'F12',
-        click: () => getMainWindow()?.webContents.toggleDevTools(),
-      },
-      { type: 'separator' },
-      {
-        label: t('menu.actualSize', '实际大小'),
-        accelerator: 'CmdOrCtrl+0',
-        click: () => getMainWindow()?.webContents.setZoomLevel(0),
-      },
-      {
-        label: t('menu.zoomIn', '放大'),
-        accelerator: 'CmdOrCtrl+Plus',
-        click: () => {
-          const mainWindow = getMainWindow();
-          if (mainWindow) {
-            const currentZoom = mainWindow.webContents.getZoomLevel();
-            mainWindow.webContents.setZoomLevel(currentZoom + 1);
-          }
-        },
-      },
-      {
-        label: t('menu.zoomOut', '缩小'),
-        accelerator: 'CmdOrCtrl+-',
-        click: () => {
-          const mainWindow = getMainWindow();
-          if (mainWindow) {
-            const currentZoom = mainWindow.webContents.getZoomLevel();
-            mainWindow.webContents.setZoomLevel(currentZoom - 1);
-          }
-        },
-      },
-      { type: 'separator' },
-      {
-        label: t('menu.fullscreen', '全屏'),
-        accelerator: 'F11',
-        click: () => {
-          const mainWindow = getMainWindow();
-          if (mainWindow) {
-            mainWindow.setFullScreen(!mainWindow.isFullScreen());
-          }
-        },
-      },
-      {
-        label: t('menu.alwaysOnTop', '置顶'),
-        type: 'checkbox',
-        checked: store.get('alwaysOnTop', false),
-        click: (menuItem) => {
-          const mainWindow = getMainWindow();
-          if (mainWindow) {
-            mainWindow.setAlwaysOnTop(menuItem.checked);
-            store.set('alwaysOnTop', menuItem.checked);
-          }
-        },
-      },
-    ],
-  };
-}
-
-function createTranslateMenu(ctx) {
-  const { getMainWindow, managers } = ctx;
-
-  return {
-    label: t('menu.translate', '翻译'),
-    submenu: [
-      {
-        label: t('menu.screenshotTranslate', '截图翻译'),
-        accelerator: 'Alt+Q',
-        click: () => managers.startScreenshot?.(),
-      },
-      {
-        label: t('menu.quickTranslate', '快速翻译'),
-        accelerator: 'CmdOrCtrl+Shift+T',
-        click: () => getMainWindow()?.webContents.send(CHANNELS.MENU.ACTION, MENU_ACTIONS.QUICK_TRANSLATE),
-      },
-      { type: 'separator' },
-      {
-        label: t('menu.switchLang', '切换语言'),
-        accelerator: 'CmdOrCtrl+L',
-        click: () => getMainWindow()?.webContents.send(CHANNELS.MENU.ACTION, MENU_ACTIONS.SWITCH_LANGUAGE),
-      },
-      {
-        label: t('menu.clearContent', '清空内容'),
-        accelerator: 'CmdOrCtrl+Shift+C',
-        click: () => getMainWindow()?.webContents.send(CHANNELS.MENU.ACTION, MENU_ACTIONS.CLEAR_CONTENT),
-      },
-    ],
-  };
-}
-
-function createSettingsMenu(ctx) {
-  const { getMainWindow } = ctx;
-
-  return {
-    label: t('menu.settings', '设置'),
-    submenu: [
-      {
-        label: t('menu.preferences', '偏好设置'),
-        accelerator: 'CmdOrCtrl+,',
-        click: () => getMainWindow()?.webContents.send(CHANNELS.MENU.ACTION, MENU_ACTIONS.OPEN_SETTINGS),
-      },
-      {
-        label: t('menu.lmStudioSettings', 'LM Studio 设置'),
-        click: () => getMainWindow()?.webContents.send(CHANNELS.MENU.ACTION, MENU_ACTIONS.LLM_SETTINGS),
-      },
-      {
-        label: t('menu.ocrSettings', 'OCR 设置'),
-        click: () => getMainWindow()?.webContents.send(CHANNELS.MENU.ACTION, MENU_ACTIONS.OCR_SETTINGS),
-      },
-    ],
-  };
-}
-
-function createHelpMenu(ctx) {
-  const { getMainWindow } = ctx;
-
-  return {
-    label: t('menu.help', '帮助'),
-    submenu: [
-      {
-        label: t('menu.userGuide', '使用指南'),
-        click: () => shell.openExternal('https://github.com/yourusername/t-translate/wiki'),
-      },
-      {
-        label: t('menu.shortcutList', '快捷键列表'),
-        click: () => getMainWindow()?.webContents.send(CHANNELS.MENU.ACTION, MENU_ACTIONS.SHOW_SHORTCUTS),
-      },
-      { type: 'separator' },
-      {
-        label: t('menu.checkUpdate', '检查更新'),
-        click: () => showUpdateDialog(getMainWindow()),
-      },
-      {
-        label: t('menu.about', '关于'),
-        click: () => showAboutDialog(getMainWindow()),
-      },
-    ],
-  };
-}
-
-function showUpdateDialog(mainWindow) {
-  dialog.showMessageBox(mainWindow, {
-    type: 'info',
-    title: t('menu.checkUpdate', '检查更新'),
-    message: t('menu.upToDate', '当前已是最新版本'),
-    buttons: [t('menu.ok', '确定')],
-  });
-}
-
-function showAboutDialog(mainWindow) {
-  dialog.showMessageBox(mainWindow, {
-    type: 'info',
-    title: t('menu.about', '关于') + ' T-Translate',
-    message: 'T-Translate',
-    detail: t('menu.aboutDetail', '版本: {{version}}\n离线翻译工具\n\n基于 LM Studio 和本地 OCR', { version: app.getVersion() }),
-    buttons: [t('menu.ok', '确定')],
-  });
-}
-
-module.exports = {
-  createMenu,
-};
+module.exports = { createMenu };

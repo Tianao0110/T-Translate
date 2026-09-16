@@ -46,31 +46,6 @@ const checkElectronAPI = () => {
   }
 
   logger.debug('Electron API available');
-
-  // Menu actions arrive via either the typed API (newer preload) or raw IPC
-  if (window.electron.menu && window.electron.menu.onAction) {
-    window.electron.menu.onAction((action) => {
-      logger.debug('Menu action:', action);
-      window.dispatchEvent(new CustomEvent('menu-action', { detail: action }));
-    });
-  } else if (window.electron.ipc) {
-    window.electron.ipc.on('menu-action', (action) => {
-      logger.debug('Menu action (IPC):', action);
-      window.dispatchEvent(new CustomEvent('menu-action', { detail: action }));
-    });
-  }
-
-  if (window.electron.translation && window.electron.translation.onImportFile) {
-    window.electron.translation.onImportFile((filePath) => {
-      logger.debug('Import file:', filePath);
-      window.dispatchEvent(new CustomEvent('import-file', { detail: filePath }));
-    });
-  } else if (window.electron.ipc) {
-    window.electron.ipc.on('import-file', (filePath) => {
-      logger.debug('Import file (IPC):', filePath);
-      window.dispatchEvent(new CustomEvent('import-file', { detail: filePath }));
-    });
-  }
 };
 
 const THEMES = ['light', 'dark', 'fresh'];

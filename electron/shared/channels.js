@@ -144,10 +144,6 @@ const CHANNELS = {
     PROBE: 'llm:probe',               // renderer → main: (file) five-step probe of an unlisted file (developer door)
     TRIAL_REPORT: 'llm:trial-report', // renderer → main: (file) trial-log summary
   },
-  MENU: {
-    ACTION: 'menu-action',
-    IMPORT_FILE: 'import-file',
-  },
   DATA: {
     ADD_TO_HISTORY: 'add-to-history',
     ATTACH_AI_RESULT: 'attach-ai-result', // rides on an existing history entry, never its own
@@ -238,27 +234,13 @@ const CHANNELS = {
   },
 };
 
-const MENU_ACTIONS = {
-  NEW_TRANSLATION: 'new-translation',
-  EXPORT_TRANSLATION: 'export-translation',
-  OPEN_SETTINGS: 'open-settings',
-  LLM_SETTINGS: 'llm-settings',
-  OCR_SETTINGS: 'ocr-settings',
-  SHOW_HISTORY: 'show-history',
-  SHOW_FAVORITES: 'show-favorites',
-  SHOW_SHORTCUTS: 'show-shortcuts',
-  CLEAR_CONTENT: 'clear-content',
-  QUICK_TRANSLATE: 'quick-translate',
-  SWITCH_LANGUAGE: 'switch-language',
-};
-
 const PRIVACY_MODES = {
   STANDARD: 'standard',
   OFFLINE: 'offline',
   SECURE: 'secure',
 };
 
-module.exports = { CHANNELS, MENU_ACTIONS, PRIVACY_MODES };
+module.exports = { CHANNELS, PRIVACY_MODES };
 
 // Add `default` export for Vite ESM consumers.
 module.exports.default = module.exports;

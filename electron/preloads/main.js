@@ -8,8 +8,6 @@ const fs = require("fs").promises;
 // Receive allow-list for the generic ipc.on / ipcRenderer.on bridges below.
 const validChannels = {
   receive: [
-    "menu-action",
-    "import-file",
     "add-to-history",
     "attach-ai-result",
     "screenshot-captured",

@@ -140,6 +140,7 @@ app.whenReady().then(() => {
     runtime,
     store,
     managers,
+    isDev,
   };
 
   createMenu(ctx);
