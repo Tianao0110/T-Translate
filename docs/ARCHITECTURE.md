@@ -2,13 +2,20 @@
 
 ## 项目概述
 
-T-Translate 是一个基于 Electron + React + Vite 的离线翻译工具，支持：
-- 划词翻译（最多 8 个冻结窗口）
-- 截图 OCR 翻译
-- 悬浮窗口实时翻译
-- 听译（本机实时转写系统声音 + 逐句翻译，模型按需下载）
-- 文档翻译（PDF、DOCX、EPUB、TXT、SRT/VTT）
-- 多种翻译源（本地 LLM、OpenAI、DeepL、Gemini 等）
+T-Translate 是一个 Windows 桌面翻译工具（Electron 42 + React 18 + Vite 7），面向用户的功能说明在 [MANUAL.zh.md](MANUAL.zh.md)。本文写给改代码的人：目录在哪、层怎么分、隐私怎么保证、各功能的设计说明在哪。
+
+| 类别 | 技术 |
+| --- | --- |
+| 框架 | Electron 42 + React 18，Vite 7 构建渲染端，esbuild 打包主进程翻译栈 |
+| 状态 | Zustand + Immer；主窗口状态经 DPAPI 加密的历史保险库持久化 |
+| 引擎宿主 | T-Engine（`electron/tengine/`）：每个原生运行时一个 utilityProcess——onnxruntime-node（OCR）、sherpa-onnx（听译 / 朗读）、llama.cpp（内置模型，koffi FFI） |
+| 翻译源 | 内置模型、LM Studio / Ollama、OpenAI / Claude / Gemini / DeepSeek / DeepL / Google / Microsoft / 百度 |
+| OCR | PP-OCRv6 本地、Windows OCR、内置视觉模型（PaddleOCR-VL）、LLM Vision、OCR.space / Google Vision / Azure / 百度 |
+| 安全 | Electron safeStorage（DPAPI）+ 访问审计；主进程单点隐私门 |
+| 打包 | electron-builder，NSIS 安装包 |
+
+设计说明（为什么这样做、踩过的坑）按功能放在 `docs/design/`：`main-process.md`、`selection.md`、`listen.md`、`ocr.md`、`model-packs.md`、`ipc.md`、`stack.md`、`renderer.md`、`tooling.md`；T-Engine 的在 [T-ENGINE.md](T-ENGINE.md)。代码注释只留指针。
+
 
 ## 目录结构
 
@@ -214,218 +221,43 @@ API 密钥解密照常（无痕不等于离线）。
 就绪探测、连接测试四处同一道门；本机判断是 `src/stack/loopback.js` 一份，
 视觉模型与外接朗读也用它。
 
-### AI 动作框架（v0.3.3）
+### 引擎层 T-Engine
 
-「总结 / 理解」这类动作**是数据不是代码**：一个动作 = 一份提示词配置。加动作
-不用改逻辑，只加一条配置；用户导入的第三方配置走同一条路径。
-
-```
-config/ai-actions.js        动作目录：内置两条（summarize / explain）+ 字段契约
-                            + normalizeActionConfig（导入唯一闸门）
-ai/ai-action-runner         纯逻辑：文本量度 / 触发判定 / 模板渲染 / 路径选择
-                            + runAiAction（唯一出口，调 stack-client）
-ai/ai-action-store          导入配置的读取缓存，每次读都重新过一遍闸门
-ai/use-ai-actions           三个窗口共用：能力探测、可用动作、结果折叠展开
-```
-
-三条容易被违反的约束：
-
-1. **能力看实现不看元数据**。`metadata.supportsChat` 只供 UI 显示；运行时一律走
-   `service.getChatCapability()`（与 `chatCompletion` 同一个 provider 循环），AI
-   路径带 `requireChat`——否则只会翻译的源会把提示词翻译一遍还回来，看着像功能
-   正常。`tests/unit/stack/provider-chat.test.js` 拿真实类核对那一列，防止漂移
-2. **两条路径，失败降级**。有视觉模型且手里有截图 → 路径 B（模型直接读图）；否则
-   路径 A（文本）。路径 B 失败且有识别文本时自动回落 A——用户不该为模型看不见图
-   买单
-3. **隐私跟随翻译**。LLM 调用的门在主进程 facade（同 translate）；结果写历史的门
-   在 `translation-store.attachAiResult`（同 addToHistory，无痕不写）；理解模式的
-   结果作为独立主条目走 addToHistory（kind `'understand'`，同一道无痕门，动作声明
-   `history:'none'` 则不写）；路径 B 在离线模式下还要求视觉端点必须在本机
-
-### 稳定性与系统集成（v0.3.7）
+原生运行时都不在主进程里，而是各自一个 utilityProcess，由 T-Engine 统一装载、监控、报告：
 
 ```
-electron/platform/crash-guard.js   崩溃自愈：渲染进程异常退出限次自动重载（3 分钟
-                                窗口内 3 次；clean-exit/killed 不触发）+ 启动哨兵
-                                （连续 3 次未撑过 60s 稳定窗口 → 安全模式：禁硬件
-                                加速、跳过原生模块预热）。依赖注入、零 electron
-                                require，直接可测
-src/core/migration-pack.js     迁移包 build/parse 纯函数。导出读 electron-store
-                                存储态（设置页内存态含解密后的 OCR 密钥，绝不可
-                                导）；两端都过 stripSecrets + 结构白名单
-electron/platform/open-with.js     右键菜单 argv 解析（.pdf/.docx/.txt 白名单）。
-                                冷启动走 process.argv，热启动走 second-instance
-                                转发；路径只在主进程暂存，渲染端单一 invoke 取
-                                文件内容——无任意路径读取面。注册表项由
-                                installer/installer.nsh 安装写入、卸载对称清除
+electron/tengine/registry.js          引擎表：宿主、运行时、能否上显卡与原因
+electron/tengine/host-manager.js      宿主框架：按需拉起、请求配对、崩溃重生与退避、事件流
+electron/tengine/engines/{ocr,audio,llm}.js  三个适配器：把各宿主的协议翻成 load / health / setProvider / status
+electron/tengine/runtime/             llama.cpp 的 koffi 绑定、会话、视觉（mtmd）、worker 线程
+electron/services/{ocr-host,audio-engine,llm-host}/  三个宿主进程本体
+electron/ipc/tengine.js               tengine:status 快照、tengine:event 事件流
+electron/ipc/gpu.js                   「显卡加速」开关：逐引擎自检，失败的留在 CPU
+electron/policy/engine-policy.js      内置模型的策略表（停滞、性能下降、思考泄漏）
 ```
 
-### 听译引擎与驻留口径（v0.4.0，捕获层 v0.4.1 换代）
+T-Engine 只报事实，不改产品行为；用哪个引擎、什么时候降档由主进程决定。全部细节与换版检查单见 [T-ENGINE.md](T-ENGINE.md)。
 
-```
-electron/listen/audio-engine-manager.js  听译会话与神经 TTS 的会话语义（来源 / 语言 / 档位 / 字幕事件转发 / 一次性重启策略）；进程本身归 T-Engine 的音频适配器（v0.5.0）
-electron/listen/listen-translator.js     听译的翻译、逐句记录与会话结束时的字幕文件（v0.5.0 从悬浮窗搬入）：定稿编号、带上文的系统提示（listen/listen-prompt.js）、流式译文经 audio-engine:translation 推给窗口、结束时等在途翻译 3 s 再落盘
-electron/tengine/engines/audio.js          音频宿主适配器：进程生命周期、模型载入计时、退出分类（model-load / session / idle）、provider 与 sherpa 的 stderr 回退标记、朗读自检；manager 订阅它转发的 worker 消息
-electron/tengine/                          T-Engine 引擎层（v0.5.0 第 1 步）：host-manager.js 通用宿主框架（按需拉起、请求配对、崩溃重生、连崩退避、事件流、状态快照）、registry.js 引擎表、engines/ocr.js OCR 引擎适配器（持有 OCR 宿主，provider / health / status）、index.js 门面（status() 快照 + on() 事件流）；手册见 docs/T-ENGINE.md
-electron/ipc/tengine.js                    tengine:status 快照与 tengine:event 转发；宿主生命周期事件在这里进 app 日志
-electron/services/ocr-host/ocr-host.js     本地 OCR 运行时（ppocr/ + onnxruntime-node + skia）跑在这个子进程；provider cpu/webgpu，首会话热身、失败回退 CPU
-electron/services/ocr-host/ppocr/          PP-OCR 流水线（检测 / 识别 / 版面），fork 自 esearch-ocr（Apache-2.0）：前后处理全部 typed array，输出与上游逐行一致（v0.4.10）
-electron/listen/listen-autosave.js          听译字幕自动保存：data\listen 下按「程序名-时间.srt」落盘、只留最近 20 个；无痕与开关的门在 ipc/audio-engine.js（v0.4.10）
-electron/ipc/gpu.js                        「显卡加速」开关：settings.gpu.enabled，开启时逐引擎自检（OCR、朗读、内置模型都经 T-Engine 适配器），失败的引擎各自留 CPU 并回传原因；引擎表在 tengine/registry.js
-```
+### 内置模型
 
-### 内置模型（v0.5.0 第 3 步；手册 docs/T-ENGINE.md）
+`electron/llm/`：`llm-pack-manager.js` 扫描 `<models>/llm-models`，只认白名单（`electron/shared/llm-packs.js`：文件名 + 大小 + SHA256，哈希是安全边界）里的文件；`llm-manager.js` 决定载哪个文件、驻留与 5 分钟闲置卸载、显卡自检，并管视觉槽（PaddleOCR-VL，只在显卡加速打开时接活）。栈侧 `src/stack/providers/tengine.js` 是翻译源「内置模型」，`src/stack/ocr/tengine-vision.js` 与 `vision-routing.js` 是 OCR 引擎「内置视觉模型」及其分配规则。设计说明：T-ENGINE.md 第五、七、十节。
 
-```
-electron/shared/llm-packs.js               模型白名单：文件名、大小、SHA256、协议、官方与镜像链接、模板族、角色（general = 翻译 + AI 动作，mt = 仅翻译，vision = 视觉 OCR，两个文件各自钉哈希）；哈希是安全边界
-electron/tengine/runtime/                  llama.cpp 运行时：llama-abi.js（钉版 b10853 的结构体 / 原型 / 默认值指纹，含 mtmd）、llama-binding.js（koffi 装载与清单校验）、llama-session.js（模型与上下文、解码循环、思考模式三层禁止、KV 前缀复用、取消、循环检测）、mtmd.js（图片 → mtmd 解码与编码 → 预填进会话 → 同一条采样循环；Spotting 输出解析成行文字 + 像素框）、worker.js（跑 FFI 的 worker_thread 协议）、llama-manifest.json（DLL 清单）
-electron/services/llm-host/llm-host.js     LLM utilityProcess：一次喂 worker 一个请求、共享取消标志、停滞看门狗；崩溃只带走本进程。文本槽 `llm` 与视觉槽 `llm-vision` 各起一个（v0.5.1）
-electron/tengine/engines/llm.js            LLM 适配器：load / unload / generate（流式）/ probe / health / metrics / setProvider / status，事件只带数字；`id` 参数区分文本槽与视觉槽
-electron/llm/llm-manager.js           主进程决策：选文件（白名单或开发者门）、驻留与 5 分钟闲置卸载、显卡自检、策略表（policy/engine-policy.js）、试用日志；视觉槽 recognize / unloadVision / visionSelfTest，只在显卡加速打开时可用
-electron/llm/llm-pack-manager.js      模型文件夹（<models>/llm-models）扫描：同名同大小才哈希，哈希对上才可用，其余列为未列入；双文件包逐文件核对（ready / partial / mismatch）
-electron/policy/engine-policy.js           策略表落码：P4 慢建议、P5/P6 连续停滞标不健康、P9 性能下降记录、P13 思考泄漏计数
-electron/tengine/metrics-log.js            事件流落盘 data\logs\tengine-<日期>.jsonl（留 3 份，无痕不写，永不含文本）
-electron/tengine/trial-log.js              未列入模型的试用日志（每模型每月一份，两个月清理）与试用报告汇总
-electron/ipc/llm.js                        llm:* 通道：状态、重扫、开文件夹、卸载、自检、探针、试用报告
-src/stack/providers/tengine.js             翻译源「内置模型」：经 runtime.localLlm 钩子到 llm-manager；仅翻译包时 canChat 为 false，AI 动作改走下一个源
-src/stack/ocr/tengine-vision.js            OCR 引擎「内置视觉模型」（v0.5.1）：经 runtime.localLlm.recognize 到视觉槽，一律 Spotting，行框按 blocks.js 契约给像素坐标；默认顺序第 3 位
-src/stack/ocr/vision-routing.js            选中内置视觉模型时的分配规则：先跑 PP-OCR，按其行框与置信度判 unreadable / large / dense / low-confidence / table / columns / mixed-sizes 才升级到视觉模型，结果带 routed 枚举
-src/components/SettingsPanel/sections/LlmSection.jsx  设置 → 本地模型：安装状态与下载链接、模型选择、后端 / 驻留 / 速度、自检与卸载、开发者门
-scripts/fetch/fetch-llama-runtime.js             按清单下载官方 llama.cpp Vulkan 包并校验（打包前跑；--pin 年度换版）
-native/sherpa-onnx-webgpu/                 带 webgpu provider 的 sherpa-onnx DLL + 补丁 + 构建配方；scripts/build/overlay-sherpa-runtime.js 在 postinstall / 打包前覆盖进 npm 包
-electron/services/audio-engine/audio-worker.js  识别模型、音频捕获、语音合成都在这个子进程里
-electron/listen/win-audio-capture.js        WASAPI 捕获（koffi，v0.4.1）
-electron/platform/app-paths.js                启动最早期定 userData（安装目录 data，不可写则留用户目录）、Chromium 存储收进 browser、一次性搬迁（v0.4.7）
-electron/packs/model-root.js               模型根目录解析（安装目录优先）
-electron/platform/data-root.js                数据根目录 = userData（翻译缓存、日志等非模型文件）
-electron/packs/model-migrate.js            老用户目录模型搬迁（复制、校验、再删）
-electron/listen/audio-pack-manager.js       识别模型包下载/卸载（工厂第二实例，asr-models）
-electron/tts/tts-pack-manager.js         语音包下载/卸载（工厂第三实例，tts-models，v0.4.2）
-electron/tts/tts-models.js               已装语音包发现：pack.json 的 files 解析成绝对路径
-src/tts/neural.js                 渲染端神经语音引擎：分块播放、音色挑选、按句回落
-```
+### 听译与朗读
 
-**音频从哪来（v0.4.1 起）**：`win-audio-capture` 用 koffi 直接调 WASAPI，两条激活路径同一
-个出口格式（16kHz 单声道 float32，直接喂 VAD；系统路径由引擎转换，进程路径由我们自己降采样，见表）：
+`electron/listen/`（会话管理、逐句翻译、字幕自动保存、包定位与下载、WASAPI 捕获）、`electron/tts/`（语音包）、`electron/services/audio-engine/`（worker：捕获、VAD、两个识别引擎、语音合成、静音闸门）。音频在 worker 内进 VAD，不跨进程、不落盘；渲染端只收文字和电平数。VAD 调参、切分、内存与延迟口径、载卸时序、语音包与闸门的取舍全部在 [design/listen.md](design/listen.md)。
 
-| 来源 | 激活方式 | 系统要求 | 取到的是 |
-|------|----------|----------|----------|
-| 全部声音 | 端点环回 + `AUTOCONVERTPCM` | 全部 Windows | 系统音量之后的混音，按端点音量（`IAudioEndpointVolume` 报的 dB）反向补偿回原始电平——用户开多小声都不影响识别（8% 音量是 -38 dB，补偿前 VAD 基本失聪）；静音仍是无声。硬件音量的设备靠削波守卫识别后停用补偿 |
-| 只听某程序 / 排除某程序 | `ActivateAudioInterfaceAsync` + `PROCESS_LOOPBACK` | Win10 build 20348+（实际=Win11） | 该进程树的渲染流，在端点音量之前（系统静音也照抓；但该程序在音量合成器里被单独静音则取不到）。要的是引擎原生 48k 立体声，由 `win-audio-resample` 自己 3:1 降采样——引擎自带的 16k 转换让 VAD 在同一首歌上少开 14% 的行 |
+### 划词与截图
 
-捕获跑在 worker 里，音频进 VAD 之前不跨进程；渲染端只收文字和一个电平数。**环回只在端点上有活动渲染流时才送包**：机器完全静默（视频暂停、没有任何程序在放）时一包都不来（2026-09-02 实测三次 0 帧，有程序出声即 1.49s/1.5s），所以 worker 在 1 秒没收到 PCM 后主动把电平归零，smoke 则自己放一个近乎无声的振荡器再断言。设备切换由
-`AUDCLNT_E_DEVICE_INVALIDATED` 明确报出并自行重建（最多三次）。**v0.4.1 之前**这一层是渲染
-进程的 `getDisplayMedia`（因此要请求一条随即停掉的视频轨）+ JS 重采样，两者都已删除。
-只听某程序时每秒核对一次目标进程还在不在：进程环回在目标退出后仍会源源不断地送全零包，
-没有任何标志或错误，所以只能主动查；查到退出即发 `source-gone`，manager 就地切回全部声音
-并通知渲染端复位选择器。
+`electron/selection/`（鼠标钩子与手势状态机、三层探测、剪贴板抓取、文本清理）、`electron/screenshot/`（多显示器截取与裁剪）。每一层为什么这样探测、窗口几何为什么这样算，见 [design/selection.md](design/selection.md)。
 
-**VAD 前的自动增益**：silero 对电平敏感而识别器不敏感（fbank 归一）——标准朗读集里 rms 0.003 的录音识别器照转、VAD 却整句不开门。`makeAgc` 在 32ms 窗上做慢包络跟随（目标 0.05、封顶 30 dB、静音门 0.0005、只抬不压），喂 VAD 与镜像段落的都是抬过的信号，电平条与 rms 指标仍读原始信号；metrics 行带 `agcGain`。静音闭合 0.5s、句头预留 0.6s 也是同一轮基准定的（英文整链 WER 22.9 → 14.7 → 10.6）。
+### AI 动作
 
-**硬切的切点与接缝**：开放段到 9s 时不在整点下刀，而是在最后 1.5s 里按每窗 RMS 找最安静的一个 32ms 窗（`pickCutWindow`，保留末尾 8 窗不切），切点之后的音频作为 carry 明确带进下一段——VAD reset 之后到它重新认定之间的窗也并入 carry，认定发生时 carry 成为新段的头；若新段由 VAD 自然闭合收尾，解码时把 carry 中 VAD 段起点之前的部分拼到前面（按全局样本坐标算，零重叠）。3s 内没人认领的 carry 自成一个定稿。此前硬切固定在 9.0s，连续演讲每段开头丢一两个字母（57 段里 8 段残词）。
+「总结 / 讲解」是数据不是代码：一个动作 = 一份提示词配置，内置的在 `src/config/ai-actions.js`，用户导入的过同一个闸门 `normalizeActionConfig`。`src/ai/ai-action-runner.js` 判触发、建提示、选路径（视觉模型直接读图为路径 B，失败降级到文本路径 A），`use-ai-actions.js` 供三个窗口复用。能力看实现不看元数据（`service.getChatCapability`），结果写历史的门与翻译同一道。设计说明：[design/renderer.md](design/renderer.md) 第 6 节。
 
-**VAD 的两档与两个自动动作**：silero 阈值默认 0.5（说话），SenseVoice 给每个定稿打的音频事件
-决定档位——最近三个定稿有两个是 `<|BGM|>` 就在下一个段间用 0.3 重建 VAD，连续三个说话再回
-0.5（实测同一首歌进程环回 0.5 下漏 14% 的歌词行，0.3 全中）。两个兜底：①看门狗报「有声无字」
-（响着 12 秒没定稿）时直接放宽到 0.3 且本会话不再收回；②自动语言的会话里连续三个定稿同一
-语言就把识别器钉到该语言（段间重建一次），避免混播内容逐句在中/日/粤间乱跳出乱码。音乐里
-一两个字的碎定稿不上屏也不翻译（`isNegligibleFinal`）。这些都在会话日志里留事件
-（`vad-threshold` / `vad-relax` / `lang-pinned` / `dropped-short`），metrics 行带当前阈值与端点音量 dB。
+### 平台层
 
-**高精度定稿档（v0.4.8，`asr-hq` 包 = Qwen3-ASR 0.6B int8）**：`settings.listen.tier` 为 `high` 且包在场时，管理器在 `init` 里带上 `useHq`，worker 的 `createRecognizer` 换成 `qwen3Asr` 配置，SenseVoice 不再加载（换载不共存，常驻 1–1.6 GB，RTF ~0.2）。VAD 仍来自基座包，所以高精度包永远不单独成立。Qwen3 的结果**没有语言与 BGM 标签**：语言钉住和音乐档 VAD 自适应在这个档位下自然不触发；自动语言会话装了草稿引擎就直接信草稿（`partialEngine = 'stream'`），没装草稿引擎则只出定稿（`'none'`）——1 GB 的模型不做伪流式重解码。单段仍受 9 s 硬切封顶：整段几十秒一次解码会退化。
+`electron/platform/`：`app-paths.js` 在启动最早期定数据目录（安装目录 `data`，不可写则用户目录），`crash-guard.js` 崩溃自愈与安全模式，`open-with.js` + `installer/installer.nsh` 右键菜单，`login-item.js` 开机自启，`native-helper.js` Win32 探测。设计说明：[design/main-process.md](design/main-process.md)。
 
-**载卸时序**：模型只在会话内驻留，不做常驻缓存。
-
-| 时刻 | 发生什么 |
-|------|----------|
-| 点开始 | fork 子进程 → `init` 声明模型路径 → `asr-start` 才真正加载 |
-| 会话中 | 定稿引擎 SenseVoice（或高精度档 Qwen3-ASR，二选一换载）+ 可选草稿引擎 zipformer 同时在内存 |
-| 点停止 | `asr-stop` 冲刷 → 主进程发 `unload`（丢引擎引用、放开模型文件）→ `shutdown` → 进程退出 |
-| 关窗/切 SECURE | 同上，`once('closed')` 与隐私监听各自兜底 |
-| 换包 | `stopSessionAndWait` 等进程真正退出才动目录——Windows 上文件句柄没放开，换包会在 150MB 下载的最后一步失败 |
-
-**内存口径**（2026-08-27 双模型 3 分钟 soak / 2026-08-29 smoke 复测）：会话中子进程 RSS 596–676MB
-且平稳；会话结束进程退出，回到 0。只装基座包约省一半。OCR host 子进程里的会话是另一
-套缓存（LRU 2 个，换包/换档位/切显卡时清），与听译互不影响；v0.4.9 起它不再占主进程内存。
-
-**延迟口径**（`npm run smoke:listen` 实测，两次跑差 <20ms）：
-
-| 指标 | 装草稿引擎 | 只装基座包 |
-|------|-----------|-----------|
-| 引擎加载 | 2.2 s | 1.2–1.4 s |
-| 首字（草稿出第一个字） | 0.56–0.57 s | 0.80–0.83 s |
-| 草稿刷新间隔 | 0.31 s | 1.03 s（伪流式节流值） |
-| 定稿（说完到出定稿） | 0.37 s | 0.37 s |
-| 解码 RTF | 0.033–0.044 | 同 |
-
-口径说明：计时从音频进入 worker 到事件送达。**v0.4.1 起采集也在 worker 内**，
-所以此前要另计的渲染端 `createScriptProcessor(4096)` 那 ~85ms 已经不存在，用户
-眼里只再多 IPC 与绘制。定稿延迟的主要成分是 VAD 尾静音（`minSilence` 0.5s，为准确率从 0.35 放上来的）
-而不是算力，所以调它才是调定稿快慢。样本是合成语音，真实带 BGM 的场景 VAD 闭合更晚。
-
-**模型文件的信任边界**（v0.4.1 定，用户拍板）：包下载有 sha256 校验；**用户手动放进
-`asr-models/` 的文件按本机信任处理，不做校验**——能往目录里放文件的人同样能直接运行任意
-程序，校验挡不住有意的本地攻击者，只挡得住意外。我们保证的是**坏文件不会拖垮主程序**：
-识别引擎在独立 utilityProcess 里，一个不是 ONNX 的文件会让它原生崩溃（`0xE06D7363`，
-JS 的 try/catch 接不到），主进程无恙，且载入期崩溃不再重试（重试必然同样崩），
-界面直接报「模型加载失败——文件可能不完整或不是识别模型」。
-
-### 神经语音（v0.4.2）
-
-同一个 worker、同一份 `audio-models` 清单，多出一种包类型 `tts-voice` 与一个根目录 `tts-models`。
-两个管理器各列各的类型（`computePackList(…, types)`），并用 `packFilter` 在核心层拒绝跨域的包 id——
-把语音包 id 递给识别模型通道会得到 `PACK_UNKNOWN`，而不是把语音包装进 `asr-models`。
-语音包带整棵目录（kokoro 的 `espeak-ng-data/`、jieba 的 `dict/`），`model-pack-core.extractZipTo`
-因此从「压平到文件名」改为保留相对路径，zip-slip 守卫改成显式检查（绝对路径、盘符、`..`
-一律拒绝并中止安装；JSZip 载入时自己也会消解 `..`）。
-
-| 包 | 引擎 | 体积 | 音色 | 采样率 | 用途 |
-|----|------|------|------|--------|------|
-| `tts-kokoro-zh-en` | kokoro（fp32） | 341MB | 0-1 美音女、2 英音女、3-57 中文女、58-102 中文男 | 24k | 主档；英文靠包内 espeak-ng-data 音素化（GPL-3 数据，NOTICE 已列） |
-| `tts-melo-zh-en` | vits（MeloTTS，fp32） | 157MB | 1 个女声 | 44.1k | 中英夹杂句子；`preferMixed` 让渲染端自动选它 |
-
-int8 版本是负优化（x86 上比 fp32 慢 4 倍且不随线程数涨），所以两个包都是 fp32。
-
-**worker 协议**：`tts-generate {id, text, sid, speed, pack}` → 若干 `tts-chunk {id, samples, sampleRate}`
-→ `tts-done {id, cancelled}`。`maxNumSentences: 1` 让 sherpa 的进度回调按句出块，渲染端收到第一句就
-开始播（`neural.js` 在一个 AudioContext 上顺序排队各块）。`tts-cancel` 让回调返回 0，sherpa 会在句间
-真正停下；`unload tts` 排在合成链之后放引用并回 `tts-unloaded`。`enableExternalBuffer` 恒为 false
-（Electron V8 内存笼）。合成跑在 addon 自己的线程上（4 线程），与识别只争 CPU。
-
-**驻留口径（零闲置铁律的唯一放宽）**：没有听译会话时朗读会起一个 TTS-only 进程（无识别模型、
-无会话日志）；最后一次朗读后闲置 60s 卸载退出，悬浮窗在屏上时续期。听译会话里加载的语音随会话
-生灭；会话结束时若语音仍热则进程转为 TTS-only 留下。开始听译时若已有 TTS-only 进程，直接换成
-会话进程（下次朗读重载语音，1.3-2.2s）。换/卸语音包走 `unloadTtsAndWait`：TTS-only 进程直接退出，
-会话内只卸语音并等 ack。
-
-**静音闸门（批 4）**：任一窗口的 `TTSManager` 在状态变为 SPEAKING/PAUSED 时经 `audio-engine:tts-playing`
-报告，manager 按 webContents id 计数（多窗口互不误解除）并向 worker 发 `tts-gate`；worker 的
-`makeTtsGate` 在 on 期间丢弃全部 PCM、off 后再挡 300ms（环回路径的尾延迟），同时把闸门状态推回悬浮窗
-（`audio-engine:tts-gate`）显示「朗读中 · 暂停收音」并压平电平条。会话中途开始时 `asr-ready` 补发一次。
-选闸门而不选 Win11 的进程排除，是因为它全平台可用且不用重开音频客户端；代价是朗读的几秒里外部声音也丢。
-
-**设置页「音频」节**：侧栏一项，进去是「听」「读」两张只读状态卡（`AudioSection`），点卡进子页、左上角
-返回；「读」内分「朗读 / 语音包」两页，「朗读」页（`TTSSection`，embedded）= 引擎分段开关 → 「当前朗读」
-状态行（本机 / API、回落说明、试听）→ 引擎自己的块（神经：中英各一行音色；系统：默认音色；外接：翻译源
-卡片式表单）→ 三滑块一行。音色用 `VoicePicker` 面板（搜索 + 性别/语言筛选 + 常用置顶 + 三列小片各带试听）。
-分段开关是用户定的设置页统一样式（所有"选择"都改它），这一轮只铺音频子页。
-
-**渲染端选音色**（`src/tts/tts-voice-pick.js`，纯函数）：用户指定的音色优先（其包读不了该语言时
-才放弃）；自动模式按目标语言/文本文字系统选常用音色；中英夹杂且装了 `preferMixed` 包时改用它；
-没有包覆盖的语言（日文等）抛 `NO_VOICE_FOR_LANG`，`TTSManager` 把这一句交给系统语音而不改引擎设置。
-
-**实测**（`npm run smoke:listen` TTS 段，Ryzen 9 7945HX）：kokoro 英文首块 0.64s、2.6s 音频合成 0.64s；
-kokoro 中文换包含载入首块 1.5s；MeloTTS 冷启动（含进程与包载入）首块 2.6s。
-
-**外接语音服务（第三个引擎，`src/stack/tts/endpoint.js`）**：只做 OpenAI 兼容 `POST {baseUrl}/v1/audio/speech`
-（model / input / voice / speed / response_format=wav），本地 IndexTTS、GPT-SoVITS、CosyVoice、kokoro-fastapi 的
-服务端和 OpenAI 都吃这一个协议。请求模块放在翻译栈里，与翻译源同一条铁律：`rtFetch`（= `net.fetch`，系统代理）、
-不抛异常、错误文案走 `_t`。三个通道 `stack:tts-capability / tts-speak / tts-test` 在 `translation-stack.js` 里
-按请求读隐私模式——**离线模式一律拒绝**（`OFFLINE_BLOCKED`），密钥前缀 `tts_endpoint_` 同时在密钥库的离线
-封锁名单上，所以离线时连解密都不发生。`tts-speak` 进 in-flight 表，渲染端停止即 `stack:abort` 中断 HTTP。
-渲染端 `src/tts/endpoint.js` 整段拿到字节后 `decodeAudioData` 播放（首版不分块）；服务不可达 / 非音频
-应答 / 离线都抛 `ENDPOINT_*`，`TTSManager` 逐句回落系统语音。设置页只有地址 / 密钥 / 模型 / 音色四个字段和
-一个「测试并试听」（用一句真合成当连通性检查，没有标准的探活路由）；密钥失焦即入库，settings 里只记 `hasKey`。
 
 ## 命名规范
 

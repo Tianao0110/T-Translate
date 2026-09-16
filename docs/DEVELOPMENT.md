@@ -221,7 +221,7 @@ npm start             # 实测：设置页出卡片、填 key、测试连接、�
 ## 🔤 OCR 支持一门新语言
 
 先分清两件事：**翻译语言**（134 种，src/config/languages.js）和 **OCR 识别语言**
-（56 种，src/config/ocr-languages.js）。后者取决于模型字典里有没有那套字形，
+（59 种，src/config/ocr-languages.js）。后者取决于模型字典里有没有那套字形，
 跟翻译能力无关。
 
 加一种之前**必须先验**，别照抄上游文档——它两个方向都错过：
@@ -289,12 +289,29 @@ export default MyOCREngine;
 
 ## 🧠 内置模型与 T-Engine
 
-内置本地模型（翻译源 `tengine`）不走上面两条路线：它是 T-Engine 引擎层的一个宿主，全部细节在 [T-ENGINE.md](T-ENGINE.md)。改它之前只需记住：
+内置本地模型（翻译源 `tengine`）和内置视觉模型（OCR 引擎 `tengine-vision`）不走上面两条路线：它们是 T-Engine 引擎层的宿主，全部细节在 [T-ENGINE.md](T-ENGINE.md)。改它之前只需记住：
 
-- **白名单在 `electron/shared/llm-packs.js`**，一个模型 = 文件名 + 大小 + 哈希 + 角色（`general` / `mt`）。加模型就是加一行，再跑 `npm run smoke:llm-stack -- --model <gguf>` 过一遍
+- **白名单在 `electron/shared/llm-packs.js`**，一个模型 = 文件名 + 大小 + 哈希 + 角色（`general` / `mt` / `vision`，视觉包是模型 + mmproj 两个文件各自钉哈希）。加模型就是加一行，再跑对应的 smoke 过一遍
 - **运行时钉版**：`npm run llama:runtime` 按 `llama-manifest.json` 下载并逐文件校验官方 llama.cpp DLL；换版走 T-ENGINE.md 第九节的检查单，ABI 结构体改动必须同步 `llama-abi.js` 的 SIZES / GOLDEN 单测
-- **开发者门**：`settings.llm.allowUnlistedModels` 或环境变量 `TT_TENGINE_DEV=1` 才能加载文件夹里的非白名单 GGUF；试用报告在 `logs/tengine-trial-*.jsonl`
+- **开发者门**：`settings.llm.allowUnlistedModels` 或环境变量 `TT_TENGINE_DEV=1` 才能加载文件夹里的非白名单 GGUF；试用报告在 `data\logs\tengine-trial-*.jsonl`
 - **思考模式一律禁止**（logit 禁 token + 模板 + 流过滤三层），新模型接入时先确认它的 think token id
+- **视觉槽只在显卡上接活**，这是主程序（`llm-manager.js` 与 `src/stack/ocr/vision-routing.js`）的决定，运行时里不放尺寸上限和路由规则
+
+**冒烟与基准**（改到对应层就跑，发版前全跑）：
+
+| 命令 | 覆盖 |
+| --- | --- |
+| `npm run smoke:llm -- --model <gguf>` | 纯 Node 驱动 runtime worker：载入、前缀复用、禁思考、取消、探针 |
+| `npm run smoke:llm-vision -- --model <gguf> --mmproj <gguf>` | 同上的视觉路径：固定图带框读回、取消、卸载 |
+| `npx electron scripts/smoke/smoke-llm-host.js --model <gguf> [--gpu]` | 真 utilityProcess：载入、流式、取消、自检、探针、杀进程重生 |
+| `npx electron scripts/smoke/smoke-llm-vision-host.js --model <gguf> --mmproj <gguf> [--gpu]` | 视觉槽端到端含智能分配 |
+| `npx electron scripts/smoke/smoke-llm-stack.js --model <gguf> [--mt <gguf>] [--gpu]` | 经翻译栈：过滤器、模板、隐私门、仅翻译包 |
+| `npm run smoke:ocr [-- --gpu]` | OCR 宿主：CPU（与 WebGPU）识别、杀进程重生、深度健康检查 |
+| `npm run smoke:listen` | 听译 + 朗读整链（先 `npm run audio:release`） |
+| `npm run smoke:offline` | 离线模式：所有下载入口与更新检查必须 `OFFLINE_BLOCKED` |
+| `npm run bench:listen -- --lang zh\|en` | 听译准确率基准（FLEURS） |
+
+`npm run smoke:xxx -- --flag` 会吞掉参数的情况下，直接 `npx electron scripts/smoke/<file>.js --flag` 跑。
 
 ---
 
@@ -328,14 +345,14 @@ await window.electron.stack.cacheStats()
 await window.electron.stack.clearCache('all')
 ```
 
-- **主进程/栈日志**：设置 → 关于 → 打开日志目录（`%APPDATA%/t-translate/logs/app-*.log`），翻译栈与 OCR 管线日志都在这。
+- **主进程/栈日志**：设置 → 关于 → 打开日志目录（装机版在安装目录 `data\logs\app-*.log`，开发态在 `%APPDATA%\t-translate\logs\`），翻译栈与 OCR 管线日志都在这。
 - **划词链路探针**：`npm run start:debug`（`TT_SELECTION_DEBUG=1`）输出选区检测各层判定。
 - **听译 + 朗读整链冒烟**：`npm run smoke:listen`（先 `npm run audio:release` 备好本地包）。临时沙箱里把 GitHub 换成 `file://` 跑完下载→校验→安装→发现→识别→卸载，再装两个语音包跑 TTS-only 进程合成、换包、取消、卸载驱逐，并打印首字/定稿/首块延迟。换模型、动分发链、发版前各跑一次。
 - **语音包打包**：语音包源目录不在 `asr-models` 里，用 `node scripts/build/build-audio-release.js --src <解压目录> --only tts-kokoro-zh-en,tts-melo-zh-en`；`--only` 之外的包沿用 `release-audio-models/manifest.json` 里已有的条目，不会把识别模型从清单里挤掉。真机试装未发布的包：`$env:TT_AUDIO_MANIFEST_URL='file:///F:/T-Translate/release-audio-models/local-manifest.json'; npm start`（`local-manifest.json` 是 baseUrl 指向本地目录的副本）。
 - **离线模式冒烟**：`npm run smoke:offline`。真实 store 置离线，`net.fetch` / 全局 `fetch` / `http(s).request` 全部换成一碰就报错的绊线，逐个调 OCR / 听译 / 语音三个包管理器与它们的 IPC 处理器、再调检查更新与下载更新，断言每条都以 `OFFLINE_BLOCKED` 拒绝且绊线一次都没碰到。改闸门、加下载入口、发版前各跑一次。
 
 - **听译捕获层**：`electron/listen/win-audio-capture.js` 用 koffi 直调 WASAPI，跑在音频 worker 里。改它之后 `npm run smoke:listen` 会真开一次音频客户端断言流是否稳定送达（smoke 自己从隐藏窗口放一个近乎无声的振荡器：WASAPI 环回只在端点上有渲染流时才送包，机器完全静默时一包都没有，2026-09-02 实测）；要验真实声音得让机器出声，参考 gstack `v041-process-loopback-spike` 里的做法。三个 koffi 坑记在文件头：`koffi.address()` 不认 Buffer（结构体内存一律 `koffi.alloc`）、`void*` 参数不吃 Buffer、`koffi.proto` 的类型名是全局注册表（放模块作用域，否则第二次调用报 Duplicate type name）。
-- **听译会话日志**：`%APPDATA%/t-translate/logs/audio-probe-*.jsonl`，滚动 3 份（够解释最近一次故障即可），默认只有时长/耗时/VAD 指标。**识别出的文字默认不写**——要看文字加 `TT_LISTEN_LOG_TEXT=1` 再启动。
+- **听译会话日志**：日志目录下的 `audio-probe-*.jsonl`，滚动 3 份（够解释最近一次故障即可），默认只有时长/耗时/VAD 指标。**识别出的文字默认不写**——要看文字加 `TT_LISTEN_LOG_TEXT=1` 再启动。
 - **网络请求**：主进程栈的请求不经过渲染端 DevTools Network 面板，看日志或在 provider 里临时加 log。
 
 ## ✅ 提交前检查
@@ -347,6 +364,10 @@ npm run stack:build      # 栈可打包
 npx vite build           # 渲染端可构建
 npm run check:all        # 常量表 + i18n + 硬编码中文
 ```
+
+**代码注释**只写英文、只说「这段做什么、接到哪」；原因、历史、测量值写进 `docs/design/<feature>.md`（T-Engine 的写进 T-ENGINE.md），不进源码。
+
+**发版前**过一遍 `docs/MANUAL.zh.md` / `MANUAL.en.md`：这一版改过的界面、设置项、快捷键、模型链接都要同步进说明书，它随安装包分发。
 
 ---
 

@@ -36,9 +36,11 @@ T-Engine 只做三件事：**装载运行时、监控引擎、报告事实**。
 
 ```
 electron/tengine/
-  registry.js          引擎表：id、宿主、运行时、包类型、可用后端、自检方式（gpu-engines.js 长成它）
+  index.js             门面：createTengine() 与程序实例 get()，status() 快照 + on() 事件流
+  registry.js          引擎表：id、宿主、运行时、包类型、可用后端、自检方式
   host-manager.js      主进程侧宿主框架：fork / ready / 请求配对与超时 / 流式事件 / 退出→拒绝在途→重生+退避 / 闲置卸载 / 后端切换+自检 / health
-  host-worker.js       worker 套件：消息循环、reply/emit、日志转发、fatal、看门狗
+  engines/ocr.js       OCR 适配器：持有 OCR 宿主，provider / health / status
+  engines/audio.js     音频适配器：进程生命周期、模型载入计时、退出分类、provider 与 stderr 回退标记、朗读自检
   runtime/
     llama-abi.js       钉版本的结构体与函数原型——年度换版唯一要核对的文件，配 golden 测试
     llama-binding.js   koffi 装载：DLL 目录、依赖顺序、后端目录、设备枚举
