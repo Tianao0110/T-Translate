@@ -94,6 +94,24 @@ export function getLanguageName(code) {
   return LANGUAGE_CODES[code]?.name || code;
 }
 
+// Chat messages for a translation request. `options.systemPrompt` is a string
+// or `{ content, mode }`; mode 'user' folds the instruction into the user
+// turn for small translation-only models whose templates have no system role.
+export function buildTranslationMessages(text, targetLang, options = {}) {
+  let prompt = options.systemPrompt;
+  let mode = 'system';
+  if (prompt && typeof prompt === 'object') {
+    mode = prompt.mode || 'system';
+    prompt = prompt.content;
+  }
+  if (!prompt) {
+    prompt = `You are a professional translator. Translate the following text to ${getLanguageName(targetLang)}. Output only the translation, nothing else.`;
+  }
+  return mode === 'user'
+    ? [{ role: 'user', content: `${prompt}\n\n${text}` }]
+    : [{ role: 'system', content: prompt }, { role: 'user', content: text }];
+}
+
 // Fetch signal for providers with a fixed per-request timeout: combines the
 // caller's abort signal (facade requestId -> AbortController, P2-34) with the
 // provider's own timeout. Either firing cancels the HTTP request.

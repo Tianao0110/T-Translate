@@ -5,7 +5,7 @@ import {
   Clock, Search, Trash2, Copy, Star,
   Calendar, ChevronDown, ChevronRight, LayoutGrid,
   BarChart3, TrendingUp, X, Edit3, Download, Upload,
-  Hash, Type, Languages, Activity, RotateCcw, Lock,
+  Hash, Type, Languages, Activity, Lock,
   Table, CheckSquare, Square, Trash, ArrowUpDown, Sparkles, Image as ImageIcon
 } from 'lucide-react';
 import useTranslationStore from '../../stores/translation-store';
@@ -14,6 +14,7 @@ import { resolveActionLabel } from '../../ai/ai-action-runner.js';
 import { useDebounce } from '../../core/performance';
 import useVisibleHotkey from '../../core/use-visible-hotkey.js';
 import HighlightText from '../shared/HighlightText.jsx';
+import CardText from '../shared/CardText.jsx';
 import AiBadge from '../shared/AiBadge.jsx';
 import { useConfirm } from '../shared/ConfirmDialog.jsx';
 import dayjs from 'dayjs';
@@ -117,18 +118,14 @@ const HistoryCard = memo(({
       </div>
 
       <div className="card-body" onClick={handleToggle} title={t('history.card.clickHint')}>
-        <div className="card-text-label">
-          {showTranslated
+        <CardText
+          label={showTranslated
             ? (item.kind === 'understand' ? t('history.card.explain', '讲解') : t('history.card.target'))
             : t('history.card.source')}
-          <RotateCcw size={12} className="switch-hint" />
-        </div>
-        <div className={`card-text ${showTranslated ? 'translated' : 'source'}`}>
-          <HighlightText
-            text={showTranslated ? item.translatedText : item.sourceText}
-            search={searchQuery}
-          />
-        </div>
+          translated={showTranslated}
+          text={showTranslated ? item.translatedText : item.sourceText}
+          search={searchQuery}
+        />
       </div>
 
       <div className="card-actions">

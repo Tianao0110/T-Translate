@@ -6,7 +6,7 @@
 // model". Cancellation goes through the hook's cancel handle, stalls are
 // the host watchdog's, and both come back as ordinary provider errors.
 
-import { BaseProvider, LANGUAGE_CODES, combineSignal } from './base.js';
+import { BaseProvider, buildTranslationMessages, combineSignal } from './base.js';
 import { _t } from '../i18n.js';
 import { getLocalLlm } from '../runtime.js';
 import { PROVIDER_METADATA } from './metadata.js';
@@ -51,13 +51,13 @@ class TengineProvider extends BaseProvider {
 
   async translate(text, sourceLang = 'auto', targetLang = 'zh', options = {}) {
     if (!text?.trim()) return { success: false, error: _t('providerError.emptyText', '文本为空') };
-    const messages = this._buildMessages(text, targetLang, options);
+    const messages = buildTranslationMessages(text, targetLang, options);
     return this._run({ kind: 'translate', messages, options, maxTokens: translateBudget(text) });
   }
 
   async translateStream(text, sourceLang, targetLang, onChunk, options = {}) {
     if (!text?.trim()) return { success: false, error: _t('providerError.emptyText', '文本为空') };
-    const messages = this._buildMessages(text, targetLang, options);
+    const messages = buildTranslationMessages(text, targetLang, options);
     return this._run({ kind: 'translate', messages, options, maxTokens: translateBudget(text), onToken: onChunk });
   }
 
@@ -89,22 +89,6 @@ class TengineProvider extends BaseProvider {
     const llm = getLocalLlm();
     const s = llm ? llm.status() : null;
     return (s?.packs?.packs || []).filter((p) => p.status === 'ready').map((p) => p.id);
-  }
-
-  _buildMessages(text, targetLang, options = {}) {
-    let prompt = options.systemPrompt;
-    let mode = 'system';
-    if (prompt && typeof prompt === 'object') {
-      mode = prompt.mode || 'system';
-      prompt = prompt.content;
-    }
-    if (!prompt) {
-      const langName = LANGUAGE_CODES[targetLang]?.name || targetLang;
-      prompt = `You are a professional translator. Translate the following text to ${langName}. Output only the translation, nothing else.`;
-    }
-    return mode === 'user'
-      ? [{ role: 'user', content: `${prompt}\n\n${text}` }]
-      : [{ role: 'system', content: prompt }, { role: 'user', content: text }];
   }
 
   _describe(e) {

@@ -7,26 +7,12 @@ const { store } = require('../state');
 const { isOfflineMode } = require('../security/privacy-gate');
 const { computePackList, TTS_TYPES } = require('../shared/audio-packs');
 const { listInstalledPacks } = require('../listen/asr-models');
-const { modelDir, modelDirs } = require('../packs/model-root');
+const { packRoots } = require('../packs/pack-roots');
 const engineManager = require('../listen/audio-engine-manager');
 const { createPackManager } = require('../packs/model-pack-core');
 const { MANIFEST_URL } = require('../listen/audio-pack-manager');
 
-function packsRoot() {
-  return modelDir('tts-models');
-}
-
-function packsRoots() {
-  return modelDirs('tts-models');
-}
-
-function listAllInstalled() {
-  const byId = new Map();
-  for (const root of packsRoots().reverse()) {
-    for (const pack of listInstalledPacks(root)) byId.set(pack.id, pack);
-  }
-  return [...byId.values()];
-}
+const { packsRoot, packsRoots, listAllInstalled } = packRoots('tts-models', listInstalledPacks);
 
 const manager = createPackManager({
   manifestUrl: MANIFEST_URL,

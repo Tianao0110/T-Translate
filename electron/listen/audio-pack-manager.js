@@ -9,7 +9,7 @@ const { store } = require('../state');
 const { isOfflineMode } = require('../security/privacy-gate');
 const { computePackList, ASR_TYPES } = require('../shared/audio-packs');
 const { listInstalledPacks } = require('./asr-models');
-const { modelDir, modelDirs } = require('../packs/model-root');
+const { packRoots } = require('../packs/pack-roots');
 const engineManager = require('./audio-engine-manager');
 const { createPackManager } = require('../packs/model-pack-core');
 
@@ -21,22 +21,7 @@ const MANIFEST_URL =
 // Downloads land in the install dir's models folder (see model-root.js);
 // packsRoots() also covers the old userData location so a pack put there by an
 // earlier build stays listed, usable and removable.
-function packsRoot() {
-  return modelDir('asr-models');
-}
-
-function packsRoots() {
-  return modelDirs('asr-models');
-}
-
-// Active root last so it wins on an id collision with a stale older copy.
-function listAllInstalled() {
-  const byId = new Map();
-  for (const root of packsRoots().reverse()) {
-    for (const pack of listInstalledPacks(root)) byId.set(pack.id, pack);
-  }
-  return [...byId.values()];
-}
+const { packsRoot, packsRoots, listAllInstalled } = packRoots('asr-models', listInstalledPacks);
 
 const manager = createPackManager({
   manifestUrl: MANIFEST_URL,

@@ -50,7 +50,7 @@ t-translate/
 │   ├── platform/               # 数据目录、日志、崩溃守卫、开机自启、右键打开、更新器、Win32 与多屏辅助
 │   ├── policy/                 # engine-policy：内置模型健康 / 驻留策略的纯函数
 │   ├── tengine/                # T-Engine：引擎适配层与 llama.cpp 运行时绑定（见 T-ENGINE.md）
-│   └── services/               # 各引擎的 utilityProcess 宿主（audio-engine / ocr-host / llm-host）
+│   └── services/               # 各引擎的 utilityProcess 宿主：audio-engine（audio-worker 分发 + asr-session / capture / tts / io）、ocr-host、llm-host
 │
 ├── src/                        # 渲染进程代码
 │   ├── main.jsx                # 应用入口

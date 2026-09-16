@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Star, Search, Trash2, Copy, Edit3, X, Plus,
   Folder, FolderPlus, Tag, Hash,
-  Check, Palette, RotateCcw, Bookmark, Sparkles, RefreshCw, BookOpen,
+  Check, Palette, Bookmark, Sparkles, RefreshCw, BookOpen,
   Download, Upload
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
@@ -12,6 +12,7 @@ import translationService from '../../translation/stack-client.js';
 import { getAnalysisPrompts, parseJsonReply } from '../../ai/ai-prompts.js';
 import useVisibleHotkey from '../../core/use-visible-hotkey.js';
 import HighlightText from '../shared/HighlightText.jsx';
+import CardText from '../shared/CardText.jsx';
 import { useConfirm } from '../shared/ConfirmDialog.jsx';
 import {
   exportToJSON, exportToCSV, exportToTBX,
@@ -239,16 +240,12 @@ const FavoriteCard = ({
         className="card-body"
         onClick={() => !isEditing && setShowTranslated(!showTranslated)}
       >
-        <div className="card-text-label">
-          {showTranslated ? t('history.card.target') : t('history.card.source')}
-          <RotateCcw size={12} className="switch-hint" />
-        </div>
-        <div className={`card-text ${showTranslated ? 'translated' : 'source'}`}>
-          <HighlightText
-            text={showTranslated ? item.translatedText : item.sourceText}
-            search={searchQuery}
-          />
-        </div>
+        <CardText
+          label={showTranslated ? t('history.card.target') : t('history.card.source')}
+          translated={showTranslated}
+          text={showTranslated ? item.translatedText : item.sourceText}
+          search={searchQuery}
+        />
       </div>
 
       {!isEditing && item.tags && item.tags.length > 0 && (

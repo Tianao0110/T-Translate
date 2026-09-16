@@ -1,6 +1,7 @@
 // Preload for the selection-translator window.
 
 const { contextBridge, ipcRenderer } = require("electron");
+const { stackBridge } = require("./stack-bridge");
 
 contextBridge.exposeInMainWorld("electron", {
   // One-way crash reporting to the on-disk log. Renderer logging was
@@ -79,25 +80,9 @@ contextBridge.exposeInMainWorld("electron", {
 
   // Main-process translation stack (same bridge as the main-window preload;
   // this window only translates, so no test/management surface is exposed).
-  stack: {
-    translate: (payload) => ipcRenderer.invoke("stack:translate", payload),
-    streamStart: (payload) => ipcRenderer.invoke("stack:translate-stream-start", payload),
-    abort: (id) => ipcRenderer.invoke("stack:abort", { id }),
-    chat: (payload) => ipcRenderer.invoke("stack:chat", payload),
-    chatCapability: () => ipcRenderer.invoke("stack:chat-capability"),
-    providersStatus: () => ipcRenderer.invoke("stack:providers-status"),
-    currentProvider: () => ipcRenderer.invoke("stack:current-provider"),
-    reload: () => ipcRenderer.invoke("stack:reload"),
-    cacheStats: () => ipcRenderer.invoke("stack:cache-stats"),
-    onStreamChunk: (callback) => {
-      const handler = (event, frame) => callback(frame);
-      ipcRenderer.on("stack:stream-chunk", handler);
-      return () => ipcRenderer.removeListener("stack:stream-chunk", handler);
-    },
-    onChanged: (callback) => {
-      const handler = () => callback();
-      ipcRenderer.on("stack:changed", handler);
-      return () => ipcRenderer.removeListener("stack:changed", handler);
-    },
-  },
+  stack: stackBridge(ipcRenderer, [
+    'translate', 'streamStart', 'abort', 'chat', 'chatCapability',
+    'providersStatus', 'currentProvider', 'reload', 'cacheStats',
+    'onStreamChunk', 'onChanged',
+  ]),
 });

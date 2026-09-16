@@ -2,6 +2,7 @@
 // main.js MUST set `sandbox: false` for fs access (preload runs in renderer process).
 
 const { contextBridge, ipcRenderer } = require("electron");
+const { stackBridge } = require("./stack-bridge");
 const fs = require("fs").promises;
 
 // Receive allow-list — the generic ipc.on / ipcRenderer.on bridges below are
@@ -124,44 +125,7 @@ const electronAPI = {
     isAvailable: () => ipcRenderer.invoke("secure-storage:isAvailable"),
   },
   // Main-process translation stack (translation/stack-client.js is the consumer).
-  // No privacyMode/useCache here — the main-process facade injects them.
-  stack: {
-    translate: (payload) => ipcRenderer.invoke("stack:translate", payload),
-    streamStart: (payload) => ipcRenderer.invoke("stack:translate-stream-start", payload),
-    abort: (id) => ipcRenderer.invoke("stack:abort", { id }),
-    chat: (payload) => ipcRenderer.invoke("stack:chat", payload),
-    chatCapability: () => ipcRenderer.invoke("stack:chat-capability"),
-    testProvider: (providerId) => ipcRenderer.invoke("stack:test-provider", { providerId }),
-    testProviderConfig: (providerId, config) =>
-      ipcRenderer.invoke("stack:test-provider-config", { providerId, config }),
-    providersStatus: () => ipcRenderer.invoke("stack:providers-status"),
-    readiness: () => ipcRenderer.invoke("stack:readiness"),
-    currentProvider: () => ipcRenderer.invoke("stack:current-provider"),
-    reload: () => ipcRenderer.invoke("stack:reload"),
-    clearCache: (level) => ipcRenderer.invoke("stack:clear-cache", { level }),
-    cacheStats: () => ipcRenderer.invoke("stack:cache-stats"),
-    ocrRecognize: (imageData, options) =>
-      ipcRenderer.invoke("stack:ocr-recognize", { imageData, options }),
-    ocrResetVision: () => ipcRenderer.invoke("stack:ocr-reset-vision"),
-    visionChat: (messages, imageData, options) =>
-      ipcRenderer.invoke("stack:vision-chat", { messages, imageData, options }),
-    visionCapability: () => ipcRenderer.invoke("stack:vision-capability"),
-    // External TTS endpoint (tts/endpoint.js). Audio comes back as
-    // bytes; playback stays in the renderer, the request never leaves main.
-    ttsCapability: () => ipcRenderer.invoke("stack:tts-capability"),
-    ttsSpeak: (payload) => ipcRenderer.invoke("stack:tts-speak", payload),
-    ttsTest: (config) => ipcRenderer.invoke("stack:tts-test", { config }),
-    onStreamChunk: (callback) => {
-      const handler = (event, frame) => callback(frame);
-      ipcRenderer.on("stack:stream-chunk", handler);
-      return () => ipcRenderer.removeListener("stack:stream-chunk", handler);
-    },
-    onChanged: (callback) => {
-      const handler = () => callback();
-      ipcRenderer.on("stack:changed", handler);
-      return () => ipcRenderer.removeListener("stack:changed", handler);
-    },
-  },
+  stack: stackBridge(ipcRenderer),
   floatingWindow: {
     notifySettingsChanged: () => ipcRenderer.invoke("floating-window:notify-settings-changed"),
   },
