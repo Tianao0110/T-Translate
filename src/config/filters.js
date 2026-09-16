@@ -3,8 +3,7 @@
 // restored after. Used to prevent code, URLs, emails etc. from being
 // rewritten by the LLM.
 
-// No logger import here: this file is cross-imported by the main-process
-// stack bundle, and core/logger.js carries a Vite-only import.meta.
+// No logger import here: this file is also bundled into the main-process stack.
 
 // Each filter: { name, pattern (RegExp, MUST be /g), description, enabled }.
 const DEFAULT_FILTERS = [
@@ -64,9 +63,7 @@ const DEFAULT_FILTERS = [
   },
   {
     name: 'version_number',
-    // A `v` prefix, or three segments: a bare "0.3" is a decimal, not a
-    // version. Turning "0.3 seconds" into a placeholder made a small local
-    // model treat it as an OCR error and rewrite it.
+    // A `v` prefix, or three segments: a bare "0.3" is a decimal.
     pattern: /\bv\d+\.\d+(?:\.\d+)*(?:-[\w.]+)?\b|\b\d+\.\d+\.\d+(?:\.\d+)*(?:-[\w.]+)?\b/g,
     description: '版本号 (v1.2.3)',
     enabled: true,

@@ -1,13 +1,6 @@
-// Listen-mode content area: finals (split at sentence-ending punctuation, the
-// subtitle short-line rule) + their translations, with the streaming draft as
-// the big "now playing" tail line. Finals only ever reach translation — the
-// draft line is provisional by contract. Session status lives in the TOP BAR
-// (the otherwise-empty drag strip), not here — the transcript gets the area.
-//
-// Each finished row carries a read-aloud button (v0.4.2): hover to reveal,
-// click to hear the translation (or the source when there is none) through
-// the configured TTS engine. Playback from any window mutes capture in the
-// worker (the gate), so the spoken line never comes back as a subtitle.
+// Listen-mode content area: finals + their translations, with the streaming
+// draft as the tail line. Session status lives in the top bar. Each finished
+// row carries a read-aloud button; playback mutes capture in the worker.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -82,9 +75,7 @@ const ListenPanel = ({ session }) => {
               : t('floatingWindow.listenIdle', '点击开始，听译系统声音')}
           </div>
         )}
-        {/* The freshest final stays full-strength even while a draft is in
-            flight — the draft outranks it by size/weight alone, and dimming
-            the newest translation mid-sentence hides the payload. */}
+        {/* The freshest final stays full-strength while a draft is in flight. */}
         {segments.map((seg, idx) => {
           const speaking = speakingId === seg.id;
           const hasTrans = !!seg.trans && seg.trans !== 'pending';

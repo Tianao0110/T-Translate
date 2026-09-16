@@ -2,16 +2,7 @@ import { applyGlossary, isUsableTerm, termAppliesTo } from '../stack/glossary.js
 
 /**
  * Find glossary terms a translated document left in the source language.
- *
- * Only that one case is reported, and the omission is deliberate. A term the
- * model rendered as some *other* word (glossary says 词元, model wrote 令牌) is
- * both unfixable here — nothing in the string says which span was meant to be
- * the term — and beside the point: this app exists to get a reader to the gist,
- * not to hold a translation to professional terminology standards. A list of
- * "go look at these five paragraphs yourself" is proofreading work, and it is
- * work that better models keep making less necessary on their own.
- *
- * What is left is deterministic, instant, and always actionable.
+ * Only that one case is reported (docs/design/renderer.md §5).
  *
  * @param {Array} segments document segments
  * @param {Array<{source: string, target: string}>} terms from getGlossaryTerms()
@@ -29,9 +20,7 @@ export function scanDocumentTerms(segments, terms) {
     const translated = segment?.translated;
     if (!original || !translated) continue;
 
-    // The term has to have been in this paragraph's source. Without that check
-    // an English word that merely survived into the translation could be
-    // rewritten as a term it never was.
+    // The term has to have been in this paragraph's source.
     const relevant = usable.filter((term) => termAppliesTo(term, original));
     if (!relevant.length) continue;
     checked += 1;
@@ -46,11 +35,8 @@ export function scanDocumentTerms(segments, terms) {
 }
 
 /**
- * The translation as it stands with only the still-active replacements applied.
- *
- * Recomputed from the untouched original every time rather than patched in
- * place, so undoing one term in a paragraph that had three cannot disturb the
- * other two.
+ * The translation as it stands with only the still-active replacements
+ * applied, recomputed from the untouched original.
  */
 export function renderWithReplacements(before, replacements, isActive) {
   const active = replacements

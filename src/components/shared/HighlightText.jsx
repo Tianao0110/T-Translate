@@ -1,6 +1,4 @@
-// Shared search-term highlighter. History and Favorites used to carry
-// near-identical copies (the Favorites one without memo or error handling
-// for regex-hostile input).
+// Shared search-term highlighter for the history and favorites cards.
 
 import { memo } from 'react';
 
@@ -14,10 +12,8 @@ const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
  * @param {string} [termClassName]
  */
 const HighlightText = memo(({ text, search, terms, termClassName = 'term-highlight', onTermClick }) => {
-  // Last line of defense: a non-string here (a stray result object from the
-  // 0.3.x empty-translation bug) would be handed to React as a child and throw
-  // #31, taking down the whole panel over one bad row. The store repairs those
-  // on rehydrate; this makes the render path survive whatever slips past.
+  // Last line of defense against a non-string (stores/history-sanitize.js
+  // repairs them on rehydrate).
   if (typeof text !== 'string') return text == null ? null : String(text);
 
   const needles = [];
@@ -28,8 +24,7 @@ const HighlightText = memo(({ text, search, terms, termClassName = 'term-highlig
   if (!needles.length) return text;
 
   try {
-    // Longest first: a term that contains another must win the match, or the
-    // shorter one splits it and both render wrong.
+    // Longest first.
     const sorted = [...needles].sort((a, b) => b.value.length - a.value.length);
     const pattern = new RegExp(`(${sorted.map((n) => escapeRe(n.value)).join('|')})`, 'gi');
     const parts = text.split(pattern);

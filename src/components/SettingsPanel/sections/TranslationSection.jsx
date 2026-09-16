@@ -19,8 +19,7 @@ const TranslationSection = ({
   const customLanguages = useTranslationStore((s) => s.customLanguages);
   const removeCustomLanguage = useTranslationStore((s) => s.removeCustomLanguage);
 
-  // Removal lives here rather than in the picker: it is rare and destructive,
-  // and the panel people open every day should not carry a delete control.
+  // Custom-language removal lives here, not in the picker.
   const handleRemoveLanguage = async (lang) => {
     if (!(await confirm(t('translationSettings.customLangRemoveConfirm', { name: lang.name })))) return;
     removeCustomLanguage(lang.code);
@@ -29,17 +28,14 @@ const TranslationSection = ({
 
   const handleClearCache = async () => {
     if (!(await confirm(t('translationSettings.clearCacheConfirm')))) return;
-    // Cache lives in the main-process stack since v0.3.1 (the old
-    // localStorage key is retired at boot by App.jsx).
+    // The cache lives in the main-process stack.
     await window.electron?.stack?.clearCache?.('all');
     notify(t('translationSettings.cacheCleared'), 'success');
   };
 
   const sameLangBehavior = settings.translation?.sameLanguageBehavior || 'original';
 
-  // Applies immediately (silent state update + own persistence), like the
-  // theme/language controls — the selection window re-reads the store on every
-  // trigger and the floating window reloads on the notify broadcast.
+  // Applies immediately (silent state update + own persistence).
   const setSameLangBehavior = async (value) => {
     updateSetting('translation', 'sameLanguageBehavior', value, true);
     try {
@@ -105,8 +101,7 @@ const TranslationSection = ({
             {customLanguages.map((lang) => (
               <div key={lang.code} className="custom-lang-item">
                 <span className="custom-lang-name">{lang.name}</span>
-                {/* The prompt name is the thing that actually decides whether a
-                    model understands the request, so it is worth showing. */}
+                {/* The prompt name is shown when it differs. */}
                 {lang.promptName !== lang.name && (
                   <span className="custom-lang-prompt">
                     {t('translationSettings.customLangPrompt', { name: lang.promptName })}

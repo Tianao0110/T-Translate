@@ -1,8 +1,5 @@
-// Window-level hotkey that only fires while the owning panel is visible.
-// Tab panels stay mounted behind inactive tabs (display:none), so a bare
-// window listener swallows keys app-wide — this bug class shipped three
-// times (DocumentTranslator Ctrl+F, HistoryPanel arrow nav, MainWindow
-// ghost search) before being centralized here.
+// Window-level hotkey that only fires while the owning panel is visible
+// (tab panels stay mounted behind inactive tabs).
 
 import { useEffect, useRef } from 'react';
 

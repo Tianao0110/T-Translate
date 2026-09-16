@@ -1277,8 +1277,7 @@ const zh = {
     noTextRecognized: "（未识别到文字）",
     noValidTextRecognized: "（未识别到有效文字）"
   },
-  // Single block — a duplicate key here silently overrides the earlier one
-  // (the parser's epubNo* lookups were dead for several versions).
+  // Single block — a duplicate key here silently overrides the earlier one.
   docParser: {
     emptySegment: "空段落", tooShort: "过短", numbersOnly: "纯数字",
     codeBlock: "代码块", alreadyTargetLang: "已是目标语言", containsKeyword: "包含关键词",

@@ -1,8 +1,5 @@
-// Listen-mode model packs. This is the ONLY download entry point for ASR
-// models (user's call, 2026-08-28): the floating window's listen button stays
-// visible but disabled and points here, so the download flow lives in one
-// place instead of two windows. The list itself is PackList, shared with the
-// voice packs on the TTS page.
+// Listen-mode model packs: the only download entry point for ASR models.
+// The list itself is PackList, shared with the voice packs on the TTS page.
 
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -11,13 +8,12 @@ import { Seg, Switch } from './shared.jsx';
 import createLogger from '../../../core/logger.js';
 const logger = createLogger('ListenSection');
 
-// Final-pass tier (v0.4.8). Picking "high" without the pack on disk
-// downloads it first, like the OCR tier; the engine reads the stored tier at
-// the next session start, so there is nothing to hot-swap here.
+// Final-pass tier. Picking "high" without the pack on disk downloads it
+// first; the engine reads the stored tier at the next session start.
 const HQ_PACK_ID = 'asr-hq-qwen3-0.6b';
 const INSTALLED_STATES = ['installed', 'update-available', 'orphaned'];
 
-// embedded: rendered inside the 「音频」 sub-page, which owns the heading.
+// embedded: rendered inside the audio sub-page, which owns the heading.
 const ListenSection = ({ notify, confirm, embedded = false }) => {
   const { t } = useTranslation();
 
@@ -52,8 +48,7 @@ const ListenSection = ({ notify, confirm, embedded = false }) => {
     await window.electron?.store?.set?.('settings.listen.autosave', next);
   };
 
-  // The floating window caches "is listen available" — tell it to re-ask, or a
-  // freshly downloaded model leaves the button grey until the window reopens.
+  // The floating window caches "is listen available": tell it to re-ask.
   const handleChanged = useCallback(() => {
     loadInfo();
     window.electron?.floatingWindow?.notifySettingsChanged?.();
@@ -64,9 +59,7 @@ const ListenSection = ({ notify, confirm, embedded = false }) => {
     await window.electron?.store?.set?.('settings.listen.tier', next);
   }, []);
 
-  // Removing the pack from the list below must not leave the tier pointing
-  // at an engine that is gone: the manager would fall back silently, the
-  // control would lie.
+  // Removing the pack must not leave the tier pointing at an engine that is gone.
   const handlePacks = useCallback((packs) => {
     const hq = packs.find((p) => p.id === HQ_PACK_ID);
     const present = !!hq && INSTALLED_STATES.includes(hq.status);
@@ -157,9 +150,7 @@ const ListenSection = ({ notify, confirm, embedded = false }) => {
         onChanged={handleChanged}
         onPacks={handlePacks}
       >
-        {/* Where the models actually are, which is not always where the next
-            download will land: packs installed before v0.4.0 still sit in the
-            old userData folder and keep working from there. */}
+        {/* Where the models actually are (an older root may still hold some). */}
         <p className="setting-hint">
           {t('listen.packs.location', { dir: info?.activeDir || info?.modelsDir || '' })}
         </p>

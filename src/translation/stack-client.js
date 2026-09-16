@@ -1,11 +1,6 @@
-// Renderer-side thin client for the main-process translation stack.
-// Same-name API as the old services/translation.js singleton so orchestration
-// layers switch by changing one import.
-//
-// privacyMode/useCache are GONE from this surface: the main-process facade
-// reads the live mode per request and injects both — a call site cannot weaken
-// SECURE/OFFLINE anymore. stripPrivacy() below is belt-and-braces (and drops
-// non-cloneable fields like AbortSignal that would break the IPC invoke).
+// Renderer-side thin client for the main-process translation stack. No
+// privacyMode / useCache on this surface (the facade injects them);
+// stripPrivacy() also drops non-cloneable fields such as AbortSignal.
 
 import createLogger from '../core/logger.js';
 
@@ -22,9 +17,9 @@ function stripPrivacy(options = {}) {
   return rest;
 }
 
-// One global chunk listener per window; frames route by streamId. A frame can
-// arrive before the streamStart invoke resolves (the facade fires its async
-// pipeline immediately), so unknown-stream frames buffer briefly.
+// One global chunk listener per window; frames route by streamId and may
+// arrive before the streamStart invoke resolves, so unknown-stream frames
+// buffer briefly.
 let chunkHandlers = null;
 const pendingFrames = new Map();
 
@@ -73,10 +68,8 @@ class StackClient {
   }
 
   // `supersede` (default on): a new stream from this window aborts the
-  // previous one — right for a translation panel that only ever shows one
-  // result. Listen subtitles are many independent lines in flight at once, so
-  // they pass `supersede: false` and never touch the active-stream slot.
-  // `noCache` mirrors the unary path's payload-level flag.
+  // previous one; listen subtitles pass `supersede: false`. `noCache`
+  // mirrors the unary path's payload-level flag.
   async translateStream(text, options = {}, onChunk, { supersede = true, noCache = false } = {}) {
     const b = bridge();
     if (!b) {
@@ -85,8 +78,7 @@ class StackClient {
     }
     ensureChunkListener();
 
-    // Supersede semantics: orchestration layers already drop stale frames by
-    // translation id; this upgrade kills the upstream HTTP too (P2-34).
+    // Supersede: abort the previous stream's upstream request too.
     if (supersede && this._activeStreamId) {
       const stale = this._activeStreamId;
       this._activeStreamId = null;
@@ -161,9 +153,8 @@ class StackClient {
     }
   }
 
-  // Whether a real chat completion is possible right now. Asked before an AI
-  // action is offered — a provider that only translates would answer a prompt
-  // with a translation of that prompt.
+  // Whether a real chat completion is possible right now (asked before an
+  // AI action is offered).
   async getChatCapability() {
     const b = bridge();
     if (!b?.chatCapability) return { available: false, providerId: null, providerName: null };
@@ -181,8 +172,7 @@ class StackClient {
     return b.testProvider(providerId);
   }
 
-  // Third arg (privacyMode) accepted for drop-in compatibility but never sent —
-  // the facade applies the real mode.
+  // Third arg (privacyMode) accepted for compatibility but never sent.
   async testProviderWithConfig(providerId, config) {
     const b = bridge();
     if (!b) return { success: false, message: NO_BRIDGE.error };
@@ -201,9 +191,8 @@ class StackClient {
     return b.providersStatus();
   }
 
-  // Whether anything can translate right now. Without the bridge (dev browser
-  // session) the honest answer is "unknown", and an unknown must not be shown
-  // as a problem.
+  // Whether anything can translate right now; without the bridge the answer
+  // is "unknown".
   async getReadiness() {
     const b = bridge();
     if (!b?.readiness) return null;

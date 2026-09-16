@@ -2,28 +2,14 @@ import { useCallback, useRef, useState } from 'react';
 import { getAiAction } from '../config/ai-actions.js';
 import { runAiAction } from './ai-action-runner.js';
 
-// Give up on a batch once the provider has clearly stopped answering, rather
-// than firing one doomed request per paragraph through a whole document.
+// Give up on a batch once the provider has clearly stopped answering.
 const MAX_CONSECUTIVE_FAILURES = 3;
 
 /**
- * Per-paragraph explanations for a document.
- *
- * The shared use-ai-actions hook keeps one result per action and replaces it
- * when the source text changes; a document needs many notes alive at once, so
- * they are kept here keyed by segment. The fold contract is the same as the
- * shared one on purpose: the first click runs the action, later clicks put the
- * note away and back. Re-running would spend tokens to reproduce a note the
- * reader already has.
- *
- * Notes live in a ref as well as state so that `explain` does not change
- * identity every time one lands. It is passed to every memoized SegmentItem,
- * and a batch over a long document would otherwise re-render all of them once
- * per completed note.
- *
- * reset() lives here because notes are keyed by segment id and ids restart at
- * 0 for every document — a load path that forgot to clear them would show the
- * previous document's explanations against the new one's paragraphs.
+ * Per-paragraph explanations for a document, keyed by segment. Same fold
+ * contract as use-ai-actions: the first click runs the action, later clicks
+ * put the note away and back. Notes live in a ref as well as state so
+ * `explain` keeps its identity. reset() clears them for a new document.
  */
 export default function useSegmentNotes({ capabilities, sourceLang, targetLang, onError }) {
   const [notes, setNotes] = useState({});
@@ -78,13 +64,8 @@ export default function useSegmentNotes({ capabilities, sourceLang, targetLang, 
   }, [runOne, onError]);
 
   /**
-   * Explain every paragraph that has no note yet. Same worker-pool shape as the
-   * document's translation pass, for the same reason: local models serialize on
-   * the GPU, so a low concurrency is not a limitation.
-   *
-   * Resolves with the finished note map as well as the counts: React state has
-   * not propagated to the caller's closure yet, and the caller's next step is
-   * to summarize exactly these notes.
+   * Explain every paragraph that has no note yet (worker pool). Resolves
+   * with the finished note map as well as the counts.
    *
    * @returns {{done: number, failed: number, skipped: number, stopped: boolean, notes: object}}
    */
@@ -138,8 +119,7 @@ export default function useSegmentNotes({ capabilities, sourceLang, targetLang, 
       setBatch(null);
     }
 
-    // One report for the batch — a dead provider must not raise a toast per
-    // paragraph.
+    // One report for the batch.
     if (firstError) onError?.(firstError);
     return { done, failed, skipped, stopped: stopRef.current, notes: notesRef.current };
   }, [runOne, onError]);
@@ -147,9 +127,7 @@ export default function useSegmentNotes({ capabilities, sourceLang, targetLang, 
   const stopBatch = useCallback(() => { stopRef.current = true; }, []);
 
   // Restore path: re-seat notes saved with the document's progress blob.
-  // Existing notes win — one the reader just made must not be clobbered by
-  // an old blob arriving late. Non-string values are dropped (the blob is
-  // hand-editable localStorage).
+  // Existing notes win; non-string values are dropped.
   const seed = useCallback((map) => {
     if (!map || typeof map !== 'object') return;
     const clean = {};

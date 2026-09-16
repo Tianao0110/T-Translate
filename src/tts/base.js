@@ -20,8 +20,7 @@ export class BaseTTSEngine {
     this.config = config;
     this._status = TTS_STATUS.IDLE;
     this._currentUtterance = null;
-    // Multi-listener: a single slot let whichever component subscribed last
-    // silently evict the others (main panel status died once Settings opened).
+    // Multi-listener.
     this._statusListeners = new Set();
     this._onProgress = null;
   }
@@ -40,9 +39,8 @@ export class BaseTTSEngine {
     this._onProgress = callback;
   }
 
-  // TTSManager pushes rate/pitch/volume changes here; engines read them on
-  // the next speak. No engine defined this, so the first settings change with
-  // a live engine threw "updateConfig is not a function".
+  // TTSManager pushes rate / pitch / volume changes here; engines read them
+  // on the next speak.
   updateConfig(config = {}) {
     this.config = { ...this.config, ...config };
   }

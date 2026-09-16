@@ -62,8 +62,8 @@ const AboutSection = ({ notify, resetSettings }) => {
     loadStorage();
   };
 
-  // Packs still in the old folder come first: the clear button only shows
-  // once they are moved, so 700 MB of models never go with a single click.
+  // Packs still in the old folder come first; the clear button only shows
+  // once they are moved.
   const showMovePacks = Boolean(storage && storage.legacyPacks > 0 && !storage.fallback);
 
   const cleanLegacy = async () => {
@@ -74,9 +74,8 @@ const AboutSection = ({ notify, resetSettings }) => {
     loadStorage();
   };
 
-  // GPU acceleration (v0.4.9): one switch; enabling runs a self-test in the
-  // OCR host and only sticks when the GPU actually built the session. The
-  // host swaps providers live, so nothing here asks for a restart.
+  // GPU acceleration: one switch; enabling runs the engines' self-tests
+  // (electron/ipc/gpu.js).
   const [gpu, setGpu] = useState(null); // { enabled, engines, supported, last }
   const [gpuBusy, setGpuBusy] = useState(false);
   const loadGpu = useCallback(async () => {
@@ -211,8 +210,7 @@ const AboutSection = ({ notify, resetSettings }) => {
       if (!result.success) {
         setUpdateStage(UPDATE_STAGE.ERROR);
         setErrorMsg(result.error || t('about.updateFailed'));
-        // errorMsg only renders inside the update modal, which isn't open
-        // during the check stage — without a toast this failure is invisible.
+        // errorMsg only renders inside the update modal, so toast here.
         notify(result.error || t('about.updateFailed'), 'error');
         return;
       }

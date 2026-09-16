@@ -1,18 +1,9 @@
-// Language picker for a 134-entry catalogue.
-//
-// A native <select> stopped working at this size, so this is a panel: recently
-// used pinned at the top, then one section per letter, with an index strip you
-// can click or press-and-drag through.
-//
-// Two things that look like details but are the design:
-//
-//   The index follows the UI language. 荷兰语 files under H for a Chinese
-//   reader and Dutch under D for an English one, so a remembered letter is
-//   only valid for the language it was recorded in (see letterLang).
-//
-//   Chips show the name in the UI language, not the endonym. Without a search
-//   box the eye is the only way in, and `አማርኛ` tells a Chinese reader nothing
-//   while 阿姆哈拉语 does. The endonym lives in the tooltip.
+// Language picker for the 134-entry catalogue: recently used pinned at the
+// top, then one section per letter, with an index strip you can click or
+// press-and-drag through. The index follows the UI language (a remembered
+// letter is only valid for the language it was recorded in, see letterLang);
+// chips show the name in the UI language, the endonym lives in the tooltip.
+// Design notes: docs/design/renderer.md §9.
 
 import { useState, useRef, useEffect, useMemo, useCallback, memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -58,13 +49,10 @@ const LanguagePicker = memo(({
     [options]
   );
 
-  // 'auto' is not a language and belongs in no letter group — it sits above
-  // everything, in the picker that offers it.
+  // 'auto' is not a language: it sits above everything.
   const autoOption = byCode.auto || null;
 
-  // User-added languages get their own pinned section rather than a letter
-  // group: their "letter" is the first character of a name the user typed,
-  // which put a stray 藏 on the end of an A-Z strip.
+  // User-added languages get their own pinned section rather than a letter group.
   const customLangs = useMemo(
     () => options.filter((l) => l.custom || custom.has(l.code)),
     [options, custom]
@@ -93,12 +81,9 @@ const LanguagePicker = memo(({
     const group = groupRefs.current.get(letter);
     const list = listRef.current;
     if (!group || !list) return;
-    // offsetTop is relative to the scroll container, so this lands the section
-    // header at the top without the animation lag scrollIntoView has mid-drag.
+    // offsetTop is relative to the scroll container.
     const top = group.offsetTop - list.offsetTop;
-    // scrollTo is not universal (jsdom has no implementation, and neither did
-    // older embedded engines); losing the animation beats throwing out of a
-    // click handler.
+    // scrollTo may be missing (jsdom): fall back to scrollTop.
     if (typeof list.scrollTo === 'function') {
       list.scrollTo({ top, behavior: smooth ? 'smooth' : 'auto' });
     } else {
@@ -106,10 +91,8 @@ const LanguagePicker = memo(({
     }
   }, []);
 
-  // The panel is far wider than its trigger, so a trigger sitting near the
-  // right edge (the document translator's header, or any narrow window) pushes
-  // it off screen. Measured on open rather than guessed from a breakpoint —
-  // what matters is this trigger's position, not the viewport size.
+  // Flip the panel to the left when the trigger sits near the right edge,
+  // measured on open.
   useEffect(() => {
     if (!open || !rootRef.current) return;
     const { left } = rootRef.current.getBoundingClientRect();
@@ -117,8 +100,7 @@ const LanguagePicker = memo(({
     setAlignRight(left + PANEL_WIDTH > window.innerWidth - 8);
   }, [open]);
 
-  // Reopening returns to where the user was browsing — but a letter recorded
-  // under a different UI language points at a group that no longer exists.
+  // Reopening returns to where the user was browsing, in the same UI language.
   useEffect(() => {
     if (!open) return;
     const usable = lastLetter && letterLang === uiLanguage;
@@ -158,8 +140,7 @@ const LanguagePicker = memo(({
     onBrowse?.(letter, uiLanguage);
   }, [scrollToLetter, onBrowse, uiLanguage]);
 
-  // Press and drag along the strip. Click alone still works — drag is a touch
-  // idiom a mouse user will not discover, so it can only ever be a bonus.
+  // Press and drag along the strip; click alone still works.
   const letterFromPoint = (x, y) =>
     document.elementFromPoint(x, y)?.closest('[data-letter]')?.dataset.letter;
 
@@ -214,9 +195,7 @@ const LanguagePicker = memo(({
         : undefined}
       onClick={() => select(lang.code)}
     >
-      {/* A custom language's code IS its prompt name, so it would render as a
-          whole word in the slot meant for a two-letter tag. The dashed frame
-          already says "custom"; the slot stays empty. */}
+      {/* A custom language's code is its prompt name; the tag slot stays empty. */}
       {!lang.custom && <span className="lp-chip-code">{lang.code.toUpperCase()}</span>}
       <span className="lp-chip-name">{displayName(lang, uiLanguage)}</span>
     </button>
@@ -250,9 +229,7 @@ const LanguagePicker = memo(({
                 key={letter}
                 className="lp-index-letter"
                 data-letter={letter}
-                // Its own click handler, not just the strip's hit-testing: the
-                // drag path resolves the letter from pointer coordinates, and
-                // a plain click must not depend on that working.
+                // Its own click handler, independent of the drag path.
                 onClick={() => jumpTo(letter, true)}
               >
                 {letter}

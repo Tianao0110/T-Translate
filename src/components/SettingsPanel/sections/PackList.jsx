@@ -1,10 +1,7 @@
 // Downloadable model pack list shared by the listen (ASR) and TTS (voice)
-// settings sections: one manifest-backed list, one download/update/remove
-// flow, one progress bar. `bridge` is the preload surface for the domain
+// settings sections. `bridge` is the preload surface for the domain
 // (window.electron.audioPacks / ttsPacks) and `prefix` the i18n namespace.
-//
-// Row markup reuses the OCR pack classes (styles/ocr.css) — same rows, same
-// badges, same progress bar.
+// Row markup reuses the OCR pack classes (styles/ocr.css).
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -124,8 +121,7 @@ const PackList = ({ bridge, prefix, notify, confirm, onChanged, onPacks, filter,
             {sizeMB && <span className="engine-size">{sizeMB} MB</span>}
           </div>
           {desc && <p className="setting-hint">{desc}</p>}
-          {/* Link-only packs (over 400 MB are never re-hosted): the upstream
-              link and the folder the extracted archive goes into. */}
+          {/* Link-only packs: the upstream link and the target folder. */}
           {pack.manual && !installed && (
             <div className="sub-setting" style={{ marginTop: 6 }}>
               <p className="setting-hint">{t(`${prefix}.manualHint`)}</p>
@@ -195,9 +191,7 @@ const PackList = ({ bridge, prefix, notify, confirm, onChanged, onPacks, filter,
 
   return (
     <div className="setting-group">
-      {/* .ocr-pack-section-header is the flex row only; .pack-section-title
-          is deliberately NOT reused — it carries the OCR list's disclosure
-          chevron, and this list does not fold. */}
+      {/* .ocr-pack-section-header only; this list does not fold. */}
       <div className="ocr-pack-section-header">
         <h4 className="listen-packs-title">{t(`${prefix}.title`)}</h4>
         <button

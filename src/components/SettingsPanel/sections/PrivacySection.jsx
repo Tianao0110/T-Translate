@@ -29,8 +29,7 @@ const PrivacySection = ({
   const currentMode = useTranslationStore((s) => s.translationMode) || PRIVACY_MODE_IDS.STANDARD;
   const modeConfig = PRIVACY_MODES[currentMode];
 
-  // PRIVACY_MODES stores icon names as strings (so the config file stays
-  // pure data); resolve them to actual lucide components here.
+  // PRIVACY_MODES stores icon names as strings; resolved to lucide here.
   const getModeIcon = (iconName, size = 24) => {
     const icons = {
       'Zap': Zap,
@@ -50,12 +49,11 @@ const PrivacySection = ({
     return t(modeKeys[modeId] || 'privacy.modes.standard');
   };
 
-  // Matrix columns use the config ids ('secure'), the seg shows the user-facing
-  // names ('无痕'). Same order everywhere.
+  // Matrix columns use the config ids; the seg shows the user-facing names.
   const modeIds = PRIVACY_MODE_ORDER;
   const stateIcon = (state) => (state === 'on' ? <Check size={12} /> : state === 'part' ? <Minus size={12} /> : <X size={12} />);
   // 'main' = mode picker + this mode's module list; 'detail' = the read-only
-  // three-mode comparison behind the 详细 button.
+  // three-mode comparison.
   const [view, setView] = useState('main');
 
   // A cell is a pill (icon + one word) with a short reason under it when the
@@ -86,8 +84,7 @@ const PrivacySection = ({
         const k = localStorage.key(i);
         const bytes = k.length + (localStorage.getItem(k)?.length || 0);
         localStorageBytes += bytes;
-        // Document-translation resume blobs (dt_progress_<fingerprint>) carry
-        // translated text — itemized so they're visible, not buried in the total.
+        // Document-translation resume blobs (dt_progress_<fingerprint>), itemized.
         if (k.startsWith('dt_progress_')) {
           docProgressCount++;
           docProgressBytes += bytes;
@@ -163,9 +160,8 @@ const PrivacySection = ({
         notify(t('privacy.migration.needApp'), 'warning');
         return;
       }
-      // Read the PERSISTED settings, never this panel's in-memory copy — the
-      // panel decrypts OCR keys into its inputs, and those must not reach a
-      // shareable file. The stored bucket is already key-free.
+      // Read the persisted settings, never this panel's in-memory copy (it
+      // holds decrypted OCR keys).
       const storedSettings = await window.electron.store.get('settings');
       const { favorites, customLanguages } = useTranslationStore.getState();
       const appVersion = (await window.electron?.app?.getVersion?.()) || '';
@@ -240,8 +236,7 @@ const PrivacySection = ({
           clean.aiActions.imported = validateImportedActions(clean.aiActions.imported);
         }
         if (window.electron?.store) {
-          // Per-bucket dot-path writes: buckets absent from the pack keep
-          // their local values instead of being wiped by a whole-key set.
+          // Per-bucket dot-path writes: absent buckets keep their local values.
           for (const [bucket, value] of Object.entries(clean)) {
             await window.electron.store.set(`settings.${bucket}`, value);
           }

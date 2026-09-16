@@ -23,8 +23,7 @@ const ChildPane = ({
   const paneRef = useRef(null);
   const controlsTimerRef = useRef(null);
 
-  // Mirrors of drag state — global mousemove/mouseup handlers close over
-  // these via ref, which avoids stale state when React batches updates
+  // Ref mirrors of drag state for the global mousemove / mouseup handlers.
   const dragStateRef = useRef({
     isDragging: false,
     startX: 0,
@@ -82,9 +81,7 @@ const ChildPane = ({
       let newX = e.clientX - dragStateRef.current.offsetX;
       let newY = e.clientY - dragStateRef.current.offsetY;
 
-      // Web content can't render outside the BrowserWindow — clamp to the
-      // viewport so panes can't be "lost" past an edge. Double-click detach
-      // is the way to move a pane out of the window.
+      // Clamp to the viewport; double-click detach moves a pane out.
       const rect = paneRef.current?.getBoundingClientRect();
       const maxX = window.innerWidth - (rect?.width ?? 80);
       const maxY = window.innerHeight - (rect?.height ?? 32);
@@ -106,9 +103,7 @@ const ChildPane = ({
       dragStateRef.current.isDragging = false;
       setIsDragging(false);
 
-      // Coordinate convention differs by state: un-frozen panes store
-      // parent-relative coords; frozen panes store viewport coords (they're
-      // detached from the parent layout)
+      // Un-frozen panes store parent-relative coords, frozen panes viewport coords.
       if (!isFrozen && parentBounds) {
         const relativeX = finalX - parentBounds.x;
         const relativeY = finalY - parentBounds.y;
@@ -154,8 +149,7 @@ const ChildPane = ({
 
   const [fixedSize, setFixedSize] = useState(null);
 
-  // Lock dimensions once translation completes — prevents layout shift if the
-  // user later hovers, and stops the pane from flickering when content updates
+  // Lock dimensions once translation completes.
   useEffect(() => {
     if (status === CHILD_PANE_STATUS.DONE && !fixedSize && paneRef.current) {
       const rect = paneRef.current.getBoundingClientRect();
@@ -175,8 +169,7 @@ const ChildPane = ({
       width: `${fixedSize.width}px`,
       height: `${fixedSize.height}px`,
     } : {
-      // Tight floor: word-pile panes anchor to word-sized boxes, and an
-      // inflated frame is what makes neighboring panes overlap
+      // Tight floor: word-pile panes anchor to word-sized boxes.
       minWidth: '48px',
       maxWidth: isFrozen ? '400px' : 'calc(100% - 20px)',
     }),

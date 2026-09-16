@@ -16,8 +16,7 @@ export default function useSaveModal(currentTranslation, addToFavorites, notify,
   const [editableTags, setEditableTags] = useState('');
   const [editableSummary, setEditableSummary] = useState('');
 
-  // Generation counter: a slow LLM reply from a closed/superseded modal must
-  // not overwrite the fields of a newer analysis (and then get saved).
+  // Generation counter against slow replies from a superseded modal.
   const analyzeReqRef = useRef(0);
 
   const analyzeContent = useCallback(async () => {
@@ -28,8 +27,7 @@ export default function useSaveModal(currentTranslation, addToFavorites, notify,
       const { sourceText, translatedText } = currentTranslation;
       const { systemPrompt, userPrompt } = getAnalysisPrompts(sourceText, translatedText);
 
-      // Privacy fields no longer travel from call sites — the main-process
-      // facade injects the live mode into every stack request.
+      // Privacy fields are injected by the main-process facade.
       const result = await translationService.chatCompletion([
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },

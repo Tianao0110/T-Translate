@@ -161,8 +161,7 @@ const FavoriteCard = ({
     try {
       const { systemPrompt, userPrompt } = getAnalysisPrompts(item.sourceText, item.translatedText);
 
-      // Privacy fields no longer travel from call sites — the main-process
-      // facade injects the live mode into every stack request.
+      // Privacy fields are injected by the main-process facade.
       const result = await translationService.chatCompletion([
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
@@ -414,8 +413,7 @@ const FavoritesPanel = ({ showNotification }) => {
       const savedFolders = JSON.parse(saved);
       const savedIds = savedFolders.map(f => f.id);
 
-      // Re-inject any system folders that aren't in localStorage so
-      // upgrades from older versions still get glossary / style library.
+      // Re-inject any system folders that aren't in localStorage.
       const missingSystemFolders = DEFAULT_FOLDERS.filter(
         f => f.isSystem && !savedIds.includes(f.id)
       );
@@ -455,8 +453,7 @@ const FavoritesPanel = ({ showNotification }) => {
     }
   );
 
-  // useShallow: favorites tab stays mounted behind other tabs — without a
-  // selector every streaming flush would re-render it
+  // useShallow: the tab stays mounted behind other tabs.
   const {
     favorites,
     removeFromFavorites,

@@ -1,18 +1,6 @@
-// src/config/model-template-mapping.js
-//
-// Detects translation-only "MT specialist" models from their name. Used by
-// the main-process stack (stack/service.js): when the active provider's model
-// matches a rule, the service switches prompt structure to user-only mode +
-// simplified instruction, avoiding the prompt-leak common with small MT models
-// whose chat templates don't expect a system role.
-//
-// The user's tone choice (natural / precise / formal) still applies — only
-// the prompt structure flips. See buildMTPrompt() in stack/service.js.
-//
-// MAINTENANCE: to support a new MT-specialist model, append a rule below.
-// Patterns should be forward-compatible — match the family, not the version
-// (e.g. `/\bhy[\s\-_]?mt/i` catches Hy-MT2, Hy-MT3, HyMT4, etc.). Avoid
-// version-specific patterns like `/hy-mt2/i` that go stale on the next release.
+// Detects translation-only "MT specialist" models from their name; the
+// stack (stack/service.js buildMTPrompt) switches to the user-only prompt
+// for them. New rules match the family, not the version.
 
 const MODEL_TEMPLATE_RULES = [
   {

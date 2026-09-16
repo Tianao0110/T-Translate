@@ -1,8 +1,5 @@
 // Shared wiring for the data-driven AI actions: which ones this surface may
-// offer right now, running one, and holding its result so the surface can
-// expand it in place. Generalizes the style-rewrite flow (result -> chatCompletion
-// -> shown next to the translation) so a new action is a config entry rather
-// than another copy of this hook.
+// offer right now, running one, and holding its result.
 
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -21,10 +18,7 @@ import createLogger from '../core/logger.js';
 
 const logger = createLogger('useAiActions');
 
-// Read at use time, not at mount: the settings panel lives in this same
-// renderer, and a threshold the user just changed should apply to the next
-// keystroke rather than the next launch. Cached on the raw string so the JSON
-// is parsed once per actual change, not once per render.
+// Read at use time, not at mount; cached on the raw string.
 let _settingsRaw = null;
 let _longFormCache;
 function userLongFormGate() {
@@ -48,15 +42,13 @@ export default function useAiActions(surface, attachResult) {
   const { i18n } = useTranslation();
   const [capabilities, setCapabilities] = useState({ text: false, vision: false });
   const [runningId, setRunningId] = useState(null);
-  // One result per action, remembered with the text it was made from so a new
-  // translation can never show the previous passage's summary.
+  // One result per action, remembered with the text it was made from.
   const [results, setResults] = useState({});
   const [expandedId, setExpandedId] = useState(null);
   // User-imported action configs, alongside the built-ins.
   const [imported, setImported] = useState([]);
 
-  // Re-probed whenever the stack reloads: adding an LLM provider — or importing
-  // an action — in settings must light the entry up without restarting.
+  // Re-probed whenever the stack reloads.
   useEffect(() => {
     let cancelled = false;
     const probe = () => {
@@ -88,16 +80,14 @@ export default function useAiActions(surface, attachResult) {
     );
   }, [surface, capabilities, imported]);
 
-  // Which pipeline an action would use, so a surface can say up front that the
-  // capture itself is about to be sent — an image gives away far more than the
-  // line of text path A would send.
+  // Which pipeline an action would use, so a surface can say up front that
+  // the capture itself is about to be sent.
   const pathFor = useCallback((action, hasImage) => (
     resolveActionPath(action, { capabilities, hasImage })
   ), [capabilities]);
 
-  // What the surface should render right now, or null. Returns nothing once the
-  // window has moved on to different text — or to a different reading language,
-  // since the answer was written in the one that was set at the time.
+  // What the surface should render right now, or null once the window has
+  // moved on to different text or a different reading language.
   const expandedFor = useCallback((sourceText, targetLanguage) => {
     const entry = expandedId ? results[expandedId] : null;
     if (!entry || entry.sourceText !== sourceText) return null;
@@ -105,18 +95,13 @@ export default function useAiActions(surface, attachResult) {
     return entry;
   }, [expandedId, results]);
 
-  // For surfaces that share one slot between the source text and a result:
-  // whatever opens there closes whatever was there before.
+  // Surfaces that share one slot between the source text and a result.
   const collapse = useCallback(() => setExpandedId(null), []);
 
-  // First click runs the action, later clicks fold its result away and back —
-  // same as the card's source toggle, and it means a result can never become
-  // the input of another run.
+  // First click runs the action, later clicks fold its result away and back.
   const toggle = useCallback(async (action, context) => {
     const cached = results[action.id];
-    // Identity is the passage AND the language it was answered in. Keying on
-    // the text alone meant switching the target language kept handing back the
-    // old answer, so the summary stayed in the previous language forever.
+    // Identity is the passage and the language it was answered in.
     if (cached && cached.sourceText === context.sourceText
         && cached.targetLanguage === context.targetLanguage) {
       setExpandedId(expandedId === action.id ? null : action.id);
@@ -141,7 +126,7 @@ export default function useAiActions(surface, attachResult) {
         }));
         setExpandedId(action.id);
         // The store applies the secure-mode gate and decides which entry this
-        // hangs on — nothing to hang it on means it stays a one-off.
+        // hangs on.
         if (isAttachableResult(action) && attachResult) {
           attachResult({
             sourceText: context.sourceText,

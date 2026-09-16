@@ -22,8 +22,8 @@ export function exportToJSON(items) {
   return JSON.stringify(data, null, 2);
 }
 
-// Accepts both our wrapper shape ({terms: []}) and a bare array. Also tolerates
-// Chinese field names (原文/译文/备注) for exports from other tools.
+// Accepts both our wrapper shape ({terms: []}) and a bare array, with
+// Chinese field names tolerated for exports from other tools.
 function importFromJSON(jsonString) {
   try {
     const data = JSON.parse(jsonString);
@@ -72,7 +72,7 @@ export function exportToCSV(items) {
     return `${source},${target},${note},${tags}`;
   });
 
-  // BOM prefix so Excel opens the file as UTF-8 (otherwise CJK chars get mangled)
+  // BOM prefix so Excel opens the file as UTF-8.
   return '\uFEFF' + header + '\n' + rows.join('\n');
 }
 

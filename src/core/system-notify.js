@@ -1,9 +1,6 @@
-// OS-level notification for long-task completion (document translation, the
-// summarize-everything pass). Fires only when the window is hidden or
-// minimized — the in-window toast already covers the visible case — and only
-// while settings.interface.systemNotifications is on (default on; undefined
-// counts as on). Clicking brings the main window back, including from the
-// close-to-tray hidden state.
+// OS-level notification for long-task completion. Fires only when the
+// window is hidden or minimized and settings.interface.systemNotifications
+// is on (undefined counts as on). Clicking brings the main window back.
 
 import createLogger from './logger.js';
 
@@ -12,9 +9,7 @@ const logger = createLogger('SystemNotify');
 export async function notifyTaskDone(title, body) {
   try {
     if (typeof document === 'undefined' || !document.hidden) return false;
-    // Electron grants renderer notifications unconditionally; the permission
-    // check only matters for the browser-mode dev server, where we skip
-    // rather than nag with a permission prompt.
+    // The permission check only matters for the browser-mode dev server.
     if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return false;
 
     const enabled = await window.electron?.store?.get?.('settings.interface.systemNotifications');

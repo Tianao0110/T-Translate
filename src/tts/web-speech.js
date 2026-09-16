@@ -33,9 +33,7 @@ export class WebSpeechEngine extends BaseTTSEngine {
     }
   }
 
-  // Voice list loads asynchronously on first SpeechSynthesis use. Some platforms
-  // populate immediately, others fire 'voiceschanged' later. Electron is the
-  // worst case and needs a few retries.
+  // The voice list loads asynchronously; Electron needs a few retries.
   async _loadVoicesAsync() {
     if (!this._synth) return [];
 
@@ -131,13 +129,9 @@ export class WebSpeechEngine extends BaseTTSEngine {
     if (/[Ѐ-ӿ]/.test(text)) return 'ru';
     if (/[؀-ۿ]/.test(text)) return 'ar';
 
-    // ---- Latin-script refinement ----
-    // Everything Latin used to fall through to 'en', so Spanish/French/German
-    // text was read by an English voice. Two tiers, checked in order.
-    //
-    // Tier 1 — (near-)exclusive marks, effectively owned by one language.
-    // The Turkish set deliberately has no /i flag: with it, dotless ı would
-    // case-fold onto plain I and every English sentence would match.
+    // ---- Latin-script refinement, two tiers ----
+    // Tier 1 — (near-)exclusive marks. The Turkish set has no /i flag on
+    // purpose (dotless ı would case-fold onto plain I).
     if (/[ßẞ]/.test(text)) return 'de';
     if (/[ñ¿¡]/.test(text)) return 'es';
     if (/[ãõ]/i.test(text)) return 'pt';
@@ -150,9 +144,7 @@ export class WebSpeechEngine extends BaseTTSEngine {
     if (/[øæ]/i.test(text)) return 'da'; // Danish/Norwegian share these; a da voice reads both acceptably
     if (/å/i.test(text)) return /[äö]/i.test(text) ? 'sv' : 'no';
 
-    // Tier 2 — shared accents, best-frequency guess. Known trade-offs
-    // (Finnish ä/ö lands on de; a French phrase with no ç/circumflex can land
-    // on es) all still beat the old en-for-everything.
+    // Tier 2 — shared accents, best-frequency guess.
     if (/[êîûëç]/i.test(text)) return 'fr'; // high-frequency French marks (être, ça, français)
     if (/[ìò]/i.test(text)) return 'it';    // grave i/o is Italian-only among the majors
     if (/[áéíóú]/i.test(text)) return 'es'; // acute vowels are pan-Iberian; es is the widest guess, pt/fr strong marks were checked above
@@ -208,9 +200,7 @@ export class WebSpeechEngine extends BaseTTSEngine {
         'pt': ['pt-BR', 'pt-PT', 'pt'],
         'it': ['it-IT', 'it'],
         'ar': ['ar-SA', 'ar'],
-        // Norwegian voices ship as nb-NO/nn-NO — the 'no' prefix match above
-        // never finds them, so this entry is load-bearing (unlike pl/cs/tr/...
-        // whose region tags all start with the bare code).
+        // Norwegian voices ship as nb-NO / nn-NO; this entry is load-bearing.
         'no': ['nb-NO', 'no-NO', 'nn-NO'],
       };
 
@@ -242,7 +232,7 @@ export class WebSpeechEngine extends BaseTTSEngine {
       await this._voicesPromise;
     }
 
-    // Cancel + tiny delay; speaking on top of an active utterance is racy on Chrome/Edge
+    // Cancel + tiny delay before speaking.
     if (this._synth.speaking || this._synth.pending) {
       this.stop();
       await new Promise(resolve => setTimeout(resolve, 50));
@@ -273,7 +263,7 @@ export class WebSpeechEngine extends BaseTTSEngine {
       utterance.voice = voice;
       utterance.lang = voice.lang;
 
-      // Clamp to spec ranges (out-of-range values fail silently on some engines)
+      // Clamp to spec ranges.
       utterance.rate = Math.max(0.1, Math.min(10, rate));
       utterance.pitch = Math.max(0, Math.min(2, pitch));
       utterance.volume = Math.max(0, Math.min(1, volume));
@@ -311,7 +301,7 @@ export class WebSpeechEngine extends BaseTTSEngine {
       this._currentUtterance = utterance;
       this._synth.cancel();
 
-      // Tiny delay after cancel — some engines drop utterances queued too quickly
+      // Tiny delay after cancel.
       setTimeout(() => {
         this._synth.speak(utterance);
       }, 10);

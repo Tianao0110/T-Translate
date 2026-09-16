@@ -11,8 +11,8 @@ import { THEMES } from './config/constants.js';
 
 const logger = createLogger('App');
 
-// Still load-bearing: floating-window.js GET_SETTINGS reads the live language
-// pair from this global via executeJavaScript when the main window is around.
+// Load-bearing: electron/ipc/floating-window.js GET_SETTINGS reads the live
+// language pair from this global via executeJavaScript.
 if (typeof window !== 'undefined') {
   window.__TRANSLATION_STORE__ = useTranslationStore;
 }
@@ -20,10 +20,8 @@ if (typeof window !== 'undefined') {
 // One-time wiring of Zustand -> electron-store (subscribes for the lifetime of the app)
 initStoreSync(useTranslationStore);
 
-// Retire localStorage keys orphaned by the v0.3.1 stack migration. The L2
-// cache is droppable (rebuilt cold in the main process, D-2b); custom filter
-// defs move to electron-store where the stack reads them (D-1b). All windows
-// share one origin, so running this in the main window covers everything.
+// Retire localStorage keys orphaned by the stack migration (all windows
+// share one origin).
 (async function retireLegacyLocalStorage() {
   try {
     const rawFilters = localStorage.getItem(USER_FILTERS_KEY);
@@ -49,9 +47,8 @@ function App() {
   const setOcrEngine = useTranslationStore((state) => state.setOcrEngine);
 
   useEffect(() => {
-    // Theme source-of-truth precedence: settings store > localStorage. We
-    // mirror the resolved value back to localStorage so a refresh paints
-    // the correct theme before React mounts.
+    // Theme precedence: settings store > localStorage; the resolved value is
+    // mirrored back to localStorage.
     const initTheme = async () => {
       let savedTheme = 'light';
 
@@ -76,9 +73,6 @@ function App() {
     initTheme();
 
     // Seed the OCR engine from electron-store (the single source of truth).
-    // It's no longer persisted in the zustand key, so without this the main
-    // window would reset to the default engine every launch and diverge from
-    // what the floating window reads from settings.ocr.engine.
     (async () => {
       try {
         const engine = await window.electron?.store?.get?.('settings.ocr.engine');
@@ -141,8 +135,7 @@ function App() {
           timestamp: item.timestamp || Date.now(),
           source: item.from || item.source || 'unknown',
         };
-        // Understanding results arrive as their own kind; dropping the marker
-        // here would silently re-file them as translations.
+        // Understanding results arrive as their own kind.
         if (item.kind === 'understand') {
           entry.kind = 'understand';
           if (item.actionId) entry.actionId = item.actionId;
@@ -166,9 +159,7 @@ function App() {
     };
   }, [addToHistory, attachAiResult]);
 
-  // Render-phase errors are ErrorBoundary's job (src/main.jsx wraps <App/>);
-  // the old try/catch here broke hook ordering rules and, on a mount throw,
-  // rendered a fallback without TitleBar — no drag region in a frameless window.
+  // Render-phase errors are ErrorBoundary's job (src/main.jsx wraps <App/>).
   return (
     <div className={`app ${theme} no-titlebar`}>
       <TitleBar />

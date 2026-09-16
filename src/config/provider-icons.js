@@ -31,8 +31,7 @@ const PROVIDER_ICONS = {
   'baidu-translate': baiduTranslate,
 };
 
-// Display order preserved from the retired renderer registry (presets first,
-// then standalone providers) so the settings list doesn't reshuffle.
+// Display order of the settings list (presets first, then standalone providers).
 const ORDER = [
   'tengine',
   'openai', 'deepseek', 'ollama', 'local-llm',

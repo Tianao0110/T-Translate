@@ -1,9 +1,6 @@
-// 「读 · 朗读」 tab (rendered inside AudioSection). Compact layout per the
-// batch-4 design: enable switch, engine segmented control, one "speaking
-// with" status line that says local vs API and carries the preview button,
-// the engine's own block underneath (per-language voices for neural, a
-// default voice for system voices, the server form for the endpoint), and
-// the three sliders in one row.
+// Read-aloud tab (rendered inside AudioSection): enable switch, engine
+// segmented control, one "speaking with" status line with the preview
+// button, the engine's own block, and the three sliders in one row.
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -97,8 +94,7 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
         setTestingLang('');
       }
     });
-    // Return the slot on unmount (and stop any test playback), or the main
-    // panel's status callback stays evicted after visiting this page.
+    // Return the status slot on unmount (and stop any test playback).
     return () => {
       unsub();
       ttsManager.stop();
@@ -114,9 +110,7 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
     loadVoices();
   }, [updateSetting, loadEngines, loadVoices]);
 
-  // ttsManager.updateConfig persists to the store immediately, so the React
-  // update is silent — otherwise the panel would flag "unsaved changes" for a
-  // change that's already saved.
+  // ttsManager.updateConfig persists immediately, so the React update is silent.
   const updateTTSConfig = useCallback((key, value) => {
     updateSetting('tts', key, value, true);
     ttsManager.updateConfig({ [key]: value });
@@ -131,8 +125,7 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
     if ('baseUrl' in patch) loadEngines();
   }, [endpointCfg, updateSetting, loadEngines]);
 
-  // The key goes straight to the DPAPI vault (tts_endpoint_ prefix: offline
-  // mode blocks its decryption) and is never written into settings.
+  // The key goes straight to the DPAPI vault (tts_endpoint_ prefix).
   const saveEndpointKey = useCallback(async () => {
     const value = draftKey.trim();
     if (!value) return;
@@ -162,8 +155,7 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
     updateEndpoint({ hasKey: false });
   }, [updateEndpoint]);
 
-  // One real synthesis is the only honest connectivity test; the sample is
-  // played so the user hears the server's actual voice.
+  // Connectivity test = one real synthesis, played back.
   const testEndpoint = useCallback(async () => {
     setEndpointTesting(true);
     try {
@@ -333,8 +325,8 @@ const TTSSection = ({ settings, updateSetting, notify }) => {
                 </button>
               ))}
             </div>
-            {/* One line, no prose: the dot and the value say local vs API;
-                a warning dot means the choice is not what actually speaks. */}
+            {/* The dot and the value say local vs API; a warning dot means the
+                choice is not what actually speaks. */}
             <div className="tts-now">
               <span className={`dot ${nowLine.warn ? 'warn' : ''}`}></span>
               <span className="k">{t('audio.now.label')}</span>

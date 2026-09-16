@@ -139,10 +139,8 @@ const useSessionStore = create((set, get) => ({
     });
   },
 
-  // viewportPos {x,y} is required for correct placement: live panes hold
-  // container-relative coords while frozen panes render position:fixed
-  // (viewport space) — copying bbox unchanged would teleport the pane by the
-  // container's offset.
+  // viewportPos {x,y}: live panes hold container-relative coords, frozen
+  // panes render position:fixed (viewport space).
   freezeChildPane: (id, viewportPos) => {
     const state = get();
     const pane = state.childPanes.find((p) => p.id === id);

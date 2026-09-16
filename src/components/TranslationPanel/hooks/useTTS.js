@@ -26,8 +26,7 @@ export default function useTTS(notify, t) {
       }
     });
 
-    // Keep the panel's speak button in sync when TTS is toggled in settings,
-    // instead of freezing at the mount-time value until a restart.
+    // Keep the speak button in sync when TTS is toggled in settings.
     const unsubConfig = ttsManager.onConfigChange((cfg) => {
       setTtsEnabled(cfg.enabled);
     });

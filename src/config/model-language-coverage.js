@@ -1,35 +1,14 @@
-// What languages a locally loaded model is documented to handle.
+// What languages a locally loaded model is documented to handle. Used only
+// to reorder the failover chain, never for any claim in the UI
+// (docs/design/renderer.md §8).
 //
-// WHY THIS EXISTS: the failover chain only advances on failure, and an LLM
-// asked for a language it does not know does not fail — it produces fluent
-// nonsense and reports success. So a user with LM Studio first in the chain
-// and Google behind it never reaches Google for Tibetan: the local model
-// "succeeds" and the chain stops. This table lets the chain skip ahead before
-// that happens.
-//
-// SCOPE — read this before adding anything:
-//
-//   Used ONLY to reorder the failover chain. Never to grey out, filter, warn
-//   or otherwise make a claim in the UI. Model names are unreliable
-//   identifiers (fine-tunes, quantized re-uploads, renamed local files), and
-//   published language lists are conservative, so every entry here is a guess
-//   with a good prior — fine for "try Google first", dishonest as a statement
-//   to the user.
-//
-//   That constraint is what makes the failure modes safe:
-//     no rule matches      -> no reorder     -> exactly today's behavior
-//     rule matches wrongly -> Google goes first -> Google translates it anyway
-//     rule matches rightly -> long tail skips the small model    -> better
-//
-//   Nothing here can make the app worse than not having it. Keep it that way.
-//
-// COVERAGE VALUES:
+// Coverage values:
 //   [...]   the documented set; a target outside it demotes this provider
 //   'many'  broad multilingual (NLLB, MADLAD) — never demoted
 //   absent  unknown — never demoted
 //
-// MAINTENANCE: incomplete on purpose. Add a family only when its published
-// coverage is clear and stable; a missing entry costs nothing.
+// Incomplete on purpose: add a family only when its published coverage is
+// clear and stable.
 
 const MODEL_LANGUAGE_RULES = [
   {
@@ -62,8 +41,6 @@ const MODEL_LANGUAGE_RULES = [
   {
     label: 'Helsinki Opus-MT',
     // The pair is the model: opus-mt-en-zh does en->zh and nothing else.
-    // Sending it anything else returns confident garbage, which makes this the
-    // single most valuable rule in the table.
     pattern: /\bopus[\s\-_]?mt/i,
     derive: (modelName) => {
       const pair = modelName.match(/opus[\s\-_]?mt[\s\-_]([a-z]{2,3})[\s\-_]([a-z]{2,3})\b/i);

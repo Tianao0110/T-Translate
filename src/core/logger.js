@@ -7,16 +7,12 @@ const LOG_LEVELS = {
   ERROR: 3,
 };
 
-// Chained ?? was dead code: `NODE_ENV === '...'` is always a boolean, so the
-// third operand could never be reached. Vite always defines import.meta.env.
 const isDev = import.meta.env?.DEV ?? (process.env.NODE_ENV === 'development');
 
 // Dev: all levels. Prod: warn+ only.
 const currentLevel = isDev ? LOG_LEVELS.DEBUG : LOG_LEVELS.WARN;
 
-// Flatten to a string HERE rather than shipping objects over IPC: structured
-// clone drops an Error's stack (the only part worth having), and the main
-// process should never re-serialize whatever a renderer hands it.
+// Flatten to a string here (structured clone drops an Error's stack).
 function flatten(args) {
   return args.map((arg) => {
     if (arg instanceof Error) {
@@ -34,10 +30,7 @@ function flatten(args) {
   }).join(' ');
 }
 
-// Mirror warn/error to the main-process log file. Renderer output was console
-// only, so a React crash, an unhandled rejection or a window.onerror left no
-// trace on disk — every one of them had to be reproduced live to be seen.
-// Never throws and never awaits: a broken log path must not break the caller.
+// Mirror warn / error to the main-process log file. Never throws, never awaits.
 function forward(level, scope, args) {
   try {
     window.electron?.logs?.write?.({ level, scope, text: flatten(args) });

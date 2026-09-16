@@ -39,8 +39,7 @@ const SelectionSection = ({
     }
   };
 
-  // First-time opt-in shows a warning (CapsLock-direct can fire on accidental
-  // key presses). After confirm, subsequent toggles are silent.
+  // First-time opt-in shows a warning; later toggles are silent.
   const handleToggleSticky = async () => {
     const current = !!settings.selection.stickyViaCapsLock;
     if (current) {

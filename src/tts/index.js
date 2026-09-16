@@ -15,16 +15,14 @@ export { EndpointTTSEngine } from './endpoint.js';
 const engines = {
   'web-speech': WebSpeechEngine,
   // Neural is offered only while its bridge exists and a voice pack is
-  // installed (isAvailable); the settings page hides the engine picker
-  // otherwise, so nothing in the UI claims it prematurely.
+  // installed (isAvailable).
   'neural': NeuralTTSEngine,
   // External OpenAI-compatible server: offered while an address is set and
   // the privacy mode is not offline (main-side capability probe).
   'endpoint': EndpointTTSEngine,
 };
 
-// web-speech is the zero-download floor: always present, so a configured
-// engine that lost its voice pack degrades honestly instead of erroring.
+// web-speech is the zero-download floor.
 const FALLBACK_ENGINE_ID = 'web-speech';
 
 export const DEFAULT_TTS_CONFIG = {
@@ -46,8 +44,7 @@ class TTSManager {
     this._currentEngine = null;
     this._currentEngineId = null;
     this._config = { ...DEFAULT_TTS_CONFIG };
-    // Fan-out sets so main panel + settings page can both observe without
-    // stealing each other's single callback slot.
+    // Fan-out sets: main panel and settings page both observe.
     this._statusListeners = new Set();
     this._configListeners = new Set();
     this._engineUnsub = null;
@@ -134,9 +131,7 @@ class TTSManager {
     return this._currentEngine;
   }
 
-  // Every status change also drives the listen-mode mute gate: while this
-  // window is speaking (any engine, system voices included) the audio worker
-  // drops captured sound, so the app's own voice never lands in the subtitles.
+  // Every status change also drives the listen-mode mute gate.
   _forwardStatus(status) {
     const playing = status === TTS_STATUS.SPEAKING || status === TTS_STATUS.PAUSED;
     if (playing !== this._gateOn) {
@@ -148,10 +143,8 @@ class TTSManager {
     }
   }
 
-  // The configured engine may be unavailable (neural without its voice pack).
-  // Fall back to the floor engine WITHOUT touching _config.engine: the user's
-  // choice survives, and _refreshConfig retries it on every speak, so the
-  // engine comes back the moment its pack does.
+  // The configured engine may be unavailable: fall back to the floor engine
+  // without touching _config.engine (retried on every speak).
   async _setEngineWithFallback(engineId) {
     try {
       return await this.setEngine(engineId);
@@ -199,9 +192,7 @@ class TTSManager {
     return () => this._statusListeners.delete(callback);
   }
 
-  // Notifies subscribers when the config (enabled/rate/voice/...) changes, so
-  // e.g. the main panel's speak button appears/disappears the moment TTS is
-  // toggled in settings instead of only after a restart.
+  // Notifies subscribers when the config (enabled / rate / voice / ...) changes.
   onConfigChange(callback) {
     this._configListeners.add(callback);
     return () => this._configListeners.delete(callback);
@@ -213,9 +204,7 @@ class TTSManager {
     }
   }
 
-  // Re-read persisted config before speaking. This window (especially the
-  // persistent selection window) may hold a stale snapshot from its first
-  // init; the store is the source of truth and a settings save writes it.
+  // Re-read persisted config before speaking (the store is the source of truth).
   async _refreshConfig() {
     try {
       const stored = await window.electron?.store?.get('settings.tts');
@@ -246,8 +235,7 @@ class TTSManager {
   }
 
   async speak(text, options = {}) {
-    // Lazy refresh so a settings change (enabled toggle, rate, voice) takes
-    // effect on the next utterance without restarting this window.
+    // Lazy refresh: a settings change takes effect on the next utterance.
     await this._refreshConfig();
 
     if (!this._config.enabled) {
@@ -270,10 +258,7 @@ class TTSManager {
     try {
       return await this._currentEngine.speak(text, mergedOptions);
     } catch (e) {
-      // Per-utterance fallback: a neural pack that cannot read this language
-      // (or lost its files) hands the sentence to the system voices instead
-      // of failing it. The configured engine stays; the next utterance in a
-      // covered language goes neural again.
+      // Per-utterance fallback to the system voices; the configured engine stays.
       const msg = e?.message || '';
       const coverable =
         msg.startsWith('NO_VOICE_FOR_LANG:') ||
@@ -317,9 +302,8 @@ class TTSManager {
       });
     }
 
-    // Engine switch applies immediately when one is already live (settings
-    // page test button); windows without a live engine keep lazy-switching
-    // via _refreshConfig on their next speak.
+    // Engine switch applies immediately when one is already live; otherwise
+    // on the next speak.
     if (config.engine && this._currentEngine && config.engine !== this._currentEngineId) {
       try {
         await this._setEngineWithFallback(config.engine);

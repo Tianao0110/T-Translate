@@ -1,10 +1,6 @@
-// De-overlap layout for scattered child panes. Pure — takes measured rects,
-// returns the vertical moves — so the collision policy stays unit-testable.
-//
-// Anchor fidelity beats zero overlap: panes point at their source text, so we
-// only resolve SIGNIFICANT collisions, shift the minimal distance (up or
-// down), and give up beyond a cap rather than cascade panes away from their
-// anchors (the greedy always-down pass drifted dense UI captures badly).
+// De-overlap layout for scattered child panes: takes measured rects,
+// returns the vertical moves. Only significant collisions are resolved,
+// by the minimal shift, capped (docs/design/renderer.md §4).
 
 const DEFAULT_GAP = 4;
 const MIN_OVERLAP_RATIO = 0.4; // intersection ≤ this share of the smaller pane is tolerated

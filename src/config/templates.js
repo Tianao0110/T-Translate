@@ -1,7 +1,5 @@
-// Translation templates. Each template is a system prompt sent to the LLM;
-// different templates yield different styles (natural / precise / formal /
-// OCR-correction). The UI labels come from i18n (templates.*), so the name/
-// description/icon metadata that used to live here was unused and removed.
+// Translation templates: a system prompt per tone (natural / precise /
+// formal / OCR-correction). UI labels come from i18n (templates.*).
 
 export const LANGUAGE_NAMES = {
   'auto': 'the same language as the source',
@@ -22,11 +20,8 @@ export const LANGUAGE_NAMES = {
   'pa': 'Punjabi',
 };
 
-// Templates here = "tone" (natural / precise / formal / ocr).
-// The "message structure" (system+user vs user-only) is decided by the
-// main-process stack (stack/service.js) based on the active model —
-// translation-only small models (Hunyuan MT etc.) get a simpler prompt and
-// user-only mode, regardless of which tone template is selected.
+// Templates here = tone; the message structure (system+user vs user-only)
+// is decided by the main-process stack (stack/service.js).
 const TEMPLATES = {
   natural: {
     mode: 'system',
@@ -80,7 +75,7 @@ Requirements:
   },
 };
 
-// Returns { content, mode } — service layer expects this shape (see translation.js).
+// Returns { content, mode }, the shape the service layer expects.
 export function getSystemPrompt(templateId, targetLang) {
   const template = TEMPLATES[templateId] || TEMPLATES.natural;
   const langName = LANGUAGE_NAMES[targetLang] || targetLang;

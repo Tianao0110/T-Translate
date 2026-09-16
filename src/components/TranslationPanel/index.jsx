@@ -58,8 +58,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     };
   }, []);
 
-  // useShallow: re-render only when a selected slice changes — history,
-  // statistics and queue updates no longer touch this panel
+  // useShallow: re-render only when a selected slice changes.
   const {
     currentTranslation,
     favorites,
@@ -122,20 +121,17 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   const saveModal = useSaveModal(currentTranslation, addToFavorites, notify, t);
   const onboarding = useOnboarding();
 
-  // One at a time, and only once there is a translation to act on — both
-  // buttons are disabled without one, and a hint pointing at a dead control
-  // teaches the user to ignore hints.
+  // One hint at a time, and only once there is a translation to act on.
   const activeHint = !currentTranslation.translatedText
     ? null
     : ['styleRewrite', 'favorite'].find((id) => !onboarding.hintSeen(id)) || null;
 
-  // AI actions read the source side, so the entry follows the source box, not
-  // whether a translation already exists.
+  // AI actions read the source side, so the entry follows the source box.
   const lastCaptureRef = useRef(null); // { dataURL, sourceText } of the last capture
   const ai = useAiActions('screenshot', attachAiResult);
 
-  // The capture only stands in for the source box while the box still holds
-  // what that capture said; an edit or a paste retires it.
+  // The capture stands in for the source box only while the box still holds
+  // what that capture said.
   const captureImage = lastCaptureRef.current?.sourceText === currentTranslation.sourceText
     ? lastCaptureRef.current.dataURL
     : null;
@@ -165,25 +161,18 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   const sourceTextareaRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  // The picker needs the whole entry (Chinese name, English name, endonym)
-  // to label chips and file them under the right letter.
-  // User-added languages sit alongside the built-ins; built-ins win a clash.
+  // The picker needs the whole entry; user-added languages sit alongside the
+  // built-ins, built-ins win a clash.
   const languages = useMemo(() => mergeLanguages(LANGUAGES, customLanguages), [customLanguages]);
   const targetLanguages = useMemo(() => languages.filter((l) => l.code !== 'auto'), [languages]);
   const customCodes = useMemo(() => customCodesOf(customLanguages), [customLanguages]);
 
-  // Tone templates. MT detection is handled in the main-process stack
-  // — when a translation-only model is active, prompt structure auto-switches
-  // (user-only message + simplified prompt) regardless of which tone is picked.
+  // Tone templates; the message structure is the main-process stack's call.
   const templates = [
     { id: 'natural', name: t('templates.natural'), desc: t('templates.naturalDesc') },
     { id: 'precise', name: t('templates.precise'), desc: t('templates.preciseDesc') },
     { id: 'formal', name: t('templates.formal'), desc: t('templates.formalDesc') },
   ];
-
-  // S-2 postscript: a simple/full split was tried here and reverted the same
-  // day — hiding two icons did not justify a mode toggle, and the tone
-  // templates earn their spot (user verdict). The MT badge removal stayed.
 
   // Triggered when MainWindow passes screenshot data in via props (capture flow)
   useEffect(() => {
@@ -204,9 +193,8 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
 
         if (result.success && result.text) {
           setIsOcrSource(true);
-          // Kept past the OCR run so an AI action can read the capture itself
-          // instead of its recognized text. Paired with the text it produced —
-          // once the box holds anything else, the picture no longer describes it.
+          // Kept past the OCR run so an AI action can read the capture itself,
+          // paired with the text it produced.
           lastCaptureRef.current = { dataURL: screenshotData.dataURL, sourceText: result.text };
 
           // LLM Vision -> local OCR fallback gets surfaced; ocrStatus.fallbackNotice
@@ -220,9 +208,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
           }
 
           // No explicit auto-translate here: the OCR write to sourceText
-          // re-triggers the debounced auto-translate effect with a fresh
-          // closure (correct 'ocr' template + overlay notify); a deferred call
-          // from this render's stale handleTranslate would miss both.
+          // re-triggers the debounced auto-translate effect.
         } else {
           notify(result.error || t('translation.ocrFailed'), 'warning');
         }
@@ -238,8 +224,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     processScreenshot();
   }, [screenshotData]);
 
-  // Debounced auto-translate. Re-checks state inside the timer so a fast
-  // edit-then-clear doesn't fire a stale translation.
+  // Debounced auto-translate; re-checks state inside the timer.
   useEffect(() => {
     if (!autoTranslate) return;
     if (!currentTranslation.sourceText.trim()) return;
@@ -258,8 +243,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   }, [currentTranslation.sourceText, autoTranslate, autoTranslateDelay]);
 
   const handleTranslate = async (overrideTemplate = null) => {
-    // Closure-safe re-entrancy guard — Ctrl+Enter and template clicks are not
-    // disabled while a stream is running, and concurrent streams interleave.
+    // Closure-safe re-entrancy guard.
     if (useTranslationStore.getState().currentTranslation.status === TRANSLATION_STATUS.TRANSLATING) {
       notify(t('translation.translating'), 'info');
       return;
@@ -269,8 +253,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
       return;
     }
 
-    // navigator.onLine is unreliable and local providers work without a
-    // network — warn and let the request itself decide.
+    // navigator.onLine only warns; the request itself decides.
     if (!isConnected && translationMode !== PRIVACY_MODES.OFFLINE) {
       notify(t('translation.notConnected'), 'warning');
     }
@@ -732,15 +715,13 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   );
 };
 
-// Glossary auto-replacement toast. Dismisses on 5s timer; hover pauses the
-// timer so the user can read multi-item lists at their own pace.
+// Glossary auto-replacement toast: 5 s timer, hover pauses it.
 const GlossaryNotice = ({ count, first, replacements, onUndo, t }) => {
   const [visible, setVisible] = useState(true);
   const [expanded, setExpanded] = useState(false);
   const [hovered, setHovered] = useState(false);
 
-  // The render slot is keyless and stays truthy across translations, so new
-  // replacements arrive on this same mounted instance — re-arm per batch.
+  // Re-armed per batch (the instance stays mounted across translations).
   useEffect(() => {
     setVisible(true);
     setExpanded(false);

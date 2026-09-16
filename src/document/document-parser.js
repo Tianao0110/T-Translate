@@ -12,28 +12,22 @@ const _t = (key, fallback) => {
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 const MAX_FILE_SIZE_LABEL = '20MB';
 
-// Clamp the PDF render scale so a page with an absurd MediaBox can't allocate a
-// giant canvas (width*height*4 bytes) — the longest side never exceeds this.
+// PDF render clamp: the longest canvas side never exceeds this.
 export const MAX_PDF_CANVAS_EDGE = 5000;
 
-// The MAX_FILE_SIZE cap is on the COMPRESSED file. A zip container (EPUB/DOCX)
-// can inflate ~1000x, so a 20MB file can decompress to gigabytes and OOM the
-// renderer — a one-click DoS now that the context menu opens arbitrary files.
-// Cap the decompressed total too. Declared sizes come from the zip central
-// directory (cheap, no inflate) and can be forged, so the EPUB reader also
-// enforces a runtime accumulation cap as JSZip inflates (which verifies CRC).
+// Cap on the decompressed total of a zip container (EPUB / DOCX); declared
+// sizes can be forged, so the EPUB reader also enforces a runtime cap
+// (docs/design/renderer.md §5).
 export const MAX_DECOMPRESSED_SIZE_BYTES = 300 * 1024 * 1024;
 
-// Render scale for a page, clamped so the longest side stays within the canvas
-// edge cap. Exported so the clamp is testable without a headless canvas.
+// Render scale for a page, clamped to the canvas edge cap. Exported for tests.
 export function clampedPdfScale(pageWidth, pageHeight, desiredScale = 2) {
   const longestEdge = Math.max(pageWidth, pageHeight) || 1;
   return Math.min(desiredScale, MAX_PDF_CANVAS_EDGE / longestEdge);
 }
 
-// Sum the zip's declared uncompressed sizes (JSZip exposes them per entry
-// without inflating). Throws the shared over-limit error past the cap.
-// Exported for direct testing (a real zip-bomb fixture is impractical to ship).
+// Sum the zip's declared uncompressed sizes; throws past the cap. Exported
+// for tests.
 export function assertZipWithinDecompressedCap(zip) {
   let total = 0;
   for (const entry of Object.values(zip.files || {})) {
@@ -282,9 +276,7 @@ export function parseSRT(content) {
   const segments = [];
   const blocks = content.trim().split(/\n\s*\n/);
 
-  // ids are sequential, not the file's cue numbers — real-world SRT files
-  // restart or duplicate numbering, which would collide React keys and
-  // progress-restore mapping. The original cue number survives in `index`.
+  // ids are sequential, not the file's cue numbers (kept in `index`).
   let id = 0;
   for (const block of blocks) {
     const lines = block.trim().split('\n');
@@ -347,13 +339,11 @@ export function parseVTT(content) {
   return segments;
 }
 
-// Render a PDF page to canvas and feed it through the OCR chain.
-// Scale 2 keeps small print legible for local OCR without ballooning memory.
-// Returns null on failure so callers can distinguish "no text" from "failed".
+// Render a PDF page to canvas and feed it through the OCR chain. Returns
+// null on failure so callers can distinguish "no text" from "failed".
 async function ocrPdfPage(page, ocrRecognize) {
   try {
-    // Clamp scale so a page with an absurd MediaBox can't allocate a giant
-    // canvas (width*height*4 bytes). Never scale UP past 2 — just cap the edge.
+    // Clamp the scale; never scale up past 2.
     const base = page.getViewport({ scale: 1 });
     const viewport = page.getViewport({ scale: clampedPdfScale(base.width, base.height) });
     const canvas = document.createElement('canvas');
@@ -509,8 +499,7 @@ async function parseDOCX(file, options = {}) {
   const mammoth = await import('mammoth');
   const arrayBuffer = await file.arrayBuffer();
 
-  // mammoth exposes no inflate limit and additionally builds an in-memory DOM
-  // (a further amplifier), so pre-check the zip's declared sizes before it runs.
+  // Pre-check the zip's declared sizes before mammoth runs.
   const JSZip = (await import('jszip')).default;
   assertZipWithinDecompressedCap(await JSZip.loadAsync(arrayBuffer));
 
@@ -663,8 +652,7 @@ async function parseEPUB(file, options = {}) {
   const manifestMatch = opfContent.match(/<manifest[^>]*>([\s\S]*?)<\/manifest>/i);
   const itemTags = manifestMatch ? (manifestMatch[1].match(/<item\b[^>]*>/gi) || []) : [];
 
-  // Attribute order varies between EPUB generators — extract separately
-  // instead of assuming id comes before href.
+  // Attribute order varies between EPUB generators.
   const manifest = {};
   for (const tag of itemTags) {
     const id = tag.match(/\bid="([^"]+)"/i)?.[1];
@@ -690,8 +678,7 @@ async function parseEPUB(file, options = {}) {
       if (text.trim()) {
         allText += text + '\n\n';
       }
-      // Runtime backstop: declared sizes are forgeable, but the concatenated
-      // text can't outgrow what JSZip actually inflated (CRC-checked).
+      // Runtime backstop against forged declared sizes.
       if (allText.length > MAX_DECOMPRESSED_SIZE_BYTES) {
         throw new Error(_t('docParser.tooLargeDecompressed',
           'File content is too large after decompression'));
@@ -730,7 +717,7 @@ function extractTextFromHTML(html) {
   text = text.replace(/&gt;/g, '>');
   text = text.replace(/&amp;/g, '&');
   text = text.replace(/&quot;/g, '"');
-  // fromCodePoint, not fromCharCode — numeric entities can be astral (emoji).
+  // fromCodePoint: numeric entities can be astral.
   const decodeCodePoint = (code) => {
     try { return String.fromCodePoint(code); } catch { return ''; }
   };
@@ -748,15 +735,13 @@ export async function parseDocument(file, options = {}) {
   const format = SUPPORTED_FORMATS[ext];
 
   if (!format) {
-    // Tagged so callers can log it as the user mistake it is, rather than as a
-    // program error competing for attention in the log file.
+    // Tagged as a user mistake for the log.
     const err = new Error(_t('docParser.unsupportedFormat', 'Unsupported file format') + `: .${ext}`);
     err.code = 'UNSUPPORTED_FORMAT';
     throw err;
   }
 
-  // Whole file goes through arrayBuffer; an unbounded PDF would freeze or
-  // OOM the renderer.
+  // Size check before arrayBuffer.
   if (file.size > MAX_FILE_SIZE) {
     return {
       success: false,
@@ -848,8 +833,7 @@ export async function parseDocument(file, options = {}) {
       ...extra,
     };
   } catch (error) {
-    // Say which file and which stage. A pdf.js rejection can carry no message
-    // at all — a bare "Error:" line leaves nothing to act on.
+    // Say which file and which stage (a pdf.js rejection can carry no message).
     logger.error(
       `Parse failed: ${file?.name || 'unknown file'} (${ext || 'no extension'}, `
       + `${file?.size ?? '?'} bytes, name=${error?.name || 'Error'})`,
@@ -873,9 +857,8 @@ export async function parseDocument(file, options = {}) {
   }
 }
 
-// FileReader.readAsText is UTF-8-only; legacy Chinese subtitles/novels are
-// frequently GBK, and some Windows tools emit UTF-16. Decode by evidence:
-// BOM first, then UTF-8 unless GBK produces strictly fewer replacement chars.
+// Decode by evidence: BOM first, then UTF-8 unless GBK produces strictly
+// fewer replacement chars.
 async function readAsText(file) {
   let buffer;
   try {
@@ -1007,10 +990,8 @@ export function exportTranslatedOnly(segments, options = {}) {
     .join('\n\n');
 }
 
-// Timecodes are kept verbatim from the source file, so a VTT-loaded doc
-// exported as SRT (or vice versa) needs the millisecond separator converted —
-// players and <track> parsers reject the wrong one. SRT also requires a
-// 2-digit hour field, which short-form VTT times omit.
+// Timecodes are kept verbatim from the source file; SRT / VTT export
+// converts the millisecond separator and pads the hour field.
 export function toSRTTimecode(timecode) {
   return timecode.replace(/(?:(\d{1,2}):)?(\d{2}):(\d{2})[.,](\d{3})/g, (_, h, m, s, ms) =>
     `${(h || '0').padStart(2, '0')}:${m}:${s},${ms}`);

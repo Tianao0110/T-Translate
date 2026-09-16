@@ -1,13 +1,7 @@
-// Bridges Zustand store changes to electron-store so main-process windows
-// (selection translator, floating window) can read settings via the same
-// electron-store API without round-tripping JavaScript into a renderer.
-//
-// Single sync point for settings.translation.sourceLanguage / targetLanguage —
-// covers setLanguages/swapLanguages/setTargetLanguage/restoreFromHistory alike.
-// The store must be created with subscribeWithSelector or the selector-style
-// subscribe below silently degrades to a no-op.
-//
-// Wire it up once from App.jsx via initStoreSync().
+// Bridges Zustand store changes to electron-store for the other windows.
+// Single sync point for settings.translation.sourceLanguage / targetLanguage.
+// The store must be created with subscribeWithSelector. Wired once from
+// App.jsx via initStoreSync().
 
 import createLogger from '../core/logger.js';
 
@@ -30,8 +24,7 @@ async function flushSync(dotPath) {
     if (!window.electron?.store?.set) return;
     await window.electron.store.set(`settings.${dotPath}`, value);
     logger.debug(`Synced settings.${dotPath}`);
-    // Notify floating window so it can reload target lang / theme without restart.
-    // Separate debounce to merge bursts (e.g. user toggles src+tgt back-to-back).
+    // Notify the floating window (separate debounce to merge bursts).
     debouncedNotifyFloatingWindow();
   } catch (e) {
     logger.debug(`Sync failed for ${dotPath}:`, e.message);
@@ -53,9 +46,7 @@ function debouncedNotifyFloatingWindow(delay = 50) {
 }
 
 export function initStoreSync(translationStore) {
-  // Startup reconcile: subscribe only fires on *change*, so a language edit
-  // whose debounced write was lost (quit within 100ms) would leave the mirror
-  // stale forever. Push the current values once so electron-store matches.
+  // Startup reconcile: push the current values once.
   const initial = translationStore.getState().currentTranslation;
   debouncedSync('translation.sourceLanguage', initial.sourceLanguage);
   debouncedSync('translation.targetLanguage', initial.targetLanguage);
@@ -67,8 +58,7 @@ export function initStoreSync(translationStore) {
     }),
     (curr, prev) => {
       if (curr.src !== prev.src || curr.tgt !== prev.tgt) {
-        // Write each language field separately so we don't clobber
-        // sibling fields like translation.providers.
+        // Each language field separately (sibling fields stay untouched).
         debouncedSync('translation.sourceLanguage', curr.src);
         debouncedSync('translation.targetLanguage', curr.tgt);
       }
@@ -76,8 +66,7 @@ export function initStoreSync(translationStore) {
     { equalityFn: (a, b) => a.src === b.src && a.tgt === b.tgt }
   );
 
-  // Flush pending debounced writes before the page goes away, so a language
-  // switch immediately followed by quit/reload isn't dropped.
+  // Flush pending debounced writes before the page goes away.
   if (typeof window !== 'undefined') {
     window.addEventListener('beforeunload', () => {
       Object.keys(_pendingWrites).forEach(flushSync);

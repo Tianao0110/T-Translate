@@ -1,9 +1,7 @@
-// Main-window translation service. Wires UI store state to the main-process
-// translation stack (via stack-client) and ocrManager, drives status
-// transitions, and writes history. privacyMode/useCache no longer travel from
-// here — the main-process facade injects them; history gating reads the mode
-// snapshot the facade attaches to each result (effectivePrivacyMode), so the
-// gate can never disagree with what the request actually ran under.
+// Main-window translation service: wires UI store state to the main-process
+// translation stack (via stack-client), drives status transitions, and
+// writes history. History gating reads the effectivePrivacyMode the facade
+// attaches to each result.
 // Call graph: TranslationPanel -> translation-store -> this -> stack IPC -> providers
 
 import { v4 as uuidv4 } from 'uuid';
@@ -294,9 +292,8 @@ class MainTranslationService {
     return results;
   }
 
-  // OCR runs in the main-process stack: engine configs (with vault secrets)
-  // load there, and the privacy-mode engine allowlist is injected there — this
-  // side just forwards the image and the user's preferred engine.
+  // OCR runs in the main-process stack; this side forwards the image and
+  // the preferred engine.
   async recognizeImage(image, options = {}) {
     const state = useTranslationStore.getState();
 
@@ -318,9 +315,7 @@ class MainTranslationService {
           if (options.autoSetSource !== false) {
             draft.currentTranslation.sourceText = result.text;
           }
-          // Surface LLM-Vision fallback so the user knows they're on a different engine.
-          // Two variants: hard-lock (repeated failures disabled it) vs soft (model
-          // doesn't support vision). The lock flag rides on the result now.
+          // Surface the vision-engine fallback: hard-lock vs soft.
           if (result.fallbackFrom === 'llm-vision') {
             draft.ocrStatus.fallbackNotice = result.visionLocked
               ? _t('ocr.visionLocked', 'LLM Vision has been disabled due to repeated failures. Switched to local OCR. Re-enable in Settings > OCR.')
@@ -367,8 +362,7 @@ class MainTranslationService {
       draft.statistics.totalCharacters += item.sourceText?.length || 0;
 
       const today = new Date().toDateString();
-      // kind 'understand' rows are explanations, not translations — keep the
-      // counter honest (store-side addToHistory applies the same filter).
+      // kind 'understand' rows stay out of the translation counter.
       const historyToday = draft.history.filter(
         (h) => h.kind !== 'understand' && new Date(h.timestamp).toDateString() === today
       );

@@ -41,8 +41,7 @@ const MainWindow = () => {
 
   const [version, setVersion] = useState('');
 
-  // Narrow selectors: streaming rewrites currentTranslation.translatedText
-  // dozens of times per second — the window shell must not re-render on it.
+  // Narrow selectors: the window shell must not re-render on streaming.
   const translationStatus = useTranslationStore((s) => s.currentTranslation.status);
   const sourceLanguage = useTranslationStore((s) => s.currentTranslation.sourceLanguage);
   const targetLanguage = useTranslationStore((s) => s.currentTranslation.targetLanguage);
@@ -53,8 +52,7 @@ const MainWindow = () => {
   // Bridge from main-process screenshot capture down to TranslationPanel
   const [screenshotData, setScreenshotData] = useState(null);
 
-  // Auto-delete old history per privacy settings — the control predates
-  // 0.2.9 but never had an implementation behind it.
+  // Auto-delete old history per privacy settings.
   useEffect(() => {
     (async () => {
       try {
@@ -149,9 +147,8 @@ const MainWindow = () => {
 
         logger.debug('[Silent] OCR success, sending text to selection window');
 
-        // Engine degraded mid-capture (e.g. llm-vision → local): the notice
-        // must ride along — this chain never shows the main panel where the
-        // fallback banner normally lives.
+        // Engine degraded mid-capture: the notice rides along (this chain
+        // never shows the main panel).
         const notice = ocrResult.fallbackFrom === 'llm-vision'
           ? (ocrResult.visionLocked
             ? t('ocr.visionLocked', 'LLM Vision 已因连续失败停用，本次已用本地 OCR。可在设置 > OCR 重新启用。')
@@ -295,10 +292,8 @@ const MainWindow = () => {
     });
   }, [activeTab]);
 
-  // "Open with T-Translate" (Explorer context menu): pull the pending file on
-  // mount (cold start) and on every main-process ping (an already-running
-  // instance received a second-instance forward). The listener lives here —
-  // not in DocumentTranslator — because that tab may not be mounted yet.
+  // "Open with T-Translate": pull the pending file on mount and on every
+  // main-process ping. Lives here because the document tab may not be mounted.
   const [externalDocFile, setExternalDocFile] = useState(null);
 
   useEffect(() => {
@@ -367,8 +362,7 @@ const MainWindow = () => {
 
       <div className="main-content">
         <div className="tab-panel" style={{ display: activeTab === 'translate' ? 'flex' : 'none' }}>
-          {/* Only on the panel a new user lands on — the same strip repeated
-              on every tab would read as an alarm rather than a nudge. */}
+          {/* Only on the panel a new user lands on. */}
           <SetupNotice
             readiness={readiness}
             onOpenSettings={() => { setActiveTab('settings'); setPendingSettingsSection('providers'); }}

@@ -192,9 +192,8 @@ const LlmSection = ({ settings, updateSetting, notify }) => {
         </div>
       )}
 
-      {/* Files outside the whitelist (last year's model included) are always
-          listed so the user can see what sits in the folder; probing and
-          using them needs the switch. */}
+      {/* Files outside the whitelist are always listed; probing and using
+          them needs the switch. */}
       <div className="setting-group wide">
         <label className="setting-label">{t('llm.dev.title')}</label>
         <Switch

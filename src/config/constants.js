@@ -60,8 +60,7 @@ export const LANGUAGE_CODES = {
   VI: 'vi',
 };
 
-// The catalogue lives in config/languages.js so the stack can import the same
-// table (service.js already imports config/filters.js). One table, no drift.
+// The catalogue lives in config/languages.js, shared with the stack.
 import { LANGUAGES } from './languages.js';
 export { LANGUAGES };
 

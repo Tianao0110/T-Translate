@@ -23,14 +23,13 @@ import './styles.css';
 
 const logger = createLogger('FloatingWindow');
 
-// Default OCR engine (llm-vision) needs a local vision model — new users without it
-// hit this path. Keyword match triggers a "Go to OCR Settings" button on the error.
+// Keyword match on the vision-engine error shows a "Go to OCR Settings" button.
 const OCR_ERROR_KEYWORDS = /ocr|vision|视觉|识别|视觉模型|qwen-vl|llava/i;
 function isOcrRelatedError(msg) {
   return typeof msg === 'string' && OCR_ERROR_KEYWORDS.test(msg);
 }
 
-// Labels for the layout badge (pref lives in settings > 悬浮窗口 > 显示模式)
+// Labels for the layout badge (pref: settings.floatingWindow.displayMode).
 const MODE_LABEL_KEYS = {
   auto: ['floatingWindow.modeAuto', '自动'],
   scattered: ['floatingWindow.modeScattered', '散点'],
@@ -77,8 +76,7 @@ const FloatingWindow = () => {
   const [showOpacitySlider, setShowOpacitySlider] = useState(false);
   const [showHistoryPanel, setShowHistoryPanel] = useState(false);
   // Listen mode overlays the persisted understand toggle for this window
-  // session only — leaving listen restores whatever understand was. The mode
-  // entry is gated on ASR models being present (zero-claim until then).
+  // session only; the entry is gated on ASR models being present.
   const [listenMode, setListenMode] = useState(false);
   const [listenAvailable, setListenAvailable] = useState(false);
   const [hasOverflow, setHasOverflow] = useState(false);
@@ -93,11 +91,8 @@ const FloatingWindow = () => {
     onAutosaved: () => setToastMessage({ type: 'success', message: t('floatingWindow.listenAutosaved') }),
   });
 
-  // Mode-segment gate: the listen button is always visible, but stays disabled
-  // until a recognition model is on disk. Downloading happens in settings
-  // (user's call) — refreshListen also runs on the settings-changed broadcast
-  // the settings page fires after a pack install, so a fresh download lights
-  // the button up without reopening this window.
+  // Mode-segment gate: the listen button stays disabled until a recognition
+  // model is on disk; re-checked on the settings-changed broadcast.
   const refreshListen = useCallback(() => {
     window.electron?.audioEngine?.getInfo?.()
       .then((info) => setListenAvailable(!!info?.modelName))
@@ -118,16 +113,14 @@ const FloatingWindow = () => {
     }
   }, [notification, clearNotification]);
 
-  // AI actions run on the recognized source text, not the translation — a
-  // summary of a summary compounds whatever the translator got wrong. When a
-  // vision model is configured they run on the capture itself instead.
+  // AI actions run on the recognized source text, or on the capture itself
+  // when a vision model is configured.
   const attachAiResult = useCallback((payload) => {
     window.electron?.floatingWindow?.attachAiResult?.(payload);
   }, []);
   const ai = useAiActions('floating', attachAiResult);
   const captureImage = pipeline.getLastCaptureImage(sourceText);
-  // Whatever the mode runs on every capture is not also a button — the toolbar
-  // is for things the user chooses to do.
+  // Whatever the mode runs on every capture is not also a button.
   const autoRunId = understandMode ? getUnderstandAction(ai.imported)?.id : null;
   const aiActions = ai.availableActions({
     displayMode,
@@ -161,9 +154,8 @@ const FloatingWindow = () => {
   const passThroughRef = useRef(false);
   const showHistoryPanelRef = useRef(false);
   const savedOpacityRef = useRef(0.85);
-  // Sticky pass-through survives blur (unlike the momentary Alt hold);
-  // regionIgnoreRef tracks the current setIgnoreMouseEvents state so the
-  // mousemove-driven region toggle only IPCs on boundary crossings.
+  // Sticky pass-through survives blur; regionIgnoreRef tracks the current
+  // setIgnoreMouseEvents state.
   const [stickyPassThrough, setStickyPassThrough] = useState(false);
   const stickyPassThroughRef = useRef(false);
   const regionIgnoreRef = useRef(false);
@@ -201,8 +193,7 @@ const FloatingWindow = () => {
     };
     loadTheme();
 
-    // Track content-area bounds so child-pane drag detection knows the limits.
-    // Poll because layout shifts (resize, scrollbar appearing) don't fire events.
+    // Track content-area bounds for child-pane drag detection (polled).
     const updateContentBounds = () => {
       if (contentRef.current) {
         const rect = contentRef.current.getBoundingClientRect();
@@ -233,8 +224,7 @@ const FloatingWindow = () => {
       }
 
       if (e.key === 'Escape') {
-        // Read live state — this handler is registered once on mount and a
-        // closure over render-scope state would be frozen at first render.
+        // Read live state (the handler is registered once on mount).
         const s = useSessionStore.getState();
         // ESC priority: sticky pass-through > history panel > scattered panes > close
         if (stickyPassThroughRef.current) {
@@ -272,8 +262,7 @@ const FloatingWindow = () => {
       }
     };
 
-    // Alt keyup / blur end only the MOMENTARY hold — sticky mode must survive
-    // both (losing focus on every click-through is its whole reason to exist).
+    // Alt keyup / blur end only the momentary hold; sticky mode survives both.
     const handleKeyUp = async (e) => {
       if (e.key === 'Alt' && passThroughRef.current && !stickyPassThroughRef.current) {
         passThroughRef.current = false;
@@ -286,7 +275,7 @@ const FloatingWindow = () => {
       }
     };
 
-    // Window blur also exits the Alt hold, otherwise alt-tab leaves it stuck on
+    // Window blur also exits the Alt hold.
     const handleBlur = async () => {
       if (passThroughRef.current && !stickyPassThroughRef.current) {
         passThroughRef.current = false;
@@ -320,11 +309,9 @@ const FloatingWindow = () => {
     let unsubscribeSettings = null;
     if (window.electron?.floatingWindow?.onSettingsChanged) {
       unsubscribeSettings = window.electron.floatingWindow.onSettingsChanged((newSettings) => {
-        // Stack + OCR reloads are main-process-internal now — this channel
-        // only carries the window's UI settings (opacity/engine/theme/langs).
+        // This channel carries the window's UI settings.
         loadSettings();
-        // A model pack may have just landed (settings page fires this after an
-        // install/uninstall) — re-ask instead of staying grey until reopen.
+        // A model pack may have just landed: re-ask.
         refreshListen();
         const newTheme = newSettings?.interface?.theme;
         if (newTheme && ['light', 'dark', 'fresh'].includes(newTheme)) {
@@ -380,8 +367,7 @@ const FloatingWindow = () => {
           setTargetLanguage(settings.targetLanguage);
         }
 
-        // The pipeline auto-detects the actual text language per capture; the
-        // configured source is mirrored only so 'swap' knows the other side.
+        // The configured source is mirrored so 'swap' knows the other side.
         if (settings.sourceLanguage) {
           setSourceLanguage(settings.sourceLanguage);
         }
@@ -394,9 +380,7 @@ const FloatingWindow = () => {
           setOcrEngine(settings.ocrEngine);
         }
 
-        // Display-mode pref lives in the settings page. On change, re-layout
-        // the stashed capture immediately so the switch is visible without a
-        // fresh screenshot (no-ops when nothing was captured yet).
+        // Display-mode change: re-layout the stashed capture immediately.
         if (settings.displayMode) {
           const prev = useConfigStore.getState().floatingDisplayMode;
           if (settings.displayMode !== prev) {
@@ -416,8 +400,7 @@ const FloatingWindow = () => {
   };
 
   const handleMouseLeaveWindow = () => {
-    // 300ms delay catches the "mouse slipped off edge" case so the toolbar
-    // doesn't flicker when the cursor briefly leaves and re-enters
+    // 300 ms delay against toolbar flicker.
     toolbarTimerRef.current = setTimeout(() => {
       // Sticky pass-through keeps the top strip visible — it is the exit.
       if (stickyPassThroughRef.current) return;
@@ -443,27 +426,22 @@ const FloatingWindow = () => {
     setShowOpacitySlider(prev => !prev);
   };
 
-  // Manual title-bar drag. -webkit-app-region is dead on this transparent
-  // frameless window (E42, installed builds too), so track the pointer and
-  // stream window positions to main. Interactive islands (buttons, toolbar,
-  // opacity popup) are excluded so their clicks keep working.
+  // Manual title-bar drag: track the pointer and stream window positions to
+  // main (electron/ipc/floating-window.js). Interactive islands are excluded.
   const handleTitleBarMouseDown = (e) => {
     if (e.button !== 0) return;
     if (e.target.closest('button, .floating-toolbar, .opacity-popup, .refresh-popup')) return;
     e.preventDefault();
 
-    // Dragging the window means the watched region is about to change —
-    // stop the auto-refresh loop (user re-arms it after repositioning).
+    // Dragging stops the auto-refresh loop.
     setAutoRefresh(false);
     setShowRefreshPicker(false);
 
-    // Grab offset inside the window; window.screenX/Y and e.screenX/Y share the
-    // same DIP coordinate space, matching BrowserWindow.setBounds.
+    // Grab offset inside the window (DIP space, matching setBounds).
     const offsetX = e.screenX - window.screenX;
     const offsetY = e.screenY - window.screenY;
 
-    // Lock the size for the whole drag (fetched once): re-deriving it per frame
-    // accumulates fractional-DPI rounding and the window grows while dragging.
+    // Lock the size for the whole drag (fetched once).
     let dragSize = null;
     window.electron?.floatingWindow?.getBounds?.().then((b) => {
       if (b && Number.isFinite(b.width)) dragSize = { width: b.width, height: b.height };
@@ -476,8 +454,7 @@ const FloatingWindow = () => {
       if (raf) return;
       raf = requestAnimationFrame(() => {
         raf = 0;
-        // Hold moves until the locked size arrives (resolves within a frame or
-        // two) — a bare position update would re-round the size and drift it.
+        // Hold moves until the locked size arrives.
         if (pending && dragSize) {
           window.electron?.floatingWindow?.moveTo?.(pending.x, pending.y, dragSize.width, dragSize.height);
         }
@@ -492,9 +469,8 @@ const FloatingWindow = () => {
     window.addEventListener('mouseup', onUp);
   };
 
-  // Opacity is applied via CSS variable (--floating-opacity) so child panes stay
-  // opaque; the IPC call persists it window-locally so it survives relaunch
-  // and settings-changed broadcasts.
+  // Opacity is applied via --floating-opacity (child panes stay opaque) and
+  // persisted window-locally.
   const handleOpacityChange = async (e) => {
     const newOpacity = parseFloat(e.target.value);
     setFloatingOpacity(newOpacity);
@@ -511,14 +487,11 @@ const FloatingWindow = () => {
     }
   };
 
-  // Capture screen region that maps to this floating window's content area.
-  // Defined as a callback because the keyboard handler closes over it.
-  // keepDedup=true (auto-refresh) skips work on unchanged frames; manual
-  // captures (space/button/global hotkey) force a fresh translate.
+  // Capture the screen region under this window's content area.
+  // keepDedup=true (auto-refresh) skips unchanged frames.
   const captureAndTranslate = useCallback(async ({ keepDedup = false } = {}) => {
     try {
-      // A manual capture (button/Space/global hotkey) takes over — stop the
-      // auto-refresh loop instead of fighting it.
+      // A manual capture stops the auto-refresh loop.
       if (!keepDedup) setAutoRefresh(false);
       if (!contentRef.current) return;
 
@@ -541,14 +514,9 @@ const FloatingWindow = () => {
     }
   }, []);
 
-  // Auto-refresh: re-capture the region on a timer so a live-updating area
-  // (Teams captions, video subtitles) stays translated hands-free without the
-  // window ever taking focus. Flow per user spec: click the button → pick an
-  // interval → it starts; moving the window, a manual capture, or closing
-  // stops it (an explicit start each session, never auto-resumed). Silent
-  // dedupe in the pipeline means unchanged frames cost nothing and don't
-  // touch the UI. Intervals sized for OCR+LLM latency — 1.5s was faster than
-  // a full recognize+translate round trip.
+  // Auto-refresh: re-capture the region on a timer. Started explicitly each
+  // session; moving the window, a manual capture or closing stops it
+  // (docs/design/renderer.md §4).
   const AUTO_REFRESH_INTERVALS = [2, 3, 5, 10];
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [showRefreshPicker, setShowRefreshPicker] = useState(false);
@@ -584,8 +552,7 @@ const FloatingWindow = () => {
     setAutoRefresh(true);
   }, []);
 
-  // Global-hotkey re-capture: fires while another app holds focus, so the
-  // target never loses foreground (the whole point vs the in-window Space key).
+  // Global-hotkey re-capture: fires while another app holds focus.
   useEffect(() => {
     const off = window.electron?.floatingWindow?.onTriggerCapture?.(() => {
       captureAndTranslate({ keepDedup: false });
@@ -594,10 +561,9 @@ const FloatingWindow = () => {
   }, [captureAndTranslate]);
 
   const handleContentClick = useCallback((e) => {
-    // Any pass-through flavor: content clicks belong to the app below, never
-    // trigger a capture (the old accidental-recognition complaint).
+    // In any pass-through flavor content clicks belong to the app below.
     if (passThroughRef.current) return;
-    // Only fire toggle on bare-container clicks, not on child panes/text
+    // Only bare-container clicks toggle.
     if (
       e.target === e.currentTarget ||
       e.target.classList.contains('scattered-panes-container') ||
@@ -616,13 +582,8 @@ const FloatingWindow = () => {
     updateChildPanePosition(id, position);
   }, [updateChildPanePosition]);
 
-  // De-overlap pass: pane frames (padding/min-width/translated text) are
-  // bigger than the OCR line boxes they anchor to, so tightly stacked blocks
-  // produce unreadable overlaps. Once a batch settles (no pane pending or
-  // translating — sizes are locked then), measure the real rendered frames
-  // and let the layout policy (pane-layout.js: significant collisions only,
-  // minimal bidirectional shift, capped drift) decide the moves. Runs once
-  // per batch so it never fights the user's own drags.
+  // De-overlap pass: once a batch settles, measure the rendered frames and
+  // let floating/pane-layout.js decide the moves. Runs once per batch.
   const deoverlapKeyRef = useRef('');
   useEffect(() => {
     if (displayMode !== DISPLAY_MODE.SCATTERED || childPanes.length < 2) return;
@@ -649,7 +610,6 @@ const FloatingWindow = () => {
   }, [childPanes, displayMode, updateChildPanePosition]);
 
   // Double-click detaches a scattered pane into its own OS-level window.
-  // viewportPos comes from the child component's mouse handler.
   const handleChildPaneFreeze = useCallback(async (id, viewportPos) => {
     const pane = childPanes.find(p => p.id === id);
     if (!pane) return;
@@ -680,10 +640,8 @@ const FloatingWindow = () => {
       logger.debug('Created independent child window:', id);
     } else {
       logger.error('Failed to create child window:', result?.error);
-      // Falling back to internal freeze keeps the pane usable even when
-      // BrowserWindow creation fails (e.g. low memory). Frozen panes render in
-      // viewport space — pass the pane's viewport position, derived from the
-      // container offset when the drag handler didn't supply one.
+      // BrowserWindow creation failed: fall back to an internal freeze
+      // (viewport space).
       const contentRect = contentRef.current?.getBoundingClientRect();
       const fallbackViewportPos = viewportPos
         ? { x: viewportPos.viewportX, y: viewportPos.viewportY }
@@ -695,10 +653,7 @@ const FloatingWindow = () => {
   }, [childPanes, theme, removeChildPane, freezeChildPane]);
 
   // Sticky pass-through: content clicks fall through to the app below while
-  // the top strip stays clickable — the forwarded mousemove stream drives
-  // setIgnoreMouseEvents by cursor region. Unlike the Alt hold this needs no
-  // focus, so it survives the very click-through it exists for (manga flow:
-  // page the reader through the overlay, auto-refresh re-translates).
+  // the top strip stays clickable; needs no focus.
   const enterStickyPassThrough = useCallback(async () => {
     stickyPassThroughRef.current = true;
     passThroughRef.current = true;
@@ -738,8 +693,8 @@ const FloatingWindow = () => {
     }
   }, [enterStickyPassThrough, exitStickyPassThrough]);
 
-  // Region toggle: over the top strip → accept mouse (toolbar clickable),
-  // below it → ignore (clicks pass through). Only IPC on boundary crossings.
+  // Region toggle: over the top strip accept mouse, below it ignore. Only
+  // IPC on boundary crossings.
   useEffect(() => {
     if (!stickyPassThrough) return;
     const onMove = (e) => {
@@ -817,9 +772,8 @@ const FloatingWindow = () => {
 
   const isLoading = [STATUS.CAPTURING, STATUS.OCR_PROCESSING, STATUS.TRANSLATING].includes(status);
 
-  // Result-area badge, shown only where it carries information: auto mode
-  // (which way did the heuristic decide) and the forced-scattered fallback
-  // (engine gave no coordinates). A user-pinned mode needs no echo.
+  // Result-area badge: auto mode's decision and the forced-scattered
+  // fallback; a user-pinned mode shows none.
   const modeLabel = (m) => t(...(MODE_LABEL_KEYS[m] || MODE_LABEL_KEYS.auto));
   const modeChipText = !modeInfo
     ? ''
@@ -841,10 +795,9 @@ const FloatingWindow = () => {
       onMouseLeave={handleMouseLeaveWindow}
     >
       <div className="floating-top-area" onMouseDown={handleTitleBarMouseDown}>
-          {/* Mode segments (design A, user-picked over the dropdown): three
-              always-visible icons, single-select — no popup to fumble.
-              understand needs a chat/vision provider; listen is always there
-              but greyed until its models are downloaded in settings. */}
+          {/* Mode segments: three always-visible icons, single-select.
+              understand needs a chat / vision provider; listen is greyed until
+              its models are downloaded in settings. */}
           {(
             <div className="floating-mode-wrap">
               <button
@@ -877,15 +830,13 @@ const FloatingWindow = () => {
           )}
           {listenMode && (
             <span className="listen-topbar-status">
-              {/* Own element so a narrow window truncates the WORDS and never
-                  the meter next to them. */}
+              {/* Own element: a narrow window truncates the words, not the meter. */}
               <span className={`listen-status-text ${listen.ttsGated && listen.running ? 'gated' : ''}`}>
                 {listen.ttsGated && listen.running
                   ? t('floatingWindow.listenGate', '朗读中 · 暂停收音')
                   : t(`floatingWindow.listenStatus.${listen.sessionState}`, listen.sessionState)}
               </span>
-              {/* Fastest feedback the feature has: moves at the audio
-                  callback's rate, long before any text can appear. */}
+              {/* Level meter at the audio callback's rate. */}
               <ListenLevel levelRef={listen.levelRef} active={listen.running} gated={listen.ttsGated} />
             </span>
           )}
@@ -917,8 +868,7 @@ const FloatingWindow = () => {
                 >
                   <option value="system">{t('floatingWindow.listenSourceAll')}</option>
                   {/* The chosen program stays listed even when a refresh no
-                      longer sees it (paused, between tracks): a select whose
-                      value matches no option shows blank. */}
+                      longer sees it. */}
                   {listen.sources.processLoopback && listen.source.mode !== 'system'
                     && !listen.sources.sessions.some((x) => x.pid === listen.source.pid) && (
                     <option value={`${listen.source.mode}:${listen.source.pid}`}>
@@ -1171,8 +1121,7 @@ const FloatingWindow = () => {
               <div className="mode-indicator" title={modeChipTitle}>{modeChipText}</div>
             )}
             {translatedText}
-            {/* Folds open under the translation rather than opening a window of
-                its own — a result is never something you can act on again. */}
+            {/* Folds open under the translation. */}
             {aiResult && (
               <div className="floating-ai">
                 <div className="floating-ai-label">{aiResult.label}</div>

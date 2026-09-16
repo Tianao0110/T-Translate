@@ -14,10 +14,7 @@ export const defaultConfig = {
   ocr: { defaultEngine: 'llm-vision', windowsLanguage: 'zh-Hans' },
   ui: { theme: 'light', fontSize: 14 },
   logging: { level: 'info' },
-  // Only the global (OS-level) shortcuts are configurable. The in-app keys
-  // (translate/swap/clear/paste/copy) were editable in the UI but nothing read
-  // settings.shortcuts for them — they're hardcoded in the panels — so the
-  // rows were pure decoration and have been removed.
+  // Only the global (OS-level) shortcuts are configurable.
   shortcuts: {
     screenshot: 'Alt+Q',
     toggleWindow: 'Ctrl+Shift+W',
@@ -38,8 +35,8 @@ export const NAV_ITEMS = [
   { id: 'aiActions', icon: Sparkles, group: 'translation', keywords: ['ai', 'action', 'summarize', 'explain', 'import', 'prompt', 'AI', '动作', '总结', '讲解', '理解', '导入'] },
   { id: 'llm', icon: Cpu, group: 'system', keywords: ['llm', 'model', 'built-in', 'local', 'gguf', 'qwen', 'tengine', '内置', '模型', '本地', '大模型'] },
   { id: 'ocr', icon: Eye, group: 'system', keywords: ['ocr', 'recognize', 'screenshot', 'image', 'rapidocr', 'llm', '识别', '截图'] },
-  // 听 (recognition models) and 读 (read-aloud) live under one entry; the
-  // keyword halves still route a search to the right sub-page (index.jsx).
+  // Listen (recognition models) and speech (read-aloud) live under one entry;
+  // the keyword halves still route a search to the right sub-page (index.jsx).
   { id: 'audio', icon: AudioLines, group: 'system', keywords: ['audio', 'tts', 'speech', 'voice', 'volume', 'rate', '朗读', '语音', '语速', '音色', 'listen', 'asr', 'subtitle', 'caption', 'model', 'sensevoice', '听译', '字幕', '识别', '模型', '语音识别', '音频'] },
   { id: 'interface', icon: Palette, group: 'system', basic: true, keywords: ['theme', 'dark', 'light', 'font', 'appearance', '界面', '主题', '外观'] },
   { id: 'privacy', icon: Shield, group: 'system', keywords: ['privacy', 'security', 'mode', 'history', '隐私', '安全', '记录'] },
@@ -47,10 +44,7 @@ export const NAV_ITEMS = [
 ];
 
 export const DEFAULT_SETTINGS = {
-  // Theme/language. Previously only survived via electron-store's build-time
-  // defaults leaking through the top-level spread — a fresh install or a
-  // reset-all left this bucket undefined and InterfaceSection crashed reading
-  // .theme. Owned here now so the shape is always present.
+  // Theme / language; owned here so the shape is always present.
   interface: {
     theme: defaultConfig.ui.theme,
     language: '',
@@ -76,10 +70,8 @@ export const DEFAULT_SETTINGS = {
     sameLanguageBehavior: 'original',
   },
 
-  // Document translator. Single source of truth — DocumentTranslator reads
-  // this bucket at parse/translate time, so keys here must match what the
-  // component consumes (the pre-0.2.9 bucket drifted into three disjoint
-  // key sets and every control was dead).
+  // Document translator. Single source of truth: keys here must match what
+  // DocumentTranslator reads at parse / translate time.
   document: {
     maxCharsPerSegment: 800,
     concurrency: 2,
@@ -123,9 +115,8 @@ export const DEFAULT_SETTINGS = {
 
   shortcuts: { ...defaultConfig.shortcuts },
 
-  // saveHistory/maxHistory/cacheEnabled/maxCache were ghost keys: persisted
-  // for several versions but never consumed anywhere (history cap lives in
-  // translation-store.historyLimit, cache cap in the main-process stack).
+  // No history / cache keys here: the history cap lives in
+  // translation-store.historyLimit, the cache cap in the main-process stack.
   privacy: {
     autoDeleteDays: 0,
   },
@@ -149,13 +140,9 @@ export const DEFAULT_SETTINGS = {
     // downloadable medium variant. Applies immediately (silent update +
     // dot-path store write), like theme/language.
     modelTier: 'standard',
-    // OpenAI-compatible endpoint for the LLM-Vision OCR engine. Was the
-    // orphaned settings.connection.endpoint bucket (no UI); now a real field
-    // in the OCR panel's LLM-Vision group.
+    // OpenAI-compatible endpoint for the LLM-Vision OCR engine.
     llmEndpoint: defaultConfig.llm.endpoint,
-    // Optional explicit vision model. Blank = server's currently-loaded model;
-    // set it when LM Studio/Ollama holds several models so a non-vision one
-    // can't be picked (which silently drops the image → auto-degrade).
+    // Optional explicit vision model. Blank = server's currently-loaded model.
     llmModel: '',
   },
 
@@ -164,10 +151,8 @@ export const DEFAULT_SETTINGS = {
   // anything beyond that is a file the user chose to import.
   aiActions: {
     imported: [],
-    // When "Summarize" is offered. Shipped as an estimate and always meant to
-    // be tuned against real documents — now the user does the tuning.
-    // One number: the Latin-word bar derives from it, keeping the ratio the
-    // built-in default had (150 CJK characters ≈ 120 English words).
+    // When "Summarize" is offered. One number: the Latin-word bar derives
+    // from it (config/ai-actions.js).
     longFormChars: 150,
   },
 
@@ -181,11 +166,8 @@ export const DEFAULT_SETTINGS = {
   },
 };
 
-// 0.2.9 reshaped settings.document around the keys the translator actually
-// reads. Old keys (preserveFormatting/batchSize/maxParagraphLength/...) were
-// never consumed; batchMaxTokens belonged to a joined-batch design that was
-// never implemented. batchMaxSegments maps onto concurrency to keep the one
-// user intent that survives the redesign.
+// Pre-0.2.9 settings.document keys: batchMaxSegments maps onto concurrency,
+// the rest are dropped.
 const migrateDocumentSettings = (saved) => {
   const migrated = {
     ...DEFAULT_SETTINGS.document,
@@ -276,9 +258,7 @@ export const migrateOldSettings = (savedSettings) => {
     },
   };
 
-  // The old settings.connection bucket only ever fed the LLM-Vision OCR
-  // endpoint (its timeout/model were dead). Carry that one live value into
-  // ocr.llmEndpoint, preferring an explicit ocr.llmEndpoint if already set.
+  // Old settings.connection.endpoint -> ocr.llmEndpoint (explicit value wins).
   const legacyEndpoint = savedSettings.connection?.endpoint || savedSettings.endpoint;
   if (legacyEndpoint && !savedSettings.ocr?.llmEndpoint) {
     migrated.ocr = { ...migrated.ocr, llmEndpoint: legacyEndpoint };
@@ -293,22 +273,17 @@ export const migrateOldSettings = (savedSettings) => {
       providerConfigs: savedSettings.providers.configs,
     };
   }
-  // Drop the bucket unconditionally — old installs also carry an empty {}
-  // seeded by a former electron-store default, kept alive by the spread above.
+  // Drop the bucket unconditionally (old installs carry an empty one).
   delete migrated.providers;
 
-  // floatingWindow.lockTargetLang (retired 2026-07-10): ON meant "never flip
-  // zh<->en", which the unified behavior expresses as 'original'. OFF users
-  // get the new default ('original') rather than 'swap' — the flip is now
-  // opt-in via settings.translation.sameLanguageBehavior.
+  // Retired floatingWindow.lockTargetLang -> sameLanguageBehavior 'original'.
   if (savedSettings.floatingWindow?.lockTargetLang === true
       && !savedSettings.translation?.sameLanguageBehavior) {
     migrated.translation.sameLanguageBehavior = 'original';
   }
   delete migrated.floatingWindow.lockTargetLang;
 
-  // Pre-v0.2 flat selectionXxx -> selection nested object (only `enabled`
-  // survived; the other flat keys were dead and are no longer seeded).
+  // Pre-v0.2 flat selectionXxx -> selection nested object (only `enabled`).
   if (!savedSettings.selection || typeof savedSettings.selection !== 'object') {
     migrated.selection = {
       ...DEFAULT_SETTINGS.selection,
@@ -316,9 +291,7 @@ export const migrateOldSettings = (savedSettings) => {
     };
   }
 
-  // Legacy `settings.glass` bucket -> `floatingWindow`. Only `opacity` maps to a
-  // live key; the rest (width/height/fontSize/...) were dead for several
-  // versions. The old bucket is dropped so it never gets re-persisted.
+  // Legacy `settings.glass` bucket -> `floatingWindow` (only `opacity`).
   if (savedSettings.glass && typeof savedSettings.glass === 'object') {
     if (savedSettings.floatingWindow?.defaultOpacity === undefined &&
         typeof savedSettings.glass.opacity === 'number') {
@@ -327,15 +300,12 @@ export const migrateOldSettings = (savedSettings) => {
     delete migrated.glass;
   }
 
-  // 'paddle-ocr' engine id was removed from the registry; without this remap
-  // an old persisted value would leave OCR permanently failing (no fallback
-  // chain covers an unknown preferred engine).
+  // Retired 'paddle-ocr' engine id -> 'rapid-ocr'.
   if (migrated.ocr?.engine === 'paddle-ocr') {
     migrated.ocr.engine = 'rapid-ocr';
   }
 
-  // Dead keys from the pre-0.2.9 privacy plumbing; privacy.mode would
-  // otherwise round-trip through the settings.privacy save forever.
+  // Dead keys from the pre-0.2.9 privacy plumbing.
   delete migrated.privacyMode;
   if (migrated.privacy) delete migrated.privacy.mode;
 

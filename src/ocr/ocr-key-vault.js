@@ -1,8 +1,6 @@
-// Online-OCR API keys must live in safeStorage like provider keys, never in
-// the plaintext settings.ocr bucket. Every consumer of the bucket goes
-// through these helpers: encrypt-and-strip on save, decrypt-and-merge on load.
-// Vault key naming: ocr_<flatField> — the ocr_ prefix is what the offline
-// privacy gate in electron/ipc/secure-storage.js matches on.
+// Online-OCR API keys live in safeStorage, never in the plaintext
+// settings.ocr bucket: encrypt-and-strip on save, decrypt-and-merge on
+// load. Vault key naming: ocr_<flatField> (the offline gate matches the prefix).
 
 import createLogger from '../core/logger.js';
 
@@ -21,11 +19,9 @@ export const OCR_SECRET_FIELDS = [
 
 const vaultKey = (field) => `ocr_${field}`;
 
-// Returns { sanitized, failed }. sanitized is a copy safe to persist: secret
-// fields are stripped after a successful encrypt; cleared (empty) values also
-// delete the vault entry so a removed key cannot resurrect on next launch.
-// failed lists fields that could not be encrypted — they are still stripped
-// (plaintext is never written), the caller must surface the error.
+// Returns { sanitized, failed }. sanitized is a copy safe to persist (secret
+// fields stripped, cleared values delete the vault entry); failed lists
+// fields that could not be encrypted (still stripped).
 export async function encryptOcrSecrets(ocrSettings = {}) {
   const sanitized = { ...ocrSettings };
   const failed = [];
@@ -56,10 +52,8 @@ export async function encryptOcrSecrets(ocrSettings = {}) {
   return { sanitized, failed };
 }
 
-// Merges vault secrets into a copy of the bucket. An existing truthy bucket
-// value wins — that covers not-yet-migrated legacy plaintext. Decrypt
-// returning null (offline gate, DPAPI unavailable, no entry) leaves the
-// engine unconfigured, which is the correct failure mode.
+// Merges vault secrets into a copy of the bucket; an existing truthy bucket
+// value wins. A null decrypt leaves the engine unconfigured.
 export async function decryptOcrSecrets(ocrSettings = {}, context = 'ocr-config') {
   const merged = { ...ocrSettings };
   const ss = window.electron?.secureStorage;
@@ -77,10 +71,8 @@ export async function decryptOcrSecrets(ocrSettings = {}, context = 'ocr-config'
   return merged;
 }
 
-// One-shot migration of pre-0.3 plaintext keys out of settings.ocr. A field
-// is only stripped once its encrypt succeeded — on DPAPI-less machines legacy
-// plaintext keeps working (grandfathered), we just refuse to write new ones.
-// Idempotent: after a full migration no secret fields remain in the bucket.
+// One-shot migration of legacy plaintext keys out of settings.ocr; a field
+// is only stripped once its encrypt succeeded. Idempotent.
 export async function migrateLegacyOcrSecrets() {
   const store = window.electron?.store;
   if (!store?.get || !store?.set) return;

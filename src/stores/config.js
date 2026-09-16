@@ -30,10 +30,8 @@ const useConfigStore = create(
       // settings-changed — the pipeline reads it per capture.
       floatingDisplayMode: 'auto',
 
-      // Floating-window toggle for understanding-type AI actions. Neutral by
-      // construction: it decides nothing about behavior, it only lets the
-      // actions marked understandOnly appear — what those actions do is their
-      // prompt config, including any the user imports.
+      // Floating-window toggle for understanding-type AI actions: only lets
+      // the actions marked understandOnly appear.
       understandMode: false,
 
       setTargetLanguage: (lang) => set({ targetLanguage: lang }),

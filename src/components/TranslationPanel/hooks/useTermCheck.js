@@ -19,13 +19,13 @@ export default function useTermCheck(favorites, setTranslatedText, notify, t) {
 
     glossaryItems.forEach(fav => {
       if (!fav.sourceText || !fav.translatedText) return;
-      // '不再提示' persisted on the favorite itself (survives restart/export)
+      // "don't remind" is persisted on the favorite itself.
       if (fav.termNoRemind) return;
 
       const favSourceLower = fav.sourceText.toLowerCase().trim();
       const favTranslatedLower = fav.translatedText.toLowerCase().trim();
 
-      // Limit to short terms — multi-sentence glossary entries cause too many false positives
+      // Short terms only.
       if (favSourceLower.length <= 50 && favSourceLower.length >= 2) {
         if (sourceLower.includes(favSourceLower)) {
           // Surface only when the canonical translation is *missing* from the output
@@ -94,8 +94,7 @@ export default function useTermCheck(favorites, setTranslatedText, notify, t) {
   }, []);
 
   const alwaysUseTerm = useCallback((suggestion) => {
-    // suggestion.id IS the glossary favorite's id — persist the choice on it
-    // so it survives restarts and rides along with favorites export/import
+    // suggestion.id is the glossary favorite's id; the choice is persisted on it.
     useTranslationStore.getState().updateFavoriteItem(suggestion.id, { termNoRemind: true });
     notify(
       t('translation.termSet') + `: "${suggestion.originalTerm}" → "${suggestion.savedTranslation}"`,

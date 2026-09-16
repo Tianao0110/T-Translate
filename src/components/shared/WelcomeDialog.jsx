@@ -3,13 +3,8 @@ import { useTranslation } from 'react-i18next';
 import './welcome-dialog.css';
 
 /**
- * Shown once, on the first launch.
- *
- * It says what the app can do and where to start — it does not configure
- * anything. A first-run wizard that asks for an API key before the user knows
- * what they are buying into is the thing this deliberately is not; the setup
- * notice on the translate panel covers "you still need a provider", at the
- * moment it actually matters.
+ * Shown once, on the first launch: what the app can do and where to start.
+ * It configures nothing (docs/design/renderer.md §9).
  */
 const FEATURES = [
   { id: 'selection', Icon: MousePointerClick },

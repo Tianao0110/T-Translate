@@ -3,17 +3,9 @@ import { useCallback, useEffect, useState } from 'react';
 const STORE_KEY = 'onboarding';
 
 /**
- * What the user has already been shown.
- *
- * Lives in electron-store rather than the zustand persist, because it is
- * app-level state that the full settings reset clears along with everything
- * else, and that has nothing to do with translation content — a user who
- * clears their history should not be greeted by the welcome dialog again.
- *
- * Every read defaults to "already seen". A store that fails to answer must not
- * cause the welcome dialog to appear on someone's hundredth launch; showing a
- * hint one time too few is a non-event, one time too many is an annoyance the
- * user cannot stop.
+ * What the user has already been shown. Lives in electron-store (cleared
+ * by the full settings reset). Every read defaults to "already seen"
+ * (docs/design/renderer.md §9).
  */
 export default function useOnboarding() {
   const [state, setState] = useState(null);
@@ -22,9 +14,7 @@ export default function useOnboarding() {
     let cancelled = false;
     window.electron?.store?.get?.(STORE_KEY)
       .then((value) => { if (!cancelled) setState(value || { welcomeSeen: false, hints: {} }); })
-      // A store that cannot be read cannot be written either, so a hint shown
-      // now would come back on every launch with its dismiss button doing
-      // nothing. Treat everything as already seen.
+      // A store that cannot be read: treat everything as already seen.
       .catch(() => { if (!cancelled) setState({ welcomeSeen: true, hints: {}, unavailable: true }); });
     return () => { cancelled = true; };
   }, []);

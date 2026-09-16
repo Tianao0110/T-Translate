@@ -1,9 +1,6 @@
-// External TTS endpoint engine — an OpenAI-compatible `/v1/audio/speech`
-// server (local IndexTTS / GPT-SoVITS / CosyVoice / kokoro-fastapi wrappers,
-// or OpenAI itself). The request itself runs in the main process through the
-// translation stack (system proxy, vaulted key, offline gate); this side only
-// asks for bytes and plays them. Available while a server address is
-// configured and the privacy mode is not offline.
+// External TTS endpoint engine (OpenAI-compatible `/v1/audio/speech`). The
+// request runs in the main process through the translation stack; this side
+// only asks for bytes and plays them.
 
 import stackClient from '../translation/stack-client.js';
 import { BaseTTSEngine, TTS_STATUS } from './base.js';
@@ -89,7 +86,7 @@ export class EndpointTTSEngine extends BaseTTSEngine {
     this._ctx = ctx;
     let buffer;
     try {
-      // decodeAudioData detaches the buffer; copy so a retry could reuse it.
+      // decodeAudioData detaches the buffer; copy for retries.
       buffer = await ctx.decodeAudioData(audio.slice(0));
     } catch (e) {
       throw new Error(`ENDPOINT_FAILED:undecodable audio (${e?.message || e})`);

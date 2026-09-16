@@ -1,7 +1,5 @@
-// Shared persistence for translation-provider settings. Both ProviderSettings
-// (when mounted) and SettingsPanel's unified save go through here, so a save
-// triggered from any tab writes provider data completely instead of the old
-// activeSection-routed path that silently dropped it.
+// Shared persistence for translation-provider settings, used by
+// ProviderSettings and SettingsPanel's unified save alike.
 
 import stackClient from '../../translation/stack-client.js';
 import createLogger from '../../core/logger.js';
@@ -14,9 +12,8 @@ export const secureStorage = {
       const value = await window.electron.secureStorage.decrypt(key, context ? { context } : undefined);
       if (value) return value;
 
-      // One-shot migration: pull legacy plaintext from localStorage into
-      // safeStorage, then erase the plaintext. If migration fails we still
-      // wipe the legacy entry so plaintext never lingers.
+      // One-shot migration of legacy plaintext into safeStorage; the
+      // plaintext is erased either way.
       const legacy = localStorage.getItem(`__secure_${key}`);
       if (legacy) {
         try {
@@ -43,9 +40,7 @@ export const secureStorage = {
 };
 
 // Encrypts secret fields, strips them from the persisted config, writes both
-// dot-paths, and reloads the (main-window) translation service. All-or-nothing:
-// if any encrypt fails we abort before touching disk so a key can never be
-// silently dropped while the save reports success.
+// dot-paths, and reloads the translation service. All-or-nothing.
 // Returns { ok, sanitizedConfigs }.
 export async function persistProviderData({ providers, providerConfigs, allProvidersMeta }) {
   const sanitized = {};
@@ -87,10 +82,7 @@ export async function persistProviderData({ providers, providerConfigs, allProvi
     await window.electron.store.set('settings.translation.providerConfigs', sanitized);
   }
 
-  // Main-process stack re-reads store + vault itself — no plaintext configs
-  // travel back over IPC, and all three windows are served by the same reload
-  // (the old per-window broadcast survives only for UI-settings sync, which
-  // SettingsPanel's unified save and sync-to-electron still drive).
+  // The main-process stack re-reads store + vault itself.
   await stackClient.reload();
 
   return { ok: true, sanitizedConfigs: sanitized };

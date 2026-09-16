@@ -45,9 +45,8 @@ const STATUS = {
   SKIPPED: 'skipped',
 };
 
-// Settings are read at action time (mount/parse/translate) rather than
-// subscribed: the settings panel persists to electron-store, and a fresh
-// read per action stays in sync without a remount or IPC listener.
+// Settings are read at action time (mount / parse / translate), not
+// subscribed. Design notes: docs/design/renderer.md §5.
 const DOC_SETTINGS_DEFAULTS = {
   maxCharsPerSegment: 800,
   concurrency: 2,
@@ -91,8 +90,7 @@ function saveProgress(fp, segments, sLang, tLang, notes, digest, digestWhole) {
     const data = { ts: Date.now(), sLang, tLang,
       segs: segments.filter(s => s.status === STATUS.COMPLETED).map(s => ({ id: s.id, t: s.translated }))
     };
-    // Explanations ride the same blob: the per-paragraph pass behind them is
-    // paid model calls — losing it on close wastes real work.
+    // Explanations ride the same blob.
     if (notes && Object.keys(notes).length) data.notes = notes;
     if (digest) {
       data.digest = digest;
@@ -112,9 +110,8 @@ function loadProgress(fp) {
   } catch { return null; }
 }
 
-// loadProgress only ever cleans the key of a file the user re-opens;
-// abandoned files would pile up against the ~5MB localStorage quota until
-// saveProgress starts failing silently.
+// Expired progress blobs are cleaned once per mount (loadProgress only
+// cleans the file being re-opened).
 function sweepExpiredProgress() {
   try {
     const now = Date.now();
@@ -194,9 +191,8 @@ const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate,
 
             </>
           )}
-          {/* Outside the status branches on purpose: an explanation is built
-              from the source paragraph, so needing one has nothing to do with
-              whether the translation has arrived. */}
+          {/* Outside the status branches: an explanation is built from the
+              source paragraph. */}
           {canExplain && segment.status !== STATUS.SKIPPED && (
             <button
               className={`seg-btn ${aiNote && !noteFolded ? 'has-note' : ''}`}
@@ -269,8 +265,7 @@ const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate,
         </div>
       )}
 
-      {/* Last, so opening it never pushes the source or the translation off
-          the spot the reader is looking at. */}
+      {/* Last, below the source and the translation. */}
       {aiNote && !noteFolded && (
         <div className="segment-ai-note">
           <div className="segment-ai-label">
@@ -334,8 +329,7 @@ const DocumentTranslator = ({
   const { t } = useTranslation();
   const [confirm, confirmDialog] = useConfirm();
   
-  // Document-translator keeps its own language state, seeded from the
-  // main UI but free to diverge.
+  // Own language state, seeded from the main UI.
   const [sourceLang, setSourceLang] = useState(initialSourceLang);
   const [targetLang, setTargetLang] = useState(initialTargetLang);
   
@@ -344,9 +338,8 @@ const DocumentTranslator = ({
   const recordLanguageUse = useTranslationStore(state => state.recordLanguageUse);
   const recordLanguageBrowse = useTranslationStore(state => state.recordLanguageBrowse);
 
-  // Source allows auto; target does not.
-  // Same catalogue as the main panel, custom entries included — a language the
-  // user added is a language they expect to see everywhere.
+  // Source allows auto; target does not. Same catalogue as the main panel,
+  // custom entries included.
   const allLanguages = useMemo(() => mergeLanguages(LANGUAGES, customLanguages), [customLanguages]);
   const targetLanguages = useMemo(() => allLanguages.filter(l => l.code !== 'auto'), [allLanguages]);
   const sourceLanguages = allLanguages;
@@ -386,18 +379,15 @@ const DocumentTranslator = ({
   const [useGlossary, setUseGlossary] = useState(true);
   
   const getGlossaryTerms = useTranslationStore(state => state.getGlossaryTerms);
-  // Scalar selector: only the count decides whether the check is offered, and
-  // returning the array itself would hand back a new one on every render.
+  // Scalar selector: only the count decides whether the check is offered.
   const glossaryCount = useTranslationStore(
     state => state.favorites.filter(f => f.folderId === 'glossary').length
   );
   const translationMode = useTranslationStore(state => state.translationMode);
 
   // ===== AI actions on a document =====
-  //
-  // The shared hook is built around one active passage, so only the capability
-  // probe and the availability filter come from it; the notes themselves live
-  // in use-segment-notes, which keeps many alive at once.
+  // Capability probe and availability filter from the shared hook; the notes
+  // themselves live in use-segment-notes.
   const { capabilities, availableActions } = useAiActions('document', null);
   const noteError = useCallback(
     (error) => notify(error || t('aiActions.failed'), 'error'),
@@ -409,11 +399,9 @@ const DocumentTranslator = ({
   } = useSegmentNotes({ capabilities, sourceLang, targetLang, onError: noteError });
   const [digest, setDigest] = useState(null);
   const [digestRunning, setDigestRunning] = useState(false);
-  // True once the notes the digest was built from covered the whole document —
-  // the panel must not keep saying "only the paragraphs you opened" when it did.
+  // True once the notes the digest was built from covered the whole document.
   const [digestWholeDoc, setDigestWholeDoc] = useState(false);
-  // Ref mirrors for the beforeunload flush, which must read the latest notes
-  // without re-registering its listener per note.
+  // Ref mirrors for the beforeunload flush.
   const aiNotesRef = useRef(aiNotes);
   useEffect(() => { aiNotesRef.current = aiNotes; }, [aiNotes]);
   const digestRef = useRef({ content: null, whole: false });
@@ -423,8 +411,7 @@ const DocumentTranslator = ({
   // { fixable, review, checked, applied } from the glossary pass, or null.
   const [termReport, setTermReport] = useState(null);
 
-  // The document surface has no understanding switch — asking about a
-  // paragraph IS the request, so it opts in on the action's behalf.
+  // The document surface has no understanding switch; it opts in itself.
   const documentActions = useMemo(
     () => availableActions({ understandMode: true, text: 'x' }),
     [availableActions]
@@ -432,21 +419,18 @@ const DocumentTranslator = ({
   const canExplain = documentActions.some((a) => a.id === 'explain');
   const noteCount = Object.keys(aiNotes).length;
 
-  // Paragraphs an explanation could be built from. Skipped ones were filtered
-  // out of translation (page numbers, code blocks) and have nothing to explain.
+  // Paragraphs an explanation could be built from (skipped ones excluded).
   const explainable = useMemo(
     () => segments.filter((s) => s.status !== STATUS.SKIPPED && String(s.original || '').trim()),
     [segments]
   );
 
-  // notesOverride: the batch pass hands its own result in, because its notes
-  // have not reached this closure through state yet.
+  // notesOverride: the batch pass hands its own result in.
   const runDigest = useCallback(async (wholeDoc = false, notesOverride = null) => {
     const action = getAiAction('digest');
     if (!action || digestRunning) return false;
     const source = notesOverride || aiNotes;
-    // Document order, not the order they were opened — a note reads as a walk
-    // through the document.
+    // Document order, not the order they were opened.
     const ordered = segments
       .filter((seg) => source[seg.id])
       .map((seg, i) => `${i + 1}. ${source[seg.id]}`)
@@ -473,9 +457,7 @@ const DocumentTranslator = ({
     }
   }, [digestRunning, segments, aiNotes, sourceLang, targetLang, capabilities, notify, t]);
 
-  // One button for the whole thing: explain every paragraph, then summarize
-  // those explanations. The per-paragraph pass is what makes the summary
-  // affordable — the model never sees the full document at once.
+  // Explain every paragraph, then summarize those explanations.
   const summarizeDocument = useCallback(async () => {
     const todo = explainable.filter((s) => !aiNotes[s.id]).length;
     if (todo > 0) {
@@ -506,16 +488,9 @@ const DocumentTranslator = ({
     }
   }, [explainable, explainAll, concurrency, confirm, runDigest, notify, t, document]);
 
-  // ===== Glossary consistency =====
-  //
-  // Scope is one case only: a glossary term the model left in the source
-  // language. A term rendered as some other word is not reported at all — see
-  // document/term-consistency.js for why that is a product decision, not an
-  // oversight.
-  //
-  // `fixes` survives the modal closing: the marks in the paragraphs are what
-  // the reader interacts with afterwards, and each one has to know its own
-  // before-text to undo.
+  // ===== Glossary consistency (document/term-consistency.js) =====
+  // `fixes` survives the modal closing: the marks in the paragraphs need
+  // their before-text to undo.
   const [termModal, setTermModal] = useState(null);
   const [termFixes, setTermFixes] = useState([]);
   const [undoneTerms, setUndoneTerms] = useState(() => new Set());
@@ -547,9 +522,8 @@ const DocumentTranslator = ({
     }), 'success');
   }, [termModal, notify, t]);
 
-  // Undo one substitution where it happened. The paragraph is rebuilt from its
-  // untouched text with the remaining terms re-applied, so a paragraph that had
-  // three of them keeps the other two exactly as they were.
+  // Undo one substitution: the paragraph is rebuilt from its untouched text
+  // with the remaining terms re-applied.
   const undoOneTerm = useCallback((segmentId, from) => {
     const fix = termFixes.find((f) => f.segmentId === segmentId);
     if (!fix) return;
@@ -565,9 +539,7 @@ const DocumentTranslator = ({
     setTermPopover(null);
   }, [termFixes, undoneTerms]);
 
-  // segmentId -> what to mark and what each mark stands for. Both sides are
-  // marked: the English in the source, the substituted Chinese in the
-  // translation, so the pair is visible as a pair.
+  // segmentId -> what to mark and what each mark stands for, on both sides.
   const termMarks = useMemo(() => {
     if (!termFixes.length) return null;
     const map = {};
@@ -593,9 +565,8 @@ const DocumentTranslator = ({
     setTermPopover({ segmentId, from: pair.from, to: pair.to, x: rect.left, y: rect.bottom + 6 });
   }, [termMarks]);
 
-  // privacyMode/useCache no longer travel from here — the main-process stack
-  // facade injects the live mode into every request (renderer values are
-  // discarded by design). translationMode stays for the OCR allowlist below.
+  // privacyMode / useCache are injected by the main-process facade;
+  // translationMode stays for the OCR allowlist below.
   const buildTranslateOptions = () => ({
     glossaryTerms: useGlossary ? getGlossaryTerms(targetLang) : [],
   });
@@ -610,11 +581,8 @@ const DocumentTranslator = ({
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   
-  // Search & replace
-  // -1 in matchIndex means "not yet positioned" — Enter / Next moves to 0,
-  // Prev moves to last. matchIds is derived from query+segments via useMemo
-  // (see below), so it stays in sync without resetting the cursor when
-  // segments stream in during translation.
+  // Search: -1 in matchIndex means "not yet positioned"; matchIds is derived
+  // from query + segments below.
   const [searchQuery, setSearchQuery] = useState('');
   const [searchMatchIndex, setSearchMatchIndex] = useState(-1);
   
@@ -626,8 +594,7 @@ const DocumentTranslator = ({
   const [pendingFile, setPendingFile] = useState(null);
   const [password, setPassword] = useState('');
   
-  // Seed concurrency + display style from settings once per mount; parse-time
-  // and translate-time values are re-read fresh in loadFile/startTranslation.
+  // Seeded from settings once per mount; re-read in loadFile / startTranslation.
   useEffect(() => {
     let alive = true;
     readDocumentSettings().then((ds) => {
@@ -637,7 +604,6 @@ const DocumentTranslator = ({
     });
     return () => { alive = false; };
   }, []);
-
 
   // Drop-zone refs
   const dropZoneRef = useRef(null);
@@ -682,8 +648,7 @@ const DocumentTranslator = ({
     return () => clearInterval(timer);
   }, [isTranslating, startTime, isPaused]);
 
-  // Pure derivation so live segment updates (mid-translation) don't fight the
-  // cursor — recomputes ids without touching searchMatchIndex.
+  // Recomputes ids without touching searchMatchIndex.
   const searchMatchIds = useMemo(() => {
     if (!searchQuery) return [];
     const query = searchQuery.toLowerCase();
@@ -693,8 +658,7 @@ const DocumentTranslator = ({
   }, [searchQuery, segments]);
   const searchMatchCount = searchMatchIds.length;
 
-  // Only reset the cursor when the query itself changes. Streaming segment
-  // updates leave the cursor where the user put it.
+  // Reset the cursor only when the query itself changes.
   useEffect(() => {
     setSearchMatchIndex(-1);
   }, [searchQuery]);
@@ -703,14 +667,10 @@ const DocumentTranslator = ({
   const segmentsRef = useRef(segments);
   useEffect(() => { segmentsRef.current = segments; }, [segments]);
 
-  // Persist progress as it accumulates. Pre-0.2.9 this only fired after a
-  // run finished, so a crash or quit mid-translation lost the whole run
-  // (the L2 disk cache holds ~200 entries — no safety net for big docs).
-  // Throttled so fast providers don't stringify the list per completion.
+  // Persist progress as it accumulates (throttled).
   const lastSaveRef = useRef(0);
-  // True once this document session held output while in secure mode. The gate
-  // must outlive the mode: segment state still holds secure-era text after the
-  // user leaves secure, so one write then would flush it to disk anyway.
+  // True once this document session held output in secure mode; outlives
+  // the mode.
   const secureTaintRef = useRef(false);
   useEffect(() => {
     if (!fileFingerprint.current) return;
@@ -722,14 +682,13 @@ const DocumentTranslator = ({
     }
     if (secureTaintRef.current) return;
     const now = Date.now();
-    // A batch explain drops notes as fast as translation drops segments —
-    // same throttle, or a long document stringifies the blob per note.
+    // Same throttle for notes.
     if ((isTranslating || aiBatch) && now - lastSaveRef.current < 3000) return;
     lastSaveRef.current = now;
     saveProgress(fileFingerprint.current, segments, sourceLang, targetLang, aiNotes, digest, digestWholeDoc);
   }, [stats.completed, stats.edited, isTranslating, segments, sourceLang, targetLang, aiNotes, digest, digestWholeDoc, aiBatch, translationMode]);
 
-  // Crash/quit safety net — synchronous flush of whatever completed.
+  // Synchronous flush of whatever completed.
   useEffect(() => {
     const flush = () => {
       if (translationMode === PRIVACY_MODES.SECURE || secureTaintRef.current) return;
@@ -750,8 +709,7 @@ const DocumentTranslator = ({
   // One-time cleanup of expired progress blobs.
   useEffect(() => { sweepExpiredProgress(); }, []);
 
-  // Ctrl+F toggles in-document search (visibility-guarded: the component
-  // stays mounted behind other tabs).
+  // Ctrl+F toggles in-document search (visibility-guarded).
   useVisibleHotkey(
     rootRef,
     (e) => (e.ctrlKey || e.metaKey) && e.key === 'f',
@@ -803,8 +761,7 @@ const DocumentTranslator = ({
         },
         ocrRecognize: async (imageData) => {
           try {
-            // Scanned-page OCR runs in the main-process stack; the privacy
-            // mode's engine allowlist is injected there, not passed from here.
+            // Scanned-page OCR runs in the main-process stack.
             return await translationService.ocr.recognize(imageData);
           } catch {
             return { success: false, error: 'OCR unavailable' };
@@ -828,13 +785,11 @@ const DocumentTranslator = ({
         });
         setSegments(result.segments);
         setOutline(result.outline || []);
-        // Notes are keyed by segment id and ids restart at 0, so a new
-        // document would inherit the previous one's explanations.
+        // Notes are keyed by segment id; a new document starts clean.
         resetNotes();
         setDigest(null);
-        // A fresh parse lifts the secure-mode taint — but secure-era text also
-        // survives in the in-memory translation cache, and a cache hit would
-        // put it straight back into persistable state. Both go together.
+        // A fresh parse lifts the secure-mode taint and drops the in-memory
+        // translation cache with it.
         if (secureTaintRef.current) {
           translationCache.current.clear();
           secureTaintRef.current = false;
@@ -846,8 +801,7 @@ const DocumentTranslator = ({
         setStartTime(null);
         setElapsedTime(0);
         
-        // Check for resumable progress. A blob holding only explanations (the
-        // reader explained without translating) is still worth offering.
+        // Check for resumable progress (explanations alone count).
         const saved = loadProgress(fingerprint);
         const savedNoteCount = saved?.notes ? Object.keys(saved.notes).length : 0;
         if (saved && (saved.segs.length > 0 || savedNoteCount > 0 || saved.digest)
@@ -936,11 +890,8 @@ const DocumentTranslator = ({
     e.target.value = null;
   }, [loadFile]);
 
-  // "Open with T-Translate" hand-off from MainWindow — loads exactly like a
-  // picked file (password prompts, scanned-page OCR and progress restore all
-  // ride the same path). Consumed-callback clears the parent slot so the same
-  // File object cannot re-trigger. Deliberately keyed on externalFile alone:
-  // loadFile's identity churns with settings and must not re-run the load.
+  // "Open with T-Translate" hand-off from MainWindow: loads like a picked
+  // file. Keyed on externalFile alone (docs/design/renderer.md §5).
   const externalFileRef = useRef(null);
   useEffect(() => {
     if (!externalFile || externalFileRef.current === externalFile) return;
@@ -1009,11 +960,8 @@ const DocumentTranslator = ({
     }
   };
 
-  // Worker pool over single-segment translation. Each segment gets its own
-  // success/error state, so a failed item can't masquerade as completed the
-  // way joined-batch responses could. Concurrency stays low by default:
-  // local LLMs serialize on the GPU, so more in-flight calls only add
-  // queueing (same calibration as pipeline.js scattered mode).
+  // Worker pool over single-segment translation; each segment gets its own
+  // success / error state.
   const translateWithPool = async (toTranslate, poolSize) => {
     let cursor = 0;
     const worker = async () => {
@@ -1069,9 +1017,7 @@ const DocumentTranslator = ({
     }
   };
 
-  // Pause / resume. The elapsed timer derives from startTime, so resuming
-  // shifts the epoch forward by the paused span — otherwise pause time
-  // counts as translation time.
+  // Pause / resume: resuming shifts the timer epoch by the paused span.
   const pausedAtRef = useRef(null);
   const togglePause = () => {
     const next = !pauseRef.current;
@@ -1178,7 +1124,6 @@ const DocumentTranslator = ({
     if (text) { navigator.clipboard.writeText(text); notify?.(t('documentTranslator.notify.copied'), 'success'); }
   }, [notify, t]);
 
-
   // Restore progress
   const restoreProgress = useCallback(() => {
     if (!pendingRestore) return;
@@ -1192,8 +1137,7 @@ const DocumentTranslator = ({
       }
       return s;
     }));
-    // Notes and digest come back with the translations (seed keeps any note
-    // the reader already made in this session).
+    // Notes and digest come back with the translations.
     seedNotes(pendingRestore.notes);
     if (typeof pendingRestore.digest === 'string' && pendingRestore.digest && !digest) {
       setDigest(pendingRestore.digest);
@@ -1462,8 +1406,7 @@ const DocumentTranslator = ({
                 <span>{t('documentTranslator.newDocument')}</span>
               </button>
               
-              {/* Consolidate the explanations collected so far. Two is where
-                  it starts being worth a round trip — one note IS the note. */}
+              {/* Consolidate the explanations collected so far (two or more). */}
               {noteCount >= 2 && (
                 <button
                   className="dt-btn"
@@ -1476,8 +1419,7 @@ const DocumentTranslator = ({
                 </button>
               )}
 
-              {/* One button for the whole document: explain every paragraph,
-                  then summarize those explanations. */}
+              {/* Explain every paragraph, then summarize those explanations. */}
               {canExplain && explainable.length > 0 && (
                 aiBatch ? (
                   <button
@@ -1502,8 +1444,8 @@ const DocumentTranslator = ({
                 )
               )}
 
-              {/* Glossary consistency — no model involved, so it is offered
-                  whenever there are terms and something translated to check. */}
+              {/* Glossary consistency: offered whenever there are terms and
+                  something translated to check. */}
               {glossaryCount > 0 && stats.completed > 0 && (
                 <button
                   className="dt-btn"
@@ -1774,8 +1716,7 @@ const DocumentTranslator = ({
                     <div className="dt-digest-head">
                       <ClipboardList size={13} />
                       <span>{t('aiActions.digest.name')}</span>
-                      {/* Say plainly what this covers — it is a note on the
-                          paragraphs the reader opened, not on the document. */}
+                      {/* What the digest covers. */}
                       <span className="dt-digest-scope">
                         {digestWholeDoc
                           ? t('documentTranslator.digestScopeAll', { count: noteCount })
@@ -1994,10 +1935,8 @@ const DocumentTranslator = ({
               <Lock size={24} />
               <h3>{t('documentTranslator.password.title')}</h3>
             </div>
-            {/* Filename is attacker-controlled (Explorer right-click opens any
-                file, name and all). Render it as a React child — never through
-                dangerouslySetInnerHTML — so a name like `<img onerror=…>.pdf`
-                is escaped instead of executed. */}
+            {/* Filename is attacker-controlled: rendered as a React child,
+                never through dangerouslySetInnerHTML. */}
             <p className="password-modal-desc">
               {t('documentTranslator.password.descBefore')}
               <strong>{pendingFile?.name}</strong>
@@ -2034,8 +1973,7 @@ const DocumentTranslator = ({
       {termModal && (
         <div className="password-modal-overlay" onClick={() => setTermModal(null)}>
           <div className="password-modal dt-term-modal" onClick={e => e.stopPropagation()}>
-            {/* The list IS the explanation — a reader who opened "check terms"
-                already knows what they asked for. */}
+            {/* The list is the explanation. */}
             <div className="password-modal-header">
               <BookMarked size={24} />
               <h3>{t('documentTranslator.terms.check')}</h3>
@@ -2068,8 +2006,7 @@ const DocumentTranslator = ({
         </div>
       )}
 
-      {/* Anchored to the mark that was clicked: what the word was, and a way
-          back. Fixed positioning so a scrolled list cannot drag it away. */}
+      {/* Anchored to the mark that was clicked; fixed positioning. */}
       {termPopover && (
         <>
           <div className="dt-term-popover-scrim" onClick={() => setTermPopover(null)} />

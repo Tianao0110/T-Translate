@@ -42,8 +42,7 @@ export default function useStyleRewrite(currentTranslation, addStyleVersion, not
         styleStrength
       );
 
-      // Privacy fields no longer travel from call sites — the main-process
-      // facade injects the live mode into every stack request.
+      // Privacy fields are injected by the main-process facade.
       const result = await translationService.chatCompletion([
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },

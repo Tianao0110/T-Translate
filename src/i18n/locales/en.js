@@ -1276,8 +1276,7 @@ const en = {
     noTextRecognized: "(No text recognized)",
     noValidTextRecognized: "(No valid text recognized)"
   },
-  // Single block — a duplicate key here silently overrides the earlier one
-  // (the parser's epubNo* lookups were dead for several versions).
+  // Single block — a duplicate key here silently overrides the earlier one.
   docParser: {
     emptySegment: "Empty segment", tooShort: "Too short", numbersOnly: "Numbers only",
     codeBlock: "Code block", alreadyTargetLang: "Already in target language", containsKeyword: "Contains keyword",

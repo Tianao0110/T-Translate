@@ -1,35 +1,23 @@
-// Listen-translate session state machine for the floating window.
-//
-// Capture is NOT here any more (v0.4.1): the native WASAPI layer inside the
-// audio worker pulls 16 kHz mono float32 straight into the VAD, which removed
-// this file's getDisplayMedia call, its 48k→16k resampler, its PCM streaming,
-// and the device-loss retry loop (the audio client reports an invalidated
-// device explicitly, so the worker rebuilds it and just says so).
-//
-// What is left: session control, finals/partial state, the capture level fed
-// from the worker, per-final translation through the main-process stack
-// (privacy injected there), and SRT export assembly.
+// Listen-translate session state machine for the floating window: session
+// control, finals / partial state, the capture level fed from the worker,
+// and SRT export assembly. Capture and translation live in the main process.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { normalizeDraftCase } from '../../listen/listen-text.js';
 
-// On-screen scrollback. Small on purpose: every kept segment is live DOM, and
-// nobody scrolls back an hour in a subtitle overlay.
+// On-screen scrollback (live DOM).
 const MAX_SEGMENTS = 100;
 
-// Source-list cadence. The picker can only show programs that already opened
-// an audio stream, so it is refreshed in a burst right after a session starts
-// (pressing play usually comes next), then slowly, and not at all once the
-// window has been left alone — a hover on the toolbar wakes it up again.
+// Source-list cadence: a burst right after a session starts, then slowly,
+// then not at all until a hover on the toolbar.
 const SOURCES_BURST_MS = 10000;
 const SOURCES_BURST_EVERY_MS = 2500;
 const SOURCES_EVERY_MS = 8000;
 const SOURCES_IDLE_EVERY_MS = 4000;
 const SOURCES_STOP_AFTER_MS = 180000;
 
-// Translation, the session transcript and the subtitle file are the main
-// process's (listen/listen-translator.js): this hook shows a 100-line
-// window of finals with whatever translation has arrived for each.
+// Translation, transcript and subtitle file are the main process's
+// (listen/listen-translator.js); this hook shows a window of finals.
 export default function useListenSession({ active, onAutosaved }) {
   const [sessionState, setSessionState] = useState('idle');
   const [running, setRunning] = useState(false);
@@ -51,16 +39,13 @@ export default function useListenSession({ active, onAutosaved }) {
   const engineReadyRef = useRef(false);
   const errorLatchRef = useRef(false);
   const pendingRestartRef = useRef(false);
-  // 'source-gone' is followed within milliseconds by 'listening' (the worker
-  // re-opens whole-system capture in place); hold the notice up long enough
-  // to be read.
+  // 'source-gone' is followed within milliseconds by 'listening'; hold the
+  // notice up long enough to be read.
   const sourceGoneUntilRef = useRef(0);
   const langRef = useRef(lang);
   const targetLangRef = useRef(targetLang);
-  // {mode:'system'|'include'|'exclude', pid, name} — which sound to listen to.
-  // Deliberately NOT persisted: a pid is only meaningful while that program is
-  // running, and silently listening to whatever inherited the number next
-  // launch would be worse than starting from "whole system" every time.
+  // {mode:'system'|'include'|'exclude', pid, name} — which sound to listen
+  // to. Not persisted (a pid is only meaningful while that program runs).
   const [source, setSourceState] = useState({ mode: 'system', pid: 0, name: '' });
   const sourceRef = useRef(source);
   // What this machine can do + which programs are currently making sound.
@@ -82,10 +67,8 @@ export default function useListenSession({ active, onAutosaved }) {
     setPartial('');
   }, []);
 
-  // Mid-session switch: the worker restarts with the new config. The main
-  // process files the finals so far and the view starts over, exactly as
-  // stop + start would — the new worker's clock starts at zero, so old and
-  // new lines could not share a timeline anyway.
+  // Mid-session switch: the worker restarts with the new config, the main
+  // process files the finals so far and the view starts over.
   const restartSession = useCallback(() => {
     resetView();
     pendingRestartRef.current = true;
@@ -98,8 +81,7 @@ export default function useListenSession({ active, onAutosaved }) {
     setLangState(value);
     langRef.current = value;
     try { localStorage.setItem('listenLang', value); } catch { /* storage off */ }
-    // Language switch mid-session restarts the worker (the language is baked
-    // into the recognizer config); capture restarts with it.
+    // Language switch mid-session restarts the worker.
     bumpSourcesActivity();
     if (runningRef.current) restartSession();
   }, [bumpSourcesActivity, restartSession]);
@@ -118,8 +100,7 @@ export default function useListenSession({ active, onAutosaved }) {
   const setSource = useCallback((next) => {
     const mode = ['system', 'include', 'exclude'].includes(next?.mode) ? next.mode : 'system';
     const pid = Number.isInteger(next?.pid) && next.pid > 0 ? next.pid : 0;
-    // A pid carried under 'system' is a contradiction waiting to be read by
-    // the next person: whole-system capture targets no process at all.
+    // Whole-system capture carries no pid.
     const value = mode === 'system'
       ? { mode: 'system', pid: 0, name: '' }
       : { mode, pid, name: typeof next?.name === 'string' ? next.name : '' };
@@ -239,8 +220,7 @@ export default function useListenSession({ active, onAutosaved }) {
     const offAutosaved = bridge.onAutosaved?.((result) => onAutosavedRef.current?.(result));
 
     const offPartial = bridge.onPartial((text) => setPartial(normalizeDraftCase(text || '')));
-    // Level arrives from the worker at ~12/s and lands in a ref: the meter
-    // paints itself from a rAF loop, so this never re-renders the transcript.
+    // Level lands in a ref; the meter paints itself from a rAF loop.
     const offLevel = bridge.onLevel?.((value) => {
       levelRef.current = typeof value === 'number' ? value : 0;
     });
@@ -262,9 +242,7 @@ export default function useListenSession({ active, onAutosaved }) {
     };
   }, [active, stop]);
 
-  // A program that starts playing after the session began must still be
-  // pickable (switching mid-session is supported), hence the running-state
-  // schedule; see the SOURCES_* constants for the cadence.
+  // Source refresh schedule while running (SOURCES_* constants).
   useEffect(() => {
     if (!active) return undefined;
     const startedAt = Date.now();
@@ -290,9 +268,8 @@ export default function useListenSession({ active, onAutosaved }) {
     };
   }, [active, running, sourcesTick, refreshSources]);
 
-  // Leaving listen mode (or unmounting the window) force-stops the session —
-  // the engine must never hum without its host UI (zero-idle rule). The
-  // main-process once('closed') listener backstops a hard window close.
+  // Leaving listen mode (or unmounting the window) force-stops the session;
+  // the main-process once('closed') listener backstops a hard window close.
   useEffect(() => {
     if (!active && runningRef.current) {
       stop();

@@ -28,10 +28,8 @@ import { PRIVACY_MODES } from '../../config/constants.js';
 dayjs.extend(relativeTime);
 dayjs.extend(isSameOrAfter);
 
-// Origin filter groups. 'selection' and 'hotkey' are the same feature from the
-// user's chair (icon click vs CapsLock direct), so they filter as one. Rows
-// with no recognized source — legacy entries (normalized to 'import' on
-// reload), imports, unknowns — all land in 'other'.
+// Origin filter groups: 'selection' and 'hotkey' filter as one; rows with
+// no recognized source land in 'other'.
 const SOURCE_GROUPS = {
   main: ['main'],
   selection: ['selection', 'hotkey'],
@@ -163,8 +161,7 @@ HistoryCard.displayName = 'HistoryCard';
 const HistoryPanel = ({ showNotification }) => {
   const { t } = useTranslation();
 
-  // Month-group labels go through dayjs formats; a module-level zh-cn lock
-  // here used to leak Chinese month names into the English UI.
+  // Month-group labels go through dayjs formats in the UI locale.
   useEffect(() => {
     dayjs.locale(i18n.language === 'zh' ? 'zh-cn' : 'en');
   }, [i18n.language]);
@@ -190,8 +187,7 @@ const HistoryPanel = ({ showNotification }) => {
 
   const [detailItem, setDetailItem] = useState(null);
 
-  // Debounce typed search by 300ms — keeps filtering responsive without
-  // refiltering on every keystroke.
+  // Debounce typed search by 300 ms.
   const debouncedSearch = useDebounce(searchInput, 300);
 
   const rootRef = useRef(null);
@@ -222,8 +218,7 @@ const HistoryPanel = ({ showNotification }) => {
   const exportHistory = useTranslationStore(state => state.exportHistory);
   const importHistory = useTranslationStore(state => state.importHistory);
 
-  // Set of favorite ids — O(1) lookup vs scanning the favorites array
-  // for every history card we render.
+  // Set of favorite ids for O(1) lookup.
   const favoriteIds = useMemo(() => {
     return new Set(favorites?.map(f => f.id) || []);
   }, [favorites]);
@@ -306,8 +301,7 @@ const HistoryPanel = ({ showNotification }) => {
     return filtered;
   }, [history, debouncedSearch, dateRange, sourceFilter, sortConfig]);
 
-  // Which origin groups actually occur — the chip row only renders when there
-  // are at least two, so a long-time single-source history shows nothing new.
+  // Which origin groups actually occur; the chip row needs at least two.
   const presentSourceGroups = useMemo(() => {
     const groups = new Set();
     if (Array.isArray(history)) {
@@ -346,8 +340,7 @@ const HistoryPanel = ({ showNotification }) => {
     return () => container.removeEventListener('scroll', handleScroll);
   }, [loadMore]);
 
-  // Reset paging when the filter changes so the user sees results from
-  // the top, not whatever offset they had scrolled to.
+  // Reset paging when the filter changes.
   useEffect(() => {
     setDisplayCount(PAGE_SIZE);
   }, [debouncedSearch, dateRange, sourceFilter]);
@@ -440,8 +433,7 @@ const HistoryPanel = ({ showNotification }) => {
     notify(t('history.restored'), 'success');
   }, [restoreFromHistory, notify, t]);
 
-  // The open modal holds a snapshot of the entry, so it is refreshed here —
-  // otherwise the deleted result stays on screen until the modal is reopened.
+  // The open modal holds a snapshot of the entry; refresh it.
   const handleRemoveAiResult = useCallback((item, aiId) => {
     removeAiResult(item.id, aiId);
     const remaining = (item.ai || []).filter((a) => a.id !== aiId);
@@ -776,8 +768,7 @@ const HistoryPanel = ({ showNotification }) => {
 
           <button className="toolbar-btn" onClick={handleExport} title={t('history.export')}><Download size={16} /></button>
           {translationMode === PRIVACY_MODES.SECURE ? (
-            // Import writes persistent history — contradicts secure mode, and
-            // the stash restore on exit would silently drop it anyway.
+            // No import in secure mode.
             <span className="toolbar-btn disabled" title={t('history.importDisabledSecure')}>
               <Upload size={16} />
             </span>
@@ -879,8 +870,7 @@ const HistoryPanel = ({ showNotification }) => {
                 )}
                 <div className="detail-text translated">{detailItem.translatedText}</div>
               </div>
-              {/* Attached AI results, deletable on their own — the translation
-                  they hang on stays either way. */}
+              {/* Attached AI results, deletable on their own. */}
               {detailItem.ai?.map((result) => (
                 <div className="detail-section" key={result.id}>
                   <div className="detail-label ai">

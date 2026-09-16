@@ -24,14 +24,10 @@ const _t = (key, fallback) => {
 let lastImageHash = '';
 let lastText = '';
 let captureInFlight = false;
-// Last processed capture, kept so a display-mode toggle can re-layout
-// immediately without asking the user to re-capture. Dies with the renderer
-// (the floating window is destroyed on close, not hidden).
+// Last processed capture, for an immediate re-layout on a display-mode toggle.
 let lastCapture = null;
 
 // Forward a floating-window translation into the main window's history store.
-// The old session.addToHistory only wrote an in-memory list nothing read, so
-// floating-window translations never appeared in any history view.
 function addToMainHistory(item) {
   try {
     window.electron?.floatingWindow?.addToHistory?.({ source: 'floating', ...item });
@@ -44,14 +40,10 @@ function addToMainHistory(item) {
 // display-mode.js so it stays pure and unit-testable.
 
 class TranslationPipeline {
-  // No init/refreshOcrConfigs anymore: OCR engines, their configs (with vault
-  // secrets), and settings-save reloads all live in the main-process stack —
-  // this persistent window can't pin stale keys by construction.
+  // OCR engines and their configs live in the main-process stack.
 
   async runFromCapture(captureOptions = {}) {
-    // Single-flight: a second capture while one is running would un-hide the
-    // floating window mid-screenshot (the IPC handler's opacity dance) and
-    // interleave session state.
+    // Single-flight.
     if (captureInFlight) {
       logger.debug('Capture already in flight, ignoring');
       return { success: false, skipped: true };
@@ -61,11 +53,8 @@ class TranslationPipeline {
     const session = useSessionStore.getState();
 
     try {
-      // Auto-refresh ticks (keepDedup) run SILENTLY until content actually
-      // changes: no pane clearing, no "capturing" state, dedupe keys intact.
-      // The old behavior reset the UI every tick, which read as "it restarts
-      // recognition before the previous one finished". Manual captures keep
-      // the explicit feedback and force a re-OCR of identical frames.
+      // Auto-refresh ticks (keepDedup) run silently until content changes;
+      // manual captures keep the explicit feedback and force a re-OCR.
       if (!captureOptions.keepDedup) {
         // Frozen panes survive; transient ones are cleared each capture cycle
         session.clearChildPanes();
@@ -76,7 +65,7 @@ class TranslationPipeline {
 
       const captureResult = await window.electron?.floatingWindow?.captureRegion?.(captureOptions);
       if (!captureResult?.success) {
-        // A failed silent tick must not flash an error banner every interval.
+        // A failed silent tick shows no error banner.
         if (captureOptions.keepDedup) {
           logger.debug('Auto-refresh capture failed silently:', captureResult?.error);
           return { success: false, skipped: true };
@@ -105,14 +94,9 @@ class TranslationPipeline {
     try {
       lastCapture = { imageData, options: { ...captureOptions } };
 
-      // Dedupe key includes target language AND display-mode pref: switching
-      // either must re-run even when the captured frame is byte-identical
-      // (same precedent as targetLanguage — a mode toggle would otherwise be
-      // swallowed as "content unchanged").
-      // Understanding is a whole-passage job by definition, so the toggle wins
-      // over the layout heuristic: auto would otherwise judge a dense capture
-      // "scattered" and leave the mode with a handful of disconnected bubbles
-      // and nothing to explain.
+      // Dedupe key includes target language and display-mode pref.
+      // Understanding is a whole-passage job: the toggle wins over the
+      // layout heuristic.
       const modePref = config.understandMode ? 'unified' : (config.floatingDisplayMode || 'auto');
       const hash = await calculateHash(imageData);
       const imageKey = `${hash}::${config.targetLanguage}::${modePref}`;
@@ -122,17 +106,15 @@ class TranslationPipeline {
       }
       lastImageHash = imageKey;
 
-      // Silent tick just detected real change — NOW reset the transient panes
-      // (deferred from runFromCapture so unchanged ticks never touch the UI).
+      // Real change detected: now reset the transient panes.
       if (captureOptions.keepDedup) {
         session.clearChildPanes();
       }
 
       session.startOcr();
 
-      // Engine allowlist is injected by the main-process facade from the live
-      // privacy mode; priority is per-request now (a shared manager instance
-      // must not inherit this window's ordering globally).
+      // Engine allowlist is injected by the main-process facade; priority is
+      // per request.
       const ocrResult = await translationService.ocr.recognize(imageData, {
         engine: config.ocrEngine,
         priority: config.ocrPriority,
@@ -147,17 +129,14 @@ class TranslationPipeline {
         session.setResult(_t('svc.noTextRecognized', '（未识别到文字）'));
         return { success: true, text: '' };
       }
-      // Pair the capture with what it read, so a later text-only run can tell
-      // that the picture no longer describes the session (see
-      // getLastCaptureImage — path B must not read a stale frame).
+      // Pair the capture with what it read (getLastCaptureImage).
       if (lastCapture) lastCapture.sourceText = text;
 
       // Judgment runs on raw per-line boxes; pane granularity comes from the
-      // resolver (merged paragraphs per bubble, raw blocks for word piles).
+      // resolver.
       const mergedBlocks = ocrResult.blocks || [];
       const rawBlocks = ocrResult.rawBlocks || mergedBlocks;
-      // Capture frame in the same physical-pixel space as the OCR boxes —
-      // the sparse-coverage rule (manga bubbles over imagery) needs it.
+      // Capture frame in the OCR boxes' pixel space.
       const sf = captureOptions.scaleFactor || 1;
       const frame = captureOptions.width > 0 && captureOptions.height > 0
         ? { width: captureOptions.width * sf, height: captureOptions.height * sf }
@@ -189,9 +168,7 @@ class TranslationPipeline {
 
       session.setSourceText(text);
 
-      // Understanding mode replaces the translation step rather than adding to
-      // it — the user asked to be told what this says, not to read it in
-      // another language.
+      // Understanding mode replaces the translation step.
       if (config.understandMode) {
         return await this.runUnderstand(text, imageData);
       }
@@ -211,12 +188,9 @@ class TranslationPipeline {
     }
   }
 
-  // Understanding mode's capture path: whatever 'understand' action is
-  // installed reads the capture (or its recognized text) and the result lands
-  // in the window body where the translation normally goes. Since the mode
-  // replaces translation, its result is the capture's primary output and is
-  // recorded as its own history entry (kind 'understand') rather than riding
-  // on a translation — unless the action opts out with history:'none'.
+  // Understanding mode's capture path: the installed 'understand' action
+  // reads the capture (or its recognized text); the result is recorded as
+  // its own history entry (kind 'understand') unless the action opts out.
   async runUnderstand(text, imageData) {
     const session = useSessionStore.getState();
     const config = useConfigStore.getState();
@@ -247,9 +221,8 @@ class TranslationPipeline {
 
     session.setResult(result.content, result.provider || null);
 
-    // Text only, never the capture image: persisting screenshots would be a
-    // new privacy surface. The store applies the secure-mode gate and the
-    // replace-on-re-explain rule.
+    // Text only, never the capture image. The store applies the secure-mode
+    // gate and the replace-on-re-explain rule.
     if (action.history === 'attach') {
       addToMainHistory({
         kind: 'understand',
@@ -270,9 +243,8 @@ class TranslationPipeline {
     const config = useConfigStore.getState();
 
     try {
-      // OCR returns physical pixels of the captured display; CSS needs logical
-      // px. Prefer the capture-time scaleFactor — our own devicePixelRatio can
-      // belong to a different monitor in mixed-DPI setups.
+      // OCR returns physical pixels of the captured display; CSS needs
+      // logical px. Prefer the capture-time scaleFactor.
       const scaleFactor = captureOptions.scaleFactor || window.devicePixelRatio || 1;
       logger.debug(`ScaleFactor for coordinate conversion: ${scaleFactor}`);
 
@@ -312,8 +284,7 @@ class TranslationPipeline {
       const createdPanes = session.setChildPanes(validBlocks);
       session.setStatus('translating');
 
-      // Cap concurrency: more than 2 concurrent LLM calls causes UI jank on
-      // typical local setups (each call ties up the GPU briefly)
+      // Concurrency cap.
       const CONCURRENCY_LIMIT = 2;
       const translatePane = async (pane, index) => {
         const paneId = pane.id;
@@ -344,9 +315,7 @@ class TranslationPipeline {
             return;
           }
 
-          // Privacy fields no longer travel from here — the main-process
-          // facade injects the live mode (SECURE keeps screen-capture text out
-          // of every cache layer at the single enforcement point).
+          // Privacy fields are injected by the main-process facade.
           const result = await translationService.translate(text, {
             sourceLang,
             targetLang,
@@ -419,8 +388,8 @@ class TranslationPipeline {
         sourceLang, config.targetLanguage, config.sameLanguageBehavior, config.sourceLanguage
       );
       if (passthrough) {
-        // Already in the target language: show the original, skip the provider
-        // and history (an untranslated echo is not a record).
+        // Already in the target language: show the original, skip the
+        // provider and history.
         session.setResult(text);
         return { success: true, text, provider: null };
       }
@@ -460,9 +429,8 @@ class TranslationPipeline {
     }
   }
 
-  // Re-process the last capture (display-mode toggle re-layout). keepDedup
-  // reuses the silent-tick path: transient panes are only cleared once the
-  // dedupe key confirms a real change — which a mode switch guarantees.
+  // Re-process the last capture (display-mode toggle re-layout) through the
+  // silent-tick path.
   async rerunLastCapture() {
     if (!lastCapture || captureInFlight) {
       return { success: false, skipped: true };
@@ -479,8 +447,7 @@ class TranslationPipeline {
   }
 
   // The capture behind whatever is on screen right now, or null once the
-  // session has moved on to text that did not come from it. AI actions take it
-  // for path B — reading the picture beats summarizing the OCR of the picture.
+  // session has moved on; AI actions take it for path B.
   getLastCaptureImage(currentText) {
     if (!lastCapture?.imageData || !lastCapture.sourceText) return null;
     if (currentText != null && lastCapture.sourceText !== currentText) return null;

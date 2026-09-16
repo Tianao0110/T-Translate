@@ -14,18 +14,13 @@ const logger = createLogger('TranslationStore');
 
 const BUILTIN_LANG_CODES = new Set(LANGUAGES.map(l => l.code));
 
-// The guard exists to reject junk (a stale code from an old profile, a typo
-// over IPC), not to gatekeep the catalogue — a user-added language is a valid
-// choice, and validating only against the built-ins silently threw every one
-// of them away at the moment of selection.
+// Rejects junk codes; user-added languages are valid.
 function isKnownLanguage(state, code) {
   return BUILTIN_LANG_CODES.has(code) ||
     (state.customLanguages || []).some((l) => l.code === code);
 }
 
-// zustand persist re-serializes the partialized state — history alone can hold
-// 1000 entries — on EVERY setState: per keystroke and, while streaming, per
-// flush. Throttle the stringify+write; beforeunload covers the tail.
+// Throttled stringify + write; beforeunload covers the tail.
 const PERSIST_WRITE_MS = 1000;
 
 // Exported for tests (vault/localStorage routing + migration).
@@ -33,10 +28,8 @@ export function createThrottledJSONStorage(interval = PERSIST_WRITE_MS) {
   let timer = null;
   let pending = null; // [name, value]
 
-  // Encrypted vault (DPAPI file in userData, main process) carries the blob
-  // when the bridge exists and encryption is available; localStorage remains
-  // the fallback for vitest/headless runs and DPAPI-less machines. The flag is
-  // resolved in getItem — zustand always hydrates before the first setItem.
+  // Encrypted vault (main process) carries the blob when available;
+  // localStorage is the fallback. Resolved in getItem (hydrate runs first).
   const vaultApi = typeof window !== 'undefined' ? window.electron?.historyVault : null;
   let useVault = false;
 
@@ -48,8 +41,7 @@ export function createThrottledJSONStorage(interval = PERSIST_WRITE_MS) {
     try {
       const raw = JSON.stringify(value);
       if (useVault) {
-        // Fire-and-forget: a failed write keeps data in memory and the next
-        // throttled write retries. Never fall back to plaintext on failure.
+        // Fire-and-forget; never falls back to plaintext.
         vaultApi.save(raw).then((r) => {
           if (r && !r.success) logger.error('Vault write failed:', r.reason);
         }).catch((e) => logger.error('Vault write failed:', e));
@@ -80,8 +72,7 @@ export function createThrottledJSONStorage(interval = PERSIST_WRITE_MS) {
                 return null; // quarantined upstream; start fresh
               }
             }
-            // One-time migration: plaintext leaves localStorage only after the
-            // encrypted copy is confirmed on disk.
+            // One-time migration, after the encrypted copy is on disk.
             const legacy = localStorage.getItem(name);
             if (legacy) {
               const saved = await vaultApi.save(legacy);
@@ -111,8 +102,7 @@ export function createThrottledJSONStorage(interval = PERSIST_WRITE_MS) {
       }
     },
     setItem: (name, value) => {
-      // Immer snapshots are immutable — holding the latest reference is safe;
-      // stringify is deferred to write time.
+      // Stringify is deferred to write time.
       pending = [name, value];
       if (timer === null) timer = setTimeout(write, interval);
     },
@@ -128,11 +118,8 @@ export function createThrottledJSONStorage(interval = PERSIST_WRITE_MS) {
   };
 }
 
-// Import paths must tolerate hand-edited JSON: missing ids get generated,
-// bad timestamps fall back to now, text-less entries are dropped.
+// Import paths tolerate hand-edited JSON; unknown fields are dropped.
 // Exported for tests.
-// Attached AI results survive an export/import round trip, but only in the
-// shape the app writes — a hand-edited file must not smuggle in other fields.
 function normalizeAiResults(raw) {
   if (!Array.isArray(raw)) return null;
   const results = raw
@@ -164,8 +151,7 @@ export function normalizeHistoryItem(raw) {
   };
   const ai = normalizeAiResults(raw.ai);
   if (ai) item.ai = ai;
-  // Understanding entries round-trip export/import; unknown kinds are dropped
-  // so a hand-edited file cannot smuggle in rows the panels don't render.
+  // Understanding entries round-trip export / import; unknown kinds are dropped.
   if (raw.kind === 'understand') {
     item.kind = 'understand';
     if (typeof raw.actionId === 'string' && raw.actionId) item.actionId = raw.actionId;
@@ -184,9 +170,7 @@ const getMainTranslation = async () => {
 };
 
 const useTranslationStore = create(
-  // subscribeWithSelector: sync-to-electron.js subscribes with (selector,
-  // listener, options) — without this middleware vanilla subscribe treats the
-  // selector as the listener and the whole sync layer silently no-ops.
+  // subscribeWithSelector: required by sync-to-electron.js.
   subscribeWithSelector(persist(
     immer((set, get) => ({
       translationMode: PRIVACY_MODES.STANDARD,
@@ -250,9 +234,7 @@ const useTranslationStore = create(
 
       // ===== Actions =====
 
-      // Secure-mode round-trip: on enter, stash history/stats and run with
-      // empty ones; on exit, restore the stash so Secure-mode entries never
-      // bleed into persistent history.
+      // Secure-mode round-trip: stash history / stats on enter, restore on exit.
       setTranslationMode: (mode) =>
         set((state) => {
           const previousMode = state.translationMode;
@@ -379,9 +361,7 @@ const useTranslationStore = create(
 
       addToFavorites: (item = null, isStyleReference = false) =>
         set((state) => {
-          // Spread order makes uuidv4 a fallback only: a caller-provided id
-          // wins. Without this, an id-less entry (the glossary import bug)
-          // could never be removed — removeFromFavorites filters by id.
+          // A caller-provided id wins; uuidv4 is the fallback.
           const favoriteItem = item ? { id: uuidv4(), ...item } : {
             id: uuidv4(),
             sourceText: state.currentTranslation.sourceText,
@@ -420,9 +400,7 @@ const useTranslationStore = create(
         }),
 
       // ===== Versions =====
-      // Style-rewrite and user-edit are tracked as separate versions so the
-      // user can flip between them. We collapse repeats: a second style rewrite
-      // overwrites the existing style version (same for user edits).
+      // Style-rewrite and user-edit are separate versions; repeats collapse.
 
       addStyleVersion: (text, styleRef, styleName, styleStrength) =>
         set((state) => {
@@ -492,8 +470,7 @@ const useTranslationStore = create(
 
       clearCurrent: () =>
         set((state) => {
-          // Null id makes an in-flight stream fail its identity check instead
-          // of resurrecting text into the cleared panel
+          // Null id makes an in-flight stream fail its identity check.
           state.currentTranslation.id = null;
           state.currentTranslation.sourceText = "";
           state.currentTranslation.translatedText = "";
@@ -510,15 +487,12 @@ const useTranslationStore = create(
           state.statistics.totalTranslations = 0;
           state.statistics.totalCharacters = 0;
           state.statistics.todayTranslations = 0;
-          // The secure-mode stash must go too, or "cleared" history quietly
-          // resurrects when the user leaves secure mode.
+          // The secure-mode stash goes too.
           state._savedHistory = null;
           state._savedStatistics = null;
         }),
 
-      // Resets only the persisted preference fields (not history/favorites) to
-      // defaults. Used by Settings "reset all" so zustand-backed controls don't
-      // survive a reset that only cleared electron-store.
+      // Resets only the persisted preference fields (Settings "reset all").
       resetPreferences: () =>
         set((state) => {
           state.translationMode = PRIVACY_MODES.STANDARD;
@@ -529,18 +503,10 @@ const useTranslationStore = create(
         }),
 
       // ===== Privacy mode helpers =====
-      // getPrivacyOptions() lived here until the v0.3.1 stack migration: call
-      // sites used to attach privacyMode/useCache themselves. The main-process
-      // facade now injects both per request, so the helper had no callers left
-      // and keeping it invited someone to "restore" a gate that is already
-      // enforced one layer down.
-
       // External callers (e.g. floating window) route through this, so privacy
       // gating happens here rather than at each call site.
-      // Language-picker memory. Recent codes drive the pinned section; the
-      // letter is where the user was last browsing, and it is only meaningful
-      // in the UI language it was recorded under (荷兰语 sits under H in
-      // Chinese and Dutch under D in English).
+      // Language-picker memory: recent codes and the last letter (only
+      // meaningful in the UI language it was recorded under).
       recordLanguageUse: (code) =>
         set((state) => {
           if (!code || code === 'auto') return;
@@ -572,15 +538,12 @@ const useTranslationStore = create(
             return;
           }
 
-          // 'understand' is the only non-translation kind; anything else is
-          // stored as a plain translation row so a hand-crafted payload
-          // cannot invent kinds the panels don't render.
+          // 'understand' is the only non-translation kind.
           const kind = item.kind === 'understand' ? 'understand' : undefined;
 
           const historyItem = {
             id: item.id || uuidv4(),
-            // toStoredText, not `|| ''`: an object is truthy and would ride
-            // straight to disk, where it later kills the panel that renders it.
+            // toStoredText, not `|| ''` (history-sanitize.js).
             sourceText: toStoredText(item.sourceText),
             translatedText: toStoredText(item.translatedText),
             sourceLanguage: item.sourceLanguage || 'auto',
@@ -593,8 +556,7 @@ const useTranslationStore = create(
             if (typeof item.actionId === 'string' && item.actionId) {
               historyItem.actionId = item.actionId;
             }
-            // Re-explaining the same passage replaces the old note (same rule
-            // as entry.ai: latest wins) instead of piling near-duplicate rows.
+            // Re-explaining the same passage replaces the old note.
             state.history = state.history.filter(
               (h) => !(h.kind === 'understand' &&
                        h.sourceText === historyItem.sourceText &&
@@ -602,8 +564,7 @@ const useTranslationStore = create(
             );
           }
 
-          // De-dupe on (sourceText, translatedText) so retries don't double-log;
-          // kind-scoped so a translation can never block an explanation.
+          // De-dupe on (sourceText, translatedText), kind-scoped.
           const exists = state.history.some(
             h => h.sourceText === historyItem.sourceText &&
                  h.translatedText === historyItem.translatedText &&
@@ -615,14 +576,12 @@ const useTranslationStore = create(
             if (state.history.length > state.historyLimit) {
               state.history = state.history.slice(0, state.historyLimit);
             }
-            // Understanding entries stay out of the translation counters —
-            // "翻译次数" counting explanations would be a lie.
+            // Understanding entries stay out of the translation counters.
             if (!kind) {
               state.statistics.totalTranslations++;
               state.statistics.totalCharacters += (historyItem.sourceText?.length || 0);
             }
-            // Keep the status-bar "today" count honest for selection/floating
-            // window entries too (main-panel path recomputes it the same way).
+            // Status-bar "today" count, same as the main-panel path.
             const today = new Date().toDateString();
             state.statistics.todayTranslations = state.history.filter(
               (h) => h.kind !== 'understand' &&
@@ -631,11 +590,8 @@ const useTranslationStore = create(
           }
         }),
 
-      // An AI result rides on the translation it was derived from — a summary
-      // is not its own history entry, it is something that translation "also
-      // has". Matched by source text because the three windows share no
-      // translation id; nothing to attach to means nothing is written (the
-      // result stays a one-off in its window).
+      // An AI result rides on the translation it was derived from, matched by
+      // source text; nothing to attach to means nothing is written.
       attachAiResult: (payload = {}) =>
         set((state) => {
           if (state.translationMode === PRIVACY_MODES.SECURE) return;
@@ -647,8 +603,7 @@ const useTranslationStore = create(
           const entry = state.history.find((h) => h.sourceText === sourceText);
           if (!entry) return;
 
-          // One result per action, latest wins — same collapse rule as style
-          // versions, so re-running a summary replaces rather than piles up.
+          // One result per action, latest wins.
           const kept = (entry.ai || []).filter((a) => a.actionId !== payload.actionId);
           entry.ai = [
             {
@@ -689,8 +644,7 @@ const useTranslationStore = create(
           const item = state.history.find((h) => h.id === id);
           if (item) {
             state.currentTranslation.sourceText = item.sourceText;
-            // An explanation is not a translation: restoring one refills the
-            // source only, so the target box never presents it as translated.
+            // Restoring an explanation refills the source only.
             state.currentTranslation.translatedText =
               item.kind === 'understand' ? '' : item.translatedText;
             state.currentTranslation.sourceLanguage = item.sourceLanguage;
@@ -748,9 +702,7 @@ const useTranslationStore = create(
       }),
 
       importHistory: async (file) => {
-        // Secure mode: current history is a stash-backed empty view — an
-        // import would be silently discarded by the stash restore on exit.
-        // The UI disables the button; this guard covers any other entry point.
+        // No import in secure mode (the UI disables the button too).
         if (get().translationMode === PRIVACY_MODES.SECURE) {
           return { success: false, reason: 'secure-mode' };
         }
@@ -787,8 +739,7 @@ const useTranslationStore = create(
               state.historyLimit
             );
           });
-          // Real insert count — the old code reported the file's row count
-          // even when everything was a duplicate.
+          // Real insert count.
           return { success: true, count: added };
         } catch (error) {
           return { success: false, error: error.message };
@@ -805,18 +756,9 @@ const useTranslationStore = create(
       },
 
       // Glossary terms live in the favorites pile under folderId === 'glossary'.
-      //
-      // A glossary is not one language pair. The same word can be saved with a
-      // Chinese rendering and a French one — addToFavorites de-dupes on
-      // (sourceText, targetLanguage) precisely so it can be — and handing all
-      // of them to a translation would substitute whichever happened to sort
-      // first, dropping Chinese into French output.
-      //
-      // So: entries for another target language are excluded, and when a word
-      // has both a match for this language and a language-less entry, the match
-      // wins. Language-less entries (imported files carry no language) stay
-      // usable, because dropping them would silently break every imported
-      // glossary.
+      // Entries for another target language are excluded; a language match
+      // beats a language-less entry; language-less entries stay usable
+      // (docs/design/renderer.md §2).
       getGlossaryTerms: (targetLanguage) => {
         const state = get();
         const all = state.favorites.filter(
@@ -844,15 +786,11 @@ const useTranslationStore = create(
     })),
     {
       name: "translation-store",
-      // In Electron the blob lives DPAPI-encrypted in userData (history vault);
-      // hydration turns async (~10ms IPC) — outside Electron it stays sync
-      // localStorage, which is what the tests seed.
+      // In Electron hydration is async (history vault); outside it stays
+      // sync localStorage.
       storage: createThrottledJSONStorage(),
       merge: (persistedState, currentState) => {
-        // Rows written before v0.3.5 can hold a whole result object where the
-        // text belongs; rendering one throws and takes the panel down. Repair
-        // on the way in — the entries live in localStorage, so nothing else
-        // ever gets a chance to fix them.
+        // Repair rows holding a non-string translation on the way in.
         const cleanHistory = sanitizeTextEntries(persistedState.history, 'drop');
         const cleanSaved = sanitizeTextEntries(persistedState._savedHistory, 'drop');
         const cleanFavorites = sanitizeTextEntries(persistedState.favorites, 'blank');
@@ -879,13 +817,12 @@ const useTranslationStore = create(
             letterLang: null,
             ...(persistedState.languagePicker || {}),
           },
-          // Backfill ids for rows persisted by the id-less glossary import —
-          // without one, per-row deletion can never match them.
+          // Backfill missing ids.
           favorites: cleanFavorites.entries.map((f) =>
             f && !f.id ? { ...f, id: uuidv4() } : f
           ),
           _savedHistory: persistedState._savedHistory ? cleanSaved.entries : persistedState._savedHistory,
-          // 'strict' was removed in 0.2.9 — its core promise (no network) maps to offline
+          // Legacy 'strict' maps to offline.
           translationMode: persistedState.translationMode === 'strict'
             ? PRIVACY_MODES.OFFLINE
             : (persistedState.translationMode || currentState.translationMode),
@@ -914,18 +851,15 @@ const useTranslationStore = create(
         autoTranslateDelay: state.autoTranslateDelay,
         languagePicker: state.languagePicker,
         customLanguages: state.customLanguages,
-        // Secure-mode stash must survive a quit-while-secure: without these,
-        // the emptied history/statistics are what lands on disk and the real
-        // data is unrecoverable after restart.
+        // The secure-mode stash must survive a quit-while-secure.
         _savedHistory: state._savedHistory,
         _savedStatistics: state._savedStatistics,
         currentTranslation: {
           sourceLanguage: state.currentTranslation.sourceLanguage,
           targetLanguage: state.currentTranslation.targetLanguage,
         },
-        // ocrStatus.engine deliberately NOT persisted here — settings.ocr.engine
-        // (electron-store) is the single source of truth, seeded into the store
-        // at startup (App.jsx). Persisting it too caused the two to diverge.
+        // ocrStatus.engine is not persisted here: settings.ocr.engine is the
+        // single source of truth, seeded at startup (App.jsx).
       }),
     }
   ))

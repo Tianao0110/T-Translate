@@ -11,8 +11,7 @@
 //   ttsCancel({id})
 //   onTtsChunk(cb): cb({id, samples, sampleRate}) per sentence, then
 //                   {id, done, cancelled} or {id, error}
-// Audio is scheduled on one AudioContext as the chunks arrive, so playback
-// starts at the first sentence instead of after the whole paragraph.
+// Audio is scheduled on one AudioContext as the chunks arrive.
 
 import i18n from 'i18next';
 import { BaseTTSEngine, TTS_STATUS } from './base.js';
@@ -107,9 +106,7 @@ export class NeuralTTSEngine extends BaseTTSEngine {
     this._cancelActive();
     const voices = this._voices || (await this.getVoices());
     if (!voices.length) throw new Error('NO_VOICES');
-    // voiceId is the system-voice choice (a SpeechSynthesis voice name, or a
-    // neural id left over from before per-language voices); neural voices are
-    // chosen per language only, so it is deliberately not passed here.
+    // voiceId is the system-voice choice; neural voices are chosen per language.
     const voice = pickVoice(voices, {
       voiceByLang: options.voiceByLang,
       lang: options.lang,
@@ -130,8 +127,7 @@ export class NeuralTTSEngine extends BaseTTSEngine {
     });
 
     try {
-      // rate maps to sherpa's generation-time speed (better quality than
-      // resampling on playback); pitch is not supported by sherpa TTS.
+      // rate maps to sherpa's generation-time speed; pitch is not supported.
       const res = await bridge.ttsGenerate({
         id: requestId,
         text: clean,
@@ -232,9 +228,8 @@ export class NeuralTTSEngine extends BaseTTSEngine {
     this._setStatus(TTS_STATUS.SPEAKING);
   }
 
-  // Drops whatever is in flight without touching the public status. A new
-  // speak() supersedes silently — the panel's play/stop toggle keys off
-  // SPEAKING staying set — and only stop() announces IDLE.
+  // Drops whatever is in flight without touching the public status; only
+  // stop() announces IDLE.
   _cancelActive() {
     if (this._activeRequestId) {
       // Stops synthesis mid-text worker-side; whatever is queued is dropped.

@@ -22,9 +22,8 @@ export function detectTextLang(text) {
   return '';
 }
 
-// A sentence that switches between Chinese and English mid-way. kokoro's
-// Chinese speakers read the English part with a heavy accent; MeloTTS was
-// trained on exactly this kind of text, so a pack flagged preferMixed wins.
+// A sentence that switches between Chinese and English mid-way: a pack
+// flagged preferMixed wins.
 export function isMixedText(text) {
   return !!text && CJK_RE.test(text) && LATIN_WORD_RE.test(text);
 }
@@ -47,8 +46,7 @@ export function pickVoice(voices, { voiceByLang = {}, voiceId = '', lang = '', t
   if (!Array.isArray(voices) || voices.length === 0) return null;
   const want = normalizeLang(lang) || detectTextLang(text);
 
-  // An explicit choice wins as long as its pack can read this language at
-  // all; a Chinese-only pack asked to read Japanese falls through to auto.
+  // An explicit choice wins as long as its pack can read this language.
   if (voiceId) {
     const chosen = voices.find((v) => v.id === voiceId);
     if (chosen && supports(chosen, want)) return chosen;
@@ -66,7 +64,7 @@ export function pickVoice(voices, { voiceByLang = {}, voiceId = '', lang = '', t
   }
 
   // Native voices first; a pack whose single speaker covers both languages
-  // (MeloTTS is 'zh' but reads 'en') still counts before giving up.
+  // still counts.
   let candidates = want ? voices.filter((v) => v.lang === want) : voices;
   if (!candidates.length && want) candidates = voices.filter((v) => supports(v, want));
   if (!candidates.length) return null;

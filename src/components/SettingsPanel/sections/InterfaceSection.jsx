@@ -53,9 +53,8 @@ const InterfaceSection = ({
     }
   };
 
-  // These three controls persist immediately via their own store/IPC writes,
-  // so the React-state update is silent — otherwise the panel would show
-  // "unsaved changes" (and block on beforeunload) for a change already saved.
+  // These three controls persist immediately, so the React-state update is
+  // silent.
   const toggleAutoSelection = (enabled) => {
     updateSetting('startup', 'autoEnableSelection', enabled, true);
     window.electron?.store?.set?.('settings.startup.autoEnableSelection', enabled);
@@ -101,10 +100,8 @@ const InterfaceSection = ({
     }
   };
 
-  // Only global (OS-level) shortcuts are configurable — the in-app keys were
-  // decorative (nothing read settings.shortcuts for them). global: true routes
-  // through Electron's globalShortcut and needs pause/resume during editing so
-  // the user's chord doesn't trigger the action.
+  // Only global (OS-level) shortcuts are configurable; registration pauses
+  // during editing so the chord does not trigger the action.
   const shortcutConfig = {
     screenshot: { label: t('shortcuts.screenshot'), global: true, icon: Camera },
     toggleWindow: { label: t('shortcuts.toggleWindow'), global: true, icon: AppWindow },
@@ -131,9 +128,7 @@ const InterfaceSection = ({
     setEditingShortcut(null);
 
     if (config.global && window.electron?.shortcuts?.update) {
-      // Register with the OS first. The handler persists to store on success,
-      // so we only mirror into React state (silently — already saved) if it
-      // took; a rejected chord must not linger in state and get written later.
+      // Register with the OS first; mirror into React state only if it took.
       const result = await window.electron.shortcuts.update(action, newShortcut);
       if (result?.success) {
         updateSetting('shortcuts', action, newShortcut, true);
@@ -234,8 +229,7 @@ const InterfaceSection = ({
             return (
               <div key={action} className={`shortcut-row ${config.global ? 'global' : ''}`}>
                 <span className="shortcut-action">
-                  {/* No per-row global badge: every configurable shortcut is
-                      system-wide now, so the hint says it once instead. */}
+                  {/* No per-row global badge; the hint says it once. */}
                   <span className="shortcut-icon">{config.icon && <config.icon size={14} />}</span>
                   {config.label}
                 </span>
@@ -259,10 +253,7 @@ const InterfaceSection = ({
                         return;
                       }
 
-                      // Without Ctrl/Alt/Win the binding would hijack the key
-                      // system-wide (a bare Backspace here disabled the user's
-                      // backspace everywhere). F1-F24 are safe to bind alone;
-                      // the main process enforces the same rule on update.
+                      // Modifier rule, mirrored from electron/shared/shortcut-rules.js.
                       const isFKey = /^F([1-9]|1[0-9]|2[0-4])$/.test(e.key);
                       if (!e.ctrlKey && !e.altKey && !e.metaKey && !isFKey) {
                         notify(t('shortcuts.needsModifier'), 'error');

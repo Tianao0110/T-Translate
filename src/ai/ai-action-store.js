@@ -1,10 +1,5 @@
-// Imported AI action configs. They live in electron-store next to the rest of
-// the settings, and every read re-validates them: config.json is a plain file a
-// user can hand-edit, and the runtime trusts nothing the import gate did not
-// already check.
-//
-// Cached because three windows and the capture pipeline all ask for the same
-// list; refreshImportedActions() is the settings-save hook.
+// Imported AI action configs, from electron-store, re-validated on every
+// read. Cached; refreshImportedActions() is the settings-save hook.
 
 import { normalizeActionConfig } from '../config/ai-actions.js';
 import createLogger from '../core/logger.js';

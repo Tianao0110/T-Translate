@@ -22,8 +22,7 @@ const TYPE_COLOR_VARS = {
 const ProviderSettings = ({ settings, settingsReady, updateSettings, notify }) => {
   const { t } = useTranslation();
 
-  // useMemo so getAllProviderMetadata() returns a stable reference and
-  // doesn't retrigger the init effect on every render.
+  // Stable reference for the init effect.
   const allProvidersMeta = useMemo(() => getAllProviderMetadata(), []);
 
   const [providers, setProviders] = useState([]);
@@ -37,8 +36,7 @@ const ProviderSettings = ({ settings, settingsReady, updateSettings, notify }) =
   const initializedRef = useRef(false);
 
   // The built-in model's card carries the model's own name once a
-  // whitelisted file is installed and the source is on; otherwise the
-  // generic name. Read from the main process, refreshed on engine events.
+  // whitelisted file is installed and the source is on.
   const [builtinModel, setBuiltinModel] = useState(null);
   useEffect(() => {
     let alive = true;
@@ -79,8 +77,7 @@ const ProviderSettings = ({ settings, settingsReady, updateSettings, notify }) =
   }, [providers]);
 
   useEffect(() => {
-    // Wait for settings to load from disk before initializing — otherwise
-    // we'd overwrite saved provider configs with defaults.
+    // Wait for settings to load from disk before initializing.
     if (!settingsReady) return;
 
     const savedProviders = settings?.translation?.providers;
@@ -142,9 +139,8 @@ const ProviderSettings = ({ settings, settingsReady, updateSettings, notify }) =
 
         if (meta.configSchema) {
           for (const [key, field] of Object.entries(meta.configSchema)) {
-            // Only pull from the vault when the seed has no value — on a tab
-            // re-mount savedConfigs already carries the user's unsaved edit,
-            // and the old decrypt would clobber it with the on-disk key.
+            // Only pull from the vault when the seed has no value (a tab
+            // re-mount carries the user's unsaved edit).
             if (field.encrypted && !configs[meta.id][key]) {
               const decrypted = await secureStorage.get(`provider_${meta.id}_${key}`, 'settings-load');
               if (decrypted) {
@@ -156,16 +152,13 @@ const ProviderSettings = ({ settings, settingsReady, updateSettings, notify }) =
       }
 
       setProviderConfigs(configs);
-      // Mirror the decrypted configs up to the parent so SettingsPanel's
-      // unified save has complete provider data even if the user never edits
-      // a field (silent: this is a load-time sync, not a user change).
+      // Mirror the decrypted configs up to the parent (silent load-time sync).
       updateSettings?.('translation', 'providerConfigs', configs, true);
       initializedRef.current = true;
     };
 
     initProviders();
-    // updateSettings intentionally omitted: it changes identity on every
-    // parent render and would re-run this decrypt loop pointlessly.
+    // updateSettings intentionally omitted (changes identity every render).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settingsReady, settings?.translation?.providers, allProvidersMeta]);
 
@@ -207,9 +200,7 @@ const ProviderSettings = ({ settings, settingsReady, updateSettings, notify }) =
 
     try {
       const config = providerConfigs[providerId];
-      // Offline still blocks explicit test clicks ("no network requests, full
-      // stop") — the gate now lives in the main-process facade, which applies
-      // the live mode; nothing to pass from here.
+      // The offline gate lives in the main-process facade.
       const result = await translationService.testProviderWithConfig(providerId, config);
       setTestResults(prev => ({ ...prev, [providerId]: result }));
     } catch (error) {
@@ -376,8 +367,7 @@ const ProviderSettings = ({ settings, settingsReady, updateSettings, notify }) =
                 <span>{getFieldLabel(providerId, key, field.label)}</span>
               </label>
             ) : field.type === 'select' ? (
-              // Every schema select today has a handful of options, so the
-              // segmented control fits; a long list would need a picker.
+              // Segmented control for the schema selects (few options each).
               <Seg
                 value={config[key] || field.default || ''}
                 onChange={(v) => updateConfig(providerId, key, v)}
@@ -454,8 +444,8 @@ const ProviderSettings = ({ settings, settingsReady, updateSettings, notify }) =
                   key={provider.id}
                   className={`ps-card ${isExpanded ? 'expanded' : ''} ${isDragOver ? 'drag-over' : ''}`}
                   style={{ '--accent': meta.color || typeColor }}
-                  // Only draggable when collapsed — otherwise HTML5 drag intercepts
-                  // mousedown inside inputs, breaking text selection by click+drag.
+                  // Only draggable when collapsed (HTML5 drag would intercept
+                  // mousedown inside inputs).
                   draggable={!isExpanded}
                   onDragStart={(e) => handleDragStart(e, provider.originalIndex)}
                   onDragEnd={handleDragEnd}
@@ -476,10 +466,7 @@ const ProviderSettings = ({ settings, settingsReady, updateSettings, notify }) =
                         <span className="ps-tag" style={{ background: typeColor }}>
                           {typeLabel}
                         </span>
-                        {/* AI actions need a real chat call; a source that only
-                            translates would answer a prompt with a translation of
-                            that prompt, so its entries stay hidden. Say so here
-                            rather than leaving the user to wonder. */}
+                        {/* A source that cannot chat has no AI actions; say so. */}
                         {!meta.supportsChat && (
                           <span className="ps-tag ps-tag-muted" title={t('providerSettings.noAiActionsHint')}>
                             {t('providerSettings.noAiActions')}

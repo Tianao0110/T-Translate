@@ -1,5 +1,5 @@
-// Scattered-vs-unified display decision for the floating window.
-// Pure geometry — no store/IPC deps so the heuristic stays unit-testable.
+// Scattered-vs-unified display decision for the floating window. Pure
+// geometry. Design notes: docs/design/renderer.md §4.
 
 // Tunables, from typical OCR line boxes; revisit with real captures.
 const PILE_MIN_BLOCKS = 4; // fewer blocks never count as a word pile
@@ -25,18 +25,15 @@ function positioned(blocks) {
   return (blocks || []).filter(b => b.bbox && b.bbox.width > 0 && b.bbox.height > 0);
 }
 
-// A pile of standalone words/labels (vocab lists, UI grids, manga SFX):
-// many boxes nearly as tall as wide. Paragraph lines are far wider than tall,
-// so aspect ratio separates "words" from "lines" without reading the text.
+// A pile of standalone words / labels: many boxes nearly as tall as wide.
 export function isWordPile(blocks) {
   const valid = positioned(blocks);
   if (valid.length < PILE_MIN_BLOCKS) return false;
   return median(valid.map(b => b.bbox.width / b.bbox.height)) <= PILE_MAX_ASPECT;
 }
 
-// Text islands floating in imagery (manga bubbles, sparse labels): the blocks
-// cover a tiny share of the captured frame. A "clear paragraph" capture fills
-// it. Frame is the capture size in the same pixel space as the boxes.
+// Text islands floating in imagery: the blocks cover a tiny share of the
+// captured frame (same pixel space as the boxes).
 export function isSparseCoverage(blocks, frame) {
   if (!frame || !(frame.width > 0) || !(frame.height > 0)) return false;
   const valid = positioned(blocks);
@@ -50,14 +47,12 @@ export function shouldUseScatteredMode(blocks, frame = null) {
   const valid = positioned(blocks);
   if (!valid.length) return false;
 
-  // Islands over imagery want in-place bubbles even when a single bubble's
-  // lines form a perfect centered column (the manga case).
+  // Islands over imagery want in-place bubbles.
   if (isSparseCoverage(blocks, frame)) return true;
 
   if (valid.length < 2 || blocks.length < 2) return false;
 
-  // Standalone words want one bubble each even when they line up in a column
-  // (the old column test merged vocab lists into a single blob).
+  // Standalone words want one bubble each.
   if (isWordPile(blocks)) return true;
 
   const avgHeight = valid.reduce((s, b) => s + b.bbox.height, 0) / valid.length;
@@ -71,9 +66,8 @@ export function shouldUseScatteredMode(blocks, frame = null) {
     }
   }
 
-  // Alignment via median deviation — robust to one indented or short line,
-  // unlike the old consecutive-pair distance which an indent tripped.
-  // Left-aligned paragraphs and centered stanzas both count as one column.
+  // Alignment via median deviation; left-aligned paragraphs and centered
+  // stanzas both count as one column.
   const avgWidth = valid.reduce((s, b) => s + b.bbox.width, 0) / valid.length;
   const lefts = sorted.map(b => b.bbox.x);
   const centers = sorted.map(b => b.bbox.x + b.bbox.width / 2);
@@ -90,10 +84,8 @@ function center(b) {
   return { x: b.bbox.x + b.bbox.width / 2, y: b.bbox.y + b.bbox.height / 2 };
 }
 
-// Does this lib-merged block read as ONE visual unit (bubble/paragraph)?
-// Constituents must be aligned (center or left), of comparable width, and
-// tightly stacked. List rows glued with their neighbors' badges/indices fail
-// these and get split back to raw lines.
+// Does this lib-merged block read as one visual unit (bubble / paragraph)?
+// Constituents must be aligned, of comparable width, and tightly stacked.
 function mergeLooksLikeUnit(constituents) {
   if (constituents.length < 2) return true;
   const avgW = constituents.reduce((s, b) => s + b.bbox.width, 0) / constituents.length;
@@ -115,11 +107,8 @@ function mergeLooksLikeUnit(constituents) {
   return Math.min(leftDev, centerDev) <= avgW * AUDIT_MAX_EDGE_DEVIATION;
 }
 
-// Which blocks become panes. Lib-merged paragraphs give one pane per bubble —
-// but the merge is audited per block: only merges whose raw constituents look
-// like one unit are kept, the rest are split back to their raw lines (dense
-// UI/list content glues neighboring rows together otherwise). Word piles skip
-// merging entirely: per-word positioning is the point there.
+// Which blocks become panes: audited lib-merged paragraphs, else their raw
+// lines; word piles skip merging entirely.
 export function pickScatterBlocks(rawBlocks, mergedBlocks) {
   if (isWordPile(rawBlocks)) return rawBlocks;
   const merged = positioned(mergedBlocks);
@@ -151,12 +140,8 @@ export function pickScatterBlocks(rawBlocks, mergedBlocks) {
   return result;
 }
 
-// Boxes must sit inside the frame they were read from. Engines report in their
-// own coordinate space, and a whole-set overshoot means that space isn't
-// source-image pixels — scattering on those numbers would paste translations
-// far from the text they belong to. Distrusting the set degrades to unified,
-// which is what these engines did before they reported boxes at all. The
-// tolerance absorbs edge-clipped boxes and rounding, not a 2× scale error.
+// Boxes must sit inside the frame they were read from; a whole-set
+// overshoot degrades to unified.
 const FRAME_OVERSHOOT_TOLERANCE = 0.25;
 
 export function coordsFitFrame(blocks, frame) {
@@ -175,12 +160,8 @@ export function coordsFitFrame(blocks, frame) {
 }
 
 // Manual pref ('scattered'|'unified') overrides the heuristic ('auto').
-// Scattered mode needs positioned text blocks either way — engines that return
-// no box coordinates (LLM vision) fall back to unified instead of rendering
-// zero panes and dropping the text. `fellBack` drives the badge's "engine gave
-// no coordinates" hint, and auto mode raises it too: silently landing on
-// unified reads as "the heuristic chose this", when the truth is it never got
-// to choose.
+// Engines that return no box coordinates fall back to unified; `fellBack`
+// drives the badge's hint.
 export function resolveDisplayMode(pref, rawBlocks, mergedBlocks, frame = null) {
   if (pref === 'unified') return { useScattered: false, fellBack: false, blocks: null };
 

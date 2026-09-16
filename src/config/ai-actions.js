@@ -1,13 +1,10 @@
-// Data-driven AI action catalog. An action is a prompt config, NOT code: these
-// fields tell the framework where an entry may appear, whether the current
-// provider can run it, how the prompt is built, and where the result may be
-// stored. Adding an action means adding data — imported actions (validated by
-// normalizeActionConfig) travel the exact same path as the built-ins below.
+// Data-driven AI action catalog. An action is a prompt config, not code;
+// imported actions (validated by normalizeActionConfig) travel the same
+// path as the built-ins below. Design notes: docs/design/renderer.md §6.
 
 export const AI_ACTION_SCHEMA_VERSION = 1;
 
-// Placeholders a prompt template may use. Validated at import time so a typo
-// fails loudly instead of shipping a literal "{{sorceText}}" to the model.
+// Placeholders a prompt template may use; validated at import time.
 export const AI_ACTION_VARS = ['sourceText', 'translatedText', 'sourceLanguage', 'outputLanguage'];
 
 // 'text' = any chat-capable LLM; 'vision' = needs a vision model (path B).
@@ -19,30 +16,22 @@ const AI_ACTION_CAPABILITIES = ['text', 'vision'];
 const AI_ACTION_HISTORY_MODES = ['attach', 'none'];
 
 // Entry points an action may be offered on.
-// 'document' is a reading surface too: a paragraph of a translated manual can
-// be as opaque as a screenshot. Missing from this list, an imported action
-// aimed at documents would be rejected at import while the built-in worked.
 const AI_ACTION_SURFACES = ['selection', 'screenshot', 'floating', 'document'];
 
-// The "看 vs 懂" split as the floating window's toggle sees it: 'translate'
-// actions belong to reading (toggle off), 'understand' actions to the
-// understanding mode (toggle on), 'any' to both. Surfaces without the toggle
-// behave as if it were off.
+// The reading / understanding split as the floating window's toggle sees
+// it: 'translate' = toggle off, 'understand' = toggle on, 'any' = both.
+// Surfaces without the toggle behave as if it were off.
 const AI_ACTION_MODES = ['translate', 'understand', 'any'];
 
 // 'target'/'source' follow the translation's languages, 'ui' follows the app
 // language; anything else is taken as a literal language code.
 const AI_ACTION_OUTPUT_LANGUAGES = ['target', 'source', 'ui'];
 
-// Long-form gate for summary-shaped actions. CJK characters and Latin words are
-// counted separately because 150 Chinese characters and 150 English words are
-// nowhere near the same amount of content. These numbers are a starting point —
-// the design leaves the final values to measurement on real documents.
+// Long-form gate for summary-shaped actions; CJK characters and Latin
+// words are counted separately.
 export const LONG_FORM_GATE = { cjk: 150, latin: 120 };
 
-// The Latin bar tracks the CJK one at the ratio the built-in default carried
-// (150 characters ≈ 120 words), so the user tunes one number instead of two
-// that have to be kept in a sensible relationship with each other.
+// The Latin bar tracks the CJK one at a fixed ratio; the user tunes one number.
 export function longFormGate(cjkChars) {
   const cjk = Number(cjkChars);
   if (!Number.isFinite(cjk) || cjk <= 0) return LONG_FORM_GATE;
@@ -61,16 +50,13 @@ const SUMMARIZE = {
   history: 'attach',
   trigger: {
     surfaces: ['selection', 'screenshot', 'floating'],
-    // Scattered content is a handful of disconnected labels; there is nothing
-    // to summarize, so the entry stays hidden there.
+    // Nothing to summarize in scattered content.
     displayModes: ['unified'],
     minLength: LONG_FORM_GATE,
-    // Reading side only: with the understanding toggle on, the window is not
-    // translating any more, so there is nothing to summarize alongside.
+    // Reading side only.
     mode: 'translate',
   },
-  // The model reads the source side and answers in the output language in one
-  // step — a summary of the translation would compound its errors.
+  // The model reads the source side and answers in the output language.
   prompts: {
     zh: {
       system: '你是一个阅读助手。用户会给你一段内容，请基于原文理解它，然后用{{outputLanguage}}写总结。只输出总结正文，不要复述原文，不要说明你在做什么。',
@@ -81,9 +67,8 @@ const SUMMARIZE = {
       user: 'Read the following content and summarize its key points in {{outputLanguage}}.\n\nContent:\n{{sourceText}}\n\nRequirements:\n- 3-5 bullet points, one per line\n- Keep key numbers, names, and terminology\n- Do not add anything the source does not state',
     },
   },
-  // Path B. Carrying these is what marks an action as runnable straight off the
-  // capture; the wording has to change because there is no {{sourceText}} to
-  // paste — the model is looking at the page, layout and all.
+  // Path B prompts: carrying these marks an action as runnable straight off
+  // the capture.
   visionPrompts: {
     zh: {
       system: '你是一个阅读助手。用户会给你一张截图，请读懂图里的内容，然后用{{outputLanguage}}写总结。只输出总结正文，不要描述画面，不要说明你在做什么。',
@@ -96,12 +81,8 @@ const SUMMARIZE = {
   },
 };
 
-// Default action of the floating window's understanding toggle: with the
-// toggle on, a capture is recognized and then run through this instead of
-// being translated. The toggle itself decides nothing — it picks whichever
-// 'understand' action is installed, and what that does is its prompt config.
-// That is what keeps the switch neutral while letting an imported config
-// replace the behavior entirely.
+// Default action of the floating window's understanding toggle; an
+// imported 'understand' action replaces it.
 const EXPLAIN = {
   id: 'explain',
   schemaVersion: AI_ACTION_SCHEMA_VERSION,
@@ -113,14 +94,9 @@ const EXPLAIN = {
   outputLanguage: 'target',
   history: 'attach',
   trigger: {
-    // 'document' joins the floating window: a paragraph of a manual that is
-    // still opaque after translation is the same need the mode switch answers.
-    // The document surface has no switch — asking for a paragraph IS the
-    // request — so it passes understandMode itself.
+    // The document surface passes understandMode itself.
     surfaces: ['floating', 'document'],
-    // No display-mode or length gate: the user turned the mode on, which is
-    // the trigger. Summaries need length to be worth anything; an explanation
-    // of two dense lines does not.
+    // No display-mode or length gate.
     displayModes: null,
     minLength: null,
     mode: 'understand',
@@ -147,17 +123,8 @@ const EXPLAIN = {
   },
 };
 
-// Collects the explanations the reader has already asked for into one note.
-//
-// Deliberately NOT a whole-document summary. It only sees the paragraphs the
-// user chose to open, so calling it that would be a lie — a 200-page manual
-// with three explained paragraphs would produce a "summary" of three hard
-// paragraphs. A true full-document summary needs a map-reduce pass over every
-// segment, which is a pipeline, not a prompt.
-//
-// What it is instead is cheap and honest: the map phase was already paid for
-// by the reader's own clicks, the input is a handful of notes rather than a
-// book, and it gets more complete the more of the document they work through.
+// Collects the explanations the reader has already asked for into one note
+// (not a whole-document summary; docs/design/renderer.md §6).
 const DIGEST = {
   id: 'digest',
   schemaVersion: AI_ACTION_SCHEMA_VERSION,
@@ -167,8 +134,7 @@ const DIGEST = {
   descKey: 'aiActions.digest.desc',
   capability: 'text',
   outputLanguage: 'target',
-  // Documents keep their own progress file and never touch the history store,
-  // so there is no translation entry for this to hang on.
+  // Documents never touch the history store.
   history: 'none',
   trigger: {
     surfaces: ['document'],
@@ -194,9 +160,8 @@ export function getAiAction(id, extraActions = []) {
   return [...BUILTIN_AI_ACTIONS, ...extraActions].find(a => a.id === id) || null;
 }
 
-// What the understanding toggle runs on a capture. Imported actions win over
-// the built-in, which is how installing one swaps the mode's behavior without
-// touching the app.
+// What the understanding toggle runs on a capture; imported actions win
+// over the built-in.
 export function getUnderstandAction(extraActions = []) {
   return [...extraActions, ...BUILTIN_AI_ACTIONS].find(a => a.trigger?.mode === 'understand') || null;
 }
@@ -222,9 +187,8 @@ function checkPrompts(prompts) {
   return null;
 }
 
-// Import gate for third-party action configs: everything the runtime later
-// trusts is checked once, here, and unknown fields are dropped rather than
-// carried along. Returns { ok, action } or { ok: false, error }.
+// Import gate for third-party action configs; unknown fields are dropped.
+// Returns { ok, action } or { ok: false, error }.
 export function normalizeActionConfig(raw) {
   if (!raw || typeof raw !== 'object') return { ok: false, error: 'not an object' };
 
@@ -244,8 +208,7 @@ export function normalizeActionConfig(raw) {
     if (visionError) return { ok: false, error: `visionPrompts: ${visionError}` };
   }
 
-  // Imported actions have no i18n keys of their own, so they must carry their
-  // own display text.
+  // Imported actions carry their own display text.
   const labels = raw.labels && typeof raw.labels === 'object' ? raw.labels : null;
   if (!labels || !Object.values(labels).some(v => typeof v === 'string' && v.trim())) {
     return { ok: false, error: 'labels must hold at least one non-empty display name' };
@@ -262,9 +225,7 @@ export function normalizeActionConfig(raw) {
   }
 
   const outputLanguage = raw.outputLanguage || 'target';
-  // Either one of the follow-the-translation keywords or a plain language
-  // code; a typo'd keyword would otherwise be taken as a literal language
-  // name and reach the model as one.
+  // One of the follow-the-translation keywords or a plain language code.
   if (typeof outputLanguage !== 'string' || !/^[a-zA-Z][\w-]*$/.test(outputLanguage)) {
     return { ok: false, error: `outputLanguage must be ${AI_ACTION_OUTPUT_LANGUAGES.join('/')} or a language code` };
   }

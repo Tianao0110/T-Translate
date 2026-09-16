@@ -11,7 +11,7 @@ export const PRIVACY_MODE_ORDER = ['standard', 'secure', 'offline'];
 // on = works as usual, part = works with restrictions, off = unavailable
 export const MODULE_STATE = {
   translators: { standard: 'on', secure: 'on', offline: 'part' },
-  // Incognito: Windows OCR is out because it needs the capture as a temp file.
+  // Incognito: Windows OCR is out (temp file).
   ocr: { standard: 'on', secure: 'part', offline: 'part' },
   // Incognito: the session runs, the metrics log is simply not written.
   listen: { standard: 'on', secure: 'part', offline: 'on' },

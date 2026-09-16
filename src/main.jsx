@@ -76,9 +76,7 @@ const checkElectronAPI = () => {
 const THEMES = ['light', 'dark', 'fresh'];
 
 const initTheme = () => {
-  // No 'auto'/follow-system branch: nothing ever writes theme='auto' (the UI
-  // has only light/dark/fresh), so it was dead. A stray/unknown value falls
-  // back to light rather than an unmatched data-theme.
+  // A stray / unknown theme value falls back to light.
   const savedTheme = localStorage.getItem('theme');
   document.documentElement.setAttribute(
     'data-theme',
@@ -180,8 +178,7 @@ window.TTranslate = {
       }
     },
 
-    // Goes through the main-process stack — with webSecurity on, the renderer
-    // cannot (and should not) reach any endpoint directly.
+    // Goes through the main-process stack.
     testLLMConnection: async () => {
       try {
         const result = await window.electron?.stack?.testProvider?.('local-llm');

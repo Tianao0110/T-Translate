@@ -3,23 +3,17 @@
 export function detectLanguage(text) {
   if (!text) return 'auto';
 
-  // Kana before Han: Japanese mixes kana with kanji, so checking Han first
-  // misfiles Japanese as Chinese (which then wrongly flips ja→zh into ja→en).
+  // Kana before Han (Japanese mixes kana with kanji).
   if (/[぀-ヿ]/.test(text)) return 'ja';
   if (/[가-힯]/.test(text)) return 'ko';
   if (/[一-龥]/.test(text)) return 'zh';
   return 'en';
 }
 
-// What to do when the detected language already equals the target.
-// 'original' (default): show the source untranslated, no provider call.
-// 'swap': translate back into the user's configured source language — NOT a
-// hardcoded zh<->en pair (that old heuristic misled non-zh/en users); with
-// source on "auto" there is no other side, so zh<->en stays as the fallback.
-// Both behaviors were requested at different times (flip 2026-06-10,
-// passthrough 2026-07-10), so it's a setting now —
-// settings.translation.sameLanguageBehavior, shared by the selection window
-// and the floating window.
+// What to do when the detected language already equals the target
+// (settings.translation.sameLanguageBehavior): 'original' shows the source
+// untranslated; 'swap' translates back into the configured source language,
+// zh<->en when the source is "auto".
 export function resolveSameLanguageTarget(detected, targetLang, behavior = 'original', sourceLang = 'auto') {
   if (!targetLang || detected !== targetLang) {
     return { targetLang, passthrough: false };
@@ -68,7 +62,7 @@ export function shouldTranslateText(text) {
   // Pure digits/punctuation/symbols — nothing to translate
   if (/^[\d\s\p{P}\p{S}]+$/u.test(clean)) return false;
 
-  // Two letters or fewer of English is usually noise (e.g. UI initials)
+  // Two letters or fewer of English is noise.
   if (clean.length < 3 && /^[a-z]+$/i.test(clean)) return false;
 
   // Already a translation marker ("译: ...")

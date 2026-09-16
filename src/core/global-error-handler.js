@@ -4,8 +4,7 @@ const logger = createLogger('GlobalError');
 
 export function initGlobalErrorHandler() {
   window.onerror = (message, source, lineno, colno, error) => {
-    // `error` carries the stack; the message/line/column trio alone points at
-    // a bundled column number nobody can act on.
+    // `error` carries the stack.
     logger.error(`Uncaught error at ${source}:${lineno}:${colno} —`, error || message);
     return false;
   };

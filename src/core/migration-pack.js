@@ -1,12 +1,8 @@
 // Migration pack: build and parse the single-file JSON that moves settings,
 // glossary, favorites and custom languages between machines.
 //
-// Two hard rules from the product side:
-//   - No API keys. The persisted settings are already key-free (secrets live
-//     in the DPAPI vault, which is machine-bound), but both build and the
-//     import path strip secret fields again — a hand-edited config.json or an
-//     old install must not leak keys into a shareable file.
-//   - No model binaries. This module only ever touches JSON-able state.
+// Two hard rules: no API keys (both build and import strip secret fields),
+// no model binaries.
 //
 // Pure functions; the callers own IPC, dialogs and store writes.
 
@@ -23,9 +19,8 @@ const isPlainObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 const cleanTags = (tags) =>
   Array.isArray(tags) ? tags.filter((t) => typeof t === 'string' && t).slice(0, 20) : [];
 
-// Defense-in-depth secret removal. providersMeta carries each provider's
-// configSchema so schema-declared encrypted fields go first; a name-pattern
-// sweep catches providers the running build has no schema for.
+// Secret removal: schema-declared encrypted fields first, then a
+// name-pattern sweep.
 export function stripSecrets(settings, providersMeta = []) {
   const clean = JSON.parse(JSON.stringify(settings || {}));
 
@@ -61,8 +56,7 @@ export function buildMigrationPack({ settings, favorites, customLanguages, appVe
     if (!f || typeof f.sourceText !== 'string' || typeof f.translatedText !== 'string') continue;
     if (!f.sourceText || !f.translatedText) continue;
     if (f.folderId === 'glossary') {
-      // Same term shape as the standalone glossary export (glossary-io.js),
-      // so the two files stay mutually readable.
+      // Same term shape as the standalone glossary export (glossary-io.js).
       glossary.push({
         source: f.sourceText,
         target: f.translatedText,

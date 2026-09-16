@@ -1,13 +1,6 @@
 // The language catalogue, shared by the renderer (picker) and the stack
-// (prompt building) — src/stack/service.js already imports config/filters.js,
-// so pure data crossing that line is established practice. One table means the
-// picker can never offer a language the prompt builder cannot name.
-//
-// Scope = what Google Translate supports. Google is enabled by default, needs
-// no key, and google-translate.js passes unmapped codes straight through
-// (`mapping[code] || code`), so every entry here works out of the box without
-// a single per-provider mapping. Sources with narrower coverage (DeepL) reject
-// what they cannot do and the chain moves on.
+// (prompt building). Scope = what Google Translate supports. Design notes:
+// docs/design/renderer.md §8.
 //
 // Fields:
 //   code   what we send to providers, and the key everything else joins on
@@ -15,10 +8,9 @@
 //   nativeName endonym, shown beside the label
 //   en     English name — also the letter-index key for the English UI
 //
-// MAINTENANCE: `npm run check:languages` keeps this in sync with the provider
-// maps. `node scripts/bench/verify-google-languages.mjs` asks Google to translate a
-// sample into every code and reports the ones it rejects — run that after
-// adding entries rather than trusting a code by eye.
+// Maintenance: `npm run check:languages` keeps this in sync with the
+// provider maps; `node scripts/bench/verify-google-languages.mjs` verifies
+// new codes against Google.
 
 export const LANGUAGES = [
   { code: 'auto', name: '自动检测', nativeName: 'Auto Detect', en: 'Auto Detect' },
@@ -164,14 +156,9 @@ export function getLanguageName(code) {
   return LANGUAGE_BY_CODE[code]?.name || code;
 }
 
-// Pinyin initial of every character that starts a Chinese language name.
-// The letter index follows the UI language — a Chinese reader looks for 荷兰语
-// under H, an English reader looks for Dutch under D — so the Chinese side
-// needs the reading, not the character.
-//
-// Keyed by character rather than by language: 100 characters cover all 134
-// names, and a new language usually starts with one already here.
-// `npm run check:languages` fails if a name starts with an unmapped character.
+// Pinyin initial of every character that starts a Chinese language name
+// (the letter index follows the UI language). Keyed by character;
+// `npm run check:languages` fails if a name starts with an unmapped one.
 const PINYIN_INITIALS = {
   南: 'N', 阿: 'A', 亚: 'Y', 艾: 'A', 班: 'B', 巴: 'B', 白: 'B', 孟: 'M',
   博: 'B', 波: 'B', 保: 'B', 加: 'J', 宿: 'S', 齐: 'Q', 中: 'Z', 繁: 'F',

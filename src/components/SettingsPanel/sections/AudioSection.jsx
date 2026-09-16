@@ -1,8 +1,6 @@
-// 「音频」 section: two entry cards (听 = recognition models, 读 = read-aloud)
-// that open their own sub-page, with a back button. Replaces the separate
-// 听译模型 and 朗读设置 nav items (user's call 2026-09-03). Every visit from
-// the sidebar starts on the cards; a settings search that matched listen or
-// speech keywords lands on the matching sub-page directly (initialView).
+// Audio section: two entry cards (listen = recognition models, speech =
+// read-aloud) that open their own sub-page, with a back button. A settings
+// search that matched one side lands on that sub-page (initialView).
 
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';

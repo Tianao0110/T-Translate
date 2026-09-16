@@ -43,15 +43,12 @@ function validateSelectionText(text, settings, t) {
   if (text.length > settings.maxChars) {
     throw new Error(t('selection.tooLong', '文字太长（最多 {{max}} 字符）').replace('{{max}}', settings.maxChars));
   }
-  // Require at least one letter/number in ANY script (Cyrillic, Greek, Arabic,
-  // Thai, …), not just Latin+CJK — the old class rejected every supported
-  // non-Latin-non-CJK language outright.
+  // At least one letter / number in any script.
   if (!/[\p{L}\p{N}]/u.test(text)) {
     throw new Error(t('selection.noValidText', '选中内容无有效文字'));
   }
-  // Very long single-char runs usually mean OCR/encoding garbage. Threshold kept
-  // high so legit emphatic repetition ("哈哈哈…") and divider lines ("====")
-  // aren't rejected.
+  // Very long single-char runs are OCR / encoding garbage (threshold high
+  // enough for emphatic repetition and divider lines).
   if (/(.)\1{30,}/.test(text)) {
     throw new Error(t('selection.possibleGarbage', '选中内容可能是乱码'));
   }
@@ -68,8 +65,7 @@ const SelectionTranslator = () => {
   const [translatedText, setTranslatedText] = useState('');
   const [error, setError] = useState('');
   const [isOcrError, setIsOcrError] = useState(false);
-  // Non-fatal hint riding on screenshot results (e.g. vision engine degraded
-  // to local OCR) — this chain has no other surface to tell the user.
+  // Non-fatal hint riding on screenshot results (e.g. vision engine degraded).
   const [notice, setNotice] = useState('');
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [copied, setCopied] = useState(false);
@@ -87,7 +83,7 @@ const SelectionTranslator = () => {
   const [ttsStatus, setTtsStatus] = useState(TTS_STATUS.IDLE);
 
   // Bumped on every adjustWindowToContent run; a later run supersedes an
-  // in-flight one so overlapping passes can't fight over the final bounds.
+  // in-flight one.
   const positionTokenRef = useRef(0);
 
   const frozenRef = useRef(false); // mirror of isFrozen for timer callbacks
@@ -95,27 +91,19 @@ const SelectionTranslator = () => {
   const triggerReadyTimerRef = useRef(null);
   const contentRef = useRef(null);
   const translateTextRef = useRef(null);
-  // Phase B pass-through: when main grabbed text in Layer 3, payload carries it.
-  // handleTriggerClick prefers this over a second GET_TEXT IPC roundtrip.
+  // Phase B pass-through: text main already grabbed, carried by the payload.
   const prefetchedTextRef = useRef(null);
-  // Bumped by resetSession on every new session. Async translate paths capture
-  // it and bail after their await if a newer session started, so a stale result
-  // never overwrites a fresh trigger.
+  // Bumped by resetSession; async paths bail when a newer session started.
   const generationRef = useRef(0);
-  // Work area of the display the selection happened on (from the main payload).
-  // Placement clamps to THIS monitor's bounds+origin, not window.screen (which
-  // is only the current display and carries no global offset).
+  // Work area of the display the selection happened on; placement clamps to it.
   const screenBoundsRef = useRef(null);
-  // True while adjustWindowToContent is moving the window programmatically, so
-  // the drag-to-freeze poll doesn't mistake our own setBounds for a user drag.
+  // True while adjustWindowToContent is moving the window programmatically.
   const isAdjustingRef = useRef(false);
-  // Actual languages the last translation resolved to (after the same-language
-  // flip). History metadata and TTS read this instead of the configured target,
-  // which would otherwise mislabel/mis-voice flipped results.
+  // Actual languages the last translation resolved to (after the
+  // same-language flip); history metadata and TTS read this.
   const lastResolvedLangsRef = useRef({ sourceLanguage: 'auto', targetLanguage: 'zh' });
 
-  // Keep the document language in sync with the UI language (the static HTML
-  // hardcoded a single lang; this popup is bilingual).
+  // Keep the document language in sync with the UI language.
   useEffect(() => {
     if (i18n?.language) document.documentElement.lang = i18n.language;
   }, [i18n?.language]);
@@ -140,8 +128,7 @@ const SelectionTranslator = () => {
     if (ttsStatus === TTS_STATUS.SPEAKING) {
       ttsManager.stop();
     } else {
-      // Speak in the language actually translated INTO (post-flip), not the
-      // configured target — otherwise a flipped ja→en result gets a zh voice.
+      // Speak in the language actually translated into (post-flip).
       const speakLang = lastResolvedLangsRef.current.targetLanguage || translation.targetLanguage;
       ttsManager.speak(translatedText, { lang: speakLang }).catch(e => {
         logger.error('TTS error:', e);
@@ -149,10 +136,8 @@ const SelectionTranslator = () => {
     }
   }, [translatedText, translation.targetLanguage, ttsStatus]);
 
-  // Central per-session reset. The window is reused (hidden, not closed), so
-  // every entry point must scrub the previous session or its state leaks across
-  // selections (stale OCR-error button, mouse position, in-flight translation,
-  // still-speaking TTS). Bumps the generation so pending async work self-cancels.
+  // Central per-session reset (the window is reused): every entry point
+  // scrubs the previous session and bumps the generation.
   const resetSession = () => {
     generationRef.current += 1;
     ttsManager.stop();
@@ -165,9 +150,7 @@ const SelectionTranslator = () => {
     setTriggerFailed(false);
   };
 
-  // Degrade hint is transient — the vision lock means it only ever appears on
-  // the first two captures anyway, so a permanent banner just nags. Auto-clear
-  // 3s after it shows (a newer notice resets the timer).
+  // Degrade hint is transient: auto-clears 3 s after it shows.
   useEffect(() => {
     if (!notice) return;
     const id = setTimeout(() => setNotice(''), 3000);
@@ -204,11 +187,10 @@ const SelectionTranslator = () => {
       setTranslatedText('');
       setIsFrozen(false);
 
-      // Phase B pass-through: take Layer-3 text if present.
-      // Null out after assignment so a stale value can't leak into next cycle.
+      // Phase B pass-through: take the prefetched text if present, once.
       prefetchedTextRef.current = data.text || null;
 
-      // Debounce: ignore clicks for 100ms so a fast mouse-up doesn't fire trigger
+      // Debounce: ignore clicks for 100 ms after show.
       setTriggerReady(false);
       triggerReadyTimerRef.current = setTimeout(() => {
         setTriggerReady(true);
@@ -231,11 +213,10 @@ const SelectionTranslator = () => {
         return;
       }
       resetSession();
-      // Screenshot path has no cursor anchor — (0,0) routes adjustWindowToContent
-      // through the startDrag branch (keep the window where main positioned it).
+      // Screenshot path has no cursor anchor: (0,0) keeps the window where
+      // main positioned it.
       setMousePos({ x: 0, y: 0 });
-      // Work area of the capture's display, so the grown card clamps on-screen
-      // even when the shot was taken hard against a screen edge.
+      // Work area of the capture's display, for clamping the grown card.
       if (data.screenBounds) screenBoundsRef.current = data.screenBounds;
 
       if (data.theme) setTheme(data.theme);
@@ -244,8 +225,7 @@ const SelectionTranslator = () => {
       const newSettings = { ...DEFAULT_SETTINGS, ...data.settings };
       setSettings(newSettings);
 
-      // Error payload (e.g. loading watchdog timeout) — surface it instead of
-      // silently doing nothing (this branch previously had no receiver).
+      // Error payload (e.g. loading watchdog timeout).
       if (data.error) {
         logger.debug('Showing result error:', data.error);
         setSourceText('');
@@ -320,7 +300,7 @@ const SelectionTranslator = () => {
         setIsFrozen(false);
         // Caller already positioned us (screenshot bounds) — just show.
         setMode('overlay');
-        // Auto-hide handled by the unified overlay effect (乙案), no per-path timer.
+        // Auto-hide is handled by the unified overlay effect.
       }
     });
 
@@ -404,14 +384,9 @@ const SelectionTranslator = () => {
       if (triggerReadyTimerRef.current) clearTimeout(triggerReadyTimerRef.current);
     });
 
-    // No settings-changed listener anymore: the translation stack lives in the
-    // main process and reloads itself on save — this persistent window picks
-    // up new keys/priority automatically. (The selection UI settings arrive
-    // with each show via the payload, so nothing else needs the broadcast.)
-
-    // No keydown/ESC handler: the window is focusable:false (deliberate — it
-    // must never steal focus), so it can't receive keyboard events. Closing is
-    // via right-click, the ✕ button, click-outside, or auto-hide.
+    // No settings-changed listener (the stack reloads itself in the main
+    // process; UI settings arrive with each show) and no keydown handler (the
+    // window is focusable:false).
 
     return () => {
       if (removeShowListener) removeShowListener();
@@ -436,8 +411,7 @@ const SelectionTranslator = () => {
     setMode('loading');
 
     try {
-      // Phase B pass-through (see prefetchedTextRef comment). Fallback only
-      // hits IPC if Layer 1/2 carried no text in the SHOW_TRIGGER payload.
+      // Prefetched text first; IPC only when the payload carried none.
       let text = prefetchedTextRef.current;
       prefetchedTextRef.current = null;
       if (!text) {
@@ -475,16 +449,14 @@ const SelectionTranslator = () => {
     }
   };
 
-  // Resize window to fit translated content, then reposition near mousePos.
-  // keepPosition (frozen cards, screenshot path): resize in place at the current
-  // window position — a frozen card was deliberately dragged somewhere by the
-  // user, snapping it back to the selection anchor would undo that.
+  // Resize the window to fit the content, then reposition near mousePos.
+  // keepPosition (frozen cards, screenshot path): resize in place.
+  // Geometry notes: docs/design/renderer.md §3.
   const adjustWindowToContent = async (keepPosition = false) => {
     const contentEl = contentRef.current;
     if (!contentEl) return;
 
-    // Latest-wins guard: a re-run (e.g. toggling source) supersedes any pass
-    // still waiting on its reflow timeout.
+    // Latest-wins guard.
     const myToken = ++positionTokenRef.current;
 
     // Suppress the drag-to-freeze poll while we move the window ourselves.
@@ -494,8 +466,7 @@ const SelectionTranslator = () => {
     const maxHeight = 350, minHeight = 65;
     const toolbarHeight = 36;
 
-    // Clamp to the display the selection was on (origin-aware), not window.screen
-    // — which is only the current monitor and drops multi-display offsets.
+    // Clamp to the display the selection was on (origin-aware).
     const sb = screenBoundsRef.current;
     const originX = sb ? sb.x : 0;
     const originY = sb ? sb.y : 0;
@@ -518,9 +489,8 @@ const SelectionTranslator = () => {
 
     width = Math.round(width);
 
-    // Anchor X (and the top Y) is computed ONCE and reused for both the measure
-    // pass and the final pass, so the card can't shift horizontally between them.
-    // Only Y is refined after height is known (flip above the cursor on overflow).
+    // Anchor X (and the top Y) is computed once for both passes; only Y is
+    // refined after the height is known.
     let anchorX, topY;
     if (hasValidMousePos) {
       anchorX = mousePos.x - width / 2;
@@ -536,10 +506,7 @@ const SelectionTranslator = () => {
 
     if (positionTokenRef.current !== myToken) return; // superseded during the await above
 
-    // Measure at the target width WITHOUT resizing the window: force the content
-    // element's width, read its wrapped height synchronously, restore. The old
-    // approach resized the window to maxHeight as a "measure pass" and shrank it
-    // after — a visible balloon-then-shrink flash on every source toggle.
+    // Measure at the target width without resizing the window.
     const origWidth = contentEl.style.width;
     const origFlex = contentEl.style.flex;
     // border-box width the content will get inside the final window:
@@ -553,16 +520,14 @@ const SelectionTranslator = () => {
 
     const height = Math.min(Math.max(contentHeight + toolbarHeight + 16, minHeight), maxHeight);
 
-    // Single visible resize: geometry fully known, refine Y (flip above cursor
-    // on bottom overflow) and apply once.
+    // Single visible resize: refine Y (flip above the cursor on bottom
+    // overflow) and apply once.
     let y = topY;
     if (hasValidMousePos && y + height > originY + sh - 10) y = mousePos.y - height - 10;
     if (y < originY + 10) y = originY + 10;
 
-    // Universal off-screen guard for the FINAL geometry. The cursor path clamps
-    // anchorX earlier, but the keepPosition/screenshot path anchors at the
-    // clamped 28×28 loading spot and then the card GROWS — without this the
-    // expansion overflows the work area at screen edges.
+    // Off-screen guard for the final geometry (the keepPosition path grows
+    // from the loading spot).
     let finalX = anchorX;
     if (finalX + width > originX + sw - 10) finalX = originX + sw - width - 10;
     if (finalX < originX + 10) finalX = originX + 10;
@@ -575,29 +540,24 @@ const SelectionTranslator = () => {
       width, height: Math.round(height)
     });
 
-    // Let the bounds settle, then re-enable drag detection with the new position
-    // as its baseline (see the drag poll's isAdjustingRef handling).
+    // Let the bounds settle, then re-enable drag detection with the new
+    // position as its baseline.
     setTimeout(() => {
       if (positionTokenRef.current === myToken) isAdjustingRef.current = false;
     }, 150);
   };
 
   useEffect(() => {
-    // Fit the window to the card whenever we're in overlay mode — even on an
-    // empty translation. Gating on (translatedText || error) meant an empty
-    // result skipped the resize and the window stayed at the 40px trigger size.
-    // Frozen cards resize in place (keepPosition) instead of re-anchoring.
-    // isFrozen is read via ref, NOT a dependency: freezing happens mid-drag, and
-    // an adjust fired at that moment would setBounds into the OS move loop and
-    // kill the user's drag. Content didn't change on freeze — nothing to resize.
+    // Fit the window to the card whenever we're in overlay mode, even on an
+    // empty translation. Frozen cards resize in place. isFrozen is read via
+    // ref, not a dependency (docs/design/renderer.md §3).
     if (mode === 'overlay') {
       adjustWindowToContent(frozenRef.current);
     }
   }, [mode, translatedText, error, showSource]);
 
-  // Unified auto-hide for result cards (乙案): every overlay path hides after
-  // triggerTimeout. Hovering the card pauses the countdown (effect early-returns
-  // while hovered, reschedules the full timeout on leave); frozen cards exempt.
+  // Unified auto-hide for result cards: every overlay path hides after
+  // triggerTimeout; hovering pauses the countdown; frozen cards exempt.
   useEffect(() => {
     if (mode !== 'overlay' || isFrozen || cardHovered) return;
     const timeout = settings.triggerTimeout || 4000;
@@ -607,22 +567,19 @@ const SelectionTranslator = () => {
   }, [mode, isFrozen, cardHovered, settings.triggerTimeout]);
 
   const translateText = async (text, retryCount = 0, overrideTargetLang = null, overrideSourceLang = null, overrideBehavior = null) => {
-    // Override > state > default. Used by screenshot path which knows the lang
-    // before the state hook update has propagated.
+    // Override > state > default.
     const requestedTarget = overrideTargetLang || translation.targetLanguage || 'zh';
     const sourceLang = overrideSourceLang || translation.sourceLanguage || 'auto';
     const behavior = overrideBehavior || translation.sameLanguageBehavior || 'original';
 
-    // Text already in the target language: show the original or swap back to
-    // the configured source language, per settings.translation
-    // .sameLanguageBehavior (shared with the floating window — see
-    // resolveSameLanguageTarget).
+    // Text already in the target language: per
+    // settings.translation.sameLanguageBehavior (resolveSameLanguageTarget).
     const detected = detectLanguage(text);
     const resolved = resolveSameLanguageTarget(detected, requestedTarget, behavior, sourceLang);
     const targetLang = resolved.targetLang;
 
-    // Record the languages actually used (post-resolve) for history + TTS.
-    // passthrough also gates history: an untranslated echo is not a record.
+    // Record the languages actually used (post-resolve) for history + TTS;
+    // passthrough also gates history.
     lastResolvedLangsRef.current = {
       sourceLanguage: sourceLang !== 'auto' ? sourceLang : detected,
       targetLanguage: targetLang,
@@ -635,9 +592,7 @@ const SelectionTranslator = () => {
     }
 
     try {
-      // Privacy fields no longer travel from here — the main-process facade
-      // reads the live mode per request (this persistent window can never hold
-      // a stale mode again).
+      // Privacy fields are injected by the main-process facade.
       const result = await translationService.translate(text, {
         sourceLang: sourceLang,
         targetLang: targetLang,
@@ -654,12 +609,11 @@ const SelectionTranslator = () => {
 
       return result.text;
     } catch (err) {
-      // One automatic retry for transient network failures only. Match common
-      // markers in both languages rather than a single '连接' substring.
+      // One automatic retry for transient network failures only.
       if (retryCount < 1 && /fetch|network|timeout|ECONN|连接|超时|网络/i.test(err.message || '')) {
         logger.debug('Retrying translation...');
         await new Promise(r => setTimeout(r, 1000));
-        // Forward override langs on retry — otherwise retry would silently fall back to state
+        // Forward override langs on retry.
         return translateText(text, retryCount + 1, overrideTargetLang, overrideSourceLang, overrideBehavior);
       }
 
@@ -683,8 +637,7 @@ const SelectionTranslator = () => {
     if (settings.autoCloseOnCopy) {
       setTimeout(() => {
         ttsManager.stop();
-        // Frozen cards live in the frozen pool — hide() would only conceal one,
-        // leaving an invisible click-catcher; close it out properly.
+        // Frozen cards live in the frozen pool: close, not hide.
         if (isFrozen && windowId) {
           window.electron?.selection?.closeFrozen?.(windowId);
         } else {
@@ -697,8 +650,7 @@ const SelectionTranslator = () => {
     }
   };
 
-  // AI actions read the selected text, not the translation — understanding is
-  // done on the original side and answered in the target language in one step.
+  // AI actions read the selected text, not the translation.
   const attachAiResultFromCard = useCallback((payload) => {
     window.electron?.selection?.attachAiResult?.(payload);
   }, []);
@@ -707,9 +659,8 @@ const SelectionTranslator = () => {
   const aiTargetLanguage = translation.targetLanguage || 'zh';
   const aiResult = ai.expandedFor(sourceText, aiTargetLanguage);
 
-  // The source text and every AI result share one panel above the translation:
-  // opening either closes the other, so the card only ever grows by one block
-  // and there is exactly one place to look.
+  // The source text and every AI result share one panel above the
+  // translation: opening either closes the other.
   const toggleSource = (e) => {
     e.stopPropagation();
     ai.collapse();
@@ -725,10 +676,7 @@ const SelectionTranslator = () => {
         sourceText,
         translatedText,
         sourceLanguage: lastResolvedLangsRef.current.sourceLanguage,
-        // The configured target, not the resolved one. lastResolvedLangs holds
-        // the post-same-language-swap value, which history and TTS want but a
-        // summary does not: selecting Chinese with "swap back" on flips that
-        // field to English, and the summary came back in English too.
+        // The configured target, not the resolved one.
         targetLanguage: aiTargetLanguage,
       }
     );
@@ -767,9 +715,8 @@ const SelectionTranslator = () => {
     frozenRef.current = isFrozen;
   }, [isFrozen]);
 
-  // Drag detection: -webkit-app-region: drag doesn't fire mouseup, so we poll
-  // window bounds. When the user has moved the window >10px, freeze it into a
-  // detached overlay so the next selection spawns a fresh trigger.
+  // Drag detection by polling window bounds: a move > 10 px freezes the
+  // card into a detached overlay.
   useEffect(() => {
     if (mode !== 'overlay' || isFrozen) return;
 
@@ -788,9 +735,7 @@ const SelectionTranslator = () => {
         const currentBounds = await window.electron?.selection?.startDrag?.();
         if (!currentBounds) return;
 
-        // While adjustWindowToContent is moving the window, keep re-baselining so
-        // its programmatic setBounds never reads as a user drag (which would
-        // freeze a card the moment its content resized).
+        // Re-baseline while adjustWindowToContent is moving the window.
         if (isAdjustingRef.current) {
           lastCheckBounds = currentBounds;
           return;
@@ -818,11 +763,8 @@ const SelectionTranslator = () => {
               clearTimeout(autoHideTimerRef.current);
               autoHideTimerRef.current = null;
             }
-            // History was already recorded when this translation completed; the
-            // store dedups on (source, result), so re-adding here is pure noise.
           } else if (result?.error === 'limit') {
-            // Pinned-window cap reached: card stays active, tell the user why it
-            // didn't detach instead of silently closing someone's pinned content.
+            // Pinned-window cap reached: the card stays active and says why.
             setFreezeHint(true);
             setTimeout(() => setFreezeHint(false), 2500);
           }

@@ -20,8 +20,7 @@ const _t = (key, fallback) => {
 
 const CJK = /[぀-ヿ㐀-䶿一-鿿가-힯豈-﫿]/;
 
-// CJK characters and Latin-ish words are counted on their own scales — one
-// "unit" of Chinese is a character, one unit of English is a word.
+// CJK characters and Latin-ish words are counted on their own scales.
 export function measureText(text) {
   const s = typeof text === 'string' ? text : '';
   let cjk = 0;
@@ -32,18 +31,15 @@ export function measureText(text) {
   return { cjk, latin };
 }
 
-// Either scale clearing its own bar counts: mixed text (a Chinese article
-// quoting English) should not have to clear both.
+// Either scale clearing its own bar counts.
 export function meetsLengthGate(text, gate) {
   if (!gate) return true;
   const { cjk, latin } = measureText(text);
   return (gate.cjk > 0 && cjk >= gate.cjk) || (gate.latin > 0 && latin >= gate.latin);
 }
 
-// Which pipeline this action would run through right now, or null if neither
-// is possible. Path B (the vision model reads the capture) wins when it is
-// available: it sees the layout, so nothing is lost to OCR errors or to text
-// that a recognizer merged in the wrong order.
+// Which pipeline this action would run through right now, or null if
+// neither is possible. Path B (the vision model reads the capture) wins.
 export function resolveActionPath(action, ctx = {}) {
   if (!action) return null;
   const { capabilities = {}, hasImage = false } = ctx;
@@ -61,8 +57,7 @@ export function checkActionAvailability(action, ctx = {}) {
   const trigger = action.trigger || {};
 
   if (!resolveActionPath(action, ctx)) return { available: false, reason: 'capability' };
-  // Reading and understanding are two states of one window, not two stacked
-  // feature sets: each side offers only its own actions.
+  // Each side of the reading / understanding split offers only its own actions.
   const mode = trigger.mode || 'any';
   if (mode !== 'any' && mode !== (understandMode ? 'understand' : 'translate')) {
     return { available: false, reason: 'understandMode' };
@@ -73,8 +68,7 @@ export function checkActionAvailability(action, ctx = {}) {
   if (displayMode && trigger.displayModes && !trigger.displayModes.includes(displayMode)) {
     return { available: false, reason: 'displayMode' };
   }
-  // The surface may carry the user's own long-form threshold; an action that
-  // declares no gate is unaffected either way.
+  // The surface may carry the user's own long-form threshold.
   const gate = trigger.minLength && ctx.longFormGate ? ctx.longFormGate : trigger.minLength;
   if (!meetsLengthGate(text, gate)) {
     return { available: false, reason: 'tooShort' };
@@ -82,11 +76,9 @@ export function checkActionAvailability(action, ctx = {}) {
   return { available: true, reason: null };
 }
 
-// AI results are derivatives of the content they came from, so they follow the
-// same rule as history. The secure-mode half lives in the store next to
-// addToHistory (one gate for both, and the child windows write through it);
-// this is the config half — an action marked 'none' is module-owned and stays
-// out of the main history in every mode.
+// The config half of the history rule (the secure-mode half lives in the
+// store next to addToHistory): an action marked 'none' stays out of the
+// main history.
 export function isAttachableResult(action) {
   return !!action && action.history === 'attach';
 }
@@ -104,26 +96,18 @@ export function renderTemplate(template, vars = {}) {
   ));
 }
 
-// Pinned to the prompt's language rather than i18n's current one, so a prompt
-// never mixes an English language name into its Chinese wrapper.
+// Pinned to the prompt's language rather than i18n's current one.
 const LANGUAGE_BY_CODE = new Map(LANGUAGES.map((l) => [l.code, l]));
 
-// The name the model is told to answer in. This reads the shared 134-language
-// catalogue, not i18n: the `languages.*` bundle only ever held 16 entries, so
-// every other target reached the prompt as a bare code ("write the summary in
-// it") and models answered in English instead.
-//
-// An unknown code is returned verbatim on purpose — a user-added language
-// stores the model-facing name AS its code (see config/custom-languages.js).
+// The name the model is told to answer in, from the shared language
+// catalogue. An unknown code is returned verbatim (config/custom-languages.js).
 function languageName(code, lang) {
   const entry = LANGUAGE_BY_CODE.get(code);
   if (!entry) return code;
   return lang === 'en' ? entry.en : entry.name;
 }
 
-// Which language the model answers in. The model always reads the source side
-// (translating symbols/formulas first would damage the meaning), so this only
-// controls the output.
+// Which language the model answers in (it always reads the source side).
 function resolveOutputLanguage(action, context, uiLang) {
   const spec = action.outputLanguage || 'target';
   if (spec === 'ui') return uiLang;
@@ -135,8 +119,7 @@ function resolveOutputLanguage(action, context, uiLang) {
   return spec;
 }
 
-// A prompt wrapped in the wrong language pulls weak models into answering in
-// it, so each action carries both and we pick by UI language.
+// Each action carries both prompt languages; picked by UI language.
 function pickPrompts(action, uiLang, path) {
   const prompts = (path === 'vision' ? action.visionPrompts : action.prompts) || {};
   return prompts[uiLang] || prompts[uiLang.split('-')[0]] || prompts.zh || prompts.en
@@ -180,9 +163,7 @@ function normalizeReply(action, result, path) {
   return { success: true, actionId: action.id, content, path, provider: result.provider || null };
 }
 
-// requireChat keeps AI actions off the chatCompletion fallback that translates
-// the prompt when no provider implements chat() — a summary that is really a
-// translated instruction looks like a working feature.
+// requireChat keeps AI actions off the translate-the-prompt fallback.
 async function runTextPath(action, context) {
   const messages = buildActionMessages(action, context, i18n.language || 'zh', 'text');
   if (!messages) return { success: false, error: _t('aiActions.badConfig', '动作配置无效') };
@@ -195,17 +176,14 @@ async function runVisionPath(action, context) {
   if (!messages) return { success: false, error: _t('aiActions.badConfig', '动作配置无效') };
   const result = await translationService.visionChat(messages, context.imageData);
   const reply = normalizeReply(action, result, 'vision');
-  // The result window shows this; 'llm-vision' is an engine id, and the point
-  // for the user is which model actually looked at their screen.
+  // Shown in the result window: which model looked at the screen.
   if (reply.success) {
     reply.provider = result.model ? `LLM Vision (${result.model})` : 'LLM Vision';
   }
   return { ...reply, visionUnsupported: !!result?.visionUnsupported };
 }
 
-// Path B first when it applies, then degrade. A model that turns out not to see
-// images (or an endpoint that is down) must not cost the user the action: the
-// recognized text is already in hand, so path A finishes the job.
+// Path B first when it applies, then path A on failure.
 export async function runAiAction(action, context = {}) {
   const path = resolveActionPath(action, {
     capabilities: context.capabilities || {},
@@ -228,8 +206,7 @@ export async function runAiAction(action, context = {}) {
   }
 }
 
-// What the current setup can actually run. Both probes answer under the live
-// privacy mode, so an offline user with a cloud-only setup gets false for both.
+// What the current setup can actually run, under the live privacy mode.
 export async function getActionCapabilities() {
   const [chat, vision] = await Promise.all([
     translationService.getChatCapability(),

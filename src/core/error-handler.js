@@ -82,8 +82,7 @@ const ERROR_PATTERNS = [
     ],
   },
   {
-    // "No usable provider" is the single most common first-run failure. Without
-    // these it fell through to UNKNOWN ("操作失败：发生未知错误") — zero guidance.
+    // "No usable provider": the most common first-run failure.
     type: ERROR_TYPES.PROVIDER,
     patterns: [
       /没有可用的翻译源/,
@@ -195,8 +194,7 @@ function getProviderMessages() {
     },
     'openai': {
       api_key: _t('errors.p.openai.apiKey', 'OpenAI API Key 无效。请在设置中检查您的 API Key。'),
-      // Key must be the ERROR_TYPES value ('api_quota'), not 'quota' — otherwise
-      // formatError's providerMsgs[errorType] lookup never finds it.
+      // Key must be the ERROR_TYPES value ('api_quota').
       api_quota: _t('errors.p.openai.quota', 'OpenAI API 配额已用尽。请检查您的账户余额。'),
     },
     'deepl': {
@@ -274,8 +272,7 @@ export function getShortErrorMessage(error, options = {}) {
     return formatted.message;
   }
 
-  // Locale-appropriate separator — a hardcoded full-width '：' read as mixed
-  // punctuation on the English UI.
+  // Locale-appropriate separator.
   const sep = i18n.language?.startsWith('zh') ? '：' : ': ';
   return `${formatted.title}${sep}${formatted.message}`;
 }

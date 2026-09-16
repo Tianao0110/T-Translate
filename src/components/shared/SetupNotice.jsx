@@ -3,15 +3,9 @@ import { useTranslation } from 'react-i18next';
 import './setup-notice.css';
 
 /**
- * The one thing a new install gets wrong: no translation source it can reach.
- *
- * A persistent strip rather than a toast, because it is a standing condition,
- * not an event — and it clears itself the moment the stack reloads with
- * something usable, so there is nothing to dismiss and no state to remember.
- *
- * Renders nothing when readiness is unknown (`null`). Saying "translation is
- * not set up" because the check has not answered yet would be a lie shown to
- * exactly the users least able to tell it is one.
+ * Persistent strip for "no translation source can be reached"; clears
+ * itself when the stack reloads with something usable. Renders nothing
+ * while readiness is unknown (`null`).
  */
 export default function SetupNotice({ readiness, onOpenSettings }) {
   const { t } = useTranslation();

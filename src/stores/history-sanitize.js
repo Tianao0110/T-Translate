@@ -1,22 +1,11 @@
-// Guards the persisted text fields of history / favorites entries.
-//
-// A 0.3.x stack bug returned the whole result object ({text:"",from,to}) as a
-// translation when the model replied empty. v0.3.4 stopped that at the cache,
-// and cache entries self-heal — but by then addToHistory had already written
-// the object to disk, where nothing repairs it. Rendering a non-string as a
-// React child throws (#31), so a single bad row takes down the whole panel.
-//
-// Two shapes, two policies:
-//   history   — auto-recorded. A row whose translation cannot be recovered is
-//               not data, it is a failed translation that should never have
-//               been logged. Drop it.
-//   favorites — user-curated. Never delete silently; blank the unusable field
-//               and keep the row.
+// Guards the persisted text fields of history / favorites entries against
+// non-string translations (docs/design/renderer.md §2). history rows that
+// cannot be recovered are dropped; favorites keep the row with the field
+// blanked.
 
 const TEXT_FIELDS = ['sourceText', 'translatedText'];
 
-// Pull a usable string out of whatever was stored. The known poison carries an
-// empty `text`, but a future shape might hold the real translation.
+// Pull a usable string out of whatever was stored.
 function asText(value) {
   if (typeof value === 'string') return value;
   if (value && typeof value === 'object' && typeof value.text === 'string') {
@@ -65,8 +54,8 @@ export function sanitizeTextEntries(list, onUnrecoverable = 'drop') {
   return { entries, repaired, dropped };
 }
 
-// Write-side guard, so nothing new reaches disk in a shape the panels cannot
-// render. Mirrors the stack's _cachedText single exit.
+// Write-side guard, so nothing new reaches disk in a shape the panels
+// cannot render.
 export function toStoredText(value) {
   const text = asText(value);
   return text === null ? '' : text;

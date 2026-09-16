@@ -1,6 +1,4 @@
-// Shared AI-analysis helpers for the favorites/save flows. Two components
-// used to carry verbatim copies of these (and the favorites copy was
-// Chinese-only); keep prompt + reply parsing in one place.
+// Shared AI-analysis helpers for the favorites / save flows.
 
 import i18n from 'i18next';
 
@@ -62,9 +60,7 @@ Style reference rules (isStyleSuggested):
   return { systemPrompt, userPrompt };
 }
 
-// Style-rewrite prompts (main panel Palette button). Bilingual for the same
-// reason as above: a Chinese instruction wrapper around non-Chinese text pulls
-// weak models into replying in Chinese.
+// Style-rewrite prompts (main panel Palette button), bilingual.
 export function getStyleRewritePrompts(referenceText, targetText, strength) {
   const lang = i18n.language || 'zh';
   const isZh = lang.startsWith('zh');

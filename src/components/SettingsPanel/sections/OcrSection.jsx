@@ -9,9 +9,7 @@ import LanguagePicker from '../../shared/LanguagePicker.jsx';
 import PackList from './PackList.jsx';
 import { Seg, Switch } from './shared';
 
-// Must match electron/shared/ocr-packs.js BASE_PACK_ID / HQ_PACK_ID (renderer
-// cannot import main-process modules; the manifest may list other generations'
-// base packs, so the ids must be exact).
+// Must match electron/shared/ocr-packs.js BASE_PACK_ID / HQ_PACK_ID.
 const BASE_PACK_ID = 'base-v6';
 const HQ_PACK_ID = 'base-v6-hq';
 
@@ -92,8 +90,7 @@ const OcrSection = ({
     }
   }, []);
 
-  // Light check (file presence) on page entry; deep (builds the ONNX session,
-  // ~0.5s of main-process stalls) only for explicit user action.
+  // Light check (file presence) on page entry; deep only for explicit user action.
   const checkEngineHealth = useCallback(async (deep = false) => {
     setEngineHealth('checking');
     setHealthError('');
@@ -111,8 +108,7 @@ const OcrSection = ({
     }
   }, [t]);
 
-  // Auto-health-check rapid-ocr on entry only if user is actively using it
-  // (avoid running model load on every settings open if they're on another engine)
+  // Auto-health-check rapid-ocr on entry only if the user is on it.
   useEffect(() => {
     if (settings.ocr.rapidInstalled && settings.ocr.engine === 'rapid-ocr') {
       checkEngineHealth();
@@ -165,8 +161,8 @@ const OcrSection = ({
     checkEngineHealth(true); // deep: validate the fresh download for real
   }), [downloadPack, notify, t, updateSetting, checkEngineHealth]);
 
-  // Immediate-apply control (like theme/language): silent React update +
-  // dot-path persist + engine hot-swap via IPC.
+  // Immediate-apply control: silent React update + dot-path persist + engine
+  // hot-swap via IPC.
   const applyTier = useCallback(async (tier) => {
     updateSetting('ocr', 'modelTier', tier, true);
     window.electron?.store?.set?.('settings.ocr.modelTier', tier);
@@ -187,16 +183,13 @@ const OcrSection = ({
     updateSetting('ocr', 'engine', engineId);
     if (setOcrEngine) setOcrEngine(engineId);
 
-    // Manual re-select of llm-vision clears the auto-degrade lock so the user
-    // can re-enable it after fixing their model setup (lock lives in the
-    // main-process stack now — global across all three windows)
+    // Manual re-select of llm-vision clears the auto-degrade lock.
     if (engineId === 'llm-vision') {
       stackClient.ocr.resetVisionFallback();
     }
   };
 
-  // The picker groups by initial letter, so the pack a language needs rides
-  // in the tooltip instead of an <optgroup>.
+  // The pack a language needs rides in the tooltip.
   const langOptions = useMemo(() => {
     const opts = [{ code: 'auto', name: t('ocr.lang.auto'), en: t('ocr.lang.auto') }];
     for (const group of OCR_LANGUAGE_GROUPS) {
@@ -248,9 +241,8 @@ const OcrSection = ({
     );
   };
 
-  // Render helpers, not inline components: a component defined in the render
-  // body gets a new identity every keystroke, so React would remount the
-  // input and drop focus.
+  // Render helpers, not inline components (an inline component would remount
+  // the input every keystroke).
   const selectButton = (engineId, ready = true, onBlocked) => (
     <button
       className={`btn ${settings.ocr.engine === engineId ? 'active' : ''} ${ready ? '' : 'disabled'}`}

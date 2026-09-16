@@ -3,16 +3,9 @@ import { useTranslation } from 'react-i18next';
 import './one-time-hint.css';
 
 /**
- * A small bubble pointing at a control the user has not met yet.
- *
- * Deliberately only used in the two places the design named. A hint on every
- * control means the first launch pops something everywhere the eye lands,
- * which trains the user to dismiss without reading — and then the two hints
- * that would have helped get dismissed too.
- *
- * Renders nothing once dismissed, and dismissal is permanent — the only way
- * back is the full settings reset, which clears the onboarding flags with
- * everything else.
+ * A small bubble pointing at a control the user has not met yet. Used in
+ * two places only; dismissal is permanent until a full settings reset
+ * (docs/design/renderer.md §9).
  */
 export default function OneTimeHint({ id, text, seen, onDismiss, placement = 'bottom' }) {
   const { t } = useTranslation();
