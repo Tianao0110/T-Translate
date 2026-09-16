@@ -34,7 +34,7 @@
 - 渲染端组件文案 → 加 `locales/zh.js` + `en.js`（两份都加，`check:i18n` 锁同步）
 - 栈内（provider/OCR）文案 → 同样加 locales 两份，代码里用栈的 `_t`
 - 主进程托盘/菜单/IPC 返回给用户的错误串 → 加 `main-i18n.js` 的 **zh 和 en 两个块**
-- 错误分类器 `ERROR_PATTERNS`（`src/core/error-handler.js`）匹配关键词必须**中英双语**各写一份（栈返回哪种语言取决于用户界面语言），`tests/unit/error-classification.test.js` 锁行为
+- 错误分类器 `ERROR_PATTERNS`（`src/core/error-handler.js`）匹配关键词必须**中英双语**各写一份（栈返回哪种语言取决于用户界面语言），`tests/unit/renderer/error-classification.test.js` 锁行为
 
 ---
 

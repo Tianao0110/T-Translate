@@ -197,7 +197,7 @@ npm start             # 实测：设置页出卡片、填 key、测试连接、�
 - **`mode: 'understand'` 的动作会接管悬浮窗的理解模式**，导入的优先于内置：装一份
   就换掉默认的「讲解」，主程序不用改
 
-改完跑 `npm test`——`tests/unit/ai-actions.test.js` 覆盖触发判定与导入校验。
+改完跑 `npm test`——`tests/unit/renderer/ai-actions.test.js` 覆盖触发判定与导入校验。
 
 ---
 

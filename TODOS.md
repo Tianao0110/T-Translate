@@ -83,7 +83,7 @@ v0.3.4 给 Windows OCR / Azure / Google Vision / OCR.space / 百度 五个引擎
 - ② **混合管线**：本地 PP-OCR det 模型只出框（det 权重仅 ~9MB、无需 rec 语言包），裁切文本条喂 LLM 识别——框准、字准，代价是 N 个框 N 次调用（或拼图批量）
 - ③ **场景引导**：散点需求场景（悬浮窗）提示切换本地 OCR 引擎，llm-vision 保持整段专用——零研发成本的兜底文案方案
 
-**四个在线引擎的坐标只有 fixture 验证**（按各家文档的响应形状建的，见 `tests/unit/ocr-blocks.test.js`），无密钥无法端到端实测；Windows OCR 与本地引擎是实测过的。哪天有密钥了，实拍一次散点排版确认坐标空间无误。
+**四个在线引擎的坐标只有 fixture 验证**（按各家文档的响应形状建的，见 `tests/unit/ocr/ocr-blocks.test.js`），无密钥无法端到端实测；Windows OCR 与本地引擎是实测过的。哪天有密钥了，实拍一次散点排版确认坐标空间无误。
 
 ### ~~悬浮窗截图闪烁~~ 已关闭（2026-08-19），**降透明度兜底保留别动**
 
@@ -98,7 +98,7 @@ v0.3.4 给 Windows OCR / Azure / Google Vision / OCR.space / 百度 五个引擎
 - **选择器没有搜索框**：设计上靠字母索引，134 种够用；真扩到 240+ 时要重新评估
 - ⚠️ **暂时性死区已犯三次**，第三次（一键总结的 concurrency）**漏进了 main**。
   "人工留意"这个缓解手段就此作废——留意的人是我，照样漏。现在的防线是
-  `tests/unit/document-translator-mount.test.jsx`：把组件挂载一次。已验证它对着
+  `tests/unit/renderer/document-translator-mount.test.jsx`：把组件挂载一次。已验证它对着
   崩溃版本会红。**它只覆盖必然求值的那部分**（组件体顶层、依赖数组），条件分支里
   的错误照样漏——FloatingWindow / SelectionTranslator /
   SettingsPanel 三个挂载冒烟测试已随 v0.3.7 批 1 补齐

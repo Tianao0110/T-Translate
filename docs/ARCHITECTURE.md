@@ -143,7 +143,7 @@ t-translate/
 └── tests/                      # 测试
     ├── setup.js                # 测试环境配置
     ├── mocks/electron.js       # 主进程模块单测用 electron stub
-    └── unit/                   # 单元测试
+    └── unit/                   # 单元测试，按主题分目录：tengine / listen / ocr / stack / main / renderer
 ```
 
 ## 架构分层
@@ -222,7 +222,7 @@ ai/use-ai-actions           三个窗口共用：能力探测、可用动作、�
 1. **能力看实现不看元数据**。`metadata.supportsChat` 只供 UI 显示；运行时一律走
    `service.getChatCapability()`（与 `chatCompletion` 同一个 provider 循环），AI
    路径带 `requireChat`——否则只会翻译的源会把提示词翻译一遍还回来，看着像功能
-   正常。`tests/unit/provider-chat.test.js` 拿真实类核对那一列，防止漂移
+   正常。`tests/unit/stack/provider-chat.test.js` 拿真实类核对那一列，防止漂移
 2. **两条路径，失败降级**。有视觉模型且手里有截图 → 路径 B（模型直接读图）；否则
    路径 A（文本）。路径 B 失败且有识别文本时自动回落 A——用户不该为模型看不见图
    买单
