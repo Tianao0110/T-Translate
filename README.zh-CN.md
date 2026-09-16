@@ -10,7 +10,7 @@
 
 <p align="center">
   <strong>随手翻译，隐私无忧</strong><br>
-  划词即译 · 截图即译 · 本地 LLM 优先 · API Key 加密存储
+  划词即译 · 截图即译 · 本地模型优先 · API Key 加密存储
 </p>
 
 <p align="center">
@@ -21,48 +21,48 @@
 
 ---
 
+T-Translate 是一个 Windows 桌面翻译工具：在任何程序里选中文字就能翻译，截图能翻译，透明悬浮窗能盖在视频和游戏上实时翻译，电脑里正在播放的声音能变成字幕，PDF、Word、电子书能整本翻译。
+
+它把隐私放在第一位：程序自带本地模型，模型文件放进文件夹就能离线翻译；所有 API 密钥用 Windows 系统加密保存，不出这台电脑；离线模式下不发出任何网络请求。
+
 ## 功能一览
 
-| 功能                   | 说明                                                                                |
-| ---------------------- | ----------------------------------------------------------------------------------- |
-| **划词翻译**     | 系统级，任何应用中选中文字即翻译，支持 8 个冻结窗口                                 |
-| **截图 OCR**     | 截屏识别文字，59 种识别语言，8 个 OCR 引擎自动降级；程序自带视觉模型（PaddleOCR-VL）开显卡加速后接手大图与复杂排版 |
-| **悬浮窗口**     | 透明悬浮窗，空格截图翻译；自动刷新与全局快捷键零焦点截取，实时字幕/追番适用         |
-| **听译**         | 实时转写电脑正在播放的声音并逐句翻译，中/英/日/韩/粤五语，识别在本机，音频不落盘；可只听指定程序；字幕自动保存为 SRT |
-| **本地模型**     | 程序自带本地大模型（Qwen3-1.7B）：模型文件放进文件夹就能翻译和总结，不用装 LM Studio，不开端口，离线可用，可开显卡加速 |
-| **文档翻译**     | PDF / DOCX / EPUB / TXT / SRT 等 9 种格式，逐段翻译，进度可恢复，带术语检查；资源管理器右键直达 |
-| **134 种语言**   | 覆盖谷歌翻译支持的全部语言，选择器带字母索引与常用区，可自行添加语言                 |
-| **AI 动作**      | 长段内容总结；悬浮窗「讲解模式」与文档段落讲解；可导入自定义动作（需大模型源）   |
-| **术语库**       | 翻译后自动替换术语，支持撤销                                                        |
-| **朗读**         | 系统语音 / 神经语音包 / 外接服务三选一，听译字幕可逐句朗读                          |
-| **10 个翻译源**  | LM Studio、Ollama、OpenAI、Claude、Gemini、DeepSeek、DeepL、Google、Microsoft、百度 |
-| **三档隐私模式** | 标准 / 无痕 / 离线，离线模式下在线 API Key 禁止解密                                 |
-| **迁移包**       | 设置、术语库、收藏、自定义语言一键导出导入，换机不丢配置                            |
-| **开机自启**     | 静默运行到托盘，可选自动开启划词翻译                                                |
+| 功能 | 说明 |
+| --- | --- |
+| **划词翻译** | 在任何程序里选中文字，点一下就翻译；卡片可固定 |
+| **截图翻译** | 框选屏幕任意区域识别并翻译，多显示器可用 |
+| **悬浮窗口** | 透明窗口盖在内容上，空格截译；自动刷新盯住直播字幕，不抢焦点 |
+| **听译** | 实时转写电脑正在播放的声音并逐句翻译，识别在本机，音频不落盘；字幕自动保存 |
+| **文档翻译** | PDF、Word、EPUB、TXT、Markdown、SRT、VTT、CSV、JSON 九种格式，逐段翻译，进度可恢复 |
+| **本地模型** | 程序自带 Qwen3-1.7B，文件放进文件夹就能翻译和总结，不用装别的软件 |
+| **AI 动作** | 长文总结、段落讲解、悬浮窗讲解模式；可导入自定义动作 |
+| **术语库与风格库** | 术语自动沿用你的译法；按参考文本改写译文语气 |
+| **朗读** | 系统语音、本机神经语音包或外接服务，听译字幕可逐句朗读 |
+| **134 种语言** | 覆盖 Google 翻译支持的全部语言，还能自己添加 |
+| **11 个翻译源** | 内置模型、LM Studio、Ollama、OpenAI、Claude、Gemini、DeepSeek、DeepL、Google、Microsoft、百度 |
+| **三种隐私模式** | 标准 / 无痕 / 离线，一键切换 |
 
 ---
 
 ### 划词翻译
 
-选中任意文字自动弹出翻译窗口，支持最多 8 个冻结窗口同时显示，智能检测源语言。
+选中任意文字，旁边出现小图标，点一下就是翻译卡片。拖动卡片可以固定住，最多同时固定 8 个；打开 CapsLock 直出模式后连图标都不用点。
 
 <p align="center">
   <img src="docs/screenshots/selection-translate.png" width="600" alt="划词翻译">
 </p>
 
-### 截图 OCR 翻译
+### 截图翻译
 
-截取屏幕区域进行文字识别，引擎不可用或读不出内容时自动降级到下一个。59 种识别语言：中/繁/英/日与 37 种拉丁语言内置，韩文、西里尔、天城文、阿拉伯字母、泰米尔文、泰卢固文、卡纳达文各需一个语言包，一个包覆盖同一文字的多种语言。
+按 Alt+Q 框选屏幕区域，识别文字并翻译。本地引擎内置中、英、日和拉丁语系语言，韩文、西里尔、天城文、阿拉伯字母等按需下载语言包；引擎读不出时自动换下一个。
 
 <p align="center">
-  <img src="docs/screenshots/screenshot-ocr.png" width="600" alt="截图 OCR 翻译">
+  <img src="docs/screenshots/screenshot-ocr.png" width="600" alt="截图翻译">
 </p>
 
 ### 悬浮窗口
 
-透明悬浮窗实时翻译，支持拖拽、缩放、置顶，可开多个独立子面板。空格/左键切换：有内容清空，无内容截译。
-
-**零焦点截取**：自动刷新（2/3/5/10 秒间隔）与全局快捷键 `Ctrl+Alt+Space` 重截都不抢焦点，实时字幕不会因失焦消失。
+透明窗口盖在想看的内容上，按空格翻译窗口下面的文字。译文可以散点贴在原位置（界面、漫画），也可以合成一段（文章）。开自动刷新后盯住直播字幕循环翻译，全程不抢焦点；鼠标穿透让点击直接落到下面的程序上。
 
 <p align="center">
   <img src="docs/screenshots/floating-window.png" width="600" alt="悬浮窗口">
@@ -70,9 +70,7 @@
 
 ### 听译
 
-悬浮窗工具栏的声波图标切到听译，点 ▶ 开始：实时转写电脑正在播放的声音，逐句翻译。识别在本机完成，音频只在内存里过一遍，不写磁盘也不上传。
-
-支持中 / 英 / 日 / 韩 / 粤，可指定或自动判定；装上草稿引擎后中英边说边出字。默认听全部声音，Windows 11 可只听某一个程序。停止或切换时字幕自动保存为 SRT（含译文）。模型在「设置 → 音频 → 听」下载（基础 153MB，草稿引擎 168MB 可选，高精度定稿档 806MB 可选，带音乐或噪声时更准）。
+悬浮窗切到「听译」，实时转写电脑正在播放的声音并逐句翻译。识别在本机完成，音频只在内存里过一遍。可以只听某一个程序（Windows 11），停止时字幕自动保存成 SRT。
 
 <p align="center">
   <img src="docs/screenshots/Listen.png" width="600" alt="听译">
@@ -80,9 +78,7 @@
 
 ### 文档翻译
 
-支持 PDF、DOCX、EPUB、TXT、Markdown、SRT、VTT、CSV、JSON 共 9 种格式，支持并发翻译、扫描件 OCR 和术语库联动。PDF、DOCX、TXT 可在资源管理器右键「用 T-Translate 翻译」直接打开；翻译或全文总结完成时窗口不在前台，会发系统通知提醒。
-
-配了大模型源时，每段可让 AI **讲解这一段**，结果展开在译文下方；「总结已讲解段落」把已讲解的段落汇总成一份连贯总结，两者都随进度保存，重开文件可恢复。翻译完成后，**术语检查**找出漏翻的术语一键替换，可单独撤销。
+拖入文件逐段翻译，支持并发、扫描件 OCR、术语库联动，翻译到一半关掉下次接着来。每段可以让 AI 讲解，讲解过的段落可以汇总成总结；翻译完还能对照术语库检查用词。资源管理器里右键 PDF、Word、TXT 直接打开。
 
 <p align="center">
   <img src="docs/screenshots/document-translate.png" width="600" alt="文档翻译">
@@ -90,9 +86,7 @@
 
 ### 隐私模式
 
-三档隐私控制，按需选择。离线模式下仅使用本地 LLM，在线 API Key 禁止解密——即使程序内部被恶意代码调用也拿不到。
-
-设置 → 隐私可导出**迁移包**（设置、术语库、收藏、自定义语言），换机导入即用；API 密钥不随包迁移，需在新机重新填写。
+标准模式功能全开；无痕模式什么都不保存；离线模式完全不联网，只用本机的翻译源和识别引擎，在线 API 密钥连解密都不做。换电脑用迁移包带走设置、术语库和收藏。
 
 <p align="center">
   <img src="docs/screenshots/privacy-mode.png" width="600" alt="隐私模式">
@@ -100,7 +94,7 @@
 
 ### 多翻译源
 
-支持本地 LLM（LM Studio / Ollama）、OpenAI、Anthropic Claude、Gemini、DeepSeek、DeepL、Google 翻译、Microsoft 翻译、百度翻译共 10 个翻译源，可自由切换、拖拽排序、设置优先级。翻译失败自动切换到下一个可用源。
+内置模型、LM Studio、Ollama、OpenAI、Claude、Gemini、DeepSeek、DeepL、Google 翻译、Microsoft 翻译、百度翻译，拖动排序，一个失败自动换下一个。
 
 <p align="center">
   <img src="docs/screenshots/providers.png" width="600" alt="多翻译源">
@@ -108,109 +102,58 @@
 
 ### 朗读
 
-翻译结果可朗读，三种引擎任选：系统语音（Windows 离线语音，零安装）、神经语音（kokoro / MeloTTS 语音包，本机合成，104 个音色，可按语言各钉一个）、外接服务（任何 OpenAI 兼容的 /v1/audio/speech 接口，离线模式下一律不用）。听译字幕行可逐句朗读，朗读时自动暂停收音。语速、音量可调；语音包在「设置 → 音频 → 读」下载。
+翻译结果可以朗读：系统语音零下载，神经语音包本机合成更自然，外接服务能接任何 OpenAI 兼容的语音接口。听译字幕逐句可读，读的时候自动暂停收音。
 
 <p align="center">
-  <img src="docs/screenshots/tts.png" width="600" alt="TTS 朗读">
+  <img src="docs/screenshots/tts.png" width="600" alt="朗读">
 </p>
 
 ---
 
-## 快速开始
+## 安装
 
-从 [Releases](https://github.com/Tianao0110/T-Translate/releases) 下载安装包，或从源码构建：
+从 [Releases](https://github.com/Tianao0110/T-Translate/releases) 下载安装包（Windows x64）。装好后程序里有完整的使用说明：设置 → 使用说明；GitHub 上是同一份 [docs/MANUAL.zh.md](docs/MANUAL.zh.md)。
+
+从源码构建：
 
 ```bash
 git clone https://github.com/Tianao0110/T-Translate.git
 cd T-Translate
 npm install
-npm run ocr:models   # 拉取本地 OCR 基础模型（一次性，~19MB）
-npm run llama:runtime   # 拉取钉版 llama.cpp 运行时 DLL（一次性，~34MB）
-npm start            # 开发模式
-npm run dist         # 打包安装程序（自动含上一步）
+npm run ocr:models      # 拉取本地 OCR 基础模型（一次性，约 19MB）
+npm run llama:runtime   # 拉取钉版 llama.cpp 运行时（一次性，约 34MB）
+npm start               # 开发模式
+npm run dist            # 打包安装程序
 ```
 
----
+## 模型
 
-## 快捷键
+程序本身不带模型。语言包、听译识别模型、语音包在设置页里一键下载；下面几个大文件不经我们的服务器分发，自己下载后放进模型文件夹即可（位置在 设置 → 关于 → 存储）：
 
-| 快捷键           | 功能              |
-| ---------------- | ----------------- |
-| `Alt+Q`        | 截图翻译          |
-| `Ctrl+Shift+W` | 显示/隐藏主窗口   |
-| `Ctrl+Alt+G`   | 打开悬浮窗口      |
-| `Ctrl+Shift+T` | 开启/关闭划词翻译 |
-| `Ctrl+Alt+Space` | 悬浮窗重新截译（不抢焦点） |
-| `Ctrl+Enter`   | 执行翻译          |
+- 内置模型 Qwen3-1.7B（通用，1.8 GB）：[官方](https://huggingface.co/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf) · [镜像](https://hf-mirror.com/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf) → `models\llm-models`
+- 内置模型 Hy-MT2-1.8B（仅翻译，1.9 GB）：[官方](https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF/resolve/main/Hy-MT2-1.8B-Q8_0.gguf) · [镜像](https://hf-mirror.com/tencent/Hy-MT2-1.8B-GGUF/resolve/main/Hy-MT2-1.8B-Q8_0.gguf) → `models\llm-models`
+- 内置视觉模型 PaddleOCR-VL-1.6（两个文件，各 0.9 GB，需显卡加速）：[主模型](https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.6-GGUF/resolve/main/PaddleOCR-VL-1.6-GGUF.gguf) · [图像编码器](https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.6-GGUF/resolve/main/PaddleOCR-VL-1.6-GGUF-mmproj.gguf) → `models\llm-models`
+- 高精度听译模型 Qwen3-ASR（806 MB）：[下载](https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25.tar.bz2)，解压后整个文件夹放进 `models\asr-models`
 
-*快捷键可在设置中自定义*
+镜像链接、放好后怎么检测、程序内下载不了时的备选地址，见使用说明第 5 章。
 
----
+## 文档
 
-## 安全与隐私
-
-T-Translate 以隐私保护为核心设计理念：
-
-- **本地优先** — 本地 LLM 是第一优先级，完全离线可用
-- **主进程单点强制** — 翻译与在线 OCR 请求全部由主进程发出，渲染进程不含网络代码；隐私模式对每个请求在主进程强制（无痕不落缓存、离线走引擎白名单），任何窗口都无法绕过
-- **加密存储** — API Key 使用 Windows DPAPI 加密，无明文回退；翻译历史、收藏与统计同样整体加密落盘
-- **访问审计** — 密钥解密操作全程记录，异常频率自动告警
-- **隐私联动** — 离线模式下在线 API Key 禁止解密
-- **最小权限** — 每种窗口独立 Preload，只暴露必要的 API
-- **无 axios** — 不受近期 npm 供应链攻击影响
-
----
-
-## 📁 项目结构
-
-```
-t-translate/
-├── electron/               # 主进程代码
-│   ├── main.js             # 主进程入口
-│   ├── preloads/           # Preload 脚本（最小权限隔离）
-│   ├── shared/             # 共享常量和配置
-│   ├── ipc/                # IPC 处理器（含安全存储审计）
-│   ├── managers/           # 窗口/托盘/菜单管理器
-│   └── utils/              # 原生工具（Win32 API、状态机）
-│
-├── src/                    # 渲染进程代码 + 主进程翻译栈源码
-│   ├── stack/              # 翻译栈（运行在主进程：10 翻译源 + OCR 引擎链 + 缓存，esbuild 打包）
-│   ├── components/         # React 组件
-│   ├── assets/             # 静态资源（翻译源图标）
-│   ├── services/           # 服务层（栈客户端、截图管线）
-│   ├── stores/             # Zustand 状态管理
-│   ├── config/             # 配置（隐私模式、模板、常量、AI 动作目录）
-│   └── i18n/               # 国际化（中英双语 1000+ key）
-│
-├── public/                 # HTML 入口 + 静态资源
-├── resources/              # 应用资源（内置 OCR 基础模型）
-├── scripts/                # 工具脚本
-└── docs/                   # 项目文档
-```
-
-## 🏗️ 技术栈
-
-| 类别     | 技术                                                                    |
-| -------- | ----------------------------------------------------------------------- |
-| 框架     | Electron 42 + React 18                                                  |
-| 构建     | Vite 7（渲染端）+ esbuild（主进程翻译栈）                               |
-| 状态管理 | Zustand + Immer                                                         |
-| 样式     | CSS Variables                                                           |
-| 安全存储 | Electron safeStorage (Windows DPAPI) + 访问审计                         |
-| OCR      | PP-OCRv6 本地（简繁英日+拉丁语系内置，语言包可下载）/ Windows OCR / LLM Vision / OCR.space / Google Vision / Azure / 百度 |
-| 本地 LLM | LM Studio / Ollama（OpenAI 兼容 API）                                   |
-| 在线翻译 | OpenAI / Claude / Gemini / DeepSeek / DeepL / Google / Microsoft / 百度 |
-| 打包     | electron-builder                                                        |
-
-详细文档见 `docs/` 目录：[架构设计](docs/ARCHITECTURE.md) · [开发指南](docs/DEVELOPMENT.md) · [常见问题](docs/FAQ.md) · [OCR 模型](docs/OCR_MODELS.md) · [国际化](docs/I18N_GUIDE.md) · [主题定制](docs/THEME_CUSTOMIZATION.md)
-
----
+| 文档 | 内容 |
+| --- | --- |
+| [使用说明](docs/MANUAL.zh.md) / [User Guide](docs/MANUAL.en.md) | 面向用户的完整说明，程序内也能看 |
+| [FAQ](docs/FAQ.md) | 出错时看这里 |
+| [ARCHITECTURE](docs/ARCHITECTURE.md) | 架构、目录结构、隐私分层 |
+| [DEVELOPMENT](docs/DEVELOPMENT.md) | 新增翻译源 / OCR 引擎 / AI 动作 / 语言 |
+| [T-ENGINE](docs/T-ENGINE.md) | 引擎接入层维护手册 |
+| [OCR_MODELS](docs/OCR_MODELS.md) | OCR 模型与语言包发布 |
+| [I18N_GUIDE](docs/I18N_GUIDE.md) | 国际化 |
+| [THEME_CUSTOMIZATION](docs/THEME_CUSTOMIZATION.md) | 主题定制 |
+| `docs/design/` | 各功能的设计说明与踩坑记录 |
 
 ## 贡献
 
-欢迎提交 Issue 和 Pull Request！
-
----
+欢迎提交 Issue 和 Pull Request。
 
 ## 许可证
 
@@ -227,4 +170,3 @@ t-translate/
 <p align="center">
   Made with ❤️ by <a href="https://github.com/Tianao0110">Edan Zeng</a>
 </p>
-

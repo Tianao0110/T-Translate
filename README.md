@@ -10,7 +10,7 @@
 
 <p align="center">
   <strong>On-demand translation, privacy by default</strong><br>
-  Select to translate · Screenshot to translate · Local LLM first · API keys encrypted at rest
+  Select to translate · Screenshot to translate · Local model first · API keys encrypted at rest
 </p>
 
 <p align="center">
@@ -21,48 +21,48 @@
 
 ---
 
+T-Translate is a Windows desktop translator: select text in any program and translate it, translate a screenshot, lay a transparent window over a video or game for live translation, turn whatever your computer is playing into captions, and translate PDFs, Word files and e-books end to end.
+
+Privacy comes first: the app ships with its own local model, so one model file in a folder gives you offline translation; every API key is stored with Windows system encryption and never leaves this computer; offline mode sends no network request at all.
+
 ## Features
 
-| Feature                            | Description                                                                                                                            |
-| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| **Selection translator**     | System-wide. Select text in any app to translate. Up to 8 pinned windows                                                               |
-| **Screenshot OCR**           | Capture screen regions. 59 recognition languages, 8 OCR engines with automatic fallback; the app's own vision model (PaddleOCR-VL) takes over large captures and complex layouts with GPU acceleration on |
-| **Floating window**          | Transparent overlay. Space-bar to capture-and-translate; auto-refresh & global-hotkey zero-focus capture for live captions / subtitles |
-| **Listen mode**              | Live captions for whatever is playing, translated sentence by sentence. Chinese / English / Japanese / Korean / Cantonese, recognized on-device, audio never touches disk; can listen to a single program; subtitles auto-save as SRT |
-| **Local model**              | The app's own local LLM (Qwen3-1.7B): drop the model file into a folder and it translates and summarizes — no LM Studio, no port, works offline, GPU optional |
-| **Document translation**     | 9 formats: PDF / DOCX / EPUB / TXT / SRT / VTT / CSV / JSON / Markdown. Segment-by-segment, resumable, with term check; Explorer right-click entry |
-| **134 languages**            | Everything Google Translate supports, in a picker with a letter index and a recently-used row; more can be added by hand                |
-| **AI actions**               | Summaries of long passages; "Explain mode" in the floating window and per-paragraph explanations in documents; custom actions can be imported (needs an LLM provider) |
-| **Glossary**                 | Auto-replace terms after translation, with undo support                                                                                |
-| **Read aloud**               | System voices, neural voice packs, or an external server; listen-mode subtitles can be spoken line by line                          |
-| **10 translation providers** | LM Studio, Ollama, OpenAI, Claude, Gemini, DeepSeek, DeepL, Google, Microsoft, Baidu                                                   |
-| **3 privacy modes**          | Standard / Incognito / Offline. Offline mode blocks decryption of online API keys                                                      |
-| **Migration pack**           | One-file export/import of settings, glossary, favorites and custom languages                                                           |
-| **Auto-start**               | Silent tray launch with optional auto-enable for selection translator                                                                  |
+| Feature | Description |
+| --- | --- |
+| **Select to translate** | Select text in any program and click once; cards can be pinned |
+| **Screenshot translate** | Box any screen region to recognize and translate, on any monitor |
+| **Floating window** | Transparent overlay; Space to capture; auto refresh follows live captions without stealing focus |
+| **Listen mode** | Live captions for whatever is playing, translated sentence by sentence; recognized on this computer, audio never written to disk; captions auto-saved |
+| **Document translation** | PDF, Word, EPUB, TXT, Markdown, SRT, VTT, CSV, JSON; paragraph by paragraph, resumable |
+| **Local model** | Ships with Qwen3-1.7B: drop the file into a folder and it translates and summarizes, no other software needed |
+| **AI actions** | Summaries of long text, paragraph explanations, an explain mode in the floating window; custom actions can be imported |
+| **Glossary and style library** | Your term choices are kept automatically; rewrite a translation in the tone of a reference text |
+| **Read aloud** | System voices, local neural voice packs or an external server; listen captions can be read line by line |
+| **134 languages** | Everything Google Translate supports, plus your own additions |
+| **11 translation providers** | Built-in model, LM Studio, Ollama, OpenAI, Claude, Gemini, DeepSeek, DeepL, Google, Microsoft, Baidu |
+| **Three privacy modes** | Standard / Incognito / Offline, one click apart |
 
 ---
 
-### Selection translator
+### Select to translate
 
-Select any text and a translation window pops up automatically. Up to 8 pinned windows can stay open at once. Source language is detected automatically.
+Select any text, a small icon appears next to it, and one click gives you the translation card. Drag a card to pin it, up to 8 at once; with CapsLock direct mode on, you do not even click the icon.
 
 <p align="center">
-  <img src="docs/screenshots/selection-translate.png" width="600" alt="Selection translator">
+  <img src="docs/screenshots/selection-translate.png" width="600" alt="Select to translate">
 </p>
 
-### Screenshot OCR translation
+### Screenshot translate
 
-Capture a screen region for text recognition; when an engine is unavailable or cannot read the capture, the chain falls back to the next one. 59 recognition languages: Chinese, English, Japanese and 37 Latin-script languages built in; Korean, Cyrillic, Devanagari, Arabic, Tamil, Telugu and Kannada each need one language pack, covering every language in that script.
+Press Alt+Q and box a screen region to recognize and translate. The local engine ships with Chinese, English, Japanese and the Latin-script languages; Korean, Cyrillic, Devanagari, Arabic and more come as downloadable language packs. When one engine cannot read a capture, the next one takes over.
 
 <p align="center">
-  <img src="docs/screenshots/screenshot-ocr.png" width="600" alt="Screenshot OCR translation">
+  <img src="docs/screenshots/screenshot-ocr.png" width="600" alt="Screenshot translate">
 </p>
 
 ### Floating window
 
-Transparent overlay for live translation — drag, resize, pin on top, spawn independent child panes. Space / left-click toggles: with content, clear; without, capture and translate.
-
-**Zero-focus capture**: auto-refresh (2/3/5/10s intervals) and the `Ctrl+Alt+Space` hotkey re-capture without taking focus, so live captions don't vanish.
+A transparent window over the content you want to read; press Space to translate what is underneath. Translations can sit scattered at their original positions (interfaces, comics) or merge into one passage (articles). Auto refresh keeps translating live captions without ever taking focus; click-through sends your clicks to the program below.
 
 <p align="center">
   <img src="docs/screenshots/floating-window.png" width="600" alt="Floating window">
@@ -70,9 +70,7 @@ Transparent overlay for live translation — drag, resize, pin on top, spawn ind
 
 ### Listen mode
 
-The waveform icon in the floating window's toolbar, then ▶: it transcribes whatever your computer is playing and translates it sentence by sentence. Recognition runs on your machine; audio passes through memory and is never written to disk or uploaded.
-
-Chinese, English, Japanese, Korean and Cantonese, chosen or detected. With the optional draft engine, Chinese and English appear as they are spoken. Listens to everything by default, or to a single program on Windows 11. Subtitles auto-save as SRT (with translations) when you stop or switch. Models download under Settings → Audio → Listen (base 153 MB, draft engine 168 MB optional, high-accuracy final pass 806 MB optional — better with music or noise).
+Switch the floating window to "Listen" and the sound your computer is playing turns into captions, translated sentence by sentence. Recognition runs on this computer and the audio only passes through memory. Listen to a single program (Windows 11), and captions are saved as SRT when you stop.
 
 <p align="center">
   <img src="docs/screenshots/Listen.png" width="600" alt="Listen mode">
@@ -80,9 +78,7 @@ Chinese, English, Japanese, Korean and Cantonese, chosen or detected. With the o
 
 ### Document translation
 
-Supports 9 formats: PDF, DOCX, EPUB, TXT, SRT, VTT, CSV, JSON, Markdown — with parallel translation, scanned-PDF OCR and glossary integration. PDF, DOCX and TXT open straight from the Explorer right-click menu ("Translate with T-Translate"). When translation or a document summary finishes with the window in the background, a system notification lets you know.
-
-With an LLM provider, each paragraph can be **explained** under its translation, and a **consolidated note** collects the explanations; both are saved with the progress and come back when you reopen the file. After translating, **term check** replaces glossary terms left untranslated, with per-spot undo.
+Drop in a file and it is translated paragraph by paragraph, with parallel translation, OCR for scanned pages, glossary integration, and resumable progress. Every paragraph can be explained by AI, explained paragraphs can be digested into a summary, and a term check compares the result against your glossary. Right-click a PDF, Word or TXT file in Explorer to open it directly.
 
 <p align="center">
   <img src="docs/screenshots/document-translate.png" width="600" alt="Document translation">
@@ -90,127 +86,74 @@ With an LLM provider, each paragraph can be **explained** under its translation,
 
 ### Privacy modes
 
-Three levels of privacy control. In offline mode, only local LLMs are used. Online API keys are blocked from decryption even if internal code attempts to access them.
-
-Settings → Privacy can export a **migration pack** (settings, glossary, favorites, custom languages) to import on another machine. API keys never travel with the pack — re-enter them on the new machine.
+Standard has everything on; Incognito saves nothing; Offline never touches the network, uses only local sources and engines, and does not even decrypt online API keys. A migration pack carries settings, glossary and favorites to another computer.
 
 <p align="center">
   <img src="docs/screenshots/privacy-mode.png" width="600" alt="Privacy modes">
 </p>
 
-### Multi-provider
+### Providers
 
-10 providers: local LLM (LM Studio / Ollama), OpenAI, Anthropic Claude, Gemini, DeepSeek, DeepL, Google Translate, Microsoft Translator, Baidu Translate. Switch freely, drag to reorder, set priority. On failure, falls back to the next available provider automatically.
+Built-in model, LM Studio, Ollama, OpenAI, Claude, Gemini, DeepSeek, DeepL, Google Translate, Microsoft Translator and Baidu Translate; drag to reorder, and a failing source hands over to the next.
 
 <p align="center">
-  <img src="docs/screenshots/providers.png" width="600" alt="Multi-provider">
+  <img src="docs/screenshots/providers.png" width="600" alt="Providers">
 </p>
 
 ### Read aloud
 
-Translations can be read aloud with one of three engines: system voices (Windows offline speech, nothing to install), neural voices (kokoro / MeloTTS packs synthesised on your machine, 104 voices, one can be pinned per language), or an external server (any OpenAI-compatible /v1/audio/speech endpoint, never used in offline mode). Subtitle lines in listen mode can be spoken one at a time, and audio capture pauses while speaking. Rate and volume are adjustable; voice packs download under Settings → Audio → Read.
+Translations can be read aloud: system voices need no download, neural voice packs synthesize locally and sound more natural, and the external service takes any OpenAI-compatible speech endpoint. Listen captions can be read line by line, with capture paused while speaking.
 
 <p align="center">
-  <img src="docs/screenshots/tts.png" width="600" alt="TTS">
+  <img src="docs/screenshots/tts.png" width="600" alt="Read aloud">
 </p>
 
 ---
 
-## Quick start
+## Install
 
-Download an installer from [Releases](https://github.com/Tianao0110/T-Translate/releases), or build from source:
+Download an installer from [Releases](https://github.com/Tianao0110/T-Translate/releases) (Windows x64). The full user guide is inside the app under Settings → User Guide; the same file is [docs/MANUAL.en.md](docs/MANUAL.en.md).
+
+Build from source:
 
 ```bash
 git clone https://github.com/Tianao0110/T-Translate.git
 cd T-Translate
 npm install
-npm run ocr:models   # fetch local OCR base models (one-time, ~19MB)
-npm run llama:runtime   # fetch the pinned llama.cpp runtime DLLs (one-time, ~34MB)
-npm start            # dev mode
-npm run dist         # build installer (runs the fetch automatically)
+npm run ocr:models      # fetch the local OCR base models (one-time, ~19MB)
+npm run llama:runtime   # fetch the pinned llama.cpp runtime (one-time, ~34MB)
+npm start               # dev mode
+npm run dist            # build the installer
 ```
 
----
+## Models
 
-## Keyboard shortcuts
+The app ships without models. Language packs, listen recognition models and voice packs download with one click on the settings pages. The large files below are not distributed through our servers: download them yourself and put them into the models folder (its location is under Settings → About → Storage):
 
-| Shortcut           | Action                                      |
-| ------------------ | ------------------------------------------- |
-| `Alt+Q`          | Screenshot translate                        |
-| `Ctrl+Shift+W`   | Show / hide main window                     |
-| `Ctrl+Alt+G`     | Open floating window                        |
-| `Ctrl+Shift+T`   | Toggle selection translator                 |
-| `Ctrl+Alt+Space` | Re-capture floating window (no focus steal) |
-| `Ctrl+Enter`     | Run translation                             |
+- Built-in model Qwen3-1.7B (general, 1.8 GB): [official](https://huggingface.co/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf) · [mirror](https://hf-mirror.com/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf) → `models\llm-models`
+- Built-in model Hy-MT2-1.8B (translation only, 1.9 GB): [official](https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF/resolve/main/Hy-MT2-1.8B-Q8_0.gguf) · [mirror](https://hf-mirror.com/tencent/Hy-MT2-1.8B-GGUF/resolve/main/Hy-MT2-1.8B-Q8_0.gguf) → `models\llm-models`
+- Built-in vision model PaddleOCR-VL-1.6 (two files, 0.9 GB each, needs GPU acceleration): [main model](https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.6-GGUF/resolve/main/PaddleOCR-VL-1.6-GGUF.gguf) · [image encoder](https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.6-GGUF/resolve/main/PaddleOCR-VL-1.6-GGUF-mmproj.gguf) → `models\llm-models`
+- High-accuracy listen model Qwen3-ASR (806 MB): [download](https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25.tar.bz2), extract, and put the whole folder into `models\asr-models`
 
-*Shortcuts are customizable in Settings.*
+Mirror links, how to verify a placed file, and fallback download pages are in chapter 5 of the user guide.
 
----
+## Documentation
 
-## Security & Privacy
-
-Privacy is a core design principle:
-
-- **Local-first** — Local LLM is the top priority. Fully usable offline
-- **Main-process enforcement** — All translation and online-OCR requests originate from the main process; renderer processes contain no network code. Privacy modes are enforced per request in the main process (incognito writes no caches, offline applies engine allowlists) — no window can bypass them
-- **Encrypted at rest** — API keys encrypted via Windows DPAPI. No plaintext fallback. Translation history, favorites and statistics are encrypted on disk the same way
-- **Access audit** — Every decryption operation is logged. Abnormal frequency triggers alerts
-- **Privacy interlocks** — Offline mode blocks decryption of online API keys
-- **Least privilege** — Each window has its own preload script exposing only the APIs it needs
-- **No axios** — Unaffected by recent npm supply chain attacks
-
----
-
-## 📁 Project structure
-
-```
-t-translate/
-├── electron/               # Main process
-│   ├── main.js             # Entry point
-│   ├── preloads/           # Preload scripts (per-window isolation)
-│   ├── shared/             # Shared constants and config
-│   ├── ipc/                # IPC handlers (with secure-storage audit)
-│   ├── managers/           # Window / tray / menu managers
-│   └── utils/              # Native utilities (Win32 API, state machines)
-│
-├── src/                    # Renderer code + main-process translation stack sources
-│   ├── stack/              # Translation stack (runs in main: 10 providers + OCR chain + cache, bundled by esbuild)
-│   ├── components/         # React components
-│   ├── assets/             # Static assets (provider icons)
-│   ├── services/           # Service layer (stack client, capture pipeline)
-│   ├── stores/             # Zustand state management
-│   ├── config/             # Config (privacy modes, templates, constants, AI action catalog)
-│   └── i18n/               # i18n (zh / en, 1000+ keys each)
-│
-├── public/                 # HTML entry + static assets
-├── resources/              # App resources (bundled OCR base models)
-├── scripts/                # Utility scripts
-└── docs/                   # Project documentation
-```
-
-## 🏗️ Tech stack
-
-| Category           | Technology                                                                                                                                                           |
-| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Framework          | Electron 42 + React 18                                                                                                                                               |
-| Build              | Vite 7 (renderer) + esbuild (main-process translation stack)                                                                                                         |
-| State              | Zustand + Immer                                                                                                                                                      |
-| Styling            | CSS Variables                                                                                                                                                        |
-| Secure storage     | Electron safeStorage (Windows DPAPI) + access audit                                                                                                                  |
-| OCR                | PP-OCRv6 local (Chinese/English/Japanese/Latin scripts built in, downloadable language packs) / Windows OCR / LLM Vision / OCR.space / Google Vision / Azure / Baidu |
-| Local LLM          | LM Studio / Ollama (OpenAI-compatible API)                                                                                                                           |
-| Online translation | OpenAI / Claude / Gemini / DeepSeek / DeepL / Google / Microsoft / Baidu                                                                                             |
-| Packaging          | electron-builder                                                                                                                                                     |
-
-More docs under `docs/`: [Architecture](docs/ARCHITECTURE.md) · [Development guide](docs/DEVELOPMENT.md) · [FAQ](docs/FAQ.md) · [OCR models](docs/OCR_MODELS.md) · [i18n guide](docs/I18N_GUIDE.md) · [Theme customization](docs/THEME_CUSTOMIZATION.md)
-
----
+| Document | Contents |
+| --- | --- |
+| [User Guide](docs/MANUAL.en.md) / [使用说明](docs/MANUAL.zh.md) | The complete guide for users, also available inside the app |
+| [FAQ](docs/FAQ.md) | Troubleshooting (Chinese) |
+| [ARCHITECTURE](docs/ARCHITECTURE.md) | Architecture, layout, privacy layering (Chinese) |
+| [DEVELOPMENT](docs/DEVELOPMENT.md) | Adding providers / OCR engines / AI actions / languages (Chinese) |
+| [T-ENGINE](docs/T-ENGINE.md) | Engine layer maintenance (Chinese) |
+| [OCR_MODELS](docs/OCR_MODELS.md) | OCR models and language pack releases (Chinese) |
+| [I18N_GUIDE](docs/I18N_GUIDE.md) | Internationalization (Chinese) |
+| [THEME_CUSTOMIZATION](docs/THEME_CUSTOMIZATION.md) | Theme customization (Chinese) |
+| `docs/design/` | Per-feature design notes and pitfalls (Chinese) |
 
 ## Contributing
 
 Issues and pull requests are welcome.
-
----
 
 ## License
 
