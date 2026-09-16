@@ -345,7 +345,65 @@ AI 动作是在翻译之外再做一层理解，比如把一段内容总结成�
 
 ## 5. 模型与下载
 
-（待写）
+程序本身不带任何模型。小的模型在设置页里一键下载；大的模型（几百 MB 到 2 GB）不经我们的服务器分发，按下面的链接自己下载，放进模型文件夹即可。所有模型都在本机运行，下载完成后不再联网。
+
+模型文件夹在 设置 → 关于 → 存储 里能看到，可以直接打开。默认是程序安装目录下的 `models`，里面按用途分四个子文件夹：
+
+- `llm-models`：内置模型、内置视觉模型
+- `ocr-models`：OCR 语言包、高精度模型
+- `asr-models`：听译识别模型
+- `tts-models`：神经语音包
+
+### 5.1 内置模型（手动下载）
+
+把文件放进 `models\llm-models`，保持原文件名，然后到 设置 → 本地模型 点「重新扫描」。程序会校验文件内容，校验通过才会使用；显示「文件不符」就是下载不完整或版本不对，重新下载即可。
+
+**Qwen3-1.7B**（通用，默认）：翻译加全部 AI 动作。文件 `Qwen3-1.7B-Q8_0.gguf`，约 1.8 GB，需要 8 GB 内存。
+
+- 官方：https://huggingface.co/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf
+- 国内镜像：https://hf-mirror.com/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf
+
+**Hy-MT2-1.8B**（仅翻译）：只做翻译，速度和质量都好，但不能总结、讲解。文件 `Hy-MT2-1.8B-Q8_0.gguf`，约 1.9 GB，需要 8 GB 内存。
+
+- 官方：https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF/resolve/main/Hy-MT2-1.8B-Q8_0.gguf
+- 国内镜像：https://hf-mirror.com/tencent/Hy-MT2-1.8B-GGUF/resolve/main/Hy-MT2-1.8B-Q8_0.gguf
+
+**PaddleOCR-VL-1.6**（内置视觉模型）：两个文件都要放，主模型约 0.9 GB，图像编码器约 0.9 GB。只在显卡加速打开时可用。放好后到 设置 → OCR 识别 → 视觉大模型 点「重新检测」。
+
+- 主模型官方：https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.6-GGUF/resolve/main/PaddleOCR-VL-1.6-GGUF.gguf
+- 主模型镜像：https://hf-mirror.com/PaddlePaddle/PaddleOCR-VL-1.6-GGUF/resolve/main/PaddleOCR-VL-1.6-GGUF.gguf
+- 图像编码器官方：https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.6-GGUF/resolve/main/PaddleOCR-VL-1.6-GGUF-mmproj.gguf
+- 图像编码器镜像：https://hf-mirror.com/PaddlePaddle/PaddleOCR-VL-1.6-GGUF/resolve/main/PaddleOCR-VL-1.6-GGUF-mmproj.gguf
+
+这些链接在 设置 → 本地模型 和 OCR 识别 页里也有，点了直接打开浏览器。三个模型都是 Apache-2.0 协议。
+
+### 5.2 高精度听译模型（手动下载）
+
+带音乐或噪声的声音识别更准，支持 30 种语言。约 806 MB，运行时占 1 到 1.6 GB 内存，推荐 16 GB 内存的电脑。
+
+1. 下载：https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25.tar.bz2
+2. 解压，得到一个名为 `sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25` 的文件夹。
+3. 把整个文件夹放进 `models\asr-models`。
+4. 到 设置 → 音频 → 听，点「已放好，重新检测」，再把定稿档位切到「高精度」。
+
+### 5.3 在程序里一键下载的模型
+
+这些在设置页里点「下载」即可，离线模式下不能下载。
+
+- **OCR 语言包**（设置 → OCR 识别）：韩文、西里尔字母、天城文、阿拉伯字母、泰米尔文、泰卢固文、卡纳达文，每个包覆盖同一种文字的多种语言。还有高精度模型，约 95 MB。
+- **听译识别模型**（设置 → 音频 → 听）：基础识别模型约 153 MB，必需；草稿引擎约 168 MB，可选。
+- **神经语音包**（设置 → 音频 → 读 → 语音包）：Kokoro（103 个中英音色）和 MeloTTS（一个中英混读最自然的女声）。
+
+程序里下载不了时（比如网络原因），可以去发布页手动下载压缩包：
+
+- OCR 语言包：https://github.com/Tianao0110/T-Translate/releases/tag/ocr-models
+- 听译模型与语音包：https://github.com/Tianao0110/T-Translate/releases/tag/audio-models
+
+下载后把压缩包解压成一个文件夹，放进对应的子文件夹（`ocr-models`、`asr-models` 或 `tts-models`），再回设置页点「刷新」。
+
+### 5.4 本地大模型服务
+
+除了内置模型，也可以让程序连本机运行的 LM Studio 或 Ollama：装好软件、载入一个模型，在 设置 → 翻译源 里启用对应的翻译源就行。地址默认已经填好，用的不是默认端口再改。视觉模型（LLM Vision 引擎）也走同一个地址。
 
 ## 6. 快捷键总表
 
@@ -382,7 +440,38 @@ AI 动作是在翻译之外再做一层理解，比如把一段内容总结成�
 
 ## 7. 数据放在哪里与备份
 
-（待写）
+### 7.1 两个文件夹
+
+程序的东西都在安装目录下的两个文件夹里，在 设置 → 关于 → 存储 里能看到位置，可以直接打开：
+
+- `data`：设置、历史记录、收藏、翻译缓存、日志、自动保存的字幕。
+- `models`：下载和手动放入的模型，见第 5 章。
+
+安装目录不可写（比如装在 Program Files 里）时，程序会改用用户目录，关于页会标出来。
+
+`data` 里常用的几项：
+
+- `config.json`：全部设置。API 密钥也在里面，但是加密过的，看不到明文。
+- `translation-data.enc`：历史记录、收藏、统计，加密保存。
+- `cache\`：翻译缓存，可以随时清。
+- `logs\`：日志，排查问题时用。
+- `listen\`：听译自动保存的字幕文件。
+
+### 7.2 备份与搬家
+
+- **卸载和升级不会丢数据**：这两个文件夹会保留，重新安装后自动接上。
+- **换电脑**：不要直接复制 `data` 文件夹。历史记录和 API 密钥是用这台电脑的系统密钥加密的，到别的电脑上打不开。用下面三种导出：
+- 设置 → 隐私模式 → 迁移：「导出迁移包」得到一个 JSON 文件，包含设置、术语库、收藏和自定义语言；新电脑上「导入迁移包」。API 密钥不会进迁移包，要重新填。
+- 历史页的「导出」把历史记录存成 JSON，新电脑上「导入」。
+- 收藏页的「导出术语」单独备份术语库。
+- **模型**：`models` 文件夹可以整个复制到新电脑的同一位置，省得重新下载。
+- **同一台电脑重装系统**前，除了上面的导出，也可以整体备份 `data` 和 `models`；系统重装后加密的部分能不能打开取决于系统密钥是否还在，所以导出的文件才是可靠的备份。
+
+### 7.3 清理
+
+- 设置 → 隐私模式 → 数据管理 里可以清历史、清缓存，或「清除所有数据」。
+- 设置 → 关于 里可以重置全部设置（保留 API 密钥）、清理旧版本留下的目录。
+- 模型不用了，到对应的设置页点「卸载」；手动放入的文件直接从文件夹删掉即可。
 
 ## 8. 常见问题
 
