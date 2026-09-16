@@ -30,7 +30,8 @@ import {
   AboutSection,
   ProvidersSection,
   TranslationSection,
-  AiActionsSection
+  AiActionsSection,
+  ManualSection
 } from './sections/index.jsx';
 
 const logger = createLogger('Settings');
@@ -54,6 +55,7 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
     audio: t('settingsNav.audio'),
     interface: t('settingsNav.interface'),
     privacy: t('settingsNav.privacy'),
+    manual: t('settingsNav.manual'),
     about: t('settingsNav.about'),
   };
 
@@ -565,6 +567,8 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
             setEditingShortcut={setEditingShortcut}
           />
         );
+      case 'manual':
+        return <ManualSection />;
       case 'about':
         return (
           <AboutSection notify={notify} resetSettings={resetSettings} />

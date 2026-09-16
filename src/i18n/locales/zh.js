@@ -8,7 +8,7 @@ const zh = {
     groupTranslation: "翻译", groupSystem: "系统",
     providers: "翻译源", translation: "翻译设置", selection: "划词翻译", floatingWindow: "悬浮窗口", document: "文档翻译",
     aiActions: "AI 动作",
-    llm: "本地模型", ocr: "OCR 识别", tts: "朗读设置", listen: "听译模型", audio: "音频", interface: "界面外观", privacy: "隐私模式", about: "关于",
+    llm: "本地模型", ocr: "OCR 识别", tts: "朗读设置", listen: "听译模型", audio: "音频", interface: "界面外观", privacy: "隐私模式", manual: "使用说明", about: "关于",
     export: "导出", import: "导入", reset: "重置",
     simpleMode: "简洁", fullMode: "完整", switchToFull: "完整", switchToSimple: "简洁",
     modeHint: "当前为简洁目录，点下方「完整」可查看全部设置（划词、悬浮窗、OCR、隐私等）",
@@ -456,6 +456,10 @@ const zh = {
     selection: { title: "划词翻译" },
     floatingWindow: { title: "悬浮窗口" },
     aiActions: { title: "AI 动作" }
+  },
+  manual: {
+    title: "使用说明",
+    contents: "目录",
   },
   about: {
     desc: "智能离线翻译工具",

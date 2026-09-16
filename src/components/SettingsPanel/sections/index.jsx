@@ -13,5 +13,6 @@ export { default as AboutSection } from './AboutSection.jsx';
 export { default as ProvidersSection } from './ProvidersSection.jsx';
 export { default as TranslationSection } from './TranslationSection.jsx';
 export { default as AiActionsSection } from './AiActionsSection.jsx';
+export { default as ManualSection } from './ManualSection.jsx';
 
 export * from './shared.jsx';

@@ -2,7 +2,7 @@
 
 import {
   Globe, Shield, Info, Eye, Palette, Layers, MousePointer, Server,
-  FileText, Sparkles, AudioLines, Cpu
+  FileText, Sparkles, AudioLines, Cpu, BookOpen
 } from 'lucide-react';
 
 import { PRIVACY_MODES, getModeFeatures, isFeatureEnabled, isProviderAllowed as isProviderAllowedByMode, PRIVACY_MODE_IDS } from '../../stack/privacy-modes.js';
@@ -40,6 +40,7 @@ export const NAV_ITEMS = [
   { id: 'audio', icon: AudioLines, group: 'system', keywords: ['audio', 'tts', 'speech', 'voice', 'volume', 'rate', '朗读', '语音', '语速', '音色', 'listen', 'asr', 'subtitle', 'caption', 'model', 'sensevoice', '听译', '字幕', '识别', '模型', '语音识别', '音频'] },
   { id: 'interface', icon: Palette, group: 'system', basic: true, keywords: ['theme', 'dark', 'light', 'font', 'appearance', '界面', '主题', '外观'] },
   { id: 'privacy', icon: Shield, group: 'system', keywords: ['privacy', 'security', 'mode', 'history', '隐私', '安全', '记录'] },
+  { id: 'manual', icon: BookOpen, group: 'system', basic: true, keywords: ['manual', 'guide', 'help', 'how', '说明', '帮助', '教程', '使用'] },
   { id: 'about', icon: Info, group: 'system', basic: true, keywords: ['about', 'version', 'info', '关于', '版本'] },
 ];
 

@@ -8,7 +8,7 @@ const en = {
     groupTranslation: "Translation", groupSystem: "System",
     providers: "Providers", translation: "Translation", selection: "Selection", floatingWindow: "Floating Window", document: "Documents",
     aiActions: "AI Actions",
-    llm: "Local model", ocr: "OCR", tts: "Text to Speech", listen: "Listen models", audio: "Audio", interface: "Appearance", privacy: "Privacy", about: "About",
+    llm: "Local model", ocr: "OCR", tts: "Text to Speech", listen: "Listen models", audio: "Audio", interface: "Appearance", privacy: "Privacy", manual: "User Guide", about: "About",
     export: "Export", import: "Import", reset: "Reset",
     simpleMode: "Simple", fullMode: "Full", switchToFull: "Full", switchToSimple: "Simple",
     modeHint: "You're viewing the simple catalog. Click Full below for all settings (selection, floating window, OCR, privacy...)",
@@ -456,6 +456,10 @@ const en = {
     selection: { title: "Selection Translate" },
     floatingWindow: { title: "Floating Window" },
     aiActions: { title: "AI Actions" }
+  },
+  manual: {
+    title: "User Guide",
+    contents: "Contents",
   },
   about: {
     desc: "Smart Offline Translation Tool",

@@ -1,0 +1,124 @@
+/* In-app user guide (ManualSection): chapter list on the left, text on the right. */
+
+.manual .manual-layout {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.manual .manual-toc {
+  position: sticky;
+  top: 0;
+  flex: 0 0 200px;
+  max-height: calc(100vh - 160px);
+  overflow-y: auto;
+  padding-right: 8px;
+  border-right: 1px solid var(--border-primary);
+}
+
+.manual .manual-toc-chapter {
+  margin-bottom: 6px;
+}
+
+.manual .manual-toc-link {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 5px 8px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.manual .manual-toc-link.sub {
+  padding-left: 20px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.manual .manual-toc-link:hover {
+  background: var(--bg-secondary);
+}
+
+.manual .manual-toc-link.active {
+  color: var(--accent-primary);
+  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+}
+
+.manual .manual-body {
+  flex: 1;
+  min-width: 0;
+  max-width: 720px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-primary);
+}
+
+.manual .manual-body h2 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 28px 0 12px;
+  padding-top: 8px;
+}
+
+.manual .manual-body h2:first-child {
+  margin-top: 4px;
+}
+
+.manual .manual-body h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 20px 0 8px;
+}
+
+.manual .manual-body h4 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 14px 0 6px;
+}
+
+.manual .manual-body p {
+  margin: 0 0 10px;
+}
+
+.manual .manual-body ul,
+.manual .manual-body ol {
+  margin: 0 0 10px;
+  padding-left: 22px;
+}
+
+.manual .manual-body li {
+  margin-bottom: 4px;
+}
+
+.manual .manual-body code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  font-size: 12.5px;
+}
+
+.manual .manual-body pre {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  overflow-x: auto;
+}
+
+.manual .manual-body pre code {
+  padding: 0;
+  background: transparent;
+}
+
+.manual .manual-body a {
+  color: var(--accent-primary);
+  text-decoration: none;
+}
+
+.manual .manual-body a:hover {
+  text-decoration: underline;
+}
