@@ -1,13 +1,6 @@
 // Asks Google to translate a sample into every code in the catalogue and
-// reports the ones it rejects.
-//
-// Why this exists: config/languages.js carries ~134 codes that nothing in the
-// app can validate. A wrong code does not throw — google-translate.js passes
-// unmapped codes straight through, so a typo just comes back as untranslated
-// text, silently, forever. This is the only way to know the table is real.
-//
-// One-off, NOT part of check:all — it makes one network request per language
-// against Google's unofficial endpoint. Run it after editing the catalogue.
+// reports the ones it rejects. One-off, not part of check:all (one network
+// request per language); run it after editing config/languages.js.
 //
 //   node scripts/bench/verify-google-languages.mjs
 //   node scripts/bench/verify-google-languages.mjs --delay 500   (if throttled)
@@ -25,8 +18,7 @@ configureRuntime({ fetch: (...args) => globalThis.fetch(...args) });
 const provider = new GoogleTranslateProvider({ domain: 'com' });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// 'en' is the sample's own language — Google rightly echoes it back, which
-// would otherwise read as an invalid code.
+// 'en' is the sample's own language: Google echoes it back.
 const SOURCE = 'en';
 const targets = LANGUAGES.filter((l) => l.code !== 'auto' && l.code !== SOURCE);
 const failed = [];

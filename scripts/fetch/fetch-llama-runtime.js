@@ -14,9 +14,8 @@ const REPO = 'ggml-org/llama.cpp';
 const MANIFEST = path.join(__dirname, '..', '..', 'electron', 'tengine', 'runtime', 'llama-manifest.json');
 const DEST = path.join(__dirname, '..', '..', 'resources', 'llama');
 
-// The Vulkan zip is a superset of the CPU zip (same llama/ggml DLLs plus the
-// Vulkan backend, verified byte-identical on b10853), so one download covers
-// both backends.
+// The Vulkan zip is a superset of the CPU zip, so one download covers both
+// backends.
 const zipName = (build) => `llama-${build}-bin-win-vulkan-x64.zip`;
 const zipUrl = (build) => `https://github.com/${REPO}/releases/download/${build}/${zipName(build)}`;
 
@@ -57,8 +56,8 @@ async function download(url) {
   return buf;
 }
 
-// GitHub publishes a sha256 digest per release asset. It is a second opinion
-// while pinning; later fetches trust the manifest hash only.
+// GitHub's per-asset sha256 digest is a second opinion while pinning; later
+// fetches trust the manifest hash only.
 async function publishedDigest(build, name) {
   try {
     const res = await fetch(`https://api.github.com/repos/${REPO}/releases/tags/${build}`, {

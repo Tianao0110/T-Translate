@@ -7,15 +7,13 @@
 //        node scripts/check/check-hardcoded-chinese.js --update-baseline
 //
 // Output buckets:
-//   🔴 ERROR   - user-visible UI text (label / error / message / placeholder ...)
-//   🟡 WARNING - probably needs i18n but worth a human look
-//   ⚪ SKIP    - safe (comments, logs, i18n source files, etc.)
+//   ERROR   - user-visible UI text (label / error / message / placeholder ...)
+//   WARNING - probably needs i18n but worth a human look
+//   SKIP    - safe (comments, logs, i18n source files, etc.)
 //
-// Baseline gate: historical high-priority findings are frozen in
-// hardcoded-chinese-baseline.json (keys are file::text, no line numbers, so
-// unrelated edits don't shift them). Anything beyond the baseline exits 1 —
-// new code must use i18n. Paid some debt down? --update-baseline ratchets
-// the file tighter. It never accepts new findings; fix those instead.
+// Baseline gate: high-priority findings are frozen in
+// hardcoded-chinese-baseline.json (keys are file::text); anything beyond
+// the baseline exits 1. --update-baseline only ratchets the file tighter.
 
 const fs = require('fs');
 const path = require('path');
@@ -25,8 +23,8 @@ const isStrict = process.argv.includes('--strict');
 const isUpdateBaseline = process.argv.includes('--update-baseline');
 const BASELINE_PATH = path.join(__dirname, 'hardcoded-chinese-baseline.json');
 
-// Everything user-facing outside the stack (which carries Chinese fallbacks
-// by design) and the engine hosts.
+// Everything user-facing outside the stack (Chinese fallbacks by design)
+// and the engine hosts.
 const SCAN_DIRS = [
   'src/components',
   'src/stores',
@@ -239,7 +237,7 @@ function main() {
     console.log('✅ No high-priority issues. Low-priority items may be intentional.');
   }
 
-  // Forward slashes so the baseline is byte-identical on any OS.
+  // Forward slashes: the baseline is byte-identical on any OS.
   const currentCounts = {};
   for (const r of fileResults) {
     for (const f of r.errors) {

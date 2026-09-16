@@ -5,29 +5,10 @@
 //
 //   node scripts/build/build-audio-release.js [--src <dir>] [--only <id,id>]
 //
-// --src defaults to %APPDATA%\t-translate\asr-models (where the probe reads
-// manually placed models). Extract the upstream .tar.bz2 tarballs there first:
-// Node has no bzip2, so extraction stays a manual step — the exact upstream
-// URLs are in audio-model-sources.js and land in PROVENANCE.txt inside each
-// pack, so a rebuild a year from now is a download + `tar -xjf` away.
-//
-// --only rebuilds just those packs; the others keep their entries from the
-// existing release-audio-models/manifest.json, so a voice-pack rebuild from
-// a different source tree never drops the ASR packs out of the manifest.
-// Voice packs carry whole directories (`tree` sources): their files are
-// zipped with relative paths, which the app's extractor preserves.
-//
-// Publishing steps (manual, one-time per model update):
-//   1. GitHub -> Releases -> Draft new release, tag `audio-models`
-//      (mark as PRE-RELEASE so electron-updater never treats it as "latest" —
-//      the same rule that keeps the ocr-models tag out of the update channel)
-//   2. Upload everything inside release-audio-models/
-//   3. Publish. The app reads manifest.json from that release at runtime.
-//   To ship a model update later: bump `version` in audio-model-sources.js,
-//   re-run this script, replace the changed assets + manifest.json.
-//
-// Zip entries carry a fixed timestamp, so the same inputs always produce the
-// same sha256 — re-run and diff to verify an asset was built from these files.
+// --src defaults to %APPDATA%\t-translate\asr-models; extract the upstream
+// .tar.bz2 tarballs there first (Node has no bzip2). --only rebuilds just
+// those packs; the others keep their manifest entries. Publishing steps
+// and the reproducible-zip rationale: docs/design/tooling.md §2.
 /* eslint-disable no-console */
 
 const path = require('path');
@@ -38,7 +19,7 @@ const { PACKS, RELEASE_BASE_URL } = require('../fetch/audio-model-sources');
 
 const OUT_DIR = path.join(__dirname, '..', '..', 'release-audio-models');
 const LICENSE_DIR = path.join(__dirname, '..', 'model-licenses');
-// Any fixed date works; this one keeps zip metadata stable across rebuilds.
+// Fixed date: zip metadata stays stable across rebuilds.
 const ZIP_DATE = new Date('2020-01-01T00:00:00Z');
 
 function sha256(buf) {
@@ -57,8 +38,8 @@ function parseArgs(argv) {
   return { srcRoot: path.join(process.env.APPDATA, 't-translate', 'asr-models'), only };
 }
 
-// Every file under <srcRoot>/<dir>/<tree>, as [relative-with-forward-slashes, buffer],
-// sorted so the zip (and its hash) is the same on every rebuild.
+// Every file under <srcRoot>/<dir>/<tree>, as [relative-with-forward-slashes,
+// buffer], sorted.
 function readTree(srcRoot, entry, packId) {
   const base = path.join(srcRoot, entry.dir, entry.tree);
   if (!fs.existsSync(base)) {
@@ -150,8 +131,7 @@ async function buildPack(pack, srcRoot) {
 
   for (const entry of pack.sources) {
     if (entry.tree) {
-      // One provenance line per tree: the hash of its sorted (name, hash)
-      // list, so a changed or missing file inside still changes the record.
+      // One provenance line per tree: the hash of its sorted (name, hash) list.
       const files = readTree(srcRoot, entry, pack.id);
       const inner = [];
       for (const [name, buf] of files) {
@@ -192,9 +172,8 @@ async function buildPack(pack, srcRoot) {
       `(${(rawBytes / 1024 / 1024).toFixed(1)} MB raw, ${Math.round((1 - buffer.length / rawBytes) * 100)}% saved)`
   );
 
-  // Manifest entries carry no source paths — clients join baseUrl + file.
-  // Voice-pack fields (engine, voiceGroups, ...) pass through untouched: the
-  // app persists them into pack.json and builds its picker from there.
+  // Manifest entries carry no source paths (clients join baseUrl + file);
+  // voice-pack fields pass through untouched.
   return {
     id: pack.id,
     type: pack.type,
@@ -241,9 +220,8 @@ async function main() {
     built.set(pack.id, await buildPack(pack, srcRoot));
   }
 
-  // Packs not rebuilt keep their previous manifest entry (their zips are
-  // still in OUT_DIR from the earlier run); a pack with neither is dropped
-  // with a warning rather than invented.
+  // Packs not rebuilt keep their previous manifest entry; a pack with
+  // neither is dropped with a warning.
   const previous = new Map((readExistingManifest()?.packs || []).map((p) => [p.id, p]));
   const packs = [];
   for (const pack of PACKS) {

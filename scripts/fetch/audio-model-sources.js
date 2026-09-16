@@ -2,19 +2,10 @@
 // build-audio-release.js to prepare the GitHub `audio-models` release —
 // the sibling of ocr-model-sources.js / build-ocr-release.js.
 //
-// Upstream is k2-fsa/sherpa-onnx's pre-converted model releases, shipped as
-// .tar.bz2. Node has no bzip2, so the packs published here are REPACKAGED as
-// flat zips from an already-extracted local copy; the exact upstream artifact
-// each file came from is recorded per pack and burned into PROVENANCE.txt
-// inside the zip.
-//
-// Same-name-different-source trap: the 2025-09-09 `sense-voice` package on the
-// same upstream tag is ASLP-lab's Cantonese-specialised fine-tune (judges every
-// language as yue, garbles ja/ko). `sourceDir` pins the vetted 2024-07-17
-// original and the build refuses to package anything else.
-//
-// Bump `version` when swapping in newer weights — installed apps compare it
-// against their local pack.json to offer updates.
+// Upstream is k2-fsa/sherpa-onnx's pre-converted model releases, repackaged
+// as flat zips from an extracted local copy; `sourceDir` pins the vetted
+// upstream artifact. Bump `version` when swapping in newer weights.
+// Design notes: docs/design/tooling.md §3.
 
 const UPSTREAM_BASE = 'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models';
 
@@ -24,9 +15,8 @@ const RELEASE_BASE_URL =
 const SENSE_VOICE_DIR = 'sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17';
 const ZIPFORMER_DIR = 'sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20';
 
-// Required pack: the final-pass engine (punctuation + ITN) plus the VAD that
-// gates it. VAD rides along instead of being its own pack because every path
-// needs it, it is 0.3% of the download, and a future base swap brings its own.
+// Required pack: the final-pass engine (punctuation + ITN) plus the VAD
+// that gates it.
 const ASR_BASE_PACK = {
   id: 'asr-base-sense-voice',
   type: 'asr-base',
@@ -34,8 +24,7 @@ const ASR_BASE_PACK = {
   model: SENSE_VOICE_DIR,
   file: 'asr-base-sense-voice.zip',
   languages: ['zh', 'en', 'ja', 'ko', 'yue'],
-  // Role -> installed filename. This map supersedes the hardcoded filenames in
-  // electron/listen/asr-models.js: swapping a model edits the map, not the code.
+  // Role -> installed filename (electron/listen/asr-models.js reads it).
   files: {
     model: 'model.int8.onnx',
     tokens: 'tokens.txt',
@@ -57,9 +46,7 @@ const ASR_BASE_PACK = {
   ],
 };
 
-// Optional pack: the two-pass draft engine. Absent = drafts fall back to
-// pseudo-streaming (partials replayed from the final engine), which still
-// works — never gate listen mode on this one.
+// Optional pack: the two-pass draft engine. Absent = pseudo-streaming drafts.
 const ASR_DRAFT_PACK = {
   id: 'asr-draft-zipformer-zh-en',
   type: 'asr-draft',
@@ -84,17 +71,9 @@ const ASR_DRAFT_PACK = {
   upstream: [`${UPSTREAM_BASE}/${ZIPFORMER_DIR}.tar.bz2`],
 };
 
-// Optional pack: the high-accuracy final-pass engine (v0.4.8). Qwen3-ASR
-// 0.6B is an LLM-style decoder: far more robust than SenseVoice on music,
-// rap and noise (measured 7.8% vs 95.6% CER on a song with BGM) and covers
-// 31 languages, at ~1 GB resident and RTF ~0.2 on CPU. It replaces
-// SenseVoice for finals only when the user picks the tier; the VAD still
-// comes from the base pack, so this one never stands alone.
-//
-// Same-name-different-source note: the ONNX export is a third-party one
-// (Wasser1462's script, weights on ModelScope), repackaged by sherpa-onnx.
-// The 2026-09-07 spike verified it end to end; treat any newer export the
-// same way before swapping it in.
+// Optional pack: the high-accuracy final-pass engine (Qwen3-ASR 0.6B).
+// Replaces SenseVoice for finals when the user picks the tier; the VAD
+// still comes from the base pack.
 const QWEN3_ASR_DIR = 'sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25';
 
 const ASR_HQ_PACK = {
@@ -124,23 +103,16 @@ const ASR_HQ_PACK = {
   licenses: ['LICENSE-qwen3-asr.txt'],
   license: 'Apache-2.0 (Qwen3-ASR-0.6B, Qwen team / Alibaba Cloud; ONNX export by Wasser1462 via sherpa-onnx)',
   upstream: [`${UPSTREAM_BASE}/${QWEN3_ASR_DIR}.tar.bz2`],
-  // Also reachable by hand: the upstream tarball extracted into
-  // asr-models/<QWEN3_ASR_DIR> resolves without pack.json. The app ships the
-  // same entry in electron/shared/audio-packs.js (MANUAL_PACKS) — a unit test
-  // keeps the two in step. A pack over 400 MB from here on carries `manual`
-  // and no `file`: link only, never uploaded.
+  // Link-only pack (`manual`, no `file`): the app ships the same entry in
+  // electron/shared/audio-packs.js (MANUAL_PACKS); a unit test keeps the two
+  // in step.
   manual: { dir: QWEN3_ASR_DIR, url: `${UPSTREAM_BASE}/${QWEN3_ASR_DIR}.tar.bz2`, archive: 'tar.bz2' },
 };
 
-// ===== Neural voice packs (v0.4.2) =====
-// Same release, same manifest, different root (tts-models) and different
-// manager. Unlike the ASR packs these carry whole directories: sherpa opens
-// espeak-ng-data/ and dict/ by path, so `tree` sources are zipped with their
-// relative paths intact and extracted the same way.
-//
-// int8 is a pessimization here: measured 4x slower than fp32 on x86 with no
-// gain from more threads (onnxruntime dequantization overhead), so both packs
-// ship the fp32 weights despite the size.
+// ===== Neural voice packs =====
+// Same release, same manifest, different root (tts-models) and manager.
+// These carry whole directories (`tree` sources, zipped with relative
+// paths). fp32 weights on purpose (docs/design/tooling.md §3).
 
 const TTS_UPSTREAM_BASE = 'https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models';
 
@@ -148,9 +120,8 @@ const KOKORO_DIR = 'kokoro-multi-lang-v1_1';
 const MELO_DIR = 'vits-melo-tts-zh_en';
 
 // Kokoro v1.1-zh, 103 speakers: 0-1 US English female, 2 British English
-// female, 3-57 Chinese female, 58-102 Chinese male. No English male voice
-// exists in this generation. English goes through espeak-ng phonemization
-// (GPL-3 data, shipped in the pack), Chinese through the jieba dict + lexicon.
+// female, 3-57 Chinese female, 58-102 Chinese male. English goes through
+// espeak-ng (GPL-3 data, shipped in the pack), Chinese through jieba.
 const TTS_KOKORO_PACK = {
   id: 'tts-kokoro-zh-en',
   type: 'tts-voice',
@@ -196,9 +167,8 @@ const TTS_KOKORO_PACK = {
   upstream: [`${TTS_UPSTREAM_BASE}/${KOKORO_DIR}.tar.bz2`],
 };
 
-// MeloTTS zh_en: one female speaker trained on mixed Chinese/English, so a
-// sentence that switches language mid-way reads naturally — the pack the
-// renderer prefers for mixed text when it is installed. No espeak-ng needed.
+// MeloTTS zh_en: one female speaker trained on mixed Chinese / English; the
+// pack the renderer prefers for mixed text. No espeak-ng needed.
 const TTS_MELO_PACK = {
   id: 'tts-melo-zh-en',
   type: 'tts-voice',
@@ -218,9 +188,7 @@ const TTS_MELO_PACK = {
   voiceGroups: [{ from: 0, to: 0, lang: 'zh', gender: 'f' }],
   featured: [0],
   preferMixed: true,
-  // Its Chinese runs ~20% faster than kokoro at the same speed value (22
-  // characters: 4.18s vs 5.09s); 0.9 chosen by ear. English is already at a
-  // normal pace.
+  // Speed chosen by ear.
   speedScale: { zh: 0.9, en: 1 },
   sources: [
     { dir: MELO_DIR, file: 'model.onnx' },

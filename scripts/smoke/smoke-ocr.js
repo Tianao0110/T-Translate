@@ -75,8 +75,7 @@ async function main() {
     const t2 = Date.now();
     const third = await ocrEngine.recognize(zhPng, { language: 'zh-Hans', preprocess: { enabled: false } });
     step(`${label}: warm recognition`, third.success, `${Date.now() - t2}ms`);
-    // A screen-sized capture is where the model dominates the wall clock, so
-    // the CPU / GPU comparison is measured on it.
+    // The CPU / GPU comparison is measured on a screen-sized capture.
     const t3 = Date.now();
     const big = await ocrEngine.recognize(bigPng, { language: 'zh-Hans', preprocess: { enabled: false } });
     const bigMs = Date.now() - t3;
@@ -88,7 +87,7 @@ async function main() {
   const cpu = await pass('cpu');
   step('host process is running', hostManager.running() === true);
 
-  // A dead host must not strand the app: the next call respawns it.
+  // The next call after a dead host respawns it.
   hostManager.shutdown();
   step('host stopped on shutdown', hostManager.running() === false);
   const afterKill = await ocrEngine.recognize(enPng, { language: 'en', preprocess: { enabled: false } });

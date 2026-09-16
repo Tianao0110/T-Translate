@@ -3,8 +3,8 @@
 //
 //   npx electron scripts/smoke/smoke-listen.js [--wav <file>] [--keep] [--soak <minutes>]
 //
-// --soak replays the audio for N minutes in one session and reports the worker
-// RSS trend — the answer to "does hours of listening grow anything".
+// --soak replays the audio for N minutes in one session and reports the
+// worker RSS trend.
 //
 // Covers manifest fetch -> sha256 verify -> zip extract -> pack.json write ->
 // staging swap -> pack-based model discovery -> worker load -> VAD ->
@@ -12,9 +12,8 @@
 // plus the offline-mode refusal. GitHub is swapped for file:// URLs against
 // release-audio-models/, so run `npm run audio:release` first.
 //
-// Run this after swapping a model, touching the pack pipeline, or before a
-// release that claims listen mode works. The user's own models are never
-// touched: everything happens under a temp userData.
+// The user's own models are never touched: everything happens under a temp
+// userData. Design notes: docs/design/tooling.md §4.
 /* eslint-disable no-console */
 
 const path = require('path');
@@ -27,11 +26,8 @@ const { RELEASE_DIR, RELEASE_MANIFEST, listenSandbox, installPacks, fakeWindow, 
 const KEEP = has('--keep');
 const { step, summary } = checklist();
 
-// SAPI speech is real speech as far as VAD and SenseVoice are concerned.
-// Two traps burned in here: PowerShell gets the script as -EncodedCommand
-// (UTF-16LE base64) because Chinese through a normal argv is mangled, and the
-// synthesizer renders at its native 22050 Hz — asking SAPI itself for 16 kHz
-// writes a silent file with these Desktop voices (verified: maxAbs 0.000).
+// SAPI speech as the test signal: the script goes as -EncodedCommand and
+// the synthesizer renders at its native rate (docs/design/tooling.md §4).
 function synthesizeWav(dest) {
   const ps = `
 Add-Type -AssemblyName System.Speech
@@ -79,9 +75,8 @@ function readWavPcm(file, targetRate = 16000) {
   return out;
 }
 
-// First sample where speech actually starts, in seconds. Latency has to be
-// measured from the sound, not from the start of the file (SAPI opens with
-// ~100 ms of digital silence).
+// First sample where speech actually starts, in seconds (latency is
+// measured from the sound, not the file start).
 function speechOnsetSeconds(pcm, rate = 16000, threshold = 0.02) {
   for (let i = 0; i < pcm.length; i++) {
     if (Math.abs(pcm[i]) > threshold) return i / rate;
@@ -115,11 +110,9 @@ async function main() {
     before.packs.map((p) => `${p.id}:${p.status}`).join(', ')
   );
 
-  // The offline gate refuses NETWORK access, and this whole harness runs on
-  // file:// URLs (a local read is not the network), so the refusal has to be
-  // checked against the URL shape a real user gets: a second manager, same
-  // gate, https manifest. Both of its network paths must refuse before any
-  // fetch happens — the injected fetch throws if it is ever reached.
+  // The offline refusal is checked against an https manifest (file:// is a
+  // local read): a second manager, same gate; the injected fetch throws if
+  // it is ever reached.
   store.set('privacyMode', 'offline');
   const netMgr = createPackManager({
     manifestUrl: 'https://github.com/Tianao0110/T-Translate/releases/download/audio-models/manifest.json',
@@ -152,13 +145,9 @@ async function main() {
     `download=${offlineCodes[0]}, manifest=${offlineCodes[1]}, list=${offlineList.manifestError}`
   );
 
-  // Native capture (v0.4.1). A loopback client only receives packets while
-  // some render stream is active on the endpoint — a fully silent machine
-  // delivers nothing at all (0.00s measured 2026-09-02; earlier green runs had
-  // a browser or the app playing). So the check renders its own near-silent
-  // tone from a hidden window for the duration: the frame count then proves
-  // koffi loaded, the client activated, the format was accepted, the pump runs
-  // and stop() stops it. Signal itself is not assertable without making noise.
+  // Native capture: a loopback client only receives packets while some
+  // render stream is active, so the check renders its own near-silent tone
+  // from a hidden window and asserts on the frame count.
   const winAudio = require('../../electron/listen/win-audio-capture');
   const caps = winAudio.getCapabilities();
   step(
@@ -208,9 +197,8 @@ async function main() {
   const pcm = readWavPcm(wav);
   const onsetS = speechOnsetSeconds(pcm);
 
-  // One session: feed the audio in real time and time everything against the
-  // audio clock. The feed is scheduled against a fixed start so sleep drift
-  // does not get counted as engine latency.
+  // One session: feed the audio in real time against a fixed start and time
+  // everything against the audio clock.
   async function runSession(label, soakMinutes = 0) {
     const ev = { status: [], segments: [], partials: [], rss: [] };
     const stamp = { partials: [], segments: [] };
@@ -239,8 +227,7 @@ async function main() {
     await waitFor(() => ev.status.includes('listening'), { tries: 200 });
     const loadMs = Date.now() - loadStart;
 
-    // Soak: replay the same audio until the clock runs out; what is under
-    // test is whether hours of continuous use grow anything without bound.
+    // Soak: replay the same audio until the clock runs out.
     const t0 = await feedRealtime(engineManager, pcm, { silenceChunks: 25, soakMs: soakMinutes * 60000 });
 
     // Wall clock at which a given point on the audio timeline was fed.
@@ -262,10 +249,7 @@ async function main() {
 
   const withDraft = await runSession('two-pass（装了草稿引擎）', soakMinutes);
 
-  // Segment starts must only move forward. They did not: forced splits call
-  // vad.reset(), sherpa's own segment clock restarts at zero with it, and every
-  // naturally-closed segment after a split reported a start from the new
-  // origin — so a long session's SRT timeline walked backwards.
+  // Segment starts must only move forward across forced splits.
   const starts = withDraft.ev.segments.map((x) => x.segStartS);
   const backwards = starts.filter((v, i) => i > 0 && v < starts[i - 1]);
   step(
@@ -289,10 +273,9 @@ async function main() {
   const logText = logFile ? fs.readFileSync(path.join(logsDir, logFile), 'utf8') : '';
   step('unload reached the worker (hook is wired)', /"unload"/.test(logText), logFile || '(no log)');
 
-  // ===== High-accuracy tier (v0.4.8) =====
-  // Only when the ~900 MB pack zip was built locally: it is optional, so a
-  // release dir without it is not a failure. Same wav, same harness — the
-  // engine swap must be invisible to everything above the worker.
+  // ===== High-accuracy tier =====
+  // Only when the pack zip was built locally (optional). Same wav, same
+  // harness: the engine swap must be invisible above the worker.
   const hqEntry = manifest.packs.find((p) => p.type === 'asr-hq');
   if (hqEntry && fs.existsSync(path.join(RELEASE_DIR, hqEntry.file))) {
     const tHq = Date.now();
@@ -331,8 +314,7 @@ async function main() {
   const models2 = locateAsrModels(packMgr.packsRoot());
   step('listen still works without the draft pack', !!models2 && models2.streaming === null);
 
-  // Same audio again with the draft engine gone: this is what a user who only
-  // installed the base pack actually sees.
+  // Same audio again with the draft engine gone (base pack only).
   const pseudo = await runSession('伪流式（只装基座包）');
   step(
     'pseudo-streaming still recognizes and still draws drafts',
@@ -340,7 +322,7 @@ async function main() {
     `${pseudo.ev.segments.length} finals / ${pseudo.ev.partials.length} partials`
   );
 
-  // ===== Neural TTS (v0.4.2) =====
+  // ===== Neural TTS =====
   // Same manifest, own manager and root; the worker comes up TTS-only (no
   // listen session), streams one sentence at a time, swaps packs on demand,
   // stops mid-text on cancel, and releases the pack before a swap/removal.
@@ -447,10 +429,9 @@ async function main() {
     kokoroEn.error || `${kokoroEn.audioS.toFixed(2)}s, first chunk ${kokoroEn.firstChunkMs}ms`
   );
 
-  // ===== Neural voice on the GPU (v0.4.9) =====
+  // ===== Neural voice on the GPU =====
   // Needs the WebGPU runtime overlay (scripts/build/overlay-sherpa-runtime.js);
-  // without it sherpa reports the fallback on stderr and the self-test
-  // says so rather than pretending.
+  // without it the self-test reports the fallback.
   engineManager.setTtsProvider('webgpu');
   const gpuTest = await engineManager.ttsSelfTest();
   const gpuOn = gpuTest.ok && gpuTest.provider === 'webgpu';

@@ -3,13 +3,7 @@
 // the zips + manifest.json ready to upload as release assets.
 //   node scripts/build/build-ocr-release.js
 //
-// Publishing steps (manual, one-time per model update):
-//   1. GitHub -> Releases -> Draft new release, tag `ocr-models`
-//      (mark as PRE-RELEASE so electron-updater never treats it as "latest")
-//   2. Upload everything inside release-ocr-models/
-//   3. Publish. The app reads manifest.json from that release at runtime.
-//   To ship a model update later: bump `version` in ocr-model-sources.js,
-//   re-run this script, replace the changed assets + manifest.json.
+// Publishing steps: docs/OCR_MODELS.md and docs/design/tooling.md §2.
 /* eslint-disable no-console */
 
 const path = require('path');
@@ -49,7 +43,7 @@ async function main() {
 
   const packs = [];
   // Legacy entries first: pre-v6 clients pick their base pack via
-  // find(type === 'base'), so base-v5 must precede base-v6 in the manifest.
+  // find(type === 'base').
   for (const pack of [...LEGACY_PACKS, BASE_PACK, HQ_PACK, ...LANG_PACKS]) {
     packs.push(await fetchPack(pack));
   }

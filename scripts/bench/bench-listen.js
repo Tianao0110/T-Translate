@@ -2,8 +2,7 @@
 // distinct sentences per language joined with a gap, replayed in real time
 // through the real chain (VAD, AGC, splits, both engines, the watchdog), then
 // scored: coverage, CER (zh) / CER + WER (en), finals per sentence, final
-// latency. This is the harness the 2026-09-02 baseline was measured with,
-// rebuilt as a script so it stops disappearing with a scratchpad.
+// latency. Design notes: docs/design/tooling.md §4.
 //
 //   npx electron scripts/bench/bench-listen.js --lang zh|en [--tier standard|high] [--n 40] [--gap 0.8]
 //
@@ -15,11 +14,10 @@
 // Packs come from release-audio-models/ (run `npm run audio:release` first);
 // the user's own models are never touched — everything runs in a temp userData.
 //
-// Scoring conventions match the baseline doc: references are FLEURS'
-// normalised column; zh strips spaces and punctuation before CER; en lowers
-// case and strips punctuation and apostrophes before CER and WER. Finals are
-// assigned to the sentence they overlap most; a sentence with no final is
-// uncovered and its whole reference counts as deleted.
+// Scoring: references are FLEURS' normalised column; zh strips spaces and
+// punctuation before CER; en lowers case and strips punctuation and
+// apostrophes before CER and WER. Finals go to the sentence they overlap
+// most; a sentence with no final counts as deleted.
 /* eslint-disable no-console */
 
 const path = require('path');
@@ -34,8 +32,7 @@ const LANG = arg('--lang', 'zh');
 const TIER = arg('--tier', 'standard');
 const N = Number(arg('--n', 40));
 const GAP_S = Number(arg('--gap', 0.8));
-// --normalize scales every clip to a common rms (0.05, the AGC's own target)
-// before joining, so the run measures the chain without FLEURS' level jumps.
+// --normalize scales every clip to a common rms before joining.
 const NORMALIZE = has('--normalize');
 const TARGET_RMS = 0.05;
 const LEAD_S = 1.0;
@@ -180,8 +177,7 @@ function score(lang, timeline, finals) {
       ref,
       hyp,
       finals: buckets[i].length,
-      // The finals themselves, with their times, so a miss can be told from a
-      // merge with the neighbour or a late VAD open.
+      // The finals themselves, with their times.
       segments: buckets[i].map((f) => ({ start: Math.round(f.segStartS * 100) / 100, end: Math.round((f.segStartS + f.segDurS) * 100) / 100, text: f.text })),
       covered: buckets[i].length > 0,
       refLen: refChars.length,
@@ -277,8 +273,7 @@ async function main() {
     engine: TIER === 'high' ? models.hq?.dirName : path.basename(models.modelDir),
     loadMs,
     // Anything beyond starting > listening > stopped means the host died and
-    // came back mid-run; its clock restarts, so later finals land on the
-    // wrong sentences and their latency is meaningless.
+    // came back mid-run: the run is void.
     statusTrail: ev.status,
     ...agg,
     events,

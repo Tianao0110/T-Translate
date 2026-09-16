@@ -15,9 +15,8 @@ const BASE_PACK = {
   version: '1.0.0',
   file: 'ppocr_v6_small.zip',
   url: `${UPSTREAM_BASE}/ppocr_v6_small.zip`,
-  // v6-small is a single 50-language model. The exposed subset is the one
-  // verified against its dictionary — see src/config/ocr-languages.js for why
-  // Vietnamese and Greek are absent despite the scripts looking covered.
+  // v6-small is a single 50-language model; the exposed subset is the one
+  // verified against its dictionary (src/config/ocr-languages.js).
   languages: [
     'zh-Hans', 'zh-Hant', 'en', 'ja',
     'fr', 'de', 'es', 'it', 'pt', 'nl', 'sv', 'da', 'no', 'fi',
@@ -32,10 +31,8 @@ const BASE_PACK = {
   },
 };
 
-// Optional high-accuracy base variant (PP-OCRv6 medium). Not bundled into the
-// installer, not a language pack: users opt in via the model-tier control in
-// OCR settings and the engine swaps it in for the base det/rec. Its type keeps
-// it out of the base row and the language-pack list in every client generation.
+// Optional high-accuracy base variant (PP-OCRv6 medium): not bundled, not a
+// language pack; users opt in via the model-tier control in OCR settings.
 const HQ_PACK = {
   id: 'base-v6-hq',
   type: 'base-variant',
@@ -51,10 +48,8 @@ const HQ_PACK = {
   },
 };
 
-// Kept in the release manifest for apps shipped before the v6 base swap:
-// their base-pack repair resolves 'base-v5', and their fr/de/es still map to
-// the latin pack. Never bump/change these — old clients' engine enables the
-// space heuristic for gen !== 'v5', so they must never receive v6 models.
+// Kept in the release manifest for apps shipped before the v6 base swap.
+// Never bump or change these (docs/design/tooling.md §3).
 const LEGACY_PACKS = [
   {
     id: 'base-v5',
@@ -134,8 +129,7 @@ const LANG_PACKS = [
     files: { rec: 'te_rec.onnx', dict: 'te_dict.txt' },
   },
   {
-    // Upstream calls this one "ka" — Georgian's ISO code — but the model is
-    // Kannada. Verified against its dictionary, not its filename.
+    // Upstream's "ka" archive is Kannada, not Georgian.
     id: 'kannada',
     type: 'lang',
     gen: 'v4',

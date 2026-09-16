@@ -59,8 +59,7 @@ async function main() {
   const row = scan.packs.find((p) => p.role === 'vision');
   step('two-file pack verified by both hashes', row && row.status === 'ready', row ? `${row.id}: ${row.files.map((f) => `${f.part}=${f.status}`).join(' ')}` : 'no vision row');
 
-  // GPU only: on the CPU the manager refuses before a byte of the pack is
-  // read, and the settings card reads unusable.
+  // GPU only: on the CPU the manager refuses before the pack is read.
   let onCpu = null;
   try {
     await (await llmManager.recognize({ image: fs.readFileSync(VISION_HEALTH_IMAGE) })).promise;

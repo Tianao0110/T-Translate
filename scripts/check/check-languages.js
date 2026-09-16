@@ -1,12 +1,8 @@
 #!/usr/bin/env node
-// Keeps the language tables from drifting apart.
-//
-// The catalogue itself now lives in one place (src/config/languages.js, shared
-// by the renderer and the stack), so the drift that remains is at the edges:
-// the named-constant enum, and each traditional provider's own code map.
-//
-// Providers legitimately support a SUBSET — DeepL has no Thai. The reverse, a
-// provider mapping a code the app cannot even offer, is a real error.
+// Keeps the language tables from drifting apart: the named-constant enum
+// and each traditional provider's code map must be subsets of the
+// catalogue (src/config/languages.js); the two OCR language tables must be
+// equal. Design notes: docs/design/tooling.md §1.
 
 const fs = require('fs');
 const path = require('path');
@@ -26,8 +22,8 @@ function catalogue() {
   return b && [...b.matchAll(/code: '([^']+)'/g)].map((m) => m[1]);
 }
 
-// Not a mirror of the catalogue — it only names the handful of codes written
-// literally in code (AUTO, ZH). Its invariant is "subset", not "equal".
+// Only names the handful of codes written literally in code (AUTO, ZH);
+// the invariant is "subset".
 function enumCodes() {
   const b = block(read('../../src/config/constants.js'), /export const LANGUAGE_CODES = \{/, '};');
   return b ? [...b.matchAll(/: '([^']+)'/g)].map((m) => m[1]) : [];
@@ -43,11 +39,8 @@ const PROVIDERS = [
   { id: 'baidu', file: '../../src/stack/providers/baidu-translate.js', fn: '_mapLanguageCode', unmapped: 'passthrough' },
 ];
 
-// The OCR language list exists twice on purpose: the engine resolves model
-// packs in the main process, the settings select renders in the renderer, and
-// the renderer cannot import main-process code. Equal, not subset — a code in
-// only one of them is either a language the UI offers and the engine
-// mis-routes, or one the engine knows and nobody can pick.
+// The OCR language list exists twice (main process and renderer); the
+// invariant is "equal".
 function ocrPackMaps() {
   const ui = block(read('../../src/config/ocr-languages.js'), /export const OCR_LANGUAGE_GROUPS = \[/, '\n];');
   const engine = block(read('../../electron/shared/ocr-packs.js'), /const LANGUAGE_TO_PACK = \{/, '\n};');
@@ -67,9 +60,7 @@ function ocrPackMaps() {
 
 function providerCodes(meta) {
   const content = read(meta.file);
-  // The DEFINITION, not the first call site — google-translate.js calls its
-  // mapper 90 lines above where it defines it, and slicing from the call site
-  // swept up the request headers as if they were language codes.
+  // The definition, not the first call site.
   const at = content.indexOf(`\n  ${meta.fn}(`);
   if (at === -1) return null;
   const body = content.slice(at, content.indexOf('\n  }', at));
@@ -94,9 +85,7 @@ function main() {
     console.log(`  ❌ 目录里有重复的语言码: ${[...new Set(dupes)].join(', ')}`);
   }
 
-  // The Chinese letter index reads the pinyin initial off the name's first
-  // character. An unmapped character silently lands the language in the '#'
-  // group, where nobody will look for it.
+  // The Chinese letter index needs every name's first character mapped.
   const src = read('../../src/config/languages.js');
   const initials = block(src, /const PINYIN_INITIALS = \{/, '};') || '';
   const mappedChars = new Set([...initials.matchAll(/(\S): '/g)].map((m) => m[1]));

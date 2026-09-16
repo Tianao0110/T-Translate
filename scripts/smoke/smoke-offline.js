@@ -49,8 +49,7 @@ async function main() {
   const { store } = require('../../electron/state');
   store.set('privacyMode', 'offline');
 
-  // Capture IPC handlers instead of registering them: the handlers are the
-  // exact functions a renderer reaches, called here with a fake event.
+  // Capture IPC handlers instead of registering them; called with a fake event.
   const handlers = new Map();
   ipcMain.handle = (channel, fn) => handlers.set(channel, fn);
   ipcMain.on = () => {};

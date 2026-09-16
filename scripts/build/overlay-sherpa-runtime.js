@@ -2,17 +2,9 @@
 // CPU-only DLLs (Windows x64). Runs on postinstall and before packaging.
 //
 // What it lays over node_modules/sherpa-onnx-win-x64/:
-//   sherpa-onnx-c-api.dll, sherpa-onnx-cxx-api.dll
-//       — from native/sherpa-onnx-webgpu/bin: sherpa-onnx v1.13.7 built with
-//         the `webgpu` provider patch (recipe in that folder's README)
-//   onnxruntime.dll, dxcompiler.dll, dxil.dll
-//       — from onnxruntime-node: the only prebuilt ORT with the WebGPU EP
-//         (official NuGet/GitHub builds do not carry it)
-//
-// Why an overlay and not a fork of the npm package: the addon (.node) stays
-// upstream's; only the C-API DLL it links and the ORT it loads change. The
-// addon resolves both next to itself, which is why the copies must sit in
-// the sherpa package directory rather than on PATH. Idempotent by sha256.
+//   sherpa-onnx-c-api.dll, sherpa-onnx-cxx-api.dll  from native/sherpa-onnx-webgpu/bin
+//   onnxruntime.dll, dxcompiler.dll, dxil.dll        from onnxruntime-node
+// Idempotent by sha256. Design notes: docs/design/tooling.md §2.
 //
 //   node scripts/build/overlay-sherpa-runtime.js           apply
 //   node scripts/build/overlay-sherpa-runtime.js --check   report only, exit 1 if stale
@@ -29,8 +21,7 @@ const NATIVE = path.join(ROOT, 'native', 'sherpa-onnx-webgpu', 'bin');
 const ORT_NODE = path.join(ROOT, 'node_modules', 'onnxruntime-node', 'bin', 'napi-v6', 'win32', 'x64');
 const BACKUP = path.join(TARGET, '.npm-original');
 
-// Versions the overlay was built against. A different addon or ORT means
-// the DLLs must be rebuilt, not copied.
+// Versions the overlay was built against.
 const EXPECTED = { 'sherpa-onnx-node': '1.13.7', 'onnxruntime-node': '1.26.0' };
 
 const SOURCES = [
@@ -101,8 +92,7 @@ function main() {
     return 0;
   }
 
-  // Keep the untouched originals once, so --restore and a clean diff are
-  // always possible without reinstalling.
+  // Keep the untouched originals once, for --restore.
   if (!fs.existsSync(BACKUP)) {
     fs.mkdirSync(BACKUP);
     for (const s of SOURCES) {

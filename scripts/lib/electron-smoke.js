@@ -45,7 +45,7 @@ function checklist() {
 }
 
 // Fresh userData and models root under the temp dir. Call before requiring
-// any main-process module: state.js freezes the store path on load.
+// any main-process module (state.js freezes the store path on load).
 function sandbox(name) {
   const { app } = require('electron');
   const dir = path.join(os.tmpdir(), name);
@@ -55,8 +55,7 @@ function sandbox(name) {
   process.env.TT_MODELS_ROOT = path.join(dir, 'models');
   return {
     dir,
-    // Chromium keeps session files open until exit, so a failed rm is not a
-    // test failure: the next run's rmSync gets them.
+    // A failed rm is not a test failure (Chromium holds session files).
     cleanup() {
       try {
         fs.rmSync(dir, { recursive: true, force: true });
