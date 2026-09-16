@@ -6,8 +6,7 @@ const logger = require('../platform/logger')('IPC:FloatingWindow');
 const displayHelper = require('../platform/display-helper');
 const { t } = require('../shared/main-i18n');
 
-// Module scope (not per-register) so window-manager can close panes when the
-// floating window itself goes away — panes must never outlive their parent.
+// Module scope: window-manager closes the panes with the floating window.
 const childPaneWindows = new Map();
 const MAX_CHILD_WINDOWS = 15;
 
@@ -80,8 +79,7 @@ function register(ctx) {
     return null;
   });
 
-  // Opacity is applied via CSS variable in the renderer (so child panes aren't
-  // affected). We only persist the value for next launch.
+  // Opacity is applied by the renderer (CSS variable); only persisted here.
   ipcMain.handle(CHANNELS.FLOATING_WINDOW.SET_OPACITY, (event, opacity) => {
     const current = store.get('floatingWindowLocal', {});
     store.set('floatingWindowLocal', { ...current, opacity });
@@ -90,15 +88,9 @@ function register(ctx) {
 
   // ===== Manual window drag =====
 
-  // -webkit-app-region dragging is dead on this transparent frameless window
-  // (Electron 42; the installed 0.2.8 reproduces it too), so the renderer tracks
-  // the pointer itself and streams positions here. `on` (not handle): this fires
-  // at mousemove frequency, fire-and-forget. Addressed via event.sender.
-  //
-  // Size is passed in, captured ONCE at drag start: on fractional display
-  // scaling (e.g. 1.75x) a bare setPosition re-rounds the size每 call and the
-  // rounding error accumulates — the window visibly grows while dragging.
-  // A constant DIP size through setBounds rounds identically every frame.
+  // The renderer tracks the pointer and streams positions here (`on`,
+  // fire-and-forget, addressed via event.sender). Size is the drag-start
+  // size, applied through setBounds every frame (docs/design/ipc.md).
   ipcMain.on(CHANNELS.FLOATING_WINDOW.SET_POSITION, (event, x, y, width, height) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (!win || win.isDestroyed() || !Number.isFinite(x) || !Number.isFinite(y)) return;
@@ -127,8 +119,7 @@ function register(ctx) {
 
   // ===== Settings =====
 
-  // Reads live language from main-window renderer store, falls back to persisted
-  // defaults if the main window isn't around yet
+  // Live language from the main-window store, else the persisted defaults.
   ipcMain.handle(CHANNELS.FLOATING_WINDOW.GET_SETTINGS, async () => {
     const mainWindow = getMainWindow();
     const mainSettings = store.get('settings', {});
@@ -189,9 +180,7 @@ function register(ctx) {
     if (floatingWindow && !floatingWindow.isDestroyed()) {
       floatingWindow.webContents.send(CHANNELS.FLOATING_WINDOW.SETTINGS_CHANGED, settings);
 
-      // Capture-visibility applies live: WDA_EXCLUDEFROMCAPTURE keeps OCR from
-      // re-reading our own overlay, but the user can opt in to being
-      // capturable (to screenshot/record the overlay itself).
+      // Capture-visibility applies live (platform/native-helper.js).
       if (process.platform === 'win32') {
         const helper = require('../platform/native-helper');
         if (settings.floatingWindow?.captureVisible) {
@@ -202,10 +191,7 @@ function register(ctx) {
       }
     }
 
-    // The selection window is a persistent (hide-not-close) renderer with its
-    // own translation stack, so a provider/settings change must reach it too —
-    // otherwise it keeps using the config snapshot from its first translation
-    // until the whole app restarts.
+    // The persistent selection window must see the change too.
     const selectionWindow = getSelectionWindow?.();
     if (selectionWindow && !selectionWindow.isDestroyed()) {
       selectionWindow.webContents.send(CHANNELS.SELECTION.SETTINGS_CHANGED);
@@ -214,9 +200,8 @@ function register(ctx) {
     return !!(floatingWindow && !floatingWindow.isDestroyed());
   });
 
-  // Forward floating-window translations into the main window's history store,
-  // reusing the same DATA.ADD_TO_HISTORY channel the selection window uses. The
-  // store applies the secure-mode gate, so no privacy check is needed here.
+  // Forward translations into the main window's history store (same channel
+  // as the selection window); the store applies the secure-mode gate.
   ipcMain.handle(CHANNELS.FLOATING_WINDOW.ADD_TO_HISTORY, (event, item) => {
     const mainWindow = getMainWindow();
     mainWindow?.webContents.send(CHANNELS.DATA.ADD_TO_HISTORY, item);
@@ -231,8 +216,7 @@ function register(ctx) {
     return true;
   });
 
-  // Show + focus main window, then send 'navigate' with 'settings:<section>' format
-  // so MainWindow can switch tab AND jump to the right SettingsPanel section in one trip.
+  // Show + focus the main window, then 'navigate' with 'settings:<section>'.
   ipcMain.handle(CHANNELS.FLOATING_WINDOW.OPEN_MAIN_SETTINGS, (event, section) => {
     const mainWindow = getMainWindow();
     if (!mainWindow || mainWindow.isDestroyed()) {
@@ -258,13 +242,8 @@ function register(ctx) {
         throw new Error(t('floatingWindow.windowNotFound', '玻璃窗口不存在'));
       }
 
-      // Hide self AND detached child panes before capture so we don't OCR our
-      // own translation overlays. WDA_EXCLUDEFROMCAPTURE is applied too, but it
-      // is not guaranteed across GPU/driver combos, so opacity stays as the
-      // fallback that actually decides correctness here.
-      // (Until 2026-08-19 the affinity call never took effect at all — the HWND
-      // was being passed to koffi as a Buffer, so this fallback was the only
-      // thing working. See makeWindowInvisibleToCapture.)
+      // Hide self and the detached child panes before capture; the capture
+      // affinity alone is not relied on (docs/design/ipc.md).
       const hideForCapture = (visible) => {
         try {
           floatingWindow.setOpacity(visible ? 1 : 0);
@@ -292,9 +271,7 @@ function register(ctx) {
       }
 
       if (screenshot) {
-        // Renderer needs the CAPTURED display's scale to map OCR pixel coords
-        // back to CSS px — its own devicePixelRatio may belong to a different
-        // monitor in mixed-DPI setups.
+        // The captured display's scale, for mapping OCR pixels back to CSS px.
         const { screen } = require('electron');
         const scaleFactor = screen.getDisplayMatching({
           x: Math.round(bounds.x),
@@ -378,8 +355,7 @@ function register(ctx) {
       removeOldestChildWindow();
     }
 
-    // Auto-size from text dimensions; clamp to keep tiny snippets readable
-    // and prevent giant overlays.
+    // Auto-size from text dimensions, clamped.
     const textLength = (text || '').length;
     const lineCount = (text || '').split('\n').length;
     const estimatedWidth = Math.min(Math.max(textLength * 8 + 80, 120), 400);
@@ -440,8 +416,7 @@ function register(ctx) {
         childWindow.show();
       });
 
-      // Panes sit directly over the source text — without this the next
-      // capture would OCR the pane's own translation.
+      // Panes sit over the source text: excluded from capture.
       if (process.platform === 'win32') {
         childWindow.webContents.once('did-finish-load', () => {
           try {

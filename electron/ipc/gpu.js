@@ -1,18 +1,8 @@
-// GPU acceleration switch. One persisted flag (settings.gpu.enabled) that
-// the main process applies to every engine in tengine/registry.js that can
-// take the GPU — local OCR (onnxruntime-node) and the neural voice
-// (sherpa-onnx) today — all on the one WebGPU execution provider.
-//
-// Enabling is a self-test, not a hope: each engine loads its model on the
-// GPU in its own utilityProcess and warms up; an engine that cannot goes
-// back to the CPU on its own and says why. The switch sticks when at least
-// one engine made it, and the settings page shows each engine's real
-// backend. Providers swap live (sessions rebuilt on the next request), so
-// nothing here restarts the app.
-//
-// Listen stays on the CPU by table: its models are int8, and quantized
-// graphs run 3–6x slower on WebGPU (measured 2026-09-07, see gstack
-// v049-gpu-research).
+// GPU acceleration switch: one persisted flag (settings.gpu.enabled) the
+// main process applies to every GPU-capable engine in tengine/registry.js.
+// Enabling runs each engine's self-test; the switch sticks when at least one
+// engine made it, and the settings page shows each engine's real backend.
+// Which engines take the GPU and why: docs/T-ENGINE.md §10.
 
 const { ipcMain } = require('electron');
 const { CHANNELS } = require('../shared/channels');
@@ -61,8 +51,7 @@ const DRIVERS = {
 
 function register(ctx) {
   const { store } = ctx;
-  // Last self-test per engine, so the page shows the live backend without
-  // spawning anything just to ask.
+  // Last self-test per engine, for the page's live backend column.
   const last = {}; // id -> { ok, provider, fallback, at }
 
   const enabled = () => store.get(KEY, false) === true;

@@ -4,8 +4,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 const { stackBridge } = require("./stack-bridge");
 
 contextBridge.exposeInMainWorld("electron", {
-  // One-way crash reporting to the on-disk log. Renderer logging was
-  // console-only, so nothing from this window ever survived a restart.
+  // One-way crash reporting to the on-disk log.
   logs: {
     write: (payload) => ipcRenderer.send('logs:write', payload),
   },
@@ -48,14 +47,13 @@ contextBridge.exposeInMainWorld("electron", {
       ipcRenderer.on("selection:show-direct", listener);
       return () => ipcRenderer.removeListener("selection:show-direct", listener);
     },
-    // Provider/settings changed in the main window — this persistent window
-    // must reload its translation stack or it keeps using stale keys/priority.
+    // Provider / settings changed in the main window: reload here too.
     onSettingsChanged: (callback) => {
       const listener = () => callback();
       ipcRenderer.on("selection:settings-changed", listener);
       return () => ipcRenderer.removeListener("selection:settings-changed", listener);
     },
-    // Reuses floating-window:open-main-settings channel — handler doesn't care which window invoked it
+    // Reuses the floating-window:open-main-settings channel.
     openOcrSettings: () => ipcRenderer.invoke("floating-window:open-main-settings", "ocr"),
   },
 
@@ -63,8 +61,7 @@ contextBridge.exposeInMainWorld("electron", {
     writeText: (text) => ipcRenderer.invoke("clipboard:write-text", text),
   },
 
-  // Privacy mode must be visible here: translate() filters providers and gates
-  // the disk cache by it (same contract as the floating window's preload).
+  // Privacy mode, read-only (same contract as the floating window's preload).
   privacy: {
     getMode: () => ipcRenderer.invoke("privacy:getMode"),
   },
@@ -75,8 +72,7 @@ contextBridge.exposeInMainWorld("electron", {
     set: (key, value) => ipcRenderer.invoke("store-set", key, value),
   },
 
-  // No secureStorage here: translation moved into the main-process stack
-  // (v0.3.1), so this window has no reason to ever see a decrypted key.
+  // No secureStorage here: this window never sees a decrypted key.
 
   // Main-process translation stack (same bridge as the main-window preload;
   // this window only translates, so no test/management surface is exposed).

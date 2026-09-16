@@ -4,15 +4,12 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electron', {
-  // One-way crash reporting to the on-disk log. Renderer logging was
-  // console-only, so nothing from this window ever survived a restart.
+  // One-way crash reporting to the on-disk log.
   logs: {
     write: (payload) => ipcRenderer.send('logs:write', payload),
   },
 
-  // Privacy mode must be visible here: the pipeline filters cloud providers by
-  // it, and screen captures are the most privacy-sensitive input in the app.
-  // Read-only — mode switching stays in the main window.
+  // Privacy mode, read-only: the pipeline filters providers by it.
   privacy: {
     getMode: () => ipcRenderer.invoke('privacy:getMode'),
   },
@@ -25,9 +22,8 @@ contextBridge.exposeInMainWorld('electron', {
   floatingWindow: {
     getBounds: () => ipcRenderer.invoke('floating-window:get-bounds'),
 
-    // Manual title-bar drag: high-frequency fire-and-forget position stream.
-    // width/height = drag-start size, held constant to defeat fractional-DPI
-    // rounding accumulation (window grew while dragging on 1.75x displays).
+    // Manual title-bar drag: fire-and-forget position stream with the
+    // drag-start size (ipc/floating-window.js).
     moveTo: (x, y, width, height) => ipcRenderer.send('floating-window:set-position', x, y, width, height),
 
     captureRegion: (bounds) => ipcRenderer.invoke('floating-window:capture-region', bounds),
@@ -77,10 +73,8 @@ contextBridge.exposeInMainWorld('electron', {
     },
   },
 
-  // Listen-translate: capture is native and lives in the audio worker, so this
-  // window never touches audio — it sends session control and receives text
-  // plus a level number. Translation of finals reuses stack.translate below
-  // (privacy injected main-process side).
+  // Listen-translate: session control out, text plus a level number back;
+  // audio never reaches this window.
   audioEngine: {
     getInfo: () => ipcRenderer.invoke('audio-engine:get-info'),
     start: (opts) => ipcRenderer.send('audio-engine:start', opts),
@@ -88,9 +82,8 @@ contextBridge.exposeInMainWorld('electron', {
     // Which programs are making sound, and whether this Windows build can
     // capture a single one of them.
     listSources: () => ipcRenderer.invoke('audio-engine:sources'),
-    // Translation of each final happens in the main process; the window
-    // only names the target and paints what comes back. Subtitles are filed
-    // there too when the session ends; the window only opens the folder.
+    // Finals are translated and subtitles filed in the main process
+    // (listen/listen-translator.js); the window names the target and paints.
     setTarget: (lang) => ipcRenderer.send('audio-engine:set-target', lang),
     openListenDir: () => ipcRenderer.invoke('audio-engine:open-listen-dir'),
     onTranslation: (cb) => {

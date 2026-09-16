@@ -3,8 +3,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronChildPane', {
-  // One-way crash reporting to the on-disk log. Renderer logging was
-  // console-only, so nothing from this window ever survived a restart.
+  // One-way crash reporting to the on-disk log.
   logs: {
     write: (payload) => ipcRenderer.send('logs:write', payload),
   },

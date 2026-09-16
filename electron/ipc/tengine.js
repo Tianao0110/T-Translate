@@ -1,7 +1,6 @@
-// T-Engine IPC: the status snapshot on demand, and the engine event stream
-// forwarded to the windows that show engine state. The main process is the
-// first reader of that stream — every host lifecycle event lands in the app
-// log here, so a misbehaving engine leaves a trail without any window open.
+// T-Engine IPC: the status snapshot on demand, the engine event stream
+// forwarded to the windows that show engine state, and every host lifecycle
+// event into the app log.
 
 const { ipcMain } = require('electron');
 const { CHANNELS, PRIVACY_MODES } = require('../shared/channels');
@@ -13,8 +12,7 @@ const logger = require('../platform/logger')('IPC:TEngine');
 function register(ctx) {
   const engine = tengine.get();
   // The metrics sink (docs/T-ENGINE.md §7): numbers to data\logs, nothing
-  // in secure mode. The gate is read per event, so switching modes
-  // mid-session takes effect on the next line.
+  // in secure mode; the gate is read per event.
   const metrics = createMetricsLog({
     dir: dataDir('logs'),
     isSecure: () => ctx.store.get('privacyMode', PRIVACY_MODES.STANDARD) === PRIVACY_MODES.SECURE,

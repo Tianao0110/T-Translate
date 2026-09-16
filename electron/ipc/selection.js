@@ -5,15 +5,14 @@ const { CHANNELS } = require('../shared/channels');
 const logger = require('../platform/logger')('IPC:Selection');
 const { captureSelectedText, hasFileFormat } = require('../selection/clipboard-capture');
 
-// Address the window that actually sent the IPC, not the active-slot window. A
-// frozen card is detached from windows.selection, so getSelectionWindow() would
-// misroute its own hide/resize/drag onto whatever card is currently active.
+// Address the window that sent the IPC, not the active-slot window (frozen
+// cards are detached from windows.selection).
 const senderWindow = (event) => BrowserWindow.fromWebContents(event.sender);
 
 function register(ctx) {
   const { getMainWindow, runtime, managers } = ctx;
 
-  // Collapse 3+ consecutive blank lines into 2 (paragraph detection over-produces blanks)
+  // Collapse 3+ consecutive blank lines into 2.
   const cleanTextBlankLines = (text) => {
     if (!text) return text;
     return text.replace(/(\n\s*){3,}/g, '\n\n');
@@ -68,9 +67,8 @@ function register(ctx) {
 
   // ===== Text capture =====
 
-  // Anti-misfire: clipboard may contain a file drop instead of selected text;
-  // distinguish via the formats the copy produced (read fresh inside the
-  // capture, before restore) so we don't translate file paths blindly.
+  // The clipboard may hold a file drop instead of text; the capture reports
+  // the formats the copy produced.
   ipcMain.handle(CHANNELS.SELECTION.GET_TEXT, async () => {
     const { text, formats, fileClipboard } = await captureSelectedText();
 
@@ -129,9 +127,8 @@ function register(ctx) {
 
 // ===== Helpers =====
 
-// Thin wrapper kept for the hotkey-direct caller (main.js). All the clipboard
-// mechanics (mutex, full-format restore, success cache) live in the shared
-// capture module so the mouseup probe and this fetch can't clobber each other.
+// Thin wrapper over selection/clipboard-capture.js, which owns the mutex,
+// the full-format restore and the success cache.
 async function fetchSelectedText() {
   const { text } = await captureSelectedText();
   return text;

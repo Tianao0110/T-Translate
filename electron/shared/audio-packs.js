@@ -14,15 +14,13 @@ const { compareVersions } = require('../packs/model-pack-core');
 const ASR_BASE_TYPE = 'asr-base';
 // Two-pass draft engine. Optional: absent means pseudo-streaming drafts.
 const ASR_DRAFT_TYPE = 'asr-draft';
-// High-accuracy final-pass engine (v0.4.8). Optional: replaces the base
-// engine for finals when the user picks the tier; the base pack's VAD still
-// gates it, so it never stands alone.
+// High-accuracy final-pass engine. Optional: replaces the base engine for
+// finals when the user picks the tier; the base pack's VAD still gates it.
 const ASR_HQ_TYPE = 'asr-hq';
 // Neural voice pack (sherpa-onnx TTS model + its G2P data). Any number.
 const TTS_VOICE_TYPE = 'tts-voice';
 
-// One manifest serves both domains; each pack manager lists only its own
-// types so a voice pack never shows up under "识别模型" and vice versa.
+// One manifest serves both domains; each pack manager lists only its own types.
 const ASR_TYPES = [ASR_BASE_TYPE, ASR_DRAFT_TYPE, ASR_HQ_TYPE];
 const TTS_TYPES = [TTS_VOICE_TYPE];
 
@@ -30,14 +28,12 @@ const TTS_TYPES = [TTS_VOICE_TYPE];
 // lists types we must skip rather than offer.
 const KNOWN_TYPES = [...ASR_TYPES, ...TTS_TYPES];
 
-// Packs too big to re-host (the rule since v0.4.10: over 400 MB is a link,
-// not an upload). The user fetches the upstream archive and drops its folder
-// into <models>/asr-models; the layout below is what the locator trusts,
-// pack.json or not ("hand-placed = trusted locally"). Shipped with the app
-// so the folder resolves offline, and merged into the manifest entry of the
-// same id so the settings page can show the link and the target folder.
-// scripts/fetch/audio-model-sources.js carries the same entry for the release
-// build; tests/unit/audio-packs.test.js keeps the two in step.
+// Link-only packs (over 400 MB): the user fetches the upstream archive and
+// drops its folder into <models>/asr-models; the layout below is what the
+// locator trusts, pack.json or not. Merged into the manifest entry of the
+// same id for the settings page. scripts/fetch/audio-model-sources.js
+// carries the same entry; tests/unit/listen/audio-packs.test.js keeps the
+// two in step.
 const QWEN3_ASR_DIR = 'sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25';
 const MANUAL_PACKS = [
   {
@@ -96,8 +92,7 @@ function computePackList(installedPacks, manifest, types = KNOWN_TYPES) {
     }
   }
 
-  // Installed but no longer in the manifest (or the manifest never loaded):
-  // still usable, still removable — never hide what is on disk.
+  // Installed but not in the manifest (or none loaded): still listed.
   for (const local of installed.values()) {
     result.push({ ...local, status: 'orphaned', installedVersion: local.version });
   }

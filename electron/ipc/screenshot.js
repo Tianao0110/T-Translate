@@ -1,5 +1,5 @@
-// Screenshot IPC handlers. The capture core itself lives in main.js (wired via
-// managers) — the copy that used to live here had drifted and was unreferenced.
+// Screenshot IPC handlers; the capture flow itself is screenshot/flow.js,
+// reached through managers.
 
 const { ipcMain, globalShortcut } = require('electron');
 const { CHANNELS } = require('../shared/channels');
@@ -65,7 +65,7 @@ function register(ctx) {
       runtime._windows.screenshot = null;
     }
 
-    // Only restore main window if it was visible before AND user opened from UI (not hotkey)
+    // Restore the main window only if it was visible and opened from the UI.
     if (!runtime.screenshotFromHotkey && runtime.wasMainWindowVisible && mainWindow) {
       mainWindow.show();
       mainWindow.focus();
@@ -88,8 +88,7 @@ function register(ctx) {
       logger.warn('OCR failed:', data.error);
       const errorText = data.error || '';
 
-      // main-i18n t(key, params): the 2nd arg is interpolation params, not a
-      // fallback — these keys exist in main-i18n, so pass the key alone.
+      // main-i18n t(key, params): the 2nd arg is params, not a fallback.
       let displayError;
       if (errorText.includes('vision') || errorText.includes('not support') || errorText.includes('不支持')) {
         displayError = t('screenshot.visionNotSupported');

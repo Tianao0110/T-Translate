@@ -17,9 +17,8 @@ const CHANNELS = {
     SAVE_FILE: 'save-file',   // dialog + write in one round trip
   },
   DOCUMENT: {
-    // "Open with T-Translate" hand-off: renderer pulls the pending file (path
-    // is main-process-owned — no arbitrary-path read surface), main pushes a
-    // ready ping on second-instance.
+    // "Open with T-Translate" hand-off: renderer pulls the pending file, main
+    // pushes a ready ping on second-instance.
     TAKE_PENDING_OPEN: 'document:take-pending-open',
     OPEN_FILE_READY: 'document:open-file-ready',
   },
@@ -40,8 +39,7 @@ const CHANNELS = {
   },
   LOGS: {
     OPEN_DIRECTORY: 'logs:open-directory',
-    // Fire-and-forget: renderer crashes never reached the log files, so a
-    // React error or unhandled rejection left no trace on disk at all.
+    // Fire-and-forget renderer log lines into the on-disk log.
     WRITE: 'logs:write',
   },
   PRIVACY: {
@@ -125,8 +123,8 @@ const CHANNELS = {
     OPEN_FOLDER: 'models:open-folder',
     CLEAN_LEGACY: 'models:clean-legacy',
   },
-  // GPU acceleration switch (v0.4.9): one setting, main process applies it
-  // to every engine that can take it (local OCR for now).
+  // GPU acceleration switch: one setting, applied by ipc/gpu.js to every
+  // engine that can take it.
   GPU: {
     STATUS: 'gpu:status',
     SET_ENABLED: 'gpu:set-enabled',
@@ -136,7 +134,7 @@ const CHANNELS = {
     STATUS: 'tengine:status',   // renderer → main: {provider, engines[{id, host, runtime, gpu, provider, lastHealth, host:{running,…}}]}
     EVENT: 'tengine:event',     // main → renderer: {engine, host, kind, at, …} per host lifecycle event
   },
-  // Built-in model (v0.5.0): the model folder and the developer door. No text crosses here.
+  // Built-in model: the model folder and the developer door. No text crosses here.
   LLM: {
     STATUS: 'llm:status',             // renderer → main: {dir, packs, resident, provider, runtime, …}
     RESCAN: 'llm:rescan',             // renderer → main: rescan the folder, returns status
@@ -196,16 +194,14 @@ const CHANNELS = {
     OCR_RESET_VISION: 'stack:ocr-reset-vision',
     VISION_CHAT: 'stack:vision-chat',             // path B: prompt + capture to a vision model
     VISION_CAPABILITY: 'stack:vision-capability', // may path B run under the live privacy mode?
-    // External TTS endpoint (OpenAI-compatible /v1/audio/speech), v0.4.2.
-    // Offline mode refuses all three main-side; the key stays in the vault.
+    // External TTS endpoint (OpenAI-compatible /v1/audio/speech). Offline
+    // mode refuses all three main-side; the key stays in the vault.
     TTS_CAPABILITY: 'stack:tts-capability',       // configured + allowed under the live privacy mode?
     TTS_SPEAK: 'stack:tts-speak',                 // {requestId, text, voice, speed} → {success, audio}
     TTS_TEST: 'stack:tts-test',                   // settings page: synthesize a sample with a draft config
   },
-  // Listen-translate (audio engine). Hosted by the floating window's listen
-  // mode; the mode entry is always visible but disabled until an ASR base
-  // pack sits under userData/asr-models — packs install from settings, and
-  // hand-placed model folders still count.
+  // Listen-translate (audio engine), hosted by the floating window's listen
+  // mode; disabled until an ASR base pack sits under <models>/asr-models.
   AUDIO_ENGINE: {
     GET_INFO: 'audio-engine:get-info',   // renderer → main: model/privacy/state snapshot
     START: 'audio-engine:start',         // renderer → main: spawn ASR worker; payload {language, source}
@@ -213,9 +209,7 @@ const CHANNELS = {
     SOURCES: 'audio-engine:sources',     // renderer → main: audio sources + capability probe
     STATUS: 'audio-engine:status',       // main → renderer: {state, detail}
     LEVEL: 'audio-engine:level',         // main → renderer: 0..1 capture level, ~12/s
-    // v0.4.1 moved capture into the worker's native WASAPI layer, so the
-    // renderer no longer produces PCM at all: the pcm/event channels it used
-    // to push through are gone rather than left dangling.
+    // Capture is native in the worker; the renderer never produces PCM.
     SEGMENT: 'audio-engine:segment',     // main → renderer: recognized (final) segment record
     PARTIAL: 'audio-engine:partial',     // main → renderer: open-segment provisional text ('' clears)
     SET_TARGET: 'audio-engine:set-target',   // renderer → main: translation target for the running session ('' = none)
@@ -227,8 +221,8 @@ const CHANNELS = {
     PACKS_DOWNLOAD: 'audio-engine:packs-download',
     PACKS_REMOVE: 'audio-engine:packs-remove',
     DOWNLOAD_PROGRESS: 'audio-engine:download-progress', // shared by ASR and voice packs (payload carries packId)
-    // Neural TTS (v0.4.2): voice packs live under tts-models and synthesis
-    // runs in the same worker. Audio streams back one sentence at a time.
+    // Neural TTS: voice packs under tts-models, synthesis in the same worker.
+    // Audio streams back one sentence at a time.
     TTS_STATUS: 'audio-engine:tts-status',     // renderer → main: {available, packs, loaded}
     TTS_VOICES: 'audio-engine:tts-voices',     // renderer → main: installed voices (packId:sid)
     TTS_GENERATE: 'audio-engine:tts-generate', // renderer → main: {id, text, packId, sid, speed}
@@ -261,8 +255,6 @@ const MENU_ACTIONS = {
 const PRIVACY_MODES = {
   STANDARD: 'standard',
   OFFLINE: 'offline',
-  // SECURE was missing here, so privacy:setMode('secure') failed validation
-  // and the main-process mode key silently kept its previous value.
   SECURE: 'secure',
 };
 

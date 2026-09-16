@@ -10,9 +10,7 @@ const { t } = require("../shared/main-i18n");
 const { isOfflineMode } = require("../security/privacy-gate");
 const { syncLoginItem } = require("../platform/login-item");
 
-// Must match MAX_FILE_SIZE in src/document/document-parser.js: the parser refuses
-// anything larger anyway, so a higher cap here would only read the whole file
-// into memory and ship it over IPC for the renderer to reject.
+// Must match MAX_FILE_SIZE in src/document/document-parser.js.
 const MAX_OPEN_WITH_BYTES = 20 * 1024 * 1024;
 
 function register(ctx) {
@@ -47,9 +45,8 @@ function register(ctx) {
     return mainWindow ? mainWindow.isMaximized() : false;
   });
 
-  // One-shot pickup of the context-menu file. The renderer never supplies a
-  // path — only the argv-parsed, main-process-owned pending path is ever read,
-  // so this opens no arbitrary-file surface.
+  // One-shot pickup of the context-menu file; the path is main-process-owned,
+  // never renderer-supplied.
   ipcMain.handle(CHANNELS.DOCUMENT.TAKE_PENDING_OPEN, async () => {
     const filePath = runtime.pendingOpenFile;
     if (!filePath) return null;
@@ -70,8 +67,7 @@ function register(ctx) {
     }
   });
 
-  // Bring the main window back — notification clicks land here, and the
-  // window may be hidden to tray (close-to-hide) or minimized.
+  // Bring the main window back (notification clicks; hidden to tray or minimized).
   ipcMain.on(CHANNELS.SYSTEM.SHOW, () => {
     const mainWindow = getMainWindow();
     if (mainWindow) {
@@ -126,12 +122,11 @@ function register(ctx) {
 
   const autoUpdater = require('../platform/auto-updater');
 
-  // IPC doesn't stream — track download state here and poll/push via separate channel.
+  // Download state tracked here; progress is pushed on its own channel.
   let _downloadProgress = null;
   let _isDownloading = false;
 
-  // Offline mode promises "no network requests" — that includes the updater.
-  // Gated in main so all windows are covered by one check.
+  // Offline mode covers the updater too; gated here for every window.
   const updateBlockedOffline = () =>
     isOfflineMode(store)
       ? { success: false, offline: true, error: t('system.offlineUpdateBlocked', '离线模式下已禁用检查更新') }
@@ -148,9 +143,8 @@ function register(ctx) {
     }
   });
 
-  // Push download progress to renderer via 'update:download-progress'.
-  // Renderer still sends {downloadUrl, downloadName} - ignored, electron-updater
-  // downloads whatever the preceding check resolved from the feed.
+  // Progress goes out on 'update:download-progress'. The renderer's
+  // {downloadUrl, downloadName} is ignored; electron-updater uses the feed.
   ipcMain.handle(CHANNELS.APP.DOWNLOAD_UPDATE, async () => {
     const blocked = updateBlockedOffline();
     if (blocked) return blocked;
@@ -215,8 +209,7 @@ function register(ctx) {
     }
   });
 
-  // Save dialog + write in one invoke — the renderer has no fs for
-  // arbitrary files, and a path returned from SAVE alone is useless to it.
+  // Save dialog + write in one invoke (the renderer has no fs).
   ipcMain.handle(CHANNELS.DIALOG.SAVE_FILE, async (event, { defaultPath, filters, data, encoding } = {}) => {
     const mainWindow = getMainWindow();
     try {
@@ -250,18 +243,14 @@ function register(ctx) {
 
   // ===== Logs =====
 
-  // Renderer-side logging had no path to disk: src/core/logger.js writes to
-  // console only, so React crashes, unhandled rejections and window.onerror
-  // left the log files completely blind to the whole renderer half of the app.
-  // One-way (`on`, not `handle`) — logging must never make the caller await.
+  // Renderer log lines into the on-disk log. One-way (`on`, not `handle`).
   const RENDERER_LEVELS = new Set(['error', 'warn', 'info']);
   const MAX_RENDERER_MSG = 4000;
 
   ipcMain.on(CHANNELS.LOGS.WRITE, (event, payload = {}) => {
     const level = RENDERER_LEVELS.has(payload.level) ? payload.level : 'error';
     const scope = String(payload.scope || 'Renderer').slice(0, 40);
-    // Already a string from the renderer side; cap it so a runaway loop cannot
-    // blow past the 5MB file cap in one write.
+    // Capped so one write cannot blow past the log file cap.
     const text = String(payload.text || '').slice(0, MAX_RENDERER_MSG);
     if (!text) return;
 
@@ -328,7 +317,7 @@ function register(ctx) {
         openAtLogin: enabled,
         args: enabled ? ['--startup'] : [],
       });
-      // Mirror to store: getLoginItemSettings is unreliable in dev mode.
+      // Mirrored to the store (platform/login-item.js).
       store.set('settings.startup.autoLaunch', enabled);
       logger.info('Auto launch set to:', enabled);
       return { success: true, enabled };
@@ -338,8 +327,8 @@ function register(ctx) {
     }
   });
 
-  // Retire the pre-v0.3.7 Run entry name once, and keep the current-name
-  // entry in line with the stored preference (see platform/login-item.js).
+  // Retire the old Run entry name once; keep the current one in line with
+  // the stored preference (platform/login-item.js).
   syncLoginItem({ app, store })
     .then((r) => {
       if (r.legacyRemoved) logger.info('Legacy auto launch entry retired');
@@ -349,7 +338,7 @@ function register(ctx) {
 
   ipcMain.handle(CHANNELS.APP.GET_AUTO_LAUNCH, () => {
     try {
-      // Prefer store (reliable in dev), fall back to system API.
+      // Store first, then the system API.
       const stored = store.get('settings.startup.autoLaunch');
       if (stored !== undefined) {
         return { success: true, enabled: !!stored };

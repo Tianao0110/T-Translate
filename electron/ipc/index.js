@@ -56,8 +56,7 @@ function initIPC(deps) {
     runtime: deps.runtime,
     store: deps.store,
     app: deps.app,
-    // Platform modules are dependencies like any other here — submodules that
-    // take them from ctx stay loadable (and testable) outside a real Electron.
+    // Platform modules are injected like any other dependency.
     electron: require('electron'),
     displayHelper: require('../platform/display-helper'),
     // Managers passed in (avoids circular dep on window-manager).

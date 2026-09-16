@@ -19,7 +19,7 @@ function register(ctx) {
     }
   });
 
-  // on() version — legacy channel name kept for backwards compatibility.
+  // on() version (legacy channel name).
   ipcMain.on(CHANNELS.CLIPBOARD.WRITE_TEXT_LEGACY, (event, text) => {
     try {
       clipboard.writeText(text);

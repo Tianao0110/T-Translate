@@ -19,9 +19,7 @@ function register(ctx) {
   // it updated through SET_MODEL_TIER when the user switches.
   ocrEngine.setModelTier(store.get('settings.ocr.modelTier', 'standard'));
 
-  // Warm the heavy natives at idle so neither the settings page nor the
-  // first recognition pays the sync-require cost mid-interaction. Only when
-  // the local engine is actually selected — no point paying its RAM otherwise.
+  // Warm the heavy natives at idle, only when the local engine is selected.
   if (store.get('settings.ocr.engine') === 'rapid-ocr') {
     setTimeout(() => ocrEngine.prewarm(), 5000);
   }
@@ -59,8 +57,7 @@ function register(ctx) {
     return status;
   });
 
-  // Light by default (file presence only — cheap enough for page entry);
-  // options.deep also builds the session, reserved for explicit user action.
+  // Light by default (file presence); options.deep also builds the session.
   ipcMain.handle(CHANNELS.OCR.HEALTH_CHECK, async (event, engineId, options = {}) => {
     logger.info('Health check for engine:', engineId, options?.deep ? '(deep)' : '');
 
@@ -128,9 +125,8 @@ function register(ctx) {
 }
 
 // ===== Per-engine recognizers =====
-// No IPC of their own since the v0.3.1 stack migration retired the legacy
-// ocr:paddle-ocr / ocr:windows-ocr channels — the translation-stack facade
-// (ctx.localOcr) calls these exports directly in the main process.
+// No IPC of their own: the translation-stack facade (ctx.localOcr) calls
+// these exports directly.
 
 // Windows OCR — Windows.Media.Ocr via electron/ocr/windows-ocr
 async function recognizeWindows(store, imageData, options = {}) {

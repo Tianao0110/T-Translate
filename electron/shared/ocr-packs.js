@@ -3,23 +3,19 @@
 // by a pack.json; the base pack ships with the app, language packs are
 // downloaded on demand from the GitHub `ocr-models` release.
 
-// Version compare lives in the generic pack machinery — the audio registry
-// needs the identical "manifest newer than installed?" test.
+// Version compare lives in packs/model-pack-core.js.
 const { compareVersions } = require('../packs/model-pack-core');
 
 const BASE_PACK_ID = 'base-v6';
 
-// Optional high-accuracy base variant (PP-OCRv6 medium). When installed and
-// the user has picked the high tier, the engine resolves base det/rec from
-// this pack instead of BASE_PACK_ID. type 'base-variant' keeps it out of both
-// the base row and the language-pack list in every client generation.
+// Optional high-accuracy base variant (PP-OCRv6 medium), used for base
+// det/rec under the high tier. type 'base-variant' keeps it out of the base
+// row and the language-pack list.
 const HQ_PACK_ID = 'base-v6-hq';
 
-// Which languages each recognition model can actually read. Mirrors
-// OCR_LANGUAGE_GROUPS in src/config/ocr-languages.js, which documents how the
-// list was verified and why Vietnamese, Greek, Uzbek and Mongolian are absent
-// despite their scripts looking covered. The renderer cannot import this file,
-// so `npm run check:languages` fails if the two drift apart.
+// Which languages each recognition model can read. Mirrors
+// OCR_LANGUAGE_GROUPS in src/config/ocr-languages.js (`npm run
+// check:languages` keeps the two in step; verification: docs/OCR_MODELS.md).
 // Detection is script-agnostic: every pack reuses the base det model.
 const LANGUAGE_TO_PACK = {
   'auto': BASE_PACK_ID,
@@ -41,9 +37,7 @@ const LANGUAGE_TO_PACK = {
   'bg': 'cyrillic', 'sr': 'cyrillic', 'mk': 'cyrillic',
   'hi': 'devanagari', 'mr': 'devanagari', 'ne': 'devanagari', 'sa': 'devanagari',
   'ar': 'arabic', 'fa': 'arabic', 'ur': 'arabic', 'ug': 'arabic',
-  // Upstream names the Kannada archive "ka", which is Georgian in ISO 639-1.
-  // The pack really is Kannada (its dictionary holds 72 Kannada glyphs and no
-  // Georgian at all), so the language code here is kn.
+  // Upstream's "ka" archive is Kannada, not Georgian (docs/OCR_MODELS.md).
   'ta': 'tamil', 'te': 'telugu', 'kn': 'kannada',
 };
 
@@ -61,10 +55,8 @@ function computePackList(installedPacks, manifest) {
   const result = [];
 
   for (const mp of manifest?.packs || []) {
-    // The manifest also carries entries for other app generations (their base
-    // pack; packs absorbed into this build's base model). Skip what this
-    // build can't use — a still-installed absorbed pack falls through to the
-    // orphan branch below, staying visible and uninstallable.
+    // Entries for other app generations are skipped; a still-installed one
+    // falls through to the orphan branch below.
     if (mp.type === 'base' && mp.id !== BASE_PACK_ID) continue;
     if (mp.type === 'lang' && !(mp.languages || []).some((l) => LANGUAGE_TO_PACK[l] === mp.id)) continue;
 
@@ -81,8 +73,7 @@ function computePackList(installedPacks, manifest) {
     }
   }
 
-  // Installed but no longer in the manifest (or manifest unreachable):
-  // still usable, still uninstallable — never hide what's on disk.
+  // Installed but not in the manifest (or none loaded): still listed.
   for (const local of installed.values()) {
     if (local.id === BASE_PACK_ID) continue;
     result.push({ ...local, status: 'orphaned', installedVersion: local.version });

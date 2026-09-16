@@ -1,7 +1,6 @@
-// IPC for the encrypted history vault. Main-window-gated: the persist blob
-// holds the user's full translation history, so the two overlay windows
-// (whose preloads never expose these channels anyway) are refused at the
-// handler too — same defense-in-depth posture as secure-storage.
+// IPC for the encrypted history vault (security/history-vault.js). Main
+// window only: the overlay windows are refused at the handler as well as in
+// their preloads.
 
 const { ipcMain, safeStorage } = require('electron');
 const path = require('path');

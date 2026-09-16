@@ -1,11 +1,8 @@
-// Built-in LLM whitelist. These are the only GGUF files T-Engine loads unless
-// the developer door (settings.tengine.allowUnlistedModels) is open: GGUF
-// parsers have had memory-safety CVEs, so the sha256 here is a security
-// boundary, not a hint. Re-pinned once a year together with the llama.cpp
-// build in electron/tengine/runtime/llama-manifest.json (docs/T-ENGINE.md).
-//
-// Weights are never bundled or re-hosted: the user downloads the file from
-// the link below and drops it into <models>/llm-models.
+// Built-in LLM whitelist: the only GGUF files T-Engine loads unless the
+// developer door (settings.tengine.allowUnlistedModels) is open; the sha256
+// is a security boundary (docs/T-ENGINE.md §5). Re-pinned once a year with
+// the llama.cpp build in electron/tengine/runtime/llama-manifest.json.
+// Weights are never bundled: the user drops the file into <models>/llm-models.
 
 // Translation plus every AI action (summarise, explain, digest, rewrite ...).
 const LLM_ROLE_GENERAL = 'general';
@@ -31,7 +28,7 @@ const LLM_PACKS = [
     sha256: '061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a',
     arch: 'qwen3',
     template: 'qwen3',
-    // The template has a thinking switch; T-Engine keeps it off (handbook §5).
+    // The template has a thinking switch; T-Engine keeps it off (docs/T-ENGINE.md §5).
     hasThinking: true,
     ctx: 4096,
     minRamGb: 8,
@@ -106,11 +103,9 @@ function packFiles(pack) {
   return parts;
 }
 
-// Role of a file outside the whitelist, from its name alone: only the
-// Hunyuan MT family (hy-mt2-7b, hunyuan-mt-1.8b ...) is translation-only —
-// the same family test the stack's template mapping uses for LM Studio
-// models. Everything else is a general model; "MT" elsewhere in a name
-// (Qwen…-M-TI) means nothing.
+// Role of a file outside the whitelist, from its name alone: the Hunyuan MT
+// family is translation-only (same family test as the stack's template
+// mapping), everything else is a general model.
 const MT_NAME_PATTERN = /\b(hy|hunyuan)[\s\-_]?mt/i;
 function roleForFileName(name) {
   return MT_NAME_PATTERN.test(String(name || '')) ? LLM_ROLE_MT : LLM_ROLE_GENERAL;
@@ -125,8 +120,7 @@ function packByHash(sha256) {
   return LLM_PACKS.find((p) => p.sha256 === hex) || null;
 }
 
-// Cheap pre-check by file name and exact size, so the scanner only hashes
-// 2 GB when the file could be a whitelisted one (or its mmproj). The hash
+// Cheap pre-check by file name and exact size before hashing; the hash
 // still decides.
 function packForFile(name, size) {
   return LLM_PACKS.find((p) => packFiles(p).some((f) => f.file === name && f.size === size)) || null;

@@ -1,14 +1,11 @@
-// Main-window preload — exposes the `electron` API via contextBridge.
-// main.js MUST set `sandbox: false` for fs access (preload runs in renderer process).
+// Main-window preload: the `electron` API via contextBridge. Needs
+// `sandbox: false` (windows/window-manager.js) for the fs helpers.
 
 const { contextBridge, ipcRenderer } = require("electron");
 const { stackBridge } = require("./stack-bridge");
 const fs = require("fs").promises;
 
-// Receive allow-list — the generic ipc.on / ipcRenderer.on bridges below are
-// gated by this so renderer code can't subscribe to arbitrary channels.
-// (send/invoke need no list: they are only reachable through the explicit
-// electronAPI methods, never generically.)
+// Receive allow-list for the generic ipc.on / ipcRenderer.on bridges below.
 const validChannels = {
   receive: [
     "menu-action",
@@ -108,8 +105,7 @@ const electronAPI = {
   },
   logs: {
     openDirectory: () => ipcRenderer.invoke("logs:open-directory"),
-    // One-way: logging must never make the caller await, and a failed write
-    // must never surface as a rejected promise in the renderer.
+    // One-way: logging never makes the caller await.
     write: (payload) => ipcRenderer.send("logs:write", payload),
   },
   store: {
@@ -215,9 +211,7 @@ const electronAPI = {
   // Listen-mode model packs. Pack management only: capture and session
   // control belong to the floating window's preload, not this one.
   audioPacks: {
-    // Read-only status (which model is live, is the draft engine present):
-    // hand-placed model folders have no pack.json, so the pack list alone
-    // cannot answer "is listen mode usable right now".
+    // Read-only status (which model is live, is the draft engine present).
     getInfo: () => ipcRenderer.invoke("audio-engine:get-info"),
     listPacks: (options) => ipcRenderer.invoke("audio-engine:packs-list", options),
     downloadPack: (packId) => ipcRenderer.invoke("audio-engine:packs-download", packId),

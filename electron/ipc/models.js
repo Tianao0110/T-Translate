@@ -1,8 +1,6 @@
 // Storage IPC: where app data and model packs live, the one-time move of
-// packs an older build left in userData, and clearing that old userData
-// folder once a relocated install has carried everything over. Engines hold
-// model files open, so both the move and the clear first stop the listen
-// session, release the voice and drop OCR sessions.
+// packs an older build left in userData, and clearing that old folder. Both
+// stop the engines that hold model files open first.
 
 const fs = require('fs');
 const path = require('path');
@@ -19,9 +17,8 @@ const ocrEngine = require('../ocr/ocr-engine');
 let busy = false;
 
 // The old %APPDATA% folder is offered for cleanup only when userData really
-// moved away from it and it still holds something. Electron recreates the
-// default userData directory on every launch, empty — that shell is not
-// old data and must not bring the button back.
+// moved away from it and it still holds something (Electron recreates the
+// default directory empty on every launch).
 function legacyDataRoot() {
   const legacy = legacyUserData();
   if (!isRelocated() || !legacy) return null;
@@ -87,8 +84,7 @@ function register() {
   });
 
   // Deletes the pre-v0.4.7 userData folder. Refused while it still holds
-  // model packs (move them first — 700 MB is not something to drop by
-  // accident) and, belt and braces, if it is the live folder or a parent.
+  // model packs, or if it is the live folder or a parent of it.
   ipcMain.handle(CHANNELS.MODELS.CLEAN_LEGACY, async () => {
     if (busy) return { success: false, error: 'busy' };
     const legacy = legacyDataRoot();

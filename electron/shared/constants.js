@@ -1,7 +1,5 @@
-// 🔴 Single source of truth — config constants (CommonJS).
-//
-// ⚠️ Sync requirement: when this file changes, mirror the same values into
-// src/config/constants.js (ESM version). Run `npm run check:constants` to verify.
+// Single source of truth for config constants (CommonJS). Mirror every
+// change into src/config/constants.js; `npm run check:constants` verifies.
 
 const PRIVACY_MODES = {
   STANDARD: 'standard',

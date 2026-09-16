@@ -1,9 +1,5 @@
-// electron-store CRUD IPC handlers.
-//
-// Key-allowlisted (store-allowlist.js): the generic bridge is shared by every
-// window, so it only serves the keys renderers legitimately persist. The
-// store-clear channel is gone — it had zero callers and would have wiped
-// 'privacyMode' back to its default from any renderer.
+// electron-store CRUD IPC handlers, key-allowlisted (store-allowlist.js):
+// the generic bridge is shared by every window.
 
 const { ipcMain } = require('electron');
 const { CHANNELS } = require('../shared/channels');

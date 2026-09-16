@@ -1,17 +1,9 @@
-// Translation-stack IPC facade — the single enforcement point of the migrated
-// stack. Responsibilities:
-//   1. Own the stack singleton (bundle artifact of src/stack/).
-//   2. Privacy: read privacyMode from the store per request and inject
-//      privacyMode/useCache — whatever the renderer sends for those fields is
-//      discarded, so no call site can weaken SECURE/OFFLINE ever again.
-//   3. Abort registry: requestId/streamId -> AbortController, so canceling or
-//      superseding a translation interrupts the upstream HTTP for real (P2-34).
-//   4. Stream frames: forward each service emission (already coalesced at
-//      ~33ms inside the stack) as a stack:stream-chunk frame to the invoker.
-//
-// Errors cross this boundary as plain localized strings (see the stack i18n
-// pivot in src/stack/i18n.js) — invoke handlers return result objects and
-// never throw (Electron flattens thrown Errors to bare messages).
+// Translation-stack IPC facade, the single enforcement point of the stack:
+// owns the stack singleton (bundle of src/stack/), injects privacyMode /
+// useCache from the store on every request, keeps the requestId / streamId
+// -> AbortController registry, and forwards stream frames to the invoker.
+// Handlers return result objects with localized error strings and never
+// throw. Design notes: docs/design/ipc.md.
 
 const { ipcMain, net, BrowserWindow } = require('electron');
 const path = require('path');
@@ -23,9 +15,8 @@ const llmManager = require('../llm/llm-manager');
 const makeLogger = require('../platform/logger');
 const logger = makeLogger('IPC:Stack');
 
-// In-flight requests (one-shot and streams alike). Swept so an entry can never
-// leak: normal completion deletes it, sender destruction aborts it, and a
-// 10-minute GC catches anything pathological.
+// In-flight requests (one-shot and streams alike): deleted on completion,
+// aborted on sender destruction, swept by a periodic GC.
 const INFLIGHT_TTL_MS = 10 * 60 * 1000;
 
 function register(ctx) {
@@ -38,8 +29,7 @@ function register(ctx) {
     const { createTranslationStack } = require('../generated/translation-stack.cjs');
     const localOcr = require('./ocr');
     stack = createTranslationStack({
-      // Chromium network stack — system proxy and enterprise certs behave
-      // exactly like the renderer fetch the providers were written against.
+      // Chromium network stack (system proxy, enterprise certs).
       fetch: net.fetch.bind(net),
       getLanguage: () => (store.get('settings.interface.language') === 'en' ? 'en' : 'zh'),
       loggerFactory: (scope) => makeLogger(`Stack:${scope}`),
@@ -51,21 +41,19 @@ function register(ctx) {
         isWindows: process.platform === 'win32',
       },
       getCustomFilters: () => store.get('settings.translation.customFilters', []),
-      // The built-in model: the stack's 'tengine' provider reaches T-Engine's
-      // LLM host through the model manager, which owns file choice, residency
-      // and the trial log. Text goes through untouched; numbers come back.
+      // The built-in model: the stack's 'tengine' provider reaches the LLM
+      // host through llm/llm-manager.js.
       localLlm: {
         generate: (request, onToken) => llmManager.generate(request, onToken),
         status: () => llmManager.status(),
         selected: () => llmManager.selected(),
-        // The vision slot for the built-in OCR engine: image bytes in, lines
-        // with boxes out; the bytes never touch a log.
+        // The vision slot for the built-in OCR engine (never logged).
         recognize: (request) => llmManager.recognize(request),
         visionStatus: () => llmManager.visionStatus(),
       },
       cacheFilePath: path.join(dataDir('cache'), 'translation-cache.json'),
-      // External TTS endpoint: plain fields from settings, the key from the
-      // vault (null under offline mode — the prefix is on the blocked list).
+      // External TTS endpoint: fields from settings, the key from the vault
+      // (null under offline mode).
       loadTtsEndpointConfig: async () => {
         const cfg = store.get('settings.tts.endpoint', {}) || {};
         return {
@@ -81,9 +69,7 @@ function register(ctx) {
     logger.error('Stack bundle missing/broken — run `node scripts/build/build-stack.js`:', e.message);
   }
 
-  // Idle boot load (decided D-5a): first translation must not pay the config
-  // decrypt + cache read, and a broken load surfaces in the log at startup
-  // instead of on first use.
+  // Idle boot load, so the first translation does not pay for it.
   if (stack) {
     setTimeout(() => {
       stack.init()
@@ -99,11 +85,8 @@ function register(ctx) {
     return store.get('privacyMode', 'standard');
   }
 
-  // The renderer's opinion about privacyMode/useCache/signal is dropped here.
-  // `noCache` (payload level, not options) is the one exception and it is safe
-  // by construction: it can only turn caching further OFF, never on, so the
-  // secure-mode gate below still decides the ceiling. Listen mode sets it —
-  // subtitle lines are one-shot and would otherwise evict the shared cache.
+  // The renderer's privacyMode / useCache / signal are dropped here. Payload
+  // `noCache` is the one exception: it can only turn caching further off.
   function sanitizeOptions(options = {}, mode, signal, noCache = false) {
     const { privacyMode: _pm, useCache: _uc, signal: _sig, ...rest } = options;
     return {
@@ -177,8 +160,7 @@ function register(ctx) {
 
   ipcMain.handle(CHANNELS.STACK.STREAM_START, (event, payload = {}) => {
     if (!stack) return unavailable();
-    // `noCache` has the same payload-level contract as on the unary path: it
-    // can only ever reduce caching (listen subtitles stream through here).
+    // `noCache`: same payload-level contract as the unary path.
     const { text, options, noCache } = payload;
     const mode = getPrivacyMode();
     const streamId = `st_${crypto.randomUUID()}`;
@@ -241,8 +223,7 @@ function register(ctx) {
     }
   });
 
-  // Answered under the facade's privacy mode, like every other stack call: in
-  // offline mode a cloud LLM must not count as "AI available".
+  // Answered under the facade's privacy mode, like every other stack call.
   ipcMain.handle(CHANNELS.STACK.CHAT_CAPABILITY, async () => {
     if (!stack) return { available: false, providerId: null, providerName: null };
     try {
@@ -254,19 +235,17 @@ function register(ctx) {
     }
   });
 
-  // ===== Connection tests (offline gate enforced HERE, not in the renderer) =====
+  // ===== Connection tests (privacy gate applied here) =====
 
   ipcMain.handle(CHANNELS.STACK.TEST_PROVIDER, async (event, payload = {}) => {
     if (!stack) return { success: false, message: unavailable().error };
-    // testProvider applies the privacy gate itself (allowlist plus, offline,
-    // the local-endpoint rule); the mode is the facade's, never the renderer's.
+    // testProvider applies the privacy gate itself; the mode is the facade's.
     return stack.service.testProvider(payload.providerId, getPrivacyMode());
   });
 
   ipcMain.handle(CHANNELS.STACK.TEST_PROVIDER_CONFIG, async (event, payload = {}) => {
     if (!stack) return { success: false, message: unavailable().error };
-    // testProviderWithConfig applies the isProviderAllowed gate itself; the
-    // mode argument is the facade's, never the renderer's.
+    // Same gate as above; the mode is the facade's.
     return stack.service.testProviderWithConfig(payload.providerId, payload.config, getPrivacyMode());
   });
 
@@ -274,8 +253,7 @@ function register(ctx) {
 
   ipcMain.handle(CHANNELS.STACK.PROVIDERS_STATUS, () => {
     if (!stack) return [];
-    // Decrypted secrets live only in the main process — mask every
-    // schema-encrypted field before the status crosses back to a renderer.
+    // Mask every schema-encrypted field before the status reaches a renderer.
     return stack.service.getProvidersStatus().map((status) => {
       const schema = status.configSchema || {};
       const config = { ...(status.config || {}) };
@@ -330,10 +308,8 @@ function register(ctx) {
     if (!stack) return unavailable();
     const { imageData, options = {} } = payload;
     const mode = getPrivacyMode();
-    // The allowlist is injected HERE from the live mode — a renderer cannot
-    // widen the engine set (the old call sites passed it as a parameter and
-    // relied on convention). Screen captures are the most privacy-sensitive
-    // input in the app.
+    // The engine allowlist is injected from the live mode; a renderer cannot
+    // widen it.
     const { allowedEngines: _ae, ...rest } = options;
     try {
       return await stack.ocr.recognize(imageData, {
@@ -346,9 +322,8 @@ function register(ctx) {
     }
   });
 
-  // Path B carries a screen capture, so the same allowlist that guards OCR
-  // guards this — plus offline's extra rule that the endpoint must be local.
-  // Both are injected here; a renderer can only ask, never widen.
+  // Path B carries a screen capture: same allowlist as OCR, plus offline's
+  // local-endpoint rule, both injected here.
   function visionGate(mode) {
     return {
       allowedEngines: stack.privacyModes.getPrivacyModeConfig(mode).allowedOcrEngines || undefined,
@@ -385,10 +360,7 @@ function register(ctx) {
     return { success: true };
   });
 
-  // ===== External TTS endpoint =====
-  // A network service by definition (even on localhost), so offline mode
-  // refuses all three here — the renderer engine reports itself unavailable
-  // and the manager stays on system voices.
+  // ===== External TTS endpoint (offline mode refuses all three) =====
   const MAX_TTS_INPUT = 4096;
   const str = (v) => (typeof v === 'string' ? v : '');
 
@@ -447,15 +419,13 @@ function register(ctx) {
 
   logger.info('Translation-stack IPC handlers registered');
 
-  // privacy.js calls this after a mode switch: SECURE pauses L2 persistence
-  // (pending writes are flushed first inside setPersistEnabled).
+  // privacy.js calls this after a mode switch: SECURE pauses L2 persistence.
   return {
     onPrivacyModeChanged(mode) {
       stack?.cache.setPersistEnabled(mode !== 'secure');
     },
     // Main-process callers (the listen translator) go through the same
-    // sanitizer as the renderer: privacy mode from the store, cache only
-    // ever reduced, abort tracked like any other request.
+    // sanitizer as the renderer.
     async translateStream(text, options, onChunk, { noCache = false, signal = null } = {}) {
       if (!stack) return unavailable();
       const mode = getPrivacyMode();

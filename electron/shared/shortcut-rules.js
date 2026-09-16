@@ -1,9 +1,6 @@
-// Global-shortcut binding rules, shared by the shortcuts IPC (reject on update)
-// and startup registration (heal already-persisted bindings).
-//
-// A binding without a strong modifier (bare Backspace / Space / a letter…)
-// registers fine with the OS but then swallows that key system-wide while the
-// app runs. Shift alone is not enough: Shift+letter still hijacks typing.
+// Global-shortcut binding rules, shared by the shortcuts IPC (reject on
+// update) and startup registration (heal persisted bindings): a binding
+// needs a strong modifier, Shift alone does not count (docs/design/ipc.md).
 
 // Both renderer format (Ctrl/Meta) and Electron accelerator aliases, so a
 // hand-edited config in either spelling is judged the same way.

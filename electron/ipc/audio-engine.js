@@ -12,8 +12,7 @@ const logger = require('../platform/logger')('IPC:AudioEngine');
 
 const AE = CHANNELS.AUDIO_ENGINE;
 
-// One utterance. The translation panel's longest text is a few paragraphs;
-// anything past this is not a read-aloud request.
+// Cap for one read-aloud utterance.
 const MAX_TTS_CHARS = 5000;
 const TTS_ID = /^[A-Za-z0-9_-]{1,64}$/;
 const PACK_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
@@ -48,8 +47,7 @@ function registerAudioEngineIPC(ctx) {
   ipcMain.on(AE.START, (event, opts) => engineManager.startSession(opts || {}));
   ipcMain.on(AE.STOP, () => engineManager.stopSession('renderer'));
 
-  // Audio sources for the "which program" picker, plus what this machine can
-  // actually do. Sampling the peak meters takes a moment, hence invoke.
+  // Audio sources for the "which program" picker, plus what this machine can do.
   ipcMain.handle(AE.SOURCES, async () => {
     const caps = winAudio.getCapabilities();
     return {
@@ -88,9 +86,8 @@ function registerAudioEngineIPC(ctx) {
     }
   });
 
-  // The offline gate is NOT here: audio-pack-manager.downloadPack owns it, so
-  // it holds for every caller instead of only this channel. The OFFLINE_BLOCKED
-  // code arrives through the catch below like any other refusal.
+  // The offline gate lives in audio-pack-manager.downloadPack; OFFLINE_BLOCKED
+  // arrives through the catch below like any other refusal.
   ipcMain.handle(AE.PACKS_DOWNLOAD, async (event, packId) => {
     const mainWindow = getMainWindow();
     try {
@@ -114,9 +111,7 @@ function registerAudioEngineIPC(ctx) {
   });
 
   // ===== Neural TTS =====
-  // Local synthesis only: nothing here reaches the network, so neither the
-  // offline nor the secure gate applies. The audio streams back to the window
-  // that asked (event.sender), never broadcast.
+  // Local synthesis only; audio streams back to event.sender.
 
   ipcMain.handle(AE.TTS_STATUS, () => engineManager.getTtsStatus());
   ipcMain.handle(AE.TTS_VOICES, () => engineManager.getTtsVoices());
@@ -137,8 +132,7 @@ function registerAudioEngineIPC(ctx) {
     if (id) engineManager.ttsCancel(id);
   });
 
-  // Each window reports its own playback; the manager ORs them, so one
-  // window stopping never unmutes while another is still talking.
+  // Each window reports its own playback; the manager ORs them.
   ipcMain.on(AE.TTS_PLAYING, (event, payload) => {
     engineManager.setTtsPlaying(event.sender.id, !!payload?.on);
   });

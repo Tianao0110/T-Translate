@@ -8,13 +8,12 @@ const logger = require('../platform/logger')('IPC:Privacy');
 function register(ctx) {
   const { store } = ctx;
 
-  // 'strict' was removed in 0.2.9 — its core promise (no network) maps to offline
+  // Legacy 'strict' maps to offline.
   if (store.get('privacyMode') === 'strict') {
     store.set('privacyMode', 'offline');
   }
 
-  // Secure mode persists across restarts, so the log gate is applied at
-  // boot as well as on every switch (before the switch is logged).
+  // The log gate is applied at boot as well as on every switch.
   setSecureFileLogging(store.get('privacyMode') === PRIVACY_MODES.SECURE);
 
   ipcMain.handle(CHANNELS.PRIVACY.SET_MODE, (event, mode) => {
@@ -28,8 +27,7 @@ function register(ctx) {
       setSecureFileLogging(mode === PRIVACY_MODES.SECURE);
       logger.info('Mode changed to:', mode);
 
-      // SECURE pauses the stack's L2 cache persistence (flushes pending
-      // standard-mode writes first); other modes resume it.
+      // SECURE pauses the stack's L2 cache persistence; other modes resume it.
       ctx.stackHooks?.onPrivacyModeChanged?.(mode);
 
       // Log mode-specific behavior so the user-visible effect is traceable.

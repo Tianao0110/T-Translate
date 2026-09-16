@@ -1,11 +1,7 @@
-// Secure storage IPC: encrypts API keys via Electron safeStorage (DPAPI on Windows).
-// Layered defenses: access audit log, anomaly detection, privacy-mode gate.
-// No plaintext fallback — refuses to store if encryption is unavailable.
-//
-// The audit trail and the offline privacy gate live in shared modules
-// (security/secure-audit.js, security/secure-vault.js) since the main-process
-// translation stack decrypts in-process through the same code paths — an
-// IPC-local audit would be blind to the stack's traffic.
+// Secure storage IPC: API keys through Electron safeStorage (DPAPI), with
+// the access audit, anomaly detection and privacy-mode gate of
+// security/secure-vault.js and security/secure-audit.js. No plaintext
+// fallback.
 
 const { ipcMain, safeStorage } = require('electron');
 const { CHANNELS } = require('../shared/channels');
@@ -80,19 +76,15 @@ function register(ctx) {
     return safeStorage.isEncryptionAvailable();
   });
 
-  // No access-log query channel: the audit trail exists for the anomaly
-  // detector + security alerts, not for UI consumption.
+  // No access-log query channel; the audit trail is not for UI consumption.
 
   logger.info('SecureStorage IPC handlers registered (with audit & privacy guard)');
 }
 
 module.exports = register;
-// Re-exported for floating-window.js and any other main-side consumer so its
-// direct safeStorage reads respect the same offline-mode gate.
+// Re-exported for main-side consumers (floating-window.js), same offline gate.
 module.exports.isDecryptAllowed = isDecryptAllowed;
-// Test-only surface (tests/unit/secure-audit.test.js): the burst heuristic
-// must stay false-positive-free for app-internal bulk sweeps. Kept stable
-// across the extraction to security/secure-audit.js.
+// Test-only surface (tests/unit/main/secure-audit.test.js).
 module.exports._audit = {
   logAccess: audit.logAccess,
   checkAnomaly: audit.checkAnomaly,

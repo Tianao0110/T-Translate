@@ -11,9 +11,8 @@ const DEFAULT_SHORTCUTS = {
   toggleWindow: 'CommandOrControl+Shift+W',
   floatingWindow: 'CommandOrControl+Alt+G',
   selectionTranslate: 'CommandOrControl+Shift+T',
-  // Re-capture the floating window's region WITHOUT it taking focus, so the
-  // target app (Teams captions, a browser) stays foreground and doesn't hide
-  // its content. No-op when the floating window is hidden.
+  // Re-capture the floating window's region without it taking focus; no-op
+  // when the window is hidden.
   floatingCapture: 'CommandOrControl+Alt+Space',
 };
 
@@ -187,9 +186,8 @@ function registerAllShortcuts(ctx) {
   for (const [action, defaultKey] of Object.entries(DEFAULT_SHORTCUTS)) {
     let shortcut = shortcuts[action] || defaultKey;
 
-    // Heal configs recorded before the modifier rule existed: a persisted bare
-    // key (e.g. Backspace) would otherwise hijack that key system-wide at
-    // every startup with zero feedback.
+    // Heal persisted bindings that break the modifier rule
+    // (shared/shortcut-rules.js).
     if (!isAllowedGlobalShortcut(shortcut)) {
       logger.warn(`Sanitized weak shortcut: ${action} [${shortcut}] -> [${defaultKey}]`);
       store.set(`settings.shortcuts.${action}`, defaultKey);
