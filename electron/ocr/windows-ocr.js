@@ -1,8 +1,6 @@
-// Windows.Media.Ocr driver. PowerShell 5.1 hosts the WinRT calls; the script
-// travels as -EncodedCommand (base64 UTF-16LE) because inline -Command goes
-// through cmd.exe AND PowerShell argument parsing — quotes/newlines/pipes in
-// the script body get mangled in ways that differ per machine.
-// No electron imports here: keep this testable with plain `node`.
+// Windows.Media.Ocr driver: PowerShell 5.1 hosts the WinRT calls, the script
+// travels as -EncodedCommand. No electron imports: testable with plain node.
+// Design notes: docs/design/ocr.md.
 
 const path = require('path');
 const fs = require('fs');
@@ -81,9 +79,8 @@ try {
 `.trim();
 }
 
-// OcrLine carries no rect of its own — only its Words do, so a line's box is
-// their union. Line granularity matches the local engine's rawBlocks; word
-// boxes would read as a "word pile" to the floating window's layout heuristic.
+// A line's box is the union of its word rects (OcrLine has none of its own);
+// line granularity matches the local engine's rawBlocks.
 function unionWordRects(words) {
   const valid = (words || []).filter(
     w => [w?.x, w?.y, w?.w, w?.h].every(Number.isFinite) && w.w > 0 && w.h > 0
@@ -98,11 +95,8 @@ function unionWordRects(words) {
 }
 
 /**
- * Parse the PowerShell payload into text + positioned blocks.
- *
- * Falls back to treating the output as plain text when it isn't JSON: a host
- * where ConvertTo-Json misbehaves then degrades to this driver's pre-0.3.4
- * behavior (text, no coordinates) instead of failing recognition outright.
+ * Parse the PowerShell payload into text + positioned blocks. Non-JSON
+ * output is treated as plain text (no coordinates).
  *
  * @returns {{text: string, blocks: Array<{text, bbox, confidence, index}>}}
  */
@@ -154,8 +148,7 @@ async function recognize(imageData, options = {}) {
       base64Data = imageData.split(',')[1];
     }
 
-    // random suffix: concurrent recognitions in the same millisecond must not
-    // share a temp file
+    // Random suffix: concurrent recognitions must not share a temp file.
     tempFile = path.join(
       os.tmpdir(),
       `t-translate-winocr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.png`
@@ -167,8 +160,7 @@ async function recognize(imageData, options = {}) {
 
     const parsed = parseRecognizeOutput(stdout);
     const text = stripCjkSpaces(parsed.text);
-    // Boxes come straight from Windows in source-image pixels — this driver
-    // writes the capture to disk untouched, so no scale conversion applies.
+    // Boxes are in source-image pixels (the capture is written untouched).
     const blocks = parsed.blocks.map(b => ({ ...b, text: stripCjkSpaces(b.text) }));
     return {
       success: true,

@@ -252,9 +252,8 @@ async function ensureVisionLoaded() {
 // nowhere else; nothing about them is logged.
 async function recognize({ image, task = 'Spotting', maxTokens = null } = {}) {
   if (visionPolicy.state().unhealthy) throw fail('LLM_UNHEALTHY', 'built-in vision model stalled repeatedly this session');
-  // GPU only (2026-09-14 decision): on the CPU the encoder takes seconds
-  // and a screen-scaled capture blows the size cap anyway, so the engine
-  // steps aside before a 1.7 GB pack is even loaded.
+  // GPU only (docs/T-ENGINE.md §10): with the GPU off the engine steps
+  // aside before the pack is loaded.
   if (!deps.visionAdapter) throw fail('LLM_VISION_UNAVAILABLE', 'vision engine not wired');
   if (deps.visionAdapter.provider() !== 'gpu') throw fail('LLM_VISION_NEEDS_GPU', 'the built-in vision model runs only with GPU acceleration on');
   await ensureVisionLoaded();

@@ -1,7 +1,5 @@
 // RGBA pixels -> planar float32 [3, H, W] for the PP-OCR graphs. Plane order
-// is blue, green, red, each normalised with its own mean/std — the layout
-// the upstream pipeline fed the models, kept so results stay identical.
-// Written straight into the Float32Array: no nested arrays, no flatten.
+// is blue, green, red, each normalised with its own mean/std (as upstream).
 function normalizeCHW(image, mean, std) {
   const { data, width, height } = image;
   const plane = width * height;

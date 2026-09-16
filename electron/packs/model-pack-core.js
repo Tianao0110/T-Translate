@@ -1,11 +1,9 @@
 ﻿// Generic model-pack manager factory: download / verify / install / remove
 // packs under a domain-owned root, driven by a manifest.json hosted as a
-// release asset. Extracted verbatim from the OCR pack manager so the audio
-// engine (ASR/TTS packs, v0.4.x) reuses the same battle-tested machinery —
-// the app hardcodes only manifest URLs, so new packs ship by editing releases.
+// release asset. Shared by the OCR, listen and voice pack managers; design
+// notes in docs/design/model-packs.md.
 //
-// No electron import here: `fetch` is injected by each domain shell (the
-// vitest CJS-electron externalization trap; secure-vault DI pattern).
+// No electron import here: `fetch` is injected by each domain shell.
 //
 // createPackManager({
 //   manifestUrl,       resolved URL (env override happens in the shell)
@@ -14,25 +12,18 @@
 //                      domain find packs outside packsRoot() (legacy roots)
 //                      so removal works there too; defaults to packsRoot/id
 //   allowedRoots,      optional () => string[] — every root a pack may live
-//                      under. removePack refuses to delete anything outside
-//                      them, so a resolvePackDir bug cannot turn into a
-//                      recursive delete of an arbitrary folder
+//                      under; removePack refuses anything outside them
 //   listInstalled,     () => installed packs (merged into the UI list)
 //   evictSessions,     (packId) => void | Promise — release live file handles
-//                      before the swap. Awaited: a domain whose engine lives in
-//                      another process must resolve only once it is really gone
+//                      before the swap (awaited)
 //   computePackList,   (installed, manifest) => UI-ready pack list
 //   packJsonFields,    (entry) => fields persisted to pack.json (+installedAt)
 //   packFilter,        optional (entry) => boolean — manifest entries this
 //                      domain may install; others answer PACK_UNKNOWN
 //   basePackId,        optional — its removal falls back to the bundled copy
 //   supportedSchema,   manifest schema ceiling (default 1)
-//   offlineGate,       () => boolean — true refuses every NETWORK access with
-//                      OFFLINE_BLOCKED. Injected (not read from the store here)
-//                      to keep this file electron-free; lives at this layer so
-//                      the refusal is structural for both domains and both
-//                      network paths, instead of a check each IPC handler has
-//                      to remember
+//   offlineGate,       () => boolean — true refuses every network access with
+//                      OFFLINE_BLOCKED (injected; this file is electron-free)
 //   logLabel,          logger channel name
 //   deps: { fetch, fs, logger }   injection points for tests
 // })
@@ -41,13 +32,8 @@ const path = require('path');
 const nodeFs = require('fs');
 const crypto = require('crypto');
 
-// A pack id becomes a directory name (`<packsRoot>/<id>` and the matching
-// `.staging-<id>`), so it is the one caller-supplied value here that turns into
-// a filesystem path. Renderer-reachable through both packs-remove channels,
-// and removal is a recursive delete — an id like '../../Documents' escaped the
-// packs root and wiped whatever it landed on (proven, then fixed, in v0.4.1).
-// Manifest ids run through the same check: the manifest is a downloaded file,
-// so a tampered one must not be able to write outside the root either.
+// A pack id becomes a directory name (and removal is a recursive delete):
+// ids from the renderer and from the manifest both pass this check.
 const SAFE_PACK_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 function assertSafePackId(packId) {
@@ -60,8 +46,6 @@ function assertSafePackId(packId) {
 }
 
 // "1.2.10" vs "1.3.0" — numeric per-segment compare, missing segments = 0.
-// Lives here, not in a domain pack file: every pack registry (OCR, audio)
-// needs the same "is the manifest newer than what's installed" test.
 function compareVersions(a, b) {
   const pa = String(a || '0').split('.').map((n) => parseInt(n, 10) || 0);
   const pb = String(b || '0').split('.').map((n) => parseInt(n, 10) || 0);
@@ -91,8 +75,7 @@ function createPackManager({
 }) {
   const fetchImpl = deps.fetch;
   const fs = deps.fs || nodeFs;
-  // Lazy: logger.js pulls in electron at module scope, which unit tests must
-  // never reach — they inject deps.logger instead.
+  // Lazy: unit tests inject deps.logger instead.
   const logger = deps.logger || require('../platform/logger')(logLabel);
   if (typeof fetchImpl !== 'function') {
     throw new Error('createPackManager requires deps.fetch (inject net.fetch)');
@@ -100,9 +83,8 @@ function createPackManager({
 
   let _manifestCache = null;
 
-  // Every network read in this file goes through here. file:// is a local
-  // read (the env-override test path), not a network access, so it is not
-  // gated — offline mode is about leaving the machine.
+  // Every network read in this file goes through here; file:// is a local
+  // read and is not gated.
   function assertOnlineAllowed(url) {
     if (url.startsWith('file://')) return;
     if (!offlineGate()) return;
@@ -167,12 +149,8 @@ function createPackManager({
     return crypto.createHash('sha256').update(buf).digest('hex');
   }
 
-  // Entries keep their relative path: TTS voice packs carry whole trees
-  // (espeak-ng-data/, dict/) that sherpa opens by directory. Flattening to the
-  // basename used to be the zip-slip guard, so the check is explicit now: no
-  // absolute or drive-relative names, no '..' segment, and the resolved target
-  // must land inside destDir. A tampered archive aborts the install instead of
-  // being quietly rearranged.
+  // Zip-slip guard: entries keep their relative path (voice packs carry
+  // directory trees) but must resolve inside destDir.
   function safeEntryPath(destDir, name) {
     const segments = String(name).split(/[\\/]+/).filter((s) => s !== '' && s !== '.');
     const unsafe =
@@ -211,9 +189,8 @@ function createPackManager({
     assertSafePackId(packId);
     const manifest = await fetchManifest(false);
     const entry = (manifest.packs || []).find((p) => p.id === packId);
-    // packFilter keeps a domain to its own pack types: the ASR and TTS
-    // managers share one manifest, and an id handed to the wrong channel
-    // would otherwise install a voice pack under asr-models.
+    // packFilter keeps a domain to its own pack types (one manifest is
+    // shared by the ASR and TTS managers).
     if (!entry || (packFilter && !packFilter(entry))) {
       const err = new Error(`pack not in manifest: ${packId}`);
       err.code = 'PACK_UNKNOWN';
@@ -221,9 +198,7 @@ function createPackManager({
     }
 
     const url = entry.url || `${manifest.baseUrl}/${entry.file}`;
-    // Re-checked here rather than trusted from fetchManifest above: a manifest
-    // cached before the user switched to offline mode would otherwise let the
-    // much larger pack download through.
+    // Gated again for the download itself (the manifest may be cached).
     assertOnlineAllowed(url);
     logger.info(`Downloading pack ${packId} from ${url}`);
     onProgress(0, 'downloading');
@@ -299,11 +274,8 @@ function createPackManager({
     return { success: true, packId, version: entry.version };
   }
 
-  // Remove a pack folder entirely (no residue). For the base pack only the
-  // userData copy can go — the bundled copy under resources/ is part of the
-  // app and removal just falls back to it.
-  // The delete below is recursive and forced, so the directory it is handed
-  // must provably sit under a root this domain owns — never the root itself.
+  // The delete below is recursive and forced: the directory must sit under a
+  // root this domain owns, never the root itself.
   function assertInsideAllowedRoot(dir) {
     const roots = (allowedRoots ? allowedRoots() : [packsRoot()]).filter(Boolean);
     const target = path.resolve(dir);
@@ -319,11 +291,10 @@ function createPackManager({
     }
   }
 
+  // Removes the pack folder entirely; the bundled base copy is not a target.
   async function removePack(packId) {
     assertSafePackId(packId);
-    // A pack installed by an older build can live outside the current root;
-    // resolvePackDir lets the domain point at it so removal is not silently
-    // impossible for exactly the packs a user most wants to reclaim.
+    // resolvePackDir lets the domain point at a pack outside the current root.
     const dir = (resolvePackDir && resolvePackDir(packId)) || path.join(packsRoot(), packId);
     assertInsideAllowedRoot(dir);
 

@@ -41,8 +41,7 @@ function fail(code, message) {
 const THINK_OPENER = /^(<\|?(think|thinking|thought|reasoning|reason|begin_of_thought|start_of_reasoning|start_think|start_of_thinking|inner_monologue)\|?>|\[THINK\])$/i;
 const THINK_CLOSER = /^(<\|?\/(think|thinking|thought|reasoning|reason)\|?>|<\|end_of_thought\|>|<\|end_of_thinking\|>|\[\/THINK\])$/i;
 
-// Scans every token's text. The control attribute is not enough: Qwen3 and
-// Hy-MT2 both carry <think> as an ordinary token.
+// Scans every token's text, not just control tokens (docs/T-ENGINE.md §5).
 function findThinkTokens(textOf, n) {
   const openers = [];
   const closers = [];
@@ -193,8 +192,7 @@ function renderHunyuan({ system, user }) {
 
 // --- metadata --------------------------------------------------------------
 
-// Header-only read (27 ms on a 2 GB file). null when llama cannot parse the
-// file at all — garbage, truncated header, not a GGUF.
+// Header-only read; null when llama cannot parse the file at all.
 function readMetadata(binding, file) {
   const { f } = binding;
   const g = f.ggufInit(file, { no_alloc: true, ctx: null });
@@ -266,8 +264,7 @@ function vocabOnlyLoad(binding, file) {
 // --- devices ---------------------------------------------------------------
 
 // 'gpu' means one GPU: the discrete card with the most memory, else an
-// integrated one. Never llama's default of spreading layers over every
-// device (a dual-GPU laptop would put half the model on the iGPU).
+// integrated one (docs/T-ENGINE.md §4).
 function pickDevice(devices, provider, deviceIndex = null) {
   const cpu = devices.find((d) => d.type === DEV_TYPE.CPU) || null;
   if (provider !== 'gpu') return { device: cpu, provider: 'cpu', fallback: null };
@@ -347,9 +344,8 @@ function openSession(binding, {
   const vocab = f.getVocab(model);
   const mem = f.getMem(ctx);
   const nVocab = f.vocabNTokens(vocab);
-  // One token buffer per session, reused by tokenize and decode: a
-  // koffi.alloc per request was the suspected slow RSS creep in the soak
-  // spike. Prompts longer than the context fail in tokenize, not in decode.
+  // One token buffer per session, reused by tokenize and decode. Prompts
+  // longer than the context fail in tokenize, not in decode.
   const tokBufSize = nCtx + 64;
   const tokBuf = koffi.alloc('int32', tokBufSize);
   const one = koffi.alloc('int32', 1);
@@ -524,8 +520,7 @@ function openSession(binding, {
     }
     emit(stripper.push(decoder.end()));
     emit(stripper.flush());
-    // llama rolls an aborted batch back, so after a cancel the context still
-    // holds exactly the tokens that decoded; only a real error loses it.
+    // Only a real decode error invalidates the tracked prefix.
     last = trackPrefix && stop !== 'error' ? decoded : null;
     const totalMs = now() - t0;
     return {

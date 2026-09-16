@@ -8,7 +8,7 @@ const { modelDir, modelDirs } = require('./model-root');
 function packRoots(name, listInstalledPacks) {
   const packsRoot = () => modelDir(name);
   const packsRoots = () => modelDirs(name);
-  // Active root last so it wins on an id collision with a stale older copy.
+  // Active root last: it wins on an id collision.
   function listAllInstalled() {
     const byId = new Map();
     for (const root of packsRoots().reverse()) {

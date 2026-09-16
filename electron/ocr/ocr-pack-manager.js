@@ -1,7 +1,5 @@
-// OCR model pack manager: thin shell over model-pack-core, binding the OCR
-// domain pieces (manifest URL, ocr-engine hooks, pack list filter). Download /
-// verify / staging-swap / remove machinery lives in the core — shared with the
-// audio-engine pack managers (v0.4.x) with zero OCR behavior change.
+// OCR model pack manager: thin shell over packs/model-pack-core, binding the
+// OCR domain pieces (manifest URL, ocr-engine hooks, pack list filter).
 
 const { net } = require('electron');
 const { store } = require('../state');
@@ -10,7 +8,7 @@ const { isOfflineMode } = require('../security/privacy-gate');
 const ocrEngine = require('./ocr-engine');
 const { createPackManager } = require('../packs/model-pack-core');
 
-// env override makes local testing possible (file:// or http://localhost)
+// Env override for local testing (file:// or http://localhost).
 const MANIFEST_URL =
   process.env.TT_OCR_MANIFEST_URL ||
   'https://github.com/Tianao0110/T-Translate/releases/download/ocr-models/manifest.json';
@@ -18,11 +16,8 @@ const MANIFEST_URL =
 const manager = createPackManager({
   manifestUrl: MANIFEST_URL,
   packsRoot: () => ocrEngine.packsRoot(),
-  // Packs downloaded by a pre-v0.4.0 build still sit in userData — the engine
-  // reads them from there, so removal has to find them there too. The bundled
-  // base dir is deliberately excluded: it is part of the app, and removePack
-  // must keep falling through to its BUILTIN_PACK refusal instead of deleting
-  // the models that ship inside the installation.
+  // Legacy userData packs are removable too; the bundled base dir is not
+  // (removePack falls through to BUILTIN_PACK).
   resolvePackDir: (packId) => {
     const dir = ocrEngine.resolvePackDir(packId);
     return dir && dir !== ocrEngine.bundledBaseDir() ? dir : null;
@@ -41,9 +36,7 @@ const manager = createPackManager({
     size: entry.size,
   }),
   basePackId: BASE_PACK_ID,
-  // Same offline gate the audio packs carry. This side never had one: offline
-  // mode could still fetch the manifest and download a language pack, which
-  // contradicts the mode's one absolute promise.
+  // Offline gate, same as the audio packs.
   offlineGate: () => isOfflineMode(store),
   logLabel: 'OCR-Packs',
   deps: { fetch: (...args) => net.fetch(...args) },

@@ -1,9 +1,7 @@
-// Local OCR engine facade. Pack resolution (roots, pack.json, tier) lives
-// here in the main process because it owns the install directories; the
-// PP-OCR runtime itself (the ppocr pipeline + onnxruntime-node + skia) runs
-// in the OCR host utilityProcess (services/ocr-host) since v0.4.9, so a
-// native fault there — or a GPU driver fault once WebGPU is on — cannot
-// take the app down. Every export keeps its pre-v0.4.9 shape.
+// Local OCR engine facade: pack resolution (roots, pack.json, tier) in the
+// main process; the PP-OCR runtime runs in the OCR host utilityProcess
+// (services/ocr-host) through the T-Engine adapter. Design notes:
+// docs/design/ocr.md.
 
 const path = require('path');
 const fs = require('fs');
@@ -21,14 +19,13 @@ let _modelTier = 'standard';
 // resolves packs and model paths.
 const host = () => tengine.get().get('ocr');
 
-// Install target for new downloads (install dir when writable — see
-// model-root.js for why the packs no longer grow the system drive).
+// Install target for new downloads (packs/model-root.js).
 function packsRoot() {
   return modelDir('ocr-models');
 }
 
 // Every location packs may already sit in: the active root plus the old
-// userData one, so an existing install keeps reading what it downloaded.
+// userData one.
 function packsRoots() {
   return modelDirs('ocr-models');
 }
@@ -37,8 +34,7 @@ function bundledBaseDir() {
   return path.join(PATHS.resources.ocrData, 'base');
 }
 
-// A downloaded copy wins over the bundled one (that's how base model
-// updates/repairs land without touching the app's own resources).
+// A downloaded copy wins over the bundled one.
 function resolvePackDir(packId) {
   for (const root of packsRoots()) {
     const dir = path.join(root, packId);
@@ -53,8 +49,8 @@ function resolvePackDir(packId) {
 
 function readPackMeta(dir) {
   const meta = JSON.parse(fs.readFileSync(path.join(dir, 'pack.json'), 'utf8'));
-  // Model files always live flat inside the pack dir; basename() keeps a
-  // hand-edited or malformed pack.json from referencing paths outside it.
+  // Model files live flat inside the pack dir; basename() keeps pack.json
+  // from referencing paths outside it.
   for (const key of Object.keys(meta.files || {})) {
     meta.files[key] = path.basename(meta.files[key]);
   }
@@ -65,8 +61,7 @@ function isPackInstalled(packId) {
   return resolvePackDir(packId) !== null;
 }
 
-// High tier prefers the medium variant; silently falls back to the standard
-// base if the hq pack was removed from disk while the setting still says high.
+// High tier prefers the medium variant, falling back to the standard base.
 function resolveBaseDir() {
   if (_modelTier === 'high') {
     const hq = resolvePackDir(HQ_PACK_ID);
@@ -117,7 +112,6 @@ function listInstalledPacks() {
 }
 
 // The model files a session for `packId` needs, under the current tier.
-// Throws with the same codes the old in-process loader used.
 function resolveModels(packId) {
   const baseDir = resolveBaseDir();
   if (!baseDir) {
@@ -143,9 +137,8 @@ function resolveModels(packId) {
   };
 }
 
-// Pack manager calls this after uninstall/update so the next recognition
-// reloads from disk. Base packs supply the det model to every session, so
-// changing either of them invalidates the whole cache, not just their own key.
+// Pack manager calls this after uninstall / update. A base pack change drops
+// every session (det comes from it), a language pack only its own.
 function evictSessions(packId) {
   if (packId && packId !== BASE_PACK_ID && packId !== HQ_PACK_ID) host().evict(packId);
   else host().evict();
@@ -166,8 +159,8 @@ async function recognize(imageInput, options = {}) {
   let packId = packIdForLanguage(language);
   let packFallback = false;
   if (packId !== BASE_PACK_ID && !isPackInstalled(packId)) {
-    // Requested language's pack isn't installed — recognize with the base
-    // model rather than failing; caller surfaces the hint.
+    // Requested language's pack isn't installed: recognize with the base
+    // model; the caller surfaces the hint.
     packFallback = true;
     packId = BASE_PACK_ID;
   }
@@ -198,18 +191,15 @@ async function recognize(imageInput, options = {}) {
   }
 }
 
-// Health probe. The default (light) variant only verifies the model files
-// resolve and are non-empty — cheap enough for the settings page to call on
-// entry. deep additionally builds the session in the host (catches corrupt
-// models and broken native bindings), reserved for explicit user action.
+// Health probe. Light (default): the model files resolve and are non-empty.
+// deep: also builds the session in the host; for explicit user action.
 async function healthCheck({ deep = false } = {}) {
   const baseDir = resolveBaseDir();
   if (!baseDir) {
     return { healthy: false, error: 'BASE_MODELS_MISSING' };
   }
   try {
-    // activeBase is the pack id, not the directory name (the bundled copy
-    // lives in a dir just called 'base').
+    // activeBase is the pack id, not the directory name.
     const meta = readPackMeta(baseDir);
     for (const name of Object.values(meta.files || {})) {
       const st = fs.statSync(path.join(baseDir, name));
@@ -223,14 +213,13 @@ async function healthCheck({ deep = false } = {}) {
   }
 }
 
-// Spawns the host ahead of the first recognition so its native load does
-// not land on the interactive path. Session build stays lazy.
+// Spawns the host ahead of the first recognition; session build stays lazy.
 function prewarm() {
   host().prewarm();
 }
 
-// Which backend the host is actually running the base model on, and why
-// it fell back if it did — what the GPU switch in settings reports.
+// Which backend the host runs the base model on, and the fallback reason if
+// any; the settings GPU switch shows it.
 async function hostStatus() {
   return host().health({ packId: BASE_PACK_ID, models: resolveModels(BASE_PACK_ID) });
 }

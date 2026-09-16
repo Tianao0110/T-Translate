@@ -32,7 +32,6 @@ function fail(code, message) {
 }
 
 // The load probe: every manifest file present with the pinned size and hash.
-// Hashing the set costs ~150 ms once per host start.
 function verifyRuntime(dir, manifest = MANIFEST) {
   const missing = [];
   const mismatched = [];
@@ -48,8 +47,7 @@ function verifyRuntime(dir, manifest = MANIFEST) {
   return { ok: missing.length === 0 && mismatched.length === 0, build: manifest.build, missing, mismatched };
 }
 
-// koffi struct and callback types are process-global and cannot be
-// redefined, so a second loadRuntime in the same process reuses them.
+// koffi types are process-global: a second loadRuntime reuses them.
 const typesByKoffi = new WeakMap();
 function defineStructs(koffi) {
   let defined = typesByKoffi.get(koffi);
@@ -91,8 +89,7 @@ function loadRuntime(dir, { koffi = require('koffi'), verify = true } = {}) {
     }
   }
 
-  // Bind from the declared DLL first; a symbol that moved between DLLs on
-  // a re-pin is still found, and the ABI test reports where it went.
+  // Bind from the declared DLL first, then the others.
   const order = ['ggml', 'ggmlBase', 'llama', 'mtmd'];
   const f = {};
   const homes = {};
@@ -115,8 +112,7 @@ function loadRuntime(dir, { koffi = require('koffi'), verify = true } = {}) {
 
   const types = typesByKoffi.get(koffi).callbacks;
 
-  // Registered callbacks must outlive every native call that may invoke
-  // them; keep them for the life of the process.
+  // Callbacks live for the life of the process.
   const keep = [];
   const register = (proto, fn) => {
     const cb = koffi.register(fn, koffi.pointer(proto));

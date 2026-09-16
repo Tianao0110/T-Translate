@@ -2,7 +2,7 @@
 // each owning its host process, and the two lines the rest of the program
 // reads — status() as a snapshot and on() as the event stream. Nothing here
 // decides anything about the product; that stays in the main process (see
-// docs/T-ENGINE.md, "边界").
+// docs/T-ENGINE.md §1).
 //
 // createTengine() is the factory tests use with fake engines; get() is the
 // program's instance, which wires the real hosts lazily.

@@ -76,10 +76,9 @@ function parseSpotting(output, width, height) {
   return lines;
 }
 
-// Loads the mmproj next to an open text session. warmup runs the encoder
-// once on a dummy image, which is where a GPU pays its shader compile.
-// Whether an image should come here at all (backend, size, layout) is the
-// program's decision, made before the request; this reads what it is given.
+// Loads the mmproj next to an open text session; warmup runs the encoder
+// once on a dummy image. Whether an image comes here at all is decided
+// upstream (src/stack/ocr/vision-routing.js); this reads what it is given.
 function attachVision(binding, session, { mmproj, provider = 'cpu', family = null, abortFlag = null } = {}) {
   const { koffi, f } = binding;
   const h = session.handles();

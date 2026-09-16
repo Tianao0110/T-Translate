@@ -5,13 +5,7 @@
 // self-tests and the T-Engine status snapshot all read this; adding an
 // engine means adding a row, not touching the UI.
 //
-// Backend policy: one execution provider for the onnxruntime engines,
-// WebGPU (Dawn on D3D12), because it covers NVIDIA / AMD / Intel with
-// nothing to install and is the one Microsoft still develops. DirectML was
-// measured and dropped (maintenance mode, rejected Kokoro's ConvTranspose).
-// Quantized (int8) graphs run 3–6x slower on WebGPU than on the CPU, which
-// is why the listen engines are listed as CPU-only rather than "not yet".
-//
+// Backend choice and the measured numbers: docs/T-ENGINE.md §10.
 // Plain data, no requires.
 
 const PROVIDER = 'webgpu';
@@ -23,7 +17,6 @@ const ENGINES = [
     // Runtime: onnxruntime-node inside the OCR host utilityProcess.
     runtime: 'onnxruntime-node',
     gpu: true,
-    // Measured 2026-09-07 (RTX 4090 Laptop): screen-sized capture 1.95 s → 0.15 s.
     note: 'ppocr',
   },
   {
@@ -33,7 +26,6 @@ const ENGINES = [
     // provider patch (native/sherpa-onnx-webgpu).
     runtime: 'sherpa-onnx',
     gpu: true,
-    // Kokoro fp32: first chunk 573 ms → 111 ms, RTF 0.235 → 0.044.
     note: 'kokoro',
   },
   {
@@ -41,7 +33,7 @@ const ENGINES = [
     host: 'audio',
     runtime: 'sherpa-onnx',
     gpu: false,
-    // SenseVoice / zipformer / Qwen3-ASR are int8: 3–6x slower on WebGPU.
+    // int8 graphs stay on the CPU (docs/T-ENGINE.md §10).
     reason: 'int8',
   },
   {
@@ -52,7 +44,6 @@ const ENGINES = [
     runtime: 'llama.cpp',
     gpu: true,
     backend: 'vulkan',
-    // Qwen3-1.7B Q8_0 on an RTX 4090 Laptop: 22 tok/s CPU → 210 tok/s.
     note: 'qwen3',
   },
   {
@@ -63,7 +54,6 @@ const ENGINES = [
     runtime: 'llama.cpp',
     gpu: true,
     backend: 'vulkan',
-    // PaddleOCR-VL-1.6: a floating-window block 2.1 s CPU → 0.12 s on Vulkan.
     note: 'paddleocr-vl',
   },
 ];

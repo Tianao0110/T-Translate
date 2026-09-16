@@ -213,8 +213,8 @@ function afAfRec(l, op) {
     const minW = Math.min(thisW, lastW);
     const em = Box.blockSize(b.box);
     if (
-      // 左右至少有一边是相近的，中心距离要相近
-      // 行之间也不要离太远
+      // at least one side (left or right) aligns and the centres are close
+      // and the lines are not too far apart
       (Box.inlineStartDis(b.box, last.box) < 3 * em || Box.inlineEndDis(b.box, last.box) < 3 * em || Point.disByV(Box.center(b.box), Box.center(last.box), "inline") < minW * 0.4) && Box.blockGap(b.box, last.box) < em * 1.1
     ) {
     } else {

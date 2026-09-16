@@ -1,16 +1,7 @@
-// Where downloaded models live.
-//
-// Default is a `models` folder inside the install directory, not userData: the
-// packs are hundreds of megabytes, and a user who installed the app on D:/F:
-// expects that bulk to sit there too, not to grow %APPDATA% on the system
-// drive forever. In dev the "install dir" is node_modules/electron, so the
-// repo's own `models/` folder (gitignored) stands in for it. userData is only
-// the fallback when that folder cannot be written (a Program Files install
-// without admin).
-//
-// Reads look in BOTH roots: models downloaded by an earlier build (or dropped
-// in by hand, or written by a dev run) keep working where they are. Only new
-// downloads land in the active root.
+// Where downloaded models live: <install dir>/models (the repo's models/ in
+// dev), userData when that is not writable. Reads look in both the active
+// root and the pre-v0.4.0 userData root; new downloads land in the active
+// one. Design notes: docs/design/model-packs.md.
 
 const path = require('path');
 const { app } = require('electron');
@@ -31,8 +22,7 @@ function userDataDir() {
   return app.getPath('userData');
 }
 
-// The pre-v0.4.0 location: %APPDATA%\t-translate. Since v0.4.7 userData may
-// itself have moved into the install dir, so ask app-paths where it was.
+// The pre-v0.4.0 location, as app-paths reports it.
 function legacyModelsRoot() {
   return legacyUserData() || userDataDir();
 }
@@ -40,8 +30,7 @@ function legacyModelsRoot() {
 // Active root — where downloads are installed. Probed once per process.
 function modelsRoot() {
   if (_cached) return _cached;
-  // Harnesses (smoke / bench scripts) sandbox everything under a temp
-  // folder; the dev models folder must not collect their packs.
+  // TT_MODELS_ROOT: the smoke / bench harness sandbox.
   const dir = process.env.TT_MODELS_ROOT || (app.isPackaged ? installModelsDir() : devModelsDir());
   if (isWritable(dir)) {
     _cached = dir;

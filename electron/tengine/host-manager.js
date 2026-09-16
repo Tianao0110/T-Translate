@@ -68,9 +68,8 @@ function createHostManager({
   let spawnedAt = 0;
   let readyAt = 0;
   let lastExit = null; // { code, expected, at }
-  // A process we killed and are still waiting to see die: its exit is
-  // reported (expected) so adapters can finish their bookkeeping, but it no
-  // longer counts as the live host.
+  // A process we killed and are still waiting to see die; its exit is
+  // reported as expected, but it is no longer the live host.
   let dying = null;
 
   function emit(kind, detail = {}) {
@@ -129,16 +128,14 @@ function createHostManager({
       emit('exit', { code, expected: true });
       return;
     }
-    // A discarded host reports its exit after its replacement is already
-    // up: only the live child's death means anything here.
+    // Only the live child's exit counts; a discarded host's late exit is ignored.
     if (proc !== child) return;
     const expected = shuttingDown;
     child = null;
     ready = null;
     lastExit = { code, expected, at: now() };
     if (readySettle) {
-      // Died before saying ready: whoever is awaiting spawn() must hear it
-      // as a crash, not sit out the ready timeout.
+      // Died before ready: spawn() rejects now.
       clearTimeout(readySettle.timer);
       const settle = readySettle;
       readySettle = null;
@@ -256,9 +253,8 @@ function createHostManager({
     shuttingDown = true;
   }
 
-  // Drops the current host without exit bookkeeping — used when a session
-  // replaces a process that existed for something else. The old process
-  // is killed; its late exit is ignored because it is no longer `child`.
+  // Drops the current host without exit bookkeeping (a session replacing a
+  // process that existed for something else); its late exit is ignored.
   function discard(reason) {
     if (!child) return;
     const old = child;

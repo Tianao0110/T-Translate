@@ -1,8 +1,7 @@
 // DB text detection: resize to a multiple of 32, run the model, threshold
 // the probability map, turn every connected region into a min-area
 // rectangle (unclipped by 1.5), crop it upright and estimate its colours.
-// Same steps and constants as upstream esearch-ocr; the per-pixel work
-// runs on flat typed arrays instead of nested arrays and string keys.
+// Same steps and constants as upstream esearch-ocr (index.js).
 const { normalizeCHW } = require('./tensor');
 const { findComponents, minAreaRect } = require('./cv');
 const { resizeImg, data2canvas, cropQuad } = require('./image');

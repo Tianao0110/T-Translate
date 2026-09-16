@@ -1,5 +1,5 @@
-// Trial logs for models outside the whitelist (docs/T-ENGINE.md §5, "试模型
-// 模式"): one file per model per month under data\logs, richer than the
+// Trial logs for models outside the whitelist (docs/T-ENGINE.md §5): one
+// file per model per month under data\logs, richer than the
 // metrics log (probe steps with their raw errors, every request's shape),
 // optionally with prompt and output text when the developer switch is on.
 // Files older than two months are deleted when the host starts; a model

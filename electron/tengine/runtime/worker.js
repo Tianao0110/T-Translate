@@ -142,7 +142,7 @@ function health(msg) {
     };
   }
   const prompt = current.session.buildPrompt({ user: HEALTH_PROMPT });
-  // The first GPU generation pays for pipeline setup; time the second.
+  // Time the second generation (docs/T-ENGINE.md §10).
   current.session.generate({ prompt, maxTokens: 2 });
   const r = current.session.generate({ prompt, maxTokens: HEALTH_TOKENS });
   return {
@@ -248,8 +248,7 @@ function handle(msg) {
     case 'load-runtime':
       try {
         binding = loadRuntime(msg.dir);
-        // A cancel makes llama report the aborted decode as an error; that
-        // is the mechanism working, not a fault.
+        // An aborted decode is the cancel working, not a fault.
         binding.onLog((level, text) => {
           const cancelling = abortFlag && Atomics.load(abortFlag, 0) === 1;
           log(cancelling ? 'debug' : level >= ABI.ENUMS.LOG_LEVEL.ERROR ? 'error' : 'warn', text.trim());

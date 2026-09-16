@@ -2,8 +2,6 @@
 // answers in the contract's terms (provider, health, status). Pack
 // resolution stays in ocr/ocr-engine.js, which owns the install roots
 // and hands fully resolved model paths in.
-//
-// Error codes keep their pre-T-Engine names: callers switch on them.
 
 const { createHostManager } = require('../host-manager');
 

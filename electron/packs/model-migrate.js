@@ -1,8 +1,5 @@
 // Moves model packs a pre-v0.4.0 build left in userData into the active models
-// root (the install directory since v0.4.0). Copy, size-check, then delete:
-// the old copy is removed only once every byte of a pack has landed, so a
-// failure mid-way leaves the user with what they had. Dependency-injected so
-// the unit test runs on temp directories with no Electron around.
+// root: copy, size-check, then delete. Dependency-injected for the unit test.
 
 const nodeFs = require('fs');
 const nodePath = require('path');
@@ -84,9 +81,8 @@ async function removeIfEmpty(fsp, dir) {
   }
 }
 
-// Moves every legacy pack. Progress is reported in bytes across the whole
-// job so one bar covers OCR, listen and voice packs alike. Throws on the first
-// pack that cannot be copied, after discarding its partial target.
+// Moves every legacy pack; progress in bytes across the whole job. Throws on
+// the first pack that cannot be copied, after discarding its partial target.
 async function migrateLegacy({
   legacyRoot,
   activeRoot,

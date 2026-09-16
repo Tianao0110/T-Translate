@@ -1,13 +1,8 @@
 // OCR host: the PP-OCR runtime (./ppocr + onnxruntime-node + skia canvas)
-// in its own utilityProcess. The main process resolves packs and
-// model paths (it owns the install roots); this side only loads models,
-// decodes images and recognizes. A native crash here — an ONNX Runtime
-// bug, a GPU driver fault once WebGPU is on — takes this process, not
-// the app; the manager rejects in-flight requests and respawns on demand.
-//
-// Kept apart from the audio worker on purpose: both bundle an
-// onnxruntime.dll of their own and one process cannot load two DLLs of
-// the same name.
+// in its own utilityProcess. The main process resolves packs and model
+// paths; this side only loads models, decodes images and recognizes. Its
+// adapter (tengine/engines/ocr.js) rejects in-flight requests on a crash
+// and respawns on demand. Design notes: docs/design/ocr.md.
 //
 // Protocol (main -> host):
 //   {type:'init', provider:'cpu'|'webgpu'}
@@ -42,8 +37,7 @@ function ensureEnv() {
   return env;
 }
 
-// WebGPU EP (Dawn on D3D12): onnxruntime-node ships it with dxcompiler /
-// dxil next to onnxruntime.dll, so nothing is installed or downloaded.
+// WebGPU EP (Dawn on D3D12), shipped with onnxruntime-node.
 function ortOption() {
   if (provider !== 'webgpu') return undefined;
   return { executionProviders: ['webgpu'] };
@@ -55,8 +49,7 @@ function sessionKey(packId) {
 
 async function buildSession(models, opt) {
   const { createOcr, ort, canvasKit } = ensureEnv();
-  // No document-direction classifier on purpose: it misclassifies
-  // short-line CJK screenshots as vertical (see OCR_MODELS.md).
+  // No document-direction classifier (docs/OCR_MODELS.md, known limits).
   return createOcr({
     ort,
     ortOption: opt,
@@ -64,15 +57,12 @@ async function buildSession(models, opt) {
     det: models.det,
     rec: models.rec,
     dict: fs.readFileSync(models.dict, 'utf8'),
-    // The space heuristic is for v3/v4 rec models; v5+ recognize spaces
-    // natively and the heuristic over-inserts.
+    // The space heuristic is for v3/v4 rec models only.
     spaceHeuristic: models.gen === 'v3' || models.gen === 'v4',
   });
 }
 
-// WebGPU compiles its shader pipelines on the first run (0.5–1.1 s
-// measured); a blank frame absorbs that here instead of on the user's first
-// capture. Later input sizes cost only tens of milliseconds.
+// A blank frame absorbs WebGPU's first-run shader compile.
 async function warmUp(session) {
   const { canvasKit } = ensureEnv();
   const canvas = canvasKit.createCanvas(480, 320);
@@ -82,8 +72,7 @@ async function warmUp(session) {
   await session.ocr(ctx.getImageData(0, 0, 480, 320));
 }
 
-// What went wrong with the GPU, if anything — reported with every health
-// reply so the settings page can say why the switch did not take.
+// Why the GPU fell back, if it did; reported with every health reply.
 let providerFallback = null;
 
 async function createSession(models) {
@@ -93,8 +82,7 @@ async function createSession(models) {
     await warmUp(session);
     return session;
   } catch (e) {
-    // A GPU that cannot build or run the session is a CPU machine from here
-    // on: the failure is remembered, every later session skips WebGPU.
+    // Sticky: every later session on this host skips WebGPU.
     log('warn', `WebGPU failed (${e.message}) — this host falls back to CPU`);
     providerFallback = e.message;
     provider = 'cpu';
@@ -138,8 +126,7 @@ function stripDataUrl(s) {
   return s.startsWith('data:image') ? s.split(',')[1] : s;
 }
 
-// Small captures carry small glyphs; upscaling before detection recovers
-// them. Larger images skip it — cost outweighs gain.
+// Upscaling applies to small captures only.
 const PREPROCESS_MAX_DIM = 1200;
 
 async function decodeToImageData(image, preprocess = {}) {

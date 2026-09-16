@@ -1,19 +1,10 @@
 // llama.cpp b10853 ABI as T-Engine uses it: struct layouts, function
 // prototypes, enums and the default-parameter fingerprint, transcribed from
 // the pinned headers (include/llama.h, ggml.h, ggml-backend.h, gguf.h,
-// tools/mtmd/mtmd.h and mtmd-helper.h at tag b10853). The annual re-pin re-checks this file field by field against the
-// new headers (docs/T-ENGINE.md §4); tests/unit/llama-abi.test.js holds the
-// struct sizes (always) and the fingerprint the pinned DLLs must reproduce
-// (when they are fetched).
-//
-// Transcription rules:
-// - every field of a by-value struct, in header order, trailing pointers
-//   included. The spike binding had dropped `ctx_other` from the end of
-//   llama_context_params; the DLL still wrote it, 8 bytes past the buffer,
-//   on every llama_context_default_params() call.
-// - enums are int32; size_t stays 'size_t'; pointers are 'void *'.
-// - callbacks are prototypes registered with koffi.register on the runtime
-//   thread, and no callback may fire during an .async call (0xC0000005).
+// tools/mtmd/mtmd.h and mtmd-helper.h at tag b10853). The annual re-pin
+// re-checks this file field by field (rules: docs/T-ENGINE.md §4);
+// tests/unit/tengine/llama-abi.test.js holds the struct sizes and the
+// fingerprint the pinned DLLs must reproduce.
 
 const BUILD = 'b10853';
 
@@ -127,8 +118,7 @@ const STRUCTS = {
   },
 };
 
-// koffi.sizeof of the layouts above on x64. A transcription that drifts
-// changes these before it changes anything else.
+// koffi.sizeof of the layouts above on x64; the ABI test asserts them.
 const SIZES = {
   llama_model_params: 80,
   llama_context_params: 160,
@@ -230,8 +220,7 @@ const FUNCS = {
     samplerFree: 'void llama_sampler_free(void *s)',
   },
   mtmd: {
-    // Routes mtmd's own logger (and the helper's) through the same callback
-    // as llama's; otherwise every image prints its prompt to stderr.
+    // mtmd's logger (and the helper's) share llama's callback.
     mtmdHelperLogSet: 'void mtmd_helper_log_set(void *cb, void *user)',
     mtmdDefaultMarker: 'const char *mtmd_default_marker()',
     mtmdParamsDefault: 'mtmd_context_params mtmd_context_params_default()',
@@ -270,9 +259,8 @@ const ENUMS = {
   LLAMA_DEFAULT_SEED: 0xffffffff,
 };
 
-// What the pinned DLLs answer through the layouts above. A drifted layout
-// shows up here as values landing in the wrong fields; a new build with
-// different defaults shows up as an honest diff to read, not to paste over.
+// What the pinned DLLs answer through the layouts above; the ABI test
+// compares them when the DLLs are present.
 const GOLDEN = {
   version: '0.4.0-dev',
   modelParams: {

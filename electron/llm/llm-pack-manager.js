@@ -1,7 +1,7 @@
 // The LLM model folder (<models>/llm-models). Nothing is downloaded here:
 // the user follows the link, drops the file in, and this scanner decides
-// what the file is. A whitelisted name with the pinned size is hashed (a
-// few seconds per 2 GB, cached by size + mtime) and only a matching hash
+// what the file is. A whitelisted name with the pinned size is hashed
+// (cached by size + mtime) and only a matching hash
 // makes the pack "ready"; anything else is listed as unlisted and stays
 // unusable unless the developer door is open. Never loads a file from
 // outside this folder.

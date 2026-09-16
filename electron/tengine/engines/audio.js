@@ -1,10 +1,7 @@
 // The audio host (ASR + neural TTS worker) as T-Engine sees it: owns the
-// process, tells the two engines that live in it apart, and does the
-// engine-state work the audio manager used to do itself — the model-load
-// timer, "did this process ever reach asr-ready", the exit classification a
-// restart decision needs, the provider and sherpa's stderr-only fallback
-// note, and the voice self-test. Session semantics (which source, which
-// language, what the floating window is told) stay in
+// process, tells the two engines that live in it apart, and keeps the
+// engine state — model-load timer, ever-ready flag, exit classification,
+// provider and fallback note, voice self-test. Session semantics stay in
 // listen/audio-engine-manager.js, which subscribes to the messages here.
 //
 // Protocol: services/audio-engine/audio-worker.js header.
@@ -15,8 +12,7 @@ const READY_TIMEOUT_MS = 30000;
 // init → asr-start → model load → asr-ready; loading dominates.
 const MODEL_LOAD_TIMEOUT_MS = 30000;
 const TTS_LOAD_TIMEOUT_MS = 60000;
-// The fallback note travels on stderr, a different pipe from the IPC
-// reply: give it a moment to land before reading it.
+// Settle time for sherpa's stderr fallback note before health reads it.
 const STDERR_SETTLE_MS = 150;
 
 function createAudioEngine({ fork, logger, workerPath, now = Date.now, onEvent = () => {}, readyTimeoutMs = READY_TIMEOUT_MS, modelLoadTimeoutMs = MODEL_LOAD_TIMEOUT_MS, ttsLoadTimeoutMs = TTS_LOAD_TIMEOUT_MS, settleMs = STDERR_SETTLE_MS }) {
@@ -109,8 +105,8 @@ function createAudioEngine({ fork, logger, workerPath, now = Date.now, onEvent =
     onStderr,
     onEvent: (evt) => {
       if (evt.kind === 'exit' || evt.kind === 'discard') {
-        // What was the engine doing when the process went: the restart
-        // decision upstream keys on this, not on the exit code.
+        // What the engine was doing when the process went; the restart
+        // decision upstream keys on it.
         const phase = asrPhase === 'loading' && !asrEverReady ? 'model-load' : asrPhase === 'running' || asrPhase === 'stopping' ? 'session' : 'idle';
         const everReady = asrEverReady;
         clearLoadTimer();
@@ -163,9 +159,8 @@ function createAudioEngine({ fork, logger, workerPath, now = Date.now, onEvent =
     },
     asrPhase: () => asrPhase,
     asrEverReady: () => asrEverReady,
-    // 'cpu' | 'webgpu'. A loaded voice is dropped by the worker and rebuilt
-    // on the new backend at the next request — no restart, no session
-    // interruption. Returns whether anything changed.
+    // 'cpu' | 'webgpu'. The worker rebuilds a loaded voice on the new backend
+    // at the next request. Returns whether anything changed.
     setProvider(next) {
       const p = next === 'webgpu' ? 'webgpu' : 'cpu';
       providerNote = null;
@@ -181,10 +176,9 @@ function createAudioEngine({ fork, logger, workerPath, now = Date.now, onEvent =
     provider: () => provider,
     providerNote: () => providerNote,
     ttsLoadedPack: () => ttsLoadedPack,
-    // Loads a voice on the current provider (with its warm-up) and reports
-    // what actually happened — the self-test behind the GPU switch. A
-    // resident voice on this provider just answers tts-ready again. The
-    // caller brings the process up (a TTS-only init is its business).
+    // The self-test behind the GPU switch: loads a voice on the current
+    // provider (with warm-up) and reports what it ran on. The caller brings
+    // the process up.
     async health({ pack } = {}) {
       if (!pack) return { ok: false, provider, fallback: null, error: 'no-pack' };
       if (!host.running()) return { ok: false, provider, fallback: null, error: 'not-running', packId: pack.id };
