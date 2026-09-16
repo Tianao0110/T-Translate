@@ -29,7 +29,9 @@ t-translate/
 │   ├── I18N_GUIDE.md           # 国际化指南（三层 i18n 体系）
 │   ├── OCR_MODELS.md           # OCR 模型维护手册
 │   ├── FAQ.md                  # 常见问题
-│   └── THEME_CUSTOMIZATION.md  # 主题定制
+│   ├── THEME_CUSTOMIZATION.md  # 主题定制
+│   ├── T-ENGINE.md             # 引擎接入层维护手册
+│   └── design/                 # 各功能的设计说明：代码只留指针，为什么与踩坑记在这里（listen.md …）
 │
 ├── electron/                   # 主进程代码
 │   ├── main.js                 # 主进程入口（只做生命周期与接线）

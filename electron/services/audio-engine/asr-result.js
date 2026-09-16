@@ -1,17 +1,13 @@
-// sherpa-onnx writes its result JSON by hand and never escapes control
-// characters, so a recognizer that emits a newline inside the text (Qwen3-ASR
-// does on hallucinated fragments) produces a document JSON.parse rejects.
-// Replacing every control character with a space is valid both inside string
-// literals and between tokens, and the space disappears in the caller's trim().
+// Lenient parse of sherpa's hand-written result JSON: control characters
+// become spaces (they are unescaped inside the text field).
 function parseAsrResultJson(raw) {
   let out = '';
   for (const ch of String(raw)) out += ch < ' ' ? ' ' : ch;
   return JSON.parse(out);
 }
 
-// Qwen3-ASR answers as "language X<asr_text>words"; sherpa-onnx strips that
-// frame only when it opens the reply, so a hallucinated lead-in ("提纲\n")
-// leaks the whole frame into the subtitle. Keep what follows the marker.
+// Keeps what follows Qwen3-ASR's <asr_text> marker; sherpa strips the frame
+// only when it opens the reply.
 const ASR_TEXT_MARK = '<asr_text>';
 
 function stripAsrFrame(text) {

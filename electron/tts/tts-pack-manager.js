@@ -20,13 +20,11 @@ const manager = createPackManager({
   resolvePackDir: (packId) => listAllInstalled().find((p) => p.id === packId)?.dir || null,
   allowedRoots: packsRoots,
   listInstalled: listAllInstalled,
-  // Only the voice engine holds these files; a running listen session is
-  // untouched. Awaited so the swap never races the worker's open handles.
+  // Awaited so the swap never races the worker's open handles.
   evictSessions: (packId) => engineManager.unloadTtsAndWait(packId),
   computePackList: (installed, manifest) => computePackList(installed, manifest, TTS_TYPES),
   packFilter: (entry) => TTS_TYPES.includes(entry.type),
-  // engine/voiceGroups/sampleRate ride along: the worker config and the voice
-  // picker are built from pack.json alone, no manifest needed once installed.
+  // pack.json alone builds the worker config and the voice picker.
   packJsonFields: (entry) => ({
     id: entry.id,
     version: entry.version,

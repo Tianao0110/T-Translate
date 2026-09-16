@@ -1,23 +1,13 @@
-// Listen-mode translation and transcript, in the main process (v0.5.0).
-// Each final the recognizer produces is translated here — same stack, same
-// privacy gate as every other translation — and streamed to the floating
-// window as {id, text, done}; the window only paints. The session's
-// transcript (finals + settled translations) lives here too, so the SRT
-// that is filed when the session ends carries every translation that
-// finished, whether or not a window was open to see it.
-//
+// Listen-mode translation and transcript: every final is translated through
+// the stack and streamed to the floating window as {id, text, done}; the
+// transcript is filed as SRT when the session ends (listen-autosave).
 // Factory: the smoke and the unit test hand in a fake translateStream.
 
 const { buildListenSystemPrompt } = require('./listen-prompt');
 
-// Full transcript kept for the subtitle file. A 2-hour film is ~2000
-// lines (~400KB); the cap is a runaway backstop, not a budget.
+// Limits explained in docs/design/listen.md §9.
 const MAX_TRANSCRIPT = 20000;
-// Chunks carry the full text so far; the window repaints at most ~10 times
-// a second so a fast model does not turn every token into a commit.
 const PAINT_EVERY_MS = 100;
-// How long a session end waits for translations still streaming before the
-// file is written without them.
 const SETTLE_MS = 3000;
 
 function pad(n, w) {
@@ -43,8 +33,7 @@ function buildSrt(finals) {
   return blocks.join('\n\n') + '\n';
 }
 
-// enabled: whether a translation stack is wired at all (the smoke harness
-// runs without one — finals are still recorded and filed).
+// enabled: whether a translation stack is wired at all.
 function createListenTranslator({ translateStream = null, enabled = () => !!translateStream, uiLang = () => 'zh', autosave = null, emit = () => {}, logger, now = Date.now, settleMs = SETTLE_MS, paintEveryMs = PAINT_EVERY_MS }) {
   let transcript = [];
   let truncated = false;
@@ -78,8 +67,7 @@ function createListenTranslator({ translateStream = null, enabled = () => !!tran
     if (srcLang === target) return;
     seg.trans = 'pending';
     emit('translation', { id: seg.id, text: 'pending', done: false });
-    // The two finals before this one, as context for the LLM prompt (MT
-    // engines ignore the system prompt and translate the bare line).
+    // The two finals before this one, as context for the prompt (listen-prompt).
     const idx = transcript.indexOf(seg);
     const context = idx > 0 ? transcript.slice(Math.max(0, idx - 2), idx).map((s) => s.text) : [];
     const systemPrompt = buildListenSystemPrompt({ targetLang: target, context, uiLang: uiLang() });
@@ -97,9 +85,6 @@ function createListenTranslator({ translateStream = null, enabled = () => !!tran
             lastPaint = t;
             emit('translation', { id: seg.id, text: full, done: false });
           },
-          // noCache: subtitle lines are one-shot — caching them would evict
-          // the user's real translation cache. The privacy gate is the
-          // facade's.
           { noCache: true, signal: controller.signal }
         );
         settle(seg, res?.success && res.text ? res.text : null);

@@ -1,17 +1,14 @@
 // Auto-saved subtitle files for listen mode: one .srt per session end in
-// <data>\listen, named after the program that was captured and the local
-// time, the newest MAX_FILES kept. The privacy gate (secure mode) and the
-// user's switch live in the IPC handler; this module only files what it is
-// given, so it can be exercised against a temp directory.
+// <data>\listen, named after the captured program and the local time, the
+// newest MAX_FILES kept. The privacy gate and the user's switch live in
+// audio-engine-manager; this module only files what it is given.
 const fs = require('fs');
 const path = require('path');
 
 const MAX_FILES = 20;
 const MAX_NAME = 40;
 
-// Process image name -> file-name-safe stem: no extension, none of the
-// characters Windows refuses in a name (or control characters), no
-// leading/trailing dots or spaces.
+// Process image name -> file-name-safe stem.
 function safeName(name) {
   const stem = String(name || '')
     .replace(/\.[A-Za-z0-9]{1,4}$/, '')

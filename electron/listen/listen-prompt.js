@@ -1,13 +1,7 @@
-// System prompt for translating one listen-mode subtitle line, carrying the
-// previous lines as context. Sentence-by-sentence translation loses pronoun
-// referents, topic and register; a couple of preceding lines restores most of
-// that at zero extra latency. The context goes in the SYSTEM message and the
-// user message stays the single line, so small models do not translate the
-// context along with it. Only LLM providers read `systemPrompt`; MT engines
-// (Google, DeepL, …) ignore it and behave as before.
-//
-// Main-process module since v0.5.0: the listen translator lives next to the
-// translation stack, not in the floating window.
+// System prompt for translating one listen-mode subtitle line with the
+// previous lines as context (listen-translator is the caller). Only LLM
+// providers read `systemPrompt`; MT engines ignore it. Why the context sits
+// in the system message: docs/design/listen.md §9.
 
 const TARGET_NAMES = {
   zh: { zh: '中文', en: 'Chinese' },

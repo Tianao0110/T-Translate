@@ -1,12 +1,6 @@
-// Installed neural voice packs: the read side of tts-pack-manager, kept free
-// of engine/manager requires so both the pack manager and the audio engine
-// manager can ask "which voices are usable right now" without a cycle.
-//
-// A voice pack is a folder under <models>/tts-models with a pack.json whose
-// `files` map names the model plus its G2P data (a lexicon list, a jieba dict
-// dir, espeak-ng-data for kokoro's English). Every referenced path must exist
-// before the pack counts as usable — a half-swapped or hand-trimmed folder is
-// skipped rather than crashing the worker on load.
+// Installed neural voice packs: the read side of tts-pack-manager, free of
+// engine / manager requires. A pack.json `files` map names the model and its
+// G2P data; every referenced path must exist before the pack counts as usable.
 
 const nodeFs = require('fs');
 const nodePath = require('path');
@@ -15,10 +9,7 @@ const { listInstalledPacks } = require('../listen/asr-models');
 
 const ENGINES = new Set(['kokoro', 'vits']);
 
-// Fallback pace correction for packs installed before the manifest carried
-// speedScale (see audio-model-sources.js). Measured on the same 22-character
-// sentence: kokoro 5.09s, MeloTTS 4.18s at speed 1.0; 0.9 is the user's pick
-// by ear (2026-09-02).
+// Pace correction for packs installed before the manifest carried speedScale.
 const DEFAULT_SPEED_SCALE = { vits: { zh: 0.9, en: 1 } };
 
 function exists(fs, p) {
@@ -50,13 +41,9 @@ function resolveFiles(pack, { fs, path }) {
   return out;
 }
 
-/**
- * Usable voice packs across every pack root, newest root last so it wins on
- * an id collision. Shape is what the worker's tts-load expects plus the
- * voice layout the renderer builds its picker from.
- * @returns {Array<{id, version, model, engine, sampleRate, languages,
- *   voiceGroups, featured, preferMixed, dir, paths}>}
- */
+// Usable voice packs across every root (the active root wins on an id
+// collision): what the worker's tts-load expects plus the voice layout the
+// picker is built from.
 function listVoicePacks(roots, { fs = nodeFs, path = nodePath } = {}) {
   const byId = new Map();
   for (const root of [...roots].reverse()) {

@@ -1,25 +1,9 @@
-// Audio engine orchestration: the listen session and the neural voice on
-// top of T-Engine's audio host (tengine/engines/audio.js), plus the status
-// relay. The listen session is HOSTED by the floating window's listen mode —
-// this manager owns no window lifecycle. Process ownership, the model-load
-// timer, exit classification, the provider and the voice self-test are the
-// adapter's (v0.5.0); what stays here is session semantics: which source,
-// which language, which tier, what the window is told, and the one-shot
-// restart policy that keys on the adapter's verdict.
-//
-// Iron rules honored here: the worker dies with the listen session (zero idle
-// footprint; a closing host window force-stops via a once-listener armed at
-// session start), SECURE privacy mode runs the session without any session
-// log (audio never touched disk anyway; the metrics log is the one file the
-// mode still refuses), and a crashed engine restarts exactly once per
-// session before giving up.
-//
-// TTS (v0.4.2) is the one relaxation of zero-idle: a spoken line needs the
-// worker even with no session running, and a voice pack takes 1.3-2.2s to
-// load, so a TTS-only process stays warm for TTS_IDLE_MS after the last
-// utterance (longer while the floating window is on screen) and is then torn
-// down. A listen session reuses whatever process is up; TTS loaded inside a
-// session process lives as long as the session.
+// Listen session and neural voice on top of T-Engine's audio host
+// (tengine/engines/audio.js), plus the status relay to the floating window.
+// Process ownership, load timers, exit classification and the voice self-test
+// are the adapter's; this file keeps session semantics (source, language,
+// tier, one-shot restart, TTS-only idle). Rules and pitfalls:
+// docs/design/listen.md §1 and §6.
 
 const path = require('path');
 const fs = require('fs');
@@ -38,10 +22,7 @@ const STOP_GRACE_MS = 3000;
 const TTS_SPAWN_TIMEOUT_MS = 30000;
 const TTS_IDLE_MS = 60000;
 const TTS_UNLOAD_WAIT_MS = 5000;
-// Rolling cap — one file per session, oldest pruned first. Filename prefix
-// stays 'audio-probe-' so the accumulated tuning logs keep sorting together.
-// Three is enough: the log holds metrics and errors, never content, and its
-// only job is to explain the most recent failure (user's call 2026-09-03).
+// Session logs kept on disk, oldest pruned first.
 const MAX_PROBE_LOGS = 3;
 
 let deps = null; // { store, getWindow }
@@ -53,9 +34,8 @@ let restartedOnce = false;
 let killTimer = null;
 let privacyUnsub = null;
 let sessionLanguage = ''; // SenseVoice hint from the host window ('' = auto)
-// Which sound the session listens to: whole system (default), one program's
-// process tree, or everything except it. Native capture lives in the worker
-// (v0.4.1); the renderer no longer touches audio at all.
+// Which sound the session listens to: whole system, one program's process
+// tree, or everything except it.
 let sessionSource = { mode: 'system', pid: 0 };
 
 // TTS state. ttsOnly: the process exists for TTS alone (no session ever
@@ -67,9 +47,7 @@ let ttsUnloadWaiters = [];
 let spawnWaiters = []; // TTS callers waiting for a fresh process to say 'ready'
 // stopSessionAndWait needs the process gone (pack swap); TTS must not keep it.
 let exitRequested = false;
-// Mute gate: webContents ids currently playing TTS (any engine, any window).
-// The gate is on while the set is non-empty; the worker drops captured audio
-// for that span (+ a short tail) so the app never transcribes its own voice.
+// Mute gate: webContents ids currently playing TTS; on while non-empty.
 const ttsPlayingSenders = new Set();
 // Translation + transcript of the running session (listen-translator.js);
 // the stack call is wired in by the IPC layer once the stack exists.
@@ -84,8 +62,7 @@ function adapter() {
 function init(d) {
   deps = d;
   const a = adapter();
-  // init runs once per program, but the smoke harness re-inits with other
-  // deps; never stack subscriptions.
+  // The smoke harness re-inits with other deps; never stack subscriptions.
   if (unsubMessages) unsubMessages();
   if (unsubEvents) unsubEvents();
   unsubMessages = a.subscribe(onWorkerMessage);
@@ -97,8 +74,7 @@ function init(d) {
     translateStream: (...args) => translateStreamHook(...args),
     enabled: () => !!translateStreamHook,
     uiLang: () => (deps.store.get('settings.interface.language') === 'en' ? 'en' : 'zh'),
-    // Secure mode writes nothing; the user's switch is honoured here, one
-    // layer below the window.
+    // Secure mode writes nothing; the user's switch is honoured here.
     autosave: async (content, sourceName) => {
       if (isSecure()) return null;
       if (deps.store.get('settings.listen.autosave', true) === false) return null;
@@ -131,8 +107,7 @@ function endTranscript(reason) {
   translator?.endSession(reason).catch((e) => logger.warn(`transcript end failed: ${e.message}`));
 }
 
-// Where a download lands. Reads go through findModels(), which also looks at
-// the pre-v0.4.0 userData location (see model-root.js).
+// Where a download lands; reads go through findModels() over every root.
 function modelsBaseDir() {
   return modelDir('asr-models');
 }
@@ -177,8 +152,7 @@ function getInfo() {
     hqPresent: !!models?.hq,
     modelsDir: modelsBaseDir(),      // where a new download lands
     activeDir: models?.baseDir || null, // where the live set actually sits
-    // Kept for the renderer's shape; secure mode no longer blocks sessions.
-    secureBlocked: false,
+    secureBlocked: false, // kept for the renderer's shape
     running: childState === 'running' || childState === 'starting',
   };
 }
@@ -197,18 +171,14 @@ function startSession(options = {}) {
     sendStatus('no-model');
     return;
   }
-  // Zero-idle-footprint backstop: a closing host window must never leave the
-  // engine humming. once() self-detaches; a stale listener firing after a
-  // normal stop hits the idle guard in stopSession and is a no-op.
+  // A closing host window force-stops the session (stale firings are no-ops).
   hostWindow()?.once('closed', () => stopSession('window-closed'));
-  // A TTS-only process was declared without ASR paths or a session log; a
-  // session gets a fresh one and the voice reloads on the next utterance.
+  // A TTS-only process has no ASR paths: a session gets a fresh one.
   if (adapter().running()) discardWorker('listen-start');
   translator?.beginSession({ targetLang: options.targetLang, sourceName: options.source?.name });
   spawnWorker(models);
 
-  // A mid-session switch to SECURE keeps the session but closes its log:
-  // from here on nothing about it reaches disk.
+  // A mid-session switch to SECURE keeps the session but closes its log.
   privacyUnsub = deps.store.onDidChange('privacyMode', (mode) => {
     if (mode === PRIVACY_MODES.SECURE && adapter().running()) {
       logger.info('privacy switched to secure — closing the session log');
@@ -221,10 +191,8 @@ function startSession(options = {}) {
   });
 }
 
-// Renderer-supplied, so it is narrowed to the three shapes the worker accepts
-// rather than forwarded as-is.
-// 'off' opens no audio client at all: the caller feeds PCM itself, which is
-// how the smoke harness replays a wav through the real chain.
+// Narrows the renderer-supplied source to the shapes the worker accepts;
+// 'off' opens no audio client (the caller feeds PCM itself).
 function normalizeSource(source) {
   const mode = source && ['system', 'include', 'exclude', 'off'].includes(source.mode) ? source.mode : 'system';
   const pid = Number.isInteger(source?.pid) && source.pid > 0 ? source.pid : 0;
@@ -239,7 +207,7 @@ function sessionLogPath() {
   } catch {
     // appendable dir already exists in every normal run
   }
-  // Timestamp-named files sort chronologically — prune oldest beyond the cap.
+  // Timestamp-named files sort chronologically: prune the oldest past the cap.
   try {
     const old = fs
       .readdirSync(logsDir)
@@ -249,14 +217,13 @@ function sessionLogPath() {
       fs.unlinkSync(path.join(logsDir, old.shift()));
     }
   } catch {
-    // pruning is best-effort — a full disk of logs still beats a dead session
+    // pruning is best-effort
   }
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   return path.join(logsDir, `audio-probe-${stamp}.jsonl`);
 }
 
-// What the worker is told at init. models = null describes a TTS-only
-// process: no ASR paths, no session log. The GPU flag is the adapter's.
+// The worker's init message; models = null describes a TTS-only process.
 function initPayload(models) {
   return {
     models: {
@@ -265,22 +232,16 @@ function initPayload(models) {
             modelPath: models.modelPath,
             tokensPath: models.tokensPath,
             vadPath: models.vadPath,
-            // optional two-pass draft engine (null when not manually placed)
-            streaming: models.streaming,
-            // optional high-accuracy final engine (v0.4.8); used only when
-            // the tier says so AND the pack is on disk — a missing pack
-            // silently means the base engine, never a dead session
-            hq: models.hq,
+            streaming: models.streaming, // optional draft engine
+            hq: models.hq, // optional high-accuracy engine, used only when the tier says so
+
             useHq: !!models.hq && deps.store.get('settings.listen.tier') === 'high',
             language: sessionLanguage,
           }
         : null,
     },
-    // Secure mode writes no session log at all — not even metrics.
+    // Secure mode writes no session log at all; text only by opt-in.
     logPath: models && !isSecure() ? sessionLogPath() : null,
-    // Recognized text stays out of the on-disk log by default — the session
-    // log exists for tuning (segment lengths, gaps, RTF), and those are
-    // metrics, not words. Developers chasing a bad transcription opt in.
     logText: !isSecure() && process.env.TT_LISTEN_LOG_TEXT === '1',
     meta: {
       appVersion: app.getVersion(),
@@ -291,8 +252,7 @@ function initPayload(models) {
   };
 }
 
-// models = null spawns a TTS-only process: no ASR paths, no session log, no
-// model-load timer, and the ASR state machine stays idle.
+// models = null spawns a TTS-only process; the ASR state machine stays idle.
 function spawnWorker(models) {
   ttsOnly = !models;
   exitRequested = false;
@@ -303,13 +263,11 @@ function spawnWorker(models) {
   adapter()
     .spawn({ init: initPayload(models) })
     .catch((e) => logger.error(`worker spawn failed: ${e.message}`));
-  // Covers init → asr-start → model load; the adapter's timer turns a
-  // silent load into an engine-dead verdict (see onEngineEvent).
+  // The adapter's load timer turns a silent load into an engine-dead verdict.
   if (models) adapter().startAsr(sessionLanguage);
 }
 
-// Engine-level verdicts from T-Engine: the process went away, or the model
-// load timed out. Session policy (restart once, or give up) lives here.
+// Engine-level verdicts from T-Engine; the session policy answers them here.
 function onEngineEvent(evt) {
   if (evt.engine !== 'audio') return;
   if (evt.kind === 'exit') onWorkerExit(evt);
@@ -320,8 +278,7 @@ function onWorkerMessage(msg) {
   if (!msg || !msg.type) return;
   switch (msg.type) {
     case 'ready':
-      // init acknowledged — nothing loaded yet; asr-ready is the real gate.
-      // TTS callers only need the process to be talking.
+      // init acknowledged; asr-ready is the real gate for sessions.
       drainSpawnWaiters(true);
       break;
     case 'asr-ready':
@@ -329,8 +286,7 @@ function onWorkerMessage(msg) {
       logger.info(`worker ready in ${msg.loadMs}ms`);
       // A session started mid-utterance inherits the gate.
       if (ttsPlayingSenders.size > 0) adapter().post({ type: 'tts-gate', on: true });
-      // Capture starts only now: an audio client opened while the models were
-      // still loading would just fill a buffer nobody reads.
+      // Capture starts only after the models are loaded.
       if (sessionSource.mode === 'off') sendStatus('listening');
       else {
         sendStatus('connecting');
@@ -347,13 +303,11 @@ function onWorkerMessage(msg) {
       stopSession('capture-error');
       break;
     case 'capture-event':
-      // device-lost / device-reacquired / reacquire-failed — the native layer
-      // rebuilds the stream itself; this only mirrors it into the UI.
+      // The native layer rebuilds the stream itself; this mirrors it into the UI.
       if (msg.kind === 'device-reacquired') sendStatus('listening');
       else if (msg.kind === 'device-lost' || msg.kind === 'reacquire-failed') sendStatus(msg.kind);
       else if (msg.kind === 'source-gone') {
-        // The chosen program exited. Fall back to whole-system capture in
-        // place so the session keeps running; the renderer resets its picker.
+        // The chosen program exited: fall back to whole-system capture in place.
         sessionSource = { mode: 'system', pid: 0 };
         sendStatus('source-gone', msg.detail);
         adapter().post({ type: 'capture-start', ...sessionSource });
@@ -363,8 +317,7 @@ function onWorkerMessage(msg) {
       sendToWindow(CHANNELS.AUDIO_ENGINE.LEVEL, msg.value);
       break;
     case 'segment':
-      // The translator numbers the final and translates it; the window gets
-      // the record with its id, the translation follows on its own channel.
+      // The translator numbers the final; the translation follows on its own channel.
       sendToWindow(CHANNELS.AUDIO_ENGINE.SEGMENT, translator ? translator.onSegment(msg.rec) : msg.rec);
       break;
     case 'partial':
@@ -377,11 +330,8 @@ function onWorkerMessage(msg) {
       sendToWindow(CHANNELS.AUDIO_ENGINE.STATUS, { state: 'metrics', detail: msg.rec });
       break;
     case 'asr-stopped':
-      // Session flushed. A warm voice (or an utterance in flight) keeps the
-      // process as TTS-only; otherwise the zero-idle rule takes it down. Either
-      // way the recognizer is unloaded first so the model files are released
-      // now rather than whenever the process happens to die — the pack swap
-      // behind stopSessionAndWait depends on that.
+      // Session flushed: release the recognizer now, then keep the process
+      // for TTS or take it down.
       clearTimeout(killTimer);
       endTranscript('stopped');
       if (adapter().running()) {
@@ -423,8 +373,7 @@ function onWorkerMessage(msg) {
         ttsRequests.delete(msg.id);
         armTtsIdle();
       } else {
-        // A load failure (no request id): the adapter already told whoever
-        // awaited that pack.
+        // A load failure (no request id); the adapter already told the awaiter.
         logger.error(`voice ${msg.packId || '?'} load failed: ${msg.message}`);
       }
       break;
@@ -451,7 +400,7 @@ function onWorkerExit({ code, everReady }) {
   logger.info(`worker exited (code ${code}, stopping=${wasStopping}, ttsOnly=${wasTtsOnly})`);
   drainExitWaiters();
 
-  // No session was running in it: nothing to report on the status channel.
+  // No session was running in it: nothing to report.
   if (wasTtsOnly) return;
 
   endTranscript(wasStopping ? 'stopped' : 'engine-exited');
@@ -459,12 +408,7 @@ function onWorkerExit({ code, everReady }) {
     sendStatus('stopped');
     return;
   }
-  // Died before ever going ready = the models did not load. A hand-placed file
-  // that is not really an ONNX model takes the worker down through a native
-  // exception (exit 0xE06D7363) rather than the JS try/catch around the load,
-  // so there is no 'fatal' message to go on — the adapter's verdict is the
-  // signal. Loading the same file again would crash identically, so the
-  // one-shot restart is reserved for engines that were actually running.
+  // Died before ever going ready: the models did not load, no retry.
   if (!everReady) {
     logger.error('worker died during model load — not retrying');
     sendStatus('model-load-failed');
@@ -483,16 +427,13 @@ function onWorkerExit({ code, everReady }) {
   sendStatus('engine-dead');
 }
 
-// Inject PCM the host already has (the smoke harness replaying a wav through
-// the real chain). Normal sessions never call this — the worker's own native
-// capture feeds the VAD directly, and no renderer channel reaches either one.
+// Inject PCM the host already has (smoke / bench replaying a wav).
 function feedPcm(samples) {
   if (childState !== 'running' || !adapter().running()) return;
   adapter().post({ type: 'pcm', samples });
 }
 
-// Callers that must not touch the model files until the worker is really gone
-// (pack install/removal) wait on these.
+// Pack install / removal waits here until the worker is really gone.
 let exitWaiters = [];
 
 function drainExitWaiters() {
@@ -501,11 +442,8 @@ function drainExitWaiters() {
   for (const done of waiters) done();
 }
 
-/**
- * Stop and resolve only once the worker process has exited. A pack swap that
- * starts while the worker still has the .onnx files open fails on Windows —
- * and it would fail at the very end of a 150 MB download.
- */
+// Stops and resolves only once the worker process has exited (pack swaps
+// need the model files closed).
 function stopSessionAndWait(reason, timeoutMs = STOP_GRACE_MS + 2000) {
   if (!adapter().running()) {
     stopSession(reason);
@@ -537,7 +475,7 @@ function stopSession(reason) {
     childState = 'idle';
     return;
   }
-  // 'idle' with a live child is a TTS-only process — no session to stop.
+  // 'idle' with a live child is a TTS-only process: no session to stop.
   if (childState === 'stopping' || childState === 'idle') return;
   logger.info(`stopping session (${reason})`);
   childState = 'stopping';
@@ -575,8 +513,7 @@ function killWorker() {
   adapter().kill();
 }
 
-// Drop a process without going through onWorkerExit's session bookkeeping:
-// used when a listen session replaces a TTS-only process.
+// Drops a TTS-only process without onWorkerExit's session bookkeeping.
 function discardWorker(reason) {
   if (!adapter().running()) return;
   logger.info(`discarding tts-only worker (${reason})`);
@@ -632,8 +569,7 @@ function getTtsStatus() {
 }
 
 // Flat voice list for the picker: one entry per speaker id, numbered within
-// its language+gender group so the renderer can label "中文女声 3" without
-// knowing the pack layout. Names are the renderer's job (i18n).
+// its language+gender group. Names are the renderer's job (i18n).
 function getTtsVoices() {
   const voices = [];
   for (const pack of voicePacks()) {
@@ -699,11 +635,8 @@ function failTtsRequests(message) {
   ttsRequests.clear();
 }
 
-/**
- * Synthesize one utterance; the audio streams to `sender` on TTS_CHUNK as
- * {id, samples, sampleRate} messages followed by {id, done}. Resolves as soon
- * as the request is queued in the worker.
- */
+// Synthesizes one utterance; audio streams to `sender` on TTS_CHUNK as
+// {id, samples, sampleRate} then {id, done}. Resolves once queued in the worker.
 async function ttsGenerate({ id, text, packId, sid, speed }, sender) {
   const pack = voicePacks().find((p) => p.id === packId);
   if (!pack) return { success: false, error: 'pack-not-installed' };
@@ -733,9 +666,7 @@ async function ttsGenerate({ id, text, packId, sid, speed }, sender) {
   return { success: true };
 }
 
-// What the worker needs to load a voice, plus one short warm-up line per
-// language so a GPU-built engine compiles its pipelines before the first
-// real sentence.
+// What the worker needs to load a voice, plus one warm-up line per language.
 function ttsPackPayload(pack) {
   const warmup = [];
   for (const lang of pack.languages || []) {
@@ -755,9 +686,7 @@ function ttsCancel(id) {
   }
 }
 
-// Mute gate, keyed by the reporting webContents so windows do not unmute
-// each other. A destroyed window drops out via the on/off pairing its
-// engine emits; a crashed one is cleaned up when it reports again or never.
+// Mute gate, keyed by the reporting webContents so windows do not unmute each other.
 function setTtsPlaying(senderId, on) {
   const before = ttsPlayingSenders.size > 0;
   if (on) ttsPlayingSenders.add(senderId);
@@ -784,9 +713,8 @@ function armTtsIdle() {
 function onTtsIdle() {
   ttsIdleTimer = null;
   if (!adapter().running() || ttsRequests.size > 0) return;
-  // Inside a listen session the voice rides along until the session ends.
+  // Inside a listen session the voice rides along; on screen, keep it warm.
   if (childState !== 'idle') return;
-  // Floating window on screen = the user is likely to ask for another line.
   const win = hostWindow();
   if (win && win.isVisible()) {
     armTtsIdle();
@@ -796,11 +724,8 @@ function onTtsIdle() {
   shutdownWorker();
 }
 
-/**
- * Release the voice pack files before a pack swap/removal. A TTS-only process
- * exits outright (the surest release); inside a listen session only the voice
- * is unloaded and the worker's ack is awaited.
- */
+// Releases the voice pack files before a pack swap / removal: a TTS-only
+// process exits, inside a session only the voice is unloaded and acked.
 function unloadTtsAndWait(packId) {
   if (!adapter().running() || (!adapter().ttsLoadedPack() && ttsRequests.size === 0)) return Promise.resolve();
   logger.info(`releasing voice before pack swap (${packId})`);
@@ -839,17 +764,13 @@ function drainTtsUnloadWaiters() {
   for (const done of waiters) done();
 }
 
-// 'cpu' | 'webgpu'. A loaded voice is dropped by the worker and rebuilt on
-// the new backend at the next request — no restart, no session interruption.
+// 'cpu' | 'webgpu'; the worker rebuilds the voice on the next request.
 function setTtsProvider(provider) {
   adapter().setProvider(provider);
 }
 
-// Loads a voice on the current provider (with its warm-up) and reports what
-// actually happened: the GPU switch turns on only when this comes back
-// without a fallback note. Prefers Kokoro, the voice the GPU pays off for.
-// The process comes up TTS-only if nothing is running; the adapter does the
-// load, the wait and the fallback verdict.
+// Loads a voice on the current provider and reports the adapter's verdict;
+// the GPU switch turns on only without a fallback note.
 async function ttsSelfTest() {
   const packs = voicePacks();
   if (!packs.length) return { ok: false, provider: adapter().provider(), fallback: null, error: 'no-pack' };

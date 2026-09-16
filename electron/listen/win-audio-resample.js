@@ -1,13 +1,6 @@
-// Downmix + integer-factor decimation for the process-loopback path, kept
-// free of native imports so it is unit-testable.
-//
-// Why: process loopback accepts 16 kHz mono directly, but the audio engine's
-// own conversion gave silero a measurably harder signal than a proper decode
-// of the same source (86% of lyric lines at threshold 0.5 vs 95% —
-// gstack v041-listen-music-diagnosis). Asking for the engine's native 48 kHz
-// stereo and converting here with a windowed-sinc lowpass keeps that step
-// under our control. 48k → 16k is an exact 3:1, so this is plain FIR
-// decimation: one dot product per OUTPUT sample, ~1M multiplies/s.
+// Downmix + integer-factor FIR decimation for the process-loopback path
+// (48 kHz stereo to 16 kHz mono), free of native imports. Why the engine's
+// own conversion is not used: docs/design/listen.md §5.
 
 function designLowpass(taps, cutoffCyclesPerSample) {
   const h = new Float32Array(taps);

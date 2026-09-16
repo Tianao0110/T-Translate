@@ -1,13 +1,6 @@
-// Audio engine worker — ASR and neural TTS. Runs inside an Electron
-// utilityProcess so a native/model crash never takes the main process down.
-// One process for both capabilities on purpose: they share a single
-// sherpa/onnxruntime copy. Synthesis runs on the addon's own thread, so a
-// listen session and a spoken subtitle line only compete for CPU.
-//
-// Capture lives here too since v0.4.1: the native WASAPI layer
-// (listen/win-audio-capture) hands 16 kHz mono float32 straight to the VAD, so
-// audio never crosses a process boundary before it is recognized — no renderer
-// round trip, no resampler, and no screen-capture request.
+// Audio engine worker: ASR (asr-session.js), native capture (capture.js) and
+// neural TTS (tts.js) in one Electron utilityProcess, sharing a single
+// sherpa/onnxruntime copy. This file only speaks the protocol below.
 //
 // Protocol (process.parentPort):
 //   in : {type:'init', models:{asr?:{modelPath,tokensPath,vadPath,language?}},
@@ -19,8 +12,7 @@
 //        {type:'capture-stop'}           release the audio client
 //        {type:'pcm', samples}           inject 16 kHz mono float32 instead of
 //                                        capturing (smoke harness replaying a
-//                                        wav). Main-process only — no renderer
-//                                        channel reaches this since v0.4.1
+//                                        wav); main-process only
 //        {type:'asr-stop'}               flush session, keep models warm
 //        {type:'unload', what}           'asr'|'tts' — release that engine's
 //                                        model files (idle eviction, pack swap)
@@ -50,17 +42,11 @@
 //
 // TTS: `pack` is {id, engine:'kokoro'|'vits', paths:{model, tokens, voices?,
 // dataDir?, dictDir?, lexicon[], ruleFsts[]}} resolved by the host from an
-// installed pack.json (tts/tts-models). One pack loaded at a time; a
-// generate naming another pack swaps it first. Synthesis is serialized, and a
-// cancel makes the progress callback return 0, which stops sherpa mid-text.
-// ⚠ TtsRequest.enableExternalBuffer MUST be false — same Electron V8-cage
-// landmine as Vad.front(false) below, and it only explodes on the first real
-// synthesis.
+// installed pack.json (tts/tts-models). One pack loaded at a time (tts.js).
 //
-// Audio frames are transcribed and dropped — nothing here ever writes audio to
-// disk. The JSONL session log (local only) carries timing metrics; the
-// recognized WORDS stay out of it unless the host passes logText (env
-// TT_LISTEN_LOG_TEXT=1), so watching a video leaves no transcript behind.
+// Audio is transcribed and dropped, never written to disk; the session log
+// carries metrics only unless logText is set. Design notes and pitfalls:
+// docs/design/listen.md.
 
 const io = require('./io');
 const asr = require('./asr-session');

@@ -1,31 +1,8 @@
-// ASR model gate for listen mode. Two layouts resolve here:
-//
-// 1. PACKS (v0.4.0 distribution) — installed by the audio pack manager into
-//    <userData>/asr-models/<packId>/, each with a pack.json whose `files` map
-//    names the role -> filename. This is the layout the settings page installs.
-//      asr-models/
-//        asr-base-sense-voice/        pack.json {type:'asr-base', files:{model,tokens,vad}}
-//        asr-draft-zipformer-zh-en/   pack.json {type:'asr-draft', files:{encoder,decoder,joiner,tokens}}
-//
-// 2. LEGACY manual placement — what the hidden probe shipped with, kept
-//    working so anyone who dropped sherpa's tarballs in by hand (and the
-//    probe's early users) is not broken by the distribution batch:
-//      asr-models/
-//        silero_vad.onnx
-//        sherpa-onnx-sense-voice-.../          (dir name must contain "sense-voice")
-//          model.int8.onnx
-//          tokens.txt
-//        sherpa-onnx-streaming-zipformer-.../  (OPTIONAL — two-pass draft engine)
-//          encoder-epoch-99-avg-1.int8.onnx
-//          decoder-epoch-99-avg-1.onnx
-//          joiner-epoch-99-avg-1.int8.onnx
-//          tokens.txt
-//
-// Packs win when both are present. Base and draft resolve independently, so a
-// pack-installed base pairs fine with a hand-placed draft and vice versa.
-//
-// Dependency-injected fs/path so the gate is testable outside Electron
-// (secure-vault pattern).
+// ASR model resolution for listen mode. Two layouts resolve here, packs
+// first: pack.json folders installed by audio-pack-manager, and sherpa's
+// hand-placed tarballs (VAD at the root, a "sense-voice" folder, an optional
+// "streaming-zipformer" folder). Base and draft resolve independently.
+// fs / path are injected so the gate is testable outside Electron.
 
 const nodeFs = require('fs');
 const nodePath = require('path');
@@ -35,8 +12,7 @@ const VAD_FILE = 'silero_vad.onnx';
 const MODEL_FILE = 'model.int8.onnx';
 const TOKENS_FILE = 'tokens.txt';
 
-// Fixed names from the sherpa release tarball — legacy layout only. Packs
-// carry their own names in pack.json.
+// Fixed names from the sherpa release tarball (legacy layout only).
 const STREAMING_FILES = {
   encoder: 'encoder-epoch-99-avg-1.int8.onnx',
   decoder: 'decoder-epoch-99-avg-1.onnx',
@@ -60,9 +36,8 @@ function isDir(fs, p) {
   }
 }
 
-// Hand-placed upstream folders for the link-only packs (shared/audio-packs
-// MANUAL_PACKS): no pack.json, the folder name and file list are the
-// contract. A pack.json install of the same id wins.
+// Hand-placed upstream folders for the link-only packs (MANUAL_PACKS): no
+// pack.json, the folder name and file list are the contract.
 function manualPacks(baseDir, entries, taken, fs, path) {
   const dirs = new Set(entries.filter((e) => e.isDirectory()).map((e) => e.name));
   const out = [];
@@ -88,11 +63,8 @@ function readDirEntries(baseDir, fs) {
   }
 }
 
-/**
- * Every installed pack (a folder with a readable pack.json), newest-sorted by
- * folder name for deterministic picks. Also feeds the settings pack list.
- * @returns {Array<{id, version, type, files, dir, dirName}>}
- */
+// Every installed pack (a folder with a readable pack.json) plus the manual
+// ones, sorted by folder name. Also feeds the settings pack list.
 function listInstalledPacks(baseDir, { fs = nodeFs, path = nodePath } = {}) {
   if (!baseDir) return [];
   const entries = readDirEntries(baseDir, fs);
@@ -115,8 +87,7 @@ function listInstalledPacks(baseDir, { fs = nodeFs, path = nodePath } = {}) {
   return packs;
 }
 
-// Resolve the final-pass engine from an installed pack. Its `files` map is
-// authoritative: a swapped model changes the manifest, not this file.
+// The final-pass engine from an installed pack; its `files` map is authoritative.
 function baseFromPacks(packs, fs, path) {
   for (const pack of packs) {
     if (pack.type !== ASR_BASE_TYPE) continue;
@@ -155,8 +126,7 @@ function draftFromPacks(packs, fs, path) {
   return null;
 }
 
-// Optional high-accuracy final engine (Qwen3-ASR). Packs only — there is no
-// legacy hand-placed layout for it. `tokenizer` is a directory.
+// Optional high-accuracy final engine (Qwen3-ASR), packs only; `tokenizer` is a directory.
 function hqFromPacks(packs, fs, path) {
   for (const pack of packs) {
     if (pack.type !== ASR_HQ_TYPE) continue;
@@ -216,11 +186,8 @@ function baseFromLegacy(baseDir, entries, fs, path) {
   return null;
 }
 
-/**
- * Locate a usable final-pass model + VAD under baseDir, plus the optional
- * draft model set. Packs first, hand-placed folders second.
- * @returns {null | {baseDir, vadPath, modelDir, modelPath, tokensPath, modelName, streaming}}
- */
+// A usable final-pass model + VAD under baseDir, plus the optional draft and
+// high-accuracy sets; null when the base set is incomplete.
 function locateAsrModels(baseDir, { fs = nodeFs, path = nodePath } = {}) {
   if (!baseDir) return null;
   const entries = readDirEntries(baseDir, fs);

@@ -1,32 +1,10 @@
-// Windows audio capture through WASAPI, driven by koffi (same approach as
-// native-helper.js: no compiled addon, so an Electron upgrade never means a
-// rebuild — the maintenance-mode endgame is why this is not a native module).
-//
-// Two activations, one output format:
-//
-//   system   IMMDevice::Activate(IAudioClient) on the default render endpoint
-//            + AUDCLNT_STREAMFLAGS_LOOPBACK. Every Windows version. Taps AFTER
-//            the endpoint volume: a muted system yields silence, and a quiet
-//            one used to yield a whisper (8% on the slider is -38 dB and the
-//            VAD went deaf). The pump reads IAudioEndpointVolume and undoes
-//            that attenuation (win-audio-gain), so what the ASR hears no
-//            longer depends on how loud the user listens. Mute stays silence.
-//   process  ActivateAudioInterfaceAsync(VAD\Process_Loopback) with
-//            AUDIOCLIENT_ACTIVATION_PARAMS. Windows 10 build 20348+, which in
-//            practice means Windows 11 (consumer Win10 stops at 19045).
-//            Taps BEFORE the endpoint volume: a muted system still records.
-//            Two modes: capture that process tree, or capture everything else.
-//
-// Both deliver 16 kHz mono float32 to the ASR pipeline. The system path lets
-// the engine convert (AUTOCONVERTPCM — a shared-mode capture otherwise only
-// takes the endpoint's mix format, and that conversion measured fine). The
-// process path takes the engine's native 48 kHz stereo and decimates here:
-// its own 16 kHz conversion cost the VAD 14% of a song's lines (see below).
-//
-// Spike numbers behind the choices (2026-08-30, gstack v041-process-loopback-spike):
-// activation 4ms, tone captured at rms 0.039 vs an expected 0.040, EXCLUDE mode
-// measured exactly 0.00000 while that tone played, and process loopback keeps
-// working with the system muted (0.03874 vs 0.03877 unmuted).
+// Windows audio capture through WASAPI, driven by koffi (no compiled addon).
+// Two activations, one output: 'system' taps the default render endpoint
+// (every Windows version, after the endpoint volume, compensated by
+// win-audio-gain); 'include' / 'exclude' use process loopback (Windows 10
+// build 20348+, before the endpoint volume, decimated by win-audio-resample).
+// Both deliver 16 kHz mono float32 to the worker. Design notes and pitfalls:
+// docs/design/listen.md §5.
 
 const os = require('os');
 const logger = require('../platform/logger')('WinAudio');
@@ -61,15 +39,12 @@ function init() {
       QueryFullProcessImageNameW: kernel32.func(
         'int QueryFullProcessImageNameW(void* hProcess, uint32 flags, _Inout_ uint16_t* name, _Inout_ uint32* size)'
       ),
-      // Callback prototypes for the COM completion handler. koffi keeps proto
-      // names in a global registry, so these are declared exactly once.
+      // Callback prototypes for the COM completion handler (declared once).
       QIProto: koffi.proto('long TTAudioQI(void* self, void* riid, void** ppv)'),
       RefProto: koffi.proto('unsigned long TTAudioRef(void* self)'),
       DoneProto: koffi.proto('long TTAudioDone(void* self, void* op)'),
     };
-    // MTA: the process-loopback activation completes on a worker thread. In the
-    // main process this returns RPC_E_CHANGED_MODE (already STA) and that is
-    // fine — the callback still arrives through the message pump.
+    // MTA for the process-loopback completion; RPC_E_CHANGED_MODE is fine.
     api.CoInitializeEx(null, 0);
     return api;
   } catch (e) {
@@ -109,8 +84,7 @@ function comProto(sig) {
   return protos.get(sig);
 }
 
-// A COM object is a pointer to a pointer to a function table: read *this, index
-// the table, call the slot.
+// COM call by vtable slot.
 function vcall(obj, index, sig, ...args) {
   const { koffi } = init();
   const vtbl = koffi.decode(obj, 'void*');
@@ -123,7 +97,7 @@ function release(obj) {
     try {
       vcall(obj, 2, 'unsigned long Release(void*)');
     } catch {
-      // teardown path — a failed Release is not worth a crash
+      // teardown path
     }
   }
 }
@@ -144,8 +118,7 @@ function check(hr, what) {
   return hr;
 }
 
-// koffi.address() rejects Buffers, so anything whose address must be embedded
-// in another struct is allocated here rather than with Buffer.alloc.
+// koffi-allocated memory: needed wherever an address is embedded in a struct.
 function mem(bytes) {
   return init().koffi.alloc('uint8_t', bytes);
 }
@@ -165,10 +138,8 @@ function windowsBuild() {
   return m ? Number(m[1]) : 0;
 }
 
-/**
- * What this machine can do. `processLoopback:false` is the honest Win10 answer
- * — the UI must fall back to system-wide capture and say so, never pretend.
- */
+// What this machine can do; processLoopback:false means the UI falls back to
+// system-wide capture and says so.
 function getCapabilities() {
   if (process.platform !== 'win32') {
     return { supported: false, processLoopback: false, build: 0, reason: 'not-windows' };
@@ -218,14 +189,8 @@ function defaultRenderDevice() {
   return outDev[0];
 }
 
-/**
- * Audio sessions on the default render endpoint, sampled for peak level over
- * `sampleMs` so the caller can show only what is actually making sound.
- *
- * Only processes that have OPENED an audio stream appear at all — a program
- * that has never played anything is not listed, which is why the picker is
- * "play something, then choose", not "choose, then play".
- */
+// Audio sessions on the default render endpoint, sampled for peak level over
+// `sampleMs`. Only processes that have opened an audio stream appear.
 async function listAudioSessions({ sampleMs = 800, sampleEveryMs = 50 } = {}) {
   if (!init()) return [];
   let device = null;
@@ -309,19 +274,13 @@ const AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM = 0x80000000;
 const AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY = 0x08000000;
 const AUDCLNT_E_DEVICE_INVALIDATED = 0x88890004;
 const AUDCLNT_BUFFERFLAGS_SILENT = 0x2;
-// Set when the device dropped samples between two packets — i.e. our pump did
-// not drain the 2s client buffer in time. Counted rather than ignored: it is
-// the difference between "the audio stopped" and "we stopped listening".
-const AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY = 0x1;
+const AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY = 0x1; // counted: the pump fell behind
 
 const SAMPLE_RATE = 16000;
 const BUFFER_DURATION_HNS = 20000000n; // 2s of slack; the pump polls every 20ms
-// 3s (was 10s): a healthy activation completes in ~4ms, and a user who sees
-// nothing for ten seconds presses stop before the failure is ever reported.
 const ACTIVATION_TIMEOUT_MS = 3000;
 
-// WAVEFORMATEX for IEEE float: 16 kHz mono for the system path, the engine's
-// native 48 kHz stereo for the process path (decimated in win-audio-resample).
+// WAVEFORMATEX for IEEE float.
 function waveFormat(rate, channels) {
   const wf = mem(18);
   poke.u16(wf, 0, 3); // WAVE_FORMAT_IEEE_FLOAT
@@ -334,16 +293,13 @@ function waveFormat(rate, channels) {
   return wf;
 }
 
-// Process loopback is asked for the engine's native 48 kHz stereo and
-// decimated here (win-audio-resample). Its built-in conversion to 16 kHz mono
-// was measurably worse for the VAD: same song, same player, silero at 0.5
-// opened on 86% of the lyric lines vs 100% through our own FIR (2026-09-02).
+// Process loopback is captured at the engine's native format and decimated
+// in win-audio-resample.
 const NATIVE_RATE = 48000;
 const NATIVE_CHANNELS = 2;
 
-// The completion handler ActivateAudioInterfaceAsync requires: a COM object
-// implemented as a table of koffi callbacks. Every piece stays referenced for
-// the life of the call or the GC frees the vtable under Windows' feet.
+// The COM completion handler for ActivateAudioInterfaceAsync, built from koffi
+// callbacks; `keep` holds every piece alive for the life of the call.
 function makeCompletionHandler(onCompleted) {
   const { koffi, QIProto, RefProto, DoneProto } = init();
   const objBuf = mem(8);
@@ -363,8 +319,7 @@ function makeCompletionHandler(onCompleted) {
       return 0x80004005 | 0; // E_FAIL
     }
   }, koffi.pointer(QIProto));
-  // Lifetime is ours, not COM's: the handler lives exactly as long as the
-  // activation promise, so the counts are constants.
+  // Lifetime is ours, not COM's: the counts are constants.
   const addref = koffi.register(() => 2, koffi.pointer(RefProto));
   const rel = koffi.register(() => 1, koffi.pointer(RefProto));
   const done = koffi.register((self, op) => {
@@ -404,8 +359,7 @@ function activateProcessLoopback(pid, exclude) {
       }
     });
 
-    // AUDIOCLIENT_ACTIVATION_PARAMS { type; { pid; mode } } wrapped in a
-    // VT_BLOB PROPVARIANT, which is how this API takes its parameters.
+    // AUDIOCLIENT_ACTIVATION_PARAMS { type; { pid; mode } } in a VT_BLOB PROPVARIANT.
     const params = mem(12);
     poke.i32(params, 0, 1); // AUDIOCLIENT_ACTIVATION_TYPE_PROCESS_LOOPBACK
     poke.u32(params, 4, pid);
@@ -425,9 +379,7 @@ function activateProcessLoopback(pid, exclude) {
   });
 }
 
-// Returns the loopback client plus the endpoint's volume control. The volume
-// interface is best effort: without it capture still works, only at whatever
-// level the user happens to listen at (the pre-v0.4.1 behavior).
+// Returns the loopback client plus the endpoint's volume control (best effort).
 function activateSystemLoopback() {
   const device = defaultRenderDevice();
   try {
@@ -455,16 +407,9 @@ function activateSystemLoopback() {
 
 // ===== capture =====
 
-/**
- * Start capturing 16 kHz mono float32.
- *
- * @param {object} opts
- * @param {'system'|'include'|'exclude'} opts.mode
- * @param {number} [opts.pid]      target for include/exclude
- * @param {(pcm: Float32Array) => void} opts.onPcm
- * @param {(kind: string, detail?: string) => void} [opts.onEvent]
- * @returns {Promise<{stop: () => void, mode: string}>}
- */
+// Starts capturing 16 kHz mono float32. mode: 'system' | 'include' | 'exclude'
+// (pid for the last two); onPcm gets the audio, onEvent(kind, detail) the
+// device / source events. Returns { mode, stats(), stop() }.
 async function startCapture({ mode = 'system', pid = 0, onPcm, onEvent = () => {}, pollMs = 20 }) {
   if (!init()) throw new Error('native audio capture unavailable');
   if (mode !== 'system' && !getCapabilities().processLoopback) {
@@ -481,9 +426,7 @@ async function startCapture({ mode = 'system', pid = 0, onPcm, onEvent = () => {
   let silentPackets = 0;
   let discontinuities = 0;
   let framesDelivered = 0;
-  // System path only: the endpoint volume control, the inverse gain derived
-  // from it, and the guard that switches compensation off for devices that
-  // apply their volume in hardware (their loopback was never attenuated).
+  // System path only: endpoint volume, its inverse gain, and the clip guard.
   let volume = null;
   let gain = 1;
   let endpointDb = null;
@@ -494,8 +437,8 @@ async function startCapture({ mode = 'system', pid = 0, onPcm, onEvent = () => {
   const nativeSrc = mode !== 'system';
   const bytesPerFrame = nativeSrc ? 4 * NATIVE_CHANNELS : 4;
   let decimator = null;
-  // Process loopback keeps delivering zero-filled packets after the target
-  // exits — no flag, no HRESULT (measured) — so liveness is checked directly.
+  // Process loopback keeps delivering silence after the target exits, so
+  // liveness is checked directly.
   let pollsSinceLiveness = 0;
   const LIVENESS_POLLS = 50; // ~1s
 
@@ -506,7 +449,7 @@ async function startCapture({ mode = 'system', pid = 0, onPcm, onEvent = () => {
       try {
         vcall(client, 11, 'long Stop(void*)');
       } catch {
-        // the device may already be gone; nothing to salvage
+        // the device may already be gone
       }
     }
     release(capture);
@@ -516,9 +459,7 @@ async function startCapture({ mode = 'system', pid = 0, onPcm, onEvent = () => {
     capture = client = hEvent = volume = null;
   };
 
-  // GetMasterVolumeLevel is the attenuation the engine applies (dB over the
-  // device's own range); the 0..1 scalar is only the slider position and is
-  // not linear in amplitude (8% read -38 dB, not -22).
+  // GetMasterVolumeLevel (dB) is the attenuation the engine applies.
   const refreshGain = () => {
     if (!volume) return;
     try {
@@ -541,10 +482,7 @@ async function startCapture({ mode = 'system', pid = 0, onPcm, onEvent = () => {
       client = await activateProcessLoopback(pid, mode === 'exclude');
     }
 
-    // Process loopback takes 16k mono directly (it has no mix format at all —
-    // GetMixFormat returns E_NOTIMPL). The endpoint client only accepts its
-    // mix format unless the audio engine is asked to convert, which is what
-    // AUTOCONVERTPCM does — measured identical to converting it ourselves.
+    // The endpoint client needs AUTOCONVERTPCM to accept 16 kHz mono.
     let flags = AUDCLNT_STREAMFLAGS_LOOPBACK | AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
     if (mode === 'system') flags |= AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY;
     const format = nativeSrc ? waveFormat(NATIVE_RATE, NATIVE_CHANNELS) : waveFormat(SAMPLE_RATE, 1);
@@ -571,10 +509,8 @@ async function startCapture({ mode = 'system', pid = 0, onPcm, onEvent = () => {
     pollsSinceVolume = 0;
   };
 
-  // Polled rather than blocked on the event handle: this runs on the ASR
-  // worker's only JS thread, and a blocking wait there would stall decoding.
-  // 20ms against a 2s client buffer has no overflow risk and adds no
-  // meaningful latency (first token is ~560ms).
+  // Polled rather than blocked on the event handle: this runs on the worker's
+  // only JS thread.
   const drain = () => {
     if (stopped || !capture) return;
     const { koffi } = init();
@@ -615,8 +551,7 @@ async function startCapture({ mode = 'system', pid = 0, onPcm, onEvent = () => {
         framesDelivered += frames;
         if (outFlags[0] & AUDCLNT_BUFFERFLAGS_SILENT) {
           silentPackets += 1;
-          // Silent packets carry no valid data pointer; the timeline still has
-          // to advance or the VAD would see a jump-cut instead of a pause.
+          // Silent packets carry no data pointer; the timeline still advances.
           onPcm(decimator ? decimator.process(new Float32Array(frames * NATIVE_CHANNELS)) : new Float32Array(frames));
         } else if (outData[0]) {
           const bytes = new Uint8Array(koffi.decode(outData[0], 'uint8_t', frames * bytesPerFrame));
@@ -626,9 +561,7 @@ async function startCapture({ mode = 'system', pid = 0, onPcm, onEvent = () => {
             applyGain(pcm, gain);
             if (!clipGuard) clipGuard = makeClipGuard();
             if (clipGuard.check(pcm)) {
-              // Sustained clipping under gain: this device applies its volume
-              // in hardware, the loopback signal was never attenuated, and the
-              // inverse is pure distortion. Off for the rest of this capture.
+              // Sustained clipping under gain: this device was never attenuated.
               compensation = 'off';
               gain = 1;
               onEvent('volume-compensation-off', `clipping at ${endpointDb === null ? '?' : endpointDb.toFixed(1)} dB`);
@@ -641,9 +574,7 @@ async function startCapture({ mode = 'system', pid = 0, onPcm, onEvent = () => {
     }
   };
 
-  // A default-device switch (headphones plugged in) invalidates the client.
-  // The renderer used to notice this through a dead MediaStream track; here it
-  // is an explicit HRESULT, so the rebuild is immediate instead of guessed.
+  // A default-device switch invalidates the client: rebuild, up to three times.
   const onDeviceError = (hr) => {
     const code = hr >>> 0;
     if (code !== AUDCLNT_E_DEVICE_INVALIDATED) {
@@ -680,11 +611,7 @@ async function startCapture({ mode = 'system', pid = 0, onPcm, onEvent = () => {
 
   return {
     mode,
-    // Read by the worker's metrics line: silent packets mean the source went
-    // quiet at the OS level (not our doing), discontinuities mean the pump
-    // fell behind. Both are invisible in the PCM itself. endpointDb says how
-    // far down the user's volume slider was — the number that explained a
-    // "deaf" session once.
+    // Read by the worker's metrics line.
     stats() {
       return { silentPackets, discontinuities, framesDelivered, endpointDb, gain, compensation };
     },

@@ -21,44 +21,19 @@ const { post, logLine, fatal, textLogged } = require('./io');
 const capture = require('./capture');
 const tts = require('./tts');
 
+// Segmentation and VAD tuning; every number is explained in
+// docs/design/listen.md (§2 segmentation, §3 VAD).
 const SAMPLE_RATE = 16000;
 const VAD_WINDOW = 512;
-// 1.0s: RTF 0.033 leaves headroom even with a force-split-capped open segment
-// re-decode sharing the chain with finals (was 1.5s; user verdict: sluggish).
 const PARTIAL_INTERVAL_MS = 1000;
-// Layered forced segmentation, aligned with the pro-subtitle ceiling of ~7s
-// per cue (Netflix/BBC style) and sherpa's own endpointing philosophy (relax
-// the acceptable-pause threshold as the segment drags on):
-//   < SOFT s   only the VAD's 0.35s silence closes a segment (natural breaks)
-//   >= SOFT s  valley split: the moment the last VALLEY_WINDOWS windows all
-//              drop below an adaptive RMS floor (a breath, ~0.26s), finalize
-//              right there — the cut AND the VAD re-acknowledgment both land
-//              in silence, so nothing is lost
-//   >= HARD s  hard split (sung vocals over BGM may never yield a valley).
-//              Costs ~1-2 characters at the seam; the price of any output.
-// sherpa's own maxSpeechDuration stays a distrusted backstop (21s/31s
-// segments were logged under a 12/18 cap).
+// Layered forced splits: valley / text-quiescence from SOFT, hard cut at HARD.
 const SOFT_SPLIT_FROM_S = 5;
 const HARD_SPLIT_S = 9;
 const VALLEY_WINDOWS = 8; // x 512 samples = 0.256s of sustained quiet
-// 0.3 (was 0.2): real BGM raises the energy floor, so at 0.2 valleys almost
-// never fired on actual content (probe logs: 0/14 narration, 1/10 song) and
-// hard 9s dominated. A false valley in music lands in an instrumental gap —
-// which IS a sentence boundary — so widening is cheap.
 const VALLEY_RATIO = 0.3;
-const VALLEY_FLOOR = 1e-4; // absolute floor so near-digital-silence always counts
-// Text-quiescence split (stream-draft sessions only): sung vocals and voiced
-// pauses keep the ACOUSTIC floor high, but the draft engine stops emitting
-// characters the moment the sentence ends — a semantic pause detector the
-// two-pass architecture gives us for free (industry counterpart: endpoint
-// rules on trailing non-emission, and neural caption segmentation replacing
-// pause-based splits). 0.8s of no draft growth on a >=5s segment closes it.
+const VALLEY_FLOOR = 1e-4;
 const TEXT_QUIESCENCE_MS = 800;
-// silero threshold by content: 0.5 for speech, 0.3 once the finals say the
-// audio is music (sung vocals over a beat hover under 0.5 and whole lyric
-// lines never open — 86% of lines at 0.5 vs 100% at 0.3 on a real song
-// through process loopback, speech unaffected). The policy lives in
-// probe-metrics; the swap happens only between segments.
+// silero threshold by content; the policy is makeVadThresholdPolicy.
 const VAD_THRESHOLD_SPEECH = 0.5;
 const VAD_THRESHOLD_MUSIC = 0.3;
 
@@ -66,38 +41,27 @@ const ASR_LANGUAGES = new Set(['zh', 'en', 'ja', 'ko', 'yue', '']);
 
 let sherpa = null;
 let sherpaAddon = null;
-let asrPaths = null; // declared by init; loaded by asr-start
+let asrPaths = null; // declared by attach; loaded by start
 let asrLanguage = '';
 let vad = null;
 let vadThreshold = VAD_THRESHOLD_SPEECH;
 let vadPolicy = makeVadThresholdPolicy({ speech: VAD_THRESHOLD_SPEECH, music: VAD_THRESHOLD_MUSIC });
 let vadRebuildTo = null; // pending threshold change, applied at a segment boundary
 let recognizer = null;
-// High-accuracy tier (Qwen3-ASR), decided by the manager per session. Its
-// results carry no language or BGM tags, so the language pin and the music
-// VAD policy below simply never fire under it.
+// High-accuracy tier (Qwen3-ASR): no language / BGM tags on its finals, so
+// the language pin and the music policy never fire under it.
 const hqActive = () => !!(asrPaths && asrPaths.useHq && asrPaths.hq);
-// Auto-language sessions pin the recognizer to the first language that wins
-// three finals in a row. SenseVoice's per-segment detection drifts on mixed or
-// musical audio (a Chinese song drew ja/yue/en tags on 5 of 31 finals), and a
-// segment decoded under the wrong language is garbage, not "less accurate".
-// The pin rebuilds the recognizer once, between segments, inside the decode
-// chain so no in-flight final sees a half-built model.
+// Auto-language sessions pin the recognizer once LANG_PIN_STREAK finals agree;
+// the rebuild happens between segments inside the decode chain.
 const LANG_PIN_STREAK = 3;
 let pinnedLanguage = '';
 let langStreak = { lang: '', count: 0 };
 let pendingPinLang = null;
-// Two-pass draft engine (optional): a streaming zipformer emits word-by-word
-// drafts while SenseVoice keeps owning finals (spike report: first token
-// ~0.86s, 13ms/chunk, zero hallucination over 23s). Per-session choice:
-//   zh/en chosen            -> 'stream'
-//   ja/ko/yue chosen        -> 'pseudo' (model has no such languages)
-//   auto                    -> start 'pseudo', first final's lang tag decides
-// Missing model / load failure -> 'pseudo' silently (drafts are a bonus, the
-// final chain never depends on them).
+// Optional streaming draft engine: 'stream' for zh/en, 'pseudo' (re-decode of
+// the open segment) otherwise, 'none' on the high-accuracy tier without it.
 let online = null;
 let onlineStream = null;
-let partialEngine = 'pseudo'; // 'pseudo' | 'stream'
+let partialEngine = 'pseudo'; // 'pseudo' | 'stream' | 'none'
 let autoEngineDecided = false;
 let lastStreamText = '';
 let lastDraftGrowthAt = 0; // ms timestamp of the last draft-text change
@@ -107,20 +71,13 @@ let sessionLive = false;
 let pending = new Float32Array(0);
 let audioInSamples = 0;
 let segmentCount = 0;
-// Samples actually handed to the VAD, and the value that counter had at the
-// last vad.reset(). Sherpa's own segment.start restarts at zero on every
-// reset, and forced splits reset constantly — so raw VAD starts jump BACKWARDS
-// mid-session and the exported SRT timeline goes with them (probe logs showed
-// 17.10 -> 22.18 -> 0.23). Both segment sources are rebased onto this clock.
+// Session clock in samples fed to the VAD; segment starts from both sources
+// are rebased onto it (sherpa's own clock restarts on every reset).
 let vadFedSamples = 0;
 let vadBaseSamples = 0;
 
-// Open-segment accumulator for provisional decoding. VAD only hands over
-// CLOSED segments; while isDetected() is true we mirror the audio ourselves,
-// decode it every PARTIAL_INTERVAL_MS, and clear on close. The final decode of
-// the closed segment then replaces the provisional text downstream — this is
-// the v0.4.0 contract in miniature: transcript area mutable, translation only
-// ever consumes finals.
+// Open-segment mirror: the VAD only hands over closed segments, so the open
+// one is copied here for drafts and forced splits, and cleared on close.
 let openChunks = [];
 let openLen = 0;
 let lastPartialLen = 0;
@@ -129,22 +86,13 @@ let partialGen = 0; // bumped on close so a stale in-flight partial is dropped
 let openRmsSum = 0;
 let openWinCount = 0;
 let recentRms = []; // last VALLEY_WINDOWS window RMS values
-// Pre-roll: recent windows kept during silence. When detection flips on, the
-// VAD's ~0.15s acknowledgment has already swallowed the utterance head —
-// without this, every segment AFTER a forced split starts a character short
-// ("些技术" for "这些技术" in the breath harness). 0.6s (was 0.32s): on read
-// speech the VAD opens late by up to ~1.5s on soft onsets, and the longer
-// head was part of the English pipeline going 14.7% -> 10.6% WER.
+// Pre-roll: recent silent windows prepended when a segment opens.
 const PRE_ROLL_WINDOWS = 19; // ~0.6s
 let preRoll = [];
-// Per-chunk RMS of the open segment (every chunk is one VAD window), so a
-// hard cut can land in the quietest recent window instead of at 9.0s sharp.
+// Per-chunk RMS of the open segment, so a hard cut lands in a quiet window.
 let openChunkRms = [];
-// Carry-over after a forced cut: the audio from the cut point up to the VAD's
-// next acknowledgment. It is the head of the next sentence — before this it
-// was lost (every segment after a hard cut opened a letter or two short:
-// "ut your", "rote about") — so it is carried explicitly, and prefixed to the
-// next final without overlap using global sample positions.
+// Carry-over after a forced cut: audio from the cut point to the VAD's next
+// acknowledgment, prefixed to the next final without overlap.
 let carry = null; // { chunks: Float32Array[], len, startSample }
 let carryForDecode = null; // { samples: Float32Array, startSample }
 const CUT_LOOKBACK_WINDOWS = 47; // ~1.5s in which to find the quietest window
@@ -166,14 +114,10 @@ function concatChunks(chunks, len) {
   }
   return out;
 }
-// Level normalization ahead of the VAD (see makeAgc). Applied to the windows
-// the VAD and the mirrored segments see; the level meter and the rms metrics
-// keep reading the raw signal, so a quiet source still looks quiet in the log.
+// Level normalization ahead of the VAD (makeAgc); metrics read the raw signal.
 const agc = makeAgc();
 
-// Level + speech-time accumulators, reset each metrics window. These exist
-// because a session log without them cannot answer the only question a stall
-// raises: was the audio quiet, or was the VAD deaf to audible audio?
+// Level + speech-time accumulators, reset each metrics window.
 let rmsSum = 0;
 let rmsCount = 0;
 let rmsMax = 0;
@@ -209,9 +153,7 @@ function start(msg) {
   if (msg && msg.language !== undefined) {
     const lang = normalizeLanguage(msg.language);
     if (lang !== asrLanguage && recognizer) {
-      // Language is baked into the recognizer config — rebuild. (The probe
-      // manager restarts the whole worker instead; this path serves the
-      // future resident engine.)
+      // Language is baked into the recognizer config: rebuild.
       recognizer = null;
     }
     asrLanguage = lang;
@@ -235,8 +177,7 @@ function start(msg) {
     return fatal(`model load failed: ${err.message}`);
   }
 
-  // Draft engine, loaded only when it can possibly serve this session (zh/en
-  // or auto). Its failure is never fatal — worst case drafts stay pseudo.
+  // Draft engine, only for zh/en or auto sessions; a load failure keeps pseudo.
   const canStream = asrLanguage === 'zh' || asrLanguage === 'en' || asrLanguage === '';
   if (canStream && asrPaths.streaming && !online) {
     try {
@@ -267,18 +208,14 @@ function start(msg) {
     online && (asrLanguage === 'zh' || asrLanguage === 'en') ? 'stream' : 'pseudo';
   autoEngineDecided = asrLanguage !== ''; // auto keeps the decision open
   if (hqActive()) {
-    // Qwen3 finals carry no language tag, so the auto decision on the first
-    // final can never happen: trust the draft engine outright when it is
-    // loaded, and never re-decode drafts with a 1 GB model — finals only.
+    // No language tags to decide by: the draft engine as loaded, or finals only.
     partialEngine = online ? 'stream' : 'none';
     autoEngineDecided = true;
   }
   lastStreamText = '';
 
   const loadMs = Date.now() - t0;
-  // Session-scoped counters. The manager forks a fresh worker per session
-  // today, but the resident scheduler will not — a second session must not
-  // inherit the first one's clock.
+  // Session-scoped counters.
   audioInSamples = 0;
   vadFedSamples = 0;
   vadBaseSamples = 0;
@@ -310,27 +247,15 @@ function start(msg) {
   post({ type: 'asr-ready', loadMs });
 }
 
-// silero ONLY. ten-vad was tried on 2026-08-27 and reverted the same day:
-// sherpa's port drops the pitch feature, and on real music (the primary use
-// case) it missed most sung vocals — 67s of a song yielded 3 fragment segments
-// vs silero's continuous output. Don't re-add it from a clean-speech
-// benchmark; it must beat silero on BGM logs first.
+// silero VAD; the numbers are explained in docs/design/listen.md §3.
 function createVad(threshold) {
   return new sherpa.Vad(
     {
       sileroVad: {
         model: asrPaths.vadPath,
         threshold,
-        // 0.15 (was 0.25): faster onset acknowledgment.
         minSpeechDuration: 0.15,
-        // 0.5 (was 0.35, before that 0.5): 0.35 chopped read sentences at
-        // every comma into context-free fragments — FLEURS English pipeline
-        // WER 14.7% at 0.35 vs 10.6% at 0.5 (0.6 no better), for +0.15s on
-        // each final. The layered force-split below still bounds pause-free
-        // speech, so the old "finals never appeared" failure cannot return.
         minSilenceDuration: 0.5,
-        // 12 hard-cut 27% of segments (p90 14.9s). 18 clears p90;
-        // SenseVoice degrades past ~20s, so no higher.
         maxSpeechDuration: 18,
         windowSize: VAD_WINDOW,
       },
@@ -353,9 +278,6 @@ function createRecognizer(language) {
           encoder: hq.encoder,
           decoder: hq.decoder,
           tokenizer: hq.tokenizerDir,
-          // Finals are ≤9s (hard split), so 512 new tokens is generous. Past
-          // its context the model degrades to garbage — another reason the
-          // VAD gate is never bypassed for this engine.
           maxNewTokens: 512,
           maxTotalLen: 1024,
           temperature: 0,
@@ -420,8 +342,7 @@ function applyLanguagePin() {
     });
 }
 
-// Only between segments: a fresh silero starts in its non-speech state, so
-// swapping it mid-utterance would drop the rest of that utterance.
+// Only between segments (a fresh silero starts in its non-speech state).
 function applyVadThreshold() {
   const next = vadRebuildTo;
   vadRebuildTo = null;
@@ -440,17 +361,12 @@ function checkHint() {
   const hint = watchdog.hint(Date.now());
   if (hint !== lastHint) {
     lastHint = hint;
-    // The level goes in the log line: 'no-speech' at rmsMax 0.15 means the VAD
-    // was deaf to audible audio, the same hint at rmsMax 0.0005 means the
-    // stream really was quiet. Without this the two are indistinguishable
-    // afterwards, which is exactly where a stall investigation stalls.
+    // The level rides along so a stall can be told from a quiet stream.
     if (hint) {
       logLine(eventRecord(hint, `rmsAvg=${(rmsCount ? rmsSum / rmsCount : 0).toFixed(4)} rmsMax=${rmsMax.toFixed(4)}`));
     }
     post({ type: 'hint', kind: hint });
-    // Loud audio and no final for 12s: whatever this is, 0.5 is not opening
-    // on it (36s of audible English through one player did exactly that).
-    // Relax for the rest of the session instead of just saying so.
+    // Loud audio without finals: relax the VAD for the rest of the session.
     if (hint === 'no-speech' && vadThreshold === VAD_THRESHOLD_SPEECH) {
       const next = vadPolicy.hold();
       if (next !== null) {
@@ -467,9 +383,7 @@ function emitMetrics() {
   const wallMs = now - lastMetricsMs;
   lastCpu = process.cpuUsage();
   lastMetricsMs = now;
-  // Capture health, when capture is ours: silent packets mean the OS handed us
-  // digital silence (the source stopped), discontinuities mean the pump fell
-  // behind. Both look identical in the PCM.
+  // Capture health (capture.js stats), when the worker owns the client.
   const capStats = capture.stats();
   const rec = metricsRecord({
     rssMb: process.memoryUsage().rss / 1024 / 1024,
@@ -497,11 +411,8 @@ function emitMetrics() {
 
 function handlePcm(samples) {
   if (!vad || !sessionLive) return;
-  if (tts.gateBlocked(Date.now())) {
-    // Dropped on the floor: not into the VAD, not into the level meter (which
-    // the UI greys out for the gate), not into the open segment.
-    return;
-  }
+  // Our own voice is playing: the audio goes nowhere.
+  if (tts.gateBlocked(Date.now())) return;
   audioInSamples += samples.length;
 
   let sumSq = 0;
@@ -537,11 +448,8 @@ function handlePcm(samples) {
   pending = merged.subarray(offset);
 }
 
-// Mirror the open segment window-by-window. Copies, not views — a subarray
-// would pin the whole per-callback merge buffer.
-// Streaming draft pass: feed a window, decode whatever is ready (13ms per
-// 200ms of audio, measured), emit on text change. A draft-engine failure
-// downgrades to pseudo for the rest of the session — never fatal.
+// Streaming draft pass: feed a window, decode what is ready, emit on change.
+// A draft-engine failure downgrades to pseudo for the rest of the session.
 function feedStream(win) {
   if (partialEngine !== 'stream' || !online) return;
   try {
@@ -567,10 +475,7 @@ function feedStream(win) {
   }
 }
 
-// The draft lane resets at segment boundaries (natural close and forced
-// splits): the boundary moment is silence, so nothing in-flight is lost —
-// resetting on final landing instead would drop the next segment's head,
-// which streams in while the final still decodes.
+// Draft lane reset at segment boundaries (never on final landing).
 function resetStreamDraft() {
   lastStreamText = '';
   if (online && onlineStream) {
@@ -588,8 +493,7 @@ function trackOpenSegment(win) {
     watchdog.onSpeech(Date.now());
     if (openLen === 0) {
       if (carry) {
-        // A forced cut just happened and the speech went on: the carried
-        // audio is this segment's head. The pre-roll would only duplicate it.
+        // The carried tail of the last cut is this segment's head.
         for (const c of carry.chunks) {
           openChunks.push(c);
           openChunkRms.push(rmsOf(c));
@@ -600,10 +504,7 @@ function trackOpenSegment(win) {
         carry = null;
         preRoll = [];
       } else if (preRoll.length) {
-        // Segment just opened: prepend the pre-roll so the mirrored audio has
-        // the utterance head the acknowledgment window swallowed. Mostly
-        // silence plus the first ~0.15s of speech; SenseVoice doesn't mind
-        // leading quiet.
+        // Segment just opened: prepend the pre-roll.
         for (const p of preRoll) {
           openChunks.push(p);
           openChunkRms.push(rmsOf(p));
@@ -625,8 +526,7 @@ function trackOpenSegment(win) {
     recentRms.push(rms);
     if (recentRms.length > VALLEY_WINDOWS) recentRms.shift();
 
-    // All splits checked per window (32ms). Priority: hard cap, then the
-    // semantic (text-quiescence) signal, then the acoustic valley.
+    // Split checks per window: hard cap, then text quiescence, then valley.
     if (openLen >= HARD_SPLIT_S * SAMPLE_RATE) return forceSplit('hard');
     if (openLen >= SOFT_SPLIT_FROM_S * SAMPLE_RATE) {
       if (
@@ -642,8 +542,7 @@ function trackOpenSegment(win) {
       }
     }
   } else if (carry) {
-    // Between a forced cut and the VAD's re-acknowledgment: still the same
-    // stretch of speech, so it belongs with the carried head, not the pre-roll.
+    // Between a forced cut and the VAD's re-acknowledgment.
     carry.chunks.push(new Float32Array(win));
     carry.len += win.length;
     if (carry.len >= CARRY_MAX_S * SAMPLE_RATE) flushCarry('carry-timeout');
@@ -651,8 +550,7 @@ function trackOpenSegment(win) {
     preRoll.push(new Float32Array(win));
     if (preRoll.length > PRE_ROLL_WINDOWS) preRoll.shift();
     if (openLen > 0) {
-      // Segment closed naturally: the final decode is already queued via
-      // drainVadQueue.
+      // Segment closed naturally; the final decode is queued by drainVadQueue.
       resetOpenSegment();
       resetStreamDraft();
       post({ type: 'partial', text: '' });
@@ -671,9 +569,7 @@ function resetOpenSegment() {
   openChunkRms = [];
 }
 
-// The speech ended at (or right after) a forced cut and the VAD never
-// re-acknowledged: whatever was carried is the tail of that sentence and
-// gets its own final rather than waiting forever for a segment to join.
+// A carry nobody re-acknowledged gets its own final.
 function flushCarry(reason) {
   if (!carry) return;
   const { chunks, len, startSample } = carry;
@@ -682,12 +578,8 @@ function flushCarry(reason) {
   enqueueDecode({ samples: concatChunks(chunks, len), start: startSample });
 }
 
-// Force-close the open segment: finalize the mirrored audio ourselves and
-// reset the VAD so it starts a fresh one. The VAD has not closed, so its
-// queue is empty — nothing double-decodes. 'valley' and 'quiet' cuts are
-// already at a pause and cut at the end. A 'hard' cut lands in the quietest
-// window of the last ~1.5s (between words far more often than 9.0s sharp),
-// and everything after that window is carried into the next segment.
+// Force-close the open segment and reset the VAD. 'valley' / 'quiet' cut at
+// the end; 'hard' cuts in the quietest recent window and carries the rest.
 function forceSplit(reason) {
   let cutAfter = openChunks.length - 1;
   if (reason === 'hard') {
@@ -710,16 +602,12 @@ function forceSplit(reason) {
   carry = tailLen ? { chunks: tail, len: tailLen, startSample: vadFedSamples - tailLen } : null;
   carryForDecode = null;
   logLine(eventRecord('force-split', `${reason} ${(buf.length / SAMPLE_RATE).toFixed(1)}s` + (tailLen ? ` carry ${(tailLen / SAMPLE_RATE).toFixed(2)}s` : '')));
-  // Same shape as a VAD-closed segment; the final replaces the gray line
-  // on screen exactly like a natural close.
   enqueueDecode({ samples: buf, start: startSample });
 }
 
 function maybeDecodePartial() {
   if (!sessionLive || !recognizer) return;
-  // Streaming drafts come word-by-word from feedStream; the pseudo re-decode
-  // below only serves sessions the draft engine cannot (ja/ko/yue, no model).
-  // 'none' = high-accuracy tier without a draft engine: finals only.
+  // Pseudo drafts only: re-decode the open segment (stream drafts come from feedStream).
   if (partialEngine !== 'pseudo') return;
   if (openLen === 0 || openLen === lastPartialLen) return;
   lastPartialLen = openLen;
@@ -747,10 +635,7 @@ function maybeDecodePartial() {
 
 function drainVadQueue() {
   while (!vad.isEmpty()) {
-    // enableExternalBuffer=false is mandatory under Electron: the V8 memory
-    // cage rejects napi external ArrayBuffers ("External buffers are not
-    // allowed"), and it only triggers on the FIRST detected speech segment —
-    // silence-only runs never reach this call.
+    // enableExternalBuffer must stay false under Electron (docs/design/listen.md §7).
     const seg = vad.front(false);
     vad.pop();
     // Rebased: seg.start is relative to the last reset, not to the session.
@@ -779,10 +664,7 @@ function enqueueDecode(seg) {
     .catch((err) => fatal(`decode failed: ${err.message}`));
 }
 
-// The wrapper's decodeAsync JSON.parses the result itself and throws on an
-// unescaped control character; by then the decode has finished, so the raw
-// result is re-read from the stream and parsed leniently instead of letting
-// one hallucinated "\n" take the whole host down.
+// Decode, re-reading the raw result when sherpa's JSON is malformed (asr-result.js).
 async function decodeOffline(stream) {
   let result;
   try {
@@ -806,8 +688,7 @@ async function decodeSegment(seg) {
   const text = (result.text || '').trim();
   if (!text) return;
   if (result.event === '<|BGM|>' && isNegligibleFinal(text)) {
-    // A breath-sized fragment over music: activity for the watchdog, but
-    // never a subtitle line or a translation call.
+    // Breath-sized fragment over music: watchdog activity only.
     watchdog.onSegment(Date.now());
     logLine(eventRecord('dropped-short', `${text.length} chars`));
     return;
@@ -830,23 +711,15 @@ async function decodeSegment(seg) {
     text,
     repeated: isRepeat(text),
   });
-  // The record goes two ways and they are not the same trust level: the
-  // renderer needs the text to draw a subtitle, the on-disk log does not need
-  // it at all. Tuning (segment length, gaps, RTF, repeats) reads the metrics;
-  // only a developer chasing a wrong transcription needs the words, and that
-  // is what TT_LISTEN_LOG_TEXT is for. Default: nothing the user heard is
-  // written to disk.
+  // The log gets the record without its words unless the host opted in.
   logLine(textLogged() ? rec : { ...rec, text: undefined });
   post({ type: 'segment', rec });
 
   const nextThreshold = vadPolicy.onFinal(result.event);
   if (nextThreshold !== null) vadRebuildTo = nextThreshold;
 
-  // Auto-language sessions: the first zh/en final switches the drafts to the
-  // streaming engine (catching up on the audio already mirrored). A first
-  // final tagged anything else is NOT trusted to free the draft engine — on a
-  // song intro that tag is noise (yue/ja over an instrumental) — the language
-  // pin below makes that call once three finals agree.
+  // Auto-language sessions: the first zh/en final switches drafts to the
+  // streaming engine; any other tag waits for the language pin.
   if (!autoEngineDecided && online) {
     const lang = result.lang || '';
     if (lang === '<|zh|>' || lang === '<|en|>') {

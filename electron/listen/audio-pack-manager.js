@@ -1,7 +1,5 @@
-﻿// Audio model pack manager: thin shell over model-pack-core, binding the
-// audio domain pieces (manifest URL, asr-models root, live-session eviction).
-// Download / verify / staging-swap / remove machinery lives in the core,
-// shared verbatim with the OCR pack manager.
+﻿// Listen-mode pack manager: model-pack-core bound to the audio manifest, the
+// asr-models roots and live-session eviction.
 
 const path = require('path');
 const { net } = require('electron');
@@ -18,28 +16,18 @@ const MANIFEST_URL =
   process.env.TT_AUDIO_MANIFEST_URL ||
   'https://github.com/Tianao0110/T-Translate/releases/download/audio-models/manifest.json';
 
-// Downloads land in the install dir's models folder (see model-root.js);
-// packsRoots() also covers the old userData location so a pack put there by an
-// earlier build stays listed, usable and removable.
 const { packsRoot, packsRoots, listAllInstalled } = packRoots('asr-models', listInstalledPacks);
 
 const manager = createPackManager({
   manifestUrl: MANIFEST_URL,
   packsRoot,
   resolvePackDir: (packId) => listAllInstalled().find((p) => p.id === packId)?.dir || null,
-  // Both roots are legitimate homes for a pack (install dir now, userData for
-  // anything a pre-v0.4.0 build downloaded); nothing outside them is removable.
   allowedRoots: packsRoots,
   listInstalled: listAllInstalled,
-  // The worker holds the .onnx files open; swapping a pack under a live
-  // session would fail on Windows (or worse, half-swap). Stopping is the
-  // honest move — a model change mid-session cannot be seamless anyway.
-  // Awaited by the core: stopSession alone returns before the process is
-  // actually gone, and the swap would race its file handles.
+  // Awaited by the core: the swap must not race the worker's open files.
   evictSessions: () => engineManager.stopSessionAndWait('pack-swap'),
-  // Voice packs share this manifest but belong to tts-pack-manager. A
-  // link-only pack that is not installed yet also gets the folder the user
-  // must drop it into, absolute, for the settings page.
+  // ASR types only (voice packs share the manifest but belong to
+  // tts-pack-manager); a link-only pack carries the folder to drop it into.
   computePackList: (installed, manifest) =>
     computePackList(installed, manifest, ASR_TYPES).map((p) =>
       (p.manual && typeof p.manual === 'object' && !p.dir ? { ...p, targetDir: path.join(packsRoot(), p.manual.dir) } : p)),
@@ -54,11 +42,7 @@ const manager = createPackManager({
     size: entry.size,
   }),
   basePackId: null, // nothing is bundled: every pack is fully removable
-  // Offline mode promises the app never reaches the network, and a model
-  // download is not an exception the user can click their way out of. The gate
-  // is injected into the core rather than wrapped around downloadPack here, so
-  // it also covers the manifest fetch behind listPacks — opening the settings
-  // page used to hit GitHub in offline mode.
+  // Injected into the core so it also covers the manifest fetch behind listPacks.
   offlineGate: () => isOfflineMode(store),
   logLabel: 'Audio-Packs',
   deps: { fetch: (...args) => net.fetch(...args) },

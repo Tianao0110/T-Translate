@@ -6,14 +6,11 @@
 const { post, logLine } = require('./io');
 const { eventRecord } = require('./probe-metrics');
 
-// Native capture handle (listen/win-audio-capture). Null whenever no audio is
-// being pulled — the zero-idle rule applies to the audio client too.
+// Native capture handle; null whenever no audio is being pulled.
 let capture = null;
 let lastLevelPostAt = 0;
 const LEVEL_INTERVAL_MS = 80;
-// A loopback client gets no packets at all while nothing renders on the
-// endpoint (measured 2026-09-02), so a paused video would leave the meter
-// frozen on its last frame unless someone zeroes it.
+// Idle rule: zero the meter when the endpoint stops delivering packets.
 let lastPcmAt = 0;
 let levelZeroed = true;
 const LEVEL_IDLE_MS = 1000;
@@ -22,8 +19,7 @@ async function start(msg, onPcm) {
   stop();
   logLine(eventRecord('capture-activating', msg.mode || 'system'));
   try {
-    // Required lazily: a machine without the native layer must still be able
-    // to load models and report a clean capture error, not fail at import.
+    // Required lazily so a machine without the native layer still loads models.
     const winAudio = require('../../listen/win-audio-capture');
     capture = await winAudio.startCapture({
       mode: msg.mode || 'system',
@@ -57,8 +53,7 @@ function stop() {
   post({ type: 'level', value: 0 }); // the meter must not freeze on the last loud frame
 }
 
-// Same curve the renderer used to compute from its own audio callback, kept
-// identical so the meter behaves exactly as before the capture moved here.
+// Level meter (0..1-ish), posted at most every LEVEL_INTERVAL_MS.
 function emitLevel(samples) {
   const now = Date.now();
   lastPcmAt = now;
@@ -71,9 +66,7 @@ function emitLevel(samples) {
   post({ type: 'level', value: Math.min(1, Math.sqrt(rms) * 2.2) });
 }
 
-// A loopback client gets no packets at all while nothing renders on the
-// endpoint, so a paused video would leave the meter frozen on its last frame
-// unless someone zeroes it.
+// Zeroes the meter after a quiet second (a paused source delivers no packets).
 function zeroLevelIfIdle(now) {
   if (capture && !levelZeroed && now - lastPcmAt > LEVEL_IDLE_MS) {
     levelZeroed = true;

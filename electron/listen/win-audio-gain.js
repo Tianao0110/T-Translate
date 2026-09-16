@@ -1,18 +1,6 @@
-// Endpoint-volume compensation for system loopback, kept free of native
-// imports so it is unit-testable.
-//
-// Why: WASAPI loopback taps the mix AFTER the endpoint (system) volume. A
-// user listening at 8% is at -38 dB, which turned a 0.35 rms song into 0.005
-// and left silero deaf (38% of lyric lines detected vs 95% once undone —
-// gstack v041-listen-music-diagnosis). Process loopback taps before that
-// volume, which is why "just this program" worked and "all sound" did not.
+// Endpoint-volume compensation for system loopback (which taps after the
+// system volume), free of native imports. Numbers: docs/design/listen.md §5.
 
-// Capped so a slider parked at -60 dB does not turn the noise floor into a
-// signal. The margin keeps the restored level under the original: the engine
-// measured ~1.5 dB less attenuation than the endpoint reported, some players
-// run ~2 dB hot, and a brick-walled master restored that much too hot would
-// clip. 6 dB under is still far above anything the VAD needs (0.19 rms of a
-// song scored the same lyric coverage as 0.31).
 const DEFAULT_CAP_DB = 40;
 const DEFAULT_MARGIN_DB = 6;
 
@@ -22,11 +10,8 @@ function compensationGain(db, { capDb = DEFAULT_CAP_DB, marginDb = DEFAULT_MARGI
   return Math.min(gain, Math.pow(10, capDb / 20));
 }
 
-// A device that applies its volume in hardware hands loopback a full-scale
-// signal, and the inverse gain would only clip it. The endpoint's hardware
-// support flags do not say which case you are in (a Realtek codec reports
-// hardware volume and still attenuates in software), so the guard watches
-// the outcome: sustained clipping under gain means the assumption is wrong.
+// Sticky guard against compensating a device that applies its volume in
+// hardware: sustained clipping under gain trips it.
 function makeClipGuard({ windowSamples = 32000, maxRatio = 0.01, clipLevel = 0.999 } = {}) {
   let seen = 0;
   let clipped = 0;

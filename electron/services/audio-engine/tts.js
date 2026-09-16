@@ -9,13 +9,10 @@ const { hasCjk, verbalizeEnglishNumbers, scaleSpeed } = require('./tts-text-en')
 
 let sherpa = null;
 
-// 4 threads: kokoro fp32 measured RTF 0.23-0.28 at 4 on a desktop CPU, and
-// the ASR side runs on 2, so both fit a 6-core box without starving capture.
+// Thread counts and the gate tail are explained in docs/design/listen.md §7.
 const TTS_THREADS = 4;
 const TTS_ENGINES = new Set(['kokoro', 'vits']);
-// 'cpu' | 'webgpu' — set by init and tts-set-provider. On the GPU the
-// runtime does the parallelism; extra CPU threads only contend (1 thread).
-let ttsProvider = 'cpu';
+let ttsProvider = 'cpu'; // 'cpu' | 'webgpu', set by attach and setProvider
 // Bumped on every engine load; a queued unload from before the bump is void.
 let ttsGen = 0;
 let tts = null;
@@ -23,10 +20,7 @@ let ttsPackId = '';
 let ttsLoading = null; // Promise<OfflineTts> while createAsync runs
 let ttsChain = Promise.resolve(); // one synthesis at a time
 const ttsCancelled = new Set();
-// Mute gate: while a window plays TTS (any engine) the captured audio is
-// dropped here, plus a tail for the loopback path's latency, so the app's own
-// voice never reaches the VAD. Works on every Windows build, unlike process
-// exclusion, and needs no audio client restart.
+// Mute gate: captured audio is dropped while a window plays our voice.
 const TTS_GATE_TAIL_MS = 300;
 const ttsGate = makeTtsGate({ tailMs: TTS_GATE_TAIL_MS });
 
@@ -37,12 +31,9 @@ function attach({ sherpa: mod, provider }) {
   ttsProvider = provider === 'webgpu' ? 'webgpu' : 'cpu';
 }
 
-// Dropping the last reference is what releases the .onnx handles; queued up
-// behind any running synthesis so a pack swap never pulls files from under
-// the addon thread. The ack lets the host wait for exactly that moment.
+// Releases the voice behind any running synthesis; the ack tells the host.
 function unloadTts() {
-  // A load that starts while this release waits behind a running synthesis
-  // supersedes it: the state then belongs to the new engine.
+  // A load that starts meanwhile supersedes this release.
   const gen = ttsGen;
   ttsChain = ttsChain.then(async () => {
     if (ttsLoading) {
@@ -94,8 +85,7 @@ function ttsConfigFor(pack) {
       ...common,
     };
   }
-  // One sentence per batch is what makes the progress callback stream: the
-  // first chunk is the first sentence, not the whole paragraph.
+  // One sentence per batch so the progress callback streams per sentence.
   return { model, ruleFsts: list(p.ruleFsts).join(','), maxNumSentences: 1 };
 }
 
@@ -116,10 +106,7 @@ function ensureTts(pack) {
     (engine) => {
       // A newer load superseded this one while it ran: let it go.
       if (ttsPackId !== pack.id) return engine;
-      // WebGPU compiles its pipelines on the first synthesis of each
-      // language (2.8 s for Chinese measured); take that hit here, once,
-      // instead of on the user's first sentence. Failures are not fatal:
-      // sherpa already fell back to the CPU inside the session if it had to.
+      // Warm-up on the GPU: one line per language compiles the pipelines now.
       if (ttsProvider === 'webgpu') {
         for (const w of Array.isArray(pack.warmup) ? pack.warmup : []) {
           try {
@@ -156,8 +143,7 @@ function ensureTts(pack) {
 }
 
 function load(msg) {
-  // Already resident: say so again, so a caller waiting on tts-ready (the
-  // GPU self-test) is not left hanging on a load that never happens.
+  // Already resident: repeat tts-ready for whoever is waiting on it.
   if (tts && msg.pack && ttsPackId === msg.pack.id) {
     post({ type: 'tts-ready', packId: msg.pack.id, loadMs: 0, numSpeakers: tts.numSpeakers, sampleRate: tts.sampleRate });
     return;
@@ -167,16 +153,13 @@ function load(msg) {
   });
 }
 
-// The provider is baked into the engine config: a loaded voice is dropped
-// and the next load (or tts-load) rebuilds it on the new backend.
+// The provider is baked into the engine config: drop the voice, rebuild on the next load.
 function setProvider(msg) {
   const next = msg.provider === 'webgpu' ? 'webgpu' : 'cpu';
   if (next === ttsProvider) return;
   ttsProvider = next;
   logLine(eventRecord('tts-provider', next));
-  // Forget the pack id now: the release itself queues behind any running
-  // synthesis, but a tts-load arriving in between must not match the old
-  // engine and hand back the wrong backend.
+  // Forget the pack id now so a tts-load in between cannot match the old engine.
   ttsPackId = '';
   if (tts || ttsLoading) unloadTts();
 }
@@ -188,7 +171,6 @@ function generate(msg) {
   const sid = Number.isInteger(msg.sid) && msg.sid >= 0 ? msg.sid : 0;
   const speed = scaleSpeed(msg.speed, msg.pack?.speedScale, text);
 
-  // The packs' Chinese rule FSTs would read English digits in Chinese;
   // English text gets its numbers spelled out first (tts-text-en).
   const spoken = hasCjk(text) ? text : verbalizeEnglishNumbers(text);
 

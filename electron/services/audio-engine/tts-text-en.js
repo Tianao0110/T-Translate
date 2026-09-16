@@ -1,9 +1,6 @@
-// English text normalization for the neural TTS. The voice packs load Chinese
-// rule FSTs (number-zh / date-zh / phone-zh) that rewrite every digit run into
-// Chinese characters before phonemization, engine-wide and regardless of the
-// surrounding language — so "2026" inside an English sentence came out in
-// Chinese. Spelling numbers out as English words first leaves the FSTs nothing
-// to rewrite. Applied by the worker to text without CJK characters only.
+// English number verbalization for the neural TTS: digits become words before
+// the packs' Chinese rule FSTs can rewrite them (docs/design/listen.md §7).
+// Applied by the worker to text without CJK characters only.
 
 const CJK_RE = /[㐀-鿿豈-﫿]/;
 
@@ -146,9 +143,8 @@ function verbalizeEnglishNumbers(text) {
   return out;
 }
 
-// Packs do not share a natural pace: MeloTTS reads Chinese ~20% faster than
-// kokoro at the same speed value. speedScale (per pack, a number or
-// {zh, en}) rebases the user's slider so 1.0 sounds alike across packs.
+// Per-pack pace correction: speedScale (a number or {zh, en}) rebases the
+// user's slider so 1.0 sounds alike across packs.
 function scaleSpeed(speed, speedScale, text) {
   const base = Number.isFinite(speed) && speed > 0 ? speed : 1;
   let scale = 1;
