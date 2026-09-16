@@ -1,14 +1,7 @@
-// OCR engine registry + manager with auto-fallback chain.
-// Stack port of src/providers/ocr/index.js. Deliberate differences:
-//   - priority is a per-request option (the floating window used to setPriority
-//     on ITS manager instance; with one shared instance that would leak its
-//     ordering into every window — dead setPriority/setFallbackNotify/
-//     getAllOCREngines had zero callers and are dropped)
-//   - vision lock state is global by construction (one instance for all three
-//     windows — locking once benefits everyone), and fallback results carry
-//     `visionLocked` so renderers can word their notice without an extra IPC
-//   - configs load through the injected loader (flat settings.ocr bucket with
-//     vault secrets merged main-side)
+// OCR engine registry + manager with auto-fallback chain: priority is a
+// per-request option, the vision lock is global (one instance for every
+// window), configs load through the injected loader. Design notes:
+// docs/design/stack.md §5.
 
 import { RapidOCREngine, WindowsOCREngine } from './local-bridge.js';
 import { isLoopbackUrl } from '../loopback.js';
@@ -36,9 +29,8 @@ const engines = {
   'baidu-ocr': BaiduOCREngine,
 };
 
-// Local engines first (no network, no quota), then online APIs by general
-// quality/availability. The built-in vision model sits behind the two
-// classic local engines until it beats PP-OCR on the OCR gates.
+// Local engines first, then online APIs; the built-in vision model sits
+// behind the two classic local engines.
 export const DEFAULT_OCR_PRIORITY = [
   'rapid-ocr',
   'windows-ocr',
@@ -58,20 +50,15 @@ function createOCREngine(id, config = {}) {
   return new EngineClass(config);
 }
 
-// Mirrors LLMVisionEngine's own default — the manager has to answer "is this
-// endpoint local?" before an instance exists.
+// Mirrors LLMVisionEngine's own default.
 const DEFAULT_VISION_ENDPOINT = 'http://localhost:1234/v1';
 
-// Offline mode allows llm-vision only while it points at this machine. Host
-// names are matched exactly: a "localhost.evil.com" must not read as local.
+// Offline mode allows llm-vision only while it points at this machine.
 export const isLoopbackEndpoint = isLoopbackUrl;
 
-// LLM Vision auto-degrade:
-// - If llm-vision fails with "vision unsupported" we transparently retry on
-//   rapid-ocr (the local fallback) and the result carries fallbackFrom.
-// - After 2 consecutive failures we *lock* — llm-vision is skipped entirely
-//   until the user re-enables it from settings. This avoids hammering an
-//   incompatible model on every capture.
+// LLM Vision auto-degrade: "vision unsupported" retries on rapid-ocr (the
+// result carries fallbackFrom); after 2 consecutive failures llm-vision is
+// locked until the user re-enables it from settings.
 export class OCREngineManager {
   /**
    * @param {object} deps
@@ -87,9 +74,7 @@ export class OCREngineManager {
     this._visionFailCount = 0;
     this._visionFailThreshold = 2;
     this._visionLocked = false;
-    // Walked in order when llm-vision degrades or local models are missing:
-    // PP-OCR first, Windows OCR as the zero-download bedrock, the built-in
-    // vision model last (it may be uninstalled or capped on the CPU).
+    // Walked in order when llm-vision degrades or local models are missing.
     this._localFallbackChain = ['rapid-ocr', 'windows-ocr', 'tengine-vision'];
   }
 
@@ -119,10 +104,8 @@ export class OCREngineManager {
       'rapid-ocr': {},
       'windows-ocr': {},
       'tengine-vision': {},
-      // Same OpenAI-compatible endpoint the local-LLM provider uses — the
-      // engine fetches it directly and never routes through the service.
-      // model is independent of endpoint: users on LM Studio's default port
-      // (blank endpoint) still need to pin a vision model when multiple load.
+      // Same OpenAI-compatible endpoint the local-LLM provider uses; model is
+      // independent of endpoint.
       'llm-vision': (settings.llmEndpoint || settings.llmModel)
         ? {
             ...(settings.llmEndpoint ? { endpoint: settings.llmEndpoint } : {}),
@@ -163,10 +146,8 @@ export class OCREngineManager {
     const { allowedEngines, priority } = options;
     let { engine: preferredEngine } = options;
 
-    // Privacy modes pass an engine allowlist (null/undefined = unrestricted) —
-    // injected by the IPC facade from the live mode, never by a renderer.
-    // A disallowed preferred engine falls through to the filtered chain
-    // instead of failing outright.
+    // Engine allowlist (null / undefined = unrestricted), injected by the IPC
+    // facade. A disallowed preferred engine falls through to the chain.
     if (preferredEngine && allowedEngines && !allowedEngines.includes(preferredEngine)) {
       logger.debug(`Preferred engine ${preferredEngine} not allowed in current privacy mode`);
       preferredEngine = null;
@@ -190,8 +171,8 @@ export class OCREngineManager {
         }
       }
 
-      // Local models missing/corrupt -> degrade to Windows OCR instead of
-      // failing the capture; the result carries fallbackFrom for a UI notice.
+      // Local models missing / corrupt -> degrade to Windows OCR; the result
+      // carries fallbackFrom.
       if (!result.success && preferredEngine === 'rapid-ocr' &&
           result.errorCode === 'BASE_MODELS_MISSING') {
         const fallback = await this._recognizeWithEngine('windows-ocr', input, options);
@@ -203,7 +184,7 @@ export class OCREngineManager {
         return result;
       }
 
-      // Success resets the fail counter so transient errors don't accumulate forever
+      // Success resets the fail counter.
       if (result.success && preferredEngine === 'llm-vision') {
         if (this._visionFailCount > 0) {
           this._visionFailCount = 0;
@@ -216,8 +197,7 @@ export class OCREngineManager {
 
     // No engine specified — walk the priority list, skipping locked vision
     const order = priority || DEFAULT_OCR_PRIORITY;
-    // Best result that reported success but read as unusable. Held so a capture
-    // every engine struggles with still returns something.
+    // Best result that reported success but read as unusable (result-quality.js).
     let weakest = null;
     for (const id of order) {
       if (id === 'llm-vision' && this._visionLocked) continue;
@@ -233,9 +213,7 @@ export class OCREngineManager {
         const result = await instance.recognize(input, options);
         if (result.success) {
           if (isUsableResult(result, id)) return result;
-          // An engine that cannot read this script does not report failure —
-          // it returns nothing, or nonsense. Keep walking so the engines
-          // behind it get their turn.
+          // Unusable read: keep walking (result-quality.js).
           logger.debug(`Engine ${id} returned nothing usable, trying the next one`);
           if (!weakest || (result.confidence || 0) > (weakest.confidence || 0)) weakest = result;
           continue;
@@ -266,10 +244,9 @@ export class OCREngineManager {
     }
   }
 
-  // Path B for AI actions: hand the capture straight to the vision model with
-  // the action's own prompt. Shares the engine, the config and the
-  // image-dropped detection with recognize(), and counts toward the same
-  // vision lock — a model that cannot see images fails both ways.
+  // Path B for AI actions: the capture goes straight to the vision model with
+  // the action's own prompt; shares the engine, config, image-dropped
+  // detection and vision lock with recognize().
   async visionChat(messages, imageData, options = {}) {
     const capability = this.getVisionCapability(options);
     if (!capability.available) {
@@ -293,9 +270,8 @@ export class OCREngineManager {
     return result;
   }
 
-  // Whether path B may run at all. Deliberately does NOT probe the network:
-  // reachability says nothing about whether a VISION model is loaded, that is
-  // only knowable from the reply, so the caller degrades on failure instead.
+  // Whether path B may run at all. Does not probe the network; the caller
+  // degrades on failure.
   getVisionCapability(options = {}) {
     const { allowedEngines, requireLocalVision = false } = options;
 
@@ -308,9 +284,7 @@ export class OCREngineManager {
 
     const endpoint = this.configs['llm-vision']?.endpoint || DEFAULT_VISION_ENDPOINT;
     const local = isLoopbackEndpoint(endpoint);
-    // Offline mode's promise is that nothing leaves the machine, and a capture
-    // leaks far more than a line of text — a remote vision endpoint is refused
-    // rather than silently used.
+    // Offline: a remote vision endpoint is refused.
     if (requireLocalVision && !local) {
       return { available: false, reason: _t('ocr.visionNotLocal', '离线模式只允许本机视觉模型') };
     }
@@ -318,10 +292,8 @@ export class OCREngineManager {
     return { available: true, local, endpoint, model: this.configs['llm-vision']?.model || '' };
   }
 
-  // String-match against known "model doesn't speak images" failure modes
-  // from OpenAI-compatible servers, LM Studio, and timeout cases. Endpoint-level
-  // "nothing loaded" also degrades: hammering an empty server helps nobody and
-  // the local chain serves the capture instead.
+  // String-match against known "model doesn't speak images" failure modes;
+  // "nothing loaded" degrades too.
   _isVisionUnsupportedError(errorMsg) {
     if (!errorMsg) return false;
     const lower = errorMsg.toLowerCase();
@@ -345,9 +317,7 @@ export class OCREngineManager {
 
     const fallbackResult = await this._recognizeWithLocalChain(input, options);
 
-    // Callers read these to surface a "we switched engines" notice; the lock
-    // flag rides along so the notice can say "disabled until re-enabled"
-    // without a second IPC round trip.
+    // For the "we switched engines" notice; the lock flag rides along.
     if (fallbackResult.success) {
       fallbackResult.fallbackFrom = 'llm-vision';
       fallbackResult.fallbackReason = originalError;
@@ -358,10 +328,8 @@ export class OCREngineManager {
   }
 
   // The built-in vision model as the selected engine means smart routing
-  // (user rule 2026-09-14): PP-OCR reads every capture first and keeps the
-  // simple ones; a large capture, a complex layout or an unsure read goes
-  // on to the vision model. `routed` on the result says which way it went,
-  // in enums only.
+  // (vision-routing.js): PP-OCR reads every capture first. `routed` on the
+  // result says which way it went, in enums only.
   async _recognizeSmart(input, options) {
     const vision = this.getOrCreate('tengine-vision');
     const visionOk = !!vision && (await vision.isAvailable());
@@ -369,8 +337,8 @@ export class OCREngineManager {
     const ppUsable = pp.success && isUsableResult(pp, 'rapid-ocr');
 
     if (!visionOk) {
-      // Selected but not usable right now (GPU off, pack gone): the classic
-      // engines serve the capture and the result says so.
+      // Selected but not usable right now: the classic engines serve the
+      // capture and the result says so.
       const r = ppUsable ? pp : await this._recognizeWithLocalChain(input, options, ['windows-ocr']);
       if (r.success) {
         r.fallbackFrom = 'tengine-vision';
@@ -412,9 +380,7 @@ export class OCREngineManager {
     return lastResult || { success: false, error: _t('ocr.allEnginesFailed', 'All OCR engines failed') };
   }
 
-  // The reason travels with the count: locking turns the user's vision model
-  // off until they re-enable it in settings, and a log that only says "locked"
-  // leaves them with no way to find out what to fix.
+  // The reason travels with the count into the lock log line.
   _incrementVisionFail(reason) {
     this._visionFailCount++;
     if (reason) this._visionLastError = String(reason);

@@ -1,6 +1,4 @@
-// Base class for all translation providers (main-process stack port of
-// src/providers/base.js — only the _t source changed: stack i18n instead of
-// the renderer react-i18next instance).
+// Base class for all translation providers.
 
 import { _t } from '../i18n.js';
 import { LANGUAGES } from '../../config/languages.js';
@@ -79,13 +77,8 @@ export class BaseProvider {
   }
 }
 
-// Derived from the shared catalogue so a language can never exist in the
-// picker without a name here — the six LLM providers put this name straight
-// into the prompt (`Translate the following text to X`).
-//
-// English, not the endonym the old hand-written table used: the prompt around
-// it is English, and `Translate to Meiteilon` is something a model can act on
-// while the same request written in an unfamiliar script is not.
+// English language names for LLM prompts, derived from the shared catalogue
+// so every picker language has one.
 export const LANGUAGE_CODES = Object.fromEntries(
   LANGUAGES.map((lang) => [lang.code, { name: lang.en, nativeName: lang.nativeName }])
 );
@@ -112,18 +105,15 @@ export function buildTranslationMessages(text, targetLang, options = {}) {
     : [{ role: 'system', content: prompt }, { role: 'user', content: text }];
 }
 
-// Fetch signal for providers with a fixed per-request timeout: combines the
-// caller's abort signal (facade requestId -> AbortController, P2-34) with the
-// provider's own timeout. Either firing cancels the HTTP request.
+// Fetch signal for providers with a fixed per-request timeout: the caller's
+// abort signal combined with the provider's own timeout.
 export function combineSignal(external, timeoutMs) {
   const timeout = AbortSignal.timeout(timeoutMs);
   return external ? AbortSignal.any([external, timeout]) : timeout;
 }
 
 // For providers that manage their own AbortController (idle watchdogs):
-// propagate an external abort into it. The aborted-check matters — an abort
-// listener on an already-aborted signal never fires (fallback chain hands the
-// same signal to the NEXT provider after the first one died).
+// propagate an external abort into it, an already-aborted signal included.
 export function linkAbort(external, controller) {
   if (!external) return;
   if (external.aborted) {

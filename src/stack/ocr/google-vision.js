@@ -1,5 +1,4 @@
 // Google Cloud Vision OCR — https://cloud.google.com/vision/docs/ocr
-// Stack port of src/providers/ocr/google-vision.js — network via rtFetch.
 
 import { BaseOCREngine, _t } from './base.js';
 import { rectFromPoints, makeBlocks } from './blocks.js';
@@ -114,11 +113,8 @@ class GoogleVisionEngine extends BaseOCREngine {
     }
   }
 
-  // Blocks come from fullTextAnnotation (returned alongside TEXT_DETECTION),
-  // not from textAnnotations[1..]: those are per-WORD, and word boxes are about
-  // as tall as they are wide, so the scattered-mode heuristic would read every
-  // paragraph of prose as a word pile. Paragraph boxes are the coarsest
-  // granularity Vision structures for us and need no line reassembly.
+  // Blocks come from fullTextAnnotation's paragraphs, not the per-word
+  // textAnnotations[1..] (blocks.js contract).
   _paragraphBlocks(fullTextAnnotation) {
     const items = [];
     for (const page of fullTextAnnotation?.pages || []) {

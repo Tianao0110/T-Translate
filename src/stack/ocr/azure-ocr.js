@@ -1,6 +1,4 @@
 // Azure Computer Vision OCR (Read API v3.2). Asynchronous: submit, then poll.
-// Stack port of src/providers/ocr/azure-ocr.js — network via rtFetch; atob is
-// a Node global since v16.
 
 import { BaseOCREngine, _t } from './base.js';
 import { rectFromPoints, makeBlocks } from './blocks.js';
@@ -127,8 +125,7 @@ class AzureOCREngine extends BaseOCREngine {
         return { success: false, error: _t('providerError.ocrNoText', '未识别到文字') };
       }
 
-      // Read returns per-line boxes already — no merged variant, so the pipeline
-      // gets one pane per line in scattered mode.
+      // Read returns per-line boxes already.
       const blocks = makeBlocks(lines);
 
       return {

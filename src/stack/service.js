@@ -1,18 +1,8 @@
-// Translation service facade (main-process stack port of services/translation.js).
-// Owns preprocessing (do-not-translate filters), two-level cache (L1 memory +
-// L2 file-backed), template selection, provider routing with fallback,
-// privacy-mode gating, and glossary post-processing.
-//
-// Differences vs the renderer original, all mechanical:
-//   - config loading is injected (deps.loadProviderConfigs returns decrypted
-//     configs — the secure-storage waterfall lived renderer-side and is gone)
-//   - custom filters come from deps.getCustomFilters (electron-store), not
-//     localStorage
-//   - L2 cache is an injected StackTranslationCache (file-backed, single copy)
-//   - dead API surface dropped (setMode/setPriority/registerFilter/
-//     resetFailureCount and friends had zero callers repo-wide)
-// privacyMode/useCache stay as options — the IPC facade is the enforcement
-// point and injects them; the service itself remains parameterized (testable).
+// Translation service: preprocessing (do-not-translate filters), two-level
+// cache (L1 memory + L2 file-backed), template selection, provider routing
+// with fallback, privacy gating and glossary post-processing. privacyMode /
+// useCache stay options: the IPC facade (electron/ipc/translation-stack.js)
+// injects them. Design notes: docs/design/stack.md.
 //
 // Call graph: renderer stack-client -> IPC facade -> this -> Providers
 
@@ -40,8 +30,7 @@ import { detectTemplateFromModel } from '../config/model-template-mapping.js';
 import { createStreamThrottle } from '../core/stream-throttle.js';
 import { getLocalLlm } from './runtime.js';
 
-// An empty endpoint means the preset default, and every local preset
-// defaults to localhost — so only an explicit address can be off-machine.
+// An empty endpoint means the preset default (localhost for local presets).
 function endpointIsLocal(config) {
   const url = config?.endpoint || config?.baseUrl || '';
   return !url || isLoopbackUrl(url);
@@ -49,9 +38,7 @@ function endpointIsLocal(config) {
 
 const logger = createLogger('StackTranslation');
 
-// MT detection cache. Keyed by model name — re-runs only when the active
-// provider's `config.model` changes (e.g. user picks a different LM Studio
-// model). Effectively "detect once at startup, re-detect when model changes".
+// MT detection cache, keyed by model name.
 let _mtCache = { model: null, isMT: false };
 function isMTActiveModel(modelName) {
   if (!modelName) return false;
@@ -61,9 +48,8 @@ function isMTActiveModel(modelName) {
   return isMT;
 }
 
-// Short prompt for translation-only small models. Their chat templates don't
-// expect system role and long instructions get translated by mistake. Tone hint
-// preserved so the user's tone selection (natural/precise/formal) still applies.
+// Short prompt for translation-only small models (no system role); the tone
+// hint is kept.
 const _MT_TONE = {
   natural: 'natural and conversational',
   precise: 'precise and technically accurate',
@@ -80,10 +66,8 @@ function buildMTPrompt(toneTemplate, targetLang) {
 }
 
 // The built-in model: the pack decides the prompt shape. A translation-only
-// pack gets the short user-only prompt; the general 1.7B model gets the
-// shared template plus one closing line naming the output language — it
-// follows two-step templates (OCR: fix, then translate) to the first step
-// and stops without it. Cloud sources never see that line.
+// pack gets the short user-only prompt; a general model gets the shared
+// template plus one closing line naming the output language.
 function isBuiltinProvider(provider) {
   return provider?.constructor?.metadata?.id === 'tengine';
 }
@@ -237,7 +221,7 @@ export class TranslationService {
       filter.pattern.lastIndex = 0;
 
       processed = processed.replace(filter.pattern, (match) => {
-        // Unicode brackets ⟦⟧ — unlikely to appear in user text or be mangled by LLMs
+        // Unicode brackets ⟦⟧ as placeholders.
         const placeholder = `⟦${filter.name}_${index++}⟧`;
         protectedMap.set(placeholder, match);
         return placeholder;
@@ -266,9 +250,7 @@ export class TranslationService {
     return result;
   }
 
-  // Kept as a thin method so call sites read the same; the logic is shared
-  // with the renderer, which re-applies the glossary to documents translated
-  // before a term existed.
+  // Thin method over glossary.js (shared with the renderer).
   _applyGlossary(translatedText, glossaryTerms) {
     const result = applyGlossary(translatedText, glossaryTerms);
     for (const r of result.replacements) {
@@ -290,16 +272,12 @@ export class TranslationService {
       h2 = (h2 * 33) ^ c;
     }
     const hash = ((h1 >>> 0) * 4096 + (h2 >>> 0)).toString(36);
-    // model is part of the key: same provider id can serve different local
-    // models (LM Studio model swap) with very different output
+    // model is part of the key.
     return `${targetLang}-${template}-${providerId}-${model}-${hash}`;
   }
 
-  // The one place a cached entry becomes text again. Entries have carried two
-  // shapes over time (L1 kept `text`, L2 kept `translated`), and a 0.3.x bug
-  // wrote whole objects into `translated` — so this returns a string or nothing
-  // at all. Handing a non-string upward killed the renderer once already
-  // (React #31), and those entries are still on disk.
+  // The one place a cached entry becomes text again: returns a string or
+  // nothing (entries on disk carry two shapes, docs/design/stack.md §2).
   _cachedText(entry) {
     if (typeof entry === 'string') return entry || null;
     if (!entry || typeof entry !== 'object') return null;
@@ -361,10 +339,7 @@ export class TranslationService {
 
     if (!useCache) return;
 
-    // Nothing to cache is not the same as caching nothing: an empty answer
-    // stored here would be served as the translation forever after. (It used to
-    // be worse — `result.text || result` put the whole wrapper object in
-    // `translated`, which the renderer then tried to render.)
+    // An empty answer is never cached.
     if (typeof result?.text !== 'string' || !result.text) {
       logger.debug('[Cache] skipped: empty translation');
       return;
@@ -420,10 +395,7 @@ export class TranslationService {
   // ===== Priority =====
 
   getPriority() {
-    // null = never configured -> defaults. [] = user explicitly disabled
-    // every provider -> respect that, don't silently call cloud providers.
-    // (The old per-window `_mode` field is gone: setMode had zero callers, so
-    // priority always resolved through the 'normal' table.)
+    // null = never configured -> defaults. [] = every provider disabled.
     if (this._userPriority) {
       return this._userPriority;
     }
@@ -433,9 +405,8 @@ export class TranslationService {
   // ===== Scheduling helpers (shared by translate / translateStream) =====
 
   // One answer to "may this provider run right now": the privacy allowlist,
-  // its configuration, and — offline only — that a local provider really
-  // points at this machine. Offline mode promises no network traffic, and a
-  // LAN Ollama is network traffic. Returns null when usable, else the reason.
+  // its configuration, and (offline only) that a local provider points at
+  // this machine. Returns null when usable, else the reason.
   providerGate(id, privacyMode) {
     if (!isProviderAllowed(id, privacyMode)) return 'privacy';
     if (!isProviderConfigured(id)) return 'unconfigured';
@@ -445,12 +416,9 @@ export class TranslationService {
     return null;
   }
 
-  // Filters the priority list to providers usable right now (privacy /
-  // configured / not failing), then demotes providers whose loaded model is
-  // documented not to cover the target language: a local model asked for a
-  // language it does not know answers confidently and wrongly, and "success"
-  // ends the chain — so Google, which does know that language, never gets a
-  // turn. No-op when nothing is known about the loaded model (the common case).
+  // Filters the priority list to providers usable right now, then demotes
+  // providers whose loaded model is documented not to cover the target
+  // language. No-op when nothing is known about the loaded model.
   _selectProviders({ privacyMode, targetLang }) {
     const usable = [];
     for (const id of this.getPriority()) {
@@ -472,10 +440,7 @@ export class TranslationService {
   }
 
   // Success finalization shared by every scheduler exit: placeholder restore,
-  // glossary pass, cache write (raw provider output, so glossary changes don't
-  // need re-translation), result envelope. Was three copy-pasted blocks — and
-  // a fix that lands in one copy is how the language reorder above sat dead on
-  // the default streaming path for a whole release.
+  // glossary pass, cache write (raw provider output), result envelope.
   _finalize(rawText, providerId, ctx) {
     const { protectedMap, glossaryTerms, cacheKey, useCache, privacyMode, sourceLang, targetLang } = ctx;
 
@@ -526,8 +491,7 @@ export class TranslationService {
 
     const { usableProviders, firstAvailableId, firstModel } = this._selectProviders({ privacyMode, targetLang });
 
-    // Cache key bound to the first available provider + model so switching
-    // either invalidates the cache
+    // Cache key bound to the first available provider + model.
     const cacheKey = this._getCacheKey(processed, { targetLang, template, providerId: firstAvailableId, model: firstModel });
     const cached = this._checkCache(cacheKey, { useCache, privacyMode });
 
@@ -565,9 +529,7 @@ export class TranslationService {
           return this._finalize(result.text, id, finalizeCtx);
         }
 
-        // skipFailureCount: a deterministic "can't do this input" (e.g. DeepL
-        // asked for an unsupported language) — counting it would bench the
-        // provider for every other language too.
+        // skipFailureCount: a deterministic "can't do this input" is not a failure.
         if (!result.skipFailureCount) {
           this._failureCount[id] = (this._failureCount[id] || 0) + 1;
           logger.warn(`Provider ${id} failed (${this._failureCount[id]}/${this._skipThreshold})`);
@@ -587,8 +549,7 @@ export class TranslationService {
       }
     }
 
-    // Total wipeout: every provider was either tried or skipped. Clear the
-    // skip-list and retry once so a transient outage doesn't trap us forever.
+    // Every provider was tried or skipped: clear the skip-list and retry once.
     if (usableProviders.length === 0 && Object.keys(this._failureCount).length > 0) {
       logger.debug('All providers skipped, resetting failure counts...');
       this._failureCount = {};
@@ -631,7 +592,7 @@ export class TranslationService {
     if (cached) {
       const finalText = this._postProcess(cached.text, protectedMap);
 
-      // Replay cached result as a single chunk so the caller's stream-handling code path runs
+      // Replay the cached result as a single chunk.
       if (onChunk) {
         onChunk(finalText);
       }
@@ -662,11 +623,8 @@ export class TranslationService {
         if (provider.supportsStreaming && typeof provider.translateStream === 'function') {
           let fullText = '';
 
-          // Coalesced flush: placeholder restore + downstream emission run once
-          // per interval instead of per token. In the main process the RAF path
-          // of createStreamThrottle degrades to plain setTimeout (33ms tier) —
-          // this IS the stack's one batching point; the IPC facade forwards
-          // each emission as a frame without further coalescing.
+          // Coalesced flush: the stack's one batching point (the IPC facade
+          // forwards each emission as a frame).
           const throttle = createStreamThrottle(() => {
             onChunk(this._postProcess(fullText, protectedMap));
           });
@@ -684,8 +642,7 @@ export class TranslationService {
               { systemPrompt, template, signal }
             );
           } finally {
-            // A flush firing after the final result is applied downstream
-            // would overwrite glossary-applied text with a stale partial.
+            // No flush after the final result has been applied.
             throttle.cancel();
           }
 
@@ -744,8 +701,7 @@ export class TranslationService {
       return this.translateStream(text, options, onChunk);
     }
 
-    // Mirror translate(): if providers were actually tried, surface that (with
-    // the last real error) instead of the misleading "no providers available".
+    // Mirror translate(): a real last error beats "no providers available".
     return {
       success: false,
       error: tried.length > 0
@@ -789,10 +745,8 @@ export class TranslationService {
 
   // ===== Misc =====
 
-  // Which provider, if any, can run a real chat completion right now.
-  // Metadata `type: 'llm'` is NOT the answer — the anthropic and gemini
-  // providers are llm but implement translate() only, so callers that need
-  // chat must ask here rather than read the catalog.
+  // Which provider, if any, can run a real chat completion right now
+  // (metadata `type: 'llm'` is not the answer; callers ask here).
   getChatCapability(options = {}) {
     // Same provider routing as translate(): first usable one wins
     const { privacyMode = PRIVACY_MODE_IDS.STANDARD } = options;
@@ -800,8 +754,7 @@ export class TranslationService {
       if (this.providerGate(id, privacyMode)) continue;
       const provider = getProvider(id);
       if (provider && typeof provider.chat === 'function') {
-        // A provider may know it cannot chat right now (the built-in model
-        // running a translation-only pack); the chain moves on.
+        // A provider may know it cannot chat right now; the chain moves on.
         if (typeof provider.canChat === 'function' && !provider.canChat()) continue;
         return {
           available: true,
@@ -813,10 +766,8 @@ export class TranslationService {
     return { available: false, providerId: null, providerName: null };
   }
 
-  // Generic chat completion for AI features (analysis, rewriting).
-  // Falls back to translating the user message if no provider has chat();
-  // options.requireChat opts out of that fallback for callers whose prompt
-  // would come back as a translated instruction rather than an answer.
+  // Generic chat completion for AI features. Falls back to translating the
+  // user message unless options.requireChat.
   async chatCompletion(messages, options = {}) {
     if (!this._initialized) {
       await this.init();
@@ -869,7 +820,7 @@ export class TranslationService {
     if (!provider) {
       return { success: false, message: _t('svc.providerNotFound', '翻译源不存在') };
     }
-    // Even a probe is network traffic, so the same gate as translate() applies.
+    // Same gate as translate().
     const gate = this.providerGate(providerId, privacyMode);
     if (gate === 'privacy') {
       return { success: false, message: _t('svc.testBlockedByPrivacy', '当前隐私模式已禁用该翻译源') };
@@ -886,10 +837,8 @@ export class TranslationService {
     return provider.testConnection();
   }
 
-  // Used by settings UI to verify an unsaved config without committing it.
-  // privacyMode must come from the caller (the facade injects the real mode) —
-  // offline mode blocks tests against disallowed providers (even a probe
-  // request is network traffic).
+  // Settings UI: verify an unsaved config without committing it. privacyMode
+  // comes from the caller (the facade injects the real mode).
   async testProviderWithConfig(providerId, config, privacyMode = PRIVACY_MODE_IDS.STANDARD) {
     if (!isProviderAllowed(providerId, privacyMode)) {
       return { success: false, message: _t('svc.testBlockedByPrivacy', '当前隐私模式已禁用该翻译源') };
@@ -956,21 +905,9 @@ export class TranslationService {
   }
 
   /**
-   * Can this app translate anything right now?
-   *
-   * Deliberately built on the same three filters the real translate path uses
-   * (priority order, privacy allowlist, configured) — a readiness banner that
-   * disagreed with what happens on the Translate button would be worse than no
-   * banner.
-   *
-   * The two provider kinds need different evidence, and `isConfigured()` alone
-   * cannot tell them apart: a local provider has no required config fields, so
-   * it reports configured whether or not anything is listening.
-   *
-   *   cloud — a key is enough. NOT probed: a request on every launch spends the
-   *           user's quota to answer a question they did not ask.
-   *   local — probed, because that is the only way to know. Free, on loopback,
-   *           and allowed in offline mode.
+   * Can this app translate anything right now? Built on the same three
+   * filters as the real translate path. Cloud providers count as ready with
+   * a key (not probed); local providers are probed (docs/design/stack.md §2).
    *
    * @returns {Promise<{ready: boolean, reason: string, candidates: number}>}
    */

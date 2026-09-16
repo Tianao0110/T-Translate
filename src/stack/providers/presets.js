@@ -1,7 +1,6 @@
-// Stack-side presets: shared core (metadata / defaults / pure hooks) plus the
-// stack-local localized messages. The renderer's presets file assembles the
-// same core with its own _t and svg icons — see presets-core.js for why the
-// split exists.
+// Stack-side presets: shared core (presets-core.js) plus the stack-local
+// localized messages. The renderer assembles the same core with its own _t
+// and svg icons.
 
 import { PROVIDER_METADATA } from './metadata.js';
 import { PRESET_CORE } from './presets-core.js';

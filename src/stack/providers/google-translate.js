@@ -1,7 +1,5 @@
-// Google Translate via the unofficial translate.google.com web API (no key needed).
-// Stack port of src/providers/google-translate/index.js — metadata from the
-// shared table, network via rtFetch; the tk bit-magic is untouched (it must
-// match Google's algorithm exactly or the API returns 403).
+// Google Translate via the unofficial translate.google.com web API (no key).
+// The tk computation below must match Google's algorithm exactly.
 
 import { BaseProvider, _t, combineSignal } from './base.js';
 import { PROVIDER_METADATA } from './metadata.js';
@@ -25,8 +23,7 @@ class GoogleTranslateProvider extends BaseProvider {
       this.config.domain = 'com';
     }
 
-    // TKK seed — the unofficial API derives tk from this. '0.0' works for most
-    // request volumes; a real scraper would fetch it from translate.google.com
+    // TKK seed the unofficial API derives tk from.
     this._tkk = '0.0';
   }
 
@@ -40,7 +37,7 @@ class GoogleTranslateProvider extends BaseProvider {
 
   async testConnection() {
     try {
-      // Round-trip an actual translation — homepage probes don't catch API blocks
+      // Round-trip an actual translation.
       const result = await this.translate('test', 'en', 'zh');
 
       if (result.success) {
@@ -134,8 +131,7 @@ class GoogleTranslateProvider extends BaseProvider {
     }
   }
 
-  // Response shape varies — older API versions return nested arrays of sentence
-  // chunks, newer return concatenated string. Handle all three observed forms.
+  // Three observed response shapes.
   _parseResponse(data) {
     if (!data) return '';
 
@@ -181,9 +177,7 @@ class GoogleTranslateProvider extends BaseProvider {
     return mapping[code] || code;
   }
 
-  // tk parameter computation. Reverse-engineered from translate.google.com's
-  // bundled JS (QTranslate's implementation). Don't touch the bit-magic — the
-  // algorithm has to match Google's exactly or the API returns 403.
+  // tk parameter computation (QTranslate's implementation). Do not touch.
   _generateTk(text) {
     const tkk = this._tkk.split('.');
     const a = Number(tkk[0]) || 0;

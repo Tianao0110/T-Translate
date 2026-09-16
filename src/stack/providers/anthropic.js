@@ -1,6 +1,4 @@
 // Anthropic Messages API provider (not OpenAI-compatible).
-// Stack port of src/providers/anthropic/index.js — metadata from the shared
-// table, network via rtFetch; logic byte-identical.
 
 import { BaseProvider, LANGUAGE_CODES, _t, combineSignal, linkAbort } from './base.js';
 import { PROVIDER_METADATA } from './metadata.js';
@@ -35,7 +33,7 @@ class AnthropicProvider extends BaseProvider {
     return true;
   }
 
-  // Shared guard for translate/translateStream (they used to carry verbatim copies).
+  // Shared guard for translate / translateStream.
   _checkInput(text) {
     if (!text?.trim()) {
       return { success: false, error: _t('providerError.emptyText', '文本为空') };
@@ -94,8 +92,7 @@ class AnthropicProvider extends BaseProvider {
         return { success: false, error: _t('providerError.noResult', '无翻译结果') };
       }
 
-      // max_tokens => the model was cut off mid-translation. Returning it as
-      // success would cache and display a truncated translation as if complete.
+      // max_tokens => cut off mid-translation; not a success.
       if (data.stop_reason === 'max_tokens') {
         return { success: false, error: _t('providerError.truncated', '翻译结果被截断（超出最大长度）') };
       }
@@ -120,9 +117,7 @@ class AnthropicProvider extends BaseProvider {
     try {
       const systemPrompt = this._resolveSystemPrompt(options, targetLang);
 
-      // Idle watchdog, not a total-duration timeout: AbortSignal.timeout(30s)
-      // would abort a long-but-healthy stream at 30s. Reset the timer on each
-      // chunk so it only fires when the connection actually stalls.
+      // Idle watchdog, reset on each chunk (docs/design/stack.md §4).
       const controller = new AbortController();
       let idleTimer;
       const resetIdle = () => {
@@ -234,10 +229,8 @@ class AnthropicProvider extends BaseProvider {
   }
 
   // ===== Generic chat (AI actions, style rewrite) =====
-  // The Messages API this provider already speaks IS a chat API — translate()
-  // just pins the array to a single user turn. Here the caller's turns go
-  // through as-is; the only shape difference from OpenAI is that the system
-  // prompt is a top-level field rather than a message.
+  // The caller's turns go through as-is; the system prompt is a top-level
+  // field rather than a message.
   async chat(messages, options = {}) {
     if (!this.config.apiKey) {
       return { success: false, error: _t('providerError.notConfigured', '未配置 API Key') };
@@ -273,7 +266,7 @@ class AnthropicProvider extends BaseProvider {
       if (!content) {
         return { success: false, error: _t('providerError.noResponseContent', '无响应内容') };
       }
-      // Same reason as translate(): a cut-off answer must not pass as a whole one.
+      // As in translate(): a cut-off answer is not a success.
       if (data.stop_reason === 'max_tokens') {
         return { success: false, error: _t('providerError.truncated', '翻译结果被截断（超出最大长度）') };
       }
@@ -285,8 +278,8 @@ class AnthropicProvider extends BaseProvider {
     }
   }
 
-  // Header kept identical to the renderer implementation (the dangerous-direct
-  // flag is inert outside a browser context and keeps the request shape stable).
+  // The dangerous-direct flag is inert outside a browser; kept for a stable
+  // request shape.
   _buildHeaders() {
     return {
       'Content-Type': 'application/json',

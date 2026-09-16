@@ -1,26 +1,18 @@
-// LLM Vision OCR — uses a vision-capable LLM (Qwen-VL, LLaVA, etc.) via the
-// local OpenAI-compatible chat endpoint. Best for complex layout/handwriting/blur.
-// Stack port of src/providers/ocr/llm-vision.js — network via rtFetch.
+// LLM Vision OCR: a vision-capable LLM (Qwen-VL, LLaVA, ...) via the local
+// OpenAI-compatible chat endpoint.
 
 import { BaseOCREngine } from './base.js';
 import { rtFetch } from '../runtime.js';
 import createLogger from '../logger.js';
 const logger = createLogger('LLMVision');
 
-// A vision request always carries the encoded image in the prompt, so its
-// prompt_tokens run into the hundreds+ regardless of how much TEXT the image
-// holds (image tokens scale with pixels, not characters — a few-word capture
-// is unaffected). A text-only server that silently drops the image and answers
-// from the instruction alone leaves prompt_tokens at just the ~100-token OCR
-// prompt. Below this floor + a 200 "success" = the image never reached a model
-// → degrade instead of surfacing the model's chatter as OCR output.
-// Only applied when the server reports usage; many don't, and then we can't
-// tell (documented edge). Compact-tokenizer vision models sit well above 150.
+// prompt_tokens floor for a request that really carried the image; a 200
+// below it means the server dropped the image (docs/design/stack.md §5).
+// Only applied when the server reports usage.
 const VISION_PROMPT_TOKEN_FLOOR = 150;
 
-// Servers that cannot see images answer from the instruction alone. Both the
-// 400-body sniff and the token floor produce this same string because
-// ocrManager._isVisionUnsupportedError pattern-matches it to trigger fallback.
+// The error string ocrManager._isVisionUnsupportedError pattern-matches;
+// both the 400-body sniff and the token floor produce it.
 const VISION_UNSUPPORTED = 'Model does not support vision / 当前模型不支持图片识别，请加载视觉模型 (Qwen-VL, LLaVA)';
 
 function isVisionRejection(status, errorText) {
@@ -32,9 +24,7 @@ function isVisionRejection(status, errorText) {
   );
 }
 
-// A 200 whose prompt_tokens sit below the floor means the image was dropped on
-// the way in — the reply is the model talking about the instruction, not the
-// picture. Only decidable when the server reports usage.
+// A 200 whose prompt_tokens sit below the floor: the image was dropped.
 function imageWasDropped(usage) {
   const promptTokens = usage?.prompt_tokens;
   return typeof promptTokens === 'number' && promptTokens > 0 && promptTokens < VISION_PROMPT_TOKEN_FLOOR;
@@ -102,8 +92,7 @@ class LLMVisionEngine extends BaseOCREngine {
 
       if (!response.ok) {
         const errorText = await response.text();
-        // ocrManager pattern-matches this error string to trigger auto-fallback
-        // to local OCR. Keep the keywords in sync with _isVisionUnsupportedError there.
+        // Keep the keywords in sync with ocrManager._isVisionUnsupportedError.
         if (isVisionRejection(response.status, errorText)) {
           return { success: false, error: VISION_UNSUPPORTED };
         }
@@ -117,9 +106,7 @@ class LLMVisionEngine extends BaseOCREngine {
         return { success: false, error: 'No text recognized / 未识别到文字' };
       }
 
-      // Detect a stripped-image "fake success" (e.g. a translation model given
-      // an image): the error string matches _isVisionUnsupportedError, so the
-      // manager degrades to local OCR and counts it toward the vision lock.
+      // A stripped-image "fake success" degrades like an unsupported model.
       if (imageWasDropped(data.usage)) {
         logger.warn(`LLM Vision 200 but prompt_tokens=${data.usage.prompt_tokens} < ${VISION_PROMPT_TOKEN_FLOOR}: image not processed, treating as vision-unsupported`);
         return { success: false, error: 'Model does not support vision / 图片未被模型处理（当前模型可能不支持视觉）' };
@@ -142,11 +129,9 @@ class LLMVisionEngine extends BaseOCREngine {
     }
   }
 
-  // Path B for AI actions: the model reads the capture directly instead of
-  // summarizing OCR output, so layout and interleaved graphics stay intact and
-  // no recognition errors compound. Same endpoint, model and image-dropped
-  // detection as recognize() — only the prompt differs, and it comes from the
-  // action config rather than this file.
+  // Path B for AI actions: the model reads the capture directly. Same
+  // endpoint, model and image-dropped detection as recognize(); the prompt
+  // comes from the action config.
   async chat(messages, imageData, options = {}) {
     const { timeout = 60000 } = options;
     try {
@@ -220,8 +205,7 @@ Rules:
 ${langHint ? `5. The text is likely in ${langHint}` : ''}`;
   }
 
-  // LLMs often prefix output with "Here is..." or wrap in ```code fences``` even
-  // when told not to. Strip those and detect the "no text" sentinel.
+  // Strip "Here is..." prefixes and code fences; detect the "no text" sentinel.
   cleanLLMOutput(text) {
     if (!text) return '';
 

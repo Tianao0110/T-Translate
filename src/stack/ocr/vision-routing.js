@@ -1,14 +1,12 @@
-// Which captures the built-in vision model should take (user rule
-// 2026-09-14): PP-OCR reads every capture first, and a simple one stops
-// there. Only a large capture, a layout PP-OCR read as columns / a table /
-// mixed font sizes, or a read it was unsure of goes on to the vision model.
-// PP-OCR's own line boxes and confidences are the evidence; nothing here
-// looks at pixels beyond the image header.
+// Which captures the built-in vision model should take: PP-OCR reads every
+// capture first; a large capture, a columns / table / mixed-size layout, or
+// an unsure read goes on to the vision model (docs/design/stack.md §5).
+// Evidence is PP-OCR's own line boxes and confidences plus the image header.
 
 import { isUsableResult } from './result-quality.js';
 
 export const ROUTING = {
-  // Physical pixels: a full-screen or half-screen capture on a 1.75x display.
+  // Physical pixels: a full- or half-screen capture.
   LARGE_PIXELS: 1200000,
   MANY_LINES: 30,
   // Layout tests need enough lines to mean anything.
@@ -23,8 +21,7 @@ export const ROUTING = {
 };
 
 function bytesOf(input) {
-  // isView rather than instanceof: a Buffer from another realm (the
-  // renderer's test environment) is still bytes.
+  // isView rather than instanceof: cross-realm Buffers.
   if (ArrayBuffer.isView(input)) return new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
   if (input instanceof ArrayBuffer) return new Uint8Array(input);
   if (typeof input !== 'string') return null;

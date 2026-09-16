@@ -1,16 +1,10 @@
-// Single source for provider metadata (UI-facing pure data, no icons).
-// Consumed by BOTH ends: the renderer merges an svg icon per id for the
-// settings UI; the main-process stack walks configSchema for encrypted/required
-// fields. Keeping one table prevents the two ends from drifting — configSchema
-// drives key management AND form rendering, so a fork here corrupts either
-// saved secrets or the settings form.
-//
-// Everything in this file must stay JSON-serializable (it crosses IPC as-is).
+// Single source for provider metadata (UI-facing pure data, no icons),
+// consumed by the renderer (settings form) and the main-process stack
+// (encrypted / required fields). Must stay JSON-serializable: it crosses
+// IPC as-is.
 
-// `supportsChat` is the AI-action gate: it must match whether the provider
-// class actually implements chat(). Traditional/API-only sources answer a
-// prompt with a translation OF that prompt, which reads like a working
-// feature — tests/unit/provider-chat.test.js keeps this column honest.
+// `supportsChat` is the AI-action gate and must match whether the provider
+// class implements chat(); tests/unit/stack/provider-chat.test.js checks it.
 export const PROVIDER_METADATA = {
   // The built-in model: runs inside the app (T-Engine), no endpoint, no key.
   // Nothing to configure here — the model file and backend live in the
@@ -111,8 +105,7 @@ export const PROVIDER_METADATA = {
     id: 'ollama',
     name: 'Ollama (Local)',
     description: 'Local LLM via Ollama, private and free',
-    // The card paints its order number and active gear with this colour;
-    // Ollama's white brand vanished on the light theme.
+    // The card paints its order number and active gear with this colour.
     color: '#71717a',
     type: 'llm',
     supportsChat: true,
@@ -274,8 +267,7 @@ export const PROVIDER_METADATA = {
         type: 'select',
         label: 'Server',
         default: 'com',
-        // translate.google.cn was retired in Oct 2022 — its translate_a
-        // endpoint 404s now, so that option only ever produced failures.
+        // translate.google.cn is retired.
         options: [
           { value: 'com', label: 'google.com (International)' },
           { value: 'com.hk', label: 'google.com.hk (Hong Kong)' },

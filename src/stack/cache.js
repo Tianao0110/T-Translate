@@ -1,9 +1,6 @@
-// L2 translation cache for the main-process stack. Replaces the renderer's
-// localStorage-backed services/cache.js: a single in-memory Map with a
-// debounced JSON file behind it — one instance for all three windows, so the
-// old timestamp-merge dance between windows is gone by construction.
-// Old localStorage data is intentionally NOT migrated (decision D-2: 7-day TTL
-// disposable cache, cold rebuild).
+// L2 translation cache for the main-process stack: a single in-memory Map
+// with a debounced JSON file behind it, one instance for all windows. Design
+// notes: docs/design/stack.md §3.
 
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -22,8 +19,7 @@ export class StackTranslationCache {
     this._loaded = false;
   }
 
-  // Load the on-disk snapshot once. Corrupt/missing file = start empty
-  // (the cache is disposable by design).
+  // Load the on-disk snapshot once; corrupt / missing = start empty.
   async init() {
     if (this._loaded || !this.filePath) {
       this._loaded = true;
@@ -44,8 +40,7 @@ export class StackTranslationCache {
   }
 
   // SECURE mode hook: while disabled, nothing is written to disk. Pending
-  // debounced writes are flushed BEFORE disabling so standard-mode entries
-  // captured earlier still land.
+  // writes are flushed before disabling.
   async setPersistEnabled(enabled) {
     if (!enabled && this._saveTimer) {
       clearTimeout(this._saveTimer);
@@ -69,7 +64,7 @@ export class StackTranslationCache {
   }
 
   set(key, result) {
-    // Bulk evict 20% rather than 1 — avoids re-evicting on every set near capacity
+    // Bulk evict 20%.
     if (this.cache.size >= this.maxSize) {
       this.evict(Math.floor(this.maxSize * 0.2));
     }
@@ -113,7 +108,7 @@ export class StackTranslationCache {
   clear() {
     this.cache.clear();
     if (this.filePath) {
-      // Remove the snapshot too — "clear cache" must not resurrect on restart
+      // Remove the snapshot too.
       fs.rm(this.filePath, { force: true }).catch(() => {});
     }
     logger.debug('All cache cleared');
@@ -141,8 +136,7 @@ export class StackTranslationCache {
     };
   }
 
-  // Batched write — same 500ms debounce the renderer cache used, important for
-  // streaming where every completed segment triggers a set().
+  // Batched write (500 ms debounce).
   debouncedSave(delay = 500) {
     if (!this.filePath || !this._persistEnabled) return;
     clearTimeout(this._saveTimer);

@@ -1,8 +1,6 @@
-// Local OCR engines as stack classes. Unlike the renderer originals (thin IPC
-// bridges to ocr:paddle-ocr / ocr:windows-ocr), these call the main-process
-// recognizers directly through the injected runtime capability — same engine
-// code, one hop less. Engine ids stay 'rapid-ocr'/'windows-ocr' for
-// stored-settings compatibility.
+// Local OCR engines as stack classes, calling the main-process recognizers
+// through the injected runtime capability. Engine ids stay 'rapid-ocr' /
+// 'windows-ocr' for stored-settings compatibility.
 
 import { BaseOCREngine, _t } from './base.js';
 import { getLocalOcr } from '../runtime.js';

@@ -1,8 +1,4 @@
 // Shared base for all OpenAI-compatible providers (openai / deepseek / ollama / local-llm).
-// Main-process stack port of src/providers/openai-compatible.js — changes vs the
-// renderer original: _t from stack i18n, logger from stack logger, and every
-// network call goes through rtFetch (injected electron net.fetch — Node's
-// global fetch would bypass the system proxy).
 // Per-provider differences live in presets (./presets.js) as small hooks:
 //   - requireApiKey / apiKeyErrorMessage  → _checkApiKey behavior
 //   - filterModels                         → post-filter model list (e.g. gpt-* only)
@@ -83,8 +79,7 @@ class OpenAICompatibleProvider extends BaseProvider {
       if (response.success && response.content?.trim()) {
         return { success: true, text: response.content.trim() };
       }
-      // A reply of pure whitespace is not a translation. Reporting success
-      // here let an empty string travel on as the result and get cached.
+      // A reply of pure whitespace is not a translation.
       if (response.success) {
         return { success: false, error: _t('providerError.noResult', '无翻译结果') };
       }
@@ -115,15 +110,14 @@ class OpenAICompatibleProvider extends BaseProvider {
 
       const streamed = fullText.trim();
       if (!streamed) {
-        // Stream ended without producing anything — same reasoning as translate().
+        // Stream ended without producing anything: not a success.
         return { success: false, error: _t('providerError.noResult', '无翻译结果') };
       }
       return { success: true, text: streamed };
     } catch (error) {
       this._lastError = error;
       if (error.name === 'AbortError') {
-        // Distinguish "never started" from "died mid-generation" so the user
-        // knows whether to raise the timeout or check the server.
+        // "never started" and "died mid-generation" are different errors.
         return {
           success: false,
           error: fullText
@@ -170,10 +164,8 @@ class OpenAICompatibleProvider extends BaseProvider {
   }
 
   /**
-   * Fetch models from /v1/models; if it fails (non-2xx, network error) OR
-   * returns empty AND a fallback endpoint is configured (e.g. Ollama's
-   * /api/tags), try that too. Catches primary errors so old Ollama setups
-   * that only expose /api/tags can still list models.
+   * Fetch models from /v1/models; on failure or an empty list, try the
+   * preset's fallback endpoint (e.g. Ollama's /api/tags).
    */
   async _fetchModelsWithFallback() {
     let primaryError = null;
@@ -193,7 +185,7 @@ class OpenAICompatibleProvider extends BaseProvider {
       try {
         return await this._fetchModelsFrom(`${baseUrl}${this.hooks.modelsFallbackEndpoint}`);
       } catch (fallbackErr) {
-        // Surface the primary error if available — usually closer to root cause
+        // Surface the primary error if available.
         throw primaryError || fallbackErr;
       }
     }
@@ -282,9 +274,8 @@ class OpenAICompatibleProvider extends BaseProvider {
   }
 
   /**
-   * Providers like Ollama require an explicit model name and reject an omitted
-   * one. When the field is blank and the preset opts in, resolve the first
-   * available model once and cache it onto config so later calls skip the fetch.
+   * Presets that require an explicit model: resolve the first available one
+   * when the field is blank, cached onto config.
    */
   async _ensureModel() {
     if (this.config.model || !this.hooks.autoDetectModel) return;
@@ -316,8 +307,7 @@ class OpenAICompatibleProvider extends BaseProvider {
           model: this.config.model || undefined,
           messages,
           temperature: 0.3,
-          // No max_tokens unless configured — a fixed cap silently truncates
-          // long output (CJK translations expand vs the source text)
+          // No max_tokens unless configured.
           ...(this.config.maxTokens ? { max_tokens: this.config.maxTokens } : {}),
         }),
         signal: controller.signal,
@@ -363,8 +353,7 @@ class OpenAICompatibleProvider extends BaseProvider {
           model: this.config.model || undefined,
           messages,
           temperature: 0.3,
-          // No max_tokens unless configured — a fixed cap silently truncates
-          // long output (CJK translations expand vs the source text)
+          // No max_tokens unless configured.
           ...(this.config.maxTokens ? { max_tokens: this.config.maxTokens } : {}),
           stream: true,
         }),
@@ -377,10 +366,7 @@ class OpenAICompatibleProvider extends BaseProvider {
         throw new Error(`API 错误: ${response.status}`);
       }
 
-      // Idle watchdog: abort only when the stream goes fully silent for
-      // `timeout`. Re-armed on ANY received bytes — reasoning deltas and
-      // heartbeats included — so thinking models and slow hardware are never
-      // killed while still producing.
+      // Idle watchdog, re-armed on any received bytes (docs/design/stack.md §4).
       const idleMs = this.config.timeout || 30000;
       const armIdleWatchdog = () => {
         clearTimeout(idleTimer);

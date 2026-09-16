@@ -1,15 +1,12 @@
-// Injected platform capabilities for the stack (set once by createTranslationStack).
-// The stack must stay electron-free and renderer-free; fetch MUST be Electron's
-// net.fetch in production — Node's global fetch bypasses the system proxy and
-// enterprise certificates, which would break proxy users (design doc §3.2/R1).
+// Injected platform capabilities for the stack (set once by
+// createTranslationStack). fetch must be Electron's net.fetch in production
+// (docs/design/stack.md §1).
 
 const caps = {
   fetch: null,
   getLanguage: () => 'zh',
   loggerFactory: null,
-  // Local OCR recognizers (paddle/windows) — the engines already live in the
-  // main process (electron/ocr/ocr-engine.js); the stack calls them directly
-  // instead of the renderer's old IPC bridge classes.
+  // Local OCR recognizers (paddle / windows), electron/ocr/ocr-engine.js.
   localOcr: null,
   // The built-in model (T-Engine's LLM host, electron/llm/llm-manager):
   // { generate(request, onToken) -> { promise, cancel }, status(), selected(),

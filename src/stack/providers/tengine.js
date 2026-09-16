@@ -1,10 +1,6 @@
-// The built-in model as a translation provider. No network, no server, no
-// key: the main process hands the stack a `localLlm` hook (runtime.js) that
-// reaches T-Engine's LLM host, and this class turns the stack's messages
-// into one system + one user text for it. Which file runs, on which
-// backend, is the main process's decision; here it is just "the local
-// model". Cancellation goes through the hook's cancel handle, stalls are
-// the host watchdog's, and both come back as ordinary provider errors.
+// The built-in model as a translation provider: turns the stack's messages
+// into one system + one user text for the `localLlm` hook (runtime.js).
+// Which file runs, on which backend, is the main process's decision.
 
 import { BaseProvider, buildTranslationMessages, combineSignal } from './base.js';
 import { _t } from '../i18n.js';
@@ -24,8 +20,7 @@ export function splitMessages(messages = []) {
   return { system, user };
 }
 
-// Enough room for a translation of `text`: CJK output runs about one token
-// per character. The runtime clamps to the context anyway.
+// Token budget for a translation of `text`; the runtime clamps to the context.
 export function translateBudget(text) {
   return Math.min(2048, Math.max(256, Math.ceil(String(text || '').length * 2) + 64));
 }
@@ -61,9 +56,7 @@ class TengineProvider extends BaseProvider {
     return this._run({ kind: 'translate', messages, options, maxTokens: translateBudget(text), onToken: onChunk });
   }
 
-  // A translation-only pack (Hy-MT2) answers a prompt with a translation of
-  // the prompt, so it must not be picked for AI actions; the service skips
-  // providers whose canChat() says no.
+  // A translation-only pack cannot chat; the service skips it for AI actions.
   canChat() {
     const sel = getLocalLlm()?.selected?.();
     return !sel || sel.role !== 'mt';

@@ -1,12 +1,7 @@
 // External TTS endpoint: the OpenAI-compatible `POST /v1/audio/speech`
-// contract that local servers (kokoro-fastapi, IndexTTS / GPT-SoVITS /
-// CosyVoice wrappers) and OpenAI itself all speak. Lives in the stack so the
-// request goes through rtFetch (system proxy) and the key through the vault;
-// the renderer never sees the URL being hit or the key.
-//
-// Config comes from the host per call (loadConfig): { baseUrl, model, voice,
-// apiKey } — apiKey decrypted main-side, null when the vault refuses (offline
-// mode blocks the tts_endpoint_ prefix outright).
+// contract. Lives in the stack so the request goes through rtFetch and the
+// key through the vault. Config comes from the host per call (loadConfig):
+// { baseUrl, model, voice, apiKey }, apiKey null when the vault refuses.
 
 import { _t } from '../providers/base.js';
 import { isLoopbackUrl } from '../loopback.js';
@@ -42,9 +37,7 @@ export class TtsEndpointClient {
     };
   }
 
-  // Configured = a base URL exists. Reachability is deliberately not probed
-  // here (a probe on every settings render would hammer a server); speak()
-  // degrades on failure instead.
+  // Configured = a base URL exists; reachability is not probed here.
   async getCapability() {
     const cfg = await this._config();
     if (!cfg.baseUrl) {
@@ -117,8 +110,7 @@ export class TtsEndpointClient {
 
     const contentType = res.headers.get('content-type') || '';
     if (contentType.includes('application/json') || contentType.startsWith('text/')) {
-      // A server that answers speech requests with JSON is telling us
-      // something (wrong route, unsupported format) — surface it.
+      // A JSON answer to a speech request is an error worth surfacing.
       let detail = '';
       try {
         detail = (await res.text()).slice(0, 200);
@@ -140,8 +132,7 @@ export class TtsEndpointClient {
     return { success: true, audio, contentType: contentType || 'audio/wav' };
   }
 
-  // Settings-page test: a short synthesis is the only honest reachability
-  // check (there is no standard "are you a TTS server" route).
+  // Settings-page test: a short synthesis.
   async test(config = {}) {
     const client = new TtsEndpointClient({ loadConfig: async () => ({ ...(await this._loadConfig()), ...config }) });
     const t0 = Date.now();

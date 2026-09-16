@@ -1,5 +1,4 @@
 // OCR.space API engine — https://ocr.space/ocrapi
-// Stack port of src/providers/ocr/ocrspace.js — network via rtFetch.
 
 import { BaseOCREngine, _t } from './base.js';
 import { unionRects, makeBlocks } from './blocks.js';
@@ -52,9 +51,8 @@ class OCRSpaceEngine extends BaseOCREngine {
     return !!this.config.apiKey;
   }
 
-  // The OCR settings UI stores BCP-47-ish codes (zh-Hans, en, ...) but this
-  // API wants its own 3-letter codes. Map here; unknown/auto falls back to the
-  // OCREngine-2 auto behavior rather than sending an invalid language.
+  // Settings codes (zh-Hans, en, ...) -> the API's 3-letter codes; unknown /
+  // auto falls back to the engine's auto behavior.
   static LANG_MAP = {
     'zh-Hans': 'chs', 'zh-Hant': 'cht', 'en': 'eng', 'ja': 'jpn', 'ko': 'kor',
     'fr': 'fre', 'de': 'ger', 'es': 'spa', 'ru': 'rus', 'ar': 'ara',
@@ -78,12 +76,11 @@ class OCRSpaceEngine extends BaseOCREngine {
       formData.append('apikey', apiKey);
       formData.append('language', apiLang);
       formData.append('base64Image', base64Data);
-      // Overlay carries the per-word boxes the floating window's scattered mode
-      // needs. It costs response size only — no extra API credits.
+      // Overlay carries the per-word boxes (response size only, no credits).
       formData.append('isOverlayRequired', 'true');
       formData.append('detectOrientation', 'true');
       formData.append('scale', 'true');
-      // Engine 2 has materially better accuracy on small/styled text than the default
+      // Engine 2: better on small / styled text.
       formData.append('OCREngine', '2');
 
       const response = await rtFetch('https://api.ocr.space/parse/image', {
@@ -120,15 +117,9 @@ class OCRSpaceEngine extends BaseOCREngine {
     }
   }
 
-  // TextOverlay boxes words, not lines, so each line's box is the union of its
-  // words — word-level blocks would read as a "word pile" to the scattered-mode
-  // heuristic and force in-place panes on ordinary prose.
-  //
-  // Caveat: we also send scale=true (server-side upscale for small captures),
-  // and the overlay is reported in whatever space the server worked in. If that
-  // turns out not to be source-image pixels, the coordinates land outside the
-  // capture frame and resolveDisplayMode drops them — degrading to unified,
-  // which is exactly this engine's behavior before boxes existed.
+  // TextOverlay boxes words, not lines: each line's box is the union of its
+  // words (blocks.js contract). Coordinates outside the capture frame are
+  // dropped downstream.
   _overlayBlocks(parsedResults) {
     const lines = [];
     for (const result of parsedResults) {

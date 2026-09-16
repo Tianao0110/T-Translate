@@ -1,12 +1,7 @@
-// Stack-side i18n: a standalone i18next instance over the SAME locale tables
-// the renderer uses (single source, check:i18n still governs both ends).
-//
-// Implementation pivot vs design doc §2.3 (error codes over IPC): bundling the
-// shared tables keeps every provider/service error a plain string with
-// unchanged wording in both languages — ~40 _t call sites port with only the
-// import changed, and text-matching consumers (error-handler ERROR_PATTERNS,
-// OCR vision-unsupported sniffing) keep working verbatim. Language is resolved
-// per call via ctx.getLanguage(), so a switch needs no sync chain.
+// Stack-side i18n: a standalone i18next instance over the same locale tables
+// the renderer uses (check:i18n governs both ends). Errors stay plain
+// localized strings; language is resolved per call via ctx.getLanguage().
+// Design notes: docs/design/stack.md §1.
 
 import i18next from 'i18next';
 import zh from '../i18n/locales/zh.js';

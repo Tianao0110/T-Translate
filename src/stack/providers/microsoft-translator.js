@@ -1,7 +1,4 @@
 // Microsoft Translator (Azure Cognitive Services).
-// Free tier: 2M chars/month.
-// Stack port of src/providers/microsoft-translator/index.js — metadata from the
-// shared table, network via rtFetch; logic byte-identical.
 
 import { BaseProvider, _t, combineSignal } from './base.js';
 import { PROVIDER_METADATA } from './metadata.js';

@@ -1,8 +1,6 @@
-// Environment-agnostic scoped logger, API-compatible with src/core/logger.js
-// (which is unusable here: import.meta.env is a Vite-ism). The host can inject
-// a real logger factory via configureRuntime({ loggerFactory }) — the main
-// process wires electron-log so stack output lands in the on-disk log files.
-// Default: console with debug muted (providers log mostly at debug level).
+// Environment-agnostic scoped logger, API-compatible with src/core/logger.js.
+// The host injects a real factory via configureRuntime({ loggerFactory });
+// default: console with debug muted.
 
 import { getLoggerFactory } from './runtime.js';
 
@@ -18,10 +16,8 @@ function consoleLogger(scope) {
 }
 
 export default function createLogger(scope) {
-  // Resolve the factory per call, not per createLogger: stack modules build
-  // their loggers at import time, BEFORE configureRuntime injects the real
-  // factory — eager binding silently pinned the whole OCR/translation pipeline
-  // to the console fallback and the on-disk log never saw it.
+  // Resolve the factory per call: stack modules build their loggers at
+  // import time, before configureRuntime runs.
   const fallback = consoleLogger(scope);
   let real = null;
   const resolve = () => {

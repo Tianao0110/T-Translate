@@ -4,8 +4,7 @@
 // Contract: everything in src/stack/ must stay renderer-free AND electron-free
 // (no window/localStorage/navigator, no `import 'electron'`). All platform
 // capabilities arrive through the injected ctx:
-//   fetch               REQUIRED. electron net.fetch — Node's global fetch
-//                       bypasses the system proxy / enterprise certs (design R1).
+//   fetch               REQUIRED. electron net.fetch (docs/design/stack.md §1).
 //   getLanguage         () => 'zh' | 'en', for provider error messages.
 //   loggerFactory       (scope) => logger, e.g. electron/platform/logger.js.
 //   loadProviderConfigs async () => ({ list, configs }) with decrypted configs

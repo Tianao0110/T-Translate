@@ -2,13 +2,10 @@
 // every fresh translation) and the renderer (which re-applies it to a document
 // that was translated before a term existed).
 //
-// It rewrites the *translated* text, and it can only act on a term the model
-// left in the source language. A term the model rendered as some other word is
-// invisible here — nothing in the string says which span was meant to be that
-// term. Finding those needs alignment, which is what the document's term-drift
-// pass uses a model for.
+// It rewrites the translated text and only acts on a term the model left in
+// the source language; the document's term-drift pass covers the rest.
 
-// Single-character terms match far too much to be worth replacing.
+// Single-character terms are skipped.
 const MIN_TERM_LENGTH = 2;
 
 /**
@@ -24,7 +21,7 @@ export function applyGlossary(translatedText, glossaryTerms) {
   let result = translatedText;
   const replacements = [];
 
-  // Longer terms first so "API" doesn't pre-empt "API Key".
+  // Longer terms first.
   const sorted = [...glossaryTerms].sort((a, b) => b.source.length - a.source.length);
 
   for (const term of sorted) {

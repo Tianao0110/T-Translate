@@ -1,6 +1,5 @@
-// Translation provider registry: classes, instances, and configs.
-// Pure storage — fallback/priority/scheduling live in the service layer.
-// Stack port of src/providers/registry.js (imports point at stack providers).
+// Translation provider registry: classes, instances, and configs. Pure
+// storage; fallback / priority / scheduling live in service.js.
 
 import OpenAICompatibleProvider from './providers/openai-compatible.js';
 import { PRESETS, createPresetProviderClass } from './providers/presets.js';
@@ -39,12 +38,8 @@ const providerClasses = {
   'baidu-translate': BaiduTranslateProvider,
 };
 
-// Service layer reads this when no user-defined priority is set. Local models
-// lead, then the key-free cloud fallback — same shape as a fresh install's
-// enabled set (components/ProviderSettings/defaults.js), so the "never opened
-// settings" path and the "opened it once" path behave alike. The key-requiring
-// providers below are skipped instantly while unconfigured; they only matter
-// once the user has actually entered a key.
+// Service layer reads this when no user-defined priority is set. Same shape
+// as a fresh install's enabled set (components/ProviderSettings/defaults.js).
 export const DEFAULT_PRIORITY = {
   normal: ['tengine', 'local-llm', 'ollama', 'google-translate', 'openai', 'anthropic', 'gemini', 'deepseek', 'microsoft-translator', 'baidu-translate', 'deepl'],
 };
@@ -84,8 +79,7 @@ export function getProvider(id, config = null) {
   return instance;
 }
 
-// Bypasses the instance cache — used by the "test connection" flow so an
-// unsaved config doesn't pollute the live singleton.
+// Bypasses the instance cache (the "test connection" flow).
 export function createProvider(id, config = {}) {
   const ProviderClass = providerClasses[id];
   if (!ProviderClass) {

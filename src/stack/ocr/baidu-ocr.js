@@ -1,5 +1,4 @@
 // Baidu OCR — https://ai.baidu.com/tech/ocr
-// Stack port of src/providers/ocr/baidu-ocr.js — network via rtFetch.
 
 import { BaseOCREngine, _t } from './base.js';
 import { makeBlocks } from './blocks.js';
@@ -10,10 +9,8 @@ const logger = createLogger('BaiduOCR');
 const POSITION_ENDPOINT = 'accurate';       // per-line location, separate activation + quota
 const FALLBACK_ENDPOINT = 'accurate_basic'; // text only, the endpoint used before v0.3.4
 
-// Baidu codes that all mean "this account cannot use `accurate` right now":
-// 6 = interface not activated, 17/19 = daily/total quota exhausted,
-// 18 = QPS limit. Each endpoint meters separately, so basic may still answer.
-// Token and image errors are deliberately absent — they fail both endpoints.
+// Baidu codes that mean "this account cannot use `accurate` right now":
+// 6 = not activated, 17/19 = quota exhausted, 18 = QPS limit.
 const ENDPOINT_UNAVAILABLE_CODES = new Set([6, 17, 18, 19]);
 
 class BaiduOCREngine extends BaseOCREngine {
@@ -81,7 +78,7 @@ class BaiduOCREngine extends BaseOCREngine {
     }
 
     this._accessToken = data.access_token;
-    // Baidu tokens last 30 days; refresh 1 day early so we don't race the expiry
+    // Baidu tokens last 30 days; refreshed a day early.
     this._tokenExpiry = Date.now() + (data.expires_in - 86400) * 1000;
 
     return this._accessToken;
@@ -100,11 +97,8 @@ class BaiduOCREngine extends BaseOCREngine {
       // Baidu expects bare base64 form-encoded, not a data: URL
       const pureBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
 
-      // accurate carries per-line position; accurate_basic (the _basic suffix
-      // literally means "no coordinates") does not. Same accuracy, but Baidu
-      // activates and meters them separately — so try the positioned one and
-      // drop to basic when this account can't use it, rather than failing the
-      // capture over a quota the user may not even know about.
+      // accurate carries per-line positions, accurate_basic does not; try the
+      // positioned one and drop to basic when this account cannot use it.
       let data = await this._callOcr(POSITION_ENDPOINT, accessToken, pureBase64);
 
       if (ENDPOINT_UNAVAILABLE_CODES.has(data.error_code)) {

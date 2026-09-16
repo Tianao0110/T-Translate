@@ -1,5 +1,4 @@
-// Base class for all OCR engines (stack port of src/providers/ocr/base.js —
-// only the _t source changed; btoa is a Node global since v16).
+// Base class for all OCR engines.
 
 export { _t } from '../i18n.js';
 

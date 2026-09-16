@@ -1,6 +1,4 @@
-// Google Gemini provider via Google AI Studio API.
-// Stack port of src/providers/gemini/index.js — metadata from the shared table,
-// network via rtFetch; logic byte-identical.
+// Google Gemini provider via the Google AI Studio API.
 
 import { BaseProvider, LANGUAGE_CODES, _t, combineSignal } from './base.js';
 import { PROVIDER_METADATA } from './metadata.js';
@@ -31,8 +29,7 @@ class GeminiProvider extends BaseProvider {
   }
 
   async testConnection() {
-    // Use `message` (not `error`) throughout — that's the key the settings
-    // status row reads; returning `error` here dropped the real reason.
+    // `message` is the key the settings status row reads.
     if (!this.config.apiKey) {
       return { success: false, message: _t('providerError.notConfigured', '未配置 API Key') };
     }
@@ -73,9 +70,7 @@ class GeminiProvider extends BaseProvider {
       const promptOpt = options.systemPrompt;
       const promptStr = promptOpt && typeof promptOpt === 'object' ? promptOpt.content : promptOpt;
       if (promptStr) {
-        // systemPrompt arrives from the service already interpolated
-        // (getSystemPrompt / buildMTPrompt both resolve {targetLang}), so no
-        // further replace is needed — just append the source text.
+        // systemPrompt arrives already interpolated; append the source text.
         prompt = `${promptStr}\n\n${text}`;
       } else {
         const sourceName = this._getLanguageName(sourceLang);
@@ -87,9 +82,7 @@ class GeminiProvider extends BaseProvider {
 
       const requestBody = {
         contents: [{ parts: [{ text: prompt }] }],
-        // Translation tasks legitimately need to handle text in any of these
-        // categories (e.g. translating news articles, fiction). Default thresholds
-        // would block too many legitimate inputs.
+        // Safety thresholds off: translation handles every category.
         safetySettings: [
           { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
           { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
@@ -142,11 +135,9 @@ class GeminiProvider extends BaseProvider {
   }
 
   // ===== Generic chat (AI actions, style rewrite) =====
-  // generateContent is a chat endpoint; translate() just collapses everything
-  // into one part. The work here is the shape mapping: OpenAI-style
-  // {role, content} turns become contents[{role, parts}], 'assistant' is
-  // spelled 'model', and the system prompt is its own systemInstruction field
-  // instead of a message.
+  // Shape mapping: OpenAI-style {role, content} turns become contents[{role,
+  // parts}], 'assistant' is spelled 'model', the system prompt is
+  // systemInstruction.
   async chat(messages, options = {}) {
     if (!this.config.apiKey) {
       return { success: false, error: _t('providerError.notConfigured', '未配置 API Key') };
@@ -172,8 +163,7 @@ class GeminiProvider extends BaseProvider {
           body: JSON.stringify({
             contents,
             ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
-            // Same reasoning as translate(): default thresholds block content
-            // that is perfectly legitimate to summarize or explain.
+            // Safety thresholds off, as in translate().
             safetySettings: [
               { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
               { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
@@ -195,7 +185,7 @@ class GeminiProvider extends BaseProvider {
       }
 
       const data = await response.json();
-      // Multi-part answers arrive split; joining keeps a long reply whole.
+      // Multi-part answers are joined.
       const content = (data.candidates?.[0]?.content?.parts || [])
         .map(p => p.text || '')
         .join('')

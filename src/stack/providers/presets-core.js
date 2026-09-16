@@ -42,8 +42,7 @@ export const PRESET_CORE = [
     defaults: {
       endpoint: 'http://localhost:11434/v1',
       model: '',
-      // Local generation is hardware-bound: cold model load + reasoning models'
-      // thinking phase can take minutes. User-tunable in settings.
+      // Local generation can take minutes; user-tunable in settings.
       timeout: 180000,
     },
     latencyLevel: 'slow',
@@ -52,8 +51,7 @@ export const PRESET_CORE = [
       requireApiKey: false,
       // Ollama may return {models:[{name}]} via /api/tags when /v1/models is empty
       modelsFallbackEndpoint: '/api/tags',
-      // Ollama requires an explicit model (unlike LM Studio, which uses its
-      // loaded one). With the field left blank, auto-detect the first model.
+      // Ollama requires an explicit model: auto-detect the first when blank.
       autoDetectModel: true,
     },
   },
@@ -62,8 +60,7 @@ export const PRESET_CORE = [
     defaults: {
       endpoint: 'http://localhost:1234/v1',
       model: '',
-      // LM Studio JIT-loads models — first request after idle pays the full
-      // load, plus reasoning models' thinking phase. User-tunable in settings.
+      // LM Studio JIT-loads models; user-tunable in settings.
       timeout: 180000,
     },
     latencyLevel: 'slow',

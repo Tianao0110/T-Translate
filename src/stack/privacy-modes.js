@@ -47,8 +47,7 @@ export const PRIVACY_MODES = {
       ocr: true,
     },
     allowedProviders: null,
-    // Windows OCR hands the capture to PowerShell as a temp file; incognito
-    // promises nothing touches disk, so it sits this mode out.
+    // Windows OCR writes a temp file, so it sits this mode out.
     allowedOcrEngines: Object.values(OCR_ENGINES).filter((id) => id !== OCR_ENGINES.WINDOWS_OCR),
   },
 
@@ -62,8 +61,7 @@ export const PRIVACY_MODES = {
       saveHistory: true,
       useCache: true,
       onlineApi: false,
-      // Local usage counters do accumulate offline (history is on); claiming
-      // otherwise made the privacy matrix lie. Only secure mode gates them.
+      // Local usage counters accumulate offline; only secure mode gates them.
       analytics: true,
       autoSave: true,
       selectionTranslate: true,

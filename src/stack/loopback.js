@@ -1,8 +1,6 @@
-// "Does this URL point at this machine?" — the one answer offline mode relies
+// "Does this URL point at this machine?": the one answer offline mode relies
 // on for local LLM providers, the vision engine and the external speech
-// server alike. Host names are matched exactly (plus the .localhost TLD, which
-// resolves to loopback by RFC 6761): "localhost.evil.com" must not read as
-// local, and neither must a LAN address.
+// server. Host names are matched exactly, plus the .localhost TLD (RFC 6761).
 
 export function isLoopbackUrl(url) {
   try {

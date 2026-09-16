@@ -1,9 +1,7 @@
 // The built-in vision model as an OCR engine: PaddleOCR-VL in T-Engine's
-// vision host, reached through the injected localLlm.recognize. Always the
-// Spotting task, so every line comes back with its box in source-image
-// pixels (blocks.js contract); the pipeline groups lines into paragraphs
-// the same way it does for Windows OCR. The capture goes to the host as
-// bytes and nowhere else.
+// vision host, through the injected localLlm.recognize. Always the Spotting
+// task, so every line comes back with its box in source-image pixels
+// (blocks.js contract). The capture goes to the host as bytes and nowhere else.
 
 import { BaseOCREngine, _t } from './base.js';
 import { getLocalLlm } from '../runtime.js';
@@ -48,7 +46,7 @@ class TengineVisionEngine extends BaseOCREngine {
   };
 
   // Usable once the two-file pack passed its hashes and the vision host is
-  // on the GPU (2026-09-14 decision: never on the CPU).
+  // on the GPU (docs/T-ENGINE.md §10).
   async isAvailable() {
     const llm = getLocalLlm();
     if (!llm?.recognize || !llm.visionStatus) return false;
@@ -91,8 +89,7 @@ class TengineVisionEngine extends BaseOCREngine {
         confidence: 0.9,
       };
     } catch (error) {
-      // Not installed, or the CPU refused the size: an honest failure the
-      // manager walks past to the next engine.
+      // Not installed, or the size was refused: the manager walks on.
       logger.warn('recognize failed:', error.message);
       return { success: false, error: error.message, errorCode: error.code || null };
     }

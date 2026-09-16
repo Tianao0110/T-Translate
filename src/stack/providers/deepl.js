@@ -1,6 +1,4 @@
 // DeepL translation provider.
-// Stack port of src/providers/deepl/index.js — metadata from the shared table,
-// network via rtFetch; logic byte-identical.
 
 import { BaseProvider, _t, combineSignal } from './base.js';
 import { PROVIDER_METADATA } from './metadata.js';
@@ -62,8 +60,7 @@ class DeepLProvider extends BaseProvider {
       'vi': 'VI',
     };
 
-    // Unmapped (e.g. Punjabi) returns null — the caller reports a friendly
-    // "unsupported language" instead of blindly upper-casing and 400-ing.
+    // Unmapped returns null; the caller reports "unsupported language".
     return mapping[code] ?? null;
   }
 
@@ -76,9 +73,7 @@ class DeepLProvider extends BaseProvider {
       return { success: false, error: _t('providerError.notConfigured', '未配置 API Key') };
     }
 
-    // Reject languages DeepL doesn't support before spending a request. Flagged
-    // skipFailureCount so one unsupported pick (e.g. Punjabi) doesn't rack up
-    // failures and get DeepL benched for every other language this session.
+    // Reject unsupported languages before spending a request; not a failure.
     const targetCode = this._convertLangCode(targetLang, true);
     if (!targetCode) {
       return { success: false, error: _t('providerError.unsupportedTargetLang', '所选目标语言不受支持'), skipFailureCount: true };
@@ -140,9 +135,7 @@ class DeepLProvider extends BaseProvider {
     } catch (error) {
       this._lastError = error;
 
-      // AbortSignal.timeout() rejects with a TimeoutError (not AbortError),
-      // so the old AbortError check never matched and timeouts fell through
-      // to the generic branch.
+      // AbortSignal.timeout() rejects with a TimeoutError, not AbortError.
       if (error.name === 'TimeoutError' || error.name === 'AbortError') {
         return { success: false, error: _t('providerError.timeout', '请求超时') };
       }
@@ -160,7 +153,7 @@ class DeepLProvider extends BaseProvider {
     }
 
     try {
-      // /usage is the cheapest endpoint and surfaces quota info as a bonus
+      // /usage: the cheapest endpoint, with quota info.
       const response = await rtFetch(`${this.baseUrl}/usage`, {
         method: 'GET',
         headers: {

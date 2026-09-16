@@ -1,9 +1,6 @@
-// Baidu Translate API (https://fanyi-api.baidu.com).
-// Free tier: 50k chars/month standard, 1M chars/month advanced.
-// Reachable inside mainland China without a proxy.
-// Stack port of src/providers/baidu-translate/index.js — metadata from the
-// shared table, network via rtFetch; the MD5 reference impl is untouched (any
-// change breaks the request signature).
+// Baidu Translate API (https://fanyi-api.baidu.com). The MD5 reference
+// implementation below must stay untouched: the request signature depends
+// on it.
 
 import { BaseProvider, _t, combineSignal } from './base.js';
 import { PROVIDER_METADATA } from './metadata.js';
@@ -62,8 +59,7 @@ class BaiduTranslateProvider extends BaseProvider {
     return mapping[code] || code;
   }
 
-  // Standard MD5 reference impl. Don't refactor — the algorithm is fixed and
-  // any change breaks the request signature.
+  // Standard MD5 reference impl. Do not refactor.
   _md5Manual(string) {
     function md5cycle(x, k) {
       let a = x[0], b = x[1], c = x[2], d = x[3];
@@ -167,10 +163,7 @@ class BaiduTranslateProvider extends BaseProvider {
         sign,
       });
 
-      // Long text as a GET query string blows the URL length limit (and hits
-      // Baidu's long-query rate cap). Baidu accepts the same params as a POST
-      // body, so switch over once the text is large. Threshold mirrors the
-      // google provider's URL-length guard.
+      // Long text goes as a POST body (same threshold as the google provider).
       const usesPost = text.length > 1500;
       const response = await rtFetch(
         usesPost
@@ -203,7 +196,7 @@ class BaiduTranslateProvider extends BaseProvider {
         };
       }
 
-      // trans_result is one entry per paragraph; join with newlines to round-trip
+      // trans_result is one entry per paragraph.
       const translatedText = data.trans_result?.map(r => r.dst).join('\n');
 
       if (!translatedText) {
