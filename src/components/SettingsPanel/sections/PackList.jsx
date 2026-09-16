@@ -9,7 +9,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Download, RefreshCw, Trash2, AlertTriangle, ExternalLink } from 'lucide-react';
-import createLogger from '../../../utils/logger.js';
+import createLogger from '../../../core/logger.js';
 const logger = createLogger('PackList');
 
 // `filter` narrows the rows shown (the OCR page lists only language packs

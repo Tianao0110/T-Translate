@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveSameLanguageTarget } from '../../src/utils/text.js';
+import { resolveSameLanguageTarget } from '../../src/core/text.js';
 
 describe('resolveSameLanguageTarget', () => {
   it('translates normally when detected differs from target', () => {

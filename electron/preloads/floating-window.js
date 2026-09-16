@@ -123,7 +123,7 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.on('audio-engine:level', handler);
       return () => ipcRenderer.removeListener('audio-engine:level', handler);
     },
-    // Neural TTS (services/tts/neural.js): same worker, audio streamed back
+    // Neural TTS (tts/neural.js): same worker, audio streamed back
     // one sentence at a time and played through WebAudio in this window.
     ttsStatus: () => ipcRenderer.invoke('audio-engine:tts-status'),
     ttsVoices: () => ipcRenderer.invoke('audio-engine:tts-voices'),
@@ -173,7 +173,7 @@ contextBridge.exposeInMainWorld('electron', {
     visionChat: (messages, imageData, options) =>
       ipcRenderer.invoke('stack:vision-chat', { messages, imageData, options }),
     visionCapability: () => ipcRenderer.invoke('stack:vision-capability'),
-    // External TTS endpoint (services/tts/endpoint.js)
+    // External TTS endpoint (tts/endpoint.js)
     ttsCapability: () => ipcRenderer.invoke('stack:tts-capability'),
     ttsSpeak: (payload) => ipcRenderer.invoke('stack:tts-speak', payload),
     onStreamChunk: (callback) => {

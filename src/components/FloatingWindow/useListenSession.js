@@ -11,8 +11,8 @@
 // (privacy injected there), and SRT export assembly.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import createLogger from '../../utils/logger.js';
-import { normalizeDraftCase } from '../../utils/listen-text.js';
+import createLogger from '../../core/logger.js';
+import { normalizeDraftCase } from '../../listen/listen-text.js';
 
 const logger = createLogger('ListenSession');
 

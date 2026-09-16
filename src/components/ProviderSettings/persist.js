@@ -3,8 +3,8 @@
 // triggered from any tab writes provider data completely instead of the old
 // activeSection-routed path that silently dropped it.
 
-import stackClient from '../../services/stack-client.js';
-import createLogger from '../../utils/logger.js';
+import stackClient from '../../translation/stack-client.js';
+import createLogger from '../../core/logger.js';
 
 const logger = createLogger('ProviderSettings');
 

@@ -77,11 +77,14 @@ t-translate/
 │   │   ├── providers/          # 翻译源实现 + metadata.js（跨端共享的纯数据表）
 │   │   └── ocr/                # 在线 OCR 四引擎 + LLM Vision + 本地引擎 local-bridge
 │   │
-│   ├── services/               # 渲染端服务层
-│   │   ├── stack-client.js     # 主进程栈的渲染端客户端（stack:* IPC，同名 API）
-│   │   ├── main-translation.js # 主窗口翻译编排
-│   │   ├── pipeline.js         # 悬浮窗口流水线
-│   │   └── tts/                # TTS 语音 (base, index, web-speech)
+│   ├── translation/            # 渲染端翻译层：stack-client（stack:* IPC 客户端）、main-translation（主窗口编排）、就绪判断 hook
+│   ├── ai/                     # AI 动作：提示词模板、runner、store、use-ai-actions / use-segment-notes
+│   ├── floating/               # 悬浮窗：pipeline（流水线）、display-mode、pane-layout
+│   ├── document/               # 文档翻译：解析器、术语表 IO、术语一致性
+│   ├── ocr/                    # 渲染端 OCR 辅助：密钥保险库、图片工具
+│   ├── tts/                    # 朗读：引擎基类、系统语音、神经语音、外接端点、音色挑选
+│   ├── listen/                 # 听译字幕文本处理
+│   ├── core/                   # 跨窗口基础件：logger、错误分类、性能 hook、流式节流、系统通知、迁移包、隐私模块矩阵、引导与热键 hook
 │   │
 │   ├── stores/                 # Zustand 状态管理
 │   │   ├── translation-store.js# 翻译状态
@@ -94,9 +97,7 @@ t-translate/
 │   │
 │   ├── config/                 # 前端配置
 │   │   ├── constants.js        # 常量定义
-│   │   ├── defaults.js         # 默认值
 │   │   ├── templates.js        # 翻译模板
-│   │   ├── privacy-modes.js    # 隐私模式
 │   │   ├── languages.js       # 语言目录（134 种）+ 拼音索引，渲染端与栈共用
 │   │   ├── ocr-languages.js   # OCR 可识别语言（56 种）→ 模型包，与主进程那份互校
 │   │   ├── custom-languages.js # 用户自定义语言的校验与合并
@@ -109,8 +110,6 @@ t-translate/
 │   │       ├── zh.js           # 中文
 │   │       └── en.js           # English
 │   │
-│   ├── hooks/                  # 共享 hooks（use-visible-hotkey 等）
-│   ├── utils/                  # 工具函数
 │   ├── styles/                 # 全局样式
 │   │   ├── index.css           # CSS Reset + 基础变量
 │   │   └── App.css             # 全局共享样式
@@ -216,10 +215,10 @@ API 密钥解密照常（无痕不等于离线）。
 ```
 config/ai-actions.js        动作目录：内置两条（summarize / explain）+ 字段契约
                             + normalizeActionConfig（导入唯一闸门）
-services/ai-action-runner   纯逻辑：文本量度 / 触发判定 / 模板渲染 / 路径选择
+ai/ai-action-runner         纯逻辑：文本量度 / 触发判定 / 模板渲染 / 路径选择
                             + runAiAction（唯一出口，调 stack-client）
-services/ai-action-store    导入配置的读取缓存，每次读都重新过一遍闸门
-hooks/use-ai-actions        三个窗口共用：能力探测、可用动作、结果折叠展开
+ai/ai-action-store          导入配置的读取缓存，每次读都重新过一遍闸门
+ai/use-ai-actions           三个窗口共用：能力探测、可用动作、结果折叠展开
 ```
 
 三条容易被违反的约束：
@@ -244,7 +243,7 @@ electron/platform/crash-guard.js   崩溃自愈：渲染进程异常退出限次
                                 （连续 3 次未撑过 60s 稳定窗口 → 安全模式：禁硬件
                                 加速、跳过原生模块预热）。依赖注入、零 electron
                                 require，直接可测
-src/utils/migration-pack.js     迁移包 build/parse 纯函数。导出读 electron-store
+src/core/migration-pack.js     迁移包 build/parse 纯函数。导出读 electron-store
                                 存储态（设置页内存态含解密后的 OCR 密钥，绝不可
                                 导）；两端都过 stripSecrets + 结构白名单
 electron/platform/open-with.js     右键菜单 argv 解析（.pdf/.docx/.txt 白名单）。
@@ -296,7 +295,7 @@ electron/packs/model-migrate.js            老用户目录模型搬迁（复制�
 electron/listen/audio-pack-manager.js       识别模型包下载/卸载（工厂第二实例，asr-models）
 electron/tts/tts-pack-manager.js         语音包下载/卸载（工厂第三实例，tts-models，v0.4.2）
 electron/tts/tts-models.js               已装语音包发现：pack.json 的 files 解析成绝对路径
-src/services/tts/neural.js                 渲染端神经语音引擎：分块播放、音色挑选、按句回落
+src/tts/neural.js                 渲染端神经语音引擎：分块播放、音色挑选、按句回落
 ```
 
 **音频从哪来（v0.4.1 起）**：`win-audio-capture` 用 koffi 直接调 WASAPI，两条激活路径同一
@@ -404,7 +403,7 @@ int8 版本是负优化（x86 上比 fp32 慢 4 倍且不随线程数涨），�
 卡片式表单）→ 三滑块一行。音色用 `VoicePicker` 面板（搜索 + 性别/语言筛选 + 常用置顶 + 三列小片各带试听）。
 分段开关是用户定的设置页统一样式（所有"选择"都改它），这一轮只铺音频子页。
 
-**渲染端选音色**（`src/utils/tts-voice-pick.js`，纯函数）：用户指定的音色优先（其包读不了该语言时
+**渲染端选音色**（`src/tts/tts-voice-pick.js`，纯函数）：用户指定的音色优先（其包读不了该语言时
 才放弃）；自动模式按目标语言/文本文字系统选常用音色；中英夹杂且装了 `preferMixed` 包时改用它；
 没有包覆盖的语言（日文等）抛 `NO_VOICE_FOR_LANG`，`TTSManager` 把这一句交给系统语音而不改引擎设置。
 
@@ -417,7 +416,7 @@ kokoro 中文换包含载入首块 1.5s；MeloTTS 冷启动（含进程与包载
 不抛异常、错误文案走 `_t`。三个通道 `stack:tts-capability / tts-speak / tts-test` 在 `translation-stack.js` 里
 按请求读隐私模式——**离线模式一律拒绝**（`OFFLINE_BLOCKED`），密钥前缀 `tts_endpoint_` 同时在密钥库的离线
 封锁名单上，所以离线时连解密都不发生。`tts-speak` 进 in-flight 表，渲染端停止即 `stack:abort` 中断 HTTP。
-渲染端 `src/services/tts/endpoint.js` 整段拿到字节后 `decodeAudioData` 播放（首版不分块）；服务不可达 / 非音频
+渲染端 `src/tts/endpoint.js` 整段拿到字节后 `decodeAudioData` 播放（首版不分块）；服务不可达 / 非音频
 应答 / 离线都抛 `ENDPOINT_*`，`TTSManager` 逐句回落系统语音。设置页只有地址 / 密钥 / 模型 / 音色四个字段和
 一个「测试并试听」（用一句真合成当连通性检查，没有标准的探活路由）；密钥失焦即入库，settings 里只记 `hasKey`。
 

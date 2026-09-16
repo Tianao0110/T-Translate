@@ -9,10 +9,10 @@ import {
   Table, CheckSquare, Square, Trash, ArrowUpDown, Sparkles, Image as ImageIcon
 } from 'lucide-react';
 import useTranslationStore from '../../stores/translation-store';
-import { getAiAction } from '@config/ai-actions';
-import { resolveActionLabel } from '../../services/ai-action-runner.js';
-import { useDebounce } from '../../utils/performance';
-import useVisibleHotkey from '../../hooks/use-visible-hotkey.js';
+import { getAiAction } from '../../config/ai-actions.js';
+import { resolveActionLabel } from '../../ai/ai-action-runner.js';
+import { useDebounce } from '../../core/performance';
+import useVisibleHotkey from '../../core/use-visible-hotkey.js';
 import HighlightText from '../shared/HighlightText.jsx';
 import AiBadge from '../shared/AiBadge.jsx';
 import { useConfirm } from '../shared/ConfirmDialog.jsx';
@@ -22,7 +22,7 @@ import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import 'dayjs/locale/zh-cn';
 import './styles.css';
 
-import { PRIVACY_MODES } from '@config/defaults';
+import { PRIVACY_MODES } from '../../config/constants.js';
 
 dayjs.extend(relativeTime);
 dayjs.extend(isSameOrAfter);

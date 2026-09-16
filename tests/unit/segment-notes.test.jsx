@@ -8,12 +8,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 
 const runAiAction = vi.fn();
-vi.mock('../../src/services/ai-action-runner.js', async (importOriginal) => ({
+vi.mock('../../src/ai/ai-action-runner.js', async (importOriginal) => ({
   ...(await importOriginal()),
   runAiAction: (...args) => runAiAction(...args),
 }));
 
-const useSegmentNotes = (await import('../../src/hooks/use-segment-notes.js')).default;
+const useSegmentNotes = (await import('../../src/ai/use-segment-notes.js')).default;
 
 const seg = (id, original) => ({ id, original, translated: '' });
 const options = { capabilities: { text: true }, sourceLang: 'en', targetLang: 'zh' };

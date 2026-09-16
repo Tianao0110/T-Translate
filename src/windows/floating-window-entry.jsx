@@ -2,7 +2,7 @@
 import ReactDOM from 'react-dom/client';
 import FloatingWindow from '../components/FloatingWindow';
 import ErrorBoundary from '../components/ErrorBoundary';
-import { initGlobalErrorHandler } from '../utils/global-error-handler.js';
+import { initGlobalErrorHandler } from '../core/global-error-handler.js';
 import i18n from '../i18n.js';
 
 initGlobalErrorHandler();

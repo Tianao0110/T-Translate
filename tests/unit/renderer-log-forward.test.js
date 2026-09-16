@@ -22,7 +22,7 @@ afterEach(() => {
 
 async function freshLogger(scope) {
   vi.resetModules();
-  const { default: createLogger } = await import('../../src/utils/logger.js');
+  const { default: createLogger } = await import('../../src/core/logger.js');
   return createLogger(scope);
 }
 

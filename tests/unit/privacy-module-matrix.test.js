@@ -2,7 +2,7 @@
 // and state the decisions the code enforces.
 
 import { describe, it, expect } from 'vitest';
-import { PRIVACY_MODULES, PRIVACY_MODE_ORDER, MODULE_STATE, moduleState } from '../../src/utils/privacy-module-matrix.js';
+import { PRIVACY_MODULES, PRIVACY_MODE_ORDER, MODULE_STATE, moduleState } from '../../src/core/privacy-module-matrix.js';
 import zh from '../../src/i18n/locales/zh.js';
 import en from '../../src/i18n/locales/en.js';
 

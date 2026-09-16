@@ -7,8 +7,8 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Upload, Trash2, Lock } from 'lucide-react';
 
-import { BUILTIN_AI_ACTIONS, normalizeActionConfig } from '@config/ai-actions';
-import { resolveActionLabel } from '../../../services/ai-action-runner.js';
+import { BUILTIN_AI_ACTIONS, normalizeActionConfig } from '../../../config/ai-actions.js';
+import { resolveActionLabel } from '../../../ai/ai-action-runner.js';
 import AiActionIcon from '../../shared/AiActionIcon.jsx';
 
 const SURFACE_KEYS = {

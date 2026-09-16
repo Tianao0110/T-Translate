@@ -2,7 +2,7 @@
 // bidirectional shift, capped drift (anchor fidelity beats zero overlap).
 
 import { describe, it, expect } from 'vitest';
-import { resolveOverlaps } from '../../src/services/pane-layout.js';
+import { resolveOverlaps } from '../../src/floating/pane-layout.js';
 
 const rect = (id, x, y, w, h) => ({ id, x, y, w, h });
 

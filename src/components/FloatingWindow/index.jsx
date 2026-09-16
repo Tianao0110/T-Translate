@@ -1,5 +1,5 @@
 // Floating translation overlay window. Pure UI shell over the session store;
-// all capture/OCR/translate logic lives in services/pipeline.js.
+// all capture/OCR/translate logic lives in floating/pipeline.js.
 // Supports scattered mode where each OCR block becomes its own child pane.
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -7,18 +7,18 @@ import { useTranslation } from 'react-i18next';
 import { Camera, X, Loader2, AlertCircle, ChevronDown, GripHorizontal, History, Clock, RefreshCw, Ghost, Brain, AudioLines, Play, Square, FolderOpen } from 'lucide-react';
 import useSessionStore, { STATUS, DISPLAY_MODE, CHILD_PANE_STATUS } from '../../stores/session.js';
 import useConfigStore from '../../stores/config.js';
-import pipeline from '../../services/pipeline.js';
-import { resolveOverlaps } from '../../services/pane-layout.js';
+import pipeline from '../../floating/pipeline.js';
+import { resolveOverlaps } from '../../floating/pane-layout.js';
 import ChildPane from './ChildPane.jsx';
 import AiActionIcon from '../shared/AiActionIcon.jsx';
 import AiBadge from '../shared/AiBadge.jsx';
-import useAiActions from '../../hooks/use-ai-actions.js';
+import useAiActions from '../../ai/use-ai-actions.js';
 import useListenSession from './useListenSession.js';
 import ListenPanel from './ListenPanel.jsx';
 import ListenLevel from './ListenLevel.jsx';
-import { getUnderstandAction } from '@config/ai-actions';
-import { resolveActionLabel } from '../../services/ai-action-runner.js';
-import createLogger from '../../utils/logger.js';
+import { getUnderstandAction } from '../../config/ai-actions.js';
+import { resolveActionLabel } from '../../ai/ai-action-runner.js';
+import createLogger from '../../core/logger.js';
 import './styles.css';
 
 const logger = createLogger('FloatingWindow');

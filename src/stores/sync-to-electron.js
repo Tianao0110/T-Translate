@@ -9,7 +9,7 @@
 //
 // Wire it up once from App.jsx via initStoreSync().
 
-import createLogger from '../utils/logger.js';
+import createLogger from '../core/logger.js';
 
 const logger = createLogger('StoreSync');
 

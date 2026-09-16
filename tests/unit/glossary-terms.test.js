@@ -7,7 +7,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 
-vi.mock('../../src/services/stack-client.js', () => ({
+vi.mock('../../src/translation/stack-client.js', () => ({
   default: { onChanged: () => () => {}, translate: vi.fn() },
 }));
 

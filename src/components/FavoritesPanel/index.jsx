@@ -8,21 +8,21 @@ import {
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import useTranslationStore from '../../stores/translation-store';
-import translationService from '../../services/stack-client.js';
-import { getAnalysisPrompts, parseJsonReply } from '../../utils/ai-prompts.js';
-import useVisibleHotkey from '../../hooks/use-visible-hotkey.js';
+import translationService from '../../translation/stack-client.js';
+import { getAnalysisPrompts, parseJsonReply } from '../../ai/ai-prompts.js';
+import useVisibleHotkey from '../../core/use-visible-hotkey.js';
 import HighlightText from '../shared/HighlightText.jsx';
 import { useConfirm } from '../shared/ConfirmDialog.jsx';
 import {
   exportToJSON, exportToCSV, exportToTBX,
   autoImport, downloadFile
-} from '../../utils/glossary-io.js';
+} from '../../document/glossary-io.js';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/zh-cn';
 import 'dayjs/locale/en';
 import './styles.css';
-import createLogger from '../../utils/logger.js';
+import createLogger from '../../core/logger.js';
 const logger = createLogger('Favorites');
 
 dayjs.extend(relativeTime);

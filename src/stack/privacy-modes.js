@@ -1,7 +1,7 @@
 // Privacy-mode definitions. Each mode pins feature flags and an
 // optional allowlist of providers / OCR engines. Consumed app-wide:
 // the main-process stack enforces them; renderer UI reads them for display
-// (via the src/config/privacy-modes.js re-export shim).
+// (the renderer imports this file directly).
 
 import { PRIVACY_MODES as PRIVACY_MODE_IDS, PROVIDER_IDS, OCR_ENGINES } from '../config/constants.js';
 

@@ -1,7 +1,5 @@
-// vitest.config.js
-// 测试配置 - Vitest
-//
-// 使用与 Vite 相同的别名配置，确保测试中 @config 等路径正常工作
+// Vitest config. Main-process modules load under jsdom through the electron
+// stub in tests/mocks/electron.js.
 
 import { defineConfig } from 'vitest/config';
 import path from 'path';
@@ -9,40 +7,20 @@ import path from 'path';
 export default defineConfig({
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, 'src'),
-      '@components': path.resolve(__dirname, 'src/components'),
-      '@services': path.resolve(__dirname, 'src/services'),
-      '@utils': path.resolve(__dirname, 'src/utils'),
-      '@stores': path.resolve(__dirname, 'src/stores'),
-      '@config': path.resolve(__dirname, 'src/config'),
-      // 测试里任何 import/require 'electron' 都重定向到 mock stub，
-      // 让主进程文件能在 jsdom 环境加载而不挂
       electron: path.resolve(__dirname, 'tests/mocks/electron.js'),
-      // Vite public 根资源导入（import x from '/icon.png'）在 vitest 下没有
-      // public 目录语义，会被当成 file:///icon.png 加载而炸；指回真实文件
+      // `import x from '/icon.png'` has no public-root meaning under vitest.
       '/icon.png': path.resolve(__dirname, 'public/icon.png'),
     },
   },
   test: {
-    // 使用 jsdom 环境（React 组件测试需要）
     environment: 'jsdom',
-
-    // 全局注入 describe, it, expect 等（jest-dom 需要）
     globals: true,
-
-    // 全局 setup（注入 testing-library matchers）
     setupFiles: ['./tests/setup.js'],
-
-    // 测试文件匹配模式
     include: [
       'tests/**/*.{test,spec}.{js,jsx}',
       'src/**/*.{test,spec}.{js,jsx}',
     ],
-
-    // 排除
     exclude: ['node_modules', 'build', 'dist'],
-
-    // 覆盖率配置
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],

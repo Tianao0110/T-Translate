@@ -124,7 +124,7 @@ const electronAPI = {
     delete: (key) => ipcRenderer.invoke("secure-storage:delete", key),
     isAvailable: () => ipcRenderer.invoke("secure-storage:isAvailable"),
   },
-  // Main-process translation stack (services/stack-client.js is the consumer).
+  // Main-process translation stack (translation/stack-client.js is the consumer).
   // No privacyMode/useCache here — the main-process facade injects them.
   stack: {
     translate: (payload) => ipcRenderer.invoke("stack:translate", payload),
@@ -147,7 +147,7 @@ const electronAPI = {
     visionChat: (messages, imageData, options) =>
       ipcRenderer.invoke("stack:vision-chat", { messages, imageData, options }),
     visionCapability: () => ipcRenderer.invoke("stack:vision-capability"),
-    // External TTS endpoint (services/tts/endpoint.js). Audio comes back as
+    // External TTS endpoint (tts/endpoint.js). Audio comes back as
     // bytes; playback stays in the renderer, the request never leaves main.
     ttsCapability: () => ipcRenderer.invoke("stack:tts-capability"),
     ttsSpeak: (payload) => ipcRenderer.invoke("stack:tts-speak", payload),
@@ -279,7 +279,7 @@ const electronAPI = {
   },
   // Neural TTS — the only audio-engine surface this window gets. Synthesis
   // runs in the audio worker; PCM streams back one sentence at a time and
-  // plays through WebAudio here (services/tts/neural.js).
+  // plays through WebAudio here (tts/neural.js).
   audioEngine: {
     ttsStatus: () => ipcRenderer.invoke("audio-engine:tts-status"),
     ttsVoices: () => ipcRenderer.invoke("audio-engine:tts-voices"),

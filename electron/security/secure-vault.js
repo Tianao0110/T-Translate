@@ -9,7 +9,7 @@ const { auditAccess } = require('./secure-audit');
 const logger = require('../platform/logger')('SecureVault');
 
 // Flat settings.ocr field names of all secret values. Mirror of
-// OCR_SECRET_FIELDS in src/utils/ocr-key-vault.js (renderer encrypt side) —
+// OCR_SECRET_FIELDS in src/ocr/ocr-key-vault.js (renderer encrypt side) —
 // the two lists must stay in sync.
 const OCR_SECRET_FIELDS = [
   'ocrspaceKey',
@@ -133,7 +133,7 @@ function createSecureVault({ store, safeStorage } = {}) {
   }
 
   // Flat settings.ocr bucket with vault secrets merged in — main-process port
-  // of utils/ocr-key-vault.js decryptOcrSecrets (the encrypt-and-strip side
+  // of ocr/ocr-key-vault.js decryptOcrSecrets (the encrypt-and-strip side
   // stays renderer-side in that file; keep OCR_SECRET_FIELDS in sync).
   // An existing truthy bucket value wins (not-yet-migrated legacy plaintext).
   function decryptOcrBucket(context = 'ocr-config') {

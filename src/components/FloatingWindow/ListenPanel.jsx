@@ -12,8 +12,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Volume2, Square } from 'lucide-react';
-import ttsManager, { TTS_STATUS } from '../../services/tts/index.js';
-import createLogger from '../../utils/logger.js';
+import ttsManager, { TTS_STATUS } from '../../tts/index.js';
+import createLogger from '../../core/logger.js';
 
 const logger = createLogger('ListenPanel');
 

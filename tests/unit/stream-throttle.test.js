@@ -1,7 +1,7 @@
 // stream-throttle: device-tier interval selection + RAF-aligned flush behavior.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createStreamThrottle, getFlushInterval } from '../../src/utils/stream-throttle.js';
+import { createStreamThrottle, getFlushInterval } from '../../src/core/stream-throttle.js';
 
 describe('getFlushInterval', () => {
   it('returns 16ms for high-tier devices (≥8 cores and ≥8 reported GB)', () => {

@@ -4,7 +4,7 @@
 // the intended winners, not the documented trade-off misses.
 
 import { describe, it, expect } from 'vitest';
-import { WebSpeechEngine } from '../../src/services/tts/web-speech.js';
+import { WebSpeechEngine } from '../../src/tts/web-speech.js';
 
 const engine = new WebSpeechEngine(); // jsdom has no speechSynthesis — fine, _detectLanguage is pure
 const detect = (text) => engine._detectLanguage(text);

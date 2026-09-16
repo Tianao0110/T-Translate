@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeDraftCase } from '../../src/utils/listen-text.js';
+import { normalizeDraftCase } from '../../src/listen/listen-text.js';
 
 describe('normalizeDraftCase', () => {
   it('lowers an all-caps draft and capitalizes sentence starts', () => {

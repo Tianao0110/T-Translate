@@ -6,8 +6,8 @@
 // Cached because three windows and the capture pipeline all ask for the same
 // list; refreshImportedActions() is the settings-save hook.
 
-import { normalizeActionConfig } from '@config/ai-actions';
-import createLogger from '../utils/logger.js';
+import { normalizeActionConfig } from '../config/ai-actions.js';
+import createLogger from '../core/logger.js';
 
 const logger = createLogger('AIActionStore');
 

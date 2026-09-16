@@ -2,11 +2,11 @@
 // current translation to imitate its tone and register.
 
 import { useState, useCallback } from 'react';
-import translationService from '../../../services/stack-client.js';
+import translationService from '../../../translation/stack-client.js';
 import useTranslationStore from '../../../stores/translation-store';
-import { getStyleRewritePrompts } from '../../../utils/ai-prompts.js';
-import createLogger from '../../../utils/logger.js';
-import { getShortErrorMessage } from '../../../utils/error-handler.js';
+import { getStyleRewritePrompts } from '../../../ai/ai-prompts.js';
+import createLogger from '../../../core/logger.js';
+import { getShortErrorMessage } from '../../../core/error-handler.js';
 
 const logger = createLogger('useStyleRewrite');
 

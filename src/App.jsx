@@ -4,10 +4,10 @@ import MainWindow from './components/MainWindow';
 import useTranslationStore from './stores/translation-store';
 import { initStoreSync } from './stores/sync-to-electron.js';
 import { USER_FILTERS_KEY } from './config/filters.js';
-import createLogger from './utils/logger.js';
+import createLogger from './core/logger.js';
 import './styles/App.css';
 
-import { THEMES } from '@config/defaults';
+import { THEMES } from './config/constants.js';
 
 const logger = createLogger('App');
 

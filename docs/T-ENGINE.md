@@ -175,7 +175,7 @@ Golden 测试至少覆盖：三个 `*_default_params()` 与 `mtmd_context_params
 
 ### T-Engine 收集什么
 
-原则：**只收数字与枚举，不收内容**。下面这张表就是全部；不在表里的不许加，加要先过隐私说明表（`src/utils/privacy-module-matrix.js` 与隐私页文案）。
+原则：**只收数字与枚举，不收内容**。下面这张表就是全部；不在表里的不许加，加要先过隐私说明表（`src/core/privacy-module-matrix.js` 与隐私页文案）。
 
 | 信号 | 字段 | 来源 | 明确不含 |
 | --- | --- | --- | --- |

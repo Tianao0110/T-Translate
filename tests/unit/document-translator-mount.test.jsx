@@ -23,7 +23,7 @@ vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: () => {} },
 }));
 
-vi.mock('../../src/services/stack-client.js', () => ({
+vi.mock('../../src/translation/stack-client.js', () => ({
   default: {
     onChanged: () => () => {},
     translate: vi.fn(),
@@ -31,7 +31,7 @@ vi.mock('../../src/services/stack-client.js', () => ({
   },
 }));
 
-vi.mock('../../src/services/ai-action-runner.js', async (importOriginal) => ({
+vi.mock('../../src/ai/ai-action-runner.js', async (importOriginal) => ({
   ...(await importOriginal()),
   runAiAction: vi.fn(),
   getActionCapabilities: async () => ({ text: false, vision: false }),

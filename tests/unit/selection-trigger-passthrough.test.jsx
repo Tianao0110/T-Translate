@@ -10,7 +10,7 @@ import React from 'react';
 let triggerCb = null;
 
 // vi.mock must run before all imports — vitest hoists these.
-vi.mock('../../src/services/stack-client.js', () => ({
+vi.mock('../../src/translation/stack-client.js', () => ({
   default: {
     initialized: true,
     init: vi.fn(() => Promise.resolve()),
@@ -18,7 +18,7 @@ vi.mock('../../src/services/stack-client.js', () => ({
   },
 }));
 
-vi.mock('../../src/services/tts/index.js', () => ({
+vi.mock('../../src/tts/index.js', () => ({
   default: {
     init: vi.fn(() => Promise.resolve()),
     stop: vi.fn(),
@@ -28,11 +28,11 @@ vi.mock('../../src/services/tts/index.js', () => ({
   TTS_STATUS: { IDLE: 'idle', SPEAKING: 'speaking', STOPPED: 'stopped' },
 }));
 
-vi.mock('../../src/utils/logger.js', () => ({
+vi.mock('../../src/core/logger.js', () => ({
   default: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
 }));
 
-vi.mock('../../src/utils/error-handler.js', () => ({
+vi.mock('../../src/core/error-handler.js', () => ({
   getShortErrorMessage: (err) => (err?.message || String(err)),
 }));
 
@@ -41,22 +41,6 @@ vi.mock('react-i18next', () => ({
   // src/i18n.js now runs for real in this graph (ai-action-runner imports it)
   // and hands this to i18next.use(); a stub keeps that bootstrap from throwing.
   initReactI18next: { type: '3rdParty', init: () => {} },
-}));
-
-vi.mock('@config/defaults', () => ({
-  PRIVACY_MODES: { STANDARD: 'standard' },
-  THEMES: { LIGHT: 'light', DARK: 'dark' },
-  LANGUAGE_CODES: ['auto', 'zh', 'en'],
-  selectionDefaults: {},
-  DEFAULT_SETTINGS: {
-    triggerTimeout: 4000,
-    showSourceByDefault: false,
-    autoCloseOnCopy: false,
-    minChars: 2,
-    maxChars: 500,
-    windowOpacity: 95,
-  },
-  DEFAULT_TRANSLATION: { sourceLanguage: 'auto', targetLanguage: 'zh' },
 }));
 
 const mockGetText = vi.fn();
@@ -120,7 +104,7 @@ describe('Phase B — text pass-through via SHOW_TRIGGER', () => {
     });
 
     // Key assertion: translate called with 'hello world', getText not called.
-    const translationService = (await import('../../src/services/stack-client.js')).default;
+    const translationService = (await import('../../src/translation/stack-client.js')).default;
     await waitFor(() => {
       expect(translationService.translate).toHaveBeenCalled();
     });
@@ -141,7 +125,7 @@ describe('Phase B — text pass-through via SHOW_TRIGGER', () => {
     });
 
     expect(mockGetText).toHaveBeenCalledTimes(1);
-    const translationService = (await import('../../src/services/stack-client.js')).default;
+    const translationService = (await import('../../src/translation/stack-client.js')).default;
     await waitFor(() => {
       expect(translationService.translate).toHaveBeenCalled();
     });
@@ -186,7 +170,7 @@ describe('Phase B — text pass-through via SHOW_TRIGGER', () => {
     });
 
     expect(mockGetText).toHaveBeenCalledTimes(1);
-    const translationService = (await import('../../src/services/stack-client.js')).default;
+    const translationService = (await import('../../src/translation/stack-client.js')).default;
     await waitFor(() => {
       expect(translationService.translate.mock.calls.at(-1)[0]).toBe('second fetch');
     });
@@ -206,7 +190,7 @@ describe('Phase B — text pass-through via SHOW_TRIGGER', () => {
       await new Promise(r => setTimeout(r, 50));
     });
 
-    const translationService = (await import('../../src/services/stack-client.js')).default;
+    const translationService = (await import('../../src/translation/stack-client.js')).default;
     await waitFor(() => {
       expect(translationService.translate).toHaveBeenCalled();
     });

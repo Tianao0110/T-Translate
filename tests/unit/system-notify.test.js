@@ -3,7 +3,7 @@
 // Clicking the toast asks the main process to show the window.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { notifyTaskDone } from '../../src/utils/system-notify.js';
+import { notifyTaskDone } from '../../src/core/system-notify.js';
 
 class FakeNotification {
   constructor(title, opts) {

@@ -8,7 +8,7 @@ import {
   isWordPile,
   isSparseCoverage,
   pickScatterBlocks,
-} from '../../src/services/display-mode.js';
+} from '../../src/floating/display-mode.js';
 
 const block = (x, y, width, height, text = 'text') => ({ text, bbox: { x, y, width, height } });
 

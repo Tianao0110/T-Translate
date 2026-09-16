@@ -11,7 +11,7 @@ import {
   buildActionMessages,
   resolveActionLabel,
   resolveActionPath,
-} from '../../src/services/ai-action-runner.js';
+} from '../../src/ai/ai-action-runner.js';
 import {
   BUILTIN_AI_ACTIONS,
   getAiAction,

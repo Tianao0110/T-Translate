@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { detectErrorType, ERROR_TYPES } from '../../src/utils/error-handler.js';
+import { detectErrorType, ERROR_TYPES } from '../../src/core/error-handler.js';
 
 // Provider-layer strings were migrated to i18n (both languages). detectErrorType
 // must keep classifying them from EITHER locale, or the English UI loses the

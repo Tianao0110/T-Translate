@@ -8,7 +8,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import PackList from './PackList.jsx';
 import { Seg, Switch } from './shared.jsx';
-import createLogger from '../../../utils/logger.js';
+import createLogger from '../../../core/logger.js';
 const logger = createLogger('ListenSection');
 
 // Final-pass tier (v0.4.8). Picking "high" without the pack on disk

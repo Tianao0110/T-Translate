@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import React from 'react';
 
-vi.mock('../../src/utils/logger.js', () => ({
+vi.mock('../../src/core/logger.js', () => ({
   default: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() }),
 }));
 
@@ -16,7 +16,7 @@ vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: () => {} },
 }));
 
-vi.mock('../../src/services/ai-action-runner.js', async (importOriginal) => ({
+vi.mock('../../src/ai/ai-action-runner.js', async (importOriginal) => ({
   ...(await importOriginal()),
   runAiAction: vi.fn(),
   getActionCapabilities: async () => ({ text: false, vision: false }),

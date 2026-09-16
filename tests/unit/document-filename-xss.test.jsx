@@ -16,18 +16,18 @@ vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: () => {} },
 }));
 
-vi.mock('../../src/services/stack-client.js', () => ({
+vi.mock('../../src/translation/stack-client.js', () => ({
   default: { onChanged: () => () => {}, translate: vi.fn(), ocr: { recognize: vi.fn() } },
 }));
 
-vi.mock('../../src/services/ai-action-runner.js', async (importOriginal) => ({
+vi.mock('../../src/ai/ai-action-runner.js', async (importOriginal) => ({
   ...(await importOriginal()),
   runAiAction: vi.fn(),
   getActionCapabilities: async () => ({ text: false, vision: false }),
 }));
 
 // Force the password-required branch so the modal renders with our filename.
-vi.mock('../../src/utils/document-parser.js', async (importOriginal) => ({
+vi.mock('../../src/document/document-parser.js', async (importOriginal) => ({
   ...(await importOriginal()),
   parseDocument: vi.fn(async () => ({ needPassword: true })),
 }));

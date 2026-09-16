@@ -8,7 +8,7 @@ import {
   Database, BookOpen, BarChart3,
   Edit3, Check, Copy, Search, Rows2, Columns2, ClipboardList, Sparkles, BookMarked
 } from 'lucide-react';
-import createLogger from '../../utils/logger.js';
+import createLogger from '../../core/logger.js';
 import {
   parseDocument,
   exportBilingual,
@@ -18,20 +18,20 @@ import {
   exportDOCX,
   exportPDFHTML,
   SUPPORTED_FORMATS,
-} from '../../utils/document-parser.js';
-import translationService from '../../services/stack-client.js';
+} from '../../document/document-parser.js';
+import translationService from '../../translation/stack-client.js';
 import useTranslationStore from '../../stores/translation-store';
 import { LANGUAGES, PRIVACY_MODES } from '../../config/constants.js';
-import useVisibleHotkey from '../../hooks/use-visible-hotkey.js';
+import useVisibleHotkey from '../../core/use-visible-hotkey.js';
 import LanguagePicker from '../shared/LanguagePicker.jsx';
 import { useConfirm } from '../shared/ConfirmDialog.jsx';
-import { scanDocumentTerms, renderWithReplacements } from '../../utils/term-consistency.js';
-import { notifyTaskDone } from '../../utils/system-notify.js';
+import { scanDocumentTerms, renderWithReplacements } from '../../document/term-consistency.js';
+import { notifyTaskDone } from '../../core/system-notify.js';
 import HighlightText from '../shared/HighlightText.jsx';
 import AiBadge from '../shared/AiBadge.jsx';
-import useAiActions from '../../hooks/use-ai-actions.js';
-import useSegmentNotes from '../../hooks/use-segment-notes.js';
-import { runAiAction } from '../../services/ai-action-runner.js';
+import useAiActions from '../../ai/use-ai-actions.js';
+import useSegmentNotes from '../../ai/use-segment-notes.js';
+import { runAiAction } from '../../ai/ai-action-runner.js';
 import { getAiAction } from '../../config/ai-actions.js';
 import { mergeLanguages, customCodesOf } from '../../config/custom-languages.js';
 import './styles.css';
@@ -510,7 +510,7 @@ const DocumentTranslator = ({
   //
   // Scope is one case only: a glossary term the model left in the source
   // language. A term rendered as some other word is not reported at all — see
-  // utils/term-consistency.js for why that is a product decision, not an
+  // document/term-consistency.js for why that is a product decision, not an
   // oversight.
   //
   // `fixes` survives the modal closing: the marks in the paragraphs are what

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import translationService from '../services/stack-client.js';
-import createLogger from '../utils/logger.js';
+import translationService from './stack-client.js';
+import createLogger from '../core/logger.js';
 
 const logger = createLogger('useTranslationReadiness');
 

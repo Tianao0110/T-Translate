@@ -1,14 +1,14 @@
 // Main-window translation store. Owns source/translated text, versions,
 // history, favorites, OCR status, and privacy-mode behavior.
-// Floating window uses a separate stores/session.js + services/pipeline.js.
+// Floating window uses a separate stores/session.js + floating/pipeline.js.
 
 import { create } from "zustand";
 import { persist, subscribeWithSelector } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 import { v4 as uuidv4 } from "uuid";
 
-import { PRIVACY_MODES, TRANSLATION_STATUS, LANGUAGE_CODES, DEFAULTS, LANGUAGES } from "@config/defaults";
-import createLogger from '../utils/logger.js';
+import { PRIVACY_MODES, TRANSLATION_STATUS, LANGUAGE_CODES, DEFAULTS, LANGUAGES } from "../config/constants.js";
+import createLogger from '../core/logger.js';
 import { sanitizeTextEntries, toStoredText } from './history-sanitize.js';
 const logger = createLogger('TranslationStore');
 
@@ -177,7 +177,7 @@ export function normalizeHistoryItem(raw) {
 let _mainTranslation = null;
 const getMainTranslation = async () => {
   if (!_mainTranslation) {
-    const module = await import("../services/main-translation.js");
+    const module = await import("../translation/main-translation.js");
     _mainTranslation = module.default;
   }
   return _mainTranslation;

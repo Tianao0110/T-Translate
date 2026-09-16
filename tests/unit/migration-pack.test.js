@@ -9,7 +9,7 @@ import {
   stripSecrets,
   MIGRATION_FORMAT,
   MIGRATION_VERSION,
-} from '../../src/utils/migration-pack.js';
+} from '../../src/core/migration-pack.js';
 
 const providersMeta = [
   { id: 'openai', configSchema: { apiKey: { encrypted: true }, model: {} } },

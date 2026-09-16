@@ -5,7 +5,7 @@
 // the second category does not creep back in as "helpful" noise.
 
 import { describe, it, expect } from 'vitest';
-import { scanDocumentTerms, renderWithReplacements } from '../../src/utils/term-consistency.js';
+import { scanDocumentTerms, renderWithReplacements } from '../../src/document/term-consistency.js';
 import { applyGlossary } from '../../src/stack/glossary.js';
 
 const seg = (id, original, translated) => ({ id, original, translated });

@@ -1,4 +1,4 @@
-import createLogger from '../../utils/logger.js';
+import createLogger from '../../core/logger.js';
 const logger = createLogger('MainWindow');
 import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,15 +13,15 @@ import appIcon from '/icon.png';
 import TranslationPanel from '../TranslationPanel';
 import SetupNotice from '../shared/SetupNotice.jsx';
 import WelcomeDialog from '../shared/WelcomeDialog.jsx';
-import useOnboarding from '../../hooks/use-onboarding.js';
-import useTranslationReadiness from '../../hooks/use-translation-readiness.js';
+import useOnboarding from '../../core/use-onboarding.js';
+import useTranslationReadiness from '../../translation/use-translation-readiness.js';
 const HistoryPanel = lazy(() => import('../HistoryPanel'));
 const SettingsPanel = lazy(() => import('../SettingsPanel'));
 const FavoritesPanel = lazy(() => import('../FavoritesPanel'));
 const DocumentTranslator = lazy(() => import('../DocumentTranslator'));
 import './styles.css';
 
-import { TRANSLATION_STATUS } from '@config/defaults';
+import { TRANSLATION_STATUS } from '../../config/constants.js';
 
 const LazyLoadingFallback = () => (
   <div className="lazy-loading-fallback">

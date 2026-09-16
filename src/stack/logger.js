@@ -1,4 +1,4 @@
-// Environment-agnostic scoped logger, API-compatible with src/utils/logger.js
+// Environment-agnostic scoped logger, API-compatible with src/core/logger.js
 // (which is unusable here: import.meta.env is a Vite-ism). The host can inject
 // a real logger factory via configureRuntime({ loggerFactory }) — the main
 // process wires electron-log so stack output lands in the on-disk log files.

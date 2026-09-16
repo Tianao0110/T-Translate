@@ -1,17 +1,17 @@
 // Floating-window translation pipeline: capture -> OCR -> (scattered or unified) -> translate.
 // Owns dedupe-by-hash, same-language behavior, and child-pane lifecycle.
 
-import translationService from './stack-client.js';
+import translationService from '../translation/stack-client.js';
 import useSessionStore, { DISPLAY_MODE, CHILD_PANE_STATUS } from '../stores/session.js';
 import useConfigStore from '../stores/config.js';
 import { resolveDisplayMode } from './display-mode.js';
-import { calculateHash } from '../utils/image.js';
-import { detectLanguage, resolveSameLanguageTarget, cleanTranslationOutput, shouldTranslateText } from '../utils/text.js';
-import { getUnderstandAction } from '@config/ai-actions';
-import { ensureImportedActions } from './ai-action-store.js';
-import { getActionCapabilities, runAiAction } from './ai-action-runner.js';
-import createLogger from '../utils/logger.js';
-import { getShortErrorMessage } from '../utils/error-handler.js';
+import { calculateHash } from '../ocr/image.js';
+import { detectLanguage, resolveSameLanguageTarget, cleanTranslationOutput, shouldTranslateText } from '../core/text.js';
+import { getUnderstandAction } from '../config/ai-actions.js';
+import { ensureImportedActions } from '../ai/ai-action-store.js';
+import { getActionCapabilities, runAiAction } from '../ai/ai-action-runner.js';
+import createLogger from '../core/logger.js';
+import { getShortErrorMessage } from '../core/error-handler.js';
 import i18n from '../i18n.js';
 
 const logger = createLogger('Pipeline');

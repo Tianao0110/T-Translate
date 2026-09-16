@@ -1,7 +1,7 @@
 // Document parsing helpers: format-specific loaders, smart segmentation,
 // outline detection, batch grouping, and bilingual export.
 
-import createLogger from './logger.js';
+import createLogger from '../core/logger.js';
 import i18n from '../i18n.js';
 const logger = createLogger('DocumentParser');
 

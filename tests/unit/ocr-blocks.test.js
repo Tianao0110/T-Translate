@@ -9,7 +9,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { rectFromPoints, unionRects, makeBlocks } from '../../src/stack/ocr/blocks.js';
-import { coordsFitFrame, resolveDisplayMode, shouldUseScatteredMode } from '../../src/services/display-mode.js';
+import { coordsFitFrame, resolveDisplayMode, shouldUseScatteredMode } from '../../src/floating/display-mode.js';
 import { configureRuntime } from '../../src/stack/runtime.js';
 import AzureOCREngine from '../../src/stack/ocr/azure-ocr.js';
 import GoogleVisionEngine from '../../src/stack/ocr/google-vision.js';

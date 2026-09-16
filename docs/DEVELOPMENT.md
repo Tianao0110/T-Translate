@@ -28,7 +28,7 @@ src/stack/                      # 主进程翻译栈（ESM 源码，esbuild 打�
     └── <id>.js                 # 在线引擎类（ocrspace/google-vision/azure/baidu/llm-vision）
 
 src/（渲染端，只管 UI）
-├── services/stack-client.js    # 栈的渲染端客户端（stack:* IPC，同名 API）
+├── translation/stack-client.js # 栈的渲染端客户端（stack:* IPC，同名 API）
 ├── config/provider-icons.js    # ★ 翻译源图标 + 显示顺序（渲染端专属，svg 不进栈 bundle）
 ├── assets/provider-icons/      # 翻译源 svg 图标
 └── components/ProviderSettings # 按 metadata.configSchema 自动渲染配置表单
@@ -190,7 +190,7 @@ npm start             # 实测：设置页出卡片、填 key、测试连接、�
 
 - **模板变量只有四个**：`{{sourceText}}` `{{translatedText}}` `{{sourceLanguage}}`
   `{{outputLanguage}}`。写错的变量名会在导入时被拒收，不会被当字面量发给模型
-- **提示词必须双语**：中文包裹的指令会把弱模型带偏成中文回答（和 `utils/ai-prompts`
+- **提示词必须双语**：中文包裹的指令会把弱模型带偏成中文回答（和 `ai/ai-prompts`
   同一个理由）
 - **带了 `visionPrompts` 才算支持路径 B**。措辞得换——图里没有 `{{sourceText}}`
   可以贴，模型是在看版面
@@ -307,7 +307,7 @@ export default MyOCREngine;
 - **悬浮窗/划词窗不加载 App.css 令牌表**：这两个独立窗口只能用各自的局部变量（`--floating-*` / `--sel-*`），引用 `--accent-*` 会静默失效。
 - **图标一律 [lucide-react](https://lucide.dev/)**，不用 emoji。
 - **弹窗用 `shared/ConfirmDialog`**（`useConfirm()` Promise 式），禁止 `window.confirm`。
-- **常驻面板（display:none 挂载）的 window 级快捷键**必须走 `hooks/use-visible-hotkey`，否则隐藏页签也会响应按键。
+- **常驻面板（display:none 挂载）的 window 级快捷键**必须走 `core/use-visible-hotkey`，否则隐藏页签也会响应按键。
 - 类名用组件前缀（`.ps-card`、`.setting-group`），不用内联样式堆布局。
 
 ---
@@ -359,7 +359,7 @@ npm run check:all        # 常量表 + i18n + 硬编码中文
 | `src/stack/ocr/manager.js` | OCR 引擎注册表 + 降级链 |
 | `src/stack/runtime.js` | rtFetch（网络唯一出口） |
 | `src/config/provider-icons.js` | 渲染端图标 + 显示顺序 |
-| `src/services/stack-client.js` | 渲染端栈客户端 |
+| `src/translation/stack-client.js` | 渲染端栈客户端 |
 | `electron/ipc/translation-stack.js` | 栈 IPC facade（隐私注入/abort/流帧） |
 | `electron/platform/open-with.js` + `installer/installer.nsh` | 右键菜单：扩展名白名单与注册表宏，**改扩展名两处必须同步**（nsh 为 UTF-8 BOM，别用会丢 BOM 的编辑器保存） |
 | `docs/ARCHITECTURE.md` | 架构文档 |

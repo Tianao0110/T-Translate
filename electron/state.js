@@ -63,7 +63,7 @@ const store = new Store({
       screenshot: {},
       floatingWindow: {},
       // Must stay value-identical to DEFAULT_TTS_CONFIG in
-      // src/services/tts/index.js (main process can't import that ESM module).
+      // src/tts/index.js (main process can't import that ESM module).
       tts: {
         enabled: true,
         engine: 'web-speech',

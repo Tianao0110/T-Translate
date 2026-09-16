@@ -1,7 +1,7 @@
 // Web Speech API TTS engine — uses the browser's built-in SpeechSynthesis.
 
 import { BaseTTSEngine, TTS_STATUS } from './base.js';
-import createLogger from '../../utils/logger.js';
+import createLogger from '../core/logger.js';
 const logger = createLogger('WebSpeech');
 
 export class WebSpeechEngine extends BaseTTSEngine {

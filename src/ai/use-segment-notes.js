@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { getAiAction } from '../config/ai-actions.js';
-import { runAiAction } from '../services/ai-action-runner.js';
+import { runAiAction } from './ai-action-runner.js';
 
 // Give up on a batch once the provider has clearly stopped answering, rather
 // than firing one doomed request per paragraph through a whole document.

@@ -5,9 +5,9 @@
 // asks for bytes and plays them. Available while a server address is
 // configured and the privacy mode is not offline.
 
-import stackClient from '../stack-client.js';
+import stackClient from '../translation/stack-client.js';
 import { BaseTTSEngine, TTS_STATUS } from './base.js';
-import createLogger from '../../utils/logger.js';
+import createLogger from '../core/logger.js';
 const logger = createLogger('EndpointTTS');
 
 let _requestSeq = 0;

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import createLogger from '../../../utils/logger.js';
+import createLogger from '../../../core/logger.js';
 import { useConfirm } from '../../shared/ConfirmDialog.jsx';
 import { Seg, Switch, Slider } from './shared';
 

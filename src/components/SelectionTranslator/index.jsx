@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pin, Volume2, VolumeX, X, Loader2 } from 'lucide-react';
-import translationService from '../../services/stack-client.js';
-import ttsManager, { TTS_STATUS } from '../../services/tts/index.js';
+import translationService from '../../translation/stack-client.js';
+import ttsManager, { TTS_STATUS } from '../../tts/index.js';
 import AiActionIcon from '../shared/AiActionIcon.jsx';
-import useAiActions from '../../hooks/use-ai-actions.js';
-import { resolveActionLabel } from '../../services/ai-action-runner.js';
-import createLogger from '../../utils/logger.js';
-import { getShortErrorMessage } from '../../utils/error-handler.js';
-import { detectLanguage, resolveSameLanguageTarget } from '../../utils/text.js';
+import useAiActions from '../../ai/use-ai-actions.js';
+import { resolveActionLabel } from '../../ai/ai-action-runner.js';
+import createLogger from '../../core/logger.js';
+import { getShortErrorMessage } from '../../core/error-handler.js';
+import { detectLanguage, resolveSameLanguageTarget } from '../../core/text.js';
 import './styles.css';
 
-import { PRIVACY_MODES, THEMES } from '@config/defaults';
+import { PRIVACY_MODES, THEMES } from '../../config/constants.js';
 
 const logger = createLogger('Selection');
 

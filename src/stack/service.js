@@ -37,7 +37,7 @@ import { getEnabledFilters } from '../config/filters.js';
 import { reorderForLanguage } from '../config/model-language-coverage.js';
 import { getSystemPrompt, LANGUAGE_NAMES } from '../config/templates.js';
 import { detectTemplateFromModel } from '../config/model-template-mapping.js';
-import { createStreamThrottle } from '../utils/stream-throttle.js';
+import { createStreamThrottle } from '../core/stream-throttle.js';
 import { getLocalLlm } from './runtime.js';
 
 // An empty endpoint means the preset default, and every local preset

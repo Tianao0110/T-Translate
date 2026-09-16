@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import React from 'react';
 
-vi.mock('../../src/services/pipeline.js', () => ({
+vi.mock('../../src/floating/pipeline.js', () => ({
   default: {
     capture: vi.fn(() => Promise.resolve()),
     cancel: vi.fn(),
@@ -15,13 +15,13 @@ vi.mock('../../src/services/pipeline.js', () => ({
   },
 }));
 
-vi.mock('../../src/services/ai-action-runner.js', async (importOriginal) => ({
+vi.mock('../../src/ai/ai-action-runner.js', async (importOriginal) => ({
   ...(await importOriginal()),
   runAiAction: vi.fn(),
   getActionCapabilities: async () => ({ text: false, vision: false }),
 }));
 
-vi.mock('../../src/utils/logger.js', () => ({
+vi.mock('../../src/core/logger.js', () => ({
   default: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
 }));
 

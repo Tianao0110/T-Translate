@@ -1,7 +1,7 @@
 // Neural voice selection: which installed pack/speaker reads a given text.
 
 import { describe, it, expect } from 'vitest';
-import { pickVoice, isMixedText, detectTextLang, normalizeLang } from '../../src/utils/tts-voice-pick.js';
+import { pickVoice, isMixedText, detectTextLang, normalizeLang } from '../../src/tts/tts-voice-pick.js';
 
 const kokoro = (sid, lang, gender, featured) => ({
   id: `tts-kokoro-zh-en:${sid}`,

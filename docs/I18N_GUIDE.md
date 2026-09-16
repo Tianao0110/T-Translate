@@ -34,7 +34,7 @@
 - 渲染端组件文案 → 加 `locales/zh.js` + `en.js`（两份都加，`check:i18n` 锁同步）
 - 栈内（provider/OCR）文案 → 同样加 locales 两份，代码里用栈的 `_t`
 - 主进程托盘/菜单/IPC 返回给用户的错误串 → 加 `main-i18n.js` 的 **zh 和 en 两个块**
-- 错误分类器 `ERROR_PATTERNS`（`src/utils/error-handler.js`）匹配关键词必须**中英双语**各写一份（栈返回哪种语言取决于用户界面语言），`tests/unit/error-classification.test.js` 锁行为
+- 错误分类器 `ERROR_PATTERNS`（`src/core/error-handler.js`）匹配关键词必须**中英双语**各写一份（栈返回哪种语言取决于用户界面语言），`tests/unit/error-classification.test.js` 锁行为
 
 ---
 
@@ -47,7 +47,7 @@ src/
 │   ├── zh.js                   # 中文词表（渲染端 + 栈共用）
 │   └── en.js                   # 英文词表（渲染端 + 栈共用）
 ├── stack/i18n.js               # 栈内 i18n 实例（复用上面的词表，导出 _t）
-├── utils/ai-prompts.js         # AI 提示词双语模板（isZh 分支）
+├── ai/ai-prompts.js            # AI 提示词双语模板（isZh 分支）
 └── components/SettingsPanel/sections/InterfaceSection.jsx  # 语言切换 UI
 
 electron/shared/main-i18n.js    # 主进程独立双语消息表（托盘/菜单/IPC 错误串）
@@ -154,7 +154,7 @@ resources: {
 },
 ```
 
-同步动作：`scripts/check-i18n.js` 需把新语言纳入比对；`electron/shared/main-i18n.js` 和 `src/utils/ai-prompts.js` 的语言分支也要补对应文案，否则托盘/提示词会回退中文。
+同步动作：`scripts/check-i18n.js` 需把新语言纳入比对；`electron/shared/main-i18n.js` 和 `src/ai/ai-prompts.js` 的语言分支也要补对应文案，否则托盘/提示词会回退中文。
 
 ### 步骤 2: 更新语言选择器
 
@@ -500,7 +500,7 @@ npm run check:hardcoded    # 扫描组件里硬编码的中文字符串
 
 1. `src/i18n/locales/zh.js` + `en.js` —— 渲染端与主进程栈共用的主词表
 2. `electron/shared/main-i18n.js` —— 主进程原生 UI 双语表（托盘/菜单/IPC 错误串）
-3. `src/utils/ai-prompts.js` —— AI 提示词双语模板（isZh 分支）
+3. `src/ai/ai-prompts.js` —— AI 提示词双语模板（isZh 分支）
 
 ---
 

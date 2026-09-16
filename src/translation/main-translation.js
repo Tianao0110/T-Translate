@@ -10,8 +10,8 @@ import { v4 as uuidv4 } from 'uuid';
 import translationService from './stack-client.js';
 import useTranslationStore from '../stores/translation-store.js';
 
-import { PRIVACY_MODES, TRANSLATION_STATUS } from '@config/defaults';
-import createLogger from '../utils/logger.js';
+import { PRIVACY_MODES, TRANSLATION_STATUS } from '../config/constants.js';
+import createLogger from '../core/logger.js';
 import i18n from '../i18n.js';
 const logger = createLogger('MainTranslation');
 

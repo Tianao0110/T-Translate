@@ -8,10 +8,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Play, Square, RefreshCw, Zap, Cpu, Sparkles, Globe } from 'lucide-react';
-import ttsManager, { DEFAULT_TTS_CONFIG, TTS_STATUS } from '../../../services/tts/index.js';
-import stackClient from '../../../services/stack-client.js';
+import ttsManager, { DEFAULT_TTS_CONFIG, TTS_STATUS } from '../../../tts/index.js';
+import stackClient from '../../../translation/stack-client.js';
 import VoicePicker from './VoicePicker.jsx';
-import createLogger from '../../../utils/logger.js';
+import createLogger from '../../../core/logger.js';
 const logger = createLogger('TTSSection');
 
 const ENGINE_ORDER = ['web-speech', 'neural', 'endpoint'];

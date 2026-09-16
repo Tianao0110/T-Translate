@@ -19,7 +19,7 @@ import {
   assertZipWithinDecompressedCap,
   MAX_PDF_CANVAS_EDGE,
   MAX_DECOMPRESSED_SIZE_BYTES,
-} from '../../src/utils/document-parser.js';
+} from '../../src/document/document-parser.js';
 
 describe('timecode conversion', () => {
   it('VTT dot becomes SRT comma', () => {

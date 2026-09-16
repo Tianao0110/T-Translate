@@ -4,11 +4,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Zap, Shield, Lock, Trash2, ClipboardList, Database, Check, X, Minus, ArrowRightLeft, Download, Upload, Table2, ChevronLeft } from 'lucide-react';
 import useTranslationStore from '../../../stores/translation-store';
-import translationService from '../../../services/stack-client.js';
+import translationService from '../../../translation/stack-client.js';
 import { PRIVACY_MODES, PRIVACY_MODE_IDS } from '../constants.js';
-import { PRIVACY_MODULES, PRIVACY_MODE_ORDER, moduleState } from '../../../utils/privacy-module-matrix.js';
-import { buildMigrationPack, parseMigrationPack, stripSecrets, MAX_PACK_BYTES } from '../../../utils/migration-pack.js';
-import { validateImportedActions, refreshImportedActions } from '../../../services/ai-action-store.js';
+import { PRIVACY_MODULES, PRIVACY_MODE_ORDER, moduleState } from '../../../core/privacy-module-matrix.js';
+import { buildMigrationPack, parseMigrationPack, stripSecrets, MAX_PACK_BYTES } from '../../../core/migration-pack.js';
+import { validateImportedActions, refreshImportedActions } from '../../../ai/ai-action-store.js';
 import { getAllProviderMetadata } from '../../../config/provider-icons.js';
 
 const formatBytes = (bytes) => {

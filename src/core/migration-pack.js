@@ -10,7 +10,7 @@
 //
 // Pure functions; the callers own IPC, dialogs and store writes.
 
-import { OCR_SECRET_FIELDS } from './ocr-key-vault.js';
+import { OCR_SECRET_FIELDS } from '../ocr/ocr-key-vault.js';
 import { DEFAULT_SETTINGS } from '../components/SettingsPanel/constants.js';
 
 export const MIGRATION_FORMAT = 'T-Translate Migration';

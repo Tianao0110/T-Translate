@@ -7,7 +7,7 @@
 // SECURE/OFFLINE anymore. stripPrivacy() below is belt-and-braces (and drops
 // non-cloneable fields like AbortSignal that would break the IPC invoke).
 
-import createLogger from '../utils/logger.js';
+import createLogger from '../core/logger.js';
 
 const logger = createLogger('StackClient');
 
@@ -275,7 +275,7 @@ class StackClient {
     }
   }
 
-  // ===== External TTS endpoint (services/tts/endpoint.js is the consumer) =====
+  // ===== External TTS endpoint (tts/endpoint.js is the consumer) =====
 
   // Cancels one tracked request by id (the facade aborts its HTTP call).
   abortRequest(requestId) {

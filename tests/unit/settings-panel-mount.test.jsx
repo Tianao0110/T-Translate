@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import React from 'react';
 
-vi.mock('../../src/services/stack-client.js', () => ({
+vi.mock('../../src/translation/stack-client.js', () => ({
   default: {
     initialized: true,
     init: vi.fn(() => Promise.resolve()),
@@ -19,7 +19,7 @@ vi.mock('../../src/services/stack-client.js', () => ({
 
 // Vault helpers talk to safeStorage over IPC; identity stubs keep the
 // settings-load path pure in jsdom.
-vi.mock('../../src/utils/ocr-key-vault.js', () => ({
+vi.mock('../../src/ocr/ocr-key-vault.js', () => ({
   migrateLegacyOcrSecrets: vi.fn(() => Promise.resolve()),
   decryptOcrSecrets: vi.fn(async (ocr) => ocr),
   encryptOcrSecrets: vi.fn(async (ocr) => ocr),

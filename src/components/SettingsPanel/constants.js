@@ -7,8 +7,8 @@ import {
   FileText, Sparkles, AudioLines, Cpu
 } from 'lucide-react';
 
-import { PRIVACY_MODES, getModeFeatures, isFeatureEnabled, isProviderAllowed as isProviderAllowedByMode, PRIVACY_MODE_IDS } from '@config/privacy-modes';
-import { DEFAULT_TTS_CONFIG } from '../../services/tts/index.js';
+import { PRIVACY_MODES, getModeFeatures, isFeatureEnabled, isProviderAllowed as isProviderAllowedByMode, PRIVACY_MODE_IDS } from '../../stack/privacy-modes.js';
+import { DEFAULT_TTS_CONFIG } from '../../tts/index.js';
 
 export const defaultConfig = {
   llm: { endpoint: 'http://localhost:1234/v1', timeout: 60000 },
@@ -173,7 +173,7 @@ export const DEFAULT_SETTINGS = {
     longFormChars: 150,
   },
 
-  // Single source of truth for TTS defaults is services/tts/index.js
+  // Single source of truth for TTS defaults is tts/index.js
   // (electron/state.js keeps a value-identical copy — main process can't
   // import renderer ESM).
   tts: { ...DEFAULT_TTS_CONFIG },

@@ -5,7 +5,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import useOnboarding from '../../src/hooks/use-onboarding.js';
+import useOnboarding from '../../src/core/use-onboarding.js';
 
 let store;
 

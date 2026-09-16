@@ -7,7 +7,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
-import { LANGUAGE_CODES, OCR_ENGINES } from '@config/defaults';
+import { LANGUAGE_CODES, OCR_ENGINES } from '../config/constants.js';
 
 const useConfigStore = create(
   persist(

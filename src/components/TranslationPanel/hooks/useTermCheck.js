@@ -3,7 +3,7 @@
 
 import { useState, useCallback } from 'react';
 import useTranslationStore from '../../../stores/translation-store';
-import createLogger from '../../../utils/logger.js';
+import createLogger from '../../../core/logger.js';
 
 const logger = createLogger('useTermCheck');
 

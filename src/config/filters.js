@@ -4,7 +4,7 @@
 // rewritten by the LLM.
 
 // No logger import here: this file is cross-imported by the main-process
-// stack bundle, and utils/logger.js carries a Vite-only import.meta.
+// stack bundle, and core/logger.js carries a Vite-only import.meta.
 
 // Each filter: { name, pattern (RegExp, MUST be /g), description, enabled }.
 export const DEFAULT_FILTERS = [

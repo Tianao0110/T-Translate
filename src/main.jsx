@@ -3,8 +3,8 @@ import ReactDOM from 'react-dom/client';
 import './i18n'; // i18n init must run before any component imports a translation
 import App from './App';
 import ErrorBoundary from './components/ErrorBoundary';
-import createLogger from './utils/logger.js';
-import { initGlobalErrorHandler } from './utils/global-error-handler.js';
+import createLogger from './core/logger.js';
+import { initGlobalErrorHandler } from './core/global-error-handler.js';
 import './styles/index.css';
 
 const logger = createLogger('Main');

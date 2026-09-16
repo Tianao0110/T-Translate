@@ -7,11 +7,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AudioLines, Volume2, ChevronLeft, ChevronRight } from 'lucide-react';
-import ttsManager, { DEFAULT_TTS_CONFIG } from '../../../services/tts/index.js';
+import ttsManager, { DEFAULT_TTS_CONFIG } from '../../../tts/index.js';
 import ListenSection from './ListenSection.jsx';
 import TTSSection from './TTSSection.jsx';
 import PackList from './PackList.jsx';
-import createLogger from '../../../utils/logger.js';
+import createLogger from '../../../core/logger.js';
 const logger = createLogger('AudioSection');
 
 const AudioSection = ({ settings, updateSetting, notify, confirm, initialView }) => {

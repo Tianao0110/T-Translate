@@ -12,24 +12,24 @@ import {
 
 import { useShallow } from 'zustand/react/shallow';
 import useTranslationStore from '../../stores/translation-store';
-import translationService from '../../services/stack-client.js';
-import { TTS_STATUS } from '../../services/tts/index.js';
-import createLogger from '../../utils/logger.js';
-import { getShortErrorMessage } from '../../utils/error-handler.js';
+import translationService from '../../translation/stack-client.js';
+import { TTS_STATUS } from '../../tts/index.js';
+import createLogger from '../../core/logger.js';
+import { getShortErrorMessage } from '../../core/error-handler.js';
 import './styles.css';
 
-import { PRIVACY_MODES, TRANSLATION_STATUS, LANGUAGES } from '@config/defaults';
+import { PRIVACY_MODES, TRANSLATION_STATUS, LANGUAGES } from '../../config/constants.js';
 
 import { useTTS, useTermCheck, useStyleRewrite, useSaveModal } from './hooks';
-import useAiActions from '../../hooks/use-ai-actions.js';
-import { resolveActionLabel } from '../../services/ai-action-runner.js';
+import useAiActions from '../../ai/use-ai-actions.js';
+import { resolveActionLabel } from '../../ai/ai-action-runner.js';
 import AiActionIcon from '../shared/AiActionIcon.jsx';
 import OneTimeHint from '../shared/OneTimeHint.jsx';
-import useOnboarding from '../../hooks/use-onboarding.js';
+import useOnboarding from '../../core/use-onboarding.js';
 
 import { StyleModal, SaveModal } from './components.jsx';
 import LanguagePicker from '../shared/LanguagePicker.jsx';
-import { mergeLanguages, customCodesOf } from '@config/custom-languages';
+import { mergeLanguages, customCodesOf } from '../../config/custom-languages.js';
 
 const logger = createLogger('TranslationPanel');
 

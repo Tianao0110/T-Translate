@@ -10,7 +10,7 @@ const { t } = require("../shared/main-i18n");
 const { isOfflineMode } = require("../security/privacy-gate");
 const { syncLoginItem } = require("../platform/login-item");
 
-// Must match MAX_FILE_SIZE in src/utils/document-parser.js: the parser refuses
+// Must match MAX_FILE_SIZE in src/document/document-parser.js: the parser refuses
 // anything larger anyway, so a higher cap here would only read the whole file
 // into memory and ship it over IPC for the renderer to reject.
 const MAX_OPEN_WITH_BYTES = 20 * 1024 * 1024;
@@ -250,7 +250,7 @@ function register(ctx) {
 
   // ===== Logs =====
 
-  // Renderer-side logging had no path to disk: src/utils/logger.js writes to
+  // Renderer-side logging had no path to disk: src/core/logger.js writes to
   // console only, so React crashes, unhandled rejections and window.onerror
   // left the log files completely blind to the whole renderer half of the app.
   // One-way (`on`, not `handle`) — logging must never make the caller await.

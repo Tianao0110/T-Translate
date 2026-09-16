@@ -5,11 +5,11 @@
 // Everything above runAiAction is pure so the gating rules can be unit-tested
 // without a provider.
 
-import translationService from './stack-client.js';
-import { AI_ACTION_VARS } from '@config/ai-actions';
-import { LANGUAGES } from '@config/languages';
-import { detectLanguage } from '../utils/text.js';
-import createLogger from '../utils/logger.js';
+import translationService from '../translation/stack-client.js';
+import { AI_ACTION_VARS } from '../config/ai-actions.js';
+import { LANGUAGES } from '../config/languages.js';
+import { detectLanguage } from '../core/text.js';
+import createLogger from '../core/logger.js';
 import i18n from '../i18n.js';
 
 const logger = createLogger('AIAction');

@@ -9,7 +9,7 @@ import React from 'react';
 
 let triggerCb = null;
 
-vi.mock('../../src/services/stack-client.js', () => ({
+vi.mock('../../src/translation/stack-client.js', () => ({
   default: {
     initialized: true,
     init: vi.fn(() => Promise.resolve()),
@@ -17,7 +17,7 @@ vi.mock('../../src/services/stack-client.js', () => ({
   },
 }));
 
-vi.mock('../../src/services/tts/index.js', () => ({
+vi.mock('../../src/tts/index.js', () => ({
   default: {
     init: vi.fn(() => Promise.resolve()),
     stop: vi.fn(),
@@ -27,7 +27,7 @@ vi.mock('../../src/services/tts/index.js', () => ({
   TTS_STATUS: { IDLE: 'idle', SPEAKING: 'speaking', STOPPED: 'stopped' },
 }));
 
-vi.mock('../../src/utils/logger.js', () => ({
+vi.mock('../../src/core/logger.js', () => ({
   default: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
 }));
 

@@ -3,7 +3,7 @@
 // configured-but-unavailable engine degrades to web-speech instead of erroring.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import ttsManager, { NeuralTTSEngine } from '../../src/services/tts/index.js';
+import ttsManager, { NeuralTTSEngine } from '../../src/tts/index.js';
 
 function stubSpeechSynthesis() {
   const synth = {
@@ -172,7 +172,7 @@ describe('neural engine playback control', () => {
 
 describe('external endpoint engine', () => {
   it('is unavailable without the stack bridge or without a configured server', async () => {
-    const { EndpointTTSEngine } = await import('../../src/services/tts/index.js');
+    const { EndpointTTSEngine } = await import('../../src/tts/index.js');
     const engine = new EndpointTTSEngine({});
     expect(await engine.isAvailable()).toBe(false);
     window.electron = { stack: { ttsSpeak: vi.fn(), ttsCapability: vi.fn(async () => ({ available: false, reason: 'offline-mode', code: 'OFFLINE_BLOCKED' })), abort: vi.fn(async () => {}) } };
@@ -182,7 +182,7 @@ describe('external endpoint engine', () => {
   });
 
   it('a failed server reply is an ENDPOINT_ error the manager can cover with system voices', async () => {
-    const { EndpointTTSEngine } = await import('../../src/services/tts/index.js');
+    const { EndpointTTSEngine } = await import('../../src/tts/index.js');
     window.electron = {
       stack: {
         ttsSpeak: vi.fn(async () => ({ success: false, error: 'ECONNREFUSED' })),

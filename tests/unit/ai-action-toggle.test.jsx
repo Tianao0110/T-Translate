@@ -7,13 +7,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 
 const runAiAction = vi.fn();
-vi.mock('../../src/services/ai-action-runner.js', async (importOriginal) => ({
+vi.mock('../../src/ai/ai-action-runner.js', async (importOriginal) => ({
   ...(await importOriginal()),
   runAiAction: (...args) => runAiAction(...args),
   getActionCapabilities: async () => ({ text: true, vision: false }),
 }));
 
-vi.mock('../../src/services/stack-client.js', () => ({
+vi.mock('../../src/translation/stack-client.js', () => ({
   default: { onChanged: () => () => {} },
 }));
 
@@ -22,7 +22,7 @@ vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: () => {} },
 }));
 
-const useAiActions = (await import('../../src/hooks/use-ai-actions.js')).default;
+const useAiActions = (await import('../../src/ai/use-ai-actions.js')).default;
 const { getAiAction } = await import('../../src/config/ai-actions.js');
 
 const summarize = getAiAction('summarize');

@@ -10,9 +10,9 @@ const stackClient = {
   visionChat: vi.fn(),
   chatCompletion: vi.fn(),
 };
-vi.mock('../../src/services/stack-client.js', () => ({ default: stackClient }));
+vi.mock('../../src/translation/stack-client.js', () => ({ default: stackClient }));
 
-const { runAiAction } = await import('../../src/services/ai-action-runner.js');
+const { runAiAction } = await import('../../src/ai/ai-action-runner.js');
 const { getAiAction } = await import('../../src/config/ai-actions.js');
 
 const IMG = 'data:image/png;base64,AAAA';

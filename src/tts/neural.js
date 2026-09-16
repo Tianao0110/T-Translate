@@ -16,8 +16,8 @@
 
 import i18n from 'i18next';
 import { BaseTTSEngine, TTS_STATUS } from './base.js';
-import { pickVoice, normalizeLang, detectTextLang } from '../../utils/tts-voice-pick.js';
-import createLogger from '../../utils/logger.js';
+import { pickVoice, normalizeLang, detectTextLang } from './tts-voice-pick.js';
+import createLogger from '../core/logger.js';
 const logger = createLogger('NeuralTTS');
 
 let _requestSeq = 0;

@@ -3,7 +3,7 @@
 
 import React from 'react';
 import i18n from '../../i18n.js';
-import createLogger from '../../utils/logger.js';
+import createLogger from '../../core/logger.js';
 
 const logger = createLogger('ErrorBoundary');
 

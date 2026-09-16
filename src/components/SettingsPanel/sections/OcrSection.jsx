@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff, AlertTriangle, RefreshCw, Download, Cpu, Sparkles, Globe, ExternalLink, FolderOpen } from 'lucide-react';
-import stackClient from '../../../services/stack-client.js';
+import stackClient from '../../../translation/stack-client.js';
 import { OCR_LANGUAGE_GROUPS, ocrLanguageName } from '../../../config/ocr-languages.js';
 import LanguagePicker from '../../shared/LanguagePicker.jsx';
 import PackList from './PackList.jsx';

@@ -4,7 +4,7 @@ import { TTS_STATUS } from './base.js';
 import WebSpeechEngine from './web-speech.js';
 import NeuralTTSEngine from './neural.js';
 import EndpointTTSEngine from './endpoint.js';
-import createLogger from '../../utils/logger.js';
+import createLogger from '../core/logger.js';
 const logger = createLogger('TTSManager');
 
 export { BaseTTSEngine, TTS_STATUS } from './base.js';

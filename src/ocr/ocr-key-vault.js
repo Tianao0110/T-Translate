@@ -4,7 +4,7 @@
 // Vault key naming: ocr_<flatField> — the ocr_ prefix is what the offline
 // privacy gate in electron/ipc/secure-storage.js matches on.
 
-import createLogger from './logger.js';
+import createLogger from '../core/logger.js';
 
 const logger = createLogger('OcrKeyVault');
 

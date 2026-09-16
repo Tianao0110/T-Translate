@@ -1165,7 +1165,7 @@ const zh = {
     tengineNoChat: "当前内置模型只做翻译，AI 动作请改用通用模型",
     // Shared provider runtime messages (migrated from hardcoded Chinese).
     // English strings must keep classifiable keywords so error-handler's
-    // ERROR_PATTERNS still routes them (see utils/error-handler.js).
+    // ERROR_PATTERNS still routes them (see core/error-handler.js).
     emptyText: "文本为空",
     notConfigured: "未配置 API Key",
     notConfiguredBaidu: "未配置 APP ID 或密钥",

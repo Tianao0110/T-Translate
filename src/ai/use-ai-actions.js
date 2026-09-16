@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BUILTIN_AI_ACTIONS, longFormGate } from '@config/ai-actions';
+import { BUILTIN_AI_ACTIONS, longFormGate } from '../config/ai-actions.js';
 import {
   checkActionAvailability,
   getActionCapabilities,
@@ -14,10 +14,10 @@ import {
   resolveActionLabel,
   resolveActionPath,
   runAiAction,
-} from '../services/ai-action-runner.js';
-import { ensureImportedActions, refreshImportedActions } from '../services/ai-action-store.js';
-import translationService from '../services/stack-client.js';
-import createLogger from '../utils/logger.js';
+} from './ai-action-runner.js';
+import { ensureImportedActions, refreshImportedActions } from './ai-action-store.js';
+import translationService from '../translation/stack-client.js';
+import createLogger from '../core/logger.js';
 
 const logger = createLogger('useAiActions');
 

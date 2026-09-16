@@ -2,7 +2,7 @@
 // every read re-validates. These lock what survives that pass and what does not.
 
 import { describe, it, expect } from 'vitest';
-import { validateImportedActions } from '../../src/services/ai-action-store.js';
+import { validateImportedActions } from '../../src/ai/ai-action-store.js';
 import { AI_ACTION_SCHEMA_VERSION } from '../../src/config/ai-actions.js';
 
 const valid = (overrides = {}) => ({
