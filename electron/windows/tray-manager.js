@@ -1,4 +1,5 @@
-﻿// System tray manager with locale-aware menu labels.
+﻿// System tray: icon (green dot while selection translate is on), menu with
+// locale-aware labels (shared/tray-labels), click handling.
 
 const { Tray, Menu, nativeImage, app } = require('electron');
 const { store, runtime } = require('../state');
@@ -19,7 +20,7 @@ let deps = {
   getSelectionEnabled: null,
 };
 
-// Precedence: stored user preference > OS locale > English
+// Stored preference > OS locale > English.
 function detectLanguage() {
   const savedLang = store.get('settings.interface.language');
   if (savedLang) {
@@ -44,8 +45,7 @@ function init(dependencies) {
   logger.debug('Tray language initialized:', lang);
 }
 
-// Paints a 10px green dot in the bottom-right corner of the 32px tray icon
-// (visual signal that selection-translate is active).
+// The 32px tray icon with a green dot in the corner.
 function createIconWithDot(icon) {
   try {
     const size = 32;
@@ -65,7 +65,6 @@ function createIconWithDot(icon) {
         const dy = y + 0.5 - cy;
         if (dx * dx + dy * dy <= r * r) {
           const idx = (y * size + x) * 4;
-          // #10b981 (emerald-500)
           buf[idx] = 0x10;
           buf[idx + 1] = 0xb9;
           buf[idx + 2] = 0x81;
@@ -112,8 +111,7 @@ function createTray(ctx) {
 
   updateMenu();
 
-  // Windows fires `click` before `double-click`. Delay single-click 300ms so
-  // a real double-click can cancel it before the selection-toggle fires.
+  // Windows fires click before double-click: the single click waits 300ms.
   let clickTimer = null;
 
   tray.on('click', () => {
@@ -147,7 +145,7 @@ function createTray(ctx) {
   return tray;
 }
 
-// Sync tray labels by watching store, so no extra IPC channel is needed
+// Tray labels follow the interface language setting.
 function setupLanguageListener() {
   store.onDidChange('settings', (newSettings, oldSettings) => {
     const newLang = newSettings?.interface?.language;
@@ -211,10 +209,7 @@ function updateMenu() {
         }
       },
     },
-    // A plain item on purpose: a checkbox makes Windows reserve a check
-    // column for every row, which is the only thing that made the menu look
-    // loose. The tray icon and its tooltip already show whether selection
-    // translation is on.
+    // A plain item, not a checkbox: the icon and tooltip carry the state.
     {
       label: t('selectionTranslate'),
       click: () => {

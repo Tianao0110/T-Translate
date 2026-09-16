@@ -1,24 +1,13 @@
-﻿// Global state — two layers.
-//   1. Persistent config (electron-store) — survives restarts.
-//   2. Runtime state — in-memory, reset on every launch.
-//
-// Data-flow contract:
-//   electron-store is the single source of truth for cross-process config.
-//   Renderer reads/writes via IPC (store-get / store-set).
-//   Renderer-side Zustand stores (config.js, translation-store.js) hold UI state
-//   and mirror the relevant slices into electron-store on change (e.g. language,
-//   theme). Main process only reads electron-store; it never injects into the
-//   renderer with executeJavaScript.
+﻿// Global state: the electron-store (persistent, the one source of cross-process
+// config; renderers reach it over store-get / store-set) and the in-memory
+// runtime + window refs. Contract: docs/design/main-process.md §8.
 
 const Store = require('electron-store');
 const { pruneRetiredSettings } = require('./platform/store-cleanup');
 
 const isDev = process.env.NODE_ENV === 'development' || !require('electron').app.isPackaged;
 
-// One-time store-key migration from the legacy "glass" naming (pre-0.2.9).
-// An old key present on disk means a pre-rename install — its value is the
-// user's real data, so it simply moves; idempotent because the old key is
-// deleted afterwards.
+// One-time key rename from the pre-0.2.9 "glass" naming; idempotent.
 function migrateGlassKeys(s) {
   const renames = [
     ['glassBounds', 'floatingWindowBounds'],
@@ -46,14 +35,11 @@ const store = new Store({
     floatingWindowBounds: { width: 400, height: 200 },
     floatingWindowLocal: {},
 
-    // Selection translate — disabled by default on every launch (user opts in per session).
     selectionEnabled: false,
 
     privacyMode: 'standard',
 
-    // App-wide settings buckets. (No 'providers'/'connection' seeds: both
-    // buckets are retired — seeding them here re-created ghost keys on every
-    // fresh install that the renderer-side migration then carried forever.)
+    // App-wide settings buckets (no retired buckets seeded here).
     settings: {
       shortcuts: {},
       translation: {},
@@ -62,8 +48,7 @@ const store = new Store({
       selection: {},
       screenshot: {},
       floatingWindow: {},
-      // Must stay value-identical to DEFAULT_TTS_CONFIG in
-      // src/tts/index.js (main process can't import that ESM module).
+      // Must stay value-identical to DEFAULT_TTS_CONFIG in src/tts/index.js.
       tts: {
         enabled: true,
         engine: 'web-speech',
@@ -84,17 +69,15 @@ const runtime = {
   isQuitting: false,
   isAppReady: false,
 
-  // Set once before app-ready when crash-guard detects consecutive startup
-  // failures; a boot-time decision, deliberately untouched by resetRuntime.
+  // Boot-time decision by crash-guard (main.js).
   safeMode: false,
 
-  // File path handed over by the Explorer context menu (cold-start argv or
-  // second-instance forward), consumed once by the renderer's take-pending IPC.
+  // "Open with" file, consumed once by the renderer's take-pending IPC.
   pendingOpenFile: null,
 
-  selectionEnabled: false,  // Off by default each launch (mirror of store but cleared on start).
+  selectionEnabled: false, // off on every launch
 
-  // Window refs — accessed through `windows` getter/setter below.
+  // Window refs, accessed through `windows` below.
   _windows: {
     main: null,
     floatingWindow: null,
@@ -117,8 +100,7 @@ const runtime = {
   shortcutsRegistered: false,
 };
 
-// Window-ref proxy with getter/setter — lets us add dev-only logging without
-// touching every caller.
+// Window-ref proxy (dev logging on set).
 const windows = {
   get main() { return runtime._windows.main; },
   set main(win) {
@@ -149,7 +131,6 @@ const windows = {
   },
 };
 
-// Legacy aliases — kept for backwards compatibility with older call sites.
 function getMainWindow() {
   return windows.main;
 }

@@ -1,12 +1,6 @@
-// Unified selected-text capture over the clipboard. Single owner of:
-//   - a module-level mutex, so only one Ctrl+C-and-read runs at a time
-//     (the mouseup selection probe and the icon-click fetch used to interleave
-//     and clobber each other's restore);
-//   - full-format snapshot/restore, so a probe never destroys the user's
-//     clipboard image/files/rich text (a passive probe overwriting an unpasted
-//     screenshot was a real data-loss path);
-//   - a short-lived success cache, so a fetch within 500ms of a capture reuses
-//     the text instead of firing a second redundant Ctrl+C.
+// Selected-text capture over the clipboard: one mutex, a full-format
+// snapshot / restore around the synthetic Ctrl+C, and a short success cache.
+// Why each exists: docs/design/selection.md §3.
 
 const { clipboard } = require('electron');
 const { simulateCtrlC } = require('../platform/native-helper');
@@ -18,9 +12,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // Mutex: captures append to this chain so they run strictly one at a time.
 let chain = Promise.resolve();
 
-// Success cache (root-fix): a capture that landed <500ms ago is reused rather
-// than re-probing. Fixes the "press but no content" second fetch after focus
-// moves, and collapses probe+fetch on the same selection into one Ctrl+C.
+// Success cache: a capture that landed within CACHE_TTL is reused.
 let lastText = null;
 let lastTextAt = 0;
 const CACHE_TTL = 500;
@@ -37,8 +29,7 @@ function hasImageFormat(formats) {
   );
 }
 
-// Snapshot every format we can put back. Image is only read when present
-// (readImage on an empty clipboard is wasted work).
+// Snapshot every format we can put back.
 function snapshotClipboard() {
   const formats = clipboard.availableFormats();
   return {
@@ -69,18 +60,12 @@ function restoreClipboard(snap) {
   }
 }
 
-/**
- * Capture the currently selected text via a clipboard round-trip.
- * Serialized against every other capture; original clipboard is restored.
- *
- * @param {Object} [options]
- * @param {boolean} [options.isComplexApp] extend the deadline for slow apps (Office)
- * @returns {Promise<{ text: string|null, formats: string[], fileClipboard?: boolean, fromCache?: boolean }>}
- *   fileClipboard=true means the clipboard held files we refused to clobber (no probe ran).
- */
+// Captures the selected text via a clipboard round-trip, serialized against
+// every other capture, clipboard restored. isComplexApp extends the deadline.
+// Returns { text, formats, fileClipboard?, fromCache? }; fileClipboard means
+// the clipboard held files and no probe ran.
 function captureSelectedText(options = {}) {
   const job = chain.catch(() => {}).then(() => runCapture(options));
-  // Keep the chain alive even if this job rejects, so the next capture still runs.
   chain = job.catch(() => {});
   return job;
 }
@@ -93,9 +78,7 @@ async function runCapture({ isComplexApp = false } = {}) {
 
   const snap = snapshotClipboard();
 
-  // Files can't be restored through the clipboard API, so a probe would destroy
-  // them irreversibly. Refuse to probe when the clipboard holds files and no
-  // text. (Images we snapshot and best-effort restore below.)
+  // Files cannot be restored through the clipboard API: no probe.
   if (hasFileFormat(snap.formats) && !snap.text) {
     return { text: null, formats: snap.formats, fileClipboard: true };
   }
@@ -109,8 +92,7 @@ async function runCapture({ isComplexApp = false } = {}) {
     let text = '';
     let formats = [];
 
-    // Poll until the copy lands: non-empty text, or a file copy's format shows
-    // up (Explorer file selection produces CF_HDROP, often without text).
+    // Poll until the copy lands: text, or a file format (Explorer selections).
     while (Date.now() < deadline) {
       await sleep(50);
       const current = clipboard.readText();
@@ -122,8 +104,7 @@ async function runCapture({ isComplexApp = false } = {}) {
       }
     }
 
-    // Formats produced by the copy, read BEFORE restore so callers get fresh
-    // data (reading them post-restore was the file-drop misdetection bug).
+    // Formats produced by the copy, read before the restore.
     if (formats.length === 0) formats = clipboard.availableFormats();
 
     restoreClipboard(snap);
@@ -142,16 +123,13 @@ async function runCapture({ isComplexApp = false } = {}) {
   }
 }
 
-// Drop the success cache. Called on each fresh mousedown so a cached capture
-// can only ever be reused within the same selection gesture, never across two
-// quick consecutive selections.
+// Called on each fresh mousedown: a cache never crosses two gestures.
 function invalidateCache() {
   lastText = null;
   lastTextAt = 0;
 }
 
-// Detection wrapper for the mouseup probe: only the yes/no + text matters.
-// fileClipboard → null (undetermined; don't show a false "no selection").
+// Detection wrapper for the mouseup probe; fileClipboard reads as undetermined.
 async function detectSelectionViaClipboard(options = {}) {
   const res = await captureSelectedText(options);
   if (res.fileClipboard) return { hasSelection: null, text: '' };

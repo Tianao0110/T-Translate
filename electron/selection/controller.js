@@ -17,18 +17,15 @@ const logger = require('../platform/logger')('Selection');
 
 let selectionStateMachine = null;
 
-// Opt-in probe diagnostics (set TT_SELECTION_DEBUG=1). Records which detection
-// layer resolved each gesture, by control class + method only — never text
-// content — so the app-matrix pass can see where a given app lands.
-// Tolerant parse: cmd's `set X=1 && …` includes the trailing space in the value.
+// Opt-in probe diagnostics (TT_SELECTION_DEBUG=1): control class + method
+// per gesture, never text.
 const SELECTION_DEBUG = /^(1|true)$/i.test((process.env.TT_SELECTION_DEBUG || '').trim());
 function debugProbe(stage, data) {
   if (SELECTION_DEBUG) logger.info(`[probe:${stage}]`, JSON.stringify(data));
 }
 
-// Terminal window classes where a blind Ctrl+C is a SIGINT (kills the running
-// process). The sticky-direct path downgrades to the click-to-confirm trigger
-// icon for these instead of auto-injecting.
+// Terminal window classes: the sticky-direct path never injects Ctrl+C into
+// these, it shows the trigger icon instead.
 const TERMINAL_CLASSES = [
   'CASCADIA_HOSTING_WINDOW_CLASS', // Windows Terminal
   'ConsoleWindowClass',            // conhost / cmd / classic console
@@ -41,9 +38,7 @@ function isTerminalClass(className) {
   return TERMINAL_CLASSES.some((c) => className.includes(c));
 }
 
-// Single source for the settings payload every selection-window path sends —
-// kills per-call-site drift (screenshot Modes 2/3 were missing showSourceByDefault
-// and triggerTimeout, and defaults disagreed across sites).
+// The settings payload every selection-window path sends.
 function buildSelectionSettingsPayload() {
   const s = store.get('settings.selection', {}) || {};
   return {
@@ -53,34 +48,25 @@ function buildSelectionSettingsPayload() {
     minChars: s.minChars || 2,
     maxChars: s.maxChars || 500,
     windowOpacity: s.windowOpacity || 95,
-    // Rainbow signature skin takes over the selection window in every theme
-    // when on; off = each theme's own matched skin (fresh has an aqua one).
     rainbowWindow: s.rainbowWindow || false,
-    // UI language, so the persistent window refreshes its i18n on each show —
-    // language (unlike theme) has no cross-window broadcast.
+    // UI language: the persistent window refreshes its i18n on each show.
     language: store.get('settings.interface.language') || undefined,
   };
 }
 
-// Cached mirror of settings.selection — electron-store re-reads and re-parses
-// the whole settings file from disk on every .get(), too slow for the global
-// mousedown/mouseup hot path.
+// Cached mirror of settings.selection for the mouse-hook hot path.
 let cachedSelectionSettings = store.get('settings.selection', {});
 store.onDidChange('settings.selection', (value) => {
   cachedSelectionSettings = value || {};
 });
 
-// Cancellation for in-flight delayed-confirm: a newer confirm (triple-click's
-// third mouseup) cancels the older one so only the final selection gets probed.
+// Cancellation for an in-flight delayed confirm: a newer one cancels it.
 let pendingConfirmCancel = null;
 
-// Foreground window snapshot taken at mousedown; compared at mouseup to detect
-// window-drag gestures (see getForegroundWindowSnapshot).
+// Foreground window snapshot taken at mousedown, compared at mouseup.
 let gestureWindowSnapshot = null;
 
-// True when the gesture moved the foreground window itself (title-bar drag,
-// double-click maximize): the user was manipulating a window, not selecting
-// text — probing would inject Ctrl+C into it (SIGINT in terminals).
+// True when the gesture moved the foreground window itself (title-bar drag).
 function isWindowDragGesture() {
   if (!gestureWindowSnapshot) return false;
   const { getForegroundWindowSnapshot } = require('../platform/native-helper');
@@ -91,8 +77,7 @@ function isWindowDragGesture() {
   return moved;
 }
 
-// Delayed-confirm path for double/triple click. The system needs time to react before
-// we can check if text actually got selected.
+// Double / triple click: wait out the multi-click window, then probe.
 async function handleDelayedConfirm(x, y) {
   if (pendingConfirmCancel) pendingConfirmCancel();
   let cancelled = false;
@@ -103,11 +88,7 @@ async function handleDelayedConfirm(x, y) {
     const { hasTextSelection } = require('../platform/native-helper');
     const { detectSelectionViaClipboard } = require('./clipboard-capture');
 
-    // Wait out the FULL multi-click window before probing. Probing earlier (was
-    // 80ms) fired between the 2nd and 3rd click of a triple-click: the probe's
-    // synthetic Ctrl+C landed mid-sequence, broke the app's own triple-click
-    // expansion, and captured the double-click word instead of the paragraph.
-    // Any click that arrives within this window cancels us and re-schedules.
+    // Any click inside this window cancels us and re-schedules.
     await new Promise(resolve => setTimeout(resolve, FSM_CONFIG.DOUBLE_CLICK_TIME));
 
     if (cancelled) {
@@ -115,8 +96,7 @@ async function handleDelayedConfirm(x, y) {
       return;
     }
 
-    // Double-click on a title bar maximizes the window — that resize lands
-    // after our mouseup, so re-check here (post-wait) before probing.
+    // A title-bar double-click resizes after our mouseup: re-check here.
     if (isWindowDragGesture()) {
       logger.debug('Delayed confirm: window moved/resized (title-bar double-click) — skip probe');
       debugProbe('delayed', { skipped: 'window-drag gesture' });
@@ -143,7 +123,6 @@ async function handleDelayedConfirm(x, y) {
     }
 
     // ----- Layer 3: clipboard fallback for complex apps -----
-    // Office / Outlook need longer waits + retry.
     const reason = selectionCheck.reason || '';
     const isOfficeApp = reason.includes('OpusApp') ||
                         reason.includes('EXCEL') ||
@@ -176,24 +155,18 @@ async function handleDelayedConfirm(x, y) {
     selectionStateMachine.reset();
   } catch (err) {
     logger.error('handleDelayedConfirm error:', err);
-    // Belt-and-suspenders reset.
     if (selectionStateMachine) {
       selectionStateMachine.reset();
     }
   } finally {
-    // Only release the slot if I'm still the current owner — a newer confirm
-    // may have already overwritten pendingConfirmCancel with its own token.
+    // Only release the slot if still the current owner.
     if (pendingConfirmCancel === myCancel) pendingConfirmCancel = null;
   }
 }
 
-// Show the trigger icon at (mouseX, mouseY). Reads language settings from electron-store
-// (TranslationPanel mirrors them on every change — single source of truth).
-//
-// `prefetchedText` (v0.2.5 Phase B): when the caller already captured selected text
-// (Layer 3 path), pass it through. The renderer stores it in a ref and uses it
-// directly on icon click, skipping the second clipboard fetch (which is the root cause
-// of the "press but no content" issue in complex apps with focus-transfer behavior).
+// Shows the trigger icon at (mouseX, mouseY). `prefetchedText` is text the
+// Layer 3 probe already captured; the renderer uses it on click instead of
+// fetching again.
 async function showSelectionTrigger(mouseX, mouseY, prefetchedText = null, options = {}) {
   logger.debug(`showSelectionTrigger called (prefetched=${prefetchedText ? prefetchedText.length + ' chars' : 'none'}, failed=${!!options.failed})`);
 
@@ -212,11 +185,7 @@ async function showSelectionTrigger(mouseX, mouseY, prefetchedText = null, optio
 
   const win = windowManager.createSelectionWindow();
 
-  // Trigger window must be square, else the icon's border-radius:50% renders
-  // an ellipse. Electron 42 on Windows clamps frameless/transparent windows to
-  // a ~30x37 minimum, so the old 28x28 came out non-square. 40 clears the clamp
-  // on every DPI tested; the renderer also pins the icon to a fixed size so a
-  // clamp on some other DPI still can't distort it.
+  // Square and above Electron's frameless-window minimum (docs/design/selection.md §5).
   const TRIGGER_SIZE = 40;
   const GAP = 8;
 
@@ -225,8 +194,7 @@ async function showSelectionTrigger(mouseX, mouseY, prefetchedText = null, optio
   let triggerY = mouseY + GAP;
 
   const display = screen.getDisplayNearestPoint({ x: mouseX, y: mouseY });
-  // workArea (not bounds) so the icon never tucks under the taskbar, and shares
-  // the same reference frame as the card's renderer-side availWidth/Height clamp.
+  // workArea keeps the icon off the taskbar and matches the renderer's clamp.
   const bounds = display.workArea;
 
   if (triggerX + TRIGGER_SIZE > bounds.x + bounds.width) {
@@ -248,9 +216,7 @@ async function showSelectionTrigger(mouseX, mouseY, prefetchedText = null, optio
     win.webContents.send(CHANNELS.SELECTION.SHOW_TRIGGER, {
       mouseX,
       mouseY,
-      // Work area of the display the selection happened on, so the renderer
-      // clamps card placement to the RIGHT monitor (window.screen is only the
-      // current display and carries no global origin).
+      // Work area of the display the selection happened on, for the card clamp.
       screenBounds: { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height },
       theme: interfaceSettings.theme || 'light',
       settings: buildSelectionSettingsPayload(),
@@ -259,10 +225,8 @@ async function showSelectionTrigger(mouseX, mouseY, prefetchedText = null, optio
         sourceLanguage: currentSourceLang,
         sameLanguageBehavior: translationSettings.sameLanguageBehavior || 'original',
       },
-      // v0.2.5 Phase B pass-through — see function docstring.
       text: prefetchedText,
-      // Sticky-direct capture came back empty: render the icon in a failed
-      // state (red + shake); a click retries via GET_TEXT.
+      // Sticky-direct capture came back empty: failed icon, a click retries.
       failed: !!options.failed,
     });
   };
@@ -274,16 +238,9 @@ async function showSelectionTrigger(mouseX, mouseY, prefetchedText = null, optio
   }
 }
 
-/**
- * CapsLock sticky direct path: skip the trigger icon, capture text and pop the card
- * straight away. Invoked from the mouseup handler when FSM returns `{ skipIcon: true }`.
- *
- * Failure modes are silent: if no text captured OR window create failed, the function
- * returns without showing anything (the user sees nothing, not an error).
- *
- * payload shape intentionally mirrors SHOW_TRIGGER so the renderer's two paths stay
- * consistent.
- */
+// CapsLock sticky direct path: no trigger icon, capture and translate at
+// once. Invoked from mouseup when the FSM returns { skipIcon: true }; the
+// payload mirrors SHOW_TRIGGER.
 async function handleHotkeyDirectPath(x, y) {
   logger.debug('handleHotkeyDirectPath called', { x, y });
 
@@ -292,9 +249,7 @@ async function handleHotkeyDirectPath(x, y) {
     return;
   }
 
-  // Terminal: never blind-inject Ctrl+C (a no-selection copy is a SIGINT that
-  // kills the running process). Downgrade to the trigger icon so the copy only
-  // happens if the user explicitly clicks it.
+  // Terminals get the trigger icon: no blind Ctrl+C.
   const { getForegroundClassName } = require('../platform/native-helper');
   if (isTerminalClass(getForegroundClassName())) {
     logger.debug('Sticky direct in terminal — downgrading to trigger icon');
@@ -314,15 +269,14 @@ async function handleHotkeyDirectPath(x, y) {
     return;
   }
 
-  // Match showSelectionTrigger geometry (mouse + 8, 40×40 square — see the
-  // border-radius/clamp note there). Renderer resizes to card size on result.
+  // Same geometry as showSelectionTrigger; the renderer resizes to the card.
   const winW = 40;
   const winH = 40;
   let posX = x + 8;
   let posY = y + 8;
 
   const display = screen.getDisplayNearestPoint({ x: posX, y: posY });
-  const displayBounds = display.workArea; // keep off the taskbar (matches trigger path)
+  const displayBounds = display.workArea;
 
   if (posX + winW > displayBounds.x + displayBounds.width) {
     posX = x - winW - 8;
@@ -339,8 +293,6 @@ async function handleHotkeyDirectPath(x, y) {
   });
 
   const payloadBase = {
-    // Anchor + display work area so the card lands at the selection point on the
-    // correct monitor (P1-6 / P1-8) rather than the last trigger's spot.
     mouseX: x,
     mouseY: y,
     screenBounds: { x: displayBounds.x, y: displayBounds.y, width: displayBounds.width, height: displayBounds.height },
@@ -359,7 +311,7 @@ async function handleHotkeyDirectPath(x, y) {
     else fn();
   };
 
-  // Show a loading dot right away — capture takes ~0.8s and a silent gap felt broken.
+  // Loading dot right away; the capture takes ~0.8s.
   whenReady(() => {
     if (win.isDestroyed()) return;
     win.webContents.send(CHANNELS.SELECTION.SHOW_DIRECT, { ...payloadBase, phase: 'capturing' });
@@ -372,8 +324,7 @@ async function handleHotkeyDirectPath(x, y) {
   if (text && text.trim()) {
     whenReady(() => win.webContents.send(CHANNELS.SELECTION.SHOW_DIRECT, { ...payloadBase, phase: 'translate', text: text.trim() }));
   } else {
-    // Empty capture: don't fail silently. Flip to a clickable "failed" trigger
-    // (red + shake) so the user can retry via the icon, which re-runs GET_TEXT.
+    // Empty capture: a clickable failed trigger, so the user can retry.
     logger.debug('Hotkey: no text captured, showing failed trigger');
     showSelectionTrigger(x, y, null, { failed: true });
   }
@@ -386,10 +337,9 @@ function hideSelectionWindow() {
   }
 }
 
-// Send OCR'd text to the selection window — Mode 2 of SHOW_RESULT: the window receives
-// raw text and translates it itself (so the same translator + history flow gets reused).
+// SHOW_RESULT mode 2: raw OCR text, the window translates it itself.
 function showSelectionWithText(text, notice) {
-  clearSelectionLoadingWatchdog(); // OCR resolved — cancel the timeout
+  clearSelectionLoadingWatchdog();
   const win = runtime.screenshotSelectionWindow;
 
   if (!win || win.isDestroyed()) {
@@ -405,15 +355,13 @@ function showSelectionWithText(text, notice) {
 
   const currentTargetLang = translationSettings.targetLanguage || 'zh';
 
-  // Work area of the display the loading window sits on — the card expands from
-  // a clamped 28×28 spot near a screen edge, so the renderer needs these bounds
-  // to keep the grown card on-screen (the screenshot path has no cursor anchor).
+  // Work area of the display the loading window sits on, for the card clamp.
   const wb = win.getBounds();
   const disp = screen.getDisplayNearestPoint({ x: wb.x, y: wb.y });
 
   win.webContents.send(CHANNELS.SELECTION.SHOW_RESULT, {
-    text: text,  // Mode 2: text only, renderer translates.
-    notice: notice || undefined, // e.g. "vision model degraded to local OCR"
+    text: text,
+    notice: notice || undefined,
     targetLanguage: currentTargetLang,
     sameLanguageBehavior: translationSettings.sameLanguageBehavior || 'original',
     theme: interfaceSettings.theme || 'light',
@@ -422,10 +370,9 @@ function showSelectionWithText(text, notice) {
   });
 }
 
-// Show result directly (Mode 3): already-translated text. Used for OCR-failure paths
-// where the renderer should display content (or an error) without translating again.
+// SHOW_RESULT mode 3: already-translated text or an OCR error, no translation.
 function showSelectionResult(data) {
-  clearSelectionLoadingWatchdog(); // OCR resolved (result or error) — cancel the timeout
+  clearSelectionLoadingWatchdog();
   const win = runtime.screenshotSelectionWindow;
 
   if (!win || win.isDestroyed()) {
@@ -445,7 +392,6 @@ function showSelectionResult(data) {
   });
 }
 
-// Cancel the loading-window watchdog (OCR resolved, or we're tearing down).
 function clearSelectionLoadingWatchdog() {
   if (runtime.screenshotLoadingTimer) {
     clearTimeout(runtime.screenshotLoadingTimer);
@@ -453,7 +399,7 @@ function clearSelectionLoadingWatchdog() {
   }
 }
 
-// Close the screenshot-OCR loading window. If errorMsg is provided, show it for 4s first.
+// Closes the screenshot-OCR loading window; an errorMsg shows for 4s first.
 function hideSelectionLoading(errorMsg) {
   clearSelectionLoadingWatchdog();
   const win = runtime.screenshotSelectionWindow;
@@ -485,8 +431,7 @@ async function showSelectionLoading(bounds) {
   const win = windowManager.createSelectionWindow();
   runtime.screenshotSelectionWindow = win;
 
-  // Watchdog: if OCR never reports back (renderer not ready, message dropped),
-  // don't leave a permanent, unclosable spinner — surface a timeout after 20s.
+  // Watchdog: a spinner nobody closes times out after 20s.
   clearSelectionLoadingWatchdog();
   runtime.screenshotLoadingTimer = setTimeout(() => {
     logger.warn('Selection loading timed out with no OCR result');
@@ -498,8 +443,8 @@ async function showSelectionLoading(bounds) {
   let posY = bounds.y + bounds.height + 10;
 
   const display = screen.getDisplayNearestPoint({ x: posX, y: posY });
-  const screenBounds = display.workArea; // workArea (not bounds) so it clears the taskbar
-  const winSize = 28;  // Square loading window, matches selection-trigger size.
+  const screenBounds = display.workArea;
+  const winSize = 28;
 
   if (posX + winSize > screenBounds.x + screenBounds.width) {
     posX = bounds.x - winSize - 10;
@@ -538,20 +483,18 @@ function toggleSelectionTranslate() {
     hideSelectionWindow();
     stopSelectionHook();
   } else {
-    hookOk = startSelectionHook() !== false; // may flip selectionEnabled back off on failure
+    hookOk = startSelectionHook() !== false;
   }
 
-  updateTrayMenu(); // after the hook attempt, so it reflects a failed enable
+  updateTrayMenu();
   windows.main?.webContents?.send(CHANNELS.SELECTION.STATE_CHANGED, runtime.selectionEnabled);
   logger.info('Selection translate:', runtime.selectionEnabled ? 'enabled' : 'disabled');
 
-  // Distinguish "user turned it off" from "enable failed" so the UI can show an
-  // error instead of a green "disabled" success toast.
+  // 'hookFailed' lets the UI show an error instead of a "disabled" toast.
   return { enabled: runtime.selectionEnabled, error: hookOk ? null : 'hookFailed' };
 }
 
-// Wire the global mouse hook (uIOhook) and route mousedown/move/up into the FSM.
-// Returns true on success, false if the native hook failed to start.
+// Wires the global mouse hook into the FSM; false if the native hook failed.
 function startSelectionHook() {
   if (runtime.selectionHook || !runtime.selectionEnabled) return true;
 
@@ -563,33 +506,28 @@ function startSelectionHook() {
     }
     selectionStateMachine.reset();
 
-    // uIOhook is a singleton EventEmitter and .stop() does NOT drop listeners.
-    // Clear ours before re-adding so toggling selection on/off can't accumulate
-    // duplicate handlers (which raced each other and broke double-click capture).
+    // uIOhook is a singleton whose .stop() keeps listeners: clear ours first.
     uIOhook.removeAllListeners('mousedown');
     uIOhook.removeAllListeners('mousemove');
     uIOhook.removeAllListeners('mouseup');
 
     // ----- mousedown -----
     uIOhook.on('mousedown', (e) => {
-      if (e.button !== 1) return; // Left button only.
+      if (e.button !== 1) return;
 
       const cursorPos = screen.getCursorScreenPoint();
       const { x, y } = cursorPos;
 
-      // P3-20 verification aid: uiohook event coords vs Electron DIP coords.
-      // On a scaled display (e.g. 1.75x) a physical-pixel uiohook reads ~scale×
-      // larger. Verdict is precomputed so the log line answers directly.
+      // Coordinate-space check: uiohook event coords vs Electron DIP coords.
       if (SELECTION_DEBUG) {
-        const ratio = x > 100 ? (e.x / x) : null; // skip near-origin clicks (ratio unstable)
+        const ratio = x > 100 ? (e.x / x) : null;
         const verdict = ratio === null ? 'click further from screen corner and retry'
           : Math.abs(ratio - 1) < 0.05 ? 'SAME coordinate space -> switching to event coords is SAFE'
           : `uiohook is ~${ratio.toFixed(2)}x (physical pixels) -> DO NOT switch, keep getCursorScreenPoint`;
         debugProbe('coords', { uiohook: { x: e.x, y: e.y }, electronDip: { x, y }, verdict });
       }
 
-      // Click inside any of our selection windows (including frozen ones) — treat
-      // as a drag-on-overlay and skip the FSM entirely.
+      // Click inside one of our selection windows: not a gesture.
       if (windowManager.isPointInSelectionWindows(x, y)) {
         runtime.isDraggingOverlay = true;
         return;
@@ -597,27 +535,23 @@ function startSelectionHook() {
 
       runtime.isDraggingOverlay = false;
 
-      // Click on our other windows — also ignore.
       if (isClickInOurWindows(x, y)) {
         return;
       }
 
-      // Hide the existing trigger UNLESS this is a multi-click extending selection —
-      // hiding mid-double-click causes a visible flicker.
+      // Keep the trigger through a multi-click (hiding it would flicker).
       const isMultiClick = selectionStateMachine.peekMultiClick(x, y);
 
       if (!isMultiClick) {
         hideSelectionWindow();
       }
 
-      // Fresh gesture: drop any cached capture so it can only be reused within
-      // this one selection, never leak into the next.
+      // Fresh gesture: a cached capture never leaks into the next selection.
       require('./clipboard-capture').invalidateCache();
 
-      // Window-drag detection baseline (compared at mouseup).
       gestureWindowSnapshot = require('../platform/native-helper').getForegroundWindowSnapshot();
 
-      // Sticky direct: setting on + CapsLock LED on → bypass trigger icon.
+      // Sticky direct: setting on + CapsLock LED on.
       const stickyActive = !!cachedSelectionSettings.stickyViaCapsLock && isCapsLockOn();
 
       selectionStateMachine.onMouseDown(x, y, stickyActive);
@@ -653,8 +587,7 @@ function startSelectionHook() {
         const cursorPos = screen.getCursorScreenPoint();
         const { x, y } = cursorPos;
 
-        // Mouseup inside our selection window — user is clicking our trigger, not
-        // ending a fresh selection. Reset and let the renderer's click handler run.
+        // Mouseup inside our selection window is a click on the trigger.
         if (windows.selection && !windows.selection.isDestroyed() && windows.selection.isVisible()) {
           const bounds = windows.selection.getBounds();
           if (x >= bounds.x && x <= bounds.x + bounds.width &&
@@ -664,15 +597,12 @@ function startSelectionHook() {
           }
         }
 
-        // Re-read sticky state at mouseup (user may have released CapsLock mid-drag).
         const stickyActive = !!cachedSelectionSettings.stickyViaCapsLock && isCapsLockOn();
 
         const result = selectionStateMachine.onMouseUp(x, y, stickyActive);
 
         if (result.shouldShow) {
-          // Title-bar drags kinematically look like fast selections. If the
-          // foreground window itself moved with the gesture, bail before any
-          // probe/injection (Ctrl+C into a dragged terminal is a SIGINT).
+          // A title-bar drag looks like a fast selection: never probe it.
           if (isWindowDragGesture()) {
             logger.debug('Gesture moved the foreground window (title-bar drag) — skip probe');
             debugProbe('drag', { skipped: 'window-drag gesture' });
@@ -680,20 +610,18 @@ function startSelectionHook() {
             return;
           }
 
-          // Sticky direct: skip the icon, skip Layer 1+2 probe, go straight to capture + translate.
           if (result.skipIcon) {
             await handleHotkeyDirectPath(x, y);
             selectionStateMachine.reset();
             return;
           }
 
-          // Multi-click: needs delayed confirm (system selects text async after the click).
           if (result.needsDelayedConfirm) {
             handleDelayedConfirm(x, y);
             return;
           }
 
-          // Normal drag: run the three-layer selection probe.
+          // Normal drag: the three-layer probe (native-helper), then the clipboard.
           const { hasTextSelection } = require('../platform/native-helper');
           const { detectSelectionViaClipboard } = require('./clipboard-capture');
           const selectionCheck = hasTextSelection();
@@ -701,20 +629,17 @@ function startSelectionHook() {
           debugProbe('drag', selectionCheck);
 
           if (selectionCheck.hasSelection === true) {
-            // Layer 1+2 confirmed selection.
             showSelectionTrigger(x, y);
             selectionStateMachine.reset();
             return;
           }
 
           if (selectionCheck.hasSelection === false) {
-            // Layer 1+2 confirmed no selection (desktop, file manager etc.).
             logger.debug('Normal drag: no selection detected, skip trigger');
             selectionStateMachine.reset();
             return;
           }
 
-          // hasSelection === null (complex app like browser) — run clipboard fallback.
           const dragReason = selectionCheck.reason || '';
           const isOfficeApp = dragReason.includes('OpusApp') ||
                               dragReason.includes('EXCEL') ||
@@ -759,15 +684,13 @@ function startSelectionHook() {
 }
 
 function stopSelectionHook() {
-  // Reset state machine first (clears timers).
   if (selectionStateMachine) {
     selectionStateMachine.reset();
   }
 
   if (runtime.selectionHook) {
     try {
-      // Drop our handlers too — .stop() only halts the native thread, listeners
-      // persist on the singleton and would double up on the next enable.
+      // .stop() only halts the native thread; the listeners must go too.
       runtime.selectionHook.removeAllListeners('mousedown');
       runtime.selectionHook.removeAllListeners('mousemove');
       runtime.selectionHook.removeAllListeners('mouseup');
@@ -781,9 +704,6 @@ function stopSelectionHook() {
 }
 
 function isClickInOurWindows(x, y) {
-  // Include the screenshot overlay: while it's up (fullscreen, focused), the
-  // user's rubber-band drag must not drive the selection FSM and inject Ctrl+C
-  // into our own capture surface.
   const windowsToCheck = [windows.main, windows.floatingWindow, windows.screenshot];
   for (const win of windowsToCheck) {
     if (win && !win.isDestroyed() && win.isVisible()) {
@@ -812,7 +732,7 @@ function preheatSelectionModules() {
         require('koffi');
         logger.debug('koffi preloaded');
       } catch (e) {
-        // Not critical.
+        // optional
       }
     }
 

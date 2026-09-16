@@ -29,7 +29,7 @@ async function startScreenshot(fromHotkey = false) {
 
   await new Promise(resolve => setTimeout(resolve, 300));
 
-  // Span all displays — compute the union bounding box.
+  // Union bounding box of every display.
   const displays = screen.getAllDisplays();
   const primaryDisplay = screen.getPrimaryDisplay();
 
@@ -48,7 +48,6 @@ async function startScreenshot(fromHotkey = false) {
   const totalHeight = maxY - minY;
   const totalBounds = { minX, minY, maxX, maxY, totalWidth, totalHeight };
 
-  // Prefer node-screenshots (faster) and fall back to Electron's desktopCapturer.
   let screenshotData = null;
   if (screenshotModule.isNodeScreenshotsAvailable()) {
     screenshotData = await screenshotModule.captureWithNodeScreenshots(displays, totalBounds);
@@ -132,7 +131,7 @@ async function handleScreenshotSelection(bounds) {
       dataURL = screenshotModule.cropFromDesktopCapturer(data, bounds);
     }
 
-    // Save screenshot position for chaining into the selection-translate window.
+    // Kept for the selection window that shows the result.
     runtime.lastScreenshotBounds = {
       x: bounds.x + bounds.width,
       y: bounds.y + bounds.height,
@@ -151,7 +150,6 @@ async function handleScreenshotSelection(bounds) {
     const outputMode = screenshotSettings.outputMode || 'bubble';
 
     if (outputMode === 'main') {
-      // Main-window mode: show main window and hand off the captured dataURL.
       runtime.wasMainWindowVisible = false;
       if (windows.main) {
         windows.main.show();
@@ -162,13 +160,12 @@ async function handleScreenshotSelection(bounds) {
         windows.main.webContents.send(CHANNELS.SCREENSHOT.CAPTURED, dataURL);
       }
     } else {
-      // Bubble mode: background-process the screenshot, no main-window show.
+      // Bubble mode: the main window processes it in the background.
       logger.info('Screenshot bubble mode: processing in background');
 
       await showSelectionLoading(bounds);
 
-      // Make sure main window is loaded for background processing — but force it
-      // hidden so ready-to-show doesn't pop it visible.
+      // The main window must exist for the silent path, but stay hidden.
       if (!windows.main) {
         windowManager.createMainWindow();
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -178,7 +175,6 @@ async function handleScreenshotSelection(bounds) {
       }
 
       if (windows.main && dataURL) {
-        // String literal (not constant) for cross-version compat.
         windows.main.webContents.send('screenshot-captured-silent', dataURL);
       }
     }

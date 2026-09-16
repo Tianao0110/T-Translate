@@ -1,6 +1,6 @@
-// Screenshot capture/crop with multi-monitor + multi-GPU support.
-// Prefers node-screenshots (native, per-monitor) and falls back to
-// desktopCapturer (Electron built-in, single stitched thumbnail).
+// Screen capture and crop across monitors: node-screenshots first, Electron's
+// desktopCapturer as the fallback. Coordinate spaces and the multi-GPU
+// heuristics: docs/design/main-process.md §6.
 
 const { screen, desktopCapturer, nativeImage } = require('electron');
 
@@ -33,7 +33,7 @@ async function captureWithNodeScreenshots(displays, totalBounds) {
     const { Monitor } = nodeScreenshots;
     const monitors = Monitor.all();
 
-    // node-screenshots versions differ: some expose props, others methods
+    // node-screenshots versions differ: properties or methods.
     const firstMonitor = monitors[0];
     const isMethodApi = typeof firstMonitor.id === 'function';
 
@@ -118,8 +118,7 @@ async function captureWithDesktopCapturer(displays, primaryDisplay, totalBounds,
       size: s.thumbnail.getSize()
     })));
 
-    // Mark suspicious thumbnails: on multi-GPU systems desktopCapturer
-    // sometimes returns only one monitor when we asked for all.
+    // A stitched thumbnail that covers only one monitor is a multi-GPU symptom.
     const firstSource = sources[0];
     const thumbSize = firstSource?.thumbnail?.getSize();
 
@@ -153,10 +152,8 @@ async function captureWithDesktopCapturer(displays, primaryDisplay, totalBounds,
   }
 }
 
-// Coordinate-space note: `bounds` from the renderer is in Electron logical
-// coordinates (already divided by scaleFactor). node-screenshots returns
-// monitor bounds in physical pixels on Windows but logical on some Linux
-// setups, so we match against both before falling back.
+// `bounds` is in Electron logical coordinates; monitors are matched by
+// physical position first, then logical.
 function cropFromNodeScreenshots(data, bounds) {
   const { monitors, displays } = data;
 
@@ -181,7 +178,6 @@ function cropFromNodeScreenshots(data, bounds) {
 
   let targetMonitor = monitors[0];
 
-  // Try physical-coordinate match first (Windows)
   const physicalCenterX = centerX * scaleFactor;
   const physicalCenterY = centerY * scaleFactor;
 
@@ -193,7 +189,6 @@ function cropFromNodeScreenshots(data, bounds) {
     }
   }
 
-  // Fall back to logical-coordinate match (some Linux setups)
   if (targetMonitor === monitors[0]) {
     for (const monitor of monitors) {
       if (centerX >= monitor.x && centerX < monitor.x + monitor.width &&
@@ -213,7 +208,6 @@ function cropFromNodeScreenshots(data, bounds) {
 
   console.log('[Screenshot] Logical relative position:', { x: logicalRelativeX, y: logicalRelativeY });
 
-  // Captured image is physical resolution, so multiply by scaleFactor
   const cropBounds = {
     x: Math.max(0, Math.round(logicalRelativeX * scaleFactor)),
     y: Math.max(0, Math.round(logicalRelativeY * scaleFactor)),
@@ -245,8 +239,7 @@ function cropFromDesktopCapturer(data, bounds) {
   const fullScreenshot = sources[0].thumbnail;
   const screenshotSize = fullScreenshot.getSize();
 
-  // Multi-GPU recovery: if the stitched thumbnail looks wrong, guess which
-  // single display the thumbnail actually came from by aspect ratio.
+  // Multi-GPU recovery: pick the display the thumbnail came from by aspect ratio.
   if (maybeInvalid && displays.length > 1) {
     console.log('[Screenshot] Multi-GPU issue detected, attempting to match display');
 
@@ -292,7 +285,6 @@ function cropFromDesktopCapturer(data, bounds) {
     }
   }
 
-  // Normal path: thumbnail spans union bounds
   const scaleX = screenshotSize.width / totalBounds.totalWidth;
   const scaleY = screenshotSize.height / totalBounds.totalHeight;
 
@@ -346,8 +338,7 @@ module.exports = {
   processSelection,
   isNodeScreenshotsAvailable,
 
-  // On-demand capture for floating window region OCR (no pre-capture step).
-  // Uses the same logical/physical coordinate handling as cropFromNodeScreenshots.
+  // On-demand capture of one region, for the floating window's OCR.
   async captureRegion(bounds) {
     try {
       if (!nodeScreenshots) {
@@ -406,10 +397,7 @@ module.exports = {
 
       const scaleFactor = targetDisplay.scaleFactor;
 
-      // Match the node-screenshots monitor to targetDisplay by PHYSICAL origin
-      // (display.nativeOrigin). `logicalCenter × scaleFactor` is NOT a global
-      // physical coordinate in mixed-DPI setups — each display's physical
-      // origin is laid out independently — and could pick the wrong monitor.
+      // Match the monitor by physical origin (mixed-DPI safe), then by heuristics.
       let targetMonitor = null;
       const nativeOrigin = targetDisplay.nativeOrigin;
       if (nativeOrigin) {
@@ -418,7 +406,6 @@ module.exports = {
         ) || null;
       }
 
-      // Fallback 1: physical-center heuristic (correct on uniform-DPI setups)
       if (!targetMonitor) {
         const physicalCenterX = centerX * scaleFactor;
         const physicalCenterY = centerY * scaleFactor;
@@ -428,7 +415,6 @@ module.exports = {
         ) || null;
       }
 
-      // Fallback 2: logical-coordinate match (some Linux setups)
       if (!targetMonitor) {
         targetMonitor = processedMonitors.find(m =>
           centerX >= m.x && centerX < m.x + m.width &&
@@ -459,8 +445,7 @@ module.exports = {
       const imgHeight = targetMonitor.height;
       cropBounds.x = Math.min(cropBounds.x, imgWidth - 1);
       cropBounds.y = Math.min(cropBounds.y, imgHeight - 1);
-      // Floor at 1px: a window straddling displays can otherwise degenerate to
-      // a 0-size crop -> empty nativeImage -> opaque "截图失败"
+      // Floor at 1px: a straddling window must not degenerate to an empty crop.
       cropBounds.width = Math.max(1, Math.min(cropBounds.width, imgWidth - cropBounds.x));
       cropBounds.height = Math.max(1, Math.min(cropBounds.height, imgHeight - cropBounds.y));
 

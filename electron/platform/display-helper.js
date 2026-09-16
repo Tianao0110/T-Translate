@@ -1,8 +1,8 @@
-// Multi-monitor helpers — bounds math, point/rect visibility, window-position layout.
+// Multi-monitor helpers for window placement (window-manager, main.js).
 
 const { screen } = require('electron');
 
-// Bounds is "visible" if at least minVisiblePixels² overlaps some display.
+// At least minVisiblePixels² of the bounds overlaps some display.
 function isBoundsVisible(bounds, minVisiblePixels = 50) {
   const displays = screen.getAllDisplays();
 
@@ -25,16 +25,8 @@ function getNearestDisplay(x, y) {
   return screen.getDisplayNearestPoint({ x, y });
 }
 
-/**
- * Normalize a persisted window position to `{ x, y }`.
- *
- * Builds up to v0.3.3 stored `BrowserWindow.getPosition()` verbatim — an [x, y]
- * array — while the read side took `.x` / `.y` off it. That silently yielded
- * undefined, so every launch fell through to "no position info" and recentred
- * the window. Both shapes are accepted so existing installs keep their spot.
- *
- * @returns {{ x?: number, y?: number }} — empty when nothing usable was stored.
- */
+// A persisted window position as { x, y }; both the [x, y] array older
+// builds stored and the object shape are accepted.
 function normalizeWindowPosition(stored) {
   if (Array.isArray(stored)) {
     const [x, y] = stored;
@@ -46,16 +38,11 @@ function normalizeWindowPosition(stored) {
   return {};
 }
 
-/**
- * Ensure window bounds land on a valid display. If invalid, either recenter on the
- * primary display or clamp to the nearest one.
- *
- * @returns {{ x, y, width, height, adjusted }} — `adjusted` true if bounds were moved.
- */
+// Bounds moved onto a valid display when needed (recentred or clamped);
+// `adjusted` says whether they moved.
 function ensureBoundsOnDisplay(bounds, options = {}) {
   const { minVisiblePixels = 100, centerOnInvalid = true } = options;
 
-  // No position info → start centered on primary.
   if (bounds.x === undefined || bounds.y === undefined) {
     const primary = screen.getPrimaryDisplay();
     return {
@@ -81,7 +68,6 @@ function ensureBoundsOnDisplay(bounds, options = {}) {
       adjusted: true,
     };
   } else {
-    // Clamp to the nearest display's visible region.
     const centerX = bounds.x + bounds.width / 2;
     const centerY = bounds.y + bounds.height / 2;
     const nearestDisplay = getNearestDisplay(centerX, centerY);
@@ -100,10 +86,7 @@ function ensureBoundsOnDisplay(bounds, options = {}) {
   }
 }
 
-/**
- * Subscribe to display add/remove/changed events.
- * @returns {Function} Unsubscribe function.
- */
+// Display add / remove / change events; returns the unsubscribe function.
 function onDisplayChange(callback) {
   const handleAdded = (event, display) => callback('added', display);
   const handleRemoved = (event, display) => callback('removed', display);
@@ -120,7 +103,7 @@ function onDisplayChange(callback) {
   };
 }
 
-// Single-line summary of all displays — for diagnostic logging.
+// One-line summary of all displays for the log.
 function getDisplaySummary() {
   const displays = screen.getAllDisplays();
   const primary = screen.getPrimaryDisplay();

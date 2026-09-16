@@ -1,5 +1,5 @@
-// Scoped logger backed by electron-log when available; falls back to console.
-// Privacy: filters API keys / bearer tokens from log output before writing.
+// Scoped logger over electron-log (console fallback), secrets filtered before
+// writing. Rotation and secure-mode rules: docs/design/main-process.md §3.
 
 const path = require('path');
 const { app } = require('electron');
@@ -18,8 +18,7 @@ const LOG_LEVELS = {
   ERROR: 3,
 };
 
-// Regex set for redacting secrets. Order matters: specific patterns (sk-, AIza)
-// before generic key=value matchers.
+// Secret redaction, specific patterns before the generic key=value one.
 const SENSITIVE_PATTERNS = [
   { pattern: /(api[_-]?key|apikey|secret|token|password|bearer)\s*[=:]\s*["']?([a-zA-Z0-9_-]{8,})["']?/gi, replace: '$1=***FILTERED***' },
   { pattern: /sk-[a-zA-Z0-9]{32,}/g, replace: 'sk-***FILTERED***' },
@@ -45,9 +44,7 @@ function filterSensitive(data) {
 
 function formatArgs(args) {
   return args.map(arg => {
-    // Errors first: message/stack/code are non-enumerable, so JSON.stringify
-    // renders every Error as "{}" — which is exactly what the log files were
-    // full of, and why they could not diagnose a single crash.
+    // Errors carry their message / stack / code as non-enumerable properties.
     if (arg instanceof Error) {
       const parts = [arg.stack || `${arg.name}: ${arg.message}`];
       if (arg.code) parts.push(`code=${arg.code}`);
@@ -57,9 +54,6 @@ function formatArgs(args) {
     if (typeof arg === 'object' && arg !== null) {
       try {
         const json = JSON.stringify(arg, null, 2);
-        // Same blind spot one level down: an object whose own keys are all
-        // non-enumerable (or an empty one) says nothing. Fall back to the
-        // runtime's own description.
         return filterSensitive(json === '{}' ? String(arg) : json);
       } catch {
         return String(arg);
@@ -69,18 +63,13 @@ function formatArgs(args) {
   });
 }
 
-// Local YYYY-MM-DD. Not toISOString(): that is UTC, so west-of-UTC machines
-// rolled the file over mid-evening and named it for the next day, while the
-// timestamps written inside stayed local.
+// Local YYYY-MM-DD for the file name (not UTC).
 function localDateStamp(date = new Date()) {
   const pad = (n) => String(n).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-// Secure (incognito) mode keeps only errors on disk: routine info/warn lines
-// describe what the user was doing, and the mode promises no such trail.
-// Console output is unaffected. Renderer lines arriving over logs:write go
-// through the same transport, so they are covered too.
+// Secure mode keeps only errors on disk; console output is unaffected.
 const NORMAL_FILE_LEVEL = 'info';
 const SECURE_FILE_LEVEL = 'error';
 let secureFileLogging = false;
@@ -92,7 +81,7 @@ function setSecureFileLogging(on) {
   }
 }
 
-// Configure electron-log: per-day rotated files, 5MB cap, 7-day retention.
+// electron-log: per-day files, 5MB cap, 7-day retention.
 function configureElectronLog() {
   if (!electronLog) return;
 
@@ -140,11 +129,8 @@ function cleanOldLogs(logDir, keepDays) {
   }
 }
 
-// Initialize the log dir as soon as the module loads: app.getPath already
-// works before ready, and waiting for ready left every line logged during
-// startup in electron-log's default main.log. app is optional-chained so
-// the module stays loadable outside a real Electron main process (vitest
-// requires it through the electron mock).
+// Configured at load time so startup lines land in the right file; app is
+// optional so the module loads under the vitest electron mock.
 let logDirectory = null;
 if (electronLog && typeof app?.getPath === 'function') {
   logDirectory = configureElectronLog();
@@ -158,7 +144,7 @@ function getLogDirectory() {
   return null;
 }
 
-// Create a logger with a `[scope]` prefix; routes through electron-log when present.
+// A logger with a `[scope]` prefix.
 function createLogger(scope) {
   const prefix = `[${scope}]`;
 
@@ -184,7 +170,7 @@ function createLogger(scope) {
         electronLog.info(prefix, '[OK]', ...formatArgs(args));
       },
 
-      // Dev-only grouping/timing — silenced in production.
+      // Dev-only grouping / timing.
       group: (label) => {
         if (process.env.NODE_ENV === 'development') {
           console.group(`${prefix} ${label}`);

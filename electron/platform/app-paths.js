@@ -1,16 +1,8 @@
-// Where the app keeps its files, decided before anything else touches disk.
-//
-// A packaged build with a writable install directory keeps everything in
-// `<install>\data`: settings, the history vault, cache, logs. Chromium's own
-// storage (localStorage, disk cache, GPU shader caches, ...) is redirected to
-// `data\browser` so the top level stays readable. When the install directory
-// cannot be written (Program Files without admin) or in dev, userData stays
-// the Electron default (%APPDATA%\t-translate) and only the browser subfolder
-// is carved out.
-//
-// This module runs before electron-store and the logger are loaded — both
-// freeze their path on first require — so it depends on fs and path only and
-// hands its log lines back to the caller.
+// Where the app keeps its files, decided before anything else touches disk:
+// `<install>\data` when writable (Chromium's own storage under data\browser),
+// otherwise Electron's default userData. Runs before electron-store and the
+// logger load, so it depends on fs and path only. Layout and migration
+// rules: docs/design/main-process.md §1.
 
 const path = require('path');
 const fs = require('fs');
@@ -18,9 +10,7 @@ const fs = require('fs');
 const DATA_DIR = 'data';
 const BROWSER_DIR = 'browser';
 
-// Everything Chromium writes at the top of userData when sessionData is not
-// redirected. Only these names are moved by the in-place tidy; anything else
-// is either ours or unknown and stays put.
+// Everything Chromium writes at the top of userData; only these move.
 const CHROMIUM_ENTRIES = [
   'Cache', 'Code Cache', 'GPUCache', 'DawnCache', 'DawnGraphiteCache', 'DawnWebGPUCache',
   'DIPS', 'DIPS-wal', 'DIPS-journal', 'Local State', 'Local Storage', 'Session Storage', 'IndexedDB',
@@ -29,13 +19,8 @@ const CHROMIUM_ENTRIES = [
   'Service Worker', 'Crashpad', 'Dictionaries', 'VideoDecodeStats', 'Platform Notifications',
 ];
 
-// What a relocated install carries over from the old userData. Logs stay
-// behind; Session Storage is gone once the window closes anyway.
-//
-// `Local State` is not optional: on Windows safeStorage encrypts with a
-// random key kept in that file (the "v10" prefix), and DPAPI only wraps the
-// key. Without it the history vault and every stored API key decrypt to
-// garbage in the new folder.
+// What a relocated install carries over from the old userData. `Local State`
+// holds safeStorage's key: without it nothing encrypted can be read.
 const CARRIED_FILES = ['config.json', 'translation-data.enc'];
 const CARRIED_BROWSER_ENTRIES = ['Local State', 'Local Storage', 'IndexedDB'];
 const LEGACY_CACHE = path.join('Caches', 'translation-cache.json');
@@ -112,18 +97,14 @@ function removeIfEmpty(dir) {
   }
 }
 
-// First launch in the install directory: copy what an older build kept in
-// %APPDATA%. Never overwrites, so a second launch is a no-op and the old
-// folder stays intact until the user clears it from the About page.
+// First launch in the install directory: copy, never overwrite.
 function carryOverLegacy(p, notes) {
   for (const f of CARRIED_FILES) copyIfMissing(path.join(p.legacyUserData, f), path.join(p.userData, f), notes);
   copyIfMissing(path.join(p.legacyUserData, LEGACY_CACHE), path.join(p.userData, CACHE_FILE), notes);
   for (const d of CARRIED_BROWSER_ENTRIES) copyIfMissing(path.join(p.legacyUserData, d), path.join(p.browser, d), notes);
 }
 
-// userData stays where it was: pull Chromium's folders into browser\ (a
-// same-volume rename, so instant), lift the v0.4.6 data\ subfolder back up
-// and retire the pre-v0.4.6 Caches\ file.
+// userData stays where it was: Chromium folders into browser\, older layouts lifted.
 function tidyInPlace(p, notes) {
   let moved = 0;
   for (const name of CHROMIUM_ENTRIES) {
@@ -154,9 +135,8 @@ function migrate(p) {
   return notes;
 }
 
-// Call once, before require('./state'): sets userData, sessionData and
-// crashDumps, then runs the one-time migration. Returns the layout plus the
-// log lines the migration produced (the logger is not up yet).
+// Call once before require('./state'): sets the paths, runs the migration,
+// returns the layout plus the log lines it produced.
 function applyAppPaths(app, options = {}) {
   const p = resolveAppPaths(app, options);
   app.setPath('userData', p.userData);
@@ -166,8 +146,7 @@ function applyAppPaths(app, options = {}) {
   return current;
 }
 
-// The pre-move userData (%APPDATA%\t-translate) — where older builds left
-// models, and what the About page offers to clean up. Null until applied.
+// The pre-move userData, which the About page offers to clean up.
 function legacyUserData() {
   return current ? current.legacyUserData : null;
 }

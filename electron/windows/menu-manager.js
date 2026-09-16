@@ -1,5 +1,5 @@
-// Application menu builder (File / Edit / View / Translate / Settings / Help)
-// and standard dialogs.
+// Application menu (File / Edit / View / Translate / Settings / Help); items
+// send MENU_ACTIONS to the main window.
 
 const { Menu, dialog, shell, app } = require('electron');
 const { CHANNELS, MENU_ACTIONS } = require('../shared/channels');

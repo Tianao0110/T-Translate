@@ -1,7 +1,5 @@
-// In-app updater backed by electron-updater: blockmap differential downloads,
-// SHA512 verification, resumable transfers, silent NSIS install.
-// The IPC-facing result shapes are kept identical to the previous hand-rolled
-// GitHub updater so preload/renderer stay untouched.
+// In-app updater over electron-updater (blockmap differential downloads,
+// silent NSIS install); ipc/system.js exposes it, the About page drives it.
 
 const { app } = require('electron');
 const logger = require('./logger')('AutoUpdater');
@@ -16,18 +14,14 @@ function getUpdater() {
 
   const { autoUpdater } = require('electron-updater');
 
-  // Test hook: lets an unpackaged probe point the updater at a local feed.
+  // Test hook: an unpackaged probe can point the updater at a local feed.
   if (!app.isPackaged && process.env.TT_UPDATE_CONFIG) {
     autoUpdater.forceDevUpdateConfig = true;
     autoUpdater.updateConfigPath = process.env.TT_UPDATE_CONFIG;
   }
 
-  // Download stays user-triggered from the About page, but a downloaded
-  // update still applies if the user quits without clicking install.
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
-  // We ship one NSIS installer and nothing else; leaving this false made
-  // electron-updater warn on every download. It becomes the default upstream.
   autoUpdater.disableWebInstaller = true;
   autoUpdater.logger = logger;
 
@@ -35,8 +29,7 @@ function getUpdater() {
   return _updater;
 }
 
-// GitHub provider returns release notes as HTML; the About modal renders plain
-// text, so strip tags and decode the entities that survive.
+// GitHub release notes arrive as HTML; the About modal renders plain text.
 function normalizeReleaseNotes(notes) {
   if (!notes) return '';
   let text;
@@ -63,8 +56,7 @@ function normalizeReleaseNotes(notes) {
 async function checkForUpdate() {
   const currentVersion = app.getVersion().replace(/^v/, '');
 
-  // electron-updater needs the packaged app-update.yml; dev mode is a no-op
-  // (renderer shows "no releases") unless the TT_UPDATE_CONFIG hook is set.
+  // Dev mode is a no-op unless the TT_UPDATE_CONFIG hook is set.
   if (!app.isPackaged && !process.env.TT_UPDATE_CONFIG) {
     logger.info('Dev mode - update check skipped');
     return { success: true, hasUpdate: false, currentVersion, latestVersion: null };
@@ -95,8 +87,6 @@ async function checkForUpdate() {
     releaseName: info.releaseName || `v${info.version}`,
     releaseNotes: normalizeReleaseNotes(info.releaseNotes),
     publishedAt: info.releaseDate || null,
-    // Renderer only needs these truthy/for display - the actual download is
-    // driven by electron-updater from the same feed.
     downloadUrl: downloadName
       ? `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest/download/${encodeURIComponent(downloadName)}`
       : null,
@@ -130,9 +120,7 @@ async function downloadUpdate(onProgress) {
 
 async function installUpdate() {
   logger.info('Installing update (silent NSIS, relaunch after)');
-  // isSilent: NSIS runs with /S - no wizard, no progress-bar bounce.
-  // isForceRunAfter: relaunch the app once the update is applied.
-  getUpdater().quitAndInstall(true, true);
+  getUpdater().quitAndInstall(true, true); // silent, relaunch after
 }
 
 module.exports = {

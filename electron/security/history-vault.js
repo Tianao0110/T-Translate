@@ -1,10 +1,6 @@
 // Encrypted-at-rest vault for the translation-store persist blob (history,
-// favorites, statistics, secure-mode stash). DPAPI via Electron safeStorage —
-// same key story as the API-key vault: ciphertext is bound to the Windows
-// user account, no key material of our own.
-//
-// Dependency-injected fs/safeStorage/path so the vault is testable outside
-// Electron (secure-vault pattern).
+// favorites, statistics), DPAPI via safeStorage; ipc/history-vault.js is the
+// consumer. fs / safeStorage / path are injected for tests.
 
 const nodeFs = require('fs');
 const nodePath = require('path');
@@ -33,10 +29,8 @@ function createHistoryVault({ filePath, fs = nodeFs, path = nodePath, safeStorag
     return { available: available(), exists, fileSize };
   }
 
-  // Returns the decrypted JSON string, or null (no vault / unreadable).
-  // A file that exists but cannot be decrypted is evidence of corruption or a
-  // foreign-account copy: keep it under a .corrupt-<ts> name instead of
-  // overwriting, and start fresh.
+  // The decrypted JSON string, or null; an undecryptable file is quarantined
+  // as .corrupt-<ts> rather than overwritten.
   function load() {
     if (!available()) return null;
     let buf;
@@ -59,7 +53,7 @@ function createHistoryVault({ filePath, fs = nodeFs, path = nodePath, safeStorag
     }
   }
 
-  // Atomic save: write ciphertext to a temp sibling, then rename over.
+  // Atomic save through a temp sibling.
   function save(jsonString) {
     if (typeof jsonString !== 'string' || !jsonString) {
       return { success: false, reason: 'empty' };
@@ -82,7 +76,6 @@ function createHistoryVault({ filePath, fs = nodeFs, path = nodePath, safeStorag
       fs.unlinkSync(filePath);
       return { success: true };
     } catch (err) {
-      // Already gone counts as cleared.
       if (err.code === 'ENOENT') return { success: true };
       logger.error?.(`history-vault: clear failed: ${err.message}`);
       return { success: false, reason: err.message };

@@ -1,14 +1,6 @@
-// One-time removal of settings keys no build reads any more. The renderer's
-// settings migration drops these from its in-memory copy, but it only ever
-// writes sub-buckets back, so the dead keys sat in config.json for years.
-// Idempotent: a key is deleted only when present, so this costs nothing on
-// a clean store.
+// One-time, idempotent removal of settings keys no build reads any more
+// (state.js runs it at startup).
 
-// Pre-v0.3 flat mirrors of what now lives under settings.translation /
-// settings.interface / settings.privacy, plus three retired buckets:
-// providers -> translation.providers, connection -> ocr.llmEndpoint,
-// glass -> floatingWindow (the settings.glassWindow rename is handled in
-// state.js; this one was an even older shape).
 const RETIRED_SETTINGS_KEYS = [
   'settings.providers',
   'settings.connection',

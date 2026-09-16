@@ -1,12 +1,5 @@
-// One definition of "offline mode is on" for the main process.
-//
-// The predicate had grown three copies (updater IPC, audio pack manager, and
-// the OCR gap this file closes), and a promise as absolute as "offline mode
-// never touches the network" cannot be spelled out per call site — the third
-// copy is where it becomes a shared structure.
-//
-// The store is a parameter so callers that already hold one (ctx.store) pass
-// it; everyone else gets the app-wide instance.
+// The one definition of "offline mode is on" for the main process. The store
+// is a parameter for callers that already hold one; the rest get the app's.
 
 const { PRIVACY_MODES } = require('../shared/channels');
 

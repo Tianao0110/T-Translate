@@ -1,10 +1,7 @@
-// Start-with-Windows housekeeping. Electron keeps the HKCU Run value under
-// the AppUserModelId and only ever reads or deletes that one name. Builds
-// before v0.3.7 set no AppUserModelId, so their entry sits under Electron's
-// default "electron.app.T-Translate" — invisible to getLoginItemSettings.
-// v0.4.7's restore therefore wrote a second entry beside it and the app
-// launched twice at logon, the second instance surfacing the window. Node has
-// no registry API; reg.exe ships with every Windows.
+// Start-with-Windows housekeeping: retire the pre-v0.3.7 Run entry (under
+// Electron's default name, invisible to getLoginItemSettings) once via
+// reg.exe, then keep the current entry in line with the stored preference.
+// History: docs/design/main-process.md §4.
 
 const { execFile } = require('child_process');
 
@@ -28,12 +25,8 @@ async function deleteRunValue(name, exec) {
   await reg(['delete', APPROVED_KEY, '/v', name, '/f'], exec);
 }
 
-// Once per install: retire the legacy entry (a legacy entry means the user
-// had auto-launch on, so the preference follows it). Every start: make the
-// entry under the current name match the stored preference — a keep-data
-// reinstall clears the registry but keeps the preference. Only a missing
-// entry is written; rewriting an existing one would also reset the Task
-// Manager "disabled" flag the user may have set.
+// Once per install: retire the legacy entry (its presence means auto-launch
+// was on). Every start: write a missing entry only, never rewrite one.
 async function syncLoginItem({ app, store, exec = execFile, platform = process.platform }) {
   if (platform !== 'win32' || !app.isPackaged) return { skipped: true };
   const result = { legacyRemoved: false, entryWritten: false };

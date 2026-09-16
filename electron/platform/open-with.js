@@ -1,18 +1,12 @@
-// "Open with T-Translate" argv parsing. The Explorer context menu launches
-// the exe with the file path as an argument; a running instance receives the
-// same argv via second-instance. Both paths funnel through here.
-//
-// Only the extensions the context menu registers (installer/installer.nsh)
-// are accepted — this is also what keeps dev-mode argv noise (electron.exe,
-// main.js, --flags) from ever being mistaken for a document.
+// "Open with T-Translate" argv parsing (cold start and second-instance).
+// Only the extensions installer/installer.nsh registers are accepted.
 
 const fs = require('fs');
 const path = require('path');
 
 const OPENABLE_EXTENSIONS = new Set(['.pdf', '.docx', '.txt']);
 
-// Returns the first existing, supported file in argv, or null.
-// `exists` is injectable for tests.
+// The first existing, supported file in argv, or null; `exists` is injectable.
 function extractOpenableFile(argv, exists = fs.existsSync) {
   if (!Array.isArray(argv)) return null;
 

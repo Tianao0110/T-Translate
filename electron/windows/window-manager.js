@@ -1,5 +1,6 @@
-// Window manager: main, floating window, selection (with freeze-multi support),
-// and screenshot windows. Deps injected via init() to avoid require cycles.
+// The four windows: main, floating overlay, selection (with frozen cards)
+// and the screenshot overlay. Deps injected via init(); every window goes
+// through hardenWebContents. Behaviour notes: docs/design/main-process.md §5.
 
 const { BrowserWindow, shell } = require('electron');
 const PATHS = require('../shared/paths');
@@ -32,15 +33,7 @@ function init(deps) {
   logger.info?.('Window manager initialized') || console.log('Window manager initialized');
 }
 
-// Navigation + window.open hardening, applied to every window we create.
-//
-// Both are escalation paths rather than bugs on their own: our preload
-// exposes secureStorage.decrypt, so a renderer that gets navigated to an
-// attacker page would hand that page the API-key bridge; and an ungated
-// shell.openExternal turns any injected window.open into "ask Windows to
-// run this" (file:// to an exe, a UNC path, ms-msdt: and friends). The
-// http/https allow-list mirrors the one on the open-external IPC handler.
-
+// Navigation + window.open policy (security/url-policy.js) for every window.
 function hardenWebContents(win, name) {
   win.webContents.on('will-navigate', (event, url) => {
     if (isInternalUrl(url, isDev)) return;
@@ -76,7 +69,6 @@ function createMainWindow() {
     y: windowPosition.y,
   };
 
-  // Guard against orphaned positions when a monitor is unplugged
   const validBounds = displayHelper.ensureBoundsOnDisplay(savedBounds, {
     minVisiblePixels: 100,
     centerOnInvalid: true,
@@ -132,7 +124,6 @@ function createMainWindow() {
 
   mainWindow.on('move', () => {
     if (!mainWindow.isMaximized()) {
-      // getPosition() returns [x, y]; the read side wants { x, y }.
       const [x, y] = mainWindow.getPosition();
       store.set('windowPosition', { x, y });
     }
@@ -146,7 +137,7 @@ function createMainWindow() {
     mainWindow.webContents.send('maximize-change', false);
   });
 
-  // Hide instead of quit on close — let tray do final quit via isQuitting flag
+  // Close hides; the tray's quit sets isQuitting.
   mainWindow.on('close', (event) => {
     if (!runtime.isQuitting && process.platform !== 'darwin') {
       event.preventDefault();
@@ -160,8 +151,7 @@ function createMainWindow() {
 
   hardenWebContents(mainWindow, 'Main window');
 
-  // Renderer self-heal: abnormal death reloads in place (bounded); past the
-  // limit the give-up handler relaunches the app into safe mode.
+  // Renderer self-heal (crash-guard); past the limit main.js relaunches into safe mode.
   crashGuard?.attachRendererRecovery(mainWindow, {
     name: 'Main window',
     isQuitting: () => runtime.isQuitting,
@@ -215,15 +205,11 @@ function createFloatingWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       preload: PATHS.preloads.floatingWindow,
-      backgroundThrottling: false, // floating-window refresh must run while unfocused
-      // webSecurity stays default-on: renderers stopped talking to the network
-      // when translation/OCR moved into the main process (v0.3.1)
+      backgroundThrottling: false, // the refresh loop must run while unfocused
     },
   });
 
-  // WDA_EXCLUDEFROMCAPTURE so OCR doesn't re-read our own overlay — unless
-  // the user opted in to being capturable (screenshots/recordings of the
-  // overlay itself; settings changes re-apply live via the notify handler).
+  // Hidden from capture so OCR never reads our own overlay, unless opted in.
   if (process.platform === 'win32') {
     floatingWindow.webContents.on('did-finish-load', () => {
       const captureVisible = !!store.get('settings.floatingWindow.captureVisible', false);
@@ -231,21 +217,13 @@ function createFloatingWindow() {
     });
   }
 
-  // No setDisplayMediaRequestHandler here any more: listen mode captured
-  // system audio through getDisplayMedia until v0.4.1, which meant asking for
-  // a screen source (and a video track we stopped immediately) just to reach
-  // the speakers. Capture is now native WASAPI inside the audio worker, so the
-  // app never requests screen capture for audio at all.
-
   if (isDev) {
     floatingWindow.loadURL(PATHS.pages.floatingWindow.url);
   } else {
     floatingWindow.loadFile(PATHS.pages.floatingWindow.file);
   }
 
-  // Debounced persist: the manual title-bar drag streams setBounds per frame,
-  // and each one fires 'moved' — writing electron-store (synchronous disk IO)
-  // 60×/s would jank the drag. Trailing write after the movement settles.
+  // Debounced persist: the title-bar drag fires 'moved' per frame.
   let persistBoundsTimer = null;
   const persistBounds = () => {
     if (persistBoundsTimer) clearTimeout(persistBoundsTimer);
@@ -262,8 +240,7 @@ function createFloatingWindow() {
 
   floatingWindow.on('closed', () => {
     windows.floatingWindow = null;
-    // Detached panes are alwaysOnTop orphans without their parent — reap them
-    // on every close path (ESC, tray toggle, IPC), not just the X button.
+    // Detached panes are orphans without their parent: reap them.
     try {
       require('../ipc/floating-window').closeAllChildPaneWindows();
     } catch (e) {
@@ -271,9 +248,7 @@ function createFloatingWindow() {
     }
   });
 
-  // Electron on Windows can drop alwaysOnTop z-order when focus moves away.
-  // Re-apply on blur — keep default 'floating' level (no second arg), do NOT
-  // elevate to 'screen-saver' which would clobber the user's other pinned tools.
+  // Windows can drop the alwaysOnTop z-order on blur: re-apply at 'floating' level.
   floatingWindow.on('blur', () => {
     if (floatingWindow.isDestroyed()) return;
     if (floatingWindow.isAlwaysOnTop()) {
@@ -282,14 +257,8 @@ function createFloatingWindow() {
     }
   });
 
-  // ESC and Space are handled in the renderer (FloatingWindow keydown), which
-  // knows the UI priority order (history panel > scattered panes > close) and
-  // runs child-window cleanup. A main-process before-input-event shortcut here
-  // would bypass all of that — deliberately absent.
-
-  // Renderer self-heal: reload on abnormal death. An auxiliary window never
-  // escalates to app relaunch — if reloads can't save it, close it; the user
-  // recreates it from the tray with a fresh renderer.
+  // ESC / Space are the renderer's (FloatingWindow keydown), on purpose.
+  // Renderer self-heal: an auxiliary window closes instead of relaunching the app.
   crashGuard?.attachRendererRecovery(floatingWindow, {
     name: 'Floating window',
     isQuitting: () => runtime.isQuitting,
@@ -318,18 +287,15 @@ function toggleFloatingWindow() {
   }
 }
 
-// ===== Selection translate windows (freeze-to-multi pattern) =====
-// Active window gets replaced on each selection. User can "freeze" the current
-// window to detach it into the pool, so the next selection spawns a fresh one.
+// ===== Selection translate windows =====
+// One active window, hidden between selections; a frozen card leaves the
+// active slot so the next selection gets a fresh one.
 
 function createSelectionWindow() {
   if (windows.selection && !windows.selection.isDestroyed()) {
     const isFrozen = windows.selection._isFrozen;
     if (!isFrozen) {
-      // A persistent hide()-not-close window can outlive its renderer (crash,
-      // dev-server restart mid-session). Reusing it then means every trigger
-      // icon and result card goes to an invisible corpse — transparent +
-      // frameless + dead renderer paints nothing and raises nothing. Recreate.
+      // A hide()-not-close window can outlive its renderer: recreate it then.
       if (windows.selection._rendererDead || windows.selection.webContents.isCrashed()) {
         logger.warn?.(`Selection window ${windows.selection._windowId} renderer dead — recreating`);
         try { windows.selection.destroy(); } catch { /* already gone */ }
@@ -364,9 +330,7 @@ function createSelectionWindow() {
   selectionWindow._windowId = windowId;
   selectionWindow._isFrozen = false;
 
-  // 'floating' (not 'screen-saver'): a frozen card can live for a long time, and
-  // screen-saver level would sit above the user's own pinned tools. Same rule as
-  // the floating-window overlay.
+  // 'floating' level, like the overlay; never 'screen-saver'.
   selectionWindow.setAlwaysOnTop(true, 'floating');
   selectionWindow.setIgnoreMouseEvents(false);
 
@@ -376,19 +340,12 @@ function createSelectionWindow() {
     selectionWindow.loadFile(PATHS.pages.selection.file);
   }
 
-  // Renderer-death markers for the self-heal above. warn (not debug) so a
-  // field log shows exactly when and why the window went dark.
+  // Renderer-death markers for the recreate above.
   selectionWindow.webContents.on('render-process-gone', (event, details) => {
     logger.warn?.(`Selection window ${windowId} renderer gone: ${details?.reason || 'unknown'}`);
     selectionWindow._rendererDead = true;
   });
-  // ONLY a real main-frame load failure means a dead renderer. did-fail-load
-  // also fires for aborted loads (errorCode -3, e.g. a dev-server HMR reload)
-  // and subframes — the renderer is perfectly alive in those cases, and
-  // marking it dead made the next reuse needlessly destroy a healthy window
-  // (the regression behind "loaded a model → selection window went dark":
-  // heavier OCR keeps the window alive longer, so a spurious -3 was far more
-  // likely to land mid-session).
+  // Only a real main-frame load failure counts; -3 (aborted) and subframes do not.
   selectionWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
     if (!isMainFrame || errorCode === -3) return;
     logger.warn?.(`Selection window ${windowId} main-frame load failed: ${errorCode} ${errorDescription}`);
@@ -422,9 +379,7 @@ function freezeSelectionWindow() {
     return { success: false, error: 'Already frozen' };
   }
 
-  // At capacity: refuse rather than silently closing the oldest pinned card —
-  // that card holds content the user deliberately pinned. Caller surfaces a hint
-  // and leaves this card active (it gets replaced by the next selection as usual).
+  // At capacity: refuse; the caller surfaces a hint.
   if (frozenSelectionWindows.size >= MAX_FROZEN_WINDOWS) {
     logger.debug?.(`Freeze refused: at limit (${MAX_FROZEN_WINDOWS})`);
     return { success: false, error: 'limit', frozenCount: frozenSelectionWindows.size };
@@ -433,7 +388,6 @@ function freezeSelectionWindow() {
   currentWindow._isFrozen = true;
   frozenSelectionWindows.set(currentWindow._windowId, currentWindow);
 
-  // Detach from active slot so next selection spawns fresh
   windows.selection = null;
 
   logger.info?.(`Selection window ${currentWindow._windowId} frozen, total frozen: ${frozenSelectionWindows.size}`);
@@ -502,8 +456,7 @@ function createScreenshotWindow(bounds) {
   return screenshotWindow;
 }
 
-// Hit-test against active + all frozen selection windows.
-// Used by global mouse hook to decide whether to suppress auto-close on click.
+// Hit-test against the active and every frozen selection window (mouse hook).
 function isPointInSelectionWindows(x, y) {
   if (windows.selection && !windows.selection.isDestroyed() && windows.selection.isVisible()) {
     const bounds = windows.selection.getBounds();

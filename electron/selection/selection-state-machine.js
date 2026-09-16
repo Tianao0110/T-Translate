@@ -1,4 +1,6 @@
-// Selection state machine — kinematic detection of intentional text-selection gestures.
+// Kinematic detection of a deliberate text-selection gesture from the global
+// mouse hook (controller.js feeds it). Conditions and numbers:
+// docs/design/selection.md §1.
 
 const logger = require('../platform/logger')('SelectionSM');
 
@@ -13,46 +15,40 @@ const STATES = {
 
 const CONFIG = {
   // Sampling
-  SAMPLE_INTERVAL: 25,        // Sampling interval (ms)
-  MIN_DISTANCE: 1.5,          // Min valid displacement (px)
-  MIN_DELTA_TIME: 10,         // Min valid time delta (ms)
-  MIN_DELTA_DISTANCE: 3,      // Min displacement paired with MIN_DELTA_TIME (px)
+  SAMPLE_INTERVAL: 25,
+  MIN_DISTANCE: 1.5,
+  MIN_DELTA_TIME: 10,
+  MIN_DELTA_DISTANCE: 3,
 
   // Condition A: direction stability
   DIRECTION_WINDOW_SIZE: 5,
-  DIRECTION_THRESHOLD: 15,    // Direction-change tolerance (degrees)
-  MIN_TOTAL_DISTANCE: 12,     // Min total displacement (px)
-  MIN_DURATION_A: 80,         // Min duration (ms)
+  DIRECTION_THRESHOLD: 15,
+  MIN_TOTAL_DISTANCE: 12,
+  MIN_DURATION_A: 80,
 
-  // Condition B: slow & precise (deliberate)
-  LOW_SPEED_THRESHOLD: 0.1,   // Max avg speed (px/ms)
-  MAX_INSTANT_DISTANCE: 3,    // Max instantaneous jump (px)
-  MIN_DURATION_B: 100,        // Min duration (ms)
+  // Condition B: slow and precise
+  LOW_SPEED_THRESHOLD: 0.1,
+  MAX_INSTANT_DISTANCE: 3,
+  MIN_DURATION_B: 100,
 
-  // Condition D: fast decisive selection
-  // Added to fix auto-detect path missing "user drags fast across a word" cases.
-  // Threshold rationale: D fires in ~10ms while A/B need ≥80ms; speed must be >0.2 px/ms
-  // (B requires ≤0.1 — non-overlapping); horizontal-dominant motion only (filters out
-  // diagonal drags which are typically not selection).
+  // Condition D: fast decisive, horizontal-dominant
   MIN_DURATION_D: 10,
   MIN_DISTANCE_D: 8,
   MIN_HORIZONTAL_D: 5,
   MIN_SPEED_D: 0.2,
-  MAX_VERTICAL_RATIO_D: 0.6,  // dy/dx upper bound
+  MAX_VERTICAL_RATIO_D: 0.6,
 
   // Condition C: double / triple click
-  DOUBLE_CLICK_TIME: 400,     // Multi-click time window (ms)
-  DOUBLE_CLICK_DISTANCE: 15,  // Multi-click distance threshold (px)
+  DOUBLE_CLICK_TIME: 400,
+  DOUBLE_CLICK_DISTANCE: 15,
 
-  // Sticky-direct: minimum drag before the CapsLock path fires. A pure click
-  // (zero drag) must NOT trigger the direct Ctrl+C injection — in a terminal
-  // with no selection that Ctrl+C is a SIGINT that kills the running process.
+  // Sticky-direct: minimum drag before the CapsLock path may inject Ctrl+C.
   STICKY_MIN_DISTANCE: 8,
 
-  // Retreat (LIKELY → POSSIBLE rollback)
-  GRACE_PERIOD: 120,          // No retreat checks during this window after entering LIKELY (ms)
-  RETREAT_ANGLE: 60,          // Min direction-change angle counted as a retreat sample (deg)
-  RETREAT_COUNT: 3,           // Consecutive retreat samples required
+  // Retreat (LIKELY -> POSSIBLE rollback)
+  GRACE_PERIOD: 120,
+  RETREAT_ANGLE: 60,
+  RETREAT_COUNT: 3,
 
   // State timeouts
   POSSIBLE_TIMEOUT: 4000,
@@ -62,8 +58,7 @@ const CONFIG = {
 // ===== State machine =====
 
 class SelectionStateMachine {
-  // Injectable clock: kinematic conditions divide distance by wall-clock time,
-  // so tests must control it — real sleeps stretch under load and flip verdicts.
+  // Injectable clock: the conditions divide distance by time, so tests control it.
   constructor({ now = Date.now } = {}) {
     this.now = now;
     this.reset();
@@ -72,7 +67,6 @@ class SelectionStateMachine {
   }
 
   reset() {
-    // clearTimeout MUST run before nulling timeoutId.
     this.clearTimeout();
 
     this.state = STATES.IDLE;
@@ -105,7 +99,6 @@ class SelectionStateMachine {
   transitionTo(newState) {
     const oldState = this.state;
 
-    // No-op: already IDLE.
     if (oldState === newState && newState === STATES.IDLE) {
       return;
     }
@@ -119,9 +112,7 @@ class SelectionStateMachine {
     } else if (newState === STATES.LIKELY) {
       this.likelyEnteredAt = this.now();
       this.retreatCount = 0;
-      // Sticky direct path needs no watchdog: the user is actively dragging and mouseup
-      // resolves the state. The 2s LIKELY_TIMEOUT would falsely kill long slow selections
-      // on the direct path.
+      // The sticky direct path has no watchdog: mouseup resolves it.
       if (!this.isHotkeyTriggered) {
         this.setTimeout(CONFIG.LIKELY_TIMEOUT);
       }
@@ -132,11 +123,7 @@ class SelectionStateMachine {
 
   // ===== Event handlers =====
 
-  /**
-   * @param {number} x
-   * @param {number} y
-   * @param {boolean} hotkeyActive — sticky direct mode (CapsLock toggle) on at this moment
-   */
+  // hotkeyActive: sticky direct mode (CapsLock toggle) on at this moment.
   onMouseDown(x, y, hotkeyActive = false) {
     const now = this.now();
 
@@ -156,8 +143,6 @@ class SelectionStateMachine {
     this.lastSampleTime = now;
 
     // Priority: sticky direct > multi-click > normal flow.
-    // Sticky direct + multi-click together still goes through the direct path
-    // (user's explicit intent wins).
     if (hotkeyActive) {
       logger.debug('Sticky direct (CapsLock on) detected, entering LIKELY direct');
       this.transitionTo(STATES.LIKELY);
@@ -174,7 +159,6 @@ class SelectionStateMachine {
 
     const now = this.now();
 
-    // Throttle by sample interval.
     if (now - this.lastSampleTime < CONFIG.SAMPLE_INTERVAL) {
       return;
     }
@@ -187,7 +171,7 @@ class SelectionStateMachine {
     const distance = Math.sqrt(dx * dx + dy * dy);
     const dt = now - lastSample.t;
 
-    // Drop noise: tiny moves or too-fast samples with tiny displacement.
+    // Drop noise.
     if (distance < CONFIG.MIN_DISTANCE) {
       return;
     }
@@ -208,16 +192,11 @@ class SelectionStateMachine {
     }
   }
 
-  /**
-   * @param {number} x
-   * @param {number} y
-   * @param {boolean} hotkeyActive — sticky direct mode on at this moment
-   */
+  // Returns { shouldShow, skipIcon?, needsDelayedConfirm? } for controller.js.
   onMouseUp(x, y, hotkeyActive = false) {
     const now = this.now();
 
-    // Always stamp upTime (even on hotkey path) — otherwise the next double-click
-    // after a sticky direct can be misclassified.
+    // Always stamp upTime, the hotkey path included.
     if (this.clickHistory.length > 0) {
       const lastClick = this.clickHistory[this.clickHistory.length - 1];
       lastClick.upTime = now;
@@ -226,11 +205,8 @@ class SelectionStateMachine {
     if (this.state === STATES.LIKELY) {
       this.transitionTo(STATES.CONFIRMED);
 
-      // Sticky direct path: hotkey was active at BOTH mousedown and mouseup.
-      // Caller skips the trigger icon and goes straight to capture+translate.
-      // Note: direct beats multi-click — both flags true still uses this branch.
+      // Sticky direct: hotkey active at both mousedown and mouseup, with a real drag.
       if (this.isHotkeyTriggered && hotkeyActive) {
-        // Require a real drag: a pure click must not inject Ctrl+C (SIGINT risk).
         if (this.getTotalDistance() < CONFIG.STICKY_MIN_DISTANCE) {
           logger.debug('Sticky direct: pure click, no drag — skip (no injection)');
           return { shouldShow: false };
@@ -239,14 +215,11 @@ class SelectionStateMachine {
         return { shouldShow: true, skipIcon: true };
       }
 
-      // Multi-click needs delayed confirm — system needs time to actually select.
       if (this.isMultiClickTriggered) {
         logger.debug('Multi-click needs delayed confirmation');
         return { shouldShow: true, needsDelayedConfirm: true };
       }
 
-      // Normal return — also covers "CapsLock was on at mousedown but off at mouseup"
-      // (user released sticky mid-drag). Falls back to ordinary trigger-icon flow.
       return { shouldShow: true };
     } else if (this.state === STATES.POSSIBLE) {
       this.transitionTo(STATES.IDLE);
@@ -274,8 +247,7 @@ class SelectionStateMachine {
            distance < CONFIG.DOUBLE_CLICK_DISTANCE;
   }
 
-  // Non-mutating peek used during mousedown to decide whether to hide the existing
-  // window (avoid flicker when a double-click is about to extend selection).
+  // Non-mutating multi-click check for mousedown (controller keeps the trigger up).
   peekMultiClick(x, y) {
     const now = this.now();
     if (this.clickHistory.length === 0) return false;
@@ -299,8 +271,7 @@ class SelectionStateMachine {
     return isMulti;
   }
 
-  // Evaluate POSSIBLE → LIKELY transition. Conditions D / A / B checked in that order;
-  // D wins fastest (~10ms) so we test it first.
+  // POSSIBLE -> LIKELY: conditions D / A / B in that order.
   evaluatePossible(now) {
     const duration = now - this.startTime;
 
@@ -330,8 +301,7 @@ class SelectionStateMachine {
     const totalDistance = this.getTotalDistance();
     if (totalDistance < CONFIG.MIN_TOTAL_DISTANCE) return false;
 
-    // Median direction-change across the recent window. Wrapping handled at 180°;
-    // outliers (>120°) ignored — they're usually transient noise.
+    // Median direction change across the recent window (wrap at 180°, outliers out).
     const recentDirections = this.directions.slice(-CONFIG.DIRECTION_WINDOW_SIZE);
     const changes = [];
 
@@ -354,7 +324,6 @@ class SelectionStateMachine {
     if (duration < CONFIG.MIN_DURATION_B) return false;
     if (this.samples.length < 3) return false;
 
-    // Speed-check the recent N samples, not the whole trajectory.
     const recentSamples = this.samples.slice(-5);
     if (recentSamples.length < 2) return false;
 
@@ -372,7 +341,7 @@ class SelectionStateMachine {
     const avgSpeed = totalDist / totalTime;
     if (avgSpeed > CONFIG.LOW_SPEED_THRESHOLD) return false;
 
-    // Even with low avg speed, reject if any single hop is large (likely a fast pan).
+    // Reject any single large hop.
     for (let i = 1; i < recentSamples.length; i++) {
       const dx = recentSamples[i].x - recentSamples[i - 1].x;
       const dy = recentSamples[i].y - recentSamples[i - 1].y;
@@ -383,8 +352,7 @@ class SelectionStateMachine {
     return true;
   }
 
-  // Condition D — fixes "user drags fast across one word and FSM misses it" on the
-  // auto-detect path. See CONFIG for threshold rationale.
+  // Condition D: fast, horizontal-dominant drag.
   checkFastDecisive(duration) {
     if (duration < CONFIG.MIN_DURATION_D) return false;
     if (this.samples.length < 2) return false;
@@ -393,36 +361,24 @@ class SelectionStateMachine {
     const totalDistance = this.getTotalDistance();
     if (totalDistance < CONFIG.MIN_DISTANCE_D) return false;
 
-    // Horizontal vs vertical: from startPos to the latest sample.
     const lastSample = this.samples[this.samples.length - 1];
     const dx = Math.abs(lastSample.x - this.startPos.x);
     const dy = Math.abs(lastSample.y - this.startPos.y);
-
-    // Must be clearly horizontal-dominant.
     if (dx < CONFIG.MIN_HORIZONTAL_D) return false;
-
-    // Reject diagonal drags (dy must not exceed dx by too much).
     if (dx > 0 && dy / dx > CONFIG.MAX_VERTICAL_RATIO_D) return false;
-
-    // Must be fast (distinguishes from Condition B's slow & precise).
     const speed = totalDistance / duration;
     if (speed < CONFIG.MIN_SPEED_D) return false;
 
     return true;
   }
 
-  // Evaluate LIKELY → POSSIBLE retreat. RETREAT_COUNT consecutive samples with
-  // sharp direction change (>RETREAT_ANGLE) rolls the state back.
+  // LIKELY -> POSSIBLE retreat on RETREAT_COUNT sharp direction changes.
   evaluateLikely(now) {
-    // Refresh the watchdog on every accepted sample so LIKELY_TIMEOUT means
-    // "2s without movement", not "2s since entering LIKELY" — otherwise a slow
-    // multi-line drag that takes >2s gets killed mid-selection. Hotkey path has
-    // no watchdog (see transitionTo), so leave it alone.
+    // The watchdog means "LIKELY_TIMEOUT without movement": refresh per sample.
     if (!this.isHotkeyTriggered) {
       this.setTimeout(CONFIG.LIKELY_TIMEOUT);
     }
 
-    // No retreat checks during the grace period.
     if (now - this.likelyEnteredAt < CONFIG.GRACE_PERIOD) {
       return;
     }

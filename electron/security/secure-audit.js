@@ -1,26 +1,21 @@
-// Access audit for safeStorage decryption — extracted from ipc/secure-storage.js
-// so the main-process translation stack's secureVault shares the SAME trail and
-// burst alarm. After the stack migration most decryption happens in-process
-// without touching IPC; an IPC-local audit would be blind to the biggest
-// consumer.
+// Access audit for safeStorage decryption, shared by the IPC handler and
+// secure-vault: one trail, one burst alarm (security-alert to every window).
 
 const { BrowserWindow } = require('electron');
 const logger = require('../platform/logger')('SecureAudit');
 
-// App-internal bulk sweeps legitimately touch every stored key at once:
-// settings-page load, translation-stack boot/reload, OCR engine config loads.
-// They stay in the audit trail but are excluded from the burst alarm — it
-// exists to flag access patterns the app's own architecture can't produce.
+// Bulk sweeps (settings load, stack reload, OCR config) stay in the trail but
+// are excluded from the burst alarm.
 const BULK_CONTEXTS = new Set(['settings-load', 'stack-reload', 'ocr-config']);
 
 const accessLog = {
   records: [],
   maxRecords: 200,
 
-  alertThreshold: 15,      // >15 non-bulk decrypts in window => suspicious
+  alertThreshold: 15, // non-bulk decrypts per window
   alertWindowMs: 60000,
   lastAlertTime: 0,
-  alertCooldownMs: 300000, // throttle alerts to 1 per 5 min
+  alertCooldownMs: 300000,
 };
 
 function logAccess(key, context = 'unknown') {
@@ -72,8 +67,7 @@ function sendSecurityAlert(anomaly) {
   }
 }
 
-// Record an access AND fire the alert if it crosses the line — the one-call
-// form both the IPC handler and the stack vault use.
+// Records an access and fires the alert when it crosses the line.
 function auditAccess(key, context) {
   const anomaly = logAccess(key, context);
   if (anomaly.isAnomaly) {
