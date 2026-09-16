@@ -58,7 +58,7 @@ scripts/model-licenses/.
 
 ## 内置推理运行时 / Inference runtime
 
-DLL 由 scripts/fetch-llama-runtime.js 按 electron/tengine/runtime/llama-manifest.json 的哈希清单从 llama.cpp 官方 Release 取得，随安装包分发，不入 git。
+DLL 由 scripts/fetch/fetch-llama-runtime.js 按 electron/tengine/runtime/llama-manifest.json 的哈希清单从 llama.cpp 官方 Release 取得，随安装包分发，不入 git。
 The DLLs are fetched from the official llama.cpp release against a hash manifest and ship with the installer; they are not in git.
 
 | Component                                      | License                        |

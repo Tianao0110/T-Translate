@@ -60,7 +60,7 @@ electron/services/ocr-host/ocr-host.js     已有：OCR utilityProcess（v0.4.9�
 electron/services/audio-engine/audio-worker.js  已有：音频 utilityProcess（v0.4.0）
 electron/tengine/runtime/llama-manifest.json  官方 zip 与取用 DLL 的 SHA256 清单（DLL 本身不进 git）
 resources/llama/                           取包脚本抽出的 DLL，gitignore，打包时作 extraResources 进 resources/llama
-scripts/fetch-llama-runtime.js             按清单下载官方 zip、校验、抽出 DLL（打包前跑）；--pin bNNNN 年度换版重写清单
+scripts/fetch/fetch-llama-runtime.js             按清单下载官方 zip、校验、抽出 DLL（打包前跑）；--pin bNNNN 年度换版重写清单
 ```
 
 契约（每个引擎在宿主里实现五个动作）：`load(pack)` / `unload()` / `run(request) → result | stream` / `health()` / `setProvider(cpu | webgpu | vulkan)`。音频宿主的会话语义（capture / asr-start / tts-gate）留在它自己那层，不进契约。
@@ -85,11 +85,11 @@ koffi 装载顺序（否则依赖解析失败）：`SetDllDirectoryW(<目录>)` 
 
 ### sherpa-onnx（音频宿主）与 onnxruntime-node（OCR 宿主）
 
-已有，钉在 `package.json` 精确版本（sherpa-onnx-node 1.13.7、onnxruntime-node 1.26.0），sherpa 的 WebGPU 补丁版 DLL 由 `scripts/overlay-sherpa-runtime.js` 覆盖，配方在 `native/sherpa-onnx-webgpu/README.md`。
+已有，钉在 `package.json` 精确版本（sherpa-onnx-node 1.13.7、onnxruntime-node 1.26.0），sherpa 的 WebGPU 补丁版 DLL 由 `scripts/build/overlay-sherpa-runtime.js` 覆盖，配方在 `native/sherpa-onnx-webgpu/README.md`。
 
 ### 年度换版流程（每年一次，或安全修复时）
 
-1. 选新 build 号，跑 `node scripts/fetch-llama-runtime.js --pin bNNNN`：下载官方 Vulkan zip、与 GitHub 发布的 digest 比对、重写 `llama-manifest.json`、抽出 DLL；`tests/unit/llama-manifest.test.js` 守住装载顺序里的文件不被漏掉。
+1. 选新 build 号，跑 `node scripts/fetch/fetch-llama-runtime.js --pin bNNNN`：下载官方 Vulkan zip、与 GitHub 发布的 digest 比对、重写 `llama-manifest.json`、抽出 DLL；`tests/unit/llama-manifest.test.js` 守住装载顺序里的文件不被漏掉。
 2. 从同 tag 取 `include/llama.h`、`tools/mtmd/mtmd.h`、`tools/mtmd/mtmd-helper.h`、`ggml/include/ggml-backend.h`，逐字段核对 `llama-abi.js` 里的结构体（见第四节），核对用到的每个函数是否被标 `DEPRECATED`（llama.h 里约 40 处）。
 3. 跑 golden 测试：默认参数值、固定 prompt 贪心输出、视觉固定图输出。任何一项变了都要人工看原因，不许改期望值了事。
 4. 跑装前自测的基准数字，更新 FAQ 里的速度口径。
@@ -111,7 +111,7 @@ koffi 装载顺序（否则依赖解析失败）：`SetDllDirectoryW(<目录>)` 
 - 双显卡机器要把 `llama_model_params.devices` 显式指到独显：本机默认选择恰好是 Vulkan0 = 4090（核显一字节没占），但不能指望别的机器也这样；指定后 llama 日志里 `VulkanN model buffer size` 能对上，作为自检断言。
 - 退出码：Git Bash 报的 127 是 msys 误报（PowerShell 读同一进程为 0），判断宿主崩溃以 utilityProcess 的 `exit` 事件 code 为准；0xC0000005 是访问违规，0xC0000409 是 fast-fail。
 
-Golden 测试至少覆盖：三个 `*_default_params()` 与 `mtmd_context_params_default()` / `mtmd_helper_init_opt_default()` 的全部字段值（`tests/unit/llama-abi.test.js` 已做）、`llama_version()` 与 GOLDEN 里的库版本串一致（它只报库版本如 `0.4.0-dev`，不是 build 号——build 由清单哈希保证）、固定 prompt 贪心输出前 N 个 token（`scripts/smoke-llm.js`）、视觉固定图 `runtime/assets/vision-health.png` 的 Spotting 结果（`scripts/smoke-llm-vision.js`：读到 OK 那一行且带框、两次输出逐字相同）。
+Golden 测试至少覆盖：三个 `*_default_params()` 与 `mtmd_context_params_default()` / `mtmd_helper_init_opt_default()` 的全部字段值（`tests/unit/llama-abi.test.js` 已做）、`llama_version()` 与 GOLDEN 里的库版本串一致（它只报库版本如 `0.4.0-dev`，不是 build 号——build 由清单哈希保证）、固定 prompt 贪心输出前 N 个 token（`scripts/smoke/smoke-llm.js`）、视觉固定图 `runtime/assets/vision-health.png` 的 Spotting 结果（`scripts/smoke/smoke-llm-vision.js`：读到 OK 那一行且带框、两次输出逐字相同）。
 
 视觉路径的补充规则（v0.5.1）：mtmd 的结构体（`mtmd_context_params` 96 字节、`mtmd_input_text` 24、`mtmd_helper_init_opt` 24、`mtmd_helper_bitmap_wrapper` 16）与函数表同样放在 `llama-abi.js`，符号归属 `mtmd`；`mtmd_helper_log_set` 与 `llama_log_set` 挂同一个回调，否则 mtmd 会把每张图的提示词打到 stderr。图片字节经 `mtmd_helper_bitmap_init_from_buf` 直接喂（PNG / JPEG 由它解码），`mtmd_helper_eval_chunks` 一次完成编码与预填，之后接会话的 `generateContinue`；预填后不保留前缀（图像不是 token 列表）。mmproj 的 `warmup` 留开：它在载入时跑一次哑图，显卡首次的着色器编译（约 20 s）就落在载入而不是用户的第一张图。PaddleOCR-VL 的提示词是 `<|begin_of_sentence|>User: <__media__><任务>:\nAssistant:\n`，任务一律 `Spotting`（`OCR:` 对多栏整屏会漏栏）；mmproj 元数据把输入限在 1 MP，整屏会被缩放。
 

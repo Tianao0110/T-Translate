@@ -5,7 +5,7 @@
 // latency. This is the harness the 2026-09-02 baseline was measured with,
 // rebuilt as a script so it stops disappearing with a scratchpad.
 //
-//   npx electron scripts/bench-listen.js --lang zh|en [--tier standard|high] [--n 40] [--gap 0.8]
+//   npx electron scripts/bench/bench-listen.js --lang zh|en [--tier standard|high] [--n 40] [--gap 0.8]
 //
 // Data lives in bench-data/fleurs/<lang>/ (gitignored): dev.tsv and the
 // extracted dev/ wavs, fetched with
@@ -24,32 +24,21 @@
 
 const path = require('path');
 const fs = require('fs');
-const os = require('os');
-const { app } = require('electron');
+const { REPO, arg, has, sleep, waitFor, run } = require('../lib/electron-smoke');
+const { RELEASE_MANIFEST, listenSandbox, fakeWindow, feedRealtime, percentile, median } = require('../lib/listen-sandbox');
 
-const REPO = path.resolve(__dirname, '..').replace(/\\/g, '/');
-const RELEASE_DIR = `${REPO}/release-audio-models`;
 const DATA_DIR = path.join(REPO, 'bench-data');
 const RATE = 16000;
 
-const arg = (name, def = null) => {
-  const i = process.argv.indexOf(name);
-  return i > -1 ? process.argv[i + 1] : def;
-};
 const LANG = arg('--lang', 'zh');
 const TIER = arg('--tier', 'standard');
-// One sandbox per run so two languages can bench side by side.
-const SANDBOX = path.join(os.tmpdir(), `tt-listen-bench-${LANG}-${TIER}${process.argv.includes('--normalize') ? '-norm' : ''}`);
 const N = Number(arg('--n', 40));
 const GAP_S = Number(arg('--gap', 0.8));
 // --normalize scales every clip to a common rms (0.05, the AGC's own target)
-// before joining: FLEURS readings sit anywhere between -22 and -65 dB, and
-// the difference between this run and the raw one is what the level jumps
-// alone cost the chain.
-const NORMALIZE = process.argv.includes('--normalize');
+// before joining, so the run measures the chain without FLEURS' level jumps.
+const NORMALIZE = has('--normalize');
 const TARGET_RMS = 0.05;
 const LEAD_S = 1.0;
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ----- data ---------------------------------------------------------------
 
@@ -225,40 +214,23 @@ function score(lang, timeline, finals) {
   return { rows, agg };
 }
 
-function median(xs) {
-  return percentile(xs, 0.5);
-}
-function percentile(xs, p) {
-  if (!xs.length) return null;
-  const s = [...xs].sort((a, b) => a - b);
-  return s[Math.min(s.length - 1, Math.floor(p * s.length))];
-}
-
 // ----- run --------------------------------------------------------------------
 
 async function main() {
   if (!['zh', 'en'].includes(LANG)) throw new Error('--lang zh|en');
-  if (!fs.existsSync(`${RELEASE_DIR}/manifest.json`)) throw new Error(`missing ${RELEASE_DIR}/manifest.json — run: npm run audio:release`);
+  if (!fs.existsSync(RELEASE_MANIFEST)) throw new Error(`missing ${RELEASE_MANIFEST} — run: npm run audio:release`);
 
   const sentences = pickSentences(LANG, N);
   const { pcm, timeline } = buildTrack(sentences);
   console.log(`${LANG} ${TIER}: ${sentences.length} sentences, ${(pcm.length / RATE).toFixed(1)} s of audio (gap ${GAP_S}s)`);
 
-  fs.rmSync(SANDBOX, { recursive: true, force: true });
-  fs.mkdirSync(SANDBOX, { recursive: true });
-  app.setPath('userData', SANDBOX);
-  // Packs go to the sandbox too, not the dev models folder (model-root.js).
-  process.env.TT_MODELS_ROOT = path.join(SANDBOX, 'models');
-  const manifest = JSON.parse(fs.readFileSync(`${RELEASE_DIR}/manifest.json`, 'utf8'));
-  manifest.baseUrl = `file:///${RELEASE_DIR}`;
-  const manifestPath = path.join(SANDBOX, 'local-manifest.json');
-  fs.writeFileSync(manifestPath, JSON.stringify(manifest));
-  process.env.TT_AUDIO_MANIFEST_URL = `file:///${manifestPath.replace(/\\/g, '/')}`;
+  // One sandbox per run so two languages can bench side by side.
+  const box = listenSandbox(`tt-listen-bench-${LANG}-${TIER}${NORMALIZE ? '-norm' : ''}`);
 
-  const packMgr = require('../electron/listen/audio-pack-manager');
-  const engineManager = require('../electron/listen/audio-engine-manager');
-  const { locateAsrModels } = require('../electron/listen/asr-models');
-  const { store } = require('../electron/state');
+  const packMgr = require('../../electron/listen/audio-pack-manager');
+  const engineManager = require('../../electron/listen/audio-engine-manager');
+  const { locateAsrModels } = require('../../electron/listen/asr-models');
+  const { store } = require('../../electron/state');
 
   const wanted = ['asr-base-sense-voice', 'asr-draft-zipformer-zh-en', ...(TIER === 'high' ? ['asr-hq-qwen3-0.6b'] : [])];
   for (const id of wanted) {
@@ -271,45 +243,22 @@ async function main() {
   store.set('settings.listen.autosave', false);
 
   const ev = { status: [], segments: [], stamps: [] };
-  const fakeWin = {
-    isDestroyed: () => false,
-    once: () => {},
-    webContents: {
-      send: (channel, payload) => {
-        if (channel.endsWith(':status')) ev.status.push(payload.state);
-        else if (channel.endsWith(':segment')) {
-          ev.segments.push(payload);
-          ev.stamps.push(Date.now());
-        }
+  engineManager.init({
+    store,
+    getWindow: () => fakeWindow({
+      status: (p) => ev.status.push(p.state),
+      segment: (p) => {
+        ev.segments.push(p);
+        ev.stamps.push(Date.now());
       },
-    },
-  };
-  engineManager.init({ store, getWindow: () => fakeWin });
+    }),
+  });
   const loadStart = Date.now();
   engineManager.startSession({ language: LANG, source: { mode: 'off' } });
-  for (let i = 0; i < 300 && !ev.status.includes('listening'); i++) await sleep(100);
-  if (!ev.status.includes('listening')) throw new Error(`session never reached listening: ${ev.status.join(',')}`);
+  if (!(await waitFor(() => ev.status.includes('listening'), { tries: 300 }))) throw new Error(`session never reached listening: ${ev.status.join(',')}`);
   const loadMs = Date.now() - loadStart;
 
-  const CHUNK = 1600;
-  const t0 = Date.now();
-  let fed = 0;
-  const pace = async () => {
-    const wait = t0 + fed / 16 - Date.now();
-    if (wait > 0) await sleep(wait);
-  };
-  for (let i = 0; i < pcm.length; i += CHUNK) {
-    await pace();
-    const chunk = pcm.slice(i, i + CHUNK);
-    engineManager.feedPcm(chunk);
-    fed += chunk.length;
-  }
-  const silence = new Float32Array(CHUNK);
-  for (let i = 0; i < 40; i++) {
-    await pace();
-    engineManager.feedPcm(silence);
-    fed += CHUNK;
-  }
+  const t0 = await feedRealtime(engineManager, pcm, { silenceChunks: 40 });
   await sleep(1500);
   await engineManager.stopSessionAndWait('bench');
 
@@ -351,17 +300,8 @@ async function main() {
   console.log('\nworst 5:');
   for (const r of worst) console.log(`  [${(r.cer * 100).toFixed(0)}%] ref: ${r.ref}\n         hyp: ${r.hyp || '(none)'}`);
   console.log(`\nsaved ${outFile}`);
-  // The sandbox holds a copy of every pack it installed (up to 1.4 GB for
-  // the high-accuracy tier); the results are what matters.
-  try {
-    fs.rmSync(SANDBOX, { recursive: true, force: true });
-  } catch (e) {
-    console.log(`sandbox kept (${e.message}): ${SANDBOX}`);
-  }
-  app.exit(0);
+  box.cleanup();
+  return 0;
 }
 
-app.whenReady().then(() => main().catch((e) => {
-  console.error('bench failed:', e);
-  app.exit(1);
-}));
+run(main);

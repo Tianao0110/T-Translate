@@ -51,8 +51,8 @@ src/
 └── components/SettingsPanel/sections/InterfaceSection.jsx  # 语言切换 UI
 
 electron/shared/main-i18n.js    # 主进程独立双语消息表（托盘/菜单/IPC 错误串）
-scripts/check-i18n.js           # zh/en key 同步检查（npm run check:i18n，提交前必过）
-scripts/check-hardcoded-chinese.js  # 硬编码中文扫描（npm run check:hardcoded）
+scripts/check/check-i18n.js           # zh/en key 同步检查（npm run check:i18n，提交前必过）
+scripts/check/check-hardcoded-chinese.js  # 硬编码中文扫描（npm run check:hardcoded）
 ```
 
 ---
@@ -154,7 +154,7 @@ resources: {
 },
 ```
 
-同步动作：`scripts/check-i18n.js` 需把新语言纳入比对；`electron/shared/main-i18n.js` 和 `src/ai/ai-prompts.js` 的语言分支也要补对应文案，否则托盘/提示词会回退中文。
+同步动作：`scripts/check/check-i18n.js` 需把新语言纳入比对；`electron/shared/main-i18n.js` 和 `src/ai/ai-prompts.js` 的语言分支也要补对应文案，否则托盘/提示词会回退中文。
 
 ### 步骤 2: 更新语言选择器
 

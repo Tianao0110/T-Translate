@@ -4,7 +4,7 @@
 // so every pack is downloaded on demand from the GitHub `audio-models`
 // release (or placed by hand — see asr-models.js for the legacy layout).
 //
-// Pack shape is defined by scripts/audio-model-sources.js: each entry carries
+// Pack shape is defined by scripts/fetch/audio-model-sources.js: each entry carries
 // a `files` map of role -> filename, which is what frees the engine from
 // hardcoding sherpa's filenames.
 
@@ -36,7 +36,7 @@ const KNOWN_TYPES = [...ASR_TYPES, ...TTS_TYPES];
 // pack.json or not ("hand-placed = trusted locally"). Shipped with the app
 // so the folder resolves offline, and merged into the manifest entry of the
 // same id so the settings page can show the link and the target folder.
-// scripts/audio-model-sources.js carries the same entry for the release
+// scripts/fetch/audio-model-sources.js carries the same entry for the release
 // build; tests/unit/audio-packs.test.js keeps the two in step.
 const QWEN3_ASR_DIR = 'sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25';
 const MANUAL_PACKS = [

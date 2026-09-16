@@ -4,16 +4,16 @@
 //   - keys whose value is the empty string
 //
 // Usage: npm run check:i18n
-// CI:    node scripts/check-i18n.js --strict   (exits non-zero on drift)
+// CI:    node scripts/check/check-i18n.js --strict   (exits non-zero on drift)
 
 const fs = require('fs');
 const path = require('path');
 
-const ZH_PATH = path.join(__dirname, '../src/i18n/locales/zh.js');
-const EN_PATH = path.join(__dirname, '../src/i18n/locales/en.js');
+const ZH_PATH = path.join(__dirname, '../../src/i18n/locales/zh.js');
+const EN_PATH = path.join(__dirname, '../../src/i18n/locales/en.js');
 
 // Main-process i18n is checked alongside the renderer locales.
-const MAIN_I18N_PATH = path.join(__dirname, '../electron/shared/main-i18n.js');
+const MAIN_I18N_PATH = path.join(__dirname, '../../electron/shared/main-i18n.js');
 
 const isStrict = process.argv.includes('--strict');
 const showValues = process.argv.includes('--verbose');

@@ -1,63 +1,25 @@
 // The vision slot end to end in a real Electron: the model folder scanner
 // accepting the two-file pack, llm-manager loading it into its own host
-// next to the text model, a recognize() with boxes, the CPU size cap, the
-// GPU self-test, and both hosts unloading. userData and the model folder
-// are sandboxes; the files are hard-linked in under their pinned names.
+// next to the text model, a recognize() with boxes, the CPU refusal, the
+// GPU self-test, smart routing through the stack, and both hosts unloading.
+// userData and the model folder are sandboxes; the files are hard-linked in
+// under their pinned names.
 //
-//   npm run smoke:llm-vision-host -- --model <PaddleOCR-VL gguf> --mmproj <mmproj gguf> [--text <Qwen3 gguf>] [--gpu]
+//   npx electron scripts/smoke/smoke-llm-vision-host.js --model <PaddleOCR-VL gguf> --mmproj <mmproj gguf> [--text <Qwen3 gguf>] [--gpu]
 /* eslint-disable no-console */
 
 const path = require('path');
 const fs = require('fs');
-const os = require('os');
-const { app } = require('electron');
+const { VISION_HEALTH_IMAGE, arg, has, sleep, checklist, sandbox, place, fakeStore, run } = require('../lib/electron-smoke');
 
-const SANDBOX = path.join(os.tmpdir(), 't-translate-smoke-llm-vision-host');
-const arg = (name, def = null) => {
-  const i = process.argv.indexOf(name);
-  return i > -1 ? process.argv[i + 1] : def;
-};
 const MODEL = arg('--model', process.env.TT_VISION_MODEL);
 const MMPROJ = arg('--mmproj', process.env.TT_VISION_MMPROJ);
 const TEXT = arg('--text', process.env.TT_LLM_MODEL);
-const GPU = process.argv.includes('--gpu');
-const HEALTH_IMAGE = path.join(__dirname, '..', 'electron', 'tengine', 'runtime', 'assets', 'vision-health.png');
+const GPU = has('--gpu');
+const { step, summary } = checklist();
 
-let failures = 0;
-function step(label, ok, detail) {
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? `  — ${detail}` : ''}`);
-  if (!ok) failures++;
-}
-
-function place(dir, src) {
-  const dst = path.join(dir, path.basename(src));
-  try {
-    fs.linkSync(src, dst);
-  } catch {
-    // Hard links cannot cross volumes (the sandbox is on the system drive):
-    // this is a real copy of a large file, removed again at exit.
-    console.log(`copying ${path.basename(src)} into the sandbox (${Math.round(fs.statSync(src).size / 1048576)} MB, no hard link across drives)`);
-    fs.copyFileSync(src, dst);
-  }
-  return dst;
-}
-
-function cleanupSandbox() {
-  try {
-    fs.rmSync(SANDBOX, { recursive: true, force: true });
-  } catch (e) {
-    console.log(`sandbox kept (${e.message}): ${SANDBOX}`);
-  }
-}
-
-function fakeStore(seed = {}) {
-  const data = { ...seed };
-  return { get: (k, d) => (k in data ? data[k] : d), set: (k, v) => { data[k] = v; }, onDidChange: () => () => {} };
-}
-
-// A PNG larger than the CPU cap, made of the health image's bytes is not
-// possible without a decoder; a raw RGB bitmap is enough for mtmd's stb
-// loader through a BMP header instead.
+// A raw RGB bitmap behind a BMP header is enough for mtmd's stb loader and
+// needs no encoder here.
 function bigBmp(width, height) {
   const rowBytes = (width * 3 + 3) & ~3;
   const size = 54 + rowBytes * height;
@@ -75,24 +37,21 @@ function bigBmp(width, height) {
 
 async function main() {
   if (!MODEL || !MMPROJ || !fs.existsSync(MODEL) || !fs.existsSync(MMPROJ)) {
-    console.error('usage: npm run smoke:llm-vision-host -- --model <gguf> --mmproj <gguf> [--text <gguf>] [--gpu]');
-    app.exit(2);
-    return;
+    console.error('usage: npx electron scripts/smoke/smoke-llm-vision-host.js --model <gguf> --mmproj <gguf> [--text <gguf>] [--gpu]');
+    return 2;
   }
-  fs.rmSync(SANDBOX, { recursive: true, force: true });
-  const modelsDir = path.join(SANDBOX, 'llm-models');
+  const box = sandbox('t-translate-smoke-llm-vision-host');
+  const modelsDir = path.join(box.dir, 'llm-models');
   fs.mkdirSync(modelsDir, { recursive: true });
-  app.setPath('userData', SANDBOX);
-  process.env.TT_MODELS_ROOT = path.join(SANDBOX, 'models');
   place(modelsDir, MODEL);
   place(modelsDir, MMPROJ);
   if (TEXT && fs.existsSync(TEXT)) place(modelsDir, TEXT);
 
   const store = fakeStore({ privacyMode: 'standard' });
-  const tengine = require('../electron/tengine').get();
-  const llmManager = require('../electron/llm/llm-manager');
-  const makeLogger = require('../electron/platform/logger');
-  llmManager.init({ store, tengine, adapter: tengine.get('llm'), visionAdapter: tengine.get('llm-vision'), logsDir: path.join(SANDBOX, 'logs'), modelsDir, logger: makeLogger('LLM') });
+  const tengine = require('../../electron/tengine').get();
+  const llmManager = require('../../electron/llm/llm-manager');
+  const makeLogger = require('../../electron/platform/logger');
+  llmManager.init({ store, tengine, adapter: tengine.get('llm'), visionAdapter: tengine.get('llm-vision'), logsDir: path.join(box.dir, 'logs'), modelsDir, logger: makeLogger('LLM') });
   tengine.get('llm').setProvider(GPU ? 'gpu' : 'cpu');
   tengine.get('llm-vision').setProvider('cpu');
 
@@ -104,14 +63,14 @@ async function main() {
   // read, and the settings card reads unusable.
   let onCpu = null;
   try {
-    await (await llmManager.recognize({ image: fs.readFileSync(HEALTH_IMAGE) })).promise;
+    await (await llmManager.recognize({ image: fs.readFileSync(VISION_HEALTH_IMAGE) })).promise;
   } catch (e) {
     onCpu = e;
   }
   step('on the CPU the vision slot refuses before loading', onCpu && onCpu.code === 'LLM_VISION_NEEDS_GPU' && !llmManager.status().vision.resident && llmManager.status().vision.usable === false, onCpu ? onCpu.message : 'accepted');
 
   tengine.get('llm-vision').setProvider('gpu');
-  const image = fs.readFileSync(HEALTH_IMAGE);
+  const image = fs.readFileSync(VISION_HEALTH_IMAGE);
   const t0 = Date.now();
   const r1 = await (await llmManager.recognize({ image })).promise;
   step('recognize on the GPU host reads the fixed image with a box', r1.lines.some((l) => l.text.includes('OK') && l.box), `${Date.now() - t0} ms incl. load and warm-up: ${JSON.stringify(r1.lines)}`);
@@ -140,7 +99,7 @@ async function main() {
   // first and keeps a simple capture; a capture it cannot read escalates
   // to the vision model; with the GPU off the classic engines serve it
   // and the result carries the notice.
-  const { createTranslationStack } = require('../electron/generated/translation-stack.cjs');
+  const { createTranslationStack } = require('../../electron/generated/translation-stack.cjs');
   const line = { text: 'stub line', confidence: 0.98, bbox: { x: 10, y: 10, width: 200, height: 20 } };
   let paddleMode = 'simple';
   const paddleStub = async () => (paddleMode === 'simple'
@@ -178,13 +137,9 @@ async function main() {
   step('manual unload clears both slots', (await llmManager.unloadVision('smoke')) === true && llmManager.status().vision.resident === null);
   await llmManager.unload('smoke');
   tengine.shutdownAll();
-  await new Promise((r) => setTimeout(r, 300));
-  cleanupSandbox();
-  console.log(failures ? `\n${failures} check(s) failed` : '\nall checks passed');
-  app.exit(failures ? 1 : 0);
+  await sleep(300);
+  box.cleanup();
+  return summary();
 }
 
-app.whenReady().then(() => main().catch((e) => {
-  console.error('smoke failed:', e);
-  app.exit(1);
-}));
+run(main);

@@ -3,7 +3,7 @@
 // alongside the weights, computes sha256/size, and emits
 // release-audio-models/ ready to upload as release assets.
 //
-//   node scripts/build-audio-release.js [--src <dir>] [--only <id,id>]
+//   node scripts/build/build-audio-release.js [--src <dir>] [--only <id,id>]
 //
 // --src defaults to %APPDATA%\t-translate\asr-models (where the probe reads
 // manually placed models). Extract the upstream .tar.bz2 tarballs there first:
@@ -34,10 +34,10 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const JSZip = require('jszip');
-const { PACKS, RELEASE_BASE_URL } = require('./audio-model-sources');
+const { PACKS, RELEASE_BASE_URL } = require('../fetch/audio-model-sources');
 
-const OUT_DIR = path.join(__dirname, '..', 'release-audio-models');
-const LICENSE_DIR = path.join(__dirname, 'model-licenses');
+const OUT_DIR = path.join(__dirname, '..', '..', 'release-audio-models');
+const LICENSE_DIR = path.join(__dirname, '..', 'model-licenses');
 // Any fixed date works; this one keeps zip metadata stable across rebuilds.
 const ZIP_DATE = new Date('2020-01-01T00:00:00Z');
 

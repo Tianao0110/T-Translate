@@ -2,7 +2,7 @@
 // driven with the real store set to offline and every network primitive
 // replaced by a tripwire. A single reached primitive fails the run.
 //
-//   npx electron scripts/smoke-offline.js
+//   npm run smoke:offline
 //
 // Covers the three real pack managers (OCR / listen / voice) at manager level
 // and through their IPC handlers, plus the updater's check and download
@@ -10,19 +10,12 @@
 // and models are never touched.
 /* eslint-disable no-console */
 
-const path = require('path');
-const fs = require('fs');
-const os = require('os');
 const http = require('http');
 const https = require('https');
 const { app, ipcMain, net } = require('electron');
+const { checklist, sandbox, run } = require('../lib/electron-smoke');
 
-const SANDBOX = path.join(os.tmpdir(), 'tt-offline-smoke');
-const results = [];
-function step(name, ok, detail = '') {
-  results.push({ name, ok });
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? '  — ' + detail : ''}`);
-}
+const { step, summary } = checklist();
 
 // Any of these being reached while offline is the bug this script exists for.
 const netCalls = [];
@@ -50,13 +43,10 @@ async function refusal(call) {
 }
 
 async function main() {
-  fs.rmSync(SANDBOX, { recursive: true, force: true });
-  fs.mkdirSync(SANDBOX, { recursive: true });
-  app.setPath('userData', SANDBOX);
-  process.env.TT_MODELS_ROOT = path.join(SANDBOX, 'models');
+  const box = sandbox('tt-offline-smoke');
   armTripwire();
 
-  const { store } = require('../electron/state');
+  const { store } = require('../../electron/state');
   store.set('privacyMode', 'offline');
 
   // Capture IPC handlers instead of registering them: the handlers are the
@@ -65,12 +55,12 @@ async function main() {
   ipcMain.handle = (channel, fn) => handlers.set(channel, fn);
   ipcMain.on = () => {};
 
-  const { CHANNELS } = require('../electron/shared/channels');
+  const { CHANNELS } = require('../../electron/shared/channels');
   const AE = CHANNELS.AUDIO_ENGINE;
   const managers = {
-    'ocr-pack-manager': require('../electron/ocr/ocr-pack-manager'),
-    'audio-pack-manager': require('../electron/listen/audio-pack-manager'),
-    'tts-pack-manager': require('../electron/tts/tts-pack-manager'),
+    'ocr-pack-manager': require('../../electron/ocr/ocr-pack-manager'),
+    'audio-pack-manager': require('../../electron/listen/audio-pack-manager'),
+    'tts-pack-manager': require('../../electron/tts/tts-pack-manager'),
   };
 
   // ---- manager level ----
@@ -82,14 +72,14 @@ async function main() {
   }
 
   // ---- IPC level ----
-  const autoUpdater = require('../electron/platform/auto-updater');
+  const autoUpdater = require('../../electron/platform/auto-updater');
   autoUpdater.checkForUpdate = trip('auto-updater.checkForUpdate');
   autoUpdater.downloadUpdate = trip('auto-updater.downloadUpdate');
 
   const ctx = { getMainWindow: () => null, store, app, runtime: {}, windows: {} };
-  require('../electron/ipc/system')(ctx);
-  require('../electron/ipc/ocr')(ctx);
-  require('../electron/ipc/audio-engine')(ctx);
+  require('../../electron/ipc/system')(ctx);
+  require('../../electron/ipc/ocr')(ctx);
+  require('../../electron/ipc/audio-engine')(ctx);
 
   const evt = { sender: { id: 1, send() {} } };
   const ipcCases = [
@@ -120,18 +110,9 @@ async function main() {
   step('no network primitive was reached', netCalls.length === 0, netCalls.join(' | '));
 
   store.set('privacyMode', 'standard');
-  const failed = results.filter((r) => !r.ok).length;
-  console.log(`\n==== ${results.length - failed}/${results.length} passed ====`);
-  try {
-    fs.rmSync(SANDBOX, { recursive: true, force: true });
-  } catch {
-    console.log('sandbox cleanup deferred to next run (EPERM)');
-  }
-  app.exit(failed ? 1 : 0);
+  const failed = summary();
+  box.cleanup();
+  return failed;
 }
 
-app.on('window-all-closed', () => {});
-app.whenReady().then(main).catch((e) => {
-  console.error('smoke crashed:', e);
-  app.exit(2);
-});
+run(main);

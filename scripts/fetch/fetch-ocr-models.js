@@ -1,13 +1,13 @@
 // Downloads the bundled base OCR models into resources/ocr/base (gitignored).
 // Run once after clone and before packaging:
-//   node scripts/fetch-ocr-models.js [--force]
+//   node scripts/fetch/fetch-ocr-models.js [--force]
 /* eslint-disable no-console */
 
 const path = require('path');
 const fs = require('fs');
 const { BASE_PACK } = require('./ocr-model-sources');
 
-const DEST = path.join(__dirname, '..', 'resources', 'ocr', 'base');
+const DEST = path.join(__dirname, '..', '..', 'resources', 'ocr', 'base');
 
 async function main() {
   const force = process.argv.includes('--force');

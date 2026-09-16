@@ -1,6 +1,6 @@
 // The forked PP-OCR pipeline's pure pieces: binary-map components, the
 // rotated rectangle, tensor layout, CTC decoding and the 90-degree turn.
-// The model-bound path is covered by scripts/smoke-ocr.js.
+// The model-bound path is covered by scripts/smoke/smoke-ocr.js.
 
 import { describe, it, expect } from 'vitest';
 import { createRequire } from 'module';

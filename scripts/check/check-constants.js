@@ -7,8 +7,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const electronConstantsPath = path.join(__dirname, '../electron/shared/constants.js');
-const srcConstantsPath = path.join(__dirname, '../src/config/constants.js');
+const electronConstantsPath = path.join(__dirname, '../../electron/shared/constants.js');
+const srcConstantsPath = path.join(__dirname, '../../src/config/constants.js');
 
 const CONSTANTS_TO_CHECK = [
   'PRIVACY_MODES',

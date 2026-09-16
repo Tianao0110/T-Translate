@@ -8,10 +8,10 @@
 const path = require('path');
 const { buildSync } = require('esbuild');
 
-const outfile = path.join(__dirname, '..', 'electron', 'generated', 'translation-stack.cjs');
+const outfile = path.join(__dirname, '..', '..', 'electron', 'generated', 'translation-stack.cjs');
 
 buildSync({
-  entryPoints: [path.join(__dirname, '..', 'src', 'stack', 'index.js')],
+  entryPoints: [path.join(__dirname, '..', '..', 'src', 'stack', 'index.js')],
   outfile,
   bundle: true,
   platform: 'node',

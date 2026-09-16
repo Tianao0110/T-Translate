@@ -1,9 +1,9 @@
 // Fetches the pinned llama.cpp runtime DLLs into resources/llama (gitignored)
 // and verifies every file against electron/tengine/runtime/llama-manifest.json.
 // Run after clone and before packaging:
-//   node scripts/fetch-llama-runtime.js [--force]
+//   node scripts/fetch/fetch-llama-runtime.js [--force]
 // Annual re-pin: download the new build, rewrite the manifest, extract.
-//   node scripts/fetch-llama-runtime.js --pin b12345 [--zip path/to/local.zip]
+//   node scripts/fetch/fetch-llama-runtime.js --pin b12345 [--zip path/to/local.zip]
 /* eslint-disable no-console */
 
 const path = require('path');
@@ -11,8 +11,8 @@ const fs = require('fs');
 const crypto = require('crypto');
 
 const REPO = 'ggml-org/llama.cpp';
-const MANIFEST = path.join(__dirname, '..', 'electron', 'tengine', 'runtime', 'llama-manifest.json');
-const DEST = path.join(__dirname, '..', 'resources', 'llama');
+const MANIFEST = path.join(__dirname, '..', '..', 'electron', 'tengine', 'runtime', 'llama-manifest.json');
+const DEST = path.join(__dirname, '..', '..', 'resources', 'llama');
 
 // The Vulkan zip is a superset of the CPU zip (same llama/ggml DLLs plus the
 // Vulkan backend, verified byte-identical on b10853), so one download covers

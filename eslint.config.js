@@ -19,7 +19,7 @@ export default [
       'dist/**',
       'node_modules/**',
       'resources/**',
-      'electron/generated/**', // esbuild artifact (scripts/build-stack.js)
+      'electron/generated/**', // esbuild artifact (scripts/build/build-stack.js)
       '*.old',
       '*.backup.*',
     ],

@@ -211,7 +211,7 @@ npm start             # 实测：设置页出卡片、填 key、测试连接、�
    （中文界面的字母索引靠它，缺了会静默落进 `#` 组）
 3. `npm run check:languages` —— 校验目录无重复码、具名枚举是子集、各 provider
    映射不含目录外的语言
-4. `node scripts/verify-google-languages.mjs` —— 逐个向谷歌实际请求一次翻译，
+4. `node scripts/bench/verify-google-languages.mjs` —— 逐个向谷歌实际请求一次翻译，
    报出被拒绝或原样返回的码。**别靠肉眼保证码是对的**：错的码不会抛错，只会
    静默返回未翻译的原文。这个脚本不进 check:all（一种语言一次网络请求）
 
@@ -331,7 +331,7 @@ await window.electron.stack.clearCache('all')
 - **主进程/栈日志**：设置 → 关于 → 打开日志目录（`%APPDATA%/t-translate/logs/app-*.log`），翻译栈与 OCR 管线日志都在这。
 - **划词链路探针**：`npm run start:debug`（`TT_SELECTION_DEBUG=1`）输出选区检测各层判定。
 - **听译 + 朗读整链冒烟**：`npm run smoke:listen`（先 `npm run audio:release` 备好本地包）。临时沙箱里把 GitHub 换成 `file://` 跑完下载→校验→安装→发现→识别→卸载，再装两个语音包跑 TTS-only 进程合成、换包、取消、卸载驱逐，并打印首字/定稿/首块延迟。换模型、动分发链、发版前各跑一次。
-- **语音包打包**：语音包源目录不在 `asr-models` 里，用 `node scripts/build-audio-release.js --src <解压目录> --only tts-kokoro-zh-en,tts-melo-zh-en`；`--only` 之外的包沿用 `release-audio-models/manifest.json` 里已有的条目，不会把识别模型从清单里挤掉。真机试装未发布的包：`$env:TT_AUDIO_MANIFEST_URL='file:///F:/T-Translate/release-audio-models/local-manifest.json'; npm start`（`local-manifest.json` 是 baseUrl 指向本地目录的副本）。
+- **语音包打包**：语音包源目录不在 `asr-models` 里，用 `node scripts/build/build-audio-release.js --src <解压目录> --only tts-kokoro-zh-en,tts-melo-zh-en`；`--only` 之外的包沿用 `release-audio-models/manifest.json` 里已有的条目，不会把识别模型从清单里挤掉。真机试装未发布的包：`$env:TT_AUDIO_MANIFEST_URL='file:///F:/T-Translate/release-audio-models/local-manifest.json'; npm start`（`local-manifest.json` 是 baseUrl 指向本地目录的副本）。
 - **离线模式冒烟**：`npm run smoke:offline`。真实 store 置离线，`net.fetch` / 全局 `fetch` / `http(s).request` 全部换成一碰就报错的绊线，逐个调 OCR / 听译 / 语音三个包管理器与它们的 IPC 处理器、再调检查更新与下载更新，断言每条都以 `OFFLINE_BLOCKED` 拒绝且绊线一次都没碰到。改闸门、加下载入口、发版前各跑一次。
 
 - **听译捕获层**：`electron/listen/win-audio-capture.js` 用 koffi 直调 WASAPI，跑在音频 worker 里。改它之后 `npm run smoke:listen` 会真开一次音频客户端断言流是否稳定送达（smoke 自己从隐藏窗口放一个近乎无声的振荡器：WASAPI 环回只在端点上有渲染流时才送包，机器完全静默时一包都没有，2026-09-02 实测）；要验真实声音得让机器出声，参考 gstack `v041-process-loopback-spike` 里的做法。三个 koffi 坑记在文件头：`koffi.address()` 不认 Buffer（结构体内存一律 `koffi.alloc`）、`void*` 参数不吃 Buffer、`koffi.proto` 的类型名是全局注册表（放模块作用域，否则第二次调用报 Duplicate type name）。

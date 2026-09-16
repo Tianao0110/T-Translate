@@ -1,5 +1,5 @@
 // Main-process translation stack — ESM source, bundled to CJS by
-// scripts/build-stack.js into electron/generated/translation-stack.cjs.
+// scripts/build/build-stack.js into electron/generated/translation-stack.cjs.
 //
 // Contract: everything in src/stack/ must stay renderer-free AND electron-free
 // (no window/localStorage/navigator, no `import 'electron'`). All platform

@@ -131,18 +131,14 @@ t-translate/
 ├── resources/                  # 应用资源
 │   └── ocr/                    # 内置 OCR 基础模型（fetch-ocr-models 拉取，gitignore）
 │
-├── scripts/                    # 工具脚本
-│   ├── build-stack.js          # esbuild 打包翻译栈（dev/build 自动执行）
-│   ├── fetch-ocr-models.js     # 拉取内置 OCR 基础模型
-│   ├── build-ocr-release.js    # 生成 ocr-models Release 资产（发模型用）
-│   ├── audio-model-sources.js  # 听译模型包来源与角色映射（换模型改这里）
-│   ├── build-audio-release.js  # 生成 audio-models Release 资产
-│   ├── model-licenses/         # 模型协议原文（随包分发，见 NOTICE）
-│   ├── smoke-listen.js         # 听译整链冒烟 + 延迟测量（npm run smoke:listen）
-│   ├── smoke-offline.js        # 离线模式所有下载入口拒绝断言（npm run smoke:offline）
-│   ├── check-constants.js      # 常量同步检查
-│   ├── check-i18n.js           # i18n key 一致性检查
-│   └── check-hardcoded-chinese.js  # 硬编码中文扫描
+├── scripts/                    # 工具脚本（按用途分组）
+│   ├── check/                  # 提交门禁：常量同步、语言表、i18n key、硬编码中文（含基线 json）
+│   ├── build/                  # build-stack（esbuild 打包翻译栈）、两个模型 Release 资产生成、sherpa 运行时覆盖、wait-for-vite
+│   ├── fetch/                  # 拉取内置 OCR 基础模型与 llama.cpp 运行时；OCR / 听译模型包来源表（换模型改这里）
+│   ├── smoke/                  # 真 Electron / 真 worker 冒烟：listen、ocr、offline、llm 五件
+│   ├── bench/                  # bench-listen（FLEURS 听译基准，npm run bench:listen）、verify-google-languages
+│   ├── lib/                    # 冒烟与基准共用件：electron-smoke（沙箱 / 清单 / 运行器）、worker-driver、listen-sandbox
+│   └── model-licenses/         # 模型协议原文（随包分发，见 NOTICE）
 │
 └── tests/                      # 测试
     ├── setup.js                # 测试环境配置
@@ -284,8 +280,8 @@ src/stack/providers/tengine.js             翻译源「内置模型」：经 run
 src/stack/ocr/tengine-vision.js            OCR 引擎「内置视觉模型」（v0.5.1）：经 runtime.localLlm.recognize 到视觉槽，一律 Spotting，行框按 blocks.js 契约给像素坐标；默认顺序第 3 位
 src/stack/ocr/vision-routing.js            选中内置视觉模型时的分配规则：先跑 PP-OCR，按其行框与置信度判 unreadable / large / dense / low-confidence / table / columns / mixed-sizes 才升级到视觉模型，结果带 routed 枚举
 src/components/SettingsPanel/sections/LlmSection.jsx  设置 → 本地模型：安装状态与下载链接、模型选择、后端 / 驻留 / 速度、自检与卸载、开发者门
-scripts/fetch-llama-runtime.js             按清单下载官方 llama.cpp Vulkan 包并校验（打包前跑；--pin 年度换版）
-native/sherpa-onnx-webgpu/                 带 webgpu provider 的 sherpa-onnx DLL + 补丁 + 构建配方；scripts/overlay-sherpa-runtime.js 在 postinstall / 打包前覆盖进 npm 包
+scripts/fetch/fetch-llama-runtime.js             按清单下载官方 llama.cpp Vulkan 包并校验（打包前跑；--pin 年度换版）
+native/sherpa-onnx-webgpu/                 带 webgpu provider 的 sherpa-onnx DLL + 补丁 + 构建配方；scripts/build/overlay-sherpa-runtime.js 在 postinstall / 打包前覆盖进 npm 包
 electron/services/audio-engine/audio-worker.js  识别模型、音频捕获、语音合成都在这个子进程里
 electron/listen/win-audio-capture.js        WASAPI 捕获（koffi，v0.4.1）
 electron/platform/app-paths.js                启动最早期定 userData（安装目录 data，不可写则留用户目录）、Chromium 存储收进 browser、一次性搬迁（v0.4.7）

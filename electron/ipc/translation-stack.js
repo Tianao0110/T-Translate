@@ -78,7 +78,7 @@ function register(ctx) {
     });
   } catch (e) {
     stackLoadError = e;
-    logger.error('Stack bundle missing/broken — run `node scripts/build-stack.js`:', e.message);
+    logger.error('Stack bundle missing/broken — run `node scripts/build/build-stack.js`:', e.message);
   }
 
   // Idle boot load (decided D-5a): first translation must not pay the config

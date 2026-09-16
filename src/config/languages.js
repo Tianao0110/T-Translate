@@ -16,7 +16,7 @@
 //   en     English name — also the letter-index key for the English UI
 //
 // MAINTENANCE: `npm run check:languages` keeps this in sync with the provider
-// maps. `node scripts/verify-google-languages.mjs` asks Google to translate a
+// maps. `node scripts/bench/verify-google-languages.mjs` asks Google to translate a
 // sample into every code and reports the ones it rejects — run that after
 // adding entries rather than trusting a code by eye.
 

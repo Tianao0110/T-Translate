@@ -3,92 +3,52 @@
 // privacy gate in between. userData and the model folder are sandboxes; the
 // model files are hard-linked in under their whitelisted names.
 //
-//   npm run smoke:llm-stack -- --model <Qwen3 gguf> [--mt <Hy-MT2 gguf>] [--gpu]
+//   npx electron scripts/smoke/smoke-llm-stack.js --model <Qwen3 gguf> [--mt <Hy-MT2 gguf>] [--gpu]
 /* eslint-disable no-console */
 
 const path = require('path');
 const fs = require('fs');
-const os = require('os');
-const { app, net } = require('electron');
+const { net } = require('electron');
+const { arg, has, sleep, checklist, sandbox, place, fakeStore, run } = require('../lib/electron-smoke');
 
-const SANDBOX = path.join(os.tmpdir(), 't-translate-smoke-llm-stack');
-const arg = (name, def = null) => {
-  const i = process.argv.indexOf(name);
-  return i > -1 ? process.argv[i + 1] : def;
-};
 const MODEL = arg('--model', process.env.TT_LLM_MODEL);
 const MT = arg('--mt', null);
-const GPU = process.argv.includes('--gpu');
-
-let failures = 0;
-function step(label, ok, detail) {
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? `  — ${detail}` : ''}`);
-  if (!ok) failures++;
-}
+const GPU = has('--gpu');
+const { step, summary } = checklist();
 const zh = (s) => /[一-鿿]/.test(String(s || ''));
 
-function place(dir, src) {
-  const { LLM_PACKS } = require('../electron/shared/llm-packs');
+// A whitelisted file goes in under its pinned name so the scanner's hash
+// check applies; anything else keeps its own name.
+function placeModel(dir, src) {
+  const { LLM_PACKS } = require('../../electron/shared/llm-packs');
   const size = fs.statSync(src).size;
   const pack = LLM_PACKS.find((p) => p.size === size) || null;
-  const name = pack ? pack.file : path.basename(src);
-  const dst = path.join(dir, name);
-  try {
-    fs.linkSync(src, dst);
-  } catch {
-    // Hard links cannot cross volumes (the sandbox is on the system drive):
-    // this is a real copy of a 2 GB file, removed again at exit.
-    console.log(`copying ${path.basename(src)} into the sandbox (${Math.round(size / 1048576)} MB, no hard link across drives)`);
-    fs.copyFileSync(src, dst);
-  }
-  return { pack, dst };
-}
-
-function cleanupSandbox() {
-  try {
-    fs.rmSync(SANDBOX, { recursive: true, force: true });
-  } catch (e) {
-    console.log(`sandbox kept (${e.message}): ${SANDBOX}`);
-  }
-}
-
-function fakeStore(seed = {}) {
-  const data = { ...seed };
-  return {
-    get: (k, d) => (k in data ? data[k] : d),
-    set: (k, v) => {
-      data[k] = v;
-    },
-    onDidChange: () => () => {},
-  };
+  return { pack, dst: place(dir, src, pack ? pack.file : path.basename(src)) };
 }
 
 async function main() {
   if (!MODEL || !fs.existsSync(MODEL)) {
-    console.error('usage: npm run smoke:llm-stack -- --model <path.gguf> [--mt <path.gguf>] [--gpu]');
-    app.exit(2);
-    return;
+    console.error('usage: npx electron scripts/smoke/smoke-llm-stack.js --model <path.gguf> [--mt <path.gguf>] [--gpu]');
+    return 2;
   }
-  fs.rmSync(SANDBOX, { recursive: true, force: true });
-  const modelsDir = path.join(SANDBOX, 'llm-models');
+  const box = sandbox('t-translate-smoke-llm-stack');
+  const modelsDir = path.join(box.dir, 'llm-models');
   fs.mkdirSync(modelsDir, { recursive: true });
-  app.setPath('userData', SANDBOX);
-  process.env.TT_MODELS_ROOT = path.join(SANDBOX, 'models');
-  const placed = place(modelsDir, MODEL);
-  const placedMt = MT && fs.existsSync(MT) ? place(modelsDir, MT) : null;
+  const placed = placeModel(modelsDir, MODEL);
+  const placedMt = MT && fs.existsSync(MT) ? placeModel(modelsDir, MT) : null;
   console.log(`model folder ${modelsDir}: ${placed.pack ? placed.pack.id : 'unlisted'}${placedMt ? ` + ${placedMt.pack ? placedMt.pack.id : 'unlisted'}` : ''}`);
 
   const store = fakeStore({ privacyMode: 'standard' });
-  const tengine = require('../electron/tengine').get();
-  const llmManager = require('../electron/llm/llm-manager');
-  const makeLogger = require('../electron/platform/logger');
-  llmManager.init({ store, tengine, adapter: tengine.get('llm'), logsDir: path.join(SANDBOX, 'logs'), modelsDir, logger: makeLogger('LLM') });
+  const tengine = require('../../electron/tengine').get();
+  const llmManager = require('../../electron/llm/llm-manager');
+  const makeLogger = require('../../electron/platform/logger');
+  llmManager.init({ store, tengine, adapter: tengine.get('llm'), logsDir: path.join(box.dir, 'logs'), modelsDir, logger: makeLogger('LLM') });
   tengine.get('llm').setProvider(GPU ? 'gpu' : 'cpu');
   const t0 = Date.now();
   const scan = await llmManager.rescan();
   step('whitelisted file verified by hash', scan.packs.some((p) => p.status === 'ready'), `${Date.now() - t0} ms: ${scan.packs.map((p) => `${p.id}:${p.status}`).join(' ')}`);
 
-  const { createTranslationStack } = require('../electron/generated/translation-stack.cjs');
+  const { createTranslationStack } = require('../../electron/generated/translation-stack.cjs');
   const stack = createTranslationStack({
     fetch: net.fetch.bind(net),
     getLanguage: () => 'zh',
@@ -152,13 +112,9 @@ async function main() {
   console.log(`resident ${s.resident ? `${s.resident.file} on ${s.resident.provider}` : 'none'}, last request ${s.lastRequest ? `${s.lastRequest.tokPerSec} tok/s, stop ${s.lastRequest.stop}` : 'none'}`);
   await llmManager.unload('smoke');
   tengine.shutdownAll();
-  await new Promise((r) => setTimeout(r, 300));
-  cleanupSandbox();
-  console.log(failures ? `\n${failures} check(s) failed` : '\nall checks passed');
-  app.exit(failures ? 1 : 0);
+  await sleep(300);
+  box.cleanup();
+  return summary();
 }
 
-app.whenReady().then(() => main().catch((e) => {
-  console.error('smoke failed:', e);
-  app.exit(1);
-}));
+run(main);

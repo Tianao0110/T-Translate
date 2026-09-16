@@ -3,8 +3,8 @@
 // logs, and the i18n files themselves) to surface missing i18n coverage.
 //
 // Usage: npm run check:hardcoded
-//        node scripts/check-hardcoded-chinese.js --strict
-//        node scripts/check-hardcoded-chinese.js --update-baseline
+//        node scripts/check/check-hardcoded-chinese.js --strict
+//        node scripts/check/check-hardcoded-chinese.js --update-baseline
 //
 // Output buckets:
 //   🔴 ERROR   - user-visible UI text (label / error / message / placeholder ...)
@@ -20,22 +20,38 @@
 const fs = require('fs');
 const path = require('path');
 
-const PROJECT_ROOT = path.join(__dirname, '..');
+const PROJECT_ROOT = path.join(__dirname, '..', '..');
 const isStrict = process.argv.includes('--strict');
 const isUpdateBaseline = process.argv.includes('--update-baseline');
 const BASELINE_PATH = path.join(__dirname, 'hardcoded-chinese-baseline.json');
 
+// Everything user-facing outside the stack (which carries Chinese fallbacks
+// by design) and the engine hosts.
 const SCAN_DIRS = [
   'src/components',
-  'src/services',
   'src/stores',
   'src/config',
-  'src/utils',
   'src/windows',
+  'src/core',
+  'src/document',
+  'src/ai',
+  'src/floating',
+  'src/ocr',
+  'src/tts',
+  'src/listen',
+  'src/translation',
   'electron/ipc',
-  'electron/managers',
   'electron/shared',
-  'electron/utils',
+  'electron/windows',
+  'electron/selection',
+  'electron/screenshot',
+  'electron/platform',
+  'electron/security',
+  'electron/listen',
+  'electron/tts',
+  'electron/ocr',
+  'electron/llm',
+  'electron/packs',
 ];
 
 const EXCLUDE_FILES = [
@@ -242,7 +258,7 @@ function main() {
     baseline = JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf-8'));
   } catch {
     console.log('⚠️  No baseline file — every high-priority finding counts as new.');
-    console.log('   Generate it with: node scripts/check-hardcoded-chinese.js --update-baseline\n');
+    console.log('   Generate it with: node scripts/check/check-hardcoded-chinese.js --update-baseline\n');
   }
 
   const newViolations = [];

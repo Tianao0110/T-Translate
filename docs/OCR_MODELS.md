@@ -38,7 +38,7 @@ npm run ocr:release        # 生成 release-ocr-models/（8 个 zip + manifest.j
 
 ### 日后更新模型（无需发应用新版）
 
-1. 在 [scripts/ocr-model-sources.js](../scripts/ocr-model-sources.js) 更新对应包的 `url`（新模型来源）并 **bump `version`**
+1. 在 [scripts/fetch/ocr-model-sources.js](../scripts/fetch/ocr-model-sources.js) 更新对应包的 `url`（新模型来源）并 **bump `version`**
 2. `npm run ocr:release` 重新生成
 3. 到 `ocr-models` Release 页 **删除旧资产、上传新 zip + 新 manifest.json**（tag 不变）
 4. 用户端点「刷新」即看到「可更新」徽章，点更新完成升级；应用代码零改动

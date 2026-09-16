@@ -1,7 +1,7 @@
 // Listen-module smoke test: the whole chain with real weights, in a throwaway
 // sandbox, no network.
 //
-//   npx electron scripts/smoke-listen.js [--wav <file>] [--keep] [--soak <minutes>]
+//   npx electron scripts/smoke/smoke-listen.js [--wav <file>] [--keep] [--soak <minutes>]
 //
 // --soak replays the audio for N minutes in one session and reports the worker
 // RSS trend — the answer to "does hours of listening grow anything".
@@ -19,20 +19,13 @@
 
 const path = require('path');
 const fs = require('fs');
-const os = require('os');
 const { execFileSync } = require('child_process');
-const { app, BrowserWindow } = require('electron');
+const { BrowserWindow } = require('electron');
+const { arg, has, sleep, waitFor, checklist, run } = require('../lib/electron-smoke');
+const { RELEASE_DIR, RELEASE_MANIFEST, listenSandbox, installPacks, fakeWindow, feedRealtime, median } = require('../lib/listen-sandbox');
 
-const REPO = path.resolve(__dirname, '..').replace(/\\/g, '/');
-const RELEASE_DIR = `${REPO}/release-audio-models`;
-const SANDBOX = path.join(os.tmpdir(), 'tt-listen-smoke');
-const KEEP = process.argv.includes('--keep');
-
-const results = [];
-function step(name, ok, detail = '') {
-  results.push({ name, ok });
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? '  — ' + detail : ''}`);
-}
+const KEEP = has('--keep');
+const { step, summary } = checklist();
 
 // SAPI speech is real speech as far as VAD and SenseVoice are concerned.
 // Two traps burned in here: PowerShell gets the script as -EncodedCommand
@@ -86,8 +79,6 @@ function readWavPcm(file, targetRate = 16000) {
   return out;
 }
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
 // First sample where speech actually starts, in seconds. Latency has to be
 // measured from the sound, not from the start of the file (SAPI opens with
 // ~100 ms of digital silence).
@@ -98,39 +89,22 @@ function speechOnsetSeconds(pcm, rate = 16000, threshold = 0.02) {
   return 0;
 }
 
-function median(xs) {
-  if (!xs.length) return null;
-  const s = [...xs].sort((a, b) => a - b);
-  return s[Math.floor(s.length / 2)];
-}
-
 async function main() {
-  if (!fs.existsSync(`${RELEASE_DIR}/manifest.json`)) {
-    console.error(`missing ${RELEASE_DIR}/manifest.json — run: npm run audio:release`);
-    app.exit(2);
-    return;
+  if (!fs.existsSync(RELEASE_MANIFEST)) {
+    console.error(`missing ${RELEASE_MANIFEST} — run: npm run audio:release`);
+    return 2;
   }
 
-  fs.rmSync(SANDBOX, { recursive: true, force: true });
-  fs.mkdirSync(SANDBOX, { recursive: true });
-  app.setPath('userData', SANDBOX);
-  process.env.TT_MODELS_ROOT = path.join(SANDBOX, 'models');
+  const box = listenSandbox('tt-listen-smoke');
+  const SANDBOX = box.dir;
+  const { manifest } = box;
+  const wav = arg('--wav') || synthesizeWav(path.join(SANDBOX, 'speech.wav'));
 
-  // Local manifest: same file, baseUrl pointed at the local zips.
-  const manifest = JSON.parse(fs.readFileSync(`${RELEASE_DIR}/manifest.json`, 'utf8'));
-  manifest.baseUrl = `file:///${RELEASE_DIR}`;
-  const manifestPath = path.join(SANDBOX, 'local-manifest.json');
-  fs.writeFileSync(manifestPath, JSON.stringify(manifest));
-  process.env.TT_AUDIO_MANIFEST_URL = `file:///${manifestPath.replace(/\\/g, '/')}`;
-
-  const wavArg = process.argv.indexOf('--wav');
-  const wav = wavArg !== -1 ? process.argv[wavArg + 1] : synthesizeWav(path.join(SANDBOX, 'speech.wav'));
-
-  const packMgr = require('../electron/listen/audio-pack-manager');
-  const { createPackManager } = require('../electron/packs/model-pack-core');
-  const engineManager = require('../electron/listen/audio-engine-manager');
-  const { locateAsrModels } = require('../electron/listen/asr-models');
-  const { store } = require('../electron/state');
+  const packMgr = require('../../electron/listen/audio-pack-manager');
+  const { createPackManager } = require('../../electron/packs/model-pack-core');
+  const engineManager = require('../../electron/listen/audio-engine-manager');
+  const { locateAsrModels } = require('../../electron/listen/asr-models');
+  const { store } = require('../../electron/state');
 
   console.log(`sandbox: ${SANDBOX}\npacks root: ${packMgr.packsRoot()}\n`);
 
@@ -185,7 +159,7 @@ async function main() {
   // tone from a hidden window for the duration: the frame count then proves
   // koffi loaded, the client activated, the format was accepted, the pump runs
   // and stop() stops it. Signal itself is not assertable without making noise.
-  const winAudio = require('../electron/listen/win-audio-capture');
+  const winAudio = require('../../electron/listen/win-audio-capture');
   const caps = winAudio.getCapabilities();
   step(
     'native capture capability probe',
@@ -193,10 +167,7 @@ async function main() {
     `build=${caps.build}, processLoopback=${caps.processLoopback}${caps.reason ? ` (${caps.reason})` : ''}`
   );
   if (caps.supported) {
-    // Destroying the only window would otherwise quit the app (Electron's
-    // default window-all-closed handling) halfway through the smoke.
-    app.on('window-all-closed', () => {});
-    const keepAlive = new BrowserWindow({ show: false, webPreferences: { backgroundThrottling: false } });
+    const keepAlive =new BrowserWindow({ show: false, webPreferences: { backgroundThrottling: false } });
     await keepAlive.loadURL(
       'data:text/html,<script>const c=new AudioContext();const o=c.createOscillator();const g=c.createGain();' +
         'g.gain.value=0.0005;o.connect(g);g.connect(c.destination);o.start();</script>'
@@ -217,11 +188,8 @@ async function main() {
     );
   }
 
-  for (const id of ['asr-base-sense-voice', 'asr-draft-zipformer-zh-en']) {
-    const phases = new Set();
-    const t0 = Date.now();
-    const res = await packMgr.downloadPack(id, (_p, phase) => phases.add(phase));
-    step(`install ${id}`, res.success === true, `${Date.now() - t0}ms, ${[...phases].join('→')}`);
+  for (const r of await installPacks(packMgr, ['asr-base-sense-voice', 'asr-draft-zipformer-zh-en'])) {
+    step(`install ${r.id}`, r.success, `${r.ms}ms, ${r.phases.join('→')}`);
   }
 
   const after = await packMgr.listPacks({ refresh: false });
@@ -246,64 +214,34 @@ async function main() {
   async function runSession(label, soakMinutes = 0) {
     const ev = { status: [], segments: [], partials: [], rss: [] };
     const stamp = { partials: [], segments: [] };
-    let t0 = 0;
-    const fakeWin = {
-      isDestroyed: () => false,
-      once: () => {},
-      webContents: {
-        send: (channel, payload) => {
-          const now = Date.now();
-          if (channel.endsWith(':status')) {
-            ev.status.push(payload.state);
-            if (payload.state === 'metrics' && payload.detail) ev.rss.push(payload.detail.rssMb);
-          } else if (channel.endsWith(':segment')) {
-            ev.segments.push(payload);
-            stamp.segments.push(now);
-          } else if (channel.endsWith(':partial') && payload) {
-            ev.partials.push(payload);
-            stamp.partials.push(now);
-          }
+    engineManager.init({
+      store,
+      getWindow: () => fakeWindow({
+        status: (p) => {
+          ev.status.push(p.state);
+          if (p.state === 'metrics' && p.detail) ev.rss.push(p.detail.rssMb);
         },
-      },
-    };
-    engineManager.init({ store, getWindow: () => fakeWin });
+        segment: (p) => {
+          ev.segments.push(p);
+          stamp.segments.push(Date.now());
+        },
+        partial: (p) => {
+          ev.partials.push(p);
+          stamp.partials.push(Date.now());
+        },
+      }),
+    });
 
     const loadStart = Date.now();
     // source 'off': no audio client is opened, this harness feeds the wav in
     // itself. Every other session captures natively inside the worker.
     engineManager.startSession({ language: 'zh', source: { mode: 'off' } });
-    for (let i = 0; i < 200 && !ev.status.includes('listening'); i++) await sleep(100);
+    await waitFor(() => ev.status.includes('listening'), { tries: 200 });
     const loadMs = Date.now() - loadStart;
 
-    const CHUNK = 1600; // 100 ms
-    t0 = Date.now();
-    // Pace by AUDIO FED, not by chunk count: the last slice of the buffer is a
-    // short one (7.52s is not a whole number of 100ms chunks), and giving it a
-    // full slot drifts the clock 80ms per lap — over a 12-minute soak that
-    // showed up as 7.7s of fake, linearly-growing "engine latency".
-    let fedSamples = 0;
-    const pace = async () => {
-      const wait = t0 + fedSamples / 16 - Date.now();
-      if (wait > 0) await sleep(wait);
-    };
-    // Soak: replay the same audio until the clock runs out. Nothing about the
-    // engine treats a loop differently — what is under test is whether hours
-    // of continuous use grow anything without bound.
-    const until = soakMinutes > 0 ? t0 + soakMinutes * 60000 : 0;
-    do {
-      for (let i = 0; i < pcm.length; i += CHUNK) {
-        await pace();
-        const chunk = pcm.slice(i, i + CHUNK);
-        engineManager.feedPcm(chunk);
-        fedSamples += chunk.length;
-      }
-    } while (until && Date.now() < until);
-    const silence = new Float32Array(CHUNK);
-    for (let i = 0; i < 25; i++) {
-      await pace();
-      engineManager.feedPcm(silence);
-      fedSamples += CHUNK;
-    }
+    // Soak: replay the same audio until the clock runs out; what is under
+    // test is whether hours of continuous use grow anything without bound.
+    const t0 = await feedRealtime(engineManager, pcm, { silenceChunks: 25, soakMs: soakMinutes * 60000 });
 
     // Wall clock at which a given point on the audio timeline was fed.
     const audioClock = (seconds) => t0 + seconds * 1000;
@@ -318,8 +256,7 @@ async function main() {
     return { label, ev, loadMs, firstDraftMs, draftGaps, finalLatencies };
   }
 
-  const soakArg = process.argv.indexOf('--soak');
-  const soakMinutes = soakArg !== -1 ? Number(process.argv[soakArg + 1]) || 10 : 0;
+  const soakMinutes = has('--soak') ? Number(arg('--soak')) || 10 : 0;
   if (soakMinutes > 0) console.log(`soak: ${soakMinutes} 分钟连续会话
 `);
 
@@ -345,7 +282,7 @@ async function main() {
   step('streaming drafts emitted', withDraft.ev.partials.length > 0, `${withDraft.ev.partials.length} partials`);
   step('stopSessionAndWait returns after the worker is gone', !engineManager.getInfo().running);
 
-  const logsDir = require('../electron/platform/data-root').dataDir('logs');
+  const logsDir = require('../../electron/platform/data-root').dataDir('logs');
   const logFile = fs.existsSync(logsDir)
     ? fs.readdirSync(logsDir).filter((f) => f.endsWith('.jsonl')).sort().pop()
     : null;
@@ -407,8 +344,8 @@ async function main() {
   // Same manifest, own manager and root; the worker comes up TTS-only (no
   // listen session), streams one sentence at a time, swaps packs on demand,
   // stops mid-text on cancel, and releases the pack before a swap/removal.
-  const ttsPackMgr = require('../electron/tts/tts-pack-manager');
-  const { listVoicePacks } = require('../electron/tts/tts-models');
+  const ttsPackMgr = require('../../electron/tts/tts-pack-manager');
+  const { listVoicePacks } = require('../../electron/tts/tts-models');
 
   const ttsList = await ttsPackMgr.listPacks({ refresh: false });
   step(
@@ -511,7 +448,7 @@ async function main() {
   );
 
   // ===== Neural voice on the GPU (v0.4.9) =====
-  // Needs the WebGPU runtime overlay (scripts/overlay-sherpa-runtime.js);
+  // Needs the WebGPU runtime overlay (scripts/build/overlay-sherpa-runtime.js);
   // without it sherpa reports the fallback on stderr and the self-test
   // says so rather than pretending.
   engineManager.setTtsProvider('webgpu');
@@ -589,28 +526,14 @@ async function main() {
     console.log('');
   }
 
-  const failed = results.filter((r) => !r.ok).length;
-  console.log(`\n==== ${results.length - failed}/${results.length} passed ====`);
+  const failed = summary();
   if (logText) {
     console.log('\n--- session log ---');
     console.log(logText.trim());
   }
-  if (failed === 0 && !KEEP) {
-    // The keep-alive window leaves Chromium session files open under the
-    // sandbox userData until the process exits; the next run's rmSync at
-    // startup gets them. Not a test failure.
-    try {
-      fs.rmSync(SANDBOX, { recursive: true, force: true });
-    } catch (e) {
-      console.log(`\nsandbox cleanup deferred to next run (${e.code || e.message})`);
-    }
-  } else console.log(`\nsandbox kept: ${SANDBOX}`);
-  app.exit(failed === 0 ? 0 : 1);
+  if (failed === 0 && !KEEP) box.cleanup();
+  else console.log(`\nsandbox kept: ${SANDBOX}`);
+  return failed;
 }
 
-app.whenReady().then(() =>
-  main().catch((e) => {
-    console.error('SMOKE CRASHED:', e && e.stack);
-    app.exit(2);
-  })
-);
+run(main);

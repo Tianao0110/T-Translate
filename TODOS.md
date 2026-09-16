@@ -36,7 +36,7 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 ### 听译小项（2026-09-08 复查结论「链不用动」，用户定只记不改；数字与诊断在 gstack v050-listen-review-2026-09-08）
 
 - 段尾填充词幻觉：英文标准档极低电平时定稿末尾偶尔多出 yeah / okay，修法是定稿前裁掉段尾静音；AGC 两个边界（+30 dB 封顶救不了峰值 0.005 的句、40 dB 台阶处慢包络让间隔底噪过门槛）只在 FLEURS 这类极端材料出现；高精度档把数字念成英文单词，可加轻量数词转数字。有真实反馈再动
-- 改听译链必跑 `scripts/bench-listen.js` zh / en 标准档各一次 + `--normalize`，高精度档单跑；结果 JSON 先看 `statusTrail` 有没有中途重启
+- 改听译链必跑 `scripts/bench/bench-listen.js` zh / en 标准档各一次 + `--normalize`，高精度档单跑；结果 JSON 先看 `statusTrail` 有没有中途重启
 
 ### 引擎进 GPU 的后续（v0.4.10 已发 OCR + 朗读；spike 结论在 gstack v049-gpu-research「v0.4.10 调优三连」）
 
@@ -93,7 +93,7 @@ v0.3.4 给 Windows OCR / Azure / Google Vision / OCR.space / 百度 五个引擎
 
 134 种目录 + 新选择器 + 自定义语言 + 文档段落讲解已落地。剩余候选：
 
-- **可以扩到 240+**：谷歌 2024 年又加了 110 种（含藏语、粤语等）。核对脚本 `scripts/verify-google-languages.mjs` 现成，跑一轮就知道哪些码可用；未做是因为那批低资源语言翻译质量参差，等有人提再说
+- **可以扩到 240+**：谷歌 2024 年又加了 110 种（含藏语、粤语等）。核对脚本 `scripts/bench/verify-google-languages.mjs` 现成，跑一轮就知道哪些码可用；未做是因为那批低资源语言翻译质量参差，等有人提再说
 - **模型语言表只有五条**（Llama 3.x / Qwen 2-3 / NLLB / MADLAD / Opus-MT，见 `config/model-language-coverage.js`）。故意不求全——缺条目零代价，只在降级链排序上生效、绝不进 UI。Mistral、Gemma、Phi 跨版本语言覆盖差异太大，写进去准确度不如不写
 - **选择器没有搜索框**：设计上靠字母索引，134 种够用；真扩到 240+ 时要重新评估
 - ⚠️ **暂时性死区已犯三次**，第三次（一键总结的 concurrency）**漏进了 main**。

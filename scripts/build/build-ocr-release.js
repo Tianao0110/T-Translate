@@ -1,7 +1,7 @@
 // Prepares the GitHub `ocr-models` release: downloads every pack zip from
 // upstream, computes sha256/size, and emits release-ocr-models/ containing
 // the zips + manifest.json ready to upload as release assets.
-//   node scripts/build-ocr-release.js
+//   node scripts/build/build-ocr-release.js
 //
 // Publishing steps (manual, one-time per model update):
 //   1. GitHub -> Releases -> Draft new release, tag `ocr-models`
@@ -15,9 +15,9 @@
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const { BASE_PACK, HQ_PACK, LANG_PACKS, LEGACY_PACKS, RELEASE_BASE_URL } = require('./ocr-model-sources');
+const { BASE_PACK, HQ_PACK, LANG_PACKS, LEGACY_PACKS, RELEASE_BASE_URL } = require('../fetch/ocr-model-sources');
 
-const OUT_DIR = path.join(__dirname, '..', 'release-ocr-models');
+const OUT_DIR = path.join(__dirname, '..', '..', 'release-ocr-models');
 
 async function fetchPack(pack) {
   const dest = path.join(OUT_DIR, pack.file);

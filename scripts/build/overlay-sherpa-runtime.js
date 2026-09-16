@@ -14,16 +14,16 @@
 // addon resolves both next to itself, which is why the copies must sit in
 // the sherpa package directory rather than on PATH. Idempotent by sha256.
 //
-//   node scripts/overlay-sherpa-runtime.js           apply
-//   node scripts/overlay-sherpa-runtime.js --check   report only, exit 1 if stale
-//   node scripts/overlay-sherpa-runtime.js --restore put the npm originals back
+//   node scripts/build/overlay-sherpa-runtime.js           apply
+//   node scripts/build/overlay-sherpa-runtime.js --check   report only, exit 1 if stale
+//   node scripts/build/overlay-sherpa-runtime.js --restore put the npm originals back
 /* eslint-disable no-console */
 
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const ROOT = path.join(__dirname, '..');
+const ROOT = path.join(__dirname, '..', '..');
 const TARGET = path.join(ROOT, 'node_modules', 'sherpa-onnx-win-x64');
 const NATIVE = path.join(ROOT, 'native', 'sherpa-onnx-webgpu', 'bin');
 const ORT_NODE = path.join(ROOT, 'node_modules', 'onnxruntime-node', 'bin', 'napi-v6', 'win32', 'x64');

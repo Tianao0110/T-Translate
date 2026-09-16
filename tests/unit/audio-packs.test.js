@@ -90,7 +90,7 @@ describe('link-only packs', () => {
   });
 
   it('every catalog entry mirrors the release source definition', () => {
-    const { PACKS } = require('../../scripts/audio-model-sources.js');
+    const { PACKS } = require('../../scripts/fetch/audio-model-sources.js');
     for (const m of MANUAL_PACKS) {
       const src = PACKS.find((p) => p.id === m.id);
       expect(src, m.id).toBeTruthy();

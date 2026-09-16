@@ -6,39 +6,23 @@
 //   npm run smoke:llm-host -- --model <path.gguf> [--gpu]
 /* eslint-disable no-console */
 
-const path = require('path');
 const fs = require('fs');
-const os = require('os');
-const { app } = require('electron');
+const { arg, has, sleep, checklist, sandbox, run } = require('../lib/electron-smoke');
 
-const SANDBOX = path.join(os.tmpdir(), 't-translate-smoke-llm-host');
-const arg = (name, def = null) => {
-  const i = process.argv.indexOf(name);
-  return i > -1 ? process.argv[i + 1] : def;
-};
 const MODEL = arg('--model', process.env.TT_LLM_MODEL);
-const GPU = process.argv.includes('--gpu');
-
-let failures = 0;
-function step(label, ok, detail) {
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? `  — ${detail}` : ''}`);
-  if (!ok) failures++;
-}
+const GPU = has('--gpu');
+const { step, summary } = checklist();
 
 const SYSTEM = 'You are a professional translator. Translate the following text into Chinese (Simplified).\n\nRequirements:\n- Use natural, conversational tone\n- Output ONLY the translation, no explanations or notes\n- Do NOT translate content inside special markers like ⟦...⟧';
 
 async function main() {
   if (!MODEL || !fs.existsSync(MODEL)) {
     console.error('usage: npm run smoke:llm-host -- --model <path.gguf> [--gpu]');
-    app.exit(2);
-    return;
+    return 2;
   }
-  fs.rmSync(SANDBOX, { recursive: true, force: true });
-  fs.mkdirSync(SANDBOX, { recursive: true });
-  app.setPath('userData', SANDBOX);
-  process.env.TT_MODELS_ROOT = path.join(SANDBOX, 'models');
+  const box = sandbox('t-translate-smoke-llm-host');
 
-  const tengine = require('../electron/tengine').get();
+  const tengine = require('../../electron/tengine').get();
   const llm = tengine.get('llm');
   const events = [];
   tengine.on((e) => events.push(e));
@@ -46,7 +30,7 @@ async function main() {
 
   const t0 = Date.now();
   await llm.host.spawn();
-  await new Promise((r) => setTimeout(r, 50));
+  await sleep(50);
   const rt = llm.runtime();
   step('host up with the pinned runtime', !!rt && rt.build === 'b10853', `${Date.now() - t0} ms, ${rt ? rt.devices.map((d) => `${d.name}[${d.typeName}]`).join(' ') : 'no info'}`);
 
@@ -80,7 +64,7 @@ async function main() {
 
   const exitsBefore = events.filter((e) => e.kind === 'exit').length;
   llm.host.kill();
-  await new Promise((r) => setTimeout(r, 300));
+  await sleep(300);
   step('kill reports an expected exit', events.filter((e) => e.kind === 'exit').length === exitsBefore + 1 && llm.loaded() === null);
   const t1 = Date.now();
   await llm.load(MODEL, { nCtx: 4096 });
@@ -96,12 +80,9 @@ async function main() {
   step('no prompt or output text in the event stream', !leak);
 
   llm.shutdown();
-  await new Promise((r) => setTimeout(r, 200));
-  console.log(failures ? `\n${failures} check(s) failed` : '\nall checks passed');
-  app.exit(failures ? 1 : 0);
+  await sleep(200);
+  box.cleanup();
+  return summary();
 }
 
-app.whenReady().then(() => main().catch((e) => {
-  console.error('smoke failed:', e);
-  app.exit(1);
-}));
+run(main);

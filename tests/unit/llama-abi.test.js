@@ -1,6 +1,6 @@
 // The ABI transcription is checked two ways: struct sizes through koffi
 // alone (always), and the default-parameter fingerprint through the pinned
-// DLLs (only when scripts/fetch-llama-runtime.js has put them in
+// DLLs (only when scripts/fetch/fetch-llama-runtime.js has put them in
 // resources/llama). A drifted field lands values in the wrong slots and
 // both checks say so before any model is loaded.
 

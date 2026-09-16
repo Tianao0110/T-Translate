@@ -9,12 +9,12 @@
 // One-off, NOT part of check:all — it makes one network request per language
 // against Google's unofficial endpoint. Run it after editing the catalogue.
 //
-//   node scripts/verify-google-languages.mjs
-//   node scripts/verify-google-languages.mjs --delay 500   (if throttled)
+//   node scripts/bench/verify-google-languages.mjs
+//   node scripts/bench/verify-google-languages.mjs --delay 500   (if throttled)
 
-import { LANGUAGES } from '../src/config/languages.js';
-import { configureRuntime } from '../src/stack/runtime.js';
-import GoogleTranslateProvider from '../src/stack/providers/google-translate.js';
+import { LANGUAGES } from '../../src/config/languages.js';
+import { configureRuntime } from '../../src/stack/runtime.js';
+import GoogleTranslateProvider from '../../src/stack/providers/google-translate.js';
 
 const SAMPLE = 'The quick brown fox jumps over the lazy dog.';
 const delayArg = process.argv.indexOf('--delay');

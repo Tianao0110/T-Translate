@@ -2,74 +2,32 @@
 // host will, against the pinned DLLs in resources/llama and one whitelisted
 // model on disk. Prints load and decode numbers, checks prefix reuse, the
 // no-thinking rule, cancellation and the probe steps.
-//   node scripts/smoke-llm.js --model <path.gguf> [--provider cpu|gpu] [--threads N]
+//   node scripts/smoke/smoke-llm.js --model <path.gguf> [--provider cpu|gpu] [--threads N]
 /* eslint-disable no-console */
 
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const { Worker } = require('worker_threads');
+const { RUNTIME_DIR, arg, startWorker } = require('../lib/worker-driver');
 
-const arg = (name, def = null) => {
-  const i = process.argv.indexOf(name);
-  return i > -1 ? process.argv[i + 1] : def;
-};
 const MODEL = arg('--model', process.env.TT_LLM_MODEL);
 const PROVIDER = arg('--provider', 'cpu');
 const THREADS = Number(arg('--threads', 0)) || null;
-const RUNTIME = path.join(__dirname, '..', 'resources', 'llama');
 if (!MODEL || !fs.existsSync(MODEL)) {
-  console.error('usage: node scripts/smoke-llm.js --model <path.gguf> [--provider cpu|gpu]');
+  console.error('usage: node scripts/smoke/smoke-llm.js --model <path.gguf> [--provider cpu|gpu]');
   process.exit(2);
 }
 
-const abortFlag = new SharedArrayBuffer(4);
-const flag = new Int32Array(abortFlag);
-const worker = new Worker(path.join(__dirname, '..', 'electron', 'tengine', 'runtime', 'worker.js'), { workerData: { abortFlag } });
-worker.on('error', (e) => {
-  console.error('worker error', e);
-  process.exit(1);
-});
-const waiters = [];
-const tokens = new Map();
-worker.on('message', (m) => {
-  if (m.type === 'log') {
-    console.log(`   [${m.level}] ${m.message}`);
-    return;
-  }
-  if (m.type === 'token') {
-    tokens.set(m.reqId, (tokens.get(m.reqId) || '') + m.text);
-    return;
-  }
-  if (m.type === 'progress') return;
-  const w = waiters.shift();
-  if (w) w(m);
-});
-const ask = (msg) => new Promise((resolve) => {
-  waiters.push(resolve);
-  worker.postMessage(msg);
-});
-let reqSeq = 0;
-const gen = async (fields) => {
-  const reqId = `g${++reqSeq}`;
-  const r = await ask({ type: 'generate', reqId, ...fields });
-  return { ...r, streamed: tokens.get(reqId) || '' };
-};
-const failures = [];
-const check = (ok, label) => {
-  console.log(`   ${ok ? 'PASS' : 'FAIL'}  ${label}`);
-  if (!ok) failures.push(label);
-};
+const { ask, generate: gen, nextReqId, cancel, check, finish } = startWorker();
 
 // The general model gets the app's translation template; a translation-only
-// model (Hy-MT2) gets the short instruction the stack's MT path sends, since
-// it translates a long system prompt instead of obeying it.
+// model (Hy-MT2) gets the short instruction the stack's MT path sends.
 const SYSTEM_GENERAL = 'You are a professional translator. Translate the following text into Chinese (Simplified).\n\nRequirements:\n- Use natural, conversational tone\n- Output ONLY the translation, no explanations or notes\n- Do NOT translate content inside special markers like ⟦...⟧';
 const SYSTEM_MT = 'Translate the following text into Chinese (Simplified) in a natural and conversational tone. ONLY output the translated result without any explanation:';
 
 (async () => {
-  console.log(`runtime ${RUNTIME}\nmodel ${MODEL}\nprovider ${PROVIDER}, ${os.cpus().length} logical cpus`);
-  const rt = await ask({ type: 'load-runtime', dir: RUNTIME });
+  console.log(`runtime ${RUNTIME_DIR}\nmodel ${MODEL}\nprovider ${PROVIDER}, ${os.cpus().length} logical cpus`);
+  const rt = await ask({ type: 'load-runtime', dir: RUNTIME_DIR });
   if (!rt.ok) {
     console.error('runtime failed:', rt.error);
     process.exit(1);
@@ -114,9 +72,9 @@ const SYSTEM_MT = 'Translate the following text into Chinese (Simplified) in a n
   }
 
   console.log('\n4. cancel mid-generation');
-  const reqId = `g${++reqSeq}`;
+  const reqId = nextReqId();
   const p = ask({ type: 'generate', reqId, system: '', user: 'Write a 500 word essay about the ocean.', maxTokens: 400 });
-  setTimeout(() => Atomics.store(flag, 0, 1), 400);
+  setTimeout(cancel, 400);
   const t0 = Date.now();
   const r4 = await p;
   console.log(`   stop ${r4.result?.stop}, ${r4.result?.genTokens} tok, returned ${Date.now() - t0} ms after start`);
@@ -149,10 +107,7 @@ const SYSTEM_MT = 'Translate the following text into Chinese (Simplified) in a n
   console.log(`   junk: ${pj.report.steps.map((st) => `${st.name}:${st.ok ? 'ok' : 'fail'}`).join(' ')} → ${pj.report.verdict}`);
   check(pj.report.verdict === 'unusable' && pj.report.steps[0].ok === false, 'junk rejected at the header');
 
-  await ask({ type: 'shutdown' });
-  await worker.terminate();
-  console.log(failures.length ? `\n${failures.length} check(s) failed: ${failures.join('; ')}` : '\nall checks passed');
-  process.exit(failures.length ? 1 : 0);
+  await finish();
 })().catch((e) => {
   console.error('smoke failed:', e);
   process.exit(1);

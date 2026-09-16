@@ -8,12 +8,8 @@
 //   npm run smoke:ocr -- --gpu   also the WebGPU path (needs a DX12 GPU)
 /* eslint-disable no-console */
 
-const path = require('path');
-const fs = require('fs');
-const os = require('os');
-const { app } = require('electron');
+const { has, checklist, sandbox, run } = require('../lib/electron-smoke');
 
-const SANDBOX = path.join(os.tmpdir(), 't-translate-smoke-ocr');
 const TEXT_ZH = '今天的会议改到下午三点';
 const TEXT_EN = 'Hello World 2026';
 const BIG_LINES = [
@@ -26,12 +22,7 @@ const BIG_LINES = [
   '离线模式下不会发出任何网络请求',
   'Thank you for reading this far',
 ];
-
-let failures = 0;
-function step(label, ok, detail) {
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? `  — ${detail}` : ''}`);
-  if (!ok) failures++;
-}
+const { step, summary } = checklist();
 
 function renderPng(text, width = 640, height = 120) {
   const canvasKit = require('@napi-rs/canvas');
@@ -48,18 +39,15 @@ function renderPng(text, width = 640, height = 120) {
 const norm = (s) => String(s).replace(/\s+/g, '').toLowerCase();
 
 async function main() {
-  fs.rmSync(SANDBOX, { recursive: true, force: true });
-  fs.mkdirSync(SANDBOX, { recursive: true });
-  app.setPath('userData', SANDBOX);
-  process.env.TT_MODELS_ROOT = path.join(SANDBOX, 'models');
+  const box = sandbox('t-translate-smoke-ocr');
 
-  const ocrEngine = require('../electron/ocr/ocr-engine');
-  const hostManager = require('../electron/tengine').get().get('ocr');
-  const gpu = process.argv.includes('--gpu');
+  const ocrEngine = require('../../electron/ocr/ocr-engine');
+  const hostManager = require('../../electron/tengine').get().get('ocr');
+  const gpu = has('--gpu');
 
   const light = await ocrEngine.healthCheck();
   step('bundled base pack resolves', light.healthy === true, light.activeBase || light.error);
-  if (!light.healthy) return;
+  if (!light.healthy) return summary();
 
   const zhPng = renderPng(TEXT_ZH);
   const enPng = renderPng(TEXT_EN);
@@ -87,13 +75,12 @@ async function main() {
     const t2 = Date.now();
     const third = await ocrEngine.recognize(zhPng, { language: 'zh-Hans', preprocess: { enabled: false } });
     step(`${label}: warm recognition`, third.success, `${Date.now() - t2}ms`);
-    // A screen-sized capture is where the model dominates the wall clock
-    // (small strips are mostly decode + IPC), so that is what the CPU/GPU
-    // comparison is measured on.
+    // A screen-sized capture is where the model dominates the wall clock, so
+    // the CPU / GPU comparison is measured on it.
     const t3 = Date.now();
     const big = await ocrEngine.recognize(bigPng, { language: 'zh-Hans', preprocess: { enabled: false } });
     const bigMs = Date.now() - t3;
-    // rawBlocks = per line; blocks = the lib's paragraph merge, fewer by design.
+    // rawBlocks = per line; blocks = the paragraph merge, fewer by design.
     step(`${label}: screen-sized capture (${BIG_LINES.length} lines)`, big.success && big.rawBlocks.length >= BIG_LINES.length - 1, `${big.rawBlocks?.length ?? 0} lines in ${bigMs}ms`);
     return { firstMs, secondMs, warmMs: Date.now() - t2, bigMs };
   }
@@ -122,14 +109,8 @@ async function main() {
   }
 
   hostManager.shutdown();
-  console.log(`\n==== ${failures ? `${failures} FAILED` : 'all passed'} ====`);
+  box.cleanup();
+  return summary();
 }
 
-app.whenReady().then(() =>
-  main()
-    .catch((e) => {
-      console.error('smoke crashed:', e);
-      failures++;
-    })
-    .finally(() => app.exit(failures ? 1 : 0)),
-);
+run(main);

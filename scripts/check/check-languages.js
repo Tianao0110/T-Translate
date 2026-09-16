@@ -22,14 +22,14 @@ function block(content, startRe, endToken) {
 }
 
 function catalogue() {
-  const b = block(read('../src/config/languages.js'), /export const LANGUAGES = \[/, '\n];');
+  const b = block(read('../../src/config/languages.js'), /export const LANGUAGES = \[/, '\n];');
   return b && [...b.matchAll(/code: '([^']+)'/g)].map((m) => m[1]);
 }
 
 // Not a mirror of the catalogue — it only names the handful of codes written
 // literally in code (AUTO, ZH). Its invariant is "subset", not "equal".
 function enumCodes() {
-  const b = block(read('../src/config/constants.js'), /export const LANGUAGE_CODES = \{/, '};');
+  const b = block(read('../../src/config/constants.js'), /export const LANGUAGE_CODES = \{/, '};');
   return b ? [...b.matchAll(/: '([^']+)'/g)].map((m) => m[1]) : [];
 }
 
@@ -37,10 +37,10 @@ const PROVIDERS = [
   // `unmapped` = what the mapper does with a code it has no entry for.
   //   passthrough — sends the code as-is (right for ISO-code APIs)
   //   reject      — returns null and the caller reports "unsupported"
-  { id: 'deepl', file: '../src/stack/providers/deepl.js', fn: '_convertLangCode', unmapped: 'reject' },
-  { id: 'google', file: '../src/stack/providers/google-translate.js', fn: '_mapLanguageCode', unmapped: 'passthrough' },
-  { id: 'microsoft', file: '../src/stack/providers/microsoft-translator.js', fn: '_mapLanguageCode', unmapped: 'passthrough' },
-  { id: 'baidu', file: '../src/stack/providers/baidu-translate.js', fn: '_mapLanguageCode', unmapped: 'passthrough' },
+  { id: 'deepl', file: '../../src/stack/providers/deepl.js', fn: '_convertLangCode', unmapped: 'reject' },
+  { id: 'google', file: '../../src/stack/providers/google-translate.js', fn: '_mapLanguageCode', unmapped: 'passthrough' },
+  { id: 'microsoft', file: '../../src/stack/providers/microsoft-translator.js', fn: '_mapLanguageCode', unmapped: 'passthrough' },
+  { id: 'baidu', file: '../../src/stack/providers/baidu-translate.js', fn: '_mapLanguageCode', unmapped: 'passthrough' },
 ];
 
 // The OCR language list exists twice on purpose: the engine resolves model
@@ -49,8 +49,8 @@ const PROVIDERS = [
 // only one of them is either a language the UI offers and the engine
 // mis-routes, or one the engine knows and nobody can pick.
 function ocrPackMaps() {
-  const ui = block(read('../src/config/ocr-languages.js'), /export const OCR_LANGUAGE_GROUPS = \[/, '\n];');
-  const engine = block(read('../electron/shared/ocr-packs.js'), /const LANGUAGE_TO_PACK = \{/, '\n};');
+  const ui = block(read('../../src/config/ocr-languages.js'), /export const OCR_LANGUAGE_GROUPS = \[/, '\n];');
+  const engine = block(read('../../electron/shared/ocr-packs.js'), /const LANGUAGE_TO_PACK = \{/, '\n};');
   if (!ui || !engine) return null;
 
   const uiMap = { auto: 'base-v6' };
@@ -97,7 +97,7 @@ function main() {
   // The Chinese letter index reads the pinyin initial off the name's first
   // character. An unmapped character silently lands the language in the '#'
   // group, where nobody will look for it.
-  const src = read('../src/config/languages.js');
+  const src = read('../../src/config/languages.js');
   const initials = block(src, /const PINYIN_INITIALS = \{/, '};') || '';
   const mappedChars = new Set([...initials.matchAll(/(\S): '/g)].map((m) => m[1]));
   const namesBlock = block(src, /export const LANGUAGES = \[/, '\n];') || '';

@@ -3,66 +3,29 @@
 // per-image numbers, checks the fixed self-test image reads back with a
 // box, that cancellation reaches an image request, and that unloading
 // frees both halves.
-//   node scripts/smoke-llm-vision.js --model <path.gguf> --mmproj <path.gguf> [--provider cpu|gpu] [--image <png>]
+//   node scripts/smoke/smoke-llm-vision.js --model <path.gguf> --mmproj <path.gguf> [--provider cpu|gpu] [--image <png>]
 /* eslint-disable no-console */
 
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const { Worker } = require('worker_threads');
+const { RUNTIME_DIR, HEALTH_IMAGE, arg, startWorker } = require('../lib/worker-driver');
 
-const arg = (name, def = null) => {
-  const i = process.argv.indexOf(name);
-  return i > -1 ? process.argv[i + 1] : def;
-};
 const MODEL = arg('--model', process.env.TT_VISION_MODEL);
 const MMPROJ = arg('--mmproj', process.env.TT_VISION_MMPROJ);
 const PROVIDER = arg('--provider', 'cpu');
 const IMAGE = arg('--image', null);
-const RUNTIME = path.join(__dirname, '..', 'resources', 'llama');
-const HEALTH_IMAGE = path.join(__dirname, '..', 'electron', 'tengine', 'runtime', 'assets', 'vision-health.png');
 if (!MODEL || !MMPROJ || !fs.existsSync(MODEL) || !fs.existsSync(MMPROJ)) {
-  console.error('usage: node scripts/smoke-llm-vision.js --model <path.gguf> --mmproj <path.gguf> [--provider cpu|gpu] [--image <png>]');
+  console.error('usage: node scripts/smoke/smoke-llm-vision.js --model <path.gguf> --mmproj <path.gguf> [--provider cpu|gpu] [--image <png>]');
   process.exit(2);
 }
 
-const abortFlag = new SharedArrayBuffer(4);
-const flag = new Int32Array(abortFlag);
-const worker = new Worker(path.join(__dirname, '..', 'electron', 'tengine', 'runtime', 'worker.js'), { workerData: { abortFlag } });
-worker.on('error', (e) => {
-  console.error('worker error', e);
-  process.exit(1);
-});
-const waiters = [];
-const tokens = new Map();
-worker.on('message', (m) => {
-  if (m.type === 'log') {
-    if (m.level === 'error') console.log(`   [${m.level}] ${m.message}`);
-    return;
-  }
-  if (m.type === 'token') {
-    tokens.set(m.reqId, (tokens.get(m.reqId) || '') + m.text);
-    return;
-  }
-  if (m.type === 'progress') return;
-  const w = waiters.shift();
-  if (w) w(m);
-});
-const ask = (msg) => new Promise((resolve) => {
-  waiters.push(resolve);
-  worker.postMessage(msg);
-});
-let reqSeq = 0;
-const failures = [];
-const check = (ok, label) => {
-  console.log(`   ${ok ? 'PASS' : 'FAIL'}  ${label}`);
-  if (!ok) failures.push(label);
-};
+const { ask, generate: gen, nextReqId, cancel, check, finish } = startWorker({ logLevel: 'error' });
 const describe = (r) => `${r.imageTokens} image tok, prefill ${r.promptMs} ms, first ${r.firstMs} ms, ${r.genTokens} tok in ${r.totalMs - r.promptMs} ms (${r.tokPerSec} tok/s), total ${r.totalMs} ms, stop ${r.stop}, ${r.lines.length} lines`;
 
 (async () => {
-  console.log(`runtime ${RUNTIME}\nmodel ${MODEL}\nmmproj ${MMPROJ}\nprovider ${PROVIDER}, ${os.cpus().length} logical cpus`);
-  const rt = await ask({ type: 'load-runtime', dir: RUNTIME });
+  console.log(`runtime ${RUNTIME_DIR}\nmodel ${MODEL}\nmmproj ${MMPROJ}\nprovider ${PROVIDER}, ${os.cpus().length} logical cpus`);
+  const rt = await ask({ type: 'load-runtime', dir: RUNTIME_DIR });
   if (!rt.ok) {
     console.error('runtime failed:', rt.error);
     process.exit(1);
@@ -79,21 +42,21 @@ const describe = (r) => `${r.imageTokens} image tok, prefill ${r.promptMs} ms, f
 
   console.log('\n1. fixed self-test image, Spotting');
   const health = fs.readFileSync(HEALTH_IMAGE);
-  const r1 = await ask({ type: 'generate', reqId: `g${++reqSeq}`, image: health });
+  const r1 = await gen({ image: health });
   console.log(`   ${describe(r1.result)}`);
   for (const l of r1.result.lines) console.log(`   | ${l.text}  ${JSON.stringify(l.box)}`);
   check(r1.ok && r1.result.stop === 'eog', 'ends at EOG');
   check(r1.result.lines.some((l) => l.text.includes('OK') && l.box), 'reads the OK line with a box');
   check(r1.result.lines.every((l) => !l.box || (l.box[0] >= 0 && l.box[2] <= r1.result.width && l.box[3] <= r1.result.height)), 'boxes stay inside the image');
-  check(tokens.get(`g${reqSeq}`) === r1.result.text, 'streamed text equals the result');
+  check(r1.streamed === r1.result.text, 'streamed text equals the result');
 
   console.log('\n2. same image again (steady state)');
-  const r2 = await ask({ type: 'generate', reqId: `g${++reqSeq}`, image: health });
+  const r2 = await gen({ image: health });
   console.log(`   ${describe(r2.result)}`);
   check(r2.result.text === r1.result.text, 'deterministic output');
 
   console.log('\n3. plain OCR task');
-  const r3 = await ask({ type: 'generate', reqId: `g${++reqSeq}`, image: health, task: 'OCR' });
+  const r3 = await gen({ image: health, task: 'OCR' });
   console.log(`   → ${r3.result.text.trim()}`);
   check(r3.ok && /OK/.test(r3.result.text) && r3.result.lines.length === 0, 'OCR task returns text only');
 
@@ -104,22 +67,22 @@ const describe = (r) => `${r.imageTokens} image tok, prefill ${r.promptMs} ms, f
 
   if (IMAGE && fs.existsSync(IMAGE)) {
     console.log(`\n5. ${path.basename(IMAGE)}`);
-    const r5 = await ask({ type: 'generate', reqId: `g${++reqSeq}`, image: fs.readFileSync(IMAGE) });
+    const r5 = await gen({ image: fs.readFileSync(IMAGE) });
     console.log(`   ${describe(r5.result)}`);
     for (const l of r5.result.lines.slice(0, 12)) console.log(`   | ${l.text}  ${JSON.stringify(l.box)}`);
     check(r5.ok && r5.result.lines.length > 0, 'custom image yields lines');
   }
 
   console.log('\n6. cancel during an image request');
-  const reqId = `g${++reqSeq}`;
+  const reqId = nextReqId();
   const p = ask({ type: 'generate', reqId, image: IMAGE && fs.existsSync(IMAGE) ? fs.readFileSync(IMAGE) : health });
-  setTimeout(() => Atomics.store(flag, 0, 1), 5);
+  setTimeout(cancel, 5);
   const r6 = await p;
   console.log(`   stop ${r6.ok ? r6.result.stop : r6.error.code} after ${r6.ok ? r6.result.totalMs : '?'} ms`);
   check(r6.ok && (r6.result.stop === 'cancel' || r6.result.stop === 'eog'), 'cancel is honoured or the request was already done');
 
   console.log('\n7. text request on a vision model still works');
-  const r7 = await ask({ type: 'generate', reqId: `g${++reqSeq}`, prompt: '<|begin_of_sentence|>User: Say OK.\nAssistant:\n', maxTokens: 8 });
+  const r7 = await gen({ prompt: '<|begin_of_sentence|>User: Say OK.\nAssistant:\n', maxTokens: 8 });
   console.log(`   → ${JSON.stringify(r7.ok ? r7.result.text : r7.error)}`);
   check(r7.ok, 'text path unaffected');
 
@@ -129,9 +92,7 @@ const describe = (r) => `${r.imageTokens} image tok, prefill ${r.promptMs} ms, f
   console.log(`\nrss ${Math.round(before / 1048576)} MB → ${Math.round(after / 1048576)} MB after unload`);
   check(after <= before, 'unload releases memory');
 
-  await ask({ type: 'shutdown' });
-  console.log(failures.length ? `\n${failures.length} check(s) failed: ${failures.join('; ')}` : '\nall checks passed');
-  process.exit(failures.length ? 1 : 0);
+  await finish();
 })().catch((e) => {
   console.error('smoke failed:', e);
   process.exit(1);
