@@ -6,6 +6,7 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 
 - **版本号五处一起改，缺一处就对不上**：`package.json` / `package-lock.json`（自述的两个 version 字段，手改 package.json 不会带上它——v0.3.0～v0.3.2 三版都漂着发出去了）/ `README.md` 徽章 / `README.zh-CN.md` 徽章 / `CHANGELOG.md` 把「未发布」**改标题**成 `## vX.Y.Z — 日期 — 主题`（别在它前面新插一节，那样两条旧记录会留在孤立的「未发布」里）。代码里没有硬编码版本，运行时读 `app.getVersion()`，不用管；docs 里的历史版本号是叙述，别改
 - **新功能发版前对齐文档**：README×2 功能表 + 功能段、docs/FAQ（用户会问什么）、docs/ARCHITECTURE + DEVELOPMENT（后来人怎么改）。v0.3.3 的 AI 动作就是发完才发现四份文档零提及
+- **发版前过一遍说明书** `docs/MANUAL.zh.md` / `MANUAL.en.md`：这一版改过的界面、设置项、快捷键、模型链接都要同步进去，它随安装包分发（v0.5.1 起）
 - 打包：`npm run dist`，产物在 `release/`；GitHub Release **必传三件套** `T-Translate-Setup-x.x.x.exe` + `.exe.blockmap` + `latest.yml`（缺 latest.yml 用户端检查更新直接报错）。⚠️ 打包前**关掉 VS Code**：它锁着 `release/win-unpacked/resources/app.asar`，`npm run dist` 会以 `EBUSY` 失败；非要并行就换输出目录 `-c.directories.output=release-xxx`
 - 模型热更新不用发版，只改对应 Release 资产：OCR 走 `ocr-models` tag（手册 [docs/OCR_MODELS.md](docs/OCR_MODELS.md)），听译走 `audio-models` tag（`npm run audio:release` 生成资产）。**两个 tag 都必须勾 Pre-release**，否则 electron-updater 会把它们当最新版去找 latest.yml；同理**永远别开 allowPrerelease**
 - 听译改动发版前跑 `npm run smoke:listen`（整链 13 项断言 + 延迟数字），改了模型或分发链必跑
@@ -13,17 +14,16 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 
 ## 下一版本候选
 
-### v0.5.1：内置视觉模型（分支 feat/v0.5.1，方案与进度 gstack v051-vision-plan-2026-09-14）
+### 内置视觉模型的后续（v0.5.1 已出；方案与落地在 gstack v051-vision-plan-2026-09-14）
 
-- ✅ 第 0–3 步已落（mtmd 运行时、双宿主管理层、栈引擎 + 设置卡、GPU-only + 智能分配）；第 4 步验证与文档进行中
 - **分配阈值待真实反馈调**：`src/stack/ocr/vision-routing.js` 的 ROUTING（大图 1.2 MP、密集 30 行、表格 3 行 × 3 块、多栏各 4 行、字号差 2.5 倍、置信度 0.75 / 三成行低于 0.6）是 2026-09-14 拍脑袋定的；结果里的 `routed.reason` 就是对数用的，用户觉得「该走视觉没走 / 不该走走了」时按它调
 - 顺带：Q6_K 掐表对比（可选）
 
-### v0.5.2：文档整体精简 + 程序内「使用说明」（用户 2026-09-08 拍板；落法与 8 章骨架在 gstack v052-manual-outline-2026-09-08）
+### 文档收尾（说明书与文档精简已随 v0.5.1 出；落法在 gstack v052-manual-outline-2026-09-08）
 
-- 说明书源 `docs/MANUAL.zh.md` / `MANUAL.en.md` 随包分发，设置页新增「使用说明」入口离线可看，模型链接集中写进说明书（大包链接自取，小包保留一键下载）
-- **写法铁律**：分批写，每批写前核实界面（要截图），不确定就问，做完一批等用户指令再开下一批；先中文后英文
-- 文档精简：README 两份砍到概览 / 功能表 / 安装 / 链接；FAQ 只留排错；ARCHITECTURE 与 DEVELOPMENT 补 T-Engine 砍陈旧；其余四份逐份查过时；之后发版备忘加「每版过一遍说明书」
+- `docs/I18N_GUIDE.md` 与 `docs/THEME_CUSTOMIZATION.md` 还没逐份查过时（本轮只过了 README×2 / FAQ / ARCHITECTURE / DEVELOPMENT / T-ENGINE / OCR_MODELS）
+- README 截图沿用旧图，界面定型后看要不要换一轮（用户未定）
+- 说明书铁律照旧：改界面必改说明书，写前核实界面，不确定就问，先中文后英文
 
 ### 翻译源相关（v0.5.0 已出，可以开了；调研全文 gstack v048-engine-landscape-2026-09-07）
 
@@ -67,7 +67,7 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 
 ### LLM 视觉 OCR 丢失位置信息（其余六个引擎已于 v0.3.4 补齐，只剩这一个）
 
-v0.3.4 给 Windows OCR / Azure / Google Vision / OCR.space / 百度 五个引擎补上了行级坐标（坐标契约与粒度铁律见 `src/stack/ocr/blocks.js` 注释）。**llm-vision 仍是唯一无坐标的引擎**——模型只被要求输出文字，散点模式下退回整段（现在两种模式都会给提示）。候选方向（需实验验证，需要机器上有 Qwen2-VL 类模型）：
+v0.3.4 给 Windows OCR / Azure / Google Vision / OCR.space / 百度 五个引擎补上了行级坐标（坐标契约与粒度铁律见 `src/stack/ocr/blocks.js` 注释）。**llm-vision 仍是唯一无坐标的引擎**——模型只被要求输出文字，散点模式下退回整段（现在两种模式都会给提示）。**v0.5.1 补注**：内置视觉模型（PaddleOCR-VL）自带行框，要位置的散点场景直接用它，本节只剩外部 llm-vision 源这一个口子，优先级再降。候选方向（需实验验证，需要机器上有 Qwen2-VL 类模型）：
 
 - ① **让模型返回坐标** —— ✅ **2026-08-19 实测可行**，用户机器上的 `baidu.unlimited-ocr`（LM Studio）：800×520 合成图，**5/5 块全中、位置误差均值和最大都是 3px、文字逐字准确、1.3 秒**，全部框都在 `coordsFitFrame` 容差内。实现要点：
   - ⚠️ **别逼模型输出 JSON**。第一版提示词要求 `[{"text":..,"box":..}]`，结果既漏块又开始胡编文字；换成"列出每个文字块和它的边界框"这种它原生会说的话就全对。用模型的原生格式，别跟它较劲
@@ -190,6 +190,6 @@ v0.3.4 给 Windows OCR / Azure / Google Vision / OCR.space / 百度 五个引擎
 
 ### Incremental unit test coverage buildout
 
-`tests/unit/` 现有 65 个测试文件、728 用例（selection / stack 五件套 / OCR 坐标 / 语言目录与选择器 / 历史与理解条目 / 段落笔记 / 历史保险库与存储路由 / store 白名单 / 模型包 core 与换包时序 / 听译模型发现与包列表 / 听译声音来源 / TTS 引擎落回 等）。Principle: add tests when you touch a file, new features ship with tests, bug fixes ship with regression tests. Not chasing 100% coverage.
+`tests/unit/` 现有 110 个测试文件、1078 用例（selection / stack 五件套 / OCR 坐标与视觉分配 / T-Engine ABI 指纹 / 语言目录与选择器 / 历史与理解条目 / 段落笔记 / 历史保险库与存储路由 / store 白名单 / 模型包 core 与换包时序 / 听译模型发现与包列表 / 听译声音来源 / TTS 引擎落回 / 说明书解析与设置页挂载 等）。Principle: add tests when you touch a file, new features ship with tests, bug fixes ship with regression tests. Not chasing 100% coverage.
 
 
