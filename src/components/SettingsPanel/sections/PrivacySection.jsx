@@ -262,6 +262,7 @@ const PrivacySection = ({
             id: `mig_${Date.now()}_g${i}`,
             sourceText: term.source,
             translatedText: term.target,
+            ...(term.targetLanguage ? { targetLanguage: term.targetLanguage } : {}),
             note: term.note,
             tags: term.tags,
             folderId: 'glossary',

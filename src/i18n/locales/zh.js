@@ -218,7 +218,7 @@ const zh = {
     deleteFolderConfirm: "删除文件夹后，其中的收藏将移至\"未分类\"",
     moved: "已移动", noValidTerms: "未找到有效术语",
     exportedTerms: "已导出 {{count}} 条术语 ({{format}})",
-    importedTerms: "已导入 {{count}} 条术语", importSkipped: "（跳过 {{skipped}} 条重复）",
+    importedTerms: "已导入 {{count}} 条术语", importSkipped: "（跳过 {{skipped}} 条重复）", importBoundTo: "，只在译成{{language}}时生效",
     importFailed: "导入失败",
     tagsLabel: "标签（逗号分隔）", tagsPlaceholder: "正式, 学术, 重要...",
     noteLabel: "笔记", notePlaceholder: "添加笔记..."

@@ -19,6 +19,8 @@ function stackBridge(ipcRenderer, keys = null) {
     reload: () => ipcRenderer.invoke("stack:reload"),
     clearCache: (level) => ipcRenderer.invoke("stack:clear-cache", { level }),
     cacheStats: () => ipcRenderer.invoke("stack:cache-stats"),
+    // Main window only; the facade refuses any other sender.
+    setGlossary: (items) => ipcRenderer.invoke("stack:set-glossary", { items }),
     ocrRecognize: (imageData, options) =>
       ipcRenderer.invoke("stack:ocr-recognize", { imageData, options }),
     ocrResetVision: () => ipcRenderer.invoke("stack:ocr-reset-vision"),

@@ -24,6 +24,7 @@ import 'dayjs/locale/zh-cn';
 import 'dayjs/locale/en';
 import './styles.css';
 import createLogger from '../../core/logger.js';
+import { LANGUAGE_BY_CODE } from '../../config/languages.js';
 const logger = createLogger('Favorites');
 
 dayjs.extend(relativeTime);
@@ -536,7 +537,10 @@ const FavoritesPanel = ({ showNotification }) => {
         return;
       }
 
-      const { addToFavorites } = useTranslationStore.getState();
+      const { addToFavorites, currentTranslation } = useTranslationStore.getState();
+      // Glossary files carry no language; the terms are bound to the target
+      // language in use, so they never rewrite a translation into another one.
+      const targetLanguage = currentTranslation?.targetLanguage || undefined;
       let added = 0;
 
       for (const term of terms) {
@@ -553,6 +557,7 @@ const FavoritesPanel = ({ showNotification }) => {
             note: term.note,
             tags: term.tags,
             folderId: 'glossary',
+            ...(targetLanguage ? { targetLanguage } : {}),
             timestamp: Date.now(),
           });
           added++;
@@ -560,7 +565,14 @@ const FavoritesPanel = ({ showNotification }) => {
       }
 
       const skipped = terms.length - added;
-      notify(t('favorites.importedTerms', { count: added }) + (skipped > 0 ? t('favorites.importSkipped', { skipped }) : ''), 'success');
+      const lang = LANGUAGE_BY_CODE[targetLanguage];
+      const language = lang ? (i18n.language?.startsWith('en') ? lang.en : lang.name) : targetLanguage;
+      notify(
+        t('favorites.importedTerms', { count: added }) +
+          (skipped > 0 ? t('favorites.importSkipped', { skipped }) : '') +
+          (added > 0 && language ? t('favorites.importBoundTo', { language }) : ''),
+        'success'
+      );
     } catch (e) {
       notify(t('favorites.importFailed') + ': ' + e.message, 'error');
     }

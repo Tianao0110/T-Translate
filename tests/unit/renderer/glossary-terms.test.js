@@ -33,14 +33,14 @@ describe('getGlossaryTerms', () => {
       { id: 'x', sourceText: 'a saved phrase', translatedText: '一句收藏', folderId: null },
     ]);
 
-    expect(get('zh')).toEqual([{ source: 'GPU', target: '图形处理器' }]);
+    expect(get('zh')).toEqual([{ source: 'GPU', target: '图形处理器', bound: true }]);
   });
 
   it('picks the rendering for the language being translated into', () => {
     seed([term('GPU', '图形处理器', 'zh'), term('GPU', 'processeur graphique', 'fr')]);
 
-    expect(get('fr')).toEqual([{ source: 'GPU', target: 'processeur graphique' }]);
-    expect(get('zh')).toEqual([{ source: 'GPU', target: '图形处理器' }]);
+    expect(get('fr')).toEqual([{ source: 'GPU', target: 'processeur graphique', bound: true }]);
+    expect(get('zh')).toEqual([{ source: 'GPU', target: '图形处理器', bound: true }]);
   });
 
   it('leaves out a term saved for a language this document is not in', () => {
@@ -52,20 +52,20 @@ describe('getGlossaryTerms', () => {
   it('keeps entries that carry no language — imported files have none', () => {
     seed([term('GPU', '图形处理器', undefined)]);
 
-    expect(get('fr')).toEqual([{ source: 'GPU', target: '图形处理器' }]);
-    expect(get('zh')).toEqual([{ source: 'GPU', target: '图形处理器' }]);
+    expect(get('fr')).toEqual([{ source: 'GPU', target: '图形处理器', bound: false }]);
+    expect(get('zh')).toEqual([{ source: 'GPU', target: '图形处理器', bound: false }]);
   });
 
   it('prefers an exact language match over a language-less entry', () => {
     seed([term('GPU', '旧的译法', undefined), term('GPU', 'processeur graphique', 'fr')]);
 
-    expect(get('fr')).toEqual([{ source: 'GPU', target: 'processeur graphique' }]);
+    expect(get('fr')).toEqual([{ source: 'GPU', target: 'processeur graphique', bound: true }]);
   });
 
   it('prefers the match whichever order they were saved in', () => {
     seed([term('GPU', 'processeur graphique', 'fr'), term('GPU', '旧的译法', undefined)]);
 
-    expect(get('fr')).toEqual([{ source: 'GPU', target: 'processeur graphique' }]);
+    expect(get('fr')).toEqual([{ source: 'GPU', target: 'processeur graphique', bound: true }]);
   });
 
   it('treats the same word in different casing as one term', () => {

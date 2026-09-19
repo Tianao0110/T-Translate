@@ -19,6 +19,7 @@ const logger = makeLogger('IPC:Stack');
 // aborted on sender destruction, swept by a periodic GC.
 const INFLIGHT_TTL_MS = 10 * 60 * 1000;
 
+
 function register(ctx) {
   const { store } = ctx;
   const vault = createSecureVault({ store });
@@ -289,6 +290,23 @@ function register(ctx) {
       logger.error('Stack reload failed:', e);
       return { success: false, error: e.message };
     }
+  });
+
+  // The glossary lives in the main window's encrypted favorites; it pushes
+  // the terms here so the selection and floating windows translate with them
+  // too. Held in memory only.
+  ipcMain.handle(CHANNELS.STACK.SET_GLOSSARY, (event, payload = {}) => {
+    if (!stack) return unavailable();
+    const main = ctx.getMainWindow?.();
+    if (!main || event.sender !== main.webContents) {
+      logger.warn('set-glossary from a non-main window refused');
+      return { success: false, error: 'refused' };
+    }
+    // The service bounds and cleans what it is handed. The count is all that
+    // is logged.
+    const count = stack.service.setGlossary(payload.items);
+    logger.info(`Glossary set: ${count} terms`);
+    return { success: true, count };
   });
 
   ipcMain.handle(CHANNELS.STACK.CLEAR_CACHE, (event, payload = {}) => {

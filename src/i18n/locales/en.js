@@ -218,7 +218,7 @@ const en = {
     deleteFolderConfirm: "Delete folder? Items will be moved to \"Uncategorized\"",
     moved: "Moved", noValidTerms: "No valid terms found",
     exportedTerms: "Exported {{count}} terms ({{format}})",
-    importedTerms: "Imported {{count}} terms", importSkipped: " (skipped {{skipped}} duplicates)",
+    importedTerms: "Imported {{count}} terms", importSkipped: " (skipped {{skipped}} duplicates)", importBoundTo: ". They apply only when translating into {{language}}",
     importFailed: "Import failed",
     tagsLabel: "Tags (comma separated)", tagsPlaceholder: "formal, academic, important...",
     noteLabel: "Note", notePlaceholder: "Add note..."

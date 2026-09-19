@@ -186,6 +186,7 @@ const CHANNELS = {
     CLEAR_CACHE: 'stack:clear-cache',
     CACHE_STATS: 'stack:cache-stats',
     CHANGED: 'stack:changed',                     // main → renderer: stack reloaded
+    SET_GLOSSARY: 'stack:set-glossary',           // main window → main: the glossary every window translates with
     OCR_RECOGNIZE: 'stack:ocr-recognize',         // allowedEngines injected main-side
     OCR_RESET_VISION: 'stack:ocr-reset-vision',
     VISION_CHAT: 'stack:vision-chat',             // path B: prompt + capture to a vision model

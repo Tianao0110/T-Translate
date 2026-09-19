@@ -56,10 +56,12 @@ export function buildMigrationPack({ settings, favorites, customLanguages, appVe
     if (!f || typeof f.sourceText !== 'string' || typeof f.translatedText !== 'string') continue;
     if (!f.sourceText || !f.translatedText) continue;
     if (f.folderId === 'glossary') {
-      // Same term shape as the standalone glossary export (glossary-io.js).
+      // The term shape of the standalone glossary export (glossary-io.js),
+      // plus the language the term was saved for.
       glossary.push({
         source: f.sourceText,
         target: f.translatedText,
+        ...(typeof f.targetLanguage === 'string' && f.targetLanguage ? { targetLanguage: f.targetLanguage } : {}),
         note: typeof f.note === 'string' ? f.note : '',
         tags: cleanTags(f.tags),
         createdAt: f.createdAt || '',
@@ -121,6 +123,7 @@ function sanitizeTerms(raw) {
     out.push({
       source,
       target,
+      ...(typeof t.targetLanguage === 'string' && t.targetLanguage ? { targetLanguage: t.targetLanguage.slice(0, 32) } : {}),
       note: typeof t.note === 'string' ? t.note : '',
       tags: cleanTags(t.tags),
       createdAt: typeof t.createdAt === 'string' ? t.createdAt : '',

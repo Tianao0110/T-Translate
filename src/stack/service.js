@@ -6,7 +6,7 @@
 //
 // Call graph: renderer stack-client -> IPC facade -> this -> Providers
 
-import { applyGlossary } from './glossary.js';
+import { glossaryPass, pickTermsForTarget, sanitizeGlossaryItems } from './glossary.js';
 import { _t } from './i18n.js';
 import createLogger from './logger.js';
 
@@ -111,6 +111,9 @@ export class TranslationService {
 
     this._filters = [];
     this._filtersInitialized = false;
+
+    // The user's glossary, pushed by the main window (setGlossary).
+    this._glossaryItems = [];
 
     this._l1Cache = new Map();
     this._l1MaxSize = 100;
@@ -250,9 +253,22 @@ export class TranslationService {
     return result;
   }
 
+  // The glossary every window translates with; a request that carries its
+  // own glossaryTerms keeps them (the main window and the document page do).
+  setGlossary(items) {
+    this._glossaryItems = sanitizeGlossaryItems(items);
+    return this._glossaryItems.length;
+  }
+
+  _termsFor(options, targetLang) {
+    return Array.isArray(options.glossaryTerms)
+      ? options.glossaryTerms
+      : pickTermsForTarget(this._glossaryItems, targetLang);
+  }
+
   // Thin method over glossary.js (shared with the renderer).
-  _applyGlossary(translatedText, glossaryTerms) {
-    const result = applyGlossary(translatedText, glossaryTerms);
+  _applyGlossary(translatedText, glossaryTerms, sourceText) {
+    const result = glossaryPass(translatedText, glossaryTerms, sourceText);
     for (const r of result.replacements) {
       logger.debug(`Glossary replaced: "${r.from}" → "${r.to}"`);
     }
@@ -441,17 +457,23 @@ export class TranslationService {
 
   // Success finalization shared by every scheduler exit: placeholder restore,
   // glossary pass, cache write (raw provider output), result envelope.
-  _finalize(rawText, providerId, ctx) {
-    const { protectedMap, glossaryTerms, cacheKey, useCache, privacyMode, sourceLang, targetLang } = ctx;
-
-    let finalText = this._postProcess(rawText, protectedMap);
-
-    let glossaryReplacements = [];
-    if (glossaryTerms.length > 0) {
-      const glossaryResult = this._applyGlossary(finalText, glossaryTerms);
-      finalText = glossaryResult.text;
-      glossaryReplacements = glossaryResult.replacements;
+  // Placeholder restore plus the glossary pass: the text fields of a result,
+  // for a fresh provider answer and for a cache hit alike.
+  _textFields(rawText, ctx) {
+    const restored = this._postProcess(rawText, ctx.protectedMap);
+    if (!ctx.glossaryTerms.length) {
+      return { text: restored, originalText: null, glossaryReplacements: [] };
     }
+    const { text, replacements } = this._applyGlossary(restored, ctx.glossaryTerms, ctx.sourceText);
+    return {
+      text,
+      originalText: replacements.length > 0 ? restored : null,
+      glossaryReplacements: replacements,
+    };
+  }
+
+  _finalize(rawText, providerId, ctx) {
+    const { cacheKey, useCache, privacyMode, sourceLang, targetLang } = ctx;
 
     this._saveCache(cacheKey, {
       text: rawText,
@@ -461,9 +483,7 @@ export class TranslationService {
 
     return {
       success: true,
-      text: finalText,
-      originalText: glossaryReplacements.length > 0 ? this._postProcess(rawText, protectedMap) : null,
-      glossaryReplacements,
+      ...this._textFields(rawText, ctx),
       provider: providerId,
       fromCache: false,
     };
@@ -483,9 +503,9 @@ export class TranslationService {
       enableFallback = true,
       privacyMode = PRIVACY_MODE_IDS.STANDARD,
       useCache = true,
-      glossaryTerms = [],
       signal = undefined,
     } = options;
+    const glossaryTerms = this._termsFor(options, targetLang);
 
     const { processed, protectedMap } = this._preProcess(text);
 
@@ -495,16 +515,17 @@ export class TranslationService {
     const cacheKey = this._getCacheKey(processed, { targetLang, template, providerId: firstAvailableId, model: firstModel });
     const cached = this._checkCache(cacheKey, { useCache, privacyMode });
 
+    const finalizeCtx = { protectedMap, glossaryTerms, sourceText: text, cacheKey, useCache, privacyMode, sourceLang, targetLang };
+
     if (cached) {
       return {
         success: true,
-        text: this._postProcess(cached.text, protectedMap),
+        ...this._textFields(cached.text, finalizeCtx),
         fromCache: true,
         cacheSource: cached.source,
       };
     }
 
-    const finalizeCtx = { protectedMap, glossaryTerms, cacheKey, useCache, privacyMode, sourceLang, targetLang };
     const tried = [];
 
     for (const id of usableProviders) {
@@ -578,9 +599,9 @@ export class TranslationService {
       enableFallback = true,
       privacyMode = PRIVACY_MODE_IDS.STANDARD,
       useCache = true,
-      glossaryTerms = [],
       signal = undefined,
     } = options;
+    const glossaryTerms = this._termsFor(options, targetLang);
 
     const { processed, protectedMap } = this._preProcess(text);
 
@@ -589,22 +610,23 @@ export class TranslationService {
     const cacheKey = this._getCacheKey(processed, { targetLang, template, providerId: firstAvailableId, model: firstModel });
     const cached = this._checkCache(cacheKey, { useCache, privacyMode });
 
+    const finalizeCtx = { protectedMap, glossaryTerms, sourceText: text, cacheKey, useCache, privacyMode, sourceLang, targetLang };
+
     if (cached) {
-      const finalText = this._postProcess(cached.text, protectedMap);
+      const fields = this._textFields(cached.text, finalizeCtx);
 
       // Replay the cached result as a single chunk.
       if (onChunk) {
-        onChunk(finalText);
+        onChunk(fields.text);
       }
 
       return {
         success: true,
-        text: finalText,
+        ...fields,
         fromCache: true,
       };
     }
 
-    const finalizeCtx = { protectedMap, glossaryTerms, cacheKey, useCache, privacyMode, sourceLang, targetLang };
     const tried = [];
     let lastError = null;
 

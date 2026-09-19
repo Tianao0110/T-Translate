@@ -141,6 +141,27 @@ describe('parseMigrationPack', () => {
     expect(r.payload.glossary).toHaveLength(2);
   });
 
+  it('keeps the language a glossary term was saved for, through export and import', () => {
+    // Without it a term imported on the new machine applies to every target
+    // language, and rewrites translations into its own source language.
+    const built = buildMigrationPack({
+      settings: {},
+      favorites: [
+        { id: 'g1', sourceText: 'fine-tuning', translatedText: '微调', folderId: 'glossary', targetLanguage: 'zh' },
+        { id: 'g2', sourceText: 'loose', translatedText: '松散', folderId: 'glossary' },
+      ],
+      customLanguages: [],
+      appVersion: '0.5.2',
+      providersMeta,
+    });
+    expect(built.payload.glossary[0]).toMatchObject({ source: 'fine-tuning', target: '微调', targetLanguage: 'zh' });
+    expect(built.payload.glossary[1]).not.toHaveProperty('targetLanguage');
+
+    const parsed = parseMigrationPack(JSON.stringify(built));
+    expect(parsed.payload.glossary[0].targetLanguage).toBe('zh');
+    expect(parsed.payload.glossary[1]).not.toHaveProperty('targetLanguage');
+  });
+
   it('tolerates a missing payload', () => {
     const r = parseMigrationPack(JSON.stringify({ format: MIGRATION_FORMAT, version: 1 }));
     expect(r.ok).toBe(true);

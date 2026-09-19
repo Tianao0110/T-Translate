@@ -10,7 +10,20 @@ import { v4 as uuidv4 } from "uuid";
 import { PRIVACY_MODES, TRANSLATION_STATUS, LANGUAGE_CODES, DEFAULTS, LANGUAGES } from "../config/constants.js";
 import createLogger from '../core/logger.js';
 import { sanitizeTextEntries, toStoredText } from './history-sanitize.js';
+import { pickTermsForTarget } from '../stack/glossary.js';
 const logger = createLogger('TranslationStore');
+
+// The glossary folder of the favorites, in the shape stack/glossary.js and
+// the stack:set-glossary push take.
+export function glossaryItemsOf(favorites) {
+  return (favorites || [])
+    .filter((item) => item.folderId === 'glossary' && item.sourceText && item.translatedText)
+    .map((item) => ({
+      source: item.sourceText,
+      target: item.translatedText,
+      ...(item.targetLanguage ? { targetLanguage: item.targetLanguage } : {}),
+    }));
+}
 
 const BUILTIN_LANG_CODES = new Set(LANGUAGES.map(l => l.code));
 
@@ -755,34 +768,11 @@ const useTranslationStore = create(
         );
       },
 
-      // Glossary terms live in the favorites pile under folderId === 'glossary'.
-      // Entries for another target language are excluded; a language match
-      // beats a language-less entry; language-less entries stay usable
-      // (docs/design/renderer.md §2).
-      getGlossaryTerms: (targetLanguage) => {
-        const state = get();
-        const all = state.favorites.filter(
-          item => item.folderId === 'glossary' && item.sourceText && item.translatedText
-        );
-
-        const usable = targetLanguage
-          ? all.filter(item => !item.targetLanguage || item.targetLanguage === targetLanguage)
-          : all;
-
-        const bySource = new Map();
-        for (const item of usable) {
-          const key = item.sourceText.toLowerCase();
-          const held = bySource.get(key);
-          const isExactMatch = targetLanguage && item.targetLanguage === targetLanguage;
-          const heldIsExact = targetLanguage && held?.targetLanguage === targetLanguage;
-          if (!held || (isExactMatch && !heldIsExact)) bySource.set(key, item);
-        }
-
-        return [...bySource.values()].map(item => ({
-          source: item.sourceText,
-          target: item.translatedText,
-        }));
-      },
+      // Glossary terms live in the favorites pile under folderId === 'glossary';
+      // which of them one target language may use is stack/glossary.js's rule
+      // (docs/design/stack.md §3).
+      getGlossaryTerms: (targetLanguage) =>
+        pickTermsForTarget(glossaryItemsOf(get().favorites), targetLanguage),
     })),
     {
       name: "translation-store",
