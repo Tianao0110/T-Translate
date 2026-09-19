@@ -3,7 +3,7 @@
 // own line boxes and confidences.
 
 import { describe, it, expect } from 'vitest';
-import { imageSize, decideEscalation, ROUTING } from '../../../src/stack/ocr/vision-routing.js';
+import { imageSize, decideEscalation, describeCapture, ROUTING } from '../../../src/stack/ocr/vision-routing.js';
 
 function png(width, height) {
   const b = Buffer.alloc(33, 0);
@@ -106,5 +106,36 @@ describe('decideEscalation', () => {
     const bottom = grid({ rows: 5, cols: 1, x0: 60, y0: 300, w: 300 });
     expect(decideEscalation(pp([...top, ...bottom]), null)).toBeNull();
     expect(decideEscalation(pp(grid({ rows: 2, cols: 3 })), null)).toBeNull();
+  });
+});
+
+describe('describeCapture', () => {
+  it('reports the numbers the decision weighs', () => {
+    // A table also reads as side-by-side columns; decideEscalation tests rows first.
+    expect(describeCapture(pp(grid({ rows: 4, cols: 3 })), { width: 700, height: 200 })).toEqual({
+      megapixels: 0.14, lines: 12, meanConfidence: 0.98, lowLineShare: 0, wideRows: 4, columns: 3, sizeSpread: 1,
+    });
+
+    const left = grid({ rows: 5, cols: 1, x0: 20, w: 300 });
+    const right = grid({ rows: 5, cols: 1, x0: 400, w: 300 });
+    expect(describeCapture(pp([...left, ...right]), null)).toMatchObject({ megapixels: null, lines: 10, columns: 2 });
+
+    const shaky = grid({ rows: 6, cols: 1 }).map((l, i) => ({ ...l, confidence: i < 2 ? 0.5 : 0.9 }));
+    expect(describeCapture(pp(shaky), null)).toMatchObject({ meanConfidence: 0.77, lowLineShare: 0.33 });
+
+    const body = grid({ rows: 8, cols: 1, y0: 80, w: 500, h: 16 });
+    const heading = [{ text: 'Title', confidence: 0.99, bbox: { x: 20, y: 10, width: 300, height: 48 } }];
+    expect(describeCapture(pp([...heading, ...body]), null).sizeSpread).toBe(3);
+  });
+
+  it('stays numeric when PP-OCR gave nothing', () => {
+    const empty = { megapixels: null, lines: 0, meanConfidence: null, lowLineShare: null, wideRows: 0, columns: 0, sizeSpread: null };
+    expect(describeCapture({ success: false, error: 'no models' }, null)).toEqual(empty);
+    expect(describeCapture(null, null)).toEqual(empty);
+  });
+
+  it('never carries the recognized text', () => {
+    const secret = grid({ rows: 4, cols: 3 }).map((l) => ({ ...l, text: 'PRIVATE-TEXT' }));
+    expect(JSON.stringify(describeCapture(pp(secret), { width: 700, height: 200 }))).not.toContain('PRIVATE');
   });
 });

@@ -7,7 +7,7 @@ import { RapidOCREngine, WindowsOCREngine } from './local-bridge.js';
 import { isLoopbackUrl } from '../loopback.js';
 import LLMVisionEngine from './llm-vision.js';
 import TengineVisionEngine from './tengine-vision.js';
-import { decideEscalation, imageSize } from './vision-routing.js';
+import { decideEscalation, describeCapture, imageSize } from './vision-routing.js';
 import OCRSpaceEngine from './ocrspace.js';
 import GoogleVisionEngine from './google-vision.js';
 import AzureOCREngine from './azure-ocr.js';
@@ -333,7 +333,9 @@ export class OCREngineManager {
   async _recognizeSmart(input, options) {
     const vision = this.getOrCreate('tengine-vision');
     const visionOk = !!vision && (await vision.isAvailable());
+    const ppStart = Date.now();
     const pp = await this._recognizeWithEngine('rapid-ocr', input, options);
+    const ppMs = Date.now() - ppStart;
     const ppUsable = pp.success && isUsableResult(pp, 'rapid-ocr');
 
     if (!visionOk) {
@@ -347,15 +349,31 @@ export class OCREngineManager {
       return r;
     }
 
-    const decision = decideEscalation(pp, imageSize(input));
+    const size = imageSize(input);
+    const decision = decideEscalation(pp, size);
+    // One line per capture for tuning ROUTING (docs/design/stack.md §5): where it
+    // went, why, and the numbers behind the call.
+    const note = (to, extra = '') => {
+      const c = describeCapture(pp, size);
+      logger.info(
+        `vision routing: to=${to} reason=${decision ? decision.reason : 'simple'}` +
+        ` mp=${c.megapixels} lines=${c.lines} conf=${c.meanConfidence} low=${c.lowLineShare}` +
+        ` rows=${c.wideRows} cols=${c.columns} spread=${c.sizeSpread} pp=${ppMs}ms${extra}`
+      );
+    };
+
     if (!decision) {
+      note('rapid-ocr');
       return { ...pp, routed: { engine: 'tengine-vision', to: 'rapid-ocr', reason: 'simple' } };
     }
-    logger.info(`vision escalation: ${decision.reason}`);
+    const visionStart = Date.now();
     const v = await this._recognizeWithEngine('tengine-vision', input, options);
+    const visionMs = Date.now() - visionStart;
     if (v.success && isUsableResult(v, 'tengine-vision')) {
+      note('tengine-vision', ` vision=${visionMs}ms`);
       return { ...v, routed: { engine: 'tengine-vision', to: 'tengine-vision', reason: decision.reason } };
     }
+    note('rapid-ocr', ` vision=${visionMs}ms visionFailed`);
     logger.warn(`vision model could not serve the capture (${v.error || 'unusable'}), PP-OCR's read stands`);
     if (ppUsable) return { ...pp, routed: { engine: 'tengine-vision', to: 'rapid-ocr', reason: decision.reason, visionFailed: true } };
     const last = await this._recognizeWithLocalChain(input, options, ['windows-ocr']);

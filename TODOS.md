@@ -16,7 +16,7 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 
 ### 内置视觉模型的后续（v0.5.1 已出；方案与落地在 gstack v051-vision-plan-2026-09-14）
 
-- **分配阈值待真实反馈调**：`src/stack/ocr/vision-routing.js` 的 ROUTING（大图 1.2 MP、密集 30 行、表格 3 行 × 3 块、多栏各 4 行、字号差 2.5 倍、置信度 0.75 / 三成行低于 0.6）是 2026-09-14 拍脑袋定的；结果里的 `routed.reason` 就是对数用的，用户觉得「该走视觉没走 / 不该走走了」时按它调
+- **分配阈值待真实反馈调**：`src/stack/ocr/vision-routing.js` 的 ROUTING（大图 1.2 MP、密集 30 行、表格 3 行 × 3 块、多栏各 4 行、字号差 2.5 倍、置信度 0.75 / 三成行低于 0.6）是 2026-09-14 拍脑袋定的。v0.5.2 起每张截图在日志里记一行 `vision routing:`（去向、原因和各项数字，不含文字），用一两周后按 `docs/design/stack.md` 第 5 节的字段表对数再调，一次只动一个阈值
 - 顺带：Q6_K 掐表对比（可选）
 
 ### 文档收尾（说明书与文档精简已随 v0.5.1 出；落法在 gstack v052-manual-outline-2026-09-08）

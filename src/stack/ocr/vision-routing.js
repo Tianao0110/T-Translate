@@ -96,19 +96,35 @@ function cluster(values, tol) {
   return groups.map((g) => g.items);
 }
 
-function layoutReason(lines) {
-  if (lines.length < ROUTING.MIN_LINES_FOR_LAYOUT) return null;
+// PP-OCR's lines that carry a real box.
+function boxedLines(pp) {
+  return ((pp && (pp.rawBlocks || pp.blocks)) || []).filter((b) => b && b.bbox && b.bbox.width > 0 && b.bbox.height > 0);
+}
+
+// Mean line confidence and the share of lines below LOW_LINE_CONFIDENCE;
+// null when PP-OCR gave no confidences.
+function confidenceStats(lines) {
+  const confs = lines.map((l) => l.confidence).filter((c) => Number.isFinite(c));
+  if (!confs.length) return null;
+  return {
+    mean: confs.reduce((a, c) => a + c, 0) / confs.length,
+    lowShare: confs.filter((c) => c < ROUTING.LOW_LINE_CONFIDENCE).length / confs.length,
+  };
+}
+
+// The three layout measurements layoutReason tests against ROUTING.
+function layoutMetrics(lines) {
   const heights = lines.map((l) => l.bbox.height);
   const h = median(heights) || 1;
 
   // A table: several rows that each hold three or more boxes side by side.
   const rows = cluster(lines.map((l) => l.bbox.y + l.bbox.height / 2), h * 0.6);
   const wideRows = rows.filter((r) => r.length >= ROUTING.TABLE_COLS).length;
-  if (wideRows >= ROUTING.TABLE_ROWS) return 'table';
 
   // Columns: two or more groups of left edges, each a real column of lines,
   // and the groups overlap vertically (side by side, not one under the other).
   const cols = cluster(lines.map((l) => l.bbox.x), h).filter((c) => c.length >= ROUTING.COLUMN_MIN_LINES);
+  let sideBySide = false;
   if (cols.length >= 2) {
     const span = (c) => {
       const ys = c.map((i) => lines[i].bbox.y);
@@ -117,13 +133,21 @@ function layoutReason(lines) {
     };
     const [a, b] = [span(cols[0]), span(cols[1])];
     const overlap = Math.min(a[1], b[1]) - Math.max(a[0], b[0]);
-    if (overlap > 0.5 * Math.min(a[1] - a[0], b[1] - b[0])) return 'columns';
+    sideBySide = overlap > 0.5 * Math.min(a[1] - a[0], b[1] - b[0]);
   }
 
   // Headings, captions and body text together: the tallest or the smallest
   // line far from the typical one (a single heading over a paragraph counts).
-  const spread = Math.max(percentile(heights, 1) / h, h / Math.max(1, percentile(heights, 0)));
-  if (spread >= ROUTING.SIZE_SPREAD) return 'mixed-sizes';
+  const sizeSpread = Math.max(percentile(heights, 1) / h, h / Math.max(1, percentile(heights, 0)));
+  return { wideRows, columns: sideBySide ? cols.length : 0, sizeSpread };
+}
+
+function layoutReason(lines) {
+  if (lines.length < ROUTING.MIN_LINES_FOR_LAYOUT) return null;
+  const m = layoutMetrics(lines);
+  if (m.wideRows >= ROUTING.TABLE_ROWS) return 'table';
+  if (m.columns >= 2) return 'columns';
+  if (m.sizeSpread >= ROUTING.SIZE_SPREAD) return 'mixed-sizes';
   return null;
 }
 
@@ -132,16 +156,32 @@ function layoutReason(lines) {
 export function decideEscalation(pp, size = null) {
   if (!pp || !pp.success || !isUsableResult(pp, 'rapid-ocr')) return { reason: 'unreadable' };
   if (size && size.width * size.height >= ROUTING.LARGE_PIXELS) return { reason: 'large' };
-  const lines = (pp.rawBlocks || pp.blocks || []).filter((b) => b && b.bbox && b.bbox.width > 0 && b.bbox.height > 0);
+  const lines = boxedLines(pp);
   if (lines.length >= ROUTING.MANY_LINES) return { reason: 'dense' };
 
-  const confs = lines.map((l) => l.confidence).filter((c) => Number.isFinite(c));
-  if (confs.length) {
-    const mean = confs.reduce((a, c) => a + c, 0) / confs.length;
-    const low = confs.filter((c) => c < ROUTING.LOW_LINE_CONFIDENCE).length / confs.length;
-    if (mean < ROUTING.LOW_CONFIDENCE || low >= ROUTING.LOW_LINE_SHARE) return { reason: 'low-confidence' };
+  const conf = confidenceStats(lines);
+  if (conf && (conf.mean < ROUTING.LOW_CONFIDENCE || conf.lowShare >= ROUTING.LOW_LINE_SHARE)) {
+    return { reason: 'low-confidence' };
   }
 
   const layout = layoutReason(lines);
   return layout ? { reason: layout } : null;
+}
+
+// The numbers decideEscalation weighs, for manager.js's routing log line:
+// sizes, counts and ratios only, never the recognized text.
+export function describeCapture(pp, size = null) {
+  const round = (n) => Math.round(n * 100) / 100;
+  const lines = boxedLines(pp);
+  const conf = confidenceStats(lines);
+  const layout = lines.length ? layoutMetrics(lines) : null;
+  return {
+    megapixels: size ? round((size.width * size.height) / 1e6) : null,
+    lines: lines.length,
+    meanConfidence: conf ? round(conf.mean) : null,
+    lowLineShare: conf ? round(conf.lowShare) : null,
+    wideRows: layout ? layout.wideRows : 0,
+    columns: layout ? layout.columns : 0,
+    sizeSpread: layout ? round(layout.sizeSpread) : null,
+  };
 }

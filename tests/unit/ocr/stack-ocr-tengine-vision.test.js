@@ -133,3 +133,58 @@ describe('built-in vision engine in the OCR chain', () => {
     expect(r.fallbackFrom).toBe('tengine-vision');
   });
 });
+
+describe('the routing log line', () => {
+  const logged = [];
+  const capture = (level) => (...args) => logged.push(`${level} ${args.join(' ')}`);
+  const routingLines = () => logged.filter((l) => l.includes('vision routing:'));
+
+  beforeEach(() => {
+    logged.length = 0;
+    configureRuntime({
+      loggerFactory: () => ({ debug: () => {}, info: capture('info'), warn: capture('warn'), error: capture('error'), success: capture('info') }),
+    });
+  });
+
+  it('writes one line per capture, with the numbers and both timings', async () => {
+    configureRuntime({ localLlm: llm() });
+    useLocal({ paddle: async () => TABLE });
+    const manager = await makeManager();
+    await manager.recognize(IMG, { engine: 'tengine-vision' });
+
+    expect(routingLines()).toHaveLength(1);
+    expect(routingLines()[0]).toMatch(
+      /^info vision routing: to=tengine-vision reason=table mp=null lines=12 conf=0\.98 low=0 rows=4 cols=3 spread=1 pp=\d+ms vision=\d+ms$/
+    );
+  });
+
+  it('also records the captures that stay on PP-OCR', async () => {
+    configureRuntime({ localLlm: llm() });
+    const manager = await makeManager();
+    await manager.recognize(IMG, { engine: 'tengine-vision' });
+
+    expect(routingLines()).toHaveLength(1);
+    expect(routingLines()[0]).toMatch(/to=rapid-ocr reason=simple .* lines=2 .* pp=\d+ms$/);
+  });
+
+  it('marks a vision failure on the same line', async () => {
+    configureRuntime({ localLlm: llm({ reject: Object.assign(new Error('host stalled'), { code: 'LLM_UNHEALTHY' }) }) });
+    useLocal({ paddle: async () => TABLE });
+    const manager = await makeManager();
+    await manager.recognize(IMG, { engine: 'tengine-vision' });
+
+    expect(routingLines()).toHaveLength(1);
+    expect(routingLines()[0]).toMatch(/to=rapid-ocr reason=table .* visionFailed$/);
+  });
+
+  it('never contains what was read', async () => {
+    configureRuntime({ localLlm: llm({ lines: [{ text: 'VISION-SECRET', box: [45, 19, 91, 45] }] }) });
+    useLocal({ paddle: async () => TABLE });
+    const manager = await makeManager();
+    await manager.recognize(IMG, { engine: 'tengine-vision' });
+
+    const all = logged.join('\n');
+    expect(all).not.toContain('VISION-SECRET');
+    expect(all).not.toContain('cell00');
+  });
+});

@@ -61,6 +61,24 @@
 - 各在线引擎：Azure Read 异步提交再轮询（10 s 预算 1 s 间隔），boundingBox 是 8 数四边形，逐行框无合并变体。百度 OCR：token 30 天，提前一天刷新；`accurate` 带坐标、`accurate_basic`（basic 字面意思就是无坐标）不带，精度相同但百度分别开通计量，先试带坐标的、该账号用不了（6 未开通、17/19 配额、18 QPS）再降 basic，不为用户可能不知道的配额让截图失败；token 与图片错误两个端点都会挂所以不在降级码里。Google Vision 块取 `fullTextAnnotation` 的段落而非逐词的 `textAnnotations[1..]`；段落无 text 字段，要从 symbols 加 detectedBreak 重建。OCR.space 用 Engine 2（小字 / 花体明显更准），`isOverlayRequired` 只多响应体不多计费，overlay 是词框需并成行；同时发 `scale=true`（服务端放大小图），overlay 坐标空间若不是源图像素会落到框外被 `resolveDisplayMode` 丢掉，退化成统一模式即该引擎有框之前的行为。
 - 路径 B（AI 动作直接看图）：模型直接读截图而不是总结 OCR 输出，版面与图文交错保持完整、识别错误不叠加；与 recognize() 共用端点、模型、丢图检测与视觉锁，只有提示不同（来自动作配置）。是否可用故意**不探测网络**：可达说明不了有没有载入视觉模型，只能从回复知道，失败时降级。离线模式下远程视觉端点直接拒绝：截图泄漏的远比一行文字多。
 - **内置视觉模型的智能分配**（`vision-routing.js`，用户 2026-09-14 拍板）：选中它 = PP-OCR 先读每张截图，简单的到此为止；只有大图（物理像素上 1.75x 屏的整屏 / 半屏截图）、PP-OCR 读成分栏 / 表格 / 混合字号的版面、或它没把握的读取才升级到视觉模型。证据只用 PP-OCR 自己的行框与置信度，像素只看文件头（PNG / JPEG / BMP 尺寸）。表格 = 若干行每行三个以上并排框；分栏 = 两组以上左边缘、各是真正的一栏且纵向重叠；混合字号 = 最高或最矮行离典型值很远。结果里的 `routed` 只用枚举说明走了哪条路。视觉引擎（`tengine-vision.js`）只在双文件包过哈希且视觉宿主在 GPU 上时可用（GPU-only 见 T-ENGINE §10）；未安装或 CPU 拒绝尺寸是诚实失败，管理器走向下一个引擎。始终 Spotting 任务，每行带源图像素框。
+- **分配日志（v0.5.2）**：`ROUTING` 那组阈值是 2026-09-14 拍脑袋定的，要调得有数据，所以选中视觉引擎后**每张截图**在主程序日志里记一行（走本地 OCR 的也记，之前只记升级的、且没有数字）：
+
+  ```
+  [info]  [Stack:OCRManager] vision routing: to=tengine-vision reason=table mp=0.14 lines=12 conf=0.98 low=0 rows=4 cols=3 spread=1 pp=85ms vision=640ms
+  ```
+
+  | 字段 | 含义 | 对着的阈值 |
+  | --- | --- | --- |
+  | `to` / `reason` | 去向与原因（`simple` = 留在本地 OCR） | — |
+  | `mp` | 图片百万像素，读不出文件头时为 null | `LARGE_PIXELS` 1.2 |
+  | `lines` | PP-OCR 带框的行数 | `MANY_LINES` 30；版面判断要 `MIN_LINES_FOR_LAYOUT` 8 行起 |
+  | `conf` / `low` | 平均行置信度 / 低于 0.6 的行占比 | `LOW_CONFIDENCE` 0.75、`LOW_LINE_SHARE` 0.3 |
+  | `rows` | 并排三框以上的行数 | `TABLE_ROWS` 3 |
+  | `cols` | 纵向重叠的栏数（表格也会读成栏，判断时表格在前） | 2 |
+  | `spread` | 最高或最矮行与典型行高之比 | `SIZE_SPREAD` 2.5 |
+  | `pp` / `vision` | 两边各自耗时；`visionFailed` = 视觉失败、本地 OCR 的结果顶上 | — |
+
+  **只有数字，不含任何识别文字**（`describeCapture`，单测守着）。调法：用一两周后在日志里搜 `vision routing:`，把「该走视觉没走」的那几张找出来，看它们卡在哪个字段差一点；「不该走走了」的看是哪个 `reason` 误伤最多，再动对应那一个阈值，别一次动几个。日志在安装版的 `data\logs`，开发态在 `%APPDATA%\t-translate\logs`。无痕模式下文件日志只记 error 级，这一行不落盘，属预期。视觉引擎不可用（显卡关着或模型不在）时不算分配，不记这一行，结果里有 `fallbackReason: 'unavailable'`。
 - 本地引擎的栈类（`local-bridge.js`）直接调注入的主进程识别器，少一跳；引擎 id 保持 `rapid-ocr` / `windows-ocr` 兼容已存设置。`blocks` = 段落合并，`rawBlocks` = 逐行，散落模式用 rawBlocks。
 
 ## 6. 外部语音端点（tts/endpoint.js）
