@@ -397,6 +397,19 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  /* Capped and scrollable so many tags never squeeze the folder list. */
+  max-height: 38%;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.tag-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.tag-list::-webkit-scrollbar-thumb {
+  background: var(--border-primary);
+  border-radius: 2px;
 }
 
 .tag-item {
@@ -663,7 +676,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  padding: 0 14px 12px;
+  padding: 8px 14px 12px;
 }
 
 .tag-chip {
