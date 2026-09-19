@@ -21,7 +21,6 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 
 ### 文档收尾（说明书与文档精简已随 v0.5.1 出；落法在 gstack v052-manual-outline-2026-09-08）
 
-- `docs/I18N_GUIDE.md` 与 `docs/THEME_CUSTOMIZATION.md` 还没逐份查过时（本轮只过了 README×2 / FAQ / ARCHITECTURE / DEVELOPMENT / T-ENGINE / OCR_MODELS）
 - README 截图沿用旧图，界面定型后看要不要换一轮（用户未定）
 - 说明书铁律照旧：改界面必改说明书，写前核实界面，不确定就问，先中文后英文
 

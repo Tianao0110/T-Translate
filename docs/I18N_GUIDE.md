@@ -1,6 +1,6 @@
 ﻿# T-Translate 多语言国际化 (i18n) 开发指南
 
-## 📋 目录
+## 目录
 
 1. [技术栈概述](#技术栈概述)
 2. [文件结构](#文件结构)
@@ -20,20 +20,20 @@
 | react-i18next | ^14.x | React 集成 |
 | dayjs | ^1.x | 日期本地化 |
 
-### 架构设计：三层 i18n 体系（⚠️ 新增文案先确认落在哪层）
+### 架构设计：三层 i18n 体系（新增文案先确认落在哪层）
 
 项目有**三个独立的 i18n 实例**，词表归属不同，混淆会导致"key 加了却不生效"：
 
 | 层 | 实例 | 词表来源 | 取词方式 | 典型场景 |
 |----|------|---------|---------|---------|
-| 渲染进程（三窗 UI） | react-i18next（`src/i18n.js` 初始化） | `src/i18n/locales/zh.js` + `en.js` | `useTranslation()` 的 `t()` | 所有 React 组件文案 |
+| 渲染进程（各窗口的 UI） | react-i18next（`src/i18n.js` 初始化） | `src/i18n/locales/zh.js` + `en.js` | `useTranslation()` 的 `t()` | 所有 React 组件文案 |
 | 主进程翻译栈 | 栈内独立 i18next（`src/stack/i18n.js`） | **复用同一份** `src/i18n/locales` 词表 | `_t(key, 中文fallback)` | provider/OCR 错误文案（跨 IPC 后两端逐字一致） |
 | 主进程原生 UI | `electron/shared/main-i18n.js` | **该文件内自带的 zh/en 双表** | `t(key, params)`（第二参是插值参数，**不是 fallback**） | 托盘/菜单/快捷键冲突提示/OCR 健康检查消息 |
 
 实践规则：
 - 渲染端组件文案 → 加 `locales/zh.js` + `en.js`（两份都加，`check:i18n` 锁同步）
 - 栈内（provider/OCR）文案 → 同样加 locales 两份，代码里用栈的 `_t`
-- 主进程托盘/菜单/IPC 返回给用户的错误串 → 加 `main-i18n.js` 的 **zh 和 en 两个块**
+- 主进程托盘/菜单/IPC 返回给用户的错误串 → 加 `main-i18n.js` 的 **zh 和 en 两个块**。缺键不会报错，`t()` 直接把键名当文字显示出来（v0.5.1 安全模式提示框的按钮就这样显示过 `menu.ok`）；`tests/unit/main/main-i18n-keys.test.js` 扫 `electron/` 里全部调用点，守「用到的键两张表都有、两张表键一致」。删这张表里的键之前先跑这条单测
 - 错误分类器 `ERROR_PATTERNS`（`src/core/error-handler.js`）匹配关键词必须**中英双语**各写一份（栈返回哪种语言取决于用户界面语言），`tests/unit/renderer/error-classification.test.js` 锁行为
 
 ---
@@ -101,14 +101,14 @@ const zh = {
 ### 翻译键命名规范
 
 ```javascript
-// ✅ 好的命名
+// 好的命名
 translation: {
   inputPlaceholder: "输入要翻译的文本...",  // 功能_位置
   ocrSuccess: "识别成功 ({{engine}})",      // 功能_状态 + 参数
   enterText: "请输入要翻译的内容",          // 动作_对象
 }
 
-// ❌ 避免的命名
+// 避免的命名
 translation: {
   text1: "...",           // 无意义编号
   placeholder: "...",     // 过于笼统
@@ -343,11 +343,11 @@ i18n.changeLanguage('en');
 ### 1. 翻译键提取
 
 ```jsx
-// ❌ 硬编码
+// 硬编码（不要这样）
 <button title="复制译文">Copy</button>
 notify('已复制', 'success');
 
-// ✅ 使用翻译键
+// 使用翻译键
 <button title={t('favorites.copyTarget')}>Copy</button>
 notify(t('history.copied'), 'success');
 ```
@@ -358,18 +358,18 @@ notify(t('history.copied'), 'success');
 // 所有语言包必须有相同的键结构
 const zh = { nav: { translate: "翻译" } };
 const en = { nav: { translate: "Translate" } };
-const ja = { nav: { translate: "翻訳" } };  // ✅ 结构一致
+const ja = { nav: { translate: "翻訳" } };  // 结构一致
 ```
 
 ### 3. 避免在翻译中包含 HTML
 
 ```jsx
-// ❌ 不推荐
+// 不推荐
 translation: {
   welcome: "<strong>欢迎</strong>使用"
 }
 
-// ✅ 推荐：在组件中处理样式
+// 推荐：在组件中处理样式
 translation: {
   welcome: "欢迎使用"
 }
@@ -431,24 +431,16 @@ const getFolderName = (folder) => {
 
 ### Q1: 翻译键不存在时显示什么？
 
-```javascript
-// i18n.js 配置
-i18n.init({
-  fallbackLng: 'zh',           // 回退语言
-  returnEmptyString: false,    // 空字符串返回键名
-  // 自定义缺失处理
-  missingKeyHandler: (lng, ns, key) => {
-    console.warn(`Missing translation: ${key} [${lng}]`);
-  }
-});
-```
+渲染端与栈：先回退到英文表（`src/i18n.js` 的 `fallbackLng: 'en'`），英文表也没有就显示键名本身。栈的 `_t(key, 中文fallback)` 多一层：两张表都没有时用传入的中文。主进程 `main-i18n.js`：当前语言 → 中文表 → 键名，没有 fallback 参数。
+
+项目没有配置 `missingKeyHandler`，缺键不会有任何警告，靠 `npm run check:i18n` 与上面那条单测在提交前拦住。
 
 ### Q2: 如何调试翻译问题？
 
 ```javascript
 // 开启调试模式
 i18n.init({
-  debug: process.env.NODE_ENV === 'development',
+  debug: import.meta.env.DEV,  // Vite 环境；临时打开，别提交
 });
 
 // 检查当前语言
@@ -490,7 +482,7 @@ npm run check:i18n:strict  # 严格模式（额外检查空值等）
 npm run check:hardcoded    # 扫描组件里硬编码的中文字符串
 ```
 
-`main-i18n.js` 的双表不在脚本覆盖范围内——新增键时人工保证 zh/en 两个块都加。
+`main-i18n.js` 的双表不在这三个脚本里，由单测 `tests/unit/main/main-i18n-keys.test.js` 覆盖（随 `npm test` 跑）：用到的键两张表都要有，两张表的键要一致。
 
 ---
 
@@ -510,8 +502,8 @@ npm run check:hardcoded    # 扫描组件里硬编码的中文字符串
 |------|------|------|
 | v1.0 | 2026-01-22 | 初始国际化实现，支持中文/英文 |
 | v2.0 | 2026-07-10 | 补三层 i18n 体系（渲染端/栈/main-i18n）、locales 拆分文件现实、check 工具链；示例改用 ConfirmDialog 与 electron-store 持久化 |
+| v2.1 | 2026-09-18 | 查过时：缺键回退写成真实行为（回退英文、无 missingKeyHandler）、main-i18n 由单测守键、去 emoji |
 
 ---
 
-**文档维护者**: T-Translate 开发团队
-**最后更新**: 2026-07-10
+**最后更新**: 2026-09-18

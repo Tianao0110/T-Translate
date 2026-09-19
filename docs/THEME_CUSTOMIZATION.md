@@ -4,7 +4,7 @@
 
 ---
 
-## 📋 内置主题
+## 内置主题
 
 T-Translate 提供三种内置主题：
 
@@ -18,7 +18,7 @@ T-Translate 提供三种内置主题：
 
 ---
 
-## 🎨 快速自定义：修改强调色
+## 快速自定义：修改强调色
 
 最简单的自定义方式是修改强调色（按钮、链接、高亮等的颜色）。
 
@@ -40,14 +40,14 @@ T-Translate 提供三种内置主题：
 
 ---
 
-## 🎯 进阶自定义：创建新主题
+## 进阶自定义：创建新主题
 
 ### 步骤 1：定义 CSS 变量
 
 在 `src/styles/App.css` 中添加新主题：
 
 ```css
-/* 🌸 示例：樱花主题 */
+/* 示例：樱花主题 */
 [data-theme="sakura"] {
   /* 背景色 */
   --bg-primary: #fdf2f8;      /* 主背景 */
@@ -125,9 +125,15 @@ T-Translate 提供三种内置主题：
 
 ### 步骤 3：添加划词翻译主题（可选）
 
-在 `src/components/SelectionTranslator/styles.css` 中添加：
+在 `src/components/SelectionTranslator/styles.css` 中添加。划词窗的强调色走它自己的 `--sel-*` 变量，先补变量块，再按需补卡片等具体样式：
 
 ```css
+.sel-root[data-theme="sakura"] {
+  --sel-accent: #ec4899;
+  --sel-accent-hi: #f472b6;
+  --sel-on-accent: #ffffff;   /* 强调色上的文字色，亮色强调要换深字 */
+}
+
 [data-theme="sakura"] .sel-card {
   background: rgba(253, 242, 248, 0.95);
   border-color: rgba(236, 72, 153, 0.2);
@@ -153,7 +159,9 @@ T-Translate 提供三种内置主题：
 
 ### 步骤 4：注册主题
 
-1. 在 `src/config/constants.js` 中添加：
+主题 id 在代码里一共列了五处，漏一处就会出现「设置里能选、某个窗口不认」：
+
+1. `src/config/constants.js` 与 `electron/shared/constants.js` 的 `THEMES`，两份必须一致（`npm run check:constants` 会拦）：
 
 ```javascript
 export const THEMES = {
@@ -164,18 +172,21 @@ export const THEMES = {
 };
 ```
 
-2. 在 `src/components/SettingsPanel/sections/InterfaceSection.jsx` 中添加按钮：
+2. `src/main.jsx` 的 `THEMES` 列表（主窗口启动时校验已存主题）：
 
-```jsx
-<button 
-  className={`theme-option sakura ${settings.interface.theme === 'sakura' ? 'active' : ''}`} 
-  onClick={() => switchTheme('sakura')}
->
-  <Flower size={16}/>樱花
-</button>
+```javascript
+const THEMES = ['light', 'dark', 'fresh', 'sakura'];
 ```
 
-3. 在 `src/components/FloatingWindow/index.jsx` 中更新主题验证：
+3. `src/components/SettingsPanel/sections/InterfaceSection.jsx` 的 `themeOptions`（主题是分段开关，加一项即可，图标用 lucide-react）：
+
+```jsx
+{ value: 'sakura', icon: <Flower size={14} />, label: t('settings.general.themes.sakura') },
+```
+
+   名称走 i18n：在 `src/i18n/locales/zh.js` 和 `en.js` 的 `settings.general.themes` 下各加一条 `sakura`。
+
+4. `src/components/FloatingWindow/index.jsx` 的主题校验，**有两处**（设置变更监听与主题广播监听），都要加：
 
 ```javascript
 if (newTheme && ['light', 'dark', 'fresh', 'sakura'].includes(newTheme)) {
@@ -183,7 +194,7 @@ if (newTheme && ['light', 'dark', 'fresh', 'sakura'].includes(newTheme)) {
 
 ---
 
-## 📁 CSS 变量完整列表
+## CSS 变量完整列表
 
 ### 颜色变量
 
@@ -238,7 +249,7 @@ if (newTheme && ['light', 'dark', 'fresh', 'sakura'].includes(newTheme)) {
 
 ---
 
-## 🎨 配色建议
+## 配色建议
 
 ### 浅色主题
 
@@ -260,7 +271,7 @@ if (newTheme && ['light', 'dark', 'fresh', 'sakura'].includes(newTheme)) {
 
 ---
 
-## 💡 最佳实践
+## 最佳实践
 
 1. **对比度**：确保文字与背景有足够对比度（WCAG AA 标准：4.5:1）
 2. **一致性**：同一主题中的颜色应该协调
@@ -269,17 +280,20 @@ if (newTheme && ['light', 'dark', 'fresh', 'sakura'].includes(newTheme)) {
 
 ---
 
-## 📝 常见问题
+## 常见问题
 
 ### Q: 修改后主题不生效？
 A: 确保 CSS 选择器优先级足够高，可以使用浏览器开发者工具检查。
 
 ### Q: 悬浮窗口主题和主窗口不同步？
-A: 检查 `FloatingWindow/index.jsx` 中的主题验证列表是否包含新主题。
+A: 检查 `FloatingWindow/index.jsx` 中的两处主题验证列表是否都包含新主题。
+
+### Q: 重启后主题变回经典？
+A: `src/main.jsx` 的 `THEMES` 列表里没有新主题，启动时被当成无效值丢掉了。
 
 ### Q: 如何只修改某个组件的样式？
 A: 使用更具体的选择器，如 `[data-theme="sakura"] .specific-component`。
 
 ---
 
-**文档更新日期**: 2026-07-04
+**文档更新日期**: 2026-09-18（查过时：注册主题改为现行五处、划词窗补 `--sel-*` 变量块、去 emoji）

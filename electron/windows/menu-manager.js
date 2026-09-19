@@ -1,6 +1,6 @@
-// Application menu. The main window is frameless with the menu bar hidden, so
-// this exists for its accelerators (Ctrl+Q, F11, zoom, Ctrl+,) and the Help
-// entries, which open pages of the in-app settings through 'navigate'.
+// Application menu. The main window is frameless and never shows a menu bar,
+// so every item here is an accelerator: Ctrl+Q, the edit roles, zoom, F11,
+// and Ctrl+, which opens the in-app settings through 'navigate'.
 
 const { Menu, app } = require('electron');
 const logger = require('../platform/logger')('MenuManager');
@@ -17,7 +17,7 @@ function openInMain(getMainWindow, target) {
 }
 
 function createMenu(ctx) {
-  const { getMainWindow, runtime, store, isDev } = ctx;
+  const { getMainWindow, runtime, isDev } = ctx;
 
   const fileMenu = {
     label: t('menu.file'),
@@ -75,16 +75,6 @@ function createMenu(ctx) {
           if (win) win.setFullScreen(!win.isFullScreen());
         },
       },
-      {
-        label: t('menu.alwaysOnTop'),
-        type: 'checkbox',
-        checked: store.get('alwaysOnTop', false),
-        click: (item) => {
-          const win = getMainWindow();
-          if (win) win.setAlwaysOnTop(item.checked);
-          store.set('alwaysOnTop', item.checked);
-        },
-      },
     ],
   };
 
@@ -95,17 +85,7 @@ function createMenu(ctx) {
     ],
   };
 
-  const helpMenu = {
-    label: t('menu.help'),
-    submenu: [
-      { label: t('menu.userGuide'), click: () => openInMain(getMainWindow, 'settings:manual') },
-      { type: 'separator' },
-      { label: t('menu.checkUpdate'), click: () => openInMain(getMainWindow, 'settings:about') },
-      { label: t('menu.about'), click: () => openInMain(getMainWindow, 'settings:about') },
-    ],
-  };
-
-  const menu = Menu.buildFromTemplate([fileMenu, editMenu, viewMenu, settingsMenu, helpMenu]);
+  const menu = Menu.buildFromTemplate([fileMenu, editMenu, viewMenu, settingsMenu]);
   Menu.setApplicationMenu(menu);
   logger.info('Application menu created');
   return menu;

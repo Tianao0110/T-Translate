@@ -60,17 +60,17 @@ const messages = {
     'screenshot.noImage': '没有预先截取的屏幕图像',
     'screenshot.noSource': '没有可用的截图源',
     'selection.loadingTimeout': '识别超时，请重试',
-    
-    // menu
+    'floatingWindow.windowNotFound': '悬浮窗不存在',
+
+    // menu (accelerators only; menu.ok is the native dialogs' button)
     'menu.file': '文件', 'menu.edit': '编辑', 'menu.view': '视图',
-    'menu.settings': '设置', 'menu.help': '帮助',
-    'menu.about': '关于', 'menu.preferences': '偏好设置', 'menu.quit': '退出',
+    'menu.settings': '设置', 'menu.preferences': '偏好设置', 'menu.quit': '退出',
     'menu.undo': '撤销', 'menu.redo': '重做',
     'menu.cut': '剪切', 'menu.copy': '复制', 'menu.paste': '粘贴', 'menu.selectAll': '全选',
     'menu.reload': '重新加载', 'menu.devTools': '开发者工具',
     'menu.actualSize': '实际大小', 'menu.zoomIn': '放大', 'menu.zoomOut': '缩小',
-    'menu.fullscreen': '全屏', 'menu.alwaysOnTop': '置顶',
-    'menu.userGuide': '使用说明', 'menu.checkUpdate': '检查更新',
+    'menu.fullscreen': '全屏',
+    'menu.ok': '确定',
   },
   en: {
     // OCR engine detection
@@ -127,17 +127,17 @@ const messages = {
     'screenshot.noImage': 'No pre-captured screen image',
     'screenshot.noSource': 'No screenshot source available',
     'selection.loadingTimeout': 'Recognition timed out, please try again',
-    
-    // menu
+    'floatingWindow.windowNotFound': 'The floating window does not exist',
+
+    // menu (accelerators only; menu.ok is the native dialogs' button)
     'menu.file': 'File', 'menu.edit': 'Edit', 'menu.view': 'View',
-    'menu.settings': 'Settings', 'menu.help': 'Help',
-    'menu.about': 'About', 'menu.preferences': 'Preferences', 'menu.quit': 'Quit',
+    'menu.settings': 'Settings', 'menu.preferences': 'Preferences', 'menu.quit': 'Quit',
     'menu.undo': 'Undo', 'menu.redo': 'Redo',
     'menu.cut': 'Cut', 'menu.copy': 'Copy', 'menu.paste': 'Paste', 'menu.selectAll': 'Select All',
     'menu.reload': 'Reload', 'menu.devTools': 'Developer Tools',
     'menu.actualSize': 'Actual Size', 'menu.zoomIn': 'Zoom In', 'menu.zoomOut': 'Zoom Out',
-    'menu.fullscreen': 'Fullscreen', 'menu.alwaysOnTop': 'Always on Top',
-    'menu.userGuide': 'User Guide', 'menu.checkUpdate': 'Check for Updates',
+    'menu.fullscreen': 'Fullscreen',
+    'menu.ok': 'OK',
   },
 };
 

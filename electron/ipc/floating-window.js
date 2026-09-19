@@ -239,7 +239,7 @@ function register(ctx) {
 
     try {
       if (!floatingWindow || floatingWindow.isDestroyed()) {
-        throw new Error(t('floatingWindow.windowNotFound', '玻璃窗口不存在'));
+        throw new Error(t('floatingWindow.windowNotFound'));
       }
 
       // Hide self and the detached child panes before capture; the capture

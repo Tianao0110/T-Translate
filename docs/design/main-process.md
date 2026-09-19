@@ -42,7 +42,7 @@
 - 悬浮窗：`backgroundThrottling: false`（失焦时刷新循环必须继续）；`WDA_EXCLUDEFROMCAPTURE` 让 OCR 不把自己的覆盖层读回来，用户可选允许被截取；`getNativeWindowHandle()` 返回的是**装着 HWND 的 Buffer**，直接交给 koffi 的 `void*` 传的是 Buffer 的地址，Win32 拿到假窗口每次都返回 false（实测 IsWindow(buffer) false、IsWindow(decoded) true），必须 `koffi.decode` 出句柄。不再有 `setDisplayMediaRequestHandler`：v0.4.1 前听译经 getDisplayMedia 抓系统音，要申请屏幕源再立刻停掉视频轨；现在原生 WASAPI，程序不再为音频申请屏幕捕获。边界持久化去抖 300 ms：手动标题栏拖动每帧 setBounds，同步写盘 60 次/秒会卡。Windows 上失焦可能丢置顶 z 序，blur 时重设，保持默认 `floating` 级、不升到 `screen-saver`（会压住用户其它钉住的工具）。ESC / Space 在渲染端处理（知道 UI 优先级：历史面板 > 散落面板 > 关闭，并做子窗清理），主进程故意不加 before-input-event 快捷键。关闭时收割所有子面板窗口（它们是没有父窗的置顶孤儿）。
 - 截图窗：跨所有显示器的并集矩形，`enableLargerThanScreen`，`screen-saver` 级置顶（临时覆盖层，允许）。
 - 托盘：Windows 先发 click 再发 double-click，单击延迟 300 ms，真正的双击能取消它再触发划词开关。划词项用普通菜单项而不是 checkbox：checkbox 让 Windows 给每一行预留勾选列，是菜单看起来松散的唯一原因；托盘图标（右下角绿点）与提示已经表明状态。标签跟随 `settings.interface.language` 变化，无需额外 IPC。
-- 菜单：中文回退文本经 `main-i18n`。
+- 菜单：主窗口无边框、从不显示菜单栏，所以应用菜单**只为快捷键存在**（Ctrl+Q、编辑角色、缩放、F11、Ctrl+,），没有快捷键的项永远点不到——v0.5.2 删掉了「置顶」勾选（主窗口置顶另有渲染端按钮经 `set-always-on-top`）和帮助三项。文字经 `main-i18n`，`menu.ok` 是原生对话框的按钮文字，不是菜单项：v0.5.1 清理菜单键时把它当无用键删了，安全模式提示框的按钮于是显示成 `menu.ok`（`t()` 缺键时静默返回键名）。v0.5.2 恢复，并加 `tests/unit/main/main-i18n-keys.test.js` 扫全部调用点；同一条单测还抓出 `floatingWindow.windowNotFound` 从来没进过表。
 
 ## 6. 截图（screenshot/）
 
