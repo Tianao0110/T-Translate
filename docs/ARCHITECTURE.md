@@ -117,7 +117,7 @@ t-translate/
 │   │   ├── constants.js        # 常量定义
 │   │   ├── templates.js        # 翻译模板
 │   │   ├── languages.js       # 语言目录（134 种）+ 拼音索引，渲染端与栈共用
-│   │   ├── ocr-languages.js   # OCR 可识别语言（56 种）→ 模型包，与主进程那份互校
+│   │   ├── ocr-languages.js   # OCR 可识别语言（59 种）→ 模型包，与主进程那份互校
 │   │   ├── custom-languages.js # 用户自定义语言的校验与合并
 │   │   ├── model-language-coverage.js # 模型语言能力表（只影响降级链排序）
 │   │   ├── provider-icons.js   # stack 共享表 + 图标合成的渲染端 provider 目录
@@ -280,5 +280,5 @@ npm run dist             # 打包安装程序（产物在 release/，发布传�
 npm run lint             # ESLint 检查（全仓 0 error 是底线）
 npm run format           # Prettier 格式化
 npm test                 # 运行测试（vitest）
-npm run check:all        # 常量同步 + i18n 键同步 + 硬编码中文，三连
+npm run check:all        # 常量同步 + 语言表 + i18n 键同步 + 硬编码中文 + 文档路径与链接
 ```

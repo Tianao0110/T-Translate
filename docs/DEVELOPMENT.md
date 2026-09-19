@@ -6,7 +6,7 @@
 
 ---
 
-## 📁 开发者视角的代码分布
+## 开发者视角的代码分布
 
 ```
 src/stack/                      # 主进程翻译栈（ESM 源码，esbuild 打包，运行时单实例）
@@ -20,11 +20,18 @@ src/stack/                      # 主进程翻译栈（ESM 源码，esbuild 打�
 │   ├── metadata.js             # ★ 跨端共享元数据表（configSchema 驱动表单与密钥加密）
 │   ├── presets-core.js         # OpenAI 兼容预设（加兼容源只需在这加条目）
 │   ├── presets.js              # 预设 → Provider 类的包装
+│   ├── openai-compatible.js    # 预设共用的 OpenAI 兼容基类
+│   ├── retired-models.js       # 厂商已关停的型号名 → 现役名（registry 三个入口都过一遍）
+│   ├── tengine.js              # 内置模型源（不联网，见下文「内置模型与 T-Engine」）
 │   └── <id>.js                 # 独立翻译源类（deepl/gemini/anthropic/...）
 └── ocr/
     ├── base.js                 # BaseOCREngine + _t
     ├── manager.js              # ★ OCR 引擎注册表 + 自动降级链 + vision 全局锁
     ├── local-bridge.js         # 本地引擎桥（主进程内直调 ocr-engine/windows-ocr）
+    ├── blocks.js               # 行框契约（各引擎坐标统一成像素框）
+    ├── result-quality.js       # 「读不出来」的判定门槛
+    ├── tengine-vision.js       # 内置视觉模型引擎
+    ├── vision-routing.js       # 选中内置视觉模型时的智能分配
     └── <id>.js                 # 在线引擎类（ocrspace/google-vision/azure/baidu/llm-vision）
 
 src/（渲染端，只管 UI）
@@ -42,7 +49,7 @@ src/（渲染端，只管 UI）
 
 ---
 
-## 🔌 新增翻译源（Provider）
+## 新增翻译源（Provider）
 
 ### 路线 A：OpenAI 兼容 API（最常见，零类文件）
 
@@ -131,6 +138,7 @@ export default MyProvider;
   description: '一句话描述',
   color: '#3b82f6',            // 卡片强调色（品牌色，数据例外可写死）
   type: 'llm',                 // 'llm' | 'api' | 'traditional'
+  supportsChat: true,          // 必填：类里实现了 chat() 才能写 true，AI 动作靠它选源
   helpUrl: 'https://...',      // "获取 API Key" 跳转
   configSchema: {
     apiKey: { type: 'password', label: 'API Key', required: true, encrypted: true, placeholder: 'sk-...' },
@@ -142,6 +150,11 @@ export default MyProvider;
 ```
 
 字段类型：`text` / `password`（配 `encrypted: true` 走 safeStorage）/ `select`（带 `options`）/ `checkbox` / `number`。
+
+两条单测守这张表，加源后会自动覆盖到：
+
+- `tests/unit/stack/provider-chat.test.js`：每个源都要声明 `supportsChat`，且与类里有没有 `chat()` 一致。
+- `tests/unit/stack/provider-models.test.js`：`model` 的表单默认值必须等于类（或预设）里的默认值、`placeholder` 同值，且不在 `retired-models.js` 的停用名单里。**默认型号要写厂商现役的名字**，动手前对一遍它的弃用页；厂商关停某个名字后，把它登进 `retired-models.js`（只收已关停的，见 `docs/design/stack.md` 第 4 节）。
 
 ### 注册与渲染端登记
 
@@ -159,7 +172,7 @@ npm start             # 实测：设置页出卡片、填 key、测试连接、�
 
 ---
 
-## ✨ 新增 AI 动作（总结 / 理解那一族）
+## 新增 AI 动作（总结 / 理解那一族）
 
 **动作是数据不是代码**——正常情况下你不写 JS，只加一份配置。
 
@@ -201,7 +214,7 @@ npm start             # 实测：设置页出卡片、填 key、测试连接、�
 
 ---
 
-## 🌐 新增语言
+## 新增语言
 
 语言目录是**一张共享表**：`src/config/languages.js`，渲染端（选择器）和主进程栈
 （提示词里的语言名）共用同一份。加一种语言：
@@ -218,7 +231,7 @@ npm start             # 实测：设置页出卡片、填 key、测试连接、�
 传统翻译源的映射按需补：Google/微软吃 ISO 码、未映射直传；百度那套是自定义码
 （jp/kor/fra/vie），漏了会发出它不认识的码；DeepL 未映射即报"不支持"，是刻意的。
 
-## 🔤 OCR 支持一门新语言
+## OCR 支持一门新语言
 
 先分清两件事：**翻译语言**（134 种，src/config/languages.js）和 **OCR 识别语言**
 （59 种，src/config/ocr-languages.js）。后者取决于模型字典里有没有那套字形，
@@ -239,7 +252,7 @@ npm start             # 实测：设置页出卡片、填 key、测试连接、�
 判定「读不出来」的门槛在 src/stack/ocr/result-quality.js，里面的数字全部是
 实测值，改动前先看那份注释。
 
-## 👁️ 新增 OCR 引擎
+## 新增 OCR 引擎
 
 在线 OCR 引擎同样活在栈里：`src/stack/ocr/my-ocr.js`（参考 `ocrspace.js`，最小样板）：
 
@@ -287,7 +300,7 @@ export default MyOCREngine;
 
 ---
 
-## 🧠 内置模型与 T-Engine
+## 内置模型与 T-Engine
 
 内置本地模型（翻译源 `tengine`）和内置视觉模型（OCR 引擎 `tengine-vision`）不走上面两条路线：它们是 T-Engine 引擎层的宿主，全部细节在 [T-ENGINE.md](T-ENGINE.md)。改它之前只需记住：
 
@@ -315,7 +328,7 @@ export default MyOCREngine;
 
 ---
 
-## 🎨 UI 与样式规范
+## UI 与样式规范
 
 样式令牌的完整说明在 [THEME_CUSTOMIZATION.md](THEME_CUSTOMIZATION.md)，开发时只需记住这几条硬规则：
 
@@ -329,7 +342,7 @@ export default MyOCREngine;
 
 ---
 
-## 🔧 调试技巧
+## 调试技巧
 
 ```javascript
 // 渲染端 DevTools（F12）里：
@@ -355,14 +368,14 @@ await window.electron.stack.clearCache('all')
 - **听译会话日志**：日志目录下的 `audio-probe-*.jsonl`，滚动 3 份（够解释最近一次故障即可），默认只有时长/耗时/VAD 指标。**识别出的文字默认不写**——要看文字加 `TT_LISTEN_LOG_TEXT=1` 再启动。
 - **网络请求**：主进程栈的请求不经过渲染端 DevTools Network 面板，看日志或在 provider 里临时加 log。
 
-## ✅ 提交前检查
+## 提交前检查
 
 ```bash
 npx eslint . --quiet     # 0 error（全仓已归零，不许回退）
 npm test                 # vitest
 npm run stack:build      # 栈可打包
 npx vite build           # 渲染端可构建
-npm run check:all        # 常量表 + i18n + 硬编码中文
+npm run check:all        # 常量表 + 语言表 + i18n + 硬编码中文 + 文档里的路径与链接
 ```
 
 **代码注释**只写英文、只说「这段做什么、接到哪」；原因、历史、测量值写进 `docs/design/<feature>.md`（T-Engine 的写进 T-ENGINE.md），不进源码。
@@ -371,7 +384,7 @@ npm run check:all        # 常量表 + i18n + 硬编码中文
 
 ---
 
-## 📚 相关文件
+## 相关文件
 
 | 文件 | 说明 |
 |------|------|
@@ -387,13 +400,13 @@ npm run check:all        # 常量表 + i18n + 硬编码中文
 
 ---
 
-## ❓ 常见问题
+## 常见问题
 
 **Q: 新增的翻译源不显示？**
 A: 四处检查：stack/registry.js 注册、metadata.js 表项、provider-icons.js 的 ICONS+ORDER、`npm run stack:build` 是否重新打包（dev 启动会自动打包）。
 
 **Q: 配置保存后不生效？**
-A: 设置页保存会自动触发栈 reload 并广播三窗，无需手动处理；自己写的调试路径可以调 `window.electron.stack.reload()`。
+A: 设置页保存会自动触发栈 reload 并广播给各窗口，无需手动处理；自己写的调试路径可以调 `window.electron.stack.reload()`。
 
 **Q: API Key 在设置里显示为密文/空？**
 A: 正常。密钥经 Windows DPAPI 加密存主进程，设置页加载时经审计通道解密回填，明文永不落盘。

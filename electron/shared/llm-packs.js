@@ -1,5 +1,5 @@
 // Built-in LLM whitelist: the only GGUF files T-Engine loads unless the
-// developer door (settings.tengine.allowUnlistedModels) is open; the sha256
+// developer door (settings.llm.allowUnlistedModels) is open; the sha256
 // is a security boundary (docs/T-ENGINE.md §5). Re-pinned once a year with
 // the llama.cpp build in electron/tengine/runtime/llama-manifest.json.
 // Weights are never bundled: the user drops the file into <models>/llm-models.

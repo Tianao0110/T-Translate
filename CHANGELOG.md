@@ -22,6 +22,7 @@
 - 新增主进程文案表的守门单测：扫 `electron/` 里全部 `t()` 调用点，用到的键两张表都要有；顺带补上从未进表的 `floatingWindow.windowNotFound`
 - 硬编码中文基线收紧一次，净删 43 条已不存在的条目
 - `I18N_GUIDE` 与 `THEME_CUSTOMIZATION` 查过时：缺键回退写成真实行为，注册主题改为现行五处，去 emoji
+- **全部文档查了一遍过时，并新增 `check:docs` 门禁**（进 `check:all`，CI 会拦）：文档里提到的仓库路径、`npm run` 脚本名、相对链接必须还在。这一轮改掉的：OCR 模型文档的语言包是七个不是四个、发布文件是 12 个不是 9 个、空格启发式的行号链接指到了别的函数；ARCHITECTURE 的 OCR 语言数 56 → 59；T-ENGINE 的指标名 `think_leak` → 实际的 `thinkLeak`；sherpa 说明里的脚本路径；DEVELOPMENT 的目录树补上新文件、元数据示例补上必填的 `supportsChat`、去 emoji；源码里一条写错设置键名的注释
 
 ## v0.5.1 — 2026-09-16 — 内置视觉模型、程序内使用说明与文档精简
 

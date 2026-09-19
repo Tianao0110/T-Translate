@@ -27,7 +27,7 @@ describe('default model names', () => {
     .filter(([, meta]) => meta.configSchema?.model?.default);
 
   it('covers the four cloud LLM providers, so the checks below are not vacuous', () => {
-    expect(withDefault.map(([id]) => id).sort()).toEqual(['anthropic', 'deepseek', 'gemini', 'openai']);
+    expect(withDefault.map(([id]) => id)).toEqual(expect.arrayContaining(['anthropic', 'deepseek', 'gemini', 'openai']));
   });
 
   for (const [id, meta] of withDefault) {

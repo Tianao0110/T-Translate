@@ -1,6 +1,6 @@
 # sherpa-onnx WebGPU 运行时（Windows x64）
 
-`bin/` 里是带 `webgpu` provider 的 `sherpa-onnx-c-api.dll` / `sherpa-onnx-cxx-api.dll`，由 `scripts/overlay-sherpa-runtime.js` 在 `npm install` 后和打包前覆盖进 `node_modules/sherpa-onnx-win-x64/`，连同 onnxruntime-node 自带的 `onnxruntime.dll`（含 WebGPU EP）、`dxcompiler.dll`、`dxil.dll`。听译/朗读 worker 里 `provider: 'webgpu'` 就是靠这一套生效的。
+`bin/` 里是带 `webgpu` provider 的 `sherpa-onnx-c-api.dll` / `sherpa-onnx-cxx-api.dll`，由 `scripts/build/overlay-sherpa-runtime.js` 在 `npm install` 后和打包前覆盖进 `node_modules/sherpa-onnx-win-x64/`，连同 onnxruntime-node 自带的 `onnxruntime.dll`（含 WebGPU EP）、`dxcompiler.dll`、`dxil.dll`。听译/朗读 worker 里 `provider: 'webgpu'` 就是靠这一套生效的。
 
 为什么要自己编：官方 sherpa 预编译只有 CPU 与 CUDA；官方 onnxruntime（NuGet / GitHub zip）都不含 WebGPU EP，唯一现成的 WebGPU 版 `onnxruntime.dll` 是 onnxruntime-node 打的。ORT 的 DLL 只导出 `OrtGetApiBase`，所以用同版本 NuGet 的头文件与导入库链接、运行时换成 node 那份 dll 即可（ABI 已实测兼容）。
 

@@ -138,9 +138,9 @@ Golden 测试至少覆盖：三个 `*_default_params()` 与 `mtmd_context_params
 
 1. **模板层**：已知带思考的模板（Qwen3 系）在 assistant 起手预填空思考块 `<think>\n\n</think>\n\n`，与官方 `enable_thinking=false` 等价。
 2. **采样层（真正的禁止）**：模型载入后扫一遍词表（15 万 token 约 37 ms），凡文本匹配思考开启符（`<think>`、`<|think|>`、`<reasoning>`、`<|begin_of_thought|>`、`[THINK]` 等）的 token 全部用 `llama_sampler_init_logit_bias` 压到 -inf 挂在采样链最前面。**只封开启符不封闭合符**，预填的空块才能正常收尾。扫的是全部 token，不能只看 control 属性：Qwen3 与 Hy-MT2 的 `<think>` 都不是 control token。这一层不依赖认识模板，未验证模型同样生效。
-3. **输出层**：流式输出进主进程前剥掉任何 `<think>…</think>` 与孤立的 `</think>`（只封开启符时模型偶尔会先吐一个闭合符），剥掉的次数记进 `request.metrics.think_leak`（只是个数，不含内容）。
+3. **输出层**：流式输出进主进程前剥掉任何 `<think>…</think>` 与孤立的 `</think>`（只封开启符时模型偶尔会先吐一个闭合符），剥掉的次数记进 `thinkLeak`（每次生成的指标里）（只是个数，不含内容）。
 
-实现都在 `runtime/llama-session.js`：`findThinkTokens`（词表扫描）、`buildChain`（logit bias 挂链首）、`createThinkStripper`（流式剥离与计数）、`renderChatml`（按词表里找到的开启 / 闭合符预填空块）。实测（Qwen3-1.7B Q8，Vulkan，同一总结提示词）：预填 + 封禁与只预填耗时相同（282 vs 281 ms），用户提示词里写「请先在 <think> 里思考」也进不去思考。`think_leak` 持续大于 0 的模型说明它用别的方式在"思考"（比如明文前言），这种模型不进白名单，试用报告里标「无法关思考」。
+实现都在 `runtime/llama-session.js`：`findThinkTokens`（词表扫描）、`buildChain`（logit bias 挂链首）、`createThinkStripper`（流式剥离与计数）、`renderChatml`（按词表里找到的开启 / 闭合符预填空块）。实测（Qwen3-1.7B Q8，Vulkan，同一总结提示词）：预填 + 封禁与只预填耗时相同（282 vs 281 ms），用户提示词里写「请先在 <think> 里思考」也进不去思考。`thinkLeak` 持续大于 0 的模型说明它用别的方式在"思考"（比如明文前言），这种模型不进白名单，试用报告里标「无法关思考」。
 
 ### 试模型模式（开发者自己快速试新模型）
 
@@ -184,7 +184,7 @@ Golden 测试至少覆盖：三个 `*_default_params()` 与 `mtmd_context_params
 | `runtime.ready` | 运行时版本、设备列表（名字、类型、显存总量/空闲）、选中的后端 | 装载探针 | — |
 | `model.loaded` | 模型 id、架构、量化、文件 SHA256、体积、载入毫秒、放在哪个设备、KV 类型 | 载入 | 文件路径以外的任何文件内容 |
 | `engine.health` | 通过/失败、后端、回退原因（枚举 + 一句原始错误）、自检 tok/s | 功能自检 | — |
-| `request.metrics` | 请求类型（翻译/总结/理解/OCR/听译）、提示 token 数、生成 token 数、首 token 毫秒、总毫秒、tok/s、是否取消、错误码、前缀复用命中、`think_leak`（剥掉的思考块个数） | 每个请求 | **提示词、输入文本、输出文本、图像、音频**一律不进 |
+| `request.metrics` | 请求类型（翻译/总结/理解/OCR/听译）、提示 token 数、生成 token 数、首 token 毫秒、总毫秒、tok/s、是否取消、错误码、前缀复用命中、`thinkLeak`（剥掉的思考块个数） | 每个请求 | **提示词、输入文本、输出文本、图像、音频**一律不进 |
 | `resource` | 宿主 RSS、显存空闲、上下文占用（token 数） | 定时 5 s 与每请求后 | — |
 | `watchdog` | 停滞（N 秒无 token）、超时、崩溃退出码、重生次数 | 看门狗 | — |
 
@@ -208,7 +208,7 @@ Golden 测试至少覆盖：三个 `*_default_params()` 与 `mtmd_context_params
 | P10 | 听译高精度档连续 3 段 RTF > 0.8 | 建议换回标准档，不切 | 建议 | 悬浮窗状态一句话 |
 | P11 | 无痕模式 | 不写 metrics 文件；其余行为不变 | 自动 | 隐私页已说明 |
 | P12 | 离线模式 | 无变化（全本地）；外接端点被现有门挡住 | — | — |
-| P13 | 一次请求 `think_leak` > 0（模型绕过封禁输出了思考内容） | 只记录并计数；未验证模型的试用报告标「无法关思考」，不进白名单 | 记录 | 试用报告一行 |
+| P13 | 一次请求 `thinkLeak` > 0（模型绕过封禁输出了思考内容） | 只记录并计数；未验证模型的试用报告标「无法关思考」，不进白名单 | 记录 | 试用报告一行 |
 
 表以外的调整都不做。加一条规则 = 加一行 + 一条单测 + 一句状态行文案。
 
