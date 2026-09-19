@@ -149,6 +149,7 @@ npm run dist            # 打包安装程序
 | [OCR_MODELS](docs/OCR_MODELS.md) | OCR 模型与语言包发布 |
 | [I18N_GUIDE](docs/I18N_GUIDE.md) | 国际化 |
 | [THEME_CUSTOMIZATION](docs/THEME_CUSTOMIZATION.md) | 主题定制 |
+| [MAINTENANCE](docs/MAINTENANCE.md) | 年度维护清单：哪些地方要查、年度模型评估 |
 | `docs/design/` | 各功能的设计说明与踩坑记录 |
 
 ## 贡献

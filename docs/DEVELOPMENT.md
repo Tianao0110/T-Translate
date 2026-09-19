@@ -397,6 +397,7 @@ npm run check:all        # 常量表 + 语言表 + i18n + 硬编码中文 + 文�
 | `electron/ipc/translation-stack.js` | 栈 IPC facade（隐私注入/abort/流帧） |
 | `electron/platform/open-with.js` + `installer/installer.nsh` | 右键菜单：扩展名白名单与注册表宏，**改扩展名两处必须同步**（nsh 为 UTF-8 BOM，别用会丢 BOM 的编辑器保存） |
 | `docs/ARCHITECTURE.md` | 架构文档 |
+| `docs/MAINTENANCE.md` | 年度维护清单（要查哪些层、年度模型评估、在线源弃用页） |
 
 ---
 

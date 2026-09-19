@@ -149,6 +149,7 @@ Mirror links, how to verify a placed file, and fallback download pages are in ch
 | [OCR_MODELS](docs/OCR_MODELS.md) | OCR models and language pack releases (Chinese) |
 | [I18N_GUIDE](docs/I18N_GUIDE.md) | Internationalization (Chinese) |
 | [THEME_CUSTOMIZATION](docs/THEME_CUSTOMIZATION.md) | Theme customization (Chinese) |
+| [MAINTENANCE](docs/MAINTENANCE.md) | Yearly maintenance checklist and model review (Chinese) |
 | `docs/design/` | Per-feature design notes and pitfalls (Chinese) |
 
 ## Contributing

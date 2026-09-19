@@ -11,6 +11,8 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 - 模型热更新不用发版，只改对应 Release 资产：OCR 走 `ocr-models` tag（手册 [docs/OCR_MODELS.md](docs/OCR_MODELS.md)），听译走 `audio-models` tag（`npm run audio:release` 生成资产）。**两个 tag 都必须勾 Pre-release**，否则 electron-updater 会把它们当最新版去找 latest.yml；同理**永远别开 allowPrerelease**
 - 听译改动发版前跑 `npm run smoke:listen`（整链 13 项断言 + 延迟数字），改了模型或分发链必跑
 - 语言包 rec 模型目前 v4 代际；上游出 v5 多语言 ONNX 后按 OCR_MODELS.md「更新模型」流程换入
+- **一年一次的体检照 [docs/MAINTENANCE.md](docs/MAINTENANCE.md)**（v0.5.2 起）：先分诊，再按层动（底层引擎 / 平台 / 年度模型评估 / Windows 接口 / 在线接口 / 前端库），做完在文末「年检记录」记一行。下一次：2027-09 前后，或某个依赖出高危公告、用户反馈某个在线源或模型链接失效时
+- 文档里的路径、`npm run` 脚本名、相对链接由 `npm run check:docs` 守着（进了 `check:all`）；它抓不了「说法不对了」，步骤数、个数、界面叫法仍要发版前人工过
 
 ## 下一版本候选
 

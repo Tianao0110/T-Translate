@@ -234,7 +234,7 @@ Golden 测试至少覆盖：三个 `*_default_params()` 与 `mtmd_context_params
 - [ ] build 号、SHA256SUMS、取包脚本三处一致
 - [ ] 四个头文件与 `llama-abi.js` 逐字段核对，弃用函数已替换
 - [ ] golden 测试全过，期望值未被"顺手"改动
-- [ ] `npm run smoke:llm`（落地后新增）、`smoke:ocr`、`smoke:listen` 全过
+- [ ] `smoke:llm`、`smoke:llm-host`、`smoke:llm-vision`、`smoke:llm-vision-host`、`smoke:llm-stack`、`smoke:ocr`、`smoke:listen` 全过（参数见 DEVELOPMENT.md 的「冒烟与基准」）
 - [ ] 装前自测数字更新到 FAQ
 - [ ] 模型白名单 SHA 更新，链接导入页链接有效
 - [ ] 安装包内 DLL 清单核对（asar.unpacked 下只有需要的文件）
