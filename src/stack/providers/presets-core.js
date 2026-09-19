@@ -9,7 +9,7 @@ export const PRESET_CORE = [
     id: 'openai',
     defaults: {
       apiKey: '',
-      model: 'gpt-4o-mini',
+      model: 'gpt-4.1-mini',
       endpoint: 'https://api.openai.com/v1',
       timeout: 15000,
     },
@@ -26,7 +26,7 @@ export const PRESET_CORE = [
     id: 'deepseek',
     defaults: {
       apiKey: '',
-      model: 'deepseek-chat',
+      model: 'deepseek-flash',
       endpoint: 'https://api.deepseek.com/v1',
       timeout: 30000,
     },

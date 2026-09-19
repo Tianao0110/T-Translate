@@ -39,7 +39,14 @@
 - **闲置看门狗而不是总时长超时**：`AbortSignal.timeout(30s)` 会杀掉一条长但健康的流；每收到任何字节（含推理增量与心跳）重置，思考模型与慢硬件不会在还在产出时被杀。`AbortSignal.timeout()` 抛的是 TimeoutError 不是 AbortError，旧的 AbortError 判断从未命中。
 - OpenAI 兼容：纯空白回复不是翻译，报成功曾让空串一路当结果并被缓存；「从没开始」与「中途死掉」要区分，用户才知道该调超时还是查服务器；不配置就不发 `max_tokens`，固定上限会悄悄截断长输出（CJK 译文比原文膨胀）。模型列表先 `/v1/models`，失败或为空再走预设的兜底端点（Ollama `/api/tags`），并优先暴露主端点的错误。Ollama 要显式模型名（LM Studio 用已加载的），留空时自动取第一个并缓存到配置。本地生成受硬件限制（冷载入 + 推理模型思考阶段可达数分钟），超时可调；LM Studio JIT 载入，闲置后第一请求付全额载入。
 - Anthropic / Gemini：`max_tokens` / 截断的回答不能当完整的成功——会缓存并展示半截译文。Gemini 的安全阈值全部放开：翻译合法地要处理新闻、小说等类别，默认阈值拦太多；多段回答要拼接；状态行读的是 `message` 键不是 `error`。Anthropic 的 dangerous-direct 头在浏览器外是惰性的，保留只为请求形状稳定。
-- DeepL：免费密钥以 `:fx` 结尾且主机不同；不支持的语言（旁遮普语）在发请求前就拒并标 `skipFailureCount`；456 = 配额耗尽；`/usage` 是最便宜的探测且顺带报配额。
+- DeepL：免费密钥以 `:fx` 结尾且主机不同；不支持的语言（旁遮普语）在发请求前就拒并标 `skipFailureCount`；456 = 配额耗尽；`/usage` 是最便宜的探测且顺带报配额。**「强制走免费版主机」默认关（v0.5.2 起，原为开）**：主机选择 = 选项 或 `:fx` 后缀，默认开时不带 `:fx` 的 Key 会被送到免费主机而鉴权失败；默认关则两种 Key 都走对，已保存的 true 不受影响。DeepL 2026-07 起新注册只有 Developer 计划（一次性 100 万字符），老 API Free Key（`:fx`、每月 50 万）仍可用；新 Key 是否还带 `:fx` 没有 Key 验证不了，默认关正是为了不依赖这个答案。
+- **默认模型名与停用名单（v0.5.2，2026-09-18 对各家官方文档核实，作者没有任何在线 Key，全部只到文档与单测级）**：
+  - DeepSeek `deepseek-chat` / `deepseek-reasoner` 于 2026-07-24 停用（api-docs.deepseek.com/updates），现名 `deepseek-flash`（滚动别名，思考要显式开）。Gemini `gemini-2.0-flash` 于 2026-06-01 关停（ai.google.dev 的 deprecations 页），默认改滚动别名 `gemini-flash-latest`——Google 四个月内连发 3.5 → 3.8，钉具体版本一年内必死，别名不用年年换。Anthropic `claude-sonnet-4-20250514` 已标弃用（退役日未定），默认改 `claude-sonnet-5`。OpenAI `gpt-4o-mini` 仍在役，默认改 `gpt-4.1-mini`：GPT-5.x / 6 全是推理模型，会拒绝兼容层固定发送的 `temperature`，4.1-mini 是仍接受现有请求形状的最新型号。
+  - `providers/retired-models.js`：厂商**已关停**的名字 → 现役名字，registry 的三个入口（`createProvider` / `updateProviderConfig` / `initConfigs`）都过一遍，所以设置里存着旧名的老用户不用动手。**只收已关停的**：还在役的型号（哪怕已弃用）不许映射，那等于悄悄换掉用户选的、按量计费的模型。设置页仍显示用户存的旧名，请求按现役名发。
+  - 新一代模型默认开思考，回答前面多一个思考块：Claude 的 `content[0]` 可能是 `thinking`（默认 `display: omitted`，文字为空），Gemini 的 `parts` 里可能有 `thought: true`。两个源改为只拼文本块 / 非思考段，此前读 `[0]` 会把正常回答报成「无翻译结果」。思考 token 计入输出上限（Anthropic `max_tokens`、Gemini `maxOutputTokens` 都是思考 + 正文合计），上限从 4096 / 2048 提到 8192，否则长段落会被思考吃掉额度而截断；上限不影响计费，只按实际产出算。
+  - 不主动发关思考的参数：`thinking: {type: "disabled"}` 在部分型号上直接 400，Gemini 的 `thinkingLevel` / `thinkingBudget` 按代际不同，用户可以填任意型号，发了反而更容易坏。
+  - Gemini 翻译与连接测试的端点从 `v1` 改 `v1beta`：对话路径本来就在 v1beta，官方示例全部用它，别名与新型号在 v1 上是否可用没有依据。
+  - 守门单测 `tests/unit/stack/provider-models.test.js`：表单默认值 = 类默认值、默认值不在停用名单、停用名单不指向另一个停用名、带思考块的回答能解析、DeepL 主机选择。
 - 百度翻译：MD5 参考实现**别重构**——算法固定，任何改动破坏签名；签名对 UTF-8 字节算；长文本 GET 会超 URL 长度（也撞长查询限速），改 POST 体，阈值与 Google 源的 URL 长度守卫一致。Google（非官方 web API）：tk 位运算是从 translate.google.com 打包 JS 逆向来的，必须与 Google 完全一致否则 403；TKK 种子 `0.0` 对大多数请求量有效；响应形状三种都见过；连接测试要真翻一句，首页探测抓不到 API 封禁。微软：区域绑定密钥要区域头，全局密钥不要。
 - 内置模型源（`tengine.js`）：无网络无服务无密钥，把栈的消息合成一 system 一 user 交给 `localLlm` 钩子；多轮对话折成带标签的行（运行时模板只渲染一个 user 轮）；`maxTokens` 按 CJK 约一字一 token 估。仅翻译包 `canChat()` 为 false，AI 动作跳过它。
 

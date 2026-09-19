@@ -27,8 +27,8 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 
 ### 翻译源相关（v0.5.0 已出，可以开了；调研全文 gstack v048-engine-landscape-2026-09-07）
 
-- **DeepL 文案**：2026-07 起 DeepL 停售 API Free / API Pro，新 Developer 计划是一次性 100 万字符不续（老 API Free key 仍可用）。程序里 DeepL 的"免费"引导措辞要改
-- **免费 LLM 预设**：智谱 GLM-4-Flash 永久免费、OpenAI 兼容、无 token 上限只限并发——走 Route A，在 presets-core.js 加一条预设即可，零新代码
+- **在线源全部只到文档与单测级**：作者没有任何在线 Key（2026-09-18 口径），v0.5.2 的默认模型更新、思考块解析、DeepL 主机默认值都没真机跑过；有用户反馈某个源不通时，先看 `docs/design/stack.md` 第 4 节「默认模型名与停用名单」
+- **免费 LLM 预设（暂不做，等有人要）**：智谱 OpenAI 兼容端点 `https://open.bigmodel.cn/api/paas/v4/`，2026-09-18 定价页标免费的文本模型是 `glm-4.7-flash`（200K）/ `glm-4-flash-250414` / `glm-z1-flash`，「GLM-4-Flash」这个名字已过时。没做的原因：没人能真机验证，还多一个要年年盯的接口；`glm-4.7-flash` 可能默认开思考，预设钩子里没有「额外请求体」这一项
 - **国内翻译源候选**：腾讯机器翻译 500 万字/月、火山翻译 200 万字/月 + 100 页文档（程序目前只接了百度 100 万字/月）。Route B 各半天，等有人要再做
 - 本地翻译模型选型已随 v0.5.0 落定：Qwen3-1.7B 默认通才 + Hy-MT2-1.8B 仅翻译进白名单；轻量替补候选 NiuTrans LMT-60 0.6B/1.7B（Qwen3 底座，Apache-2.0，中英中心）留作年度换版时比对
 - 不选：TranslateGemma（Gemma 协议、4B 起）

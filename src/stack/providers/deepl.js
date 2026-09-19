@@ -11,7 +11,7 @@ class DeepLProvider extends BaseProvider {
   constructor(config = {}) {
     super({
       apiKey: '',
-      useFreeApi: true,
+      useFreeApi: false,
       ...config,
     });
   }

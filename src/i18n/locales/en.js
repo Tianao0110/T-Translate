@@ -61,7 +61,7 @@ const en = {
   providerConfig: {
     'local-llm': { endpoint: 'API Endpoint', model: 'Model Name', timeout: 'Timeout (ms)', model_placeholder: 'Leave empty to auto-detect' },
     'openai': { apiKey: 'API Key', baseUrl: 'API Endpoint', model: 'Model Name' },
-    'deepl': { apiKey: 'API Key', useFreeApi: 'Use Free API (Key ending with :fx)' },
+    'deepl': { apiKey: 'API Key', useFreeApi: 'Force the free-plan host (keys ending with :fx are detected automatically; usually leave off)' },
     'gemini': { apiKey: 'API Key', model: 'Model' },
     'deepseek': { apiKey: 'API Key', model: 'Model', endpoint: 'API Endpoint' },
     'google-translate': { domain: 'Server', domain_com: 'google.com (International)', 'domain_com.hk': 'google.com.hk (Hong Kong)' },
@@ -1227,7 +1227,7 @@ const en = {
     p: {
       localLlm: { network: "LM Studio is not running or unreachable. Please ensure LM Studio is started and a model is loaded.", config: "Please check LM Studio endpoint (default: http://localhost:1234)" },
       openai: { apiKey: "OpenAI API Key is invalid. Please check your API Key in settings.", quota: "OpenAI API quota exhausted. Please check your account balance." },
-      deepl: { apiKey: "DeepL API Key is invalid. Please confirm you're using an API Key, not an account password.", quota: "DeepL free tier quota exhausted. Consider upgrading or switching providers." },
+      deepl: { apiKey: "DeepL API Key is invalid. Please confirm you're using an API Key, not an account password.", quota: "DeepL quota exhausted (the Developer plan is a one-time credit of 1 million characters and does not renew). Upgrade or switch providers." },
       gemini: { apiKey: "Gemini API Key is invalid. Please get a valid Key from Google AI Studio." },
       deepseek: { apiKey: "DeepSeek API Key is invalid. Please check your configuration." },
       google: { network: "Google Translate is temporarily unreachable. A network proxy may be needed." }

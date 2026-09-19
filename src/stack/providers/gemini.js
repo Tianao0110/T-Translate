@@ -13,7 +13,7 @@ class GeminiProvider extends BaseProvider {
   constructor(config = {}) {
     super({
       apiKey: '',
-      model: 'gemini-2.0-flash',
+      model: 'gemini-flash-latest',
       temperature: 0.2,
       timeout: 30000,
       ...config,
@@ -28,6 +28,16 @@ class GeminiProvider extends BaseProvider {
     return true;
   }
 
+  // The answer is the joined text parts of the first candidate; thought
+  // parts are left out.
+  _answerText(data) {
+    return (data.candidates?.[0]?.content?.parts || [])
+      .filter(part => !part?.thought)
+      .map(part => part?.text || '')
+      .join('')
+      .trim();
+  }
+
   async testConnection() {
     // `message` is the key the settings status row reads.
     if (!this.config.apiKey) {
@@ -37,7 +47,7 @@ class GeminiProvider extends BaseProvider {
     try {
       // Model-info endpoint is the cheapest way to validate the key
       const response = await rtFetch(
-        `https://generativelanguage.googleapis.com/v1/models/${this.config.model}?key=${this.config.apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${this.config.model}?key=${this.config.apiKey}`,
         {
           method: 'GET',
           signal: AbortSignal.timeout(10000),
@@ -91,12 +101,12 @@ class GeminiProvider extends BaseProvider {
         ],
         generationConfig: {
           temperature: this.config.temperature,
-          maxOutputTokens: 2048,
+          maxOutputTokens: 8192,
         },
       };
 
       const response = await rtFetch(
-        `https://generativelanguage.googleapis.com/v1/models/${this.config.model}:generateContent?key=${this.config.apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${this.config.model}:generateContent?key=${this.config.apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -112,7 +122,7 @@ class GeminiProvider extends BaseProvider {
 
       const data = await response.json();
 
-      const translatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      const translatedText = this._answerText(data);
 
       if (!translatedText) {
         // Distinguish safety-block from generic empty response
@@ -172,7 +182,7 @@ class GeminiProvider extends BaseProvider {
             ],
             generationConfig: {
               temperature: options.temperature ?? 0.7,
-              maxOutputTokens: options.max_tokens ?? 2048,
+              maxOutputTokens: options.max_tokens ?? 8192,
             },
           }),
           signal: combineSignal(options.signal, this.config.timeout),
@@ -185,11 +195,7 @@ class GeminiProvider extends BaseProvider {
       }
 
       const data = await response.json();
-      // Multi-part answers are joined.
-      const content = (data.candidates?.[0]?.content?.parts || [])
-        .map(p => p.text || '')
-        .join('')
-        .trim();
+      const content = this._answerText(data);
 
       if (!content) {
         if (data.promptFeedback?.blockReason) {

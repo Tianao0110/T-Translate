@@ -10,6 +10,7 @@ import AnthropicProvider from './providers/anthropic.js';
 import MicrosoftTranslatorProvider from './providers/microsoft-translator.js';
 import BaiduTranslateProvider from './providers/baidu-translate.js';
 import TengineProvider from './providers/tengine.js';
+import { withLiveModel } from './providers/retired-models.js';
 import createLogger from './logger.js';
 
 const logger = createLogger('Registry');
@@ -86,7 +87,7 @@ export function createProvider(id, config = {}) {
     logger.error(`Unknown provider: ${id}`);
     return null;
   }
-  return new ProviderClass(config);
+  return new ProviderClass(withLiveModel(id, config));
 }
 
 export function isProviderConfigured(id) {
@@ -102,7 +103,7 @@ export function getMissingConfig(id) {
 // Merges into existing config (does not replace). Live instances get updated in-place.
 export function updateProviderConfig(id, config) {
   const existingConfig = configs.get(id) || {};
-  const newConfig = { ...existingConfig, ...config };
+  const newConfig = withLiveModel(id, { ...existingConfig, ...config });
   configs.set(id, newConfig);
 
   if (instances.has(id)) {
@@ -120,7 +121,7 @@ export function initConfigs(allConfigs, clearExisting = true) {
 
   for (const [id, config] of Object.entries(allConfigs)) {
     if (config && Object.keys(config).length > 0) {
-      configs.set(id, config);
+      configs.set(id, withLiveModel(id, config));
     }
   }
   logger.debug(`Initialized configs for: ${Object.keys(allConfigs).join(', ')}`);

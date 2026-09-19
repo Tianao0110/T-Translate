@@ -14,7 +14,7 @@ class AnthropicProvider extends BaseProvider {
   constructor(config = {}) {
     super({
       apiKey: '',
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-5',
       baseUrl: 'https://api.anthropic.com',
       timeout: 30000,
       ...config,
@@ -51,10 +51,17 @@ class AnthropicProvider extends BaseProvider {
       `You are a professional translator. Translate the following text to ${LANGUAGE_CODES[targetLang]?.name || targetLang}. Output only the translation, nothing else.`;
   }
 
+  // The answer is the text blocks of the reply; thinking blocks carry none.
+  _answerText(data) {
+    return (data.content || [])
+      .map(block => (typeof block?.text === 'string' ? block.text : ''))
+      .join('');
+  }
+
   _buildBody(text, systemPrompt, stream = false) {
     return JSON.stringify({
       model: this.config.model,
-      max_tokens: 4096,
+      max_tokens: 8192,
       ...(stream ? { stream: true } : {}),
       system: systemPrompt,
       messages: [
@@ -86,7 +93,7 @@ class AnthropicProvider extends BaseProvider {
       }
 
       const data = await response.json();
-      const translatedText = data.content?.[0]?.text;
+      const translatedText = this._answerText(data);
 
       if (!translatedText) {
         return { success: false, error: _t('providerError.noResult', '无翻译结果') };
@@ -248,7 +255,7 @@ class AnthropicProvider extends BaseProvider {
         headers: this._buildHeaders(),
         body: JSON.stringify({
           model: this.config.model,
-          max_tokens: options.max_tokens ?? 2048,
+          max_tokens: options.max_tokens ?? 8192,
           ...(system ? { system } : {}),
           messages: turns.map(m => ({ role: m.role, content: m.content })),
         }),
@@ -261,7 +268,7 @@ class AnthropicProvider extends BaseProvider {
       }
 
       const data = await response.json();
-      const content = data.content?.[0]?.text;
+      const content = this._answerText(data);
 
       if (!content) {
         return { success: false, error: _t('providerError.noResponseContent', '无响应内容') };

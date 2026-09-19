@@ -2,6 +2,15 @@
 
 本文档记录 T-Translate 各版本变更。早于 v0.2.4 的历史请查 git log 与版本 tag。
 
+## 未发布
+
+### 翻译源
+
+- **四个在线源的默认模型换成现役型号**：DeepSeek `deepseek-flash`、Gemini `gemini-flash-latest`、Claude `claude-sonnet-5`、OpenAI `gpt-4.1-mini`。其中 DeepSeek 与 Gemini 的旧默认值已被厂商关停（2026-07-24、2026-06-01），新用户按默认配置第一次请求就会失败
+- 设置里存着已关停旧名字（`deepseek-chat`、`deepseek-reasoner`、`gemini-2.0-flash`）的，程序自动按现役名字请求，不用手动改
+- 修复 Claude 与 Gemini 的新一代模型（默认先思考再回答）在非流式翻译与 AI 动作里被报成「无翻译结果」；两个源的输出上限提到 8192，思考不再挤掉长段落的译文
+- DeepL：「强制走免费版主机」默认改为不勾（以 `:fx` 结尾的 Key 照旧自动识别），不带 `:fx` 的 Key 不再被送错主机；配额用尽的提示补上「新注册的 Developer 计划是一次性 100 万字符」
+
 ## v0.5.1 — 2026-09-16 — 内置视觉模型、程序内使用说明与文档精简
 
 ### 截图识别

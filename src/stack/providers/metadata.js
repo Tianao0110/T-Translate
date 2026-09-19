@@ -46,9 +46,9 @@ export const PROVIDER_METADATA = {
       model: {
         type: 'text',
         label: 'Model Name',
-        default: 'gpt-4o-mini',
+        default: 'gpt-4.1-mini',
         required: false,
-        placeholder: 'gpt-4o-mini',
+        placeholder: 'gpt-4.1-mini',
       },
       timeout: {
         type: 'number',
@@ -80,9 +80,9 @@ export const PROVIDER_METADATA = {
       model: {
         type: 'text',
         label: 'Model',
-        default: 'deepseek-chat',
+        default: 'deepseek-flash',
         required: false,
-        placeholder: 'deepseek-chat',
+        placeholder: 'deepseek-flash',
       },
       endpoint: {
         type: 'text',
@@ -188,9 +188,9 @@ export const PROVIDER_METADATA = {
       model: {
         type: 'text',
         label: 'Model',
-        default: 'claude-sonnet-4-20250514',
+        default: 'claude-sonnet-5',
         required: false,
-        placeholder: 'claude-sonnet-4-20250514',
+        placeholder: 'claude-sonnet-5',
       },
       baseUrl: {
         type: 'text',
@@ -215,13 +215,13 @@ export const PROVIDER_METADATA = {
         type: 'password',
         label: 'API Key',
         required: true,
-        placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx:fx',
+        placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
         encrypted: true,
       },
       useFreeApi: {
         type: 'checkbox',
-        label: 'Use Free API (Key ending with :fx)',
-        default: true,
+        label: 'Force the free-plan host (keys ending with :fx are detected automatically; usually leave off)',
+        default: false,
         required: false,
       },
     },
@@ -247,9 +247,9 @@ export const PROVIDER_METADATA = {
       model: {
         type: 'text',
         label: 'Model',
-        default: 'gemini-2.0-flash',
+        default: 'gemini-flash-latest',
         required: false,
-        placeholder: 'gemini-2.0-flash',
+        placeholder: 'gemini-flash-latest',
       },
     },
   },

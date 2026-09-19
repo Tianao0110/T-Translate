@@ -61,7 +61,7 @@ const zh = {
   providerConfig: {
     'local-llm': { endpoint: 'API 地址', model: '模型名称', timeout: '超时时间 (ms)', model_placeholder: '留空自动检测' },
     'openai': { apiKey: 'API Key', baseUrl: 'API 地址', model: '模型名称' },
-    'deepl': { apiKey: 'API Key', useFreeApi: '使用免费 API（Key 以 :fx 结尾）' },
+    'deepl': { apiKey: 'API Key', useFreeApi: '强制走免费版主机（以 :fx 结尾的 Key 会自动识别，一般不用勾）' },
     'gemini': { apiKey: 'API Key', model: '模型' },
     'deepseek': { apiKey: 'API Key', model: '模型', endpoint: 'API 地址' },
     'google-translate': { domain: '服务器', domain_com: 'google.com (国际)', 'domain_com.hk': 'google.com.hk (香港)' },
@@ -1228,7 +1228,7 @@ const zh = {
     p: {
       localLlm: { network: "LM Studio 未运行或无法连接。请确保 LM Studio 已启动并加载了模型。", config: "请检查 LM Studio 地址配置（默认 http://localhost:1234）" },
       openai: { apiKey: "OpenAI API Key 无效。请在设置中检查您的 API Key。", quota: "OpenAI API 配额已用尽。请检查您的账户余额。" },
-      deepl: { apiKey: "DeepL API Key 无效。请确认使用的是 API Key 而非账户密码。", quota: "DeepL 免费版配额已用尽。考虑升级或切换翻译源。" },
+      deepl: { apiKey: "DeepL API Key 无效。请确认使用的是 API Key 而非账户密码。", quota: "DeepL 配额已用尽（新注册的 Developer 计划是一次性 100 万字符，不按月恢复）。可升级或切换翻译源。" },
       gemini: { apiKey: "Gemini API Key 无效。请前往 Google AI Studio 获取有效的 Key。" },
       deepseek: { apiKey: "DeepSeek API Key 无效。请检查配置。" },
       google: { network: "Google 翻译服务暂时无法访问。可能需要网络代理。" }
