@@ -161,4 +161,5 @@ npx eslint . --quiet && npm test && npm run stack:build && npx vite build && npm
 
 | 日期 | 动了哪几层 | 换了什么 | 备注 |
 | --- | --- | --- | --- |
+| 2026-09-18 | 依赖 | `npm audit` 四个 high：xmldom、js-yaml、fast-uri 已用 `npm update <包名>` 精确升级；adm-zip（经 onnxruntime 的安装脚本，运行时不用）未动 | **别直接跑 `npm audit fix`**：实测它会把 Electron 42.4.0 升到 42.11.6 并改动七十多个包。Electron 同大版本的补丁升级值得做，但要单独一步并手测一轮，本次没做 |
 | 2026-09-18 | 在线接口、文档 | DeepSeek 与 Gemini 的默认型号已被关停，四个在线源换现役型号并加停用名单；全部文档查过时 | 这份清单的第一版随 v0.5.2 写成，底层引擎与本地模型本年未动 |
