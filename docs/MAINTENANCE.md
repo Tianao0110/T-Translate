@@ -152,6 +152,15 @@ npx eslint . --quiet && npm test && npm run stack:build && npx vite build && npm
 
 然后是 smoke，改到哪层跑哪层，年检时全跑：`smoke:offline`、`smoke:ocr`、`smoke:listen`、`smoke:llm`、`smoke:llm-host`、`smoke:llm-vision`、`smoke:llm-vision-host`、`smoke:llm-stack`。带模型参数的几个怎么传，见 [DEVELOPMENT.md](DEVELOPMENT.md) 的「冒烟与基准」。
 
+**升过依赖就要真打一次包**，冒烟不覆盖打包这一步：
+
+```bash
+npx electron-builder --dir --publish=never -c.directories.output=release-verify
+```
+
+只出解压目录、不出安装包，几分钟。打完看三样：`release-verifywin-unpackedesourcesapp.asar.unpacked
+ode_modules` 里原生模块齐不齐；启动里面的 `T-Translate.exe`，看它自己的 `datalogs` 里划词模块预热成功；然后删掉 `release-verify`。
+
 最后是只有真机能验的：
 
 - 打包，装上一个正式版，点「检查更新」，确认能升到新包，模型与数据都还在。
@@ -162,5 +171,5 @@ npx eslint . --quiet && npm test && npm run stack:build && npx vite build && npm
 
 | 日期 | 动了哪几层 | 换了什么 | 备注 |
 | --- | --- | --- | --- |
-| 2026-09-20 | 依赖、平台 | `npm update` 把全部依赖升到各自范围内的最新：Electron 42.4.0 → 42.11.6、koffi 2.15 → 2.16.3、mammoth、jszip、immer、vite、vitest 等，共 195 个包换版本；`npm audit` 的 high 四个降到一个（adm-zip，经 onnxruntime 的安装脚本，运行时不用） | 大版本一个没动。两个坑：①`npm update` 会把 sherpa 的补丁 DLL 冲回原版，之后必须跑一次 `node scripts/build/overlay-sherpa-runtime.js`（`--check` 会报 stale）；②vitest 换版后改用根目录的 vite 7，JSX 默认变回经典模式，单测报 `React is not defined`，`vitest.config.js` 里已显式写 `esbuild.jsx: automatic`。八个冒烟与门禁全过；划词、截图、悬浮窗要手测 |
+| 2026-09-20 | 依赖、平台 | `npm update` 把全部依赖升到各自范围内的最新：Electron 42.4.0 → 42.11.6、koffi 2.15 → 2.16.3、mammoth、jszip、immer、vite、vitest 等，共 195 个包换版本；`npm audit` 的 high 四个降到一个（adm-zip，经 onnxruntime 的安装脚本，运行时不用） | 大版本一个没动。两个坑：①`npm update` 会把 sherpa 的补丁 DLL 冲回原版，之后必须跑一次 `node scripts/build/overlay-sherpa-runtime.js`（`--check` 会报 stale）；②vitest 换版后改用根目录的 vite 7，JSX 默认变回经典模式，单测报 `React is not defined`，`vitest.config.js` 里已显式写 `esbuild.jsx: automatic`。八个冒烟与门禁全过；划词、截图、悬浮窗要手测。③**打包当场失败**：`uiohook-napi` 1.5.5 把预编译文件从 `node.napi.node` 改名为 `uiohook-napi.node`，electron-builder 的重编工具只认前者，认不出就从源码编译，而本机 node-gyp 找不到 Visual Studio。运行时不受影响（加载器两种名字都认），所以冒烟和手测都没发现。修法是 `package.json` 的 `build.npmRebuild: false`——原生模块全是 N-API 预编译件，重编本来就是空转。教训已写进第 8 节：升依赖后要真打一次包 |
 | 2026-09-18 | 在线接口、文档 | DeepSeek 与 Gemini 的默认型号已被关停，四个在线源换现役型号并加停用名单；全部文档查过时 | 这份清单的第一版随 v0.5.2 写成，底层引擎与本地模型本年未动 |

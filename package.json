@@ -95,6 +95,7 @@
   },
   "build": {
     "appId": "com.ttranslate.core",
+    "npmRebuild": false,
     "productName": "T-Translate",
     "publish": {
       "provider": "github",
