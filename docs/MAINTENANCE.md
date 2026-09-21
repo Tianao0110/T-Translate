@@ -158,8 +158,11 @@ npx eslint . --quiet && npm test && npm run stack:build && npx vite build && npm
 npx electron-builder --dir --publish=never -c.directories.output=release-verify
 ```
 
-只出解压目录、不出安装包，几分钟。打完看三样：`release-verifywin-unpackedesourcesapp.asar.unpacked
-ode_modules` 里原生模块齐不齐；启动里面的 `T-Translate.exe`，看它自己的 `datalogs` 里划词模块预热成功；然后删掉 `release-verify`。
+只出解压目录、不出安装包，几分钟。打完看三样：
+
+- `release-verify\win-unpacked\resources\app.asar.unpacked\node_modules` 里原生模块齐不齐。
+- 启动 `release-verify\win-unpacked` 里的 `T-Translate.exe`，看它自己的 `data\logs` 里划词模块预热成功。
+- 验完删掉 `release-verify`。VS Code 开着时它里面的 `app.asar` 会被锁住删不掉，先关 VS Code。
 
 最后是只有真机能验的：
 
