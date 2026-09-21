@@ -12,7 +12,8 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 - 听译改动发版前跑 `npm run smoke:listen`（整链 13 项断言 + 延迟数字），改了模型或分发链必跑
 - 语言包 rec 模型目前 v4 代际；上游出 v5 多语言 ONNX 后按 OCR_MODELS.md「更新模型」流程换入
 - **一年一次的体检照 [docs/MAINTENANCE.md](docs/MAINTENANCE.md)**（v0.5.2 起）：先分诊，再按层动（底层引擎 / 平台 / 年度模型评估 / Windows 接口 / 在线接口 / 前端库），做完在文末「年检记录」记一行。下一次：2027-09 前后，或某个依赖出高危公告、用户反馈某个在线源或模型链接失效时
-- 文档里的路径、`npm run` 脚本名、相对链接由 `npm run check:docs` 守着（进了 `check:all`）；它抓不了「说法不对了」，步骤数、个数、界面叫法仍要发版前人工过
+- 文档里的路径、`npm run` 脚本名、相对链接由 `npm run check:docs` 守着（进了 `check:all`），说明书引号里的界面叫法也由它对词表；步骤数、个数这类「说法不对了」它抓不了，仍要发版前人工过
+- **依赖升级的口径（2026-09-20 用户拍板）**：`npm update` 升到范围内最新可以做，做完重跑 `node scripts/build/overlay-sherpa-runtime.js`（它会把 sherpa 的补丁 DLL 冲回原版）再跑全套冒烟；大版本逐个评估，别用 `npm audit fix --force`
 
 ## 下一版本候选
 
@@ -21,8 +22,9 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 - **分配阈值待真实反馈调**：`src/stack/ocr/vision-routing.js` 的 ROUTING（大图 1.2 MP、密集 30 行、表格 3 行 × 3 块、多栏各 4 行、字号差 2.5 倍、置信度 0.75 / 三成行低于 0.6）是 2026-09-14 拍脑袋定的。v0.5.2 起每张截图在日志里记一行 `vision routing:`（去向、原因和各项数字，不含文字），用一两周后按 `docs/design/stack.md` 第 5 节的字段表对数再调，一次只动一个阈值
 - 顺带：Q6_K 掐表对比（可选）
 
-### 文档收尾（说明书与文档精简已随 v0.5.1 出；落法在 gstack v052-manual-outline-2026-09-08）
+### 文档与界面收尾
 
+- **风格库在本地小模型上基本没用**（2026-09-18 讨论）：现在是「先平译、再拿一条参考重写」，1.7B 模型从单个例子里学不出风格，所以用户的风格库一直空着。想法是改成翻译时把两三对「原文 → 译文」直接放进提示词当示范（小模型吃例子不吃指令，前缀复用让固定示范几乎不花时间）。**先做实验再决定做不做**：十句上下，本机 Qwen3-1.7B 跑「现有默认 / 只加文学化指令 / 加三条示范」三种条件对比；没差别就是模型规模问题，用户自己用可以经「自定义模型」开关试 7B–9B
 - README 截图沿用旧图，界面定型后看要不要换一轮（用户未定）
 - 说明书铁律照旧：改界面必改说明书，写前核实界面，不确定就问，先中文后英文
 
@@ -191,6 +193,6 @@ v0.3.4 给 Windows OCR / Azure / Google Vision / OCR.space / 百度 五个引擎
 
 ### Incremental unit test coverage buildout
 
-`tests/unit/` 现有 110 个测试文件、1078 用例（selection / stack 五件套 / OCR 坐标与视觉分配 / T-Engine ABI 指纹 / 语言目录与选择器 / 历史与理解条目 / 段落笔记 / 历史保险库与存储路由 / store 白名单 / 模型包 core 与换包时序 / 听译模型发现与包列表 / 听译声音来源 / TTS 引擎落回 / 说明书解析与设置页挂载 等）。Principle: add tests when you touch a file, new features ship with tests, bug fixes ship with regression tests. Not chasing 100% coverage.
+`tests/unit/` 现有 114 个测试文件、1138 用例（selection / stack 五件套 / OCR 坐标与视觉分配 / T-Engine ABI 指纹 / 语言目录与选择器 / 历史与理解条目 / 段落笔记 / 历史保险库与存储路由 / store 白名单 / 模型包 core 与换包时序 / 听译模型发现与包列表 / 听译声音来源 / TTS 引擎落回 / 说明书解析与设置页挂载 等）。Principle: add tests when you touch a file, new features ship with tests, bug fixes ship with regression tests. Not chasing 100% coverage.
 
 
