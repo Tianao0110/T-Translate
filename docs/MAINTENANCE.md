@@ -44,6 +44,7 @@ sherpa 那一项是最可能卡住人的：没有装 VS 2022 的机器编不出�
 - **electron-updater**：Release 必须带 `latest.yml`；两个模型 tag（`ocr-models`、`audio-models`）必须是 Pre-release；永远别开 `allowPrerelease`。
 - **electron-store 停在 8**：9 起只有 ESM，主进程是 CommonJS，升了直接起不来。除非先把主进程迁到 ESM，否则不动。
 - **构建链**：Node 22（CI 在 `.github/workflows/ci.yml`）、Vite、esbuild（精确版本，打翻译栈用）、Vitest、ESLint。升完跑一遍门禁即可。
+- **范围内升级与大版本升级是两回事**。`npm update` 只升到 `package.json` 里范围允许的最新，通常是补丁与小版本，每年做一次、跑完第 8 节即可；之后记得重跑 `node scripts/build/overlay-sherpa-runtime.js`，它会把 sherpa 的补丁 DLL 冲掉。大版本（`npm outdated` 的 Latest 一列）逐个评估破坏性变更，一次只升一个。
 
 ## 4. 年度模型评估
 
@@ -161,5 +162,5 @@ npx eslint . --quiet && npm test && npm run stack:build && npx vite build && npm
 
 | 日期 | 动了哪几层 | 换了什么 | 备注 |
 | --- | --- | --- | --- |
-| 2026-09-18 | 依赖 | `npm audit` 四个 high：xmldom、js-yaml、fast-uri 已用 `npm update <包名>` 精确升级；adm-zip（经 onnxruntime 的安装脚本，运行时不用）未动 | **别直接跑 `npm audit fix`**：实测它会把 Electron 42.4.0 升到 42.11.6 并改动七十多个包。Electron 同大版本的补丁升级值得做，但要单独一步并手测一轮，本次没做 |
+| 2026-09-20 | 依赖、平台 | `npm update` 把全部依赖升到各自范围内的最新：Electron 42.4.0 → 42.11.6、koffi 2.15 → 2.16.3、mammoth、jszip、immer、vite、vitest 等，共 195 个包换版本；`npm audit` 的 high 四个降到一个（adm-zip，经 onnxruntime 的安装脚本，运行时不用） | 大版本一个没动。两个坑：①`npm update` 会把 sherpa 的补丁 DLL 冲回原版，之后必须跑一次 `node scripts/build/overlay-sherpa-runtime.js`（`--check` 会报 stale）；②vitest 换版后改用根目录的 vite 7，JSX 默认变回经典模式，单测报 `React is not defined`，`vitest.config.js` 里已显式写 `esbuild.jsx: automatic`。八个冒烟与门禁全过；划词、截图、悬浮窗要手测 |
 | 2026-09-18 | 在线接口、文档 | DeepSeek 与 Gemini 的默认型号已被关停，四个在线源换现役型号并加停用名单；全部文档查过时 | 这份清单的第一版随 v0.5.2 写成，底层引擎与本地模型本年未动 |

@@ -5,6 +5,8 @@ import { defineConfig } from 'vitest/config';
 import path from 'path';
 
 export default defineConfig({
+  // JSX without a React import, as the app's own build (plugin-react) does.
+  esbuild: { jsx: 'automatic' },
   resolve: {
     alias: {
       electron: path.resolve(__dirname, 'tests/mocks/electron.js'),
