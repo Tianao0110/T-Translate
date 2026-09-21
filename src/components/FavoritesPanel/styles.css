@@ -18,6 +18,7 @@
   flex-direction: column;
   flex-shrink: 0;
   overflow: hidden;
+  position: relative;
 }
 
 .sidebar-header {
@@ -392,24 +393,46 @@
   text-transform: uppercase;
 }
 
+.sidebar-section-title .tag-count {
+  font-weight: 400;
+}
+
+.tag-expand-btn {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tag-expand-btn:hover {
+  background: var(--bg-hover);
+  color: var(--accent-primary);
+}
+
+/* One row in the sidebar; the expand button opens .tag-overlay with the rest. */
 .tag-list {
   padding: 0 8px 16px;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 6px;
-  /* Capped and scrollable so many tags never squeeze the folder list. */
-  max-height: 38%;
-  overflow-y: auto;
+  overflow: hidden;
   flex-shrink: 0;
+  -webkit-mask-image: linear-gradient(to right, black 82%, transparent);
+  mask-image: linear-gradient(to right, black 82%, transparent);
 }
 
-.tag-list::-webkit-scrollbar {
-  width: 4px;
-}
-
-.tag-list::-webkit-scrollbar-thumb {
-  background: var(--border-primary);
-  border-radius: 2px;
+.tag-list .tag-item {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .tag-item {
@@ -443,6 +466,73 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+/* All tags, laid over the whole sidebar; the list on the right filters as one is picked. */
+.tag-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+}
+
+.tag-overlay-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  border-bottom: 1px solid var(--border-primary);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.tag-overlay-header .tag-count {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-tertiary);
+}
+
+.tag-overlay-close {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tag-overlay-close:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.tag-overlay-body {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 6px;
+  padding: 12px 8px;
+  overflow-y: auto;
+}
+
+.tag-overlay-body::-webkit-scrollbar {
+  width: 4px;
+}
+
+.tag-overlay-body::-webkit-scrollbar-thumb {
+  background: var(--border-primary);
+  border-radius: 2px;
 }
 
 /* 工具栏 */

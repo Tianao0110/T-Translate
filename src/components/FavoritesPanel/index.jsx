@@ -4,7 +4,7 @@ import {
   Star, Search, Trash2, Copy, Edit3, X, Plus,
   Folder, FolderPlus, Tag, Hash,
   Check, Palette, Bookmark, Sparkles, RefreshCw, BookOpen,
-  Download, Upload
+  Download, Upload, ChevronRight, ChevronLeft
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import useTranslationStore from '../../stores/translation-store';
@@ -438,6 +438,8 @@ const FavoritesPanel = ({ showNotification }) => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState(null);
+  // The sidebar shows one row of tags; this opens all of them over the sidebar.
+  const [showAllTags, setShowAllTags] = useState(false);
 
   const rootRef = useRef(null);
   const searchRef = useRef(null);
@@ -452,6 +454,11 @@ const FavoritesPanel = ({ showNotification }) => {
       e.preventDefault();
       searchRef.current?.focus();
     }
+  );
+  useVisibleHotkey(
+    rootRef,
+    (e) => e.key === 'Escape' && showAllTags,
+    () => setShowAllTags(false)
   );
 
   // useShallow: the tab stays mounted behind other tabs.
@@ -900,9 +907,19 @@ const FavoritesPanel = ({ showNotification }) => {
           <>
             <div className="sidebar-section-title">
               <Tag size={14} /> {t('favorites.tags')}
+              <span className="tag-count">{allTags.length}</span>
+              <button
+                className="tag-expand-btn"
+                onClick={() => setShowAllTags(open => !open)}
+                title={showAllTags ? t('favorites.tagsCollapse') : t('favorites.tagsExpand')}
+                aria-expanded={showAllTags}
+              >
+                {showAllTags ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+              </button>
             </div>
             <div className="tag-list">
-              {allTags.map(tag => (
+              {/* One row; the tag in use leads it so it stays in view. */}
+              {[...allTags].sort((a, b) => (b === selectedTag) - (a === selectedTag)).map(tag => (
                 <button
                   key={tag}
                   className={`tag-item ${selectedTag === tag ? 'active' : ''}`}
@@ -914,6 +931,35 @@ const FavoritesPanel = ({ showNotification }) => {
               ))}
             </div>
           </>
+        )}
+
+        {showAllTags && allTags.length > 0 && (
+          <div className="tag-overlay">
+            <div className="tag-overlay-header">
+              <Tag size={16} />
+              <span>{t('favorites.allTags')}</span>
+              <span className="tag-count">{allTags.length}</span>
+              <button
+                className="tag-overlay-close"
+                onClick={() => setShowAllTags(false)}
+                title={t('favorites.tagsCollapse')}
+              >
+                <ChevronLeft size={18} />
+              </button>
+            </div>
+            <div className="tag-overlay-body">
+              {allTags.map(tag => (
+                <button
+                  key={tag}
+                  className={`tag-item ${selectedTag === tag ? 'active' : ''}`}
+                  onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
+                >
+                  <Hash size={12} />
+                  {tag}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
       </div>
 
