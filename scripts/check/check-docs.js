@@ -74,13 +74,54 @@ function problemsIn(doc) {
   return [...found];
 }
 
+// The user guide quotes interface labels: 「…」 in the Chinese one, "…" in the
+// English one. Each quote has to be a string the app can actually show.
+const MANUALS = [
+  { doc: 'docs/MANUAL.zh.md', quote: /「([^」\n]{2,30})」/g, locale: 'src/i18n/locales/zh.js', show: (q) => `「${q}」` },
+  { doc: 'docs/MANUAL.en.md', quote: /"([^"\n]{2,40})"/g, locale: 'src/i18n/locales/en.js', show: (q) => `"${q}"` },
+];
+// Text the app shows that lives outside the renderer locales: native menus
+// and dialogs, tray labels, the Explorer context menu.
+const OTHER_LABEL_SOURCES = ['electron/shared/main-i18n.js', 'electron/shared/tray-labels.js', 'installer/installer.nsh'];
+
+function labelProblemsIn({ doc, quote, locale, show }) {
+  const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
+  const shown = [locale, ...OTHER_LABEL_SOURCES].map(read).join('\n');
+  const lines = read(doc).split(/\r?\n/);
+  // A quote may also name a section of the guide itself.
+  const ownTitles = lines
+    .flatMap((l) => [...l.matchAll(/^#+\s+(.+)$/g), ...l.matchAll(/\*\*([^*]+)\*\*/g)])
+    .map((m) => m[1].replace(/^[\d.]+\s*/, '').trim());
+
+  const found = [];
+  let inFence = false;
+  lines.forEach((line, i) => {
+    if (/^\s*```/.test(line)) { inFence = !inFence; return; }
+    if (inFence) return;
+    for (const m of line.matchAll(quote)) {
+      const q = m[1].trim();
+      // An arrow means a menu path or a formula, not one label.
+      if (q.includes('→')) continue;
+      if (shown.includes(q) || ownTitles.includes(q)) continue;
+      found.push(`${doc}:${i + 1}  not a label the app shows: ${show(q)}`);
+    }
+  });
+  return found;
+}
+
 const docs = docFiles();
 const problems = docs.flatMap(problemsIn);
+const labelProblems = MANUALS.flatMap(labelProblemsIn);
 
 if (problems.length) {
   console.log('Docs point at things that no longer exist:\n');
   for (const p of problems) console.log(`  ${p}`);
   console.log('\nFix the doc, or add a deliberate example name to EXAMPLES in scripts/check/check-docs.js.');
-  process.exit(1);
 }
-console.log(`check:docs OK — ${docs.length} docs, every path, npm script and relative link resolves.`);
+if (labelProblems.length) {
+  console.log(`${problems.length ? '\n' : ''}The user guide quotes labels the interface does not have (check wording and capitals against the locale file):\n`);
+  for (const p of labelProblems) console.log(`  ${p}`);
+}
+if (problems.length || labelProblems.length) process.exit(1);
+
+console.log(`check:docs OK — ${docs.length} docs: every path, npm script and relative link resolves, and every label the user guide quotes exists.`);

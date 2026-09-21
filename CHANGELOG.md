@@ -9,6 +9,7 @@
 - **四个在线源的默认模型换成现役型号**：DeepSeek `deepseek-flash`、Gemini `gemini-flash-latest`、Claude `claude-sonnet-5`、OpenAI `gpt-4.1-mini`。其中 DeepSeek 与 Gemini 的旧默认值已被厂商关停（2026-07-24、2026-06-01），新用户按默认配置第一次请求就会失败
 - 设置里存着已关停旧名字（`deepseek-chat`、`deepseek-reasoner`、`gemini-2.0-flash`）的，程序自动按现役名字请求，不用手动改
 - 修复 Claude 与 Gemini 的新一代模型（默认先思考再回答）在非流式翻译与 AI 动作里被报成「无翻译结果」；两个源的输出上限提到 8192，思考不再挤掉长段落的译文
+- 修复 Gemini 被截断的回答当成功返回（半截译文会被展示并进缓存），现在与 Claude 一样报「翻译结果被截断」
 - DeepL：「强制走免费版主机」默认改为不勾（以 `:fx` 结尾的 Key 照旧自动识别），不带 `:fx` 的 Key 不再被送错主机；配额用尽的提示补上「新注册的 Developer 计划是一次性 100 万字符」
 
 ### 术语库
@@ -33,6 +34,7 @@
 - 新增主进程文案表的守门单测：扫 `electron/` 里全部 `t()` 调用点，用到的键两张表都要有；顺带补上从未进表的 `floatingWindow.windowNotFound`
 - 硬编码中文基线收紧一次，净删 43 条已不存在的条目
 - `I18N_GUIDE` 与 `THEME_CUSTOMIZATION` 查过时：缺键回退写成真实行为，注册主题改为现行五处，去 emoji
+- 说明书：术语库一节按真实行为重写（只换译文里还留着的原词、对所有窗口生效、按目标语言生效、英文按整词）；英文说明书里 12 处与界面对不上的叫法改成界面上的原文。`check:docs` 加一条规则守着：说明书引号里的界面叫法必须能在词表里找到
 - **全部文档查了一遍过时，并新增 `check:docs` 门禁**（进 `check:all`，CI 会拦）：文档里提到的仓库路径、`npm run` 脚本名、相对链接必须还在。这一轮改掉的：OCR 模型文档的语言包是七个不是四个、发布文件是 12 个不是 9 个、空格启发式的行号链接指到了别的函数；ARCHITECTURE 的 OCR 语言数 56 → 59；T-ENGINE 的指标名 `think_leak` → 实际的 `thinkLeak`；sherpa 说明里的脚本路径；DEVELOPMENT 的目录树补上新文件、元数据示例补上必填的 `supportsChat`、去 emoji；源码里一条写错设置键名的注释
 
 ## v0.5.1 — 2026-09-16 — 内置视觉模型、程序内使用说明与文档精简

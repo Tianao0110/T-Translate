@@ -150,3 +150,37 @@ describe('gemini: answers that carry a thought part', () => {
     expect(result).toMatchObject({ success: true, content: '你好，世界' });
   });
 });
+
+describe('gemini: an answer cut off at the output cap is not a success', () => {
+  // A half translation reported as success gets shown and cached as the whole.
+  const cutOff = { candidates: [{ finishReason: 'MAX_TOKENS', content: { parts: [{ text: '你好，世' }] } }] };
+  const thinkingAteItAll = { candidates: [{ finishReason: 'MAX_TOKENS', content: { parts: [] } }] };
+  const finished = { candidates: [{ finishReason: 'STOP', content: { parts: [{ text: '你好，世界' }] } }] };
+
+  it('translate fails with the truncation message', async () => {
+    useFetch(replyWith(cutOff));
+    const result = await createProvider('gemini', { apiKey: 'k' }).translate('Hello, world', 'en', 'zh');
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('截断');
+  });
+
+  it('says truncated, not "no result", when thinking used the whole cap', async () => {
+    useFetch(replyWith(thinkingAteItAll));
+    const result = await createProvider('gemini', { apiKey: 'k' }).translate('Hello, world', 'en', 'zh');
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('截断');
+  });
+
+  it('chat fails the same way', async () => {
+    useFetch(replyWith(cutOff));
+    const result = await createProvider('gemini', { apiKey: 'k' }).chat([{ role: 'user', content: 'Hello' }]);
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('截断');
+  });
+
+  it('a finished answer still succeeds', async () => {
+    useFetch(replyWith(finished));
+    const result = await createProvider('gemini', { apiKey: 'k' }).translate('Hello, world', 'en', 'zh');
+    expect(result).toMatchObject({ success: true, text: '你好，世界' });
+  });
+});

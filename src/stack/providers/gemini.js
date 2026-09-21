@@ -38,6 +38,10 @@ class GeminiProvider extends BaseProvider {
       .trim();
   }
 
+  _wasCutOff(data) {
+    return data.candidates?.[0]?.finishReason === 'MAX_TOKENS';
+  }
+
   async testConnection() {
     // `message` is the key the settings status row reads.
     if (!this.config.apiKey) {
@@ -124,6 +128,11 @@ class GeminiProvider extends BaseProvider {
 
       const translatedText = this._answerText(data);
 
+      // MAX_TOKENS => cut off mid-translation; not a success.
+      if (this._wasCutOff(data)) {
+        return { success: false, error: _t('providerError.truncated', '翻译结果被截断（超出最大长度）') };
+      }
+
       if (!translatedText) {
         // Distinguish safety-block from generic empty response
         if (data.promptFeedback?.blockReason) {
@@ -196,6 +205,11 @@ class GeminiProvider extends BaseProvider {
 
       const data = await response.json();
       const content = this._answerText(data);
+
+      // As in translate(): a cut-off answer is not a success.
+      if (this._wasCutOff(data)) {
+        return { success: false, error: _t('providerError.truncated', '翻译结果被截断（超出最大长度）') };
+      }
 
       if (!content) {
         if (data.promptFeedback?.blockReason) {
