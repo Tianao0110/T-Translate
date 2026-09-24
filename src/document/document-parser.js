@@ -3,6 +3,7 @@
 
 import createLogger from '../core/logger.js';
 import i18n from '../i18n.js';
+import { judgeLanguage, mainLanguage } from '../stack/language-detect.js';
 const logger = createLogger('DocumentParser');
 
 const _t = (key, fallback) => {
@@ -129,14 +130,7 @@ function estimateTokens(text) {
 
 export function detectLanguage(text) {
   if (!text) return 'unknown';
-  const chineseRatio = (text.match(/[\u4e00-\u9fff]/g) || []).length / text.length;
-  const japaneseRatio = (text.match(/[\u3040-\u309f\u30a0-\u30ff]/g) || []).length / text.length;
-  const koreanRatio = (text.match(/[\uac00-\ud7af]/g) || []).length / text.length;
-
-  if (chineseRatio > 0.3) return 'zh';
-  if (japaneseRatio > 0.1) return 'ja';
-  if (koreanRatio > 0.1) return 'ko';
-  return 'en';
+  return mainLanguage(text) || 'en';
 }
 
 export function shouldSkipSegment(text, filters = {}) {
@@ -158,11 +152,8 @@ export function shouldSkipSegment(text, filters = {}) {
     return { skip: true, reason: _t('docParser.codeBlock', 'Code block') };
   }
 
-  if (filters.skipTargetLang && filters.targetLang) {
-    const lang = detectLanguage(trimmed);
-    if (lang === filters.targetLang) {
-      return { skip: true, reason: _t('docParser.alreadyTargetLang', 'Already in target language') };
-    }
+  if (filters.skipTargetLang && filters.targetLang && judgeLanguage(trimmed, filters.targetLang).inTarget) {
+    return { skip: true, reason: _t('docParser.alreadyTargetLang', 'Already in target language') };
   }
 
   if (filters.skipKeywords && filters.skipKeywords.length > 0) {

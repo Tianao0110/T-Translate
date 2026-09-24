@@ -139,6 +139,13 @@ describe('shouldSkipSegment', () => {
       skipTargetLang: true, targetLang: 'zh',
     }).skip).toBe(false);
   });
+
+  it('only skips paragraphs that read as the target language', () => {
+    const skip = (text, targetLang) => shouldSkipSegment(text, { skipTargetLang: true, targetLang }).skip;
+    expect(skip('In Chinese philosophy, yin and yang (阴阳) describes complementary forces.', 'zh')).toBe(false);
+    expect(skip('在 Kubernetes 集群中部署 Docker 容器时，需要配置 Service。', 'zh')).toBe(true);
+    expect(skip('Я не знаю, что ты имеешь в виду.', 'en')).toBe(false);
+  });
 });
 
 describe('detectLanguage', () => {

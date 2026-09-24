@@ -3,6 +3,7 @@
 // stripPrivacy() also drops non-cloneable fields such as AbortSignal.
 
 import createLogger from '../core/logger.js';
+import { judgeLanguage } from '../stack/language-detect.js';
 
 const logger = createLogger('StackClient');
 
@@ -130,6 +131,12 @@ class StackClient {
         })
         .catch((e) => finish({ success: false, error: e.message }));
     });
+  }
+
+  // { language, inTarget } for the same-language decision
+  // (core/text.js resolveSameLanguageTarget).
+  async detectLanguage(text, targetLang) {
+    return judgeLanguage(text, targetLang);
   }
 
   // Kill the current in-flight stream (if any) without starting a new one.
