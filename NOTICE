@@ -13,6 +13,7 @@ licenses:
 | -------------------- | ---------------------------- |
 | @napi-rs/canvas      | MIT                          |
 | dayjs                | MIT                          |
+| eld（打包进翻译栈）  | Apache-2.0                   |
 | electron-log         | MIT                          |
 | electron-store       | MIT                          |
 | electron-updater     | MIT                          |

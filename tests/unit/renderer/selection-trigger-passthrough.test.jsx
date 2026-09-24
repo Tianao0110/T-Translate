@@ -15,6 +15,8 @@ vi.mock('../../../src/translation/stack-client.js', () => ({
     initialized: true,
     init: vi.fn(() => Promise.resolve()),
     translate: vi.fn(() => Promise.resolve({ success: true, text: 'TRANSLATED' })),
+    // Every text in this file is English.
+    detectLanguage: vi.fn((text, targetLang) => Promise.resolve({ language: 'en', inTarget: targetLang === 'en' })),
   },
 }));
 

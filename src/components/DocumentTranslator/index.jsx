@@ -767,6 +767,7 @@ const DocumentTranslator = ({
             return { success: false, error: 'OCR unavailable' };
           }
         },
+        detectLanguages: (texts, lang) => translationService.detectLanguages(texts, lang),
         onProgress: setParseProgress,
       });
       

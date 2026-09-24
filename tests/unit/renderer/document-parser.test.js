@@ -1,8 +1,9 @@
 // Pure-function coverage for the 0.2.9 document-translation overhaul:
 // timecode conversion, CSV splitting, SRT id stability, segmentation.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
+  parseDocument,
   toSRTTimecode,
   toVTTTimecode,
   splitCSVLine,
@@ -138,6 +139,40 @@ describe('shouldSkipSegment', () => {
       skipShort: true, minLength: 10, skipNumbers: true, skipCode: true,
       skipTargetLang: true, targetLang: 'zh',
     }).skip).toBe(false);
+  });
+
+  it('only skips paragraphs that read as the target language', () => {
+    const skip = (text, targetLang) => shouldSkipSegment(text, { skipTargetLang: true, targetLang }).skip;
+    expect(skip('In Chinese philosophy, yin and yang (阴阳) describes complementary forces.', 'zh')).toBe(false);
+    expect(skip('在 Kubernetes 集群中部署 Docker 容器时，需要配置 Service。', 'zh')).toBe(true);
+    expect(skip('Я не знаю, что ты имеешь в виду.', 'en')).toBe(false);
+    // English or French: left for parseDocument to settle through the stack.
+    expect(skip('This is a normal English sentence.', 'en')).toBe(false);
+  });
+});
+
+describe('parseDocument target-language filter', () => {
+  const file = () => new File([
+    'Bonjour à tous, je suis très content de vous voir ici aujourd\'hui.\n\n'
+    + 'Hello everyone, I am very happy to see you all here today.\n\n'
+    + '这是一段中文。',
+  ], 'mixed.txt', { type: 'text/plain' });
+  const filters = { skipTargetLang: true, targetLang: 'en' };
+
+  it('asks the stack only about paragraphs the scripts leave open', async () => {
+    const detectLanguages = vi.fn(async (texts) => texts.map((text) => ({
+      language: text.startsWith('Hello') ? 'en' : 'fr',
+      inTarget: text.startsWith('Hello'),
+    })));
+    const result = await parseDocument(file(), { filters, detectLanguages });
+    expect(detectLanguages).toHaveBeenCalledTimes(1);
+    expect(detectLanguages.mock.calls[0][0]).toHaveLength(2);
+    expect(result.segments.map((seg) => seg.status)).toEqual(['pending', 'skipped', 'pending']);
+  });
+
+  it('keeps open paragraphs when nothing settles them', async () => {
+    const result = await parseDocument(file(), { filters });
+    expect(result.segments.map((seg) => seg.status)).toEqual(['pending', 'pending', 'pending']);
   });
 });
 

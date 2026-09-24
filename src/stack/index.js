@@ -30,6 +30,7 @@ import { OCREngineManager } from './ocr/manager.js';
 import { TtsEndpointClient } from './tts/endpoint.js';
 import { PROVIDER_METADATA } from './providers/metadata.js';
 import * as privacyModes from './privacy-modes.js';
+import { detectLanguages } from './language-id.js';
 
 export function createTranslationStack(ctx = {}) {
   if (typeof ctx.fetch !== 'function') {
@@ -60,6 +61,8 @@ export function createTranslationStack(ctx = {}) {
     tts,
     metadata: PROVIDER_METADATA,
     privacyModes,
+    // Same-language judgment for every window (language-id.js).
+    language: { detect: detectLanguages },
     // Load the L2 snapshot then warm provider + OCR configs. Idempotent.
     async init() {
       await cache.init();

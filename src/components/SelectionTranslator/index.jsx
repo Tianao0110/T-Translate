@@ -8,7 +8,7 @@ import useAiActions from '../../ai/use-ai-actions.js';
 import { resolveActionLabel } from '../../ai/ai-action-runner.js';
 import createLogger from '../../core/logger.js';
 import { getShortErrorMessage } from '../../core/error-handler.js';
-import { detectLanguage, resolveSameLanguageTarget } from '../../core/text.js';
+import { resolveSameLanguageTarget } from '../../core/text.js';
 import './styles.css';
 
 import { THEMES } from '../../config/constants.js';
@@ -574,14 +574,14 @@ const SelectionTranslator = () => {
 
     // Text already in the target language: per
     // settings.translation.sameLanguageBehavior (resolveSameLanguageTarget).
-    const detected = detectLanguage(text);
-    const resolved = resolveSameLanguageTarget(detected, requestedTarget, behavior, sourceLang);
+    const detected = await translationService.detectLanguage(text, requestedTarget);
+    const resolved = resolveSameLanguageTarget(detected.inTarget, requestedTarget, behavior, sourceLang);
     const targetLang = resolved.targetLang;
 
     // Record the languages actually used (post-resolve) for history + TTS;
     // passthrough also gates history.
     lastResolvedLangsRef.current = {
-      sourceLanguage: sourceLang !== 'auto' ? sourceLang : detected,
+      sourceLanguage: sourceLang !== 'auto' ? sourceLang : detected.language,
       targetLanguage: targetLang,
       passthrough: resolved.passthrough,
     };

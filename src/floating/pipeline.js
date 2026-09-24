@@ -302,10 +302,10 @@ class TranslationPipeline {
             return;
           }
 
-          const sourceLang = detectLanguage(text);
+          const { language: sourceLang, inTarget } = await translationService.detectLanguage(text, config.targetLanguage);
 
           const { targetLang, passthrough } = resolveSameLanguageTarget(
-            sourceLang, config.targetLanguage, config.sameLanguageBehavior, config.sourceLanguage
+            inTarget, config.targetLanguage, config.sameLanguageBehavior, config.sourceLanguage
           );
           if (passthrough) {
             session.updateChildPane(paneId, {
@@ -382,10 +382,10 @@ class TranslationPipeline {
     try {
       session.startTranslation();
 
-      const sourceLang = detectLanguage(text);
+      const { language: sourceLang, inTarget } = await translationService.detectLanguage(text, config.targetLanguage);
 
       const { targetLang, passthrough } = resolveSameLanguageTarget(
-        sourceLang, config.targetLanguage, config.sameLanguageBehavior, config.sourceLanguage
+        inTarget, config.targetLanguage, config.sameLanguageBehavior, config.sourceLanguage
       );
       if (passthrough) {
         // Already in the target language: show the original, skip the
