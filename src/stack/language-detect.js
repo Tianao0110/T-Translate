@@ -1,41 +1,50 @@
 // Language judgment shared by the stack and every window: which language a
 // text is mostly in, and whether it already reads as a target language.
 // Callers: core/text.js, document/document-parser.js,
-// translation/stack-client.js.
+// translation/stack-client.js, stack/language-id.js (adds ELD).
 
-// [script, letters, unit, language its runs are labeled with]. Kana decides
-// between zh and ja for the whole text (see scriptRuns).
+// [script, letters, unit, catalogue languages written in it; runs are
+// labeled with the first]. Kana decides between zh and ja for the whole text
+// (see scriptRuns).
 const SCRIPTS = [
-  ['cjk', '\\p{Script=Han}\\p{Script=Hiragana}\\p{Script=Katakana}\\p{Script=Bopomofo}\\u30FC\\uFF70', 'char', 'zh'],
-  ['hangul', '\\p{Script=Hangul}', 'char', 'ko'],
-  ['thai', '\\p{Script=Thai}', 'char', 'th'],
-  ['lao', '\\p{Script=Lao}', 'char', 'lo'],
-  ['khmer', '\\p{Script=Khmer}', 'char', 'km'],
-  ['myanmar', '\\p{Script=Myanmar}', 'char', 'my'],
-  ['latin', '\\p{Script=Latin}', 'word', 'en'],
-  ['cyrillic', '\\p{Script=Cyrillic}', 'word', 'ru'],
-  ['arabic', '\\p{Script=Arabic}', 'word', 'ar'],
-  ['devanagari', '\\p{Script=Devanagari}', 'word', 'hi'],
-  ['greek', '\\p{Script=Greek}', 'word', 'el'],
-  ['hebrew', '\\p{Script=Hebrew}', 'word', 'he'],
-  ['armenian', '\\p{Script=Armenian}', 'word', 'hy'],
-  ['georgian', '\\p{Script=Georgian}', 'word', 'ka'],
-  ['bengali', '\\p{Script=Bengali}', 'word', 'bn'],
-  ['gurmukhi', '\\p{Script=Gurmukhi}', 'word', 'pa'],
-  ['gujarati', '\\p{Script=Gujarati}', 'word', 'gu'],
-  ['oriya', '\\p{Script=Oriya}', 'word', 'or'],
-  ['tamil', '\\p{Script=Tamil}', 'word', 'ta'],
-  ['telugu', '\\p{Script=Telugu}', 'word', 'te'],
-  ['kannada', '\\p{Script=Kannada}', 'word', 'kn'],
-  ['malayalam', '\\p{Script=Malayalam}', 'word', 'ml'],
-  ['sinhala', '\\p{Script=Sinhala}', 'word', 'si'],
-  ['ethiopic', '\\p{Script=Ethiopic}', 'word', 'am'],
-  ['thaana', '\\p{Script=Thaana}', 'word', 'dv'],
-  ['meetei', '\\p{Script=Meetei_Mayek}', 'word', 'mni-Mtei'],
+  ['cjk', '\\p{Script=Han}\\p{Script=Hiragana}\\p{Script=Katakana}\\p{Script=Bopomofo}\\u30FC\\uFF70', 'char', ['zh', 'zh-TW', 'ja']],
+  ['hangul', '\\p{Script=Hangul}', 'char', ['ko']],
+  ['thai', '\\p{Script=Thai}', 'char', ['th']],
+  ['lao', '\\p{Script=Lao}', 'char', ['lo']],
+  ['khmer', '\\p{Script=Khmer}', 'char', ['km']],
+  ['myanmar', '\\p{Script=Myanmar}', 'char', ['my']],
+  ['latin', '\\p{Script=Latin}', 'word', ['en']],
+  ['cyrillic', '\\p{Script=Cyrillic}', 'word', ['ru', 'uk', 'be', 'bg', 'kk', 'ky', 'mk', 'mn', 'sr', 'tg', 'tt']],
+  ['arabic', '\\p{Script=Arabic}', 'word', ['ar', 'fa', 'ur', 'ckb', 'ps', 'sd', 'ug']],
+  ['devanagari', '\\p{Script=Devanagari}', 'word', ['hi', 'mr', 'ne', 'sa', 'mai', 'bho', 'doi', 'gom']],
+  ['greek', '\\p{Script=Greek}', 'word', ['el']],
+  ['hebrew', '\\p{Script=Hebrew}', 'word', ['he', 'yi']],
+  ['armenian', '\\p{Script=Armenian}', 'word', ['hy']],
+  ['georgian', '\\p{Script=Georgian}', 'word', ['ka']],
+  ['bengali', '\\p{Script=Bengali}', 'word', ['bn', 'as']],
+  ['gurmukhi', '\\p{Script=Gurmukhi}', 'word', ['pa']],
+  ['gujarati', '\\p{Script=Gujarati}', 'word', ['gu']],
+  ['oriya', '\\p{Script=Oriya}', 'word', ['or']],
+  ['tamil', '\\p{Script=Tamil}', 'word', ['ta']],
+  ['telugu', '\\p{Script=Telugu}', 'word', ['te']],
+  ['kannada', '\\p{Script=Kannada}', 'word', ['kn']],
+  ['malayalam', '\\p{Script=Malayalam}', 'word', ['ml']],
+  ['sinhala', '\\p{Script=Sinhala}', 'word', ['si']],
+  ['ethiopic', '\\p{Script=Ethiopic}', 'word', ['am', 'ti']],
+  ['thaana', '\\p{Script=Thaana}', 'word', ['dv']],
+  ['meetei', '\\p{Script=Meetei_Mayek}', 'word', ['mni-Mtei']],
 ];
 
 // Letters of any other script form runs of unknown language.
-const OTHER = ['other', null, 'word', null];
+const OTHER = ['other', null, 'word', [null]];
+
+// Scripts whose languages an `identify` function tells apart; runs of the
+// others are always labeled with their script's first language.
+const IDENTIFIED = new Set(['latin', 'cyrillic', 'arabic', 'devanagari']);
+
+// Catalogue code -> script; codes not listed above are written in Latin.
+const SCRIPT_OF = new Map(SCRIPTS.flatMap(([id, , , langs]) => langs.map((lang) => [lang, id])));
+const scriptOf = (lang) => SCRIPT_OF.get(lang) || 'latin';
 
 // One alternative per script; the last one takes a single letter of any
 // script not listed (Common / Inherited letters stay neutral).
@@ -46,7 +55,7 @@ const CHUNK_RE = new RegExp(
   ].join('|'),
   'gu'
 );
-const KANA_RE = /[\p{Script=Hiragana}\p{Script=Katakana}ーｰ]/gu;
+const KANA_RE = new RegExp('[\\p{Script=Hiragana}\\p{Script=Katakana}\\u30FC\\uFF70]', 'gu');
 const LETTER_RE = /\p{L}/u;
 
 // Longest run in another language that still reads as a name or a term:
@@ -60,9 +69,9 @@ const MAX_CHARS = 10000;
 // scripts, whitespace-separated words for the rest. CJK runs are ja when the
 // text is all kana, or when kana written next to other CJK letters make up
 // at least 5% of its CJK characters (a lone kana in a kaomoji does not).
-function scriptRuns(text) {
+function scriptRuns(text, identify) {
   const sample = String(text || '').slice(0, MAX_CHARS);
-  const runs = [];
+  const spans = [];
   let cjk = 0;
   let kana = 0;
   let kanaInWords = 0;
@@ -77,23 +86,49 @@ function scriptRuns(text) {
       kana += found;
       if (chars > 1) kanaInWords += found;
     }
-    const last = runs[runs.length - 1];
+    const last = spans[spans.length - 1];
     if (last && last.script === script) {
       last.end = m.index + m[0].length;
       last.chars += chars;
     } else {
-      runs.push({ script, start: m.index, end: m.index + m[0].length, chars });
+      spans.push({ script, start: m.index, end: m.index + m[0].length, chars });
     }
   }
 
   const japanese = kana > 0 && (kana === cjk || kanaInWords * 20 >= cjk);
-  return runs.map(({ script, start, end, chars }) => {
-    const [id, , unit, lang] = script;
-    const units = unit === 'char'
-      ? chars
-      : sample.slice(start, end).split(/\s+/).filter((word) => LETTER_RE.test(word)).length;
-    return { unit, units, lang: id === 'cjk' && japanese ? 'ja' : lang };
+  const runs = spans.map(({ script, start, end, chars }) => {
+    const [id, , unit, langs] = script;
+    const text = sample.slice(start, end);
+    return {
+      script: id,
+      unit,
+      units: unit === 'char' ? chars : text.split(/\s+/).filter((word) => LETTER_RE.test(word)).length,
+      lang: id === 'cjk' && japanese ? 'ja' : langs[0],
+      sure: true,
+      text,
+    };
   });
+  if (identify) settleShared(runs, identify);
+  return runs;
+}
+
+// One identify() call per shared script, over all of its runs; an answer
+// outside that script counts as none. Unanswered runs keep their script's
+// first language as a label but are unsure about the target.
+function settleShared(runs, identify) {
+  const byScript = new Map();
+  for (const run of runs) {
+    if (!IDENTIFIED.has(run.script)) continue;
+    if (!byScript.has(run.script)) byScript.set(run.script, []);
+    byScript.get(run.script).push(run);
+  }
+  for (const [script, list] of byScript) {
+    const lang = identify(list.map((run) => run.text).join(' '));
+    for (const run of list) {
+      if (lang && scriptOf(lang) === script) run.lang = lang;
+      else run.sure = false;
+    }
+  }
 }
 
 function mostUnits(runs) {
@@ -113,23 +148,35 @@ function mostUnits(runs) {
 }
 
 // Already in the target language: it holds most of the text and every other
-// run is term-sized. Text without letters has nothing to translate.
+// run is term-sized. Unsure runs written in the target's script are tried as
+// target and as not; null when the two answers differ. Text without letters
+// has nothing to translate.
 function readsAs(runs, targetLang) {
   if (!runs.length) return true;
   if (!targetLang) return false;
-  let target = 0;
-  let other = 0;
-  for (const run of runs) {
-    if (run.lang === targetLang) {
-      target += run.units;
-    } else if (run.units > TERM_LIMIT[run.unit]) {
-      return false;
-    } else {
-      other += run.units;
+  const targetScript = scriptOf(targetLang);
+  const verdict = (unsureIsTarget) => {
+    let target = 0;
+    let other = 0;
+    for (const run of runs) {
+      const isTarget = run.sure ? run.lang === targetLang : unsureIsTarget && run.script === targetScript;
+      if (isTarget) {
+        target += run.units;
+      } else if (run.units > TERM_LIMIT[run.unit]) {
+        return false;
+      } else {
+        other += run.units;
+      }
     }
-  }
-  return target > other;
+    return target > other;
+  };
+  const answer = verdict(true);
+  return answer === verdict(false) ? answer : null;
 }
+
+// identify() that never answers, for callers that settle shared-script text
+// later (document/document-parser.js via the stack).
+export const unsure = () => null;
 
 // The language most of the text is in, or null when it has no letters of a
 // known script.
@@ -138,9 +185,12 @@ export function mainLanguage(text) {
 }
 
 // { language, inTarget } for the same-language decision (core/text.js
-// resolveSameLanguageTarget); language is 'auto' when unknown.
-export function judgeLanguage(text, targetLang) {
-  const runs = scriptRuns(text);
+// resolveSameLanguageTarget); language is 'auto' when unknown. `identify`
+// (text) names the language of shared-script text, null when it can't tell;
+// without it every script counts as its first language. inTarget is null
+// when unsure runs decide the answer.
+export function judgeLanguage(text, targetLang, identify) {
+  const runs = scriptRuns(text, identify);
   return {
     language: mostUnits(runs) || 'auto',
     inTarget: readsAs(runs, targetLang),

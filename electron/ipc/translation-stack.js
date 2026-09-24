@@ -19,6 +19,9 @@ const logger = makeLogger('IPC:Stack');
 // aborted on sender destruction, swept by a periodic GC.
 const INFLIGHT_TTL_MS = 10 * 60 * 1000;
 
+// Texts per stack:detect-language call; stack-client batches below it.
+const MAX_DETECT_TEXTS = 2000;
+
 
 function register(ctx) {
   const { store } = ctx;
@@ -307,6 +310,20 @@ function register(ctx) {
     const count = stack.service.setGlossary(payload.items);
     logger.info(`Glossary set: ${count} terms`);
     return { success: true, count };
+  });
+
+  // Local and read-only: the same-language judgment (stack/language-id.js).
+  // null tells the caller to judge on its own.
+  ipcMain.handle(CHANNELS.STACK.DETECT_LANGUAGE, async (event, payload = {}) => {
+    if (!stack || !Array.isArray(payload.texts) || payload.texts.length > MAX_DETECT_TEXTS) return null;
+    const texts = payload.texts.map((text) => (typeof text === 'string' ? text : ''));
+    const targetLang = typeof payload.targetLang === 'string' ? payload.targetLang.slice(0, 16) : '';
+    try {
+      return await stack.language.detect(texts, targetLang);
+    } catch (e) {
+      logger.error('detect language failed:', e);
+      return null;
+    }
   });
 
   ipcMain.handle(CHANNELS.STACK.CLEAR_CACHE, (event, payload = {}) => {

@@ -4,7 +4,7 @@
 // most of it and everything else is name- or term-sized.
 
 import { describe, it, expect } from 'vitest';
-import { judgeLanguage, mainLanguage } from '../../../src/stack/language-detect.js';
+import { judgeLanguage, mainLanguage, unsure } from '../../../src/stack/language-detect.js';
 import { LANGUAGES } from '../../../src/config/languages.js';
 
 describe('mainLanguage', () => {
@@ -89,5 +89,25 @@ describe('judgeLanguage: already in the target language?', () => {
   it('has nothing to translate without letters, and never matches an empty target', () => {
     expect(judgeLanguage('12345', 'zh')).toEqual({ language: 'auto', inTarget: true });
     expect(judgeLanguage('Hello world', '').inTarget).toBe(false);
+  });
+});
+
+describe('judgeLanguage with identify (languages sharing a script)', () => {
+  const french = 'Je ne sais pas ce que tu veux dire.';
+
+  it('takes the identified language', () => {
+    expect(judgeLanguage(french, 'en', () => 'fr')).toEqual({ language: 'fr', inTarget: false });
+    expect(judgeLanguage(french, 'fr', () => 'fr').inTarget).toBe(true);
+  });
+
+  it('is unsure only when unsettled text decides the answer', () => {
+    expect(judgeLanguage(french, 'en', unsure)).toEqual({ language: 'en', inTarget: null });
+    expect(judgeLanguage(french, 'zh', unsure).inTarget).toBe(false);
+    expect(judgeLanguage(`${french} 这是一段很长的中文句子`, 'en', unsure).inTarget).toBe(false);
+    expect(judgeLanguage('这是一段很长的中文句子 Paris', 'zh', unsure).inTarget).toBe(true);
+  });
+
+  it('ignores an answer from another script', () => {
+    expect(judgeLanguage('Hello world, how are you?', 'en', () => 'ru').inTarget).toBeNull();
   });
 });

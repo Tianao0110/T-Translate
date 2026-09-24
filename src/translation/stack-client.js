@@ -13,6 +13,9 @@ const bridge = () => window.electron?.stack;
 // politely fails. Dev-only path, plain fallback text by convention.
 const NO_BRIDGE = { success: false, error: '翻译服务不可用（需在桌面应用内使用）' };
 
+// Texts per stack:detect-language call (the facade caps it at 2000).
+const DETECT_BATCH = 1000;
+
 function stripPrivacy(options = {}) {
   const { privacyMode: _pm, useCache: _uc, signal: _sig, ...rest } = options;
   return rest;
@@ -133,10 +136,32 @@ class StackClient {
     });
   }
 
-  // { language, inTarget } for the same-language decision
-  // (core/text.js resolveSameLanguageTarget).
+  // One { language, inTarget } per text for the same-language decision
+  // (core/text.js resolveSameLanguageTarget), judged in the main process
+  // with ELD; inTarget is null when it can't tell. Judged here, script by
+  // script, when the main process does not answer.
+  async detectLanguages(texts, targetLang) {
+    const b = bridge();
+    if (b?.detectLanguage) {
+      try {
+        const results = [];
+        for (let i = 0; i < texts.length; i += DETECT_BATCH) {
+          const batch = texts.slice(i, i + DETECT_BATCH);
+          const judged = await b.detectLanguage({ texts: batch, targetLang });
+          if (!Array.isArray(judged) || judged.length !== batch.length) throw new Error('no answer');
+          results.push(...judged);
+        }
+        return results;
+      } catch (e) {
+        logger.warn('detect-language IPC failed, judging locally:', e.message);
+      }
+    }
+    return texts.map((text) => judgeLanguage(text, targetLang));
+  }
+
   async detectLanguage(text, targetLang) {
-    return judgeLanguage(text, targetLang);
+    const [result] = await this.detectLanguages([text], targetLang);
+    return result;
   }
 
   // Kill the current in-flight stream (if any) without starting a new one.

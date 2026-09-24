@@ -3,7 +3,7 @@
 
 import createLogger from '../core/logger.js';
 import i18n from '../i18n.js';
-import { judgeLanguage, mainLanguage } from '../stack/language-detect.js';
+import { judgeLanguage, mainLanguage, unsure } from '../stack/language-detect.js';
 const logger = createLogger('DocumentParser');
 
 const _t = (key, fallback) => {
@@ -152,7 +152,9 @@ export function shouldSkipSegment(text, filters = {}) {
     return { skip: true, reason: _t('docParser.codeBlock', 'Code block') };
   }
 
-  if (filters.skipTargetLang && filters.targetLang && judgeLanguage(trimmed, filters.targetLang).inTarget) {
+  // Only what the scripts settle; parseDocument asks the stack about the rest.
+  if (filters.skipTargetLang && filters.targetLang
+      && judgeLanguage(trimmed, filters.targetLang, unsure).inTarget === true) {
     return { skip: true, reason: _t('docParser.alreadyTargetLang', 'Already in target language') };
   }
 
@@ -165,6 +167,33 @@ export function shouldSkipSegment(text, filters = {}) {
   }
 
   return { skip: false };
+}
+
+// Formats split by splitIntoSegments, so under the paragraph filters.
+const SEGMENTED_PARSERS = new Set(['text', 'pdf', 'docx', 'epub']);
+
+// The target-language filter for paragraphs the scripts alone leave open (a
+// language sharing the target's script): one batch through
+// options.detectLanguages (stack-client, the stack's ELD).
+async function settleTargetLanguage(segments, { filters = {}, detectLanguages } = {}) {
+  if (!filters.skipTargetLang || !filters.targetLang || !detectLanguages) return;
+  const open = segments.filter((seg) => seg.status === 'pending'
+    && judgeLanguage(seg.original, filters.targetLang, unsure).inTarget === null);
+  if (!open.length) return;
+  try {
+    const judged = await detectLanguages(open.map((seg) => seg.original), filters.targetLang);
+    open.forEach((seg, i) => {
+      if (judged?.[i]?.inTarget !== true) return;
+      Object.assign(seg, {
+        status: 'skipped',
+        tokens: 0,
+        isFiltered: true,
+        filterReason: _t('docParser.alreadyTargetLang', 'Already in target language'),
+      });
+    });
+  } catch (e) {
+    logger.warn('Target-language check failed, paragraphs kept:', e?.message);
+  }
 }
 
 export function splitIntoSegments(text, options = {}) {
@@ -805,6 +834,10 @@ export async function parseDocument(file, options = {}) {
 
       default:
         throw new Error(_t('docParser.unimplementedParser', 'Unimplemented parser') + ': ' + format.parser);
+    }
+
+    if (SEGMENTED_PARSERS.has(format.parser)) {
+      await settleTargetLanguage(segments, options);
     }
 
     const headings = detectHeadings(segments);

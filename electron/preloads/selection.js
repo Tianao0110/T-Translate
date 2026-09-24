@@ -79,6 +79,6 @@ contextBridge.exposeInMainWorld("electron", {
   stack: stackBridge(ipcRenderer, [
     'translate', 'streamStart', 'abort', 'chat', 'chatCapability',
     'providersStatus', 'currentProvider', 'reload', 'cacheStats',
-    'onStreamChunk', 'onChanged',
+    'detectLanguage', 'onStreamChunk', 'onChanged',
   ]),
 });

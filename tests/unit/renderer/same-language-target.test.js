@@ -41,6 +41,15 @@ describe('resolveSameLanguageTarget', () => {
       .toEqual({ targetLang: 'zh', passthrough: false });
   });
 
+  it('translates unsure text either way', () => {
+    // 'original' shows the source only when sure; 'swap' swaps unless sure
+    // the text is in another language.
+    expect(resolveSameLanguageTarget(null, 'en', 'original'))
+      .toEqual({ targetLang: 'en', passthrough: false });
+    expect(resolveSameLanguageTarget(null, 'en', 'swap', 'auto'))
+      .toEqual({ targetLang: 'zh', passthrough: false });
+  });
+
   it('never flips when the target is empty', () => {
     expect(resolveSameLanguageTarget(true, '', 'swap').passthrough).toBe(false);
     expect(resolveSameLanguageTarget(true, null, 'original').targetLang).toBe(null);

@@ -9,12 +9,14 @@ export function detectLanguage(text) {
 }
 
 // What to do when the text already reads as the target language (`inTarget`
-// from stack-client detectLanguage), per settings.translation.
-// sameLanguageBehavior: 'original' shows the source untranslated; 'swap'
-// translates back into the configured source language, zh<->en when the
-// source is "auto".
+// from stack-client detectLanguage: true, false, or null when unsure), per
+// settings.translation.sameLanguageBehavior: 'original' shows the source
+// untranslated, only when sure; 'swap' translates back into the configured
+// source language (zh<->en when the source is "auto") unless sure the text
+// is not in the target language. Either way, unsure text gets translated.
 export function resolveSameLanguageTarget(inTarget, targetLang, behavior = 'original', sourceLang = 'auto') {
-  if (!targetLang || !inTarget) {
+  const same = behavior === 'swap' ? inTarget !== false : inTarget === true;
+  if (!targetLang || !same) {
     return { targetLang, passthrough: false };
   }
   if (behavior === 'swap') {
