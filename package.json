@@ -38,6 +38,7 @@
     "smoke:llm-stack": "electron scripts/smoke/smoke-llm-stack.js",
     "smoke:llm-vision": "node scripts/smoke/smoke-llm-vision.js",
     "smoke:llm-vision-host": "electron scripts/smoke/smoke-llm-vision-host.js",
+    "smoke:llm-asr": "node scripts/smoke/smoke-llm-asr.js",
     "bench:listen": "electron scripts/bench/bench-listen.js",
     "postinstall": "node scripts/build/overlay-sherpa-runtime.js",
     "runtime:overlay": "node scripts/build/overlay-sherpa-runtime.js"

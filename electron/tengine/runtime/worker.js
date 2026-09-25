@@ -8,10 +8,14 @@
 //
 // in  {type:'load-runtime', dir}                 -> {type:'runtime', ok, info|error}
 //     {type:'load-model', reqId, file, options}  -> {type:'progress', reqId, value}* then {type:'model', reqId, ok, info|error}
-//                                                   (options.mmproj attaches the vision encoder; info.vision says so)
+//                                                   (options.mmproj attaches the vision encoder, or the audio one
+//                                                    with options.media 'audio' + options.audioFamily; info.vision /
+//                                                    info.audio says which)
 //     {type:'generate', reqId, system?, user?, prompt?, maxTokens?, sampler?}
 //     {type:'generate', reqId, image, task?, maxTokens?, sampler?}   image: PNG/JPEG bytes, never logged
 //                                                -> {type:'token', reqId, text}* then {type:'done', reqId, ok, result|error}
+//     {type:'generate', reqId, audio, maxTokens?}  audio: Float32Array PCM at info.audio.sampleRate, never logged
+//                                                -> {type:'done', reqId, ok, result|error}, no tokens
 //     {type:'unload-model', reqId}               -> {type:'unloaded', reqId}
 //     {type:'probe', reqId, file, options}       -> {type:'probed', reqId, report}
 //     {type:'health', reqId, file, options}      -> {type:'health', reqId, ok, value|error}
@@ -36,12 +40,16 @@ const log = (level, message) => post({ type: 'log', level, message });
 const errInfo = (e) => ({ message: e.message, code: e.code || 'LLM_FAILED' });
 
 let binding = null;
-let current = null; // { session, vision, file, provider }
+let current = null; // { session, vision, audio, file, provider }
 // Long enough to time: the answer runs to the token limit.
 const HEALTH_PROMPT = 'List the numbers from one to thirty as English words, separated by commas.';
 const HEALTH_TOKENS = 24;
 // The fixed image behind the vision self-test and the golden check.
 const HEALTH_IMAGE = path.join(__dirname, 'assets', 'vision-health.png');
+// The fixed sentence behind the audio self-test, and what it says.
+const HEALTH_AUDIO = path.join(__dirname, 'assets', 'asr-health.wav');
+const HEALTH_AUDIO_TEXT = '今天天气很好，我们去公园散步吧。';
+const HEALTH_AUDIO_MAX_DISTANCE = 0.2;
 
 function runtimeInfo() {
   return {
@@ -61,6 +69,7 @@ function requireRuntime() {
 function unloadModel() {
   if (!current) return;
   if (current.vision) current.vision.close();
+  if (current.audio) current.audio.close();
   current.session.close();
   current = null;
 }
@@ -77,21 +86,27 @@ function loadModel(msg) {
     onProgress: (value) => post({ type: 'progress', reqId: msg.reqId, value }),
   });
   let vision = null;
+  let audio = null;
   if (options.mmproj) {
     try {
-      vision = mtmd.attachVision(binding, s, { mmproj: options.mmproj, provider: s.provider, family: options.visionFamily || null, abortFlag });
+      if (options.media === 'audio') {
+        audio = mtmd.attachAudio(binding, s, { mmproj: options.mmproj, provider: s.provider, family: options.audioFamily || null, abortFlag });
+      } else {
+        vision = mtmd.attachVision(binding, s, { mmproj: options.mmproj, provider: s.provider, family: options.visionFamily || null, abortFlag });
+      }
     } catch (e) {
       s.close();
       throw e;
     }
   }
-  current = { session: s, vision, file: msg.file, mmproj: options.mmproj || null, provider: options.provider || 'cpu' };
+  current = { session: s, vision, audio, file: msg.file, mmproj: options.mmproj || null, provider: options.provider || 'cpu' };
   return modelInfo();
 }
 
 function modelInfo() {
   const s = current.session;
   const v = current.vision;
+  const a = current.audio;
   return {
     ...s.info(),
     file: current.file,
@@ -102,6 +117,7 @@ function modelInfo() {
     ctxMs: s.ctxMs,
     threads: s.threads,
     vision: v ? { mmproj: current.mmproj, loadMs: v.loadMs, family: v.family, mrope: v.mrope } : null,
+    audio: a ? { mmproj: current.mmproj, loadMs: a.loadMs, warmupMs: a.warmupMs, sampleRate: a.sampleRate, family: a.family, mrope: a.mrope } : null,
   };
 }
 
@@ -110,6 +126,21 @@ function asBuffer(image) {
   if (Buffer.isBuffer(image)) return image;
   if (image instanceof Uint8Array) return Buffer.from(image.buffer, image.byteOffset, image.byteLength);
   throw Object.assign(new Error('image must be bytes'), { code: 'LLM_BAD_IMAGE' });
+}
+
+// Character edit distance over the reference length, punctuation and
+// spaces ignored: how far the self-test transcript is from the sentence.
+function textDistance(hyp, ref) {
+  const norm = (s) => [...String(s || '').replace(/[\s\p{P}\p{S}]+/gu, '')];
+  const a = norm(hyp);
+  const b = norm(ref);
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return b.length ? prev[b.length] / b.length : 0;
 }
 
 // The self-test behind the GPU switch and the pre-install check: the model
@@ -138,6 +169,27 @@ function health(msg) {
       tokPerSec: r.tokPerSec,
       genTokens: r.genTokens,
       lines: r.lines.length,
+      stop: r.stop,
+    };
+  }
+  if (current.audio) {
+    // The fixed sentence twice, time the second; the transcript has to read it back.
+    const pcm = mtmd.readWav(fs.readFileSync(HEALTH_AUDIO), current.audio.sampleRate);
+    current.audio.transcribe({ pcm, maxTokens: 4 });
+    const r = current.audio.transcribe({ pcm });
+    const distance = textDistance(r.transcript, HEALTH_AUDIO_TEXT);
+    return {
+      ok: r.stop === 'eog' && distance <= HEALTH_AUDIO_MAX_DISTANCE,
+      provider: info.provider,
+      device: info.device,
+      fallback: info.fallback,
+      loadMs: fresh ? info.loadMs + info.audio.loadMs : 0,
+      firstMs: r.firstMs,
+      promptMs: r.promptMs,
+      audioTokens: r.audioTokens,
+      tokPerSec: r.tokPerSec,
+      genTokens: r.genTokens,
+      distance: Math.round(distance * 100) / 100,
       stop: r.stop,
     };
   }
@@ -170,6 +222,10 @@ function generate(msg) {
       sampler: msg.sampler || {},
       onToken: (text) => post({ type: 'token', reqId: msg.reqId, text }),
     });
+  }
+  if (msg.audio !== undefined) {
+    if (!current.audio) throw Object.assign(new Error('the loaded model has no audio encoder'), { code: 'LLM_AUDIO_UNSUPPORTED' });
+    return current.audio.transcribe({ pcm: msg.audio, maxTokens: msg.maxTokens || null });
   }
   const prompt = msg.prompt !== undefined ? msg.prompt : current.session.buildPrompt({ system: msg.system || '', user: msg.user || '' });
   return current.session.generate({
