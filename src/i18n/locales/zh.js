@@ -505,11 +505,11 @@ const zh = {
       title: "显卡加速",
       switchLabel: "用显卡加速",
       testing: "正在逐个引擎自检",
-      confirm: "开启后这些引擎会在显卡上运行（NVIDIA / AMD / Intel 通用）：本地 OCR、神经语音朗读、本地模型。听译识别留在 CPU。每个引擎会先自检，不行的自动留在 CPU；不需要重启。",
+      confirm: "开启后这些引擎会在显卡上运行（NVIDIA / AMD / Intel 通用）：本地 OCR、神经语音朗读、本地模型、听译识别（高精度）。听译识别（标准）留在 CPU。每个引擎会先自检，不行的自动留在 CPU；不需要重启。",
       enabled: "显卡加速已开启",
       disabled: "显卡加速已关闭",
       failed: "所有引擎都没能进显卡，保持 CPU：{{reason}}",
-      engineNames: { ocr: "本地 OCR", tts: "神经语音朗读", asr: "听译识别", llm: "本地模型", "llm-vision": "内置视觉模型" },
+      engineNames: { ocr: "本地 OCR", tts: "神经语音朗读", asr: "听译识别（标准）", llm: "本地模型", "llm-vision": "内置视觉模型", "llm-asr": "听译识别（高精度）" },
       reasons: { int8: "int8 量化模型，显卡上反而慢 3 到 6 倍" },
       state: {
         gpu: "显卡（WebGPU）",

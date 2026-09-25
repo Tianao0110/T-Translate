@@ -10,6 +10,7 @@
 //   {type:'load-model', id, reqId, file, options}      progress events, then result {info}
 //   {type:'generate', id, reqId, system?, user?, prompt?, maxTokens?, sampler?}
 //                                                     token events, then result {text, stop, ...numbers}
+//   {type:'generate', id, reqId, image | audio, ...}  the vision / speech slots (runtime/worker.js)
 //   {type:'cancel', reqId}                            aborts that request (running or queued)
 //   {type:'unload-model', id}                         result {}
 //   {type:'probe', id, reqId, file, options}          result {report}

@@ -129,6 +129,16 @@ function get() {
       onEvent: (evt) => tengine.emit(evt),
     }),
   );
+  tengine.register(
+    createLlmEngine({
+      id: 'llm-asr',
+      fork,
+      logger: createLogger('LLM-ASR-Host'),
+      workerPath: path.join(__dirname, '../services/llm-host/llm-host.js'),
+      runtimeDir: resources.llamaRuntime,
+      onEvent: (evt) => tengine.emit(evt),
+    }),
+  );
   _default = tengine;
   return tengine;
 }

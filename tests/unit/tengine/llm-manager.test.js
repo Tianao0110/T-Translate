@@ -58,17 +58,28 @@ function fakeAdapter() {
 }
 
 const VPACK = { id: 'paddleocr-vl-1.6', role: 'vision', default: false, name: 'Eyes', file: 'V.gguf', ctx: 4096, template: 'auto', visionFamily: 'paddleocr' };
+const APACKS = {
+  big: { id: 'qwen3-asr-1.7b', role: 'asr', default: false, name: 'Ears L', file: 'A17.gguf', size: 2000, ctx: 2048, template: 'auto', audioFamily: 'qwen3-asr' },
+  small: { id: 'qwen3-asr-0.6b', role: 'asr', default: false, name: 'Ears S', file: 'A06.gguf', size: 800, ctx: 2048, template: 'auto', audioFamily: 'qwen3-asr' },
+};
 
-function fakePacks({ ready = true, unlisted = [], door = () => false, dir = 'C:/models/llm-models', vision = false } = {}) {
+function fakePacks({ ready = true, unlisted = [], door = () => false, dir = 'C:/models/llm-models', vision = false, asr = [] } = {}) {
   let last = null;
   const visionRow = { ...VPACK, status: vision ? 'ready' : 'missing', path: vision ? `${dir}/V.gguf` : null, mmprojPath: vision ? `${dir}/V-mmproj.gguf` : null, files: [] };
   const visionTarget = () => (vision ? { pack: VPACK, path: `${dir}/V.gguf`, mmproj: `${dir}/V-mmproj.gguf`, trial: false } : null);
+  const asrRows = Object.entries(APACKS).map(([k, p]) => ({ ...p, status: asr.includes(k) ? 'ready' : 'missing', files: [] }));
+  const asrTarget = (p) => ({ pack: p, path: `${dir}/${p.file}`, mmproj: `${dir}/mmproj-${p.file}`, trial: false });
   return {
     dir: () => dir,
     scan: vi.fn(async () => {
-      last = { dir, packs: [{ ...PACK, status: ready ? 'ready' : 'missing', path: ready ? `${dir}/Q.gguf` : null }, visionRow], unlisted: unlisted.map((f) => ({ file: f, path: `${dir}/${f}` })), allowUnlisted: door() };
+      last = { dir, packs: [{ ...PACK, status: ready ? 'ready' : 'missing', path: ready ? `${dir}/Q.gguf` : null }, visionRow, ...asrRows], unlisted: unlisted.map((f) => ({ file: f, path: `${dir}/${f}` })), allowUnlisted: door() };
       return last;
     }),
+    resolveAsr: ({ preferLarger = false } = {}) => {
+      const installed = Object.entries(APACKS).filter(([k]) => asr.includes(k)).map(([, p]) => p);
+      installed.sort((a, b) => (preferLarger ? b.size - a.size : a.size - b.size));
+      return installed.length ? asrTarget(installed[0]) : null;
+    },
     scanning: () => false,
     status: () => last,
     resolvePack: (id) => (id === PACK.id && ready ? { pack: PACK, path: `${dir}/Q.gguf`, trial: false } : id === VPACK.id ? visionTarget() : null),
@@ -98,9 +109,9 @@ afterEach(() => {
   fs.rmSync(logsDir, { recursive: true, force: true });
 });
 
-function boot({ adapter = fakeAdapter(), packs = fakePacks(), store = fakeStore(), bus = tengineBus(), timers, visionAdapter = null } = {}) {
-  manager.init({ store, tengine: bus, adapter, visionAdapter, packs, logsDir, logger: null, ...(timers ? { timers } : {}) });
-  return { adapter, packs, store, bus, visionAdapter };
+function boot({ adapter = fakeAdapter(), packs = fakePacks(), store = fakeStore(), bus = tengineBus(), timers, visionAdapter = null, asrAdapter = null } = {}) {
+  manager.init({ store, tengine: bus, adapter, visionAdapter, asrAdapter, packs, logsDir, logger: null, ...(timers ? { timers } : {}) });
+  return { adapter, packs, store, bus, visionAdapter, asrAdapter };
 }
 
 describe('llm manager', () => {
@@ -309,5 +320,82 @@ describe('the vision slot', () => {
     expect(adapter.load).toHaveBeenCalledTimes(1);
     expect(await manager.unloadVision('manual')).toBe(true);
     expect(adapter.loaded()).toBeTruthy();
+  });
+});
+
+describe('the speech slot', () => {
+  const pcm = new Float32Array([0.1, -0.1, 0.05]);
+  const audioOptions = (file) => ({ nCtx: 2048, nBatch: 512, template: 'auto', mmproj: `C:/models/llm-models/mmproj-${file}`, media: 'audio', audioFamily: 'qwen3-asr' });
+
+  it('takes the larger pack on the GPU and the smaller on the CPU, reloading when the provider changes', async () => {
+    const asrAdapter = fakeAdapter();
+    asrAdapter.setProvider('gpu');
+    const { adapter } = boot({ packs: fakePacks({ asr: ['big', 'small'] }), asrAdapter });
+    await (await manager.transcribe({ pcm })).promise;
+    expect(asrAdapter.load).toHaveBeenLastCalledWith('C:/models/llm-models/A17.gguf', audioOptions('A17.gguf'));
+    expect(asrAdapter.generate).toHaveBeenLastCalledWith({ kind: 'asr', audio: pcm });
+    await (await manager.transcribe({ pcm, maxTokens: 64 })).promise;
+    expect(asrAdapter.load).toHaveBeenCalledTimes(1);
+    expect(asrAdapter.generate).toHaveBeenLastCalledWith({ kind: 'asr', audio: pcm, maxTokens: 64 });
+    asrAdapter.setProvider('cpu');
+    await (await manager.transcribe({ pcm })).promise;
+    expect(asrAdapter.load).toHaveBeenLastCalledWith('C:/models/llm-models/A06.gguf', audioOptions('A06.gguf'));
+    expect(adapter.load).not.toHaveBeenCalled();
+  });
+
+  it('runs on the CPU with whichever pack is installed', async () => {
+    const asrAdapter = fakeAdapter();
+    boot({ packs: fakePacks({ asr: ['big'] }), asrAdapter });
+    await (await manager.transcribe({ pcm })).promise;
+    expect(asrAdapter.load).toHaveBeenCalledWith('C:/models/llm-models/A17.gguf', audioOptions('A17.gguf'));
+    expect(manager.status().asr).toMatchObject({ available: true, usable: true, selected: 'qwen3-asr-1.7b', provider: 'cpu', resident: { file: 'A17.gguf' }, inflight: 0 });
+  });
+
+  it('refuses without a speech pack or a speech host, and tells the GPU switch it is pending', async () => {
+    boot({ packs: fakePacks({ asr: [] }), asrAdapter: fakeAdapter() });
+    await expect(manager.transcribe({ pcm })).rejects.toMatchObject({ code: 'LLM_ASR_MISSING' });
+    expect(await manager.asrSelfTest()).toEqual({ ok: true, provider: 'cpu', fallback: null, pending: true });
+    expect(manager.status().asr).toMatchObject({ available: true, usable: false, selected: null });
+    manager.reset();
+    boot({ packs: fakePacks({ asr: ['small'] }) });
+    await expect(manager.transcribe({ pcm })).rejects.toMatchObject({ code: 'LLM_ASR_UNAVAILABLE' });
+    expect(manager.status().asr).toEqual({ available: false });
+  });
+
+  it('runs the GPU self-test on the pack the GPU would load and keeps it resident', async () => {
+    const asrAdapter = fakeAdapter();
+    boot({ packs: fakePacks({ asr: ['big', 'small'] }), asrAdapter });
+    asrAdapter.setProvider('gpu');
+    const r = await manager.asrSelfTest();
+    expect(asrAdapter.health).toHaveBeenCalledWith({ file: 'C:/models/llm-models/A17.gguf', options: audioOptions('A17.gguf') });
+    expect(r).toMatchObject({ ok: true, provider: 'webgpu', fallback: null });
+    await (await manager.transcribe({ pcm })).promise;
+    expect(asrAdapter.load).not.toHaveBeenCalled();
+  });
+
+  it('P6: three stalls make transcribe step aside, the other slots carry on', async () => {
+    const asrAdapter = fakeAdapter();
+    const { bus } = boot({ packs: fakePacks({ asr: ['small'] }), asrAdapter });
+    for (let i = 0; i < 3; i++) bus.emit({ engine: 'llm-asr', host: 'llm-asr', kind: 'request', at: i, stop: 'stall', genTokens: 0 });
+    await expect(manager.transcribe({ pcm })).rejects.toMatchObject({ code: 'LLM_UNHEALTHY' });
+    expect(manager.status().asr.policy.unhealthy).toBe(true);
+    expect(manager.status().policy.unhealthy).toBe(false);
+    await (await manager.generate({ user: 'U' })).promise;
+    bus.emit({ engine: 'llm-asr', host: 'llm-asr', kind: 'exit', at: 9, code: 1 });
+    await (await manager.transcribe({ pcm })).promise;
+    expect(asrAdapter.load).toHaveBeenCalledTimes(1);
+    expect(await manager.unloadAsr('manual')).toBe(true);
+  });
+});
+
+describe('the translation model choice', () => {
+  it('falls back to the default pack when settings name a vision or speech pack', async () => {
+    for (const id of ['paddleocr-vl-1.6', 'qwen3-asr-1.7b']) {
+      const { adapter } = boot({ packs: fakePacks({ vision: true, asr: ['big'] }), store: fakeStore({ 'settings.llm.pack': id }) });
+      expect(manager.selected()).toMatchObject({ id: 'qwen3-1.7b', role: 'general' });
+      await manager.ensureLoaded();
+      expect(adapter.load).toHaveBeenCalledWith('C:/models/llm-models/Q.gguf', expect.anything(), expect.anything());
+      manager.reset();
+    }
   });
 });

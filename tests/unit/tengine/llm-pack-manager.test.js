@@ -134,4 +134,37 @@ describe('llm pack manager', () => {
     expect(m.resolveVision()).toBeNull();
     expect(m.resolvePack('eyes')).toBeNull();
   });
+
+  it('picks the larger ready speech pack for the GPU and the smaller for the CPU', async () => {
+    const BIG = Buffer.from('GGUF-tiny-speech-model-large-0123456789');
+    const SMALL = Buffer.from('GGUF-tiny-speech-small');
+    const BIG_PROJ = Buffer.from('GGUF-audio-mmproj-large');
+    const SMALL_PROJ = Buffer.from('GGUF-audio-mmproj-s');
+    const base = { role: 'asr', default: false, vendor: 'test', ctx: 512, template: 'auto', audioFamily: 'qwen3-asr', license: { name: 'Apache-2.0', url: 'https://x' }, minRamGb: 1 };
+    const speech = [
+      { ...base, id: 'ears-big', name: 'Big', file: 'Big.gguf', size: BIG.length, sha256: sha(BIG), mmproj: { file: 'mmproj-Big.gguf', size: BIG_PROJ.length, sha256: sha(BIG_PROJ) }, source: { url: 'https://x/Big.gguf' } },
+      { ...base, id: 'ears-small', name: 'Small', file: 'Small.gguf', size: SMALL.length, sha256: sha(SMALL), mmproj: { file: 'mmproj-Small.gguf', size: SMALL_PROJ.length, sha256: sha(SMALL_PROJ) }, source: { url: 'https://x/Small.gguf' } },
+    ];
+    const m = createLlmPackManager({ dir, packs: [...PACKS, ...speech] });
+    await m.scan();
+    expect(m.resolveAsr({ preferLarger: true })).toBeNull();
+
+    fs.writeFileSync(path.join(dir, 'Small.gguf'), SMALL);
+    fs.writeFileSync(path.join(dir, 'mmproj-Small.gguf'), SMALL_PROJ);
+    await m.scan();
+    // The only one installed serves both providers.
+    expect(m.resolveAsr({ preferLarger: true })).toEqual({ pack: speech[1], path: path.join(dir, 'Small.gguf'), mmproj: path.join(dir, 'mmproj-Small.gguf'), trial: false });
+
+    fs.writeFileSync(path.join(dir, 'Big.gguf'), BIG);
+    await m.scan();
+    // The large model without its mmproj is partial and not picked.
+    expect(m.resolveAsr({ preferLarger: true }).pack.id).toBe('ears-small');
+
+    fs.writeFileSync(path.join(dir, 'mmproj-Big.gguf'), BIG_PROJ);
+    await m.scan();
+    expect(m.resolveAsr({ preferLarger: true }).pack.id).toBe('ears-big');
+    expect(m.resolveAsr({ preferLarger: false }).pack.id).toBe('ears-small');
+    expect(m.resolveAsr().pack.id).toBe('ears-small');
+    expect(m.resolveVision()).toBeNull();
+  });
 });

@@ -9,7 +9,7 @@
 const nodeFs = require('fs');
 const nodePath = require('path');
 const crypto = require('crypto');
-const { LLM_PACKS, LLM_ROLE_VISION, packFiles, defaultPack, roleForFileName } = require('../shared/llm-packs');
+const { LLM_PACKS, LLM_ROLE_VISION, LLM_ROLE_ASR, packFiles, defaultPack, roleForFileName } = require('../shared/llm-packs');
 
 const CACHE_FILE = '.tt-hashes.json';
 
@@ -169,6 +169,15 @@ function createLlmPackManager({ dir, packs = LLM_PACKS, allowUnlisted = () => fa
     return row ? resolvePack(row.id) : null;
   }
 
+  // The installed speech pack to load: the largest on the GPU, the smallest
+  // on the CPU.
+  function resolveAsr({ preferLarger = false } = {}) {
+    if (!last) return null;
+    const ready = last.packs.filter((p) => p.role === LLM_ROLE_ASR && p.status === 'ready');
+    ready.sort((a, b) => (preferLarger ? b.size - a.size : a.size - b.size));
+    return ready.length ? resolvePack(ready[0].id) : null;
+  }
+
   // A file outside the whitelist, by bare name, only while the developer
   // door is open and only from inside the folder.
   function resolveUnlisted(fileName) {
@@ -187,6 +196,7 @@ function createLlmPackManager({ dir, packs = LLM_PACKS, allowUnlisted = () => fa
     resolvePack,
     resolveDefault,
     resolveVision,
+    resolveAsr,
     resolveUnlisted,
   };
 }

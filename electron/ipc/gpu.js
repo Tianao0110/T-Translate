@@ -47,6 +47,11 @@ const DRIVERS = {
     // Same shape for the vision pack: the fixed image on the GPU, timed.
     selfTest: () => llmManager.visionSelfTest(),
   },
+  'llm-asr': {
+    setProvider: (p) => tengine.get().setProvider('llm-asr', p),
+    // And for the speech pack: the fixed sentence on the GPU, read back.
+    selfTest: () => llmManager.asrSelfTest(),
+  },
 };
 
 function register(ctx) {

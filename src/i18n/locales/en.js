@@ -505,11 +505,11 @@ const en = {
       title: "GPU acceleration",
       switchLabel: "Use the GPU",
       testing: "Self-testing each engine",
-      confirm: "These engines will run on the GPU (works on NVIDIA / AMD / Intel): local OCR, neural read-aloud, the local model. Listen recognition stays on the CPU. Each engine self-tests first and stays on the CPU if it cannot; no restart needed.",
+      confirm: "These engines will run on the GPU (works on NVIDIA / AMD / Intel): local OCR, neural read-aloud, the local model, listen recognition (high accuracy). Listen recognition (standard) stays on the CPU. Each engine self-tests first and stays on the CPU if it cannot; no restart needed.",
       enabled: "GPU acceleration on",
       disabled: "GPU acceleration off",
       failed: "No engine could use the GPU, staying on the CPU: {{reason}}",
-      engineNames: { ocr: "Local OCR", tts: "Neural read-aloud", asr: "Listen recognition", llm: "Local model", "llm-vision": "Built-in vision model" },
+      engineNames: { ocr: "Local OCR", tts: "Neural read-aloud", asr: "Listen recognition (standard)", llm: "Local model", "llm-vision": "Built-in vision model", "llm-asr": "Listen recognition (high accuracy)" },
       reasons: { int8: "int8 quantized models run 3–6x slower on the GPU" },
       state: {
         gpu: "GPU (WebGPU)",
