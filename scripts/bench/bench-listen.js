@@ -4,7 +4,7 @@
 // scored: coverage, CER (zh) / CER + WER (en), finals per sentence, final
 // latency. Design notes: docs/design/tooling.md §4.
 //
-//   npx electron scripts/bench/bench-listen.js --lang zh|en [--tier standard|high] [--n 40] [--gap 0.8]
+//   npx electron scripts/bench/bench-listen.js --lang zh|en [--tier standard|high] [--gpu] [--asr-dir <dir>] [--n 40] [--gap 0.8]
 //
 // Data lives in bench-data/fleurs/<lang>/ (gitignored): dev.tsv and the
 // extracted dev/ wavs, fetched with
@@ -12,7 +12,9 @@
 //   curl -L -o dev.tar.gz https://huggingface.co/datasets/google/fleurs/resolve/main/data/<cmn_hans_cn|en_us>/audio/dev.tar.gz
 //   tar -xzf dev.tar.gz
 // Packs come from release-audio-models/ (run `npm run audio:release` first);
-// the user's own models are never touched — everything runs in a temp userData.
+// the high tier's speech packs from models/asr-gguf (or --asr-dir) through
+// T-Engine's speech host, on the GPU with --gpu. The user's own models are
+// never touched — everything runs in a temp userData.
 //
 // Scoring: references are FLEURS' normalised column; zh strips spaces and
 // punctuation before CER; en lowers case and strips punctuation and
@@ -23,7 +25,7 @@
 const path = require('path');
 const fs = require('fs');
 const { REPO, arg, has, sleep, waitFor, run } = require('../lib/electron-smoke');
-const { RELEASE_MANIFEST, listenSandbox, fakeWindow, feedRealtime, percentile, median } = require('../lib/listen-sandbox');
+const { RELEASE_MANIFEST, DEFAULT_ASR_DIR, listenSandbox, speechHost, hqFallbacks, fakeWindow, feedRealtime, percentile, median } = require('../lib/listen-sandbox');
 
 const DATA_DIR = path.join(REPO, 'bench-data');
 const RATE = 16000;
@@ -32,6 +34,8 @@ const LANG = arg('--lang', 'zh');
 const TIER = arg('--tier', 'standard');
 const N = Number(arg('--n', 40));
 const GAP_S = Number(arg('--gap', 0.8));
+const GPU = has('--gpu');
+const ASR_DIR = arg('--asr-dir', DEFAULT_ASR_DIR);
 // --normalize scales every clip to a common rms before joining.
 const NORMALIZE = has('--normalize');
 const TARGET_RMS = 0.05;
@@ -221,20 +225,28 @@ async function main() {
   console.log(`${LANG} ${TIER}: ${sentences.length} sentences, ${(pcm.length / RATE).toFixed(1)} s of audio (gap ${GAP_S}s)`);
 
   // One sandbox per run so two languages can bench side by side.
-  const box = listenSandbox(`tt-listen-bench-${LANG}-${TIER}${NORMALIZE ? '-norm' : ''}`);
+  const box = listenSandbox(`tt-listen-bench-${LANG}-${TIER}${GPU ? '-gpu' : ''}${NORMALIZE ? '-norm' : ''}`);
 
   const packMgr = require('../../electron/listen/audio-pack-manager');
   const engineManager = require('../../electron/listen/audio-engine-manager');
   const { locateAsrModels } = require('../../electron/listen/asr-models');
   const { store } = require('../../electron/state');
 
-  const wanted = ['asr-base-sense-voice', 'asr-draft-zipformer-zh-en', ...(TIER === 'high' ? ['asr-hq-qwen3-0.6b'] : [])];
-  for (const id of wanted) {
+  for (const id of ['asr-base-sense-voice', 'asr-draft-zipformer-zh-en']) {
     const r = await packMgr.downloadPack(id, () => {});
     if (!r.success) throw new Error(`install ${id} failed`);
   }
   const models = locateAsrModels(packMgr.packsRoot());
-  if (!models || (TIER === 'high' && !models.hq)) throw new Error('models did not resolve');
+  if (!models) throw new Error('models did not resolve');
+  const host = TIER === 'high' ? await speechHost({ asrDir: ASR_DIR, gpu: GPU }) : null;
+  if (TIER === 'high' && !(host && host.llmManager.asrStatus().usable)) throw new Error(`no complete speech pack in ${ASR_DIR}`);
+  // The speech host's own numbers per request: encoder + prefill, tokens, speed.
+  const hqRequests = [];
+  if (host) {
+    host.tengine.on((evt) => {
+      if (evt.engine === 'llm-asr' && evt.kind === 'request') hqRequests.push({ at: evt.at, promptMs: evt.promptMs, genTokens: evt.genTokens, totalMs: evt.totalMs, tokPerSec: evt.tokPerSec, stop: evt.stop });
+    });
+  }
   store.set('settings.listen.tier', TIER);
   store.set('settings.listen.autosave', false);
 
@@ -258,7 +270,7 @@ async function main() {
   await sleep(1500);
   await engineManager.stopSessionAndWait('bench');
 
-  const finals = ev.segments.map((s) => ({ text: s.text, segStartS: s.segStartS, segDurS: s.segDurS, event: s.event || null }));
+  const finals = ev.segments.map((s) => ({ text: s.text, segStartS: s.segStartS, segDurS: s.segDurS, decodeMs: s.decodeMs, event: s.event || null }));
   const latencies = ev.segments.map((s, i) => ev.stamps[i] - (t0 + (s.segStartS + s.segDurS) * 1000));
   const { rows, agg } = score(LANG, timeline, finals);
   const events = finals.reduce((acc, f) => ({ ...acc, [f.event || 'natural']: (acc[f.event || 'natural'] || 0) + 1 }), {});
@@ -270,7 +282,10 @@ async function main() {
     n: N,
     gapS: GAP_S,
     at: new Date().toISOString(),
-    engine: TIER === 'high' ? models.hq?.dirName : path.basename(models.modelDir),
+    engine: TIER === 'high' ? `${host.llmManager.asrStatus().selected} (${GPU ? 'gpu' : 'cpu'})` : path.basename(models.modelDir),
+    // Finals the speech host did not answer came from the standard engine.
+    hqFallbacks: TIER === 'high' ? hqFallbacks() : null,
+    hqRequests: host ? hqRequests.map((q) => ({ ...q, at: q.at - t0 })) : null,
     loadMs,
     // Anything beyond starting > listening > stopped means the host died and
     // came back mid-run: the run is void.
@@ -280,14 +295,14 @@ async function main() {
     finalLatencyMedianMs: Math.round(median(latencies) || 0),
     finalLatencyP90Ms: Math.round(percentile(latencies, 0.9) || 0),
     rows,
-    allFinals: finals.map((f) => ({ start: Math.round(f.segStartS * 100) / 100, end: Math.round((f.segStartS + f.segDurS) * 100) / 100, text: f.text })),
+    allFinals: finals.map((f, i) => ({ start: Math.round(f.segStartS * 100) / 100, end: Math.round((f.segStartS + f.segDurS) * 100) / 100, decodeMs: f.decodeMs, latencyMs: Math.round(latencies[i]), text: f.text })),
   };
   const outDir = path.join(DATA_DIR, 'results');
   fs.mkdirSync(outDir, { recursive: true });
-  const outFile = path.join(outDir, `${LANG}-${TIER}${NORMALIZE ? '-norm' : ''}-${result.at.replace(/[:.]/g, '-')}.json`);
+  const outFile = path.join(outDir, `${LANG}-${TIER}${GPU ? '-gpu' : ''}${NORMALIZE ? '-norm' : ''}-${result.at.replace(/[:.]/g, '-')}.json`);
   fs.writeFileSync(outFile, JSON.stringify(result, null, 2));
 
-  console.log(`\nengine ${result.engine}, load ${loadMs} ms, status ${ev.status.join(' > ')}`);
+  console.log(`\nengine ${result.engine}, load ${loadMs} ms, status ${ev.status.join(' > ')}${result.hqFallbacks ? `, ${result.hqFallbacks} finals fell back` : ''}`);
   console.log(`coverage ${agg.covered}/${agg.sentences}, finals ${agg.finals} (${JSON.stringify(events)}), split sentences ${agg.split}`);
   console.log(`CER ${(agg.cer * 100).toFixed(2)}%${agg.wer !== null ? `, WER ${(agg.wer * 100).toFixed(2)}%` : ''}  (hyp ${agg.hypChars} vs ref ${agg.refChars} chars, median ${(agg.cerMedian * 100).toFixed(1)}%, p90 ${(agg.cerP90 * 100).toFixed(1)}%, >50%: ${agg.worst})`);
   console.log(`final latency median ${result.finalLatencyMedianMs} ms, p90 ${result.finalLatencyP90Ms} ms`);
@@ -295,6 +310,11 @@ async function main() {
   console.log('\nworst 5:');
   for (const r of worst) console.log(`  [${(r.cer * 100).toFixed(0)}%] ref: ${r.ref}\n         hyp: ${r.hyp || '(none)'}`);
   console.log(`\nsaved ${outFile}`);
+  if (host) {
+    await host.llmManager.unloadAsr('bench');
+    host.tengine.shutdownAll();
+    await sleep(300);
+  }
   box.cleanup();
   return 0;
 }

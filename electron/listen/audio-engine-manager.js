@@ -16,6 +16,7 @@ const { dataDir } = require('../platform/data-root');
 const { createListenAutosave } = require('./listen-autosave');
 const { createListenTranslator } = require('./listen-translator');
 const tengine = require('../tengine');
+const llmManager = require('../llm/llm-manager');
 const logger = require('../platform/logger')('AudioEngine');
 
 const STOP_GRACE_MS = 3000;
@@ -125,6 +126,16 @@ function isAvailable() {
   return findModels() !== null;
 }
 
+// The high-accuracy tier needs a speech pack in the model folder; T-Engine's
+// speech host runs it on whatever the GPU switch says.
+function hqUsable() {
+  try {
+    return llmManager.asrStatus().usable === true;
+  } catch {
+    return false; // model manager not initialised
+  }
+}
+
 function isSecure() {
   return deps.store.get('privacyMode', PRIVACY_MODES.STANDARD) === PRIVACY_MODES.SECURE;
 }
@@ -149,7 +160,7 @@ function getInfo() {
   return {
     modelName: models ? models.modelName : null,
     streamingPresent: !!models?.streaming,
-    hqPresent: !!models?.hq,
+    hqPresent: hqUsable(),
     modelsDir: modelsBaseDir(),      // where a new download lands
     activeDir: models?.baseDir || null, // where the live set actually sits
     secureBlocked: false, // kept for the renderer's shape
@@ -224,7 +235,7 @@ function sessionLogPath() {
 }
 
 // The worker's init message; models = null describes a TTS-only process.
-function initPayload(models) {
+function initPayload(models, remoteHq) {
   return {
     models: {
       asr: models
@@ -233,9 +244,7 @@ function initPayload(models) {
             tokensPath: models.tokensPath,
             vadPath: models.vadPath,
             streaming: models.streaming, // optional draft engine
-            hq: models.hq, // optional high-accuracy engine, used only when the tier says so
-
-            useHq: !!models.hq && deps.store.get('settings.listen.tier') === 'high',
+            remoteHq, // finals from the speech host (transcribeForWorker)
             language: sessionLanguage,
           }
         : null,
@@ -260,11 +269,56 @@ function spawnWorker(models) {
     childState = 'starting';
     sendStatus('loading');
   }
+  const remoteHq = !!models && deps.store.get('settings.listen.tier') === 'high' && hqUsable();
   adapter()
-    .spawn({ init: initPayload(models) })
+    .spawn({ init: initPayload(models, remoteHq) })
     .catch((e) => logger.error(`worker spawn failed: ${e.message}`));
   // The adapter's load timer turns a silent load into an engine-dead verdict.
   if (models) adapter().startAsr(sessionLanguage);
+  // The speech model loads alongside the worker.
+  if (remoteHq) llmManager.ensureAsrLoaded().catch((e) => logger.warn(`speech model preload failed: ${e.code || e.message}`));
+}
+
+// High-accuracy finals on their way: worker id -> the host request's cancel,
+// or null until the request exists; hq-cancel and the end of the worker
+// withdraw them.
+const hqPending = new Map();
+
+// A high-accuracy final: the worker's segment goes to the speech host and the
+// answer back to the worker, which carries on as with its own finals. Audio
+// and text pass through in memory; only a failure code is logged.
+function transcribeForWorker({ id, samples }) {
+  hqPending.set(id, null);
+  llmManager
+    .transcribe({ pcm: samples })
+    .then((g) => {
+      if (!hqPending.has(id)) g.cancel();
+      else hqPending.set(id, g.cancel);
+      return g.promise;
+    })
+    .then((r) => (r.stop === 'cancel' || r.stop === 'stall' || r.stop === 'error' ? { ok: false, code: r.stop } : { ok: true, text: r.transcript || '' }))
+    .catch((e) => ({ ok: false, code: e.code || 'LLM_FAILED' }))
+    .then((reply) => {
+      const wanted = hqPending.has(id);
+      hqPending.delete(id);
+      if (!wanted) return;
+      if (!reply.ok) logger.warn(`high-accuracy final fell back to the standard engine: ${reply.code}`);
+      try {
+        if (adapter().running()) adapter().post({ type: 'hq-result', id, ...reply });
+      } catch {
+        // worker gone; its session is over
+      }
+    });
+}
+
+function cancelHq(id) {
+  const cancel = hqPending.get(id);
+  hqPending.delete(id);
+  if (cancel) cancel();
+}
+
+function cancelAllHq() {
+  for (const id of [...hqPending.keys()]) cancelHq(id);
 }
 
 // Engine-level verdicts from T-Engine; the session policy answers them here.
@@ -322,6 +376,12 @@ function onWorkerMessage(msg) {
       break;
     case 'partial':
       sendToWindow(CHANNELS.AUDIO_ENGINE.PARTIAL, msg.text);
+      break;
+    case 'hq-transcribe':
+      transcribeForWorker(msg);
+      break;
+    case 'hq-cancel':
+      cancelHq(msg.id);
       break;
     case 'hint':
       sendStatus(msg.kind ? `hint-${msg.kind}` : 'listening');
@@ -394,6 +454,7 @@ function onWorkerExit({ code, everReady }) {
   ttsOnly = false;
   exitRequested = false;
   failTtsRequests('engine-exited');
+  cancelAllHq();
   drainTtsUnloadWaiters();
   drainSpawnWaiters(false);
   unsubscribePrivacy();

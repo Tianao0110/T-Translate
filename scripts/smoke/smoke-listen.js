@@ -1,10 +1,11 @@
 // Listen-module smoke test: the whole chain with real weights, in a throwaway
 // sandbox, no network.
 //
-//   npx electron scripts/smoke/smoke-listen.js [--wav <file>] [--keep] [--soak <minutes>]
+//   npx electron scripts/smoke/smoke-listen.js [--wav <file>] [--keep] [--soak <minutes>] [--asr-dir <dir>] [--gpu]
 //
 // --soak replays the audio for N minutes in one session and reports the
-// worker RSS trend.
+// worker RSS trend. The high-accuracy steps run when a speech pack sits in
+// models/asr-gguf (or --asr-dir); --gpu puts the speech host on the GPU.
 //
 // Covers manifest fetch -> sha256 verify -> zip extract -> pack.json write ->
 // staging swap -> pack-based model discovery -> worker load -> VAD ->
@@ -21,7 +22,7 @@ const fs = require('fs');
 const { execFileSync } = require('child_process');
 const { BrowserWindow } = require('electron');
 const { arg, has, sleep, waitFor, checklist, run } = require('../lib/electron-smoke');
-const { RELEASE_DIR, RELEASE_MANIFEST, listenSandbox, installPacks, fakeWindow, feedRealtime, median } = require('../lib/listen-sandbox');
+const { RELEASE_MANIFEST, DEFAULT_ASR_DIR, listenSandbox, installPacks, speechHost, hqFallbacks, fakeWindow, feedRealtime, median } = require('../lib/listen-sandbox');
 
 const KEEP = has('--keep');
 const { step, summary } = checklist();
@@ -92,7 +93,6 @@ async function main() {
 
   const box = listenSandbox('tt-listen-smoke');
   const SANDBOX = box.dir;
-  const { manifest } = box;
   const wav = arg('--wav') || synthesizeWav(path.join(SANDBOX, 'speech.wav'));
 
   const packMgr = require('../../electron/listen/audio-pack-manager');
@@ -274,35 +274,39 @@ async function main() {
   step('unload reached the worker (hook is wired)', /"unload"/.test(logText), logFile || '(no log)');
 
   // ===== High-accuracy tier =====
-  // Only when the pack zip was built locally (optional). Same wav, same
-  // harness: the engine swap must be invisible above the worker.
-  const hqEntry = manifest.packs.find((p) => p.type === 'asr-hq');
-  if (hqEntry && fs.existsSync(path.join(RELEASE_DIR, hqEntry.file))) {
-    const tHq = Date.now();
-    const hqRes = await packMgr.downloadPack(hqEntry.id, () => {});
-    step(`install ${hqEntry.id}`, hqRes.success === true, `${Date.now() - tHq}ms`);
-    const modelsHq = locateAsrModels(packMgr.packsRoot());
-    step('pack.json resolves the high-accuracy engine', !!modelsHq?.hq, modelsHq?.hq?.dirName || 'null');
+  // Finals from T-Engine's speech host when a speech pack is at hand. Same
+  // wav, same harness: the engine swap must be invisible above the worker.
+  const host = await speechHost({ asrDir: arg('--asr-dir') || DEFAULT_ASR_DIR, gpu: has('--gpu') });
+  if (host) {
+    const a = host.llmManager.asrStatus();
+    step('speech pack ready for the high-accuracy tier', a.usable, `${a.selected} on ${a.provider}`);
     store.set('settings.listen.tier', 'high');
-    const hqRun = await runSession('高精度定稿（Qwen3-ASR）');
-    store.set('settings.listen.tier', 'standard');
+    const hqRun = await runSession('高精度定稿（Qwen3-ASR，语音宿主）');
+    const hqFell = hqFallbacks();
     step(
-      'high-accuracy tier recognizes finals',
-      hqRun.ev.segments.length > 0,
-      hqRun.ev.segments.map((s) => JSON.stringify(s.text)).join(' | ') || '(none)'
+      'high-accuracy tier recognizes finals on the speech host',
+      hqRun.ev.segments.length > 0 && hqFell === 0,
+      `${hqRun.ev.segments.map((s) => JSON.stringify(s.text)).join(' | ') || '(none)'}; ${hqFell} fell back`
     );
     step(
       'high-accuracy tier keeps streaming drafts',
       hqRun.ev.partials.length > 0,
-      `${hqRun.ev.partials.length} partials, load ${hqRun.loadMs}ms`
+      `${hqRun.ev.partials.length} partials, load ${hqRun.loadMs}ms, finals ${median(hqRun.finalLatencies)}ms after the audio`
     );
-    const rmHq = await packMgr.removePack(hqEntry.id);
+    // Three stalls mark the host unhealthy: its finals must come from SenseVoice.
+    for (let i = 0; i < 3; i++) host.tengine.emit({ engine: 'llm-asr', host: 'llm-asr', kind: 'request', at: Date.now(), stop: 'stall', genTokens: 0 });
+    const sick = await runSession('高精度定稿（语音宿主不可用）');
+    const sickFell = hqFallbacks();
     step(
-      'high-accuracy pack removal leaves no residue',
-      rmHq.success === true && !fs.existsSync(path.join(packMgr.packsRoot(), hqEntry.id))
+      'finals the speech host cannot give come from the standard engine',
+      sick.ev.segments.length > 0 && sickFell > 0,
+      `${sick.ev.segments.map((s) => JSON.stringify(s.text)).join(' | ') || '(none)'}; ${sickFell} fell back`
     );
+    host.tengine.emit({ engine: 'llm-asr', host: 'llm-asr', kind: 'exit', at: Date.now(), code: 0 });
+    store.set('settings.listen.tier', 'standard');
+    await host.llmManager.unloadAsr('smoke');
   } else {
-    console.log('  (high-accuracy pack not built locally — tier steps skipped)\n');
+    console.log('  (no speech pack in models/asr-gguf — high-accuracy steps skipped)\n');
   }
 
   const rm = await packMgr.removePack('asr-draft-zipformer-zh-en');

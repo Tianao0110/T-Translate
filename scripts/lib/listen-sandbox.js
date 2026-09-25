@@ -1,12 +1,16 @@
 // Shared setup for the listen-mode smoke and bench: the audio packs come
 // from release-audio-models/ through a file:// manifest into the sandbox,
-// the floating window is a stand-in that routes audio-engine:* sends to
+// the high-accuracy tier's speech packs are linked in from a folder, the
+// floating window is a stand-in that routes audio-engine:* sends to
 // handlers, and audio is fed in real time against the audio clock.
 /* eslint-disable no-console */
 
 const path = require('path');
 const fs = require('fs');
-const { REPO, sandbox, sleep } = require('./electron-smoke');
+const { REPO, sandbox, sleep, place } = require('./electron-smoke');
+
+// Where the speech packs sit on the developer machine unless --asr-dir says otherwise.
+const DEFAULT_ASR_DIR = path.join(REPO, 'models', 'asr-gguf');
 
 const RELEASE_DIR = `${REPO.replace(/\\/g, '/')}/release-audio-models`;
 const RELEASE_MANIFEST = `${RELEASE_DIR}/manifest.json`;
@@ -32,6 +36,39 @@ async function installPacks(packMgr, ids) {
     rows.push({ id, success: res.success === true, ms: Date.now() - t0, phases: [...phases] });
   }
   return rows;
+}
+
+// The high-accuracy tier inside the sandbox: every complete speech pack in
+// asrDir is linked into the sandbox's model folder under its pinned names,
+// and llm-manager runs on T-Engine's hosts with the speech host on the GPU or
+// the CPU. null when asrDir holds no complete pack. Call after the sandbox
+// exists (TT_MODELS_ROOT points into it).
+async function speechHost({ asrDir = DEFAULT_ASR_DIR, gpu = false } = {}) {
+  const { packsForRole, packFiles, LLM_ROLE_ASR, LLM_MODELS_DIR } = require('../../electron/shared/llm-packs');
+  const present = packsForRole(LLM_ROLE_ASR).filter((p) => packFiles(p).every((f) => fs.existsSync(path.join(asrDir, f.file))));
+  if (!present.length) return null;
+  const { modelDir } = require('../../electron/packs/model-root');
+  const { dataDir } = require('../../electron/platform/data-root');
+  const { store } = require('../../electron/state');
+  const dir = modelDir(LLM_MODELS_DIR);
+  fs.mkdirSync(dir, { recursive: true });
+  for (const p of present) for (const f of packFiles(p)) place(dir, path.join(asrDir, f.file));
+  const tengine = require('../../electron/tengine').get();
+  const llmManager = require('../../electron/llm/llm-manager');
+  llmManager.init({ store, tengine, adapter: tengine.get('llm'), asrAdapter: tengine.get('llm-asr'), logsDir: dataDir('logs'), modelsDir: dir, logger: require('../../electron/platform/logger')('LLM') });
+  tengine.get('llm-asr').setProvider(gpu ? 'gpu' : 'cpu');
+  await llmManager.rescan();
+  return { llmManager, tengine, dir, packs: present.map((p) => p.id) };
+}
+
+// hq-fallback events in the sandbox's newest session log: finals the speech
+// host did not answer.
+function hqFallbacks() {
+  const { dataDir } = require('../../electron/platform/data-root');
+  const logs = dataDir('logs');
+  const file = fs.existsSync(logs) ? fs.readdirSync(logs).filter((f) => f.startsWith('audio-probe-') && f.endsWith('.jsonl')).sort().pop() : null;
+  if (!file) return 0;
+  return fs.readFileSync(path.join(logs, file), 'utf8').split('\n').filter((l) => l.includes('"hq-fallback"')).length;
 }
 
 function fakeWindow({ status, segment, partial } = {}) {
@@ -84,4 +121,4 @@ function percentile(xs, p) {
 }
 const median = (xs) => percentile(xs, 0.5);
 
-module.exports = { RELEASE_DIR, RELEASE_MANIFEST, listenSandbox, installPacks, fakeWindow, feedRealtime, percentile, median };
+module.exports = { RELEASE_DIR, RELEASE_MANIFEST, DEFAULT_ASR_DIR, listenSandbox, installPacks, speechHost, hqFallbacks, fakeWindow, feedRealtime, percentile, median };

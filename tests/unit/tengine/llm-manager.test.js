@@ -14,7 +14,8 @@ const manager = require('../../../electron/llm/llm-manager.js');
 
 const PACK = { id: 'qwen3-1.7b', role: 'general', default: true, file: 'Q.gguf', ctx: 4096, template: 'qwen3' };
 
-function fakeAdapter() {
+// loadGate: a promise every load waits on, to hold a load in flight.
+function fakeAdapter({ loadGate = null } = {}) {
   let provider = 'cpu';
   let loaded = null;
   const a = {
@@ -28,6 +29,7 @@ function fakeAdapter() {
     status: () => ({ lastHealth: null, lastRequest: null }),
     load: vi.fn(async (file, options) => {
       a.calls.push(['load', file, options]);
+      if (loadGate) await loadGate;
       loaded = { file, provider, device: { name: 'CPU' }, fallback: null, loadMs: 10, info: { name: 'Q' } };
       return loaded.info;
     }),
@@ -325,21 +327,30 @@ describe('the vision slot', () => {
 
 describe('the speech slot', () => {
   const pcm = new Float32Array([0.1, -0.1, 0.05]);
-  const audioOptions = (file) => ({ nCtx: 2048, nBatch: 512, template: 'auto', mmproj: `C:/models/llm-models/mmproj-${file}`, media: 'audio', audioFamily: 'qwen3-asr' });
+  // On the CPU the thread count depends on the machine: two to four.
+  const audioOptions = (file, provider) => ({
+    nCtx: 2048,
+    nBatch: 512,
+    template: 'auto',
+    mmproj: `C:/models/llm-models/mmproj-${file}`,
+    media: 'audio',
+    audioFamily: 'qwen3-asr',
+    threads: provider === 'gpu' ? null : expect.any(Number),
+  });
 
   it('takes the larger pack on the GPU and the smaller on the CPU, reloading when the provider changes', async () => {
     const asrAdapter = fakeAdapter();
     asrAdapter.setProvider('gpu');
     const { adapter } = boot({ packs: fakePacks({ asr: ['big', 'small'] }), asrAdapter });
     await (await manager.transcribe({ pcm })).promise;
-    expect(asrAdapter.load).toHaveBeenLastCalledWith('C:/models/llm-models/A17.gguf', audioOptions('A17.gguf'));
+    expect(asrAdapter.load).toHaveBeenLastCalledWith('C:/models/llm-models/A17.gguf', audioOptions('A17.gguf', 'gpu'));
     expect(asrAdapter.generate).toHaveBeenLastCalledWith({ kind: 'asr', audio: pcm });
     await (await manager.transcribe({ pcm, maxTokens: 64 })).promise;
     expect(asrAdapter.load).toHaveBeenCalledTimes(1);
     expect(asrAdapter.generate).toHaveBeenLastCalledWith({ kind: 'asr', audio: pcm, maxTokens: 64 });
     asrAdapter.setProvider('cpu');
     await (await manager.transcribe({ pcm })).promise;
-    expect(asrAdapter.load).toHaveBeenLastCalledWith('C:/models/llm-models/A06.gguf', audioOptions('A06.gguf'));
+    expect(asrAdapter.load).toHaveBeenLastCalledWith('C:/models/llm-models/A06.gguf', audioOptions('A06.gguf', 'cpu'));
     expect(adapter.load).not.toHaveBeenCalled();
   });
 
@@ -347,7 +358,10 @@ describe('the speech slot', () => {
     const asrAdapter = fakeAdapter();
     boot({ packs: fakePacks({ asr: ['big'] }), asrAdapter });
     await (await manager.transcribe({ pcm })).promise;
-    expect(asrAdapter.load).toHaveBeenCalledWith('C:/models/llm-models/A17.gguf', audioOptions('A17.gguf'));
+    expect(asrAdapter.load).toHaveBeenCalledWith('C:/models/llm-models/A17.gguf', audioOptions('A17.gguf', 'cpu'));
+    const { threads } = asrAdapter.load.mock.calls[0][1];
+    expect(threads).toBeGreaterThanOrEqual(2);
+    expect(threads).toBeLessThanOrEqual(4);
     expect(manager.status().asr).toMatchObject({ available: true, usable: true, selected: 'qwen3-asr-1.7b', provider: 'cpu', resident: { file: 'A17.gguf' }, inflight: 0 });
   });
 
@@ -367,10 +381,27 @@ describe('the speech slot', () => {
     boot({ packs: fakePacks({ asr: ['big', 'small'] }), asrAdapter });
     asrAdapter.setProvider('gpu');
     const r = await manager.asrSelfTest();
-    expect(asrAdapter.health).toHaveBeenCalledWith({ file: 'C:/models/llm-models/A17.gguf', options: audioOptions('A17.gguf') });
+    expect(asrAdapter.health).toHaveBeenCalledWith({ file: 'C:/models/llm-models/A17.gguf', options: audioOptions('A17.gguf', 'gpu') });
     expect(r).toMatchObject({ ok: true, provider: 'webgpu', fallback: null });
     await (await manager.transcribe({ pcm })).promise;
     expect(asrAdapter.load).not.toHaveBeenCalled();
+  });
+
+  it('a transcribe during the session preload waits for that load instead of loading again', async () => {
+    let open;
+    const gate = new Promise((resolve) => {
+      open = resolve;
+    });
+    const asrAdapter = fakeAdapter({ loadGate: gate });
+    boot({ packs: fakePacks({ asr: ['small'] }), asrAdapter });
+    const preload = manager.ensureAsrLoaded();
+    const pending = manager.transcribe({ pcm });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    open();
+    await preload;
+    await (await pending).promise;
+    expect(asrAdapter.load).toHaveBeenCalledTimes(1);
+    expect(asrAdapter.generate).toHaveBeenCalledTimes(1);
   });
 
   it('P6: three stalls make transcribe step aside, the other slots carry on', async () => {

@@ -3,11 +3,15 @@
 // sherpa/onnxruntime copy. This file only speaks the protocol below.
 //
 // Protocol (process.parentPort):
-//   in : {type:'init', models:{asr?:{modelPath,tokensPath,vadPath,language?}},
-//         logPath?, logText, meta}       declare paths + open log; loads
+//   in : {type:'init', models:{asr?:{modelPath,tokensPath,vadPath,streaming?,
+//         remoteHq?,language?}}, logPath?, logText, meta}
+//                                        declare paths + open log; loads
 //                                        nothing. No logPath = no log file (a
-//                                        TTS-only process has no session)
+//                                        TTS-only process has no session).
+//                                        remoteHq: finals go to the speech host
 //        {type:'asr-start', language?}   load ASR if needed, begin a session
+//        {type:'hq-result', id, ok, text?, code?}  the main process's answer
+//                                        to an hq-transcribe
 //        {type:'capture-start', mode, pid}  'system' | 'include' | 'exclude'
 //        {type:'capture-stop'}           release the audio client
 //        {type:'pcm', samples}           inject 16 kHz mono float32 instead of
@@ -29,6 +33,9 @@
 //        {type:'partial', text}          open-segment provisional text; ''
 //                                        clears it (segment closed)
 //        {type:'segment', rec} | {type:'hint', kind} | {type:'metrics', rec}
+//        {type:'hq-transcribe', id, samples}  a high-accuracy final for
+//                                        T-Engine's speech host (16 kHz float)
+//        {type:'hq-cancel', id}          that final is no longer wanted
 //        {type:'capture-started', mode} | {type:'capture-error', message}
 //        {type:'capture-event', kind, detail}  device lost / reacquired
 //        {type:'level', value}            0..1-ish capture RMS, ~12/s
@@ -44,9 +51,10 @@
 // dataDir?, dictDir?, lexicon[], ruleFsts[]}} resolved by the host from an
 // installed pack.json (tts/tts-models). One pack loaded at a time (tts.js).
 //
-// Audio is transcribed and dropped, never written to disk; the session log
-// carries metrics only unless logText is set. Design notes and pitfalls:
-// docs/design/listen.md.
+// Audio is transcribed and dropped, never written to disk (a high-accuracy
+// final passes through the main process to the speech host in memory); the
+// session log carries metrics only unless logText is set. Design notes and
+// pitfalls: docs/design/listen.md.
 
 const io = require('./io');
 const asr = require('./asr-session');
@@ -103,6 +111,7 @@ process.parentPort.on('message', (e) => {
   switch (msg.type) {
     case 'init': return handleInit(msg);
     case 'asr-start': return asr.start(msg);
+    case 'hq-result': return asr.handleHqResult(msg);
     case 'capture-start': return capture.start(msg, asr.handlePcm);
     case 'pcm': return asr.handlePcm(msg.samples);
     case 'capture-stop': return capture.stop();

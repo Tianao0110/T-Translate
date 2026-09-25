@@ -11,6 +11,7 @@
 // host, residency, idle timer and policy streaks, so they stay resident
 // next to the text model and none waits for another.
 
+const os = require('os');
 const path = require('path');
 const { PRIVACY_MODES } = require('../shared/channels');
 const { LLM_MODELS_DIR, LLM_ROLE_VISION, LLM_ROLE_ASR, LLM_TEXT_ROLES, packById, defaultPack, roleForFileName } = require('../shared/llm-packs');
@@ -99,10 +100,12 @@ function armIdle() {
 // --- media slots ---
 //
 // One role on its own host: which pack to load (resolve, given the
-// adapter's provider), how (loadOptions), then residency, the idle timer,
-// in-flight bookkeeping, the GPU self-test and the policy streaks.
+// adapter's provider), how (loadOptions, given the pack and the provider),
+// then residency, the idle timer, in-flight bookkeeping, the GPU self-test
+// and the policy streaks.
 function createMediaSlot({ engine, adapterKey, label, unavailable, missing, resolve, loadOptions }) {
   let slotResident = null; // { path, provider }
+  let slotLoading = null; // { key, promise } while a load is on its way
   let slotIdle = null;
   let slotInflight = 0;
   let slotPolicy = createLlmPolicy({ engine });
@@ -142,10 +145,22 @@ function createMediaSlot({ engine, adapterKey, label, unavailable, missing, reso
     if (loaded && slotResident && slotResident.path === t.path && slotResident.provider === provider) {
       return { info: loaded.info, target: t, reloaded: false };
     }
-    const info = await a.load(t.path, loadOptions(t));
-    slotResident = { path: t.path, provider };
-    armSlotIdle();
-    return { info, target: t, reloaded: true };
+    // Joins a load of the same file on the same provider already on its way.
+    const key = `${provider}|${t.path}`;
+    if (slotLoading && slotLoading.key === key) {
+      return { info: await slotLoading.promise, target: t, reloaded: false };
+    }
+    const promise = a.load(t.path, loadOptions(t, provider)).then((info) => {
+      slotResident = { path: t.path, provider };
+      armSlotIdle();
+      return info;
+    });
+    slotLoading = { key, promise };
+    try {
+      return { info: await promise, target: t, reloaded: true };
+    } finally {
+      if (slotLoading && slotLoading.promise === promise) slotLoading = null;
+    }
   }
 
   // One request on the slot's model, loading it first.
@@ -183,7 +198,7 @@ function createMediaSlot({ engine, adapterKey, label, unavailable, missing, reso
     if (!deps.packs.status()) await deps.packs.scan();
     const t = resolve(a.provider());
     if (!t) return { ok: true, provider: 'cpu', fallback: null, pending: true };
-    const r = await a.health({ file: t.path, options: loadOptions(t) });
+    const r = await a.health({ file: t.path, options: loadOptions(t, a.provider()) });
     slotResident = { path: t.path, provider: a.provider() };
     armSlotIdle();
     return { ok: !!r.ok && r.provider === 'gpu' && !r.fallback, provider: r.provider === 'gpu' ? 'webgpu' : 'cpu', fallback: r.fallback || null, tokPerSec: r.tokPerSec ?? null, promptMs: r.promptMs ?? null };
@@ -215,6 +230,7 @@ function createMediaSlot({ engine, adapterKey, label, unavailable, missing, reso
   function reset() {
     clearSlotIdle();
     slotResident = null;
+    slotLoading = null;
     slotInflight = 0;
     slotPolicy = createLlmPolicy({ engine });
   }
@@ -240,7 +256,9 @@ const vision = createMediaSlot({
 });
 
 // The speech slot: the audio mmproj next to its model, on the GPU or the
-// CPU, the larger pack on the GPU.
+// CPU, the larger pack on the GPU. On the CPU it runs next to the listen
+// worker, with at most ASR_CPU_THREADS threads (docs/design/listen.md).
+const ASR_CPU_THREADS = Math.max(2, Math.min(4, Math.floor((typeof os.availableParallelism === 'function' ? os.availableParallelism() : os.cpus().length) / 2)));
 const asr = createMediaSlot({
   engine: 'llm-asr',
   adapterKey: 'asrAdapter',
@@ -248,13 +266,14 @@ const asr = createMediaSlot({
   unavailable: ['LLM_ASR_UNAVAILABLE', 'speech engine not wired'],
   missing: ['LLM_ASR_MISSING', 'no speech model installed'],
   resolve: (provider) => deps.packs.resolveAsr({ preferLarger: provider === 'gpu' }),
-  loadOptions: (target) => ({
+  loadOptions: (target, provider) => ({
     nCtx: target.pack ? target.pack.ctx : 2048,
     nBatch: 512,
     template: 'auto',
     mmproj: target.mmproj,
     media: 'audio',
     audioFamily: target.pack ? target.pack.audioFamily || null : null,
+    threads: provider === 'gpu' ? null : ASR_CPU_THREADS,
   }),
 });
 

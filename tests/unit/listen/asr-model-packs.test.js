@@ -163,9 +163,9 @@ describe('listInstalledPacks', () => {
   });
 });
 
-// v0.4.8: the optional high-accuracy final engine resolves from its own pack
-// type; its tokenizer is a directory, so vocab.json inside it is the probe.
-describe('locateAsrModels — high-accuracy pack', () => {
+// The high-accuracy tier runs on T-Engine's speech host: an old sherpa
+// high-accuracy pack on disk is listed but never resolved for a session.
+describe('locateAsrModels — old high-accuracy pack', () => {
   const hqPackJson = JSON.stringify({
     id: 'asr-hq-qwen3-0.6b',
     type: 'asr-hq',
@@ -174,7 +174,7 @@ describe('locateAsrModels — high-accuracy pack', () => {
     engine: 'qwen3-asr',
     files: { convFrontend: 'conv_frontend.onnx', encoder: 'encoder.int8.onnx', decoder: 'decoder.int8.onnx', tokenizer: 'tokenizer' },
   });
-  const baseTree = {
+  const tree = {
     base: ['asr-base-sense-voice/', 'asr-hq-qwen3-0.6b/'],
     'base/asr-base-sense-voice/pack.json': basePackJson,
     'base/asr-base-sense-voice/model.int8.onnx': 'file',
@@ -184,39 +184,15 @@ describe('locateAsrModels — high-accuracy pack', () => {
     'base/asr-hq-qwen3-0.6b/conv_frontend.onnx': 'file',
     'base/asr-hq-qwen3-0.6b/encoder.int8.onnx': 'file',
     'base/asr-hq-qwen3-0.6b/decoder.int8.onnx': 'file',
+    'base/asr-hq-qwen3-0.6b/tokenizer/vocab.json': 'file',
   };
 
-  it('resolves the engine files and tokenizer dir when complete', () => {
-    const fs = makeFs({ ...baseTree, 'base/asr-hq-qwen3-0.6b/tokenizer/vocab.json': 'file' });
+  it('resolves the base set only', () => {
+    const fs = makeFs(tree);
     const found = locateAsrModels('base', { fs, path: P });
-    expect(found.hq).toEqual({
-      convFrontend: 'base/asr-hq-qwen3-0.6b/conv_frontend.onnx',
-      encoder: 'base/asr-hq-qwen3-0.6b/encoder.int8.onnx',
-      decoder: 'base/asr-hq-qwen3-0.6b/decoder.int8.onnx',
-      tokenizerDir: 'base/asr-hq-qwen3-0.6b/tokenizer',
-      engine: 'qwen3-asr',
-      modelName: 'sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25',
-      dirName: 'asr-hq-qwen3-0.6b',
-    });
-  });
-
-  it('yields hq: null when the tokenizer is missing, without gating listen mode', () => {
-    const fs = makeFs(baseTree);
-    const found = locateAsrModels('base', { fs, path: P });
-    expect(found).not.toBeNull();
-    expect(found.hq).toBeNull();
-  });
-
-  it('never resolves hq without a base pack (the VAD lives there)', () => {
-    const fs = makeFs({
-      base: ['asr-hq-qwen3-0.6b/'],
-      'base/asr-hq-qwen3-0.6b/pack.json': hqPackJson,
-      'base/asr-hq-qwen3-0.6b/conv_frontend.onnx': 'file',
-      'base/asr-hq-qwen3-0.6b/encoder.int8.onnx': 'file',
-      'base/asr-hq-qwen3-0.6b/decoder.int8.onnx': 'file',
-      'base/asr-hq-qwen3-0.6b/tokenizer/vocab.json': 'file',
-    });
-    expect(locateAsrModels('base', { fs, path: P })).toBeNull();
+    expect(found.modelName).toBeTruthy();
+    expect(found).not.toHaveProperty('hq');
+    expect(listInstalledPacks('base', { fs, path: P }).map((p) => p.id)).toContain('asr-hq-qwen3-0.6b');
   });
 });
 
@@ -235,12 +211,10 @@ function hqManualTree(dir = `base/${HQ_DIR}`) {
 }
 
 describe('hand-placed link-only packs', () => {
-  it('lists the upstream folder as the high-accuracy pack and resolves it', () => {
+  it('lists the upstream folder as the high-accuracy pack', () => {
     const fs = makeFs({ base: ['asr-base-sense-voice/', `${HQ_DIR}/`], ...basePackTree(), ...hqManualTree() });
     const packs = listInstalledPacks('base', { fs, path: P });
     expect(packs.find((p) => p.id === 'asr-hq-qwen3-0.6b')).toMatchObject({ type: 'asr-hq', manual: true, dirName: HQ_DIR, dir: `base/${HQ_DIR}` });
-    const located = locateAsrModels('base', { fs, path: P });
-    expect(located.hq).toMatchObject({ engine: 'qwen3-asr', tokenizerDir: `base/${HQ_DIR}/tokenizer`, dirName: HQ_DIR });
   });
 
   it('a folder missing a file is not a pack', () => {
@@ -248,7 +222,6 @@ describe('hand-placed link-only packs', () => {
     delete tree[`base/${HQ_DIR}/decoder.int8.onnx`];
     const fs = makeFs(tree);
     expect(listInstalledPacks('base', { fs, path: P }).map((p) => p.id)).toEqual(['asr-base-sense-voice']);
-    expect(locateAsrModels('base', { fs, path: P }).hq).toBeNull();
   });
 
   it('a pack.json install of the same id wins over the hand-placed folder', () => {
