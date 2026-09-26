@@ -220,7 +220,7 @@ Turns the sound playing on this computer into captions and translates them in re
 
 **Preparation**
 
-- Download the "Base model" under Settings → Audio → Listen. For text that appears while speech is still going, add the "Draft engine"; for better accuracy with music or noise, add the "High-accuracy final engine" and switch the final tier to high accuracy.
+- Download the "Base model" under Settings → Audio → Listen. For text that appears while speech is still going, add the "Draft engine"; for better accuracy with music or noise, place one of the models under "High-accuracy models" using its links, then switch the final tier to high accuracy.
 
 **Use**
 

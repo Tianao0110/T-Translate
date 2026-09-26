@@ -1,17 +1,19 @@
-// Listen-mode model packs: the only download entry point for ASR models.
-// The list itself is PackList, shared with the voice packs on the TTS page.
+// Listen-mode models: the ASR packs (PackList, shared with the voice packs on
+// the TTS page, the only download entry point for them) and the
+// high-accuracy tier's speech models (SpeechPacks, placed by hand).
 
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import PackList from './PackList.jsx';
+import SpeechPacks from './SpeechPacks.jsx';
 import { Seg, Switch } from './shared.jsx';
 import createLogger from '../../../core/logger.js';
 const logger = createLogger('ListenSection');
 
-// Final-pass tier. Picking "high" without the pack on disk downloads it
-// first; the engine reads the stored tier at the next session start.
-const HQ_PACK_ID = 'asr-hq-qwen3-0.6b';
+// The old high-accuracy pack: listed only while it is still on disk, to be removed.
+const LEGACY_HQ_TYPE = 'asr-hq';
 const INSTALLED_STATES = ['installed', 'update-available', 'orphaned'];
+const showPack = (p) => p.type !== LEGACY_HQ_TYPE || INSTALLED_STATES.includes(p.status);
 
 // embedded: rendered inside the audio sub-page, which owns the heading.
 const ListenSection = ({ notify, confirm, embedded = false }) => {
@@ -19,10 +21,9 @@ const ListenSection = ({ notify, confirm, embedded = false }) => {
 
   const [info, setInfo] = useState(null); // { modelName, streamingPresent, hqPresent, modelsDir, ... }
   const [tier, setTier] = useState('standard');
-  const [tierBusy, setTierBusy] = useState(false);
   const [autosave, setAutosave] = useState(true);
-  const [hqInstalled, setHqInstalled] = useState(false);
-  const [listKey, setListKey] = useState(0); // remounts PackList after a download it did not start
+  const [llm, setLlm] = useState(null); // llm:status, for the speech models
+  const [rescanning, setRescanning] = useState(false);
 
   const loadInfo = useCallback(async () => {
     try {
@@ -33,15 +34,25 @@ const ListenSection = ({ notify, confirm, embedded = false }) => {
     }
   }, []);
 
+  const loadLlm = useCallback(async () => {
+    try {
+      setLlm((await window.electron?.llm?.status?.()) || null);
+    } catch (e) {
+      logger.debug('model status failed:', e.message);
+      setLlm(null);
+    }
+  }, []);
+
   useEffect(() => {
     loadInfo();
+    loadLlm();
     window.electron?.store?.get?.('settings.listen.tier')
       .then((v) => setTier(v === 'high' ? 'high' : 'standard'))
       .catch(() => {});
     window.electron?.store?.get?.('settings.listen.autosave')
       .then((v) => setAutosave(v !== false))
       .catch(() => {});
-  }, [loadInfo]);
+  }, [loadInfo, loadLlm]);
 
   const handleAutosaveChange = async (next) => {
     setAutosave(next);
@@ -54,47 +65,28 @@ const ListenSection = ({ notify, confirm, embedded = false }) => {
     window.electron?.floatingWindow?.notifySettingsChanged?.();
   }, [loadInfo]);
 
-  const applyTier = useCallback(async (next) => {
-    setTier(next);
-    await window.electron?.store?.set?.('settings.listen.tier', next);
-  }, []);
-
-  // Removing the pack must not leave the tier pointing at an engine that is gone.
-  const handlePacks = useCallback((packs) => {
-    const hq = packs.find((p) => p.id === HQ_PACK_ID);
-    const present = !!hq && INSTALLED_STATES.includes(hq.status);
-    setHqInstalled(present);
-    if (!present) {
-      window.electron?.store?.get?.('settings.listen.tier')
-        .then((v) => { if (v === 'high') applyTier('standard'); })
-        .catch(() => {});
+  const rescanSpeech = async () => {
+    setRescanning(true);
+    try {
+      const s = await window.electron?.llm?.rescan?.();
+      if (s) setLlm(s);
+    } catch (e) {
+      logger.debug('model rescan failed:', e.message);
+    } finally {
+      setRescanning(false);
     }
-  }, [applyTier]);
+  };
+
+  const hqReady = !!llm?.asr?.usable;
 
   const handleTierChange = async (next) => {
-    if (next === tier || tierBusy) return;
-    if (next === 'high' && !hqInstalled) {
-      setTierBusy(true);
-      try {
-        const res = await window.electron?.audioPacks?.downloadPack?.(HQ_PACK_ID);
-        if (res?.success) {
-          await applyTier('high');
-          notify(t('listen.tier.enabled'), 'success');
-          setListKey((k) => k + 1);
-          handleChanged();
-        } else if (res?.errorCode === 'OFFLINE_BLOCKED') {
-          notify(t('listen.packs.offlineBlocked'), 'warning');
-        } else {
-          notify(res?.error || t('listen.packs.downloadFailed'), 'error');
-        }
-      } catch (e) {
-        notify(t('listen.packs.downloadFailed') + ': ' + e.message, 'error');
-      } finally {
-        setTierBusy(false);
-      }
+    if (next === tier) return;
+    if (next === 'high' && !hqReady) {
+      notify(t('listen.hq.needPack'), 'warning');
       return;
     }
-    await applyTier(next);
+    setTier(next);
+    await window.electron?.store?.set?.('settings.listen.tier', next);
     notify(t(next === 'high' ? 'listen.tier.enabled' : 'listen.tier.disabled'), 'success');
   };
 
@@ -129,12 +121,15 @@ const ListenSection = ({ notify, confirm, embedded = false }) => {
           value={tier}
           onChange={handleTierChange}
           options={[
-            { value: 'standard', label: t('listen.tier.standard'), disabled: tierBusy },
-            { value: 'high', label: t('listen.tier.high'), disabled: tierBusy || !ready },
+            { value: 'standard', label: t('listen.tier.standard') },
+            { value: 'high', label: t('listen.tier.high'), disabled: !ready },
           ]}
         />
         <p className="setting-hint">{t('listen.tier.hint')}</p>
+        {tier === 'high' && llm && !hqReady && <p className="setting-hint">{t('listen.hq.inactive')}</p>}
       </div>
+
+      {llm && <SpeechPacks status={llm} busy={rescanning} onRescan={rescanSpeech} />}
 
       <div className="setting-group">
         <Switch checked={autosave} onChange={handleAutosaveChange} label={t('listen.autosave.label')} />
@@ -142,13 +137,12 @@ const ListenSection = ({ notify, confirm, embedded = false }) => {
       </div>
 
       <PackList
-        key={listKey}
         bridge={window.electron?.audioPacks}
         prefix="listen.packs"
         notify={notify}
         confirm={confirm}
         onChanged={handleChanged}
-        onPacks={handlePacks}
+        filter={showPack}
       >
         {/* Where the models actually are (an older root may still hold some). */}
         <p className="setting-hint">

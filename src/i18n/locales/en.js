@@ -782,9 +782,27 @@ const en = {
       label: "Final pass",
       standard: "Standard",
       high: "High accuracy",
-      hint: "High accuracy: better with music or noise, 30 languages; 806 MB download, 1–1.6 GB of RAM, finals 1–2 s later, 16 GB RAM recommended",
+      hint: "High accuracy: better with music or noise, 30 languages; needs one of the models below; finals 0.2–0.6 s later than standard",
       enabled: "Switched to high-accuracy finals; applies from the next listen session",
       disabled: "Back to standard finals",
+    },
+    hq: {
+      title: "High-accuracy models",
+      hint: "Pick one, download both of its files and drop them into the model folder with their names unchanged. With a dedicated GPU take 1.7B; without one, or with little video memory, take 0.6B",
+      folder: "Model folder: {{dir}}",
+      next: "Next listen session: {{name}} ({{where}})",
+      where: { gpu: "GPU", cpu: "CPU" },
+      needPack: "Add a high-accuracy model first",
+      inactive: "No high-accuracy model is available; listen mode runs on the standard tier",
+      badge: { ready: "Ready", partial: "Incomplete", mismatch: "File mismatch", missing: "Not present" },
+      part: { model: "Model", mmproj: "Audio encoder" },
+      state: { ready: "Ready", missing: "Not present", mismatch: "Hash mismatch" },
+      linkModel: "Model (official)",
+      linkEncoder: "Audio encoder (official)",
+      mirrorModel: "Model (mirror)",
+      mirrorEncoder: "Audio encoder (mirror)",
+      openFolder: "Open model folder",
+      rescan: "Re-detect",
     },
     autosave: {
       label: "Auto-save subtitles on stop or switch",
@@ -809,6 +827,7 @@ const en = {
       removed: "Model uninstalled",
       removeFailed: "Uninstall failed",
       removeConfirm: "Uninstall this model? Listen mode needs it downloaded again to work",
+      removeConfirmFor: { "asr-hq-qwen3-0.6b": "Remove the old high-accuracy engine? The high-accuracy tier uses the new models now; listen mode is not affected" },
       location: "Model folder: {{dir}}",
       manualHint: "Too big to re-host: download from the official link, extract, put the whole folder into the directory below, then click “Placed, check again”",
       manualLink: "Official download",
@@ -819,12 +838,12 @@ const en = {
       names: {
         "asr-base-sense-voice": "Base model (zh/en/ja/ko/yue)",
         "asr-draft-zipformer-zh-en": "Draft engine (zh/en)",
-        "asr-hq-qwen3-0.6b": "High-accuracy final engine (Qwen3-ASR, 30 languages)"
+        "asr-hq-qwen3-0.6b": "Old high-accuracy engine (no longer used)"
       },
       desc: {
         "asr-base": "Required. Finished sentences with punctuation.",
         "asr-draft": "Optional. Live text for Chinese and English.",
-        "asr-hq": "Optional. Better with music or noise; 1–1.6 GB of RAM."
+        "asr-hq": "The high-accuracy tier uses the models above now; remove this pack to free about 1 GB."
       }
     }
   },
