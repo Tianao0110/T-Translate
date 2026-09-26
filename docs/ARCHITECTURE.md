@@ -8,7 +8,7 @@ T-Translate 是一个 Windows 桌面翻译工具（Electron 42 + React 18 + Vite
 | --- | --- |
 | 框架 | Electron 42 + React 18，Vite 7 构建渲染端，esbuild 打包主进程翻译栈 |
 | 状态 | Zustand + Immer；主窗口状态经 DPAPI 加密的历史保险库持久化 |
-| 引擎宿主 | T-Engine（`electron/tengine/`）：每个原生运行时一个 utilityProcess——onnxruntime-node（OCR）、sherpa-onnx（听译 / 朗读）、llama.cpp（内置模型，koffi FFI） |
+| 引擎宿主 | T-Engine（`electron/tengine/`）：每个原生运行时一个 utilityProcess——onnxruntime-node（OCR）、sherpa-onnx（听译 / 朗读）、llama.cpp（内置模型与听译高精度档，koffi FFI） |
 | 翻译源 | 内置模型、LM Studio / Ollama、OpenAI / Claude / Gemini / DeepSeek / DeepL / Google / Microsoft / 百度 |
 | OCR | PP-OCRv6 本地、Windows OCR、内置视觉模型（PaddleOCR-VL）、LLM Vision、OCR.space / Google Vision / Azure / 百度 |
 | 安全 | Electron safeStorage（DPAPI）+ 访问审计；主进程单点隐私门 |
@@ -62,7 +62,7 @@ t-translate/
 │   ├── listen/                 # 听译：audio-engine-manager（ASR 子进程会话）、listen-translator、自动保存、模型表、音频包、WASAPI 抓音
 │   ├── tts/                    # 朗读：音色表与语音包
 │   ├── ocr/                    # 本地 OCR：ocr-engine、Windows OCR、OCR 模型包
-│   ├── llm/                    # 内置模型：llm-manager（文本槽 + 视觉槽）、模型包扫描
+│   ├── llm/                    # 内置模型：llm-manager（文本槽 + 视觉槽 + 语音槽）、模型包扫描
 │   ├── packs/                  # 模型包公共层：model-pack-core（下载安装工厂）、model-root、旧目录迁移
 │   ├── security/               # secure-vault / secure-audit / history-vault / privacy-gate / url-policy
 │   ├── platform/               # 数据目录、日志、崩溃守卫、开机自启、右键打开、更新器、Win32 与多屏辅助
@@ -229,7 +229,7 @@ API 密钥解密照常（无痕不等于离线）。
 electron/tengine/registry.js          引擎表：宿主、运行时、能否上显卡与原因
 electron/tengine/host-manager.js      宿主框架：按需拉起、请求配对、崩溃重生与退避、事件流
 electron/tengine/engines/{ocr,audio,llm}.js  三个适配器：把各宿主的协议翻成 load / health / setProvider / status
-electron/tengine/runtime/             llama.cpp 的 koffi 绑定、会话、视觉（mtmd）、worker 线程
+electron/tengine/runtime/             llama.cpp 的 koffi 绑定、会话、图像与音频（mtmd）、worker 线程
 electron/services/{ocr-host,audio-engine,llm-host}/  三个宿主进程本体
 electron/ipc/tengine.js               tengine:status 快照、tengine:event 事件流
 electron/ipc/gpu.js                   「显卡加速」开关：逐引擎自检，失败的留在 CPU
@@ -240,11 +240,11 @@ T-Engine 只报事实，不改产品行为；用哪个引擎、什么时候降�
 
 ### 内置模型
 
-`electron/llm/`：`llm-pack-manager.js` 扫描 `<models>/llm-models`，只认白名单（`electron/shared/llm-packs.js`：文件名 + 大小 + SHA256，哈希是安全边界）里的文件；`llm-manager.js` 决定载哪个文件、驻留与 5 分钟闲置卸载、显卡自检，并管视觉槽（PaddleOCR-VL，只在显卡加速打开时接活）。栈侧 `src/stack/providers/tengine.js` 是翻译源「内置模型」，`src/stack/ocr/tengine-vision.js` 与 `vision-routing.js` 是 OCR 引擎「内置视觉模型」及其分配规则。设计说明：T-ENGINE.md 第五、七、十节。
+`electron/llm/`：`llm-pack-manager.js` 扫描 `<models>/llm-models`，只认白名单（`electron/shared/llm-packs.js`：文件名 + 大小 + SHA256，哈希是安全边界）里的文件；`llm-manager.js` 决定载哪个文件、驻留与 5 分钟闲置卸载、显卡自检，并管视觉槽（PaddleOCR-VL，只在显卡加速打开时接活）和语音槽（Qwen3-ASR，给听译高精度档出定稿；两个尺寸都装了时，显卡开着用 1.7B、关着用 0.6B）。栈侧 `src/stack/providers/tengine.js` 是翻译源「内置模型」，`src/stack/ocr/tengine-vision.js` 与 `vision-routing.js` 是 OCR 引擎「内置视觉模型」及其分配规则。设计说明：T-ENGINE.md 第五、七、十节。
 
 ### 听译与朗读
 
-`electron/listen/`（会话管理、逐句翻译、字幕自动保存、包定位与下载、WASAPI 捕获）、`electron/tts/`（语音包）、`electron/services/audio-engine/`（worker：捕获、VAD、两个识别引擎、语音合成、静音闸门）。音频在 worker 内进 VAD，不跨进程、不落盘；渲染端只收文字和电平数。VAD 调参、切分、内存与延迟口径、载卸时序、语音包与闸门的取舍全部在 [design/listen.md](design/listen.md)。
+`electron/listen/`（会话管理、逐句翻译、字幕自动保存、包定位与下载、WASAPI 捕获）、`electron/tts/`（语音包）、`electron/services/audio-engine/`（worker：捕获、VAD、两个识别引擎、语音合成、静音闸门）。音频在 worker 内进 VAD，不落盘；高精度档的定稿段经主进程交给 T-Engine 语音槽（`llm-asr` 宿主），只走内存里的进程消息；渲染端只收文字和电平数。VAD 调参、切分、内存与延迟口径、载卸时序、语音包与闸门的取舍全部在 [design/listen.md](design/listen.md)。
 
 ### 划词与截图
 

@@ -9,7 +9,7 @@ T-Engine 是程序自己的引擎接入层：把本地 OCR、听译、朗读、�
 T-Engine 只做三件事：**装载运行时、监控引擎、报告事实**。
 
 - 它不改产品行为。用哪个引擎、什么时候降档、翻译走哪条链，由主进程的策略层决定（`electron/ipc/*` 与 managers 之上那层），T-Engine 只给信号和建议。原因：隐私门和产品行为按架构规则住在主进程（见 ARCHITECTURE.md「隐私分层」），一个会自己改流程的引擎层没法测、没法解释。
-- 它不装在主进程里。每个运行时家族一个 utilityProcess：音频（sherpa-onnx）、OCR（onnxruntime-node）、LLM（llama.cpp）。三个原因：崩溃隔离、同名 DLL 互斥（一个进程装不下两份 onnxruntime.dll）、内存按进程记账（双槽 4 GB 封顶）。LLM 家族是例外中的例外：文本槽（`llm`）与视觉槽（`llm-vision`）各一个宿主进程，同一套 DLL 装两次——两个模型并存驻留、互不等待，一个出错不连累另一个，代价是运行时多占一份（约 80 MB）。
+- 它不装在主进程里。每个运行时家族一个 utilityProcess：音频（sherpa-onnx）、OCR（onnxruntime-node）、LLM（llama.cpp）。三个原因：崩溃隔离、同名 DLL 互斥（一个进程装不下两份 onnxruntime.dll）、内存按进程记账（双槽 4 GB 封顶）。LLM 家族是例外中的例外：文本槽（`llm`）、视觉槽（`llm-vision`）与语音槽（`llm-asr`）各一个宿主进程，同一套 DLL 各装一份——几个模型并存驻留、互不等待，一个出错不连累别的，代价是每个宿主的运行时多占一份（约 80 MB）。
 - 它不编译原生代码。绑定层是 koffi（FFI）直接调官方发布的 DLL；C++ addon 只在"KV 缓存留显卡的自写解码循环"这类需求出现时才考虑，目前没有。
 
 信号与策略的分工，用一句话记：**T-Engine 说"我现在这样"，主程序说"那就这么办"**。
@@ -45,16 +45,17 @@ electron/tengine/
     llama-abi.js       钉版本的结构体与函数原型——年度换版唯一要核对的文件，配 golden 测试
     llama-binding.js   koffi 装载：DLL 目录、依赖顺序、后端目录、设备枚举
     llama-session.js   模型/上下文生命周期、解码循环、采样链、取消、前缀复用、token 流
-    mtmd.js            视觉：图片字节 → mtmd 解码与编码 → 预填进同一个会话 → 会话的采样循环；Spotting 输出解析成行文字 + 像素框
+    mtmd.js            视觉与音频：图片字节 / 16 kHz PCM → mtmd 编码 → 预填进同一个会话 → 会话的采样循环；Spotting 输出解析成行文字 + 像素框，Qwen3-ASR 回复拆成语言 + 正文
     assets/vision-health.png  视觉自检与 golden 用的固定图（「T-Translate OK 确认」）
+    assets/asr-health.wav     语音自检用的固定句（「今天天气很好，我们去公园散步吧。」，Kokoro 合成，4.1 s）
     worker.js          runtime 所在的 worker_thread：所有 FFI 调用在这条线程上同步进行；
                        宿主主线程只做 IPC、取消标志、看门狗
   engines/llm.js       LLM 适配器：load / unload / generate（流式，reqId 路由）/ probe / health / metrics / setProvider / status
   metrics-log.js       事件流落盘：data\logs\tengine-<日期>.jsonl，留 3 份，无痕不写，内容键一律剥掉
   trial-log.js         试用日志：data\logs\tengine-trial-<模型>-<月>.jsonl，两个月清理，文本只在开关后写；summarize 出试用报告
 electron/services/llm-host/llm-host.js     LLM utilityProcess：进程内一条 worker_thread 跑 runtime，主线程转发、排队、持取消标志、跑停滞看门狗
-electron/llm/llm-manager.js           主进程侧决策：选文件（白名单 / 开发者门）、驻留与 5 分钟闲置卸载（P8）、显卡开关自检、试用日志；视觉槽（recognize / unloadVision / visionSelfTest）有自己的驻留、闲置计时与策略实例；只在显卡上接活（`usable`），这是主程序的决定
-electron/llm/llm-pack-manager.js      模型文件夹扫描：同名同大小才哈希（缓存 size+mtime），哈希对上才 ready，其余列为未列入；双文件包（模型 + mmproj）逐文件核对，全对才 ready，缺一个 partial、错一个 mismatch
+electron/llm/llm-manager.js           主进程侧决策：选文件（白名单 / 开发者门）、驻留与 5 分钟闲置卸载（P8）、显卡开关自检、试用日志；视觉槽（recognize / unloadVision / visionSelfTest）与语音槽（transcribe / ensureAsrLoaded / unloadAsr / asrSelfTest）是两个媒体槽，各有自己的驻留、闲置计时与策略实例；视觉只在显卡上接活（`usable`），语音在 CPU 和显卡上都接，这是主程序的决定
+electron/llm/llm-pack-manager.js      模型文件夹扫描：同名同大小才哈希（缓存 size+mtime），哈希对上才 ready，其余列为未列入；双文件包（模型 + mmproj）逐文件核对，全对才 ready，缺一个 partial、错一个 mismatch；语音包按后端挑（resolveAsr：显卡取大、CPU 取小）
 electron/ipc/llm.js                        llm:* 通道：状态、重扫、开文件夹、卸载、探针、试用报告；不过文本
 src/stack/ocr/tengine-vision.js            OCR 引擎「内置视觉模型」：经 runtime.localLlm.recognize 到视觉槽，一律 Spotting，行框按 blocks.js 契约给像素坐标；默认顺序第 3 位；只在视觉槽在显卡上时可用（visionStatus().usable）
 src/stack/ocr/vision-routing.js            选中内置视觉模型时的分配规则（2026-09-14 用户定）：先跑 PP-OCR，按其行框与置信度判 unreadable / large / dense / low-confidence / table / columns / mixed-sizes 才升级到视觉模型；结果带 routed 枚举，阈值在 ROUTING
@@ -113,7 +114,7 @@ koffi 装载顺序（否则依赖解析失败）：`SetDllDirectoryW(<目录>)` 
 - 双显卡机器要把 `llama_model_params.devices` 显式指到独显：本机默认选择恰好是 Vulkan0 = 4090（核显一字节没占），但不能指望别的机器也这样；指定后 llama 日志里 `VulkanN model buffer size` 能对上，作为自检断言。
 - 退出码：Git Bash 报的 127 是 msys 误报（PowerShell 读同一进程为 0），判断宿主崩溃以 utilityProcess 的 `exit` 事件 code 为准；0xC0000005 是访问违规，0xC0000409 是 fast-fail。
 
-Golden 测试至少覆盖：三个 `*_default_params()` 与 `mtmd_context_params_default()` / `mtmd_helper_init_opt_default()` 的全部字段值（`tests/unit/tengine/llama-abi.test.js` 已做）、`llama_version()` 与 GOLDEN 里的库版本串一致（它只报库版本如 `0.4.0-dev`，不是 build 号——build 由清单哈希保证）、固定 prompt 贪心输出前 N 个 token（`scripts/smoke/smoke-llm.js`）、视觉固定图 `runtime/assets/vision-health.png` 的 Spotting 结果（`scripts/smoke/smoke-llm-vision.js`：读到 OK 那一行且带框、两次输出逐字相同）。
+Golden 测试至少覆盖：三个 `*_default_params()` 与 `mtmd_context_params_default()` / `mtmd_helper_init_opt_default()` 的全部字段值（`tests/unit/tengine/llama-abi.test.js` 已做）、`llama_version()` 与 GOLDEN 里的库版本串一致（它只报库版本如 `0.4.0-dev`，不是 build 号——build 由清单哈希保证）、固定 prompt 贪心输出前 N 个 token（`scripts/smoke/smoke-llm.js`）、视觉固定图 `runtime/assets/vision-health.png` 的 Spotting 结果（`scripts/smoke/smoke-llm-vision.js`：读到 OK 那一行且带框、两次输出逐字相同）、语音固定句 `runtime/assets/asr-health.wav` 的转写（`scripts/smoke/smoke-llm-asr.js`：逐字读回、标出中文、两次输出逐字相同）。
 
 视觉路径的补充规则（v0.5.1）：mtmd 的结构体（`mtmd_context_params` 96 字节、`mtmd_input_text` 24、`mtmd_helper_init_opt` 24、`mtmd_helper_bitmap_wrapper` 16）与函数表同样放在 `llama-abi.js`，符号归属 `mtmd`；`mtmd_helper_log_set` 与 `llama_log_set` 挂同一个回调，否则 mtmd 会把每张图的提示词打到 stderr。图片字节经 `mtmd_helper_bitmap_init_from_buf` 直接喂（PNG / JPEG 由它解码），`mtmd_helper_eval_chunks` 一次完成编码与预填，之后接会话的 `generateContinue`；预填后不保留前缀（图像不是 token 列表）。mmproj 的 `warmup` 留开：它在载入时跑一次哑图，显卡首次的着色器编译（约 20 s）就落在载入而不是用户的第一张图。PaddleOCR-VL 的提示词是 `<|begin_of_sentence|>User: <__media__><任务>:\nAssistant:\n`，任务一律 `Spotting`（`OCR:` 对多栏整屏会漏栏）；mmproj 元数据把输入限在 1 MP，整屏会被缩放。
 
@@ -205,14 +206,14 @@ Golden 测试至少覆盖：三个 `*_default_params()` 与 `mtmd_context_params
 | P7 | 宿主崩溃 | 下次请求自动重生；2 分钟内第 3 次崩溃则 1 分钟内不再拉起（已有，host-manager 内建） | 自动 | 退避期间的请求报「引擎暂不可用」 |
 | P8 | 闲置：LLM 5 分钟、朗读 60 秒无请求 | 卸载模型 / 退出 TTS-only 进程 | 自动 | 无（下次请求多等载入时间） |
 | P9 | 连续 3 个请求 tok/s 低于自检基线一半 | 只记录并显示「性能下降」 | 记录 | 状态行 |
-| P10 | 听译高精度档连续 3 段 RTF > 0.8 | 建议换回标准档，不切 | 建议 | 悬浮窗状态一句话 |
+| P10 | 听译高精度档：宿主不健康或报错、一段排队超 2.5 s、10 s 没答复 | 这一段由标准档引擎出字；超时的请求撤回，之后 30 s 都走标准档 | 自动 | 无（会话日志记 `hq-fallback`） |
 | P11 | 无痕模式 | 不写 metrics 文件；其余行为不变 | 自动 | 隐私页已说明 |
 | P12 | 离线模式 | 无变化（全本地）；外接端点被现有门挡住 | — | — |
 | P13 | 一次请求 `thinkLeak` > 0（模型绕过封禁输出了思考内容） | 只记录并计数；未验证模型的试用报告标「无法关思考」，不进白名单 | 记录 | 试用报告一行 |
 
 表以外的调整都不做。加一条规则 = 加一行 + 一条单测 + 一句状态行文案。
 
-落码位置（2026-09-08）：内置模型这一列的 P4 / P5 / P6 / P9 / P13 在 `electron/policy/engine-policy.js`（纯函数，`observe(event)` 进、动作出，`tests/unit/tengine/engine-policy.test.js` 逐条守着），`llm/llm-manager.js` 喂事件并执行——P6 让 `generate()` 抛 `LLM_UNHEALTHY`，栈里的内置源据此让位给下一个源，宿主重启或换模型后自动恢复；P8 闲置卸载在 manager 本身；P1 / P2 / P3 / P7 在适配器与宿主框架；P10 / P11 / P12 在听译 manager 与 metrics-log。
+落码位置（2026-09-08）：内置模型这一列的 P4 / P5 / P6 / P9 / P13 在 `electron/policy/engine-policy.js`（纯函数，`observe(event)` 进、动作出，`tests/unit/tengine/engine-policy.test.js` 逐条守着），`llm/llm-manager.js` 喂事件并执行——P6 让 `generate()` 抛 `LLM_UNHEALTHY`，栈里的内置源据此让位给下一个源，宿主重启或换模型后自动恢复；P8 闲置卸载在 manager 本身；P1 / P2 / P3 / P7 在适配器与宿主框架；P10 在听译 worker（`asr-session.js` 的 `decodeHq`）与听译 manager（撤回请求）；P11 / P12 在 metrics-log。
 
 ## 八、排障
 
@@ -234,7 +235,7 @@ Golden 测试至少覆盖：三个 `*_default_params()` 与 `mtmd_context_params
 - [ ] build 号、SHA256SUMS、取包脚本三处一致
 - [ ] 四个头文件与 `llama-abi.js` 逐字段核对，弃用函数已替换
 - [ ] golden 测试全过，期望值未被"顺手"改动
-- [ ] `smoke:llm`、`smoke:llm-host`、`smoke:llm-vision`、`smoke:llm-vision-host`、`smoke:llm-stack`、`smoke:ocr`、`smoke:listen` 全过（参数见 DEVELOPMENT.md 的「冒烟与基准」）
+- [ ] `smoke:llm`、`smoke:llm-host`、`smoke:llm-vision`、`smoke:llm-vision-host`、`smoke:llm-asr`、`smoke:llm-asr-host`、`smoke:llm-stack`、`smoke:ocr`、`smoke:listen` 全过（参数见 DEVELOPMENT.md 的「冒烟与基准」）
 - [ ] 装前自测数字更新到 FAQ
 - [ ] 模型白名单 SHA 更新，链接导入页链接有效
 - [ ] 安装包内 DLL 清单核对（asar.unpacked 下只有需要的文件）
@@ -246,8 +247,8 @@ Golden 测试至少覆盖：三个 `*_default_params()` 与 `mtmd_context_params
 ### 后端选型与实测数字（registry.js）
 
 - onnxruntime 系引擎只用一个执行提供器：WebGPU（Dawn on D3D12）。它一份代码覆盖 NVIDIA / AMD / Intel、什么都不用装，而且是微软还在推进的那个。DirectML 测过又放弃：维护模式，且拒绝 Kokoro 的 ConvTranspose。
-- 量化（int8）图在 WebGPU 上比 CPU 慢 3–6 倍，所以听译引擎（SenseVoice / zipformer / Qwen3-ASR，都是 int8）在表里标成 CPU-only，不是「还没做」。
-- llama.cpp 家族走 Vulkan 不走 WebGPU；视觉槽是同一套运行时的第二个宿主进程（mtmd 做图像编码器），与文本模型并存驻留。
+- 量化（int8）图在 WebGPU 上比 CPU 慢 3–6 倍，所以听译标准档的引擎（SenseVoice / zipformer，都是 int8）在表里标成 CPU-only，不是「还没做」。高精度档换到了 llama.cpp 的语音槽（`llm-asr`），走 Vulkan；为什么不在 sherpa 里上显卡，见 `design/listen.md` §4。
+- llama.cpp 家族走 Vulkan 不走 WebGPU；视觉槽、语音槽是同一套运行时的第二、第三个宿主进程（mtmd 分别做图像、音频编码器），与文本模型并存驻留。
 
 | 引擎 | 样本 | CPU | GPU |
 | --- | --- | --- | --- |
@@ -255,6 +256,7 @@ Golden 测试至少覆盖：三个 `*_default_params()` 与 `mtmd_context_params
 | 朗读 Kokoro fp32 | 首块 / RTF | 573 ms / 0.235 | 111 ms / 0.044 |
 | 文本 Qwen3-1.7B Q8_0 | 生成 | 22 tok/s | 210 tok/s |
 | 视觉 PaddleOCR-VL-1.6 | 悬浮窗一块 | 2.1 s | 0.12 s |
+| 语音 Qwen3-ASR Q8_0（2026-09-25） | FLEURS 一句（整链定稿延迟中位） | 0.6B，4 线程：0.85–0.9 s | 0.6B 0.12 s（引擎）；1.7B 0.42–0.65 s（整链） |
 
 ### 宿主框架（host-manager.js）
 
@@ -279,9 +281,12 @@ Golden 测试至少覆盖：三个 `*_default_params()` 与 `mtmd_context_params
 - GPU 自检掐表取第二次生成：第一次要付流水线 / 着色器编译。视觉自检同理，固定图跑两次计第二次。探针里被取消的解码在 llama 眼里是错误，那是机制在工作不是故障。
 - worker 里 `mtmd_helper_log_set` 与 `llama_log_set` 挂同一个回调，否则每张图的提示词会打到 stderr。
 - 视觉引擎 **GPU-only**（2026-09-14 拍板，另见第一节）：CPU 上编码器要好几秒，整屏缩放后的图又超尺寸上限，所以显卡关着时引擎在 1.7 GB 的包被载入之前就让位。
+- 音频：`mtmd_bitmap_init_from_audio` 接 16 kHz 单声道 float PCM。提示词里只放媒体标记，`<|audio_start|>` / `<|audio_end|>` 由 mtmd 按模型自己加（探针逐 token 核过），再手写一层就重复了。回复是「language X<asr_text>正文」，X 为 None 表示没有语音；贪心解码，回复上限取音频 token 数加 32。超过 60 s 的音频拒收：上游音频按 30 s 分块，超过约 2 分钟会没有输出（issue #21847，未修），听译按 VAD 切段，最长 18 s。
+- 语音槽在显卡上载入时用 2 s 微弱噪声跑一遍热身：与其他显卡任务的首次预热撞在一起时，第一段定稿实测要 8 s。语音自检读固定句 `assets/asr-health.wav` 两遍、掐第二遍，读回的字错不超过两成才算通过。
 
 ### 主进程侧（llm/、policy/）
 
-- 内置模型驻留一份，闲置五分钟卸载（P8）；视觉模型是独立的第二槽，自己的宿主、驻留、闲置计时与策略连击，不与文本模型互等。
+- 内置模型驻留一份，闲置五分钟卸载（P8）；视觉模型、语音模型是两个独立的媒体槽（`createMediaSlot`），各有自己的宿主、驻留、闲置计时与策略连击，不与文本模型互等。同一文件在同一后端上的载入会合并：听译会话开始时的预载与第一段定稿同时到，只载一次。
+- 语音槽在 CPU 上最多 4 线程（核少的机器取核数一半，至少 2）：它和听译 worker 的草稿引擎同时在跑，8 线程反而更慢，数字见 `design/listen.md` §4。
 - P6：连续三次停滞 / 超时后本会话让位，直到宿主重启或重新载入模型（两者都重置策略）。
 - 白名单外的文件走开发者门：探针五步的原始报告写进该文件的试用日志，调用方也拿到同一份。

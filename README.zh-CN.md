@@ -133,7 +133,7 @@ npm run dist            # 打包安装程序
 - 内置模型 Qwen3-1.7B（通用，1.8 GB）：[官方](https://huggingface.co/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf) · [镜像](https://hf-mirror.com/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf) → `models\llm-models`
 - 内置模型 Hy-MT2-1.8B（仅翻译，1.9 GB）：[官方](https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF/resolve/main/Hy-MT2-1.8B-Q8_0.gguf) · [镜像](https://hf-mirror.com/tencent/Hy-MT2-1.8B-GGUF/resolve/main/Hy-MT2-1.8B-Q8_0.gguf) → `models\llm-models`
 - 内置视觉模型 PaddleOCR-VL-1.6（两个文件，各 0.9 GB，需显卡加速）：[主模型](https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.6-GGUF/resolve/main/PaddleOCR-VL-1.6-GGUF.gguf) · [图像编码器](https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.6-GGUF/resolve/main/PaddleOCR-VL-1.6-GGUF-mmproj.gguf) → `models\llm-models`
-- 高精度听译模型 Qwen3-ASR（806 MB）：[下载](https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25.tar.bz2)，解压后整个文件夹放进 `models\asr-models`
+- 高精度听译模型 Qwen3-ASR，二选一，各两个文件：1.7B（2.5 GB，有独立显卡时选）[主模型](https://huggingface.co/ggml-org/Qwen3-ASR-1.7B-GGUF/resolve/main/Qwen3-ASR-1.7B-Q8_0.gguf) · [音频编码器](https://huggingface.co/ggml-org/Qwen3-ASR-1.7B-GGUF/resolve/main/mmproj-Qwen3-ASR-1.7B-Q8_0.gguf)；0.6B（1 GB）[主模型](https://huggingface.co/ggml-org/Qwen3-ASR-0.6B-GGUF/resolve/main/Qwen3-ASR-0.6B-Q8_0.gguf) · [音频编码器](https://huggingface.co/ggml-org/Qwen3-ASR-0.6B-GGUF/resolve/main/mmproj-Qwen3-ASR-0.6B-Q8_0.gguf) → `models\llm-models`
 
 镜像链接、放好后怎么检测、程序内下载不了时的备选地址，见使用说明第 5 章。
 

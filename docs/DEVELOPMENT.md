@@ -302,13 +302,14 @@ export default MyOCREngine;
 
 ## 内置模型与 T-Engine
 
-内置本地模型（翻译源 `tengine`）和内置视觉模型（OCR 引擎 `tengine-vision`）不走上面两条路线：它们是 T-Engine 引擎层的宿主，全部细节在 [T-ENGINE.md](T-ENGINE.md)。改它之前只需记住：
+内置本地模型（翻译源 `tengine`）、内置视觉模型（OCR 引擎 `tengine-vision`）和听译高精度档的语音模型不走上面两条路线：它们是 T-Engine 引擎层的宿主，全部细节在 [T-ENGINE.md](T-ENGINE.md)。改它之前只需记住：
 
-- **白名单在 `electron/shared/llm-packs.js`**，一个模型 = 文件名 + 大小 + 哈希 + 角色（`general` / `mt` / `vision`，视觉包是模型 + mmproj 两个文件各自钉哈希）。加模型就是加一行，再跑对应的 smoke 过一遍
+- **白名单在 `electron/shared/llm-packs.js`**，一个模型 = 文件名 + 大小 + 哈希 + 角色（`general` / `mt` / `vision` / `asr`，视觉包与语音包是模型 + mmproj 两个文件各自钉哈希）。加模型就是加一行，再跑对应的 smoke 过一遍
 - **运行时钉版**：`npm run llama:runtime` 按 `llama-manifest.json` 下载并逐文件校验官方 llama.cpp DLL；换版走 T-ENGINE.md 第九节的检查单，ABI 结构体改动必须同步 `llama-abi.js` 的 SIZES / GOLDEN 单测
 - **开发者门**：`settings.llm.allowUnlistedModels` 或环境变量 `TT_TENGINE_DEV=1` 才能加载文件夹里的非白名单 GGUF；试用报告在 `data\logs\tengine-trial-*.jsonl`
 - **思考模式一律禁止**（logit 禁 token + 模板 + 流过滤三层），新模型接入时先确认它的 think token id
 - **视觉槽只在显卡上接活**，这是主程序（`llm-manager.js` 与 `src/stack/ocr/vision-routing.js`）的决定，运行时里不放尺寸上限和路由规则
+- **语音槽显卡与 CPU 都接活**：两个尺寸都装了时显卡开着用 1.7B、关着用 0.6B；答得慢或出错时由听译 worker 回落到标准档（T-ENGINE.md 的 P10），运行时不管
 
 **冒烟与基准**（改到对应层就跑，发版前全跑）：
 
@@ -318,13 +319,15 @@ export default MyOCREngine;
 | `npm run smoke:llm-vision -- --model <gguf> --mmproj <gguf>` | 同上的视觉路径：固定图带框读回、取消、卸载 |
 | `npx electron scripts/smoke/smoke-llm-host.js --model <gguf> [--gpu]` | 真 utilityProcess：载入、流式、取消、自检、探针、杀进程重生 |
 | `npx electron scripts/smoke/smoke-llm-vision-host.js --model <gguf> --mmproj <gguf> [--gpu]` | 视觉槽端到端含智能分配 |
+| `npm run smoke:llm-asr -- --model <gguf> --mmproj <gguf> [--provider gpu]` | 同上的音频路径：自检句读回、噪声不出字、坏输入拒收、取消、卸载 |
+| `npx electron scripts/smoke/smoke-llm-asr-host.js --dir <放语音包的文件夹> [--text <gguf>]` | 语音槽端到端：扫描、按后端挑尺寸、GPU 与 CPU 识别、显卡自检、与文本宿主并存 |
 | `npx electron scripts/smoke/smoke-llm-stack.js --model <gguf> [--mt <gguf>] [--gpu]` | 经翻译栈：过滤器、模板、隐私门、仅翻译包 |
 | `npm run smoke:ocr [-- --gpu]` | OCR 宿主：CPU（与 WebGPU）识别、杀进程重生、深度健康检查 |
-| `npm run smoke:listen` | 听译 + 朗读整链（先 `npm run audio:release`） |
+| `npm run smoke:listen` | 听译 + 朗读整链（先 `npm run audio:release`）；`models/asr-gguf` 里有语音包（或 `--asr-dir`）时连高精度档一起跑，`--gpu` 上显卡 |
 | `npm run smoke:offline` | 离线模式：所有下载入口与更新检查必须 `OFFLINE_BLOCKED` |
-| `npm run bench:listen -- --lang zh\|en` | 听译准确率基准（FLEURS） |
+| `npm run bench:listen -- --lang zh\|en [--tier high [--gpu]]` | 听译准确率基准（FLEURS） |
 
-`npm run smoke:xxx -- --flag` 会吞掉参数的情况下，直接 `npx electron scripts/smoke/<file>.js --flag` 跑。
+`npm run smoke:xxx -- --flag` 会吞掉参数的情况下，直接 `npx electron scripts/smoke/<file>.js --flag` 跑。沙盒建在系统临时目录，模型以硬链接放进去；临时目录和模型不在同一个盘时会整份复制（1.7B 语音包约 2.5 GB），这时把 `TEMP` 指到同盘、仓库之外的目录再跑。
 
 ---
 

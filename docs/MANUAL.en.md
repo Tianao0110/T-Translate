@@ -310,8 +310,9 @@ The model that ships with the app; you download the files yourself and put them 
 ### 4.9 Audio · Listen
 
 - From the "Audio" page, click "Listen".
-- Recognition model list: base recognition model (required), draft engine (optional, text while speech is still going), high-accuracy final engine (optional, too large to download here; fetch it from the link and place it in the given folder). Download, update and uninstall live here.
-- Final tier: standard / high accuracy.
+- Recognition model list: base recognition model (required), draft engine (optional, text while speech is still going). Download, update and uninstall live here. An old high-accuracy engine installed earlier is listed here too; it is no longer used and can be removed.
+- Final tier: standard / high accuracy. High accuracy needs one of the "High-accuracy models" in place first.
+- High-accuracy models: Qwen3-ASR 1.7B and 0.6B, two files each, with whether they are in place, download links, the model folder, "Re-detect", and which one the next listen session uses. With GPU acceleration on the 1.7B runs, with it off the 0.6B; if only one is in place, that one runs.
 - Auto-save captions on stop or switch: on by default.
 
 ### 4.10 Audio · Speak
@@ -343,17 +344,17 @@ The model that ships with the app; you download the files yourself and put them 
 
 - Version and "Check for Updates". A new version can be downloaded and installed from here, or fetched from GitHub by hand.
 - Storage: where the data and models folders are, with buttons to open them. Models left elsewhere by an older version can be moved into the app folder, and the old folder cleaned afterwards.
-- GPU acceleration: one switch. When on, local OCR, neural voices, the local model and the built-in vision model run on the GPU; each engine self-tests first and stays on the CPU if it cannot, no restart needed. Listen recognition always stays on the CPU.
+- GPU acceleration: one switch. When on, local OCR, neural voices, the local model, the built-in vision model and the high-accuracy listen tier run on the GPU; each engine self-tests first and stays on the CPU if it cannot, no restart needed. The standard listen tier always stays on the CPU.
 - Engine status: where each engine runs, its self-test result and speed.
 - Open the log folder, reset all settings (API keys are kept).
 
 ## 5. Models and downloads
 
-The app ships without models. Small ones download with one click on the settings pages; large ones (hundreds of MB to 2 GB) are not distributed through our servers: download them from the links below and place them in the models folder. Every model runs on this computer; once downloaded, nothing goes online.
+The app ships without models. Small ones download with one click on the settings pages; large ones (hundreds of MB to over 2 GB) are not distributed through our servers: download them from the links below and place them in the models folder. Every model runs on this computer; once downloaded, nothing goes online.
 
 The models folder is shown under Settings → About → Storage and can be opened from there. By default it is `models` inside the install folder, with four subfolders:
 
-- `llm-models`: the built-in model and the built-in vision model
+- `llm-models`: the built-in model, the built-in vision model and the high-accuracy listen models
 - `ocr-models`: OCR language packs and the high-accuracy model
 - `asr-models`: listen recognition models
 - `tts-models`: neural voice packs
@@ -381,14 +382,25 @@ Put the file into `models\llm-models`, keep the original file name, then click "
 
 The same links are on the Local model and OCR settings pages and open in your browser. All three models are Apache-2.0.
 
-### 5.2 High-accuracy listen model (manual download)
+### 5.2 High-accuracy listen models (manual download)
 
-More accurate with music or noise, 30 languages. About 806 MB, 1 to 1.6 GB of RAM while running; 16 GB of RAM recommended.
+More accurate with music or noise, 30 languages. Pick one of the two sizes; each has two files (main model and audio encoder). Put them into `models\llm-models` with their original names, click "Re-detect" under Settings → Audio → Listen, then switch the final tier to "High accuracy". With GPU acceleration on the 1.7B runs, with it off the 0.6B; if only one is in place, that one runs.
 
-1. Download: https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25.tar.bz2
-2. Extract it; you get a folder named `sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25`.
-3. Put the whole folder into `models\asr-models`.
-4. Under Settings → Audio → Listen, click "Placed, check again", then switch the final tier to "High accuracy".
+**Qwen3-ASR-1.7B**: more accurate; take it if you have a dedicated GPU. Main model about 2.2 GB, audio encoder about 0.36 GB; about 3 GB of video memory while running.
+
+- Main model, official: https://huggingface.co/ggml-org/Qwen3-ASR-1.7B-GGUF/resolve/main/Qwen3-ASR-1.7B-Q8_0.gguf
+- Main model, mirror: https://hf-mirror.com/ggml-org/Qwen3-ASR-1.7B-GGUF/resolve/main/Qwen3-ASR-1.7B-Q8_0.gguf
+- Audio encoder, official: https://huggingface.co/ggml-org/Qwen3-ASR-1.7B-GGUF/resolve/main/mmproj-Qwen3-ASR-1.7B-Q8_0.gguf
+- Audio encoder, mirror: https://hf-mirror.com/ggml-org/Qwen3-ASR-1.7B-GGUF/resolve/main/mmproj-Qwen3-ASR-1.7B-Q8_0.gguf
+
+**Qwen3-ASR-0.6B**: take it without a GPU or with little video memory. Main model about 0.8 GB, audio encoder about 0.2 GB; about 1.5 GB of RAM while running on the CPU.
+
+- Main model, official: https://huggingface.co/ggml-org/Qwen3-ASR-0.6B-GGUF/resolve/main/Qwen3-ASR-0.6B-Q8_0.gguf
+- Main model, mirror: https://hf-mirror.com/ggml-org/Qwen3-ASR-0.6B-GGUF/resolve/main/Qwen3-ASR-0.6B-Q8_0.gguf
+- Audio encoder, official: https://huggingface.co/ggml-org/Qwen3-ASR-0.6B-GGUF/resolve/main/mmproj-Qwen3-ASR-0.6B-Q8_0.gguf
+- Audio encoder, mirror: https://hf-mirror.com/ggml-org/Qwen3-ASR-0.6B-GGUF/resolve/main/mmproj-Qwen3-ASR-0.6B-Q8_0.gguf
+
+Both models are Apache-2.0. The old high-accuracy engine that used to sit in `models\asr-models` is no longer used; remove it from the recognition model list under Settings → Audio → Listen.
 
 ### 5.3 Models downloaded inside the app
 

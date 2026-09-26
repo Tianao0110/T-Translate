@@ -5,9 +5,9 @@
 ## 1. 进程与边界
 
 - ASR 与神经 TTS 跑在同一个 utilityProcess：两者共用一份 sherpa / onnxruntime，原生崩溃不会拖垮主进程。合成在插件自己的线程上，听译会话和朗读只争 CPU。
-- 抓音（v0.4.1 起）也在 worker 里：WASAPI 直接把 16 kHz 单声道 float32 交给 VAD，音频在被识别前不跨进程、不经渲染端、不走屏幕捕获权限。
+- 抓音（v0.4.1 起）也在 worker 里：WASAPI 直接把 16 kHz 单声道 float32 交给 VAD，不经渲染端、不走屏幕捕获权限。标准档的音频在被识别前不跨进程；高精度档的定稿段经主进程送到 T-Engine 的语音宿主（§4），同样只在内存里，不经渲染端、不落盘。
 - 音频帧只转写不落盘。JSONL 会话日志只记时延与指标；识别出的文字默认不写（`TT_LISTEN_LOG_TEXT=1` 才写），看视频不留逐字稿。无痕模式连指标日志都不写；会话中切入无痕，`log-close` 立刻停写、会话照常。
-- 零闲置：会话结束 worker 随之退出；宿主窗口关闭时 `once('closed')` 兜底强停。唯一的放宽是 TTS：语音包加载要 1.3–2.2 s，TTS-only 进程在最后一句后保温 `TTS_IDLE_MS`（悬浮窗还在屏上就继续保温），之后退出。听译会话复用已起的进程；会话里加载的语音随会话同生同灭。
+- 零闲置：会话结束 worker 随之退出；宿主窗口关闭时 `once('closed')` 兜底强停。唯一的放宽是 TTS：语音包加载要 1.3–2.2 s，TTS-only 进程在最后一句后保温 `TTS_IDLE_MS`（悬浮窗还在屏上就继续保温），之后退出。听译会话复用已起的进程；会话里加载的语音随会话同生同灭。高精度档的语音宿主不跟 worker 走，最后一次请求 5 分钟后卸载（llm-manager 的媒体槽）。
 - 崩溃重启：一次会话只自动重启一次，再崩就报 `engine-dead`。载入阶段就死（`everReady=false`）不重试——手放的假 ONNX 走原生异常（0xE06D7363）把进程带走，JS 的 try/catch 接不到，再载入只会同样崩。
 - 会话日志文件只留 3 份（`MAX_PROBE_LOGS`，用户 2026-09-03 拍板）：它只记指标与错误，任务是解释最近一次故障。
 
@@ -44,8 +44,14 @@ VAD 只交出已闭合的段；开段期间 worker 自己镜像音频，每 `PAR
 
 - 草稿引擎（流式 zipformer）可选：zh/en 选定 → `stream`；ja/ko/yue → `pseudo`（模型无此语言）；自动 → 先 `pseudo`，第一条 zh/en 定稿切到 `stream`（并追喂已镜像音频）；其他标签不信（歌曲前奏上 yue/ja 是噪声），交给语言钉。载入失败静默降 `pseudo`，定稿链永不依赖草稿。草稿在段界重置（自然闭合与强制切都在静音里）；若在定稿落地时重置会丢下一段的开头。
 - 语言钉：自动语言会话里连续 `LANG_PIN_STREAK`（3）条同语言定稿后把识别器钉到该语言。SenseVoice 逐段检测在混合或音乐音频上漂移（一首中文歌 31 条定稿里 5 条标成 ja/yue/en），错语言解出的是垃圾。重建只在段间、在解码链里做，在途定稿不会看到半建的模型。
-- 高精度档（Qwen3-ASR，v0.4.8）：定稿不带语言与 BGM 标签，语言钉与音乐策略在它下面不触发；草稿只信流式引擎，没有就 `none`（1 GB 模型不做草稿重解）。`maxNewTokens` 512 / `maxTotalLen` 1024：定稿 ≤ 9 s 足够，超出上下文会出垃圾——所以 VAD 门永远不绕过。
-- Qwen3-ASR 会在幻觉碎片里吐换行，sherpa 手写 JSON 不转义控制字符，`decodeAsync` 抛 SyntaxError 曾把整个宿主带崩（听译基准抓到的丢句根因）。`asr-result.js`：重读原始 JSON 把控制字符换空格再 parse；`<asr_text>` 帧只在开头才被 sherpa 剥掉，幻觉前导会把整帧漏进字幕，只留标记之后。
+- 高精度档（Qwen3-ASR，经 T-Engine 语音宿主）：worker 照常切段，定稿段发给主进程（`hq-transcribe`，16 kHz float），主进程交 `llm-manager.transcribe` → `llm-asr` 宿主（llama.cpp + mtmd 音频编码器，`runtime/mtmd.js` 的 `attachAudio`），结果回 worker（`hq-result`）后与 SenseVoice 定稿同样处理。定稿不带语言与 BGM 标签，语言钉与音乐策略在它下面不触发；草稿只信流式引擎，没有就 `none`。
+- 为什么换：v0.4.10 试过把 sherpa 的 Qwen3-ASR fp32 直接放 WebGPU，总 RTF 与 int8 CPU 持平——sherpa 解码每步把 57 个输出（logits + 各层 KV）从显卡读回，每个 token 固定 50–60 ms（gstack v049-gpu-research）。llama.cpp b10853 的 mtmd 自带 Qwen3-ASR 音频编码（`qwen3a`，上游 PR #19441），KV 缓存和采样留在显卡上，钉版不用换。引擎级 FLEURS 各 150 句：0.6B 显卡中文 CER 7.69%（sherpa int8 7.76%）、英文 WER 5.39%（6.63%），每句中位 0.12 s（1.57 s）；1.7B 为 7.06% / 4.69%，0.2 s（gstack v053-hq-asr-gpu-spike）。英文差距里有一截是数字写法：sherpa int8 把数字念成单词，GGUF 出阿拉伯数字，和参考一致。
+- 同一个 GGUF 也在 CPU 上跑，sherpa 的 qwen3Asr 分支撤掉：显卡上取 1.7B、CPU 上取 0.6B，只装了一个就用那一个（`resolveAsr`）。CPU 线程定 4（核少的机器按核数一半，至少 2）：整链英文 40 句定稿延迟中位 / p90，8 线程 1.13 / 2.49 s（另一次积压到 29.8 s，与 worker 的草稿引擎抢核），2 线程 1.16 / 1.57 s，4 线程 0.85 / 1.11 s。
+- 兜底在 worker 侧，SenseVoice 一直加载着：宿主报错或被停滞保护（P6）判为不健康 → 这一段由 SenseVoice 出；一段在解码链里排队超过 2.5 s → SenseVoice（积压上限）；10 s 没答复 → 发 `hq-cancel` 撤回（不撤的话那条慢请求继续占着宿主，后面几段跟着排队、跟着超时），这一段由 SenseVoice 出，之后 30 s 冷却期都走 SenseVoice，再回到高精度。退回在会话日志里记 `hq-fallback`（原因：错误码 / backlog / timeout / cooldown），bench 数的就是它。
+- 会话开始时预载语音模型（`ensureAsrLoaded`）；预载和第一段定稿同时到时合并成一次载入（媒体槽的 `slotLoading`）。
+- 整链 bench（FLEURS 40 句，原始电平，定稿延迟中位 / p90）：显卡 1.7B 中文 CER 11.8%，0.65 / 0.89 s；英文 CER 8.4%、WER 10.8%，0.42 / 0.71 s。CPU 0.6B 中文 11.9%，0.90 / 1.13 s；英文 8.4% / 11.4%，0.85 / 1.11 s。旧 sherpa CPU 档英文 WER 12.8%，1.1 / 1.5 s；中文 10.8–12.4%，1.1 / 1.4 s。整链的中文差距被切段稀释（40 句里 22 句被切成多段）。别的程序把 CPU 吃满时（实测另一个进程占 ~85%），CPU 版每段都会超时，兜底把延迟压在 10 s 以内。
+- 旧 sherpa 高精度包（`asr-hq` 类型、`MANUAL_PACKS` 条目）：新版不再用，设置页只在已安装时列出、供删除；audio-models 的 manifest 仍保留这个条目给旧版程序（它们靠它显示和下载高精度包），别删。
+- 经 sherpa 跑 Qwen3-ASR 时的换行 / `<asr_text>` 帧问题随 qwen3Asr 分支退役；`asr-result.js` 只剩 JSON 宽松解析（sherpa 手写 JSON 不转义控制字符，SenseVoice 也走它）。llama.cpp 路径由 `mtmd.parseAsrReply` 拆「language X<asr_text>正文」。
 
 ## 5. 抓音（win-audio-capture.js）
 
@@ -80,7 +86,7 @@ VAD 只交出已闭合的段；开段期间 worker 自己镜像音频，每 `PAR
 
 ## 8. 模型包与目录（asr-models.js、tts-models.js、pack-roots.js）
 
-- 两种布局都认：包（`asr-models/<packId>/pack.json` 的 `files` 映射角色 → 文件名）与手放的 sherpa 原始 tarball（VAD 在根、目录名含 `sense-voice` / `streaming-zipformer`，文件名固定）。包优先；基座与草稿各自独立解析，可混搭。高精度档只有包布局。链接手放的大包（`MANUAL_PACKS`）无 pack.json，目录名与文件清单就是契约，同 id 的 pack.json 安装胜出。
+- 两种布局都认：包（`asr-models/<packId>/pack.json` 的 `files` 映射角色 → 文件名）与手放的 sherpa 原始 tarball（VAD 在根、目录名含 `sense-voice` / `streaming-zipformer`，文件名固定）。包优先；基座与草稿各自独立解析，可混搭。高精度档的模型不在这里，由 llm-manager 在 `llm-models` 里按白名单认（§4）。链接手放的大包（`MANUAL_PACKS`）无 pack.json，目录名与文件清单就是契约，同 id 的 pack.json 安装胜出。
 - 多根：安装目录的 models 为活动根，旧的 userData 位置仍被列出、可用、可删；活动根在 id 冲突时胜出（`pack-roots.js`）。
 - 语音包每个引用路径都必须存在才算可用，半换或手删的目录跳过而不是让 worker 载入时崩。
 
