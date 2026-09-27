@@ -15,9 +15,11 @@ const manager = require('../../../electron/llm/llm-manager.js');
 const PACK = { id: 'qwen3-1.7b', role: 'general', default: true, file: 'Q.gguf', ctx: 4096, template: 'qwen3' };
 
 // loadGate: a promise every load waits on, to hold a load in flight.
-function fakeAdapter({ loadGate = null } = {}) {
+// devices: the host's ready info; prewarm brings devicesAfterPrewarm.
+function fakeAdapter({ loadGate = null, devices = null, devicesAfterPrewarm = null } = {}) {
   let provider = 'cpu';
   let loaded = null;
+  let runtimeDevices = devices;
   const a = {
     calls: [],
     provider: () => provider,
@@ -25,7 +27,10 @@ function fakeAdapter({ loadGate = null } = {}) {
       provider = p;
     },
     loaded: () => loaded,
-    runtime: () => ({ build: 'b10853' }),
+    runtime: () => ({ build: 'b10853', ...(runtimeDevices ? { devices: runtimeDevices } : {}) }),
+    prewarm: vi.fn(async () => {
+      if (devicesAfterPrewarm) runtimeDevices = devicesAfterPrewarm;
+    }),
     status: () => ({ lastHealth: null, lastRequest: null }),
     load: vi.fn(async (file, options) => {
       a.calls.push(['load', file, options]);
@@ -402,6 +407,56 @@ describe('the speech slot', () => {
     await (await pending).promise;
     expect(asrAdapter.load).toHaveBeenCalledTimes(1);
     expect(asrAdapter.generate).toHaveBeenCalledTimes(1);
+  });
+
+  const GiB = 1024 ** 3;
+  const card = (typeName, gib) => ({ name: typeName, typeName, memory: { total: gib * GiB, free: gib * GiB } });
+  const cpuDevice = { name: 'CPU', typeName: 'cpu', memory: { total: 32 * GiB, free: 16 * GiB } };
+
+  it('on the GPU the larger pack needs a discrete card with 8 GB; smaller cards and integrated GPUs get the smaller one', async () => {
+    const cases = [
+      { devices: [card('igpu', 16), card('gpu', 16), cpuDevice], file: 'A17.gguf', id: 'qwen3-asr-1.7b' },
+      { devices: [card('gpu', 8), cpuDevice], file: 'A17.gguf', id: 'qwen3-asr-1.7b' },
+      { devices: [card('gpu', 6), cpuDevice], file: 'A06.gguf', id: 'qwen3-asr-0.6b' },
+      { devices: [card('gpu', 4), card('gpu', 6), cpuDevice], file: 'A06.gguf', id: 'qwen3-asr-0.6b' },
+      { devices: [card('igpu', 16), cpuDevice], file: 'A06.gguf', id: 'qwen3-asr-0.6b' },
+    ];
+    for (const c of cases) {
+      manager.reset();
+      const asrAdapter = fakeAdapter({ devices: c.devices });
+      asrAdapter.setProvider('gpu');
+      boot({ packs: fakePacks({ asr: ['big', 'small'] }), asrAdapter });
+      await (await manager.transcribe({ pcm })).promise;
+      expect(asrAdapter.load).toHaveBeenLastCalledWith(`C:/models/llm-models/${c.file}`, audioOptions(c.file, 'gpu'));
+      expect(manager.status().asr.selected).toBe(c.id);
+      expect(asrAdapter.prewarm).not.toHaveBeenCalled();
+    }
+  });
+
+  it('starts the host to learn the card before the first GPU load or self-test, never on the CPU', async () => {
+    const asrAdapter = fakeAdapter({ devicesAfterPrewarm: [card('gpu', 6), cpuDevice] });
+    boot({ packs: fakePacks({ asr: ['big', 'small'] }), asrAdapter });
+    await (await manager.transcribe({ pcm })).promise;
+    expect(asrAdapter.prewarm).not.toHaveBeenCalled();
+    asrAdapter.setProvider('gpu');
+    expect(manager.status().asr.selected).toBe('qwen3-asr-1.7b');
+    const r = await manager.asrSelfTest();
+    expect(asrAdapter.prewarm).toHaveBeenCalledTimes(1);
+    expect(asrAdapter.health).toHaveBeenLastCalledWith({ file: 'C:/models/llm-models/A06.gguf', options: audioOptions('A06.gguf', 'gpu') });
+    expect(r).toMatchObject({ ok: true, provider: 'webgpu' });
+    expect(manager.status().asr.selected).toBe('qwen3-asr-0.6b');
+    await (await manager.transcribe({ pcm })).promise;
+    expect(asrAdapter.prewarm).toHaveBeenCalledTimes(1);
+  });
+
+  it('knows the card from the text host too', async () => {
+    const adapter = fakeAdapter({ devices: [card('gpu', 6), cpuDevice] });
+    const asrAdapter = fakeAdapter();
+    asrAdapter.setProvider('gpu');
+    boot({ adapter, packs: fakePacks({ asr: ['big', 'small'] }), asrAdapter });
+    await (await manager.transcribe({ pcm })).promise;
+    expect(asrAdapter.prewarm).not.toHaveBeenCalled();
+    expect(asrAdapter.load).toHaveBeenLastCalledWith('C:/models/llm-models/A06.gguf', audioOptions('A06.gguf', 'gpu'));
   });
 
   it('P6: three stalls make transcribe step aside, the other slots carry on', async () => {

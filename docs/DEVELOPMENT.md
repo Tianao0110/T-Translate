@@ -309,7 +309,7 @@ export default MyOCREngine;
 - **开发者门**：`settings.llm.allowUnlistedModels` 或环境变量 `TT_TENGINE_DEV=1` 才能加载文件夹里的非白名单 GGUF；试用报告在 `data\logs\tengine-trial-*.jsonl`
 - **思考模式一律禁止**（logit 禁 token + 模板 + 流过滤三层），新模型接入时先确认它的 think token id
 - **视觉槽只在显卡上接活**，这是主程序（`llm-manager.js` 与 `src/stack/ocr/vision-routing.js`）的决定，运行时里不放尺寸上限和路由规则
-- **语音槽显卡与 CPU 都接活**：两个尺寸都装了时显卡开着用 1.7B、关着用 0.6B；答得慢或出错时由听译 worker 回落到标准档（T-ENGINE.md 的 P10），运行时不管
+- **语音槽显卡与 CPU 都接活**：两个尺寸都装了时，显卡开着且独立显卡显存 8 GB 以上用 1.7B，其余用 0.6B（显存从 LLM 宿主的 ready 信息读）；答得慢或出错时由听译 worker 回落到标准档（T-ENGINE.md 的 P10），运行时不管
 
 **冒烟与基准**（改到对应层就跑，发版前全跑）：
 

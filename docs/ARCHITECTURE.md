@@ -240,7 +240,7 @@ T-Engine 只报事实，不改产品行为；用哪个引擎、什么时候降�
 
 ### 内置模型
 
-`electron/llm/`：`llm-pack-manager.js` 扫描 `<models>/llm-models`，只认白名单（`electron/shared/llm-packs.js`：文件名 + 大小 + SHA256，哈希是安全边界）里的文件；`llm-manager.js` 决定载哪个文件、驻留与 5 分钟闲置卸载、显卡自检，并管视觉槽（PaddleOCR-VL，只在显卡加速打开时接活）和语音槽（Qwen3-ASR，给听译高精度档出定稿；两个尺寸都装了时，显卡开着用 1.7B、关着用 0.6B）。栈侧 `src/stack/providers/tengine.js` 是翻译源「内置模型」，`src/stack/ocr/tengine-vision.js` 与 `vision-routing.js` 是 OCR 引擎「内置视觉模型」及其分配规则。设计说明：T-ENGINE.md 第五、七、十节。
+`electron/llm/`：`llm-pack-manager.js` 扫描 `<models>/llm-models`，只认白名单（`electron/shared/llm-packs.js`：文件名 + 大小 + SHA256，哈希是安全边界）里的文件；`llm-manager.js` 决定载哪个文件、驻留与 5 分钟闲置卸载、显卡自检，并管视觉槽（PaddleOCR-VL，只在显卡加速打开时接活）和语音槽（Qwen3-ASR，给听译高精度档出定稿；两个尺寸都装了时，显卡开着且独立显卡显存 8 GB 以上用 1.7B，其余用 0.6B）。栈侧 `src/stack/providers/tengine.js` 是翻译源「内置模型」，`src/stack/ocr/tengine-vision.js` 与 `vision-routing.js` 是 OCR 引擎「内置视觉模型」及其分配规则。设计说明：T-ENGINE.md 第五、七、十节。
 
 ### 听译与朗读
 

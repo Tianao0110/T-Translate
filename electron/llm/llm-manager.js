@@ -100,10 +100,10 @@ function armIdle() {
 // --- media slots ---
 //
 // One role on its own host: which pack to load (resolve, given the
-// adapter's provider), how (loadOptions, given the pack and the provider),
-// then residency, the idle timer, in-flight bookkeeping, the GPU self-test
-// and the policy streaks.
-function createMediaSlot({ engine, adapterKey, label, unavailable, missing, resolve, loadOptions }) {
+// adapter's provider, after the optional prepare), how (loadOptions, given
+// the pack and the provider), then residency, the idle timer, in-flight
+// bookkeeping, the GPU self-test and the policy streaks.
+function createMediaSlot({ engine, adapterKey, label, unavailable, missing, resolve, loadOptions, prepare = null }) {
   let slotResident = null; // { path, provider }
   let slotLoading = null; // { key, promise } while a load is on its way
   let slotIdle = null;
@@ -132,6 +132,7 @@ function createMediaSlot({ engine, adapterKey, label, unavailable, missing, reso
     if (!deps) throw fail('LLM_NOT_READY', 'model manager not initialised');
     if (!adapter()) throw fail(unavailable[0], unavailable[1]);
     if (!deps.packs.status()) await deps.packs.scan();
+    if (prepare) await prepare(adapter());
     const r = resolve(adapter().provider());
     if (!r) throw fail(missing[0], missing[1]);
     return r;
@@ -196,6 +197,7 @@ function createMediaSlot({ engine, adapterKey, label, unavailable, missing, reso
     const a = adapter();
     if (!a) return { ok: true, provider: 'cpu', fallback: null, pending: true };
     if (!deps.packs.status()) await deps.packs.scan();
+    if (prepare) await prepare(a);
     const t = resolve(a.provider());
     if (!t) return { ok: true, provider: 'cpu', fallback: null, pending: true };
     const r = await a.health({ file: t.path, options: loadOptions(t, a.provider()) });
@@ -256,16 +258,47 @@ const vision = createMediaSlot({
 });
 
 // The speech slot: the audio mmproj next to its model, on the GPU or the
-// CPU, the larger pack on the GPU. On the CPU it runs next to the listen
-// worker, with at most ASR_CPU_THREADS threads (docs/design/listen.md).
+// CPU. The larger pack only on a discrete card with ASR_LARGE_MIN_VRAM
+// (docs/T-ENGINE.md §6). On the CPU it runs next to the listen worker, with
+// at most ASR_CPU_THREADS threads (docs/design/listen.md).
 const ASR_CPU_THREADS = Math.max(2, Math.min(4, Math.floor((typeof os.availableParallelism === 'function' ? os.availableParallelism() : os.cpus().length) / 2)));
+const ASR_LARGE_MIN_VRAM = 7.5 * 1024 ** 3;
+
+// The card the runtime takes for 'gpu' (llama-session.js pickDevice): the
+// discrete one with the most memory, else an integrated one. From any LLM
+// host's ready info; null until one has started.
+function gpuCard() {
+  for (const key of ['asrAdapter', 'adapter', 'visionAdapter']) {
+    const a = deps ? deps[key] : null;
+    const devices = a && typeof a.runtime === 'function' ? a.runtime()?.devices : null;
+    if (!Array.isArray(devices) || !devices.length) continue;
+    const byMemory = (x, y) => (y.memory?.total || 0) - (x.memory?.total || 0);
+    const discrete = devices.filter((d) => d.typeName === 'gpu').sort(byMemory)[0];
+    const integrated = devices.filter((d) => d.typeName === 'igpu').sort(byMemory)[0];
+    const card = discrete || integrated;
+    return { discrete: !!discrete, total: card ? card.memory?.total || 0 : 0 };
+  }
+  return null;
+}
+
+// Status shows the larger pack while the card is unknown; loads learn it first (prepare).
+function asrPrefersLarger(provider) {
+  if (provider !== 'gpu') return false;
+  const card = gpuCard();
+  return !card || (card.discrete && card.total >= ASR_LARGE_MIN_VRAM);
+}
+
 const asr = createMediaSlot({
   engine: 'llm-asr',
   adapterKey: 'asrAdapter',
   label: 'speech model',
   unavailable: ['LLM_ASR_UNAVAILABLE', 'speech engine not wired'],
   missing: ['LLM_ASR_MISSING', 'no speech model installed'],
-  resolve: (provider) => deps.packs.resolveAsr({ preferLarger: provider === 'gpu' }),
+  // On the GPU the size depends on the card: bring the host up to learn it.
+  prepare: async (a) => {
+    if (a.provider() === 'gpu' && !gpuCard() && typeof a.prewarm === 'function') await a.prewarm();
+  },
+  resolve: (provider) => deps.packs.resolveAsr({ preferLarger: asrPrefersLarger(provider) }),
   loadOptions: (target, provider) => ({
     nCtx: target.pack ? target.pack.ctx : 2048,
     nBatch: 512,
@@ -418,7 +451,7 @@ function asrStatus() {
   if (!deps.asrAdapter) return { available: false };
   const live = asr.liveStatus();
   const rows = (deps.packs.status()?.packs || []).filter((p) => p.role === LLM_ROLE_ASR);
-  const next = deps.packs.resolveAsr({ preferLarger: live.provider === 'gpu' });
+  const next = deps.packs.resolveAsr({ preferLarger: asrPrefersLarger(live.provider) });
   return {
     available: true,
     packs: rows.map((r) => ({ id: r.id, name: r.name, status: r.status, files: r.files || [] })),

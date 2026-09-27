@@ -789,7 +789,7 @@ const en = {
     },
     hq: {
       title: "High-accuracy models",
-      hint: "Pick one, download both of its files and drop them into the model folder with their names unchanged. With a dedicated GPU take 1.7B; without one, or with little video memory, take 0.6B",
+      hint: "Pick one, download both of its files and drop them into the model folder with their names unchanged. With a dedicated GPU of 8 GB or more take 1.7B; otherwise take 0.6B",
       folder: "Model folder: {{dir}}",
       next: "Next listen session: {{name}} ({{where}})",
       where: { gpu: "GPU", cpu: "CPU" },

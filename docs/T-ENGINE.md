@@ -55,7 +55,7 @@ electron/tengine/
   trial-log.js         试用日志：data\logs\tengine-trial-<模型>-<月>.jsonl，两个月清理，文本只在开关后写；summarize 出试用报告
 electron/services/llm-host/llm-host.js     LLM utilityProcess：进程内一条 worker_thread 跑 runtime，主线程转发、排队、持取消标志、跑停滞看门狗
 electron/llm/llm-manager.js           主进程侧决策：选文件（白名单 / 开发者门）、驻留与 5 分钟闲置卸载（P8）、显卡开关自检、试用日志；视觉槽（recognize / unloadVision / visionSelfTest）与语音槽（transcribe / ensureAsrLoaded / unloadAsr / asrSelfTest）是两个媒体槽，各有自己的驻留、闲置计时与策略实例；视觉只在显卡上接活（`usable`），语音在 CPU 和显卡上都接，这是主程序的决定
-electron/llm/llm-pack-manager.js      模型文件夹扫描：同名同大小才哈希（缓存 size+mtime），哈希对上才 ready，其余列为未列入；双文件包（模型 + mmproj）逐文件核对，全对才 ready，缺一个 partial、错一个 mismatch；语音包按后端挑（resolveAsr：显卡取大、CPU 取小）
+electron/llm/llm-pack-manager.js      模型文件夹扫描：同名同大小才哈希（缓存 size+mtime），哈希对上才 ready，其余列为未列入；双文件包（模型 + mmproj）逐文件核对，全对才 ready，缺一个 partial、错一个 mismatch；语音包按后端挑（resolveAsr 取大或取小；取不取大由 llm-manager 按显卡定，见第六节）
 electron/ipc/llm.js                        llm:* 通道：状态、重扫、开文件夹、卸载、探针、试用报告；不过文本
 src/stack/ocr/tengine-vision.js            OCR 引擎「内置视觉模型」：经 runtime.localLlm.recognize 到视觉槽，一律 Spotting，行框按 blocks.js 契约给像素坐标；默认顺序第 3 位；只在视觉槽在显卡上时可用（visionStatus().usable）
 src/stack/ocr/vision-routing.js            选中内置视觉模型时的分配规则（2026-09-14 用户定）：先跑 PP-OCR，按其行框与置信度判 unreadable / large / dense / low-confidence / table / columns / mixed-sizes 才升级到视觉模型；结果带 routed 枚举，阈值在 ROUTING
@@ -168,7 +168,7 @@ Golden 测试至少覆盖：三个 `*_default_params()` 与 `mtmd_context_params
 ## 六、轻量化口径
 
 - 安装包增量：CPU 运行时 ~18 MB + Vulkan 57 MB（zip 内约 50 MB），两者都随安装包走（2026-09-07 拍板：不为几十 MB 做可选下载）。
-- 内存：模型 mmap 载入，闲置卸载（音频宿主已有 60 s 口径）；LLM 家族三个槽各一个进程。实测（2026-09-26，每个槽跑过一次真实请求）：CPU 上文本 Qwen3-1.7B 约 2.5 GB、语音 0.6B 约 1.5 GB，听译高精度档加内置翻译约 4 GB（听译 worker 另占 0.6–0.7 GB）；显卡上的显存是文本 2.5 GB、语音 1.7B 3.2 GB（0.6B 1.9 GB）、视觉 1.9 GB，听译高精度档加翻译 5.7 GB（0.6B 4.5 GB），再截图用视觉 7.7 GB（6.4 GB）。显卡上各宿主工作集里的一两 GB 是映射着的模型文件，系统可回收。
+- 内存：模型 mmap 载入，闲置卸载（音频宿主已有 60 s 口径）；LLM 家族三个槽各一个进程。实测（2026-09-26，每个槽跑过一次真实请求）：CPU 上文本 Qwen3-1.7B 约 2.5 GB、语音 0.6B 约 1.5 GB，听译高精度档加内置翻译约 4 GB（听译 worker 另占 0.6–0.7 GB）；显卡上的显存是文本 2.5 GB、语音 1.7B 3.2 GB（0.6B 1.9 GB）、视觉 1.9 GB，听译高精度档加翻译 5.7 GB（0.6B 4.5 GB），再截图用视觉 7.7 GB（6.4 GB）。显卡上各宿主工作集里的一两 GB 是映射着的模型文件，系统可回收。所以语音槽只在 8 GB 以上的独立显卡上取 1.7B（`llm-manager.js` 的 `ASR_LARGE_MIN_VRAM`，按 7.5 GiB 判断，因为标称 8 GB 的卡报出来略少），6 GB 的卡放 1.7B 加翻译模型就满了；核显用的是系统内存、算力也弱，一律取 0.6B。显存读自任一 LLM 宿主 ready 时报的设备表（挑卡规则与运行时 `pickDevice` 一致）；还没有宿主起来时，载入前先把语音宿主拉起来。
 - 启动：宿主按需拉起，DLL 按需装载；主进程零原生依赖增量（koffi 已在）。
 - 首次编译：Vulkan / WebGPU 首次推理都要编着色器（文本 1.5 s、视觉 7 s 量级），放在装前自测与自检里热身，不让用户的第一句吃它。
 - 前缀复用（系统提示 + 上文共享 KV，`llama_memory_seq_rm` 只丢尾巴）：CPU 上 1.7B 带 407 token 系统提示的请求从 458 ms 降到 258 ms，0.6B 从 112 降到 83；显卡上 9 ms 对 6 ms，可忽略。值得做，但只在 CPU 档有感。

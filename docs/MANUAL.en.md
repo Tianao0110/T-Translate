@@ -312,7 +312,7 @@ The model that ships with the app; you download the files yourself and put them 
 - From the "Audio" page, click "Listen".
 - Recognition model list: base recognition model (required), draft engine (optional, text while speech is still going). Download, update and uninstall live here. An old high-accuracy engine installed earlier is listed here too; it is no longer used and can be removed.
 - Final tier: standard / high accuracy. High accuracy needs one of the "High-accuracy models" in place first. If none is in place when listening starts, the floating window says so once and that session uses standard recognition.
-- High-accuracy models: Qwen3-ASR 1.7B and 0.6B, two files each, with whether they are in place, download links, the model folder, "Re-detect", and which one the next listen session uses. With GPU acceleration on the 1.7B runs, with it off the 0.6B; if only one is in place, that one runs.
+- High-accuracy models: Qwen3-ASR 1.7B and 0.6B, two files each, with whether they are in place, download links, the model folder, "Re-detect", and which one the next listen session uses. The 1.7B runs when GPU acceleration is on and the dedicated GPU has 8 GB or more of video memory, otherwise the 0.6B; if only one is in place, that one runs.
 - Auto-save captions on stop or switch: on by default.
 
 ### 4.10 Audio · Speak
@@ -384,16 +384,16 @@ The same links are on the Local model and OCR settings pages and open in your br
 
 ### 5.2 High-accuracy listen models (manual download)
 
-More accurate with music or noise, 30 languages. Pick one of the two sizes; each has two files (main model and audio encoder). Put them into `models\llm-models` with their original names, click "Re-detect" under Settings → Audio → Listen, then switch the final tier to "High accuracy". With GPU acceleration on the 1.7B runs, with it off the 0.6B; if only one is in place, that one runs.
+More accurate with music or noise, 30 languages. Pick one of the two sizes; each has two files (main model and audio encoder). Put them into `models\llm-models` with their original names, click "Re-detect" under Settings → Audio → Listen, then switch the final tier to "High accuracy". The 1.7B runs when GPU acceleration is on and the dedicated GPU has 8 GB or more of video memory, otherwise the 0.6B; if only one is in place, that one runs.
 
-**Qwen3-ASR-1.7B**: more accurate; take it if you have a dedicated GPU. Main model about 2.2 GB, audio encoder about 0.36 GB; about 3 GB of video memory while running.
+**Qwen3-ASR-1.7B**: more accurate; take it if your dedicated GPU has 8 GB or more of video memory. Main model about 2.2 GB, audio encoder about 0.36 GB; about 3 GB of video memory while running.
 
 - Main model, official: https://huggingface.co/ggml-org/Qwen3-ASR-1.7B-GGUF/resolve/main/Qwen3-ASR-1.7B-Q8_0.gguf
 - Main model, mirror: https://hf-mirror.com/ggml-org/Qwen3-ASR-1.7B-GGUF/resolve/main/Qwen3-ASR-1.7B-Q8_0.gguf
 - Audio encoder, official: https://huggingface.co/ggml-org/Qwen3-ASR-1.7B-GGUF/resolve/main/mmproj-Qwen3-ASR-1.7B-Q8_0.gguf
 - Audio encoder, mirror: https://hf-mirror.com/ggml-org/Qwen3-ASR-1.7B-GGUF/resolve/main/mmproj-Qwen3-ASR-1.7B-Q8_0.gguf
 
-**Qwen3-ASR-0.6B**: take it without a GPU or with little video memory. Main model about 0.8 GB, audio encoder about 0.2 GB; about 1.5 GB of RAM while running on the CPU.
+**Qwen3-ASR-0.6B**: take it without a dedicated GPU or with less than 8 GB of video memory. Main model about 0.8 GB, audio encoder about 0.2 GB; about 1.5 GB of RAM while running on the CPU.
 
 - Main model, official: https://huggingface.co/ggml-org/Qwen3-ASR-0.6B-GGUF/resolve/main/Qwen3-ASR-0.6B-Q8_0.gguf
 - Main model, mirror: https://hf-mirror.com/ggml-org/Qwen3-ASR-0.6B-GGUF/resolve/main/Qwen3-ASR-0.6B-Q8_0.gguf
