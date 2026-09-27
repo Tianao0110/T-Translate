@@ -54,12 +54,17 @@ let recognizer = null;
 // language / BGM tags, so the language pin and the music policy never fire
 // from them; SenseVoice stays loaded and takes any final the host does not
 // answer in time, any segment that queued too long behind slower ones, and
-// every segment for HQ_COOLDOWN_MS after a timeout.
+// every segment for HQ_COOLDOWN_MS after a timeout. Once stopped, the finals
+// still due share HQ_STOP_BUDGET_MS, so asr-stopped goes out inside the
+// manager's stop grace.
 const hqActive = () => !!(asrPaths && asrPaths.remoteHq);
 const HQ_TIMEOUT_MS = 10000;
 const HQ_BACKLOG_MS = 2500;
 const HQ_COOLDOWN_MS = 30000;
+const HQ_STOP_BUDGET_MS = 2000;
+const HQ_STOP_MIN_MS = 500;
 let hqCooldownUntil = 0;
+let hqStopDeadline = 0; // set by stop()
 let hqSeq = 0;
 const hqWaiters = new Map(); // id -> { resolve, timer }
 // Auto-language sessions pin the recognizer once LANG_PIN_STREAK finals agree;
@@ -239,6 +244,7 @@ function start(msg) {
   carryForDecode = null;
   preRoll = [];
   hqCooldownUntil = 0;
+  hqStopDeadline = 0;
   sessionLive = true;
   logLine({
     ts: Date.now(),
@@ -673,17 +679,24 @@ async function decodeLocal(samples) {
   return decodeOffline(stream);
 }
 
+// Withdraws request id after ms: hq-cancel to the main process, and the
+// waiting decode falls back with `code`.
+function armHqTimer(id, ms, code) {
+  return setTimeout(() => {
+    const w = hqWaiters.get(id);
+    if (!w) return;
+    hqWaiters.delete(id);
+    post({ type: 'hq-cancel', id });
+    w.resolve({ ok: false, code });
+  }, ms);
+}
+
 // One segment to the speech host; resolves with the main process's answer,
 // or with a timeout after withdrawing the request.
-function transcribeRemote(samples) {
+function transcribeRemote(samples, ms, code) {
   const id = ++hqSeq;
   return new Promise((resolve) => {
-    const timer = setTimeout(() => {
-      hqWaiters.delete(id);
-      post({ type: 'hq-cancel', id });
-      resolve({ ok: false, code: 'timeout' });
-    }, HQ_TIMEOUT_MS);
-    hqWaiters.set(id, { resolve, timer });
+    hqWaiters.set(id, { resolve, timer: armHqTimer(id, ms, code) });
     post({ type: 'hq-transcribe', id, samples: new Float32Array(samples) });
   });
 }
@@ -698,7 +711,8 @@ function handleHqResult(msg) {
 }
 
 // The host's final; SenseVoice's while the host cools down, when the segment
-// queued too long, or when the host could not answer.
+// queued too long, when the stop budget is nearly spent, or when the host
+// could not answer.
 async function decodeHq(seg) {
   const now = Date.now();
   if (now < hqCooldownUntil) {
@@ -710,7 +724,12 @@ async function decodeHq(seg) {
     logLine(eventRecord('hq-fallback', `backlog ${waited}ms`));
     return decodeLocal(seg.samples);
   }
-  const r = await transcribeRemote(seg.samples);
+  const left = hqStopDeadline ? hqStopDeadline - now : HQ_TIMEOUT_MS;
+  if (left < HQ_STOP_MIN_MS) {
+    logLine(eventRecord('hq-fallback', 'stop'));
+    return decodeLocal(seg.samples);
+  }
+  const r = await transcribeRemote(seg.samples, left, hqStopDeadline ? 'stop' : 'timeout');
   if (r.ok) return { text: r.text || '', lang: '', event: '' };
   if (r.code === 'timeout') hqCooldownUntil = Date.now() + HQ_COOLDOWN_MS;
   logLine(eventRecord('hq-fallback', String(r.code || 'failed')));
@@ -773,6 +792,12 @@ function stop() {
   // Capture first: no new audio may arrive while the VAD is flushing.
   capture.stop();
   sessionLive = false;
+  // Finals already on the host get what is left of the stop budget.
+  hqStopDeadline = Date.now() + HQ_STOP_BUDGET_MS;
+  for (const [id, w] of hqWaiters) {
+    clearTimeout(w.timer);
+    w.timer = armHqTimer(id, HQ_STOP_BUDGET_MS, 'stop');
+  }
   if (partialTimer) clearInterval(partialTimer);
   if (hintTimer) clearInterval(hintTimer);
   if (metricsTimer) clearInterval(metricsTimer);

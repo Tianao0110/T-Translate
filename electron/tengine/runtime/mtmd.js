@@ -96,17 +96,19 @@ function parseSpotting(output, width, height) {
 }
 
 const ASR_MARK = '<asr_text>';
-const ASR_LANGUAGE = /^\s*language\s+([A-Za-z]+)\s*<asr_text>/;
+const ASR_LANGUAGE = /^\s*language\s+([A-Za-z]+)/;
 
 // { language: 'Chinese' | 'English' | ... | null, transcript }. "None" is
-// the model's answer for no speech.
+// the model's answer for no speech; without the marker only what follows
+// the language frame counts.
 function parseAsrReply(output) {
   const s = String(output || '');
   const m = ASR_LANGUAGE.exec(s);
   const at = s.lastIndexOf(ASR_MARK);
+  const rest = (at !== -1 ? s.slice(at + ASR_MARK.length) : m ? s.slice(m[0].length) : s).trim();
   return {
     language: m && m[1] !== 'None' ? m[1] : null,
-    transcript: (at === -1 ? s : s.slice(at + ASR_MARK.length)).trim(),
+    transcript: rest === 'None' ? '' : rest,
   };
 }
 

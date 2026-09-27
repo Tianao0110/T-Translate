@@ -98,7 +98,7 @@ const LLM_PACKS = [
       },
     },
   },
-  // The speech packs; llm-pack-manager's resolveAsr picks one by provider.
+  // The speech packs; llm-manager picks one by provider and card (resolveAsr).
   {
     id: 'qwen3-asr-1.7b',
     role: LLM_ROLE_ASR,

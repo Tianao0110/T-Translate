@@ -73,6 +73,13 @@ describe('parseAsrReply', () => {
     expect(parseAsrReply('language English<asr_text>a<asr_text>b')).toEqual({ language: 'English', transcript: 'b' });
     expect(parseAsrReply(null)).toEqual({ language: null, transcript: '' });
   });
+
+  it('never turns a bare frame into a caption when the marker is missing', () => {
+    expect(parseAsrReply('None')).toEqual({ language: null, transcript: '' });
+    expect(parseAsrReply('language None')).toEqual({ language: null, transcript: '' });
+    expect(parseAsrReply('language Chinese')).toEqual({ language: 'Chinese', transcript: '' });
+    expect(parseAsrReply('language Chinese今天天气很好')).toEqual({ language: 'Chinese', transcript: '今天天气很好' });
+  });
 });
 
 describe('readWav', () => {

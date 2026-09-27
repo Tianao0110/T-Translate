@@ -169,8 +169,8 @@ function createLlmPackManager({ dir, packs = LLM_PACKS, allowUnlisted = () => fa
     return row ? resolvePack(row.id) : null;
   }
 
-  // The installed speech pack to load: the largest on the GPU, the smallest
-  // on the CPU.
+  // The installed speech pack to load: the largest with preferLarger, else
+  // the smallest; llm-manager decides from the provider and the card.
   function resolveAsr({ preferLarger = false } = {}) {
     if (!last) return null;
     const ready = last.packs.filter((p) => p.role === LLM_ROLE_ASR && p.status === 'ready');

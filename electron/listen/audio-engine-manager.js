@@ -290,8 +290,9 @@ function spawnWorker(models) {
     childState = 'starting';
     sendStatus('loading');
   }
-  const remoteHq = !!models && deps.store.get('settings.listen.tier') === 'high' && hqUsable();
-  hqNoticePending = !!models && deps.store.get('settings.listen.tier') === 'high' && !remoteHq;
+  const highTier = !!models && deps.store.get('settings.listen.tier') === 'high';
+  const remoteHq = highTier && hqUsable();
+  hqNoticePending = highTier && !remoteHq;
   clearTimeout(hqNoticeTimer);
   if (hqNoticePending) logger.info('high tier chosen but no usable speech model: standard finals this session');
   adapter()

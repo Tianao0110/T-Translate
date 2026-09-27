@@ -49,8 +49,17 @@ const DRIVERS = {
   },
   'llm-asr': {
     setProvider: (p) => tengine.get().setProvider('llm-asr', p),
+    // Before the others and on its own, unloaded again unless a listen
+    // session holds it, so the three models never share VRAM here
+    // (docs/T-ENGINE.md §6).
+    solo: true,
     // And for the speech pack: the fixed sentence on the GPU, read back.
-    selfTest: () => llmManager.asrSelfTest(),
+    selfTest: async () => {
+      const held = !!llmManager.asrStatus().resident;
+      const r = await llmManager.asrSelfTest();
+      if (!held) await llmManager.unloadAsr('self-test');
+      return r;
+    },
   },
 };
 
@@ -99,16 +108,18 @@ function register(ctx) {
 
     applyProvider(GPU_PROVIDER);
     const capable = GPU_ENGINES.filter((e) => e.gpu && DRIVERS[e.id]);
-    const results = await Promise.all(
-      capable.map(async (e) => {
-        try {
-          const r = await DRIVERS[e.id].selfTest();
-          return { id: e.id, ...r };
-        } catch (err) {
-          return { id: e.id, ok: false, provider: 'cpu', fallback: err.message };
-        }
-      }),
-    );
+    const selfTest = async (e) => {
+      try {
+        const r = await DRIVERS[e.id].selfTest();
+        return { id: e.id, ...r };
+      } catch (err) {
+        return { id: e.id, ok: false, provider: 'cpu', fallback: err.message };
+      }
+    };
+    // Solo drivers one at a time first, then the rest together.
+    const results = [];
+    for (const e of capable.filter((x) => DRIVERS[x.id].solo)) results.push(await selfTest(e));
+    results.push(...(await Promise.all(capable.filter((x) => !DRIVERS[x.id].solo).map(selfTest))));
     let any = false;
     for (const r of results) {
       last[r.id] = { ...r, at: Date.now() };
