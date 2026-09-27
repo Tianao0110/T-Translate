@@ -51,6 +51,7 @@ VAD 只交出已闭合的段；开段期间 worker 自己镜像音频，每 `PAR
 - 会话开始时预载语音模型（`ensureAsrLoaded`）；预载和第一段定稿同时到时合并成一次载入（媒体槽的 `slotLoading`）。
 - 整链 bench（FLEURS 40 句，原始电平，定稿延迟中位 / p90）：显卡 1.7B 中文 CER 11.8%，0.65 / 0.89 s；英文 CER 8.4%、WER 10.8%，0.42 / 0.71 s。CPU 0.6B 中文 11.9%，0.90 / 1.13 s；英文 8.4% / 11.4%，0.85 / 1.11 s。旧 sherpa CPU 档英文 WER 12.8%，1.1 / 1.5 s；中文 10.8–12.4%，1.1 / 1.4 s。整链的中文差距被切段稀释（40 句里 22 句被切成多段）。别的程序把 CPU 吃满时（实测另一个进程占 ~85%），CPU 版每段都会超时，兜底把延迟压在 10 s 以内。
 - 旧 sherpa 高精度包（`asr-hq` 类型、`MANUAL_PACKS` 条目）：新版不再用，设置页只在已安装时列出、供删除；audio-models 的 manifest 仍保留这个条目给旧版程序（它们靠它显示和下载高精度包），别删。
+- 档位是高精度而语音槽不可用（没放模型、换了电脑、升级前装的是旧包）：会话照常按标准档跑，进入监听后发一次 `hint-hq-missing`，8 秒后没被别的状态顶掉就退回 `listening`。只在会话开始时判断，中途放好模型要下次开始才生效；设置页的档位下面同时有一行常驻说明。
 - 经 sherpa 跑 Qwen3-ASR 时的换行 / `<asr_text>` 帧问题随 qwen3Asr 分支退役；`asr-result.js` 只剩 JSON 宽松解析（sherpa 手写 JSON 不转义控制字符，SenseVoice 也走它）。llama.cpp 路径由 `mtmd.parseAsrReply` 拆「language X<asr_text>正文」。
 
 ## 5. 抓音（win-audio-capture.js）

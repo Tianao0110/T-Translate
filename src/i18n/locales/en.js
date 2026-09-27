@@ -363,6 +363,7 @@ const en = {
       "source-gone": "That program exited — back to all sound",
       "hint-no-audio": "No sound detected — is the system muted?",
       "hint-no-speech": "Sound present, but no clear speech recognized for a while",
+      "hint-hq-missing": "No high-accuracy model, using standard recognition this time",
       stopped: "Stopped",
       "no-model": "Speech recognition models not found",
       "secure-blocked": "Listen mode is unavailable in secure privacy mode",

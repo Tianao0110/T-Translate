@@ -311,7 +311,7 @@ The model that ships with the app; you download the files yourself and put them 
 
 - From the "Audio" page, click "Listen".
 - Recognition model list: base recognition model (required), draft engine (optional, text while speech is still going). Download, update and uninstall live here. An old high-accuracy engine installed earlier is listed here too; it is no longer used and can be removed.
-- Final tier: standard / high accuracy. High accuracy needs one of the "High-accuracy models" in place first.
+- Final tier: standard / high accuracy. High accuracy needs one of the "High-accuracy models" in place first. If none is in place when listening starts, the floating window says so once and that session uses standard recognition.
 - High-accuracy models: Qwen3-ASR 1.7B and 0.6B, two files each, with whether they are in place, download links, the model folder, "Re-detect", and which one the next listen session uses. With GPU acceleration on the 1.7B runs, with it off the 0.6B; if only one is in place, that one runs.
 - Auto-save captions on stop or switch: on by default.
 

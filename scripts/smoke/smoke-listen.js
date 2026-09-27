@@ -274,6 +274,20 @@ async function main() {
   step('unload reached the worker (hook is wired)', /"unload"/.test(logText), logFile || '(no log)');
 
   // ===== High-accuracy tier =====
+  // Chosen with no usable speech model yet: the session runs on the standard
+  // engine, says so once after it starts listening, and nothing follows
+  // 'stopped' once the notice would have expired.
+  store.set('settings.listen.tier', 'high');
+  const missing = await runSession('高精度档但没有语音模型');
+  await sleep(8500);
+  const trail = missing.ev.status.filter((s) => s !== 'metrics');
+  step(
+    'high tier without a speech model: notice right after listening, standard finals, quiet after stop',
+    trail.indexOf('hint-hq-missing') === trail.indexOf('listening') + 1 && missing.ev.segments.length > 0 && trail[trail.length - 1] === 'stopped',
+    `${trail.join(' > ')}; ${missing.ev.segments.length} finals`
+  );
+  store.set('settings.listen.tier', 'standard');
+
   // Finals from T-Engine's speech host when a speech pack is at hand. Same
   // wav, same harness: the engine swap must be invisible above the worker.
   const host = await speechHost({ asrDir: arg('--asr-dir') || DEFAULT_ASR_DIR, gpu: has('--gpu') });

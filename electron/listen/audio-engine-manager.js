@@ -25,6 +25,8 @@ const TTS_IDLE_MS = 60000;
 const TTS_UNLOAD_WAIT_MS = 5000;
 // Session logs kept on disk, oldest pruned first.
 const MAX_PROBE_LOGS = 3;
+// How long the floating window shows that the high tier has no model.
+const HQ_NOTICE_MS = 8000;
 
 let deps = null; // { store, getWindow }
 let audio = null; // T-Engine's audio host adapter
@@ -38,6 +40,10 @@ let sessionLanguage = ''; // SenseVoice hint from the host window ('' = auto)
 // Which sound the session listens to: whole system, one program's process
 // tree, or everything except it.
 let sessionSource = { mode: 'system', pid: 0 };
+// High tier chosen without a usable speech model: told once when listening starts.
+let hqNoticePending = false;
+let hqNoticeTimer = null;
+let lastStatus = null;
 
 // TTS state. ttsOnly: the process exists for TTS alone (no session ever
 // started in it, or the session ended and TTS kept it alive).
@@ -152,7 +158,22 @@ function sendToWindow(channel, payload) {
 
 function sendStatus(state, detail) {
   logger.debug(`status: ${state}${detail ? ` (${detail})` : ''}`);
+  lastStatus = state;
   sendToWindow(CHANNELS.AUDIO_ENGINE.STATUS, { state, detail });
+}
+
+// The session's first 'listening', followed by the missing-model notice when
+// one is due; the notice gives way to 'listening' unless something replaced it.
+function sendListening() {
+  sendStatus('listening');
+  if (!hqNoticePending) return;
+  hqNoticePending = false;
+  sendStatus('hint-hq-missing');
+  clearTimeout(hqNoticeTimer);
+  hqNoticeTimer = setTimeout(() => {
+    hqNoticeTimer = null;
+    if (lastStatus === 'hint-hq-missing') sendStatus('listening');
+  }, HQ_NOTICE_MS);
 }
 
 function getInfo() {
@@ -270,6 +291,9 @@ function spawnWorker(models) {
     sendStatus('loading');
   }
   const remoteHq = !!models && deps.store.get('settings.listen.tier') === 'high' && hqUsable();
+  hqNoticePending = !!models && deps.store.get('settings.listen.tier') === 'high' && !remoteHq;
+  clearTimeout(hqNoticeTimer);
+  if (hqNoticePending) logger.info('high tier chosen but no usable speech model: standard finals this session');
   adapter()
     .spawn({ init: initPayload(models, remoteHq) })
     .catch((e) => logger.error(`worker spawn failed: ${e.message}`));
@@ -341,7 +365,7 @@ function onWorkerMessage(msg) {
       // A session started mid-utterance inherits the gate.
       if (ttsPlayingSenders.size > 0) adapter().post({ type: 'tts-gate', on: true });
       // Capture starts only after the models are loaded.
-      if (sessionSource.mode === 'off') sendStatus('listening');
+      if (sessionSource.mode === 'off') sendListening();
       else {
         sendStatus('connecting');
         adapter().post({ type: 'capture-start', ...sessionSource });
@@ -349,7 +373,7 @@ function onWorkerMessage(msg) {
       break;
     case 'capture-started':
       logger.info(`capture started (${msg.mode})`);
-      sendStatus('listening');
+      sendListening();
       break;
     case 'capture-error':
       logger.error(`capture failed: ${msg.message}`);
