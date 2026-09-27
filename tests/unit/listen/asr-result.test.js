@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseAsrResultJson, stripAsrFrame } from '../../../electron/services/audio-engine/asr-result.js';
+import { parseAsrResultJson } from '../../../electron/services/audio-engine/asr-result.js';
 
 // The shape sherpa-onnx's OfflineRecognitionResult::AsJsonString emits.
 const raw = (text, tokens) => `{"lang": "", "emotion": "", "event": "", "text": "${text}", "timestamps": [], "durations": [], "tokens":[${tokens.map((t) => `"${t}"`).join(', ')}], "words": []}`;
@@ -23,16 +23,5 @@ describe('parseAsrResultJson', () => {
   it('turns other control characters into spaces', () => {
     const r = parseAsrResultJson(raw(`one\ttwo${NUL}three`, ['one']));
     expect(r.text).toBe('one two three');
-  });
-});
-
-describe('stripAsrFrame', () => {
-  it('drops a leaked Qwen3-ASR frame and keeps the words after it', () => {
-    expect(stripAsrFrame('提纲 language Chinese<asr_text>很快，配备了防暴装备的警察。')).toBe('很快，配备了防暴装备的警察。');
-  });
-
-  it('leaves ordinary text and empty results alone', () => {
-    expect(stripAsrFrame('很快，配备了防暴装备的警察。')).toBe('很快，配备了防暴装备的警察。');
-    expect(stripAsrFrame(undefined)).toBe('');
   });
 });

@@ -27,16 +27,17 @@ describe('tengine registry', () => {
     for (const e of ENGINES.filter((x) => !x.gpu)) expect(typeof e.reason).toBe('string');
   });
 
-  it('lists OCR, the neural voice and both built-in models as GPU-capable, listen as CPU-only', () => {
-    expect(gpuCapableIds().sort()).toEqual(['llm', 'llm-vision', 'ocr', 'tts']);
+  it('lists OCR, the neural voice and the three built-in models as GPU-capable, standard listen as CPU-only', () => {
+    expect(gpuCapableIds().sort()).toEqual(['llm', 'llm-asr', 'llm-vision', 'ocr', 'tts']);
     expect(engineById('asr').gpu).toBe(false);
     expect(engineById('nope')).toBeNull();
   });
 
   it('names the backend where it is not the shared onnxruntime provider', () => {
     expect(engineById('llm')).toMatchObject({ host: 'llm', runtime: 'llama.cpp', backend: 'vulkan' });
-    // The vision model has its own host on the same runtime.
+    // The vision and speech models have their own hosts on the same runtime.
     expect(engineById('llm-vision')).toMatchObject({ host: 'llm-vision', runtime: 'llama.cpp', backend: 'vulkan' });
+    expect(engineById('llm-asr')).toMatchObject({ host: 'llm-asr', runtime: 'llama.cpp', backend: 'vulkan', note: 'qwen3-asr' });
     for (const e of ENGINES.filter((x) => x.gpu && x.runtime !== 'llama.cpp')) expect(e.backend).toBeUndefined();
   });
 });

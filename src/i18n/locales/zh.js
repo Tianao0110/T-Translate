@@ -363,6 +363,7 @@ const zh = {
       "source-gone": "所选程序已退出，已切回全部声音",
       "hint-no-audio": "未检测到声音——检查系统音量是否静音",
       "hint-no-speech": "有声音，但长时间未识别到清晰语音",
+      "hint-hq-missing": "没有可用的高精度模型，本次按标准档识别",
       stopped: "已停止",
       "no-model": "未找到语音识别模型",
       "secure-blocked": "隐私安全模式下听译不可用",
@@ -505,11 +506,11 @@ const zh = {
       title: "显卡加速",
       switchLabel: "用显卡加速",
       testing: "正在逐个引擎自检",
-      confirm: "开启后这些引擎会在显卡上运行（NVIDIA / AMD / Intel 通用）：本地 OCR、神经语音朗读、本地模型。听译识别留在 CPU。每个引擎会先自检，不行的自动留在 CPU；不需要重启。",
+      confirm: "开启后这些引擎会在显卡上运行（NVIDIA / AMD / Intel 通用）：本地 OCR、神经语音朗读、本地模型、听译识别（高精度）。听译识别（标准）留在 CPU。每个引擎会先自检，不行的自动留在 CPU；不需要重启。",
       enabled: "显卡加速已开启",
       disabled: "显卡加速已关闭",
       failed: "所有引擎都没能进显卡，保持 CPU：{{reason}}",
-      engineNames: { ocr: "本地 OCR", tts: "神经语音朗读", asr: "听译识别", llm: "本地模型", "llm-vision": "内置视觉模型" },
+      engineNames: { ocr: "本地 OCR", tts: "神经语音朗读", asr: "听译识别（标准）", llm: "本地模型", "llm-vision": "内置视觉模型", "llm-asr": "听译识别（高精度）" },
       reasons: { int8: "int8 量化模型，显卡上反而慢 3 到 6 倍" },
       state: {
         gpu: "显卡（WebGPU）",
@@ -782,9 +783,27 @@ const zh = {
       label: "定稿档位",
       standard: "标准",
       high: "高精度",
-      hint: "高精度：带音乐或噪声时更准，30 种语言；下载 806 MB，占内存 1–1.6 GB，定稿晚 1–2 秒，推荐 16 GB 内存",
+      hint: "高精度：带音乐或噪声时更准，30 种语言；需要下面的模型，定稿比标准档晚 0.2–0.6 秒",
       enabled: "已切到高精度定稿，下次开始听译生效",
       disabled: "已切回标准定稿",
+    },
+    hq: {
+      title: "高精度档的模型",
+      hint: "两个任选其一，下载后原文件名放进模型文件夹：独立显卡显存 8 GB 以上选 1.7B，其余选 0.6B",
+      folder: "模型文件夹：{{dir}}",
+      next: "下次听译用 {{name}}（{{where}}）",
+      where: { gpu: "显卡", cpu: "CPU" },
+      needPack: "先放入一个高精度模型",
+      inactive: "没有可用的高精度模型，听译按标准档运行",
+      badge: { ready: "已就绪", partial: "不完整", mismatch: "文件不符", missing: "未放入" },
+      part: { model: "主模型", mmproj: "音频编码器" },
+      state: { ready: "已就绪", missing: "未放入", mismatch: "校验不符" },
+      linkModel: "主模型（官方）",
+      linkEncoder: "音频编码器（官方）",
+      mirrorModel: "主模型（镜像）",
+      mirrorEncoder: "音频编码器（镜像）",
+      openFolder: "打开模型文件夹",
+      rescan: "重新检测",
     },
     autosave: {
       label: "停止或切换时自动保存字幕",
@@ -809,6 +828,7 @@ const zh = {
       removed: "模型已卸载",
       removeFailed: "模型卸载失败",
       removeConfirm: "确定卸载该模型？卸载后听译要重新下载才能用",
+      removeConfirmFor: { "asr-hq-qwen3-0.6b": "删除旧版高精度引擎？高精度档已改用新模型，删除不影响听译" },
       location: "模型目录：{{dir}}",
       manualHint: "这个包太大，不经我们的服务器分发：点官方链接下载，解压后把整个文件夹放进下面的目录，再点「已放好，重新检测」",
       manualLink: "官方下载",
@@ -819,12 +839,12 @@ const zh = {
       names: {
         "asr-base-sense-voice": "基础识别模型（中/英/日/韩/粤）",
         "asr-draft-zipformer-zh-en": "草稿引擎（中英）",
-        "asr-hq-qwen3-0.6b": "高精度定稿引擎（Qwen3-ASR，30 种语言）"
+        "asr-hq-qwen3-0.6b": "旧版高精度引擎（已不再使用）"
       },
       desc: {
         "asr-base": "必需。成句定稿，带标点",
         "asr-draft": "可选。中英边说边出字",
-        "asr-hq": "可选。带音乐或噪声时更准；占内存 1–1.6 GB"
+        "asr-hq": "高精度档已改用上面的模型，这个包可以删除，释放约 1 GB"
       }
     }
   },

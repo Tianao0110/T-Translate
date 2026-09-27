@@ -124,6 +124,21 @@ describe('LlmSection', () => {
     await waitFor(() => expect(container.textContent).toContain('llm.dev.reportLine:1,3,0,0,0,0,0,20'));
   });
 
+  it('offers only the translation models, not the vision or speech packs', async () => {
+    const media = [
+      { id: 'paddleocr-vl-1.6', role: 'vision', name: 'PaddleOCR-VL-1.6', file: 'V.gguf', size: 1, status: 'ready', license: { name: 'Apache-2.0' }, source: null },
+      { id: 'qwen3-asr-1.7b', role: 'asr', name: 'Qwen3-ASR-1.7B', file: 'A.gguf', size: 1, status: 'ready', license: { name: 'Apache-2.0' }, source: null },
+    ];
+    const withMedia = { ...STATUS, packs: { ...STATUS.packs, packs: [...STATUS.packs.packs, ...media] } };
+    const llm = bridge({ status: vi.fn(async () => withMedia), rescan: vi.fn(async () => withMedia) });
+    // A speech pack left in the setting falls back to the first translation model.
+    const { container, findByText } = mount({ settings: { llm: { pack: 'qwen3-asr-1.7b' } }, llm });
+    await findByText('llm.engineNameWith:Qwen3-1.7B');
+    const labels = Array.from(container.querySelectorAll('.seg button')).map((b) => b.textContent);
+    expect(labels).toHaveLength(2);
+    expect(labels.join(' ')).not.toMatch(/PaddleOCR|ASR/);
+  });
+
   it('renders without a bridge', () => {
     window.electron = undefined;
     const { container } = render(<LlmSection settings={{ llm: {} }} updateSetting={() => {}} notify={() => {}} />);

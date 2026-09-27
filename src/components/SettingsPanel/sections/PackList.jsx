@@ -76,7 +76,8 @@ const PackList = ({ bridge, prefix, notify, confirm, onChanged, onPacks, filter,
   }, [bridge, prefix, notify, t, loadPacks, onChanged]);
 
   const handleRemove = useCallback(async (packId) => {
-    if (!(await confirm(t(`${prefix}.removeConfirm`)))) return;
+    // A pack may carry its own question; the generic one otherwise.
+    if (!(await confirm(t(`${prefix}.removeConfirmFor.${packId}`, t(`${prefix}.removeConfirm`))))) return;
     try {
       const result = await bridge?.removePack?.(packId);
       if (result?.success) {

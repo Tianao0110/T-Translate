@@ -1,6 +1,7 @@
 // The ASR session inside the worker: silero VAD windows, the open-segment
-// mirror with its layered forced splits, SenseVoice / Qwen3-ASR finals, the
-// streaming draft engine, the language pin, the signal watchdog and the
+// mirror with its layered forced splits, SenseVoice finals or the
+// high-accuracy tier's (T-Engine's speech host, through the main process),
+// the streaming draft engine, the language pin, the signal watchdog and the
 // metrics window. Audio arrives through handlePcm (from capture.js or the
 // host's pcm messages); finals and drafts leave as parentPort messages.
 // Protocol: audio-worker.js header.
@@ -16,7 +17,7 @@ const {
   makeAgc,
   pickCutWindow,
 } = require('./probe-metrics');
-const { parseAsrResultJson, stripAsrFrame } = require('./asr-result');
+const { parseAsrResultJson } = require('./asr-result');
 const { post, logLine, fatal, textLogged } = require('./io');
 const capture = require('./capture');
 const tts = require('./tts');
@@ -48,9 +49,24 @@ let vadThreshold = VAD_THRESHOLD_SPEECH;
 let vadPolicy = makeVadThresholdPolicy({ speech: VAD_THRESHOLD_SPEECH, music: VAD_THRESHOLD_MUSIC });
 let vadRebuildTo = null; // pending threshold change, applied at a segment boundary
 let recognizer = null;
-// High-accuracy tier (Qwen3-ASR): no language / BGM tags on its finals, so
-// the language pin and the music policy never fire under it.
-const hqActive = () => !!(asrPaths && asrPaths.useHq && asrPaths.hq);
+// High-accuracy tier: finals come from T-Engine's speech host (hq-transcribe
+// out, hq-result back, hq-cancel when the answer is too late). They carry no
+// language / BGM tags, so the language pin and the music policy never fire
+// from them; SenseVoice stays loaded and takes any final the host does not
+// answer in time, any segment that queued too long behind slower ones, and
+// every segment for HQ_COOLDOWN_MS after a timeout. Once stopped, the finals
+// still due share HQ_STOP_BUDGET_MS, so asr-stopped goes out inside the
+// manager's stop grace.
+const hqActive = () => !!(asrPaths && asrPaths.remoteHq);
+const HQ_TIMEOUT_MS = 10000;
+const HQ_BACKLOG_MS = 2500;
+const HQ_COOLDOWN_MS = 30000;
+const HQ_STOP_BUDGET_MS = 2000;
+const HQ_STOP_MIN_MS = 500;
+let hqCooldownUntil = 0;
+let hqStopDeadline = 0; // set by stop()
+let hqSeq = 0;
+const hqWaiters = new Map(); // id -> { resolve, timer }
 // Auto-language sessions pin the recognizer once LANG_PIN_STREAK finals agree;
 // the rebuild happens between segments inside the decode chain.
 const LANG_PIN_STREAK = 3;
@@ -227,6 +243,8 @@ function start(msg) {
   carry = null;
   carryForDecode = null;
   preRoll = [];
+  hqCooldownUntil = 0;
+  hqStopDeadline = 0;
   sessionLive = true;
   logLine({
     ts: Date.now(),
@@ -268,29 +286,6 @@ function createVad(threshold) {
 }
 
 function createRecognizer(language) {
-  if (hqActive()) {
-    const hq = asrPaths.hq;
-    return new sherpa.OfflineRecognizer({
-      featConfig: { sampleRate: SAMPLE_RATE, featureDim: 80 },
-      modelConfig: {
-        qwen3Asr: {
-          convFrontend: hq.convFrontend,
-          encoder: hq.encoder,
-          decoder: hq.decoder,
-          tokenizer: hq.tokenizerDir,
-          maxNewTokens: 512,
-          maxTotalLen: 1024,
-          temperature: 0,
-          topP: 1,
-          seed: 0,
-          hotwords: '',
-        },
-        numThreads: 2,
-        provider: 'cpu',
-        debug: 0,
-      },
-    });
-  }
   return new sherpa.OfflineRecognizer({
     featConfig: { sampleRate: SAMPLE_RATE, featureDim: 80 },
     modelConfig: {
@@ -659,8 +654,9 @@ function drainVadQueue() {
 }
 
 function enqueueDecode(seg) {
+  const queued = { ...seg, queuedAt: Date.now() };
   decodeChain = decodeChain
-    .then(() => decodeSegment(seg))
+    .then(() => decodeSegment(queued))
     .catch((err) => fatal(`decode failed: ${err.message}`));
 }
 
@@ -674,16 +670,76 @@ async function decodeOffline(stream) {
     logLine(eventRecord('result-unescaped', err.message));
     result = parseAsrResultJson(sherpaAddon.getOfflineStreamResultAsJson(stream.handle));
   }
-  result.text = stripAsrFrame(result.text);
   return result;
+}
+
+async function decodeLocal(samples) {
+  const stream = recognizer.createStream();
+  stream.acceptWaveform({ samples, sampleRate: SAMPLE_RATE });
+  return decodeOffline(stream);
+}
+
+// Withdraws request id after ms: hq-cancel to the main process, and the
+// waiting decode falls back with `code`.
+function armHqTimer(id, ms, code) {
+  return setTimeout(() => {
+    const w = hqWaiters.get(id);
+    if (!w) return;
+    hqWaiters.delete(id);
+    post({ type: 'hq-cancel', id });
+    w.resolve({ ok: false, code });
+  }, ms);
+}
+
+// One segment to the speech host; resolves with the main process's answer,
+// or with a timeout after withdrawing the request.
+function transcribeRemote(samples, ms, code) {
+  const id = ++hqSeq;
+  return new Promise((resolve) => {
+    hqWaiters.set(id, { resolve, timer: armHqTimer(id, ms, code) });
+    post({ type: 'hq-transcribe', id, samples: new Float32Array(samples) });
+  });
+}
+
+// The main process's answer to an hq-transcribe.
+function handleHqResult(msg) {
+  const w = msg ? hqWaiters.get(msg.id) : null;
+  if (!w) return;
+  clearTimeout(w.timer);
+  hqWaiters.delete(msg.id);
+  w.resolve(msg);
+}
+
+// The host's final; SenseVoice's while the host cools down, when the segment
+// queued too long, when the stop budget is nearly spent, or when the host
+// could not answer.
+async function decodeHq(seg) {
+  const now = Date.now();
+  if (now < hqCooldownUntil) {
+    logLine(eventRecord('hq-fallback', 'cooldown'));
+    return decodeLocal(seg.samples);
+  }
+  const waited = now - seg.queuedAt;
+  if (waited > HQ_BACKLOG_MS) {
+    logLine(eventRecord('hq-fallback', `backlog ${waited}ms`));
+    return decodeLocal(seg.samples);
+  }
+  const left = hqStopDeadline ? hqStopDeadline - now : HQ_TIMEOUT_MS;
+  if (left < HQ_STOP_MIN_MS) {
+    logLine(eventRecord('hq-fallback', 'stop'));
+    return decodeLocal(seg.samples);
+  }
+  const r = await transcribeRemote(seg.samples, left, hqStopDeadline ? 'stop' : 'timeout');
+  if (r.ok) return { text: r.text || '', lang: '', event: '' };
+  if (r.code === 'timeout') hqCooldownUntil = Date.now() + HQ_COOLDOWN_MS;
+  logLine(eventRecord('hq-fallback', String(r.code || 'failed')));
+  return decodeLocal(seg.samples);
 }
 
 async function decodeSegment(seg) {
   if (!recognizer) return;
-  const stream = recognizer.createStream();
-  stream.acceptWaveform({ samples: seg.samples, sampleRate: SAMPLE_RATE });
   const t0 = Date.now();
-  const result = await decodeOffline(stream);
+  const result = hqActive() ? await decodeHq(seg) : await decodeLocal(seg.samples);
   const decodeMs = Date.now() - t0;
   const text = (result.text || '').trim();
   if (!text) return;
@@ -736,6 +792,12 @@ function stop() {
   // Capture first: no new audio may arrive while the VAD is flushing.
   capture.stop();
   sessionLive = false;
+  // Finals already on the host get what is left of the stop budget.
+  hqStopDeadline = Date.now() + HQ_STOP_BUDGET_MS;
+  for (const [id, w] of hqWaiters) {
+    clearTimeout(w.timer);
+    w.timer = armHqTimer(id, HQ_STOP_BUDGET_MS, 'stop');
+  }
   if (partialTimer) clearInterval(partialTimer);
   if (hintTimer) clearInterval(hintTimer);
   if (metricsTimer) clearInterval(metricsTimer);
@@ -784,4 +846,4 @@ function stopTimers() {
 // Resolves once every queued decode has finished; shutdown waits on it.
 const drain = () => decodeChain;
 
-module.exports = { attach, start, stop, unload, handlePcm, stopTimers, drain };
+module.exports = { attach, start, stop, unload, handlePcm, handleHqResult, stopTimers, drain };

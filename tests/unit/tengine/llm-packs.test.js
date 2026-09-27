@@ -93,4 +93,27 @@ describe('llm packs whitelist', () => {
     expect(packs.packByHash(v.mmproj.sha256)).toBeNull();
     expect(packs.packsForRole(packs.LLM_ROLE_GENERAL).every((p) => p.id !== v.id)).toBe(true);
   });
+
+  it('pins both speech packs as model + audio mmproj with the Qwen3-ASR prompt family', () => {
+    const speech = packs.packsForRole(packs.LLM_ROLE_ASR);
+    expect(speech.map((p) => p.id)).toEqual(['qwen3-asr-1.7b', 'qwen3-asr-0.6b']);
+    expect(speech[0].size).toBeGreaterThan(speech[1].size);
+    for (const p of speech) {
+      expect(p.default).toBe(false);
+      expect(p.audioFamily).toBe('qwen3-asr');
+      expect(packs.packFiles(p).map((f) => f.part)).toEqual(['model', 'mmproj']);
+      expect(p.mmproj.sha256).toMatch(HEX64);
+      expect(p.mmproj.sha256).not.toBe(p.sha256);
+      expect(p.source.url).toMatch(/^https:\/\/huggingface\.co\/ggml-org\//);
+      expect(p.source.mmproj.url.endsWith(`/${p.mmproj.file}`)).toBe(true);
+      expect(p.source.mmproj.mirror).toMatch(/^https:\/\/hf-mirror\.com\/.+\.gguf$/);
+      expect(packs.packForFile(p.mmproj.file, p.mmproj.size)).toBe(p);
+    }
+  });
+
+  it('only the general and translation-only roles can drive the translation provider', () => {
+    expect(packs.LLM_TEXT_ROLES).toEqual([packs.LLM_ROLE_GENERAL, packs.LLM_ROLE_MT]);
+    expect(packs.LLM_TEXT_ROLES).not.toContain(packs.LLM_ROLE_VISION);
+    expect(packs.LLM_TEXT_ROLES).not.toContain(packs.LLM_ROLE_ASR);
+  });
 });

@@ -56,6 +56,16 @@ const ENGINES = [
     backend: 'vulkan',
     note: 'paddleocr-vl',
   },
+  {
+    id: 'llm-asr',
+    host: 'llm-asr',
+    // The same llama.cpp runtime in a third host process, with mtmd for the
+    // audio encoder: the listen chain's high-accuracy tier.
+    runtime: 'llama.cpp',
+    gpu: true,
+    backend: 'vulkan',
+    note: 'qwen3-asr',
+  },
 ];
 
 const gpuCapableIds = () => ENGINES.filter((e) => e.gpu).map((e) => e.id);

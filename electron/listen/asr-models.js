@@ -6,7 +6,7 @@
 
 const nodeFs = require('fs');
 const nodePath = require('path');
-const { ASR_BASE_TYPE, ASR_DRAFT_TYPE, ASR_HQ_TYPE, MANUAL_PACKS } = require('../shared/audio-packs');
+const { ASR_BASE_TYPE, ASR_DRAFT_TYPE, MANUAL_PACKS } = require('../shared/audio-packs');
 
 const VAD_FILE = 'silero_vad.onnx';
 const MODEL_FILE = 'model.int8.onnx';
@@ -126,24 +126,6 @@ function draftFromPacks(packs, fs, path) {
   return null;
 }
 
-// Optional high-accuracy final engine (Qwen3-ASR), packs only; `tokenizer` is a directory.
-function hqFromPacks(packs, fs, path) {
-  for (const pack of packs) {
-    if (pack.type !== ASR_HQ_TYPE) continue;
-    const files = pack.files || {};
-    const set = {
-      convFrontend: files.convFrontend && path.join(pack.dir, files.convFrontend),
-      encoder: files.encoder && path.join(pack.dir, files.encoder),
-      decoder: files.decoder && path.join(pack.dir, files.decoder),
-    };
-    const tokenizerDir = files.tokenizer && path.join(pack.dir, files.tokenizer);
-    if (!tokenizerDir || !Object.values(set).every((p) => p && isFile(fs, p))) continue;
-    if (!isFile(fs, path.join(tokenizerDir, 'vocab.json'))) continue;
-    return { ...set, tokenizerDir, engine: pack.engine || 'qwen3-asr', modelName: pack.model || pack.dirName, dirName: pack.dirName };
-  }
-  return null;
-}
-
 // Legacy: the optional streaming (draft) model set by folder name. Never gates.
 function draftFromLegacy(baseDir, entries, fs, path) {
   const candidates = entries
@@ -186,8 +168,9 @@ function baseFromLegacy(baseDir, entries, fs, path) {
   return null;
 }
 
-// A usable final-pass model + VAD under baseDir, plus the optional draft and
-// high-accuracy sets; null when the base set is incomplete.
+// A usable final-pass model + VAD under baseDir, plus the optional draft
+// set; null when the base set is incomplete. The high-accuracy tier's model
+// lives with T-Engine's speech host (llm-manager), not here.
 function locateAsrModels(baseDir, { fs = nodeFs, path = nodePath } = {}) {
   if (!baseDir) return null;
   const entries = readDirEntries(baseDir, fs);
@@ -200,9 +183,8 @@ function locateAsrModels(baseDir, { fs = nodeFs, path = nodePath } = {}) {
 
   const streaming =
     draftFromPacks(packs, fs, path) || draftFromLegacy(baseDir, entries, fs, path);
-  const hq = hqFromPacks(packs, fs, path);
 
-  return { baseDir, ...base, streaming, hq };
+  return { baseDir, ...base, streaming };
 }
 
 module.exports = {

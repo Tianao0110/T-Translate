@@ -29,7 +29,7 @@ T-Translate 进入维护模式后，每年照这份清单走一遍，目标是�
 
 | 项 | 现钉版本 | 钉在哪 | 怎么换 | 换完跑 |
 | --- | --- | --- | --- | --- |
-| llama.cpp 运行时（含视觉、Vulkan） | b10853 | `electron/tengine/runtime/llama-manifest.json` 与 `llama-abi.js` | [T-ENGINE.md](T-ENGINE.md) 第三节「年度换版流程」五步，做完对着第九节检查单勾一遍 | golden 单测、`smoke:llm`、`smoke:llm-host`、`smoke:llm-vision`、`smoke:llm-vision-host`、`smoke:llm-stack` |
+| llama.cpp 运行时（含视觉、音频、Vulkan） | b10853 | `electron/tengine/runtime/llama-manifest.json` 与 `llama-abi.js` | [T-ENGINE.md](T-ENGINE.md) 第三节「年度换版流程」五步，做完对着第九节检查单勾一遍 | golden 单测、`smoke:llm`、`smoke:llm-host`、`smoke:llm-vision`、`smoke:llm-vision-host`、`smoke:llm-asr`、`smoke:llm-asr-host`、`smoke:llm-stack` |
 | sherpa-onnx 与自编的 WebGPU DLL | 1.13.7，精确版本 | `package.json` 与 `native/sherpa-onnx-webgpu/` | 按 [native/sherpa-onnx-webgpu/README.md](../native/sherpa-onnx-webgpu/README.md) 的配方重编，要 VS 2022 与 cmake，约 25 分钟 | `node scripts/build/overlay-sherpa-runtime.js --check`、`smoke:listen`、`bench:listen` 中英各一次 |
 | onnxruntime-node | 1.26.0，精确版本 | `package.json` | **它和上一项锁死**：sherpa 用的 `onnxruntime.dll` 是它提供的，升任何一个都要重编另一个。两个一起升，或都不升 | `smoke:ocr`，带 `--gpu` 再跑一次 |
 | koffi | ^2.15 | `package.json` | llama、声音捕获、Win32 调用三处都靠它。升级前读 [T-ENGINE.md](T-ENGINE.md) 第四节和 [design/selection.md](design/selection.md) 第 2 节里记的坑 | 上面全部 smoke，外加手测一次划词 |
@@ -55,7 +55,8 @@ sherpa 那一项是最可能卡住人的：没有装 VS 2022 的机器编不出�
 | 本地翻译与 AI 动作 | Qwen3-1.7B（通用）、Hy-MT2-1.8B（仅翻译） | `electron/shared/llm-packs.js` |
 | 本地视觉识别 | PaddleOCR-VL-1.6（主模型加图像编码器） | 同上 |
 | 本地 OCR | PP-OCRv6 small 与 medium，七个 v4 语言包 | `scripts/fetch/ocr-model-sources.js`、`electron/shared/ocr-packs.js` |
-| 听译 | SenseVoice、zipformer 中英、silero VAD、Qwen3-ASR 0.6B | `scripts/fetch/audio-model-sources.js`、`electron/shared/audio-packs.js` |
+| 听译 | SenseVoice、zipformer 中英、silero VAD | `scripts/fetch/audio-model-sources.js`、`electron/shared/audio-packs.js` |
+| 听译高精度档 | Qwen3-ASR 1.7B 与 0.6B（主模型加音频编码器） | `electron/shared/llm-packs.js` |
 | 朗读 | Kokoro v1.1、MeloTTS | 同上 |
 
 ### 第一步：收候选
@@ -90,7 +91,7 @@ sherpa 那一项是最可能卡住人的：没有装 VS 2022 的机器编不出�
 同一组输入，新旧各跑一遍，看结果、速度和思考泄漏次数。
 
 - **翻译**：仓库里目前没有成套的固定句子集。第一次年检时建一份，二十句上下：中英日互译的短句、一段长文、一段带 OCR 错字的文本、几句带术语的。放进单测目录下的夹具里，以后每年用同一份，结果才可比。
-- **听译**：`npm run bench:listen -- --lang zh` 和 `--lang en` 各一次，再加 `--normalize`；高精度档单独跑。结果先看 `statusTrail` 里有没有中途重启。
+- **听译**：`npm run bench:listen -- --lang zh` 和 `--lang en` 各一次，再加 `--normalize`；高精度档用 `--tier high` 单独跑，显卡与 CPU 各一次（CPU 上看有没有 `hq-fallback`）。结果先看 `statusTrail` 里有没有中途重启。
 - **视觉识别**：照 v0.5.1 过的「四道门」再过一遍（速度、坐标误差、多种文字的字符错误率、整屏截图）。
 - **本地 OCR 加语言**：字形在字典里不等于模型能读。渲染一张样图跑真引擎，规矩在 [DEVELOPMENT.md](DEVELOPMENT.md) 的「OCR 支持一门新语言」。
 
@@ -150,7 +151,7 @@ OCR 与听译的小包可以不发版直接换 Release 资产，流程在 [OCR_M
 npx eslint . --quiet && npm test && npm run stack:build && npx vite build && npm run check:all
 ```
 
-然后是 smoke，改到哪层跑哪层，年检时全跑：`smoke:offline`、`smoke:ocr`、`smoke:listen`、`smoke:llm`、`smoke:llm-host`、`smoke:llm-vision`、`smoke:llm-vision-host`、`smoke:llm-stack`。带模型参数的几个怎么传，见 [DEVELOPMENT.md](DEVELOPMENT.md) 的「冒烟与基准」。
+然后是 smoke，改到哪层跑哪层，年检时全跑：`smoke:offline`、`smoke:ocr`、`smoke:listen`、`smoke:llm`、`smoke:llm-host`、`smoke:llm-vision`、`smoke:llm-vision-host`、`smoke:llm-asr`、`smoke:llm-asr-host`、`smoke:llm-stack`。带模型参数的几个怎么传，见 [DEVELOPMENT.md](DEVELOPMENT.md) 的「冒烟与基准」。
 
 **升过依赖就要真打一次包**，冒烟不覆盖打包这一步：
 

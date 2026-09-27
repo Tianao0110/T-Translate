@@ -38,7 +38,8 @@ const LlmSection = ({ settings, updateSetting, notify }) => {
   }, [load]);
 
   const llm = settings.llm || {};
-  const packs = status?.packs?.packs || [];
+  // Translation models only; the vision and speech packs belong to their own sections.
+  const packs = (status?.packs?.packs || []).filter((p) => p.role === 'general' || p.role === 'mt');
   const unlisted = status?.packs?.unlisted || [];
   const doorOpen = !!llm.allowUnlistedModels;
   const stem = (file) => file.replace(/\.gguf$/i, '');

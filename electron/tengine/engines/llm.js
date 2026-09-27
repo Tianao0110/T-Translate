@@ -26,9 +26,10 @@ function toProvider(value) {
   return value === 'cpu' || !value ? 'cpu' : 'gpu';
 }
 
-// One instance per slot: the text model ('llm') and the vision model
-// ('llm-vision') each get their own host process, so the two can stay
-// resident together and a fault in one leaves the other alone.
+// One instance per slot: the text model ('llm'), the vision model
+// ('llm-vision') and the speech model ('llm-asr') each get their own host
+// process, so they can stay resident together and a fault in one leaves
+// the others alone.
 function createLlmEngine({
   id = 'llm',
   fork,

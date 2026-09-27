@@ -80,7 +80,7 @@ const STRUCTS = {
   llama_logit_bias: { token: 'int32', bias: 'float' },
   llama_chat_message: { role: 'const char *', content: 'const char *' },
   gguf_init_params: { no_alloc: 'bool', ctx: 'void *' },
-  // mtmd.h / mtmd-helper.h, the vision side (runtime/mtmd.js).
+  // mtmd.h / mtmd-helper.h, images and audio (runtime/mtmd.js).
   mtmd_context_params: {
     use_gpu: 'bool',
     device: 'void *',
@@ -227,9 +227,12 @@ const FUNCS = {
     mtmdInit: 'void *mtmd_init_from_file(const char *mmproj, void *model, mtmd_context_params params)',
     mtmdFree: 'void mtmd_free(void *ctx)',
     mtmdSupportVision: 'bool mtmd_support_vision(void *ctx)',
+    mtmdSupportAudio: 'bool mtmd_support_audio(void *ctx)',
+    mtmdAudioSampleRate: 'int32 mtmd_get_audio_sample_rate(void *ctx)',
     mtmdUseMrope: 'bool mtmd_decode_use_mrope(void *ctx)',
     mtmdHelperOptDefault: 'mtmd_helper_init_opt mtmd_helper_init_opt_default()',
     mtmdBitmapFromBuf: 'mtmd_helper_bitmap_wrapper mtmd_helper_bitmap_init_from_buf(void *ctx, const uint8 *buf, size_t len, bool placeholder, mtmd_helper_init_opt opt)',
+    mtmdBitmapFromAudio: 'void *mtmd_bitmap_init_from_audio(size_t n, const float *pcm)',
     mtmdBitmapNx: 'uint32 mtmd_bitmap_get_nx(void *bitmap)',
     mtmdBitmapNy: 'uint32 mtmd_bitmap_get_ny(void *bitmap)',
     mtmdBitmapFree: 'void mtmd_bitmap_free(void *bitmap)',
