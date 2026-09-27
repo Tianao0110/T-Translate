@@ -24,7 +24,7 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 
 ### 文档与界面收尾
 
-- **风格库在本地小模型上基本没用**（2026-09-18 讨论）：现在是「先平译、再拿一条参考重写」，1.7B 模型从单个例子里学不出风格，所以用户的风格库一直空着。想法是改成翻译时把两三对「原文 → 译文」直接放进提示词当示范（小模型吃例子不吃指令，前缀复用让固定示范几乎不花时间）。**先做实验再决定做不做**：十句上下，本机 Qwen3-1.7B 跑「现有默认 / 只加文学化指令 / 加三条示范」三种条件对比；没差别就是模型规模问题，用户自己用可以经「自定义模型」开关试 7B–9B
+- ~~风格库改成把几对「原文 → 译文」放进提示词当示范~~ 不做（2026-09-25 用户拍板：直接去主程序改写就行）
 - README 截图沿用旧图，界面定型后看要不要换一轮（用户未定）
 - 说明书铁律照旧：改界面必改说明书，写前核实界面，不确定就问，先中文后英文
 
@@ -38,12 +38,17 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 
 ### 听译小项（2026-09-08 复查结论「链不用动」，用户定只记不改；数字与诊断在 gstack v050-listen-review-2026-09-08）
 
-- 段尾填充词幻觉：英文标准档极低电平时定稿末尾偶尔多出 yeah / okay，修法是定稿前裁掉段尾静音；AGC 两个边界（+30 dB 封顶救不了峰值 0.005 的句、40 dB 台阶处慢包络让间隔底噪过门槛）只在 FLEURS 这类极端材料出现；高精度档把数字念成英文单词，可加轻量数词转数字。有真实反馈再动
-- 改听译链必跑 `scripts/bench/bench-listen.js` zh / en 标准档各一次 + `--normalize`，高精度档单跑；结果 JSON 先看 `statusTrail` 有没有中途重启
+- 段尾填充词幻觉：英文标准档极低电平时定稿末尾偶尔多出 yeah / okay，修法是定稿前裁掉段尾静音；AGC 两个边界（+30 dB 封顶救不了峰值 0.005 的句、40 dB 台阶处慢包络让间隔底噪过门槛）只在 FLEURS 这类极端材料出现。有真实反馈再动
+- 改听译链必跑 `scripts/bench/bench-listen.js` zh / en 标准档各一次 + `--normalize`，高精度档用 `--tier high` 单跑（显卡加 `--gpu`）；结果 JSON 先看 `statusTrail` 有没有中途重启
+
+### 高精度听译的边角（2026-09-26 代码审查留下的，概率低或要先搭框架；设计在 `docs/design/listen.md` §4）
+
+- 开机后模型文件夹第一次扫描还没完（刚放入新 GGUF、正在算哈希的那几秒）就开始听译：`audio-engine-manager.js` 的 `spawnWorker` 同步读扫描结果，这一次按标准档跑，还会提示「没有可用的高精度模型」。有反馈再让开始听译等扫描结束
+- 设置页「下次听译用哪个」在这次开机还没有任何 LLM 宿主起来过时按 1.7B 显示（显存未知），6 GB 的卡要等第一次载入后才显示 0.6B；实际载入不受影响。要改就把最近一次看到的显卡记进 store
+- 悬浮窗「没有可用的高精度模型」这段（`sendListening` 与 8 秒退回）只有手跑的 `smoke-listen` 覆盖，CI 测不到；`audio-engine-manager.js` 没有单测框架，要补得先搭
 
 ### 引擎进 GPU 的后续（v0.4.10 已发 OCR + 朗读；spike 结论在 gstack v049-gpu-research「v0.4.10 调优三连」）
 
-- **高精度听译档进显卡是运行时工程，不是换个包**：fp32 直接上 WebGPU 总 RTF 0.212 ≈ int8 CPU 0.202，每个 token 固定 50–60ms，是解码循环每步 57 个输出逐个从显卡读回的开销；要 KV 缓存与采样留在显卡（IO binding + 静态缓存导出，或自写解码循环）——归 v0.5.0 自研原生层，是它第一个有数字的驱动力。fp16 后转输出全空（bf16 训练溢出），要 fp16 得从 PyTorch 重导；上游 fp32 导出在 ModelScope zengshuishui/Qwen3-ASR-onnx
 - Kokoro fp16 暂缓：两种转换器都转不干净这张图（Loop 子图 / Resize 常量 / 正弦源），收益只有首块 111 → 约 70ms
 - sherpa WebGPU 三文件补丁提上游，合入后不用再维护 `native/sherpa-onnx-webgpu` 的 DLL
 
