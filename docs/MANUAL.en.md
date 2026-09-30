@@ -107,7 +107,8 @@ Three tone buttons under the languages: Natural (everyday), Precise (technical, 
 
 - Nine formats: plain text, Markdown, SRT subtitles, WebVTT subtitles, PDF, Word (.docx), CSV, JSON, EPUB. One file up to 20 MB.
 - Drop a file in or click to choose. Right-clicking a .pdf / .docx / .txt in Explorer and choosing "Translate with T-Translate" opens it here too.
-- Encrypted PDFs ask for the password. Scanned PDFs have no text layer, so the app runs OCR page by page; set up an OCR engine in Settings first.
+- Encrypted PDFs ask for the password. Scanned PDFs have no text layer, so the app runs OCR page by page; set up an OCR engine in Settings first. Pages whose text layer is garbled are read by OCR too.
+- PDFs are split into the original paragraphs. Running headers, footers and page numbers are dropped, and each table row becomes one paragraph.
 - The document is shown paragraph by paragraph, stacked or side by side. The outline on the left jumps to headings.
 - "Start translation" translates paragraph by paragraph; you can pause, resume and stop. Failed paragraphs can be retried one at a time or all at once with "Retry Failed".
 - Every translated paragraph can be edited, retranslated or copied.
