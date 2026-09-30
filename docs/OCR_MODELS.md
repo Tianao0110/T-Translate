@@ -7,6 +7,7 @@
 | 安装包内置 | 基础包 base-v6（PP-OCRv6 small det + 简繁英日及 46 拉丁语系 rec + 字典，下载 ~25MB / 落盘 ~31MB） | 随安装包分发，开箱即用 |
 | 应用内下载 | 高精度包 base-v6-hq（PP-OCRv6 medium det + rec，下载 ~95MB / 落盘 ~139MB） | 设置 → OCR → 模型档位 选「高精度」，切换即时生效、切回不删包 |
 | 应用内下载 | 语言包七个（韩 / 西里尔 / 天城文 / 泰米尔 / 泰卢固 / 卡纳达 / 阿拉伯，各 ~8MB；拉丁包已被 base-v6 吸收退役） | 用户在 设置 → OCR → 语言包 按需下载 |
+| 应用内下载 | 版面分析包 layout-v3（PP-DocLayoutV3 官方 ONNX，下载 ~112MB / 落盘 ~125MB） | 设置 → OCR → 本地 OCR 引擎 → 版面分析模型；只在显卡加速开着时给文档翻译的 PDF 解析用 |
 | 应用内修复 | 基础包重新下载到模型目录 | 内置模型损坏 / 缺失时 |
 
 ## 运行时目录
@@ -27,12 +28,12 @@ https://github.com/Tianao0110/T-Translate/releases/download/ocr-models/manifest.
 ### 首次发布（一次性）
 
 ```bash
-npm run ocr:release        # 生成 release-ocr-models/（11 个 zip + manifest.json）
+npm run ocr:release        # 生成 release-ocr-models/（12 个 zip + manifest.json）
 ```
 
 1. GitHub → Releases → Draft a new release，tag 填 `ocr-models`（不要带 v 前缀）
 2. **勾选 "Set as a pre-release"** —— 防止 electron-updater 把它当成应用最新版
-3. 上传 `release-ocr-models/` 里的全部 12 个文件（基础包两档 + 两个旧代际包 + 七个语言包 + manifest），发布
+3. 上传 `release-ocr-models/` 里的全部 13 个文件（基础包两档 + 两个旧代际包 + 七个语言包 + 版面分析包 + manifest），发布
 
 > **新旧双轨**：manifest 同时携带 `LEGACY_PACKS`（base-v5 + latin）服务 v6 换代前的老客户端——它们的基础包修复按 id `base-v5` 取包、法德西仍映射拉丁包，且其引擎对 gen≠'v5' 会开空格启发式，**绝不能收到 v6 模型**。旧资产（ppocr_v5_mobile.zip / latin.zip）永远保留在 Release 上，legacy 条目不 bump 版本。新客户端在 `computePackList` 里自动跳过异代 base 与被吸收的语言包。
 
@@ -45,6 +46,12 @@ npm run ocr:release        # 生成 release-ocr-models/（11 个 zip + manifest.
 
 新增语言包同理：在 `ocr-model-sources.js` 的 `LANG_PACKS` 加条目 + 在 `electron/shared/ocr-packs.js` 的 `LANGUAGE_TO_PACK` 加语言映射 + 设置页语言下拉、`ocr.packs.names.*` 文案补齐（这一步需要发版）。资产可先于发版上线（2026-08-25 实证）：v0.3.x 客户端的 `computePackList` 会跳过无语言映射的包（隐形），v0.2.x 更老客户端按裸 id 列出但语言下拉不路由到它，无害。
 
+### 版面分析包（从官方散文件打包）
+
+上游只发散文件，没有 zip。`ocr-model-sources.js` 的 `LAYOUT_PACK` 用 `sources` 列出两个官方文件（`inference.onnx` / `inference.yml`）的地址和钉死的 sha256，外加 `notice`（Apache-2.0 署名）。`npm run ocr:release` 下载、按哈希校验、附 `NOTICE.txt`，以固定时间戳打成 `pp_doclayout_v3.zip`：同样的输入每次打出同一个 zip。清单条目里不带 `sources` / `notice`。
+
+首次上线（2026-09-30 起）：把 `pp_doclayout_v3.zip` 和新的 `manifest.json` 传到 `ocr-models` Release，其余资产不动。已发布的客户端只列 `type: "lang"` 的包，这一条对它们不可见，可以先于发版上线。换模型时同「日后更新模型」：改 `sources` 的地址与哈希、bump `version`，删掉本地旧 zip 再打。
+
 ## manifest.json 协议（schemaVersion 1）
 
 ```jsonc
@@ -54,7 +61,7 @@ npm run ocr:release        # 生成 release-ocr-models/（11 个 zip + manifest.
   "baseUrl": "https://github.com/<owner>/<repo>/releases/download/ocr-models",
   "packs": [{
     "id": "korean",            // 唯一 id，= 安装目录名
-    "type": "lang",            // base | lang
+    "type": "lang",            // base | lang | layout
     "gen": "v4",               // 模型代际；引擎仅对 v3/v4 开空格启发式（v5+ 原生识别空格）
     "version": "1.0.0",        // 与本地 pack.json 比较以提示更新
     "file": "korean.zip",      // 资产文件名（与 baseUrl 拼接；也可用 url 字段覆写）

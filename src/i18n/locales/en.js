@@ -695,6 +695,14 @@ const en = {
       state: { ready: "Ready", missing: "Not present", mismatch: "Hash mismatch" },
       fallbackNotice: "The built-in vision model is not available right now (GPU acceleration off or model files missing); Local OCR handled it",
     },
+    layout: {
+      name: "Layout model (PP-DocLayoutV3)",
+      desc: "Reads the page layout before a PDF is translated: text inside formulas, figures, headers and footers is no longer translated as body text, and tables are translated row by row. Used only while GPU acceleration is on",
+      needsGpu: "GPU acceleration is off, so PDFs are still split by rules (Settings → About → GPU acceleration)",
+      downloaded: "Layout model installed",
+      removeConfirm: "Remove the layout model? PDFs will be split by rules again",
+      removed: "Layout model removed",
+    },
     tier: {
       label: "Model tier",
       standard: "Standard (bundled)",

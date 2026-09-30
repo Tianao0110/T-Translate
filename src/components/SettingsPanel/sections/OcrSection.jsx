@@ -2,16 +2,17 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Eye, EyeOff, AlertTriangle, RefreshCw, Download, Cpu, Sparkles, Globe, ExternalLink, FolderOpen } from 'lucide-react';
+import { Eye, EyeOff, AlertTriangle, RefreshCw, Download, Cpu, Sparkles, Globe, ExternalLink, FolderOpen, Trash2 } from 'lucide-react';
 import stackClient from '../../../translation/stack-client.js';
 import { OCR_LANGUAGE_GROUPS, ocrLanguageName } from '../../../config/ocr-languages.js';
 import LanguagePicker from '../../shared/LanguagePicker.jsx';
 import PackList from './PackList.jsx';
 import { Seg, Switch } from './shared';
 
-// Must match electron/shared/ocr-packs.js BASE_PACK_ID / HQ_PACK_ID.
+// Must match electron/shared/ocr-packs.js BASE_PACK_ID / HQ_PACK_ID / LAYOUT_PACK_ID.
 const BASE_PACK_ID = 'base-v6';
 const HQ_PACK_ID = 'base-v6-hq';
+const LAYOUT_PACK_ID = 'layout-v3';
 
 const ENGINE_TAB = {
   'rapid-ocr': 'local',
@@ -80,6 +81,14 @@ const OcrSection = ({
     }
   };
 
+  // The PDF layout model runs only while GPU acceleration is on.
+  const [layoutGpu, setLayoutGpu] = useState(null);
+  useEffect(() => {
+    Promise.resolve(window.electron?.ocr?.layoutStatus?.())
+      .then((s) => setLayoutGpu(s ? !!s.gpu : null))
+      .catch(() => setLayoutGpu(null));
+  }, []);
+
   const refreshPacks = useCallback(async () => {
     if (!window.electron?.ocr?.listPacks) return;
     try {
@@ -119,9 +128,9 @@ const OcrSection = ({
   }, [settings.ocr.engine, settings.ocr.rapidInstalled, checkEngineHealth]);
 
   useEffect(() => {
-    // Only the two packs this page drives itself; PackList tracks its own rows.
+    // Only the packs this page drives itself; PackList tracks its own rows.
     const cleanup = window.electron?.ocr?.onPackProgress?.((data) => {
-      if (data.packId !== BASE_PACK_ID && data.packId !== HQ_PACK_ID) return;
+      if (![BASE_PACK_ID, HQ_PACK_ID, LAYOUT_PACK_ID].includes(data.packId)) return;
       setPackProgress(data.progress >= 100 || data.progress < 0 ? null : data);
     });
 
@@ -160,6 +169,25 @@ const OcrSection = ({
     updateSetting('ocr', 'rapidInstalled', true);
     checkEngineHealth(true); // deep: validate the fresh download for real
   }), [downloadPack, notify, t, updateSetting, checkEngineHealth]);
+
+  const handleDownloadLayout = useCallback(() => downloadPack(LAYOUT_PACK_ID, () => {
+    notify(t('ocr.layout.downloaded'), 'success');
+  }), [downloadPack, notify, t]);
+
+  const handleRemoveLayout = useCallback(async () => {
+    if (!(await confirm(t('ocr.layout.removeConfirm')))) return;
+    try {
+      const result = await window.electron?.ocr?.removePack?.(LAYOUT_PACK_ID);
+      if (result?.success) {
+        notify(t('ocr.layout.removed'), 'success');
+        await refreshPacks();
+      } else {
+        notify(result?.error || t('ocr.packs.removeFailed'), 'error');
+      }
+    } catch (e) {
+      notify(t('ocr.packs.removeFailed') + ': ' + e.message, 'error');
+    }
+  }, [confirm, notify, t, refreshPacks]);
 
   // Immediate-apply control: silent React update + dot-path persist + engine
   // hot-swap via IPC.
@@ -472,6 +500,55 @@ const OcrSection = ({
     </>
   );
 
+  // Not an OCR engine: a downloadable pack the document panel uses for PDFs.
+  const layoutPack = packs.find((p) => p.id === LAYOUT_PACK_ID);
+  const layoutInstalled = !!layoutPack && INSTALLED_STATES.includes(layoutPack.status);
+  const layoutCanDownload = !!layoutPack?.file && ['not-installed', 'update-available'].includes(layoutPack.status);
+  const layoutSizeMB = layoutPack?.size ? (layoutPack.size / 1024 / 1024).toFixed(1) : null;
+  const layoutCard = layoutPack && engineCard({
+    id: LAYOUT_PACK_ID,
+    name: t('ocr.layout.name'),
+    badge: (
+      <>
+        {layoutPack.status === 'update-available'
+          ? <span className="engine-badge download">{t('ocr.packs.updateAvailable')}</span>
+          : layoutInstalled
+            ? <span className="engine-badge installed">{t('ocr.installed')}</span>
+            : <span className="engine-badge unavailable">{t('ocr.packs.notInstalled')}</span>}
+        {layoutSizeMB && <span className="engine-size">{layoutSizeMB} MB</span>}
+      </>
+    ),
+    body: (
+      <>
+        <p className="engine-meta">{t('ocr.layout.desc')}</p>
+        {layoutInstalled && layoutGpu === false && <p className="setting-hint">{t('ocr.layout.needsGpu')}</p>}
+        {progressBar(LAYOUT_PACK_ID)}
+      </>
+    ),
+    actions: (
+      <>
+        {layoutCanDownload && (
+          <button className="btn download" disabled={busyPackId !== null} onClick={handleDownloadLayout}>
+            {busyPackId === LAYOUT_PACK_ID
+              ? <><RefreshCw size={13} className="spinning" /> {t('ocr.packs.downloadingShort')}</>
+              : layoutPack.status === 'update-available' ? t('ocr.packs.update') : t('ocr.download')}
+          </button>
+        )}
+        {layoutInstalled && (
+          <button
+            className="btn-small uninstall"
+            disabled={busyPackId !== null}
+            onClick={handleRemoveLayout}
+            title={t('ocr.uninstall')}
+            style={{ marginLeft: 6, padding: '4px 8px' }}
+          >
+            <Trash2 size={12} />
+          </button>
+        )}
+      </>
+    ),
+  });
+
   const localTab = (
     <>
       <div className="ocr-engines-list">
@@ -499,6 +576,7 @@ const OcrSection = ({
           body: visionBody,
           actions: visionActions,
         })}
+        {layoutCard}
       </div>
       <PackList
         bridge={window.electron?.ocr}

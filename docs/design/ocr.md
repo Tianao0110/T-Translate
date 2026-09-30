@@ -40,3 +40,13 @@
 - 坐标：`OcrLine` 自身没有矩形，只有 `Words` 有，所以行框是词框的并集。取**行**粒度与本地引擎的 `rawBlocks` 对齐；给词框的话悬浮窗的版面启发式会把它读成「一堆词」。框直接是源图像素（截图原样写盘，没有缩放）。
 - 输出不是 JSON 时当纯文本用：某台机器 `ConvertTo-Json` 失常时退化到 0.3.4 以前「只有文字没坐标」的行为，而不是整个识别失败。PS 5.1 会把单元素数组塌成对象、空数组可能给 null，解析时要兜。
 - 临时文件名带随机后缀：同一毫秒并发两次识别不能共用一个文件。stderr 是完整的 PS 错误记录，只取第一行有意义的文字。
+
+## 5. 版面分析（layout.js）
+
+- 给文档翻译的 PDF 解析用（渲染端怎么用这些块见 `design/renderer.md` §5「版面模型接入」）：渲染端每页送一张长边 1024px 的 PNG，宿主回 `{ blocks: [{ label, score, box, order }] }`，`box` 是占整图的比例，`order` 是阅读顺序。不识别文字。
+- 只在显卡加速开着时放行：`ocr:layout` 在 IPC 层查 `settings.gpu.enabled`，关着回 `LAYOUT_NEEDS_GPU`，渲染端不发请求、PDF 走纯规则。与内置视觉模型同一口径（用户 2026-09-29 定）。门面错误码：`LAYOUT_NOT_INSTALLED`（包不在）、`LAYOUT_FAILED`（宿主出错）。
+- 模型：PP-DocLayoutV3 官方 ONNX（`PaddlePaddle/PP-DocLayoutV3_onnx`，Apache-2.0），`ocr-models` 发布里的 `layout-v3` 包（type `layout`，不进语言包列表；发布流程见 `OCR_MODELS.md`）。
+- 输入：`image` [1, 3, 800, 800]，RGB 直接拉伸到 800×800（不保比例）后 /255，不减均值；`scale_factor` [800/H, 800/W]；`im_shape` [800, 800]。
+- 输出：`fetch_name_0` 每框 `[类别, 分数, x1, y1, x2, y2, 阅读序号]`，坐标已按 `scale_factor` 还原成原图像素；`fetch_name_1` 是有效框数；`fetch_name_2` 是每框 200×200 掩码（一页约 48MB），`session.run` 只取前两个输出，掩码不回传。V2 的每框多一列（两把顺序键：a 升序、b 降序），`parseRows` 两种都认。25 个类别两代相同。分数低于 0.45 的框丢掉。
+- 为什么是 V3 不是 V2：程序走的 WebGPU 上两者每页都是约 0.12 秒；V3 小 40%（125MB 对 204MB），表格里的斜体不再被当成行内公式，与 PaddleOCR-VL-1.6 同一套，拍照倾斜页也能处理。DirectML / CPU 上 V3 慢一半，但那条路不用。数字与试过的转换路子在 TODOS「B 档」。
+- 会话：自己一把缓存（`provider:packId`），不和识别会话抢位置，一次只留一个；和识别会话同一套 WebGPU 失败回 CPU 的粘性回退；换档 / 卸载 / 切显卡同样清掉。模型文件读进内存后不占文件句柄，会话开着也能直接删包（真机验证过）。没有空白帧热身：每次启动后第一页多约 4 秒，只在打开 PDF 时发生。
