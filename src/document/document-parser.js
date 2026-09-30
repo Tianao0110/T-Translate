@@ -6,6 +6,7 @@ import i18n from '../i18n.js';
 import { judgeLanguage, mainLanguage, unsure } from '../stack/language-detect.js';
 import { readPageLayout, isGarbledPage, buildParagraphs } from './pdf-text.js';
 import { splitSentences } from './sentence-breaks.js';
+import { htmlToParagraphs } from './html-blocks.js';
 const logger = createLogger('DocumentParser');
 
 const _t = (key, fallback) => {
@@ -406,17 +407,20 @@ function unitBox(viewport, box) {
 }
 
 // One paragraph → one segment unless it outgrows maxCharsPerSegment; every
-// piece carries the paragraph's page locations (loc), heading level and
-// table-row mark. Exported for tests.
+// piece carries the paragraph's heading level, table-row mark and, for PDF,
+// page locations (loc). Shared by the PDF, Word and EPUB parsers.
+// Exported for tests.
 export function segmentsFromParagraphs(paragraphs, viewports, { maxCharsPerSegment = 800, filters = {} } = {}) {
   const segments = [];
   let id = 0;
   for (const para of paragraphs) {
-    const loc = para.parts.map((part) => {
-      const box = unitBox(viewports.get(part.page), part.box);
-      return box ? { page: part.page, box } : { page: part.page };
-    });
-    const extra = { loc };
+    const extra = {};
+    if (para.parts) {
+      extra.loc = para.parts.map((part) => {
+        const box = unitBox(viewports?.get(part.page), part.box);
+        return box ? { page: part.page, box } : { page: part.page };
+      });
+    }
     if (para.heading) extra.heading = para.heading;
     if (para.row) extra.row = true;
     // Short headings ("Methods") still get translated.
@@ -535,10 +539,14 @@ async function parseDOCX(file, options = {}) {
   const JSZip = (await import('jszip')).default;
   assertZipWithinDecompressedCap(await JSZip.loadAsync(arrayBuffer));
 
-  const result = await mammoth.extractRawText({ arrayBuffer });
-  const text = result.value;
-
-  const segments = splitIntoSegments(text, {
+  // HTML keeps headings, lists and tables; images are dropped instead of
+  // inlined as base64.
+  // arrayBuffer feeds mammoth's browser build (the app), buffer its Node
+  // build (unit tests).
+  const result = await mammoth.convertToHtml({ arrayBuffer, buffer: arrayBuffer }, {
+    convertImage: mammoth.images.imgElement(async () => ({ src: '' })),
+  });
+  const segments = segmentsFromParagraphs(htmlToParagraphs(result.value), null, {
     maxCharsPerSegment,
     filters,
   });
@@ -692,7 +700,8 @@ async function parseEPUB(file, options = {}) {
     if (id && href) manifest[id] = href;
   }
 
-  let allText = '';
+  const paragraphs = [];
+  let totalChars = 0;
   let chapterCount = 0;
 
   for (const id of spineIds) {
@@ -706,23 +715,21 @@ async function parseEPUB(file, options = {}) {
 
     if (content) {
       chapterCount++;
-      const text = extractTextFromHTML(content);
-      if (text.trim()) {
-        allText += text + '\n\n';
-      }
       // Runtime backstop against forged declared sizes.
-      if (allText.length > MAX_DECOMPRESSED_SIZE_BYTES) {
+      totalChars += content.length;
+      if (totalChars > MAX_DECOMPRESSED_SIZE_BYTES) {
         throw new Error(_t('docParser.tooLargeDecompressed',
           'File content is too large after decompression'));
       }
+      paragraphs.push(...htmlToParagraphs(content));
     }
   }
 
-  if (!allText.trim()) {
+  if (!paragraphs.length) {
     throw new Error(_t('docParser.epubNoContent', 'No translatable text found in EPUB'));
   }
 
-  const segments = splitIntoSegments(allText, {
+  const segments = segmentsFromParagraphs(paragraphs, null, {
     maxCharsPerSegment,
     filters,
   });
@@ -732,34 +739,6 @@ async function parseEPUB(file, options = {}) {
     title,
     chapterCount,
   };
-}
-
-function extractTextFromHTML(html) {
-  let text = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
-  text = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
-
-  // Convert block-level tags to newlines.
-  text = text.replace(/<\/(p|div|h[1-6]|br|li|tr)>/gi, '\n');
-  text = text.replace(/<(p|div|h[1-6]|br|li|tr)[^>]*>/gi, '\n');
-
-  text = text.replace(/<[^>]+>/g, '');
-
-  text = text.replace(/&nbsp;/g, ' ');
-  text = text.replace(/&lt;/g, '<');
-  text = text.replace(/&gt;/g, '>');
-  text = text.replace(/&amp;/g, '&');
-  text = text.replace(/&quot;/g, '"');
-  // fromCodePoint: numeric entities can be astral.
-  const decodeCodePoint = (code) => {
-    try { return String.fromCodePoint(code); } catch { return ''; }
-  };
-  text = text.replace(/&#(\d+);/g, (_, code) => decodeCodePoint(Number(code)));
-  text = text.replace(/&#x([0-9a-f]+);/gi, (_, code) => decodeCodePoint(parseInt(code, 16)));
-
-  text = text.replace(/[ \t]+/g, ' ');
-  text = text.replace(/\n\s*\n/g, '\n\n');
-
-  return text.trim();
 }
 
 export async function parseDocument(file, options = {}) {

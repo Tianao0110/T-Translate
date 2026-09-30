@@ -267,6 +267,66 @@ describe('PDF paragraphs to segments', () => {
   });
 });
 
+describe('Word and EPUB keep their structure', () => {
+  const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const para = (text, style) => `<w:p>${style ? `<w:pPr><w:pStyle w:val="${style}"/></w:pPr>` : ''}<w:r><w:t>${text}</w:t></w:r></w:p>`;
+  const cell = (text) => `<w:tc>${para(text)}</w:tc>`;
+
+  async function zipFile(name, entries) {
+    const JSZip = (await import('jszip')).default;
+    const zip = new JSZip();
+    for (const [path, body] of Object.entries(entries)) zip.file(path, body);
+    return new File([await zip.generateAsync({ type: 'arraybuffer' })], name);
+  }
+
+  it('Word headings, paragraphs and table rows come through', async () => {
+    const file = await zipFile('sample.docx', {
+      '[Content_Types].xml': '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        + '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        + '<Default Extension="xml" ContentType="application/xml"/>'
+        + '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+        + '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>',
+      '_rels/.rels': '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        + '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>',
+      'word/_rels/document.xml.rels': '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        + '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',
+      'word/styles.xml': `<?xml version="1.0"?><w:styles xmlns:w="${W}"><w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/></w:style></w:styles>`,
+      'word/document.xml': `<?xml version="1.0"?><w:document xmlns:w="${W}"><w:body>`
+        + para('Introduction', 'Heading1')
+        + para('The first paragraph of body text.')
+        + `<w:tbl><w:tr>${cell('Site')}${cell('Area')}</w:tr><w:tr>${cell('Pine Ck')}${cell('320')}</w:tr></w:tbl>`
+        + '</w:body></w:document>',
+    });
+    const result = await parseDocument(file, { filters: { skipShort: true, minLength: 10, skipNumbers: true } });
+    expect(result.success).toBe(true);
+    expect(result.segments.map(s => [s.original, s.heading || 0, !!s.row, s.status])).toEqual([
+      ['Introduction', 1, false, 'pending'],
+      ['The first paragraph of body text.', 0, false, 'pending'],
+      ['Site | Area', 0, true, 'pending'],
+      ['Pine Ck | 320', 0, true, 'pending'],
+    ]);
+    expect(result.outline.map(h => h.text)).toEqual(['Introduction']);
+  });
+
+  it('EPUB chapters give headings and paragraphs with entities decoded', async () => {
+    const file = await zipFile('book.epub', {
+      'META-INF/container.xml': '<?xml version="1.0"?><container><rootfiles><rootfile full-path="OEBPS/content.opf"/></rootfiles></container>',
+      'OEBPS/content.opf': '<?xml version="1.0"?><package><metadata><dc:title>A Small Book</dc:title></metadata>'
+        + '<manifest><item id="c1" href="ch1.xhtml"/><item id="css" href="style.css"/></manifest><spine><itemref idref="c1"/></spine></package>',
+      'OEBPS/ch1.xhtml': '<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml"><head><title>ch1</title></head>'
+        + '<body><h2>Chapter One</h2><p>Tom &amp; Jerry went out.</p><p>They came back late at night.</p></body></html>',
+    });
+    const result = await parseDocument(file, { filters: { skipShort: false } });
+    expect(result.success).toBe(true);
+    expect(result.title).toBe('A Small Book');
+    expect(result.segments.map(s => [s.original, s.heading || 0])).toEqual([
+      ['Chapter One', 2],
+      ['Tom & Jerry went out.', 0],
+      ['They came back late at night.', 0],
+    ]);
+  });
+});
+
 describe('structured export', () => {
   const segments = [
     { id: 0, original: 'Results', translated: '结果', status: 'completed', heading: 2 },
