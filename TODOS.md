@@ -30,7 +30,7 @@ MinerU 本身不接（Python + Rust 库 docvortex + torch/ONNX），只借思路
   - **斜向水印过滤、乱码页走 OCR 只有单测**，三份样本里都没有这两种页，碰到真文件再实跑一次
   - 用户主要翻英文 PDF，中文只有构造数据的单测（CJK 接行不加空格）；有中文 PDF 反馈时拿真文件补基线
   - ~~请求变多要不要拼短段~~ 不做：2026-09-29 真机实测耗时基本不变（论文 52 → 59 秒、网页打印 44 → 47 秒），拼回去反而重现旧切法的质量问题，数字在 `docs/design/renderer.md` §5
-  - **本地小模型碰到乱码段会把提示词当译文输出**（新切法下只剩公式碎片 2 / 211 段，旧切法 19 / 124 段）：译文里出现提示词原句时判失败而不是当成功展示，可以在内置模型源里做。有真实反馈再动
+  - ~~本地小模型碰到乱码段会把提示词当译文输出~~ 已做（`src/stack/prompt-echo.js`，识别后换短提示重试，实测 21 / 21 救回）。**流式路径没做**（悬浮窗、划词逐字出字，到结尾才能判断时已经上屏）：有真实反馈再在流式收尾时补判
   - 对照方法：vitest 直接跑 `parseDocument` 输出段落清单，改前改后比。坑：`src/i18n.js` 顶层读 `localStorage`，要先垫一个；pdf.js 的 `workerSrc` 要手动指到 `node_modules/pdfjs-dist/build/pdf.worker.mjs`；vitest 的 root 和测试文件不能跨盘
 - **面板不照搬 MinerU**：它的左右是「原 PDF 页面 | 抽出的 Markdown」，用来查抽取质量，两边不联动；我们已有逐段对照（[index.jsx:358](src/components/DocumentTranslator/index.jsx:358)）。A 档落地后再定要不要加可折叠的「原文页面」侧栏：点段落跳页并高亮，只动文档面板
 - **B 档候选：版面模型 PP-DocLayoutV2**（ONNX 204MB，Apache-2.0，HF `opendatalab/MinerU-4_models_onnx` 的 `Layout/PP-DocLayoutV2/`）：解决双栏顺序、公式和图内文字混入、表格图注、标题层级。要新开模型包 + 离线拦截，中等工程。**现有的 PaddleOCR-VL 替代不了它**：我们只用 Spotting（[T-ENGINE.md:119](docs/T-ENGINE.md:119)），只出「行文字 + 框」、不分类；官方文档解析是「PP-DocLayoutV2 切块分类排序 → 裁块交 VLM 按类识别」两段，我们只接了后段，B 就是缺的前段。硬拿它跑有文字层的 PDF 也不划算（原文字层是准的、只在显卡上可用、1 MP 上限让整页 A4 缩到约 100 dpi）。扫描页已经走同一个 OCR 管理器（[index.jsx:772](src/components/DocumentTranslator/index.jsx:772)），选了内置视觉模型时大图应会升级过去（未实跑）。A 档之后只剩「公式和图内文字混入」真正需要 B；到时按「补全 PaddleOCR-VL 官方流程」立项，截图的智能分配也能用上真版面信息
