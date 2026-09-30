@@ -372,6 +372,11 @@ export function parseVTT(content) {
   return segments;
 }
 
+// Off-screen page renders for OCR and layout. 'print' needs no animation
+// frames, so parsing keeps going while the window is minimized
+// (docs/design/renderer.md §5).
+const PARSE_RENDER_INTENT = 'print';
+
 // Render a PDF page to canvas and feed it through the OCR chain. Returns
 // null on failure so callers can distinguish "no text" from "failed".
 async function ocrPdfPage(page, ocrRecognize) {
@@ -382,7 +387,7 @@ async function ocrPdfPage(page, ocrRecognize) {
     const canvas = document.createElement('canvas');
     canvas.width = Math.ceil(viewport.width);
     canvas.height = Math.ceil(viewport.height);
-    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport, intent: PARSE_RENDER_INTENT }).promise;
     const result = await ocrRecognize(canvas.toDataURL('image/png'));
     return result?.success && result.text ? result.text : null;
   } catch {
@@ -496,7 +501,7 @@ async function layoutPdfPage(page, layoutAnalyze) {
   const canvas = document.createElement('canvas');
   canvas.width = Math.ceil(viewport.width);
   canvas.height = Math.ceil(viewport.height);
-  await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+  await page.render({ canvasContext: canvas.getContext('2d'), viewport, intent: PARSE_RENDER_INTENT }).promise;
   const result = await layoutAnalyze(canvas.toDataURL('image/png'));
   if (!result?.success || !Array.isArray(result.blocks)) return null;
   return result.blocks.map((block) => {
