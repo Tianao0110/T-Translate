@@ -29,6 +29,7 @@ import { getSystemPrompt, LANGUAGE_NAMES } from '../config/templates.js';
 import { detectTemplateFromModel } from '../config/model-template-mapping.js';
 import { createStreamThrottle } from '../core/stream-throttle.js';
 import { getLocalLlm } from './runtime.js';
+import { isPromptEcho, stripInstructionLead } from './prompt-echo.js';
 
 // An empty endpoint means the preset default (localhost for local presets).
 function endpointIsLocal(config) {
@@ -539,11 +540,27 @@ export class TranslationService {
 
         const systemPrompt = resolveSystemPrompt(provider, template, targetLang);
 
-        const result = await provider.translate(processed, sourceLang, targetLang, {
+        let result = await provider.translate(processed, sourceLang, targetLang, {
           systemPrompt,
           template,
           signal,
         });
+
+        // The model answered with the prompt's requirement list: once more
+        // with the short prompt, then this provider counts as failed.
+        if (result.success && isPromptEcho(result.text, processed, systemPrompt?.content)) {
+          logger.warn(`Provider ${id} echoed the prompt, retrying with the short prompt`);
+          result = await provider.translate(processed, sourceLang, targetLang, {
+            systemPrompt: buildMTPrompt(template, targetLang),
+            template,
+            signal,
+          });
+          if (result.success && isPromptEcho(result.text, processed, systemPrompt?.content)) {
+            result = { success: false, error: _t('svc.promptEcho', '模型把提示词当成了译文'), skipFailureCount: true };
+          } else if (result.success) {
+            result = { ...result, text: stripInstructionLead(result.text, processed) };
+          }
+        }
 
         if (result.success) {
           this._failureCount[id] = 0;

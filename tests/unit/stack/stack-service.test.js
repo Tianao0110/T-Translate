@@ -89,6 +89,55 @@ describe('stack TranslationService', () => {
     expect(hosts.some(u => u.includes('api.deepseek.com'))).toBe(true);
   });
 
+  // What the built-in 1.7B answered for some fragments: the prompt's
+  // requirement list, translated.
+  const ECHO = '要求：\n- 使用自然、口语化的语气\n- 保持原意和语境\n- 只输出翻译，不添加任何解释或注释\n- 输出语言：简体中文';
+
+  it('retries a prompt echo once with the short user-only prompt', async () => {
+    const answers = [ECHO, '参考文献，1980 年'];
+    const fetchMock = vi.fn(async () => okChatResponse(answers.shift()));
+    configureRuntime({ fetch: fetchMock });
+
+    const svc = makeService(makeFakeL2());
+    await svc.init(SETTINGS);
+    const result = await svc.translate(', 1980; Van Wyk, 1987;', { targetLang: 'zh' });
+
+    expect(result.success).toBe(true);
+    expect(result.provider).toBe('openai');
+    expect(result.text).toBe('参考文献，1980 年');
+    const retry = JSON.parse(fetchMock.mock.calls[1][1].body).messages;
+    expect(retry).toHaveLength(1);
+    expect(retry[0].role).toBe('user');
+    expect(retry[0].content).toContain('ONLY output the translated result');
+    expect(retry[0].content).toContain(', 1980; Van Wyk, 1987;');
+  });
+
+  it('a provider that echoes twice fails over and the echo is never cached', async () => {
+    const fetchMock = vi.fn(async (url) => okChatResponse(String(url).includes('api.openai.com') ? ECHO : '你好'));
+    configureRuntime({ fetch: fetchMock });
+
+    const l2 = makeFakeL2();
+    const svc = makeService(l2);
+    await svc.init(SETTINGS);
+    const result = await svc.translate('hello there', { targetLang: 'zh' });
+
+    expect(result.provider).toBe('deepseek');
+    expect(result.text).toBe('你好');
+    expect(fetchMock.mock.calls.filter(c => String(c[0]).includes('api.openai.com'))).toHaveLength(2);
+    expect(JSON.stringify(l2.set.mock.calls)).not.toContain('要求');
+  });
+
+  it('with fallback off an echo comes back as a failure', async () => {
+    configureRuntime({ fetch: vi.fn(async () => okChatResponse(ECHO)) });
+
+    const svc = makeService(makeFakeL2());
+    await svc.init(SETTINGS);
+    const result = await svc.translate('hello there', { targetLang: 'zh', enableFallback: false });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('模型把提示词当成了译文');
+  });
+
   it('SECURE mode never writes the persistent L2 cache', async () => {
     const fetchMock = vi.fn(async () => okChatResponse('翻译结果'));
     configureRuntime({ fetch: fetchMock });

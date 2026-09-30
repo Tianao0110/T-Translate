@@ -1296,6 +1296,7 @@ const en = {
   svc: {
     noProvider: "No translation providers available",
     allFailed: "All translation providers failed",
+    promptEcho: "The model returned its instructions instead of a translation",
     testBlockedByPrivacy: "This provider is disabled by the current privacy mode",
     offlineRemoteEndpoint: "Offline mode only allows providers on this machine",
     batchFailed: "Batch translation failed entirely",

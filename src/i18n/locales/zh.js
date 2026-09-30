@@ -1297,6 +1297,7 @@ const zh = {
   svc: {
     noProvider: "没有可用的翻译源",
     allFailed: "所有翻译源均失败",
+    promptEcho: "模型把提示词当成了译文",
     testBlockedByPrivacy: "当前隐私模式已禁用该翻译源",
     offlineRemoteEndpoint: "离线模式只允许本机地址的翻译源",
     batchFailed: "批量翻译全部失败",
