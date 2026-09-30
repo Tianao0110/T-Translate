@@ -7,7 +7,7 @@ const path = require('path');
 const fs = require('fs');
 const PATHS = require('../shared/paths');
 const { modelDir, modelDirs } = require('../packs/model-root');
-const { BASE_PACK_ID, HQ_PACK_ID, packIdForLanguage } = require('../shared/ocr-packs');
+const { BASE_PACK_ID, HQ_PACK_ID, LAYOUT_PACK_ID, packIdForLanguage } = require('../shared/ocr-packs');
 const tengine = require('../tengine');
 const logger = require('../platform/logger')('OCR-Engine');
 
@@ -191,6 +191,38 @@ async function recognize(imageInput, options = {}) {
   }
 }
 
+// The installed layout model, or null. Only the downloaded pack exists;
+// nothing is bundled.
+function resolveLayoutModel() {
+  const dir = resolvePackDir(LAYOUT_PACK_ID);
+  if (!dir) return null;
+  const meta = readPackMeta(dir);
+  return { packId: meta.id, model: path.join(dir, meta.files.model) };
+}
+
+/**
+ * Layout blocks of one rendered page, for the PDF parser.
+ *
+ * @param {string|Buffer} imageInput - dataURL / base64 string / raw Buffer
+ * @returns {Promise<{success, blocks?: Array<{label, score, box: number[], order}>, error?, errorCode?}>}
+ *   box is [left, top, right, bottom] as fractions of the image.
+ */
+async function analyzeLayout(imageInput) {
+  const found = resolveLayoutModel();
+  if (!found) return { success: false, error: 'layout model not installed', errorCode: 'LAYOUT_NOT_INSTALLED' };
+  try {
+    const out = await host().layout({
+      packId: found.packId,
+      model: found.model,
+      image: Buffer.isBuffer(imageInput) ? imageInput : String(imageInput),
+    });
+    return { success: true, blocks: out.blocks };
+  } catch (error) {
+    logger.error('Layout analysis failed:', error.message);
+    return { success: false, error: error.message, errorCode: error.code || 'LAYOUT_FAILED' };
+  }
+}
+
 // Health probe. Light (default): the model files resolve and are non-empty.
 // deep: also builds the session in the host; for explicit user action.
 async function healthCheck({ deep = false } = {}) {
@@ -232,6 +264,8 @@ function setProvider(provider) {
 
 module.exports = {
   recognize,
+  analyzeLayout,
+  resolveLayoutModel,
   healthCheck,
   hostStatus,
   setProvider,

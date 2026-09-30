@@ -161,6 +161,10 @@ const electronAPI = {
     downloadPack: (packId) => ipcRenderer.invoke("ocr:packs-download", packId),
     removePack: (packId) => ipcRenderer.invoke("ocr:packs-remove", packId),
     setModelTier: (tier) => ipcRenderer.invoke("ocr:set-model-tier", tier),
+
+    // PDF layout analysis for the document panel (GPU only).
+    layoutStatus: () => ipcRenderer.invoke("ocr:layout-status"),
+    analyzeLayout: (image) => ipcRenderer.invoke("ocr:layout", image),
     onPackProgress: (callback) => {
       const handler = (event, data) => callback(data);
       ipcRenderer.on("ocr:download-progress", handler);

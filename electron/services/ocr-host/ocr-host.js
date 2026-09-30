@@ -7,6 +7,7 @@
 // Protocol (main -> host):
 //   {type:'init', provider:'cpu'|'webgpu'}
 //   {type:'recognize', id, packId, models:{det, rec, dict, gen}, image, preprocess}
+//   {type:'layout', id, packId, model, image}   PDF page → layout blocks
 //   {type:'health', id, packId, models}      build the session, report ok
 //   {type:'evict', packId?}                  drop one or every cached session
 //   {type:'set-provider', provider}          drops every session, next load uses it
@@ -26,14 +27,17 @@ let provider = 'cpu';
 // key -> Promise<ocr instance>; promise so concurrent callers share one load.
 const sessions = new Map();
 const MAX_SESSIONS = 2;
+// The layout model has its own slot, so it and OCR never evict each other.
+const layoutSessions = new Map();
 
 // Heavy natives load lazily on the first request, not at fork.
 function ensureEnv() {
   if (env) return env;
   const { createOcr } = require('./ppocr');
+  const { createLayout } = require('./layout');
   const ort = require('onnxruntime-node');
   const canvasKit = require('@napi-rs/canvas');
-  env = { createOcr, ort, canvasKit };
+  env = { createOcr, createLayout, ort, canvasKit };
   return env;
 }
 
@@ -115,11 +119,40 @@ async function getSession(packId, models) {
 function evict(packId) {
   if (!packId) {
     sessions.clear();
+    layoutSessions.clear();
     return;
   }
-  for (const key of [...sessions.keys()]) {
-    if (key.endsWith(`:${packId}`)) sessions.delete(key);
+  for (const cache of [sessions, layoutSessions]) {
+    for (const key of [...cache.keys()]) {
+      if (key.endsWith(`:${packId}`)) cache.delete(key);
+    }
   }
+}
+
+async function createLayoutSession(model) {
+  const { createLayout, ort, canvasKit } = ensureEnv();
+  if (provider !== 'webgpu') return createLayout({ ort, canvasKit, model });
+  try {
+    return await createLayout({ ort, ortOption: ortOption(), canvasKit, model });
+  } catch (e) {
+    log('warn', `WebGPU failed for layout (${e.message}) — this host falls back to CPU`);
+    providerFallback = e.message;
+    provider = 'cpu';
+    return createLayout({ ort, canvasKit, model });
+  }
+}
+
+function getLayout(packId, model) {
+  const key = sessionKey(packId);
+  if (layoutSessions.has(key)) return layoutSessions.get(key);
+  layoutSessions.clear();
+  log('info', `loading layout session ${key}`);
+  const promise = createLayoutSession(model).catch((e) => {
+    layoutSessions.delete(key);
+    throw e;
+  });
+  layoutSessions.set(key, promise);
+  return promise;
 }
 
 function stripDataUrl(s) {
@@ -185,6 +218,14 @@ async function recognize(msg) {
   };
 }
 
+async function layout(msg) {
+  const session = await getLayout(msg.packId, msg.model);
+  const { canvasKit } = ensureEnv();
+  const buf = typeof msg.image === 'string' ? Buffer.from(stripDataUrl(msg.image), 'base64') : Buffer.from(msg.image);
+  const img = await canvasKit.loadImage(buf);
+  return { blocks: await session.analyze(img), provider };
+}
+
 async function handle(msg) {
   switch (msg.type) {
     case 'init':
@@ -198,6 +239,7 @@ async function handle(msg) {
       if (next !== provider) {
         provider = next;
         sessions.clear();
+        layoutSessions.clear();
       }
       return;
     }
@@ -206,6 +248,8 @@ async function handle(msg) {
       return;
     case 'recognize':
       return reply(msg.id, () => recognize(msg));
+    case 'layout':
+      return reply(msg.id, () => layout(msg));
     case 'health':
       return reply(msg.id, async () => {
         await getSession(msg.packId, msg.models);
@@ -213,6 +257,7 @@ async function handle(msg) {
       });
     case 'shutdown':
       sessions.clear();
+      layoutSessions.clear();
       process.exit(0);
       return;
     default:

@@ -13,6 +13,10 @@ const BASE_PACK_ID = 'base-v6';
 // row and the language-pack list.
 const HQ_PACK_ID = 'base-v6-hq';
 
+// PDF layout analysis (PP-DocLayoutV3). type 'layout' keeps it out of the
+// language list; it runs in the OCR host but reads no text.
+const LAYOUT_PACK_ID = 'layout-v3';
+
 // Which languages each recognition model can read. Mirrors
 // OCR_LANGUAGE_GROUPS in src/config/ocr-languages.js (`npm run
 // check:languages` keeps the two in step; verification: docs/OCR_MODELS.md).
@@ -85,6 +89,7 @@ function computePackList(installedPacks, manifest) {
 module.exports = {
   BASE_PACK_ID,
   HQ_PACK_ID,
+  LAYOUT_PACK_ID,
   LANGUAGE_TO_PACK,
   packIdForLanguage,
   compareVersions,

@@ -36,6 +36,7 @@ function createOcrEngine({ fork, logger, workerPath, now = Date.now, onEvent = (
     id: 'ocr',
     host,
     recognize: (payload) => host.request('recognize', payload),
+    layout: (payload) => host.request('layout', payload),
     evict(packId) {
       host.post({ type: 'evict', packId });
     },

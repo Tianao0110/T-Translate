@@ -6,6 +6,7 @@ import { describe, it, expect } from 'vitest';
 
 const {
   BASE_PACK_ID,
+  LAYOUT_PACK_ID,
   packIdForLanguage,
   compareVersions,
   computePackList,
@@ -132,6 +133,13 @@ describe('computePackList', () => {
       packs: [{ id: 'base-v6-hq', type: 'base-variant', version: '1.0.0', languages: ['fr'] }],
     });
     expect(list.find((p) => p.id === 'base-v6-hq')?.status).toBe('not-installed');
+  });
+
+  it('passes the layout pack through with its install state', () => {
+    const manifest = { packs: [{ id: LAYOUT_PACK_ID, type: 'layout', version: '1.0.0' }] };
+    expect(computePackList([], manifest).find((p) => p.id === LAYOUT_PACK_ID)?.status).toBe('not-installed');
+    const installed = computePackList([{ id: LAYOUT_PACK_ID, type: 'layout', version: '1.0.0' }], manifest);
+    expect(installed.find((p) => p.id === LAYOUT_PACK_ID)?.status).toBe('installed');
   });
 
   it('keeps an installed absorbed pack visible as orphaned (uninstallable)', () => {
