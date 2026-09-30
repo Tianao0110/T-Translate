@@ -482,8 +482,37 @@ export async function openPdf(file, password) {
   return loadingTask.promise;
 }
 
+// Long side of the page image sent to the layout model; it resizes to
+// 800 × 800 itself.
+const LAYOUT_RENDER_EDGE = 1024;
+
+// Layout blocks of one page: render it, hand it to the layout model (the
+// OCR host, through options.layoutAnalyze), map the boxes back to PDF user
+// space for pdf-text.js. null keeps the page on the rule-based path.
+async function layoutPdfPage(page, layoutAnalyze) {
+  const base = page.getViewport({ scale: 1 });
+  const scale = clampedPdfScale(base.width, base.height, LAYOUT_RENDER_EDGE / Math.max(base.width, base.height));
+  const viewport = page.getViewport({ scale });
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.ceil(viewport.width);
+  canvas.height = Math.ceil(viewport.height);
+  await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+  const result = await layoutAnalyze(canvas.toDataURL('image/png'));
+  if (!result?.success || !Array.isArray(result.blocks)) return null;
+  return result.blocks.map((block) => {
+    const [x0, y0] = base.convertToPdfPoint(block.box[0] * base.width, block.box[1] * base.height);
+    const [x1, y1] = base.convertToPdfPoint(block.box[2] * base.width, block.box[3] * base.height);
+    return {
+      label: block.label,
+      order: block.order,
+      box: [Math.min(x0, x1), Math.min(y0, y1), Math.max(x0, x1), Math.max(y0, y1)],
+    };
+  });
+}
+
 async function parsePDF(file, options = {}) {
   const { password, maxCharsPerSegment = 800, filters = {}, ocrRecognize, onProgress } = options;
+  let { layoutAnalyze } = options;
 
   const pdf = await openPdf(file, password);
   const numPages = pdf.numPages;
@@ -491,6 +520,7 @@ async function parsePDF(file, options = {}) {
   const pages = [];
   const viewports = new Map();
   let usedOcr = false;
+  let usedLayout = false;
 
   for (let i = 1; i <= numPages; i++) {
     onProgress?.({ page: i, total: numPages });
@@ -509,7 +539,19 @@ async function parsePDF(file, options = {}) {
         continue;
       }
     }
-    pages.push({ page: i, layout });
+
+    let blocks = null;
+    if (layoutAnalyze) {
+      onProgress?.({ page: i, total: numPages, layout: true });
+      blocks = await layoutPdfPage(page, layoutAnalyze).catch(() => null);
+      // A refusal (model gone, GPU switched off) holds for every page.
+      if (!blocks) {
+        logger.warn(`Layout analysis unavailable from page ${i}, rule-based paragraphs from here`);
+        layoutAnalyze = null;
+      }
+    }
+    if (blocks) usedLayout = true;
+    pages.push(blocks ? { page: i, layout, blocks } : { page: i, layout });
   }
 
   const segments = segmentsFromParagraphs(buildParagraphs(pages), viewports, {
@@ -525,6 +567,7 @@ async function parsePDF(file, options = {}) {
   if (usedOcr) {
     result.usedOcr = true;
   }
+  if (usedLayout) result.usedLayout = true;
   // Nothing extractable and OCR didn't save it — tell the user why the
   // document came back empty instead of showing "0 segments".
   if (segments.length === 0) {
@@ -791,6 +834,7 @@ export async function parseDocument(file, options = {}) {
         extra.pageCount = pdfResult.pageCount;
         extra.isPdf = true;
         if (pdfResult.usedOcr) extra.usedOcr = true;
+        if (pdfResult.usedLayout) extra.usedLayout = true;
         if (pdfResult.warning === 'scanned_no_ocr') {
           extra.isScanned = true;
           extra.warning = 'scanned_no_ocr';

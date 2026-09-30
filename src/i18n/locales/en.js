@@ -1073,7 +1073,8 @@ const en = {
       orClick: "or click to select",
       supported: "Supported: {{formats}}",
       parsing: "Parsing file...",
-      ocrProgress: "OCR on page {{page}}/{{total}}..."
+      ocrProgress: "OCR on page {{page}}/{{total}}...",
+      layoutProgress: "Analysing layout, page {{page}}/{{total}}..."
     },
     // Password modal
     password: {

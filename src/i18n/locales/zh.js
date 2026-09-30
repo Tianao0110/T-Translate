@@ -1073,7 +1073,8 @@ const zh = {
       orClick: "或点击选择文件",
       supported: "支持：{{formats}}",
       parsing: "正在解析文件...",
-      ocrProgress: "OCR 识别第 {{page}}/{{total}} 页..."
+      ocrProgress: "OCR 识别第 {{page}}/{{total}} 页...",
+      layoutProgress: "版面分析第 {{page}}/{{total}} 页..."
     },
     // Password modal
     password: {

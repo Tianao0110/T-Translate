@@ -229,6 +229,60 @@ describe('buildParagraphs', () => {
   });
 });
 
+describe('buildParagraphs with layout blocks', () => {
+  // Blocks are in PDF user space ([x0, y0, x1, y1], y up) like parsePDF hands them over.
+  const block = (label, order, box) => ({ label, order, box });
+  const withBlocks = (rows, blocks) => ({ ...page(1, rows), blocks });
+
+  it('drops formula and figure text and keeps one paragraph per text block', () => {
+    const paras = buildParagraphs([withBlocks([
+      [`Body text starts here and ${FILLER}`, 50, 700],
+      [`and ends inside the block ${FILLER}.`, 50, 688],
+      ['Q% Z a C b', 100, 650],
+      ['Left camera Right camera', 60, 600],
+      [`Second paragraph ${FILLER}.`, 50, 560],
+    ], [
+      block('text', 0, [40, 680, 560, 715]),
+      block('display_formula', 1, [90, 640, 300, 665]),
+      block('chart', 2, [40, 580, 400, 630]),
+      block('text', 3, [40, 550, 560, 575]),
+    ])]);
+    expect(texts(paras).map((t) => t.slice(0, 18))).toEqual(['Body text starts h', 'Second paragraph t']);
+  });
+
+  it('keeps rule-based order and headings: title labels on web user names do not count', () => {
+    const paras = buildParagraphs([withBlocks([
+      ['Doppel11 • 5d ago', 50, 700, 9],
+      [`Is there any mod for this laptop ${FILLER}?`, 50, 680],
+    ], [
+      block('text', 0, [40, 670, 560, 695]),
+      block('paragraph_title', 1, [40, 695, 200, 710]),
+    ])]);
+    expect(paras.map((p) => [p.text.slice(0, 12), p.heading || 0])).toEqual([['Doppel11 • 5', 0], ['Is there any', 0]]);
+  });
+
+  it('turns every line of a table block into a table row, wrapped cells included', () => {
+    const paras = buildParagraphs([withBlocks([
+      ['Site', 50, 500], ['Area', 150, 500],
+      ['Pine Ck', 50, 488], ['Nandakumar and', 150, 488],
+      ['Mein, 1993', 150, 476],
+    ], [block('table', 0, [40, 470, 300, 515])])]);
+    expect(paras.map((p) => [p.text, !!p.row])).toEqual([
+      ['Site Area', true], ['Pine Ck Nandakumar and', true], ['Mein, 1993', true],
+    ]);
+  });
+
+  it('inline formulas claim no line', () => {
+    const paras = buildParagraphs([withBlocks([
+      [`Second block with x = y inside ${FILLER}.`, 50, 500],
+    ], [
+      block('text', 0, [40, 490, 560, 515]),
+      block('inline_formula', 1, [40, 495, 560, 510]),
+    ])]);
+    expect(paras).toHaveLength(1);
+  });
+});
+
 describe('cleanText', () => {
   it('merges spacing accents inside words only', () => {
     expect(cleanText('J˛edrzej')).toBe('Jędrzej');

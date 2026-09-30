@@ -389,12 +389,16 @@ function expectedPitch(stats, size) {
 
 const HEADING_NUMBER = /^(?:\d+(?:\.\d+)*\.?|[IVX]+\.|[A-Z]\.)\s+/u;
 
+// A lone unnumbered Latin word needs six letters: "Methods" yes, a "Reply"
+// button no.
 function headingShaped(line, maxLength) {
   const text = line.text.trim();
+  const loneWord = !HEADING_NUMBER.test(text) && /^[\p{Script=Latin}]+$/u.test(text);
   return !line.joined
     && text.length <= maxLength
     && /^[\p{L}\p{N}]/u.test(text)
     && (/\p{L}{3}/u.test(text) || (CJK.test(text) && (text.match(/\p{L}/gu) || []).length >= 2))
+    && !(loneWord && text.length < 6)
     && !/[.。!！,，;；:：]$/u.test(text)
     && !/^\p{Ll}/u.test(text);
 }
@@ -402,6 +406,7 @@ function headingShaped(line, maxLength) {
 // Lines near body size that still read as headings: set in a font of their
 // own, or short all-caps lines ("II. BACKGROUND", often small caps).
 function isHeadingLine(line, bodySize, bodyFont) {
+  if (line.inTable) return false;
   const ratio = line.size / bodySize;
   if (ratio < 0.75 || ratio > HEADING_SIZE_RATIO) return false;
   if (ratio >= 0.85 && bodyFont && line.fontUniform && line.font !== bodyFont && headingShaped(line, 100)) {
@@ -415,8 +420,10 @@ function isHeadingLine(line, bodySize, bodyFont) {
     && headingShaped(line, 80);
 }
 
+// Three or more cells on one baseline, or any line the layout model put in
+// a table.
 function isTableRow(line) {
-  return (line.cells || 0) >= 3;
+  return (line.cells || 0) >= 3 || !!line.inTable;
 }
 
 function startsBlock(line, prev) {
@@ -592,8 +599,48 @@ function numberingDepth(text) {
   return /^[A-Z]\.\s/u.test(text) ? 2 : 1;
 }
 
+// Layout labels whose text never becomes a segment: formulas, figure
+// labels, page furniture.
+const LAYOUT_DROP = new Set(['display_formula', 'formula_number', 'chart', 'image', 'header', 'footer',
+  'number', 'header_image', 'footer_image', 'seal']);
+
+function blockArea(block) {
+  return (block.box[2] - block.box[0]) * (block.box[3] - block.box[1]);
+}
+
+// The smallest block holding the line's centre; inline formulas sit inside
+// running text and never claim a line.
+function blockOf(line, blocks) {
+  const cx = (line.box[0] + line.box[2]) / 2;
+  const cy = (line.box[1] + line.box[3]) / 2;
+  let best = null;
+  for (const block of blocks) {
+    if (block.label === 'inline_formula') continue;
+    const [x0, y0, x1, y1] = block.box;
+    if (cx < x0 || cx > x1 || cy < y0 || cy > y1) continue;
+    if (!best || blockArea(block) < blockArea(best)) best = block;
+  }
+  return best;
+}
+
+// Layout blocks on a page: lines inside formulas, figures and page furniture
+// go, lines inside a table block are marked as table rows. Paragraphs,
+// headings and order stay rule-based: on web pages the model's title labels
+// fire on user names and badges.
+function placeInLayout(lines, blocks) {
+  const kept = [];
+  for (const line of lines) {
+    const block = blockOf(line, blocks);
+    if (block && LAYOUT_DROP.has(block.label)) continue;
+    if (block?.label === 'table') line.inTable = true;
+    kept.push(line);
+  }
+  return kept;
+}
+
 function markHeadings(paras, stats) {
   const bySize = (p) => p.lines
+    && !isTableRow(p.lines[0])
     && p.size >= stats.bodySize * HEADING_SIZE_RATIO
     && p.text.length <= 200
     && p.lines.length <= 3
@@ -609,9 +656,11 @@ function markHeadings(paras, stats) {
   }
 }
 
-// pages: [{ page, layout }] from readPageLayout, or [{ page, text }] for pages
-// read by OCR. Returns paragraphs in reading order; box is in PDF user space,
-// `row` marks a table row whose cells are joined by " | ".
+// pages: [{ page, layout, blocks? }] from readPageLayout (blocks: layout
+// model output in PDF user space, [{ label, box, order }]), or
+// [{ page, text }] for pages read by OCR. Returns paragraphs in reading
+// order; box is in PDF user space, `row` marks a table row whose cells are
+// joined by " | ".
 export function buildParagraphs(pages) {
   const layoutPages = pages.filter((p) => p.layout);
   const stats = documentStats(layoutPages);
@@ -628,8 +677,9 @@ export function buildParagraphs(pages) {
       tail = null;
       continue;
     }
-    const { layout, page } = entry;
-    const kept = layout.lines.filter((l) => !isRunningLine(l, layout.frame, keys));
+    const { layout, page, blocks } = entry;
+    let kept = layout.lines.filter((l) => !isRunningLine(l, layout.frame, keys));
+    if (blocks?.length) kept = placeInLayout(kept, blocks);
     const lines = markLines(mergeRows(kept, stats), stats);
     const paras = pageParagraphs(lines, page, stats, words);
     const flow = paras.filter((p) => !isMarginNote(p, layout.frame, stats));
@@ -643,7 +693,8 @@ export function buildParagraphs(pages) {
     out.push(...paras);
     if (flow.length) tail = flow[flow.length - 1];
     for (const group of layout.strays) {
-      out.push(...pageParagraphs(markLines(mergeRows(group, stats), stats), page, stats, words));
+      const strayLines = blocks?.length ? placeInLayout(group, blocks) : group;
+      out.push(...pageParagraphs(markLines(mergeRows(strayLines, stats), stats), page, stats, words));
     }
   }
 
