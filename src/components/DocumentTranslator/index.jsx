@@ -774,6 +774,10 @@ const DocumentTranslator = ({
     
     try {
       const docSettings = await readDocumentSettings();
+      // Layout analysis runs only with the model installed and GPU on.
+      const layout = /\.pdf$/i.test(file.name)
+        ? await Promise.resolve(window.electron?.ocr?.layoutStatus?.()).catch(() => null)
+        : null;
       const result = await parseDocument(file, {
         maxCharsPerSegment: docSettings.maxCharsPerSegment,
         password: filePassword,
@@ -790,6 +794,7 @@ const DocumentTranslator = ({
           }
         },
         detectLanguages: (texts, lang) => translationService.detectLanguages(texts, lang),
+        layoutAnalyze: layout?.usable ? (image) => window.electron.ocr.analyzeLayout(image) : undefined,
         onProgress: setParseProgress,
       });
       
@@ -1612,7 +1617,9 @@ const DocumentTranslator = ({
                 <p>
                   {parseProgress?.ocr
                     ? t('documentTranslator.upload.ocrProgress', { page: parseProgress.page, total: parseProgress.total })
-                    : t('documentTranslator.upload.parsing')}
+                    : parseProgress?.layout
+                      ? t('documentTranslator.upload.layoutProgress', { page: parseProgress.page, total: parseProgress.total })
+                      : t('documentTranslator.upload.parsing')}
                 </p>
               </div>
             ) : (

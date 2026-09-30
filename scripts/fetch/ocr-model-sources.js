@@ -151,7 +151,32 @@ const LANG_PACKS = [
   },
 ];
 
+// Layout analysis for PDF documents: PaddlePaddle's official ONNX export of
+// PP-DocLayoutV3 (Apache-2.0). Upstream ships loose files, so the release
+// builder zips them with the license notice; each source is pinned.
+const LAYOUT_UPSTREAM = 'https://huggingface.co/PaddlePaddle/PP-DocLayoutV3_onnx/resolve/main';
+const LAYOUT_PACK = {
+  id: 'layout-v3',
+  type: 'layout',
+  version: '1.0.0',
+  file: 'pp_doclayout_v3.zip',
+  sources: {
+    'inference.onnx': {
+      url: `${LAYOUT_UPSTREAM}/inference.onnx`,
+      sha256: '45bf71750b00739a41fc209f132eb104a4d6b5bb29483c9078164d8b87cf28ba',
+    },
+    'inference.yml': {
+      url: `${LAYOUT_UPSTREAM}/inference.yml`,
+      sha256: '506fcfac13b3b546ae40d7886b44126420f392adb694e3f8bb6a6286a1f90fdc',
+    },
+  },
+  notice: 'PP-DocLayoutV3 by PaddlePaddle, licensed under the Apache License 2.0.\n'
+    + 'Source: https://huggingface.co/PaddlePaddle/PP-DocLayoutV3_onnx\n'
+    + 'License: https://www.apache.org/licenses/LICENSE-2.0\n',
+  files: { model: 'inference.onnx', config: 'inference.yml' },
+};
+
 // Where the app downloads packs from at runtime (the user-controlled release).
 const RELEASE_BASE_URL = 'https://github.com/Tianao0110/T-Translate/releases/download/ocr-models';
 
-module.exports = { UPSTREAM_BASE, BASE_PACK, HQ_PACK, LANG_PACKS, LEGACY_PACKS, RELEASE_BASE_URL };
+module.exports = { UPSTREAM_BASE, BASE_PACK, HQ_PACK, LANG_PACKS, LEGACY_PACKS, LAYOUT_PACK, RELEASE_BASE_URL };

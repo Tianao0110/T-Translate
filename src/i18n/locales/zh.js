@@ -695,6 +695,14 @@ const zh = {
       state: { ready: "已就绪", missing: "未放入", mismatch: "校验不符" },
       fallbackNotice: "内置视觉模型当前不可用（显卡加速未开或模型文件不在），已改用本地 OCR",
     },
+    layout: {
+      name: "版面分析模型（PP-DocLayoutV3）",
+      desc: "翻译 PDF 时先看版面：公式、图、页眉页脚里的文字不再当正文翻译，表格按行翻译。只在显卡加速打开时使用",
+      needsGpu: "显卡加速没开，PDF 仍按规则切段（设置 → 关于 → 显卡加速）",
+      downloaded: "版面分析模型安装完成",
+      removeConfirm: "确定删除版面分析模型？删除后 PDF 按规则切段",
+      removed: "版面分析模型已删除",
+    },
     tier: {
       label: "模型档位",
       standard: "标准（内置）",
@@ -1073,7 +1081,8 @@ const zh = {
       orClick: "或点击选择文件",
       supported: "支持：{{formats}}",
       parsing: "正在解析文件...",
-      ocrProgress: "OCR 识别第 {{page}}/{{total}} 页..."
+      ocrProgress: "OCR 识别第 {{page}}/{{total}} 页...",
+      layoutProgress: "版面分析第 {{page}}/{{total}} 页..."
     },
     // Password modal
     password: {

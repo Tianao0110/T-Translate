@@ -115,6 +115,8 @@ const CHANNELS = {
     DOWNLOAD_PROGRESS: 'ocr:download-progress',
     HEALTH_CHECK: 'ocr:health-check',
     SET_MODEL_TIER: 'ocr:set-model-tier',
+    LAYOUT_STATUS: 'ocr:layout-status',
+    LAYOUT: 'ocr:layout',
   },
   MODELS: {
     STORAGE_INFO: 'models:storage-info',

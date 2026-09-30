@@ -9,9 +9,33 @@
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const { BASE_PACK, HQ_PACK, LANG_PACKS, LEGACY_PACKS, RELEASE_BASE_URL } = require('../fetch/ocr-model-sources');
+const { BASE_PACK, HQ_PACK, LANG_PACKS, LEGACY_PACKS, LAYOUT_PACK, RELEASE_BASE_URL } = require('../fetch/ocr-model-sources');
 
 const OUT_DIR = path.join(__dirname, '..', '..', 'release-ocr-models');
+
+const sha256 = (buf) => crypto.createHash('sha256').update(buf).digest('hex');
+
+async function download(url) {
+  const res = await fetch(url, { redirect: 'follow' });
+  if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+  return Buffer.from(await res.arrayBuffer());
+}
+
+// Loose upstream files (pack.sources) → one zip with the license notice.
+// Fixed entry dates keep the zip, and so its sha256, stable across rebuilds.
+async function zipSources(pack) {
+  const JSZip = require('jszip');
+  const zip = new JSZip();
+  const date = new Date('2026-01-01T00:00:00Z');
+  for (const [name, source] of Object.entries(pack.sources)) {
+    console.log(`    ${name}: downloading ${source.url}`);
+    const buf = await download(source.url);
+    if (source.sha256 && sha256(buf) !== source.sha256) throw new Error(`checksum mismatch for ${source.url}`);
+    zip.file(name, buf, { date });
+  }
+  if (pack.notice) zip.file('NOTICE.txt', pack.notice, { date });
+  return zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+}
 
 async function fetchPack(pack) {
   const dest = path.join(OUT_DIR, pack.file);
@@ -20,21 +44,25 @@ async function fetchPack(pack) {
   if (fs.existsSync(dest)) {
     buffer = fs.readFileSync(dest);
     console.log(`  ${pack.file}: reusing local copy`);
+  } else if (pack.sources) {
+    console.log(`  ${pack.file}: building from upstream files`);
+    buffer = await zipSources(pack);
+    fs.writeFileSync(dest, buffer);
   } else {
     console.log(`  ${pack.file}: downloading ${pack.url}`);
-    const res = await fetch(pack.url, { redirect: 'follow' });
-    if (!res.ok) throw new Error(`HTTP ${res.status} for ${pack.url}`);
-    buffer = Buffer.from(await res.arrayBuffer());
+    buffer = await download(pack.url);
     fs.writeFileSync(dest, buffer);
   }
 
   // Manifest entries carry no url — clients join baseUrl + file instead.
   const entry = { ...pack };
   delete entry.url;
+  delete entry.sources;
+  delete entry.notice;
   return {
     ...entry,
     size: buffer.length,
-    sha256: crypto.createHash('sha256').update(buffer).digest('hex'),
+    sha256: sha256(buffer),
   };
 }
 
@@ -44,7 +72,7 @@ async function main() {
   const packs = [];
   // Legacy entries first: pre-v6 clients pick their base pack via
   // find(type === 'base').
-  for (const pack of [...LEGACY_PACKS, BASE_PACK, HQ_PACK, ...LANG_PACKS]) {
+  for (const pack of [...LEGACY_PACKS, BASE_PACK, HQ_PACK, ...LANG_PACKS, LAYOUT_PACK]) {
     packs.push(await fetchPack(pack));
   }
 

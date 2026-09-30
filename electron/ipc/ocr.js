@@ -121,8 +121,34 @@ function register(ctx) {
     }
   });
 
+  // ===== PDF layout analysis =====
+  // GPU only, like the built-in vision model: with the switch off the PDF
+  // parser keeps its rule-based path. Design notes: docs/design/ocr.md.
+
+  const layoutUsable = () => ({
+    installed: !!ocrEngine.resolveLayoutModel(),
+    gpu: store.get('settings.gpu.enabled', false) === true,
+  });
+
+  ipcMain.handle(CHANNELS.OCR.LAYOUT_STATUS, () => {
+    const status = layoutUsable();
+    return { ...status, usable: status.installed && status.gpu };
+  });
+
+  ipcMain.handle(CHANNELS.OCR.LAYOUT, async (event, image) => {
+    if (typeof image !== 'string' || image.length > MAX_LAYOUT_IMAGE_CHARS) {
+      return { success: false, errorCode: 'LAYOUT_BAD_IMAGE' };
+    }
+    if (!layoutUsable().gpu) return { success: false, errorCode: 'LAYOUT_NEEDS_GPU' };
+    return ocrEngine.analyzeLayout(image);
+  });
+
   logger.info('OCR IPC handlers registered');
 }
+
+// A rendered page as a PNG data URL; the parser sends about 1024 px on the
+// long side, so this leaves wide headroom.
+const MAX_LAYOUT_IMAGE_CHARS = 30 * 1024 * 1024;
 
 // ===== Per-engine recognizers =====
 // No IPC of their own: the translation-stack facade (ctx.localOcr) calls
