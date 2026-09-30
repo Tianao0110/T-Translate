@@ -110,12 +110,13 @@ Three tone buttons under the languages: Natural (everyday), Precise (technical, 
 - Encrypted PDFs ask for the password. Scanned PDFs have no text layer, so the app runs OCR page by page; set up an OCR engine in Settings first. Pages whose text layer is garbled are read by OCR too.
 - PDFs are split into the original paragraphs. Running headers, footers and page numbers are dropped, and each table row becomes one paragraph.
 - The document is shown paragraph by paragraph, stacked or side by side. The outline on the left jumps to headings.
+- Each PDF paragraph has a locate button (crosshair icon, "Show on the original page"): it opens the "Original page" panel on the right at that page with the paragraph outlined, so figures, tables and formulas can be read against the original. In a narrow window the outline steps aside while the panel is open.
 - "Start translation" translates paragraph by paragraph; you can pause, resume and stop. Failed paragraphs can be retried one at a time or all at once with "Retry Failed".
 - Every translated paragraph can be edited, retranslated or copied.
 - The "Parallel" switch at the bottom translates several paragraphs at once; turn it off if a local model is unstable.
 - The "Glossary" switch at the bottom controls whether glossary terms are applied.
 - Closing the app mid-way is fine: opening the same file again offers to restore the previous progress.
-- **Export**: bilingual or translation-only TXT, Markdown and Word; PDF through the print dialog; subtitles as SRT or VTT.
+- **Export**: bilingual or translation-only TXT, Markdown and Word; PDF through the print dialog; subtitles as SRT or VTT. Markdown, Word and PDF keep headings and tables, with the original above the translation in each cell.
 - **Explain and summarize**: each paragraph has "Explain this paragraph"; after two or more explanations you can summarize the explained paragraphs; the whole-document "Summarize" button explains every paragraph first and then summarizes, which takes a while on long documents and is billed per use on online APIs.
 - **Check terms**: checks the whole document against the glossary, lists what can be replaced, and lets you undo one at a time. No model is involved.
 - The statistics button at the bottom right shows paragraph counts, characters and time; when a document finishes while the window is in the background, a system notification appears.
@@ -281,7 +282,7 @@ See "Related settings" in chapter 2.
 
 - Max characters per segment: longer paragraphs are split at this size.
 - Segments at once: how many paragraphs parallel mode translates together. 1 to 2 for local models; online APIs can go higher.
-- Smart filter: skip short paragraphs (with a minimum length), skip number-only paragraphs such as page numbers, keep code blocks untranslated, skip paragraphs already in the target language.
+- Smart filter: skip short paragraphs (with a minimum length; headings are exempt), skip number-only paragraphs such as page numbers and rows of figures in tables, keep code blocks untranslated, skip paragraphs already in the target language.
 - Default display style: stacked or side by side.
 - The supported file formats are listed below.
 

@@ -610,7 +610,8 @@ function markHeadings(paras, stats) {
 }
 
 // pages: [{ page, layout }] from readPageLayout, or [{ page, text }] for pages
-// read by OCR. Returns paragraphs in reading order; box is in PDF user space.
+// read by OCR. Returns paragraphs in reading order; box is in PDF user space,
+// `row` marks a table row whose cells are joined by " | ".
 export function buildParagraphs(pages) {
   const layoutPages = pages.filter((p) => p.layout);
   const stats = documentStats(layoutPages);
@@ -653,6 +654,7 @@ export function buildParagraphs(pages) {
       text: cleanText(para.text),
       parts: para.parts,
       ...(para.heading ? { heading: para.heading } : {}),
+      ...(para.lines?.length === 1 && isTableRow(para.lines[0]) ? { row: true } : {}),
     }))
     .filter((para) => para.text);
 }

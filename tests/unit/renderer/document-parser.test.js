@@ -18,6 +18,11 @@ import {
   buildOutlineTree,
   clampedPdfScale,
   assertZipWithinDecompressedCap,
+  segmentsFromParagraphs,
+  exportBilingual,
+  exportTranslatedOnly,
+  exportDOCX,
+  exportPDFHTML,
   MAX_PDF_CANVAS_EDGE,
   MAX_DECOMPRESSED_SIZE_BYTES,
 } from '../../../src/document/document-parser.js';
@@ -163,6 +168,14 @@ describe('shouldSkipSegment', () => {
     expect(shouldSkipSegment('这是一段中文文本内容', { skipTargetLang: true, targetLang: 'zh' }).skip).toBe(true);
   });
 
+  it('skips letterless text as numbers only, CJK counts as letters', () => {
+    const skip = (text) => shouldSkipSegment(text, { skipNumbers: true }).skip;
+    expect(skip('0.82 | 0.85 | 0.81')).toBe(true);
+    expect(skip('(3)')).toBe(true);
+    expect(skip('Q3 results')).toBe(false);
+    expect(skip('第三章')).toBe(false);
+  });
+
   it('keeps normal translatable text', () => {
     expect(shouldSkipSegment('This is a normal English sentence.', {
       skipShort: true, minLength: 10, skipNumbers: true, skipCode: true,
@@ -235,6 +248,130 @@ describe('outline detection', () => {
       { id: 2, original: 'II. BACKGROUND', heading: 2 },
     ];
     expect(detectHeadings(segments).map(h => [h.segmentId, h.level])).toEqual([[0, 1], [2, 2]]);
+  });
+});
+
+describe('PDF paragraphs to segments', () => {
+  it('translates short headings and carries the table-row mark', () => {
+    const segments = segmentsFromParagraphs([
+      { text: 'Methods', parts: [{ page: 1 }], heading: 2 },
+      { text: 'Tiny', parts: [{ page: 1 }] },
+      { text: 'Site | Area | Depth', parts: [{ page: 2 }], row: true },
+    ], new Map(), { filters: { skipShort: true, minLength: 10 } });
+    expect(segments.map(s => [s.status, s.heading || 0, !!s.row])).toEqual([
+      ['pending', 2, false],
+      ['skipped', 0, false],
+      ['pending', 0, true],
+    ]);
+    expect(segments[2].loc).toEqual([{ page: 2 }]);
+  });
+});
+
+describe('Word and EPUB keep their structure', () => {
+  const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const para = (text, style) => `<w:p>${style ? `<w:pPr><w:pStyle w:val="${style}"/></w:pPr>` : ''}<w:r><w:t>${text}</w:t></w:r></w:p>`;
+  const cell = (text) => `<w:tc>${para(text)}</w:tc>`;
+
+  async function zipFile(name, entries) {
+    const JSZip = (await import('jszip')).default;
+    const zip = new JSZip();
+    for (const [path, body] of Object.entries(entries)) zip.file(path, body);
+    return new File([await zip.generateAsync({ type: 'arraybuffer' })], name);
+  }
+
+  it('Word headings, paragraphs and table rows come through', async () => {
+    const file = await zipFile('sample.docx', {
+      '[Content_Types].xml': '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        + '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        + '<Default Extension="xml" ContentType="application/xml"/>'
+        + '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+        + '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>',
+      '_rels/.rels': '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        + '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>',
+      'word/_rels/document.xml.rels': '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        + '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',
+      'word/styles.xml': `<?xml version="1.0"?><w:styles xmlns:w="${W}"><w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/></w:style></w:styles>`,
+      'word/document.xml': `<?xml version="1.0"?><w:document xmlns:w="${W}"><w:body>`
+        + para('Introduction', 'Heading1')
+        + para('The first paragraph of body text.')
+        + `<w:tbl><w:tr>${cell('Site')}${cell('Area')}</w:tr><w:tr>${cell('Pine Ck')}${cell('320')}</w:tr></w:tbl>`
+        + '</w:body></w:document>',
+    });
+    const result = await parseDocument(file, { filters: { skipShort: true, minLength: 10, skipNumbers: true } });
+    expect(result.success).toBe(true);
+    expect(result.segments.map(s => [s.original, s.heading || 0, !!s.row, s.status])).toEqual([
+      ['Introduction', 1, false, 'pending'],
+      ['The first paragraph of body text.', 0, false, 'pending'],
+      ['Site | Area', 0, true, 'pending'],
+      ['Pine Ck | 320', 0, true, 'pending'],
+    ]);
+    expect(result.outline.map(h => h.text)).toEqual(['Introduction']);
+  });
+
+  it('EPUB chapters give headings and paragraphs with entities decoded', async () => {
+    const file = await zipFile('book.epub', {
+      'META-INF/container.xml': '<?xml version="1.0"?><container><rootfiles><rootfile full-path="OEBPS/content.opf"/></rootfiles></container>',
+      'OEBPS/content.opf': '<?xml version="1.0"?><package><metadata><dc:title>A Small Book</dc:title></metadata>'
+        + '<manifest><item id="c1" href="ch1.xhtml"/><item id="css" href="style.css"/></manifest><spine><itemref idref="c1"/></spine></package>',
+      'OEBPS/ch1.xhtml': '<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml"><head><title>ch1</title></head>'
+        + '<body><h2>Chapter One</h2><p>Tom &amp; Jerry went out.</p><p>They came back late at night.</p></body></html>',
+    });
+    const result = await parseDocument(file, { filters: { skipShort: false } });
+    expect(result.success).toBe(true);
+    expect(result.title).toBe('A Small Book');
+    expect(result.segments.map(s => [s.original, s.heading || 0])).toEqual([
+      ['Chapter One', 2],
+      ['Tom & Jerry went out.', 0],
+      ['They came back late at night.', 0],
+    ]);
+  });
+});
+
+describe('structured export', () => {
+  const segments = [
+    { id: 0, original: 'Results', translated: '结果', status: 'completed', heading: 2 },
+    { id: 1, original: 'Site | Area | Depth', translated: '地点 | 面积 | 深度', status: 'completed', row: true },
+    { id: 2, original: '12 | 320 | 1.0', translated: '', status: 'skipped', row: true },
+    { id: 3, original: 'Glendhu | 310 | 0.64', translated: 'Glendhu 310 0.64', status: 'completed', row: true },
+    { id: 4, original: 'Body text here.', translated: '正文在这里。', status: 'completed' },
+    { id: 5, original: 'Reply8', translated: '', status: 'skipped' },
+  ];
+
+  it('Markdown uses #, a table with paired cells, and quoted originals', () => {
+    const md = exportBilingual(segments, { style: 'below', format: 'md' });
+    expect(md).toContain('## 结果\n\n*Results*');
+    expect(md).toContain([
+      '| Site<br>地点 | Area<br>面积 | Depth<br>深度 |',
+      '| --- | --- | --- |',
+      '| 12 | 320 | 1.0 |',
+      '| Glendhu | 310 | 0.64 |',
+      '| Glendhu 310 0.64 |  |  |',
+    ].join('\n'));
+    expect(md).toContain('> Body text here.\n\n正文在这里。');
+    expect(md).not.toContain('Reply8');
+  });
+
+  it('Word export has real headings and a table, full-width row when cells do not line up', async () => {
+    const html = await exportDOCX(segments, { style: 'bilingual', title: 'demo' }).text();
+    expect(html).toContain('<h3>结果</h3><p class="heading-original">Results</p>');
+    expect(html).toContain('<td><span class="cell-original">Site</span><br>地点</td>');
+    expect(html).toContain('<tr><td>12</td><td>320</td><td>1.0</td></tr>');
+    expect(html).toContain('<td colspan="3">Glendhu 310 0.64</td>');
+    expect(html).not.toContain('Reply8');
+  });
+
+  it('print export in translated-only mode shows translations in the cells', () => {
+    const html = exportPDFHTML(segments, { style: 'translated-only', title: 'demo' });
+    expect(html).toContain('<h3>结果</h3>');
+    expect(html).not.toContain('heading-original">Results');
+    expect(html).toContain('<tr><td>地点</td><td>面积</td><td>深度</td></tr>');
+    expect(html).toContain('<tr><td colspan="3">Glendhu 310 0.64</td></tr>');
+  });
+
+  it('plain-text export keeps skipped headings and table rows', () => {
+    const text = exportTranslatedOnly(segments);
+    expect(text).toContain('12 | 320 | 1.0');
+    expect(text).not.toContain('Reply8');
   });
 });
 

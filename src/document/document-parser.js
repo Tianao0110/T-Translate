@@ -6,6 +6,7 @@ import i18n from '../i18n.js';
 import { judgeLanguage, mainLanguage, unsure } from '../stack/language-detect.js';
 import { readPageLayout, isGarbledPage, buildParagraphs } from './pdf-text.js';
 import { splitSentences } from './sentence-breaks.js';
+import { htmlToParagraphs } from './html-blocks.js';
 const logger = createLogger('DocumentParser');
 
 const _t = (key, fallback) => {
@@ -156,7 +157,8 @@ export function shouldSkipSegment(text, filters = {}) {
     return { skip: true, reason: _t('docParser.tooShort', 'Too short') };
   }
 
-  if (filters.skipNumbers && /^\d+$/.test(trimmed)) {
+  // Nothing to translate without a letter: numbers, table figures, "(3)".
+  if (filters.skipNumbers && !/\p{L}/u.test(trimmed)) {
     return { skip: true, reason: _t('docParser.numbersOnly', 'Numbers only') };
   }
 
@@ -405,17 +407,24 @@ function unitBox(viewport, box) {
 }
 
 // One paragraph → one segment unless it outgrows maxCharsPerSegment; every
-// piece carries the paragraph's page locations (loc) and heading level.
-function segmentsFromParagraphs(paragraphs, viewports, { maxCharsPerSegment = 800, filters = {} } = {}) {
+// piece carries the paragraph's heading level, table-row mark and, for PDF,
+// page locations (loc). Shared by the PDF, Word and EPUB parsers.
+// Exported for tests.
+export function segmentsFromParagraphs(paragraphs, viewports, { maxCharsPerSegment = 800, filters = {} } = {}) {
   const segments = [];
   let id = 0;
   for (const para of paragraphs) {
-    const loc = para.parts.map((part) => {
-      const box = unitBox(viewports.get(part.page), part.box);
-      return box ? { page: part.page, box } : { page: part.page };
-    });
-    const extra = para.heading ? { loc, heading: para.heading } : { loc };
-    const skipCheck = shouldSkipSegment(para.text, filters);
+    const extra = {};
+    if (para.parts) {
+      extra.loc = para.parts.map((part) => {
+        const box = unitBox(viewports?.get(part.page), part.box);
+        return box ? { page: part.page, box } : { page: part.page };
+      });
+    }
+    if (para.heading) extra.heading = para.heading;
+    if (para.row) extra.row = true;
+    // Short headings ("Methods") still get translated.
+    const skipCheck = shouldSkipSegment(para.text, para.heading ? { ...filters, skipShort: false } : filters);
     if (skipCheck.skip) {
       segments.push({
         id: id++,
@@ -447,9 +456,9 @@ function segmentsFromParagraphs(paragraphs, viewports, { maxCharsPerSegment = 80
   return segments;
 }
 
-async function parsePDF(file, options = {}) {
-  const { password, maxCharsPerSegment = 800, filters = {}, ocrRecognize, onProgress } = options;
-
+// pdf.js document from a file's bytes. Shared by parsePDF and the document
+// panel's page preview (components/DocumentTranslator/PagePreview.jsx).
+export async function openPdf(file, password) {
   const pdfjsLib = await import('pdfjs-dist');
 
   // Prefer the local worker; fall back to main-thread parsing if the
@@ -465,14 +474,18 @@ async function parsePDF(file, options = {}) {
     }
   }
 
-  const arrayBuffer = await file.arrayBuffer();
-
+  // pdf.js takes ownership of the buffer, so every open reads a fresh one.
   const loadingTask = pdfjsLib.getDocument({
-    data: arrayBuffer,
+    data: await file.arrayBuffer(),
     password: password || undefined,
   });
+  return loadingTask.promise;
+}
 
-  const pdf = await loadingTask.promise;
+async function parsePDF(file, options = {}) {
+  const { password, maxCharsPerSegment = 800, filters = {}, ocrRecognize, onProgress } = options;
+
+  const pdf = await openPdf(file, password);
   const numPages = pdf.numPages;
 
   const pages = [];
@@ -530,10 +543,14 @@ async function parseDOCX(file, options = {}) {
   const JSZip = (await import('jszip')).default;
   assertZipWithinDecompressedCap(await JSZip.loadAsync(arrayBuffer));
 
-  const result = await mammoth.extractRawText({ arrayBuffer });
-  const text = result.value;
-
-  const segments = splitIntoSegments(text, {
+  // HTML keeps headings, lists and tables; images are dropped instead of
+  // inlined as base64.
+  // arrayBuffer feeds mammoth's browser build (the app), buffer its Node
+  // build (unit tests).
+  const result = await mammoth.convertToHtml({ arrayBuffer, buffer: arrayBuffer }, {
+    convertImage: mammoth.images.imgElement(async () => ({ src: '' })),
+  });
+  const segments = segmentsFromParagraphs(htmlToParagraphs(result.value), null, {
     maxCharsPerSegment,
     filters,
   });
@@ -687,7 +704,8 @@ async function parseEPUB(file, options = {}) {
     if (id && href) manifest[id] = href;
   }
 
-  let allText = '';
+  const paragraphs = [];
+  let totalChars = 0;
   let chapterCount = 0;
 
   for (const id of spineIds) {
@@ -701,23 +719,21 @@ async function parseEPUB(file, options = {}) {
 
     if (content) {
       chapterCount++;
-      const text = extractTextFromHTML(content);
-      if (text.trim()) {
-        allText += text + '\n\n';
-      }
       // Runtime backstop against forged declared sizes.
-      if (allText.length > MAX_DECOMPRESSED_SIZE_BYTES) {
+      totalChars += content.length;
+      if (totalChars > MAX_DECOMPRESSED_SIZE_BYTES) {
         throw new Error(_t('docParser.tooLargeDecompressed',
           'File content is too large after decompression'));
       }
+      paragraphs.push(...htmlToParagraphs(content));
     }
   }
 
-  if (!allText.trim()) {
+  if (!paragraphs.length) {
     throw new Error(_t('docParser.epubNoContent', 'No translatable text found in EPUB'));
   }
 
-  const segments = splitIntoSegments(allText, {
+  const segments = segmentsFromParagraphs(paragraphs, null, {
     maxCharsPerSegment,
     filters,
   });
@@ -727,34 +743,6 @@ async function parseEPUB(file, options = {}) {
     title,
     chapterCount,
   };
-}
-
-function extractTextFromHTML(html) {
-  let text = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
-  text = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
-
-  // Convert block-level tags to newlines.
-  text = text.replace(/<\/(p|div|h[1-6]|br|li|tr)>/gi, '\n');
-  text = text.replace(/<(p|div|h[1-6]|br|li|tr)[^>]*>/gi, '\n');
-
-  text = text.replace(/<[^>]+>/g, '');
-
-  text = text.replace(/&nbsp;/g, ' ');
-  text = text.replace(/&lt;/g, '<');
-  text = text.replace(/&gt;/g, '>');
-  text = text.replace(/&amp;/g, '&');
-  text = text.replace(/&quot;/g, '"');
-  // fromCodePoint: numeric entities can be astral.
-  const decodeCodePoint = (code) => {
-    try { return String.fromCodePoint(code); } catch { return ''; }
-  };
-  text = text.replace(/&#(\d+);/g, (_, code) => decodeCodePoint(Number(code)));
-  text = text.replace(/&#x([0-9a-f]+);/gi, (_, code) => decodeCodePoint(parseInt(code, 16)));
-
-  text = text.replace(/[ \t]+/g, ' ');
-  text = text.replace(/\n\s*\n/g, '\n\n');
-
-  return text.trim();
 }
 
 export async function parseDocument(file, options = {}) {
@@ -976,16 +964,83 @@ function batchSegments(segments, options = {}) {
   return batches;
 }
 
+// Headings and table rows stay in every export even when the filters skipped
+// them (already target language, figures only): they carry the structure.
+function keepInExport(segment, includeSkipped) {
+  return includeSkipped || segment.status !== 'skipped' || !!segment.heading || !!segment.row;
+}
+
+// Consecutive table rows become one table block; the rest stay one block per
+// segment. Feeds the Markdown and HTML (Word / print) exporters.
+function exportBlocks(segments, includeSkipped) {
+  const blocks = [];
+  for (const segment of segments) {
+    if (!keepInExport(segment, includeSkipped)) continue;
+    const last = blocks[blocks.length - 1];
+    if (segment.row && last?.type === 'table') last.rows.push(segment);
+    else if (segment.row) blocks.push({ type: 'table', rows: [segment] });
+    else blocks.push({ type: segment.heading ? 'heading' : 'text', segment });
+  }
+  return blocks;
+}
+
+function splitCells(text) {
+  return (text || '').split(/\s*[|｜]\s*/).map((cell) => cell.trim());
+}
+
+// Bilingual Markdown: headings as #, table rows as a table (original over
+// translation in each cell), paragraphs as quoted original + translation.
+function exportMarkdown(segments, includeSkipped) {
+  const out = [];
+  const oneLine = (text) => (text || '').replace(/\s*\n\s*/g, ' ');
+  for (const block of exportBlocks(segments, includeSkipped)) {
+    if (block.type === 'table') {
+      out.push(markdownTable(block.rows, oneLine));
+      continue;
+    }
+    const { original = '', translated = '', heading } = block.segment;
+    if (block.type === 'heading') {
+      out.push(`${'#'.repeat(Math.min(6, heading))} ${oneLine(translated || original)}`);
+      if (translated) out.push(`*${oneLine(original)}*`);
+      continue;
+    }
+    out.push(original.split('\n').map((line) => `> ${line}`).join('\n'));
+    if (translated) out.push(translated);
+  }
+  return out.join('\n\n') + '\n';
+}
+
+function markdownTable(rows, oneLine) {
+  const lines = [];
+  let width = 0;
+  for (const row of rows) {
+    const cells = splitCells(row.original).map(oneLine);
+    const translated = row.translated ? splitCells(row.translated).map(oneLine) : null;
+    if (translated && translated.length === cells.length) {
+      lines.push(cells.map((cell, i) => `${cell}<br>${translated[i]}`));
+    } else {
+      lines.push(cells);
+      if (translated) lines.push([oneLine(row.translated)]);
+    }
+    width = Math.max(width, cells.length);
+  }
+  const render = (cells) => `| ${[...cells, ...Array(width - cells.length).fill('')].join(' | ')} |`;
+  return [render(lines[0]), render(Array(width).fill('---')), ...lines.slice(1).map(render)].join('\n');
+}
+
 export function exportBilingual(segments, options = {}) {
   const {
     style = 'below',
+    format = 'txt',
     includeSkipped = false,
   } = options;
+
+  if (format === 'md') return exportMarkdown(segments, includeSkipped);
 
   let output = '';
 
   for (const segment of segments) {
-    if (!includeSkipped && segment.status === 'skipped') continue;
+    if (!keepInExport(segment, includeSkipped)) continue;
 
     const original = segment.original || '';
     const translated = segment.translated || '';
@@ -1016,7 +1071,7 @@ export function exportTranslatedOnly(segments, options = {}) {
   const { includeSkipped = false } = options;
 
   return segments
-    .filter(s => includeSkipped || s.status !== 'skipped')
+    .filter(s => keepInExport(s, includeSkipped))
     .map(s => s.translated || s.original)
     .join('\n\n');
 }
@@ -1049,6 +1104,62 @@ export function exportVTT(segments) {
   return `WEBVTT\n\n${body}`;
 }
 
+// Shared body of the Word and print exports: parser headings become
+// <h2>–<h6> under the document title, consecutive table rows one <table>,
+// other segments a bilingual pair or a single paragraph.
+function htmlBody(segments, style, includeSkipped) {
+  // Multi-line text (subtitles) collapses in HTML without explicit breaks.
+  const html = (text) => escapeHtml(text || '').replace(/\n/g, '<br>');
+  let content = '';
+  for (const block of exportBlocks(segments, includeSkipped)) {
+    if (block.type === 'table') {
+      content += htmlTable(block.rows, style, html);
+      continue;
+    }
+    const original = html(block.segment.original);
+    const translated = html(block.segment.translated);
+    if (block.type === 'heading') {
+      const tag = `h${Math.min(6, block.segment.heading + 1)}`;
+      const shown = style === 'bilingual' || style === 'translated-only' ? translated || original : original;
+      content += `<${tag}>${shown}</${tag}>`;
+      if (style === 'bilingual' && translated) content += `<p class="heading-original">${original}</p>`;
+    } else if (style === 'bilingual') {
+      content += `<div class="segment"><p class="original">${original}</p>${translated ? `<p class="translated">${translated}</p>` : ''}</div>`;
+    } else if (style === 'translated-only') {
+      content += `<p class="text">${translated || original}</p>`;
+    } else {
+      content += `<p class="text">${original}</p>`;
+    }
+  }
+  return content;
+}
+
+// Cells pair up when the translation kept the " | " separators; otherwise the
+// row shows its source cells and the translation in one full-width cell.
+function htmlTable(rows, style, html) {
+  const width = Math.max(...rows.map((row) => splitCells(row.original).length));
+  const pad = (cells) => [...cells, ...Array(width - cells.length).fill('')];
+  const tr = (cells) => `<tr>${cells.map((cell) => `<td>${cell}</td>`).join('')}</tr>`;
+  const wide = (inner) => `<tr><td colspan="${width}">${inner}</td></tr>`;
+  let body = '';
+  for (const row of rows) {
+    const cells = splitCells(row.original);
+    const translated = row.translated ? splitCells(row.translated) : null;
+    const fits = !!translated && translated.length === cells.length;
+    if (style === 'bilingual' && fits) {
+      body += tr(pad(cells.map((cell, i) => `<span class="cell-original">${html(cell)}</span><br>${html(translated[i])}`)));
+    } else if (style === 'translated-only' && fits) {
+      body += tr(pad(translated.map(html)));
+    } else if (style === 'translated-only' && translated) {
+      body += wide(html(row.translated));
+    } else {
+      body += tr(pad(cells.map(html)));
+      if (style === 'bilingual' && translated) body += wide(html(row.translated));
+    }
+  }
+  return `<table>${body}</table>`;
+}
+
 // Exports a Word-compatible HTML document — Word opens it directly.
 export function exportDOCX(segments, options = {}) {
   const {
@@ -1059,26 +1170,7 @@ export function exportDOCX(segments, options = {}) {
 
   const now = new Date().toLocaleString('zh-CN');
 
-  let content = '';
-
-  for (const segment of segments) {
-    if (!includeSkipped && segment.status === 'skipped') continue;
-
-    // Multi-line text (subtitles) collapses in HTML without explicit breaks.
-    const original = escapeHtml(segment.original || '').replace(/\n/g, '<br>');
-    const translated = escapeHtml(segment.translated || '').replace(/\n/g, '<br>');
-
-    if (style === 'bilingual') {
-      content += `
-        <p style="color: #666; margin-bottom: 8px; font-size: 11pt;">${original}</p>
-        ${translated ? `<p style="color: #000; margin-bottom: 24px; font-size: 12pt;">${translated}</p>` : ''}
-      `;
-    } else if (style === 'translated-only') {
-      content += `<p style="margin-bottom: 16px;">${translated || original}</p>`;
-    } else {
-      content += `<p style="margin-bottom: 16px;">${original}</p>`;
-    }
-  }
+  const content = htmlBody(segments, style, includeSkipped);
 
   const html = `
 <!DOCTYPE html>
@@ -1121,6 +1213,13 @@ export function exportDOCX(segments, options = {}) {
       padding-bottom: 20px;
       border-bottom: 1px solid #ddd;
     }
+    .original { color: #666; margin-bottom: 8px; font-size: 11pt; }
+    .translated { color: #000; margin-bottom: 24px; font-size: 12pt; }
+    .text { margin-bottom: 16px; }
+    .heading-original { color: #666; font-size: 10pt; margin-top: -6px; margin-bottom: 12px; }
+    table { border-collapse: collapse; margin: 12px 0 24px; font-size: 10.5pt; }
+    td { border: 1px solid #bbb; padding: 4px 8px; vertical-align: top; }
+    .cell-original { color: #666; }
   </style>
 </head>
 <body>
@@ -1143,27 +1242,7 @@ export function exportPDFHTML(segments, options = {}) {
 
   const now = new Date().toLocaleString('zh-CN');
 
-  let content = '';
-
-  for (const segment of segments) {
-    if (!includeSkipped && segment.status === 'skipped') continue;
-
-    const original = escapeHtml(segment.original || '').replace(/\n/g, '<br>');
-    const translated = escapeHtml(segment.translated || '').replace(/\n/g, '<br>');
-
-    if (style === 'bilingual') {
-      content += `
-        <div class="segment">
-          <p class="original">${original}</p>
-          ${translated ? `<p class="translated">${translated}</p>` : ''}
-        </div>
-      `;
-    } else if (style === 'translated-only') {
-      content += `<p class="text">${translated || original}</p>`;
-    } else {
-      content += `<p class="text">${original}</p>`;
-    }
-  }
+  const content = htmlBody(segments, style, includeSkipped);
 
   return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -1216,9 +1295,29 @@ export function exportPDFHTML(segments, options = {}) {
     .text {
       margin-bottom: 16px;
     }
+    .heading-original {
+      color: #666;
+      font-size: 10pt;
+      margin-top: -6px;
+      margin-bottom: 12px;
+    }
+    table {
+      border-collapse: collapse;
+      margin: 12px 0 24px;
+      font-size: 10.5pt;
+    }
+    td {
+      border: 1px solid #bbb;
+      padding: 4px 8px;
+      vertical-align: top;
+    }
+    .cell-original {
+      color: #666;
+    }
     @media print {
       body { padding: 0; }
       .segment { page-break-inside: avoid; }
+      tr { page-break-inside: avoid; }
     }
   </style>
 </head>
