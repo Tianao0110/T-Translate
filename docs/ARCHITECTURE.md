@@ -10,7 +10,7 @@ T-Translate 是一个 Windows 桌面翻译工具（Electron 42 + React 18 + Vite
 | 状态 | Zustand + Immer；主窗口状态经 DPAPI 加密的历史保险库持久化 |
 | 引擎宿主 | T-Engine（`electron/tengine/`）：每个原生运行时一个 utilityProcess——onnxruntime-node（OCR）、sherpa-onnx（听译 / 朗读）、llama.cpp（内置模型与听译高精度档，koffi FFI） |
 | 翻译源 | 内置模型、LM Studio / Ollama、OpenAI / Claude / Gemini / DeepSeek / DeepL / Google / Microsoft / 百度 |
-| OCR | PP-OCRv6 本地、Windows OCR、内置视觉模型（PaddleOCR-VL）、LLM Vision、OCR.space / Google Vision / Azure / 百度 |
+| OCR | PP-OCRv6 本地、Windows OCR、内置视觉模型（PaddleOCR-VL）、LLM Vision、OCR.space / Google Vision / Azure / 百度；PDF 版面分析 PP-DocLayoutV3（显卡加速开着时） |
 | 安全 | Electron safeStorage（DPAPI）+ 访问审计；主进程单点隐私门 |
 | 打包 | electron-builder，NSIS 安装包 |
 
@@ -61,7 +61,7 @@ t-translate/
 │   ├── screenshot/             # 截图 OCR：flow（截屏→框选→裁剪→交接）、screenshot-module（多屏截取与裁剪）
 │   ├── listen/                 # 听译：audio-engine-manager（ASR 子进程会话）、listen-translator、自动保存、模型表、音频包、WASAPI 抓音
 │   ├── tts/                    # 朗读：音色表与语音包
-│   ├── ocr/                    # 本地 OCR：ocr-engine、Windows OCR、OCR 模型包
+│   ├── ocr/                    # 本地 OCR：ocr-engine（含 PDF 版面分析门面）、Windows OCR、OCR 模型包
 │   ├── llm/                    # 内置模型：llm-manager（文本槽 + 视觉槽 + 语音槽）、模型包扫描
 │   ├── packs/                  # 模型包公共层：model-pack-core（下载安装工厂）、model-root、旧目录迁移
 │   ├── security/               # secure-vault / secure-audit / history-vault / privacy-gate / url-policy
@@ -98,7 +98,7 @@ t-translate/
 │   ├── translation/            # 渲染端翻译层：stack-client（stack:* IPC 客户端）、main-translation（主窗口编排）、就绪判断 hook
 │   ├── ai/                     # AI 动作：提示词模板、runner、store、use-ai-actions / use-segment-notes
 │   ├── floating/               # 悬浮窗：pipeline（流水线）、display-mode、pane-layout
-│   ├── document/               # 文档翻译：解析器、术语表 IO、术语一致性
+│   ├── document/               # 文档翻译：解析器、PDF 文字层重建（pdf-text）、Word / EPUB 结构（html-blocks）、进度核对、术语表 IO、术语一致性
 │   ├── ocr/                    # 渲染端 OCR 辅助：密钥保险库、图片工具
 │   ├── tts/                    # 朗读：引擎基类、系统语音、神经语音、外接端点、音色挑选
 │   ├── listen/                 # 听译字幕文本处理

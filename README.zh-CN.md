@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.5.2-green" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.5.3-green" alt="Version">
   <img src="https://img.shields.io/badge/license-T--Translate%201.0-blue" alt="License">
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform">
 </p>
@@ -78,7 +78,7 @@ T-Translate 是一个 Windows 桌面翻译工具：在任何程序里选中文�
 
 ### 文档翻译
 
-拖入文件逐段翻译，支持并发、扫描件 OCR、术语库联动，翻译到一半关掉下次接着来。每段可以让 AI 讲解，讲解过的段落可以汇总成总结；翻译完还能对照术语库检查用词。资源管理器里右键 PDF、Word、TXT 直接打开。
+拖入文件按原文段落逐段翻译：标题进大纲，表格按行翻，导出的 Word、Markdown 保留标题和表格。PDF 能对照原文页面看，显卡加速开着时还可以用版面分析模型把公式、图里的文字挡在外面。支持并发、扫描件 OCR、术语库联动，翻译到一半关掉下次接着来。每段可以让 AI 讲解，讲解过的段落可以汇总成总结；翻译完还能对照术语库检查用词。资源管理器里右键 PDF、Word、TXT 直接打开。
 
 <p align="center">
   <img src="docs/screenshots/document-translate.png" width="600" alt="文档翻译">
@@ -128,7 +128,7 @@ npm run dist            # 打包安装程序
 
 ## 模型
 
-程序本身不带模型。语言包、听译识别模型、语音包在设置页里一键下载；下面几个大文件不经我们的服务器分发，自己下载后放进模型文件夹即可（位置在 设置 → 关于 → 存储）：
+程序本身不带模型。语言包、PDF 版面分析模型、听译识别模型、语音包在设置页里一键下载；下面几个大文件不经我们的服务器分发，自己下载后放进模型文件夹即可（位置在 设置 → 关于 → 存储）：
 
 - 内置模型 Qwen3-1.7B（通用，1.8 GB）：[官方](https://huggingface.co/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf) · [镜像](https://hf-mirror.com/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf) → `models\llm-models`
 - 内置模型 Hy-MT2-1.8B（仅翻译，1.9 GB）：[官方](https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF/resolve/main/Hy-MT2-1.8B-Q8_0.gguf) · [镜像](https://hf-mirror.com/tencent/Hy-MT2-1.8B-GGUF/resolve/main/Hy-MT2-1.8B-Q8_0.gguf) → `models\llm-models`

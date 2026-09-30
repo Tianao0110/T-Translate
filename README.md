@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.5.2-green" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.5.3-green" alt="Version">
   <img src="https://img.shields.io/badge/license-T--Translate%201.0-blue" alt="License">
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform">
 </p>
@@ -78,7 +78,7 @@ Switch the floating window to "Listen" and the sound your computer is playing tu
 
 ### Document translation
 
-Drop in a file and it is translated paragraph by paragraph, with parallel translation, OCR for scanned pages, glossary integration, and resumable progress. Every paragraph can be explained by AI, explained paragraphs can be digested into a summary, and a term check compares the result against your glossary. Right-click a PDF, Word or TXT file in Explorer to open it directly.
+Drop in a file and it is translated along its original paragraphs: headings go into the outline, tables are translated row by row, and Word and Markdown exports keep both. PDFs can be checked against the original page, and with GPU acceleration on, an optional layout model keeps formula and figure text out. Parallel translation, OCR for scanned pages, glossary integration, and resumable progress. Every paragraph can be explained by AI, explained paragraphs can be digested into a summary, and a term check compares the result against your glossary. Right-click a PDF, Word or TXT file in Explorer to open it directly.
 
 <p align="center">
   <img src="docs/screenshots/document-translate.png" width="600" alt="Document translation">
@@ -128,7 +128,7 @@ npm run dist            # build the installer
 
 ## Models
 
-The app ships without models. Language packs, listen recognition models and voice packs download with one click on the settings pages. The large files below are not distributed through our servers: download them yourself and put them into the models folder (its location is under Settings → About → Storage):
+The app ships without models. Language packs, the PDF layout model, listen recognition models and voice packs download with one click on the settings pages. The large files below are not distributed through our servers: download them yourself and put them into the models folder (its location is under Settings → About → Storage):
 
 - Built-in model Qwen3-1.7B (general, 1.8 GB): [official](https://huggingface.co/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf) · [mirror](https://hf-mirror.com/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf) → `models\llm-models`
 - Built-in model Hy-MT2-1.8B (translation only, 1.9 GB): [official](https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF/resolve/main/Hy-MT2-1.8B-Q8_0.gguf) · [mirror](https://hf-mirror.com/tencent/Hy-MT2-1.8B-GGUF/resolve/main/Hy-MT2-1.8B-Q8_0.gguf) → `models\llm-models`
