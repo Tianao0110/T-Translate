@@ -110,6 +110,7 @@ Three tone buttons under the languages: Natural (everyday), Precise (technical, 
 - Encrypted PDFs ask for the password. Scanned PDFs have no text layer, so the app runs OCR page by page; set up an OCR engine in Settings first. Pages whose text layer is garbled are read by OCR too.
 - PDFs are split into the original paragraphs. Running headers, footers and page numbers are dropped, and each table row becomes one paragraph.
 - The document is shown paragraph by paragraph, stacked or side by side. The outline on the left jumps to headings.
+- Each PDF paragraph has a locate button (crosshair icon, "Show on the original page"): it opens the "Original page" panel on the right at that page with the paragraph outlined, so figures, tables and formulas can be read against the original. In a narrow window the outline steps aside while the panel is open.
 - "Start translation" translates paragraph by paragraph; you can pause, resume and stop. Failed paragraphs can be retried one at a time or all at once with "Retry Failed".
 - Every translated paragraph can be edited, retranslated or copied.
 - The "Parallel" switch at the bottom translates several paragraphs at once; turn it off if a local model is unstable.
