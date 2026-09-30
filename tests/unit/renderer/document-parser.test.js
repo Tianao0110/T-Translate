@@ -21,6 +21,7 @@ import {
   MAX_PDF_CANVAS_EDGE,
   MAX_DECOMPRESSED_SIZE_BYTES,
 } from '../../../src/document/document-parser.js';
+import { splitSentences, endsSentence } from '../../../src/document/sentence-breaks.js';
 
 describe('timecode conversion', () => {
   it('VTT dot becomes SRT comma', () => {
@@ -124,6 +125,34 @@ describe('splitIntoSegments', () => {
     expect(segments.length).toBeGreaterThan(1);
     expect(segments.every(s => s.original.length <= 200)).toBe(true);
   });
+
+  it('does not split long paragraphs at abbreviations, initials or decimals', () => {
+    const para = 'Smith et al. showed that 3.75 holds in v1.8.0 for N.J. Lane, e.g. in dry years. '
+      + 'The next sentence follows here. And a third one ends it.';
+    const segments = splitIntoSegments(para, { maxCharsPerSegment: 90, filters: { skipShort: false } });
+    expect(segments.map(s => s.original)).toEqual([
+      'Smith et al. showed that 3.75 holds in v1.8.0 for N.J. Lane, e.g. in dry years.',
+      'The next sentence follows here. And a third one ends it.',
+    ]);
+  });
+});
+
+describe('sentence breaks', () => {
+  it('splitSentences keeps the text intact and breaks after CJK stops', () => {
+    const text = '第一句。第二句！Third one? Fourth.';
+    const pieces = splitSentences(text);
+    expect(pieces.join('')).toBe(text);
+    expect(pieces).toEqual(['第一句。', '第二句！', 'Third one? ', 'Fourth.']);
+  });
+
+  it('endsSentence ignores abbreviations and initials', () => {
+    expect(endsSentence('It works.')).toBe(true);
+    expect(endsSentence('as follows:')).toBe(true);
+    expect(endsSentence('结束了。')).toBe(true);
+    expect(endsSentence('the model by Smith et al.')).toBe(false);
+    expect(endsSentence('Patrick N.J.')).toBe(false);
+    expect(endsSentence('no stop here')).toBe(false);
+  });
 });
 
 describe('shouldSkipSegment', () => {
@@ -197,6 +226,15 @@ describe('outline detection', () => {
     expect(tree).toHaveLength(2);
     expect(tree[0].children).toHaveLength(1);
     expect(tree[0].children[0].segmentId).toBe(1);
+  });
+
+  it('uses parser heading marks instead of the text patterns when present', () => {
+    const segments = [
+      { id: 0, original: 'A Study of Things', heading: 1 },
+      { id: 1, original: '1. A numbered line the patterns would catch' },
+      { id: 2, original: 'II. BACKGROUND', heading: 2 },
+    ];
+    expect(detectHeadings(segments).map(h => [h.segmentId, h.level])).toEqual([[0, 1], [2, 2]]);
   });
 });
 
