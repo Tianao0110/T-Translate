@@ -420,10 +420,10 @@ function isHeadingLine(line, bodySize, bodyFont) {
     && headingShaped(line, 80);
 }
 
-// Three or more cells on one baseline, or any line the layout model put in
-// a table.
+// A line mergeRows split into cells, or any line the layout model put in a
+// table.
 function isTableRow(line) {
-  return (line.cells || 0) >= 3 || !!line.inTable;
+  return line.cells > 0 || !!line.inTable;
 }
 
 function startsBlock(line, prev) {
@@ -432,19 +432,20 @@ function startsBlock(line, prev) {
   return NUMBERED_START.test(line.text) && endsSentence(prev.text);
 }
 
-// Consecutive lines on one baseline become one line; three or more of them
-// read as a table row, cells kept apart by " | ".
+// Consecutive lines on one baseline become one line; three or more of them,
+// or two inside a layout table block, read as a table row, cells kept apart
+// by " | ". `pieces` keeps each cell's text and span for foldCellWraps.
 function mergeRows(lines, stats) {
   const out = [];
   let run = [];
   const flush = () => {
     if (run.length === 1) out.push(run[0]);
     if (run.length < 2) return;
-    const cells = run.length;
+    const cells = run.length >= 3 || run.some((l) => l.inTable) ? run.length : 0;
     const u0 = Math.min(...run.map((l) => l.u0));
     out.push({
       ...run[0],
-      text: run.map((l) => l.text).join(cells >= 3 ? ' | ' : ' '),
+      text: run.map((l) => l.text).join(cells ? ' | ' : ' '),
       u0,
       u1: Math.max(...run.map((l) => l.u1)),
       vTop: Math.max(...run.map((l) => l.vTop)),
@@ -454,7 +455,8 @@ function mergeRows(lines, stats) {
         Math.min(...run.map((l) => l.box[0])), Math.min(...run.map((l) => l.box[1])),
         Math.max(...run.map((l) => l.box[2])), Math.max(...run.map((l) => l.box[3])),
       ],
-      cells: cells >= 3 ? cells : 0,
+      cells,
+      pieces: run.map(({ text, u0: left, u1 }) => ({ text, u0: left, u1 })),
       joined: true,
     });
   };
@@ -470,6 +472,58 @@ function mergeRows(lines, stats) {
     run.push(line);
   }
   flush();
+  return out;
+}
+
+// Which cells of `row` a line straight below it continues: every piece of
+// the line starts right of the first column (a first column entry starts a
+// new row) and overlaps exactly one cell, each a different one. null when
+// the line is not a wrap.
+function wrapCells(row, line, stats) {
+  if (!(row?.cells >= 2) || !row.pieces) return null;
+  const size = Math.max(row.size, line.size);
+  if (Math.abs(line.size - row.size) > SIZE_CHANGE_RATIO * size) return null;
+  const dv = row.base - line.base;
+  const pitch = expectedPitch(stats, size);
+  if (dv < 0.3 * pitch || dv > PARAGRAPH_GAP_RATIO * pitch) return null;
+  const pieces = line.pieces || [line];
+  if (pieces.length >= row.cells) return null;
+  const slots = [];
+  for (const piece of pieces) {
+    if (piece.u0 <= row.pieces[0].u1) return null;
+    const hits = [];
+    row.pieces.forEach((cell, i) => {
+      if (Math.min(cell.u1, piece.u1) > Math.max(cell.u0, piece.u0)) hits.push(i);
+    });
+    if (hits.length !== 1 || hits[0] <= (slots[slots.length - 1] ?? 0)) return null;
+    slots.push(hits[0]);
+  }
+  return { slots, pieces };
+}
+
+// Lines that continue wrapped cells ("Nandakumar and" / "Mein, 1993") join
+// those cells of the row above instead of standing as rows of their own.
+function foldCellWraps(lines, stats, words) {
+  const out = [];
+  for (const line of lines) {
+    const row = out[out.length - 1];
+    const wrap = wrapCells(row, line, stats);
+    if (!wrap) {
+      out.push(line);
+      continue;
+    }
+    wrap.slots.forEach((slot, i) => {
+      row.pieces[slot].text = joinText(row.pieces[slot].text, wrap.pieces[i].text, words);
+    });
+    row.text = row.pieces.map((p) => p.text).join(' | ');
+    row.base = line.base;
+    row.vBottom = Math.min(row.vBottom, line.vBottom);
+    row.u1 = Math.max(row.u1, line.u1);
+    row.box = [
+      Math.min(row.box[0], line.box[0]), Math.min(row.box[1], line.box[1]),
+      Math.max(row.box[2], line.box[2]), Math.max(row.box[3], line.box[3]),
+    ];
+  }
   return out;
 }
 
@@ -680,7 +734,7 @@ export function buildParagraphs(pages) {
     const { layout, page, blocks } = entry;
     let kept = layout.lines.filter((l) => !isRunningLine(l, layout.frame, keys));
     if (blocks?.length) kept = placeInLayout(kept, blocks);
-    const lines = markLines(mergeRows(kept, stats), stats);
+    const lines = markLines(foldCellWraps(mergeRows(kept, stats), stats, words), stats);
     const paras = pageParagraphs(lines, page, stats, words);
     const flow = paras.filter((p) => !isMarginNote(p, layout.frame, stats));
     if (tail && flow.length && continuesAcrossFlow(tail.lines[tail.lines.length - 1], flow[0].lines[0])) {
@@ -694,7 +748,7 @@ export function buildParagraphs(pages) {
     if (flow.length) tail = flow[flow.length - 1];
     for (const group of layout.strays) {
       const strayLines = blocks?.length ? placeInLayout(group, blocks) : group;
-      out.push(...pageParagraphs(markLines(mergeRows(strayLines, stats), stats), page, stats, words));
+      out.push(...pageParagraphs(markLines(foldCellWraps(mergeRows(strayLines, stats), stats, words), stats), page, stats, words));
     }
   }
 

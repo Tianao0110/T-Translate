@@ -208,6 +208,37 @@ describe('buildParagraphs', () => {
     expect(paras.every((p) => p.row)).toBe(true);
   });
 
+  it('folds lines that continue wrapped cells into the row above', () => {
+    const paras = buildParagraphs([page(1, [
+      ['Site', 50, 500], ['Area', 150, 500], ['Reference', 250, 500],
+      ['Stewarts Ck', 50, 488], ['1156', 150, 488], ['Nandakumar and', 250, 488],
+      ['Mein, 1993', 250, 476],
+      ['Glendhu', 50, 464], ['310', 150, 464], ['Fahey and', 250, 464],
+      ['(km2)', 150, 452], ['Jackson, 1997', 250, 452],
+    ])]);
+    expect(texts(paras)).toEqual([
+      'Site | Area | Reference',
+      'Stewarts Ck | 1156 | Nandakumar and Mein, 1993',
+      'Glendhu | 310 (km2) | Fahey and Jackson, 1997',
+    ]);
+    expect(paras.every((p) => p.row)).toBe(true);
+  });
+
+  it('keeps a first-column line, a full row, a line across cells and text after a gap out of the row above', () => {
+    const paras = buildParagraphs([page(1, [
+      ['Site', 50, 500], ['Area', 150, 500], ['Depth', 250, 500],
+      ['Pine Ck', 50, 488], ['320', 150, 488], ['1.0', 250, 488],
+      ['(Vic)', 50, 476],
+      ['Oak Ck', 50, 464], ['12', 150, 464], ['2.0', 250, 464],
+      ['spans the area and depth columns', 150, 452],
+      ['Values are annual means.', 150, 420],
+    ])]);
+    expect(texts(paras)).toEqual([
+      'Site | Area | Depth', 'Pine Ck | 320 | 1.0', '(Vic)', 'Oak Ck | 12 | 2.0',
+      'spans the area and depth columns', 'Values are annual means.',
+    ]);
+  });
+
   it('reads a rotated table in its own direction', () => {
     const items = [
       item(`Normal body text ${FILLER}.`, 50, 700),
@@ -261,14 +292,15 @@ describe('buildParagraphs with layout blocks', () => {
     expect(paras.map((p) => [p.text.slice(0, 12), p.heading || 0])).toEqual([['Doppel11 • 5', 0], ['Is there any', 0]]);
   });
 
-  it('turns every line of a table block into a table row, wrapped cells included', () => {
+  it('turns every line of a table block into a table row and folds wrapped cells back in', () => {
     const paras = buildParagraphs([withBlocks([
       ['Site', 50, 500], ['Area', 150, 500],
       ['Pine Ck', 50, 488], ['Nandakumar and', 150, 488],
       ['Mein, 1993', 150, 476],
-    ], [block('table', 0, [40, 470, 300, 515])])]);
+      ['Note', 50, 464],
+    ], [block('table', 0, [40, 460, 300, 515])])]);
     expect(paras.map((p) => [p.text, !!p.row])).toEqual([
-      ['Site Area', true], ['Pine Ck Nandakumar and', true], ['Mein, 1993', true],
+      ['Site | Area', true], ['Pine Ck | Nandakumar and Mein, 1993', true], ['Note', true],
     ]);
   });
 
