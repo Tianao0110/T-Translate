@@ -205,6 +205,7 @@ describe('buildParagraphs', () => {
       ['Pine Ck', 50, 488], ['320', 150, 488], ['1.0', 250, 488],
     ])]);
     expect(texts(paras)).toEqual(['Site | Area | Depth', 'Pine Ck | 320 | 1.0']);
+    expect(paras.every((p) => p.row)).toBe(true);
   });
 
   it('reads a rotated table in its own direction', () => {

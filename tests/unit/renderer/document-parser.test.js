@@ -18,6 +18,11 @@ import {
   buildOutlineTree,
   clampedPdfScale,
   assertZipWithinDecompressedCap,
+  segmentsFromParagraphs,
+  exportBilingual,
+  exportTranslatedOnly,
+  exportDOCX,
+  exportPDFHTML,
   MAX_PDF_CANVAS_EDGE,
   MAX_DECOMPRESSED_SIZE_BYTES,
 } from '../../../src/document/document-parser.js';
@@ -163,6 +168,14 @@ describe('shouldSkipSegment', () => {
     expect(shouldSkipSegment('这是一段中文文本内容', { skipTargetLang: true, targetLang: 'zh' }).skip).toBe(true);
   });
 
+  it('skips letterless text as numbers only, CJK counts as letters', () => {
+    const skip = (text) => shouldSkipSegment(text, { skipNumbers: true }).skip;
+    expect(skip('0.82 | 0.85 | 0.81')).toBe(true);
+    expect(skip('(3)')).toBe(true);
+    expect(skip('Q3 results')).toBe(false);
+    expect(skip('第三章')).toBe(false);
+  });
+
   it('keeps normal translatable text', () => {
     expect(shouldSkipSegment('This is a normal English sentence.', {
       skipShort: true, minLength: 10, skipNumbers: true, skipCode: true,
@@ -235,6 +248,70 @@ describe('outline detection', () => {
       { id: 2, original: 'II. BACKGROUND', heading: 2 },
     ];
     expect(detectHeadings(segments).map(h => [h.segmentId, h.level])).toEqual([[0, 1], [2, 2]]);
+  });
+});
+
+describe('PDF paragraphs to segments', () => {
+  it('translates short headings and carries the table-row mark', () => {
+    const segments = segmentsFromParagraphs([
+      { text: 'Methods', parts: [{ page: 1 }], heading: 2 },
+      { text: 'Tiny', parts: [{ page: 1 }] },
+      { text: 'Site | Area | Depth', parts: [{ page: 2 }], row: true },
+    ], new Map(), { filters: { skipShort: true, minLength: 10 } });
+    expect(segments.map(s => [s.status, s.heading || 0, !!s.row])).toEqual([
+      ['pending', 2, false],
+      ['skipped', 0, false],
+      ['pending', 0, true],
+    ]);
+    expect(segments[2].loc).toEqual([{ page: 2 }]);
+  });
+});
+
+describe('structured export', () => {
+  const segments = [
+    { id: 0, original: 'Results', translated: '结果', status: 'completed', heading: 2 },
+    { id: 1, original: 'Site | Area | Depth', translated: '地点 | 面积 | 深度', status: 'completed', row: true },
+    { id: 2, original: '12 | 320 | 1.0', translated: '', status: 'skipped', row: true },
+    { id: 3, original: 'Glendhu | 310 | 0.64', translated: 'Glendhu 310 0.64', status: 'completed', row: true },
+    { id: 4, original: 'Body text here.', translated: '正文在这里。', status: 'completed' },
+    { id: 5, original: 'Reply8', translated: '', status: 'skipped' },
+  ];
+
+  it('Markdown uses #, a table with paired cells, and quoted originals', () => {
+    const md = exportBilingual(segments, { style: 'below', format: 'md' });
+    expect(md).toContain('## 结果\n\n*Results*');
+    expect(md).toContain([
+      '| Site<br>地点 | Area<br>面积 | Depth<br>深度 |',
+      '| --- | --- | --- |',
+      '| 12 | 320 | 1.0 |',
+      '| Glendhu | 310 | 0.64 |',
+      '| Glendhu 310 0.64 |  |  |',
+    ].join('\n'));
+    expect(md).toContain('> Body text here.\n\n正文在这里。');
+    expect(md).not.toContain('Reply8');
+  });
+
+  it('Word export has real headings and a table, full-width row when cells do not line up', async () => {
+    const html = await exportDOCX(segments, { style: 'bilingual', title: 'demo' }).text();
+    expect(html).toContain('<h3>结果</h3><p class="heading-original">Results</p>');
+    expect(html).toContain('<td><span class="cell-original">Site</span><br>地点</td>');
+    expect(html).toContain('<tr><td>12</td><td>320</td><td>1.0</td></tr>');
+    expect(html).toContain('<td colspan="3">Glendhu 310 0.64</td>');
+    expect(html).not.toContain('Reply8');
+  });
+
+  it('print export in translated-only mode shows translations in the cells', () => {
+    const html = exportPDFHTML(segments, { style: 'translated-only', title: 'demo' });
+    expect(html).toContain('<h3>结果</h3>');
+    expect(html).not.toContain('heading-original">Results');
+    expect(html).toContain('<tr><td>地点</td><td>面积</td><td>深度</td></tr>');
+    expect(html).toContain('<tr><td colspan="3">Glendhu 310 0.64</td></tr>');
+  });
+
+  it('plain-text export keeps skipped headings and table rows', () => {
+    const text = exportTranslatedOnly(segments);
+    expect(text).toContain('12 | 320 | 1.0');
+    expect(text).not.toContain('Reply8');
   });
 });
 
