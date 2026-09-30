@@ -456,9 +456,9 @@ export function segmentsFromParagraphs(paragraphs, viewports, { maxCharsPerSegme
   return segments;
 }
 
-async function parsePDF(file, options = {}) {
-  const { password, maxCharsPerSegment = 800, filters = {}, ocrRecognize, onProgress } = options;
-
+// pdf.js document from a file's bytes. Shared by parsePDF and the document
+// panel's page preview (components/DocumentTranslator/PagePreview.jsx).
+export async function openPdf(file, password) {
   const pdfjsLib = await import('pdfjs-dist');
 
   // Prefer the local worker; fall back to main-thread parsing if the
@@ -474,14 +474,18 @@ async function parsePDF(file, options = {}) {
     }
   }
 
-  const arrayBuffer = await file.arrayBuffer();
-
+  // pdf.js takes ownership of the buffer, so every open reads a fresh one.
   const loadingTask = pdfjsLib.getDocument({
-    data: arrayBuffer,
+    data: await file.arrayBuffer(),
     password: password || undefined,
   });
+  return loadingTask.promise;
+}
 
-  const pdf = await loadingTask.promise;
+async function parsePDF(file, options = {}) {
+  const { password, maxCharsPerSegment = 800, filters = {}, ocrRecognize, onProgress } = options;
+
+  const pdf = await openPdf(file, password);
   const numPages = pdf.numPages;
 
   const pages = [];

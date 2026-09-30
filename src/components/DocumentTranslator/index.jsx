@@ -6,7 +6,7 @@ import {
   Loader, ArrowUp, FileDown,
   SkipForward, RefreshCw, Zap, Lock, Key,
   Database, BookOpen, BarChart3,
-  Edit3, Check, Copy, Search, Rows2, Columns2, ClipboardList, Sparkles, BookMarked
+  Edit3, Check, Copy, Search, Rows2, Columns2, ClipboardList, Sparkles, BookMarked, Crosshair
 } from 'lucide-react';
 import createLogger from '../../core/logger.js';
 import {
@@ -27,6 +27,7 @@ import LanguagePicker from '../shared/LanguagePicker.jsx';
 import { useConfirm } from '../shared/ConfirmDialog.jsx';
 import { scanDocumentTerms, renderWithReplacements } from '../../document/term-consistency.js';
 import { PROGRESS_VERSION, segmentHash, noteHashes, matchSavedProgress } from '../../document/progress-guard.js';
+import PagePreview from './PagePreview.jsx';
 import { notifyTaskDone } from '../../core/system-notify.js';
 import HighlightText from '../shared/HighlightText.jsx';
 import AiBadge from '../shared/AiBadge.jsx';
@@ -137,7 +138,7 @@ function sweepExpiredProgress() {
 }
 
 const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate, onEdit, onCopy, searchQuery, termMarks, onTermClick, t,
-  onExplain, aiNote, noteFolded, aiRunning, canExplain }) => {
+  onExplain, aiNote, noteFolded, aiRunning, canExplain, onLocate }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState('');
   const editRef = useRef(null);
@@ -209,6 +210,11 @@ const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate,
               title={t('documentTranslator.segment.explain', '讲解这一段')}
             >
               {aiRunning ? <Loader size={12} className="spinning" /> : <AiBadge size={12} />}
+            </button>
+          )}
+          {onLocate && segment.loc?.length > 0 && (
+            <button className="seg-btn" onClick={() => onLocate(segment)} title={t('documentTranslator.segment.locate')}>
+              <Crosshair size={12} />
             </button>
           )}
         </div>
@@ -368,7 +374,15 @@ const DocumentTranslator = ({
   
   // Fingerprint used to key progress in localStorage.
   const fileFingerprint = useRef(null);
-  
+  // Source file and the password that opened it, for the page preview.
+  const sourceFileRef = useRef(null);
+  const sourcePasswordRef = useRef(null);
+  // Segment the page preview outlines; null keeps the preview closed.
+  const [previewTarget, setPreviewTarget] = useState(null);
+  const locateSegment = useCallback((segment) => {
+    setPreviewTarget({ page: segment.loc[0].page, loc: segment.loc });
+  }, []);
+
   // Outline navigation
   const [outline, setOutline] = useState([]);
   
@@ -784,7 +798,10 @@ const DocumentTranslator = ({
       if (result.success) {
         const fingerprint = getFileFingerprint(file);
         fileFingerprint.current = fingerprint;
-        
+        sourceFileRef.current = file;
+        sourcePasswordRef.current = filePassword;
+        setPreviewTarget(null);
+
         setDocument({
           filename: result.filename,
           format: result.format,
@@ -1302,6 +1319,8 @@ const DocumentTranslator = ({
     setPendingRestore(null);
     setShowSearch(false);
     setSearchQuery('');
+    setPreviewTarget(null);
+    sourceFileRef.current = null;
     
     fileFingerprint.current = null;
   };
@@ -1756,10 +1775,20 @@ const DocumentTranslator = ({
                     noteFolded={!!foldedNotes[segment.id]}
                     aiRunning={aiRunningId === segment.id}
                     canExplain={canExplain}
+                    onLocate={locateSegment}
                     t={t}
                   />
                 ))}
               </div>
+
+              {previewTarget && sourceFileRef.current && (
+                <PagePreview
+                  file={sourceFileRef.current}
+                  password={sourcePasswordRef.current}
+                  target={previewTarget}
+                  onClose={() => setPreviewTarget(null)}
+                />
+              )}
             </div>
 
             {/* Scroll-to-top */}

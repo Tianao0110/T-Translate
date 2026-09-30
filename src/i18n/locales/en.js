@@ -1027,7 +1027,17 @@ const en = {
       edit: "Edit translation",
       copy: "Copy translation",
       save: "Save",
-      cancel: "Cancel"
+      cancel: "Cancel",
+      locate: "Show on the original page"
+    },
+    // Page preview (PDF)
+    preview: {
+      title: "Original page",
+      page: "Page {{page}} / {{total}}",
+      prev: "Previous page",
+      next: "Next page",
+      close: "Close",
+      failed: "Could not open the original page"
     },
     // Progress restore
     restore: {

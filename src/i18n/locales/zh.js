@@ -1027,7 +1027,17 @@ const zh = {
       edit: "编辑译文",
       copy: "复制译文",
       save: "保存",
-      cancel: "取消"
+      cancel: "取消",
+      locate: "在原文页面中查看"
+    },
+    // Page preview (PDF)
+    preview: {
+      title: "原文页面",
+      page: "第 {{page}} / {{total}} 页",
+      prev: "上一页",
+      next: "下一页",
+      close: "关闭",
+      failed: "原文页面打不开"
     },
     // Progress restore
     restore: {
