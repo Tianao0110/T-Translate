@@ -4,6 +4,8 @@
 import createLogger from '../core/logger.js';
 import i18n from '../i18n.js';
 import { judgeLanguage, mainLanguage, unsure } from '../stack/language-detect.js';
+import { readPageLayout, isGarbledPage, buildParagraphs } from './pdf-text.js';
+import { splitSentences } from './sentence-breaks.js';
 const logger = createLogger('DocumentParser');
 
 const _t = (key, fallback) => {
@@ -77,6 +79,16 @@ const HEADING_PATTERNS = [
 
 export function detectHeadings(segments) {
   const headings = [];
+
+  // Parsers that read layout (PDF) mark headings themselves.
+  if (segments.some((s) => s.heading)) {
+    for (const segment of segments) {
+      if (!segment.heading) continue;
+      const text = segment.original?.trim() || '';
+      headings.push({ segmentId: segment.id, level: segment.heading, text, original: text });
+    }
+    return headings;
+  }
 
   for (const segment of segments) {
     const text = segment.original?.trim() || '';
@@ -254,8 +266,7 @@ export function splitIntoSegments(text, options = {}) {
 }
 
 function splitBySentence(text, maxChars) {
-  const sentenceEnders = /([.。!！?？]+[\s]*)/g;
-  const parts = text.split(sentenceEnders);
+  const parts = splitSentences(text);
 
   const result = [];
   let current = '';
@@ -381,6 +392,61 @@ async function ocrPdfPage(page, ocrRecognize) {
 // real text pages clear this easily.
 const SCANNED_PAGE_MAX_CHARS = 20;
 
+// PDF user-space box → [left, top, right, bottom] as fractions of the
+// rendered page, the frame a page preview draws highlights in.
+function unitBox(viewport, box) {
+  if (!viewport || !box) return undefined;
+  const [x1, y1, x2, y2] = viewport.convertToViewportRectangle(box);
+  const clamp = (v) => Math.round(Math.min(1, Math.max(0, v)) * 10000) / 10000;
+  return [
+    clamp(Math.min(x1, x2) / viewport.width), clamp(Math.min(y1, y2) / viewport.height),
+    clamp(Math.max(x1, x2) / viewport.width), clamp(Math.max(y1, y2) / viewport.height),
+  ];
+}
+
+// One paragraph → one segment unless it outgrows maxCharsPerSegment; every
+// piece carries the paragraph's page locations (loc) and heading level.
+function segmentsFromParagraphs(paragraphs, viewports, { maxCharsPerSegment = 800, filters = {} } = {}) {
+  const segments = [];
+  let id = 0;
+  for (const para of paragraphs) {
+    const loc = para.parts.map((part) => {
+      const box = unitBox(viewports.get(part.page), part.box);
+      return box ? { page: part.page, box } : { page: part.page };
+    });
+    const extra = para.heading ? { loc, heading: para.heading } : { loc };
+    const skipCheck = shouldSkipSegment(para.text, filters);
+    if (skipCheck.skip) {
+      segments.push({
+        id: id++,
+        original: para.text,
+        translated: '',
+        status: 'skipped',
+        tokens: 0,
+        isFiltered: true,
+        filterReason: skipCheck.reason,
+        ...extra,
+      });
+      continue;
+    }
+    const pieces = para.text.length <= maxCharsPerSegment
+      ? [para.text]
+      : splitBySentence(para.text, maxCharsPerSegment);
+    for (const piece of pieces) {
+      if (!piece.trim()) continue;
+      segments.push({
+        id: id++,
+        original: piece.trim(),
+        translated: '',
+        status: 'pending',
+        tokens: estimateTokens(piece),
+        ...extra,
+      });
+    }
+  }
+  return segments;
+}
+
 async function parsePDF(file, options = {}) {
   const { password, maxCharsPerSegment = 800, filters = {}, ocrRecognize, onProgress } = options;
 
@@ -409,90 +475,31 @@ async function parsePDF(file, options = {}) {
   const pdf = await loadingTask.promise;
   const numPages = pdf.numPages;
 
-  let allText = '';
-  const pageTexts = [];
+  const pages = [];
+  const viewports = new Map();
   let usedOcr = false;
 
   for (let i = 1; i <= numPages; i++) {
     onProgress?.({ page: i, total: numPages });
     const page = await pdf.getPage(i);
     const textContent = await page.getTextContent();
+    const layout = readPageLayout(textContent.items, page.view);
+    viewports.set(i, page.getViewport({ scale: 1 }));
 
-    // Group text-run items into visual lines by Y coordinate.
-    const lines = [];
-    let currentLine = '';
-    let lastY = null;
-    let lastX = 0;
-
-    for (const item of textContent.items) {
-      if (!item.str) continue;
-
-      const y = Math.round(item.transform[5]);
-      const x = item.transform[4];
-
-      if (lastY !== null && Math.abs(y - lastY) > 3) {
-        if (currentLine.trim()) {
-          lines.push(currentLine.trim());
-        }
-        currentLine = item.str;
-      } else {
-        // Same line: insert a space if there's a visible horizontal gap.
-        if (currentLine && x - lastX > 10) {
-          currentLine += ' ';
-        }
-        currentLine += item.str;
-      }
-      lastY = y;
-      lastX = x + (item.width || item.str.length * 6);
-    }
-    if (currentLine.trim()) {
-      lines.push(currentLine.trim());
-    }
-
-    // Stitch lines into paragraphs: keep newline at sentence-ending
-    // punctuation or short lines (likely headings / list items),
-    // otherwise join (a paragraph was wrapped mid-sentence in the PDF).
-    let pageText = '';
-    for (let j = 0; j < lines.length; j++) {
-      const line = lines[j];
-      const nextLine = lines[j + 1];
-
-      // Drop suspected page numbers in headers/footers.
-      if ((j === 0 || j === lines.length - 1) && /^\d{1,4}$/.test(line)) {
-        continue;
-      }
-
-      pageText += line;
-
-      const endsWithPunctuation = /[.!?。！？;:；：]$/.test(line);
-      const isShortLine = line.length < 40;
-
-      if (endsWithPunctuation || isShortLine || !nextLine) {
-        pageText += '\n';
-      } else {
-        // CJK doesn't need a join space; Latin scripts do.
-        const lastChar = line[line.length - 1];
-        const isCJK = /[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff]/.test(lastChar);
-        pageText += isCJK ? '' : ' ';
-      }
-    }
-
-    // Image-only page (scanned PDF) — render it and run the OCR chain.
-    if (pageText.trim().length < SCANNED_PAGE_MAX_CHARS && ocrRecognize) {
+    // Image-only or garbled text layer — render it and run the OCR chain.
+    if ((layout.chars < SCANNED_PAGE_MAX_CHARS || isGarbledPage(layout)) && ocrRecognize) {
       onProgress?.({ page: i, total: numPages, ocr: true });
       const ocrText = await ocrPdfPage(page, ocrRecognize);
       if (ocrText?.trim()) {
-        pageText = ocrText;
+        pages.push({ page: i, text: ocrText });
         usedOcr = true;
+        continue;
       }
     }
-
-    pageTexts.push(pageText.trim());
+    pages.push({ page: i, layout });
   }
 
-  allText = pageTexts.filter(t => t).join('\n\n');
-
-  const segments = splitIntoSegments(allText, {
+  const segments = segmentsFromParagraphs(buildParagraphs(pages), viewports, {
     maxCharsPerSegment,
     filters,
   });

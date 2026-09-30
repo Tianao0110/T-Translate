@@ -26,6 +26,7 @@ import useVisibleHotkey from '../../core/use-visible-hotkey.js';
 import LanguagePicker from '../shared/LanguagePicker.jsx';
 import { useConfirm } from '../shared/ConfirmDialog.jsx';
 import { scanDocumentTerms, renderWithReplacements } from '../../document/term-consistency.js';
+import { PROGRESS_VERSION, segmentHash, noteHashes, matchSavedProgress } from '../../document/progress-guard.js';
 import { notifyTaskDone } from '../../core/system-notify.js';
 import HighlightText from '../shared/HighlightText.jsx';
 import AiBadge from '../shared/AiBadge.jsx';
@@ -87,11 +88,15 @@ function getFileFingerprint(file) {
 
 function saveProgress(fp, segments, sLang, tLang, notes, digest, digestWhole) {
   try {
-    const data = { ts: Date.now(), sLang, tLang,
-      segs: segments.filter(s => s.status === STATUS.COMPLETED).map(s => ({ id: s.id, t: s.translated }))
+    const data = { v: PROGRESS_VERSION, ts: Date.now(), sLang, tLang,
+      segs: segments.filter(s => s.status === STATUS.COMPLETED)
+        .map(s => ({ id: s.id, t: s.translated, h: segmentHash(s.original || '') }))
     };
     // Explanations ride the same blob.
-    if (notes && Object.keys(notes).length) data.notes = notes;
+    if (notes && Object.keys(notes).length) {
+      data.notes = notes;
+      data.nh = noteHashes(segments, notes);
+    }
     if (digest) {
       data.digest = digest;
       data.digestWhole = !!digestWhole;
@@ -105,7 +110,10 @@ function loadProgress(fp) {
     const raw = localStorage.getItem(PROGRESS_KEY + fp);
     if (!raw) return null;
     const data = JSON.parse(raw);
-    if (Date.now() - data.ts > PROGRESS_TTL_MS) { localStorage.removeItem(PROGRESS_KEY + fp); return null; }
+    if (data.v !== PROGRESS_VERSION || Date.now() - data.ts > PROGRESS_TTL_MS) {
+      localStorage.removeItem(PROGRESS_KEY + fp);
+      return null;
+    }
     return data;
   } catch { return null; }
 }
@@ -119,8 +127,8 @@ function sweepExpiredProgress() {
       const key = localStorage.key(i);
       if (!key?.startsWith(PROGRESS_KEY)) continue;
       try {
-        const { ts } = JSON.parse(localStorage.getItem(key));
-        if (!ts || now - ts > PROGRESS_TTL_MS) localStorage.removeItem(key);
+        const { ts, v } = JSON.parse(localStorage.getItem(key));
+        if (!ts || now - ts > PROGRESS_TTL_MS || v !== PROGRESS_VERSION) localStorage.removeItem(key);
       } catch {
         localStorage.removeItem(key);
       }
@@ -803,7 +811,7 @@ const DocumentTranslator = ({
         setElapsedTime(0);
         
         // Check for resumable progress (explanations alone count).
-        const saved = loadProgress(fingerprint);
+        const saved = matchSavedProgress(loadProgress(fingerprint), result.segments);
         const savedNoteCount = saved?.notes ? Object.keys(saved.notes).length : 0;
         if (saved && (saved.segs.length > 0 || savedNoteCount > 0 || saved.digest)
             && saved.sLang === sourceLang && saved.tLang === targetLang) {

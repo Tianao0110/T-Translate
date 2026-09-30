@@ -22,6 +22,20 @@ Forward-looking work clipboard. Git history / GitHub release notes are the archi
 - **分配阈值待真实反馈调**：`src/stack/ocr/vision-routing.js` 的 ROUTING（大图 1.2 MP、密集 30 行、表格 3 行 × 3 块、多栏各 4 行、字号差 2.5 倍、置信度 0.75 / 三成行低于 0.6）是 2026-09-14 拍脑袋定的。v0.5.2 起每张截图在日志里记一行 `vision routing:`（去向、原因和各项数字，不含文字），用一两周后按 `docs/design/stack.md` 第 5 节的字段表对数再调，一次只动一个阈值
 - 顺带：Q6_K 掐表对比（可选）
 
+### 文档翻译的 PDF 解析（2026-09-29 对照 MinerU 4.0.10 的结论）
+
+MinerU 本身不接（Python + Rust 库 docvortex + torch/ONNX），只借思路用 JS 重写。它的代码是 Apache-2.0 加附加条款（月活过 1 亿或月收入过 2000 万美元要商用授权、在线服务须署名），只借思路不受约束。
+
+- ~~A 档：纯规则重写 PDF 的行与段落重建~~ 已做（feat/pdf-paragraphs）：规则与阈值在 `docs/design/renderer.md` §5「PDF 文字层重建」。三份基线（MinerU `demo/pdfs` 两篇双栏论文 + 用户的 Reddit 打印 PDF `F:\Translate-demo\`）句中切断 9 / 4 / 1 → 0 / 公式碎片 / 0，断词残留 26 / 34 → 0，页眉页脚清零，两篇论文大纲完整。剩下的：
+  - **斜向水印过滤、乱码页走 OCR 只有单测**，三份样本里都没有这两种页，碰到真文件再实跑一次
+  - 用户主要翻英文 PDF，中文只有构造数据的单测（CJK 接行不加空格）；有中文 PDF 反馈时拿真文件补基线
+  - 翻译请求次数约为此前 3–5 倍（总字数不变），本地模型逐段有固定开销。嫌慢再考虑把相邻短段拼成一次请求（`batchSegments` 还在 document-parser.js 里没人用）
+  - 对照方法：vitest 直接跑 `parseDocument` 输出段落清单，改前改后比。坑：`src/i18n.js` 顶层读 `localStorage`，要先垫一个；pdf.js 的 `workerSrc` 要手动指到 `node_modules/pdfjs-dist/build/pdf.worker.mjs`；vitest 的 root 和测试文件不能跨盘
+- **面板不照搬 MinerU**：它的左右是「原 PDF 页面 | 抽出的 Markdown」，用来查抽取质量，两边不联动；我们已有逐段对照（[index.jsx:358](src/components/DocumentTranslator/index.jsx:358)）。A 档落地后再定要不要加可折叠的「原文页面」侧栏：点段落跳页并高亮，只动文档面板
+- **B 档候选：版面模型 PP-DocLayoutV2**（ONNX 204MB，Apache-2.0，HF `opendatalab/MinerU-4_models_onnx` 的 `Layout/PP-DocLayoutV2/`）：解决双栏顺序、公式和图内文字混入、表格图注、标题层级。要新开模型包 + 离线拦截，中等工程。**现有的 PaddleOCR-VL 替代不了它**：我们只用 Spotting（[T-ENGINE.md:119](docs/T-ENGINE.md:119)），只出「行文字 + 框」、不分类；官方文档解析是「PP-DocLayoutV2 切块分类排序 → 裁块交 VLM 按类识别」两段，我们只接了后段，B 就是缺的前段。硬拿它跑有文字层的 PDF 也不划算（原文字层是准的、只在显卡上可用、1 MP 上限让整页 A4 缩到约 100 dpi）。扫描页已经走同一个 OCR 管理器（[index.jsx:772](src/components/DocumentTranslator/index.jsx:772)），选了内置视觉模型时大图应会升级过去（未实跑）。A 档之后只剩「公式和图内文字混入」真正需要 B；到时按「补全 PaddleOCR-VL 官方流程」立项，截图的智能分配也能用上真版面信息
+- **C 档候选：MinerU2.5-Pro 1.2B 视觉模型**（GGUF Q8_0 506MB + mmproj 677MB，Qwen2-VL 架构，Apache-2.0，HF `jinzhenj/MinerU2.5-Pro-2605-1.2B-GGUF`）：进 T-Engine 视觉槽，按「显卡独占 + 智能分配」只接扫描页和复杂页；超 400MB 只给链接；调用协议在外部 Python 包 `mineru_vl_utils`，要移植。A 做完再立项调研
+- 不做：公式识别模型（564MB，翻译用不上 LaTeX）、文档库 / Agent 阅读 / 多服务路由、Python 运行时本身；它的 OCR 同为 PP-OCRv6，没有收益。保持原版式的译文 PDF（PDFMathTranslate / BabelDOC 那种左原右译）是另一个量级，前提是 B 档 + 译文回排，现在不开
+
 ### 文档与界面收尾
 
 - ~~风格库改成把几对「原文 → 译文」放进提示词当示范~~ 不做（2026-09-25 用户拍板：直接去主程序改写就行）
