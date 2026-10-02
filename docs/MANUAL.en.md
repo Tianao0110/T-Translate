@@ -224,7 +224,7 @@ The floating window is a transparent window you lay over what you want to read; 
 - Wheel: zoom. You can also drag an edge or a corner.
 - Double-click: shrink it to the screen edge. Hover to see it full size, double-click again to put it back.
 - Right-click: copy what the pin shows (the original or the translated image) and close it. Esc closes without copying.
-- When the OCR engine reports where the text is (local OCR, Windows OCR), each passage is translated in place. Vision models give no positions, so the translation covers the whole image.
+- Pins read with local OCR first and translate each passage in place. Only an image local OCR cannot read goes to the engine chosen under Settings → OCR (a vision model, say); vision models give no positions, so the translation covers the whole image over a blurred copy of it.
 - Up to 8 pins at a time; a new one closes the oldest. Pins stay in memory and are never saved.
 
 ### 3.3 Live captions (listen mode)
