@@ -62,7 +62,8 @@ const CHANNELS = {
   },
   // Pinned screenshots (screenshot/pin-windows.js); main finds the pin by event.sender.
   PIN: {
-    GET_INIT: 'pin:get-init', // renderer → main: { image, theme, targetLanguage, sameLanguageBehavior, ocrEngine }
+    GET_INIT: 'pin:get-init', // renderer → main: { image, theme, targetLanguage, sameLanguageBehavior, ocrEngine } | null while prewarmed
+    INIT: 'pin:init',         // main → prewarmed renderer: the same payload once it becomes a pin
     READY: 'pin:ready',       // renderer → main: image painted, show the window
     MOVE: 'pin:move',         // renderer → main: manual drag stream (x, y)
     SET_BOUNDS: 'pin:set-bounds', // renderer → main: zoom (x, y, width, height)

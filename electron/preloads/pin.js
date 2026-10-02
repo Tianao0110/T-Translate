@@ -11,6 +11,11 @@ contextBridge.exposeInMainWorld('electron', {
 
   pin: {
     getInit: () => ipcRenderer.invoke('pin:get-init'),
+    onInit: (callback) => {
+      const handler = (event, init) => callback(init);
+      ipcRenderer.on('pin:init', handler);
+      return () => ipcRenderer.removeListener('pin:init', handler);
+    },
     ready: () => ipcRenderer.send('pin:ready'),
     // Manual drag: fire-and-forget position stream; main keeps the size.
     moveTo: (x, y) => ipcRenderer.send('pin:move', x, y),

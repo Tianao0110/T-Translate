@@ -71,6 +71,7 @@ async function startScreenshot(fromHotkey = false) {
 
   // ESC cancels the screenshot selection.
   globalShortcut.register('Escape', () => {
+    pinWindows.discardWarm();
     if (windows.screenshot) {
       windows.screenshot.close();
       windows.screenshot = null;
@@ -89,6 +90,7 @@ async function startScreenshot(fromHotkey = false) {
   });
 
   const screenshotWindow = windowManager.createScreenshotWindow(totalBounds);
+  if ((store.get('settings')?.screenshot?.outputMode || 'pin') === 'pin') pinWindows.prewarm();
 
   screenshotWindow.webContents.on('did-finish-load', () => {
     let showConfirmButtons = true;
@@ -194,6 +196,7 @@ async function handleScreenshotSelection(bounds) {
     return dataURL;
   } catch (error) {
     logger.error('Screenshot selection error:', error);
+    pinWindows.discardWarm();
 
     runtime.screenshotData = null;
     screenshotModule.clearScreenshotData();

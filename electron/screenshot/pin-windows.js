@@ -2,6 +2,8 @@
 // window at the spot it was captured from. The image stays in memory only,
 // here and in the pin's renderer (components/PinWindow); IPC in ipc/screenshot.js.
 // Docked pins line up along a screen edge (geometry in dock-layout.js).
+// While the capture overlay is up, one hidden window loads ahead (prewarm)
+// and the next pin takes it.
 
 const { BrowserWindow, clipboard, nativeImage, screen } = require('electron');
 const PATHS = require('../shared/paths');
@@ -9,6 +11,7 @@ const { store, isDev } = require('../state');
 const { hardenWebContents } = require('../windows/window-manager');
 const logger = require('../platform/logger')('Pin');
 const { dockSide, stackSlots, peekBounds } = require('./dock-layout');
+const { CHANNELS } = require('../shared/channels');
 
 const MAX_PINS = 8;
 const READY_TIMEOUT_MS = 10000;
@@ -18,26 +21,14 @@ const MAX_SIDE = 16384;
 // dock = { displayId, side, order, width, height, thumb, peeking }.
 const pins = new Map();
 let dockOrder = 0;
+// The prewarmed window, not yet a pin.
+let warm = null;
 
-function createPin(image, bounds) {
-  while (pins.size >= MAX_PINS) {
-    const [oldestId, oldest] = pins.entries().next().value;
-    pins.delete(oldestId);
-    if (!oldest.window.isDestroyed()) oldest.window.close();
-  }
-
-  const width = Math.max(1, Math.round(bounds.width));
-  const height = Math.max(1, Math.round(bounds.height));
-
-  const x = Math.round(bounds.x);
-  const y = Math.round(bounds.y);
-
-  // The renderer draws the image 1:1 at the top-left; any extra window pixels stay transparent.
+// The renderer draws the image 1:1 at the top-left; any extra window pixels stay transparent.
+function buildWindow() {
   const win = new BrowserWindow({
-    x,
-    y,
-    width,
-    height,
+    width: 1,
+    height: 1,
     frame: false,
     thickFrame: false,
     transparent: true,
@@ -58,25 +49,15 @@ function createPin(image, bounds) {
     },
   });
 
-  win.setBounds({ x, y, width, height });
   // 'floating' level, like the overlay and the selection window.
   win.setAlwaysOnTop(true, 'floating');
-
   const id = win.id;
-  pins.set(id, { window: win, image, width, height });
 
   if (isDev) {
     win.loadURL(PATHS.pages.pin.url);
   } else {
     win.loadFile(PATHS.pages.pin.file);
   }
-
-  // Shown when the renderer reports the image painted (markReady); a pin that never does is dropped.
-  const readyTimer = setTimeout(() => {
-    if (win.isDestroyed() || win.isVisible()) return;
-    logger.warn(`Pin ${id} never reported ready, closing`);
-    win.destroy();
-  }, READY_TIMEOUT_MS);
 
   // Re-apply the z-order Windows drops on blur.
   win.on('blur', () => {
@@ -91,13 +72,57 @@ function createPin(image, bounds) {
   });
 
   win.on('closed', () => {
-    clearTimeout(readyTimer);
-    const dock = pins.get(id)?.dock;
+    if (warm === win) warm = null;
+    const pin = pins.get(id);
+    if (!pin) return;
+    clearTimeout(pin.readyTimer);
     pins.delete(id);
-    if (dock) restack(dock.displayId, dock.side);
+    if (pin.dock) restack(pin.dock.displayId, pin.dock.side);
   });
 
   hardenWebContents(win, 'Pin window');
+  return win;
+}
+
+// Capture overlay up: load a pin window ahead so the pin shows the moment the
+// selection lands (flow.js); discardWarm() when the capture is abandoned.
+function prewarm() {
+  if (warm && !warm.isDestroyed()) return;
+  warm = buildWindow();
+}
+
+function discardWarm() {
+  const win = warm;
+  warm = null;
+  if (win && !win.isDestroyed()) win.destroy();
+}
+
+function createPin(image, bounds) {
+  while (pins.size >= MAX_PINS) {
+    const [oldestId, oldest] = pins.entries().next().value;
+    pins.delete(oldestId);
+    if (!oldest.window.isDestroyed()) oldest.window.close();
+  }
+
+  const width = Math.max(1, Math.round(bounds.width));
+  const height = Math.max(1, Math.round(bounds.height));
+  const x = Math.round(bounds.x);
+  const y = Math.round(bounds.y);
+
+  const win = warm && !warm.isDestroyed() ? warm : buildWindow();
+  warm = null;
+  win.setBounds({ x, y, width, height });
+
+  const id = win.id;
+  // Shown when the renderer reports the image painted (markReady); a pin that never does is dropped.
+  const readyTimer = setTimeout(() => {
+    if (win.isDestroyed() || win.isVisible()) return;
+    logger.warn(`Pin ${id} never reported ready, closing`);
+    win.destroy();
+  }, READY_TIMEOUT_MS);
+  pins.set(id, { window: win, image, width, height, readyTimer });
+  // A renderer that already asked (prewarmed) gets its image pushed.
+  win.webContents.send(CHANNELS.PIN.INIT, getInitFor(pins.get(id)));
 
   logger.info(`Pin ${id} created (${width}x${height}), total ${pins.size}`);
   return win;
@@ -108,10 +133,14 @@ function pinOf(sender) {
   return win ? pins.get(win.id) || null : null;
 }
 
-// The image plus the settings the renderer's recognize + translate pass needs.
+// The image plus the settings the renderer's recognize + translate pass needs;
+// null for a prewarmed window (its image arrives as PIN.INIT).
 function getInit(sender) {
   const pin = pinOf(sender);
-  if (!pin) return null;
+  return pin ? getInitFor(pin) : null;
+}
+
+function getInitFor(pin) {
   const settings = store.get('settings') || {};
   return {
     image: pin.image,
@@ -242,4 +271,4 @@ function isPointInPins(x, y) {
   return false;
 }
 
-module.exports = { createPin, getInit, markReady, movePin, resizePin, dockPin, undockPin, peekPin, closePin, isPointInPins };
+module.exports = { prewarm, discardWarm, createPin, getInit, markReady, movePin, resizePin, dockPin, undockPin, peekPin, closePin, isPointInPins };

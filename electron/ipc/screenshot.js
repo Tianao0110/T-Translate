@@ -46,6 +46,7 @@ function register(ctx) {
 
   ipcMain.on(CHANNELS.SCREENSHOT.CANCEL, () => {
     logger.info('Screenshot cancelled');
+    require('../screenshot/pin-windows').discardWarm();
 
     const mainWindow = getMainWindow();
     const screenshotMod = getScreenshotModule();

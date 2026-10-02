@@ -225,17 +225,21 @@ const PinWindow = () => {
   const dockRef = useRef(null);
   const peekRef = useRef({ open: false, timer: 0 });
 
+  // A prewarmed window has no image yet: it arrives as an init push.
   useEffect(() => {
     let cancelled = false;
-    window.electron?.pin?.getInit?.().then((init) => {
-      if (cancelled || !init) return;
+    const take = (init) => {
+      if (cancelled || !init || initRef.current) return;
       initRef.current = init;
       setTheme(init.theme || 'light');
       setImage(init.image);
-    });
+    };
+    const unsubscribeInit = window.electron?.pin?.onInit?.(take);
+    window.electron?.pin?.getInit?.().then(take);
     const unsubscribeTheme = window.electron?.theme?.onChanged?.((next) => setTheme(next));
     return () => {
       cancelled = true;
+      unsubscribeInit?.();
       unsubscribeTheme?.();
     };
   }, []);
