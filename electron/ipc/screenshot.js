@@ -75,6 +75,15 @@ function register(ctx) {
     runtime.screenshotFromHotkey = false;
   });
 
+  // Pinned screenshots: each handler resolves its pin from event.sender.
+  const pinWindows = require('../screenshot/pin-windows');
+  ipcMain.handle(CHANNELS.PIN.GET_INIT, (event) => pinWindows.getInit(event.sender));
+  ipcMain.on(CHANNELS.PIN.READY, (event) => pinWindows.markReady(event.sender));
+  ipcMain.on(CHANNELS.PIN.MOVE, (event, x, y) => pinWindows.movePin(event.sender, x, y));
+  ipcMain.on(CHANNELS.PIN.CLOSE, (event, options) => {
+    pinWindows.closePin(event.sender, { copyImage: !!options?.copyImage });
+  });
+
   // OCR done -> push text into selection window for translation
   ipcMain.on(CHANNELS.SCREENSHOT.OCR_COMPLETE, (event, data) => {
     if (data.success && data.text) {

@@ -60,6 +60,13 @@ const CHANNELS = {
     CONFIG: 'screenshot-config',
     OCR_COMPLETE: 'screenshot:ocr-complete',       // OCR done — forward text to selection window for translation.
   },
+  // Pinned screenshots (screenshot/pin-windows.js); main finds the pin by event.sender.
+  PIN: {
+    GET_INIT: 'pin:get-init', // renderer → main: { image, theme }
+    READY: 'pin:ready',       // renderer → main: image painted, show the window
+    MOVE: 'pin:move',         // renderer → main: manual drag stream (x, y)
+    CLOSE: 'pin:close',       // renderer → main: { copyImage }
+  },
   FLOATING_WINDOW: {
     CLOSE: 'floating-window:close',
     GET_BOUNDS: 'floating-window:get-bounds',

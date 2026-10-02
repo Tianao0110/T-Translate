@@ -395,7 +395,7 @@ const zh = {
     rainbowWindow: "彩虹划词窗口",
     rainbowOnDesc: "彩虹签名样式接管全部主题的划词窗口（八色粉彩工具条）",
     rainbowOffDesc: "划词窗口跟随当前主题配色",
-    screenshotOutput: "截图翻译输出", bubble: "气泡窗口", mainWindow: "主窗口",
+    screenshotOutput: "截图翻译输出", pin: "贴图", bubble: "划词窗口", mainWindow: "主窗口",
     bubbleDesc: "截图翻译结果显示在悬浮气泡中", mainWindowDesc: "截图翻译结果显示在主窗口中", outputHint: "气泡模式下，截图后后台处理，完成后弹出结果",
     charLimit: "字符数限制", minChars: "最小", maxChars: "最大", charLimitHint: "少于最小或超过最大字符数的选中内容不会触发翻译",
     instructions: "使用说明", workflow: "划词翻译流程",

@@ -1,14 +1,16 @@
 // Screenshot OCR flow in the main process: capture every display, open the
 // region-selection overlay, crop the chosen region, then hand the image to
-// the main window (main-window mode) or to the selection window via the
-// silent OCR chain (bubble mode). Wired from main.js; the IPC layer and the
-// global shortcut reach it through `managers`.
+// a pinned window (pin mode, pin-windows.js), the main window (main-window
+// mode) or the selection window via the silent OCR chain (bubble mode).
+// Wired from main.js; the IPC layer and the global shortcut reach it
+// through `managers`.
 
 const { screen, globalShortcut } = require('electron');
 const { store, runtime, windows } = require('../state');
 const { CHANNELS } = require('../shared/channels');
 const windowManager = require('../windows/window-manager');
 const screenshotModule = require('./screenshot-module');
+const pinWindows = require('./pin-windows');
 const { showSelectionLoading } = require('../selection/controller');
 const logger = require('../platform/logger')('Screenshot');
 
@@ -147,9 +149,11 @@ async function handleScreenshotSelection(bounds) {
 
     const settings = store.get('settings', {});
     const screenshotSettings = settings.screenshot || {};
-    const outputMode = screenshotSettings.outputMode || 'bubble';
+    const outputMode = screenshotSettings.outputMode || 'pin';
 
-    if (outputMode === 'main') {
+    if (outputMode === 'pin') {
+      if (dataURL) pinWindows.createPin(dataURL, bounds);
+    } else if (outputMode === 'main') {
       runtime.wasMainWindowVisible = false;
       if (windows.main) {
         windows.main.show();

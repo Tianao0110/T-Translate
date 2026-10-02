@@ -24,6 +24,7 @@ const preloads = {
   floatingWindow: path.join(ELECTRON_DIR, 'preloads/floating-window.js'),
   childPane: path.join(ELECTRON_DIR, 'preloads/child-pane.js'),
   screenshot: path.join(ELECTRON_DIR, 'preloads/screenshot.js'),
+  pin: path.join(ELECTRON_DIR, 'preloads/pin.js'),
 };
 
 // Each page exposes both `url` (dev server) and `file` (prod build).
@@ -39,6 +40,10 @@ const pages = {
   floatingWindow: {
     url: `${DEV_SERVER}/floating-window.html`,
     file: path.join(BASE_DIR, 'build/floating-window.html'),
+  },
+  pin: {
+    url: `${DEV_SERVER}/pin.html`,
+    file: path.join(BASE_DIR, 'build/pin.html'),
   },
   screenshot: {
     // Screenshot page is plain HTML — not processed by Vite.

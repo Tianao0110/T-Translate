@@ -1,0 +1,40 @@
+/* Pinned screenshot window. Loads no App.css: theme tokens are local. */
+
+html, body {
+  background: transparent;
+}
+
+.pin-root {
+  --pin-accent: #3b82f6;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  cursor: move;
+  user-select: none;
+}
+
+.pin-root[data-theme="dark"] { --pin-accent: #d6a854; }
+.pin-root[data-theme="fresh"] { --pin-accent: #10b981; }
+
+/* Sized by the renderer to the image's natural size, anchored top-left. */
+.pin-frame {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.pin-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  -webkit-user-drag: none;
+}
+
+/* Edge ring, drawn inside the image. */
+.pin-frame::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--pin-accent) 75%, transparent);
+  pointer-events: none;
+}

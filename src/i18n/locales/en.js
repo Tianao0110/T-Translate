@@ -395,7 +395,7 @@ const en = {
     rainbowWindow: "Rainbow Selection Window",
     rainbowOnDesc: "Rainbow signature skin takes over the selection window in every theme (8-color pastel toolbar)",
     rainbowOffDesc: "Selection window follows the current theme palette",
-    screenshotOutput: "Screenshot Output", bubble: "Bubble Window", mainWindow: "Main Window",
+    screenshotOutput: "Screenshot Output", pin: "Pin", bubble: "Selection Window", mainWindow: "Main Window",
     bubbleDesc: "Show result in floating bubble", mainWindowDesc: "Show result in main window", outputHint: "In bubble mode, process in background and popup when done",
     charLimit: "Character Limit", minChars: "Min", maxChars: "Max", charLimitHint: "Content below min or above max characters won't trigger translation",
     instructions: "Instructions", workflow: "Workflow",

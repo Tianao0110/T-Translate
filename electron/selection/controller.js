@@ -12,6 +12,7 @@ const { isCapsLockOn } = require('../platform/native-helper');
 const { fetchSelectedText } = require('../ipc/selection');
 const { SelectionStateMachine, STATES, CONFIG: FSM_CONFIG } = require('./selection-state-machine');
 const windowManager = require('../windows/window-manager');
+const pinWindows = require('../screenshot/pin-windows');
 const { updateTrayMenu } = require('../windows/tray-manager');
 const logger = require('../platform/logger')('Selection');
 
@@ -527,8 +528,8 @@ function startSelectionHook() {
         debugProbe('coords', { uiohook: { x: e.x, y: e.y }, electronDip: { x, y }, verdict });
       }
 
-      // Click inside one of our selection windows: not a gesture.
-      if (windowManager.isPointInSelectionWindows(x, y)) {
+      // Click inside one of our selection windows or a pin: not a gesture.
+      if (windowManager.isPointInSelectionWindows(x, y) || pinWindows.isPointInPins(x, y)) {
         runtime.isDraggingOverlay = true;
         return;
       }

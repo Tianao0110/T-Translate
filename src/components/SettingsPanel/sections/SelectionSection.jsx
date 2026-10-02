@@ -61,7 +61,7 @@ const SelectionSection = ({
   };
 
   const sel = settings.selection;
-  const outputMode = settings.screenshot?.outputMode || 'bubble';
+  const outputMode = settings.screenshot?.outputMode || 'pin';
   const opacity = sel.windowOpacity || 95;
 
   return (
@@ -130,6 +130,7 @@ const SelectionSection = ({
           value={outputMode}
           onChange={(v) => updateSetting('screenshot', 'outputMode', v)}
           options={[
+            { value: 'pin', label: t('selection.pin') },
             { value: 'bubble', label: t('selection.bubble') },
             { value: 'main', label: t('selection.mainWindow') },
           ]}
