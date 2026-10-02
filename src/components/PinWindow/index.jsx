@@ -1,9 +1,11 @@
 // Pinned screenshot: shows the captured image, recognizes and translates it
 // (pipeline.js), then lays the translation over it — block by block over the
-// original spots when the engine gave boxes, as one panel otherwise. A click
-// switches between translation and original, a drag moves the window. Close
-// gestures are in windows/pin-entry.jsx (via closePinWindow); the window
-// itself is electron/screenshot/pin-windows.js.
+// original spots when the engine gave boxes, as one panel otherwise. Text is
+// selectable for copying: the translation itself, and a transparent layer of
+// the recognized lines over the original. A click switches between
+// translation and original; a drag selects on text and moves the window
+// elsewhere. Close gestures are in windows/pin-entry.jsx (via
+// closePinWindow); the window itself is electron/screenshot/pin-windows.js.
 
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,6 +15,7 @@ import { patchColors } from './patch-colors.js';
 import './styles.css';
 
 const CLICK_SLOP = 3;
+const CLICK_DELAY = 250; // ms a click waits to rule out a double-click
 const PATCH_PAD = 2; // CSS px a patch reaches past its OCR box
 const COLOR_BAND = 3; // source px sampled around a box for its background
 const MIN_FONT = 8;
@@ -88,12 +91,36 @@ const Patch = ({ text, rect, colors, lineHeight }) => {
   return (
     <div
       ref={boxRef}
-      className={`pin-patch${clipped ? ' is-clipped' : ''}`}
+      className={`pin-patch pin-selectable${clipped ? ' is-clipped' : ''}`}
       title={clipped ? text : undefined}
       style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height, ...colors }}
     >
       <span ref={textRef}>{text}</span>
     </div>
+  );
+};
+
+// A recognized line as transparent, selectable text over its box, stretched
+// to the box width.
+const TextLine = ({ text, rect }) => {
+  const ref = useRef(null);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.transform = 'none';
+    const natural = el.scrollWidth;
+    if (natural > 0) el.style.transform = `scaleX(${rect.width / natural})`;
+  }, [text, rect]);
+
+  return (
+    <span
+      ref={ref}
+      className="pin-line pin-selectable"
+      style={{ left: rect.x, top: rect.y, height: rect.height, fontSize: rect.height }}
+    >
+      {text}
+    </span>
   );
 };
 
@@ -110,6 +137,7 @@ const PinWindow = () => {
   const startedRef = useRef(false);
   const frameRef = useRef(null);
   const imgRef = useRef(null);
+  const clickTimerRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -167,25 +195,94 @@ const PinWindow = () => {
         const y = Math.max(0, b.bbox.y / s - PATCH_PAD);
         const right = Math.min(size.width, (b.bbox.x + b.bbox.width) / s + PATCH_PAD);
         const bottom = Math.min(size.height, (b.bbox.y + b.bbox.height) / s + PATCH_PAD);
-        return { id: i, text: b.translatedText, colors: colors[i] || {}, rect: { x, y, width: right - x, height: bottom - y } };
+        return { id: i, bbox: b.bbox, text: b.translatedText, colors: colors[i] || {}, rect: { x, y, width: right - x, height: bottom - y } };
       })
       .filter(Boolean);
   }, [result, size]);
 
   const lineHeight = result?.lineHeight && size ? result.lineHeight / size.scale : null;
 
+  // Recognized lines in CSS px, each with the block it belongs to (the
+  // engine's reading order) and whether a translation patch covers it.
+  const lines = useMemo(() => {
+    if (result?.mode !== 'blocks' || !size) return [];
+    const s = size.scale;
+    const patched = new Set((patches || []).map((p) => p.id));
+    return result.lines.map((l, i) => {
+      const cx = l.bbox.x + l.bbox.width / 2;
+      const cy = l.bbox.y + l.bbox.height / 2;
+      const block = result.blocks.findIndex(({ bbox: b }) => cx >= b.x && cx <= b.x + b.width && cy >= b.y && cy <= b.y + b.height);
+      return {
+        id: i,
+        text: l.text,
+        block: block < 0 ? Infinity : block,
+        covered: patched.has(block),
+        rect: { x: l.bbox.x / s, y: l.bbox.y / s, width: l.bbox.width / s, height: l.bbox.height / s },
+      };
+    });
+  }, [result, size, patches]);
+
+  // What sits over the image, in reading order so a drag selects that way:
+  // block by block, top to bottom inside a block. The original shows every
+  // line; the translation shows the patches plus the lines no patch covers.
+  const items = useMemo(() => {
+    const list = showOriginal
+      ? lines.map((l) => ({ kind: 'line', ...l }))
+      : [
+          ...(patches || []).map((p) => ({ kind: 'patch', block: p.id, ...p })),
+          ...lines.filter((l) => !l.covered).map((l) => ({ kind: 'line', ...l })),
+        ];
+    return list.sort((a, b) => a.block - b.block || a.rect.y - b.rect.y || a.rect.x - b.rect.x);
+  }, [lines, patches, showOriginal]);
+
+  // A copy puts one selected item per line: absolutely placed text
+  // serializes without breaks.
+  useEffect(() => {
+    const onCopy = (e) => {
+      const sel = window.getSelection();
+      if (!sel?.rangeCount || sel.isCollapsed) return;
+      const range = sel.getRangeAt(0);
+      const parts = [];
+      for (const el of document.querySelectorAll('.pin-items > *, .pin-overlay')) {
+        if (!range.intersectsNode(el)) continue;
+        const part = document.createRange();
+        part.selectNodeContents(el);
+        if (range.compareBoundaryPoints(Range.START_TO_START, part) > 0) part.setStart(range.startContainer, range.startOffset);
+        if (range.compareBoundaryPoints(Range.END_TO_END, part) < 0) part.setEnd(range.endContainer, range.endOffset);
+        const text = part.toString();
+        if (text) parts.push(text);
+      }
+      if (!parts.length) return;
+      e.clipboardData.setData('text/plain', parts.join('\n'));
+      e.preventDefault();
+    };
+    document.addEventListener('copy', onCopy);
+    return () => document.removeEventListener('copy', onCopy);
+  }, []);
+
+  useEffect(() => () => clearTimeout(clickTimerRef.current), []);
+
   useEffect(() => {
     frameEl = frameRef.current;
     copyTarget = result && !result.error && !showOriginal ? 'view' : 'image';
   }, [result, showOriginal, size]);
 
-  // A press that stays within CLICK_SLOP switches the view; past it, the
-  // window follows the pointer (DIP, like setBounds).
+  // A press that stays within CLICK_SLOP is a click: it switches the view
+  // after CLICK_DELAY unless a second press follows. Past the slop, a press on
+  // text selects (native) and anywhere else the window follows the pointer
+  // (DIP, like setBounds).
   const handleMouseDown = (e) => {
     if (e.button !== 0) return;
     // Presses on the overlay's scrollbar scroll.
     if (e.target.classList?.contains('pin-overlay') && e.nativeEvent.offsetX >= e.target.clientWidth) return;
-    e.preventDefault();
+    clearTimeout(clickTimerRef.current);
+    // Second press of a double-click: no word selection, no view switch.
+    if (e.detail >= 2) {
+      e.preventDefault();
+      return;
+    }
+    const onText = !!e.target.closest?.('.pin-selectable');
+    if (!onText) e.preventDefault();
 
     const startX = e.screenX;
     const startY = e.screenY;
@@ -198,6 +295,7 @@ const PinWindow = () => {
     const onMove = (ev) => {
       if (!dragging && Math.hypot(ev.screenX - startX, ev.screenY - startY) <= CLICK_SLOP) return;
       dragging = true;
+      if (onText) return;
       pending = { x: ev.screenX - offsetX, y: ev.screenY - offsetY };
       if (raf) return;
       raf = requestAnimationFrame(() => {
@@ -209,7 +307,9 @@ const PinWindow = () => {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
       if (raf) cancelAnimationFrame(raf);
-      if (!dragging && result) setShowOriginal((v) => !v);
+      if (!dragging && result) {
+        clickTimerRef.current = setTimeout(() => setShowOriginal((v) => !v), CLICK_DELAY);
+      }
     };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
@@ -222,15 +322,16 @@ const PinWindow = () => {
       {image && (
         <div className="pin-frame" ref={frameRef} style={sizeStyle}>
           <img ref={imgRef} className="pin-image" src={image} alt="" draggable={false} onLoad={handleLoad} />
-          {patches && (
-            <div className={`pin-patches${showOriginal ? ' is-hidden' : ''}`}>
-              {patches.map((p) => (
-                <Patch key={p.id} text={p.text} rect={p.rect} colors={p.colors} lineHeight={lineHeight} />
+          {items.length > 0 && (
+            <div className="pin-items">
+              {items.map((it) => (it.kind === 'patch'
+                ? <Patch key={`p${it.id}`} text={it.text} rect={it.rect} colors={it.colors} lineHeight={lineHeight} />
+                : <TextLine key={`l${it.id}`} text={it.text} rect={it.rect} />
               ))}
             </div>
           )}
           {result && result.mode !== 'blocks' && !showOriginal && (
-            <div className={`pin-overlay${result.error ? ' is-error' : ''}`}>
+            <div className={`pin-overlay${result.error ? ' is-error' : ' pin-selectable'}`}>
               {result.error || result.translatedText}
             </div>
           )}

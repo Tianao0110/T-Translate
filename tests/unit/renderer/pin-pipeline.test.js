@@ -109,6 +109,7 @@ describe('recognizeAndTranslate: blocks with boxes', () => {
     expect(translate).toHaveBeenCalledTimes(2);
     expect(r.blocks.map((b) => [b.translatedText, b.bbox.y])).toEqual([['译:Pinne', 10], ['译:Click', 120]]);
     expect(r.lineHeight).toBe(24);
+    expect(r.lines.map((l) => l.text)).toEqual(['Pinned screenshots stay on top.', 'Click to switch views.']);
     expect(r.translatedText).toBe('译:Pinne\n译:Click');
     expect(r.passthrough).toBe(false);
   });

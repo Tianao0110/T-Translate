@@ -19,7 +19,7 @@ const median = (nums) => {
 };
 
 // Resolves to one of, never throws:
-//   { mode: 'blocks', blocks: [{ text, bbox, translatedText?, passthrough?, error? }], lineHeight, ...summary }
+//   { mode: 'blocks', blocks: [{ text, bbox, translatedText?, passthrough?, error? }], lines: [{ text, bbox }], lineHeight, ...summary }
 //   { mode: 'unified', ...summary }
 //   { error }
 // summary = { sourceText, translatedText, sourceLanguage, targetLanguage, passthrough }.
@@ -117,11 +117,14 @@ async function translateBlocks(picked, rawBlocks, { targetLanguage, sameLanguage
   const done = blocks.filter((b) => b.translatedText);
   if (!done.length) return { error: blocks.find((b) => b.error)?.error || i18n.t('selection.translateFailed') };
 
-  const heights = rawBlocks.map((b) => b.bbox?.height).filter((h) => h > 0);
+  const lines = rawBlocks
+    .filter((b) => b.text?.trim() && b.bbox?.width > 0 && b.bbox?.height > 0)
+    .map((b) => ({ text: b.text.trim(), bbox: { ...b.bbox } }));
   return {
     mode: 'blocks',
     blocks,
-    lineHeight: heights.length ? median(heights) : null,
+    lines,
+    lineHeight: lines.length ? median(lines.map((l) => l.bbox.height)) : null,
     sourceText: texts.join('\n'),
     translatedText: done.map((b) => b.translatedText).join('\n'),
     sourceLanguage: detected.find((d) => d?.language)?.language || 'auto',

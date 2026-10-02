@@ -61,15 +61,13 @@ html, body {
   color: var(--pin-danger);
 }
 
-/* Translation patches over their source boxes; colors come inline from the image. */
-.pin-patches {
+/* Patches and text lines over the image. */
+.pin-items {
   position: absolute;
   inset: 0;
 }
 
-.pin-patches.is-hidden {
-  visibility: hidden;
-}
+/* Translation patches over their source boxes; colors come inline from the image. */
 
 .pin-patch {
   position: absolute;
@@ -82,6 +80,29 @@ html, body {
 
 .pin-patch.is-clipped {
   align-items: flex-start;
+}
+
+/* Recognized lines: transparent text, visible only as a selection. */
+.pin-line {
+  position: absolute;
+  white-space: pre;
+  line-height: 1;
+  color: transparent;
+  transform-origin: 0 0;
+}
+
+.pin-selectable {
+  user-select: text;
+  cursor: text;
+}
+
+.pin-selectable::selection,
+.pin-selectable *::selection {
+  background: color-mix(in srgb, var(--pin-accent) 40%, transparent);
+}
+
+.pin-line::selection {
+  color: transparent;
 }
 
 .pin-badge {
