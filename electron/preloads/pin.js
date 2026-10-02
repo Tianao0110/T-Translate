@@ -23,7 +23,14 @@ contextBridge.exposeInMainWorld('electron', {
     setBounds: (x, y, width, height) => ipcRenderer.send('pin:set-bounds', x, y, width, height),
     // Docking: main places the thumbnail and the hover preview.
     dock: (size) => ipcRenderer.invoke('pin:dock', size),
-    undock: (x, y, width, height) => ipcRenderer.send('pin:undock', x, y, width, height),
+    undock: () => ipcRenderer.send('pin:undock'),
+    // Animation frames (docking, preview, smooth zoom) and new dock slots.
+    frame: (x, y, width, height) => ipcRenderer.send('pin:frame', x, y, width, height),
+    onSlot: (callback) => {
+      const handler = (event, slot) => callback(slot);
+      ipcRenderer.on('pin:slot', handler);
+      return () => ipcRenderer.removeListener('pin:slot', handler);
+    },
     peek: (on, size) => ipcRenderer.invoke('pin:peek', on, size),
     // copy: 'image' | 'view' (with rect) | null.
     close: (copy, rect) => ipcRenderer.send('pin:close', { copy: copy || null, rect: rect || null }),

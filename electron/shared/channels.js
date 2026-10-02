@@ -68,7 +68,9 @@ const CHANNELS = {
     MOVE: 'pin:move',         // renderer → main: manual drag stream (x, y)
     SET_BOUNDS: 'pin:set-bounds', // renderer → main: zoom (x, y, width, height)
     DOCK: 'pin:dock',         // renderer → main: thumbnail { width, height } → its bounds
-    UNDOCK: 'pin:undock',     // renderer → main: bounds to return to (x, y, width, height)
+    UNDOCK: 'pin:undock',     // renderer → main: leaving the edge
+    FRAME: 'pin:frame',       // renderer → main: one animation frame (x, y, width, height)
+    SLOT: 'pin:slot',         // main → docked renderer: its new thumbnail bounds after a restack
     PEEK: 'pin:peek',         // renderer → main: (on, { width, height }) → preview or thumbnail bounds
     CLOSE: 'pin:close',       // renderer → main: { copy: 'image' | 'view' | null, rect }
     ADD_TO_HISTORY: 'pin:add-to-history', // forward a translation into the main window's history

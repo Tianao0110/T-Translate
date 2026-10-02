@@ -83,7 +83,8 @@ function register(ctx) {
   ipcMain.on(CHANNELS.PIN.MOVE, (event, x, y) => pinWindows.movePin(event.sender, x, y));
   ipcMain.on(CHANNELS.PIN.SET_BOUNDS, (event, x, y, w, h) => pinWindows.resizePin(event.sender, x, y, w, h));
   ipcMain.handle(CHANNELS.PIN.DOCK, (event, size) => pinWindows.dockPin(event.sender, size));
-  ipcMain.on(CHANNELS.PIN.UNDOCK, (event, x, y, w, h) => pinWindows.undockPin(event.sender, x, y, w, h));
+  ipcMain.on(CHANNELS.PIN.UNDOCK, (event) => pinWindows.undockPin(event.sender));
+  ipcMain.on(CHANNELS.PIN.FRAME, (event, x, y, w, h) => pinWindows.framePin(event.sender, x, y, w, h));
   ipcMain.handle(CHANNELS.PIN.PEEK, (event, on, size) => pinWindows.peekPin(event.sender, !!on, size));
   ipcMain.on(CHANNELS.PIN.CLOSE, (event, options) => {
     pinWindows.closePin(event.sender, { copy: options?.copy, rect: options?.rect });

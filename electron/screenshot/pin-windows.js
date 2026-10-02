@@ -173,10 +173,15 @@ function resizePin(sender, x, y, width, height) {
   pin.window.setBounds({ x: Math.round(x), y: Math.round(y), width: pin.width, height: pin.height });
 }
 
-function setPinBounds(pin, b) {
-  pin.width = b.width;
-  pin.height = b.height;
-  pin.window.setBounds({ x: Math.round(b.x), y: Math.round(b.y), width: b.width, height: b.height });
+// One animation frame from the renderer (docking, preview, smooth zoom):
+// allowed while docked, unlike drags and edge resizes.
+function framePin(sender, x, y, width, height) {
+  const pin = pinOf(sender);
+  if (!pin || pin.window.isDestroyed()) return;
+  if (![x, y, width, height].every(Number.isFinite) || width < 1 || height < 1 || width > MAX_SIDE || height > MAX_SIDE) return;
+  pin.width = Math.round(width);
+  pin.height = Math.round(height);
+  pin.window.setBounds({ x: Math.round(x), y: Math.round(y), width: pin.width, height: pin.height });
 }
 
 function workAreaOf(displayId) {
@@ -184,16 +189,17 @@ function workAreaOf(displayId) {
   return display.workArea;
 }
 
-// Re-lays one edge's thumbnails in dock order; a previewing pin keeps its
-// preview and only learns its new slot.
-function restack(displayId, side) {
+// Re-lays one edge's thumbnails in dock order. Each pin animates to its new
+// slot itself (PIN.SLOT); a previewing pin, or `skipId` (the one docking,
+// which gets its slot as the return value), only has the slot recorded.
+function restack(displayId, side, skipId = null) {
   const docked = [...pins.values()]
     .filter((p) => p.dock && p.dock.displayId === displayId && p.dock.side === side && !p.window.isDestroyed())
     .sort((a, b) => a.dock.order - b.dock.order);
   const slots = stackSlots(docked.map((p) => p.dock), side, workAreaOf(displayId));
   docked.forEach((p, i) => {
     p.dock.thumb = slots[i];
-    if (!p.dock.peeking) setPinBounds(p, slots[i]);
+    if (p.window.id !== skipId && !p.dock.peeking) p.window.webContents.send(CHANNELS.PIN.SLOT, slots[i]);
   });
 }
 
@@ -209,35 +215,31 @@ function dockPin(sender, size) {
   const display = screen.getDisplayMatching(bounds);
   const side = dockSide(bounds, display.workArea);
   pin.dock = { displayId: display.id, side, order: ++dockOrder, width, height, thumb: null, peeking: false };
-  restack(display.id, side);
+  restack(display.id, side, pin.window.id);
   return pin.dock.thumb;
 }
 
-// Double-click on a docked pin: back to the bounds it had.
-function undockPin(sender, x, y, width, height) {
+// Double-click on a docked pin: it leaves the edge (the renderer animates
+// back to the bounds it had) and the rest of that edge closes up.
+function undockPin(sender) {
   const pin = pinOf(sender);
   if (!pin || !pin.dock || pin.window.isDestroyed()) return;
-  if (![x, y, width, height].every(Number.isFinite) || width < 1 || height < 1 || width > MAX_SIDE || height > MAX_SIDE) return;
   const { displayId, side } = pin.dock;
   pin.dock = null;
-  setPinBounds(pin, { x, y, width: Math.round(width), height: Math.round(height) });
   restack(displayId, side);
 }
 
-// Hover on a docked pin: open the preview at `size` (capped to the work
-// area) beside the edge, or fall back to the thumbnail. Returns the bounds.
+// Hover on a docked pin: where the preview opens at `size` (capped to the
+// work area), or the thumbnail it falls back to. The renderer animates there.
 function peekPin(sender, on, size) {
   const pin = pinOf(sender);
   if (!pin || !pin.dock || !pin.dock.thumb || pin.window.isDestroyed()) return null;
   if (!on || !(size?.width >= 1 && size?.height >= 1)) {
     pin.dock.peeking = false;
-    setPinBounds(pin, pin.dock.thumb);
     return pin.dock.thumb;
   }
-  const b = peekBounds(pin.dock.thumb, pin.dock.side, size, workAreaOf(pin.dock.displayId));
   pin.dock.peeking = true;
-  setPinBounds(pin, b);
-  return b;
+  return peekBounds(pin.dock.thumb, pin.dock.side, size, workAreaOf(pin.dock.displayId));
 }
 
 // copy: 'image' puts the captured image on the clipboard, 'view' the rendered
@@ -271,4 +273,4 @@ function isPointInPins(x, y) {
   return false;
 }
 
-module.exports = { prewarm, discardWarm, createPin, getInit, markReady, movePin, resizePin, dockPin, undockPin, peekPin, closePin, isPointInPins };
+module.exports = { prewarm, discardWarm, createPin, getInit, markReady, movePin, resizePin, framePin, dockPin, undockPin, peekPin, closePin, isPointInPins };

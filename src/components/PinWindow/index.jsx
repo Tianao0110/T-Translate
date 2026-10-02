@@ -29,6 +29,9 @@ const THUMB_SIDE = 120; // px a docked thumbnail's longer side
 const THUMB_MIN = 24; // px its shorter side never goes below
 const PEEK_DELAY = 120; // ms hover before the preview opens
 const UNPEEK_DELAY = 250; // ms outside before it closes
+const ZOOM_ANIM_MS = 110;
+const DOCK_ANIM_MS = 220;
+const PEEK_ANIM_MS = 160;
 const EDGE_CURSORS = { n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize', nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize' };
 const PATCH_PAD = 2; // CSS px a patch reaches past its OCR box
 const COLOR_BAND = 3; // source px sampled around a box for its background
@@ -224,6 +227,10 @@ const PinWindow = () => {
   const [dock, setDock] = useState(null);
   const dockRef = useRef(null);
   const peekRef = useRef({ open: false, timer: 0 });
+  // The running animation: { raf, to: { bounds, zoom } }.
+  const animRef = useRef(null);
+  const sizeRef = useRef(null);
+  sizeRef.current = size;
 
   // A prewarmed window has no image yet: it arrives as an init push.
   useEffect(() => {
@@ -359,12 +366,49 @@ const PinWindow = () => {
   useEffect(() => () => {
     clearTimeout(clickTimerRef.current);
     clearTimeout(peekRef.current.timer);
+    if (animRef.current) cancelAnimationFrame(animRef.current.raf);
   }, []);
 
-  const showZoom = (z) => {
-    zoomRef.current = z;
-    setZoom(z);
+  const stopAnimation = () => {
+    if (animRef.current) cancelAnimationFrame(animRef.current.raf);
+    animRef.current = null;
   };
+
+  // Window bounds and content zoom move together, one frame at a time, from
+  // where they are now to `to` (ease-out); main applies each frame.
+  const animateTo = (to, duration) => {
+    stopAnimation();
+    const from = { bounds: { ...boundsRef.current }, zoom: zoomRef.current };
+    const start = performance.now();
+    const step = (now) => {
+      const t = Math.min(1, (now - start) / duration);
+      const e = 1 - (1 - t) ** 3;
+      const mix = (a, b) => a + (b - a) * e;
+      const b = {
+        x: mix(from.bounds.x, to.bounds.x),
+        y: mix(from.bounds.y, to.bounds.y),
+        width: mix(from.bounds.width, to.bounds.width),
+        height: mix(from.bounds.height, to.bounds.height),
+      };
+      const z = mix(from.zoom, to.zoom);
+      boundsRef.current = b;
+      zoomRef.current = z;
+      setZoom(z);
+      window.electron?.pin?.frame?.(Math.round(b.x), Math.round(b.y), Math.round(b.width), Math.round(b.height));
+      if (t < 1) animRef.current.raf = requestAnimationFrame(step);
+      else animRef.current = null;
+    };
+    animRef.current = { raf: requestAnimationFrame(step), to };
+  };
+
+  const boundsAt = (b, zoom) => ({ bounds: b, zoom });
+
+  // A restack elsewhere on the edge moves this thumbnail to a new slot.
+  useEffect(() => window.electron?.pin?.onSlot?.((slot) => {
+    const s = sizeRef.current;
+    if (!dockRef.current || peekRef.current.open || !s) return;
+    animateTo(boundsAt(slot, slot.width / s.width), DOCK_ANIM_MS);
+  }), []);
 
   // Double-click: dock as a thumbnail, or return to where it was.
   const toggleDock = async () => {
@@ -376,9 +420,8 @@ const PinWindow = () => {
       const { bounds, zoom: z } = docked.prev;
       dockRef.current = null;
       setDock(null);
-      boundsRef.current = { ...bounds };
-      showZoom(z);
-      window.electron?.pin?.undock?.(Math.round(bounds.x), Math.round(bounds.y), Math.round(bounds.width), Math.round(bounds.height));
+      window.electron?.pin?.undock?.();
+      animateTo(boundsAt(bounds, z), DOCK_ANIM_MS);
       return;
     }
     const prev = { bounds: { ...boundsRef.current }, zoom: zoomRef.current };
@@ -390,7 +433,7 @@ const PinWindow = () => {
     const next = { prev, thumbZoom: thumb.width / size.width };
     dockRef.current = next;
     setDock(next);
-    showZoom(next.thumbZoom);
+    animateTo(boundsAt(thumb, next.thumbZoom), DOCK_ANIM_MS);
   };
 
   // Hover on a docked thumbnail opens the preview at the pre-dock size;
@@ -405,7 +448,7 @@ const PinWindow = () => {
       peekRef.current.open = open;
       const { width, height } = docked.prev.bounds;
       const b = await window.electron?.pin?.peek?.(open, { width, height });
-      if (b && dockRef.current === docked) showZoom(b.width / size.width);
+      if (b && dockRef.current === docked) animateTo(boundsAt(b, b.width / size.width), PEEK_ANIM_MS);
     }, open ? PEEK_DELAY : UNPEEK_DELAY);
   };
 
@@ -417,6 +460,7 @@ const PinWindow = () => {
   // New zoom with the window placed so the anchor (window CSS px, or a fixed
   // corner) stays put; main resizes the window to match.
   const applyZoom = (next, place) => {
+    stopAnimation();
     const [lo, hi] = zoomLimits();
     const z = Math.min(hi, Math.max(lo, next));
     const width = size.width * z;
@@ -428,7 +472,8 @@ const PinWindow = () => {
     window.electron?.pin?.setBounds?.(Math.round(x), Math.round(y), Math.round(width), Math.round(height));
   };
 
-  // Wheel zooms around the pointer.
+  // Wheel zooms around the pointer, eased; steps during an animation add up
+  // on its target.
   useEffect(() => {
     const root = rootRef.current;
     if (!root || !size) return undefined;
@@ -438,8 +483,11 @@ const PinWindow = () => {
       if (!b || dockRef.current) return;
       const delta = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
       const z = zoomRef.current;
-      const k = Math.exp(-delta * ZOOM_PER_WHEEL);
-      applyZoom(z * k, (w, h, next) => placeAround(b, e.clientX, e.clientY, next / z));
+      const [lo, hi] = zoomLimits();
+      const target = animRef.current?.to.zoom ?? z;
+      const next = Math.min(hi, Math.max(lo, target * Math.exp(-delta * ZOOM_PER_WHEEL)));
+      const { x, y } = placeAround(b, e.clientX, e.clientY, next / z);
+      animateTo(boundsAt({ x, y, width: size.width * next, height: size.height * next }, next), ZOOM_ANIM_MS);
     };
     root.addEventListener('wheel', onWheel, { passive: false });
     return () => root.removeEventListener('wheel', onWheel);
@@ -460,6 +508,7 @@ const PinWindow = () => {
   // Edge drag: aspect-locked zoom with the opposite side or corner fixed.
   const startResize = (e, side) => {
     e.preventDefault();
+    stopAnimation();
     const start = { ...boundsRef.current };
     const startX = e.screenX;
     const startY = e.screenY;
@@ -522,6 +571,7 @@ const PinWindow = () => {
     let raf = 0;
     const onMove = (ev) => {
       if (!dragging && Math.hypot(ev.screenX - startX, ev.screenY - startY) <= CLICK_SLOP) return;
+      if (!dragging) stopAnimation();
       dragging = true;
       if (onText || docked) return;
       pending = { x: ev.screenX - offsetX, y: ev.screenY - offsetY };
