@@ -3,6 +3,7 @@ const zh = {
   nav: { translate: "翻译", history: "历史", favorites: "收藏", documents: "文档", settings: "设置" },
   status: { ready: "就绪", today: "今日", online: "在线", offline: "离线" },
   screenshot: { failed: "截图失败" },
+  pin: { working: "正在识别和翻译…" },
   settingsNav: {
     searchPlaceholder: "搜索设置...",
     groupTranslation: "翻译", groupSystem: "系统",

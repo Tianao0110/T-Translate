@@ -6,15 +6,28 @@ html, body {
 
 .pin-root {
   --pin-accent: #3b82f6;
+  --pin-surface: #ffffff;
+  --pin-text: #333;
+  --pin-danger: #ef4444;
   position: fixed;
   inset: 0;
   overflow: hidden;
-  cursor: move;
+  cursor: default;
   user-select: none;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-.pin-root[data-theme="dark"] { --pin-accent: #d6a854; }
-.pin-root[data-theme="fresh"] { --pin-accent: #10b981; }
+.pin-root[data-theme="dark"] {
+  --pin-accent: #d6a854;
+  --pin-surface: #262421;
+  --pin-text: #e8e4dd;
+}
+
+.pin-root[data-theme="fresh"] {
+  --pin-accent: #10b981;
+  --pin-surface: #ecf6f4;
+  --pin-text: #1e3431;
+}
 
 /* Sized by the renderer to the image's natural size, anchored top-left. */
 .pin-frame {
@@ -30,6 +43,50 @@ html, body {
   -webkit-user-drag: none;
 }
 
+.pin-overlay {
+  position: absolute;
+  inset: 0;
+  padding: 4px 8px;
+  overflow: auto;
+  background: var(--pin-surface);
+  color: var(--pin-text);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  scrollbar-width: thin;
+}
+
+.pin-overlay.is-error {
+  color: var(--pin-danger);
+}
+
+.pin-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--pin-surface);
+  color: var(--pin-accent);
+}
+
+.pin-badge.is-error {
+  color: var(--pin-danger);
+}
+
+.pin-spin {
+  animation: pin-spin 1s linear infinite;
+}
+
+@keyframes pin-spin {
+  to { transform: rotate(360deg); }
+}
+
 /* Edge ring, drawn inside the image. */
 .pin-frame::after {
   content: '';
@@ -37,4 +94,9 @@ html, body {
   inset: 0;
   box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--pin-accent) 75%, transparent);
   pointer-events: none;
+}
+
+.pin-capturing .pin-frame::after,
+.pin-capturing .pin-badge {
+  display: none;
 }

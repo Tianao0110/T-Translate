@@ -1,6 +1,7 @@
 // Preload for a pinned screenshot window (screenshot/pin-windows.js).
 
 const { contextBridge, ipcRenderer } = require('electron');
+const { stackBridge } = require('./stack-bridge');
 
 contextBridge.exposeInMainWorld('electron', {
   // One-way crash reporting to the on-disk log.
@@ -13,7 +14,9 @@ contextBridge.exposeInMainWorld('electron', {
     ready: () => ipcRenderer.send('pin:ready'),
     // Manual drag: fire-and-forget position stream; main keeps the size.
     moveTo: (x, y) => ipcRenderer.send('pin:move', x, y),
-    close: (copyImage) => ipcRenderer.send('pin:close', { copyImage: !!copyImage }),
+    // copy: 'image' | 'view' (with rect) | null.
+    close: (copy, rect) => ipcRenderer.send('pin:close', { copy: copy || null, rect: rect || null }),
+    addToHistory: (item) => ipcRenderer.invoke('pin:add-to-history', item),
   },
 
   theme: {
@@ -23,4 +26,7 @@ contextBridge.exposeInMainWorld('electron', {
       return () => ipcRenderer.removeListener('theme:changed', handler);
     },
   },
+
+  // Recognize + translate only.
+  stack: stackBridge(ipcRenderer, ['translate', 'detectLanguage', 'ocrRecognize']),
 });

@@ -3,6 +3,7 @@ const en = {
   nav: { translate: "Translate", history: "History", favorites: "Favorites", documents: "Documents", settings: "Settings" },
   status: { ready: "Ready", today: "Today", online: "Online", offline: "Offline" },
   screenshot: { failed: "Screenshot failed" },
+  pin: { working: "Recognizing and translating…" },
   settingsNav: {
     searchPlaceholder: "Search settings...",
     groupTranslation: "Translation", groupSystem: "System",

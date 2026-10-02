@@ -62,10 +62,11 @@ const CHANNELS = {
   },
   // Pinned screenshots (screenshot/pin-windows.js); main finds the pin by event.sender.
   PIN: {
-    GET_INIT: 'pin:get-init', // renderer → main: { image, theme }
+    GET_INIT: 'pin:get-init', // renderer → main: { image, theme, targetLanguage, sameLanguageBehavior, ocrEngine }
     READY: 'pin:ready',       // renderer → main: image painted, show the window
     MOVE: 'pin:move',         // renderer → main: manual drag stream (x, y)
-    CLOSE: 'pin:close',       // renderer → main: { copyImage }
+    CLOSE: 'pin:close',       // renderer → main: { copy: 'image' | 'view' | null, rect }
+    ADD_TO_HISTORY: 'pin:add-to-history', // forward a translation into the main window's history
   },
   FLOATING_WINDOW: {
     CLOSE: 'floating-window:close',

@@ -49,6 +49,7 @@ function createPin(image, bounds) {
       preload: PATHS.preloads.pin,
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: false, // the preload requires preloads/stack-bridge.js
     },
   });
 
@@ -100,11 +101,18 @@ function pinOf(sender) {
   return win ? pins.get(win.id) || null : null;
 }
 
+// The image plus the settings the renderer's recognize + translate pass needs.
 function getInit(sender) {
   const pin = pinOf(sender);
   if (!pin) return null;
-  const theme = store.get('settings')?.interface?.theme || 'light';
-  return { image: pin.image, theme };
+  const settings = store.get('settings') || {};
+  return {
+    image: pin.image,
+    theme: settings.interface?.theme || 'light',
+    targetLanguage: settings.translation?.targetLanguage || 'zh',
+    sameLanguageBehavior: settings.translation?.sameLanguageBehavior || 'original',
+    ocrEngine: settings.ocr?.engine || 'llm-vision',
+  };
 }
 
 function markReady(sender) {
@@ -119,17 +127,25 @@ function movePin(sender, x, y) {
   pin.window.setBounds({ x: Math.round(x), y: Math.round(y), width: pin.width, height: pin.height });
 }
 
-function closePin(sender, { copyImage = false } = {}) {
+// copy: 'image' puts the captured image on the clipboard, 'view' the rendered
+// page inside `rect` (DIP), anything else nothing.
+async function closePin(sender, { copy = null, rect = null } = {}) {
   const pin = pinOf(sender);
   if (!pin) return;
-  if (copyImage) {
-    try {
+  try {
+    if (copy === 'image') {
       clipboard.writeImage(nativeImage.createFromDataURL(pin.image));
-    } catch (e) {
-      logger.warn('Copying the pinned image failed:', e.message);
+    } else if (copy === 'view' && isRect(rect) && !pin.window.isDestroyed()) {
+      clipboard.writeImage(await pin.window.webContents.capturePage(rect));
     }
+  } catch (e) {
+    logger.warn('Copying the pin failed:', e.message);
   }
   if (!pin.window.isDestroyed()) pin.window.close();
+}
+
+function isRect(r) {
+  return !!r && [r.x, r.y, r.width, r.height].every(Number.isInteger) && r.width > 0 && r.height > 0;
 }
 
 // Hit test for the select-to-translate mouse hook (selection/controller.js).

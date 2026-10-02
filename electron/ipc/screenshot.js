@@ -81,7 +81,11 @@ function register(ctx) {
   ipcMain.on(CHANNELS.PIN.READY, (event) => pinWindows.markReady(event.sender));
   ipcMain.on(CHANNELS.PIN.MOVE, (event, x, y) => pinWindows.movePin(event.sender, x, y));
   ipcMain.on(CHANNELS.PIN.CLOSE, (event, options) => {
-    pinWindows.closePin(event.sender, { copyImage: !!options?.copyImage });
+    pinWindows.closePin(event.sender, { copy: options?.copy, rect: options?.rect });
+  });
+  ipcMain.handle(CHANNELS.PIN.ADD_TO_HISTORY, (event, item) => {
+    getMainWindow()?.webContents.send(CHANNELS.DATA.ADD_TO_HISTORY, item);
+    return true;
   });
 
   // OCR done -> push text into selection window for translation
