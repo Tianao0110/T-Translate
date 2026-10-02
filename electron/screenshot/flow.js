@@ -10,6 +10,7 @@ const { store, runtime, windows } = require('../state');
 const { CHANNELS } = require('../shared/channels');
 const windowManager = require('../windows/window-manager');
 const screenshotModule = require('./screenshot-module');
+const { t } = require('../shared/main-i18n');
 const pinWindows = require('./pin-windows');
 const { showSelectionLoading } = require('../selection/controller');
 const logger = require('../platform/logger')('Screenshot');
@@ -98,7 +99,14 @@ async function startScreenshot(fromHotkey = false) {
       }
     } catch (e) {}
 
-    screenshotWindow.webContents.send(CHANNELS.SCREENSHOT.CONFIG, { showConfirmButtons });
+    screenshotWindow.webContents.send(CHANNELS.SCREENSHOT.CONFIG, {
+      showConfirmButtons,
+      labels: {
+        tips: t('screenshot.overlayTips'),
+        cancel: t('screenshot.overlayCancel'),
+        confirm: t('screenshot.overlayConfirm'),
+      },
+    });
     screenshotWindow.focus();
     screenshotWindow.webContents.focus();
   });

@@ -59,6 +59,9 @@ const messages = {
     'screenshot.ocrError': 'OCR 错误',
     'screenshot.noImage': '没有预先截取的屏幕图像',
     'screenshot.noSource': '没有可用的截图源',
+    'screenshot.overlayTips': '拖动鼠标选择截图区域 | ESC 或右键取消',
+    'screenshot.overlayCancel': '取消 (ESC)',
+    'screenshot.overlayConfirm': '确认截图 (Enter)',
     'selection.loadingTimeout': '识别超时，请重试',
     'floatingWindow.windowNotFound': '悬浮窗不存在',
 
@@ -126,6 +129,9 @@ const messages = {
     'screenshot.ocrError': 'OCR Error',
     'screenshot.noImage': 'No pre-captured screen image',
     'screenshot.noSource': 'No screenshot source available',
+    'screenshot.overlayTips': 'Drag to select an area | Esc or right-click to cancel',
+    'screenshot.overlayCancel': 'Cancel (Esc)',
+    'screenshot.overlayConfirm': 'Capture (Enter)',
     'selection.loadingTimeout': 'Recognition timed out, please try again',
     'floatingWindow.windowNotFound': 'The floating window does not exist',
 

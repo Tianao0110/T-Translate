@@ -170,7 +170,7 @@ Select text in any program and translate it.
 - Button auto-hide time, show source by default, close after copy.
 - Character limits: selections that are too short or too long are not translated; the default is 2 to 2000 characters.
 - Window opacity, Rainbow selection window (a colorful alternative look).
-- Screenshot output: whether screenshot results appear in a bubble window or the main window, see 3.2.
+- Screenshot output: whether a screenshot becomes a pin, or its result appears in the selection window or the main window. Pin is the default, see 3.2.
 
 ## 3. Floating window
 
@@ -214,8 +214,18 @@ The floating window is a transparent window you lay over what you want to read; 
 
 - Press Alt+Q, or use "Screenshot Translate" in the tray menu or the screenshot button in the translation panel. The screen dims; drag out a box. Any monitor works.
 - By default you confirm with ✓ or Enter and cancel with Esc. To skip the confirmation, turn off "Show Screenshot Confirm Buttons" under Settings → OCR.
-- Where the result goes is set under Settings → Selection → Screenshot output: **bubble window** shows a translation card next to the box, like the selection card; **main window** fills the recognized text into the translation panel and translates it.
+- Where the result goes is set under Settings → Selection → Screenshot output: **pin** (the default) keeps the screenshot on screen where you took it and covers it with the translation when ready; **selection window** shows a translation card next to the box, like the selection card; **main window** fills the recognized text into the translation panel and translates it.
 - If the chosen OCR engine cannot run (for example the vision model is not installed yet), the app falls back to local recognition and says so in the result.
+
+**Working with a pin**
+
+- Click: switch between the original and the translation.
+- Drag on text: select it, Ctrl+C copies. Drag anywhere else: move the pin.
+- Wheel: zoom. You can also drag an edge or a corner.
+- Double-click: shrink it to the screen edge. Hover to see it full size, double-click again to put it back.
+- Right-click: copy what the pin shows (the original or the translated image) and close it. Esc closes without copying.
+- When the OCR engine reports where the text is (local OCR, Windows OCR), each passage is translated in place. Vision models give no positions, so the translation covers the whole image.
+- Up to 8 pins at a time; a new one closes the oldest. Pins stay in memory and are never saved.
 
 ### 3.3 Live captions (listen mode)
 
