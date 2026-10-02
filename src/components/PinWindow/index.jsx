@@ -14,7 +14,7 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import { useTranslation } from 'react-i18next';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { recognizeAndTranslate } from './pipeline.js';
-import { patchColors } from './patch-colors.js';
+import { patchColors, meanLuminance } from './patch-colors.js';
 import { edgeAt as edgeIn, zoomFromEdge, placeAround } from './zoom.js';
 import './styles.css';
 
@@ -34,6 +34,9 @@ const PATCH_PAD = 2; // CSS px a patch reaches past its OCR box
 const COLOR_BAND = 3; // source px sampled around a box for its background
 const MIN_FONT = 8;
 const FONT_TO_LINE = 0.85;
+const OVERLAY_FONT_MIN = 11;
+const OVERLAY_FONT_MAX = 24;
+const LIGHT_IMAGE_ABOVE = 0.55; // mean luminance from which an image counts as light
 
 // What a right-click copies: the captured image, or the frame as shown.
 let copyTarget = 'image';
@@ -110,6 +113,65 @@ const Patch = ({ text, rect, colors, lineHeight }) => {
       style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height, ...colors }}
     >
       <span ref={textRef}>{text}</span>
+    </div>
+  );
+};
+
+// 'light' or 'dark', from a small downscale of the loaded image.
+function imageTone(img) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 32;
+  canvas.height = 32;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0, 32, 32);
+  return meanLuminance(ctx.getImageData(0, 0, 32, 32)) > LIGHT_IMAGE_ABOVE ? 'light' : 'dark';
+}
+
+// The whole-image panel (no box positions, or an error): the pin itself
+// blurred under a veil toned to the image, the text centered at the largest
+// size that fits; past OVERLAY_FONT_MIN it scrolls.
+const Overlay = ({ image, text, error, tone }) => {
+  const scrollRef = useRef(null);
+  const bodyRef = useRef(null);
+  const [overflow, setOverflow] = useState(false);
+
+  useLayoutEffect(() => {
+    const box = scrollRef.current;
+    const body = bodyRef.current;
+    if (!box || !body) return;
+    const cs = getComputedStyle(box);
+    const availH = box.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    const availW = box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const fits = (size) => {
+      body.style.fontSize = `${size}px`;
+      return body.offsetHeight <= availH && body.scrollWidth <= availW;
+    };
+    if (fits(OVERLAY_FONT_MAX)) {
+      setOverflow(false);
+      return;
+    }
+    let lo = OVERLAY_FONT_MIN;
+    let hi = OVERLAY_FONT_MAX;
+    while (hi - lo > 0.25) {
+      const mid = (lo + hi) / 2;
+      if (fits(mid)) lo = mid;
+      else hi = mid;
+    }
+    setOverflow(!fits(lo));
+  }, [text, error]);
+
+  const multiline = !error && String(text || '').includes('\n');
+  return (
+    <div className={`pin-overlay is-${tone}${error ? ' is-error' : ''}`}>
+      <img className="pin-overlay-blur" src={image} alt="" draggable={false} />
+      <div ref={scrollRef} className={`pin-overlay-scroll${overflow ? ' is-overflow' : ''}`}>
+        <div ref={bodyRef} className="pin-overlay-body">
+          {error && <AlertCircle className="pin-overlay-icon" />}
+          <div className={`pin-overlay-text${multiline ? ' is-multiline' : ''}${error ? '' : ' pin-selectable'}`}>
+            {error || text}
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
@@ -227,6 +289,11 @@ const PinWindow = () => {
 
   const lineHeight = result?.lineHeight && size ? result.lineHeight / size.scale : null;
 
+  const overlayTone = useMemo(
+    () => (result && result.mode !== 'blocks' && imgRef.current ? imageTone(imgRef.current) : 'dark'),
+    [result],
+  );
+
   // Recognized lines in CSS px, each with the block it belongs to (the
   // engine's reading order) and whether a translation patch covers it.
   const lines = useMemo(() => {
@@ -268,7 +335,7 @@ const PinWindow = () => {
       if (!sel?.rangeCount || sel.isCollapsed) return;
       const range = sel.getRangeAt(0);
       const parts = [];
-      for (const el of document.querySelectorAll('.pin-items > *, .pin-overlay')) {
+      for (const el of document.querySelectorAll('.pin-items > *, .pin-overlay-text')) {
         if (!range.intersectsNode(el)) continue;
         const part = document.createRange();
         part.selectNodeContents(el);
@@ -424,7 +491,7 @@ const PinWindow = () => {
   const handleMouseDown = (e) => {
     if (e.button !== 0) return;
     // Presses on the overlay's scrollbar scroll.
-    if (e.target.classList?.contains('pin-overlay') && e.nativeEvent.offsetX >= e.target.clientWidth) return;
+    if (e.target.classList?.contains('pin-overlay-scroll') && e.nativeEvent.offsetX >= e.target.clientWidth) return;
     clearTimeout(clickTimerRef.current);
     // Second press of a double-click: no word selection, no view switch; it docks.
     if (e.detail >= 2) {
@@ -473,6 +540,9 @@ const PinWindow = () => {
     window.addEventListener('mouseup', onUp);
   };
 
+  // The red corner mark: a full failure while the original shows, or blocks that stayed untranslated.
+  const badgeError = result?.error ? (showOriginal ? result.error : null) : result?.partialError || null;
+
   const sizeStyle = size
     ? { width: size.width, height: size.height, transform: `scale(${zoom})`, '--pin-zoom': zoom }
     : { visibility: 'hidden' };
@@ -503,17 +573,15 @@ const PinWindow = () => {
             </div>
           )}
           {result && result.mode !== 'blocks' && !showOriginal && (
-            <div className={`pin-overlay${result.error ? ' is-error' : ' pin-selectable'}`}>
-              {result.error || result.translatedText}
-            </div>
+            <Overlay image={image} text={result.translatedText} error={result.error} tone={overlayTone} />
           )}
           {!result && (
             <span className="pin-badge" title={t('pin.working')}>
               <Loader2 size={12} className="pin-spin" />
             </span>
           )}
-          {result?.error && showOriginal && (
-            <span className="pin-badge is-error" title={result.error}>
+          {badgeError && (
+            <span className="pin-badge is-error" title={badgeError}>
               <AlertCircle size={12} />
             </span>
           )}

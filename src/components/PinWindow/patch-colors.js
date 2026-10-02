@@ -10,6 +10,17 @@ const distance = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 const css = (c) => `rgb(${c.map((v) => Math.round(v)).join(', ')})`;
 const luminance = ([r, g, b]) => (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
 
+// Mean luminance (0–1) of an ImageData sample: the tone of the veil over a
+// pin whose translation covers the whole image.
+export function meanLuminance(region) {
+  const { data } = region;
+  const n = data.length / 4;
+  if (!n) return 1;
+  let sum = 0;
+  for (let i = 0; i < data.length; i += 4) sum += luminance([data[i], data[i + 1], data[i + 2]]);
+  return sum / n;
+}
+
 // `region` is ImageData around the box; `box` is the text box inside it
 // ({ x, y, width, height } in region pixels).
 export function patchColors(region, box) {

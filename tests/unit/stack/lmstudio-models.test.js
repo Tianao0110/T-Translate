@@ -61,6 +61,11 @@ describe('pickLoadedModel', () => {
     expect(await pickLoadedModel(ENDPOINT)).toEqual({ known: false, id: null });
   });
 
+  it('a model list without LM Studio states (another server) is not LM Studio', async () => {
+    lmStudio([{ id: 'some-model', object: 'model' }]);
+    expect(await pickLoadedModel(ENDPOINT)).toEqual({ known: false, id: null });
+  });
+
   it('asks once per burst (cached a few seconds)', async () => {
     const { fetch } = lmStudio([model('mt', 'llm', 'loaded')]);
     await pickLoadedModel(ENDPOINT);
@@ -124,5 +129,23 @@ describe('LM Studio vision OCR', () => {
     }
     expect(chats).toHaveLength(0);
     expect(manager._visionLocked).toBeFalsy();
+  });
+});
+
+describe('the service keeps the last provider error', () => {
+  it('nothing loaded in LM Studio: the generic failure carries the LM Studio message as detail', async () => {
+    lmStudio([model('vl', 'vlm', 'not-loaded')]);
+    const { TranslationService } = await import('../../../src/stack/service.js');
+    const service = new TranslationService({
+      loadProviderConfigs: async () => ({
+        list: [{ id: 'local-llm', enabled: true, priority: 1 }],
+        configs: { 'local-llm': { endpoint: ENDPOINT } },
+      }),
+    });
+    await service.init();
+    const r = await service.translate('Hello world', { sourceLang: 'en', targetLang: 'zh', useCache: false });
+    expect(r.success).toBe(false);
+    expect(r.error).toContain('local-llm');
+    expect(r.detail).toContain('LM Studio');
   });
 });

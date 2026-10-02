@@ -20,7 +20,10 @@ vi.mock('../../../src/translation/stack-client.js', () => ({
   },
 }));
 
+// Messages containing "plain" read as an unknown kind and keep their text.
 vi.mock('../../../src/core/error-handler.js', () => ({
+  ERROR_TYPES: { UNKNOWN: 'unknown' },
+  detectErrorType: (msg) => (String(msg).includes('plain') ? 'unknown' : 'network'),
   getShortErrorMessage: (err) => `short:${err?.message || err}`,
 }));
 
@@ -126,10 +129,69 @@ describe('recognizeAndTranslate: blocks with boxes', () => {
     expect(await recognizeAndTranslate('img', init, frame)).toEqual({ error: 'short:down' });
   });
 
+  it('fails as a whole when every block that needed translating failed, symbols aside', async () => {
+    ocrRecognize.mockResolvedValue({
+      ...positioned,
+      blocks: [...positioned.blocks, box('>', 380, 10, 10, 24)],
+      rawBlocks: [...positioned.rawBlocks, box('>', 380, 10, 10, 24)],
+    });
+    translate.mockResolvedValue({ success: false, error: 'down' });
+    expect(await recognizeAndTranslate('img', init, frame)).toEqual({ error: 'short:down' });
+  });
+
+  it('reports the failure of the blocks that stayed untranslated', async () => {
+    ocrRecognize.mockResolvedValue(positioned);
+    translate.mockResolvedValueOnce({ success: true, text: '贴图保持置顶' }).mockResolvedValueOnce({ success: false, error: 'busy' });
+    const r = await recognizeAndTranslate('img', init, frame);
+    expect(r.mode).toBe('blocks');
+    expect(r.partialError).toBe('short:busy');
+  });
+
   it('falls back to one translation when the boxes do not fit the image', async () => {
     ocrRecognize.mockResolvedValue(positioned);
     const r = await recognizeAndTranslate('img', init, { width: 100, height: 50 });
     expect(r.mode).toBe('unified');
     expect(translate).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('recognizeAndTranslate: local OCR first', () => {
+  const vision = { ...init, ocrEngine: 'llm-vision' };
+
+  it('uses the local read when it is usable; the chosen engine is not asked', async () => {
+    ocrRecognize.mockResolvedValue({ success: true, text: 'Hello world', confidence: 0.95, blocks: [] });
+    await recognizeAndTranslate('img', vision);
+    expect(ocrRecognize).toHaveBeenCalledTimes(1);
+    expect(ocrRecognize).toHaveBeenCalledWith('img', { engine: 'rapid-ocr' });
+  });
+
+  it('hands an unreadable image to the engine chosen in settings', async () => {
+    ocrRecognize
+      .mockResolvedValueOnce({ success: true, text: '', blocks: [] })
+      .mockResolvedValueOnce({ success: true, text: 'Read by the vision model' });
+    const r = await recognizeAndTranslate('img', vision);
+    expect(ocrRecognize).toHaveBeenNthCalledWith(2, 'img', { engine: 'llm-vision' });
+    expect(r).toMatchObject({ mode: 'unified', sourceText: 'Read by the vision model' });
+  });
+
+  it("surfaces the chosen engine's own failure (e.g. nothing loaded in LM Studio)", async () => {
+    ocrRecognize
+      .mockResolvedValueOnce({ success: true, text: '', blocks: [] })
+      .mockResolvedValueOnce({ success: false, errorCode: 'LMSTUDIO_NONE_LOADED', error: 'load a model in LM Studio' });
+    expect(await recognizeAndTranslate('img', vision)).toEqual({ error: 'short:load a model in LM Studio' });
+  });
+});
+
+describe('recognizeAndTranslate: error wording', () => {
+  it('keeps a message of no known kind as the stack wrote it', async () => {
+    ocrRecognize.mockResolvedValueOnce({ success: false, error: 'plain: load a model in LM Studio first' });
+    expect(await recognizeAndTranslate('img', init)).toEqual({ error: 'plain: load a model in LM Studio first' });
+  });
+});
+
+describe("recognizeAndTranslate: the provider's own reason", () => {
+  it('shows the last provider error the service passed as detail', async () => {
+    translate.mockResolvedValueOnce({ success: false, error: 'all providers failed (local-llm)', detail: 'plain: load a model in LM Studio first' });
+    expect(await recognizeAndTranslate('img', init)).toEqual({ error: 'plain: load a model in LM Studio first' });
   });
 });

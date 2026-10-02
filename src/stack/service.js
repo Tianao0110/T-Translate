@@ -528,6 +528,7 @@ export class TranslationService {
     }
 
     const tried = [];
+    let lastError = null;
 
     for (const id of usableProviders) {
       const provider = getProvider(id);
@@ -566,6 +567,7 @@ export class TranslationService {
           this._failureCount[id] = 0;
           return this._finalize(result.text, id, finalizeCtx);
         }
+        lastError = result.error;
 
         // skipFailureCount: a deterministic "can't do this input" is not a failure.
         if (!result.skipFailureCount) {
@@ -580,6 +582,7 @@ export class TranslationService {
       } catch (error) {
         this._failureCount[id] = (this._failureCount[id] || 0) + 1;
         logger.error(`Provider ${id} error:`, error);
+        lastError = error.message;
 
         if (!enableFallback) {
           return { success: false, error: error.message, provider: id };
@@ -594,11 +597,13 @@ export class TranslationService {
       return this.translate(text, options);
     }
 
+    // `detail`: the last provider's own words, for callers that show them.
     return {
       success: false,
       error: tried.length > 0
         ? _t('svc.allFailed', '所有翻译源均失败') + ` (${tried.join(', ')})`
         : _t('svc.noProvider', '没有可用的翻译源'),
+      ...(lastError ? { detail: lastError } : {}),
     };
   }
 

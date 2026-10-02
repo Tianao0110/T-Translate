@@ -27,7 +27,8 @@ async function listModels(endpoint) {
     const res = await rtFetch(`${base}/api/v0/models`, { method: 'GET', signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
     if (res.ok) {
       const data = await res.json();
-      if (Array.isArray(data?.data)) models = data.data;
+      // Only LM Studio's list carries `state`; another server's model list is not one.
+      if (Array.isArray(data?.data) && data.data.some((m) => typeof m?.state === 'string')) models = data.data;
     }
   } catch { /* not LM Studio, or not running */ }
   cache.set(base, { at: now, models });

@@ -2,7 +2,7 @@
 // background from the band around the box, text color from the far pixels inside.
 
 import { describe, it, expect } from 'vitest';
-import { patchColors } from '../../../src/components/PinWindow/patch-colors.js';
+import { patchColors, meanLuminance } from '../../../src/components/PinWindow/patch-colors.js';
 
 // width x height region filled with `bg`, the given pixels set to `ink`.
 function region(width, height, bg, ink = [], inkPixels = []) {
@@ -37,5 +37,16 @@ describe('patchColors', () => {
   it('uses the box edge when the box fills the region', () => {
     const r = region(10, 6, [200, 220, 240], [0, 0, 0], [[4, 3]]);
     expect(patchColors(r, { x: 0, y: 0, width: 10, height: 6 }).background).toBe('rgb(200, 220, 240)');
+  });
+});
+
+describe('meanLuminance', () => {
+  it('reads a dark capture as dark and a light one as light', () => {
+    expect(meanLuminance(region(8, 8, [20, 20, 20]))).toBeLessThan(0.15);
+    expect(meanLuminance(region(8, 8, [245, 245, 245]))).toBeGreaterThan(0.9);
+  });
+
+  it('weighs green above red and blue, as the eye does', () => {
+    expect(meanLuminance(region(4, 4, [0, 200, 0]))).toBeGreaterThan(meanLuminance(region(4, 4, [200, 0, 0])));
   });
 });

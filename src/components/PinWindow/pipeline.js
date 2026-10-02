@@ -1,16 +1,25 @@
 // Pinned screenshot: recognize the image, then translate the text through the
-// main-process stack (translation/stack-client.js). With box coordinates each
+// main-process stack (translation/stack-client.js). Local OCR reads first; the
+// engine chosen in settings only gets images it cannot read. With box coordinates each
 // block is translated on its own and goes back over its spot (granularity from
 // floating/display-mode.js); without them the whole text is translated as one.
 // Same language handling as the selection window's screenshot path.
 
 import translationService from '../../translation/stack-client.js';
 import { resolveSameLanguageTarget, shouldTranslateText, cleanTranslationOutput } from '../../core/text.js';
-import { getShortErrorMessage } from '../../core/error-handler.js';
+import { getShortErrorMessage, detectErrorType, ERROR_TYPES } from '../../core/error-handler.js';
 import { resolveDisplayMode } from '../../floating/display-mode.js';
+import { isUsableResult } from '../../stack/ocr/result-quality.js';
 import i18n from '../../i18n.js';
 
 const CONCURRENCY = 2;
+
+// A known kind of failure gets its friendly wording; anything else keeps the
+// stack's own message, which already says what to do.
+function describeError(error, options) {
+  const raw = typeof error === 'string' ? error : error?.message || String(error);
+  return detectErrorType(raw) === ERROR_TYPES.UNKNOWN ? raw : getShortErrorMessage(raw, options);
+}
 
 const median = (nums) => {
   const s = [...nums].sort((a, b) => a - b);
@@ -19,16 +28,16 @@ const median = (nums) => {
 };
 
 // Resolves to one of, never throws:
-//   { mode: 'blocks', blocks: [{ text, bbox, translatedText?, passthrough?, error? }], lines: [{ text, bbox }], lineHeight, ...summary }
+//   { mode: 'blocks', blocks: [{ text, bbox, translatedText?, passthrough?, error? }], lines: [{ text, bbox }], lineHeight, partialError, ...summary }
 //   { mode: 'unified', ...summary }
 //   { error }
 // summary = { sourceText, translatedText, sourceLanguage, targetLanguage, passthrough }.
 // `frame` is the image's natural size, the OCR boxes' pixel space.
 export async function recognizeAndTranslate(image, { ocrEngine, targetLanguage = 'zh', sameLanguageBehavior = 'original' } = {}, frame = null) {
   try {
-    const ocr = await translationService.ocr.recognize(image, ocrEngine ? { engine: ocrEngine } : {});
+    const ocr = await recognizeLocalFirst(image, ocrEngine);
     if (!ocr?.success) {
-      return { error: getShortErrorMessage(ocr?.error || i18n.t('svc.ocrFailed'), { context: 'ocr' }) };
+      return { error: describeError(ocr?.error || i18n.t('svc.ocrFailed'), { context: 'ocr' }) };
     }
 
     const sourceText = ocr.text?.trim();
@@ -40,8 +49,16 @@ export async function recognizeAndTranslate(image, { ocrEngine, targetLanguage =
     if (useScattered) return await translateBlocks(blocks, rawBlocks, settings);
     return await translateWhole(sourceText, settings);
   } catch (e) {
-    return { error: getShortErrorMessage(e) };
+    return { error: describeError(e) };
   }
+}
+
+const LOCAL_ENGINE = 'rapid-ocr';
+
+async function recognizeLocalFirst(image, ocrEngine) {
+  const local = await translationService.ocr.recognize(image, { engine: LOCAL_ENGINE });
+  if (isUsableResult(local, LOCAL_ENGINE) || !ocrEngine || ocrEngine === LOCAL_ENGINE) return local;
+  return translationService.ocr.recognize(image, { engine: ocrEngine });
 }
 
 async function translateWhole(sourceText, { targetLanguage, sameLanguageBehavior }) {
@@ -61,7 +78,7 @@ async function translateWhole(sourceText, { targetLanguage, sameLanguageBehavior
     targetLang: resolved.targetLang,
   });
   if (!result?.success) {
-    return { error: getShortErrorMessage(result?.error || i18n.t('selection.translateFailed'), { provider: result?.provider }) };
+    return { error: describeError(result?.detail || result?.error || i18n.t('selection.translateFailed'), { provider: result?.provider }) };
   }
   if (!result.text) return { error: i18n.t('selection.emptyResult') };
 
@@ -103,10 +120,10 @@ async function translateBlocks(picked, rawBlocks, { targetLanguage, sameLanguage
         translatedAny = true;
         usedTarget = resolved.targetLang;
       } else {
-        block.error = getShortErrorMessage(result?.error || i18n.t('selection.translateFailed'), { provider: result?.provider });
+        block.error = describeError(result?.detail || result?.error || i18n.t('selection.translateFailed'), { provider: result?.provider });
       }
     } catch (e) {
-      block.error = getShortErrorMessage(e);
+      block.error = describeError(e);
     }
   };
 
@@ -114,8 +131,11 @@ async function translateBlocks(picked, rawBlocks, { targetLanguage, sameLanguage
     await Promise.all(blocks.slice(i, i + CONCURRENCY).map((b, j) => translateOne(b, i + j)));
   }
 
+  // Judged on the blocks that needed translating.
+  const failed = blocks.filter((b) => b.error);
+  const needed = blocks.filter((b) => !b.passthrough);
+  if (needed.length && failed.length === needed.length) return { error: failed[0].error };
   const done = blocks.filter((b) => b.translatedText);
-  if (!done.length) return { error: blocks.find((b) => b.error)?.error || i18n.t('selection.translateFailed') };
 
   const lines = rawBlocks
     .filter((b) => b.text?.trim() && b.bbox?.width > 0 && b.bbox?.height > 0)
@@ -130,5 +150,6 @@ async function translateBlocks(picked, rawBlocks, { targetLanguage, sameLanguage
     sourceLanguage: detected.find((d) => d?.language)?.language || 'auto',
     targetLanguage: usedTarget,
     passthrough: !translatedAny,
+    partialError: failed[0]?.error || null,
   };
 }

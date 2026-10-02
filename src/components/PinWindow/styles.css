@@ -9,6 +9,13 @@ html, body {
   --pin-surface: #ffffff;
   --pin-text: #333;
   --pin-danger: #ef4444;
+  /* Veils over the blurred image follow the image's own tone, not the theme. */
+  --pin-veil-dark: rgba(0, 0, 0, 0.42);
+  --pin-veil-dark-text: #f4f4f4;
+  --pin-veil-dark-halo: rgba(0, 0, 0, 0.45);
+  --pin-veil-light: rgba(255, 255, 255, 0.5);
+  --pin-veil-light-text: #1c1c1c;
+  --pin-veil-light-halo: rgba(255, 255, 255, 0.6);
   position: fixed;
   inset: 0;
   overflow: hidden;
@@ -50,21 +57,74 @@ html, body {
   -webkit-user-drag: none;
 }
 
+/* Whole-image panel: blurred pin, toned veil, centered text. */
 .pin-overlay {
   position: absolute;
   inset: 0;
-  padding: 4px 8px;
+  overflow: hidden;
+}
+
+/* Oversized so the blur's faded rim stays outside the frame. */
+.pin-overlay-blur {
+  position: absolute;
+  left: -8%;
+  top: -8%;
+  width: 116%;
+  height: 116%;
+  filter: blur(14px);
+  -webkit-user-drag: none;
+}
+
+.pin-overlay-scroll {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
   overflow: auto;
-  background: var(--pin-surface);
-  color: var(--pin-text);
-  font-size: 13px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
   scrollbar-width: thin;
 }
 
-.pin-overlay.is-error {
+.pin-overlay-scroll.is-overflow {
+  align-items: flex-start;
+}
+
+.pin-overlay.is-dark .pin-overlay-scroll {
+  background: var(--pin-veil-dark);
+  color: var(--pin-veil-dark-text);
+  text-shadow: 0 1px 2px var(--pin-veil-dark-halo);
+}
+
+.pin-overlay.is-light .pin-overlay-scroll {
+  background: var(--pin-veil-light);
+  color: var(--pin-veil-light-text);
+  text-shadow: 0 1px 2px var(--pin-veil-light-halo);
+}
+
+.pin-overlay-body {
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4em;
+  line-height: 1.5;
+}
+
+.pin-overlay-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+.pin-overlay-text.is-multiline {
+  text-align: left;
+}
+
+.pin-overlay-icon {
+  width: 1.6em;
+  height: 1.6em;
+  flex-shrink: 0;
   color: var(--pin-danger);
 }
 
