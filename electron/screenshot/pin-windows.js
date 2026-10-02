@@ -1,19 +1,23 @@
 // Pinned screenshots: each crop from flow.js becomes a frameless always-on-top
 // window at the spot it was captured from. The image stays in memory only,
 // here and in the pin's renderer (components/PinWindow); IPC in ipc/screenshot.js.
+// Docked pins line up along a screen edge (geometry in dock-layout.js).
 
-const { BrowserWindow, clipboard, nativeImage } = require('electron');
+const { BrowserWindow, clipboard, nativeImage, screen } = require('electron');
 const PATHS = require('../shared/paths');
 const { store, isDev } = require('../state');
 const { hardenWebContents } = require('../windows/window-manager');
 const logger = require('../platform/logger')('Pin');
+const { dockSide, stackSlots, peekBounds } = require('./dock-layout');
 
 const MAX_PINS = 8;
 const READY_TIMEOUT_MS = 10000;
 const MAX_SIDE = 16384;
 
-// BrowserWindow id -> { window, image, width, height }, oldest first.
+// BrowserWindow id -> { window, image, width, height, dock? }, oldest first.
+// dock = { displayId, side, order, width, height, thumb, peeking }.
 const pins = new Map();
+let dockOrder = 0;
 
 function createPin(image, bounds) {
   while (pins.size >= MAX_PINS) {
@@ -88,7 +92,9 @@ function createPin(image, bounds) {
 
   win.on('closed', () => {
     clearTimeout(readyTimer);
+    const dock = pins.get(id)?.dock;
     pins.delete(id);
+    if (dock) restack(dock.displayId, dock.side);
   });
 
   hardenWebContents(win, 'Pin window');
@@ -124,18 +130,85 @@ function markReady(sender) {
 // Manual drag from the renderer; the window keeps its captured size.
 function movePin(sender, x, y) {
   const pin = pinOf(sender);
-  if (!pin || pin.window.isDestroyed() || !Number.isFinite(x) || !Number.isFinite(y)) return;
+  if (!pin || pin.dock || pin.window.isDestroyed() || !Number.isFinite(x) || !Number.isFinite(y)) return;
   pin.window.setBounds({ x: Math.round(x), y: Math.round(y), width: pin.width, height: pin.height });
 }
 
 // Zoom from the renderer: new bounds, kept as the size later moves use.
 function resizePin(sender, x, y, width, height) {
   const pin = pinOf(sender);
-  if (!pin || pin.window.isDestroyed()) return;
+  if (!pin || pin.dock || pin.window.isDestroyed()) return;
   if (![x, y, width, height].every(Number.isFinite) || width < 1 || height < 1 || width > MAX_SIDE || height > MAX_SIDE) return;
   pin.width = Math.round(width);
   pin.height = Math.round(height);
   pin.window.setBounds({ x: Math.round(x), y: Math.round(y), width: pin.width, height: pin.height });
+}
+
+function setPinBounds(pin, b) {
+  pin.width = b.width;
+  pin.height = b.height;
+  pin.window.setBounds({ x: Math.round(b.x), y: Math.round(b.y), width: b.width, height: b.height });
+}
+
+function workAreaOf(displayId) {
+  const display = screen.getAllDisplays().find((d) => d.id === displayId) || screen.getPrimaryDisplay();
+  return display.workArea;
+}
+
+// Re-lays one edge's thumbnails in dock order; a previewing pin keeps its
+// preview and only learns its new slot.
+function restack(displayId, side) {
+  const docked = [...pins.values()]
+    .filter((p) => p.dock && p.dock.displayId === displayId && p.dock.side === side && !p.window.isDestroyed())
+    .sort((a, b) => a.dock.order - b.dock.order);
+  const slots = stackSlots(docked.map((p) => p.dock), side, workAreaOf(displayId));
+  docked.forEach((p, i) => {
+    p.dock.thumb = slots[i];
+    if (!p.dock.peeking) setPinBounds(p, slots[i]);
+  });
+}
+
+// Double-click: shrink to `size` (DIP) at the nearer left / right edge of
+// the pin's display. Returns the thumbnail bounds.
+function dockPin(sender, size) {
+  const pin = pinOf(sender);
+  if (!pin || pin.window.isDestroyed() || pin.dock) return null;
+  const width = Math.round(size?.width);
+  const height = Math.round(size?.height);
+  if (!(width >= 1 && height >= 1 && width <= MAX_SIDE && height <= MAX_SIDE)) return null;
+  const bounds = pin.window.getBounds();
+  const display = screen.getDisplayMatching(bounds);
+  const side = dockSide(bounds, display.workArea);
+  pin.dock = { displayId: display.id, side, order: ++dockOrder, width, height, thumb: null, peeking: false };
+  restack(display.id, side);
+  return pin.dock.thumb;
+}
+
+// Double-click on a docked pin: back to the bounds it had.
+function undockPin(sender, x, y, width, height) {
+  const pin = pinOf(sender);
+  if (!pin || !pin.dock || pin.window.isDestroyed()) return;
+  if (![x, y, width, height].every(Number.isFinite) || width < 1 || height < 1 || width > MAX_SIDE || height > MAX_SIDE) return;
+  const { displayId, side } = pin.dock;
+  pin.dock = null;
+  setPinBounds(pin, { x, y, width: Math.round(width), height: Math.round(height) });
+  restack(displayId, side);
+}
+
+// Hover on a docked pin: open the preview at `size` (capped to the work
+// area) beside the edge, or fall back to the thumbnail. Returns the bounds.
+function peekPin(sender, on, size) {
+  const pin = pinOf(sender);
+  if (!pin || !pin.dock || !pin.dock.thumb || pin.window.isDestroyed()) return null;
+  if (!on || !(size?.width >= 1 && size?.height >= 1)) {
+    pin.dock.peeking = false;
+    setPinBounds(pin, pin.dock.thumb);
+    return pin.dock.thumb;
+  }
+  const b = peekBounds(pin.dock.thumb, pin.dock.side, size, workAreaOf(pin.dock.displayId));
+  pin.dock.peeking = true;
+  setPinBounds(pin, b);
+  return b;
 }
 
 // copy: 'image' puts the captured image on the clipboard, 'view' the rendered
@@ -169,4 +242,4 @@ function isPointInPins(x, y) {
   return false;
 }
 
-module.exports = { createPin, getInit, markReady, movePin, resizePin, closePin, isPointInPins };
+module.exports = { createPin, getInit, markReady, movePin, resizePin, dockPin, undockPin, peekPin, closePin, isPointInPins };

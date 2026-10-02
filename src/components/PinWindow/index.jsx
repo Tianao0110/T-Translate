@@ -4,9 +4,11 @@
 // selectable for copying: the translation itself, and a transparent layer of
 // the recognized lines over the original. A click switches between
 // translation and original; a drag selects on text and moves the window
-// elsewhere. The wheel and the window edges zoom the whole pin. Close
-// gestures are in windows/pin-entry.jsx (via closePinWindow); the window
-// itself is electron/screenshot/pin-windows.js.
+// elsewhere. The wheel and the window edges zoom the whole pin. A
+// double-click docks it as a thumbnail at the screen edge, which previews on
+// hover; another double-click brings it back. Close gestures are in
+// windows/pin-entry.jsx (via closePinWindow); the window itself is
+// electron/screenshot/pin-windows.js.
 
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -23,6 +25,10 @@ const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 4;
 const ZOOM_PER_WHEEL = 0.0015; // zoom factor = exp(-deltaY * this)
 const MIN_SIDE = 16; // px the zoomed pin never goes below
+const THUMB_SIDE = 120; // px a docked thumbnail's longer side
+const THUMB_MIN = 24; // px its shorter side never goes below
+const PEEK_DELAY = 120; // ms hover before the preview opens
+const UNPEEK_DELAY = 250; // ms outside before it closes
 const EDGE_CURSORS = { n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize', nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize' };
 const PATCH_PAD = 2; // CSS px a patch reaches past its OCR box
 const COLOR_BAND = 3; // source px sampled around a box for its background
@@ -152,6 +158,10 @@ const PinWindow = () => {
   // Last window bounds asked of main (DIP); window.screenX lags behind a burst of wheel steps.
   const boundsRef = useRef(null);
   const [edge, setEdge] = useState(null);
+  // Docked: { prev: { bounds, zoom }, thumbZoom } while a thumbnail at the screen edge.
+  const [dock, setDock] = useState(null);
+  const dockRef = useRef(null);
+  const peekRef = useRef({ open: false, timer: 0 });
 
   useEffect(() => {
     let cancelled = false;
@@ -275,7 +285,58 @@ const PinWindow = () => {
     return () => document.removeEventListener('copy', onCopy);
   }, []);
 
-  useEffect(() => () => clearTimeout(clickTimerRef.current), []);
+  useEffect(() => () => {
+    clearTimeout(clickTimerRef.current);
+    clearTimeout(peekRef.current.timer);
+  }, []);
+
+  const showZoom = (z) => {
+    zoomRef.current = z;
+    setZoom(z);
+  };
+
+  // Double-click: dock as a thumbnail, or return to where it was.
+  const toggleDock = async () => {
+    if (!size || !boundsRef.current) return;
+    const docked = dockRef.current;
+    clearTimeout(peekRef.current.timer);
+    peekRef.current.open = false;
+    if (docked) {
+      const { bounds, zoom: z } = docked.prev;
+      dockRef.current = null;
+      setDock(null);
+      boundsRef.current = { ...bounds };
+      showZoom(z);
+      window.electron?.pin?.undock?.(Math.round(bounds.x), Math.round(bounds.y), Math.round(bounds.width), Math.round(bounds.height));
+      return;
+    }
+    const prev = { bounds: { ...boundsRef.current }, zoom: zoomRef.current };
+    const longSide = Math.max(size.width, size.height);
+    const shortSide = Math.min(size.width, size.height);
+    const thumbZoom = Math.min(prev.zoom, Math.max(THUMB_SIDE / longSide, THUMB_MIN / shortSide));
+    const thumb = await window.electron?.pin?.dock?.({ width: size.width * thumbZoom, height: size.height * thumbZoom });
+    if (!thumb) return;
+    const next = { prev, thumbZoom: thumb.width / size.width };
+    dockRef.current = next;
+    setDock(next);
+    showZoom(next.thumbZoom);
+  };
+
+  // Hover on a docked thumbnail opens the preview at the pre-dock size;
+  // leaving closes it. Both wait a beat so passing the edge does not flicker.
+  const setPeek = (open) => {
+    const docked = dockRef.current;
+    if (!docked || !size) return;
+    clearTimeout(peekRef.current.timer);
+    if (peekRef.current.open === open) return;
+    peekRef.current.timer = setTimeout(async () => {
+      if (dockRef.current !== docked) return;
+      peekRef.current.open = open;
+      const { width, height } = docked.prev.bounds;
+      const b = await window.electron?.pin?.peek?.(open, { width, height });
+      if (b && dockRef.current === docked) showZoom(b.width / size.width);
+    }, open ? PEEK_DELAY : UNPEEK_DELAY);
+  };
 
   const zoomLimits = () => {
     const minSide = Math.min(size.width, size.height);
@@ -303,7 +364,7 @@ const PinWindow = () => {
     const onWheel = (e) => {
       e.preventDefault();
       const b = boundsRef.current;
-      if (!b) return;
+      if (!b || dockRef.current) return;
       const delta = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
       const z = zoomRef.current;
       const k = Math.exp(-delta * ZOOM_PER_WHEEL);
@@ -320,7 +381,7 @@ const PinWindow = () => {
   };
 
   const handleHover = (e) => {
-    if (e.buttons) return;
+    if (e.buttons || dockRef.current) return;
     const next = edgeAt(e.clientX, e.clientY);
     if (next !== edge) setEdge(next);
   };
@@ -365,12 +426,14 @@ const PinWindow = () => {
     // Presses on the overlay's scrollbar scroll.
     if (e.target.classList?.contains('pin-overlay') && e.nativeEvent.offsetX >= e.target.clientWidth) return;
     clearTimeout(clickTimerRef.current);
-    // Second press of a double-click: no word selection, no view switch.
+    // Second press of a double-click: no word selection, no view switch; it docks.
     if (e.detail >= 2) {
       e.preventDefault();
+      if (e.detail === 2) toggleDock();
       return;
     }
-    const side = edgeAt(e.clientX, e.clientY);
+    const docked = !!dockRef.current;
+    const side = docked ? null : edgeAt(e.clientX, e.clientY);
     if (side && boundsRef.current) {
       startResize(e, side);
       return;
@@ -389,7 +452,7 @@ const PinWindow = () => {
     const onMove = (ev) => {
       if (!dragging && Math.hypot(ev.screenX - startX, ev.screenY - startY) <= CLICK_SLOP) return;
       dragging = true;
-      if (onText) return;
+      if (onText || docked) return;
       pending = { x: ev.screenX - offsetX, y: ev.screenY - offsetY };
       if (raf) return;
       raf = requestAnimationFrame(() => {
@@ -422,7 +485,11 @@ const PinWindow = () => {
       style={edge ? { cursor: EDGE_CURSORS[edge] } : undefined}
       onMouseDown={handleMouseDown}
       onMouseMove={handleHover}
-      onMouseLeave={() => setEdge(null)}
+      onMouseEnter={() => setPeek(true)}
+      onMouseLeave={() => {
+        setEdge(null);
+        setPeek(false);
+      }}
     >
       {image && (
         <div className="pin-frame" ref={frameRef} style={sizeStyle}>

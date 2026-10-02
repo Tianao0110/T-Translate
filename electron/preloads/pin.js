@@ -16,6 +16,10 @@ contextBridge.exposeInMainWorld('electron', {
     moveTo: (x, y) => ipcRenderer.send('pin:move', x, y),
     // Zoom: new bounds; main keeps the size for later moves.
     setBounds: (x, y, width, height) => ipcRenderer.send('pin:set-bounds', x, y, width, height),
+    // Docking: main places the thumbnail and the hover preview.
+    dock: (size) => ipcRenderer.invoke('pin:dock', size),
+    undock: (x, y, width, height) => ipcRenderer.send('pin:undock', x, y, width, height),
+    peek: (on, size) => ipcRenderer.invoke('pin:peek', on, size),
     // copy: 'image' | 'view' (with rect) | null.
     close: (copy, rect) => ipcRenderer.send('pin:close', { copy: copy || null, rect: rect || null }),
     addToHistory: (item) => ipcRenderer.invoke('pin:add-to-history', item),
