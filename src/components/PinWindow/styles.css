@@ -61,6 +61,29 @@ html, body {
   color: var(--pin-danger);
 }
 
+/* Translation patches over their source boxes; colors come inline from the image. */
+.pin-patches {
+  position: absolute;
+  inset: 0;
+}
+
+.pin-patches.is-hidden {
+  visibility: hidden;
+}
+
+.pin-patch {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.pin-patch.is-clipped {
+  align-items: flex-start;
+}
+
 .pin-badge {
   position: absolute;
   top: 4px;
