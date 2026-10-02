@@ -29,11 +29,18 @@ html, body {
   --pin-text: #1e3431;
 }
 
-/* Sized by the renderer to the image's natural size, anchored top-left. */
+/* Sized by the renderer to the image's natural size, anchored top-left,
+   scaled as a whole by the pin's zoom. */
 .pin-frame {
   position: absolute;
   top: 0;
   left: 0;
+  transform-origin: 0 0;
+}
+
+/* Edge hover: the resize cursor wins over text and drag cursors. */
+.pin-root.is-edge * {
+  cursor: inherit !important;
 }
 
 .pin-image {
@@ -136,7 +143,7 @@ html, body {
   content: '';
   position: absolute;
   inset: 0;
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--pin-accent) 75%, transparent);
+  box-shadow: inset 0 0 0 calc(2px / var(--pin-zoom, 1)) color-mix(in srgb, var(--pin-accent) 75%, transparent);
   pointer-events: none;
 }
 

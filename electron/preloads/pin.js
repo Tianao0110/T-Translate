@@ -14,6 +14,8 @@ contextBridge.exposeInMainWorld('electron', {
     ready: () => ipcRenderer.send('pin:ready'),
     // Manual drag: fire-and-forget position stream; main keeps the size.
     moveTo: (x, y) => ipcRenderer.send('pin:move', x, y),
+    // Zoom: new bounds; main keeps the size for later moves.
+    setBounds: (x, y, width, height) => ipcRenderer.send('pin:set-bounds', x, y, width, height),
     // copy: 'image' | 'view' (with rect) | null.
     close: (copy, rect) => ipcRenderer.send('pin:close', { copy: copy || null, rect: rect || null }),
     addToHistory: (item) => ipcRenderer.invoke('pin:add-to-history', item),

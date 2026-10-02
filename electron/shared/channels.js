@@ -65,6 +65,7 @@ const CHANNELS = {
     GET_INIT: 'pin:get-init', // renderer → main: { image, theme, targetLanguage, sameLanguageBehavior, ocrEngine }
     READY: 'pin:ready',       // renderer → main: image painted, show the window
     MOVE: 'pin:move',         // renderer → main: manual drag stream (x, y)
+    SET_BOUNDS: 'pin:set-bounds', // renderer → main: zoom (x, y, width, height)
     CLOSE: 'pin:close',       // renderer → main: { copy: 'image' | 'view' | null, rect }
     ADD_TO_HISTORY: 'pin:add-to-history', // forward a translation into the main window's history
   },

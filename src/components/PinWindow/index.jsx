@@ -4,18 +4,26 @@
 // selectable for copying: the translation itself, and a transparent layer of
 // the recognized lines over the original. A click switches between
 // translation and original; a drag selects on text and moves the window
-// elsewhere. Close gestures are in windows/pin-entry.jsx (via
-// closePinWindow); the window itself is electron/screenshot/pin-windows.js.
+// elsewhere. The wheel and the window edges zoom the whole pin. Close
+// gestures are in windows/pin-entry.jsx (via closePinWindow); the window
+// itself is electron/screenshot/pin-windows.js.
 
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { recognizeAndTranslate } from './pipeline.js';
 import { patchColors } from './patch-colors.js';
+import { edgeAt as edgeIn, zoomFromEdge, placeAround } from './zoom.js';
 import './styles.css';
 
 const CLICK_SLOP = 3;
 const CLICK_DELAY = 250; // ms a click waits to rule out a double-click
+const EDGE = 6; // px along the window edge that resize instead of drag
+const MIN_ZOOM = 0.25;
+const MAX_ZOOM = 4;
+const ZOOM_PER_WHEEL = 0.0015; // zoom factor = exp(-deltaY * this)
+const MIN_SIDE = 16; // px the zoomed pin never goes below
+const EDGE_CURSORS = { n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize', nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize' };
 const PATCH_PAD = 2; // CSS px a patch reaches past its OCR box
 const COLOR_BAND = 3; // source px sampled around a box for its background
 const MIN_FONT = 8;
@@ -138,6 +146,12 @@ const PinWindow = () => {
   const frameRef = useRef(null);
   const imgRef = useRef(null);
   const clickTimerRef = useRef(0);
+  const rootRef = useRef(null);
+  const [zoom, setZoom] = useState(1);
+  const zoomRef = useRef(1);
+  // Last window bounds asked of main (DIP); window.screenX lags behind a burst of wheel steps.
+  const boundsRef = useRef(null);
+  const [edge, setEdge] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -164,6 +178,7 @@ const PinWindow = () => {
   useEffect(() => {
     if (!size || !image || startedRef.current) return;
     startedRef.current = true;
+    boundsRef.current = { x: window.screenX, y: window.screenY, width: size.width, height: size.height };
     window.electron?.pin?.ready?.();
     const frame = { width: size.width * size.scale, height: size.height * size.scale };
     recognizeAndTranslate(image, initRef.current || {}, frame).then((r) => {
@@ -262,6 +277,80 @@ const PinWindow = () => {
 
   useEffect(() => () => clearTimeout(clickTimerRef.current), []);
 
+  const zoomLimits = () => {
+    const minSide = Math.min(size.width, size.height);
+    return [Math.max(MIN_ZOOM, MIN_SIDE / minSide), MAX_ZOOM];
+  };
+
+  // New zoom with the window placed so the anchor (window CSS px, or a fixed
+  // corner) stays put; main resizes the window to match.
+  const applyZoom = (next, place) => {
+    const [lo, hi] = zoomLimits();
+    const z = Math.min(hi, Math.max(lo, next));
+    const width = size.width * z;
+    const height = size.height * z;
+    const { x, y } = place(width, height, z);
+    zoomRef.current = z;
+    setZoom(z);
+    boundsRef.current = { x, y, width, height };
+    window.electron?.pin?.setBounds?.(Math.round(x), Math.round(y), Math.round(width), Math.round(height));
+  };
+
+  // Wheel zooms around the pointer.
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root || !size) return undefined;
+    const onWheel = (e) => {
+      e.preventDefault();
+      const b = boundsRef.current;
+      if (!b) return;
+      const delta = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+      const z = zoomRef.current;
+      const k = Math.exp(-delta * ZOOM_PER_WHEEL);
+      applyZoom(z * k, (w, h, next) => placeAround(b, e.clientX, e.clientY, next / z));
+    };
+    root.addEventListener('wheel', onWheel, { passive: false });
+    return () => root.removeEventListener('wheel', onWheel);
+  });
+
+  // Which window edge (or corner) a point is on, if any.
+  const edgeAt = (x, y) => {
+    if (!size) return null;
+    return edgeIn(x, y, size.width * zoomRef.current, size.height * zoomRef.current, EDGE) || null;
+  };
+
+  const handleHover = (e) => {
+    if (e.buttons) return;
+    const next = edgeAt(e.clientX, e.clientY);
+    if (next !== edge) setEdge(next);
+  };
+
+  // Edge drag: aspect-locked zoom with the opposite side or corner fixed.
+  const startResize = (e, side) => {
+    e.preventDefault();
+    const start = { ...boundsRef.current };
+    const startX = e.screenX;
+    const startY = e.screenY;
+    let pending = null;
+    let raf = 0;
+    const onMove = (ev) => {
+      pending = { dx: ev.screenX - startX, dy: ev.screenY - startY };
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const { zoom: next, place } = zoomFromEdge(side, start, pending.dx, pending.dy, size);
+        applyZoom(next, place);
+      });
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      if (raf) cancelAnimationFrame(raf);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
   useEffect(() => {
     frameEl = frameRef.current;
     copyTarget = result && !result.error && !showOriginal ? 'view' : 'image';
@@ -279,6 +368,11 @@ const PinWindow = () => {
     // Second press of a double-click: no word selection, no view switch.
     if (e.detail >= 2) {
       e.preventDefault();
+      return;
+    }
+    const side = edgeAt(e.clientX, e.clientY);
+    if (side && boundsRef.current) {
+      startResize(e, side);
       return;
     }
     const onText = !!e.target.closest?.('.pin-selectable');
@@ -300,6 +394,7 @@ const PinWindow = () => {
       if (raf) return;
       raf = requestAnimationFrame(() => {
         raf = 0;
+        if (boundsRef.current) Object.assign(boundsRef.current, pending);
         window.electron?.pin?.moveTo?.(pending.x, pending.y);
       });
     };
@@ -315,10 +410,20 @@ const PinWindow = () => {
     window.addEventListener('mouseup', onUp);
   };
 
-  const sizeStyle = size ? { width: size.width, height: size.height } : { visibility: 'hidden' };
+  const sizeStyle = size
+    ? { width: size.width, height: size.height, transform: `scale(${zoom})`, '--pin-zoom': zoom }
+    : { visibility: 'hidden' };
 
   return (
-    <div className="pin-root" data-theme={theme} onMouseDown={handleMouseDown}>
+    <div
+      ref={rootRef}
+      className={`pin-root${edge ? ' is-edge' : ''}`}
+      data-theme={theme}
+      style={edge ? { cursor: EDGE_CURSORS[edge] } : undefined}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleHover}
+      onMouseLeave={() => setEdge(null)}
+    >
       {image && (
         <div className="pin-frame" ref={frameRef} style={sizeStyle}>
           <img ref={imgRef} className="pin-image" src={image} alt="" draggable={false} onLoad={handleLoad} />

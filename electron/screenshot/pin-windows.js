@@ -10,6 +10,7 @@ const logger = require('../platform/logger')('Pin');
 
 const MAX_PINS = 8;
 const READY_TIMEOUT_MS = 10000;
+const MAX_SIDE = 16384;
 
 // BrowserWindow id -> { window, image, width, height }, oldest first.
 const pins = new Map();
@@ -127,6 +128,16 @@ function movePin(sender, x, y) {
   pin.window.setBounds({ x: Math.round(x), y: Math.round(y), width: pin.width, height: pin.height });
 }
 
+// Zoom from the renderer: new bounds, kept as the size later moves use.
+function resizePin(sender, x, y, width, height) {
+  const pin = pinOf(sender);
+  if (!pin || pin.window.isDestroyed()) return;
+  if (![x, y, width, height].every(Number.isFinite) || width < 1 || height < 1 || width > MAX_SIDE || height > MAX_SIDE) return;
+  pin.width = Math.round(width);
+  pin.height = Math.round(height);
+  pin.window.setBounds({ x: Math.round(x), y: Math.round(y), width: pin.width, height: pin.height });
+}
+
 // copy: 'image' puts the captured image on the clipboard, 'view' the rendered
 // page inside `rect` (DIP), anything else nothing.
 async function closePin(sender, { copy = null, rect = null } = {}) {
@@ -158,4 +169,4 @@ function isPointInPins(x, y) {
   return false;
 }
 
-module.exports = { createPin, getInit, markReady, movePin, closePin, isPointInPins };
+module.exports = { createPin, getInit, markReady, movePin, resizePin, closePin, isPointInPins };

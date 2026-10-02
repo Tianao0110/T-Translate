@@ -80,6 +80,7 @@ function register(ctx) {
   ipcMain.handle(CHANNELS.PIN.GET_INIT, (event) => pinWindows.getInit(event.sender));
   ipcMain.on(CHANNELS.PIN.READY, (event) => pinWindows.markReady(event.sender));
   ipcMain.on(CHANNELS.PIN.MOVE, (event, x, y) => pinWindows.movePin(event.sender, x, y));
+  ipcMain.on(CHANNELS.PIN.SET_BOUNDS, (event, x, y, w, h) => pinWindows.resizePin(event.sender, x, y, w, h));
   ipcMain.on(CHANNELS.PIN.CLOSE, (event, options) => {
     pinWindows.closePin(event.sender, { copy: options?.copy, rect: options?.rect });
   });
