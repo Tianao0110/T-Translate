@@ -1,9 +1,10 @@
 // LLM Vision OCR: a vision-capable LLM (Qwen-VL, LLaVA, ...) via the local
 // OpenAI-compatible chat endpoint.
 
-import { BaseOCREngine } from './base.js';
+import { BaseOCREngine, _t } from './base.js';
 import { rtFetch } from '../runtime.js';
 import createLogger from '../logger.js';
+import { pickLoadedModel } from '../lmstudio-models.js';
 const logger = createLogger('LLMVision');
 
 // prompt_tokens floor for a request that really carried the image; a 200
@@ -62,8 +63,27 @@ class LLMVisionEngine extends BaseOCREngine {
     }
   }
 
+  // The configured model, else the image-capable one LM Studio has loaded;
+  // none loaded fails with errorCode LMSTUDIO_NONE_LOADED (ocr/manager.js).
+  async _resolveModel() {
+    if (this.config.model) return { model: this.config.model };
+    const { known, id } = await pickLoadedModel(this.config.endpoint, { vision: true });
+    if (known && !id) {
+      return {
+        failure: {
+          success: false,
+          errorCode: 'LMSTUDIO_NONE_LOADED',
+          error: _t('ocr.lmstudioNoneLoaded', 'LM Studio 里还没有加载能看图的模型：先在 LM Studio 里加载一个，或者在 OCR 识别里写明要用的模型名'),
+        },
+      };
+    }
+    return { model: id || undefined };
+  }
+
   async recognize(input, options = {}) {
     try {
+      const { model, failure } = await this._resolveModel();
+      if (failure) return failure;
       const imageData = this.ensureBase64(input);
       const { sourceLanguage = 'auto' } = options;
 
@@ -73,7 +93,7 @@ class LLMVisionEngine extends BaseOCREngine {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: this.config.model || undefined,
+          model,
           messages: [
             { role: 'system', content: systemPrompt },
             {
@@ -139,6 +159,8 @@ class LLMVisionEngine extends BaseOCREngine {
       const system = messages.find(m => m.role === 'system');
       const user = messages.find(m => m.role === 'user');
       if (!user) return { success: false, error: 'No user message / 缺少提示词' };
+      const { model, failure } = await this._resolveModel();
+      if (failure) return failure;
 
       const payload = [];
       if (system?.content) payload.push({ role: 'system', content: system.content });
@@ -154,7 +176,7 @@ class LLMVisionEngine extends BaseOCREngine {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: this.config.model || undefined,
+          model,
           messages: payload,
           max_tokens: 2048,
         }),

@@ -777,6 +777,7 @@ const zh = {
     },
     visionFallback: "当前模型不支持视觉识别，已自动切换到本地 OCR",
     visionLocked: "LLM 视觉识别已因多次失败被禁用，已切换到本地 OCR。如需重新启用请前往 设置 > OCR",
+    lmstudioNoneLoaded: "LM Studio 里还没有加载能看图的模型：先在 LM Studio 里加载一个，或者在 OCR 识别里写明要用的模型名",
     visionBlockedByPrivacy: "当前隐私模式已禁用视觉模型",
     visionNotLocal: "离线模式只允许本机视觉模型，截图不出本机",
     allEnginesFailed: "所有 OCR 引擎均失败"
@@ -1208,6 +1209,7 @@ const zh = {
     tengineCancelled: "已取消",
     tengineFailed: "内置模型生成失败",
     tengineNoChat: "当前内置模型只做翻译，AI 动作请改用通用模型",
+    lmstudioNoneLoaded: "LM Studio 里还没有加载模型：先在 LM Studio 里加载一个，或者在翻译源里写明要用的模型名",
     // Shared provider runtime messages (migrated from hardcoded Chinese).
     // English strings must keep classifiable keywords so error-handler's
     // ERROR_PATTERNS still routes them (see core/error-handler.js).

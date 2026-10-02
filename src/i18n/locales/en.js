@@ -777,6 +777,7 @@ const en = {
     },
     visionFallback: "Current model does not support vision. Automatically switched to local OCR.",
     visionLocked: "LLM Vision has been disabled due to repeated failures. Switched to local OCR. Re-enable in Settings > OCR.",
+    lmstudioNoneLoaded: "No image-capable model is loaded in LM Studio. Load one there, or name the model under OCR",
     visionBlockedByPrivacy: "The current privacy mode disables vision models",
     visionNotLocal: "Offline mode allows only a vision model on this machine — the screenshot stays local",
     allEnginesFailed: "All OCR engines failed"
@@ -1207,6 +1208,7 @@ const en = {
     tengineUnhealthy: "Built-in model stalled repeatedly; another provider is used for this session",
     tengineCancelled: "Cancelled",
     tengineFailed: "Built-in model failed to generate",
+    lmstudioNoneLoaded: "No model is loaded in LM Studio. Load one there, or name the model in the provider's fields",
     tengineNoChat: "The selected built-in model only translates; pick the general model for AI actions",
     // English strings keep the keywords error-handler's ERROR_PATTERNS match on
     // (not configured / invalid / timeout / quota / connection failed).

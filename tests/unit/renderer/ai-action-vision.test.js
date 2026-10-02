@@ -102,7 +102,8 @@ describe('visionChat', () => {
     const result = await manager.visionChat(MESSAGES, IMG, {});
 
     expect(result).toMatchObject({ success: true, content: 'summary text' });
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const chatCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/chat/completions'));
+    const body = JSON.parse(chatCall[1].body);
     expect(body.messages[0].role).toBe('system');
     expect(body.messages[1].content[0]).toMatchObject({ type: 'text' });
     expect(body.messages[1].content[1].image_url.url).toBe(IMG);
