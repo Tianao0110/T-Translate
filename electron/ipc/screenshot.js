@@ -46,6 +46,7 @@ function register(ctx) {
 
   ipcMain.on(CHANNELS.SCREENSHOT.CANCEL, () => {
     logger.info('Screenshot cancelled');
+    require('../screenshot/pin-windows').discardWarm();
 
     const mainWindow = getMainWindow();
     const screenshotMod = getScreenshotModule();
@@ -73,6 +74,24 @@ function register(ctx) {
 
     runtime.wasMainWindowVisible = false;
     runtime.screenshotFromHotkey = false;
+  });
+
+  // Pinned screenshots: each handler resolves its pin from event.sender.
+  const pinWindows = require('../screenshot/pin-windows');
+  ipcMain.handle(CHANNELS.PIN.GET_INIT, (event) => pinWindows.getInit(event.sender));
+  ipcMain.on(CHANNELS.PIN.READY, (event) => pinWindows.markReady(event.sender));
+  ipcMain.on(CHANNELS.PIN.MOVE, (event, x, y) => pinWindows.movePin(event.sender, x, y));
+  ipcMain.on(CHANNELS.PIN.SET_BOUNDS, (event, x, y, w, h) => pinWindows.resizePin(event.sender, x, y, w, h));
+  ipcMain.handle(CHANNELS.PIN.DOCK, (event, size) => pinWindows.dockPin(event.sender, size));
+  ipcMain.on(CHANNELS.PIN.UNDOCK, (event) => pinWindows.undockPin(event.sender));
+  ipcMain.on(CHANNELS.PIN.FRAME, (event, x, y, w, h) => pinWindows.framePin(event.sender, x, y, w, h));
+  ipcMain.handle(CHANNELS.PIN.PEEK, (event, on, size) => pinWindows.peekPin(event.sender, !!on, size));
+  ipcMain.on(CHANNELS.PIN.CLOSE, (event, options) => {
+    pinWindows.closePin(event.sender, { copy: options?.copy, rect: options?.rect });
+  });
+  ipcMain.handle(CHANNELS.PIN.ADD_TO_HISTORY, (event, item) => {
+    getMainWindow()?.webContents.send(CHANNELS.DATA.ADD_TO_HISTORY, item);
+    return true;
   });
 
   // OCR done -> push text into selection window for translation

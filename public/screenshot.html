@@ -69,13 +69,6 @@
         z-index: 1000;
       }
 
-      #tips kbd {
-        background: rgba(255, 255, 255, 0.2);
-        padding: 2px 6px;
-        border-radius: 4px;
-        margin: 0 2px;
-      }
-
       /*=============================================
       确认按钮样式 
     =============================================*/
@@ -199,11 +192,11 @@
     <div id="overlay"></div>
     <div id="selection"></div>
     <div id="size-indicator"></div>
-    <div id="tips">拖动鼠标选择截图区域 | <kbd>ESC</kbd> 或 右键取消</div>
+    <div id="tips"></div>
 
     <!-- 确认/取消按钮 -->
     <div id="action-buttons">
-      <button class="action-btn cancel" id="btn-cancel" title="取消 (ESC)">
+      <button class="action-btn cancel" id="btn-cancel">
         <svg
           viewBox="0 0 24 24"
           fill="none"
@@ -219,7 +212,6 @@
       <button
         class="action-btn confirm"
         id="btn-confirm"
-        title="确认截图 (Enter)"
       >
         <svg
           viewBox="0 0 24 24"
@@ -260,6 +252,12 @@
       screenshot.onConfig((config) => {
         if (config.showConfirmButtons !== undefined) {
           showConfirmButtons = config.showConfirmButtons;
+        }
+        // Labels in the UI language, from electron/shared/main-i18n.js.
+        if (config.labels) {
+          tips.textContent = config.labels.tips || "";
+          btnCancel.title = config.labels.cancel || "";
+          btnConfirm.title = config.labels.confirm || "";
         }
       });
 

@@ -67,6 +67,7 @@ export const PRESET_CORE = [
     requiresNetwork: false,
     hooks: {
       requireApiKey: false,
+      loadedModel: true,
     },
   },
 ];

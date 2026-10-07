@@ -60,6 +60,21 @@ const CHANNELS = {
     CONFIG: 'screenshot-config',
     OCR_COMPLETE: 'screenshot:ocr-complete',       // OCR done — forward text to selection window for translation.
   },
+  // Pinned screenshots (screenshot/pin-windows.js); main finds the pin by event.sender.
+  PIN: {
+    GET_INIT: 'pin:get-init', // renderer → main: { image, theme, targetLanguage, sameLanguageBehavior, ocrEngine } | null while prewarmed
+    INIT: 'pin:init',         // main → prewarmed renderer: the same payload once it becomes a pin
+    READY: 'pin:ready',       // renderer → main: image painted, show the window
+    MOVE: 'pin:move',         // renderer → main: manual drag stream (x, y)
+    SET_BOUNDS: 'pin:set-bounds', // renderer → main: zoom (x, y, width, height)
+    DOCK: 'pin:dock',         // renderer → main: thumbnail { width, height } → its bounds
+    UNDOCK: 'pin:undock',     // renderer → main: leaving the edge
+    FRAME: 'pin:frame',       // renderer → main: one animation frame (x, y, width, height)
+    SLOT: 'pin:slot',         // main → docked renderer: its new thumbnail bounds after a restack
+    PEEK: 'pin:peek',         // renderer → main: (on, { width, height }) → preview or thumbnail bounds
+    CLOSE: 'pin:close',       // renderer → main: { copy: 'image' | 'view' | null, rect }
+    ADD_TO_HISTORY: 'pin:add-to-history', // forward a translation into the main window's history
+  },
   FLOATING_WINDOW: {
     CLOSE: 'floating-window:close',
     GET_BOUNDS: 'floating-window:get-bounds',

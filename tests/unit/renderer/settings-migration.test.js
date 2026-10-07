@@ -1,5 +1,5 @@
-﻿// migrateOldSettings coverage for the glass -> floatingWindow bucket unification
-// and the paddle-ocr engine id remap.
+﻿// migrateOldSettings coverage for the glass -> floatingWindow bucket unification,
+// the paddle-ocr engine id remap and the screenshot output default.
 
 import { describe, it, expect } from 'vitest';
 import { migrateOldSettings, DEFAULT_SETTINGS } from '../../../src/components/SettingsPanel/constants.js';
@@ -99,6 +99,18 @@ describe('migrateOldSettings: removed OCR engine id', () => {
   it('leaves other engine ids alone', () => {
     for (const id of ['rapid-ocr', 'windows-ocr', 'llm-vision', 'baidu-ocr']) {
       expect(migrateOldSettings({ ocr: { engine: id } }).ocr.engine).toBe(id);
+    }
+  });
+});
+
+describe('migrateOldSettings: screenshot output', () => {
+  it('defaults to pin when nothing was saved', () => {
+    expect(migrateOldSettings({}).screenshot.outputMode).toBe('pin');
+  });
+
+  it('keeps a saved choice', () => {
+    for (const mode of ['bubble', 'main', 'pin']) {
+      expect(migrateOldSettings({ screenshot: { outputMode: mode } }).screenshot.outputMode).toBe(mode);
     }
   });
 });

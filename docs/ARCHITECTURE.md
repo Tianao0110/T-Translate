@@ -58,7 +58,7 @@ t-translate/
 │   ├── ipc/                    # IPC 处理器 (按功能拆分，translation-stack.js 为栈 facade)
 │   ├── windows/                # 窗口 / 菜单 / 托盘管理器
 │   ├── selection/              # 划词翻译：controller（鼠标钩子、三层探测、图标/直达两条路）、手势状态机、剪贴板抓取
-│   ├── screenshot/             # 截图 OCR：flow（截屏→框选→裁剪→交接）、screenshot-module（多屏截取与裁剪）
+│   ├── screenshot/             # 截图 OCR：flow（截屏→框选→裁剪→交接）、screenshot-module（多屏截取与裁剪）、pin-windows（贴图窗口：缩放、停靠）、dock-layout（停靠排位）
 │   ├── listen/                 # 听译：audio-engine-manager（ASR 子进程会话）、listen-translator、自动保存、模型表、音频包、WASAPI 抓音
 │   ├── tts/                    # 朗读：音色表与语音包
 │   ├── ocr/                    # 本地 OCR：ocr-engine（含 PDF 版面分析门面）、Windows OCR、OCR 模型包
@@ -83,6 +83,7 @@ t-translate/
 │   │   ├── FavoritesPanel/     # 收藏功能
 │   │   ├── FloatingWindow/    # 悬浮窗口
 │   │   ├── SelectionTranslator/# 划词翻译
+│   │   ├── PinWindow/          # 截图贴图（识别翻译、译文贴回原位、选字、缩放、停靠）
 │   │   ├── DocumentTranslator/ # 文档翻译
 │   │   ├── ProviderSettings/   # 翻译源设置
 │   │   ├── TitleBar/           # 标题栏
@@ -134,7 +135,8 @@ t-translate/
 │   │
 │   └── windows/                # 子窗口入口
 │       ├── floating-window-entry.jsx     # 悬浮窗口入口
-│       └── selection-entry.jsx # 划词翻译入口
+│       ├── selection-entry.jsx # 划词翻译入口
+│       └── pin-entry.jsx       # 截图贴图入口
 │
 ├── public/                     # 静态资源 + HTML 入口
 │   ├── index.html              # 主窗口
@@ -142,6 +144,7 @@ t-translate/
 │   ├── floating-window.html              # 悬浮窗口
 │   ├── child-pane.html         # 子面板
 │   ├── screenshot.html         # 截图选区
+│   ├── pin.html                # 截图贴图
 │   ├── icon.png                # 应用图标
 │   ├── icon.ico                # Windows 图标
 │   └── tray-icon.ico           # 托盘图标
@@ -169,7 +172,7 @@ t-translate/
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                         View Layer                              │
-│  components/* (React Components，三渲染窗口)                     │
+│  components/* (React Components，四渲染窗口)                     │
 └────────────────────────────────┬────────────────────────────────┘
                                  │
                                  ▼

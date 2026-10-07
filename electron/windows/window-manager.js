@@ -481,6 +481,7 @@ function isPointInSelectionWindows(x, y) {
 
 module.exports = {
   isPointInSelectionWindows,
+  hardenWebContents,
   init,
   createMainWindow,
   createFloatingWindow,

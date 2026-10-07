@@ -5,11 +5,13 @@
 //   - modelsFallbackEndpoint               → secondary models endpoint (e.g. Ollama /api/tags)
 //   - fieldAdapter                         → normalize config (e.g. baseUrl → endpoint)
 //   - testConnectionMessage                → custom success message
+//   - loadedModel                          → blank model = the one LM Studio has loaded (lmstudio-models.js)
 
 import { BaseProvider, buildTranslationMessages, combineSignal, linkAbort } from './base.js';
 import { _t } from '../i18n.js';
 import { rtFetch } from '../runtime.js';
 import createLogger from '../logger.js';
+import { pickLoadedModel } from '../lmstudio-models.js';
 
 const logger = createLogger('OpenAICompat');
 
@@ -213,11 +215,13 @@ class OpenAICompatibleProvider extends BaseProvider {
 
   async chat(messages, options = {}) {
     try {
+      const { model, error } = await this._resolveModel();
+      if (error) return { success: false, error };
       const response = await rtFetch(`${this.config.endpoint}/chat/completions`, {
         method: 'POST',
         headers: this._buildHeaders(),
         body: JSON.stringify({
-          model: this.config.model || undefined,
+          model,
           messages,
           temperature: options.temperature ?? 0.7,
           ...(options.max_tokens ? { max_tokens: options.max_tokens } : {}),
@@ -289,11 +293,24 @@ class OpenAICompatibleProvider extends BaseProvider {
     } catch { /* leave blank; the request will surface a clear error */ }
   }
 
+  // The model a request names: the configured one, else for presets with
+  // hooks.loadedModel the one LM Studio has loaded; nothing loaded is an error.
+  async _resolveModel() {
+    if (this.config.model || !this.hooks.loadedModel) return { model: this.config.model || undefined };
+    const { known, id } = await pickLoadedModel(this.config.endpoint);
+    if (known && !id) {
+      return { error: _t('providerError.lmstudioNoneLoaded', 'LM Studio 里还没有加载模型：先在 LM Studio 里加载一个，或者在翻译源里写明要用的模型名') };
+    }
+    return { model: id || undefined };
+  }
+
   /**
    * Chat completion (non-streaming)
    */
   async _chatCompletion(messages, extSignal) {
     await this._ensureModel();
+    const { model, error } = await this._resolveModel();
+    if (error) return { success: false, error };
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
     // The facade's abort signal cancels the same controller.
@@ -304,7 +321,7 @@ class OpenAICompatibleProvider extends BaseProvider {
         method: 'POST',
         headers: this._buildHeaders(),
         body: JSON.stringify({
-          model: this.config.model || undefined,
+          model,
           messages,
           temperature: 0.3,
           // No max_tokens unless configured.
@@ -339,6 +356,8 @@ class OpenAICompatibleProvider extends BaseProvider {
    */
   async _chatCompletionStream(messages, onChunk, extSignal) {
     await this._ensureModel();
+    const { model, error } = await this._resolveModel();
+    if (error) throw new Error(error);
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
     let idleTimer = null;
@@ -350,7 +369,7 @@ class OpenAICompatibleProvider extends BaseProvider {
         method: 'POST',
         headers: this._buildHeaders(),
         body: JSON.stringify({
-          model: this.config.model || undefined,
+          model,
           messages,
           temperature: 0.3,
           // No max_tokens unless configured.

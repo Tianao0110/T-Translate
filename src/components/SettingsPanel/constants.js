@@ -163,7 +163,7 @@ export const DEFAULT_SETTINGS = {
   tts: { ...DEFAULT_TTS_CONFIG },
 
   screenshot: {
-    outputMode: 'bubble', // 'bubble' | 'main'
+    outputMode: 'pin', // 'pin' | 'bubble' | 'main'
   },
 };
 

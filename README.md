@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.5.3-green" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.5.4-green" alt="Version">
   <img src="https://img.shields.io/badge/license-T--Translate%201.0-blue" alt="License">
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform">
 </p>
@@ -30,7 +30,7 @@ Privacy comes first: the app ships with its own local model, so one model file i
 | Feature | Description |
 | --- | --- |
 | **Select to translate** | Select text in any program and click once; cards can be pinned |
-| **Screenshot translate** | Box any screen region to recognize and translate, on any monitor |
+| **Screenshot translate** | Box any screen region to recognize and translate, on any monitor; pin it on screen with the translation laid over the original |
 | **Floating window** | Transparent overlay; Space to capture; auto refresh follows live captions without stealing focus |
 | **Listen mode** | Live captions for whatever is playing, translated sentence by sentence; recognized on this computer, audio never written to disk; captions auto-saved |
 | **Document translation** | PDF, Word, EPUB, TXT, Markdown, SRT, VTT, CSV, JSON; paragraph by paragraph, resumable |

@@ -1,0 +1,213 @@
+/* Pinned screenshot window. Loads no App.css: theme tokens are local. */
+
+html, body {
+  background: transparent;
+}
+
+.pin-root {
+  --pin-accent: #3b82f6;
+  --pin-surface: #ffffff;
+  --pin-text: #333;
+  --pin-danger: #ef4444;
+  /* Veils over the blurred image follow the image's own tone, not the theme. */
+  --pin-veil-dark: rgba(0, 0, 0, 0.42);
+  --pin-veil-dark-text: #f4f4f4;
+  --pin-veil-dark-halo: rgba(0, 0, 0, 0.45);
+  --pin-veil-light: rgba(255, 255, 255, 0.5);
+  --pin-veil-light-text: #1c1c1c;
+  --pin-veil-light-halo: rgba(255, 255, 255, 0.6);
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  cursor: default;
+  user-select: none;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.pin-root[data-theme="dark"] {
+  --pin-accent: #d6a854;
+  --pin-surface: #262421;
+  --pin-text: #e8e4dd;
+}
+
+.pin-root[data-theme="fresh"] {
+  --pin-accent: #10b981;
+  --pin-surface: #ecf6f4;
+  --pin-text: #1e3431;
+}
+
+/* Sized by the renderer to the image's natural size, anchored top-left,
+   scaled as a whole by the pin's zoom. */
+.pin-frame {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+
+/* Edge hover: the resize cursor wins over text and drag cursors. */
+.pin-root.is-edge * {
+  cursor: inherit !important;
+}
+
+.pin-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  -webkit-user-drag: none;
+}
+
+/* Whole-image panel: blurred pin, toned veil, centered text. */
+.pin-overlay {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+/* Oversized so the blur's faded rim stays outside the frame. */
+.pin-overlay-blur {
+  position: absolute;
+  left: -8%;
+  top: -8%;
+  width: 116%;
+  height: 116%;
+  filter: blur(14px);
+  -webkit-user-drag: none;
+}
+
+.pin-overlay-scroll {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+
+.pin-overlay-scroll.is-overflow {
+  align-items: flex-start;
+}
+
+.pin-overlay.is-dark .pin-overlay-scroll {
+  background: var(--pin-veil-dark);
+  color: var(--pin-veil-dark-text);
+  text-shadow: 0 1px 2px var(--pin-veil-dark-halo);
+}
+
+.pin-overlay.is-light .pin-overlay-scroll {
+  background: var(--pin-veil-light);
+  color: var(--pin-veil-light-text);
+  text-shadow: 0 1px 2px var(--pin-veil-light-halo);
+}
+
+.pin-overlay-body {
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4em;
+  line-height: 1.5;
+}
+
+.pin-overlay-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+.pin-overlay-text.is-multiline {
+  text-align: left;
+}
+
+.pin-overlay-icon {
+  width: 1.6em;
+  height: 1.6em;
+  flex-shrink: 0;
+  color: var(--pin-danger);
+}
+
+/* Patches and text lines over the image. */
+.pin-items {
+  position: absolute;
+  inset: 0;
+}
+
+/* Translation patches over their source boxes; colors come inline from the image. */
+
+.pin-patch {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.pin-patch.is-clipped {
+  align-items: flex-start;
+}
+
+/* Recognized lines: transparent text, visible only as a selection. */
+.pin-line {
+  position: absolute;
+  white-space: pre;
+  line-height: 1;
+  color: transparent;
+  transform-origin: 0 0;
+}
+
+.pin-selectable {
+  user-select: text;
+  cursor: text;
+}
+
+.pin-selectable::selection,
+.pin-selectable *::selection {
+  background: color-mix(in srgb, var(--pin-accent) 40%, transparent);
+}
+
+.pin-line::selection {
+  color: transparent;
+}
+
+.pin-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--pin-surface);
+  color: var(--pin-accent);
+}
+
+.pin-badge.is-error {
+  color: var(--pin-danger);
+}
+
+.pin-spin {
+  animation: pin-spin 1s linear infinite;
+}
+
+@keyframes pin-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Edge ring, drawn inside the image. */
+.pin-frame::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 0 calc(2px / var(--pin-zoom, 1)) color-mix(in srgb, var(--pin-accent) 75%, transparent);
+  pointer-events: none;
+}
+
+.pin-capturing .pin-frame::after,
+.pin-capturing .pin-badge {
+  display: none;
+}

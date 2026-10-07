@@ -166,6 +166,7 @@ export class OCREngineManager {
       const result = await this._recognizeWithEngine(preferredEngine, input, options);
 
       if (!result.success && preferredEngine === 'llm-vision') {
+        if (result.errorCode === 'LMSTUDIO_NONE_LOADED') return result;
         if (this._isVisionUnsupportedError(result.error)) {
           return this._handleVisionFallback(input, options, result.error);
         }
@@ -220,7 +221,7 @@ export class OCREngineManager {
         }
 
         // Walk-the-priority path still counts toward the vision lock threshold
-        if (id === 'llm-vision' && this._isVisionUnsupportedError(result.error)) {
+        if (id === 'llm-vision' && result.errorCode !== 'LMSTUDIO_NONE_LOADED' && this._isVisionUnsupportedError(result.error)) {
           this._incrementVisionFail(result.error);
         }
       } catch (error) {
@@ -263,6 +264,7 @@ export class OCREngineManager {
       this._visionFailCount = 0;
       return result;
     }
+    if (result.errorCode === 'LMSTUDIO_NONE_LOADED') return result;
     if (result.visionUnsupported || this._isVisionUnsupportedError(result.error)) {
       this._incrementVisionFail(result.error);
       result.visionUnsupported = true;
