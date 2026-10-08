@@ -60,68 +60,6 @@
   color: var(--text-primary);
 }
 
-/* 模式功能面板 */
-.mode-features-panel {
-  margin-top: 20px;
-  padding: 16px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-primary);
-  border-radius: 10px;
-}
-
-.mode-features-panel h4 {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0 0 12px 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.feature-list {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
-}
-
-.feature-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  background: var(--bg-primary);
-  border-radius: 6px;
-  font-size: 13px;
-}
-
-.feature-item.enabled {
-  border-left: 3px solid #10b981;
-}
-
-.feature-item.disabled {
-  border-left: 3px solid #ef4444;
-  opacity: 0.7;
-}
-
-.feature-icon {
-  display: inline-flex;
-  align-items: center;
-}
-
-.feature-item.enabled .feature-icon { color: var(--success); }
-.feature-item.disabled .feature-icon { color: var(--error); }
-
-.feature-name {
-  flex: 1;
-  color: var(--text-primary);
-}
-
-.feature-status {
-  font-size: 12px;
-  color: var(--text-tertiary);
-}
-
 .mode-warning {
   display: flex;
   align-items: flex-start;
@@ -321,17 +259,8 @@
 }
 
 
-/* ==================== 按模块的功能说明（v0.4.2） ==================== */
-/* A third state next to enabled/disabled: works with restrictions. */
-.feature-item.partial {
-  border-left: 3px solid var(--warning);
-}
-
-.feature-item.partial .feature-icon {
-  color: var(--warning);
-}
-
-/* Read-only three-mode overview under the per-mode list. */
+/* Three-mode overview right under the mode picker; the current mode's column
+   is tinted. */
 .pm-table {
   width: 100%;
   border-collapse: collapse;
@@ -341,7 +270,7 @@
 
 .pm-table th,
 .pm-table td {
-  padding: 8px 10px;
+  padding: 6px 10px;
   border-bottom: 1px solid var(--border-primary);
   text-align: left;
   vertical-align: top;
@@ -368,29 +297,7 @@
   background: color-mix(in srgb, var(--accent-primary) 6%, transparent);
 }
 
-/* Head row: title + the 详细 button that opens the comparison view. */
-.pm-head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.pm-head h3 {
-  flex: 1;
-  margin-bottom: 0;
-}
-
-.pm-head + .seg {
-  margin-top: 16px;
-}
-
 /* State pills: icon + one word; a short reason below when restricted. */
-.pm-row {
-  border-left: none;
-  opacity: 1;
-  justify-content: space-between;
-}
-
 .pm-cell {
   display: inline-flex;
   flex-direction: column;
@@ -434,17 +341,7 @@
   vertical-align: middle;
 }
 
-/* Head row: the 详细 button stays a one-line pill on the right edge of the
-   content column; the pill grid and the comparison table center their data
-   columns (user's call 2026-09-03). */
-.pm-head .btn-small {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  white-space: nowrap;
-  width: auto;
-}
-
+/* The data columns are centered (user's call 2026-09-03). */
 .pm-table {
   table-layout: fixed;
 }
@@ -463,17 +360,3 @@
   align-items: center;
 }
 
-/* .btn-small carries no surface of its own here; give the 详细 button the
-   same bordered look as the pack-list buttons. */
-.pm-head .btn-small {
-  padding: 5px 10px;
-  border-radius: 6px;
-  border: 1px solid var(--border-primary);
-  background: var(--bg-primary);
-  color: var(--text-secondary);
-}
-
-.pm-head .btn-small:hover {
-  color: var(--text-primary);
-  border-color: var(--accent-primary);
-}

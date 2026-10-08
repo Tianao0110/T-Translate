@@ -228,7 +228,6 @@ const en = {
   privacy: {
     modeDescription: "Choose a mode that fits your needs. Different features are available in different modes.",
     currentMode: "Current Mode",
-    featuresTitle: "Current Mode Features",
     switchedTo: "Switched to {{mode}}",
     modes: {
       standard: "Standard", standardDesc: "Full features, auto-save history",
@@ -241,8 +240,6 @@ const en = {
     features: { history: "History", cache: "Translation Cache", onlineApi: "Online Translation API", analytics: "Local Usage Stats" },
     modeShort: { standard: "Standard", secure: "Incognito", offline: "Offline" },
     stateWord: { on: "On", part: "Limited", off: "Off" },
-    detail: "Details",
-    detailTitle: "Modes side by side",
     modules: {
       translators: { name: "Translation providers", standard: "Local LLM and online providers", secure: "All available", offline: "Local LLM only, online providers disabled", offlineShort: "local LLM only" },
       ocr: { name: "OCR", standard: "Local + online engines", secure: "No Windows OCR (it needs the capture as a temp file)", secureShort: "no Windows OCR", offline: "Local engines only", offlineShort: "local engines only" },

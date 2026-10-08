@@ -228,7 +228,6 @@ const zh = {
   privacy: {
     modeDescription: "选择适合您需求的工作模式，不同模式下可用功能不同",
     currentMode: "当前模式",
-    featuresTitle: "当前模式功能说明",
     switchedTo: "已切换到 {{mode}}",
     modes: {
       standard: "标准模式", standardDesc: "功能全开，自动保存历史记录",
@@ -241,8 +240,6 @@ const zh = {
     features: { history: "历史记录", cache: "翻译缓存", onlineApi: "在线翻译API", analytics: "本地使用统计" },
     modeShort: { standard: "标准", secure: "无痕", offline: "离线" },
     stateWord: { on: "可用", part: "受限", off: "不可用" },
-    detail: "详细",
-    detailTitle: "三种模式对比",
     modules: {
       translators: { name: "翻译源", standard: "本地 LLM 与在线源都可用", secure: "都可用", offline: "只用本地 LLM，在线源禁用", offlineShort: "仅本地 LLM" },
       ocr: { name: "OCR", standard: "本地引擎 + 在线引擎", secure: "不用 Windows OCR（它要把截图写成临时文件）", secureShort: "无 Windows OCR", offline: "只用本地引擎", offlineShort: "仅本地引擎" },

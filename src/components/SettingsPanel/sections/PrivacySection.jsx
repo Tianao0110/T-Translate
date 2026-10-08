@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Zap, Shield, Lock, Trash2, ClipboardList, Database, Check, X, Minus, ArrowRightLeft, Download, Upload, Table2, ChevronLeft } from 'lucide-react';
+import { Zap, Shield, Lock, Trash2, Database, Check, X, Minus, ArrowRightLeft, Download, Upload } from 'lucide-react';
 import useTranslationStore from '../../../stores/translation-store';
 import translationService from '../../../translation/stack-client.js';
 import { PRIVACY_MODES, PRIVACY_MODE_IDS } from '../constants.js';
@@ -53,9 +53,6 @@ const PrivacySection = ({
   // Matrix columns use the config ids; the seg shows the user-facing names.
   const modeIds = PRIVACY_MODE_ORDER;
   const stateIcon = (state) => (state === 'on' ? <Check size={12} /> : state === 'part' ? <Minus size={12} /> : <X size={12} />);
-  // 'main' = mode picker + this mode's module list; 'detail' = the read-only
-  // three-mode comparison.
-  const [view, setView] = useState('main');
 
   // A cell is a pill (icon + one word) with a short reason under it when the
   // module is restricted; the full sentence lives in the tooltip only.
@@ -301,14 +298,30 @@ const PrivacySection = ({
     }
   };
 
-  if (view === 'detail') {
-    return (
-      <div className="setting-content">
-        <div className="audio-subhead">
-          <button type="button" className="audio-back" onClick={() => setView('main')}>
-            <ChevronLeft size={14} />{t('settings.privacy.title')}
-          </button>
-          <h3>{t('privacy.detailTitle')}</h3>
+  return (
+    <div className="setting-content">
+      <h3>{t('settings.privacy.title')}</h3>
+
+      {/* The picker, then what each mode allows, all three side by side with
+          the current one highlighted. The old per-mode list was one column of
+          this table and the full table sat behind a 详细 button. */}
+      <div className="setting-group wide">
+        <div className="seg">
+          {modeIds.map((id) => {
+            const mode = PRIVACY_MODES[id];
+            if (!mode) return null;
+            return (
+              <button
+                key={id}
+                type="button"
+                className={currentMode === id ? 'on' : ''}
+                onClick={() => handleModeChange(mode)}
+              >
+                {getModeIcon(mode.icon, 13)}
+                {getModeName(id)}
+              </button>
+            );
+          })}
         </div>
         <table className="pm-table">
           <thead>
@@ -331,55 +344,11 @@ const PrivacySection = ({
           </tbody>
         </table>
       </div>
-    );
-  }
-
-  return (
-    <div className="setting-content">
-      <div className="pm-head">
-        <h3>{t('settings.privacy.title')}</h3>
-        <button type="button" className="btn-small" onClick={() => setView('detail')}>
-          <Table2 size={12} /><span style={{ marginLeft: 4 }}>{t('privacy.detail')}</span>
-        </button>
-      </div>
-
-      {/* Mode picker: the house segmented style; the selected segment IS the
-          current mode, so no separate banner. */}
-      <div className="seg">
-        {modeIds.map((id) => {
-          const mode = PRIVACY_MODES[id];
-          if (!mode) return null;
-          return (
-            <button
-              key={id}
-              type="button"
-              className={currentMode === id ? 'on' : ''}
-              onClick={() => handleModeChange(mode)}
-            >
-              {getModeIcon(mode.icon, 13)}
-              {getModeName(id)}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* What this mode means per module: name + state pill (+ short reason) */}
-      <div className="mode-features-panel">
-        <h4><ClipboardList size={15} /> {t('privacy.featuresTitle')}</h4>
-        <div className="feature-list">
-          {PRIVACY_MODULES.map((m) => (
-            <div key={m} className="feature-item pm-row">
-              <span className="feature-name">{t(`privacy.modules.${m}.name`)}</span>
-              {statePill(m, currentMode)}
-            </div>
-          ))}
-        </div>
-      </div>
 
       {/* Data management, one label/value grid so every row lines up: where it
           lives, how much of each kind is stored, auto-delete, then what can be
           done with it (migrate, clear). Dividers split the three parts. */}
-      <div className="setting-group">
+      <div className="setting-group wide">
         <label className="setting-label"><Database size={15} /> {t('privacy.dataManagement')}</label>
 
         <div className="storage-grid data-grid">

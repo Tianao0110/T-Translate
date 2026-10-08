@@ -41,7 +41,7 @@ Switch under Settings → Privacy:
 - **Incognito**: nothing is saved; closing the window clears everything.
 - **Offline**: no network at all; only translation sources and recognition engines on this computer are used.
 
-For a feature-by-feature comparison, click "Details" on the Privacy page.
+The Privacy page has a feature-by-feature comparison table of the three modes.
 
 ## 1. Main window
 
@@ -347,7 +347,7 @@ The model that ships with the app; you download the files yourself and put them 
 
 ### 4.12 Privacy
 
-- Three modes at the top: standard / incognito / offline, with each feature's state in the current mode below and "Details" for the full comparison.
+- Three modes at the top: standard / incognito / offline, with a table below showing each feature's state in all three modes; the current mode's column is highlighted.
 - Data management: everything about your data is in this one group, top to bottom:
 - **Storage locations**: where the data and models folders are, with buttons to open them; models left elsewhere by an older version can be moved with "Move to program folder", and the old folder cleaned afterwards with "Clear old folder".
 - **Usage**: how much history, favorites, cache, document progress, settings and logs take up; "Auto-delete history" in days, 0 means never.
