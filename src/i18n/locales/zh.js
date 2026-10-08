@@ -96,7 +96,16 @@ const zh = {
     smartFilter: "智能过滤", skipShort: "跳过过短段落", minLength: "最小字符数",
     skipNumbers: "跳过纯数字段落（如页码）", skipCode: "保留代码块不翻译", skipTargetLang: "跳过已是目标语言的段落",
     displayStyle: "默认显示样式",
-    styleBelow: "上下对照", styleSideBySide: "左右对照"
+    styleBelow: "上下对照", styleSideBySide: "左右对照",
+    layout: {
+      title: "PDF 版面分析",
+      name: "版面分析模型（PP-DocLayoutV3）",
+      desc: "翻译 PDF 时跳过公式、图、页眉页脚，表格按行翻译",
+      needsGpu: "显卡加速没开，PDF 仍按规则切段（设置 → 本地模型 → 本地引擎）",
+      downloaded: "版面分析模型安装完成",
+      removeConfirm: "删除版面分析模型？",
+      removed: "版面分析模型已删除",
+    },
   },
   shortcuts: {
     title: "快捷键",
@@ -679,19 +688,11 @@ const zh = {
       mirrorEncoder: "图像编码器（镜像）",
       openFolder: "打开模型文件夹",
       rescan: "重新检测",
-      needsGpu: "需要在「关于」里打开显卡加速",
+      needsGpu: "需要在 本地模型 → 本地引擎 里打开显卡加速",
       smartHint: "简单截图走本地 OCR，复杂的才交给视觉模型",
       part: { model: "主模型", mmproj: "图像编码器" },
       state: { ready: "已就绪", missing: "未放入", mismatch: "校验不符" },
       fallbackNotice: "内置视觉模型用不了，这次用了本地 OCR",
-    },
-    layout: {
-      name: "版面分析模型（PP-DocLayoutV3）",
-      desc: "翻译 PDF 时跳过公式、图、页眉页脚，表格按行翻译",
-      needsGpu: "显卡加速没开，PDF 仍按规则切段（设置 → 关于 → 显卡加速）",
-      downloaded: "版面分析模型安装完成",
-      removeConfirm: "删除版面分析模型？",
-      removed: "版面分析模型已删除",
     },
     tier: {
       label: "模型档位",

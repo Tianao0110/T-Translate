@@ -109,7 +109,7 @@ Three tone buttons under the languages: Natural (everyday), Precise (technical, 
 - Drop a file in or click to choose. Right-clicking a .pdf / .docx / .txt in Explorer and choosing "Translate with T-Translate" opens it here too.
 - Encrypted PDFs ask for the password. Scanned PDFs have no text layer, so the app runs OCR page by page; set up an OCR engine in Settings first. Pages whose text layer is garbled are read by OCR too.
 - PDFs are split into the original paragraphs. Running headers, footers and page numbers are dropped, and each table row becomes one paragraph.
-- With the layout model installed and GPU acceleration on, each PDF page is read for layout first: text inside formulas, figures, headers and footers is no longer translated as body text, and tables are translated row by row. Loading shows layout progress page by page; the first PDF after each start takes a few seconds longer. Download the model under Settings → OCR → Local engines.
+- With the layout model installed and GPU acceleration on, each PDF page is read for layout first: text inside formulas, figures, headers and footers is no longer translated as body text, and tables are translated row by row. Loading shows layout progress page by page; the first PDF after each start takes a few seconds longer. Download the model under Settings → Documents.
 - The document is shown paragraph by paragraph, stacked or side by side. The outline on the left jumps to headings.
 - Each PDF paragraph has a locate button (crosshair icon, "Show on the original page"): it opens the "Original page" panel on the right at that page with the paragraph outlined, so figures, tables and formulas can be read against the original. In a narrow window the outline steps aside while the panel is open.
 - "Start translation" translates paragraph by paragraph; you can pause, resume and stop. Failed paragraphs can be retried one at a time or all at once with "Retry Failed".
@@ -294,6 +294,7 @@ See "Related settings" in chapter 2.
 - Segments at once: how many paragraphs parallel mode translates together. 1 to 2 for local models; online APIs can go higher.
 - Default display style: stacked or side by side.
 - Smart filter: skip short paragraphs (the minimum length sits next to the switch; headings are exempt), skip number-only paragraphs such as page numbers and rows of figures in tables, keep code blocks untranslated, skip paragraphs already in the target language.
+- PDF layout analysis: the layout model (PP-DocLayoutV3, about 112 MB to download). Once installed, each PDF page is read for layout before it is split: text inside formulas, figures, headers and footers is not translated as body text, and tables are translated row by row. It takes effect only while GPU acceleration is on; when it is off, a note here points to Local model → Local engines.
 - The supported file formats are listed in the upload area of the Documents page.
 
 ### 4.6 AI Actions
@@ -314,7 +315,7 @@ The model that ships with the app; you download the files yourself and put them 
 
 - Recognition language: auto by default. Chinese, English, Japanese and most Latin-script languages are built in; Korean, Cyrillic, Devanagari, Arabic and others need a language pack downloaded below. The same group holds the screenshot options: show confirm buttons; enlarge small images for better recognition of small text.
 - Engines come in three groups; click "Use" to make one the default:
-- **Local engines**: Local OCR (built in, milliseconds) and Windows OCR (ships with Windows, no download, modest quality). Local OCR has a model tier (standard / high accuracy, the latter better on blurry photos and stylized text, about 95 MB to download), the language pack list, and an engine recheck. At the bottom is the layout model (about 112 MB to download); it is used only for PDF document translation, and only while GPU acceleration is on.
+- **Local engines**: Local OCR (built in, milliseconds) and Windows OCR (ships with Windows, no download, modest quality). Local OCR has a model tier (standard / high accuracy, the latter better on blurry photos and stylized text, about 95 MB to download), the language pack list, and an engine recheck.
 - **Vision models**: the built-in vision model (two files you download yourself, usable only with GPU acceleration on; simple captures still go to local OCR, large images, columns and tables go to the vision model) and LLM Vision (the LM Studio / Ollama address and a vision model name).
 - **Online services**: OCR.space, Google Vision, Azure, Baidu OCR, each with its key. Disabled automatically in privacy modes.
 
@@ -419,7 +420,8 @@ Both models are Apache-2.0. The old high-accuracy engine that used to sit in `mo
 
 Click "Download" on the settings pages. Downloads are blocked in offline mode.
 
-- **OCR language packs** (Settings → OCR): Korean, Cyrillic, Devanagari, Arabic, Tamil, Telugu, Kannada; one pack covers every language written in that script. Plus the high-accuracy model, about 95 MB, and the layout model, about 112 MB (used for PDFs only while GPU acceleration is on).
+- **OCR language packs** (Settings → OCR): Korean, Cyrillic, Devanagari, Arabic, Tamil, Telugu, Kannada; one pack covers every language written in that script. Plus the high-accuracy model, about 95 MB.
+- **Layout model** (Settings → Documents): about 112 MB, used for PDFs only while GPU acceleration is on.
 - **Listen recognition models** (Settings → Audio → Listen): the base recognition model, about 153 MB, required; the draft engine, about 168 MB, optional.
 - **Neural voice packs** (Settings → Audio → Speak → Voice packs): Kokoro (103 Chinese and English voices) and MeloTTS (one female voice that reads mixed Chinese and English most naturally).
 

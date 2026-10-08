@@ -96,7 +96,16 @@ const en = {
     smartFilter: "Smart Filter", skipShort: "Skip short paragraphs", minLength: "Min length",
     skipNumbers: "Skip number-only paragraphs (e.g. page numbers)", skipCode: "Keep code blocks untranslated", skipTargetLang: "Skip paragraphs already in target language",
     displayStyle: "Default Display Style",
-    styleBelow: "Top-bottom", styleSideBySide: "Side by side"
+    styleBelow: "Top-bottom", styleSideBySide: "Side by side",
+    layout: {
+      title: "PDF layout analysis",
+      name: "Layout model (PP-DocLayoutV3)",
+      desc: "PDFs skip formulas, figures, headers and footers; tables go row by row",
+      needsGpu: "GPU acceleration is off, so PDFs are still split by rules (Settings → Local model → Local engines)",
+      downloaded: "Layout model installed",
+      removeConfirm: "Remove the layout model?",
+      removed: "Layout model removed",
+    },
   },
   shortcuts: {
     title: "Shortcuts",
@@ -679,19 +688,11 @@ const en = {
       mirrorEncoder: "Image encoder (mirror)",
       openFolder: "Open model folder",
       rescan: "Re-detect",
-      needsGpu: "Turn on GPU acceleration under About",
+      needsGpu: "Turn on GPU acceleration under Local model → Local engines",
       smartHint: "Simple captures use Local OCR; complex ones go to the vision model",
       part: { model: "Model", mmproj: "Image encoder" },
       state: { ready: "Ready", missing: "Not present", mismatch: "Hash mismatch" },
       fallbackNotice: "Built-in vision model unavailable; Local OCR was used",
-    },
-    layout: {
-      name: "Layout model (PP-DocLayoutV3)",
-      desc: "PDFs skip formulas, figures, headers and footers; tables go row by row",
-      needsGpu: "GPU acceleration is off, so PDFs are still split by rules (Settings → About → GPU acceleration)",
-      downloaded: "Layout model installed",
-      removeConfirm: "Remove the layout model?",
-      removed: "Layout model removed",
     },
     tier: {
       label: "Model tier",

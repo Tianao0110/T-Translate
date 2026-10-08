@@ -1,10 +1,13 @@
 import { useTranslation } from 'react-i18next';
 import { Filter } from 'lucide-react';
 import { Seg, Switch } from './shared';
+import LayoutModelCard from './LayoutModelCard.jsx';
 
 const DocumentSection = ({
   settings,
-  updateSetting
+  updateSetting,
+  notify,
+  confirm
 }) => {
   const { t } = useTranslation();
 
@@ -58,7 +61,9 @@ const DocumentSection = ({
         </div>
       </div>
 
-      <div className="setting-group">
+      {/* Two rows tall on wide windows, so the layout model sits under the
+          fields instead of alone in a third row. */}
+      <div className="setting-group doc-filter-group">
         <label className="setting-label">
           <Filter size={16} /> {t('documentSettings.smartFilter')}
         </label>
@@ -99,6 +104,8 @@ const DocumentSection = ({
           label={t('documentSettings.skipTargetLang')}
         />
       </div>
+
+      <LayoutModelCard notify={notify} confirm={confirm} />
     </div>
   );
 };

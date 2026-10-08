@@ -828,6 +828,40 @@
   margin-top: 10px;
 }
 
+/* 版面分析模型：名称、状态、大小和按钮一行，按钮靠右 */
+.layout-model-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.layout-model-head .setting-label {
+  margin: 0;
+}
+
+.layout-model-head .engine-actions {
+  margin-left: auto;
+}
+
+.layout-model-head .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.layout-model .engine-download-progress {
+  margin-top: 8px;
+}
+
+/* 宽窗口：智能过滤占右栏两行，版面分析模型接在左栏字段组下面 */
+@container settings (min-width: 1040px) {
+  .setting-content > .doc-filter-group {
+    grid-row: span 2;
+  }
+}
+
 /* 「总结」行右侧的字数门槛 */
 .ai-action-threshold {
   display: inline-flex;
