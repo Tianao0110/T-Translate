@@ -351,8 +351,11 @@ The model that ships with the app; you download the files yourself and put them 
 ### 4.12 Privacy
 
 - Three modes at the top: standard / incognito / offline, with each feature's state in the current mode below and "Details" for the full comparison.
-- Data management: at the top, where the data and models folders are, with buttons to open them; models left elsewhere by an older version can be moved with "Move to program folder", and the old folder cleaned afterwards with "Clear old folder". Below that, how much history, favorites, cache, document progress, settings and logs take up; clear history, clear cache, or clear all data; "Auto-delete history" in days, 0 means never.
-- Migration: "Export Migration Pack" bundles settings, glossary, favorites and custom languages into one file; "Import Migration Pack" on another computer lets you pick which parts to take. API keys and model files are never included.
+- Data management: everything about your data is in this one group, top to bottom:
+- **Storage locations**: where the data and models folders are, with buttons to open them; models left elsewhere by an older version can be moved with "Move to program folder", and the old folder cleaned afterwards with "Clear old folder".
+- **Usage**: how much history, favorites, cache, document progress, settings and logs take up; "Auto-delete history" in days, 0 means never.
+- **Migration**: "Export Migration Pack" bundles settings, glossary, favorites and custom languages into one file; "Import Migration Pack" on another computer lets you pick which parts to take. API keys and model files are never included.
+- **Clear**: clear history, clear cache, or clear all data.
 
 ### 4.13 About
 
@@ -490,7 +493,7 @@ The common items in `data`:
 
 - **Uninstalling and upgrading keep your data**: both folders are preserved and picked up again after a reinstall.
 - **Moving to another computer**: do not copy the `data` folder. History and API keys are encrypted with this computer's system key and cannot be opened elsewhere. Use the three exports instead:
-- Settings → Privacy → Migration: "Export Migration Pack" writes a JSON file with settings, glossary, favorites and custom languages; "Import Migration Pack" on the new computer. API keys are not included and must be entered again.
+- Settings → Privacy → Data management: "Export Migration Pack" writes a JSON file with settings, glossary, favorites and custom languages; "Import Migration Pack" on the new computer. API keys are not included and must be entered again.
 - "Export" on the History page writes history to JSON; "Import" on the new computer.
 - "Export Terms" on the Favorites page backs up the glossary on its own.
 - **Models**: the `models` folder can be copied as a whole to the same location on the new computer to skip the downloads.

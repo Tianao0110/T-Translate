@@ -257,6 +257,7 @@ const en = {
     offlineWarning: "In offline mode, only local LLM translation is available. Online sources (OpenAI, DeepL, etc.) are disabled.",
     incognitoWarning: "Incognito mode is on: Translation history is paused. Previous history will be restored when you exit.",
     dataManagement: "Data Management",
+    clearLabel: "Clear",
     stats: {
       history: "History",
       favorites: "Favorites",

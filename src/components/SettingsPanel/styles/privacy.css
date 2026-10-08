@@ -146,11 +146,16 @@
   margin-top: 1px;
 }
 
-/* 危险操作区域 */
-.danger-actions {
-  display: flex;
-  gap: 12px;
+/* 数据管理底部的「迁移」「清除」两行，与上方统计用分隔线隔开 */
+.data-actions {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-primary);
+}
+
+.data-actions .storage-value {
   flex-wrap: wrap;
+  gap: 8px;
 }
 
 /* 输入框后缀 */

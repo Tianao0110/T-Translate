@@ -33,7 +33,7 @@ export const NAV_ITEMS = [
   { id: 'floatingWindow', icon: Layers, group: 'translation', keywords: ['glass', 'floating', 'overlay', 'pin', '玻璃', '透明', '置顶', '悬浮', '散点', '整段'] },
   { id: 'document', icon: FileText, group: 'translation', keywords: ['document', 'pdf', 'docx', 'epub', 'srt', 'subtitle', '文档', '字幕'] },
   { id: 'aiActions', icon: Sparkles, group: 'translation', keywords: ['ai', 'action', 'summarize', 'explain', 'import', 'prompt', 'AI', '动作', '总结', '讲解', '理解', '导入'] },
-  { id: 'llm', icon: Cpu, group: 'system', keywords: ['llm', 'model', 'built-in', 'local', 'gguf', 'qwen', 'tengine', 'engine', 'gpu', 'vulkan', 'webgpu', '内置', '模型', '本地', '大模型', '引擎', '显卡', '加速'] },
+  { id: 'llm', icon: Cpu, group: 'system', basic: true, keywords: ['llm', 'model', 'built-in', 'local', 'gguf', 'qwen', 'tengine', 'engine', 'gpu', 'vulkan', 'webgpu', '内置', '模型', '本地', '大模型', '引擎', '显卡', '加速'] },
   { id: 'ocr', icon: Eye, group: 'system', keywords: ['ocr', 'recognize', 'screenshot', 'image', 'rapidocr', 'llm', '识别', '截图'] },
   // Listen (recognition models) and speech (read-aloud) live under one entry;
   // the keyword halves still route a search to the right sub-page (index.jsx).

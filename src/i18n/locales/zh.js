@@ -257,6 +257,7 @@ const zh = {
     offlineWarning: "离线模式下仅可使用本地 LLM 翻译，在线翻译源（OpenAI、DeepL等）将被禁用",
     incognitoWarning: "无痕模式已开启：翻译记录暂停保存，退出后恢复之前的历史",
     dataManagement: "数据管理",
+    clearLabel: "清除",
     stats: {
       history: "历史记录",
       favorites: "收藏",

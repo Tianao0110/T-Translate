@@ -376,7 +376,8 @@ const PrivacySection = ({
         </div>
       </div>
 
-      {/* Data management */}
+      {/* Data management: where it lives, how much is stored, and what can be
+          done with it (migrate, clear) in one group. */}
       <div className="setting-group">
         <label className="setting-label"><Database size={15} /> {t('privacy.dataManagement')}</label>
 
@@ -426,33 +427,30 @@ const PrivacySection = ({
           {t('privacy.zeroMeansNever')}
           {currentMode === PRIVACY_MODE_IDS.SECURE ? t('privacy.incognitoDisabled') : ''}
         </p>
-      </div>
 
-      {/* Migration pack */}
-      <div className="setting-group">
-        <label className="setting-label"><ArrowRightLeft size={15} /> {t('privacy.migration.title')}</label>
-        <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap'}}>
-          <button className="neutral-button" onClick={handleExportPack}>
-            <Download size={16} /> {t('privacy.migration.export')}
-          </button>
-          <label className="neutral-button">
-            <Upload size={16} /> {t('privacy.migration.import')}
-            <input type="file" accept=".json" onChange={handleImportFile} style={{display: 'none'}} />
-          </label>
-        </div>
-      </div>
-
-      <div className="setting-group">
-        <div className="danger-actions">
-          <button className="danger-button" onClick={handleClearHistory}>
-            <Trash2 size={16} /> {t('settings.privacy.clearHistory')}
-          </button>
-          <button className="danger-button" onClick={handleClearCache}>
-            <Trash2 size={16} /> {t('translationSettings.clearCache')}
-          </button>
-          <button className="danger-button" onClick={handleClearAllData}>
-            <Trash2 size={16} /> {t('settings.privacy.clearAll')}
-          </button>
+        <div className="storage-grid data-actions">
+          <span className="storage-label">{t('privacy.migration.title')}</span>
+          <span className="storage-value">
+            <button className="neutral-button" onClick={handleExportPack}>
+              <Download size={16} /> {t('privacy.migration.export')}
+            </button>
+            <label className="neutral-button">
+              <Upload size={16} /> {t('privacy.migration.import')}
+              <input type="file" accept=".json" onChange={handleImportFile} style={{display: 'none'}} />
+            </label>
+          </span>
+          <span className="storage-label">{t('privacy.clearLabel')}</span>
+          <span className="storage-value">
+            <button className="danger-button" onClick={handleClearHistory}>
+              <Trash2 size={16} /> {t('settings.privacy.clearHistory')}
+            </button>
+            <button className="danger-button" onClick={handleClearCache}>
+              <Trash2 size={16} /> {t('translationSettings.clearCache')}
+            </button>
+            <button className="danger-button" onClick={handleClearAllData}>
+              <Trash2 size={16} /> {t('settings.privacy.clearAll')}
+            </button>
+          </span>
         </div>
       </div>
 
