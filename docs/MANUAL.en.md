@@ -320,22 +320,22 @@ The model that ships with the app; you download the files yourself and put them 
 
 ### 4.9 Audio · Listen
 
-- From the "Audio" page, click "Listen".
+- On the "Audio" page, switch to "Listen" at the top; its tag says whether recognition is ready.
 - Recognition model list: base recognition model (required), draft engine (optional, text while speech is still going). Download, update and uninstall live here. An old high-accuracy engine installed earlier is listed here too; it is no longer used and can be removed.
 - Final tier: standard / high accuracy. High accuracy needs one of the "High-accuracy models" in place first. If none is in place when listening starts, the floating window says so once and that session uses standard recognition.
-- High-accuracy models: Qwen3-ASR 1.7B and 0.6B, two files each, with whether they are in place, download links, the model folder, "Re-detect", and which one the next listen session uses. The 1.7B runs when GPU acceleration is on and the dedicated GPU has 8 GB or more of video memory, otherwise the 0.6B; if only one is in place, that one runs.
+- High-accuracy models (right under the final tier): Qwen3-ASR 1.7B and 0.6B, two files each, with whether they are in place, download links, the model folder, "Re-detect", and which one the next listen session uses. The 1.7B runs when GPU acceleration is on and the dedicated GPU has 8 GB or more of video memory, otherwise the 0.6B; if only one is in place, that one runs.
 - Auto-save captions on stop or switch: on by default.
 
 ### 4.10 Audio · Speak
 
-- From the "Audio" page, click "Speak".
+- On the "Audio" page, switch to "Speak" at the top; its tag names the engine that reads aloud right now.
 - Enable Text-to-Speech: when off, no read-aloud buttons are shown anywhere.
 - Engine: system voices (no download), neural voices (voice packs required, more natural), external service (appears once an address is filled in).
 - Now speaking: what is actually in use, with a preview. If the chosen engine cannot speak, system voices take over automatically.
 - Voices: neural voices are chosen per language (Chinese, English) through a picker with search and preview; system voices can be fixed to one, or chosen automatically by text language.
 - External speech service: address, key, model and voice, then "Test and listen". Not available in offline mode.
 - Rate, pitch and volume sliders. Pitch only affects system voices.
-- Voice packs: download and uninstall on the "Voice packs" tab.
+- Voice packs: listed at the bottom of the read-aloud settings, where you download and uninstall them.
 
 ### 4.11 Appearance
 

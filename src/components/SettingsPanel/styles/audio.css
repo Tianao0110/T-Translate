@@ -1,84 +1,7 @@
-/* SettingsPanel - 「音频」节（v0.4.2）
- * 两卡入口 → 听 / 读 子页；子页内分页与所有"选择"用分段开关（用户定的统一样式）；
- * 朗读页的「当前朗读」状态行、紧凑音色行、并排滑块；音色选择面板。 */
-
-/* ==================== 入口：两张卡 ==================== */
-.audio-home {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-top: 20px;
-}
-
-.audio-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 20px 20px 18px;
-  min-height: 150px;
-  border: 1px solid var(--border-primary);
-  border-radius: 12px;
-  background: var(--bg-secondary);
-  cursor: pointer;
-  text-align: left;
-  color: inherit;
-  font: inherit;
-  transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
-}
-
-.audio-card:hover {
-  border-color: var(--accent-primary);
-  transform: translateY(-1px);
-  box-shadow: 0 6px 18px color-mix(in srgb, var(--accent-primary) 12%, transparent);
-}
-
-.audio-card-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: color-mix(in srgb, var(--accent-primary) 14%, transparent);
-  color: var(--accent-primary);
-}
-
-.audio-card.warn .audio-card-icon {
-  background: color-mix(in srgb, var(--error) 12%, transparent);
-  color: var(--error);
-}
-
-.audio-card-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.audio-card-title .engine-badge {
-  font-size: 10px;
-}
-
-.audio-card-line {
-  font-size: 13px;
-  color: var(--text-primary);
-}
-
-.audio-card-meta {
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin-top: auto;
-}
-
-.audio-card-chev {
-  position: absolute;
-  right: 16px;
-  top: 20px;
-  color: var(--text-tertiary);
-}
+/* SettingsPanel - 「音频」节
+ * 顶部「听 / 读」两个页签（各带一个状态标签），所有"选择"用分段开关（用户定的统一样式）；
+ * 朗读页的「当前朗读」状态行、紧凑音色行、并排滑块；音色选择面板。
+ * 子页头部（返回按钮）现在只有隐私页的「详细」对比在用。 */
 
 /* ==================== 子页头部 ==================== */
 .audio-subhead {
@@ -118,6 +41,18 @@
 
 .audio-tabs {
   margin-bottom: 18px;
+}
+
+.audio-tabs .engine-badge {
+  margin-left: 6px;
+  font-size: 10px;
+}
+
+/* 读页签：语音包列在朗读设置下面，与上面隔一条线（朗读设置最后一组没有下边线） */
+.audio-packs {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-primary);
 }
 
 /* ==================== 朗读页：当前朗读状态行 ==================== */

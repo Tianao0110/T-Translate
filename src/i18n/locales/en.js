@@ -857,22 +857,9 @@ const en = {
     }
   },
   audio: {
-    description: "Listen is recognition, Speak is read-aloud; open a card for its settings",
-    back: "Audio",
     cards: { listen: "Listen", speak: "Speak" },
-    tabs: { read: "Read aloud", packs: "Voice packs" },
     listen: {
-      ready: "Ready", notReady: "Not installed",
-      readyDraft: "Base model + draft engine, live text for Chinese and English",
-      readyBase: "Base model, text after each sentence",
-      notReadyLine: "Download a recognition model to enable listen mode",
-      meta: "{{count}} recognition models installed · {{mb}} MB",
-      metaNone: "Base model 153 MB · optional draft engine 168 MB"
-    },
-    speak: {
-      lineWeb: "System voice picked by language",
-      metaPacks: "{{count}} voice packs installed", metaNoPacks: "No voice packs",
-      metaEndpoint: "External server configured", metaNoEndpoint: "No external server"
+      ready: "Ready", notReady: "Not installed"
     },
     engine: { label: "Engine", packs: "{{count}} packs", noPacks: "no packs", endpointUnset: "not set" },
     now: {

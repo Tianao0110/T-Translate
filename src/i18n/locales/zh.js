@@ -857,22 +857,9 @@ const zh = {
     }
   },
   audio: {
-    description: "听是识别，读是朗读；点卡进入各自的设置",
-    back: "音频",
     cards: { listen: "听", speak: "读" },
-    tabs: { read: "朗读", packs: "语音包" },
     listen: {
-      ready: "已就绪", notReady: "未安装",
-      readyDraft: "基础模型 + 草稿引擎，中英边说边出字",
-      readyBase: "基础模型，整句说完出字",
-      notReadyLine: "下载识别模型后悬浮窗才能听译",
-      meta: "已装 {{count}} 个识别模型 · {{mb}} MB",
-      metaNone: "基础模型 153 MB · 可选草稿引擎 168 MB"
-    },
-    speak: {
-      lineWeb: "自动按语言选系统语音",
-      metaPacks: "已装 {{count}} 个语音包", metaNoPacks: "没有语音包",
-      metaEndpoint: "外接服务已配置", metaNoEndpoint: "外接服务未配置"
+      ready: "已就绪", notReady: "未安装"
     },
     engine: { label: "引擎", packs: "{{count}} 包", noPacks: "未装包", endpointUnset: "未配置" },
     now: {
