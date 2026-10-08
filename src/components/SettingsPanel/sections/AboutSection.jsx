@@ -1,11 +1,12 @@
-// About section — app info + in-app auto-updater.
+// About section — app info + in-app auto-updater. Storage locations live on
+// the privacy page, the GPU switch and engine status on the local-model page.
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { GitBranch, RefreshCw, FolderOpen, Download, X, Loader2, CheckCircle, AlertCircle, ExternalLink, Rocket, Cpu, Heart, PartyPopper, Package, HardDrive, Trash2, Zap } from 'lucide-react';
-import { useConfirm } from '../../shared/ConfirmDialog.jsx';
-import { Switch } from './shared.jsx';
+import { GitBranch, RefreshCw, FolderOpen, Download, X, Loader2, CheckCircle, AlertCircle, ExternalLink, Rocket, Heart, PartyPopper, Package } from 'lucide-react';
 import appIcon from '/icon.png';
+
+const FEATURE_KEYS = ['feature1', 'feature2', 'feature3', 'feature4', 'feature5', 'feature6'];
 
 const UPDATE_STAGE = {
   IDLE: 'idle',
@@ -26,127 +27,6 @@ const AboutSection = ({ notify, resetSettings }) => {
   const [downloadedPath, setDownloadedPath] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
   const cleanupRef = useRef(null);
-
-  // Model storage: active root, fallback state, and what an older build
-  // left in userData. Refreshed after a move so the card reflects it.
-  const [storage, setStorage] = useState(null);
-  const [migrate, setMigrate] = useState({ state: 'idle', progress: null, error: '' });
-  const [clean, setClean] = useState({ state: 'idle', error: '' });
-  const [confirm, confirmDialog] = useConfirm();
-
-  const loadStorage = useCallback(async () => {
-    try {
-      const info = await window.electron?.models?.storageInfo?.();
-      if (info) setStorage(info);
-    } catch {
-      // no bridge (older preload) — the card simply stays hidden
-    }
-  }, []);
-
-  useEffect(() => {
-    loadStorage();
-    const off = window.electron?.models?.onMigrateProgress?.((p) => {
-      setMigrate((m) => ({ ...m, progress: p }));
-    });
-    return () => off?.();
-  }, [loadStorage]);
-
-  const moveModels = async () => {
-    setMigrate({ state: 'running', progress: null, error: '' });
-    const result = await window.electron?.models?.migrate?.();
-    if (result?.success) {
-      setMigrate({ state: 'done', progress: null, error: '' });
-    } else {
-      setMigrate({ state: 'failed', progress: null, error: result?.error || '' });
-    }
-    loadStorage();
-  };
-
-  // Packs still in the old folder come first; the clear button only shows
-  // once they are moved.
-  const showMovePacks = Boolean(storage && storage.legacyPacks > 0 && !storage.fallback);
-
-  const cleanLegacy = async () => {
-    if (!(await confirm(t('about.storage.cleanConfirm', { path: storage.legacyDataRoot })))) return;
-    setClean({ state: 'running', error: '' });
-    const result = await window.electron?.models?.cleanLegacy?.();
-    setClean(result?.success ? { state: 'done', error: '' } : { state: 'failed', error: result?.error || '' });
-    loadStorage();
-  };
-
-  // GPU acceleration: one switch; enabling runs the engines' self-tests
-  // (electron/ipc/gpu.js).
-  const [gpu, setGpu] = useState(null); // { enabled, engines, supported, last }
-  const [gpuBusy, setGpuBusy] = useState(false);
-  const loadGpu = useCallback(async () => {
-    try {
-      const info = await window.electron?.gpu?.status?.();
-      if (info) setGpu(info);
-    } catch {
-      // no bridge (older preload) — the card stays hidden
-    }
-  }, []);
-  useEffect(() => {
-    loadGpu();
-  }, [loadGpu]);
-
-  // T-Engine snapshot: one line per engine — is the host up, which backend,
-  // what the last self-test said. Refreshed on engine events.
-  const [engines, setEngines] = useState(null);
-  const loadEngines = useCallback(async () => {
-    try {
-      const s = await window.electron?.tengine?.status?.();
-      if (s?.engines) setEngines(s.engines);
-    } catch {
-      // older preload — the card stays hidden
-    }
-  }, []);
-  useEffect(() => {
-    loadEngines();
-    return window.electron?.tengine?.onEvent?.(() => loadEngines());
-  }, [loadEngines]);
-
-  const engineLine = (e) => {
-    const parts = [];
-    const host = e.host || null;
-    if (host?.backoffUntil) parts.push(t('about.tengine.backoff'));
-    else parts.push(host?.running ? (host.ready ? t('about.tengine.ready') : t('about.tengine.running')) : t('about.tengine.idle'));
-    if (e.lastHealth) {
-      parts.push(e.lastHealth.ok
-        ? `${t('about.tengine.healthOk')}${e.lastHealth.tokPerSec ? ` · ${t('about.tengine.speed', { n: e.lastHealth.tokPerSec })}` : ''}`
-        : t('about.tengine.healthFail', { reason: e.lastHealth.fallback || e.lastHealth.code || '' }));
-    }
-    if (host?.crashesInWindow) parts.push(t('about.tengine.crashes', { n: host.crashesInWindow }));
-    return parts.join(' · ');
-  };
-
-  const toggleGpu = async (next) => {
-    if (gpuBusy) return;
-    if (next && !(await confirm(t('about.gpu.confirm')))) return;
-    setGpuBusy(true);
-    try {
-      const result = await window.electron?.gpu?.setEnabled?.(next);
-      if (result?.success) {
-        notify(t(next ? 'about.gpu.enabled' : 'about.gpu.disabled'), 'success');
-      } else {
-        const reason = (result?.engines || []).map((e) => e.state?.fallback).find(Boolean) || '';
-        notify(t('about.gpu.failed', { reason }), 'warning');
-      }
-    } finally {
-      setGpuBusy(false);
-      loadGpu();
-    }
-  };
-
-  // One line per engine, straight from the main-process table: what it runs
-  // on right now, or why it never takes the GPU.
-  const engineState = (e) => {
-    if (!e.gpu) return { cls: '', text: t('about.gpu.state.cpuOnly', { reason: t(`about.gpu.reasons.${e.reason}`) }) };
-    if (e.state?.provider === 'webgpu') return { cls: 'installed', text: t(e.backend === 'vulkan' ? 'about.gpu.state.gpuVulkan' : 'about.gpu.state.gpu') };
-    if (e.state?.fallback) return { cls: 'unavailable', text: t('about.gpu.state.fallback', { reason: e.state.fallback }) };
-    if (e.state?.pending) return { cls: '', text: t('about.gpu.state.pending') };
-    return { cls: '', text: t('about.gpu.state.cpu') };
-  };
 
   useEffect(() => {
     const fetchVersion = async () => {
@@ -460,172 +340,63 @@ const AboutSection = ({ notify, resetSettings }) => {
 
   return (
     <div className="setting-content about-section">
-      <div className="app-info">
+      {/* Version and update sit at the top: the page is long, and checking for
+          an update is what people come here for. */}
+      <div className="about-header">
         <img src={appIcon} alt="T-Translate" className="app-logo-img" />
-        <h2>T-Translate</h2>
-        <p className="version-tag">v{version}</p>
-        <p className="app-desc">{t('about.desc')}</p>
+        <div className="about-title">
+          <div className="about-name-row">
+            <h2>T-Translate</h2>
+            <span className="version-tag">v{version}</span>
+          </div>
+          <p className="app-desc">{t('about.desc')}</p>
+        </div>
+        <div className="about-actions">
+          <button
+            className="about-update-button"
+            onClick={checkUpdate}
+            disabled={updateStage === UPDATE_STAGE.CHECKING || updateStage === UPDATE_STAGE.DOWNLOADING}
+          >
+            {updateStage === UPDATE_STAGE.CHECKING ? (
+              <><Loader2 size={16} className="spinning" /> {t('settings.about.checking')}</>
+            ) : (
+              <><RefreshCw size={16}/> {t('settings.about.checkUpdate')}</>
+            )}
+          </button>
+          <div className="about-links">
+            <button className="link-button" onClick={openGitHub}>
+              <GitBranch size={14}/> GitHub
+            </button>
+            <button className="link-button" onClick={openLogDirectory}>
+              <FolderOpen size={14}/> {t('about.openLogs')}
+            </button>
+          </div>
+        </div>
       </div>
 
+
+      {/* What the app does, one card. The developer-facing tech stack card
+          (untranslated, and out of date) was dropped. */}
       <div className="info-cards">
         <div className="info-card">
           <h4><Rocket size={16} /> {t('about.features')}</h4>
-          <ul>
-            <li>{t('about.feature1')}</li>
-            <li>{t('about.feature2')}</li>
-            <li>{t('about.feature3')}</li>
-            <li>{t('about.feature4')}</li>
-          </ul>
-        </div>
-        <div className="info-card">
-          <h4><Cpu size={16} /> {t('about.techStack')}</h4>
-          <ul>
-            <li>Electron + React 18</li>
-            <li>Zustand State Management</li>
-            <li>LM Studio / Ollama</li>
-            <li>PP-OCRv6 / LLM Vision</li>
+          <ul className="about-features">
+            {FEATURE_KEYS.map((key) => <li key={key}>{t(`about.${key}`)}</li>)}
           </ul>
         </div>
       </div>
 
-      {storage && (
-        <div className="info-card storage-card">
-          <h4><HardDrive size={16} /> {t('about.storage.title')}</h4>
-          <div className="storage-grid">
-            <span className="storage-label">{t('about.storage.dataDir')}</span>
-            <span className="storage-value">
-              <span className={`engine-badge ${storage.dataFallback ? 'unavailable' : 'installed'}`}>
-                {storage.dataFallback ? t('about.storage.inUserDir') : t('about.storage.inProgramDir')}
-              </span>
-              <span className="storage-path" title={storage.dataRoot}>{storage.dataRoot}</span>
-              <button className="link-button" onClick={() => window.electron?.models?.openFolder?.('data')}>
-                <FolderOpen size={14} /> {t('about.storage.openFolder')}
-              </button>
-            </span>
-            <span className="storage-label">{t('about.storage.modelsDir')}</span>
-            <span className="storage-value">
-              <span className={`engine-badge ${storage.fallback ? 'unavailable' : 'installed'}`}>
-                {storage.fallback ? t('about.storage.inUserDir') : t('about.storage.inProgramDir')}
-              </span>
-              <span className="storage-path" title={storage.root}>{storage.root}</span>
-              <button className="link-button" onClick={() => window.electron?.models?.openFolder?.('models')}>
-                <FolderOpen size={14} /> {t('about.storage.openFolder')}
-              </button>
-            </span>
-            {(showMovePacks || storage.legacyDataRoot) && (
-              <>
-                <span className="storage-label">{t('about.storage.legacyLabel')}</span>
-                <span className="storage-value">
-                  {showMovePacks ? (
-                    <>
-                      <span>{t('about.storage.legacyFound', { count: storage.legacyPacks, size: formatSize(storage.legacyBytes) })}</span>
-                      <button
-                        className="link-button"
-                        disabled={migrate.state === 'running'}
-                        onClick={moveModels}
-                      >
-                        {migrate.state === 'running'
-                          ? <><RefreshCw size={14} className="spinning" /> {t('about.storage.moving')}</>
-                          : <><HardDrive size={14} /> {t('about.storage.moveButton')}</>}
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <span className="storage-path" title={storage.legacyDataRoot}>{storage.legacyDataRoot}</span>
-                      <button
-                        className="link-button"
-                        disabled={clean.state === 'running'}
-                        onClick={cleanLegacy}
-                      >
-                        {clean.state === 'running'
-                          ? <><RefreshCw size={14} className="spinning" /> {t('about.storage.cleaning')}</>
-                          : <><Trash2 size={14} /> {t('about.storage.cleanButton')}</>}
-                      </button>
-                    </>
-                  )}
-                </span>
-              </>
-            )}
-          </div>
-          {migrate.state === 'running' && migrate.progress && (
-            <div className="engine-download-progress">
-              <div className="download-progress-bar">
-                <div className="download-progress-fill" style={{ width: `${migrate.progress.total ? Math.max(2, Math.round(migrate.progress.done / migrate.progress.total * 100)) : 2}%` }} />
-              </div>
-              <span className="download-progress-text">{migrate.progress.pack}</span>
-            </div>
-          )}
-          {migrate.state === 'done' && <p className="storage-note">{t('about.storage.moved')}</p>}
-          {migrate.state === 'failed' && <p className="storage-note error">{t('about.storage.moveFailed', { error: migrate.error })}</p>}
-          {clean.state === 'done' && <p className="storage-note">{t('about.storage.cleaned')}</p>}
-          {clean.state === 'failed' && <p className="storage-note error">{t('about.storage.cleanFailed', { error: clean.error })}</p>}
+      {/* Reset stays at the bottom, away from the everyday buttons. */}
+      <div className="about-footer">
+        <div className="about-credits">
+          <p className="made-with">Made with <Heart size={13} style={{ fill: 'currentColor' }} /> for Tianao</p>
+          <p className="copyright">{t('settings.about.copyright')}</p>
         </div>
-      )}
-      {gpu?.supported && (
-        <div className="info-card storage-card">
-          <h4><Zap size={16} /> {t('about.gpu.title')}</h4>
-          <div className="storage-grid">
-            <span className="storage-label">{t('about.gpu.switchLabel')}</span>
-            <span className="storage-value">
-              <Switch checked={!!gpu.enabled} onChange={toggleGpu} disabled={gpuBusy} label="" />
-              {gpuBusy && <span className="engine-badge">{t('about.gpu.testing')}</span>}
-            </span>
-            {(gpu.engines || []).map((e) => {
-              const s = engineState(e);
-              return (
-                <React.Fragment key={e.id}>
-                  <span className="storage-label">{t(`about.gpu.engineNames.${e.id}`)}</span>
-                  <span className="storage-value">
-                    <span className={`engine-badge ${s.cls}`}>{s.text}</span>
-                  </span>
-                </React.Fragment>
-              );
-            })}
-          </div>
-        </div>
-      )}
-      {engines && engines.length > 0 && (
-        <div className="info-card storage-card">
-          <h4><Cpu size={16} /> {t('about.tengine.title')}</h4>
-          <div className="storage-grid">
-            {engines.map((e) => (
-              <React.Fragment key={e.id}>
-                <span className="storage-label">{t(`about.gpu.engineNames.${e.id}`)}</span>
-                <span className="storage-value">{engineLine(e)}</span>
-              </React.Fragment>
-            ))}
-          </div>
-        </div>
-      )}
-      {confirmDialog}
-      <div className="about-actions">
-        <button className="link-button" onClick={openGitHub}>
-          <GitBranch size={16}/> GitHub
-        </button>
-        <button
-          className={`link-button ${updateStage === UPDATE_STAGE.CHECKING ? 'checking' : ''}`}
-          onClick={checkUpdate}
-          disabled={updateStage === UPDATE_STAGE.CHECKING || updateStage === UPDATE_STAGE.DOWNLOADING}
-        >
-          {updateStage === UPDATE_STAGE.CHECKING ? (
-            <><Loader2 size={16} className="spinning" /> {t('settings.about.checking')}</>
-          ) : (
-            <><RefreshCw size={16}/> {t('settings.about.checkUpdate')}</>
-          )}
-        </button>
-        <button className="link-button" onClick={openLogDirectory}>
-          <FolderOpen size={16}/> {t('about.openLogs')}
-        </button>
         {resetSettings && (
           <button className="link-button danger" onClick={() => resetSettings()}>
-            <RefreshCw size={16}/> {t('settingsNav.reset')}
+            <RefreshCw size={14}/> {t('about.resetAll')}
           </button>
         )}
-      </div>
-
-      <div className="about-footer">
-        <p className="made-with">Made with <Heart size={13} style={{ fill: 'currentColor' }} /> for Tianao</p>
-        <p className="copyright">{t('settings.about.copyright')}</p>
       </div>
 
       {showUpdateModal && updateInfo && (

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Zap, Shield, Lock, Trash2, ClipboardList, Database, Check, X, Minus, ArrowRightLeft, Download, Upload, Table2, ChevronLeft } from 'lucide-react';
+import { Zap, Shield, Lock, Trash2, Database, Check, X, Minus, ArrowRightLeft, Download, Upload } from 'lucide-react';
 import useTranslationStore from '../../../stores/translation-store';
 import translationService from '../../../translation/stack-client.js';
 import { PRIVACY_MODES, PRIVACY_MODE_IDS } from '../constants.js';
@@ -10,6 +10,7 @@ import { PRIVACY_MODULES, PRIVACY_MODE_ORDER, moduleState } from '../../../core/
 import { buildMigrationPack, parseMigrationPack, stripSecrets, MAX_PACK_BYTES } from '../../../core/migration-pack.js';
 import { validateImportedActions, refreshImportedActions } from '../../../ai/ai-action-store.js';
 import { getAllProviderMetadata } from '../../../config/provider-icons.js';
+import StorageLocations from './StorageLocations.jsx';
 
 const formatBytes = (bytes) => {
   if (!bytes) return '0 KB';
@@ -52,9 +53,6 @@ const PrivacySection = ({
   // Matrix columns use the config ids; the seg shows the user-facing names.
   const modeIds = PRIVACY_MODE_ORDER;
   const stateIcon = (state) => (state === 'on' ? <Check size={12} /> : state === 'part' ? <Minus size={12} /> : <X size={12} />);
-  // 'main' = mode picker + this mode's module list; 'detail' = the read-only
-  // three-mode comparison.
-  const [view, setView] = useState('main');
 
   // A cell is a pill (icon + one word) with a short reason under it when the
   // module is restricted; the full sentence lives in the tooltip only.
@@ -300,14 +298,30 @@ const PrivacySection = ({
     }
   };
 
-  if (view === 'detail') {
-    return (
-      <div className="setting-content">
-        <div className="audio-subhead">
-          <button type="button" className="audio-back" onClick={() => setView('main')}>
-            <ChevronLeft size={14} />{t('settings.privacy.title')}
-          </button>
-          <h3>{t('privacy.detailTitle')}</h3>
+  return (
+    <div className="setting-content">
+      <h3>{t('settingsNav.privacy')}</h3>
+
+      {/* The picker, then what each mode allows, all three side by side with
+          the current one highlighted. The old per-mode list was one column of
+          this table and the full table sat behind a 详细 button. */}
+      <div className="setting-group wide">
+        <div className="seg">
+          {modeIds.map((id) => {
+            const mode = PRIVACY_MODES[id];
+            if (!mode) return null;
+            return (
+              <button
+                key={id}
+                type="button"
+                className={currentMode === id ? 'on' : ''}
+                onClick={() => handleModeChange(mode)}
+              >
+                {getModeIcon(mode.icon, 13)}
+                {getModeName(id)}
+              </button>
+            );
+          })}
         </div>
         <table className="pm-table">
           <thead>
@@ -330,85 +344,41 @@ const PrivacySection = ({
           </tbody>
         </table>
       </div>
-    );
-  }
 
-  return (
-    <div className="setting-content">
-      <div className="pm-head">
-        <h3>{t('settings.privacy.title')}</h3>
-        <button type="button" className="btn-small" onClick={() => setView('detail')}>
-          <Table2 size={12} /><span style={{ marginLeft: 4 }}>{t('privacy.detail')}</span>
-        </button>
-      </div>
-
-      {/* Mode picker: the house segmented style; the selected segment IS the
-          current mode, so no separate banner. */}
-      <div className="seg">
-        {modeIds.map((id) => {
-          const mode = PRIVACY_MODES[id];
-          if (!mode) return null;
-          return (
-            <button
-              key={id}
-              type="button"
-              className={currentMode === id ? 'on' : ''}
-              onClick={() => handleModeChange(mode)}
-            >
-              {getModeIcon(mode.icon, 13)}
-              {getModeName(id)}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* What this mode means per module: name + state pill (+ short reason) */}
-      <div className="mode-features-panel">
-        <h4><ClipboardList size={15} /> {t('privacy.featuresTitle')}</h4>
-        <div className="feature-list">
-          {PRIVACY_MODULES.map((m) => (
-            <div key={m} className="feature-item pm-row">
-              <span className="feature-name">{t(`privacy.modules.${m}.name`)}</span>
-              {statePill(m, currentMode)}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Data management */}
-      <div className="setting-group">
+      {/* Data management, one label/value grid so every row lines up: where it
+          lives, how much of each kind is stored, auto-delete, then what can be
+          done with it (migrate, clear). Dividers split the three parts. */}
+      <div className="setting-group wide">
         <label className="setting-label"><Database size={15} /> {t('privacy.dataManagement')}</label>
 
-        {dataStats && (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr 1fr',
-            gap: '8px 16px',
-            marginBottom: '16px',
-            padding: '12px',
-            background: 'var(--bg-secondary)',
-            borderRadius: '8px',
-            fontSize: '13px',
-          }}>
-            <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.history')}</span><br/>{dataStats.historyCount} {t('privacy.stats.items')}</div>
-            <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.favorites')}</span><br/>{dataStats.favoritesCount} {t('privacy.stats.items')}</div>
-            <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.cache')}</span><br/>{dataStats.cacheCount} {t('privacy.stats.items')}</div>
-            <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.historyStore')}</span><br/>{dataStats.vaultAvailable
-              ? formatBytes(dataStats.vaultFileSize)
-              : t('privacy.stats.plaintext')}</div>
-            <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.docProgress')}</span><br/>{dataStats.docProgressCount} {t('privacy.stats.items')} · {formatBytes(dataStats.docProgressBytes)}</div>
-            <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.localData')}</span><br/>{formatBytes(dataStats.localStorageBytes)}</div>
-            <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.settingsFile')}</span><br/>{formatBytes(dataStats.settingsFileSize)}</div>
-            <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.logs')}</span><br/>{formatBytes(dataStats.logsDirSize)}</div>
-          </div>
-        )}
+        <div className="storage-grid data-grid">
+          <StorageLocations confirm={confirm} />
 
-        <div className="setting-row">
-          <span>{t('privacy.autoDeleteHistory')}</span>
-          <div className="input-with-suffix">
+          <div className="data-divider" />
+          {dataStats && (
+            <div className="data-stats">
+              {[
+                [t('privacy.stats.history'), `${dataStats.historyCount} ${t('privacy.stats.items')}`],
+                [t('privacy.stats.favorites'), `${dataStats.favoritesCount} ${t('privacy.stats.items')}`],
+                [t('privacy.stats.cache'), `${dataStats.cacheCount} ${t('privacy.stats.items')}`],
+                [t('privacy.stats.docProgress'), `${dataStats.docProgressCount} ${t('privacy.stats.items')} · ${formatBytes(dataStats.docProgressBytes)}`],
+                [t('privacy.stats.historyStore'), dataStats.vaultAvailable ? formatBytes(dataStats.vaultFileSize) : t('privacy.stats.plaintext')],
+                [t('privacy.stats.localData'), formatBytes(dataStats.localStorageBytes)],
+                [t('privacy.stats.settingsFile'), formatBytes(dataStats.settingsFileSize)],
+                [t('privacy.stats.logs'), formatBytes(dataStats.logsDirSize)],
+              ].map(([label, value]) => (
+                <div key={label} className="data-stat">
+                  <span className="data-stat-label">{label}</span>
+                  <span className="data-stat-value">{value}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <span className="storage-label">{t('privacy.autoDeleteHistory')}</span>
+          <span className="storage-value">
             <input
               type="number"
-              className="setting-input small"
+              className="setting-input small compact"
               value={settings.privacy?.autoDeleteDays || 0}
               onChange={(e) => updateSetting('privacy', 'autoDeleteDays', parseInt(e.target.value) || 0)}
               min="0"
@@ -416,39 +386,35 @@ const PrivacySection = ({
               disabled={currentMode === PRIVACY_MODE_IDS.SECURE}
             />
             <span className="input-suffix">{t('privacy.daysLater')}</span>
-          </div>
-        </div>
-        <p className="setting-hint">
-          {t('privacy.zeroMeansNever')}
-          {currentMode === PRIVACY_MODE_IDS.SECURE ? t('privacy.incognitoDisabled') : ''}
-        </p>
-      </div>
+            <span className="data-hint">
+              {t('privacy.zeroMeansNever')}
+              {currentMode === PRIVACY_MODE_IDS.SECURE ? t('privacy.incognitoDisabled') : ''}
+            </span>
+          </span>
 
-      {/* Migration pack */}
-      <div className="setting-group">
-        <label className="setting-label"><ArrowRightLeft size={15} /> {t('privacy.migration.title')}</label>
-        <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap'}}>
-          <button className="neutral-button" onClick={handleExportPack}>
-            <Download size={16} /> {t('privacy.migration.export')}
-          </button>
-          <label className="neutral-button">
-            <Upload size={16} /> {t('privacy.migration.import')}
-            <input type="file" accept=".json" onChange={handleImportFile} style={{display: 'none'}} />
-          </label>
-        </div>
-      </div>
-
-      <div className="setting-group">
-        <div className="danger-actions">
-          <button className="danger-button" onClick={handleClearHistory}>
-            <Trash2 size={16} /> {t('settings.privacy.clearHistory')}
-          </button>
-          <button className="danger-button" onClick={handleClearCache}>
-            <Trash2 size={16} /> {t('translationSettings.clearCache')}
-          </button>
-          <button className="danger-button" onClick={handleClearAllData}>
-            <Trash2 size={16} /> {t('settings.privacy.clearAll')}
-          </button>
+          <div className="data-divider" />
+          <span className="storage-label">{t('privacy.migration.title')}</span>
+          <span className="storage-value">
+            <button className="neutral-button" onClick={handleExportPack}>
+              <Download size={14} /> {t('privacy.migration.export')}
+            </button>
+            <label className="neutral-button">
+              <Upload size={14} /> {t('privacy.migration.import')}
+              <input type="file" accept=".json" onChange={handleImportFile} style={{display: 'none'}} />
+            </label>
+          </span>
+          <span className="storage-label">{t('privacy.clearLabel')}</span>
+          <span className="storage-value">
+            <button className="danger-button" onClick={handleClearHistory}>
+              <Trash2 size={14} /> {t('settings.privacy.clearHistory')}
+            </button>
+            <button className="danger-button" onClick={handleClearCache}>
+              <Trash2 size={14} /> {t('translationSettings.clearCache')}
+            </button>
+            <button className="danger-button" onClick={handleClearAllData}>
+              <Trash2 size={14} /> {t('settings.privacy.clearAll')}
+            </button>
+          </span>
         </div>
       </div>
 

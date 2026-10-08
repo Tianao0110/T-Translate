@@ -127,9 +127,9 @@ const ListenSection = ({ notify, confirm, embedded = false }) => {
         />
         <p className="setting-hint">{t('listen.tier.hint')}</p>
         {tier === 'high' && llm && !hqReady && <p className="setting-hint">{t('listen.hq.inactive')}</p>}
+        {/* The high tier's models belong to the tier choice, right under it. */}
+        {llm && <SpeechPacks nested status={llm} busy={rescanning} onRescan={rescanSpeech} />}
       </div>
-
-      {llm && <SpeechPacks status={llm} busy={rescanning} onRescan={rescanSpeech} />}
 
       <div className="setting-group">
         <Switch checked={autosave} onChange={handleAutosaveChange} label={t('listen.autosave.label')} />

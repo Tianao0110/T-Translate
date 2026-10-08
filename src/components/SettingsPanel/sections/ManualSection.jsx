@@ -1,8 +1,10 @@
 // In-app user guide: docs/MANUAL.<lang>.md rendered with the small reader in
-// ../manual-markdown.js. Left: chapter list; right: the text. External links
-// open in the system browser through the preload's shell bridge.
+// ../manual-markdown.js. Left: chapter list, with only the current chapter's
+// sections unfolded; right: the text. The highlight follows the reading
+// position. External links open in the system browser through the preload's
+// shell bridge.
 
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import manualZh from '../../../../docs/MANUAL.zh.md?raw';
 import manualEn from '../../../../docs/MANUAL.en.md?raw';
@@ -65,18 +67,56 @@ function Block({ block }) {
 const ManualSection = () => {
   const { t, i18n } = useTranslation();
   const source = i18n.language?.startsWith('en') ? manualEn : manualZh;
-  const blocks = useMemo(() => parseMarkdown(source), [source]);
+  // The lines before the first chapter only say where this guide can be read —
+  // which is here — so the in-app reader starts at chapter 0.
+  const blocks = useMemo(() => {
+    const all = parseMarkdown(source);
+    const first = all.findIndex((b) => b.type === 'heading' && b.level === 2);
+    return first > 0 ? all.slice(first) : all;
+  }, [source]);
   const toc = useMemo(() => buildToc(blocks), [blocks]);
   const [active, setActive] = useState(null);
+
+  // Section id -> its chapter, to unfold the chapter that holds the active one.
+  const chapterOf = useMemo(() => {
+    const map = {};
+    for (const ch of toc) {
+      map[ch.id] = ch.id;
+      for (const sec of ch.children) map[sec.id] = ch.id;
+    }
+    return map;
+  }, [toc]);
+  const openChapter = active ? chapterOf[active] : null;
 
   const jump = useCallback((id) => {
     setActive(id);
     document.getElementById(id)?.scrollIntoView({ block: 'start' });
   }, []);
 
+  // Scroll spy: the last heading that has reached the top of the scroll area
+  // is the active one. The page root is the scroll container.
+  const rootRef = useRef(null);
+  const frame = useRef(0);
+  const onScroll = useCallback(() => {
+    cancelAnimationFrame(frame.current);
+    frame.current = requestAnimationFrame(() => {
+      const root = rootRef.current;
+      if (!root) return;
+      const top = root.getBoundingClientRect().top + 24;
+      let current = null;
+      for (const ch of toc) {
+        for (const id of [ch.id, ...ch.children.map((c) => c.id)]) {
+          const el = document.getElementById(id);
+          if (el && el.getBoundingClientRect().top <= top) current = id;
+        }
+      }
+      setActive(current);
+    });
+  }, [toc]);
+
   return (
-    <div className="setting-content manual">
-      <h3>{t('manual.title')}</h3>
+    <div className="setting-content manual" ref={rootRef} onScroll={onScroll}>
+      <h3>{t('settingsNav.manual')}</h3>
       <div className="manual-layout">
         <nav className="manual-toc" aria-label={t('manual.contents')}>
           {toc.map((chapter) => (
@@ -88,7 +128,7 @@ const ManualSection = () => {
               >
                 {chapter.text}
               </button>
-              {chapter.children.map((sec) => (
+              {openChapter === chapter.id && chapter.children.map((sec) => (
                 <button
                   key={sec.id}
                   type="button"

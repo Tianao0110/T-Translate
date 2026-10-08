@@ -1,10 +1,13 @@
 import { useTranslation } from 'react-i18next';
 import { Filter } from 'lucide-react';
 import { Seg, Switch } from './shared';
+import LayoutModelCard from './LayoutModelCard.jsx';
 
 const DocumentSection = ({
   settings,
-  updateSetting
+  updateSetting,
+  notify,
+  confirm
 }) => {
   const { t } = useTranslation();
 
@@ -17,13 +20,16 @@ const DocumentSection = ({
 
   const filters = settings.document?.filters || {};
 
+  const skipShort = filters.skipShort ?? true;
+
   return (
     <div className="setting-content">
-      <h3>{t('documentSettings.title')}</h3>
+      <h3>{t('settingsNav.document')}</h3>
 
+      {/* How a document is cut, how many pieces run at once, how results show.
+          Supported formats are listed on the document page's drop zone. */}
       <div className="setting-group">
-        <label className="setting-label">{t('documentSettings.segmentSettings')}</label>
-        <div className="field-grid">
+        <div className="field-grid doc-fields">
           <span>{t('documentSettings.maxCharsPerSegment')}</span>
           <input
             type="number"
@@ -43,31 +49,45 @@ const DocumentSection = ({
             min="1"
             max="6"
           />
+          <span>{t('documentSettings.displayStyle')}</span>
+          <Seg
+            value={settings.document?.displayStyle || 'below'}
+            onChange={(v) => updateSetting('document', 'displayStyle', v)}
+            options={[
+              { value: 'below', label: t('documentSettings.styleBelow') },
+              { value: 'side-by-side', label: t('documentSettings.styleSideBySide') },
+            ]}
+          />
         </div>
       </div>
 
-      <div className="setting-group">
+      {/* Two rows tall on wide windows, so the layout model sits under the
+          fields instead of alone in a third row. */}
+      <div className="setting-group doc-filter-group">
         <label className="setting-label">
           <Filter size={16} /> {t('documentSettings.smartFilter')}
         </label>
-        <Switch
-          checked={filters.skipShort ?? true}
-          onChange={(on) => updateFilter('skipShort', on)}
-          label={t('documentSettings.skipShort')}
-        />
-        {(filters.skipShort ?? true) && (
-          <div className="setting-row sub-setting">
-            <span>{t('documentSettings.minLength')}</span>
-            <input
-              type="number"
-              className="setting-input small"
-              value={filters.minLength || 10}
-              onChange={(e) => updateFilter('minLength', Math.min(Math.max(parseInt(e.target.value) || 10, 1), 50))}
-              min="1"
-              max="50"
-            />
-          </div>
-        )}
+        {/* The length threshold sits on the same line as its switch. */}
+        <div className="doc-filter-row">
+          <Switch
+            checked={skipShort}
+            onChange={(on) => updateFilter('skipShort', on)}
+            label={t('documentSettings.skipShort')}
+          />
+          {skipShort && (
+            <>
+              <span className="input-suffix">{t('documentSettings.minLength')}</span>
+              <input
+                type="number"
+                className="setting-input small"
+                value={filters.minLength || 10}
+                onChange={(e) => updateFilter('minLength', Math.min(Math.max(parseInt(e.target.value) || 10, 1), 50))}
+                min="1"
+                max="50"
+              />
+            </>
+          )}
+        </div>
         <Switch
           checked={filters.skipNumbers ?? true}
           onChange={(on) => updateFilter('skipNumbers', on)}
@@ -85,32 +105,7 @@ const DocumentSection = ({
         />
       </div>
 
-      <div className="setting-group">
-        <label className="setting-label">{t('documentSettings.displayStyle')}</label>
-        <Seg
-          value={settings.document?.displayStyle || 'below'}
-          onChange={(v) => updateSetting('document', 'displayStyle', v)}
-          options={[
-            { value: 'below', label: t('documentSettings.styleBelow') },
-            { value: 'side-by-side', label: t('documentSettings.styleSideBySide') },
-          ]}
-        />
-      </div>
-
-      <div className="setting-group">
-        <label className="setting-label">{t('documentSettings.supportedFormats')}</label>
-        <div className="format-tags">
-          <span className="format-tag">TXT</span>
-          <span className="format-tag">MD</span>
-          <span className="format-tag">SRT</span>
-          <span className="format-tag">VTT</span>
-          <span className="format-tag">PDF</span>
-          <span className="format-tag">DOCX</span>
-          <span className="format-tag">CSV</span>
-          <span className="format-tag">JSON</span>
-          <span className="format-tag">EPUB</span>
-        </div>
-      </div>
+      <LayoutModelCard notify={notify} confirm={confirm} />
     </div>
   );
 };

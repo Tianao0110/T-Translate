@@ -3,7 +3,7 @@
 import { useTranslation } from 'react-i18next';
 import createLogger from '../../../core/logger.js';
 import { useConfirm } from '../../shared/ConfirmDialog.jsx';
-import { Seg, Switch, Slider } from './shared';
+import { Switch, Slider } from './shared';
 
 const logger = createLogger('Settings:Selection');
 
@@ -61,15 +61,16 @@ const SelectionSection = ({
   };
 
   const sel = settings.selection;
-  const outputMode = settings.screenshot?.outputMode || 'pin';
   const opacity = sel.windowOpacity || 95;
 
   return (
     <div className="setting-content">
-      <h3>{t('settings.selection.title')}</h3>
+      <h3>{t('settingsNav.selection')}</h3>
 
+      {/* Triggering: on/off, CapsLock direct mode, which selections count and
+          how long the button waits. Screenshot output lives on the translation
+          page — it is about where a translation lands, not about selecting. */}
       <div className="setting-group">
-        <label className="setting-label">{t('selection.enableSelection')}</label>
         <Switch
           checked={!!sel.enabled}
           onChange={() => handleToggleSelection()}
@@ -82,9 +83,43 @@ const SelectionSection = ({
             label={t('selection.stickyCapsLockLabel')}
           />
         )}
+        <div className="setting-row" style={{ marginTop: '16px' }}>
+          <span>{t('selection.charLimit')}</span>
+          <span className="input-suffix">{t('selection.minChars')}</span>
+          <input
+            type="number"
+            className="setting-input small"
+            value={sel.minChars}
+            onChange={(e) => updateSetting('selection', 'minChars', parseInt(e.target.value) || 2)}
+            min="1"
+            max="10"
+          />
+          <span className="input-suffix">{t('selection.maxChars')}</span>
+          <input
+            type="number"
+            className="setting-input small"
+            value={sel.maxChars}
+            onChange={(e) => updateSetting('selection', 'maxChars', parseInt(e.target.value) || 2000)}
+            min="50"
+            max="5000"
+          />
+        </div>
+        <div className="sliders solo" style={{ marginTop: '16px' }}>
+          <Slider
+            label={t('selection.triggerTimeout')}
+            display={`${sel.triggerTimeout / 1000}${t('selection.seconds')}`}
+            min={2000}
+            max={10000}
+            step={1000}
+            value={sel.triggerTimeout}
+            onChange={(v) => updateSetting('selection', 'triggerTimeout', Math.round(v))}
+          />
+        </div>
       </div>
 
+      {/* The translation card itself. */}
       <div className="setting-group">
+        <label className="setting-label">{t('selection.bubble')}</label>
         <Switch
           checked={!!sel.showSourceByDefault}
           onChange={(on) => updateSetting('selection', 'showSourceByDefault', on)}
@@ -100,19 +135,7 @@ const SelectionSection = ({
           onChange={(on) => updateSetting('selection', 'rainbowWindow', on)}
           label={t('selection.rainbowWindow')}
         />
-      </div>
-
-      <div className="setting-group">
-        <div className="sliders">
-          <Slider
-            label={t('selection.triggerTimeout')}
-            display={`${sel.triggerTimeout / 1000}${t('selection.seconds')}`}
-            min={2000}
-            max={10000}
-            step={1000}
-            value={sel.triggerTimeout}
-            onChange={(v) => updateSetting('selection', 'triggerTimeout', Math.round(v))}
-          />
+        <div className="sliders solo" style={{ marginTop: '16px' }}>
           <Slider
             label={t('selection.windowOpacity')}
             display={`${opacity}%`}
@@ -120,43 +143,6 @@ const SelectionSection = ({
             max={100}
             value={opacity}
             onChange={(v) => updateSetting('selection', 'windowOpacity', Math.round(v))}
-          />
-        </div>
-      </div>
-
-      <div className="setting-group">
-        <label className="setting-label">{t('selection.screenshotOutput')}</label>
-        <Seg
-          value={outputMode}
-          onChange={(v) => updateSetting('screenshot', 'outputMode', v)}
-          options={[
-            { value: 'pin', label: t('selection.pin') },
-            { value: 'bubble', label: t('selection.bubble') },
-            { value: 'main', label: t('selection.mainWindow') },
-          ]}
-        />
-      </div>
-
-      <div className="setting-group">
-        <label className="setting-label">{t('selection.charLimit')}</label>
-        <div className="field-grid">
-          <span>{t('selection.minChars')}</span>
-          <input
-            type="number"
-            className="setting-input small"
-            value={sel.minChars}
-            onChange={(e) => updateSetting('selection', 'minChars', parseInt(e.target.value) || 2)}
-            min="1"
-            max="10"
-          />
-          <span>{t('selection.maxChars')}</span>
-          <input
-            type="number"
-            className="setting-input small"
-            value={sel.maxChars}
-            onChange={(e) => updateSetting('selection', 'maxChars', parseInt(e.target.value) || 2000)}
-            min="50"
-            max="5000"
           />
         </div>
       </div>

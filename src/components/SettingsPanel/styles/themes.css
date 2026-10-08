@@ -162,12 +162,6 @@
   background: linear-gradient(135deg, #34d399, #10b981) !important;
 }
 
-/* 快捷键行 */
-[data-theme="fresh"] .shortcut-row.global {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), transparent) !important;
-  border-color: rgba(16, 185, 129, 0.12) !important;
-}
-
 /* 信息卡片 */
 [data-theme="fresh"] .info-card {
   border-color: rgba(16, 185, 129, 0.15) !important;
@@ -178,7 +172,7 @@
 }
 
 /* 版本标签 */
-[data-theme="fresh"] .app-info .version-tag {
+[data-theme="fresh"] .about-name-row .version-tag {
   background: linear-gradient(135deg, #10b981, #059669) !important;
 }
 

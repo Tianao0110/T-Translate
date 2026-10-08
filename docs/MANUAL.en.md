@@ -41,7 +41,7 @@ Switch under Settings → Privacy:
 - **Incognito**: nothing is saved; closing the window clears everything.
 - **Offline**: no network at all; only translation sources and recognition engines on this computer are used.
 
-For a feature-by-feature comparison, click "Details" on the Privacy page.
+The Privacy page has a feature-by-feature comparison table of the three modes.
 
 ## 1. Main window
 
@@ -109,7 +109,7 @@ Three tone buttons under the languages: Natural (everyday), Precise (technical, 
 - Drop a file in or click to choose. Right-clicking a .pdf / .docx / .txt in Explorer and choosing "Translate with T-Translate" opens it here too.
 - Encrypted PDFs ask for the password. Scanned PDFs have no text layer, so the app runs OCR page by page; set up an OCR engine in Settings first. Pages whose text layer is garbled are read by OCR too.
 - PDFs are split into the original paragraphs. Running headers, footers and page numbers are dropped, and each table row becomes one paragraph.
-- With the layout model installed and GPU acceleration on, each PDF page is read for layout first: text inside formulas, figures, headers and footers is no longer translated as body text, and tables are translated row by row. Loading shows layout progress page by page; the first PDF after each start takes a few seconds longer. Download the model under Settings → OCR → Local engines.
+- With the layout model installed and GPU acceleration on, each PDF page is read for layout first: text inside formulas, figures, headers and footers is no longer translated as body text, and tables are translated row by row. Loading shows layout progress page by page; the first PDF after each start takes a few seconds longer. Download the model under Settings → Documents.
 - The document is shown paragraph by paragraph, stacked or side by side. The outline on the left jumps to headings.
 - Each PDF paragraph has a locate button (crosshair icon, "Show on the original page"): it opens the "Original page" panel on the right at that page with the paragraph outlined, so figures, tables and formulas can be read against the original. In a narrow window the outline steps aside while the panel is open.
 - "Start translation" translates paragraph by paragraph; you can pause, resume and stop. Failed paragraphs can be retried one at a time or all at once with "Retry Failed".
@@ -127,7 +127,7 @@ Three tone buttons under the languages: Natural (everyday), Precise (technical, 
 AI actions add a layer of understanding on top of translation, such as summarizing a passage into key points or explaining a block of content.
 
 - Two built in: **Summarize** (translation panel, selection card, floating window; only when the text is long enough) and **Explain** (the floating window's explain mode and every paragraph of a document).
-- They need a chat-capable source: the built-in general model, LM Studio, Ollama, OpenAI, DeepSeek, Gemini, Claude and the like. Traditional sources such as Google Translate, DeepL, Baidu and Microsoft cannot do them; their cards say "No AI actions".
+- They need a chat-capable source: the built-in general model, LM Studio, Ollama, OpenAI, DeepSeek, Gemini, Claude and the like. Traditional sources such as Google Translate, DeepL, Baidu and Microsoft cannot do them; their cards, once expanded, say "No AI actions".
 - Results show under the translation and can be folded; they are also attached to the matching history entry and visible in its details.
 - With a vision model set up, screenshot content is handed to the vision model as an image; the button says so.
 - The length threshold for "Summarize" and importing more actions are under Settings → AI Actions.
@@ -167,10 +167,9 @@ Select text in any program and translate it.
 
 **Related settings** (Settings → Selection)
 
-- Button auto-hide time, show source by default, close after copy.
-- Character limits: selections that are too short or too long are not translated; the default is 2 to 2000 characters.
-- Window opacity, Rainbow selection window (a colorful alternative look).
-- Screenshot output: whether a screenshot becomes a pin, or its result appears in the selection window or the main window. Pin is the default, see 3.2.
+- Triggering: enable selection translate, CapsLock direct mode; character limits (selections that are too short or too long are not translated; the default is 2 to 2000 characters); button auto-hide time.
+- Selection window: show source by default, close after copy, Rainbow selection window (a colorful alternative look), window opacity.
+- Screenshot output is under Settings → Translation: whether a screenshot becomes a pin, or its result appears in the selection window or the main window. Pin is the default, see 3.2.
 
 ## 3. Floating window
 
@@ -214,7 +213,7 @@ The floating window is a transparent window you lay over what you want to read; 
 
 - Press Alt+Q, or use "Screenshot Translate" in the tray menu or the screenshot button in the translation panel. The screen dims; drag out a box. Any monitor works.
 - By default you confirm with ✓ or Enter and cancel with Esc. To skip the confirmation, turn off "Show Screenshot Confirm Buttons" under Settings → OCR.
-- Where the result goes is set under Settings → Selection → Screenshot output: **pin** (the default) keeps the screenshot on screen where you took it and covers it with the translation when ready; **selection window** shows a translation card next to the box, like the selection card; **main window** fills the recognized text into the translation panel and translates it.
+- Where the result goes is set under Settings → Translation → Screenshot output: **pin** (the default) keeps the screenshot on screen where you took it and covers it with the translation when ready; **selection window** shows a translation card next to the box, like the selection card; **main window** fills the recognized text into the translation panel and translates it.
 - If the chosen OCR engine cannot run (for example the vision model is not installed yet), the app falls back to local recognition and says so in the result.
 
 **Working with a pin**
@@ -264,9 +263,9 @@ Most settings need "Save Changes" at the bottom right; theme, language, shortcut
 ### 4.1 Providers
 
 - The upper part lists enabled sources; they are tried in order and the first success wins. Drag cards to reorder.
-- On each card: the switch on the right enables or disables it; the gear opens its configuration (API address, key, model name) with "Test Connection" and a "Get API Key" link.
+- On each card: the switch on the right enables or disables it; click the card or the gear to open its configuration (API address, key, model name). The bottom row has "Test Connection" and a link: "Get API Key" for sources that need a key, "Website" for the rest. The built-in model has no connection test; use "Self-test" in its card.
 - The lower part lists disabled sources; click "Enable" to add one.
-- The tag on a card gives its type: AI model, professional API, traditional. Cards marked "No AI actions" only translate; they cannot summarize or explain.
+- An expanded card shows a type tag next to its name: AI model, professional API, traditional. The last two carry "No AI actions" in the same tag: they only translate and cannot summarize or explain.
 - The built-in model's card shows whether it runs on the GPU or the CPU, whether it is loaded and how fast it is, with self-test and unload buttons.
 - Keys are stored encrypted on this computer; the settings file never holds them in plain text.
 
@@ -275,8 +274,9 @@ Most settings need "Save Changes" at the bottom right; theme, language, shortcut
 - Auto translate: starts after you stop typing; the delay is adjustable below.
 - Streaming output: the translation appears word by word.
 - When the content is already in the target language: show the source, or translate back into your source language. Applies to selection and the floating window. It counts only when nearly all of the text is in the target language; a few foreign names or terms don't matter. A whole foreign sentence, or text that is mostly foreign, is translated in full.
+- Screenshot output: pin (the default), selection window or main window, see 3.2.
 - Custom languages: languages added at the bottom of the language picker are listed here and can be removed. Google Translate does not support them; whether they translate depends on the model in use.
-- Translation cache: repeated text returns the cached result; clear it here.
+- Translation cache: repeated text returns the cached result; clear it under Settings → Privacy → Data management.
 
 ### 4.3 Selection
 
@@ -284,60 +284,59 @@ See "Related settings" in chapter 2.
 
 ### 4.4 Floating Window
 
-- Default opacity.
-- Display mode: auto / scattered / unified, see 3.1.
-- OCR engine: follows the OCR page by default, or pick one just for the floating window.
-- Allow the overlay in screenshots and recordings: off by default.
+- Window: display mode (auto / scattered / unified, see 3.1), default opacity, allow the overlay in screenshots and recordings (off by default).
+- OCR engine: follows the OCR page; "Go to Settings" takes you there.
+- Shortcuts: the open/close shortcut (as set under Appearance → Shortcuts), Space to capture, Esc to close; the full list is in 6.3.
 
 ### 4.5 Documents
 
 - Max characters per segment: longer paragraphs are split at this size.
 - Segments at once: how many paragraphs parallel mode translates together. 1 to 2 for local models; online APIs can go higher.
-- Smart filter: skip short paragraphs (with a minimum length; headings are exempt), skip number-only paragraphs such as page numbers and rows of figures in tables, keep code blocks untranslated, skip paragraphs already in the target language.
 - Default display style: stacked or side by side.
-- The supported file formats are listed below.
+- Smart filter: skip short paragraphs (the minimum length sits next to the switch; headings are exempt), skip number-only paragraphs such as page numbers and rows of figures in tables, keep code blocks untranslated, skip paragraphs already in the target language.
+- PDF layout analysis: the layout model (PP-DocLayoutV3, about 112 MB to download). Once installed, each PDF page is read for layout before it is split: text inside formulas, figures, headers and footers is not translated as body text, and tables are translated row by row. It takes effect only while GPU acceleration is on; when it is off, a note here points to Local model → Local engines.
+- The supported file formats are listed in the upload area of the Documents page.
 
 ### 4.6 AI Actions
 
-- Built-in actions: Summarize, Explain. Adjust the length threshold for "Summarize" here; lower it if the button does not show when you expect it.
-- Imported actions: "Import a config file" takes a JSON file with one action or a set; save to apply. Invalid files are rejected with a reason.
-- Imported actions can be removed.
+- All actions sit in one list, each row saying where it appears (selection, main panel, floating window, documents). The built-in Summarize, Explain and Summarize explained carry a lock and cannot be removed.
+- The Summarize row has its length threshold on the right: Summarize shows once the content reaches it; lower it if the button does not show when you expect it.
+- Import: "Import a config file" takes a JSON file with one action or a set; save to apply. Invalid files are rejected with a reason. Imported actions follow the built-in ones and can be removed.
 
 ### 4.7 Local model
 
 The model that ships with the app; you download the files yourself and put them into the models folder, see chapter 5.
 
-- Model: which one to use. The general model translates and runs AI actions; the translation-only model only translates, and AI actions automatically move to another AI source while it is selected.
-- Model files: one card per file showing installed / not installed / file mismatch, with official and mirror download links. After placing a file, click "Rescan", or "Open folder" to look.
+- Model: which one to use. The general model translates and runs AI actions; the translation-only model only translates, and AI actions automatically move to another AI source while it is selected. Right under the choice is that model's file: installed / not installed / file mismatch, with official and mirror download links. After placing a file, click "Rescan", or "Open folder" to look.
+- Local engines: one "Use the GPU" switch. When on, local OCR, neural voices, the local model, the built-in vision model, PDF layout analysis and the high-accuracy listen tier run on the GPU; each engine self-tests first and stays on the CPU if it cannot, no restart needed. The standard listen tier always stays on the CPU. Below it, one row per engine: whether it runs on the GPU or the CPU right now, whether it is running, its self-test result and speed.
 - Custom models (developer): when on, other GGUF files in the folder become selectable and can be probed, with a trial report. These are unverified; judge the results yourself.
 
 ### 4.8 OCR
 
-- Recognition language: auto by default. Chinese, English, Japanese and most Latin-script languages are built in; Korean, Cyrillic, Devanagari, Arabic and others need a language pack downloaded below.
-- Screenshot options: show confirm buttons; enlarge small images for better recognition of small text.
+- Recognition language: auto by default. Chinese, English, Japanese and most Latin-script languages are built in; Korean, Cyrillic, Devanagari, Arabic and others need a language pack downloaded below. The same group holds the screenshot options: show confirm buttons; enlarge small images for better recognition of small text.
 - Engines come in three groups; click "Use" to make one the default:
-- **Local engines**: Local OCR (built in, milliseconds) and Windows OCR (ships with Windows, no download, modest quality). Local OCR has a model tier (standard / high accuracy, the latter better on blurry photos and stylized text, about 95 MB to download), the language pack list, and an engine recheck. At the bottom is the layout model (about 112 MB to download); it is used only for PDF document translation, and only while GPU acceleration is on.
+- **Local engines**: Local OCR (built in, milliseconds) and Windows OCR (ships with Windows, no download, modest quality). Local OCR has a model tier (standard / high accuracy, the latter better on blurry photos and stylized text, about 95 MB to download), the language pack list, and an engine recheck.
 - **Vision models**: the built-in vision model (two files you download yourself, usable only with GPU acceleration on; simple captures still go to local OCR, large images, columns and tables go to the vision model) and LLM Vision (the LM Studio / Ollama address and a vision model name).
 - **Online services**: OCR.space, Google Vision, Azure, Baidu OCR, each with its key. Disabled automatically in privacy modes.
 
 ### 4.9 Audio · Listen
 
-- From the "Audio" page, click "Listen".
+- On the "Audio" page, switch to "Listen" at the top; its tag says whether recognition is ready.
 - Recognition model list: base recognition model (required), draft engine (optional, text while speech is still going). Download, update and uninstall live here. An old high-accuracy engine installed earlier is listed here too; it is no longer used and can be removed.
 - Final tier: standard / high accuracy. High accuracy needs one of the "High-accuracy models" in place first. If none is in place when listening starts, the floating window says so once and that session uses standard recognition.
-- High-accuracy models: Qwen3-ASR 1.7B and 0.6B, two files each, with whether they are in place, download links, the model folder, "Re-detect", and which one the next listen session uses. The 1.7B runs when GPU acceleration is on and the dedicated GPU has 8 GB or more of video memory, otherwise the 0.6B; if only one is in place, that one runs.
+- High-accuracy models (right under the final tier): Qwen3-ASR 1.7B and 0.6B, two files each, with whether they are in place, download links, the model folder, "Re-detect", and which one the next listen session uses. The 1.7B runs when GPU acceleration is on and the dedicated GPU has 8 GB or more of video memory, otherwise the 0.6B; if only one is in place, that one runs.
 - Auto-save captions on stop or switch: on by default.
 
 ### 4.10 Audio · Speak
 
-- From the "Audio" page, click "Speak".
+- On the "Audio" page, switch to "Speak" at the top; its tag names the engine that reads aloud right now.
 - Enable Text-to-Speech: when off, no read-aloud buttons are shown anywhere.
 - Engine: system voices (no download), neural voices (voice packs required, more natural), external service (appears once an address is filled in).
 - Now speaking: what is actually in use, with a preview. If the chosen engine cannot speak, system voices take over automatically.
 - Voices: neural voices are chosen per language (Chinese, English) through a picker with search and preview; system voices can be fixed to one, or chosen automatically by text language.
 - External speech service: address, key, model and voice, then "Test and listen". Not available in offline mode.
 - Rate, pitch and volume sliders. Pitch only affects system voices.
-- Voice packs: download and uninstall on the "Voice packs" tab.
+- Voice packs: listed at the bottom of the read-aloud settings, where you download and uninstall them.
 
 ### 4.11 Appearance
 
@@ -349,23 +348,25 @@ The model that ships with the app; you download the files yourself and put them 
 
 ### 4.12 Privacy
 
-- Three modes at the top: standard / incognito / offline, with each feature's state in the current mode below and "Details" for the full comparison.
-- Data management: how much history, favorites, cache, document progress, settings and logs take up; clear history, clear cache, or clear all data; "Auto-delete history" in days, 0 means never.
-- Migration: "Export Migration Pack" bundles settings, glossary, favorites and custom languages into one file; "Import Migration Pack" on another computer lets you pick which parts to take. API keys and model files are never included.
+- Three modes at the top: standard / incognito / offline, with a table below showing each feature's state in all three modes; the current mode's column is highlighted.
+- Data management: everything about your data is in this one group, top to bottom:
+- **Storage locations**: where the data and models folders are, with buttons to open them; models left elsewhere by an older version can be moved with "Move to program folder", and the old folder cleaned afterwards with "Clear old folder".
+- **Usage**: how much history, favorites, cache, document progress, settings and logs take up; "Auto-delete history" in days, 0 means never.
+- **Migration**: "Export Migration Pack" bundles settings, glossary, favorites and custom languages into one file; "Import Migration Pack" on another computer lets you pick which parts to take. API keys and model files are never included.
+- **Clear**: clear history, clear cache, or clear all data.
 
 ### 4.13 About
 
-- Version and "Check for Updates". A new version can be downloaded and installed from here, or fetched from GitHub by hand.
-- Storage: where the data and models folders are, with buttons to open them. Models left elsewhere by an older version can be moved into the app folder, and the old folder cleaned afterwards.
-- GPU acceleration: one switch. When on, local OCR, neural voices, the local model, the built-in vision model, PDF layout analysis and the high-accuracy listen tier run on the GPU; each engine self-tests first and stays on the CPU if it cannot, no restart needed. The standard listen tier always stays on the CPU.
-- Engine status: where each engine runs, its self-test result and speed.
-- Open the log folder, reset all settings (API keys are kept).
+- Top row: version, "Check for Updates", GitHub, open the log folder. A new version can be downloaded and installed from here, or fetched from GitHub by hand.
+- Core features.
+- Footer: reset all settings (API keys are kept).
+- Storage locations are under 4.12 Privacy → Data management; GPU acceleration and engine status are under 4.7 Local model.
 
 ## 5. Models and downloads
 
 The app ships without models. Small ones download with one click on the settings pages; large ones (hundreds of MB to over 2 GB) are not distributed through our servers: download them from the links below and place them in the models folder. Every model runs on this computer; once downloaded, nothing goes online.
 
-The models folder is shown under Settings → About → Storage and can be opened from there. By default it is `models` inside the install folder, with four subfolders:
+The models folder is shown under Settings → Privacy → Data management and can be opened from there. By default it is `models` inside the install folder, with four subfolders:
 
 - `llm-models`: the built-in model, the built-in vision model and the high-accuracy listen models
 - `ocr-models`: OCR language packs, the high-accuracy model and the layout model
@@ -419,7 +420,8 @@ Both models are Apache-2.0. The old high-accuracy engine that used to sit in `mo
 
 Click "Download" on the settings pages. Downloads are blocked in offline mode.
 
-- **OCR language packs** (Settings → OCR): Korean, Cyrillic, Devanagari, Arabic, Tamil, Telugu, Kannada; one pack covers every language written in that script. Plus the high-accuracy model, about 95 MB, and the layout model, about 112 MB (used for PDFs only while GPU acceleration is on).
+- **OCR language packs** (Settings → OCR): Korean, Cyrillic, Devanagari, Arabic, Tamil, Telugu, Kannada; one pack covers every language written in that script. Plus the high-accuracy model, about 95 MB.
+- **Layout model** (Settings → Documents): about 112 MB, used for PDFs only while GPU acceleration is on.
 - **Listen recognition models** (Settings → Audio → Listen): the base recognition model, about 153 MB, required; the draft engine, about 168 MB, optional.
 - **Neural voice packs** (Settings → Audio → Speak → Voice packs): Kokoro (103 Chinese and English voices) and MeloTTS (one female voice that reads mixed Chinese and English most naturally).
 
@@ -471,12 +473,12 @@ Work in any program; change them under Settings → Appearance → Shortcuts:
 
 ### 7.1 Two folders
 
-Everything the app owns sits in two folders under the install folder; their locations are shown under Settings → About → Storage, with buttons to open them:
+Everything the app owns sits in two folders under the install folder; their locations are shown under Settings → Privacy → Data management, with buttons to open them:
 
 - `data`: settings, history, favorites, translation cache, logs, auto-saved captions.
 - `models`: downloaded and hand-placed models, see chapter 5.
 
-If the install folder is not writable (for example under Program Files), the app uses the user profile folder instead, and the About page says so.
+If the install folder is not writable (for example under Program Files), the app uses the user profile folder instead, and Data management says so.
 
 The common items in `data`:
 
@@ -490,7 +492,7 @@ The common items in `data`:
 
 - **Uninstalling and upgrading keep your data**: both folders are preserved and picked up again after a reinstall.
 - **Moving to another computer**: do not copy the `data` folder. History and API keys are encrypted with this computer's system key and cannot be opened elsewhere. Use the three exports instead:
-- Settings → Privacy → Migration: "Export Migration Pack" writes a JSON file with settings, glossary, favorites and custom languages; "Import Migration Pack" on the new computer. API keys are not included and must be entered again.
+- Settings → Privacy → Data management: "Export Migration Pack" writes a JSON file with settings, glossary, favorites and custom languages; "Import Migration Pack" on the new computer. API keys are not included and must be entered again.
 - "Export" on the History page writes history to JSON; "Import" on the new computer.
 - "Export Terms" on the Favorites page backs up the glossary on its own.
 - **Models**: the `models` folder can be copied as a whole to the same location on the new computer to skip the downloads.
@@ -499,7 +501,8 @@ The common items in `data`:
 ### 7.3 Cleaning up
 
 - Settings → Privacy → Data management clears history, the cache, or all data.
-- Settings → About resets all settings (API keys are kept) and cleans up folders left by older versions.
+- Settings → Privacy → Data management also cleans up folders left by older versions.
+- Settings → About resets all settings (API keys are kept).
 - Models you no longer need: click "Uninstall" on the matching settings page; hand-placed files can simply be deleted from the folder.
 
 ## 8. FAQ
@@ -516,7 +519,7 @@ Google Translate and the other online sources, online OCR, the external speech s
 The built-in model is loaded by the app itself, with no other software. LM Studio and Ollama are servers you run yourself that the app connects to. The built-in model is the easy path; use LM Studio or Ollama when you want a bigger model.
 
 **Why is there no "Summarize" button?**
-Either the text is not long enough (the threshold is under Settings → AI Actions), or the current source cannot chat (any card marked "No AI actions").
+Either the text is not long enough (the threshold is under Settings → AI Actions), or the current source cannot chat (any card marked "No AI actions" when expanded).
 
 **How do I make a word always translate my way?**
 Save it into the glossary (Favorites → Glossary). Later, when a translation still contains the original word, it is replaced with your rendering; when the model translated it another way, the main window shows a hint under the translation that you can apply with one click.
@@ -528,10 +531,10 @@ Click the click-through button and clicks on the content area go to the program 
 Subtitles on screen: lay the floating window over the subtitle area and turn on auto refresh. Sound without subtitles: use listen mode in the floating window.
 
 **I want screenshot results in the main window.**
-Settings → Selection → Screenshot output, choose "Main Window".
+Settings → Translation → Screenshot output, choose "Main Window".
 
 **Should I turn on GPU acceleration?**
-With a discrete graphics card, yes: Settings → About → GPU acceleration. Each engine self-tests and stays on the CPU if it cannot use the GPU; nothing breaks.
+With a discrete graphics card, yes: Settings → Local model → Local engines → "Use the GPU". Each engine self-tests and stays on the CPU if it cannot use the GPU; nothing breaks.
 
 **A shortcut clashes with another program.**
 Settings → Appearance → Shortcuts, click the entry and press a new combination.

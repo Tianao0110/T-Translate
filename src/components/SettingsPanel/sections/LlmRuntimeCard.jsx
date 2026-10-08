@@ -1,6 +1,6 @@
 // The local model's runtime block inside the built-in provider's card on
 // the providers page: backend, residency and speed as the same label/value
-// grid the About page uses, plus self-test / unload in the card's own
+// grid the local-engines card uses, plus self-test / unload in the card's own
 // button style. Self-contained: needs only notify.
 
 import { useState, useEffect, useCallback } from 'react';

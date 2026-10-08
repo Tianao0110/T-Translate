@@ -128,7 +128,7 @@ npm run dist            # build the installer
 
 ## Models
 
-The app ships without models. Language packs, the PDF layout model, listen recognition models and voice packs download with one click on the settings pages. The large files below are not distributed through our servers: download them yourself and put them into the models folder (its location is under Settings → About → Storage):
+The app ships without models. Language packs, the PDF layout model, listen recognition models and voice packs download with one click on the settings pages. The large files below are not distributed through our servers: download them yourself and put them into the models folder (its location is under Settings → Privacy → Data management):
 
 - Built-in model Qwen3-1.7B (general, 1.8 GB): [official](https://huggingface.co/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf) · [mirror](https://hf-mirror.com/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf) → `models\llm-models`
 - Built-in model Hy-MT2-1.8B (translation only, 1.9 GB): [official](https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF/resolve/main/Hy-MT2-1.8B-Q8_0.gguf) · [mirror](https://hf-mirror.com/tencent/Hy-MT2-1.8B-GGUF/resolve/main/Hy-MT2-1.8B-Q8_0.gguf) → `models\llm-models`

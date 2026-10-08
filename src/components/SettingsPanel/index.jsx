@@ -512,6 +512,8 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
             <DocumentSection
               settings={settings}
               updateSetting={updateSetting}
+              notify={notify}
+              confirm={confirm}
             />
           );
         case 'privacy':
@@ -530,6 +532,7 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
             settings={settings}
             updateSetting={updateSetting}
             notify={notify}
+            confirm={confirm}
           />
         );
       case 'ocr':

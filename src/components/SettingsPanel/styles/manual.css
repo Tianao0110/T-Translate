@@ -122,3 +122,14 @@
 .manual .manual-body a:hover {
   text-decoration: underline;
 }
+
+/* Narrow window: a slimmer chapter list leaves the text a readable width. */
+@container settings (max-width: 640px) {
+  .manual .manual-toc {
+    flex-basis: 140px;
+  }
+
+  .manual .manual-layout {
+    gap: 16px;
+  }
+}

@@ -1,12 +1,13 @@
 // The high-accuracy listen tier's models: the whitelisted Qwen3-ASR GGUF
 // pairs the user downloads and drops into the model folder. Rows come from
 // llm:status; T-Engine's speech host loads the one llm-manager picks.
-// Markup reuses the engine card classes (styles/ocr.css).
+// Markup reuses the engine card classes (styles/ocr.css). `nested` renders it
+// as an indented block inside the tier group instead of a group of its own.
 
 import { useTranslation } from 'react-i18next';
 import { AlertTriangle, ExternalLink, FolderOpen, RefreshCw } from 'lucide-react';
 
-const SpeechPacks = ({ status, busy, onRescan }) => {
+const SpeechPacks = ({ status, busy, onRescan, nested = false }) => {
   const { t } = useTranslation();
   const packs = (status?.packs?.packs || []).filter((p) => p.role === 'asr');
   const asr = status?.asr || null;
@@ -27,7 +28,7 @@ const SpeechPacks = ({ status, busy, onRescan }) => {
   };
 
   return (
-    <div className="setting-group">
+    <div className={nested ? 'sub-setting' : 'setting-group'} style={nested ? { marginTop: 14 } : undefined}>
       <label className="setting-label">{t('listen.hq.title')}</label>
       <p className="setting-hint">{t('listen.hq.hint')}</p>
       <div className="ocr-engines-list">

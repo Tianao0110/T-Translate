@@ -128,7 +128,7 @@ npm run dist            # 打包安装程序
 
 ## 模型
 
-程序本身不带模型。语言包、PDF 版面分析模型、听译识别模型、语音包在设置页里一键下载；下面几个大文件不经我们的服务器分发，自己下载后放进模型文件夹即可（位置在 设置 → 关于 → 存储）：
+程序本身不带模型。语言包、PDF 版面分析模型、听译识别模型、语音包在设置页里一键下载；下面几个大文件不经我们的服务器分发，自己下载后放进模型文件夹即可（位置在 设置 → 隐私模式 → 数据管理）：
 
 - 内置模型 Qwen3-1.7B（通用，1.8 GB）：[官方](https://huggingface.co/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf) · [镜像](https://hf-mirror.com/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf) → `models\llm-models`
 - 内置模型 Hy-MT2-1.8B（仅翻译，1.9 GB）：[官方](https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF/resolve/main/Hy-MT2-1.8B-Q8_0.gguf) · [镜像](https://hf-mirror.com/tencent/Hy-MT2-1.8B-GGUF/resolve/main/Hy-MT2-1.8B-Q8_0.gguf) → `models\llm-models`

@@ -2,17 +2,19 @@
 // (which model, the model file card, the developer door), all built from
 // the panel's existing pieces. The runtime block (backend / residency /
 // speed, self-test, unload) lives in the provider's card on the providers
-// page (LlmRuntimeCard).
+// page (LlmRuntimeCard); the GPU switch and every local engine's status sit
+// here (LocalEnginesCard).
 
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AlertTriangle, RefreshCw, ExternalLink } from 'lucide-react';
 import { Seg, Switch } from './shared';
+import LocalEnginesCard from './LocalEnginesCard.jsx';
 
 const GB = 1024 * 1024 * 1024;
 const formatSize = (bytes) => (bytes >= GB ? `${(bytes / GB).toFixed(1)} GB` : `${Math.round(bytes / 1048576)} MB`);
 
-const LlmSection = ({ settings, updateSetting, notify }) => {
+const LlmSection = ({ settings, updateSetting, notify, confirm }) => {
   const { t } = useTranslation();
   const bridge = window.electron?.llm;
   const [status, setStatus] = useState(null);
@@ -118,80 +120,83 @@ const LlmSection = ({ settings, updateSetting, notify }) => {
 
   return (
     <div className="setting-content animate-fade-in">
-      <h3>{t('settings.llm.title')}</h3>
+      <h3>{t('settingsNav.llm')}</h3>
       <p className="setting-description">{t('llm.description')}</p>
 
-      {options.length > 0 && (
+      {/* Which model, and its file right under the choice — one group. */}
+      {(options.length > 0 || selected) && (
         <div className="setting-group wide">
           <label className="setting-label">{t('llm.modelLabel')}</label>
-          <Seg
-            size="small"
-            value={selectedId}
-            onChange={choosePack}
-            options={options.map(({ value, label }) => ({ value, label }))}
-          />
-          <p className="setting-hint">
-            {selected?.unlisted ? t('llm.roleUnlistedHint') : selected?.role === 'mt' ? t('llm.roleMtHint') : t('llm.roleGeneralHint')}
-          </p>
+          {options.length > 0 && (
+            <>
+              <Seg
+                size="small"
+                value={selectedId}
+                onChange={choosePack}
+                options={options.map(({ value, label }) => ({ value, label }))}
+              />
+              <p className="setting-hint">
+                {selected?.unlisted ? t('llm.roleUnlistedHint') : selected?.role === 'mt' ? t('llm.roleMtHint') : t('llm.roleGeneralHint')}
+              </p>
+            </>
+          )}
+          {selected && (
+            <div className="ocr-engines-list" style={{ marginTop: '12px' }}>
+              <div className={`ocr-engine-item ${selected.status === 'ready' || selected.status === 'unverified' ? 'active' : ''}`.trim()}>
+                <div className="engine-info">
+                  <div className="engine-header">
+                    <span className="engine-name">{t('llm.engineNameWith', { name: selected.name })}</span>
+                    {badge(selected)}
+                  </div>
+                  <p className="engine-meta">{t('llm.fileLine', { file: selected.file, size: formatSize(selected.size), license: selected.license?.name || t('llm.unverified') })}</p>
+                  {status?.dir && <p className="engine-meta">{status.dir}</p>}
+                  {selected.status === 'mismatch' && (
+                    <div className="engine-error-box">
+                      <AlertTriangle size={14} />
+                      <div className="error-content">
+                        <p className="error-title">{t('llm.mismatch')}</p>
+                        <p className="error-detail">{t('llm.mismatchHint')}</p>
+                      </div>
+                    </div>
+                  )}
+                  {selected.status !== 'ready' && selected.source && (
+                    <>
+                      <p className="engine-meta">{t('llm.howTo')}</p>
+                      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 6 }}>
+                        <button className="link-button" onClick={() => window.electron?.shell?.openExternal?.(selected.source?.url)}>
+                          <ExternalLink size={14} /> {t('llm.linkOfficial')}
+                        </button>
+                        {selected.source?.mirror && (
+                          <button className="link-button" onClick={() => window.electron?.shell?.openExternal?.(selected.source.mirror)}>
+                            <ExternalLink size={14} /> {t('llm.linkMirror')}
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+                <div className="engine-actions">
+                  <button className="btn" onClick={() => bridge?.openDir?.()} title={t('llm.openFolder')}>
+                    {t('llm.openFolder')}
+                  </button>
+                  <button
+                    className="btn-small"
+                    onClick={rescan}
+                    disabled={busy !== null}
+                    title={t('llm.rescan')}
+                    style={{ marginLeft: 6, padding: '4px 8px' }}
+                  >
+                    <RefreshCw size={12} className={busy === 'scan' || status?.scanning ? 'spinning' : ''} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          {selected && <p className="setting-hint">{t('llm.enabledHint')}</p>}
         </div>
       )}
 
-      {selected && (
-        <div className="setting-group wide">
-          <label className="setting-label">{t('llm.fileLabel')}</label>
-          <div className="ocr-engines-list">
-            <div className={`ocr-engine-item ${selected.status === 'ready' || selected.status === 'unverified' ? 'active' : ''}`.trim()}>
-              <div className="engine-info">
-                <div className="engine-header">
-                  <span className="engine-name">{t('llm.engineNameWith', { name: selected.name })}</span>
-                  {badge(selected)}
-                </div>
-                <p className="engine-meta">{t('llm.fileLine', { file: selected.file, size: formatSize(selected.size), license: selected.license?.name || t('llm.unverified') })}</p>
-                {status?.dir && <p className="engine-meta">{status.dir}</p>}
-                {selected.status === 'mismatch' && (
-                  <div className="engine-error-box">
-                    <AlertTriangle size={14} />
-                    <div className="error-content">
-                      <p className="error-title">{t('llm.mismatch')}</p>
-                      <p className="error-detail">{t('llm.mismatchHint')}</p>
-                    </div>
-                  </div>
-                )}
-                {selected.status !== 'ready' && selected.source && (
-                  <>
-                    <p className="engine-meta">{t('llm.howTo')}</p>
-                    <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 6 }}>
-                      <button className="link-button" onClick={() => window.electron?.shell?.openExternal?.(selected.source?.url)}>
-                        <ExternalLink size={14} /> {t('llm.linkOfficial')}
-                      </button>
-                      {selected.source?.mirror && (
-                        <button className="link-button" onClick={() => window.electron?.shell?.openExternal?.(selected.source.mirror)}>
-                          <ExternalLink size={14} /> {t('llm.linkMirror')}
-                        </button>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-              <div className="engine-actions">
-                <button className="btn" onClick={() => bridge?.openDir?.()} title={t('llm.openFolder')}>
-                  {t('llm.openFolder')}
-                </button>
-                <button
-                  className="btn-small"
-                  onClick={rescan}
-                  disabled={busy !== null}
-                  title={t('llm.rescan')}
-                  style={{ marginLeft: 6, padding: '4px 8px' }}
-                >
-                  <RefreshCw size={12} className={busy === 'scan' || status?.scanning ? 'spinning' : ''} />
-                </button>
-              </div>
-            </div>
-          </div>
-          <p className="setting-hint">{t('llm.enabledHint')}</p>
-        </div>
-      )}
+      <LocalEnginesCard notify={notify} confirm={confirm} />
 
       {/* Files outside the whitelist are always listed; probing and using
           them needs the switch. */}
@@ -216,7 +221,9 @@ const LlmSection = ({ settings, updateSetting, notify }) => {
           label={t('llm.dev.allow')}
         />
         <p className="setting-hint">{t('llm.dev.allowHint')}</p>
-        {status?.ready && (
+        {/* With the switch off and nothing outside the whitelist there is
+            nothing to list; "nothing found" only matters once it is on. */}
+        {status?.ready && (doorOpen || unlisted.length > 0) && (
           <div className="sub-setting" style={{ marginTop: 10 }}>
             {unlisted.length === 0 && <p className="setting-hint">{t('llm.dev.none')}</p>}
             {unlisted.length > 0 && (
