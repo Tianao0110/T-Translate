@@ -17,7 +17,7 @@ const LAYOUT_PACK_ID = 'layout-v3';
 const ENGINE_TAB = {
   'rapid-ocr': 'local',
   'windows-ocr': 'local',
-  'tengine-vision': 'local',
+  'tengine-vision': 'vision',
   'llm-vision': 'vision',
   'ocrspace': 'online',
   'google-vision': 'online',
@@ -294,8 +294,8 @@ const OcrSection = ({
     </div>
   );
 
-  const keyField = ({ label, keyName, toggleKey, placeholder }) => (
-    <div className="ps-field" key={keyName}>
+  const keyField = ({ label, keyName, toggleKey, placeholder, half = false }) => (
+    <div className={`ps-field ${half ? 'half' : ''}`.trim()} key={keyName}>
       <label className="ps-label">{label}</label>
       <div className="ps-input-group">
         <input
@@ -569,13 +569,6 @@ const OcrSection = ({
             : null,
           actions: selectButton('windows-ocr'),
         })}
-        {engineCard({
-          id: 'tengine-vision',
-          name: t('ocr.tengineVision.name'),
-          badge: visionBadge,
-          body: visionBody,
-          actions: visionActions,
-        })}
         {layoutCard}
       </div>
       <PackList
@@ -589,8 +582,17 @@ const OcrSection = ({
     </>
   );
 
+  // The built-in vision model and LLM Vision side by side: both read an image
+  // with a vision model, one in-app, one through LM Studio / Ollama.
   const visionTab = (
     <div className="ocr-engines-list">
+      {engineCard({
+        id: 'tengine-vision',
+        name: t('ocr.tengineVision.name'),
+        badge: visionBadge,
+        body: visionBody,
+        actions: visionActions,
+      })}
       {engineCard({
         id: 'llm-vision',
         name: 'LLM Vision',
@@ -652,8 +654,8 @@ const OcrSection = ({
         badge: <span className="engine-badge free">{t('ocr.free1k')}</span>,
         body: (
           <div className="ps-config-form">
-            {keyField({ label: 'API Key', keyName: 'baiduApiKey', toggleKey: 'baidu', placeholder: 'API Key' })}
-            {keyField({ label: 'Secret Key', keyName: 'baiduSecretKey', toggleKey: 'baiduSecret', placeholder: 'Secret Key' })}
+            {keyField({ label: 'API Key', keyName: 'baiduApiKey', toggleKey: 'baidu', placeholder: 'API Key', half: true })}
+            {keyField({ label: 'Secret Key', keyName: 'baiduSecretKey', toggleKey: 'baiduSecret', placeholder: 'Secret Key', half: true })}
           </div>
         ),
         actions: selectButton(
@@ -671,6 +673,7 @@ const OcrSection = ({
     <div className="setting-content animate-fade-in">
       <h3>{t('settings.ocr.title')}</h3>
 
+      {/* What to read and how a capture is taken — one group above the engines. */}
       <div className="setting-group">
         <label className="setting-label">{t('ocr.recognitionLanguage')}</label>
         <LanguagePicker
@@ -678,19 +681,18 @@ const OcrSection = ({
           options={langOptions}
           onChange={(code) => updateSetting('ocr', 'recognitionLanguage', code)}
         />
-      </div>
-
-      <div className="setting-group">
-        <Switch
-          checked={settings.screenshot?.showConfirmButtons ?? true}
-          onChange={(on) => updateSetting('screenshot', 'showConfirmButtons', on)}
-          label={t('ocr.showConfirmButtons')}
-        />
-        <Switch
-          checked={preprocess}
-          onChange={(on) => updateSetting('ocr', 'enablePreprocess', on)}
-          label={t('ocr.autoEnlarge')}
-        />
+        <div style={{ marginTop: '16px' }}>
+          <Switch
+            checked={settings.screenshot?.showConfirmButtons ?? true}
+            onChange={(on) => updateSetting('screenshot', 'showConfirmButtons', on)}
+            label={t('ocr.showConfirmButtons')}
+          />
+          <Switch
+            checked={preprocess}
+            onChange={(on) => updateSetting('ocr', 'enablePreprocess', on)}
+            label={t('ocr.autoEnlarge')}
+          />
+        </div>
         {preprocess && (
           <div className="sub-setting" style={{ marginTop: 10 }}>
             <label className="setting-label">{t('ocr.scaleFactor')}</label>

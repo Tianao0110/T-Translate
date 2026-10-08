@@ -312,8 +312,7 @@ The model that ships with the app; you download the files yourself and put them 
 
 ### 4.8 OCR
 
-- Recognition language: auto by default. Chinese, English, Japanese and most Latin-script languages are built in; Korean, Cyrillic, Devanagari, Arabic and others need a language pack downloaded below.
-- Screenshot options: show confirm buttons; enlarge small images for better recognition of small text.
+- Recognition language: auto by default. Chinese, English, Japanese and most Latin-script languages are built in; Korean, Cyrillic, Devanagari, Arabic and others need a language pack downloaded below. The same group holds the screenshot options: show confirm buttons; enlarge small images for better recognition of small text.
 - Engines come in three groups; click "Use" to make one the default:
 - **Local engines**: Local OCR (built in, milliseconds) and Windows OCR (ships with Windows, no download, modest quality). Local OCR has a model tier (standard / high accuracy, the latter better on blurry photos and stylized text, about 95 MB to download), the language pack list, and an engine recheck. At the bottom is the layout model (about 112 MB to download); it is used only for PDF document translation, and only while GPU acceleration is on.
 - **Vision models**: the built-in vision model (two files you download yourself, usable only with GPU acceleration on; simple captures still go to local OCR, large images, columns and tables go to the vision model) and LLM Vision (the LM Studio / Ollama address and a vision model name).
