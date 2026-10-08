@@ -729,11 +729,7 @@
   color: var(--accent-primary);
 }
 
-/* ==================== 存储位置（隐私页）与 label/value 网格 ==================== */
-.storage-locations {
-  margin-bottom: 16px;
-}
-
+/* ==================== label/value 网格（隐私页数据管理、本地引擎卡、本地模型运行状态） ==================== */
 .storage-grid {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
@@ -768,28 +764,6 @@
 .storage-value > span:first-child + span:not(.storage-path) {
   flex: 1;
   min-width: 0;
-}
-
-.storage-locations .link-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  font-size: 12px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-primary);
-  border-radius: 6px;
-  white-space: nowrap;
-  text-decoration: none;
-}
-
-.storage-locations .link-button:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
-.storage-locations .engine-download-progress {
-  margin-top: 12px;
 }
 
 .storage-note {

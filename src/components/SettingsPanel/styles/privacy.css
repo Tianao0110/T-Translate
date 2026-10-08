@@ -146,25 +146,126 @@
   margin-top: 1px;
 }
 
-/* 数据管理底部的「迁移」「清除」两行，与上方统计用分隔线隔开 */
-.data-actions {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border-primary);
+/* ==================== 数据管理 ==================== */
+/* 一张 label/value 网格：目录 → 占用 → 自动删除 → 迁移、清除，分隔线隔成三段，
+   标签列全组对齐。进度条、提示、分隔线和占用方块占满整行。 */
+.data-grid {
+  gap: 10px 16px;
 }
 
-.data-actions .storage-value {
+.data-grid .data-span,
+.data-divider,
+.data-stats {
+  grid-column: 1 / -1;
+}
+
+.data-divider {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--border-primary);
+}
+
+/* 目录读不到（旧 preload）时不留开头那条线 */
+.data-grid > .data-divider:first-child {
+  display: none;
+}
+
+.data-grid .storage-note {
+  margin: 0;
+}
+
+.data-grid .storage-value {
   flex-wrap: wrap;
   gap: 8px;
 }
 
-/* 输入框后缀 */
-.input-with-suffix {
-  display: flex;
-  align-items: center;
+/* 目录行的按钮一律靠右，和是否有路径无关 */
+.data-grid .storage-value > .link-button {
+  margin-left: auto;
+}
+
+/* 占用：两行四格，先条数后大小；窄窗口两列 */
+.data-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
 
+.data-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+}
+
+.data-stat-label {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.data-stat-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@container settings (max-width: 600px) {
+  .data-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.data-hint {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+/* 组里的按钮统一成小号：白底细边，文字色区分用途；危险操作悬停才变红框 */
+.data-grid .link-button,
+.data-grid .neutral-button,
+.data-grid .danger-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.data-grid .link-button:hover,
+.data-grid .neutral-button:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.data-grid .danger-button {
+  color: var(--error, #ef4444);
+}
+
+.data-grid .danger-button:hover {
+  background: color-mix(in srgb, var(--error, #ef4444) 8%, var(--bg-primary));
+  border-color: var(--error, #ef4444);
+  color: var(--error, #ef4444);
+}
+
+.data-grid .link-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* 输入框后缀 */
 .input-suffix {
   font-size: 13px;
   color: var(--text-tertiary);

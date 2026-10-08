@@ -376,44 +376,40 @@ const PrivacySection = ({
         </div>
       </div>
 
-      {/* Data management: where it lives, how much is stored, and what can be
-          done with it (migrate, clear) in one group. */}
+      {/* Data management, one label/value grid so every row lines up: where it
+          lives, how much of each kind is stored, auto-delete, then what can be
+          done with it (migrate, clear). Dividers split the three parts. */}
       <div className="setting-group">
         <label className="setting-label"><Database size={15} /> {t('privacy.dataManagement')}</label>
 
-        {/* Where it lives first, then how much of each kind is stored there. */}
-        <StorageLocations confirm={confirm} />
+        <div className="storage-grid data-grid">
+          <StorageLocations confirm={confirm} />
 
-        {dataStats && (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr 1fr',
-            gap: '8px 16px',
-            marginBottom: '16px',
-            padding: '12px',
-            background: 'var(--bg-secondary)',
-            borderRadius: '8px',
-            fontSize: '13px',
-          }}>
-            <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.history')}</span><br/>{dataStats.historyCount} {t('privacy.stats.items')}</div>
-            <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.favorites')}</span><br/>{dataStats.favoritesCount} {t('privacy.stats.items')}</div>
-            <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.cache')}</span><br/>{dataStats.cacheCount} {t('privacy.stats.items')}</div>
-            <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.historyStore')}</span><br/>{dataStats.vaultAvailable
-              ? formatBytes(dataStats.vaultFileSize)
-              : t('privacy.stats.plaintext')}</div>
-            <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.docProgress')}</span><br/>{dataStats.docProgressCount} {t('privacy.stats.items')} · {formatBytes(dataStats.docProgressBytes)}</div>
-            <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.localData')}</span><br/>{formatBytes(dataStats.localStorageBytes)}</div>
-            <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.settingsFile')}</span><br/>{formatBytes(dataStats.settingsFileSize)}</div>
-            <div><span style={{color: 'var(--text-secondary)'}}>{t('privacy.stats.logs')}</span><br/>{formatBytes(dataStats.logsDirSize)}</div>
-          </div>
-        )}
-
-        <div className="setting-row">
-          <span>{t('privacy.autoDeleteHistory')}</span>
-          <div className="input-with-suffix">
+          <div className="data-divider" />
+          {dataStats && (
+            <div className="data-stats">
+              {[
+                [t('privacy.stats.history'), `${dataStats.historyCount} ${t('privacy.stats.items')}`],
+                [t('privacy.stats.favorites'), `${dataStats.favoritesCount} ${t('privacy.stats.items')}`],
+                [t('privacy.stats.cache'), `${dataStats.cacheCount} ${t('privacy.stats.items')}`],
+                [t('privacy.stats.docProgress'), `${dataStats.docProgressCount} ${t('privacy.stats.items')} · ${formatBytes(dataStats.docProgressBytes)}`],
+                [t('privacy.stats.historyStore'), dataStats.vaultAvailable ? formatBytes(dataStats.vaultFileSize) : t('privacy.stats.plaintext')],
+                [t('privacy.stats.localData'), formatBytes(dataStats.localStorageBytes)],
+                [t('privacy.stats.settingsFile'), formatBytes(dataStats.settingsFileSize)],
+                [t('privacy.stats.logs'), formatBytes(dataStats.logsDirSize)],
+              ].map(([label, value]) => (
+                <div key={label} className="data-stat">
+                  <span className="data-stat-label">{label}</span>
+                  <span className="data-stat-value">{value}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <span className="storage-label">{t('privacy.autoDeleteHistory')}</span>
+          <span className="storage-value">
             <input
               type="number"
-              className="setting-input small"
+              className="setting-input small compact"
               value={settings.privacy?.autoDeleteDays || 0}
               onChange={(e) => updateSetting('privacy', 'autoDeleteDays', parseInt(e.target.value) || 0)}
               min="0"
@@ -421,34 +417,33 @@ const PrivacySection = ({
               disabled={currentMode === PRIVACY_MODE_IDS.SECURE}
             />
             <span className="input-suffix">{t('privacy.daysLater')}</span>
-          </div>
-        </div>
-        <p className="setting-hint">
-          {t('privacy.zeroMeansNever')}
-          {currentMode === PRIVACY_MODE_IDS.SECURE ? t('privacy.incognitoDisabled') : ''}
-        </p>
+            <span className="data-hint">
+              {t('privacy.zeroMeansNever')}
+              {currentMode === PRIVACY_MODE_IDS.SECURE ? t('privacy.incognitoDisabled') : ''}
+            </span>
+          </span>
 
-        <div className="storage-grid data-actions">
+          <div className="data-divider" />
           <span className="storage-label">{t('privacy.migration.title')}</span>
           <span className="storage-value">
             <button className="neutral-button" onClick={handleExportPack}>
-              <Download size={16} /> {t('privacy.migration.export')}
+              <Download size={14} /> {t('privacy.migration.export')}
             </button>
             <label className="neutral-button">
-              <Upload size={16} /> {t('privacy.migration.import')}
+              <Upload size={14} /> {t('privacy.migration.import')}
               <input type="file" accept=".json" onChange={handleImportFile} style={{display: 'none'}} />
             </label>
           </span>
           <span className="storage-label">{t('privacy.clearLabel')}</span>
           <span className="storage-value">
             <button className="danger-button" onClick={handleClearHistory}>
-              <Trash2 size={16} /> {t('settings.privacy.clearHistory')}
+              <Trash2 size={14} /> {t('settings.privacy.clearHistory')}
             </button>
             <button className="danger-button" onClick={handleClearCache}>
-              <Trash2 size={16} /> {t('translationSettings.clearCache')}
+              <Trash2 size={14} /> {t('translationSettings.clearCache')}
             </button>
             <button className="danger-button" onClick={handleClearAllData}>
-              <Trash2 size={16} /> {t('settings.privacy.clearAll')}
+              <Trash2 size={14} /> {t('settings.privacy.clearAll')}
             </button>
           </span>
         </div>
