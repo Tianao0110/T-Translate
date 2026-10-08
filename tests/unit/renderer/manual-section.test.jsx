@@ -15,7 +15,7 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('../../../docs/MANUAL.zh.md?raw', () => ({
-  default: '# 标题\n\n## 0. 开始使用\n\n### 0.1 安装\n\n看 [官网](https://example.com/) 和 [下一章](#1-主窗口)。\n\n## 1. 主窗口\n\n正文。\n',
+  default: '# 标题\n\n前言。\n\n## 0. 开始使用\n\n### 0.1 安装\n\n看 [官网](https://example.com/) 和 [下一章](#1-主窗口)。\n\n## 1. 主窗口\n\n正文。\n',
 }));
 vi.mock('../../../docs/MANUAL.en.md?raw', () => ({
   default: '# Title\n\n## 0. Getting started\n\nEnglish body.\n',
@@ -31,11 +31,23 @@ afterEach(() => {
 
 describe('ManualSection', () => {
   it('renders the chapter list and the body from the Chinese guide', () => {
-    const { container, getByText } = render(<ManualSection />);
+    const { container, getByText, queryByText } = render(<ManualSection />);
     const toc = container.querySelectorAll('.manual-toc-link');
-    expect([...toc].map((b) => b.textContent)).toEqual(['0. 开始使用', '0.1 安装', '1. 主窗口']);
+    // Chapters only until one is opened.
+    expect([...toc].map((b) => b.textContent)).toEqual(['0. 开始使用', '1. 主窗口']);
     expect(getByText('正文。')).toBeInTheDocument();
     expect(document.getElementById('1-主窗口')?.tagName).toBe('H2');
+    // The lines before the first chapter are not shown in the app.
+    expect(queryByText('前言。')).toBeNull();
+  });
+
+  it('unfolds the sections of the chapter that is opened', () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    const { container, getByText } = render(<ManualSection />);
+    fireEvent.click(getByText('0. 开始使用', { selector: '.manual-toc-link' }));
+    const toc = container.querySelectorAll('.manual-toc-link');
+    expect([...toc].map((b) => b.textContent)).toEqual(['0. 开始使用', '0.1 安装', '1. 主窗口']);
+    expect(container.querySelector('.manual-toc-link.active')?.textContent).toBe('0. 开始使用');
   });
 
   it('switches to the English guide with the UI language', () => {
