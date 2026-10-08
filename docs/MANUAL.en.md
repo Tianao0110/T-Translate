@@ -284,10 +284,9 @@ See "Related settings" in chapter 2.
 
 ### 4.4 Floating Window
 
-- Default opacity.
-- Display mode: auto / scattered / unified, see 3.1.
-- OCR engine: follows the OCR page by default, or pick one just for the floating window.
-- Allow the overlay in screenshots and recordings: off by default.
+- Window: display mode (auto / scattered / unified, see 3.1), default opacity, allow the overlay in screenshots and recordings (off by default).
+- OCR engine: follows the OCR page; "Go to Settings" takes you there.
+- Shortcuts: the open/close shortcut (as set under Appearance → Shortcuts), Space to capture, Esc to close; the full list is in 6.3.
 
 ### 4.5 Documents
 

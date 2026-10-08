@@ -2,34 +2,25 @@
 
 /* ==================== 快捷键显示 ==================== */
 .shortcut-info {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.shortcut-item {
-  display: flex;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 8px 12px;
   align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
-  background: var(--bg-secondary);
-  border-radius: 6px;
 }
 
-.shortcut-item kbd {
-  display: inline-block;
-  padding: 4px 8px;
+.shortcut-info kbd {
+  justify-self: start;
+  padding: 3px 8px;
   background: var(--bg-tertiary);
   border: 1px solid var(--border-primary);
   border-radius: 4px;
   font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
   font-size: 12px;
   color: var(--text-primary);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
-.shortcut-item span {
-  font-size: 13px;
+.shortcut-info span {
+  font-size: 12px;
   color: var(--text-secondary);
 }
 

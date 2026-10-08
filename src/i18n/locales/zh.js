@@ -327,7 +327,7 @@ const zh = {
     ocrEngine: "OCR 引擎", useGlobalOcr: "跟随全局 OCR（当前：{{engine}}）", goToSettings: "前往设置",
     defaultOpacity: "默认透明度", opacityHint: "在悬浮窗中点击小横条可实时调节",
     windowOptions: "窗口选项", rememberPosition: "记住窗口位置", autoPin: "默认置顶显示",
-    shortcut: { toggle: "打开/关闭悬浮窗口", capture: "手动截图识别", exit: "退出字幕模式/关闭窗口" },
+    shortcut: { toggle: "打开/关闭悬浮窗口", capture: "截译一次，有结果时清空", exit: "关闭窗口" },
     instructions: "使用说明",
     normalMode: "普通模式", normalModeDesc: "点击 📷 截图识别当前区域",
     subtitleMode: "字幕模式", subtitleModeDesc: "点击 🎬 开启实时字幕翻译",

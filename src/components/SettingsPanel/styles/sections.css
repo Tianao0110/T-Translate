@@ -789,3 +789,14 @@
 .engines-span {
   grid-column: 2 / -1;
 }
+
+/* ==================== 悬浮窗口页：引擎与快捷键 ==================== */
+/* 快捷键是多行，标签贴顶对齐 */
+.floating-info {
+  align-items: start;
+}
+
+.floating-info .storage-value {
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}

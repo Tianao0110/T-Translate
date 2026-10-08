@@ -327,7 +327,7 @@ const en = {
     ocrEngine: "OCR Engine", useGlobalOcr: "Follows global OCR ({{engine}})", goToSettings: "Go to Settings",
     defaultOpacity: "Default Opacity", opacityHint: "Click the bar in floating window to adjust in real-time",
     windowOptions: "Window Options", rememberPosition: "Remember Position", autoPin: "Always on Top",
-    shortcut: { toggle: "Toggle Floating Window", capture: "Manual Screenshot", exit: "Exit Subtitle Mode / Close" },
+    shortcut: { toggle: "Toggle Floating Window", capture: "Capture once; clear when there is a result", exit: "Close the window" },
     instructions: "Instructions",
     normalMode: "Normal Mode", normalModeDesc: "Click 📷 to capture current area",
     subtitleMode: "Subtitle Mode", subtitleModeDesc: "Click 🎬 to enable real-time subtitle translation",
