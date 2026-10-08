@@ -199,12 +199,6 @@
   box-shadow: 0 4px 12px color-mix(in srgb, var(--accent-primary) 40%, transparent);
 }
 
-/* 检查中按钮状态 */
-.about-actions .link-button.checking {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
 /* ==================== 下载进度 ==================== */
 
 .update-download-progress {

@@ -355,11 +355,11 @@ The model that ships with the app; you download the files yourself and put them 
 
 ### 4.13 About
 
-- Version and "Check for Updates". A new version can be downloaded and installed from here, or fetched from GitHub by hand.
+- Top row: version, "Check for Updates", GitHub, open the log folder. A new version can be downloaded and installed from here, or fetched from GitHub by hand.
 - Storage: where the data and models folders are, with buttons to open them. Models left elsewhere by an older version can be moved into the app folder, and the old folder cleaned afterwards.
 - GPU acceleration: one switch. When on, local OCR, neural voices, the local model, the built-in vision model, PDF layout analysis and the high-accuracy listen tier run on the GPU; each engine self-tests first and stays on the CPU if it cannot, no restart needed. The standard listen tier always stays on the CPU.
 - Engine status: where each engine runs, its self-test result and speed.
-- Open the log folder, reset all settings (API keys are kept).
+- Footer: reset all settings (API keys are kept).
 
 ## 5. Models and downloads
 

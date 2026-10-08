@@ -473,6 +473,7 @@ const zh = {
     feature4: "划词翻译 + 悬浮窗口",
     techStack: "技术栈",
     openLogs: "打开日志目录",
+    resetAll: "重置全部设置",
     storage: {
       title: "存储",
       dataDir: "数据目录",

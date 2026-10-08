@@ -460,31 +460,37 @@ const AboutSection = ({ notify, resetSettings }) => {
 
   return (
     <div className="setting-content about-section">
-      <div className="app-info">
+      {/* Version and update sit at the top: the page is long, and checking for
+          an update is what people come here for. */}
+      <div className="about-header">
         <img src={appIcon} alt="T-Translate" className="app-logo-img" />
-        <h2>T-Translate</h2>
-        <p className="version-tag">v{version}</p>
-        <p className="app-desc">{t('about.desc')}</p>
-      </div>
-
-      <div className="info-cards">
-        <div className="info-card">
-          <h4><Rocket size={16} /> {t('about.features')}</h4>
-          <ul>
-            <li>{t('about.feature1')}</li>
-            <li>{t('about.feature2')}</li>
-            <li>{t('about.feature3')}</li>
-            <li>{t('about.feature4')}</li>
-          </ul>
+        <div className="about-title">
+          <div className="about-name-row">
+            <h2>T-Translate</h2>
+            <span className="version-tag">v{version}</span>
+          </div>
+          <p className="app-desc">{t('about.desc')}</p>
         </div>
-        <div className="info-card">
-          <h4><Cpu size={16} /> {t('about.techStack')}</h4>
-          <ul>
-            <li>Electron + React 18</li>
-            <li>Zustand State Management</li>
-            <li>LM Studio / Ollama</li>
-            <li>PP-OCRv6 / LLM Vision</li>
-          </ul>
+        <div className="about-actions">
+          <button
+            className="about-update-button"
+            onClick={checkUpdate}
+            disabled={updateStage === UPDATE_STAGE.CHECKING || updateStage === UPDATE_STAGE.DOWNLOADING}
+          >
+            {updateStage === UPDATE_STAGE.CHECKING ? (
+              <><Loader2 size={16} className="spinning" /> {t('settings.about.checking')}</>
+            ) : (
+              <><RefreshCw size={16}/> {t('settings.about.checkUpdate')}</>
+            )}
+          </button>
+          <div className="about-links">
+            <button className="link-button" onClick={openGitHub}>
+              <GitBranch size={14}/> GitHub
+            </button>
+            <button className="link-button" onClick={openLogDirectory}>
+              <FolderOpen size={14}/> {t('about.openLogs')}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -598,34 +604,39 @@ const AboutSection = ({ notify, resetSettings }) => {
         </div>
       )}
       {confirmDialog}
-      <div className="about-actions">
-        <button className="link-button" onClick={openGitHub}>
-          <GitBranch size={16}/> GitHub
-        </button>
-        <button
-          className={`link-button ${updateStage === UPDATE_STAGE.CHECKING ? 'checking' : ''}`}
-          onClick={checkUpdate}
-          disabled={updateStage === UPDATE_STAGE.CHECKING || updateStage === UPDATE_STAGE.DOWNLOADING}
-        >
-          {updateStage === UPDATE_STAGE.CHECKING ? (
-            <><Loader2 size={16} className="spinning" /> {t('settings.about.checking')}</>
-          ) : (
-            <><RefreshCw size={16}/> {t('settings.about.checkUpdate')}</>
-          )}
-        </button>
-        <button className="link-button" onClick={openLogDirectory}>
-          <FolderOpen size={16}/> {t('about.openLogs')}
-        </button>
-        {resetSettings && (
-          <button className="link-button danger" onClick={() => resetSettings()}>
-            <RefreshCw size={16}/> {t('settingsNav.reset')}
-          </button>
-        )}
+
+      <div className="info-cards">
+        <div className="info-card">
+          <h4><Rocket size={16} /> {t('about.features')}</h4>
+          <ul>
+            <li>{t('about.feature1')}</li>
+            <li>{t('about.feature2')}</li>
+            <li>{t('about.feature3')}</li>
+            <li>{t('about.feature4')}</li>
+          </ul>
+        </div>
+        <div className="info-card">
+          <h4><Cpu size={16} /> {t('about.techStack')}</h4>
+          <ul>
+            <li>Electron + React 18</li>
+            <li>Zustand State Management</li>
+            <li>LM Studio / Ollama</li>
+            <li>PP-OCRv6 / LLM Vision</li>
+          </ul>
+        </div>
       </div>
 
+      {/* Reset stays at the bottom, away from the everyday buttons. */}
       <div className="about-footer">
-        <p className="made-with">Made with <Heart size={13} style={{ fill: 'currentColor' }} /> for Tianao</p>
-        <p className="copyright">{t('settings.about.copyright')}</p>
+        <div className="about-credits">
+          <p className="made-with">Made with <Heart size={13} style={{ fill: 'currentColor' }} /> for Tianao</p>
+          <p className="copyright">{t('settings.about.copyright')}</p>
+        </div>
+        {resetSettings && (
+          <button className="link-button danger" onClick={() => resetSettings()}>
+            <RefreshCw size={14}/> {t('about.resetAll')}
+          </button>
+        )}
       </div>
 
       {showUpdateModal && updateInfo && (

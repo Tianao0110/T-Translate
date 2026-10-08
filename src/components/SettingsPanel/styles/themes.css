@@ -178,7 +178,7 @@
 }
 
 /* 版本标签 */
-[data-theme="fresh"] .app-info .version-tag {
+[data-theme="fresh"] .about-name-row .version-tag {
   background: linear-gradient(135deg, #10b981, #059669) !important;
 }
 

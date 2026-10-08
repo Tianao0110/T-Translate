@@ -217,38 +217,204 @@
 }
 
 /* ==================== 关于页面 ==================== */
-.about-section {
-  text-align: center;
+/* 顶部一行：图标、名称与版本、检查更新。页面较长，常用按钮放在最上面，不用往下翻。 */
+.about-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px 20px;
+  margin: 0 0 16px 0;
+  padding: 18px 20px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent-primary) 6%, var(--bg-secondary)), var(--bg-secondary));
+  border: 1px solid var(--border-primary);
+  border-radius: 14px;
 }
 
+.app-logo-img {
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.1));
+}
+
+.about-title {
+  flex: 1;
+  min-width: 160px;
+}
+
+.about-name-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.about-name-row h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
+}
+
+.about-name-row .version-tag {
+  padding: 3px 10px;
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-hover));
+  color: var(--text-on-accent);
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.about-title .app-desc {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+/* 换行到第二行时仍靠右 */
+.about-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.about-update-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-hover));
+  color: var(--text-on-accent);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.about-update-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--accent-primary) 35%, transparent);
+}
+
+.about-update-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.about-links {
+  display: flex;
+  gap: 14px;
+}
+
+.about-links .link-button {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.about-links .link-button:hover {
+  color: var(--accent-primary);
+}
+
+/* 功能与技术栈：静态介绍，放在状态卡片之后 */
 .info-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
-  margin: 24px 0;
-  text-align: left;
+  margin: 0 0 16px 0;
 }
 
 .info-card {
+  padding: 16px 20px;
   background: var(--bg-secondary);
-  padding: 16px;
-  border-radius: 10px;
   border: 1px solid var(--border-primary);
+  border-radius: 14px;
+  transition: all 0.2s ease;
+}
+
+.info-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
 }
 
 .info-card h4 {
-  font-size: 13px;
-  font-weight: 600;
-  margin: 0 0 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 700;
   color: var(--text-primary);
+}
+
+.info-card ul {
+  margin: 0;
+  padding: 0 0 0 18px;
 }
 
 .info-card p,
 .info-card li {
   font-size: 12px;
   color: var(--text-secondary);
-  line-height: 1.5;
+  line-height: 1.7;
   margin: 0;
+}
+
+/* 页脚：署名在左，重置全部设置在右，远离常用按钮 */
+.about-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-primary);
+}
+
+.about-credits p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+/* Inline heart icon (block-level per global svg reset) needs a flex row */
+.about-credits .made-with {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.about-credits .copyright {
+  margin-top: 2px;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.about-footer .link-button.danger {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.about-footer .link-button.danger:hover {
+  color: var(--error);
+}
+
+/* 宽排版下 .setting-content 是网格，行距由 row-gap 给，块自身不再留外边距 */
+@container settings (min-width: 1040px) {
+  .about-section > .about-header,
+  .about-section > .info-cards,
+  .about-section > .storage-card,
+  .about-section > .about-footer {
+    margin: 0;
+  }
 }
 
 /* ==================== 子设置 ==================== */
@@ -258,138 +424,6 @@
   border-left: 2px solid var(--border-primary);
 }
 
-
-/* ==================== 关于页面补充 ==================== */
-.about-actions {
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-  margin-top: 20px;
-}
-
-.about-actions .link-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-primary);
-  border-radius: 6px;
-  text-decoration: none;
-}
-
-.about-actions .link-button:hover {
-  border-color: var(--accent-primary);
-  background: var(--bg-hover);
-}
-
-.app-info {
-  text-align: center;
-  padding: 20px 0;
-}
-
-/* Logo 文字样式 */
-/* 图片 Logo */
-.app-logo-img {
-  display: block;
-  margin: 0 auto;
-  width: 80px;
-  height: 80px;
-  border-radius: 16px;
-  object-fit: contain;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
-}
-
-.app-info h2 {
-  margin: 12px 0 8px;
-  font-size: 24px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.app-info p {
-  color: var(--text-secondary);
-  font-size: 14px;
-}
-
-.app-info .version-tag {
-  display: inline-block;
-  padding: 4px 12px;
-  background: var(--accent-primary);
-  color: var(--text-on-accent);
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 500;
-  margin: 8px 0;
-}
-
-.app-info .app-desc {
-  color: var(--text-tertiary);
-  font-size: 13px;
-  margin-top: 8px;
-}
-
-/* Info Cards */
-.info-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
-  margin: 20px 0;
-}
-
-.info-card {
-  padding: 16px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-primary);
-  border-radius: 10px;
-}
-
-.info-card h4 {
-  margin: 0 0 12px 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.info-card ul {
-  margin: 0;
-  padding: 0 0 0 16px;
-  font-size: 13px;
-  color: var(--text-secondary);
-  line-height: 1.8;
-}
-
-.info-card li {
-  margin: 0;
-}
-
-/* About Footer */
-.about-footer {
-  text-align: center;
-  margin-top: 24px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border-primary);
-}
-
-.about-footer p {
-  margin: 4px 0;
-  font-size: 13px;
-  color: var(--text-tertiary);
-}
-
-/* Inline heart icon (block-level per global svg reset) needs a centered flex row */
-.about-footer .made-with {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-}
-
-.about-footer .copyright {
-  font-size: 11px;
-  color: var(--text-tertiary);
-  opacity: 0.7;
-}
 
 /* ==================== 主题选择器优化 ==================== */
 .theme-selector {
@@ -614,72 +648,6 @@
   line-height: 1.7;
 }
 
-/* ==================== 关于页面优化 ==================== */
-.app-info {
-  text-align: center;
-  padding: 30px 0;
-}
-
-.app-info h2 {
-  margin: 0 0 8px;
-  font-size: 26px;
-  font-weight: 700;
-  color: var(--text-primary);
-  letter-spacing: -0.5px;
-}
-
-.app-info .version-tag {
-  display: inline-block;
-  padding: 6px 16px;
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-hover));
-  color: var(--text-on-accent);
-  border-radius: 20px;
-  font-size: 13px;
-  font-weight: 600;
-  margin: 10px 0;
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--accent-primary) 30%, transparent);
-}
-
-/* 特性卡片 */
-.info-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
-  margin: 28px 0;
-}
-
-.info-card {
-  padding: 20px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-primary);
-  border-radius: 14px;
-  transition: all 0.2s ease;
-}
-
-.info-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
-}
-
-.info-card h4 {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 14px 0;
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.info-card ul {
-  margin: 0;
-  padding: 0 0 0 18px;
-  font-size: 13px;
-  color: var(--text-secondary);
-  line-height: 2;
-}
-
-
 /* ==================== AI 动作 ==================== */
 .ai-action-list {
   display: flex;
@@ -764,8 +732,7 @@
 
 /* ==================== 关于页：存储卡 ==================== */
 .storage-card {
-  margin: 0 0 24px 0;
-  text-align: left;
+  margin: 0 0 16px 0;
 }
 
 .storage-grid {

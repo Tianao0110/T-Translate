@@ -473,6 +473,7 @@ const en = {
     feature4: "Selection translate + Floating window",
     techStack: "Tech Stack",
     openLogs: "Open Log Directory",
+    resetAll: "Reset All Settings",
     storage: {
       title: "Storage",
       dataDir: "Data",
