@@ -1278,13 +1278,11 @@ const en = {
   // Display text for the built-in AI actions (config/ai-actions.js). Imported
   // actions carry their own labels instead — they have no keys here.
   aiActions: {
-    surfaceSelection: "Selection", surfaceScreenshot: "Main panel", surfaceFloating: "Floating window",
+    surfaceSelection: "Selection", surfaceScreenshot: "Main panel", surfaceFloating: "Floating window", surfaceDocument: "Documents",
     inUnderstandMode: "in Explain mode",
     description: "One more layer of understanding on what you are looking at. An action is a prompt config, not code — two ship with the app, the rest are imported.",
-    builtinTitle: "Built-in actions",
-    longForm: "When Summarize appears",
+    longFormShort: "Min. length",
     longFormHint: "Summarize is offered once the content reaches this length. Counted in Chinese characters; English is converted to words (150 characters ≈ 120 words). If it stays hidden when you expect it, lower this.", builtinHint: "Built in; ships with the app",
-    importedTitle: "Imported actions", importedEmpty: "Nothing imported yet",
     import: "Import a config file",
     importTitle: "Import an AI action config",
     importHint: "A JSON file holding one action or a list of them. A config that breaks the schema is refused with the reason, and prompts may only use known variables.",

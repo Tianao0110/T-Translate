@@ -1279,13 +1279,11 @@ const zh = {
   // Display text for the built-in AI actions (config/ai-actions.js). Imported
   // actions carry their own labels instead — they have no keys here.
   aiActions: {
-    surfaceSelection: "划词", surfaceScreenshot: "主面板", surfaceFloating: "悬浮窗",
+    surfaceSelection: "划词", surfaceScreenshot: "主面板", surfaceFloating: "悬浮窗", surfaceDocument: "文档",
     inUnderstandMode: "讲解模式下",
     description: "在看到的内容上再做一层理解。一个动作就是一份提示词配置，不是代码——内置两个，其余靠导入。",
-    builtinTitle: "内置动作",
-    longForm: "「总结」出现的门槛",
+    longFormShort: "字数门槛",
     longFormHint: "内容达到这个字数才会出现「总结」按钮。按中文字数算，英文按词数换算（150 字 ≈ 120 词）。觉得该出现却没出现，就调小它。", builtinHint: "内置动作，随程序发布",
-    importedTitle: "导入的动作", importedEmpty: "还没有导入任何动作",
     import: "导入配置文件",
     importTitle: "导入 AI 动作配置",
     importHint: "JSON 文件，一个动作或一组动作。字段不合规会被拒绝并说明原因，提示词里只允许已知变量。",

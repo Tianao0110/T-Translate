@@ -298,9 +298,9 @@ See "Related settings" in chapter 2.
 
 ### 4.6 AI Actions
 
-- Built-in actions: Summarize, Explain. Adjust the length threshold for "Summarize" here; lower it if the button does not show when you expect it.
-- Imported actions: "Import a config file" takes a JSON file with one action or a set; save to apply. Invalid files are rejected with a reason.
-- Imported actions can be removed.
+- All actions sit in one list, each row saying where it appears (selection, main panel, floating window, documents). The built-in Summarize, Explain and Summarize explained carry a lock and cannot be removed.
+- The Summarize row has its length threshold on the right: Summarize shows once the content reaches it; lower it if the button does not show when you expect it.
+- Import: "Import a config file" takes a JSON file with one action or a set; save to apply. Invalid files are rejected with a reason. Imported actions follow the built-in ones and can be removed.
 
 ### 4.7 Local model
 

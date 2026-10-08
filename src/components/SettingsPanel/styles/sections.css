@@ -810,3 +810,17 @@
 .setting-group .doc-filter-row + .setting-switch {
   margin-top: 10px;
 }
+
+/* 「总结」行右侧的字数门槛 */
+.ai-action-threshold {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.ai-action-threshold .setting-input.small {
+  width: 72px;
+}

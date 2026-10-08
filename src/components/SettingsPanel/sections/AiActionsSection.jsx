@@ -14,6 +14,7 @@ const SURFACE_KEYS = {
   selection: 'aiActions.surfaceSelection',
   screenshot: 'aiActions.surfaceScreenshot',
   floating: 'aiActions.surfaceFloating',
+  document: 'aiActions.surfaceDocument',
 };
 
 const AiActionsSection = ({ settings, updateSetting, notify, confirm }) => {
@@ -75,8 +76,10 @@ const AiActionsSection = ({ settings, updateSetting, notify, confirm }) => {
     <div className="setting-content">
       <h3>{t('settings.aiActions.title')}</h3>
 
-      <div className="setting-group">
-        <label className="setting-label">{t('aiActions.builtinTitle')}</label>
+      {/* Every action in one list: built-ins locked — Summarize carries its
+          length threshold on its own row — imported ones removable, and the
+          import button under the list. */}
+      <div className="setting-group wide">
         <div className="ai-action-list">
           {BUILTIN_AI_ACTIONS.map((action) => (
             <div className="ai-action-item" key={action.id}>
@@ -88,50 +91,41 @@ const AiActionsSection = ({ settings, updateSetting, notify, confirm }) => {
                 </div>
                 <div className="ai-action-meta">{describeWhere(action)}</div>
               </div>
+              {action.id === 'summarize' && (
+                <label className="ai-action-threshold" title={t('aiActions.longFormHint')}>
+                  <span>{t('aiActions.longFormShort')}</span>
+                  <input
+                    type="number"
+                    className="setting-input small"
+                    value={settings.aiActions?.longFormChars ?? 150}
+                    onChange={(e) => updateSetting(
+                      'aiActions', 'longFormChars',
+                      Math.min(2000, Math.max(10, parseInt(e.target.value) || 150))
+                    )}
+                    min="10"
+                    max="2000"
+                  />
+                </label>
+              )}
+            </div>
+          ))}
+          {imported.map((action) => (
+            <div className="ai-action-item" key={action.id}>
+              <span className="ai-action-icon"><AiActionIcon name={action.icon} size={15} /></span>
+              <div className="ai-action-body">
+                <div className="ai-action-name">{resolveActionLabel(action, i18n.language)}</div>
+                <div className="ai-action-meta">{describeWhere(action)}</div>
+              </div>
+              <button
+                className="ai-action-remove"
+                onClick={() => handleRemove(action)}
+                title={t('aiActions.remove')}
+              >
+                <Trash2 size={14} />
+              </button>
             </div>
           ))}
         </div>
-      </div>
-
-      <div className="setting-group">
-        <label className="setting-label">{t('aiActions.longForm')}</label>
-        <input
-          type="number"
-          className="setting-input small"
-          value={settings.aiActions?.longFormChars ?? 150}
-          onChange={(e) => updateSetting(
-            'aiActions', 'longFormChars',
-            Math.min(2000, Math.max(10, parseInt(e.target.value) || 150))
-          )}
-          min="10"
-          max="2000"
-        />
-      </div>
-
-      <div className="setting-group">
-        <label className="setting-label">{t('aiActions.importedTitle')}</label>
-        {imported.length === 0 ? (
-          <div className="setting-hint-inline">{t('aiActions.importedEmpty')}</div>
-        ) : (
-          <div className="ai-action-list">
-            {imported.map((action) => (
-              <div className="ai-action-item" key={action.id}>
-                <span className="ai-action-icon"><AiActionIcon name={action.icon} size={15} /></span>
-                <div className="ai-action-body">
-                  <div className="ai-action-name">{resolveActionLabel(action, i18n.language)}</div>
-                  <div className="ai-action-meta">{describeWhere(action)}</div>
-                </div>
-                <button
-                  className="ai-action-remove"
-                  onClick={() => handleRemove(action)}
-                  title={t('aiActions.remove')}
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
 
         <button className="ai-action-import" onClick={handleImport}>
           <Upload size={14} /> {t('aiActions.import')}
