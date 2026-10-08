@@ -10,6 +10,7 @@ import { PRIVACY_MODULES, PRIVACY_MODE_ORDER, moduleState } from '../../../core/
 import { buildMigrationPack, parseMigrationPack, stripSecrets, MAX_PACK_BYTES } from '../../../core/migration-pack.js';
 import { validateImportedActions, refreshImportedActions } from '../../../ai/ai-action-store.js';
 import { getAllProviderMetadata } from '../../../config/provider-icons.js';
+import StorageLocations from './StorageLocations.jsx';
 
 const formatBytes = (bytes) => {
   if (!bytes) return '0 KB';
@@ -378,6 +379,9 @@ const PrivacySection = ({
       {/* Data management */}
       <div className="setting-group">
         <label className="setting-label"><Database size={15} /> {t('privacy.dataManagement')}</label>
+
+        {/* Where it lives first, then how much of each kind is stored there. */}
+        <StorageLocations confirm={confirm} />
 
         {dataStats && (
           <div style={{

@@ -411,7 +411,6 @@
 @container settings (min-width: 1040px) {
   .about-section > .about-header,
   .about-section > .info-cards,
-  .about-section > .storage-card,
   .about-section > .about-footer {
     margin: 0;
   }
@@ -730,9 +729,9 @@
   color: var(--accent-primary);
 }
 
-/* ==================== 关于页：存储卡 ==================== */
-.storage-card {
-  margin: 0 0 16px 0;
+/* ==================== 存储位置（隐私页）与 label/value 网格 ==================== */
+.storage-locations {
+  margin-bottom: 16px;
 }
 
 .storage-grid {
@@ -771,7 +770,7 @@
   min-width: 0;
 }
 
-.storage-card .link-button {
+.storage-locations .link-button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -784,12 +783,12 @@
   text-decoration: none;
 }
 
-.storage-card .link-button:disabled {
+.storage-locations .link-button:disabled {
   opacity: 0.6;
   cursor: default;
 }
 
-.storage-card .engine-download-progress {
+.storage-locations .engine-download-progress {
   margin-top: 12px;
 }
 
@@ -801,4 +800,18 @@
 
 .storage-note.error {
   color: var(--error);
+}
+
+/* ==================== 本地模型页：本地引擎卡 ==================== */
+/* 引擎名 | 跑在哪（显卡开关可用时）| 宿主状态。窗口窄时设备徽标折行，状态列至少留 9em */
+.engines-grid.with-device {
+  grid-template-columns: max-content minmax(0, max-content) minmax(9em, 1fr);
+}
+
+.engines-grid .engine-badge {
+  white-space: normal;
+}
+
+.engines-span {
+  grid-column: 2 / -1;
 }

@@ -6,7 +6,7 @@
 
 - `applyAppPaths` 必须在 `require('./state')` 之前跑：electron-store 与 logger 都在第一次 require 时冻结路径。它只依赖 fs / path，日志行交回调用方（logger 还没起）。
 - 打包版且安装目录可写 → 一切放在 `<install>\data`（设置、历史保险库、缓存、日志），Chromium 自己的存储重定向到 `data\browser`，顶层保持可读；安装目录不可写（Program Files 无管理员）或开发态 → userData 留在 Electron 默认（`%APPDATA%\t-translate`），只把 browser 子目录切出来。真 Electron 探针证实 Chromium 全部文件（含 DIPS / GPUCache / Local State）都跟 sessionData 走。
-- 首次搬家从旧 userData 复制 config.json、translation-data.enc、旧缓存与三项浏览器数据（Local State、Local Storage、IndexedDB）。**`Local State` 不可少**：Windows 上 safeStorage 用保存在该文件里的随机密钥加密（密文 v10 前缀），DPAPI 只包住这把密钥；不带它，历史保险库与所有已存 API 密钥在新目录全部解不开（首轮真机漏了，用户历史被判 corrupt，靠沙盒副本恢复）。目标存在就不覆盖，二次启动是空操作，旧目录留给关于页清理。Electron 每次启动都会重建空的 `%APPDATA%\t-translate`，空目录不算旧数据。
+- 首次搬家从旧 userData 复制 config.json、translation-data.enc、旧缓存与三项浏览器数据（Local State、Local Storage、IndexedDB）。**`Local State` 不可少**：Windows 上 safeStorage 用保存在该文件里的随机密钥加密（密文 v10 前缀），DPAPI 只包住这把密钥；不带它，历史保险库与所有已存 API 密钥在新目录全部解不开（首轮真机漏了，用户历史被判 corrupt，靠沙盒副本恢复）。目标存在就不覆盖，二次启动是空操作，旧目录留给隐私页数据管理里的「清理旧数据」。Electron 每次启动都会重建空的 `%APPDATA%\t-translate`，空目录不算旧数据。
 - 原地整理：Chromium 条目改名进 browser\（同卷 rename 即时完成），v0.4.6 的 data\ 子目录提上来，旧的 Caches\ 文件退休。
 - `TT_USERDATA` 是开发 / QA 沙箱覆盖。
 - 单实例锁：输掉的实例立即退出，它的 before-quit 不能碰启动探针计数；右键菜单「用 T-Translate 打开」的文件经 argv（冷启动）或 second-instance 转发，只认 installer.nsh 注册的扩展名（.pdf/.docx/.txt），也因此开发态的 electron.exe / main.js / --flags 永远不会被当成文档。

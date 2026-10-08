@@ -309,6 +309,7 @@ The model that ships with the app; you download the files yourself and put them 
 
 - Model: which one to use. The general model translates and runs AI actions; the translation-only model only translates, and AI actions automatically move to another AI source while it is selected.
 - Model files: one card per file showing installed / not installed / file mismatch, with official and mirror download links. After placing a file, click "Rescan", or "Open folder" to look.
+- Local engines: one "Use the GPU" switch. When on, local OCR, neural voices, the local model, the built-in vision model, PDF layout analysis and the high-accuracy listen tier run on the GPU; each engine self-tests first and stays on the CPU if it cannot, no restart needed. The standard listen tier always stays on the CPU. Below it, one row per engine: whether it runs on the GPU or the CPU right now, whether it is running, its self-test result and speed.
 - Custom models (developer): when on, other GGUF files in the folder become selectable and can be probed, with a trial report. These are unverified; judge the results yourself.
 
 ### 4.8 OCR
@@ -350,22 +351,21 @@ The model that ships with the app; you download the files yourself and put them 
 ### 4.12 Privacy
 
 - Three modes at the top: standard / incognito / offline, with each feature's state in the current mode below and "Details" for the full comparison.
-- Data management: how much history, favorites, cache, document progress, settings and logs take up; clear history, clear cache, or clear all data; "Auto-delete history" in days, 0 means never.
+- Data management: at the top, where the data and models folders are, with buttons to open them; models left elsewhere by an older version can be moved with "Move to program folder", and the old folder cleaned afterwards with "Clear old folder". Below that, how much history, favorites, cache, document progress, settings and logs take up; clear history, clear cache, or clear all data; "Auto-delete history" in days, 0 means never.
 - Migration: "Export Migration Pack" bundles settings, glossary, favorites and custom languages into one file; "Import Migration Pack" on another computer lets you pick which parts to take. API keys and model files are never included.
 
 ### 4.13 About
 
 - Top row: version, "Check for Updates", GitHub, open the log folder. A new version can be downloaded and installed from here, or fetched from GitHub by hand.
-- Storage: where the data and models folders are, with buttons to open them. Models left elsewhere by an older version can be moved into the app folder, and the old folder cleaned afterwards.
-- GPU acceleration: one switch. When on, local OCR, neural voices, the local model, the built-in vision model, PDF layout analysis and the high-accuracy listen tier run on the GPU; each engine self-tests first and stays on the CPU if it cannot, no restart needed. The standard listen tier always stays on the CPU.
-- Engine status: where each engine runs, its self-test result and speed.
+- Core features and tech stack.
 - Footer: reset all settings (API keys are kept).
+- Storage locations are under 4.12 Privacy → Data management; GPU acceleration and engine status are under 4.7 Local model.
 
 ## 5. Models and downloads
 
 The app ships without models. Small ones download with one click on the settings pages; large ones (hundreds of MB to over 2 GB) are not distributed through our servers: download them from the links below and place them in the models folder. Every model runs on this computer; once downloaded, nothing goes online.
 
-The models folder is shown under Settings → About → Storage and can be opened from there. By default it is `models` inside the install folder, with four subfolders:
+The models folder is shown under Settings → Privacy → Data management and can be opened from there. By default it is `models` inside the install folder, with four subfolders:
 
 - `llm-models`: the built-in model, the built-in vision model and the high-accuracy listen models
 - `ocr-models`: OCR language packs, the high-accuracy model and the layout model
@@ -471,12 +471,12 @@ Work in any program; change them under Settings → Appearance → Shortcuts:
 
 ### 7.1 Two folders
 
-Everything the app owns sits in two folders under the install folder; their locations are shown under Settings → About → Storage, with buttons to open them:
+Everything the app owns sits in two folders under the install folder; their locations are shown under Settings → Privacy → Data management, with buttons to open them:
 
 - `data`: settings, history, favorites, translation cache, logs, auto-saved captions.
 - `models`: downloaded and hand-placed models, see chapter 5.
 
-If the install folder is not writable (for example under Program Files), the app uses the user profile folder instead, and the About page says so.
+If the install folder is not writable (for example under Program Files), the app uses the user profile folder instead, and Data management says so.
 
 The common items in `data`:
 
@@ -499,7 +499,8 @@ The common items in `data`:
 ### 7.3 Cleaning up
 
 - Settings → Privacy → Data management clears history, the cache, or all data.
-- Settings → About resets all settings (API keys are kept) and cleans up folders left by older versions.
+- Settings → Privacy → Data management also cleans up folders left by older versions.
+- Settings → About resets all settings (API keys are kept).
 - Models you no longer need: click "Uninstall" on the matching settings page; hand-placed files can simply be deleted from the folder.
 
 ## 8. FAQ
@@ -531,7 +532,7 @@ Subtitles on screen: lay the floating window over the subtitle area and turn on 
 Settings → Selection → Screenshot output, choose "Main Window".
 
 **Should I turn on GPU acceleration?**
-With a discrete graphics card, yes: Settings → About → GPU acceleration. Each engine self-tests and stays on the CPU if it cannot use the GPU; nothing breaks.
+With a discrete graphics card, yes: Settings → Local model → Local engines → "Use the GPU". Each engine self-tests and stays on the CPU if it cannot use the GPU; nothing breaks.
 
 **A shortcut clashes with another program.**
 Settings → Appearance → Shortcuts, click the entry and press a new combination.

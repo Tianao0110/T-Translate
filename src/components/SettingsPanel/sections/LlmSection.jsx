@@ -2,17 +2,19 @@
 // (which model, the model file card, the developer door), all built from
 // the panel's existing pieces. The runtime block (backend / residency /
 // speed, self-test, unload) lives in the provider's card on the providers
-// page (LlmRuntimeCard).
+// page (LlmRuntimeCard); the GPU switch and every local engine's status sit
+// here (LocalEnginesCard).
 
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AlertTriangle, RefreshCw, ExternalLink } from 'lucide-react';
 import { Seg, Switch } from './shared';
+import LocalEnginesCard from './LocalEnginesCard.jsx';
 
 const GB = 1024 * 1024 * 1024;
 const formatSize = (bytes) => (bytes >= GB ? `${(bytes / GB).toFixed(1)} GB` : `${Math.round(bytes / 1048576)} MB`);
 
-const LlmSection = ({ settings, updateSetting, notify }) => {
+const LlmSection = ({ settings, updateSetting, notify, confirm }) => {
   const { t } = useTranslation();
   const bridge = window.electron?.llm;
   const [status, setStatus] = useState(null);
@@ -192,6 +194,8 @@ const LlmSection = ({ settings, updateSetting, notify }) => {
           <p className="setting-hint">{t('llm.enabledHint')}</p>
         </div>
       )}
+
+      <LocalEnginesCard notify={notify} confirm={confirm} />
 
       {/* Files outside the whitelist are always listed; probing and using
           them needs the switch. */}
