@@ -11,7 +11,7 @@ const ProvidersSection = ({
 
   return (
     <div className="setting-content">
-      <h3>{t('providerSettings.title')}</h3>
+      <h3>{t('settingsNav.providers')}</h3>
 
       <ProviderSettings
         settings={settings}

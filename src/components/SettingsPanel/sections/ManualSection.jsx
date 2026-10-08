@@ -116,7 +116,7 @@ const ManualSection = () => {
 
   return (
     <div className="setting-content manual" ref={rootRef} onScroll={onScroll}>
-      <h3>{t('manual.title')}</h3>
+      <h3>{t('settingsNav.manual')}</h3>
       <div className="manual-layout">
         <nav className="manual-toc" aria-label={t('manual.contents')}>
           {toc.map((chapter) => (

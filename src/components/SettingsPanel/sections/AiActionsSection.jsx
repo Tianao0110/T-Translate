@@ -74,7 +74,7 @@ const AiActionsSection = ({ settings, updateSetting, notify, confirm }) => {
 
   return (
     <div className="setting-content">
-      <h3>{t('settings.aiActions.title')}</h3>
+      <h3>{t('settingsNav.aiActions')}</h3>
 
       {/* Every action in one list: built-ins locked — Summarize carries its
           length threshold on its own row — imported ones removable, and the

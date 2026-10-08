@@ -21,7 +21,7 @@ const DocumentSection = ({
 
   return (
     <div className="setting-content">
-      <h3>{t('documentSettings.title')}</h3>
+      <h3>{t('settingsNav.document')}</h3>
 
       {/* How a document is cut, how many pieces run at once, how results show.
           Supported formats are listed on the document page's drop zone. */}

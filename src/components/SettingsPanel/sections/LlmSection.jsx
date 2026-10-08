@@ -120,7 +120,7 @@ const LlmSection = ({ settings, updateSetting, notify, confirm }) => {
 
   return (
     <div className="setting-content animate-fade-in">
-      <h3>{t('settings.llm.title')}</h3>
+      <h3>{t('settingsNav.llm')}</h3>
       <p className="setting-description">{t('llm.description')}</p>
 
       {/* Which model, and its file right under the choice — one group. */}

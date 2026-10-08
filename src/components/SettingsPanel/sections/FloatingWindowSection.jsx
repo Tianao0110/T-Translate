@@ -41,7 +41,7 @@ const FloatingWindowSection = ({
 
   return (
     <div className="setting-content">
-      <h3>{t('settings.floatingWindow.title')}</h3>
+      <h3>{t('settingsNav.floatingWindow')}</h3>
 
       {/* The window: how results are laid out, how see-through it starts,
           whether screen capture sees it. */}

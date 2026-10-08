@@ -42,7 +42,7 @@ const TranslationSection = ({
 
   return (
     <div className="setting-content">
-      <h3>{t('translationSettings.title')}</h3>
+      <h3>{t('settingsNav.translation')}</h3>
 
       {/* How a translation runs and where it lands — when it starts, how it
           appears, what happens to text already in the target language, where a

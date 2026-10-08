@@ -300,7 +300,7 @@ const PrivacySection = ({
 
   return (
     <div className="setting-content">
-      <h3>{t('settings.privacy.title')}</h3>
+      <h3>{t('settingsNav.privacy')}</h3>
 
       {/* The picker, then what each mode allows, all three side by side with
           the current one highlighted. The old per-mode list was one column of

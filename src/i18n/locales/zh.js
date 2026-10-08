@@ -18,7 +18,7 @@ const zh = {
     unsavedChanges: "有未保存的更改", saving: "保存中...", saveChanges: "保存更改"
   },
   providerSettings: {
-    title: "翻译源设置", description: "配置翻译服务，支持本地模型和在线 API",
+    description: "配置翻译服务，支持本地模型和在线 API",
     priorityHint: "按顺序尝试，拖动卡片调整顺序",
     configDetails: "配置详情", testConnection: "测试连接",
     testing: "测试中...", connected: "已连接", connectionFailed: "连接失败", notTested: "未测试",
@@ -73,7 +73,7 @@ const zh = {
     'baidu-translate': { appId: 'APP ID', secretKey: '密钥' }
   },
   translationSettings: {
-    title: "翻译设置", description: "配置翻译行为和输出方式",
+    description: "配置翻译行为和输出方式",
     autoTranslate: "自动翻译", autoTranslateHint: "输入停止后自动开始翻译",
     autoDelay: "自动翻译延迟", autoDelayHint: "停止输入后等待多久开始翻译",
     streamOutput: "流式输出（打字机效果）", streamOutputHint: "开启后翻译结果将逐字显示",
@@ -89,7 +89,7 @@ const zh = {
     clearCache: "清除缓存", clearCacheConfirm: "确定要清除翻译缓存吗？", cacheCleared: "缓存已清除"
   },
   documentSettings: {
-    title: "文档翻译设置", description: "配置文档翻译的分段策略、过滤规则和显示样式",
+    description: "配置文档翻译的分段策略、过滤规则和显示样式",
     maxCharsPerSegment: "单段最大字符数", segmentHint: "过长的段落会按此限制自动分割",
     parallelTranslation: "并发翻译", concurrency: "同时翻译段数",
     concurrencyHint: "本地模型建议 1-2（GPU 串行，调高只会排队）；在线 API 可调高",
@@ -441,7 +441,7 @@ const zh = {
     resetSectionConfirm: "重置 \"{{section}}\" 的设置？", resetAllConfirm: "重置所有设置？API 密钥会保留",
     sectionReset: "{{section}} 设置已重置", sectionNotFound: "未找到 {{section}} 的默认设置", allReset: "所有设置已重置",
     general: {
-      title: "通用设置", language: "界面语言", languageDesc: "选择应用界面显示语言",
+      language: "界面语言", languageDesc: "选择应用界面显示语言",
       theme: "主题", themeDesc: "选择应用外观主题",
       themes: { default: "默认", fresh: "清新", dark: "暗色" },
       langSwitched: "界面语言已切换"
@@ -461,22 +461,15 @@ const zh = {
       system: "长任务完成后发送系统通知",
       systemHint: "窗口不在前台时，文档翻译或全文总结完成会从系统通知中心提醒，点击回到窗口",
     },
-    ocr: { title: "OCR 设置" },
-    llm: { title: "本地模型" },
     shortcuts: { title: "快捷键设置" },
     privacy: {
-      title: "隐私设置",
       clearHistory: "清除历史记录", clearAll: "清除所有数据"
     },
     tts: { title: "语音设置" },
     listen: { title: "听译模型" },
     about: { checkUpdate: "检查更新", checking: "检查中...", upToDate: "已是最新版本", newVersion: "发现新版本", download: "前往下载", later: "稍后再说", releaseNotes: "更新内容", publishedAt: "发布时间", copyright: "© 2026 T-Translate" },
-    selection: { title: "划词翻译" },
-    floatingWindow: { title: "悬浮窗口" },
-    aiActions: { title: "AI 动作" }
   },
   manual: {
-    title: "使用说明",
     contents: "目录",
   },
   about: {

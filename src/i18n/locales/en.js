@@ -18,7 +18,7 @@ const en = {
     unsavedChanges: "Unsaved changes", saving: "Saving...", saveChanges: "Save Changes"
   },
   providerSettings: {
-    title: "Translation Providers", description: "Configure translation services, supporting local models and online APIs",
+    description: "Configure translation services, supporting local models and online APIs",
     priorityHint: "Tried in order; drag cards to reorder",
     configDetails: "Configuration", testConnection: "Test Connection",
     testing: "Testing...", connected: "Connected", connectionFailed: "Connection failed", notTested: "Not tested",
@@ -73,7 +73,7 @@ const en = {
     'baidu-translate': { appId: 'APP ID', secretKey: 'Secret Key' }
   },
   translationSettings: {
-    title: "Translation Settings", description: "Configure translation behavior and output",
+    description: "Configure translation behavior and output",
     autoTranslate: "Auto Translate", autoTranslateHint: "Start translation automatically after input stops",
     autoDelay: "Auto Translate Delay", autoDelayHint: "How long to wait after input stops",
     streamOutput: "Stream Output (Typewriter effect)", streamOutputHint: "Results will appear character by character",
@@ -89,7 +89,7 @@ const en = {
     clearCache: "Clear Cache", clearCacheConfirm: "Are you sure to clear translation cache?", cacheCleared: "Cache cleared"
   },
   documentSettings: {
-    title: "Document Translation", description: "Configure segmentation, filter rules and display style",
+    description: "Configure segmentation, filter rules and display style",
     maxCharsPerSegment: "Max chars per segment", segmentHint: "Long paragraphs will be split automatically",
     parallelTranslation: "Parallel Translation", concurrency: "Concurrent segments",
     concurrencyHint: "Local models: keep at 1-2 (GPU serializes anyway); online APIs can go higher",
@@ -441,7 +441,7 @@ const en = {
     resetSectionConfirm: "Reset \"{{section}}\" settings?", resetAllConfirm: "Reset all settings? API keys are kept",
     sectionReset: "{{section}} settings reset", sectionNotFound: "Default settings for {{section}} not found", allReset: "All settings reset",
     general: {
-      title: "General Settings", language: "Language", languageDesc: "Select interface language",
+      language: "Language", languageDesc: "Select interface language",
       theme: "Theme", themeDesc: "Select app appearance",
       themes: { default: "Default", fresh: "Fresh", dark: "Dark" },
       langSwitched: "Language changed"
@@ -461,22 +461,15 @@ const en = {
       system: "System notification when long tasks finish",
       systemHint: "With the window in the background, finished document translations and document summaries post a system notification. Click it to return.",
     },
-    ocr: { title: "OCR Settings" },
-    llm: { title: "Local model" },
     shortcuts: { title: "Keyboard Shortcuts" },
     privacy: {
-      title: "Privacy Settings",
       clearHistory: "Clear History", clearAll: "Clear All Data"
     },
     tts: { title: "Text-to-Speech" },
     listen: { title: "Listen models" },
     about: { checkUpdate: "Check for Updates", checking: "Checking...", upToDate: "You're up to date", newVersion: "New version available", download: "Download", later: "Later", releaseNotes: "Release Notes", publishedAt: "Published", copyright: "© 2026 T-Translate" },
-    selection: { title: "Selection Translate" },
-    floatingWindow: { title: "Floating Window" },
-    aiActions: { title: "AI Actions" }
   },
   manual: {
-    title: "User Guide",
     contents: "Contents",
   },
   about: {

@@ -671,7 +671,7 @@ const OcrSection = ({
 
   return (
     <div className="setting-content animate-fade-in">
-      <h3>{t('settings.ocr.title')}</h3>
+      <h3>{t('settingsNav.ocr')}</h3>
 
       {/* What to read and how a capture is taken — one group above the engines. */}
       <div className="setting-group">

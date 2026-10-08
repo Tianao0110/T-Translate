@@ -160,7 +160,7 @@ const InterfaceSection = ({
 
   return (
     <div className="setting-content">
-      <h3>{t('settings.general.title')}</h3>
+      <h3>{t('settingsNav.interface')}</h3>
 
       {/* How it looks: language and theme, one row each. */}
       <div className="setting-group">

@@ -65,7 +65,7 @@ const SelectionSection = ({
 
   return (
     <div className="setting-content">
-      <h3>{t('settings.selection.title')}</h3>
+      <h3>{t('settingsNav.selection')}</h3>
 
       {/* Triggering: on/off, CapsLock direct mode, which selections count and
           how long the button waits. Screenshot output lives on the translation
