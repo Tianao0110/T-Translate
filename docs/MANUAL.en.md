@@ -357,7 +357,7 @@ The model that ships with the app; you download the files yourself and put them 
 ### 4.13 About
 
 - Top row: version, "Check for Updates", GitHub, open the log folder. A new version can be downloaded and installed from here, or fetched from GitHub by hand.
-- Core features and tech stack.
+- Core features.
 - Footer: reset all settings (API keys are kept).
 - Storage locations are under 4.12 Privacy → Data management; GPU acceleration and engine status are under 4.7 Local model.
 

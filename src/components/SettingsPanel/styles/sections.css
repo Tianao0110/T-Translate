@@ -350,6 +350,22 @@
   margin: 0;
 }
 
+/* 核心特性：一张卡，宽时两列 */
+.about-features {
+  columns: 2;
+  column-gap: 32px;
+}
+
+.about-features li {
+  break-inside: avoid;
+}
+
+@container settings (max-width: 600px) {
+  .about-features {
+    columns: 1;
+  }
+}
+
 /* 页脚：署名在左，重置全部设置在右，远离常用按钮 */
 .about-footer {
   display: flex;

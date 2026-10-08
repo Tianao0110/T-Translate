@@ -3,8 +3,10 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { GitBranch, RefreshCw, FolderOpen, Download, X, Loader2, CheckCircle, AlertCircle, ExternalLink, Rocket, Cpu, Heart, PartyPopper, Package } from 'lucide-react';
+import { GitBranch, RefreshCw, FolderOpen, Download, X, Loader2, CheckCircle, AlertCircle, ExternalLink, Rocket, Heart, PartyPopper, Package } from 'lucide-react';
 import appIcon from '/icon.png';
+
+const FEATURE_KEYS = ['feature1', 'feature2', 'feature3', 'feature4', 'feature5', 'feature6'];
 
 const UPDATE_STAGE = {
   IDLE: 'idle',
@@ -373,23 +375,13 @@ const AboutSection = ({ notify, resetSettings }) => {
       </div>
 
 
+      {/* What the app does, one card. The developer-facing tech stack card
+          (untranslated, and out of date) was dropped. */}
       <div className="info-cards">
         <div className="info-card">
           <h4><Rocket size={16} /> {t('about.features')}</h4>
-          <ul>
-            <li>{t('about.feature1')}</li>
-            <li>{t('about.feature2')}</li>
-            <li>{t('about.feature3')}</li>
-            <li>{t('about.feature4')}</li>
-          </ul>
-        </div>
-        <div className="info-card">
-          <h4><Cpu size={16} /> {t('about.techStack')}</h4>
-          <ul>
-            <li>Electron + React 18</li>
-            <li>Zustand State Management</li>
-            <li>LM Studio / Ollama</li>
-            <li>PP-OCRv6 / LLM Vision</li>
+          <ul className="about-features">
+            {FEATURE_KEYS.map((key) => <li key={key}>{t(`about.${key}`)}</li>)}
           </ul>
         </div>
       </div>
