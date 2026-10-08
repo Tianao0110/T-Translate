@@ -127,7 +127,7 @@ Three tone buttons under the languages: Natural (everyday), Precise (technical, 
 AI actions add a layer of understanding on top of translation, such as summarizing a passage into key points or explaining a block of content.
 
 - Two built in: **Summarize** (translation panel, selection card, floating window; only when the text is long enough) and **Explain** (the floating window's explain mode and every paragraph of a document).
-- They need a chat-capable source: the built-in general model, LM Studio, Ollama, OpenAI, DeepSeek, Gemini, Claude and the like. Traditional sources such as Google Translate, DeepL, Baidu and Microsoft cannot do them; their cards say "No AI actions".
+- They need a chat-capable source: the built-in general model, LM Studio, Ollama, OpenAI, DeepSeek, Gemini, Claude and the like. Traditional sources such as Google Translate, DeepL, Baidu and Microsoft cannot do them; their cards, once expanded, say "No AI actions".
 - Results show under the translation and can be folded; they are also attached to the matching history entry and visible in its details.
 - With a vision model set up, screenshot content is handed to the vision model as an image; the button says so.
 - The length threshold for "Summarize" and importing more actions are under Settings → AI Actions.
@@ -266,7 +266,7 @@ Most settings need "Save Changes" at the bottom right; theme, language, shortcut
 - The upper part lists enabled sources; they are tried in order and the first success wins. Drag cards to reorder.
 - On each card: the switch on the right enables or disables it; click the card or the gear to open its configuration (API address, key, model name). The bottom row has "Test Connection" and a link: "Get API Key" for sources that need a key, "Website" for the rest. The built-in model has no connection test; use "Self-test" in its card.
 - The lower part lists disabled sources; click "Enable" to add one.
-- Every card, enabled or not, has one type tag: AI model, professional API, traditional. The last two carry "No AI actions" in the same tag: they only translate and cannot summarize or explain.
+- An expanded card shows a type tag next to its name: AI model, professional API, traditional. The last two carry "No AI actions" in the same tag: they only translate and cannot summarize or explain.
 - The built-in model's card shows whether it runs on the GPU or the CPU, whether it is loaded and how fast it is, with self-test and unload buttons.
 - Keys are stored encrypted on this computer; the settings file never holds them in plain text.
 
@@ -520,7 +520,7 @@ Google Translate and the other online sources, online OCR, the external speech s
 The built-in model is loaded by the app itself, with no other software. LM Studio and Ollama are servers you run yourself that the app connects to. The built-in model is the easy path; use LM Studio or Ollama when you want a bigger model.
 
 **Why is there no "Summarize" button?**
-Either the text is not long enough (the threshold is under Settings → AI Actions), or the current source cannot chat (any card marked "No AI actions").
+Either the text is not long enough (the threshold is under Settings → AI Actions), or the current source cannot chat (any card marked "No AI actions" when expanded).
 
 **How do I make a word always translate my way?**
 Save it into the glossary (Favorites → Glossary). Later, when a translation still contains the original word, it is replaced with your rendering; when the model translated it another way, the main window shows a hint under the translation that you can apply with one click.

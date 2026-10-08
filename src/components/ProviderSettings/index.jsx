@@ -451,7 +451,8 @@ const ProviderSettings = ({ settings, settingsReady, updateSettings, notify }) =
   };
 
   // One tag per source: its type, with the no-AI-actions caveat folded in for
-  // the types that cannot chat (only LLM sources run AI actions).
+  // the types that cannot chat (only LLM sources run AI actions). Shown only
+  // on an expanded card, so the collapsed list stays name + description.
   const renderTypeTag = (meta) => {
     const label = t(`providerSettings.typeLabels.${meta.type}`) || meta.type;
     return (
@@ -529,7 +530,7 @@ const ProviderSettings = ({ settings, settingsReady, updateSettings, notify }) =
                     <div className="ps-info">
                       <div className="ps-title">
                         <span className="ps-name">{providerName(provider, meta)}</span>
-                        {renderTypeTag(meta)}
+                        {isExpanded && renderTypeTag(meta)}
                       </div>
                       <div className="ps-desc">{t(`providerSettings.descriptions.${provider.id}`, { defaultValue: meta.description })}</div>
                     </div>
@@ -597,7 +598,7 @@ const ProviderSettings = ({ settings, settingsReady, updateSettings, notify }) =
                     <div className="ps-mini-info">
                       <div className="ps-mini-name">
                         <span className="ps-mini-label">{providerName(provider, meta)}</span>
-                        {renderTypeTag(meta)}
+                        {isExpanded && renderTypeTag(meta)}
                       </div>
                       <div className="ps-mini-desc">{t(`providerSettings.descriptions.${provider.id}`, { defaultValue: meta.description })}</div>
                     </div>
