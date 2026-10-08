@@ -90,14 +90,13 @@ const en = {
   },
   documentSettings: {
     title: "Document Translation", description: "Configure segmentation, filter rules and display style",
-    segmentSettings: "Segmentation", maxCharsPerSegment: "Max chars per segment", segmentHint: "Long paragraphs will be split automatically",
+    maxCharsPerSegment: "Max chars per segment", segmentHint: "Long paragraphs will be split automatically",
     parallelTranslation: "Parallel Translation", concurrency: "Concurrent segments",
     concurrencyHint: "Local models: keep at 1-2 (GPU serializes anyway); online APIs can go higher",
     smartFilter: "Smart Filter", skipShort: "Skip short paragraphs", minLength: "Min length",
     skipNumbers: "Skip number-only paragraphs (e.g. page numbers)", skipCode: "Keep code blocks untranslated", skipTargetLang: "Skip paragraphs already in target language",
     displayStyle: "Default Display Style",
-    styleBelow: "Top-bottom", styleSideBySide: "Side by side",
-    supportedFormats: "Supported Formats", formatHint: "Supports encrypted PDFs · Auto chapter detection · Translation memory"
+    styleBelow: "Top-bottom", styleSideBySide: "Side by side"
   },
   shortcuts: {
     title: "Shortcuts",

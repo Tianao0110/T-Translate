@@ -292,9 +292,9 @@ See "Related settings" in chapter 2.
 
 - Max characters per segment: longer paragraphs are split at this size.
 - Segments at once: how many paragraphs parallel mode translates together. 1 to 2 for local models; online APIs can go higher.
-- Smart filter: skip short paragraphs (with a minimum length; headings are exempt), skip number-only paragraphs such as page numbers and rows of figures in tables, keep code blocks untranslated, skip paragraphs already in the target language.
 - Default display style: stacked or side by side.
-- The supported file formats are listed below.
+- Smart filter: skip short paragraphs (the minimum length sits next to the switch; headings are exempt), skip number-only paragraphs such as page numbers and rows of figures in tables, keep code blocks untranslated, skip paragraphs already in the target language.
+- The supported file formats are listed in the upload area of the Documents page.
 
 ### 4.6 AI Actions
 

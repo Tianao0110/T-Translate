@@ -199,23 +199,6 @@
   left: -16px;
 }
 
-/* ==================== 格式标签 ==================== */
-.format-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.format-tag {
-  padding: 5px 12px;
-  background: var(--accent-primary);
-  color: var(--text-on-accent);
-  border-radius: 16px;
-  font-size: 12px;
-  font-weight: 500;
-}
-
 /* ==================== 关于页面 ==================== */
 /* 顶部一行：图标、名称与版本、检查更新。页面较长，常用按钮放在最上面，不用往下翻。 */
 .about-header {
@@ -799,4 +782,31 @@
 .floating-info .storage-value {
   flex-wrap: wrap;
   gap: 4px 10px;
+}
+
+/* ==================== 文档翻译页 ==================== */
+/* 两个数字框和显示样式同一张标签网格：数字框定宽，分段控件按内容宽 */
+.doc-fields {
+  grid-template-columns: max-content auto;
+  justify-items: start;
+}
+
+.doc-fields .setting-input.small {
+  width: 96px;
+}
+
+/* 「跳过过短段落」与它的最小字符数在同一行 */
+.doc-filter-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.doc-filter-row .setting-input.small {
+  width: 72px;
+}
+
+.setting-group .doc-filter-row + .setting-switch {
+  margin-top: 10px;
 }
