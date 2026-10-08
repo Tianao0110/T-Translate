@@ -25,80 +25,24 @@
 }
 
 /* ==================== 快捷键编辑器 ==================== */
+/* 紧凑列表：一行一个快捷键，行间细分隔线（此前每行一张带渐变的卡片，五行占四百多像素）。
+   右边的按键组可点，点了换成录入框。 */
 .shortcut-editor {
   display: flex;
   flex-direction: column;
-  gap: 8px;
 }
 
 .shortcut-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-primary);
-  border-radius: 8px;
+  gap: 12px;
+  padding: 8px 2px;
+  border-bottom: 1px solid var(--border-primary);
 }
 
-.shortcut-action {
-  font-size: 13px;
-  color: var(--text-primary);
-}
-
-.shortcut-key {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  background: transparent;
-  border: 1px solid var(--border-secondary);
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.shortcut-key:hover {
-  border-color: var(--accent-primary);
-  background: var(--bg-hover);
-}
-
-.shortcut-key kbd {
-  display: inline-block;
-  padding: 2px 6px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-primary);
-  border-radius: 3px;
-  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
-  font-size: 11px;
-  color: var(--text-primary);
-}
-
-.shortcut-input {
-  width: 120px;
-  padding: 6px 10px;
-  background: var(--accent-primary);
-  border: 2px solid var(--accent-primary);
-  border-radius: 6px;
-  color: var(--text-on-accent);
-  font-size: 12px;
-  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
-  text-align: center;
-  outline: none;
-}
-
-.shortcut-input::placeholder {
-  color: rgba(255, 255, 255, 0.7);
-}
-
-/* 全局快捷键样式 */
-.shortcut-row.global {
-  background: linear-gradient(135deg, var(--bg-secondary), color-mix(in srgb, var(--accent-primary) 5%, transparent));
-  border-color: color-mix(in srgb, var(--accent-primary) 30%, transparent);
-}
-
-.shortcut-row.global:hover {
-  border-color: var(--accent-primary);
+.shortcut-row:last-child {
+  border-bottom: none;
 }
 
 .shortcut-action {
@@ -118,41 +62,49 @@
   color: var(--accent-primary);
   opacity: 0.85;
 }
-/* src/components/SettingsPanel/styles.patch.css */
-/* 设置面板 UI 优化补丁 - 更现代的视觉设计 */
 
-/* ==================== 快捷键编辑器优化 ==================== */
-.shortcut-row {
+.shortcut-key {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 14px 18px;
-  background: var(--bg-primary);
-  border: 1.5px solid var(--border-primary);
-  border-radius: 12px;
-  margin-bottom: 10px;
-  transition: all 0.2s ease;
+  gap: 4px;
+  padding: 3px 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
 }
 
-.shortcut-row:hover {
-  border-color: var(--border-secondary);
-}
-
-.shortcut-row.global {
-  background: linear-gradient(135deg, color-mix(in srgb, var(--accent-primary) 5%, transparent), transparent);
-  border-color: color-mix(in srgb, var(--accent-primary) 20%, transparent);
+.shortcut-key:hover {
+  border-color: var(--accent-primary);
+  background: var(--bg-hover);
 }
 
 .shortcut-key kbd {
   display: inline-block;
-  padding: 4px 10px;
+  padding: 2px 8px;
   background: var(--bg-tertiary);
   border: 1px solid var(--border-primary);
-  border-radius: 6px;
+  border-radius: 5px;
   font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
   font-size: 12px;
   font-weight: 600;
   color: var(--text-primary);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
+.shortcut-input {
+  width: 140px;
+  padding: 5px 10px;
+  background: var(--accent-primary);
+  border: 2px solid var(--accent-primary);
+  border-radius: 6px;
+  color: var(--text-on-accent);
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  text-align: center;
+  outline: none;
+}
+
+.shortcut-input::placeholder {
+  color: rgba(255, 255, 255, 0.7);
+}

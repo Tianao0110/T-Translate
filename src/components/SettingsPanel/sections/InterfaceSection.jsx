@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Sun, Moon, Leaf, RefreshCw, Globe, Power, Keyboard, Camera, AppWindow, Layers, Pencil, ScanLine, Bell } from 'lucide-react';
+import { Sun, Moon, Leaf, RefreshCw, Keyboard, Camera, AppWindow, Layers, Pencil, ScanLine } from 'lucide-react';
 import { defaultConfig } from '../constants.js';
 import { Seg, Switch } from './shared';
 
@@ -162,11 +162,26 @@ const InterfaceSection = ({
     <div className="setting-content">
       <h3>{t('settings.general.title')}</h3>
 
+      {/* How it looks: language and theme, one row each. */}
       <div className="setting-group">
-        <label className="setting-label">
-          <Power size={16} />
-          {t('settings.startup.title')}
-        </label>
+        <div className="field-grid iface-fields">
+          <span>{t('settings.general.language')}</span>
+          <Seg
+            value={i18n.language}
+            onChange={switchLanguage}
+            options={LANGUAGES.map((lang) => ({ value: lang.code, label: lang.nativeName }))}
+          />
+          <span>{t('settings.general.theme')}</span>
+          <Seg
+            value={settings.interface?.theme || 'light'}
+            onChange={switchTheme}
+            options={themeOptions}
+          />
+        </div>
+      </div>
+
+      {/* Startup and notifications — plain switches, one group. */}
+      <div className="setting-group">
         <Switch
           checked={autoLaunch}
           disabled={autoLaunchLoading}
@@ -180,38 +195,10 @@ const InterfaceSection = ({
             label={t('settings.startup.autoSelection')}
           />
         )}
-      </div>
-
-      <div className="setting-group">
-        <label className="setting-label">
-          <Bell size={16} />
-          {t('settings.notifications.title')}
-        </label>
         <Switch
           checked={settings.interface?.systemNotifications ?? true}
           onChange={toggleSystemNotifications}
           label={t('settings.notifications.system')}
-        />
-      </div>
-
-      <div className="setting-group">
-        <label className="setting-label">
-          <Globe size={16} />
-          {t('settings.general.language')}
-        </label>
-        <Seg
-          value={i18n.language}
-          onChange={switchLanguage}
-          options={LANGUAGES.map((lang) => ({ value: lang.code, label: lang.nativeName }))}
-        />
-      </div>
-
-      <div className="setting-group">
-        <label className="setting-label">{t('settings.general.theme')}</label>
-        <Seg
-          value={settings.interface?.theme || 'light'}
-          onChange={switchTheme}
-          options={themeOptions}
         />
       </div>
 
@@ -227,7 +214,7 @@ const InterfaceSection = ({
             if (!config) return null;
 
             return (
-              <div key={action} className={`shortcut-row ${config.global ? 'global' : ''}`}>
+              <div key={action} className="shortcut-row">
                 <span className="shortcut-action">
                   {/* No per-row global badge; the hint says it once. */}
                   <span className="shortcut-icon">{config.icon && <config.icon size={14} />}</span>
