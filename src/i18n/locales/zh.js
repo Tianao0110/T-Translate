@@ -86,7 +86,6 @@ const zh = {
     customLangRemoved: "已删除「{{name}}」",
     sameLangHint: "作用于划词翻译和悬浮窗口：选中或识别的内容已经是目标语言时，直接显示原文（不调用翻译），或反向翻成你设定的源语言（源语言为\"自动检测\"时按中↔英处理）",
     sameLangSaved: "已生效",
-    cache: "翻译缓存", cacheHint: "缓存已翻译的内容，相同文本再次翻译时直接返回结果",
     clearCache: "清除缓存", clearCacheConfirm: "确定要清除翻译缓存吗？", cacheCleared: "缓存已清除"
   },
   documentSettings: {

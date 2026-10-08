@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Trash2, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import useTranslationStore from '../../../stores/translation-store';
 import { Seg, Switch, Slider } from './shared';
 
@@ -26,13 +26,6 @@ const TranslationSection = ({
     notify(t('translationSettings.customLangRemoved', { name: lang.name }), 'success');
   };
 
-  const handleClearCache = async () => {
-    if (!(await confirm(t('translationSettings.clearCacheConfirm')))) return;
-    // The cache lives in the main-process stack.
-    await window.electron?.stack?.clearCache?.('all');
-    notify(t('translationSettings.cacheCleared'), 'success');
-  };
-
   const sameLangBehavior = settings.translation?.sameLanguageBehavior || 'original';
 
   // Applies immediately (silent state update + own persistence).
@@ -51,6 +44,9 @@ const TranslationSection = ({
     <div className="setting-content">
       <h3>{t('translationSettings.title')}</h3>
 
+      {/* How a translation runs — when it starts, how it appears, what happens
+          to text already in the target language — in one group. Clearing the
+          cache lives with the other data on the privacy page. */}
       <div className="setting-group">
         <Switch
           checked={autoTranslate}
@@ -58,7 +54,7 @@ const TranslationSection = ({
           label={t('translationSettings.autoTranslate')}
         />
         {autoTranslate && (
-          <div className="sliders solo" style={{ marginTop: '12px' }}>
+          <div className="sliders solo sub-setting" style={{ marginTop: '10px' }}>
             <Slider
               label={t('translationSettings.autoDelay')}
               display={`${autoTranslateDelay}ms`}
@@ -70,18 +66,15 @@ const TranslationSection = ({
             />
           </div>
         )}
-      </div>
+        <div style={{ marginTop: '12px' }}>
+          <Switch
+            checked={useStreamOutput}
+            onChange={setUseStreamOutput}
+            label={t('translationSettings.streamOutput')}
+          />
+        </div>
 
-      <div className="setting-group">
-        <Switch
-          checked={useStreamOutput}
-          onChange={setUseStreamOutput}
-          label={t('translationSettings.streamOutput')}
-        />
-      </div>
-
-      <div className="setting-group">
-        <label className="setting-label">{t('translationSettings.sameLangTitle')}</label>
+        <label className="setting-label" style={{ marginTop: '18px' }}>{t('translationSettings.sameLangTitle')}</label>
         <Seg
           value={sameLangBehavior}
           onChange={setSameLangBehavior}
@@ -118,13 +111,6 @@ const TranslationSection = ({
             ))}
           </div>
         )}
-      </div>
-
-      <div className="setting-group">
-        <label className="setting-label">{t('translationSettings.cache')}</label>
-        <button className="danger-button" onClick={handleClearCache}>
-          <Trash2 size={16} /> {t('translationSettings.clearCache')}
-        </button>
       </div>
     </div>
   );

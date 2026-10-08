@@ -276,7 +276,7 @@ Most settings need "Save Changes" at the bottom right; theme, language, shortcut
 - Streaming output: the translation appears word by word.
 - When the content is already in the target language: show the source, or translate back into your source language. Applies to selection and the floating window. It counts only when nearly all of the text is in the target language; a few foreign names or terms don't matter. A whole foreign sentence, or text that is mostly foreign, is translated in full.
 - Custom languages: languages added at the bottom of the language picker are listed here and can be removed. Google Translate does not support them; whether they translate depends on the model in use.
-- Translation cache: repeated text returns the cached result; clear it here.
+- Translation cache: repeated text returns the cached result; clear it under Settings → Privacy → Data management.
 
 ### 4.3 Selection
 

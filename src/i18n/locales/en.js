@@ -86,7 +86,6 @@ const en = {
     customLangRemoved: "Removed \"{{name}}\"",
     sameLangHint: "Applies to selection translate and the floating window: when selected or recognized text is already in the target language, show it as-is (no translation call), or translate back into your configured source language (zh↔en when source is \"Auto\")",
     sameLangSaved: "Applied",
-    cache: "Translation Cache", cacheHint: "Cache translated content, return cached results for same text",
     clearCache: "Clear Cache", clearCacheConfirm: "Are you sure to clear translation cache?", cacheCleared: "Cache cleared"
   },
   documentSettings: {
