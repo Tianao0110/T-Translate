@@ -12,6 +12,9 @@ import { Seg } from '../SettingsPanel/sections/shared.jsx';
 import LlmRuntimeCard from '../SettingsPanel/sections/LlmRuntimeCard.jsx';
 import './styles.css';
 
+// Text fields short enough to pair up beside another short field.
+const SHORT_FIELDS = new Set(['model', 'region', 'appId']);
+
 // Status/type colors resolve to theme tokens (defined in ProviderSettings/styles.css).
 const TYPE_COLOR_VARS = {
   'llm': 'var(--ps-type-llm)',
@@ -326,10 +329,23 @@ const ProviderSettings = ({ settings, settingsReady, updateSettings, notify }) =
       );
     }
 
+    // Short fields (keys, model names, timeouts) sit side by side in pairs;
+    // URLs and anything left alone take the full row.
+    const entries = Object.entries(meta.configSchema);
+    const isShort = ([key, field]) => field.type === 'number' || field.type === 'password' || SHORT_FIELDS.has(key);
+    const half = new Set();
+    for (let i = 0; i < entries.length - 1; i++) {
+      if (!half.has(entries[i][0]) && isShort(entries[i]) && isShort(entries[i + 1])) {
+        half.add(entries[i][0]);
+        half.add(entries[i + 1][0]);
+        i++;
+      }
+    }
+
     return (
       <div className="ps-config-form">
-        {Object.entries(meta.configSchema).map(([key, field]) => (
-          <div key={key} className="ps-field">
+        {entries.map(([key, field]) => (
+          <div key={key} className={`ps-field ${half.has(key) ? 'half' : ''}`.trim()}>
             {field.type !== 'checkbox' && (
               <label className="ps-label">
                 {getFieldLabel(providerId, key, field.label)}
@@ -387,12 +403,48 @@ const ProviderSettings = ({ settings, settingsReady, updateSettings, notify }) =
             )}
           </div>
         ))}
+      </div>
+    );
+  };
 
-        {meta.helpUrl && (
-          <a href={meta.helpUrl} target="_blank" rel="noopener noreferrer" className="ps-help-link">
-            <ExternalLink size={14} />
-            {t('providerSettings.getApiKey', { defaultValue: 'Get API Key' })}
-          </a>
+  // Config form, then one row: test, its status, and the provider's link
+  // (labelled for a key only when the source takes one). The built-in model
+  // has no connection to test — its self-test lives in the runtime block.
+  const renderExpanded = (providerId) => {
+    const meta = allProvidersMeta.find(m => m.id === providerId);
+    const result = testResults[providerId];
+    const needsKey = Object.values(meta?.configSchema || {}).some((f) => f.type === 'password');
+    return (
+      <div className="ps-expand-content">
+        {renderConfigForm(providerId)}
+
+        {providerId !== 'tengine' && (
+          <div className="ps-test-row">
+            <button
+              className={`ps-test-btn ${result?.success ? 'success' : result?.success === false ? 'error' : ''}`}
+              onClick={() => testConnection(providerId)}
+              disabled={testingProvider === providerId}
+            >
+              {testingProvider === providerId ? (
+                <RefreshCw size={14} className="spinning" />
+              ) : (
+                <Zap size={14} />
+              )}
+              <span>{t('providerSettings.testConnection')}</span>
+            </button>
+
+            <div className="ps-status">
+              <span className="ps-status-dot" style={{ background: getStatusColor(providerId) }}></span>
+              <span>{getStatusText(providerId)}</span>
+            </div>
+
+            {meta?.helpUrl && (
+              <a href={meta.helpUrl} target="_blank" rel="noopener noreferrer" className="ps-help-link">
+                <ExternalLink size={14} />
+                {needsKey ? t('providerSettings.getApiKey') : t('providerSettings.website')}
+              </a>
+            )}
+          </div>
         )}
       </div>
     );
@@ -453,7 +505,7 @@ const ProviderSettings = ({ settings, settingsReady, updateSettings, notify }) =
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, provider.originalIndex)}
                 >
-                  <div className="ps-card-header">
+                  <div className="ps-card-header" onClick={() => setExpandedProvider(isExpanded ? null : provider.id)}>
                     <div className="ps-priority">{rank}</div>
 
                     <div className="ps-icon">
@@ -476,7 +528,7 @@ const ProviderSettings = ({ settings, settingsReady, updateSettings, notify }) =
                       <div className="ps-desc">{t(`providerSettings.descriptions.${provider.id}`, { defaultValue: meta.description })}</div>
                     </div>
 
-                    <div className="ps-card-actions">
+                    <div className="ps-card-actions" onClick={(e) => e.stopPropagation()}>
                       <button
                         className={`ps-config-btn ${isExpanded ? 'active' : ''}`}
                         onClick={() => setExpandedProvider(isExpanded ? null : provider.id)}
@@ -499,31 +551,7 @@ const ProviderSettings = ({ settings, settingsReady, updateSettings, notify }) =
                     <GripVertical size={12} />
                   </div>
 
-                  {isExpanded && (
-                    <div className="ps-expand-content">
-                      {renderConfigForm(provider.id)}
-
-                      <div className="ps-test-row">
-                        <button
-                          className={`ps-test-btn ${testResults[provider.id]?.success ? 'success' : testResults[provider.id]?.success === false ? 'error' : ''}`}
-                          onClick={() => testConnection(provider.id)}
-                          disabled={testingProvider === provider.id}
-                        >
-                          {testingProvider === provider.id ? (
-                            <RefreshCw size={14} className="spinning" />
-                          ) : (
-                            <Zap size={14} />
-                          )}
-                          <span>{t('providerSettings.testConnection')}</span>
-                        </button>
-
-                        <div className="ps-status">
-                          <span className="ps-status-dot" style={{ background: getStatusColor(provider.id) }}></span>
-                          <span>{getStatusText(provider.id)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  {isExpanded && renderExpanded(provider.id)}
                 </div>
               );
             })}
@@ -582,29 +610,7 @@ const ProviderSettings = ({ settings, settingsReady, updateSettings, notify }) =
                     </button>
                   </div>
 
-                  {isExpanded && (
-                    <div className="ps-expand-content">
-                      {renderConfigForm(provider.id)}
-                      <div className="ps-test-row">
-                        <button
-                          className={`ps-test-btn ${testResults[provider.id]?.success ? 'success' : testResults[provider.id]?.success === false ? 'error' : ''}`}
-                          onClick={() => testConnection(provider.id)}
-                          disabled={testingProvider === provider.id}
-                        >
-                          {testingProvider === provider.id ? (
-                            <RefreshCw size={14} className="spinning" />
-                          ) : (
-                            <Zap size={14} />
-                          )}
-                          <span>{t('providerSettings.testConnection')}</span>
-                        </button>
-                        <div className="ps-status">
-                          <span className="ps-status-dot" style={{ background: getStatusColor(provider.id) }}></span>
-                          <span>{getStatusText(provider.id)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  {isExpanded && renderExpanded(provider.id)}
                 </div>
               );
             })}

@@ -163,7 +163,8 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 14px 16px 14px 20px;
+  padding: 12px 16px 12px 20px;
+  cursor: pointer;
 }
 
 /* 优先级数字 */
@@ -179,8 +180,8 @@
 
 /* 图标 */
 .ps-icon {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border-radius: 10px;
   background: var(--bg-secondary);
   border: 1px solid var(--border-secondary);
@@ -325,10 +326,25 @@
 }
 
 /* ========== 配置表单 ========== */
+/* 两列网格：短字段（密钥、模型名、超时）成对并排，其余占整行；窄窗口全部整行 */
 .ps-config-form {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+}
+
+.ps-config-form > * {
+  grid-column: 1 / -1;
+}
+
+.ps-config-form > .ps-field.half {
+  grid-column: auto;
+}
+
+@container settings (max-width: 600px) {
+  .ps-config-form > .ps-field.half {
+    grid-column: 1 / -1;
+  }
 }
 
 .ps-config-empty {
@@ -437,14 +453,15 @@
   cursor: pointer;
 }
 
+/* 在测试行最右边 */
 .ps-help-link {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  margin-left: auto;
   font-size: 12px;
   color: var(--accent-primary);
   text-decoration: none;
-  margin-top: 2px;
 }
 
 .ps-help-link:hover {
@@ -514,9 +531,10 @@
 }
 
 /* ========== 未启用网格 ========== */
+/* 至少 280px 一格：名字不折行、简介能看全；窄窗口一列 */
 .ps-disabled-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 8px;
 }
 

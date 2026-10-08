@@ -264,7 +264,7 @@ Most settings need "Save Changes" at the bottom right; theme, language, shortcut
 ### 4.1 Providers
 
 - The upper part lists enabled sources; they are tried in order and the first success wins. Drag cards to reorder.
-- On each card: the switch on the right enables or disables it; the gear opens its configuration (API address, key, model name) with "Test Connection" and a "Get API Key" link.
+- On each card: the switch on the right enables or disables it; click the card or the gear to open its configuration (API address, key, model name). The bottom row has "Test Connection" and a link: "Get API Key" for sources that need a key, "Website" for the rest. The built-in model has no connection test; use "Self-test" in its card.
 - The lower part lists disabled sources; click "Enable" to add one.
 - The tag on a card gives its type: AI model, professional API, traditional. Cards marked "No AI actions" only translate; they cannot summarize or explain.
 - The built-in model's card shows whether it runs on the GPU or the CPU, whether it is loaded and how fast it is, with self-test and unload buttons.
