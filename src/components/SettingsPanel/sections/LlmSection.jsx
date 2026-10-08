@@ -123,75 +123,76 @@ const LlmSection = ({ settings, updateSetting, notify, confirm }) => {
       <h3>{t('settings.llm.title')}</h3>
       <p className="setting-description">{t('llm.description')}</p>
 
-      {options.length > 0 && (
+      {/* Which model, and its file right under the choice — one group. */}
+      {(options.length > 0 || selected) && (
         <div className="setting-group wide">
           <label className="setting-label">{t('llm.modelLabel')}</label>
-          <Seg
-            size="small"
-            value={selectedId}
-            onChange={choosePack}
-            options={options.map(({ value, label }) => ({ value, label }))}
-          />
-          <p className="setting-hint">
-            {selected?.unlisted ? t('llm.roleUnlistedHint') : selected?.role === 'mt' ? t('llm.roleMtHint') : t('llm.roleGeneralHint')}
-          </p>
-        </div>
-      )}
-
-      {selected && (
-        <div className="setting-group wide">
-          <label className="setting-label">{t('llm.fileLabel')}</label>
-          <div className="ocr-engines-list">
-            <div className={`ocr-engine-item ${selected.status === 'ready' || selected.status === 'unverified' ? 'active' : ''}`.trim()}>
-              <div className="engine-info">
-                <div className="engine-header">
-                  <span className="engine-name">{t('llm.engineNameWith', { name: selected.name })}</span>
-                  {badge(selected)}
-                </div>
-                <p className="engine-meta">{t('llm.fileLine', { file: selected.file, size: formatSize(selected.size), license: selected.license?.name || t('llm.unverified') })}</p>
-                {status?.dir && <p className="engine-meta">{status.dir}</p>}
-                {selected.status === 'mismatch' && (
-                  <div className="engine-error-box">
-                    <AlertTriangle size={14} />
-                    <div className="error-content">
-                      <p className="error-title">{t('llm.mismatch')}</p>
-                      <p className="error-detail">{t('llm.mismatchHint')}</p>
-                    </div>
+          {options.length > 0 && (
+            <>
+              <Seg
+                size="small"
+                value={selectedId}
+                onChange={choosePack}
+                options={options.map(({ value, label }) => ({ value, label }))}
+              />
+              <p className="setting-hint">
+                {selected?.unlisted ? t('llm.roleUnlistedHint') : selected?.role === 'mt' ? t('llm.roleMtHint') : t('llm.roleGeneralHint')}
+              </p>
+            </>
+          )}
+          {selected && (
+            <div className="ocr-engines-list" style={{ marginTop: '12px' }}>
+              <div className={`ocr-engine-item ${selected.status === 'ready' || selected.status === 'unverified' ? 'active' : ''}`.trim()}>
+                <div className="engine-info">
+                  <div className="engine-header">
+                    <span className="engine-name">{t('llm.engineNameWith', { name: selected.name })}</span>
+                    {badge(selected)}
                   </div>
-                )}
-                {selected.status !== 'ready' && selected.source && (
-                  <>
-                    <p className="engine-meta">{t('llm.howTo')}</p>
-                    <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 6 }}>
-                      <button className="link-button" onClick={() => window.electron?.shell?.openExternal?.(selected.source?.url)}>
-                        <ExternalLink size={14} /> {t('llm.linkOfficial')}
-                      </button>
-                      {selected.source?.mirror && (
-                        <button className="link-button" onClick={() => window.electron?.shell?.openExternal?.(selected.source.mirror)}>
-                          <ExternalLink size={14} /> {t('llm.linkMirror')}
-                        </button>
-                      )}
+                  <p className="engine-meta">{t('llm.fileLine', { file: selected.file, size: formatSize(selected.size), license: selected.license?.name || t('llm.unverified') })}</p>
+                  {status?.dir && <p className="engine-meta">{status.dir}</p>}
+                  {selected.status === 'mismatch' && (
+                    <div className="engine-error-box">
+                      <AlertTriangle size={14} />
+                      <div className="error-content">
+                        <p className="error-title">{t('llm.mismatch')}</p>
+                        <p className="error-detail">{t('llm.mismatchHint')}</p>
+                      </div>
                     </div>
-                  </>
-                )}
-              </div>
-              <div className="engine-actions">
-                <button className="btn" onClick={() => bridge?.openDir?.()} title={t('llm.openFolder')}>
-                  {t('llm.openFolder')}
-                </button>
-                <button
-                  className="btn-small"
-                  onClick={rescan}
-                  disabled={busy !== null}
-                  title={t('llm.rescan')}
-                  style={{ marginLeft: 6, padding: '4px 8px' }}
-                >
-                  <RefreshCw size={12} className={busy === 'scan' || status?.scanning ? 'spinning' : ''} />
-                </button>
+                  )}
+                  {selected.status !== 'ready' && selected.source && (
+                    <>
+                      <p className="engine-meta">{t('llm.howTo')}</p>
+                      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 6 }}>
+                        <button className="link-button" onClick={() => window.electron?.shell?.openExternal?.(selected.source?.url)}>
+                          <ExternalLink size={14} /> {t('llm.linkOfficial')}
+                        </button>
+                        {selected.source?.mirror && (
+                          <button className="link-button" onClick={() => window.electron?.shell?.openExternal?.(selected.source.mirror)}>
+                            <ExternalLink size={14} /> {t('llm.linkMirror')}
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+                <div className="engine-actions">
+                  <button className="btn" onClick={() => bridge?.openDir?.()} title={t('llm.openFolder')}>
+                    {t('llm.openFolder')}
+                  </button>
+                  <button
+                    className="btn-small"
+                    onClick={rescan}
+                    disabled={busy !== null}
+                    title={t('llm.rescan')}
+                    style={{ marginLeft: 6, padding: '4px 8px' }}
+                  >
+                    <RefreshCw size={12} className={busy === 'scan' || status?.scanning ? 'spinning' : ''} />
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-          <p className="setting-hint">{t('llm.enabledHint')}</p>
+          )}
+          {selected && <p className="setting-hint">{t('llm.enabledHint')}</p>}
         </div>
       )}
 
@@ -220,7 +221,9 @@ const LlmSection = ({ settings, updateSetting, notify, confirm }) => {
           label={t('llm.dev.allow')}
         />
         <p className="setting-hint">{t('llm.dev.allowHint')}</p>
-        {status?.ready && (
+        {/* With the switch off and nothing outside the whitelist there is
+            nothing to list; "nothing found" only matters once it is on. */}
+        {status?.ready && (doorOpen || unlisted.length > 0) && (
           <div className="sub-setting" style={{ marginTop: 10 }}>
             {unlisted.length === 0 && <p className="setting-hint">{t('llm.dev.none')}</p>}
             {unlisted.length > 0 && (

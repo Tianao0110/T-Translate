@@ -341,12 +341,31 @@ input:checked + .switch-slider::before {
 }
 
 /* ==================== 小号按钮 ==================== */
+/* Secondary actions beside an engine's main button (rescan, open folder,
+   recheck, details). Without its own border and background it fell back to
+   the browser's default button frame. */
 .btn-small {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 4px 10px;
   font-size: 12px;
-  border-radius: 4px;
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.15s;
+}
+
+.btn-small:hover:not(:disabled) {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.btn-small:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .btn-small.uninstall {

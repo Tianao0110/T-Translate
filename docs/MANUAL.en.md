@@ -306,8 +306,7 @@ See "Related settings" in chapter 2.
 
 The model that ships with the app; you download the files yourself and put them into the models folder, see chapter 5.
 
-- Model: which one to use. The general model translates and runs AI actions; the translation-only model only translates, and AI actions automatically move to another AI source while it is selected.
-- Model files: one card per file showing installed / not installed / file mismatch, with official and mirror download links. After placing a file, click "Rescan", or "Open folder" to look.
+- Model: which one to use. The general model translates and runs AI actions; the translation-only model only translates, and AI actions automatically move to another AI source while it is selected. Right under the choice is that model's file: installed / not installed / file mismatch, with official and mirror download links. After placing a file, click "Rescan", or "Open folder" to look.
 - Local engines: one "Use the GPU" switch. When on, local OCR, neural voices, the local model, the built-in vision model, PDF layout analysis and the high-accuracy listen tier run on the GPU; each engine self-tests first and stays on the CPU if it cannot, no restart needed. The standard listen tier always stays on the CPU. Below it, one row per engine: whether it runs on the GPU or the CPU right now, whether it is running, its self-test result and speed.
 - Custom models (developer): when on, other GGUF files in the folder become selectable and can be probed, with a trial report. These are unverified; judge the results yourself.
 

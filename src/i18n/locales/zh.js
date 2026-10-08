@@ -561,7 +561,6 @@ const zh = {
     howTo: "按链接下载，放进模型文件夹",
     linkOfficial: "官方下载",
     linkMirror: "国内镜像",
-    fileLabel: "模型文件",
     openFolder: "打开文件夹",
     rescan: "重新扫描",
     scanned: "已重新扫描",

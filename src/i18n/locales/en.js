@@ -561,7 +561,6 @@ const en = {
     howTo: "Download from a link and put it in the model folder",
     linkOfficial: "Official download",
     linkMirror: "Mirror (China)",
-    fileLabel: "Model file",
     openFolder: "Open folder",
     rescan: "Rescan",
     scanned: "Rescanned",
