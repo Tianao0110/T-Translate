@@ -2,7 +2,7 @@
 import { useTranslation } from 'react-i18next';
 import {
   RefreshCw, Eye, EyeOff, ExternalLink, GripVertical,
-  Zap, Globe, Plus, Settings, Power, MessageSquareOff
+  Zap, Globe, Plus, Settings, Power
 } from 'lucide-react';
 import { getAllProviderMetadata } from '../../config/provider-icons.js';
 import translationService from '../../translation/stack-client.js';
@@ -450,6 +450,21 @@ const ProviderSettings = ({ settings, settingsReady, updateSettings, notify }) =
     );
   };
 
+  // One tag per source: its type, with the no-AI-actions caveat folded in for
+  // the types that cannot chat (only LLM sources run AI actions).
+  const renderTypeTag = (meta) => {
+    const label = t(`providerSettings.typeLabels.${meta.type}`) || meta.type;
+    return (
+      <span
+        className="ps-tag"
+        style={{ background: TYPE_COLOR_VARS[meta.type] || TYPE_COLOR_VARS['api'] }}
+        title={meta.supportsChat ? undefined : t('providerSettings.noAiActionsHint')}
+      >
+        {meta.supportsChat ? label : `${label} · ${t('providerSettings.noAiActions')}`}
+      </span>
+    );
+  };
+
   const getEnabledRank = (providerId) => {
     let rank = 0;
     for (const p of providers) {
@@ -487,7 +502,6 @@ const ProviderSettings = ({ settings, settingsReady, updateSettings, notify }) =
 
               const isExpanded = expandedProvider === provider.id;
               const typeColor = TYPE_COLOR_VARS[meta.type] || TYPE_COLOR_VARS['api'];
-              const typeLabel = t(`providerSettings.typeLabels.${meta.type}`) || meta.type;
               const rank = getEnabledRank(provider.id);
               const isDragOver = dragOverIndex === provider.originalIndex && draggedIndex !== provider.originalIndex;
 
@@ -515,15 +529,7 @@ const ProviderSettings = ({ settings, settingsReady, updateSettings, notify }) =
                     <div className="ps-info">
                       <div className="ps-title">
                         <span className="ps-name">{providerName(provider, meta)}</span>
-                        <span className="ps-tag" style={{ background: typeColor }}>
-                          {typeLabel}
-                        </span>
-                        {/* A source that cannot chat has no AI actions; say so. */}
-                        {!meta.supportsChat && (
-                          <span className="ps-tag ps-tag-muted" title={t('providerSettings.noAiActionsHint')}>
-                            {t('providerSettings.noAiActions')}
-                          </span>
-                        )}
+                        {renderTypeTag(meta)}
                       </div>
                       <div className="ps-desc">{t(`providerSettings.descriptions.${provider.id}`, { defaultValue: meta.description })}</div>
                     </div>
@@ -591,13 +597,7 @@ const ProviderSettings = ({ settings, settingsReady, updateSettings, notify }) =
                     <div className="ps-mini-info">
                       <div className="ps-mini-name">
                         <span className="ps-mini-label">{providerName(provider, meta)}</span>
-                        {!meta.supportsChat && (
-                          <MessageSquareOff
-                            size={12}
-                            className="ps-no-chat"
-                            title={`${t('providerSettings.noAiActions')} — ${t('providerSettings.noAiActionsHint')}`}
-                          />
-                        )}
+                        {renderTypeTag(meta)}
                       </div>
                       <div className="ps-mini-desc">{t(`providerSettings.descriptions.${provider.id}`, { defaultValue: meta.description })}</div>
                     </div>
