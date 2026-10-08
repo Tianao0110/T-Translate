@@ -167,10 +167,9 @@ Select text in any program and translate it.
 
 **Related settings** (Settings → Selection)
 
-- Button auto-hide time, show source by default, close after copy.
-- Character limits: selections that are too short or too long are not translated; the default is 2 to 2000 characters.
-- Window opacity, Rainbow selection window (a colorful alternative look).
-- Screenshot output: whether a screenshot becomes a pin, or its result appears in the selection window or the main window. Pin is the default, see 3.2.
+- Triggering: enable selection translate, CapsLock direct mode; character limits (selections that are too short or too long are not translated; the default is 2 to 2000 characters); button auto-hide time.
+- Selection window: show source by default, close after copy, Rainbow selection window (a colorful alternative look), window opacity.
+- Screenshot output is under Settings → Translation: whether a screenshot becomes a pin, or its result appears in the selection window or the main window. Pin is the default, see 3.2.
 
 ## 3. Floating window
 
@@ -214,7 +213,7 @@ The floating window is a transparent window you lay over what you want to read; 
 
 - Press Alt+Q, or use "Screenshot Translate" in the tray menu or the screenshot button in the translation panel. The screen dims; drag out a box. Any monitor works.
 - By default you confirm with ✓ or Enter and cancel with Esc. To skip the confirmation, turn off "Show Screenshot Confirm Buttons" under Settings → OCR.
-- Where the result goes is set under Settings → Selection → Screenshot output: **pin** (the default) keeps the screenshot on screen where you took it and covers it with the translation when ready; **selection window** shows a translation card next to the box, like the selection card; **main window** fills the recognized text into the translation panel and translates it.
+- Where the result goes is set under Settings → Translation → Screenshot output: **pin** (the default) keeps the screenshot on screen where you took it and covers it with the translation when ready; **selection window** shows a translation card next to the box, like the selection card; **main window** fills the recognized text into the translation panel and translates it.
 - If the chosen OCR engine cannot run (for example the vision model is not installed yet), the app falls back to local recognition and says so in the result.
 
 **Working with a pin**
@@ -275,6 +274,7 @@ Most settings need "Save Changes" at the bottom right; theme, language, shortcut
 - Auto translate: starts after you stop typing; the delay is adjustable below.
 - Streaming output: the translation appears word by word.
 - When the content is already in the target language: show the source, or translate back into your source language. Applies to selection and the floating window. It counts only when nearly all of the text is in the target language; a few foreign names or terms don't matter. A whole foreign sentence, or text that is mostly foreign, is translated in full.
+- Screenshot output: pin (the default), selection window or main window, see 3.2.
 - Custom languages: languages added at the bottom of the language picker are listed here and can be removed. Google Translate does not support them; whether they translate depends on the model in use.
 - Translation cache: repeated text returns the cached result; clear it under Settings → Privacy → Data management.
 
@@ -532,7 +532,7 @@ Click the click-through button and clicks on the content area go to the program 
 Subtitles on screen: lay the floating window over the subtitle area and turn on auto refresh. Sound without subtitles: use listen mode in the floating window.
 
 **I want screenshot results in the main window.**
-Settings → Selection → Screenshot output, choose "Main Window".
+Settings → Translation → Screenshot output, choose "Main Window".
 
 **Should I turn on GPU acceleration?**
 With a discrete graphics card, yes: Settings → Local model → Local engines → "Use the GPU". Each engine self-tests and stays on the CPU if it cannot use the GPU; nothing breaks.

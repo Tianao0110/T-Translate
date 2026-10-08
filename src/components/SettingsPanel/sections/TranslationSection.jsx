@@ -44,9 +44,10 @@ const TranslationSection = ({
     <div className="setting-content">
       <h3>{t('translationSettings.title')}</h3>
 
-      {/* How a translation runs — when it starts, how it appears, what happens
-          to text already in the target language — in one group. Clearing the
-          cache lives with the other data on the privacy page. */}
+      {/* How a translation runs and where it lands — when it starts, how it
+          appears, what happens to text already in the target language, where a
+          screenshot's result goes — in one group. Clearing the cache lives with
+          the other data on the privacy page. */}
       <div className="setting-group">
         <Switch
           checked={autoTranslate}
@@ -81,6 +82,17 @@ const TranslationSection = ({
           options={[
             { value: 'original', label: t('translationSettings.sameLangOriginal') },
             { value: 'swap', label: t('translationSettings.sameLangSwap') },
+          ]}
+        />
+
+        <label className="setting-label" style={{ marginTop: '18px' }}>{t('selection.screenshotOutput')}</label>
+        <Seg
+          value={settings.screenshot?.outputMode || 'pin'}
+          onChange={(v) => updateSetting('screenshot', 'outputMode', v)}
+          options={[
+            { value: 'pin', label: t('selection.pin') },
+            { value: 'bubble', label: t('selection.bubble') },
+            { value: 'main', label: t('selection.mainWindow') },
           ]}
         />
       </div>
