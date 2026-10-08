@@ -1,43 +1,6 @@
 /* SettingsPanel - 「音频」节
  * 顶部「听 / 读」两个页签（各带一个状态标签），所有"选择"用分段开关（用户定的统一样式）；
- * 朗读页的「当前朗读」状态行、紧凑音色行、并排滑块；音色选择面板。
- * 子页头部（返回按钮）现在只有隐私页的「详细」对比在用。 */
-
-/* ==================== 子页头部 ==================== */
-.audio-subhead {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 4px 0 18px;
-}
-
-.audio-back {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 5px 10px 5px 6px;
-  border-radius: 8px;
-  border: 1px solid var(--border-primary);
-  background: var(--bg-primary);
-  color: var(--text-secondary);
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.audio-back:hover {
-  color: var(--text-primary);
-  border-color: var(--border-secondary);
-}
-
-.audio-subhead h3 {
-  margin: 0;
-  font-size: 20px;
-}
-
-.audio-subhead .audio-subhead-note {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
+ * 朗读页的「当前朗读」状态行、紧凑音色行、并排滑块；音色选择面板。 */
 
 .audio-tabs {
   margin-bottom: 18px;
