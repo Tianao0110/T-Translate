@@ -276,6 +276,27 @@
 .outline-item.level-3 { padding-left: 40px; font-size: 12px; }
 .outline-item.level-4 { padding-left: 52px; font-size: 12px; }
 
+.outline-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-right: 4px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-tertiary);
+  vertical-align: middle;
+  cursor: pointer;
+}
+
+.outline-toggle:hover {
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  color: var(--text-primary);
+}
+
 .dt-segments.with-outline {
   flex: 1;
 }

@@ -450,7 +450,7 @@
 }
 
 .save-modal-footer .btn-save:hover {
-  background: #d97706;
+  background: color-mix(in srgb, var(--warning) 85%, var(--text-primary));
 }
 
 /* 空风格库样式更新 */

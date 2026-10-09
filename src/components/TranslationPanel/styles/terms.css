@@ -101,7 +101,7 @@
 }
 
 .term-btn.apply:hover {
-  background: #059669;
+  background: color-mix(in srgb, var(--success) 85%, var(--text-primary));
 }
 
 .term-btn.ignore {

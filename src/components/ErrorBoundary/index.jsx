@@ -2,6 +2,7 @@
 // useTranslation is unavailable, so we call i18n.t() directly.
 
 import React from 'react';
+import { Frown } from 'lucide-react';
 import i18n from '../../i18n.js';
 import createLogger from '../../core/logger.js';
 
@@ -79,12 +80,14 @@ component stack:${errorInfo?.componentStack || ' (none)'}`
           justifyContent: 'center',
           height: '100%',
           padding: '12px',
-          backgroundColor: '#fef2f2',
-          color: '#991b1b',
+          backgroundColor: 'color-mix(in srgb, var(--error, #ef4444) 8%, var(--bg-primary, #ffffff))',
+          color: 'var(--error, #991b1b)',
           fontSize: '13px',
           textAlign: 'center',
         }}>
-          <div style={{ marginBottom: '8px' }}>😕 {t('errorBoundary.title', 'Something went wrong')}</div>
+          <div style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Frown size={14} /> {t('errorBoundary.title', 'Something went wrong')}
+          </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             {retryCount < 3 && (
               <button
@@ -106,9 +109,9 @@ component stack:${errorInfo?.componentStack || ' (none)'}`
               onClick={this.handleReload}
               style={{
                 padding: '4px 12px',
-                backgroundColor: '#6b7280',
-                color: 'white',
-                border: 'none',
+                backgroundColor: 'var(--bg-primary, #ffffff)',
+                color: 'var(--text-primary, #374151)',
+                border: '1px solid var(--border-primary, #d1d5db)',
                 borderRadius: '4px',
                 cursor: 'pointer',
                 fontSize: '12px',
@@ -129,22 +132,22 @@ component stack:${errorInfo?.componentStack || ' (none)'}`
         alignItems: 'center',
         height: '100vh',
         padding: '20px',
-        backgroundColor: '#f9fafb',
+        backgroundColor: 'var(--bg-secondary, #f9fafb)',
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       }}>
         <div style={{
           maxWidth: '500px',
           textAlign: 'center',
         }}>
-          <div style={{ 
-            fontSize: '48px', 
+          <div style={{
             marginBottom: '16px',
+            color: 'var(--text-tertiary, #9ca3af)',
           }}>
-            😕
+            <Frown size={48} />
           </div>
-          
-          <h1 style={{ 
-            color: '#1f2937', 
+
+          <h1 style={{
+            color: 'var(--text-primary, #1f2937)',
             fontSize: '20px',
             fontWeight: '600',
             marginBottom: '8px',
@@ -155,8 +158,8 @@ component stack:${errorInfo?.componentStack || ' (none)'}`
             }
           </h1>
           
-          <p style={{ 
-            color: '#6b7280', 
+          <p style={{
+            color: 'var(--text-secondary, #6b7280)',
             fontSize: '14px',
             marginBottom: '24px',
           }}>
@@ -193,17 +196,17 @@ component stack:${errorInfo?.componentStack || ' (none)'}`
               onClick={this.handleReload}
               style={{
                 padding: '10px 24px',
-                backgroundColor: '#f3f4f6',
-                color: '#374151',
-                border: '1px solid #d1d5db',
+                backgroundColor: 'var(--bg-tertiary, #f3f4f6)',
+                color: 'var(--text-primary, #374151)',
+                border: '1px solid var(--border-primary, #d1d5db)',
                 borderRadius: '8px',
                 cursor: 'pointer',
                 fontSize: '14px',
                 fontWeight: '500',
                 transition: 'background-color 0.2s',
               }}
-              onMouseOver={(e) => e.target.style.backgroundColor = '#e5e7eb'}
-              onMouseOut={(e) => e.target.style.backgroundColor = '#f3f4f6'}
+              onMouseOver={(e) => e.target.style.backgroundColor = 'var(--bg-hover, #e5e7eb)'}
+              onMouseOut={(e) => e.target.style.backgroundColor = 'var(--bg-tertiary, #f3f4f6)'}
             >
               {t('errorBoundary.reload', 'Reload')}
             </button>
@@ -211,14 +214,14 @@ component stack:${errorInfo?.componentStack || ' (none)'}`
 
           <details style={{ 
             textAlign: 'left',
-            backgroundColor: '#fef2f2',
-            border: '1px solid #fecaca',
+            backgroundColor: 'color-mix(in srgb, var(--error, #ef4444) 8%, var(--bg-primary, #ffffff))',
+            border: '1px solid color-mix(in srgb, var(--error, #ef4444) 30%, transparent)',
             borderRadius: '8px',
             padding: '12px',
           }}>
-            <summary style={{ 
-              cursor: 'pointer', 
-              color: '#991b1b',
+            <summary style={{
+              cursor: 'pointer',
+              color: 'var(--error, #991b1b)',
               fontSize: '13px',
               fontWeight: '500',
               marginBottom: '8px',
@@ -229,7 +232,7 @@ component stack:${errorInfo?.componentStack || ' (none)'}`
               whiteSpace: 'pre-wrap',
               wordBreak: 'break-word',
               fontSize: '12px',
-              color: '#7f1d1d',
+              color: 'var(--text-primary, #7f1d1d)',
               margin: 0,
               maxHeight: '200px',
               overflow: 'auto',

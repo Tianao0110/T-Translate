@@ -109,7 +109,6 @@ const LayoutModelCard = ({ notify, confirm }) => {
               disabled={busy}
               onClick={handleRemove}
               title={t('ocr.uninstall')}
-              style={{ padding: '4px 8px' }}
             >
               <Trash2 size={12} />
             </button>
