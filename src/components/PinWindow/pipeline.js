@@ -56,7 +56,7 @@ export async function recognizeAndTranslate(image, { ocrEngine, targetLanguage =
 const LOCAL_ENGINE = 'rapid-ocr';
 
 async function recognizeLocalFirst(image, ocrEngine) {
-  const local = await translationService.ocr.recognize(image, { engine: LOCAL_ENGINE });
+  const local = await translationService.ocr.recognize(image, { engine: LOCAL_ENGINE, caller: 'pin' });
   if (isUsableResult(local, LOCAL_ENGINE) || !ocrEngine || ocrEngine === LOCAL_ENGINE) return local;
   return translationService.ocr.recognize(image, { engine: ocrEngine });
 }

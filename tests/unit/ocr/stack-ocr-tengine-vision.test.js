@@ -2,7 +2,7 @@
 // default walk and the offline allowlist, being skipped while unusable,
 // and the smart routing when it is the selected engine — PP-OCR keeps the
 // simple captures, the vision model takes the hard ones, and either side
-// failing leaves a usable answer.
+// failing leaves a usable answer. Pinned captures log the same numbers.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { OCREngineManager, DEFAULT_OCR_PRIORITY } from '../../../src/stack/ocr/manager.js';
@@ -186,5 +186,54 @@ describe('the routing log line', () => {
     const all = logged.join('\n');
     expect(all).not.toContain('VISION-SECRET');
     expect(all).not.toContain('cell00');
+  });
+
+  describe('for pinned captures', () => {
+    const pinLines = () => logged.filter((l) => l.includes('pin capture:'));
+    const pinRead = async () => (await makeManager()).recognize(IMG, { engine: 'rapid-ocr', caller: 'pin' });
+
+    it('writes one line with where smart routing would have sent the capture', async () => {
+      useLocal({ paddle: async () => TABLE });
+      await pinRead();
+
+      expect(pinLines()).toHaveLength(1);
+      expect(pinLines()[0]).toMatch(
+        /^info pin capture: local=usable would=table mp=null lines=12 conf=0\.98 low=0 rows=4 cols=3 spread=1 pp=\d+ms$/
+      );
+    });
+
+    it('marks a capture smart routing would keep on local OCR as simple', async () => {
+      await pinRead();
+
+      expect(pinLines()).toHaveLength(1);
+      expect(pinLines()[0]).toMatch(/local=usable would=simple .* lines=2 .* pp=\d+ms$/);
+    });
+
+    it('tells an empty read from a failed one', async () => {
+      useLocal({ paddle: async () => ({ success: true, text: '', blocks: [], rawBlocks: [] }) });
+      await pinRead();
+      useLocal({ paddle: async () => ({ success: false, error: 'no models', errorCode: 'BASE_MODELS_MISSING' }) });
+      await pinRead();
+
+      expect(pinLines()).toHaveLength(2);
+      expect(pinLines()[0]).toMatch(/local=unusable would=unreadable .* lines=0 /);
+      expect(pinLines()[1]).toMatch(/local=failed would=unreadable .* lines=0 /);
+    });
+
+    it('stays quiet for captures that are not pins', async () => {
+      useLocal({ paddle: async () => TABLE });
+      const manager = await makeManager();
+      await manager.recognize(IMG, { engine: 'rapid-ocr' });
+      await manager.recognize(IMG, { engine: 'windows-ocr', caller: 'pin' });
+
+      expect(pinLines()).toHaveLength(0);
+    });
+
+    it('never contains what was read', async () => {
+      useLocal({ paddle: async () => TABLE });
+      await pinRead();
+
+      expect(logged.join('\n')).not.toContain('cell00');
+    });
   });
 });

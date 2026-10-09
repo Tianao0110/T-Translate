@@ -163,7 +163,11 @@ export class OCREngineManager {
     }
 
     if (preferredEngine) {
+      const started = Date.now();
       const result = await this._recognizeWithEngine(preferredEngine, input, options);
+      if (options.caller === 'pin' && preferredEngine === 'rapid-ocr') {
+        this._notePinCapture(result, input, Date.now() - started);
+      }
 
       if (!result.success && preferredEngine === 'llm-vision') {
         if (result.errorCode === 'LMSTUDIO_NONE_LOADED') return result;
@@ -380,6 +384,21 @@ export class OCREngineManager {
     if (ppUsable) return { ...pp, routed: { engine: 'tengine-vision', to: 'rapid-ocr', reason: decision.reason, visionFailed: true } };
     const last = await this._recognizeWithLocalChain(input, options, ['windows-ocr']);
     return last.success ? last : (pp.success ? pp : v);
+  }
+
+  // One line per pinned capture, read by local OCR first (PinWindow/pipeline.js),
+  // for tuning ROUTING (docs/design/stack.md §5): how local OCR fared and where
+  // smart routing would have sent the capture.
+  _notePinCapture(pp, input, ppMs) {
+    const size = imageSize(input);
+    const local = !pp.success ? 'failed' : isUsableResult(pp, 'rapid-ocr') ? 'usable' : 'unusable';
+    const decision = decideEscalation(pp, size);
+    const c = describeCapture(pp, size);
+    logger.info(
+      `pin capture: local=${local} would=${decision ? decision.reason : 'simple'}` +
+      ` mp=${c.megapixels} lines=${c.lines} conf=${c.meanConfidence} low=${c.lowLineShare}` +
+      ` rows=${c.wideRows} cols=${c.columns} spread=${c.sizeSpread} pp=${ppMs}ms`
+    );
   }
 
   // Walk the local chain; first usable result wins. Last failure is
