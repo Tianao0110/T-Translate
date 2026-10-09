@@ -754,10 +754,10 @@ input:checked + .switch-slider::before {
   align-items: center;
   gap: 8px;
   padding: 10px 18px;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1.5px solid #ef4444;
+  background: color-mix(in srgb, var(--error) 8%, var(--bg-primary));
+  border: 1.5px solid var(--error);
   border-radius: 10px;
-  color: #dc2626;
+  color: var(--error);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -765,8 +765,7 @@ input:checked + .switch-slider::before {
 }
 
 .btn-danger:hover {
-  background: #ef4444;
-  color: white;
+  background: color-mix(in srgb, var(--error) 16%, var(--bg-primary));
 }
 
 
