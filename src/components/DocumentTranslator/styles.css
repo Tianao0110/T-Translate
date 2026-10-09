@@ -254,7 +254,7 @@
 }
 
 .outline-item {
-  padding: 6px 16px;
+  padding: 0 16px;
   font-size: 13px;
   color: var(--text-secondary);
   cursor: pointer;
@@ -269,6 +269,10 @@
   background: var(--bg-hover);
   color: var(--text-primary);
   border-left-color: var(--accent-primary);
+}
+
+.outline-item-header {
+  padding: 6px 0;
 }
 
 .outline-item.level-1 { padding-left: 16px; font-weight: 500; }
