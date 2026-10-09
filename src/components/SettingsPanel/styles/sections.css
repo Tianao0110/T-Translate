@@ -713,11 +713,13 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
-  font-size: 13px;
+  min-height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 500;
   border: 1px solid var(--border-primary);
   border-radius: 6px;
-  background: var(--bg-secondary);
+  background: var(--bg-primary);
   color: var(--text-primary);
   cursor: pointer;
   transition: all 0.15s;

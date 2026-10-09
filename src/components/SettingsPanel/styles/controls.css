@@ -347,13 +347,17 @@ input:checked + .switch-slider::before {
 .btn-small {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
-  padding: 4px 10px;
+  min-height: 30px;
+  padding: 0 10px;
   font-size: 12px;
+  font-weight: 500;
   border: 1px solid var(--border-primary);
   border-radius: 6px;
   background: var(--bg-primary);
   color: var(--text-secondary);
+  white-space: nowrap;
   cursor: pointer;
   transition: all 0.15s;
 }
@@ -374,9 +378,10 @@ input:checked + .switch-slider::before {
   border: 1px solid var(--border-primary);
 }
 
-.btn-small.uninstall:hover {
-  color: #ef4444;
-  border-color: #ef4444;
+.btn-small.uninstall:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--error) 8%, var(--bg-primary));
+  color: var(--error);
+  border-color: var(--error);
 }
 
 /* ==================== 链接按钮 ==================== */

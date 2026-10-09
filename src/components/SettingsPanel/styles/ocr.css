@@ -108,35 +108,45 @@
 }
 
 .engine-actions .btn {
-  padding: 8px 14px;
-  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--border-primary);
   border-radius: 6px;
   font-size: 12px;
   font-weight: 500;
+  white-space: nowrap;
   cursor: pointer;
   transition: all 0.15s;
-  background: var(--bg-tertiary);
+  background: var(--bg-primary);
   color: var(--text-primary);
   min-width: 50px;
 }
 
 .engine-actions .btn:hover {
-  background: var(--accent-primary);
-  color: var(--text-on-accent);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
 }
 
 .engine-actions .btn.active {
   background: var(--accent-primary);
+  border-color: var(--accent-primary);
   color: var(--text-on-accent);
 }
 
 .engine-actions .btn.download {
-  background: #f97316;
-  color: white;
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: var(--text-on-accent);
 }
 
 .engine-actions .btn.download:hover {
-  background: #ea580c;
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: var(--text-on-accent);
 }
 
 .engine-actions .btn.uninstall {
@@ -146,9 +156,9 @@
 }
 
 .engine-actions .btn.uninstall:hover {
-  background: #ef4444;
-  color: white;
-  border-color: #ef4444;
+  background: color-mix(in srgb, var(--error) 8%, var(--bg-primary));
+  color: var(--error);
+  border-color: var(--error);
 }
 
 .engine-actions .btn.disabled {
@@ -308,23 +318,15 @@
 }
 
 .engine-actions .btn.repair {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: linear-gradient(135deg, #f97316, #ea580c);
-  color: white;
-  border: none;
-  padding: 8px 14px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s;
+  background: var(--warning);
+  border-color: var(--warning);
+  color: var(--text-on-accent);
 }
 
 .engine-actions .btn.repair:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 3px 10px rgba(249, 115, 22, 0.3);
+  background: color-mix(in srgb, var(--warning) 85%, var(--text-primary));
+  border-color: color-mix(in srgb, var(--warning) 85%, var(--text-primary));
+  color: var(--text-on-accent);
 }
 
 .engine-actions .btn.repair:disabled {
@@ -441,16 +443,8 @@
 
 .pack-actions .btn-small,
 .ocr-pack-section-header .btn-small {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 8px;
-  border: 1px solid var(--border-primary);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 11px;
-  cursor: pointer;
-  transition: all 0.15s;
+  min-height: 26px;
+  padding: 0 8px;
 }
 
 .pack-actions .btn-small:hover:not(:disabled),
@@ -464,8 +458,9 @@
 }
 
 .pack-actions .btn-small.uninstall:hover:not(:disabled) {
-  border-color: #ef4444;
-  color: #ef4444;
+  background: color-mix(in srgb, var(--error) 8%, var(--bg-primary));
+  border-color: var(--error);
+  color: var(--error);
 }
 
 .pack-actions .btn-small:disabled {

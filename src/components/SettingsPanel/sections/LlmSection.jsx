@@ -184,7 +184,7 @@ const LlmSection = ({ settings, updateSetting, notify, confirm }) => {
                     onClick={rescan}
                     disabled={busy !== null}
                     title={t('llm.rescan')}
-                    style={{ marginLeft: 6, padding: '4px 8px' }}
+                    style={{ marginLeft: 6 }}
                   >
                     <RefreshCw size={12} className={busy === 'scan' || status?.scanning ? 'spinning' : ''} />
                   </button>

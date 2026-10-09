@@ -341,7 +341,7 @@ const OcrSection = ({
         onClick={() => checkEngineHealth(true)}
         disabled={engineHealth === 'checking'}
         title={t('ocr.recheckHealth')}
-        style={{marginLeft: 6, padding: '4px 8px'}}
+        style={{marginLeft: 6}}
       >
         <RefreshCw size={12} className={engineHealth === 'checking' ? 'spinning' : ''} />
       </button>
@@ -456,7 +456,7 @@ const OcrSection = ({
         className="btn-small"
         onClick={() => window.electron?.llm?.openDir?.()}
         title={t('ocr.tengineVision.openFolder')}
-        style={{ marginLeft: 6, padding: '4px 8px' }}
+        style={{ marginLeft: 6 }}
       >
         <FolderOpen size={12} />
       </button>
@@ -465,7 +465,7 @@ const OcrSection = ({
         onClick={rescanVision}
         disabled={visionBusy}
         title={t('ocr.tengineVision.rescan')}
-        style={{ marginLeft: 6, padding: '4px 8px' }}
+        style={{ marginLeft: 6 }}
       >
         <RefreshCw size={12} className={visionBusy ? 'spinning' : ''} />
       </button>
