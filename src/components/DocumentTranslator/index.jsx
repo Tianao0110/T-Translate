@@ -298,18 +298,20 @@ const OutlineItem = ({ item, onNavigate, level = 0 }) => {
   const hasChildren = item.children && item.children.length > 0;
   
   return (
-    <div className="outline-item" style={{ paddingLeft: level * 12 }}>
-      <div 
+    <div className="outline-item" style={level > 0 ? { paddingLeft: 12, paddingRight: 0 } : undefined}>
+      <div
         className="outline-item-header"
         onClick={() => onNavigate(item.segmentId)}
       >
-        {hasChildren && (
-          <button 
+        {hasChildren ? (
+          <button
             className="outline-toggle"
             onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
           >
             {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
           </button>
+        ) : (
+          <span className="outline-toggle-spacer" aria-hidden="true" />
         )}
         <span className={`outline-text level-${item.level}`}>
           {item.text}
