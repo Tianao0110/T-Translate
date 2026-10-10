@@ -64,7 +64,7 @@ sherpa 那一项是最可能卡住人的：没有装 VS 2022 的机器编不出�
 - 各家自己的发布页：Qwen、腾讯混元、PaddleOCR、k2-fsa/sherpa-onnx 的模型库。
 - HuggingFace 按任务看当年的热门（翻译、图文识别、语音识别、语音合成）。
 - 当年 WMT 通用翻译任务的结果，看小模型那一档。
-- TODOS 里已经记着的候选先看（例如 NiuTrans LMT 系列）。
+- 已经记着的候选先看：NiuTrans LMT 系列（0.6B / 1.7B，Qwen3 底座，Apache-2.0，中英为中心）。
 
 ### 第二步：收评价
 
@@ -169,7 +169,17 @@ npx electron-builder --dir --publish=never -c.directories.output=release-verify
 
 - 打包，装上一个正式版，点「检查更新」，确认能升到新包，模型与数据都还在。
 - 走一遍 `docs/MANUAL.zh.md`，这一年改过的界面、设置项、快捷键、模型链接都同步进去，中英两份。
-- 发版流程照 TODOS 里的「发布流程备忘」。
+- 发版照下面的「发版步骤」。
+
+### 发版步骤（每版适用）
+
+- 版本号五处一起改：`package.json`；`package-lock.json` 自述的两个 `version`（手改 `package.json` 不会带上它）；`README.md` 与 `README.zh-CN.md` 的版本徽章；`CHANGELOG.md` 把「未发布」改标题成 `## vX.Y.Z — 日期 — 主题`，别在它前面新插一节。代码里没有写死的版本号；docs 里的历史版本号是叙述，不改。
+- 新功能先对齐文档：两份 README 的功能表、`docs/FAQ.md`、`docs/ARCHITECTURE.md` 与 `docs/DEVELOPMENT.md`，再过一遍两份说明书。
+- 打包 `npm run dist`，产物在 `release/`。先关 VS Code，否则 `app.asar` 被锁、报 `EBUSY`。
+- GitHub Release 传三件：`T-Translate-Setup-x.x.x.exe`、`.exe.blockmap`、`latest.yml`。缺 `latest.yml`，用户检查更新直接报错。
+- 模型更新不用发版：OCR 走 `ocr-models` tag（见 [OCR_MODELS.md](OCR_MODELS.md)），听译与语音走 `audio-models` tag（`npm run audio:release`）。两个 tag 都要勾 Pre-release，否则自动更新会把它们当成最新版去找 `latest.yml`；同理永远不开 `allowPrerelease`。
+- 改过听译链，发版前跑 `npm run smoke:listen`。
+- 依赖：范围内升到最新（`npm update`）可以做，做完先跑 `node scripts/build/overlay-sherpa-runtime.js`、再跑全套冒烟，并按上面真打一次包；大版本逐个评估，不用 `npm audit fix --force`。
 
 ## 年检记录
 

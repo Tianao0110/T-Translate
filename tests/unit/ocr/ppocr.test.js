@@ -10,6 +10,7 @@ const { findComponents, minAreaRect } = require('../../../electron/services/ocr-
 const { normalizeCHW } = require('../../../electron/services/ocr-host/ppocr/tensor.js');
 const { parseDict, decode } = require('../../../electron/services/ocr-host/ppocr/rec.js');
 const image = require('../../../electron/services/ocr-host/ppocr/image.js');
+const { detInputSize, DET_MAX_SIDE } = require('../../../electron/services/ocr-host/ppocr/det.js');
 
 describe('ppocr cv', () => {
   it('groups 8-connected pixels and keeps only boundary pixels', () => {
@@ -103,5 +104,30 @@ describe('ppocr image', () => {
     expect([out.width, out.height]).toEqual([1, 3]);
     expect([out.data[0], out.data[4], out.data[8]]).toEqual([3, 2, 1]);
     expect(image.rotateImg(src, 0)).toBe(src);
+  });
+});
+
+// The detector input: large captures are capped on the longer side (the
+// recognizer still crops from the full image); a small capture enlarged by
+// the caller keeps its enlargement.
+describe('ppocr detector input size', () => {
+  const size = (w, h, upscale = 1) => detInputSize(w, h, 1, DET_MAX_SIDE * upscale);
+
+  it('caps a 4K capture at 1280 on the longer side', () => {
+    expect(DET_MAX_SIDE).toBe(1280);
+    expect(size(3840, 2160)).toEqual({ resizeW: 1280, resizeH: 736 });
+    expect(size(2160, 3840)).toEqual({ resizeW: 736, resizeH: 1280 });
+  });
+
+  it('leaves a capture under the cap at its own size, rounded to 32', () => {
+    expect(size(800, 500)).toEqual({ resizeW: 800, resizeH: 512 });
+  });
+
+  it('keeps an enlarged small capture enlarged', () => {
+    expect(size(2000, 1200, 2)).toEqual({ resizeW: 2016, resizeH: 1216 });
+  });
+
+  it('never goes below one 32-pixel cell', () => {
+    expect(size(10, 5)).toEqual({ resizeW: 32, resizeH: 32 });
   });
 });

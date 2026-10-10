@@ -17,6 +17,8 @@ const koffi = require('koffi');
 
 const RUNTIME_DIR = path.resolve(__dirname, '../../../resources/llama');
 const haveDlls = fs.existsSync(path.join(RUNTIME_DIR, 'llama.dll'));
+// Backend loading starts the Vulkan driver, which may first wake a sleeping GPU.
+const BACKEND_LOAD_TIMEOUT_MS = 30000;
 
 const plain = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, typeof v === 'bigint' ? Number(v) : v]));
 
@@ -88,5 +90,5 @@ describe('llama ABI transcription', () => {
     expect(cpu).toBeTruthy();
     expect(cpu.memory.total).toBeGreaterThan(0);
     expect(typeof rt.systemInfo()).toBe('string');
-  });
+  }, BACKEND_LOAD_TIMEOUT_MS);
 });
