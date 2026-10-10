@@ -155,7 +155,8 @@ export class TranslationService {
       }
 
       if (providerList) {
-        this._userPriority = this._extractPriority(providerList);
+        // A list with no entries was never saved: the default order applies.
+        this._userPriority = providerList.length ? this._extractPriority(providerList) : null;
         logger.debug('User priority:', this._userPriority);
       }
 
