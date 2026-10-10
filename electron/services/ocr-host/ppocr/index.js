@@ -20,8 +20,9 @@ async function createOcr({ ort, ortOption, canvasKit, det, rec, dict, spaceHeuri
   const recognizer = createRec({ ort, session: recSession, dict, spaceHeuristic, imgh });
 
   return {
-    async ocr(imageData) {
-      const boxes = await detector.det(imageData);
+    // options.upscale: how much a small capture was enlarged before this call.
+    async ocr(imageData, options = {}) {
+      const boxes = await detector.det(imageData, options);
       const lines = await recognizer.rec(boxes);
       return { src: lines, ...afAfRec(lines) };
     },

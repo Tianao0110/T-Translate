@@ -246,7 +246,7 @@ function toBlocks(lines, scale) {
 async function recognize(msg) {
   return using(getSession(msg.packId, msg.models), async (session) => {
     const { imageData, scale } = await decodeToImageData(msg.image, msg.preprocess);
-    const out = await session.ocr(imageData);
+    const out = await session.ocr(imageData, { upscale: scale });
     const blocks = toBlocks(out.parragraphs, scale);
     const rawBlocks = toBlocks(out.src, scale);
     return {

@@ -286,10 +286,24 @@ function afterDet(prob, width, height, resizeW, resizeH, src) {
   return boxes;
 }
 
+// Longest side of the detector input, in the capture's own pixels
+// (docs/design/ocr.md §3). Recognition still crops from the full image.
+const DET_MAX_SIDE = 1280;
+
+// Detector input size: a multiple of 32 on each side, the longer one capped.
+function detInputSize(width, height, ratio, maxSide) {
+  const r = Math.min(ratio, maxSide / Math.max(width, height));
+  return {
+    resizeW: Math.max(Math.round((width * r) / 32) * 32, 32),
+    resizeH: Math.max(Math.round((height * r) / 32) * 32, 32),
+  };
+}
+
 function createDet({ ort, session, ratio = 1 }) {
-  async function det(src) {
-    const resizeH = Math.max(Math.round((src.height * ratio) / 32) * 32, 32);
-    const resizeW = Math.max(Math.round((src.width * ratio) / 32) * 32, 32);
+  // upscale: how much the caller enlarged a small capture; the cap scales
+  // with it so the enlargement survives.
+  async function det(src, { upscale = 1 } = {}) {
+    const { resizeW, resizeH } = detInputSize(src.width, src.height, ratio, DET_MAX_SIDE * upscale);
     const image = resizeImg(src, resizeW, resizeH, 'fill');
     const input = new ort.Tensor('float32', normalizeCHW(image, DET_MEAN, DET_STD), [1, 3, resizeH, resizeW]);
     const out = await session.run({ [session.inputNames[0]]: input });
@@ -299,4 +313,4 @@ function createDet({ ort, session, ratio = 1 }) {
   return { det };
 }
 
-module.exports = { createDet };
+module.exports = { createDet, detInputSize, DET_MAX_SIDE };
