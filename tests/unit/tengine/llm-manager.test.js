@@ -42,6 +42,10 @@ function fakeAdapter({ loadGate = null, devices = null, devicesAfterPrewarm = nu
       a.calls.push(['unload']);
       loaded = null;
     }),
+    shutdown: vi.fn(() => {
+      a.calls.push(['shutdown']);
+      loaded = null;
+    }),
     generate: vi.fn((req, onToken) => {
       a.calls.push(['generate', req]);
       if (onToken) onToken('你好');
@@ -164,6 +168,16 @@ describe('llm manager', () => {
     await vi.advanceTimersByTimeAsync(2000);
     expect(adapter.unload).toHaveBeenCalledTimes(1);
     expect(adapter.loaded()).toBeNull();
+    expect(adapter.calls.slice(-2)).toEqual([['unload'], ['shutdown']]);
+  });
+
+  it('only the idle unload stops the host; a manual unload keeps it', async () => {
+    const { adapter } = boot();
+    await (await manager.generate({ user: 'U' })).promise;
+    expect(await manager.unload('manual')).toBe(true);
+    expect(adapter.shutdown).not.toHaveBeenCalled();
+    await (await manager.generate({ user: 'U' })).promise;
+    expect(adapter.load).toHaveBeenCalledTimes(2);
   });
 
   it('the developer door gates unlisted files, probes them and logs the trial', async () => {
@@ -312,6 +326,8 @@ describe('the vision slot', () => {
     await vi.advanceTimersByTimeAsync(manager.IDLE_UNLOAD_MS + 1000);
     expect(visionAdapter.unload).toHaveBeenCalledTimes(1);
     expect(adapter.unload).toHaveBeenCalledTimes(1);
+    expect(visionAdapter.shutdown).toHaveBeenCalledTimes(1);
+    expect(adapter.shutdown).toHaveBeenCalledTimes(1);
   });
 
   it('drops the vision residency when its host exits, leaving the text slot alone', async () => {
@@ -357,6 +373,16 @@ describe('the speech slot', () => {
     await (await manager.transcribe({ pcm })).promise;
     expect(asrAdapter.load).toHaveBeenLastCalledWith('C:/models/llm-models/A06.gguf', audioOptions('A06.gguf', 'cpu'));
     expect(adapter.load).not.toHaveBeenCalled();
+  });
+
+  it('idles the speech model out but keeps its host for the next line of a silent session', async () => {
+    vi.useFakeTimers();
+    const asrAdapter = fakeAdapter();
+    boot({ packs: fakePacks({ asr: ['big'] }), asrAdapter, timers: { set: setTimeout, clear: clearTimeout } });
+    await (await manager.transcribe({ pcm })).promise;
+    await vi.advanceTimersByTimeAsync(manager.IDLE_UNLOAD_MS + 1000);
+    expect(asrAdapter.unload).toHaveBeenCalledTimes(1);
+    expect(asrAdapter.shutdown).not.toHaveBeenCalled();
   });
 
   it('runs on the CPU with whichever pack is installed', async () => {
