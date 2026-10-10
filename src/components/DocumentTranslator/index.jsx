@@ -137,6 +137,9 @@ function sweepExpiredProgress() {
   } catch { /* localStorage unavailable */ }
 }
 
+// Placeholder bars shown while a segment translates, sized by its source.
+const skeletonLines = (text = '') => (text.length < 40 ? 1 : text.length < 160 ? 2 : 3);
+
 const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate, onEdit, onCopy, searchQuery, termMarks, onTermClick, t,
   onExplain, aiNote, noteFolded, aiRunning, canExplain, onLocate }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -234,8 +237,8 @@ const SegmentItem = React.memo(({ segment, displayStyle, onRetry, onRetranslate,
       {segment.status !== STATUS.SKIPPED && (
         <div className={`segment-translated ${segment.status}`}>
           {segment.status === STATUS.TRANSLATING && (
-            <span className="translating-hint">
-              <Loader size={14} className="spinning" /> {t('documentTranslator.status.translating')}
+            <span className="translating-skeleton" role="status" aria-label={t('documentTranslator.status.translating')}>
+              {Array.from({ length: skeletonLines(segment.original) }, (_, i) => <span key={i} />)}
             </span>
           )}
           {segment.status === STATUS.COMPLETED && !isEditing && (

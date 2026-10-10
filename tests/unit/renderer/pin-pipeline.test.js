@@ -41,7 +41,7 @@ beforeEach(() => {
 describe('recognizeAndTranslate', () => {
   it('recognizes with the configured engine, then translates the trimmed text', async () => {
     const r = await recognizeAndTranslate('data:image/png;base64,x', init);
-    expect(ocrRecognize).toHaveBeenCalledWith('data:image/png;base64,x', { engine: 'rapid-ocr' });
+    expect(ocrRecognize).toHaveBeenCalledWith('data:image/png;base64,x', { engine: 'rapid-ocr', caller: 'pin' });
     expect(translate).toHaveBeenCalledWith('Hello world', { sourceLang: 'auto', targetLang: 'zh' });
     expect(r).toEqual({
       mode: 'unified', sourceText: 'Hello world', translatedText: '你好世界',
@@ -162,7 +162,7 @@ describe('recognizeAndTranslate: local OCR first', () => {
     ocrRecognize.mockResolvedValue({ success: true, text: 'Hello world', confidence: 0.95, blocks: [] });
     await recognizeAndTranslate('img', vision);
     expect(ocrRecognize).toHaveBeenCalledTimes(1);
-    expect(ocrRecognize).toHaveBeenCalledWith('img', { engine: 'rapid-ocr' });
+    expect(ocrRecognize).toHaveBeenCalledWith('img', { engine: 'rapid-ocr', caller: 'pin' });
   });
 
   it('hands an unreadable image to the engine chosen in settings', async () => {

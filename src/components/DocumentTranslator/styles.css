@@ -762,7 +762,6 @@
   background: color-mix(in srgb, var(--error) 9%, transparent);
 }
 
-.translating-hint,
 .pending-hint,
 .error-hint {
   display: flex;
@@ -771,8 +770,39 @@
   font-size: 13px;
 }
 
-.translating-hint {
-  color: var(--accent-primary);
+.translating-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 5px 0;
+}
+
+.translating-skeleton > span {
+  height: 10px;
+  border-radius: 5px;
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--accent-primary) 10%, transparent) 25%,
+    color-mix(in srgb, var(--accent-primary) 22%, transparent) 50%,
+    color-mix(in srgb, var(--accent-primary) 10%, transparent) 75%);
+  background-size: 200% 100%;
+  animation: segment-shimmer 1.4s ease-in-out infinite;
+}
+
+.translating-skeleton > span:last-child:not(:first-child) {
+  width: 60%;
+}
+
+.translating-skeleton > span:only-child {
+  width: 45%;
+}
+
+@keyframes segment-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .translating-skeleton > span { animation: none; }
 }
 
 .pending-hint {

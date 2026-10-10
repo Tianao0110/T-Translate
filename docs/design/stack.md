@@ -86,6 +86,13 @@
   | `pp` / `vision` | 两边各自耗时；`visionFailed` = 视觉失败、本地 OCR 的结果顶上 | — |
 
   **只有数字，不含任何识别文字**（`describeCapture`，单测守着）。调法：用一两周后在日志里搜 `vision routing:`，把「该走视觉没走」的那几张找出来，看它们卡在哪个字段差一点；「不该走走了」的看是哪个 `reason` 误伤最多，再动对应那一个阈值，别一次动几个。日志在安装版的 `data\logs`，开发态在 `%APPDATA%\t-translate\logs`。无痕模式下文件日志只记 error 级，这一行不落盘，属预期。视觉引擎不可用（显卡关着或模型不在）时不算分配，不记这一行，结果里有 `fallbackReason: 'unavailable'`。
+- **贴图识别日志**（2026-10-09）：贴图不走智能分配——`PinWindow/pipeline.js` 先点名本地 OCR，读得出就到此为止，读不清才交给设置里的引擎（那时若是内置视觉模型，上面那行照记）。所以用贴图的人攒不出 `vision routing:` 的数据（2026-10-09 查用户装机日志，一行都没有）。贴图的本地识别请求带 `caller: 'pin'`，管理器为它记一行，数字同上表：
+
+  ```
+  [info]  [Stack:OCRManager] pin capture: local=usable would=table mp=1.76 lines=24 conf=0.97 low=0.04 rows=3 cols=1 spread=1.2 pp=180ms
+  ```
+
+  `local` = 本地 OCR 读得出（`usable`）/ 读不清（`unusable`，贴图随后交给设置里的引擎）/ 出错（`failed`）；`would` = 假如选的是内置视觉模型，智能分配会给的原因（`simple` = 留在本地 OCR）。不论 OCR 设置选的是哪个引擎都记，平时只用本地 OCR 的人也能攒数据：`would` 不是 `simple` 的那些贴图，就是换成视觉模型会走不同路的，对着当时的截图看分得对不对，再按上面的调法动阈值。同样只有数字，无痕模式不落盘。单测在 `stack-ocr-tengine-vision.test.js`：栈日志器（`src/stack/logger.js`）第一次解析到工厂后就一直用它，同一文件里收集日志的几组测试必须共用一个数组，所以贴图那组嵌在分配日志那组里。
 - 本地引擎的栈类（`local-bridge.js`）直接调注入的主进程识别器，少一跳；引擎 id 保持 `rapid-ocr` / `windows-ocr` 兼容已存设置。`blocks` = 段落合并，`rawBlocks` = 逐行，散落模式用 rawBlocks。
 
 ## 6. 外部语音端点（tts/endpoint.js）
