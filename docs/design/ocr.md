@@ -52,5 +52,5 @@
 - 模型：PP-DocLayoutV3 官方 ONNX（`PaddlePaddle/PP-DocLayoutV3_onnx`，Apache-2.0），`ocr-models` 发布里的 `layout-v3` 包（type `layout`，不进语言包列表；发布流程见 `OCR_MODELS.md`）。
 - 输入：`image` [1, 3, 800, 800]，RGB 直接拉伸到 800×800（不保比例）后 /255，不减均值；`scale_factor` [800/H, 800/W]；`im_shape` [800, 800]。
 - 输出：`fetch_name_0` 每框 `[类别, 分数, x1, y1, x2, y2, 阅读序号]`，坐标已按 `scale_factor` 还原成原图像素；`fetch_name_1` 是有效框数；`fetch_name_2` 是每框 200×200 掩码（一页约 48MB），`session.run` 只取前两个输出，掩码不回传。V2 的每框多一列（两把顺序键：a 升序、b 降序），`parseRows` 两种都认。25 个类别两代相同。分数低于 0.45 的框丢掉。
-- 为什么是 V3 不是 V2：程序走的 WebGPU 上两者每页都是约 0.12 秒；V3 小 40%（125MB 对 204MB），表格里的斜体不再被当成行内公式，与 PaddleOCR-VL-1.6 同一套，拍照倾斜页也能处理。DirectML / CPU 上 V3 慢一半，但那条路不用。数字与试过的转换路子在 TODOS「B 档」。
+- 为什么是 V3 不是 V2：程序走的 WebGPU 上两者每页都是约 0.12 秒；V3 小 40%（125MB 对 204MB），表格里的斜体不再被当成行内公式，与 PaddleOCR-VL-1.6 同一套，拍照倾斜页也能处理。DirectML / CPU 上 V3 慢一半，但那条路不用。用的是飞桨官方发布的 ONNX（V2 204MB、V3 125MB，都是 Apache-2.0；MinerU 那份 V2 与官方哈希相同）；Windows 上 paddle2onnx 2.x 装不上（2.0 只有 Mac / Linux 包，2.1.0 与各版 paddle 的原生库对不上），不必自己转。
 - 会话：自己一把缓存（`provider:packId`），不和识别会话抢位置，一次只留一个；和识别会话同一套 WebGPU 失败回 CPU 的粘性回退；换档 / 卸载 / 切显卡同样清掉。模型文件读进内存后不占文件句柄，会话开着也能直接删包（真机验证过）。没有空白帧热身：每次启动后第一页多约 4 秒，只在打开 PDF 时发生。
