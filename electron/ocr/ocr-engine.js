@@ -153,17 +153,17 @@ function evictSessions(packId) {
  * @param {{enabled: boolean, scale: number}} [options.preprocess] - auto-enlarge small captures
  * @returns {Promise<{success, text?, blocks?, rawBlocks?, confidence?, engine, pack?, packFallback?, error?, errorCode?}>}
  */
+function packForLanguage(language) {
+  const packId = packIdForLanguage(language);
+  // Requested language's pack isn't installed: recognize with the base
+  // model; the caller surfaces the hint.
+  if (packId !== BASE_PACK_ID && !isPackInstalled(packId)) return { packId: BASE_PACK_ID, packFallback: true };
+  return { packId, packFallback: false };
+}
+
 async function recognize(imageInput, options = {}) {
   const language = options.language || 'auto';
-
-  let packId = packIdForLanguage(language);
-  let packFallback = false;
-  if (packId !== BASE_PACK_ID && !isPackInstalled(packId)) {
-    // Requested language's pack isn't installed: recognize with the base
-    // model; the caller surfaces the hint.
-    packFallback = true;
-    packId = BASE_PACK_ID;
-  }
+  const { packId, packFallback } = packForLanguage(language);
 
   try {
     const models = resolveModels(packId);
@@ -250,6 +250,17 @@ function prewarm() {
   host().prewarm();
 }
 
+// Builds the session a recognition in `language` will use, while the user is
+// still selecting (screenshot/flow.js).
+function warmFor(language = 'auto') {
+  try {
+    const { packId } = packForLanguage(language);
+    host().health({ packId, models: resolveModels(packId) }).catch((e) => logger.warn('OCR warm-up failed:', e.message));
+  } catch (e) {
+    logger.warn('OCR warm-up skipped:', e.message);
+  }
+}
+
 // Which backend the host runs the base model on, and the fallback reason if
 // any; the settings GPU switch shows it.
 async function hostStatus() {
@@ -270,6 +281,7 @@ module.exports = {
   hostStatus,
   setProvider,
   prewarm,
+  warmFor,
   evictSessions,
   setModelTier,
   isPackInstalled,

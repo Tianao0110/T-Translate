@@ -133,3 +133,68 @@ describe('tengine ocr engine', () => {
     expect(children[0].sent[0]).toEqual({ type: 'init', provider: 'webgpu' });
   });
 });
+
+// Idle shutdown: the host goes after a quiet spell and the next request
+// brings it back; a request in flight or a fresh one keeps it alive.
+function manualTimers() {
+  const list = [];
+  return {
+    list,
+    live: () => list.filter((t) => !t.cleared && !t.fired),
+    set: (fn, ms) => { const t = { fn, ms }; list.push(t); return t; },
+    clear: (t) => { if (t) t.cleared = true; },
+    fireAll() { for (const t of this.live()) { t.fired = true; t.fn(); } },
+  };
+}
+
+describe('tengine ocr engine idle shutdown', () => {
+  it('shuts the host down after the idle spell and respawns on the next request', async () => {
+    const timers = manualTimers();
+    const { m, fork, children } = engine(readyThenEcho, { timers, idleShutdownMs: 1000 });
+    await m.recognize({ packId: 'base' });
+    expect(timers.live()).toHaveLength(1);
+    expect(timers.live()[0].ms).toBe(1000);
+    timers.fireAll();
+    expect(m.running()).toBe(false);
+    expect(children[0].sent.at(-1)).toEqual({ type: 'shutdown' });
+    expect((await m.recognize({ packId: 'base' })).text).toBe('seen:base');
+    expect(fork).toHaveBeenCalledTimes(2);
+  });
+
+  it('a new request cancels the pending shutdown and re-arms it when done', async () => {
+    const timers = manualTimers();
+    const { m } = engine(readyThenEcho, { timers, idleShutdownMs: 1000 });
+    await m.recognize({ packId: 'base' });
+    const first = timers.live()[0];
+    await m.recognize({ packId: 'ko' });
+    expect(first.cleared).toBe(true);
+    expect(timers.live()).toHaveLength(1);
+    expect(m.running()).toBe(true);
+  });
+
+  it('never arms while a request is still running', async () => {
+    const timers = manualTimers();
+    let hold;
+    const script = (msg) => {
+      if (msg.type === 'init') return { type: 'ready' };
+      if (msg.type === 'recognize') { hold = () => ({ type: 'result', id: msg.id, ok: true, value: { text: 'late' } }); }
+      return null;
+    };
+    const { m, children } = engine(script, { timers, idleShutdownMs: 1000 });
+    const pending = m.recognize({ packId: 'base' });
+    await new Promise((r) => setTimeout(r, 5));
+    expect(timers.live()).toHaveLength(0);
+    children[0].emit('message', hold());
+    expect((await pending).text).toBe('late');
+    expect(timers.live()).toHaveLength(1);
+  });
+
+  it('a prewarmed host that is never used still goes idle', async () => {
+    const timers = manualTimers();
+    const { m } = engine(readyThenEcho, { timers, idleShutdownMs: 1000 });
+    await m.prewarm();
+    expect(m.running()).toBe(true);
+    timers.fireAll();
+    expect(m.running()).toBe(false);
+  });
+});
