@@ -12,6 +12,7 @@ const windowManager = require('../windows/window-manager');
 const screenshotModule = require('./screenshot-module');
 const { t } = require('../shared/main-i18n');
 const pinWindows = require('./pin-windows');
+const ocrEngine = require('../ocr/ocr-engine');
 const { showSelectionLoading } = require('../selection/controller');
 const logger = require('../platform/logger')('Screenshot');
 
@@ -90,7 +91,11 @@ async function startScreenshot(fromHotkey = false) {
   });
 
   const screenshotWindow = windowManager.createScreenshotWindow(totalBounds);
-  if ((store.get('settings')?.screenshot?.outputMode || 'pin') === 'pin') pinWindows.prewarm();
+  const settings = store.get('settings') || {};
+  const outputMode = settings.screenshot?.outputMode || 'pin';
+  if (outputMode === 'pin') pinWindows.prewarm();
+  // Pins recognize locally first; the other outputs only with the local engine chosen.
+  if (outputMode === 'pin' || settings.ocr?.engine === 'rapid-ocr') ocrEngine.warmFor(settings.ocr?.recognitionLanguage);
 
   screenshotWindow.webContents.on('did-finish-load', () => {
     let showConfirmButtons = true;

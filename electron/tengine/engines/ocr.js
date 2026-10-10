@@ -13,9 +13,18 @@ const CODES = {
   failed: 'OCR_FAILED',
 };
 
-function createOcrEngine({ fork, logger, workerPath, now = Date.now, onEvent = () => {}, readyTimeoutMs, requestTimeoutMs }) {
+// The host and its sessions go after this long without a request; the next
+// request respawns it (docs/design/ocr.md §2).
+const IDLE_SHUTDOWN_MS = 3 * 60 * 1000;
+
+function createOcrEngine({
+  fork, logger, workerPath, now = Date.now, onEvent = () => {}, readyTimeoutMs, requestTimeoutMs,
+  idleShutdownMs = IDLE_SHUTDOWN_MS, timers = { set: setTimeout, clear: clearTimeout },
+}) {
   let provider = 'cpu';
   let lastHealth = null;
+  let inFlight = 0;
+  let idleTimer = null;
   const host = createHostManager({
     name: 'ocr',
     serviceName: 't-translate-ocr',
@@ -32,11 +41,36 @@ function createOcrEngine({ fork, logger, workerPath, now = Date.now, onEvent = (
     ...(requestTimeoutMs ? { requestTimeoutMs } : {}),
   });
 
+  function armIdle() {
+    if (idleTimer) timers.clear(idleTimer);
+    idleTimer = null;
+    if (inFlight > 0 || !idleShutdownMs) return;
+    idleTimer = timers.set(() => {
+      idleTimer = null;
+      if (inFlight > 0 || !host.running()) return;
+      logger.info?.(`ocr host idle for ${Math.round(idleShutdownMs / 1000)}s, shutting down`);
+      host.shutdown();
+    }, idleShutdownMs);
+    if (typeof idleTimer?.unref === 'function') idleTimer.unref();
+  }
+
+  async function tracked(fn) {
+    if (idleTimer) timers.clear(idleTimer);
+    idleTimer = null;
+    inFlight++;
+    try {
+      return await fn();
+    } finally {
+      inFlight--;
+      armIdle();
+    }
+  }
+
   return {
     id: 'ocr',
     host,
-    recognize: (payload) => host.request('recognize', payload),
-    layout: (payload) => host.request('layout', payload),
+    recognize: (payload) => tracked(() => host.request('recognize', payload)),
+    layout: (payload) => tracked(() => host.request('layout', payload)),
     evict(packId) {
       host.post({ type: 'evict', packId });
     },
@@ -49,7 +83,7 @@ function createOcrEngine({ fork, logger, workerPath, now = Date.now, onEvent = (
     provider: () => provider,
     // Builds the given pack's session in the host and records what it
     // actually ran on — the self-test behind the GPU switch.
-    async health(payload) {
+    health: (payload) => tracked(async () => {
       const t0 = now();
       try {
         const r = await host.request('health', payload);
@@ -59,12 +93,12 @@ function createOcrEngine({ fork, logger, workerPath, now = Date.now, onEvent = (
         lastHealth = { ok: false, provider, fallback: e.message, code: e.code || null, loadMs: Math.round(now() - t0), at: now() };
         throw e;
       }
-    },
-    prewarm: () => host.prewarm(),
+    }),
+    prewarm: () => host.prewarm().then(armIdle),
     shutdown: () => host.shutdown(),
     running: () => host.running(),
     status: () => ({ id: 'ocr', provider, lastHealth, host: host.status() }),
   };
 }
 
-module.exports = { createOcrEngine, CODES };
+module.exports = { createOcrEngine, CODES, IDLE_SHUTDOWN_MS };

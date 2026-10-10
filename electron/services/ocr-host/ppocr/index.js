@@ -27,6 +27,10 @@ async function createOcr({ ort, ortOption, canvasKit, det, rec, dict, spaceHeuri
     },
     det: detector.det,
     rec: recognizer.rec,
+    // Frees both sessions' native memory and GPU buffers now, not at GC.
+    async release() {
+      await Promise.allSettled([detSession.release(), recSession.release()]);
+    },
   };
 }
 

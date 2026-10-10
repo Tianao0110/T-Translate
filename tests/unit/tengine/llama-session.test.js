@@ -154,3 +154,34 @@ describe('kv estimate', () => {
     expect(s.estimateKvBytes({}, 4096)).toBe(256 * 1024 * 1024);
   });
 });
+
+// Model params as openSession hands them to llama_model_load: offloaded
+// weights are read once (no mapping kept), CPU weights stay mapped.
+describe('model load mode', () => {
+  const devs = [
+    { index: 0, type: 1, name: 'Vulkan0', memory: { free: 1, total: 16e9 }, handle: {} },
+    { index: 1, type: 0, name: 'CPU', memory: { free: 1, total: 32e9 }, handle: {} },
+  ];
+  const paramsFor = (provider) => {
+    const seen = [];
+    const binding = {
+      koffi: { alloc: () => ({}), encode: () => {}, array: () => ({}) },
+      loadBackends() {},
+      devices: () => devs,
+      f: {
+        modelDefault: () => ({ load_mode: -1, n_gpu_layers: 0, devices: null }),
+        modelLoad: (file, mp) => { seen.push({ ...mp }); return null; },
+      },
+    };
+    expect(() => s.openSession(binding, { file: 'm.gguf', provider })).toThrow();
+    return seen[0];
+  };
+
+  it('GPU: all layers offloaded, loaded without keeping the file mapped', () => {
+    expect(paramsFor('gpu')).toMatchObject({ n_gpu_layers: -1, load_mode: 0 });
+  });
+
+  it('CPU: no offload, llama.cpp keeps its own load mode (mapped)', () => {
+    expect(paramsFor('cpu')).toMatchObject({ n_gpu_layers: 0, load_mode: -1 });
+  });
+});

@@ -64,7 +64,7 @@ async function createLayout({ ort, ortOption, canvasKit, model }) {
     return parseRows(preds.data, cols, count, img.width, img.height);
   }
 
-  return { analyze };
+  return { analyze, release: () => session.release() };
 }
 
 module.exports = { createLayout, parseRows, LABELS, MIN_SCORE };

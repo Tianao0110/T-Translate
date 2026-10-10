@@ -259,6 +259,8 @@ const ENUMS = {
   DECODE: { OK: 0, NO_KV_SLOT: 1, ABORTED: 2 },
   // mtmd_input_chunk_type
   MTMD_CHUNK: { TEXT: 0, IMAGE: 1, AUDIO: 2 },
+  // llama_load_mode
+  LOAD_MODE: { AUTO: -1, NONE: 0, MMAP: 1, MLOCK: 2, MMAP_MLOCK: 3, DIRECT_IO: 4 },
   LLAMA_DEFAULT_SEED: 0xffffffff,
 };
 

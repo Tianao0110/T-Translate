@@ -103,7 +103,7 @@ function armIdle() {
 // adapter's provider, after the optional prepare), how (loadOptions, given
 // the pack and the provider), then residency, the idle timer, in-flight
 // bookkeeping, the GPU self-test and the policy streaks.
-function createMediaSlot({ engine, adapterKey, label, unavailable, missing, resolve, loadOptions, prepare = null }) {
+function createMediaSlot({ engine, adapterKey, label, unavailable, missing, resolve, loadOptions, prepare = null, keepHostWhenIdle = false }) {
   let slotResident = null; // { path, provider }
   let slotLoading = null; // { key, promise } while a load is on its way
   let slotIdle = null;
@@ -186,6 +186,8 @@ function createMediaSlot({ engine, adapterKey, label, unavailable, missing, reso
     }
     await a.unload();
     slotResident = null;
+    // An idle slot gives its host back too; the next load respawns it.
+    if (reason === 'idle' && !keepHostWhenIdle) a.shutdown();
     deps.logger?.info?.(`${label} unloaded (${reason})`);
     return true;
   }
@@ -294,6 +296,9 @@ const asr = createMediaSlot({
   label: 'speech model',
   unavailable: ['LLM_ASR_UNAVAILABLE', 'speech engine not wired'],
   missing: ['LLM_ASR_MISSING', 'no speech model installed'],
+  // A listen session can sit silent past the idle spell; its next line must
+  // not also wait for a host start (docs/T-ENGINE.md §7).
+  keepHostWhenIdle: true,
   // On the GPU the size depends on the card: bring the host up to learn it.
   prepare: async (a) => {
     if (a.provider() === 'gpu' && !gpuCard() && typeof a.prewarm === 'function') await a.prewarm();
@@ -497,6 +502,8 @@ async function unload(reason = 'manual') {
   await deps.adapter.unload();
   resident = null;
   trial = null;
+  // Idle gives the host back too (docs/T-ENGINE.md §7); the next load respawns it.
+  if (reason === 'idle') deps.adapter.shutdown();
   deps.logger?.info?.(`model unloaded (${reason})`);
   return true;
 }

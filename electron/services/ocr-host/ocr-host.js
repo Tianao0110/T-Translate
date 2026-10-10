@@ -41,10 +41,45 @@ function ensureEnv() {
   return env;
 }
 
+// CPU sessions run without onnxruntime's grow-only arena (docs/design/ocr.md).
+const CPU_OPTION = { enableCpuMemArena: false };
+
 // WebGPU EP (Dawn on D3D12), shipped with onnxruntime-node.
 function ortOption() {
-  if (provider !== 'webgpu') return undefined;
+  if (provider !== 'webgpu') return CPU_OPTION;
   return { executionProviders: ['webgpu'] };
+}
+
+// A dropped session is released once no request is still running on it.
+const busy = new Map(); // session promise -> requests in flight
+const doomed = new Set();
+
+function release(promise) {
+  promise.then((s) => s.release()).catch(() => {});
+}
+
+function dispose(promise) {
+  if (busy.get(promise)) doomed.add(promise);
+  else release(promise);
+}
+
+function dropAll(cache) {
+  for (const p of cache.values()) dispose(p);
+  cache.clear();
+}
+
+async function using(promise, fn) {
+  busy.set(promise, (busy.get(promise) || 0) + 1);
+  try {
+    return await fn(await promise);
+  } finally {
+    const left = busy.get(promise) - 1;
+    if (left) busy.set(promise, left);
+    else {
+      busy.delete(promise);
+      if (doomed.delete(promise)) release(promise);
+    }
+  }
 }
 
 function sessionKey(packId) {
@@ -80,7 +115,7 @@ async function warmUp(session) {
 let providerFallback = null;
 
 async function createSession(models) {
-  if (provider !== 'webgpu') return buildSession(models, undefined);
+  if (provider !== 'webgpu') return buildSession(models, CPU_OPTION);
   try {
     const session = await buildSession(models, ortOption());
     await warmUp(session);
@@ -90,11 +125,11 @@ async function createSession(models) {
     log('warn', `WebGPU failed (${e.message}) — this host falls back to CPU`);
     providerFallback = e.message;
     provider = 'cpu';
-    return buildSession(models, undefined);
+    return buildSession(models, CPU_OPTION);
   }
 }
 
-async function getSession(packId, models) {
+function getSession(packId, models) {
   const key = sessionKey(packId);
   if (sessions.has(key)) {
     const p = sessions.get(key);
@@ -104,6 +139,7 @@ async function getSession(packId, models) {
   }
   while (sessions.size >= MAX_SESSIONS) {
     const oldest = sessions.keys().next().value;
+    dispose(sessions.get(oldest));
     sessions.delete(oldest);
     log('info', `evicted OCR session ${oldest}`);
   }
@@ -118,34 +154,37 @@ async function getSession(packId, models) {
 
 function evict(packId) {
   if (!packId) {
-    sessions.clear();
-    layoutSessions.clear();
+    dropAll(sessions);
+    dropAll(layoutSessions);
     return;
   }
   for (const cache of [sessions, layoutSessions]) {
     for (const key of [...cache.keys()]) {
-      if (key.endsWith(`:${packId}`)) cache.delete(key);
+      if (key.endsWith(`:${packId}`)) {
+        dispose(cache.get(key));
+        cache.delete(key);
+      }
     }
   }
 }
 
 async function createLayoutSession(model) {
   const { createLayout, ort, canvasKit } = ensureEnv();
-  if (provider !== 'webgpu') return createLayout({ ort, canvasKit, model });
+  if (provider !== 'webgpu') return createLayout({ ort, ortOption: CPU_OPTION, canvasKit, model });
   try {
     return await createLayout({ ort, ortOption: ortOption(), canvasKit, model });
   } catch (e) {
     log('warn', `WebGPU failed for layout (${e.message}) — this host falls back to CPU`);
     providerFallback = e.message;
     provider = 'cpu';
-    return createLayout({ ort, canvasKit, model });
+    return createLayout({ ort, ortOption: CPU_OPTION, canvasKit, model });
   }
 }
 
 function getLayout(packId, model) {
   const key = sessionKey(packId);
   if (layoutSessions.has(key)) return layoutSessions.get(key);
-  layoutSessions.clear();
+  dropAll(layoutSessions);
   log('info', `loading layout session ${key}`);
   const promise = createLayoutSession(model).catch((e) => {
     layoutSessions.delete(key);
@@ -205,25 +244,27 @@ function toBlocks(lines, scale) {
 }
 
 async function recognize(msg) {
-  const session = await getSession(msg.packId, msg.models);
-  const { imageData, scale } = await decodeToImageData(msg.image, msg.preprocess);
-  const out = await session.ocr(imageData);
-  const blocks = toBlocks(out.parragraphs, scale);
-  const rawBlocks = toBlocks(out.src, scale);
-  return {
-    text: blocks.map((b) => b.text).join('\n').trim(),
-    blocks,
-    rawBlocks,
-    confidence: blocks.length ? blocks.reduce((s, b) => s + b.confidence, 0) / blocks.length : 0,
-  };
+  return using(getSession(msg.packId, msg.models), async (session) => {
+    const { imageData, scale } = await decodeToImageData(msg.image, msg.preprocess);
+    const out = await session.ocr(imageData);
+    const blocks = toBlocks(out.parragraphs, scale);
+    const rawBlocks = toBlocks(out.src, scale);
+    return {
+      text: blocks.map((b) => b.text).join('\n').trim(),
+      blocks,
+      rawBlocks,
+      confidence: blocks.length ? blocks.reduce((s, b) => s + b.confidence, 0) / blocks.length : 0,
+    };
+  });
 }
 
 async function layout(msg) {
-  const session = await getLayout(msg.packId, msg.model);
-  const { canvasKit } = ensureEnv();
-  const buf = typeof msg.image === 'string' ? Buffer.from(stripDataUrl(msg.image), 'base64') : Buffer.from(msg.image);
-  const img = await canvasKit.loadImage(buf);
-  return { blocks: await session.analyze(img), provider };
+  return using(getLayout(msg.packId, msg.model), async (session) => {
+    const { canvasKit } = ensureEnv();
+    const buf = typeof msg.image === 'string' ? Buffer.from(stripDataUrl(msg.image), 'base64') : Buffer.from(msg.image);
+    const img = await canvasKit.loadImage(buf);
+    return { blocks: await session.analyze(img), provider };
+  });
 }
 
 async function handle(msg) {
@@ -238,8 +279,8 @@ async function handle(msg) {
       providerFallback = null;
       if (next !== provider) {
         provider = next;
-        sessions.clear();
-        layoutSessions.clear();
+        dropAll(sessions);
+        dropAll(layoutSessions);
       }
       return;
     }
