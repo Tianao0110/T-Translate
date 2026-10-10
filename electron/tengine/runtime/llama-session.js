@@ -305,6 +305,8 @@ function openSession(binding, {
 
   const mp = f.modelDefault();
   mp.n_gpu_layers = picked.provider === 'gpu' ? -1 : 0;
+  // Offloaded weights are read once, not left mapped (docs/T-ENGINE.md §6).
+  if (picked.provider === 'gpu') mp.load_mode = ABI.ENUMS.LOAD_MODE.NONE;
   let deviceList = null;
   if (picked.device) {
     deviceList = koffi.alloc('void *', 2);
