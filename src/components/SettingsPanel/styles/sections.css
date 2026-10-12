@@ -762,6 +762,20 @@
   flex: 1;
 }
 
+/* Narrow column: the path gets its own full-width line under the badge and button */
+.storage-value:has(> .storage-path) {
+  container-type: inline-size;
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+@container (max-width: 420px) {
+  .storage-path {
+    order: 1;
+    flex-basis: 100%;
+  }
+}
+
 .storage-value > span:first-child + span:not(.storage-path) {
   flex: 1;
   min-width: 0;
@@ -789,6 +803,13 @@
 
 .engines-span {
   grid-column: 2 / -1;
+}
+
+/* Why an engine stays on the CPU, under its row */
+.engines-note {
+  margin-top: -8px;
+  font-size: 11px;
+  color: var(--text-tertiary);
 }
 
 /* ==================== 悬浮窗口页：引擎与快捷键 ==================== */
