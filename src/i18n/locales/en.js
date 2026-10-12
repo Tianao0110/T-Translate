@@ -50,13 +50,13 @@ const en = {
       'tengine': 'The built-in model, on this machine',
       'local-llm': 'Local LLM, free',
       'openai': 'GPT models, high quality',
-      'deepl': 'Dedicated translator, high quality',
+      'deepl': 'Top-quality translator',
       'gemini': "Google's model, free tier",
-      'deepseek': 'Affordable, strong in Chinese',
+      'deepseek': 'Low cost, good at Chinese',
       'google-translate': 'Free, many languages',
       'ollama': 'Local LLM, free',
       'anthropic': 'Claude, very high quality',
-      'microsoft-translator': '2M characters free per month',
+      'microsoft-translator': '2M chars free per month',
       'baidu-translate': 'Direct in China, free tier'
     }
   },
@@ -625,7 +625,6 @@ const en = {
         cpu: "CPU",
         pending: "GPU from the next use",
         fallback: "Back on the CPU: {{reason}}",
-        cpuOnly: "CPU ({{reason}})",
       },
     },
     tengine: {

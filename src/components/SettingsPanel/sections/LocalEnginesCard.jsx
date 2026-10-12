@@ -60,7 +60,7 @@ const LocalEnginesCard = ({ notify, confirm }) => {
 
   // What it runs on right now, or why it never takes the GPU.
   const deviceBadge = (e) => {
-    if (!e.gpu) return { cls: '', text: t('llm.gpu.state.cpuOnly', { reason: t(`llm.gpu.reasons.${e.reason}`) }) };
+    if (!e.gpu) return { cls: '', text: t('llm.gpu.state.cpu'), note: t(`llm.gpu.reasons.${e.reason}`) };
     if (e.state?.provider === 'webgpu') return { cls: 'installed', text: t(e.backend === 'vulkan' ? 'llm.gpu.state.gpuVulkan' : 'llm.gpu.state.gpu') };
     if (e.state?.fallback) return { cls: 'unavailable', text: t('llm.gpu.state.fallback', { reason: e.state.fallback }) };
     if (e.state?.pending) return { cls: '', text: t('llm.gpu.state.pending') };
@@ -114,6 +114,7 @@ const LocalEnginesCard = ({ notify, confirm }) => {
                 </span>
               )}
               <span className="storage-value">{h ? hostLine(h) : ''}</span>
+              {d?.note && <span className="engines-span engines-note">{d.note}</span>}
             </React.Fragment>
           );
         })}

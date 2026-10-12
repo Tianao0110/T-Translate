@@ -625,7 +625,6 @@ const zh = {
         cpu: "CPU",
         pending: "下次使用时进显卡",
         fallback: "已回到 CPU：{{reason}}",
-        cpuOnly: "CPU（{{reason}}）",
       },
     },
     tengine: {
