@@ -196,6 +196,7 @@ npm start             # 实测：设置页出卡片、填 key、测试连接、�
   },
   prompts:       { zh: { system, user }, en: { ... } },   // 路径 A：喂识别出的文本
   visionPrompts: { zh: { system, user }, en: { ... } },   // 路径 B：喂截图本身（可省）
+  kindPrompts:   { code: { zh, en }, error: { ... }, formula: { ... } },  // 路径 A 按内容类型换（可省）
 }
 ```
 
@@ -207,8 +208,11 @@ npm start             # 实测：设置页出卡片、填 key、测试连接、�
   同一个理由）
 - **带了 `visionPrompts` 才算支持路径 B**。措辞得换——图里没有 `{{sourceText}}`
   可以贴，模型是在看版面
-- **`mode: 'understand'` 的动作会接管悬浮窗的理解模式**，导入的优先于内置：装一份
-  就换掉默认的「讲解」，主程序不用改
+- **`mode: 'understand'` 的动作会接管悬浮窗的理解模式和划词卡片的自动讲解**，导入的
+  优先于内置：装一份就换掉默认的「讲解」，主程序不用改
+- **`kindPrompts` 按内容类型换提示词**：只用在路径 A，类型由 `src/ai/content-kind.js`
+  判定（code / error / formula），没有对应的一套就用 `prompts`。别把「如果是代码就……」
+  写进同一份提示词——小模型会把代码那套硬套到普通文字上
 
 改完跑 `npm test`——`tests/unit/renderer/ai-actions.test.js` 覆盖触发判定与导入校验。
 

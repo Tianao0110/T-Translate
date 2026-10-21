@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.5.5-green" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.5.6-green" alt="Version">
   <img src="https://img.shields.io/badge/license-T--Translate%201.0-blue" alt="License">
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform">
 </p>
@@ -29,7 +29,7 @@ Privacy comes first: the app ships with its own local model, so one model file i
 
 | Feature | Description |
 | --- | --- |
-| **Select to translate** | Select text in any program and click once; cards can be pinned |
+| **Select to translate** | Select text in any program and click once; code, errors and formulas get explained instead; cards can be pinned |
 | **Screenshot translate** | Box any screen region to recognize and translate, on any monitor; pin it on screen with the translation laid over the original |
 | **Floating window** | Transparent overlay; Space to capture; auto refresh follows live captions without stealing focus |
 | **Listen mode** | Live captions for whatever is playing, translated sentence by sentence; recognized on this computer, audio never written to disk; captions auto-saved |
@@ -46,7 +46,7 @@ Privacy comes first: the app ships with its own local model, so one model file i
 
 ### Select to translate
 
-Select any text, a small icon appears next to it, and one click gives you the translation card. Drag a card to pin it, up to 8 at once; with CapsLock direct mode on, you do not even click the icon.
+Select any text, a small icon appears next to it, and one click gives you the translation card. When the selection is code, an error or a formula, the card explains what it means instead. Drag a card to pin it, up to 8 at once; with CapsLock direct mode on, you do not even click the icon.
 
 <p align="center">
   <img src="docs/screenshots/selection-translate.png" width="600" alt="Select to translate">

@@ -97,7 +97,7 @@ t-translate/
 │   │   └── ocr/                # 在线 OCR 四引擎 + LLM Vision + 本地引擎 local-bridge
 │   │
 │   ├── translation/            # 渲染端翻译层：stack-client（stack:* IPC 客户端）、main-translation（主窗口编排）、就绪判断 hook
-│   ├── ai/                     # AI 动作：提示词模板、runner、store、use-ai-actions / use-segment-notes
+│   ├── ai/                     # AI 动作：提示词模板、runner、store、内容类型判定、use-ai-actions / use-segment-notes
 │   ├── floating/               # 悬浮窗：pipeline（流水线）、display-mode、pane-layout
 │   ├── document/               # 文档翻译：解析器、PDF 文字层重建（pdf-text）、Word / EPUB 结构（html-blocks）、进度核对、术语表 IO、术语一致性
 │   ├── ocr/                    # 渲染端 OCR 辅助：密钥保险库、图片工具
