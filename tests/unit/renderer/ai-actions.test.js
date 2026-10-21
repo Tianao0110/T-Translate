@@ -9,6 +9,7 @@ import {
   isAttachableResult,
   renderTemplate,
   buildActionMessages,
+  toPlainText,
   resolveActionLabel,
   resolveActionPath,
 } from '../../../src/ai/ai-action-runner.js';
@@ -541,5 +542,17 @@ describe('buildActionMessages: by content kind', () => {
   it('the formula prompt explains without working out a result', () => {
     const text = buildActionMessages(explain, ctx('x^2 - 5x + 6 = 0'), 'zh')[1].content;
     expect(text).toMatch(/不要算出最终结果/);
+  });
+});
+
+// AI results reach surfaces that show plain text only.
+describe('toPlainText', () => {
+  it('drops bold, inline code, headings and rules', () => {
+    const md = '### 一、概述\n\n1. **初始化计数器**：调用 `fn` 之前加一\n2. __not bold__ stays\n\n---\n\n结束';
+    expect(toPlainText(md)).toBe('一、概述\n\n1. 初始化计数器：调用 fn 之前加一\n2. __not bold__ stays\n\n结束');
+  });
+
+  it('keeps a power operator and list markers', () => {
+    expect(toPlainText('x**2 + y**2 = r**2\n- a\n- b')).toBe('x**2 + y**2 = r**2\n- a\n- b');
   });
 });

@@ -165,11 +165,23 @@ function unwrap(content) {
   return out.trim();
 }
 
+// No surface renders Markdown: bold, inline code, headings and rules come
+// out as plain text. A power operator (x**2) is not bold.
+export function toPlainText(content) {
+  return String(content)
+    .replace(/(?<![\w)\]])\*\*(?=\S)([^*\n]+?)(?<=\S)\*\*(?![\w(])/g, '$1')
+    .replace(/`([^`\n]+)`/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^\s*(?:-{3,}|\*{3,})\s*$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 function normalizeReply(action, result, path) {
   if (!result?.success) {
     return { success: false, error: result?.error || _t('aiActions.failed', 'AI 动作失败') };
   }
-  const content = unwrap(result.content || '');
+  const content = toPlainText(unwrap(result.content || ''));
   if (!content) {
     return { success: false, error: _t('aiActions.emptyResult', 'AI 未返回内容') };
   }
