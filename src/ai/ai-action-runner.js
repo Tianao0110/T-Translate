@@ -9,6 +9,7 @@ import translationService from '../translation/stack-client.js';
 import { AI_ACTION_VARS } from '../config/ai-actions.js';
 import { LANGUAGES } from '../config/languages.js';
 import { detectLanguage } from '../core/text.js';
+import { classifyContent } from './content-kind.js';
 import createLogger from '../core/logger.js';
 import i18n from '../i18n.js';
 
@@ -126,9 +127,21 @@ function pickPrompts(action, uiLang, path) {
     || Object.values(prompts)[0] || null;
 }
 
+// An action's prompts for code, a stack trace or a formula, when it has a
+// usable set for that kind.
+function pickKindPrompts(action, lang, kind) {
+  const set = action.kindPrompts?.[kind];
+  const prompts = set && (set[lang] || set.zh || set.en);
+  return prompts && typeof prompts.user === 'string' && prompts.user.trim() ? prompts : null;
+}
+
+// context.contentKind, when given, skips the classifier.
 export function buildActionMessages(action, context = {}, uiLang = 'zh', path = 'text') {
   const lang = uiLang.startsWith('zh') ? 'zh' : 'en';
-  const prompts = pickPrompts(action, lang, path);
+  const kind = path === 'text' && action.kindPrompts
+    ? (context.contentKind || classifyContent(context.sourceText))
+    : 'text';
+  const prompts = (kind !== 'text' && pickKindPrompts(action, lang, kind)) || pickPrompts(action, lang, path);
   if (!prompts) return null;
 
   const vars = {
@@ -152,11 +165,23 @@ function unwrap(content) {
   return out.trim();
 }
 
+// No surface renders Markdown: bold, inline code, headings and rules come
+// out as plain text. A power operator (x**2) is not bold.
+export function toPlainText(content) {
+  return String(content)
+    .replace(/(?<![\w)\]])\*\*(?=\S)([^*\n]+?)(?<=\S)\*\*(?![\w(])/g, '$1')
+    .replace(/`([^`\n]+)`/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^\s*(?:-{3,}|\*{3,})\s*$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 function normalizeReply(action, result, path) {
   if (!result?.success) {
     return { success: false, error: result?.error || _t('aiActions.failed', 'AI 动作失败') };
   }
-  const content = unwrap(result.content || '');
+  const content = toPlainText(unwrap(result.content || ''));
   if (!content) {
     return { success: false, error: _t('aiActions.emptyResult', 'AI 未返回内容') };
   }

@@ -410,6 +410,7 @@ const zh = {
     triggerTimeout: "按钮自动消失时间", seconds: "秒", triggerTimeoutHint: "划词后翻译按钮自动消失的时间",
     showSourceByDefault: "默认显示原文", showSourceOnDesc: "翻译结果默认显示原文对照", showSourceOffDesc: "只显示翻译结果",
     autoCloseOnCopy: "复制后自动关闭", autoCloseOnDesc: "点击复制后自动关闭翻译窗口", autoCloseOffDesc: "复制后保持窗口打开",
+    autoExplain: "代码和公式改为讲解", explainedCode: "已按代码讲解", explainedError: "已按报错讲解", explainedFormula: "已按公式讲解",
     // CapsLock sticky direct mode
     stickyCapsLockLabel: "CapsLock 直出模式",
     stickyCapsLockDesc: "使用 CapsLock 作为划词直出模式",

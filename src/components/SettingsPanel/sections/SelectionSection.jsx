@@ -131,6 +131,11 @@ const SelectionSection = ({
           label={t('selection.autoCloseOnCopy')}
         />
         <Switch
+          checked={sel.autoExplain !== false}
+          onChange={(on) => updateSetting('selection', 'autoExplain', on)}
+          label={t('selection.autoExplain')}
+        />
+        <Switch
           checked={!!sel.rainbowWindow}
           onChange={(on) => updateSetting('selection', 'rainbowWindow', on)}
           label={t('selection.rainbowWindow')}

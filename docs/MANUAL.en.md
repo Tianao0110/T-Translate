@@ -165,10 +165,15 @@ Select text in any program and translate it.
 - With "CapsLock Direct Mode" on under Settings → Selection, selecting text pops the card up directly while the CapsLock light is on, no icon click needed. Turn CapsLock off to get the normal flow back; typing capitals is unaffected.
 - In terminal programs (Windows Terminal, Command Prompt and the like) the icon still comes first.
 
+**Code and formulas**
+
+- When you select code, a stack trace or a formula, the card explains it instead: what the code does and its key steps, where an error went wrong and the likely causes, what a formula means and what its symbols stand for, without working out a result. The card briefly says "Explained as code" or similar.
+- This needs a model that can chat (the built-in model, LM Studio and the like); without one, the card translates as usual. Turn off "Explain code and formulas" under Settings → Selection if you don't want it.
+
 **Related settings** (Settings → Selection)
 
 - Triggering: enable selection translate, CapsLock direct mode; character limits (selections that are too short or too long are not translated; the default is 2 to 2000 characters); button auto-hide time.
-- Selection window: show source by default, close after copy, Rainbow selection window (a colorful alternative look), window opacity.
+- Selection window: show source by default, close after copy, explain code and formulas, Rainbow selection window (a colorful alternative look), window opacity.
 - Screenshot output is under Settings → Translation: whether a screenshot becomes a pin, or its result appears in the selection window or the main window. Pin is the default, see 3.2.
 
 ## 3. Floating window

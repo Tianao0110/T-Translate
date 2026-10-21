@@ -103,6 +103,8 @@ export const DEFAULT_SETTINGS = {
     triggerTimeout: 4000,
     showSourceByDefault: false,
     autoCloseOnCopy: false,
+    // Code, stack traces and formulas are explained instead of translated.
+    autoExplain: true,
     minChars: 2,
     maxChars: 2000,
     windowOpacity: 95,

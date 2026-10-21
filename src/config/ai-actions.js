@@ -111,6 +111,40 @@ const EXPLAIN = {
       user: 'Explain the following content in {{outputLanguage}}.\n\nContent:\n{{sourceText}}\n\nRequirements:\n- Start with one or two sentences on what it is about overall\n- Then explain the key concepts, terms, or symbols in it\n- Do not invent anything the source does not state',
     },
   },
+  // Text path only, picked by ai/content-kind.js; ordinary text keeps
+  // the prompts above.
+  kindPrompts: {
+    code: {
+      zh: {
+        system: '你是一个讲解助手。用户会给你一段代码，请读懂它，然后用{{outputLanguage}}讲清楚它是做什么的。只输出讲解正文，不要复述或逐行翻译代码。',
+        user: '请讲解下面这段代码，用{{outputLanguage}}回答。\n\n代码：\n{{sourceText}}\n\n要求：\n- 先用一两句说清这段代码是做什么用的\n- 再按执行顺序讲关键步骤\n- 说明输入、输出和副作用\n- 点出容易忽略的地方\n- 用几段简短的话写，不用标题和 Markdown 格式，不要贴出代码，二百字左右\n- 原文没写的不要编造',
+      },
+      en: {
+        system: 'You are an explaining assistant. The user gives you a piece of code; understand it, then explain in {{outputLanguage}} what it does. Output only the explanation — do not restate the code or translate it line by line.',
+        user: 'Explain the following code in {{outputLanguage}}.\n\nCode:\n{{sourceText}}\n\nRequirements:\n- Start with one or two sentences on what this code is for\n- Walk through the key steps in the order they run\n- Name its inputs, outputs and side effects\n- Point out what is easy to miss\n- Write a few short paragraphs, no headings or Markdown, do not paste the code back, about 120 words\n- Do not invent anything the code does not show',
+      },
+    },
+    error: {
+      zh: {
+        system: '你是一个讲解助手。用户会给你一段报错信息或调用栈，请读懂它，然后用{{outputLanguage}}讲清楚出了什么问题。只输出讲解正文，不要复述原文。',
+        user: '请讲解下面这段报错，用{{outputLanguage}}回答。\n\n内容：\n{{sourceText}}\n\n要求：\n- 先用一两句说清出了什么错\n- 指出最可能出错的位置（哪个文件、哪一行、哪个调用）\n- 列出最可能的原因和排查方向\n- 用几段简短的话写，不用标题和 Markdown 格式，二百字左右\n- 原文没写的不要编造',
+      },
+      en: {
+        system: 'You are an explaining assistant. The user gives you an error message or stack trace; understand it, then explain in {{outputLanguage}} what went wrong. Output only the explanation — do not restate it.',
+        user: 'Explain the following error in {{outputLanguage}}.\n\nContent:\n{{sourceText}}\n\nRequirements:\n- Start with one or two sentences on what went wrong\n- Point to where it most likely failed (file, line, call)\n- List the most likely causes and where to look\n- Write a few short paragraphs, no headings or Markdown, about 120 words\n- Do not invent anything the error does not show',
+      },
+    },
+    formula: {
+      zh: {
+        system: '你是一个讲解助手。用户会给你一个公式或算式，请读懂它，然后用{{outputLanguage}}讲清楚它表达的意思。只输出讲解正文。',
+        user: '请讲解下面这个公式或算式，用{{outputLanguage}}回答。\n\n内容：\n{{sourceText}}\n\n要求：\n- 先用一两句说清它表达什么\n- 解释每个符号和变量的含义\n- 说明它属于哪类问题，通常用什么方法处理\n- 只讲含义和思路，不要算出最终结果\n- 用几段简短的话写，不用标题和 Markdown 格式，二百字左右\n- 原文没写的不要编造',
+      },
+      en: {
+        system: 'You are an explaining assistant. The user gives you a formula or expression; understand it, then explain in {{outputLanguage}} what it means. Output only the explanation.',
+        user: 'Explain the following formula or expression in {{outputLanguage}}.\n\nContent:\n{{sourceText}}\n\nRequirements:\n- Start with one or two sentences on what it expresses\n- Explain what each symbol and variable means\n- Say what kind of problem it belongs to and the usual way to approach it\n- Explain the meaning and the approach only; do not work out a final result\n- Write a few short paragraphs, no headings or Markdown, about 120 words\n- Do not invent anything the source does not state',
+      },
+    },
+  },
   visionPrompts: {
     zh: {
       system: '你是一个讲解助手。用户会给你一张截图，请读懂图里的内容，然后用{{outputLanguage}}讲清楚它在说什么。只输出讲解正文，不要描述画面。',
