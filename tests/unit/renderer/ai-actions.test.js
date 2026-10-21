@@ -505,3 +505,41 @@ describe('built-in catalog', () => {
     expect(getAiAction('does-not-exist')).toBeNull();
   });
 });
+
+// The built-in explain action answers code, stack traces and formulas in
+// their own shape; ordinary text, the vision path and imported actions are
+// untouched.
+describe('buildActionMessages: by content kind', () => {
+  const explain = getAiAction('explain');
+  const ctx = (sourceText, extra = {}) => ({ sourceText, sourceLanguage: 'auto', targetLanguage: 'zh', ...extra });
+  const code = 'const doubled = items.map((x) => x * 2);';
+  const trace = "TypeError: x is undefined\n    at App (App.jsx:12:15)\n    at run (main.js:3:1)";
+
+  it('code, a stack trace and a formula each get their own prompt', () => {
+    expect(buildActionMessages(explain, ctx(code), 'zh')[1].content).toMatch(/这段代码/);
+    expect(buildActionMessages(explain, ctx(trace), 'zh')[1].content).toMatch(/这段报错/);
+    expect(buildActionMessages(explain, ctx('x^2 - 5x + 6 = 0'), 'zh')[1].content).toMatch(/公式或算式/);
+    expect(buildActionMessages(explain, ctx(code), 'en')[1].content).toMatch(/Explain the following code/);
+  });
+
+  it('ordinary text keeps the general prompt', () => {
+    const general = buildActionMessages(explain, ctx('Pinned screenshots stay on top of other windows.'), 'zh')[1].content;
+    expect(general).toMatch(/请讲解下面这段内容/);
+  });
+
+  it('a caller-supplied kind skips the classifier', () => {
+    expect(buildActionMessages(explain, ctx('plain words here', { contentKind: 'code' }), 'zh')[1].content).toMatch(/这段代码/);
+  });
+
+  it('the vision path and actions without kind prompts are untouched', () => {
+    expect(buildActionMessages(explain, ctx(code), 'zh', 'vision')[1].content).toMatch(/截图/);
+    expect(buildActionMessages(getAiAction('summarize'), ctx(code), 'zh')[0].content).toMatch(/阅读助手/);
+    const broken = { ...explain, kindPrompts: { code: { zh: { system: 'x', user: '' } } } };
+    expect(buildActionMessages(broken, ctx(code), 'zh')[1].content).toMatch(/请讲解下面这段内容/);
+  });
+
+  it('the formula prompt explains without working out a result', () => {
+    const text = buildActionMessages(explain, ctx('x^2 - 5x + 6 = 0'), 'zh')[1].content;
+    expect(text).toMatch(/不要算出最终结果/);
+  });
+});
