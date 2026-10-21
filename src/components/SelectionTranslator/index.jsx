@@ -5,10 +5,12 @@ import translationService from '../../translation/stack-client.js';
 import ttsManager, { TTS_STATUS } from '../../tts/index.js';
 import AiActionIcon from '../shared/AiActionIcon.jsx';
 import useAiActions from '../../ai/use-ai-actions.js';
-import { resolveActionLabel } from '../../ai/ai-action-runner.js';
+import { resolveActionLabel, runAiAction } from '../../ai/ai-action-runner.js';
+import { classifyContent } from '../../ai/content-kind.js';
+import { getUnderstandAction } from '../../config/ai-actions.js';
 import createLogger from '../../core/logger.js';
 import { getShortErrorMessage } from '../../core/error-handler.js';
-import { resolveSameLanguageTarget } from '../../core/text.js';
+import { resolveSameLanguageTarget, detectLanguage } from '../../core/text.js';
 import './styles.css';
 
 import { THEMES } from '../../config/constants.js';
@@ -19,10 +21,18 @@ const DEFAULT_SETTINGS = {
   triggerTimeout: 4000,
   showSourceByDefault: false,
   autoCloseOnCopy: false,
+  autoExplain: true,
   minChars: 2,
   maxChars: 2000,
   windowOpacity: 95,
   rainbowWindow: false,
+};
+
+// The transient line telling the reader why the card explains.
+const EXPLAINED_NOTICE = {
+  code: 'selection.explainedCode',
+  error: 'selection.explainedError',
+  formula: 'selection.explainedFormula',
 };
 
 const DEFAULT_TRANSLATION = {
@@ -90,7 +100,10 @@ const SelectionTranslator = () => {
   const autoHideTimerRef = useRef(null);
   const triggerReadyTimerRef = useRef(null);
   const contentRef = useRef(null);
-  const translateTextRef = useRef(null);
+  // The latest produceCardText closure, for listeners registered at mount.
+  const produceTextRef = useRef(null);
+  // Set while the card shows an explanation instead of a translation.
+  const explainedRef = useRef(null);
   // Phase B pass-through: text main already grabbed, carried by the payload.
   const prefetchedTextRef = useRef(null);
   // Bumped by resetSession; async paths bail when a newer session started.
@@ -262,22 +275,12 @@ const SelectionTranslator = () => {
           const overrideTargetLang = data.targetLanguage || data.translation?.targetLanguage || null;
           const overrideSourceLang = data.sourceLanguage || data.translation?.sourceLanguage || null;
           const overrideBehavior = data.sameLanguageBehavior || data.translation?.sameLanguageBehavior || null;
-          const translationResult = await translateTextRef.current(data.text, 0, overrideTargetLang, overrideSourceLang, overrideBehavior);
+          const translationResult = await produceTextRef.current(data.text, newSettings, overrideTargetLang, overrideSourceLang, overrideBehavior);
           if (gen !== generationRef.current) return; // superseded by a newer session
           setTranslatedText(translationResult);
           setError('');
           setMode('overlay');
-
-          if (translationResult && !lastResolvedLangsRef.current.passthrough) {
-            window.electron?.selection?.addToHistory?.({
-              source: data.text,
-              result: translationResult,
-              sourceLanguage: lastResolvedLangsRef.current.sourceLanguage,
-              targetLanguage: lastResolvedLangsRef.current.targetLanguage,
-              timestamp: Date.now(),
-              from: 'screenshot',
-            });
-          }
+          recordHistory(data.text, translationResult, 'screenshot');
         } catch (err) {
           if (gen !== generationRef.current) return;
           setError(err.message || t('selection.translateFailed', '翻译失败'));
@@ -347,23 +350,13 @@ const SelectionTranslator = () => {
         const overrideTargetLang = newTranslation.targetLanguage || null;
         const overrideSourceLang = newTranslation.sourceLanguage || null;
         const overrideBehavior = newTranslation.sameLanguageBehavior || null;
-        const translationResult = await translateTextRef.current(text, 0, overrideTargetLang, overrideSourceLang, overrideBehavior);
+        const translationResult = await produceTextRef.current(text, newSettings, overrideTargetLang, overrideSourceLang, overrideBehavior);
         if (gen !== generationRef.current) return; // superseded by a newer session
         setTranslatedText(translationResult);
         setError('');
         setMode('overlay');
-
         // from: 'hotkey' distinguishes this path in history vs 'selection' / 'screenshot'
-        if (translationResult && !lastResolvedLangsRef.current.passthrough) {
-          window.electron?.selection?.addToHistory?.({
-            source: text,
-            result: translationResult,
-            sourceLanguage: lastResolvedLangsRef.current.sourceLanguage,
-            targetLanguage: lastResolvedLangsRef.current.targetLanguage,
-            timestamp: Date.now(),
-            from: 'hotkey',
-          });
-        }
+        recordHistory(text, translationResult, 'hotkey');
       } catch (err) {
         if (gen !== generationRef.current) return;
         logger.error('SHOW_DIRECT failed:', err);
@@ -425,22 +418,12 @@ const SelectionTranslator = () => {
       validateSelectionText(text, settings, t);
 
       setSourceText(text);
-      const translationResult = await translateText(text);
+      const translationResult = await produceCardText(text, settings);
       if (gen !== generationRef.current) return;
       setTranslatedText(translationResult);
       setError('');
       setMode('overlay');
-
-      if (translationResult && !lastResolvedLangsRef.current.passthrough) {
-        window.electron?.selection?.addToHistory?.({
-          source: text,
-          result: translationResult,
-          sourceLanguage: lastResolvedLangsRef.current.sourceLanguage,
-          targetLanguage: lastResolvedLangsRef.current.targetLanguage,
-          timestamp: Date.now(),
-          from: 'selection',
-        });
-      }
+      recordHistory(text, translationResult, 'selection');
     } catch (err) {
       if (gen !== generationRef.current) return;
       setError(err.message || t('selection.translateFailed', '翻译失败'));
@@ -622,11 +605,6 @@ const SelectionTranslator = () => {
     }
   };
 
-  // Keep ref pointed at the latest translateText closure for timer callbacks
-  useEffect(() => {
-    translateTextRef.current = translateText;
-  });
-
   const handleCopy = (e) => {
     e.stopPropagation();
     if (!translatedText) return;
@@ -658,6 +636,52 @@ const SelectionTranslator = () => {
   const aiActions = ai.availableActions({ displayMode: 'unified', text: sourceText });
   const aiTargetLanguage = translation.targetLanguage || 'zh';
   const aiResult = ai.expandedFor(sourceText, aiTargetLanguage);
+
+  // Code, a stack trace or a formula is explained instead of translated when
+  // the setting allows it and a chat model is there; otherwise, or when the
+  // explanation fails, it is translated (docs/design/renderer.md §3).
+  const produceCardText = async (text, cardSettings, overrideTargetLang = null, overrideSourceLang = null, overrideBehavior = null) => {
+    explainedRef.current = null;
+    const kind = cardSettings.autoExplain === false ? 'text' : classifyContent(text);
+    const action = kind !== 'text' && ai.capabilities.text ? getUnderstandAction(ai.imported) : null;
+    if (action) {
+      const targetLanguage = overrideTargetLang || translation.targetLanguage || 'zh';
+      const result = await runAiAction(action, {
+        sourceText: text,
+        sourceLanguage: 'auto',
+        targetLanguage,
+        capabilities: { text: true },
+        contentKind: kind,
+      });
+      if (result.success) {
+        lastResolvedLangsRef.current = { sourceLanguage: detectLanguage(text), targetLanguage, passthrough: false };
+        explainedRef.current = { actionId: action.id, record: action.history === 'attach' };
+        setNotice(t(EXPLAINED_NOTICE[kind]));
+        return result.content;
+      }
+      logger.warn(`Explaining failed (${result.error}); translating instead`);
+    }
+    return translateText(text, 0, overrideTargetLang, overrideSourceLang, overrideBehavior);
+  };
+
+  useEffect(() => {
+    produceTextRef.current = produceCardText;
+  });
+
+  // One history entry per card result; an explanation is its own kind.
+  const recordHistory = (source, result, from) => {
+    const explained = explainedRef.current;
+    if (!result || (explained ? !explained.record : lastResolvedLangsRef.current.passthrough)) return;
+    window.electron?.selection?.addToHistory?.({
+      source,
+      result,
+      sourceLanguage: lastResolvedLangsRef.current.sourceLanguage,
+      targetLanguage: lastResolvedLangsRef.current.targetLanguage,
+      timestamp: Date.now(),
+      from,
+      ...(explained && { kind: 'understand', actionId: explained.actionId }),
+    });
+  };
 
   // The source text and every AI result share one panel above the
   // translation: opening either closes the other.

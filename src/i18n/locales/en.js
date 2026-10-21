@@ -410,6 +410,7 @@ const en = {
     triggerTimeout: "Button Auto-hide Time", seconds: "s", triggerTimeoutHint: "Time before translate button auto-hides",
     showSourceByDefault: "Show Source by Default", showSourceOnDesc: "Show source text comparison by default", showSourceOffDesc: "Only show translation",
     autoCloseOnCopy: "Auto Close on Copy", autoCloseOnDesc: "Auto close window after copying", autoCloseOffDesc: "Keep window open after copying",
+    autoExplain: "Explain code and formulas", explainedCode: "Explained as code", explainedError: "Explained as an error", explainedFormula: "Explained as a formula",
     // CapsLock sticky direct mode
     stickyCapsLockLabel: "CapsLock Direct Mode",
     stickyCapsLockDesc: "Use CapsLock as sticky direct-translate mode",

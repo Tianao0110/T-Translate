@@ -46,6 +46,7 @@ function buildSelectionSettingsPayload() {
     triggerTimeout: s.triggerTimeout || 4000,
     showSourceByDefault: s.showSourceByDefault || false,
     autoCloseOnCopy: s.autoCloseOnCopy || false,
+    autoExplain: s.autoExplain !== false,
     minChars: s.minChars || 2,
     maxChars: s.maxChars || 500,
     windowOpacity: s.windowOpacity || 95,
