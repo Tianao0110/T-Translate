@@ -9,6 +9,10 @@ const {
   dialog,
 } = require('electron');
 
+// Before any window or host process starts: they inherit TZ.
+const { applyTimeZoneFallback } = require('./platform/time-zone');
+const timeZoneFix = applyTimeZoneFallback();
+
 // Where everything on disk goes; must run before require('./state').
 const { applyAppPaths } = require('./platform/app-paths');
 const appPaths = applyAppPaths(app, { override: process.env.TT_USERDATA });
@@ -22,6 +26,11 @@ const { makeWindowInvisibleToCapture } = require('./platform/native-helper');
 
 const logger = require('./platform/logger')('Main');
 logger.info(`userData: ${appPaths.userData}${appPaths.relocated ? ` (was ${appPaths.legacyUserData})` : ''}`);
+if (timeZoneFix?.zone) {
+  logger.info(`Time zone: ICU does not know "${timeZoneFix.windowsId}", using ${timeZoneFix.zone}`);
+} else if (timeZoneFix) {
+  logger.warn(`Time zone: ICU does not know "${timeZoneFix.windowsId}", times run on a fixed offset`);
+}
 for (const note of appPaths.notes) logger.info(`[app-paths] ${note}`);
 
 const { createCrashGuard, SAFE_MODE_THRESHOLD } = require('./platform/crash-guard');
@@ -189,8 +198,8 @@ app.whenReady().then(() => {
 
   crashGuard.scheduleStableMark();
 
-  // Pre-warm the selection modules; later on auto-launch to spare the boot.
-  const preheatDelay = isStartup ? 8000 : 3000;
+  // Pre-warm the selection modules; on auto-launch wait out the logon rush.
+  const preheatDelay = isStartup ? 60000 : 3000;
   setTimeout(() => {
     // Safe mode: no native modules, no auto-enable.
     if (runtime.safeMode) {
@@ -198,16 +207,18 @@ app.whenReady().then(() => {
     } else {
       selection.preheatSelectionModules();
 
-      if (isStartup && store.get('settings.startup.autoEnableSelection')) {
+      // A switch-on during the wait stays on.
+      if (isStartup && !runtime.selectionEnabled && store.get('settings.startup.autoEnableSelection')) {
         logger.info('Auto-enabling selection translate after startup');
         selection.toggleSelectionTranslate();
       }
     }
-
-    if (isStartup) {
-      store.set('startMinimized', false);
-    }
   }, preheatDelay);
+
+  // The silent main window is past ready-to-show; the next manual launch shows it.
+  if (isStartup) {
+    setTimeout(() => store.set('startMinimized', false), 8000);
+  }
 });
 
 // Process-level handlers: the native hook must stop so the process can exit.

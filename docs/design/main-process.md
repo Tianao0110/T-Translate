@@ -9,6 +9,7 @@
 - 首次搬家从旧 userData 复制 config.json、translation-data.enc、旧缓存与三项浏览器数据（Local State、Local Storage、IndexedDB）。**`Local State` 不可少**：Windows 上 safeStorage 用保存在该文件里的随机密钥加密（密文 v10 前缀），DPAPI 只包住这把密钥；不带它，历史保险库与所有已存 API 密钥在新目录全部解不开（首轮真机漏了，用户历史被判 corrupt，靠沙盒副本恢复）。目标存在就不覆盖，二次启动是空操作，旧目录留给隐私页数据管理里的「清理旧数据」。Electron 每次启动都会重建空的 `%APPDATA%\t-translate`，空目录不算旧数据。
 - 原地整理：Chromium 条目改名进 browser\（同卷 rename 即时完成），v0.4.6 的 data\ 子目录提上来，旧的 Caches\ 文件退休。
 - `TT_USERDATA` 是开发 / QA 沙箱覆盖。
+- 时区兜底（time-zone.js）：Electron 自带的 ICU 认不出较新的 Windows 时区 id（2026-10 在 ICU 78.2 上遇到「Alberta Standard Time」）时退回固定偏移、不算夏令时，主进程和渲染端的时间都差一小时：日志、历史记录、字幕文件名全受影响。main.js 第一件事就检查：ICU 解析不出时区、用户也没设 `TZ`，才用 reg.exe 读 Windows 时区 id，查表设 `TZ`。Node 在运行时改 `TZ` 会立即切换默认时区，之后启动的窗口和宿主进程都继承（真 Electron 探针确认渲染端随之正确）。表里没有的 id 记一行警告；ICU 认识以后这段自动不生效。
 - 单实例锁：输掉的实例立即退出，它的 before-quit 不能碰启动探针计数；右键菜单「用 T-Translate 打开」的文件经 argv（冷启动）或 second-instance 转发，只认 installer.nsh 注册的扩展名（.pdf/.docx/.txt），也因此开发态的 electron.exe / main.js / --flags 永远不会被当成文档。
 - 启动探针必须在第一个同步 tick、app-ready 之前跑：只有那时 `disableHardwareAcceleration()` 还有效。
 - Windows 通知按 AppUserModelID 路由（`com.ttranslate.core`，须与 package.json build.appId 一致），否则打包版里渲染端的 HTML5 通知永远到不了通知中心。
