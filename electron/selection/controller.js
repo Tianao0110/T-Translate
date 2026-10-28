@@ -11,12 +11,34 @@ const { t } = require('../shared/main-i18n');
 const { isCapsLockOn } = require('../platform/native-helper');
 const { fetchSelectedText } = require('../ipc/selection');
 const { SelectionStateMachine, STATES, CONFIG: FSM_CONFIG } = require('./selection-state-machine');
+const { createHookWatchdog } = require('./hook-watchdog');
 const windowManager = require('../windows/window-manager');
 const pinWindows = require('../screenshot/pin-windows');
 const { updateTrayMenu } = require('../windows/tray-manager');
 const logger = require('../platform/logger')('Selection');
 
 let selectionStateMachine = null;
+
+const hookWatchdog = createHookWatchdog({
+  getCursor: () => screen.getCursorScreenPoint(),
+  restart: restartSelectionHook,
+});
+
+// Per hook run, for the "hook stopped" log line; numbers only, never text.
+const hookStats = { startedAt: 0, mouseEvents: 0, lastEventAt: 0, gestures: 0, icons: 0 };
+
+function noteHookEvent() {
+  hookStats.mouseEvents += 1;
+  hookStats.lastEventAt = Date.now();
+  hookWatchdog.noteEvent();
+}
+
+function formatHookStats(now = Date.now()) {
+  const secs = (at) => Math.round((now - at) / 1000);
+  const last = hookStats.lastEventAt ? `${secs(hookStats.lastEventAt)}s ago` : 'never';
+  return `up ${secs(hookStats.startedAt)}s, mouse events ${hookStats.mouseEvents}, last ${last}, `
+    + `gestures ${hookStats.gestures}, icons ${hookStats.icons}`;
+}
 
 // Opt-in probe diagnostics (TT_SELECTION_DEBUG=1): control class + method
 // per gesture, never text.
@@ -213,6 +235,7 @@ async function showSelectionTrigger(mouseX, mouseY, prefetchedText = null, optio
     height: TRIGGER_SIZE,
   });
   win.show();
+  hookStats.icons += 1;
 
   const sendData = () => {
     win.webContents.send(CHANNELS.SELECTION.SHOW_TRIGGER, {
@@ -515,6 +538,7 @@ function startSelectionHook() {
 
     // ----- mousedown -----
     uIOhook.on('mousedown', (e) => {
+      noteHookEvent();
       if (e.button !== 1) return;
 
       const cursorPos = screen.getCursorScreenPoint();
@@ -561,6 +585,7 @@ function startSelectionHook() {
 
     // ----- mousemove -----
     uIOhook.on('mousemove', (e) => {
+      noteHookEvent();
       if (runtime.isDraggingOverlay) return;
       if (!selectionStateMachine) return;
 
@@ -573,6 +598,7 @@ function startSelectionHook() {
 
     // ----- mouseup -----
     uIOhook.on('mouseup', async (e) => {
+      noteHookEvent();
       try {
         if (e.button !== 1) return;
 
@@ -604,6 +630,7 @@ function startSelectionHook() {
         const result = selectionStateMachine.onMouseUp(x, y, stickyActive);
 
         if (result.shouldShow) {
+          hookStats.gestures += 1;
           // A title-bar drag looks like a fast selection: never probe it.
           if (isWindowDragGesture()) {
             logger.debug('Gesture moved the foreground window (title-bar drag) — skip probe');
@@ -674,6 +701,8 @@ function startSelectionHook() {
 
     uIOhook.start();
     runtime.selectionHook = uIOhook;
+    Object.assign(hookStats, { startedAt: Date.now(), mouseEvents: 0, lastEventAt: 0, gestures: 0, icons: 0 });
+    hookWatchdog.start();
     logger.info('Selection hook started (state machine mode)');
     return true;
   } catch (err) {
@@ -686,6 +715,8 @@ function startSelectionHook() {
 }
 
 function stopSelectionHook() {
+  hookWatchdog.stop();
+
   if (selectionStateMachine) {
     selectionStateMachine.reset();
   }
@@ -698,11 +729,18 @@ function stopSelectionHook() {
       runtime.selectionHook.removeAllListeners('mouseup');
       runtime.selectionHook.stop();
       runtime.selectionHook = null;
-      logger.info('Selection hook stopped');
+      logger.info(`Selection hook stopped (${formatHookStats()})`);
     } catch (err) {
       logger.error('Failed to stop selection hook:', err);
     }
   }
+}
+
+// hook-watchdog's restart: a fresh hook replaces one that went silent.
+function restartSelectionHook() {
+  logger.warn('Selection hook got no mouse events while the cursor moved — reinstalling');
+  stopSelectionHook();
+  startSelectionHook();
 }
 
 function isClickInOurWindows(x, y) {

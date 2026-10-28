@@ -19,7 +19,7 @@ This guide ships with the app and can be read offline under Settings → User Gu
 - Single click: turn select-to-translate on or off. When it is on, the tooltip shows a ✓.
 - Double click: open the main window.
 - Right-click menu: Screenshot Translate, Floating Window, Selection Translate, Settings, Quit.
-- To start the app with Windows: Settings → Appearance → Startup, turn on "Launch at startup". Turn on "Enable selection translate on startup" as well and you can select text right after boot without touching the tray.
+- To start the app with Windows: Settings → Appearance → Startup, turn on "Launch at startup". Turn on "Enable selection translate on startup" as well. Selection translate then turns on by itself about a minute after boot, without touching the tray.
 
 ### 0.3 Global shortcuts
 

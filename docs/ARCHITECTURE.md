@@ -259,7 +259,7 @@ T-Engine 只报事实，不改产品行为；用哪个引擎、什么时候降�
 
 ### 平台层
 
-`electron/platform/`：`app-paths.js` 在启动最早期定数据目录（安装目录 `data`，不可写则用户目录），`crash-guard.js` 崩溃自愈与安全模式，`open-with.js` + `installer/installer.nsh` 右键菜单，`login-item.js` 开机自启，`native-helper.js` Win32 探测。设计说明：[design/main-process.md](design/main-process.md)。
+`electron/platform/`：`app-paths.js` 在启动最早期定数据目录（安装目录 `data`，不可写则用户目录），`crash-guard.js` 崩溃自愈与安全模式，`open-with.js` + `installer/installer.nsh` 右键菜单，`login-item.js` 开机自启，`time-zone.js` 系统时区认不出时的兜底，`native-helper.js` Win32 探测。设计说明：[design/main-process.md](design/main-process.md)。
 
 
 ## 命名规范
