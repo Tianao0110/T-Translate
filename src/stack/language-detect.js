@@ -1,7 +1,7 @@
 // Language judgment shared by the stack and every window: which language a
 // text is mostly in, and whether it already reads as a target language.
 // Callers: core/text.js, document/document-parser.js,
-// translation/stack-client.js, stack/language-id.js (adds ELD).
+// translation/stack-client.js, stack/language-id.js (adds the detectors).
 
 // [script, letters, unit, catalogue languages written in it; runs are
 // labeled with the first]. Kana decides between zh and ja for the whole text
