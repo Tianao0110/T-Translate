@@ -475,10 +475,21 @@ function mergeRows(lines, stats) {
   return out;
 }
 
+// The rest of a wrapped first-column entry starts lowercase or with a bracket.
+const CELL_CONTINUATION = /^[\p{Ll}([]/u;
+
+// A first-column piece under a row: the rest of that entry when it reads as
+// one, or sits tighter than the gap that opened the row; otherwise a new row
+// ("New South Wales" heading a group).
+function continuesFirstCell(row, piece, dv) {
+  if (CELL_CONTINUATION.test(piece.text) || /[-,]$/.test(row.pieces[0].text)) return true;
+  return row.rowGap > 0 && dv < 0.8 * row.rowGap;
+}
+
 // Which cells of `row` a line straight below it continues: every piece of
-// the line starts right of the first column (a first column entry starts a
-// new row) and overlaps exactly one cell, each a different one. null when
-// the line is not a wrap.
+// the line overlaps exactly one cell, each a different one, and a piece in
+// the first column passes continuesFirstCell. null when the line is not a
+// wrap.
 function wrapCells(row, line, stats) {
   if (!(row?.cells >= 2) || !row.pieces) return null;
   const size = Math.max(row.size, line.size);
@@ -490,25 +501,27 @@ function wrapCells(row, line, stats) {
   if (pieces.length >= row.cells) return null;
   const slots = [];
   for (const piece of pieces) {
-    if (piece.u0 <= row.pieces[0].u1) return null;
     const hits = [];
     row.pieces.forEach((cell, i) => {
       if (Math.min(cell.u1, piece.u1) > Math.max(cell.u0, piece.u0)) hits.push(i);
     });
-    if (hits.length !== 1 || hits[0] <= (slots[slots.length - 1] ?? 0)) return null;
+    if (hits.length !== 1 || hits[0] <= (slots[slots.length - 1] ?? -1)) return null;
     slots.push(hits[0]);
   }
+  if (slots[0] === 0 && !continuesFirstCell(row, pieces[0], dv)) return null;
   return { slots, pieces };
 }
 
 // Lines that continue wrapped cells ("Nandakumar and" / "Mein, 1993") join
 // those cells of the row above instead of standing as rows of their own.
+// `rowGap`: how far a row sits below the row before it.
 function foldCellWraps(lines, stats, words) {
   const out = [];
   for (const line of lines) {
     const row = out[out.length - 1];
     const wrap = wrapCells(row, line, stats);
     if (!wrap) {
+      if (row && isTableRow(row) && isTableRow(line)) line.rowGap = row.base - line.base;
       out.push(line);
       continue;
     }
@@ -518,6 +531,7 @@ function foldCellWraps(lines, stats, words) {
     row.text = row.pieces.map((p) => p.text).join(' | ');
     row.base = line.base;
     row.vBottom = Math.min(row.vBottom, line.vBottom);
+    row.u0 = Math.min(row.u0, line.u0);
     row.u1 = Math.max(row.u1, line.u1);
     row.box = [
       Math.min(row.box[0], line.box[0]), Math.min(row.box[1], line.box[1]),

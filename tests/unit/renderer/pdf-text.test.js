@@ -224,18 +224,46 @@ describe('buildParagraphs', () => {
     expect(paras.every((p) => p.row)).toBe(true);
   });
 
-  it('keeps a first-column line, a full row, a line across cells and text after a gap out of the row above', () => {
+  it('keeps a first-column heading, a full row, a line across cells and text after a gap out of the row above', () => {
     const paras = buildParagraphs([page(1, [
       ['Site', 50, 500], ['Area', 150, 500], ['Depth', 250, 500],
       ['Pine Ck', 50, 488], ['320', 150, 488], ['1.0', 250, 488],
-      ['(Vic)', 50, 476],
+      ['Victoria', 50, 476],
       ['Oak Ck', 50, 464], ['12', 150, 464], ['2.0', 250, 464],
       ['spans the area and depth columns', 150, 452],
       ['Values are annual means.', 150, 420],
     ])]);
     expect(texts(paras)).toEqual([
-      'Site | Area | Depth', 'Pine Ck | 320 | 1.0', '(Vic)', 'Oak Ck | 12 | 2.0',
+      'Site | Area | Depth', 'Pine Ck | 320 | 1.0', 'Victoria', 'Oak Ck | 12 | 2.0',
       'spans the area and depth columns', 'Values are annual means.',
+    ]);
+  });
+
+  it('folds a wrapped first-column entry that reads as the rest of it', () => {
+    const paras = buildParagraphs([page(1, [
+      ['Site', 50, 500], ['Area', 170, 500], ['Reference', 250, 500],
+      ['Stewarts Creek', 50, 488], ['1156', 170, 488], ['Nandakumar and', 250, 488],
+      ['catchment (Vic)', 50, 476], ['Mein, 1993', 250, 476],
+      ['Pine Ck', 50, 464], ['320', 170, 464], ['Smith, 2001', 250, 464],
+      ['(Vic)', 50, 452],
+    ])]);
+    expect(texts(paras)).toEqual([
+      'Site | Area | Reference',
+      'Stewarts Creek catchment (Vic) | 1156 | Nandakumar and Mein, 1993',
+      'Pine Ck (Vic) | 320 | Smith, 2001',
+    ]);
+  });
+
+  it('folds a capitalised first-column line only when it sits tighter than the rows', () => {
+    const paras = buildParagraphs([page(1, [
+      ['Site', 50, 500], ['Area', 150, 500], ['Depth', 250, 500],
+      ['Lake Eildon', 50, 484], ['540', 150, 484], ['0.3', 250, 484],
+      ['North Arm', 50, 472],
+      ['Pine Ck', 50, 456], ['320', 150, 456], ['1.0', 250, 456],
+      ['Victoria', 50, 440],
+    ])]);
+    expect(texts(paras)).toEqual([
+      'Site | Area | Depth', 'Lake Eildon North Arm | 540 | 0.3', 'Pine Ck | 320 | 1.0', 'Victoria',
     ]);
   });
 
