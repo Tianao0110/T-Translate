@@ -23,11 +23,11 @@ let paddleMock;
 let windowsMock;
 let recognizeMock;
 
-function llm({ usable = true, lines = [{ text: '文件', box: [45, 19, 91, 45] }], reject = null } = {}) {
+function llm({ usable = true, lines = [{ text: '文件', box: [45, 19, 91, 45] }], reject = null, stop = 'eog' } = {}) {
   recognizeMock = vi.fn(async () => ({
     reqId: 'g1',
     cancel: vi.fn(),
-    promise: reject ? Promise.reject(reject) : Promise.resolve({ text: 'raw', stop: 'eog', lines, width: 700, height: 200 }),
+    promise: reject ? Promise.reject(reject) : Promise.resolve({ text: 'raw', stop, lines, width: 700, height: 200 }),
   }));
   return {
     recognize: recognizeMock,
@@ -38,10 +38,10 @@ function llm({ usable = true, lines = [{ text: '文件', box: [45, 19, 91, 45] }
   };
 }
 
-function useLocal({ paddle = async () => SIMPLE, windows = async () => ({ success: true, text: 'win text' }) } = {}) {
+function useLocal({ paddle = async () => SIMPLE, windows = async () => ({ success: true, text: 'win text' }), layout } = {}) {
   paddleMock = vi.fn(paddle);
   windowsMock = vi.fn(windows);
-  configureRuntime({ localOcr: { paddle: paddleMock, windows: windowsMock, isWindows: true } });
+  configureRuntime({ localOcr: { paddle: paddleMock, windows: windowsMock, ...(layout ? { layout } : {}), isWindows: true } });
 }
 
 beforeEach(() => {
@@ -154,7 +154,7 @@ describe('the routing log line', () => {
 
     expect(routingLines()).toHaveLength(1);
     expect(routingLines()[0]).toMatch(
-      /^info vision routing: to=tengine-vision reason=table mp=null lines=12 conf=0\.98 low=0 rows=4 cols=3 spread=1 pp=\d+ms vision=\d+ms$/
+      /^info vision routing: to=tengine-vision reason=table mp=null lines=12 conf=0\.98 low=0 rows=4 cols=3 spread=1 layout=off pp=\d+ms vision=\d+ms$/
     );
   });
 
@@ -165,6 +165,38 @@ describe('the routing log line', () => {
 
     expect(routingLines()).toHaveLength(1);
     expect(routingLines()[0]).toMatch(/to=rapid-ocr reason=simple .* lines=2 .* pp=\d+ms$/);
+  });
+
+  it('lets PP-OCR\'s read stand when the vision model loops or runs into the length limit', async () => {
+    for (const stop of ['loop', 'limit']) {
+      configureRuntime({ localLlm: llm({ stop }) });
+      useLocal({ paddle: async () => TABLE });
+      const manager = await makeManager();
+      const r = await manager.recognize(IMG, { engine: 'tengine-vision' });
+      expect(r.text).toBe(TABLE.text);
+      expect(r.routed).toEqual({ engine: 'tengine-vision', to: 'rapid-ocr', reason: 'table', visionFailed: true });
+    }
+    expect(logged.filter((l) => l.startsWith('warn')).join('\n')).toMatch(/VISION_LOOP[\s\S]*VISION_LIMIT/);
+  });
+
+  it('keeps plain text on PP-OCR and sends a table on when the layout model is there', async () => {
+    configureRuntime({ localLlm: llm() });
+    useLocal({ paddle: async () => TABLE, layout: async () => [{ label: 'text' }, { label: 'paragraph_title' }] });
+    let r = await (await makeManager()).recognize(IMG, { engine: 'tengine-vision' });
+    expect(r.routed).toEqual({ engine: 'tengine-vision', to: 'rapid-ocr', reason: 'simple' });
+    expect(routingLines()[0]).toMatch(/reason=simple .* layout=paragraph_title\+text pp=\d+ms lay=\d+ms$/);
+
+    useLocal({ paddle: async () => SIMPLE, layout: async () => [{ label: 'table' }] });
+    r = await (await makeManager()).recognize(IMG, { engine: 'tengine-vision' });
+    expect(r.routed).toEqual({ engine: 'tengine-vision', to: 'tengine-vision', reason: 'layout-table' });
+  });
+
+  it('falls back to the line-box rules when the layout model fails', async () => {
+    configureRuntime({ localLlm: llm() });
+    useLocal({ paddle: async () => TABLE, layout: async () => { throw new Error('host gone'); } });
+    const r = await (await makeManager()).recognize(IMG, { engine: 'tengine-vision' });
+    expect(r.routed.reason).toBe('table');
+    expect(routingLines()[0]).toMatch(/layout=off pp=\d+ms vision=\d+ms$/);
   });
 
   it('marks a vision failure on the same line', async () => {

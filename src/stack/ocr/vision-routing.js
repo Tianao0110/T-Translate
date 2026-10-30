@@ -1,7 +1,8 @@
 // Which captures the built-in vision model should take: PP-OCR reads every
-// capture first; a large capture, a columns / table / mixed-size layout, or
-// an unsure read goes on to the vision model (docs/design/stack.md §5).
-// Evidence is PP-OCR's own line boxes and confidences plus the image header.
+// capture first; an unsure read goes on to the vision model, and so do
+// tables, formulas and charts the layout model finds. Without the layout
+// model, a large capture or a columns / table / mixed-size layout in
+// PP-OCR's own line boxes goes on (docs/design/stack.md §5).
 
 import { isUsableResult } from './result-quality.js';
 
@@ -151,21 +152,33 @@ function layoutReason(lines) {
   return null;
 }
 
-// null = PP-OCR's read stands; otherwise { reason } naming what sends the
-// capture on to the vision model.
-export function decideEscalation(pp, size = null) {
-  if (!pp || !pp.success || !isUsableResult(pp, 'rapid-ocr')) return { reason: 'unreadable' };
-  if (size && size.width * size.height >= ROUTING.LARGE_PIXELS) return { reason: 'large' };
-  const lines = boxedLines(pp);
-  if (lines.length >= ROUTING.MANY_LINES) return { reason: 'dense' };
+// Layout model labels whose regions the vision model reads better than
+// PP-OCR (row order of a table, formulas, chart text).
+export const LAYOUT_ESCALATES = { table: 'layout-table', display_formula: 'layout-formula', chart: 'layout-chart' };
 
+function unsure(lines) {
   const conf = confidenceStats(lines);
-  if (conf && (conf.mean < ROUTING.LOW_CONFIDENCE || conf.lowShare >= ROUTING.LOW_LINE_SHARE)) {
-    return { reason: 'low-confidence' };
+  return !!conf && (conf.mean < ROUTING.LOW_CONFIDENCE || conf.lowShare >= ROUTING.LOW_LINE_SHARE);
+}
+
+// null = PP-OCR's read stands; otherwise { reason } naming what sends the
+// capture on to the vision model. `layout`: the layout model's blocks for
+// the capture ([] = it found none), or null without it; with it, size, line
+// count and the geometric layout tests give way to its labels.
+export function decideEscalation(pp, size = null, layout = null) {
+  if (!pp || !pp.success || !isUsableResult(pp, 'rapid-ocr')) return { reason: 'unreadable' };
+  const lines = boxedLines(pp);
+  if (layout) {
+    if (unsure(lines)) return { reason: 'low-confidence' };
+    const block = layout.find((b) => LAYOUT_ESCALATES[b.label]);
+    return block ? { reason: LAYOUT_ESCALATES[block.label] } : null;
   }
 
-  const layout = layoutReason(lines);
-  return layout ? { reason: layout } : null;
+  if (size && size.width * size.height >= ROUTING.LARGE_PIXELS) return { reason: 'large' };
+  if (lines.length >= ROUTING.MANY_LINES) return { reason: 'dense' };
+  if (unsure(lines)) return { reason: 'low-confidence' };
+  const reason = layoutReason(lines);
+  return reason ? { reason } : null;
 }
 
 // The numbers decideEscalation weighs, for manager.js's routing log line:

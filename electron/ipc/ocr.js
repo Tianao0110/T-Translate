@@ -185,6 +185,14 @@ async function recognizePaddle(store, imageData, options = {}) {
   return result;
 }
 
+// Layout blocks of a screen capture for smart routing (stack/ocr/manager.js);
+// null without the layout model or with the GPU off.
+async function analyzeLayoutCapture(store, imageData) {
+  if (store.get('settings.gpu.enabled', false) !== true || !ocrEngine.resolveLayoutModel()) return null;
+  const result = await ocrEngine.analyzeLayout(imageData);
+  return result.success ? result.blocks : null;
+}
+
 // ===== Helpers =====
 
 function sendPackProgress(mainWindow, packId, progress, phase) {
@@ -198,3 +206,4 @@ function sendPackProgress(mainWindow, packId, progress, phase) {
 module.exports = register;
 module.exports.recognizeWindows = recognizeWindows;
 module.exports.recognizePaddle = recognizePaddle;
+module.exports.analyzeLayoutCapture = analyzeLayoutCapture;

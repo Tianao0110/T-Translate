@@ -321,7 +321,7 @@ The model that ships with the app; you download the files yourself and put them 
 - Recognition language: auto by default. Chinese, English, Japanese and most Latin-script languages are built in; Korean, Cyrillic, Devanagari, Arabic and others need a language pack downloaded below. The same group holds the screenshot options: show confirm buttons; enlarge small images for better recognition of small text.
 - Engines come in three groups; click "Use" to make one the default:
 - **Local engines**: Local OCR (built in, milliseconds) and Windows OCR (ships with Windows, no download, modest quality). Local OCR has a model tier (standard / high accuracy, the latter better on blurry photos and stylized text, about 95 MB to download), the language pack list, and an engine recheck.
-- **Vision models**: the built-in vision model (two files you download yourself, usable only with GPU acceleration on; simple captures still go to local OCR, large images, columns and tables go to the vision model) and LLM Vision (the LM Studio / Ollama address and a vision model name).
+- **Vision models**: the built-in vision model (two files you download yourself, usable only with GPU acceleration on; simple captures still go to local OCR; captures with tables, formulas or charts, or that local OCR cannot read well, go to the vision model. Without the layout model, large images and columns go too) and LLM Vision (the LM Studio / Ollama address and a vision model name).
 - **Online services**: OCR.space, Google Vision, Azure, Baidu OCR, each with its key. Disabled automatically in privacy modes.
 
 ### 4.9 Audio · Listen
