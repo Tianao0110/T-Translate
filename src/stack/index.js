@@ -11,8 +11,9 @@
 //                       (main process owns decryption via secureVault).
 //   loadOcrConfigs      async () => flat settings.ocr bucket with vault
 //                       secrets merged (same ownership rule).
-//   localOcr            { paddle, windows, isWindows } — main-process local
-//                       OCR recognizers (electron/ocr/ocr-engine et al).
+//   localOcr            { paddle, windows, layout, isWindows } — main-process
+//                       local OCR recognizers and the layout model
+//                       (electron/ocr/ocr-engine et al).
 //   localLlm            { generate, status, selected } — the built-in model
 //                       (electron/llm/llm-manager). Optional — omitted =
 //                       the built-in provider reports itself as not ready.

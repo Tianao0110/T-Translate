@@ -13,6 +13,7 @@ import GoogleVisionEngine from './google-vision.js';
 import AzureOCREngine from './azure-ocr.js';
 import BaiduOCREngine from './baidu-ocr.js';
 import { isUsableResult } from './result-quality.js';
+import { getLocalOcr } from '../runtime.js';
 import { _t } from '../i18n.js';
 import createLogger from '../logger.js';
 
@@ -356,15 +357,20 @@ export class OCREngineManager {
     }
 
     const size = imageSize(input);
-    const decision = decideEscalation(pp, size);
+    const layoutStart = Date.now();
+    const layout = ppUsable ? await this._captureLayout(input) : null;
+    const layoutMs = Date.now() - layoutStart;
+    const decision = decideEscalation(pp, size, layout);
     // One line per capture for tuning ROUTING (docs/design/stack.md §5): where it
     // went, why, and the numbers behind the call.
     const note = (to, extra = '') => {
       const c = describeCapture(pp, size);
+      const labels = layout ? [...new Set(layout.map((b) => b.label))].sort().join('+') || 'none' : 'off';
       logger.info(
         `vision routing: to=${to} reason=${decision ? decision.reason : 'simple'}` +
         ` mp=${c.megapixels} lines=${c.lines} conf=${c.meanConfidence} low=${c.lowLineShare}` +
-        ` rows=${c.wideRows} cols=${c.columns} spread=${c.sizeSpread} pp=${ppMs}ms${extra}`
+        ` rows=${c.wideRows} cols=${c.columns} spread=${c.sizeSpread} layout=${labels}` +
+        ` pp=${ppMs}ms${layout ? ` lay=${layoutMs}ms` : ''}${extra}`
       );
     };
 
@@ -380,10 +386,23 @@ export class OCREngineManager {
       return { ...v, routed: { engine: 'tengine-vision', to: 'tengine-vision', reason: decision.reason } };
     }
     note('rapid-ocr', ` vision=${visionMs}ms visionFailed`);
-    logger.warn(`vision model could not serve the capture (${v.error || 'unusable'}), PP-OCR's read stands`);
+    logger.warn(`vision model could not serve the capture (${v.errorCode || v.error || 'unusable'}), PP-OCR's read stands`);
     if (ppUsable) return { ...pp, routed: { engine: 'tengine-vision', to: 'rapid-ocr', reason: decision.reason, visionFailed: true } };
     const last = await this._recognizeWithLocalChain(input, options, ['windows-ocr']);
     return last.success ? last : (pp.success ? pp : v);
+  }
+
+  // The layout model's blocks for a capture (main process, GPU only); null
+  // when it is not installed, the GPU is off or it fails.
+  async _captureLayout(input) {
+    const layout = getLocalOcr()?.layout;
+    if (!layout) return null;
+    try {
+      return (await layout(input)) || null;
+    } catch (e) {
+      logger.warn('layout analysis failed:', e.message);
+      return null;
+    }
   }
 
   // One line per pinned capture, read by local OCR first (PinWindow/pipeline.js),

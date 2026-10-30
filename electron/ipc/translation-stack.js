@@ -42,6 +42,7 @@ function register(ctx) {
       localOcr: {
         paddle: (imageData, options) => localOcr.recognizePaddle(store, imageData, options),
         windows: (imageData, options) => localOcr.recognizeWindows(store, imageData, options),
+        layout: (imageData) => localOcr.analyzeLayoutCapture(store, imageData),
         isWindows: process.platform === 'win32',
       },
       getCustomFilters: () => store.get('settings.translation.customFilters', []),

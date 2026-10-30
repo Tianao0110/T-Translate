@@ -109,6 +109,32 @@ describe('decideEscalation', () => {
   });
 });
 
+describe('decideEscalation with the layout model', () => {
+  const block = (label) => ({ label, score: 0.9, box: [0.1, 0.1, 0.9, 0.5] });
+  const SCREEN = { width: 2560, height: 1600 };
+
+  it('keeps a large or dense capture of plain text on PP-OCR', () => {
+    expect(decideEscalation(pp(grid({ rows: 3, cols: 1 })), SCREEN, [block('text'), block('paragraph_title')])).toBeNull();
+    expect(decideEscalation(pp(grid({ rows: 32, cols: 1 })), SCREEN, [block('text'), block('image')])).toBeNull();
+    expect(decideEscalation(pp(grid({ rows: 3, cols: 1 })), SCREEN, [])).toBeNull();
+  });
+
+  it('sends tables, formulas and charts on, whatever their size', () => {
+    expect(decideEscalation(pp(grid({ rows: 3, cols: 1 })), { width: 600, height: 200 }, [block('table')])).toEqual({ reason: 'layout-table' });
+    expect(decideEscalation(pp(grid({ rows: 3, cols: 1 })), null, [block('text'), block('display_formula')])).toEqual({ reason: 'layout-formula' });
+    expect(decideEscalation(pp(grid({ rows: 3, cols: 1 })), SCREEN, [block('chart')])).toEqual({ reason: 'layout-chart' });
+  });
+
+  it('lets its labels replace the line-box layout tests', () => {
+    expect(decideEscalation(pp(grid({ rows: 4, cols: 3 })), null, [block('text')])).toBeNull();
+  });
+
+  it('still escalates an unreadable or unsure read', () => {
+    expect(decideEscalation({ success: false }, SCREEN, [block('text')])).toEqual({ reason: 'unreadable' });
+    expect(decideEscalation(pp(grid({ rows: 6, cols: 1, confidence: 0.7 })), null, [block('text')])).toEqual({ reason: 'low-confidence' });
+  });
+});
+
 describe('describeCapture', () => {
   it('reports the numbers the decision weighs', () => {
     // A table also reads as side-by-side columns; decideEscalation tests rows first.

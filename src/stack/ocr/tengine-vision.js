@@ -73,8 +73,12 @@ class TengineVisionEngine extends BaseOCREngine {
       } finally {
         options.signal?.removeEventListener?.('abort', onAbort);
       }
-      if (r.stop === 'cancel' || r.stop === 'stall') {
-        return { success: false, error: r.stop === 'stall' ? _t('providerError.tengineFailed', '内置模型生成失败') : _t('providerError.tengineCancelled', '已取消') };
+      if (r.stop === 'cancel') {
+        return { success: false, error: _t('providerError.tengineCancelled', '已取消') };
+      }
+      // A stall, a repetition loop or the length limit leaves no whole read.
+      if (r.stop === 'stall' || r.stop === 'loop' || r.stop === 'limit') {
+        return { success: false, error: _t('providerError.tengineFailed', '内置模型生成失败'), errorCode: `VISION_${r.stop.toUpperCase()}` };
       }
       const lines = r.lines || [];
       const blocks = linesToBlocks(lines);

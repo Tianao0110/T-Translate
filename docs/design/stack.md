@@ -68,10 +68,12 @@
 - 各在线引擎：Azure Read 异步提交再轮询（10 s 预算 1 s 间隔），boundingBox 是 8 数四边形，逐行框无合并变体。百度 OCR：token 30 天，提前一天刷新；`accurate` 带坐标、`accurate_basic`（basic 字面意思就是无坐标）不带，精度相同但百度分别开通计量，先试带坐标的、该账号用不了（6 未开通、17/19 配额、18 QPS）再降 basic，不为用户可能不知道的配额让截图失败；token 与图片错误两个端点都会挂所以不在降级码里。Google Vision 块取 `fullTextAnnotation` 的段落而非逐词的 `textAnnotations[1..]`；段落无 text 字段，要从 symbols 加 detectedBreak 重建。OCR.space 用 Engine 2（小字 / 花体明显更准），`isOverlayRequired` 只多响应体不多计费，overlay 是词框需并成行；同时发 `scale=true`（服务端放大小图），overlay 坐标空间若不是源图像素会落到框外被 `resolveDisplayMode` 丢掉，退化成统一模式即该引擎有框之前的行为。
 - 路径 B（AI 动作直接看图）：模型直接读截图而不是总结 OCR 输出，版面与图文交错保持完整、识别错误不叠加；与 recognize() 共用端点、模型、丢图检测与视觉锁，只有提示不同（来自动作配置）。是否可用故意**不探测网络**：可达说明不了有没有载入视觉模型，只能从回复知道，失败时降级。离线模式下远程视觉端点直接拒绝：截图泄漏的远比一行文字多。
 - **内置视觉模型的智能分配**（`vision-routing.js`，用户 2026-09-14 拍板）：选中它 = PP-OCR 先读每张截图，简单的到此为止；只有大图（物理像素上 1.75x 屏的整屏 / 半屏截图）、PP-OCR 读成分栏 / 表格 / 混合字号的版面、或它没把握的读取才升级到视觉模型。证据只用 PP-OCR 自己的行框与置信度，像素只看文件头（PNG / JPEG / BMP 尺寸）。表格 = 若干行每行三个以上并排框；分栏 = 两组以上左边缘、各是真正的一栏且纵向重叠；混合字号 = 最高或最矮行离典型值很远。结果里的 `routed` 只用枚举说明走了哪条路。视觉引擎（`tengine-vision.js`）只在双文件包过哈希且视觉宿主在 GPU 上时可用（GPU-only 见 T-ENGINE §10）；未安装或 CPU 拒绝尺寸是诚实失败，管理器走向下一个引擎。始终 Spotting 任务，每行带源图像素框。
+- **版面模型参与分配**（2026-10-30）：装了版面模型且显卡开着时，PP-OCR 读得出、有把握的截图再过一遍版面模型（经 `localOcr.layout` 到主进程，约 0.1 s），只有它找到表格、行间公式、图表才升级（`reason=layout-table` / `layout-formula` / `layout-chart`）；大图、行多、行框推出的分栏 / 表格 / 字号差都不再单独升级。版面模型没装、显卡关着或出错时照旧用上面的行框规则。依据（19 张构造截图：GitHub 页面 9 张、Reddit 网页存的 PDF 里框的区域 10 张，PP-OCR 与视觉模型各读一遍）：旧规则升级 13 张，其中 8 张只因为图大；两边读出的词 95% 以上相同，视觉模型慢 3–5 倍；版面模型在 4 张表格局部上都给出 table，与行框规则一致；纯文字的大图（发布页、PDF 整页、评论串）留在 PP-OCR 不丢内容。视觉模型读表格的行序更对（PP-OCR 把中文 README 的功能表先读完一整列再读下一列），但会把左侧文件树和正文逐行交错，所以分栏的纯文字留在 PP-OCR。代码区（`algorithm`）不算升级理由：两边各错几个字符（PP-OCR「1lama」、视觉「Tiana0」），长代码页视觉模型会写到长度上限。按新规则这组视觉调用 13 → 8。
+- **视觉模型读不完整算失败**（2026-10-30）：陷入重复（`stop=loop`，结尾冒出一串乱码）或写到长度上限（`stop=limit`，后半截丢了）与卡死同样返回失败（`VISION_LOOP` / `VISION_LIMIT`），智能分配退回 PP-OCR 的结果并在日志里记 `visionFailed`。以前照单全收：深色软件界面那张结尾是一串 `\( V_{10} \)`，GitHub 代码页只读到第 19 行。
 - **分配日志（v0.5.2）**：`ROUTING` 那组阈值是 2026-09-14 拍脑袋定的，要调得有数据，所以选中视觉引擎后**每张截图**在主程序日志里记一行（走本地 OCR 的也记，之前只记升级的、且没有数字）：
 
   ```
-  [info]  [Stack:OCRManager] vision routing: to=tengine-vision reason=table mp=0.14 lines=12 conf=0.98 low=0 rows=4 cols=3 spread=1 pp=85ms vision=640ms
+  [info]  [Stack:OCRManager] vision routing: to=tengine-vision reason=layout-table mp=0.88 lines=22 conf=0.98 low=0 rows=6 cols=4 spread=1.1 layout=table pp=264ms lay=118ms vision=1035ms
   ```
 
   | 字段 | 含义 | 对着的阈值 |
@@ -83,7 +85,8 @@
   | `rows` | 并排三框以上的行数 | `TABLE_ROWS` 3 |
   | `cols` | 纵向重叠的栏数（表格也会读成栏，判断时表格在前） | 2 |
   | `spread` | 最高或最矮行与典型行高之比 | `SIZE_SPREAD` 2.5 |
-  | `pp` / `vision` | 两边各自耗时；`visionFailed` = 视觉失败、本地 OCR 的结果顶上 | — |
+  | `layout` | 版面模型给的标签（去重排序，`+` 连接，不含文字）；`off` = 没用版面模型（没装、显卡关、出错，或 PP-OCR 读不出），`none` = 用了但什么都没找到。不是 `off` 时上面 `mp` 到 `spread` 只记录、不参与决定 | `LAYOUT_ESCALATES`：table / display_formula / chart |
+  | `pp` / `lay` / `vision` | 各自耗时（`lay` 只在用了版面模型时有）；`visionFailed` = 视觉失败（含 `VISION_LOOP` / `VISION_LIMIT`）、本地 OCR 的结果顶上 | — |
 
   **只有数字，不含任何识别文字**（`describeCapture`，单测守着）。调法：用一两周后在日志里搜 `vision routing:`，把「该走视觉没走」的那几张找出来，看它们卡在哪个字段差一点；「不该走走了」的看是哪个 `reason` 误伤最多，再动对应那一个阈值，别一次动几个。日志在安装版的 `data\logs`，开发态在 `%APPDATA%\t-translate\logs`。无痕模式下文件日志只记 error 级，这一行不落盘，属预期。视觉引擎不可用（显卡关着或模型不在）时不算分配，不记这一行，结果里有 `fallbackReason: 'unavailable'`。
 - **贴图识别日志**（2026-10-09）：贴图不走智能分配——`PinWindow/pipeline.js` 先点名本地 OCR，读得出就到此为止，读不清才交给设置里的引擎（那时若是内置视觉模型，上面那行照记）。所以用贴图的人攒不出 `vision routing:` 的数据（2026-10-09 查用户装机日志，一行都没有）。贴图的本地识别请求带 `caller: 'pin'`，管理器为它记一行，数字同上表：
@@ -92,7 +95,7 @@
   [info]  [Stack:OCRManager] pin capture: local=usable would=table mp=1.76 lines=24 conf=0.97 low=0.04 rows=3 cols=1 spread=1.2 pp=180ms
   ```
 
-  `local` = 本地 OCR 读得出（`usable`）/ 读不清（`unusable`，贴图随后交给设置里的引擎）/ 出错（`failed`）；`would` = 假如选的是内置视觉模型，智能分配会给的原因（`simple` = 留在本地 OCR）。不论 OCR 设置选的是哪个引擎都记，平时只用本地 OCR 的人也能攒数据：`would` 不是 `simple` 的那些贴图，就是换成视觉模型会走不同路的，对着当时的截图看分得对不对，再按上面的调法动阈值。同样只有数字，无痕模式不落盘。单测在 `stack-ocr-tengine-vision.test.js`：栈日志器（`src/stack/logger.js`）第一次解析到工厂后就一直用它，同一文件里收集日志的几组测试必须共用一个数组，所以贴图那组嵌在分配日志那组里。
+  `local` = 本地 OCR 读得出（`usable`）/ 读不清（`unusable`，贴图随后交给设置里的引擎）/ 出错（`failed`）；`would` = 假如选的是内置视觉模型，智能分配会给的原因（`simple` = 留在本地 OCR）；贴图不跑版面模型（每张贴图多 0.1 s 不值），所以 `would` 按行框规则算。不论 OCR 设置选的是哪个引擎都记，平时只用本地 OCR 的人也能攒数据：`would` 不是 `simple` 的那些贴图，就是换成视觉模型会走不同路的，对着当时的截图看分得对不对，再按上面的调法动阈值。同样只有数字，无痕模式不落盘。单测在 `stack-ocr-tengine-vision.test.js`：栈日志器（`src/stack/logger.js`）第一次解析到工厂后就一直用它，同一文件里收集日志的几组测试必须共用一个数组，所以贴图那组嵌在分配日志那组里。
 - 本地引擎的栈类（`local-bridge.js`）直接调注入的主进程识别器，少一跳；引擎 id 保持 `rapid-ocr` / `windows-ocr` 兼容已存设置。`blocks` = 段落合并，`rawBlocks` = 逐行，散落模式用 rawBlocks。
 
 ## 6. 外部语音端点（tts/endpoint.js）
