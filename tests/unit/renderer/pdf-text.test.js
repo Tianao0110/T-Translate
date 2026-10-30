@@ -267,6 +267,23 @@ describe('buildParagraphs', () => {
     ]);
   });
 
+  it('splits cells a narrow column gap ran together on the column edges other rows share', () => {
+    const paras = buildParagraphs([page(1, [
+      ['Subject', 50, 500], ['Course Title', 130, 500], ['Campus', 260, 500], ['Grade', 310, 500],
+      ['CPRG 305', 50, 488], ['Testing', 130, 488], ['MC', 260, 488], ['A', 310, 488],
+      ['CPRG 303', 50, 476], ['Mobile Apps', 130, 476], ['MC', 260, 476], ['A+', 310, 476],
+      ['CPSY 300', 50, 464], ['Cloud Computing for SD', 130, 464], ['MC', 260, 464], ['A', 310, 464],
+      ['Values are annual means over the full', 50, 430], ['record.', 260, 430],
+    ])]);
+    expect(texts(paras)).toEqual([
+      'Subject | Course Title | Campus | Grade',
+      'CPRG 305 | Testing | MC | A',
+      'CPRG 303 | Mobile Apps | MC | A+',
+      'CPSY 300 | Cloud Computing for SD | MC | A',
+      'Values are annual means over the full record.',
+    ]);
+  });
+
   it('reads a rotated table in its own direction', () => {
     const items = [
       item(`Normal body text ${FILLER}.`, 50, 700),
