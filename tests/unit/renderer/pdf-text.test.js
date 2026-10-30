@@ -284,6 +284,29 @@ describe('buildParagraphs', () => {
     ]);
   });
 
+  it('puts a row of vertically centred cells back together across its baselines', () => {
+    const paras = buildParagraphs([page(1, [
+      ['Site', 50, 500], ['Area', 150, 500], ['Change', 250, 500], ['Reference', 350, 500],
+      ['Stewarts Creek', 50, 481], ['Nandakumar and', 350, 481],
+      ['1156', 150, 475], ['0.42', 250, 475],
+      ['catchment (Vic)', 50, 469], ['Mein, 1993', 350, 469],
+      ['Pine Ck', 50, 450], ['320', 150, 450], ['1.00', 250, 450], ['Smith, 2001', 350, 450],
+      ['Victoria', 50, 431],
+      ['Glendhu', 50, 412],
+      ['experimental', 50, 400], ['310', 150, 400], ['0.80', 250, 400], ['Fahey, 1997', 350, 400],
+      ['basin', 50, 388],
+      ['Total', 50, 369], ['1882', 150, 369], ['2.37', 250, 369],
+    ])]);
+    expect(texts(paras)).toEqual([
+      'Site | Area | Change | Reference',
+      'Stewarts Creek catchment (Vic) | 1156 | 0.42 | Nandakumar and Mein, 1993',
+      'Pine Ck | 320 | 1.00 | Smith, 2001',
+      'Victoria',
+      'Glendhu experimental basin | 310 | 0.80 | Fahey, 1997',
+      'Total | 1882 | 2.37',
+    ]);
+  });
+
   it('reads a rotated table in its own direction', () => {
     const items = [
       item(`Normal body text ${FILLER}.`, 50, 700),
