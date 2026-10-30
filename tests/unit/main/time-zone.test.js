@@ -1,5 +1,7 @@
 // applyTimeZoneFallback with a fake env and registry: TZ is pinned only when
-// ICU could not resolve the Windows zone and the id is in the table.
+// ICU could not resolve the Windows zone and the id is in the table. An
+// unresolved zone is passed as null: undefined would fall back to the
+// machine's own zone.
 
 import { describe, it, expect } from 'vitest';
 import { createRequire } from 'module';
@@ -13,7 +15,7 @@ const run = (overrides = {}) => {
   const result = applyTimeZoneFallback({
     env,
     platform: 'win32',
-    resolvedZone: undefined,
+    resolvedZone: null,
     readZoneId: () => { reads += 1; return 'Alberta Standard Time'; },
     ...overrides,
   });
