@@ -14,8 +14,9 @@ buildSync({
   platform: 'node',
   format: 'cjs',
   target: 'node22', // Electron 42 ships Node 22
-  // Tripwire: the stack must stay electron-free.
-  external: ['electron'],
+  // Tripwire: the stack must stay electron-free. fastText reads its wasm and
+  // model beside its own files, so it loads from node_modules at runtime.
+  external: ['electron', 'fasttext.wasm.js'],
   logLevel: 'info',
 });
 

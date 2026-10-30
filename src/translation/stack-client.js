@@ -138,7 +138,7 @@ class StackClient {
 
   // One { language, inTarget } per text for the same-language decision
   // (core/text.js resolveSameLanguageTarget), judged in the main process
-  // with ELD; inTarget is null when it can't tell. Judged here, script by
+  // with its language detectors; inTarget is null when it can't tell. Judged here, script by
   // script, when the main process does not answer.
   async detectLanguages(texts, targetLang) {
     const b = bridge();

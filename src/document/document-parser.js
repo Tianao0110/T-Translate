@@ -188,7 +188,7 @@ const SEGMENTED_PARSERS = new Set(['text', 'pdf', 'docx', 'epub']);
 
 // The target-language filter for paragraphs the scripts alone leave open (a
 // language sharing the target's script): one batch through
-// options.detectLanguages (stack-client, the stack's ELD).
+// options.detectLanguages (stack-client, the stack's language detectors).
 async function settleTargetLanguage(segments, { filters = {}, detectLanguages } = {}) {
   if (!filters.skipTargetLang || !filters.targetLang || !detectLanguages) return;
   const open = segments.filter((seg) => seg.status === 'pending'

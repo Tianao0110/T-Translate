@@ -13,10 +13,13 @@ licenses:
 | -------------------- | ---------------------------- |
 | @napi-rs/canvas      | MIT                          |
 | dayjs                | MIT                          |
+| cld3-asm（打包进翻译栈；内含 Google CLD3，Apache-2.0） | MIT |
 | eld（打包进翻译栈）  | Apache-2.0                   |
 | electron-log         | MIT                          |
 | electron-store       | MIT                          |
 | electron-updater     | MIT                          |
+| fasttext.wasm.js（内含 fastText，MIT） | MIT        |
+| franc（打包进翻译栈） | MIT                         |
 | esearch-ocr（源码 fork 于 electron/services/ocr-host/ppocr，非 npm 依赖） | Apache-2.0 |
 | i18next              | MIT                          |
 | immer                | MIT                          |
@@ -40,6 +43,7 @@ licenses:
 | ---------------------------------- | ---------- |
 | Electron                           | MIT        |
 | PP-OCR 系列模型（PaddleOCR 项目）  | Apache-2.0 |
+| fastText 语言识别模型 lid.176.ftz（Facebook AI Research，随 fasttext.wasm.js 原样分发，未修改；https://fasttext.cc/docs/en/language-identification.html） | CC BY-SA 3.0 |
 
 ## 语音模型 / Speech models
 
