@@ -17,6 +17,8 @@ const RUNNING_MIN_SHARE = 0.4;
 const GARBLED_MIN_CHARS = 10;
 const GARBLED_MIN_RATIO = 0.1;
 const MAX_HEADING_LEVEL = 6;
+const COLUMN_EDGE_ROWS = 3;
+const COLUMN_EDGE_TOLERANCE = 0.3;
 
 const CJK = /[\u{3000}-\u{30ff}\u{3400}-\u{4dbf}\u{4e00}-\u{9fff}\u{ac00}-\u{d7af}\u{f900}-\u{faff}\u{ff00}-\u{ffef}]/u;
 const GARBLED_CHAR = /[\p{Co}\p{Cc}\u{fffd}]/u;
@@ -165,6 +167,9 @@ function finishLine(line, rot) {
       Math.min(corners[0].x, corners[1].x), Math.min(corners[0].y, corners[1].y),
       Math.max(corners[0].x, corners[1].x), Math.max(corners[0].y, corners[1].y),
     ],
+    // For splitAtColumns.
+    runs: items,
+    rot,
   };
 }
 
@@ -461,11 +466,7 @@ function mergeRows(lines, stats) {
     });
   };
   for (const line of lines) {
-    const first = run[0];
-    const sameRow = first
-      && Math.abs(first.size - line.size) <= SIZE_CHANGE_RATIO * Math.max(first.size, line.size)
-      && Math.abs(first.base - line.base) < 0.3 * expectedPitch(stats, Math.max(first.size, line.size));
-    if (!sameRow) {
+    if (!run[0] || !onSameRow(run[0], line, stats)) {
       flush();
       run = [];
     }
@@ -473,6 +474,66 @@ function mergeRows(lines, stats) {
   }
   flush();
   return out;
+}
+
+function onSameRow(a, b, stats) {
+  return Math.abs(a.size - b.size) <= SIZE_CHANGE_RATIO * Math.max(a.size, b.size)
+    && Math.abs(a.base - b.base) < 0.3 * expectedPitch(stats, Math.max(a.size, b.size));
+}
+
+// Left edges of cells that at least COLUMN_EDGE_ROWS table rows share.
+function columnEdges(rows) {
+  const starts = rows.flatMap((row, r) => row.pieces.slice(1).map((piece) => ({ u: piece.u0, row: r, em: row.size })))
+    .sort((a, b) => a.u - b.u);
+  const edges = [];
+  let group = [];
+  const flush = () => {
+    if (new Set(group.map((s) => s.row)).size >= COLUMN_EDGE_ROWS) {
+      edges.push({ u: median(group.map((s) => s.u)), tol: COLUMN_EDGE_TOLERANCE * median(group.map((s) => s.em)) });
+    }
+  };
+  for (const start of starts) {
+    if (group.length && start.u - group[group.length - 1].u > COLUMN_EDGE_TOLERANCE * start.em) {
+      flush();
+      group = [];
+    }
+    group.push(start);
+  }
+  if (group.length) flush();
+  return edges;
+}
+
+// A line cut at every item that starts on a column edge, unless the item
+// touches the one before it (two halves of a word).
+function splitAtEdges(line, edges) {
+  const runs = line.runs || [];
+  const cuts = [];
+  for (let i = 1; i < runs.length; i += 1) {
+    if (runs[i].role !== 'text' || Math.abs(runs[i].u0 - runs[i - 1].u1) < 0.15 * line.size) continue;
+    if (edges.some((edge) => Math.abs(edge.u - runs[i].u0) <= edge.tol)) cuts.push(i);
+  }
+  if (!cuts.length) return [line];
+  const parts = [];
+  let start = 0;
+  for (const cut of [...cuts, runs.length]) {
+    parts.push(finishLine({ items: runs.slice(start, cut), vTop: line.vTop, vBottom: line.vBottom }, line.rot));
+    start = cut;
+  }
+  return parts.filter((part) => part.text);
+}
+
+// Cells a narrow column gap ran into one line ("Cloud Computing for SD" +
+// "MC") split apart on the column edges of the page's table rows. Only lines
+// that share a baseline with another line are cut; a line standing alone,
+// body text, never is.
+function splitAtColumns(lines, stats) {
+  const edges = columnEdges(mergeRows(lines, stats).filter((row) => row.cells >= 3));
+  if (!edges.length) return lines;
+  return lines.flatMap((line, i) => {
+    const shared = (i > 0 && onSameRow(lines[i - 1], line, stats))
+      || (i + 1 < lines.length && onSameRow(lines[i + 1], line, stats));
+    return shared ? splitAtEdges(line, edges) : [line];
+  });
 }
 
 // The rest of a wrapped first-column entry starts lowercase or with a bracket.
@@ -748,7 +809,7 @@ export function buildParagraphs(pages) {
     const { layout, page, blocks } = entry;
     let kept = layout.lines.filter((l) => !isRunningLine(l, layout.frame, keys));
     if (blocks?.length) kept = placeInLayout(kept, blocks);
-    const lines = markLines(foldCellWraps(mergeRows(kept, stats), stats, words), stats);
+    const lines = markLines(foldCellWraps(mergeRows(splitAtColumns(kept, stats), stats), stats, words), stats);
     const paras = pageParagraphs(lines, page, stats, words);
     const flow = paras.filter((p) => !isMarginNote(p, layout.frame, stats));
     if (tail && flow.length && continuesAcrossFlow(tail.lines[tail.lines.length - 1], flow[0].lines[0])) {
@@ -762,7 +823,8 @@ export function buildParagraphs(pages) {
     if (flow.length) tail = flow[flow.length - 1];
     for (const group of layout.strays) {
       const strayLines = blocks?.length ? placeInLayout(group, blocks) : group;
-      out.push(...pageParagraphs(markLines(foldCellWraps(mergeRows(strayLines, stats), stats, words), stats), page, stats, words));
+      const rows = mergeRows(splitAtColumns(strayLines, stats), stats);
+      out.push(...pageParagraphs(markLines(foldCellWraps(rows, stats, words), stats), page, stats, words));
     }
   }
 
