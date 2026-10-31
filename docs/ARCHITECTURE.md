@@ -251,7 +251,7 @@ T-Engine 只报事实，不改产品行为；用哪个引擎、什么时候降�
 
 ### 划词与截图
 
-`electron/selection/`（鼠标钩子与手势状态机、三层探测、剪贴板抓取、文本清理）、`electron/screenshot/`（多显示器截取与裁剪）。每一层为什么这样探测、窗口几何为什么这样算，见 [design/selection.md](design/selection.md)。
+`electron/selection/`（鼠标钩子与手势状态机、钩子巡检、三层探测、剪贴板抓取、文本清理）、`electron/screenshot/`（多显示器截取与裁剪）。每一层为什么这样探测、窗口几何为什么这样算，见 [design/selection.md](design/selection.md)。
 
 ### AI 动作
 
