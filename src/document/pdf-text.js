@@ -536,6 +536,120 @@ function splitAtColumns(lines, stats) {
   });
 }
 
+// One row of a table whose cells sit across several baselines: each column's
+// lines top to bottom make its cell.
+function bandRow(band, edges, words) {
+  const columns = new Map();
+  for (const line of band) {
+    const col = edges.filter((edge) => line.u0 >= edge.u - edge.tol).length;
+    if (!columns.has(col)) columns.set(col, []);
+    columns.get(col).push(line);
+  }
+  if (columns.size < 3) return null;
+  const pieces = [...columns.keys()].sort((a, b) => a - b).map((col) => {
+    const parts = columns.get(col).sort((a, b) => b.base - a.base || a.u0 - b.u0);
+    return {
+      text: parts.slice(1).reduce((text, part) => joinText(text, part.text, words), parts[0].text),
+      u0: Math.min(...parts.map((p) => p.u0)),
+      u1: Math.max(...parts.map((p) => p.u1)),
+    };
+  });
+  return {
+    ...band[0],
+    text: pieces.map((p) => p.text).join(' | '),
+    base: Math.min(...band.map((l) => l.base)),
+    u0: Math.min(...band.map((l) => l.u0)),
+    u1: Math.max(...band.map((l) => l.u1)),
+    vTop: Math.max(...band.map((l) => l.vTop)),
+    vBottom: Math.min(...band.map((l) => l.vBottom)),
+    fontUniform: band.every((l) => l.fontUniform && l.font === band[0].font),
+    box: [
+      Math.min(...band.map((l) => l.box[0])), Math.min(...band.map((l) => l.box[1])),
+      Math.max(...band.map((l) => l.box[2])), Math.max(...band.map((l) => l.box[3])),
+    ],
+    cells: pieces.length,
+    pieces,
+    joined: true,
+    // Whole already: foldCellWraps adds nothing to it.
+    centered: true,
+  };
+}
+
+// The line pitch inside cells: the smallest step from a line to the one
+// above it in the same column. The page's usual pitch would be the row
+// spacing when a table fills the page.
+function cellPitch(run, size) {
+  let pitch = Infinity;
+  run.forEach((line, i) => {
+    for (let j = i - 1; j >= 0; j -= 1) {
+      if (Math.min(line.u1, run[j].u1) <= Math.max(line.u0, run[j].u0)) continue;
+      const dv = run[j].base - line.base;
+      if (dv >= 0.8 * size) pitch = Math.min(pitch, dv);
+      break;
+    }
+  });
+  return Number.isFinite(pitch) ? pitch : null;
+}
+
+// Vertically centred cells (the HTML default) set a one-line cell half a
+// line off its row's wrapped cells, so a row spans several baselines
+// ("Stewarts Creek" / "1156  0.42" / "catchment (Vic)"). Where table lines
+// in different columns sit half a line apart and rows are spaced wider than
+// lines inside a cell, everything between two row gaps becomes one row.
+// Tables without such half steps are left to mergeRows and foldCellWraps.
+function assembleCenteredRows(lines, stats, words) {
+  const rows = mergeRows(lines, stats).filter((row) => row.cells >= 3);
+  const edges = columnEdges(rows);
+  if (!edges.length) return lines;
+  const size = median(rows.map((row) => row.size));
+  const top = Math.max(...rows.map((row) => row.base)) + 2.5 * size;
+  const bottom = Math.min(...rows.map((row) => row.base)) - 2.5 * size;
+  const left = Math.min(...rows.map((row) => row.u0)) - size;
+  const right = Math.max(...rows.map((row) => row.u1)) + size;
+  const inTable = (line) => line.base <= top && line.base >= bottom && line.u0 >= left && line.u0 <= right
+    && Math.abs(line.size - size) <= SIZE_CHANGE_RATIO * size;
+
+  const out = [];
+  let run = [];
+  const flush = () => {
+    const pitch = cellPitch(run, size);
+    const halfStep = !!pitch && run.some((line, i) => {
+      const prev = run[i - 1];
+      const dv = prev ? prev.base - line.base : 0;
+      return dv > 0.3 * pitch && dv < 0.75 * pitch && (line.u0 > prev.u1 || prev.u0 > line.u1);
+    });
+    const rowGap = halfStep && run.some((line, i) => i > 0 && run[i - 1].base - line.base > 1.3 * pitch);
+    if (!rowGap) {
+      out.push(...run);
+      run = [];
+      return;
+    }
+    let band = [];
+    const close = () => {
+      const spread = Math.max(...band.map((l) => l.base)) - Math.min(...band.map((l) => l.base));
+      const row = spread > 0.3 * pitch ? bandRow(band, edges, words) : null;
+      out.push(...(row ? [row] : band));
+      band = [];
+    };
+    for (const line of run) {
+      if (band.length && Math.min(...band.map((l) => l.base)) - line.base > 1.15 * pitch) close();
+      band.push(line);
+    }
+    close();
+    run = [];
+  };
+  for (const line of lines) {
+    if (inTable(line)) {
+      run.push(line);
+    } else {
+      flush();
+      out.push(line);
+    }
+  }
+  flush();
+  return out;
+}
+
 // The rest of a wrapped first-column entry starts lowercase or with a bracket.
 const CELL_CONTINUATION = /^[\p{Ll}([]/u;
 
@@ -552,7 +666,7 @@ function continuesFirstCell(row, piece, dv) {
 // the first column passes continuesFirstCell. null when the line is not a
 // wrap.
 function wrapCells(row, line, stats) {
-  if (!(row?.cells >= 2) || !row.pieces) return null;
+  if (!(row?.cells >= 2) || !row.pieces || row.centered) return null;
   const size = Math.max(row.size, line.size);
   if (Math.abs(line.size - row.size) > SIZE_CHANGE_RATIO * size) return null;
   const dv = row.base - line.base;
@@ -809,7 +923,8 @@ export function buildParagraphs(pages) {
     const { layout, page, blocks } = entry;
     let kept = layout.lines.filter((l) => !isRunningLine(l, layout.frame, keys));
     if (blocks?.length) kept = placeInLayout(kept, blocks);
-    const lines = markLines(foldCellWraps(mergeRows(splitAtColumns(kept, stats), stats), stats, words), stats);
+    const rows = mergeRows(assembleCenteredRows(splitAtColumns(kept, stats), stats, words), stats);
+    const lines = markLines(foldCellWraps(rows, stats, words), stats);
     const paras = pageParagraphs(lines, page, stats, words);
     const flow = paras.filter((p) => !isMarginNote(p, layout.frame, stats));
     if (tail && flow.length && continuesAcrossFlow(tail.lines[tail.lines.length - 1], flow[0].lines[0])) {
@@ -823,8 +938,8 @@ export function buildParagraphs(pages) {
     if (flow.length) tail = flow[flow.length - 1];
     for (const group of layout.strays) {
       const strayLines = blocks?.length ? placeInLayout(group, blocks) : group;
-      const rows = mergeRows(splitAtColumns(strayLines, stats), stats);
-      out.push(...pageParagraphs(markLines(foldCellWraps(rows, stats, words), stats), page, stats, words));
+      const strayRows = mergeRows(assembleCenteredRows(splitAtColumns(strayLines, stats), stats, words), stats);
+      out.push(...pageParagraphs(markLines(foldCellWraps(strayRows, stats, words), stats), page, stats, words));
     }
   }
 
