@@ -15,6 +15,7 @@ src/stack/                      # 主进程翻译栈（ESM 源码，esbuild 打�
 ├── registry.js                 # 翻译源注册表 + DEFAULT_PRIORITY
 ├── runtime.js                  # rtFetch（Electron net.fetch 封装，网络唯一出口）
 ├── i18n.js                     # 栈内 _t（复用 src/i18n/locales 词表）
+├── language-id.js              # 同一种字母的语言由识别器投票（规则在 language-vote.js）
 ├── providers/
 │   ├── base.js                 # BaseProvider + _t + combineSignal
 │   ├── metadata.js             # ★ 跨端共享元数据表（configSchema 驱动表单与密钥加密）
