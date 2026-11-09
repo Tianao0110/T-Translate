@@ -101,4 +101,4 @@ function createOcrEngine({
   };
 }
 
-module.exports = { createOcrEngine, CODES, IDLE_SHUTDOWN_MS };
+module.exports = { createOcrEngine, CODES };

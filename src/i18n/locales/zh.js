@@ -9,21 +9,18 @@ const zh = {
     groupTranslation: "翻译", groupSystem: "系统",
     providers: "翻译源", translation: "翻译设置", selection: "划词翻译", floatingWindow: "悬浮窗口", document: "文档翻译",
     aiActions: "AI 动作",
-    llm: "本地模型", ocr: "OCR 识别", tts: "朗读设置", listen: "听译模型", audio: "音频", interface: "界面外观", privacy: "隐私模式", manual: "使用说明", about: "关于",
-    export: "导出", import: "导入", reset: "重置",
-    simpleMode: "简洁", fullMode: "完整", switchToFull: "完整", switchToSimple: "简洁",
+    llm: "本地模型", ocr: "OCR 识别", audio: "音频", interface: "界面外观", privacy: "隐私模式", manual: "使用说明", about: "关于",
+    simpleMode: "简洁", fullMode: "完整",
     modeHint: "点下方「完整」看全部设置",
     modeHintGotIt: "知道了",
     noMatch: "未找到匹配的设置",
     unsavedChanges: "有未保存的更改", saving: "保存中...", saveChanges: "保存更改"
   },
   providerSettings: {
-    description: "配置翻译服务，支持本地模型和在线 API",
     priorityHint: "按顺序尝试，拖动卡片调整顺序",
     configDetails: "配置详情", testConnection: "测试连接",
     testing: "测试中...", connected: "已连接", connectionFailed: "连接失败", notTested: "未测试",
     noConfig: "此翻译源无需额外配置，开箱即用",
-    saved: "翻译源设置已保存", saveFailed: "保存失败",
     encryptFailed: "密钥加密失败，未保存",
     enabledSection: "已启用", disabledSection: "未启用",
     noEnabled: "尚未启用任何翻译源",
@@ -73,32 +70,26 @@ const zh = {
     'baidu-translate': { appId: 'APP ID', secretKey: '密钥' }
   },
   translationSettings: {
-    description: "配置翻译行为和输出方式",
-    autoTranslate: "自动翻译", autoTranslateHint: "输入停止后自动开始翻译",
-    autoDelay: "自动翻译延迟", autoDelayHint: "停止输入后等待多久开始翻译",
-    streamOutput: "流式输出（打字机效果）", streamOutputHint: "开启后翻译结果将逐字显示",
+    autoTranslate: "自动翻译",
+    autoDelay: "自动翻译延迟",
+    streamOutput: "流式输出（打字机效果）",
     sameLangTitle: "内容已是目标语言时", sameLangOriginal: "显示原文", sameLangSwap: "自动互译（译回源语言）",
     customLangs: "自定义语言",
-    customLangsHint: "从语言选择器底部添加。这些语言不在谷歌翻译的支持范围内，能否翻译取决于当前使用的大模型。",
     customLangsEmpty: "还没有添加自定义语言",
     customLangPrompt: "发给模型：{{name}}",
     customLangRemoveConfirm: "确定删除自定义语言「{{name}}」？",
     customLangRemoved: "已删除「{{name}}」",
-    sameLangHint: "作用于划词翻译和悬浮窗口：选中或识别的内容已经是目标语言时，直接显示原文（不调用翻译），或反向翻成你设定的源语言（源语言为\"自动检测\"时按中↔英处理）",
     sameLangSaved: "已生效",
     clearCache: "清除缓存", clearCacheConfirm: "确定要清除翻译缓存吗？", cacheCleared: "缓存已清除"
   },
   documentSettings: {
-    description: "配置文档翻译的分段策略、过滤规则和显示样式",
-    maxCharsPerSegment: "单段最大字符数", segmentHint: "过长的段落会按此限制自动分割",
-    parallelTranslation: "并发翻译", concurrency: "同时翻译段数",
-    concurrencyHint: "本地模型建议 1-2（GPU 串行，调高只会排队）；在线 API 可调高",
+    maxCharsPerSegment: "单段最大字符数",
+    concurrency: "同时翻译段数",
     smartFilter: "智能过滤", skipShort: "跳过过短段落", minLength: "最小字符数",
     skipNumbers: "跳过纯数字段落（如页码）", skipCode: "保留代码块不翻译", skipTargetLang: "跳过已是目标语言的段落",
     displayStyle: "默认显示样式",
     styleBelow: "上下对照", styleSideBySide: "左右对照",
     layout: {
-      title: "PDF 版面分析",
       name: "版面分析模型（PP-DocLayoutV3）",
       desc: "翻译 PDF 时跳过公式、图、页眉页脚，表格按行翻译",
       needsGpu: "显卡加速没开，PDF 仍按规则切段（设置 → 本地模型 → 本地引擎）",
@@ -233,7 +224,6 @@ const zh = {
     tagsLabel: "标签（逗号分隔）", tagsPlaceholder: "正式, 学术, 重要...",
     noteLabel: "笔记", notePlaceholder: "添加笔记..."
   },
-  documents: { title: "文档翻译", upload: "上传文档", dragDrop: "拖拽文件到这里，或点击上传", supported: "支持 PDF、DOCX、EPUB、TXT 格式", translating: "翻译中...", download: "下载译文", preview: "预览" },
   privacy: {
     modeDescription: "选择适合您需求的工作模式，不同模式下可用功能不同",
     currentMode: "当前模式",
@@ -513,11 +503,7 @@ const zh = {
   },
   // Single block — a duplicate key would silently override the earlier one
   notify: {
-    success: "成功", error: "错误", warning: "警告", info: "提示",
-    copySuccess: "已复制到剪贴板", copyFailed: "复制失败",
-    saveSuccess: "保存成功", saveFailed: "保存失败",
-    networkError: "网络错误", unknownError: "未知错误", translateError: "翻译失败", ocrError: "识别失败",
-    shortcutRegistered: "快捷键已注册", shortcutConflict: "快捷键冲突"
+    networkError: "网络错误"
   },
   setupNotice: {
     noProvider: "还没有可用的翻译源，现在还翻译不了",
@@ -544,7 +530,7 @@ const zh = {
     suspiciousAccess: "⚠️ 安全警告：检测到异常的密钥访问（{{count}} 次，涉及 {{keys}} 个密钥）。如非您本人操作，请立即更换所有 API Key。",
     encryptionUnavailable: "系统加密不可用，API Key 无法安全存储。请检查系统安全设置。",
   },
-  common: { confirm: "确定", cancel: "取消", save: "保存", delete: "删除", edit: "编辑", close: "关闭", open: "打开", enable: "启用", disable: "禁用", loading: "加载中...", noData: "暂无数据", retry: "重试", reset: "重置", search: "搜索", filter: "筛选", all: "全部", none: "无", yes: "是", no: "否", show: "显示", hide: "隐藏", on: "开启", off: "关闭" },
+  common: { confirm: "确定", cancel: "取消", delete: "删除", loading: "加载中...", show: "显示", hide: "隐藏" },
   llm: {
     description: "程序自带的模型，每年更新",
     engineName: "本地模型",
@@ -1207,7 +1193,6 @@ const zh = {
     timeout: "请求超时",
     truncated: "翻译结果被截断（超出最大长度）",
     quotaExhausted: "配额已用完",
-    apiError: "API 错误: {{status}}",
     httpError: "HTTP {{status}}",
     contentBlocked: "内容被安全策略拦截",
     cannotConnectTryOther: "无法连接，请检查网络或尝试其他服务器",
@@ -1319,14 +1304,6 @@ const zh = {
     jsonParseFailed: "JSON 解析失败",
     csvEmpty: "CSV 文件为空或格式错误",
     unknownFormat: "无法识别文件格式，请使用 JSON、CSV 或 TBX 格式"
-  },
-  tray: {
-    showWindow: "显示窗口",
-    screenshot: "截图翻译",
-    floatingWindow: "悬浮窗口",
-    selectionTranslate: "划词翻译",
-    alwaysOnTop: "置顶",
-    quit: "退出"
   }
 };
 

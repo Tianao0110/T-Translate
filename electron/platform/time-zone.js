@@ -40,4 +40,4 @@ function applyTimeZoneFallback({
   return { windowsId, zone };
 }
 
-module.exports = { applyTimeZoneFallback, readWindowsZoneId, WINDOWS_ZONE_FALLBACKS };
+module.exports = { applyTimeZoneFallback, readWindowsZoneId };

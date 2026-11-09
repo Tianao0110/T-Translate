@@ -161,15 +161,6 @@ function setupLanguageListener() {
   });
 }
 
-function updateLanguage(lang) {
-  const success = setLanguage(lang);
-  if (success) {
-    updateMenu();
-    logger.info('Tray language updated to:', lang);
-  }
-  return success;
-}
-
 function updateMenu() {
   if (!tray) {
     logger.warn('Cannot update menu: tray not created');
@@ -263,6 +254,5 @@ module.exports = {
   init,
   createTray,
   updateTrayMenu: updateMenu,
-  updateLanguage,
   destroyTray,
 };

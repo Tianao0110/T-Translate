@@ -58,4 +58,4 @@ function createHookWatchdog({
   return { start, stop, noteEvent };
 }
 
-module.exports = { createHookWatchdog, CHECK_INTERVAL_MS, SILENT_CHECKS, MIN_RESTART_GAP_MS };
+module.exports = { createHookWatchdog, CHECK_INTERVAL_MS, MIN_RESTART_GAP_MS };

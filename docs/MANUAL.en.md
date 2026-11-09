@@ -112,7 +112,7 @@ Three tone buttons under the languages: Natural (everyday), Precise (technical, 
 - With the layout model installed and GPU acceleration on, each PDF page is read for layout first: text inside formulas, figures, headers and footers is no longer translated as body text, and tables are translated row by row. Loading shows layout progress page by page; the first PDF after each start takes a few seconds longer. Download the model under Settings → Documents.
 - The document is shown paragraph by paragraph, stacked or side by side. The outline on the left jumps to headings.
 - Each PDF paragraph has a locate button (crosshair icon, "Show on the original page"): it opens the "Original page" panel on the right at that page with the paragraph outlined, so figures, tables and formulas can be read against the original. In a narrow window the outline steps aside while the panel is open.
-- "Start translation" translates paragraph by paragraph; you can pause, resume and stop. Failed paragraphs can be retried one at a time or all at once with "Retry Failed".
+- "Start Translation" translates paragraph by paragraph; you can pause, resume and stop. Failed paragraphs can be retried one at a time or all at once with "Retry Failed".
 - Every translated paragraph can be edited, retranslated or copied.
 - The "Parallel" switch at the bottom translates several paragraphs at once; turn it off if a local model is unstable.
 - The "Glossary" switch at the bottom controls whether glossary terms are applied.

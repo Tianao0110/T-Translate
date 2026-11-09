@@ -103,7 +103,6 @@ function computePackList(installedPacks, manifest, types = KNOWN_TYPES) {
 module.exports = {
   ASR_BASE_TYPE,
   ASR_DRAFT_TYPE,
-  ASR_HQ_TYPE,
   TTS_VOICE_TYPE,
   ASR_TYPES,
   TTS_TYPES,

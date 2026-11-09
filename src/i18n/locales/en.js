@@ -9,21 +9,18 @@ const en = {
     groupTranslation: "Translation", groupSystem: "System",
     providers: "Providers", translation: "Translation", selection: "Selection", floatingWindow: "Floating Window", document: "Documents",
     aiActions: "AI Actions",
-    llm: "Local model", ocr: "OCR", tts: "Text to Speech", listen: "Listen models", audio: "Audio", interface: "Appearance", privacy: "Privacy", manual: "User Guide", about: "About",
-    export: "Export", import: "Import", reset: "Reset",
-    simpleMode: "Simple", fullMode: "Full", switchToFull: "Full", switchToSimple: "Simple",
+    llm: "Local model", ocr: "OCR", audio: "Audio", interface: "Appearance", privacy: "Privacy", manual: "User Guide", about: "About",
+    simpleMode: "Simple", fullMode: "Full",
     modeHint: "Click Full below for all settings",
     modeHintGotIt: "Got it",
     noMatch: "No matching settings found",
     unsavedChanges: "Unsaved changes", saving: "Saving...", saveChanges: "Save Changes"
   },
   providerSettings: {
-    description: "Configure translation services, supporting local models and online APIs",
     priorityHint: "Tried in order; drag cards to reorder",
     configDetails: "Configuration", testConnection: "Test Connection",
     testing: "Testing...", connected: "Connected", connectionFailed: "Connection failed", notTested: "Not tested",
     noConfig: "This provider requires no configuration, ready to use",
-    saved: "Provider settings saved", saveFailed: "Save failed",
     encryptFailed: "Key encryption failed; not saved",
     enabledSection: "Enabled", disabledSection: "Not Enabled",
     noEnabled: "No translation providers enabled",
@@ -73,32 +70,26 @@ const en = {
     'baidu-translate': { appId: 'APP ID', secretKey: 'Secret Key' }
   },
   translationSettings: {
-    description: "Configure translation behavior and output",
-    autoTranslate: "Auto Translate", autoTranslateHint: "Start translation automatically after input stops",
-    autoDelay: "Auto Translate Delay", autoDelayHint: "How long to wait after input stops",
-    streamOutput: "Stream Output (Typewriter effect)", streamOutputHint: "Results will appear character by character",
+    autoTranslate: "Auto Translate",
+    autoDelay: "Auto Translate Delay",
+    streamOutput: "Stream Output (Typewriter effect)",
     sameLangTitle: "When Text Is Already in Target Language", sameLangOriginal: "Show Original", sameLangSwap: "Auto Swap (back to source)",
     customLangs: "Custom languages",
-    customLangsHint: "Added from the bottom of the language picker. These are outside Google Translate's range — whether they work depends on the model in use.",
     customLangsEmpty: "No custom languages yet",
     customLangPrompt: "sent as: {{name}}",
     customLangRemoveConfirm: "Remove the custom language \"{{name}}\"?",
     customLangRemoved: "Removed \"{{name}}\"",
-    sameLangHint: "Applies to selection translate and the floating window: when selected or recognized text is already in the target language, show it as-is (no translation call), or translate back into your configured source language (zh↔en when source is \"Auto\")",
     sameLangSaved: "Applied",
     clearCache: "Clear Cache", clearCacheConfirm: "Are you sure to clear translation cache?", cacheCleared: "Cache cleared"
   },
   documentSettings: {
-    description: "Configure segmentation, filter rules and display style",
-    maxCharsPerSegment: "Max chars per segment", segmentHint: "Long paragraphs will be split automatically",
-    parallelTranslation: "Parallel Translation", concurrency: "Concurrent segments",
-    concurrencyHint: "Local models: keep at 1-2 (GPU serializes anyway); online APIs can go higher",
+    maxCharsPerSegment: "Max chars per segment",
+    concurrency: "Concurrent segments",
     smartFilter: "Smart Filter", skipShort: "Skip short paragraphs", minLength: "Min length",
     skipNumbers: "Skip number-only paragraphs (e.g. page numbers)", skipCode: "Keep code blocks untranslated", skipTargetLang: "Skip paragraphs already in target language",
     displayStyle: "Default Display Style",
     styleBelow: "Top-bottom", styleSideBySide: "Side by side",
     layout: {
-      title: "PDF layout analysis",
       name: "Layout model (PP-DocLayoutV3)",
       desc: "PDFs skip formulas, figures, headers and footers; tables go row by row",
       needsGpu: "GPU acceleration is off, so PDFs are still split by rules (Settings → Local model → Local engines)",
@@ -233,7 +224,6 @@ const en = {
     tagsLabel: "Tags (comma separated)", tagsPlaceholder: "formal, academic, important...",
     noteLabel: "Note", notePlaceholder: "Add note..."
   },
-  documents: { title: "Document Translation", upload: "Upload Document", dragDrop: "Drag & drop file here, or click to upload", supported: "Supports PDF, DOCX, EPUB, TXT", translating: "Translating...", download: "Download", preview: "Preview" },
   privacy: {
     modeDescription: "Choose a mode that fits your needs. Different features are available in different modes.",
     currentMode: "Current Mode",
@@ -513,11 +503,7 @@ const en = {
   },
   // Single block — a duplicate key would silently override the earlier one
   notify: {
-    success: "Success", error: "Error", warning: "Warning", info: "Info",
-    copySuccess: "Copied to clipboard", copyFailed: "Copy failed",
-    saveSuccess: "Saved successfully", saveFailed: "Save failed",
-    networkError: "Network error", unknownError: "Unknown error", translateError: "Translation failed", ocrError: "Recognition failed",
-    shortcutRegistered: "Shortcut registered", shortcutConflict: "Shortcut conflict"
+    networkError: "Network error"
   },
   setupNotice: {
     noProvider: "No translation source is set up yet, so nothing can be translated",
@@ -544,7 +530,7 @@ const en = {
     suspiciousAccess: "⚠️ Security Alert: Suspicious key access detected ({{count}} operations, {{keys}} unique keys). If this was not you, change all API Keys immediately.",
     encryptionUnavailable: "System encryption unavailable. API Keys cannot be stored securely.",
   },
-  common: { confirm: "Confirm", cancel: "Cancel", save: "Save", delete: "Delete", edit: "Edit", close: "Close", open: "Open", enable: "Enable", disable: "Disable", loading: "Loading...", noData: "No data", retry: "Retry", reset: "Reset", search: "Search", filter: "Filter", all: "All", none: "None", yes: "Yes", no: "No", show: "Show", hide: "Hide", on: "On", off: "Off" },
+  common: { confirm: "Confirm", cancel: "Cancel", delete: "Delete", loading: "Loading...", show: "Show", hide: "Hide" },
   llm: {
     description: "The app's own model, updated yearly",
     engineName: "Local model",
@@ -1206,7 +1192,6 @@ const en = {
     timeout: "Request timeout",
     truncated: "Translation was truncated (exceeded max length)",
     quotaExhausted: "Quota exhausted",
-    apiError: "API error: {{status}}",
     httpError: "HTTP {{status}}",
     contentBlocked: "Content blocked by safety policy",
     cannotConnectTryOther: "Cannot connect — check your network or try another server",
@@ -1318,14 +1303,6 @@ const en = {
     jsonParseFailed: "JSON parse failed",
     csvEmpty: "CSV file is empty or malformed",
     unknownFormat: "Unrecognized file format. Please use JSON, CSV, or TBX."
-  },
-  tray: {
-    showWindow: "Show Window",
-    screenshot: "Screenshot Translate",
-    floatingWindow: "Floating Window",
-    selectionTranslate: "Selection Translate",
-    alwaysOnTop: "Always on Top",
-    quit: "Quit"
   }
 };
 

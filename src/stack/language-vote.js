@@ -4,7 +4,7 @@
 // detectors. Rules and measurements: docs/design/stack.md §8.
 
 // Catalogue codes each detector can answer (pinned package versions).
-export const ELD_LANGUAGES = new Set([
+const ELD_LANGUAGES = new Set([
   'am', 'ar', 'az', 'be', 'bg', 'bn', 'ca', 'ckb', 'cs', 'da', 'de', 'el', 'en', 'es', 'et', 'eu', 'fa', 'fi', 'fr',
   'gu', 'he', 'hi', 'hr', 'hu', 'hy', 'is', 'it', 'ja', 'ka', 'kn', 'ko', 'lo', 'lt', 'lv', 'ml', 'mr', 'ms', 'nl',
   'no', 'or', 'pa', 'pl', 'pt', 'ro', 'ru', 'sk', 'sl', 'sq', 'sr', 'sv', 'ta', 'te', 'th', 'tl', 'tr', 'uk', 'ur',
@@ -39,14 +39,14 @@ const FRANC_CODES = {
 };
 
 // Languages only CLD3 / franc know.
-export const FILLER_LANGUAGES = new Set([
+const FILLER_LANGUAGES = new Set([
   'ay', 'bho', 'bm', 'ee', 'ha', 'haw', 'hmn', 'ig', 'lg', 'ln', 'mi', 'nso', 'ny', 'rw', 'sm', 'sn', 'st', 'ts',
   'xh', 'zu',
 ]);
 
-export const FASTTEXT_ALONE = 0.7;
-export const CLD3_ALONE = 0.95;
-export const FRANC_MARGIN = 0.15;
+const FASTTEXT_ALONE = 0.7;
+const CLD3_ALONE = 0.95;
+const FRANC_MARGIN = 0.15;
 
 const ARABIC = /\p{Script=Arabic}/u;
 const ALIASES = { fil: 'tl', iw: 'he', jv: 'jw' };

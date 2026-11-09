@@ -154,7 +154,7 @@ function layoutReason(lines) {
 
 // Layout model labels whose regions the vision model reads better than
 // PP-OCR (row order of a table, formulas, chart text).
-export const LAYOUT_ESCALATES = { table: 'layout-table', display_formula: 'layout-formula', chart: 'layout-chart' };
+const LAYOUT_ESCALATES = { table: 'layout-table', display_formula: 'layout-formula', chart: 'layout-chart' };
 
 function unsure(lines) {
   const conf = confidenceStats(lines);
