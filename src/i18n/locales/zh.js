@@ -73,6 +73,7 @@ const zh = {
     autoTranslate: "自动翻译",
     autoDelay: "自动翻译延迟",
     streamOutput: "流式输出（打字机效果）",
+    inputCompletion: "输入补全",
     sameLangTitle: "内容已是目标语言时", sameLangOriginal: "显示原文", sameLangSwap: "自动互译（译回源语言）",
     customLangs: "自定义语言",
     customLangsEmpty: "还没有添加自定义语言",

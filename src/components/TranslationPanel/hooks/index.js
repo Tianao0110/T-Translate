@@ -2,3 +2,4 @@ export { default as useTTS } from './useTTS.js';
 export { default as useTermCheck } from './useTermCheck.js';
 export { default as useStyleRewrite } from './useStyleRewrite.js';
 export { default as useSaveModal } from './useSaveModal.js';
+export { default as useInputCompletion } from './useInputCompletion.js';

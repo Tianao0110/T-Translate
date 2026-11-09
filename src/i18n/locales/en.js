@@ -73,6 +73,7 @@ const en = {
     autoTranslate: "Auto Translate",
     autoDelay: "Auto Translate Delay",
     streamOutput: "Stream Output (Typewriter effect)",
+    inputCompletion: "Input Completion",
     sameLangTitle: "When Text Is Already in Target Language", sameLangOriginal: "Show Original", sameLangSwap: "Auto Swap (back to source)",
     customLangs: "Custom languages",
     customLangsEmpty: "No custom languages yet",

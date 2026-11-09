@@ -19,7 +19,7 @@ import './styles.css';
 
 import { PRIVACY_MODES, TRANSLATION_STATUS, LANGUAGES } from '../../config/constants.js';
 
-import { useTTS, useTermCheck, useStyleRewrite, useSaveModal } from './hooks';
+import { useTTS, useTermCheck, useStyleRewrite, useSaveModal, useInputCompletion } from './hooks';
 import useAiActions from '../../ai/use-ai-actions.js';
 import { resolveActionLabel } from '../../ai/ai-action-runner.js';
 import AiActionIcon from '../shared/AiActionIcon.jsx';
@@ -62,6 +62,8 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   const {
     currentTranslation,
     favorites,
+    history,
+    inputCompletion,
     languagePicker,
     customLanguages,
     useStreamOutput,
@@ -89,6 +91,8 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   } = useTranslationStore(useShallow((s) => ({
     currentTranslation: s.currentTranslation,
     favorites: s.favorites,
+    history: s.history,
+    inputCompletion: s.inputCompletion,
     useStreamOutput: s.useStreamOutput,
     autoTranslate: s.autoTranslate,
     autoTranslateDelay: s.autoTranslateDelay,
@@ -159,6 +163,18 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   }, [ai, currentTranslation, captureImage, notify]);
 
   const sourceTextareaRef = useRef(null);
+
+  const completion = useInputCompletion({
+    text: currentTranslation.sourceText,
+    enabled: inputCompletion,
+    history,
+    favorites,
+    textareaRef: sourceTextareaRef,
+    onAccept: (full) => {
+      setSourceText(full);
+      if (isOcrSource) setIsOcrSource(false);
+    },
+  });
   const fileInputRef = useRef(null);
 
   // The picker needs the whole entry; user-added languages sit alongside the
@@ -470,20 +486,31 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
             </div>
           </div>
 
-          <textarea
-            ref={sourceTextareaRef}
-            className="translation-textarea"
-            value={currentTranslation.sourceText}
-            onChange={(e) => {
-              setSourceText(e.target.value);
-              if (isOcrSource) setIsOcrSource(false);
-            }}
-            onPaste={handlePaste}
-            placeholder={isOcrProcessing ? t('translation.ocrProcessing') : (dragOver ? t('translation.dropFile') : t('translation.inputPlaceholder'))}
-            spellCheck={false}
-            disabled={isOcrProcessing}
-            onKeyDown={(e) => { if (e.ctrlKey && e.key === 'Enter') handleTranslate(); }}
-          />
+          <div className="textarea-stack">
+            <textarea
+              ref={sourceTextareaRef}
+              className="translation-textarea"
+              value={currentTranslation.sourceText}
+              onChange={(e) => {
+                setSourceText(e.target.value);
+                if (isOcrSource) setIsOcrSource(false);
+              }}
+              onPaste={handlePaste}
+              placeholder={isOcrProcessing ? t('translation.ocrProcessing') : (dragOver ? t('translation.dropFile') : t('translation.inputPlaceholder'))}
+              spellCheck={false}
+              disabled={isOcrProcessing}
+              onKeyDown={(e) => {
+                if (completion.onKeyDown(e)) return;
+                if (e.ctrlKey && e.key === 'Enter') handleTranslate();
+              }}
+              {...completion.handlers}
+            />
+            {completion.suffix && (
+              <div className="translation-ghost" ref={completion.ghostRef} aria-hidden="true">
+                {currentTranslation.sourceText}<span className="ghost-suffix">{completion.suffix}</span>
+              </div>
+            )}
+          </div>
 
           <div className="box-footer">
             <span className="char-count">{(currentTranslation.sourceText || '').length} {t('translation.characters')}</span>

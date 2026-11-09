@@ -63,6 +63,7 @@ Three tone buttons under the languages: Natural (everyday), Precise (technical, 
 
 - Type or paste text. Press Ctrl+Enter or click "Translate".
 - With "Auto Translate" on (Settings → Translation), translation starts shortly after you stop typing.
+- "Input Completion" is on by default: while you type, a grey hint shows a sentence from your history or glossary that starts the same way. Tab accepts it, Esc hides it.
 - Buttons above the box: screenshot OCR, import image, paste, clear, read the source aloud.
 - You can also drop an image or a .txt / .md file onto the box: images are recognized first, text files are read in.
 - If the clipboard holds an image, "Paste" recognizes the text in it.
@@ -277,6 +278,7 @@ Most settings need "Save Changes" at the bottom right; theme, language, shortcut
 ### 4.2 Translation
 
 - Auto translate: starts after you stop typing; the delay is adjustable below.
+- Input Completion: a grey hint shows a sentence from your history or glossary that starts the same way; Tab accepts it.
 - Streaming output: the translation appears word by word.
 - When the content is already in the target language: show the source, or translate back into your source language. Applies to selection and the floating window. It counts only when nearly all of the text is in the target language; a few foreign names or terms don't matter. A whole foreign sentence, or text that is mostly foreign, is translated in full.
 - Screenshot output: pin (the default), selection window or main window, see 3.2.

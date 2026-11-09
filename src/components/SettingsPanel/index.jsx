@@ -72,7 +72,9 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
     autoTranslate,
     setAutoTranslate,
     autoTranslateDelay,
-    setAutoTranslateDelay
+    setAutoTranslateDelay,
+    inputCompletion,
+    setInputCompletion
   } = useTranslationStore(useShallow((s) => ({
     setOcrEngine: s.setOcrEngine,
     useStreamOutput: s.useStreamOutput,
@@ -81,6 +83,8 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
     setAutoTranslate: s.setAutoTranslate,
     autoTranslateDelay: s.autoTranslateDelay,
     setAutoTranslateDelay: s.setAutoTranslateDelay,
+    inputCompletion: s.inputCompletion,
+    setInputCompletion: s.setInputCompletion,
   })));
 
   const allProvidersMeta = useMemo(() => getAllProviderMetadata(), []);
@@ -590,6 +594,8 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
             setAutoTranslate={setAutoTranslate}
             autoTranslateDelay={autoTranslateDelay}
             setAutoTranslateDelay={setAutoTranslateDelay}
+            inputCompletion={inputCompletion}
+            setInputCompletion={setInputCompletion}
           />
         );
       case 'floatingWindow':

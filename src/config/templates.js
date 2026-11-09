@@ -30,6 +30,7 @@ const TEMPLATES = {
 Requirements:
 - Use natural, conversational tone
 - Maintain the original meaning and nuance
+- The source may contain fast-typing slips (typos, wrong homophones, swapped word order): translate what was meant rather than the slip, but leave code and identifiers as they are
 - Output ONLY the translation, no explanations or notes
 - Do NOT translate content inside special markers like ⟦...⟧`,
   },
@@ -42,6 +43,7 @@ Requirements:
 - Maintain technical accuracy and terminology consistency
 - Preserve code snippets, variable names, and technical terms
 - Use formal, precise language
+- The source may contain fast-typing slips (typos, wrong homophones, swapped word order): translate what was meant rather than the slip, but leave code and identifiers as they are
 - Output ONLY the translation, no explanations
 - Do NOT translate content inside special markers like ⟦...⟧`,
   },
@@ -54,6 +56,7 @@ Requirements:
 - Use formal, professional language appropriate for business contexts
 - Maintain proper honorifics and formal expressions
 - Ensure clarity and professionalism
+- The source may contain fast-typing slips (typos, wrong homophones, swapped word order): translate what was meant rather than the slip, but leave code and identifiers as they are
 - Output ONLY the translation, no explanations
 - Do NOT translate content inside special markers like ⟦...⟧`,
   },

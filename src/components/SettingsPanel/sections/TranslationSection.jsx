@@ -13,7 +13,9 @@ const TranslationSection = ({
   autoTranslateDelay,
   setAutoTranslateDelay,
   useStreamOutput,
-  setUseStreamOutput
+  setUseStreamOutput,
+  inputCompletion,
+  setInputCompletion
 }) => {
   const { t } = useTranslation();
   const customLanguages = useTranslationStore((s) => s.customLanguages);
@@ -72,6 +74,13 @@ const TranslationSection = ({
             checked={useStreamOutput}
             onChange={setUseStreamOutput}
             label={t('translationSettings.streamOutput')}
+          />
+        </div>
+        <div style={{ marginTop: '12px' }}>
+          <Switch
+            checked={inputCompletion}
+            onChange={setInputCompletion}
+            label={t('translationSettings.inputCompletion')}
           />
         </div>
 

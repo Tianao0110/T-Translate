@@ -272,6 +272,32 @@
   background: var(--bg-secondary);
 }
 
+/* Ghost completion over the source textarea: typed part transparent, suffix
+   grey. Font metrics and size are copied from the textarea at runtime
+   (hooks/useInputCompletion.js). */
+.textarea-stack {
+  flex: 1;
+  display: flex;
+  position: relative;
+  min-height: 0;
+}
+
+.translation-ghost {
+  position: absolute;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  pointer-events: none;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  color: transparent;
+}
+
+.translation-ghost .ghost-suffix {
+  color: var(--text-tertiary);
+}
+
 /* Custom scrollbar */
 .translation-textarea::-webkit-scrollbar {
   width: 8px;
