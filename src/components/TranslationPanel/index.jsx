@@ -497,7 +497,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
               }}
               onPaste={handlePaste}
               placeholder={isOcrProcessing ? t('translation.ocrProcessing') : (dragOver ? t('translation.dropFile') : t('translation.inputPlaceholder'))}
-              spellCheck={false}
+              spellCheck
               disabled={isOcrProcessing}
               onKeyDown={(e) => {
                 if (completion.onKeyDown(e)) return;

@@ -40,6 +40,7 @@ const crashGuard = createCrashGuard({ store, logger });
 const { createMenu } = require('./windows/menu-manager');
 const { createTray, destroyTray } = require('./windows/tray-manager');
 const windowManager = require('./windows/window-manager');
+const { setupSpellcheck } = require('./windows/spellcheck');
 const audioEngineManager = require('./listen/audio-engine-manager');
 const displayHelper = require('./platform/display-helper');
 const selection = require('./selection/controller');
@@ -107,6 +108,10 @@ app.whenReady().then(() => {
     crashGuard,
     onMainRendererGiveUp,
   });
+
+  // Before any window exists: dead dictionary URL + OS spellcheck languages,
+  // and the main window's right-click menu.
+  setupSpellcheck({ getMainWindow: () => windows.main, logger });
 
   // Listen-translate engine: hosted by the floating window's listen mode.
   audioEngineManager.init({

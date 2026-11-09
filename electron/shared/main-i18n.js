@@ -74,6 +74,7 @@ const messages = {
     'menu.actualSize': '实际大小', 'menu.zoomIn': '放大', 'menu.zoomOut': '缩小',
     'menu.fullscreen': '全屏',
     'menu.ok': '确定',
+    'menu.addToDictionary': '添加到词典', 'menu.noSuggestions': '没有建议',
   },
   en: {
     // OCR engine detection
@@ -144,6 +145,7 @@ const messages = {
     'menu.actualSize': 'Actual Size', 'menu.zoomIn': 'Zoom In', 'menu.zoomOut': 'Zoom Out',
     'menu.fullscreen': 'Fullscreen',
     'menu.ok': 'OK',
+    'menu.addToDictionary': 'Add to Dictionary', 'menu.noSuggestions': 'No suggestions',
   },
 };
 

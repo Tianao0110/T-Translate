@@ -64,6 +64,7 @@ Three tone buttons under the languages: Natural (everyday), Precise (technical, 
 - Type or paste text. Press Ctrl+Enter or click "Translate".
 - With "Auto Translate" on (Settings → Translation), translation starts shortly after you stop typing.
 - "Input Completion" is on by default: while you type, a grey hint shows a sentence from your history or glossary that starts the same way. Tab accepts it, Esc hides it.
+- Misspelled words in the source box get a red underline; right-click for suggestions and "Add to Dictionary". This is the Windows spellchecker: it knows the languages installed in Windows and never goes online.
 - Buttons above the box: screenshot OCR, import image, paste, clear, read the source aloud.
 - You can also drop an image or a .txt / .md file onto the box: images are recognized first, text files are read in.
 - If the clipboard holds an image, "Paste" recognizes the text in it.
