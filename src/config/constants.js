@@ -1,5 +1,4 @@
-// Renderer-side mirror of electron/shared/constants.js.
-// IMPORTANT: keep in sync with the source — `npm run check:constants` verifies.
+// The only copy of these constants; the renderer and the stack bundle both import it.
 
 export const PRIVACY_MODES = {
   STANDARD: 'standard',

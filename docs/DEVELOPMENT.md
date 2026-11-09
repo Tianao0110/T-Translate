@@ -161,7 +161,7 @@ export default MyProvider;
 
 1. **栈注册**：`src/stack/registry.js` —— import 类 + 加进 `providerClasses` + `DEFAULT_PRIORITY.normal` 排个位置（路线 A 的预设自动注册，跳过 import）。
 2. **渲染端图标**：svg 放 `src/assets/provider-icons/my-provider.svg`，在 `src/config/provider-icons.js` 的 `PROVIDER_ICONS` 和 `ORDER` 各加一行（ORDER 决定设置页显示顺序）。
-3. **常量表**：`npm run check:constants` 会校验 PROVIDER_IDS 跨文件同步，报错就按提示补齐。
+3. **常量表**：把 id 加进 `src/config/constants.js` 的 `PROVIDER_IDS`。
 
 ### 验证
 
@@ -298,7 +298,7 @@ export default MyOCREngine;
 登记三处：
 
 1. `src/stack/ocr/manager.js` —— import + `engines` 表 + `DEFAULT_OCR_PRIORITY`（决定自动降级链位置）。
-2. `src/config/constants.js` 与 `electron/shared/constants.js` 的 `OCR_ENGINES` 常量表（`check:constants` 锁同步）。
+2. `src/config/constants.js` 的 `OCR_ENGINES` 常量表。
 3. 设置页 UI：`src/components/SettingsPanel/sections/OcrSection.jsx` 加引擎卡片（参考现有在线引擎块；密钥输入走统一的 OCR 密钥仓，保存时自动 DPAPI 加密）。
 
 注意：非标准隐私模式下引擎走 `allowedEngines` 白名单（`src/stack/privacy-modes.js`），新在线引擎默认**不在**离线白名单——这是设计，不要绕。
@@ -383,7 +383,7 @@ npx eslint . --quiet     # 0 error（全仓已归零，不许回退）
 npm test                 # vitest
 npm run stack:build      # 栈可打包
 npx vite build           # 渲染端可构建
-npm run check:all        # 常量表 + 语言表 + i18n + 硬编码中文 + 文档里的路径与链接
+npm run check:all        # 语言表 + i18n + 硬编码中文 + 文档里的路径与链接
 ```
 
 **代码注释**只写英文、只说「这段做什么、接到哪」；原因、历史、测量值写进 `docs/design/<feature>.md`（T-Engine 的写进 T-ENGINE.md），不进源码。

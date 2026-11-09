@@ -159,9 +159,9 @@ T-Translate 提供三种内置主题：
 
 ### 步骤 4：注册主题
 
-主题 id 在代码里一共列了五处，漏一处就会出现「设置里能选、某个窗口不认」：
+主题 id 在代码里一共列了四处，漏一处就会出现「设置里能选、某个窗口不认」：
 
-1. `src/config/constants.js` 与 `electron/shared/constants.js` 的 `THEMES`，两份必须一致（`npm run check:constants` 会拦）：
+1. `src/config/constants.js` 的 `THEMES`：
 
 ```javascript
 export const THEMES = {
