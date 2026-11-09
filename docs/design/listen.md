@@ -76,6 +76,7 @@ VAD 只交出已闭合的段；开段期间 worker 自己镜像音频，每 `PAR
 - TTS-only 的 worker 上「先卸载再做事」有陷阱：`unloadTtsAndWait` 对 childState idle 的进程语义是让子进程退出，随后的 `tts-load` 发给已死句柄会 60 s 超时。自检因此不再先卸载（worker 切 provider 已自行丢弃语音，同 provider 驻留时 `tts-load` 重发 `tts-ready`）。
 - 静音闸门按上报的 webContents 计数：多窗口互不解除；worker 侧丢弃闸门期间的音频再加 300 ms 尾巴（环回路径的延迟），程序永远不转写自己的声音。这在每个 Windows 版本都可用，不像进程排除，也不需要重启音频客户端。
 - `normalizeSource` 把渲染端给的来源收窄成 worker 接受的三种形态；`off` 不开音频客户端，由调用方喂 PCM（smoke / bench 回放 wav）。
+- **会话归属与 sink**（2026-11-09，为伴生通道加）：`startSession({ owner: 'companion', sink })` 让会话向 sink（status / segment / partial / translation / autosaved / level 任选）汇报而不是向宿主窗口，不挂窗口关闭兜底，翻译器按会话关掉 SRT 自动保存（`beginSession({ autosave: false })`，转写仍留在内存给翻译当上下文）。一次只有一个会话：伴生来的 start 碰上占用返回 `{ ok: false, busy }`；**用户自己的听译优先**——窗口 start 碰上伴生会话时先 `stopSession('preempted')`，把这次 start 存进 `pendingStart`，等 worker 退出或转为 TTS 保温后 `finishSession()` 再起；sink 在最后一个终态状态（stopped / model-load-failed / engine-dead）送达之后才清。窗口自己的 STOP 带 `{ from: 'window' }`，不会结束它没开的伴生会话（悬浮窗卸载时会盲发一次 STOP）。
 
 ## 7. 朗读（tts.js、tts-text-en.js、tts-models.js）
 

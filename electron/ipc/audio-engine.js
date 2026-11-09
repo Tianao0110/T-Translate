@@ -45,7 +45,7 @@ function registerAudioEngineIPC(ctx) {
   ipcMain.handle(AE.GET_INFO, () => engineManager.getInfo());
 
   ipcMain.on(AE.START, (event, opts) => engineManager.startSession(opts || {}));
-  ipcMain.on(AE.STOP, () => engineManager.stopSession('renderer'));
+  ipcMain.on(AE.STOP, () => engineManager.stopSession('renderer', { from: 'window' }));
 
   // Audio sources for the "which program" picker, plus what this machine can do.
   ipcMain.handle(AE.SOURCES, async () => {

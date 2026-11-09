@@ -37,17 +37,22 @@ function buildSrt(finals) {
 function createListenTranslator({ translateStream = null, enabled = () => !!translateStream, uiLang = () => 'zh', autosave = null, emit = () => {}, logger, now = Date.now, settleMs = SETTLE_MS, paintEveryMs = PAINT_EVERY_MS }) {
   let transcript = [];
   let truncated = false;
+  let fileTranscript = true;
   let targetLang = '';
   let sourceName = '';
   let active = false;
   let nextId = 1;
   const inflight = new Map(); // id -> { controller, promise }
 
-  function beginSession({ targetLang: target = '', sourceName: name = '' } = {}) {
+  // autosave: false keeps the transcript in memory for context only; nothing
+  // is filed when the session ends (companion sessions — the client keeps
+  // its own record).
+  function beginSession({ targetLang: target = '', sourceName: name = '', autosave: file = true } = {}) {
     transcript = [];
     truncated = false;
     targetLang = typeof target === 'string' ? target : '';
     sourceName = typeof name === 'string' ? name : '';
+    fileTranscript = file !== false;
     active = true;
   }
 
@@ -118,6 +123,7 @@ function createListenTranslator({ translateStream = null, enabled = () => !!tran
     active = false;
     const finals = transcript.filter((s) => s.text);
     const name = sourceName;
+    const fileIt = fileTranscript;
     transcript = [];
     if (inflight.size) {
       await Promise.race([
@@ -126,7 +132,7 @@ function createListenTranslator({ translateStream = null, enabled = () => !!tran
       ]);
       for (const e of inflight.values()) e.controller.abort();
     }
-    if (!finals.length || !autosave) return null;
+    if (!finals.length || !autosave || !fileIt) return null;
     try {
       const filePath = await autosave(buildSrt(finals), name, { reason, truncated });
       if (filePath) emit('autosaved', { filePath, lines: finals.length, reason });

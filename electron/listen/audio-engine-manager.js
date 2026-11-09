@@ -61,6 +61,22 @@ const ttsPlayingSenders = new Set();
 let translator = null;
 let translateStreamHook = null;
 let autosaveStore = null;
+// Who the running session reports to: the host window, or a companion sink
+// (companion/ — an object with any of status / segment / partial /
+// translation / autosaved / level). A window start arriving during a
+// companion session stops it and waits here until the worker is gone.
+let sessionSink = null;
+let sessionOwner = null; // 'window' | 'companion' | null
+let pendingStart = null;
+
+const SINK_METHODS = {
+  [CHANNELS.AUDIO_ENGINE.STATUS]: 'status',
+  [CHANNELS.AUDIO_ENGINE.SEGMENT]: 'segment',
+  [CHANNELS.AUDIO_ENGINE.PARTIAL]: 'partial',
+  [CHANNELS.AUDIO_ENGINE.TRANSLATION]: 'translation',
+  [CHANNELS.AUDIO_ENGINE.AUTOSAVED]: 'autosaved',
+  [CHANNELS.AUDIO_ENGINE.LEVEL]: 'level',
+};
 
 function adapter() {
   return (audio ||= tengine.get().get('audio'));
@@ -152,8 +168,26 @@ function hostWindow() {
 }
 
 function sendToWindow(channel, payload) {
+  if (sessionSink) {
+    const method = SINK_METHODS[channel];
+    if (method && typeof sessionSink[method] === 'function') {
+      if (channel === CHANNELS.AUDIO_ENGINE.STATUS) sessionSink.status(payload.state, payload.detail);
+      else sessionSink[method](payload);
+    }
+    return;
+  }
   const win = hostWindow();
   if (win) win.webContents.send(channel, payload);
+}
+
+// The session is over and its last status delivered: drop the sink, then
+// start the session that was waiting for the worker to go.
+function finishSession() {
+  sessionSink = null;
+  sessionOwner = null;
+  const next = pendingStart;
+  pendingStart = null;
+  if (next) startSession(next);
 }
 
 function sendStatus(state, detail) {
@@ -186,14 +220,30 @@ function getInfo() {
     activeDir: models?.baseDir || null, // where the live set actually sits
     secureBlocked: false, // kept for the renderer's shape
     running: childState === 'running' || childState === 'starting',
+    owner: sessionOwner,
   };
 }
 
+// options.owner 'companion' with options.sink: the session reports to the
+// sink instead of the host window and files no transcript. Returns
+// { ok } / { ok, queued } / { ok: false, busy | error }.
 function startSession(options = {}) {
+  const owner = options.owner === 'companion' && options.sink ? 'companion' : 'window';
   if (childState !== 'idle') {
-    logger.warn(`start ignored in state ${childState}`);
-    return;
+    // The user's own listen session wins: the companion one is stopped and
+    // this start waits for the worker to go.
+    if (owner === 'window' && sessionOwner === 'companion') {
+      logger.info('preempting the companion session for the window');
+      pendingStart = { ...options, owner };
+      stopSession('preempted');
+      return { ok: true, queued: true };
+    }
+    logger.warn(`start ignored in state ${childState} (owner ${sessionOwner})`);
+    return { ok: false, busy: sessionOwner || 'window' };
   }
+  pendingStart = null;
+  sessionOwner = owner;
+  sessionSink = owner === 'companion' ? options.sink : null;
   // Each user-initiated session gets its own one-shot crash restart.
   restartedOnce = false;
   sessionLanguage = typeof options.language === 'string' ? options.language : '';
@@ -201,13 +251,14 @@ function startSession(options = {}) {
   const models = findModels();
   if (!models) {
     sendStatus('no-model');
-    return;
+    finishSession();
+    return { ok: false, error: 'no-model' };
   }
   // A closing host window force-stops the session (stale firings are no-ops).
-  hostWindow()?.once('closed', () => stopSession('window-closed'));
+  if (owner === 'window') hostWindow()?.once('closed', () => stopSession('window-closed'));
   // A TTS-only process has no ASR paths: a session gets a fresh one.
   if (adapter().running()) discardWorker('listen-start');
-  translator?.beginSession({ targetLang: options.targetLang, sourceName: options.source?.name });
+  translator?.beginSession({ targetLang: options.targetLang, sourceName: options.source?.name, autosave: owner !== 'companion' });
   spawnWorker(models);
 
   // A mid-session switch to SECURE keeps the session but closes its log.
@@ -221,6 +272,7 @@ function startSession(options = {}) {
       }
     }
   });
+  return { ok: true };
 }
 
 // Narrows the renderer-supplied source to the shapes the worker accepts;
@@ -428,6 +480,7 @@ function onWorkerMessage(msg) {
             unsubscribePrivacy();
             sendStatus('stopped');
             armTtsIdle();
+            finishSession();
             break;
           }
           adapter().expectExit();
@@ -492,16 +545,18 @@ function onWorkerExit({ code, everReady }) {
   endTranscript(wasStopping ? 'stopped' : 'engine-exited');
   if (wasStopping) {
     sendStatus('stopped');
+    finishSession();
     return;
   }
   // Died before ever going ready: the models did not load, no retry.
   if (!everReady) {
     logger.error('worker died during model load — not retrying');
     sendStatus('model-load-failed');
+    finishSession();
     return;
   }
   // Unexpected death mid-session: one automatic restart, then give up.
-  if (!restartedOnce && hostWindow()) {
+  if (!restartedOnce && (sessionSink || hostWindow())) {
     restartedOnce = true;
     sendStatus('engine-restarting');
     const models = findModels();
@@ -511,6 +566,7 @@ function onWorkerExit({ code, everReady }) {
     }
   }
   sendStatus('engine-dead');
+  finishSession();
 }
 
 // Inject PCM the host already has (smoke / bench replaying a wav).
@@ -555,7 +611,10 @@ function stopSessionAndWait(reason, timeoutMs = STOP_GRACE_MS + 2000) {
   });
 }
 
-function stopSession(reason) {
+// from 'window': the floating window's own stop, which must not end a
+// companion session it never started.
+function stopSession(reason, { from = null } = {}) {
+  if (from === 'window' && sessionOwner === 'companion') return;
   unsubscribePrivacy();
   if (!adapter().running()) {
     childState = 'idle';
@@ -882,6 +941,7 @@ module.exports = {
   startSession,
   stopSession,
   stopSessionAndWait,
+  currentOwner: () => sessionOwner,
   feedPcm,
   getTtsStatus,
   getTtsVoices,
