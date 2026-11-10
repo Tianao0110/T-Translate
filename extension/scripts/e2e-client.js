@@ -11,53 +11,13 @@
 
 const path = require('path');
 const fs = require('fs');
-const { execFileSync } = require('child_process');
 const { pathToFileURL } = require('url');
 const { REPO, arg, has, sleep, waitFor, checklist, sandbox, fakeStore, run } = require('../../scripts/lib/electron-smoke');
 const { fakeWindow, readWavPcm } = require('../../scripts/lib/listen-sandbox');
+const { synthesizeWav, linkPacks } = require('./lib/speech');
 
 const { step, summary } = checklist();
 const KEEP = has('--keep');
-const LINES = [
-  'Good evening everyone, thank you for joining the weekly briefing.',
-  'Tonight we look at the new train schedule and the road works downtown.',
-  'That is all for now, see you next week.',
-];
-
-function synthesizeWav(dest) {
-  const quote = (s) => `'${s.replace(/'/g, "''")}'`;
-  const ps = `
-$ProgressPreference = 'SilentlyContinue'
-Add-Type -AssemblyName System.Speech
-$s = New-Object System.Speech.Synthesis.SpeechSynthesizer
-$names = $s.GetInstalledVoices() | ForEach-Object { $_.VoiceInfo.Name }
-if ($names -contains 'Microsoft David Desktop') { $s.SelectVoice('Microsoft David Desktop') }
-$p = New-Object System.Speech.Synthesis.PromptBuilder([System.Globalization.CultureInfo]::GetCultureInfo('en-US'))
-foreach ($line in @(${LINES.map(quote).join(', ')})) { $p.AppendText($line); $p.AppendBreak([TimeSpan]::FromMilliseconds(1200)) }
-$s.SetOutputToWaveFile(${quote(dest)})
-$s.Speak($p)
-$s.SetOutputToNull()
-$s.Dispose()
-`;
-  execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(ps, 'utf16le').toString('base64')], { stdio: ['ignore', 'pipe', 'pipe'] });
-  return dest;
-}
-
-function linkPacks(packsDir, dest) {
-  for (const pack of fs.readdirSync(packsDir)) {
-    const src = path.join(packsDir, pack);
-    if (!fs.statSync(src).isDirectory()) continue;
-    const out = path.join(dest, pack);
-    fs.mkdirSync(out, { recursive: true });
-    for (const f of fs.readdirSync(src)) {
-      try {
-        fs.linkSync(path.join(src, f), path.join(out, f));
-      } catch {
-        fs.copyFileSync(path.join(src, f), path.join(out, f));
-      }
-    }
-  }
-}
 
 async function main() {
   const packsDir = arg('--packs');

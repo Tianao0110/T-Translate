@@ -4,7 +4,12 @@
 // options / popup ──COMPANION_*──▶ service worker ──(target: offscreen)──▶ offscreen
 // offscreen ──COMPANION_STATE_CHANGED──▶ everyone (badge, open pages)
 // offscreen ──STORAGE_*──▶ service worker (offscreen pages only get chrome.runtime)
+// extension pages ──MEDIA_OPEN/PUSH/CLOSE──▶ service worker ──▶ offscreen (media pipeline)
+// offscreen ──MEDIA_EVENT { key, event }──▶ everyone
 // content scripts ──PING──▶ service worker
+//
+// Messages are JSON on the wire (an ArrayBuffer arrives as {}), so media
+// bytes travel as base64: encodeBytes / decodeBytes.
 
 export const MSG = {
   // Ensure the channel is loaded and re-check it with one hello; replies with the state.
@@ -17,10 +22,19 @@ export const MSG = {
   COMPANION_STATE_CHANGED: 'companion/state-changed',
   STORAGE_GET: 'storage/get',
   STORAGE_SET: 'storage/set',
+  // payload { key, lang, targetLang }: a new media stream (replaces the one in progress).
+  MEDIA_OPEN: 'media/open',
+  // payload { key, bytes }: bytes is base64 of the next WebM bytes, cut anywhere.
+  MEDIA_PUSH: 'media/push',
+  // payload { key }: replies with the stream's stats once its session closed.
+  MEDIA_CLOSE: 'media/close',
+  MEDIA_EVENT: 'media/event',
   PING: 'ping',
 };
 
 export const TARGET_OFFSCREEN = 'offscreen';
+export const MAX_MEDIA_PUSH_BYTES = 256 * 1024;
+const MAX_MEDIA_PUSH_CHARS = Math.ceil(MAX_MEDIA_PUSH_BYTES / 3) * 4;
 
 export class MessageError extends Error {
   constructor(code, message = code) {
@@ -30,6 +44,28 @@ export class MessageError extends Error {
 }
 
 const runtimeOf = (runtime) => runtime || globalThis.chrome?.runtime;
+
+export function encodeBytes(bytes) {
+  const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  let s = '';
+  for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode(...u8.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+
+// Throws MessageError 'bad-bytes' / 'too-large' (over MAX_MEDIA_PUSH_BYTES).
+export function decodeBytes(b64) {
+  if (typeof b64 !== 'string') throw new MessageError('bad-bytes');
+  if (b64.length > MAX_MEDIA_PUSH_CHARS) throw new MessageError('too-large');
+  let s;
+  try {
+    s = atob(b64);
+  } catch {
+    throw new MessageError('bad-bytes');
+  }
+  const out = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+  return out;
+}
 
 export function errorOf(e) {
   return { code: (e && typeof e.code === 'string' && e.code) || 'error', message: String(e?.message ?? e) };

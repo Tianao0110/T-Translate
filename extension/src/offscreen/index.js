@@ -1,10 +1,12 @@
 // Offscreen document: owns the companion client (long fetch streams outlive
-// the service worker), answers the worker's COMPANION_* requests and
-// broadcasts every state change. Its chrome.runtime is messaging only, so
-// storage goes through the worker and the version comes from the build.
+// the service worker) and the media pipeline (WebCodecs), answers the
+// worker's COMPANION_* and MEDIA_* requests and broadcasts state changes and
+// media events. Its chrome.runtime is messaging only, so storage goes through
+// the worker and the version comes from the build.
 
 import { createCompanionClient } from './companion-client.js';
-import { MSG, TARGET_OFFSCREEN, call, notify, handle, isExtensionSender } from '../shared/messages.js';
+import { createMediaPipeline } from './media-pipeline.js';
+import { MSG, TARGET_OFFSCREEN, call, notify, handle, isExtensionSender, decodeBytes } from '../shared/messages.js';
 import { VERSION } from '../shared/version.js';
 
 const storage = {
@@ -36,6 +38,8 @@ let loading = start();
 loading.catch(() => {});
 const ready = () => (loading = loading.catch(start));
 
+const pipeline = createMediaPipeline({ client, onEvent: (payload) => notify(MSG.MEDIA_EVENT, payload) });
+
 handle(
   {
     [MSG.COMPANION_LOAD]: async () => {
@@ -66,6 +70,14 @@ handle(
       await client.forget();
       return client.getState();
     },
+    // Fails fast when the app is not reachable; the ASR session opens with the first decoded audio.
+    [MSG.MEDIA_OPEN]: async (payload) => {
+      await ready();
+      if (client.getState().status !== 'ready') await connectOnce();
+      return pipeline.open({ key: payload?.key, lang: String(payload?.lang ?? ''), targetLang: String(payload?.targetLang ?? '') });
+    },
+    [MSG.MEDIA_PUSH]: async (payload) => pipeline.push({ key: payload?.key, bytes: decodeBytes(payload?.bytes) }),
+    [MSG.MEDIA_CLOSE]: async (payload) => pipeline.close({ key: payload?.key }),
   },
   { target: TARGET_OFFSCREEN, accept: (_msg, sender) => isExtensionSender(sender) }
 );

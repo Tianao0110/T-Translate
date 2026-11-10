@@ -1,6 +1,7 @@
 // Service worker: keeps the offscreen document (which owns the companion
-// client) alive, relays the extension pages' COMPANION_* requests to it, does
-// chrome.storage for it, paints the badge and polls the channel once a minute.
+// client and the media pipeline) alive, relays the extension pages'
+// COMPANION_* and MEDIA_* requests to it, does chrome.storage for it, paints
+// the badge and polls the channel once a minute.
 
 import { MSG, TARGET_OFFSCREEN, request, handle, isExtensionSender } from '../shared/messages.js';
 import { showBadge } from './badge.js';
@@ -56,6 +57,9 @@ handle(
     [MSG.COMPANION_CONNECT]: relay(MSG.COMPANION_CONNECT),
     [MSG.COMPANION_STATE]: relay(MSG.COMPANION_STATE),
     [MSG.COMPANION_FORGET]: relay(MSG.COMPANION_FORGET),
+    [MSG.MEDIA_OPEN]: relay(MSG.MEDIA_OPEN),
+    [MSG.MEDIA_PUSH]: relay(MSG.MEDIA_PUSH),
+    [MSG.MEDIA_CLOSE]: relay(MSG.MEDIA_CLOSE),
     [MSG.COMPANION_STATE_CHANGED]: (state) => showBadge(state),
     [MSG.STORAGE_GET]: async ({ key }) => (await chrome.storage.local.get(key))[key] ?? null,
     [MSG.STORAGE_SET]: async ({ key, value }) => {
