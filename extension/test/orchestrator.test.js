@@ -103,7 +103,8 @@ describe('helpers', () => {
     expect(mediaEligible(snap({ state: 'paused' }))).toBe(false);
     expect(mediaEligible(snap({ muted: true }))).toBe(false);
     expect(mediaEligible(snap({ volume: 0 }))).toBe(false);
-    expect(mediaEligible(snap({ duration: 8 }))).toBe(false);
+    expect(mediaEligible(snap({ duration: 4 }))).toBe(false);
+    expect(mediaEligible(snap({ duration: 6 }))).toBe(true);
     expect(mediaEligible(snap({ duration: null, live: true }))).toBe(true);
     expect(mediaEligible(snap({ pageVisible: false }))).toBe(false);
     expect(mediaEligible(snap({ width: 120, height: 80 }))).toBe(false);
