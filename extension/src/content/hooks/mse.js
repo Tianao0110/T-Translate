@@ -1,7 +1,8 @@
 // Page world: Media Source Extensions. Notes each MediaSource (and its blob
 // URL, so the isolated world can match it to a <video src>), each
 // SourceBuffer's mime, and copies the bytes of audio appends the media
-// pipeline can decode (WebM / Opus); other audio appends are only counted.
+// pipeline can decode (WebM / Opus, MP4 / AAC); other audio appends are only
+// counted.
 // Video bytes are never copied.
 
 import { hookMethod, hookSetter, tryHook } from './patch.js';

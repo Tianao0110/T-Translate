@@ -11,10 +11,24 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createMseRelay } from '../src/content/mse-relay.js';
 import { clusterTimes, timecodeScale } from '../src/content/webm-sniff.js';
+import { fragmentTimes, mp4Timescale } from '../src/content/mp4-sniff.js';
 import { decodeBytes } from '../src/shared/messages.js';
 import { LIMITS } from '../src/content/bridge-protocol.js';
 
 const FIXTURE = new Uint8Array(fs.readFileSync(path.join(__dirname, 'fixtures', 'tone-2s.webm')));
+// ftyp + moov, then a moof + mdat per second (tfdt 0, 48128, 96256 at 48 kHz), then mfra.
+const M4S = new Uint8Array(fs.readFileSync(path.join(__dirname, 'fixtures', 'tone-2s.m4s')));
+const M4S_INIT = M4S.subarray(0, 692);
+const M4S_FRAGS = [M4S.subarray(692, 9179), M4S.subarray(9179, 17536), M4S.subarray(17536, 17781)];
+
+// ISO BMFF boxes for the sniffer: a moof with one traf and a tfdt, a moov with traks.
+const be = (v, n) => Array.from({ length: n }, (_, i) => Math.floor(v / 256 ** (n - 1 - i)) % 256);
+const box = (type, ...kids) => {
+  const body = kids.flatMap((k) => [...k]);
+  return Uint8Array.from([...be(body.length + 8, 4), ...[...type].map((c) => c.charCodeAt(0)), ...body]);
+};
+const moofAt = (ticks, version = 0) => box('moof', box('traf', box('tfhd', [0, 2, 0, 0], be(1, 4)), box('tfdt', [version, 0, 0, 0], be(ticks, version ? 8 : 4))));
+const trak = (handler, timescale) => box('trak', box('mdia', box('mdhd', [0, 0, 0, 0], be(0, 8), be(timescale, 4), be(0, 4)), box('hdlr', [0, 0, 0, 0], be(0, 4), [...handler].map((c) => c.charCodeAt(0)))));
 const tick = (ms = 5) => new Promise((r) => setTimeout(r, ms));
 const EBML = [0x1a, 0x45, 0xdf, 0xa3];
 
@@ -76,7 +90,47 @@ describe('cluster times', () => {
   });
 });
 
+describe('fMP4 times', () => {
+  it('the fixture: the sound track’s timescale, each moof’s tfdt in seconds', () => {
+    expect(mp4Timescale(M4S_INIT)).toBe(48000);
+    expect(mp4Timescale(M4S_FRAGS[0])).toBeNull();
+    expect(fragmentTimes(M4S, 48000)).toEqual({ first: 0, last: 2.005 });
+    expect(fragmentTimes(M4S_FRAGS[1], 48000)).toEqual({ first: 1.003, last: 1.003 });
+    expect(fragmentTimes(M4S_INIT, 48000)).toBeNull();
+    expect(fragmentTimes(M4S_FRAGS[1], null)).toBeNull();
+  });
+
+  it('a cut-off append still has its moof’s time; tfdt v0 and v1; the soun trak wins over the first', () => {
+    const frag = Uint8Array.from([...moofAt(90000 * 4), ...box('mdat', new Array(500).fill(1))]);
+    expect(fragmentTimes(frag.subarray(0, 120), 90000)).toEqual({ first: 4, last: 4 });
+    expect(fragmentTimes(moofAt(2 ** 33, 1), 1000)).toEqual({ first: 8589934.592, last: 8589934.592 });
+    expect(mp4Timescale(box('moov', trak('vide', 90000), trak('soun', 44100)))).toBe(44100);
+    expect(mp4Timescale(box('moov', trak('vide', 90000)))).toBe(90000);
+    expect(fragmentTimes(new Uint8Array(64).fill(0x6d), 1000)).toBeNull();
+  });
+});
+
 describe('MSE relay', () => {
+  it('fMP4 / AAC: held and timed by tfdt; fromS skips older fragments, the init still goes first', async () => {
+    const { relay, sent } = setup({ maxPush: 4096 });
+    relay.onMainEvent({ k: 'mse-buffer', sbId: 3, msId: 1, mime: 'audio/mp4; codecs="mp4a.40.2"' });
+    let seq = 0;
+    const append = (u8, init = false) => relay.onMainEvent({ k: 'mse-chunk', sbId: 3, seq: seq++, init, size: u8.length, bytes: u8.slice().buffer });
+    append(M4S_INIT, true);
+    for (const f of M4S_FRAGS) append(f);
+    expect(relay.stream(3)).toMatchObject({ kind: 'audio', codec: 'mp4a.40.2', forward: true, inits: 1, chunks: 4, firstTimeS: 0, lastTimeS: 2.005, held: M4S.subarray(0, 17781).length });
+    expect(relay.mainStream('blob:https://www.youtube.com/a')).toBe(3);
+    expect(relay.start(3, { fromS: 1 })).toMatchObject({ init: true, backlogBytes: M4S_INIT.length + M4S_FRAGS[1].length + M4S_FRAGS[2].length });
+    await tick(10);
+    expect(sent.map((p) => [p.init, p.raw.length, p.timeS])).toEqual([
+      [true, 692, null],
+      [false, 4096, 1.003],
+      [false, 4096, null],
+      [false, M4S_FRAGS[1].length + M4S_FRAGS[2].length - 8192, 2.005],
+    ]);
+    expect(new Uint8Array(sent.slice(1).flatMap((p) => [...p.raw]))).toEqual(M4S.subarray(9179, 17781));
+  });
+
   it('counts every stream, holds only decodable audio, tracks cluster times', () => {
     const { relay, push } = setup();
     push(new Uint8Array([...EBML, 0x9f, 1, 2, 3]), true);
@@ -264,11 +318,11 @@ describe('MSE relay', () => {
     expect(relay.mainStream('blob:https://www.youtube.com/a')).toBeNull();
   });
 
-  it('a changeType away from Opus stops holding; keepAttached forgets detached sources', () => {
+  it('a changeType away from Opus to undecodable audio stops holding; keepAttached forgets detached sources', () => {
     const { relay, push } = setup();
-    relay.onMainEvent({ k: 'mse-op', sbId: 1, op: 'changeType', mime: 'audio/mp4; codecs="mp4a.40.2"' });
+    relay.onMainEvent({ k: 'mse-op', sbId: 1, op: 'changeType', mime: 'audio/mp4; codecs="ac-3"' });
     push(new Uint8Array(40));
-    expect(relay.stream(1)).toMatchObject({ forward: false, codec: 'mp4a.40.2', held: 0, lastOp: { op: 'changeType' } });
+    expect(relay.stream(1)).toMatchObject({ forward: false, codec: 'ac-3', held: 0, lastOp: { op: 'changeType' } });
     relay.onMainEvent({ k: 'mse-source', msId: 2, url: 'blob:https://www.youtube.com/b' });
     relay.onMainEvent({ k: 'mse-buffer', sbId: 3, msId: 2, mime: 'audio/webm; codecs="opus"' });
     relay.keepAttached(new Set(['blob:https://www.youtube.com/b']));

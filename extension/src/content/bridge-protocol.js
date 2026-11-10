@@ -26,9 +26,11 @@ const HOOK_STATES = ['ok', 'failed', 'absent'];
 const EME_VIA = ['request', 'setMediaKeys', 'encrypted'];
 
 const AUDIO_CODEC = /^(opus|vorbis|mp4a|flac|ac-3|ec-3|mp3|alac)/;
+// AAC-LC, HE-AAC v1 and v2.
+const AAC = /^mp4a\.40\.0*(2|5|29)$/;
 
 // What a SourceBuffer mime carries and whether the media pipeline can take it
-// (WebM with Opus, or WebM audio without a codecs parameter).
+// (WebM with Opus, MP4 with AAC, or either without a codecs parameter).
 export function classifyMime(mime) {
   const m = String(mime || '').toLowerCase();
   const type = m.split(';')[0].trim();
@@ -40,15 +42,17 @@ export function classifyMime(mime) {
   const kind = audio ? 'audio' : type.startsWith('video/') ? 'video' : 'other';
   const container = type.split('/')[1] || '';
   const codec = codecs[0] || '';
-  const forward = kind === 'audio' && container === 'webm' && (codec === '' || codec === 'opus');
+  const forward =
+    kind === 'audio' && ((container === 'webm' && (codec === '' || codec === 'opus')) || (container === 'mp4' && (codec === '' || AAC.test(codec))));
   return { kind, container, codec, forward };
 }
 
-// An append that starts with a WebM EBML header or an MP4 ftyp box.
+// An append that starts with a WebM EBML header or an MP4 ftyp (or bare moov) box.
 export function isInitSegment(u8) {
   if (!u8 || u8.length < 8) return false;
   if (u8[0] === 0x1a && u8[1] === 0x45 && u8[2] === 0xdf && u8[3] === 0xa3) return true;
-  return u8[4] === 0x66 && u8[5] === 0x74 && u8[6] === 0x79 && u8[7] === 0x70;
+  const type = String.fromCharCode(u8[4], u8[5], u8[6], u8[7]);
+  return type === 'ftyp' || type === 'moov';
 }
 
 const str = (v, max) => (typeof v === 'string' && v.length <= max ? v : undefined);

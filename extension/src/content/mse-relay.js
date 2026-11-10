@@ -1,19 +1,28 @@
 // Isolated world: the page's MSE streams as the page world reports them.
 // Every SourceBuffer is a stream (its id is the page world's sbId) with
-// counts and cluster times. Audio the pipeline can decode is held in a ring
-// (LIMITS.ringBytes, oldest out, the init segment governing the oldest kept
-// chunk is kept too) until start(streamId); then the ring and everything
+// counts and media times (WebM clusters, MP4 fragments). Audio the pipeline
+// can decode is held in a ring (LIMITS.ringBytes, oldest out, the init
+// segment governing the oldest kept chunk is kept too) until
+// start(streamId); then the ring and everything
 // after it goes to send() as PAGE_MEDIA payloads: at most maxPush raw bytes,
 // at least once a second, an init segment in a payload of its own, one in
 // flight at a time. stop() drops what is queued and held.
 
 import { LIMITS, classifyMime } from './bridge-protocol.js';
 import { clusterTimes, timecodeScale, DEFAULT_TIMECODE_SCALE } from './webm-sniff.js';
+import { fragmentTimes, mp4Timescale } from './mp4-sniff.js';
 import { MAX_MEDIA_PUSH_BYTES, encodeBytes } from '../shared/messages.js';
 
 const err = (code) => Object.assign(new Error(code), { code });
 const MAX_SOURCES = 64;
 const MAX_STREAMS = 32;
+
+// Per container: the init segment's time scale (WebM ns per tick, MP4 ticks
+// per second) and the { first, last } seconds of an append.
+const SNIFF = {
+  webm: { scale: timecodeScale, times: (u8, scale) => clusterTimes(u8, scale ?? DEFAULT_TIMECODE_SCALE) },
+  mp4: { scale: mp4Timescale, times: (u8, scale) => (scale ? fragmentTimes(u8, scale) : null) },
+};
 
 function concat(parts, n) {
   if (parts.length === 1) return parts[0];
@@ -63,7 +72,7 @@ export function createMseRelay({
       const oldest = [...streams.values()].find((s) => !s.alive) || streams.values().next().value;
       streams.delete(oldest.sbId);
     }
-    const s = { sbId, msId, mime, ...classifyMime(mime), alive: true, inits: 0, chunks: 0, bytes: 0, firstTimeS: null, lastTimeS: null, lastOp: null, scale: DEFAULT_TIMECODE_SCALE, ring: [], ringBytes: 0, headInit: null, lastInit: null };
+    const s = { sbId, msId, mime, ...classifyMime(mime), alive: true, inits: 0, chunks: 0, bytes: 0, firstTimeS: null, lastTimeS: null, lastOp: null, scale: null, ring: [], ringBytes: 0, headInit: null, lastInit: null };
     streams.set(sbId, s);
     return s;
   }
@@ -93,9 +102,10 @@ export function createMseRelay({
     if (ev.init) s.inits++;
     const u8 = ev.bytes ? new Uint8Array(ev.bytes) : null;
     let times = null;
-    if (u8 && s.container === 'webm') {
-      if (ev.init) s.scale = timecodeScale(u8) || s.scale;
-      times = clusterTimes(u8, s.scale);
+    const sniff = SNIFF[s.container];
+    if (u8 && sniff) {
+      if (ev.init) s.scale = sniff.scale(u8) || s.scale;
+      times = sniff.times(u8, s.scale);
       if (times) {
         s.firstTimeS ??= times.first;
         s.lastTimeS = times.last;
@@ -222,7 +232,11 @@ export function createMseRelay({
           const s = streams.get(ev.sbId);
           if (!s) return null;
           s.lastOp = { op: ev.op, at: now(), ...(ev.mime !== undefined && { mime: ev.mime }), ...(ev.start !== undefined && { start: ev.start, end: ev.end }), ...(ev.value !== undefined && { value: ev.value }) };
-          if (ev.op === 'changeType') Object.assign(s, { mime: ev.mime ?? s.mime }, classifyMime(ev.mime ?? s.mime));
+          if (ev.op === 'changeType') {
+            const next = classifyMime(ev.mime ?? s.mime);
+            if (next.container !== s.container) s.scale = null;
+            Object.assign(s, { mime: ev.mime ?? s.mime }, next);
+          }
           if (ev.op === 'removed') kill(s);
           onStream(summary(s));
           return s;
@@ -240,7 +254,7 @@ export function createMseRelay({
       }
     },
 
-    // fromS: held chunks with a cluster time before it are not sent (the init
+    // fromS: held chunks with a media time before it are not sent (the init
     // segment that governs the first kept chunk still is).
     start(streamId, { fromS = null } = {}) {
       const s = streams.get(streamId);

@@ -226,6 +226,7 @@ describe('MSE hooks', () => {
     const audio = ms.addSourceBuffer('audio/webm; codecs="opus"');
     const video = ms.addSourceBuffer('video/mp4; codecs="av01.0.08M.08"');
     const aac = ms.addSourceBuffer('audio/mp4; codecs="mp4a.40.2"');
+    const ac3 = ms.addSourceBuffer('audio/mp4; codecs="ac-3"');
     expect(audio).toBeInstanceOf(FakeSB);
 
     const init = new Uint8Array([...EBML, 1, 2, 3]);
@@ -233,19 +234,22 @@ describe('MSE hooks', () => {
     const page = new Uint8Array(64).fill(7);
     audio.appendBuffer(new DataView(page.buffer, 8, 16));
     video.appendBuffer(new Uint8Array(1000));
-    aac.appendBuffer(new Uint8Array(500));
+    aac.appendBuffer(new Uint8Array(500).fill(5));
+    ac3.appendBuffer(new Uint8Array(300));
     expect(audio.got[0]).toBe(init); // the page's own object went to the browser
 
     const kinds = reports.map((r) => r.k);
-    expect(kinds).toEqual(['mse-source', 'mse-buffer', 'mse-buffer', 'mse-buffer', 'mse-chunk', 'mse-chunk', 'mse-chunk']);
+    expect(kinds).toEqual(['mse-source', 'mse-buffer', 'mse-buffer', 'mse-buffer', 'mse-buffer', 'mse-chunk', 'mse-chunk', 'mse-chunk', 'mse-chunk']);
     expect(reports[1]).toEqual({ k: 'mse-buffer', sbId: 1, msId: 1, mime: 'audio/webm; codecs="opus"' });
-    const [c0, c1, c2] = reports.filter((r) => r.k === 'mse-chunk');
+    const [c0, c1, c2, c3] = reports.filter((r) => r.k === 'mse-chunk');
     expect(c0).toMatchObject({ sbId: 1, seq: 0, init: true, size: 12 });
     expect(new Uint8Array(c0.bytes)).toEqual(init);
     expect(c0.bytes).not.toBe(init.buffer);
     expect(c1).toMatchObject({ sbId: 1, seq: 1, init: false, size: 16 });
     expect([...new Uint8Array(c1.bytes)]).toEqual(new Array(16).fill(7));
-    expect(c2).toEqual({ k: 'mse-chunk', sbId: 3, seq: 0, init: false, size: 500, bytes: null });
+    expect(c2).toMatchObject({ sbId: 3, seq: 0, init: false, size: 500 });
+    expect([...new Uint8Array(c2.bytes)]).toEqual(new Array(500).fill(5));
+    expect(c3).toEqual({ k: 'mse-chunk', sbId: 4, seq: 0, init: false, size: 300, bytes: null });
   });
 
   it('page-visible failures stay the page’s: thrown errors pass through, nothing reported', () => {
@@ -276,8 +280,8 @@ describe('MSE hooks', () => {
     sb.remove(0, 30);
     sb.timestampOffset = 12.5;
     expect(sb.timestampOffset).toBe(12.5);
-    sb.changeType('audio/mp4; codecs="mp4a.40.2"');
-    expect(sb.type).toBe('audio/mp4; codecs="mp4a.40.2"');
+    sb.changeType('audio/mp4; codecs="ec-3"');
+    expect(sb.type).toBe('audio/mp4; codecs="ec-3"');
     sb.appendBuffer(new Uint8Array(10));
     ms.removeSourceBuffer(sb);
     ms.fire('sourceclose');
@@ -286,7 +290,7 @@ describe('MSE hooks', () => {
       expect([k, sbId]).toEqual(['mse-op', 1]);
       return rest;
     });
-    expect(ops).toEqual([{ op: 'abort' }, { op: 'remove', start: 0, end: 30 }, { op: 'timestampOffset', value: 12.5 }, { op: 'changeType', mime: 'audio/mp4; codecs="mp4a.40.2"' }, { op: 'removed' }]);
+    expect(ops).toEqual([{ op: 'abort' }, { op: 'remove', start: 0, end: 30 }, { op: 'timestampOffset', value: 12.5 }, { op: 'changeType', mime: 'audio/mp4; codecs="ec-3"' }, { op: 'removed' }]);
     expect(reports.find((r) => r.k === 'mse-chunk')).toMatchObject({ bytes: null, size: 10 });
     expect(reports.at(-1)).toEqual({ k: 'mse-closed', msId: 1 });
   });
@@ -298,17 +302,25 @@ describe('MSE hooks', () => {
   it('mime classification and init sniffing', () => {
     expect(classifyMime('audio/webm; codecs="opus"')).toEqual({ kind: 'audio', container: 'webm', codec: 'opus', forward: true });
     expect(classifyMime('audio/webm')).toMatchObject({ kind: 'audio', forward: true });
-    expect(classifyMime('audio/mp4; codecs="mp4a.40.2"')).toMatchObject({ kind: 'audio', forward: false, codec: 'mp4a.40.2' });
     expect(classifyMime('video/webm; codecs="opus"')).toMatchObject({ kind: 'audio', forward: true });
     expect(classifyMime('video/webm; codecs="vp9, opus"')).toMatchObject({ kind: 'video', forward: false });
+    // MP4: AAC-LC, HE-AAC v1 / v2 (also zero-padded) or no codecs go through; other audio does not.
+    expect(classifyMime('audio/mp4; codecs="mp4a.40.2"')).toEqual({ kind: 'audio', container: 'mp4', codec: 'mp4a.40.2', forward: true });
+    for (const c of ['mp4a.40.5', 'mp4a.40.29', 'mp4a.40.02', 'MP4A.40.2']) expect(classifyMime(`audio/mp4;codecs="${c}"`), c).toMatchObject({ forward: true });
+    expect(classifyMime('audio/mp4')).toMatchObject({ kind: 'audio', container: 'mp4', forward: true });
+    for (const c of ['flac', 'ac-3', 'ec-3', 'opus', 'mp4a.40.1', 'mp4a.40.42', 'mp4a.6b']) expect(classifyMime(`audio/mp4; codecs="${c}"`), c).toMatchObject({ kind: 'audio', forward: false });
+    expect(classifyMime('video/mp4; codecs="avc1.64001f, mp4a.40.2"')).toMatchObject({ kind: 'video', forward: false });
+    expect(classifyMime('audio/webm; codecs="mp4a.40.2"')).toMatchObject({ kind: 'audio', forward: false });
     expect(isInitSegment(new Uint8Array(EBML))).toBe(true);
     expect(isInitSegment(new Uint8Array([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70]))).toBe(true);
+    expect(isInitSegment(new Uint8Array([0, 0, 2, 0x98, 0x6d, 0x6f, 0x6f, 0x76]))).toBe(true);
+    expect(isInitSegment(new Uint8Array([0, 0, 1, 0x20, 0x6d, 0x6f, 0x6f, 0x66]))).toBe(false);
     expect(isInitSegment(new Uint8Array([0x1f, 0x43, 0xb6, 0x75, 1, 1, 1, 1]))).toBe(false);
   });
 });
 
 describe('EME hooks', () => {
-  it('report key system requests, setMediaKeys and encrypted events without blocking', async () => {
+  it('report key system requests, setMediaKeys with keys and encrypted events without blocking; clearing keys is not reported', async () => {
     class Navigator {
       requestMediaKeySystemAccess(keySystem) {
         return Promise.reject(new DOMException(`${keySystem} unsupported`, 'NotSupportedError'));
@@ -325,6 +337,7 @@ describe('EME hooks', () => {
     expect(installEmeHooks(win, { emit: (e) => reports.push(e) })).toEqual({ eme: 'ok' });
     await expect(new Navigator().requestMediaKeySystemAccess('com.widevine.alpha', [{}])).rejects.toThrow('com.widevine.alpha unsupported');
     const el = new HTMLMediaElement();
+    await el.setMediaKeys(null);
     await el.setMediaKeys({ id: 1 });
     expect(el.keys).toEqual({ id: 1 });
     const v = document.createElement('video');
