@@ -191,6 +191,64 @@ describe('commands', () => {
     expect(big.textTracks).toBeDefined();
   });
 
+  it('the notice shows on the primary video with the locale’s words; its buttons report back; navigation removes it', async () => {
+    mountVideo();
+    const notices = [];
+    const makeNotice = (opts) => {
+      const n = { opts, shown: null, visible: false, kind: null, destroyed: false, show(s) {
+        n.shown = s;
+        n.visible = true;
+        n.kind = s.kind;
+      }, hide() {
+        n.visible = false;
+        n.kind = null;
+      }, destroy() {
+        n.destroyed = true;
+      } };
+      notices.push(n);
+      return n;
+    };
+    const i18n = { getMessage: (k) => ({ noticeListen: '读不到音频', noticeListenButton: '开始听译', noticeDismiss: '关闭' })[k] || '' };
+    const { runtime } = start({ makeNotice, i18n });
+    expect(await runtime.command({ cmd: 'notice', kind: 'listen' })).toEqual({ ok: true, result: { kind: 'listen' } });
+    expect(notices).toHaveLength(1);
+    expect(notices[0].shown).toEqual({ kind: 'listen', text: '读不到音频', button: '开始听译', dismissTitle: '关闭' });
+    expect((await runtime.command({ cmd: 'query' })).result.notice).toBe('listen');
+    notices[0].opts.onAccept('listen');
+    notices[0].opts.onDismiss('listen');
+    await tick();
+    expect(runtime.events('notice-action')).toEqual([
+      { type: 'notice-action', kind: 'listen', action: 'accept' },
+      { type: 'notice-action', kind: 'listen', action: 'dismiss' },
+    ]);
+    expect(await runtime.command({ cmd: 'notice', kind: null })).toEqual({ ok: true, result: { kind: null } });
+    expect(notices[0].visible).toBe(false);
+    expect(await runtime.command({ cmd: 'notice', kind: 'dance' })).toMatchObject({ ok: false, error: { code: 'bad-command' } });
+    await runtime.command({ cmd: 'notice', kind: 'listen' });
+    history.pushState(null, '', '/watch?v=nextVideo01');
+    document.dispatchEvent(new Event('yt-navigate-finish'));
+    await tick();
+    expect(notices[0].destroyed).toBe(true);
+  });
+
+  it('mse-capture passes fromS on; a visibility change reports the primary video', async () => {
+    mountVideo();
+    const { runtime, main } = start();
+    main({ k: 'mse-source', msId: 1, url: 'blob:https://www.youtube.com/ms-a' });
+    main({ k: 'mse-buffer', sbId: 3, msId: 1, mime: 'audio/webm; codecs="opus"' });
+    main({ k: 'mse-chunk', sbId: 3, seq: 0, init: true, size: 5, bytes: new Uint8Array(EBML).buffer });
+    main({ k: 'mse-chunk', sbId: 3, seq: 1, init: false, size: 3, bytes: new Uint8Array([1, 2, 3]).buffer });
+    const on = await runtime.command({ cmd: 'mse-capture', on: true, fromS: 100 });
+    // The held chunk has no cluster time, so it is kept; the backlog is init + chunk.
+    expect(on).toEqual({ ok: true, result: { on: true, streamId: 3, backlogBytes: 8, init: true } });
+    runtime.sent.length = 0;
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+    document.dispatchEvent(new Event('visibilitychange'));
+    await tick();
+    expect(runtime.events('media')).toEqual([expect.objectContaining({ type: 'media', reason: 'visibility', primary: true, media: expect.objectContaining({ pageVisible: false }) })]);
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+  });
+
   it('a video-less page refuses cues; site captions hide and show', async () => {
     const { runtime } = start();
     expect(await runtime.command({ cmd: 'cues', op: 'set', cues: [] })).toMatchObject({ ok: false, error: { code: 'no-video' } });

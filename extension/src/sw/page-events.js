@@ -4,11 +4,12 @@
 // the commands that go back to it. Only top frames on the manifest's
 // content-script hosts may report. The orchestrator (S5) reads
 // getTabEvidence and onPageEvent and decides; this module only carries out
-// commands, including the minimal MSE glue: while a tab has capture on, its
-// PAGE_MEDIA bytes go to the offscreen pipeline under the key
-// tab:<tabId>:<gen> and the pipeline's segments and translations come back
-// to the tab as `cues` commands (ids prefixed m<gen>- so a reopened session
-// cannot overwrite the last one's cues).
+// commands, including the glue to the offscreen document: while a tab has
+// capture on, its PAGE_MEDIA bytes go to the media pipeline under the key
+// tab:<tabId>:<gen>, and a tab's listen session (the DRM fallback) runs under
+// tab:<tabId>:l<gen>; both sessions' segments and translations come back to
+// the tab as `cues` commands (ids prefixed m<gen>- / l<gen>- so a reopened
+// session cannot overwrite the last one's cues).
 
 import { MSG } from '../shared/messages.js';
 import { checkPageEvent, checkPageMedia } from '../shared/page-protocol.js';
@@ -48,6 +49,7 @@ function freshEvidence(tabId, docId) {
     mse: { audio: null, streams: [] },
     eme: null,
     capture: null,
+    listen: null,
     updatedAt: 0,
   };
 }
@@ -119,6 +121,7 @@ export function createPageEvents({
     let ev = byTab.get(tabId);
     if (!ev || ev.docId !== docId) {
       if (ev?.capture?.on) closeCapture(ev, 'new-document', { tellTab: false });
+      if (ev?.listen?.on) closeListen(ev, 'new-document');
       ev = freshEvidence(tabId, docId);
       byTab.set(tabId, ev);
     }
@@ -136,7 +139,9 @@ export function createPageEvents({
     switch (event.type) {
       case 'navigated':
         if (ev.capture?.on) closeCapture(ev, 'navigated', { tellTab: false });
+        if (ev.listen?.on) closeListen(ev, 'navigated');
         ev.capture = null;
+        ev.listen = null;
         resetForNavigation(ev);
         Object.assign(ev, { url: event.url, site: event.site, mediaId: event.mediaId, navSeq: event.navSeq });
         return event;
@@ -191,6 +196,8 @@ export function createPageEvents({
         // The page stopped forwarding (overflow, stream gone): close our end too.
         if (ev.capture?.on && !event.on) closeCapture(ev, event.reason || 'page-stopped', { tellTab: false });
         return event;
+      case 'notice-action':
+        return event;
       default:
         return null;
     }
@@ -226,7 +233,12 @@ export function createPageEvents({
     const cap = { on: true, key, gen: g, streamId: null, lang, targetLang, startedAt: now(), pushes: 0, bytes: 0, segments: 0, translations: 0, firstSegmentAt: null, reason: null, chain: Promise.resolve() };
     ev.capture = cap;
     try {
-      const r = await sendToTab(tabId, { cmd: 'mse-capture', on: true, ...(Number.isSafeInteger(c.streamId) && { streamId: c.streamId }) });
+      const r = await sendToTab(tabId, {
+        cmd: 'mse-capture',
+        on: true,
+        ...(Number.isSafeInteger(c.streamId) && { streamId: c.streamId }),
+        ...(Number.isFinite(c.fromS) && { fromS: c.fromS }),
+      });
       cap.streamId ??= r?.streamId ?? null;
       return { key, ...r };
     } catch (e) {
@@ -260,6 +272,54 @@ export function createPageEvents({
     return rest;
   }
 
+  // ---- listen (the app captures system sound; nothing comes from the page) ----
+
+  async function openListen(tabId, c) {
+    const ev = byTab.get(tabId);
+    if (!ev) throw err('no-page');
+    if (ev.listen?.on) await closeListen(ev, 'restart');
+    const g = ++gen;
+    const key = `tab:${tabId}:l${g}`;
+    const lang = typeof c.lang === 'string' && c.lang ? c.lang : DEFAULT_LANG;
+    const targetLang = typeof c.targetLang === 'string' && c.targetLang ? c.targetLang : DEFAULT_TARGET;
+    const mediaStartS = Number.isFinite(c.mediaStartS) && c.mediaStartS > 0 ? c.mediaStartS : 0;
+    const l = { on: true, key, gen: g, lang, targetLang, mediaStartS, startedAt: now(), segments: 0, translations: 0, firstSegmentAt: null, reason: null, lastStatus: null };
+    ev.listen = l;
+    keys.set(key, { tabId, gen: g, kind: 'listen' });
+    if (keys.size > 8) keys.delete(keys.keys().next().value);
+    try {
+      await toOffscreen(MSG.LISTEN_OPEN, { key, lang, targetLang, mediaStartS });
+    } catch (e) {
+      l.on = false;
+      l.reason = e.code || 'open-failed';
+      throw e;
+    }
+    return { key, lang, targetLang, mediaStartS };
+  }
+
+  function closeListen(ev, reason) {
+    const l = ev.listen;
+    if (!l || !l.on) return Promise.resolve(l || null);
+    l.on = false;
+    l.reason = reason;
+    l.closing = toOffscreen(MSG.LISTEN_CLOSE, { key: l.key }).then(
+      (r) => {
+        l.stats = r;
+        return publicListen(l);
+      },
+      (e) => {
+        l.closeError = e.code || e.message;
+        return publicListen(l);
+      }
+    );
+    return l.closing;
+  }
+
+  function publicListen(l) {
+    const { closing: _x, ...rest } = l;
+    return rest;
+  }
+
   async function onPageMedia(payload, sender) {
     const ev = byTab.get(sender.tab.id);
     const cap = ev?.capture;
@@ -286,12 +346,13 @@ export function createPageEvents({
     }
   }
 
-  // MEDIA_EVENT broadcasts from the offscreen pipeline.
+  // MEDIA_EVENT broadcasts from the offscreen pipeline and listen sessions.
   function onMediaEvent(payload) {
     const owner = keys.get(payload?.key);
     const event = payload?.event;
     if (!owner || !event) return;
     const ev = byTab.get(owner.tabId);
+    if (owner.kind === 'listen') return onListenEvent(owner, ev, payload.key, event);
     const cap = ev?.capture?.gen === owner.gen ? ev.capture : null;
     const id = event.id !== undefined ? `m${owner.gen}-${event.id}` : null;
     if (event.type === 'segment') {
@@ -310,7 +371,28 @@ export function createPageEvents({
     } else if (cap && (event.type === 'status' || event.type === 'error' || event.type === 'suspended')) {
       cap.lastStatus = event.state || event.type;
     }
-    emit(owner.tabId, { type: 'capture-event', key: payload.key, event: id ? { ...event, id } : event });
+    emit(owner.tabId, { type: 'capture-event', kind: 'capture', key: payload.key, event: id ? { ...event, id } : event });
+  }
+
+  function onListenEvent(owner, ev, key, event) {
+    const l = ev?.listen?.gen === owner.gen ? ev.listen : null;
+    const id = event.id !== undefined ? `l${owner.gen}-${event.id}` : null;
+    if (event.type === 'segment') {
+      if (l) {
+        l.segments++;
+        l.firstSegmentAt ??= now();
+      }
+      sendToTab(owner.tabId, { cmd: 'cues', op: 'upsert', cue: { id, start: event.start, end: event.end, text: event.text } }).catch(() => {});
+    } else if (event.type === 'translation') {
+      if (l) l.translations++;
+      sendToTab(owner.tabId, { cmd: 'cues', op: 'translation', id, text: event.text, done: !!event.done }).catch(() => {});
+    } else if (event.type === 'closed' && l?.on) {
+      l.on = false;
+      l.reason = event.reason || 'closed';
+    } else if (l && (event.type === 'status' || event.type === 'error')) {
+      l.lastStatus = event.state || event.type;
+    }
+    emit(owner.tabId, { type: 'capture-event', kind: 'listen', key, event: id ? { ...event, id } : event });
   }
 
   // ---- extension pages ----
@@ -323,19 +405,25 @@ export function createPageEvents({
       const ev = byTab.get(tabId);
       return ev ? closeCapture(ev, 'command') : null;
     }
+    if (command.cmd === 'listen') {
+      if (command.on) return openListen(tabId, command);
+      const ev = byTab.get(tabId);
+      return ev ? closeListen(ev, command.reason || 'command') : null;
+    }
     return sendToTab(tabId, command);
   }
 
   function getTabEvidence(tabId) {
     const ev = byTab.get(tabId);
     if (!ev) return null;
-    return JSON.parse(JSON.stringify({ ...ev, capture: ev.capture ? publicCapture(ev.capture) : null }));
+    return JSON.parse(JSON.stringify({ ...ev, capture: ev.capture ? publicCapture(ev.capture) : null, listen: ev.listen ? publicListen(ev.listen) : null }));
   }
 
   function forget(tabId, reason) {
     const ev = byTab.get(tabId);
     if (!ev) return;
     if (ev.capture?.on) closeCapture(ev, reason, { tellTab: false });
+    if (ev.listen?.on) closeListen(ev, reason);
     byTab.delete(tabId);
     sendChains.delete(tabId);
     for (const k of [...parts.keys()]) if (k.startsWith(`${tabId}:`)) parts.delete(k);

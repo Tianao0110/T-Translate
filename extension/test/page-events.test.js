@@ -211,6 +211,56 @@ describe('commands and the capture glue', () => {
     expect(heard.filter((h) => h.event.type === 'capture-event').map((h) => h.event.event.id)).toEqual(['m1-0', 'm1-0']);
   });
 
+  it('capture on passes fromS to the page; notice actions reach listeners', async () => {
+    nav();
+    tabReplies['mse-capture'] = (c) => ({ ok: true, result: { on: c.on, streamId: 1 } });
+    await ext(MSG.TAB_COMMAND, { tabId: 7, command: { cmd: 'mse-capture', on: true, streamId: 1, fromS: 27.5, lang: 'auto', targetLang: 'ja' } });
+    expect(tabs.sent.at(-1).cmd).toEqual({ cmd: 'mse-capture', on: true, streamId: 1, fromS: 27.5 });
+    expect(offscreen.calls[0].payload).toEqual({ key: 'tab:7:1', lang: 'auto', targetLang: 'ja' });
+    report({ type: 'notice-action', kind: 'listen', action: 'accept' });
+    expect(heard.at(-1).event).toEqual({ type: 'notice-action', kind: 'listen', action: 'accept' });
+    expect(() => report({ type: 'notice-action', kind: 'listen', action: 'maybe' })).toThrow(expect.objectContaining({ code: 'bad-event' }));
+  });
+
+  it('listen on: opens the session under its own key, sends its cues back, closes on off, navigation or the stream ending', async () => {
+    nav();
+    offscreen.call = async (type, payload) => {
+      offscreen.calls.push({ type, payload });
+      if (type === MSG.LISTEN_OPEN) return { key: payload.key, id: 's1' };
+      if (type === MSG.LISTEN_CLOSE) return { key: payload.key, segments: 1 };
+      return null;
+    };
+    const r = await ext(MSG.TAB_COMMAND, { tabId: 7, command: { cmd: 'listen', on: true, lang: 'auto', targetLang: 'zh', mediaStartS: 12.5 } });
+    expect(r).toEqual({ key: 'tab:7:l1', lang: 'auto', targetLang: 'zh', mediaStartS: 12.5 });
+    expect(offscreen.calls[0]).toEqual({ type: MSG.LISTEN_OPEN, payload: { key: 'tab:7:l1', lang: 'auto', targetLang: 'zh', mediaStartS: 12.5 } });
+    expect(tabs.sent).toHaveLength(0); // nothing to tell the page
+    pe.onMediaEvent({ key: 'tab:7:l1', event: { type: 'status', state: 'listening' } });
+    pe.onMediaEvent({ key: 'tab:7:l1', event: { type: 'segment', id: 0, start: 13, end: 15, text: 'Hi' } });
+    pe.onMediaEvent({ key: 'tab:7:l1', event: { type: 'translation', id: 0, text: '嗨', done: true } });
+    await tick();
+    expect(tabs.sent.map((s) => s.cmd)).toEqual([
+      { cmd: 'cues', op: 'upsert', cue: { id: 'l1-0', start: 13, end: 15, text: 'Hi' } },
+      { cmd: 'cues', op: 'translation', id: 'l1-0', text: '嗨', done: true },
+    ]);
+    expect(pe.getTabEvidence(7).listen).toMatchObject({ on: true, key: 'tab:7:l1', segments: 1, translations: 1, lastStatus: 'listening' });
+    expect(heard.filter((h) => h.event.type === 'capture-event').map((h) => h.event.kind)).toEqual(['listen', 'listen', 'listen']);
+
+    const off = await ext(MSG.TAB_COMMAND, { tabId: 7, command: { cmd: 'listen', on: false } });
+    expect(off).toMatchObject({ on: false, reason: 'command', stats: { segments: 1 } });
+    expect(offscreen.calls.at(-1)).toEqual({ type: MSG.LISTEN_CLOSE, payload: { key: 'tab:7:l1' } });
+
+    await ext(MSG.TAB_COMMAND, { tabId: 7, command: { cmd: 'listen', on: true } });
+    expect(pe.getTabEvidence(7).listen.key).toBe('tab:7:l2');
+    pe.onMediaEvent({ key: 'tab:7:l2', event: { type: 'closed', reason: 'preempted' } });
+    expect(pe.getTabEvidence(7).listen).toMatchObject({ on: false, reason: 'preempted' });
+
+    await ext(MSG.TAB_COMMAND, { tabId: 7, command: { cmd: 'listen', on: true } });
+    nav(1, 'nextVideo001');
+    await tick();
+    expect(offscreen.calls.at(-1)).toEqual({ type: MSG.LISTEN_CLOSE, payload: { key: 'tab:7:l3' } });
+    expect(pe.getTabEvidence(7).listen).toBeNull();
+  });
+
   it('a reopened capture gets a new key and cue prefix; navigation and the pipeline closing end it', async () => {
     nav();
     tabReplies['mse-capture'] = (c) => ({ ok: true, result: { on: !!c.on, streamId: 1 } });

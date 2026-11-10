@@ -6,6 +6,7 @@
 
 import { createCompanionClient } from './companion-client.js';
 import { createMediaPipeline } from './media-pipeline.js';
+import { createListenSessions } from './listen-session.js';
 import { MSG, TARGET_OFFSCREEN, call, notify, handle, isExtensionSender, decodeBytes } from '../shared/messages.js';
 import { VERSION } from '../shared/version.js';
 
@@ -39,6 +40,12 @@ loading.catch(() => {});
 const ready = () => (loading = loading.catch(start));
 
 const pipeline = createMediaPipeline({ client, onEvent: (payload) => notify(MSG.MEDIA_EVENT, payload) });
+const listen = createListenSessions({ client, onEvent: (payload) => notify(MSG.MEDIA_EVENT, payload) });
+
+async function connected() {
+  await ready();
+  if (client.getState().status !== 'ready') await connectOnce();
+}
 
 handle(
   {
@@ -70,14 +77,23 @@ handle(
       await client.forget();
       return client.getState();
     },
+    [MSG.COMPANION_TRANSLATE]: async (payload) => {
+      await connected();
+      const items = Array.isArray(payload?.items) ? payload.items : [];
+      return client.translate(items, { source: String(payload?.source || 'auto'), target: String(payload?.target ?? '') });
+    },
     // Fails fast when the app is not reachable; the ASR session opens with the first decoded audio.
     [MSG.MEDIA_OPEN]: async (payload) => {
-      await ready();
-      if (client.getState().status !== 'ready') await connectOnce();
+      await connected();
       return pipeline.open({ key: payload?.key, lang: String(payload?.lang ?? ''), targetLang: String(payload?.targetLang ?? '') });
     },
     [MSG.MEDIA_PUSH]: async (payload) => pipeline.push({ key: payload?.key, bytes: decodeBytes(payload?.bytes) }),
     [MSG.MEDIA_CLOSE]: async (payload) => pipeline.close({ key: payload?.key }),
+    [MSG.LISTEN_OPEN]: async (payload) => {
+      await connected();
+      return listen.open({ key: payload?.key, lang: String(payload?.lang ?? ''), targetLang: String(payload?.targetLang ?? ''), mediaStartS: Number(payload?.mediaStartS) || 0 });
+    },
+    [MSG.LISTEN_CLOSE]: async (payload) => listen.close({ key: payload?.key }),
   },
   { target: TARGET_OFFSCREEN, accept: (_msg, sender) => isExtensionSender(sender) }
 );

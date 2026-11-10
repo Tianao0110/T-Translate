@@ -29,16 +29,24 @@ function makeCdp(sendRaw) {
       if (m.id && waiters.has(m.id)) {
         const w = waiters.get(m.id);
         waiters.delete(m.id);
+        clearTimeout(w.timer);
         if (m.error) w.reject(new Error(`${w.method}: ${m.error.message}`));
         else w.resolve(m.result);
       } else {
         for (const fn of listeners) fn(m);
       }
     },
-    send(method, params = {}, sessionId) {
+    // A call the browser never answers (a page promise that never settles)
+    // rejects after timeoutMs instead of hanging the script.
+    send(method, params = {}, sessionId, { timeoutMs = 120000 } = {}) {
       return new Promise((resolve, reject) => {
         const i = ++id;
-        waiters.set(i, { resolve, reject, method });
+        const timer = setTimeout(() => {
+          if (!waiters.delete(i)) return;
+          reject(new Error(`${method}: no reply in ${timeoutMs} ms`));
+        }, timeoutMs);
+        timer.unref?.();
+        waiters.set(i, { resolve, reject, method, timer });
         sendRaw(JSON.stringify({ id: i, method, params, ...(sessionId ? { sessionId } : {}) }));
       });
     },
@@ -97,8 +105,8 @@ async function launchBrowser({ exe, profile, lang = 'en-US', args = [], headless
     await cdp.send('Runtime.enable', {}, sessionId);
     return sessionId;
   };
-  const evaluate = async (sessionId, expression) => {
-    const r = await cdp.send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true }, sessionId);
+  const evaluate = async (sessionId, expression, opts) => {
+    const r = await cdp.send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true }, sessionId, opts);
     if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text);
     return r.result.value;
   };

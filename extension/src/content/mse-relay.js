@@ -240,15 +240,29 @@ export function createMseRelay({
       }
     },
 
-    start(streamId) {
+    // fromS: held chunks with a cluster time before it are not sent (the init
+    // segment that governs the first kept chunk still is).
+    start(streamId, { fromS = null } = {}) {
       const s = streams.get(streamId);
       if (!s || !s.alive) throw err('no-stream');
       if (!s.forward) throw err('unsupported');
       stop('restart');
+      let ring = s.ring;
+      let governing = ring.length ? (ring[0].init ? null : s.headInit) : s.lastInit;
+      if (Number.isFinite(fromS) && ring.length) {
+        let i = 0;
+        let gov = governing;
+        for (; i < ring.length; i++) {
+          const e = ring[i];
+          if (e.init) gov = e;
+          else if (!(e.timeS !== null && e.timeS < fromS)) break;
+        }
+        ring = ring.slice(i);
+        governing = ring.length ? (ring[0].init ? null : gov) : s.lastInit;
+      }
       const queue = [];
-      const governing = s.ring.length ? (s.ring[0].init ? null : s.headInit) : s.lastInit;
       if (governing) queue.push(governing);
-      queue.push(...s.ring);
+      queue.push(...ring);
       s.ring = [];
       s.ringBytes = 0;
       s.headInit = s.lastInit;

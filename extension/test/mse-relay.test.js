@@ -167,6 +167,45 @@ describe('MSE relay', () => {
     ]);
   });
 
+  it('fromS skips held chunks before it, keeping the init that governs the rest', async () => {
+    const { relay, sent, push } = setup({ maxPush: 1000 });
+    const init1 = new Uint8Array([...EBML, 1, 1, 1, 1]);
+    const init2 = new Uint8Array([...EBML, 2, 2, 2, 2]);
+    push(init1, true);
+    push(cluster(10000, 10));
+    push(cluster(20000, 10));
+    push(init2, true);
+    push(cluster(30000, 10));
+    push(cluster(40000, 10));
+    expect(relay.start(1, { fromS: 35 })).toMatchObject({ init: true });
+    await tick(5);
+    expect(sent.map((p) => [p.init, p.raw[4], p.timeS])).toEqual([
+      [true, 2, null],
+      [false, 0x01, 40],
+    ]);
+    relay.stop();
+    sent.length = 0;
+    // Everything held is older: only the latest init goes, the live chunks follow.
+    push(cluster(50000, 10));
+    expect(relay.start(1, { fromS: 60 })).toMatchObject({ init: true, backlogBytes: init2.length });
+    push(cluster(61000, 10));
+    await tick(50);
+    expect(sent.map((p) => [p.init, p.timeS])).toEqual([
+      [true, null],
+      [false, 61],
+    ]);
+    relay.stop();
+    sent.length = 0;
+    // Nothing older than fromS: the usual ring goes out.
+    push(cluster(70000, 10));
+    relay.start(1, { fromS: 5 });
+    await tick(5);
+    expect(sent.map((p) => [p.init, p.timeS])).toEqual([
+      [true, null],
+      [false, 70],
+    ]);
+  });
+
   it('stop drops what is held; the latest init still opens the next capture', async () => {
     const { relay, sent, push } = setup({ maxPush: 1000 });
     push(new Uint8Array([...EBML, 1, 1]), true);

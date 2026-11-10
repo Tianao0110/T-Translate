@@ -29,5 +29,16 @@
   "errGeneric": {
     "message": "Something went wrong: $CODE$",
     "placeholders": { "code": { "content": "$1" } }
-  }
+  },
+  "badgeCaptions": { "message": "CC" },
+  "badgeListening": { "message": "L" },
+  "badgeOff": { "message": "off" },
+  "titleCaptions": { "message": "Captions on" },
+  "titleListening": { "message": "Listening" },
+  "titleOff": { "message": "Off on this site" },
+  "titlePrompt": { "message": "This video needs listen mode" },
+  "titleSuspended": { "message": "No speech heard, paused" },
+  "noticeListen": { "message": "This video’s audio can’t be read. T-Translate can listen to it instead." },
+  "noticeListenButton": { "message": "Listen" },
+  "noticeDismiss": { "message": "Dismiss" }
 }

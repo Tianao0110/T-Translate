@@ -29,5 +29,16 @@
   "errGeneric": {
     "message": "出错了：$CODE$",
     "placeholders": { "code": { "content": "$1" } }
-  }
+  },
+  "badgeCaptions": { "message": "字" },
+  "badgeListening": { "message": "听" },
+  "badgeOff": { "message": "关" },
+  "titleCaptions": { "message": "字幕中" },
+  "titleListening": { "message": "听译中" },
+  "titleOff": { "message": "本站已关" },
+  "titlePrompt": { "message": "此视频需要听译" },
+  "titleSuspended": { "message": "没听到人声，已暂停" },
+  "noticeListen": { "message": "此视频无法读取音频，可以用 T-Translate 听译" },
+  "noticeListenButton": { "message": "开始听译" },
+  "noticeDismiss": { "message": "关闭" }
 }

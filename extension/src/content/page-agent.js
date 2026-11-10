@@ -2,8 +2,9 @@
 // (through the bridge), the media elements' state and the site's navigation,
 // tells the service worker as PAGE_EVENTs, forwards MSE audio as PAGE_MEDIA
 // while the worker has capture on, and runs the worker's PAGE_COMMANDs
-// (captions into the renderer, display, site captions, page-world actions).
-// Decides nothing by itself: when to capture or show is the worker's call.
+// (captions into the renderer, display, site captions, the tier-3 notice,
+// page-world actions). Decides nothing by itself: when to capture or show is
+// the worker's call.
 
 import { MSG, request, handle } from '../shared/messages.js';
 import { PAGE_EVENT_MAX_CHARS, MAX_CUES_PER_PART, sanitizeCue } from '../shared/page-protocol.js';
@@ -12,6 +13,7 @@ import { createCaptionRenderer, MODES, DISPLAYS } from './caption-renderer.js';
 import { createBridge } from './bridge.js';
 import { createMediaWatch } from './media-watch.js';
 import { createMseRelay } from './mse-relay.js';
+import { createNotice } from './notice.js';
 import { siteFor } from './sites/index.js';
 
 const MAX_SUBTITLES = 16;
@@ -44,9 +46,11 @@ export function createPageAgent({
   win = window,
   doc = document,
   runtime = chrome.runtime,
+  i18n = globalThis.chrome?.i18n,
   site = siteFor(win.location.hostname),
   makeBridge = createBridge,
   makeRenderer = createCaptionRenderer,
+  makeNotice = createNotice,
   now = () => Date.now(),
   statsMs = 1000,
   hooksTimeoutMs = HOOKS_TIMEOUT_MS,
@@ -65,6 +69,15 @@ export function createPageAgent({
   const view = { display: 'bilingual', mode: 'track', siteCaptions: 'show' };
   let renderer = null;
   let rendererEl = null;
+  let notice = null;
+  let noticeEl = null;
+  const t = (key) => {
+    try {
+      return i18n?.getMessage?.(key) || '';
+    } catch {
+      return '';
+    }
+  };
   const statsAt = new Map();
   const statsTimers = new Map();
 
@@ -213,6 +226,40 @@ export function createPageAgent({
     return site.hideSiteCaptions(doc, hidden);
   }
 
+  // ---- the tier-3 notice ----
+
+  function destroyNotice() {
+    notice?.destroy();
+    notice = null;
+    noticeEl = null;
+  }
+
+  function showNotice(kind) {
+    if (kind === null) {
+      notice?.hide();
+      return { kind: null };
+    }
+    if (kind !== 'listen') throw err('bad-command');
+    const v = media.primaryVideo();
+    if (!v) throw err('no-video');
+    if (!notice || noticeEl !== v) {
+      destroyNotice();
+      notice = makeNotice({
+        video: v,
+        onAccept: (k) => send({ type: 'notice-action', kind: k, action: 'accept' }),
+        onDismiss: (k) => send({ type: 'notice-action', kind: k, action: 'dismiss' }),
+      });
+      noticeEl = v;
+    }
+    notice.show({
+      kind,
+      text: t('noticeListen') || 'This video’s audio can’t be read. T-Translate can listen to it instead.',
+      button: t('noticeListenButton') || 'Listen',
+      dismissTitle: t('noticeDismiss') || 'Dismiss',
+    });
+    return { kind };
+  }
+
   function snapshot() {
     const primary = media.primaryVideo();
     return {
@@ -232,6 +279,7 @@ export function createPageAgent({
       eme,
       view: { ...view },
       renderer: renderer ? { cues: renderer.list().length, mode: renderer.mode, display: renderer.display } : null,
+      notice: notice?.visible ? notice.kind : null,
     };
   }
 
@@ -241,8 +289,10 @@ export function createPageAgent({
         if (!c.on) return { on: false, ...(relay.stop('off') || {}) };
         const id = Number.isSafeInteger(c.streamId) ? c.streamId : mainStreamId();
         if (id === null) throw err('no-stream');
-        return { on: true, ...relay.start(id) };
+        return { on: true, ...relay.start(id, { fromS: Number.isFinite(c.fromS) ? c.fromS : null }) };
       }
+      case 'notice':
+        return showNotice(c.kind ?? null);
       case 'cues':
         return applyCues(c);
       case 'display':
@@ -283,8 +333,15 @@ export function createPageAgent({
     relay.stop('navigated');
     relay.keepAttached(new Set(media.list().map((m) => m.src).filter(Boolean)));
     destroyRenderer();
+    destroyNotice();
     if (view.siteCaptions === 'hide') setSiteCaptions(false);
     reportAll();
+  }
+
+  // The tab going hidden or shown is a media report too (timeupdate stops with it).
+  function onVisibility() {
+    const v = media.primaryVideo();
+    if (v) send({ type: 'media', reason: 'visibility', media: media.snapshot(v), primary: true });
   }
 
   function checkMediaId() {
@@ -324,6 +381,7 @@ export function createPageAgent({
 
   const bridge = makeBridge({ win, onEvent: onMainEvent });
   const unwatchNav = site.watchNavigation({ doc, win }, onNavigate);
+  doc.addEventListener('visibilitychange', onVisibility);
   const unhandle = handle({ [MSG.PAGE_COMMAND]: runCommand }, { runtime, accept: (_m, sender) => sender?.id === runtime.id && !sender.tab });
 
   const hooksTimer = setTimeout(() => {
@@ -342,10 +400,12 @@ export function createPageAgent({
     media.stop();
     bridge.close();
     unwatchNav();
+    doc.removeEventListener('visibilitychange', onVisibility);
     try {
       unhandle();
     } catch {}
     destroyRenderer();
+    destroyNotice();
     if (view.siteCaptions === 'hide') setSiteCaptions(false);
   }
 

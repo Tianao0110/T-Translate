@@ -168,7 +168,8 @@ async function main() {
     if (off) await attach(off.targetId);
     step('offscreen document up', !!off);
 
-    const rec = await evaluate(page, `(${RECORD})(${JSON.stringify(fs.readFileSync(wav).toString('base64'))})`);
+    // Records in real time, so the clip's length bounds the wait.
+    const rec = await evaluate(page, `(${RECORD})(${JSON.stringify(fs.readFileSync(wav).toString('base64'))})`, { timeoutMs: 600000 });
     const webm = Buffer.from(rec.b64, 'base64');
     const mid = asMidStream(webm, OFFSET_MS);
     step('MediaRecorder WebM/Opus from <audio>', webm.length > 1000 && rec.duration > 5, `${(webm.length / 1024).toFixed(1)} KB, ${rec.duration.toFixed(2)} s audio, recorded in ${rec.recordMs} ms`);

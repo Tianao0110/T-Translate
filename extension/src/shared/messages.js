@@ -4,8 +4,8 @@
 // options / popup ──COMPANION_*──▶ service worker ──(target: offscreen)──▶ offscreen
 // offscreen ──COMPANION_STATE_CHANGED──▶ everyone (badge, open pages)
 // offscreen ──STORAGE_*──▶ service worker (offscreen pages only get chrome.runtime)
-// extension pages ──MEDIA_OPEN/PUSH/CLOSE──▶ service worker ──▶ offscreen (media pipeline)
-// offscreen ──MEDIA_EVENT { key, event }──▶ everyone
+// extension pages ──MEDIA_OPEN/PUSH/CLOSE / LISTEN_OPEN/CLOSE / COMPANION_TRANSLATE──▶ service worker ──▶ offscreen
+// offscreen ──MEDIA_EVENT { key, event }──▶ everyone (media pipeline and listen sessions alike)
 // content scripts ──PAGE_EVENT / PAGE_MEDIA / PING──▶ service worker (only these)
 // service worker ──PAGE_COMMAND──▶ a tab's top-frame content script (tabs.sendMessage)
 // extension pages ──TAB_EVIDENCE / TAB_COMMAND──▶ service worker
@@ -22,6 +22,8 @@ export const MSG = {
   COMPANION_STATE: 'companion/state',
   COMPANION_FORGET: 'companion/forget',
   COMPANION_STATE_CHANGED: 'companion/state-changed',
+  // payload { items: [{ id, text }], source?, target }: replies the client's translate result.
+  COMPANION_TRANSLATE: 'companion/translate',
   STORAGE_GET: 'storage/get',
   STORAGE_SET: 'storage/set',
   // payload { key, lang, targetLang }: a new media stream (replaces the one in progress).
@@ -31,6 +33,10 @@ export const MSG = {
   // payload { key }: replies with the stream's stats once its session closed.
   MEDIA_CLOSE: 'media/close',
   MEDIA_EVENT: 'media/event',
+  // payload { key, lang, targetLang, mediaStartS }: a listen session (the app captures system sound); events arrive as MEDIA_EVENT.
+  LISTEN_OPEN: 'listen/open',
+  // payload { key }: closes it; replies once it is closed.
+  LISTEN_CLOSE: 'listen/close',
   // payload { docId, navSeq, event }: what the page did (shared/page-protocol.js); replies { boot }.
   PAGE_EVENT: 'page/event',
   // payload { streamId, seq, init, timeS, bytes }: MSE audio while capture is on; replies { accepted, ended?, reason? }.
@@ -39,8 +45,10 @@ export const MSG = {
   PAGE_COMMAND: 'page/command',
   // payload { tabId }: the tab's evidence, or null.
   TAB_EVIDENCE: 'tab/evidence',
-  // payload { tabId, command }: a PAGE_COMMAND for the tab (mse-capture also opens / closes the media stream).
+  // payload { tabId, command }: a PAGE_COMMAND for the tab (mse-capture / listen open and close the sessions too).
   TAB_COMMAND: 'tab/command',
+  // payload { tabId }: what the orchestrator does in the tab (state, tier, why it is blocked), or null.
+  TAB_STATE: 'tab/state',
   PING: 'ping',
 };
 
