@@ -280,6 +280,7 @@ export function createPageAgent({
   const listOf = (many, one) => (Array.isArray(many) ? many : one ? [one] : []);
 
   function applyCues(c) {
+    if (c.op === 'list') return { cues: renderer ? renderer.list() : [] };
     const r = ensureRenderer();
     if (c.op === 'set') r.setCues(listOf(c.cues).map(sanitizeCue).filter(Boolean));
     else if (c.op === 'upsert') for (const cue of listOf(c.cues, c.cue).map(sanitizeCue).filter(Boolean)) r.upsert(cue);

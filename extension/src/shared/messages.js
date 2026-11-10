@@ -8,7 +8,8 @@
 // offscreen ──MEDIA_EVENT { key, event }──▶ everyone (media pipeline and listen sessions alike)
 // content scripts ──PAGE_EVENT / PAGE_MEDIA / PING──▶ service worker (only these)
 // service worker ──PAGE_COMMAND──▶ a tab's top-frame content script (tabs.sendMessage)
-// extension pages ──TAB_EVIDENCE / TAB_COMMAND──▶ service worker
+// extension pages ──TAB_EVIDENCE / TAB_COMMAND / TAB_STATE──▶ service worker
+// extension pages ──CACHE_*──▶ service worker (the subtitle cache, sw/cache-db.js)
 //
 // Messages are JSON on the wire (an ArrayBuffer arrives as {}), so media
 // bytes travel as base64: encodeBytes / decodeBytes.
@@ -41,7 +42,7 @@ export const MSG = {
   PAGE_EVENT: 'page/event',
   // payload { streamId, seq, init, timeS, bytes }: MSE audio while capture is on; replies { accepted, ended?, reason? }.
   PAGE_MEDIA: 'page/media',
-  // payload { cmd, ... }: mse-capture, cues, display, mode, site-captions, yt-reload, yt-captions-on, query.
+  // payload { cmd, ... }: mse-capture, cues (op set / upsert / translation / list), display, mode, site-captions, notice, yt-reload, yt-captions-on, query.
   PAGE_COMMAND: 'page/command',
   // payload { tabId }: the tab's evidence, or null.
   TAB_EVIDENCE: 'tab/evidence',
@@ -49,6 +50,14 @@ export const MSG = {
   TAB_COMMAND: 'tab/command',
   // payload { tabId }: what the orchestrator does in the tab (state, tier, why it is blocked), or null.
   TAB_STATE: 'tab/state',
+  // Replies { count, bytes }.
+  CACHE_STATS: 'cache/stats',
+  // Empties the cache; replies { count, bytes } after.
+  CACHE_CLEAR: 'cache/clear',
+  // payload { key }: the record under `${site}:${mediaId}` (a hit counts as a use), or null.
+  CACHE_GET: 'cache/get',
+  // payload { key, record: { cues, tier, lang, target } }: stores it; replies its metadata.
+  CACHE_PUT: 'cache/put',
   PING: 'ping',
 };
 

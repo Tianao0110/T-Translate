@@ -191,6 +191,19 @@ describe('commands', () => {
     expect(big.textTracks).toBeDefined();
   });
 
+  it('cues list hands back what the renderer holds, translations included; none before any cue', async () => {
+    mountVideo();
+    const { runtime } = start();
+    expect(await runtime.command({ cmd: 'cues', op: 'list' })).toEqual({ ok: true, result: { cues: [] } });
+    await runtime.command({ cmd: 'cues', op: 'set', cues: [{ id: '1', start: 1, end: 3, text: 'Hello' }, { id: '2', start: 3, end: 5, text: 'World' }] });
+    await runtime.command({ cmd: 'cues', op: 'translation', id: '1', text: '你好', done: true });
+    const r = await runtime.command({ cmd: 'cues', op: 'list' });
+    expect(r.result.cues).toEqual([
+      { id: '1', start: 1, end: 3, text: 'Hello', translation: '你好' },
+      { id: '2', start: 3, end: 5, text: 'World', translation: null },
+    ]);
+  });
+
   it('the notice shows on the primary video with the locale’s words; its buttons report back; navigation removes it', async () => {
     mountVideo();
     const notices = [];

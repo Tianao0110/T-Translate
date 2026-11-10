@@ -3,7 +3,8 @@
 // extension pages' COMPANION_* / MEDIA_* / LISTEN_* requests to it, does
 // chrome.storage for it, keeps each tab's page evidence and carries commands
 // to it (page-events.js), decides per tab what runs (session-orchestrator.js),
-// paints the badge and polls the channel once a minute.
+// holds the subtitle cache (cache-db.js), paints the badge and polls the
+// channel once a minute.
 
 import { MSG, TARGET_OFFSCREEN, request, handle, on, isExtensionSender } from '../shared/messages.js';
 import { showBadge, showTabBadge } from './badge.js';
@@ -11,6 +12,7 @@ import { createPageEvents } from './page-events.js';
 import { createPrefs } from './prefs.js';
 import { createTabArbiter } from './tab-arbiter.js';
 import { createOrchestrator } from './session-orchestrator.js';
+import { createSubtitleCache, openIndexedDbStore, cacheHandlers } from './cache-db.js';
 
 const OFFSCREEN_PATH = 'offscreen.html';
 const KEEPALIVE = 'companion-keepalive';
@@ -69,6 +71,8 @@ export const orchestrator = createOrchestrator({
   translate: (items, { source, target }) => toOffscreen(MSG.COMPANION_TRANSLATE, { items, source, target }),
   onState: (tabId, state) => showTabBadge(tabId, state, channel),
 });
+// Subtitles kept per media in IndexedDB; extension pages reach it through CACHE_*.
+export const subtitleCache = createSubtitleCache({ store: openIndexedDbStore() });
 
 function channelChanged(state) {
   channel = state || { status: 'unpaired' };
@@ -97,6 +101,7 @@ handle(
     },
     [MSG.TAB_STATE]: ({ tabId } = {}) => orchestrator.stateOf(tabId),
     ...pageEvents.extensionHandlers,
+    ...cacheHandlers(subtitleCache),
   },
   { accept: fromExtension }
 );
