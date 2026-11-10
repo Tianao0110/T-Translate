@@ -28,7 +28,7 @@
     {
       "matches": ["*://*.youtube.com/*", "*://*.bilibili.com/*"],
       "js": ["content-isolated.js"],
-      "run_at": "document_idle"
+      "run_at": "document_start"
     }
   ],
   "options_ui": {

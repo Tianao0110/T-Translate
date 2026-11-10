@@ -6,7 +6,9 @@
 // offscreen ──STORAGE_*──▶ service worker (offscreen pages only get chrome.runtime)
 // extension pages ──MEDIA_OPEN/PUSH/CLOSE──▶ service worker ──▶ offscreen (media pipeline)
 // offscreen ──MEDIA_EVENT { key, event }──▶ everyone
-// content scripts ──PING──▶ service worker
+// content scripts ──PAGE_EVENT / PAGE_MEDIA / PING──▶ service worker (only these)
+// service worker ──PAGE_COMMAND──▶ a tab's top-frame content script (tabs.sendMessage)
+// extension pages ──TAB_EVIDENCE / TAB_COMMAND──▶ service worker
 //
 // Messages are JSON on the wire (an ArrayBuffer arrives as {}), so media
 // bytes travel as base64: encodeBytes / decodeBytes.
@@ -29,6 +31,16 @@ export const MSG = {
   // payload { key }: replies with the stream's stats once its session closed.
   MEDIA_CLOSE: 'media/close',
   MEDIA_EVENT: 'media/event',
+  // payload { docId, navSeq, event }: what the page did (shared/page-protocol.js); replies { boot }.
+  PAGE_EVENT: 'page/event',
+  // payload { streamId, seq, init, timeS, bytes }: MSE audio while capture is on; replies { accepted, ended?, reason? }.
+  PAGE_MEDIA: 'page/media',
+  // payload { cmd, ... }: mse-capture, cues, display, mode, site-captions, yt-reload, yt-captions-on, query.
+  PAGE_COMMAND: 'page/command',
+  // payload { tabId }: the tab's evidence, or null.
+  TAB_EVIDENCE: 'tab/evidence',
+  // payload { tabId, command }: a PAGE_COMMAND for the tab (mse-capture also opens / closes the media stream).
+  TAB_COMMAND: 'tab/command',
   PING: 'ping',
 };
 

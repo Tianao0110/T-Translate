@@ -1,7 +1,6 @@
-// Isolated world at document_idle. The bridge to the page world and the
-// caption rendering land here later; for now one ping to the service worker,
-// the page is left alone.
+// Isolated world at document_start: the page agent (bridge to the page
+// world, media elements, navigation, captions) for the top frame.
 
-import { MSG, request } from '../shared/messages.js';
+import { createPageAgent } from './page-agent.js';
 
-request(MSG.PING);
+createPageAgent();

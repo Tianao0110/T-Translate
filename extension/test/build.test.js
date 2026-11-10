@@ -47,7 +47,7 @@ describe('extension build', () => {
     expect(m.background).toEqual({ service_worker: 'sw.js', type: 'module' });
     const [main, isolated] = m.content_scripts;
     expect(main).toMatchObject({ js: ['content-main.js'], world: 'MAIN', run_at: 'document_start' });
-    expect(isolated).toMatchObject({ js: ['content-isolated.js'], run_at: 'document_idle' });
+    expect(isolated).toMatchObject({ js: ['content-isolated.js'], run_at: 'document_start' });
     expect(isolated.world).toBeUndefined();
     const referenced = [
       m.background.service_worker, m.options_ui.page, m.action.default_popup,
