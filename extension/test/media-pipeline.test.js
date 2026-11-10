@@ -230,17 +230,18 @@ describe('media bytes over JSON messages', () => {
 });
 
 describe('media pipeline: closing for a seek', () => {
-  it('close with drain false drops what is queued instead of feeding it, and a new open does not wait on it', async () => {
+  it('close with drain false drops what is queued instead of decoding it (the fake decoder only yields on flush), and a new open does not wait on it', async () => {
     const { p, log, events } = setup();
     p.open({ key: 'tab1', lang: 'en', targetLang: 'zh' });
     for (let i = 0; i < FIXTURE.length; i += 1000) p.push({ key: 'tab1', bytes: FIXTURE.subarray(i, i + 1000) });
-    await new Promise((r) => setTimeout(r, 20)); // the decoder has handed some audio to the feeder
+    await new Promise((r) => setTimeout(r, 20)); // the decoder is configured and holds the blocks
     const closing = p.close({ key: 'tab1', drain: false });
     p.open({ key: 'tab2', lang: 'en', targetLang: 'zh' });
     const stats = await closing;
-    expect(log.drain).toBe(false);
-    expect(stats).toMatchObject({ bytes: FIXTURE.length });
-    expect(events).toEqual([{ key: 'tab1', event: { type: 'closed', reason: 'closed' } }]);
+    expect(log.pushed ?? 0).toBe(0); // nothing flushed, so no feeder and nothing fed
+    expect(log.closed).toBe(1);
+    expect(stats).toMatchObject({ bytes: FIXTURE.length, blocks: 31 });
+    expect(events).toEqual([{ key: 'tab1', event: { type: 'closed', reason: 'no-audio' } }]);
     expect(p.current()).toBe('tab2');
     await p.close({ key: 'tab2' });
   });
