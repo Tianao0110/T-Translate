@@ -1,9 +1,12 @@
 // Options page: pair with T-Translate, see the channel state, reconnect or
-// forget the pairing. All work happens in the offscreen client via the worker.
+// forget the pairing (all of it in the offscreen client via the worker);
+// per-site switches and auto listen (prefs in chrome.storage.local, which
+// the worker follows); the subtitle cache's size and emptying it.
 
 import { MSG, request, on } from '../shared/messages.js';
 import { CLIENT_STATUS } from '../shared/protocol.js';
 import { describeState, errorText } from '../shared/status-text.js';
+import { createPrefs } from '../sw/prefs.js';
 import { t, localize } from '../shared/page.js';
 
 const $ = (id) => document.getElementById(id);
@@ -54,3 +57,49 @@ on(MSG.COMPANION_STATE_CHANGED, (s) => {
 });
 render();
 act('load', MSG.COMPANION_LOAD);
+
+// ---- per site ----
+
+const prefs = createPrefs();
+const siteSwitches = { youtube: $('site-youtube'), bilibili: $('site-bilibili') };
+
+function renderPrefs() {
+  const p = prefs.get();
+  for (const [site, el] of Object.entries(siteSwitches)) el.checked = !p.siteOff[site];
+  $('auto-listen').checked = p.autoListen;
+}
+
+for (const [site, el] of Object.entries(siteSwitches)) {
+  el.addEventListener('change', () => {
+    const siteOff = { ...prefs.get().siteOff };
+    if (el.checked) delete siteOff[site];
+    else siteOff[site] = true;
+    prefs.set({ siteOff });
+  });
+}
+$('auto-listen').addEventListener('change', (e) => prefs.set({ autoListen: e.target.checked }));
+prefs.onChange(renderPrefs);
+prefs.load().then(renderPrefs);
+
+// ---- cache ----
+
+const size = (n) => (n < 1024 * 1024 ? `${Math.round(n / 1024)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
+
+async function renderCache() {
+  const r = await request(MSG.CACHE_STATS);
+  if (!r.ok) {
+    $('cache-stats').textContent = errorText(r.error?.code || 'error', t);
+    return;
+  }
+  const count = String(r.result.count);
+  const bytes = size(r.result.bytes);
+  $('cache-stats').textContent = t('cacheStats', [count, bytes]);
+}
+
+$('cache-clear').addEventListener('click', async () => {
+  $('cache-clear').disabled = true;
+  await request(MSG.CACHE_CLEAR);
+  $('cache-clear').disabled = false;
+  renderCache();
+});
+renderCache();

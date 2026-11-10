@@ -36,6 +36,22 @@ header p {
   background: var(--tc-surface);
 }
 
+.card + .card {
+  margin-top: 16px;
+}
+
+h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.row .hint {
+  display: block;
+  margin: 0;
+  font-size: 12px;
+}
+
 .status {
   font-weight: 500;
 }

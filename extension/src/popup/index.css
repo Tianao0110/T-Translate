@@ -1,13 +1,47 @@
 @import '../shared/theme.css';
 
 body {
-  width: 300px;
+  width: 320px;
   padding: 14px 16px;
   background: var(--tc-surface);
 }
 
-#open-options {
-  display: inline-block;
+.status {
+  font-weight: 500;
+}
+
+.status .sub {
+  display: block;
+  color: var(--tc-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.status .sub:empty {
+  display: none;
+}
+
+.controls {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--tc-border);
+  font-size: 13px;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--tc-border);
+}
+
+.footer button {
+  font-size: 13px;
+  padding: 4px 12px;
+}
+
+#open-options {
   font-size: 13px;
 }
