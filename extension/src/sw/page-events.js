@@ -27,7 +27,6 @@ const MAX_STREAMS = 16;
 const MAX_PENDING_PARTS = 4;
 const DEFAULT_LANG = 'en';
 const DEFAULT_TARGET = 'zh';
-const CLOSE_WAIT_MS = 15000; // a reopen waits this long at most for the last stream to drain
 
 const err = (code) => Object.assign(new Error(code), { code });
 
@@ -79,7 +78,6 @@ export function createPageEvents({
   sites = null, // site-access.js: granted() and ready
   now = () => Date.now(),
   bootId = crypto.randomUUID(),
-  closeWaitMs = CLOSE_WAIT_MS,
 }) {
   const matchers = (manifest?.content_scripts || []).flatMap((c) => c.matches || []).map(matchPattern);
   let siteMatchers = (sites?.granted?.() || []).map(matchPattern);
@@ -370,9 +368,6 @@ export function createPageEvents({
     const url = typeof c.url === 'string' ? c.url : '';
     if (!/^https?:[/][/]/i.test(url) || !ev.media.some((m) => m.src === url)) throw err('not-page-media');
     if (ev.direct?.on) await closeDirect(ev, 'restart');
-    // Off then on (a seek): the last stream may still be draining, and the
-    // app takes one session at a time; opening now would fail the new one.
-    else if (ev.direct?.closing) await Promise.race([ev.direct.closing, new Promise((r) => setTimeout(r, closeWaitMs))]);
     if (byTab.get(tabId) !== ev) throw err('no-page');
     const g = ++gen;
     const key = `tab:${tabId}:d${g}`;

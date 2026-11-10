@@ -68,6 +68,7 @@ function createCompanionSession({ engineManager, logger, now = Date.now, maxAhea
 
   function stop(s, reason) {
     if (s.closed) return;
+    s.stopping = true;
     if (ownerNow() === 'companion') engineManager.stopSession(reason);
   }
 
@@ -150,7 +151,9 @@ function createCompanionSession({ engineManager, logger, now = Date.now, maxAhea
     if (typeof lang !== 'string' || !LANG_RE.test(lang)) return { error: 'bad-request' };
     if (typeof targetLang !== 'string' || !LANG_RE.test(targetLang)) return { error: 'bad-request' };
     if (typeof mediaStartS !== 'number' || !Number.isFinite(mediaStartS) || mediaStartS < 0) return { error: 'bad-request' };
-    if (current) return { error: 'busy', owner: 'companion' };
+    // A session already told to close frees the slot (a seek reopens at once);
+    // the engine queues the new start behind the worker going away.
+    if (current && !current.stopping) return { error: 'busy', owner: 'companion' };
 
     const s = {
       id: crypto.randomUUID(),
@@ -169,6 +172,7 @@ function createCompanionSession({ engineManager, logger, now = Date.now, maxAhea
       pendingIds: new Set(),
       idleTimer: null,
     };
+    if (current && current !== s) last = current; // the one still stopping
     current = s;
     const sink = {
       status: (state, detail) => onStatus(s, state, detail),

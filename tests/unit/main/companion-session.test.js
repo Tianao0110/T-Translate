@@ -255,3 +255,27 @@ it('closes a session nobody reads or feeds', () => {
   vi.advanceTimersByTime(1000);
   expect(engine.stopped).toEqual(['companion-idle']);
 });
+
+describe('reopening while the last session is still stopping', () => {
+  it('a session told to close frees the slot: the next open queues in the engine instead of busy, both stay findable', async () => {
+    const { engine, session } = setup();
+    const a = session.open({ mode: 'feed' });
+    const { events: ea } = collect(session, a.id);
+    expect(session.close(a.id)).toEqual({ ok: true });
+    expect(engine.stopped).toEqual(['companion-close']);
+    // The manager queues the start behind the worker that is going (audio-engine-manager.js).
+    engine.startResult = () => ({ ok: true, queued: true });
+    const b = session.open({ mode: 'feed', mediaStartS: 95 });
+    expect(b.id).toBeTruthy();
+    const { events: eb } = collect(session, b.id);
+    expect(session.status()).toMatchObject({ active: true, id: b.id, state: 'starting' });
+    expect(session.has(a.id)).toBe(true);
+    expect(session.open({ mode: 'feed' })).toEqual({ error: 'busy', owner: 'companion' }); // b is not stopping
+    engine.end('stopped'); // a's last status
+    await tick();
+    await tick();
+    expect(ea.at(-1)).toMatchObject({ type: 'closed' });
+    expect(eb).toEqual([]);
+    expect(session.status()).toMatchObject({ active: true, id: b.id });
+  });
+});

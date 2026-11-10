@@ -442,7 +442,7 @@ describe('the direct glue (files the page plays by URL)', () => {
     expect(tabs.sent.length).toBe(sent);
   });
 
-  it('off then on at once (a seek): the new stream opens only once the last one has drained', async () => {
+  it('off then on at once (a seek): the new stream opens without waiting for the last one to finish closing (the app queues it)', async () => {
     page();
     await cmd({ cmd: 'direct', on: true, url: SRC, fromS: 20 });
     let drained;
@@ -453,11 +453,11 @@ describe('the direct glue (files the page plays by URL)', () => {
     const off = cmd({ cmd: 'direct', on: false, reason: 'seek' });
     const reopened = cmd({ cmd: 'direct', on: true, url: SRC, fromS: 95 });
     await tick();
-    expect(calls.map((c) => c[0])).toEqual(['open', 'close']);
+    expect(calls.map((c) => c[0])).toEqual(['open', 'close', 'open']);
+    expect(await reopened).toMatchObject({ key: 'tab:7:d2', fromS: 95 });
     drained();
     expect(await off).toMatchObject({ on: false, reason: 'seek' });
-    expect(await reopened).toMatchObject({ key: 'tab:7:d2', fromS: 95 });
-    expect(calls.map((c) => c[0])).toEqual(['open', 'close', 'open']);
+    expect(de.getTabEvidence(7).direct).toMatchObject({ on: true, key: 'tab:7:d2' });
   });
 
   it('a refused open (no permission) leaves it off with the reason', async () => {

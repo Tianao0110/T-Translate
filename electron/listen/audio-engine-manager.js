@@ -241,6 +241,13 @@ function getInfo() {
 
 // options.owner 'companion' with options.sink: the session reports to the
 // sink instead of the host window and files no transcript. Returns
+// One start waits at a time; a companion start displaced by a later one is
+// told it ended before it began.
+function queueStart(next) {
+  if (pendingStart?.owner === 'companion' && pendingStart !== next) pendingStart.sink?.status?.('stopped', 'preempted');
+  pendingStart = next;
+}
+
 // { ok } / { ok, queued } / { ok: false, busy | error }.
 function startSession(options = {}) {
   const owner = options.owner === 'companion' && options.sink ? 'companion' : 'window';
@@ -249,8 +256,14 @@ function startSession(options = {}) {
     // this start waits for the worker to go.
     if (owner === 'window' && sessionOwner === 'companion') {
       logger.info('preempting the companion session for the window');
-      pendingStart = { ...options, owner };
+      queueStart({ ...options, owner });
       stopSession('preempted');
+      return { ok: true, queued: true };
+    }
+    // The companion reopening right after it closed (a seek): its start
+    // waits for the worker to go, like the window's.
+    if (owner === 'companion' && sessionOwner === 'companion' && childState === 'stopping') {
+      queueStart({ ...options, owner });
       return { ok: true, queued: true };
     }
     logger.warn(`start ignored in state ${childState} (owner ${sessionOwner})`);
