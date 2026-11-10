@@ -27,9 +27,11 @@ export const MSG = {
   COMPANION_TRANSLATE: 'companion/translate',
   STORAGE_GET: 'storage/get',
   STORAGE_SET: 'storage/set',
-  // payload { key, lang, targetLang }: a new media stream (replaces the one in progress).
+  // payload { key, lang, targetLang, source? }: a new media stream (replaces the one in progress);
+  // source 'mse' (default: WebM / fragmented MP4 from a page) or 'direct' (a progressive MP4 the worker fetches).
   MEDIA_OPEN: 'media/open',
-  // payload { key, bytes }: bytes is base64 of the next WebM bytes, cut anywhere.
+  // payload { key, bytes, offset? }: bytes is base64 of the stream's next bytes, cut anywhere;
+  // offset is their file offset (direct streams only, required there). Replies { ended }.
   MEDIA_PUSH: 'media/push',
   // payload { key }: replies with the stream's stats once its session closed.
   MEDIA_CLOSE: 'media/close',

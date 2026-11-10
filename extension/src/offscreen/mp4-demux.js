@@ -6,150 +6,17 @@
 // once and resyncs on the next moof or init segment. Plain JS so it runs
 // under Node for tests.
 
+import { type4, u24, u32, s32, u64, printable, need, kids, find, readSoundTrak } from '../shared/mp4-table.js';
+
+export { parseAudioSpecificConfig } from '../shared/mp4-table.js';
+
 const EMPTY = new Uint8Array(0);
 const SKIP = new Set(['ftyp', 'styp', 'sidx', 'ssix', 'free', 'skip', 'emsg', 'prft', 'mfra', 'meta', 'uuid', 'pdin', 'wide', 'mdat']);
 const SYNC = new Set(['moof', 'moov', 'ftyp', 'styp']);
-const AAC_RATES = [96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350];
-
-const type4 = (u8, i) => String.fromCharCode(u8[i], u8[i + 1], u8[i + 2], u8[i + 3]);
-const u16 = (u8, i) => (u8[i] << 8) | u8[i + 1];
-const u24 = (u8, i) => (u8[i] << 16) | (u8[i + 1] << 8) | u8[i + 2];
-const u32 = (u8, i) => ((u8[i] << 24) >>> 0) + (u8[i + 1] << 16) + (u8[i + 2] << 8) + u8[i + 3];
-const s32 = (u8, i) => (u8[i] << 24) | (u8[i + 1] << 16) | (u8[i + 2] << 8) | u8[i + 3];
-const u64 = (u8, i) => u32(u8, i) * 2 ** 32 + u32(u8, i + 4);
-const printable = (u8, i) => u8[i] >= 0x20 && u8[i] <= 0x7e && u8[i + 1] >= 0x20 && u8[i + 1] <= 0x7e && u8[i + 2] >= 0x20 && u8[i + 2] <= 0x7e && u8[i + 3] >= 0x20 && u8[i + 3] <= 0x7e;
-
-function need(ok, message) {
-  if (!ok) throw new Error(message);
-}
-
-// [type, payload start, end] of every box in [from, to); throws when one overruns.
-function kids(u8, from, to) {
-  const out = [];
-  for (let p = from; p + 8 <= to; ) {
-    let size = u32(u8, p);
-    let head = 8;
-    if (size === 1) {
-      need(p + 16 <= to, 'short box header');
-      size = u64(u8, p + 8);
-      head = 16;
-    } else if (size === 0) size = to - p;
-    need(size >= head && p + size <= to, `${type4(u8, p + 4)} overruns its parent`);
-    out.push([type4(u8, p + 4), p + head, p + size]);
-    p += size;
-  }
-  return out;
-}
-
-const find = (list, type) => list.find((b) => b[0] === type) || null;
-
-// { objectType, sampleRate, channels } of an MPEG-4 AudioSpecificConfig
-// (objectType is the signalled one: 5 or 29 for explicit HE-AAC).
-export function parseAudioSpecificConfig(asc) {
-  let bit = 0;
-  const read = (n) => {
-    let v = 0;
-    for (let i = 0; i < n; i++, bit++) {
-      const byte = asc[bit >> 3];
-      need(byte !== undefined, 'short AudioSpecificConfig');
-      v = v * 2 + ((byte >> (7 - (bit & 7))) & 1);
-    }
-    return v;
-  };
-  const aot = () => {
-    const a = read(5);
-    return a === 31 ? 32 + read(6) : a;
-  };
-  const rate = () => {
-    const i = read(4);
-    return i === 15 ? read(24) : AAC_RATES[i] || 0;
-  };
-  const objectType = aot();
-  const sampleRate = rate();
-  const channels = read(4);
-  return { objectType, sampleRate, channels };
-}
-
-// { oti, asc } from an esds payload (after its version and flags).
-function readEsds(u8, from, to) {
-  let p = from;
-  const desc = (tag) => {
-    need(p < to && u8[p] === tag, `esds: no descriptor ${tag}`);
-    p++;
-    let len = 0;
-    for (let i = 0; i < 4; i++) {
-      need(p < to, 'esds: short descriptor');
-      const b = u8[p++];
-      len = len * 128 + (b & 0x7f);
-      if (!(b & 0x80)) break;
-    }
-    need(p + len <= to, 'esds: descriptor overruns');
-    return p + len;
-  };
-  desc(0x03);
-  p += 2;
-  const flags = u8[p++];
-  if (flags & 0x80) p += 2;
-  if (flags & 0x40) p += 1 + u8[p];
-  if (flags & 0x20) p += 2;
-  desc(0x04);
-  const oti = u8[p];
-  p += 13;
-  if (u8[p] !== 0x05) return { oti, asc: null };
-  const end = desc(0x05);
-  return { oti, asc: u8.slice(p, end) };
-}
-
-// codec, channels, sampleRate, codecPrivate of the first sample entry (an
-// AudioSampleEntry); other entries than mp4a come out under their own name
-// for the decoder to refuse.
-function readSampleEntry(u8, type, a, b) {
-  need(a + 28 <= b, `short ${type}`);
-  const version = u16(u8, a + 8);
-  let channels = u16(u8, a + 16);
-  let sampleRate = u32(u8, a + 24) >>> 16;
-  let from = a + 28;
-  if (version === 1) from += 16;
-  else if (version === 2) {
-    need(a + 64 <= b, 'short mp4a v2');
-    sampleRate = new DataView(u8.buffer, u8.byteOffset + a + 32, 8).getFloat64(0);
-    channels = u32(u8, a + 40);
-    from += 36;
-  }
-  const rest = { channels: channels || 1, sampleRate: Math.round(sampleRate) || 48000 };
-  if (type !== 'mp4a') return { codec: type.trim(), ...rest, codecPrivate: null };
-  let list = kids(u8, from, b);
-  const wave = find(list, 'wave');
-  if (wave) list = list.concat(kids(u8, wave[1], wave[2]));
-  const esds = find(list, 'esds');
-  const { oti, asc } = esds ? readEsds(u8, esds[1] + 4, esds[2]) : { oti: 0x40, asc: null };
-  let codec = 'mp4a';
-  if (asc?.length) {
-    const cfg = parseAudioSpecificConfig(asc);
-    codec = oti === 0x40 ? `mp4a.40.${cfg.objectType}` : `mp4a.${oti.toString(16)}`;
-    sampleRate ||= cfg.sampleRate;
-    channels ||= cfg.channels;
-  }
-  return { codec, channels: channels || 1, sampleRate: Math.round(sampleRate) || 48000, codecPrivate: asc?.length ? asc : null };
-}
 
 function readTrak(u8, a, b) {
-  const list = kids(u8, a, b);
-  const tkhd = find(list, 'tkhd');
-  const mdia = find(list, 'mdia');
-  if (!tkhd || !mdia) return null;
-  const id = u32(u8, tkhd[1] + (u8[tkhd[1]] === 1 ? 20 : 12));
-  const ml = kids(u8, mdia[1], mdia[2]);
-  const mdhd = find(ml, 'mdhd');
-  const hdlr = find(ml, 'hdlr');
-  if (!mdhd || !hdlr || type4(u8, hdlr[1] + 8) !== 'soun') return null;
-  const timescale = u32(u8, mdhd[1] + (u8[mdhd[1]] === 1 ? 20 : 12));
-  const minf = find(ml, 'minf');
-  const stbl = minf && find(kids(u8, minf[1], minf[2]), 'stbl');
-  const stsd = stbl && find(kids(u8, stbl[1], stbl[2]), 'stsd');
-  const entry = stsd && kids(u8, stsd[1] + 8, stsd[2])[0];
-  if (!id || !timescale || !entry) return null;
-  return { id, timescale, ...readSampleEntry(u8, entry[0], entry[1], entry[2]) };
+  const t = readSoundTrak(u8, a, b);
+  return t && { id: t.id, timescale: t.timescale, codec: t.codec, channels: t.channels, sampleRate: t.sampleRate, codecPrivate: t.codecPrivate };
 }
 
 export function createMp4Demuxer({ maxBoxBytes = 16 * 1024 * 1024, maxUnknownBytes = 1024 * 1024 } = {}) {

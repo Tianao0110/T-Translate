@@ -1,10 +1,13 @@
-// One media stream at a time: WebM or fragmented MP4 bytes → demuxer →
+// One media stream at a time: WebM or fragmented MP4 bytes from a page's MSE
+// (source 'mse'), or a progressive MP4 the service worker fetches by range
+// (source 'direct', every push with its file offset) → demuxer →
 // WebCodecs → 16 kHz mono → feeder → companion ASR session. onEvent({ key, event }) carries the
 // session's events (status, segment, translation, closed) and the feeder's
 // (suspended, dropped, error); every open ends with exactly one 'closed'.
 
 import { createWebmDemuxer } from './webm-demux.js';
 import { createMp4Demuxer } from './mp4-demux.js';
+import { createProgressiveMp4Demuxer } from './mp4-progressive.js';
 import { createAudioDecoder, createResampler } from './decode.js';
 import { createAudioFeeder } from './audio-feeder.js';
 import { SAMPLE_RATE } from '../shared/protocol.js';
@@ -19,6 +22,7 @@ export class PipelineError extends Error {
   }
 }
 
+const SOURCES = ['mse', 'direct'];
 const MP4_HEAD = new Set(['ftyp', 'moov', 'moof', 'styp', 'sidx']);
 
 // 'webm' or 'mp4' from a stream's first 12 bytes (an init segment, or a
@@ -207,13 +211,15 @@ export function createMediaPipeline({
 
   return {
     // A new key replaces the stream in progress (closed without draining).
-    open({ key, lang = '', targetLang = '' } = {}) {
+    open({ key, lang = '', targetLang = '', source = 'mse' } = {}) {
       if (typeof key !== 'string' || !key) throw new PipelineError('bad-request', 'key');
+      if (!SOURCES.includes(source)) throw new PipelineError('bad-request', 'source');
       const after = cur ? closeStream(cur, { drain: false }) : null;
       const s = {
         key,
         lang,
         targetLang,
+        source,
         after,
         demuxer: null,
         track: null,
@@ -228,19 +234,25 @@ export function createMediaPipeline({
         failure: null,
         closedSent: false,
         closing: null,
-        stats: { container: null, bytes: 0, blocks: 0, decodedS: 0, demuxErrors: 0, firstPushAt: 0, lastPcmAt: 0 },
+        stats: { source, container: null, bytes: 0, blocks: 0, decodedS: 0, demuxErrors: 0, firstPushAt: 0, lastPcmAt: 0 },
       };
-      s.demuxer = createAutoDemuxer((container) => (s.stats.container = container));
+      if (source === 'direct') {
+        s.demuxer = createProgressiveMp4Demuxer();
+        s.stats.container = 'mp4';
+      } else s.demuxer = createAutoDemuxer((container) => (s.stats.container = container));
       cur = s;
       return { key };
     },
 
-    push({ key, bytes }) {
+    // offset: the bytes' file offset, required for a direct stream.
+    push({ key, bytes, offset }) {
       const s = need(key);
+      const direct = s.source === 'direct';
+      if (direct && !(Number.isSafeInteger(offset) && offset >= 0)) throw new PipelineError('bad-request', 'offset');
       if (s.ended) return { ended: true };
       s.stats.firstPushAt ||= now();
       s.stats.bytes += bytes.length;
-      for (const evt of s.demuxer.push(bytes)) onDemux(s, evt);
+      for (const evt of direct ? s.demuxer.push(bytes, { offset }) : s.demuxer.push(bytes)) onDemux(s, evt);
       return { ended: s.ended };
     },
 

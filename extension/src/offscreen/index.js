@@ -85,9 +85,9 @@ handle(
     // Fails fast when the app is not reachable; the ASR session opens with the first decoded audio.
     [MSG.MEDIA_OPEN]: async (payload) => {
       await connected();
-      return pipeline.open({ key: payload?.key, lang: String(payload?.lang ?? ''), targetLang: String(payload?.targetLang ?? '') });
+      return pipeline.open({ key: payload?.key, lang: String(payload?.lang ?? ''), targetLang: String(payload?.targetLang ?? ''), source: payload?.source ?? 'mse' });
     },
-    [MSG.MEDIA_PUSH]: async (payload) => pipeline.push({ key: payload?.key, bytes: decodeBytes(payload?.bytes) }),
+    [MSG.MEDIA_PUSH]: async (payload) => pipeline.push({ key: payload?.key, bytes: decodeBytes(payload?.bytes), offset: payload?.offset }),
     [MSG.MEDIA_CLOSE]: async (payload) => pipeline.close({ key: payload?.key }),
     [MSG.LISTEN_OPEN]: async (payload) => {
       await connected();

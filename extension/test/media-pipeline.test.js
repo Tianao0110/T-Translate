@@ -5,7 +5,8 @@
 // supported) and a fake feeder: the container is picked from the first
 // bytes, the first block's time becomes mediaStartS, blocks wait for the
 // decoder, 48 kHz arrives as 16 kHz, close drains and ends with one 'closed';
-// AAC in WebM is reported unsupported, AAC in fMP4 decodes.
+// AAC in WebM is reported unsupported, AAC in fMP4 decodes; a direct
+// (progressive MP4) stream takes pushes with file offsets.
 
 import { describe, it, expect, vi } from 'vitest';
 import fs from 'node:fs';
@@ -14,11 +15,14 @@ import { createMediaPipeline, containerOf } from '../src/offscreen/media-pipelin
 import { opusPacketMs } from '../src/offscreen/webm-demux.js';
 import { decoderConfig } from '../src/offscreen/decode.js';
 import { MSG, encodeBytes, decodeBytes, MAX_MEDIA_PUSH_BYTES } from '../src/shared/messages.js';
+import { parseMoov, offsetAt } from '../src/shared/mp4-table.js';
 
 const FIXTURE = new Uint8Array(fs.readFileSync(path.join(__dirname, 'fixtures', 'tone-2s.webm')));
 // AAC-LC 48 kHz mono, ftyp + moov (692 bytes), a moof + mdat a second (the second at 9179).
 const M4S = new Uint8Array(fs.readFileSync(path.join(__dirname, 'fixtures', 'tone-2s.m4s')));
 const AAC_FRAMES = 95;
+const FAST = new Uint8Array(fs.readFileSync(path.join(__dirname, 'fixtures', 'tone-2s-faststart.mp4')));
+const LAST = new Uint8Array(fs.readFileSync(path.join(__dirname, 'fixtures', 'tone-2s-moov-last.mp4')));
 
 function fakeDecoderFactory(log) {
   return async ({ track, onPcm }) => {
@@ -170,6 +174,39 @@ describe('media pipeline', () => {
     expect(containerOf(FIXTURE)).toBe('webm');
     expect(containerOf(Uint8Array.from([0x1f, 0x43, 0xb6, 0x75, 1, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]))).toBe('webm');
     expect(containerOf(head('mdat'))).toBe('webm');
+  });
+
+  it('direct: the head, then mdat with offsets → ~2 s of 16 kHz audio; source in the stats', async () => {
+    const { p, log, events } = setup();
+    p.open({ key: 'd', lang: 'en', targetLang: 'zh', source: 'direct' });
+    p.push({ key: 'd', bytes: FAST.subarray(0, 1154), offset: 0 });
+    for (let i = 1170; i < FAST.length; i += 1000) p.push({ key: 'd', bytes: FAST.subarray(i, i + 1000), offset: i });
+    const stats = await p.close({ key: 'd' });
+    expect(stats).toMatchObject({ source: 'direct', container: 'mp4', bytes: FAST.length - 16, blocks: AAC_FRAMES, demuxErrors: 0 });
+    expect(stats.decodedS).toBeCloseTo((AAC_FRAMES * 1024) / 48000, 6);
+    expect(log.opts).toMatchObject({ lang: 'en', targetLang: 'zh', mediaStartS: 0 });
+    expect(events).toEqual([{ key: 'd', event: { type: 'closed', reason: 'closed' } }]);
+  });
+
+  it('direct, moov at the end: the moov first, mdat from 1 s; mediaStartS from that sample', async () => {
+    const { p, log } = setup();
+    p.open({ key: 'e', source: 'direct' });
+    p.push({ key: 'e', bytes: LAST.subarray(16433), offset: 16433 });
+    const from = offsetAt(parseMoov(LAST), 1);
+    for (let i = from; i < 16433; i += 4096) p.push({ key: 'e', bytes: LAST.subarray(i, Math.min(i + 4096, 16433)), offset: i });
+    const stats = await p.close({ key: 'e' });
+    expect(stats.blocks).toBe(AAC_FRAMES - 47);
+    expect(log.opts.mediaStartS).toBeCloseTo((47 * 1024) / 48000, 9);
+  });
+
+  it('direct pushes need an offset; an unknown source is refused; mse ignores offsets', () => {
+    const { p } = setup();
+    expect(() => p.open({ key: 'z', source: 'file' })).toThrow(expect.objectContaining({ code: 'bad-request' }));
+    p.open({ key: 'd', source: 'direct' });
+    expect(() => p.push({ key: 'd', bytes: FAST.subarray(0, 100) })).toThrow(expect.objectContaining({ code: 'bad-request', message: 'offset' }));
+    expect(() => p.push({ key: 'd', bytes: FAST.subarray(0, 100), offset: -1 })).toThrow(expect.objectContaining({ code: 'bad-request' }));
+    p.open({ key: 'm' });
+    expect(p.push({ key: 'm', bytes: M4S, offset: 5 })).toEqual({ ended: false });
   });
 
   it('a stream with no audio ends with closed/no-audio', async () => {
