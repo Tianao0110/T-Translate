@@ -261,6 +261,15 @@ Turns the sound playing on this computer into captions and translates them in re
 - "Sound, but no clear speech recognized for a while": try another recognition language.
 - When the chosen program exits, capture switches back to all sound.
 
+**Browser extension**
+
+The T-Caption extension shows captions on web videos. Recognition and translation run on this computer.
+
+1. At the bottom of Settings → Audio → Listen, turn on "Allow the browser extension to connect". It is off by default.
+2. Click "Pair", then click connect in the extension within 60 seconds. You only pair once.
+3. "Regenerate token" stops every paired extension until you pair it again. Use it if you think the token leaked.
+4. When you start listen mode in the floating window, the extension's captions stop. The floating window comes first.
+
 ## 4. Settings
 
 Click "Settings" in the main window, or press Ctrl+4 / Ctrl+,. Pages are on the left; the box at the top searches settings. The catalog starts in simple mode with the common pages only; click "Full" at the bottom left for everything.
@@ -334,6 +343,7 @@ The model that ships with the app; you download the files yourself and put them 
 - Final tier: standard / high accuracy. High accuracy needs one of the "High-accuracy models" in place first. If none is in place when listening starts, the floating window says so once and that session uses standard recognition.
 - High-accuracy models (right under the final tier): Qwen3-ASR 1.7B and 0.6B, two files each, with whether they are in place, download links, the model folder, "Re-detect", and which one the next listen session uses. The 1.7B runs when GPU acceleration is on and the dedicated GPU has 8 GB or more of video memory, otherwise the 0.6B; if only one is in place, that one runs.
 - Auto-save captions on stop or switch: on by default.
+- Browser extension (at the bottom): off by default. Turning it on and pairing are in 3.3.
 
 ### 4.10 Audio · Speak
 

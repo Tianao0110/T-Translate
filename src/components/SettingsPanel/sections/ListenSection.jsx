@@ -1,9 +1,11 @@
 // Listen-mode models: the ASR packs (PackList, shared with the voice packs on
 // the TTS page, the only download entry point for them) and the
 // high-accuracy tier's speech models (SpeechPacks, placed by hand).
+// Last group: T-Caption's local channel (docs/design/listen.md §11).
 
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Plug, KeyRound } from 'lucide-react';
 import PackList from './PackList.jsx';
 import SpeechPacks from './SpeechPacks.jsx';
 import { Seg, Switch } from './shared.jsx';
@@ -14,6 +16,85 @@ const logger = createLogger('ListenSection');
 const LEGACY_HQ_TYPE = 'asr-hq';
 const INSTALLED_STATES = ['installed', 'update-available', 'orphaned'];
 const showPack = (p) => p.type !== LEGACY_HQ_TYPE || INSTALLED_STATES.includes(p.status);
+
+// The switch is a store key the main process watches; status comes from the
+// channel itself. The token never reaches this page.
+const CompanionGroup = ({ notify, confirm }) => {
+  const { t } = useTranslation();
+  const [bridge] = useState(() => window.electron?.companion || null);
+  const [enabled, setEnabled] = useState(false);
+  const [status, setStatus] = useState(null);
+
+  useEffect(() => {
+    window.electron?.store?.get?.('settings.companion.enabled')
+      .then((v) => setEnabled(v === true))
+      .catch(() => {});
+    if (!bridge) return undefined;
+    bridge.getStatus?.().then(setStatus).catch((e) => logger.debug('companion status failed:', e.message));
+    return bridge.onStatus?.(setStatus);
+  }, [bridge]);
+
+  const handleEnable = async (next) => {
+    setEnabled(next);
+    await window.electron?.store?.set?.('settings.companion.enabled', next);
+  };
+
+  const handlePair = async () => {
+    try {
+      setStatus(await bridge.openPairing());
+    } catch (e) {
+      logger.warn('companion pairing failed:', e.message);
+    }
+  };
+
+  const handleRegenerate = async () => {
+    if (!(await confirm(t('listen.companion.regenerateConfirm')))) return;
+    try {
+      setStatus(await bridge.regenerateToken());
+      notify(t('listen.companion.regenerated'), 'success');
+    } catch (e) {
+      logger.warn('companion token regenerate failed:', e.message);
+    }
+  };
+
+  let statusText = t('listen.companion.unavailable');
+  if (bridge && !enabled) statusText = t('listen.companion.statusOff');
+  else if (bridge && !status?.running) statusText = t('listen.companion.statusStarting');
+  else if (bridge) {
+    statusText = t('listen.companion.statusListening', { port: status.port });
+    if (status.session?.active) statusText += ` · ${t('listen.companion.statusSession')}`;
+  }
+
+  const waiting = !!status?.pairingOpen;
+  const needEnable = bridge && !enabled ? t('listen.companion.pairNeedEnable') : undefined;
+
+  return (
+    <div className="setting-group">
+      <label className="setting-label">{t('listen.companion.title')}</label>
+      <p className="setting-hint" style={{ marginTop: 0, marginBottom: 10 }}>{t('listen.companion.intro')}</p>
+      <Switch checked={enabled} onChange={handleEnable} label={t('listen.companion.enable')} />
+      <p className="setting-hint">{statusText}</p>
+      <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+        <button
+          className="btn-small"
+          onClick={handlePair}
+          disabled={!bridge || !enabled || !status?.running || waiting}
+          title={needEnable}
+        >
+          <Plug size={12} /> {t(waiting ? 'listen.companion.pairWaiting' : 'listen.companion.pair')}
+        </button>
+        <button
+          className="btn-small"
+          onClick={handleRegenerate}
+          disabled={!bridge || !enabled}
+          title={needEnable}
+        >
+          <KeyRound size={12} /> {t('listen.companion.regenerate')}
+        </button>
+      </div>
+    </div>
+  );
+};
 
 // embedded: rendered inside the audio sub-page, which owns the heading.
 const ListenSection = ({ notify, confirm, embedded = false }) => {
@@ -149,6 +230,8 @@ const ListenSection = ({ notify, confirm, embedded = false }) => {
           {t('listen.packs.location', { dir: info?.activeDir || info?.modelsDir || '' })}
         </p>
       </PackList>
+
+      <CompanionGroup notify={notify} confirm={confirm} />
     </div>
   );
 };
