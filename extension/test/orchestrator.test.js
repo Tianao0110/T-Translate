@@ -686,3 +686,18 @@ describe('direct links: a plain file the worker fetches itself', () => {
     expect(orch.stateOf(7)).toMatchObject({ state: 'captions', run: { tier: 1 } });
   });
 });
+
+describe('direct links: a file the fetcher cannot use', () => {
+  it('falls back to the listen notice at once, without three retries', async () => {
+    pe.reply('direct', (c) => {
+      if (c.on) throw Object.assign(new Error('no-audio'), { code: 'no-audio' });
+      return {};
+    });
+    await playing(7, { evidence: { mse: { audio: null, streams: [] } }, media: { src: 'https://cdn.example.com/v/silent.mp4', msId: null } });
+    expect(pe.of('direct').filter((c) => c.on)).toHaveLength(1);
+    expect(orch.stateOf(7)).toMatchObject({ state: 'prompt', failures: 1 });
+    expect(pe.of('notice').at(-1)).toMatchObject({ kind: 'listen' });
+    await after(60000);
+    expect(pe.of('direct').filter((c) => c.on)).toHaveLength(1);
+  });
+});

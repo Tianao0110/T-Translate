@@ -47,6 +47,8 @@ const MAX_REMEMBERED = 200;
 const MAX_LOG = 30;
 // The page stopped forwarding for a reason that is not going away by itself.
 const PAGE_STOP_RETRY = new Set(['overflow', 'send-failed', 'refused', 'pipeline-ended']);
+// direct open errors that say the file itself is no good (direct-fetch.js).
+const DIRECT_FATAL = new Set(['no-moov', 'moov-too-large', 'no-audio', 'bad-moov', 'unsupported', 'not-page-media', 'bad-request']);
 const CACHE_FLUSH_MS = 30000;
 const COVER_GAP_S = 15; // cues this close together make one covered stretch
 const COVER_TAIL_S = 2; // a stretch is left this long before its end
@@ -570,7 +572,9 @@ export function createOrchestrator({
     }
     r.failures++;
     setState(r, 'idle', { error: code });
-    if (r.failures < MAX_FAILURES) scheduleRetry(r, code === 'busy' ? busyRetryMs : retryMs);
+    // A file the fetcher cannot use will not change on retry: straight to the fallback.
+    if (r.lastRun?.kind === 'direct' && DIRECT_FATAL.has(code)) gaveUp(r);
+    else if (r.failures < MAX_FAILURES) scheduleRetry(r, code === 'busy' ? busyRetryMs : retryMs);
     else gaveUp(r);
   }
 
