@@ -5,12 +5,15 @@
 // subtitles, MSE streams), its PAGE_COMMANDs reaching the caption renderer
 // (real renderer over a fake TextTrack), site captions, capture forwarding
 // as PAGE_MEDIA, page-world commands, navigation clearing the page, a new
-// service worker getting everything again, and the missing-page-world report.
+// service worker getting everything again, and the missing-page-world report;
+// <track> files (subtitles / captions, the default first, once each, again
+// after a navigation) reported as subtitles via 'track'.
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createPageAgent, splitCues } from '../src/content/page-agent.js';
 import { createCaptionRenderer } from '../src/content/caption-renderer.js';
 import { MSG, decodeBytes } from '../src/shared/messages.js';
+import { generic } from '../src/content/sites/index.js';
 
 const EXT_ID = 'abcdefghijklmnopabcdefghijklmnop';
 const tick = (ms = 0) => new Promise((r) => setTimeout(r, ms));
@@ -325,5 +328,116 @@ describe('navigation', () => {
     const q = (await runtime.command({ cmd: 'query' })).result;
     expect(q).toMatchObject({ navSeq: 1, mediaId: 'nextVideo01', renderer: null, view: { siteCaptions: 'show' } });
     expect(q.subtitles).toHaveLength(1);
+  });
+});
+
+// <track> files work the same on every site; the generic adapter here, so
+// no other adapter's subtitle rules get in the way.
+describe('<track> files', () => {
+  const BASE = location.origin;
+  const VTT_EN = 'WEBVTT\n\n00:00:01.000 --> 00:00:03.000\nGood evening everyone.\n\n00:00:04.000 --> 00:00:06.000\nThank you for joining.\n';
+  const SRT_FR = '1\n00:00:01,000 --> 00:00:03,000\nBonsoir.\n';
+  const FILES = {
+    [`${BASE}/subs/speech.vtt`]: { status: 200, type: 'text/vtt', text: VTT_EN },
+    [`${BASE}/subs/fr.srt`]: { status: 200, type: 'application/x-subrip', text: SRT_FR },
+  };
+
+  function fakeFetch(files) {
+    const calls = [];
+    const fn = vi.fn(async (url, init) => {
+      calls.push({ url, credentials: init.credentials });
+      const f = files[url];
+      if (!f) throw new TypeError('Failed to fetch');
+      return { ok: f.status === 200, status: f.status, headers: { get: (h) => (h === 'content-type' ? f.type : null) }, text: async () => f.text };
+    });
+    return { fn, calls };
+  }
+
+  const track = (attrs) => {
+    const t = document.createElement('track');
+    for (const [k, val] of Object.entries(attrs)) t.setAttribute(k, val);
+    return t;
+  };
+  function mountWithTracks(list = []) {
+    const v = mountVideo();
+    v.src = `${BASE}/speech.mp4`;
+    for (const attrs of list) v.append(track(attrs));
+    return v;
+  }
+  function startGeneric(files) {
+    const net = fakeFetch(files);
+    return { ...start({ site: generic, fetchFn: net.fn }), net };
+  }
+
+  it('the default track first, subtitles and captions only, same-origin credentials, srclang as the language', async () => {
+    mountWithTracks([
+      { kind: 'captions', src: 'subs/fr.srt', srclang: 'fr' },
+      { src: 'subs/speech.vtt', srclang: 'en', default: '' }, // no kind: subtitles
+      { kind: 'chapters', src: 'subs/chapters.vtt' },
+      { kind: 'metadata', src: 'subs/meta.vtt' },
+      { kind: 'bogus', src: 'subs/bogus.vtt' },
+    ]);
+    const { runtime, net } = startGeneric(FILES);
+    await tick(10);
+    expect(net.calls).toEqual([
+      { url: `${BASE}/subs/speech.vtt`, credentials: 'same-origin' },
+      { url: `${BASE}/subs/fr.srt`, credentials: 'same-origin' },
+    ]);
+    const subs = runtime.events('subtitle-parsed');
+    expect(subs.map((s) => [s.url, s.via, s.format, s.lang, s.kind, s.mediaId, s.cueCount])).toEqual([
+      [`${BASE}/subs/speech.vtt`, 'track', 'vtt', 'en', '', null, 2],
+      [`${BASE}/subs/fr.srt`, 'track', 'srt', 'fr', '', null, 1],
+    ]);
+    expect(subs[0].cues.map((c) => c.text)).toEqual(['Good evening everyone.', 'Thank you for joining.']);
+    expect(agent.snapshot()).toMatchObject({ site: 'generic' });
+    expect(agent.snapshot().subtitles.map((s) => s.via)).toEqual(['track', 'track']);
+  });
+
+  it('a track added later is fetched; the same file again is not; an unreadable one is let go', async () => {
+    const v = mountWithTracks([]);
+    const { runtime, net } = startGeneric(FILES);
+    await tick(10);
+    expect(net.calls).toEqual([]);
+    const debug = vi.spyOn(console, 'debug').mockImplementation(() => {});
+    v.append(track({ kind: 'subtitles', src: `${BASE}/subs/speech.vtt`, srclang: 'en' }));
+    v.append(track({ kind: 'subtitles', src: 'https://cdn.example/no-cors.vtt' }));
+    await tick(10);
+    v.append(track({ kind: 'subtitles', src: 'subs/speech.vtt' }));
+    v.querySelector('track').setAttribute('srclang', 'en-US');
+    await tick(10);
+    expect(net.calls.map((c) => c.url)).toEqual([`${BASE}/subs/speech.vtt`, 'https://cdn.example/no-cors.vtt']);
+    expect(runtime.events('subtitle-parsed')).toHaveLength(1);
+    expect(debug).toHaveBeenCalledTimes(1);
+    debug.mockRestore();
+  });
+
+  it('a navigation fetches the tracks again', async () => {
+    mountWithTracks([{ kind: 'subtitles', src: 'subs/speech.vtt', srclang: 'en' }]);
+    const { runtime, net } = startGeneric(FILES);
+    await tick(10);
+    history.pushState(null, '', '/watch?v=next');
+    agent.onNavigate();
+    await tick(10);
+    expect(net.calls).toHaveLength(2);
+    // the first copy carried over by the navigation (it came just before), then the new fetch
+    const subs = runtime.sent.filter((m) => m.type === MSG.PAGE_EVENT && m.payload.event.type === 'subtitle-parsed');
+    expect(subs.map((m) => [m.payload.navSeq, m.payload.event.url])).toEqual([
+      [0, `${BASE}/subs/speech.vtt`],
+      [1, `${BASE}/subs/speech.vtt`],
+      [1, `${BASE}/subs/speech.vtt`],
+    ]);
+  });
+
+  it('at most eight files a navigation', async () => {
+    const files = {};
+    const list = [];
+    for (let i = 0; i < 10; i++) {
+      files[`${BASE}/s${i}.vtt`] = { status: 200, type: 'text/vtt', text: VTT_EN };
+      list.push({ kind: 'subtitles', src: `/s${i}.vtt` });
+    }
+    mountWithTracks(list);
+    const { net } = startGeneric(files);
+    await tick(10);
+    expect(net.calls).toHaveLength(8);
   });
 });

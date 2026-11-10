@@ -323,13 +323,18 @@ describe('TikTok', () => {
 });
 
 describe('generic', () => {
-  it('fingerprints the page URL (without the hash) with the media duration', () => {
+  it('fingerprints the page URL (without the hash) with the media duration; subtitle files by extension', () => {
     const a = generic.mediaId('https://video.example.com/watch/1#t=5', { duration: 600.4 });
     expect(a).toMatch(/^[0-9a-z]+-600$/);
     expect(generic.mediaId('https://video.example.com/watch/1', { duration: 600.2 })).toBe(a);
     expect(generic.mediaId('https://video.example.com/watch/2', { duration: 600 })).not.toBe(a);
     expect(generic.mediaId('https://video.example.com/watch/1', { duration: NaN })).toMatch(/-0$/);
-    expect(generic.isSubtitleRequest('https://x/a.vtt')).toBe(false);
+    expect(generic.isSubtitleRequest('https://x/subs/a.VTT?sig=1')).toBe(true);
+    for (const f of ['a.srt', 'a.ttml', 'a.dfxp']) expect(generic.isSubtitleRequest(`https://x/${f}`), f).toBe(true);
+    expect(generic.isSubtitleRequest('https://x/a.vtt.mp4')).toBe(false);
+    expect(generic.isSubtitleRequest('https://x/watch?file=a.vtt')).toBe(false);
+    expect(generic.isSubtitleRequest('not a url')).toBe(false);
+    expect(generic.subtitleInfo('https://x/a.vtt')).toEqual({ lang: '', kind: '', mediaId: null });
     expect(generic.hideSiteCaptions(document, true)).toBe(false);
   });
 

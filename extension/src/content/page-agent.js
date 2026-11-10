@@ -4,8 +4,9 @@
 // while the worker has capture on, and runs the worker's PAGE_COMMANDs
 // (captions into the renderer, display, site captions, the tier-3 notice,
 // page-world actions). Decides nothing by itself: when to capture or show is
-// the worker's call. Its only request of its own is a subtitle body a site's
-// subtitle list points at (Bilibili).
+// the worker's call. Its only requests of its own are a subtitle body a
+// site's subtitle list points at (Bilibili) and the files the primary
+// video's <track> elements point at (any site).
 
 import { MSG, request, handle } from '../shared/messages.js';
 import { PAGE_EVENT_MAX_CHARS, MAX_CUES_PER_PART, sanitizeCue } from '../shared/page-protocol.js';
@@ -20,6 +21,7 @@ import { LIMITS } from './bridge-protocol.js';
 
 const MAX_SUBTITLES = 16;
 const MAX_LISTS = 8;
+const MAX_TRACK_FILES = 8; // per navigation
 const HOOKS_TIMEOUT_MS = 5000;
 const BODY_TIMEOUT_MS = 15000;
 // Bilibili asks for the next part's subtitle list on the click, up to ~0.6 s
@@ -29,6 +31,11 @@ const PART_CHARS = PAGE_EVENT_MAX_CHARS - 8192; // room for the event's other fi
 
 const err = (code) => Object.assign(new Error(code), { code });
 const cleanUrl = (href) => String(href).split('#')[0];
+// A <track>'s kind: subtitles when the attribute is missing, metadata when it is not a known one.
+const trackKind = (t) => {
+  const k = t.getAttribute('kind');
+  return k === null ? 'subtitles' : ['subtitles', 'captions', 'descriptions', 'chapters'].includes(k.toLowerCase()) ? k.toLowerCase() : 'metadata';
+};
 
 // Cue lists cut so each part's JSON stays under maxChars.
 export function splitCues(cues, maxChars = PART_CHARS, maxCount = MAX_CUES_PER_PART) {
@@ -82,6 +89,9 @@ export function createPageAgent({
   let rendererEl = null;
   let notice = null;
   let noticeEl = null;
+  let trackEl = null; // the video whose <track> children are watched
+  let trackObserver = null;
+  let tracksSeen = new Set(); // track file URLs fetched this navigation
   const t = (key) => {
     try {
       return i18n?.getMessage?.(key) || '';
@@ -222,11 +232,11 @@ export function createPageAgent({
     );
   }
 
-  async function fetchBody(url) {
+  async function fetchBody(url, credentials = 'omit') {
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), BODY_TIMEOUT_MS);
     try {
-      const res = await fetchFn(url, { credentials: 'omit', signal: ctl.signal });
+      const res = await fetchFn(url, { credentials, signal: ctl.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       if (Number(res.headers.get('content-length')) > LIMITS.subtitleBytes) throw new Error('too large');
       const text = await res.text();
@@ -234,6 +244,48 @@ export function createPageAgent({
       return { status: res.status, contentType: res.headers.get('content-type') || '', text };
     } finally {
       clearTimeout(timer);
+    }
+  }
+
+  // ---- <track> files (any site) ----
+
+  // Follows the primary video: its subtitles / captions tracks now and as they change.
+  function watchTracks() {
+    const v = media.primaryVideo();
+    if (v === trackEl) return;
+    trackObserver?.disconnect();
+    trackObserver = null;
+    trackEl = v;
+    if (!v) return;
+    trackObserver = new MutationObserver(scanTracks);
+    trackObserver.observe(v, { childList: true, subtree: true, attributes: true, attributeFilter: ['src', 'kind', 'srclang'] });
+    scanTracks();
+  }
+
+  // Each file once a navigation, the default track first, read like a
+  // subtitle the page fetched (via 'track'). Cross-origin files without CORS
+  // cannot be read here; those are let go.
+  function scanTracks() {
+    if (!alive || !trackEl) return;
+    const tracks = [...trackEl.querySelectorAll('track')].filter((x) => ['subtitles', 'captions'].includes(trackKind(x)) && x.getAttribute('src'));
+    tracks.sort((a, b) => b.hasAttribute('default') - a.hasAttribute('default'));
+    for (const x of tracks) {
+      let url;
+      try {
+        url = new URL(x.getAttribute('src'), doc.baseURI).href;
+      } catch {
+        continue;
+      }
+      if (!/^(?:https?|data|blob):/.test(url) || tracksSeen.has(url) || tracksSeen.size >= MAX_TRACK_FILES) continue;
+      tracksSeen.add(url);
+      const nav = navSeq;
+      const lang = String(x.getAttribute('srclang') || '').slice(0, 32);
+      fetchBody(url, 'same-origin').then(
+        ({ status, contentType, text }) => {
+          if (alive && nav === navSeq) onSubtitle({ via: 'track', url, status, contentType, text }, { lang, kind: '' });
+        },
+        (e) => console.debug(`[T-Caption] track file: ${e?.message ?? e}`)
+      );
     }
   }
 
@@ -425,6 +477,8 @@ export function createPageAgent({
     destroyNotice();
     if (view.siteCaptions === 'hide') setSiteCaptions(false);
     reportAll();
+    tracksSeen = new Set();
+    scanTracks();
   }
 
   // The tab going hidden or shown is a media report too (timeupdate stops with it).
@@ -470,6 +524,7 @@ export function createPageAgent({
       }
       send({ type: 'media', reason, media: m, primary: !!primary && m.elId === media.idOf(primary) });
       if (reason === 'loadedmetadata' || reason === 'durationchange') checkMediaId();
+      if (primary !== trackEl) watchTracks();
       if (renderer && primary && primary !== rendererEl) {
         try {
           ensureRenderer();
@@ -499,6 +554,7 @@ export function createPageAgent({
     statsTimers.forEach(clearTimeout);
     relay.stop('shutdown');
     media.stop();
+    trackObserver?.disconnect();
     bridge.close();
     unwatchNav();
     doc.removeEventListener('visibilitychange', onVisibility);

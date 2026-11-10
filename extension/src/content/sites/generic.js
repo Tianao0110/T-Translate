@@ -1,7 +1,8 @@
 // Any other site: the media id is the page URL plus the media's duration,
 // navigation is history traversal plus same-document navigations (the
-// Navigation API sees pushState without patching the page), and only the
-// shared subtitle rules apply.
+// Navigation API sees pushState without patching the page), and subtitle
+// files are known by their extension (.vtt, .srt, .ttml, .dfxp), with no
+// language or media id of their own.
 
 function fnv1a(s) {
   let h = 0x811c9dc5;
@@ -22,6 +23,16 @@ function mediaId(href, media) {
   return `${fnv1a(page)}-${d}`;
 }
 
+const SUBTITLE_EXT = /\.(?:vtt|srt|ttml|dfxp)$/i;
+
+function isSubtitleRequest(href) {
+  try {
+    return SUBTITLE_EXT.test(new URL(href).pathname);
+  } catch {
+    return false;
+  }
+}
+
 function watchNavigation({ win }, fn) {
   win.addEventListener('popstate', fn);
   win.navigation?.addEventListener('currententrychange', fn);
@@ -35,8 +46,8 @@ export const generic = {
   name: 'generic',
   test: () => true,
   mediaId,
-  isSubtitleRequest: () => false,
-  subtitleInfo: () => ({}),
+  isSubtitleRequest,
+  subtitleInfo: () => ({ lang: '', kind: '', mediaId: null }),
   watchNavigation,
   hideSiteCaptions: () => false,
   mainActions: {},
