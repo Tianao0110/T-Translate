@@ -112,7 +112,7 @@ function event(e) {
         url,
         via: e.via === 'xhr' ? 'xhr' : 'fetch',
         status: int(e.status) ?? 0,
-        format: ['vtt', 'srt', 'ttml', 'json3'].includes(e.format) ? e.format : null,
+        format: ['vtt', 'srt', 'ttml', 'json3', 'bcc'].includes(e.format) ? e.format : null,
         lang: str(e.lang, 32) ?? '',
         kind: str(e.kind, 16) ?? '',
         mediaId: optStr(e.mediaId, 128),

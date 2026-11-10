@@ -4,7 +4,8 @@
 // while the worker has capture on, and runs the worker's PAGE_COMMANDs
 // (captions into the renderer, display, site captions, the tier-3 notice,
 // page-world actions). Decides nothing by itself: when to capture or show is
-// the worker's call.
+// the worker's call. Its only request of its own is a subtitle body a site's
+// subtitle list points at (Bilibili).
 
 import { MSG, request, handle } from '../shared/messages.js';
 import { PAGE_EVENT_MAX_CHARS, MAX_CUES_PER_PART, sanitizeCue } from '../shared/page-protocol.js';
@@ -15,9 +16,15 @@ import { createMediaWatch } from './media-watch.js';
 import { createMseRelay } from './mse-relay.js';
 import { createNotice } from './notice.js';
 import { siteFor } from './sites/index.js';
+import { LIMITS } from './bridge-protocol.js';
 
 const MAX_SUBTITLES = 16;
+const MAX_LISTS = 8;
 const HOOKS_TIMEOUT_MS = 5000;
+const BODY_TIMEOUT_MS = 15000;
+// Bilibili asks for the next part's subtitle list on the click, up to ~0.6 s
+// before its URL changes: what came this shortly before a navigation is the new page's.
+const CARRY_MS = 3000;
 const PART_CHARS = PAGE_EVENT_MAX_CHARS - 8192; // room for the event's other fields
 
 const err = (code) => Object.assign(new Error(code), { code });
@@ -51,6 +58,7 @@ export function createPageAgent({
   makeBridge = createBridge,
   makeRenderer = createCaptionRenderer,
   makeNotice = createNotice,
+  fetchFn = (...a) => fetch(...a),
   now = () => Date.now(),
   statsMs = 1000,
   hooksTimeoutMs = HOOKS_TIMEOUT_MS,
@@ -66,6 +74,8 @@ export function createPageAgent({
   let eme = null;
   let subSeq = 0;
   let subtitles = [];
+  let lists = []; // subtitle lists read this navigation: { url, entries, picked, status }
+  let listsSeen = new Set(); // list and body URLs already handled this navigation
   const view = { display: 'bilingual', mode: 'track', siteCaptions: 'show' };
   let renderer = null;
   let rendererEl = null;
@@ -144,25 +154,83 @@ export function createPageAgent({
 
   // ---- page world ----
 
-  function onSubtitle(ev) {
+  // extra: what a subtitle list said about the body (its language and kind).
+  function onSubtitle(ev, extra = null) {
+    const info = site.subtitleInfo(ev.url) || {};
+    if (info.list) return onSubtitleList(ev);
     const format = detectFormat(ev.text, ev.contentType, ev.url);
     const cues = format ? parseSubtitles(ev.text, format) : [];
-    const info = site.subtitleInfo(ev.url) || {};
     const sub = {
       subId: ++subSeq,
       url: ev.url,
       via: ev.via,
       status: ev.status,
       format,
-      lang: info.lang || '',
-      kind: info.kind || '',
+      lang: extra?.lang ?? info.lang ?? '',
+      kind: extra?.kind ?? info.kind ?? '',
       mediaId: info.mediaId ?? null,
       cueCount: cues.length,
       cues,
       at: now(),
     };
+    listsSeen.add(sub.url);
     subtitles = subtitles.filter((s) => s.url !== sub.url).concat(sub).slice(-MAX_SUBTITLES);
     sendSubtitle(sub);
+  }
+
+  // A site's subtitle list (Bilibili's player API): one body is fetched,
+  // human-made before AI, once per list and body URL in a navigation. Only
+  // URLs the adapter itself calls subtitle bodies are fetched, without
+  // cookies. A list that came just before a navigation goes with it (see
+  // CARRY_MS); a body whose list stayed behind is dropped.
+  function onSubtitleList(ev) {
+    if (listsSeen.has(ev.url) || typeof site.listSubtitles !== 'function') return;
+    listsSeen.add(ev.url);
+    const all = site.listSubtitles(ev.text);
+    const pick = all.find((s) => !s.ai) || all.find((s) => s.ai) || null;
+    const entry = { url: ev.url.split('?')[0], entries: all.length, picked: pick?.url ?? null, status: 'none', src: ev.url, at: now(), nav: navSeq };
+    lists = lists.concat(entry).slice(-MAX_LISTS);
+    if (!pick) return;
+    let target;
+    try {
+      target = new URL(pick.url);
+    } catch {}
+    if (!target || target.protocol !== 'https:' || !site.isSubtitleRequest(target.href) || site.subtitleInfo(target.href).list) {
+      entry.status = 'refused';
+      return;
+    }
+    if (listsSeen.has(target.href)) {
+      entry.status = 'had';
+      return;
+    }
+    listsSeen.add(target.href);
+    entry.status = 'fetching';
+    fetchBody(target.href).then(
+      ({ status, contentType, text }) => {
+        entry.status = 'ok';
+        if (!alive || entry.nav !== navSeq) return;
+        onSubtitle({ via: 'fetch', url: target.href, status, contentType, text }, { lang: pick.lang.replace(/^ai-/, ''), kind: pick.ai ? 'asr' : '' });
+      },
+      (e) => {
+        entry.status = 'failed';
+        console.debug(`[T-Caption] subtitle body: ${e?.message ?? e}`);
+      }
+    );
+  }
+
+  async function fetchBody(url) {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), BODY_TIMEOUT_MS);
+    try {
+      const res = await fetchFn(url, { credentials: 'omit', signal: ctl.signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (Number(res.headers.get('content-length')) > LIMITS.subtitleBytes) throw new Error('too large');
+      const text = await res.text();
+      if (text.length > LIMITS.subtitleBytes) throw new Error('too large');
+      return { status: res.status, contentType: res.headers.get('content-type') || '', text };
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   function onMainEvent(ev) {
@@ -273,6 +341,7 @@ export function createPageAgent({
       media: media.list(),
       primary: primary ? media.idOf(primary) : null,
       subtitles: subtitles.map(({ cues: _c, ...meta }) => meta),
+      lists: lists.map(({ url, entries, picked, status }) => ({ url, entries, picked, status })),
       mse: relay.streams(),
       mainStream: mainStreamId(),
       capture: relay.capture(),
@@ -329,7 +398,12 @@ export function createPageAgent({
     navSeq++;
     mediaId = site.mediaId(pageUrl, media.primaryVideo());
     // A new video's captions and init segment can land before the navigation event.
-    subtitles = subtitles.filter((s) => s.mediaId && s.mediaId === mediaId);
+    // Subtitles without a media id, and lists, belong to the new page when they came just before it.
+    const recent = (x) => now() - x.at <= CARRY_MS;
+    subtitles = subtitles.filter((s) => (s.mediaId ? s.mediaId === mediaId : recent(s)));
+    lists = lists.filter(recent);
+    for (const l of lists) l.nav = navSeq;
+    listsSeen = new Set([...subtitles.map((s) => s.url), ...lists.flatMap((l) => [l.src, l.picked])]);
     relay.stop('navigated');
     relay.keepAttached(new Set(media.list().map((m) => m.src).filter(Boolean)));
     destroyRenderer();

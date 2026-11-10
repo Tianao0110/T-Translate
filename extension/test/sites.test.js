@@ -1,10 +1,12 @@
 // Site adapters: YouTube media ids (watch, shorts, embed, live), timedtext
 // recognition and its language / kind / video, navigation events, hiding the
 // player's caption layer, the page-world player actions over a fake player;
-// the generic adapter's URL + duration fingerprint and navigation.
+// Bilibili media ids (BV with its part, av, bangumi), subtitle bodies and
+// lists, the list's entries, navigation and its subtitle layer; the generic
+// adapter's URL + duration fingerprint and navigation.
 
 import { describe, it, expect, vi } from 'vitest';
-import { siteFor, youtube, generic } from '../src/content/sites/index.js';
+import { siteFor, youtube, bilibili, generic } from '../src/content/sites/index.js';
 
 describe('siteFor', () => {
   it('youtube.com and its subdomains get the YouTube adapter, others the generic one', () => {
@@ -12,7 +14,14 @@ describe('siteFor', () => {
     expect(siteFor('m.youtube.com')).toBe(youtube);
     expect(siteFor('YOUTUBE.COM')).toBe(youtube);
     expect(siteFor('notyoutube.com')).toBe(generic);
-    expect(siteFor('www.bilibili.com')).toBe(generic);
+  });
+
+  it('bilibili.com and its subdomains get the Bilibili adapter, live rooms the generic one', () => {
+    expect(siteFor('www.bilibili.com')).toBe(bilibili);
+    expect(siteFor('m.bilibili.com')).toBe(bilibili);
+    expect(siteFor('bilibili.com')).toBe(bilibili);
+    expect(siteFor('live.bilibili.com')).toBe(generic);
+    expect(siteFor('notbilibili.com')).toBe(generic);
   });
 });
 
@@ -113,6 +122,102 @@ describe('YouTube', () => {
       p.remove();
       button.remove();
     });
+  });
+});
+
+describe('Bilibili', () => {
+  it('media id from BV (with its part), av and bangumi URLs', () => {
+    expect(bilibili.mediaId('https://www.bilibili.com/video/BV1GJ411x7h7/?spm_id_from=333.1007')).toBe('BV1GJ411x7h7');
+    expect(bilibili.mediaId('https://www.bilibili.com/video/BV1GJ411x7h7?p=1')).toBe('BV1GJ411x7h7');
+    expect(bilibili.mediaId('https://www.bilibili.com/video/BV1GJ411x7h7?p=3&vd_source=x')).toBe('BV1GJ411x7h7:p3');
+    expect(bilibili.mediaId('https://www.bilibili.com/video/BV1GJ411x7h7?p=abc')).toBe('BV1GJ411x7h7');
+    expect(bilibili.mediaId('https://m.bilibili.com/video/BV1GJ411x7h7')).toBe('BV1GJ411x7h7');
+    expect(bilibili.mediaId('https://www.bilibili.com/video/av170001')).toBe('av170001');
+    expect(bilibili.mediaId('https://www.bilibili.com/video/AV170001/?p=2')).toBe('av170001:p2');
+    expect(bilibili.mediaId('https://www.bilibili.com/bangumi/play/ep123456')).toBe('ep123456');
+    expect(bilibili.mediaId('https://www.bilibili.com/bangumi/play/ss4321?from=x')).toBe('ss4321');
+    expect(bilibili.mediaId('https://www.bilibili.com/zh-Hans/video/BV1Xx411c7cH/?p=2')).toBe('BV1Xx411c7cH:p2');
+    expect(bilibili.mediaId('https://www.bilibili.com/en/video/av170001')).toBe('av170001');
+    expect(bilibili.mediaId('https://www.bilibili.com/zh-Hant/bangumi/play/ep99')).toBe('ep99');
+    expect(bilibili.mediaId('https://www.bilibili.com/space/video/BV1Xx411c7cH')).toBeNull();
+    expect(bilibili.mediaId('https://www.bilibili.com/video/BV1GJ411x7')).toBeNull();
+    expect(bilibili.mediaId('https://www.bilibili.com/video/BV1GJ411x7h7x')).toBeNull();
+    expect(bilibili.mediaId('https://www.bilibili.com/')).toBeNull();
+    expect(bilibili.mediaId('https://space.bilibili.com/123')).toBeNull();
+    expect(bilibili.mediaId('https://live.bilibili.com/video/BV1GJ411x7h7')).toBeNull();
+    expect(bilibili.mediaId('https://evil.example/video/BV1GJ411x7h7')).toBeNull();
+    expect(bilibili.mediaId('not a url')).toBeNull();
+  });
+
+  it('subtitle bodies on hdslb.com and the player API lists', () => {
+    const ai = 'https://aisubtitle.hdslb.com/bfs/ai_subtitle/prod/12345abc?auth_key=1-2-3';
+    const human = 'https://i0.hdslb.com/bfs/subtitle/a1b2c3.json';
+    const list = 'https://api.bilibili.com/x/player/wbi/v2?aid=1&cid=2&w_rid=x&wts=3';
+    expect(bilibili.isSubtitleRequest(ai)).toBe(true);
+    expect(bilibili.isSubtitleRequest(human)).toBe(true);
+    expect(bilibili.isSubtitleRequest(list)).toBe(true);
+    expect(bilibili.isSubtitleRequest('https://api.bilibili.com/x/player/v2?cid=2')).toBe(true);
+    expect(bilibili.isSubtitleRequest('https://i0.hdslb.com/bfs/archive/cover.jpg')).toBe(false);
+    expect(bilibili.isSubtitleRequest('https://api.bilibili.com/x/player/wbi/playurl?cid=2')).toBe(false);
+    expect(bilibili.isSubtitleRequest('https://evil.example/bfs/subtitle/a.json')).toBe(false);
+    expect(bilibili.isSubtitleRequest('https://api.bilibili.com.evil.example/x/player/v2')).toBe(false);
+    expect(bilibili.subtitleInfo(ai)).toEqual({ lang: '', kind: 'asr', mediaId: null });
+    expect(bilibili.subtitleInfo(human)).toEqual({ lang: '', kind: '', mediaId: null });
+    expect(bilibili.subtitleInfo(list)).toEqual({ list: true });
+    expect(bilibili.subtitleInfo('https://www.bilibili.com/')).toEqual({});
+    expect(bilibili.subtitleInfo('nope')).toEqual({});
+  });
+
+  it('lists a player API response’s subtitles; bad input lists nothing', () => {
+    const res = {
+      code: 0,
+      data: {
+        subtitle: {
+          subtitles: [
+            { lan: 'ai-zh', lan_doc: '中文（自动生成）', subtitle_url: '//aisubtitle.hdslb.com/bfs/ai_subtitle/prod/1', ai_type: 1, ai_status: 2 },
+            { lan: 'en-US', lan_doc: 'English', subtitle_url: 'https://i0.hdslb.com/bfs/subtitle/2.json', ai_type: 0 },
+            { lan: 'ja', subtitle_url: '' },
+            null,
+          ],
+        },
+      },
+    };
+    expect(bilibili.listSubtitles(JSON.stringify(res))).toEqual([
+      { lang: 'ai-zh', url: 'https://aisubtitle.hdslb.com/bfs/ai_subtitle/prod/1', ai: true },
+      { lang: 'en-US', url: 'https://i0.hdslb.com/bfs/subtitle/2.json', ai: false },
+    ]);
+    expect(bilibili.listSubtitles(res)).toHaveLength(2);
+    expect(bilibili.listSubtitles({ data: { subtitle: { subtitles: [{ lan: 'zh', subtitle_url: '//x/1', ai_type: 2 }] } } })[0].ai).toBe(true);
+    for (const bad of ['', 'not json', '{}', '{"data":{"subtitle":{"subtitles":3}}}', 'null', null]) expect(bilibili.listSubtitles(bad)).toEqual([]);
+    expect(bilibili.listSubtitles(JSON.stringify({ code: 0, data: { need_login_subtitle: true, subtitle: { subtitles: [] } } }))).toEqual([]);
+  });
+
+  it('navigation: popstate and same-document navigations (part switches)', () => {
+    const fn = vi.fn();
+    const nav = new EventTarget();
+    const win = Object.assign(new EventTarget(), { navigation: nav });
+    const off = bilibili.watchNavigation({ doc: document, win }, fn);
+    win.dispatchEvent(new Event('popstate'));
+    nav.dispatchEvent(new Event('currententrychange'));
+    off();
+    nav.dispatchEvent(new Event('currententrychange'));
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  it('hides the player’s subtitle layer with one style element and shows it again', () => {
+    const wrap = document.createElement('div');
+    wrap.className = 'bpx-player-subtitle-wrap';
+    document.body.append(wrap);
+    expect(bilibili.hideSiteCaptions(document, true)).toBe(true);
+    bilibili.hideSiteCaptions(document, true);
+    const styles = [...document.querySelectorAll('style')].filter((s) => s.textContent.includes('.bpx-player-subtitle-wrap'));
+    expect(styles).toHaveLength(1);
+    expect(getComputedStyle(wrap).display).toBe('none');
+    expect(bilibili.hideSiteCaptions(document, false)).toBe(false);
+    expect([...document.querySelectorAll('style')].some((s) => s.textContent.includes('bpx-player'))).toBe(false);
+    expect(getComputedStyle(wrap).display).not.toBe('none');
+    expect(bilibili.mainActions).toEqual({});
+    wrap.remove();
   });
 });
 
