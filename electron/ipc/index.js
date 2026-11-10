@@ -16,6 +16,7 @@ const registerTranslationStackIPC = require('./translation-stack');
 const registerOcrIPC = require('./ocr');
 const registerPrivacyIPC = require('./privacy');
 const registerAudioEngineIPC = require('./audio-engine');
+const { registerCompanionIPC } = require('./companion');
 const registerModelsIPC = require('./models');
 const registerGpuIPC = require('./gpu');
 const registerTengineIPC = require('./tengine');
@@ -85,6 +86,8 @@ function initIPC(deps) {
   registerOcrIPC(context);
   registerPrivacyIPC(context);
   registerAudioEngineIPC(context);
+  // After audio-engine: the listen session's translation hook is wired by then.
+  registerCompanionIPC(context);
   registerModelsIPC(context);
   // Before gpu: the GPU switch drives engines through T-Engine, and its
   // LLM self-test goes through the model manager.

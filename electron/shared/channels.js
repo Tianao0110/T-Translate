@@ -251,6 +251,14 @@ const CHANNELS = {
     TTS_PLAYING: 'audio-engine:tts-playing',   // renderer → main: {on}
     TTS_GATE: 'audio-engine:tts-gate',         // main → floating window: {on} (mirrors the gate for the UI)
   },
+  // T-Caption's local channel (electron/companion/); the settings page only
+  // reads its status and opens the pairing window.
+  COMPANION: {
+    GET_STATUS: 'companion:get-status',             // renderer → main: {enabled, running, port, pairingOpen, session}
+    OPEN_PAIRING: 'companion:open-pairing',         // renderer → main: open the one-time pairing window
+    REGENERATE_TOKEN: 'companion:regenerate-token', // renderer → main: new token, paired clients must pair again
+    STATUS: 'companion:status',                     // main → main window: same shape as GET_STATUS, on every change
+  },
 };
 
 const PRIVACY_MODES = {

@@ -252,6 +252,18 @@ const electronAPI = {
     // Any engine's playback (system voices included) mutes listen-mode capture.
     setTtsPlaying: (on) => ipcRenderer.send("audio-engine:tts-playing", { on: !!on }),
   },
+  // T-Caption's local channel: status, the one-time pairing window, a new
+  // token. The switch itself is settings.companion.enabled in the store.
+  companion: {
+    getStatus: () => ipcRenderer.invoke("companion:get-status"),
+    openPairing: () => ipcRenderer.invoke("companion:open-pairing"),
+    regenerateToken: () => ipcRenderer.invoke("companion:regenerate-token"),
+    onStatus: (callback) => {
+      const handler = (event, data) => callback(data);
+      ipcRenderer.on("companion:status", handler);
+      return () => ipcRenderer.removeListener("companion:status", handler);
+    },
+  },
   screenshot: {
     capture: () => ipcRenderer.invoke("capture-screen"),
     onCaptured: (callback) => {

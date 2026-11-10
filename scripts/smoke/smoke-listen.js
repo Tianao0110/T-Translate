@@ -22,7 +22,7 @@ const fs = require('fs');
 const { execFileSync } = require('child_process');
 const { BrowserWindow } = require('electron');
 const { arg, has, sleep, waitFor, checklist, run } = require('../lib/electron-smoke');
-const { RELEASE_MANIFEST, DEFAULT_ASR_DIR, listenSandbox, installPacks, speechHost, hqFallbacks, fakeWindow, feedRealtime, median } = require('../lib/listen-sandbox');
+const { RELEASE_MANIFEST, DEFAULT_ASR_DIR, listenSandbox, installPacks, speechHost, hqFallbacks, fakeWindow, feedRealtime, readWavPcm, median } = require('../lib/listen-sandbox');
 
 const KEEP = has('--keep');
 const { step, summary } = checklist();
@@ -41,39 +41,6 @@ $s.Dispose()
 `;
   execFileSync('powershell', ['-NoProfile', '-EncodedCommand', Buffer.from(ps, 'utf16le').toString('base64')]);
   return dest;
-}
-
-// Reads any PCM wav and resamples to 16 kHz mono float — what the worker wants.
-function readWavPcm(file, targetRate = 16000) {
-  const buf = fs.readFileSync(file);
-  let offset = 12;
-  let dataStart = 44;
-  let dataLen = buf.length - 44;
-  let rate = targetRate;
-  while (offset + 8 <= buf.length) {
-    const id = buf.toString('ascii', offset, offset + 4);
-    const size = buf.readUInt32LE(offset + 4);
-    if (id === 'fmt ') rate = buf.readUInt32LE(offset + 12);
-    if (id === 'data') {
-      dataStart = offset + 8;
-      dataLen = size;
-      break;
-    }
-    offset += 8 + size + (size % 2);
-  }
-  const src = new Float32Array(Math.floor(dataLen / 2));
-  for (let i = 0; i < src.length; i++) src[i] = buf.readInt16LE(dataStart + i * 2) / 32768;
-  if (rate === targetRate) return src;
-
-  const ratio = rate / targetRate;
-  const out = new Float32Array(Math.floor(src.length / ratio));
-  for (let i = 0; i < out.length; i++) {
-    const p = i * ratio;
-    const i0 = Math.floor(p);
-    const frac = p - i0;
-    out[i] = src[i0] * (1 - frac) + (src[i0 + 1] ?? src[i0]) * frac;
-  }
-  return out;
 }
 
 // First sample where speech actually starts, in seconds (latency is

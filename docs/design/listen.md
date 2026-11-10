@@ -104,3 +104,21 @@ VAD 只交出已闭合的段；开段期间 worker 自己镜像音频，每 `PAR
 ## 10. 与文档相关的旧记录
 
 - 音乐场景诊断与阈值数字：gstack `v041-listen-music-diagnosis`；进程环回 spike：`v041-process-loopback-spike`（激活 4 ms，EXCLUDE 模式实测 0.00000，静音下进程环回照抓 0.03874 vs 0.03877）；准确性基准与 AGC / 切分数字：`v042-accuracy-baseline`；听译复查：`v050-listen-review`。
+
+## 11. 伴生通道（companion/）
+
+T-Caption 浏览器插件把字幕文本送来翻译、把音频送来识别；程序只当引擎，数据只在本机。代码：`electron/companion/`（`protocol.js` 常量与纯函数、`session.js` 会话包装、`server.js` HTTP 服务、`index.js` 按开关起停），IPC 在 `electron/ipc/companion.js`，冒烟 `npm run smoke:companion`。
+
+- **为什么 HTTP + NDJSON，不用 WebSocket**：Node 只有 WebSocket 客户端没有服务端，不加依赖就得自己写帧协议；MV3 的 service worker 读 `fetch` 的响应流最顺，WebSocket 在它被浏览器停掉时没有任何保证。一个请求一件事，错误就是 HTTP 状态码。事件流每行一个 JSON，`{}` 是 15 s 一次的心跳，让插件分得清「没有新字幕」和「连接断了」。
+- **只绑 127.0.0.1**，端口从 38423 起逐个试 10 个；Windows 把 Hyper-V 保留段报成 EACCES，也当占用跳过。插件在同一范围里探测。
+- **三道门，顺序固定**：① `x-tt-client: t-caption/<版本>`——网页加自定义头必须先预检，而预检拿不到授权；② Origin 只认 `chrome-extension://` 加 32 位 a–p 与 `moz-extension://` 加 UUID，没有 Origin 的非浏览器客户端（冒烟脚本）放行，`null` 与任何 http/https 一律 403；③ Bearer 令牌，常量时间比较，只有 `/v1/pair` 不要。网页来源永远拿不到 CORS 头：就算某个请求漏过去，浏览器也不把响应交给网页。私网预检（Private Network Access）的许可只回给扩展来源。三道门的拒绝每分钟最多记 5 条 warn，刷不爆日志。
+- **令牌放 `companion.token`，不放 `settings.*`**：渲染层的通用 store 桥只读写 `settings.*`（`electron/ipc/store-allowlist.js`），令牌在外面，设置页能看状态、开配对、换令牌，却读不到令牌本身。令牌只经配对交给插件。
+- **配对窗口一次性**：设置页点一下开 60 s，第一次配对成功就关；窗口外 `/v1/pair` 回 403。换令牌让已配对的插件全部失效、断开事件流，要重新配对。
+- **会话**：一次一个（听译会话本来就只能一个）。`feed` 模式插件送 PCM（float32 小端、16 kHz 单声道，单次 ≤ 1 MB、每秒 ≤ 20 次）；`system` 模式由 worker 抓系统声音，是 DRM 站点的兜底——受保护的视频拿不到音频数据，只能听扬声器里出来的声音。事件只送 status / segment / translation / closed，不送草稿和电平：插件按时间轴显示定稿，草稿用不上。积压最多 500 条，订阅时先补发，插件晚连上事件流也不丢开头；会话结束后用同一 id 还能拿到最后的 `closed`。
+- **时间轴**：segment 的 start / end = 打开时给的 `mediaStartS` + worker 的会话秒。worker 崩溃自动重启后时钟从 0 起，`feed` 模式按已收的样本数续上，`system` 模式按墙钟估。
+- **预算与背压**：送进去的音频最多领先最新终稿的结束点 60 s，超了回 429 和 `Retry-After`。插件预取音频（钩 MSE，约提前 1 分钟）不会把 worker 喂出积压；没有人声的长段（片头曲、长静音）里没有终稿，60 s 后自然卡住，插件据此挂起预取，等播放追上再续，或带新的 `mediaStartS` 重开会话。`x-seq` 重复或倒退回 409 `stale-seq`（重试不会喂两遍），跳号照收。
+- **程序不留记录**：伴生会话不自动保存 SRT（§6 的 `autosave: false`）、不写历史；日志不记音频和文字，只记路由、状态码、耗时与次数，会话指标日志照 §1 只有数字。翻译走同一个栈、同一道隐私门（`stackHooks.translateStream`）；`/v1/translate` 用缓存（字幕文本会重复），听译逐句翻译仍不进缓存（§9）。
+- **用户自己的听译优先**：悬浮窗开听译时抢占伴生会话（§6 最后一条），插件收到 `closed`、`reason: 'preempted'`；伴生会话碰上窗口会话回 409 `busy`、`owner: 'window'`。抢占的判断靠时序：管理器发完最后的 `stopped` 后同步起排队的窗口会话，下一个微任务里归属已是 `window`。
+- **没人读也没人送，30 秒自动关**：service worker 随时会被浏览器停掉，留下的会话（尤其 `system` 模式还在抓系统声音）不能一直开着。
+- **默认关**：`settings.companion.enabled` 不是 true 就不监听端口。
+- **已知限制**：会话结束那一刻还在翻的句子，译文到不了插件——管理器在终态状态后就清掉 sink，晚到的译文发给了悬浮窗（它不认识这个 id，丢掉）。插件对缺译文的句子用 `/v1/translate` 补。

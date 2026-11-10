@@ -302,6 +302,9 @@ app.on('will-quit', () => {
 
   try { selection.stopSelectionHook(); } catch (e) { /* ignore */ }
 
+  // Before the engine hosts go: a companion session ends with its worker.
+  try { require('./ipc/companion').getCompanion()?.stop(); } catch { /* ignore */ }
+
   // Engine hosts are utilityProcesses Electron does not reap by itself.
   try { require('./tengine').get().shutdownAll(); } catch (e) { /* ignore */ }
 

@@ -60,6 +60,7 @@ t-translate/
 │   ├── selection/              # 划词翻译：controller（鼠标钩子、三层探测、图标/直达两条路）、手势状态机、剪贴板抓取
 │   ├── screenshot/             # 截图 OCR：flow（截屏→框选→裁剪→交接）、screenshot-module（多屏截取与裁剪）、pin-windows（贴图窗口：缩放、停靠）、dock-layout（停靠排位）
 │   ├── listen/                 # 听译：audio-engine-manager（ASR 子进程会话）、listen-translator、自动保存、模型表、音频包、WASAPI 抓音
+│   ├── companion/              # T-Caption 本机通道：协议、HTTP 服务、伴生听译会话（默认关）
 │   ├── tts/                    # 朗读：音色表与语音包
 │   ├── ocr/                    # 本地 OCR：ocr-engine（含 PDF 版面分析门面）、Windows OCR、OCR 模型包
 │   ├── llm/                    # 内置模型：llm-manager（文本槽 + 视觉槽 + 语音槽）、模型包扫描

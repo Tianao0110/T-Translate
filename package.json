@@ -17,6 +17,7 @@
     "ocr:release": "node scripts/build/build-ocr-release.js",
     "audio:release": "node scripts/build/build-audio-release.js",
     "smoke:listen": "electron scripts/smoke/smoke-listen.js",
+    "smoke:companion": "electron scripts/smoke/smoke-companion.js",
     "smoke:offline": "electron scripts/smoke/smoke-offline.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
