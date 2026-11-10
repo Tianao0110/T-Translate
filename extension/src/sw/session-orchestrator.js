@@ -15,6 +15,12 @@
 // shows up. Stops: paused over the grace, page hidden, tab left, navigation,
 // channel gone; 60 s without a final (the pipeline's 'suspended') parks the
 // video until it changes. States go to onState(tabId, state) for the badge.
+//
+// The subtitle cache (cache-db, injected): a video's record goes to the page
+// as soon as its key is known, channel or not; recognition runs only where
+// no cue covers the playhead and starts at the covered edge; what runs is
+// written back (site cues replace the record, recognized ones add to it).
+// Secure mode and incognito tabs use the in-memory cache instead.
 
 import { MAX_TRANSLATE_ITEMS, MAX_TRANSLATE_CHARS } from '../shared/protocol.js';
 
@@ -38,6 +44,10 @@ const MAX_REMEMBERED = 200;
 const MAX_LOG = 30;
 // The page stopped forwarding for a reason that is not going away by itself.
 const PAGE_STOP_RETRY = new Set(['overflow', 'send-failed', 'refused', 'pipeline-ended']);
+const CACHE_FLUSH_MS = 30000;
+const COVER_GAP_S = 15; // cues this close together make one covered stretch
+const COVER_TAIL_S = 2; // a stretch is left this long before its end
+const MAX_CACHE_KEY = 512;
 
 const err = (code) => Object.assign(new Error(code), { code });
 
@@ -73,6 +83,26 @@ function remember(set, key) {
   if (set.size > MAX_REMEMBERED) set.delete(set.values().next().value);
 }
 
+// The stretches of a video its cues cover, gaps up to COVER_GAP_S bridged
+// (a quiet head of the video included).
+export function coverageOf(cues) {
+  const out = [];
+  const sorted = cues.filter((c) => Number.isFinite(c.start) && Number.isFinite(c.end)).sort((a, b) => a.start - b.start);
+  for (const c of sorted) {
+    const last = out[out.length - 1];
+    if (last && c.start - last.end <= COVER_GAP_S) last.end = Math.max(last.end, c.end);
+    else out.push({ start: c.start, end: Math.max(c.end, c.start) });
+  }
+  if (out.length && out[0].start <= COVER_GAP_S) out[0].start = 0;
+  return out;
+}
+
+// The stretch the playhead is in, or null; its last COVER_TAIL_S do not count.
+export const coveredAt = (stretches, t) => stretches.find((s) => t >= s.start - 1 && t < s.end - COVER_TAIL_S) ?? null;
+
+// Where the covered stretch the playhead is leaving (or just left) ends.
+export const coveredEdge = (stretches, t) => Math.max(0, ...stretches.filter((s) => s.start <= t + 1).map((s) => s.end));
+
 export function createOrchestrator({
   pageEvents,
   arbiter,
@@ -87,6 +117,8 @@ export function createOrchestrator({
   decideGraceMs = DECIDE_GRACE_MS,
   retryMs = RETRY_MS,
   translateRetryMs = TRANSLATE_RETRY_MS,
+  cache = null,
+  memoryCache = null,
 }) {
   const byTab = new Map();
   let active = null;
@@ -95,14 +127,14 @@ export function createOrchestrator({
   const noSpeech = new Set(); // media keys parked after 60 s without a final
   const listenOk = new Set(); // media keys the user accepted listening for
   const dismissed = new Set(); // media keys whose notice was dismissed
-  const cache = new Map(); // `${mediaKey}:${target}` → Map cueId → translation
+  const translations = new Map(); // `${mediaKey}:${target}` → Map cueId → translation
 
   // ---- per tab ----
 
   function ensure(tabId) {
     let r = byTab.get(tabId);
     if (!r) {
-      r = { tabId, ev: null, media: null, mediaAt: 0, mediaKey: null, run: null, gen: 0, held: false, playingSince: 0, failures: 0, state: null, log: [], siteCues: new Map(), emptySubtitle: false, promptedFor: null, view: null, timers: {}, translateError: null };
+      r = { tabId, ev: null, media: null, mediaAt: 0, mediaKey: null, run: null, gen: 0, held: false, playingSince: 0, failures: 0, state: null, stateDetail: null, log: [], siteCues: new Map(), emptySubtitle: false, promptedFor: null, view: null, timers: {}, translateError: null, cacheKey: null, cached: null, cacheLoad: 0, newCues: new Map(), idAlias: new Map(), cacheTier: null, cacheLang: '', cacheDirty: false, shown: null, cover: null, lastRun: null };
       byTab.set(tabId, r);
     }
     return r;
@@ -116,8 +148,9 @@ export function createOrchestrator({
   }
 
   function setState(r, state, detail = null) {
-    if (r.state === state && !detail) return;
+    if (r.state === state && (!detail || JSON.stringify(detail) === JSON.stringify(r.stateDetail))) return;
     r.state = state;
+    r.stateDetail = detail;
     r.log.push({ at: now(), state, ...(detail && { detail }) });
     if (r.log.length > MAX_LOG) r.log.shift();
     try {
@@ -146,13 +179,140 @@ export function createOrchestrator({
   }
 
   function cacheFor(key) {
-    let m = cache.get(key);
+    let m = translations.get(key);
     if (!m) {
       m = new Map();
-      cache.set(key, m);
-      if (cache.size > MAX_CACHED_MEDIA) cache.delete(cache.keys().next().value);
+      translations.set(key, m);
+      if (translations.size > MAX_CACHED_MEDIA) translations.delete(translations.keys().next().value);
     }
     return m;
+  }
+
+  // ---- the subtitle cache ----
+
+  const cacheOf = (r) => (companion.privacyMode === 'secure' || r.ev?.incognito ? memoryCache : cache);
+
+  // Covered stretches of the tab's video: the record plus what ran since,
+  // less the cues of the session in exceptGen (a session runs ahead of the
+  // playhead, so its own cues must not stop it).
+  function coverage(r, exceptGen = null) {
+    const stamp = `${r.cacheKey}:${r.cached?.cues.length ?? 0}:${r.newCues.size}:${exceptGen}`;
+    if (r.cover?.stamp !== stamp) r.cover = { stamp, stretches: coverageOf([...(r.cached?.cues ?? []), ...r.newCues.values()].filter((c) => exceptGen === null || c.runGen !== exceptGen)) };
+    return r.cover.stretches;
+  }
+  const covered = (r) => !!coveredAt(coverage(r), currentTime(r));
+
+  // When the video changes: what ran for the old one is written, the new
+  // one's record is looked up (evaluateAll shows it once it is here).
+  function syncCache(r) {
+    if (r.mediaKey === r.cacheKey) return;
+    flushCache(r);
+    r.cacheKey = r.mediaKey;
+    r.cached = null;
+    r.lastRun = null;
+    r.newCues = new Map();
+    r.idAlias = new Map();
+    r.cacheTier = null;
+    r.cacheLang = '';
+    r.shown = null;
+    const store = cacheOf(r);
+    const key = r.cacheKey;
+    if (!store || !key || key.length > MAX_CACHE_KEY) return;
+    const load = ++r.cacheLoad;
+    Promise.resolve()
+      .then(() => store.get(key))
+      .then(
+        (rec) => {
+          if (r.cacheLoad !== load || r.cacheKey !== key || !Array.isArray(rec?.cues) || !rec.cues.length) return;
+          r.cached = rec;
+          schedule();
+        },
+        (e) => logger.debug?.(`cache get: ${e.code || e.message}`)
+      );
+  }
+
+  // The record's cues go to the page once; stored translations for the same
+  // target seed the translate store, so translateCached sends them at once.
+  function showCached(r, p) {
+    if (!r.cached || r.shown) return;
+    r.shown = { key: r.cacheKey, count: r.cached.cues.length, translating: false };
+    sendView(r, p);
+    quiet(cmd(r, { cmd: 'site-captions', value: 'hide' }));
+    quiet(cmd(r, { cmd: 'cues', op: 'set', cues: r.cached.cues.map(({ id, start, end, text }) => ({ id, start, end, text })) }));
+    if (sameLang(r.cached.target, p.targetLang)) {
+      const store = cacheFor(`${r.cacheKey}:${p.targetLang}`);
+      for (const c of r.cached.cues) if (c.translation) store.set(c.id, c.translation);
+    }
+  }
+
+  // Once the tab is served: the stored translations, then the missing ones.
+  function translateCached(r, p) {
+    const s = r.shown;
+    if (!s || s.translating || !r.cached) return;
+    s.translating = true;
+    if (sameLang(r.cached.lang, p.targetLang)) return;
+    translateLoop(r, () => r.shown === s, { url: 'cache', lang: r.cached.lang, cues: r.cached.cues }, p);
+  }
+
+  function markDirty(r) {
+    r.cacheDirty = true;
+    if (!r.timers.flush) r.timers.flush = setTimer(() => {
+      r.timers.flush = null;
+      flushCache(r);
+    }, CACHE_FLUSH_MS);
+  }
+
+  function noteSiteCues(r, site, p) {
+    const store = cacheFor(`${r.cacheKey}:${p.targetLang}`);
+    r.newCues = new Map(site.cues.map((c) => [c.id, { id: c.id, start: c.start, end: c.end, text: c.text, translation: store.get(c.id) ?? null }]));
+    r.cacheTier = TIER.SITE;
+    r.cacheLang = site.lang || '';
+    markDirty(r);
+  }
+
+  function noteLiveCue(r, tier, gen, e) {
+    const old = r.newCues.get(e.id);
+    r.newCues.set(e.id, { id: e.id, start: e.start, end: e.end, text: e.text, translation: old?.translation ?? null, runGen: gen });
+    r.cacheTier = tier;
+    const source = prefs.get().sourceLang;
+    r.cacheLang = source && source !== 'auto' ? source : '';
+    markDirty(r);
+  }
+
+  function noteTranslation(r, id, text) {
+    const c = r.newCues.get(id) ?? r.cached?.cues.find((x) => x.id === (r.idAlias.get(id) ?? id));
+    if (!c || c.translation === text) return;
+    c.translation = text;
+    markDirty(r);
+  }
+
+  // What ran goes into the video's record: site cues replace it, recognized
+  // ones add to it under ids no later run can reuse.
+  function flushCache(r) {
+    clearTimerOf(r, 'flush');
+    if (!r.cacheDirty) return;
+    r.cacheDirty = false;
+    const store = cacheOf(r);
+    const key = r.cacheKey;
+    const fresh = [...r.newCues.values()];
+    r.newCues = new Map();
+    if (!store || !key) return;
+    const merged = new Map();
+    if (!(r.cacheTier === TIER.SITE && fresh.length)) for (const c of r.cached?.cues ?? []) merged.set(c.id, c);
+    const stamp = now().toString(36);
+    for (const c of fresh) {
+      const id = r.cacheTier === TIER.SITE ? c.id : `c${stamp}-${c.id}`;
+      if (id !== c.id) r.idAlias.set(c.id, id);
+      merged.set(id, { ...c, id });
+    }
+    const cues = [...merged.values()].sort((a, b) => a.start - b.start);
+    const record = { cues, tier: r.cacheTier ?? r.cached?.tier ?? null, lang: r.cacheLang || r.cached?.lang || '', target: prefs.get().targetLang };
+    r.cached = record;
+    // The page already has these cues (they ran here); only a new document shows the record again.
+    r.shown ??= { key, count: cues.length, translating: true };
+    Promise.resolve()
+      .then(() => store.put(key, record))
+      .catch((e) => logger.debug?.(`cache put: ${e.code || e.message}`));
   }
 
   // ---- scheduling ----
@@ -198,6 +358,9 @@ export function createOrchestrator({
       r.ev = pageEvents.getTabEvidence(r.tabId);
       if (!r.ev) continue;
       r.mediaKey = mediaKeyOf(r);
+      syncCache(r);
+      // Once the page has its video (the renderer needs it), not switched off.
+      if (r.cached && !r.shown && r.media && p.enabled && !p.siteOff[siteKeyOf(r.ev)]) showCached(r, p);
       r.block = blockedBy(r, p);
       if (!r.block || (r.block === 'paused' && r.held)) candidates.push(r.tabId);
     }
@@ -208,7 +371,7 @@ export function createOrchestrator({
       const old = byTab.get(active);
       if (old) {
         stopRun(old, 'other-tab');
-        setState(old, old.block === 'off' ? 'off' : 'idle');
+        restState(old, old.block);
       }
     }
     active = next;
@@ -220,15 +383,27 @@ export function createOrchestrator({
       } else {
         const reason = r.block || 'other-tab';
         if (r.run && !(reason === 'paused' && r.held)) stopRun(r, reason);
-        if (!r.run && !r.held) setState(r, reason === 'off' ? 'off' : 'idle');
+        if (!r.run && !r.held) restState(r, reason);
       }
     }
+  }
+
+  // Nothing runs in the tab: off; captions when the viewer is still on it
+  // (only the channel or a pause in the way) and cached cues cover the
+  // playhead; else idle.
+  function restState(r, reason) {
+    if (reason === 'off') setState(r, 'off');
+    else if ((reason === 'offline' || reason === 'paused') && covered(r)) setState(r, 'captions', { cached: true });
+    else setState(r, 'idle');
   }
 
   function decideTier(r) {
     const ev = r.ev;
     const site = pickSiteTrack(r);
     if (site) return { tier: TIER.SITE, site };
+    const stretches = coverage(r, r.run?.gen ?? null);
+    const t = currentTime(r);
+    if (coveredAt(stretches, t)) return { cached: true };
     if (ev.eme) return { tier: TIER.LISTEN, why: 'drm' };
     const hooksOk = ev.hooks?.main === 'ok' && ev.hooks.mse === 'ok';
     const viaMse = String(r.media?.src || '').startsWith('blob:') || (ev.mse?.streams?.length ?? 0) > 0;
@@ -236,14 +411,20 @@ export function createOrchestrator({
     // play; waiting for them saves opening a recognition session for nothing.
     if (hooksOk && viaMse && !r.emptySubtitle && r.playingSince && now() - r.playingSince < decideGraceMs) return { wait: true };
     const audio = ev.mse?.audio;
-    if (audio?.forward) return noSpeech.has(r.mediaKey) ? { suspended: true } : { tier: TIER.AUDIO, audio };
+    if (audio?.forward) return noSpeech.has(r.mediaKey) ? { suspended: true } : { tier: TIER.AUDIO, audio, edge: coveredEdge(stretches, t) };
     if (audio) return { tier: TIER.LISTEN, why: 'unsupported-audio' };
     if (!hooksOk || !ev.hooks) return { tier: TIER.LISTEN, why: 'no-hooks' };
     return { tier: TIER.LISTEN, why: viaMse ? 'no-audio' : 'plain-src' };
   }
 
   function drive(r, p) {
+    translateCached(r, p);
     const d = decideTier(r);
+    if (d.cached) {
+      if (r.run) stopRun(r, 'covered');
+      setState(r, 'captions', { cached: true });
+      return;
+    }
     if (d.wait) {
       setState(r, 'waiting');
       if (!r.timers.decide) r.timers.decide = setTimer(() => {
@@ -283,12 +464,13 @@ export function createOrchestrator({
     const t = currentTime(r);
     if (d.tier === TIER.SITE) {
       r.run = { tier: TIER.SITE, kind: 'site', gen, url: d.site.url, startedAt: now() };
+      noteSiteCues(r, d.site, p);
       sendView(r, p);
       if (r.promptedFor) hideNotice(r);
       quiet(cmd(r, { cmd: 'site-captions', value: 'hide' }));
       quiet(cmd(r, { cmd: 'cues', op: 'set', cues: d.site.cues }));
       setState(r, 'captions', { tier: 1 });
-      if (!sameLang(d.site.lang, p.targetLang)) translateLoop(r, gen, d.site, p);
+      if (!sameLang(d.site.lang, p.targetLang)) translateLoop(r, () => r.run?.gen === gen, d.site, p);
       return;
     }
     if (d.tier === TIER.AUDIO) {
@@ -296,7 +478,7 @@ export function createOrchestrator({
       sendView(r, p);
       if (r.promptedFor) hideNotice(r);
       setState(r, 'captions', { tier: 2 });
-      cmd(r, { cmd: 'mse-capture', on: true, streamId: d.audio.streamId, lang: p.sourceLang, targetLang: p.targetLang, fromS: Math.max(0, t - CAPTURE_BACK_S) }).then(
+      cmd(r, { cmd: 'mse-capture', on: true, streamId: d.audio.streamId, lang: p.sourceLang, targetLang: p.targetLang, fromS: Math.max(0, t - CAPTURE_BACK_S, d.edge || 0) }).then(
         (res) => opened(r, gen, res),
         (e) => fail(r, gen, e)
       );
@@ -335,11 +517,19 @@ export function createOrchestrator({
     if (r.run && r.run.gen === gen && typeof res?.key === 'string') r.run.key = res.key;
   }
 
+  // The run is over; finals the pipeline still flushes under its key are kept for the record.
+  function endRun(r) {
+    const run = r.run;
+    if (run) r.lastRun = { key: run.key ?? null, kind: run.kind, tier: run.tier, gen: run.gen };
+    r.run = null;
+    r.gen++;
+  }
+
   function fail(r, gen, e) {
     if (!r.run || r.run.gen !== gen) return;
     const code = e?.code || e?.message || 'error';
     logger.warn?.(`tab ${r.tabId}: ${r.run.kind} failed: ${code}`);
-    r.run = null;
+    endRun(r);
     r.failures++;
     setState(r, 'idle', { error: code });
     if (r.failures < MAX_FAILURES) scheduleRetry(r);
@@ -350,8 +540,8 @@ export function createOrchestrator({
     clearTimerOf(r, 'pause');
     r.held = false;
     if (!run) return;
-    r.run = null;
-    r.gen++;
+    endRun(r);
+    flushCache(r);
     if (run.kind === 'capture') quiet(cmd(r, { cmd: 'mse-capture', on: false }));
     else if (run.kind === 'listen') quiet(cmd(r, { cmd: 'listen', on: false, reason }));
     logger.debug?.(`tab ${r.tabId}: ${run.kind} stopped (${reason})`);
@@ -359,6 +549,9 @@ export function createOrchestrator({
 
   // Everything about the old document is gone with it; nothing to tell the page.
   function resetNav(r) {
+    flushCache(r);
+    r.shown = null;
+    r.lastRun = null;
     r.run = null;
     r.gen++;
     r.held = false;
@@ -375,7 +568,8 @@ export function createOrchestrator({
 
   // ---- tier 1 translation: around the playhead first, then onwards, cached ----
 
-  async function translateLoop(r, gen, site, p) {
+  // live() says whether the cues are still the page's; site is { cues, lang }.
+  async function translateLoop(r, live, site, p) {
     const target = p.targetLang;
     const store = cacheFor(`${r.mediaKey}:${target}`);
     const pending = new Map();
@@ -386,7 +580,6 @@ export function createOrchestrator({
       else pending.set(c.id, c);
     }
     if (cached.length) quiet(cmd(r, { cmd: 'cues', op: 'translation', translations: cached }));
-    const live = () => r.run?.gen === gen;
     while (pending.size && live()) {
       const t = currentTime(r);
       const all = [...pending.values()];
@@ -405,7 +598,7 @@ export function createOrchestrator({
         r.translateError = e?.code || 'translate-failed';
         logger.warn?.(`tab ${r.tabId}: translate failed: ${r.translateError}`);
         setTimer(() => {
-          if (live()) translateLoop(r, gen, { ...site, cues: [...pending.values()] }, p);
+          if (live()) translateLoop(r, live, { ...site, cues: [...pending.values()] }, p);
         }, translateRetryMs);
         return;
       }
@@ -417,6 +610,7 @@ export function createOrchestrator({
         if (!c) continue;
         if (typeof item.text === 'string' && item.text) {
           store.set(c.id, item.text);
+          noteTranslation(r, c.id, item.text);
           out.push({ id: c.id, text: item.text, done: true });
         }
       }
@@ -464,14 +658,19 @@ export function createOrchestrator({
     const e = event.event;
     const mine = r.run && ((r.run.kind === 'capture' && event.kind === 'capture') || (r.run.kind === 'listen' && event.kind === 'listen')) && (r.run.key ? event.key === r.run.key : e.type === 'segment');
     if (e.type === 'segment') r.failures = 0;
+    const owner = mine ? r.run : r.lastRun && event.key && event.key === r.lastRun.key && event.kind === r.lastRun.kind ? r.lastRun : null;
+    if (!mine && (e.type === 'segment' || e.type === 'translation')) logger.debug?.(`tab ${r.tabId}: ${e.type} ${e.id ?? ''} ${owner ? 'after the stop' : 'stray'} (${event.key})`);
+    if (owner) {
+      if (e.type === 'segment' && e.id) noteLiveCue(r, owner.tier, owner.gen, e);
+      else if (e.type === 'translation' && e.id && typeof e.text === 'string' && e.text) noteTranslation(r, e.id, e.text);
+    }
     if (!mine) return;
     if (e.type === 'suspended') {
       remember(noSpeech, r.mediaKey);
       stopRun(r, 'no-speech');
       setState(r, 'suspended');
     } else if (e.type === 'closed') {
-      r.run = null;
-      r.gen++;
+      endRun(r);
       if (e.reason === 'preempted' || e.reason === 'busy') scheduleRetry(r);
       else if (e.reason && e.reason !== 'closed') {
         r.failures++;
@@ -479,8 +678,7 @@ export function createOrchestrator({
       }
       setState(r, 'idle', { closed: e.reason });
     } else if (e.type === 'error') {
-      r.run = null;
-      r.gen++;
+      endRun(r);
       r.failures++;
       if (r.failures < MAX_FAILURES) scheduleRetry(r);
       setState(r, 'idle', { error: e.code });
@@ -491,6 +689,7 @@ export function createOrchestrator({
     if (event.type === 'forgotten') {
       const r = byTab.get(tabId);
       if (!r) return;
+      flushCache(r);
       for (const name of Object.keys(r.timers)) clearTimerOf(r, name);
       byTab.delete(tabId);
       if (active === tabId) active = null;
@@ -516,8 +715,7 @@ export function createOrchestrator({
         // The page stopped forwarding: the stream went away (a new one is
         // decided on at once) or the page could not keep up (tried again later).
         if (!event.on && r.run?.kind === 'capture') {
-          r.run = null;
-          r.gen++;
+          endRun(r);
           if (PAGE_STOP_RETRY.has(event.reason)) scheduleRetry(r);
           setState(r, 'idle', { capture: event.reason });
         }
@@ -553,7 +751,7 @@ export function createOrchestrator({
     stateOf(tabId) {
       const r = byTab.get(tabId);
       if (!r) return null;
-      return { tabId, state: r.state, run: r.run ? { tier: r.run.tier, kind: r.run.kind, key: r.run.key ?? null, startedAt: r.run.startedAt } : null, block: r.block ?? null, active: active === tabId, mediaKey: r.mediaKey, noSpeech: noSpeech.has(r.mediaKey), translateError: r.translateError, failures: r.failures, history: r.log.slice() };
+      return { tabId, state: r.state, run: r.run ? { tier: r.run.tier, kind: r.run.kind, key: r.run.key ?? null, startedAt: r.run.startedAt } : null, block: r.block ?? null, active: active === tabId, mediaKey: r.mediaKey, noSpeech: noSpeech.has(r.mediaKey), translateError: r.translateError, failures: r.failures, cached: r.cached ? { count: r.cached.cues.length, tier: r.cached.tier ?? null, shown: !!r.shown, covered: covered(r) } : null, history: r.log.slice() };
     },
     active: () => active,
     // Forgets a parked video so it is tried again.

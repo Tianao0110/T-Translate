@@ -79,5 +79,6 @@
     "message": "Videos: $COUNT$ · $SIZE$",
     "placeholders": { "count": { "content": "$1" }, "size": { "content": "$2" } }
   },
-  "cacheClear": { "message": "Clear" }
+  "cacheClear": { "message": "Clear" },
+  "tabCaptionsCached": { "message": "Showing cached captions" }
 }

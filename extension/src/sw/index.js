@@ -12,7 +12,7 @@ import { createPageEvents } from './page-events.js';
 import { createPrefs } from './prefs.js';
 import { createTabArbiter } from './tab-arbiter.js';
 import { createOrchestrator } from './session-orchestrator.js';
-import { createSubtitleCache, openIndexedDbStore, cacheHandlers } from './cache-db.js';
+import { createSubtitleCache, openIndexedDbStore, createMemoryStore, cacheHandlers } from './cache-db.js';
 
 const OFFSCREEN_PATH = 'offscreen.html';
 const KEEPALIVE = 'companion-keepalive';
@@ -64,15 +64,19 @@ export const pageEvents = createPageEvents({ toOffscreen });
 let channel = { status: 'unpaired' };
 export const prefs = createPrefs();
 export const arbiter = createTabArbiter({ onChange: () => orchestrator.evaluate() });
+// Subtitles kept per media in IndexedDB (extension pages reach it through
+// CACHE_*); only in memory for secure mode and incognito tabs.
+export const subtitleCache = createSubtitleCache({ store: openIndexedDbStore() });
+const memoryCache = createSubtitleCache({ store: createMemoryStore() });
 export const orchestrator = createOrchestrator({
   pageEvents,
   arbiter,
   prefs,
   translate: (items, { source, target }) => toOffscreen(MSG.COMPANION_TRANSLATE, { items, source, target }),
   onState: (tabId, state) => showTabBadge(tabId, state, channel),
+  cache: subtitleCache,
+  memoryCache,
 });
-// Subtitles kept per media in IndexedDB; extension pages reach it through CACHE_*.
-export const subtitleCache = createSubtitleCache({ store: openIndexedDbStore() });
 
 function channelChanged(state) {
   channel = state || { status: 'unpaired' };

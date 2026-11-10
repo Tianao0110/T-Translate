@@ -8,6 +8,8 @@
 //       answers this automated browser with empty site captions), with the
 //       time to the first sentence and the first cue on the track
 //   (b) pause: capture stops after the grace; play: it starts again
+//   (g) reload: the captions recognized so far come back from the cache,
+//       recognition starts again only past what they cover
 //   (c) a second tab with a video takes over when it is the active tab, the
 //       first stops; switching back hands it over again
 //   (d) switching the site off in prefs stops it and marks the badge; on again resumes
@@ -86,6 +88,7 @@ async function main() {
   const { cdp, attach, evaluate, open } = browser;
   console.log(`browser pid ${browser.child.pid}`);
   const extProblems = [];
+  const swDebug = []; // the worker's console.debug lines (the orchestrator's bookkeeping)
   const pageExceptions = { ours: [], site: 0 };
   const numbers = {};
   const shots = [];
@@ -140,6 +143,7 @@ async function main() {
         else extProblems.push(text);
       }
       if (m.method === 'Runtime.consoleAPICalled' && m.params.type === 'error' && !pages.has(m.sessionId)) extProblems.push(m.params.args.map((a) => a.value ?? a.description).join(' '));
+      if (m.method === 'Runtime.consoleAPICalled' && m.params.type === 'debug' && !pages.has(m.sessionId)) swDebug.push(m.params.args.map((a) => a.value ?? a.description).join(' '));
     });
     const shoot = async (session, name, clip) => {
       const { data } = await cdp.send('Page.captureScreenshot', { format: 'png', ...(clip ? { clip: { ...clip, scale: 1 } } : {}) }, session);
@@ -207,12 +211,49 @@ async function main() {
     // Not awaited: play() never settles while the player is between videos.
     await evaluate(page1, `(document.querySelector('video').play().catch(() => {}), true)`);
     const tPlay = Date.now();
+    // What was recognized before the pause runs ahead of the playhead, so
+    // the captions stay and no new session opens until the playhead passes them.
     const resumed = await until(async () => {
-      const ev = await evidence(tab1);
-      return ev?.capture?.on && ev.capture.key !== numbers.capture?.key ? ev.capture : null;
-    }, 15000);
+      const s = await state(tab1);
+      return s?.state === 'captions' && !s.run && s.cached?.covered ? s : null;
+    }, 5000, 200);
     numbers.playToResumeMs = resumed ? Date.now() - tPlay : null;
-    step('(b) playing again restarts capture under a new key', !!resumed, `${resumed?.key} after ${numbers.playToResumeMs} ms`);
+    await sleep(3000);
+    const noNew = (await evidence(tab1))?.capture;
+    step('(b) playing again keeps the recognized captions without a new session', !!resumed && !!noNew && !noNew.on && noNew.key === numbers.capture?.key, `${JSON.stringify(resumed?.cached)} after ${numbers.playToResumeMs} ms; capture ${noNew?.on ? 'on' : 'off'} (${noNew?.key})`);
+    if (!resumed) await dump(tab1);
+
+    // ---- (g) the cache: the same video again shows what was recognized, before anything runs ----
+    await sleep(3000);
+    const before = await trackInfo(page1);
+    const cueList = (list) => (list || []).map((c) => `${c.id}@${Number(c.start ?? c.startTime).toFixed(1)}-${Number(c.end ?? c.endTime).toFixed(1)}`).join(' ');
+    const onTrackBefore = await evaluate(page1, `(() => { const t = Array.from(document.querySelector('video').textTracks).find((x) => x.label === 'T-Caption'); return t ? Array.from(t.cues).map((c) => ({ id: c.id, start: c.startTime, end: c.endTime })) : []; })()`);
+    const recordBefore = (await ext('cache/get', { key: `youtube:${VIDEO}` }))?.result;
+    console.log(`  [note] track before reload: ${cueList(onTrackBefore)}\n  [note] record before reload: ${cueList(recordBefore?.cues)} (tier ${recordBefore?.tier}, target ${recordBefore?.target})`);
+    console.log(`  [note] worker: ${swDebug.filter((l) => /segment|translation|stopped/.test(l)).join(' | ')}`);
+    await evaluate(page1, `(window.__tcBeforeReload = true, true)`);
+    // A navigation to the same URL: a new document (Page.reload left YouTube's page in place).
+    await cdp.send('Page.navigate', { url: `https://www.youtube.com/watch?v=${VIDEO}` }, page1);
+    const tReload = Date.now();
+    const fromCache = await until(async () => {
+      // The old document answers until the new one commits.
+      if (await evaluate(page1, `window.__tcBeforeReload === true`).catch(() => true)) return null;
+      const s = await state(tab1);
+      const r = await trackInfo(page1);
+      return s?.cached?.count > 0 && r && r.cues > 0 ? { state: s, track: r } : null;
+    }, 30000, 200);
+    numbers.cacheShowMs = fromCache ? Date.now() - tReload : null;
+    numbers.cache = fromCache && { count: fromCache.state.cached.count, onTrack: fromCache.track.cues, cuesBefore: before?.cues ?? null, covered: fromCache.state.cached.covered, run: fromCache.state.run?.kind ?? null, t: fromCache.track.t };
+    step('(g) after a reload the captions come back from the cache, the last one flushed after the stop included', !!fromCache && fromCache.track.cues >= (before?.cues ?? 1) && fromCache.state.cached.count >= (before?.cues ?? 1), `${JSON.stringify(numbers.cache)} after ${numbers.cacheShowMs} ms`);
+    if (!fromCache) await dump(tab1);
+    await until(() => evaluate(page1, `!document.querySelector('#movie_player.ad-showing') && !!document.querySelector('#movie_player')`), 90000, 500);
+    const liveAgain = await until(async () => {
+      const s = await state(tab1);
+      return s?.run?.kind === 'capture' ? { state: s, track: await trackInfo(page1) } : null;
+    }, 90000, 500);
+    numbers.cacheEdge = liveAgain && { t: liveAgain.track?.t, covered: liveAgain.state.cached?.covered, active: liveAgain.track?.active?.length ?? 0 };
+    step('(g) recognition starts again only past what the cache covers, one caption on screen at a time', !!liveAgain && liveAgain.state.cached?.covered === false && (liveAgain.track?.active?.length ?? 0) <= 1, JSON.stringify(numbers.cacheEdge));
+    if (!liveAgain) await dump(tab1);
 
     // ---- (c) a second tab ----
     const { sessionId: page2 } = await open(`https://www.youtube.com/watch?v=${VIDEO2}`);

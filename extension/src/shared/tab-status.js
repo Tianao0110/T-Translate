@@ -7,6 +7,7 @@ export function describeTab({ tab, evidence, channel, prefs } = {}, t) {
   if (!evidence) return { tone: 'muted', text: t('tabNoVideo') };
   switch (tab?.state) {
     case 'captions':
+      if (!tab.run && tab.cached) return { tone: 'ok', text: t('tabCaptionsCached') };
       return { tone: 'ok', text: tab.run?.tier === 1 ? t('tabCaptionsSite') : t('tabCaptionsAudio') };
     case 'listening':
       return { tone: 'ok', text: t('tabListening') };

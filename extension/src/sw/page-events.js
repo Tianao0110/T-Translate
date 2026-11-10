@@ -38,6 +38,7 @@ function freshEvidence(tabId, docId) {
   return {
     tabId,
     docId,
+    incognito: false,
     url: '',
     site: 'generic',
     mediaId: null,
@@ -211,6 +212,7 @@ export function createPageEvents({
     const { event } = checked;
     if (event.type === 'navigated' ? event.navSeq < ev.navSeq : checked.navSeq !== ev.navSeq) return { boot: bootId, stale: true };
     ev.url ||= sender.url;
+    ev.incognito = !!sender.tab.incognito;
     const out = apply(ev, event);
     ev.updatedAt = now();
     if (out) emit(tabId, out);

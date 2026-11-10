@@ -79,5 +79,6 @@
     "message": "$COUNT$ 个视频，共 $SIZE$",
     "placeholders": { "count": { "content": "$1" }, "size": { "content": "$2" } }
   },
-  "cacheClear": { "message": "清空" }
+  "cacheClear": { "message": "清空" },
+  "tabCaptionsCached": { "message": "显示缓存的字幕" }
 }

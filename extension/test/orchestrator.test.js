@@ -7,7 +7,7 @@
 // retries after a lost session, seeks, and the off / offline gates.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createOrchestrator, mediaEligible, siteKeyOf, sameLang } from '../src/sw/session-orchestrator.js';
+import { createOrchestrator, mediaEligible, siteKeyOf, sameLang, coverageOf, coveredAt, coveredEdge } from '../src/sw/session-orchestrator.js';
 
 const flush = async () => {
   for (let i = 0; i < 8; i++) await Promise.resolve();
@@ -432,5 +432,180 @@ describe('one tab at a time and the gates', () => {
     expect(orch.stateOf(7)).toBeNull();
     expect(states.at(-1)).toEqual({ tabId: 7, state: null, detail: undefined });
     expect(orch.active()).toBeNull();
+  });
+});
+
+describe('the subtitle cache', () => {
+  const KEY = 'youtube:vid00000001';
+  const record = (over = {}) => ({ cues: cuesOf(6).map((c) => ({ ...c, translation: `[zh] ${c.text}` })), tier: 2, lang: 'en', target: 'zh', ...over });
+  let store;
+  let memory;
+  const fakeCache = () => {
+    const c = { records: new Map() };
+    c.get = vi.fn(async (k) => c.records.get(k) ?? null);
+    c.put = vi.fn(async (k, r) => c.records.set(k, r));
+    return c;
+  };
+  // A fresh orchestrator over fresh page-events, with the two caches.
+  function withCache({ record: rec = null, privacyMode = null } = {}) {
+    pe = fakePageEvents();
+    store = fakeCache();
+    memory = fakeCache();
+    if (rec) store.records.set(KEY, rec);
+    states = [];
+    orch = createOrchestrator({ pageEvents: pe, arbiter, prefs, translate, onState: (tabId, state, detail) => states.push({ tabId, state, detail }), logger: { warn: () => {}, debug: () => {} }, cache: store, memoryCache: memory });
+    orch.setCompanion({ status: 'ready', privacyMode });
+  }
+  const segment = (key, id, start, end, text) => pe.emit(7, { type: 'capture-event', kind: 'capture', key, event: { type: 'segment', id, start, end, text } });
+  const translated = (key, id, text) => pe.emit(7, { type: 'capture-event', kind: 'capture', key, event: { type: 'translation', id, text, done: true } });
+  const sets = () => pe.of('cues').filter((c) => c.op === 'set');
+  const batches = () => pe.of('cues').filter((c) => c.op === 'translation');
+
+  it('coverage helpers: stretches across small gaps, the tail of one, the edge being left', () => {
+    const stretches = coverageOf([{ start: 40, end: 45 }, { start: 0, end: 4 }, { start: 5, end: 9 }, { start: 30, end: 34 }]);
+    expect(stretches).toEqual([{ start: 0, end: 9 }, { start: 30, end: 45 }]); // 9 → 30 is a real gap, 34 → 40 is not
+    expect(coveredAt(stretches, 3)).toEqual({ start: 0, end: 9 });
+    expect(coveredAt(stretches, 7.5)).toBeNull(); // the last 2 s do not count
+    expect(coveredAt(stretches, 12)).toBeNull();
+    expect(coveredAt(stretches, 29.5)).toEqual({ start: 30, end: 45 });
+    expect(coveredEdge(stretches, 8)).toBe(9);
+    expect(coveredEdge(stretches, 50)).toBe(45);
+    expect(coveredEdge([], 40)).toBe(0);
+    expect(coverageOf([{ start: 5, end: 9 }])).toEqual([{ start: 0, end: 9 }]); // a quiet head counts as covered
+  });
+
+  it('a cached video shows its cues at once, channel or not; the stored translations follow once served; nothing is recognized inside the covered stretch', async () => {
+    withCache({ record: record() }); // covers 0–59
+    orch.setCompanion({ status: 'unpaired' });
+    await playing(7, { media: { currentTime: 20 } });
+    await flush();
+    expect(store.get).toHaveBeenCalledWith(KEY);
+    expect(sets()).toHaveLength(1);
+    expect(sets()[0].cues).toHaveLength(6);
+    expect(sets()[0].cues[0]).toEqual({ id: 'c0', start: 0, end: 9, text: 'line 0' });
+    expect(pe.of('site-captions')[0]).toMatchObject({ value: 'hide' });
+    expect(orch.stateOf(7)).toMatchObject({ state: 'captions', run: null, block: 'offline', cached: { count: 6, tier: 2, covered: true } });
+    expect(batches()).toHaveLength(0);
+    orch.setCompanion({ status: 'ready' });
+    await flush();
+    expect(batches()).toHaveLength(1);
+    expect(batches()[0].translations).toHaveLength(6);
+    expect(batches()[0].translations[0]).toEqual({ id: 'c0', text: '[zh] line 0', done: true });
+    expect(translate).not.toHaveBeenCalled();
+    await after(3000);
+    expect(pe.of('mse-capture')).toHaveLength(0);
+    expect(lastState()).toBe('captions');
+  });
+
+  it('past the covered stretch recognition starts at its edge; a seek back inside stops it, a seek beyond starts again', async () => {
+    withCache({ record: record() }); // covers 0–59
+    await playing(7, { media: { currentTime: 57.5 } });
+    await after(2000);
+    const on = pe.of('mse-capture').filter((c) => c.on);
+    expect(on).toHaveLength(1);
+    expect(on[0].fromS).toBe(59);
+    const key = 'tab:7:1';
+    segment(key, 'm1-0', 60, 64, 'sixty');
+    pe.emit(7, { type: 'media', reason: 'seeked', media: snap({ currentTime: 10 }), primary: true });
+    await flush();
+    expect(pe.of('mse-capture').filter((c) => !c.on)).toHaveLength(1);
+    expect(orch.stateOf(7)).toMatchObject({ state: 'captions', run: null, cached: { covered: true } });
+    await after(5000);
+    expect(pe.of('mse-capture').filter((c) => c.on)).toHaveLength(1);
+    pe.emit(7, { type: 'media', reason: 'seeked', media: snap({ currentTime: 100 }), primary: true });
+    await after(100);
+    const again = pe.of('mse-capture').filter((c) => c.on);
+    expect(again).toHaveLength(2);
+    expect(again[1].fromS).toBeCloseTo(95, 0);
+  });
+
+  it('what runs is written back merged with the record, under ids a later run cannot reuse; a translation after the write still lands', async () => {
+    withCache({ record: record({ cues: cuesOf(2) }) }); // covers 0–19, no translations
+    await playing(7, { media: { currentTime: 30 } });
+    await after(2000);
+    const key = 'tab:7:1';
+    segment(key, 'm1-0', 32, 35, 'a');
+    translated(key, 'm1-0', '[zh] a');
+    segment(key, 'm1-1', 36, 40, 'b');
+    expect(store.put).not.toHaveBeenCalled();
+    await after(30000);
+    expect(store.put).toHaveBeenCalledTimes(1);
+    const [k, rec] = store.put.mock.calls[0];
+    expect(k).toBe(KEY);
+    expect(rec).toMatchObject({ tier: 2, lang: 'en', target: 'zh' }); // the record's language stays
+    // The record's own cues had no translations: translateCached filled them in meanwhile.
+    expect(rec.cues.map((c) => [c.text, c.translation])).toEqual([['line 0', '[zh] line 0'], ['line 1', '[zh] line 1'], ['a', '[zh] a'], ['b', null]]);
+    expect(rec.cues[2].id).toMatch(/^c[0-9a-z]+-m1-0$/);
+    translated(key, 'm1-1', '[zh] b');
+    await after(30000);
+    expect(store.put).toHaveBeenCalledTimes(2);
+    expect(store.put.mock.calls[1][1].cues[3]).toMatchObject({ text: 'b', translation: '[zh] b' });
+    // The pause grace stops the run; a final flushed after the stop still joins the record.
+    pe.emit(7, { type: 'media', reason: 'pause', media: snap({ currentTime: 41, state: 'paused' }), primary: true });
+    await after(5000);
+    expect(orch.stateOf(7)).toMatchObject({ run: null, cached: { count: 4, covered: false } });
+    segment(key, 'm1-2', 40, 43, 'late');
+    await after(30000);
+    expect(store.put).toHaveBeenCalledTimes(3);
+    expect(store.put.mock.calls[2][1].cues.map((c) => c.text)).toEqual(['line 0', 'line 1', 'a', 'b', 'late']);
+    // Playing on from 44 restarts at the record's edge, 43.
+    pe.emit(7, { type: 'media', reason: 'play', media: snap({ currentTime: 44 }), primary: true });
+    await after(2000);
+    const on = pe.of('mse-capture').filter((c) => c.on);
+    expect(on).toHaveLength(2);
+    expect(on[1].fromS).toBeCloseTo(43, 0);
+  });
+
+  it('secure mode and incognito tabs keep records in memory only', async () => {
+    withCache({ privacyMode: 'secure' });
+    await playing(7, { media: { currentTime: 30 } });
+    await after(2000);
+    segment('tab:7:1', 'm1-0', 32, 35, 'a');
+    await after(30000);
+    expect(store.get).not.toHaveBeenCalled();
+    expect(store.put).not.toHaveBeenCalled();
+    expect(memory.get).toHaveBeenCalledWith(KEY);
+    expect(memory.put).toHaveBeenCalledTimes(1);
+
+    withCache();
+    await playing(7, { evidence: { incognito: true }, media: { currentTime: 30 } });
+    await after(2000);
+    segment('tab:7:1', 'm1-0', 32, 35, 'a');
+    await after(30000);
+    expect(store.get).not.toHaveBeenCalled();
+    expect(memory.get).toHaveBeenCalledWith(KEY);
+    expect(memory.put).toHaveBeenCalledTimes(1);
+  });
+
+  it('a record for another target shows its originals and is translated again; the write carries the new target', async () => {
+    withCache({ record: record({ target: 'en', cues: cuesOf(6).map((c) => ({ ...c, translation: `[en] ${c.text}` })) }) });
+    await playing(7, { media: { currentTime: 20 } });
+    await flush();
+    expect(sets()).toHaveLength(1);
+    expect(translate).toHaveBeenCalledTimes(1);
+    expect(translate.mock.calls[0][1]).toEqual({ source: 'en', target: 'zh' });
+    expect(batches()).toHaveLength(1);
+    expect(batches()[0].translations[0]).toEqual({ id: 'c0', text: '[zh] line 0', done: true });
+    await after(30000);
+    expect(store.put).toHaveBeenCalledTimes(1);
+    expect(store.put.mock.calls[0][1]).toMatchObject({ tier: 2, lang: 'en', target: 'zh' });
+    expect(store.put.mock.calls[0][1].cues[5].translation).toBe('[zh] line 5');
+  });
+
+  it('site captions replace the record and carry their translations', async () => {
+    withCache({ record: record() });
+    await playing(7, { media: { currentTime: 20 } });
+    await flush();
+    const siteCues = cuesOf(3, 100).map((c, i) => ({ ...c, id: `s${i}` }));
+    pe.emit(7, { type: 'subtitle-parsed', url: 'https://www.youtube.com/api/timedtext?v=vid00000001', cueCount: 3, cues: siteCues, lang: 'en', kind: '', mediaId: 'vid00000001' });
+    await flush();
+    expect(sets()).toHaveLength(2);
+    expect(sets()[1].cues.map((c) => c.id)).toEqual(['s0', 's1', 's2']);
+    expect(orch.stateOf(7)).toMatchObject({ state: 'captions', run: { tier: 1 } });
+    await after(30000);
+    expect(store.put).toHaveBeenCalledTimes(1);
+    const rec = store.put.mock.calls[0][1];
+    expect(rec).toMatchObject({ tier: 1, lang: 'en', target: 'zh' });
+    expect(rec.cues.map((c) => [c.id, c.translation])).toEqual([['s0', '[zh] line 0'], ['s1', '[zh] line 1'], ['s2', '[zh] line 2']]);
   });
 });

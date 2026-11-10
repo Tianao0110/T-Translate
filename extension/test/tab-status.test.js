@@ -12,6 +12,7 @@ describe('describeTab', () => {
   it('running states', () => {
     expect(describeTab({ tab: { state: 'captions', run: { tier: 1 } }, evidence: ev, channel: ready }, t)).toEqual({ tone: 'ok', text: 'tabCaptionsSite' });
     expect(describeTab({ tab: { state: 'captions', run: { tier: 2 } }, evidence: ev, channel: ready }, t)).toEqual({ tone: 'ok', text: 'tabCaptionsAudio' });
+    expect(describeTab({ tab: { state: 'captions', run: null, cached: { count: 3, covered: true } }, evidence: ev, channel: { status: 'offline' } }, t)).toEqual({ tone: 'ok', text: 'tabCaptionsCached' });
     expect(describeTab({ tab: { state: 'listening' }, evidence: ev }, t).text).toBe('tabListening');
     expect(describeTab({ tab: { state: 'prompt' }, evidence: ev }, t)).toEqual({ tone: 'warn', text: 'tabPrompt' });
     expect(describeTab({ tab: { state: 'suspended' }, evidence: ev }, t).text).toBe('tabSuspended');
