@@ -388,7 +388,7 @@ async function main() {
       const wideNew = await overlayInfo(page2);
       await player(page2, `v.style.width = '360px'; v.style.height = '640px'; return true;`);
       numbers.e = { portrait: { before, after }, wide: { old: wideOld?.fontSize, now: wideNew?.fontSize } };
-      await sideBySide('6-portrait-compare', [fBefore, fAfter], [`before: 4.6cqh → ${before.fontSize}px`, `after: min(4.6cqh, 3.5cqw) → ${after.fontSize}px`]);
+      await sideBySide('6-portrait-compare', [fBefore, fAfter], [`before: 4.6cqh → ${before.fontSize}px`, `after: min(4.6cqh, 4.5cqw) → ${after.fontSize}px`]);
       // Candidates for the width factor, the current rule first (any factor
       // from 3.45 up leaves 4:3 and wider as they are).
       await sleep(400);

@@ -25,7 +25,7 @@ const CSS = `
   position: absolute; left: 4%; right: 4%; bottom: 7%;
   display: flex; flex-direction: column; align-items: center; gap: 0.12em;
   font-family: system-ui, "Segoe UI", "PingFang SC", "Hiragino Sans", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
-  font-size: var(--tc-cap-size, clamp(14px, min(4.6cqh, 3.5cqw), 52px));
+  font-size: var(--tc-cap-size, clamp(14px, min(4.6cqh, 4.5cqw), 52px));
   font-weight: 500; line-height: 1.35; text-align: center;
 }
 .tc-cap-box[hidden] { display: none; }
