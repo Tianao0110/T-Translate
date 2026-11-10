@@ -228,3 +228,20 @@ describe('media bytes over JSON messages', () => {
     expect(() => decodeBytes({})).toThrow(expect.objectContaining({ code: 'bad-bytes' }));
   });
 });
+
+describe('media pipeline: closing for a seek', () => {
+  it('close with drain false drops what is queued instead of feeding it, and a new open does not wait on it', async () => {
+    const { p, log, events } = setup();
+    p.open({ key: 'tab1', lang: 'en', targetLang: 'zh' });
+    for (let i = 0; i < FIXTURE.length; i += 1000) p.push({ key: 'tab1', bytes: FIXTURE.subarray(i, i + 1000) });
+    await new Promise((r) => setTimeout(r, 20)); // the decoder has handed some audio to the feeder
+    const closing = p.close({ key: 'tab1', drain: false });
+    p.open({ key: 'tab2', lang: 'en', targetLang: 'zh' });
+    const stats = await closing;
+    expect(log.drain).toBe(false);
+    expect(stats).toMatchObject({ bytes: FIXTURE.length });
+    expect(events).toEqual([{ key: 'tab1', event: { type: 'closed', reason: 'closed' } }]);
+    expect(p.current()).toBe('tab2');
+    await p.close({ key: 'tab2' });
+  });
+});

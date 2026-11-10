@@ -287,7 +287,7 @@ describe('direct fetch', () => {
     const r = await d.close({ key: 'k' });
     expect(aborted).toBe(true);
     expect(r).toMatchObject({ source: 'direct', blocks: 9, fetch: { requests: 2, reason: 'closed', done: false, error: null } });
-    expect(off.calls.at(-1)).toEqual({ type: MSG.MEDIA_CLOSE, key: 'k' });
+    expect(off.calls.at(-1)).toEqual({ type: MSG.MEDIA_CLOSE, key: 'k', drain: true });
     expect(events).toEqual([]);
     expect(d.current()).toBe(null);
     await expect(d.close({ key: 'k' })).resolves.toBe(r);

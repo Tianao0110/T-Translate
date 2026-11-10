@@ -593,7 +593,7 @@ export function createOrchestrator({
     if (!run) return;
     endRun(r);
     flushCache(r);
-    if (run.kind === 'capture') quiet(cmd(r, { cmd: 'mse-capture', on: false }));
+    if (run.kind === 'capture') quiet(cmd(r, { cmd: 'mse-capture', on: false, reason }));
     else if (run.kind === 'direct') quiet(cmd(r, { cmd: 'direct', on: false, reason }));
     else if (run.kind === 'listen') quiet(cmd(r, { cmd: 'listen', on: false, reason }));
     logger.debug?.(`tab ${r.tabId}: ${run.kind} stopped (${reason})`);
@@ -737,7 +737,7 @@ export function createOrchestrator({
     } else if (e.type === 'error') {
       endRun(r);
       r.failures++;
-      if (r.failures < MAX_FAILURES) scheduleRetry(r);
+      if (r.failures < MAX_FAILURES) scheduleRetry(r, e.code === 'busy' ? busyRetryMs : retryMs);
       else gaveUp(r);
       setState(r, 'idle', { error: e.code });
     }

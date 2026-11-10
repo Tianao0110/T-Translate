@@ -210,11 +210,13 @@ export function createMediaPipeline({
   }
 
   return {
-    // A new key replaces the stream in progress (closed without draining).
+    // A new key replaces the stream in progress (closed without draining);
+    // one still draining after close() is waited for (the app takes one
+    // session at a time).
     open({ key, lang = '', targetLang = '', source = 'mse' } = {}) {
       if (typeof key !== 'string' || !key) throw new PipelineError('bad-request', 'key');
       if (!SOURCES.includes(source)) throw new PipelineError('bad-request', 'source');
-      const after = cur ? closeStream(cur, { drain: false }) : null;
+      const after = cur ? closeStream(cur, { drain: false }) : (last?.closing ?? null);
       const s = {
         key,
         lang,
@@ -256,10 +258,11 @@ export function createMediaPipeline({
       return { ended: s.ended };
     },
 
-    // Decodes and feeds what is left, closes the session; resolves the stats.
-    close({ key } = {}) {
+    // Decodes and feeds what is left (drain false: drops it, for a seek),
+    // closes the session; resolves the stats.
+    close({ key, drain = true } = {}) {
       if (last?.key === key && cur?.key !== key) return last.closing;
-      return closeStream(need(key), { drain: true });
+      return closeStream(need(key), { drain: drain !== false });
     },
 
     current: () => cur?.key ?? null,

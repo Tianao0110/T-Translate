@@ -287,14 +287,15 @@ export function createPageEvents({
     }
   }
 
-  // tellTab false: the page already stopped, or is gone.
+  // tellTab false: the page already stopped, or is gone. A seek drops the
+  // audio fetched ahead instead of draining it (the restart wants the new spot).
   function closeCapture(ev, reason, { tellTab = true } = {}) {
     const cap = ev.capture;
     if (!cap || !cap.on) return Promise.resolve(cap ? publicCapture(cap) : null);
     cap.on = false;
     cap.reason = reason;
     if (tellTab) sendToTab(ev.tabId, { cmd: 'mse-capture', on: false }).catch(() => {});
-    cap.closing = cap.chain.then(() => toOffscreen(MSG.MEDIA_CLOSE, { key: cap.key })).then(
+    cap.closing = cap.chain.then(() => toOffscreen(MSG.MEDIA_CLOSE, { key: cap.key, drain: reason !== 'seek' })).then(
       (stats) => {
         cap.stats = stats;
         return publicCapture(cap);
@@ -405,7 +406,7 @@ export function createPageEvents({
     if (!d || !d.on) return d ? (d.closing ?? Promise.resolve(publicDirect(d))) : Promise.resolve(null);
     d.on = false;
     d.reason = reason;
-    d.closing = direct.close({ key: d.key }).then(
+    d.closing = direct.close({ key: d.key, drain: reason !== 'seek' }).then(
       (r) => {
         if (r) {
           const { fetch, ...stats } = r;
@@ -539,7 +540,7 @@ export function createPageEvents({
     if (command.cmd === 'mse-capture') {
       if (command.on) return openCapture(tabId, command);
       const ev = byTab.get(tabId);
-      return ev ? closeCapture(ev, 'command') : null;
+      return ev ? closeCapture(ev, command.reason || 'command') : null;
     }
     if (command.cmd === 'listen') {
       if (command.on) return openListen(tabId, command);

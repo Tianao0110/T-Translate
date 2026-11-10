@@ -210,7 +210,7 @@ describe('commands and the capture glue', () => {
 
     const off = await ext(MSG.TAB_COMMAND, { tabId: 7, command: { cmd: 'mse-capture', on: false } });
     expect(off).toMatchObject({ on: false, reason: 'command', stats: { bytes: 1, blocks: 1 } });
-    expect(offscreen.calls.at(-1)).toEqual({ type: MSG.MEDIA_CLOSE, payload: { key: 'tab:7:1' } });
+    expect(offscreen.calls.at(-1)).toEqual({ type: MSG.MEDIA_CLOSE, payload: { key: 'tab:7:1', drain: true } });
     expect(tabs.sent.filter((s) => s.cmd.cmd === 'mse-capture').map((s) => s.cmd.on)).toEqual([true, false]);
     expect(await media({ streamId: 1, seq: 2, bytes: 'DDDD' })).toEqual({ accepted: false, reason: 'not-capturing' });
     expect(heard.filter((h) => h.event.type === 'capture-event').map((h) => h.event.event.id)).toEqual(['m1-0', 'm1-0']);
@@ -290,7 +290,7 @@ describe('commands and the capture glue', () => {
     await ext(MSG.TAB_COMMAND, { tabId: 7, command: { cmd: 'mse-capture', on: true } });
     nav(1, 'nextVideo01');
     await tick();
-    expect(offscreen.calls.at(-1)).toEqual({ type: MSG.MEDIA_CLOSE, payload: { key: 'tab:7:3' } });
+    expect(offscreen.calls.at(-1)).toEqual({ type: MSG.MEDIA_CLOSE, payload: { key: 'tab:7:3', drain: true } });
   });
 
   it('a failed open or a refusing tab leaves capture off; a replaced stream stops on its next push', async () => {
@@ -318,7 +318,7 @@ describe('commands and the capture glue', () => {
     await ext(MSG.TAB_COMMAND, { tabId: 7, command: { cmd: 'mse-capture', on: true } });
     report({ type: 'capture', on: false, streamId: 1, reason: 'overflow', pushes: 3, bytes: 900 });
     await tick();
-    expect(offscreen.calls.at(-1)).toEqual({ type: MSG.MEDIA_CLOSE, payload: { key: 'tab:7:1' } });
+    expect(offscreen.calls.at(-1)).toEqual({ type: MSG.MEDIA_CLOSE, payload: { key: 'tab:7:1', drain: true } });
     expect(tabs.sent.filter((s) => s.cmd.cmd === 'mse-capture').map((s) => s.cmd.on)).toEqual([true]);
   });
 });
@@ -368,6 +368,16 @@ describe('the direct glue (files the page plays by URL)', () => {
     const hostOnly = createPageEvents({ runtime: { id: EXT_ID }, tabs, manifest: { ...MANIFEST, host_permissions: ['http://127.0.0.1/*'] }, toOffscreen: (t, p) => offscreen.call(t, p) });
     expect(hostOnly.fromPage({}, from())).toBe(false);
     expect(pe.fromPage({}, from())).toBe(false);
+  });
+
+  it('off for a seek closes without draining; any other reason drains', async () => {
+    page();
+    await cmd({ cmd: 'direct', on: true, url: SRC, fromS: 20 });
+    await cmd({ cmd: 'direct', on: false, reason: 'seek' });
+    expect(direct.close).toHaveBeenLastCalledWith({ key: 'tab:7:d1', drain: false });
+    await cmd({ cmd: 'direct', on: true, url: SRC, fromS: 95 });
+    await cmd({ cmd: 'direct', on: false, reason: 'paused' });
+    expect(direct.close).toHaveBeenLastCalledWith({ key: 'tab:7:d2', drain: true });
   });
 
   it('on: only a URL the tab plays; opens under tab:<id>:d<gen>, evidence carries the fetch counters', async () => {
