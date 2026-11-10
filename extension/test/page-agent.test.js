@@ -247,6 +247,47 @@ describe('commands', () => {
     expect(notices[0].destroyed).toBe(true);
   });
 
+  it('the permission notice has no button, only the dismiss; reset takes captions and notice off; resync reports again', async () => {
+    mountVideo();
+    const notices = [];
+    const makeNotice = (opts) => {
+      const n = { opts, shown: null, visible: false, kind: null, destroyed: false, show(s) {
+        n.shown = s;
+        n.visible = true;
+        n.kind = s.kind;
+      }, hide() {
+        n.visible = false;
+      }, destroy() {
+        n.destroyed = true;
+      } };
+      notices.push(n);
+      return n;
+    };
+    const i18n = { getMessage: (k) => ({ noticePermission: '需要允许读取本站视频', noticeDismiss: '关闭' })[k] || '' };
+    const { runtime, tracks } = start({ makeNotice, i18n });
+    expect(await runtime.command({ cmd: 'notice', kind: 'permission', origin: 'http://localhost/*' })).toEqual({ ok: true, result: { kind: 'permission' } });
+    expect(notices[0].shown).toEqual({ kind: 'permission', text: '需要允许读取本站视频', button: null, dismissTitle: '关闭' });
+    notices[0].opts.onDismiss('permission');
+    await tick();
+    expect(runtime.events('notice-action')).toEqual([{ type: 'notice-action', kind: 'permission', action: 'dismiss' }]);
+
+    await runtime.command({ cmd: 'cues', op: 'set', cues: [{ id: '1', start: 1, end: 3, text: 'Hello' }] });
+    expect(tracks).toHaveLength(1);
+    expect(await runtime.command({ cmd: 'reset' })).toEqual({ ok: true, result: { reset: true } });
+    expect(notices[0].destroyed).toBe(true);
+    expect((await runtime.command({ cmd: 'query' })).result).toMatchObject({ renderer: null, notice: null });
+    expect(tracks[0].list).toHaveLength(0);
+
+    expect(agent.alive).toBe(true);
+    runtime.sent.length = 0;
+    agent.resync();
+    await tick();
+    expect(runtime.events('navigated')).toEqual([expect.objectContaining({ navSeq: 0, resync: true })]);
+    expect(runtime.events('media')).toHaveLength(1);
+    agent.shutdown();
+    expect(agent.alive).toBe(false);
+  });
+
   it('mse-capture passes fromS on; a visibility change reports the primary video', async () => {
     mountVideo();
     const { runtime, main } = start();

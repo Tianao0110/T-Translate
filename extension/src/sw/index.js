@@ -3,14 +3,16 @@
 // extension pages' COMPANION_* / MEDIA_* / LISTEN_* requests to it, does
 // chrome.storage for it, keeps each tab's page evidence and carries commands
 // to it (page-events.js), fetches files pages play by URL (direct-fetch.js),
-// decides per tab what runs (session-orchestrator.js),
+// keeps the sites the user allowed (site-access.js), decides per tab what
+// runs (session-orchestrator.js),
 // holds the subtitle cache (cache-db.js), paints the badge and polls the
 // channel once a minute.
 
-import { MSG, TARGET_OFFSCREEN, request, handle, on, isExtensionSender } from '../shared/messages.js';
+import { MSG, TARGET_OFFSCREEN, request, handle, on, notify, isExtensionSender } from '../shared/messages.js';
 import { showBadge, showTabBadge } from './badge.js';
 import { createPageEvents } from './page-events.js';
 import { createDirectFetch } from './direct-fetch.js';
+import { createSiteAccess } from './site-access.js';
 import { createPrefs } from './prefs.js';
 import { createTabArbiter } from './tab-arbiter.js';
 import { createOrchestrator } from './session-orchestrator.js';
@@ -62,8 +64,18 @@ const fromExtension = (_msg, sender) => isExtensionSender(sender);
 
 // Files pages play by URL, fetched here by range; its fetch errors come back like the pipeline's events.
 const directFetch = createDirectFetch({ toOffscreen, onEvent: (payload) => pageEvents.onMediaEvent(payload) });
+// The sites allowed beyond the manifest's: their pages may report, tabs waiting on a host try again.
+export const siteAccess = createSiteAccess({
+  hasPage: (tabId) => pageEvents.has(tabId),
+  onAllowed: (pattern) => orchestrator.permissionGranted(pattern),
+  onChange: ({ sites, added }) => {
+    pageEvents.refreshSites();
+    if (added.length) orchestrator.permissionGranted();
+    notify(MSG.SITES_CHANGED, { sites });
+  },
+});
 // For the orchestrator: getTabEvidence(tabId), onPageEvent(fn), command(tabId, command).
-export const pageEvents = createPageEvents({ toOffscreen, direct: directFetch });
+export const pageEvents = createPageEvents({ toOffscreen, direct: directFetch, sites: siteAccess });
 
 let channel = { status: 'unpaired' };
 export const prefs = createPrefs();
@@ -77,7 +89,7 @@ export const orchestrator = createOrchestrator({
   arbiter,
   prefs,
   translate: (items, { source, target }) => toOffscreen(MSG.COMPANION_TRANSLATE, { items, source, target }),
-  onState: (tabId, state) => showTabBadge(tabId, state, channel),
+  onState: (tabId, state, detail) => showTabBadge(tabId, state, channel, detail),
   cache: subtitleCache,
   memoryCache,
 });
@@ -108,14 +120,18 @@ handle(
       else await chrome.storage.local.set({ [key]: value });
     },
     [MSG.TAB_STATE]: ({ tabId } = {}) => orchestrator.stateOf(tabId),
+    [MSG.SITE_LIST]: () => siteAccess.list(),
+    // Waiting tabs try again through onAllowed.
+    [MSG.SITE_ALLOW]: ({ pattern, tabId, pending } = {}) => (pending ? siteAccess.expect(pattern, { tabId }) : siteAccess.allowSite(pattern, { tabId })),
+    [MSG.SITE_REVOKE]: ({ pattern } = {}) => siteAccess.revokeSite(pattern),
     ...pageEvents.extensionHandlers,
     ...cacheHandlers(subtitleCache),
   },
   { accept: fromExtension }
 );
 
-// Content scripts: page events and MSE bytes from top frames on our hosts, and the liveness ping.
-handle(pageEvents.contentHandlers, { accept: pageEvents.fromPage });
+// Content scripts: page events and MSE bytes from top frames on our hosts and allowed sites, and the liveness ping.
+handle(pageEvents.contentHandlers, { accept: pageEvents.fromTopFrame });
 on(MSG.MEDIA_EVENT, pageEvents.onMediaEvent);
 handle({
   [MSG.PING]: (_payload, sender) => {

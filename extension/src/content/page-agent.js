@@ -364,12 +364,19 @@ export function createPageAgent({
     noticeEl = null;
   }
 
+  // 'listen': a sentence and a button; 'permission': the worker may not read
+  // the video's host yet, granted from the toolbar popup (only a dismiss here).
+  const NOTICES = {
+    listen: () => ({ text: t('noticeListen') || 'This video’s audio can’t be read. T-Translate can listen to it instead.', button: t('noticeListenButton') || 'Listen' }),
+    permission: () => ({ text: t('noticePermission') || 'T-Translate needs access to this site’s video: click the T-Caption icon in the toolbar.', button: null }),
+  };
+
   function showNotice(kind) {
     if (kind === null) {
       notice?.hide();
       return { kind: null };
     }
-    if (kind !== 'listen') throw err('bad-command');
+    if (!Object.hasOwn(NOTICES, kind)) throw err('bad-command');
     const v = media.primaryVideo();
     if (!v) throw err('no-video');
     if (!notice || noticeEl !== v) {
@@ -381,13 +388,16 @@ export function createPageAgent({
       });
       noticeEl = v;
     }
-    notice.show({
-      kind,
-      text: t('noticeListen') || 'This video’s audio can’t be read. T-Translate can listen to it instead.',
-      button: t('noticeListenButton') || 'Listen',
-      dismissTitle: t('noticeDismiss') || 'Dismiss',
-    });
+    notice.show({ kind, ...NOTICES[kind](), dismissTitle: t('noticeDismiss') || 'Dismiss' });
     return { kind };
+  }
+
+  // The site was taken off T-Caption's list: nothing of ours stays on the page.
+  function reset() {
+    destroyRenderer();
+    destroyNotice();
+    if (view.siteCaptions === 'hide') setSiteCaptions(false);
+    return { reset: true };
   }
 
   function snapshot() {
@@ -446,6 +456,8 @@ export function createPageAgent({
         return bridge.command(c.cmd, c.args && typeof c.args === 'object' ? c.args : {}, 20000);
       case 'query':
         return snapshot();
+      case 'reset':
+        return reset();
       default:
         throw err('unknown-command');
     }
@@ -575,5 +587,18 @@ export function createPageAgent({
   if (doc.readyState === 'loading') doc.addEventListener('DOMContentLoaded', onParsed, { once: true });
   else site.readPage?.(doc);
 
-  return { runCommand, snapshot, shutdown, onNavigate, get docId() { return docId; } };
+  return {
+    runCommand,
+    snapshot,
+    shutdown,
+    onNavigate,
+    // Everything told again (the worker forgot the page: its site was removed, then allowed).
+    resync: () => reportAll(true),
+    get alive() {
+      return alive;
+    },
+    get docId() {
+      return docId;
+    },
+  };
 }

@@ -2,8 +2,9 @@
 // and listen engine in a sandbox Electron, the built extension in Chrome
 // with a throwaway profile, a page on 127.0.0.1 whose <video src> is a
 // progressive MP4 (about 70 s of SAPI speech, twice, with H.264 test video)
-// and a <track>. Content scripts do not match 127.0.0.1: they are injected
-// from the options page with chrome.scripting. The site is switched off in
+// and a <track>. Content scripts do not match 127.0.0.1: the site is allowed
+// through the worker (SITE_ALLOW; the manifest already grants the host, so
+// no dialog), which injects them into the open tab. The site is switched off in
 // prefs, so the orchestrator stays out; every step is a TAB_COMMAND. The
 // server logs each range asked for; the worker's own requests are also
 // watched over CDP (Network on its target) to tell a request stuck in the
@@ -215,15 +216,10 @@ async function main() {
   const bilingual = (r) => (r && r.active.some((t) => t.includes('\n') && t.includes('[译]')) ? r : null);
   const genOf = (key) => /:d(\d+)$/.exec(key || '')?.[1];
 
+  // The scripts in the tab: injected now, or already there (registered for the site).
   async function inject(tabId) {
-    return evaluate(
-      opt,
-      `(async () => {
-        await chrome.scripting.executeScript({ target: { tabId: ${tabId} }, files: ['content-main.js'], world: 'MAIN', injectImmediately: true });
-        await chrome.scripting.executeScript({ target: { tabId: ${tabId} }, files: ['content-isolated.js'], injectImmediately: true });
-        return true;
-      })()`
-    );
+    const r = await ext('site/allow', { pattern: 'http://127.0.0.1/*', tabId });
+    return r?.ok && ['injected', 'present', 'resynced'].includes(r.result.injected);
   }
 
   // Feeds the playhead every second until done(ev, t) or ms; returns the last { ev, t }.
@@ -252,7 +248,7 @@ async function main() {
     shell.pages.add(page);
     const tab = await until(() => shell.tabIdOf(`${BASE}/fast.html`), 10000);
     await until(() => player(page, 'return v.readyState >= 1;'), 15000);
-    step('page loaded, scripts injected from the options page', (await inject(tab)) === true, `tab ${tab}`);
+    step('page loaded, the site allowed and the scripts in the tab', (await inject(tab)) === true, `tab ${tab}`);
     const evA = await until(async () => {
       const ev = await evidence(tab);
       return ev?.media?.length && ev.subtitles?.some((s) => s.via === 'track') ? ev : null;

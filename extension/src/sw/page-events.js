@@ -11,11 +11,15 @@
 // (direct-fetch.js) under tab:<tabId>:d<gen>; their segments and
 // translations come back to the tab as `cues` commands (ids prefixed m<gen>-
 // / l<gen>- / d<gen>- so a reopened session cannot overwrite the last one's
-// cues). Pages may report from the content-script hosts and the other hosts
-// the manifest grants (scripts injected there, e.g. 127.0.0.1 for tests).
+// cues). Pages may report from the manifest's content-script hosts and the
+// sites the user allowed (site-access.js; reports wait until that list is
+// known). A site removed takes its tabs' evidence with it.
 
 import { MSG } from '../shared/messages.js';
 import { checkPageEvent, checkPageMedia } from '../shared/page-protocol.js';
+import { matchPattern } from '../shared/match-pattern.js';
+
+export { matchPattern };
 
 const MAX_MEDIA = 16;
 const MAX_SUBTITLES = 32;
@@ -23,19 +27,9 @@ const MAX_STREAMS = 16;
 const MAX_PENDING_PARTS = 4;
 const DEFAULT_LANG = 'en';
 const DEFAULT_TARGET = 'zh';
+const CLOSE_WAIT_MS = 15000; // a reopen waits this long at most for the last stream to drain
 
 const err = (code) => Object.assign(new Error(code), { code });
-
-// A content-script match pattern (scheme://host/path with *) as a URL test.
-export function matchPattern(pattern) {
-  const m = /^(\*|https?):\/\/(\*|(?:\*\.)?[^/*]+)(\/.*)$/.exec(pattern);
-  if (!m) return () => false;
-  const [, scheme, host, path] = m;
-  const esc = (s) => s.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
-  const hostRe = host === '*' ? '[^/]+' : host.startsWith('*.') ? `(?:[^/]+\\.)?${esc(host.slice(2))}` : esc(host);
-  const re = new RegExp(`^${scheme === '*' ? 'https?' : scheme}://${hostRe}(?::\\d+)?${esc(path).replace(/\*/g, '.*')}$`, 'i');
-  return (url) => typeof url === 'string' && re.test(url);
-}
 
 function freshEvidence(tabId, docId) {
   return {
@@ -82,10 +76,23 @@ export function createPageEvents({
   toOffscreen,
   direct = null, // direct-fetch.js
   manifest = runtime?.getManifest?.(),
+  sites = null, // site-access.js: granted() and ready
   now = () => Date.now(),
   bootId = crypto.randomUUID(),
+  closeWaitMs = CLOSE_WAIT_MS,
 }) {
-  const matchers = [...(manifest?.content_scripts || []).flatMap((c) => c.matches || []), ...(manifest?.host_permissions || [])].map(matchPattern);
+  const matchers = (manifest?.content_scripts || []).flatMap((c) => c.matches || []).map(matchPattern);
+  let siteMatchers = (sites?.granted?.() || []).map(matchPattern);
+  let sitesKnown = !sites?.ready;
+  const sitesReady = sitesKnown
+    ? Promise.resolve()
+    : Promise.resolve(sites.ready)
+        .catch(() => {})
+        .then(() => {
+          sitesKnown = true;
+          refreshSites();
+        });
+  const matches = (url) => matchers.some((m) => m(url)) || siteMatchers.some((m) => m(url));
   const byTab = new Map();
   const listeners = new Set();
   const parts = new Map(); // `${tabId}:${subId}` → { parts: [], got }
@@ -103,9 +110,28 @@ export function createPageEvents({
     }
   };
 
-  // Top frame of a tab on one of the manifest's content-script hosts.
-  function fromPage(_msg, sender) {
-    return !!sender && sender.id === runtime.id && !!sender.tab && Number.isSafeInteger(sender.tab.id) && sender.frameId === 0 && matchers.some((m) => m(sender.url));
+  const fromTopFrame = (_msg, sender) => !!sender && sender.id === runtime.id && !!sender.tab && Number.isSafeInteger(sender.tab.id) && sender.frameId === 0;
+
+  // Top frame of a tab on one of the manifest's content-script hosts or an allowed site.
+  const fromPage = (msg, sender) => fromTopFrame(msg, sender) && matches(sender.url);
+
+  // Until the allowed sites are known (a worker just woken by this very message), reports wait.
+  const gated = (fn) =>
+    function run(payload, sender) {
+      if (!sitesKnown) return sitesReady.then(() => run(payload, sender));
+      if (!fromPage(payload, sender)) throw err('forbidden');
+      return fn(payload, sender);
+    };
+
+  // The allowed sites changed: tabs on a site no longer allowed are forgotten,
+  // and what T-Caption drew there is taken off the page (its scripts stay until the page reloads).
+  function refreshSites() {
+    siteMatchers = (sites?.granted?.() || []).map(matchPattern);
+    for (const [tabId, ev] of [...byTab]) {
+      if (!ev.url || matches(ev.url)) continue;
+      sendToTab(tabId, { cmd: 'reset' }).catch(() => {});
+      forget(tabId, 'revoked');
+    }
   }
 
   function sendToTab(tabId, command) {
@@ -343,6 +369,10 @@ export function createPageEvents({
     const url = typeof c.url === 'string' ? c.url : '';
     if (!/^https?:[/][/]/i.test(url) || !ev.media.some((m) => m.src === url)) throw err('not-page-media');
     if (ev.direct?.on) await closeDirect(ev, 'restart');
+    // Off then on (a seek): the last stream may still be draining, and the
+    // app takes one session at a time; opening now would fail the new one.
+    else if (ev.direct?.closing) await Promise.race([ev.direct.closing, new Promise((r) => setTimeout(r, closeWaitMs))]);
+    if (byTab.get(tabId) !== ev) throw err('no-page');
     const g = ++gen;
     const key = `tab:${tabId}:d${g}`;
     const lang = typeof c.lang === 'string' && c.lang ? c.lang : DEFAULT_LANG;
@@ -543,21 +573,32 @@ export function createPageEvents({
     byTab.delete(tabId);
     sendChains.delete(tabId);
     for (const k of [...parts.keys()]) if (k.startsWith(`${tabId}:`)) parts.delete(k);
+    // A closing stream's last finals must not draw on a page we let go of.
+    for (const [k, owner] of [...keys]) if (owner.tabId === tabId) keys.delete(k);
     emit(tabId, { type: 'forgotten', reason });
   }
 
   tabs?.onRemoved?.addListener((tabId) => forget(tabId, 'tab-closed'));
   // Left for a page without our content scripts: nothing will report there.
   tabs?.onUpdated?.addListener((tabId, info) => {
-    if (info.url && !matchers.some((m) => m(info.url))) forget(tabId, 'left');
+    if (!info.url) return;
+    const check = () => {
+      if (!matches(info.url)) forget(tabId, 'left');
+    };
+    if (sitesKnown) check();
+    else sitesReady.then(check);
   });
 
   return {
     bootId,
     fromPage,
+    // The content handlers check the page themselves once the allowed sites are known.
+    fromTopFrame,
+    refreshSites,
+    has: (tabId) => byTab.has(tabId),
     contentHandlers: {
-      [MSG.PAGE_EVENT]: onPageEvent,
-      [MSG.PAGE_MEDIA]: onPageMedia,
+      [MSG.PAGE_EVENT]: gated(onPageEvent),
+      [MSG.PAGE_MEDIA]: gated(onPageMedia),
     },
     extensionHandlers: {
       [MSG.TAB_EVIDENCE]: ({ tabId } = {}) => getTabEvidence(tabId),

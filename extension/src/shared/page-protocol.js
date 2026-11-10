@@ -6,8 +6,9 @@
 export const PAGE_EVENT_MAX_CHARS = 256 * 1024; // one PAGE_EVENT; subtitle cues are split to fit
 export const MAX_CUES_PER_PART = 5000;
 
-export const PAGE_COMMANDS = ['mse-capture', 'cues', 'display', 'mode', 'site-captions', 'notice', 'yt-reload', 'yt-captions-on', 'query'];
-export const NOTICE_KINDS = ['listen'];
+export const PAGE_COMMANDS = ['mse-capture', 'cues', 'display', 'mode', 'site-captions', 'notice', 'yt-reload', 'yt-captions-on', 'query', 'reset'];
+// listen: tier 3 (accept or dismiss); permission: the video's host is not allowed yet (dismiss only).
+export const NOTICE_KINDS = ['listen', 'permission'];
 
 const str = (v, max) => (typeof v === 'string' && v.length <= max ? v : undefined);
 const optStr = (v, max) => (v === null || v === undefined ? null : str(v, max) ?? null);
@@ -131,7 +132,7 @@ function event(e) {
     case 'capture':
       return { type: 'capture', on: bool(e.on), streamId: int(e.streamId) ?? null, reason: str(e.reason, 32) ?? '', pushes: int(e.pushes) ?? 0, bytes: int(e.bytes) ?? 0 };
     case 'notice-action':
-      return NOTICE_KINDS.includes(e.kind) && ['accept', 'dismiss'].includes(e.action) ? { type: 'notice-action', kind: e.kind, action: e.action } : null;
+      return NOTICE_KINDS.includes(e.kind) && (e.action === 'dismiss' || (e.action === 'accept' && e.kind === 'listen')) ? { type: 'notice-action', kind: e.kind, action: e.action } : null;
     default:
       return null;
   }

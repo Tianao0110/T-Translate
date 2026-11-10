@@ -81,5 +81,18 @@
     "placeholders": { "count": { "content": "$1" }, "size": { "content": "$2" } }
   },
   "cacheClear": { "message": "清空" },
-  "tabCaptionsCached": { "message": "显示缓存的字幕" }
+  "tabCaptionsCached": { "message": "显示缓存的字幕" },
+  "tabNotEnabled": { "message": "T-Caption 还没在本站启用" },
+  "tabPermission": {
+    "message": "需要允许读取 $HOST$ 的视频",
+    "placeholders": { "host": { "content": "$1" } }
+  },
+  "allowSite": { "message": "允许在本站使用" },
+  "allowRead": { "message": "允许" },
+  "allowDenied": { "message": "未允许" },
+  "titlePermission": { "message": "需要允许读取视频" },
+  "noticePermission": { "message": "T-Translate 需要允许读取本站视频：点右上角工具栏里的 T-Caption 图标" },
+  "sitesAllowedTitle": { "message": "已允许的站点" },
+  "sitesAllowedEmpty": { "message": "还没有。在视频网页上打开工具栏里的 T-Caption，点「允许在本站使用」" },
+  "siteRemove": { "message": "移除" }
 }

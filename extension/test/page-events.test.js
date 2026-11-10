@@ -86,6 +86,10 @@ describe('who may report', () => {
     expect(m('https://www.youtube.com.evil.example/')).toBe(false);
     expect(m('ftp://www.youtube.com/')).toBe(false);
     expect(matchPattern('nonsense')('https://x/')).toBe(false);
+    expect(matchPattern('http://localhost/*')('http://localhost:8123/a.html')).toBe(true);
+    expect(matchPattern('http://localhost/*')('http://media.localhost:8123/a.mp4')).toBe(false);
+    expect(matchPattern('<all_urls>')('https://example.com/')).toBe(true);
+    expect(matchPattern('<all_urls>')('chrome://extensions/')).toBe(false);
   });
 });
 
@@ -221,6 +225,9 @@ describe('commands and the capture glue', () => {
     report({ type: 'notice-action', kind: 'listen', action: 'accept' });
     expect(heard.at(-1).event).toEqual({ type: 'notice-action', kind: 'listen', action: 'accept' });
     expect(() => report({ type: 'notice-action', kind: 'listen', action: 'maybe' })).toThrow(expect.objectContaining({ code: 'bad-event' }));
+    report({ type: 'notice-action', kind: 'permission', action: 'dismiss' });
+    expect(heard.at(-1).event).toEqual({ type: 'notice-action', kind: 'permission', action: 'dismiss' });
+    expect(() => report({ type: 'notice-action', kind: 'permission', action: 'accept' })).toThrow(expect.objectContaining({ code: 'bad-event' }));
   });
 
   it('listen on: opens the session under its own key, sends its cues back, closes on off, navigation or the stream ending', async () => {
@@ -342,7 +349,7 @@ describe('the direct glue (files the page plays by URL)', () => {
       }),
       stats: vi.fn(() => ({ bytes: 400000, requests: 2, aheadS: 59, maxAheadS: 60, fetchedToS: 80, playS: 21, done: false, error: null })),
     };
-    de = createPageEvents({ runtime: { id: EXT_ID }, tabs, manifest: { ...MANIFEST, host_permissions: ['http://127.0.0.1/*'] }, toOffscreen: (t, p) => offscreen.call(t, p), direct, bootId: 'boot-2', now: () => 2000 });
+    de = createPageEvents({ runtime: { id: EXT_ID }, tabs, manifest: { ...MANIFEST, host_permissions: ['http://127.0.0.1/*'] }, sites: { granted: () => ['http://127.0.0.1/*'] }, toOffscreen: (t, p) => offscreen.call(t, p), direct, bootId: 'boot-2', now: () => 2000 });
     heard = [];
     de.onPageEvent((e) => heard.push(e));
   });
@@ -355,9 +362,11 @@ describe('the direct glue (files the page plays by URL)', () => {
     say({ type: 'media', reason: 'play', media: mediaSnap(1, { src: SRC, msId: null }), primary: true });
   }
 
-  it('pages on the manifest’s other granted hosts may report', () => {
+  it('pages on an allowed site may report; a manifest host alone is not enough', () => {
     expect(de.fromPage({}, from())).toBe(true);
     expect(de.fromPage({}, { ...from(), url: 'http://localhost:8123/' })).toBe(false);
+    const hostOnly = createPageEvents({ runtime: { id: EXT_ID }, tabs, manifest: { ...MANIFEST, host_permissions: ['http://127.0.0.1/*'] }, toOffscreen: (t, p) => offscreen.call(t, p) });
+    expect(hostOnly.fromPage({}, from())).toBe(false);
     expect(pe.fromPage({}, from())).toBe(false);
   });
 
@@ -416,6 +425,29 @@ describe('the direct glue (files the page plays by URL)', () => {
     await cmd({ cmd: 'direct', on: true, url: SRC });
     tabs.onRemoved.fire(7);
     expect(calls.at(-1)).toEqual(['close', 'tab:7:d4']);
+    // A final the closing stream still flushes goes nowhere.
+    const sent = tabs.sent.length;
+    de.onMediaEvent({ key: 'tab:7:d4', event: { type: 'segment', id: 9, start: 50, end: 52, text: 'Late.' } });
+    await tick();
+    expect(tabs.sent.length).toBe(sent);
+  });
+
+  it('off then on at once (a seek): the new stream opens only once the last one has drained', async () => {
+    page();
+    await cmd({ cmd: 'direct', on: true, url: SRC, fromS: 20 });
+    let drained;
+    direct.close.mockImplementationOnce(({ key }) => {
+      calls.push(['close', key]);
+      return new Promise((r) => (drained = () => r({ source: 'direct', fetch: { bytes: 1 } })));
+    });
+    const off = cmd({ cmd: 'direct', on: false, reason: 'seek' });
+    const reopened = cmd({ cmd: 'direct', on: true, url: SRC, fromS: 95 });
+    await tick();
+    expect(calls.map((c) => c[0])).toEqual(['open', 'close']);
+    drained();
+    expect(await off).toMatchObject({ on: false, reason: 'seek' });
+    expect(await reopened).toMatchObject({ key: 'tab:7:d2', fromS: 95 });
+    expect(calls.map((c) => c[0])).toEqual(['open', 'close', 'open']);
   });
 
   it('a refused open (no permission) leaves it off with the reason', async () => {
@@ -430,5 +462,67 @@ describe('the direct glue (files the page plays by URL)', () => {
     nav();
     report({ type: 'media', reason: 'play', media: mediaSnap(1, { src: 'https://www.youtube.com/a.mp4' }), primary: true });
     await expect(pe.extensionHandlers[MSG.TAB_COMMAND]({ tabId: 7, command: { cmd: 'direct', on: true, url: 'https://www.youtube.com/a.mp4' } })).rejects.toMatchObject({ code: 'unsupported' });
+  });
+});
+
+describe('sites the user allowed (site-access)', () => {
+  const PAGE = 'http://localhost:8123/watch.html';
+  let sites;
+  let release;
+  let se;
+
+  beforeEach(() => {
+    let resolve;
+    sites = { list: [], granted: () => sites.list.slice(), ready: new Promise((r) => (resolve = r)) };
+    release = (list) => {
+      sites.list = list;
+      resolve();
+    };
+    se = createPageEvents({ runtime: { id: EXT_ID }, tabs, manifest: MANIFEST, toOffscreen: (t, p) => offscreen.call(t, p), sites, bootId: 'boot-3', now: () => 3000 });
+    heard = [];
+    se.onPageEvent((e) => heard.push(e));
+  });
+
+  const from = (url = PAGE, tabId = 7) => ({ id: EXT_ID, tab: { id: tabId }, frameId: 0, url });
+  const say = (event, { url = PAGE, tabId = 7, navSeq = 0 } = {}) => se.contentHandlers[MSG.PAGE_EVENT]({ docId: 'doc-s', navSeq, event }, from(url, tabId));
+  const navigated = (url = PAGE) => ({ type: 'navigated', url, mediaId: null, navSeq: 0, site: 'generic' });
+
+  it('reports wait until the list is known; then only allowed sites and the manifest’s hosts get through', async () => {
+    const early = say(navigated());
+    const stranger = Promise.resolve(say(navigated('http://example.com/'), { url: 'http://example.com/', tabId: 9 })).catch((e) => e);
+    await tick();
+    expect(se.getTabEvidence(7)).toBeNull();
+    release(['http://localhost/*']);
+    await expect(early).resolves.toEqual({ boot: 'boot-3' });
+    expect(await stranger).toMatchObject({ code: 'forbidden' });
+    expect(se.getTabEvidence(7)).toMatchObject({ url: PAGE, site: 'generic' });
+    expect(se.getTabEvidence(9)).toBeNull();
+    expect(se.fromPage({}, from())).toBe(true);
+    expect(se.fromPage({}, from(WATCH))).toBe(true);
+    expect(se.fromPage({}, from('http://example.com/'))).toBe(false);
+    expect(se.fromTopFrame({}, from('http://example.com/'))).toBe(true);
+    expect(se.fromTopFrame({}, { ...from(), frameId: 2 })).toBe(false);
+    // Known now: answered at once.
+    expect(say({ type: 'media', reason: 'play', media: mediaSnap(1, { src: 'http://localhost:8123/a.mp4', msId: null }), primary: true })).toEqual({ boot: 'boot-3' });
+    expect(() => say(navigated('http://example.com/'), { url: 'http://example.com/', tabId: 9 })).toThrow(expect.objectContaining({ code: 'forbidden' }));
+  });
+
+  it('a site removed: its tabs are told to take captions off and forgotten; others stay', async () => {
+    release(['http://localhost/*', 'https://videos.example.org/*']);
+    await sites.ready;
+    await tick();
+    say(navigated());
+    say(navigated('https://videos.example.org/v/1'), { url: 'https://videos.example.org/v/1', tabId: 8 });
+    tabs.onUpdated.fire(7, { url: 'http://localhost:8123/other.html' });
+    expect(se.has(7)).toBe(true);
+    sites.list = ['https://videos.example.org/*'];
+    se.refreshSites();
+    await tick();
+    expect(se.has(7)).toBe(false);
+    expect(se.getTabEvidence(8)).not.toBeNull();
+    expect(tabs.sent.filter((s) => s.cmd.cmd === 'reset').map((s) => s.tabId)).toEqual([7]);
+    expect(heard.filter((h) => h.event.type === 'forgotten').map((h) => [h.tabId, h.event.reason])).toEqual([[7, 'revoked']]);
+    tabs.onUpdated.fire(8, { url: 'http://example.com/' });
+    expect(se.has(8)).toBe(false);
   });
 });

@@ -1,5 +1,5 @@
-// One line over the video with a sentence and a button (and a dismiss), for
-// the tier-3 prompt: in a shadow root like the caption overlay, mounted in
+// One line over the video with a sentence, a button if there is one, and a
+// dismiss: the tier-3 prompt, the permission hint. In a shadow root like the caption overlay, mounted in
 // the fullscreen element while one holds the video, laid over the video's
 // lower edge. show() replaces what is shown; hide() keeps the host for the
 // next show; destroy() removes it.
@@ -19,22 +19,23 @@ const HOST_STYLE = {
 const CSS = `
 .tc-nt-root { position: absolute; inset: 0; overflow: hidden; container-type: size; }
 .tc-nt-bar {
-  position: absolute; left: 50%; bottom: 16%; transform: translateX(-50%);
+  position: absolute; left: 0; right: 0; bottom: 16%; margin: 0 auto; width: fit-content;
   max-width: 92%; box-sizing: border-box; padding: 0.45em 0.6em 0.45em 0.9em;
   display: flex; align-items: center; gap: 0.7em;
   font-family: system-ui, "Segoe UI", "PingFang SC", "Hiragino Sans", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
-  font-size: var(--tc-nt-size, clamp(12px, 2.6cqh, 18px)); line-height: 1.3;
+  font-size: var(--tc-nt-size, clamp(12px, min(2.6cqh, 1.95cqw), 18px)); line-height: 1.3;
   color: var(--tc-nt-fg, #fff); background: var(--tc-nt-bg, rgba(20, 20, 20, 0.86));
   border-radius: 0.5em; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
   pointer-events: auto;
 }
 .tc-nt-bar[hidden] { display: none; }
-.tc-nt-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tc-nt-text { min-width: 0; overflow-wrap: anywhere; }
 .tc-nt-btn {
   all: initial; cursor: pointer; font: inherit; color: inherit; white-space: nowrap;
   padding: 0.3em 0.9em; border-radius: 0.4em; background: var(--tc-nt-accent, #2b7de9);
 }
 .tc-nt-btn:hover { filter: brightness(1.1); }
+.tc-nt-btn[hidden] { display: none; }
 .tc-nt-x { all: initial; cursor: pointer; font: inherit; color: inherit; opacity: 0.7; padding: 0.2em 0.4em; line-height: 1; }
 .tc-nt-x:hover { opacity: 1; }
 `;
@@ -130,8 +131,9 @@ export function createNotice({ video, onAccept = () => {}, onDismiss = () => {} 
       if (destroyed) return;
       kind = k;
       text.textContent = t;
-      btn.textContent = button;
-      btn.title = button;
+      btn.hidden = !button;
+      btn.textContent = button || '';
+      btn.title = button || '';
       x.title = dismissTitle;
       x.setAttribute('aria-label', dismissTitle);
       bar.hidden = false;

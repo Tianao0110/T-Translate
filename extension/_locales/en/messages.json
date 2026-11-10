@@ -81,5 +81,18 @@
     "placeholders": { "count": { "content": "$1" }, "size": { "content": "$2" } }
   },
   "cacheClear": { "message": "Clear" },
-  "tabCaptionsCached": { "message": "Showing cached captions" }
+  "tabCaptionsCached": { "message": "Showing cached captions" },
+  "tabNotEnabled": { "message": "T-Caption isn't on for this site yet" },
+  "tabPermission": {
+    "message": "Needs access to videos from $HOST$",
+    "placeholders": { "host": { "content": "$1" } }
+  },
+  "allowSite": { "message": "Allow on this site" },
+  "allowRead": { "message": "Allow" },
+  "allowDenied": { "message": "Not allowed" },
+  "titlePermission": { "message": "Needs access to the video" },
+  "noticePermission": { "message": "T-Translate needs access to this site's video: click the T-Caption icon in the toolbar." },
+  "sitesAllowedTitle": { "message": "Allowed sites" },
+  "sitesAllowedEmpty": { "message": "None yet. On a video page, open T-Caption in the toolbar and click “Allow on this site”." },
+  "siteRemove": { "message": "Remove" }
 }

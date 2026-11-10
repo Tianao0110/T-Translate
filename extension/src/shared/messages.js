@@ -9,6 +9,7 @@
 // content scripts ──PAGE_EVENT / PAGE_MEDIA / PING──▶ service worker (only these)
 // service worker ──PAGE_COMMAND──▶ a tab's top-frame content script (tabs.sendMessage)
 // extension pages ──TAB_EVIDENCE / TAB_COMMAND / TAB_STATE──▶ service worker
+// extension pages ──SITE_LIST / SITE_ALLOW / SITE_REVOKE──▶ service worker (sw/site-access.js)
 // extension pages ──CACHE_*──▶ service worker (the subtitle cache, sw/cache-db.js)
 //
 // Messages are JSON on the wire (an ArrayBuffer arrives as {}), so media
@@ -52,6 +53,16 @@ export const MSG = {
   TAB_COMMAND: 'tab/command',
   // payload { tabId }: what the orchestrator does in the tab (state, tier, why it is blocked), or null.
   TAB_STATE: 'tab/state',
+  // Replies the host patterns of the sites T-Caption runs on beyond the manifest's.
+  SITE_LIST: 'site/list',
+  // payload { pattern, tabId?, pending? }: the browser granted pattern (permissions.request in the
+  // user's click): scripts for it, injected into tabId at once; replies { pattern, sites, injected }.
+  // pending: sent just before the request, finished here when the grant arrives (the popup may be gone).
+  SITE_ALLOW: 'site/allow',
+  // payload { pattern }: stops running there and gives the permission back; replies { pattern, removed, sites }.
+  SITE_REVOKE: 'site/revoke',
+  // Broadcast by the worker, payload { sites }: the list changed.
+  SITES_CHANGED: 'site/changed',
   // Replies { count, bytes }.
   CACHE_STATS: 'cache/stats',
   // Empties the cache; replies { count, bytes } after.
