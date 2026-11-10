@@ -22,7 +22,8 @@ async function until(fn, ms, every = 250) {
 }
 
 // Resolves the shell, or null (usage printed) without --packs / a browser.
-async function startShell({ name, step, version, shotPrefix }) {
+// extraHosts: host permissions for this build only (build.mjs).
+async function startShell({ name, step, version, shotPrefix, extraHosts = [] }) {
   const packsDir = arg('--packs');
   const exe = findBrowser(arg('--browser'));
   if (!packsDir || !fs.existsSync(packsDir) || !exe) {
@@ -50,7 +51,7 @@ async function startShell({ name, step, version, shotPrefix }) {
   step('companion channel up', companion.status().running === true, `port ${companion.status().port}`);
 
   const { build } = await import(pathToFileURL(path.join(REPO, 'extension/scripts/build.mjs')).href);
-  const { outDir } = await build({ outDir: path.join(box.dir, 'dist'), logLevel: 'silent' });
+  const { outDir } = await build({ outDir: path.join(box.dir, 'dist'), logLevel: 'silent', extraHosts });
 
   const browser = await launchBrowser({ exe, profile: path.join(box.dir, 'profile'), lang: arg('--lang') || 'en-US', headless: !has('--headed'), args: ['--window-size=1280,900'] });
   const { cdp, attach, evaluate, open } = browser;

@@ -2,7 +2,7 @@
 
 T-Translate 的浏览器插件：给网页视频显示字幕，识别和翻译都由本机的 T-Translate 完成。设计见 `docs/design/listen.md` §11（桌面侧通道）。
 
-当前状态：S5 —— 装好配对后不用再碰：YouTube 页面上视频一出声就自动出双语字幕。有站点字幕就直接翻译；没有就抄播放器的音频送给 T-Translate 识别；DRM 站点在视频上提示一行，点一下让 T-Translate 听系统声音。一次只服务正在看的那个标签页；暂停 5 秒、切走标签页、关掉本站（偏好）都会停。S6 加了 B 站适配、工具栏弹窗（状态、本站开关、显示方式、目标语言、导出 SRT）、选项页的按站点开关与字幕缓存。看过的视频再打开，字幕直接从缓存出来（程序没开也行），只对没看过的段落识别。S7 起 B 站没有字幕的视频也能识别（fMP4 / AAC 音频）。S8 加了 TikTok：信息流里往下刷一条就当换了一页，站点字幕直接翻译，没有就识别音频。S9a 起页面直接播放 .mp4 文件（没有 MSE）时，插件自己按段取这个文件的音频去识别；页面里 `<track>` 指向的字幕文件和页面取的 .vtt / .srt / .ttml 也当站点字幕用（何时启用由状态机定，通用站点的授权与注入是 S9b）。
+当前状态：S5 —— 装好配对后不用再碰：YouTube 页面上视频一出声就自动出双语字幕。有站点字幕就直接翻译；没有就抄播放器的音频送给 T-Translate 识别；DRM 站点在视频上提示一行，点一下让 T-Translate 听系统声音。一次只服务正在看的那个标签页；暂停 5 秒、切走标签页、关掉本站（偏好）都会停。S6 加了 B 站适配、工具栏弹窗（状态、本站开关、显示方式、目标语言、导出 SRT）、选项页的按站点开关与字幕缓存。看过的视频再打开，字幕直接从缓存出来（程序没开也行），只对没看过的段落识别。S7 起 B 站没有字幕的视频也能识别（fMP4 / AAC 音频）。S8 加了 TikTok：信息流里往下刷一条就当换了一页，站点字幕直接翻译，没有就识别音频。S9a 起页面直接播放 .mp4 文件（没有 MSE）时，插件自己按段取这个文件的音频去识别；页面里 `<track>` 指向的字幕文件和页面取的 .vtt / .srt / .ttml 也当站点字幕用。S9b 起其他网站也能用：在网页上点工具栏的 T-Caption，选「允许在本站使用」，浏览器同意后本站就生效（当前页面立即生效，不用刷新）；视频文件在另一个网站时，页面上会提示，弹窗里再点「允许」。允许过的网站在选项页可以移除。竖屏视频的覆盖层字幕不再盖住半个画面。
 
 ## 安装（开发者模式）
 
@@ -24,7 +24,8 @@ src/sw/direct-fetch.js            直链 .mp4：按 Range 取 moov 与音频字�
 src/sw/session-orchestrator.js    每标签页的三级状态机：何时开、开哪一级、何时停；一次只服务一个标签页；缓存命中直接出字幕，只对没覆盖的段落识别，跑出来的写回缓存
 src/sw/tab-arbiter.js             哪个标签页在看（聚焦窗口的活动标签页、各窗口的活动标签页）
 src/sw/prefs.js                   偏好（chrome.storage.local 的 prefs：开关、autoListen、显示方式、目标语言、按站点关）
-src/sw/badge.js                   角标：通道状态的色点；按标签页标「CC / L / off」
+src/sw/badge.js                   角标：通道状态的色点；按标签页标「CC / L / off」，等待允许读取视频时标琥珀色「!」
+src/sw/site-access.js             允许的网站：浏览器授权后登记内容脚本（document_start，一对脚本管所有网站）、当前标签页立即注入、移除时注销并交还权限
 src/sw/cache-db.js                字幕缓存：按媒体存字幕与译文，超 200 条 / 100 MB 淘汰最久没用的；IndexedDB（CACHE_* 消息）
 src/offscreen/companion-client.js 通道客户端（配对、hello、翻译、识别会话、事件流）
 src/offscreen/webm-demux.js       WebM 流式解析（任意切块、未知长度、lacing、坏数据重同步）
@@ -47,11 +48,11 @@ src/content/parsers/              站点字幕解析：VTT、SRT、TTML、json3�
 src/content/caption-track.js      字幕画成视频的原生字幕轨（TextTrack）
 src/content/overlay.js            覆盖层：站点藏了原生字幕时画在视频上，跟随全屏
 src/content/caption-renderer.js   字幕与译文、双语 / 只译文 / 只原文、两种画法切换，接媒体流水线事件
-src/content/notice.js             视频上的一行提示（DRM 时「用 T-Translate 听译」+ 按钮）
-src/options/                      选项页：配对、按站点开关、自动听译、字幕缓存
-src/popup/                        工具栏弹窗：当前标签页状态、本站开关、显示方式、画法、目标语言、导出字幕
-src/shared/                       协议常量、消息约定（媒体字节走 base64）、页面事件格式与校验、状态文案、SRT / VTT 导出、配色、MP4 采样表（mp4-table.js）
-scripts/build.mjs                 esbuild 构建 → dist/（不入库）
+src/content/notice.js             视频上的一行提示（DRM 时「用 T-Translate 听译」+ 按钮；视频所在网站未允许时只有关闭）
+src/options/                      选项页：配对、按站点开关、自动听译、已允许的站点（可移除）、字幕缓存
+src/popup/                        工具栏弹窗：当前标签页状态、「允许在本站使用」/「允许」读取视频、本站开关、显示方式、画法、目标语言、导出字幕
+src/shared/                       协议常量、消息约定（媒体字节走 base64）、页面事件格式与校验、状态文案、SRT / VTT 导出、配色、MP4 采样表（mp4-table.js）、匹配模式（match-pattern.js）
+scripts/build.mjs                 esbuild 构建 → dist/（不入库）；extraHosts 只给真机脚本用（无头浏览器点不了授权框）
 scripts/e2e-client.js             端到端：真实通道 + 真实引擎（npm run smoke:caption-client -- --packs <已装听译包目录>）
 scripts/e2e-pipeline.js           端到端：浏览器里录 WebM（或 --ffmpeg 转 fMP4 / AAC）→ 插件流水线 → 真实通道与引擎（用法见文件头）
 scripts/e2e-render.js             真机：本地页面的视频上画字幕，读 activeCues 并截图（node extension/scripts/e2e-render.js --out <截图目录>）
@@ -61,6 +62,7 @@ scripts/e2e-bilibili.js           真机：真实 B 站页面的证据、AAC 音
 scripts/e2e-tiktok.js             真机：真实 TikTok 信息流与视频页，HE-AAC 识别出双语字幕、往下刷一条即导航、站点 WebVTT 走一级、本站开关（用法见文件头）
 scripts/e2e-popup.js              真机：真实 YouTube 页面上的弹窗、显示方式、本站开关、导出、缓存与选项页（用法见文件头）
 scripts/e2e-direct.js             真机：本地页面直链播放的 MP4（moov 在前 / 在后），取流起点、领先量、跳转、中止、<track> 字幕（用法见文件头）
+scripts/e2e-generic.js            真机：普通网站从弹窗允许、立即注入、状态机自己出字幕、跳转重开、视频在另一网站时的提示与授权、竖屏字号、移除网站（用法见文件头）
 scripts/make-fixture.js           重录单测样本 test/fixtures/tone-2s.webm
 scripts/make-fixture-mp4.js       用 ffmpeg 重做 MP4 单测样本：分片 tone-2s.m4s、渐进式 moov 在前 / 在后两个 .mp4（--ffmpeg 传路径）
 scripts/lib/browser.js            临时配置的 Chrome / Edge + DevTools 管道

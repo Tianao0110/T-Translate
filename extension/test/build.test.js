@@ -74,6 +74,16 @@ describe('extension build', () => {
     }
   });
 
+  it('the manifest’s permissions are the source’s; extraHosts (real-browser scripts only) adds hosts to that build alone', async () => {
+    const source = readJson(path.join(EXT, 'manifest.json'));
+    const m = readJson(path.join(result.outDir, 'manifest.json'));
+    expect(m.host_permissions).toEqual(source.host_permissions);
+    expect(m.optional_host_permissions).toEqual(['<all_urls>']);
+    expect(m.permissions).toEqual(source.permissions);
+    const e2e = await build({ outDir: path.join(out, 'e2e'), logLevel: 'silent', extraHosts: ['http://localhost/*'] });
+    expect(readJson(path.join(e2e.outDir, 'manifest.json')).host_permissions).toEqual([...source.host_permissions, 'http://localhost/*']);
+  }, 30000);
+
   it('a prerelease version moves to version_name', () => {
     expect(manifestVersion('0.6.0-beta.1')).toEqual({ version: '0.6.0', version_name: '0.6.0-beta.1' });
     expect(manifestVersion('0.5.7')).toEqual({ version: '0.5.7' });

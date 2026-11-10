@@ -1,7 +1,9 @@
 // Builds the extension into extension/dist/ (or --out <dir>): esbuild bundles
 // the six scripts and two stylesheets, the pages, _locales and icons are
 // copied, and manifest.json gets the version from the root package.json.
-// Missing source icons are drawn first with @napi-rs/canvas.
+// Missing source icons are drawn first with @napi-rs/canvas. extraHosts (the
+// real-browser scripts only) adds host permissions to that build's manifest:
+// a headless browser cannot answer the permission dialog.
 //
 //   node extension/scripts/build.mjs [--out <dir>] [--watch]
 
@@ -80,12 +82,13 @@ async function ensureIcons() {
 
 const appVersion = () => JSON.parse(fs.readFileSync(path.join(REPO, 'package.json'), 'utf8')).version;
 
-function copyStatic(outDir) {
+function copyStatic(outDir, extraHosts = []) {
   for (const [out, from] of Object.entries(PAGES)) fs.copyFileSync(src(from), path.join(outDir, out));
   fs.cpSync(path.join(EXT, '_locales'), path.join(outDir, '_locales'), { recursive: true });
   fs.cpSync(path.join(EXT, 'icons'), path.join(outDir, 'icons'), { recursive: true });
   const manifest = JSON.parse(fs.readFileSync(path.join(EXT, 'manifest.json'), 'utf8'));
   Object.assign(manifest, manifestVersion(appVersion()));
+  if (extraHosts.length) manifest.host_permissions = [...new Set([...manifest.host_permissions, ...extraHosts])];
   fs.writeFileSync(path.join(outDir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
 }
 
@@ -97,7 +100,7 @@ function listFiles(dir, base = dir) {
 }
 
 // Resolves { outDir, files } after a one-off build; with watch, { outDir, stop }.
-export async function build({ outDir = DEFAULT_OUT, watch = false, logLevel = 'warning' } = {}) {
+export async function build({ outDir = DEFAULT_OUT, watch = false, logLevel = 'warning', extraHosts = [] } = {}) {
   outDir = path.resolve(outDir);
   const rel = path.relative(outDir, EXT);
   if (!rel || (!rel.startsWith('..') && !path.isAbsolute(rel))) throw new Error(`refusing to clean ${outDir}: it holds the extension sources`);
@@ -123,7 +126,7 @@ export async function build({ outDir = DEFAULT_OUT, watch = false, logLevel = 'w
 
   if (!watch) {
     await Promise.all(configs.map((c) => esbuild.build(c)));
-    copyStatic(outDir);
+    copyStatic(outDir, extraHosts);
     return { outDir, files: listFiles(outDir).sort() };
   }
 
