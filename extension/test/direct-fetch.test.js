@@ -4,8 +4,9 @@
 // probe, the moov from the head or the tail, the stream opened as 'direct'
 // with the moov bytes and then the audio bytes at their offsets, from fromS,
 // at most aheadS past the reported playhead, video gaps skipped; 416 / 403 /
-// 200 / network errors as fetch-failed; the permission check; close aborts
-// the request in flight; a new open stops the last.
+// 200 / network errors as fetch-failed; a stalled request timed out and
+// tried once more; the permission check; close aborts the request in flight;
+// a new open stops the last.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import fs from 'node:fs';
@@ -45,7 +46,7 @@ function rangeServer(file) {
       const [, a, b] = /^bytes=(\d+)-(\d+)$/.exec(init.headers.Range);
       const start = Number(a);
       const end = Math.min(Number(b), file.length - 1);
-      srv.requests.push({ url, start, end: Number(b) + 1, credentials: init.credentials, redirect: init.redirect });
+      srv.requests.push({ url, start, end: Number(b) + 1, credentials: init.credentials, redirect: init.redirect, cache: init.cache });
       if (init.signal?.aborted) throw abortError();
       const hooked = srv.hook?.(start, init);
       if (hooked) return hooked;
@@ -101,7 +102,7 @@ describe('direct fetch', () => {
       [0, 4096],
       [1170, FAST.length],
     ]);
-    expect(srv.requests.every((q) => q.url === URL_ && q.credentials === 'include' && q.redirect === 'follow')).toBe(true);
+    expect(srv.requests.every((q) => q.url === URL_ && q.credentials === 'include' && q.redirect === 'follow' && q.cache === 'no-store')).toBe(true);
     expect(off.calls[0]).toEqual({ type: MSG.MEDIA_OPEN, key: 'k1', lang: 'en', targetLang: 'zh', source: 'direct' });
     expect(pushes().map((p) => [p.offset, p.bytes.length])).toEqual([
       [0, 1154],
@@ -214,6 +215,27 @@ describe('direct fetch', () => {
       expect(off.calls.some((c) => c.type === MSG.MEDIA_CLOSE)).toBe(false);
       expect(d.current()).toBe(`k${status}`);
     }
+  });
+
+  it('a request with no answer times out and is tried once more; twice is a fetch-failed', async () => {
+    const hang = (init) => new Promise((_, reject) => init.signal.addEventListener('abort', () => reject(abortError())));
+    // the first try of the first audio range hangs, the second gets through
+    const once = make(FAST, { requestTimeoutMs: 20, logger: { warn: () => {} } });
+    let hung = 0;
+    once.srv.hook = (start, init) => (start === 1170 && !hung++ ? hang(init) : null);
+    await once.d.open({ key: 'a', url: URL_ });
+    await vi.waitFor(() => expect(once.d.stats('a').done).toBe(true));
+    expect(once.srv.requests.map((q) => q.start)).toEqual([0, 1170, 1170]);
+    expect(once.d.stats('a')).toMatchObject({ requests: 3, retried: 1, error: null });
+    expectFileBytes(FAST);
+
+    events = [];
+    const twice = make(FAST, { requestTimeoutMs: 20 });
+    twice.srv.hook = (start, init) => (start === 1170 ? hang(init) : null);
+    await twice.d.open({ key: 'b', url: URL_ });
+    await vi.waitFor(() => expect(events).toHaveLength(1));
+    expect(events[0]).toEqual({ key: 'b', event: { type: 'error', code: 'fetch-failed', status: 0 } });
+    expect(twice.d.stats('b')).toMatchObject({ requests: 3, retried: 1, error: { code: 'fetch-failed', status: 0, message: 'timeout' } });
   });
 
   it('open fails on the head or the moov: the code, no stream left open', async () => {

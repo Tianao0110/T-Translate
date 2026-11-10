@@ -7,13 +7,15 @@
 // between audio chunks are skipped when the gap is large. One file at a
 // time; a new open stops the last one's fetching.
 //
-// A fetch that fails after open (not 206, 416, 403, network) stops the
-// fetching but not the stream, which keeps what it has; it comes back as
+// A request that gets no answer in requestTimeoutMs, or drops, is tried
+// once more. A fetch that fails after open (not 206, 416, 403, network,
+// timeout) stops the fetching but not the stream, which keeps what it has; it comes back as
 // onEvent({ key, event: { type: 'error', code: 'fetch-failed', status } }),
 // the shape of the pipeline's MEDIA_EVENT, so page-events handles both
 // alike; the end of the file as { type: 'status', state: 'fetch-end' }.
-// Requests carry Range and the page's cookies, nothing else. The only
-// permission check: the extension may read the file's host.
+// Requests carry Range and the page's cookies, nothing else, and skip the
+// HTTP cache (each range is read once). The only permission check: the
+// extension may read the file's host.
 
 import { MSG, MAX_MEDIA_PUSH_BYTES, MessageError, encodeBytes } from '../shared/messages.js';
 import { parseMoov, probeHead, indexAtTime, topBoxes } from '../shared/mp4-table.js';
@@ -22,6 +24,7 @@ const HEAD_BYTES = 64 * 1024;
 const MAX_MOOV_BYTES = 32 * 1024 * 1024;
 const GAP_BYTES = 64 * 1024;
 const REFILL_S = 15; // once ahead, wait until the lead is this much short before fetching again
+const REQUEST_TIMEOUT_MS = 30000; // one range, headers and body
 const MAX_SESSIONS = 4;
 
 const ABORTED = new MessageError('closed');
@@ -63,6 +66,8 @@ export function createDirectFetch({
   gapBytes = GAP_BYTES,
   headBytes = HEAD_BYTES,
   maxMoovBytes = MAX_MOOV_BYTES,
+  requestTimeoutMs = REQUEST_TIMEOUT_MS,
+  retries = 1,
 } = {}) {
   const refillMs = Math.min(REFILL_S, aheadS / 4) * 1000;
   const sessions = new Map(); // key → session, the last few
@@ -89,37 +94,65 @@ export function createDirectFetch({
     if (s.halted) throw ABORTED;
   }
 
-  // Bytes [start, end) of the file; fewer at its end.
+  // Bytes [start, end) of the file; fewer at its end. A stalled or dropped
+  // request is tried again; an HTTP answer is final.
   async function fetchRange(s, start, end) {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await fetchOnce(s, start, end);
+      } catch (e) {
+        if (!(e instanceof FetchError) || e.status !== 0 || attempt >= retries) throw e;
+        s.retried++;
+        logger.warn?.(`direct: range ${start}-${end - 1} ${e.message}, again`);
+      }
+    }
+  }
+
+  async function fetchOnce(s, start, end) {
     check(s);
     s.requests++;
-    let res;
-    try {
-      res = await fetchFn(s.url, { headers: { Range: `bytes=${start}-${end - 1}` }, credentials: 'include', redirect: 'follow', signal: s.ctl.signal });
-    } catch (e) {
+    const ctl = new AbortController();
+    const stop = () => ctl.abort();
+    s.ctl.signal.addEventListener('abort', stop);
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      ctl.abort();
+    }, requestTimeoutMs);
+    const lost = (e) => {
       check(s);
-      throw new FetchError(0, e?.message || 'network');
-    }
-    check(s);
-    if (res.status !== 206) {
-      res.body?.cancel?.().catch(() => {});
-      throw new FetchError(res.status);
-    }
-    const range = contentRange(res.headers.get('content-range'));
-    if (!range || range.start !== start) {
-      res.body?.cancel?.().catch(() => {});
-      throw new FetchError(206, 'bad content-range');
-    }
-    if (range.total !== null) s.total = range.total;
-    let bytes;
+      return new FetchError(0, timedOut ? 'timeout' : e?.message || 'network');
+    };
     try {
-      bytes = new Uint8Array(await res.arrayBuffer());
-    } catch (e) {
+      let res;
+      try {
+        res = await fetchFn(s.url, { headers: { Range: `bytes=${start}-${end - 1}` }, credentials: 'include', redirect: 'follow', cache: 'no-store', signal: ctl.signal });
+      } catch (e) {
+        throw lost(e);
+      }
       check(s);
-      throw new FetchError(0, e?.message || 'network');
+      if (res.status !== 206) {
+        res.body?.cancel?.().catch(() => {});
+        throw new FetchError(res.status);
+      }
+      const range = contentRange(res.headers.get('content-range'));
+      if (!range || range.start !== start) {
+        res.body?.cancel?.().catch(() => {});
+        throw new FetchError(206, 'bad content-range');
+      }
+      if (range.total !== null) s.total = range.total;
+      let bytes;
+      try {
+        bytes = new Uint8Array(await res.arrayBuffer());
+      } catch (e) {
+        throw lost(e);
+      }
+      s.bytes += bytes.length;
+      return bytes.length > end - start ? bytes.subarray(0, end - start) : bytes;
+    } finally {
+      clearTimeout(timer);
+      s.ctl.signal.removeEventListener('abort', stop);
     }
-    s.bytes += bytes.length;
-    return bytes.length > end - start ? bytes.subarray(0, end - start) : bytes;
   }
 
   // The moov's sample table and the bytes that carry it to the pipeline: ftyp + moov from the head, or the moov alone from the tail.
@@ -235,6 +268,7 @@ export function createDirectFetch({
       limitS: aheadS,
       bytes: s.bytes,
       requests: s.requests,
+      retried: s.retried,
       pushes: s.pushes,
       moovAt: s.where,
       durationS: s.table ? s.table.durationMs / 1000 : null,
@@ -270,6 +304,7 @@ export function createDirectFetch({
       maxAheadS: 0,
       bytes: 0,
       requests: 0,
+      retried: 0,
       pushes: 0,
       done: false,
       error: null,

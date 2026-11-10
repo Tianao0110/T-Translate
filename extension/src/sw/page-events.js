@@ -367,7 +367,7 @@ export function createPageEvents({
   // The fetcher's counters as evidence fields.
   function syncDirect(d, f) {
     if (!f) return;
-    Object.assign(d, { bytes: f.bytes, requests: f.requests, aheadS: f.aheadS, maxAheadS: f.maxAheadS, fetchedToS: f.fetchedToS, playS: f.playS, done: f.done, fetchError: f.error });
+    Object.assign(d, { bytes: f.bytes, requests: f.requests, retried: f.retried, aheadS: f.aheadS, maxAheadS: f.maxAheadS, fetchedToS: f.fetchedToS, playS: f.playS, done: f.done, fetchError: f.error });
   }
 
   function closeDirect(ev, reason) {
