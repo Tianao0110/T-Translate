@@ -16,8 +16,12 @@ function fakeTrack(kind, label, language) {
     language,
     mode: 'disabled',
     list,
+    active: [],
     get cues() {
       return this.mode === 'disabled' ? null : list.slice();
+    },
+    get activeCues() {
+      return this.active.slice();
     },
     addCue(c) {
       list.push(c);
@@ -81,6 +85,22 @@ describe('createCaptionTrack', () => {
     expect(t.track.list).toEqual([]);
     t.destroy();
     expect(t.track.mode).toBe('disabled');
+  });
+
+  it('swaps a cue that is on screen for a fresh one when its text changes', () => {
+    const t = createCaptionTrack({ video, addTextTrack, createCue });
+    t.set(CUES);
+    const cueA = t.track.list[0];
+    t.track.active = [cueA];
+    t.updateText('a', 'Hello\n你好');
+    expect(t.track.list.map((c) => c.id)).toEqual(['b', 'c', 'a']);
+    const fresh = t.track.list[2];
+    expect(fresh).not.toBe(cueA);
+    expect(fresh).toMatchObject({ id: 'a', startTime: 1, endTime: 3, text: 'Hello\n你好' });
+    t.track.active = [];
+    t.updateText('a', 'Hello\n您好');
+    expect(t.track.list[2]).toBe(fresh); // off screen: edited in place
+    expect(fresh.text).toBe('Hello\n您好');
   });
 
   it('reuses its own track left on the video, emptied', () => {

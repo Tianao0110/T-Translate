@@ -44,11 +44,24 @@ export function createCaptionTrack({
     cues.set(id, cue);
   }
 
-  // Chrome repaints an active cue as soon as its text changes.
+  const isActive = (cue) => Array.from(track.activeCues || []).includes(cue);
+
+  // A cue on screen is not always repainted when its text changes (real
+  // players' videos kept the old text), so an active cue is swapped for a
+  // fresh one; the rest change in place.
   function updateText(id, text) {
     const cue = cues.get(id);
     const t = escapeCueText(text);
-    if (cue && cue.text !== t) cue.text = t;
+    if (!cue || cue.text === t) return;
+    if (!isActive(cue)) {
+      cue.text = t;
+      return;
+    }
+    remove(cue);
+    const fresh = createCue(cue.startTime, cue.endTime, t);
+    fresh.id = id;
+    track.addCue(fresh);
+    cues.set(id, fresh);
   }
 
   function clear() {

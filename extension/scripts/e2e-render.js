@@ -200,8 +200,8 @@ async function main() {
     await shoot('3-track-bilingual');
     await shoot('3-track-bilingual-zoom', await captionClip());
 
-    // The cue on screen changes while the video is paused: Chrome repaints
-    // the in-place text change without a time tick. The zoom shot is the proof.
+    // The cue on screen changes while the video is paused: the track swaps
+    // the cue, so the new text is painted at once. The zoom shot is the proof.
     await js(`document.getElementById('v').pause()`);
     await sleep(100);
     await js(`TCaption.applyMediaEvent(window.__r, { type: 'translation', id: 2, text: ${JSON.stringify(`${TRANSLATION}（暂停时更新）`)}, done: true })`);
