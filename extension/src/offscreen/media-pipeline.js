@@ -1,10 +1,11 @@
-// One media stream at a time: WebM bytes → demuxer → WebCodecs → 16 kHz
-// mono → feeder → companion ASR session. onEvent({ key, event }) carries the
+// One media stream at a time: WebM or fragmented MP4 bytes → demuxer →
+// WebCodecs → 16 kHz mono → feeder → companion ASR session. onEvent({ key, event }) carries the
 // session's events (status, segment, translation, closed) and the feeder's
 // (suspended, dropped, error); every open ends with exactly one 'closed'.
 
 import { createWebmDemuxer } from './webm-demux.js';
-import { createOpusDecoder, createResampler } from './decode.js';
+import { createMp4Demuxer } from './mp4-demux.js';
+import { createAudioDecoder, createResampler } from './decode.js';
 import { createAudioFeeder } from './audio-feeder.js';
 import { SAMPLE_RATE } from '../shared/protocol.js';
 
@@ -18,6 +19,42 @@ export class PipelineError extends Error {
   }
 }
 
+const MP4_HEAD = new Set(['ftyp', 'moov', 'moof', 'styp', 'sidx']);
+
+// 'webm' or 'mp4' from a stream's first 12 bytes (an init segment, or a
+// cluster / fragment when the stream had none); WebM when unsure, as before.
+export function containerOf(head) {
+  if (head[0] === 0x1a && head[1] === 0x45 && head[2] === 0xdf && head[3] === 0xa3) return 'webm';
+  const type = String.fromCharCode(head[4], head[5], head[6], head[7]);
+  return MP4_HEAD.has(type) ? 'mp4' : 'webm';
+}
+
+// Holds the first 12 bytes, then hands everything to the demuxer they call for.
+function createAutoDemuxer(onPick) {
+  let inner = null;
+  let head = new Uint8Array(0);
+  const pick = () => {
+    const container = containerOf(head);
+    inner = container === 'mp4' ? createMp4Demuxer() : createWebmDemuxer();
+    onPick(container);
+    return inner.push(head);
+  };
+  return {
+    push(bytes) {
+      if (inner) return inner.push(bytes);
+      const next = new Uint8Array(head.length + bytes.length);
+      next.set(head);
+      next.set(bytes, head.length);
+      head = next;
+      return head.length >= 12 ? pick() : [];
+    },
+    flush() {
+      if (!inner && head.length) pick();
+      return inner ? inner.flush() : [];
+    },
+  };
+}
+
 const sameTrack = (a, b) =>
   a.codec === b.codec && a.channels === b.channels && a.sampleRate === b.sampleRate && String(a.codecPrivate) === String(b.codecPrivate);
 
@@ -25,7 +62,7 @@ export function createMediaPipeline({
   client,
   logger = console,
   onEvent = () => {},
-  createDecoder = createOpusDecoder,
+  createDecoder = createAudioDecoder,
   createFeeder = createAudioFeeder,
   now = () => performance.now(),
 } = {}) {
@@ -137,7 +174,7 @@ export function createMediaPipeline({
     }
     if (evt.type === 'error') {
       s.stats.demuxErrors++;
-      logger.warn?.(`webm: ${evt.message}`);
+      logger.warn?.(`${s.stats.container}: ${evt.message}`);
     }
   }
 
@@ -173,12 +210,12 @@ export function createMediaPipeline({
     open({ key, lang = '', targetLang = '' } = {}) {
       if (typeof key !== 'string' || !key) throw new PipelineError('bad-request', 'key');
       const after = cur ? closeStream(cur, { drain: false }) : null;
-      cur = {
+      const s = {
         key,
         lang,
         targetLang,
         after,
-        demuxer: createWebmDemuxer(),
+        demuxer: null,
         track: null,
         decoder: null,
         decoderReady: null,
@@ -191,8 +228,10 @@ export function createMediaPipeline({
         failure: null,
         closedSent: false,
         closing: null,
-        stats: { bytes: 0, blocks: 0, decodedS: 0, demuxErrors: 0, firstPushAt: 0, lastPcmAt: 0 },
+        stats: { container: null, bytes: 0, blocks: 0, decodedS: 0, demuxErrors: 0, firstPushAt: 0, lastPcmAt: 0 },
       };
+      s.demuxer = createAutoDemuxer((container) => (s.stats.container = container));
+      cur = s;
       return { key };
     },
 

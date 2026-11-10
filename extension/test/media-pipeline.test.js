@@ -1,22 +1,28 @@
 // @vitest-environment node
 //
-// The media pipeline with the real demuxer and resampler, a fake decoder
-// (silence of each packet's length) and a fake feeder: the first block's time
-// becomes mediaStartS, blocks wait for the decoder, 48 kHz arrives as 16 kHz,
-// close drains and ends with one 'closed'; AAC is reported unsupported.
+// The media pipeline with the real demuxers and resampler, a fake decoder
+// (silence of each packet's length; the real decoderConfig says what is
+// supported) and a fake feeder: the container is picked from the first
+// bytes, the first block's time becomes mediaStartS, blocks wait for the
+// decoder, 48 kHz arrives as 16 kHz, close drains and ends with one 'closed';
+// AAC in WebM is reported unsupported, AAC in fMP4 decodes.
 
 import { describe, it, expect, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { createMediaPipeline } from '../src/offscreen/media-pipeline.js';
+import { createMediaPipeline, containerOf } from '../src/offscreen/media-pipeline.js';
 import { opusPacketMs } from '../src/offscreen/webm-demux.js';
+import { decoderConfig } from '../src/offscreen/decode.js';
 import { MSG, encodeBytes, decodeBytes, MAX_MEDIA_PUSH_BYTES } from '../src/shared/messages.js';
 
 const FIXTURE = new Uint8Array(fs.readFileSync(path.join(__dirname, 'fixtures', 'tone-2s.webm')));
+// AAC-LC 48 kHz mono, ftyp + moov (692 bytes), a moof + mdat a second (the second at 9179).
+const M4S = new Uint8Array(fs.readFileSync(path.join(__dirname, 'fixtures', 'tone-2s.m4s')));
+const AAC_FRAMES = 95;
 
 function fakeDecoderFactory(log) {
   return async ({ track, onPcm }) => {
-    if (track.codec !== 'A_OPUS') throw Object.assign(new Error(track.codec), { code: 'unsupported' });
+    if (!decoderConfig(track)) throw Object.assign(new Error(track.codec), { code: 'unsupported' });
     await new Promise((r) => setTimeout(r, 5)); // isConfigSupported is async
     const queue = [];
     log.created++;
@@ -26,7 +32,8 @@ function fakeDecoderFactory(log) {
         return true;
       },
       async flush() {
-        for (const b of queue.splice(0)) onPcm({ pcm: new Float32Array((opusPacketMs(b.data) * 48000) / 1000), sampleRate: 48000, timeMs: b.timeMs });
+        const frames = (b) => (track.codec === 'A_OPUS' ? (opusPacketMs(b.data) * 48000) / 1000 : 1024);
+        for (const b of queue.splice(0)) onPcm({ pcm: new Float32Array(frames(b)), sampleRate: 48000, timeMs: b.timeMs });
       },
       close() {
         log.closed++;
@@ -103,7 +110,7 @@ describe('media pipeline', () => {
     expect(events.filter((e) => e.event.type === 'closed').map((e) => e.key)).toEqual(['a', 'b']);
   });
 
-  it('AAC: status unsupported, then closed with that reason; no session opened', async () => {
+  it('AAC in WebM: status unsupported, then closed with that reason; no session opened', async () => {
     const { p, log, events } = setup();
     const aac = Uint8Array.from(FIXTURE);
     const at = Buffer.from(aac).indexOf('A_OPUS');
@@ -116,6 +123,53 @@ describe('media pipeline', () => {
     await p.close({ key: 'k' });
     expect(log.opts).toBeUndefined();
     expect(events.at(-1).event).toEqual({ type: 'closed', reason: 'unsupported' });
+  });
+
+  it('fMP4 / AAC: 95 frames in any cuts → 16 kHz audio, mediaStartS from the first tfdt', async () => {
+    const { p, log, events } = setup();
+    p.open({ key: 'm', lang: 'zh', targetLang: 'en' });
+    for (let i = 0; i < M4S.length; i += 777) p.push({ key: 'm', bytes: M4S.subarray(i, i + 777) });
+    const stats = await p.close({ key: 'm' });
+    expect(stats).toMatchObject({ container: 'mp4', bytes: M4S.length, blocks: AAC_FRAMES, demuxErrors: 0 });
+    expect(stats.decodedS).toBeCloseTo((AAC_FRAMES * 1024) / 48000, 6);
+    expect(log.opts).toMatchObject({ lang: 'zh', targetLang: 'en', mediaStartS: 0 });
+    expect(log.pushed).toBe(Math.floor((AAC_FRAMES * 1024) / 3));
+    expect(events).toEqual([{ key: 'm', event: { type: 'closed', reason: 'closed' } }]);
+  });
+
+  it('fMP4 joined mid-video: the init, then fragments from the second; one decoder for a repeated init', async () => {
+    const { p, log } = setup();
+    p.open({ key: 'j' });
+    p.push({ key: 'j', bytes: M4S.subarray(0, 692) });
+    p.push({ key: 'j', bytes: M4S.subarray(9179) });
+    // the same init again (a player re-appending it), then the whole file
+    p.push({ key: 'j', bytes: M4S });
+    const stats = await p.close({ key: 'j' });
+    expect(log.opts.mediaStartS).toBeCloseTo(48128 / 48000, 9);
+    expect(stats.blocks).toBe(48 + AAC_FRAMES);
+    expect(log.created).toBe(1);
+  });
+
+  it('a new init with another AudioSpecificConfig gets a new decoder', async () => {
+    const { p, log } = setup();
+    const stereo = Uint8Array.from(M4S);
+    const at = Buffer.from(stereo).indexOf(Buffer.from([0x05, 0x80, 0x80, 0x80, 0x05, 0x11, 0x88]));
+    stereo[at + 6] = 0x90;
+    p.open({ key: 'c' });
+    p.push({ key: 'c', bytes: M4S });
+    await vi.waitFor(() => expect(log.created).toBe(1));
+    p.push({ key: 'c', bytes: stereo });
+    await p.close({ key: 'c' });
+    expect(log.created).toBe(2);
+    expect(log.closed).toBe(2);
+  });
+
+  it('picks the container from the first bytes', () => {
+    const head = (type) => Uint8Array.from([0, 0, 0, 24, ...[...type].map((c) => c.charCodeAt(0)), 0, 0, 0, 0]);
+    for (const t of ['ftyp', 'moov', 'moof', 'styp', 'sidx']) expect(containerOf(head(t)), t).toBe('mp4');
+    expect(containerOf(FIXTURE)).toBe('webm');
+    expect(containerOf(Uint8Array.from([0x1f, 0x43, 0xb6, 0x75, 1, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]))).toBe('webm');
+    expect(containerOf(head('mdat'))).toBe('webm');
   });
 
   it('a stream with no audio ends with closed/no-audio', async () => {

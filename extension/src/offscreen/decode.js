@@ -27,16 +27,31 @@ export function mixToMono(audio) {
   return out;
 }
 
+// The WebCodecs config for a demuxer track, or null when we do not take it:
+// Opus from WebM, AAC from MP4 (raw frames need the AudioSpecificConfig).
+export function decoderConfig(track) {
+  if (track.codec === 'A_OPUS') {
+    const config = { codec: 'opus', sampleRate: 48000, numberOfChannels: track.channels };
+    if (track.codecPrivate?.length) config.description = track.codecPrivate;
+    return config;
+  }
+  if (/^mp4a\.(40\.\d+|6[67])$/.test(track.codec) && track.codecPrivate?.length) {
+    return { codec: track.codec, sampleRate: track.sampleRate, numberOfChannels: track.channels, description: track.codecPrivate };
+  }
+  return null;
+}
+
 // track: the demuxer's track event. onPcm({ pcm, sampleRate, timeMs }) per
-// decoded AudioData. Rejects with code 'unsupported' for AAC (not yet) and
-// configs the browser cannot decode.
-export async function createOpusDecoder({ track, onPcm, onError = () => {}, AudioDecoder: Decoder = globalThis.AudioDecoder, EncodedAudioChunk: Chunk = globalThis.EncodedAudioChunk }) {
-  if (track.codec !== 'A_OPUS') throw new DecodeError('unsupported', track.codec);
+// decoded AudioData, at the rate the decoder puts out (HE-AAC may double the
+// track's). Rejects with code 'unsupported' for other codecs and configs the
+// browser cannot decode.
+export async function createAudioDecoder({ track, onPcm, onError = () => {}, AudioDecoder: Decoder = globalThis.AudioDecoder, EncodedAudioChunk: Chunk = globalThis.EncodedAudioChunk }) {
+  const config = decoderConfig(track);
+  if (!config) throw new DecodeError('unsupported', track.codec);
   if (!Decoder || !Chunk) throw new DecodeError('unsupported', 'WebCodecs AudioDecoder is missing');
-  const config = { codec: 'opus', sampleRate: 48000, numberOfChannels: track.channels };
-  if (track.codecPrivate?.length) config.description = track.codecPrivate;
-  const { supported } = await Decoder.isConfigSupported(config);
-  if (!supported) throw new DecodeError('unsupported', `opus ${track.channels}ch`);
+  // A config the browser calls invalid (TypeError) is as good as unsupported.
+  const supported = await Decoder.isConfigSupported(config).then((r) => r.supported, () => false);
+  if (!supported) throw new DecodeError('unsupported', `${config.codec} ${track.channels}ch`);
 
   let closed = false;
   const decoder = new Decoder({
