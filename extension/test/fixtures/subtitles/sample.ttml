@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<tt xmlns="http://www.w3.org/ns/ttml" xmlns:tts="http://www.w3.org/ns/ttml#styling" xmlns:ttp="http://www.w3.org/ns/ttml#parameter"
+    ttp:frameRate="25" ttp:tickRate="10000000" xml:lang="en">
+  <head>
+    <styling>
+      <style xml:id="s1" tts:color="white" tts:fontSize="100%"/>
+    </styling>
+    <layout>
+      <region xml:id="bottom" tts:origin="10% 80%" tts:extent="80% 20%"/>
+    </layout>
+  </head>
+  <body style="s1">
+    <div region="bottom">
+      <p xml:id="sub1" begin="00:00:01.000" end="00:00:02.500">Plain clock <span tts:fontStyle="italic">with <span tts:fontWeight="bold">nested</span> spans</span></p>
+      <p begin="00:00:02:12" end="00:00:04:00" region="bottom">Frames at<br/>25 fps</p>
+      <p begin="45000000t" dur="15000000t">Ticks &amp; a dur</p>
+      <p begin="6.5s" end="7500ms">
+        <span>你好</span>
+        <span>世界</span>
+      </p>
+    </div>
+    <div begin="100s">
+      <p begin="1s" end="3s">Offset by the div</p>
+      <p begin="2s"><span begin="0s" end="1s">Timed</span> <span begin="1s" end="2.5s">by spans</span></p>
+      <p begin="5s" end="6s">   </p>
+    </div>
+  </body>
+</tt>

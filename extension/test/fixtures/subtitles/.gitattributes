@@ -1,0 +1,2 @@
+# Byte-exact fixtures: sample.srt keeps its BOM and CRLF line ends.
+* -text

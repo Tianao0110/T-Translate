@@ -1,0 +1,22 @@
+{
+  "wireMagic": "pb3",
+  "pens": [{}],
+  "wsWinStyles": [{}, { "mhModeHint": 2, "juJustifCode": 0, "sdScrollDir": 3 }],
+  "wpWinPositions": [{}, { "apPoint": 6, "ahHorPos": 20, "avVerPos": 100, "rcRows": 2, "ccCols": 40 }],
+  "events": [
+    { "tStartMs": 0, "dDurationMs": 3600000, "id": 1, "wpWinPosId": 1, "wsWinStyleId": 1 },
+    { "tStartMs": 160, "dDurationMs": 4799, "wWinId": 1, "segs": [
+      { "utf8": "so", "acAsrConf": 0 }, { "utf8": " today", "tOffsetMs": 240, "acAsrConf": 0 },
+      { "utf8": " we're", "tOffsetMs": 600, "acAsrConf": 0 }, { "utf8": " going", "tOffsetMs": 960, "acAsrConf": 0 }
+    ] },
+    { "tStartMs": 2629, "dDurationMs": 2330, "wWinId": 1, "aAppend": 1, "segs": [{ "utf8": "\n" }] },
+    { "tStartMs": 2639, "dDurationMs": 4320, "wWinId": 1, "segs": [
+      { "utf8": "to", "acAsrConf": 0 }, { "utf8": " talk", "tOffsetMs": 320, "acAsrConf": 0 }, { "utf8": " about", "tOffsetMs": 720, "acAsrConf": 0 }
+    ] },
+    { "tStartMs": 4959, "dDurationMs": 3000, "wWinId": 1, "aAppend": 1, "segs": [{ "utf8": " subtitles" }] },
+    { "tStartMs": 9000, "dDurationMs": 1000, "wWinId": 1, "segs": [{ "utf8": "\n" }] },
+    { "tStartMs": 10000, "segs": [{ "utf8": "no duration" }] },
+    { "tStartMs": 12000, "dDurationMs": 2500, "segs": [{ "utf8": "Manual line one\nline two" }] },
+    { "tStartMs": 15000, "dDurationMs": 2000, "segs": [{ "utf8": "日本語の" }, { "utf8": "\n" }, { "utf8": "字幕" }] }
+  ]
+}
