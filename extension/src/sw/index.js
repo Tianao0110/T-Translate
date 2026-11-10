@@ -1,10 +1,12 @@
 // Service worker: keeps the offscreen document (which owns the companion
 // client and the media pipeline) alive, relays the extension pages'
-// COMPANION_* and MEDIA_* requests to it, does chrome.storage for it, paints
-// the badge and polls the channel once a minute.
+// COMPANION_* and MEDIA_* requests to it, does chrome.storage for it, keeps
+// each tab's page evidence and carries commands to it (page-events.js),
+// paints the badge and polls the channel once a minute.
 
-import { MSG, TARGET_OFFSCREEN, request, handle, isExtensionSender } from '../shared/messages.js';
+import { MSG, TARGET_OFFSCREEN, request, handle, on, isExtensionSender } from '../shared/messages.js';
 import { showBadge } from './badge.js';
+import { createPageEvents } from './page-events.js';
 
 const OFFSCREEN_PATH = 'offscreen.html';
 const KEEPALIVE = 'companion-keepalive';
@@ -50,6 +52,9 @@ async function toOffscreen(type, payload) {
 const relay = (type) => (payload) => toOffscreen(type, payload);
 const fromExtension = (_msg, sender) => isExtensionSender(sender);
 
+// For the orchestrator: getTabEvidence(tabId), onPageEvent(fn), command(tabId, command).
+export const pageEvents = createPageEvents({ toOffscreen });
+
 handle(
   {
     [MSG.COMPANION_LOAD]: relay(MSG.COMPANION_LOAD),
@@ -66,11 +71,14 @@ handle(
       if (value === null || value === undefined) await chrome.storage.local.remove(key);
       else await chrome.storage.local.set({ [key]: value });
     },
+    ...pageEvents.extensionHandlers,
   },
   { accept: fromExtension }
 );
 
-// Content scripts: only the liveness ping for now.
+// Content scripts: page events and MSE bytes from top frames on our hosts, and the liveness ping.
+handle(pageEvents.contentHandlers, { accept: pageEvents.fromPage });
+on(MSG.MEDIA_EVENT, pageEvents.onMediaEvent);
 handle({
   [MSG.PING]: (_payload, sender) => {
     console.debug(`[T-Caption] ping from tab ${sender.tab?.id ?? '?'}`);

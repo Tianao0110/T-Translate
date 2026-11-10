@@ -49,8 +49,10 @@ function makeCdp(sendRaw) {
   };
 }
 
-// Resolves { child, cdp, attach, evaluate, open, close }.
-async function launchBrowser({ exe, profile, lang = 'en-US', args = [] }) {
+// Resolves { child, cdp, attach, evaluate, open, close }. headless: false
+// opens a real window (some sites refuse headless browsers); still driven
+// only over the pipe.
+async function launchBrowser({ exe, profile, lang = 'en-US', args = [], headless = true }) {
   const argv = [
     `--user-data-dir=${profile}`,
     '--no-first-run',
@@ -58,7 +60,7 @@ async function launchBrowser({ exe, profile, lang = 'en-US', args = [] }) {
     '--disable-default-apps',
     '--disable-sync',
     `--lang=${lang}`,
-    '--headless=new',
+    ...(headless ? ['--headless=new'] : []),
     '--autoplay-policy=no-user-gesture-required',
     '--remote-debugging-pipe',
     '--enable-unsafe-extension-debugging',
