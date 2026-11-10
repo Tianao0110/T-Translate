@@ -200,6 +200,19 @@ async function main() {
     await shoot('3-track-bilingual');
     await shoot('3-track-bilingual-zoom', await captionClip());
 
+    // The cue on screen changes while the video is paused: Chrome repaints
+    // the in-place text change without a time tick. The zoom shot is the proof.
+    await js(`document.getElementById('v').pause()`);
+    await sleep(100);
+    await js(`TCaption.applyMediaEvent(window.__r, { type: 'translation', id: 2, text: ${JSON.stringify(`${TRANSLATION}（暂停时更新）`)}, done: true })`);
+    await sleep(300);
+    readings.paused = await active();
+    step('paused video: the active cue carries the text changed while paused', readings.paused.active[0]?.text === `${LONG}\n${TRANSLATION}（暂停时更新）`, JSON.stringify(readings.paused.active.map((c) => c.id)));
+    await shoot('3b-track-paused-update-zoom', await captionClip());
+    await js(`(document.getElementById('v').play(), true)`);
+    await js(`TCaption.applyMediaEvent(window.__r, { type: 'translation', id: 2, text: ${JSON.stringify(TRANSLATION)}, done: true })`);
+    await sleep(150);
+
     await js(`window.__r.setMode('overlay')`);
     await sleep(150);
     readings.overlay = { track: await active(), overlay: await overlayLines() };
