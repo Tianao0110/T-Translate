@@ -21,6 +21,7 @@ export default [
       'resources/**',
       'electron/generated/**', // esbuild artifact (scripts/build/build-stack.js)
       'extension/dist/**', // esbuild artifact (extension/scripts/build.mjs)
+      'extension/dist-firefox/**', // same, --target firefox
       '*.old',
       '*.backup.*',
     ],

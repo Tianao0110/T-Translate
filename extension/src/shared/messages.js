@@ -11,6 +11,8 @@
 // extension pages ──TAB_EVIDENCE / TAB_COMMAND / TAB_STATE──▶ service worker
 // extension pages ──SITE_LIST / SITE_ALLOW / SITE_REVOKE──▶ service worker (sw/site-access.js)
 // extension pages ──CACHE_*──▶ service worker (the subtitle cache, sw/cache-db.js)
+// Firefox: no offscreen document; the worker's requests to it are direct
+// calls in the background page, its broadcasts also go out by notifyLocal.
 //
 // Messages are JSON on the wire (an ArrayBuffer arrives as {}), so media
 // bytes travel as base64: encodeBytes / decodeBytes.
@@ -87,6 +89,17 @@ export class MessageError extends Error {
 
 const runtimeOf = (runtime) => runtime || globalThis.chrome?.runtime;
 
+// Same-page delivery: a Firefox build runs the worker's and the offscreen's
+// code in one background page, where runtime.sendMessage never reaches the
+// page that sent it, so their broadcasts also go through notifyLocal. Kept
+// per runtime; nothing in a Chrome build calls notifyLocal.
+const localListeners = new WeakMap();
+const localOf = (rt) => {
+  let set = localListeners.get(rt);
+  if (!set) localListeners.set(rt, (set = new Set()));
+  return set;
+};
+
 export function encodeBytes(bytes) {
   const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
   let s = '';
@@ -142,6 +155,18 @@ export function notify(type, payload, { runtime } = {}) {
   } catch {}
 }
 
+// A broadcast to this page's own handle() / on() listeners, as if it came
+// from another extension page (replies are dropped).
+export function notifyLocal(type, payload, { runtime } = {}) {
+  const rt = runtimeOf(runtime);
+  const sender = { id: rt.id, url: globalThis.location?.href ?? '' };
+  for (const fn of [...localOf(rt)]) {
+    try {
+      fn({ type, payload }, sender, () => {});
+    } catch {}
+  }
+}
+
 // Answers the types in map ({ [type]: async (payload, sender) => result }) that
 // are addressed to `target` (null: untargeted) and pass accept(msg, sender).
 // Other messages are left to other listeners. Returns the unsubscribe.
@@ -164,7 +189,11 @@ export function handle(map, { target = null, accept = () => true, runtime } = {}
     return true; // the reply is async
   };
   rt.onMessage.addListener(listener);
-  return () => rt.onMessage.removeListener(listener);
+  localOf(rt).add(listener);
+  return () => {
+    rt.onMessage.removeListener(listener);
+    localOf(rt).delete(listener);
+  };
 }
 
 // Listens for an untargeted broadcast without replying.
@@ -175,7 +204,11 @@ export function on(type, fn, { runtime } = {}) {
     return false;
   };
   rt.onMessage.addListener(listener);
-  return () => rt.onMessage.removeListener(listener);
+  localOf(rt).add(listener);
+  return () => {
+    rt.onMessage.removeListener(listener);
+    localOf(rt).delete(listener);
+  };
 }
 
 // Extension pages (service worker, offscreen, options, popup) — not content

@@ -60,6 +60,18 @@ const id = (v) => (Number.isSafeInteger(v) && v > 0 ? v : undefined);
 const count = (v) => (Number.isSafeInteger(v) && v >= 0 ? v : undefined);
 const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
 const oneOf = (v, list) => (list.includes(v) ? v : undefined);
+// Firefox hands the port's messages over in the page's compartment, where an
+// ArrayBuffer fails instanceof here; structuredClone makes it one of ours.
+function ownArrayBuffer(v) {
+  if (v instanceof ArrayBuffer) return v;
+  if (Object.prototype.toString.call(v) !== '[object ArrayBuffer]') return null;
+  try {
+    const copy = structuredClone(v);
+    return copy instanceof ArrayBuffer ? copy : null;
+  } catch {
+    return null;
+  }
+}
 const drop = (o) => {
   for (const k of Object.keys(o)) if (o[k] === undefined) delete o[k];
   return o;
@@ -116,11 +128,8 @@ export function sanitizeMainEvent(ev) {
       const seq = count(ev.seq);
       const size = count(ev.size);
       if (!sbId || seq === undefined || size === undefined) return null;
-      let bytes = null;
-      if (ev.bytes instanceof ArrayBuffer) {
-        if (ev.bytes.byteLength > LIMITS.chunkBytes || ev.bytes.byteLength !== size) return null;
-        bytes = ev.bytes;
-      }
+      const bytes = ownArrayBuffer(ev.bytes);
+      if (bytes && (bytes.byteLength > LIMITS.chunkBytes || bytes.byteLength !== size)) return null;
       return { k: 'mse-chunk', sbId, seq, init: ev.init === true, size, bytes };
     }
     case 'mse-op': {

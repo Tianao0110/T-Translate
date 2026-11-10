@@ -97,3 +97,4 @@ tests/*
 
 # 浏览器插件 T-Caption 的构建产物（extension/scripts/build.mjs 生成）
 /extension/dist/
+/extension/dist-firefox/

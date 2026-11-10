@@ -84,6 +84,23 @@ describe('extension build', () => {
     expect(readJson(path.join(e2e.outDir, 'manifest.json')).host_permissions).toEqual([...source.host_permissions, 'http://localhost/*']);
   }, 30000);
 
+  it('--target firefox: one background page instead of the worker and the offscreen document, a fixed add-on id', async () => {
+    const ff = await build({ target: 'firefox', outDir: path.join(out, 'firefox'), logLevel: 'silent' });
+    expect(ff.files).toEqual(expect.arrayContaining(['background.js', 'options.js', 'popup.js', 'content-main.js', 'content-isolated.js', 'options.html', 'popup.html', 'manifest.json']));
+    expect(ff.files.filter((f) => /^(sw|offscreen)\./.test(f))).toEqual([]);
+    expect(ff.files).toHaveLength(result.files.length - 2);
+    const source = readJson(path.join(EXT, 'manifest.json'));
+    const m = readJson(path.join(ff.outDir, 'manifest.json'));
+    expect(m.background).toEqual({ scripts: ['background.js'], type: 'module' });
+    expect(m.permissions).toEqual(source.permissions.filter((p) => p !== 'offscreen'));
+    expect(m.browser_specific_settings.gecko).toMatchObject({ id: expect.stringMatching(/@/), strict_min_version: '130.0' });
+    expect(m.minimum_chrome_version).toBeUndefined();
+    expect(m.content_scripts).toEqual(source.content_scripts);
+    const js = fs.readFileSync(path.join(ff.outDir, 'background.js'), 'utf8');
+    expect(js).not.toMatch(/chrome\.offscreen|getContexts/);
+    expect(js).toContain(JSON.stringify(pkg.version));
+  }, 30000);
+
   it('a prerelease version moves to version_name', () => {
     expect(manifestVersion('0.6.0-beta.1')).toEqual({ version: '0.6.0', version_name: '0.6.0-beta.1' });
     expect(manifestVersion('0.5.7')).toEqual({ version: '0.5.7' });

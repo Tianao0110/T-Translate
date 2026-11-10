@@ -1,8 +1,8 @@
 // The runtime message envelope: request/call against a fake chrome.runtime,
-// handle()'s routing (type, target, accept) and error wrapping.
+// handle()'s routing (type, target, accept) and error wrapping; notifyLocal.
 
-import { describe, it, expect } from 'vitest';
-import { MSG, request, call, handle, on, isExtensionSender } from '../src/shared/messages.js';
+import { describe, it, expect, vi } from 'vitest';
+import { MSG, request, call, handle, on, notifyLocal, isExtensionSender } from '../src/shared/messages.js';
 
 const EXT_URL = 'chrome-extension://abcdefghijklmnopabcdefghijklmnop/';
 
@@ -85,5 +85,34 @@ describe('handle', () => {
     stop();
     expect(heard).toEqual([{ status: 'offline' }]);
     expect((await request(MSG.COMPANION_STATE_CHANGED, {}, { runtime })).error.code).toBe('no-receiver');
+  });
+});
+
+describe('notifyLocal (one background page for worker and offscreen, Firefox)', () => {
+  it('reaches this runtime’s handle() and on() listeners, not the wire, not another runtime; unsubscribe stops it', () => {
+    const runtime = fakeRuntime();
+    const other = fakeRuntime();
+    const sendMessage = vi.spyOn(runtime, 'sendMessage');
+    const heard = [];
+    const handled = [];
+    const off = on(MSG.MEDIA_EVENT, (p) => heard.push(p), { runtime });
+    const stop = handle({ [MSG.COMPANION_STATE_CHANGED]: (p, sender) => handled.push([p, sender.id]) }, { runtime });
+    on(MSG.MEDIA_EVENT, () => heard.push('other runtime'), { runtime: other });
+
+    notifyLocal(MSG.MEDIA_EVENT, { key: 'k', event: { type: 'segment' } }, { runtime });
+    notifyLocal(MSG.COMPANION_STATE_CHANGED, { status: 'ready' }, { runtime });
+    return Promise.resolve().then(() => {
+      expect(heard).toEqual([{ key: 'k', event: { type: 'segment' } }]);
+      expect(handled).toEqual([[{ status: 'ready' }, runtime.id]]);
+      expect(sendMessage).not.toHaveBeenCalled();
+      off();
+      stop();
+      notifyLocal(MSG.MEDIA_EVENT, { key: 'k2' }, { runtime });
+      notifyLocal(MSG.COMPANION_STATE_CHANGED, { status: 'offline' }, { runtime });
+      return Promise.resolve().then(() => {
+        expect(heard).toHaveLength(1);
+        expect(handled).toHaveLength(1);
+      });
+    });
   });
 });

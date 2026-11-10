@@ -4,8 +4,11 @@
 // Missing source icons are drawn first with @napi-rs/canvas. extraHosts (the
 // real-browser scripts only) adds host permissions to that build's manifest:
 // a headless browser cannot answer the permission dialog.
+// --target firefox builds into extension/dist-firefox/: one background page
+// (firefox/background.js) instead of the service worker and the offscreen
+// document, and the manifest keys Firefox wants.
 //
-//   node extension/scripts/build.mjs [--out <dir>] [--watch]
+//   node extension/scripts/build.mjs [--target chrome|firefox] [--out <dir>] [--watch]
 
 import * as esbuild from 'esbuild';
 import fs from 'node:fs';
@@ -15,6 +18,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const EXT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REPO = path.resolve(EXT, '..');
 export const DEFAULT_OUT = path.join(EXT, 'dist');
+export const FIREFOX_OUT = path.join(EXT, 'dist-firefox');
+export const GECKO_ID = 't-caption@t-translate';
 export const ICON_SIZES = [16, 32, 48, 128];
 const ICON_COLOR = '#2f6fed';
 
@@ -38,6 +43,31 @@ const PAGES = {
   'offscreen.html': 'offscreen/index.html',
   'options.html': 'options/index.html',
   'popup.html': 'popup/index.html',
+};
+
+// Event page instead of the service worker; no offscreen permission; a fixed add-on id.
+function firefoxManifest(m) {
+  const rest = { ...m };
+  delete rest.minimum_chrome_version;
+  return {
+    ...rest,
+    background: { scripts: ['background.js'], type: 'module' },
+    permissions: m.permissions.filter((p) => p !== 'offscreen'),
+    browser_specific_settings: { gecko: { id: GECKO_ID, strict_min_version: '130.0' } },
+  };
+}
+
+// What differs per browser: entry points, pages, esbuild target, manifest.
+const TARGETS = {
+  chrome: { out: DEFAULT_OUT, esbuild: 'chrome116', esm: ESM_ENTRIES, pages: PAGES, manifest: (m) => m },
+  firefox: {
+    out: FIREFOX_OUT,
+    // AudioDecoder (desktop) and MAIN-world content scripts.
+    esbuild: 'firefox130',
+    esm: [{ in: src('firefox/background.js'), out: 'background' }, ...ESM_ENTRIES.filter((e) => !['sw', 'offscreen'].includes(e.out))],
+    pages: Object.fromEntries(Object.entries(PAGES).filter(([out]) => out !== 'offscreen.html')),
+    manifest: firefoxManifest,
+  },
 };
 
 // Chrome takes 1–4 dot-separated integers; a prerelease tag goes to version_name.
@@ -82,14 +112,14 @@ async function ensureIcons() {
 
 const appVersion = () => JSON.parse(fs.readFileSync(path.join(REPO, 'package.json'), 'utf8')).version;
 
-function copyStatic(outDir, extraHosts = []) {
-  for (const [out, from] of Object.entries(PAGES)) fs.copyFileSync(src(from), path.join(outDir, out));
+function copyStatic(outDir, extraHosts = [], t = TARGETS.chrome) {
+  for (const [out, from] of Object.entries(t.pages)) fs.copyFileSync(src(from), path.join(outDir, out));
   fs.cpSync(path.join(EXT, '_locales'), path.join(outDir, '_locales'), { recursive: true });
   fs.cpSync(path.join(EXT, 'icons'), path.join(outDir, 'icons'), { recursive: true });
   const manifest = JSON.parse(fs.readFileSync(path.join(EXT, 'manifest.json'), 'utf8'));
   Object.assign(manifest, manifestVersion(appVersion()));
   if (extraHosts.length) manifest.host_permissions = [...new Set([...manifest.host_permissions, ...extraHosts])];
-  fs.writeFileSync(path.join(outDir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+  fs.writeFileSync(path.join(outDir, 'manifest.json'), `${JSON.stringify(t.manifest(manifest), null, 2)}\n`);
 }
 
 function listFiles(dir, base = dir) {
@@ -100,8 +130,10 @@ function listFiles(dir, base = dir) {
 }
 
 // Resolves { outDir, files } after a one-off build; with watch, { outDir, stop }.
-export async function build({ outDir = DEFAULT_OUT, watch = false, logLevel = 'warning', extraHosts = [] } = {}) {
-  outDir = path.resolve(outDir);
+export async function build({ target = 'chrome', outDir, watch = false, logLevel = 'warning', extraHosts = [] } = {}) {
+  const t = TARGETS[target];
+  if (!t) throw new Error(`unknown target ${target}`);
+  outDir = path.resolve(outDir || t.out);
   const rel = path.relative(outDir, EXT);
   if (!rel || (!rel.startsWith('..') && !path.isAbsolute(rel))) throw new Error(`refusing to clean ${outDir}: it holds the extension sources`);
   fs.rmSync(outDir, { recursive: true, force: true });
@@ -110,7 +142,7 @@ export async function build({ outDir = DEFAULT_OUT, watch = false, logLevel = 'w
 
   const common = {
     bundle: true,
-    target: 'chrome116',
+    target: t.esbuild,
     sourcemap: false,
     minify: false,
     outdir: outDir,
@@ -119,24 +151,24 @@ export async function build({ outDir = DEFAULT_OUT, watch = false, logLevel = 'w
     define: { __TC_VERSION__: JSON.stringify(appVersion()) },
   };
   const configs = [
-    { ...common, entryPoints: ESM_ENTRIES, format: 'esm' },
+    { ...common, entryPoints: t.esm, format: 'esm' },
     { ...common, entryPoints: IIFE_ENTRIES, format: 'iife' },
     { ...common, entryPoints: CSS_ENTRIES },
   ];
 
   if (!watch) {
     await Promise.all(configs.map((c) => esbuild.build(c)));
-    copyStatic(outDir, extraHosts);
+    copyStatic(outDir, extraHosts, t);
     return { outDir, files: listFiles(outDir).sort() };
   }
 
-  const recopy = { name: 'copy-static', setup: (b) => b.onEnd(() => copyStatic(outDir)) };
+  const recopy = { name: 'copy-static', setup: (b) => b.onEnd(() => copyStatic(outDir, [], t)) };
   const contexts = await Promise.all(configs.map((c) => esbuild.context({ ...c, plugins: [recopy] })));
   await Promise.all(contexts.map((c) => c.watch()));
   let timer = null;
   const later = () => {
     clearTimeout(timer);
-    timer = setTimeout(() => copyStatic(outDir), 100);
+    timer = setTimeout(() => copyStatic(outDir, [], t), 100);
   };
   const watchers = [
     fs.watch(path.join(EXT, 'src'), { recursive: true }, (_e, f) => f && f.endsWith('.html') && later()),
@@ -156,8 +188,9 @@ const isMain = process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).h
 if (isMain) {
   const argv = process.argv.slice(2);
   const at = argv.indexOf('--out');
+  const tt = argv.indexOf('--target');
   const watch = argv.includes('--watch');
-  build({ outDir: at > -1 ? argv[at + 1] : DEFAULT_OUT, watch, logLevel: 'info' }).then(
+  build({ target: tt > -1 ? argv[tt + 1] : 'chrome', outDir: at > -1 ? argv[at + 1] : undefined, watch, logLevel: 'info' }).then(
     (r) => {
       const where = path.relative(process.cwd(), r.outDir) || r.outDir;
       if (watch) console.log(`watching, output in ${where} (Ctrl+C to stop)`);

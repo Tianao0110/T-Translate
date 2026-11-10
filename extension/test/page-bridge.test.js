@@ -10,6 +10,7 @@
 
 import { describe, it, expect, afterEach } from 'vitest';
 import { MessageChannel } from 'node:worker_threads';
+import vm from 'node:vm';
 import { createOutbox, acceptHello } from '../src/content/hooks/outbox.js';
 import { createBridge } from '../src/content/bridge.js';
 import { LIMITS, sanitizeMainEvent } from '../src/content/bridge-protocol.js';
@@ -175,6 +176,17 @@ describe('what the isolated world accepts', () => {
     expect(sanitizeMainEvent({ k: 'eme', via: 'request', keySystem: 'com.widevine.alpha', junk: 1 })).toEqual({ k: 'eme', via: 'request', keySystem: 'com.widevine.alpha' });
     expect(sanitizeMainEvent({ k: 'mse-op', sbId: 1, op: 'remove', start: 0, end: Infinity })).toEqual({ k: 'mse-op', sbId: 1, op: 'remove', start: 0 });
     expect(sanitizeMainEvent(null)).toBeNull();
+  });
+
+  it('an ArrayBuffer from another realm (Firefox: the page’s compartment) is copied into ours; size limits still hold', () => {
+    const foreign = vm.runInNewContext('new Uint8Array([7, 8, 9]).buffer');
+    expect(foreign instanceof ArrayBuffer).toBe(false);
+    const ev = sanitizeMainEvent({ k: 'mse-chunk', sbId: 1, seq: 0, size: 3, bytes: foreign });
+    expect(ev.bytes instanceof ArrayBuffer).toBe(true);
+    expect([...new Uint8Array(ev.bytes)]).toEqual([7, 8, 9]);
+    expect(sanitizeMainEvent({ k: 'mse-chunk', sbId: 1, seq: 0, size: 4, bytes: foreign })).toBeNull();
+    // Not a buffer at all: the chunk is still counted, without bytes.
+    expect(sanitizeMainEvent({ k: 'mse-chunk', sbId: 1, seq: 0, size: 3, bytes: { [Symbol.toStringTag]: 'ArrayBuffer', byteLength: 3 } })).toMatchObject({ k: 'mse-chunk', size: 3, bytes: null });
   });
 });
 
