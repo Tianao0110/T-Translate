@@ -4,15 +4,19 @@
 // extension's own messages and the page over CDP.
 //
 //   (a) a long public video: the evidence says bilibili, the BV id, a video,
-//       hooks in place; the audio is an MSE audio/mp4 stream (not forwarded:
-//       fMP4 / AAC is S7) with its init segment seen at document_start;
-//       numbers for S7 (mime, append sizes and pace, the .m4s range requests)
+//       hooks in place; the audio is an MSE audio/mp4 (AAC) stream that is
+//       forwarded, its init segment seen at document_start; append sizes
+//       and pace, the .m4s range requests
 //   (b) the player's subtitle list request is copied (signed out it lists
 //       nothing: need_login_subtitle is recorded); the player's subtitle
 //       layer the hide rule targets is on the page
-//   (c) the orchestrator ends at tier 3: the prompt state and the notice bar
+//   (c) with no subtitles the orchestrator runs tier 2: the fMP4 / AAC audio
+//       is recognized and real sentences show on the track, bilingual; the
+//       player rebuilds its MediaSource a few seconds in and the capture
+//       follows the new stream (new init segment) with sentences after it
 //   (d) a multi-part video: switching to part 2 is a navigation with the
-//       :p2 media id and a new subtitle list
+//       :p2 media id and a new subtitle list, and the new part gets
+//       captions too (part 2, or the next one the player moves on to)
 //   (e) a subtitle list we serve on a bilibili.com URL (CDP Fetch, like the
 //       DRM page in e2e-auto.js): the agent fetches the human-made body from
 //       hdslb.com, tier 1 starts, the track shows both lines and the
@@ -67,14 +71,25 @@ const FAKE_HTML = `<!doctype html><html><head><meta charset="utf-8"><title>T-Cap
 </script></body></html>`;
 
 async function main() {
-  const shell = await startShell({ name: 'tt-caption-bili', step, version: 'e2e-s6-bili', shotPrefix: 't-caption-s6' });
+  const shell = await startShell({ name: 'tt-caption-bili', step, version: 'e2e-s7-bili', shotPrefix: 't-caption-s7' });
   if (!shell) return 2;
-  const { cdp, evaluate, open, until, evidence, query, tabIdOf, stateIs, shoot, dump, trackInfo } = shell;
+  const { cdp, evaluate, open, until, evidence, query, tabIdOf, stateIs, shoot, dump, trackInfo, opt } = shell;
   const numbers = {};
+  const mediaEvents = () => evaluate(opt, 'window.__media');
+  const segmentsOf = (evs, key) => (evs || []).filter((e) => e.event.type === 'segment' && (!key || e.key === key));
+  const bilingual = (r) => (r && r.active.some((t) => t.includes('\n')) ? r : null);
+  // Screenshots the moment a bilingual cue is live (none between sentences).
+  const shootLive = async (session, name, clip) => {
+    const r = await until(async () => bilingual(await trackInfo(session)), 20000, 100);
+    if (r) await shoot(session, name, clip);
+    return r?.active ?? null;
+  };
+  const zoomBox = (session) => evaluate(session, `(() => { const r = document.querySelector('video').getBoundingClientRect(); return { x: r.left, y: r.top + r.height * 0.6, width: r.width, height: r.height * 0.4 }; })()`);
 
   try {
     // The real videos speak Chinese; English is the target.
     await shell.setPrefs({ targetLang: 'en' });
+    await evaluate(opt, `(() => { window.__media = []; chrome.runtime.onMessage.addListener((m) => { if (m && m.type === 'media/event') window.__media.push({ at: Date.now(), ...m.payload }); }); })()`);
 
     // ---- (a) a long public video ----
     const { sessionId: page1 } = await open('about:blank');
@@ -127,35 +142,48 @@ async function main() {
     step('(a) evidence: site bilibili, the BV id, a video, hooks in place', ev1?.site === 'bilibili' && ev1.mediaId === VIDEO && !!media1 && ev1.hooks?.main === 'ok' && ev1.hooks?.xhr === 'ok' && ev1.hooks?.mse === 'ok', `${JSON.stringify(numbers.page)}; hooks ${JSON.stringify(ev1?.hooks)}`);
     if (!ev1) await dump(tab1);
 
-    // Twenty seconds of appends: the pace and sizes S7 will deal with.
-    const samples = [];
-    for (let i = 0; i < 20; i++) {
+    // Forty seconds of the audio streams, the capture and the page, twice a
+    // second: append sizes and pace, the player starting over (a new
+    // document or a new MediaSource), which stream is captured, the track.
+    const timeline = [];
+    for (const t0 = Date.now(); Date.now() - t0 < 40000; await sleep(500)) {
       const ev = await evidence(tab1);
-      const a = ev?.mse.streams.find((s) => s.kind === 'audio' && s.alive);
-      const m = ev?.media.find((x) => x.elId === ev.primaryElId);
-      if (a) samples.push({ t: Date.now() - tOpen, chunks: a.chunks, bytes: a.bytes, ct: m?.currentTime ?? null, buf: m?.bufferedEndS ?? null });
-      await sleep(1000);
+      if (!ev) continue;
+      const m = ev.media.find((x) => x.elId === ev.primaryElId);
+      const c = ev.capture;
+      const pg = await evaluate(page1, `(() => { const v = document.querySelector('video'); const t = v && Array.from(v.textTracks).find((x) => x.label === 'T-Caption'); return { doc: performance.timeOrigin, href: location.href, src: (v && v.src) || '', active: t ? Array.from(t.activeCues || []).map((x) => x.text) : [] }; })()`).catch(() => null);
+      timeline.push({
+        t: Date.now() - tOpen,
+        doc: pg?.doc ?? null,
+        href: pg?.href ?? null,
+        src: pg?.src ?? null,
+        active: pg?.active ?? [],
+        streams: ev.mse.streams.filter((x) => x.kind === 'audio').map((x) => ({ id: x.streamId, alive: x.alive, chunks: x.chunks, bytes: x.bytes, inits: x.inits, first: x.firstTimeS, last: x.lastTimeS })),
+        capture: c && { key: c.key, on: c.on, streamId: c.streamId, pushes: c.pushes, bytes: c.bytes, segments: c.segments, reason: c.reason },
+        ct: m?.currentTime ?? null,
+        buf: m?.bufferedEndS ?? null,
+      });
     }
     const evA = await evidence(tab1);
-    const audio = evA?.mse.streams.filter((s) => s.kind === 'audio');
-    const a0 = audio?.find((s) => s.alive) || audio?.[0];
-    const first = samples[0];
-    const last = samples.at(-1);
+    const audio = evA?.mse.streams.filter((x) => x.kind === 'audio') || [];
+    const a0 = audio.filter((x) => x.alive).at(-1) || audio.at(-1);
+    const mine = timeline.map((p) => ({ t: p.t, s: p.streams.find((y) => y.id === a0?.streamId) })).filter((p) => p.s);
+    const pace = mine.length > 1 ? { chunks: mine.at(-1).s.chunks - mine[0].s.chunks, bytes: mine.at(-1).s.bytes - mine[0].s.bytes, seconds: Math.round((mine.at(-1).t - mine[0].t) / 1000) } : null;
+    const lastT = timeline.at(-1);
     numbers.audio = a0 && {
       mime: a0.mime,
       codec: a0.codec,
       forward: a0.forward,
-      init: a0.init,
       inits: a0.inits,
       chunks: a0.chunks,
       bytes: a0.bytes,
-      avgChunk: a0.chunks ? Math.round(a0.bytes / a0.chunks) : null,
-      streams: audio.length,
-      video: evA.mse.streams.filter((s) => s.kind === 'video').map((s) => s.mime),
-      paceLast20s: first && last ? { chunks: last.chunks - first.chunks, bytes: last.bytes - first.bytes, seconds: Math.round((last.t - first.t) / 1000) } : null,
-      ahead: last && last.buf !== null && last.ct !== null ? Math.round((last.buf - last.ct) * 10) / 10 : null,
+      avgChunk: a0.chunks > 1 ? Math.round(a0.bytes / a0.chunks) : null,
+      streams: audio.map((x) => `${x.streamId}${x.alive ? '' : '†'} ${x.chunks}ch ${x.firstTimeS ?? '?'}–${x.lastTimeS ?? '?'}s`),
+      video: evA.mse.streams.filter((x) => x.kind === 'video').map((x) => x.mime),
+      pace,
+      ahead: lastT && lastT.buf !== null && lastT.ct !== null ? Math.round((lastT.buf - lastT.ct) * 10) / 10 : null,
     };
-    step('(a) MSE audio is audio/mp4, not forwarded, init segment seen', !!a0 && /^audio\/mp4/.test(a0.mime) && a0.forward === false && a0.inits >= 1, JSON.stringify(numbers.audio));
+    step('(a) MSE audio is audio/mp4 AAC, forwarded, init segment seen', !!a0 && /^audio\/mp4/.test(a0.mime) && /^mp4a\.40\./.test(a0.codec) && a0.forward === true && a0.inits >= 1, JSON.stringify(numbers.audio));
     const audioReqs = net.m4s.filter((r) => r.audio);
     numbers.m4s = {
       audioRequests: audioReqs.length,
@@ -163,7 +191,7 @@ async function main() {
       audioTypes: [...new Set(audioReqs.map((r) => r.type))],
       audioRanges: audioReqs.slice(0, 6).map((r) => `${r.range || 'no range'} → ${r.bytes} B`),
     };
-    console.log(`  [S7] samples: ${samples.map((s) => `${Math.round(s.t / 1000)}s ${s.chunks}ch ct=${s.ct?.toFixed?.(1)} buf=${s.buf?.toFixed?.(1)}`).join(' | ')}`);
+    console.log(`  [S7] timeline: ${timeline.filter((_, i) => i % 4 === 0).map((p) => `${(p.t / 1000).toFixed(1)}s d${String(p.doc).slice(-4)} ${String(p.src).slice(-6)} ${p.streams.map((x) => `#${x.id}${x.alive ? '' : '†'}:${x.chunks}`).join('/')} ct=${p.ct?.toFixed?.(1)} cap=${p.capture ? `${p.capture.on ? 'on' : 'off'}#${p.capture.streamId}:${p.capture.pushes}p/${p.capture.segments}s` : '-'}`).join(' | ')}`);
     console.log(`  [S7] m4s: ${JSON.stringify(numbers.m4s)}`);
 
     // ---- (b) subtitle list and layer ----
@@ -179,15 +207,64 @@ async function main() {
     const layer = await evaluate(page1, `(() => { const a = document.querySelector('.bpx-player-subtitle-wrap'); const b = document.querySelector('.bilibili-player-video-subtitle'); return { bpx: !!a, old: !!b }; })()`);
     step('(b) the player’s subtitle layer the hide rule targets is on the page', layer?.bpx || layer?.old, JSON.stringify(layer));
 
-    // ---- (c) tier 3 ----
-    const prompt = await stateIs(tab1, 'prompt', 30000);
-    const bar = await until(() => evaluate(page1, `(() => { const h = document.querySelector('.tc-nt-host'); const b = h && h.shadowRoot.querySelector('.tc-nt-bar'); if (!b || b.hidden) return null; return { text: h.shadowRoot.querySelector('.tc-nt-text').textContent, button: h.shadowRoot.querySelector('.tc-nt-btn').textContent }; })()`), 10000);
-    const why = prompt?.history?.findLast?.((h) => h.state === 'prompt')?.detail?.why ?? null;
-    step('(c) the orchestrator ends at tier 3: prompt state and the notice bar', !!prompt && !!bar, `state ${prompt?.state} (${why}); ${JSON.stringify(bar)}; ${Date.now() - tOpen} ms after opening`);
-    if (!prompt || !bar) await dump(tab1);
-    if (bar) await shoot(page1, '1-bilibili-prompt');
+    // ---- (c) tier 2 on fMP4 / AAC ----
+    const captions = await stateIs(tab1, 'captions', 30000);
+    const evs1 = await until(async () => {
+      const evs = await mediaEvents();
+      return segmentsOf(evs).length ? evs : null;
+    }, 60000, 300);
+    const seen = timeline.find((p) => p.active.some((t) => t.includes('\n')));
+    const active1 = seen ? { active: seen.active } : await until(async () => bilingual(await trackInfo(page1)), 60000, 300);
+    const activeAt = seen ? seen.t : active1 ? Date.now() - tOpen : null;
+    const evC = await evidence(tab1);
+    const firstSeg = segmentsOf(evs1)[0];
+    // The tier 2 start the first sentence belongs to (the redirect restarts it).
+    const capStart = (captions?.history || []).filter((h) => h.state === 'captions' && h.detail?.tier === 2 && (!firstSeg || h.at <= firstSeg.at)).at(-1)?.at ?? null;
+    numbers.captions = {
+      state: captions && { state: captions.state, tier: captions.run?.tier, kind: captions.run?.kind },
+      captionsAfterMs: capStart ? capStart - tOpen : null,
+      firstSentenceAfterOpenMs: firstSeg ? firstSeg.at - tOpen : null,
+      firstSentenceAfterCaptureMs: firstSeg && capStart ? firstSeg.at - capStart : null,
+      firstSentence: firstSeg && { start: firstSeg.event.start, end: firstSeg.event.end, text: firstSeg.event.text },
+      firstCueOnTrackMs: activeAt,
+      capture: evC?.capture && { key: evC.capture.key, streamId: evC.capture.streamId, pushes: evC.capture.pushes, kb: Math.round(evC.capture.bytes / 1024), segments: evC.capture.segments },
+    };
+    step('(c) no subtitles: tier 2 runs on the fMP4 / AAC audio', !!captions && captions.run?.tier === 2 && captions.run?.kind === 'capture', JSON.stringify(numbers.captions.state));
+    step('(c) real sentences come back and show on the track, bilingual', !!firstSeg && !!active1, `first sentence ${numbers.captions.firstSentenceAfterOpenMs} ms after opening (${numbers.captions.firstSentenceAfterCaptureMs} ms after tier 2), first cue on track ${numbers.captions.firstCueOnTrackMs} ms; ${JSON.stringify(active1?.active)}`);
+    if (!active1) await dump(tab1);
+    if (active1) {
+      numbers.shots = { captions: await shootLive(page1, '1-bilibili-captions') };
+      numbers.shots.zoom = await shootLive(page1, '2-bilibili-captions-zoom', await zoomBox(page1));
+    }
     const [badge1, title1] = (await shell.badge(tab1)) || [];
-    numbers.promptBadge = `${badge1} · ${title1}`;
+    numbers.captionsBadge = `${badge1} · ${title1}`;
+
+    // The player starting over a few seconds in: a new document (another
+    // URL), a new MediaSource (another blob src) or an audio stream that died.
+    // After the last of these the capture runs on the stream that is alive
+    // now, which had its own init segment, and sentences keep coming.
+    const resets = [];
+    for (let i = 1; i < timeline.length; i++) {
+      const [a, b] = [timeline[i - 1], timeline[i]];
+      const why = [a.doc !== b.doc && 'document', a.src !== b.src && 'src', a.streams.some((x) => x.alive && b.streams.some((y) => y.id === x.id && !y.alive)) && 'stream died'].filter(Boolean);
+      if (why.length) resets.push({ t: b.t, why: why.join('+'), href: b.href !== a.href ? b.href : undefined });
+    }
+    const resetAt = resets.at(-1)?.t ?? null;
+    const alive = audio.filter((x) => x.alive).at(-1);
+    const allEvs = await mediaEvents();
+    const keysAfter = [...new Set(timeline.filter((p) => resetAt !== null && p.t > resetAt).map((p) => p.capture?.key).filter(Boolean))];
+    const segsAfter = resetAt !== null ? segmentsOf(allEvs).filter((e) => e.at - tOpen > resetAt && keysAfter.includes(e.key)) : [];
+    numbers.restart = {
+      resets,
+      audioNow: alive && { id: alive.streamId, inits: alive.inits, chunks: alive.chunks, firstTimeS: alive.firstTimeS },
+      captureKeys: [...new Set(timeline.map((p) => p.capture?.key).filter(Boolean))],
+      keysAfter,
+      captureNow: evC?.capture && { key: evC.capture.key, streamId: evC.capture.streamId, on: evC.capture.on },
+      sentencesAfter: segsAfter.length,
+      firstAfterMs: segsAfter[0] ? segsAfter[0].at - tOpen - resetAt : null,
+      historyHead: (captions?.history || []).slice(0, 8).map((h) => `${h.at - tOpen}ms ${h.state}${h.detail ? ' ' + JSON.stringify(h.detail) : ''}`),
+    };
+    step('(c) the player starts over a few seconds in; the capture picks up the new stream (its own init) and sentences go on', resetAt !== null && resetAt < 20000 && !!alive && alive.inits >= 1 && !!evC?.capture?.on && evC.capture.streamId === alive.streamId && segsAfter.length > 0, JSON.stringify(numbers.restart));
 
     // ---- (d) a multi-part video ----
     net.lists.length = 0;
@@ -215,6 +292,7 @@ async function main() {
       if (r && !r.moved) clicks++;
       return r?.moved ? { clicks, url: await evaluate(page1, 'location.href') } : null;
     }, 30000, 2500);
+    const clickedAt = Date.now();
     const evP2 = await until(async () => {
       const ev = await evidence(tab1);
       return ev?.mediaId === `${MULTI}:p2` ? ev : null;
@@ -230,7 +308,34 @@ async function main() {
       const evd = await evidence(tab1);
       console.log(`  [d] page ${await evaluate(page1, 'location.href')}; agent ${qd?.url} navSeq ${qd?.navSeq} mediaId ${qd?.mediaId}; worker ${evd?.url} navSeq ${evd?.navSeq} mediaId ${evd?.mediaId}`);
     }
-    if (evP2) await shoot(page1, '2-bilibili-part2');
+    // Each part after the switch (part 2, and the next ones the player moves
+    // on to by itself): its capture keys, how far it played, its sentences.
+    const keyBefore = numbers.captions.capture?.key ?? null;
+    const byPart = {};
+    let p2 = null;
+    for (const t0 = Date.now(); Date.now() - t0 < 90000 && !p2; await sleep(500)) {
+      const ev = await evidence(tab1);
+      const st = await shell.state(tab1);
+      const part = /:p(\d+)$/.exec(st?.mediaKey || '')?.[1];
+      if (!ev || !part || part === '1') continue;
+      const m = ev.media.find((x) => x.elId === ev.primaryElId);
+      const row = (byPart[`p${part}`] ??= { keys: [], playedTo: 0, duration: m?.duration ?? null, states: [], sentences: 0, firstAfterClickMs: null });
+      row.playedTo = Math.max(row.playedTo, Math.round(m?.currentTime ?? 0));
+      if (row.states.at(-1) !== st.state) row.states.push(st.state);
+      const key = ev.capture?.key !== keyBefore ? ev.capture?.key : null;
+      if (key && !row.keys.includes(key)) row.keys.push(key);
+      const segs = segmentsOf(await mediaEvents()).filter((e) => row.keys.includes(e.key));
+      row.sentences = segs.length;
+      if (segs.length) {
+        row.firstAfterClickMs ??= segs[0].at - clickedAt;
+        if (st.run?.tier === 2) p2 = { part: `p${part}`, key: segs[0].key, seg: segs[0], mediaKey: st.mediaKey };
+      }
+    }
+    const active2 = p2 && (await until(async () => bilingual(await trackInfo(page1)), 30000, 300));
+    numbers.part2 = { byPart, captioned: p2 && { part: p2.part, key: p2.key, sentence: p2.seg.event.text, start: p2.seg.event.start, onTrack: active2?.active } };
+    step('(d) after the switch the new part gets captions too: a new capture, real sentences, bilingual on the track', !!p2 && !!active2, JSON.stringify(numbers.part2));
+    if (!p2) await dump(tab1);
+    if (active2) numbers.shots.part = await shootLive(page1, '3-bilibili-part2');
 
     // ---- (e) a list we serve ----
     await cdp.send('Page.navigate', { url: 'about:blank' }, page1);
@@ -253,30 +358,28 @@ async function main() {
     });
     await cdp.send('Page.navigate', { url: FAKE_PAGE }, page2);
     const tab2 = await until(() => tabIdOf(FAKE_PAGE), 10000);
-    const captions = await stateIs(tab2, 'captions', 30000);
+    const captions2 = await stateIs(tab2, 'captions', 30000);
     const q3 = await query(tab2);
     const sub = (await evidence(tab2))?.subtitles?.[0];
     numbers.served = { requests: served.map((s) => `${s.url.replace(/^https:\/\//, '').slice(0, 60)} (${s.origin || 'no origin'})`), lists: q3?.lists, subtitle: sub && { url: sub.url, format: sub.format, lang: sub.lang, kind: sub.kind, cueCount: sub.cueCount, via: sub.via } };
     step('(e) the served list leads to one fetch of the human-made body; bcc cues reach the worker', sub?.url === FAKE_HUMAN && sub.format === 'bcc' && sub.cueCount === 60 && sub.lang === 'en-US' && served.filter((s) => s.url.includes('tc-e2e-')).length === 1, JSON.stringify(numbers.served));
-    const active2 = await until(async () => {
+    const site2 = await until(async () => {
       const r = await trackInfo(page2);
       return r && r.active.some((t) => t.includes('\n[译]')) ? r : null;
     }, 30000, 300);
     const hidden = await evaluate(page2, `getComputedStyle(document.querySelector('.bpx-player-subtitle-wrap')).display`);
-    step('(e) tier 1: both lines on the track, the player’s subtitle layer hidden', !!captions && captions.run?.tier === 1 && !!active2 && hidden === 'none', `state ${captions?.state} tier ${captions?.run?.tier}; ${JSON.stringify(active2?.active)}; layer ${hidden}`);
-    if (!active2) await dump(tab2);
-    if (active2) {
+    step('(e) tier 1: both lines on the track, the player’s subtitle layer hidden', !!captions2 && captions2.run?.tier === 1 && !!site2 && hidden === 'none', `state ${captions2?.state} tier ${captions2?.run?.tier}; ${JSON.stringify(site2?.active)}; layer ${hidden}`);
+    if (!site2) await dump(tab2);
+    if (site2) {
       const clip = await evaluate(page2, `(() => { const r = document.querySelector('video').getBoundingClientRect(); return { x: r.left, y: r.top + r.height * 0.6, width: r.width, height: r.height * 0.4 }; })()`);
-      // The first cue got its translation while on screen; a later one had it before it showed.
       numbers.firstCueShot = (await trackInfo(page2))?.active;
-      await shoot(page2, '3-bilibili-first-cue-zoom', clip);
-      const later = await until(async () => {
+      await shoot(page2, '4-bilibili-site-cue-zoom', clip);
+      const laterSite = await until(async () => {
         const r = await trackInfo(page2);
         return r && r.active.some((t) => /^Line ([3-9]|\d\d) /.test(t) && t.includes('\n[译]')) ? r : null;
       }, 15000, 200);
-      numbers.laterCueShot = later?.active;
-      await shoot(page2, '4-bilibili-site-captions');
-      await shoot(page2, '5-bilibili-later-cue-zoom', clip);
+      numbers.laterCueShot = laterSite?.active;
+      await shoot(page2, '5-bilibili-site-captions');
     }
     unlisten();
 

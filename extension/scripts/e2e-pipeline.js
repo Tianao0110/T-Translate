@@ -4,9 +4,11 @@
 // synthesized speech from an <audio> element into WebM/Opus (MediaRecorder);
 // the bytes get unknown-size Segment / Clusters and cluster times +100 s (an
 // MSE stream mid-video), then go through MEDIA_OPEN / PUSH / CLOSE in random
-// cuts of up to 16 KB.
+// cuts of up to 16 KB. With --ffmpeg the speech becomes fragmented MP4 / AAC
+// instead (a moof + mdat a second, like Bilibili's DASH audio), every tfdt
+// moved +100 s, and the browser decodes AAC.
 //
-//   npx electron extension/scripts/e2e-pipeline.js --packs <installed asr-models dir> [--browser <exe>]
+//   npx electron extension/scripts/e2e-pipeline.js --packs <installed asr-models dir> [--browser <exe>] [--ffmpeg <ffmpeg.exe>]
 //
 // Set TEMP to a folder on the packs' drive so they are hard-linked, not
 // copied. The sandbox is left in place for the recycle bin.
@@ -15,6 +17,7 @@
 const path = require('path');
 const fs = require('fs');
 const { pathToFileURL } = require('url');
+const { execFileSync } = require('child_process');
 const { REPO, arg, sleep, checklist, sandbox, fakeStore, run } = require('../../scripts/lib/electron-smoke');
 const { fakeWindow } = require('../../scripts/lib/listen-sandbox');
 const { synthesizeWav, linkPacks } = require('./lib/speech');
@@ -23,6 +26,8 @@ const { findBrowser, launchBrowser, loadExtension } = require('./lib/browser');
 const { step, summary } = checklist();
 const OFFSET_MS = 100000;
 const KEY = 'e2e-tab';
+const FFMPEG = arg('--ffmpeg');
+const AAC_RATE = 48000; // the AAC track's timescale too
 
 // Unknown sizes for the Segment and every Cluster, offsetMs added to each Cluster Timecode.
 function asMidStream(webm, offsetMs) {
@@ -51,6 +56,40 @@ function asMidStream(webm, offsetMs) {
   }
   out.push(src.subarray(from));
   return { bytes: Buffer.concat(out), clusters };
+}
+
+// Fragmented MP4 / AAC of a wav through ffmpeg.
+function toFmp4(ffmpeg, wav, out) {
+  // prettier-ignore
+  execFileSync(ffmpeg, [
+    '-hide_banner', '-loglevel', 'error', '-y', '-i', wav,
+    '-ar', String(AAC_RATE), '-ac', '1', '-c:a', 'aac', '-b:a', '64k',
+    '-movflags', 'frag_keyframe+empty_moov+default_base_moof', '-frag_duration', '1000000',
+    '-f', 'mp4', out,
+  ], { stdio: 'inherit' });
+  return fs.readFileSync(out);
+}
+
+// Every moof's tfdt plus ticks.
+function shiftTfdt(src, ticks) {
+  const b = Buffer.from(src);
+  let fragments = 0;
+  const walk = (from, to) => {
+    for (let p = from; p + 8 <= to; ) {
+      const size = b.readUInt32BE(p);
+      const type = b.toString('latin1', p + 4, p + 8);
+      if (size < 8 || p + size > to) return;
+      if (type === 'moof' || type === 'traf') walk(p + 8, p + size);
+      else if (type === 'tfdt') {
+        if (b[p + 8] === 1) b.writeBigUInt64BE(b.readBigUInt64BE(p + 12) + BigInt(ticks), p + 12);
+        else b.writeUInt32BE(b.readUInt32BE(p + 12) + ticks, p + 12);
+        fragments++;
+      }
+      p += size;
+    }
+  };
+  walk(0, b.length);
+  return { bytes: b, fragments };
 }
 
 // In the extension page: plays the wav in an <audio>, records its captureStream.
@@ -168,14 +207,29 @@ async function main() {
     if (off) await attach(off.targetId);
     step('offscreen document up', !!off);
 
-    // Records in real time, so the clip's length bounds the wait.
-    const rec = await evaluate(page, `(${RECORD})(${JSON.stringify(fs.readFileSync(wav).toString('base64'))})`, { timeoutMs: 600000 });
-    const webm = Buffer.from(rec.b64, 'base64');
-    const mid = asMidStream(webm, OFFSET_MS);
-    step('MediaRecorder WebM/Opus from <audio>', webm.length > 1000 && rec.duration > 5, `${(webm.length / 1024).toFixed(1)} KB, ${rec.duration.toFixed(2)} s audio, recorded in ${rec.recordMs} ms`);
-    step('rewritten as an unknown-size stream at +100 s', mid.clusters >= 1, `${mid.clusters} cluster(s)`);
+    const format = FFMPEG ? 'mp4' : 'webm';
+    let media;
+    let audioS;
+    if (FFMPEG) {
+      const m4s = toFmp4(FFMPEG, wav, path.join(box.dir, 'speech.m4s'));
+      const wavBytes = fs.readFileSync(wav);
+      audioS = (wavBytes.length - 44) / wavBytes.readUInt32LE(28);
+      const mid = shiftTfdt(m4s, (OFFSET_MS / 1000) * AAC_RATE);
+      step('ffmpeg fMP4/AAC from the wav', m4s.length > 1000 && audioS > 5, `${(m4s.length / 1024).toFixed(1)} KB, ${audioS.toFixed(2)} s audio`);
+      step('every tfdt moved to +100 s', mid.fragments >= 2, `${mid.fragments} fragment(s)`);
+      media = mid.bytes;
+    } else {
+      // Records in real time, so the clip's length bounds the wait.
+      const rec = await evaluate(page, `(${RECORD})(${JSON.stringify(fs.readFileSync(wav).toString('base64'))})`, { timeoutMs: 600000 });
+      const webm = Buffer.from(rec.b64, 'base64');
+      const mid = asMidStream(webm, OFFSET_MS);
+      audioS = rec.duration;
+      step('MediaRecorder WebM/Opus from <audio>', webm.length > 1000 && rec.duration > 5, `${(webm.length / 1024).toFixed(1)} KB, ${rec.duration.toFixed(2)} s audio, recorded in ${rec.recordMs} ms`);
+      step('rewritten as an unknown-size stream at +100 s', mid.clusters >= 1, `${mid.clusters} cluster(s)`);
+      media = mid.bytes;
+    }
 
-    const pushed = await evaluate(page, `(${PUSH})(${JSON.stringify({ b64: mid.bytes.toString('base64'), key: KEY, maxCut: 16384 })})`);
+    const pushed = await evaluate(page, `(${PUSH})(${JSON.stringify({ b64: media.toString('base64'), key: KEY, maxCut: 16384 })})`);
     step('MEDIA_OPEN + every MEDIA_PUSH answered ok', pushed.pushes > 0 && !pushed.open && !pushed.push, JSON.stringify(pushed));
 
     const events = () => evaluate(page, 'window.__events');
@@ -207,13 +261,14 @@ async function main() {
     const closedEvents = evs.filter((e) => e.event.type === 'closed');
     step('close → one closed/closed on MEDIA_EVENT, all with the key', closedEvents.length === 1 && closedEvents[0].event.reason === 'closed' && evs.every((e) => e.key === KEY), JSON.stringify(closedEvents.map((e) => e.event)));
     const stats = closed?.result;
-    step('MEDIA_CLOSE replies with the stream stats', closed?.ok && stats.blocks > 0 && stats.feeder?.fedS > 0, JSON.stringify(stats));
+    step(`MEDIA_CLOSE replies with the stream stats (${format})`, closed?.ok && stats.container === format && stats.blocks > 0 && stats.feeder?.fedS > 0, JSON.stringify(stats));
     step('no exceptions or console errors in extension contexts', problems.length === 0, problems.join(' || '));
 
     const numbers = {
       browser: path.basename(exe),
-      webmKB: +(webm.length / 1024).toFixed(1),
-      audioS: +rec.duration.toFixed(2),
+      format,
+      mediaKB: +(media.length / 1024).toFixed(1),
+      audioS: +audioS.toFixed(2),
       pushes: pushed.pushes,
       pushMs: pushed.pushMs,
       blocks: stats?.blocks,
