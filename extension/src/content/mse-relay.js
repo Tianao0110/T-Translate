@@ -254,8 +254,9 @@ export function createMseRelay({
       }
     },
 
-    // fromS: held chunks with a media time before it are not sent (the init
-    // segment that governs the first kept chunk still is).
+    // fromS: held chunks that end before it are not sent; the chunk whose
+    // span holds fromS (the last one starting at or before it) still is, and
+    // so is the init segment that governs the first kept chunk.
     start(streamId, { fromS = null } = {}) {
       const s = streams.get(streamId);
       if (!s || !s.alive) throw err('no-stream');
@@ -264,15 +265,21 @@ export function createMseRelay({
       let ring = s.ring;
       let governing = ring.length ? (ring[0].init ? null : s.headInit) : s.lastInit;
       if (Number.isFinite(fromS) && ring.length) {
-        let i = 0;
+        let keep = 0;
+        let keptGov = governing;
         let gov = governing;
-        for (; i < ring.length; i++) {
+        for (let i = 0; i < ring.length; i++) {
           const e = ring[i];
-          if (e.init) gov = e;
-          else if (!(e.timeS !== null && e.timeS < fromS)) break;
+          if (e.init) {
+            gov = e;
+            continue;
+          }
+          if (e.timeS === null || e.timeS > fromS) break;
+          keep = i;
+          keptGov = gov;
         }
-        ring = ring.slice(i);
-        governing = ring.length ? (ring[0].init ? null : gov) : s.lastInit;
+        ring = ring.slice(keep);
+        governing = ring.length ? (ring[0].init ? null : keptGov) : s.lastInit;
       }
       const queue = [];
       if (governing) queue.push(governing);

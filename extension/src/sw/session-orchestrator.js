@@ -30,6 +30,7 @@ export const STATES = ['idle', 'waiting', 'captions', 'listening', 'prompt', 'su
 const PAUSE_GRACE_MS = 5000;
 const DECIDE_GRACE_MS = 2000;
 const RETRY_MS = 15000;
+const BUSY_RETRY_MS = 3000; // the app's previous session is still closing
 const TRANSLATE_RETRY_MS = 30000;
 const MAX_FAILURES = 3;
 const NEAR_S = 120;
@@ -116,6 +117,7 @@ export function createOrchestrator({
   pauseGraceMs = PAUSE_GRACE_MS,
   decideGraceMs = DECIDE_GRACE_MS,
   retryMs = RETRY_MS,
+  busyRetryMs = BUSY_RETRY_MS,
   translateRetryMs = TRANSLATE_RETRY_MS,
   cache = null,
   memoryCache = null,
@@ -532,7 +534,7 @@ export function createOrchestrator({
     endRun(r);
     r.failures++;
     setState(r, 'idle', { error: code });
-    if (r.failures < MAX_FAILURES) scheduleRetry(r);
+    if (r.failures < MAX_FAILURES) scheduleRetry(r, code === 'busy' ? busyRetryMs : retryMs);
   }
 
   function stopRun(r, reason) {
@@ -671,7 +673,7 @@ export function createOrchestrator({
       setState(r, 'suspended');
     } else if (e.type === 'closed') {
       endRun(r);
-      if (e.reason === 'preempted' || e.reason === 'busy') scheduleRetry(r);
+      if (e.reason === 'preempted' || e.reason === 'busy') scheduleRetry(r, busyRetryMs);
       else if (e.reason && e.reason !== 'closed') {
         r.failures++;
         if (r.failures < MAX_FAILURES) scheduleRetry(r);

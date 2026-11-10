@@ -120,8 +120,21 @@ describe('MSE relay', () => {
     for (const f of M4S_FRAGS) append(f);
     expect(relay.stream(3)).toMatchObject({ kind: 'audio', codec: 'mp4a.40.2', forward: true, inits: 1, chunks: 4, firstTimeS: 0, lastTimeS: 2.005, held: M4S.subarray(0, 17781).length });
     expect(relay.mainStream('blob:https://www.youtube.com/a')).toBe(3);
-    expect(relay.start(3, { fromS: 1 })).toMatchObject({ init: true, backlogBytes: M4S_INIT.length + M4S_FRAGS[1].length + M4S_FRAGS[2].length });
-    await tick(10);
+    // fromS 1 falls inside the first fragment (0–1.003), so it goes too; fromS 1.5 skips it.
+    expect(relay.start(3, { fromS: 1 })).toMatchObject({ init: true, backlogBytes: M4S_INIT.length + M4S_FRAGS.reduce((n, f) => n + f.length, 0) });
+    await tick(20);
+    expect(sent[0]).toMatchObject({ init: true, timeS: null });
+    expect(sent[0].raw.length).toBe(692);
+    expect(sent[1].timeS).toBe(0);
+    expect(new Uint8Array(sent.slice(1).flatMap((p) => [...p.raw]))).toEqual(M4S.subarray(692, 17781));
+    relay.stop();
+    sent.length = 0;
+    relay.onMainEvent({ k: 'mse-buffer', sbId: 4, msId: 1, mime: 'audio/mp4; codecs="mp4a.40.2"' });
+    const append4 = (u8, init = false) => relay.onMainEvent({ k: 'mse-chunk', sbId: 4, seq: seq++, init, size: u8.length, bytes: u8.slice().buffer });
+    append4(M4S_INIT, true);
+    for (const f of M4S_FRAGS) append4(f);
+    expect(relay.start(4, { fromS: 1.5 })).toMatchObject({ init: true, backlogBytes: M4S_INIT.length + M4S_FRAGS[1].length + M4S_FRAGS[2].length });
+    await tick(20);
     expect(sent.map((p) => [p.init, p.raw.length, p.timeS])).toEqual([
       [true, 692, null],
       [false, 4096, 1.003],
@@ -231,23 +244,28 @@ describe('MSE relay', () => {
     push(init2, true);
     push(cluster(30000, 10));
     push(cluster(40000, 10));
+    // 35 s is inside the cluster that starts at 30: it goes, with the init that governs it.
     expect(relay.start(1, { fromS: 35 })).toMatchObject({ init: true });
-    await tick(5);
+    await tick(20);
     expect(sent.map((p) => [p.init, p.raw[4], p.timeS])).toEqual([
       [true, 2, null],
-      [false, 0x01, 40],
+      [false, 0x01, 30],
     ]);
+    expect(sent[1].raw.length).toBe(cluster(30000, 10).length + cluster(40000, 10).length); // both held clusters, one payload
     relay.stop();
     sent.length = 0;
-    // Everything held is older: only the latest init goes, the live chunks follow.
+    // The last held cluster starts before fromS, so it is the one that may hold it: it goes, the live chunks follow.
     push(cluster(50000, 10));
-    expect(relay.start(1, { fromS: 60 })).toMatchObject({ init: true, backlogBytes: init2.length });
+    const started = relay.start(1, { fromS: 60 });
+    expect(started).toMatchObject({ init: true });
+    expect(started.backlogBytes).toBeGreaterThan(init2.length);
     push(cluster(61000, 10));
-    await tick(50);
+    await tick(150);
     expect(sent.map((p) => [p.init, p.timeS])).toEqual([
       [true, null],
-      [false, 61],
+      [false, 50],
     ]);
+    expect(sent[1].raw.length).toBe(cluster(50000, 10).length + cluster(61000, 10).length); // the held one and the live one, one payload
     relay.stop();
     sent.length = 0;
     // Nothing older than fromS: the usual ring goes out.

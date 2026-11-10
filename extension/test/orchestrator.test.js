@@ -219,9 +219,9 @@ describe('tier 2: decodable audio', () => {
     pe.emit(7, { type: 'capture-event', kind: 'capture', key: await openKey(0), event: { type: 'closed', reason: 'preempted' } });
     await flush();
     expect(lastState()).toBe('idle');
-    await after(14000);
+    await after(2500);
     expect(pe.of('mse-capture')).toHaveLength(1);
-    await after(1500);
+    await after(1000);
     expect(pe.of('mse-capture')).toHaveLength(2);
     // From now on opening fails.
     pe.reply('mse-capture', (c) => {
