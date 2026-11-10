@@ -331,6 +331,10 @@ function createCompanionServer({
     };
 
     res.setHeader('Cache-Control', 'no-store');
+    if (!P.hostAllowed(req.headers.host, boundPort)) {
+      refused('host', route);
+      return reply(403, { error: 'host' });
+    }
     const origin = req.headers.origin;
     const extension = P.isExtensionOrigin(origin);
     if (extension) {

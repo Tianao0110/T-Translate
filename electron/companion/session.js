@@ -8,13 +8,24 @@ const { MAX_AHEAD_S, createFeedBudget, mediaTimeOf } = require('./protocol');
 const MAX_BACKLOG = 500;
 // A session nobody reads or feeds is closed after this long.
 const IDLE_CLOSE_MS = 30000;
+// After the engine stopped, how long 'closed' waits for translations still
+// in flight (the translator itself gives them 3 s, listen-translator.js).
+const SETTLE_MS = 3500;
 const TERMINAL = new Set(['stopped', 'model-load-failed', 'engine-dead', 'no-model']);
 const NOT_READY = new Set(['loading', 'connecting', 'engine-restarting']);
 const LANG_RE = /^[A-Za-z0-9-]{0,16}$/;
+// The engine's stop reasons as the client sees them.
+const CLOSE_REASONS = { 'companion-close': 'closed', 'companion-idle': 'idle', 'companion-disabled': 'disabled' };
 
 const cleanLang = (tag) => (typeof tag === 'string' ? tag.replace(/[<|>]/g, '') : '');
 
-function createCompanionSession({ engineManager, logger, now = Date.now, maxAheadS = MAX_AHEAD_S, maxBacklog = MAX_BACKLOG, idleCloseMs = IDLE_CLOSE_MS, onChange = () => {} }) {
+function closeReason(state, detail) {
+  if (state !== 'stopped') return state;
+  if (typeof detail === 'string' && detail) return CLOSE_REASONS[detail] || detail;
+  return null;
+}
+
+function createCompanionSession({ engineManager, logger, now = Date.now, maxAheadS = MAX_AHEAD_S, maxBacklog = MAX_BACKLOG, idleCloseMs = IDLE_CLOSE_MS, settleMs = SETTLE_MS, onChange = () => {} }) {
   let current = null;
   // The session that closed last, so a late events subscriber still gets its end.
   let last = null;
@@ -67,7 +78,25 @@ function createCompanionSession({ engineManager, logger, now = Date.now, maxAhea
     s.listeningAt = 0;
   }
 
-  function finish(s, state) {
+  // 'closed' goes out once the translations still pending have settled (or
+  // settleMs passed); the engine keeps delivering them to this sink meanwhile.
+  function settleThenClose(s) {
+    const deadline = now() + settleMs;
+    const tick = () => {
+      if (s.pendingIds.size && now() < deadline) {
+        const t = setTimeout(tick, 100);
+        t.unref?.();
+        return;
+      }
+      logger?.info?.(`companion session closed (${s.closedReason})`);
+      s.closedEvt = { type: 'closed', reason: s.closedReason };
+      emit(s, s.closedEvt);
+      onChange();
+    };
+    tick();
+  }
+
+  function finish(s, state, detail) {
     s.closed = true;
     s.ready = false;
     clearTimeout(s.idleTimer);
@@ -75,13 +104,12 @@ function createCompanionSession({ engineManager, logger, now = Date.now, maxAhea
       current = null;
       last = s;
     }
-    // By the next microtask a window start queued behind this session owns the engine.
+    const known = closeReason(state, detail);
+    // Without a reason on 'stopped': by the next microtask a window start
+    // queued behind this session owns the engine.
     queueMicrotask(() => {
-      const reason = state === 'stopped' && ownerNow() === 'window' ? 'preempted' : state;
-      logger?.info?.(`companion session closed (${reason})`);
-      s.closedEvt = { type: 'closed', reason };
-      emit(s, s.closedEvt);
-      onChange();
+      s.closedReason = known || (ownerNow() === 'window' ? 'preempted' : state);
+      settleThenClose(s);
     });
   }
 
@@ -96,7 +124,7 @@ function createCompanionSession({ engineManager, logger, now = Date.now, maxAhea
     }
     if (state === 'engine-restarting') rebase(s);
     emit(s, typeof detail === 'string' && detail ? { type: 'status', state, detail } : { type: 'status', state });
-    if (TERMINAL.has(state)) finish(s, state);
+    if (TERMINAL.has(state)) finish(s, state, detail);
     else onChange();
   }
 
@@ -107,8 +135,11 @@ function createCompanionSession({ engineManager, logger, now = Date.now, maxAhea
     emit(s, { type: 'segment', id: rec.id, start: t.start, end: t.end, text: rec.text, lang: cleanLang(rec.lang) });
   }
 
+  // Translations keep arriving after the engine stopped until 'closed' went out.
   function onTranslation(s, p) {
-    if (s.closed || !p) return;
+    if (s.closedEvt || !p) return;
+    if (p.done) s.pendingIds.delete(p.id);
+    else if (p.text === 'pending') s.pendingIds.add(p.id);
     emit(s, { type: 'translation', id: p.id, text: p.text, done: !!p.done });
   }
 
@@ -134,6 +165,8 @@ function createCompanionSession({ engineManager, logger, now = Date.now, maxAhea
       listeners: new Set(),
       closed: false,
       closedEvt: null,
+      closedReason: null,
+      pendingIds: new Set(),
       idleTimer: null,
     };
     current = s;

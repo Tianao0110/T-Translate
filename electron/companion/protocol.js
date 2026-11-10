@@ -83,6 +83,15 @@ function ndjson(obj) {
   return JSON.stringify(obj) + '\n';
 }
 
+// The Host header must name this machine, and this port when it carries one;
+// a page that reached 127.0.0.1 through DNS rebinding carries its own name.
+function hostAllowed(host, port) {
+  if (typeof host !== 'string') return false;
+  const m = /^(127\.0\.0\.1|localhost)(?::(\d{1,5}))?$/.exec(host.trim());
+  if (!m) return false;
+  return !m[2] || !port || Number(m[2]) === port;
+}
+
 module.exports = {
   PROTOCOL_VERSION,
   HOST,
@@ -106,4 +115,5 @@ module.exports = {
   mediaTimeOf,
   createFeedBudget,
   ndjson,
+  hostAllowed,
 };

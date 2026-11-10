@@ -118,7 +118,7 @@ T-Caption 浏览器插件把字幕文本送来翻译、把音频送来识别；�
 - **时间轴**：segment 的 start / end = 打开时给的 `mediaStartS` + worker 的会话秒。worker 崩溃自动重启后时钟从 0 起，`feed` 模式按已收的样本数续上，`system` 模式按墙钟估。
 - **预算与背压**：送进去的音频最多领先最新终稿的结束点 60 s，超了回 429 和 `Retry-After`。插件预取音频（钩 MSE，约提前 1 分钟）不会把 worker 喂出积压；没有人声的长段（片头曲、长静音）里没有终稿，60 s 后自然卡住，插件据此挂起预取，等播放追上再续，或带新的 `mediaStartS` 重开会话。`x-seq` 重复或倒退回 409 `stale-seq`（重试不会喂两遍），跳号照收。
 - **程序不留记录**：伴生会话不自动保存 SRT（§6 的 `autosave: false`）、不写历史；日志不记音频和文字，只记路由、状态码、耗时与次数，会话指标日志照 §1 只有数字。翻译走同一个栈、同一道隐私门（`stackHooks.translateStream`）；`/v1/translate` 用缓存（字幕文本会重复），听译逐句翻译仍不进缓存（§9）。
-- **用户自己的听译优先**：悬浮窗开听译时抢占伴生会话（§6 最后一条），插件收到 `closed`、`reason: 'preempted'`；伴生会话碰上窗口会话回 409 `busy`、`owner: 'window'`。抢占的判断靠时序：管理器发完最后的 `stopped` 后同步起排队的窗口会话，下一个微任务里归属已是 `window`。
+- **用户自己的听译优先**：悬浮窗开听译时抢占伴生会话（§6 最后一条），插件收到 `closed`、`reason: 'preempted'`；伴生会话碰上窗口会话回 409 `busy`、`owner: 'window'`。`closed` 的 reason 词表：`closed`（插件自己关）、`idle`（30 s 无人读写）、`disabled`（开关关掉）、`preempted`（被窗口听译抢占）、`window-closed`，以及引擎终态名 `model-load-failed` / `engine-dead` / `no-model`。抢占的原因由管理器放在 `stopped` 的 detail 里（`preempted`，其它停法也带各自的原因），时序判断（下一个微任务里归属已是 `window`）只作没有 detail 时的后备。
 - **没人读也没人送，30 秒自动关**：service worker 随时会被浏览器停掉，留下的会话（尤其 `system` 模式还在抓系统声音）不能一直开着。
 - **默认关**：`settings.companion.enabled` 不是 true 就不监听端口。
-- **已知限制**：会话结束那一刻还在翻的句子，译文到不了插件——管理器在终态状态后就清掉 sink，晚到的译文发给了悬浮窗（它不认识这个 id，丢掉）。插件对缺译文的句子用 `/v1/translate` 补。
+- **会话结束时还在翻的句子**：翻译器给在途翻译最多 3 s 落定（§9）；管理器在这段时间里把 id 不超过该会话最后一句的译文仍送回退役的 sink（5 s 宽限，id 全局递增所以不会错投给下一个会话）；会话包装在 `stopped` 之后等这些 `pending` 过的 id 都 `done`（上限 3.5 s）才发 `closed`。插件在 `closed` 之前收到的就是全部；仍缺译文的句子用 `/v1/translate` 补。

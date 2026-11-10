@@ -68,6 +68,14 @@ let autosaveStore = null;
 let sessionSink = null;
 let sessionOwner = null; // 'window' | 'companion' | null
 let pendingStart = null;
+// A session's last stop reason rides on its 'stopped' status. Translations
+// that settle after a companion session ended (the translator waits for them,
+// listen-translator.js) still reach its sink for a moment: ids never repeat,
+// so anything up to the session's last final is hers.
+let stopReason = null;
+let sinkMaxId = -1;
+let retired = null; // { sink, maxId, until }
+const RETIRED_SINK_MS = 5000;
 
 const SINK_METHODS = {
   [CHANNELS.AUDIO_ENGINE.STATUS]: 'status',
@@ -168,7 +176,12 @@ function hostWindow() {
 }
 
 function sendToWindow(channel, payload) {
+  if (channel === CHANNELS.AUDIO_ENGINE.TRANSLATION && retired && payload && payload.id <= retired.maxId) {
+    if (Date.now() < retired.until && typeof retired.sink.translation === 'function') retired.sink.translation(payload);
+    return;
+  }
   if (sessionSink) {
+    if (channel === CHANNELS.AUDIO_ENGINE.SEGMENT && payload && payload.id > sinkMaxId) sinkMaxId = payload.id;
     const method = SINK_METHODS[channel];
     if (method && typeof sessionSink[method] === 'function') {
       if (channel === CHANNELS.AUDIO_ENGINE.STATUS) sessionSink.status(payload.state, payload.detail);
@@ -183,8 +196,10 @@ function sendToWindow(channel, payload) {
 // The session is over and its last status delivered: drop the sink, then
 // start the session that was waiting for the worker to go.
 function finishSession() {
+  if (sessionSink) retired = { sink: sessionSink, maxId: sinkMaxId, until: Date.now() + RETIRED_SINK_MS };
   sessionSink = null;
   sessionOwner = null;
+  sinkMaxId = -1;
   const next = pendingStart;
   pendingStart = null;
   if (next) startSession(next);
@@ -244,6 +259,8 @@ function startSession(options = {}) {
   pendingStart = null;
   sessionOwner = owner;
   sessionSink = owner === 'companion' ? options.sink : null;
+  sinkMaxId = -1;
+  stopReason = null;
   // Each user-initiated session gets its own one-shot crash restart.
   restartedOnce = false;
   sessionLanguage = typeof options.language === 'string' ? options.language : '';
@@ -478,7 +495,7 @@ function onWorkerMessage(msg) {
             childState = 'idle';
             ttsOnly = true;
             unsubscribePrivacy();
-            sendStatus('stopped');
+            sendStatus('stopped', stopReason || undefined);
             armTtsIdle();
             finishSession();
             break;
@@ -544,7 +561,7 @@ function onWorkerExit({ code, everReady }) {
 
   endTranscript(wasStopping ? 'stopped' : 'engine-exited');
   if (wasStopping) {
-    sendStatus('stopped');
+    sendStatus('stopped', stopReason || undefined);
     finishSession();
     return;
   }
@@ -615,6 +632,7 @@ function stopSessionAndWait(reason, timeoutMs = STOP_GRACE_MS + 2000) {
 // companion session it never started.
 function stopSession(reason, { from = null } = {}) {
   if (from === 'window' && sessionOwner === 'companion') return;
+  stopReason = reason;
   unsubscribePrivacy();
   if (!adapter().running()) {
     childState = 'idle';

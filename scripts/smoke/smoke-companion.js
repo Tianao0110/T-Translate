@@ -292,8 +292,8 @@ async function main() {
     await Promise.race([stream.done, sleep(10000)]);
     const closedEvt = ofType(stream, 'closed')[0];
     step(
-      'asr/close: 204, then closed/stopped and the stream ends',
-      closed.status === 204 && stream.ended && closedEvt?.reason === 'stopped' && closedEvt.at >= closeAt,
+      'asr/close: 204, then closed/closed and the stream ends',
+      closed.status === 204 && stream.ended && closedEvt?.reason === 'closed' && closedEvt.at >= closeAt,
       closedEvt ? `closed ${closedEvt.at - closeAt} ms after the request` : 'no closed event'
     );
     await waitFor(() => !engineManager.getInfo().running, { tries: 100 });
@@ -309,7 +309,7 @@ async function main() {
     }
     step(
       'listen/open (system) opens, captures and closes',
-      sys.status === 200 && sysListening && ofType(sysStream, 'closed')[0]?.reason === 'stopped',
+      sys.status === 200 && sysListening && ofType(sysStream, 'closed')[0]?.reason === 'closed',
       sysStream ? sysStream.events.filter((e) => e.type !== 'segment' && e.type !== 'translation').map((e) => e.state || `closed:${e.reason}`).join(' > ') : JSON.stringify(sys.json)
     );
     await waitFor(() => !engineManager.getInfo().running, { tries: 100 });
