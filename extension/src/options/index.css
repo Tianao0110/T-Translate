@@ -78,3 +78,26 @@ h2 {
 .error:empty {
   display: none;
 }
+
+.sites {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sites:empty {
+  display: none;
+}
+
+.sites .row span {
+  overflow-wrap: anywhere;
+}
+
+.sites button {
+  font-size: 13px;
+  padding: 3px 12px;
+}
+
+.sites:not(:empty) + .hint {
+  display: none;
+}

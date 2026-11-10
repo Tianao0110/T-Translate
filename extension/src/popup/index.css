@@ -21,6 +21,32 @@ body {
   display: none;
 }
 
+.allow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.allow[hidden] {
+  display: none;
+}
+
+.allow button {
+  font-size: 13px;
+  padding: 4px 12px;
+}
+
+.allow .sub {
+  color: var(--tc-muted);
+  font-size: 12px;
+}
+
+/* .row's display would otherwise win over [hidden]. */
+.row[hidden] {
+  display: none;
+}
+
 .controls {
   margin-top: 12px;
   padding-top: 8px;

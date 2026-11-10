@@ -2,9 +2,12 @@
 // (TAB_STATE), whether the page reported anything (TAB_EVIDENCE) and the
 // channel. t is chrome.i18n.getMessage (or a stand-in in tests).
 
-// { tone: 'ok' | 'warn' | 'muted', text }
-export function describeTab({ tab, evidence, channel, prefs } = {}, t) {
-  if (!evidence) return { tone: 'muted', text: t('tabNoVideo') };
+import { patternHost } from './match-pattern.js';
+
+// { tone: 'ok' | 'warn' | 'muted', text }. notEnabled: an ordinary web page
+// T-Caption has no scripts on yet (the popup offers to allow the site).
+export function describeTab({ tab, evidence, channel, prefs, notEnabled = false } = {}, t) {
+  if (!evidence) return { tone: 'muted', text: notEnabled ? t('tabNotEnabled') : t('tabNoVideo') };
   switch (tab?.state) {
     case 'captions':
       if (!tab.run && tab.cached) return { tone: 'ok', text: t('tabCaptionsCached') };
@@ -12,6 +15,8 @@ export function describeTab({ tab, evidence, channel, prefs } = {}, t) {
     case 'listening':
       return { tone: 'ok', text: t('tabListening') };
     case 'prompt':
+      // The video's host is not allowed yet (the popup has the button).
+      if (tab.needs?.origin) return { tone: 'warn', text: t('tabPermission', [patternHost(tab.needs.origin)]) };
       return { tone: 'warn', text: t('tabPrompt') };
     case 'suspended':
       return { tone: 'warn', text: t('tabSuspended') };

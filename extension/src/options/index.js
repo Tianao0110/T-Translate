@@ -1,7 +1,8 @@
 // Options page: pair with T-Translate, see the channel state, reconnect or
 // forget the pairing (all of it in the offscreen client via the worker);
 // per-site switches and auto listen (prefs in chrome.storage.local, which
-// the worker follows); the subtitle cache's size and emptying it.
+// the worker follows); the sites allowed beyond T-Caption's own, each with a
+// remove; the subtitle cache's size and emptying it.
 
 import { MSG, request, on } from '../shared/messages.js';
 import { CLIENT_STATUS } from '../shared/protocol.js';
@@ -80,6 +81,36 @@ for (const [site, el] of Object.entries(siteSwitches)) {
 $('auto-listen').addEventListener('change', (e) => prefs.set({ autoListen: e.target.checked }));
 prefs.onChange(renderPrefs);
 prefs.load().then(renderPrefs);
+
+// ---- allowed sites ----
+
+async function renderSites() {
+  const r = await request(MSG.SITE_LIST);
+  const list = $('allowed-sites');
+  const sites = r.ok && Array.isArray(r.result) ? r.result : [];
+  list.replaceChildren(
+    ...sites.map((pattern) => {
+      const li = document.createElement('li');
+      li.className = 'row';
+      const name = document.createElement('span');
+      name.textContent = pattern.replace(/\/\*$/, '');
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.textContent = t('siteRemove');
+      remove.addEventListener('click', async () => {
+        remove.disabled = true;
+        await request(MSG.SITE_REVOKE, { pattern });
+        renderSites();
+      });
+      li.append(name, remove);
+      return li;
+    })
+  );
+}
+
+// Allowed or removed elsewhere too (the popup, the browser's extension settings).
+on(MSG.SITES_CHANGED, renderSites);
+renderSites();
 
 // ---- cache ----
 

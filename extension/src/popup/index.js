@@ -1,13 +1,18 @@
 // Toolbar popup: what T-Caption does in the current tab, the prefs that
 // matter while watching (written straight to chrome.storage.local, which the
-// worker follows) and the tab's captions as an SRT file.
+// worker follows) and the tab's captions as an SRT file. On a page T-Caption
+// is not on yet, or whose video's host it may not read, one button asks the
+// browser for that host (it has to be asked in the click itself).
 // popup.html?tab=<tabId> picks the tab instead (only the e2e scripts use it).
 
 import { MSG, request, on } from '../shared/messages.js';
-import { describeState } from '../shared/status-text.js';
+import { describeState, errorText } from '../shared/status-text.js';
 import { describeTab } from '../shared/tab-status.js';
+import { matchPattern } from '../shared/match-pattern.js';
 import { toSrt, exportFileName } from '../shared/subtitle-export.js';
 import { createPrefs } from '../sw/prefs.js';
+import { hostPattern } from '../sw/direct-fetch.js';
+import { siteKeyOf } from '../sw/session-orchestrator.js';
 import { t, localize } from '../shared/page.js';
 
 const TARGETS = ['zh', 'zh-TW', 'en', 'ja', 'ko', 'fr', 'de', 'es', 'ru', 'pt', 'it', 'vi', 'th', 'ar'];
@@ -21,6 +26,10 @@ let tab = null;
 let evidence = null;
 let channel = null;
 let cueCount = 0;
+let pageUrl = '';
+let allow = null; // { pattern, kind: 'site' | 'read' }
+let allowNote = '';
+const builtIn = (chrome.runtime.getManifest().content_scripts || []).flatMap((c) => c.matches || []).map(matchPattern);
 
 const result = async (type, payload) => {
   const r = await request(type, payload);
@@ -57,20 +66,36 @@ function fillTargets(current) {
   select.value = current;
 }
 
+// What the button asks for: the video's host the tab waits on, or this
+// page's own host when T-Caption has no scripts here (not one of its own sites).
+function allowFor() {
+  if (tab?.state === 'prompt' && tab.needs?.origin) return { pattern: tab.needs.origin, kind: 'read' };
+  if (evidence || !/^https?:\/\//i.test(pageUrl) || builtIn.some((m) => m(pageUrl))) return null;
+  try {
+    return { pattern: hostPattern(pageUrl), kind: 'site' };
+  } catch {
+    return null;
+  }
+}
+
 function render() {
   const p = prefs.get();
-  const view = describeTab({ tab, evidence, channel, prefs: p }, t);
+  allow = allowFor();
+  const view = describeTab({ tab, evidence, channel, prefs: p, notEnabled: allow?.kind === 'site' }, t);
   $('status').dataset.tone = view.tone;
   $('status-text').textContent = view.text;
   $('channel-text').textContent = channel && channel.status !== 'ready' ? describeState(channel, t).text : '';
+  $('allow-row').hidden = !allow;
+  if (allow) $('allow').textContent = allow.kind === 'site' ? t('allowSite') : t('allowRead');
+  $('allow-note').textContent = allow ? allowNote : '';
 
-  const site = evidence?.site;
+  // A site of its own, or the host's switch on any other site.
+  const siteKey = evidence ? siteKeyOf(evidence) : null;
   const siteRow = $('site-row');
-  siteRow.hidden = !site || site === 'generic';
+  siteRow.hidden = !siteKey || siteKey === 'generic';
   if (!siteRow.hidden) {
-    const name = siteName(site);
-    $('site-label').textContent = t('popupSite', [name]);
-    $('site-on').checked = !p.siteOff[site];
+    $('site-label').textContent = t('popupSite', [siteName(siteKey)]);
+    $('site-on').checked = !p.siteOff[siteKey];
   }
   $('enabled').checked = p.enabled;
   for (const el of document.querySelectorAll('input[name="display"]')) el.checked = el.value === p.display;
@@ -81,7 +106,9 @@ function render() {
 
 async function refresh() {
   if (tabId !== null) {
-    [tab, evidence] = await Promise.all([result(MSG.TAB_STATE, { tabId }), result(MSG.TAB_EVIDENCE, { tabId })]);
+    let info;
+    [tab, evidence, info] = await Promise.all([result(MSG.TAB_STATE, { tabId }), result(MSG.TAB_EVIDENCE, { tabId }), chrome.tabs.get(tabId).catch(() => null)]);
+    pageUrl = info?.url || info?.pendingUrl || '';
     const q = evidence ? await result(MSG.TAB_COMMAND, { tabId, command: { cmd: 'query' } }) : null;
     cueCount = q?.renderer?.cues ?? 0;
   }
@@ -112,8 +139,31 @@ $('open-options').addEventListener('click', (e) => {
   chrome.runtime.openOptionsPage();
   window.close();
 });
+$('allow').addEventListener('click', () => {
+  const want = allow;
+  if (!want) return;
+  allowNote = '';
+  // Sent first: if the browser's dialog closes this popup, the worker finishes once the grant arrives.
+  request(MSG.SITE_ALLOW, { pattern: want.pattern, tabId, pending: true });
+  chrome.permissions.request({ origins: [want.pattern] }).then(
+    async (ok) => {
+      if (!ok) {
+        allowNote = t('allowDenied');
+        render();
+        return;
+      }
+      const r = await request(MSG.SITE_ALLOW, { pattern: want.pattern, tabId });
+      if (!r.ok) allowNote = errorText(r.error?.code || 'error', t);
+      await refresh();
+    },
+    (e) => {
+      allowNote = errorText(String(e?.message || e), t);
+      render();
+    }
+  );
+});
 $('site-on').addEventListener('change', (e) => {
-  const site = evidence?.site;
+  const site = evidence ? siteKeyOf(evidence) : null;
   if (!site || site === 'generic') return;
   const siteOff = { ...prefs.get().siteOff };
   if (e.target.checked) delete siteOff[site];

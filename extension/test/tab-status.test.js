@@ -30,8 +30,17 @@ describe('describeTab', () => {
     expect(describeTab({ tab: null, evidence: ev, channel: ready }, t).text).toBe('tabWaiting');
   });
 
-  it('a page that reported nothing has no video for us', () => {
+  it('a page that reported nothing has no video for us, or is a site not allowed yet', () => {
     expect(describeTab({ tab: null, evidence: null, channel: ready }, t)).toEqual({ tone: 'muted', text: 'tabNoVideo' });
     expect(describeTab({}, t).text).toBe('tabNoVideo');
+    expect(describeTab({ tab: null, evidence: null, channel: ready, notEnabled: true }, t)).toEqual({ tone: 'muted', text: 'tabNotEnabled' });
+  });
+
+  it('a file played by URL: recognized like audio; its host not allowed yet asks by name', () => {
+    const tr = (k, subs) => (subs ? `${k}:${subs.join(',')}` : k);
+    const generic = { site: 'generic', url: 'http://127.0.0.1:8123/watch.html' };
+    expect(describeTab({ tab: { state: 'captions', run: { tier: 2, kind: 'direct' } }, evidence: generic, channel: ready }, tr)).toEqual({ tone: 'ok', text: 'tabCaptionsAudio' });
+    expect(describeTab({ tab: { state: 'prompt', needs: { origin: 'http://media.localhost/*' } }, evidence: generic, channel: ready }, tr)).toEqual({ tone: 'warn', text: 'tabPermission:media.localhost' });
+    expect(describeTab({ tab: { state: 'prompt', needs: null }, evidence: generic, channel: ready }, tr).text).toBe('tabPrompt');
   });
 });
