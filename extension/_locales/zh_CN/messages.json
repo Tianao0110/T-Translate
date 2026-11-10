@@ -1,0 +1,33 @@
+{
+  "appName": { "message": "T-Caption" },
+  "appDesc": { "message": "给网页视频显示字幕，识别和翻译都由本机的 T-Translate 完成" },
+  "optionsTitle": { "message": "T-Caption 设置" },
+  "statusUnpaired": { "message": "未配对" },
+  "statusOffline": { "message": "离线：找不到 T-Translate" },
+  "statusReady": {
+    "message": "已连接：T-Translate $VERSION$，端口 $PORT$，隐私模式 $MODE$",
+    "placeholders": {
+      "version": { "content": "$1" },
+      "port": { "content": "$2" },
+      "mode": { "content": "$3" }
+    }
+  },
+  "privacyStandard": { "message": "标准" },
+  "privacySecure": { "message": "无痕" },
+  "privacyOffline": { "message": "离线" },
+  "pair": { "message": "配对" },
+  "pairing": { "message": "配对中…" },
+  "pairHint": { "message": "先在 T-Translate 的「设置 → 音频 → 听」里点「配对」，然后 60 秒内点这里" },
+  "reconnect": { "message": "重新连接" },
+  "connecting": { "message": "连接中…" },
+  "forget": { "message": "断开" },
+  "openOptions": { "message": "打开设置" },
+  "errProtocol": { "message": "通道版本不一致，请把 T-Translate 和插件都更新到最新版" },
+  "errPairing": { "message": "没有等待配对的 T-Translate。先在程序里点「配对」，60 秒内再点这里" },
+  "errUnreachable": { "message": "找不到 T-Translate。确认程序开着，并打开了「允许浏览器插件连接」" },
+  "errUnauthorized": { "message": "令牌已失效，请重新配对" },
+  "errGeneric": {
+    "message": "出错了：$CODE$",
+    "placeholders": { "code": { "content": "$1" } }
+  }
+}

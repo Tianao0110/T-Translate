@@ -19,6 +19,7 @@
     "smoke:listen": "electron scripts/smoke/smoke-listen.js",
     "smoke:companion": "electron scripts/smoke/smoke-companion.js",
     "smoke:caption-client": "electron extension/scripts/e2e-client.js",
+    "extension:build": "node extension/scripts/build.mjs",
     "smoke:offline": "electron scripts/smoke/smoke-offline.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

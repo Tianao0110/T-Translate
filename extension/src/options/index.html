@@ -1,0 +1,34 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>T-Caption</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <img src="icons/icon-48.png" alt="" />
+        <div>
+          <h1 data-i18n="optionsTitle"></h1>
+          <p data-i18n="appDesc"></p>
+        </div>
+      </header>
+      <section class="card">
+        <div id="status" class="status" data-tone="muted" role="status" aria-live="polite">
+          <span class="dot"></span>
+          <span id="status-text"></span>
+        </div>
+        <div class="actions">
+          <button id="pair" class="primary" type="button" data-i18n="pair"></button>
+          <button id="reconnect" type="button" data-i18n="reconnect"></button>
+          <button id="forget" type="button" data-i18n="forget"></button>
+        </div>
+        <p class="hint" data-i18n="pairHint"></p>
+        <p id="error" class="error" role="alert"></p>
+      </section>
+    </main>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

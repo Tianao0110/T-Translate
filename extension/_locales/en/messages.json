@@ -1,0 +1,33 @@
+{
+  "appName": { "message": "T-Caption" },
+  "appDesc": { "message": "Captions for web videos. Recognition and translation run in T-Translate on this computer." },
+  "optionsTitle": { "message": "T-Caption settings" },
+  "statusUnpaired": { "message": "Not paired" },
+  "statusOffline": { "message": "Offline: T-Translate not found" },
+  "statusReady": {
+    "message": "Connected: T-Translate $VERSION$, port $PORT$, privacy mode $MODE$",
+    "placeholders": {
+      "version": { "content": "$1" },
+      "port": { "content": "$2" },
+      "mode": { "content": "$3" }
+    }
+  },
+  "privacyStandard": { "message": "Standard" },
+  "privacySecure": { "message": "Incognito" },
+  "privacyOffline": { "message": "Offline" },
+  "pair": { "message": "Pair" },
+  "pairing": { "message": "Pairing…" },
+  "pairHint": { "message": "In T-Translate, open Settings → Audio → Listen and click Pair, then click Pair here within 60 seconds." },
+  "reconnect": { "message": "Reconnect" },
+  "connecting": { "message": "Connecting…" },
+  "forget": { "message": "Disconnect" },
+  "openOptions": { "message": "Open settings" },
+  "errProtocol": { "message": "Channel version mismatch. Update T-Translate and the extension to the latest version." },
+  "errPairing": { "message": "No T-Translate is waiting to pair. Click Pair in the app first, then click here within 60 seconds." },
+  "errUnreachable": { "message": "Can't reach T-Translate. Make sure it is running and \"Allow the browser extension to connect\" is on." },
+  "errUnauthorized": { "message": "The token is no longer valid. Pair again." },
+  "errGeneric": {
+    "message": "Something went wrong: $CODE$",
+    "placeholders": { "code": { "content": "$1" } }
+  }
+}

@@ -1,0 +1,13 @@
+@import '../shared/theme.css';
+
+body {
+  width: 300px;
+  padding: 14px 16px;
+  background: var(--tc-surface);
+}
+
+#open-options {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 13px;
+}
