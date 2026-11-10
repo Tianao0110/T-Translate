@@ -21,20 +21,14 @@ async function until(fn, ms, every = 250) {
   return null;
 }
 
-// Resolves the shell, or null (usage printed) without --packs / a browser.
-// extraHosts: host permissions for this build only (build.mjs).
-async function startShell({ name, step, version, shotPrefix, extraHosts = [] }) {
-  const packsDir = arg('--packs');
-  const exe = findBrowser(arg('--browser'));
-  if (!packsDir || !fs.existsSync(packsDir) || !exe) {
-    console.error('usage: --packs <dir with asr-base-sense-voice/ etc.> [--browser <chrome.exe>] [--out <dir>] [--headed]');
-    return null;
-  }
+// The sandbox (with the listen packs linked in), its screenshot folder and
+// the real companion server and engine; Firefox's shell uses it too.
+async function startCompanion({ name, step, version, packsDir, browserExe }) {
   const box = sandbox(name);
   const shotsDir = path.resolve(arg('--out') || path.join(box.dir, 'shots'));
   fs.mkdirSync(shotsDir, { recursive: true });
   linkPacks(packsDir, path.join(process.env.TT_MODELS_ROOT, 'asr-models'));
-  console.log(`sandbox: ${box.dir}\nbrowser: ${exe}${has('--headed') ? ' (window)' : ' (headless)'}\nscreenshots: ${shotsDir}\n`);
+  console.log(`sandbox: ${box.dir}\nbrowser: ${browserExe}${has('--headed') ? ' (window)' : ' (headless)'}\nscreenshots: ${shotsDir}\n`);
 
   const engineManager = require('../../../electron/listen/audio-engine-manager');
   const { initCompanion } = require('../../../electron/companion');
@@ -49,6 +43,19 @@ async function startShell({ name, step, version, shotPrefix, extraHosts = [] }) 
   const companion = initCompanion({ store, engineManager, translateStream, logger, version: version, getPrivacyMode: () => 'standard' });
   await companion.ready();
   step('companion channel up', companion.status().running === true, `port ${companion.status().port}`);
+  return { box, shotsDir, companion, engineManager };
+}
+
+// Resolves the shell, or null (usage printed) without --packs / a browser.
+// extraHosts: host permissions for this build only (build.mjs).
+async function startShell({ name, step, version, shotPrefix, extraHosts = [] }) {
+  const packsDir = arg('--packs');
+  const exe = findBrowser(arg('--browser'));
+  if (!packsDir || !fs.existsSync(packsDir) || !exe) {
+    console.error('usage: --packs <dir with asr-base-sense-voice/ etc.> [--browser <chrome.exe>] [--out <dir>] [--headed]');
+    return null;
+  }
+  const { box, shotsDir, companion, engineManager } = await startCompanion({ name, step, version, packsDir, browserExe: exe });
 
   const { build } = await import(pathToFileURL(path.join(REPO, 'extension/scripts/build.mjs')).href);
   const { outDir } = await build({ outDir: path.join(box.dir, 'dist'), logLevel: 'silent', extraHosts });
@@ -128,4 +135,4 @@ async function startShell({ name, step, version, shotPrefix, extraHosts = [] }) 
   return shell;
 }
 
-module.exports = { startShell, until };
+module.exports = { startShell, startCompanion, until };

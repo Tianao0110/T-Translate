@@ -12,13 +12,17 @@ T-Translate 的浏览器插件：给网页视频显示字幕，识别和翻译�
 
 改了代码重新构建，再到扩展管理页点插件卡片上的刷新按钮。`node extension/scripts/build.mjs --watch` 边改边构建。
 
+Firefox（试验中，130 起）：`node extension/scripts/build.mjs --target firefox`，产物在 `extension/dist-firefox/`；`about:debugging` →「此 Firefox」→「临时载入附加组件」选其中的 `manifest.json`（浏览器重启后要再载入一次）。
+
 ## 目录
 
 ```
 manifest.json                     源模板，构建时写入根 package.json 的版本号
 _locales/                         界面文案（zh_CN 默认、en）
 icons/                            图标（缺了构建时自动画）
-src/sw/                           service worker：拉起 offscreen、转发消息、每分钟连一次
+src/sw/index.js                   service worker（Chrome）：拉起 offscreen，按消息转给它
+src/sw/worker.js                  后台的其余部分（两种浏览器共用）：转发消息、各模块装配、每分钟连一次
+src/firefox/background.js         Firefox 的后台页：没有 offscreen，那部分直接在这里跑（同页面广播走 notifyLocal）
 src/sw/page-events.js             各标签页的页面证据、给页面下命令、分片 / 听译 / 直链会话送去识别再把字幕发回页面
 src/sw/direct-fetch.js            直链 .mp4：按 Range 取 moov 与音频字节（领先播放点不超过 60 秒），送流水线
 src/sw/session-orchestrator.js    每标签页的三级状态机：何时开、开哪一级、何时停；一次只服务一个标签页；缓存命中直接出字幕，只对没覆盖的段落识别，跑出来的写回缓存
@@ -27,6 +31,7 @@ src/sw/prefs.js                   偏好（chrome.storage.local 的 prefs：开�
 src/sw/badge.js                   角标：通道状态的色点；按标签页标「CC / L / off」，等待允许读取视频时标琥珀色「!」
 src/sw/site-access.js             允许的网站：浏览器授权后登记内容脚本（document_start，一对脚本管所有网站）、当前标签页立即注入、移除时注销并交还权限
 src/sw/cache-db.js                字幕缓存：按媒体存字幕与译文，超 200 条 / 100 MB 淘汰最久没用的；IndexedDB（CACHE_* 消息）
+src/offscreen/handlers.js         offscreen 一侧的请求处理（通道客户端、流水线、听译会话），Chrome 的 offscreen 与 Firefox 的后台页共用
 src/offscreen/companion-client.js 通道客户端（配对、hello、翻译、识别会话、事件流）
 src/offscreen/webm-demux.js       WebM 流式解析（任意切块、未知长度、lacing、坏数据重同步）
 src/offscreen/mp4-demux.js        fMP4 流式解析（moov 取 AAC 配置，moof + mdat 取帧，同 WebM 的事件，坏数据重同步）
@@ -52,7 +57,7 @@ src/content/notice.js             视频上的一行提示（DRM 时「用 T-Tra
 src/options/                      选项页：配对、按站点开关、自动听译、已允许的站点（可移除）、字幕缓存
 src/popup/                        工具栏弹窗：当前标签页状态、「允许在本站使用」/「允许」读取视频、本站开关、显示方式、画法、目标语言、导出字幕
 src/shared/                       协议常量、消息约定（媒体字节走 base64）、页面事件格式与校验、状态文案、SRT / VTT 导出、配色、MP4 采样表（mp4-table.js）、匹配模式（match-pattern.js）
-scripts/build.mjs                 esbuild 构建 → dist/（不入库）；extraHosts 只给真机脚本用（无头浏览器点不了授权框）
+scripts/build.mjs                 esbuild 构建 → dist/（不入库）；--target firefox → dist-firefox/；extraHosts 只给真机脚本用（无头浏览器点不了授权框）
 scripts/e2e-client.js             端到端：真实通道 + 真实引擎（npm run smoke:caption-client -- --packs <已装听译包目录>）
 scripts/e2e-pipeline.js           端到端：浏览器里录 WebM（或 --ffmpeg 转 fMP4 / AAC）→ 插件流水线 → 真实通道与引擎（用法见文件头）
 scripts/e2e-render.js             真机：本地页面的视频上画字幕，读 activeCues 并截图（node extension/scripts/e2e-render.js --out <截图目录>）
@@ -66,6 +71,8 @@ scripts/e2e-generic.js            真机：普通网站从弹窗允许、立即�
 scripts/make-fixture.js           重录单测样本 test/fixtures/tone-2s.webm
 scripts/make-fixture-mp4.js       用 ffmpeg 重做 MP4 单测样本：分片 tone-2s.m4s、渐进式 moov 在前 / 在后两个 .mp4（--ffmpeg 传路径）
 scripts/lib/browser.js            临时配置的 Chrome / Edge + DevTools 管道
+scripts/e2e-firefox.js            真机（Firefox 摸底）：临时附加组件、后台页配对、事件页存活、YouTube 二级出字幕、站点授权与注入、直链取流、权限（用法见文件头）
 scripts/lib/e2e-shell.js          真机脚本的壳：沙盒 Electron 通道 + 听译包 + 无头 Chrome + 配对
+scripts/lib/firefox.js            临时配置的 Firefox + WebDriver BiDi（装临时附加组件、开页、求值、点击、截图、日志）
 test/                             单测（并入根 vitest：npm test）
 ```
