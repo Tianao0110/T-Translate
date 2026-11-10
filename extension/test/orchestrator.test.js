@@ -35,6 +35,7 @@ function fakePageEvents() {
       if (r) return typeof r === 'function' ? r(command, tabId) : r;
       if (command.cmd === 'mse-capture' && command.on) return { key: `tab:${tabId}:${++gen}`, init: true, backlogBytes: 1 };
       if (command.cmd === 'listen' && command.on) return { key: `tab:${tabId}:l${++gen}` };
+      if (command.cmd === 'direct' && command.on) return { key: `tab:${tabId}:d${++gen}` };
       return {};
     }),
     emit: (tabId, event) => listeners.forEach((fn) => fn({ tabId, event })),
@@ -332,8 +333,14 @@ describe('tier 3: DRM and no audio', () => {
     expect(pe.of('listen').at(-1)).toMatchObject({ on: true });
   });
 
-  it('no hooks in the page means the notice too; DRM appearing mid-capture switches over', async () => {
-    await playing(7, { evidence: { hooks: { main: 'missing' }, mse: { audio: null, streams: [] } }, media: { src: 'https://cdn.example/video.mp4' } });
+  it('no hooks in the page: a plain file still goes direct (no hooks needed), a blob src means the notice; DRM appearing mid-capture switches over', async () => {
+    await playing(7, { evidence: { hooks: { main: 'missing' }, mse: { audio: null, streams: [] } }, media: { src: 'https://cdn.example/video.mp4', msId: null } });
+    expect(pe.of('direct').at(-1)).toMatchObject({ on: true, url: 'https://cdn.example/video.mp4' });
+    expect(pe.of('notice')).toHaveLength(0);
+    pe.evidence.delete(7);
+    pe.emit(7, { type: 'forgotten' });
+    await flush();
+    await playing(7, { evidence: { hooks: { main: 'missing' }, mse: { audio: null, streams: [] } } });
     expect(pe.of('notice').at(-1)).toMatchObject({ kind: 'listen' });
     pe.commands.length = 0;
     await playing(8);
@@ -608,5 +615,74 @@ describe('the subtitle cache', () => {
     const rec = store.put.mock.calls[0][1];
     expect(rec).toMatchObject({ tier: 1, lang: 'en', target: 'zh' });
     expect(rec.cues.map((c) => [c.id, c.translation])).toEqual([['s0', '[zh] line 0'], ['s1', '[zh] line 1'], ['s2', '[zh] line 2']]);
+  });
+});
+
+describe('direct links: a plain file the worker fetches itself', () => {
+  const DIRECT = 'https://cdn.example.com/v/talk.mp4';
+  const plain = (media = {}) => ({ evidence: { mse: { audio: null, streams: [] } }, media: { src: DIRECT, msId: null, ...media } });
+  const report = (reason, media) => pe.emit(7, { type: 'media', reason, media: snap({ src: DIRECT, msId: null, ...media }), primary: true });
+
+  it('starts at once from a little before the playhead, feeds the playhead, stops after the pause grace and restarts at the covered edge', async () => {
+    await playing(7, plain());
+    const on = pe.of('direct').filter((c) => c.on);
+    expect(on).toHaveLength(1);
+    expect(on[0]).toMatchObject({ tabId: 7, url: DIRECT, lang: 'auto', targetLang: 'zh' });
+    expect(on[0].fromS).toBeCloseTo(25, 0);
+    expect(orch.stateOf(7)).toMatchObject({ state: 'captions', run: { tier: 2, kind: 'direct', key: 'tab:7:d1' }, needs: null });
+    report('timeupdate', { currentTime: 31 });
+    await flush();
+    expect(pe.of('direct').filter((c) => c.position !== undefined).at(-1)).toMatchObject({ position: 31 });
+    pe.emit(7, { type: 'capture-event', kind: 'direct', key: 'tab:7:d1', event: { type: 'segment', id: 'd1-0', start: 26, end: 40, text: 'hello' } });
+    report('pause', { currentTime: 32, state: 'paused' });
+    await after(5000);
+    const off = pe.of('direct').filter((c) => c.on === false);
+    expect(off).toHaveLength(1);
+    expect(off[0].reason).toBe('paused');
+    report('play', { currentTime: 41 });
+    await flush();
+    const again = pe.of('direct').filter((c) => c.on);
+    expect(again).toHaveLength(2);
+    expect(again[1].fromS).toBeCloseTo(40, 0); // the segment noted before the pause ends at 40
+  });
+
+  it('without permission for the origin the tab prompts once; permissionGranted starts it', async () => {
+    let denied = true;
+    pe.reply('direct', (c) => {
+      if (c.on && denied) throw Object.assign(new Error('https://cdn.example.com'), { code: 'no-permission' });
+      return c.on ? { key: 'tab:7:d9' } : {};
+    });
+    await playing(7, plain());
+    expect(orch.stateOf(7)).toMatchObject({ state: 'prompt', run: null, needs: { origin: 'https://cdn.example.com' }, failures: 0 });
+    expect(pe.of('notice')).toHaveLength(1);
+    expect(pe.of('notice')[0]).toMatchObject({ kind: 'permission', origin: 'https://cdn.example.com' });
+    report('timeupdate', { currentTime: 31 });
+    await after(3000);
+    expect(pe.of('direct').filter((c) => c.on)).toHaveLength(1); // not asked again every second
+    denied = false;
+    orch.permissionGranted('https://cdn.example.com');
+    await flush();
+    expect(pe.of('direct').filter((c) => c.on)).toHaveLength(2);
+    expect(orch.stateOf(7)).toMatchObject({ state: 'captions', run: { kind: 'direct', key: 'tab:7:d9' }, needs: null });
+  });
+
+  it('a file that keeps failing falls back to the listen notice after three tries', async () => {
+    await playing(7, plain());
+    for (let i = 1; i <= 3; i++) {
+      pe.emit(7, { type: 'capture-event', kind: 'direct', key: `tab:7:d${i}`, event: { type: 'error', code: 'fetch-failed' } });
+      await after(15500);
+    }
+    expect(pe.of('direct').filter((c) => c.on)).toHaveLength(3);
+    expect(orch.stateOf(7)).toMatchObject({ state: 'prompt', failures: 3 });
+    expect(pe.of('notice').at(-1)).toMatchObject({ kind: 'listen' });
+    expect(orch.stateOf(7).history.at(-1).detail).toEqual({ why: 'direct-failed' });
+  });
+
+  it('site captions arriving upgrade a direct run', async () => {
+    await playing(7, plain());
+    pe.emit(7, { type: 'subtitle-parsed', url: 'https://cdn.example.com/v/talk.vtt', cueCount: 2, cues: cuesOf(2), lang: 'en', kind: '', mediaId: null });
+    await flush();
+    expect(pe.of('direct').filter((c) => c.on === false)[0]).toMatchObject({ reason: 'upgrade' });
+    expect(orch.stateOf(7)).toMatchObject({ state: 'captions', run: { tier: 1 } });
   });
 });

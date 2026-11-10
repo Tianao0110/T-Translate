@@ -8,7 +8,9 @@
 //   1 site captions with cues for this video → cues to the page, translated
 //     around the playhead first (cached per video and target language)
 //   2 decodable MSE audio and no DRM → mse-capture (page-events feeds the
-//     media pipeline; cues come back by themselves)
+//     media pipeline; cues come back by themselves); a plain http(s) src
+//     with no MSE → direct (the worker fetches the file itself by Range,
+//     once the site's origin is permitted: until then the tab prompts)
 //   3 DRM, no hooks, plain file or undecodable audio → a notice in the page;
 //     the listen session opens when the user accepts (or autoListen is on)
 // A running tier only changes upwards to tier 1, or to tier 3 when DRM
@@ -78,6 +80,7 @@ const primaryTag = (lang) => {
   return primary;
 };
 export const sameLang = (a, b) => !!a && !!b && primaryTag(a) === primaryTag(b);
+const isDirectUrl = (src) => /^https?:\/\//i.test(String(src || ''));
 
 function remember(set, key) {
   set.add(key);
@@ -136,7 +139,7 @@ export function createOrchestrator({
   function ensure(tabId) {
     let r = byTab.get(tabId);
     if (!r) {
-      r = { tabId, ev: null, media: null, mediaAt: 0, mediaKey: null, run: null, gen: 0, held: false, playingSince: 0, failures: 0, state: null, stateDetail: null, log: [], siteCues: new Map(), emptySubtitle: false, promptedFor: null, view: null, timers: {}, translateError: null, cacheKey: null, cached: null, cacheLoad: 0, newCues: new Map(), idAlias: new Map(), cacheTier: null, cacheLang: '', cacheDirty: false, shown: null, cover: null, lastRun: null };
+      r = { tabId, ev: null, media: null, mediaAt: 0, mediaKey: null, run: null, gen: 0, held: false, playingSince: 0, failures: 0, state: null, stateDetail: null, log: [], siteCues: new Map(), emptySubtitle: false, promptedFor: null, view: null, timers: {}, translateError: null, cacheKey: null, cached: null, cacheLoad: 0, newCues: new Map(), idAlias: new Map(), cacheTier: null, cacheLang: '', cacheDirty: false, shown: null, cover: null, lastRun: null, needsOrigin: null, directFailed: false };
       byTab.set(tabId, r);
     }
     return r;
@@ -298,7 +301,7 @@ export function createOrchestrator({
     const key = r.cacheKey;
     const fresh = [...r.newCues.values()];
     r.newCues = new Map();
-    if (!store || !key) return;
+    if (!key) return;
     const merged = new Map();
     if (!(r.cacheTier === TIER.SITE && fresh.length)) for (const c of r.cached?.cues ?? []) merged.set(c.id, c);
     const stamp = now().toString(36);
@@ -312,7 +315,8 @@ export function createOrchestrator({
     r.cached = record;
     // The page already has these cues (they ran here); only a new document shows the record again.
     r.shown ??= { key, count: cues.length, translating: true };
-    Promise.resolve()
+    // Without a store the record still lives in memory (coverage, resume).
+    if (store) Promise.resolve()
       .then(() => store.put(key, record))
       .catch((e) => logger.debug?.(`cache put: ${e.code || e.message}`));
   }
@@ -415,6 +419,12 @@ export function createOrchestrator({
     const audio = ev.mse?.audio;
     if (audio?.forward) return noSpeech.has(r.mediaKey) ? { suspended: true } : { tier: TIER.AUDIO, audio, edge: coveredEdge(stretches, t) };
     if (audio) return { tier: TIER.LISTEN, why: 'unsupported-audio' };
+    // A plain file: the worker fetches it itself (no hooks needed).
+    if (!viaMse && isDirectUrl(r.media?.src)) {
+      if (r.directFailed) return { tier: TIER.LISTEN, why: 'direct-failed' };
+      if (r.needsOrigin) return { permission: r.needsOrigin };
+      return noSpeech.has(r.mediaKey) ? { suspended: true } : { tier: TIER.AUDIO, kind: 'direct', url: r.media.src, edge: coveredEdge(stretches, t) };
+    }
     if (!hooksOk || !ev.hooks) return { tier: TIER.LISTEN, why: 'no-hooks' };
     return { tier: TIER.LISTEN, why: viaMse ? 'no-audio' : 'plain-src' };
   }
@@ -438,6 +448,15 @@ export function createOrchestrator({
     if (d.suspended) {
       if (r.run) stopRun(r, 'no-speech');
       setState(r, 'suspended');
+      return;
+    }
+    if (d.permission) {
+      if (r.run) stopRun(r, 'permission');
+      if (r.promptedFor !== `${r.mediaKey}:permission`) {
+        r.promptedFor = `${r.mediaKey}:permission`;
+        quiet(cmd(r, { cmd: 'notice', kind: 'permission', origin: d.permission }));
+      }
+      setState(r, 'prompt', { why: 'permission', origin: d.permission });
       return;
     }
     if (r.run) {
@@ -473,6 +492,17 @@ export function createOrchestrator({
       quiet(cmd(r, { cmd: 'cues', op: 'set', cues: d.site.cues }));
       setState(r, 'captions', { tier: 1 });
       if (!sameLang(d.site.lang, p.targetLang)) translateLoop(r, () => r.run?.gen === gen, d.site, p);
+      return;
+    }
+    if (d.tier === TIER.AUDIO && d.kind === 'direct') {
+      r.run = { tier: TIER.AUDIO, kind: 'direct', gen, url: d.url, startedAt: now() };
+      sendView(r, p);
+      if (r.promptedFor) hideNotice(r);
+      setState(r, 'captions', { tier: 2, kind: 'direct' });
+      cmd(r, { cmd: 'direct', on: true, url: d.url, lang: p.sourceLang, targetLang: p.targetLang, fromS: Math.max(0, t - CAPTURE_BACK_S, d.edge || 0) }).then(
+        (res) => opened(r, gen, res),
+        (e) => fail(r, gen, e)
+      );
       return;
     }
     if (d.tier === TIER.AUDIO) {
@@ -532,9 +562,24 @@ export function createOrchestrator({
     const code = e?.code || e?.message || 'error';
     logger.warn?.(`tab ${r.tabId}: ${r.run.kind} failed: ${code}`);
     endRun(r);
+    // The site's origin is not permitted yet: the tab prompts until permissionGranted.
+    if (code === 'no-permission') {
+      r.needsOrigin = e?.origin || (e?.message && e.message !== code ? e.message : 'unknown');
+      schedule();
+      return;
+    }
     r.failures++;
     setState(r, 'idle', { error: code });
     if (r.failures < MAX_FAILURES) scheduleRetry(r, code === 'busy' ? busyRetryMs : retryMs);
+    else gaveUp(r);
+  }
+
+  // Out of retries: a direct file that keeps failing falls back to the notice.
+  function gaveUp(r) {
+    if (r.lastRun?.kind === 'direct') {
+      r.directFailed = true;
+      schedule();
+    }
   }
 
   function stopRun(r, reason) {
@@ -545,6 +590,7 @@ export function createOrchestrator({
     endRun(r);
     flushCache(r);
     if (run.kind === 'capture') quiet(cmd(r, { cmd: 'mse-capture', on: false }));
+    else if (run.kind === 'direct') quiet(cmd(r, { cmd: 'direct', on: false, reason }));
     else if (run.kind === 'listen') quiet(cmd(r, { cmd: 'listen', on: false, reason }));
     logger.debug?.(`tab ${r.tabId}: ${run.kind} stopped (${reason})`);
   }
@@ -554,6 +600,8 @@ export function createOrchestrator({
     flushCache(r);
     r.shown = null;
     r.lastRun = null;
+    r.needsOrigin = null;
+    r.directFailed = false;
     r.run = null;
     r.gen++;
     r.held = false;
@@ -634,6 +682,8 @@ export function createOrchestrator({
       if (!r.playingSince || prev?.state === 'ended') r.playingSince = r.mediaAt;
       clearTimerOf(r, 'pause');
       r.held = false;
+      // The direct fetcher stays this far ahead of the playhead.
+      if (r.run?.kind === 'direct' && r.run.key) quiet(cmd(r, { cmd: 'direct', position: m.currentTime }));
     } else if (m.state === 'ended') {
       r.playingSince = 0;
       stopRun(r, 'ended');
@@ -658,7 +708,7 @@ export function createOrchestrator({
 
   function onCaptureEvent(r, event) {
     const e = event.event;
-    const mine = r.run && ((r.run.kind === 'capture' && event.kind === 'capture') || (r.run.kind === 'listen' && event.kind === 'listen')) && (r.run.key ? event.key === r.run.key : e.type === 'segment');
+    const mine = r.run && r.run.kind === event.kind && r.run.kind !== 'site' && (r.run.key ? event.key === r.run.key : e.type === 'segment');
     if (e.type === 'segment') r.failures = 0;
     const owner = mine ? r.run : r.lastRun && event.key && event.key === r.lastRun.key && event.kind === r.lastRun.kind ? r.lastRun : null;
     if (!mine && (e.type === 'segment' || e.type === 'translation')) logger.debug?.(`tab ${r.tabId}: ${e.type} ${e.id ?? ''} ${owner ? 'after the stop' : 'stray'} (${event.key})`);
@@ -677,12 +727,14 @@ export function createOrchestrator({
       else if (e.reason && e.reason !== 'closed') {
         r.failures++;
         if (r.failures < MAX_FAILURES) scheduleRetry(r);
+        else gaveUp(r);
       }
       setState(r, 'idle', { closed: e.reason });
     } else if (e.type === 'error') {
       endRun(r);
       r.failures++;
       if (r.failures < MAX_FAILURES) scheduleRetry(r);
+      else gaveUp(r);
       setState(r, 'idle', { error: e.code });
     }
   }
@@ -753,9 +805,14 @@ export function createOrchestrator({
     stateOf(tabId) {
       const r = byTab.get(tabId);
       if (!r) return null;
-      return { tabId, state: r.state, run: r.run ? { tier: r.run.tier, kind: r.run.kind, key: r.run.key ?? null, startedAt: r.run.startedAt } : null, block: r.block ?? null, active: active === tabId, mediaKey: r.mediaKey, noSpeech: noSpeech.has(r.mediaKey), translateError: r.translateError, failures: r.failures, cached: r.cached ? { count: r.cached.cues.length, tier: r.cached.tier ?? null, shown: !!r.shown, covered: covered(r) } : null, history: r.log.slice() };
+      return { tabId, state: r.state, run: r.run ? { tier: r.run.tier, kind: r.run.kind, key: r.run.key ?? null, startedAt: r.run.startedAt } : null, block: r.block ?? null, active: active === tabId, mediaKey: r.mediaKey, noSpeech: noSpeech.has(r.mediaKey), translateError: r.translateError, failures: r.failures, needs: r.needsOrigin ? { origin: r.needsOrigin } : null, cached: r.cached ? { count: r.cached.cues.length, tier: r.cached.tier ?? null, shown: !!r.shown, covered: covered(r) } : null, history: r.log.slice() };
     },
     active: () => active,
+    // The user allowed a site's origin (the popup): tabs waiting on it try again.
+    permissionGranted(origin) {
+      for (const r of byTab.values()) if (r.needsOrigin && (!origin || r.needsOrigin === origin)) r.needsOrigin = null;
+      schedule();
+    },
     // Forgets a parked video so it is tried again.
     unpark(mediaKey) {
       noSpeech.delete(mediaKey);
