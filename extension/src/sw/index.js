@@ -2,13 +2,15 @@
 // client, the media pipeline and listen sessions) alive, relays the
 // extension pages' COMPANION_* / MEDIA_* / LISTEN_* requests to it, does
 // chrome.storage for it, keeps each tab's page evidence and carries commands
-// to it (page-events.js), decides per tab what runs (session-orchestrator.js),
+// to it (page-events.js), fetches files pages play by URL (direct-fetch.js),
+// decides per tab what runs (session-orchestrator.js),
 // holds the subtitle cache (cache-db.js), paints the badge and polls the
 // channel once a minute.
 
 import { MSG, TARGET_OFFSCREEN, request, handle, on, isExtensionSender } from '../shared/messages.js';
 import { showBadge, showTabBadge } from './badge.js';
 import { createPageEvents } from './page-events.js';
+import { createDirectFetch } from './direct-fetch.js';
 import { createPrefs } from './prefs.js';
 import { createTabArbiter } from './tab-arbiter.js';
 import { createOrchestrator } from './session-orchestrator.js';
@@ -58,8 +60,10 @@ async function toOffscreen(type, payload) {
 const relay = (type) => (payload) => toOffscreen(type, payload);
 const fromExtension = (_msg, sender) => isExtensionSender(sender);
 
+// Files pages play by URL, fetched here by range; its fetch errors come back like the pipeline's events.
+const directFetch = createDirectFetch({ toOffscreen, onEvent: (payload) => pageEvents.onMediaEvent(payload) });
 // For the orchestrator: getTabEvidence(tabId), onPageEvent(fn), command(tabId, command).
-export const pageEvents = createPageEvents({ toOffscreen });
+export const pageEvents = createPageEvents({ toOffscreen, direct: directFetch });
 
 let channel = { status: 'unpaired' };
 export const prefs = createPrefs();

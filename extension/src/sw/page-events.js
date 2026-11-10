@@ -6,10 +6,13 @@
 // getTabEvidence and onPageEvent and decides; this module only carries out
 // commands, including the glue to the offscreen document: while a tab has
 // capture on, its PAGE_MEDIA bytes go to the media pipeline under the key
-// tab:<tabId>:<gen>, and a tab's listen session (the DRM fallback) runs under
-// tab:<tabId>:l<gen>; both sessions' segments and translations come back to
-// the tab as `cues` commands (ids prefixed m<gen>- / l<gen>- so a reopened
-// session cannot overwrite the last one's cues).
+// tab:<tabId>:<gen>, a tab's listen session (the DRM fallback) runs under
+// tab:<tabId>:l<gen>, and a directly played file the worker fetches itself
+// (direct-fetch.js) under tab:<tabId>:d<gen>; their segments and
+// translations come back to the tab as `cues` commands (ids prefixed m<gen>-
+// / l<gen>- / d<gen>- so a reopened session cannot overwrite the last one's
+// cues). Pages may report from the content-script hosts and the other hosts
+// the manifest grants (scripts injected there, e.g. 127.0.0.1 for tests).
 
 import { MSG } from '../shared/messages.js';
 import { checkPageEvent, checkPageMedia } from '../shared/page-protocol.js';
@@ -51,6 +54,7 @@ function freshEvidence(tabId, docId) {
     eme: null,
     capture: null,
     listen: null,
+    direct: null,
     updatedAt: 0,
   };
 }
@@ -76,15 +80,16 @@ export function createPageEvents({
   runtime = globalThis.chrome?.runtime,
   tabs = globalThis.chrome?.tabs,
   toOffscreen,
+  direct = null, // direct-fetch.js
   manifest = runtime?.getManifest?.(),
   now = () => Date.now(),
   bootId = crypto.randomUUID(),
 }) {
-  const matchers = (manifest?.content_scripts || []).flatMap((c) => c.matches || []).map(matchPattern);
+  const matchers = [...(manifest?.content_scripts || []).flatMap((c) => c.matches || []), ...(manifest?.host_permissions || [])].map(matchPattern);
   const byTab = new Map();
   const listeners = new Set();
   const parts = new Map(); // `${tabId}:${subId}` → { parts: [], got }
-  const keys = new Map(); // media key → { tabId, gen }
+  const keys = new Map(); // media key → { tabId, gen, kind? }
   const sendChains = new Map(); // tabId → promise, so commands reach a tab in order
   let gen = 0;
 
@@ -123,6 +128,7 @@ export function createPageEvents({
     if (!ev || ev.docId !== docId) {
       if (ev?.capture?.on) closeCapture(ev, 'new-document', { tellTab: false });
       if (ev?.listen?.on) closeListen(ev, 'new-document');
+      if (ev?.direct?.on) closeDirect(ev, 'new-document');
       ev = freshEvidence(tabId, docId);
       byTab.set(tabId, ev);
     }
@@ -141,8 +147,10 @@ export function createPageEvents({
       case 'navigated':
         if (ev.capture?.on) closeCapture(ev, 'navigated', { tellTab: false });
         if (ev.listen?.on) closeListen(ev, 'navigated');
+        if (ev.direct?.on) closeDirect(ev, 'navigated');
         ev.capture = null;
         ev.listen = null;
+        ev.direct = null;
         resetForNavigation(ev);
         Object.assign(ev, { url: event.url, site: event.site, mediaId: event.mediaId, navSeq: event.navSeq });
         return event;
@@ -219,6 +227,11 @@ export function createPageEvents({
     return { boot: bootId };
   }
 
+  const keepKey = (key, owner) => {
+    keys.set(key, owner);
+    if (keys.size > 8) keys.delete(keys.keys().next().value);
+  };
+
   // ---- capture ----
 
   async function openCapture(tabId, c) {
@@ -230,8 +243,7 @@ export function createPageEvents({
     const lang = typeof c.lang === 'string' && c.lang ? c.lang : DEFAULT_LANG;
     const targetLang = typeof c.targetLang === 'string' && c.targetLang ? c.targetLang : DEFAULT_TARGET;
     await toOffscreen(MSG.MEDIA_OPEN, { key, lang, targetLang });
-    keys.set(key, { tabId, gen: g });
-    if (keys.size > 8) keys.delete(keys.keys().next().value);
+    keepKey(key, { tabId, gen: g });
     const cap = { on: true, key, gen: g, streamId: null, lang, targetLang, startedAt: now(), pushes: 0, bytes: 0, segments: 0, translations: 0, firstSegmentAt: null, reason: null, chain: Promise.resolve() };
     ev.capture = cap;
     try {
@@ -287,8 +299,7 @@ export function createPageEvents({
     const mediaStartS = Number.isFinite(c.mediaStartS) && c.mediaStartS > 0 ? c.mediaStartS : 0;
     const l = { on: true, key, gen: g, lang, targetLang, mediaStartS, startedAt: now(), segments: 0, translations: 0, firstSegmentAt: null, reason: null, lastStatus: null };
     ev.listen = l;
-    keys.set(key, { tabId, gen: g, kind: 'listen' });
-    if (keys.size > 8) keys.delete(keys.keys().next().value);
+    keepKey(key, { tabId, gen: g, kind: 'listen' });
     try {
       await toOffscreen(MSG.LISTEN_OPEN, { key, lang, targetLang, mediaStartS });
     } catch (e) {
@@ -320,6 +331,77 @@ export function createPageEvents({
   function publicListen(l) {
     const { closing: _x, ...rest } = l;
     return rest;
+  }
+
+  // ---- direct (the worker fetches the file the page plays by URL) ----
+
+  // Only a URL one of the tab's media elements plays, over http(s).
+  async function openDirect(tabId, c) {
+    const ev = byTab.get(tabId);
+    if (!ev) throw err('no-page');
+    if (!direct) throw err('unsupported');
+    const url = typeof c.url === 'string' ? c.url : '';
+    if (!/^https?:[/][/]/i.test(url) || !ev.media.some((m) => m.src === url)) throw err('not-page-media');
+    if (ev.direct?.on) await closeDirect(ev, 'restart');
+    const g = ++gen;
+    const key = `tab:${tabId}:d${g}`;
+    const lang = typeof c.lang === 'string' && c.lang ? c.lang : DEFAULT_LANG;
+    const targetLang = typeof c.targetLang === 'string' && c.targetLang ? c.targetLang : DEFAULT_TARGET;
+    const fromS = Number.isFinite(c.fromS) && c.fromS > 0 ? c.fromS : 0;
+    const d = { on: true, key, gen: g, url, fromS, lang, targetLang, startedAt: now(), bytes: 0, requests: 0, aheadS: null, segments: 0, translations: 0, firstSegmentAt: null, reason: null, lastStatus: null };
+    ev.direct = d;
+    keepKey(key, { tabId, gen: g, kind: 'direct' });
+    try {
+      const r = await direct.open({ key, url, fromS, lang, targetLang });
+      Object.assign(d, { startS: r.startS, durationS: r.durationS, moovAt: r.moovAt });
+      return { ...r, lang, targetLang };
+    } catch (e) {
+      if (ev.direct === d && d.on) {
+        d.on = false;
+        d.reason = e.code || 'open-failed';
+      }
+      throw e;
+    }
+  }
+
+  // The fetcher's counters as evidence fields.
+  function syncDirect(d, f) {
+    if (!f) return;
+    Object.assign(d, { bytes: f.bytes, requests: f.requests, aheadS: f.aheadS, maxAheadS: f.maxAheadS, fetchedToS: f.fetchedToS, playS: f.playS, done: f.done, fetchError: f.error });
+  }
+
+  function closeDirect(ev, reason) {
+    const d = ev.direct;
+    if (!d || !d.on) return d ? (d.closing ?? Promise.resolve(publicDirect(d))) : Promise.resolve(null);
+    d.on = false;
+    d.reason = reason;
+    d.closing = direct.close({ key: d.key }).then(
+      (r) => {
+        if (r) {
+          const { fetch, ...stats } = r;
+          d.stats = stats;
+          syncDirect(d, fetch);
+        }
+        return publicDirect(d);
+      },
+      (e) => {
+        d.closeError = e.code || e.message;
+        return publicDirect(d);
+      }
+    );
+    return d.closing;
+  }
+
+  function publicDirect(d) {
+    const { closing: _x, ...rest } = d;
+    return rest;
+  }
+
+  function positionDirect(ev, timeS) {
+    const d = ev.direct;
+    if (!d?.on) return null;
+    syncDirect(d, direct.position(d.key, timeS));
+    return publicDirect(d);
   }
 
   async function onPageMedia(payload, sender) {
@@ -355,6 +437,7 @@ export function createPageEvents({
     if (!owner || !event) return;
     const ev = byTab.get(owner.tabId);
     if (owner.kind === 'listen') return onListenEvent(owner, ev, payload.key, event);
+    if (owner.kind === 'direct') return onDirectEvent(owner, ev, payload.key, event);
     const cap = ev?.capture?.gen === owner.gen ? ev.capture : null;
     const id = event.id !== undefined ? `m${owner.gen}-${event.id}` : null;
     if (event.type === 'segment') {
@@ -397,6 +480,27 @@ export function createPageEvents({
     emit(owner.tabId, { type: 'capture-event', kind: 'listen', key, event: id ? { ...event, id } : event });
   }
 
+  function onDirectEvent(owner, ev, key, event) {
+    const d = ev?.direct?.gen === owner.gen ? ev.direct : null;
+    const id = event.id !== undefined ? `d${owner.gen}-${event.id}` : null;
+    if (event.type === 'segment') {
+      if (d) {
+        d.segments++;
+        d.firstSegmentAt ??= now();
+      }
+      sendToTab(owner.tabId, { cmd: 'cues', op: 'upsert', cue: { id, start: event.start, end: event.end, text: event.text } }).catch(() => {});
+    } else if (event.type === 'translation') {
+      if (d) d.translations++;
+      sendToTab(owner.tabId, { cmd: 'cues', op: 'translation', id, text: event.text, done: !!event.done }).catch(() => {});
+    } else if (event.type === 'closed' && d?.on) {
+      // The stream ended by itself (unsupported, the app went away): stop fetching too.
+      closeDirect(ev, event.reason || 'closed');
+    } else if (d && (event.type === 'status' || event.type === 'error' || event.type === 'suspended')) {
+      d.lastStatus = event.type === 'error' ? event.code || 'error' : event.state || event.type;
+    }
+    emit(owner.tabId, { type: 'capture-event', kind: 'direct', key, event: id ? { ...event, id } : event });
+  }
+
   // ---- extension pages ----
 
   async function tabCommand({ tabId, command } = {}) {
@@ -412,13 +516,22 @@ export function createPageEvents({
       const ev = byTab.get(tabId);
       return ev ? closeListen(ev, command.reason || 'command') : null;
     }
+    // { on: true, url, fromS, lang, targetLang } / { on: false, reason } / { position: timeS }
+    if (command.cmd === 'direct') {
+      if (command.on === true) return openDirect(tabId, command);
+      const ev = byTab.get(tabId);
+      if (command.on === false) return ev ? closeDirect(ev, command.reason || 'command') : null;
+      if (Number.isFinite(command.position)) return ev ? positionDirect(ev, command.position) : null;
+      throw err('bad-request');
+    }
     return sendToTab(tabId, command);
   }
 
   function getTabEvidence(tabId) {
     const ev = byTab.get(tabId);
     if (!ev) return null;
-    return JSON.parse(JSON.stringify({ ...ev, capture: ev.capture ? publicCapture(ev.capture) : null, listen: ev.listen ? publicListen(ev.listen) : null }));
+    if (ev.direct?.on) syncDirect(ev.direct, direct.stats(ev.direct.key));
+    return JSON.parse(JSON.stringify({ ...ev, capture: ev.capture ? publicCapture(ev.capture) : null, listen: ev.listen ? publicListen(ev.listen) : null, direct: ev.direct ? publicDirect(ev.direct) : null }));
   }
 
   function forget(tabId, reason) {
@@ -426,6 +539,7 @@ export function createPageEvents({
     if (!ev) return;
     if (ev.capture?.on) closeCapture(ev, reason, { tellTab: false });
     if (ev.listen?.on) closeListen(ev, reason);
+    if (ev.direct?.on) closeDirect(ev, reason);
     byTab.delete(tabId);
     sendChains.delete(tabId);
     for (const k of [...parts.keys()]) if (k.startsWith(`${tabId}:`)) parts.delete(k);

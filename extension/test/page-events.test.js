@@ -5,7 +5,8 @@
 // build the per-tab evidence (subtitle parts reassembled for listeners),
 // stale and malformed ones are dropped, navigation and closing the tab clear
 // it; the capture glue opens / pushes / closes the media stream under its key
-// and turns pipeline segments and translations into `cues` commands.
+// and turns pipeline segments and translations into `cues` commands; the
+// direct glue does the same for files the worker fetches by URL.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createPageEvents, matchPattern } from '../src/sw/page-events.js';
@@ -312,5 +313,122 @@ describe('commands and the capture glue', () => {
     await tick();
     expect(offscreen.calls.at(-1)).toEqual({ type: MSG.MEDIA_CLOSE, payload: { key: 'tab:7:1' } });
     expect(tabs.sent.filter((s) => s.cmd.cmd === 'mse-capture').map((s) => s.cmd.on)).toEqual([true]);
+  });
+});
+
+describe('the direct glue (files the page plays by URL)', () => {
+  const PAGE = 'http://127.0.0.1:8123/watch.html';
+  const SRC = 'http://127.0.0.1:8123/speech.mp4';
+  let direct;
+  let de;
+  let calls;
+
+  beforeEach(() => {
+    calls = [];
+    direct = {
+      fail: null,
+      open: vi.fn(async (o) => {
+        calls.push(['open', o]);
+        if (direct.fail) throw Object.assign(new Error(direct.fail), { code: direct.fail });
+        return { key: o.key, url: o.url, fromS: o.fromS, startS: o.fromS, durationS: 60, codec: 'mp4a.40.2', samples: 2800, moovAt: 'head' };
+      }),
+      close: vi.fn(async ({ key }) => {
+        calls.push(['close', key]);
+        return { source: 'direct', blocks: 40, fetch: { bytes: 900000, requests: 3, aheadS: 58, maxAheadS: 60, fetchedToS: 80, playS: 22, done: false, error: null } };
+      }),
+      position: vi.fn((key, t) => {
+        calls.push(['position', key, t]);
+        return { bytes: 500000, requests: 2, aheadS: 60, maxAheadS: 60, fetchedToS: t + 60, playS: t, done: false, error: null };
+      }),
+      stats: vi.fn(() => ({ bytes: 400000, requests: 2, aheadS: 59, maxAheadS: 60, fetchedToS: 80, playS: 21, done: false, error: null })),
+    };
+    de = createPageEvents({ runtime: { id: EXT_ID }, tabs, manifest: { ...MANIFEST, host_permissions: ['http://127.0.0.1/*'] }, toOffscreen: (t, p) => offscreen.call(t, p), direct, bootId: 'boot-2', now: () => 2000 });
+    heard = [];
+    de.onPageEvent((e) => heard.push(e));
+  });
+
+  const from = (tabId = 7) => ({ id: EXT_ID, tab: { id: tabId }, frameId: 0, url: PAGE });
+  const say = (event, navSeq = 0) => de.contentHandlers[MSG.PAGE_EVENT]({ docId: 'doc-d', navSeq, event }, from());
+  const cmd = (command, tabId = 7) => de.extensionHandlers[MSG.TAB_COMMAND]({ tabId, command });
+  function page() {
+    say({ type: 'navigated', url: PAGE, mediaId: 'abc-60', navSeq: 0, site: 'generic' });
+    say({ type: 'media', reason: 'play', media: mediaSnap(1, { src: SRC, msId: null }), primary: true });
+  }
+
+  it('pages on the manifest’s other granted hosts may report', () => {
+    expect(de.fromPage({}, from())).toBe(true);
+    expect(de.fromPage({}, { ...from(), url: 'http://localhost:8123/' })).toBe(false);
+    expect(pe.fromPage({}, from())).toBe(false);
+  });
+
+  it('on: only a URL the tab plays; opens under tab:<id>:d<gen>, evidence carries the fetch counters', async () => {
+    page();
+    await expect(cmd({ cmd: 'direct', on: true, url: 'http://127.0.0.1:8123/other.mp4' })).rejects.toMatchObject({ code: 'not-page-media' });
+    await expect(cmd({ cmd: 'direct', on: true, url: 'blob:http://127.0.0.1:8123/1' })).rejects.toMatchObject({ code: 'not-page-media' });
+    await expect(cmd({ cmd: 'direct', on: true, url: SRC }, 8)).rejects.toMatchObject({ code: 'no-page' });
+    await expect(cmd({ cmd: 'direct' })).rejects.toMatchObject({ code: 'bad-request' });
+    const r = await cmd({ cmd: 'direct', on: true, url: SRC, fromS: 20, lang: 'en', targetLang: 'zh' });
+    expect(r).toMatchObject({ key: 'tab:7:d1', fromS: 20, startS: 20, moovAt: 'head', lang: 'en', targetLang: 'zh' });
+    expect(calls[0]).toEqual(['open', { key: 'tab:7:d1', url: SRC, fromS: 20, lang: 'en', targetLang: 'zh' }]);
+    expect(de.getTabEvidence(7).direct).toMatchObject({ on: true, key: 'tab:7:d1', url: SRC, fromS: 20, startedAt: 2000, bytes: 400000, requests: 2, aheadS: 59, segments: 0, reason: null, moovAt: 'head' });
+  });
+
+  it('position feeds the playhead; segments and translations come back as cues with a d<gen>- prefix', async () => {
+    page();
+    await cmd({ cmd: 'direct', on: true, url: SRC, fromS: 20 });
+    expect(await cmd({ cmd: 'direct', position: 21.5 })).toMatchObject({ on: true, playS: 21.5, aheadS: 60 });
+    expect(calls.at(-1)).toEqual(['position', 'tab:7:d1', 21.5]);
+    de.onMediaEvent({ key: 'tab:7:d1', event: { type: 'segment', id: 3, start: 20.4, end: 23, text: 'Good evening.' } });
+    de.onMediaEvent({ key: 'tab:7:d1', event: { type: 'translation', id: 3, text: '晚上好。', done: true } });
+    de.onMediaEvent({ key: 'tab:7:d1', event: { type: 'error', code: 'fetch-failed', status: 403 } });
+    await tick();
+    expect(tabs.sent.filter((s) => s.cmd.cmd === 'cues').map((s) => s.cmd)).toEqual([
+      { cmd: 'cues', op: 'upsert', cue: { id: 'd1-3', start: 20.4, end: 23, text: 'Good evening.' } },
+      { cmd: 'cues', op: 'translation', id: 'd1-3', text: '晚上好。', done: true },
+    ]);
+    expect(de.getTabEvidence(7).direct).toMatchObject({ segments: 1, translations: 1, firstSegmentAt: 2000, lastStatus: 'fetch-failed' });
+    expect(heard.filter((h) => h.event.type === 'capture-event').map((h) => [h.event.kind, h.event.key, h.event.event.id ?? h.event.event.code])).toEqual([
+      ['direct', 'tab:7:d1', 'd1-3'],
+      ['direct', 'tab:7:d1', 'd1-3'],
+      ['direct', 'tab:7:d1', 'fetch-failed'],
+    ]);
+  });
+
+  it('off closes with the stats; a reopen gets d2; navigation, the stream ending and the tab closing close it', async () => {
+    page();
+    await cmd({ cmd: 'direct', on: true, url: SRC });
+    const off = await cmd({ cmd: 'direct', on: false, reason: 'paused' });
+    expect(off).toMatchObject({ on: false, reason: 'paused', stats: { source: 'direct', blocks: 40 }, bytes: 900000, requests: 3, maxAheadS: 60 });
+    expect(await cmd({ cmd: 'direct', position: 30 })).toBe(null);
+
+    await cmd({ cmd: 'direct', on: true, url: SRC, fromS: 45 });
+    expect(de.getTabEvidence(7).direct).toMatchObject({ key: 'tab:7:d2', fromS: 45 });
+    say({ type: 'navigated', url: PAGE, mediaId: 'abc-60', navSeq: 1, site: 'generic' }, 1);
+    expect(calls.filter((c) => c[0] === 'close').map((c) => c[1])).toEqual(['tab:7:d1', 'tab:7:d2']);
+    expect(de.getTabEvidence(7).direct).toBeNull();
+
+    say({ type: 'media', reason: 'play', media: mediaSnap(1, { src: SRC, msId: null }), primary: true }, 1);
+    await cmd({ cmd: 'direct', on: true, url: SRC });
+    de.onMediaEvent({ key: 'tab:7:d3', event: { type: 'closed', reason: 'no-reply' } });
+    expect(de.getTabEvidence(7).direct).toMatchObject({ on: false, reason: 'no-reply' });
+    expect(calls.at(-1)).toEqual(['close', 'tab:7:d3']);
+
+    await cmd({ cmd: 'direct', on: true, url: SRC });
+    tabs.onRemoved.fire(7);
+    expect(calls.at(-1)).toEqual(['close', 'tab:7:d4']);
+  });
+
+  it('a refused open (no permission) leaves it off with the reason', async () => {
+    page();
+    direct.fail = 'no-permission';
+    await expect(cmd({ cmd: 'direct', on: true, url: SRC })).rejects.toMatchObject({ code: 'no-permission' });
+    expect(de.getTabEvidence(7).direct).toMatchObject({ on: false, reason: 'no-permission' });
+    expect(direct.close).not.toHaveBeenCalled();
+  });
+
+  it('without a fetcher the command is unsupported', async () => {
+    nav();
+    report({ type: 'media', reason: 'play', media: mediaSnap(1, { src: 'https://www.youtube.com/a.mp4' }), primary: true });
+    await expect(pe.extensionHandlers[MSG.TAB_COMMAND]({ tabId: 7, command: { cmd: 'direct', on: true, url: 'https://www.youtube.com/a.mp4' } })).rejects.toMatchObject({ code: 'unsupported' });
   });
 });
