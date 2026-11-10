@@ -63,17 +63,23 @@ export function createMediaWatch({ doc, win, onReport = () => {}, onRemoved = ()
     };
   }
 
+  // An element moved elsewhere in the page (feeds reuse their players) comes
+  // back under its old id.
   function track(el) {
-    if (ids.has(el)) return false;
-    const id = ++next;
-    ids.set(el, id);
+    let id = ids.get(el);
+    if (id && known.get(id) === el) return false;
+    if (!id) {
+      id = ++next;
+      ids.set(el, id);
+    }
     known.set(id, el);
     return true;
   }
 
+  // All of them known before the first report, so the primary is picked among all.
   function found(node) {
     const els = isMedia(node) ? [node] : node.getElementsByTagName ? [...node.getElementsByTagName('video'), ...node.getElementsByTagName('audio')] : [];
-    for (const el of els) if (track(el)) onReport(snapshot(el), 'added');
+    for (const el of els.filter(track)) onReport(snapshot(el), 'added');
   }
 
   function sweep() {
@@ -97,9 +103,12 @@ export function createMediaWatch({ doc, win, onReport = () => {}, onRemoved = ()
     onReport(snapshot(el), e.type);
   }
 
-  const area = (el) => {
+  // Box area and the part of it in the viewport.
+  const sizes = (el) => {
     const r = el.getBoundingClientRect();
-    return r.width * r.height;
+    const w = Math.min(r.right, win.innerWidth) - Math.max(r.left, 0);
+    const h = Math.min(r.bottom, win.innerHeight) - Math.max(r.top, 0);
+    return { el, area: r.width * r.height, shown: w > 0 && h > 0 ? w * h : 0 };
   };
 
   return {
@@ -123,12 +132,15 @@ export function createMediaWatch({ doc, win, onReport = () => {}, onRemoved = ()
       for (const type of EVENTS) doc.removeEventListener(type, onEvent, true);
       observer?.disconnect();
     },
-    // The playing <video> with the largest box, else the largest one.
+    // The playing <video> with the largest box (ties: the one more in view);
+    // with none playing the one most in view, then the largest (a paused
+    // feed video, not the next one preloaded below it).
     primaryVideo() {
       const videos = [...known.values()].filter((el) => el.isConnected && el.nodeName === 'VIDEO');
       const playing = videos.filter((el) => !el.paused && !el.ended);
-      const pool = playing.length ? playing : videos;
-      return pool.sort((a, b) => area(b) - area(a))[0] || null;
+      const pool = (playing.length ? playing : videos).map(sizes);
+      const order = playing.length ? (a, b) => b.area - a.area || b.shown - a.shown : (a, b) => b.shown - a.shown || b.area - a.area;
+      return pool.sort(order)[0]?.el || null;
     },
     idOf: (el) => ids.get(el) ?? null,
     snapshot: (el) => snapshot(el),

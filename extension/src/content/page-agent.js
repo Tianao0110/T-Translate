@@ -77,6 +77,7 @@ export function createPageAgent({
   let lists = []; // subtitle lists read this navigation: { url, entries, picked, status }
   let listsSeen = new Set(); // list and body URLs already handled this navigation
   const view = { display: 'bilingual', mode: 'track', siteCaptions: 'show' };
+  let feedEl = null; // feeds: the primary video the media id was last checked against
   let renderer = null;
   let rendererEl = null;
   let notice = null;
@@ -158,6 +159,9 @@ export function createPageAgent({
   function onSubtitle(ev, extra = null) {
     const info = site.subtitleInfo(ev.url) || {};
     if (info.list) return onSubtitleList(ev);
+    // Item data saying whose each subtitle file is (TikTok); a file no item claims is dropped.
+    if (info.catalog) return site.readCatalog?.(ev.text);
+    if (info.stray) return;
     const format = detectFormat(ev.text, ev.contentType, ev.url);
     const cues = format ? parseSubtitles(ev.text, format) : [];
     const sub = {
@@ -261,6 +265,11 @@ export function createPageAgent({
     rendererEl = null;
   }
 
+  // A video kept transparent while a canvas draws its picture (TikTok) shows
+  // no native track: its captions go over it instead.
+  const transparent = (v) => typeof v?.checkVisibility === 'function' && v.checkVisibility() && !v.checkVisibility({ opacityProperty: true, visibilityProperty: true });
+  const modeFor = (v) => (view.mode === 'track' && transparent(v) ? 'overlay' : view.mode);
+
   // The renderer follows the primary video; cues and translations move with it.
   function ensureRenderer() {
     const v = media.primaryVideo();
@@ -268,7 +277,7 @@ export function createPageAgent({
     if (renderer && rendererEl === v) return renderer;
     const saved = renderer ? renderer.list() : [];
     destroyRenderer();
-    renderer = makeRenderer({ video: v, mode: view.mode, display: view.display });
+    renderer = makeRenderer({ video: v, mode: modeFor(v), display: view.display });
     rendererEl = v;
     if (saved.length) {
       renderer.setCues(saved);
@@ -373,7 +382,7 @@ export function createPageAgent({
       case 'mode':
         if (!MODES.includes(c.value)) throw err('bad-command');
         view.mode = c.value;
-        renderer?.setMode(c.value);
+        renderer?.setMode(modeFor(rendererEl));
         return { mode: view.mode };
       case 'site-captions': {
         if (c.value !== 'hide' && c.value !== 'show') throw err('bad-command');
@@ -396,8 +405,13 @@ export function createPageAgent({
     const next = cleanUrl(win.location.href);
     if (!alive || next === pageUrl) return;
     pageUrl = next;
+    newPage(site.mediaId(pageUrl, media.primaryVideo()));
+  }
+
+  // Another page, or in a feed another video under the same URL.
+  function newPage(id) {
     navSeq++;
-    mediaId = site.mediaId(pageUrl, media.primaryVideo());
+    mediaId = id;
     // A new video's captions and init segment can land before the navigation event.
     // Subtitles without a media id, and lists, belong to the new page when they came just before it.
     const recent = (x) => now() - x.at <= CARRY_MS;
@@ -419,12 +433,18 @@ export function createPageAgent({
     if (v) send({ type: 'media', reason: 'visibility', media: media.snapshot(v), primary: true });
   }
 
+  // True when it made a new page. In a feed another video's id is another
+  // page; with no id (between videos) the last one's stays.
   function checkMediaId() {
     const id = site.mediaId(pageUrl, media.primaryVideo());
-    if (id !== mediaId) {
-      mediaId = id;
-      send({ type: 'media-id', mediaId });
+    if (id === mediaId || (site.feed && !id)) return false;
+    if (site.feed && mediaId) {
+      newPage(id);
+      return true;
     }
+    mediaId = id;
+    send({ type: 'media-id', mediaId });
+    return false;
   }
 
   // ---- wiring ----
@@ -443,6 +463,11 @@ export function createPageAgent({
     msIdOf: (src) => relay.msIdOf(src),
     onReport(m, reason) {
       const primary = media.primaryVideo();
+      // Feeds: checked before the report, so the next video's reports go with its own page.
+      if (site.feed && primary !== feedEl) {
+        feedEl = primary;
+        if (checkMediaId()) return;
+      }
       send({ type: 'media', reason, media: m, primary: !!primary && m.elId === media.idOf(primary) });
       if (reason === 'loadedmetadata' || reason === 'durationchange') checkMediaId();
       if (renderer && primary && primary !== rendererEl) {
@@ -450,6 +475,7 @@ export function createPageAgent({
           ensureRenderer();
         } catch {}
       }
+      if (renderer && renderer.mode !== modeFor(rendererEl)) renderer.setMode(modeFor(rendererEl));
     },
     onRemoved: (elId) => send({ type: 'media-removed', elId }),
   });
@@ -486,7 +512,12 @@ export function createPageAgent({
 
   send({ type: 'navigated', url: pageUrl, mediaId, navSeq, site: site.name, resync: false });
   media.start();
-  if (doc.readyState === 'loading') doc.addEventListener('DOMContentLoaded', () => media.scan(), { once: true });
+  const onParsed = () => {
+    media.scan();
+    site.readPage?.(doc);
+  };
+  if (doc.readyState === 'loading') doc.addEventListener('DOMContentLoaded', onParsed, { once: true });
+  else site.readPage?.(doc);
 
   return { runCommand, snapshot, shutdown, onNavigate, get docId() { return docId; } };
 }

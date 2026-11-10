@@ -2,11 +2,13 @@
 // recognition and its language / kind / video, navigation events, hiding the
 // player's caption layer, the page-world player actions over a fake player;
 // Bilibili media ids (BV with its part, av, bangumi), subtitle bodies and
-// lists, the list's entries, navigation and its subtitle layer; the generic
-// adapter's URL + duration fingerprint and navigation.
+// lists, the list's entries, navigation and its subtitle layer; TikTok media
+// ids (video page URL, else the player wrapper), subtitle files claimed by
+// item data, navigation and its caption layer; the generic adapter's URL +
+// duration fingerprint and navigation.
 
 import { describe, it, expect, vi } from 'vitest';
-import { siteFor, youtube, bilibili, generic } from '../src/content/sites/index.js';
+import { siteFor, youtube, bilibili, tiktok, generic } from '../src/content/sites/index.js';
 
 describe('siteFor', () => {
   it('youtube.com and its subdomains get the YouTube adapter, others the generic one', () => {
@@ -22,6 +24,14 @@ describe('siteFor', () => {
     expect(siteFor('bilibili.com')).toBe(bilibili);
     expect(siteFor('live.bilibili.com')).toBe(generic);
     expect(siteFor('notbilibili.com')).toBe(generic);
+  });
+
+  it('tiktok.com and its subdomains get the TikTok adapter, its CDNs do not', () => {
+    expect(siteFor('www.tiktok.com')).toBe(tiktok);
+    expect(siteFor('m.tiktok.com')).toBe(tiktok);
+    expect(siteFor('tiktok.com')).toBe(tiktok);
+    expect(siteFor('nottiktok.com')).toBe(generic);
+    expect(siteFor('v16-webapp-prime.tiktokcdn.com')).toBe(generic);
   });
 });
 
@@ -218,6 +228,97 @@ describe('Bilibili', () => {
     expect(getComputedStyle(wrap).display).not.toBe('none');
     expect(bilibili.mainActions).toEqual({});
     wrap.remove();
+  });
+});
+
+describe('TikTok', () => {
+  // URL shapes from a real page (2026-11-10): subtitle files end in a 32-hex
+  // id, video files in an o… id; both say mime_type=video_mp4.
+  const vttUrl = (file, host = 'v16-webapp.tiktok.com', sig = '12031373c9c7d41547b0b6a63a0318b3') => `https://${host}/${sig}/6af607bd/video/tos/alisg/tos-alisg-pv-0037/${file}/?a=1988&bti=ODszNWYuMDE6&bt=1863&mime_type=video_mp4&rc=x`;
+  const VIDEO_FILE = 'https://v16-webapp-prime.tiktok.com/video/tos/alisg/tos-alisg-ve-0068c800-sg/oIfxEZFERcrf31S2vgHtpIqQQAzqhoDwR/?a=1988&bt=1863&mime_type=video_mp4';
+  const LIST = 'https://www.tiktok.com/api/recommend/item_list/?WebIdLastTime=1&aid=1988&count=9';
+  const item = (id, subs, captions = []) => ({ id, author: { uniqueId: 'u' }, video: { duration: 30, subtitleInfos: subs, claInfo: { captionInfos: captions } } });
+  const sub = (file, lang = 'eng-US', source = 'ASR') => ({ Format: 'webvtt', LanguageCodeName: lang, Source: source, Url: vttUrl(file) });
+
+  it('media id from a video page URL, else from the player wrapper around the video', () => {
+    const wrap = document.createElement('div');
+    wrap.id = 'xgwrapper-0-7696986447479311648';
+    const v = document.createElement('video');
+    wrap.append(document.createElement('div'));
+    wrap.firstChild.append(v);
+    expect(tiktok.mediaId('https://www.tiktok.com/@verified_nate/video/7656927541181123861?is_from_webapp=1', v)).toBe('7656927541181123861');
+    expect(tiktok.mediaId('https://www.tiktok.com/foryou', v)).toBe('7696986447479311648');
+    expect(tiktok.mediaId('https://www.tiktok.com/foryou', document.createElement('video'))).toBeNull();
+    expect(tiktok.mediaId('https://www.tiktok.com/foryou', null)).toBeNull();
+    expect(tiktok.mediaId('https://www.tiktok.com/@verified_nate', null)).toBeNull();
+    expect(tiktok.mediaId('https://evil.example/@u/video/7656927541181123861', v)).toBeNull();
+    expect(tiktok.feed).toBe(true);
+  });
+
+  it('subtitle files and item requests are copied; video files and other APIs are not', () => {
+    expect(tiktok.isSubtitleRequest(vttUrl('99485768101742f3a80e82681727af79'))).toBe(true);
+    expect(tiktok.isSubtitleRequest(vttUrl('99485768101742f3a80e82681727af79', 'v19-webapp.tiktokcdn-us.com'))).toBe(true);
+    expect(tiktok.isSubtitleRequest(VIDEO_FILE)).toBe(false);
+    expect(tiktok.isSubtitleRequest(LIST)).toBe(true);
+    expect(tiktok.isSubtitleRequest('https://www.tiktok.com/api/prefetch/explore/item_list/?aid=1988')).toBe(true);
+    expect(tiktok.isSubtitleRequest('https://www.tiktok.com/api/item/detail/?itemId=1')).toBe(true);
+    expect(tiktok.isSubtitleRequest('https://www.tiktok.com/api/comment/list/?aweme_id=1')).toBe(false);
+    expect(tiktok.isSubtitleRequest('https://evil.example/x/video/tos/a/b/99485768101742f3a80e82681727af79/')).toBe(false);
+    expect(tiktok.subtitleInfo(LIST)).toEqual({ catalog: true });
+    expect(tiktok.subtitleInfo(VIDEO_FILE)).toEqual({});
+  });
+
+  it('a subtitle file is a stray until item data claims it; then its item, language and kind', () => {
+    const [a, b, c] = ['a1'.repeat(16), 'b2'.repeat(16), 'c3'.repeat(16)];
+    expect(tiktok.subtitleInfo(vttUrl(a))).toEqual({ stray: true });
+    tiktok.readCatalog(JSON.stringify({ itemList: [item('7656927541181123861', [sub(a)]), item('7683631118070926610', [sub(b, 'urd-PK', 'MT')], [{ language: 'urd-PK', url: vttUrl(b), urlList: [vttUrl(b, 'v19-webapp.tiktok.com')] }])] }));
+    expect(tiktok.subtitleInfo(vttUrl(a))).toEqual({ lang: 'en-US', kind: 'asr', mediaId: '7656927541181123861' });
+    // Another host and signature, the same file.
+    expect(tiktok.subtitleInfo(vttUrl(a, 'v19-webapp.tiktok.com', 'f'.repeat(32)))).toEqual({ lang: 'en-US', kind: 'asr', mediaId: '7656927541181123861' });
+    expect(tiktok.subtitleInfo(vttUrl(b, 'v19-webapp.tiktok.com'))).toEqual({ lang: 'ur-PK', kind: '', mediaId: '7683631118070926610' });
+    expect(tiktok.subtitleInfo(vttUrl(c))).toEqual({ stray: true });
+    tiktok.readCatalog('{not json');
+    tiktok.readCatalog(JSON.stringify({ itemList: [{ id: 'x', video: { subtitleInfos: [sub(c)] } }, { id: '123', video: null }] }));
+    expect(tiktok.subtitleInfo(vttUrl(c))).toEqual({ stray: true });
+  });
+
+  it('the video page’s own data claims its subtitle file', () => {
+    const file = 'd4'.repeat(16);
+    const script = document.createElement('script');
+    script.id = '__UNIVERSAL_DATA_FOR_REHYDRATION__';
+    script.type = 'application/json';
+    script.textContent = JSON.stringify({ __DEFAULT_SCOPE__: { 'webapp.video-detail': { itemInfo: { itemStruct: item('7704437998909164823', [sub(file)]) } } } });
+    document.body.append(script);
+    tiktok.readPage(document);
+    expect(tiktok.subtitleInfo(vttUrl(file))).toMatchObject({ mediaId: '7704437998909164823', lang: 'en-US' });
+    script.remove();
+    expect(() => tiktok.readPage(document)).not.toThrow();
+  });
+
+  it('navigation: popstate and same-document navigations', () => {
+    const fn = vi.fn();
+    const nav = new EventTarget();
+    const win = Object.assign(new EventTarget(), { navigation: nav });
+    const off = tiktok.watchNavigation({ doc: document, win }, fn);
+    win.dispatchEvent(new Event('popstate'));
+    nav.dispatchEvent(new Event('currententrychange'));
+    off();
+    nav.dispatchEvent(new Event('currententrychange'));
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  it('hides the player’s caption layer with one style element and shows it again', () => {
+    const layer = document.createElement('div');
+    layer.className = 'css-pfus7k-7937d88b--DivCaptionContainer e1nv076w0';
+    document.body.append(layer);
+    expect(tiktok.hideSiteCaptions(document, true)).toBe(true);
+    tiktok.hideSiteCaptions(document, true);
+    expect([...document.querySelectorAll('style')].filter((s) => s.textContent.includes('DivCaptionContainer'))).toHaveLength(1);
+    expect(getComputedStyle(layer).display).toBe('none');
+    expect(tiktok.hideSiteCaptions(document, false)).toBe(false);
+    expect(getComputedStyle(layer).display).not.toBe('none');
+    expect(tiktok.mainActions).toEqual({});
+    layer.remove();
   });
 });
 

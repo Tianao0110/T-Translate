@@ -61,7 +61,7 @@ act('load', MSG.COMPANION_LOAD);
 // ---- per site ----
 
 const prefs = createPrefs();
-const siteSwitches = { youtube: $('site-youtube'), bilibili: $('site-bilibili') };
+const siteSwitches = { youtube: $('site-youtube'), bilibili: $('site-bilibili'), tiktok: $('site-tiktok') };
 
 function renderPrefs() {
   const p = prefs.get();

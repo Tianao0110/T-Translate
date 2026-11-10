@@ -34,7 +34,8 @@ async function targetTab() {
   return active?.id ?? null;
 }
 
-const siteName = (site) => (site === 'youtube' ? t('siteYoutube') : site === 'bilibili' ? t('siteBilibili') : site);
+const SITE_NAMES = { youtube: 'siteYoutube', bilibili: 'siteBilibili', tiktok: 'siteTiktok' };
+const siteName = (site) => (Object.hasOwn(SITE_NAMES, site) ? t(SITE_NAMES[site]) : site);
 
 let names = null;
 function langName(code) {

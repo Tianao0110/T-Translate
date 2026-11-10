@@ -71,6 +71,7 @@
   "exportSrt": { "message": "导出字幕" },
   "siteYoutube": { "message": "YouTube" },
   "siteBilibili": { "message": "B 站" },
+  "siteTiktok": { "message": "TikTok" },
   "sitesTitle": { "message": "按站点" },
   "autoListen": { "message": "自动听译" },
   "autoListenHint": { "message": "读不到音频的视频直接开听译，不再提示" },

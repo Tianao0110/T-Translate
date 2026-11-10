@@ -71,6 +71,7 @@
   "exportSrt": { "message": "Export captions" },
   "siteYoutube": { "message": "YouTube" },
   "siteBilibili": { "message": "Bilibili" },
+  "siteTiktok": { "message": "TikTok" },
   "sitesTitle": { "message": "Sites" },
   "autoListen": { "message": "Listen automatically" },
   "autoListenHint": { "message": "When a video's audio can't be read, start listen mode without asking" },
