@@ -120,6 +120,45 @@ export default [
     },
   },
 
+  // ========== 浏览器插件 T-Caption (extension/) ==========
+  // src/ runs in the browser / extension pages (ESM, bundled by esbuild);
+  // test/ and scripts/ run under vitest / Electron.
+  {
+    files: ['extension/src/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: {
+        ...globals.browser,
+        ...globals.webextensions,
+      },
+    },
+    rules: {
+      ...js.configs.recommended.rules,
+      'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      'no-console': 'off',
+      'no-constant-condition': ['error', { checkLoops: false }],
+      'prefer-const': 'warn',
+      'no-empty': ['warn', { allowEmptyCatch: true }],
+    },
+  },
+  {
+    files: ['extension/test/**/*.js', 'extension/scripts/**/*.{js,mjs}'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: {
+        ...globals.node,
+        ...globals.browser,
+      },
+    },
+    rules: {
+      ...js.configs.recommended.rules,
+      'no-console': 'off',
+      'no-empty': ['warn', { allowEmptyCatch: true }],
+    },
+  },
+
   // ========== 配置文件 / 脚本 ==========
   {
     files: ['vite.config.js', 'scripts/**/*.js', 'eslint.config.js'],

@@ -94,3 +94,6 @@ tests/*
 
 # 听译基准数据（FLEURS 下载与拼接结果，scripts/bench-listen.js 生成）
 /bench-data/
+
+# 浏览器插件 T-Caption 的构建产物（extension/scripts/build.mjs 生成）
+/extension/dist/

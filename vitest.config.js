@@ -21,6 +21,7 @@ export default defineConfig({
     include: [
       'tests/**/*.{test,spec}.{js,jsx}',
       'src/**/*.{test,spec}.{js,jsx}',
+      'extension/test/**/*.{test,spec}.js',
     ],
     exclude: ['node_modules', 'build', 'dist'],
     coverage: {
