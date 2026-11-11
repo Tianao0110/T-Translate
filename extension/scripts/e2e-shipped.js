@@ -52,7 +52,7 @@ async function main() {
     const tabIdOf = (prefix) => evaluate(opt, `chrome.tabs.query({}).then((ts) => ts.find((t) => (t.url || t.pendingUrl || '').startsWith(${JSON.stringify(prefix)}))?.id ?? null)`);
     const trackInfo = (session) =>
       evaluate(session, `(() => { const v = document.querySelector('video'); if (!v) return null; const t = Array.from(v.textTracks).find((x) => x.label === 'T-Caption'); return { t: v.currentTime, cues: t ? t.cues.length : 0, active: t ? Array.from(t.activeCues || []).map((c) => c.text) : [] }; })()`);
-    await evaluate(opt, `chrome.storage.local.set({ prefs: { targetLang: 'zh' } }).then(() => true)`);
+    await evaluate(opt, `chrome.storage.local.set({ prefs: { targetLang: 'zh', mode: 'track' } }).then(() => true)`);
 
     const { sessionId: page } = await open('about:blank');
     const tOpen = Date.now();

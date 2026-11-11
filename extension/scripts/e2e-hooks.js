@@ -110,6 +110,7 @@ async function main() {
     companion.openPairing();
     const paired = await evaluate(opt, `chrome.runtime.sendMessage({ type: 'companion/pair' })`);
     step('paired through the extension', paired?.ok && paired.result.status === 'ready', paired?.result?.status || JSON.stringify(paired?.error));
+    await evaluate(opt, `chrome.storage.local.set({ prefs: { mode: 'track' } }).then(() => true)`);
     await evaluate(opt, `(() => { window.__media = []; chrome.runtime.onMessage.addListener((m) => { if (m && m.type === 'media/event') window.__media.push({ at: Date.now(), ...m.payload }); }); })()`);
 
     const ext = (type, payload) => evaluate(opt, `chrome.runtime.sendMessage(${JSON.stringify({ type, payload })})`);

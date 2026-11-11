@@ -173,7 +173,7 @@ async function main() {
     }
 
     // ---- (d) YouTube ----
-    await evaluate(opt, `chrome.storage.local.set({ prefs: { targetLang: 'zh' } }).then(() => true)`);
+    await evaluate(opt, `chrome.storage.local.set({ prefs: { targetLang: 'zh', mode: 'track' } }).then(() => true)`);
     const yt = await open(null);
     const tOpen = Date.now();
     await ff.navigate(yt, `https://www.youtube.com/watch?v=${VIDEO}`, 'interactive');

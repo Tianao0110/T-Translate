@@ -112,6 +112,14 @@ async function main() {
       return r && r.active.some((t) => t.includes('\n[译]')) ? r : null;
     }, 15000, 300);
     step('(b) display segments: the track’s active cue follows (translation only, then both)', prefsTr?.display === 'translation' && !!onlyTr && !!both, `${JSON.stringify(onlyTr?.active)} → ${JSON.stringify(both?.active)}`);
+    const sizeOnPage = (want) => until(() => evaluate(page1, `document.querySelector('video').getAttribute('data-tc-cap-size') === ${JSON.stringify(want)} || null`), 10000, 200);
+    const sizeChecked = await evaluate(pop, `document.querySelector('input[name=size]:checked')?.value ?? null`);
+    await click('input[name=size][value=small]');
+    const small = await sizeOnPage('small');
+    const prefsSmall = await shell.getPrefs();
+    await click('input[name=size][value=medium]');
+    const medium = await sizeOnPage('medium');
+    step('(b) size segments: medium checked, small then medium reach the video', sizeChecked === 'medium' && prefsSmall?.size === 'small' && !!small && !!medium, `checked ${sizeChecked}; prefs ${prefsSmall?.size}; page small ${!!small}, medium ${!!medium}`);
 
     // ---- (c) the site switch ----
     await click('#site-on');
@@ -127,9 +135,9 @@ async function main() {
     const back = await stateIs(tab1, 'captions', 30000);
     const vBack = await until(async () => {
       const v = await popupView();
-      return v.siteOn && v.status === want ? v : null;
+      return v.siteOn && (v.status === want || v.status === msg('tabCaptionsCached')) ? v : null;
     }, 10000);
-    step('(c) on again: captions come back', !!back && !!vBack, `${back?.state} tier ${back?.run?.tier}; popup “${vBack?.status}”`);
+    step('(c) on again: captions come back (recognized or from the cache)', !!back && !!vBack, `${back?.state} tier ${back?.run?.tier}; popup “${vBack?.status}”`);
     if (!back) await dump(tab1);
 
     // ---- (d) export ----

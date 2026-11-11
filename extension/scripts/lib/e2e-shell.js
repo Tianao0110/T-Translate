@@ -131,7 +131,8 @@ async function startShell({ name, step, version, shotPrefix, extraHosts = [] }) 
     query: async (tabId) => (await ext('tab/command', { tabId, command: { cmd: 'query' } }))?.result,
     tabIdOf: (prefix) => evaluate(opt, `chrome.tabs.query({}).then((ts) => ts.find((t) => (t.url || t.pendingUrl || '').startsWith(${JSON.stringify(prefix)}))?.id ?? null)`),
     badge: (tabId) => evaluate(opt, `Promise.all([chrome.action.getBadgeText({ tabId: ${tabId} }), chrome.action.getTitle({ tabId: ${tabId} })])`),
-    setPrefs: (prefs) => evaluate(opt, `chrome.storage.local.set({ prefs: ${JSON.stringify(prefs)} }).then(() => true)`),
+    // Drawn as a track unless a script asks otherwise, so activeCues can be read.
+    setPrefs: (prefs) => evaluate(opt, `chrome.storage.local.set({ prefs: ${JSON.stringify({ mode: 'track', ...prefs })} }).then(() => true)`),
     getPrefs: () => evaluate(opt, `chrome.storage.local.get('prefs').then((r) => r.prefs ?? null)`),
     async stateIs(tabId, want, ms) {
       return until(async () => {
