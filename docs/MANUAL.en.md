@@ -280,6 +280,13 @@ Connect it:
 3. "Regenerate token" stops every paired extension until you pair it again. Use it if you think the token leaked.
 4. When you start listen mode in the floating window, the extension's captions stop. The floating window comes first.
 
+Using it:
+
+- Works on YouTube, Bilibili, TikTok and pages that play a video file directly. Captions appear as soon as the video has sound: site captions are translated, otherwise the sound is recognized.
+- Other sites: on that page, click the T-Caption icon in the browser toolbar and choose 'Allow on this site'. It takes effect as soon as the browser agrees.
+- The toolbar popup switches the display mode, the target language and the per-site switch, and exports captions (SRT / VTT). Captions of videos you have watched are cached and show again at once; clear the cache on the extension's options page.
+- Protected (DRM) video has no readable audio. A line on the video offers to let T-Translate listen to the system sound instead.
+
 ## 4. Settings
 
 Click "Settings" in the main window, or press Ctrl+4 / Ctrl+,. Pages are on the left; the box at the top searches settings. The catalog starts in simple mode with the common pages only; click "Full" at the bottom left for everything.
