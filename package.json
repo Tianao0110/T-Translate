@@ -11,7 +11,7 @@
     "electron:start": "electron .",
     "stack:build": "node scripts/build/build-stack.js",
     "build": "node scripts/fetch/fetch-ocr-models.js && node scripts/fetch/fetch-llama-runtime.js && node scripts/build/build-stack.js && vite build && electron-builder",
-    "dist": "node scripts/build/overlay-sherpa-runtime.js && node scripts/fetch/fetch-ocr-models.js && node scripts/fetch/fetch-llama-runtime.js && node scripts/build/build-stack.js && vite build && electron-builder --publish=never",
+    "dist": "node extension/scripts/build.mjs && node scripts/build/overlay-sherpa-runtime.js &&node scripts/fetch/fetch-ocr-models.js && node scripts/fetch/fetch-llama-runtime.js && node scripts/build/build-stack.js && vite build && electron-builder --publish=never",
     "ocr:models": "node scripts/fetch/fetch-ocr-models.js",
     "llama:runtime": "node scripts/fetch/fetch-llama-runtime.js",
     "ocr:release": "node scripts/build/build-ocr-release.js",
@@ -183,6 +183,13 @@
       {
         "from": "public/child-pane.html",
         "to": "resources/child-pane.html"
+      },
+      {
+        "from": "extension/dist",
+        "to": "resources/t-caption",
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "win": {

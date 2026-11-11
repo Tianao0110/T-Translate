@@ -258,6 +258,7 @@ const CHANNELS = {
     OPEN_PAIRING: 'companion:open-pairing',         // renderer → main: open the one-time pairing window
     REGENERATE_TOKEN: 'companion:regenerate-token', // renderer → main: new token, paired clients must pair again
     STATUS: 'companion:status',                     // main → main window: same shape as GET_STATUS, on every change
+    OPEN_EXTENSION_FOLDER: 'companion:open-extension-folder', // renderer → main: {ok, path} | {ok: false, error: 'missing', path}
   },
 };
 

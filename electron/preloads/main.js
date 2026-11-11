@@ -258,6 +258,7 @@ const electronAPI = {
     getStatus: () => ipcRenderer.invoke("companion:get-status"),
     openPairing: () => ipcRenderer.invoke("companion:open-pairing"),
     regenerateToken: () => ipcRenderer.invoke("companion:regenerate-token"),
+    openExtensionFolder: () => ipcRenderer.invoke("companion:open-extension-folder"),
     onStatus: (callback) => {
       const handler = (event, data) => callback(data);
       ipcRenderer.on("companion:status", handler);

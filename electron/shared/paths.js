@@ -76,6 +76,10 @@ const resources = {
   llamaRuntime: isDev
     ? path.join(BASE_DIR, 'resources/llama')
     : path.join(process.resourcesPath, 'resources/llama'),
+  // The built T-Caption extension (npm run extension:build); the settings page opens it for "Load unpacked".
+  extension: isDev
+    ? path.join(BASE_DIR, 'extension/dist')
+    : path.join(process.resourcesPath, 'resources/t-caption'),
 };
 
 module.exports = {
