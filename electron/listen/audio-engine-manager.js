@@ -62,6 +62,7 @@ const ttsPlayingSenders = new Set();
 // the stack call is wired in by the IPC layer once the stack exists.
 let translator = null;
 let translateStreamHook = null;
+let detectLanguageHook = null;
 let autosaveStore = null;
 // Who the running session reports to: the host window, or a companion sink
 // (companion/ — an object with any of status / segment / partial /
@@ -110,6 +111,7 @@ function init(d) {
   autosaveStore = createListenAutosave({ dir: dataDir('listen') });
   translator = createListenTranslator({
     translateStream: (...args) => translateStreamHook(...args),
+    detectLanguage: (...args) => (detectLanguageHook ? detectLanguageHook(...args) : null),
     enabled: () => !!translateStreamHook,
     uiLang: () => (deps.store.get('settings.interface.language') === 'en' ? 'en' : 'zh'),
     // Secure mode writes nothing; the user's switch is honoured here.
@@ -127,8 +129,9 @@ function init(d) {
 
 // The IPC layer owns the translation stack; it hands the main-process
 // stream call in once both exist.
-function configureTranslation({ translateStream } = {}) {
+function configureTranslation({ translateStream, detectLanguage } = {}) {
   translateStreamHook = typeof translateStream === 'function' ? translateStream : null;
+  detectLanguageHook = typeof detectLanguage === 'function' ? detectLanguage : null;
 }
 
 function setTargetLang(lang) {

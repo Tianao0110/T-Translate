@@ -33,8 +33,10 @@ function buildSrt(finals) {
   return blocks.join('\n\n') + '\n';
 }
 
-// enabled: whether a translation stack is wired at all.
-function createListenTranslator({ translateStream = null, enabled = () => !!translateStream, uiLang = () => 'zh', autosave = null, emit = () => {}, logger, now = Date.now, settleMs = SETTLE_MS, paintEveryMs = PAINT_EVERY_MS }) {
+// enabled: whether a translation stack is wired at all; detectLanguage
+// (texts, target) → [{ inTarget }] or null judges a final the recognizer did
+// not tag (the high-accuracy tier).
+function createListenTranslator({ translateStream = null, detectLanguage = null, enabled = () => !!translateStream, uiLang = () => 'zh', autosave = null, emit = () => {}, logger, now = Date.now, settleMs = SETTLE_MS, paintEveryMs = PAINT_EVERY_MS }) {
   let transcript = [];
   let truncated = false;
   let fileTranscript = true;
@@ -77,6 +79,10 @@ function createListenTranslator({ translateStream = null, enabled = () => !!tran
     if (!target || !translateStream || !enabled()) return;
     const srcLang = (seg.lang || '').replace(/[<|>]/g, '');
     if (srcLang === target) return;
+    if (!srcLang && detectLanguage) {
+      const judged = await Promise.resolve(detectLanguage([seg.text], target)).catch(() => null);
+      if (judged?.[0]?.inTarget === true) return;
+    }
     seg.trans = 'pending';
     emit('translation', { id: seg.id, text: 'pending', done: false });
     // The two finals before this one, as context for the prompt (listen-prompt).

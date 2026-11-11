@@ -59,7 +59,7 @@ function registerAudioEngineIPC(ctx) {
   // Translation of each final and the subtitle file at session end live in
   // the main process (listen/listen-translator.js); the window names the
   // target and opens the folder.
-  engineManager.configureTranslation({ translateStream: ctx.stackHooks?.translateStream || null });
+  engineManager.configureTranslation({ translateStream: ctx.stackHooks?.translateStream || null, detectLanguage: ctx.stackHooks?.detectLanguage || null });
   ipcMain.on(AE.SET_TARGET, (event, lang) => engineManager.setTargetLang(typeof lang === 'string' ? lang : ''));
 
   ipcMain.handle(AE.OPEN_LISTEN_DIR, async () => {

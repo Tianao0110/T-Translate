@@ -103,6 +103,9 @@ function createCompanionServer({
   store,
   session,
   translateStream = null,
+  // (texts, targetLang) → [{ inTarget }] or null: text already in the target
+  // language comes back as it is, untranslated.
+  detectLanguage = null,
   logger,
   version = '',
   getPrivacyMode = () => 'standard',
@@ -211,8 +214,17 @@ function createCompanionServer({
     const out = new Array(items.length);
     let next = 0;
     let failed = 0;
-    const one = async (it) => {
+    let judged = null;
+    if (detectLanguage && !source) {
+      try {
+        judged = await detectLanguage(items.map((it) => it.text), target);
+      } catch {
+        // judged as unknown: everything is translated
+      }
+    }
+    const one = async (it, i) => {
       if (!it.text.trim()) return { id: it.id, text: '' };
+      if (judged?.[i]?.inTarget === true) return { id: it.id, text: it.text };
       try {
         const r = await translateStream(it.text, { sourceLang: source || 'auto', targetLang: target }, () => {}, { noCache: false, signal: controller.signal });
         if (r && r.success && typeof r.text === 'string') return { id: it.id, text: r.text };
@@ -225,7 +237,7 @@ function createCompanionServer({
     const lane = async () => {
       while (next < items.length && !controller.signal.aborted) {
         const i = next++;
-        out[i] = await one(items[i]);
+        out[i] = await one(items[i], i);
       }
     };
     await Promise.all(Array.from({ length: Math.min(TRANSLATE_LANES, items.length) }, lane));

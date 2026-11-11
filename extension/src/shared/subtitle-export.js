@@ -17,11 +17,17 @@ function clock(s, sep) {
 // One cue's text may not hold a blank line (it would end the cue).
 const line = (s) => (typeof s === 'string' ? s.replace(/\r\n?/g, '\n').replace(/\n\s*\n+/g, '\n').trim() : '');
 
+// The same words but for case, spaces and punctuation: a translation that
+// only repeats its original (the video already in the target language).
+const bare = (s) => String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+export const sameText = (a, b) => !!bare(a) && bare(a) === bare(b);
+
 export function cueText(cue, display = 'bilingual') {
   const text = line(cue?.text);
   const tr = line(cue?.translation);
   if (display === 'original') return text;
   if (display === 'translation') return tr || text;
+  if (sameText(text, tr)) return text;
   return [text, tr].filter(Boolean).join('\n');
 }
 

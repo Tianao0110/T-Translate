@@ -5,7 +5,7 @@
 const { createCompanionSession } = require('./session');
 const { createCompanionServer } = require('./server');
 
-function initCompanion({ store, engineManager, translateStream = null, logger, version = '', getPrivacyMode = () => 'standard', onStatus = () => {}, serverOptions = {}, sessionOptions = {} }) {
+function initCompanion({ store, engineManager, translateStream = null, detectLanguage = null, logger, version = '', getPrivacyMode = () => 'standard', onStatus = () => {}, serverOptions = {}, sessionOptions = {} }) {
   let stopped = false;
   let lastSent = '';
   let server = null;
@@ -40,6 +40,7 @@ function initCompanion({ store, engineManager, translateStream = null, logger, v
     store,
     session,
     translateStream,
+    detectLanguage,
     logger,
     version,
     getPrivacyMode,

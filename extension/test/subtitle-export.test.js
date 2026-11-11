@@ -4,7 +4,7 @@
 // characters kept out of cue text; file names cleaned for every OS.
 
 import { describe, it, expect } from 'vitest';
-import { toSrt, toVtt, cueText, exportFileName } from '../src/shared/subtitle-export.js';
+import { toSrt, toVtt, cueText, sameText, exportFileName } from '../src/shared/subtitle-export.js';
 import { parseSrt } from '../src/content/parsers/srt.js';
 import { parseVtt } from '../src/content/parsers/vtt.js';
 
@@ -32,6 +32,15 @@ describe('export', () => {
     expect(cueText({ text: '', translation: 'only' }, 'original')).toBe('');
     expect(cueText({ text: '', translation: 'only' }, 'bilingual')).toBe('only');
     expect(cueText({ text: 'a', translation: 'b' })).toBe('a\nb');
+  });
+
+  it('bilingual shows once a translation that only repeats the original (case, spaces, punctuation aside)', () => {
+    expect(cueText({ text: 'Thank you.', translation: 'thank you' })).toBe('Thank you.');
+    expect(cueText({ text: "It's   fine!", translation: 'It’s fine' })).toBe("It's   fine!");
+    expect(cueText({ text: 'Thank you.', translation: 'Thanks a lot.' })).toBe('Thank you.\nThanks a lot.');
+    expect(cueText({ text: '...', translation: '!!!' })).toBe('...\n!!!'); // no words: nothing to compare
+    expect(sameText('你好，世界', '你好世界')).toBe(true);
+    expect(sameText('', '')).toBe(false);
   });
 
   it('WebVTT: header, dot clock, markup characters escaped', () => {

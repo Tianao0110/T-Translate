@@ -460,6 +460,17 @@ function register(ctx) {
     onPrivacyModeChanged(mode) {
       stack?.cache.setPersistEnabled(mode !== 'secure');
     },
+    // The same-language judgment for main-process callers (the listen
+    // translator, the companion channel): [{ language, inTarget }] or null.
+    async detectLanguage(texts, targetLang) {
+      if (!stack || !Array.isArray(texts) || texts.length > MAX_DETECT_TEXTS) return null;
+      try {
+        return await stack.language.detect(texts.map((t) => (typeof t === 'string' ? t : '')), String(targetLang || '').slice(0, 16));
+      } catch (e) {
+        logger.error('detect language (main) failed:', e);
+        return null;
+      }
+    },
     // Main-process callers (the listen translator) go through the same
     // sanitizer as the renderer.
     async translateStream(text, options, onChunk, { noCache = false, signal = null } = {}) {

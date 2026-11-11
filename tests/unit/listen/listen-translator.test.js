@@ -90,6 +90,20 @@ describe('listen translator', () => {
     expect(events).toEqual([]);
   });
 
+  it('a final with no language tag is judged first: already in the target, it is left untranslated', async () => {
+    const detectLanguage = vi.fn(async (texts) => texts.map((t) => ({ inTarget: /^[A-Za-z ,.']+$/.test(t) })));
+    const { t, events, stream } = make({ detectLanguage });
+    t.beginSession({ targetLang: 'en' });
+    t.onSegment(rec('This is English already.', ''));
+    t.onSegment(rec('这句要翻译', ''));
+    t.onSegment(rec('Tagged english', 'en')); // the tag settles it, no judging
+    await flush(); await flush(); await flush();
+    expect(detectLanguage).toHaveBeenCalledTimes(2);
+    expect(detectLanguage.mock.calls[0]).toEqual([['This is English already.'], 'en']);
+    expect(stream.mock.calls.map((c) => c[0])).toEqual(['这句要翻译']);
+    expect(events.filter((e) => e.kind === 'translation').every((e) => e.id === 2)).toBe(true);
+  });
+
   it('settles a failed or rejected translation as null', async () => {
     const { t, events } = make({ translateStream: vi.fn(async () => ({ success: false, error: 'nope' })) });
     t.beginSession({ targetLang: 'en' });

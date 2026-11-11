@@ -160,6 +160,15 @@ describe('createCaptionRenderer', () => {
     expect(r.display).toBe('bilingual');
   });
 
+  it('bilingual shows a translation that only repeats the original once', () => {
+    const r = make();
+    r.setCues([{ id: 'a', start: 1, end: 3, text: 'Thank you.' }]);
+    r.setTranslation('a', 'thank you', true);
+    expect(video.textTracks[0].list[0].text).toBe('Thank you.');
+    r.setTranslation('a', '谢谢。', true);
+    expect(video.textTracks[0].list[0].text).toBe('Thank you.\n谢谢。');
+  });
+
   it('a failed translation (done, no text) falls back to the original', () => {
     const r = make();
     r.setCues(CUES);

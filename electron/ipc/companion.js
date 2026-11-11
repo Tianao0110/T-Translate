@@ -22,6 +22,7 @@ function registerCompanionIPC(ctx) {
     store,
     engineManager,
     translateStream: ctx.stackHooks?.translateStream || null,
+    detectLanguage: ctx.stackHooks?.detectLanguage || null,
     logger,
     version: ctx.app.getVersion(),
     getPrivacyMode: () => store.get('privacyMode', 'standard'),

@@ -7,6 +7,7 @@ import { createCaptionTrack } from './caption-track.js';
 import { DEFAULT_SIZE, SIZES } from './caption-size.js';
 import { createOverlay } from './overlay.js';
 import { normalizeText } from './parsers/text.js';
+import { sameText } from '../shared/subtitle-export.js';
 
 export const MODES = ['track', 'overlay'];
 export const DISPLAYS = ['bilingual', 'translation', 'original'];
@@ -36,10 +37,12 @@ export function createCaptionRenderer({
   };
   let view = makeView(mode);
 
-  // The translation stands in for a missing original, never the other way round.
+  // The translation stands in for a missing original, never the other way
+  // round; one that only repeats the original shows once.
   function textOf(e) {
     if (display === 'original' || !e.translation) return e.text;
-    return display === 'translation' ? e.translation : `${e.text}\n${e.translation}`;
+    if (display === 'translation') return e.translation;
+    return sameText(e.text, e.translation) ? e.text : `${e.text}\n${e.translation}`;
   }
   const viewCue = (e) => ({ id: e.id, start: e.start, end: e.end, text: textOf(e) });
 

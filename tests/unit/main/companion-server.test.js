@@ -444,6 +444,23 @@ describe('translate', () => {
     expect(translateCalls[0].extra.noCache).toBe(false);
   });
 
+  it('text already in the target language comes back as it is, untranslated (source unknown only)', async () => {
+    await server.stop();
+    const judged = [];
+    await boot({
+      detectLanguage: async (texts, target) => {
+        judged.push([texts, target]);
+        return texts.map((t) => ({ inTarget: /^[a-z ]+$/i.test(t) }));
+      },
+    });
+    const r = await post('/v1/translate', { items: [{ id: 1, text: 'already english' }, { id: 2, text: '要翻译' }], target: 'en' });
+    expect(r.json.items).toEqual([{ id: 1, text: 'already english' }, { id: 2, text: expect.any(String) }]);
+    expect(translateCalls.map((c) => c.text)).toEqual(['要翻译']);
+    expect(judged).toEqual([[['already english', '要翻译'], 'en']]);
+    await post('/v1/translate', { items: [{ id: 3, text: 'abc' }], source: 'fr', target: 'en' });
+    expect(judged).toHaveLength(1); // a given source is trusted
+  });
+
   it('passes the source language through', async () => {
     await post('/v1/translate', { items: [{ id: 1, text: 'x' }], source: 'en', target: 'ja' });
     expect(translateCalls[0].options).toEqual({ sourceLang: 'en', targetLang: 'ja' });
