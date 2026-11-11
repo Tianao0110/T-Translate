@@ -1,15 +1,15 @@
 // Captions drawn over the video, for pages that hide native tracks: a box in
 // a shadow root (site CSS stays out), mounted in the fullscreen element while
-// one holds the video. Up to MAX_SHOWN cues at once, oldest on top and dimmed;
-// a cue stays past its end until it has had time to be read, and a new one
-// fades in. Same set / upsert / updateText / clear / setSize / destroy as
+// one holds the video. One cue at a time: it stays past its end, until it has
+// had time to be read or the next one starts, and a new one fades in. Same
+// set / upsert / updateText / clear / setSize / destroy as
 // caption-track.js. The text size follows the video's height, or its width
 // when that is the shorter measure (portrait video), times the size factor.
 
 import { cueTimes } from './caption-track.js';
 import { DEFAULT_SIZE, scaleOf } from './caption-size.js';
 
-export const MAX_SHOWN = 2;
+export const MAX_SHOWN = 1;
 const LINGER_S = 1;
 const READ_BASE_S = 0.6;
 const READ_WIDTH_PER_S = 20; // a CJK character counts 2
@@ -42,11 +42,10 @@ const CSS = `
   display: flex; flex-direction: column; align-items: center; gap: 0.12em; max-width: 100%;
   animation: tc-cap-in 160ms ease-out;
 }
-.tc-cap-cue.tc-cap-old .tc-cap-line { color: var(--tc-cap-fg-old, #c8c8c8); }
 @keyframes tc-cap-in { from { opacity: 0; transform: translateY(0.3em); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .tc-cap-cue, .tc-cap-line { animation: none; transition: none; } }
+@media (prefers-reduced-motion: reduce) { .tc-cap-cue { animation: none; } }
 .tc-cap-line {
-  max-width: 100%; box-sizing: border-box; padding: 0.04em 0.4em; border-radius: 0.18em; transition: color 200ms ease-out;
+  max-width: 100%; box-sizing: border-box; padding: 0.04em 0.4em; border-radius: 0.18em;
   color: var(--tc-cap-fg, #fff); background: var(--tc-cap-bg, rgba(8, 8, 8, 0.55));
   text-shadow: 0 0 0.08em #000, 0.04em 0.04em 0.08em #000, -0.04em -0.04em 0.08em #000,
     0.04em -0.04em 0.08em #000, -0.04em 0.04em 0.08em #000;
@@ -166,7 +165,6 @@ export function createOverlay({ video, size = DEFAULT_SIZE }) {
         r.text = c.text;
         r.el.replaceChildren(...linesOf(c.text));
       }
-      r.el.classList.toggle('tc-cap-old', k < list.length - 1);
       if (r.el.parentNode !== box || r.el.nextSibling !== next) box.insertBefore(r.el, next);
       next = r.el;
     }

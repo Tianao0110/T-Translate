@@ -33,13 +33,14 @@ describe('shownIndexes', () => {
   ]);
   const at = (t) => shownIndexes(cues, maxHold, t);
 
-  it('the newest cues still held at t, oldest first, at most MAX_SHOWN', () => {
-    expect(MAX_SHOWN).toBe(2);
+  it('the newest cue still held at t; more, oldest first, when asked for', () => {
+    expect(MAX_SHOWN).toBe(1);
     expect(at(5)).toEqual([0]);
-    expect(at(10)).toEqual([0, 1]); // start is inclusive
-    expect(at(11.5)).toEqual([1, 2]);
-    expect(at(12)).toEqual([0, 2]); // hold is exclusive
-    expect(at(16)).toEqual([0]);
+    expect(at(10)).toEqual([1]); // start is inclusive
+    expect(at(11.5)).toEqual([2]);
+    expect(at(12)).toEqual([2]);
+    expect(at(16)).toEqual([0]); // hold is exclusive
+    expect(shownIndexes(cues, maxHold, 12, 2)).toEqual([0, 2]);
     expect(shownIndexes(cues, maxHold, 11.5, 3)).toEqual([0, 1, 2]);
   });
 
@@ -93,7 +94,6 @@ describe('createOverlay', () => {
 
   const lines = (o) => [...o.host.shadowRoot.querySelectorAll('.tc-cap-line')].map((l) => l.textContent);
   const boxHidden = (o) => o.host.shadowRoot.querySelector('.tc-cap-box').hidden;
-  const cueClasses = (o) => [...o.host.shadowRoot.querySelectorAll('.tc-cap-cue')].map((el) => el.className);
 
   it('mounts next to the video, isolated, click-through', () => {
     const o = createOverlay({ video });
@@ -125,32 +125,33 @@ describe('createOverlay', () => {
     o.refresh();
     expect(lines(o)).toEqual(['zero length']); // stretched to half a second
     o.upsert({ id: 'y', start: 8.1, end: 9, text: 'newer' });
-    expect(lines(o)).toEqual(['zero length', 'newer']);
-    expect(cueClasses(o)).toEqual(['tc-cap-cue tc-cap-old', 'tc-cap-cue']);
+    expect(lines(o)).toEqual(['newer']);
     o.clear();
     expect(lines(o)).toEqual([]);
     expect(boxHidden(o)).toBe(true);
   });
 
-  it('keeps a shown cue in place while its text changes; a third cue pushes the oldest out', () => {
+  it('a cue lingers through a short gap, keeps its box while its text changes, and gives way to the next', () => {
     const o = createOverlay({ video });
     o.set([
       { id: 'a', start: 0, end: 2, text: 'one' },
-      { id: 'b', start: 2, end: 4, text: 'two' },
-      { id: 'c', start: 2.5, end: 5, text: 'three' },
+      { id: 'b', start: 4, end: 6, text: 'two' },
+      { id: 'c', start: 6, end: 8, text: 'three' },
     ]);
-    video.currentTime = 2.2;
-    o.refresh();
-    expect(lines(o)).toEqual(['one', 'two']); // 'one' lingers a beat past its end
-    const boxOf = (text) => [...o.host.shadowRoot.querySelectorAll('.tc-cap-cue')].find((el) => el.textContent.startsWith(text));
-    const two = boxOf('two');
+    const at = (t) => {
+      video.currentTime = t;
+      o.refresh();
+      return lines(o);
+    };
+    expect(at(2.5)).toEqual(['one']); // a beat past its end
+    expect(at(3.1)).toEqual([]);
+    expect(at(4)).toEqual(['two']);
+    const box = o.host.shadowRoot.querySelector('.tc-cap-cue');
     o.updateText('b', 'two\n二');
-    expect(lines(o)).toEqual(['one', 'two', '二']);
-    expect(boxOf('two')).toBe(two);
-    video.currentTime = 2.6;
-    o.refresh();
-    expect(lines(o)).toEqual(['two', '二', 'three']);
-    expect(boxOf('two')).toBe(two);
+    expect(lines(o)).toEqual(['two', '二']);
+    expect(o.host.shadowRoot.querySelector('.tc-cap-cue')).toBe(box);
+    expect(at(6)).toEqual(['three']);
+    expect(o.host.shadowRoot.querySelectorAll('.tc-cap-cue')).toHaveLength(1);
   });
 
   it('scales the text by the size factor', () => {

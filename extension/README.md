@@ -54,7 +54,7 @@ src/content/mp4-sniff.js          不解封装读 fMP4 分片的媒体时间（m
 src/content/sites/                站点适配：YouTube（媒体 id、timedtext、导航、隐藏站点字幕、播放器操作）、B 站（BV / av / 番剧 id、分 P、字幕清单 → 取字幕体）、TikTok（视频页 id 或播放器外框的条目 id、信息流换视频即导航、条目数据认领 WebVTT）、通用（字幕文件按扩展名认）
 src/content/parsers/              站点字幕解析：VTT、SRT、TTML、json3、B 站 JSON，detectFormat 认格式
 src/content/caption-track.js      字幕画成视频的原生字幕轨（TextTrack）
-src/content/overlay.js            覆盖层（默认画法）：画在视频上，跟随全屏；最多两句，旧的在上、留到读完，新的淡入
+src/content/overlay.js            覆盖层（默认画法）：画在视频上，跟随全屏；一次一句，停顿时多留一会儿，新的淡入
 src/content/caption-size.js       字号四档（小 / 中 / 大 / 特大）对应的倍数
 src/content/caption-renderer.js   字幕与译文、双语 / 只译文 / 只原文、两种画法切换、字号，接媒体流水线事件
 src/content/notice.js             视频上的一行提示（DRM 时「用 T-Translate 听译」+ 按钮；视频所在网站未允许时只有关闭）
