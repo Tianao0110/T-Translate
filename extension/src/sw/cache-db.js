@@ -5,7 +5,8 @@
 // worker, a Map in tests and wherever nothing may reach the disk.
 //
 // A record is { key, cues: [{ id, start, end, text, translation }], tier,
-// lang, target, updatedAt, bytes, cueCount }; bytes is its JSON length.
+// lang, target, sentences, updatedAt, bytes, cueCount }; bytes is its JSON
+// length; sentences: recognized cues were cut into sentences by the app.
 // all() may leave cues out: the LRU only reads the rest.
 
 import { MSG } from '../shared/messages.js';
@@ -96,12 +97,12 @@ export function createSubtitleCache({ store, maxEntries = 200, maxBytes = 100 * 
       }),
 
     // Stores the record and evicts the oldest past the limits; resolves its metadata.
-    put: (key, { cues, tier = null, lang = '', target = '' } = {}) =>
+    put: (key, { cues, tier = null, lang = '', target = '', sentences = false } = {}) =>
       serial(async () => {
         checkKey(key);
         await load();
         const list = cleanCues(cues);
-        const record = { key, cues: list, tier: Number.isSafeInteger(tier) ? tier : null, lang: str(lang, MAX_LANG), target: str(target, MAX_LANG), updatedAt: stamp(), bytes: 0, cueCount: list.length };
+        const record = { key, cues: list, tier: Number.isSafeInteger(tier) ? tier : null, lang: str(lang, MAX_LANG), target: str(target, MAX_LANG), sentences: sentences === true, updatedAt: stamp(), bytes: 0, cueCount: list.length };
         // The size includes its own digits.
         for (let n = 0, i = 0; i < 4; i++) {
           const len = JSON.stringify({ ...record, bytes: n }).length;

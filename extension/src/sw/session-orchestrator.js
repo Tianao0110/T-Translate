@@ -209,6 +209,10 @@ export function createOrchestrator({
   }
   const covered = (r) => !!coveredAt(coverage(r), currentTime(r));
 
+  // A recognized record without `sentences` holds whole segments: it counts as
+  // missing, and the next run replaces it.
+  const staleRecord = (rec) => rec.tier !== TIER.SITE && rec.sentences !== true;
+
   // When the video changes: what ran for the old one is written, the new
   // one's record is looked up (evaluateAll shows it once it is here).
   function syncCache(r) {
@@ -230,7 +234,7 @@ export function createOrchestrator({
       .then(() => store.get(key))
       .then(
         (rec) => {
-          if (r.cacheLoad !== load || r.cacheKey !== key || !Array.isArray(rec?.cues) || !rec.cues.length) return;
+          if (r.cacheLoad !== load || r.cacheKey !== key || !Array.isArray(rec?.cues) || !rec.cues.length || staleRecord(rec)) return;
           r.cached = rec;
           schedule();
         },
@@ -313,7 +317,7 @@ export function createOrchestrator({
       merged.set(id, { ...c, id });
     }
     const cues = [...merged.values()].sort((a, b) => a.start - b.start);
-    const record = { cues, tier: r.cacheTier ?? r.cached?.tier ?? null, lang: r.cacheLang || r.cached?.lang || '', target: prefs.get().targetLang };
+    const record = { cues, tier: r.cacheTier ?? r.cached?.tier ?? null, lang: r.cacheLang || r.cached?.lang || '', target: prefs.get().targetLang, sentences: true };
     r.cached = record;
     // The page already has these cues (they ran here); only a new document shows the record again.
     r.shown ??= { key, count: cues.length, translating: true };

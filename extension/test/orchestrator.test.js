@@ -457,7 +457,7 @@ describe('one tab at a time and the gates', () => {
 
 describe('the subtitle cache', () => {
   const KEY = 'youtube:vid00000001';
-  const record = (over = {}) => ({ cues: cuesOf(6).map((c) => ({ ...c, translation: `[zh] ${c.text}` })), tier: 2, lang: 'en', target: 'zh', ...over });
+  const record = (over = {}) => ({ cues: cuesOf(6).map((c) => ({ ...c, translation: `[zh] ${c.text}` })), tier: 2, lang: 'en', target: 'zh', sentences: true, ...over });
   let store;
   let memory;
   const fakeCache = () => {
@@ -574,6 +574,24 @@ describe('the subtitle cache', () => {
     const on = pe.of('mse-capture').filter((c) => c.on);
     expect(on).toHaveLength(2);
     expect(on[1].fromS).toBeCloseTo(43, 0);
+  });
+
+  it('a recognized record of whole segments (no sentences mark) counts as missing and is replaced; site records stay', async () => {
+    withCache({ record: record({ sentences: undefined }) });
+    await playing(7, { media: { currentTime: 20 } });
+    await after(2000);
+    expect(sets()).toHaveLength(0);
+    expect(pe.of('mse-capture').filter((c) => c.on)).toHaveLength(1);
+    segment('tab:7:1', 'm1-0', 20, 23, 'fresh');
+    await after(30000);
+    const [, rec] = store.put.mock.calls[0];
+    expect(rec.sentences).toBe(true);
+    expect(rec.cues.map((c) => c.text)).toEqual(['fresh']);
+
+    withCache({ record: record({ tier: 1, sentences: undefined }) });
+    await playing(7, { media: { currentTime: 20 } });
+    await flush();
+    expect(sets()).toHaveLength(1);
   });
 
   it('secure mode and incognito tabs keep records in memory only', async () => {
