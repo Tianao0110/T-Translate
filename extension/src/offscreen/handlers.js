@@ -84,11 +84,11 @@ export function createOffscreenHandlers({ storage, notify }) {
       return pipeline.open({ key: payload?.key, lang: String(payload?.lang ?? ''), targetLang: String(payload?.targetLang ?? ''), source: payload?.source ?? 'mse' });
     },
     [MSG.MEDIA_PUSH]: async (payload) => pipeline.push({ key: payload?.key, bytes: decodeBytes(payload?.bytes), offset: payload?.offset }),
-    [MSG.MEDIA_CLOSE]: async (payload) => pipeline.close({ key: payload?.key, drain: payload?.drain !== false }),
+    [MSG.MEDIA_CLOSE]: async (payload) => pipeline.close({ key: payload?.key, drain: payload?.drain !== false, handover: payload?.handover === true }),
     [MSG.LISTEN_OPEN]: async (payload) => {
       await connected();
       return listen.open({ key: payload?.key, lang: String(payload?.lang ?? ''), targetLang: String(payload?.targetLang ?? ''), mediaStartS: Number(payload?.mediaStartS) || 0 });
     },
-    [MSG.LISTEN_CLOSE]: async (payload) => listen.close({ key: payload?.key }),
+    [MSG.LISTEN_CLOSE]: async (payload) => listen.close({ key: payload?.key, handover: payload?.handover === true }),
   };
 }

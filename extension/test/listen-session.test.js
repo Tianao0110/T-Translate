@@ -32,9 +32,91 @@ function fakeClient() {
       return true;
     }),
     push: (id, evt) => subs.get(id)?.(evt),
+    canSeek: false,
+    seekFail: null,
+    getState: () => ({ capabilities: { listen: true, ...(client.canSeek && { seek: true }) } }),
+    seekAsr: vi.fn(async (id) => {
+      client.order.push(`seek ${id}`);
+      if (client.seekFail) throw Object.assign(new Error(client.seekFail), { code: client.seekFail });
+      return { atS: 4 };
+    }),
+    order: [],
   };
+  const open = client.listenOpen;
+  client.listenOpen = vi.fn(async (opts) => {
+    client.order.push('open');
+    return open(opts);
+  });
+  const close = client.closeAsr;
+  client.closeAsr = vi.fn(async (id) => {
+    client.order.push(`close ${id}`);
+    return close(id);
+  });
   return client;
 }
+
+describe('listen sessions: handing the session over at a seek', () => {
+  const seekable = () => {
+    const client = fakeClient();
+    client.canSeek = true;
+    const events = [];
+    const ls = createListenSessions({ client, onEvent: (e) => events.push(e), leaseMs: 40 });
+    return { client, events, ls };
+  };
+  const of = (events, key) => events.filter((e) => e.key === key).map((e) => [e.event.type, e.event.id ?? e.event.reason]);
+
+  it('a close for a seek leases the app’s session; the next open takes it with a seek, translations follow their segments', async () => {
+    const { client, events, ls } = seekable();
+    await ls.open({ key: 'l1', lang: 'en', targetLang: 'zh', mediaStartS: 10 });
+    client.push('s1', { type: 'segment', id: 1, start: 11, end: 12, text: 'a' });
+    expect(await ls.close({ key: 'l1', handover: true })).toEqual({ key: 'l1', id: 's1', segments: 1, handedOver: true });
+    client.push('s1', { type: 'segment', id: 2, start: 12, end: 13, text: 'flushed' });
+    const r = await ls.open({ key: 'l2', lang: 'en', targetLang: 'zh', mediaStartS: 300 });
+    expect(r).toEqual({ key: 'l2', id: 's1', adopted: true });
+    expect(client.seekAsr).toHaveBeenCalledWith('s1', { mediaStartS: 300 });
+    expect(client.order).toEqual(['open', 'seek s1']);
+    client.push('s1', { type: 'translation', id: 2, text: 'T2', done: true });
+    client.push('s1', { type: 'segment', id: 3, start: 300.5, end: 302, text: 'after' });
+    client.push('s1', { type: 'translation', id: 3, text: 'T3', done: true });
+    expect(of(events, 'l1')).toEqual([['segment', 1], ['closed', 'handover'], ['segment', 2], ['translation', 2]]);
+    expect(of(events, 'l2')).toEqual([['segment', 3], ['translation', 3]]);
+    expect(ls.current()).toBe('l2');
+    await ls.close({ key: 'l2' });
+    await tick();
+    expect(client.closed).toEqual(['s1']);
+    expect(of(events, 'l2').at(-1)).toEqual(['closed', 'closed']);
+  });
+
+  it('a lease nobody takes is closed after leaseMs', async () => {
+    const { client, ls } = seekable();
+    await ls.open({ key: 'l1', lang: 'en', targetLang: 'zh' });
+    await ls.close({ key: 'l1', handover: true });
+    expect(client.closed).toEqual([]);
+    await vi.waitFor(() => expect(client.closed).toEqual(['s1']));
+  });
+
+  it('other languages, or a failed seek: the leased session is closed first, then a new one opened', async () => {
+    const { client, ls } = seekable();
+    await ls.open({ key: 'l1', lang: 'en', targetLang: 'zh' });
+    await ls.close({ key: 'l1', handover: true });
+    await ls.open({ key: 'l2', lang: 'en', targetLang: 'ja' });
+    expect(client.order).toEqual(['open', 'close s1', 'open']);
+    await ls.close({ key: 'l2', handover: true });
+    client.seekFail = 'not-ready';
+    expect(await ls.open({ key: 'l3', lang: 'en', targetLang: 'ja' })).toEqual({ key: 'l3', id: 's3' });
+    expect(client.order.slice(3)).toEqual(['seek s2', 'close s2', 'open']);
+  });
+
+  it('an app that cannot seek: the close is an ordinary one', async () => {
+    const client = fakeClient();
+    const events = [];
+    const ls = createListenSessions({ client, onEvent: (e) => events.push(e) });
+    await ls.open({ key: 'l1' });
+    await ls.close({ key: 'l1', handover: true });
+    expect(client.closed).toEqual(['s1']);
+    expect(events.at(-1).event).toEqual({ type: 'closed', reason: 'closed' });
+  });
+});
 
 describe('listen sessions', () => {
   it('opens, relays events under the key, closes once', async () => {

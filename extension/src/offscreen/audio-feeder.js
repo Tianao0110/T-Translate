@@ -2,8 +2,11 @@
 // session, in order, honouring the server's backpressure; the session's
 // events go to onEvent unchanged, plus 'suspended', 'dropped' and 'error'.
 // The desktop side keeps the media timeline from mediaStartS and the samples fed.
+// At a seek the session is not closed: detach() leases it to the next
+// feeder, whose start() takes it over with a seek (session-route.js).
 
 import { FEED_CHUNK_SAMPLES, SAMPLE_RATE } from '../shared/protocol.js';
+import { createSessionRoute } from './session-route.js';
 
 const STALL_MS = 60000;
 const MAX_QUEUE_S = 90;
@@ -26,15 +29,21 @@ export function createAudioFeeder({
   stallMs = STALL_MS,
   maxQueueS = MAX_QUEUE_S,
   closeWaitMs = CLOSE_WAIT_MS,
+  lease = null, // a detached feeder's lease, or a promise of one / null
 } = {}) {
   const maxChunks = Math.max(1, Math.round((maxQueueS * SAMPLE_RATE) / FEED_CHUNK_SAMPLES));
-  // idle → starting → running ⇄ suspended → draining → closing → closed; failed on errors
+  // idle → starting → running ⇄ suspended → draining → closing → closed;
+  // failed on errors; detached once the session went to the next feeder
   let state = 'idle';
   let id = null;
-  let sub = null;
+  let route = null;
   let starting = null;
   let stopping = null;
+  let detaching = null;
   let pumping = null;
+  let wake = null; // ends a backpressure wait early (detach)
+  let handedOver = false;
+  let adopted = false;
   const queue = []; // full chunks not yet sent
   let tail = new Float32Array(FEED_CHUNK_SAMPLES);
   let tailLen = 0;
@@ -79,6 +88,14 @@ export function createAudioFeeder({
 
   const pumpable = () => state === 'running' || state === 'draining';
 
+  function nap(ms) {
+    if (state === 'detached') return Promise.resolve();
+    return new Promise((resolve) => {
+      wake = resolve;
+      sleep(ms).then(resolve);
+    }).finally(() => (wake = null));
+  }
+
   function kick() {
     if (pumping || !pumpable() || !queue.length) return;
     pumping = pump().finally(() => {
@@ -118,7 +135,7 @@ export function createAudioFeeder({
           emit({ type: 'suspended' });
           return;
         }
-        await sleep(r.wait);
+        await nap(r.wait);
         if (!pumpable()) {
           if (state === 'suspended') {
             queue.unshift(chunk);
@@ -152,23 +169,87 @@ export function createAudioFeeder({
       feedMs: stats.lastFeedAt - stats.firstFeedAt,
       queuedS: (queue.length * FEED_CHUNK_SAMPLES + tailLen) / SAMPLE_RATE,
       closed: sawClosed,
+      handedOver,
+      adopted,
     };
   }
 
+  // The session for the next feeder: adopt(onEvent) moves its events there
+  // and returns the route (its sub to stop); release() closes it instead,
+  // its last events still coming here until 'closed'.
+  function leaseOf() {
+    const r = route;
+    let released = false;
+    const l = {
+      id,
+      seq,
+      lang,
+      targetLang,
+      dead: false,
+      taken: false,
+      adopt(handler) {
+        l.taken = true;
+        r.hand(handler);
+        return r;
+      },
+      async release() {
+        if (released || l.taken) return;
+        released = true;
+        r.lease = null;
+        try {
+          await client.closeAsr(l.id);
+        } catch (e) {
+          logger.warn?.(`close failed: ${e.code || e.message}`);
+        }
+        let timer;
+        Promise.race([r.closed, new Promise((res) => (timer = setTimeout(res, closeWaitMs)))]).then(() => {
+          clearTimeout(timer);
+          r.sub?.stop();
+        });
+      },
+    };
+    r.lease = l;
+    return l;
+  }
+
+  // Takes over a detached feeder's session with a seek; any failure releases
+  // it. True when taken.
+  async function adopt(held) {
+    if (!held.dead) {
+      try {
+        await client.seekAsr(held.id, { mediaStartS });
+        if (held.dead) throw Object.assign(new Error('closed'), { code: 'closed' });
+        ({ id, seq } = held);
+        route = held.adopt(onServerEvent);
+        adopted = true;
+        return true;
+      } catch (e) {
+        logger.warn?.(`seek failed: ${e.code || e.message}`);
+      }
+    }
+    await held.release();
+    return false;
+  }
+
   return {
-    // Opens the session and its event stream. Rejects with the client's error
-    // (busy, no-model, unpaired …), or 'stopped' when stop() came first.
+    // Takes over the leased session, else opens one and its event stream.
+    // Rejects with the client's error (busy, no-model, unpaired …), or
+    // 'stopped' when stop() came first.
     start() {
       if (!starting && state !== 'idle') return Promise.reject(Object.assign(new Error('stopped'), { code: 'stopped' }));
       starting ??= (async () => {
         state = 'starting';
-        try {
-          ({ id } = await client.openAsr({ mode: 'feed', lang, targetLang, mediaStartS }));
-        } catch (e) {
-          state = 'failed';
-          throw e;
+        const held = await lease;
+        if (!(held && (await adopt(held)))) {
+          try {
+            ({ id } = await client.openAsr({ mode: 'feed', lang, targetLang, mediaStartS }));
+          } catch (e) {
+            state = 'failed';
+            throw e;
+          }
+          route = createSessionRoute(onServerEvent);
+          route.sub = client.subscribe(id, route.deliver);
         }
-        sub = client.subscribe(id, onServerEvent);
         if (state === 'starting') state = 'running';
         kick();
         return id;
@@ -205,6 +286,7 @@ export function createAudioFeeder({
     // session and waits for its 'closed'. Resolves the stats.
     stop({ drain = true } = {}) {
       stopping ??= (async () => {
+        if (detaching && (await detaching)) return snapshot();
         try {
           await starting;
         } catch {}
@@ -239,11 +321,35 @@ export function createAudioFeeder({
           await Promise.race([closed, new Promise((r) => (timer = setTimeout(r, closeWaitMs)))]);
           clearTimeout(timer);
         }
-        sub?.stop();
+        route?.sub?.stop();
         state = 'closed';
         return snapshot();
       })();
       return stopping;
+    },
+
+    // A seek: the session goes to the next feeder instead of closing. What
+    // is queued is dropped; the chunk already on its way lands first, so the
+    // next feeder's seek comes after it. Resolves the lease, or null with no
+    // session to hand over (then stop() closes as usual).
+    detach() {
+      if (stopping) return stopping.then(() => null);
+      detaching ??= (async () => {
+        try {
+          await starting;
+        } catch {}
+        if (!id || (state !== 'running' && state !== 'suspended')) return null;
+        queue.length = 0;
+        tail = new Float32Array(FEED_CHUNK_SAMPLES);
+        tailLen = 0;
+        state = 'detached';
+        wake?.();
+        while (pumping) await pumping;
+        if (sawClosed) return null;
+        handedOver = true;
+        return leaseOf();
+      })();
+      return detaching;
     },
 
     stats: snapshot,

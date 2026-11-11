@@ -251,6 +251,11 @@ export function createPageEvents({
     return { boot: bootId };
   }
 
+  // A seek, or the stop that comes while the tab's video is still seeking to
+  // a spot it has not buffered (too few frames there to stay eligible).
+  const isSeek = (ev, reason) => reason === 'seek' || (reason === 'other-tab' && ev.media.find((m) => m.elId === ev.primaryElId)?.state === 'seeking');
+  const closeFor = (ev, reason) => (isSeek(ev, reason) ? { drain: false, handover: true } : { drain: true });
+
   const keepKey = (key, owner) => {
     keys.set(key, owner);
     if (keys.size > 8) keys.delete(keys.keys().next().value);
@@ -286,14 +291,16 @@ export function createPageEvents({
   }
 
   // tellTab false: the page already stopped, or is gone. A seek drops the
-  // audio fetched ahead instead of draining it (the restart wants the new spot).
+  // audio fetched ahead instead of draining it (the restart wants the new
+  // spot) and hands the app's session to the restart.
   function closeCapture(ev, reason, { tellTab = true } = {}) {
     const cap = ev.capture;
     if (!cap || !cap.on) return Promise.resolve(cap ? publicCapture(cap) : null);
     cap.on = false;
     cap.reason = reason;
     if (tellTab) sendToTab(ev.tabId, { cmd: 'mse-capture', on: false }).catch(() => {});
-    cap.closing = cap.chain.then(() => toOffscreen(MSG.MEDIA_CLOSE, { key: cap.key, drain: reason !== 'seek' })).then(
+    const how = closeFor(ev, reason);
+    cap.closing = cap.chain.then(() => toOffscreen(MSG.MEDIA_CLOSE, { key: cap.key, ...how })).then(
       (stats) => {
         cap.stats = stats;
         return publicCapture(cap);
@@ -340,7 +347,7 @@ export function createPageEvents({
     if (!l || !l.on) return Promise.resolve(l || null);
     l.on = false;
     l.reason = reason;
-    l.closing = toOffscreen(MSG.LISTEN_CLOSE, { key: l.key }).then(
+    l.closing = toOffscreen(MSG.LISTEN_CLOSE, { key: l.key, ...(isSeek(ev, reason) && { handover: true }) }).then(
       (r) => {
         l.stats = r;
         return publicListen(l);
@@ -401,7 +408,7 @@ export function createPageEvents({
     if (!d || !d.on) return d ? (d.closing ?? Promise.resolve(publicDirect(d))) : Promise.resolve(null);
     d.on = false;
     d.reason = reason;
-    d.closing = direct.close({ key: d.key, drain: reason !== 'seek' }).then(
+    d.closing = direct.close({ key: d.key, ...closeFor(ev, reason) }).then(
       (r) => {
         if (r) {
           const { fetch, ...stats } = r;

@@ -2,7 +2,7 @@
 
 T-Translate 的浏览器插件：给网页视频显示字幕，识别和翻译都由本机的 T-Translate 完成。设计见 `docs/design/listen.md` §11（桌面侧通道）。
 
-当前状态：S5 —— 装好配对后不用再碰：YouTube 页面上视频一出声就自动出双语字幕。有站点字幕就直接翻译；没有就抄播放器的音频送给 T-Translate 识别；DRM 站点在视频上提示一行，点一下让 T-Translate 听系统声音。一次只服务正在看的那个标签页；暂停 5 秒、切走标签页、关掉本站（偏好）都会停。S6 加了 B 站适配、工具栏弹窗（状态、本站开关、显示方式、目标语言、导出 SRT）、选项页的按站点开关与字幕缓存。看过的视频再打开，字幕直接从缓存出来（程序没开也行），只对没看过的段落识别。S7 起 B 站没有字幕的视频也能识别（fMP4 / AAC 音频）。S8 加了 TikTok：信息流里往下刷一条就当换了一页，站点字幕直接翻译，没有就识别音频。S9a 起页面直接播放 .mp4 文件（没有 MSE）时，插件自己按段取这个文件的音频去识别；页面里 `<track>` 指向的字幕文件和页面取的 .vtt / .srt / .ttml 也当站点字幕用。S9b 起其他网站也能用：在网页上点工具栏的 T-Caption，选「允许在本站使用」，浏览器同意后本站就生效（当前页面立即生效，不用刷新）；视频文件在另一个网站时，页面上会提示，弹窗里再点「允许」。允许过的网站在选项页可以移除。竖屏视频的覆盖层字幕不再盖住半个画面。
+当前状态：S5 —— 装好配对后不用再碰：YouTube 页面上视频一出声就自动出双语字幕。有站点字幕就直接翻译；没有就抄播放器的音频送给 T-Translate 识别；DRM 站点在视频上提示一行，点一下让 T-Translate 听系统声音。一次只服务正在看的那个标签页；暂停 5 秒、切走标签页、关掉本站（偏好）都会停。S6 加了 B 站适配、工具栏弹窗（状态、本站开关、显示方式、目标语言、导出 SRT）、选项页的按站点开关与字幕缓存。看过的视频再打开，字幕直接从缓存出来（程序没开也行），只对没看过的段落识别。S7 起 B 站没有字幕的视频也能识别（fMP4 / AAC 音频）。S8 加了 TikTok：信息流里往下刷一条就当换了一页，站点字幕直接翻译，没有就识别音频。S9a 起页面直接播放 .mp4 文件（没有 MSE）时，插件自己按段取这个文件的音频去识别；页面里 `<track>` 指向的字幕文件和页面取的 .vtt / .srt / .ttml 也当站点字幕用。S9b 起其他网站也能用：在网页上点工具栏的 T-Caption，选「允许在本站使用」，浏览器同意后本站就生效（当前页面立即生效，不用刷新）；视频文件在另一个网站时，页面上会提示，弹窗里再点「允许」。允许过的网站在选项页可以移除。竖屏视频的覆盖层字幕不再盖住半个画面。S11 起视频跳转后不再重新加载识别模型，新位置的字幕接得更快。
 
 ## 安装
 
@@ -34,14 +34,15 @@ src/sw/badge.js                   角标：通道状态的色点；按标签页�
 src/sw/site-access.js             允许的网站：浏览器授权后登记内容脚本（document_start，一对脚本管所有网站）、当前标签页立即注入、移除时注销并交还权限
 src/sw/cache-db.js                字幕缓存：按媒体存字幕与译文，超 200 条 / 100 MB 淘汰最久没用的；IndexedDB（CACHE_* 消息）
 src/offscreen/handlers.js         offscreen 一侧的请求处理（通道客户端、流水线、听译会话），Chrome 的 offscreen 与 Firefox 的后台页共用
-src/offscreen/companion-client.js 通道客户端（配对、hello、翻译、识别会话、事件流）
+src/offscreen/companion-client.js 通道客户端（配对、hello、翻译、识别会话、跳转、事件流）
 src/offscreen/webm-demux.js       WebM 流式解析（任意切块、未知长度、lacing、坏数据重同步）
 src/offscreen/mp4-demux.js        fMP4 流式解析（moov 取 AAC 配置，moof + mdat 取帧，同 WebM 的事件，坏数据重同步）
 src/offscreen/mp4-progressive.js  渐进式 MP4 解析（先收 moov，再收任意起点的 mdat 字节，按采样表切帧）
 src/offscreen/decode.js           WebCodecs 解 Opus / AAC → 单声道，重采样到 16 kHz
-src/offscreen/audio-feeder.js     按秒喂给通道（背压等待、60 秒挂起、90 秒队列上限）
-src/offscreen/media-pipeline.js   上面几段串起来，按开头字节选 WebM / MP4 解析器（直链固定用渐进式），一次一路媒体流（MEDIA_OPEN / PUSH / CLOSE）
-src/offscreen/listen-session.js   DRM 兜底：让程序自己听系统声音的会话（LISTEN_OPEN / CLOSE），事件同媒体流水线
+src/offscreen/audio-feeder.js     按秒喂给通道（背压等待、60 秒挂起、90 秒队列上限）；跳转时把识别会话交给下一个喂送器
+src/offscreen/media-pipeline.js   上面几段串起来，按开头字节选 WebM / MP4 解析器（直链固定用渐进式），一次一路媒体流（MEDIA_OPEN / PUSH / CLOSE）；跳转交出的会话留 5 秒等下一路
+src/offscreen/listen-session.js   DRM 兜底：让程序自己听系统声音的会话（LISTEN_OPEN / CLOSE），事件同媒体流水线，跳转同样交接
+src/offscreen/session-route.js    一个识别会话的事件送给当前持有它的流；交接后译文仍跟着自己的那句
 src/content/main-world.js         主世界入口（document_start，不碰 chrome.*，不留全局变量）
 src/content/hooks/                主世界钩子：fetch / XHR 抄字幕响应、MSE 抄音频分片、EME，握手前先缓冲
 src/content/bridge.js             隔离世界一端：MessageChannel 握手（nonce），主世界来的数据一律校验
@@ -64,12 +65,12 @@ scripts/e2e-client.js             端到端：真实通道 + 真实引擎（npm 
 scripts/e2e-pipeline.js           端到端：浏览器里录 WebM（或 --ffmpeg 转 fMP4 / AAC）→ 插件流水线 → 真实通道与引擎（用法见文件头）
 scripts/e2e-render.js             真机：本地页面的视频上画字幕，读 activeCues 并截图（node extension/scripts/e2e-render.js --out <截图目录>）
 scripts/e2e-hooks.js              真机：真实 YouTube 页面上验钩子、分片识别、导航、EME（用法见文件头）
-scripts/e2e-auto.js               真机：不下任何命令，真实 YouTube 页面上字幕自己出现；暂停 / 切标签页 / 关站点 / DRM 提示（用法见文件头）
+scripts/e2e-auto.js               真机：不下任何命令，真实 YouTube 页面上字幕自己出现；暂停 / 跳转 / 切标签页 / 关站点 / DRM 提示（用法见文件头）
 scripts/e2e-bilibili.js           真机：真实 B 站页面的证据、AAC 音频识别出双语字幕、MediaSource 重建后续上、字幕清单、分 P；构造清单走一级（用法见文件头）
 scripts/e2e-tiktok.js             真机：真实 TikTok 信息流与视频页，HE-AAC 识别出双语字幕、往下刷一条即导航、站点 WebVTT 走一级、本站开关（用法见文件头）
 scripts/e2e-popup.js              真机：真实 YouTube 页面上的弹窗、显示方式、本站开关、导出、缓存与选项页（用法见文件头）
 scripts/e2e-direct.js             真机：本地页面直链播放的 MP4（moov 在前 / 在后），取流起点、领先量、跳转、中止、<track> 字幕（用法见文件头）
-scripts/e2e-generic.js            真机：普通网站从弹窗允许、立即注入、状态机自己出字幕、跳转重开、视频在另一网站时的提示与授权、竖屏字号、移除网站（用法见文件头）
+scripts/e2e-generic.js            真机：普通网站从弹窗允许、立即注入、状态机自己出字幕、跳转交接识别会话、视频在另一网站时的提示与授权、竖屏字号、移除网站（用法见文件头）
 scripts/make-fixture.js           重录单测样本 test/fixtures/tone-2s.webm
 scripts/make-fixture-mp4.js       用 ffmpeg 重做 MP4 单测样本：分片 tone-2s.m4s、渐进式 moov 在前 / 在后两个 .mp4（--ffmpeg 传路径）
 scripts/lib/browser.js            临时配置的 Chrome / Edge + DevTools 管道

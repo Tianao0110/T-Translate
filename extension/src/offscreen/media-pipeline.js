@@ -4,6 +4,9 @@
 // WebCodecs → 16 kHz mono → feeder → companion ASR session. onEvent({ key, event }) carries the
 // session's events (status, segment, translation, closed) and the feeder's
 // (suspended, dropped, error); every open ends with exactly one 'closed'.
+// A stream closed for a seek (or replaced by one of the same languages)
+// hands its session to the next open instead ('closed' reason 'handover');
+// a lease nobody takes in leaseMs is closed.
 
 import { createWebmDemuxer } from './webm-demux.js';
 import { createMp4Demuxer } from './mp4-demux.js';
@@ -14,6 +17,7 @@ import { SAMPLE_RATE } from '../shared/protocol.js';
 
 // About a minute of 20 ms packets waiting for the decoder to configure.
 const MAX_PENDING_BLOCKS = 3000;
+const LEASE_MS = 5000;
 
 export class PipelineError extends Error {
   constructor(code, message = code) {
@@ -69,8 +73,39 @@ export function createMediaPipeline({
   createDecoder = createAudioDecoder,
   createFeeder = createAudioFeeder,
   now = () => performance.now(),
+  leaseMs = LEASE_MS,
 } = {}) {
   let cur = null;
+  let lease = null; // a session handed over, until an open takes it
+  let leaseTimer = null;
+
+  const canSeek = () => client.getState?.()?.capabilities?.seek === true;
+
+  function dropLease() {
+    clearTimeout(leaseTimer);
+    leaseTimer = null;
+    const l = lease;
+    lease = null;
+    return l ? l.release() : null;
+  }
+
+  function offer(l) {
+    dropLease();
+    lease = l;
+    leaseTimer = setTimeout(dropLease, leaseMs);
+  }
+
+  // The stream takes the lease when its languages match; otherwise the
+  // session is closed before the stream opens its own.
+  async function claim(s) {
+    const l = lease;
+    if (!l) return;
+    clearTimeout(leaseTimer);
+    lease = null;
+    leaseTimer = null;
+    if (!l.dead && !s.closing && l.lang === s.lang && l.targetLang === s.targetLang) s.lease = l;
+    else await l.release();
+  }
 
   function emit(s, event) {
     if (event.type === 'closed') {
@@ -108,6 +143,7 @@ export function createMediaPipeline({
         lang: s.lang,
         targetLang: s.targetLang,
         mediaStartS: Math.max(0, s.firstBlockMs / 1000),
+        lease: Promise.resolve(s.after).then(() => s.lease),
         logger,
         onEvent: (event) => {
           if (event.type === 'closed') s.ended = true;
@@ -189,7 +225,7 @@ export function createMediaPipeline({
 
   let last = null; // the stream most recently closed, so a repeated close gets the same answer
 
-  function closeStream(s, { drain }) {
+  function closeStream(s, { drain, handover = false }) {
     s.closing ??= (async () => {
       if (cur === s) cur = null;
       last = s;
@@ -200,9 +236,12 @@ export function createMediaPipeline({
       }
       s.decoder?.close();
       s.ended = true;
-      const feeder = s.feeder ? await s.feeder.stop({ drain }) : null;
+      const handed = handover && s.feeder ? await s.feeder.detach() : null;
+      const feeder = handed ? s.feeder.stats() : s.feeder ? await s.feeder.stop({ drain }) : null;
+      if (handed) offer(handed);
+      if (s.lease && !s.lease.taken) s.lease.release();
       // Covers streams that never opened a session, and an app that went quiet.
-      emit(s, { type: 'closed', reason: s.failure || (feeder ? 'no-reply' : 'no-audio') });
+      emit(s, { type: 'closed', reason: handed ? 'handover' : s.failure || (feeder ? 'no-reply' : 'no-audio') });
       const { firstPushAt, lastPcmAt, ...rest } = s.stats;
       return { ...rest, decodeMs: lastPcmAt ? Math.round(lastPcmAt - firstPushAt) : 0, feeder };
     })();
@@ -210,19 +249,21 @@ export function createMediaPipeline({
   }
 
   return {
-    // A new key replaces the stream in progress (closed without draining);
-    // one still draining after close() is waited for (the app takes one
-    // session at a time).
+    // A new key replaces the stream in progress (closed without draining,
+    // its session handed over when the languages match); one still closing
+    // after close() is waited for (the app takes one session at a time).
     open({ key, lang = '', targetLang = '', source = 'mse' } = {}) {
       if (typeof key !== 'string' || !key) throw new PipelineError('bad-request', 'key');
       if (!SOURCES.includes(source)) throw new PipelineError('bad-request', 'source');
-      const after = cur ? closeStream(cur, { drain: false }) : (last?.closing ?? null);
+      const handover = !!cur && canSeek() && cur.lang === lang && cur.targetLang === targetLang;
+      const prev = cur ? closeStream(cur, { drain: false, handover }) : (last?.closing ?? null);
       const s = {
         key,
         lang,
         targetLang,
         source,
-        after,
+        after: null,
+        lease: null,
         demuxer: null,
         track: null,
         decoder: null,
@@ -238,6 +279,9 @@ export function createMediaPipeline({
         closing: null,
         stats: { source, container: null, bytes: 0, blocks: 0, decodedS: 0, demuxErrors: 0, firstPushAt: 0, lastPcmAt: 0 },
       };
+      s.after = Promise.resolve(prev)
+        .catch(() => {})
+        .then(() => claim(s));
       if (source === 'direct') {
         s.demuxer = createProgressiveMp4Demuxer();
         s.stats.container = 'mp4';
@@ -259,10 +303,11 @@ export function createMediaPipeline({
     },
 
     // Decodes and feeds what is left (drain false: drops it, for a seek),
-    // closes the session; resolves the stats.
-    close({ key, drain = true } = {}) {
+    // closes the session, or with handover (and an app that can seek) leaves
+    // it to the next open; resolves the stats.
+    close({ key, drain = true, handover = false } = {}) {
       if (last?.key === key && cur?.key !== key) return last.closing;
-      return closeStream(need(key), { drain: drain !== false });
+      return closeStream(need(key), { drain: drain !== false, handover: handover === true && canSeek() });
     },
 
     current: () => cur?.key ?? null,

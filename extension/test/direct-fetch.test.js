@@ -295,6 +295,14 @@ describe('direct fetch', () => {
     expect(d.position('k', 1)).toBe(null);
   });
 
+  it('close for a seek passes drain false and handover on to the pipeline', async () => {
+    const { d } = make(FAST);
+    await d.open({ key: 'k', url: URL_ });
+    await idle();
+    await d.close({ key: 'k', drain: false, handover: true });
+    expect(off.calls.at(-1)).toEqual({ type: MSG.MEDIA_CLOSE, key: 'k', drain: false, handover: true });
+  });
+
   it('a new open stops the last one’s fetching; the pipeline saying ended stops it too', async () => {
     const { srv, d } = make(FAST, { aheadS: 0.5 });
     await d.open({ key: 'a', url: URL_ });

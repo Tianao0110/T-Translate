@@ -312,6 +312,45 @@ describe('commands and the capture glue', () => {
     await expect(media({ streamId: 1, seq: 'x', bytes: 1 })).resolves.toEqual({ accepted: false, reason: 'not-capturing' });
   });
 
+  it('a seek closes capture and listen without draining and hands the session over; other reasons do not', async () => {
+    nav();
+    tabReplies['mse-capture'] = (c) => ({ ok: true, result: { on: !!c.on, streamId: 1 } });
+    offscreen.call = async (type, payload) => {
+      offscreen.calls.push({ type, payload });
+      if (type === MSG.LISTEN_OPEN) return { key: payload.key, id: 's1' };
+      return { segments: 0 };
+    };
+    await ext(MSG.TAB_COMMAND, { tabId: 7, command: { cmd: 'mse-capture', on: true } });
+    await ext(MSG.TAB_COMMAND, { tabId: 7, command: { cmd: 'mse-capture', on: false, reason: 'seek' } });
+    expect(offscreen.calls.at(-1)).toEqual({ type: MSG.MEDIA_CLOSE, payload: { key: 'tab:7:1', drain: false, handover: true } });
+    await ext(MSG.TAB_COMMAND, { tabId: 7, command: { cmd: 'mse-capture', on: true } });
+    await ext(MSG.TAB_COMMAND, { tabId: 7, command: { cmd: 'mse-capture', on: false, reason: 'paused' } });
+    expect(offscreen.calls.at(-1)).toEqual({ type: MSG.MEDIA_CLOSE, payload: { key: 'tab:7:2', drain: true } });
+
+    await ext(MSG.TAB_COMMAND, { tabId: 7, command: { cmd: 'listen', on: true } });
+    await ext(MSG.TAB_COMMAND, { tabId: 7, command: { cmd: 'listen', on: false, reason: 'seek' } });
+    expect(offscreen.calls.at(-1)).toEqual({ type: MSG.LISTEN_CLOSE, payload: { key: 'tab:7:l3', handover: true } });
+    await ext(MSG.TAB_COMMAND, { tabId: 7, command: { cmd: 'listen', on: true } });
+    await ext(MSG.TAB_COMMAND, { tabId: 7, command: { cmd: 'listen', on: false, reason: 'paused' } });
+    expect(offscreen.calls.at(-1)).toEqual({ type: MSG.LISTEN_CLOSE, payload: { key: 'tab:7:l4' } });
+  });
+
+  it('a stop for another tab while the video is still seeking is a seek too; while it plays it drains', async () => {
+    nav();
+    tabReplies['mse-capture'] = (c) => ({ ok: true, result: { on: !!c.on, streamId: 1 } });
+    report({ type: 'media', reason: 'play', media: mediaSnap(1), primary: true });
+    await ext(MSG.TAB_COMMAND, { tabId: 7, command: { cmd: 'mse-capture', on: true } });
+    await ext(MSG.TAB_COMMAND, { tabId: 7, command: { cmd: 'mse-capture', on: false, reason: 'other-tab' } });
+    expect(offscreen.calls.at(-1)).toEqual({ type: MSG.MEDIA_CLOSE, payload: { key: 'tab:7:1', drain: true } });
+    report({ type: 'media', reason: 'seeking', media: mediaSnap(1, { state: 'seeking', readyState: 1, currentTime: 300 }), primary: true });
+    await ext(MSG.TAB_COMMAND, { tabId: 7, command: { cmd: 'mse-capture', on: true } });
+    await ext(MSG.TAB_COMMAND, { tabId: 7, command: { cmd: 'mse-capture', on: false, reason: 'other-tab' } });
+    expect(offscreen.calls.at(-1)).toEqual({ type: MSG.MEDIA_CLOSE, payload: { key: 'tab:7:2', drain: false, handover: true } });
+    await ext(MSG.TAB_COMMAND, { tabId: 7, command: { cmd: 'mse-capture', on: true } });
+    await ext(MSG.TAB_COMMAND, { tabId: 7, command: { cmd: 'mse-capture', on: false, reason: 'paused' } });
+    expect(offscreen.calls.at(-1)).toEqual({ type: MSG.MEDIA_CLOSE, payload: { key: 'tab:7:3', drain: true } });
+  });
+
   it('the page stopping on its own (overflow) closes the stream', async () => {
     nav();
     tabReplies['mse-capture'] = () => ({ ok: true, result: { streamId: 1 } });
@@ -370,11 +409,11 @@ describe('the direct glue (files the page plays by URL)', () => {
     expect(pe.fromPage({}, from())).toBe(false);
   });
 
-  it('off for a seek closes without draining; any other reason drains', async () => {
+  it('off for a seek closes without draining and hands the session over; any other reason drains', async () => {
     page();
     await cmd({ cmd: 'direct', on: true, url: SRC, fromS: 20 });
     await cmd({ cmd: 'direct', on: false, reason: 'seek' });
-    expect(direct.close).toHaveBeenLastCalledWith({ key: 'tab:7:d1', drain: false });
+    expect(direct.close).toHaveBeenLastCalledWith({ key: 'tab:7:d1', drain: false, handover: true });
     await cmd({ cmd: 'direct', on: true, url: SRC, fromS: 95 });
     await cmd({ cmd: 'direct', on: false, reason: 'paused' });
     expect(direct.close).toHaveBeenLastCalledWith({ key: 'tab:7:d2', drain: true });

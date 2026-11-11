@@ -229,6 +229,141 @@ describe('media bytes over JSON messages', () => {
   });
 });
 
+// Feeders that report their lease and can be detached; a decoder that yields
+// 20 ms of PCM for every block at once, so a feeder exists before any close.
+function handoverSetup({ seek = true, leaseMs } = {}) {
+  const log = { feeders: [], order: [] };
+  const events = [];
+  const createFeeder = (opts) => {
+    const f = { opts, pushed: 0, detached: false, stopped: null, got: undefined };
+    f.lease = { id: `asr-${log.feeders.length + 1}`, lang: opts.lang, targetLang: opts.targetLang, dead: false, taken: false, released: 0 };
+    f.lease.release = async () => {
+      f.lease.released++;
+      log.order.push(`release ${f.lease.id}`);
+    };
+    log.feeders.push(f);
+    return {
+      start: async () => {
+        f.got = await opts.lease;
+        if (f.got) f.got.taken = true;
+        log.order.push(`start ${f.got?.id ?? 'fresh'}`);
+      },
+      push: (pcm) => ((f.pushed += pcm.length), true),
+      stop: async ({ drain }) => {
+        f.stopped = { drain };
+        opts.onEvent({ type: 'closed', reason: 'closed' });
+        return { closed: true };
+      },
+      detach: async () => {
+        f.detached = true;
+        return f.lease;
+      },
+      stats: () => ({ handedOver: f.detached }),
+    };
+  };
+  const createDecoder = async ({ onPcm }) => ({
+    decode(block) {
+      queueMicrotask(() => onPcm({ pcm: new Float32Array(960), sampleRate: 48000, timeMs: block.timeMs }));
+      return true;
+    },
+    async flush() {},
+    close() {},
+  });
+  const client = { getState: () => ({ capabilities: seek ? { asr: true, seek: true } : { asr: true } }) };
+  const p = createMediaPipeline({ client, logger: { warn: () => {} }, onEvent: (e) => events.push(e), createDecoder, createFeeder, ...(leaseMs && { leaseMs }) });
+  // Bytes for the stream until its feeder (the nth so far) has audio.
+  const feed = async (key, n) => {
+    p.push({ key, bytes: FIXTURE });
+    await vi.waitFor(() => expect(log.feeders[n - 1]?.pushed).toBeGreaterThan(0));
+  };
+  return { p, log, events, feed };
+}
+
+const closedOf = (events, key) => events.filter((e) => e.key === key && e.event.type === 'closed').map((e) => e.event.reason);
+
+describe('media pipeline: handing the session over at a seek', () => {
+  it('close with handover detaches the feeder: closed/handover once, and the next open of the same languages takes the lease', async () => {
+    const { p, log, events, feed } = handoverSetup();
+    p.open({ key: 'a', lang: 'en', targetLang: 'zh' });
+    await feed('a', 1);
+    const stats = await p.close({ key: 'a', drain: false, handover: true });
+    const [fa] = log.feeders;
+    expect(fa.detached).toBe(true);
+    expect(fa.stopped).toBeNull();
+    expect(stats.feeder).toEqual({ handedOver: true });
+    expect(closedOf(events, 'a')).toEqual(['handover']);
+    p.open({ key: 'b', lang: 'en', targetLang: 'zh' });
+    await feed('b', 2);
+    await vi.waitFor(() => expect(log.order).toContain('start asr-1'));
+    expect(log.feeders[1].got).toBe(fa.lease);
+    expect(fa.lease.released).toBe(0);
+    await p.close({ key: 'b' });
+    expect(fa.lease.released).toBe(0); // taken: b's feeder closed it
+    expect(log.feeders[1].stopped).toEqual({ drain: true });
+  });
+
+  it('another language pair releases the lease before the new stream opens its own session', async () => {
+    const { p, log, feed } = handoverSetup();
+    p.open({ key: 'a', lang: 'en', targetLang: 'zh' });
+    await feed('a', 1);
+    await p.close({ key: 'a', drain: false, handover: true });
+    p.open({ key: 'b', lang: 'en', targetLang: 'ja' });
+    await feed('b', 2);
+    await vi.waitFor(() => expect(log.order).toContain('start fresh'));
+    expect(log.order).toEqual(['start fresh', 'release asr-1', 'start fresh']);
+  });
+
+  it('a lease nobody takes is released after leaseMs', async () => {
+    const { p, log, feed } = handoverSetup({ leaseMs: 30 });
+    p.open({ key: 'a', lang: 'en', targetLang: 'zh' });
+    await feed('a', 1);
+    await p.close({ key: 'a', drain: false, handover: true });
+    expect(log.feeders[0].lease.released).toBe(0);
+    await vi.waitFor(() => expect(log.feeders[0].lease.released).toBe(1));
+  });
+
+  it('the stream that took the lease closing before any audio decoded releases it', async () => {
+    const { p, log, events, feed } = handoverSetup();
+    p.open({ key: 'a', lang: 'en', targetLang: 'zh' });
+    await feed('a', 1);
+    await p.close({ key: 'a', drain: false, handover: true });
+    p.open({ key: 'b', lang: 'en', targetLang: 'zh' });
+    await new Promise((r) => setTimeout(r, 5)); // b claims the lease
+    await p.close({ key: 'b' });
+    expect(log.feeders).toHaveLength(1);
+    expect(log.feeders[0].lease.released).toBe(1);
+    expect(closedOf(events, 'b')).toEqual(['no-audio']);
+  });
+
+  it('a stream with no session yet hands nothing over: an ordinary close', async () => {
+    const { p, events } = handoverSetup();
+    p.open({ key: 'a', lang: 'en', targetLang: 'zh' });
+    await p.close({ key: 'a', drain: false, handover: true });
+    expect(closedOf(events, 'a')).toEqual(['no-audio']);
+  });
+
+  it('an app that cannot seek: handover is an ordinary close without draining', async () => {
+    const { p, log, events, feed } = handoverSetup({ seek: false });
+    p.open({ key: 'a', lang: 'en', targetLang: 'zh' });
+    await feed('a', 1);
+    await p.close({ key: 'a', drain: false, handover: true });
+    expect(log.feeders[0]).toMatchObject({ detached: false, stopped: { drain: false } });
+    expect(closedOf(events, 'a')).toEqual(['closed']);
+  });
+
+  it('an open that replaces a live stream of the same languages takes its session too', async () => {
+    const { p, log, events, feed } = handoverSetup();
+    p.open({ key: 'a', lang: 'en', targetLang: 'zh' });
+    await feed('a', 1);
+    p.open({ key: 'b', lang: 'en', targetLang: 'zh' });
+    await feed('b', 2);
+    await vi.waitFor(() => expect(log.order).toContain('start asr-1'));
+    expect(closedOf(events, 'a')).toEqual(['handover']);
+    expect(await p.close({ key: 'a', drain: false, handover: true })).toMatchObject({ feeder: { handedOver: true } });
+    expect(log.feeders[1].got).toBe(log.feeders[0].lease);
+  });
+});
+
 describe('media pipeline: closing for a seek', () => {
   it('close with drain false drops what is queued instead of decoding it (the fake decoder only yields on flush), and a new open does not wait on it', async () => {
     const { p, log, events } = setup();

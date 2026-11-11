@@ -13,6 +13,10 @@
 //   (c) a second tab with a video takes over when it is the active tab, the
 //       first stops; switching back hands it over again
 //   (d) switching the site off in prefs stops it and marks the badge; on again resumes
+//   (h) a seek: capture restarts at the new place on the same recognition
+//       session (handed over, one seek in the worker, no new worker), the
+//       half sentence from before the jump kept at its old time in the cache;
+//       a seek while paused leaves the session to its 5 s lease
 //   (e) a DRM page we serve at a youtube.com URL gets the notice; its button
 //       opens a listen session (the app's system capture); pausing closes it
 //   (f) translate through the channel (what tier 1 uses) answers
@@ -30,6 +34,7 @@ const { REPO, arg, has, sleep, checklist, sandbox, fakeStore, run } = require('.
 const { fakeWindow } = require('../../scripts/lib/listen-sandbox');
 const { linkPacks } = require('./lib/speech');
 const { findBrowser, launchBrowser, loadExtension } = require('./lib/browser');
+const { channelLogger, workerLogs } = require('./lib/e2e-shell');
 
 const { step, summary } = checklist();
 const VIDEO = arg('--video') || 'UF8uR6Z6KLc';
@@ -76,7 +81,7 @@ async function main() {
     return { success: true, text: `[译] ${text}` };
   };
   engineManager.configureTranslation({ translateStream });
-  const logger = { info: () => {}, warn: (m) => console.log('  [warn]', m), error: (m) => console.log('  [error]', m), debug: () => {} };
+  const { logger, routes } = channelLogger();
   const companion = initCompanion({ store, engineManager, translateStream, logger, version: 'e2e-s5', getPrivacyMode: () => 'standard' });
   await companion.ready();
   step('companion channel up', companion.status().running === true, `port ${companion.status().port}`);
@@ -291,6 +296,90 @@ async function main() {
     const onAgain = await stateIs(tab1, 'captions', 20000);
     step('(d) switched on again: captions resume', !!onAgain, JSON.stringify(onAgain?.run));
     await ext('tab/command', { tabId: tab1, command: { cmd: 'query' } });
+
+    // ---- (h) a seek on YouTube (MSE), in a fresh tab (the first player has stopped loading by now) ----
+    const { sessionId: pageH, targetId: pageHTarget } = await open(`https://www.youtube.com/watch?v=${VIDEO2}`);
+    pages.add(pageH);
+    const tabH = await until(() => tabIdOf(`https://www.youtube.com/watch?v=${VIDEO2}`), 15000);
+    await until(() => evaluate(pageH, `!document.querySelector('#movie_player.ad-showing') && !!document.querySelector('#movie_player')`), 90000, 500);
+    const liveH = await until(async () => {
+      const ev = await evidence(tabH);
+      return ev?.capture?.on && ev.capture.segments > 0 ? ev : null;
+    }, 90000, 500);
+    if (!liveH) await dump(tabH);
+    const keyH1 = liveH?.capture?.key;
+    const atH = await evaluate(pageH, `(() => { const v = document.querySelector('video'); let end = null; for (let i = 0; i < v.buffered.length; i++) if (v.buffered.start(i) <= v.currentTime && v.currentTime <= v.buffered.end(i)) end = v.buffered.end(i); return { t: v.currentTime, bufferedEnd: end }; })()`);
+    const fromH = atH?.t ?? 0;
+    const toH = Math.round(fromH + 20);
+    const debugAt = swDebug.length;
+    const tSeekH = Date.now();
+    await evaluate(pageH, `(document.querySelector('video').currentTime = ${toH}, true)`);
+    const runH = await until(async () => {
+      const ev = await evidence(tabH);
+      return ev?.capture?.on && ev.capture.key !== keyH1 ? ev : null;
+    }, 30000, 250);
+    const firstNewH = await until(async () => (await evaluate(opt, 'window.__media')).find((e) => e.key === runH?.capture?.key && e.event.type === 'segment' && e.event.start >= toH - 6), 30000, 200);
+    const mediaH = await evaluate(opt, 'window.__media');
+    const closedH1 = mediaH.find((e) => e.key === keyH1 && e.event.type === 'closed');
+    // Finals still decoded from what was fed before the jump: their old times, under either key.
+    const oldH = mediaH.filter((e) => e.at >= tSeekH && e.event.type === 'segment' && (e.event.start < toH - 6 || e.key === keyH1));
+    const seekRouteH = routes.find((r) => r.route === 'POST /v1/asr/seek' && r.at >= tSeekH);
+    const logsH = workerLogs(box.dir);
+    const startsAfterH = logsH.flatMap((l) => l.records.filter((r) => r.type === 'asr_start' && r.ts >= tSeekH));
+    const seekEvtH = logsH.flatMap((l) => l.records.filter((r) => r.type === 'event' && r.kind === 'seek' && r.ts >= tSeekH))[0];
+    const stopLine = swDebug.slice(debugAt).find((l) => l.includes(`tab ${tabH}: capture stopped`) && !l.includes('(paused)'));
+    numbers.seek = {
+      fromS: fromH,
+      toS: toH,
+      bufferedEndS: atH?.bufferedEnd ?? null,
+      stoppedAs: stopLine?.replace(/^.*stopped /, '') ?? null,
+      seekToReopenS: runH ? (runH.capture.startedAt - tSeekH) / 1000 : null,
+      seekToFirstSentenceS: firstNewH ? (firstNewH.at - tSeekH) / 1000 : null,
+      seekHttp: seekRouteH && { status: seekRouteH.status, ms: seekRouteH.ms, atS: (seekRouteH.at - tSeekH) / 1000 },
+      workerSeek: seekEvtH && { cut: seekEvtH.detail, atS: (seekEvtH.ts - tSeekH) / 1000 },
+      oldStreamClosed: closedH1?.event.reason ?? null,
+      fromBeforeTheJump: oldH.map((e) => ({ key: e.key.split(':').pop(), id: e.event.id, start: e.event.start, afterS: (e.at - tSeekH) / 1000 })),
+      asrStartsAfterSeek: startsAfterH.length,
+    };
+    step(
+      '(h) a seek: capture restarts at the new place on the same recognition session (handed over, one seek, no new worker), first sentence in under 4 s',
+      !!runH && closedH1?.event.reason === 'handover' && seekRouteH?.status === 200 && !!seekEvtH && startsAfterH.length === 0 && numbers.seek.seekToFirstSentenceS < 4,
+      `${keyH1} → ${runH?.capture?.key}; ${logsH.map((l) => l.file).join(', ')}; ${JSON.stringify(numbers.seek)}`
+    );
+    if (!runH || !firstNewH) await dump(tabH);
+
+    const keyH2 = runH?.capture?.key;
+    const tPauseSeekH = Date.now();
+    await evaluate(pageH, `(() => { const v = document.querySelector('video'); v.pause(); v.currentTime = Math.max(0, v.currentTime - 15); return true; })()`);
+    const closedH2 = await until(async () => {
+      const ev = await evidence(tabH);
+      return ev?.capture && !ev.capture.on && ev.capture.key === keyH2 && ev.capture.stats ? ev.capture : null;
+    }, 10000, 200);
+    const releasedH = await until(async () => {
+      const c = routes.find((r) => r.route === 'POST /v1/asr/close' && r.at >= tPauseSeekH);
+      return c && !engineManager.getInfo().running ? { ...c, idleAt: Date.now() } : null;
+    }, 15000, 100);
+    const mediaH2 = await evaluate(opt, 'window.__media');
+    const fh = closedH2?.stats?.feeder;
+    numbers.seekPaused = {
+      reason: closedH2?.reason,
+      feeder: fh && { state: fh.state, adopted: fh.adopted, handedOver: fh.handedOver, fedS: fh.fedS },
+      streamClosed: mediaH2.find((e) => e.key === keyH2 && e.event.type === 'closed')?.event.reason ?? null,
+      leaseClosedAfterS: releasedH ? (releasedH.at - tPauseSeekH) / 1000 : null,
+      engineIdleAfterS: releasedH ? (releasedH.idleAt - tPauseSeekH) / 1000 : null,
+      reopened: (await evidence(tabH))?.capture?.key !== keyH2,
+    };
+    step(
+      '(h) the restarted capture had taken the session over; a seek while paused hands it over, nobody takes it, it is closed after the 5 s lease',
+      fh?.adopted === true && fh.handedOver === true && numbers.seekPaused.streamClosed === 'handover' && !numbers.seekPaused.reopened && numbers.seekPaused.leaseClosedAfterS >= 4.5 && numbers.seekPaused.leaseClosedAfterS < 8,
+      JSON.stringify(numbers.seekPaused)
+    );
+    // The stop for that seek wrote the run's cues, the late ones included, into the video's record.
+    const recordH = (await ext('cache/get', { key: `youtube:${VIDEO2}` }))?.result;
+    const keptH = oldH.filter((e) => (recordH?.cues || []).some((c) => Math.abs(c.start - e.event.start) < 0.01 && c.text === e.event.text));
+    numbers.seekCache = { fromBeforeTheJump: oldH.length, inTheRecord: keptH.length, recordCues: recordH?.cues?.length ?? null };
+    step('(h) finals from before the jump are in the video’s record at their old times', oldH.length > 0 && keptH.length === oldH.length, JSON.stringify(numbers.seekCache));
+    await cdp.send('Target.closeTarget', { targetId: pageHTarget });
 
     // ---- (e) DRM page ----
     const { sessionId: page3 } = await open('about:blank');

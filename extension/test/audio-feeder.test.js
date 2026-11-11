@@ -10,17 +10,27 @@ import { createAudioFeeder } from '../src/offscreen/audio-feeder.js';
 import { FEED_CHUNK_SAMPLES as CHUNK } from '../src/shared/protocol.js';
 
 function fakeClient(reply = () => ({ ok: true })) {
-  const calls = { open: [], feed: [], close: [] };
-  let onEvent = null;
+  const calls = { open: [], feed: [], close: [], seek: [], order: [] };
+  const subs = new Map(); // session id → its event stream's callback
+  let lastId = null;
   const client = {
     calls,
     stopped: false,
+    seekFail: null,
     openAsr: async (opts) => {
       calls.open.push(opts);
-      return { id: 'asr-1' };
+      calls.order.push('open');
+      return { id: `asr-${calls.open.length}` };
+    },
+    seekAsr: async (id, opts) => {
+      calls.seek.push({ id, ...opts });
+      calls.order.push('seek');
+      if (client.seekFail) throw Object.assign(new Error(client.seekFail), { code: client.seekFail });
+      return { atS: 3 };
     },
     subscribe: (id, fn) => {
-      onEvent = fn;
+      subs.set(id, fn);
+      lastId = id;
       return { stop: () => (client.stopped = true) };
     },
     feed: async (id, pcm, seq) => {
@@ -29,10 +39,12 @@ function fakeClient(reply = () => ({ ok: true })) {
     },
     closeAsr: async (id) => {
       calls.close.push(id);
-      setTimeout(() => onEvent?.({ type: 'closed', reason: 'closed' }), 0);
+      calls.order.push('close');
+      setTimeout(() => subs.get(id)?.({ type: 'closed', reason: 'closed' }), 0);
       return true;
     },
-    emit: (evt) => onEvent(evt),
+    // An event on the newest session's stream.
+    emit: (evt) => subs.get(lastId)(evt),
   };
   return client;
 }
@@ -183,6 +195,106 @@ describe('audio feeder', () => {
     expect((await feeder.stop()).state).toBe('closed');
     await expect(feeder.start()).rejects.toMatchObject({ code: 'stopped' });
     expect(client.calls.open).toHaveLength(0);
+  });
+
+  it('a seek: detach waits for the chunk on its way, drops the queue and leases the session; the next feeder takes it with a seek and goes on with the seq', async () => {
+    let release;
+    const gate = new Promise((r) => (release = r));
+    const client = fakeClient();
+    const feed = client.feed;
+    client.feed = async (...a) => {
+      const r = await feed(...a);
+      if (client.calls.feed.length === 1) await gate;
+      return r;
+    };
+    const a = feederWith(client);
+    await a.feeder.start();
+    for (let k = 0; k < 3; k++) a.feeder.push(filled(CHUNK, k));
+    await vi.waitFor(() => expect(client.calls.feed).toHaveLength(1));
+    let lease = null;
+    const detaching = a.feeder.detach().then((l) => (lease = l));
+    await new Promise((r) => setTimeout(r, 10));
+    expect(lease).toBeNull(); // the first chunk has not landed yet
+    release();
+    await detaching;
+    expect(lease).toMatchObject({ id: 'asr-1', seq: 1, lang: 'en', targetLang: 'zh', dead: false });
+    expect(client.calls.feed).toHaveLength(1);
+    expect(a.feeder.stats()).toMatchObject({ state: 'detached', handedOver: true, adopted: false, fedChunks: 1 });
+    expect(a.feeder.push(filled(CHUNK, 9))).toBe(false);
+
+    client.emit({ type: 'segment', id: 7, start: 12.5, end: 14, text: 'before the jump' });
+    const b = feederWith(client, { lease: Promise.resolve(lease), mediaStartS: 95 });
+    await b.feeder.start();
+    expect(client.calls.seek).toEqual([{ id: 'asr-1', mediaStartS: 95 }]);
+    expect(client.calls.open).toHaveLength(1);
+    expect(b.feeder.stats()).toMatchObject({ id: 'asr-1', state: 'running', adopted: true });
+    b.feeder.push(filled(CHUNK, 0.5));
+    await vi.waitFor(() => expect(client.calls.feed).toHaveLength(2));
+    expect(client.calls.feed[1]).toMatchObject({ id: 'asr-1', seq: 1 });
+
+    client.emit({ type: 'segment', id: 8, start: 95.5, end: 97, text: 'after' });
+    client.emit({ type: 'translation', id: 7, text: 'T7', done: true });
+    client.emit({ type: 'translation', id: 8, text: 'T8', done: true });
+    expect(a.events.map((e) => [e.type, e.id])).toEqual([['segment', 7], ['translation', 7]]);
+    expect(b.events.map((e) => [e.type, e.id])).toEqual([['segment', 8], ['translation', 8]]);
+
+    await a.feeder.stop(); // a handed-over feeder closes nothing
+    expect(client.calls.close).toEqual([]);
+    const stats = await b.feeder.stop();
+    expect(client.calls.close).toEqual(['asr-1']);
+    expect(client.stopped).toBe(true);
+    expect(stats).toMatchObject({ state: 'closed', closed: true, adopted: true });
+    expect(b.events.at(-1)).toEqual({ type: 'closed', reason: 'closed' });
+  });
+
+  it('detach cuts a backpressure wait short', async () => {
+    const client = fakeClient(() => ({ wait: 1000, reason: 'backpressure' }));
+    const { feeder } = feederWith(client, { sleep: () => new Promise(() => {}) });
+    await feeder.start();
+    feeder.push(filled(CHUNK, 1));
+    await vi.waitFor(() => expect(client.calls.feed).toHaveLength(1));
+    const lease = await feeder.detach();
+    expect(lease).toMatchObject({ id: 'asr-1', seq: 1 });
+  });
+
+  it('a failed seek releases the lease (closed first) and opens a session as before', async () => {
+    const client = fakeClient();
+    const a = feederWith(client);
+    await a.feeder.start();
+    const lease = await a.feeder.detach();
+    client.seekFail = 'not-ready';
+    const b = feederWith(client, { lease, mediaStartS: 95 });
+    expect(await b.feeder.start()).toBe('asr-2');
+    expect(client.calls.order).toEqual(['open', 'seek', 'close', 'open']);
+    expect(client.calls.open[1]).toMatchObject({ mediaStartS: 95 });
+    expect(b.feeder.stats()).toMatchObject({ adopted: false, state: 'running' });
+    await vi.waitFor(() => expect(a.events).toEqual([{ type: 'closed', reason: 'closed' }]));
+  });
+
+  it('a lease the app closed meanwhile is dead: no seek, released, a new session', async () => {
+    const client = fakeClient();
+    const a = feederWith(client);
+    await a.feeder.start();
+    const lease = await a.feeder.detach();
+    client.emit({ type: 'closed', reason: 'idle' });
+    expect(lease.dead).toBe(true);
+    const b = feederWith(client, { lease });
+    await b.feeder.start();
+    expect(client.calls.seek).toEqual([]);
+    expect(client.calls.order).toEqual(['open', 'close', 'open']);
+  });
+
+  it('nothing to hand over (never opened, or the open failed): detach resolves null', async () => {
+    const client = fakeClient();
+    const { feeder } = feederWith(client);
+    expect(await feeder.detach()).toBeNull();
+    client.openAsr = async () => {
+      throw Object.assign(new Error('busy'), { code: 'busy' });
+    };
+    const other = feederWith(client);
+    await expect(other.feeder.start()).rejects.toMatchObject({ code: 'busy' });
+    expect(await other.feeder.detach()).toBeNull();
+    expect((await other.feeder.stop()).state).toBe('closed');
   });
 
   it('a failed open rejects start() and stop() still resolves', async () => {

@@ -19,7 +19,9 @@
 //       resolves, the scripts are registered and in the page at once, the
 //       orchestrator opens direct by itself, bilingual captions on the track
 //   (d) a seek past 3 s: direct closed and opened again from the new place
-//       (a new key, fromS near it), new captions there
+//       (a new key, fromS near it), new captions there; the recognition
+//       session is handed over (one seek in the worker, no new worker); a
+//       seek while paused leaves the session to its 5 s lease
 //   (c) a page on 127.0.0.1 (allowed from its popup) whose video is on
 //       media.localhost: prompt for that host, the page notice, the '!'
 //       badge, the popup's "Allow"; its click records what the request does,
@@ -289,6 +291,8 @@ async function main() {
     await cdp.send('Target.closeTarget', { targetId: pop1Target });
 
     // ---- (d) ----
+    // Every media event the offscreen side broadcasts, as the options page hears it.
+    await evaluate(opt, `(() => { window.__media = []; chrome.runtime.onMessage.addListener((m) => { if (m && m.type === 'media/event') { const e = m.payload.event; window.__media.push({ at: Date.now(), key: m.payload.key, type: e.type, reason: e.reason, id: e.id, start: e.start, text: e.text }); } }); return true; })()`);
     const genB = genOf(runB?.direct?.key);
     const tSeek = Date.now();
     await player(page, 'v.currentTime = 100; return true;');
@@ -302,12 +306,71 @@ async function main() {
     }, 60000, 250);
     const genD = genOf(runD?.direct?.key);
     const cuesD = genD ? await cuesOf(tab, `d${genD}-`) : [];
-    const firstD = cuesD.length ? Math.min(...cuesD.map((c) => c.start)) : null;
+    // Finals the worker still decoded from before the jump come under the new key, at their old times.
+    const cuesNewD = cuesD.filter((c) => c.start >= 93);
+    const firstD = cuesNewD.length ? Math.min(...cuesNewD.map((c) => c.start)) : null;
+    const mediaD = await evaluate(opt, 'window.__media');
+    const segsD = mediaD.filter((e) => e.key === runD?.direct?.key && e.type === 'segment');
+    const firstNewD = segsD.find((e) => e.start >= 93);
+    const oldD = mediaD.filter((e) => e.type === 'segment' && e.at >= tSeek && e.start < 93);
+    const oldClosedD = mediaD.find((e) => e.key === runB?.direct?.key && e.type === 'closed');
+    const seekRouteD = shell.routes.find((r) => r.route === 'POST /v1/asr/seek' && r.at >= tSeek);
+    const logsD = shell.workerLogs();
+    const startsAfterD = logsD.flatMap((l) => l.records.filter((r) => r.type === 'asr_start' && r.ts >= tSeek));
+    const seekEvtD = logsD.flatMap((l) => l.records.filter((r) => r.type === 'event' && r.kind === 'seek' && r.ts >= tSeek))[0];
     const histD = ((await state(tab))?.history || []).filter((h) => h.at >= tSeek).map((h) => `${((h.at - tSeek) / 1000).toFixed(1)}s ${h.state}${h.detail ? ` ${JSON.stringify(h.detail)}` : ''}`);
-    numbers.d = { seekToReopenS: runD ? (runD.direct.startedAt - tSeek) / 1000 : null, seekToFirstSentenceS: runD ? (runD.direct.firstSegmentAt - tSeek) / 1000 : null, seekToBilingualOnTrackS: sawD ? (sawD - tSeek) / 1000 : null, fromS: runD?.direct?.fromS, firstCueAtS: firstD, states: histD };
+    numbers.d = {
+      seekToReopenS: runD ? (runD.direct.startedAt - tSeek) / 1000 : null,
+      seekToFirstSentenceS: firstNewD ? (firstNewD.at - tSeek) / 1000 : null,
+      seekToFirstEventS: runD ? (runD.direct.firstSegmentAt - tSeek) / 1000 : null,
+      seekToBilingualOnTrackS: sawD ? (sawD - tSeek) / 1000 : null,
+      fromS: runD?.direct?.fromS,
+      firstCueAtS: firstD,
+      seekHttp: seekRouteD && { status: seekRouteD.status, ms: seekRouteD.ms, atS: (seekRouteD.at - tSeek) / 1000 },
+      workerSeek: seekEvtD && { cut: seekEvtD.detail, atS: (seekEvtD.ts - tSeek) / 1000 },
+      oldStreamClosed: oldClosedD?.reason ?? null,
+      fromBeforeTheJump: oldD.map((e) => `${e.key.split(':').pop()}#${e.id}@${e.start}`),
+      asrStartsAfterSeek: startsAfterD.length,
+      states: histD,
+    };
     step('(d) a seek to 100 s: direct closed and opened again (new key, fromS near 95), new captions from there', !!runD && runD.direct.fromS >= 93 && runD.direct.fromS <= 100 && firstD >= 93 && firstD < 115, `${runB?.direct?.key} → ${runD?.direct?.key}; ${JSON.stringify(numbers.d)}`);
+    step(
+      '(d) the same recognition session goes on: the old stream closed handing it over, one seek in the worker, no new worker, first sentence there in under 4 s',
+      oldClosedD?.reason === 'handover' && seekRouteD?.status === 200 && !!seekEvtD && startsAfterD.length === 0 && numbers.d.seekToFirstSentenceS < 4,
+      `${logsD.map((l) => l.file).join(', ')}; ${JSON.stringify({ seekToFirstSentenceS: numbers.d.seekToFirstSentenceS, seekHttp: numbers.d.seekHttp, workerSeek: numbers.d.workerSeek, oldStreamClosed: numbers.d.oldStreamClosed, asrStartsAfterSeek: numbers.d.asrStartsAfterSeek })}`
+    );
     if (!runD) await dump(tab);
-    await player(page, 'v.pause(); return true;');
+    if (oldClosedD?.reason !== 'handover') {
+      const caps = (await ext('companion/state'))?.result?.capabilities;
+      console.log(`  [debug] capabilities ${JSON.stringify(caps)}; worker / offscreen console since the seek: ${shell.extConsole.filter((l) => l.at >= tSeek - 500).map((l) => `+${l.at - tSeek} ${l.text}`).join(' | ')}`);
+    }
+
+    // A seek while paused: the session is handed over, nothing takes it, the lease runs out.
+    const tPauseSeek = Date.now();
+    await player(page, 'v.pause(); v.currentTime = 150; return true;');
+    const closedD = await until(async () => {
+      const ev = await evidence(tab);
+      return ev?.direct && !ev.direct.on && ev.direct.key === runD?.direct?.key && ev.direct.stats ? ev.direct : null;
+    }, 10000, 200);
+    const releasedD = await until(async () => {
+      const c = shell.routes.find((r) => r.route === 'POST /v1/asr/close' && r.at >= tPauseSeek);
+      return c && !shell.engineManager.getInfo().running ? { ...c, idleAt: Date.now() } : null;
+    }, 15000, 100);
+    const mediaD2 = await evaluate(opt, 'window.__media');
+    const fd = closedD?.stats?.feeder;
+    numbers.d2 = {
+      reason: closedD?.reason,
+      feeder: fd && { state: fd.state, adopted: fd.adopted, handedOver: fd.handedOver, fedS: fd.fedS },
+      streamClosed: mediaD2.find((e) => e.key === runD?.direct?.key && e.type === 'closed')?.reason ?? null,
+      leaseClosedAfterS: releasedD ? (releasedD.at - tPauseSeek) / 1000 : null,
+      engineIdleAfterS: releasedD ? (releasedD.idleAt - tPauseSeek) / 1000 : null,
+      reopened: (await evidence(tab))?.direct?.key !== runD?.direct?.key,
+    };
+    step(
+      '(d) the reopened stream had taken the session over; a seek while paused hands it over, nobody takes it, it is closed after the 5 s lease',
+      fd?.adopted === true && fd.handedOver === true && numbers.d2.streamClosed === 'handover' && !numbers.d2.reopened && numbers.d2.leaseClosedAfterS >= 4.5 && numbers.d2.leaseClosedAfterS < 8,
+      JSON.stringify(numbers.d2)
+    );
 
     // ---- (c) ----
     const { sessionId: page2, targetId: page2Target } = await shell.open(`${LOOP}/cross.html`);

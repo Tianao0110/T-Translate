@@ -1,5 +1,5 @@
 // The extension's side of Companion Protocol v1: pairing, hello, translate,
-// ASR sessions (open / feed / events / close) and the system-listen fallback,
+// ASR sessions (open / feed / seek / events / close) and the system-listen fallback,
 // against the T-Translate companion server on 127.0.0.1. Runs in the
 // offscreen document (long-lived fetch streams, WebCodecs next door); only
 // fetch, storage and timers are used, so it also runs under Node for tests.
@@ -231,6 +231,14 @@ export function createCompanionClient({
     throw new ClientError(j.error || 'feed-failed', res.status, j);
   }
 
+  // The media jumped: the same session goes on from mediaStartS. Resolves { atS }.
+  async function seekAsr(id, { mediaStartS = 0 } = {}) {
+    const res = await request('POST', '/v1/asr/seek', { json: { id, mediaStartS } });
+    const j = await jsonOf(res);
+    if (res.status === 200 && Number.isFinite(j.atS)) return { atS: j.atS };
+    throw new ClientError(j.error || 'seek-failed', res.status);
+  }
+
   async function closeAsr(id) {
     const res = await request('POST', '/v1/asr/close', { json: { id } });
     return res.status === 204 || res.status === 404;
@@ -328,6 +336,7 @@ export function createCompanionClient({
     openAsr,
     listenOpen,
     feed,
+    seekAsr,
     closeAsr,
     subscribe,
     forget,

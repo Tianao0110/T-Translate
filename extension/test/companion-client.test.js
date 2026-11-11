@@ -177,6 +177,20 @@ describe('translate and feed', () => {
     await client.load();
     await expect(client.openAsr({ lang: 'en' })).rejects.toMatchObject({ code: 'busy', detail: 'window' });
   });
+
+  it('seekAsr posts the id and the new start, resolves the cut, throws the server’s code', async () => {
+    const storage = await paired();
+    const bodies = [];
+    const replies = [() => json(200, { atS: 41.25 }), () => json(503, { error: 'not-ready' }), () => json(404, { error: 'unknown-session' }), () => json(404, {})];
+    const fetch = fakeFetch({ [`POST http://127.0.0.1:${PORT_BASE}/v1/asr/seek`]: (init) => (bodies.push(JSON.parse(init.body)), replies[bodies.length - 1]()) });
+    const client = createCompanionClient({ version: '0.5.8', storage, fetch });
+    await client.load();
+    expect(await client.seekAsr('s1', { mediaStartS: 95.5 })).toEqual({ atS: 41.25 });
+    expect(bodies[0]).toEqual({ id: 's1', mediaStartS: 95.5 });
+    await expect(client.seekAsr('s1', { mediaStartS: 1 })).rejects.toMatchObject({ code: 'not-ready', status: 503 });
+    await expect(client.seekAsr('s1', { mediaStartS: 1 })).rejects.toMatchObject({ code: 'unknown-session', status: 404 });
+    await expect(client.seekAsr('s1', { mediaStartS: 1 })).rejects.toMatchObject({ code: 'seek-failed', status: 404 });
+  });
 });
 
 describe('event stream', () => {

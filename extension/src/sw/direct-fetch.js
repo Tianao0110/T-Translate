@@ -345,9 +345,9 @@ export function createDirectFetch({
   }
 
   // Stops fetching (the request in flight is aborted), closes the stream
-  // (the pipeline drains it unless drain is false); resolves the pipeline's
-  // stats plus { fetch }.
-  function close({ key, drain = true } = {}) {
+  // (the pipeline drains it unless drain is false, and with handover leaves
+  // its session to the next stream); resolves the pipeline's stats plus { fetch }.
+  function close({ key, drain = true, handover = false } = {}) {
     const s = sessions.get(key);
     if (!s) return Promise.resolve(null);
     s.closing ??= (async () => {
@@ -355,7 +355,7 @@ export function createDirectFetch({
       if (cur === s) cur = null;
       await s.pumping;
       let stats = null;
-      if (s.opened) stats = await toOffscreen(MSG.MEDIA_CLOSE, { key, drain: drain !== false }).catch((e) => ({ closeError: e.code || e.message }));
+      if (s.opened) stats = await toOffscreen(MSG.MEDIA_CLOSE, { key, drain: drain !== false, ...(handover === true && { handover: true }) }).catch((e) => ({ closeError: e.code || e.message }));
       return { ...stats, fetch: statsOf(s) };
     })();
     return s.closing;

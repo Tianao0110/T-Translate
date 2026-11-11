@@ -21,6 +21,34 @@ async function until(fn, ms, every = 250) {
   return null;
 }
 
+// The listen worker's session logs in the sandbox (one file per worker
+// started, the newest three kept): [{ file, records }].
+function workerLogs(boxDir) {
+  const dir = path.join(boxDir, 'logs');
+  if (!fs.existsSync(dir)) return [];
+  return fs
+    .readdirSync(dir)
+    .filter((f) => f.startsWith('audio-probe-') && f.endsWith('.jsonl'))
+    .sort()
+    .map((file) => ({ file, records: fs.readFileSync(path.join(dir, file), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) }));
+}
+
+// The channel's logger: warnings and errors printed, the ASR session routes
+// kept as { at, route, status, ms } (the server logs each when it answers).
+function channelLogger() {
+  const routes = [];
+  const logger = {
+    info: () => {},
+    warn: (m) => console.log('  [warn]', m),
+    error: (m) => console.log('  [error]', m),
+    debug: (m) => {
+      const r = /^companion (\w+ \/v1\/asr\/\w+) -> (\d+) \((\d+) ms\)$/.exec(String(m));
+      if (r) routes.push({ at: Date.now(), route: r[1], status: Number(r[2]), ms: Number(r[3]) });
+    },
+  };
+  return { logger, routes };
+}
+
 // The sandbox (with the listen packs linked in), its screenshot folder and
 // the real companion server and engine; Firefox's shell uses it too.
 async function startCompanion({ name, step, version, packsDir, browserExe }) {
@@ -39,11 +67,11 @@ async function startCompanion({ name, step, version, packsDir, browserExe }) {
     return { success: true, text: `[译] ${text}` };
   };
   engineManager.configureTranslation({ translateStream });
-  const logger = { info: () => {}, warn: (m) => console.log('  [warn]', m), error: (m) => console.log('  [error]', m), debug: () => {} };
+  const { logger, routes } = channelLogger();
   const companion = initCompanion({ store, engineManager, translateStream, logger, version: version, getPrivacyMode: () => 'standard' });
   await companion.ready();
   step('companion channel up', companion.status().running === true, `port ${companion.status().port}`);
-  return { box, shotsDir, companion, engineManager };
+  return { box, shotsDir, companion, engineManager, routes };
 }
 
 // Resolves the shell, or null (usage printed) without --packs / a browser.
@@ -55,7 +83,7 @@ async function startShell({ name, step, version, shotPrefix, extraHosts = [] }) 
     console.error('usage: --packs <dir with asr-base-sense-voice/ etc.> [--browser <chrome.exe>] [--out <dir>] [--headed]');
     return null;
   }
-  const { box, shotsDir, companion, engineManager } = await startCompanion({ name, step, version, packsDir, browserExe: exe });
+  const { box, shotsDir, companion, engineManager, routes } = await startCompanion({ name, step, version, packsDir, browserExe: exe });
 
   const { build } = await import(pathToFileURL(path.join(REPO, 'extension/scripts/build.mjs')).href);
   const { outDir } = await build({ outDir: path.join(box.dir, 'dist'), logLevel: 'silent', extraHosts });
@@ -63,7 +91,7 @@ async function startShell({ name, step, version, shotPrefix, extraHosts = [] }) 
   const browser = await launchBrowser({ exe, profile: path.join(box.dir, 'profile'), lang: arg('--lang') || 'en-US', headless: !has('--headed'), args: ['--window-size=1280,900'] });
   const { cdp, attach, evaluate, open } = browser;
   console.log(`browser pid ${browser.child.pid}`);
-  const shell = { box, shotsDir, companion, engineManager, browser, cdp, evaluate, open, pages: new Set(), shots: [], extProblems: [], pageExceptions: { ours: [], site: 0 } };
+  const shell = { box, shotsDir, companion, engineManager, routes, workerLogs: () => workerLogs(box.dir), browser, cdp, evaluate, open, pages: new Set(), shots: [], extProblems: [], extConsole: [], pageExceptions: { ours: [], site: 0 } };
 
   cdp.listen((m) => {
     if (m.method === 'Runtime.exceptionThrown') {
@@ -75,6 +103,8 @@ async function startShell({ name, step, version, shotPrefix, extraHosts = [] }) 
       else shell.extProblems.push(text);
     }
     if (m.method === 'Runtime.consoleAPICalled' && m.params.type === 'error' && !shell.pages.has(m.sessionId)) shell.extProblems.push(m.params.args.map((a) => a.value ?? a.description).join(' '));
+    // warn / debug lines of the worker and the offscreen document, with when they came
+    if (m.method === 'Runtime.consoleAPICalled' && ['warning', 'debug'].includes(m.params.type) && !shell.pages.has(m.sessionId)) shell.extConsole.push({ at: Date.now(), text: m.params.args.map((a) => a.value ?? a.description).join(' ') });
   });
 
   const { id, sw } = await loadExtension(browser, outDir);
@@ -86,6 +116,9 @@ async function startShell({ name, step, version, shotPrefix, extraHosts = [] }) 
   const paired = await evaluate(opt, `chrome.runtime.sendMessage({ type: 'companion/pair' })`);
   step('paired through the extension', paired?.ok && paired.result.status === 'ready', paired?.result?.status || JSON.stringify(paired?.error));
 
+  // The offscreen document's console too (its warnings say why a session went the way it did).
+  const offscreenTarget = (await cdp.send('Target.getTargets')).targetInfos.find((t) => t.url === `chrome-extension://${id}/offscreen.html`);
+  if (offscreenTarget) shell.offscreen = await attach(offscreenTarget.targetId);
   const ext = (type, payload) => evaluate(opt, `chrome.runtime.sendMessage(${JSON.stringify({ type, payload })})`);
   Object.assign(shell, {
     extId: id,
@@ -135,4 +168,4 @@ async function startShell({ name, step, version, shotPrefix, extraHosts = [] }) 
   return shell;
 }
 
-module.exports = { startShell, startCompanion, until };
+module.exports = { startShell, startCompanion, until, workerLogs, channelLogger };
