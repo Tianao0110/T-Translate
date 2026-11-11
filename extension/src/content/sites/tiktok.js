@@ -3,7 +3,10 @@
 // another id there is another page). The player prefetches WebVTT files for
 // the next videos too, so a subtitle file counts only once item data (the
 // feed's item lists, the video page's own data) says whose it is; others
-// are strays. SPA navigation through history; hiding the caption layer.
+// are strays. SPA navigation through history; hiding the caption layer;
+// where the description and playback bar sit over the video.
+
+import { topOf } from './controls.js';
 
 const VIDEO = /^\/@[^/]+\/video\/(\d{6,25})(?:[/?#]|$)/;
 const WRAPPER = /^xgwrapper-\d+-(\d{6,25})$/;
@@ -135,6 +138,13 @@ function hideSiteCaptions(doc, on) {
   return on;
 }
 
+// The description (author, text, music) and the playback bar laid over the
+// lower video, wherever the layout nests them; other feed items' fall
+// outside the video's box.
+function controlsTop(video) {
+  return topOf(video, video.ownerDocument.querySelectorAll('[class*="DivDescriptionLayer"], [class*="DivPlaybackChrome"]'));
+}
+
 export const tiktok = {
   name: 'tiktok',
   test: isHost,
@@ -146,5 +156,6 @@ export const tiktok = {
   readPage,
   watchNavigation,
   hideSiteCaptions,
+  controlsTop,
   mainActions: {},
 };

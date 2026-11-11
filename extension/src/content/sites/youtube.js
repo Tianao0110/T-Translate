@@ -1,7 +1,9 @@
 // YouTube: media id from the URL, the player's own timedtext requests (the
 // pot token they carry is why they are copied, not rebuilt), SPA navigation
-// through yt-navigate-finish, hiding the player's caption layer, and two
-// page-world actions on the player element.
+// through yt-navigate-finish, hiding the player's caption layer, where its
+// control bar sits, and two page-world actions on the player element.
+
+import { topOf } from './controls.js';
 
 const VIDEO_ID = /^[\w-]{11}$/;
 const PATH_ID = /^\/(?:shorts|embed|live|v)\/([\w-]{11})(?:[/?#]|$)/;
@@ -62,6 +64,13 @@ function hideSiteCaptions(doc, on) {
     hideStyles.delete(doc);
   }
   return on;
+}
+
+// The control bar with its progress bar, while it is shown.
+function controlsTop(video) {
+  const player = video.closest?.('.html5-video-player');
+  if (!player) return null;
+  return topOf(video, [player.querySelector('.ytp-chrome-bottom'), player.querySelector('.ytp-progress-bar-container')], player);
 }
 
 // ---- page world only: the player element's methods live there ----
@@ -165,5 +174,6 @@ export const youtube = {
   subtitleInfo,
   watchNavigation,
   hideSiteCaptions,
+  controlsTop,
   mainActions: { 'yt-reload': reload, 'yt-captions-on': captionsOn },
 };

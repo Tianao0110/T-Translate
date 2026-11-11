@@ -51,7 +51,7 @@ src/content/media-watch.js        找页面里的 video / audio，报播放状�
 src/content/mse-relay.js          MSE 音频：环形缓冲，打开转发后按 256 KB / 1 秒一包送出
 src/content/webm-sniff.js         不解封装读 WebM 分片的媒体时间（Cluster Timecode）
 src/content/mp4-sniff.js          不解封装读 fMP4 分片的媒体时间（mdhd timescale + tfdt）
-src/content/sites/                站点适配：YouTube（媒体 id、timedtext、导航、隐藏站点字幕、播放器操作）、B 站（BV / av / 番剧 id、分 P、字幕清单 → 取字幕体）、TikTok（视频页 id 或播放器外框的条目 id、信息流换视频即导航、条目数据认领 WebVTT）、通用（字幕文件按扩展名认）
+src/content/sites/                站点适配：YouTube（媒体 id、timedtext、导航、隐藏站点字幕、播放器操作）、B 站（BV / av / 番剧 id、分 P、字幕清单 → 取字幕体）、TikTok（视频页 id 或播放器外框的条目 id、信息流换视频即导航、条目数据认领 WebVTT）、通用（字幕文件按扩展名认）；前三个还报控制条从哪开始（controls.js），覆盖层字幕在它上面
 src/content/parsers/              站点字幕解析：VTT、SRT、TTML、json3、B 站 JSON，detectFormat 认格式
 src/content/caption-track.js      字幕画成视频的原生字幕轨（TextTrack）
 src/content/overlay.js            覆盖层（默认画法）：画在视频上，跟随全屏；一次一句，停顿时多留一会儿，新的淡入

@@ -350,3 +350,67 @@ describe('generic', () => {
     expect(fn).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('the player bars the caption overlay stays above (controlsTop)', () => {
+  const box = (el, top, height, left = 0, width = 800) => {
+    el.getBoundingClientRect = () => ({ top, bottom: top + height, left, right: left + width, width, height, x: left, y: top });
+    return el;
+  };
+  const el = (tag, cls, ...kids) => {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    e.append(...kids);
+    return e;
+  };
+  const mount = (root) => {
+    document.body.replaceChildren(root);
+    return root;
+  };
+
+  it('YouTube: the control bar with its progress bar while shown, nothing once faded out', () => {
+    const video = box(el('video'), 0, 450);
+    const progress = box(el('div', 'ytp-progress-bar-container'), 388, 6);
+    const bar = box(el('div', 'ytp-chrome-bottom', progress), 391, 59);
+    mount(el('div', 'html5-video-player', el('div', 'html5-video-container', video), bar));
+    expect(youtube.controlsTop(video)).toBe(388);
+    bar.style.opacity = '0';
+    expect(youtube.controlsTop(video)).toBeNull();
+    expect(youtube.controlsTop(box(el('video'), 0, 450))).toBeNull(); // no player around it
+  });
+
+  it('Bilibili: the control bar and the highlight graph, unless the player marks them hidden', () => {
+    const video = box(el('video'), 0, 438);
+    const pbp = box(el('div', 'bpx-player-pbp show'), 355, 28);
+    const player = mount(el('div', 'bpx-player-container', video, box(el('div', 'bpx-player-control-wrap'), 383, 55), pbp));
+    player.setAttribute('data-ctrl-hidden', 'false');
+    expect(bilibili.controlsTop(video)).toBe(355);
+    pbp.className = 'bpx-player-pbp';
+    expect(bilibili.controlsTop(video)).toBe(383);
+    player.setAttribute('data-ctrl-hidden', 'true');
+    expect(bilibili.controlsTop(video)).toBeNull();
+  });
+
+  it('TikTok: the description and the dimmed playback bar over the lower video; other items and the upper half do not count', () => {
+    const video = box(el('video'), 16, 769, 460, 577);
+    let inner = video;
+    for (let i = 0; i < 5; i++) inner = el('div', '', inner);
+    const chrome = box(el('div', 'css-1-DivPlaybackChrome e1'), 721, 64, 452, 590);
+    chrome.style.opacity = '0.28';
+    mount(
+      el(
+        'div',
+        'item',
+        inner,
+        box(el('div', 'css-2-DivDescriptionLayer e2'), 601, 120, 452, 590),
+        chrome,
+        box(el('div', 'css-3-DivDescriptionLayer e3'), 1201, 120, 452, 590), // the next video's
+        box(el('div', 'css-4-DivDescriptionLayer e4'), 100, 60, 452, 590)
+      )
+    );
+    expect(tiktok.controlsTop(video)).toBe(601);
+  });
+
+  it('the generic adapter has none', () => {
+    expect(generic.controlsTop).toBeUndefined();
+  });
+});

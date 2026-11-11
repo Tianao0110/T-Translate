@@ -330,7 +330,7 @@ export function createPageAgent({
     if (renderer && rendererEl === v) return renderer;
     const saved = renderer ? renderer.list() : [];
     destroyRenderer();
-    renderer = makeRenderer({ video: v, mode: modeFor(v), display: view.display, size: view.size });
+    renderer = makeRenderer({ video: v, mode: modeFor(v), display: view.display, size: view.size, controlsTop: site.controlsTop });
     rendererEl = v;
     if (saved.length) {
       renderer.setCues(saved);

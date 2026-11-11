@@ -17,6 +17,7 @@ export function createCaptionRenderer({
   mode = 'track',
   display = 'bilingual',
   size = DEFAULT_SIZE,
+  controlsTop = null,
   lang = '',
   label,
   addTextTrack,
@@ -28,7 +29,7 @@ export function createCaptionRenderer({
   if (!SIZES.includes(size)) size = DEFAULT_SIZE;
   let entries = new Map();
   const makeView = (m) =>
-    m === 'overlay' ? makeOverlay({ video, size }) : createCaptionTrack({ video, lang, label, addTextTrack, createCue, size });
+    m === 'overlay' ? makeOverlay({ video, size, controlsTop }) : createCaptionTrack({ video, lang, label, addTextTrack, createCue, size });
   let view = makeView(mode);
 
   // The translation stands in for a missing original, never the other way round.

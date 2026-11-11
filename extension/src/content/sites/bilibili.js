@@ -1,8 +1,11 @@
 // Bilibili: media id from the URL (BV / av with its part, bangumi ep / ss),
 // subtitle bodies on hdslb.com and the player API's subtitle list (the page
 // agent fetches the body the list points at), SPA navigation through
-// history (part switches use pushState) and hiding the player's subtitle
-// layer. Live rooms are left to the generic adapter.
+// history (part switches use pushState), hiding the player's subtitle
+// layer and where its control bar sits. Live rooms are left to the generic
+// adapter.
+
+import { topOf } from './controls.js';
 
 // Paths may start with a locale (/zh-Hans/video/…, seen outside mainland China).
 const LOCALE = '(?:/[a-z]{2}(?:-[A-Za-z]{2,4})?)?';
@@ -99,6 +102,13 @@ function hideSiteCaptions(doc, on) {
   return on;
 }
 
+// The control bar and the highlight graph over it, unless the player hides them.
+function controlsTop(video) {
+  const box = video.closest?.('.bpx-player-container');
+  if (!box || box.getAttribute('data-ctrl-hidden') === 'true') return null;
+  return topOf(video, [box.querySelector('.bpx-player-control-wrap'), box.querySelector('.bpx-player-pbp.show')], box);
+}
+
 export const bilibili = {
   name: 'bilibili',
   test: isHost,
@@ -108,5 +118,6 @@ export const bilibili = {
   listSubtitles,
   watchNavigation,
   hideSiteCaptions,
+  controlsTop,
   mainActions: {},
 };

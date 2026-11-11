@@ -5,6 +5,8 @@
 // set / upsert / updateText / clear / setSize / destroy as
 // caption-track.js. The text size follows the video's height, or its width
 // when that is the shorter measure (portrait video), times the size factor.
+// controlsTop(video) (the site adapter's) says where the player's own bars
+// start while they show; the box rises above them and comes back down.
 
 import { cueTimes } from './caption-track.js';
 import { DEFAULT_SIZE, scaleOf } from './caption-size.js';
@@ -13,6 +15,9 @@ export const MAX_SHOWN = 1;
 const LINGER_S = 1;
 const READ_BASE_S = 0.6;
 const READ_WIDTH_PER_S = 20; // a CJK character counts 2
+const CONTROLS_GAP_PX = 8;
+const MAX_LIFT = 0.5; // of the video's height
+const CONTROLS_POLL_MS = 250;
 
 const WIDE = /[\u{1100}-\u{11FF}\u{2E80}-\u{9FFF}\u{AC00}-\u{D7AF}\u{F900}-\u{FAFF}\u{FF00}-\u{FFEF}]/u;
 
@@ -31,7 +36,8 @@ const HOST_STYLE = {
 const CSS = `
 .tc-cap-root { position: absolute; inset: 0; overflow: hidden; container-type: size; }
 .tc-cap-box {
-  position: absolute; left: 4%; right: 4%; bottom: 7%;
+  position: absolute; left: 4%; right: 4%; bottom: max(7%, var(--tc-cap-lift, 0px));
+  transition: bottom 150ms ease-out;
   display: flex; flex-direction: column; align-items: center; gap: 0.35em;
   font-family: system-ui, "Segoe UI", "PingFang SC", "Hiragino Sans", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
   font-size: var(--tc-cap-size, clamp(12px, calc(min(4.6cqh, 4.5cqw) * var(--tc-cap-scale, 1)), 64px));
@@ -43,7 +49,7 @@ const CSS = `
   animation: tc-cap-in 160ms ease-out;
 }
 @keyframes tc-cap-in { from { opacity: 0; transform: translateY(0.3em); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .tc-cap-cue { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .tc-cap-box { transition: none; } .tc-cap-cue { animation: none; } }
 .tc-cap-line {
   max-width: 100%; box-sizing: border-box; padding: 0.04em 0.4em; border-radius: 0.18em;
   color: var(--tc-cap-fg, #fff); background: var(--tc-cap-bg, rgba(8, 8, 8, 0.55));
@@ -77,7 +83,7 @@ export function shownIndexes(cues, maxHold, t, max = MAX_SHOWN) {
   return out.reverse();
 }
 
-export function createOverlay({ video, size = DEFAULT_SIZE }) {
+export function createOverlay({ video, size = DEFAULT_SIZE, controlsTop = null }) {
   const doc = video.ownerDocument;
   const win = doc.defaultView;
   const host = doc.createElement('div');
@@ -100,6 +106,7 @@ export function createOverlay({ video, size = DEFAULT_SIZE }) {
   let maxHold = [];
   let holdsStale = false;
   let lastBox = '';
+  let lastLift = 0;
   let destroyed = false;
 
   const setSize = (next) => root.style.setProperty('--tc-cap-scale', String(scaleOf(next)));
@@ -129,6 +136,19 @@ export function createOverlay({ video, size = DEFAULT_SIZE }) {
     if (next.join() === lastBox) return;
     lastBox = next.join();
     ['left', 'top', 'width', 'height'].forEach((k, i) => host.style.setProperty(k, next[i], 'important'));
+  }
+
+  function lift() {
+    if (!controlsTop) return;
+    let top = null;
+    try {
+      top = controlsTop(video);
+    } catch {} // a player mid-rebuild
+    const v = video.getBoundingClientRect();
+    const px = Number.isFinite(top) ? Math.round(Math.min(v.height * MAX_LIFT, Math.max(0, v.bottom - top + CONTROLS_GAP_PX))) : 0;
+    if (px === lastLift) return;
+    lastLift = px;
+    root.style.setProperty('--tc-cap-lift', `${px}px`);
   }
 
   function linesOf(text) {
@@ -183,7 +203,10 @@ export function createOverlay({ video, size = DEFAULT_SIZE }) {
       holdsStale = false;
     }
     mount();
-    if (host.isConnected) place();
+    if (host.isConnected) {
+      place();
+      lift();
+    }
     render(shownIndexes(sorted, maxHold, video.currentTime).map((i) => sorted[i]).filter((c) => c.text));
   }
 
@@ -217,6 +240,8 @@ export function createOverlay({ video, size = DEFAULT_SIZE }) {
   win.addEventListener('resize', onChange, opts);
   const ro = typeof win.ResizeObserver === 'function' ? new win.ResizeObserver(onChange) : null;
   ro?.observe(video);
+  // The player's bars come and go between frames and events.
+  const poll = controlsTop ? win.setInterval(onChange, CONTROLS_POLL_MS) : 0;
 
   refresh();
 
@@ -250,6 +275,7 @@ export function createOverlay({ video, size = DEFAULT_SIZE }) {
       destroyed = true;
       ac.abort();
       ro?.disconnect();
+      if (poll) win.clearInterval(poll);
       if (hasVfc && frame) video.cancelVideoFrameCallback?.(frame);
       if (raf) win.cancelAnimationFrame(raf);
       byId.clear();

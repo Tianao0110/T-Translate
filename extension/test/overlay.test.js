@@ -154,6 +154,30 @@ describe('createOverlay', () => {
     expect(o.host.shadowRoot.querySelectorAll('.tc-cap-cue')).toHaveLength(1);
   });
 
+  it('rises above the player’s bars while they show, polled, and comes back down', () => {
+    vi.useFakeTimers();
+    try {
+      video.getBoundingClientRect = () => ({ top: 0, bottom: 400, left: 0, right: 600, width: 600, height: 400, x: 0, y: 0 });
+      const lift = (o) => o.host.shadowRoot.querySelector('.tc-cap-root').style.getPropertyValue('--tc-cap-lift');
+      let top = 340;
+      const o = createOverlay({ video, controlsTop: () => top });
+      expect(lift(o)).toBe('68px'); // 400 - 340 + 8
+      top = null;
+      vi.advanceTimersByTime(250);
+      expect(lift(o)).toBe('0px');
+      top = 20; // a bar up the whole video: half its height at most
+      vi.advanceTimersByTime(250);
+      expect(lift(o)).toBe('200px');
+      o.destroy();
+      top = 340;
+      vi.advanceTimersByTime(1000);
+      expect(lift(o)).toBe('200px');
+      expect(lift(createOverlay({ video }))).toBe('');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('scales the text by the size factor', () => {
     const scale = (o) => o.host.shadowRoot.querySelector('.tc-cap-root').style.getPropertyValue('--tc-cap-scale');
     const o = createOverlay({ video });
