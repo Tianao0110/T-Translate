@@ -1,9 +1,9 @@
 @import '../shared/theme.css';
 
 main {
-  max-width: 560px;
-  margin: 48px auto;
-  padding: 0 16px;
+  max-width: 1040px;
+  margin: 40px auto;
+  padding: 0 24px;
 }
 
 header {
@@ -36,8 +36,56 @@ header p {
   background: var(--tc-surface);
 }
 
-.card + .card {
-  margin-top: 16px;
+/* The four numbers under the title. */
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.tile {
+  padding: 14px 18px;
+  border: 1px solid var(--tc-border);
+  border-radius: var(--tc-radius);
+  background: var(--tc-surface);
+}
+
+.tile b {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 22px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tile span {
+  color: var(--tc-muted);
+  font-size: 12px;
+}
+
+/* Connection and blocked sites on the left, the cache on the right. */
+.columns {
+  display: grid;
+  grid-template-columns: 380px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (max-width: 860px) {
+  .tiles {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 h2 {
@@ -113,13 +161,44 @@ h2 {
   display: none;
 }
 
+/* Select the page, how many are picked, export and delete them. */
+.cache-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0 8px;
+  border-bottom: 1px solid var(--tc-border);
+}
+
+.cache-bar .hint {
+  flex: 1;
+  margin: 0;
+}
+
+.cache-bar button,
+.cache-total button {
+  font-size: 13px;
+  padding: 3px 12px;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
 .cache-item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   padding: 8px 0;
   border-bottom: 1px solid var(--tc-border);
+}
+
+.cache-item input {
+  flex: none;
 }
 
 .cache-main {
@@ -140,12 +219,22 @@ h2 {
   font-size: 12px;
 }
 
-.cache-item button {
-  flex: none;
-  font-size: 13px;
-  padding: 3px 12px;
-}
-
 .cache-total {
   margin-top: 8px;
+}
+
+.cache-total > span:first-child {
+  flex: 1;
+}
+
+.pager {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--tc-muted);
+  font-size: 13px;
+}
+
+.pager[hidden] {
+  display: none;
 }

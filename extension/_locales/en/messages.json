@@ -81,6 +81,24 @@
   },
   "cacheClear": { "message": "Clear" },
   "cacheDelete": { "message": "Delete" },
+  "cacheExport": { "message": "Export captions" },
+  "cacheSelectPage": { "message": "Select page" },
+  "cacheSelected": {
+    "message": "$N$ selected",
+    "placeholders": { "n": { "content": "$1" } }
+  },
+  "cachePrev": { "message": "Previous" },
+  "cacheNext": { "message": "Next" },
+  "cachePage": {
+    "message": "$CUR$ / $ALL$",
+    "placeholders": { "cur": { "content": "$1" }, "all": { "content": "$2" } }
+  },
+  "tileConn": { "message": "with T-Translate" },
+  "tileReady": { "message": "Connected" },
+  "tileOffline": { "message": "Not connected" },
+  "tileUnpaired": { "message": "Not paired" },
+  "tileVideos": { "message": "Cached videos" },
+  "tileSize": { "message": "Cache size" },
   "cacheEmpty": { "message": "No cached captions yet" },
   "cacheLine": {
     "message": "$SITE$ · $TIME$ · $COUNT$ lines · $SIZE$",

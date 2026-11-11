@@ -284,7 +284,7 @@ Using it:
 
 - Works on YouTube, Bilibili, TikTok and pages that play a video file directly. Captions appear as soon as the video has sound: site captions are translated, otherwise the sound is recognized.
 - Other sites: on that page, click the T-Caption icon in the browser toolbar and choose 'Allow on this site'. It takes effect as soon as the browser agrees.
-- The toolbar popup switches the display mode, the text size and the target language, and exports captions (SRT / VTT). Set Show to Off to turn the extension off. To turn it off on one site only, click “Turn off on this site” in the popup on that site; the whole site goes off, subdomains included. The extension's options page lists the sites you turned off, each with a remove. Captions of videos you have watched are cached and show again at once; the options page lists each cached video (title, site, time), to delete one by one or clear all.
+- The toolbar popup switches the display mode, the text size and the target language, and exports captions (SRT / VTT). Set Show to Off to turn the extension off. To turn it off on one site only, click “Turn off on this site” in the popup on that site; the whole site goes off, subdomains included. The extension's options page lists the sites you turned off, each with a remove. Captions of videos you have watched are cached and show again at once; the options page shows the connection, the cache and the blocked sites as numbers at the top, and lists cached videos ten to a page (title, site, time): tick some to delete them or export them as SRT, or clear them all.
 - Protected (DRM) video has no readable audio. A line on the video offers to let T-Translate listen to the system sound instead.
 
 ## 4. Settings

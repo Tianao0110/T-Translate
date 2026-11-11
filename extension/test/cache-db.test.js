@@ -158,7 +158,19 @@ describe('CACHE_* handlers', () => {
       ['youtube:a', 'First', 'https://www.youtube.com/watch?v=a', 2],
     ]);
     expect(list[0]).not.toHaveProperty('cues');
+    now.tick(1000);
+    expect((await call(MSG.CACHE_GET, { key: 'youtube:a', peek: true }, { runtime })).cues).toHaveLength(2);
+    expect((await call(MSG.CACHE_LIST, null, { runtime })).map((m) => m.key)).toEqual(['bilibili:b', 'youtube:a']); // a peek is no use
     expect(await call(MSG.CACHE_DELETE, { key: 'youtube:a' }, { runtime })).toMatchObject({ count: 1 });
     expect((await call(MSG.CACHE_LIST, null, { runtime })).map((m) => m.key)).toEqual(['bilibili:b']);
+  });
+
+  it('delete takes several keys at once', async () => {
+    const runtime = fakeRuntime();
+    const cache = createSubtitleCache({ store: createMemoryStore() });
+    handle(cacheHandlers(cache), { runtime, accept: (_m, s) => isExtensionSender(s, runtime) });
+    for (const k of ['youtube:a', 'youtube:b', 'tiktok:c']) await call(MSG.CACHE_PUT, { key: k, record: rec(1) }, { runtime });
+    expect(await call(MSG.CACHE_DELETE, { keys: ['youtube:a', 'tiktok:c'] }, { runtime })).toMatchObject({ count: 1 });
+    expect((await call(MSG.CACHE_LIST, null, { runtime })).map((m) => m.key)).toEqual(['youtube:b']);
   });
 });

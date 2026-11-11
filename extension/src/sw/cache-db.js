@@ -17,6 +17,7 @@ const MAX_KEY = 512;
 const MAX_LANG = 32;
 const MAX_URL = 2048;
 const MAX_TITLE = 300;
+const MAX_DELETE = 500; // keys in one delete request
 
 const err = (code) => Object.assign(new Error(code), { code });
 const meta = ({ key, tier, lang, target, url = '', title = '', updatedAt, bytes, cueCount }) => ({ key, tier, lang, target, url, title, updatedAt, bytes, cueCount });
@@ -83,8 +84,8 @@ export function createSubtitleCache({ store, maxEntries = 200, maxBytes = 100 * 
   };
 
   return {
-    // The record (a hit counts as a use), or null.
-    get: (key) =>
+    // The record (a hit counts as a use, unless only peeked at), or null.
+    get: (key, { peek = false } = {}) =>
       serial(async () => {
         checkKey(key);
         await load();
@@ -93,6 +94,7 @@ export function createSubtitleCache({ store, maxEntries = 200, maxBytes = 100 * 
           index.delete(key);
           return null;
         }
+        if (peek) return r;
         r.updatedAt = stamp();
         await store.put(r);
         index.set(key, meta(r));
@@ -251,11 +253,12 @@ export function cacheHandlers(cache) {
       await cache.clear();
       return cache.stats();
     },
-    [MSG.CACHE_GET]: ({ key } = {}) => cache.get(key),
+    [MSG.CACHE_GET]: ({ key, peek } = {}) => cache.get(key, { peek: peek === true }),
     [MSG.CACHE_PUT]: ({ key, record } = {}) => cache.put(key, record || {}),
     [MSG.CACHE_LIST]: () => cache.list(),
-    [MSG.CACHE_DELETE]: async ({ key } = {}) => {
-      await cache.delete(key);
+    [MSG.CACHE_DELETE]: async ({ key, keys } = {}) => {
+      const list = Array.isArray(keys) ? keys.slice(0, MAX_DELETE) : [key];
+      for (const k of list) await cache.delete(k);
       return cache.stats();
     },
   };

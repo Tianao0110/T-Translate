@@ -59,7 +59,7 @@ src/content/caption-size.js       字号四档（小 / 中 / 大 / 特大）对�
 src/content/cue-timing.js         一句显示多久（两种画法共用）
 src/content/caption-renderer.js   字幕与译文、双语 / 只译文 / 只原文、两种画法切换、字号，接媒体流水线事件
 src/content/notice.js             视频上的一行提示（DRM 时「用 T-Translate 听译」+ 按钮；视频所在网站未允许时只有关闭）
-src/options/                      选项页：配对、禁止字幕的网站（可移除）、字幕缓存（每个视频的标题、网站、时间，可单独删除）
+src/options/                      选项页：顶部四个数字（连接、缓存视频数、缓存大小、禁止网站数）、配对、禁止字幕的网站（可移除）、字幕缓存（每页 10 个，标题、网站、时间，勾选后批量删除或导出 SRT）
 src/popup/                        工具栏弹窗：当前标签页状态、「允许在本站使用」/「允许」读取视频、显示方式（选「无」即关闭）、字号、画法、目标语言、导出字幕、在此网站禁用 / 恢复
 src/shared/                       协议常量、消息约定（媒体字节走 base64）、页面事件格式与校验、状态文案、SRT / VTT 导出、配色、MP4 采样表（mp4-table.js）、匹配模式（match-pattern.js）
 scripts/build.mjs                 esbuild 构建 → dist/（不入库）；--target firefox → dist-firefox/；extraHosts 只给真机脚本用（无头浏览器点不了授权框）

@@ -81,6 +81,24 @@
   },
   "cacheClear": { "message": "清空" },
   "cacheDelete": { "message": "删除" },
+  "cacheExport": { "message": "导出字幕" },
+  "cacheSelectPage": { "message": "全选本页" },
+  "cacheSelected": {
+    "message": "已选 $N$ 个",
+    "placeholders": { "n": { "content": "$1" } }
+  },
+  "cachePrev": { "message": "上一页" },
+  "cacheNext": { "message": "下一页" },
+  "cachePage": {
+    "message": "$CUR$ / $ALL$",
+    "placeholders": { "cur": { "content": "$1" }, "all": { "content": "$2" } }
+  },
+  "tileConn": { "message": "与 T-Translate" },
+  "tileReady": { "message": "已连接" },
+  "tileOffline": { "message": "未连接" },
+  "tileUnpaired": { "message": "未配对" },
+  "tileVideos": { "message": "缓存的视频" },
+  "tileSize": { "message": "缓存占用" },
   "cacheEmpty": { "message": "还没有缓存的字幕" },
   "cacheLine": {
     "message": "$SITE$ · $TIME$ · $COUNT$ 句 · $SIZE$",

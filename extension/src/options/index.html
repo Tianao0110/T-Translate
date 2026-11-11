@@ -15,33 +15,54 @@
           <p data-i18n="appDesc"></p>
         </div>
       </header>
-      <section class="card">
-        <div id="status" class="status" data-tone="muted" role="status" aria-live="polite">
-          <span class="dot"></span>
-          <span id="status-text"></span>
-        </div>
-        <div class="actions">
-          <button id="pair" class="primary" type="button" data-i18n="pair"></button>
-          <button id="reconnect" type="button" data-i18n="reconnect"></button>
-          <button id="forget" type="button" data-i18n="forget"></button>
-        </div>
-        <p class="hint" data-i18n="pairHint"></p>
-        <p id="error" class="error" role="alert"></p>
+      <section class="tiles" aria-live="polite">
+        <div class="tile"><b id="tile-conn"></b><span data-i18n="tileConn"></span></div>
+        <div class="tile"><b id="tile-videos"></b><span data-i18n="tileVideos"></span></div>
+        <div class="tile"><b id="tile-size"></b><span data-i18n="tileSize"></span></div>
+        <div class="tile"><b id="tile-blocked"></b><span data-i18n="blockedTitle"></span></div>
       </section>
-      <section class="card">
-        <h2 data-i18n="blockedTitle"></h2>
-        <ul id="blocked-sites" class="sites"></ul>
-        <p id="blocked-empty" class="hint" data-i18n="blockedEmpty"></p>
-      </section>
-      <section class="card">
-        <h2 data-i18n="cacheTitle"></h2>
-        <ul id="cache-list" class="cache-list"></ul>
-        <p id="cache-empty" class="hint" data-i18n="cacheEmpty"></p>
-        <div class="row cache-total">
-          <span id="cache-stats"></span>
-          <button id="cache-clear" type="button" data-i18n="cacheClear"></button>
+      <div class="columns">
+        <div class="column">
+          <section class="card">
+            <div id="status" class="status" data-tone="muted" role="status" aria-live="polite">
+              <span class="dot"></span>
+              <span id="status-text"></span>
+            </div>
+            <div class="actions">
+              <button id="pair" class="primary" type="button" data-i18n="pair"></button>
+              <button id="reconnect" type="button" data-i18n="reconnect"></button>
+              <button id="forget" type="button" data-i18n="forget"></button>
+            </div>
+            <p id="pair-hint" class="hint" data-i18n="pairHint"></p>
+            <p id="error" class="error" role="alert"></p>
+          </section>
+          <section class="card">
+            <h2 data-i18n="blockedTitle"></h2>
+            <ul id="blocked-sites" class="sites"></ul>
+            <p id="blocked-empty" class="hint" data-i18n="blockedEmpty"></p>
+          </section>
         </div>
-      </section>
+        <section class="card cache">
+          <h2 data-i18n="cacheTitle"></h2>
+          <div class="cache-bar">
+            <label class="check"><input id="cache-select-page" type="checkbox" /><span data-i18n="cacheSelectPage"></span></label>
+            <span id="cache-selected" class="hint"></span>
+            <button id="cache-export" type="button" data-i18n="cacheExport" disabled></button>
+            <button id="cache-delete" type="button" data-i18n="cacheDelete" disabled></button>
+          </div>
+          <ul id="cache-list" class="cache-list"></ul>
+          <p id="cache-empty" class="hint" data-i18n="cacheEmpty"></p>
+          <div class="row cache-total">
+            <span id="cache-stats"></span>
+            <span class="pager">
+              <button id="cache-prev" type="button" data-i18n="cachePrev"></button>
+              <span id="cache-page"></span>
+              <button id="cache-next" type="button" data-i18n="cacheNext"></button>
+            </span>
+            <button id="cache-clear" type="button" data-i18n="cacheClear"></button>
+          </div>
+        </section>
+      </div>
     </main>
     <script type="module" src="options.js"></script>
   </body>
