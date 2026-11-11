@@ -10,6 +10,8 @@ const PAUSE_S = 0.7;
 const LEAD_S = 0.1;
 
 const WIDE = /[\u{1100}-\u{11FF}\u{2E80}-\u{9FFF}\u{AC00}-\u{D7AF}\u{F900}-\u{FAFF}\u{FF00}-\u{FFEF}]/u;
+// Wide script written without spaces (Hangul has them): any two characters part.
+const UNSPACED = /[\u{2E80}-\u{9FFF}\u{F900}-\u{FAFF}\u{FF00}-\u{FFEF}]/u;
 const SENTENCE_END = /[.?!\u{3002}\u{FF1F}\u{FF01}\u{2026}]["'\u{201D}\u{2019})\u{FF09}\u{300D}\u{300F}]*$/u;
 const CLAUSE_END = /[,;:\u{FF0C}\u{FF1B}\u{FF1A}\u{3001}]$/u;
 const LEADING_PUNCT = /^\s*[\p{P}]/u;
@@ -44,7 +46,7 @@ function strengthAfter(units, k) {
   const tail = a.trimEnd();
   if (SENTENCE_END.test(tail)) return 3;
   if (CLAUSE_END.test(tail)) return 2;
-  const boundary = /^\s/.test(b) || WIDE.test(tail.slice(-1)) || WIDE.test(b.trim()[0] || '');
+  const boundary = /^\s/.test(b) || UNSPACED.test(tail.slice(-1)) || UNSPACED.test(b.trim()[0] || '');
   if (!boundary) return 0;
   if (units[k].t !== null && units[k + 1].t - units[k].t >= PAUSE_S) return 2;
   return 1;

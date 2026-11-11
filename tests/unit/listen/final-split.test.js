@@ -73,6 +73,13 @@ describe('splitFinal', () => {
     for (const p of splitFinal(recOf(textOf(EN), 10.69), EN)) expect(p.text).not.toMatch(/^[\p{P}]/u);
   });
 
+  it('cuts Korean only between words', () => {
+    const text = '오늘은 브라우저 확장 프로그램의 자막 표시에 대해 이야기해 보겠습니다 먼저 글자 크기를 조절할 수 있어야 하고 긴 문장은 나누어야 합니다';
+    const pieces = splitFinal(recOf(text, 9), null);
+    expect(pieces.length).toBeGreaterThan(1);
+    expect(pieces.map((p) => p.text).join(' ')).toBe(text);
+  });
+
   it('falls back to width-shared times when the marks do not spell the text', () => {
     const wrong = { ...EN, tokens: EN.tokens.slice(1) };
     const pieces = splitFinal(recOf(textOf(EN), 10.69), { tokens: wrong.tokens, timestamps: EN.timestamps.slice(1) });
