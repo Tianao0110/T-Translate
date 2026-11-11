@@ -41,6 +41,14 @@ describe('tengine facade', () => {
     expect(t.status().engines.find((e) => e.id === 'asr').provider).toBe('webgpu');
   });
 
+  it('each row says whether its engine is working, asked per id', () => {
+    const t = createTengine();
+    t.register({ ...fakeEngine('audio'), engines: ['tts', 'asr'], working: (id) => id === 'asr' });
+    t.register(fakeEngine('ocr'));
+    const working = Object.fromEntries(t.status().engines.map((e) => [e.id, e.working]));
+    expect(working).toMatchObject({ asr: true, tts: false, ocr: false, llm: false });
+  });
+
   it('delegates provider, health and shutdown to the engine', async () => {
     const t = createTengine();
     const e = t.register(fakeEngine('ocr'));

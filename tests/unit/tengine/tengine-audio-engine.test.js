@@ -71,6 +71,32 @@ describe('tengine audio engine', () => {
     expect(a.asrPhase()).toBe('idle');
   });
 
+  it('says which of its engines is working: the recognizer in a session, the voice while it speaks', async () => {
+    let t = 0;
+    const { a, child } = engine(ack, { now: () => t });
+    await a.spawn({ init: {} });
+    expect([a.working('asr'), a.working('tts')]).toEqual([false, false]);
+    a.startAsr('');
+    expect(a.working('asr')).toBe(false); // loading
+    child().emit('message', { type: 'asr-ready', loadMs: 1 });
+    expect(a.working('asr')).toBe(true);
+    child().emit('message', { type: 'asr-stopped' });
+    expect(a.working('asr')).toBe(false);
+    a.post({ type: 'tts-generate', id: 7, text: 'hi' });
+    a.post({ type: 'tts-generate', id: 8, text: 'there' });
+    expect(a.working('tts')).toBe(true);
+    child().emit('message', { type: 'tts-done', id: 7 });
+    a.post({ type: 'tts-cancel', id: 8 });
+    t += 1000;
+    expect(a.working('tts')).toBe(true); // the short tail after the last one
+    t += 1000;
+    expect(a.working('tts')).toBe(false);
+    a.post({ type: 'tts-generate', id: 9, text: 'again' });
+    child().emit('message', { type: 'tts-error', id: 9, message: 'x' });
+    t += 2000;
+    expect(a.working('tts')).toBe(false);
+  });
+
   it('kills a process whose model load never finishes and says so', async () => {
     const { a, events } = engine(ack, { modelLoadTimeoutMs: 20 });
     await a.spawn({ init: {} });

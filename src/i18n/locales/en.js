@@ -618,6 +618,7 @@ const en = {
     tengine: {
       title: "Local engines",
       running: "Running",
+      working: "Working",
       idle: "Not started",
       ready: "Ready",
       healthOk: "Self-test passed",

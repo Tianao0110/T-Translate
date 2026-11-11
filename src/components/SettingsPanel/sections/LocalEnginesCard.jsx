@@ -1,11 +1,14 @@
 // Every local engine on one card: the GPU switch, then a row per engine with
 // what it runs on (electron/ipc/gpu.js) and how its host is doing
 // (electron/tengine). Both tables come from the same engine registry, so the
-// rows line up by id. Enabling the GPU runs the engines' self-tests.
+// rows line up by id. Enabling the GPU runs the engines' self-tests. While the
+// card is open the host snapshot is read every second, for the working mark.
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Switch } from './shared.jsx';
+
+const STATUS_POLL_MS = 1000;
 
 const LocalEnginesCard = ({ notify, confirm }) => {
   const { t } = useTranslation();
@@ -36,7 +39,12 @@ const LocalEnginesCard = ({ notify, confirm }) => {
   }, []);
   useEffect(() => {
     loadEngines();
-    return window.electron?.tengine?.onEvent?.(() => loadEngines());
+    const off = window.electron?.tengine?.onEvent?.(() => loadEngines());
+    const timer = setInterval(loadEngines, STATUS_POLL_MS);
+    return () => {
+      off?.();
+      clearInterval(timer);
+    };
   }, [loadEngines]);
 
   const toggleGpu = async (next) => {
@@ -67,12 +75,13 @@ const LocalEnginesCard = ({ notify, confirm }) => {
     return { cls: '', text: t('llm.gpu.state.cpu') };
   };
 
-  // Is the host up, what the last self-test said, recent crashes.
+  // Is the host up (the working mark stands in for it), what the last
+  // self-test said, recent crashes.
   const hostLine = (e) => {
     const parts = [];
     const host = e.host || null;
     if (host?.backoffUntil) parts.push(t('llm.tengine.backoff'));
-    else parts.push(host?.running ? (host.ready ? t('llm.tengine.ready') : t('llm.tengine.running')) : t('llm.tengine.idle'));
+    else if (!e.working) parts.push(host?.running ? (host.ready ? t('llm.tengine.ready') : t('llm.tengine.running')) : t('llm.tengine.idle'));
     if (e.lastHealth) {
       parts.push(e.lastHealth.ok
         ? `${t('llm.tengine.healthOk')}${e.lastHealth.tokPerSec ? ` · ${t('llm.tengine.speed', { n: e.lastHealth.tokPerSec })}` : ''}`
@@ -113,7 +122,11 @@ const LocalEnginesCard = ({ notify, confirm }) => {
                   {d && <span className={`engine-badge ${d.cls}`}>{d.text}</span>}
                 </span>
               )}
-              <span className="storage-value">{h ? hostLine(h) : ''}</span>
+              <span className="storage-value">
+                {h?.working && <span className="engine-working">{t('llm.tengine.working')}</span>}
+                {h?.working && hostLine(h) ? ' · ' : ''}
+                {h ? hostLine(h) : ''}
+              </span>
               {d?.note && <span className="engines-span engines-note">{d.note}</span>}
             </React.Fragment>
           );

@@ -60,7 +60,7 @@ function createTengine({ logger } = {}) {
         // row keeps its own id.
         engines: ENGINES.map((row) => {
           const live = engines.get(row.id);
-          return { ...row, ...(live ? live.status() : { provider: 'cpu', lastHealth: null, host: null }), id: row.id };
+          return { ...row, ...(live ? live.status() : { provider: 'cpu', lastHealth: null, host: null }), id: row.id, working: !!live?.working?.(row.id) };
         }),
       };
     },

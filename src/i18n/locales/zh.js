@@ -618,6 +618,7 @@ const zh = {
     tengine: {
       title: "本地引擎",
       running: "运行中",
+      working: "工作中",
       idle: "未启动",
       ready: "就绪",
       healthOk: "自检通过",

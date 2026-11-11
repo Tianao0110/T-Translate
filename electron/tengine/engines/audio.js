@@ -7,6 +7,7 @@
 // Protocol: services/audio-engine/audio-worker.js header.
 
 const { createHostManager } = require('../host-manager');
+const { createWorkClock } = require('../work-clock');
 
 const READY_TIMEOUT_MS = 30000;
 // init → asr-start → model load → asr-ready; loading dominates.
@@ -27,6 +28,7 @@ function createAudioEngine({ fork, logger, workerPath, now = Date.now, onEvent =
   // TTS engine state.
   let ttsLoadedPack = '';
   const ttsLoadWaiters = new Map(); // packId -> { resolve, reject, timer }
+  const ttsWork = createWorkClock({ now }); // one job per tts-generate id
   const subscribers = new Set();
 
   const emit = (kind, detail = {}) => onEvent({ engine: 'audio', kind, at: now(), ...detail });
@@ -64,7 +66,11 @@ function createAudioEngine({ fork, logger, workerPath, now = Date.now, onEvent =
       case 'tts-unloaded':
         ttsLoadedPack = '';
         break;
+      case 'tts-done':
+        ttsWork.end(msg.id);
+        break;
       case 'tts-error':
+        if (msg.id) ttsWork.end(msg.id);
         if (!msg.id && msg.packId) settleTtsWaiter(msg.packId, Object.assign(new Error(msg.message || 'tts-load-failed'), { code: 'TTS_LOAD_FAILED' }));
         break;
       case 'fatal':
@@ -114,6 +120,7 @@ function createAudioEngine({ fork, logger, workerPath, now = Date.now, onEvent =
         asrEverReady = false;
         asrLoadedAt = 0;
         ttsLoadedPack = '';
+        ttsWork.clear();
         for (const id of [...ttsLoadWaiters.keys()]) settleTtsWaiter(id, Object.assign(new Error('audio host exited'), { code: 'AUDIO_HOST_EXITED' }));
         onEvent({ engine: 'audio', ...evt, phase, everReady });
         return;
@@ -133,11 +140,17 @@ function createAudioEngine({ fork, logger, workerPath, now = Date.now, onEvent =
       return () => subscribers.delete(fn);
     },
     spawn: (opts) => host.spawn(opts),
-    post: (msg) => host.post(msg),
+    post(msg) {
+      if (msg?.type === 'tts-generate') ttsWork.begin(msg.id);
+      else if (msg?.type === 'tts-cancel') ttsWork.end(msg.id);
+      return host.post(msg);
+    },
     kill: () => host.kill(),
     discard: (reason) => host.discard(reason),
     expectExit: () => host.expectExit(),
     running: () => host.running(),
+    // The recognizer while a listen session runs; the voice while it speaks.
+    working: (id) => (id === 'asr' ? asrPhase === 'running' : ttsWork.working()),
     // Begins a listen session's model load and arms the timer that turns a
     // silent load into an engine-dead verdict.
     startAsr(language) {

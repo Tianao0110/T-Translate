@@ -8,6 +8,7 @@
 // routed to the caller without knowing the host manager's ids.
 
 const { createHostManager } = require('../host-manager');
+const { createWorkClock } = require('../work-clock');
 
 const CODES = {
   crashed: 'LLM_HOST_CRASHED',
@@ -50,6 +51,7 @@ function createLlmEngine({
   let runtime = null; // ready info: build, version, devices
   let seq = 0;
   const streams = new Map(); // reqId -> { onToken, onProgress, lastProgressAt }
+  const work = createWorkClock({ now });
 
   const emit = (kind, detail = {}) => onEvent({ engine: id, host: id, kind, at: now(), ...detail });
 
@@ -143,6 +145,7 @@ function createLlmEngine({
   function generate(request, onToken = null) {
     const reqId = nextId('g');
     streams.set(reqId, { onToken, onProgress: null, lastProgressAt: 0 });
+    work.begin(reqId);
     const t0 = now();
     const promise = host
       .request('generate', { reqId, ...request }, { timeoutMs: GENERATE_TIMEOUT_MS })
@@ -168,7 +171,10 @@ function createLlmEngine({
         emit('request-failed', { requestKind: request.kind || 'generate', code: e.code || null, totalMs: Math.round(now() - t0) });
         throw e;
       })
-      .finally(() => streams.delete(reqId));
+      .finally(() => {
+        streams.delete(reqId);
+        work.end(reqId);
+      });
     return {
       reqId,
       promise,
@@ -236,6 +242,7 @@ function createLlmEngine({
       host.shutdown();
     },
     running: () => host.running(),
+    working: () => work.working(),
     status: () => ({
       id,
       provider,

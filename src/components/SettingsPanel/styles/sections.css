@@ -812,6 +812,33 @@
   color: var(--text-tertiary);
 }
 
+/* An engine doing something right now: a pulsing dot before the word */
+.engine-working {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
+.engine-working::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+  animation: engine-working-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes engine-working-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .engine-working::before { animation: none; }
+}
+
 /* ==================== 悬浮窗口页：引擎与快捷键 ==================== */
 /* 快捷键是多行，标签贴顶对齐 */
 .floating-info {

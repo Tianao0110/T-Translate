@@ -4,6 +4,7 @@
 // and hands fully resolved model paths in.
 
 const { createHostManager } = require('../host-manager');
+const { createWorkClock } = require('../work-clock');
 
 const CODES = {
   crashed: 'OCR_HOST_CRASHED',
@@ -24,6 +25,7 @@ function createOcrEngine({
   let provider = 'cpu';
   let lastHealth = null;
   let inFlight = 0;
+  const work = createWorkClock({ now });
   let idleTimer = null;
   const host = createHostManager({
     name: 'ocr',
@@ -59,7 +61,7 @@ function createOcrEngine({
     idleTimer = null;
     inFlight++;
     try {
-      return await fn();
+      return await work.track(fn);
     } finally {
       inFlight--;
       armIdle();
@@ -97,6 +99,7 @@ function createOcrEngine({
     prewarm: () => host.prewarm().then(armIdle),
     shutdown: () => host.shutdown(),
     running: () => host.running(),
+    working: () => work.working(),
     status: () => ({ id: 'ocr', provider, lastHealth, host: host.status() }),
   };
 }
