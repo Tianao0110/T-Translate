@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plug, KeyRound } from 'lucide-react';
+import { Plug, KeyRound, FolderOpen } from 'lucide-react';
 import PackList from './PackList.jsx';
 import SpeechPacks from './SpeechPacks.jsx';
 import { Seg, Switch } from './shared.jsx';
@@ -24,6 +24,7 @@ const CompanionGroup = ({ notify, confirm }) => {
   const [bridge] = useState(() => window.electron?.companion || null);
   const [enabled, setEnabled] = useState(false);
   const [status, setStatus] = useState(null);
+  const [folderMissing, setFolderMissing] = useState(false);
 
   useEffect(() => {
     window.electron?.store?.get?.('settings.companion.enabled')
@@ -44,6 +45,16 @@ const CompanionGroup = ({ notify, confirm }) => {
       setStatus(await bridge.openPairing());
     } catch (e) {
       logger.warn('companion pairing failed:', e.message);
+    }
+  };
+
+  const handleOpenFolder = async () => {
+    try {
+      const r = await bridge.openExtensionFolder();
+      setFolderMissing(r?.error === 'missing');
+      if (!r?.ok && r?.error !== 'missing') logger.warn('extension folder open failed:', r?.error);
+    } catch (e) {
+      logger.warn('extension folder open failed:', e.message);
     }
   };
 
@@ -72,6 +83,19 @@ const CompanionGroup = ({ notify, confirm }) => {
     <div className="setting-group">
       <label className="setting-label">{t('listen.companion.title')}</label>
       <p className="setting-hint" style={{ marginTop: 0, marginBottom: 10 }}>{t('listen.companion.intro')}</p>
+      <div style={{ marginBottom: 12 }}>
+        <button className="btn-small" onClick={handleOpenFolder} disabled={!bridge?.openExtensionFolder}>
+          <FolderOpen size={12} /> {t('listen.companion.openFolder')}
+        </button>
+        <p className="setting-hint">
+          {t('listen.companion.installChrome')}
+          <br />
+          {t('listen.companion.installEdge')}
+          <br />
+          {t('listen.companion.installNote')}
+        </p>
+        {folderMissing && <p className="setting-hint">{t('listen.companion.folderMissing')}</p>}
+      </div>
       <Switch checked={enabled} onChange={handleEnable} label={t('listen.companion.enable')} />
       <p className="setting-hint">{statusText}</p>
       <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>

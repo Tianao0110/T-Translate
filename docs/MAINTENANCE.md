@@ -159,9 +159,9 @@ npx eslint . --quiet && npm test && npm run stack:build && npx vite build && npm
 npx electron-builder --dir --publish=never -c.directories.output=release-verify
 ```
 
-只出解压目录、不出安装包，几分钟。打完看三样：
+只出解压目录、不出安装包，几分钟。这条命令不构建浏览器插件，先跑一次 `npm run extension:build`。打完看三样：
 
-- `release-verify\win-unpacked\resources\app.asar.unpacked\node_modules` 里原生模块齐不齐。
+- `release-verify\win-unpacked\resources\app.asar.unpacked\node_modules` 里原生模块齐不齐，`resources\resources\t-caption` 里有插件。
 - 启动 `release-verify\win-unpacked` 里的 `T-Translate.exe`，看它自己的 `data\logs` 里划词模块预热成功。
 - 验完删掉 `release-verify`。VS Code 开着时它里面的 `app.asar` 会被锁住删不掉，先关 VS Code。
 
@@ -175,7 +175,7 @@ npx electron-builder --dir --publish=never -c.directories.output=release-verify
 
 - 版本号五处一起改：`package.json`；`package-lock.json` 自述的两个 `version`（手改 `package.json` 不会带上它）；`README.md` 与 `README.zh-CN.md` 的版本徽章；`CHANGELOG.md` 把「未发布」改标题成 `## vX.Y.Z — 日期 — 主题`，别在它前面新插一节。代码里没有写死的版本号；docs 里的历史版本号是叙述，不改。
 - 新功能先对齐文档：两份 README 的功能表、`docs/FAQ.md`、`docs/ARCHITECTURE.md` 与 `docs/DEVELOPMENT.md`，再过一遍两份说明书。
-- 打包 `npm run dist`，产物在 `release/`。先关 VS Code，否则 `app.asar` 被锁、报 `EBUSY`。
+- 打包 `npm run dist`（会先构建浏览器插件），产物在 `release/`。先关 VS Code，否则 `app.asar` 被锁、报 `EBUSY`。
 - GitHub Release 传三件：`T-Translate-Setup-x.x.x.exe`、`.exe.blockmap`、`latest.yml`。缺 `latest.yml`，用户检查更新直接报错。
 - 模型更新不用发版：OCR 走 `ocr-models` tag（见 [OCR_MODELS.md](OCR_MODELS.md)），听译与语音走 `audio-models` tag（`npm run audio:release`）。两个 tag 都要勾 Pre-release，否则自动更新会把它们当成最新版去找 `latest.yml`；同理永远不开 `allowPrerelease`。
 - 改过听译链，发版前跑 `npm run smoke:listen`。

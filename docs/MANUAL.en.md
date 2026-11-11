@@ -263,9 +263,19 @@ Turns the sound playing on this computer into captions and translates them in re
 
 **Browser extension**
 
-The T-Caption extension shows captions on web videos. Recognition and translation run on this computer.
+The T-Caption extension shows captions on web videos. Recognition and translation run on this computer. It comes with the installer and works in Chrome and Edge.
 
-1. At the bottom of Settings → Audio → Listen, turn on "Allow the browser extension to connect". It is off by default.
+Install it once:
+
+1. At the bottom of Settings → Audio → Listen, click "Open extension folder".
+2. In Chrome, open chrome://extensions (in Edge, edge://extensions) and turn on Developer mode.
+3. Click Load unpacked and pick the folder you just opened.
+
+After an app update, click the reload button on the extension to update it.
+
+Connect it:
+
+1. In the same place, turn on "Allow the browser extension to connect". It is off by default.
 2. Click "Pair", then click connect in the extension within 60 seconds. You only pair once.
 3. "Regenerate token" stops every paired extension until you pair it again. Use it if you think the token leaked.
 4. When you start listen mode in the floating window, the extension's captions stop. The floating window comes first.
@@ -343,7 +353,7 @@ The model that ships with the app; you download the files yourself and put them 
 - Final tier: standard / high accuracy. High accuracy needs one of the "High-accuracy models" in place first. If none is in place when listening starts, the floating window says so once and that session uses standard recognition.
 - High-accuracy models (right under the final tier): Qwen3-ASR 1.7B and 0.6B, two files each, with whether they are in place, download links, the model folder, "Re-detect", and which one the next listen session uses. The 1.7B runs when GPU acceleration is on and the dedicated GPU has 8 GB or more of video memory, otherwise the 0.6B; if only one is in place, that one runs.
 - Auto-save captions on stop or switch: on by default.
-- Browser extension (at the bottom): off by default. Turning it on and pairing are in 3.3.
+- Browser extension (at the bottom): off by default. Installing, turning it on and pairing are in 3.3.
 
 ### 4.10 Audio · Speak
 

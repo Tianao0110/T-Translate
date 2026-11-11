@@ -799,6 +799,11 @@ const zh = {
     companion: {
       title: "浏览器插件",
       intro: "T-Caption 插件在浏览器里给网页视频显示字幕，识别和翻译都在本机完成",
+      openFolder: "打开插件文件夹",
+      installChrome: "Chrome：打开 chrome://extensions，开启「开发者模式」，点「加载已解压的扩展程序」，选这个文件夹",
+      installEdge: "Edge：打开 edge://extensions，同样操作",
+      installNote: "支持 Chrome / Edge；程序更新后到扩展页点一下刷新",
+      folderMissing: "插件还没构建，先运行 npm run extension:build",
       enable: "允许浏览器插件连接",
       statusOff: "未开启",
       statusStarting: "启动中…",

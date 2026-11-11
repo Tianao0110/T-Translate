@@ -4,13 +4,15 @@ T-Translate 的浏览器插件：给网页视频显示字幕，识别和翻译�
 
 当前状态：S5 —— 装好配对后不用再碰：YouTube 页面上视频一出声就自动出双语字幕。有站点字幕就直接翻译；没有就抄播放器的音频送给 T-Translate 识别；DRM 站点在视频上提示一行，点一下让 T-Translate 听系统声音。一次只服务正在看的那个标签页；暂停 5 秒、切走标签页、关掉本站（偏好）都会停。S6 加了 B 站适配、工具栏弹窗（状态、本站开关、显示方式、目标语言、导出 SRT）、选项页的按站点开关与字幕缓存。看过的视频再打开，字幕直接从缓存出来（程序没开也行），只对没看过的段落识别。S7 起 B 站没有字幕的视频也能识别（fMP4 / AAC 音频）。S8 加了 TikTok：信息流里往下刷一条就当换了一页，站点字幕直接翻译，没有就识别音频。S9a 起页面直接播放 .mp4 文件（没有 MSE）时，插件自己按段取这个文件的音频去识别；页面里 `<track>` 指向的字幕文件和页面取的 .vtt / .srt / .ttml 也当站点字幕用。S9b 起其他网站也能用：在网页上点工具栏的 T-Caption，选「允许在本站使用」，浏览器同意后本站就生效（当前页面立即生效，不用刷新）；视频文件在另一个网站时，页面上会提示，弹窗里再点「允许」。允许过的网站在选项页可以移除。竖屏视频的覆盖层字幕不再盖住半个画面。
 
-## 安装（开发者模式）
+## 安装
 
-1. 在仓库根目录运行 `npm run extension:build`，产物在 `extension/dist/`。
-2. Chrome 打开 `chrome://extensions`（Edge 是 `edge://extensions`），打开「开发者模式」，点「加载已解压的扩展程序」，选 `extension/dist/`。
-3. T-Translate 里打开「设置 → 音频 → 听 → 浏览器插件」，打开「允许浏览器插件连接」并点「配对」；60 秒内到插件的选项页点「配对」。
+1. 插件文件夹有两个来处：
+   - 安装包里自带：T-Translate 里「设置 → 音频 → 听 → 浏览器插件」点「打开插件文件夹」（安装目录下的 `resources\resources\t-caption\`）。`npm run dist` 会先构建插件再打包。
+   - 开发者自己构建：在仓库根目录运行 `npm run extension:build`，产物在 `extension/dist/`。
+2. Chrome 打开 `chrome://extensions`（Edge 是 `edge://extensions`），打开「开发者模式」，点「加载已解压的扩展程序」，选这个文件夹。
+3. T-Translate 里打开「允许浏览器插件连接」并点「配对」；60 秒内到插件的选项页点「配对」。
 
-改了代码重新构建，再到扩展管理页点插件卡片上的刷新按钮。`node extension/scripts/build.mjs --watch` 边改边构建。
+程序更新或改了代码重新构建后，到扩展管理页点插件卡片上的刷新按钮。`node extension/scripts/build.mjs --watch` 边改边构建。
 
 Firefox（试验中，130 起）：`node extension/scripts/build.mjs --target firefox`，产物在 `extension/dist-firefox/`；`about:debugging` →「此 Firefox」→「临时载入附加组件」选其中的 `manifest.json`（浏览器重启后要再载入一次）。
 
@@ -71,6 +73,7 @@ scripts/e2e-generic.js            真机：普通网站从弹窗允许、立即�
 scripts/make-fixture.js           重录单测样本 test/fixtures/tone-2s.webm
 scripts/make-fixture-mp4.js       用 ffmpeg 重做 MP4 单测样本：分片 tone-2s.m4s、渐进式 moov 在前 / 在后两个 .mp4（--ffmpeg 传路径）
 scripts/lib/browser.js            临时配置的 Chrome / Edge + DevTools 管道
+scripts/e2e-shipped.js            真机：安装包里那份插件（win-unpacked 的 resources\resources\t-caption）原样装进 Chrome，配对、YouTube 出字幕（用法见文件头）
 scripts/e2e-firefox.js            真机（Firefox 摸底）：临时附加组件、后台页配对、事件页存活、YouTube 二级出字幕、站点授权与注入、直链取流、权限（用法见文件头）
 scripts/lib/e2e-shell.js          真机脚本的壳：沙盒 Electron 通道 + 听译包 + 无头 Chrome + 配对
 scripts/lib/firefox.js            临时配置的 Firefox + WebDriver BiDi（装临时附加组件、开页、求值、点击、截图、日志）

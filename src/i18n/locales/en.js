@@ -799,6 +799,11 @@ const en = {
     companion: {
       title: "Browser extension",
       intro: "The T-Caption extension shows captions on web videos. Recognition and translation run on this computer.",
+      openFolder: "Open extension folder",
+      installChrome: "Chrome: open chrome://extensions, turn on Developer mode, click Load unpacked and pick this folder.",
+      installEdge: "Edge: do the same at edge://extensions.",
+      installNote: "Works in Chrome and Edge. After an app update, click reload on the extensions page.",
+      folderMissing: "The extension is not built yet. Run npm run extension:build first.",
       enable: "Allow the browser extension to connect",
       statusOff: "Off",
       statusStarting: "Starting…",

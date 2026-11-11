@@ -280,7 +280,7 @@ npm start                # 启动开发环境（先打包栈，再 vite + electr
 npm run start:debug      # 同上 + 划词链路探针日志（TT_SELECTION_DEBUG=1）
 npm run stack:build      # 单独打包翻译栈（esbuild → electron/generated/）
 npm run build            # 构建生产版本
-npm run dist             # 打包安装程序（产物在 release/，发布传三件套 exe+blockmap+latest.yml）
+npm run dist             # 打包安装程序（先构建浏览器插件；产物在 release/，发布传三件套 exe+blockmap+latest.yml）
 npm run lint             # ESLint 检查（全仓 0 error 是底线）
 npm run format           # Prettier 格式化
 npm test                 # 运行测试（vitest）
