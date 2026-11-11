@@ -472,15 +472,13 @@ async function main() {
     step('(e) portrait overlay: smaller text, a smaller share of the picture; 16:9 unchanged', !!evE && !!after && after.fontSize < before.fontSize && after.boxH / after.videoH < before.boxH / before.videoH && numbers.e?.wide.old === numbers.e?.wide.now, JSON.stringify(numbers.e || (await overlayInfo(page2))));
 
     // ---- (f) ----
-    const optList = () => evaluate(opt, `[...document.querySelectorAll('#allowed-sites li')].map((li) => li.firstChild.textContent)`);
+    const optList = async () => ((await sites()) || []).map((p) => p.replace(/\/\*$/, ''));
     const listF = await until(async () => {
       const l = await optList();
       return l.length === 3 ? l : null;
     }, 5000);
-    step('(f) the options page lists the allowed sites', JSON.stringify(listF) === JSON.stringify(['http://127.0.0.1', 'http://localhost', 'http://media.localhost']), JSON.stringify(listF || (await optList())));
-    const card = await evaluate(opt, `(() => { const r = document.getElementById('allowed-sites').closest('.card').getBoundingClientRect(); return { x: Math.floor(r.x), y: Math.floor(r.y + scrollY), width: Math.ceil(r.width), height: Math.ceil(r.height) }; })()`);
-    await shoot(opt, '7-options-sites', card);
-    await evaluate(opt, `(() => { const li = [...document.querySelectorAll('#allowed-sites li')].find((x) => x.firstChild.textContent === 'http://localhost'); li.querySelector('button').click(); return true; })()`);
+    step('(f) the worker lists the allowed sites', JSON.stringify(listF) === JSON.stringify(['http://127.0.0.1', 'http://localhost', 'http://media.localhost']), JSON.stringify(listF || (await optList())));
+    await ext('site/revoke', { pattern: 'http://localhost/*' });
     const listAfter = await until(async () => {
       const l = await optList();
       return l.length === 2 ? l : null;

@@ -5,8 +5,9 @@
 // worker, a Map in tests and wherever nothing may reach the disk.
 //
 // A record is { key, cues: [{ id, start, end, text, translation }], tier,
-// lang, target, sentences, updatedAt, bytes, cueCount }; bytes is its JSON
-// length; sentences: recognized cues were cut into sentences by the app.
+// lang, target, sentences, url, title, updatedAt, bytes, cueCount }; bytes is
+// its JSON length; sentences: recognized cues were cut into sentences by the
+// app; url and title: the page the video played on, for the options page.
 // all() may leave cues out: the LRU only reads the rest.
 
 import { MSG } from '../shared/messages.js';
@@ -14,9 +15,11 @@ import { MSG } from '../shared/messages.js';
 export const CACHE_STORE = 'subtitles';
 const MAX_KEY = 512;
 const MAX_LANG = 32;
+const MAX_URL = 2048;
+const MAX_TITLE = 300;
 
 const err = (code) => Object.assign(new Error(code), { code });
-const meta = ({ key, tier, lang, target, updatedAt, bytes, cueCount }) => ({ key, tier, lang, target, updatedAt, bytes, cueCount });
+const meta = ({ key, tier, lang, target, url = '', title = '', updatedAt, bytes, cueCount }) => ({ key, tier, lang, target, url, title, updatedAt, bytes, cueCount });
 const str = (v, max) => (typeof v === 'string' && v.length <= max ? v : '');
 
 function cleanCues(cues) {
@@ -97,12 +100,12 @@ export function createSubtitleCache({ store, maxEntries = 200, maxBytes = 100 * 
       }),
 
     // Stores the record and evicts the oldest past the limits; resolves its metadata.
-    put: (key, { cues, tier = null, lang = '', target = '', sentences = false } = {}) =>
+    put: (key, { cues, tier = null, lang = '', target = '', sentences = false, url = '', title = '' } = {}) =>
       serial(async () => {
         checkKey(key);
         await load();
         const list = cleanCues(cues);
-        const record = { key, cues: list, tier: Number.isSafeInteger(tier) ? tier : null, lang: str(lang, MAX_LANG), target: str(target, MAX_LANG), sentences: sentences === true, updatedAt: stamp(), bytes: 0, cueCount: list.length };
+        const record = { key, cues: list, tier: Number.isSafeInteger(tier) ? tier : null, lang: str(lang, MAX_LANG), target: str(target, MAX_LANG), sentences: sentences === true, url: /^https?:\/\//i.test(url) ? str(url, MAX_URL) : '', title: str(title, MAX_TITLE), updatedAt: stamp(), bytes: 0, cueCount: list.length };
         // The size includes its own digits.
         for (let n = 0, i = 0; i < 4; i++) {
           const len = JSON.stringify({ ...record, bytes: n }).length;
@@ -250,5 +253,10 @@ export function cacheHandlers(cache) {
     },
     [MSG.CACHE_GET]: ({ key } = {}) => cache.get(key),
     [MSG.CACHE_PUT]: ({ key, record } = {}) => cache.put(key, record || {}),
+    [MSG.CACHE_LIST]: () => cache.list(),
+    [MSG.CACHE_DELETE]: async ({ key } = {}) => {
+      await cache.delete(key);
+      return cache.stats();
+    },
   };
 }

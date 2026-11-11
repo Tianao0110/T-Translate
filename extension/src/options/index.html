@@ -29,35 +29,15 @@
         <p id="error" class="error" role="alert"></p>
       </section>
       <section class="card">
-        <h2 data-i18n="sitesTitle"></h2>
-        <label class="row">
-          <span data-i18n="siteYoutube"></span>
-          <input id="site-youtube" class="switch" type="checkbox" />
-        </label>
-        <label class="row">
-          <span data-i18n="siteBilibili"></span>
-          <input id="site-bilibili" class="switch" type="checkbox" />
-        </label>
-        <label class="row">
-          <span data-i18n="siteTiktok"></span>
-          <input id="site-tiktok" class="switch" type="checkbox" />
-        </label>
-        <label class="row">
-          <span>
-            <span data-i18n="autoListen"></span>
-            <span class="hint" data-i18n="autoListenHint"></span>
-          </span>
-          <input id="auto-listen" class="switch" type="checkbox" />
-        </label>
-      </section>
-      <section class="card">
-        <h2 data-i18n="sitesAllowedTitle"></h2>
-        <ul id="allowed-sites" class="sites"></ul>
-        <p id="allowed-empty" class="hint" data-i18n="sitesAllowedEmpty"></p>
+        <h2 data-i18n="blockedTitle"></h2>
+        <ul id="blocked-sites" class="sites"></ul>
+        <p id="blocked-empty" class="hint" data-i18n="blockedEmpty"></p>
       </section>
       <section class="card">
         <h2 data-i18n="cacheTitle"></h2>
-        <div class="row">
+        <ul id="cache-list" class="cache-list"></ul>
+        <p id="cache-empty" class="hint" data-i18n="cacheEmpty"></p>
+        <div class="row cache-total">
           <span id="cache-stats"></span>
           <button id="cache-clear" type="button" data-i18n="cacheClear"></button>
         </div>

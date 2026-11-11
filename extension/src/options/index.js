@@ -1,8 +1,8 @@
 // Options page: pair with T-Translate, see the channel state, reconnect or
-// forget the pairing (all of it in the offscreen client via the worker);
-// per-site switches and auto listen (prefs in chrome.storage.local, which
-// the worker follows); the sites allowed beyond T-Caption's own, each with a
-// remove; the subtitle cache's size and emptying it.
+// forget the pairing (all of it in the offscreen client via the worker); the
+// sites switched off (prefs in chrome.storage.local, which the worker
+// follows), each with a remove; the cached videos, newest first, each with
+// where and when it was watched and a delete, and emptying the cache.
 
 import { MSG, request, on } from '../shared/messages.js';
 import { CLIENT_STATUS } from '../shared/protocol.js';
@@ -59,48 +59,34 @@ on(MSG.COMPANION_STATE_CHANGED, (s) => {
 render();
 act('load', MSG.COMPANION_LOAD);
 
-// ---- per site ----
 
+// ---- sites switched off ----
+
+const SITE_NAMES = { youtube: 'siteYoutube', bilibili: 'siteBilibili', tiktok: 'siteTiktok' };
+const siteName = (key) => (Object.hasOwn(SITE_NAMES, key) ? t(SITE_NAMES[key]) : key);
 const prefs = createPrefs();
-const siteSwitches = { youtube: $('site-youtube'), bilibili: $('site-bilibili'), tiktok: $('site-tiktok') };
 
-function renderPrefs() {
-  const p = prefs.get();
-  for (const [site, el] of Object.entries(siteSwitches)) el.checked = !p.siteOff[site];
-  $('auto-listen').checked = p.autoListen;
+function button(text, onClick) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.textContent = text;
+  b.addEventListener('click', onClick);
+  return b;
 }
 
-for (const [site, el] of Object.entries(siteSwitches)) {
-  el.addEventListener('change', () => {
-    const siteOff = { ...prefs.get().siteOff };
-    if (el.checked) delete siteOff[site];
-    else siteOff[site] = true;
-    prefs.set({ siteOff });
-  });
-}
-$('auto-listen').addEventListener('change', (e) => prefs.set({ autoListen: e.target.checked }));
-prefs.onChange(renderPrefs);
-prefs.load().then(renderPrefs);
-
-// ---- allowed sites ----
-
-async function renderSites() {
-  const r = await request(MSG.SITE_LIST);
-  const list = $('allowed-sites');
-  const sites = r.ok && Array.isArray(r.result) ? r.result : [];
-  list.replaceChildren(
-    ...sites.map((pattern) => {
+function renderBlocked() {
+  const off = Object.keys(prefs.get().siteOff).sort();
+  $('blocked-sites').replaceChildren(
+    ...off.map((key) => {
       const li = document.createElement('li');
       li.className = 'row';
       const name = document.createElement('span');
-      name.textContent = pattern.replace(/\/\*$/, '');
-      const remove = document.createElement('button');
-      remove.type = 'button';
-      remove.textContent = t('siteRemove');
-      remove.addEventListener('click', async () => {
+      name.textContent = siteName(key);
+      const remove = button(t('siteRemove'), () => {
         remove.disabled = true;
-        await request(MSG.SITE_REVOKE, { pattern });
-        renderSites();
+        const siteOff = { ...prefs.get().siteOff };
+        delete siteOff[key];
+        prefs.set({ siteOff });
       });
       li.append(name, remove);
       return li;
@@ -108,23 +94,72 @@ async function renderSites() {
   );
 }
 
-// Allowed or removed elsewhere too (the popup, the browser's extension settings).
-on(MSG.SITES_CHANGED, renderSites);
-renderSites();
+prefs.onChange(renderBlocked);
+prefs.load().then(renderBlocked);
 
 // ---- cache ----
 
-const size = (n) => (n < 1024 * 1024 ? `${Math.round(n / 1024)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
+const size = (n) => (n < 1024 * 1024 ? `${n > 0 ? Math.max(1, Math.round(n / 1024)) : 0} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
+const thisYear = new Date().getFullYear();
+let dateFormat = null;
+function when(ms) {
+  const d = new Date(ms);
+  dateFormat ??= {
+    near: new Intl.DateTimeFormat(chrome.i18n.getUILanguage(), { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }),
+    far: new Intl.DateTimeFormat(chrome.i18n.getUILanguage(), { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }),
+  };
+  return (d.getFullYear() === thisYear ? dateFormat.near : dateFormat.far).format(d);
+}
+
+// The page title without an unread count in front or the site's name behind.
+const cleanTitle = (s) =>
+  String(s || '')
+    .replace(/^\(\d+\)\s*/, '')
+    .replace(/\s*[-–|]\s*(YouTube|TikTok)\s*$/i, '')
+    .replace(/_哔哩哔哩_bilibili$/, '')
+    .trim();
+
+function siteOfRecord(m) {
+  const site = String(m.key).split(':')[0];
+  if (site !== 'generic') return siteName(site);
+  try {
+    return new URL(m.url).hostname.replace(/^www\./, '');
+  } catch {
+    return '';
+  }
+}
+
+function cacheItem(m) {
+  const li = document.createElement('li');
+  li.className = 'cache-item';
+  const main = document.createElement('div');
+  main.className = 'cache-main';
+  const title = cleanTitle(m.title) || String(m.key).slice(String(m.key).indexOf(':') + 1);
+  const head = document.createElement(m.url ? 'a' : 'span');
+  head.className = 'cache-title';
+  head.textContent = title;
+  if (m.url) Object.assign(head, { href: m.url, target: '_blank', rel: 'noopener noreferrer' });
+  const line = document.createElement('span');
+  line.className = 'hint';
+  line.textContent = t('cacheLine', [siteOfRecord(m) || '?', when(m.updatedAt), String(m.cueCount ?? 0), size(m.bytes || 0)]);
+  main.append(head, line);
+  const del = button(t('cacheDelete'), async () => {
+    del.disabled = true;
+    await request(MSG.CACHE_DELETE, { key: m.key });
+    renderCache();
+  });
+  li.append(main, del);
+  return li;
+}
 
 async function renderCache() {
-  const r = await request(MSG.CACHE_STATS);
-  if (!r.ok) {
-    $('cache-stats').textContent = errorText(r.error?.code || 'error', t);
+  const [stats, list] = await Promise.all([request(MSG.CACHE_STATS), request(MSG.CACHE_LIST)]);
+  if (!stats.ok) {
+    $('cache-stats').textContent = errorText(stats.error?.code || 'error', t);
     return;
   }
-  const count = String(r.result.count);
-  const bytes = size(r.result.bytes);
-  $('cache-stats').textContent = t('cacheStats', [count, bytes]);
+  $('cache-stats').textContent = t('cacheStats', [String(stats.result.count), size(stats.result.bytes)]);
+  $('cache-list').replaceChildren(...(list.ok && Array.isArray(list.result) ? list.result : []).map(cacheItem));
 }
 
 $('cache-clear').addEventListener('click', async () => {

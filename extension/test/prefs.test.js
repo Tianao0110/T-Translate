@@ -4,7 +4,7 @@
 // language, reading and writing chrome.storage.local, and change events.
 
 import { describe, it, expect, vi } from 'vitest';
-import { createPrefs, defaultTargetLang, normalizePrefs, DEFAULT_PREFS } from '../src/sw/prefs.js';
+import { createPrefs, defaultTargetLang, normalizePrefs, DEFAULT_PREFS, isSiteOff, siteOffEntry } from '../src/sw/prefs.js';
 
 function fakeStorage(initial = {}) {
   const data = { ...initial };
@@ -35,21 +35,29 @@ describe('prefs', () => {
 
   it('normalizes stored values over the defaults', () => {
     expect(normalizePrefs(null, 'zh-CN')).toEqual({ ...DEFAULT_PREFS, targetLang: 'zh' });
-    expect(normalizePrefs({ enabled: false, autoListen: true, display: 'translation', mode: 'track', size: 'xlarge', targetLang: 'ja', sourceLang: 'en', siteOff: { youtube: true, bad: 'x' } }, 'en')).toEqual({ enabled: false, autoListen: true, display: 'translation', mode: 'track', size: 'xlarge', targetLang: 'ja', sourceLang: 'en', siteOff: { youtube: true } });
+    expect(normalizePrefs({ enabled: false, autoListen: true, display: 'translation', mode: 'track', size: 'xlarge', targetLang: 'ja', sourceLang: 'en', siteOff: { youtube: true, bad: 'x' } }, 'en')).toEqual({ enabled: false, display: 'translation', mode: 'track', size: 'xlarge', targetLang: 'ja', sourceLang: 'en', siteOff: { youtube: true } });
     expect(normalizePrefs({ display: 'huge', mode: 3, size: 'giant', targetLang: 'not a lang!', sourceLang: '' }, 'en')).toMatchObject({ display: 'bilingual', mode: 'overlay', size: 'medium', targetLang: 'en', sourceLang: 'auto' });
   });
 
+  it('a site switched off takes its subdomains with it; built-in sites go by their key', () => {
+    const off = { 'example.com': true, youtube: true };
+    expect(['example.com', 'video.example.com', 'a.b.example.com', 'example.org', 'notexample.com', 'youtube', 'bilibili'].map((k) => isSiteOff(off, k))).toEqual([true, true, true, false, false, true, false]);
+    expect(siteOffEntry(off, 'a.b.example.com')).toBe('example.com');
+    expect(siteOffEntry({ com: true }, 'example.com')).toBeNull(); // never a bare top-level domain
+    expect(isSiteOff(off, null)).toBe(false);
+  });
+
   it('loads, reads, writes and reports changes', async () => {
-    const storage = fakeStorage({ prefs: { autoListen: true } });
+    const storage = fakeStorage({ prefs: { display: 'original' } });
     const prefs = createPrefs({ storage, uiLang: () => 'zh-CN' });
-    expect(prefs.get()).toMatchObject({ autoListen: false, targetLang: 'zh' });
+    expect(prefs.get()).toMatchObject({ display: 'bilingual', targetLang: 'zh' });
     await prefs.load();
-    expect(prefs.get()).toMatchObject({ autoListen: true, targetLang: 'zh' });
+    expect(prefs.get()).toMatchObject({ display: 'original', targetLang: 'zh' });
     const seen = [];
     prefs.onChange((p) => seen.push(p));
     const next = await prefs.set({ siteOff: { youtube: true } });
-    expect(next).toMatchObject({ autoListen: true, siteOff: { youtube: true } });
-    expect(storage.data.prefs).toEqual({ autoListen: true, siteOff: { youtube: true } });
+    expect(next).toMatchObject({ display: 'original', siteOff: { youtube: true } });
+    expect(storage.data.prefs).toEqual({ display: 'original', siteOff: { youtube: true } });
     expect(seen).toHaveLength(1);
     expect(seen[0].siteOff).toEqual({ youtube: true });
   });

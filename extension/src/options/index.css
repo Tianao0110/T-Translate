@@ -101,3 +101,51 @@ h2 {
 .sites:not(:empty) + .hint {
   display: none;
 }
+
+/* Cached videos: title (a link to the page) over site, time, lines and size. */
+.cache-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cache-list:not(:empty) + .hint {
+  display: none;
+}
+
+.cache-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--tc-border);
+}
+
+.cache-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cache-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.cache-main .hint {
+  margin: 0;
+  font-size: 12px;
+}
+
+.cache-item button {
+  flex: none;
+  font-size: 13px;
+  padding: 3px 12px;
+}
+
+.cache-total {
+  margin-top: 8px;
+}

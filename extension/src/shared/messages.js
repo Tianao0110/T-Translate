@@ -71,8 +71,12 @@ export const MSG = {
   CACHE_CLEAR: 'cache/clear',
   // payload { key }: the record under `${site}:${mediaId}` (a hit counts as a use), or null.
   CACHE_GET: 'cache/get',
-  // payload { key, record: { cues, tier, lang, target } }: stores it; replies its metadata.
+  // payload { key, record: { cues, tier, lang, target, sentences, url, title } }: stores it; replies its metadata.
   CACHE_PUT: 'cache/put',
+  // Replies every record's metadata (no cues), newest first.
+  CACHE_LIST: 'cache/list',
+  // payload { key }: removes that record; replies { count, bytes } after.
+  CACHE_DELETE: 'cache/delete',
   PING: 'ping',
 };
 

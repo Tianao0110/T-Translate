@@ -339,7 +339,7 @@ describe('tier 3: DRM and no audio', () => {
     expect(pe.of('notice').filter((n) => n.kind === 'listen')).toHaveLength(1);
   });
 
-  it('dismissing keeps the page quiet for that video; autoListen skips the notice', async () => {
+  it('dismissing keeps the page quiet for that video', async () => {
     await playing(7, { evidence: { eme: { keySystem: 'com.widevine.alpha' }, mse: { audio: null, streams: [] } } });
     pe.emit(7, { type: 'notice-action', kind: 'listen', action: 'dismiss' });
     await flush();
@@ -348,9 +348,9 @@ describe('tier 3: DRM and no audio', () => {
     expect(pe.of('notice')).toHaveLength(1);
     expect(pe.of('listen')).toHaveLength(0);
     expect(lastState()).toBe('idle');
-    prefs.change({ autoListen: true });
+    prefs.change({ autoListen: true }); // gone: a stored value changes nothing
     await flush();
-    expect(pe.of('listen').at(-1)).toMatchObject({ on: true });
+    expect(pe.of('listen')).toHaveLength(0);
   });
 
   it('no hooks in the page: a plain file still goes direct (no hooks needed), a blob src means the notice; DRM appearing mid-capture switches over', async () => {
@@ -446,6 +446,17 @@ describe('one tab at a time and the gates', () => {
     await after(15000);
     expect(pe.of('mse-capture').filter((c) => c.on)).toHaveLength(3);
     expect(orch.stateOf(7).history.map((h) => h.state)).toEqual(['waiting', 'captions', 'idle', 'captions', 'idle', 'captions']);
+  });
+
+  it('a site switched off keeps its subdomains off too', async () => {
+    prefs.p = { ...prefs.p, siteOff: { 'example.com': true } };
+    await playing(7, { evidence: { site: 'generic', url: 'https://video.example.com/watch/1', mediaId: 'abc-900' } });
+    await after(2000);
+    expect(lastState()).toBe('off');
+    expect(pe.of('mse-capture')).toHaveLength(0);
+    prefs.change({ siteOff: {} });
+    await after(2000);
+    expect(pe.of('mse-capture').filter((c) => c.on)).toHaveLength(1);
   });
 
   it('display, mode and size preferences reach a running tab; a closed tab is forgotten', async () => {
@@ -555,6 +566,19 @@ describe('the subtitle cache', () => {
     const again = pe.of('mse-capture').filter((c) => c.on);
     expect(again).toHaveLength(2);
     expect(again[1].fromS).toBeCloseTo(95, 0);
+  });
+
+  it('a record says where its video played, also when it is written after the tab moved on', async () => {
+    withCache();
+    await playing(7, { evidence: { title: 'Video one - YouTube' }, media: { currentTime: 20 } });
+    await after(2000);
+    segment('tab:7:1', 'm1-0', 20, 23, 'hello');
+    pe.evidence.set(7, evidenceOf(7, { mediaId: 'vid00000002', url: 'https://www.youtube.com/watch?v=vid00000002', title: 'Video two - YouTube' }));
+    pe.emit(7, { type: 'navigated', url: 'https://www.youtube.com/watch?v=vid00000002', mediaId: 'vid00000002', navSeq: 1, site: 'youtube' });
+    await flush();
+    const [k, rec] = store.put.mock.calls[0];
+    expect(k).toBe(KEY);
+    expect(rec).toMatchObject({ url: 'https://www.youtube.com/watch?v=vid00000001', title: 'Video one - YouTube', sentences: true });
   });
 
   it('what runs is written back merged with the record, under ids a later run cannot reuse; a translation after the write still lands', async () => {

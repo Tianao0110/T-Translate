@@ -12,7 +12,7 @@
 //     with no MSE → direct (the worker fetches the file itself by Range,
 //     once the site's origin is permitted: until then the tab prompts)
 //   3 DRM, no hooks, plain file or undecodable audio → a notice in the page;
-//     the listen session opens when the user accepts (or autoListen is on)
+//     the listen session opens when the user accepts
 // A running tier only changes upwards to tier 1, or to tier 3 when DRM
 // shows up. Stops: paused over the grace, page hidden, tab left, navigation,
 // channel gone; 60 s without a final (the pipeline's 'suspended') parks the
@@ -25,6 +25,7 @@
 // Secure mode and incognito tabs use the in-memory cache instead.
 
 import { MAX_TRANSLATE_ITEMS, MAX_TRANSLATE_CHARS } from '../shared/protocol.js';
+import { isSiteOff } from './prefs.js';
 
 export const TIER = { SITE: 1, AUDIO: 2, LISTEN: 3 };
 export const STATES = ['idle', 'waiting', 'captions', 'listening', 'prompt', 'suspended', 'off'];
@@ -225,6 +226,7 @@ export function createOrchestrator({
     r.idAlias = new Map();
     r.cacheTier = null;
     r.cacheLang = '';
+    r.cachePage = null;
     r.shown = null;
     const store = cacheOf(r);
     const key = r.cacheKey;
@@ -317,7 +319,8 @@ export function createOrchestrator({
       merged.set(id, { ...c, id });
     }
     const cues = [...merged.values()].sort((a, b) => a.start - b.start);
-    const record = { cues, tier: r.cacheTier ?? r.cached?.tier ?? null, lang: r.cacheLang || r.cached?.lang || '', target: prefs.get().targetLang, sentences: true };
+    const page = r.cachePage || {};
+    const record = { cues, tier: r.cacheTier ?? r.cached?.tier ?? null, lang: r.cacheLang || r.cached?.lang || '', target: prefs.get().targetLang, sentences: true, url: page.url || r.cached?.url || '', title: page.title || r.cached?.title || '' };
     r.cached = record;
     // The page already has these cues (they ran here); only a new document shows the record again.
     r.shown ??= { key, count: cues.length, translating: true };
@@ -354,7 +357,7 @@ export function createOrchestrator({
 
   function blockedBy(r, p) {
     if (companion.status !== 'ready') return 'offline';
-    if (!p.enabled || p.siteOff[siteKeyOf(r.ev)]) return 'off';
+    if (!p.enabled || isSiteOff(p.siteOff, siteKeyOf(r.ev))) return 'off';
     if (!r.media) return 'no-media';
     if (!r.media.pageVisible) return 'hidden';
     if (!arbiter.isVisible(r.tabId)) return 'hidden';
@@ -373,8 +376,11 @@ export function createOrchestrator({
       if (!r.ev) continue;
       r.mediaKey = mediaKeyOf(r);
       syncCache(r);
+      // Where the record's video plays, read while it is the tab's video (a
+      // record is written after the tab has moved on too).
+      if (r.ev.url) r.cachePage = { url: r.ev.url, title: r.ev.title || r.cachePage?.title || '' };
       // Once the page has its video (the renderer needs it), not switched off.
-      if (r.cached && !r.shown && r.media && p.enabled && !p.siteOff[siteKeyOf(r.ev)]) showCached(r, p);
+      if (r.cached && !r.shown && r.media && p.enabled && !isSiteOff(p.siteOff, siteKeyOf(r.ev))) showCached(r, p);
       r.block = blockedBy(r, p);
       if (!r.block || (r.block === 'paused' && r.held)) candidates.push(r.tabId);
     }
@@ -526,7 +532,7 @@ export function createOrchestrator({
       return;
     }
     // Tier 3
-    if (listenOk.has(r.mediaKey) || p.autoListen) {
+    if (listenOk.has(r.mediaKey)) {
       r.run = { tier: TIER.LISTEN, kind: 'listen', gen, startedAt: now() };
       sendView(r, p);
       if (r.promptedFor) hideNotice(r);

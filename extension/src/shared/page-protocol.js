@@ -10,6 +10,7 @@ export const PAGE_COMMANDS = ['mse-capture', 'cues', 'display', 'mode', 'site-ca
 // listen: tier 3 (accept or dismiss); permission: the video's host is not allowed yet (dismiss only).
 export const NOTICE_KINDS = ['listen', 'permission'];
 
+const MAX_TITLE = 300;
 const str = (v, max) => (typeof v === 'string' && v.length <= max ? v : undefined);
 const optStr = (v, max) => (v === null || v === undefined ? null : str(v, max) ?? null);
 const int = (v) => (Number.isSafeInteger(v) && v >= 0 ? v : undefined);
@@ -95,7 +96,7 @@ function event(e) {
     }
     case 'media': {
       const m = media(e.media);
-      return m ? { type: 'media', reason: str(e.reason, 32) ?? '', media: m, primary: bool(e.primary) } : null;
+      return m ? { type: 'media', reason: str(e.reason, 32) ?? '', media: m, primary: bool(e.primary), title: str(e.title, MAX_TITLE) ?? '' } : null;
     }
     case 'media-removed':
       return int(e.elId) ? { type: 'media-removed', elId: e.elId } : null;

@@ -29,7 +29,7 @@ src/sw/page-events.js             各标签页的页面证据、给页面下命�
 src/sw/direct-fetch.js            直链 .mp4：按 Range 取 moov 与音频字节（领先播放点不超过 60 秒），送流水线
 src/sw/session-orchestrator.js    每标签页的三级状态机：何时开、开哪一级、何时停；一次只服务一个标签页；缓存命中直接出字幕，只对没覆盖的段落识别，跑出来的写回缓存
 src/sw/tab-arbiter.js             哪个标签页在看（聚焦窗口的活动标签页、各窗口的活动标签页）
-src/sw/prefs.js                   偏好（chrome.storage.local 的 prefs：开关、autoListen、显示方式、目标语言、按站点关）
+src/sw/prefs.js                   偏好（chrome.storage.local 的 prefs：开关、显示方式、字号、画法、目标语言、禁止的网站；禁一个网站连子域名一起禁）
 src/sw/badge.js                   角标：通道状态的色点；按标签页标「CC / L / off」，等待允许读取视频时标琥珀色「!」
 src/sw/site-access.js             允许的网站：浏览器授权后登记内容脚本（document_start，一对脚本管所有网站）、当前标签页立即注入、移除时注销并交还权限
 src/sw/cache-db.js                字幕缓存：按媒体存字幕与译文，超 200 条 / 100 MB 淘汰最久没用的；IndexedDB（CACHE_* 消息）
@@ -59,8 +59,8 @@ src/content/caption-size.js       字号四档（小 / 中 / 大 / 特大）对�
 src/content/cue-timing.js         一句显示多久（两种画法共用）
 src/content/caption-renderer.js   字幕与译文、双语 / 只译文 / 只原文、两种画法切换、字号，接媒体流水线事件
 src/content/notice.js             视频上的一行提示（DRM 时「用 T-Translate 听译」+ 按钮；视频所在网站未允许时只有关闭）
-src/options/                      选项页：配对、按站点开关、自动听译、已允许的站点（可移除）、字幕缓存
-src/popup/                        工具栏弹窗：当前标签页状态、「允许在本站使用」/「允许」读取视频、显示方式（选「无」即关闭）、字号、画法、目标语言、导出字幕
+src/options/                      选项页：配对、禁止字幕的网站（可移除）、字幕缓存（每个视频的标题、网站、时间，可单独删除）
+src/popup/                        工具栏弹窗：当前标签页状态、「允许在本站使用」/「允许」读取视频、显示方式（选「无」即关闭）、字号、画法、目标语言、导出字幕、在此网站禁用 / 恢复
 src/shared/                       协议常量、消息约定（媒体字节走 base64）、页面事件格式与校验、状态文案、SRT / VTT 导出、配色、MP4 采样表（mp4-table.js）、匹配模式（match-pattern.js）
 scripts/build.mjs                 esbuild 构建 → dist/（不入库）；--target firefox → dist-firefox/；extraHosts 只给真机脚本用（无头浏览器点不了授权框）
 scripts/e2e-client.js             端到端：真实通道 + 真实引擎（npm run smoke:caption-client -- --packs <已装听译包目录>）
@@ -70,7 +70,7 @@ scripts/e2e-hooks.js              真机：真实 YouTube 页面上验钩子、�
 scripts/e2e-auto.js               真机：不下任何命令，真实 YouTube 页面上字幕自己出现；暂停 / 跳转 / 切标签页 / 关站点 / DRM 提示（用法见文件头）
 scripts/e2e-bilibili.js           真机：真实 B 站页面的证据、AAC 音频识别出双语字幕、MediaSource 重建后续上、字幕清单、分 P；构造清单走一级（用法见文件头）
 scripts/e2e-tiktok.js             真机：真实 TikTok 信息流与视频页，HE-AAC 识别出双语字幕、往下刷一条即导航、站点 WebVTT 走一级、本站开关（用法见文件头）
-scripts/e2e-popup.js              真机：真实 YouTube 页面上的弹窗、显示方式、本站开关、导出、缓存与选项页（用法见文件头）
+scripts/e2e-popup.js              真机：真实 YouTube 页面上的弹窗、显示方式（含「无」）、字号、导出、缓存与选项页（用法见文件头）
 scripts/e2e-direct.js             真机：本地页面直链播放的 MP4（moov 在前 / 在后），取流起点、领先量、跳转、中止、<track> 字幕（用法见文件头）
 scripts/e2e-generic.js            真机：普通网站从弹窗允许、立即注入、状态机自己出字幕、跳转交接识别会话、视频在另一网站时的提示与授权、竖屏字号、移除网站（用法见文件头）
 scripts/make-fixture.js           重录单测样本 test/fixtures/tone-2s.webm

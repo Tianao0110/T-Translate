@@ -154,7 +154,7 @@ async function main() {
     // ---- (e) the cache through the worker ----
     const listed = (await ext('tab/command', { tabId: tab1, command: { cmd: 'cues', op: 'list' } }))?.result?.cues || [];
     const key = `youtube:${VIDEO}`;
-    const put = await ext('cache/put', { key, record: { cues: listed, tier: 2, lang: 'en', target: 'zh' } });
+    const put = await ext('cache/put', { key, record: { cues: listed, tier: 2, lang: 'en', target: 'zh', sentences: true, url: `https://www.youtube.com/watch?v=${VIDEO}`, title: 'Steve Jobs Stanford Commencement Speech - YouTube' } });
     const get = await ext('cache/get', { key });
     const stats1 = await ext('cache/stats');
     const idb = await evaluate(shell.opt, `new Promise((resolve) => { const q = indexedDB.open('t-caption'); q.onsuccess = () => { const db = q.result; const t = db.transaction('subtitles', 'readonly').objectStore('subtitles'); const c = t.count(); const k = t.index('updatedAt').getAllKeys(); t.transaction.oncomplete = () => { resolve({ stores: [...db.objectStoreNames], count: c.result, keys: k.result }); db.close(); }; }; q.onerror = () => resolve({ error: String(q.error) }); })`);
@@ -162,7 +162,7 @@ async function main() {
     step('(e) cache put → get → stats through the worker, the record in IndexedDB', put?.ok && get?.result?.cues?.length === listed.length && listed.length > 0 && stats1?.result?.count === 1 && stats1.result.bytes === put.result.bytes && idb?.count === 1 && idb.keys?.[0] === key, JSON.stringify(numbers.cache));
 
     await cdp.send('Page.reload', {}, shell.opt);
-    const optView = await until(() => evaluate(shell.opt, `(() => { const s = document.getElementById('cache-stats')?.textContent; return s ? { stats: s, yt: document.getElementById('site-youtube').checked, bili: document.getElementById('site-bilibili').checked, auto: document.getElementById('auto-listen').checked } : null; })()`), 10000);
+    const optView = await until(() => evaluate(shell.opt, `(() => { const s = document.getElementById('cache-stats')?.textContent; const items = [...document.querySelectorAll('#cache-list .cache-item')]; return s && items.length ? { stats: s, items: items.map((li) => ({ title: li.querySelector('.cache-title').textContent, href: li.querySelector('.cache-title').getAttribute('href'), line: li.querySelector('.hint').textContent })), cards: [...document.querySelectorAll('.card h2')].map((h) => h.textContent) } : null; })()`), 10000);
     const optBox = await evaluate(shell.opt, `(() => { const r = document.querySelector('main').getBoundingClientRect(); return { x: r.left - 8, y: r.top - 8, width: r.width + 16, height: r.height + 16 }; })()`);
     await shoot(shell.opt, `6-options-${LOCALE}`, optBox);
     await evaluate(shell.opt, `(document.getElementById('cache-clear').click(), true)`);
@@ -173,7 +173,8 @@ async function main() {
     const empty = msg('cacheStats', ['0', '0 KB']);
     const optAfter = await until(() => evaluate(shell.opt, `(() => { const s = document.getElementById('cache-stats').textContent; return s === ${JSON.stringify(empty)} ? s : null; })()`), 5000);
     numbers.cache.options = { before: optView, after: optAfter, stats: cleared };
-    step('(e) the options page shows the cache and site switches; Clear empties it (stats 0)', !!optView && optView.stats === msg('cacheStats', ['1', `${Math.round(put.result.bytes / 1024)} KB`]) && optView.yt && optView.bili && !optView.auto && !!cleared && cleared.bytes === 0 && !!optAfter, JSON.stringify(numbers.cache.options));
+    const item = optView?.items?.[0];
+    step('(e) the options page lists the cached video (title linking to its page, site and time) and the blocked-sites card; Clear empties it (stats 0)', !!optView && optView.stats === msg('cacheStats', ['1', `${Math.max(1, Math.round(put.result.bytes / 1024))} KB`]) && item?.title === 'Steve Jobs Stanford Commencement Speech' && item.href === `https://www.youtube.com/watch?v=${VIDEO}` && item.line.startsWith(msg('siteYoutube')) && optView.cards.includes(msg('blockedTitle')) && !!cleared && cleared.bytes === 0 && !!optAfter, JSON.stringify(numbers.cache.options));
     const gone = await ext('cache/get', { key });
     step('(e) after clearing the record is gone', gone?.ok && gone.result === null, JSON.stringify(gone));
 

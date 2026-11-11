@@ -10,7 +10,6 @@ export const PREFS_KEY = 'prefs';
 
 export const DEFAULT_PREFS = Object.freeze({
   enabled: true,
-  autoListen: false,
   display: 'bilingual',
   mode: 'overlay',
   size: 'medium',
@@ -30,13 +29,28 @@ export function defaultTargetLang(uiLang) {
   return p || 'en';
 }
 
+// The siteOff entry that switches the site `key` (siteKeyOf) off: the key
+// itself or, for a host, one of its parent domains, so a blocked site takes
+// its subdomains with it; null when none does.
+export function siteOffEntry(siteOff, key) {
+  if (!key || !siteOff) return null;
+  if (siteOff[key]) return key;
+  const parts = key.split('.');
+  for (let i = 1; i < parts.length - 1; i++) {
+    const parent = parts.slice(i).join('.');
+    if (siteOff[parent]) return parent;
+  }
+  return null;
+}
+
+export const isSiteOff = (siteOff, key) => siteOffEntry(siteOff, key) !== null;
+
 export function normalizePrefs(raw, uiLang) {
   const r = raw && typeof raw === 'object' ? raw : {};
   const siteOff = {};
   if (r.siteOff && typeof r.siteOff === 'object') for (const [k, v] of Object.entries(r.siteOff)) if (v === true && typeof k === 'string' && k.length <= 128) siteOff[k] = true;
   return {
     enabled: r.enabled !== false,
-    autoListen: r.autoListen === true,
     display: DISPLAYS.includes(r.display) ? r.display : DEFAULT_PREFS.display,
     mode: MODES.includes(r.mode) ? r.mode : DEFAULT_PREFS.mode,
     size: SIZES.includes(r.size) ? r.size : DEFAULT_PREFS.size,

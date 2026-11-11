@@ -54,6 +54,7 @@ function freshEvidence(tabId, docId) {
 
 // Navigation keeps what belongs to the document (hooks, EME) and drops the rest.
 function resetForNavigation(ev) {
+  ev.title = '';
   ev.media = [];
   ev.primaryElId = null;
   ev.subtitles = [];
@@ -184,6 +185,7 @@ export function createPageEvents({
       case 'media':
         upsert(ev.media, event.media, 'elId', MAX_MEDIA);
         if (event.primary) ev.primaryElId = event.media.elId;
+        if (event.title) ev.title = event.title;
         return event;
       case 'media-removed':
         ev.media = ev.media.filter((m) => m.elId !== event.elId);

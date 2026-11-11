@@ -24,7 +24,7 @@ describe('subtitle cache', () => {
     const cache = createSubtitleCache({ store, now });
     const m = await cache.put('youtube:UF8uR6Z6KLc', { cues: [cue(1, 'Hello', '你好'), { id: 2, start: 2, end: 3, text: 'World' }, { id: 'bad', start: 'x' }], tier: 2, lang: 'en', target: 'zh' });
     const stored = await store.get('youtube:UF8uR6Z6KLc');
-    expect(m).toEqual({ key: 'youtube:UF8uR6Z6KLc', tier: 2, lang: 'en', target: 'zh', updatedAt: 1000, bytes: JSON.stringify(stored).length, cueCount: 2 });
+    expect(m).toEqual({ key: 'youtube:UF8uR6Z6KLc', tier: 2, lang: 'en', target: 'zh', url: '', title: '', updatedAt: 1000, bytes: JSON.stringify(stored).length, cueCount: 2 });
     expect(stored.cues).toEqual([cue(1, 'Hello', '你好'), { id: '2', start: 2, end: 3, text: 'World', translation: null }]);
     now.tick(500);
     const hit = await cache.get('youtube:UF8uR6Z6KLc');
@@ -142,5 +142,23 @@ describe('CACHE_* handlers', () => {
     expect(await request(MSG.CACHE_PUT, { key: '' }, { runtime })).toMatchObject({ ok: false, error: { code: 'bad-request' } });
     runtime.sender = { id: runtime.id, url: 'https://www.youtube.com/watch?v=x', tab: { id: 3 } };
     expect(await request(MSG.CACHE_STATS, null, { runtime })).toMatchObject({ ok: false, error: { code: 'forbidden' } });
+  });
+
+  it('list hands back where and when, newest first; delete removes one', async () => {
+    const runtime = fakeRuntime();
+    const now = clock();
+    const cache = createSubtitleCache({ store: createMemoryStore(), now });
+    handle(cacheHandlers(cache), { runtime, accept: (_m, s) => isExtensionSender(s, runtime) });
+    await call(MSG.CACHE_PUT, { key: 'youtube:a', record: { ...rec(2), url: 'https://www.youtube.com/watch?v=a', title: 'First' } }, { runtime });
+    now.tick(1000);
+    await call(MSG.CACHE_PUT, { key: 'bilibili:b', record: { ...rec(1), url: 'javascript:alert(1)', title: 'Second' } }, { runtime });
+    const list = await call(MSG.CACHE_LIST, null, { runtime });
+    expect(list.map((m) => [m.key, m.title, m.url, m.cueCount])).toEqual([
+      ['bilibili:b', 'Second', '', 1], // only an http(s) page is kept
+      ['youtube:a', 'First', 'https://www.youtube.com/watch?v=a', 2],
+    ]);
+    expect(list[0]).not.toHaveProperty('cues');
+    expect(await call(MSG.CACHE_DELETE, { key: 'youtube:a' }, { runtime })).toMatchObject({ count: 1 });
+    expect((await call(MSG.CACHE_LIST, null, { runtime })).map((m) => m.key)).toEqual(['bilibili:b']);
   });
 });

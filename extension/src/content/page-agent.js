@@ -563,7 +563,7 @@ export function createPageAgent({
         feedEl = primary;
         if (checkMediaId()) return;
       }
-      send({ type: 'media', reason, media: m, primary: !!primary && m.elId === media.idOf(primary) });
+      send({ type: 'media', reason, media: m, primary: !!primary && m.elId === media.idOf(primary), title: doc.title });
       if (reason === 'loadedmetadata' || reason === 'durationchange') checkMediaId();
       if (primary !== trackEl) watchTracks();
       if (renderer && primary && primary !== rendererEl) {

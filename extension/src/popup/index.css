@@ -71,3 +71,21 @@ body {
 #open-options {
   font-size: 13px;
 }
+
+.links {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* A button that reads as a link, next to the options link. */
+button.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--tc-accent);
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  cursor: pointer;
+}

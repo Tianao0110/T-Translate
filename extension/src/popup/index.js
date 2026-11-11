@@ -1,6 +1,7 @@
 // Toolbar popup: what T-Caption does in the current tab, the prefs that
 // matter while watching (written straight to chrome.storage.local, which the
-// worker follows) and the tab's captions as an SRT file. On a page T-Caption
+// worker follows), turning the site off or on, and the tab's captions as an
+// SRT file. On a page T-Caption
 // is not on yet, or whose video's host it may not read, one button asks the
 // browser for that host (it has to be asked in the click itself).
 // popup.html?tab=<tabId> picks the tab instead (only the e2e scripts use it).
@@ -10,7 +11,7 @@ import { describeState, errorText } from '../shared/status-text.js';
 import { describeTab } from '../shared/tab-status.js';
 import { matchPattern } from '../shared/match-pattern.js';
 import { toSrt, exportFileName } from '../shared/subtitle-export.js';
-import { createPrefs } from '../sw/prefs.js';
+import { createPrefs, isSiteOff, siteOffEntry } from '../sw/prefs.js';
 import { hostPattern } from '../sw/direct-fetch.js';
 import { siteKeyOf } from '../sw/session-orchestrator.js';
 import { t, localize } from '../shared/page.js';
@@ -75,6 +76,12 @@ function allowFor() {
   }
 }
 
+// The site of the tab's page, for the per-site switch; none without our scripts.
+function currentSite() {
+  const key = evidence ? siteKeyOf(evidence) : null;
+  return key && key !== 'generic' ? key : null;
+}
+
 function render() {
   const p = prefs.get();
   allow = allowFor();
@@ -92,6 +99,9 @@ function render() {
   for (const el of document.querySelectorAll('input[name="size"]')) el.checked = el.value === p.size;
   fillTargets(p.targetLang);
   $('export').disabled = cueCount === 0;
+  const site = currentSite();
+  $('site-toggle').hidden = !site;
+  if (site) $('site-toggle').textContent = t(isSiteOff(p.siteOff, site) ? 'siteEnable' : 'siteDisable');
 }
 
 async function refresh() {
@@ -152,14 +162,20 @@ $('allow').addEventListener('click', () => {
     }
   );
 });
-// 'off' turns T-Caption off everywhere; any other choice turns it on, here too
-// if this site was switched off on the options page.
+// 'off' turns T-Caption off everywhere; any other choice turns it on.
 $('display').addEventListener('change', (e) => {
   if (e.target.value === 'off') return prefs.set({ enabled: false });
-  const site = evidence ? siteKeyOf(evidence) : null;
+  prefs.set({ enabled: true, display: e.target.value });
+});
+// This site off (its pages and subdomains with it), or every entry that
+// switched it off removed again.
+$('site-toggle').addEventListener('click', () => {
+  const key = currentSite();
+  if (!key) return;
   const siteOff = { ...prefs.get().siteOff };
-  if (site) delete siteOff[site];
-  prefs.set({ enabled: true, display: e.target.value, siteOff });
+  if (isSiteOff(siteOff, key)) for (let k = siteOffEntry(siteOff, key); k; k = siteOffEntry(siteOff, key)) delete siteOff[k];
+  else siteOff[key] = true;
+  prefs.set({ siteOff });
 });
 $('mode').addEventListener('change', (e) => prefs.set({ mode: e.target.value }));
 $('size').addEventListener('change', (e) => prefs.set({ size: e.target.value }));
