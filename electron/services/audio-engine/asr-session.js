@@ -787,6 +787,36 @@ async function decodeSegment(seg) {
   }
 }
 
+// The client's media jumped: what is open is finalized on the old timeline,
+// the audio state starts over, models stay loaded. atS, on the session clock
+// (never reset), is the cut: finals queued before it start before atS, the
+// ones after at or after it.
+function seek() {
+  if (!sessionLive || !vad) return post({ type: 'asr-seek-failed', reason: 'not-live' });
+  pending = new Float32Array(0);
+  resetOpenSegment();
+  resetStreamDraft();
+  flushCarry('seek');
+  try {
+    vad.flush();
+    drainVadQueue();
+  } catch (err) {
+    logLine(eventRecord('seek-flush-failed', String(err.message)));
+  }
+  try {
+    vad.reset();
+    vadBaseSamples = vadFedSamples;
+  } catch (err) {
+    logLine(eventRecord('seek-failed', String(err.message)));
+    return post({ type: 'asr-seek-failed', reason: 'vad' });
+  }
+  preRoll = [];
+  carryForDecode = null;
+  const atS = vadFedSamples / SAMPLE_RATE;
+  logLine(eventRecord('seek', `${atS.toFixed(2)}s`));
+  post({ type: 'asr-seeked', atS });
+}
+
 function stop() {
   if (!sessionLive) return;
   // Capture first: no new audio may arrive while the VAD is flushing.
@@ -846,4 +876,4 @@ function stopTimers() {
 // Resolves once every queued decode has finished; shutdown waits on it.
 const drain = () => decodeChain;
 
-module.exports = { attach, start, stop, unload, handlePcm, handleHqResult, stopTimers, drain };
+module.exports = { attach, start, seek, stop, unload, handlePcm, handleHqResult, stopTimers, drain };

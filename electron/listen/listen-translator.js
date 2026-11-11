@@ -42,6 +42,7 @@ function createListenTranslator({ translateStream = null, enabled = () => !!tran
   let sourceName = '';
   let active = false;
   let nextId = 1;
+  let contextFloor = 0; // finals before this index are not context (markBreak)
   const inflight = new Map(); // id -> { controller, promise }
 
   // autosave: false keeps the transcript in memory for context only; nothing
@@ -54,10 +55,16 @@ function createListenTranslator({ translateStream = null, enabled = () => !!tran
     sourceName = typeof name === 'string' ? name : '';
     fileTranscript = file !== false;
     active = true;
+    contextFloor = 0;
   }
 
   function setTarget(lang) {
     targetLang = typeof lang === 'string' ? lang : '';
+  }
+
+  // The media jumped: the next finals take no context from the ones before.
+  function markBreak() {
+    contextFloor = transcript.length;
   }
 
   function settle(seg, text) {
@@ -74,7 +81,7 @@ function createListenTranslator({ translateStream = null, enabled = () => !!tran
     emit('translation', { id: seg.id, text: 'pending', done: false });
     // The two finals before this one, as context for the prompt (listen-prompt).
     const idx = transcript.indexOf(seg);
-    const context = idx > 0 ? transcript.slice(Math.max(0, idx - 2), idx).map((s) => s.text) : [];
+    const context = idx > 0 ? transcript.slice(Math.max(contextFloor, idx - 2), idx).map((s) => s.text) : [];
     const systemPrompt = buildListenSystemPrompt({ targetLang: target, context, uiLang: uiLang() });
     const controller = new AbortController();
     let lastPaint = 0;
@@ -146,6 +153,7 @@ function createListenTranslator({ translateStream = null, enabled = () => !!tran
   return {
     beginSession,
     setTarget,
+    markBreak,
     onSegment,
     endSession,
     status: () => ({ active, targetLang, sourceName, lines: transcript.length, inflight: inflight.size, truncated }),

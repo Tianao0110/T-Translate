@@ -57,6 +57,28 @@ describe('listen translator', () => {
     expect(t.status()).toMatchObject({ active: true, lines: 3, inflight: 0 });
   });
 
+  it('markBreak: finals after a jump take no context from before it; a new session starts clean', async () => {
+    const { t, stream } = make();
+    t.beginSession({ targetLang: 'en' });
+    t.onSegment(rec('一'));
+    t.onSegment(rec('二'));
+    t.markBreak();
+    t.onSegment(rec('三'));
+    t.onSegment(rec('四'));
+    await flush(); await flush();
+    const promptOf = (text) => stream.mock.calls.find((c) => c[0] === text)[1].systemPrompt.content;
+    expect(promptOf('二')).toContain('- 一');
+    expect(promptOf('三')).not.toContain('- 二');
+    expect(promptOf('三')).not.toContain('- 一');
+    expect(promptOf('四')).toContain('- 三');
+    expect(promptOf('四')).not.toContain('- 二');
+    t.beginSession({ targetLang: 'en' });
+    t.onSegment(rec('五'));
+    t.onSegment(rec('六'));
+    await flush(); await flush();
+    expect(promptOf('六')).toContain('- 五');
+  });
+
   it('skips lines already in the target language and when no target is set', async () => {
     const { t, events, stream } = make();
     t.beginSession({ targetLang: 'zh' });

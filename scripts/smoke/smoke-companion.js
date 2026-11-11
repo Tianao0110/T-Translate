@@ -7,9 +7,10 @@
 // linked or copied read-only into the sandbox; --zh speaks Chinese instead
 // of English; --wav brings an English recording of your own. Covers pairing -> hello ->
 // asr/open (feed) -> events stream -> unpaced feed against the rate limit
-// -> finals on the media timeline with their translations -> close; the
-// system-sound session; preemption by a window session; no subtitle file
-// left behind; the port released. Protocol: docs/design/listen.md §11;
+// -> finals on the media timeline with their translations -> close; a seek
+// mid-sentence (the half sentence on the old timeline, the rest from the new
+// start, no reload); the system-sound session; preemption by a window
+// session; no subtitle file left behind; the port released. Protocol: docs/design/listen.md §11;
 // harness notes: docs/design/tooling.md §4.
 /* eslint-disable no-console */
 
@@ -26,6 +27,7 @@ const CLIENT = 't-caption/0.0.0-smoke';
 const CHUNK = 1600; // 100 ms
 const TAIL_SILENCE_S = 2.5;
 const MEDIA_START_S = 100;
+const SEEK_TO_S = 500;
 
 const LINES = {
   en: ['Good morning everyone, and welcome to the weekly news.', 'Today we will talk about the weather and the traffic in the city.', 'Thank you for listening, and have a nice day.'],
@@ -125,10 +127,11 @@ function api(base, token = null) {
   return { json, feed, events };
 }
 
-// Unpaced 100 ms posts; a 429 waits out Retry-After, a 503 (not ready yet) retries.
-async function feedAll(client, id, pcm) {
-  const stats = { posts: 0, rate: 0, backpressure: 0, notReady: 0, other: [] };
-  let seq = 0;
+// Unpaced 100 ms posts from x-seq seq0; a 429 waits out Retry-After, a 503
+// (not ready yet) retries. stats.seq is the next x-seq.
+async function feedAll(client, id, pcm, seq0 = 0) {
+  const stats = { posts: 0, rate: 0, backpressure: 0, notReady: 0, other: [], seq: seq0 };
+  let seq = seq0;
   for (let i = 0; i < pcm.length; i += CHUNK) {
     const chunk = pcm.slice(i, i + CHUNK);
     for (;;) {
@@ -147,10 +150,12 @@ async function feedAll(client, id, pcm) {
         await sleep(200);
       } else {
         stats.other.push(r.status);
+        stats.seq = seq;
         return stats;
       }
     }
   }
+  stats.seq = seq;
   return stats;
 }
 
@@ -298,6 +303,69 @@ async function main() {
     );
     await waitFor(() => !engineManager.getInfo().running, { tries: 100 });
 
+    // ===== Seek in place: the same session, a new media start =====
+    const seekOpen = await client.json('POST', '/v1/asr/open', { mode: 'feed', lang, targetLang: target, mediaStartS: MEDIA_START_S });
+    const seekId = seekOpen.json.id;
+    const seekStream = await client.events(seekId);
+    await waitFor(() => hasState(seekStream, 'listening'), { tries: 300 });
+    // Up to the middle of the last sentence, so the seek has a half sentence to flush.
+    let lastVoiced = speech.length - 1;
+    while (lastVoiced > 0 && Math.abs(speech[lastVoiced]) < 0.01) lastVoiced--;
+    const cut = Math.max(16000, lastVoiced - Math.round(0.8 * 16000));
+    const fedBefore = await feedAll(client, seekId, speech.slice(0, cut));
+    const tSeek = Date.now();
+    const seekRes = await client.json('POST', '/v1/asr/seek', { id: seekId, mediaStartS: SEEK_TO_S });
+    const seekMs = Date.now() - tSeek;
+    step(
+      'asr/seek: 200 with the cut on the session clock, the engine never reloads',
+      seekRes.status === 200 && Math.abs(seekRes.json?.atS - cut / 16000) < 0.05 && engineManager.getInfo().running,
+      `${JSON.stringify(seekRes.json)} after ${(cut / 16000).toFixed(2)} s fed, ${seekMs} ms; 503 before ${fedBefore.notReady}`
+    );
+    const seekAt = Date.now();
+    const fedAfter = await feedAll(client, seekId, pcm, fedBefore.seq);
+    lastCount = -1;
+    stableSince = Date.now();
+    await waitFor(
+      () => {
+        const n = ofType(seekStream, 'segment').length;
+        if (n !== lastCount) {
+          lastCount = n;
+          stableSince = Date.now();
+        }
+        return ofType(seekStream, 'segment').some((s) => s.start >= SEEK_TO_S) && Date.now() - stableSince > 3000;
+      },
+      { tries: 300 }
+    );
+    const seekSegs = ofType(seekStream, 'segment');
+    const oldSegs = seekSegs.filter((s) => s.start < SEEK_TO_S);
+    const newSegs = seekSegs.filter((s) => s.start >= SEEK_TO_S);
+    const halfLine = lang === 'zh' ? /谢谢|收听/ : /thank|listening/i;
+    const lastOld = oldSegs.at(-1);
+    step(
+      'the half sentence open at the seek comes out on the old timeline',
+      !!lastOld && halfLine.test(lastOld.text) && lastOld.at >= tSeek && lastOld.start >= MEDIA_START_S && lastOld.end <= MEDIA_START_S + cut / 16000 + 0.05,
+      `${oldSegs.map((s) => `[${s.start.toFixed(2)}–${s.end.toFixed(2)}] ${JSON.stringify(s.text)}`).join(' | ')}; the last one ${lastOld ? lastOld.at - tSeek : '?'} ms after the seek`
+    );
+    const newStarts = newSegs.map((s) => s.start);
+    step(
+      'finals after the seek run from the new start, in order, translated',
+      newSegs.length >= 2 && newStarts[0] < SEEK_TO_S + 3 && newStarts.every((v, i) => i === 0 || v > newStarts[i - 1]) && newSegs.every((s) => s.end <= SEEK_TO_S + pcm.length / 16000 + 0.5) && newSegs.every((s) => ofType(seekStream, 'translation').some((t) => t.id === s.id && t.done)),
+      `${newSegs.map((s) => `[${s.start.toFixed(2)}–${s.end.toFixed(2)}] ${JSON.stringify(s.text)}`).join(' | ')}; first final ${newSegs[0] ? ((newSegs[0].at - seekAt) / 1000).toFixed(1) : '?'} s after the seek; ${fedAfter.posts} posts`
+    );
+    const reloads = seekStream.events.filter((e) => e.type === 'status' && e.at >= tSeek && ['loading', 'engine-restarting'].includes(e.state));
+    const { dataDir } = require('../../electron/platform/data-root');
+    const probeLog = fs.readdirSync(dataDir('logs')).filter((f) => f.startsWith('audio-probe-')).sort().at(-1);
+    const probe = probeLog ? fs.readFileSync(path.join(dataDir('logs'), probeLog), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
+    const seekEvents = probe.filter((r) => r.type === 'event' && r.kind === 'seek');
+    step(
+      'no reload: no loading status after the seek, one asr_start in the worker log, its seek event',
+      reloads.length === 0 && probe.filter((r) => r.type === 'asr_start').length === 1 && seekEvents.length === 1,
+      `${probeLog}: ${seekEvents.map((r) => `seek ${r.detail} at +${r.ts - tSeek} ms`).join(', ')}; statuses after ${reloads.map((e) => e.state).join(', ') || 'none'}`
+    );
+    await client.json('POST', '/v1/asr/close', { id: seekId });
+    await Promise.race([seekStream.done, sleep(10000)]);
+    await waitFor(() => !engineManager.getInfo().running, { tries: 100 });
+
     // ===== System sound (DRM fallback) =====
     const sys = await client.json('POST', '/v1/listen/open', { lang, targetLang: target, mediaStartS: 0 });
     const sysStream = sys.json?.id ? await client.events(sys.json.id) : null;
@@ -338,6 +406,7 @@ async function main() {
     console.log('\n==== 摘要 ====');
     console.log(`  终稿 ${segments.length} 条，首条 ${starts[0]?.toFixed(2)} s（媒体起点 ${MEDIA_START_S} s），模型就绪 ${loadMs} ms`);
     console.log(`  送音 ${(feedMs / 1000).toFixed(1)} s，限速 429 ${fed.rate} 次，背压 429 ${fed.backpressure} 次`);
+    console.log(`  跳转：往返 ${seekMs} ms，切点 ${seekRes.json?.atS} s，新起点后首条终稿 ${newSegs[0]?.start.toFixed(2)} s`);
     console.log(`  事件流心跳 ${stream.heartbeats} 次\n`);
   } finally {
     await companion.stop();

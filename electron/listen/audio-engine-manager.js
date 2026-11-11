@@ -20,6 +20,7 @@ const llmManager = require('../llm/llm-manager');
 const logger = require('../platform/logger')('AudioEngine');
 
 const STOP_GRACE_MS = 3000;
+const SEEK_TIMEOUT_MS = 3000;
 const TTS_SPAWN_TIMEOUT_MS = 30000;
 const TTS_IDLE_MS = 60000;
 const TTS_UNLOAD_WAIT_MS = 5000;
@@ -76,6 +77,11 @@ let stopReason = null;
 let sinkMaxId = -1;
 let retired = null; // { sink, maxId, until }
 const RETIRED_SINK_MS = 5000;
+// asr-seek requests in the order sent, answered in that order by the worker
+// (a timed-out one stays until its answer); the translation context breaks
+// at the first final from each seek's atS on.
+let seekWaiters = [];
+let seekBreaks = [];
 
 const SINK_METHODS = {
   [CHANNELS.AUDIO_ENGINE.STATUS]: 'status',
@@ -274,6 +280,7 @@ function startSession(options = {}) {
   sessionSink = owner === 'companion' ? options.sink : null;
   sinkMaxId = -1;
   stopReason = null;
+  failSeeks('stopped');
   // Each user-initiated session gets its own one-shot crash restart.
   restartedOnce = false;
   sessionLanguage = typeof options.language === 'string' ? options.language : '';
@@ -478,8 +485,19 @@ function onWorkerMessage(msg) {
       sendToWindow(CHANNELS.AUDIO_ENGINE.LEVEL, msg.value);
       break;
     case 'segment':
+      if (seekBreaks.length && msg.rec && msg.rec.segStartS >= seekBreaks[0]) {
+        while (seekBreaks.length && msg.rec.segStartS >= seekBreaks[0]) seekBreaks.shift();
+        translator?.markBreak();
+      }
       // The translator numbers the final; the translation follows on its own channel.
       sendToWindow(CHANNELS.AUDIO_ENGINE.SEGMENT, translator ? translator.onSegment(msg.rec) : msg.rec);
+      break;
+    case 'asr-seeked':
+      if (Number.isFinite(msg.atS)) seekBreaks.push(msg.atS);
+      answerSeek({ ok: true, atS: msg.atS });
+      break;
+    case 'asr-seek-failed':
+      answerSeek({ ok: false, error: msg.reason || 'failed' });
       break;
     case 'partial':
       sendToWindow(CHANNELS.AUDIO_ENGINE.PARTIAL, msg.text);
@@ -556,6 +574,7 @@ function onWorkerMessage(msg) {
 function onWorkerExit({ code, everReady }) {
   clearTimeout(killTimer);
   clearTimeout(ttsIdleTimer);
+  failSeeks('stopped');
   const wasStopping = childState === 'stopping';
   const wasTtsOnly = ttsOnly;
   childState = 'idle';
@@ -603,6 +622,42 @@ function onWorkerExit({ code, everReady }) {
 function feedPcm(samples) {
   if (childState !== 'running' || !adapter().running()) return;
   adapter().post({ type: 'pcm', samples });
+}
+
+// The running session starts over from a new media position without
+// reloading: { ok, atS } with atS the worker's session seconds at the cut,
+// or { ok: false, error: 'not-ready' | 'timeout' | 'stopped' | <worker's reason> }.
+function seekSession() {
+  if (childState !== 'running' || !adapter().running()) return Promise.resolve({ ok: false, error: 'not-ready' });
+  return new Promise((resolve) => {
+    const w = { done: false, timer: null };
+    w.settle = (r) => {
+      if (w.done) return;
+      w.done = true;
+      clearTimeout(w.timer);
+      resolve(r);
+    };
+    w.timer = setTimeout(() => w.settle({ ok: false, error: 'timeout' }), SEEK_TIMEOUT_MS);
+    seekWaiters.push(w);
+    try {
+      adapter().post({ type: 'asr-seek' });
+    } catch {
+      seekWaiters = seekWaiters.filter((x) => x !== w);
+      w.settle({ ok: false, error: 'not-ready' });
+    }
+  });
+}
+
+function answerSeek(r) {
+  const w = seekWaiters.shift();
+  if (w) w.settle(r);
+}
+
+function failSeeks(error) {
+  const waiters = seekWaiters;
+  seekWaiters = [];
+  seekBreaks = [];
+  for (const w of waiters) w.settle({ ok: false, error });
 }
 
 // Pack install / removal waits here until the worker is really gone.
@@ -655,6 +710,7 @@ function stopSession(reason, { from = null } = {}) {
   if (childState === 'stopping' || childState === 'idle') return;
   logger.info(`stopping session (${reason})`);
   childState = 'stopping';
+  failSeeks('stopped');
   try {
     adapter().stopAsr();
     adapter().post({ type: 'asr-stop' });
@@ -974,6 +1030,7 @@ module.exports = {
   stopSessionAndWait,
   currentOwner: () => sessionOwner,
   feedPcm,
+  seekSession,
   getTtsStatus,
   getTtsVoices,
   ttsGenerate,

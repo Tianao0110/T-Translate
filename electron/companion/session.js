@@ -129,9 +129,16 @@ function createCompanionSession({ engineManager, logger, now = Date.now, maxAhea
     else onChange();
   }
 
+  // The media timeline a final belongs to: the last seek at or before its start.
+  function epochOf(s, startS) {
+    for (let i = s.epochs.length - 1; i > 0; i--) if (s.epochs[i].sessionS <= startS + 0.0005) return s.epochs[i];
+    return s.epochs[0];
+  }
+
   function onSegment(s, rec) {
     if (s.closed || !rec) return;
-    const t = mediaTimeOf(rec, s.mediaStartS + s.clockS);
+    const e = epochOf(s, s.clockS + rec.segStartS);
+    const t = mediaTimeOf(rec, e.mediaStartS - e.sessionS + s.clockS);
     s.budget.finalAt(s.clockS + rec.segStartS + rec.segDurS);
     emit(s, { type: 'segment', id: rec.id, start: t.start, end: t.end, text: rec.text, lang: cleanLang(rec.lang) });
   }
@@ -160,7 +167,8 @@ function createCompanionSession({ engineManager, logger, now = Date.now, maxAhea
       mode,
       state: 'starting',
       ready: false,
-      mediaStartS,
+      // Session seconds (clockS + worker seconds) at which each media timeline starts.
+      epochs: [{ sessionS: 0, mediaStartS }],
       clockS: 0,
       listeningAt: 0,
       budget: createFeedBudget({ maxAheadS }),
@@ -216,6 +224,32 @@ function createCompanionSession({ engineManager, logger, now = Date.now, maxAhea
     return { ok: true };
   }
 
+  // The client's media jumped: the same engine session goes on from
+  // mediaStartS. Returns { ok, atS } or { error }.
+  async function seek(id, { mediaStartS } = {}) {
+    const s = current && current.id === id ? current : null;
+    if (!s) return { error: 'unknown-session' };
+    if (typeof mediaStartS !== 'number' || !Number.isFinite(mediaStartS) || mediaStartS < 0) return { error: 'bad-request' };
+    if (!s.ready || s.stopping || ownerNow() !== 'companion') return { error: 'not-ready' };
+    let r;
+    try {
+      r = await engineManager.seekSession();
+    } catch (e) {
+      r = { ok: false, error: e.message };
+    }
+    if (!r?.ok || !Number.isFinite(r.atS)) {
+      logger?.warn?.(`companion seek failed: ${r?.error || 'no-reply'}`);
+      return { error: 'not-ready' };
+    }
+    if (s.closed) return { error: 'not-ready' };
+    const sessionS = s.clockS + r.atS;
+    s.epochs.push({ sessionS, mediaStartS });
+    // Audio fed before the jump that never became a final no longer counts.
+    if (s.mode === 'feed') s.budget.finalAt(sessionS);
+    armIdle(s);
+    return { ok: true, atS: r.atS };
+  }
+
   // Closing a session that already ended is not an error.
   function close(id) {
     if (current && current.id === id) {
@@ -258,7 +292,7 @@ function createCompanionSession({ engineManager, logger, now = Date.now, maxAhea
     return { active: true, id: s.id, mode: s.mode, state: s.state, aheadS: s.budget.aheadS() };
   }
 
-  return { open, feed, close, closeActive, subscribe, has: (id) => !!find(id), status };
+  return { open, feed, seek, close, closeActive, subscribe, has: (id) => !!find(id), status };
 }
 
 module.exports = { createCompanionSession, LANG_RE };

@@ -17,6 +17,9 @@
 //        {type:'pcm', samples}           inject 16 kHz mono float32 instead of
 //                                        capturing (smoke harness replaying a
 //                                        wav); main-process only
+//        {type:'asr-seek'}               the fed media jumped: finalize what is
+//                                        open, restart the audio state, keep
+//                                        the session and its clock
 //        {type:'asr-stop'}               flush session, keep models warm
 //        {type:'unload', what}           'asr'|'tts' — release that engine's
 //                                        model files (idle eviction, pack swap)
@@ -39,6 +42,10 @@
 //        {type:'capture-started', mode} | {type:'capture-error', message}
 //        {type:'capture-event', kind, detail}  device lost / reacquired
 //        {type:'level', value}            0..1-ish capture RMS, ~12/s
+//        {type:'asr-seeked', atS}        session seconds at the cut: finals
+//                                        that start before it are from before
+//                                        the jump
+//        {type:'asr-seek-failed', reason}  'not-live' | 'vad'
 //        {type:'asr-stopped'} | {type:'fatal', message}
 //        {type:'tts-ready', packId, loadMs, numSpeakers, sampleRate}
 //        {type:'tts-chunk', id, samples, sampleRate, progress}  one sentence
@@ -115,6 +122,7 @@ process.parentPort.on('message', (e) => {
     case 'capture-start': return capture.start(msg, asr.handlePcm);
     case 'pcm': return asr.handlePcm(msg.samples);
     case 'capture-stop': return capture.stop();
+    case 'asr-seek': return asr.seek();
     case 'asr-stop': return asr.stop();
     case 'unload': return handleUnload(msg.what);
     case 'log-close': return io.closeLog();

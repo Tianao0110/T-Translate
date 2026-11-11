@@ -26,6 +26,13 @@ function fakeEngine() {
   };
   e.currentOwner = () => e.owner;
   e.stopSession = (reason) => e.stopped.push(reason);
+  // The worker's cut for each asr-seek, or the manager's failure.
+  e.seeks = 0;
+  e.seekReply = { ok: true, atS: 0 };
+  e.seekSession = async () => {
+    e.seeks++;
+    return e.seekReply;
+  };
   e.feedPcm = (samples) => {
     e.fed += samples.length;
   };
@@ -241,6 +248,86 @@ it('a restarted worker keeps the media timeline going', () => {
   const { events } = collect(session, id);
   engine.sink.segment({ id: 2, segStartS: 0.5, segDurS: 1, text: 'b', lang: '' });
   expect(events.at(-1)).toMatchObject({ type: 'segment', start: 13.5, end: 14.5 });
+});
+
+describe('seek', () => {
+  const seg = (id, segStartS, segDurS = 1) => ({ id, segStartS, segDurS, text: `s${id}`, lang: '' });
+
+  it('finals from the cut on map from the new start; the ones flushed from before it keep the old one', async () => {
+    const { engine, session } = setup();
+    const { id } = session.open({ mode: 'feed', mediaStartS: 100 });
+    engine.listening();
+    session.feed(id, new Float32Array(16000 * 10));
+    engine.seekReply = { ok: true, atS: 9.984 };
+    expect(await session.seek(id, { mediaStartS: 300 })).toEqual({ ok: true, atS: 9.984 });
+    const { events } = collect(session, id);
+    engine.sink.segment(seg(1, 8.5, 1.4)); // the half sentence the seek flushed
+    engine.sink.segment(seg(2, 9.984, 1));
+    engine.sink.segment(seg(3, 10.5, 2));
+    expect(events.filter((e) => e.type === 'segment').map((e) => [e.id, e.start, e.end])).toEqual([
+      [1, 108.5, 109.9],
+      [2, 300, 301],
+      [3, 300.516, 302.516],
+    ]);
+  });
+
+  it('two seeks: each final takes the last cut at or before its start', async () => {
+    const { engine, session } = setup();
+    const { id } = session.open({ mode: 'feed', mediaStartS: 0 });
+    engine.listening();
+    engine.seekReply = { ok: true, atS: 5 };
+    await session.seek(id, { mediaStartS: 200 });
+    engine.seekReply = { ok: true, atS: 12 };
+    await session.seek(id, { mediaStartS: 50 });
+    const { events } = collect(session, id);
+    for (const [n, at] of [[1, 4], [2, 6], [3, 11.5], [4, 12], [5, 20]]) engine.sink.segment(seg(n, at));
+    expect(events.filter((e) => e.type === 'segment').map((e) => e.start)).toEqual([4, 201, 206.5, 50, 58]);
+  });
+
+  it('frees the feed budget: audio fed before the cut no longer holds new audio back', async () => {
+    const { engine, session } = setup({ maxAheadS: 1 });
+    const { id } = session.open({ mode: 'feed' });
+    engine.listening();
+    expect(session.feed(id, new Float32Array(16000))).toEqual({ ok: true });
+    expect(session.feed(id, new Float32Array(1600))).toEqual({ error: 'backpressure', retryAfterMs: 1000 });
+    engine.seekReply = { ok: true, atS: 0.992 };
+    await session.seek(id, { mediaStartS: 40 });
+    expect(session.feed(id, new Float32Array(8000))).toEqual({ ok: true });
+    expect(session.status().aheadS).toBe(0.508);
+  });
+
+  it('refuses unknown ids, bad starts, sessions not listening, stopping or not the engine’s owner, and a failed engine seek', async () => {
+    const { engine, session } = setup();
+    const { id } = session.open({ mode: 'feed' });
+    expect(await session.seek('nope', { mediaStartS: 1 })).toEqual({ error: 'unknown-session' });
+    for (const mediaStartS of [undefined, -1, NaN, Infinity, '5']) expect(await session.seek(id, { mediaStartS })).toEqual({ error: 'bad-request' });
+    expect(await session.seek(id, { mediaStartS: 1 })).toEqual({ error: 'not-ready' }); // still loading
+    engine.listening();
+    engine.seekReply = { ok: false, error: 'timeout' };
+    expect(await session.seek(id, { mediaStartS: 1 })).toEqual({ error: 'not-ready' });
+    engine.owner = 'window';
+    expect(await session.seek(id, { mediaStartS: 1 })).toEqual({ error: 'not-ready' });
+    engine.owner = 'companion';
+    session.close(id);
+    expect(await session.seek(id, { mediaStartS: 1 })).toEqual({ error: 'not-ready' });
+    expect(engine.seeks).toBe(1);
+  });
+
+  it('a seek after a worker restart: the cut is on the rebased clock', async () => {
+    const { engine, session } = setup();
+    const { id } = session.open({ mode: 'feed', mediaStartS: 10 });
+    engine.listening();
+    session.feed(id, new Float32Array(16000 * 3));
+    engine.sink.status('engine-restarting');
+    engine.sink.status('loading');
+    engine.listening();
+    engine.seekReply = { ok: true, atS: 2 };
+    await session.seek(id, { mediaStartS: 200 });
+    const { events } = collect(session, id);
+    engine.sink.segment(seg(1, 1)); // after the restart, before the cut
+    engine.sink.segment(seg(2, 2.5));
+    expect(events.filter((e) => e.type === 'segment').map((e) => e.start)).toEqual([14, 200.5]);
+  });
 });
 
 it('closes a session nobody reads or feeds', () => {

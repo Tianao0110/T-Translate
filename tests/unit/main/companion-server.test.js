@@ -43,6 +43,12 @@ function fakeSession() {
       s.closed.push(id);
       return id === SID ? { ok: true } : { error: 'unknown-session' };
     },
+    seekResult: { ok: true, atS: 12.34 },
+    seeks: [],
+    seek: async (id, opts) => {
+      s.seeks.push({ id, ...opts });
+      return id === SID ? s.seekResult : { error: 'unknown-session' };
+    },
     closeActive() {},
     has: (id) => id === SID,
     subscribe: (id, fn) => {
@@ -180,7 +186,7 @@ describe('gates', () => {
 describe('hello and token', () => {
   it('hello reports app, protocol, privacy and capabilities', async () => {
     const r = await request(port, { headers: auth() });
-    expect(r.json).toEqual({ app: 'T-Translate', version: '9.9.9', protocol: 1, privacyMode: 'offline', capabilities: { asr: true, translate: true, listen: true } });
+    expect(r.json).toEqual({ app: 'T-Translate', version: '9.9.9', protocol: 1, privacyMode: 'offline', capabilities: { asr: true, translate: true, listen: true, seek: true } });
   });
 
   it('the token lives in companion.token and survives a restart', async () => {
@@ -256,6 +262,31 @@ describe('asr sessions', () => {
     expect((await post('/v1/asr/close', { id: SID })).status).toBe(204);
     expect((await post('/v1/asr/close', { id: 'x' })).status).toBe(404);
     expect(session.closed).toEqual([SID, 'x']);
+  });
+
+  it('seek: 200 with the cut, 404 / 400 / 503 from the session; the id and mediaStartS go through', async () => {
+    const r = await post('/v1/asr/seek', { id: SID, mediaStartS: 95.5 });
+    expect([r.status, r.json]).toEqual([200, { atS: 12.34 }]);
+    expect(session.seeks[0]).toEqual({ id: SID, mediaStartS: 95.5 });
+    const u = await post('/v1/asr/seek', { id: 'x', mediaStartS: 1 });
+    expect([u.status, u.json]).toEqual([404, { error: 'unknown-session' }]);
+    for (const [error, status] of [['bad-request', 400], ['not-ready', 503]]) {
+      session.seekResult = { error };
+      const e = await post('/v1/asr/seek', { id: SID, mediaStartS: 1 });
+      expect([e.status, e.json]).toEqual([status, { error }]);
+    }
+    expect((await post('/v1/asr/seek', { id: 7 })).status).toBe(404);
+    expect(session.seeks.at(-1)).toEqual({ id: '', mediaStartS: undefined });
+  });
+
+  it('a seek leaves the feed sequence of the session as it was', async () => {
+    const feed = (seq) => request(port, { method: 'POST', path: '/v1/asr/feed', headers: { ...auth(), 'content-type': 'application/octet-stream', 'x-session-id': SID, 'x-seq': String(seq) }, body: Buffer.from(new Float32Array(4).buffer) });
+    await post('/v1/asr/open', { mode: 'feed' });
+    expect((await feed(0)).status).toBe(204);
+    expect((await feed(1)).status).toBe(204);
+    expect((await post('/v1/asr/seek', { id: SID, mediaStartS: 50 })).status).toBe(200);
+    expect((await feed(1)).json).toEqual({ error: 'stale-seq', expected: 2 });
+    expect((await feed(2)).status).toBe(204);
   });
 });
 

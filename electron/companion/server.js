@@ -13,6 +13,7 @@ const MAX_ITEM_ID = 128;
 const CORS_ALLOW_HEADERS = 'authorization, content-type, x-tt-client, x-session-id, x-seq';
 const FEED_ERRORS = { 'unknown-session': 404, 'wrong-mode': 409, 'not-ready': 503 };
 const OPEN_ERRORS = { 'no-model': 503, 'bad-request': 400 };
+const SEEK_ERRORS = { 'unknown-session': 404, 'bad-request': 400, 'not-ready': 503 };
 
 class HttpError extends Error {
   constructor(status, code) {
@@ -185,7 +186,7 @@ function createCompanionServer({
       version,
       protocol: P.PROTOCOL_VERSION,
       privacyMode: getPrivacyMode(),
-      capabilities: { asr, translate: !!translateStream, listen: true },
+      capabilities: { asr, translate: !!translateStream, listen: true, seek: true },
     };
   }
 
@@ -275,6 +276,13 @@ function createCompanionServer({
     }
     if (r.error === 'backpressure') return reply(429, { error: 'backpressure', retryAfterMs: r.retryAfterMs }, { 'Retry-After': '1' });
     return reply(FEED_ERRORS[r.error] || 500, { error: r.error });
+  }
+
+  async function seekSession(req, reply) {
+    const { id, mediaStartS } = await readJson(req);
+    const r = await session.seek(typeof id === 'string' ? id : '', { mediaStartS });
+    if (r.ok) return reply(200, { atS: r.atS });
+    return reply(SEEK_ERRORS[r.error] || 500, { error: r.error });
   }
 
   async function closeSession(req, res, reply) {
@@ -379,6 +387,8 @@ function createCompanionServer({
         return openSession(req, reply, 'system');
       case 'POST /v1/asr/feed':
         return feed(req, res, reply);
+      case 'POST /v1/asr/seek':
+        return seekSession(req, reply);
       case 'POST /v1/asr/close':
         return closeSession(req, res, reply);
       case 'GET /v1/asr/events':
