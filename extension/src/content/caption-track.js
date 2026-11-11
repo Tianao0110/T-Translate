@@ -1,8 +1,24 @@
 // Captions as a native 'subtitles' TextTrack on the video. A track cannot be
 // removed from its video, so one left by an earlier run (same label) is
-// emptied and reused instead of piling up in the player's caption menu.
+// emptied and reused instead of piling up in the player's caption menu. The
+// size factor reaches the browser's cue box through one page stylesheet keyed
+// on a data attribute of the video.
+
+import { DEFAULT_SIZE, SIZE_SCALES, SIZES } from './caption-size.js';
 
 const MIN_CUE_S = 0.5;
+const SIZE_ATTR = 'data-tc-cap-size';
+const SIZE_STYLE_ID = 'tc-cap-cue-size';
+
+function ensureSizeStyle(doc) {
+  if (!doc || doc.getElementById(SIZE_STYLE_ID)) return;
+  const st = doc.createElement('style');
+  st.id = SIZE_STYLE_ID;
+  st.textContent = Object.entries(SIZE_SCALES)
+    .map(([name, k]) => `video[${SIZE_ATTR}="${name}"]::cue { font-size: ${Math.round(k * 100)}%; }`)
+    .join('\n');
+  (doc.head || doc.documentElement).append(st);
+}
 
 // VTTCue needs start < end; a zero-length or reversed cue gets half a second.
 export const cueTimes = (start, end) => (end > start ? [start, end] : [start, start + MIN_CUE_S]);
@@ -16,7 +32,14 @@ export function createCaptionTrack({
   lang = '',
   addTextTrack = (v, kind, l, language) => v.addTextTrack(kind, l, language),
   createCue = (s, e, t) => new VTTCue(s, e, t),
+  size = DEFAULT_SIZE,
 }) {
+  function setSize(next) {
+    ensureSizeStyle(video.ownerDocument);
+    video.setAttribute?.(SIZE_ATTR, SIZES.includes(next) ? next : DEFAULT_SIZE);
+  }
+  setSize(size);
+
   let track = Array.from(video.textTracks || []).find((t) => t.kind === 'subtitles' && t.label === label);
   if (track) {
     track.mode = 'hidden'; // a disabled track lists no cues
@@ -78,9 +101,11 @@ export function createCaptionTrack({
     upsert,
     updateText,
     clear,
+    setSize,
     destroy() {
       clear();
       track.mode = 'disabled';
+      video.removeAttribute?.(SIZE_ATTR);
     },
   };
 }

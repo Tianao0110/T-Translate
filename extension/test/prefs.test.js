@@ -35,8 +35,8 @@ describe('prefs', () => {
 
   it('normalizes stored values over the defaults', () => {
     expect(normalizePrefs(null, 'zh-CN')).toEqual({ ...DEFAULT_PREFS, targetLang: 'zh' });
-    expect(normalizePrefs({ enabled: false, autoListen: true, display: 'translation', mode: 'overlay', targetLang: 'ja', sourceLang: 'en', siteOff: { youtube: true, bad: 'x' } }, 'en')).toEqual({ enabled: false, autoListen: true, display: 'translation', mode: 'overlay', targetLang: 'ja', sourceLang: 'en', siteOff: { youtube: true } });
-    expect(normalizePrefs({ display: 'huge', mode: 3, targetLang: 'not a lang!', sourceLang: '' }, 'en')).toMatchObject({ display: 'bilingual', mode: 'track', targetLang: 'en', sourceLang: 'auto' });
+    expect(normalizePrefs({ enabled: false, autoListen: true, display: 'translation', mode: 'track', size: 'xlarge', targetLang: 'ja', sourceLang: 'en', siteOff: { youtube: true, bad: 'x' } }, 'en')).toEqual({ enabled: false, autoListen: true, display: 'translation', mode: 'track', size: 'xlarge', targetLang: 'ja', sourceLang: 'en', siteOff: { youtube: true } });
+    expect(normalizePrefs({ display: 'huge', mode: 3, size: 'giant', targetLang: 'not a lang!', sourceLang: '' }, 'en')).toMatchObject({ display: 'bilingual', mode: 'overlay', size: 'medium', targetLang: 'en', sourceLang: 'auto' });
   });
 
   it('loads, reads, writes and reports changes', async () => {

@@ -476,10 +476,11 @@ export function createOrchestrator({
   // ---- running ----
 
   function sendView(r, p) {
-    if (r.view && r.view.display === p.display && r.view.mode === p.mode) return;
-    r.view = { display: p.display, mode: p.mode };
+    if (r.view && r.view.display === p.display && r.view.mode === p.mode && r.view.size === p.size) return;
+    r.view = { display: p.display, mode: p.mode, size: p.size };
     quiet(cmd(r, { cmd: 'display', value: p.display }));
     quiet(cmd(r, { cmd: 'mode', value: p.mode }));
+    quiet(cmd(r, { cmd: 'size', value: p.size }));
   }
 
   function start(r, d, p) {
@@ -795,7 +796,7 @@ export function createOrchestrator({
 
   pageEvents.onPageEvent(onPageEvent);
   prefs.onChange((p) => {
-    for (const r of byTab.values()) if (r.run) sendView(r, p);
+    for (const r of byTab.values()) if (r.run || r.view) sendView(r, p);
     schedule();
   });
 

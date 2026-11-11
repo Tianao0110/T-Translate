@@ -47,7 +47,7 @@ export const MSG = {
   PAGE_EVENT: 'page/event',
   // payload { streamId, seq, init, timeS, bytes }: MSE audio while capture is on; replies { accepted, ended?, reason? }.
   PAGE_MEDIA: 'page/media',
-  // payload { cmd, ... }: mse-capture, cues (op set / upsert / translation / list), display, mode, site-captions, notice, yt-reload, yt-captions-on, query.
+  // payload { cmd, ... }: mse-capture, cues (op set / upsert / translation / list), display, mode, size, site-captions, notice, yt-reload, yt-captions-on, query.
   PAGE_COMMAND: 'page/command',
   // payload { tabId }: the tab's evidence, or null.
   TAB_EVIDENCE: 'tab/evidence',

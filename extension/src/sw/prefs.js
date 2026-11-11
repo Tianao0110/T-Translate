@@ -5,13 +5,15 @@
 
 export const DISPLAYS = ['bilingual', 'translation', 'original'];
 export const MODES = ['track', 'overlay'];
+export const SIZES = ['small', 'medium', 'large', 'xlarge'];
 export const PREFS_KEY = 'prefs';
 
 export const DEFAULT_PREFS = Object.freeze({
   enabled: true,
   autoListen: false,
   display: 'bilingual',
-  mode: 'track',
+  mode: 'overlay',
+  size: 'medium',
   targetLang: null, // null: defaultTargetLang(ui language)
   sourceLang: 'auto',
   siteOff: {},
@@ -37,6 +39,7 @@ export function normalizePrefs(raw, uiLang) {
     autoListen: r.autoListen === true,
     display: DISPLAYS.includes(r.display) ? r.display : DEFAULT_PREFS.display,
     mode: MODES.includes(r.mode) ? r.mode : DEFAULT_PREFS.mode,
+    size: SIZES.includes(r.size) ? r.size : DEFAULT_PREFS.size,
     targetLang: typeof r.targetLang === 'string' && LANG_RE.test(r.targetLang) ? r.targetLang : defaultTargetLang(uiLang),
     sourceLang: typeof r.sourceLang === 'string' && LANG_RE.test(r.sourceLang) ? r.sourceLang : DEFAULT_PREFS.sourceLang,
     siteOff,

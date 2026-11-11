@@ -11,7 +11,8 @@
 import { MSG, request, handle } from '../shared/messages.js';
 import { PAGE_EVENT_MAX_CHARS, MAX_CUES_PER_PART, sanitizeCue } from '../shared/page-protocol.js';
 import { detectFormat, parseSubtitles } from './parsers/index.js';
-import { createCaptionRenderer, MODES, DISPLAYS } from './caption-renderer.js';
+import { createCaptionRenderer, MODES, DISPLAYS, SIZES } from './caption-renderer.js';
+import { DEFAULT_SIZE } from './caption-size.js';
 import { createBridge } from './bridge.js';
 import { createMediaWatch } from './media-watch.js';
 import { createMseRelay } from './mse-relay.js';
@@ -83,7 +84,7 @@ export function createPageAgent({
   let subtitles = [];
   let lists = []; // subtitle lists read this navigation: { url, entries, picked, status }
   let listsSeen = new Set(); // list and body URLs already handled this navigation
-  const view = { display: 'bilingual', mode: 'track', siteCaptions: 'show' };
+  const view = { display: 'bilingual', mode: 'track', size: DEFAULT_SIZE, siteCaptions: 'show' };
   let feedEl = null; // feeds: the primary video the media id was last checked against
   let renderer = null;
   let rendererEl = null;
@@ -329,7 +330,7 @@ export function createPageAgent({
     if (renderer && rendererEl === v) return renderer;
     const saved = renderer ? renderer.list() : [];
     destroyRenderer();
-    renderer = makeRenderer({ video: v, mode: modeFor(v), display: view.display });
+    renderer = makeRenderer({ video: v, mode: modeFor(v), display: view.display, size: view.size });
     rendererEl = v;
     if (saved.length) {
       renderer.setCues(saved);
@@ -446,6 +447,11 @@ export function createPageAgent({
         view.mode = c.value;
         renderer?.setMode(modeFor(rendererEl));
         return { mode: view.mode };
+      case 'size':
+        if (!SIZES.includes(c.value)) throw err('bad-command');
+        view.size = c.value;
+        renderer?.setSize(c.value);
+        return { size: view.size };
       case 'site-captions': {
         if (c.value !== 'hide' && c.value !== 'show') throw err('bad-command');
         const applied = setSiteCaptions(c.value === 'hide');

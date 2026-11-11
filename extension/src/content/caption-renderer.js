@@ -4,16 +4,19 @@
 // subtitles) and by the media pipeline's events through applyMediaEvent.
 
 import { createCaptionTrack } from './caption-track.js';
+import { DEFAULT_SIZE, SIZES } from './caption-size.js';
 import { createOverlay } from './overlay.js';
 import { normalizeText } from './parsers/text.js';
 
 export const MODES = ['track', 'overlay'];
 export const DISPLAYS = ['bilingual', 'translation', 'original'];
+export { SIZES };
 
 export function createCaptionRenderer({
   video,
   mode = 'track',
   display = 'bilingual',
+  size = DEFAULT_SIZE,
   lang = '',
   label,
   addTextTrack,
@@ -22,9 +25,10 @@ export function createCaptionRenderer({
 }) {
   if (!MODES.includes(mode)) mode = 'track';
   if (!DISPLAYS.includes(display)) display = 'bilingual';
+  if (!SIZES.includes(size)) size = DEFAULT_SIZE;
   let entries = new Map();
   const makeView = (m) =>
-    m === 'overlay' ? makeOverlay({ video }) : createCaptionTrack({ video, lang, label, addTextTrack, createCue });
+    m === 'overlay' ? makeOverlay({ video, size }) : createCaptionTrack({ video, lang, label, addTextTrack, createCue, size });
   let view = makeView(mode);
 
   // The translation stands in for a missing original, never the other way round.
@@ -48,6 +52,9 @@ export function createCaptionRenderer({
     },
     get display() {
       return display;
+    },
+    get size() {
+      return size;
     },
     get view() {
       return view;
@@ -88,6 +95,12 @@ export function createCaptionRenderer({
       if (!DISPLAYS.includes(next) || next === display) return;
       display = next;
       for (const e of entries.values()) view.updateText(e.id, textOf(e));
+    },
+
+    setSize(next) {
+      if (!SIZES.includes(next) || next === size) return;
+      size = next;
+      view.setSize?.(size);
     },
 
     setMode(next) {

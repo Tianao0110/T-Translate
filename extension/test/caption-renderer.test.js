@@ -200,4 +200,24 @@ describe('createCaptionRenderer', () => {
     expect(track.mode).toBe('disabled');
     expect(r.list()).toEqual([]);
   });
+
+  it('the size reaches the track through one page stylesheet and the overlay through its factor', () => {
+    const r = make();
+    expect(r.size).toBe('medium');
+    expect(video.getAttribute('data-tc-cap-size')).toBe('medium');
+    const sheet = document.getElementById('tc-cap-cue-size');
+    expect(sheet.textContent).toContain('video[data-tc-cap-size="medium"]::cue { font-size: 80%; }');
+    r.setSize('large');
+    r.setSize('bogus');
+    expect(video.getAttribute('data-tc-cap-size')).toBe('large');
+    r.setMode('overlay');
+    expect(r.view.host.shadowRoot.querySelector('.tc-cap-root').style.getPropertyValue('--tc-cap-scale')).toBe('1');
+    r.setSize('small');
+    expect(r.view.host.shadowRoot.querySelector('.tc-cap-root').style.getPropertyValue('--tc-cap-scale')).toBe('0.65');
+    r.setMode('track');
+    expect(video.getAttribute('data-tc-cap-size')).toBe('small');
+    r.destroy();
+    expect(video.hasAttribute('data-tc-cap-size')).toBe(false);
+    expect(document.querySelectorAll('#tc-cap-cue-size')).toHaveLength(1);
+  });
 });

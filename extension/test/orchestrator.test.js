@@ -77,7 +77,7 @@ beforeEach(() => {
   pe = fakePageEvents();
   arbiter = { focusedTab: 7, visibleTabs: new Set([7]), focused: () => arbiter.focusedTab, visible: () => [arbiter.focusedTab, ...arbiter.visibleTabs].filter((t, i, a) => t !== null && a.indexOf(t) === i), isVisible: (t) => arbiter.visibleTabs.has(t) };
   const listeners = new Set();
-  prefs = { p: { enabled: true, autoListen: false, display: 'bilingual', mode: 'track', targetLang: 'zh', sourceLang: 'auto', siteOff: {} }, get: () => prefs.p, onChange: (fn) => listeners.add(fn), change(patch) {
+  prefs = { p: { enabled: true, autoListen: false, display: 'bilingual', mode: 'track', size: 'medium', targetLang: 'zh', sourceLang: 'auto', siteOff: {} }, get: () => prefs.p, onChange: (fn) => listeners.add(fn), change(patch) {
     prefs.p = { ...prefs.p, ...patch };
     listeners.forEach((fn) => fn(prefs.p));
   } };
@@ -134,9 +134,10 @@ describe('tier 2: decodable audio', () => {
     expect(on).toHaveLength(1);
     expect(on[0]).toMatchObject({ tabId: 7, on: true, streamId: 1, lang: 'auto', targetLang: 'zh' });
     expect(on[0].fromS).toBeCloseTo(32 - 5, 0);
-    expect(pe.commands.slice(0, 2).map((c) => [c.cmd, c.value])).toEqual([
+    expect(pe.commands.slice(0, 3).map((c) => [c.cmd, c.value])).toEqual([
       ['display', 'bilingual'],
       ['mode', 'track'],
+      ['size', 'medium'],
     ]);
     expect(lastState()).toBe('captions');
     expect(orch.stateOf(7)).toMatchObject({ state: 'captions', run: { tier: 2, kind: 'capture' }, active: true });
@@ -194,7 +195,8 @@ describe('tier 2: decodable audio', () => {
   it('60 s without a final parks the video; a new video is tried afresh', async () => {
     await playing();
     await after(2000);
-    const key = pe.of('mse-capture')[0] && (await pe.command.mock.results[2].value).key;
+    const at = pe.command.mock.calls.findIndex((c) => c[1].cmd === 'mse-capture');
+    const key = (await pe.command.mock.results[at].value).key;
     pe.emit(7, { type: 'capture-event', kind: 'capture', key, event: { type: 'suspended' } });
     await flush();
     expect(pe.of('mse-capture').at(-1)).toMatchObject({ on: false });
@@ -428,13 +430,23 @@ describe('one tab at a time and the gates', () => {
     expect(orch.stateOf(7).history.map((h) => h.state)).toEqual(['waiting', 'captions', 'idle', 'captions', 'idle', 'captions']);
   });
 
-  it('display and mode preferences reach a running tab; a closed tab is forgotten', async () => {
+  it('display, mode and size preferences reach a running tab; a closed tab is forgotten', async () => {
     await playing();
     await after(2000);
     prefs.change({ display: 'translation', mode: 'overlay' });
     await flush();
     expect(pe.of('display').at(-1)).toMatchObject({ value: 'translation' });
     expect(pe.of('mode').at(-1)).toMatchObject({ value: 'overlay' });
+    prefs.change({ size: 'large' });
+    await flush();
+    expect(pe.of('size').at(-1)).toMatchObject({ value: 'large' });
+    // Paused past the grace: no run, the captions still on the page.
+    pe.emit(7, { type: 'media', reason: 'pause', media: snap({ state: 'paused', currentTime: 40 }), primary: true });
+    await after(6000);
+    expect(orch.stateOf(7).run).toBeFalsy();
+    prefs.change({ size: 'small' });
+    await flush();
+    expect(pe.of('size').at(-1)).toMatchObject({ value: 'small' });
     pe.emit(7, { type: 'forgotten', reason: 'tab-closed' });
     await flush();
     expect(orch.stateOf(7)).toBeNull();

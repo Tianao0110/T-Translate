@@ -188,6 +188,9 @@ describe('commands', () => {
     await runtime.command({ cmd: 'display', value: 'translation' });
     expect(tracks[0].list[1].text).toBe('炸鱼薯条');
     expect(await runtime.command({ cmd: 'display', value: 'loud' })).toMatchObject({ ok: false, error: { code: 'bad-command' } });
+    expect(await runtime.command({ cmd: 'size', value: 'small' })).toEqual({ ok: true, result: { size: 'small' } });
+    expect(big.getAttribute('data-tc-cap-size')).toBe('small');
+    expect(await runtime.command({ cmd: 'size', value: 'huge' })).toMatchObject({ ok: false, error: { code: 'bad-command' } });
     const q = await runtime.command({ cmd: 'query' });
     expect(q.result).toMatchObject({ mediaId: 'UF8uR6Z6KLc', site: 'youtube', bridge: true, renderer: { cues: 3, mode: 'track', display: 'translation' }, view: { display: 'translation', mode: 'track' } });
     expect(q.result.primary).toBe(2);

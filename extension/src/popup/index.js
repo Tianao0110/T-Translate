@@ -100,6 +100,7 @@ function render() {
   $('enabled').checked = p.enabled;
   for (const el of document.querySelectorAll('input[name="display"]')) el.checked = el.value === p.display;
   for (const el of document.querySelectorAll('input[name="mode"]')) el.checked = el.value === p.mode;
+  for (const el of document.querySelectorAll('input[name="size"]')) el.checked = el.value === p.size;
   fillTargets(p.targetLang);
   $('export').disabled = cueCount === 0;
 }
@@ -173,6 +174,7 @@ $('site-on').addEventListener('change', (e) => {
 $('enabled').addEventListener('change', (e) => prefs.set({ enabled: e.target.checked }));
 $('display').addEventListener('change', (e) => prefs.set({ display: e.target.value }));
 $('mode').addEventListener('change', (e) => prefs.set({ mode: e.target.value }));
+$('size').addEventListener('change', (e) => prefs.set({ size: e.target.value }));
 $('target').addEventListener('change', (e) => prefs.set({ targetLang: e.target.value }));
 $('export').addEventListener('click', exportSrt);
 

@@ -160,8 +160,9 @@ async function main() {
       evaluate(session, `(() => { const v = document.querySelector('video'); if (!v) return null; const t = Array.from(v.textTracks).find((x) => x.label === 'T-Caption'); return { t: v.currentTime, paused: v.paused, cues: t ? t.cues.length : 0, active: t ? Array.from(t.activeCues || []).map((c) => c.text) : [] }; })()`);
 
     // The browser's UI language is English, like the test video's speech; a
-    // Chinese target makes the translation show on the track.
-    await setPrefs({ targetLang: 'zh' });
+    // Chinese target makes the translation show on the track, drawn as a track
+    // so activeCues can be read.
+    await setPrefs({ targetLang: 'zh', mode: 'track' });
 
     // ---- (a) hands off ----
     const { sessionId: page1 } = await open('about:blank');
