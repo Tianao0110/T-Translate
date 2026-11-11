@@ -43,9 +43,6 @@ async function targetTab() {
   return active?.id ?? null;
 }
 
-const SITE_NAMES = { youtube: 'siteYoutube', bilibili: 'siteBilibili', tiktok: 'siteTiktok' };
-const siteName = (site) => (Object.hasOwn(SITE_NAMES, site) ? t(SITE_NAMES[site]) : site);
-
 let names = null;
 function langName(code) {
   try {
@@ -89,16 +86,8 @@ function render() {
   if (allow) $('allow').textContent = allow.kind === 'site' ? t('allowSite') : t('allowRead');
   $('allow-note').textContent = allow ? allowNote : '';
 
-  // A site of its own, or the host's switch on any other site.
-  const siteKey = evidence ? siteKeyOf(evidence) : null;
-  const siteRow = $('site-row');
-  siteRow.hidden = !siteKey || siteKey === 'generic';
-  if (!siteRow.hidden) {
-    $('site-label').textContent = t('popupSite', [siteName(siteKey)]);
-    $('site-on').checked = !p.siteOff[siteKey];
-  }
-  $('enabled').checked = p.enabled;
-  for (const el of document.querySelectorAll('input[name="display"]')) el.checked = el.value === p.display;
+  // 'off' stands for the master switch.
+  for (const el of document.querySelectorAll('input[name="display"]')) el.checked = el.value === (p.enabled ? p.display : 'off');
   for (const el of document.querySelectorAll('input[name="mode"]')) el.checked = el.value === p.mode;
   for (const el of document.querySelectorAll('input[name="size"]')) el.checked = el.value === p.size;
   fillTargets(p.targetLang);
@@ -163,16 +152,15 @@ $('allow').addEventListener('click', () => {
     }
   );
 });
-$('site-on').addEventListener('change', (e) => {
+// 'off' turns T-Caption off everywhere; any other choice turns it on, here too
+// if this site was switched off on the options page.
+$('display').addEventListener('change', (e) => {
+  if (e.target.value === 'off') return prefs.set({ enabled: false });
   const site = evidence ? siteKeyOf(evidence) : null;
-  if (!site || site === 'generic') return;
   const siteOff = { ...prefs.get().siteOff };
-  if (e.target.checked) delete siteOff[site];
-  else siteOff[site] = true;
-  prefs.set({ siteOff });
+  if (site) delete siteOff[site];
+  prefs.set({ enabled: true, display: e.target.value, siteOff });
 });
-$('enabled').addEventListener('change', (e) => prefs.set({ enabled: e.target.checked }));
-$('display').addEventListener('change', (e) => prefs.set({ display: e.target.value }));
 $('mode').addEventListener('change', (e) => prefs.set({ mode: e.target.value }));
 $('size').addEventListener('change', (e) => prefs.set({ size: e.target.value }));
 $('target').addEventListener('change', (e) => prefs.set({ targetLang: e.target.value }));

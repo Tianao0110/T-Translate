@@ -75,13 +75,13 @@ async function main() {
     };
     const { sessionId: pop, targetId: popTarget } = await openPopup(tab1);
     const popupView = () =>
-      evaluate(pop, `(() => ({ status: document.getElementById('status-text').textContent, tone: document.getElementById('status').dataset.tone, channel: document.getElementById('channel-text').textContent, siteShown: !document.getElementById('site-row').hidden, site: document.getElementById('site-label').textContent, siteOn: document.getElementById('site-on').checked, enabled: document.getElementById('enabled').checked, display: document.querySelector('input[name=display]:checked')?.value ?? null, mode: document.querySelector('input[name=mode]:checked')?.value ?? null, target: document.getElementById('target').value, targets: document.getElementById('target').options.length, exportOn: !document.getElementById('export').disabled }))()`);
+      evaluate(pop, `(() => ({ status: document.getElementById('status-text').textContent, tone: document.getElementById('status').dataset.tone, channel: document.getElementById('channel-text').textContent, display: document.querySelector('input[name=display]:checked')?.value ?? null, rows: document.querySelectorAll('.controls > .row').length, mode: document.querySelector('input[name=mode]:checked')?.value ?? null, target: document.getElementById('target').value, targets: document.getElementById('target').options.length, exportOn: !document.getElementById('export').disabled }))()`);
     const want = captions?.run?.tier === 1 ? msg('tabCaptionsSite') : msg('tabCaptionsAudio');
     const v1 = await until(async () => {
       const v = await popupView();
       return v.status === want && v.exportOn ? v : null;
     }, 10000);
-    step('(a) the popup’s status line says what runs in the tab; controls show the prefs', !!v1 && v1.siteShown && v1.siteOn && v1.enabled && v1.display === 'bilingual' && v1.mode === 'track' && v1.target === 'zh', JSON.stringify(v1 || (await popupView())));
+    step('(a) the popup’s status line says what runs in the tab; controls show the prefs', !!v1 && v1.display === 'bilingual' && v1.rows === 4 && v1.mode === 'track' && v1.target === 'zh', JSON.stringify(v1 || (await popupView())));
     const popBox = await evaluate(pop, `(() => { const r = document.body.getBoundingClientRect(); return { x: 0, y: 0, width: Math.ceil(r.width), height: Math.ceil(r.height) }; })()`);
     if (v1) {
       for (const scheme of ['dark', 'light']) {
@@ -92,10 +92,10 @@ async function main() {
     }
     const { sessionId: popOther, targetId: otherTarget } = await openPopup(Number(await evaluate(shell.opt, `chrome.tabs.getCurrent().then((t) => t.id)`)));
     const vOther = await until(async () => {
-      const v = await evaluate(popOther, `({ status: document.getElementById('status-text').textContent, siteShown: !document.getElementById('site-row').hidden, exportOn: !document.getElementById('export').disabled })`);
+      const v = await evaluate(popOther, `({ status: document.getElementById('status-text').textContent, exportOn: !document.getElementById('export').disabled })`);
       return v.status ? v : null;
     }, 5000);
-    step('(a) a tab without our scripts: no video, no site switch, nothing to export', vOther?.status === msg('tabNoVideo') && !vOther.siteShown && !vOther.exportOn, JSON.stringify(vOther));
+    step('(a) a tab without our scripts: no video, nothing to export', vOther?.status === msg('tabNoVideo') && !vOther.exportOn, JSON.stringify(vOther));
     await cdp.send('Target.closeTarget', { targetId: otherTarget });
 
     // ---- (b) display ----
@@ -121,21 +121,21 @@ async function main() {
     const medium = await sizeOnPage('medium');
     step('(b) size segments: medium checked, small then medium reach the video', sizeChecked === 'medium' && prefsSmall?.size === 'small' && !!small && !!medium, `checked ${sizeChecked}; prefs ${prefsSmall?.size}; page small ${!!small}, medium ${!!medium}`);
 
-    // ---- (c) the site switch ----
-    await click('#site-on');
+    // ---- (c) display off: T-Caption off everywhere, then on again ----
+    await click('input[name=display][value=off]');
     const off = await stateIs(tab1, 'off', 10000);
     const [badgeOff] = (await badge(tab1)) || [];
     const vOff = await until(async () => {
       const v = await popupView();
-      return v.status === msg('tabOff') ? v : null;
+      return v.status === msg('tabDisabled') && v.display === 'off' ? v : null;
     }, 5000);
     const prefsOff = await shell.getPrefs();
-    step('(c) site switch off: the tab is off, the badge says off, so does the popup', !!off && badgeOff === msg('badgeOff') && !!vOff && prefsOff?.siteOff?.youtube === true, `${off?.state} badge ${badgeOff}; popup “${vOff?.status}”; prefs ${JSON.stringify(prefsOff?.siteOff)}`);
-    await click('#site-on');
+    step('(c) display off: the tab is off, the badge says off, so does the popup', !!off && badgeOff === msg('badgeOff') && !!vOff && prefsOff?.enabled === false, `${off?.state} badge ${badgeOff}; popup “${vOff?.status}”; enabled ${prefsOff?.enabled}`);
+    await click('input[name=display][value=bilingual]');
     const back = await stateIs(tab1, 'captions', 30000);
     const vBack = await until(async () => {
       const v = await popupView();
-      return v.siteOn && (v.status === want || v.status === msg('tabCaptionsCached')) ? v : null;
+      return v.display === 'bilingual' && (v.status === want || v.status === msg('tabCaptionsCached')) ? v : null;
     }, 10000);
     step('(c) on again: captions come back (recognized or from the cache)', !!back && !!vBack, `${back?.state} tier ${back?.run?.tier}; popup “${vBack?.status}”`);
     if (!back) await dump(tab1);

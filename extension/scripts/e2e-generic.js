@@ -200,7 +200,7 @@ async function main() {
     await evaluate(p.sessionId, `(() => { const orig = chrome.permissions.request.bind(chrome.permissions); window.__req = []; chrome.permissions.request = (o) => { const e = { origins: o.origins, at: Date.now(), state: 'pending' }; window.__req.push(e); const pr = orig(o); pr.then((v) => { e.state = 'resolved ' + v; e.doneAt = Date.now(); }, (err) => { e.state = 'rejected ' + err.message; }); return pr; }; return true; })()`);
     return p;
   };
-  const popupView = (pop) => evaluate(pop, `({ status: document.getElementById('status-text').textContent, tone: document.getElementById('status').dataset.tone, allowShown: !document.getElementById('allow-row').hidden, allow: document.getElementById('allow').textContent, note: document.getElementById('allow-note').textContent, site: document.getElementById('site-row').hidden ? null : document.getElementById('site-label').textContent, requests: window.__req })`);
+  const popupView = (pop) => evaluate(pop, `({ status: document.getElementById('status-text').textContent, tone: document.getElementById('status').dataset.tone, allowShown: !document.getElementById('allow-row').hidden, allow: document.getElementById('allow').textContent, note: document.getElementById('allow-note').textContent, requests: window.__req })`);
   const popupIs = (pop, want, ms = 10000) =>
     until(async () => {
       const v = await popupView(pop);
@@ -251,7 +251,7 @@ async function main() {
     step('(a) a page on localhost: no agent of ours, no evidence', evA === null && !agentA && contexts.get(page)?.size > 0, `evidence ${JSON.stringify(evA)}; agent ${agentA}; contexts ${contextsOf(page)}`);
     const { sessionId: pop1, targetId: pop1Target } = await openPopup(tab);
     const vA = await popupIs(pop1, msg('tabNotEnabled'));
-    step('(a) the popup: “not on for this site” and the allow button', !!vA && vA.allowShown && vA.allow === msg('allowSite') && !vA.site, JSON.stringify(vA || (await popupView(pop1))));
+    step('(a) the popup: “not on for this site” and the allow button', !!vA && vA.allowShown && vA.allow === msg('allowSite'), JSON.stringify(vA || (await popupView(pop1))));
     if (vA) await shoot(pop1, '1-popup-not-enabled', await popBox(pop1));
 
     // ---- (b) ----
@@ -283,7 +283,7 @@ async function main() {
     if (!runB) await dump(tab);
     const vB = await popupIs(pop1, msg('tabCaptionsAudio'));
     const [badgeB] = (await badge(tab)) || [];
-    step('(b) the popup says it recognizes, the button gone, the host’s own switch shown; badge', !!vB && !vB.allowShown && vB.site === msg('popupSite', ['localhost']) && badgeB === msg('badgeCaptions'), `${JSON.stringify(vB)}; badge ${badgeB}`);
+    step('(b) the popup says it recognizes, the button gone; badge', !!vB && !vB.allowShown && badgeB === msg('badgeCaptions'), `${JSON.stringify(vB)}; badge ${badgeB}`);
     if (bilingual(await until(async () => bilingual(await trackInfo(page)), 15000, 100))) {
       await shoot(page, '2-allowed-captions');
       await shoot(page, '2-allowed-captions-zoom', { x: 16, y: 380, width: 960, height: 176 });
