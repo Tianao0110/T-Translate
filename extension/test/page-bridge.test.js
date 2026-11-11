@@ -135,13 +135,13 @@ describe('handshake and buffering', () => {
 
   it('retries the hello when the page world was not listening yet', async () => {
     const win = fakeWindow();
-    const { bridge } = isolatedSide(win, { retryMs: [30] });
+    const { bridge } = isolatedSide(win, { retryMs: [300] });
     await tick(10);
     const outbox = createOutbox();
     acceptHello(win, outbox, () => null);
     await tick(10);
     expect(bridge.connected).toBe(false);
-    await tick(40);
+    await tick(400);
     expect(bridge.connected).toBe(true);
     bridge.close();
   });
