@@ -15,6 +15,7 @@ const { modelDir, modelDirs } = require('../packs/model-root');
 const { dataDir } = require('../platform/data-root');
 const { createListenAutosave } = require('./listen-autosave');
 const { createListenTranslator } = require('./listen-translator');
+const { splitFinal } = require('./final-split');
 const tengine = require('../tengine');
 const llmManager = require('../llm/llm-manager');
 const logger = require('../platform/logger')('AudioEngine');
@@ -489,8 +490,11 @@ function onWorkerMessage(msg) {
         while (seekBreaks.length && msg.rec.segStartS >= seekBreaks[0]) seekBreaks.shift();
         translator?.markBreak();
       }
-      // The translator numbers the final; the translation follows on its own channel.
-      sendToWindow(CHANNELS.AUDIO_ENGINE.SEGMENT, translator ? translator.onSegment(msg.rec) : msg.rec);
+      // Companion finals go out as caption-sized pieces. The translator numbers
+      // each; the translation follows on its own channel.
+      for (const rec of sessionOwner === 'companion' && msg.rec ? splitFinal(msg.rec, msg.marks) : [msg.rec]) {
+        sendToWindow(CHANNELS.AUDIO_ENGINE.SEGMENT, translator ? translator.onSegment(rec) : rec);
+      }
       break;
     case 'asr-seeked':
       if (Number.isFinite(msg.atS)) seekBreaks.push(msg.atS);

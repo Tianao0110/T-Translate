@@ -35,7 +35,8 @@
 //        {type:'asr-ready', loadMs}      ASR loaded + session live
 //        {type:'partial', text}          open-segment provisional text; ''
 //                                        clears it (segment closed)
-//        {type:'segment', rec} | {type:'hint', kind} | {type:'metrics', rec}
+//        {type:'segment', rec, marks}    marks: {tokens, timestamps} or null
+//        {type:'hint', kind} | {type:'metrics', rec}
 //        {type:'hq-transcribe', id, samples}  a high-accuracy final for
 //                                        T-Engine's speech host (16 kHz float)
 //        {type:'hq-cancel', id}          that final is no longer wanted

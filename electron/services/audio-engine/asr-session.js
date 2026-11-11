@@ -769,7 +769,9 @@ async function decodeSegment(seg) {
   });
   // The log gets the record without its words unless the host opted in.
   logLine(textLogged() ? rec : { ...rec, text: undefined });
-  post({ type: 'segment', rec });
+  // Token starts ride beside the record (never logged) for the companion's caption cuts.
+  const marks = Array.isArray(result.tokens) && Array.isArray(result.timestamps) ? { tokens: result.tokens, timestamps: result.timestamps } : null;
+  post({ type: 'segment', rec, marks });
 
   const nextThreshold = vadPolicy.onFinal(result.event);
   if (nextThreshold !== null) vadRebuildTo = nextThreshold;
