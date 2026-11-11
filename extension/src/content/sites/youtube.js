@@ -1,7 +1,8 @@
 // YouTube: media id from the URL, the player's own timedtext requests (the
 // pot token they carry is why they are copied, not rebuilt), SPA navigation
 // through yt-navigate-finish, hiding the player's caption layer, where its
-// control bar sits, and two page-world actions on the player element.
+// control bar sits, whether an ad plays, and two page-world actions on the
+// player element.
 
 import { topOf } from './controls.js';
 
@@ -65,6 +66,9 @@ function hideSiteCaptions(doc, on) {
   }
   return on;
 }
+
+// An ad plays in the programme's own <video> while the player is marked so.
+const adShowing = (video) => !!video.closest?.('.html5-video-player')?.classList.contains('ad-showing');
 
 // The control bar with its progress bar, while it is shown.
 function controlsTop(video) {
@@ -175,5 +179,6 @@ export const youtube = {
   watchNavigation,
   hideSiteCaptions,
   controlsTop,
+  adShowing,
   mainActions: { 'yt-reload': reload, 'yt-captions-on': captionsOn },
 };

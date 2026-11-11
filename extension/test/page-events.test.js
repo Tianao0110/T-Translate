@@ -94,6 +94,14 @@ describe('who may report', () => {
 });
 
 describe('evidence', () => {
+  it('a media report carries the ad mark through, only a real true', () => {
+    nav();
+    report({ type: 'media', reason: 'ad', media: mediaSnap(1, { ad: 'yes' }), primary: true });
+    expect(heard.at(-1).event.media.ad).toBe(false);
+    report({ type: 'media', reason: 'ad', media: mediaSnap(1, { ad: true }), primary: true });
+    expect(heard.at(-1).event).toMatchObject({ reason: 'ad', media: { ad: true } });
+  });
+
   it('builds up from events and reads back as a copy', () => {
     expect(nav()).toEqual({ boot: 'boot-1' });
     report({ type: 'hooks', hooks: { main: 'ok', fetch: 'ok', xhr: 'ok', mse: 'ok', objectUrl: 'ok', eme: 'ok' } });

@@ -36,6 +36,8 @@ export function describeTab({ tab, evidence, channel, prefs, notEnabled = false 
       return { tone: 'muted', text: t('tabPaused') };
     case 'ended':
       return { tone: 'muted', text: t('tabEnded') };
+    case 'ad':
+      return { tone: 'muted', text: t('tabAd') };
     default:
       return { tone: 'muted', text: t('tabWaiting') };
   }

@@ -152,6 +152,24 @@ describe('tier 2: decodable audio', () => {
     expect(pe.of('mse-capture')).toHaveLength(1);
   });
 
+  it('an ad in the video stops capture at once and captures nothing for it; the programme back starts again where it is', async () => {
+    await playing();
+    await after(2000);
+    expect(pe.of('mse-capture').filter((c) => c.on)).toHaveLength(1);
+    pe.emit(7, { type: 'media', reason: 'ad', media: snap({ ad: true, currentTime: 0, duration: 15 }), primary: true });
+    await flush();
+    expect(pe.of('mse-capture').at(-1)).toMatchObject({ on: false });
+    expect(orch.stateOf(7)).toMatchObject({ run: null, block: 'ad' });
+    pe.emit(7, { type: 'media', reason: 'timeupdate', media: snap({ ad: true, currentTime: 9, duration: 15 }), primary: true });
+    await after(5000);
+    expect(pe.of('mse-capture').filter((c) => c.on)).toHaveLength(1);
+    pe.emit(7, { type: 'media', reason: 'ad', media: snap({ currentTime: 40 }), primary: true });
+    await after(2000);
+    const again = pe.of('mse-capture').filter((c) => c.on);
+    expect(again).toHaveLength(2);
+    expect(again[1].fromS).toBeCloseTo(35, 0);
+  });
+
   it('pausing stops capture after the grace; playing again restarts it', async () => {
     await playing();
     await after(2000);

@@ -51,6 +51,7 @@ function media(m) {
     bufferedEndS: num(m.bufferedEndS),
     encrypted: bool(m.encrypted),
     siteTracks: int(m.siteTracks) ?? 0,
+    ad: bool(m.ad),
   };
 }
 

@@ -53,13 +53,14 @@ src/content/webm-sniff.js         不解封装读 WebM 分片的媒体时间（C
 src/content/mp4-sniff.js          不解封装读 fMP4 分片的媒体时间（mdhd timescale + tfdt）
 src/content/sites/                站点适配：YouTube（媒体 id、timedtext、导航、隐藏站点字幕、播放器操作）、B 站（BV / av / 番剧 id、分 P、字幕清单 → 取字幕体）、TikTok（视频页 id 或播放器外框的条目 id、信息流换视频即导航、条目数据认领 WebVTT）、通用（字幕文件按扩展名认）；前三个还报控制条从哪开始（controls.js），覆盖层字幕在它上面
 src/content/parsers/              站点字幕解析：VTT、SRT、TTML、json3、B 站 JSON，detectFormat 认格式
-src/content/caption-track.js      字幕画成视频的原生字幕轨（TextTrack）
-src/content/overlay.js            覆盖层（默认画法）：画在视频上，跟随全屏；一次一句，停顿时多留一会儿，新的淡入
+src/content/caption-track.js      字幕画成视频的原生字幕轨（TextTrack），同样一次一句；视频本身全屏时覆盖层画不上去，临时换成它
+src/content/overlay.js            覆盖层（默认画法）：画在视频上，跟随全屏；一次一句，停顿时多留一会儿，新的淡入；广告时隐藏
 src/content/caption-size.js       字号四档（小 / 中 / 大 / 特大）对应的倍数
+src/content/cue-timing.js         一句显示多久（两种画法共用）
 src/content/caption-renderer.js   字幕与译文、双语 / 只译文 / 只原文、两种画法切换、字号，接媒体流水线事件
 src/content/notice.js             视频上的一行提示（DRM 时「用 T-Translate 听译」+ 按钮；视频所在网站未允许时只有关闭）
 src/options/                      选项页：配对、按站点开关、自动听译、已允许的站点（可移除）、字幕缓存
-src/popup/                        工具栏弹窗：当前标签页状态、「允许在本站使用」/「允许」读取视频、本站开关、显示方式、画法、字号、目标语言、导出字幕
+src/popup/                        工具栏弹窗：当前标签页状态、「允许在本站使用」/「允许」读取视频、显示方式（选「无」即关闭）、字号、画法、目标语言、导出字幕
 src/shared/                       协议常量、消息约定（媒体字节走 base64）、页面事件格式与校验、状态文案、SRT / VTT 导出、配色、MP4 采样表（mp4-table.js）、匹配模式（match-pattern.js）
 scripts/build.mjs                 esbuild 构建 → dist/（不入库）；--target firefox → dist-firefox/；extraHosts 只给真机脚本用（无头浏览器点不了授权框）
 scripts/e2e-client.js             端到端：真实通道 + 真实引擎（npm run smoke:caption-client -- --packs <已装听译包目录>）

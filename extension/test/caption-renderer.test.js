@@ -68,16 +68,16 @@ describe('createCaptionTrack', () => {
     const t = createCaptionTrack({ video, lang: 'zh', addTextTrack, createCue });
     expect(t.track).toMatchObject({ kind: 'subtitles', label: 'T-Caption', language: 'zh', mode: 'showing' });
     t.set(CUES);
-    expect(shown(t.track)).toEqual(['a@1-3:Hello', 'b@3-6:Fish &amp; &lt;chips&gt;', 'c@6-9:Bye']);
+    expect(shown(t.track)).toEqual(['a@1-3:Hello', 'b@3-6:Fish &amp; &lt;chips&gt;', 'c@6-10:Bye']); // each ends at the next, the last a beat after its end
     t.set(CUES.slice(0, 1));
-    expect(shown(t.track)).toEqual(['a@1-3:Hello']);
+    expect(shown(t.track)).toEqual(['a@1-4:Hello']);
     const cueA = t.track.list[0];
     t.upsert({ id: 'a', start: 1, end: 3, text: 'Hi' });
     expect(t.track.list[0]).toBe(cueA); // same times: the cue is edited in place
     t.upsert({ id: 'a', start: 1.5, end: 3, text: 'Hi' });
     t.upsert({ id: 'd', start: 4, end: 4, text: 'zero' });
     t.upsert({ id: 'e', start: 8, end: 7, text: 'reversed' });
-    expect(shown(t.track)).toEqual(['a@1.5-3:Hi', 'd@4-4.5:zero', 'e@8-8.5:reversed']);
+    expect(shown(t.track)).toEqual(['a@1.5-4:Hi', 'd@4-5.5:zero', 'e@8-9.5:reversed']);
     t.updateText('d', 'one\ntwo');
     t.updateText('missing', 'ignored');
     expect(t.track.list[1].text).toBe('one\ntwo');
@@ -85,6 +85,19 @@ describe('createCaptionTrack', () => {
     expect(t.track.list).toEqual([]);
     t.destroy();
     expect(t.track.mode).toBe('disabled');
+  });
+
+  it('never draws two cues at once: an earlier one ends where a later one starts; a hidden track keeps its cues', () => {
+    const t = createCaptionTrack({ video, addTextTrack, createCue });
+    t.set([{ id: 'a', start: 0, end: 5, text: 'long' }]);
+    t.upsert({ id: 'b', start: 3, end: 6, text: 'overlapping' });
+    t.upsert({ id: 'c', start: 3, end: 4, text: 'same start, given later' });
+    expect(shown(t.track)).toEqual(['a@0-3:long', 'c@3-5:same start, given later']); // b would last no time: not drawn
+    t.setHidden(true);
+    expect(t.track.mode).toBe('hidden');
+    expect(t.track.list).toHaveLength(2);
+    t.setHidden(false);
+    expect(t.track.mode).toBe('showing');
   });
 
   it('swaps a cue that is on screen for a fresh one when its text changes', () => {
@@ -169,7 +182,7 @@ describe('createCaptionRenderer', () => {
     expect(applyMediaEvent(r, { type: 'segment', id: 7, start: 100.14, end: 102.5, text: 'Hello world', lang: 'en' })).toBe(true);
     applyMediaEvent(r, { type: 'translation', id: 7, text: 'pending', done: false });
     const track = video.textTracks[0];
-    expect(shown(track)).toEqual(['7@100.14-102.5:Hello world']);
+    expect(shown(track)).toEqual(['7@100.14-103.5:Hello world']);
     applyMediaEvent(r, { type: 'translation', id: 7, text: '你好', done: false });
     applyMediaEvent(r, { type: 'translation', id: 7, text: '你好，世界', done: true });
     expect(track.list[0].text).toBe('Hello world\n你好，世界');
@@ -195,7 +208,7 @@ describe('createCaptionRenderer', () => {
     r.setMode('track');
     expect(added).toBe(1);
     expect(document.querySelector('.tc-cap-host')).toBeNull();
-    expect(shown(track)).toEqual(['a@1-3:Hello', 'b@3-6:炸鱼薯条', 'c@6-9:Bye']);
+    expect(shown(track)).toEqual(['a@1-3:Hello', 'b@3-6:炸鱼薯条', 'c@6-10:Bye']);
     r.destroy();
     expect(track.mode).toBe('disabled');
     expect(r.list()).toEqual([]);

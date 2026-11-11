@@ -413,4 +413,14 @@ describe('the player bars the caption overlay stays above (controlsTop)', () => 
   it('the generic adapter has none', () => {
     expect(generic.controlsTop).toBeUndefined();
   });
+
+  it('YouTube: an ad plays while the player is marked ad-showing', () => {
+    const video = el('video');
+    const player = mount(el('div', 'html5-video-player', el('div', 'html5-video-container', video)));
+    expect(youtube.adShowing(video)).toBe(false);
+    player.classList.add('ad-showing');
+    expect(youtube.adShowing(video)).toBe(true);
+    expect(youtube.adShowing(el('video'))).toBe(false);
+    expect(bilibili.adShowing).toBeUndefined();
+  });
 });

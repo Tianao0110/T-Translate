@@ -8,18 +8,14 @@
 // controlsTop(video) (the site adapter's) says where the player's own bars
 // start while they show; the box rises above them and comes back down.
 
-import { cueTimes } from './caption-track.js';
+import { cueTimes, holdUntil } from './cue-timing.js';
 import { DEFAULT_SIZE, scaleOf } from './caption-size.js';
 
+export { holdUntil };
 export const MAX_SHOWN = 1;
-const LINGER_S = 1;
-const READ_BASE_S = 0.6;
-const READ_WIDTH_PER_S = 20; // a CJK character counts 2
 const CONTROLS_GAP_PX = 8;
 const MAX_LIFT = 0.5; // of the video's height
 const CONTROLS_POLL_MS = 250;
-
-const WIDE = /[\u{1100}-\u{11FF}\u{2E80}-\u{9FFF}\u{AC00}-\u{D7AF}\u{F900}-\u{FAFF}\u{FF00}-\u{FFEF}]/u;
 
 const HOST_STYLE = {
   all: 'initial',
@@ -58,14 +54,6 @@ const CSS = `
   white-space: pre-wrap; overflow-wrap: anywhere;
 }
 `;
-
-// When a cue may leave the screen: a beat after its end, or once its text has
-// had time to be read, whichever is later.
-export function holdUntil({ start, end, text }) {
-  let w = 0;
-  for (const ch of String(text).replace(/\s+/g, ' ').trim()) w += WIDE.test(ch) ? 2 : 1;
-  return Math.max(end + LINGER_S, start + READ_BASE_S + w / READ_WIDTH_PER_S);
-}
 
 // Indexes of the newest `max` cues with start <= t < hold, oldest first. cues
 // are sorted by start and maxHold[i] is the largest hold among cues[0..i], so
@@ -107,6 +95,7 @@ export function createOverlay({ video, size = DEFAULT_SIZE, controlsTop = null }
   let holdsStale = false;
   let lastBox = '';
   let lastLift = 0;
+  let hidden = false; // an ad plays in the video
   let destroyed = false;
 
   const setSize = (next) => root.style.setProperty('--tc-cap-scale', String(scaleOf(next)));
@@ -207,7 +196,7 @@ export function createOverlay({ video, size = DEFAULT_SIZE, controlsTop = null }
       place();
       lift();
     }
-    render(shownIndexes(sorted, maxHold, video.currentTime).map((i) => sorted[i]).filter((c) => c.text));
+    render(hidden ? [] : shownIndexes(sorted, maxHold, video.currentTime).map((i) => sorted[i]).filter((c) => c.text));
   }
 
   function put({ id, start, end, text }) {
@@ -269,6 +258,10 @@ export function createOverlay({ video, size = DEFAULT_SIZE, controlsTop = null }
       refresh();
     },
     setSize,
+    setHidden(on) {
+      hidden = !!on;
+      refresh();
+    },
     refresh,
     destroy() {
       if (destroyed) return;

@@ -28,8 +28,12 @@ export function createCaptionRenderer({
   if (!DISPLAYS.includes(display)) display = 'bilingual';
   if (!SIZES.includes(size)) size = DEFAULT_SIZE;
   let entries = new Map();
-  const makeView = (m) =>
-    m === 'overlay' ? makeOverlay({ video, size, controlsTop }) : createCaptionTrack({ video, lang, label, addTextTrack, createCue, size });
+  let hidden = false;
+  const makeView = (m) => {
+    const v = m === 'overlay' ? makeOverlay({ video, size, controlsTop }) : createCaptionTrack({ video, lang, label, addTextTrack, createCue, size });
+    if (hidden) v.setHidden?.(true);
+    return v;
+  };
   let view = makeView(mode);
 
   // The translation stands in for a missing original, never the other way round.
@@ -102,6 +106,13 @@ export function createCaptionRenderer({
       if (!SIZES.includes(next) || next === size) return;
       size = next;
       view.setSize?.(size);
+    },
+
+    // Nothing shows while an ad plays in the video; the cues stay.
+    setHidden(on) {
+      if (!!on === hidden) return;
+      hidden = !!on;
+      view.setHidden?.(hidden);
     },
 
     setMode(next) {

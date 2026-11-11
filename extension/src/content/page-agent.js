@@ -28,6 +28,7 @@ const BODY_TIMEOUT_MS = 15000;
 // Bilibili asks for the next part's subtitle list on the click, up to ~0.6 s
 // before its URL changes: what came this shortly before a navigation is the new page's.
 const CARRY_MS = 3000;
+const AD_POLL_MS = 500;
 const PART_CHARS = PAGE_EVENT_MAX_CHARS - 8192; // room for the event's other fields
 
 const err = (code) => Object.assign(new Error(code), { code });
@@ -321,7 +322,27 @@ export function createPageAgent({
   // A video kept transparent while a canvas draws its picture (TikTok) shows
   // no native track: its captions go over it instead.
   const transparent = (v) => typeof v?.checkVisibility === 'function' && v.checkVisibility() && !v.checkVisibility({ opacityProperty: true, visibilityProperty: true });
-  const modeFor = (v) => (view.mode === 'track' && transparent(v) ? 'overlay' : view.mode);
+  const modeFor = (v) => {
+    if (view.mode === 'track' && transparent(v)) return 'overlay';
+    // Nothing can be drawn over a video that is itself fullscreen.
+    if (view.mode === 'overlay' && v && doc.fullscreenElement === v) return 'track';
+    return view.mode;
+  };
+  const recheckMode = () => {
+    if (renderer && renderer.mode !== modeFor(rendererEl)) renderer.setMode(modeFor(rendererEl));
+  };
+
+  // An ad playing in the primary video: its captions hide, and the worker
+  // hears of it through a report (the ad shows without a media event of its own).
+  let adShown = false;
+  function checkAd() {
+    const v = media.primaryVideo();
+    const ad = !!v && !!site.adShowing(v);
+    if (ad === adShown) return;
+    adShown = ad;
+    renderer?.setHidden(ad);
+    if (v) media.report(v, 'ad');
+  }
 
   // The renderer follows the primary video; cues and translations move with it.
   function ensureRenderer() {
@@ -332,6 +353,7 @@ export function createPageAgent({
     destroyRenderer();
     renderer = makeRenderer({ video: v, mode: modeFor(v), display: view.display, size: view.size, controlsTop: site.controlsTop });
     rendererEl = v;
+    if (adShown) renderer.setHidden(true);
     if (saved.length) {
       renderer.setCues(saved);
       for (const e of saved) if (e.translation) renderer.setTranslation(e.id, e.translation, true);
@@ -533,6 +555,7 @@ export function createPageAgent({
     win,
     now,
     msIdOf: (src) => relay.msIdOf(src),
+    adOf: (el) => !!site.adShowing?.(el),
     onReport(m, reason) {
       const primary = media.primaryVideo();
       // Feeds: checked before the report, so the next video's reports go with its own page.
@@ -548,7 +571,7 @@ export function createPageAgent({
           ensureRenderer();
         } catch {}
       }
-      if (renderer && renderer.mode !== modeFor(rendererEl)) renderer.setMode(modeFor(rendererEl));
+      recheckMode();
     },
     onRemoved: (elId) => send({ type: 'media-removed', elId }),
   });
@@ -556,6 +579,8 @@ export function createPageAgent({
   const bridge = makeBridge({ win, onEvent: onMainEvent });
   const unwatchNav = site.watchNavigation({ doc, win }, onNavigate);
   doc.addEventListener('visibilitychange', onVisibility);
+  doc.addEventListener('fullscreenchange', recheckMode);
+  const adTimer = site.adShowing ? win.setInterval(checkAd, AD_POLL_MS) : 0;
   const unhandle = handle({ [MSG.PAGE_COMMAND]: runCommand }, { runtime, accept: (_m, sender) => sender?.id === runtime.id && !sender.tab });
 
   const hooksTimer = setTimeout(() => {
@@ -576,6 +601,8 @@ export function createPageAgent({
     bridge.close();
     unwatchNav();
     doc.removeEventListener('visibilitychange', onVisibility);
+    doc.removeEventListener('fullscreenchange', recheckMode);
+    if (adTimer) win.clearInterval(adTimer);
     try {
       unhandle();
     } catch {}

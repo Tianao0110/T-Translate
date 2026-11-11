@@ -359,6 +359,8 @@ export function createOrchestrator({
     if (!r.media.pageVisible) return 'hidden';
     if (!arbiter.isVisible(r.tabId)) return 'hidden';
     if (r.media.state === 'ended') return 'ended';
+    // An ad in the programme's <video>: nothing is captured or written for it.
+    if (r.media.ad) return 'ad';
     if (!mediaEligible(r.media)) return 'paused';
     return null;
   }

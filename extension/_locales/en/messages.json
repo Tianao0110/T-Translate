@@ -54,16 +54,13 @@
   "tabHidden": { "message": "Tab is in the background" },
   "tabPaused": { "message": "Paused" },
   "tabEnded": { "message": "Finished" },
+  "tabAd": { "message": "Ad playing, captions paused" },
   "tabWaiting": { "message": "Waiting" },
-  "popupSite": {
-    "message": "This site ($SITE$)",
-    "placeholders": { "site": { "content": "$1" } }
-  },
-  "popupEnabled": { "message": "Enabled" },
   "popupDisplay": { "message": "Show" },
   "displayBilingual": { "message": "Both" },
   "displayTranslation": { "message": "Translation" },
   "displayOriginal": { "message": "Original" },
+  "displayOff": { "message": "Off" },
   "popupMode": { "message": "Draw as" },
   "modeTrack": { "message": "Track" },
   "modeOverlay": { "message": "Overlay" },

@@ -1,8 +1,9 @@
 // Isolated world: the page's <video> / <audio> elements. Found by a
 // MutationObserver and by media events caught in the capture phase on the
 // document (they do not bubble); each event reports the element's snapshot,
-// timeupdate at most once per timeupdateMs. Element ids live in a WeakMap,
-// nothing is written into the page.
+// timeupdate at most once per timeupdateMs; adOf (the site's) marks an ad
+// playing in the element. Element ids live in a WeakMap, nothing is written
+// into the page.
 
 const EVENTS = ['play', 'pause', 'seeking', 'seeked', 'ended', 'loadedmetadata', 'durationchange', 'emptied', 'volumechange', 'timeupdate'];
 const OWN_TRACK = 'T-Caption';
@@ -26,7 +27,7 @@ function bufferedEnd(el) {
   return null;
 }
 
-export function createMediaWatch({ doc, win, onReport = () => {}, onRemoved = () => {}, msIdOf = () => null, now = () => Date.now(), timeupdateMs = 1000 }) {
+export function createMediaWatch({ doc, win, onReport = () => {}, onRemoved = () => {}, msIdOf = () => null, adOf = () => false, now = () => Date.now(), timeupdateMs = 1000 }) {
   const ids = new WeakMap();
   const known = new Map(); // elId → element
   const ticked = new WeakMap();
@@ -60,6 +61,7 @@ export function createMediaWatch({ doc, win, onReport = () => {}, onRemoved = ()
       bufferedEndS: bufferedEnd(el),
       encrypted: !!el.mediaKeys,
       siteTracks: Array.from(el.textTracks || []).filter((t) => t.label !== OWN_TRACK).length,
+      ad: !!adOf(el),
     };
   }
 
@@ -144,6 +146,7 @@ export function createMediaWatch({ doc, win, onReport = () => {}, onRemoved = ()
     },
     idOf: (el) => ids.get(el) ?? null,
     snapshot: (el) => snapshot(el),
+    report: (el, reason) => onReport(snapshot(el), reason),
     list: () => [...known.values()].filter((el) => el.isConnected).map(snapshot),
   };
 }

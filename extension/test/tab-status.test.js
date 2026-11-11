@@ -25,7 +25,7 @@ describe('describeTab', () => {
 
   it('idle: why it waits', () => {
     const idle = (block) => describeTab({ tab: { state: 'idle', block }, evidence: ev, channel: ready }, t).text;
-    expect(['offline', 'no-media', 'hidden', 'paused', 'ended', 'other-tab', null].map(idle)).toEqual(['tabOffline', 'tabNoMedia', 'tabHidden', 'tabPaused', 'tabEnded', 'tabWaiting', 'tabWaiting']);
+    expect(['offline', 'no-media', 'hidden', 'paused', 'ended', 'ad', 'other-tab', null].map(idle)).toEqual(['tabOffline', 'tabNoMedia', 'tabHidden', 'tabPaused', 'tabEnded', 'tabAd', 'tabWaiting', 'tabWaiting']);
     expect(describeTab({ tab: null, evidence: ev, channel: { status: 'offline' } }, t)).toEqual({ tone: 'warn', text: 'tabOffline' });
     expect(describeTab({ tab: null, evidence: ev, channel: ready }, t).text).toBe('tabWaiting');
   });

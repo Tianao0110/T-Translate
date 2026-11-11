@@ -54,16 +54,13 @@
   "tabHidden": { "message": "标签页不在前台" },
   "tabPaused": { "message": "已暂停" },
   "tabEnded": { "message": "已播完" },
+  "tabAd": { "message": "广告中，字幕暂停" },
   "tabWaiting": { "message": "等待中" },
-  "popupSite": {
-    "message": "本站（$SITE$）",
-    "placeholders": { "site": { "content": "$1" } }
-  },
-  "popupEnabled": { "message": "总开关" },
   "popupDisplay": { "message": "显示" },
   "displayBilingual": { "message": "双语" },
   "displayTranslation": { "message": "只译文" },
   "displayOriginal": { "message": "只原文" },
+  "displayOff": { "message": "无" },
   "popupMode": { "message": "画法" },
   "modeTrack": { "message": "字幕轨" },
   "modeOverlay": { "message": "覆盖层" },

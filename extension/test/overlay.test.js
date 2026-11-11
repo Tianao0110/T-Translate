@@ -178,6 +178,18 @@ describe('createOverlay', () => {
     }
   });
 
+  it('shows nothing while hidden (an ad), the cues kept', () => {
+    const o = createOverlay({ video });
+    o.set([{ id: 'a', start: 0, end: 5, text: 'programme' }]);
+    video.currentTime = 1;
+    o.refresh();
+    o.setHidden(true);
+    expect(lines(o)).toEqual([]);
+    expect(boxHidden(o)).toBe(true);
+    o.setHidden(false);
+    expect(lines(o)).toEqual(['programme']);
+  });
+
   it('scales the text by the size factor', () => {
     const scale = (o) => o.host.shadowRoot.querySelector('.tc-cap-root').style.getPropertyValue('--tc-cap-scale');
     const o = createOverlay({ video });

@@ -166,6 +166,47 @@ describe('reports', () => {
   });
 });
 
+describe('ads', () => {
+  it('an ad marked on the player hides the captions and is reported; its end shows them again', async () => {
+    const v = mountVideo();
+    const player = Object.assign(document.createElement('div'), { className: 'html5-video-player' });
+    document.body.append(player);
+    player.append(v);
+    const { runtime, tracks } = start();
+    await runtime.command({ cmd: 'cues', op: 'set', cues: [{ id: '1', start: 0, end: 9, text: 'Hello' }] });
+    expect(tracks[0].mode).toBe('showing');
+    player.classList.add('ad-showing');
+    await tick(700);
+    expect(tracks[0].mode).toBe('hidden');
+    expect(runtime.events('media').at(-1)).toMatchObject({ reason: 'ad', media: { ad: true } });
+    player.classList.remove('ad-showing');
+    await tick(700);
+    expect(tracks[0].mode).toBe('showing');
+    expect(runtime.events('media').at(-1)).toMatchObject({ reason: 'ad', media: { ad: false } });
+  });
+
+  it('the overlay gives way to the track while the bare video is fullscreen', async () => {
+    const v = mountVideo();
+    let fsEl = null;
+    Object.defineProperty(document, 'fullscreenElement', { get: () => fsEl, configurable: true });
+    try {
+      const { runtime } = start();
+      await runtime.command({ cmd: 'mode', value: 'overlay' });
+      await runtime.command({ cmd: 'cues', op: 'set', cues: [{ id: '1', start: 0, end: 9, text: 'Hello' }] });
+      const mode = async () => (await runtime.command({ cmd: 'query' })).result.renderer.mode;
+      expect(await mode()).toBe('overlay');
+      fsEl = v;
+      document.dispatchEvent(new Event('fullscreenchange'));
+      expect(await mode()).toBe('track');
+      fsEl = null;
+      document.dispatchEvent(new Event('fullscreenchange'));
+      expect(await mode()).toBe('overlay');
+    } finally {
+      delete document.fullscreenElement;
+    }
+  });
+});
+
 describe('commands', () => {
   it('only the extension’s worker may command', async () => {
     mountVideo();
