@@ -98,16 +98,20 @@ function withOutputLanguage(prompt, targetLang) {
   return { ...prompt, content: `${prompt.content}\n- Output language: ${langName}. Never answer in any other language.` };
 }
 
-function resolveSystemPrompt(provider, template, targetLang) {
+// `custom`: a caller's own prompt (listen mode's, carrying the preceding
+// lines); it stands in for the tone template, a translation-only model keeps
+// its short prompt.
+function resolveSystemPrompt(provider, template, targetLang, custom = null) {
+  const own = custom?.content ? custom : null;
   if (isBuiltinProvider(provider)) {
     const selected = getLocalLlm()?.selected?.();
     return selected?.role === 'mt'
       ? buildMTPrompt(template, targetLang)
-      : withOutputLanguage(getSystemPrompt(template, targetLang), targetLang);
+      : withOutputLanguage(own || getSystemPrompt(template, targetLang), targetLang);
   }
   return isMTActiveModel(provider.config?.model)
     ? buildMTPrompt(template, targetLang)
-    : getSystemPrompt(template, targetLang);
+    : own || getSystemPrompt(template, targetLang);
 }
 
 export class TranslationService {
@@ -549,7 +553,7 @@ export class TranslationService {
 
     // Cache key bound to the first available provider + model.
     const cacheKey = this._getCacheKey(processed, { targetLang, template, providerId: firstAvailableId, model: firstModel, terms: this._keyTerms(firstAvailableId, promptTerms) });
-    const cacheable = useCache && !this._readsContext(firstAvailableId, context);
+    const cacheable = useCache && !this._readsContext(firstAvailableId, context) && !options.systemPrompt?.content;
     const cached = this._checkCache(cacheKey, { useCache: cacheable, privacyMode });
 
     const finalizeCtx = { protectedMap, glossaryTerms, sourceText: text, cacheKey, useCache: cacheable, privacyMode, sourceLang, targetLang };
@@ -575,7 +579,7 @@ export class TranslationService {
       try {
         logger.debug(`Trying provider: ${id}`);
 
-        const systemPrompt = resolveSystemPrompt(provider, template, targetLang);
+        const systemPrompt = resolveSystemPrompt(provider, template, targetLang, options.systemPrompt);
 
         let result = await provider.translate(processed, sourceLang, targetLang, {
           systemPrompt,
@@ -672,7 +676,7 @@ export class TranslationService {
     const { usableProviders, firstAvailableId, firstModel } = this._selectProviders({ privacyMode, targetLang });
 
     const cacheKey = this._getCacheKey(processed, { targetLang, template, providerId: firstAvailableId, model: firstModel, terms: this._keyTerms(firstAvailableId, promptTerms) });
-    const cacheable = useCache && !this._readsContext(firstAvailableId, context);
+    const cacheable = useCache && !this._readsContext(firstAvailableId, context) && !options.systemPrompt?.content;
     const cached = this._checkCache(cacheKey, { useCache: cacheable, privacyMode });
 
     const finalizeCtx = { protectedMap, glossaryTerms, sourceText: text, cacheKey, useCache: cacheable, privacyMode, sourceLang, targetLang };
@@ -705,7 +709,7 @@ export class TranslationService {
       try {
         logger.debug(`Trying stream provider: ${id}`);
 
-        const systemPrompt = resolveSystemPrompt(provider, template, targetLang);
+        const systemPrompt = resolveSystemPrompt(provider, template, targetLang, options.systemPrompt);
 
         if (provider.supportsStreaming && typeof provider.translateStream === 'function') {
           let fullText = '';

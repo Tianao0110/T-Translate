@@ -368,6 +368,65 @@ describe('context', () => {
   });
 });
 
+// Listen mode sends its own system prompt with the preceding lines. The stack
+// once built its own prompt and dropped it, so listen context never reached a
+// model; these pin that it does now, and where it must not.
+describe("a caller's own system prompt", () => {
+  const LISTEN = { content: '你是实时字幕的译员。\n\n前面几句（只作上下文，不要翻译它们）：\n- We booked a tennis lesson.', mode: 'system' };
+
+  it('an LLM source gets it in place of the tone template, and the request skips the cache', async () => {
+    const fetchMock = vi.fn(async () => okChatResponse('但球场还是湿的。'));
+    configureRuntime({ fetch: fetchMock });
+    const l2 = makeFakeL2();
+    const svc = makeService(l2);
+    await svc.init(SETTINGS);
+    const opts = { targetLang: 'zh', systemPrompt: LISTEN };
+    await svc.translate('But the court was still wet.', opts);
+    await svc.translate('But the court was still wet.', opts);
+    const messages = JSON.parse(fetchMock.mock.calls[0][1].body).messages;
+    expect(messages[0]).toEqual({ role: 'system', content: LISTEN.content });
+    expect(messages[1]).toEqual({ role: 'user', content: 'But the court was still wet.' });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(l2.set).not.toHaveBeenCalled();
+  });
+
+  function builtin(role) {
+    const requests = [];
+    return {
+      requests,
+      selected: () => ({ id: role === 'mt' ? 'hy-mt2-1.8b' : 'qwen3-1.7b', role, name: 'M', status: 'ready', promptFields: [] }),
+      status: () => ({}),
+      generate: vi.fn(async (request) => {
+        requests.push(request);
+        return { promise: Promise.resolve({ text: '但球场还是湿的。', stop: 'eog' }), cancel: () => {} };
+      }),
+    };
+  }
+  const TENGINE = { providers: { list: [{ id: 'tengine', enabled: true, priority: 1 }], configs: { tengine: {} } } };
+
+  it('the built-in general model gets it plus the output-language line', async () => {
+    const llm = builtin('general');
+    configureRuntime({ localLlm: llm });
+    const svc = makeService(makeFakeL2());
+    await svc.init(TENGINE);
+    await svc.translateStream('But the court was still wet.', { targetLang: 'zh', systemPrompt: LISTEN }, () => {});
+    expect(llm.requests[0].system).toBe(`${LISTEN.content}\n- Output language: Chinese (Simplified). Never answer in any other language.`);
+    configureRuntime({ localLlm: null });
+  });
+
+  it('a translation-only model keeps its short prompt', async () => {
+    const llm = builtin('mt');
+    configureRuntime({ localLlm: llm });
+    const svc = makeService(makeFakeL2());
+    await svc.init(TENGINE);
+    await svc.translate('But the court was still wet.', { targetLang: 'zh', systemPrompt: LISTEN });
+    expect(llm.requests[0].system).toBe('');
+    expect(llm.requests[0].user).toMatch(/^Translate the following text into Chinese \(Simplified\)/);
+    expect(llm.requests[0].user).not.toContain('字幕');
+    configureRuntime({ localLlm: null });
+  });
+});
+
 // A provider that only translates answers a prompt with a translation OF that
 // prompt, which reads like a working AI feature. These lock the honest answer.
 describe('chat capability', () => {
