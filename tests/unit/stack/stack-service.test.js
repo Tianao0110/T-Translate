@@ -4,7 +4,7 @@
 // network, no electron.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { TranslationService } from '../../../src/stack/service.js';
+import { TranslationService, promptContext } from '../../../src/stack/service.js';
 import { configureRuntime } from '../../../src/stack/runtime.js';
 
 // Two cloud providers, both configured; priority = openai then deepseek.
@@ -309,6 +309,62 @@ describe('language-coverage reorder', () => {
 
     expect(result.success).toBe(true);
     expect(result.provider).toBe('local-llm');
+  });
+});
+
+// Preceding lines: trimmed once in the stack, handed to every provider, and a
+// request carrying them skips the cache only for a model that reads them.
+describe('context', () => {
+  it('keeps the last two lines within 300 characters, the tail of one long line', () => {
+    expect(promptContext(['a', ' b ', '', 'c'])).toEqual(['b', 'c']);
+    expect(promptContext(['x'.repeat(200), 'y'.repeat(200)])).toEqual(['y'.repeat(200)]);
+    expect(promptContext([`${'p'.repeat(100)}${'q'.repeat(300)}`])).toEqual(['q'.repeat(300)]);
+    expect(promptContext(null)).toEqual([]);
+  });
+
+  function plamoLlm(answer = '河岸太泥泞了。') {
+    const requests = [];
+    return {
+      requests,
+      selected: () => ({ id: 'plamo-3-translate-2b', role: 'mt', name: 'PLaMo', status: 'ready', promptFields: ['glossary', 'context'] }),
+      status: () => ({}),
+      generate: vi.fn(async (request) => {
+        requests.push(request);
+        return { promise: Promise.resolve({ text: answer, stop: 'eog' }), cancel: () => {} };
+      }),
+    };
+  }
+  const TENGINE = { providers: { list: [{ id: 'tengine', enabled: true, priority: 1 }], configs: { tengine: {} } } };
+
+  it('a model that reads context gets it and the request skips the cache', async () => {
+    const llm = plamoLlm();
+    configureRuntime({ localLlm: llm });
+    const l2 = makeFakeL2();
+    const svc = makeService(l2);
+    await svc.init(TENGINE);
+    const opts = { targetLang: 'zh', context: ['We went fishing by the river.'] };
+    const first = await svc.translate('The bank was muddy.', opts);
+    const second = await svc.translateStream('The bank was muddy.', opts, () => {});
+    expect(first.fromCache).toBe(false);
+    expect(second.fromCache).toBe(false);
+    expect(llm.requests[0].translate.context).toBe('We went fishing by the river.');
+    expect(llm.requests).toHaveLength(2);
+    expect(l2.set).not.toHaveBeenCalled();
+    // Without context the same model caches as before.
+    await svc.translate('The bank was muddy.', { targetLang: 'zh' });
+    expect((await svc.translate('The bank was muddy.', { targetLang: 'zh' })).fromCache).toBe(true);
+    configureRuntime({ localLlm: null });
+  });
+
+  it('a provider that does not read context keeps its cache', async () => {
+    const fetchMock = vi.fn(async () => okChatResponse('河岸'));
+    configureRuntime({ fetch: fetchMock });
+    const svc = makeService(makeFakeL2());
+    await svc.init(SETTINGS);
+    const opts = { targetLang: 'zh', context: ['We went fishing.'] };
+    await svc.translate('bank', opts);
+    expect((await svc.translate('bank', opts)).fromCache).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
 

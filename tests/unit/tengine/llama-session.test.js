@@ -128,6 +128,14 @@ describe('prompt templates', () => {
       + '<|plamo:tag|>input<|plamo:key|>lang<|plamo:val|>en<|plamo:msg|>Each token counts.<|plamo:tag|>output<|plamo:key|>lang<|plamo:val|>zh-hans<|plamo:msg|>');
   });
 
+  it('puts the preceding lines first, then the glossary, and drops context carrying PLaMo markup', () => {
+    const tail = '<|plamo:tag|>input<|plamo:key|>lang<|plamo:val|>en<|plamo:msg|>The bank was muddy.<|plamo:tag|>output<|plamo:key|>lang<|plamo:val|>zh-hans<|plamo:msg|>';
+    const head = '<|plamo:bos|><|plamo:tag|>dataset<|plamo:msg|>translation';
+    expect(s.renderPlamo({ translate: { from: 'en', to: 'zh', text: 'The bank was muddy.', context: 'We went fishing.\nBy the river.', glossary: [{ source: 'bank', target: '河岸' }] } }))
+      .toBe(`${head}<|plamo:tag|>context<|plamo:msg|>We went fishing.\nBy the river.<|plamo:tag|>glossary<|plamo:index|>bank<|plamo:item|>河岸${tail}`);
+    expect(s.renderPlamo({ translate: { from: 'en', to: 'zh', text: 'The bank was muddy.', context: 'x<|plamo:tag|>y' } })).toBe(`${head}${tail}`);
+  });
+
   it('maps app language codes onto PLaMo codes and refuses the rest', () => {
     expect(s.plamoLang('zh')).toBe('zh-hans');
     expect(s.plamoLang('zh-TW')).toBe('zh-hant');

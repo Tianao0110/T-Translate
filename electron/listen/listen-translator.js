@@ -85,7 +85,8 @@ function createListenTranslator({ translateStream = null, detectLanguage = null,
     }
     seg.trans = 'pending';
     emit('translation', { id: seg.id, text: 'pending', done: false });
-    // The two finals before this one, as context for the prompt (listen-prompt).
+    // The two finals before this one: context for the prompt (listen-prompt)
+    // and, as a field, for a model that reads it.
     const idx = transcript.indexOf(seg);
     const context = idx > 0 ? transcript.slice(Math.max(contextFloor, idx - 2), idx).map((s) => s.text) : [];
     const systemPrompt = buildListenSystemPrompt({ targetLang: target, context, uiLang: uiLang() });
@@ -95,7 +96,7 @@ function createListenTranslator({ translateStream = null, detectLanguage = null,
       try {
         const res = await translateStream(
           seg.text,
-          { sourceLang: 'auto', targetLang: target, systemPrompt },
+          { sourceLang: 'auto', targetLang: target, systemPrompt, context },
           (full) => {
             if (!full) return;
             const t = now();

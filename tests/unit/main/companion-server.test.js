@@ -440,8 +440,12 @@ describe('translate', () => {
     expect(r.status).toBe(200);
     expect(r.json.items).toEqual([{ id: 'a', text: '<one>' }, { id: 2, error: 'translate-failed' }, { id: 'c', text: '<three>' }, { id: 'd', text: '' }, { id: 'e', text: '<five>' }]);
     expect(peak).toBe(2);
-    expect(translateCalls[0].options).toEqual({ sourceLang: 'auto', targetLang: 'zh' });
+    expect(translateCalls[0].options).toEqual({ sourceLang: 'auto', targetLang: 'zh', context: [] });
     expect(translateCalls[0].extra.noCache).toBe(false);
+    // The cues before each one in the batch ride along as context, blanks left out.
+    const contextOf = (text) => translateCalls.find((c) => c.text === text).options.context;
+    expect(contextOf('three')).toEqual(['one', 'FAIL']);
+    expect(contextOf('five')).toEqual(['three']);
   });
 
   it('text already in the target language comes back as it is, untranslated (source unknown only)', async () => {
@@ -463,7 +467,7 @@ describe('translate', () => {
 
   it('passes the source language through', async () => {
     await post('/v1/translate', { items: [{ id: 1, text: 'x' }], source: 'en', target: 'ja' });
-    expect(translateCalls[0].options).toEqual({ sourceLang: 'en', targetLang: 'ja' });
+    expect(translateCalls[0].options).toEqual({ sourceLang: 'en', targetLang: 'ja', context: [] });
   });
 
   it('limits: 400 past 50 items or 2000 chars, 400 without a target, 413 past 64 KB', async () => {

@@ -116,6 +116,19 @@ describe('tengine provider', () => {
     expect(new TengineProvider().readsPromptGlossary()).toBe(false);
   });
 
+  it('passes the preceding lines as one context field and says whether the pack reads them', async () => {
+    const llm = fakeLlm({ selected: { id: 'plamo-3-translate-2b', role: 'mt', name: 'PLaMo', status: 'ready', promptFields: ['glossary', 'context'] } });
+    configureRuntime({ localLlm: llm });
+    const p = new TengineProvider();
+    expect(p.readsPromptContext()).toBe(true);
+    await p.translate('The bank was muddy.', 'en', 'zh', { context: ['We went fishing.', 'By the river.'] });
+    expect(llm.calls[0].translate.context).toBe('We went fishing.\nBy the river.');
+    await p.translate('Hi', 'en', 'zh', { context: [] });
+    expect(llm.calls[1].translate).not.toHaveProperty('context');
+    configureRuntime({ localLlm: fakeLlm() });
+    expect(new TengineProvider().readsPromptContext()).toBe(false);
+  });
+
   it('a target language the model lacks is reported without counting as a failure', async () => {
     configureRuntime({ localLlm: fakeLlm({ generateError: Object.assign(new Error('no pt'), { code: 'LLM_LANG_UNSUPPORTED' }) }) });
     const r = await new TengineProvider().translate('Hello', 'en', 'pt');

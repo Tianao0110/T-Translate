@@ -66,6 +66,26 @@ function buildMTPrompt(toneTemplate, targetLang) {
   };
 }
 
+// Preceding source lines for a model that reads context (PLaMo): the last
+// two, 300 characters in all; a single longer line keeps its tail. Listen,
+// browser captions and documents send them as `options.context`.
+const MAX_CONTEXT_LINES = 2;
+const MAX_CONTEXT_CHARS = 300;
+export function promptContext(context) {
+  const lines = (Array.isArray(context) ? context : []).map((s) => String(s || '').trim()).filter(Boolean).slice(-MAX_CONTEXT_LINES);
+  const kept = [];
+  let total = 0;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    total += lines[i].length;
+    if (total > MAX_CONTEXT_CHARS) {
+      if (!kept.length) kept.unshift(lines[i].slice(-MAX_CONTEXT_CHARS));
+      break;
+    }
+    kept.unshift(lines[i]);
+  }
+  return kept;
+}
+
 // The built-in model: the pack decides the prompt shape. A translation-only
 // pack gets the short user-only prompt; a general model gets the shared
 // template plus one closing line naming the output language.
@@ -271,6 +291,11 @@ export class TranslationService {
   // The prompt glossary keys the cache only for a provider that reads it.
   _keyTerms(providerId, promptTerms) {
     return getProvider(providerId)?.readsPromptGlossary?.() ? promptTerms : null;
+  }
+
+  // A request with context, for a provider that reads it, skips the cache.
+  _readsContext(providerId, context) {
+    return context.length > 0 && !!getProvider(providerId)?.readsPromptContext?.();
   }
 
   // Thin method over glossary.js (shared with the renderer).
@@ -518,14 +543,16 @@ export class TranslationService {
 
     const { processed, protectedMap } = this._preProcess(text);
     const promptTerms = termsForPrompt(glossaryTerms, processed);
+    const context = promptContext(options.context);
 
     const { usableProviders, firstAvailableId, firstModel } = this._selectProviders({ privacyMode, targetLang });
 
     // Cache key bound to the first available provider + model.
     const cacheKey = this._getCacheKey(processed, { targetLang, template, providerId: firstAvailableId, model: firstModel, terms: this._keyTerms(firstAvailableId, promptTerms) });
-    const cached = this._checkCache(cacheKey, { useCache, privacyMode });
+    const cacheable = useCache && !this._readsContext(firstAvailableId, context);
+    const cached = this._checkCache(cacheKey, { useCache: cacheable, privacyMode });
 
-    const finalizeCtx = { protectedMap, glossaryTerms, sourceText: text, cacheKey, useCache, privacyMode, sourceLang, targetLang };
+    const finalizeCtx = { protectedMap, glossaryTerms, sourceText: text, cacheKey, useCache: cacheable, privacyMode, sourceLang, targetLang };
 
     if (cached) {
       return {
@@ -555,6 +582,7 @@ export class TranslationService {
           template,
           signal,
           glossary: promptTerms,
+          context,
         });
 
         // The model answered with the prompt's requirement list: once more
@@ -566,6 +594,7 @@ export class TranslationService {
             template,
             signal,
             glossary: promptTerms,
+            context,
           });
           if (result.success && isPromptEcho(result.text, processed, systemPrompt?.content)) {
             result = { success: false, error: _t('svc.promptEcho', '模型把提示词当成了译文'), skipFailureCount: true };
@@ -638,13 +667,15 @@ export class TranslationService {
 
     const { processed, protectedMap } = this._preProcess(text);
     const promptTerms = termsForPrompt(glossaryTerms, processed);
+    const context = promptContext(options.context);
 
     const { usableProviders, firstAvailableId, firstModel } = this._selectProviders({ privacyMode, targetLang });
 
     const cacheKey = this._getCacheKey(processed, { targetLang, template, providerId: firstAvailableId, model: firstModel, terms: this._keyTerms(firstAvailableId, promptTerms) });
-    const cached = this._checkCache(cacheKey, { useCache, privacyMode });
+    const cacheable = useCache && !this._readsContext(firstAvailableId, context);
+    const cached = this._checkCache(cacheKey, { useCache: cacheable, privacyMode });
 
-    const finalizeCtx = { protectedMap, glossaryTerms, sourceText: text, cacheKey, useCache, privacyMode, sourceLang, targetLang };
+    const finalizeCtx = { protectedMap, glossaryTerms, sourceText: text, cacheKey, useCache: cacheable, privacyMode, sourceLang, targetLang };
 
     if (cached) {
       const fields = this._textFields(cached.text, finalizeCtx);
@@ -695,7 +726,7 @@ export class TranslationService {
                 fullText += chunk;
                 if (onChunk) throttle.schedule();
               },
-              { systemPrompt, template, signal, glossary: promptTerms }
+              { systemPrompt, template, signal, glossary: promptTerms, context }
             );
           } finally {
             // No flush after the final result has been applied.
@@ -721,6 +752,7 @@ export class TranslationService {
             template,
             signal,
             glossary: promptTerms,
+            context,
           });
 
           if (result.success) {

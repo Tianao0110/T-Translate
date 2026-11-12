@@ -225,8 +225,10 @@ function createCompanionServer({
     const one = async (it, i) => {
       if (!it.text.trim()) return { id: it.id, text: '' };
       if (judged?.[i]?.inTarget === true) return { id: it.id, text: it.text };
+      // The two cues before this one in the batch, for a model that reads context.
+      const context = items.slice(Math.max(0, i - 2), i).map((x) => x.text).filter((s) => s.trim());
       try {
-        const r = await translateStream(it.text, { sourceLang: source || 'auto', targetLang: target }, () => {}, { noCache: false, signal: controller.signal });
+        const r = await translateStream(it.text, { sourceLang: source || 'auto', targetLang: target, context }, () => {}, { noCache: false, signal: controller.signal });
         if (r && r.success && typeof r.text === 'string') return { id: it.id, text: r.text };
       } catch {
         // counted as a failed item

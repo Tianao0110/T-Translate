@@ -50,6 +50,8 @@ describe('listen translator', () => {
     expect(third[1].targetLang).toBe('en');
     expect(third[1].systemPrompt.content).toContain('- 一');
     expect(third[1].systemPrompt.content).toContain('- 二');
+    expect(third[1].context).toEqual(['一', '二']);
+    expect(stream.mock.calls[0][1].context).toEqual([]);
     expect(third[3]).toMatchObject({ noCache: true });
     const forOne = events.filter((e) => e.kind === 'translation' && e.id === 1).map((e) => [e.text, e.done]);
     expect(forOne[0]).toEqual(['pending', false]);

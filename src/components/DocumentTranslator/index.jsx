@@ -675,6 +675,13 @@ const DocumentTranslator = ({
   const buildTranslateOptions = () => ({
     glossaryTerms: useGlossary ? getGlossaryTerms(targetLang) : [],
   });
+
+  // The paragraph before this one, as context for a model that reads it.
+  const contextFor = (segment) => {
+    const i = segments.findIndex((s) => s.id === segment.id);
+    const prev = i > 0 ? segments[i - 1].original : '';
+    return prev ? [prev] : [];
+  };
   
   const [startTime, setStartTime] = useState(null);
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -1106,6 +1113,7 @@ const DocumentTranslator = ({
         sourceLang,
         targetLang,
         ...buildTranslateOptions(),
+        context: contextFor(segment),
       });
 
       const translated = result.success ? (result.text || result.translatedText || '') : '';
@@ -1170,6 +1178,7 @@ const DocumentTranslator = ({
         sourceLang,
         targetLang,
         ...buildTranslateOptions(),
+        context: contextFor(segment),
       });
 
       if (result.success) {
@@ -1212,7 +1221,7 @@ const DocumentTranslator = ({
     translationCache.current.delete(cacheKey);
     setSegments(prev => prev.map(s => s.id === segmentId ? { ...s, status: STATUS.TRANSLATING, edited: false } : s));
     try {
-      const result = await translationService.translate(segment.original, { sourceLang, targetLang, ...buildTranslateOptions() });
+      const result = await translationService.translate(segment.original, { sourceLang, targetLang, ...buildTranslateOptions(), context: contextFor(segment) });
       if (result.success) {
         const translated = result.text || result.translatedText || '';
         translationCache.current.set(cacheKey, translated);

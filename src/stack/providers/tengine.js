@@ -25,14 +25,16 @@ export function translateBudget(text) {
   return Math.min(2048, Math.max(256, Math.ceil(String(text || '').length * 2) + 64));
 }
 
-// The languages, text and glossary as fields, for templates that take them
-// that way (runtime renderPlamo); the others render from system + user.
+// The languages, text, glossary and preceding lines as fields, for templates
+// that take them that way (runtime renderPlamo); the others render from
+// system + user.
 export function translateFields(text, sourceLang, targetLang, options = {}) {
   return {
     from: sourceLang,
     to: targetLang,
     text,
     ...(options.glossary?.length ? { glossary: options.glossary } : {}),
+    ...(options.context?.length ? { context: options.context.join('\n') } : {}),
   };
 }
 
@@ -77,6 +79,11 @@ class TengineProvider extends BaseProvider {
   // keys its cache on the terms then).
   readsPromptGlossary() {
     return !!getLocalLlm()?.selected?.()?.promptFields?.includes('glossary');
+  }
+
+  // Whether it reads the preceding lines (the service skips the cache then).
+  readsPromptContext() {
+    return !!getLocalLlm()?.selected?.()?.promptFields?.includes('context');
   }
 
   // AI actions (summaries, explanations, rewrites).
