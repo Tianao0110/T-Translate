@@ -368,6 +368,24 @@ describe('structured export', () => {
     expect(html).toContain('<tr><td colspan="3">Glendhu 310 0.64</td></tr>');
   });
 
+  it('empty cells keep their column; a translation that left them out still pairs with the filled cells', async () => {
+    const rows = [
+      { id: 0, original: 'Subject | Midterm | Final | Notes | Hours', translated: '科目 | 期中 | 期末 | 评语 | 学时', status: 'completed', row: true },
+      { id: 1, original: 'Math | | B | | 3.000', translated: '数学 | B | 3.000', status: 'completed', row: true },
+      { id: 2, original: 'Art | | A | | 3.000', translated: '艺术 |  | A |  | 3.000', status: 'completed', row: true },
+      { id: 3, original: 'Music | | A | | 3.000', translated: '音乐 A 3.000', status: 'completed', row: true },
+    ];
+    const md = exportBilingual(rows, { style: 'below', format: 'md' });
+    expect(md).toContain('| Math<br>数学 |  | B<br>B |  | 3.000<br>3.000 |');
+    expect(md).toContain('| Art<br>艺术 |  | A<br>A |  | 3.000<br>3.000 |');
+    expect(md).toContain('| Music |  | A |  | 3.000 |\n| 音乐 A 3.000 |  |  |  |  |');
+    const html = await exportDOCX(rows, { style: 'bilingual', title: 'demo' }).text();
+    expect(html).toContain('<tr><td><span class="cell-original">Math</span><br>数学</td><td></td><td><span class="cell-original">B</span><br>B</td><td></td>');
+    expect(html).toContain('<td colspan="5">音乐 A 3.000</td>');
+    const only = exportPDFHTML(rows, { style: 'translated-only', title: 'demo' });
+    expect(only).toContain('<tr><td>数学</td><td></td><td>B</td><td></td><td>3.000</td></tr>');
+  });
+
   it('plain-text export keeps skipped headings and table rows', () => {
     const text = exportTranslatedOnly(segments);
     expect(text).toContain('12 | 320 | 1.0');

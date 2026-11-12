@@ -284,6 +284,38 @@ describe('buildParagraphs', () => {
     ]);
   });
 
+  it('keeps empty cells in their columns so rows line up under the header; empty columns at the end are left off', () => {
+    const paras = buildParagraphs([page(1, [
+      ['Subject', 50, 500], ['Title', 130, 500], ['Midterm', 230, 500], ['Final', 290, 500], ['Notes', 350, 500], ['Hours', 430, 500], ['Action', 500, 500],
+      ['CPRG 305', 50, 488], ['Testing', 130, 488], ['A', 290, 488], ['3.000', 430, 488],
+      ['CPRG 303', 50, 476], ['Mobile', 130, 476], ['B+', 230, 476], ['A+', 290, 476], ['3.000', 430, 476],
+      ['MATH 237', 50, 464], ['Math', 130, 464], ['B', 290, 464], ['Late', 350, 464], ['3.000', 430, 464],
+      ['Values are annual means over the full', 50, 430], ['record.', 260, 430],
+    ])]);
+    expect(texts(paras)).toEqual([
+      'Subject | Title | Midterm | Final | Notes | Hours | Action',
+      'CPRG 305 | Testing | | A | | 3.000',
+      'CPRG 303 | Mobile | B+ | A+ | | 3.000',
+      'MATH 237 | Math | | B | Late | 3.000',
+      'Values are annual means over the full record.',
+    ]);
+    expect(paras.slice(0, 4).every((p) => p.row)).toBe(true);
+  });
+
+  it('leaves a sparse row alone rather than guess a grid for it', () => {
+    const paras = buildParagraphs([page(1, [
+      ['Subject', 50, 500], ['Title', 140, 500], ['Midterm', 230, 500], ['Final', 310, 500], ['Notes', 380, 500], ['Hours', 450, 500], ['Action', 530, 500],
+      ['CPRG 305', 50, 488], ['Testing', 140, 488], ['B+', 230, 488], ['A', 310, 488], ['Fine', 380, 488], ['3.000', 450, 488], ['View', 530, 488],
+      ['Total', 50, 476], ['Credits', 230, 476], ['6.000', 450, 476],
+    ])]);
+    expect(texts(paras)).toEqual([
+      'Subject | Title | Midterm | Final | Notes | Hours | Action',
+      'CPRG 305 | Testing | B+ | A | Fine | 3.000 | View',
+      // Three of seven columns filled: left alone.
+      'Total | Credits | 6.000',
+    ]);
+  });
+
   it('puts a row of vertically centred cells back together across its baselines', () => {
     const paras = buildParagraphs([page(1, [
       ['Site', 50, 500], ['Area', 150, 500], ['Change', 250, 500], ['Reference', 350, 500],

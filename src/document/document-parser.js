@@ -1037,6 +1037,17 @@ function splitCells(text) {
   return (text || '').split(/\s*[|｜]\s*/).map((cell) => cell.trim());
 }
 
+// The translated cells lined up with the original ones: one for one, or, when
+// the model left the empty cells out, one per filled cell with the empty ones
+// kept empty; null when they do not pair up.
+function pairCells(cells, translated) {
+  if (!translated) return null;
+  if (translated.length === cells.length) return translated;
+  if (translated.length !== cells.filter(Boolean).length) return null;
+  let next = 0;
+  return cells.map((cell) => (cell ? translated[next++] : ''));
+}
+
 // Bilingual Markdown: headings as #, table rows as a table (original over
 // translation in each cell), paragraphs as quoted original + translation.
 function exportMarkdown(segments, includeSkipped) {
@@ -1064,12 +1075,12 @@ function markdownTable(rows, oneLine) {
   let width = 0;
   for (const row of rows) {
     const cells = splitCells(row.original).map(oneLine);
-    const translated = row.translated ? splitCells(row.translated).map(oneLine) : null;
-    if (translated && translated.length === cells.length) {
-      lines.push(cells.map((cell, i) => `${cell}<br>${translated[i]}`));
+    const paired = pairCells(cells, row.translated ? splitCells(row.translated).map(oneLine) : null);
+    if (paired) {
+      lines.push(cells.map((cell, i) => (cell ? `${cell}<br>${paired[i]}` : '')));
     } else {
       lines.push(cells);
-      if (translated) lines.push([oneLine(row.translated)]);
+      if (row.translated) lines.push([oneLine(row.translated)]);
     }
     width = Math.max(width, cells.length);
   }
@@ -1193,17 +1204,16 @@ function htmlTable(rows, style, html) {
   let body = '';
   for (const row of rows) {
     const cells = splitCells(row.original);
-    const translated = row.translated ? splitCells(row.translated) : null;
-    const fits = !!translated && translated.length === cells.length;
-    if (style === 'bilingual' && fits) {
-      body += tr(pad(cells.map((cell, i) => `<span class="cell-original">${html(cell)}</span><br>${html(translated[i])}`)));
-    } else if (style === 'translated-only' && fits) {
-      body += tr(pad(translated.map(html)));
-    } else if (style === 'translated-only' && translated) {
+    const paired = pairCells(cells, row.translated ? splitCells(row.translated) : null);
+    if (style === 'bilingual' && paired) {
+      body += tr(pad(cells.map((cell, i) => (cell ? `<span class="cell-original">${html(cell)}</span><br>${html(paired[i])}` : ''))));
+    } else if (style === 'translated-only' && paired) {
+      body += tr(pad(paired.map(html)));
+    } else if (style === 'translated-only' && row.translated) {
       body += wide(html(row.translated));
     } else {
       body += tr(pad(cells.map(html)));
-      if (style === 'bilingual' && translated) body += wide(html(row.translated));
+      if (style === 'bilingual' && row.translated) body += wide(html(row.translated));
     }
   }
   return `<table>${body}</table>`;

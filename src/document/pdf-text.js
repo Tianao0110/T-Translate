@@ -716,6 +716,49 @@ function foldCellWraps(lines, stats, words) {
   return out;
 }
 
+// Rows of a table with fewer cells than its widest row (empty cells leave no
+// text): each cell goes to the column its centre falls in, columns split
+// halfway between the widest row's cells, and the skipped columns before the
+// last filled one stay as empty cells, so every row lines up under the header
+// in the exported table (the exporters pad the end). A row whose cells do not
+// land in distinct columns, or that fills fewer than half of the columns, is
+// left as it is.
+function alignTableCells(lines) {
+  let run = [];
+  const flush = () => {
+    if (run.length >= 2) alignRun(run);
+    run = [];
+  };
+  for (const line of lines) {
+    if (line.cells >= 2 && line.pieces?.length >= 2) run.push(line);
+    else flush();
+  }
+  flush();
+  return lines;
+}
+
+function alignRun(run) {
+  const widest = run.reduce((a, b) => (b.pieces.length > a.pieces.length ? b : a));
+  const columns = widest.pieces;
+  if (columns.length < 3) return;
+  const bounds = columns.slice(1).map((col, i) => (columns[i].u1 + col.u0) / 2);
+  const columnOf = (piece) => bounds.filter((b) => (piece.u0 + piece.u1) / 2 > b).length;
+  for (const row of run) {
+    const filled = row.pieces.length;
+    if (filled >= columns.length || columns.length - filled > filled) continue;
+    const slots = row.pieces.map(columnOf);
+    if (slots.some((slot, i) => i > 0 && slot <= slots[i - 1])) continue;
+    const pieces = columns.slice(0, slots[slots.length - 1] + 1).map((col) => ({ text: '', u0: col.u0, u1: col.u0 }));
+    row.pieces.forEach((piece, i) => {
+      pieces[slots[i]] = piece;
+    });
+    if (pieces.length === filled) continue;
+    row.pieces = pieces;
+    row.cells = pieces.length;
+    row.text = pieces.map((p) => p.text).join(' | ');
+  }
+}
+
 // Per page: the column right edge each line sits against, whether it runs
 // to that edge, and whether it reads as a heading.
 function markLines(lines, stats) {
@@ -924,7 +967,7 @@ export function buildParagraphs(pages) {
     let kept = layout.lines.filter((l) => !isRunningLine(l, layout.frame, keys));
     if (blocks?.length) kept = placeInLayout(kept, blocks);
     const rows = mergeRows(assembleCenteredRows(splitAtColumns(kept, stats), stats, words), stats);
-    const lines = markLines(foldCellWraps(rows, stats, words), stats);
+    const lines = markLines(alignTableCells(foldCellWraps(rows, stats, words)), stats);
     const paras = pageParagraphs(lines, page, stats, words);
     const flow = paras.filter((p) => !isMarginNote(p, layout.frame, stats));
     if (tail && flow.length && continuesAcrossFlow(tail.lines[tail.lines.length - 1], flow[0].lines[0])) {
@@ -939,7 +982,7 @@ export function buildParagraphs(pages) {
     for (const group of layout.strays) {
       const strayLines = blocks?.length ? placeInLayout(group, blocks) : group;
       const strayRows = mergeRows(assembleCenteredRows(splitAtColumns(strayLines, stats), stats, words), stats);
-      out.push(...pageParagraphs(markLines(foldCellWraps(strayRows, stats, words), stats), page, stats, words));
+      out.push(...pageParagraphs(markLines(alignTableCells(foldCellWraps(strayRows, stats, words)), stats), page, stats, words));
     }
   }
 
