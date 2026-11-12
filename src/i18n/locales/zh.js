@@ -990,6 +990,7 @@ const zh = {
     digestScopeAll: "覆盖全文 {{count}} 个段落",
     summarizeAll: "总结全文",
     summarizeAllHint: "先逐段讲解全文，再汇总成总结",
+    summarizeSourceHint: "直接读原文，分段总结后合成一份",
     summarizeAllConfirm: "将逐段讲解 {{count}} 个段落，再汇总成全文总结。\n\n这会向模型发起 {{count}} 次请求，长文档可能需要几分钟；在线 API 会按用量计费。过程中可以随时停止，已完成的讲解会保留。",
     summarizeAllStop: "停止（已完成的讲解会保留）",
     summarizeAllPartial: "有段落没讲解成功，总结只覆盖了 {{done}}/{{total}} 段",
@@ -1151,7 +1152,15 @@ const zh = {
     },
     // Outline
     outline: {
-      title: "大纲"
+      title: "大纲",
+      collapse: "收起大纲",
+      expand: "展开大纲"
+    },
+    view: {
+      segments: "段落",
+      digest: "总结",
+      wholeTitle: "全文总结",
+      closeDigest: "关闭总结"
     },
     // File suffixes
     fileSuffix: {

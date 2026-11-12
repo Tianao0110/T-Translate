@@ -112,7 +112,7 @@ Three tone buttons under the languages: Natural (everyday), Precise (technical, 
 - Encrypted PDFs ask for the password. Scanned PDFs have no text layer, so the app runs OCR page by page; set up an OCR engine in Settings first. Pages whose text layer is garbled are read by OCR too.
 - PDFs are split into the original paragraphs. Running headers, footers and page numbers are dropped, and each table row becomes one paragraph.
 - With the layout model installed and GPU acceleration on, each PDF page is read for layout first: text inside formulas, figures, headers and footers is no longer translated as body text, and tables are translated row by row. Loading shows layout progress page by page; the first PDF after each start takes a few seconds longer. Download the model under Settings → Documents.
-- The document is shown paragraph by paragraph, stacked or side by side. The outline on the left jumps to headings.
+- The document is shown paragraph by paragraph, stacked or side by side. The outline on the left jumps to headings. Click « at its top to fold it into a thin bar; hover the bar to show the outline for a moment.
 - Each PDF paragraph has a locate button (crosshair icon, "Show on the original page"): it opens the "Original page" panel on the right at that page with the paragraph outlined, so figures, tables and formulas can be read against the original. In a narrow window the outline steps aside while the panel is open.
 - "Start Translation" translates paragraph by paragraph; you can pause, resume and stop. Failed paragraphs can be retried one at a time or all at once with "Retry Failed".
 - Every translated paragraph can be edited, retranslated or copied.
@@ -120,7 +120,7 @@ Three tone buttons under the languages: Natural (everyday), Precise (technical, 
 - The "Glossary" switch at the bottom controls whether glossary terms are applied.
 - Closing the app mid-way is fine: opening the same file again offers to restore the previous progress.
 - **Export**: bilingual or translation-only TXT, Markdown and Word; PDF through the print dialog; subtitles as SRT or VTT. Markdown, Word and PDF keep headings and tables, with the original above the translation in each cell.
-- **Explain and summarize**: each paragraph has "Explain this paragraph"; after two or more explanations you can summarize the explained paragraphs; the whole-document "Summarize" button explains every paragraph first and then summarizes, which takes a while on long documents and is billed per use on online APIs.
+- **Explain and summarize**: each paragraph has "Explain this paragraph"; after two or more explanations you can summarize the explained paragraphs; the whole-document "Summarize" button reads the original text part by part on a local model, and on an online model explains every paragraph first and then summarizes (billed per use). Once there is a summary, switch between "Paragraphs" and "Summary" above the list.
 - **Check terms**: checks the whole document against the glossary, lists what can be replaced, and lets you undo one at a time. No model is involved.
 - The statistics button at the bottom right shows paragraph counts, characters and time; when a document finishes while the window is in the background, a system notification appears.
 

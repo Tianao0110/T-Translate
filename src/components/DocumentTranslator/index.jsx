@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   FileText, Upload, X, Play, Pause, RotateCcw, Download,
@@ -6,7 +6,8 @@ import {
   Loader, ArrowUp, FileDown,
   SkipForward, RefreshCw, Zap, Lock, Key,
   Database, BookOpen, BarChart3,
-  Edit3, Check, Copy, Search, Rows2, Columns2, ClipboardList, Sparkles, BookMarked, Crosshair
+  Edit3, Check, Copy, Search, Rows2, Columns2, ClipboardList, Sparkles, BookMarked, Crosshair,
+  ChevronsLeft, ChevronsRight
 } from 'lucide-react';
 import createLogger from '../../core/logger.js';
 import {
@@ -35,7 +36,7 @@ import AiBadge from '../shared/AiBadge.jsx';
 import useAiActions from '../../ai/use-ai-actions.js';
 import useSegmentNotes from '../../ai/use-segment-notes.js';
 import { runAiAction } from '../../ai/ai-action-runner.js';
-import { getAiAction } from '../../config/ai-actions.js';
+import { getAiAction, DOCUMENT_SUMMARY } from '../../config/ai-actions.js';
 import { mergeLanguages, customCodesOf } from '../../config/custom-languages.js';
 import './styles.css';
 
@@ -137,6 +138,19 @@ function sweepExpiredProgress() {
     }
   } catch { /* localStorage unavailable */ }
 }
+
+// Whether the outline sits collapsed to its rail; a per-machine view choice.
+const OUTLINE_COLLAPSED_KEY = 'documentOutlineCollapsed';
+function readOutlineCollapsed() {
+  try { return localStorage.getItem(OUTLINE_COLLAPSED_KEY) === '1'; } catch { return false; }
+}
+function writeOutlineCollapsed(value) {
+  try { localStorage.setItem(OUTLINE_COLLAPSED_KEY, value ? '1' : '0'); } catch { /* localStorage unavailable */ }
+}
+// Hover delays for the floating outline: a pointer passing over the rail
+// does not open it, and moving from the rail onto it does not close it.
+const OUTLINE_OPEN_DELAY_MS = 200;
+const OUTLINE_CLOSE_DELAY_MS = 250;
 
 // Placeholder bars shown while a segment translates, sized by its source.
 const skeletonLines = (text = '') => (text.length < 40 ? 1 : text.length < 160 ? 2 : 3);
@@ -392,7 +406,24 @@ const DocumentTranslator = ({
 
   // Outline navigation
   const [outline, setOutline] = useState([]);
-  
+  const [outlineCollapsed, setOutlineCollapsed] = useState(readOutlineCollapsed);
+  const [outlineFloating, setOutlineFloating] = useState(false);
+  const outlineHoverTimer = useRef(null);
+  const toggleOutline = (collapsed) => {
+    clearTimeout(outlineHoverTimer.current);
+    setOutlineFloating(false);
+    setOutlineCollapsed(collapsed);
+    writeOutlineCollapsed(collapsed);
+  };
+  const hoverOutline = (open) => {
+    clearTimeout(outlineHoverTimer.current);
+    outlineHoverTimer.current = setTimeout(
+      () => setOutlineFloating(open),
+      open ? OUTLINE_OPEN_DELAY_MS : OUTLINE_CLOSE_DELAY_MS
+    );
+  };
+  useEffect(() => () => clearTimeout(outlineHoverTimer.current), []);
+
   // In-memory translation memory for this session.
   const translationCache = useRef(new Map());
   
@@ -430,6 +461,26 @@ const DocumentTranslator = ({
   const [digestRunning, setDigestRunning] = useState(false);
   // True once the notes the digest was built from covered the whole document.
   const [digestWholeDoc, setDigestWholeDoc] = useState(false);
+  // 'segments' | 'digest'; the summary tab only exists while there is one.
+  const [listView, setListView] = useState('segments');
+  const showDigest = listView === 'digest' && !!digest;
+  // Each tab keeps its own scroll position in the shared list.
+  const listScrollRef = useRef({ segments: 0, digest: 0 });
+  const shownViewRef = useRef('segments');
+  const switchListView = useCallback((view) => {
+    if (listRef.current) listScrollRef.current[shownViewRef.current] = listRef.current.scrollTop;
+    setListView(view);
+  }, []);
+  useLayoutEffect(() => {
+    const view = showDigest ? 'digest' : 'segments';
+    // A summary arriving or closing must not move the paragraphs.
+    if (view === 'segments' && shownViewRef.current === 'segments') return;
+    shownViewRef.current = view;
+    if (listRef.current) listRef.current.scrollTop = listScrollRef.current[view];
+  }, [showDigest, digest]);
+  useEffect(() => {
+    if (!digest) setListView('segments');
+  }, [digest]);
   // Ref mirrors for the beforeunload flush.
   const aiNotesRef = useRef(aiNotes);
   useEffect(() => { aiNotesRef.current = aiNotes; }, [aiNotes]);
@@ -454,16 +505,14 @@ const DocumentTranslator = ({
     [segments]
   );
 
-  // notesOverride: the batch pass hands its own result in.
-  const runDigest = useCallback(async (wholeDoc = false, notesOverride = null) => {
-    const action = getAiAction('digest');
+  // One summary over texts keyed by segment id, in document order; shown on
+  // the summary tab once done.
+  const runSummary = useCallback(async (action, textById, wholeDoc) => {
     if (!action || digestRunning) return false;
-    const source = notesOverride || aiNotes;
     const sectionStarts = sectionStartIds(outline);
-    // Document order, not the order they were opened.
     const items = segments
-      .filter((seg) => source[seg.id])
-      .map((seg) => ({ text: source[seg.id], sectionStart: sectionStarts.has(seg.id) }));
+      .filter((seg) => textById[seg.id])
+      .map((seg) => ({ text: textById[seg.id], sectionStart: sectionStarts.has(seg.id) }));
     if (!items.length) return false;
 
     setDigestRunning(true);
@@ -482,6 +531,8 @@ const DocumentTranslator = ({
       if (result.success) {
         setDigest(result.content);
         setDigestWholeDoc(wholeDoc);
+        switchListView('digest');
+        listScrollRef.current.digest = 0;
         return true;
       }
       notify(result.error || t('aiActions.failed'), 'error');
@@ -489,10 +540,29 @@ const DocumentTranslator = ({
     } finally {
       setDigestRunning(false);
     }
-  }, [digestRunning, segments, outline, aiNotes, sourceLang, targetLang, capabilities, notify, t]);
+  }, [digestRunning, segments, outline, sourceLang, targetLang, capabilities, notify, t, switchListView]);
 
-  // Explain every paragraph, then summarize those explanations.
+  // notesOverride: the batch pass hands its own result in.
+  const runDigest = useCallback(
+    (wholeDoc = false, notesOverride = null) => runSummary(getAiAction('digest'), notesOverride || aiNotes, wholeDoc),
+    [runSummary, aiNotes]
+  );
+
+  // A local model summarizes the original paragraphs directly; others explain
+  // every paragraph first, then summarize those explanations.
   const summarizeDocument = useCallback(async () => {
+    if (capabilities.textLocal) {
+      const originals = Object.fromEntries(explainable.map((s) => [s.id, s.original]));
+      if (await runSummary(DOCUMENT_SUMMARY, originals, true)) {
+        notifyTaskDone(
+          t('documentTranslator.sysNotify.summaryDoneTitle'),
+          t('documentTranslator.sysNotify.summaryDoneBody', { name: document?.filename || '' }),
+          onActivate
+        );
+      }
+      return;
+    }
+
     const todo = explainable.filter((s) => !aiNotes[s.id]).length;
     if (todo > 0) {
       const ok = await confirm(
@@ -521,7 +591,7 @@ const DocumentTranslator = ({
         onActivate
       );
     }
-  }, [explainable, explainAll, concurrency, confirm, runDigest, notify, t, document, onActivate]);
+  }, [capabilities.textLocal, explainable, aiNotes, runSummary, explainAll, concurrency, confirm, runDigest, notify, t, document, onActivate]);
 
   // ===== Glossary consistency (document/term-consistency.js) =====
   // `fixes` survives the modal closing: the marks in the paragraphs need
@@ -1363,13 +1433,20 @@ const DocumentTranslator = ({
     listRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Jump to a segment by querying its DOM node.
-  const scrollToSegment = (segmentId) => {
-    const element = listRef.current?.querySelector(`[data-segment-id="${segmentId}"]`);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  // Scroll a segment node into view, leaving the summary tab first.
+  const revealInList = (selector) => {
+    const go = () => {
+      const element = listRef.current?.querySelector(selector);
+      if (element) element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+    if (showDigest) {
+      switchListView('segments');
+      requestAnimationFrame(go);
+    } else {
+      go();
     }
   };
+  const scrollToSegment = (segmentId) => revealInList(`[data-segment-id="${segmentId}"]`);
 
   // Cycle through search matches. From the unpositioned (-1) state or any
   // out-of-bounds index, jump to the first (next) or last (prev) match.
@@ -1458,7 +1535,7 @@ const DocumentTranslator = ({
               {noteCount >= 2 && (
                 <button
                   className="dt-btn"
-                  onClick={runDigest}
+                  onClick={() => runDigest()}
                   disabled={digestRunning}
                   title={t('documentTranslator.digestHint', '把已讲解的段落整理成一份笔记')}
                 >
@@ -1484,7 +1561,7 @@ const DocumentTranslator = ({
                     className="dt-btn"
                     onClick={summarizeDocument}
                     disabled={digestRunning}
-                    title={t('documentTranslator.summarizeAllHint')}
+                    title={t(capabilities.textLocal ? 'documentTranslator.summarizeSourceHint' : 'documentTranslator.summarizeAllHint')}
                   >
                     {digestRunning ? <Loader size={16} className="spinning" /> : <Sparkles size={16} />}
                     <span>{t('documentTranslator.summarizeAll')}</span>
@@ -1715,11 +1792,7 @@ const DocumentTranslator = ({
                   {stats.edited > 0 && (
                     <button
                       className="edited-count edited-locate-btn"
-                      onClick={() => {
-                        // `document` is shadowed by component state here
-                        const el = listRef.current?.querySelector('.segment-item.edited');
-                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                      }}
+                      onClick={() => revealInList('.segment-item.edited')}
                       title={t('documentTranslator.progress.editedHint')}
                     >
                        · {t('documentTranslator.progress.edited')} {stats.edited}
@@ -1736,51 +1809,130 @@ const DocumentTranslator = ({
 
             {/* Main content area with optional outline sidebar */}
             <div className="dt-main-content">
-              {/* Outline sidebar */}
+              {/* Outline sidebar: docked, or a rail that floats it out on hover */}
               {outline && outline.length > 0 && (
-                <div className="dt-outline">
-                  <div className="outline-header">
-                    <BookOpen size={14} />
-                    <span>{t('documentTranslator.outline.title')}</span>
+                outlineCollapsed ? (
+                  <div
+                    className="dt-outline-dock"
+                    onMouseEnter={() => hoverOutline(true)}
+                    onMouseLeave={() => hoverOutline(false)}
+                  >
+                    <div className="dt-outline-rail">
+                      <button
+                        className="outline-fold-btn"
+                        onClick={() => toggleOutline(false)}
+                        title={t('documentTranslator.outline.expand')}
+                      >
+                        <ChevronsRight size={14} />
+                      </button>
+                      <span className="dt-outline-rail-label">{t('documentTranslator.outline.title')}</span>
+                    </div>
+                    {outlineFloating && (
+                      <div className="dt-outline dt-outline-float">
+                        <div className="outline-header">
+                          <BookOpen size={14} />
+                          <span>{t('documentTranslator.outline.title')}</span>
+                        </div>
+                        <div className="outline-tree">
+                          {outline.map((item, idx) => (
+                            <OutlineItem
+                              key={idx}
+                              item={item}
+                              onNavigate={(id) => { setOutlineFloating(false); scrollToSegment(id); }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div className="outline-tree">
-                    {outline.map((item, idx) => (
-                      <OutlineItem 
-                        key={idx} 
-                        item={item} 
-                        onNavigate={scrollToSegment}
-                      />
-                    ))}
+                ) : (
+                  <div className="dt-outline">
+                    <div className="outline-header">
+                      <BookOpen size={14} />
+                      <span>{t('documentTranslator.outline.title')}</span>
+                      <button
+                        className="outline-fold-btn"
+                        onClick={() => toggleOutline(true)}
+                        title={t('documentTranslator.outline.collapse')}
+                      >
+                        <ChevronsLeft size={14} />
+                      </button>
+                    </div>
+                    <div className="outline-tree">
+                      {outline.map((item, idx) => (
+                        <OutlineItem
+                          key={idx}
+                          item={item}
+                          onNavigate={scrollToSegment}
+                        />
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )
               )}
 
               {/* Segment list — CSS content-visibility keeps rendering cheap */}
-              <div 
+              <div
                 className={`dt-segments ${outline?.length > 0 ? 'with-outline' : ''}`}
                 ref={listRef}
                 onScroll={handleScroll}
               >
                 {digest && (
-                  <div className="dt-digest">
+                  <div className="dt-view-bar">
+                    <div className="style-selector dt-view-tabs" role="tablist">
+                      <button
+                        role="tab"
+                        aria-selected={!showDigest}
+                        className={showDigest ? '' : 'active'}
+                        onClick={() => switchListView('segments')}
+                      >
+                        {t('documentTranslator.view.segments')}
+                      </button>
+                      <button
+                        role="tab"
+                        aria-selected={showDigest}
+                        className={showDigest ? 'active' : ''}
+                        onClick={() => switchListView('digest')}
+                      >
+                        {t('documentTranslator.view.digest')}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {showDigest && (
+                  <div className="dt-digest-page">
                     <div className="dt-digest-head">
-                      <ClipboardList size={13} />
-                      <span>{t('aiActions.digest.name')}</span>
-                      {/* What the digest covers. */}
+                      <ClipboardList size={15} />
+                      <span>{digestWholeDoc ? t('documentTranslator.view.wholeTitle') : t('aiActions.digest.name')}</span>
+                      {/* What the summary covers. */}
                       <span className="dt-digest-scope">
                         {digestWholeDoc
-                          ? t('documentTranslator.digestScopeAll', { count: noteCount })
+                          ? t('documentTranslator.digestScopeAll', { count: explainable.length })
                           : t('documentTranslator.digestScope', { count: noteCount })}
                       </span>
-                      <button className="dt-digest-close" onClick={() => setDigest(null)}>
-                        <X size={13} />
-                      </button>
+                      <span className="dt-digest-tools">
+                        <button
+                          className="dt-digest-close"
+                          onClick={() => { navigator.clipboard.writeText(digest); notify?.(t('translation.copied'), 'success'); }}
+                          title={t('translation.copy')}
+                        >
+                          <Copy size={14} />
+                        </button>
+                        <button
+                          className="dt-digest-close"
+                          onClick={() => setDigest(null)}
+                          title={t('documentTranslator.view.closeDigest')}
+                        >
+                          <X size={14} />
+                        </button>
+                      </span>
                     </div>
                     <div className="dt-digest-body">{digest}</div>
                   </div>
                 )}
 
-                {segments.map(segment => (
+                {!showDigest && segments.map(segment => (
                   <SegmentItem
                     key={segment.id}
                     segment={segment}

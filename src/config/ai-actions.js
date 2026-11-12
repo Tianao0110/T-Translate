@@ -212,6 +212,52 @@ const DIGEST = {
   },
 };
 
+// "Summarize" on a local model reads the original paragraphs instead of
+// explaining each one first (document/digest-batches.js does the grouping).
+// Not offered on its own, so it stays out of BUILTIN_AI_ACTIONS.
+export const DOCUMENT_SUMMARY = {
+  id: 'document-summary',
+  schemaVersion: AI_ACTION_SCHEMA_VERSION,
+  builtin: true,
+  icon: 'Sparkles',
+  capability: 'text',
+  outputLanguage: 'target',
+  history: 'none',
+  trigger: { surfaces: ['document'], displayModes: null, minLength: null, mode: 'understand' },
+  prompts: {
+    zh: {
+      system: '你在帮读者总结一份文档。用户会给你文档的原文段落，请用{{outputLanguage}}写一份总结。只输出总结正文。',
+      user: '下面是一份文档的原文，按顺序编号。请用{{outputLanguage}}写一份总结。\n\n原文：\n{{sourceText}}\n\n要求：\n- 先用一两句说清这是什么文档、主要讲什么\n- 再按主题归拢要点，保留关键的名称、数字、日期和结论\n- 写成几段短话，不用标题和 Markdown 格式\n- 原文没有的不要编造',
+    },
+    en: {
+      system: 'You are helping a reader summarize a document. The user gives you its original paragraphs; write a summary in {{outputLanguage}}. Output only the summary.',
+      user: 'Below is the original text of a document, numbered in order. Write a summary of it in {{outputLanguage}}.\n\nText:\n{{sourceText}}\n\nRequirements:\n- Start with one or two sentences on what the document is and what it is about\n- Then group the main points by theme, keeping the key names, numbers, dates and conclusions\n- Write a few short paragraphs, no headings or Markdown\n- Do not invent anything the text does not contain',
+    },
+  },
+  stagePrompts: {
+    part: {
+      zh: {
+        system: '你在帮读者总结一份长文档。用户会给你其中连续一部分的原文，或前面几部分的小结，请用{{outputLanguage}}写成这一部分的要点小结。只输出小结正文。',
+        user: '下面是一份长文档中连续一部分的原文（或前面几部分的小结）。请用{{outputLanguage}}写成这一部分的要点小结，之后会和其他部分的小结合在一起。\n\n内容：\n{{sourceText}}\n\n要求：\n- 保留关键的名称、数字、日期和结论\n- 按主题归拢，不要逐条复述\n- 写成几段短话，不用标题和 Markdown 格式，三百字以内\n- 原文没有的不要编造',
+      },
+      en: {
+        system: 'You are helping a reader summarize a long document. The user gives you the original text of one consecutive part, or summaries of earlier parts; condense it into a short summary of that part in {{outputLanguage}}. Output only the summary.',
+        user: 'Below is the original text of one consecutive part of a long document (or summaries of earlier parts). Condense it into a short summary of this part, in {{outputLanguage}}; it will be combined with the summaries of the other parts.\n\nContent:\n{{sourceText}}\n\nRequirements:\n- Keep the key names, numbers, dates and conclusions\n- Group by theme rather than restating each paragraph in turn\n- Write a few short paragraphs, no headings or Markdown, under 200 words\n- Do not invent anything the text does not contain',
+      },
+    },
+    merge: {
+      zh: {
+        system: '你在帮读者总结一份文档。用户会给你这份文档按顺序分成几部分后各部分的要点小结，请用{{outputLanguage}}整理成一份完整的总结。只输出总结正文。',
+        user: '下面是一份文档按顺序分成几部分后，各部分的要点小结。请用{{outputLanguage}}整理成一份完整的总结。\n\n各部分小结：\n{{sourceText}}\n\n要求：\n- 先用一两句说清这是什么文档、主要讲什么\n- 再按主题归拢要点，不要逐部分复述，保留关键的名称、数字、日期和结论\n- 指出不同部分之间的关联\n- 小结里没有的不要编造',
+      },
+      en: {
+        system: 'You are helping a reader summarize a document. The user gives you summaries of its consecutive parts, in order; combine them into one complete summary in {{outputLanguage}}. Output only the summary.',
+        user: 'Below are summaries of the consecutive parts of one document, in order. Combine them into one complete summary, in {{outputLanguage}}.\n\nPart summaries:\n{{sourceText}}\n\nRequirements:\n- Start with one or two sentences on what the document is and what it is about\n- Then group the main points by theme rather than restating each part, keeping the key names, numbers, dates and conclusions\n- Point out how different parts relate\n- Do not invent anything the summaries do not contain',
+      },
+    },
+  },
+};
+
 export const BUILTIN_AI_ACTIONS = [SUMMARIZE, EXPLAIN, DIGEST];
 
 export function getAiAction(id, extraActions = []) {

@@ -990,6 +990,7 @@ const en = {
     digestScopeAll: "covering all {{count}} paragraphs of the document",
     summarizeAll: "Summarize",
     summarizeAllHint: "Explain every paragraph, then summarize those explanations",
+    summarizeSourceHint: "Summarize straight from the original text, part by part",
     summarizeAllConfirm: "This will explain {{count}} paragraphs one by one, then summarize them into one document summary.\n\nThat is {{count}} requests to the model — minutes for a long document, and metered usage on a paid API. You can stop at any point; explanations already finished are kept.",
     summarizeAllStop: "Stop (finished explanations are kept)",
     summarizeAllPartial: "Some paragraphs could not be explained — the summary covers {{done}}/{{total}}",
@@ -1151,7 +1152,15 @@ const en = {
     },
     // Outline
     outline: {
-      title: "Outline"
+      title: "Outline",
+      collapse: "Collapse outline",
+      expand: "Expand outline"
+    },
+    view: {
+      segments: "Paragraphs",
+      digest: "Summary",
+      wholeTitle: "Document summary",
+      closeDigest: "Close summary"
     },
     // File suffixes
     fileSuffix: {
