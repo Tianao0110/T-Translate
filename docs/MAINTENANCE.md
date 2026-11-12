@@ -29,7 +29,7 @@ T-Translate 进入维护模式后，每年照这份清单走一遍，目标是�
 
 | 项 | 现钉版本 | 钉在哪 | 怎么换 | 换完跑 |
 | --- | --- | --- | --- | --- |
-| llama.cpp 运行时（含视觉、音频、Vulkan） | b10853 | `electron/tengine/runtime/llama-manifest.json` 与 `llama-abi.js` | [T-ENGINE.md](T-ENGINE.md) 第三节「年度换版流程」五步，做完对着第九节检查单勾一遍 | golden 单测、`smoke:llm`、`smoke:llm-host`、`smoke:llm-vision`、`smoke:llm-vision-host`、`smoke:llm-asr`、`smoke:llm-asr-host`、`smoke:llm-stack` |
+| llama.cpp 运行时（含视觉、音频、Vulkan） | b12318 | `electron/tengine/runtime/llama-manifest.json` 与 `llama-abi.js` | [T-ENGINE.md](T-ENGINE.md) 第三节「年度换版流程」五步，做完对着第九节检查单勾一遍 | golden 单测、`smoke:llm`、`smoke:llm-host`、`smoke:llm-vision`、`smoke:llm-vision-host`、`smoke:llm-asr`、`smoke:llm-asr-host`、`smoke:llm-stack` |
 | sherpa-onnx 与自编的 WebGPU DLL | 1.13.7，精确版本 | `package.json` 与 `native/sherpa-onnx-webgpu/` | 按 [native/sherpa-onnx-webgpu/README.md](../native/sherpa-onnx-webgpu/README.md) 的配方重编，要 VS 2022 与 cmake，约 25 分钟 | `node scripts/build/overlay-sherpa-runtime.js --check`、`smoke:listen`、`bench:listen` 中英各一次 |
 | onnxruntime-node | 1.26.0，精确版本 | `package.json` | **它和上一项锁死**：sherpa 用的 `onnxruntime.dll` 是它提供的，升任何一个都要重编另一个。两个一起升，或都不升 | `smoke:ocr`，带 `--gpu` 再跑一次 |
 | koffi | ^2.15 | `package.json` | llama、声音捕获、Win32 调用三处都靠它。升级前读 [T-ENGINE.md](T-ENGINE.md) 第四节和 [design/selection.md](design/selection.md) 第 2 节里记的坑 | 上面全部 smoke，外加手测一次划词 |

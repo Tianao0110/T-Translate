@@ -1,12 +1,12 @@
-// llama.cpp b10853 ABI as T-Engine uses it: struct layouts, function
+// llama.cpp b12318 ABI as T-Engine uses it: struct layouts, function
 // prototypes, enums and the default-parameter fingerprint, transcribed from
 // the pinned headers (include/llama.h, ggml.h, ggml-backend.h, gguf.h,
-// tools/mtmd/mtmd.h and mtmd-helper.h at tag b10853). The annual re-pin
+// tools/mtmd/mtmd.h and mtmd-helper.h at tag b12318). The annual re-pin
 // re-checks this file field by field (rules: docs/T-ENGINE.md §4);
 // tests/unit/tengine/llama-abi.test.js holds the struct sizes and the
 // fingerprint the pinned DLLs must reproduce.
 
-const BUILD = 'b10853';
+const BUILD = 'b12318';
 
 const STRUCTS = {
   llama_model_params: {
@@ -55,6 +55,8 @@ const STRUCTS = {
     cb_eval_user_data: 'void *',
     type_k: 'int32',
     type_v: 'int32',
+    moe_cache_size: 'size_t',
+    moe_cache_cpu_share: 'float',
     abort_callback: 'void *',
     abort_callback_data: 'void *',
     embeddings: 'bool',
@@ -108,6 +110,7 @@ const STRUCTS = {
     fps_target: 'float',
     ffmpeg_bin_dir: 'const char *',
     timestamp_interval_ms: 'int64',
+    no_soundtrack: 'bool',
   },
   mtmd_helper_init_opt: {
     video_params: 'mtmd_helper_video_init_params',
@@ -121,7 +124,7 @@ const STRUCTS = {
 // koffi.sizeof of the layouts above on x64; the ABI test asserts them.
 const SIZES = {
   llama_model_params: 80,
-  llama_context_params: 160,
+  llama_context_params: 176,
   llama_batch: 56,
   llama_sampler_chain_params: 1,
   llama_logit_bias: 8,
@@ -129,8 +132,8 @@ const SIZES = {
   gguf_init_params: 16,
   mtmd_context_params: 96,
   mtmd_input_text: 24,
-  mtmd_helper_video_init_params: 24,
-  mtmd_helper_init_opt: 24,
+  mtmd_helper_video_init_params: 32,
+  mtmd_helper_init_opt: 32,
   mtmd_helper_bitmap_wrapper: 16,
 };
 
@@ -267,7 +270,7 @@ const ENUMS = {
 // What the pinned DLLs answer through the layouts above; the ABI test
 // compares them when the DLLs are present.
 const GOLDEN = {
-  version: '0.4.0-dev',
+  version: '0.9.0-dev',
   modelParams: {
     devices: null, tensor_buft_overrides: null, n_gpu_layers: -1, split_mode: 1, load_mode: -1, lazy_mode: 1, main_gpu: 0,
     tensor_split: null, progress_callback: null, progress_callback_user_data: null, kv_overrides: null,
@@ -278,7 +281,8 @@ const GOLDEN = {
     n_threads: 4, n_threads_batch: 4,
     ctx_type: 0, rope_scaling_type: -1, pooling_type: -1, attention_type: -1, flash_attn_type: -1,
     rope_freq_base: 0, rope_freq_scale: 0, yarn_ext_factor: -1, yarn_attn_factor: -1, yarn_beta_fast: -1, yarn_beta_slow: -1, yarn_orig_ctx: 0, defrag_thold: -1,
-    cb_eval: null, cb_eval_user_data: null, type_k: 1, type_v: 1, abort_callback: null, abort_callback_data: null,
+    cb_eval: null, cb_eval_user_data: null, type_k: 1, type_v: 1, moe_cache_size: 0, moe_cache_cpu_share: 0,
+    abort_callback: null, abort_callback_data: null,
     embeddings: false, offload_kqv: true, no_perf: true, op_offload: true, swa_full: true, kv_unified: false,
     samplers: null, n_samplers: 0, ctx_other: null,
   },
@@ -288,7 +292,7 @@ const GOLDEN = {
     flash_attn_type: -1, warmup: true, image_min_tokens: -1, image_max_tokens: -1, cb_eval: null, cb_eval_user_data: null,
     batch_max_tokens: 1024, progress_callback: null, progress_callback_user_data: null,
   },
-  mtmdHelperOpt: { video_params: { fps_target: 4, ffmpeg_bin_dir: null, timestamp_interval_ms: 5000 } },
+  mtmdHelperOpt: { video_params: { fps_target: 4, ffmpeg_bin_dir: null, timestamp_interval_ms: 5000, no_soundtrack: false } },
   mtmdMarker: '<__media__>',
 };
 

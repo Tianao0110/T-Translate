@@ -77,11 +77,11 @@ IPC 通道前缀 `tengine:*`。宿主与主进程之间只走 utilityProcess 消
 | 项 | 值 |
 | --- | --- |
 | 来源 | llama.cpp GitHub Release，只取 `llama-<build>-bin-win-vulkan-x64.zip`：它是 CPU 包的超集（多一个 ggml-vulkan.dll，其余 DLL 逐字节相同，b10853 核过） |
-| 当前钉版 | b10853（2026-09-08） |
+| 当前钉版 | b12318（2026-11-12） |
 | 取用文件 | `llama.dll`、`mtmd.dll`、`ggml.dll`、`ggml-base.dll`、`ggml-cpu-*.dll`（全部变体，运行时自选）、`ggml-vulkan.dll`、`libomp.dll` + `LICENSE-LLVM-OpenMP` |
 | 不取 | CUDA 包（143–242 MB + cudart 373 MB）、各 `llama-*.exe`、`llama-server-impl.dll`、`ggml-rpc*` |
 | 清单 | `electron/tengine/runtime/llama-manifest.json`：zip 与取用的 21 个文件各自的 SHA256 与大小，取包脚本与装载探针都按它核对 |
-| 体积 | zip 34 MB；取用的 21 个文件解压约 78 MB，其中 ggml-vulkan.dll 57 MB |
+| 体积 | zip 36 MB；取用的 21 个文件解压约 67 MB，其中 ggml-vulkan.dll 40 MB（b12318） |
 | 后端加载 | `ggml_backend_load_all_from_path(<DLL 目录>)`，之后 `ggml_backend_dev_count/get/name/description` 枚举设备 |
 
 koffi 装载顺序（否则依赖解析失败）：`SetDllDirectoryW(<目录>)` → `libomp.dll` → `ggml-base.dll` → `ggml.dll` → `llama.dll` → `mtmd.dll`。设备 API（`ggml_backend_dev_name` 等）在 `ggml-base.dll`，注册表 API（`load_all`、`dev_count`、`dev_get`）在 `ggml.dll`，绑定里按顺序尝试两个句柄。
@@ -116,7 +116,7 @@ koffi 装载顺序（否则依赖解析失败）：`SetDllDirectoryW(<目录>)` 
 
 Golden 测试至少覆盖：三个 `*_default_params()` 与 `mtmd_context_params_default()` / `mtmd_helper_init_opt_default()` 的全部字段值（`tests/unit/tengine/llama-abi.test.js` 已做）、`llama_version()` 与 GOLDEN 里的库版本串一致（它只报库版本如 `0.4.0-dev`，不是 build 号——build 由清单哈希保证）、固定 prompt 贪心输出前 N 个 token（`scripts/smoke/smoke-llm.js`）、视觉固定图 `runtime/assets/vision-health.png` 的 Spotting 结果（`scripts/smoke/smoke-llm-vision.js`：读到 OK 那一行且带框、两次输出逐字相同）、语音固定句 `runtime/assets/asr-health.wav` 的转写（`scripts/smoke/smoke-llm-asr.js`：逐字读回、标出中文、两次输出逐字相同）。
 
-视觉路径的补充规则（v0.5.1）：mtmd 的结构体（`mtmd_context_params` 96 字节、`mtmd_input_text` 24、`mtmd_helper_init_opt` 24、`mtmd_helper_bitmap_wrapper` 16）与函数表同样放在 `llama-abi.js`，符号归属 `mtmd`；`mtmd_helper_log_set` 与 `llama_log_set` 挂同一个回调，否则 mtmd 会把每张图的提示词打到 stderr。图片字节经 `mtmd_helper_bitmap_init_from_buf` 直接喂（PNG / JPEG 由它解码），`mtmd_helper_eval_chunks` 一次完成编码与预填，之后接会话的 `generateContinue`；预填后不保留前缀（图像不是 token 列表）。mmproj 的 `warmup` 留开：它在载入时跑一次哑图，显卡首次的着色器编译（约 20 s）就落在载入而不是用户的第一张图。PaddleOCR-VL 的提示词是 `<|begin_of_sentence|>User: <__media__><任务>:\nAssistant:\n`，任务一律 `Spotting`（`OCR:` 对多栏整屏会漏栏）；mmproj 元数据把输入限在 1 MP，整屏会被缩放。
+视觉路径的补充规则（v0.5.1）：mtmd 的结构体（`mtmd_context_params` 96 字节、`mtmd_input_text` 24、`mtmd_helper_init_opt` 32、`mtmd_helper_bitmap_wrapper` 16）与函数表同样放在 `llama-abi.js`，符号归属 `mtmd`；`mtmd_helper_log_set` 与 `llama_log_set` 挂同一个回调，否则 mtmd 会把每张图的提示词打到 stderr。图片字节经 `mtmd_helper_bitmap_init_from_buf` 直接喂（PNG / JPEG 由它解码），`mtmd_helper_eval_chunks` 一次完成编码与预填，之后接会话的 `generateContinue`；预填后不保留前缀（图像不是 token 列表）。mmproj 的 `warmup` 留开：它在载入时跑一次哑图，显卡首次的着色器编译（约 20 s）就落在载入而不是用户的第一张图。PaddleOCR-VL 的提示词是 `<|begin_of_sentence|>User: <__media__><任务>:\nAssistant:\n`，任务一律 `Spotting`（`OCR:` 对多栏整屏会漏栏）；mmproj 元数据把输入限在 1 MP，整屏会被缩放。
 
 ## 五、健康与安全
 

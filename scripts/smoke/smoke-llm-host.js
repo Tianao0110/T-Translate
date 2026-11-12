@@ -8,6 +8,7 @@
 
 const fs = require('fs');
 const { arg, has, sleep, checklist, sandbox, run } = require('../lib/electron-smoke');
+const { build: PINNED_BUILD } = require('../../electron/tengine/runtime/llama-manifest.json');
 
 const MODEL = arg('--model', process.env.TT_LLM_MODEL);
 const GPU = has('--gpu');
@@ -32,7 +33,7 @@ async function main() {
   await llm.host.spawn();
   await sleep(50);
   const rt = llm.runtime();
-  step('host up with the pinned runtime', !!rt && rt.build === 'b10853', `${Date.now() - t0} ms, ${rt ? rt.devices.map((d) => `${d.name}[${d.typeName}]`).join(' ') : 'no info'}`);
+  step('host up with the pinned runtime', !!rt && rt.build === PINNED_BUILD, `${Date.now() - t0} ms, ${rt ? rt.devices.map((d) => `${d.name}[${d.typeName}]`).join(' ') : 'no info'}`);
 
   const progress = [];
   const info = await llm.load(MODEL, { nCtx: 4096 }, { onProgress: (v) => progress.push(v) });
