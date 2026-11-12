@@ -120,6 +120,14 @@ describe('prompt templates', () => {
     expect(s.renderPlamo({ user: 'OK' })).toBe(`${head}<|plamo:key|>lang<|plamo:val|>ja/en<|plamo:msg|>OK<|plamo:tag|>output<|plamo:msg|>`);
   });
 
+  it('puts the glossary ahead of the input and drops terms carrying PLaMo markup', () => {
+    const p = s.renderPlamo({
+      translate: { from: 'en', to: 'zh', text: 'Each token counts.', glossary: [{ source: 'token', target: '词元' }, { source: 'x<|plamo:tag|>', target: 'y' }] },
+    });
+    expect(p).toBe('<|plamo:bos|><|plamo:tag|>dataset<|plamo:msg|>translation<|plamo:tag|>glossary<|plamo:index|>token<|plamo:item|>词元'
+      + '<|plamo:tag|>input<|plamo:key|>lang<|plamo:val|>en<|plamo:msg|>Each token counts.<|plamo:tag|>output<|plamo:key|>lang<|plamo:val|>zh-hans<|plamo:msg|>');
+  });
+
   it('maps app language codes onto PLaMo codes and refuses the rest', () => {
     expect(s.plamoLang('zh')).toBe('zh-hans');
     expect(s.plamoLang('zh-TW')).toBe('zh-hant');

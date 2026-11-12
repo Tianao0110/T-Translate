@@ -6,7 +6,7 @@
 //
 // Call graph: renderer stack-client -> IPC facade -> this -> Providers
 
-import { glossaryPass, pickTermsForTarget, sanitizeGlossaryItems } from './glossary.js';
+import { glossaryPass, pickTermsForTarget, sanitizeGlossaryItems, termsForPrompt } from './glossary.js';
 import { _t } from './i18n.js';
 import createLogger from './logger.js';
 
@@ -268,6 +268,11 @@ export class TranslationService {
       : pickTermsForTarget(this._glossaryItems, targetLang);
   }
 
+  // The prompt glossary keys the cache only for a provider that reads it.
+  _keyTerms(providerId, promptTerms) {
+    return getProvider(providerId)?.readsPromptGlossary?.() ? promptTerms : null;
+  }
+
   // Thin method over glossary.js (shared with the renderer).
   _applyGlossary(translatedText, glossaryTerms, sourceText) {
     const result = glossaryPass(translatedText, glossaryTerms, sourceText);
@@ -280,12 +285,14 @@ export class TranslationService {
   // ===== Two-level cache =====
 
   // djb2 dual-hash for short, collision-resistant cache keys.
+  // `terms`: the glossary a prompt-reading model was given, part of the key.
   _getCacheKey(text, options) {
-    const { targetLang = 'zh', template = 'natural', providerId = '', model = '' } = options;
+    const { targetLang = 'zh', template = 'natural', providerId = '', model = '', terms = null } = options;
+    const keyed = terms?.length ? `${text}\n${JSON.stringify(terms)}` : text;
     let h1 = 5381;
     let h2 = 52711;
-    for (let i = 0; i < text.length; i++) {
-      const c = text.charCodeAt(i);
+    for (let i = 0; i < keyed.length; i++) {
+      const c = keyed.charCodeAt(i);
       h1 = (h1 * 33) ^ c;
       h2 = (h2 * 33) ^ c;
     }
@@ -510,11 +517,12 @@ export class TranslationService {
     const glossaryTerms = this._termsFor(options, targetLang);
 
     const { processed, protectedMap } = this._preProcess(text);
+    const promptTerms = termsForPrompt(glossaryTerms, processed);
 
     const { usableProviders, firstAvailableId, firstModel } = this._selectProviders({ privacyMode, targetLang });
 
     // Cache key bound to the first available provider + model.
-    const cacheKey = this._getCacheKey(processed, { targetLang, template, providerId: firstAvailableId, model: firstModel });
+    const cacheKey = this._getCacheKey(processed, { targetLang, template, providerId: firstAvailableId, model: firstModel, terms: this._keyTerms(firstAvailableId, promptTerms) });
     const cached = this._checkCache(cacheKey, { useCache, privacyMode });
 
     const finalizeCtx = { protectedMap, glossaryTerms, sourceText: text, cacheKey, useCache, privacyMode, sourceLang, targetLang };
@@ -546,6 +554,7 @@ export class TranslationService {
           systemPrompt,
           template,
           signal,
+          glossary: promptTerms,
         });
 
         // The model answered with the prompt's requirement list: once more
@@ -556,6 +565,7 @@ export class TranslationService {
             systemPrompt: buildMTPrompt(template, targetLang),
             template,
             signal,
+            glossary: promptTerms,
           });
           if (result.success && isPromptEcho(result.text, processed, systemPrompt?.content)) {
             result = { success: false, error: _t('svc.promptEcho', '模型把提示词当成了译文'), skipFailureCount: true };
@@ -627,10 +637,11 @@ export class TranslationService {
     const glossaryTerms = this._termsFor(options, targetLang);
 
     const { processed, protectedMap } = this._preProcess(text);
+    const promptTerms = termsForPrompt(glossaryTerms, processed);
 
     const { usableProviders, firstAvailableId, firstModel } = this._selectProviders({ privacyMode, targetLang });
 
-    const cacheKey = this._getCacheKey(processed, { targetLang, template, providerId: firstAvailableId, model: firstModel });
+    const cacheKey = this._getCacheKey(processed, { targetLang, template, providerId: firstAvailableId, model: firstModel, terms: this._keyTerms(firstAvailableId, promptTerms) });
     const cached = this._checkCache(cacheKey, { useCache, privacyMode });
 
     const finalizeCtx = { protectedMap, glossaryTerms, sourceText: text, cacheKey, useCache, privacyMode, sourceLang, targetLang };
@@ -684,7 +695,7 @@ export class TranslationService {
                 fullText += chunk;
                 if (onChunk) throttle.schedule();
               },
-              { systemPrompt, template, signal }
+              { systemPrompt, template, signal, glossary: promptTerms }
             );
           } finally {
             // No flush after the final result has been applied.
@@ -709,6 +720,7 @@ export class TranslationService {
             systemPrompt,
             template,
             signal,
+            glossary: promptTerms,
           });
 
           if (result.success) {

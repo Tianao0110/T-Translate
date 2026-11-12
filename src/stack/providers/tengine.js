@@ -25,6 +25,17 @@ export function translateBudget(text) {
   return Math.min(2048, Math.max(256, Math.ceil(String(text || '').length * 2) + 64));
 }
 
+// The languages, text and glossary as fields, for templates that take them
+// that way (runtime renderPlamo); the others render from system + user.
+export function translateFields(text, sourceLang, targetLang, options = {}) {
+  return {
+    from: sourceLang,
+    to: targetLang,
+    text,
+    ...(options.glossary?.length ? { glossary: options.glossary } : {}),
+  };
+}
+
 class TengineProvider extends BaseProvider {
   static metadata = PROVIDER_METADATA['tengine'];
 
@@ -47,21 +58,25 @@ class TengineProvider extends BaseProvider {
   async translate(text, sourceLang = 'auto', targetLang = 'zh', options = {}) {
     if (!text?.trim()) return { success: false, error: _t('providerError.emptyText', '文本为空') };
     const messages = buildTranslationMessages(text, targetLang, options);
-    const translate = { from: sourceLang, to: targetLang, text };
-    return this._run({ kind: 'translate', messages, translate, options, maxTokens: translateBudget(text) });
+    return this._run({ kind: 'translate', messages, translate: translateFields(text, sourceLang, targetLang, options), options, maxTokens: translateBudget(text) });
   }
 
   async translateStream(text, sourceLang, targetLang, onChunk, options = {}) {
     if (!text?.trim()) return { success: false, error: _t('providerError.emptyText', '文本为空') };
     const messages = buildTranslationMessages(text, targetLang, options);
-    const translate = { from: sourceLang, to: targetLang, text };
-    return this._run({ kind: 'translate', messages, translate, options, maxTokens: translateBudget(text), onToken: onChunk });
+    return this._run({ kind: 'translate', messages, translate: translateFields(text, sourceLang, targetLang, options), options, maxTokens: translateBudget(text), onToken: onChunk });
   }
 
   // A translation-only pack cannot chat; the service skips it for AI actions.
   canChat() {
     const sel = getLocalLlm()?.selected?.();
     return !sel || sel.role !== 'mt';
+  }
+
+  // Whether the selected pack's template reads the glossary (the service
+  // keys its cache on the terms then).
+  readsPromptGlossary() {
+    return !!getLocalLlm()?.selected?.()?.promptFields?.includes('glossary');
   }
 
   // AI actions (summaries, explanations, rewrites).

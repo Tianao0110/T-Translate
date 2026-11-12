@@ -61,6 +61,33 @@ export function termAppliesTo(term, sourceText) {
   return isUsableTerm(term) && termRegex(term.source).test(String(sourceText || ''));
 }
 
+// Terms handed to a model that reads a glossary in its prompt (PLaMo): the
+// ones occurring in the text, a plural or possessive ending included, longest
+// first, at most MAX_PROMPT_TERMS.
+export const MAX_PROMPT_TERMS = 20;
+
+function promptTermRegex(source) {
+  const escaped = source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const head = WORD_CHAR.test(source[0]) ? `(?<![${WORD_CHARS}])` : '';
+  const tail = WORD_CHAR.test(source[source.length - 1]) ? `(?:e?s|['’]s)?(?![${WORD_CHARS}])` : '';
+  return new RegExp(`${head}${escaped}${tail}`, 'i');
+}
+
+export function termsForPrompt(terms, sourceText, max = MAX_PROMPT_TERMS) {
+  const text = String(sourceText || '');
+  const seen = new Set();
+  const out = [];
+  const longestFirst = (terms || []).filter(isUsableTerm).sort((a, b) => b.source.length - a.source.length);
+  for (const term of longestFirst) {
+    const key = term.source.toLowerCase();
+    if (seen.has(key) || !promptTermRegex(term.source).test(text)) continue;
+    seen.add(key);
+    out.push({ source: term.source, target: term.target });
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
 // Bounds of the glossary a window hands to the service (setGlossary).
 const MAX_GLOSSARY_ITEMS = 5000;
 const MAX_TERM_CHARS = 500;

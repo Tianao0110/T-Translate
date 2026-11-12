@@ -103,6 +103,19 @@ describe('tengine provider', () => {
     expect((await new TengineProvider().translate('x', 'en', 'zh')).error).toContain('未安装');
   });
 
+  it('passes the glossary along as a field and says whether the pack reads it', async () => {
+    const llm = fakeLlm({ selected: { id: 'plamo-3-translate-2b', role: 'mt', name: 'PLaMo', status: 'ready', promptFields: ['glossary', 'context'] } });
+    configureRuntime({ localLlm: llm });
+    const p = new TengineProvider();
+    expect(p.readsPromptGlossary()).toBe(true);
+    await p.translate('Each token counts.', 'en', 'zh', { glossary: [{ source: 'token', target: '词元' }] });
+    expect(llm.calls[0].translate).toEqual({ from: 'en', to: 'zh', text: 'Each token counts.', glossary: [{ source: 'token', target: '词元' }] });
+    await p.translateStream('Hi', 'en', 'zh', () => {}, { glossary: [] });
+    expect(llm.calls[1].translate).toEqual({ from: 'en', to: 'zh', text: 'Hi' });
+    configureRuntime({ localLlm: fakeLlm() });
+    expect(new TengineProvider().readsPromptGlossary()).toBe(false);
+  });
+
   it('a target language the model lacks is reported without counting as a failure', async () => {
     configureRuntime({ localLlm: fakeLlm({ generateError: Object.assign(new Error('no pt'), { code: 'LLM_LANG_UNSUPPORTED' }) }) });
     const r = await new TengineProvider().translate('Hello', 'en', 'pt');

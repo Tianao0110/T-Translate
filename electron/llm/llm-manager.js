@@ -77,7 +77,7 @@ function selected() {
   const pack = selectedPack();
   if (!pack) return null;
   const row = deps.packs.status()?.packs.find((p) => p.id === pack.id);
-  return { id: pack.id, role: pack.role, name: pack.name, status: row ? row.status : 'unknown', trial: false };
+  return { id: pack.id, role: pack.role, name: pack.name, status: row ? row.status : 'unknown', trial: false, promptFields: pack.promptFields || [] };
 }
 
 function clearIdle() {

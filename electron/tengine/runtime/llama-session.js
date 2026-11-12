@@ -203,16 +203,21 @@ function plamoLang(code) {
   return PLAMO_LANGS.has(mapped) ? mapped : null;
 }
 
-// translate = { from, to, text }. Without it (self-test, probe) the model's
-// own Japanese / English switch is used.
+// A glossary term or context line carrying PLaMo's own markup is dropped.
+const PLAMO_MARK = '<|plamo:';
+
+// translate = { from, to, text, glossary?: [{source, target}] }. Without it
+// (self-test, probe) the model's own Japanese / English switch is used.
 function renderPlamo({ user = '', translate = null }) {
-  const head = '<|plamo:bos|><|plamo:tag|>dataset<|plamo:msg|>translation<|plamo:tag|>input';
-  if (!translate) return `${head}<|plamo:key|>lang<|plamo:val|>ja/en<|plamo:msg|>${user}<|plamo:tag|>output<|plamo:msg|>`;
+  const head = '<|plamo:bos|><|plamo:tag|>dataset<|plamo:msg|>translation';
+  if (!translate) return `${head}<|plamo:tag|>input<|plamo:key|>lang<|plamo:val|>ja/en<|plamo:msg|>${user}<|plamo:tag|>output<|plamo:msg|>`;
   const to = plamoLang(translate.to);
   if (!to) throw fail('LLM_LANG_UNSUPPORTED', `the model cannot translate into ${translate.to}`);
   const from = plamoLang(translate.from);
   const text = translate.text ?? user;
-  return `${head}${from ? `<|plamo:key|>lang<|plamo:val|>${from}` : ''}<|plamo:msg|>${text}<|plamo:tag|>output<|plamo:key|>lang<|plamo:val|>${to}<|plamo:msg|>`;
+  const terms = (translate.glossary || []).filter((g) => g?.source && g?.target && !`${g.source}${g.target}`.includes(PLAMO_MARK));
+  const glossary = terms.length ? `<|plamo:tag|>glossary${terms.map((g) => `<|plamo:index|>${g.source}<|plamo:item|>${g.target}`).join('')}` : '';
+  return `${head}${glossary}<|plamo:tag|>input${from ? `<|plamo:key|>lang<|plamo:val|>${from}` : ''}<|plamo:msg|>${text}<|plamo:tag|>output<|plamo:key|>lang<|plamo:val|>${to}<|plamo:msg|>`;
 }
 
 // --- metadata --------------------------------------------------------------

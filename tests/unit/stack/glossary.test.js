@@ -11,7 +11,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
-  applyGlossary, termAppliesTo, termRegex, pickTermsForTarget, glossaryPass, sanitizeGlossaryItems,
+  applyGlossary, termAppliesTo, termRegex, pickTermsForTarget, glossaryPass, sanitizeGlossaryItems, termsForPrompt, MAX_PROMPT_TERMS,
 } from '../../../src/stack/glossary.js';
 import { TranslationService } from '../../../src/stack/service.js';
 import { configureRuntime } from '../../../src/stack/runtime.js';
@@ -48,6 +48,32 @@ describe('term matching', () => {
     expect(termAppliesTo({ source: 'prompt', target: 'x' }, 'Many prompts here')).toBe(false);
     expect(termAppliesTo({ source: 'prompt', target: 'x' }, 'One Prompt here')).toBe(true);
     expect(termRegex('a.b').test('axb')).toBe(false);
+  });
+});
+
+describe('termsForPrompt (the glossary a prompt-reading model gets)', () => {
+  it('takes the terms in the text, plural and possessive endings included', () => {
+    const terms = [{ source: 'agent', target: '智能体' }, { source: 'token', target: '词元' }, { source: 'prompt', target: '提示词' }, { source: 'loss', target: '损失' }];
+    expect(termsForPrompt(terms, "These agents' prompts cost one token each.")).toEqual([
+      { source: 'prompt', target: '提示词' },
+      { source: 'agent', target: '智能体' },
+      { source: 'token', target: '词元' },
+    ]);
+    expect(termsForPrompt([{ source: 'token', target: '词元' }], 'the tokenizer is fine')).toEqual([]);
+    expect(termsForPrompt([{ source: 'pin', target: '贴图' }], 'a pink pine')).toEqual([]);
+  });
+
+  it('matches CJK terms as substrings and drops duplicates and single characters', () => {
+    const terms = [{ source: '划词翻译', target: 'select-to-translate' }, { source: '划词翻译', target: 'other' }, { source: '译', target: 'x' }];
+    expect(termsForPrompt(terms, '开启划词翻译后')).toEqual([{ source: '划词翻译', target: 'select-to-translate' }]);
+  });
+
+  it('keeps at most MAX_PROMPT_TERMS, longest first', () => {
+    const many = Array.from({ length: MAX_PROMPT_TERMS + 5 }, (_, i) => ({ source: `term${String(i).padStart(2, '0')}${'x'.repeat(i)}`, target: `t${i}` }));
+    const text = many.map((t) => t.source).join(' ');
+    const picked = termsForPrompt(many, text);
+    expect(picked).toHaveLength(MAX_PROMPT_TERMS);
+    expect(picked[0].target).toBe(`t${MAX_PROMPT_TERMS + 4}`);
   });
 });
 
@@ -173,6 +199,33 @@ describe('the service applies the glossary for every caller', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(second.fromCache).toBe(true);
     expect(second.text).toBe('开启 限流。');
+  });
+
+  it('a model that reads the glossary gets the terms in the text, and its cache keys on them', async () => {
+    const requests = [];
+    const localLlm = {
+      selected: () => ({ id: 'plamo-3-translate-2b', role: 'mt', name: 'PLaMo', status: 'ready', promptFields: ['glossary', 'context'] }),
+      status: () => ({}),
+      generate: vi.fn(async (request) => {
+        requests.push(request);
+        return { promise: Promise.resolve({ text: '开启限流。', stop: 'eog' }), cancel: () => {} };
+      }),
+    };
+    configureRuntime({ localLlm, getLanguage: () => 'zh' });
+    const svc = new TranslationService({ getCustomFilters: () => [], cache: fakeL2() });
+    await svc.init({ providers: { list: [{ id: 'tengine', enabled: true, priority: 1 }], configs: { tengine: {} } } });
+
+    await svc.translate('Enable rate limiting.', { targetLang: 'zh' });
+    expect(requests[0].translate.glossary).toBeUndefined();
+
+    svc.setGlossary([{ source: 'rate limiting', target: '限流', targetLanguage: 'zh' }, { source: 'loss', target: '损失' }]);
+    const second = await svc.translate('Enable rate limiting.', { targetLang: 'zh' });
+    expect(second.fromCache).toBe(false);
+    expect(requests[1].translate.glossary).toEqual([{ source: 'rate limiting', target: '限流' }]);
+    const third = await svc.translate('Enable rate limiting.', { targetLang: 'zh' });
+    expect(third.fromCache).toBe(true);
+    expect(requests).toHaveLength(2);
+    configureRuntime({ localLlm: null });
   });
 
   it('a streamed translation served from cache replays the glossaried text', async () => {

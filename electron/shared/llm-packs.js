@@ -5,6 +5,8 @@
 // Weights are never bundled: the user drops the file into <models>/llm-models.
 // `archived: true` keeps a retired pack loadable for users who still have it;
 // the settings page then shows it by name only and never offers it.
+// `promptFields` lists the request fields the pack's template reads
+// ('glossary', 'context'); the stack provider reports them to the service.
 
 // Translation plus every AI action (summarise, explain, digest, rewrite ...).
 const LLM_ROLE_GENERAL = 'general';
@@ -57,6 +59,7 @@ const LLM_PACKS = [
     sha256: '1ffd9073afcc70e35ccc942428aa2b73d7aa2b9ea779bf504b775369e0276c13',
     arch: 'plamo3',
     template: 'plamo',
+    promptFields: ['glossary', 'context'],
     hasThinking: false,
     ctx: 4096,
     minRamGb: 8,
