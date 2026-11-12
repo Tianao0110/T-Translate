@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.5.8-green" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.5.9-green" alt="Version">
   <img src="https://img.shields.io/badge/license-T--Translate%201.0-blue" alt="License">
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform">
 </p>
@@ -132,6 +132,7 @@ npm run dist            # build the installer
 The app ships without models. Language packs, the PDF layout model, listen recognition models and voice packs download with one click on the settings pages. The large files below are not distributed through our servers: download them yourself and put them into the models folder (its location is under Settings → Privacy → Data management):
 
 - Built-in model Qwen3-1.7B (general, 1.8 GB): [official](https://huggingface.co/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf) · [mirror](https://hf-mirror.com/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf) → `models\llm-models`
+- Built-in model PLaMo 3 Translate 2B (translation only, 1.8 GB): [official](https://huggingface.co/pfnet/plamo-3-translate-2b-GGUF/resolve/main/plamo-3-translate-2b-Q4_K_M.gguf) · [mirror](https://hf-mirror.com/pfnet/plamo-3-translate-2b-GGUF/resolve/main/plamo-3-translate-2b-Q4_K_M.gguf) → `models\llm-models`
 - Built-in model Hy-MT2-1.8B (translation only, 1.9 GB): [official](https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF/resolve/main/Hy-MT2-1.8B-Q8_0.gguf) · [mirror](https://hf-mirror.com/tencent/Hy-MT2-1.8B-GGUF/resolve/main/Hy-MT2-1.8B-Q8_0.gguf) → `models\llm-models`
 - Built-in vision model PaddleOCR-VL-1.6 (two files, 0.9 GB each, needs GPU acceleration): [main model](https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.6-GGUF/resolve/main/PaddleOCR-VL-1.6-GGUF.gguf) · [image encoder](https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.6-GGUF/resolve/main/PaddleOCR-VL-1.6-GGUF-mmproj.gguf) → `models\llm-models`
 - High-accuracy listen model Qwen3-ASR, one of two sizes, two files each: 1.7B (2.5 GB, for a dedicated GPU with 8 GB or more) [main model](https://huggingface.co/ggml-org/Qwen3-ASR-1.7B-GGUF/resolve/main/Qwen3-ASR-1.7B-Q8_0.gguf) · [audio encoder](https://huggingface.co/ggml-org/Qwen3-ASR-1.7B-GGUF/resolve/main/mmproj-Qwen3-ASR-1.7B-Q8_0.gguf); 0.6B (1 GB) [main model](https://huggingface.co/ggml-org/Qwen3-ASR-0.6B-GGUF/resolve/main/Qwen3-ASR-0.6B-Q8_0.gguf) · [audio encoder](https://huggingface.co/ggml-org/Qwen3-ASR-0.6B-GGUF/resolve/main/mmproj-Qwen3-ASR-0.6B-Q8_0.gguf) → `models\llm-models`

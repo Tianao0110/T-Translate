@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.5.8-green" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.5.9-green" alt="Version">
   <img src="https://img.shields.io/badge/license-T--Translate%201.0-blue" alt="License">
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform">
 </p>
@@ -132,6 +132,7 @@ npm run dist            # 打包安装程序
 程序本身不带模型。语言包、PDF 版面分析模型、听译识别模型、语音包在设置页里一键下载；下面几个大文件不经我们的服务器分发，自己下载后放进模型文件夹即可（位置在 设置 → 隐私模式 → 数据管理）：
 
 - 内置模型 Qwen3-1.7B（通用，1.8 GB）：[官方](https://huggingface.co/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf) · [镜像](https://hf-mirror.com/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf) → `models\llm-models`
+- 内置模型 PLaMo 3 Translate 2B（仅翻译，1.8 GB）：[官方](https://huggingface.co/pfnet/plamo-3-translate-2b-GGUF/resolve/main/plamo-3-translate-2b-Q4_K_M.gguf) · [镜像](https://hf-mirror.com/pfnet/plamo-3-translate-2b-GGUF/resolve/main/plamo-3-translate-2b-Q4_K_M.gguf) → `models\llm-models`
 - 内置模型 Hy-MT2-1.8B（仅翻译，1.9 GB）：[官方](https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF/resolve/main/Hy-MT2-1.8B-Q8_0.gguf) · [镜像](https://hf-mirror.com/tencent/Hy-MT2-1.8B-GGUF/resolve/main/Hy-MT2-1.8B-Q8_0.gguf) → `models\llm-models`
 - 内置视觉模型 PaddleOCR-VL-1.6（两个文件，各 0.9 GB，需显卡加速）：[主模型](https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.6-GGUF/resolve/main/PaddleOCR-VL-1.6-GGUF.gguf) · [图像编码器](https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.6-GGUF/resolve/main/PaddleOCR-VL-1.6-GGUF-mmproj.gguf) → `models\llm-models`
 - 高精度听译模型 Qwen3-ASR，二选一，各两个文件：1.7B（2.5 GB，独立显卡显存 8 GB 以上时选）[主模型](https://huggingface.co/ggml-org/Qwen3-ASR-1.7B-GGUF/resolve/main/Qwen3-ASR-1.7B-Q8_0.gguf) · [音频编码器](https://huggingface.co/ggml-org/Qwen3-ASR-1.7B-GGUF/resolve/main/mmproj-Qwen3-ASR-1.7B-Q8_0.gguf)；0.6B（1 GB）[主模型](https://huggingface.co/ggml-org/Qwen3-ASR-0.6B-GGUF/resolve/main/Qwen3-ASR-0.6B-Q8_0.gguf) · [音频编码器](https://huggingface.co/ggml-org/Qwen3-ASR-0.6B-GGUF/resolve/main/mmproj-Qwen3-ASR-0.6B-Q8_0.gguf) → `models\llm-models`
