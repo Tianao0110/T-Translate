@@ -95,7 +95,7 @@ export function createPageAgent({
   const view = { display: 'bilingual', mode: 'track', size: DEFAULT_SIZE, siteCaptions: 'show', offset: 0, autoPause: false };
   let feedEl = null; // feeds: the primary video the media id was last checked against
   let renderer = null;
-  let study = null; // sentence controls on the renderer's video
+  let study = null; // pause per line on the renderer's video
   let rendererEl = null;
   let notice = null;
   let noticeEl = null;
@@ -375,46 +375,33 @@ export function createPageAgent({
     return renderer;
   }
 
-  // Seek / pause / play through the site's player in the page world, for
-  // sites that offer it (a 'player' action); null: on the video itself.
+  // Pause through the site's player in the page world, for sites that offer
+  // it (a 'player' action); null: on the video itself.
   function playerControl() {
     if (!Object.hasOwn(site.mainActions || {}, 'player')) return null;
-    const run = (op, s) => {
-      bridge.command('player', s === undefined ? { op } : { op, s }, PLAYER_MS).catch((e) => console.debug(`[T-Caption] player ${op}: ${e?.code ?? e?.message ?? e}`));
+    return {
+      pause: () => {
+        bridge.command('player', { op: 'pause' }, PLAYER_MS).catch((e) => console.debug(`[T-Caption] player pause: ${e?.code ?? e?.message ?? e}`));
+      },
     };
-    return { seek: (s) => run('seek', s), pause: () => run('pause'), play: () => run('play') };
   }
 
   const listOf = (many, one) => (Array.isArray(many) ? many : one ? [one] : []);
 
-  // The cues as shown, offset applied, for the sentence controls.
+  // The cues as shown, offset applied, for pause per line.
   const shownCues = () => (renderer ? renderer.list().map((e) => ({ start: e.start + view.offset, end: e.end + view.offset })) : []);
 
   // Shown later by s seconds (negative: earlier), for this video only.
-  function setOffset(s, announce) {
+  function setOffset(s) {
     view.offset = Math.round(Math.max(-MAX_OFFSET_S, Math.min(MAX_OFFSET_S, s)) * 10) / 10;
     renderer?.setOffset(view.offset);
-    if (announce) {
-      const n = String(Math.abs(view.offset));
-      flash(view.offset === 0 ? t('offsetReset') || 'Captions back on time' : t(view.offset < 0 ? 'offsetEarlier' : 'offsetLater', [n]) || `Captions ${view.offset}s`);
-    }
     return { offset: view.offset };
   }
 
-  function setAutoPause(on, announce) {
+  function setAutoPause(on) {
     view.autoPause = !!on;
     study?.setAutoPause(view.autoPause);
-    if (announce) flash(t(view.autoPause ? 'autoPauseOn' : 'autoPauseOff') || `Pause after each line: ${view.autoPause ? 'on' : 'off'}`);
     return { autoPause: view.autoPause };
-  }
-
-  function goSentence(action) {
-    if (!study || !renderer?.list().length) {
-      flash(t('noCues') || 'No captions on this video yet');
-      throw err('no-cues');
-    }
-    const target = study.go(action);
-    return { at: target ? target.start : null };
   }
 
   function applyCues(c) {
@@ -469,7 +456,7 @@ export function createPageAgent({
     return { kind };
   }
 
-  // A line of our own over the video (a dropped file, a shortcut), gone after a while.
+  // A line of our own over the video (a dropped file), gone after a while.
   let flashTimer = 0;
   function flash(text, ms = FLASH_MS) {
     const v = media.primaryVideo();
@@ -588,17 +575,14 @@ export function createPageAgent({
         view.size = c.value;
         renderer?.setSize(c.value);
         return { size: view.size };
-      // { delta } or { value } in seconds; announce: a line on the video.
+      // { delta } or { value } in seconds.
       case 'offset':
-        if (Number.isFinite(c.delta)) return setOffset(view.offset + c.delta, !!c.announce);
-        if (Number.isFinite(c.value)) return setOffset(c.value, !!c.announce);
+        if (Number.isFinite(c.delta)) return setOffset(view.offset + c.delta);
+        if (Number.isFinite(c.value)) return setOffset(c.value);
         throw err('bad-command');
       case 'auto-pause':
         if (typeof c.value !== 'boolean') throw err('bad-command');
-        return setAutoPause(c.value, !!c.announce);
-      case 'sentence':
-        if (!['prev', 'next', 'repeat'].includes(c.action)) throw err('bad-command');
-        return goSentence(c.action);
+        return setAutoPause(c.value);
       case 'site-captions': {
         if (c.value !== 'hide' && c.value !== 'show') throw err('bad-command');
         const applied = setSiteCaptions(c.value === 'hide');

@@ -267,30 +267,23 @@ describe('commands', () => {
     expect(big.textTracks).toBeDefined();
   });
 
-  it('caption timing, line jumps and pause per line act on the primary video; announced ones flash a line', async () => {
-    const v = mountVideo();
-    Object.defineProperty(v, 'currentTime', { value: 4, writable: true, configurable: true });
+  it('caption timing and pause per line act on the primary video, quietly', async () => {
+    mountVideo();
     const flashes = [];
     const makeNotice = () => ({ show: (s) => flashes.push(s.text), hide() {}, destroy() {} });
-    const i18n = { getMessage: (k, subs) => ({ offsetEarlier: `提前 ${subs?.[0]} 秒`, offsetLater: `推迟 ${subs?.[0]} 秒`, offsetReset: '复原', autoPauseOn: '每句暂停：开', noCues: '没有字幕' })[k] || '' };
-    const { runtime, tracks } = start({ makeNotice, i18n });
-    expect(await runtime.command({ cmd: 'sentence', action: 'next' })).toMatchObject({ ok: false, error: { code: 'no-cues' } });
-    expect(flashes).toEqual(['没有字幕']);
+    const { runtime, tracks } = start({ makeNotice });
     await runtime.command({ cmd: 'cues', op: 'set', cues: [{ id: '1', start: 1, end: 3, text: 'Hello' }, { id: '2', start: 3, end: 5, text: 'There' }] });
     expect(await runtime.command({ cmd: 'offset', delta: 0.5 })).toEqual({ ok: true, result: { offset: 0.5 } });
     expect(tracks[0].list.map((c) => c.startTime)).toEqual([1.5, 3.5]);
-    expect(await runtime.command({ cmd: 'offset', delta: -1, announce: true })).toEqual({ ok: true, result: { offset: -0.5 } });
+    expect(await runtime.command({ cmd: 'offset', delta: -1 })).toEqual({ ok: true, result: { offset: -0.5 } });
     expect(await runtime.command({ cmd: 'offset', value: 99 })).toEqual({ ok: true, result: { offset: 30 } });
-    expect(await runtime.command({ cmd: 'offset', value: 0, announce: true })).toEqual({ ok: true, result: { offset: 0 } });
+    expect(await runtime.command({ cmd: 'offset', value: 0 })).toEqual({ ok: true, result: { offset: 0 } });
     expect(await runtime.command({ cmd: 'offset' })).toMatchObject({ ok: false, error: { code: 'bad-command' } });
-    // Lines go by the shown times: at 4 s the second line plays.
-    expect(await runtime.command({ cmd: 'sentence', action: 'repeat' })).toEqual({ ok: true, result: { at: 3 } });
-    expect(v.currentTime).toBe(3);
-    expect(await runtime.command({ cmd: 'sentence', action: 'prev' })).toEqual({ ok: true, result: { at: 1 } });
-    expect(await runtime.command({ cmd: 'sentence', action: 'sideways' })).toMatchObject({ ok: false, error: { code: 'bad-command' } });
-    expect(await runtime.command({ cmd: 'auto-pause', value: true, announce: true })).toEqual({ ok: true, result: { autoPause: true } });
+    // Line jumps went with the shortcut keys.
+    expect(await runtime.command({ cmd: 'sentence', action: 'next' })).toMatchObject({ ok: false, error: { code: 'unknown-command' } });
+    expect(await runtime.command({ cmd: 'auto-pause', value: true })).toEqual({ ok: true, result: { autoPause: true } });
     expect(await runtime.command({ cmd: 'auto-pause', value: 'yes' })).toMatchObject({ ok: false, error: { code: 'bad-command' } });
-    expect(flashes).toEqual(['没有字幕', '提前 0.5 秒', '复原', '每句暂停：开']);
+    expect(flashes).toEqual([]);
     expect((await runtime.command({ cmd: 'query' })).result.view).toMatchObject({ offset: 0, autoPause: true });
   });
 

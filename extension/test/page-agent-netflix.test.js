@@ -5,7 +5,7 @@
 // the page's object, the track list sent once the player says the audio's
 // language, tracks ranked audio language first and forced ones last, files
 // no list named are strays, the player action), and the page agent fetching
-// the best track of a list and jumping lines through the player.
+// the best track of a list and pausing per line through the player.
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createPageAgent } from '../src/content/page-agent.js';
@@ -112,14 +112,12 @@ describe('the Netflix adapter', () => {
     expect(JSON.parse(emitted[0].text)).toMatchObject({ movieId: '81234567', audio: 'en', selected: { lang: 'zh-Hans', kind: '' } });
   });
 
-  it('the player action seeks in milliseconds, pauses and plays; without a player it says so', () => {
+  it('the player action pauses; anything else is refused; without a player it says so', () => {
     const player = fakePlayer();
     const win = fakeWin(player);
-    expect(netflix.mainActions.player({ win, op: 'seek', s: 12.3456 })).toEqual({ op: 'seek' });
-    netflix.mainActions.player({ win, op: 'pause' });
-    netflix.mainActions.player({ win, op: 'play' });
-    expect(player.calls).toEqual([['seek', 12346], ['pause'], ['play']]);
-    expect(() => netflix.mainActions.player({ win, op: 'jump' })).toThrow(expect.objectContaining({ code: 'bad-command' }));
+    expect(netflix.mainActions.player({ win, op: 'pause' })).toEqual({ op: 'pause' });
+    expect(player.calls).toEqual([['pause']]);
+    expect(() => netflix.mainActions.player({ win, op: 'seek', s: 3 })).toThrow(expect.objectContaining({ code: 'bad-command' }));
     expect(() => netflix.mainActions.player({ win: {}, op: 'pause' })).toThrow(expect.objectContaining({ code: 'no-player' }));
   });
 });
@@ -165,11 +163,11 @@ afterEach(() => {
 });
 
 describe('the page agent on Netflix', () => {
-  it('fetches the best track of a list without cookies; the player’s own files are strays; lines jump through the player', async () => {
+  it('fetches the best track of a list without cookies; the player’s own files are strays; pause per line goes through the player', async () => {
     const v = mountVideo();
     const fetchFn = vi.fn(async () => response(VTT));
     const runtime = fakeRuntime();
-    const bridge = { connected: true, command: vi.fn(async () => ({ op: 'seek' })), close: vi.fn(), onEvent: null };
+    const bridge = { connected: true, command: vi.fn(async () => ({ op: 'pause' })), close: vi.fn(), onEvent: null };
     const addTextTrack = () => {
       const list = [];
       return { mode: 'disabled', list, get cues() { return list.slice(); }, addCue: (c) => list.push(c), removeCue: (c) => list.splice(list.indexOf(c), 1) };
@@ -197,8 +195,12 @@ describe('the page agent on Netflix', () => {
     expect(subs).toHaveLength(1);
     expect(subs[0]).toMatchObject({ url: EN, format: 'vtt', lang: 'en', mediaId: '81234567', cueCount: 2 });
     await runtime.command({ cmd: 'cues', op: 'set', cues: [{ id: '1', start: 1, end: 2.5, text: 'Hello there' }, { id: '2', start: 3, end: 5, text: 'General Kenobi' }] });
-    expect(await runtime.command({ cmd: 'sentence', action: 'prev' })).toEqual({ ok: true, result: { at: 1 } });
-    expect(bridge.command).toHaveBeenCalledWith('player', { op: 'seek', s: 1 }, 5000);
-    expect(v.currentTime).toBe(4);
+    expect(await runtime.command({ cmd: 'auto-pause', value: true })).toEqual({ ok: true, result: { autoPause: true } });
+    // Playing past the end of the second line: the player pauses, not the video.
+    v.currentTime = 4.9;
+    v.dispatchEvent(new Event('timeupdate'));
+    v.currentTime = 5.05;
+    v.dispatchEvent(new Event('timeupdate'));
+    expect(bridge.command).toHaveBeenCalledWith('player', { op: 'pause' }, 5000);
   });
 });

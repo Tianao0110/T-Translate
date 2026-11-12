@@ -1,14 +1,11 @@
-// Line controls, caption timing and a dropped subtitle file on a real
+// Pause per line, caption timing and a dropped subtitle file on a real
 // YouTube page, hands off (shell in lib/e2e-shell.js). Captions run by
 // themselves first (tier 2, as in e2e-auto.js), drawn as a track:
 //
-//   (a) the shortcut keys: six commands, the four line keys bound by default
-//   (b) next twice, previous, repeat: each lands on a line's start and keeps
-//       playing (previous goes back one line, repeat stays on it)
+//   (a) no shortcut keys registered
 //   (c) pause per line (the pref, as the popup sets it): the video stops just
 //       after a line ends, again after the next; off, it plays through
-//   (d) caption timing: +2 s moves the track's lines 2 s later with a line on
-//       the video saying so; back to 0
+//   (d) caption timing: +2 s moves the track's lines 2 s later; back to 0
 //   (e) an SRT file dropped on the video (CDP drag events carrying the file):
 //       its lines become the captions (tier 1), translated
 //
@@ -44,11 +41,10 @@ async function main() {
   try {
     await setPrefs({});
 
-    // ---- (a) the shortcut keys ----
-    const commands = await evaluate(shell.opt, `chrome.commands.getAll().then((cs) => cs.filter((c) => c.name !== '_execute_action').map((c) => ({ name: c.name, shortcut: c.shortcut || '' })))`);
+    // ---- (a) no shortcut keys ----
+    const commands = await evaluate(shell.opt, `chrome.commands.getAll().then((cs) => cs.filter((c) => c.name !== '_execute_action').map((c) => c.name))`);
     numbers.commands = commands;
-    const keyOf = (name) => commands?.find((c) => c.name === name)?.shortcut ?? null;
-    step('(a) six shortcut commands; previous / next / repeat / pause per line bound by default, earlier / later left for the user', commands?.length === 6 && ['prev-sentence', 'next-sentence', 'repeat-sentence', 'toggle-auto-pause'].every((n) => keyOf(n)) && keyOf('subs-earlier') === '' && keyOf('subs-later') === '', JSON.stringify(commands));
+    step('(a) no shortcut commands registered', Array.isArray(commands) && commands.length === 0, JSON.stringify(commands));
 
     // ---- captions on their own ----
     const { sessionId: page } = await open('about:blank');
@@ -69,20 +65,6 @@ async function main() {
     const command = async (c) => (await ext('tab/command', { tabId: tab, command: c }))?.result ?? null;
     const cueList = async () => ((await command({ cmd: 'cues', op: 'list' }))?.cues || []).map((c) => ({ start: c.start, end: c.end })).sort((a, b) => a.start - b.start);
     const video = () => evaluate(page, `(() => { const v = document.querySelector('video'); return { t: v.currentTime, paused: v.paused }; })()`);
-
-    // ---- (b) line jumps ----
-    const jumps = [];
-    for (const action of ['next', 'next', 'prev', 'repeat']) {
-      const before = await video();
-      const r = await command({ cmd: 'sentence', action });
-      await sleep(400);
-      const after = await video();
-      const starts = (await cueList()).map((c) => c.start);
-      jumps.push({ action, before: before.t, at: r?.at, after: after.t, playing: !after.paused, isStart: starts.some((s) => Math.abs(s - r?.at) < 0.01) });
-    }
-    numbers.jumps = jumps;
-    const [next1, next2, prev, rep] = jumps;
-    step('(b) next twice, previous, repeat: each on a line’s start, playing; previous one line back, repeat stays', jumps.every((j) => j.isStart && j.playing && j.after >= j.at - 0.05 && j.after < j.at + 1.5) && next1.at > next1.before && next2.at > next1.at && prev.at === next1.at && rep.at === prev.at, JSON.stringify(jumps));
 
     // ---- (c) pause per line ----
     await setPrefs({ autoPause: true });
@@ -109,20 +91,18 @@ async function main() {
     // ---- (d) caption timing ----
     const trackStarts = () => evaluate(page, `(() => { const v = document.querySelector('video'); const t = Array.from(v.textTracks).find((x) => x.label === 'T-Caption'); return Array.from(t.cues).slice(0, 4).map((c) => c.startTime); })()`);
     const plain = await trackStarts();
-    const shifted = await command({ cmd: 'offset', value: 2, announce: true });
+    const shifted = await command({ cmd: 'offset', value: 2 });
     const later = await until(async () => {
       const s = await trackStarts();
       return s.length && Math.abs(s[0] - plain[0] - 2) < 0.01 ? s : null;
     }, 3000, 100);
-    const flash = await evaluate(page, `document.querySelector('.tc-nt-host')?.shadowRoot?.querySelector('.tc-nt-text')?.textContent ?? null`);
-    await shoot(page, 'timing-flash');
     const reset = await command({ cmd: 'offset', value: 0 });
     const back = await until(async () => {
       const s = await trackStarts();
       return s.length && Math.abs(s[0] - plain[0]) < 0.01 ? s : null;
     }, 3000, 100);
-    numbers.timing = { plain, later, flash, reset };
-    step('(d) caption timing +2 s moves the track’s lines with a line on the video; 0 puts them back', shifted?.offset === 2 && !!later && later.every((s, i) => Math.abs(s - plain[i] - 2) < 0.01) && /2/.test(flash || '') && reset?.offset === 0 && !!back, JSON.stringify(numbers.timing));
+    numbers.timing = { plain, later, reset };
+    step('(d) caption timing +2 s moves the track’s lines; 0 puts them back', shifted?.offset === 2 && !!later && later.every((s, i) => Math.abs(s - plain[i] - 2) < 0.01) && reset?.offset === 0 && !!back, JSON.stringify(numbers.timing));
 
     // ---- (e) a dropped subtitle file ----
     const now = (await video()).t;

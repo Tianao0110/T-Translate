@@ -1,25 +1,9 @@
-// Sentence controls over the captions on a video: jump to the previous or
-// next sentence or back to the start of this one, and pause at the end of
-// every sentence. cues() hands the shown cues ({ start, end }, any offset
-// applied); control ({ seek(s), pause(), play() }) stands in for the video's
-// own when the site's player must do them. The page agent drives it from
-// commands and the shortcut keys.
+// Pause at the end of every sentence of the captions on a video. cues()
+// hands the shown cues ({ start, end }, any offset applied); control
+// ({ pause() }) stands in for the video's own when the site's player must do
+// it. The page agent drives it from the popup's setting.
 
-const EDGE_S = 0.05;
 const MAX_STEP_S = 1.5; // a bigger jump between two readings is a seek
-
-// The cue to go to from time t: 'repeat' the one playing (or the first),
-// 'prev' the one before it, 'next' the one after it; null when there is none.
-export function sentenceTarget(cues, t, action) {
-  const list = [...cues].sort((a, b) => a.start - b.start);
-  if (!list.length) return null;
-  let i = -1;
-  for (let k = 0; k < list.length && list[k].start <= t + EDGE_S; k++) i = k;
-  if (action === 'repeat') return list[Math.max(i, 0)];
-  if (action === 'prev') return list[Math.max(i - 1, 0)];
-  if (action === 'next') return list[i + 1] ?? null;
-  return null;
-}
 
 // A cue whose end the playhead passed between two readings while playing.
 export function crossedEnd(cues, from, to) {
@@ -29,9 +13,7 @@ export function crossedEnd(cues, from, to) {
 }
 
 export function createStudy({ video, cues, control = null }) {
-  const seek = control?.seek ?? ((s) => (video.currentTime = s));
   const pause = control?.pause ?? (() => video.pause());
-  const play = control?.play ?? (() => Promise.resolve(video.play?.()).catch(() => {}));
   let autoPause = false;
   let last = video.currentTime;
   let frame = 0;
@@ -70,15 +52,6 @@ export function createStudy({ video, cues, control = null }) {
         video.cancelVideoFrameCallback?.(frame);
         frame = 0;
       }
-    },
-    // Goes to that sentence and plays from its start; the cue, or null.
-    go(action) {
-      const target = sentenceTarget(cues(), video.currentTime, action);
-      if (!target) return null;
-      last = Math.max(0, target.start);
-      seek(last);
-      if (video.paused) play();
-      return target;
     },
     destroy() {
       if (frame) video.cancelVideoFrameCallback?.(frame);

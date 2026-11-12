@@ -1,9 +1,9 @@
-// Sentence controls: which cue prev / next / repeat go to, a cue end crossed
-// while playing (a seek is not one), pausing at sentence ends through
-// timeupdate or video frame callbacks, and go() seeking and playing.
+// Pause per line: a cue end crossed while playing (a seek is not one),
+// pausing at sentence ends through timeupdate or video frame callbacks, and a
+// site's player pausing instead of the video.
 
 import { describe, it, expect } from 'vitest';
-import { sentenceTarget, crossedEnd, createStudy } from '../src/content/study.js';
+import { crossedEnd, createStudy } from '../src/content/study.js';
 
 const CUES = [
   { start: 6, end: 9 },
@@ -54,25 +54,6 @@ function fakeVideo({ frames = false } = {}) {
   };
   return v;
 }
-
-describe('sentenceTarget', () => {
-  it('repeat, prev and next around the cue playing', () => {
-    expect(sentenceTarget(CUES, 4, 'repeat')).toEqual({ start: 3, end: 6 });
-    expect(sentenceTarget(CUES, 4, 'prev')).toEqual({ start: 1, end: 3 });
-    expect(sentenceTarget(CUES, 4, 'next')).toEqual({ start: 6, end: 9 });
-    // Just before a start counts as that cue, so repeat after a jump stays put.
-    expect(sentenceTarget(CUES, 2.97, 'repeat')).toEqual({ start: 3, end: 6 });
-  });
-
-  it('before the first cue, after the last, and no cues', () => {
-    expect(sentenceTarget(CUES, 0.2, 'repeat')).toEqual({ start: 1, end: 3 });
-    expect(sentenceTarget(CUES, 0.2, 'prev')).toEqual({ start: 1, end: 3 });
-    expect(sentenceTarget(CUES, 0.2, 'next')).toEqual({ start: 1, end: 3 });
-    expect(sentenceTarget(CUES, 12, 'repeat')).toEqual({ start: 6, end: 9 });
-    expect(sentenceTarget(CUES, 12, 'next')).toBeNull();
-    expect(sentenceTarget([], 3, 'repeat')).toBeNull();
-  });
-});
 
 describe('crossedEnd', () => {
   it('a cue end passed while playing; none for a seek or going back', () => {
@@ -132,38 +113,25 @@ describe('createStudy', () => {
     expect(v.pending).toBeNull();
   });
 
-  it('a control does the seeking, pausing and playing instead of the video', () => {
+  it('a control pauses instead of the video; the shown cues come from cues()', () => {
     const v = fakeVideo();
     const calls = [];
-    const study = createStudy({ video: v, cues: () => CUES, control: { seek: (s) => calls.push(['seek', s]), pause: () => calls.push(['pause']), play: () => calls.push(['play']) } });
+    let shift = 0;
+    const study = createStudy({ video: v, cues: () => CUES.map((c) => ({ start: c.start + shift, end: c.end + shift })), control: { pause: () => calls.push('pause') } });
     v.currentTime = 4;
-    study.go('next');
-    expect(v.currentTime).toBe(4);
     v.paused = false;
     study.setAutoPause(true);
     v.tick(5.9);
     v.tick(6.1);
     expect(v.paused).toBe(false);
-    expect(calls).toEqual([['seek', 6], ['play'], ['pause']]);
-    study.destroy();
-  });
-
-  it('go() seeks to the sentence and plays; the shown cues come from cues()', () => {
-    const v = fakeVideo();
-    let shift = 0;
-    const study = createStudy({ video: v, cues: () => CUES.map((c) => ({ start: c.start + shift, end: c.end + shift })) });
-    v.currentTime = 4;
-    expect(study.go('repeat')).toEqual({ start: 3, end: 6 });
-    expect(v.currentTime).toBe(3);
-    expect(v.plays).toBe(1);
-    expect(study.go('next')).toEqual({ start: 6, end: 9 });
-    expect(v.currentTime).toBe(6);
-    expect(v.plays).toBe(1);
+    expect(calls).toEqual(['pause']);
+    // Shifted cues: the end at 9 is now at 9.5.
     shift = 0.5;
-    expect(study.go('prev')).toEqual({ start: 1.5, end: 3.5 });
-    v.currentTime = 20;
-    expect(study.go('next')).toBeNull();
-    expect(v.currentTime).toBe(20);
+    v.tick(9.1);
+    v.tick(9.3);
+    expect(calls).toEqual(['pause']);
+    v.tick(9.6);
+    expect(calls).toEqual(['pause', 'pause']);
     study.destroy();
   });
 });

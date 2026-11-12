@@ -2,8 +2,8 @@
 // manifest's text tracks are read where the player parses it (JSON.parse)
 // and WebVTT is added where it writes the request (JSON.stringify); the
 // tracks go to the isolated world as a subtitle list at LIST_URL (never
-// fetched), whose body is the track in the playing audio's language. Seeks
-// and pauses go through the player's own API ('player' action). SPA
+// fetched), whose body is the track in the playing audio's language. Pauses
+// go through the player's own API ('player' action). SPA
 // navigation through history; hiding the player's captions; where its
 // control bar sits; whether an ad plays.
 
@@ -217,14 +217,12 @@ function installMain(win, { emit }) {
   );
 }
 
-// { op: 'seek', s } / { op: 'pause' } / { op: 'play' } on the watch player.
-function player({ win, op, s }) {
+// { op: 'pause' } on the watch player.
+function player({ win, op }) {
   const p = playerOf(win);
   if (!p) throw Object.assign(new Error('no player'), { code: 'no-player' });
-  if (op === 'seek' && Number.isFinite(s) && s >= 0) p.seek(Math.round(s * 1000));
-  else if (op === 'pause') p.pause();
-  else if (op === 'play') p.play();
-  else throw Object.assign(new Error(String(op)), { code: 'bad-command' });
+  if (op !== 'pause') throw Object.assign(new Error(String(op)), { code: 'bad-command' });
+  p.pause();
   return { op };
 }
 
