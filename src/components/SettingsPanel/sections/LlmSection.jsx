@@ -5,9 +5,9 @@
 // page (LlmRuntimeCard); the GPU switch and every local engine's status sit
 // here (LocalEnginesCard).
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AlertTriangle, RefreshCw, ExternalLink } from 'lucide-react';
+import { AlertTriangle, AlertCircle, RefreshCw, ExternalLink, Check, ChevronRight, ChevronDown } from 'lucide-react';
 import { Seg, Switch } from './shared';
 import LocalEnginesCard from './LocalEnginesCard.jsx';
 
@@ -21,6 +21,28 @@ const LlmSection = ({ settings, updateSetting, notify, confirm }) => {
   const [busy, setBusy] = useState(null); // 'scan' | 'test' | 'unload' | `probe:${file}` | `report:${file}`
   const [probes, setProbes] = useState({});
   const [reports, setReports] = useState({});
+  const [listOpen, setListOpen] = useState(false);
+  const [archivedOpen, setArchivedOpen] = useState(false);
+  const listButton = useRef(null);
+  const listPop = useRef(null);
+
+  // The whitelist popover closes on Escape or a click outside it.
+  useEffect(() => {
+    if (!listOpen) return undefined;
+    const outside = (e) => {
+      if (listPop.current?.contains(e.target) || listButton.current?.contains(e.target)) return;
+      setListOpen(false);
+    };
+    const escape = (e) => {
+      if (e.key === 'Escape') setListOpen(false);
+    };
+    document.addEventListener('mousedown', outside);
+    document.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('mousedown', outside);
+      document.removeEventListener('keydown', escape);
+    };
+  }, [listOpen]);
 
   const load = useCallback(async () => {
     try {
@@ -41,7 +63,11 @@ const LlmSection = ({ settings, updateSetting, notify, confirm }) => {
 
   const llm = settings.llm || {};
   // Translation models only; the vision and speech packs belong to their own sections.
-  const packs = (status?.packs?.packs || []).filter((p) => p.role === 'general' || p.role === 'mt');
+  const textPacks = (status?.packs?.packs || []).filter((p) => p.role === 'general' || p.role === 'mt');
+  // An archived pack is offered only while its file is in the folder.
+  const packs = textPacks.filter((p) => !p.archived || p.status === 'ready');
+  const currentPacks = textPacks.filter((p) => !p.archived);
+  const archivedPacks = textPacks.filter((p) => p.archived);
   const unlisted = status?.packs?.unlisted || [];
   const doorOpen = !!llm.allowUnlistedModels;
   const stem = (file) => file.replace(/\.gguf$/i, '');
@@ -141,11 +167,22 @@ const LlmSection = ({ settings, updateSetting, notify, confirm }) => {
             </>
           )}
           {selected && (
-            <div className="ocr-engines-list" style={{ marginTop: '12px' }}>
+            <div className="ocr-engines-list llm-whitelist-anchor" style={{ marginTop: '12px' }}>
               <div className={`ocr-engine-item ${selected.status === 'ready' || selected.status === 'unverified' ? 'active' : ''}`.trim()}>
                 <div className="engine-info">
                   <div className="engine-header">
                     <span className="engine-name">{t('llm.engineNameWith', { name: selected.name })}</span>
+                    <button
+                      ref={listButton}
+                      type="button"
+                      className={`llm-whitelist-icon ${listOpen ? 'open' : ''}`.trim()}
+                      onClick={() => setListOpen((v) => !v)}
+                      title={t('llm.whitelist.title')}
+                      aria-label={t('llm.whitelist.title')}
+                      aria-expanded={listOpen}
+                    >
+                      <AlertCircle size={15} />
+                    </button>
                     {badge(selected)}
                   </div>
                   <p className="engine-meta">{t('llm.fileLine', { file: selected.file, size: formatSize(selected.size), license: selected.license?.name || t('llm.unverified') })}</p>
@@ -190,6 +227,34 @@ const LlmSection = ({ settings, updateSetting, notify, confirm }) => {
                   </button>
                 </div>
               </div>
+              {listOpen && (
+                <div ref={listPop} className="llm-whitelist-pop" role="dialog" aria-label={t('llm.whitelist.title')}>
+                  <p className="llm-whitelist-title">{t('llm.whitelist.title')}</p>
+                  {currentPacks.map((p) => (
+                    <div key={p.id} className="llm-whitelist-row">
+                      <span className="llm-whitelist-name">{p.name}</span>
+                      <span className="llm-whitelist-chip">{p.role === 'mt' ? t('llm.roleMt') : t('llm.roleGeneral')}</span>
+                      <span className="llm-whitelist-mark" title={p.status === 'ready' ? t('llm.installed') : undefined}>
+                        {p.status === 'ready' && <Check size={13} />}
+                      </span>
+                    </div>
+                  ))}
+                  {archivedPacks.length > 0 && (
+                    <>
+                      <button type="button" className="llm-whitelist-fold" onClick={() => setArchivedOpen((v) => !v)} aria-expanded={archivedOpen}>
+                        {archivedOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                        {t('llm.whitelist.archived', { count: archivedPacks.length })}
+                      </button>
+                      {archivedOpen && (
+                        <div className="llm-whitelist-archived">
+                          {archivedPacks.map((p) => <div key={p.id}>{p.name}</div>)}
+                        </div>
+                      )}
+                    </>
+                  )}
+                  <p className="llm-whitelist-hint">{t('llm.whitelist.hint')}</p>
+                </div>
+              )}
             </div>
           )}
           {selected && <p className="setting-hint">{t('llm.enabledHint')}</p>}

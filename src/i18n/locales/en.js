@@ -557,6 +557,11 @@ const en = {
     roleMt: "Translation only",
     roleGeneralHint: "Translation and AI actions",
     roleMtHint: "Translation only; AI actions use another LLM source",
+    whitelist: {
+      title: "Supported models",
+      archived: "Archived, still usable ({{count}})",
+      hint: "Put the file in the model folder to use it",
+    },
     packChanged: "Switched to {{name}}",
     enabledHint: "Enable it under Providers",
     run: {

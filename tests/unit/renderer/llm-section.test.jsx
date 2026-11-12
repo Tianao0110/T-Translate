@@ -139,6 +139,56 @@ describe('LlmSection', () => {
     expect(labels.join(' ')).not.toMatch(/PaddleOCR|ASR/);
   });
 
+  it('the icon next to the name lists the supported models, with the archive folded', async () => {
+    const archived = [
+      { id: 'old-a', role: 'mt', name: 'Old-A', file: 'A.gguf', size: 1, status: 'missing', archived: true, license: { name: 'Apache-2.0' }, source: null },
+      { id: 'old-b', role: 'general', name: 'Old-B', file: 'B.gguf', size: 1, status: 'missing', archived: true, license: { name: 'Apache-2.0' }, source: null },
+    ];
+    const withArchive = { ...STATUS, packs: { ...STATUS.packs, packs: [...STATUS.packs.packs, ...archived] } };
+    const llm = bridge({ status: vi.fn(async () => withArchive), rescan: vi.fn(async () => withArchive) });
+    const { container, findByText, getByLabelText } = mount({ llm });
+    await findByText('llm.engineNameWith:Qwen3-1.7B');
+    expect(container.querySelector('.llm-whitelist-pop')).toBeNull();
+    fireEvent.click(getByLabelText('llm.whitelist.title'));
+    const pop = container.querySelector('.llm-whitelist-pop');
+    expect(pop.textContent).toContain('Qwen3-1.7B');
+    expect(pop.textContent).toContain('Hy-MT2-1.8B');
+    // Installed packs carry the check, missing ones do not.
+    expect(pop.querySelectorAll('.llm-whitelist-mark svg')).toHaveLength(1);
+    // The archive shows its count and stays folded until asked.
+    expect(pop.textContent).toContain('llm.whitelist.archived:2');
+    expect(pop.textContent).not.toContain('Old-A');
+    fireEvent.click(pop.querySelector('.llm-whitelist-fold'));
+    expect(pop.textContent).toContain('Old-A');
+    expect(pop.textContent).toContain('Old-B');
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(container.querySelector('.llm-whitelist-pop')).toBeNull();
+    fireEvent.click(getByLabelText('llm.whitelist.title'));
+    fireEvent.mouseDown(document.body);
+    expect(container.querySelector('.llm-whitelist-pop')).toBeNull();
+  });
+
+  it('offers an archived pack only while its file is in the folder', async () => {
+    const archived = [
+      { id: 'old-here', role: 'mt', name: 'Old-Here', file: 'H.gguf', size: 1, status: 'ready', archived: true, license: { name: 'Apache-2.0' }, source: null },
+      { id: 'old-gone', role: 'mt', name: 'Old-Gone', file: 'G.gguf', size: 1, status: 'missing', archived: true, license: { name: 'Apache-2.0' }, source: null },
+    ];
+    const withArchive = { ...STATUS, packs: { ...STATUS.packs, packs: [...STATUS.packs.packs, ...archived] } };
+    const llm = bridge({ status: vi.fn(async () => withArchive), rescan: vi.fn(async () => withArchive) });
+    const { container, findByText } = mount({ llm });
+    await findByText('llm.engineNameWith:Qwen3-1.7B');
+    const labels = Array.from(container.querySelectorAll('.seg button')).map((b) => b.textContent);
+    expect(labels).toHaveLength(3);
+    expect(labels.join(' ')).toContain('Old-Here');
+    expect(labels.join(' ')).not.toContain('Old-Gone');
+    // The popover lists the archive by name only, without the role chip.
+    fireEvent.click(container.querySelector('.llm-whitelist-icon'));
+    fireEvent.click(container.querySelector('.llm-whitelist-fold'));
+    const rows = Array.from(container.querySelectorAll('.llm-whitelist-row')).map((r) => r.textContent);
+    expect(rows.join(' ')).not.toContain('Old-');
+    expect(container.querySelector('.llm-whitelist-archived').textContent).toBe('Old-HereOld-Gone');
+  });
+
   it('renders without a bridge', () => {
     window.electron = undefined;
     const { container } = render(<LlmSection settings={{ llm: {} }} updateSetting={() => {}} notify={() => {}} />);

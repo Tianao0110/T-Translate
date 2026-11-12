@@ -557,6 +557,11 @@ const zh = {
     roleMt: "仅翻译",
     roleGeneralHint: "翻译和 AI 动作",
     roleMtHint: "只做翻译，AI 动作改用其他大模型源",
+    whitelist: {
+      title: "支持的模型",
+      archived: "已归档 · 仍可使用（{{count}}）",
+      hint: "把文件放进模型文件夹即可使用",
+    },
     packChanged: "已切换到 {{name}}",
     enabledHint: "在「翻译源」里启用即可使用",
     run: {

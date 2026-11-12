@@ -415,6 +415,8 @@ The models folder is shown under Settings → Privacy → Data management and ca
 
 Put the file into `models\llm-models`, keep the original file name, then click "Rescan" under Settings → Local model. The app verifies the file and only uses it after a successful check; "File mismatch" means an incomplete download or a different version, so download it again.
 
+The exclamation mark next to the model name lists every text model the app supports; a check means the file is on this computer. Older models replaced by newer ones sit under Archived, and still work if you have the file.
+
 **Qwen3-1.7B** (general, default): translation plus every AI action. File `Qwen3-1.7B-Q8_0.gguf`, about 1.8 GB, needs 8 GB of RAM.
 
 - Official: https://huggingface.co/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf
