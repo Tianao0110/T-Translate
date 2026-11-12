@@ -47,13 +47,15 @@ class TengineProvider extends BaseProvider {
   async translate(text, sourceLang = 'auto', targetLang = 'zh', options = {}) {
     if (!text?.trim()) return { success: false, error: _t('providerError.emptyText', '文本为空') };
     const messages = buildTranslationMessages(text, targetLang, options);
-    return this._run({ kind: 'translate', messages, options, maxTokens: translateBudget(text) });
+    const translate = { from: sourceLang, to: targetLang, text };
+    return this._run({ kind: 'translate', messages, translate, options, maxTokens: translateBudget(text) });
   }
 
   async translateStream(text, sourceLang, targetLang, onChunk, options = {}) {
     if (!text?.trim()) return { success: false, error: _t('providerError.emptyText', '文本为空') };
     const messages = buildTranslationMessages(text, targetLang, options);
-    return this._run({ kind: 'translate', messages, options, maxTokens: translateBudget(text), onToken: onChunk });
+    const translate = { from: sourceLang, to: targetLang, text };
+    return this._run({ kind: 'translate', messages, translate, options, maxTokens: translateBudget(text), onToken: onChunk });
   }
 
   // A translation-only pack cannot chat; the service skips it for AI actions.
@@ -95,12 +97,20 @@ class TengineProvider extends BaseProvider {
         return _t('providerError.tengineHostDown', '内置模型引擎暂不可用');
       case 'LLM_UNHEALTHY':
         return _t('providerError.tengineUnhealthy', '内置模型连续停滞，本次会话已改用其他翻译源');
+      case 'LLM_LANG_UNSUPPORTED':
+        return _t('providerError.unsupportedTargetLang', '所选目标语言不受支持');
       default:
         return e?.message || _t('providerError.unknownError', '未知错误');
     }
   }
 
-  async _run({ kind, messages, options = {}, maxTokens, onToken = null }) {
+  // Failure envelope for the service; an unsupported target language is
+  // passed on as skipFailureCount.
+  _failure(e) {
+    return { success: false, error: this._describe(e), ...(e?.code === 'LLM_LANG_UNSUPPORTED' ? { skipFailureCount: true } : {}) };
+  }
+
+  async _run({ kind, messages, translate = null, options = {}, maxTokens, onToken = null }) {
     const llm = getLocalLlm();
     if (!llm) return { success: false, error: _t('providerError.tengineNotReady', '内置模型引擎未就绪') };
     const { system, user } = splitMessages(messages);
@@ -108,10 +118,10 @@ class TengineProvider extends BaseProvider {
 
     let handle;
     try {
-      handle = await llm.generate({ kind, system, user, maxTokens }, onToken);
+      handle = await llm.generate({ kind, system, user, ...(translate ? { translate } : {}), maxTokens }, onToken);
     } catch (e) {
       this._lastError = e;
-      return { success: false, error: this._describe(e) };
+      return this._failure(e);
     }
 
     const signal = combineSignal(options.signal, this.config.timeout || TRANSLATE_TIMEOUT_MS);
@@ -130,7 +140,7 @@ class TengineProvider extends BaseProvider {
       return { success: true, text, model: r.model || null, stop: r.stop, tokPerSec: r.tokPerSec ?? null };
     } catch (e) {
       this._lastError = e;
-      return { success: false, error: this._describe(e) };
+      return this._failure(e);
     } finally {
       if (signal) signal.removeEventListener('abort', onAbort);
     }

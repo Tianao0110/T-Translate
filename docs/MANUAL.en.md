@@ -420,6 +420,11 @@ Put the file into `models\llm-models`, keep the original file name, then click "
 - Official: https://huggingface.co/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf
 - Mirror: https://hf-mirror.com/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf
 
+**PLaMo 3 Translate 2B** (translation only): more accurate on Japanese, technical text and formatting, supports 53 languages, cannot summarize or explain. File `plamo-3-translate-2b-Q4_K_M.gguf`, about 1.8 GB, needs 8 GB of RAM.
+
+- Official: https://huggingface.co/pfnet/plamo-3-translate-2b-GGUF/resolve/main/plamo-3-translate-2b-Q4_K_M.gguf
+- Mirror: https://hf-mirror.com/pfnet/plamo-3-translate-2b-GGUF/resolve/main/plamo-3-translate-2b-Q4_K_M.gguf
+
 **Hy-MT2-1.8B** (translation only): translates well and fast, but cannot summarize or explain. File `Hy-MT2-1.8B-Q8_0.gguf`, about 1.9 GB, needs 8 GB of RAM.
 
 - Official: https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF/resolve/main/Hy-MT2-1.8B-Q8_0.gguf

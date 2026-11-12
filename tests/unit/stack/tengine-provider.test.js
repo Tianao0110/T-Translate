@@ -62,7 +62,7 @@ describe('tengine provider', () => {
     const p = new TengineProvider();
     const r = await p.translate('Hello', 'en', 'zh', { systemPrompt: { content: 'SYS', mode: 'system' } });
     expect(r).toMatchObject({ success: true, text: '你好', stop: 'eog', tokPerSec: 50 });
-    expect(llm.calls[0]).toEqual({ kind: 'translate', system: 'SYS', user: 'Hello', maxTokens: translateBudget('Hello') });
+    expect(llm.calls[0]).toEqual({ kind: 'translate', system: 'SYS', user: 'Hello', translate: { from: 'en', to: 'zh', text: 'Hello' }, maxTokens: translateBudget('Hello') });
     await p.translate('Hello', 'en', 'zh', { systemPrompt: { content: 'Translate:', mode: 'user' } });
     expect(llm.calls[1]).toMatchObject({ system: '', user: 'Translate:\n\nHello' });
     await p.translate('Hello', 'en', 'ja');
@@ -101,6 +101,15 @@ describe('tengine provider', () => {
     expect((await new TengineProvider().translate('x', 'en', 'zh')).error).toContain('无翻译结果');
     configureRuntime({ localLlm: fakeLlm({ generateError: Object.assign(new Error('nope'), { code: 'LLM_MODEL_MISSING' }) }) });
     expect((await new TengineProvider().translate('x', 'en', 'zh')).error).toContain('未安装');
+  });
+
+  it('a target language the model lacks is reported without counting as a failure', async () => {
+    configureRuntime({ localLlm: fakeLlm({ generateError: Object.assign(new Error('no pt'), { code: 'LLM_LANG_UNSUPPORTED' }) }) });
+    const r = await new TengineProvider().translate('Hello', 'en', 'pt');
+    expect(r).toMatchObject({ success: false, skipFailureCount: true });
+    expect(r.error).toContain('不受支持');
+    configureRuntime({ localLlm: fakeLlm({ generateError: Object.assign(new Error('nope'), { code: 'LLM_HOST_CRASHED' }) }) });
+    expect((await new TengineProvider().translate('Hello', 'en', 'zh')).skipFailureCount).toBeUndefined();
   });
 
   it('chat folds a conversation into one user turn and answers with content', async () => {

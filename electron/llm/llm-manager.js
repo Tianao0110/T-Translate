@@ -469,20 +469,20 @@ function asrStatus() {
 
 // Streams visible text to onToken; resolves with the engine's result. The
 // trial log gets the request's numbers (and text only with the switch).
-async function generate({ packId = null, file = null, kind = 'generate', system = '', user = '', prompt, maxTokens = 256, sampler = {} } = {}, onToken = null) {
+async function generate({ packId = null, file = null, kind = 'generate', system = '', user = '', translate = null, prompt, maxTokens = 256, sampler = {} } = {}, onToken = null) {
   // P6: after repeated stalls this session steps aside until the host is
   // restarted or a model is loaded afresh (both reset the policy).
   if (policy.state().unhealthy) throw fail('LLM_UNHEALTHY', 'built-in model stalled repeatedly this session');
   const { target } = await ensureLoaded({ packId, file });
   inflight++;
   clearIdle();
-  const request = { kind, maxTokens, sampler, ...(prompt !== undefined ? { prompt } : { system, user }) };
+  const request = { kind, maxTokens, sampler, ...(prompt !== undefined ? { prompt } : { system, user, ...(translate ? { translate } : {}) }) };
   const g = deps.adapter.generate(request, onToken);
   const promise = g.promise
     .then((r) => {
       if (trial) {
         const { text, ...numbers } = r;
-        trial.write({ kind: 'request', requestKind: kind, ...numbers, text: { system, user, prompt, output: text } });
+        trial.write({ kind: 'request', requestKind: kind, ...numbers, text: { system, user, translate, prompt, output: text } });
       }
       return r;
     })

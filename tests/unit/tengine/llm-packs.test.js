@@ -23,7 +23,7 @@ describe('llm packs whitelist', () => {
       expect(p.template).toBeTruthy();
       expect(typeof p.hasThinking).toBe('boolean');
       expect(p.ctx).toBeGreaterThan(0);
-      expect(p.license.name).toBe('Apache-2.0');
+      expect(['Apache-2.0', 'PLaMo Community License']).toContain(p.license.name);
       expect(p.license.url).toMatch(/^https:\/\//);
       expect(p.source.url).toMatch(/^https:\/\/huggingface\.co\/.+\.gguf$/);
       expect(p.source.mirror).toMatch(/^https:\/\/.+\.gguf$/);
@@ -45,6 +45,11 @@ describe('llm packs whitelist', () => {
     expect(packs.defaultPack().role).toBe(packs.LLM_ROLE_GENERAL);
   });
 
+  it('never makes an archived pack the default', () => {
+    expect(packs.LLM_PACKS.filter((p) => p.default && p.archived)).toEqual([]);
+    expect(packs.defaultPack().archived).toBeFalsy();
+  });
+
   it('looks packs up by id, hash and file identity', () => {
     const q = packs.packById('qwen3-1.7b');
     expect(q.name).toBe('Qwen3-1.7B');
@@ -56,18 +61,29 @@ describe('llm packs whitelist', () => {
     expect(packs.packForFile('other.gguf', q.size)).toBeNull();
   });
 
-  it('names a file outside the whitelist as translation-only for the Hunyuan MT family alone', () => {
+  it('names a file outside the whitelist as translation-only for the Hunyuan MT and PLaMo Translate families alone', () => {
     expect(packs.roleForFileName('Hy-MT2-7B-Q4_K_M.gguf')).toBe(packs.LLM_ROLE_MT);
     expect(packs.roleForFileName('hunyuan-mt-1.8b.gguf')).toBe(packs.LLM_ROLE_MT);
+    expect(packs.roleForFileName('plamo-3-translate-8b-Q4_K_M.gguf')).toBe(packs.LLM_ROLE_MT);
+    expect(packs.roleForFileName('plamo-2-translate.gguf')).toBe(packs.LLM_ROLE_MT);
+    expect(packs.roleForFileName('plamo-3-nict-2b.gguf')).toBe(packs.LLM_ROLE_GENERAL);
     expect(packs.roleForFileName('Qwen3.8-27B-Uncensored-YMQ-M-TI.gguf')).toBe(packs.LLM_ROLE_GENERAL);
     expect(packs.roleForFileName('gemma-3-mt-tuned.gguf')).toBe(packs.LLM_ROLE_GENERAL);
     expect(packs.roleForFileName('')).toBe(packs.LLM_ROLE_GENERAL);
   });
 
-  it('keeps the translation-only model out of the general role', () => {
+  it('keeps the translation-only models out of the general role', () => {
     const mt = packs.packsForRole(packs.LLM_ROLE_MT);
-    expect(mt.map((p) => p.id)).toEqual(['hy-mt2-1.8b']);
-    expect(packs.packsForRole(packs.LLM_ROLE_GENERAL).every((p) => p.id !== 'hy-mt2-1.8b')).toBe(true);
+    expect(mt.map((p) => p.id)).toEqual(['plamo-3-translate-2b', 'hy-mt2-1.8b']);
+    expect(packs.packsForRole(packs.LLM_ROLE_GENERAL).every((p) => p.role !== packs.LLM_ROLE_MT)).toBe(true);
+  });
+
+  it('pins PLaMo with its own prompt family and licence', () => {
+    const p = packs.packById('plamo-3-translate-2b');
+    expect(p.template).toBe('plamo');
+    expect(p.arch).toBe('plamo3');
+    expect(p.license.name).toBe('PLaMo Community License');
+    expect(packs.packForFile(p.file, p.size)).toBe(p);
   });
 
   it('pins the vision pack as two files, each with its own size, hash and link', () => {

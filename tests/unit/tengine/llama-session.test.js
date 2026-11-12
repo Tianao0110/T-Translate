@@ -109,9 +109,37 @@ describe('prompt templates', () => {
     expect(s.renderHunyuan({ user: '你好' })).toBe('<｜hy_begin▁of▁sentence｜><｜hy_User｜>你好<｜hy_Assistant｜>');
   });
 
+  it('renders PLaMo PFML with the languages as fields', () => {
+    const head = '<|plamo:bos|><|plamo:tag|>dataset<|plamo:msg|>translation<|plamo:tag|>input';
+    expect(s.renderPlamo({ user: 'ignored', translate: { from: 'en', to: 'zh', text: 'Hello' } }))
+      .toBe(`${head}<|plamo:key|>lang<|plamo:val|>en<|plamo:msg|>Hello<|plamo:tag|>output<|plamo:key|>lang<|plamo:val|>zh-hans<|plamo:msg|>`);
+    // An auto or unknown source is left for the model to detect.
+    expect(s.renderPlamo({ translate: { from: 'auto', to: 'en', text: '你好' } }))
+      .toBe(`${head}<|plamo:msg|>你好<|plamo:tag|>output<|plamo:key|>lang<|plamo:val|>en<|plamo:msg|>`);
+    // Without languages: the model's own Japanese / English switch.
+    expect(s.renderPlamo({ user: 'OK' })).toBe(`${head}<|plamo:key|>lang<|plamo:val|>ja/en<|plamo:msg|>OK<|plamo:tag|>output<|plamo:msg|>`);
+  });
+
+  it('maps app language codes onto PLaMo codes and refuses the rest', () => {
+    expect(s.plamoLang('zh')).toBe('zh-hans');
+    expect(s.plamoLang('zh-TW')).toBe('zh-hant');
+    expect(s.plamoLang('jw')).toBe('jv');
+    expect(s.plamoLang('ja')).toBe('ja');
+    expect(s.plamoLang('pt')).toBeNull();
+    expect(s.plamoLang('auto')).toBeNull();
+    let err = null;
+    try {
+      s.renderPlamo({ translate: { from: 'en', to: 'pt', text: 'Hello' } });
+    } catch (e) {
+      err = e;
+    }
+    expect(err?.code).toBe('LLM_LANG_UNSUPPORTED');
+  });
+
   it('detects the family from the model template text', () => {
     expect(s.detectFamily('{% ... <|im_start|>system ... %}')).toBe('qwen3');
     expect(s.detectFamily('<｜hy_User｜>{{ content }}')).toBe('hunyuan');
+    expect(s.detectFamily("{{- bos_token + '<|plamo:tag|>dataset<|plamo:msg|>translation' -}}")).toBe('plamo');
     expect(s.detectFamily('{{ bos_token }}<start_of_turn>')).toBe('model');
     expect(s.detectFamily(null)).toBe('unknown');
   });

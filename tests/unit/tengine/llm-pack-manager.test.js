@@ -57,6 +57,17 @@ describe('llm pack manager', () => {
     expect(cache['Tiny-Q8_0.gguf'].sha256).toBe(sha(GOOD));
   });
 
+  it('an archived pack still loads and says so in its row', async () => {
+    const OLD = Buffer.from('GGUF-tiny-retired-model-bytes');
+    const old = { ...PACKS[1], id: 'old', file: 'Old.gguf', size: OLD.length, sha256: sha(OLD), archived: true };
+    fs.writeFileSync(path.join(dir, 'Old.gguf'), OLD);
+    const m = createLlmPackManager({ dir, packs: [...PACKS, old] });
+    const s = await m.scan();
+    expect(s.packs.find((p) => p.id === 'old')).toMatchObject({ status: 'ready', archived: true });
+    expect(s.packs.find((p) => p.id === 'tiny').archived).toBe(false);
+    expect(m.resolvePack('old')).toMatchObject({ pack: old, path: path.join(dir, 'Old.gguf') });
+  });
+
   it('refuses a whitelisted name whose bytes differ', async () => {
     const bad = Buffer.from(GOOD);
     bad[3] = 0x21;

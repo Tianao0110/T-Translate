@@ -420,6 +420,11 @@ T-Caption 插件在浏览器里给网页视频显示字幕，识别和翻译都�
 - 官方：https://huggingface.co/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf
 - 国内镜像：https://hf-mirror.com/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf
 
+**PLaMo 3 Translate 2B**（仅翻译）：只做翻译，日语、技术文档和排版格式更准，支持 53 种语言，不能总结、讲解。文件 `plamo-3-translate-2b-Q4_K_M.gguf`，约 1.8 GB，需要 8 GB 内存。
+
+- 官方：https://huggingface.co/pfnet/plamo-3-translate-2b-GGUF/resolve/main/plamo-3-translate-2b-Q4_K_M.gguf
+- 国内镜像：https://hf-mirror.com/pfnet/plamo-3-translate-2b-GGUF/resolve/main/plamo-3-translate-2b-Q4_K_M.gguf
+
 **Hy-MT2-1.8B**（仅翻译）：只做翻译，速度和质量都好，但不能总结、讲解。文件 `Hy-MT2-1.8B-Q8_0.gguf`，约 1.9 GB，需要 8 GB 内存。
 
 - 官方：https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF/resolve/main/Hy-MT2-1.8B-Q8_0.gguf

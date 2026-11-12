@@ -174,6 +174,7 @@ function detectFamily(templateText) {
   if (!templateText) return 'unknown';
   if (/hy_User/.test(templateText)) return 'hunyuan';
   if (/<\|im_start\|>/.test(templateText)) return 'qwen3';
+  if (/<\|plamo:/.test(templateText)) return 'plamo';
   return 'model';
 }
 
@@ -188,6 +189,30 @@ function renderChatml({ system, user, opener = null, closer = null }) {
 // Hy-MT2: no system role, the instruction goes ahead of the text.
 function renderHunyuan({ system, user }) {
   return `<｜hy_begin▁of▁sentence｜><｜hy_User｜>${system ? `${system}\n\n` : ''}${user}<｜hy_Assistant｜>`;
+}
+
+// PLaMo translation models (PFML): the languages are fields, there is no
+// instruction. The app's language codes map onto PLaMo's 53.
+const PLAMO_LANGS = new Set(('ja en zh-hans zh-hant ko ar az be bg bn ca ceb de es et eu fa fr gu he hi hr hu hy id it jv '
+  + 'ka kk km lt lv ml mr ms my ne nl pa pl ru si sk sl sr sw ta te th tl ur uz vi').split(' '));
+const PLAMO_ALIASES = { zh: 'zh-hans', 'zh-tw': 'zh-hant', jw: 'jv' };
+
+function plamoLang(code) {
+  const c = String(code || '').toLowerCase();
+  const mapped = PLAMO_ALIASES[c] || c;
+  return PLAMO_LANGS.has(mapped) ? mapped : null;
+}
+
+// translate = { from, to, text }. Without it (self-test, probe) the model's
+// own Japanese / English switch is used.
+function renderPlamo({ user = '', translate = null }) {
+  const head = '<|plamo:bos|><|plamo:tag|>dataset<|plamo:msg|>translation<|plamo:tag|>input';
+  if (!translate) return `${head}<|plamo:key|>lang<|plamo:val|>ja/en<|plamo:msg|>${user}<|plamo:tag|>output<|plamo:msg|>`;
+  const to = plamoLang(translate.to);
+  if (!to) throw fail('LLM_LANG_UNSUPPORTED', `the model cannot translate into ${translate.to}`);
+  const from = plamoLang(translate.from);
+  const text = translate.text ?? user;
+  return `${head}${from ? `<|plamo:key|>lang<|plamo:val|>${from}` : ''}<|plamo:msg|>${text}<|plamo:tag|>output<|plamo:key|>lang<|plamo:val|>${to}<|plamo:msg|>`;
 }
 
 // --- metadata --------------------------------------------------------------
@@ -388,7 +413,8 @@ function openSession(binding, {
     return null;
   }
 
-  function buildPrompt({ system = '', user = '' }) {
+  function buildPrompt({ system = '', user = '', translate = null }) {
+    if (family === 'plamo') return renderPlamo({ user, translate });
     if (family === 'hunyuan') return renderHunyuan({ system, user });
     if (family === 'qwen3') return renderChatml({ system, user, opener: thinkOpener, closer: thinkCloser });
     const messages = [...(system ? [{ role: 'system', content: system }] : []), { role: 'user', content: user }];
@@ -595,4 +621,6 @@ module.exports = {
   detectFamily,
   renderChatml,
   renderHunyuan,
+  renderPlamo,
+  plamoLang,
 };

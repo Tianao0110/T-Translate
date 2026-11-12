@@ -128,7 +128,7 @@ Golden 测试至少覆盖：三个 `*_default_params()` 与 `mtmd_context_params
 
 安全口径：
 
-- **只加载白名单里的东西**：运行时 DLL 按 SHA256 清单，模型文件按年度钉定的 SHA256 白名单（GGUF 解析器历史上出过内存安全漏洞，任意模型文件就是攻击面）。
+- **只加载白名单里的东西**：运行时 DLL 按 SHA256 清单，模型文件按年度钉定的 SHA256 白名单（GGUF 解析器历史上出过内存安全漏洞，任意模型文件就是攻击面）。被新模型替换下来的旧模型在白名单里标 `archived: true`：手里还有这个文件的用户照常能用，设置页只列名字、不再推荐下载，也永远不当默认。换版时旧模型要跟着复测，载不了就整条删掉而不是归档。
 - **不在运行时下载可执行代码**：取包脚本只在开发机与打包前跑，DLL 随签名安装包分发；运行时只下载数据（模型、包），且离线模式一律不联网。
 - 结果进主进程前按形状校验（文本 / 框 / 时间戳），宿主是不受信任的一侧。
 - 无端口、无 HTTP、无 localhost 旁路；宿主只认 utilityProcess 消息。
@@ -278,6 +278,7 @@ Golden 测试至少覆盖：三个 `*_default_params()` 与 `mtmd_context_params
 - 符号先按声明的 DLL 绑定，找不到再翻别的：换版时搬了家的符号仍能找到，ABI 单测会点名它去了哪。
 - 装载探针对整套 DLL 做哈希约 150 ms，每次宿主启动一次。
 - 思考开启符的判定要**扫词表文本**，不能只看 control 属性：Qwen3 与 Hy-MT2 都把 `<think>` 当普通 token。
+- PLaMo 翻译模型（2026-11-12 起，需 ≥ b12318：分词器 #30045、YaRN `truncate=false` #30206）不吃聊天格式，吃 PFML：`<|plamo:bos|><|plamo:tag|>dataset<|plamo:msg|>translation<|plamo:tag|>input[<|plamo:key|>lang<|plamo:val|>源]<|plamo:msg|>原文<|plamo:tag|>output<|plamo:key|>lang<|plamo:val|>目标<|plamo:msg|>`。没有指令文字，语言是字段，所以翻译栈把 `translate: {from, to, text}` 一路透传到 `renderPlamo`。我们分词不自动加 BOS，`<|plamo:bos|>` 写在文本里；`<|plamo:tag|>` 是 EOT，`isEog` 自然停。程序语言码映射到它的 53 种（`zh` → `zh-hans`、`zh-TW` → `zh-hant`、`jw` → `jv`，其余同名）；源语言是自动或不认识就不写，由模型自己判断；目标语言不在表里报 `LLM_LANG_UNSUPPORTED`，翻译源回 `skipFailureCount`，栈换下一个源且不记失败。自检与探针没有语言时用它自带的日英互译。与官方 jinja 模板逐字一致：沙盒 26 句手写提示词与经 `renderPlamo` 输出 26/26 相同。它自带的术语表、上下文字段暂未接（术语库是译后替换，照常生效）。
 - 取消后上下文仍恰好持有已解码的 token（llama 会回滚被中止的 batch），前缀跟踪只在真正的解码错误时作废。
 - 设备选择：`gpu` 指「一块显卡」——显存最大的独显，没有独显才用核显；从不用 llama 默认的「层摊到所有设备」（双卡笔记本会把一半模型放到核显上）。
 - GPU 自检掐表取第二次生成：第一次要付流水线 / 着色器编译。视觉自检同理，固定图跑两次计第二次。探针里被取消的解码在 llama 眼里是错误，那是机制在工作不是故障。

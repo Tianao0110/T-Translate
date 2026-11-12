@@ -123,6 +123,7 @@ function createLlmPackManager({ dir, packs = LLM_PACKS, allowUnlisted = () => fa
         id: p.id,
         role: p.role,
         default: !!p.default,
+        archived: !!p.archived,
         name: p.name,
         vendor: p.vendor,
         file: p.file,
@@ -158,7 +159,7 @@ function createLlmPackManager({ dir, packs = LLM_PACKS, allowUnlisted = () => fa
   }
 
   function resolveDefault() {
-    const d = packs.find((p) => p.default) || defaultPack();
+    const d = packs.find((p) => p.default && !p.archived) || defaultPack();
     return d ? resolvePack(d.id) : null;
   }
 

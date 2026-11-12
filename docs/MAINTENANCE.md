@@ -52,7 +52,7 @@ sherpa 那一项是最可能卡住人的：没有装 VS 2022 的机器编不出�
 
 | 类别 | 现在用的 | 白名单在哪 |
 | --- | --- | --- |
-| 本地翻译与 AI 动作 | Qwen3-1.7B（通用）、Hy-MT2-1.8B（仅翻译） | `electron/shared/llm-packs.js` |
+| 本地翻译与 AI 动作 | Qwen3-1.7B（通用）、PLaMo 3 Translate 2B 与 Hy-MT2-1.8B（仅翻译） | `electron/shared/llm-packs.js` |
 | 本地视觉识别 | PaddleOCR-VL-1.6（主模型加图像编码器） | 同上 |
 | 本地 OCR | PP-OCRv6 small 与 medium，七个 v4 语言包 | `scripts/fetch/ocr-model-sources.js`、`electron/shared/ocr-packs.js` |
 | 听译 | SenseVoice、zipformer 中英、silero VAD | `scripts/fetch/audio-model-sources.js`、`electron/shared/audio-packs.js` |

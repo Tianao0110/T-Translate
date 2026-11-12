@@ -3,6 +3,8 @@
 // is a security boundary (docs/T-ENGINE.md §5). Re-pinned once a year with
 // the llama.cpp build in electron/tengine/runtime/llama-manifest.json.
 // Weights are never bundled: the user drops the file into <models>/llm-models.
+// `archived: true` keeps a retired pack loadable for users who still have it;
+// the settings page then shows it by name only and never offers it.
 
 // Translation plus every AI action (summarise, explain, digest, rewrite ...).
 const LLM_ROLE_GENERAL = 'general';
@@ -42,6 +44,27 @@ const LLM_PACKS = [
       repo: 'Qwen/Qwen3-1.7B-GGUF',
       url: 'https://huggingface.co/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf',
       mirror: 'https://hf-mirror.com/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf',
+    },
+  },
+  {
+    id: 'plamo-3-translate-2b',
+    role: LLM_ROLE_MT,
+    default: false,
+    name: 'PLaMo 3 Translate 2B',
+    vendor: 'Preferred Networks',
+    file: 'plamo-3-translate-2b-Q4_K_M.gguf',
+    size: 1807203040,
+    sha256: '1ffd9073afcc70e35ccc942428aa2b73d7aa2b9ea779bf504b775369e0276c13',
+    arch: 'plamo3',
+    template: 'plamo',
+    hasThinking: false,
+    ctx: 4096,
+    minRamGb: 8,
+    license: { name: 'PLaMo Community License', url: 'https://plamo.preferredai.jp/info/plamo-community-license-en' },
+    source: {
+      repo: 'pfnet/plamo-3-translate-2b-GGUF',
+      url: 'https://huggingface.co/pfnet/plamo-3-translate-2b-GGUF/resolve/main/plamo-3-translate-2b-Q4_K_M.gguf',
+      mirror: 'https://hf-mirror.com/pfnet/plamo-3-translate-2b-GGUF/resolve/main/plamo-3-translate-2b-Q4_K_M.gguf',
     },
   },
   {
@@ -176,7 +199,7 @@ function packFiles(pack) {
 // Role of a file outside the whitelist, from its name alone: the Hunyuan MT
 // family is translation-only (same family test as the stack's template
 // mapping), everything else is a general model.
-const MT_NAME_PATTERN = /\b(hy|hunyuan)[\s\-_]?mt/i;
+const MT_NAME_PATTERN = /\b(hy|hunyuan)[\s\-_]?mt|\bplamo[\s\-_.\d]*translate/i;
 function roleForFileName(name) {
   return MT_NAME_PATTERN.test(String(name || '')) ? LLM_ROLE_MT : LLM_ROLE_GENERAL;
 }
@@ -197,7 +220,7 @@ function packForFile(name, size) {
 }
 
 function defaultPack() {
-  return LLM_PACKS.find((p) => p.default) || null;
+  return LLM_PACKS.find((p) => p.default && !p.archived) || null;
 }
 
 function packsForRole(role) {

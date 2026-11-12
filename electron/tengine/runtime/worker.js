@@ -11,7 +11,9 @@
 //                                                   (options.mmproj attaches the vision encoder, or the audio one
 //                                                    with options.media 'audio' + options.audioFamily; info.vision /
 //                                                    info.audio says which)
-//     {type:'generate', reqId, system?, user?, prompt?, maxTokens?, sampler?}
+//     {type:'generate', reqId, system?, user?, translate?, prompt?, maxTokens?, sampler?}
+//                                                   (translate {from, to, text} feeds templates that take the
+//                                                    languages as fields, PLaMo's)
 //     {type:'generate', reqId, image, task?, maxTokens?, sampler?}   image: PNG/JPEG bytes, never logged
 //                                                -> {type:'token', reqId, text}* then {type:'done', reqId, ok, result|error}
 //     {type:'generate', reqId, audio, maxTokens?}  audio: Float32Array PCM at info.audio.sampleRate, never logged
@@ -227,7 +229,9 @@ function generate(msg) {
     if (!current.audio) throw Object.assign(new Error('the loaded model has no audio encoder'), { code: 'LLM_AUDIO_UNSUPPORTED' });
     return current.audio.transcribe({ pcm: msg.audio, maxTokens: msg.maxTokens || null });
   }
-  const prompt = msg.prompt !== undefined ? msg.prompt : current.session.buildPrompt({ system: msg.system || '', user: msg.user || '' });
+  const prompt = msg.prompt !== undefined
+    ? msg.prompt
+    : current.session.buildPrompt({ system: msg.system || '', user: msg.user || '', translate: msg.translate || null });
   return current.session.generate({
     prompt,
     maxTokens: msg.maxTokens || 256,
