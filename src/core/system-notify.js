@@ -1,12 +1,13 @@
 // OS-level notification for long-task completion. Fires only when the
 // window is hidden or minimized and settings.interface.systemNotifications
-// is on (undefined counts as on). Clicking brings the main window back.
+// is on (undefined counts as on). Clicking brings the main window back, then
+// runs onClick (the caller switches to the panel the task finished on).
 
 import createLogger from './logger.js';
 
 const logger = createLogger('SystemNotify');
 
-export async function notifyTaskDone(title, body) {
+export async function notifyTaskDone(title, body, onClick) {
   try {
     if (typeof document === 'undefined' || !document.hidden) return false;
     // The permission check only matters for the browser-mode dev server.
@@ -18,6 +19,7 @@ export async function notifyTaskDone(title, body) {
     const n = new Notification(title, { body: body || '' });
     n.onclick = () => {
       window.electron?.window?.show?.();
+      onClick?.();
     };
     return true;
   } catch (err) {

@@ -344,6 +344,7 @@ const DocumentTranslator = ({
   targetLang: initialTargetLang = 'zh',
   externalFile = null,
   onExternalFileConsumed,
+  onActivate,
 }) => {
   const { t } = useTranslation();
   const [confirm, confirmDialog] = useConfirm();
@@ -510,10 +511,11 @@ const DocumentTranslator = ({
     if (digestOk) {
       notifyTaskDone(
         t('documentTranslator.sysNotify.summaryDoneTitle'),
-        t('documentTranslator.sysNotify.summaryDoneBody', { name: document?.filename || '' })
+        t('documentTranslator.sysNotify.summaryDoneBody', { name: document?.filename || '' }),
+        onActivate
       );
     }
-  }, [explainable, explainAll, concurrency, confirm, runDigest, notify, t, document]);
+  }, [explainable, explainAll, concurrency, confirm, runDigest, notify, t, document, onActivate]);
 
   // ===== Glossary consistency (document/term-consistency.js) =====
   // `fixes` survives the modal closing: the marks in the paragraphs need
@@ -976,7 +978,8 @@ const DocumentTranslator = ({
       notify?.(t('documentTranslator.notify.translationCompleteFromCache'), 'success');
       notifyTaskDone(
         t('documentTranslator.sysNotify.translateDoneTitle'),
-        t('documentTranslator.sysNotify.translateDoneBody', { name: document?.filename || '' })
+        t('documentTranslator.sysNotify.translateDoneBody', { name: document?.filename || '' }),
+        onActivate
       );
       return;
     }
@@ -991,7 +994,8 @@ const DocumentTranslator = ({
       notify?.(t('documentTranslator.notify.translationComplete'), 'success');
       notifyTaskDone(
         t('documentTranslator.sysNotify.translateDoneTitle'),
-        t('documentTranslator.sysNotify.translateDoneBody', { name: document?.filename || '' })
+        t('documentTranslator.sysNotify.translateDoneBody', { name: document?.filename || '' }),
+        onActivate
       );
     }
   };

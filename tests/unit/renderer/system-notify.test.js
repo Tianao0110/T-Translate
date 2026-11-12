@@ -66,6 +66,13 @@ describe('notifyTaskDone', () => {
     expect(windowShow).toHaveBeenCalledTimes(1);
   });
 
+  it('click runs the caller hook after showing the window', async () => {
+    const onClick = vi.fn(() => expect(windowShow).toHaveBeenCalledTimes(1));
+    await notifyTaskDone('T', 'B', onClick);
+    FakeNotification.instances[0].onclick();
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
   it('survives a missing electron bridge (web mode)', async () => {
     window.electron = undefined;
     expect(await notifyTaskDone('T', 'B')).toBe(true); // hidden + granted + no setting = fire

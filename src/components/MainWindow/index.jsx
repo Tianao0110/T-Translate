@@ -411,6 +411,7 @@ const MainWindow = () => {
                 targetLang={targetLanguage}
                 externalFile={externalDocFile}
                 onExternalFileConsumed={() => setExternalDocFile(null)}
+                onActivate={() => setActiveTab('document')}
               />
             </Suspense>
           </div>
