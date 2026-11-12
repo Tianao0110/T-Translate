@@ -241,6 +241,7 @@ export async function getActionCapabilities() {
     text: !!chat?.available,
     vision: !!vision?.available,
     providerName: chat?.providerName || null,
+    textLocal: !!chat?.local,
     visionLocal: !!vision?.local,
   };
 }

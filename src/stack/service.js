@@ -805,6 +805,8 @@ export class TranslationService {
           available: true,
           providerId: id,
           providerName: provider?.constructor?.metadata?.name || id,
+          // Local models run small contexts; long prompts get split (document/digest-batches.js).
+          local: !provider.requiresNetwork,
         };
       }
     }

@@ -186,6 +186,30 @@ const DIGEST = {
       user: 'Below are explanations I collected while reading parts of a document. Organise them into one coherent reading note, in {{outputLanguage}}.\n\nExplanations:\n{{sourceText}}\n\nRequirements:\n- Group by theme rather than restating each one in turn\n- Point out how these parts relate to each other\n- These are only parts of the document — do not present this as covering the whole\n- Do not invent anything the notes do not contain',
     },
   },
+  // Notes too long for one request (document/digest-batches.js): each run of
+  // consecutive notes is condensed ('part'), then the parts are merged.
+  stagePrompts: {
+    part: {
+      zh: {
+        system: '你在帮读者整理阅读笔记。用户会给你一份长文档中连续一部分内容的讲解或小结，请用{{outputLanguage}}写成这一部分的要点小结。只输出小结正文。',
+        user: '下面是我在读一份长文档时，其中连续一部分内容的讲解或小结。请用{{outputLanguage}}写成这一部分的要点小结，之后会和其他部分的小结合在一起。\n\n记录：\n{{sourceText}}\n\n要求：\n- 保留关键的名称、数字、日期和结论\n- 按主题归拢，不要逐条复述\n- 写成几段短话，不用标题和 Markdown 格式，三百字以内\n- 记录里没有的不要编造',
+      },
+      en: {
+        system: 'You are helping a reader consolidate their notes. The user gives you explanations or summaries of one consecutive part of a long document; condense them into a short summary of that part in {{outputLanguage}}. Output only the summary.',
+        user: 'Below are explanations or summaries of one consecutive part of a long document I am reading. Condense them into a short summary of this part, in {{outputLanguage}}; it will be combined with the summaries of the other parts.\n\nNotes:\n{{sourceText}}\n\nRequirements:\n- Keep the key names, numbers, dates and conclusions\n- Group by theme rather than restating each one in turn\n- Write a few short paragraphs, no headings or Markdown, under 200 words\n- Do not invent anything the notes do not contain',
+      },
+    },
+    merge: {
+      zh: {
+        system: '你在帮读者整理阅读笔记。用户会给你同一份文档按顺序分成几部分后各部分的要点小结，请用{{outputLanguage}}把它们整理成一份连贯的阅读笔记。只输出笔记正文。',
+        user: '下面是我读一份长文档时，按文档顺序分成几部分、每部分讲解记录的要点小结。请用{{outputLanguage}}把它们整理成一份连贯的阅读笔记。\n\n各部分小结：\n{{sourceText}}\n\n要求：\n- 按主题归拢，不要逐部分复述\n- 指出不同部分之间的关联，比如同一件事在前后几处都提到\n- 这些只是文档的一部分，不要假装概括了全文\n- 小结里没有的不要编造',
+      },
+      en: {
+        system: 'You are helping a reader consolidate their notes. The user gives you summaries of consecutive parts of one document, in order; organise them into one coherent reading note in {{outputLanguage}}. Output only the note.',
+        user: 'Below are summaries of the notes I took while reading a long document, one per part, in document order. Organise them into one coherent reading note, in {{outputLanguage}}.\n\nPart summaries:\n{{sourceText}}\n\nRequirements:\n- Group by theme rather than restating each part in turn\n- Point out how different parts relate, such as the same thing coming up in several places\n- These are only parts of the document — do not present this as covering the whole\n- Do not invent anything the summaries do not contain',
+      },
+    },
+  },
 };
 
 export const BUILTIN_AI_ACTIONS = [SUMMARIZE, EXPLAIN, DIGEST];

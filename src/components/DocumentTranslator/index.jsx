@@ -27,6 +27,7 @@ import LanguagePicker from '../shared/LanguagePicker.jsx';
 import { useConfirm } from '../shared/ConfirmDialog.jsx';
 import { scanDocumentTerms, renderWithReplacements } from '../../document/term-consistency.js';
 import { PROGRESS_VERSION, segmentHash, noteHashes, matchSavedProgress } from '../../document/progress-guard.js';
+import { digestNotes, sectionStartIds, LOCAL_BUDGET, ONLINE_BUDGET } from '../../document/digest-batches.js';
 import PagePreview from './PagePreview.jsx';
 import { notifyTaskDone } from '../../core/system-notify.js';
 import HighlightText from '../shared/HighlightText.jsx';
@@ -458,20 +459,25 @@ const DocumentTranslator = ({
     const action = getAiAction('digest');
     if (!action || digestRunning) return false;
     const source = notesOverride || aiNotes;
+    const sectionStarts = sectionStartIds(outline);
     // Document order, not the order they were opened.
-    const ordered = segments
+    const items = segments
       .filter((seg) => source[seg.id])
-      .map((seg, i) => `${i + 1}. ${source[seg.id]}`)
-      .join('\n\n');
-    if (!ordered) return false;
+      .map((seg) => ({ text: source[seg.id], sectionStart: sectionStarts.has(seg.id) }));
+    if (!items.length) return false;
 
     setDigestRunning(true);
     try {
-      const result = await runAiAction(action, {
-        sourceText: ordered,
+      const stagePrompts = { whole: action.prompts, ...action.stagePrompts };
+      const run = (stage, sourceText) => runAiAction({ ...action, prompts: stagePrompts[stage] }, {
+        sourceText,
         sourceLanguage: sourceLang,
         targetLanguage: targetLang,
         capabilities,
+      });
+      const result = await digestNotes(items, {
+        budget: capabilities.textLocal ? LOCAL_BUDGET : ONLINE_BUDGET,
+        run,
       });
       if (result.success) {
         setDigest(result.content);
@@ -483,7 +489,7 @@ const DocumentTranslator = ({
     } finally {
       setDigestRunning(false);
     }
-  }, [digestRunning, segments, aiNotes, sourceLang, targetLang, capabilities, notify, t]);
+  }, [digestRunning, segments, outline, aiNotes, sourceLang, targetLang, capabilities, notify, t]);
 
   // Explain every paragraph, then summarize those explanations.
   const summarizeDocument = useCallback(async () => {
