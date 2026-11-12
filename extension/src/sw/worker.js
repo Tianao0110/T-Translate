@@ -4,7 +4,8 @@
 // and carries commands to it (page-events.js), fetches files pages play by
 // URL (direct-fetch.js), keeps the sites the user allowed (site-access.js),
 // decides per tab what runs (session-orchestrator.js), holds the subtitle
-// cache (cache-db.js), paints the badge and polls the channel once a minute.
+// cache (cache-db.js), paints the badge, polls the channel once a minute and
+// turns the shortcut keys into commands for the tab.
 // Chrome: a service worker with an offscreen document (index.js); Firefox:
 // one background page for both (firefox/background.js).
 //
@@ -22,6 +23,7 @@ import { createOrchestrator } from './session-orchestrator.js';
 import { createSubtitleCache, openIndexedDbStore, createMemoryStore, cacheHandlers } from './cache-db.js';
 
 const KEEPALIVE = 'companion-keepalive';
+const OFFSET_STEP_S = 0.5;
 
 export function startWorker({ toOffscreen, wake = async () => {} }) {
   const relay = (type) => (payload) => toOffscreen(type, payload);
@@ -103,6 +105,25 @@ export function startWorker({ toOffscreen, wake = async () => {} }) {
       console.debug(`[T-Caption] ping from tab ${sender.tab?.id ?? '?'}`);
       return { pong: true };
     },
+  });
+
+  // The shortcut keys (manifest commands, rebound at chrome://extensions/shortcuts)
+  // act on the tab they were pressed in.
+  const SENTENCE = { 'prev-sentence': 'prev', 'next-sentence': 'next', 'repeat-sentence': 'repeat' };
+  const OFFSET_STEP = { 'subs-earlier': -OFFSET_STEP_S, 'subs-later': OFFSET_STEP_S };
+  chrome.commands?.onCommand?.addListener(async (name, tab) => {
+    const tabId = tab?.id ?? (await chrome.tabs.query({ active: true, currentWindow: true }))[0]?.id;
+    if (!Number.isSafeInteger(tabId)) return;
+    let command = null;
+    if (SENTENCE[name]) command = { cmd: 'sentence', action: SENTENCE[name] };
+    else if (OFFSET_STEP[name]) command = { cmd: 'offset', delta: OFFSET_STEP[name], announce: true };
+    else if (name === 'toggle-auto-pause') {
+      await prefs.load();
+      const on = !prefs.get().autoPause;
+      await prefs.set({ autoPause: on });
+      command = { cmd: 'auto-pause', value: on, announce: true };
+    }
+    if (command) pageEvents.command(tabId, command).catch(() => {}); // no page of ours there
   });
 
   const wakeUp = () => Promise.resolve(wake()).catch((e) => console.warn(`[T-Caption] offscreen: ${e.message}`));

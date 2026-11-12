@@ -113,7 +113,7 @@ function event(e) {
         type: 'subtitle-parsed',
         subId: e.subId,
         url,
-        via: ['xhr', 'track'].includes(e.via) ? e.via : 'fetch',
+        via: ['xhr', 'track', 'file'].includes(e.via) ? e.via : 'fetch',
         status: int(e.status) ?? 0,
         format: ['vtt', 'srt', 'ttml', 'json3', 'bcc'].includes(e.format) ? e.format : null,
         lang: str(e.lang, 32) ?? '',

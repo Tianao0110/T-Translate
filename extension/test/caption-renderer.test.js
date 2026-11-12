@@ -242,4 +242,20 @@ describe('createCaptionRenderer', () => {
     expect(video.hasAttribute('data-tc-cap-size')).toBe(false);
     expect(document.querySelectorAll('#tc-cap-cue-size')).toHaveLength(1);
   });
+
+  it('an offset moves every shown cue, new ones too, never before 0; the list keeps the given times', () => {
+    const r = make();
+    r.setCues(CUES);
+    r.setOffset(1.5);
+    expect(r.offset).toBe(1.5);
+    const starts = () => video.textTracks[0].list.map((c) => c.startTime);
+    expect(starts()).toEqual([2.5, 4.5, 7.5]);
+    r.upsert({ id: 'd', start: 9, end: 10, text: 'More' });
+    expect(starts().at(-1)).toBe(10.5);
+    r.setOffset(-2);
+    expect(shown(video.textTracks[0])[0]).toBe('a@0-1:Hello');
+    expect(r.list().map((e) => [e.start, e.end])[0]).toEqual([1, 3]);
+    r.setOffset(Number.NaN);
+    expect(shown(video.textTracks[0])[0]).toBe('a@1-3:Hello');
+  });
 });

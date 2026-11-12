@@ -72,6 +72,25 @@ body {
   font-size: 13px;
 }
 
+/* − value + for the caption timing of the tab's video. */
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stepper button {
+  min-width: 28px;
+  padding: 2px 8px;
+  font-size: 13px;
+}
+
+#offset-value {
+  min-width: 4.5em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
 .links {
   display: inline-flex;
   align-items: center;

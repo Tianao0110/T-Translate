@@ -166,6 +166,35 @@ describe('reports', () => {
   });
 });
 
+describe('subtitle files dropped on the video', () => {
+  const dropEvent = (type, files, x = 100, y = 100) => {
+    const e = new Event(type, { bubbles: true, cancelable: true });
+    Object.defineProperties(e, { clientX: { value: x }, clientY: { value: y }, dataTransfer: { value: { types: ['Files'], files, dropEffect: 'none' } } });
+    return e;
+  };
+
+  it('a subtitle file dropped on the video becomes its track; other files and drops beside the video are left alone', async () => {
+    mountVideo();
+    const { runtime } = start();
+    await tick();
+    const over = dropEvent('dragover', []);
+    document.dispatchEvent(over);
+    expect(over.defaultPrevented).toBe(true);
+    const beside = dropEvent('drop', [new File(['x'], 'a.srt')], 5000, 5000);
+    document.dispatchEvent(beside);
+    expect(beside.defaultPrevented).toBe(false);
+    document.dispatchEvent(dropEvent('drop', [new File(['not subtitles'], 'photo.png')]));
+    await tick(20);
+    expect(runtime.events('subtitle-parsed')).toHaveLength(0);
+    const srt = '1\n00:00:01,000 --> 00:00:02,500\nHello there\n\n2\n00:00:03,000 --> 00:00:04,000\nGeneral Kenobi\n';
+    document.dispatchEvent(dropEvent('drop', [new File([srt], 'movie.srt')]));
+    await tick(20);
+    const [sub] = runtime.events('subtitle-parsed');
+    expect(sub).toMatchObject({ via: 'file', url: 'local-file:movie.srt', format: 'srt', mediaId: 'UF8uR6Z6KLc', cueCount: 2 });
+    expect(sub.cues[0]).toMatchObject({ start: 1, end: 2.5, text: 'Hello there' });
+  });
+});
+
 describe('ads', () => {
   it('an ad marked on the player hides the captions and is reported; its end shows them again', async () => {
     const v = mountVideo();
@@ -236,6 +265,33 @@ describe('commands', () => {
     expect(q.result).toMatchObject({ mediaId: 'UF8uR6Z6KLc', site: 'youtube', bridge: true, renderer: { cues: 3, mode: 'track', display: 'translation' }, view: { display: 'translation', mode: 'track' } });
     expect(q.result.primary).toBe(2);
     expect(big.textTracks).toBeDefined();
+  });
+
+  it('caption timing, line jumps and pause per line act on the primary video; announced ones flash a line', async () => {
+    const v = mountVideo();
+    Object.defineProperty(v, 'currentTime', { value: 4, writable: true, configurable: true });
+    const flashes = [];
+    const makeNotice = () => ({ show: (s) => flashes.push(s.text), hide() {}, destroy() {} });
+    const i18n = { getMessage: (k, subs) => ({ offsetEarlier: `提前 ${subs?.[0]} 秒`, offsetLater: `推迟 ${subs?.[0]} 秒`, offsetReset: '复原', autoPauseOn: '每句暂停：开', noCues: '没有字幕' })[k] || '' };
+    const { runtime, tracks } = start({ makeNotice, i18n });
+    expect(await runtime.command({ cmd: 'sentence', action: 'next' })).toMatchObject({ ok: false, error: { code: 'no-cues' } });
+    expect(flashes).toEqual(['没有字幕']);
+    await runtime.command({ cmd: 'cues', op: 'set', cues: [{ id: '1', start: 1, end: 3, text: 'Hello' }, { id: '2', start: 3, end: 5, text: 'There' }] });
+    expect(await runtime.command({ cmd: 'offset', delta: 0.5 })).toEqual({ ok: true, result: { offset: 0.5 } });
+    expect(tracks[0].list.map((c) => c.startTime)).toEqual([1.5, 3.5]);
+    expect(await runtime.command({ cmd: 'offset', delta: -1, announce: true })).toEqual({ ok: true, result: { offset: -0.5 } });
+    expect(await runtime.command({ cmd: 'offset', value: 99 })).toEqual({ ok: true, result: { offset: 30 } });
+    expect(await runtime.command({ cmd: 'offset', value: 0, announce: true })).toEqual({ ok: true, result: { offset: 0 } });
+    expect(await runtime.command({ cmd: 'offset' })).toMatchObject({ ok: false, error: { code: 'bad-command' } });
+    // Lines go by the shown times: at 4 s the second line plays.
+    expect(await runtime.command({ cmd: 'sentence', action: 'repeat' })).toEqual({ ok: true, result: { at: 3 } });
+    expect(v.currentTime).toBe(3);
+    expect(await runtime.command({ cmd: 'sentence', action: 'prev' })).toEqual({ ok: true, result: { at: 1 } });
+    expect(await runtime.command({ cmd: 'sentence', action: 'sideways' })).toMatchObject({ ok: false, error: { code: 'bad-command' } });
+    expect(await runtime.command({ cmd: 'auto-pause', value: true, announce: true })).toEqual({ ok: true, result: { autoPause: true } });
+    expect(await runtime.command({ cmd: 'auto-pause', value: 'yes' })).toMatchObject({ ok: false, error: { code: 'bad-command' } });
+    expect(flashes).toEqual(['没有字幕', '提前 0.5 秒', '复原', '每句暂停：开']);
+    expect((await runtime.command({ cmd: 'query' })).result.view).toMatchObject({ offset: 0, autoPause: true });
   });
 
   it('cues list hands back what the renderer holds, translations included; none before any cue', async () => {

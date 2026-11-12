@@ -13,6 +13,7 @@ export const DEFAULT_PREFS = Object.freeze({
   display: 'bilingual',
   mode: 'overlay',
   size: 'medium',
+  autoPause: false, // pause at the end of every sentence
   targetLang: null, // null: defaultTargetLang(ui language)
   sourceLang: 'auto',
   siteOff: {},
@@ -54,6 +55,7 @@ export function normalizePrefs(raw, uiLang) {
     display: DISPLAYS.includes(r.display) ? r.display : DEFAULT_PREFS.display,
     mode: MODES.includes(r.mode) ? r.mode : DEFAULT_PREFS.mode,
     size: SIZES.includes(r.size) ? r.size : DEFAULT_PREFS.size,
+    autoPause: r.autoPause === true,
     targetLang: typeof r.targetLang === 'string' && LANG_RE.test(r.targetLang) ? r.targetLang : defaultTargetLang(uiLang),
     sourceLang: typeof r.sourceLang === 'string' && LANG_RE.test(r.sourceLang) ? r.sourceLang : DEFAULT_PREFS.sourceLang,
     siteOff,

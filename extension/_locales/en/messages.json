@@ -41,6 +41,30 @@
   "noticeListen": { "message": "This video’s audio can’t be read. T-Translate can listen to it instead." },
   "noticeListenButton": { "message": "Listen" },
   "noticeDismiss": { "message": "Dismiss" },
+  "fileDropHint": { "message": "Drop to load the subtitle file" },
+  "fileLoaded": {
+    "message": "Loaded $NAME$ ($N$ lines)",
+    "placeholders": { "name": { "content": "$1" }, "n": { "content": "$2" } }
+  },
+  "fileUnreadable": { "message": "Can't read this subtitle file (SRT, VTT and TTML work)" },
+  "offsetEarlier": {
+    "message": "Captions $S$ s earlier",
+    "placeholders": { "s": { "content": "$1" } }
+  },
+  "offsetLater": {
+    "message": "Captions $S$ s later",
+    "placeholders": { "s": { "content": "$1" } }
+  },
+  "offsetReset": { "message": "Captions back on time" },
+  "autoPauseOn": { "message": "Pause after each line: on" },
+  "autoPauseOff": { "message": "Pause after each line: off" },
+  "noCues": { "message": "No captions on this video yet" },
+  "cmdPrev": { "message": "Previous line" },
+  "cmdNext": { "message": "Next line" },
+  "cmdRepeat": { "message": "Replay this line" },
+  "cmdAutoPause": { "message": "Turn pause after each line on or off" },
+  "cmdEarlier": { "message": "Captions 0.5 s earlier" },
+  "cmdLater": { "message": "Captions 0.5 s later" },
   "tabNoVideo": { "message": "No video on this page" },
   "tabCaptionsSite": { "message": "Translating the site's captions" },
   "tabCaptionsAudio": { "message": "Recognizing speech" },
@@ -70,10 +94,17 @@
   "sizeLarge": { "message": "L" },
   "sizeXlarge": { "message": "XL" },
   "popupTarget": { "message": "Translate to" },
+  "popupOffset": { "message": "Timing" },
+  "offsetValue": {
+    "message": "$V$ s",
+    "placeholders": { "v": { "content": "$1" } }
+  },
+  "popupAutoPause": { "message": "Pause each line" },
   "exportSrt": { "message": "Export captions" },
   "siteYoutube": { "message": "YouTube" },
   "siteBilibili": { "message": "Bilibili" },
   "siteTiktok": { "message": "TikTok" },
+  "siteNetflix": { "message": "Netflix" },
   "cacheTitle": { "message": "Subtitle cache" },
   "cacheStats": {
     "message": "Videos: $COUNT$ · $SIZE$",

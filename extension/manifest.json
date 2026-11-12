@@ -16,17 +16,17 @@
     "type": "module"
   },
   "permissions": ["storage", "offscreen", "tabs", "alarms", "scripting"],
-  "host_permissions": ["http://127.0.0.1/*", "*://*.youtube.com/*", "*://*.bilibili.com/*", "*://*.tiktok.com/*"],
+  "host_permissions": ["http://127.0.0.1/*", "*://*.youtube.com/*", "*://*.bilibili.com/*", "*://*.tiktok.com/*", "*://*.netflix.com/*"],
   "optional_host_permissions": ["<all_urls>"],
   "content_scripts": [
     {
-      "matches": ["*://*.youtube.com/*", "*://*.bilibili.com/*", "*://*.tiktok.com/*"],
+      "matches": ["*://*.youtube.com/*", "*://*.bilibili.com/*", "*://*.tiktok.com/*", "*://*.netflix.com/*"],
       "js": ["content-main.js"],
       "world": "MAIN",
       "run_at": "document_start"
     },
     {
-      "matches": ["*://*.youtube.com/*", "*://*.bilibili.com/*", "*://*.tiktok.com/*"],
+      "matches": ["*://*.youtube.com/*", "*://*.bilibili.com/*", "*://*.tiktok.com/*", "*://*.netflix.com/*"],
       "js": ["content-isolated.js"],
       "run_at": "document_start"
     }
@@ -42,5 +42,13 @@
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png"
     }
+  },
+  "commands": {
+    "prev-sentence": { "suggested_key": { "default": "Alt+Comma" }, "description": "__MSG_cmdPrev__" },
+    "next-sentence": { "suggested_key": { "default": "Alt+Period" }, "description": "__MSG_cmdNext__" },
+    "repeat-sentence": { "suggested_key": { "default": "Alt+R" }, "description": "__MSG_cmdRepeat__" },
+    "toggle-auto-pause": { "suggested_key": { "default": "Alt+P" }, "description": "__MSG_cmdAutoPause__" },
+    "subs-earlier": { "description": "__MSG_cmdEarlier__" },
+    "subs-later": { "description": "__MSG_cmdLater__" }
   }
 }

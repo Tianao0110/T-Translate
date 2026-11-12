@@ -1,5 +1,6 @@
 // One line over the video with a sentence, a button if there is one, and a
-// dismiss: the tier-3 prompt, the permission hint. In a shadow root like the caption overlay, mounted in
+// dismiss: the tier-3 prompt, the permission hint, a passing line (a file
+// loaded, the caption timing). In a shadow root like the caption overlay, mounted in
 // the fullscreen element while one holds the video, laid over the video's
 // lower edge. show() replaces what is shown; hide() keeps the host for the
 // next show; destroy() removes it.

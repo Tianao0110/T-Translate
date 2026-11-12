@@ -51,16 +51,17 @@ src/content/media-watch.js        找页面里的 video / audio，报播放状�
 src/content/mse-relay.js          MSE 音频：环形缓冲，打开转发后按 256 KB / 1 秒一包送出
 src/content/webm-sniff.js         不解封装读 WebM 分片的媒体时间（Cluster Timecode）
 src/content/mp4-sniff.js          不解封装读 fMP4 分片的媒体时间（mdhd timescale + tfdt）
-src/content/sites/                站点适配：YouTube（媒体 id、timedtext、导航、隐藏站点字幕、播放器操作）、B 站（BV / av / 番剧 id、分 P、字幕清单 → 取字幕体）、TikTok（视频页 id 或播放器外框的条目 id、信息流换视频即导航、条目数据认领 WebVTT）、通用（字幕文件按扩展名认）；前三个还报控制条从哪开始（controls.js），覆盖层字幕在它上面
+src/content/sites/                站点适配：YouTube（媒体 id、timedtext、导航、隐藏站点字幕、播放器操作）、B 站（BV / av / 番剧 id、分 P、字幕清单 → 取字幕体）、TikTok（视频页 id 或播放器外框的条目 id、信息流换视频即导航、条目数据认领 WebVTT）、Netflix（播放清单里的字幕轨 → 取声音同语言的那条，跳转和暂停走它的播放器）、通用（字幕文件按扩展名认）；四个站点还报控制条从哪开始（controls.js），覆盖层字幕在它上面
 src/content/parsers/              站点字幕解析：VTT、SRT、TTML、json3、B 站 JSON，detectFormat 认格式
 src/content/caption-track.js      字幕画成视频的原生字幕轨（TextTrack），同样一次一句；视频本身全屏时覆盖层画不上去，临时换成它
 src/content/overlay.js            覆盖层（默认画法）：画在视频上，跟随全屏；一次一句，停顿时多留一会儿，新的淡入；广告时隐藏
 src/content/caption-size.js       字号四档（小 / 中 / 大 / 特大）对应的倍数
 src/content/cue-timing.js         一句显示多久（两种画法共用）
 src/content/caption-renderer.js   字幕与译文、双语 / 只译文 / 只原文、两种画法切换、字号，接媒体流水线事件
-src/content/notice.js             视频上的一行提示（DRM 时「用 T-Translate 听译」+ 按钮；视频所在网站未允许时只有关闭）
+src/content/notice.js             视频上的一行提示（DRM 时「用 T-Translate 听译」+ 按钮；视频所在网站未允许时只有关闭；拖入字幕文件、调字幕时间时闪一下）
+src/content/study.js              上一句 / 下一句 / 重播这一句、每句暂停（快捷键和弹窗的命令都到这里）
 src/options/                      选项页：顶部四个数字（连接、缓存视频数、缓存大小、禁止网站数）、配对、禁止字幕的网站（可移除）、字幕缓存（每页 10 个，标题、网站、时间，勾选后批量删除或导出 SRT）
-src/popup/                        工具栏弹窗：当前标签页状态、「允许在本站使用」/「允许」读取视频、显示方式（选「无」即关闭）、字号、画法、目标语言、导出字幕、在此网站禁用 / 恢复
+src/popup/                        工具栏弹窗：当前标签页状态、「允许在本站使用」/「允许」读取视频、显示方式（选「无」即关闭）、字号、画法、目标语言、字幕时间 − / +、每句暂停、导出字幕、在此网站禁用 / 恢复
 src/shared/                       协议常量、消息约定（媒体字节走 base64）、页面事件格式与校验、状态文案、SRT / VTT 导出、配色、MP4 采样表（mp4-table.js）、匹配模式（match-pattern.js）
 scripts/build.mjs                 esbuild 构建 → dist/（不入库）；--target firefox → dist-firefox/；extraHosts 只给真机脚本用（无头浏览器点不了授权框）
 scripts/e2e-client.js             端到端：真实通道 + 真实引擎（npm run smoke:caption-client -- --packs <已装听译包目录>）
@@ -70,7 +71,8 @@ scripts/e2e-hooks.js              真机：真实 YouTube 页面上验钩子、�
 scripts/e2e-auto.js               真机：不下任何命令，真实 YouTube 页面上字幕自己出现；暂停 / 跳转 / 切标签页 / 关站点 / DRM 提示（用法见文件头）
 scripts/e2e-bilibili.js           真机：真实 B 站页面的证据、AAC 音频识别出双语字幕、MediaSource 重建后续上、字幕清单、分 P；构造清单走一级（用法见文件头）
 scripts/e2e-tiktok.js             真机：真实 TikTok 信息流与视频页，HE-AAC 识别出双语字幕、往下刷一条即导航、站点 WebVTT 走一级、本站开关（用法见文件头）
-scripts/e2e-popup.js              真机：真实 YouTube 页面上的弹窗、显示方式（含「无」）、字号、导出、缓存与选项页（用法见文件头）
+scripts/e2e-popup.js              真机：真实 YouTube 页面上的弹窗、显示方式（含「无」）、字号、字幕时间、每句暂停、导出、缓存与选项页（用法见文件头）
+scripts/e2e-study.js              真机：真实 YouTube 页面上的快捷键注册、上一句 / 下一句 / 重播、每句暂停、字幕时间、拖入 SRT 走一级（用法见文件头）
 scripts/e2e-direct.js             真机：本地页面直链播放的 MP4（moov 在前 / 在后），取流起点、领先量、跳转、中止、<track> 字幕（用法见文件头）
 scripts/e2e-generic.js            真机：普通网站从弹窗允许、立即注入、状态机自己出字幕、跳转交接识别会话、视频在另一网站时的提示与授权、竖屏字号、移除网站（用法见文件头）
 scripts/make-fixture.js           重录单测样本 test/fixtures/tone-2s.webm

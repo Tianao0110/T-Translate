@@ -6,7 +6,8 @@
 //   (a) the status line says what the orchestrator does in that tab; a tab
 //       without our scripts has no video
 //   (b) the display segments: the track's active cue follows (translation
-//       only, then both lines)
+//       only, then both lines); the size; the caption timing − / + (the
+//       track's lines move, the value shows it); pause per line reaching the page
 //   (c) the site switch: the tab goes off with the badge, then back on
 //   (d) export: an SRT download (Browser.setDownloadBehavior) with at least
 //       as many cues as the track had
@@ -81,7 +82,7 @@ async function main() {
       const v = await popupView();
       return v.status === want && v.exportOn ? v : null;
     }, 10000);
-    step('(a) the popup’s status line says what runs in the tab; controls show the prefs', !!v1 && v1.display === 'bilingual' && v1.rows === 4 && v1.mode === 'track' && v1.target === 'zh', JSON.stringify(v1 || (await popupView())));
+    step('(a) the popup’s status line says what runs in the tab; controls show the prefs', !!v1 && v1.display === 'bilingual' && v1.rows === 6 && v1.mode === 'track' && v1.target === 'zh', JSON.stringify(v1 || (await popupView())));
     const popBox = await evaluate(pop, `(() => { const r = document.body.getBoundingClientRect(); return { x: 0, y: 0, width: Math.ceil(r.width), height: Math.ceil(r.height) }; })()`);
     if (v1) {
       for (const scheme of ['dark', 'light']) {
@@ -120,6 +121,32 @@ async function main() {
     await click('input[name=size][value=medium]');
     const medium = await sizeOnPage('medium');
     step('(b) size segments: medium checked, small then medium reach the video', sizeChecked === 'medium' && prefsSmall?.size === 'small' && !!small && !!medium, `checked ${sizeChecked}; prefs ${prefsSmall?.size}; page small ${!!small}, medium ${!!medium}`);
+    const firstStart = () => evaluate(page1, `(() => { const t = Array.from(document.querySelector('video').textTracks).find((x) => x.label === 'T-Caption'); return t && t.cues.length ? t.cues[0].startTime : null; })()`);
+    const timingView = () => evaluate(pop, `({ shown: !document.getElementById('offset-row').hidden, value: document.getElementById('offset-value').textContent })`);
+    const start0 = await firstStart();
+    const timing0 = await timingView();
+    await click('#offset-plus');
+    await click('#offset-plus');
+    const timingLater = await until(async () => {
+      const v = await timingView();
+      return v.value === msg('offsetValue', ['+1']) ? v : null;
+    }, 5000, 100);
+    const startLater = await firstStart();
+    const viewLater = (await shell.query(tab1))?.view;
+    await click('#offset-minus');
+    await click('#offset-minus');
+    const timingBack = await until(async () => {
+      const v = await timingView();
+      return v.value === msg('offsetValue', ['0']) ? v : null;
+    }, 5000, 100);
+    numbers.timing = { before: { ...timing0, start: start0 }, later: { ...timingLater, start: startLater, offset: viewLater?.offset }, back: timingBack };
+    step('(b) caption timing: shown with captions at 0 s, + twice moves the lines 1 s later, − twice back', timing0?.shown && timing0.value === msg('offsetValue', ['0']) && !!timingLater && Math.abs(startLater - start0 - 1) < 0.01 && viewLater?.offset === 1 && !!timingBack, JSON.stringify(numbers.timing));
+    await click('#auto-pause');
+    const pauseOn = await until(async () => ((await shell.query(tab1))?.view?.autoPause === true ? true : null), 5000, 100);
+    const prefsPause = await shell.getPrefs();
+    await click('#auto-pause');
+    const pauseOff = await until(async () => ((await shell.query(tab1))?.view?.autoPause === false ? true : null), 5000, 100);
+    step('(b) pause per line: the switch reaches the page and the prefs, then off again', !!pauseOn && prefsPause?.autoPause === true && !!pauseOff, `on ${!!pauseOn} (prefs ${prefsPause?.autoPause}), off ${!!pauseOff}`);
 
     // ---- (c) display off: T-Caption off everywhere, then on again ----
     await click('input[name=display][value=off]');

@@ -1,7 +1,7 @@
 // Toolbar popup: what T-Caption does in the current tab, the prefs that
 // matter while watching (written straight to chrome.storage.local, which the
 // worker follows), turning the site off or on, and the tab's captions as an
-// SRT file. On a page T-Caption
+// SRT file, and the caption timing of the tab's video. On a page T-Caption
 // is not on yet, or whose video's host it may not read, one button asks the
 // browser for that host (it has to be asked in the click itself).
 // popup.html?tab=<tabId> picks the tab instead (only the e2e scripts use it).
@@ -19,6 +19,7 @@ import { t, localize } from '../shared/page.js';
 const TARGETS = ['zh', 'zh-TW', 'en', 'ja', 'ko', 'fr', 'de', 'es', 'ru', 'pt', 'it', 'vi', 'th', 'ar'];
 const NAME_TAGS = { zh: 'zh-Hans', 'zh-TW': 'zh-Hant' };
 const REFRESH_MS = 1000;
+const OFFSET_STEP_S = 0.5;
 
 const $ = (id) => document.getElementById(id);
 const prefs = createPrefs();
@@ -27,6 +28,7 @@ let tab = null;
 let evidence = null;
 let channel = null;
 let cueCount = 0;
+let offset = 0; // the tab's caption timing, seconds
 let pageUrl = '';
 let allow = null; // { pattern, kind: 'site' | 'read' }
 let allowNote = '';
@@ -97,6 +99,9 @@ function render() {
   for (const el of document.querySelectorAll('input[name="display"]')) el.checked = el.value === (p.enabled ? p.display : 'off');
   for (const el of document.querySelectorAll('input[name="mode"]')) el.checked = el.value === p.mode;
   for (const el of document.querySelectorAll('input[name="size"]')) el.checked = el.value === p.size;
+  $('auto-pause').checked = p.autoPause;
+  $('offset-row').hidden = cueCount === 0;
+  $('offset-value').textContent = offsetText(offset);
   fillTargets(p.targetLang);
   $('export').disabled = cueCount === 0;
   const site = currentSite();
@@ -111,7 +116,21 @@ async function refresh() {
     pageUrl = info?.url || info?.pendingUrl || '';
     const q = evidence ? await result(MSG.TAB_COMMAND, { tabId, command: { cmd: 'query' } }) : null;
     cueCount = q?.renderer?.cues ?? 0;
+    offset = q?.view?.offset ?? 0;
   }
+  render();
+}
+
+// "+1.5 s" / "0 s": later is positive.
+function offsetText(s) {
+  const n = Math.abs(s).toFixed(1).replace(/\.0$/, '');
+  const signed = s > 0 ? `+${n}` : s < 0 ? `−${n}` : n;
+  return t('offsetValue', [signed]) || `${signed} s`;
+}
+
+async function stepOffset(delta) {
+  const r = await result(MSG.TAB_COMMAND, { tabId, command: { cmd: 'offset', delta } });
+  if (typeof r?.offset === 'number') offset = r.offset;
   render();
 }
 
@@ -180,6 +199,9 @@ $('site-toggle').addEventListener('click', () => {
 $('mode').addEventListener('change', (e) => prefs.set({ mode: e.target.value }));
 $('size').addEventListener('change', (e) => prefs.set({ size: e.target.value }));
 $('target').addEventListener('change', (e) => prefs.set({ targetLang: e.target.value }));
+$('auto-pause').addEventListener('change', (e) => prefs.set({ autoPause: e.target.checked }));
+$('offset-minus').addEventListener('click', () => stepOffset(-OFFSET_STEP_S));
+$('offset-plus').addEventListener('click', () => stepOffset(OFFSET_STEP_S));
 $('export').addEventListener('click', exportSrt);
 
 prefs.onChange(render);

@@ -41,6 +41,30 @@
   "noticeListen": { "message": "此视频无法读取音频，可以用 T-Translate 听译" },
   "noticeListenButton": { "message": "开始听译" },
   "noticeDismiss": { "message": "关闭" },
+  "fileDropHint": { "message": "松开以载入字幕文件" },
+  "fileLoaded": {
+    "message": "已载入字幕：$NAME$（$N$ 句）",
+    "placeholders": { "name": { "content": "$1" }, "n": { "content": "$2" } }
+  },
+  "fileUnreadable": { "message": "读不出这个字幕文件（支持 SRT、VTT、TTML）" },
+  "offsetEarlier": {
+    "message": "字幕提前 $S$ 秒",
+    "placeholders": { "s": { "content": "$1" } }
+  },
+  "offsetLater": {
+    "message": "字幕推迟 $S$ 秒",
+    "placeholders": { "s": { "content": "$1" } }
+  },
+  "offsetReset": { "message": "字幕时间已复原" },
+  "autoPauseOn": { "message": "每句暂停：开" },
+  "autoPauseOff": { "message": "每句暂停：关" },
+  "noCues": { "message": "这个视频还没有字幕" },
+  "cmdPrev": { "message": "上一句" },
+  "cmdNext": { "message": "下一句" },
+  "cmdRepeat": { "message": "重播这一句" },
+  "cmdAutoPause": { "message": "开关每句暂停" },
+  "cmdEarlier": { "message": "字幕提前 0.5 秒" },
+  "cmdLater": { "message": "字幕推迟 0.5 秒" },
   "tabNoVideo": { "message": "此页面没有视频" },
   "tabCaptionsSite": { "message": "站点字幕翻译中" },
   "tabCaptionsAudio": { "message": "识别中" },
@@ -70,10 +94,17 @@
   "sizeLarge": { "message": "大" },
   "sizeXlarge": { "message": "特大" },
   "popupTarget": { "message": "译成" },
+  "popupOffset": { "message": "字幕时间" },
+  "offsetValue": {
+    "message": "$V$ 秒",
+    "placeholders": { "v": { "content": "$1" } }
+  },
+  "popupAutoPause": { "message": "每句暂停" },
   "exportSrt": { "message": "导出字幕" },
   "siteYoutube": { "message": "YouTube" },
   "siteBilibili": { "message": "B 站" },
   "siteTiktok": { "message": "TikTok" },
+  "siteNetflix": { "message": "Netflix" },
   "cacheTitle": { "message": "字幕缓存" },
   "cacheStats": {
     "message": "$COUNT$ 个视频，共 $SIZE$",

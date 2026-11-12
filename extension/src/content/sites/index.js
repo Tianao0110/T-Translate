@@ -3,13 +3,14 @@
 import { youtube } from './youtube.js';
 import { bilibili } from './bilibili.js';
 import { tiktok } from './tiktok.js';
+import { netflix } from './netflix.js';
 import { generic } from './generic.js';
 
-const SITES = [youtube, bilibili, tiktok];
+const SITES = [youtube, bilibili, tiktok, netflix];
 
 export function siteFor(hostname) {
   const host = String(hostname || '').toLowerCase();
   return SITES.find((s) => s.test(host)) || generic;
 }
 
-export { youtube, bilibili, tiktok, generic };
+export { youtube, bilibili, tiktok, netflix, generic };

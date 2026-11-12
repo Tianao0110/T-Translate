@@ -30,6 +30,7 @@ export function createCaptionRenderer({
   if (!SIZES.includes(size)) size = DEFAULT_SIZE;
   let entries = new Map();
   let hidden = false;
+  let offset = 0; // seconds every cue is shown later (negative: earlier)
   const makeView = (m) => {
     const v = m === 'overlay' ? makeOverlay({ video, size, controlsTop }) : createCaptionTrack({ video, lang, label, addTextTrack, createCue, size });
     if (hidden) v.setHidden?.(true);
@@ -44,7 +45,7 @@ export function createCaptionRenderer({
     if (display === 'translation') return e.translation;
     return sameText(e.text, e.translation) ? e.text : `${e.text}\n${e.translation}`;
   }
-  const viewCue = (e) => ({ id: e.id, start: e.start, end: e.end, text: textOf(e) });
+  const viewCue = (e) => ({ id: e.id, start: Math.max(0, e.start + offset), end: Math.max(0, e.end + offset), text: textOf(e) });
 
   // A cue's translation survives a re-set as long as its text is unchanged.
   function entryOf(c) {
@@ -63,6 +64,9 @@ export function createCaptionRenderer({
     },
     get size() {
       return size;
+    },
+    get offset() {
+      return offset;
     },
     get view() {
       return view;
@@ -109,6 +113,14 @@ export function createCaptionRenderer({
       if (!SIZES.includes(next) || next === size) return;
       size = next;
       view.setSize?.(size);
+    },
+
+    // Every cue moved by s seconds (the list keeps the times it was given).
+    setOffset(s) {
+      const next = Number.isFinite(s) ? s : 0;
+      if (next === offset) return;
+      offset = next;
+      view.set([...entries.values()].map(viewCue));
     },
 
     // Nothing shows while an ad plays in the video; the cues stay.

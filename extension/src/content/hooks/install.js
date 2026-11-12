@@ -1,6 +1,6 @@
-// Page world wiring: the site adapter's subtitle rule, the three hook sets,
-// the outbox and the hello listener; commands run the adapter's page-world
-// actions. Leaves no global behind.
+// Page world wiring: the site adapter's subtitle rule, the three hook sets
+// and its own (installMain), the outbox and the hello listener; commands run
+// the adapter's page-world actions. Leaves no global behind.
 
 import { installNetHooks } from './net.js';
 import { installMseHooks } from './mse.js';
@@ -34,6 +34,7 @@ export function installPageHooks(win, { site = siteFor(win.location?.hostname), 
     ...installMseHooks(win, { emit }),
     ...installEmeHooks(win, { emit }),
   };
+  site.installMain?.(win, { emit });
   emit({ k: 'hooks', status });
 
   acceptHello(win, outbox, (cmd, args) => {

@@ -488,11 +488,12 @@ export function createOrchestrator({
   // ---- running ----
 
   function sendView(r, p) {
-    if (r.view && r.view.display === p.display && r.view.mode === p.mode && r.view.size === p.size) return;
-    r.view = { display: p.display, mode: p.mode, size: p.size };
+    if (r.view && r.view.display === p.display && r.view.mode === p.mode && r.view.size === p.size && r.view.autoPause === p.autoPause) return;
+    r.view = { display: p.display, mode: p.mode, size: p.size, autoPause: p.autoPause };
     quiet(cmd(r, { cmd: 'display', value: p.display }));
     quiet(cmd(r, { cmd: 'mode', value: p.mode }));
     quiet(cmd(r, { cmd: 'size', value: p.size }));
+    quiet(cmd(r, { cmd: 'auto-pause', value: p.autoPause }));
   }
 
   function start(r, d, p) {

@@ -68,7 +68,7 @@ act('load', MSG.COMPANION_LOAD);
 
 // ---- sites switched off ----
 
-const SITE_NAMES = { youtube: 'siteYoutube', bilibili: 'siteBilibili', tiktok: 'siteTiktok' };
+const SITE_NAMES = { youtube: 'siteYoutube', bilibili: 'siteBilibili', tiktok: 'siteTiktok', netflix: 'siteNetflix' };
 const siteName = (key) => (Object.hasOwn(SITE_NAMES, key) ? t(SITE_NAMES[key]) : key);
 const prefs = createPrefs();
 

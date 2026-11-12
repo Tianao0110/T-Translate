@@ -13,6 +13,7 @@ import { PAGE_EVENT_MAX_CHARS, MAX_CUES_PER_PART, sanitizeCue } from '../shared/
 import { detectFormat, parseSubtitles } from './parsers/index.js';
 import { createCaptionRenderer, MODES, DISPLAYS, SIZES } from './caption-renderer.js';
 import { DEFAULT_SIZE } from './caption-size.js';
+import { createStudy } from './study.js';
 import { createBridge } from './bridge.js';
 import { createMediaWatch } from './media-watch.js';
 import { createMseRelay } from './mse-relay.js';
@@ -29,6 +30,12 @@ const BODY_TIMEOUT_MS = 15000;
 // before its URL changes: what came this shortly before a navigation is the new page's.
 const CARRY_MS = 3000;
 const AD_POLL_MS = 500;
+const FLASH_MS = 3000;
+const MAX_OFFSET_S = 30;
+const DRAG_HINT_MS = 600;
+const PLAYER_MS = 5000;
+const SUBTITLE_FILE = /\.(srt|vtt|ttml|dfxp|xml)$/i;
+const MAX_SUBTITLE_FILE_BYTES = 8 * 1024 * 1024;
 const PART_CHARS = PAGE_EVENT_MAX_CHARS - 8192; // room for the event's other fields
 
 const err = (code) => Object.assign(new Error(code), { code });
@@ -85,18 +92,19 @@ export function createPageAgent({
   let subtitles = [];
   let lists = []; // subtitle lists read this navigation: { url, entries, picked, status }
   let listsSeen = new Set(); // list and body URLs already handled this navigation
-  const view = { display: 'bilingual', mode: 'track', size: DEFAULT_SIZE, siteCaptions: 'show' };
+  const view = { display: 'bilingual', mode: 'track', size: DEFAULT_SIZE, siteCaptions: 'show', offset: 0, autoPause: false };
   let feedEl = null; // feeds: the primary video the media id was last checked against
   let renderer = null;
+  let study = null; // sentence controls on the renderer's video
   let rendererEl = null;
   let notice = null;
   let noticeEl = null;
   let trackEl = null; // the video whose <track> children are watched
   let trackObserver = null;
   let tracksSeen = new Set(); // track file URLs fetched this navigation
-  const t = (key) => {
+  const t = (key, subs) => {
     try {
-      return i18n?.getMessage?.(key) || '';
+      return i18n?.getMessage?.(key, subs) || '';
     } catch {
       return '';
     }
@@ -169,7 +177,8 @@ export function createPageAgent({
 
   // extra: what a subtitle list said about the body (its language and kind).
   function onSubtitle(ev, extra = null) {
-    const info = site.subtitleInfo(ev.url) || {};
+    // A file the user dropped is this video's, whatever the site's rules for its own files.
+    const info = ev.via === 'file' ? {} : site.subtitleInfo(ev.url) || {};
     if (info.list) return onSubtitleList(ev);
     // Item data saying whose each subtitle file is (TikTok); a file no item claims is dropped.
     if (info.catalog) return site.readCatalog?.(ev.text);
@@ -184,7 +193,7 @@ export function createPageAgent({
       format,
       lang: extra?.lang ?? info.lang ?? '',
       kind: extra?.kind ?? info.kind ?? '',
-      mediaId: info.mediaId ?? null,
+      mediaId: extra?.mediaId ?? info.mediaId ?? null,
       cueCount: cues.length,
       cues,
       at: now(),
@@ -314,6 +323,8 @@ export function createPageAgent({
   // ---- captions ----
 
   function destroyRenderer() {
+    study?.destroy();
+    study = null;
     renderer?.destroy();
     renderer = null;
     rendererEl = null;
@@ -354,6 +365,9 @@ export function createPageAgent({
     renderer = makeRenderer({ video: v, mode: modeFor(v), display: view.display, size: view.size, controlsTop: site.controlsTop });
     rendererEl = v;
     if (adShown) renderer.setHidden(true);
+    if (view.offset) renderer.setOffset(view.offset);
+    study = createStudy({ video: v, cues: shownCues, control: playerControl() });
+    study.setAutoPause(view.autoPause);
     if (saved.length) {
       renderer.setCues(saved);
       for (const e of saved) if (e.translation) renderer.setTranslation(e.id, e.translation, true);
@@ -361,7 +375,47 @@ export function createPageAgent({
     return renderer;
   }
 
+  // Seek / pause / play through the site's player in the page world, for
+  // sites that offer it (a 'player' action); null: on the video itself.
+  function playerControl() {
+    if (!Object.hasOwn(site.mainActions || {}, 'player')) return null;
+    const run = (op, s) => {
+      bridge.command('player', s === undefined ? { op } : { op, s }, PLAYER_MS).catch((e) => console.debug(`[T-Caption] player ${op}: ${e?.code ?? e?.message ?? e}`));
+    };
+    return { seek: (s) => run('seek', s), pause: () => run('pause'), play: () => run('play') };
+  }
+
   const listOf = (many, one) => (Array.isArray(many) ? many : one ? [one] : []);
+
+  // The cues as shown, offset applied, for the sentence controls.
+  const shownCues = () => (renderer ? renderer.list().map((e) => ({ start: e.start + view.offset, end: e.end + view.offset })) : []);
+
+  // Shown later by s seconds (negative: earlier), for this video only.
+  function setOffset(s, announce) {
+    view.offset = Math.round(Math.max(-MAX_OFFSET_S, Math.min(MAX_OFFSET_S, s)) * 10) / 10;
+    renderer?.setOffset(view.offset);
+    if (announce) {
+      const n = String(Math.abs(view.offset));
+      flash(view.offset === 0 ? t('offsetReset') || 'Captions back on time' : t(view.offset < 0 ? 'offsetEarlier' : 'offsetLater', [n]) || `Captions ${view.offset}s`);
+    }
+    return { offset: view.offset };
+  }
+
+  function setAutoPause(on, announce) {
+    view.autoPause = !!on;
+    study?.setAutoPause(view.autoPause);
+    if (announce) flash(t(view.autoPause ? 'autoPauseOn' : 'autoPauseOff') || `Pause after each line: ${view.autoPause ? 'on' : 'off'}`);
+    return { autoPause: view.autoPause };
+  }
+
+  function goSentence(action) {
+    if (!study || !renderer?.list().length) {
+      flash(t('noCues') || 'No captions on this video yet');
+      throw err('no-cues');
+    }
+    const target = study.go(action);
+    return { at: target ? target.start : null };
+  }
 
   function applyCues(c) {
     if (c.op === 'list') return { cues: renderer ? renderer.list() : [] };
@@ -413,6 +467,66 @@ export function createPageAgent({
     }
     notice.show({ kind, ...NOTICES[kind](), dismissTitle: t('noticeDismiss') || 'Dismiss' });
     return { kind };
+  }
+
+  // A line of our own over the video (a dropped file, a shortcut), gone after a while.
+  let flashTimer = 0;
+  function flash(text, ms = FLASH_MS) {
+    const v = media.primaryVideo();
+    if (!v) return;
+    if (!notice || noticeEl !== v) {
+      destroyNotice();
+      notice = makeNotice({ video: v, onAccept: () => {}, onDismiss: () => {} });
+      noticeEl = v;
+    }
+    notice.show({ kind: 'flash', text, button: null, dismissTitle: t('noticeDismiss') || 'Dismiss' });
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => notice?.hide(), ms);
+  }
+
+  // ---- subtitle files dropped on the video ----
+
+  const overVideo = (e) => {
+    const v = media.primaryVideo();
+    if (!v) return null;
+    const r = v.getBoundingClientRect();
+    return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom ? v : null;
+  };
+  const carriesFiles = (e) => Array.from(e.dataTransfer?.types || []).includes('Files');
+
+  let dragHintTimer = 0;
+  function onDragOver(e) {
+    if (!carriesFiles(e) || !overVideo(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    if (!dragHintTimer) flash(t('fileDropHint') || 'Drop to load the subtitles', 60000);
+    clearTimeout(dragHintTimer);
+    dragHintTimer = setTimeout(() => {
+      dragHintTimer = 0;
+      notice?.hide();
+    }, DRAG_HINT_MS);
+  }
+
+  // Taken over the video only: a subtitle file becomes this video's track
+  // (onSubtitle, as if the site had sent it); anything else is refused there.
+  async function onDrop(e) {
+    if (!carriesFiles(e) || !overVideo(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    clearTimeout(dragHintTimer);
+    dragHintTimer = 0;
+    const file = Array.from(e.dataTransfer.files || []).find((f) => SUBTITLE_FILE.test(f.name));
+    if (!file || file.size > MAX_SUBTITLE_FILE_BYTES) return flash(t('fileUnreadable') || 'Only SRT, VTT and TTML subtitle files');
+    const nav = navSeq;
+    let text = '';
+    try {
+      text = await file.text();
+    } catch {}
+    if (!alive || nav !== navSeq) return;
+    onSubtitle({ via: 'file', url: `local-file:${file.name}`, status: 200, contentType: '', text }, { lang: '', kind: '', mediaId });
+    const sub = subtitles.at(-1);
+    if (!sub || sub.url !== `local-file:${file.name}` || !sub.cueCount) return flash(t('fileUnreadable') || 'Only SRT, VTT and TTML subtitle files');
+    flash(t('fileLoaded', [file.name, String(sub.cueCount)]) || `Loaded ${file.name} (${sub.cueCount} lines)`);
   }
 
   // The site was taken off T-Caption's list: nothing of ours stays on the page.
@@ -474,6 +588,17 @@ export function createPageAgent({
         view.size = c.value;
         renderer?.setSize(c.value);
         return { size: view.size };
+      // { delta } or { value } in seconds; announce: a line on the video.
+      case 'offset':
+        if (Number.isFinite(c.delta)) return setOffset(view.offset + c.delta, !!c.announce);
+        if (Number.isFinite(c.value)) return setOffset(c.value, !!c.announce);
+        throw err('bad-command');
+      case 'auto-pause':
+        if (typeof c.value !== 'boolean') throw err('bad-command');
+        return setAutoPause(c.value, !!c.announce);
+      case 'sentence':
+        if (!['prev', 'next', 'repeat'].includes(c.action)) throw err('bad-command');
+        return goSentence(c.action);
       case 'site-captions': {
         if (c.value !== 'hide' && c.value !== 'show') throw err('bad-command');
         const applied = setSiteCaptions(c.value === 'hide');
@@ -515,6 +640,7 @@ export function createPageAgent({
     relay.keepAttached(new Set(media.list().map((m) => m.src).filter(Boolean)));
     destroyRenderer();
     destroyNotice();
+    view.offset = 0;
     if (view.siteCaptions === 'hide') setSiteCaptions(false);
     reportAll();
     tracksSeen = new Set();
@@ -580,6 +706,8 @@ export function createPageAgent({
   const unwatchNav = site.watchNavigation({ doc, win }, onNavigate);
   doc.addEventListener('visibilitychange', onVisibility);
   doc.addEventListener('fullscreenchange', recheckMode);
+  doc.addEventListener('dragover', onDragOver, true);
+  doc.addEventListener('drop', onDrop, true);
   const adTimer = site.adShowing ? win.setInterval(checkAd, AD_POLL_MS) : 0;
   const unhandle = handle({ [MSG.PAGE_COMMAND]: runCommand }, { runtime, accept: (_m, sender) => sender?.id === runtime.id && !sender.tab });
 
@@ -602,6 +730,10 @@ export function createPageAgent({
     unwatchNav();
     doc.removeEventListener('visibilitychange', onVisibility);
     doc.removeEventListener('fullscreenchange', recheckMode);
+    doc.removeEventListener('dragover', onDragOver, true);
+    doc.removeEventListener('drop', onDrop, true);
+    clearTimeout(flashTimer);
+    clearTimeout(dragHintTimer);
     if (adTimer) win.clearInterval(adTimer);
     try {
       unhandle();
