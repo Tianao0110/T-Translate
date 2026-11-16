@@ -1,12 +1,12 @@
-// llama.cpp b12318 ABI as T-Engine uses it: struct layouts, function
+// llama.cpp b12359 ABI as T-Engine uses it: struct layouts, function
 // prototypes, enums and the default-parameter fingerprint, transcribed from
 // the pinned headers (include/llama.h, ggml.h, ggml-backend.h, gguf.h,
-// tools/mtmd/mtmd.h and mtmd-helper.h at tag b12318). The annual re-pin
+// tools/mtmd/mtmd.h and mtmd-helper.h at tag b12359). The annual re-pin
 // re-checks this file field by field (rules: docs/T-ENGINE.md §4);
 // tests/unit/tengine/llama-abi.test.js holds the struct sizes and the
 // fingerprint the pinned DLLs must reproduce.
 
-const BUILD = 'b12318';
+const BUILD = 'b12359';
 
 const STRUCTS = {
   llama_model_params: {
@@ -50,7 +50,6 @@ const STRUCTS = {
     yarn_beta_fast: 'float',
     yarn_beta_slow: 'float',
     yarn_orig_ctx: 'uint32',
-    defrag_thold: 'float',
     cb_eval: 'void *',
     cb_eval_user_data: 'void *',
     type_k: 'int32',
@@ -270,7 +269,7 @@ const ENUMS = {
 // What the pinned DLLs answer through the layouts above; the ABI test
 // compares them when the DLLs are present.
 const GOLDEN = {
-  version: '0.9.0-dev',
+  version: '1.0.0-dev',
   modelParams: {
     devices: null, tensor_buft_overrides: null, n_gpu_layers: -1, split_mode: 1, load_mode: -1, lazy_mode: 1, main_gpu: 0,
     tensor_split: null, progress_callback: null, progress_callback_user_data: null, kv_overrides: null,
@@ -280,7 +279,7 @@ const GOLDEN = {
     n_ctx: 512, n_batch: 2048, n_ubatch: 512, n_seq_max: 1, n_rs_seq: 0, n_outputs_max: 0, n_outputs_max_per_seq: 1,
     n_threads: 4, n_threads_batch: 4,
     ctx_type: 0, rope_scaling_type: -1, pooling_type: -1, attention_type: -1, flash_attn_type: -1,
-    rope_freq_base: 0, rope_freq_scale: 0, yarn_ext_factor: -1, yarn_attn_factor: -1, yarn_beta_fast: -1, yarn_beta_slow: -1, yarn_orig_ctx: 0, defrag_thold: -1,
+    rope_freq_base: 0, rope_freq_scale: 0, yarn_ext_factor: -1, yarn_attn_factor: -1, yarn_beta_fast: -1, yarn_beta_slow: -1, yarn_orig_ctx: 0,
     cb_eval: null, cb_eval_user_data: null, type_k: 1, type_v: 1, moe_cache_size: 0, moe_cache_cpu_share: 0,
     abort_callback: null, abort_callback_data: null,
     embeddings: false, offload_kqv: true, no_perf: true, op_offload: true, swa_full: true, kv_unified: false,

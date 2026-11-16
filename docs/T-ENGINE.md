@@ -77,11 +77,11 @@ IPC 通道前缀 `tengine:*`。宿主与主进程之间只走 utilityProcess 消
 | 项 | 值 |
 | --- | --- |
 | 来源 | llama.cpp GitHub Release，只取 `llama-<build>-bin-win-vulkan-x64.zip`：它是 CPU 包的超集（多一个 ggml-vulkan.dll，其余 DLL 逐字节相同，b10853 核过） |
-| 当前钉版 | b12318（2026-11-12） |
+| 当前钉版 | b12359（2026-11-15，即 llama.cpp v1.0.0；正式版本身只带一个指向夜版号的文本文件，DLL 在对应的 bNNNN 夜版里，所以钉夜版号） |
 | 取用文件 | `llama.dll`、`mtmd.dll`、`ggml.dll`、`ggml-base.dll`、`ggml-cpu-*.dll`（全部变体，运行时自选）、`ggml-vulkan.dll`、`libomp.dll` + `LICENSE-LLVM-OpenMP` |
 | 不取 | CUDA 包（143–242 MB + cudart 373 MB）、各 `llama-*.exe`、`llama-server-impl.dll`、`ggml-rpc*` |
 | 清单 | `electron/tengine/runtime/llama-manifest.json`：zip 与取用的 21 个文件各自的 SHA256 与大小，取包脚本与装载探针都按它核对 |
-| 体积 | zip 36 MB；取用的 21 个文件解压约 67 MB，其中 ggml-vulkan.dll 40 MB（b12318） |
+| 体积 | zip 36 MB；取用的 21 个文件解压约 67 MB，其中 ggml-vulkan.dll 40 MB（b12359） |
 | 后端加载 | `ggml_backend_load_all_from_path(<DLL 目录>)`，之后 `ggml_backend_dev_count/get/name/description` 枚举设备 |
 
 koffi 装载顺序（否则依赖解析失败）：`SetDllDirectoryW(<目录>)` → `libomp.dll` → `ggml-base.dll` → `ggml.dll` → `llama.dll` → `mtmd.dll`。设备 API（`ggml_backend_dev_name` 等）在 `ggml-base.dll`，注册表 API（`load_all`、`dev_count`、`dev_get`）在 `ggml.dll`，绑定里按顺序尝试两个句柄。
