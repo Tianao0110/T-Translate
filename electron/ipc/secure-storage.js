@@ -84,9 +84,3 @@ function register(ctx) {
 module.exports = register;
 // Re-exported for main-side consumers (floating-window.js), same offline gate.
 module.exports.isDecryptAllowed = isDecryptAllowed;
-// Test-only surface (tests/unit/main/secure-audit.test.js).
-module.exports._audit = {
-  logAccess: audit.logAccess,
-  checkAnomaly: audit.checkAnomaly,
-  reset: audit.reset,
-};
