@@ -65,7 +65,7 @@ class OpenAICompatibleProvider extends BaseProvider {
 
   // ===== Translate =====
 
-  async translate(text, sourceLang = 'auto', targetLang = 'zh', options = {}) {
+  async translate(text, _sourceLang = 'auto', targetLang = 'zh', options = {}) {
     if (!text?.trim()) {
       return { success: false, error: _t('providerError.emptyText', '文本为空') };
     }

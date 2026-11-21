@@ -106,7 +106,7 @@ function register(ctx) {
         } else {
           logger.warn("Blocked non-http URL:", parsedUrl.protocol);
         }
-      } catch (e) {
+      } catch {
         logger.warn("Invalid URL:", url.substring(0, 50));
       }
     }
@@ -345,7 +345,7 @@ function register(ctx) {
       }
       const settings = app.getLoginItemSettings();
       return { success: true, enabled: settings.openAtLogin };
-    } catch (e) {
+    } catch {
       return { success: false, enabled: false };
     }
   });

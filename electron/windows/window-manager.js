@@ -466,7 +466,7 @@ function isPointInSelectionWindows(x, y) {
     }
   }
 
-  for (const [id, win] of frozenSelectionWindows) {
+  for (const win of frozenSelectionWindows.values()) {
     if (win && !win.isDestroyed() && win.isVisible()) {
       const bounds = win.getBounds();
       if (x >= bounds.x && x <= bounds.x + bounds.width &&

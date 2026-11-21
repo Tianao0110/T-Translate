@@ -50,7 +50,7 @@ const screenshot = require('./screenshot/flow');
 function onMainRendererGiveUp() {
   logger.error('Main window renderer kept crashing — relaunching into safe mode');
   crashGuard.forceSafeModeNextLaunch();
-  try { selection.stopSelectionHook(); } catch (e) { /* ignore */ }
+  try { selection.stopSelectionHook(); } catch { /* ignore */ }
   app.relaunch();
   app.exit(0);
 }
@@ -230,10 +230,10 @@ app.whenReady().then(() => {
 
 process.on('uncaughtException', (error) => {
   logger.error('Uncaught exception:', error);
-  try { selection.stopSelectionHook(); } catch (e) { /* ignore */ }
+  try { selection.stopSelectionHook(); } catch { /* ignore */ }
 });
 
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', (reason) => {
   if (reason instanceof Error) {
     logger.error('Unhandled rejection:', reason.message);
     logger.error('Stack:', reason.stack);
@@ -249,14 +249,14 @@ process.on('unhandledRejection', (reason, promise) => {
 process.on('SIGINT', () => {
   logger.info('Received SIGINT, quitting...');
   runtime.isQuitting = true;
-  try { selection.stopSelectionHook(); } catch (e) { /* ignore */ }
+  try { selection.stopSelectionHook(); } catch { /* ignore */ }
   app.quit();
 });
 
 process.on('SIGTERM', () => {
   logger.info('Received SIGTERM, quitting...');
   runtime.isQuitting = true;
-  try { selection.stopSelectionHook(); } catch (e) { /* ignore */ }
+  try { selection.stopSelectionHook(); } catch { /* ignore */ }
   app.quit();
 });
 
@@ -300,13 +300,13 @@ app.on('will-quit', () => {
 
   unregisterAllShortcuts();
 
-  try { selection.stopSelectionHook(); } catch (e) { /* ignore */ }
+  try { selection.stopSelectionHook(); } catch { /* ignore */ }
 
   // Before the engine hosts go: a companion session ends with its worker.
   try { require('./ipc/companion').getCompanion()?.stop(); } catch { /* ignore */ }
 
   // Engine hosts are utilityProcesses Electron does not reap by itself.
-  try { require('./tengine').get().shutdownAll(); } catch (e) { /* ignore */ }
+  try { require('./tengine').get().shutdownAll(); } catch { /* ignore */ }
 
   destroyTray();
 

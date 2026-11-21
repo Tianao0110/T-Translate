@@ -13,12 +13,7 @@ initGlobalErrorHandler();
 
 if (process.env.NODE_ENV === 'development') {
   if (window.__REACT_DEVTOOLS_GLOBAL_HOOK__) {
-    window.__REACT_DEVTOOLS_GLOBAL_HOOK__.onCommitFiberRoot = (
-      id,
-      root,
-      priorityLevel,
-      didTimeout
-    ) => {};
+    window.__REACT_DEVTOOLS_GLOBAL_HOOK__.onCommitFiberRoot = () => {};
   }
 
   // Surface long-running tasks (>200ms) to find render jank
@@ -33,7 +28,7 @@ if (process.env.NODE_ENV === 'development') {
 
     try {
       observer.observe({ entryTypes: ['longtask'] });
-    } catch (e) {
+    } catch {
       // longtask not supported on every Electron Chromium version — ignore
     }
   }

@@ -4,7 +4,7 @@ const { ipcMain, clipboard } = require('electron');
 const { CHANNELS } = require('../shared/channels');
 const logger = require('../platform/logger')('IPC:Clipboard');
 
-function register(ctx) {
+function register() {
   // ===== Text =====
 
   // handle() version — used by floating window and similar.

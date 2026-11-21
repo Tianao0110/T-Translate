@@ -104,7 +104,7 @@ async function startScreenshot(fromHotkey = false) {
       if (settings?.screenshot?.showConfirmButtons !== undefined) {
         showConfirmButtons = settings.screenshot.showConfirmButtons;
       }
-    } catch (e) {}
+    } catch {}
 
     screenshotWindow.webContents.send(CHANNELS.SCREENSHOT.CONFIG, {
       showConfirmButtons,
@@ -119,7 +119,7 @@ async function startScreenshot(fromHotkey = false) {
   });
 
   screenshotWindow.on('closed', () => {
-    try { globalShortcut.unregister('Escape'); } catch (e) {}
+    try { globalShortcut.unregister('Escape'); } catch {}
   });
 
   return screenshotData;
@@ -128,7 +128,7 @@ async function startScreenshot(fromHotkey = false) {
 async function handleScreenshotSelection(bounds) {
   logger.info('Handling screenshot selection:', bounds);
 
-  try { globalShortcut.unregister('Escape'); } catch (e) {}
+  try { globalShortcut.unregister('Escape'); } catch {}
 
   try {
     if (windows.screenshot) {

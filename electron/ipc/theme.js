@@ -40,7 +40,7 @@ function registerThemeIPC({ store, logger }) {
   });
 
   // Pull current theme — used when a window mounts and needs to initialize its UI.
-  ipcMain.handle(CHANNELS.THEME.SYNC, async (event) => {
+  ipcMain.handle(CHANNELS.THEME.SYNC, async () => {
     try {
       const settings = store.get('settings') || {};
       const theme = settings.interface?.theme || 'light';

@@ -70,7 +70,7 @@ class AnthropicProvider extends BaseProvider {
     });
   }
 
-  async translate(text, sourceLang = 'auto', targetLang = 'zh', options = {}) {
+  async translate(text, _sourceLang = 'auto', targetLang = 'zh', options = {}) {
     const guard = this._checkInput(text);
     if (guard) return guard;
 

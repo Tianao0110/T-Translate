@@ -46,7 +46,7 @@ class AzureOCREngine extends BaseOCREngine {
     return !!(this.config.apiKey && this.config.endpoint);
   }
 
-  async recognize(input, options = {}) {
+  async recognize(input, _options = {}) {
     const { apiKey, endpoint } = this.config;
 
     if (!apiKey || !endpoint) {

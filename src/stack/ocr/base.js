@@ -24,7 +24,7 @@ export class BaseOCREngine {
     return { success: true };
   }
 
-  async recognize(input, options = {}) {
+  async recognize(input, _options = {}) {
     throw new Error('recognize() must be implemented by subclass');
   }
 

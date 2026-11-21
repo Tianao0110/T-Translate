@@ -84,7 +84,7 @@ class BaiduOCREngine extends BaseOCREngine {
     return this._accessToken;
   }
 
-  async recognize(input, options = {}) {
+  async recognize(input, _options = {}) {
     const { apiKey, secretKey } = this.config;
 
     if (!apiKey || !secretKey) {

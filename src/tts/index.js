@@ -62,7 +62,7 @@ class TTSManager {
         if (stored) {
           config = stored;
         }
-      } catch (e) {}
+      } catch {}
     }
 
     this._config = { ...DEFAULT_TTS_CONFIG, ...config };

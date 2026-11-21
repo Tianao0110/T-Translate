@@ -60,7 +60,7 @@ export class BaseTTSEngine {
     throw new Error('Not implemented: getVoices');
   }
 
-  async speak(text, options = {}) {
+  async speak(text, _options = {}) {
     throw new Error('Not implemented: speak');
   }
 

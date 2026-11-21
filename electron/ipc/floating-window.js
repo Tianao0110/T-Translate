@@ -26,7 +26,7 @@ function removeOldestChildWindow() {
       if (!oldest.window.isDestroyed()) {
         oldest.window.close();
       }
-    } catch (e) {}
+    } catch {}
     childPaneWindows.delete(oldestId);
     logger.debug('Removed oldest child window:', oldestId);
   }
@@ -40,7 +40,7 @@ function closeAllChildPaneWindows() {
         data.window.close();
         count++;
       }
-    } catch (e) {}
+    } catch {}
   }
   childPaneWindows.clear();
   if (count > 0) logger.debug('Closed all child pane windows:', count);
@@ -48,7 +48,7 @@ function closeAllChildPaneWindows() {
 }
 
 function register(ctx) {
-  const { getMainWindow, getFloatingWindow, getSelectionWindow, store, managers } = ctx;
+  const { getMainWindow, getFloatingWindow, getSelectionWindow, store } = ctx;
 
   let screenshotModule = null;
   const getScreenshotModule = () => {
@@ -255,7 +255,7 @@ function register(ctx) {
             if (data.window && !data.window.isDestroyed()) {
               data.window.setOpacity(visible ? 1 : 0);
             }
-          } catch (e) {}
+          } catch {}
         }
       };
 
@@ -339,7 +339,6 @@ function register(ctx) {
 
   ipcMain.handle(CHANNELS.FLOATING_WINDOW.CREATE_CHILD_WINDOW, async (event, options) => {
     const { BrowserWindow } = require('electron');
-    const path = require('path');
     const PATHS = require('../shared/paths');
 
     const { id, text, x, y, width, height, theme } = options;
@@ -347,7 +346,7 @@ function register(ctx) {
     if (childPaneWindows.has(id)) {
       try {
         childPaneWindows.get(id).window.close();
-      } catch (e) {}
+      } catch {}
       childPaneWindows.delete(id);
     }
 
@@ -470,18 +469,18 @@ function register(ctx) {
   });
 
   ipcMain.on('child-pane:close', (event) => {
-    for (const [id, data] of childPaneWindows) {
+    for (const data of childPaneWindows.values()) {
       if (data.window && data.window.webContents === event.sender) {
         try {
           data.window.close();
-        } catch (e) {}
+        } catch {}
         break;
       }
     }
   });
 
   ipcMain.on('child-pane:resize', (event, width, height) => {
-    for (const [id, data] of childPaneWindows) {
+    for (const data of childPaneWindows.values()) {
       if (data.window && data.window.webContents === event.sender) {
         try {
           if (!data.window.isDestroyed()) {

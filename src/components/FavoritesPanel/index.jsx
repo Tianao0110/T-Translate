@@ -388,7 +388,7 @@ const FavoriteCard = ({
 
 const FavoritesPanel = ({ showNotification }) => {
   const { t, i18n } = useTranslation();
-  const notify = showNotification || ((msg, type) => {});
+  const notify = showNotification || (() => {});
 
   useEffect(() => {
     dayjs.locale(i18n.language === 'zh' ? 'zh-cn' : 'en');

@@ -584,7 +584,7 @@ function startSelectionHook() {
     });
 
     // ----- mousemove -----
-    uIOhook.on('mousemove', (e) => {
+    uIOhook.on('mousemove', () => {
       noteHookEvent();
       if (runtime.isDraggingOverlay) return;
       if (!selectionStateMachine) return;
@@ -771,7 +771,7 @@ function preheatSelectionModules() {
       try {
         require('koffi');
         logger.debug('koffi preloaded');
-      } catch (e) {
+      } catch {
         // optional
       }
     }

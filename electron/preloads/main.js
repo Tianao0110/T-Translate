@@ -49,7 +49,7 @@ const electronAPI = {
       const handler = (event, maximized) => callback(maximized);
       ipcRenderer.on("maximize-change", handler);
     },
-    offMaximizeChange: (callback) => {
+    offMaximizeChange: () => {
       ipcRenderer.removeAllListeners("maximize-change");
     },
   },
@@ -328,6 +328,6 @@ try {
       },
     });
   }
-} catch (error) {
+} catch {
   // Same dedup-error tolerance.
 }

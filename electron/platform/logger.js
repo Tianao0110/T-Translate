@@ -7,7 +7,7 @@ const { app } = require('electron');
 let electronLog = null;
 try {
   electronLog = require('electron-log');
-} catch (e) {
+} catch {
   // electron-log absent — drop to console-only fallback.
 }
 

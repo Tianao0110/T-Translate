@@ -58,7 +58,7 @@ function register(ctx) {
 
     try {
       globalShortcut.unregister('Escape');
-    } catch (e) {}
+    } catch {}
 
     const screenshotWindow = runtime._windows?.screenshot;
     if (screenshotWindow && !screenshotWindow.isDestroyed()) {

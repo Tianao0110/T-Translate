@@ -20,7 +20,7 @@ function initWin32API() {
     const kernel32 = koffi.load('kernel32.dll');
     const psapi = koffi.load('psapi.dll');
 
-    const POINT = koffi.struct('POINT', {
+    koffi.struct('POINT', {
       x: 'int32',
       y: 'int32',
     });
@@ -40,7 +40,7 @@ function initWin32API() {
       rcCaret_bottom: 'int32',
     });
 
-    const RECT = koffi.struct('RECT', {
+    koffi.struct('RECT', {
       left: 'int32',
       top: 'int32',
       right: 'int32',
@@ -401,7 +401,7 @@ function getForegroundWindowSnapshot() {
     const rect = {};
     if (!api.GetWindowRect(hwnd, rect)) return null;
     return { id: api._koffi.address(hwnd).toString(), left: rect.left, top: rect.top };
-  } catch (e) {
+  } catch {
     return null;
   }
 }
@@ -413,7 +413,7 @@ function getForegroundClassName() {
   if (!api) return '';
   try {
     return getFocusedWindowInfo(api).className || '';
-  } catch (e) {
+  } catch {
     return '';
   }
 }

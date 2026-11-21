@@ -2,13 +2,13 @@
 // desktopCapturer as the fallback. Coordinate spaces and the multi-GPU
 // heuristics: docs/design/main-process.md §6.
 
-const { screen, desktopCapturer, nativeImage } = require('electron');
+const { desktopCapturer, nativeImage } = require('electron');
 
 let nodeScreenshots = null;
 try {
   nodeScreenshots = require('node-screenshots');
   console.log('[Screenshot] node-screenshots loaded successfully');
-} catch (e) {
+} catch {
   console.log('[Screenshot] node-screenshots not available, will use desktopCapturer fallback');
 }
 

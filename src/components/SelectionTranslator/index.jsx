@@ -793,7 +793,7 @@ const SelectionTranslator = () => {
             setTimeout(() => setFreezeHint(false), 2500);
           }
         }
-      } catch (e) {}
+      } catch {}
     }, 100);
 
     return () => clearInterval(checkInterval);

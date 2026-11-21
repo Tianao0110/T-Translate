@@ -10,7 +10,7 @@
 // windows/pin-entry.jsx (via closePinWindow); the window itself is
 // electron/screenshot/pin-windows.js.
 
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { recognizeAndTranslate } from './pipeline.js';

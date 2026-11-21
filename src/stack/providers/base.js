@@ -11,7 +11,7 @@ export class BaseProvider {
     this._lastError = null;
   }
 
-  async translate(text, sourceLang = 'auto', targetLang = 'zh') {
+  async translate(text, _sourceLang = 'auto', _targetLang = 'zh') {
     throw new Error('translate() must be implemented by subclass');
   }
 

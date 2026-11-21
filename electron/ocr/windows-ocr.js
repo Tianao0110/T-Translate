@@ -177,7 +177,7 @@ async function recognize(imageData, options = {}) {
     return { success: false, error: firstLine, engine: 'windows-ocr' };
   } finally {
     if (tempFile) {
-      try { fs.unlinkSync(tempFile); } catch (e) { /* best-effort */ }
+      try { fs.unlinkSync(tempFile); } catch { /* best-effort */ }
     }
   }
 }

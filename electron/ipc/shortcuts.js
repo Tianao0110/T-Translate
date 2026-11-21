@@ -68,7 +68,7 @@ function register(ctx) {
       try {
         globalShortcut.unregister(oldElectronShortcut);
         logger.debug('Unregistered old shortcut:', oldElectronShortcut);
-      } catch (e) {
+      } catch {
         logger.debug('Failed to unregister old shortcut:', oldElectronShortcut);
       }
 
@@ -89,7 +89,7 @@ function register(ctx) {
         // Restore previous binding if new one collides with another app
         try {
           globalShortcut.register(oldElectronShortcut, handler);
-        } catch (e) {
+        } catch {
           logger.error('Failed to restore old shortcut');
         }
         logger.warn('Shortcut registration failed (may be in use):', electronShortcut);
