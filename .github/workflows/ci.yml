@@ -3,7 +3,12 @@
 # Lint+test only — packaging is manual and stays that way.
 name: CI
 
-on: [push, pull_request]
+# Release gate: runs when a vX.Y.Z tag is pushed, or by hand (Actions → CI → Run workflow).
+on:
+  push:
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
 
 jobs:
   check:
