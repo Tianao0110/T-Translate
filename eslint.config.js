@@ -59,6 +59,7 @@ export default [
         argsIgnorePattern: '^_',
         varsIgnorePattern: '^_',
         destructuredArrayIgnorePattern: '^_',
+        ignoreRestSiblings: true,
       }],
       'no-console': 'off', // 允许 console (项目有自己的 logger)
       'no-debugger': 'warn',
@@ -105,6 +106,7 @@ export default [
       'no-unused-vars': ['warn', {
         argsIgnorePattern: '^_',
         varsIgnorePattern: '^_',
+        ignoreRestSiblings: true,
       }],
       'no-console': 'off',
       'no-constant-condition': ['error', { checkLoops: false }],
@@ -140,7 +142,7 @@ export default [
     },
     rules: {
       ...js.configs.recommended.rules,
-      'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', ignoreRestSiblings: true }],
       'no-console': 'off',
       'no-constant-condition': ['error', { checkLoops: false }],
       'prefer-const': 'error',
