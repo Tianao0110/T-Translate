@@ -1,9 +1,10 @@
 // Vision runtime smoke: drives electron/tengine/runtime/worker.js the way
 // the LLM host will, with a text model plus its mmproj. Prints load and
-// per-image numbers, checks the fixed self-test image reads back with a
-// box, that cancellation reaches an image request, and that unloading
-// frees both halves.
-//   node scripts/smoke/smoke-llm-vision.js --model <path.gguf> --mmproj <path.gguf> [--provider cpu|gpu] [--image <png>]
+// per-image numbers, checks the fixed self-test image reads back (with a
+// box when the family's default task gives boxes), that cancellation
+// reaches an image request, and that unloading frees both halves.
+//   node scripts/smoke/smoke-llm-vision.js --model <path.gguf> --mmproj <path.gguf> [--provider cpu|gpu] [--image <png>] [--family <name>] [--task <task>]
+// --family names the prompt family (runtime/mtmd.js), e.g. minicpm-ocr; default: the model's architecture.
 /* eslint-disable no-console */
 
 const path = require('path');
@@ -15,8 +16,11 @@ const MODEL = arg('--model', process.env.TT_VISION_MODEL);
 const MMPROJ = arg('--mmproj', process.env.TT_VISION_MMPROJ);
 const PROVIDER = arg('--provider', 'cpu');
 const IMAGE = arg('--image', null);
+const FAMILY = arg('--family', null);
+const TASK = arg('--task', null);
+const taskOpt = TASK ? { task: TASK } : {};
 if (!MODEL || !MMPROJ || !fs.existsSync(MODEL) || !fs.existsSync(MMPROJ)) {
-  console.error('usage: node scripts/smoke/smoke-llm-vision.js --model <path.gguf> --mmproj <path.gguf> [--provider cpu|gpu] [--image <png>]');
+  console.error('usage: node scripts/smoke/smoke-llm-vision.js --model <path.gguf> --mmproj <path.gguf> [--provider cpu|gpu] [--image <png>] [--family <name>] [--task <task>]');
   process.exit(2);
 }
 
@@ -32,50 +36,68 @@ const describe = (r) => `${r.imageTokens} image tok, prefill ${r.promptMs} ms, f
   }
   console.log(`runtime ${rt.info.build} (${rt.info.version})`);
 
-  const m = await ask({ type: 'load-model', reqId: 'm1', file: MODEL, options: { provider: PROVIDER, nCtx: 4096, nBatch: 2048, mmproj: MMPROJ } });
+  const loadOptions = { provider: PROVIDER, nCtx: 4096, nBatch: 2048, mmproj: MMPROJ, ...(FAMILY ? { visionFamily: FAMILY } : {}) };
+  const m = await ask({ type: 'load-model', reqId: 'm1', file: MODEL, options: loadOptions });
   if (!m.ok) {
     console.error('model failed:', m.error);
     process.exit(1);
   }
-  console.log(`model ${m.info.name} (${m.info.arch}) load ${m.info.loadMs} ms + mmproj ${m.info.vision.loadMs} ms (warm-up included), on ${m.info.provider}${m.info.device ? ' ' + m.info.device.name : ''}, family ${m.info.vision.family}, mrope ${m.info.vision.mrope}`);
-  check(m.info.vision && m.info.vision.family === 'paddleocr', 'vision attached with the PaddleOCR prompt family');
+  console.log(`model ${m.info.name} (${m.info.arch}) load ${m.info.loadMs} ms + mmproj ${m.info.vision.loadMs} ms (warm-up included), on ${m.info.provider}${m.info.device ? ' ' + m.info.device.name : ''}, family ${m.info.vision.family} (default task ${m.info.vision.task}, boxes ${m.info.vision.boxes}), mrope ${m.info.vision.mrope}`);
+  const family = FAMILY || 'paddleocr';
+  check(m.info.vision && m.info.vision.family === family, `vision attached with the ${family} prompt family`);
+  const boxes = m.info.vision.boxes;
 
-  console.log('\n1. fixed self-test image, Spotting');
   const health = fs.readFileSync(HEALTH_IMAGE);
-  const r1 = await gen({ image: health });
-  console.log(`   ${describe(r1.result)}`);
-  for (const l of r1.result.lines) console.log(`   | ${l.text}  ${JSON.stringify(l.box)}`);
-  check(r1.ok && r1.result.stop === 'eog', 'ends at EOG');
-  check(r1.result.lines.some((l) => l.text.includes('OK') && l.box), 'reads the OK line with a box');
-  check(r1.result.lines.every((l) => !l.box || (l.box[0] >= 0 && l.box[2] <= r1.result.width && l.box[3] <= r1.result.height)), 'boxes stay inside the image');
-  check(r1.streamed === r1.result.text, 'streamed text equals the result');
+  if (boxes) {
+    console.log('\n1. fixed self-test image, Spotting');
+    const r1 = await gen({ image: health });
+    console.log(`   ${describe(r1.result)}`);
+    for (const l of r1.result.lines) console.log(`   | ${l.text}  ${JSON.stringify(l.box)}`);
+    check(r1.ok && r1.result.stop === 'eog', 'ends at EOG');
+    check(r1.result.lines.some((l) => l.text.includes('OK') && l.box), 'reads the OK line with a box');
+    check(r1.result.lines.every((l) => !l.box || (l.box[0] >= 0 && l.box[2] <= r1.result.width && l.box[3] <= r1.result.height)), 'boxes stay inside the image');
+    check(r1.streamed === r1.result.text, 'streamed text equals the result');
 
-  console.log('\n2. same image again (steady state)');
-  const r2 = await gen({ image: health });
-  console.log(`   ${describe(r2.result)}`);
-  check(r2.result.text === r1.result.text, 'deterministic output');
+    console.log('\n2. same image again (steady state)');
+    const r2 = await gen({ image: health });
+    console.log(`   ${describe(r2.result)}`);
+    check(r2.result.text === r1.result.text, 'deterministic output');
 
-  console.log('\n3. plain OCR task');
-  const r3 = await gen({ image: health, task: 'OCR' });
-  console.log(`   → ${r3.result.text.trim()}`);
-  check(r3.ok && /OK/.test(r3.result.text) && r3.result.lines.length === 0, 'OCR task returns text only');
+    console.log('\n3. plain OCR task');
+    const r3 = await gen({ image: health, task: 'OCR' });
+    console.log(`   → ${r3.result.text.trim()}`);
+    check(r3.ok && /OK/.test(r3.result.text) && r3.result.lines.length === 0, 'OCR task returns text only');
+  } else {
+    console.log(`\n1. fixed self-test image, ${TASK || m.info.vision.task}`);
+    const r1 = await gen({ image: health, ...taskOpt });
+    console.log(`   ${describe(r1.result)}\n   → ${r1.result.text.trim()}`);
+    check(r1.ok && r1.result.stop === 'eog', 'ends at EOG');
+    check(/OK/.test(r1.result.text), 'reads the OK line');
+    check(r1.streamed === r1.result.text, 'streamed text equals the result');
+
+    console.log('\n2. same image again (steady state)');
+    const r2 = await gen({ image: health, ...taskOpt });
+    console.log(`   ${describe(r2.result)}`);
+    check(r2.result.text === r1.result.text, 'deterministic output');
+  }
 
   console.log('\n4. health through the worker (vision branch)');
-  const h = await ask({ type: 'health', reqId: 'h1', file: MODEL, options: { provider: PROVIDER, nCtx: 4096, nBatch: 2048, mmproj: MMPROJ } });
+  const h = await ask({ type: 'health', reqId: 'h1', file: MODEL, options: loadOptions });
   console.log(`   ${JSON.stringify(h.value)}`);
-  check(h.ok && h.value.ok && h.value.lines > 0, 'health passes on the loaded pair without a reload');
+  check(h.ok && h.value.ok && (!boxes || h.value.lines > 0), 'health passes on the loaded pair without a reload');
 
   if (IMAGE && fs.existsSync(IMAGE)) {
     console.log(`\n5. ${path.basename(IMAGE)}`);
-    const r5 = await gen({ image: fs.readFileSync(IMAGE) });
+    const r5 = await gen({ image: fs.readFileSync(IMAGE), ...taskOpt });
     console.log(`   ${describe(r5.result)}`);
-    for (const l of r5.result.lines.slice(0, 12)) console.log(`   | ${l.text}  ${JSON.stringify(l.box)}`);
-    check(r5.ok && r5.result.lines.length > 0, 'custom image yields lines');
+    if (boxes) for (const l of r5.result.lines.slice(0, 12)) console.log(`   | ${l.text}  ${JSON.stringify(l.box)}`);
+    else console.log(`   → ${r5.result.text.trim().split('\n').slice(0, 12).join('\n     ')}`);
+    check(r5.ok && (boxes ? r5.result.lines.length > 0 : /\S/.test(r5.result.text)), boxes ? 'custom image yields lines' : 'custom image yields text');
   }
 
   console.log('\n6. cancel during an image request');
   const reqId = nextReqId();
-  const p = ask({ type: 'generate', reqId, image: IMAGE && fs.existsSync(IMAGE) ? fs.readFileSync(IMAGE) : health });
+  const p = ask({ type: 'generate', reqId, image: IMAGE && fs.existsSync(IMAGE) ? fs.readFileSync(IMAGE) : health, ...taskOpt });
   setTimeout(cancel, 5);
   const r6 = await p;
   console.log(`   stop ${r6.ok ? r6.result.stop : r6.error.code} after ${r6.ok ? r6.result.totalMs : '?'} ms`);

@@ -118,7 +118,7 @@ function modelInfo() {
     loadMs: s.loadMs,
     ctxMs: s.ctxMs,
     threads: s.threads,
-    vision: v ? { mmproj: current.mmproj, loadMs: v.loadMs, family: v.family, mrope: v.mrope } : null,
+    vision: v ? { mmproj: current.mmproj, loadMs: v.loadMs, family: v.family, task: v.task, boxes: v.boxes, mrope: v.mrope } : null,
     audio: a ? { mmproj: current.mmproj, loadMs: a.loadMs, warmupMs: a.warmupMs, sampleRate: a.sampleRate, family: a.family, mrope: a.mrope } : null,
   };
 }
@@ -160,7 +160,7 @@ function health(msg) {
     current.vision.generate({ image, maxTokens: 4 });
     const r = current.vision.generate({ image });
     return {
-      ok: r.genTokens > 0 && r.stop !== 'error' && r.lines.length > 0,
+      ok: r.genTokens > 0 && r.stop !== 'error' && (current.vision.boxes ? r.lines.length > 0 : /\S/.test(r.text)),
       provider: info.provider,
       device: info.device,
       fallback: info.fallback,
@@ -219,7 +219,7 @@ function generate(msg) {
     if (!current.vision) throw Object.assign(new Error('the loaded model has no vision encoder'), { code: 'LLM_VISION_UNSUPPORTED' });
     return current.vision.generate({
       image: asBuffer(msg.image),
-      task: msg.task || 'Spotting',
+      task: msg.task || current.vision.task,
       maxTokens: msg.maxTokens || null,
       sampler: msg.sampler || {},
       onToken: (text) => post({ type: 'token', reqId: msg.reqId, text }),

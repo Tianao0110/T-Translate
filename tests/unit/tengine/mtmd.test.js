@@ -15,8 +15,16 @@ describe('renderVisionPrompt', () => {
     expect(renderVisionPrompt('paddleocr', '<__media__>', 'Spotting')).toBe('<|begin_of_sentence|>User: <__media__>Spotting:\nAssistant:\n');
   });
 
+  it('renders the MiniCPM-OCR ChatML template with the thinking block closed', () => {
+    expect(renderVisionPrompt('minicpm-ocr', '<__media__>', 'Text Recognition'))
+      .toBe('<|im_start|>user\n<__media__>\nText Recognition:<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n');
+  });
+
   it('refuses a family it has no template for', () => {
     expect(() => renderVisionPrompt('qwen3', '<__media__>', 'OCR')).toThrow(expect.objectContaining({ code: 'LLM_VISION_UNSUPPORTED' }));
+    // MiniCPM-OCR's architecture name: the OCR prompt is only used when a pack names the family.
+    expect(() => renderVisionPrompt('qwen35', '<__media__>', 'OCR')).toThrow(expect.objectContaining({ code: 'LLM_VISION_UNSUPPORTED' }));
+    expect(() => renderVisionPrompt('toString', '<__media__>', 'OCR')).toThrow(expect.objectContaining({ code: 'LLM_VISION_UNSUPPORTED' }));
   });
 });
 

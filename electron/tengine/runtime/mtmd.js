@@ -34,17 +34,34 @@ function fail(code, message) {
   return e;
 }
 
-// chat_template.jinja of PaddleOCR-VL: cls, "User: " + image + text + "\n",
-// then "Assistant:\n". mtmd wraps the marker with the model's own image
-// begin / end tokens.
+// Per vision family: the prompt, the task a caller gets by default, and
+// whether that task's answer carries per-line boxes. mtmd wraps the marker
+// with the model's own image begin / end tokens. Keyed by the pack's
+// visionFamily (electron/shared/llm-packs.js), else the architecture name.
 const VISION_FAMILIES = {
-  paddleocr: (marker, task) => `<|begin_of_sentence|>User: ${marker}${task}:\nAssistant:\n`,
+  // chat_template.jinja of PaddleOCR-VL: cls, "User: " + image + text + "\n", then "Assistant:\n".
+  paddleocr: {
+    prompt: (marker, task) => `<|begin_of_sentence|>User: ${marker}${task}:\nAssistant:\n`,
+    task: 'Spotting',
+    boxes: true,
+  },
+  // MiniCPM-OCR 1.0: ChatML, image then task joined by "\n", thinking block closed.
+  // Tasks: Text Recognition, Table Recognition (OTSL), Formula Recognition (LaTeX).
+  'minicpm-ocr': {
+    prompt: (marker, task) => `<|im_start|>user\n${marker}\n${task}:<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n`,
+    task: 'Text Recognition',
+    boxes: false,
+  },
 };
 
+function visionSpec(family) {
+  const spec = Object.prototype.hasOwnProperty.call(VISION_FAMILIES, family) ? VISION_FAMILIES[family] : null;
+  if (!spec) throw fail('LLM_VISION_UNSUPPORTED', `no vision prompt for ${family || 'unknown'} models`);
+  return spec;
+}
+
 function renderVisionPrompt(family, marker, task) {
-  const render = VISION_FAMILIES[family];
-  if (!render) throw fail('LLM_VISION_UNSUPPORTED', `no vision prompt for ${family || 'unknown'} models`);
-  return render(marker, task);
+  return visionSpec(family).prompt(marker, task);
 }
 
 // Qwen3-ASR with an empty context: ChatML, the audio as the user turn. mtmd
@@ -179,7 +196,7 @@ function attachVision(binding, session, { mmproj, provider = 'cpu', family = nul
   const { koffi, f } = binding;
   const marker = f.mtmdDefaultMarker();
   const visionFamily = family || session.info().arch;
-  renderVisionPrompt(visionFamily, marker, 'OCR');
+  const spec = visionSpec(visionFamily);
   const { mctx, h, loadMs } = openMtmd(binding, session, mmproj, provider);
   if (!f.mtmdSupportVision(mctx)) {
     f.mtmdFree(mctx);
@@ -189,7 +206,7 @@ function attachVision(binding, session, { mmproj, provider = 'cpu', family = nul
   let closed = false;
   const cancelled = () => !!abortFlag && Atomics.load(abortFlag, 0) === 1;
 
-  function generate({ image, task = 'Spotting', maxTokens = null, onToken = null, sampler = {} } = {}) {
+  function generate({ image, task = spec.task, maxTokens = null, onToken = null, sampler = {} } = {}) {
     if (closed) throw fail('LLM_SESSION_CLOSED', 'vision closed');
     if (!image || !image.length) throw fail('LLM_BAD_IMAGE', 'empty image');
     const t = now();
@@ -230,6 +247,8 @@ function attachVision(binding, session, { mmproj, provider = 'cpu', family = nul
     loadMs,
     marker,
     family: visionFamily,
+    task: spec.task,
+    boxes: spec.boxes,
     mrope: !!f.mtmdUseMrope(mctx),
     generate,
     close() {

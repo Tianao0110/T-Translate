@@ -284,6 +284,7 @@ Golden 测试至少覆盖：三个 `*_default_params()` 与 `mtmd_context_params
 - GPU 自检掐表取第二次生成：第一次要付流水线 / 着色器编译。视觉自检同理，固定图跑两次计第二次。探针里被取消的解码在 llama 眼里是错误，那是机制在工作不是故障。
 - worker 里 `mtmd_helper_log_set` 与 `llama_log_set` 挂同一个回调，否则每张图的提示词会打到 stderr。
 - 视觉引擎 **GPU-only**（2026-09-14 拍板，另见第一节）：CPU 上编码器要好几秒，整屏缩放后的图又超尺寸上限，所以显卡关着时引擎在 1.7 GB 的包被载入之前就让位。
+- 视觉对话格式按包里的 `visionFamily` 认（没有才退回架构名），每种格式自带默认任务和「答案带不带行框」；自检对不带行框的格式只看读没读出字。目前两种：`paddleocr`（默认 `Spotting`，带行框）；`minicpm-ocr`（2026-11-20 起，需 ≥ b11901：MiniCPM-OCR 1.0，ChatML + 关掉的思考块，任务 `Text Recognition` / `Table Recognition`（OTSL）/ `Formula Recognition`（LaTeX），不带行框）。MiniCPM 的架构名是通用的 `qwen35`，所以它只在点名时生效。它没进白名单，程序里还用不上；沙盒实测与样本在 `F:\tt-mem\minicpm-ocr`（`RESULTS.md`），复测：`node scripts/smoke/smoke-llm-vision.js --model <MiniCPM-OCR-1_0-Q8_0.gguf> --mmproj <mmproj-model-f16-4x.gguf> --provider gpu --family minicpm-ocr`。
 - 音频：`mtmd_bitmap_init_from_audio` 接 16 kHz 单声道 float PCM。提示词里只放媒体标记，`<|audio_start|>` / `<|audio_end|>` 由 mtmd 按模型自己加（探针逐 token 核过），再手写一层就重复了。回复是「language X<asr_text>正文」，X 为 None 表示没有语音；贪心解码，回复上限取音频 token 数加 32。超过 60 s 的音频拒收：上游音频按 30 s 分块，超过约 2 分钟会没有输出（issue #21847，未修），听译按 VAD 切段，最长 18 s。
 - 语音槽在显卡上载入时用 2 s 微弱噪声跑一遍热身：与其他显卡任务的首次预热撞在一起时，第一段定稿实测要 8 s。语音自检读固定句 `assets/asr-health.wav` 两遍、掐第二遍，读回的字错不超过两成才算通过。
 
