@@ -477,8 +477,8 @@ export default withTranslation()(MyComponent);
 项目自带三道检查，改动文案后提交前必过：
 
 ```bash
-npm run check:i18n         # zh/en 键结构同步比对（缺键/多键直接列出）
-npm run check:i18n:strict  # 严格模式（额外检查空值等）
+npm run check:i18n         # zh/en 键结构同步比对（缺键/多键、空值直接列出，只提示不失败）
+npm run check:i18n:strict  # 同上，但缺键/多键时以失败退出（check:all 与 CI 用这个）
 npm run check:hardcoded    # 扫描组件里硬编码的中文字符串
 ```
 
