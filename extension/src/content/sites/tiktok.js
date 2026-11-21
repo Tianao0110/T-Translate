@@ -7,6 +7,7 @@
 // where the description and playback bar sit over the video.
 
 import { topOf } from './controls.js';
+import { parse, watchNavigation } from './common.js';
 
 const VIDEO = /^\/@[^/]+\/video\/(\d{6,25})(?:[/?#]|$)/;
 const WRAPPER = /^xgwrapper-\d+-(\d{6,25})$/;
@@ -21,13 +22,6 @@ const LANGS = { eng: 'en', cmn: 'zh', zho: 'zh', chi: 'zh', jpn: 'ja', kor: 'ko'
 
 const isHost = (host) => host === 'tiktok.com' || host.endsWith('.tiktok.com');
 const isCdn = (host) => isHost(host) || /(?:^|\.)tiktokcdn(?:-[a-z]+)?\.com$/.test(host);
-const parse = (href) => {
-  try {
-    return new URL(href);
-  } catch {
-    return null;
-  }
-};
 
 function mediaId(href, media) {
   const u = parse(href);
@@ -112,15 +106,6 @@ function subtitleInfo(href) {
   if (!id) return {};
   const f = files.get(id);
   return f ? { lang: f.lang, kind: f.kind, mediaId: f.mediaId } : { stray: true };
-}
-
-function watchNavigation({ win }, fn) {
-  win.addEventListener('popstate', fn);
-  win.navigation?.addEventListener('currententrychange', fn);
-  return () => {
-    win.removeEventListener('popstate', fn);
-    win.navigation?.removeEventListener('currententrychange', fn);
-  };
 }
 
 const hideStyles = new WeakMap();

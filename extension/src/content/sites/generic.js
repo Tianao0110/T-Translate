@@ -4,6 +4,8 @@
 // files are known by their extension (.vtt, .srt, .ttml, .dfxp), with no
 // language or media id of their own.
 
+import { watchNavigation } from './common.js';
+
 function fnv1a(s) {
   let h = 0x811c9dc5;
   for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193) >>> 0;
@@ -31,15 +33,6 @@ function isSubtitleRequest(href) {
   } catch {
     return false;
   }
-}
-
-function watchNavigation({ win }, fn) {
-  win.addEventListener('popstate', fn);
-  win.navigation?.addEventListener('currententrychange', fn);
-  return () => {
-    win.removeEventListener('popstate', fn);
-    win.navigation?.removeEventListener('currententrychange', fn);
-  };
 }
 
 export const generic = {

@@ -5,18 +5,12 @@
 // player element.
 
 import { topOf } from './controls.js';
+import { parse } from './common.js';
 
 const VIDEO_ID = /^[\w-]{11}$/;
 const PATH_ID = /^\/(?:shorts|embed|live|v)\/([\w-]{11})(?:[/?#]|$)/;
 
 const isHost = (host) => host === 'youtube.com' || host.endsWith('.youtube.com');
-const parse = (href) => {
-  try {
-    return new URL(href);
-  } catch {
-    return null;
-  }
-};
 
 function mediaId(href) {
   const u = parse(href);

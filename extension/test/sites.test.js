@@ -8,7 +8,7 @@
 // duration fingerprint and navigation.
 
 import { describe, it, expect, vi } from 'vitest';
-import { siteFor, youtube, bilibili, tiktok, generic } from '../src/content/sites/index.js';
+import { siteFor, youtube, bilibili, tiktok, netflix, generic } from '../src/content/sites/index.js';
 
 describe('siteFor', () => {
   it('youtube.com and its subdomains get the YouTube adapter, others the generic one', () => {
@@ -202,18 +202,6 @@ describe('Bilibili', () => {
     expect(bilibili.listSubtitles(JSON.stringify({ code: 0, data: { need_login_subtitle: true, subtitle: { subtitles: [] } } }))).toEqual([]);
   });
 
-  it('navigation: popstate and same-document navigations (part switches)', () => {
-    const fn = vi.fn();
-    const nav = new EventTarget();
-    const win = Object.assign(new EventTarget(), { navigation: nav });
-    const off = bilibili.watchNavigation({ doc: document, win }, fn);
-    win.dispatchEvent(new Event('popstate'));
-    nav.dispatchEvent(new Event('currententrychange'));
-    off();
-    nav.dispatchEvent(new Event('currententrychange'));
-    expect(fn).toHaveBeenCalledTimes(2);
-  });
-
   it('hides the player’s subtitle layer with one style element and shows it again', () => {
     const wrap = document.createElement('div');
     wrap.className = 'bpx-player-subtitle-wrap';
@@ -295,18 +283,6 @@ describe('TikTok', () => {
     expect(() => tiktok.readPage(document)).not.toThrow();
   });
 
-  it('navigation: popstate and same-document navigations', () => {
-    const fn = vi.fn();
-    const nav = new EventTarget();
-    const win = Object.assign(new EventTarget(), { navigation: nav });
-    const off = tiktok.watchNavigation({ doc: document, win }, fn);
-    win.dispatchEvent(new Event('popstate'));
-    nav.dispatchEvent(new Event('currententrychange'));
-    off();
-    nav.dispatchEvent(new Event('currententrychange'));
-    expect(fn).toHaveBeenCalledTimes(2);
-  });
-
   it('hides the player’s caption layer with one style element and shows it again', () => {
     const layer = document.createElement('div');
     layer.className = 'css-pfus7k-7937d88b--DivCaptionContainer e1nv076w0';
@@ -338,14 +314,18 @@ describe('generic', () => {
     expect(generic.hideSiteCaptions(document, true)).toBe(false);
   });
 
-  it('navigation: popstate and same-document navigations', () => {
+});
+
+describe('SPA navigation through history and same-document navigations', () => {
+  it.each([['Bilibili (part switches)', bilibili], ['TikTok', tiktok], ['Netflix', netflix], ['generic', generic]])('%s: fires on both, stops when unsubscribed', (_name, site) => {
     const fn = vi.fn();
     const nav = new EventTarget();
     const win = Object.assign(new EventTarget(), { navigation: nav });
-    const off = generic.watchNavigation({ win }, fn);
+    const off = site.watchNavigation({ doc: document, win }, fn);
     win.dispatchEvent(new Event('popstate'));
     nav.dispatchEvent(new Event('currententrychange'));
     off();
+    win.dispatchEvent(new Event('popstate'));
     nav.dispatchEvent(new Event('currententrychange'));
     expect(fn).toHaveBeenCalledTimes(2);
   });

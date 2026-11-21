@@ -6,6 +6,7 @@
 // adapter.
 
 import { topOf } from './controls.js';
+import { parse, watchNavigation } from './common.js';
 
 // Paths may start with a locale (/zh-Hans/video/…, seen outside mainland China).
 const LOCALE = '(?:/[a-z]{2}(?:-[A-Za-z]{2,4})?)?';
@@ -16,13 +17,6 @@ const SUBTITLE_PATH = /\/bfs\/(?:ai_)?subtitle\//;
 const LIST_PATHS = new Set(['/x/player/wbi/v2', '/x/player/v2']);
 
 const isHost = (host) => (host === 'bilibili.com' || host.endsWith('.bilibili.com')) && host !== 'live.bilibili.com';
-const parse = (href) => {
-  try {
-    return new URL(href);
-  } catch {
-    return null;
-  }
-};
 
 // The part number when it is past the first.
 function partOf(u) {
@@ -76,15 +70,6 @@ function listSubtitles(text) {
     out.push({ lang, url, ai: lang.startsWith('ai-') || Number(s.ai_type) > 0 });
   }
   return out;
-}
-
-function watchNavigation({ win }, fn) {
-  win.addEventListener('popstate', fn);
-  win.navigation?.addEventListener('currententrychange', fn);
-  return () => {
-    win.removeEventListener('popstate', fn);
-    win.navigation?.removeEventListener('currententrychange', fn);
-  };
 }
 
 const hideStyles = new WeakMap();

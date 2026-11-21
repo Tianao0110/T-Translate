@@ -8,6 +8,7 @@
 // control bar sits; whether an ad plays.
 
 import { topOf } from './controls.js';
+import { parse, watchNavigation } from './common.js';
 import { hookMethod, tryHook } from '../hooks/patch.js';
 
 const WATCH = /^\/watch\/(\d{3,15})(?:[/?#]|$)/;
@@ -26,13 +27,6 @@ const PRIMARY = { cmn: 'zh', yue: 'zh', zho: 'zh' };
 
 const kindOf = (k) => (typeof k === 'string' && Object.hasOwn(KIND_RANK, k) ? k : '');
 const isHost = (host) => host === 'netflix.com' || host.endsWith('.netflix.com');
-const parse = (href) => {
-  try {
-    return new URL(href);
-  } catch {
-    return null;
-  }
-};
 const primary = (lang) => {
   const p = String(lang || '').split('-')[0].toLowerCase();
   return PRIMARY[p] || p;
@@ -94,15 +88,6 @@ function listSubtitles(text) {
     if (bodies.size > MAX_BODIES) bodies.delete(bodies.keys().next().value);
   }
   return out.map(({ rank: _rank, ...s }) => s);
-}
-
-function watchNavigation({ win }, fn) {
-  win.addEventListener('popstate', fn);
-  win.navigation?.addEventListener('currententrychange', fn);
-  return () => {
-    win.removeEventListener('popstate', fn);
-    win.navigation?.removeEventListener('currententrychange', fn);
-  };
 }
 
 const hideStyles = new WeakMap();
