@@ -61,7 +61,6 @@ const FloatingWindow = () => {
   const {
     floatingOpacity,
     targetLanguage,
-    ocrEngine,
     understandMode,
     setUnderstandMode,
     setFloatingOpacity,
@@ -149,7 +148,6 @@ const FloatingWindow = () => {
 
   const contentRef = useRef(null);
   const toolbarTimerRef = useRef(null);
-  const rootRef = useRef(null);
   // Mirrors of state for closures inside event handlers (avoid stale-state bugs)
   const passThroughRef = useRef(false);
   const showHistoryPanelRef = useRef(false);
@@ -711,36 +709,6 @@ const FloatingWindow = () => {
     window.addEventListener('mousemove', onMove);
     return () => window.removeEventListener('mousemove', onMove);
   }, [stickyPassThrough]);
-
-  const enterPassThroughMode = useCallback(async () => {
-    if (passThroughRef.current) return;
-
-    passThroughRef.current = true;
-    setIsPassThrough(true);
-
-    logger.debug('Enter pass-through mode');
-
-    try {
-      await window.electron?.floatingWindow?.setPassThrough?.(true);
-    } catch (e) {
-      logger.error('Failed to enter pass-through mode:', e);
-    }
-  }, []);
-
-  const exitPassThroughMode = useCallback(async () => {
-    if (!passThroughRef.current) return;
-
-    passThroughRef.current = false;
-    setIsPassThrough(false);
-
-    logger.debug('Exit pass-through mode');
-
-    try {
-      await window.electron?.floatingWindow?.setPassThrough?.(false);
-    } catch (e) {
-      logger.error('Failed to exit pass-through mode:', e);
-    }
-  }, []);
 
   const toggleHistoryPanel = useCallback(async () => {
     if (showHistoryPanel) {

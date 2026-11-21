@@ -406,14 +406,6 @@ const HistoryPanel = ({ showNotification }) => {
     });
   }, []);
 
-  const selectAll = useCallback(() => {
-    if (selectedIds.size === filteredHistory.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(filteredHistory.map(i => i.id)));
-    }
-  }, [selectedIds.size, filteredHistory]);
-
   const deleteSelected = useCallback(async () => {
     if (selectedIds.size === 0) return;
     if (!(await confirm(t('history.deleteSelectedConfirm', { count: selectedIds.size })))) return;

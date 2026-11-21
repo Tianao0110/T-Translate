@@ -21,7 +21,7 @@ class MainTranslationService {
   // Picks stream vs one-shot based on user preference in the store
   async execute(options = {}) {
     const state = useTranslationStore.getState();
-    const { useStreamOutput, translationMode } = state;
+    const { useStreamOutput } = state;
 
     if (useStreamOutput) {
       return this.streamTranslate(options);

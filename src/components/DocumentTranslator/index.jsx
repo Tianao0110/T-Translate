@@ -488,8 +488,6 @@ const DocumentTranslator = ({
   useEffect(() => {
     digestRef.current = { content: digest, whole: digestWholeDoc };
   }, [digest, digestWholeDoc]);
-  // { fixable, review, checked, applied } from the glossary pass, or null.
-  const [termReport, setTermReport] = useState(null);
 
   // The document surface has no understanding switch; it opts in itself.
   const documentActions = useMemo(

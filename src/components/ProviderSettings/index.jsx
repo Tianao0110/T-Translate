@@ -216,21 +216,6 @@ const ProviderSettings = ({ settings, settingsReady, updateSettings, notify }) =
     }
   };
 
-  const moveProvider = (index, direction) => {
-    const newProviders = [...providers];
-    const targetIndex = index + direction;
-
-    if (targetIndex < 0 || targetIndex >= newProviders.length) return;
-
-    [newProviders[index], newProviders[targetIndex]] = [newProviders[targetIndex], newProviders[index]];
-    newProviders.forEach((p, i) => p.priority = i);
-
-    setProviders(newProviders);
-    if (updateSettings) {
-      updateSettings('translation', 'providers', newProviders);
-    }
-  };
-
   const handleDragStart = (e, index) => {
     setDraggedIndex(index);
     e.dataTransfer.effectAllowed = 'move';

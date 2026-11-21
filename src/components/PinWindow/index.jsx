@@ -224,7 +224,7 @@ const PinWindow = () => {
   const boundsRef = useRef(null);
   const [edge, setEdge] = useState(null);
   // Docked: { prev: { bounds, zoom }, thumbZoom } while a thumbnail at the screen edge.
-  const [dock, setDock] = useState(null);
+  const [, setDock] = useState(null);
   const dockRef = useRef(null);
   const peekRef = useRef({ open: false, timer: 0 });
   // The running animation: { raf, to: { bounds, zoom } }.

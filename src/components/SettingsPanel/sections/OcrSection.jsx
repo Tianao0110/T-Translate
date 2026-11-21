@@ -35,7 +35,7 @@ const OcrSection = ({
   setShowApiKeys,
   setOcrEngine
 }) => {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
 
   // null = unchecked, 'checking', 'healthy', 'broken'
   const [engineHealth, setEngineHealth] = useState(null);

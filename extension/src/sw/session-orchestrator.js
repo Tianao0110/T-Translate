@@ -55,8 +55,6 @@ const COVER_GAP_S = 15; // cues this close together make one covered stretch
 const COVER_TAIL_S = 2; // a stretch is left this long before its end
 const MAX_CACHE_KEY = 512;
 
-const err = (code) => Object.assign(new Error(code), { code });
-
 // The key a site's on/off switch is stored under: the adapter's name, or the host.
 export function siteKeyOf(ev) {
   if (ev?.site && ev.site !== 'generic') return ev.site;

@@ -28,7 +28,6 @@ const PrivacySection = ({
   const { t } = useTranslation();
   // Reactive subscription — nothing else re-renders this section on mode change
   const currentMode = useTranslationStore((s) => s.translationMode) || PRIVACY_MODE_IDS.STANDARD;
-  const modeConfig = PRIVACY_MODES[currentMode];
 
   // PRIVACY_MODES stores icon names as strings; resolved to lucide here.
   const getModeIcon = (iconName, size = 24) => {
