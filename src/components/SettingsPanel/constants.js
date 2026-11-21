@@ -207,7 +207,7 @@ export const migrateOldSettings = (savedSettings) => {
 
   // Deep-merge each known nested key so a partial saved object still gets all
   // newly-added defaults
-  let migrated = {
+  const migrated = {
     ...DEFAULT_SETTINGS,
     ...savedSettings,
     interface: {

@@ -24,7 +24,6 @@
 //   npx electron extension/scripts/e2e-firefox.js --packs <installed asr-models dir> [--ffmpeg <ffmpeg.exe>] [--firefox <exe>] [--out <dir>] [--headed] [--video <id>] [--idle-s 75] [--capture-s 150]
 //
 // Set TEMP to a folder on the packs' drive so they are hard-linked, not copied.
-/* eslint-disable no-console */
 
 const path = require('path');
 const fs = require('fs');

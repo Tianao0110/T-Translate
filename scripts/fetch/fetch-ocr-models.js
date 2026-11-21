@@ -1,7 +1,6 @@
 // Downloads the bundled base OCR models into resources/ocr/base (gitignored).
 // Run once after clone and before packaging:
 //   node scripts/fetch/fetch-ocr-models.js [--force]
-/* eslint-disable no-console */
 
 const path = require('path');
 const fs = require('fs');

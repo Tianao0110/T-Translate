@@ -8,7 +8,6 @@
 // ffmpeg is not a dependency: pass the executable. Run once; the files are committed.
 //
 //   node extension/scripts/make-fixture-mp4.js --ffmpeg <ffmpeg.exe> [--dir <dir>]
-/* eslint-disable no-console */
 
 const fs = require('fs');
 const path = require('path');

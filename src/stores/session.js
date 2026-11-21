@@ -148,7 +148,7 @@ const useSessionStore = create((set, get) => ({
     if (!pane) return;
 
     // FIFO eviction at the cap of 15 frozen panes
-    let newFrozenPanes = [...state.frozenPanes];
+    const newFrozenPanes = [...state.frozenPanes];
     while (newFrozenPanes.length >= 15) {
       newFrozenPanes.shift();
     }

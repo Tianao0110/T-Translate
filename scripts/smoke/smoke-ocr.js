@@ -6,7 +6,6 @@
 //
 //   npm run smoke:ocr            CPU path only
 //   npm run smoke:ocr -- --gpu   also the WebGPU path (needs a DX12 GPU)
-/* eslint-disable no-console */
 
 const { has, checklist, sandbox, run } = require('../lib/electron-smoke');
 

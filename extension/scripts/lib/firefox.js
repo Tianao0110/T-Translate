@@ -5,7 +5,6 @@
 // fixed through extensions.webextensions.uuids so its pages can be opened;
 // BiDi navigates to them and runs script there only with
 // MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1 in Firefox's environment (set here).
-/* eslint-disable no-console */
 
 const fs = require('fs');
 const path = require('path');

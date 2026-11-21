@@ -6,7 +6,6 @@
 // hard-linked in under their pinned names.
 //
 //   npx electron scripts/smoke/smoke-llm-asr-host.js --dir <folder with the Qwen3-ASR files> [--text <Qwen3 gguf>]
-/* eslint-disable no-console */
 
 const path = require('path');
 const fs = require('fs');

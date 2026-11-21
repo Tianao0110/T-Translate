@@ -3,7 +3,6 @@
 // built extension in Chrome with a throwaway profile, paired through its
 // options page; helpers that read the worker through the extension's own
 // messages, wait, screenshot pages and collect exceptions.
-/* eslint-disable no-console */
 
 const path = require('path');
 const fs = require('fs');

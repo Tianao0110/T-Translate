@@ -20,7 +20,6 @@
 // Set TEMP to a folder on the packs' drive so they are hard-linked, not
 // copied. --headed opens a real browser window (still driven only over CDP).
 // The sandbox is left in place for the recycle bin.
-/* eslint-disable no-console */
 
 const path = require('path');
 const fs = require('fs');

@@ -12,7 +12,6 @@
 // start, no reload); the system-sound session; preemption by a window
 // session; no subtitle file left behind; the port released. Protocol: docs/design/listen.md §11;
 // harness notes: docs/design/tooling.md §4.
-/* eslint-disable no-console */
 
 const path = require('path');
 const fs = require('fs');

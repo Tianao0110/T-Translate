@@ -6,7 +6,6 @@
 // under their pinned names.
 //
 //   npx electron scripts/smoke/smoke-llm-vision-host.js --model <PaddleOCR-VL gguf> --mmproj <mmproj gguf> [--text <Qwen3 gguf>] [--gpu]
-/* eslint-disable no-console */
 
 const path = require('path');
 const fs = require('fs');

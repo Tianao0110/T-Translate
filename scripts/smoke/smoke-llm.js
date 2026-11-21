@@ -3,7 +3,6 @@
 // model on disk. Prints load and decode numbers, checks prefix reuse, the
 // no-thinking rule, cancellation and the probe steps.
 //   node scripts/smoke/smoke-llm.js --model <path.gguf> [--provider cpu|gpu] [--threads N]
-/* eslint-disable no-console */
 
 const path = require('path');
 const fs = require('fs');

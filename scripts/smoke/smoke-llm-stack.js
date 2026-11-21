@@ -4,7 +4,6 @@
 // model files are hard-linked in under their whitelisted names.
 //
 //   npx electron scripts/smoke/smoke-llm-stack.js --model <Qwen3 gguf> [--mt <Hy-MT2 gguf>] [--gpu]
-/* eslint-disable no-console */
 
 const path = require('path');
 const fs = require('fs');

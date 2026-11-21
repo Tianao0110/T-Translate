@@ -231,7 +231,7 @@ ${langHint ? `5. The text is likely in ${langHint}` : ''}`;
   cleanLLMOutput(text) {
     if (!text) return '';
 
-    let cleaned = text
+    const cleaned = text
       .replace(/^(Here is the extracted text:|The text in the image is:|OCR Result:)/i, '')
       .replace(/^\s*```[\s\S]*?```\s*$/g, match => {
         return match.replace(/```\w*\n?/g, '').trim();

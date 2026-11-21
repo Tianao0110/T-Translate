@@ -9,7 +9,6 @@
 // .tar.bz2 tarballs there first (Node has no bzip2). --only rebuilds just
 // those packs; the others keep their manifest entries. Publishing steps
 // and the reproducible-zip rationale: docs/design/tooling.md §2.
-/* eslint-disable no-console */
 
 const path = require('path');
 const fs = require('fs');

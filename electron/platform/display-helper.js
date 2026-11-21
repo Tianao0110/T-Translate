@@ -73,8 +73,8 @@ function ensureBoundsOnDisplay(bounds, options = {}) {
     const nearestDisplay = getNearestDisplay(centerX, centerY);
     const db = nearestDisplay.bounds;
 
-    let newX = Math.max(db.x, Math.min(bounds.x, db.x + db.width - bounds.width));
-    let newY = Math.max(db.y, Math.min(bounds.y, db.y + db.height - bounds.height));
+    const newX = Math.max(db.x, Math.min(bounds.x, db.x + db.width - bounds.width));
+    const newY = Math.max(db.y, Math.min(bounds.y, db.y + db.height - bounds.height));
 
     return {
       x: Math.round(newX),

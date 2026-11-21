@@ -31,7 +31,6 @@
 //
 // Set TEMP to a folder on the packs' drive so they are hard-linked, not
 // copied. The sandbox is left in place for the recycle bin.
-/* eslint-disable no-console */
 
 const { arg, sleep, checklist, run } = require('../../scripts/lib/electron-smoke');
 const { startShell } = require('./lib/e2e-shell');

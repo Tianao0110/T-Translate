@@ -26,6 +26,9 @@ export default [
       '*.backup.*',
     ],
   },
+  {
+    linterOptions: { reportUnusedDisableDirectives: 'error' },
+  },
 
   // ========== 渲染进程 (src/) ==========
   {
@@ -60,7 +63,7 @@ export default [
       'no-console': 'off', // 允许 console (项目有自己的 logger)
       'no-debugger': 'warn',
       'no-constant-condition': ['error', { checkLoops: false }],
-      'prefer-const': 'warn',
+      'prefer-const': 'error',
 
       // --- React ---
       'react/jsx-uses-vars': 'error',    // JSX 引用即使用——没有它，组件/图标全报 no-unused-vars 误报
@@ -105,7 +108,7 @@ export default [
       }],
       'no-console': 'off',
       'no-constant-condition': ['error', { checkLoops: false }],
-      'prefer-const': 'warn',
+      'prefer-const': 'error',
       'no-empty': ['warn', { allowEmptyCatch: true }],
       'no-prototype-builtins': 'off',
     },
@@ -140,7 +143,7 @@ export default [
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       'no-console': 'off',
       'no-constant-condition': ['error', { checkLoops: false }],
-      'prefer-const': 'warn',
+      'prefer-const': 'error',
       'no-empty': ['warn', { allowEmptyCatch: true }],
     },
   },

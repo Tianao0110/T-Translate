@@ -1033,7 +1033,7 @@ const DocumentTranslator = ({
     setStartTime(Date.now());
     
     // Collect pending segments
-    let pendingSegments = segments.filter(s => s.status === STATUS.PENDING || s.status === STATUS.ERROR);
+    const pendingSegments = segments.filter(s => s.status === STATUS.PENDING || s.status === STATUS.ERROR);
     
     // Fill in any cached translations up front — saves a round trip.
     const toTranslate = [];

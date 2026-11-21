@@ -2,7 +2,6 @@
 // the PASS / FAIL checklist, a throwaway userData + models sandbox, hard-link
 // or copy of model files into it, a fake electron-store, and the runner that
 // turns the checklist into the exit code. Node-only smokes use worker-driver.
-/* eslint-disable no-console */
 
 const path = require('path');
 const fs = require('fs');

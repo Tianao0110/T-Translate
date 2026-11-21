@@ -4,7 +4,6 @@
 // sandbox; nothing of the user's is touched.
 //
 //   npm run smoke:llm-host -- --model <path.gguf> [--gpu]
-/* eslint-disable no-console */
 
 const fs = require('fs');
 const { arg, has, sleep, checklist, sandbox, run } = require('../lib/electron-smoke');

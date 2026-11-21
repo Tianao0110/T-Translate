@@ -5,7 +5,6 @@
 // request, and unloading frees both halves. With bench-data/fleurs present
 // it also scores ten sentences per language.
 //   node scripts/smoke/smoke-llm-asr.js --model <path.gguf> --mmproj <path.gguf> [--provider cpu|gpu] [--threads N]
-/* eslint-disable no-console */
 
 const path = require('path');
 const fs = require('fs');

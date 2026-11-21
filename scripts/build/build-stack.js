@@ -1,6 +1,5 @@
 // Bundles the main-process translation stack (src/stack/, ESM) into a single
 // CJS artifact the unbundled-CJS main process can require.
-/* eslint-disable no-console */
 
 const path = require('path');
 const { buildSync } = require('esbuild');

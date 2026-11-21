@@ -50,7 +50,7 @@ let lastStatus = null;
 // TTS state. ttsOnly: the process exists for TTS alone (no session ever
 // started in it, or the session ended and TTS kept it alive).
 let ttsOnly = false;
-let ttsRequests = new Map(); // id -> { sender }
+const ttsRequests = new Map(); // id -> { sender }
 let ttsIdleTimer = null;
 let ttsUnloadWaiters = [];
 let spawnWaiters = []; // TTS callers waiting for a fresh process to say 'ready'

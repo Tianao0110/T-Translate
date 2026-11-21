@@ -4,7 +4,6 @@
 // floating window is a stand-in that routes audio-engine:* sends to
 // handlers, wavs are read as 16 kHz float, and audio is fed in real time
 // against the audio clock.
-/* eslint-disable no-console */
 
 const path = require('path');
 const fs = require('fs');

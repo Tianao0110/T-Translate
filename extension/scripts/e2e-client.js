@@ -7,7 +7,6 @@
 //
 // Nothing of the user's is touched: sandbox userData, packs hard-linked (or
 // copied across drives) into the sandbox's models root.
-/* eslint-disable no-console */
 
 const path = require('path');
 const fs = require('fs');

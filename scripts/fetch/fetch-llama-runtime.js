@@ -4,7 +4,6 @@
 //   node scripts/fetch/fetch-llama-runtime.js [--force]
 // Annual re-pin: download the new build, rewrite the manifest, extract.
 //   node scripts/fetch/fetch-llama-runtime.js --pin b12345 [--zip path/to/local.zip]
-/* eslint-disable no-console */
 
 const path = require('path');
 const fs = require('fs');

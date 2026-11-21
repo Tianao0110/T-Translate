@@ -43,7 +43,7 @@ export function cleanText(text) {
 export function cleanTranslationOutput(text, source = '') {
   if (!text) return '';
 
-  let cleaned = text
+  const cleaned = text
     .replace(/^(翻译[：:]\s*|Translation[：:]\s*|译文[：:]\s*)/i, '')
     .replace(/^["'「」『』""''【】]|["'「」『』""''【】]$/g, '')
     .replace(/\s*（[^）]*）/g, '')

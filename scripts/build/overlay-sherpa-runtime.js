@@ -9,7 +9,6 @@
 //   node scripts/build/overlay-sherpa-runtime.js           apply
 //   node scripts/build/overlay-sherpa-runtime.js --check   report only, exit 1 if stale
 //   node scripts/build/overlay-sherpa-runtime.js --restore put the npm originals back
-/* eslint-disable no-console */
 
 const fs = require('fs');
 const path = require('path');

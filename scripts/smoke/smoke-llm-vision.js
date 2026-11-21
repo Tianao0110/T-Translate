@@ -5,7 +5,6 @@
 // reaches an image request, and that unloading frees both halves.
 //   node scripts/smoke/smoke-llm-vision.js --model <path.gguf> --mmproj <path.gguf> [--provider cpu|gpu] [--image <png>] [--family <name>] [--task <task>]
 // --family names the prompt family (runtime/mtmd.js), e.g. minicpm-ocr; default: the model's architecture.
-/* eslint-disable no-console */
 
 const path = require('path');
 const fs = require('fs');

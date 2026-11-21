@@ -15,7 +15,6 @@
 //
 // The user's own models are never touched: everything happens under a temp
 // userData. Design notes: docs/design/tooling.md §4.
-/* eslint-disable no-console */
 
 const path = require('path');
 const fs = require('fs');

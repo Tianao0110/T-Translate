@@ -10,7 +10,6 @@
 //   node extension/scripts/e2e-render.js [--browser <exe>] [--out <dir for screenshots>]
 //
 // The profile is left for the recycle bin.
-/* eslint-disable no-console */
 
 const fs = require('fs');
 const os = require('os');

@@ -4,7 +4,6 @@
 //   node scripts/build/build-ocr-release.js
 //
 // Publishing steps: docs/OCR_MODELS.md and docs/design/tooling.md §2.
-/* eslint-disable no-console */
 
 const path = require('path');
 const fs = require('fs');

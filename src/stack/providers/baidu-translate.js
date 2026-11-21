@@ -104,7 +104,7 @@ class BaiduTranslateProvider extends BaseProvider {
     function ii(a, b, c, d, x, s, t) { return cmn(c ^ (b | (~d)), a, b, x, s, t); }
     function md51(s) {
       const n = s.length;
-      let state = [1732584193, -271733879, -1732584194, 271733878];
+      const state = [1732584193, -271733879, -1732584194, 271733878];
       let i;
       for (i = 64; i <= n; i += 64) {
         md5cycle(state, md5blk(s.substring(i - 64, i)));

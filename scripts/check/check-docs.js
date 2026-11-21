@@ -6,7 +6,6 @@
 //
 // Narrative files (CHANGELOG, TODOS) are left out on purpose: they describe
 // the past. Design notes: docs/design/tooling.md §1.
-/* eslint-disable no-console */
 
 const fs = require('fs');
 const path = require('path');

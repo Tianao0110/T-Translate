@@ -8,7 +8,6 @@
 // and through their IPC handlers, plus the updater's check and download
 // channels. Everything happens under a temp userData; the user's own store
 // and models are never touched.
-/* eslint-disable no-console */
 
 const http = require('http');
 const https = require('https');

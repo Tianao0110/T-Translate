@@ -20,7 +20,6 @@
 // punctuation before CER; en lowers case and strips punctuation and
 // apostrophes before CER and WER. Finals go to the sentence they overlap
 // most; a sentence with no final counts as deleted.
-/* eslint-disable no-console */
 
 const path = require('path');
 const fs = require('fs');

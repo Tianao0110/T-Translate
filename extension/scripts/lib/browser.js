@@ -1,7 +1,6 @@
 // Chrome / Edge with a throwaway profile, driven over the DevTools pipe
 // (release Chrome ignores --load-extension, so extensions go through
 // Extensions.loadUnpacked). Used by make-fixture.js and e2e-pipeline.js.
-/* eslint-disable no-console */
 
 const fs = require('fs');
 const { spawn } = require('child_process');

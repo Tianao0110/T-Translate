@@ -3,7 +3,6 @@
 // Edge with a throwaway profile. Run once; the file is committed.
 //
 //   node extension/scripts/make-fixture.js [--browser <exe>] [--out <file>]
-/* eslint-disable no-console */
 
 const fs = require('fs');
 const os = require('os');

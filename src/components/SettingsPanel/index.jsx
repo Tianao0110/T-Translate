@@ -174,7 +174,7 @@ const SettingsPanel = ({ showNotification, initialSection, onSectionConsumed }) 
   }, [activeSection, dismissModeHint]);
 
   const { filteredNavItems, groupedNavItems } = useMemo(() => {
-    let items = searchQuery.trim()
+    const items = searchQuery.trim()
       ? NAV_ITEMS.filter(item => {
           const query = searchQuery.toLowerCase();
           const translatedLabel = (navLabels[item.id] || item.id).toLowerCase();

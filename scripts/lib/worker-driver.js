@@ -2,7 +2,6 @@
 // host does: one worker, request / response pairing, per-request token
 // accumulation, the shared abort flag, and an indented check list that ends
 // in the exit code. Used by smoke-llm and smoke-llm-vision.
-/* eslint-disable no-console */
 
 const path = require('path');
 const { Worker } = require('worker_threads');

@@ -266,7 +266,7 @@ function cropFromDesktopCapturer(data, bounds) {
       const scaleX = screenshotSize.width / matchedDisplay.bounds.width;
       const scaleY = screenshotSize.height / matchedDisplay.bounds.height;
 
-      let cropBounds = {
+      const cropBounds = {
         x: Math.round(relativeX * scaleX),
         y: Math.round(relativeY * scaleY),
         width: Math.round(bounds.width * scaleX),
@@ -291,7 +291,7 @@ function cropFromDesktopCapturer(data, bounds) {
   const relativeX = bounds.x - totalBounds.minX;
   const relativeY = bounds.y - totalBounds.minY;
 
-  let cropBounds = {
+  const cropBounds = {
     x: Math.round(relativeX * scaleX),
     y: Math.round(relativeY * scaleY),
     width: Math.round(bounds.width * scaleX),
