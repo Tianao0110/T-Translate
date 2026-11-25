@@ -64,6 +64,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     favorites,
     history,
     inputCompletion,
+    inputCompose,
     languagePicker,
     customLanguages,
     useStreamOutput,
@@ -93,6 +94,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
     favorites: s.favorites,
     history: s.history,
     inputCompletion: s.inputCompletion,
+    inputCompose: s.inputCompose,
     useStreamOutput: s.useStreamOutput,
     autoTranslate: s.autoTranslate,
     autoTranslateDelay: s.autoTranslateDelay,
@@ -167,6 +169,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
   const completion = useInputCompletion({
     text: currentTranslation.sourceText,
     enabled: inputCompletion,
+    modelEnabled: inputCompose,
     history,
     favorites,
     textareaRef: sourceTextareaRef,
@@ -507,7 +510,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
             />
             {completion.suffix && (
               <div className="translation-ghost" ref={completion.ghostRef} aria-hidden="true">
-                {currentTranslation.sourceText}<span className="ghost-suffix">{completion.suffix}</span>
+                {currentTranslation.sourceText}<wbr /><span className="ghost-suffix">{completion.suffix}</span>
               </div>
             )}
           </div>
