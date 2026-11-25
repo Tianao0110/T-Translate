@@ -565,6 +565,8 @@ function openSession(binding, {
     if (done) return { ...done, stopPiece: null };
 
     const skip = new Set(think.openers.map((t) => t.id));
+    // Logits are copied out, never viewed (docs/T-ENGINE.md §8).
+    const logitsType = koffi.array('float', nVocab, 'Typed');
     const decoded = promptTokens.slice();
     let rem = fragment;
     let text = '';
@@ -577,7 +579,7 @@ function openSession(binding, {
         stop = 'cancel';
         break;
       }
-      const logits = new Float32Array(koffi.view(f.getLogitsIth(ctx, -1), nVocab * 4));
+      const logits = koffi.decode(f.getLogitsIth(ctx, -1), logitsType);
       const { tok, p } = pickToken(logits, texts, rem, skip);
       if (firstMs === null) firstMs = now() - t0;
       if (tok < 0) {
@@ -615,6 +617,7 @@ function openSession(binding, {
       genTokens: count,
       firstMs: firstMs === null ? null : Math.round(firstMs),
       totalMs: Math.round(now() - t0),
+      tokPerSec: null,
     };
   }
 

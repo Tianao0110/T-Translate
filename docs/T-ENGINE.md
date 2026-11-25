@@ -231,6 +231,7 @@ Golden 测试至少覆盖：三个 `*_default_params()` 与 `mtmd_context_params
 | 宿主反复重生 | 模型或 DLL 与白名单不符、显存不够 | 看装载探针原因；连崩退避后提示用户 |
 | 0xC0000005 且发生在载入或解码期间 | 在 `.async` 调用里用了 JS 回调 | 改成 worker_thread 上的同步调用（第四节） |
 | 设备数组 / token 数组写完就崩 | 用了不存在的 `koffi.encode(ptr, offset, …)` 形式 | 改用 `koffi.array` 一次写入 |
+| 宿主退出码 134，日志 `FATAL ERROR: Error::New napi_get_last_error_info`；纯 Node 跑冒烟却正常 | 用 `koffi.view` 把原生内存直接当 ArrayBuffer 读。Electron 的 V8 沙盒不许 ArrayBuffer 指向外部内存 | 用 `koffi.decode(ptr, koffi.array('float', n, 'Typed'))` 拷一份（15 万个 float 约 0.15 ms） |
 
 ## 九、换版检查单（复制到 PR 里逐项勾）
 
