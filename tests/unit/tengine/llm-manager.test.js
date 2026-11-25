@@ -264,6 +264,56 @@ describe('llm manager', () => {
   });
 });
 
+describe('compose', () => {
+  const mtDoor = () => ({ store: fakeStore({ 'settings.llm.pack': 'unlisted:Hy-MT-9B.gguf', 'settings.llm.allowUnlistedModels': true }), packs: fakePacks({ unlisted: ['Hy-MT-9B.gguf'], door: () => true }) });
+
+  it('is usable on the general model only', async () => {
+    boot();
+    expect(await manager.composeUsable()).toEqual({ usable: true, reason: null });
+    manager.reset();
+    boot(mtDoor());
+    expect(await manager.composeUsable()).toEqual({ usable: false, reason: 'mt-model' });
+    manager.reset();
+    boot({ packs: fakePacks({ ready: false }) });
+    expect((await manager.composeUsable()).reason).toBe('no-model');
+  });
+
+  it('sends the prompt and the typed fragment, and shows only whole words', async () => {
+    const adapter = fakeAdapter();
+    adapter.generate.mockImplementation((req) => ({ reqId: 'c1', promise: Promise.resolve({ text: ' Thursday at', stop: 'unsure', stopPiece: ' three' }), cancel: vi.fn(), req }));
+    boot({ adapter });
+    const h = await manager.compose('The meeting was moved to Thur');
+    expect(await h.promise).toBe('sday at');
+    const req = adapter.generate.mock.calls[0][0];
+    expect(req.kind).toBe('compose');
+    expect(req.compose).toEqual({ fragment: ' Thur', minProb: 0.6 });
+    expect(req.prompt.endsWith('The meeting was moved to')).toBe(true);
+  });
+
+  it('never runs on a translation-only model or for text it cannot continue', async () => {
+    const { adapter } = boot(mtDoor());
+    expect(await (await manager.compose('Let me know if ')).promise).toBe('');
+    manager.reset();
+    const b = boot();
+    expect(await (await manager.compose('这是中文')).promise).toBe('');
+    expect(adapter.generate).not.toHaveBeenCalled();
+    expect(b.adapter.generate).not.toHaveBeenCalled();
+  });
+
+  it('a cancelled request shows nothing', async () => {
+    const adapter = fakeAdapter();
+    adapter.generate.mockImplementation(() => ({ reqId: 'c1', promise: Promise.resolve({ text: ' you', stop: 'cancel', stopPiece: null }), cancel: vi.fn() }));
+    boot({ adapter });
+    expect(await (await manager.compose('Let me know if ')).promise).toBe('');
+  });
+
+  it('warm-up loads the general model ahead of typing', async () => {
+    const { adapter } = boot();
+    expect((await manager.composeWarm()).usable).toBe(true);
+    await vi.waitFor(() => expect(adapter.load).toHaveBeenCalledTimes(1));
+  });
+});
+
 describe('the vision slot', () => {
   it('loads the vision pack with its mmproj on the vision host (GPU), without touching the text slot', async () => {
     const visionAdapter = fakeAdapter();

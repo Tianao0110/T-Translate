@@ -198,6 +198,44 @@ class StackClient {
     }
   }
 
+  // Ghost-text compose for the source box: the text to show after `text`,
+  // '' when the built-in model is unsure or cannot run.
+  async compose(text) {
+    const b = bridge();
+    if (!b?.compose) return '';
+    try {
+      const r = await b.compose(text);
+      return r?.success ? r.suffix || '' : '';
+    } catch (e) {
+      logger.error('compose IPC failed:', e);
+      return '';
+    }
+  }
+
+  // Loads the model ahead of the first compose; { usable, reason }.
+  async composeWarm() {
+    const b = bridge();
+    if (!b?.composeWarm) return { usable: false, reason: 'no-model' };
+    try {
+      return await b.composeWarm();
+    } catch (e) {
+      logger.error('compose warm IPC failed:', e);
+      return { usable: false, reason: 'no-model' };
+    }
+  }
+
+  // { usable, reason: null | 'no-model' | 'mt-model' } for the settings switch.
+  async getComposeCapability() {
+    const b = bridge();
+    if (!b?.composeCapability) return { usable: false, reason: 'no-model' };
+    try {
+      return await b.composeCapability();
+    } catch (e) {
+      logger.error('compose capability IPC failed:', e);
+      return { usable: false, reason: 'no-model' };
+    }
+  }
+
   async testProvider(providerId) {
     const b = bridge();
     if (!b) return { success: false, message: NO_BRIDGE.error };

@@ -22,6 +22,10 @@ function stackBridge(ipcRenderer, keys = null) {
     // Main window only; the facade refuses any other sender.
     setGlossary: (items) => ipcRenderer.invoke("stack:set-glossary", { items }),
     detectLanguage: (payload) => ipcRenderer.invoke("stack:detect-language", payload),
+    // Main window only; the facade refuses any other sender.
+    compose: (text) => ipcRenderer.invoke("stack:compose", { text }),
+    composeWarm: () => ipcRenderer.invoke("stack:compose-warm"),
+    composeCapability: () => ipcRenderer.invoke("stack:compose-capability"),
     ocrRecognize: (imageData, options) =>
       ipcRenderer.invoke("stack:ocr-recognize", { imageData, options }),
     ocrResetVision: () => ipcRenderer.invoke("stack:ocr-reset-vision"),

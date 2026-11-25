@@ -22,6 +22,11 @@ const INFLIGHT_TTL_MS = 10 * 60 * 1000;
 // Texts per stack:detect-language call; stack-client batches below it.
 const MAX_DETECT_TEXTS = 2000;
 
+// stack:compose reads only the end of the box; a request past the timeout
+// is cancelled.
+const COMPOSE_MAX_CHARS = 4000;
+const COMPOSE_TIMEOUT_MS = 4000;
+
 
 function register(ctx) {
   const { store } = ctx;
@@ -312,6 +317,52 @@ function register(ctx) {
     logger.info(`Glossary set: ${count} terms`);
     return { success: true, count };
   });
+
+  // Ghost-text compose for the main window's source box (llm/compose.js):
+  // the built-in general model only, so typing never reaches a network
+  // provider. A newer call cancels the one still running; a slow one gives
+  // up. Text is never logged.
+  let composeRunning = null;
+  const fromMainWindow = (event) => {
+    const main = ctx.getMainWindow?.();
+    return !!main && event.sender === main.webContents;
+  };
+
+  ipcMain.handle(CHANNELS.STACK.COMPOSE, async (event, payload = {}) => {
+    if (!fromMainWindow(event) || typeof payload.text !== 'string') return { success: false, suffix: '' };
+    const ticket = {
+      cancelled: false,
+      handle: null,
+      cancel() {
+        this.cancelled = true;
+        this.handle?.cancel();
+      },
+    };
+    composeRunning?.cancel();
+    composeRunning = ticket;
+    let timer = null;
+    try {
+      const handle = await llmManager.compose(payload.text.slice(-COMPOSE_MAX_CHARS));
+      ticket.handle = handle;
+      if (ticket.cancelled) handle.cancel();
+      timer = setTimeout(() => ticket.cancel(), COMPOSE_TIMEOUT_MS);
+      const suffix = await handle.promise;
+      return { success: true, suffix: ticket.cancelled ? '' : suffix };
+    } catch (e) {
+      logger.warn(`compose failed: ${e.code || 'error'}`);
+      return { success: false, suffix: '' };
+    } finally {
+      clearTimeout(timer);
+      if (composeRunning === ticket) composeRunning = null;
+    }
+  });
+
+  ipcMain.handle(CHANNELS.STACK.COMPOSE_WARM, async (event) => {
+    if (!fromMainWindow(event)) return { usable: false, reason: 'refused' };
+    return llmManager.composeWarm();
+  });
+
+  ipcMain.handle(CHANNELS.STACK.COMPOSE_CAPABILITY, () => llmManager.composeUsable());
 
   // Local and read-only: the same-language judgment (stack/language-id.js).
   // null tells the caller to judge on its own.

@@ -205,6 +205,10 @@ const CHANNELS = {
     CHANGED: 'stack:changed',                     // main → renderer: stack reloaded
     SET_GLOSSARY: 'stack:set-glossary',           // main window → main: the glossary every window translates with
     DETECT_LANGUAGE: 'stack:detect-language',     // {texts, targetLang} → [{language, inTarget}], local only
+    // Ghost-text compose for the main window's source box: built-in general model only, never a network provider.
+    COMPOSE: 'stack:compose',                     // {text} → {success, suffix}; a newer call cancels the running one
+    COMPOSE_WARM: 'stack:compose-warm',           // load the model ahead of typing → {usable, reason}
+    COMPOSE_CAPABILITY: 'stack:compose-capability', // → {usable, reason: null | 'no-model' | 'mt-model'}
     OCR_RECOGNIZE: 'stack:ocr-recognize',         // allowedEngines injected main-side
     OCR_RESET_VISION: 'stack:ocr-reset-vision',
     VISION_CHAT: 'stack:vision-chat',             // path B: prompt + capture to a vision model

@@ -14,7 +14,8 @@
 const os = require('os');
 const path = require('path');
 const { PRIVACY_MODES } = require('../shared/channels');
-const { LLM_MODELS_DIR, LLM_ROLE_VISION, LLM_ROLE_ASR, LLM_TEXT_ROLES, packById, defaultPack, roleForFileName } = require('../shared/llm-packs');
+const { LLM_MODELS_DIR, LLM_ROLE_GENERAL, LLM_ROLE_VISION, LLM_ROLE_ASR, LLM_TEXT_ROLES, packById, defaultPack, roleForFileName } = require('../shared/llm-packs');
+const { composeRequest, composeSuffix, COMPOSE_MIN_PROB, COMPOSE_MAX_TOKENS } = require('./compose');
 const { createLlmPackManager } = require('./llm-pack-manager');
 const { createTrialLog, pruneTrialLogs, summarizeTrialLogs } = require('../tengine/trial-log');
 const { createLlmPolicy } = require('../policy/engine-policy');
@@ -469,14 +470,14 @@ function asrStatus() {
 
 // Streams visible text to onToken; resolves with the engine's result. The
 // trial log gets the request's numbers (and text only with the switch).
-async function generate({ packId = null, file = null, kind = 'generate', system = '', user = '', translate = null, prompt, maxTokens = 256, sampler = {} } = {}, onToken = null) {
+async function generate({ packId = null, file = null, kind = 'generate', system = '', user = '', translate = null, prompt, compose = null, maxTokens = 256, sampler = {} } = {}, onToken = null) {
   // P6: after repeated stalls this session steps aside until the host is
   // restarted or a model is loaded afresh (both reset the policy).
   if (policy.state().unhealthy) throw fail('LLM_UNHEALTHY', 'built-in model stalled repeatedly this session');
   const { target } = await ensureLoaded({ packId, file });
   inflight++;
   clearIdle();
-  const request = { kind, maxTokens, sampler, ...(prompt !== undefined ? { prompt } : { system, user, ...(translate ? { translate } : {}) }) };
+  const request = { kind, maxTokens, sampler, ...(prompt !== undefined ? { prompt } : { system, user, ...(translate ? { translate } : {}) }), ...(compose ? { compose } : {}) };
   const g = deps.adapter.generate(request, onToken);
   const promise = g.promise
     .then((r) => {
@@ -491,6 +492,38 @@ async function generate({ packId = null, file = null, kind = 'generate', system 
       armIdle();
     });
   return { promise, cancel: g.cancel, reqId: g.reqId, trial: target.trial };
+}
+
+// Ghost-text compose (llm/compose.js) runs on the general text model only:
+// a translation-only pack cannot continue free text.
+async function composeUsable() {
+  if (!deps) return { usable: false, reason: 'no-model' };
+  if (!deps.packs.status()) await deps.packs.scan();
+  const sel = selected();
+  if (!sel || sel.status !== 'ready') return { usable: false, reason: 'no-model' };
+  if (sel.role !== LLM_ROLE_GENERAL) return { usable: false, reason: 'mt-model' };
+  return { usable: true, reason: null };
+}
+
+// Resolves with { promise, cancel }; the promise gives the text to show
+// after `text`, '' when the model is not sure or cannot run.
+async function compose(text) {
+  const req = (await composeUsable()).usable ? composeRequest(text) : null;
+  if (!req) return { promise: Promise.resolve(''), cancel: () => {} };
+  const g = await generate({ kind: 'compose', prompt: req.prompt, compose: { fragment: req.fragment, minProb: COMPOSE_MIN_PROB }, maxTokens: COMPOSE_MAX_TOKENS });
+  return {
+    promise: g.promise.then((r) => (r.stop === 'cancel' || r.stop === 'stall' ? '' : composeSuffix(r, req.fragment))),
+    cancel: g.cancel,
+  };
+}
+
+// Loads the general model ahead of the first compose (the source box got
+// focus with compose on). Failures surface on the request itself.
+async function composeWarm() {
+  const u = await composeUsable();
+  if (!u.usable || policy.state().unhealthy) return u;
+  ensureLoaded({}).catch((e) => deps.logger?.warn?.(`compose warm-up failed: ${e.code || e.message}`));
+  return u;
 }
 
 async function unload(reason = 'manual') {
@@ -578,6 +611,9 @@ module.exports = {
   init,
   ensureLoaded,
   generate,
+  compose,
+  composeUsable,
+  composeWarm,
   unload,
   probe,
   selfTest,
