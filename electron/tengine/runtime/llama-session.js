@@ -12,6 +12,8 @@
 // - KV prefix reuse between consecutive prompts (fixed system prompts)
 // - cancellation through a shared abort flag, a loop detector, and a stop
 //   reason on every result
+// - compose: ghost-text continuation that spells the typed word fragment
+//   first and stops at the first pick below a probability floor
 
 const os = require('os');
 const { StringDecoder } = require('string_decoder');
@@ -166,6 +168,34 @@ function commonPrefixLength(a, b) {
   let i = 0;
   while (i < n && a[i] === b[i]) i++;
   return i;
+}
+
+// --- compose ---------------------------------------------------------------
+
+// Greedy pick over one row of logits for compose. With `rem` (what is left
+// of the typed word fragment) only tokens whose text agrees with it compete,
+// and p is renormalised over them; without it p is the plain softmax of the
+// pick. Ids in `skip` never compete.
+function pickToken(logits, texts, rem = '', skip = null) {
+  const agrees = (i) => {
+    const t = texts[i];
+    return !!t && (rem.startsWith(t) || t.startsWith(rem));
+  };
+  const pool = [];
+  let best = -1;
+  let top = -Infinity;
+  for (let i = 0; i < logits.length; i++) {
+    if ((skip && skip.has(i)) || (rem && !agrees(i))) continue;
+    pool.push(i);
+    if (logits[i] > top) {
+      top = logits[i];
+      best = i;
+    }
+  }
+  if (best < 0) return { tok: -1, p: 0 };
+  let sum = 0;
+  for (const i of pool) sum += Math.exp(logits[i] - top);
+  return { tok: best, p: 1 / sum };
 }
 
 // --- prompts ---------------------------------------------------------------
@@ -464,18 +494,10 @@ function openSession(binding, {
 
   const cancelled = () => !!abortFlag && Atomics.load(abortFlag, 0) === 1;
 
-  // Decodes the prompt (reusing whatever prefix the context already holds),
-  // then samples until EOG, the token limit, a cancel, or a loop. Tokens
-  // reach onToken as visible text only; thought blocks never do.
-  function generate({ prompt, tokens = null, maxTokens = 256, onToken = null, sampler = {}, banThink = true, reuse = true } = {}) {
-    if (closed) throw fail('LLM_SESSION_CLOSED', 'session closed');
-    const promptTokens = tokens || tokenize(prompt);
-    if (promptTokens.length + MIN_GENERATION_ROOM > nCtx) {
-      throw fail('LLM_PROMPT_TOO_LONG', `${promptTokens.length} prompt tokens, context ${nCtx}`);
-    }
-    const limit = Math.min(maxTokens, nCtx - promptTokens.length);
+  // Decodes the prompt, reusing whatever prefix the context already holds.
+  // Returns the result base, or a finished cancel result in `done`.
+  function prefill(promptTokens, reuse) {
     const t0 = now();
-
     let start = 0;
     if (reuse && last) {
       const usable = Math.min(commonPrefixLength(last, promptTokens), promptTokens.length - 1);
@@ -488,11 +510,112 @@ function openSession(binding, {
     const promptMs = now() - t0;
     const base = { promptTokens: promptTokens.length, reusedTokens: start, promptMs: Math.round(promptMs), genTokens: 0, firstMs: null, text: '', thinkLeak: 0 };
     if (rc !== DECODE.OK) {
-      if (cancelled() || rc === DECODE.ABORTED) return { ...base, stop: 'cancel', totalMs: Math.round(now() - t0) };
+      if (cancelled() || rc === DECODE.ABORTED) return { t0, promptMs, base, done: { ...base, stop: 'cancel', totalMs: Math.round(now() - t0) } };
       throw fail('LLM_DECODE_FAILED', `llama_decode returned ${rc} on the prompt`);
     }
+    return { t0, promptMs, base, done: null };
+  }
 
+  function checkRoom(promptTokens) {
+    if (promptTokens.length + MIN_GENERATION_ROOM > nCtx) {
+      throw fail('LLM_PROMPT_TOO_LONG', `${promptTokens.length} prompt tokens, context ${nCtx}`);
+    }
+  }
+
+  // Decodes the prompt, then samples until EOG, the token limit, a cancel,
+  // or a loop. Tokens reach onToken as visible text only; thought blocks
+  // never do.
+  function generate({ prompt, tokens = null, maxTokens = 256, onToken = null, sampler = {}, banThink = true, reuse = true } = {}) {
+    if (closed) throw fail('LLM_SESSION_CLOSED', 'session closed');
+    const promptTokens = tokens || tokenize(prompt);
+    checkRoom(promptTokens);
+    const limit = Math.min(maxTokens, nCtx - promptTokens.length);
+    const { t0, promptMs, base, done } = prefill(promptTokens, reuse);
+    if (done) return done;
     return runLoop({ base, decoded: promptTokens.slice(), limit, t0, promptMs, sampler, banThink, onToken, trackPrefix: true });
+  }
+
+  let tokenTextTable = null;
+  // Every token's text, built on the first compose (about 75 ms at 150k tokens).
+  function tokenTexts() {
+    if (!tokenTextTable) {
+      const buf = Buffer.alloc(256);
+      tokenTextTable = new Array(nVocab);
+      for (let i = 0; i < nVocab; i++) {
+        const n = f.toPiece(vocab, i, buf, buf.length, 0, true);
+        tokenTextTable[i] = n > 0 ? buf.subarray(0, n).toString('utf8') : '';
+      }
+    }
+    return tokenTextTable;
+  }
+
+  // Ghost-text continuation: `fragment`, the word being typed and taken off
+  // the end of the prompt, is spelled first by tokens that agree with it,
+  // then the pick runs free (greedy). Every pick must reach minProb; the
+  // first that does not ends it with stop 'unsure' and its text in
+  // stopPiece, so the caller can tell whether a word was cut. `text` starts
+  // with the fragment.
+  function compose({ prompt, fragment = '', minProb = 0, maxTokens = 8 } = {}) {
+    if (closed) throw fail('LLM_SESSION_CLOSED', 'session closed');
+    const texts = tokenTexts();
+    const promptTokens = tokenize(prompt);
+    checkRoom(promptTokens);
+    const limit = Math.min(maxTokens, nCtx - promptTokens.length);
+    const { t0, base, done } = prefill(promptTokens, true);
+    if (done) return { ...done, stopPiece: null };
+
+    const skip = new Set(think.openers.map((t) => t.id));
+    const decoded = promptTokens.slice();
+    let rem = fragment;
+    let text = '';
+    let stop = 'limit';
+    let stopPiece = null;
+    let firstMs = null;
+    let count = 0;
+    for (let i = 0; i < limit; i++) {
+      if (cancelled()) {
+        stop = 'cancel';
+        break;
+      }
+      const logits = new Float32Array(koffi.view(f.getLogitsIth(ctx, -1), nVocab * 4));
+      const { tok, p } = pickToken(logits, texts, rem, skip);
+      if (firstMs === null) firstMs = now() - t0;
+      if (tok < 0) {
+        stop = 'unsure';
+        break;
+      }
+      if (!rem && f.isEog(vocab, tok)) {
+        stop = 'eog';
+        break;
+      }
+      if (p < minProb) {
+        stop = 'unsure';
+        stopPiece = texts[tok];
+        break;
+      }
+      const t = texts[tok];
+      text += t;
+      rem = t.length >= rem.length ? '' : rem.slice(t.length);
+      count++;
+      if (i === limit - 1) break;
+      koffi.encode(one, 'int32', tok);
+      const drc = f.decode(ctx, f.batchGetOne(one, 1));
+      if (drc !== DECODE.OK) {
+        stop = cancelled() || drc === DECODE.ABORTED ? 'cancel' : 'error';
+        break;
+      }
+      decoded.push(tok);
+    }
+    last = stop !== 'error' ? decoded : null;
+    return {
+      ...base,
+      text,
+      stop,
+      stopPiece,
+      genTokens: count,
+      firstMs: firstMs === null ? null : Math.round(firstMs),
+      totalMs: Math.round(now() - t0),
+    };
   }
 
   // Continues from a context somebody else filled (mtmd.js after
@@ -599,6 +722,7 @@ function openSession(binding, {
     tokenize,
     buildPrompt,
     generate,
+    compose,
     generateContinue,
     // Raw handles for mtmd.js, which prefills this context with an image.
     handles: () => ({ model, ctx, mem, vocab, nVocab, nCtx, nBatch, threads: nThreads, deviceHandle: picked.device ? picked.device.handle : null }),
@@ -626,6 +750,7 @@ module.exports = {
   createThinkStripper,
   createLoopDetector,
   commonPrefixLength,
+  pickToken,
   detectFamily,
   renderChatml,
   renderHunyuan,

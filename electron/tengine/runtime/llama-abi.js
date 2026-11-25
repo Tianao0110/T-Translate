@@ -219,6 +219,7 @@ const FUNCS = {
     samplerDist: 'void *llama_sampler_init_dist(uint32 seed)',
     samplerPenalties: 'void *llama_sampler_init_penalties(int32 nVocab, int32 lastN, float repeat, float freq, float present)',
     sample: 'int32 llama_sampler_sample(void *smpl, void *ctx, int32 idx)',
+    getLogitsIth: 'float *llama_get_logits_ith(void *ctx, int32 i)',
     samplerFree: 'void llama_sampler_free(void *s)',
   },
   mtmd: {

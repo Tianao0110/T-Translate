@@ -14,6 +14,9 @@
 //     {type:'generate', reqId, system?, user?, translate?, prompt?, maxTokens?, sampler?}
 //                                                   (translate {from, to, text} feeds templates that take the
 //                                                    languages as fields, PLaMo's)
+//     {type:'generate', reqId, prompt, compose:{fragment, minProb}, maxTokens?}
+//                                                -> {type:'done', reqId, ok, result|error}, no tokens; result.text
+//                                                   starts with the fragment, result.stopPiece names a refused pick
 //     {type:'generate', reqId, image, task?, maxTokens?, sampler?}   image: PNG/JPEG bytes, never logged
 //                                                -> {type:'token', reqId, text}* then {type:'done', reqId, ok, result|error}
 //     {type:'generate', reqId, audio, maxTokens?}  audio: Float32Array PCM at info.audio.sampleRate, never logged
@@ -228,6 +231,14 @@ function generate(msg) {
   if (msg.audio !== undefined) {
     if (!current.audio) throw Object.assign(new Error('the loaded model has no audio encoder'), { code: 'LLM_AUDIO_UNSUPPORTED' });
     return current.audio.transcribe({ pcm: msg.audio, maxTokens: msg.maxTokens || null });
+  }
+  if (msg.compose) {
+    return current.session.compose({
+      prompt: msg.prompt || '',
+      fragment: msg.compose.fragment || '',
+      minProb: msg.compose.minProb || 0,
+      maxTokens: msg.maxTokens || 8,
+    });
   }
   const prompt = msg.prompt !== undefined
     ? msg.prompt

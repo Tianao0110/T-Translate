@@ -1,6 +1,6 @@
 // The parts of the decode loop that need no DLL: thought stripping across
-// token boundaries, the loop guard, prefix reuse arithmetic, the prompt
-// templates, device choice and the KV estimate.
+// token boundaries, the loop guard, prefix reuse arithmetic, the compose
+// pick, the prompt templates, device choice and the KV estimate.
 
 import { describe, it, expect } from 'vitest';
 import { createRequire } from 'module';
@@ -93,6 +93,35 @@ describe('prefix reuse arithmetic', () => {
     expect(s.commonPrefixLength([1, 2, 3, 4], [1, 2, 9, 4])).toBe(2);
     expect(s.commonPrefixLength([1, 2], [1, 2, 3])).toBe(2);
     expect(s.commonPrefixLength([], [1])).toBe(0);
+  });
+});
+
+describe('compose pick', () => {
+  const texts = [' Thursday', ' Thurs', ' Th', ' the', 'ston', '<think>', ''];
+  const logits = Float32Array.from([2, 1, 0, 5, 4, 9, 9]);
+
+  it('without a fragment takes the plain argmax and its softmax probability', () => {
+    const r = s.pickToken(logits, texts, '', new Set([5, 6]));
+    expect(r.tok).toBe(3);
+    const sum = [2, 1, 0, 5, 4].reduce((a, x) => a + Math.exp(x - 5), 0);
+    expect(r.p).toBeCloseTo(1 / sum, 6);
+  });
+
+  it('with a fragment only tokens that agree with it compete, renormalised', () => {
+    const r = s.pickToken(logits, texts, ' Thur');
+    expect(r.tok).toBe(0);
+    // ' Thursday', ' Thurs' and ' Th' agree with ' Thur'; ' the' and 'ston' do not.
+    const sum = Math.exp(0) + Math.exp(-1) + Math.exp(-2);
+    expect(r.p).toBeCloseTo(1 / sum, 6);
+  });
+
+  it('a token shorter than the fragment counts when it is its start', () => {
+    const r = s.pickToken(Float32Array.from([0, 0, 3, 0, 0, 0, 0]), texts, ' Thur');
+    expect(r.tok).toBe(2);
+  });
+
+  it('no agreeing token means no pick', () => {
+    expect(s.pickToken(logits, texts, ' Xy')).toEqual({ tok: -1, p: 0 });
   });
 });
 
