@@ -12,12 +12,21 @@ const MIN_CHARS = 2;
 // Typing pause before asking: inside a word (Windows predictor), after a space (model).
 const WORD_PAUSE_MS = 150;
 const SPACE_PAUSE_MS = 300;
-// A history hit shows at most this much; Tab and the next pause bring the rest.
-const MAX_WORDS = 5;
+// A history hit stops where its phrase ends (docs/design/renderer.md §1);
+// the caps only keep a run-on short.
+const MAX_WORDS = 8;
 const MAX_CJK_CHARS = 10;
 const MAX_CHARS = 300;
 const CJK_CHAR = /[぀-ヿ㐀-鿿가-힯＀-￯]/;
 const CJK_STOP = /[，。！？；：、,.!?;:\n]/;
+// Words that usually open a new phrase: the completion stops before them.
+const BREAK_BEFORE = new Set([
+  'and', 'but', 'or', 'so', 'because', 'when', 'while', 'if', 'although', 'though', 'unless', 'until',
+  'after', 'before', 'as', 'than', 'which', 'who', 'whom', 'whose', 'where',
+  'at', 'in', 'on', 'by', 'from', 'during', 'about', 'without', 'within', 'through', 'across', 'around', 'near', 'via',
+  'last', 'next', 'yesterday', 'today', 'tomorrow', 'tonight',
+  'i', 'we', 'they', 'he', 'she',
+]);
 const MIRRORED = [
   'fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'lineHeight', 'letterSpacing', 'wordSpacing',
   'textIndent', 'textTransform', 'tabSize',
@@ -35,9 +44,10 @@ function startsWithLoose(candidate, typed) {
   return isPlainAscii(typed) && candidate.slice(0, typed.length).toLowerCase() === typed.toLowerCase();
 }
 
-// The first few words of a remainder: up to MAX_WORDS space-separated words
-// (a half word being finished counts as one), never past a line break. CJK
-// text stops at its first punctuation or after MAX_CJK_CHARS characters.
+// The part of a remainder up to its natural stop, never past a line break.
+// The first piece (the rest of a half word, or else the next word) always
+// shows; then words follow until a clause mark (, ; : dropped; . ! ? kept)
+// or a word that opens a new phrase. CJK text stops at its first punctuation.
 export function capCompletion(suffix) {
   const line = suffix.split('\n')[0];
   const first = line.trimStart()[0] || '';
@@ -47,8 +57,19 @@ export function capCompletion(suffix) {
     const stop = body.search(CJK_STOP);
     return line.slice(0, lead) + body.slice(0, Math.min(stop < 0 ? body.length : stop, MAX_CJK_CHARS));
   }
-  const m = line.match(new RegExp(`^(\\s*\\S+){1,${MAX_WORDS}}`));
-  return m ? m[0].slice(0, MAX_CHARS) : '';
+  const words = line.match(/\s*\S+/g) || [];
+  let out = '';
+  for (let i = 0; i < words.length && i < MAX_WORDS; i++) {
+    const w = words[i];
+    if (i > 0 && BREAK_BEFORE.has(w.trim().replace(/[^A-Za-z']/g, '').toLowerCase())) break;
+    if (/[,;:]$/.test(w)) {
+      out += w.slice(0, -1);
+      break;
+    }
+    out += w;
+    if (/[.!?]$/.test(w)) break;
+  }
+  return out.slice(0, MAX_CHARS);
 }
 
 // The text to append after `typed`, or null. `sources` is a list of arrays of

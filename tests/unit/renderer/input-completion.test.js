@@ -24,13 +24,32 @@ describe('findCompletion', () => {
     expect(findCompletion('hello W', [list('hello world')])).toBe('orld');
   });
 
-  it('shows at most five words, the half word being finished counting as one', () => {
-    expect(findCompletion('Thank you for your he', [list('Thank you for your help with the project last week.')])).toBe('lp with the project last');
-    expect(findCompletion('Thank you for your', [list('Thank you for your help with the project last week.')])).toBe(' help with the project last');
+  it('stops where the phrase ends, not after a fixed number of words', () => {
+    const hit = (typed, sentence) => findCompletion(typed, [list(sentence)]);
+    expect(hit('Thank you for your he', 'Thank you for your help with the project last week.')).toBe('lp with the project');
+    expect(hit('Could you please send me the upda', 'Could you please send me the updated version of the report by Friday?')).toBe('ted version of the report');
+    expect(hit('I would appreciate it if you could get ba', 'I would appreciate it if you could get back to me as soon as possible.')).toBe('ck to me');
+    expect(hit('The meeting has been moved to Thur', 'The meeting has been moved to Thursday at three in the afternoon.')).toBe('sday');
+    expect(hit('If you have any other questions, fe', 'If you have any other questions, feel free to contact me at any time.')).toBe('el free to contact me');
+    expect(hit('The application crashes every', 'The application crashes every time I try to open a large file.')).toBe(' time');
+  });
+
+  it('the first piece always shows, even a word that opens a phrase', () => {
+    expect(capCompletion(' last week.')).toBe(' last week.');
+    expect(capCompletion(' at three in the afternoon')).toBe(' at three');
+  });
+
+  it('a comma ends the phrase and is dropped; a full stop is kept', () => {
+    expect(capCompletion('lp, and thanks again')).toBe('lp');
+    expect(capCompletion('lp with everything.')).toBe('lp with everything.');
+  });
+
+  it('a long phrase with no stop is capped at eight words', () => {
+    expect(capCompletion(' one two three four five six seven eight nine ten')).toBe(' one two three four five six seven eight');
   });
 
   it('never runs past a line break', () => {
-    expect(findCompletion('Hi Tom', [list('Hi Tom,\nSee you on Monday.')])).toBe(',');
+    expect(findCompletion('Hi Tom', [list('Hi Tom,\nSee you on Monday.')])).toBeNull();
     expect(capCompletion('\nnext line')).toBe('');
   });
 
