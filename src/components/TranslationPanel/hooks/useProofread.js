@@ -62,7 +62,7 @@ export default function useProofread({ textareaRef, onReplace, notify, t }) {
       const result = await translationService.chatCompletion([
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
-      ]);
+      ], { requireChat: true });
       if (!result.success || !result.content) {
         notify(result.error || t('translation.proofreadFailed'), 'error');
         return;
