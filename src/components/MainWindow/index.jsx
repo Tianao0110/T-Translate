@@ -199,10 +199,11 @@ const MainWindow = () => {
   }, [activeTab, isFullscreen]);
 
   const notifyTimerRef = useRef(null);
-  const showNotification = useCallback((message, type = 'info', duration = 3000) => {
+  // action: optional { label, onClick } shown as a button in the toast.
+  const showNotification = useCallback((message, type = 'info', duration = 3000, action = null) => {
     // A previous toast's timer must not cut a newer (possibly longer) one short
     clearTimeout(notifyTimerRef.current);
-    setNotification({ message, type });
+    setNotification({ message, type, action });
     notifyTimerRef.current = setTimeout(() => setNotification(null), duration);
   }, []);
 
@@ -274,6 +275,18 @@ const MainWindow = () => {
       <div className={`notification notification-${notification.type}`}>
         {icons[notification.type]}
         <span>{notification.message}</span>
+        {notification.action && (
+          <button
+            className="notification-action"
+            onClick={() => {
+              clearTimeout(notifyTimerRef.current);
+              setNotification(null);
+              notification.action.onClick();
+            }}
+          >
+            {notification.action.label}
+          </button>
+        )}
         <button className="notification-close" onClick={() => { clearTimeout(notifyTimerRef.current); setNotification(null); }}><X size={14} /></button>
       </div>
     );

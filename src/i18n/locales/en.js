@@ -121,6 +121,8 @@ const en = {
     source: "Source", target: "Target", recognizing: "Recognizing...",
     screenshot: "Screenshot OCR", importImage: "Import Image", paste: "Paste",
     speakSource: "Speak Source", speakTarget: "Speak Target", stopSpeak: "Stop Speaking",
+    proofread: "Fix spelling and grammar (English)", proofreadDone: "Fixed", proofreadUndo: "Undo",
+    proofreadClean: "Nothing to fix", proofreadFailed: "Could not fix it. Your text is unchanged.",
     ocrProcessing: "Recognizing text from image...", dropFile: "Drop file to import...",
     noTextToSpeak: "No text to speak", speakFailed: "Speech failed",
     ocrRecognizing: "Recognizing text...", ocrSuccess: "Recognition successful ({{engine}})", ocrFailed: "No text recognized",

@@ -121,6 +121,8 @@ const zh = {
     source: "原文", target: "译文", recognizing: "识别中...",
     screenshot: "截图识别", importImage: "导入图片", paste: "粘贴",
     speakSource: "朗读原文", speakTarget: "朗读译文", stopSpeak: "停止朗读",
+    proofread: "纠错（英文拼写和语法）", proofreadDone: "已改正", proofreadUndo: "撤销",
+    proofreadClean: "没有发现要改的地方", proofreadFailed: "纠错没成功，原文没有改动",
     ocrProcessing: "正在识别图片中的文字...", dropFile: "释放文件以导入...",
     noTextToSpeak: "没有可朗读的文本", speakFailed: "朗读失败",
     ocrRecognizing: "正在识别文字...", ocrSuccess: "识别成功 ({{engine}})", ocrFailed: "未能识别到文字",

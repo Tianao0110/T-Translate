@@ -493,6 +493,22 @@
   color: var(--text-primary);
 }
 
+.notification-action {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  background: transparent;
+  border: 1px solid var(--accent-primary);
+  border-radius: 6px;
+  color: var(--accent-primary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.notification-action:hover {
+  background: color-mix(in srgb, var(--accent-primary) 12%, transparent);
+}
+
 .notification-success {
   border-color: var(--success);
   background: linear-gradient(135deg, 

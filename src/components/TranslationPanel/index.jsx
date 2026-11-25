@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Send, Camera, Image, FileText, Volume2, VolumeX, Copy,
   RotateCcw, Sparkles, Loader2, Clock,
-  Lightbulb, Check, X, ArrowRight, Palette, ChevronUp, ChevronDown, BookOpen
+  Lightbulb, Check, X, ArrowRight, Palette, ChevronUp, ChevronDown, BookOpen, SpellCheck
 } from 'lucide-react';
 
 import { useShallow } from 'zustand/react/shallow';
@@ -19,7 +19,8 @@ import './styles.css';
 
 import { PRIVACY_MODES, TRANSLATION_STATUS, LANGUAGES } from '../../config/constants.js';
 
-import { useTTS, useTermCheck, useStyleRewrite, useSaveModal, useInputCompletion } from './hooks';
+import { useTTS, useTermCheck, useStyleRewrite, useSaveModal, useInputCompletion, useProofread } from './hooks';
+import { canProofread } from './hooks/useProofread.js';
 import useAiActions from '../../ai/use-ai-actions.js';
 import { resolveActionLabel } from '../../ai/ai-action-runner.js';
 import AiActionIcon from '../shared/AiActionIcon.jsx';
@@ -178,6 +179,7 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
       if (isOcrSource) setIsOcrSource(false);
     },
   });
+  const proofread = useProofread({ textareaRef: sourceTextareaRef, onReplace: setSourceText, notify, t });
   const fileInputRef = useRef(null);
 
   // The picker needs the whole entry; user-added languages sit alongside the
@@ -476,6 +478,16 @@ const TranslationPanel = ({ showNotification, screenshotData, onScreenshotProces
               <button className="action-btn" onClick={clearCurrent} disabled={isOcrProcessing} title={t('translation.clear')}>
                 <RotateCcw size={15} />
               </button>
+              {ai.capabilities.text && (
+                <button
+                  className="action-btn"
+                  onClick={proofread.run}
+                  disabled={isOcrProcessing || proofread.busy || !canProofread(currentTranslation.sourceText)}
+                  title={t('translation.proofread')}
+                >
+                  {proofread.busy ? <Loader2 size={15} className="animate-spin" /> : <SpellCheck size={15} />}
+                </button>
+              )}
               {tts.ttsEnabled && (
                 <button
                   className={`action-btn ${tts.ttsStatus === TTS_STATUS.SPEAKING && tts.ttsTarget === 'source' ? 'active' : ''}`}

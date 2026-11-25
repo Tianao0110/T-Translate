@@ -112,6 +112,15 @@ Rewritten translation:`;
 
 // LLMs often wrap JSON in ``` fences despite being told not to. Throws on
 // unparseable replies — callers decide their own fallback.
+// Proofreading the source box (TranslationPanel useProofread); English
+// whatever the UI language (docs/design/renderer.md).
+export function getProofreadPrompts(text) {
+  return {
+    systemPrompt: 'You are a proofreader. Fix spelling mistakes, typos and grammar errors in the text the user sends. Keep its language: never translate it. Keep its meaning, wording, tone and line breaks; change only what is wrong. If nothing is wrong, return it unchanged. Output only the corrected text, with no notes, quotes or explanations.',
+    userPrompt: text,
+  };
+}
+
 export function parseJsonReply(content) {
   let cleaned = content.trim();
   cleaned = cleaned.replace(/^```json\s*/, '').replace(/```\s*$/, '');
