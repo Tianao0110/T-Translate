@@ -1,6 +1,6 @@
 // Ghost-text completion for the source box: the first history or favorites
-// entry that extends what was typed shows its remainder in grey over the
-// textarea; with none, after a typing pause, the main process finishes the
+// entry that extends what was typed shows its next few words in grey over
+// the textarea; with none, after a typing pause, the main process finishes the
 // word being typed or guesses the next one (stack:compose). Tab takes it,
 // Esc hides it until the text changes. The ghost layer copies the
 // textarea's font metrics and size at runtime so both wrap the same way.
@@ -12,7 +12,12 @@ const MIN_CHARS = 2;
 // Typing pause before asking: inside a word (Windows predictor), after a space (model).
 const WORD_PAUSE_MS = 150;
 const SPACE_PAUSE_MS = 300;
-const MAX_SUFFIX = 300;
+// A history hit shows at most this much; Tab and the next pause bring the rest.
+const MAX_WORDS = 5;
+const MAX_CJK_CHARS = 10;
+const MAX_CHARS = 300;
+const CJK_CHAR = /[぀-ヿ㐀-鿿가-힯＀-￯]/;
+const CJK_STOP = /[，。！？；：、,.!?;:\n]/;
 const MIRRORED = [
   'fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'lineHeight', 'letterSpacing', 'wordSpacing',
   'textIndent', 'textTransform', 'tabSize',
@@ -30,6 +35,22 @@ function startsWithLoose(candidate, typed) {
   return isPlainAscii(typed) && candidate.slice(0, typed.length).toLowerCase() === typed.toLowerCase();
 }
 
+// The first few words of a remainder: up to MAX_WORDS space-separated words
+// (a half word being finished counts as one), never past a line break. CJK
+// text stops at its first punctuation or after MAX_CJK_CHARS characters.
+export function capCompletion(suffix) {
+  const line = suffix.split('\n')[0];
+  const first = line.trimStart()[0] || '';
+  if (CJK_CHAR.test(first)) {
+    const lead = line.length - line.trimStart().length;
+    const body = line.slice(lead);
+    const stop = body.search(CJK_STOP);
+    return line.slice(0, lead) + body.slice(0, Math.min(stop < 0 ? body.length : stop, MAX_CJK_CHARS));
+  }
+  const m = line.match(new RegExp(`^(\\s*\\S+){1,${MAX_WORDS}}`));
+  return m ? m[0].slice(0, MAX_CHARS) : '';
+}
+
 // The text to append after `typed`, or null. `sources` is a list of arrays of
 // { sourceText } scanned in order; the first hit wins.
 export function findCompletion(typed, sources) {
@@ -39,9 +60,9 @@ export function findCompletion(typed, sources) {
     for (const item of list) {
       const text = item?.sourceText;
       if (typeof text !== 'string' || !startsWithLoose(text, typed)) continue;
-      const suffix = text.slice(typed.length);
+      const suffix = capCompletion(text.slice(typed.length));
       if (!suffix.trim()) continue;
-      return suffix.length > MAX_SUFFIX ? suffix.slice(0, MAX_SUFFIX) : suffix;
+      return suffix;
     }
   }
   return null;

@@ -1,8 +1,8 @@
-// Ghost completion appends the remainder of the first history or favorites
-// text that extends what was typed; these pin the matching rules.
+// Ghost completion appends the next few words of the first history or
+// favorites text that extends what was typed; these pin the matching rules.
 
 import { describe, it, expect } from 'vitest';
-import { findCompletion } from '../../../src/components/TranslationPanel/hooks/useInputCompletion.js';
+import { findCompletion, capCompletion } from '../../../src/components/TranslationPanel/hooks/useInputCompletion.js';
 
 const list = (...texts) => texts.map((sourceText) => ({ sourceText }));
 
@@ -22,6 +22,21 @@ describe('findCompletion', () => {
   it('ignores case for plain ASCII input and keeps the stored spelling', () => {
     expect(findCompletion('HEL', [list('hello world')])).toBe('lo world');
     expect(findCompletion('hello W', [list('hello world')])).toBe('orld');
+  });
+
+  it('shows at most five words, the half word being finished counting as one', () => {
+    expect(findCompletion('Thank you for your he', [list('Thank you for your help with the project last week.')])).toBe('lp with the project last');
+    expect(findCompletion('Thank you for your', [list('Thank you for your help with the project last week.')])).toBe(' help with the project last');
+  });
+
+  it('never runs past a line break', () => {
+    expect(findCompletion('Hi Tom', [list('Hi Tom,\nSee you on Monday.')])).toBe(',');
+    expect(capCompletion('\nnext line')).toBe('');
+  });
+
+  it('CJK stops at its first punctuation or after ten characters', () => {
+    expect(findCompletion('今天天', [list('今天天气很好，我们去公园散步吧')])).toBe('气很好');
+    expect(capCompletion('一二三四五六七八九十十一十二')).toBe('一二三四五六七八九十');
   });
 
   it('matches CJK exactly', () => {
