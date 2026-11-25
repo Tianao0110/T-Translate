@@ -64,7 +64,7 @@ Three tone buttons under the languages: Natural (everyday), Precise (technical, 
 - Type or paste text. Press Ctrl+Enter or click "Translate".
 - With "Auto Translate" on (Settings → Translation), translation starts shortly after you stop typing.
 - "Input Completion" is on by default: while you type, a grey hint shows a sentence from your history or glossary that starts the same way. Tab accepts it, Esc hides it.
-- "AI Word Suggestions (English)" is off by default. Turn it on in Settings → Translation. When you pause while typing English, the built-in model finishes the word you are typing and guesses the next word in grey. Tab accepts it. When the model is not sure, it shows nothing. It needs a general built-in model (Qwen3); a translation-only model cannot suggest words.
+- It also suggests words when you type English. Stop in the middle of a word (3 letters or more) and the Windows typing predictor finishes it. Type a space, and if the first source in your list that can chat is the built-in model, it guesses the next word. When it is not sure, it shows nothing.
 - The proofread button fixes English typos and grammar right in the source box. To get your text back, click "Undo" on the message or press Ctrl+Z. The button shows only when a model that can chat is available.
 - Misspelled words in the source box get a red underline; right-click for suggestions and "Add to Dictionary". This is the Windows spellchecker: it knows the languages installed in Windows and never goes online.
 - Buttons above the box: screenshot OCR, import image, paste, clear, proofread, read the source aloud.
@@ -309,8 +309,7 @@ Most settings need "Save Changes" at the bottom right; theme, language, shortcut
 ### 4.2 Translation
 
 - Auto translate: starts after you stop typing; the delay is adjustable below.
-- Input Completion: a grey hint shows a sentence from your history or glossary that starts the same way; Tab accepts it.
-- AI Word Suggestions (English): the built-in model finishes the word you are typing and guesses the next word in grey; Tab accepts it. Off by default; needs a general built-in model.
+- Input Completion: a grey hint shows a sentence from your history or glossary that starts the same way; when you type English, it also finishes the word you are typing and guesses the next word. Tab accepts it.
 - Streaming output: the translation appears word by word.
 - When the content is already in the target language: show the source, or translate back into your source language. Applies to selection and the floating window. It counts only when nearly all of the text is in the target language; a few foreign names or terms don't matter. A whole foreign sentence, or text that is mostly foreign, is translated in full.
 - Screenshot output: pin (the default), selection window or main window, see 3.2.

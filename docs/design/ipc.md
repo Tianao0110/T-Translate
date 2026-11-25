@@ -17,7 +17,7 @@
 - 连接测试的离线门在这里而不是渲染端：`testProvider` 自己套白名单加离线的「端点必须本地」规则，模式永远是门面的。
 - 状态回传前把 schema 里 `encrypted: true` 的字段全部打码：解密后的密钥只存在于主进程。
 - `stack:set-glossary`（v0.5.2）：主窗口把词汇表推给栈，划词窗、悬浮窗与听译字幕翻译时由栈自己取词条。**只认主窗口的 webContents**（与历史保险库同一条规矩——别的窗口不该能改写所有窗口的译文），预加载里只有主窗口的桥有这个方法。词条只在主进程内存里，不落盘；上限与清洗在栈的 `sanitizeGlossaryItems`，不在处理器里。缘由与规则见 `docs/design/stack.md` 第 3 节。
-- `stack:compose` / `stack:compose-warm` / `stack:compose-capability`（2026-11-25）：主窗口原文框的 AI 补词。前两个**只认主窗口的 webContents**，预加载里只有主窗口的桥有这三个方法。门面不经翻译栈，直接调 `llm/llm-manager.js` 的 `compose`：只走内置通用模型，逐键的文字绝不进联网源；新请求顶掉还在跑的旧请求，4 秒没回就放弃；文字不进日志，失败只记错误码。规则见 `docs/design/renderer.md` 第 1 节。
+- `stack:compose` / `stack:compose-warm`（2026-11-25）：主窗口原文框的词级补全。**只认主窗口的 webContents**，预加载里只有主窗口的桥有这两个方法。门面不经翻译栈：结尾是字母交给 `platform/text-prediction.js`（Windows 打字预测），结尾是空格且翻译源顺序里排第一的对话模型是内置模型时交给 `llm/llm-manager.js` 的 `compose`。逐键的文字不进任何联网源；新请求顶掉还在跑的旧请求，4 秒没回就放弃；文字不进日志，失败只记错误码。规则见 `docs/design/renderer.md` 第 1 节。
 - `stack:detect-language`：同语言判断（`src/stack/language-id.js`），纯本地、只读，不经隐私门，离线模式照常可用；划词窗、悬浮窗、主窗口的桥都有。每次最多 2000 条（stack-client 按 1000 条分批），超量或载荷不对返回 null，渲染端据此退回本地判断。缘由见 `docs/design/stack.md` 第 8 节。
 - OCR：引擎白名单从**当前**模式注入，渲染端不可能放宽（旧调用点把白名单当参数传、靠约定）。截图是程序里最敏感的输入。视觉路径 B 同一白名单，再加离线的本地端点规则。
 - 外部 TTS 端点按定义是网络服务（即使在 localhost），离线模式三条通道全部拒绝，渲染端引擎报自己不可用、管理器留在系统语音。设置页可用草稿配置（未保存、密钥可空）端到端试听。音频以 ArrayBuffer 原样跨 IPC（结构化克隆）。
