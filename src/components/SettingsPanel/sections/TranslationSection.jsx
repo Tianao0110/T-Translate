@@ -1,8 +1,6 @@
-import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import useTranslationStore from '../../../stores/translation-store';
-import translationService from '../../../translation/stack-client.js';
 import { Seg, Switch, Slider } from './shared';
 
 const TranslationSection = ({
@@ -17,22 +15,9 @@ const TranslationSection = ({
   useStreamOutput,
   setUseStreamOutput,
   inputCompletion,
-  setInputCompletion,
-  inputCompose,
-  setInputCompose
+  setInputCompletion
 }) => {
   const { t } = useTranslation();
-  // Whether the built-in general model is there to suggest words.
-  const [compose, setCompose] = useState({ usable: true, reason: null });
-  useEffect(() => {
-    let live = true;
-    translationService.getComposeCapability().then((c) => {
-      if (live) setCompose(c);
-    });
-    return () => {
-      live = false;
-    };
-  }, []);
   const customLanguages = useTranslationStore((s) => s.customLanguages);
   const removeCustomLanguage = useTranslationStore((s) => s.removeCustomLanguage);
 
@@ -97,19 +82,6 @@ const TranslationSection = ({
             onChange={setInputCompletion}
             label={t('translationSettings.inputCompletion')}
           />
-        </div>
-        <div style={{ marginTop: '12px' }}>
-          <Switch
-            checked={inputCompose}
-            onChange={setInputCompose}
-            disabled={!compose.usable}
-            label={t('translationSettings.inputCompose')}
-          />
-          {!compose.usable && (
-            <p className="setting-hint">
-              {t(compose.reason === 'mt-model' ? 'translationSettings.inputComposeNeedsGeneral' : 'translationSettings.inputComposeNoModel')}
-            </p>
-          )}
         </div>
 
         <label className="setting-label" style={{ marginTop: '18px' }}>{t('translationSettings.sameLangTitle')}</label>

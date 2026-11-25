@@ -1,4 +1,4 @@
-// The source box asks the built-in model for a word only after a typing
+// The source box asks the main process for a word only after a typing
 // pause, only when history has nothing, and shows an answer only for the
 // exact text it was asked about.
 
@@ -15,7 +15,7 @@ const { default: useInputCompletion } = await import('../../../src/components/Tr
 
 const setup = (props) => {
   const textareaRef = { current: null };
-  return renderHook((p) => useInputCompletion({ enabled: true, modelEnabled: true, history: [], favorites: [], textareaRef, onAccept: vi.fn(), ...p }), { initialProps: props });
+  return renderHook((p) => useInputCompletion({ enabled: true, history: [], favorites: [], textareaRef, onAccept: vi.fn(), ...p }), { initialProps: props });
 };
 
 beforeEach(() => {
@@ -27,21 +27,38 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe('model word suggestions in the source box', () => {
-  it('asks after the pause and shows the answer; focus warms the model', async () => {
+describe('word completion in the source box', () => {
+  it('inside a word asks after a short pause; focus warms the main process', async () => {
     compose.mockResolvedValue('sday');
     const { result } = setup({ text: 'moved to Thur' });
     act(() => result.current.handlers.onFocus());
     expect(composeWarm).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(140);
+    });
     expect(compose).not.toHaveBeenCalled();
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(300);
+      await vi.advanceTimersByTimeAsync(20);
     });
     expect(compose).toHaveBeenCalledWith('moved to Thur');
     expect(result.current.suffix).toBe('sday');
   });
 
-  it('history wins and the model is not asked', async () => {
+  it('after a space waits longer before asking', async () => {
+    compose.mockResolvedValue('you');
+    const { result } = setup({ text: 'Let me know if ' });
+    act(() => result.current.handlers.onFocus());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200);
+    });
+    expect(compose).not.toHaveBeenCalled();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(120);
+    });
+    expect(result.current.suffix).toBe('you');
+  });
+
+  it('history wins and nothing is asked', async () => {
     const { result } = setup({ text: 'hel', history: [{ sourceText: 'hello world' }] });
     act(() => result.current.handlers.onFocus());
     await act(async () => {
@@ -56,7 +73,7 @@ describe('model word suggestions in the source box', () => {
     const { result, rerender } = setup({ text: 'moved to Thur' });
     act(() => result.current.handlers.onFocus());
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(300);
+      await vi.advanceTimersByTimeAsync(200);
     });
     compose.mockResolvedValue('');
     rerender({ text: 'moved to Thurx' });
@@ -64,7 +81,7 @@ describe('model word suggestions in the source box', () => {
   });
 
   it('off means no request and no warm-up', async () => {
-    const { result } = setup({ text: 'moved to Thur', modelEnabled: false });
+    const { result } = setup({ text: 'moved to Thur', enabled: false });
     act(() => result.current.handlers.onFocus());
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1000);

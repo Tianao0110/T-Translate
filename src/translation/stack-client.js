@@ -198,8 +198,8 @@ class StackClient {
     }
   }
 
-  // Ghost-text compose for the source box: the text to show after `text`,
-  // '' when the built-in model is unsure or cannot run.
+  // Completion for the source box: the text to show after `text`, '' when
+  // nothing sure comes back.
   async compose(text) {
     const b = bridge();
     if (!b?.compose) return '';
@@ -212,27 +212,15 @@ class StackClient {
     }
   }
 
-  // Loads the model ahead of the first compose; { usable, reason }.
+  // Starts the predictor (and the model) ahead of the first completion.
   async composeWarm() {
     const b = bridge();
-    if (!b?.composeWarm) return { usable: false, reason: 'no-model' };
+    if (!b?.composeWarm) return { ok: false };
     try {
       return await b.composeWarm();
     } catch (e) {
       logger.error('compose warm IPC failed:', e);
-      return { usable: false, reason: 'no-model' };
-    }
-  }
-
-  // { usable, reason: null | 'no-model' | 'mt-model' } for the settings switch.
-  async getComposeCapability() {
-    const b = bridge();
-    if (!b?.composeCapability) return { usable: false, reason: 'no-model' };
-    try {
-      return await b.composeCapability();
-    } catch (e) {
-      logger.error('compose capability IPC failed:', e);
-      return { usable: false, reason: 'no-model' };
+      return { ok: false };
     }
   }
 

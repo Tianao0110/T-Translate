@@ -1,7 +1,7 @@
 // Ghost-text completion for the source box: the first history or favorites
 // entry that extends what was typed shows its remainder in grey over the
-// textarea; with none, and model suggestions on, the built-in model's guess
-// (the rest of the word, one more word) after a typing pause. Tab takes it,
+// textarea; with none, after a typing pause, the main process finishes the
+// word being typed or guesses the next one (stack:compose). Tab takes it,
 // Esc hides it until the text changes. The ghost layer copies the
 // textarea's font metrics and size at runtime so both wrap the same way.
 // Rendering is the panel's job.
@@ -9,7 +9,9 @@ import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import translationService from '../../../translation/stack-client.js';
 
 const MIN_CHARS = 2;
-const MODEL_PAUSE_MS = 300;
+// Typing pause before asking: inside a word (Windows predictor), after a space (model).
+const WORD_PAUSE_MS = 150;
+const SPACE_PAUSE_MS = 300;
 const MAX_SUFFIX = 300;
 const MIRRORED = [
   'fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'lineHeight', 'letterSpacing', 'wordSpacing',
@@ -45,36 +47,36 @@ export function findCompletion(typed, sources) {
   return null;
 }
 
-export default function useInputCompletion({ text, enabled, modelEnabled = false, history, favorites, textareaRef, onAccept }) {
+export default function useInputCompletion({ text, enabled, history, favorites, textareaRef, onAccept }) {
   const ghostRef = useRef(null);
   const [focused, setFocused] = useState(false);
   const [composing, setComposing] = useState(false);
   const [caretAtEnd, setCaretAtEnd] = useState(true);
   const [dismissedFor, setDismissedFor] = useState(null);
-  const [guess, setGuess] = useState(null); // { for: text, suffix } from the model
+  const [guess, setGuess] = useState(null); // { for: text, suffix } from stack:compose
 
   const candidate = useMemo(
     () => (enabled ? findCompletion(text, [history, favorites]) : null),
     [enabled, text, history, favorites]
   );
-  const modelSuffix = modelEnabled && guess && guess.for === text ? guess.suffix : '';
-  const best = candidate || modelSuffix;
+  const guessed = enabled && guess && guess.for === text ? guess.suffix : '';
+  const best = candidate || guessed;
   const suffix = best && focused && !composing && caretAtEnd && dismissedFor !== text ? best : '';
 
-  // Asks the model once typing pauses, only when history had nothing.
-  const wantModel = modelEnabled && !candidate && focused && !composing && caretAtEnd && dismissedFor !== text;
+  // Asks once typing pauses, only when history had nothing.
+  const wantGuess = enabled && !candidate && focused && !composing && caretAtEnd && dismissedFor !== text;
   useEffect(() => {
-    if (!wantModel) return undefined;
+    if (!wantGuess) return undefined;
     let live = true;
     const timer = setTimeout(async () => {
       const s = await translationService.compose(text);
       if (live) setGuess({ for: text, suffix: s });
-    }, MODEL_PAUSE_MS);
+    }, /[A-Za-z']$/.test(text) ? WORD_PAUSE_MS : SPACE_PAUSE_MS);
     return () => {
       live = false;
       clearTimeout(timer);
     };
-  }, [wantModel, text]);
+  }, [wantGuess, text]);
 
   const syncGhost = useCallback(() => {
     const ta = textareaRef.current;
@@ -115,7 +117,7 @@ export default function useInputCompletion({ text, enabled, modelEnabled = false
   const handlers = {
     onFocus: () => {
       setFocused(true);
-      if (modelEnabled) translationService.composeWarm();
+      if (enabled) translationService.composeWarm();
     },
     onBlur: () => setFocused(false),
     onCompositionStart: () => setComposing(true),

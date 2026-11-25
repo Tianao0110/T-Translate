@@ -191,7 +191,6 @@ const useTranslationStore = create(
       autoTranslate: false,
       autoTranslateDelay: 500,
       inputCompletion: true,
-      inputCompose: false,
       currentTranslation: {
         id: null,
         sourceText: "",
@@ -296,11 +295,6 @@ const useTranslationStore = create(
       setInputCompletion: (value) =>
         set((state) => {
           state.inputCompletion = value;
-        }),
-
-      setInputCompose: (value) =>
-        set((state) => {
-          state.inputCompose = value;
         }),
 
       setSourceText: (text) =>
@@ -525,7 +519,6 @@ const useTranslationStore = create(
           state.autoTranslate = false;
           state.autoTranslateDelay = 500;
           state.inputCompletion = true;
-          state.inputCompose = false;
           state.ocrStatus.engine = 'llm-vision';
         }),
 
@@ -854,7 +847,6 @@ const useTranslationStore = create(
         useStreamOutput: state.useStreamOutput,
         autoTranslateDelay: state.autoTranslateDelay,
         inputCompletion: state.inputCompletion,
-        inputCompose: state.inputCompose,
         languagePicker: state.languagePicker,
         customLanguages: state.customLanguages,
         // The secure-mode stash must survive a quit-while-secure.

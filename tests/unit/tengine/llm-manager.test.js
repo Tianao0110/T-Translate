@@ -278,16 +278,16 @@ describe('compose', () => {
     expect((await manager.composeUsable()).reason).toBe('no-model');
   });
 
-  it('sends the prompt and the typed fragment, and shows only whole words', async () => {
+  it('sends the text before the trailing space and shows the next whole word', async () => {
     const adapter = fakeAdapter();
-    adapter.generate.mockImplementation((req) => ({ reqId: 'c1', promise: Promise.resolve({ text: ' Thursday at', stop: 'unsure', stopPiece: ' three' }), cancel: vi.fn(), req }));
+    adapter.generate.mockImplementation(() => ({ reqId: 'c1', promise: Promise.resolve({ text: ' you have', stop: 'unsure', stopPiece: ' any' }), cancel: vi.fn() }));
     boot({ adapter });
-    const h = await manager.compose('The meeting was moved to Thur');
-    expect(await h.promise).toBe('sday at');
+    const h = await manager.compose('Let me know if ');
+    expect(await h.promise).toBe('you');
     const req = adapter.generate.mock.calls[0][0];
     expect(req.kind).toBe('compose');
-    expect(req.compose).toEqual({ fragment: ' Thur', minProb: 0.6 });
-    expect(req.prompt.endsWith('The meeting was moved to')).toBe(true);
+    expect(req.compose).toEqual({ fragment: ' ', minProb: 0.6 });
+    expect(req.prompt.endsWith('Let me know if')).toBe(true);
   });
 
   it('never runs on a translation-only model or for text it cannot continue', async () => {

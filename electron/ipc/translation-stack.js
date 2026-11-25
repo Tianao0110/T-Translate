@@ -5,13 +5,14 @@
 // Handlers return result objects with localized error strings and never
 // throw. Design notes: docs/design/ipc.md.
 
-const { ipcMain, net, BrowserWindow } = require('electron');
+const { app, ipcMain, net, BrowserWindow } = require('electron');
 const path = require('path');
 const { dataDir } = require('../platform/data-root');
 const crypto = require('crypto');
 const { CHANNELS } = require('../shared/channels');
 const { createSecureVault } = require('../security/secure-vault');
 const llmManager = require('../llm/llm-manager');
+const { createTextPredictor } = require('../platform/text-prediction');
 const makeLogger = require('../platform/logger');
 const logger = makeLogger('IPC:Stack');
 
@@ -318,18 +319,32 @@ function register(ctx) {
     return { success: true, count };
   });
 
-  // Ghost-text compose for the main window's source box (llm/compose.js):
-  // the built-in general model only, so typing never reaches a network
-  // provider. A newer call cancels the one still running; a slow one gives
-  // up. Text is never logged.
+  // Completion for the main window's source box (docs/design/renderer.md §1):
+  // the word being typed goes to the Windows predictor, the next word after
+  // a space to the built-in model when it is the first chat provider in the
+  // user's order. Never a network provider. A newer call cancels the one
+  // still running; a slow one gives up. Text is never logged.
   let composeRunning = null;
+  const textPredictor = createTextPredictor({ logger });
+  app.on('will-quit', () => textPredictor.stop());
   const fromMainWindow = (event) => {
     const main = ctx.getMainWindow?.();
     return !!main && event.sender === main.webContents;
   };
+  async function modelGuessesNext() {
+    if (!stack) return false;
+    try {
+      await stack.service.init();
+      const cap = stack.service.getChatCapability({ privacyMode: getPrivacyMode() });
+      return cap.available && cap.providerId === 'tengine';
+    } catch {
+      return false;
+    }
+  }
 
   ipcMain.handle(CHANNELS.STACK.COMPOSE, async (event, payload = {}) => {
     if (!fromMainWindow(event) || typeof payload.text !== 'string') return { success: false, suffix: '' };
+    const text = payload.text.slice(-COMPOSE_MAX_CHARS);
     const ticket = {
       cancelled: false,
       handle: null,
@@ -342,7 +357,12 @@ function register(ctx) {
     composeRunning = ticket;
     let timer = null;
     try {
-      const handle = await llmManager.compose(payload.text.slice(-COMPOSE_MAX_CHARS));
+      if (/[A-Za-z']$/.test(text)) {
+        const rest = await textPredictor.complete(text);
+        return { success: true, suffix: ticket.cancelled ? '' : rest };
+      }
+      if (!(await modelGuessesNext())) return { success: true, suffix: '' };
+      const handle = await llmManager.compose(text);
       ticket.handle = handle;
       if (ticket.cancelled) handle.cancel();
       timer = setTimeout(() => ticket.cancel(), COMPOSE_TIMEOUT_MS);
@@ -358,11 +378,11 @@ function register(ctx) {
   });
 
   ipcMain.handle(CHANNELS.STACK.COMPOSE_WARM, async (event) => {
-    if (!fromMainWindow(event)) return { usable: false, reason: 'refused' };
-    return llmManager.composeWarm();
+    if (!fromMainWindow(event)) return { ok: false };
+    textPredictor.warm().catch(() => {});
+    if (await modelGuessesNext()) await llmManager.composeWarm();
+    return { ok: true };
   });
-
-  ipcMain.handle(CHANNELS.STACK.COMPOSE_CAPABILITY, () => llmManager.composeUsable());
 
   // Local and read-only: the same-language judgment (stack/language-id.js).
   // null tells the caller to judge on its own.
