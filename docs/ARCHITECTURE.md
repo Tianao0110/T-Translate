@@ -66,7 +66,7 @@ t-translate/
 │   ├── llm/                    # 内置模型：llm-manager（文本槽 + 视觉槽 + 语音槽）、模型包扫描
 │   ├── packs/                  # 模型包公共层：model-pack-core（下载安装工厂）、model-root、旧目录迁移
 │   ├── security/               # secure-vault / secure-audit / history-vault / privacy-gate / url-policy
-│   ├── platform/               # 数据目录、日志、崩溃守卫、开机自启、右键打开、更新器、Win32 与多屏辅助
+│   ├── platform/               # 数据目录、日志、崩溃守卫、开机自启、右键打开、更新器、Win32 与多屏辅助、Windows 打字预测
 │   ├── policy/                 # engine-policy：内置模型健康 / 驻留策略的纯函数
 │   ├── tengine/                # T-Engine：引擎适配层与 llama.cpp 运行时绑定（见 T-ENGINE.md）
 │   └── services/               # 各引擎的 utilityProcess 宿主：audio-engine（audio-worker 分发 + asr-session / capture / tts / io）、ocr-host、llm-host
@@ -260,7 +260,7 @@ T-Engine 只报事实，不改产品行为；用哪个引擎、什么时候降�
 
 ### 平台层
 
-`electron/platform/`：`app-paths.js` 在启动最早期定数据目录（安装目录 `data`，不可写则用户目录），`crash-guard.js` 崩溃自愈与安全模式，`open-with.js` + `installer/installer.nsh` 右键菜单，`login-item.js` 开机自启，`time-zone.js` 系统时区认不出时的兜底，`native-helper.js` Win32 探测。设计说明：[design/main-process.md](design/main-process.md)。
+`electron/platform/`：`app-paths.js` 在启动最早期定数据目录（安装目录 `data`，不可写则用户目录），`crash-guard.js` 崩溃自愈与安全模式，`open-with.js` + `installer/installer.nsh` 右键菜单，`login-item.js` 开机自启，`time-zone.js` 系统时区认不出时的兜底，`native-helper.js` Win32 探测，`text-prediction.js` 主窗口原文框补半个词用的 Windows 打字预测（常驻一个 PowerShell 进程调 `TextPredictionGenerator`，不写盘，各隐私模式都可用；补词规则见 [design/renderer.md](design/renderer.md) 第 1 节）。设计说明：[design/main-process.md](design/main-process.md)。
 
 
 ## 命名规范

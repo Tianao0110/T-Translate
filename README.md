@@ -35,6 +35,7 @@ Privacy comes first: the app ships with its own local model, so one model file i
 | **Listen mode** | Live captions for whatever is playing, translated sentence by sentence; recognized on this computer, audio never written to disk; captions auto-saved |
 | **Browser extension** | T-Caption comes with the installer: web videos in Chrome / Edge get bilingual captions, recognized on this computer |
 | **Document translation** | PDF, Word, EPUB, TXT, Markdown, SRT, VTT, CSV, JSON; paragraph by paragraph, resumable |
+| **Typing help** | In the main window: grey hints finish your English words and phrases, misspellings are underlined, and one click fixes spelling and grammar |
 | **Local model** | Ships with Qwen3-1.7B: drop the file into a folder and it translates and summarizes, no other software needed |
 | **AI actions** | Summaries of long text, paragraph explanations, an explain mode in the floating window; custom actions can be imported |
 | **Glossary and style library** | Your term choices are kept automatically; rewrite a translation in the tone of a reference text |
